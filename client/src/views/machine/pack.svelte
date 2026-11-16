@@ -3,17 +3,6 @@
   // License, v. 2.0. If a copy of the MPL was not distributed with this
   // file, You can obtain one at https://mozilla.org/MPL/2.0/.
   // Copyright (c) 2026 2youg1 and the sprawling contributors
-
-  // The Rust tools pack: every cargo subcommand this repository calls,
-  // drawn as one row with one install control (`Sprawling/app/Spec.lean` §8-58).
-  //
-  // Each member is still its own item on the wire - detected, judged and
-  // installed on its own - so the one press hands the page's install walk
-  // the pack's missing members in table order, and the walk's steps show
-  // each one's progress and, when it fails, the log it wrote. A member
-  // this city cannot install here (kani has no Windows build) says so
-  // under its name rather than joining the walk.
-
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { DoctorItem, DoctorNewest } from "../../wire";
@@ -38,9 +27,7 @@
   const wanting = $derived(
     members.some((each) => !("present" in each.state) && each.need === "required"),
   );
-  // The pack is complete when every member this city can install here
-  // is here; a member only a person can install (kani on Windows) says
-  // so on its own line rather than keeping the whole pack "absent".
+
   const complete = $derived(
     members.every((each) => "present" in each.state || offerOf(each) === "by_hand"),
   );

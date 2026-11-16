@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The disabled ink is written only behind a variant that names a
-//! disabled state (Tools/xtask/Spec.lean §8-8a).
-//!
-//! `--color-text-disabled` aims at APCA Lc 30, about 2:1 on the light
-//! page: enough to tell a hand that a control will not answer, not enough
-//! for an eye to read a figure. Information a person reads - a cost, a
-//! time, a model name, a placeholder - takes `text-text-faint` or above.
-
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
@@ -46,8 +38,6 @@ pub(super) fn judge_disabled_ink(root: &Path) -> Result<Vec<Violation>, XtaskErr
 
 const RULE: &str = "the disabled ink is written only behind a variant that names a disabled state";
 
-/// The one-based lines that write the disabled ink without a disabled
-/// variant in front of it.
 pub(super) fn bare_uses(text: &str) -> Vec<usize> {
     text.lines()
         .enumerate()
@@ -59,8 +49,6 @@ pub(super) fn bare_uses(text: &str) -> Vec<usize> {
         .collect()
 }
 
-/// Whether the class token that ends where `before` ends carries a
-/// variant naming a disabled state.
 fn behind_disabled_variant(before: &str) -> bool {
     before
         .rsplit(|c: char| c.is_whitespace() || matches!(c, '"' | '\'' | '`' | '{' | '}'))

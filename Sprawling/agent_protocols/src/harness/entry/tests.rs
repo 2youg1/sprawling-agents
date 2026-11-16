@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The check derived from `Sprawling/agent_protocols/spec/Harness/Consent.lean`
-//! (`nothing_is_launched_before_consent`): the model leaves the digest a
-//! parameter and admits a `given` consent exactly when the recorded digest
-//! is the one recomputed from the spec. Here the real digest is fed, over
-//! every launch the generator reaches and every change to it.
-
 #![allow(clippy::unwrap_used, clippy::indexing_slicing, reason = "test code")]
 
 use proptest::prelude::*;
@@ -39,8 +33,6 @@ fn entry(launch: Launch) -> AgentEntry {
     }
 }
 
-/// One change to a launch: a word appended to the program, an argument
-/// added, split or dropped, an environment value changed.
 fn changed(launch: &Launch, how: u8, word: &str) -> Launch {
     let mut changed = launch.clone();
     match how % 4 {
@@ -59,8 +51,7 @@ fn changed(launch: &Launch, how: u8, word: &str) -> Launch {
 }
 
 proptest! {
-    /// The consent the card recorded starts exactly the spec it was
-    /// recorded for, and no spec changed after it.
+
     #[test]
     fn a_consent_admits_its_own_spec_and_no_changed_one(
         launch in launch(),

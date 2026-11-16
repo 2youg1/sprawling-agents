@@ -11,17 +11,11 @@
     reason = "test code"
 )]
 
-//! How a session opened and closed, as the rounds answer it: the lines
-//! around the turns, and the frozen facts the first of them names.
-
 use kernel::Ledger;
 use wire::{B3Hash, EventKind, Payload, RunId, TimeMs};
 
-/// The bytes a session froze for a Mayor called Cat, in the encoding
-/// `city::Naming` writes into the store.
 const NAMED_CAT: &[u8] = br#"{"person":null,"imported_from":null,"about":"","mayor":"Cat"}"#;
 
-/// Writes one run's lines into a fresh city and answers its rounds.
 fn rounds_of(
     dir: &std::path::Path,
     run: RunId,
@@ -75,19 +69,13 @@ fn rounds_of(
     *answer
 }
 
-/// A conversation has a first line and a last line, and neither is a
-/// turn: the task the person gave, and the word the run froze with. The
-/// first carries the frozen facts a page heads the session with - its
-/// policy, its effort and the names its session froze - read from the
-/// line and from the store, never from today's settings.
 #[test]
 fn the_opening_carries_the_effort_and_the_names_the_run_froze() {
     let dir = tempfile::tempdir().unwrap();
     let answer = rounds_of(
         dir.path(),
         RunId::from_bytes([8u8; 16]),
-        // A whole locator, because `run_started` states one and
-        // `kernel::event::record::RunStarted` parses it.
+
         serde_json::json!({
             "task": "plan the week",
             "goal": "a roadmap",
@@ -128,8 +116,6 @@ fn the_opening_carries_the_effort_and_the_names_the_run_froze() {
     assert_eq!(closing.at, TimeMs::new(12));
 }
 
-/// A version the store does not hold names nobody: the page falls back to
-/// the address rather than to whatever the names are today.
 #[test]
 fn a_naming_the_store_lost_answers_no_names() {
     let dir = tempfile::tempdir().unwrap();
@@ -143,9 +129,6 @@ fn a_naming_the_store_lost_answers_no_names() {
     assert_eq!((opening.names, opening.effort), (None, None));
 }
 
-/// A delegated child's opening names the run that dispatched it, read
-/// from its `run_started.parent`, so its page can link back to the
-/// parent's session (`Sprawling/wire/spec/Answer/Sessions.lean` D40).
 #[test]
 fn a_delegated_childs_opening_names_its_parent_run() {
     let dir = tempfile::tempdir().unwrap();

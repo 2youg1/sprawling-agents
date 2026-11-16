@@ -3,22 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a credential this city already keeps does when the form
-//! sends an empty box (`Sprawling/app/Spec.lean` §8-81).
-
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// An empty key box leaves the credential this city keeps where it is
-/// (`Sprawling/app/Spec.lean` §8-81).
-///
-/// The form holds the vault's reference only while it is mounted, so a
-/// person who opens the settings page again and presses "look" or
-/// "attach" says `secret: None` about an endpoint that has a key.
-/// Reading that as "no credential" asks the provider with no
-/// `Authorization` header at all - which answers 401, and a person
-/// reads that as their key being wrong - and then writes the endpoint
-/// back with its key gone.
 #[test]
 fn an_empty_key_keeps_the_credential_this_city_has_archived() {
     let dir = tempfile::tempdir().unwrap();
@@ -51,8 +38,7 @@ fn an_empty_key_keeps_the_credential_this_city_has_archived() {
     worker
         .handle(attach(Some("secret:kept/key"), b"attach"))
         .unwrap();
-    // The page was closed and opened again: the form has no reference
-    // to send, and both of its buttons say so.
+
     worker
         .handle(wire::Command::ProbeEndpoint {
             name: wire::ProviderName::parse("kept").unwrap(),

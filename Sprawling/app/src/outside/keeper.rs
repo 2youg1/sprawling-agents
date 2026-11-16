@@ -3,27 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The remote door as this process keeps it (`Sprawling/app/spec/Outside/Conduit.lean` §8-139):
-//! the one `remote_access::door::Door`, the city's signing key, the
-//! route, the device table and the ledger lines, behind one lock.
-//!
-//! [`Doorway`] is the handle every caller shares - the console's thread
-//! and each connection the remote listener answers - so a state change
-//! and the line that records it happen under the same lock and in the
-//! same order. The door decides; this module carries out what it
-//! decided: it writes the five lines (`Sprawling/kernel/Spec.lean` §8-81),
-//! keeps the device table on disk, and opens and closes the route.
-//!
-//! Time and randomness come in as [`Senses`], made in `bin::assembly`,
-//! so a test drives the door on a counted clock.
-//!
-//! The point a reader most often gets wrong: a device pins the city key it
-//! paired with, so the key outlives this process exactly as long as the
-//! vault keeps it ([`CityKey`]), and replacing it unpairs every device.
-//! A seed the vault holds but that does not read back does not stop the
-//! door from being kept: the refusal is kept instead, every invitation and
-//! handshake answers with it, and `/remote replace-key` still works.
-
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -45,51 +24,43 @@ mod sessions;
 pub(crate) use city_key::CityKey;
 pub(crate) use pairing::Inviting;
 
-/// The wall clock, read where `bin::assembly` says.
 pub(crate) type Clock = Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>;
-/// This machine's random source, filling the slice it is given.
+
 pub(crate) type Entropy = Arc<dyn Fn(&mut [u8]) -> Result<(), AxError> + Send + Sync>;
-/// Builds the route one opening of the door goes out through, closed
-/// (`Sprawling/app/spec/Assembly.lean` §8-151): asked once per `open`, so the route is the
-/// one the city's configuration names at that moment.
+
 pub(crate) type Choosing = Box<dyn FnMut() -> Result<Box<dyn Route + Send>, AxError> + Send>;
 
-/// What the door reads this machine through.
 #[derive(Clone)]
 pub(crate) struct Senses {
     pub(crate) clock: Clock,
     pub(crate) entropy: Entropy,
 }
 
-/// What a door is kept with, settled before it is.
 pub(crate) struct Keeping {
-    /// Where the device table lives: `CityLayout::devices`.
+
     pub(crate) devices: PathBuf,
-    /// Where the five lines go: the worker's relay in a served city.
+
     pub(crate) ledger: Box<dyn Ledger + Send>,
-    /// How each opening of the door builds its route.
+
     pub(crate) choose: Choosing,
     pub(crate) senses: Senses,
-    /// Where the city's signing key lives.
+
     pub(crate) key: CityKey,
 }
 
-/// Which paired devices to revoke.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Revoking {
-    /// Every device with this name.
+
     Named(String),
     All,
 }
 
-/// Whether the door is open after a look at the clock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Phase {
     Open,
     Closed,
 }
 
-/// The handle the console and every remote connection share.
 #[derive(Clone)]
 pub(crate) struct Doorway {
     kept: Arc<Mutex<Kept>>,
@@ -98,7 +69,7 @@ pub(crate) struct Doorway {
 
 struct Kept {
     door: Door,
-    /// The city's signing key, or why the vault's seed did not read back.
+
     city: Result<SigningKey, AxError>,
     key: CityKey,
     devices: PathBuf,
@@ -107,9 +78,6 @@ struct Kept {
     standing: Option<Standing>,
 }
 
-/// What an open door stands on: the open route and its answer, and the
-/// listener answering on its loopback port, which ends when this is
-/// dropped.
 struct Standing {
     route: Box<dyn Route + Send>,
     opened: Opened,
@@ -117,12 +85,7 @@ struct Standing {
 }
 
 impl Doorway {
-    /// The door this process starts with: closed, holding the devices
-    /// the table on disk names.
-    ///
-    /// # Errors
-    /// An unreadable device table; a random source that refuses. A city
-    /// key the vault cannot give back is kept as its refusal instead.
+
     pub(crate) fn keep(keeping: Keeping) -> Result<Doorway, AxError> {
         let Keeping {
             devices,
@@ -148,13 +111,6 @@ impl Doorway {
         })
     }
 
-    /// Opens the route to `local` and the door for `lasting`, and writes
-    /// `remote_opened`.
-    ///
-    /// # Errors
-    /// The door is open already; no route can be built from what the
-    /// city chose; the route does not open; the ledger refuses the line,
-    /// in which case the route is closed again.
     pub(crate) fn open(&self, local: SocketAddr, lasting: Lasting) -> Result<Opened, AxError> {
         let now = (self.senses.clock)()?;
         let epoch = Epoch::from_entropy(drawn(&self.senses)?);
@@ -187,14 +143,10 @@ impl Doorway {
         Ok(opened)
     }
 
-    /// This machine's clock and random source, which the door's wire
-    /// verbs draw their confirmation codes from as well.
     pub(crate) fn senses(&self) -> &Senses {
         &self.senses
     }
 
-    /// Keeps `listening` for as long as the door stays open, and drops it
-    /// at once when the door already closed.
     pub(crate) fn attend(&self, listening: Box<dyn Send>) -> Result<(), AxError> {
         let mut kept = self.kept()?;
         if let Some(standing) = kept.standing.as_mut() {
@@ -203,21 +155,12 @@ impl Doorway {
         Ok(())
     }
 
-    /// Closes the door and its route, and writes `remote_closed`. A door
-    /// already closed answers `Phase::Closed` and writes nothing.
-    ///
-    /// # Errors
-    /// The ledger refuses the line, or the route does not close.
     pub(crate) fn close(&self, why: RemoteClosing) -> Result<Phase, AxError> {
         let now = (self.senses.clock)()?;
         self.kept()?.close(now, why)?;
         Ok(Phase::Closed)
     }
 
-    /// Closes the door once its time is up, as `Expired`.
-    ///
-    /// # Errors
-    /// As [`Self::close`].
     pub(crate) fn tick(&self) -> Result<Phase, AxError> {
         let now = (self.senses.clock)()?;
         let mut kept = self.kept()?;
@@ -234,19 +177,10 @@ impl Doorway {
         }
     }
 
-    /// Every paired device.
-    ///
-    /// # Errors
-    /// The lock was poisoned.
     pub(crate) fn devices(&self) -> Result<Vec<Device>, AxError> {
         Ok(self.kept()?.door.devices().to_vec())
     }
 
-    /// Revokes the chosen devices, keeps the table, and writes one
-    /// `device_revoked` each. Their sessions end with them.
-    ///
-    /// # Errors
-    /// A name no paired device has; a table that cannot be written.
     pub(crate) fn revoke(&self, which: &Revoking) -> Result<Vec<Device>, AxError> {
         let now = (self.senses.clock)()?;
         let mut kept = self.kept()?;
@@ -290,8 +224,7 @@ impl Doorway {
 }
 
 impl Kept {
-    /// Revokes `chosen`, keeps the table, and writes one `device_revoked`
-    /// each.
+
     fn revoked(&mut self, now: TimeMs, chosen: Vec<Device>) -> Result<Vec<Device>, AxError> {
         for device in &chosen {
             self.door.revoke(device.id)?;
@@ -307,7 +240,6 @@ impl Kept {
         Ok(chosen)
     }
 
-    /// The city's signing key, or the refusal its seed was read with.
     fn city(&self) -> Result<&SigningKey, AxError> {
         self.city.as_ref().map_err(Clone::clone)
     }
@@ -322,8 +254,7 @@ impl Kept {
             return Ok(());
         };
         self.door.close();
-        // The listener ends before the route goes, so no connection is
-        // answered on a door already shut.
+
         drop(listening);
         let closed_route = route.close();
         let who = match why {

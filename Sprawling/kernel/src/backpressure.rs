@@ -3,21 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Admission control: the city-wide shedding posture.
-//! One function serves every queue-shaped resource — signal queues and fd
-//! headroom alike; capacity semantics belong to the caller. Queues and
-//! counters live in storage::queue, never here.
-//! The part `Sprawling/kernel/spec/Backpressure.lean` specifies this module.
-
-/// A queue's occupancy snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct QueueStats {
     pub depth: u64,
     pub capacity: u64,
 }
 
-/// What admitting this item would cost: one slot for a Signal, more for
-/// a new-Run fd reservation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ItemMeta {
     pub cost: u64,
@@ -28,18 +19,12 @@ pub enum ShedReason {
     CapacityExhausted,
 }
 
-/// Deliberately exhaustive: a new admission outcome must force every
-/// caller to decide.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Admission {
     Admit,
     Shed { reason: ShedReason },
 }
 
-/// Decides whether the queue admits one more item. Pure and total:
-/// `depth + cost <= capacity` admits; checked arithmetic, overflow sheds
-/// (fail-closed). Shedding refuses new items only — starving what is
-/// already queued is a liveness property and citysim's to assert.
 pub fn admit(stats: &QueueStats, item: &ItemMeta) -> Admission {
     match stats.depth.checked_add(item.cost) {
         Some(total) if total <= stats.capacity => Admission::Admit,
@@ -51,10 +36,6 @@ pub fn admit(stats: &QueueStats, item: &ItemMeta) -> Admission {
 
 #[cfg(kani)]
 mod verification {
-    //! V5: admission is total, monotone — a shallower queue never makes
-    //! the same item harder to admit — and fail-closed when the sum
-    //! overflows. Both harnesses range over every `u64`, and the
-    //! arithmetic is linear, so CBMC returns in under a minute.
 
     use super::*;
 
@@ -84,10 +65,6 @@ mod verification {
         }
     }
 
-    /// Fail-closed at the top of the range: whenever admitting the item
-    /// would carry the queue past `u64::MAX`, the answer is Shed. The
-    /// `#[test]` beside it fixes the depth at `u64::MAX`; this holds for
-    /// every depth, capacity and cost whose sum overflows.
     #[kani::proof]
     fn an_overflowing_sum_never_admits() {
         let stats = QueueStats {
@@ -144,12 +121,12 @@ mod tests {
                 reason: ShedReason::CapacityExhausted
             }
         );
-        // Zero-cost probes still fit a full-but-not-overflowing queue.
+
         assert_eq!(admit(&stats, &ItemMeta { cost: 0 }), Admission::Admit);
     }
 
     proptest! {
-        /// Kani mirror: monotone in depth.
+
         #[test]
         fn shallower_is_never_harder(capacity in any::<u64>(), deep in any::<u64>(),
                                      delta in any::<u64>(), cost in any::<u64>()) {
@@ -162,7 +139,6 @@ mod tests {
             }
         }
 
-        /// Kani mirror: a sum past `u64::MAX` sheds rather than wraps.
         #[test]
         fn an_overflowing_sum_sheds(capacity in any::<u64>(), depth in any::<u64>(),
                                     cost in any::<u64>()) {

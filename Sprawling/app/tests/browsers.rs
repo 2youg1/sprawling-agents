@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A run offered the browser the worker was handed
-//! (`Sprawling/app/Spec.lean` §8-45-2).
-//!
-//! The building's rules ask for a browser, and the worker was handed a
-//! source of browser tools that answers with one scripted tool. A worker
-//! that still built its own would offer the model the host's browser
-//! tool under its own name, and never the scripted one.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -24,9 +16,7 @@ use std::sync::{Arc, Mutex};
 use kernel::{
     Address, AxError, ContentBlock, IdemKey, Model, ModelRequest, ModelReturn, RunId, Seq,
 };
-// The city is formed with an in-memory vault, because these tests are
-// about the worker and must not write to the credential service of the
-// machine that runs them.
+
 use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
@@ -34,8 +24,6 @@ const LAB: &str = "lab";
 const MODEL: &str = "scripted";
 const HANDED: &str = "scripted_browser";
 
-/// Keeps the name of every tool it is offered, in its tool list or its
-/// dormant index, and ends the run on its first turn.
 struct Listening(Arc<Mutex<Vec<String>>>);
 
 impl Model for Listening {
@@ -46,8 +34,7 @@ impl Model for Listening {
                 .iter()
                 .map(|tool| tool.name.as_str().to_owned()),
         );
-        // A tool outside the mode's core is offered as a line of the
-        // dormant index (`Sprawling/runtime/Spec.lean` §8-60).
+
         self.0.lock().unwrap().extend(
             req.chat
                 .system
@@ -83,7 +70,6 @@ impl accounting::ModelFactory for Listeners {
     }
 }
 
-/// A browser that opens nothing: it is only ever listed.
 struct Scripted(kernel::ToolMeta);
 
 impl kernel::Tool for Scripted {
@@ -99,7 +85,6 @@ impl kernel::Tool for Scripted {
     }
 }
 
-/// Answers every building that asks for a browser with the scripted one.
 fn scripted(
     _city_root: &std::path::Path,
     _origin: &storage::BlockOrigin,
@@ -122,8 +107,6 @@ fn scripted(
     })
 }
 
-/// A loopback address nothing listens on: bound once for a free port,
-/// then released.
 fn refusing_url() -> String {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -206,8 +189,6 @@ fn a_run_is_offered_the_browser_the_worker_was_handed() {
         model: None,
     });
 
-    // A browser is filed under `computer`, one line of the dormant
-    // index (`Sprawling/runtime/Spec.lean` §8-60).
     let names = offered.lock().unwrap().clone();
     assert!(
         names.iter().any(|name| name == "computer (1)"),

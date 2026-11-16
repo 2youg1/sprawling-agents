@@ -3,33 +3,21 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A command line becomes an `Invocation`, or a `LineError` naming the
-//! word that could not be read (`Sprawling/app/spec/Main/Grammar.lean` §8-89). Pure: it reads
-//! the command table and the words, and touches nothing else. The
-//! precedence below is proved in `Sprawling/app/spec/Main/Grammar.lean`.
-//!
-//! `--help`/`-h` and `--version`/`-V` win wherever they stand among
-//! sprawling's own words, so no verb can act on a request for its help.
-//! Those words end at the first `--`: what follows belongs to the
-//! command a verb such as `gauge` runs (`Sprawling/app/spec/Main.lean` §8-129-4).
-
 use super::verbs::{AfterDashes, Need, Row, Takes, VERBS, Verb};
 
-/// What a command line asks for.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Invocation {
-    /// No words at all: the first screen.
+
     FirstScreen,
-    /// `help`, or `--help` with no verb.
+
     Overview,
-    /// `<verb> --help` or `help <verb>`.
+
     Help(Verb),
-    /// `--version` anywhere; `version` is an alias of `status`.
+
     Version,
     Run(Verb, Arguments),
 }
 
-/// The words a verb was given, sorted by the table.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(super) struct Arguments {
     positionals: Vec<String>,
@@ -38,17 +26,15 @@ pub(super) struct Arguments {
 }
 
 impl Arguments {
-    /// The nth positional argument, counted from one.
+
     pub(super) fn positional(&self, nth: usize) -> Option<&String> {
         self.positionals.get(nth.checked_sub(1)?)
     }
 
-    /// Whether the flag was given.
     pub(super) fn has(&self, flag: &str) -> bool {
         self.flags.iter().any(|(name, _)| *name == flag)
     }
 
-    /// The value a value-taking flag was given; the last one wins.
     pub(super) fn value(&self, flag: &str) -> Option<&str> {
         self.flags
             .iter()
@@ -57,14 +43,11 @@ impl Arguments {
             .and_then(|(_, value)| value.as_deref())
     }
 
-    /// The words after the first `--`, exactly as given: `None` when the
-    /// line has no `--`, empty when nothing follows it.
     pub(super) fn after_dashes(&self) -> Option<&[String]> {
         self.after_dashes.as_deref()
     }
 }
 
-/// A command line this binary cannot read. Every variant exits 2.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum LineError {
     UnknownVerb {
@@ -117,10 +100,6 @@ fn guess(nearest: &[&str]) -> String {
     }
 }
 
-/// Reads the words after the binary's name.
-///
-/// # Errors
-/// `LineError` names the word that could not be read and what was near it.
 pub(super) fn parse(words: &[String]) -> Result<Invocation, LineError> {
     let own = words.split(|word| word == "--").next().unwrap_or(&[]);
     if own.iter().any(|word| word == "--version" || word == "-V") {
@@ -144,10 +123,6 @@ pub(super) fn parse(words: &[String]) -> Result<Invocation, LineError> {
     arguments(named, rest).map(|arguments| Invocation::Run(named.verb, arguments))
 }
 
-/// The row `first` names, or `first` and the word after it name, and the
-/// words left after the name. A row whose name is two words
-/// (`playback export`) is named by two; every other row by one
-/// (`Sprawling/app/spec/Main.lean` §8-126).
 fn find<'words>(
     first: &str,
     rest: &'words [String],
@@ -245,9 +220,6 @@ fn arguments(row: &Row, words: &[String]) -> Result<Arguments, LineError> {
     }
 }
 
-/// The known names sharing the longest prefix (up to four characters)
-/// with what was typed: a short list a person can read, not one winner
-/// they then have to doubt.
 pub(super) fn nearest<'name>(
     typed: &str,
     known: impl Iterator<Item = &'name str> + Clone,

@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which thinking levels one (Endpoint, model) offers, the level one
-//! request is sent, and the refusal of an explicit level outside the
-//! offer (`Sprawling/gateway/spec/Provider/Thinking.lean` §8-39, gateway D35).
-//!
-//! The ladder is climbed once per (Endpoint, model): the upstream's own
-//! model list first, then the preset table's documented levels, then
-//! nobody. The first rung that states anything answers whole, so an
-//! offer is never a combination no single source stated.
-
 pub(crate) mod encoding;
 
 use kernel::event::record::ThinkingStatement;
@@ -20,10 +11,6 @@ use kernel::{AxCode, AxError, Effort};
 use super::preset::PresetThinking;
 use crate::router::AttachedEndpoint;
 
-/// A set of thinking levels, ascending by the city's order.
-///
-/// `Effort::None` has no bit: turning thinking off is not a level, so
-/// inserting it leaves the set unchanged and no offer can carry it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct EffortSet(u8);
 
@@ -50,7 +37,6 @@ impl EffortSet {
         self.0 == 0
     }
 
-    /// The levels in the city's ascending order.
     pub fn iter(self) -> impl Iterator<Item = Effort> {
         Effort::ALL
             .into_iter()
@@ -70,7 +56,6 @@ fn bit(level: Effort) -> u8 {
     }
 }
 
-/// Whether one setting is accepted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Switch {
     Allowed,
@@ -78,44 +63,38 @@ pub enum Switch {
     Unknown,
 }
 
-/// The rung of the ladder an offer came from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OfferSource {
-    /// The person stated the levels. No attach form takes them yet, so
-    /// [`ThinkingOffer::climb`] starts at the upstream; the word exists
-    /// because the wire already spells it.
+
     Person,
     Upstream,
     Preset,
     Unknown,
 }
 
-/// What one request asks of the model's thinking. Absence writes no
-/// thinking field at all.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ask {
     Level(Effort),
-    /// Thinking on, for a model with a switch and no levels.
+
     On,
 }
 
-/// The thinking levels one (Endpoint, model) offers, and who said so.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ThinkingOffer {
     pub levels: EffortSet,
-    /// Whether a model with no levels may be asked to think.
+
     pub on: Switch,
-    /// The level the source says the model uses when sent none.
+
     pub default: Option<Effort>,
-    /// Whether the source says the model thinks when sent nothing.
+
     pub default_on: Option<bool>,
     pub from: OfferSource,
-    /// The page a preset rung read its levels from.
+
     pub source: Option<&'static str>,
 }
 
 impl ThinkingOffer {
-    /// The offer nothing states.
+
     pub const UNKNOWN: ThinkingOffer = ThinkingOffer {
         levels: EffortSet(0),
         on: Switch::Unknown,
@@ -125,7 +104,6 @@ impl ThinkingOffer {
         source: None,
     };
 
-    /// The first rung that states anything answers whole.
     #[must_use]
     pub fn climb(
         upstream: Option<&ThinkingStatement>,
@@ -156,10 +134,6 @@ impl ThinkingOffer {
         }
     }
 
-    /// What one request is sent, from the level stored or inherited for
-    /// it: that level when offered, else `high` when offered, else the
-    /// stated default when offered, else thinking on for a model with a
-    /// switch and no levels, else nothing. Never a neighbouring level.
     #[must_use]
     pub fn ask(&self, stored: Option<Effort>) -> Option<Ask> {
         match stored {
@@ -181,12 +155,6 @@ impl ThinkingOffer {
         }
     }
 
-    /// Refuses a level given explicitly for one request that this
-    /// (Endpoint, model) does not offer. A stored preference is never
-    /// refused here: it goes through [`Self::ask`] instead.
-    ///
-    /// # Errors
-    /// `E_CONFIG_INVALID`, naming the model and the levels it offers.
     pub fn admit(&self, explicit: Option<Effort>, model: &str) -> Result<(), AxError> {
         let Some(level) = explicit else {
             return Ok(());
@@ -212,8 +180,6 @@ impl ThinkingOffer {
     }
 }
 
-/// The offer of one model at one attached endpoint: the row's own
-/// statement, then the preset table's.
 #[must_use]
 pub fn offer_for(endpoint: &AttachedEndpoint, model: &str) -> ThinkingOffer {
     let said = endpoint
@@ -248,9 +214,7 @@ mod tests {
     }
 
     proptest! {
-        /// The five properties `Sprawling/gateway/spec/Provider/Thinking.lean`
-        /// proves, over every subset of the seven words, every switch,
-        /// every default and every stored and explicit level.
+
         #[test]
         fn the_ladder_keeps_the_lean_properties(
             bits in 0u8..64,
@@ -282,7 +246,6 @@ mod tests {
         }
     }
 
-    /// `none` is never a level: inserting it leaves a set unchanged.
     #[test]
     fn turning_thinking_off_is_never_offered() {
         assert_eq!(EffortSet::of(&[Effort::None]), EffortSet::default());

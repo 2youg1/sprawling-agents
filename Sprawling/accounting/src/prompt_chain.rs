@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The conventions a run at an address is sent, and how each one is
-//! read: through the read bound its building gives, the judgement the
-//! `read` tool gives a path (`Sprawling/accounting/Spec.lean` §8-38).
-//!
-//! The freeze and the layers answer both read here, so what a page says
-//! the next run receives is what the next run receives. A prefix is sent
-//! to a provider, and a run can make links in its room: reading these
-//! files past the read bound would be a second path out of it.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -19,32 +10,23 @@ use std::sync::Arc;
 
 use kernel::{Address, AxCode, AxError};
 
-/// What the person reads in a refusal of one convention file.
 const ACTION: &str = "read a project's conventions";
 
-/// One `AGENTS.md` a slot may carry: where it is, the heading it is
-/// given, and whose conventions the heading says they are.
 pub(crate) struct Convention {
     pub(crate) path: PathBuf,
     pub(crate) heading: String,
     pub(crate) whose: &'static str,
 }
 
-/// How one convention file reads for the next run.
 pub(crate) enum Reading {
-    /// Sent, with these bytes.
+
     Sent(Vec<u8>),
-    /// Not there.
+
     Absent,
-    /// There and not sent, for this reason: a directory, or a link the
-    /// read bound refuses to follow.
+
     Withheld(String),
 }
 
-/// The building slot's conventions: the workspace's copy first and the
-/// building's after it, so the one nearest the work is read last.
-/// Matched by exact name in the building's own root: an address a reader
-/// cannot predict from the rule is an address nobody can check.
 pub(crate) fn building_conventions(city_root: &Path, building: &Address) -> [Convention; 2] {
     [
         Convention {
@@ -61,12 +43,6 @@ pub(crate) fn building_conventions(city_root: &Path, building: &Address) -> [Con
     ]
 }
 
-/// The conventions of every room between the building's root and `addr`,
-/// for the end of the resident slot, the one nearest the building first.
-///
-/// # Errors
-/// A level the address grammar refuses, which a parsed `addr` cannot
-/// produce.
 pub(crate) fn room_conventions(
     city_root: &Path,
     addr: &Address,
@@ -82,19 +58,6 @@ pub(crate) fn room_conventions(
         .collect())
 }
 
-/// Reads one convention file for a run of `building`.
-///
-/// The entry itself is looked at first: not there is `Absent`, and a
-/// directory is withheld, where reading it would refuse every run of the
-/// room. Anything else is opened through `runtime::BoundReader` with the
-/// building as home, so a link that leads out of the city, into a
-/// confidential building or into a reserved subtree is withheld with the
-/// bound's own reason.
-///
-/// # Errors
-/// `E_STORAGE_FATAL` naming the path for a file that is there and will
-/// not open or read: the project wrote those conventions down, and a run
-/// sent without them would follow a prompt nobody chose.
 pub(crate) fn read_convention(
     city_root: &Path,
     building: &Address,
@@ -119,9 +82,6 @@ enum ConventionOpen {
     Withheld(String),
 }
 
-/// Opens one convention through the read bound shared by the freeze,
-/// the layers answer and nested reads. Only the caller's error policy
-/// differs after this point.
 fn open_convention(
     city_root: &Path,
     bound: runtime::ReadBound,
@@ -160,9 +120,6 @@ fn open_convention(
     }
 }
 
-/// Reads a nested convention with a bounded retained prefix. The rest
-/// is still walked to EOF: an invalid sequence anywhere withholds the
-/// rule, and `dropped` is the exact number of source bytes not retained.
 fn read_nested(
     scope: &RuleScope,
     path: &Path,
@@ -209,23 +166,13 @@ fn read_nested(
     if halted() || !pending.is_empty() {
         return None;
     }
-    // The whole stream is valid here. Only the retained prefix can end
-    // in an incomplete codepoint, so cut that prefix at the valid
-    // boundary rather than dropping the rule entirely.
+
     let boundary = std::str::from_utf8(&text).map_or_else(|err| err.valid_up_to(), |_| text.len());
     text.truncate(boundary);
     let dropped = total.saturating_sub(u64::try_from(text.len()).unwrap_or(u64::MAX));
     String::from_utf8(text).ok().map(|text| (text, dropped))
 }
 
-/// What a run of `home` may read by a path: the read bound, closed over
-/// the building and this city's rules (`Sprawling/city/Spec.lean` §8-2).
-///
-/// Another building's rules are read each time a path lands in it, not
-/// here, so a run that stays in its own building never pays for them,
-/// and a building made confidential after this dispatch is closed from
-/// that moment (city D2). What was read stays while the file's stamp
-/// holds (city D3).
 pub(crate) fn read_bound(city_root: &Path, home: Address) -> runtime::ReadBound {
     let rules = city::RulesCache::new(city_root);
     Arc::new(move |target: &Address| {
@@ -236,7 +183,6 @@ pub(crate) fn read_bound(city_root: &Path, home: Address) -> runtime::ReadBound 
     })
 }
 
-/// Where a run looks for conventions below its own room.
 #[derive(Clone)]
 pub(crate) struct RuleScope {
     pub(crate) city_root: PathBuf,
@@ -245,8 +191,6 @@ pub(crate) struct RuleScope {
     pub(crate) bound: runtime::ReadBound,
 }
 
-/// Discovers candidates without recording delivery. The ordered account
-/// decides which of them becomes evidence.
 pub(crate) fn nested_rules(
     scope: RuleScope,
     context: &runtime::RuleContext,
@@ -299,7 +243,6 @@ pub(crate) fn nested_rules(
     candidates
 }
 
-/// Per-run rule delivery, confirmed only after exchange compaction.
 #[derive(Default)]
 pub(crate) struct RuleDelivery {
     pub(crate) delivered: BTreeSet<Address>,
@@ -307,7 +250,7 @@ pub(crate) struct RuleDelivery {
 }
 
 impl RuleDelivery {
-    /// The rooms discovery must not spend another read or byte on.
+
     pub(crate) fn seen(&self) -> BTreeSet<Address> {
         self.delivered
             .iter()
@@ -316,8 +259,6 @@ impl RuleDelivery {
             .collect()
     }
 
-    /// Answers one call with its selected candidates and remembers their
-    /// rooms on the open wave.
     pub(crate) fn answer(
         &mut self,
         call: &str,
@@ -381,8 +322,6 @@ impl RuleDelivery {
         selected
     }
 
-    /// Stages a cached final answer for the same compaction decision as
-    /// any newly produced answer. Its bytes are not recomputed.
     pub(crate) fn replay(&mut self, call: &str, result: &kernel::Payload) {
         let rooms = result
             .as_map()
@@ -396,9 +335,6 @@ impl RuleDelivery {
         self.pending.insert(call.to_owned(), rooms);
     }
 
-    /// Confirms only rules whose whole result survived exchange
-    /// compaction. Pending state from shortened or unadmitted calls is
-    /// discarded, so a later read may deliver those rules again.
     pub(crate) fn complete_wave(&mut self, shortened: &BTreeSet<String>) {
         for (call, rooms) in std::mem::take(&mut self.pending) {
             if !shortened.contains(&call) {
@@ -408,15 +344,6 @@ impl RuleDelivery {
     }
 }
 
-/// The city's own spelling of a path inside it.
-///
-/// The path comes from `city`, which is the authority for where a
-/// building's files sit; this only turns it back into the address a
-/// reader opens it by, so nothing here repeats that layout.
-///
-/// # Errors
-/// `E_INVALID_ARGS` for a path outside the city root or one the address
-/// grammar refuses.
 pub(crate) fn addressed(city_root: &Path, path: &Path) -> Result<Address, AxError> {
     let relative = path.strip_prefix(city_root).map_err(|_| {
         AxError::failure(
@@ -446,7 +373,6 @@ pub(crate) fn addressed(city_root: &Path, path: &Path) -> Result<Address, AxErro
     Address::parse(&spelled)
 }
 
-/// The refusal for a convention file that is there and does not read.
 fn unread(path: &Path, err: &std::io::Error) -> AxError {
     AxError::failure(
         AxCode::StorageFatal,

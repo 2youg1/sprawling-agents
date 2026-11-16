@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Two folds started together on one pass over the ledger, from the
-//! earlier of their two snapshots (`Sprawling/app/Spec.lean` §8-122). That the pass
-//! gives each fold what its own whole fold gives is `twoCutsOnePass` in
-//! `Sprawling/storage/spec/Snapshot.lean`.
-
 use std::path::Path;
 
 use kernel::{AxError, Seq};
@@ -18,38 +13,22 @@ use super::{
     Candidate, FoldStart, SnapshotFold, Started, candidate, city_root_of, last_line, whole,
 };
 
-/// Two folds started on one pass, how many lines that pass checked, and
-/// where it began.
 pub struct BothStarted<A, B> {
     pub first: Started<A>,
     pub second: Started<B>,
-    /// Lines checked one by one through `LineCheck` on this pass.
+
     pub checked: u64,
     pub from: TailFrom,
 }
 
-/// Where the one pass began.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TailFrom {
-    /// At the earlier of the two snapshots' lines.
+
     Snapshots,
-    /// At genesis, because one of the folds could not resume.
+
     Genesis,
 }
 
-/// Starts `A` and `B` over the ledger in `ledger_dir` on one pass: from
-/// the earlier of their snapshots when both fit, each line shown only to
-/// the fold whose snapshot precedes it; from genesis for both when either
-/// cannot resume. A later snapshot whose own line turns out not to sit at
-/// its seq is folded from genesis afterwards, the one case that reads
-/// twice.
-///
-/// When the pass is from genesis, `first` is handed the index it built;
-/// `second` an empty one.
-///
-/// # Errors
-/// A line that does not verify, a record a fold cannot read, and an I/O
-/// failure reading the ledger or a snapshot.
 pub fn start_both<A: SnapshotFold, B: SnapshotFold>(
     ledger_dir: &Path,
 ) -> Result<BothStarted<A, B>, AxError> {
@@ -87,8 +66,6 @@ fn reason_of<F>(candidate: Candidate<F>) -> Option<WholeFold> {
     }
 }
 
-/// One pass from `earlier`'s snapshot, folding every tail line into it
-/// and the lines past `later`'s seq into `later`.
 fn onward<E: SnapshotFold, L: SnapshotFold>(
     ledger_dir: &Path,
     (mut early, at_early): (E, ChainSnapshot),
@@ -153,8 +130,6 @@ fn onward<E: SnapshotFold, L: SnapshotFold>(
     })
 }
 
-/// Both folds from genesis on one pass, each started with the reason its
-/// own snapshot was not used, or as folded alongside the other.
 fn from_genesis<A: SnapshotFold, B: SnapshotFold>(
     ledger_dir: &Path,
     first: Option<WholeFold>,

@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// A request that nobody has verified has no verifier to name: the name
-// exists only on `Pr<Verified>`, which only `Pr::verified` builds.
-
 fn main() {
     let open = collab::Pr::open(
         collab::NodeId::parse("node-1").unwrap(),

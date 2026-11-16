@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The model catalog snapshot: pinned entries with
-//! integer prices. Value semantics on purpose — holding the previous
-//! snapshot *is* the rollback; persistence is a projection concern, not
-//! this module's.
-
 use std::collections::BTreeMap;
 
 use kernel::{AxCode, AxError, Ceiling, UsdMicros};
@@ -16,35 +11,16 @@ use crate::provider::ceiling::FigureSource;
 
 pub use kernel::event::record::InputKinds;
 
-/// One catalog row, and the row a registration holds. Prices are USD
-/// micros per one million tokens — integers end to end (decision paths
-/// ban floats).
-///
-/// Each figure travels with the rung of the ladder in
-/// `provider::ceiling` that stated it: `Some` exactly when the figure is
-/// present, so the next registration of the same model can tell a
-/// figure a person stated from one this city's tables supplied
-/// (gateway D45). A catalogue row's figures are the `Preset` rung's.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModelEntry {
     pub id: String,
-    /// The window; zero where no rung stated one.
+
     pub context_tokens: u64,
     #[serde(default)]
     pub window_from: Option<FigureSource>,
-    /// What this model may be sent. A picture reaching a `Text` row is
-    /// refused at the endpoint rather than dropped on the wire.
+
     pub input: InputKinds,
-    /// The most this model may emit in one response, thinking included.
-    /// A property of the model rather than a caller's preference.
-    ///
-    /// `None` says this catalogue row states none, which is one rung of
-    /// the ladder in `provider::ceiling` rather than the end of the
-    /// question: a registration reaches the wire with the person's
-    /// figure, the provider's own, an earlier registration's, this row,
-    /// or the city's policy default, and it records which. Lookup here stays exact by id;
-    /// prefix matching happens in `provider::preset`, and a test keeps
-    /// the two indexes from answering for one id.
+
     pub max_output_tokens: Option<Ceiling>,
     #[serde(default)]
     pub ceiling_from: Option<FigureSource>,
@@ -55,10 +31,7 @@ pub struct ModelEntry {
 }
 
 impl ModelEntry {
-    /// Whether this row names any price at all. A row whose four prices
-    /// are zero is what the pick point writes for a model the catalogue
-    /// does not know, and what a local model carries; neither is a
-    /// measured price of zero.
+
     pub fn states_a_price(&self) -> bool {
         [
             self.input_price,
@@ -71,7 +44,6 @@ impl ModelEntry {
     }
 }
 
-/// A versioned snapshot; lookups are by provider model id.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MarketSnapshot {
     version: u32,
@@ -79,15 +51,7 @@ pub struct MarketSnapshot {
 }
 
 impl MarketSnapshot {
-    /// The built-in pinned catalog (data plane; rows the city actually
-    /// uses, prices rechecked at stage openings). Micros per Mtok:
-    /// $3.00 = 3_000_000.
-    ///
-    /// # Errors
-    /// `InvalidArgs` when two rows below carry one id. An empty catalog
-    /// returned in that case would refuse every model the city knows
-    /// and name none of them as the reason, so the failure travels to
-    /// the caller instead.
+
     pub fn builtin() -> Result<MarketSnapshot, AxError> {
         let rows = vec![
             ModelEntry {
@@ -106,9 +70,7 @@ impl MarketSnapshot {
                 id: "local".to_owned(),
                 context_tokens: 32_768,
                 window_from: Some(FigureSource::Preset),
-                // Local inference here is text-only until a row says
-                // otherwise: what a local server can see is that
-                // server's fact, and this table does not guess it.
+
                 input: InputKinds::Text,
                 max_output_tokens: Ceiling::new(4_096),
                 ceiling_from: Some(FigureSource::Preset),
@@ -121,8 +83,6 @@ impl MarketSnapshot {
         MarketSnapshot::from_entries(1, rows)
     }
 
-    /// Duplicate ids are refused: two prices for one model is two
-    /// authorities for one rule.
     pub fn from_entries(version: u32, rows: Vec<ModelEntry>) -> Result<MarketSnapshot, AxError> {
         let mut entries = BTreeMap::new();
         for row in rows {

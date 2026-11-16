@@ -3,17 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which account a Session keeps across a restart, which one a new or
-//! branched Session starts on (`Sprawling/gateway/spec/Router.lean` D30),
-//! and which one a delegated child starts on (D44).
-
 use super::*;
 
-/// The binding is a fact of the ledger, so a city reopened with its
-/// snapshot gone still sends the Session's next request on the account
-/// that answered last, though the first account answers again. A branch
-/// and a new Session are new Sessions in the same room: each starts on
-/// the first account again, and neither inherits the binding.
 #[test]
 fn the_binding_outlives_a_restart_and_a_new_or_branched_session_chooses_again() {
     let mut rig = Rig::new(
@@ -64,13 +55,8 @@ fn the_binding_outlives_a_restart_and_a_new_or_branched_session_chooses_again() 
     rig.assert_keys_stay_in_the_vault();
 }
 
-/// The room the mother hands work down to.
 const CHILD: &str = "lab/helper";
 
-/// A mother whose first account refused her is bound to the second one
-/// when she hands work down, and the child, whose room has no binding
-/// yet, calls through that account from its first request, because the
-/// provider keeps the prefix the mother wrote under her account alone.
 #[test]
 fn a_delegated_child_opens_on_its_mothers_account() {
     let mut rig = Rig::new(
@@ -115,8 +101,6 @@ fn a_delegated_child_opens_on_its_mothers_account() {
     rig.assert_keys_stay_in_the_vault();
 }
 
-/// The last run the room started, and the last line of the ledger: the
-/// point a branch continues from.
 fn last_run(rig: &Rig) -> kernel::Origin {
     let started = rig.records("run_started");
     let run = started

@@ -3,67 +3,48 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The remote door's five lines: it opened, it closed, a device paired,
-//! a device was revoked, a device started a remote session
-//! (`Sprawling/kernel/spec/Event/Record.lean` §8-81).
-//!
-//! **No line here carries a key, a pairing code or a session id.** The
-//! history says who was let in and when; what a device proves itself
-//! with stays in the device table, and a ledger anybody can replay
-//! would otherwise hand a reader the means to be that device.
-//!
-//! A device is spelled by the text of its id and a person's name for
-//! it, and its authority by the word the remote door gives it: the
-//! types that decide those live in `remote_access`, which the kernel
-//! does not depend on.
-
 use serde::{Deserialize, Serialize};
 
 use crate::event::TimeMs;
 
-/// `remote_opened`: the door is open until `closes_at`, reached at `url`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RemoteOpened {
-    /// When the door closes by itself.
+
     pub closes_at: TimeMs,
-    /// The `https://` address the route answered, which a device opens.
+
     pub url: String,
 }
 
-/// `remote_closed`: the door closed, and why.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RemoteClosed {
     pub why: RemoteClosing,
 }
 
-/// Who closed the remote door.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum RemoteClosing {
-    /// The person, at the city's console.
+
     Console,
-    /// A device holding a session, which may lock the door behind it.
+
     Locked,
-    /// The time the door was opened for ran out.
+
     Expired,
 }
 
-/// `device_paired`: a device presented a good code and the city keeps it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DevicePaired {
-    /// The device id's text, as the device table spells it.
+
     pub device: String,
-    /// What the person called the device.
+
     pub name: String,
-    /// `watch` or `act`.
+
     pub authority: String,
 }
 
-/// `device_revoked`: the person took a device's pairing away.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DeviceRevoked {
@@ -71,8 +52,6 @@ pub struct DeviceRevoked {
     pub name: String,
 }
 
-/// `remote_session_started`: a paired device proved its key and holds a
-/// session until `expires`, which is never later than the door closes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RemoteSessionStarted {
@@ -86,8 +65,6 @@ mod tests {
     use super::*;
     use crate::event::Payload;
 
-    /// Each line's bytes, so a ledger written by this build reads back in
-    /// the next one.
     #[test]
     fn each_remote_door_line_spells_its_keys_once() {
         let device = "aaaqeayeaudaocajbifqydiob4".to_owned();

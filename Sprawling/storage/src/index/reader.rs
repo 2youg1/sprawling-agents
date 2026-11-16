@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Index readers: seeking lines without scanning.
-
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -14,24 +12,6 @@ use kernel::Seq;
 use super::ledger::LedgerIndex;
 use crate::error::{StorageError, io_err};
 
-/// Reads single lines by seq, holding one segment open across reads.
-///
-/// One handle and one buffer serve the whole stretch, and a walk that
-/// goes forward never seeks at all — the position the previous line
-/// left is the position the next one wants. A jump from a known
-/// position moves relative to it, so a line that already sits in the
-/// buffer — the next line of one run, a few lines of other runs
-/// further on — is read without a seek or a refill. What this replaces opened
-/// the segment again for every line and then read it one byte at a
-/// time. Over a fifty-thousand record ledger on one windows-x86_64
-/// NVMe machine (2026-09-02): 734 µs a line then, against 0.89 µs
-/// walking forward and 5.82 µs walking backward now.
-///
-/// This held handle is why line reading is the index's one step
-/// outside `Vfs` (`Sprawling/storage/spec/Vfs.lean` §8-15): the seam's `read_at` opens the
-/// segment per call, which is the 734 µs this type exists to avoid.
-/// Nothing here writes, so the crash semantics the seam is there to
-/// model have nothing to say about it.
 pub struct LineReader<'index> {
     pub(crate) index: &'index LedgerIndex,
     pub(crate) dir: PathBuf,
@@ -39,8 +19,7 @@ pub struct LineReader<'index> {
 }
 
 impl LineReader<'_> {
-    /// One line, without its terminator. A seq absent from the index is
-    /// a caller error, not a corrupt ledger.
+
     pub fn line_at(&mut self, seq: Seq) -> Result<Vec<u8>, StorageError> {
         let Some((name, offset)) = self.index.folded.loc_of(seq) else {
             return Err(StorageError::SeqMissing { seq: seq.value() });
@@ -53,16 +32,11 @@ impl LineReader<'_> {
     }
 }
 
-/// The segment a `LineReader` currently holds open, and where reading
-/// it would resume.
 pub(crate) struct OpenSegment {
     name: String,
     path: PathBuf,
     file: BufReader<File>,
-    /// The offset the next read starts at, while that offset is known.
-    /// `None` means the position must be sought before it is used —
-    /// a remembered position that might be wrong would hand the caller
-    /// another line's bytes under the seq it asked for.
+
     resume: Option<u64>,
 }
 
@@ -80,9 +54,7 @@ impl OpenSegment {
 
     fn line_at(&mut self, offset: u64) -> Result<Vec<u8>, StorageError> {
         if self.resume != Some(offset) {
-            // How far the wanted line sits from where the buffer stands;
-            // unknown when the position is unknown or the distance does
-            // not fit an `i64`, and then the seek is absolute.
+
             let distance = self.resume.and_then(|at| {
                 i64::try_from(offset)
                     .ok()?
@@ -122,8 +94,7 @@ impl OpenSegment {
 mod tests {
     use super::*;
     use kernel::{B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, TimeMs};
-    /// Writes `count` records into segments that roll every
-    /// `per_segment` lines, and returns each line in seq order.
+
     fn write_ledger_rolling(dir: &Path, count: u64, per_segment: u64) -> Vec<Vec<u8>> {
         let run = RunId::from_bytes([7u8; 16]);
         let mut lines = Vec::new();
@@ -187,11 +158,6 @@ mod tests {
         owned
     }
 
-    /// The whole point of the run index: one session's lines are found
-    /// without reading anybody else's. The assertion is on the seqs the
-    /// index hands back, because that set *is* what the reader will open
-    /// the segment for - a walk that returned the other runs' seqs and
-    /// left the filtering to the caller would have read them all.
     #[test]
     fn one_reader_answers_out_of_order_seeks_across_segments() {
         let tmp = tempfile::tempdir().unwrap();
@@ -199,10 +165,7 @@ mod tests {
         let index = LedgerIndex::rebuild(tmp.path()).unwrap();
         assert_eq!(index.len(), 9, "three segments, nine lines");
         let mut reader = index.reader(tmp.path());
-        // Backwards, repeated, and ping-ponging between segments. A
-        // reader that holds a handle open must hold its position honest
-        // too: every one of these asks for a line the buffer is not
-        // already sitting on.
+
         for value in [8u64, 0, 8, 3, 4, 3, 7, 1, 1, 5] {
             let got = reader.line_at(Seq::new(value)).unwrap();
             let expected = &lines[usize::try_from(value).unwrap()];
@@ -224,27 +187,20 @@ mod tests {
         expected.reverse();
         assert_eq!(all, expected, "newest first, and only this run's lines");
 
-        // Bounded by the answer rather than by the ledger: taking two
-        // reads two, however many lines the other runs wrote between.
         let newest_two: Vec<Seq> = index.run_seqs_before(mine, None).take(2).collect();
         assert_eq!(newest_two, [Seq::new(27), Seq::new(24)]);
 
-        // `before` is exclusive, which is what the wire's `earlier`
-        // cursor already means; paging with it never repeats a record.
         let older: Vec<Seq> = index
             .run_seqs_before(mine, Some(Seq::new(24)))
             .take(2)
             .collect();
         assert_eq!(older, [Seq::new(21), Seq::new(18)]);
 
-        // A session this ledger never held has no lines, which is a
-        // different answer from an empty ledger and needs no special case.
         let stranger: Vec<Seq> = index
             .run_seqs_before(RunId::from_bytes([9u8; 16]), None)
             .collect();
         assert!(stranger.is_empty());
 
-        // The city's own records are a run like any other here.
         assert_eq!(index.run_seqs_before(city, None).count(), 10);
     }
 
@@ -257,8 +213,6 @@ mod tests {
         let mut index = LedgerIndex::rebuild(tmp.path()).unwrap();
         assert_eq!(index.run_seqs_before(mine, None).count(), 2);
 
-        // Appended: the refresh folds the new lines into both maps, and a
-        // reopened index reads the same answer from the segments.
         write_interleaved(tmp.path(), &[mine, yours], 10);
         index.refresh(tmp.path()).unwrap();
         assert_eq!(index.run_seqs_before(mine, None).count(), 5);

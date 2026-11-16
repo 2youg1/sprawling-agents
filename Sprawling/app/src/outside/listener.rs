@@ -3,30 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The remote listener: a loopback port of its own, opened with the door
-//! and closed with it, that the route makes reachable from outside
-//! (`Sprawling/app/spec/Outside/Conduit.lean` §8-139).
-//!
-//! It answers two WebSocket paths and the page. [`PAIR_PATH`] carries one
-//! pairing handshake and ends (Sprawling/remote_access/Spec.lean §8-6).
-//! [`SESSION_PATH`] carries a session handshake, then relays: each sealed
-//! frame from the device is judged by the conduit and, when the door
-//! permits it, sent to the city's own `/ws` on this machine as a client
-//! would send it; each frame the city sends comes back sealed. Every
-//! message on either path is binary. Every other `GET` is answered with
-//! the client bundle through `wire::bundle_routes`, the same table the
-//! city's own port serves it with, so the address in the pairing code
-//! opens the page that pairs (Sprawling/remote_access/Spec.lean §8-10).
-//!
-//! The listener is its own port rather than a route on the city's port
-//! because the route makes it reachable from outside while the city's
-//! port stays where `serve` bound it, guarded by its own token. Nothing
-//! but this relay reaches the city from here.
-//!
-//! The door keeper's work that writes a line or a file runs on the
-//! blocking pool: the ledger relay waits for the city's one writer, and
-//! a socket task that waited with it would hold a reactor thread.
-
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::time::Duration;
@@ -47,33 +23,24 @@ use super::conduit::{Conduit, Step};
 use super::console::Lasting;
 use super::keeper::{Doorway, Phase};
 
-/// Where a device runs its pairing handshake.
 pub(crate) const PAIR_PATH: &str = "/remote/pair";
-/// Where a paired device opens a session.
+
 pub(crate) const SESSION_PATH: &str = "/remote/session";
 
-/// How often the listener asks the door whether its time is up.
 const TICK: Duration = Duration::from_secs(1);
 
-/// What the relay needs to reach the city it serves.
 #[derive(Clone)]
 pub(crate) struct Reaching {
-    /// The runtime the listener's tasks run on.
+
     pub(crate) runtime: tokio::runtime::Handle,
-    /// The city's own listener, as a client on this machine reaches it.
+
     pub(crate) city: SocketAddr,
-    /// The key the city's port asks every caller for, presented in
-    /// process rather than read from the key file.
+
     pub(crate) token: String,
-    /// The client bundle the city's port serves, served here too.
+
     pub(crate) page: Arc<wire::ClientAssets>,
 }
 
-/// Binds the remote listener, opens the door through the route, then
-/// answers until the door closes.
-///
-/// # Errors
-/// No loopback port; every refusal of `Doorway::open`.
 pub(super) fn open(
     doorway: &Doorway,
     reaching: &Reaching,
@@ -104,8 +71,6 @@ pub(super) fn open(
     Ok(opened)
 }
 
-/// The listener's task, ended when the door drops it, and its place among
-/// the addresses the browser tools refuse (sprawling D74).
 struct Answering(
     tokio::task::AbortHandle,
     #[expect(
@@ -121,16 +86,12 @@ impl Drop for Answering {
     }
 }
 
-/// What every route of the listener reads.
 #[derive(Clone)]
 struct Serving {
     doorway: Doorway,
     reaching: Reaching,
 }
 
-/// Serves the two paths and the page until the door says its time is up,
-/// each behind the entry decision for the listener's own names and the
-/// route's public one (wire D56).
 async fn answer(
     listener: tokio::net::TcpListener,
     doorway: Doorway,
@@ -169,8 +130,6 @@ async fn answer(
     }
 }
 
-/// Asks the door each [`TICK`] whether its time is up, and returns once
-/// it is closed.
 async fn keep_time(doorway: Doorway) {
     let now = tokio::time::Instant::now();
     let mut ticks = tokio::time::interval_at(now.checked_add(TICK).unwrap_or(now), TICK);
@@ -203,9 +162,6 @@ async fn session_upgrade(State(serving): State<Serving>, upgrade: WebSocketUpgra
     })
 }
 
-/// Ends a connection. The device learns why in the close frame's
-/// reason, a stable code and nothing else: a stranger on the route
-/// reads it too.
 async fn close(mut device: WebSocket, ended: Result<(), AxError>) {
     let reason = ended
         .err()

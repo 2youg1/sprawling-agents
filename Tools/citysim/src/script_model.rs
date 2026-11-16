@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Scripted model: the second adapter of the model seam. Deterministic by
-//! construction — the script is the entire behavior; an exhausted script
-//! answers with an empty wave, which the executor reads as conclusion.
-//!
-//! The translation face is inside the loop. A scripted turn is
-//! written as provider wire JSON and parsed by `gateway::dialect`, the
-//! same function the real endpoint uses, so the simulator exercises the
-//! translation rather than stepping around it. What stays out is the
-//! HTTP face: a network call is not deterministic, and its evidence
-//! lives in gateway's own loopback tests.
-//!
-//! Specified by `Tools/citysim/spec/Executor.lean` §8-2.
-
 use std::collections::VecDeque;
 
 use gateway::response_from_wire;
@@ -33,8 +20,6 @@ impl ScriptModel {
         }
     }
 
-    /// The wire-form script: each entry is what a provider would have
-    /// sent, parsed through the production translation.
     pub fn from_wire(kind: DialectKind, script: Vec<Value>) -> Result<Self, AxError> {
         let mut returns = Vec::new();
         for wire in &script {
@@ -46,9 +31,6 @@ impl ScriptModel {
         })
     }
 
-    /// An empty-script model: says nothing at the first call, which is
-    /// how a run reaches `Completion::Limit` rather than how it reaches
-    /// the end of its work.
     pub fn silent() -> Self {
         ScriptModel {
             script: VecDeque::new(),
@@ -56,16 +38,6 @@ impl ScriptModel {
     }
 }
 
-/// The last reply of a run that finishes: it says something and calls
-/// nothing.
-///
-/// **A reply with no content freezes as `Completion::Limit`**, because a
-/// run cannot cite an empty `model_returned` as the evidence that its
-/// work is done. A scenario that means to reach the end of its work says
-/// so through this, rather than by letting the script run out.
-///
-/// # Errors
-/// When the content blocks cannot be encoded into a payload.
 pub fn concluding(said: &str) -> Result<ModelReturn, AxError> {
     Ok(ModelReturn::bare(
         kernel::model::message_payload(&[kernel::ContentBlock::Text {
@@ -141,7 +113,7 @@ mod tests {
         assert_eq!(returned.calls.len(), 1);
         assert_eq!(returned.calls[0].name.as_str(), "edit");
         assert_eq!(returned.calls[0].id, "call-1");
-        // usage survived the translation: the account can bill it.
+
         assert!(returned.usage.is_some());
     }
 

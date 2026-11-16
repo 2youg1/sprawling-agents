@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Glass: whether text on a see-through surface of the edge layer is
-//! still legible (Tools/xtask/Spec.lean §8-51, docs/frontend-method.md §4-43).
-//!
-//! **The opacity judged is the opacity drawn.** `--glass-opacity` is the
-//! number the theme mixes the glass role with, and it is the number
-//! read here; a second declaration kept for this gate would be a floor
-//! that could drift away from what the page draws.
-//!
-//! **The backdrop is the brightest surface, not the brightest ink.** The
-//! glass blurs what is behind it by 24 px, which spreads the words there
-//! into the surface they sit on; what is left is a surface, and the
-//! brightest one a page fills an area with is a raised control under the
-//! pointer. Judged against ink, the opacity would have to reach 97 per
-//! cent and the glass would be a solid.
-
 use super::Mode;
 use super::contrast::apca_lc_over;
 use super::roles::rung_of;
@@ -25,20 +10,13 @@ use super::tables::{grey_ramp, parse_text_tokens, tier_slack};
 use crate::report::Violation;
 use crate::theme;
 
-/// The role the glass is filled with, and the surface it is judged over.
 const GLASS: &str = "glass";
 const BACKDROP: &str = "raised-hover";
-/// The text token that has to stay legible on the glass, as
-/// `parse_text_tokens` names it.
+
 const TEXT: &str = "TEXT";
-/// The declaration that says how much of the role covers the backdrop.
+
 pub(super) const OPACITY: &str = "--glass-opacity:";
 
-/// Text on the glass over the backdrop, in one lighting.
-///
-/// `written` is the stylesheet as written, which holds the roles once
-/// for both lightings; `read` is that lighting's reading of it, which
-/// holds the rungs' values.
 pub(super) fn judge_glass(written: &str, read: &str, mode: Mode) -> Vec<Violation> {
     let Some(percent) = opacity(written) else {
         return vec![refuse(
@@ -87,7 +65,6 @@ pub(super) fn judge_glass(written: &str, read: &str, mode: Mode) -> Vec<Violatio
     )]
 }
 
-/// `--glass-opacity: 75%;` as 75, when it is a whole percent in range.
 fn opacity(written: &str) -> Option<u16> {
     written.lines().find_map(|line| {
         let value = line
@@ -124,8 +101,6 @@ fn refuse(violation: String, alternative: &str) -> Violation {
 mod tests {
     use super::*;
 
-    /// The glass lines of the shipped stylesheet, around the rungs and the
-    /// text token both lightings read.
     fn sheet(percent: &str) -> String {
         format!(
             "

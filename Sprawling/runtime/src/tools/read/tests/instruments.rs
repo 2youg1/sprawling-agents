@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a read of a file costs, the handle read against the judged path
-//! it replaced, interleaved in one process so both sides see the same
-//! machine (`Sprawling/runtime/spec/Tools/Read.lean` D113).
-//!
-//! The judged side re-resolves the city root on every call, as the
-//! judged path did before the root was anchored, and cuts with the cut
-//! the one-pass cut replaced; the handle side also takes the two stamps
-//! `read` records for `edit`. The ratio test holds the handle
-//! read within a bound of one resolution of the path followed by a bare
-//! buffered read of the same bytes, which is the design's claim and a
-//! ratio every machine agrees on: going back to four resolutions and a
-//! second open per read crosses it.
-
 #![allow(
     clippy::disallowed_methods,
     clippy::arithmetic_side_effects,
@@ -28,8 +15,6 @@ use super::same_bytes::reference_cut;
 use super::*;
 use crate::tools::chosen_path::CityRoot;
 
-/// One file of `size` bytes of ordinary source-shaped lines under
-/// `lab/`, and its address.
 fn fixture(size: usize) -> (tempfile::TempDir, kernel::Address) {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
@@ -47,8 +32,6 @@ fn open_everywhere() -> ReadBound {
     Arc::new(|_: &kernel::Address| kernel::ReadVerdict::Open)
 }
 
-/// The judged path as it stood: the root resolved again, the file
-/// resolved, opened and judged again, every line collected for the cut.
 fn judged(root: &Path, addr: &kernel::Address, bound: &ReadBound) -> usize {
     let city = CityRoot::anchor(root, "read").unwrap();
     let super::engine::Looked::Text { text, .. } =
@@ -60,7 +43,6 @@ fn judged(root: &Path, addr: &kernel::Address, bound: &ReadBound) -> usize {
     cut.len()
 }
 
-/// The handle read with the one-pass cut.
 fn by_handle(city: &CityRoot, addr: &kernel::Address, bound: &ReadBound) -> usize {
     let super::engine::Looked::Text { text, .. } = super::engine::text_of(super::engine::Request {
         city,
@@ -84,15 +66,10 @@ fn by_handle(city: &CityRoot, addr: &kernel::Address, bound: &ReadBound) -> usiz
     cut.text.len()
 }
 
-/// A bare buffered read of the same bytes, cut: the floor no
-/// judgement can go under.
 fn bare(root: &Path, addr: &kernel::Address) -> usize {
     read_and_cut(&root.join(addr.as_str()))
 }
 
-/// One resolution of the path, then a bare read of where it lies: what
-/// the handle read claims to cost, one judgement of the real location
-/// and one open.
 fn resolved(root: &Path, addr: &kernel::Address) -> usize {
     read_and_cut(&std::fs::canonicalize(root.join(addr.as_str())).unwrap())
 }
@@ -113,15 +90,12 @@ fn timed(work: &mut dyn FnMut() -> usize) -> Duration {
     started.elapsed()
 }
 
-/// The `rank`-th per-mille sample, nearest rank.
 fn at(samples: &mut [Duration], per_mille: usize) -> Duration {
     samples.sort_unstable();
     let index = (samples.len() * per_mille).div_ceil(1000).saturating_sub(1);
     samples[index.min(samples.len() - 1)]
 }
 
-/// Interleaves the sides round by round, so a machine that slows down
-/// mid-run slows every side alike; one warm-up round per side first.
 fn interleaved(rounds: usize, sides: &mut [&mut dyn FnMut() -> usize]) -> Vec<Vec<Duration>> {
     for side in sides.iter_mut() {
         timed(*side);
@@ -174,8 +148,6 @@ fn instrument_read_ab() {
     }
 }
 
-/// The edit-then-read sequence: one byte written through the page cache
-/// just before each read, so the read meets a dirty page.
 #[test]
 #[ignore = "an instrument: run it by name with --run-ignored only --no-capture"]
 fn instrument_read_after_write_ab() {
@@ -190,8 +162,7 @@ fn instrument_read_after_write_ab() {
         file.seek(std::io::SeekFrom::Start(0)).unwrap();
         file.write_all(b" ").unwrap();
     };
-    // The write sits outside the timed span: it is the edit, and its
-    // close is what an on-access scanner waits on.
+
     let (mut judged_after, mut handle_after) = (Vec::new(), Vec::new());
     for _ in 0..100 {
         touch();
@@ -209,14 +180,9 @@ fn instrument_read_after_write_ab() {
     );
 }
 
-/// The ceiling CI holds (`Tools/xtask/budgets.toml` `[read_handle_ratio]`):
-/// the handle read of a 20 KiB file, where the fixed cost of resolving
-/// and opening dominates, stays within this many resolved reads of it.
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 const RATIO_CEILING: f64 = 1.5;
 
-/// Only where the engine reads through the handle: elsewhere the judged
-/// path is the read, and it is meant to cost more than a bare read.
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 #[test]
 fn a_read_costs_within_a_bound_of_a_resolved_read() {

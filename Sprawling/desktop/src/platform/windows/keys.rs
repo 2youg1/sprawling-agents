@@ -3,33 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The key names this server accepts, and the virtual-key code each one
-//! is.
-//!
-//! Editing this table is editing behaviour: a name that is not in it
-//! cannot be pressed, and that is deliberate. A key name is a thing a
-//! model writes from memory, so an unknown one is refused **with the
-//! whole table in the refusal** rather than guessed at — pressing the
-//! wrong key on somebody's desktop is not a mistake a retry undoes.
-//!
-//! One printable character is not a key here: it is what `type` types.
-//! Two ways to enter the letter `a` would be two behaviours to keep
-//! agreeing, and only one of them handles a keyboard layout correctly.
-//!
-//! The codes are Microsoft's own
-//! (<https://learn.microsoft.com/windows/win32/inputdev/virtual-key-codes>),
-//! written as the names `winsafe` gives them, which are that page's names
-//! without the `VK_` prefix. A named constant rather than a number,
-//! because the event `super::act` builds takes a `co::VK`, and making
-//! one from a bare number is the one door into it that needs `unsafe`.
-
 use winsafe::co;
 
 use crate::refusal::{Refusal, RefusalCode};
 
-/// One modifier a call may hold down. Exhaustive, and its own type
-/// rather than a string, so an action that holds a modifier this
-/// machine has no key for cannot be spelled past the parser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Modifier {
     Ctrl,
@@ -39,8 +16,7 @@ pub(crate) enum Modifier {
 }
 
 impl Modifier {
-    /// # Errors
-    /// Refuses a modifier outside the four the tool schema offers.
+
     pub(crate) fn parse(named: &str) -> Result<Modifier, Refusal> {
         match named {
             "ctrl" => Ok(Modifier::Ctrl),
@@ -66,9 +42,6 @@ impl Modifier {
     }
 }
 
-/// Every key name, with the virtual-key code it is. Matched without
-/// regard to ASCII case, because `Enter` and `enter` are one key and a
-/// refusal over capitalisation teaches nothing.
 const TABLE: [(&str, co::VK); 36] = [
     ("backspace", co::VK::BACK),
     ("tab", co::VK::TAB),
@@ -108,9 +81,6 @@ const TABLE: [(&str, co::VK); 36] = [
     ("f21", co::VK::F21),
 ];
 
-/// The spellings this table also answers to, each pointing at the row
-/// above rather than carrying a second code. One key, one code; the
-/// aliases exist because a model writes `esc` as often as `escape`.
 const ALIASES: [(&str, &str); 5] = [
     ("esc", "escape"),
     ("return", "enter"),
@@ -119,11 +89,6 @@ const ALIASES: [(&str, &str); 5] = [
     ("pgup", "pageup"),
 ];
 
-/// The virtual-key code `named` is.
-///
-/// # Errors
-/// Refuses a name this table does not hold, listing every name it does.
-/// A model that guessed once will otherwise guess again.
 pub(crate) fn code(named: &str) -> Result<co::VK, Refusal> {
     let lowered = named.to_ascii_lowercase();
     let canonical = ALIASES
@@ -147,7 +112,6 @@ pub(crate) fn code(named: &str) -> Result<co::VK, Refusal> {
         })
 }
 
-/// Every name this table answers to, for the refusal to carry.
 fn accepted() -> String {
     TABLE
         .iter()
@@ -178,8 +142,6 @@ mod tests {
         assert_eq!(seen.len(), TABLE.len());
     }
 
-    /// Capitalisation is not a decision a caller has to get right, and
-    /// the aliases point at a row rather than carrying a second code.
     #[test]
     fn case_and_the_short_spellings_reach_the_same_key() {
         assert_eq!(code("Enter").unwrap(), code("enter").unwrap());
@@ -191,8 +153,6 @@ mod tests {
         }
     }
 
-    /// The rule this module exists for: a key nobody listed is refused,
-    /// and the refusal carries the list so the next call is answerable.
     #[test]
     fn a_key_this_table_does_not_hold_is_refused_with_the_whole_table() {
         for guess in ["Meta", "Cmd", "AnyKey", "f99", ""] {
@@ -206,7 +166,6 @@ mod tests {
         }
     }
 
-    /// One printable character has one door, and it is not this one.
     #[test]
     fn a_single_letter_is_typed_rather_than_pressed() {
         assert!(code("a").is_err());
@@ -230,8 +189,7 @@ mod tests {
                 .unwrap()
                 .contains("ctrl")
         );
-        // Four modifiers, four distinct codes: two that shared one
-        // would hold down the wrong key and nothing would say so.
+
         let mut codes: Vec<co::VK> = [
             Modifier::Ctrl,
             Modifier::Alt,

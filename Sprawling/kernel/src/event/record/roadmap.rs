@@ -3,24 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a resident did to a plan node: the one payload the five
-//! `roadmap_*` kinds share.
-
 use serde::{Deserialize, Serialize};
 
 use crate::NodeId;
 use crate::locator::Locator;
 use crate::plan::StopCause;
 
-/// `roadmap_claimed`, `roadmap_split`, `roadmap_finished`,
-/// `roadmap_released` and `roadmap_blocked`: who moved which node, and
-/// the step. The five lines share `by`, `node` and `verb` and differ
-/// only in what follows the verb, so one struct holds them and the verb
-/// selects the step.
-///
-/// `node` reads back through [`NodeId::parse`]; a line whose node is not
-/// an index is refused, because a reader that skipped it would count a
-/// held node as free.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RoadmapMoved {
     pub by: String,
@@ -29,7 +17,6 @@ pub struct RoadmapMoved {
     pub step: RoadmapStep,
 }
 
-/// The step a `roadmap_*` line records, spelled by its `verb` key.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "verb", rename_all = "snake_case")]
 pub enum RoadmapStep {
@@ -61,8 +48,6 @@ mod tests {
     use super::*;
     use crate::event::Payload;
 
-    /// The bytes `collab::claim_effect` wrote by hand for a claim and a
-    /// block, and the claim read back whole.
     #[test]
     fn a_roadmap_line_writes_the_keys_the_hand_written_map_wrote() {
         let claimed = RoadmapMoved {

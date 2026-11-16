@@ -3,26 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Everything a client may ask the city to do, and the two invariants
-//! that live in the type system rather than in a check.
-//!
-//! - `Command` is generic over the carrier of a secret. `WireCommand`
-//!   fixes that carrier to an uninhabited type, so a frame arriving from
-//!   a socket cannot be a `PutSecret` — not "is rejected", but has no
-//!   representation. Credentials are enrolled on the host machine, and
-//!   that constraint is held by construction.
-//! - Every state-changing Command owns an `IdemKey` field. There is no
-//!   constructor that omits it, so "double-clicking twice opens two
-//!   runs" is not reachable from this type.
-//!
-//! The enum is not `#[non_exhaustive]`: the wire version is the
-//! versioning mechanism, so the assembly layer must handle every variant
-//! and a new one fails to compile until somebody decides what it does.
-//! That is what keeps a button off the client until the city can answer
-//! the frame behind it.
-
-//! The wire face: no-secret commands and back.
-
 use kernel::IdemKey;
 
 use super::kind::Command;
@@ -33,14 +13,10 @@ use super::step::{
     RulesWrite, SecretForgetting, SessionNaming, WorkspaceChoiceWrite,
 };
 
-/// The Command set a socket can carry. `PutSecret` is unreachable because
-/// `NoSecret` has no values.
 pub type WireCommand = Command<NoSecret>;
 
 impl<Secret> Command<Secret> {
-    /// The deduplication key. `None` only for the two Commands that change
-    /// nothing: `Auth`, and `PutSecret` whose effect is confined to the host
-    /// process and whose replay writes the same Vault entry.
+
     pub fn idem(&self) -> Option<&IdemKey> {
         match *self {
             Self::Dispatch { ref idem, .. }
@@ -97,11 +73,10 @@ impl<Secret> Command<Secret> {
 }
 
 impl From<WireCommand> for Command {
-    /// Widening a wire frame into the in-process Command set. Total: the
-    /// `PutSecret` arm is unreachable because its payload cannot exist.
+
     fn from(wire: WireCommand) -> Self {
         match wire {
-            // One line per variant keeps this table inside the function budget.
+
             #[rustfmt::skip]
             Command::Wake { source, subject, body, idem } => Self::Wake { source, subject, body, idem },
             Command::Dispatch {
@@ -190,7 +165,7 @@ impl From<WireCommand> for Command {
                 from,
                 idem,
             },
-            // One line per variant keeps this table inside the function budget.
+
             #[rustfmt::skip]
             Command::CreateBuilding { addr, template, rules, source, idem } =>
                 Self::CreateBuilding { addr, template, rules, source, idem },
@@ -294,9 +269,7 @@ impl From<WireCommand> for Command {
 )]
 mod tests {
     use super::*;
-    /// The runtime half of "a credential cannot be enrolled over a
-    /// connection": the compile-time half is `NoSecret` having no values,
-    /// and this is what happens to bytes that try anyway.
+
     #[test]
     fn a_wire_frame_carrying_put_secret_fails_to_decode() {
         let json = r#"{"put_secret":{"realm":"anthropic","name":"api","value":"sk-nope"}}"#;

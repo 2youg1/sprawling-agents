@@ -3,34 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The three documents that govern a city, and the one point they are
-//! written through.
-//!
-//! All three sit in the city's own reserved subtree, which no write
-//! domain reaches: the Mayor cannot edit who the Mayor is, the clerk
-//! cannot edit what it answers by, and neither can edit how the person
-//! wants their city run. That is the whole reason this module exists as
-//! one door rather than as three callers each joining a path — a caller
-//! that composed its own path could compose one that leaves the subtree,
-//! and then "a resident cannot edit its own governance" would hold by
-//! habit rather than by construction.
-//!
-//! Specified by `Sprawling/city/spec/Governed.lean` §8-24b.
-
 use std::path::{Path, PathBuf};
 
 use kernel::AxError;
 
 use crate::spine_files::hall::{CLERK_FILE, MAYOR_FILE};
 
-/// How this person wants their city run.
-///
-/// It belongs to no resident, which is why it sits beside the two
-/// identity files rather than at somebody's address.
 pub const PREFERENCES_FILE: &str = "PREFERENCES.md";
 
-/// Which governed document. A closed set rather than a file name,
-/// because where these live is the city's answer and not the caller's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Governed {
     Mayor,
@@ -39,7 +19,7 @@ pub enum Governed {
 }
 
 impl Governed {
-    /// The file name this document is kept under.
+
     #[must_use]
     pub fn file(self) -> &'static str {
         match self {
@@ -49,31 +29,12 @@ impl Governed {
         }
     }
 
-    /// Where this document lives in a city rooted at `city_root`.
     #[must_use]
     pub fn path(self, city_root: &Path) -> PathBuf {
         city_root.join(kernel::RESERVED_PREFIX).join(self.file())
     }
 }
 
-/// Writes one governed document whole, only if it still holds `base`,
-/// creating the reserved subtree if this city has not laid it out yet.
-///
-/// Whole rather than patched: these are documents a person edits in one
-/// box and saves once, and a partial write would leave the city governed
-/// by half a sentence. Against a base, because the raw editor and the
-/// identity cards are two writers of `MAYOR.md` and `PREFERENCES.md`
-/// (`Sprawling/city/spec/Identity.lean` §8-33), and a page left open in a second tab is a third.
-/// The identity area of those two is read before anything lands, by the
-/// same reader the cards use. The previous content is not kept here —
-/// the Ledger line that announces the write is what a reader goes back
-/// to.
-///
-/// # Errors
-/// `E_CONFIG_INVALID` for an identity area that does not read,
-/// `E_VERSION_CONFLICT` when the document is no longer `base`, and
-/// `E_STORAGE_FATAL` for a reserved subtree that cannot be read or
-/// written.
 pub fn write_governed(
     city_root: &Path,
     which: Governed,
@@ -96,8 +57,6 @@ pub fn write_governed(
 mod tests {
     use super::*;
 
-    /// Every one of the three lands inside the reserved subtree, which
-    /// is what keeps a resident from editing what governs it.
     #[test]
     fn all_three_documents_land_where_no_write_domain_reaches() {
         let dir = tempfile::tempdir().unwrap();
@@ -116,8 +75,6 @@ mod tests {
         }
     }
 
-    /// A second save replaces the first when it starts from what the
-    /// first one left: one box, one document.
     #[test]
     fn a_second_save_replaces_the_first() {
         let dir = tempfile::tempdir().unwrap();

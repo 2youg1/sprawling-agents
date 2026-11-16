@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The versions of one document, newest first (`Sprawling/accounting/spec/Views/Document.lean` §8-21,
-//! `Sprawling/wire/spec/Answer/DocumentVersions.lean` §8-83).
-//!
-//! The saves are folded from `document_written`, so a page asking about a
-//! document never walks the ledger. The version on disk is read when the
-//! question is asked, after the view lock is released, through the same
-//! door `Document` reads by - so it lands in the content store as every
-//! version the city reads does.
-
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -22,11 +13,9 @@ use wire::{DocumentState, DocumentVersion, VersionSource};
 use super::holding::Views;
 use super::prepared::Prepared;
 
-/// Every save of every document the history recorded, oldest first.
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub(crate) struct DocumentSaves(BTreeMap<Address, Vec<Save>>);
 
-/// One `document_written` line, as the versions answer reads it.
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct Save {
     seq: Seq,
@@ -37,10 +26,7 @@ pub(crate) struct Save {
 }
 
 impl DocumentSaves {
-    /// Folds one `document_written` line.
-    ///
-    /// # Errors
-    /// A line whose payload does not read as a save.
+
     pub(super) fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError> {
         let written = record.data().read::<DocumentWritten>()?;
         self.0.entry(written.at).or_default().push(Save {
@@ -54,8 +40,6 @@ impl DocumentSaves {
     }
 }
 
-/// The question, with the saves copied out of the views and the disk
-/// and the store still to read.
 pub struct VersionsAsk {
     city_root: PathBuf,
     at: Address,
@@ -63,8 +47,7 @@ pub struct VersionsAsk {
 }
 
 impl Views {
-    /// The saves of `at` are copied now; the disk is read once the views
-    /// are released.
+
     pub(in crate::views) fn versions_ask(&self, at: &Address) -> Prepared {
         Prepared::Versions(VersionsAsk {
             city_root: self.city_root.clone(),
@@ -75,7 +58,7 @@ impl Views {
 }
 
 impl VersionsAsk {
-    /// The versions, newest first, at most [`wire::VERSIONS_MAX`].
+
     pub(in crate::views) fn answer(self) -> wire::Answer {
         let on_disk = on_disk(&self.city_root, self.at.clone());
         let store =
@@ -124,10 +107,6 @@ impl VersionsAsk {
     }
 }
 
-/// This build's default, for the three documents whose default text the
-/// binary carries, listed last and after the cut so it is always there
-/// to compare with (`Sprawling/accounting/Spec.lean` §8-38). It is put in
-/// the store first; a store that will not take it lists it as not kept.
 fn shipped(city_root: &Path, at: &Address) -> Option<DocumentVersion> {
     let Some(city::PromptDocument::Shipped(doc)) = city::PromptDocument::of(at) else {
         return None;
@@ -141,9 +120,6 @@ fn shipped(city_root: &Path, at: &Address) -> Option<DocumentVersion> {
     })
 }
 
-/// The version on disk now, read through `Document`'s door so it is
-/// kept as every version the city reads is; none when nothing readable
-/// is there.
 fn on_disk(city_root: &Path, at: Address) -> Option<B3Hash> {
     match super::document::document_answer(city_root, at).state {
         DocumentState::Empty { version, .. } => Some(version),

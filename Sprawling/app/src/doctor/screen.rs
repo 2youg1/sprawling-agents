@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a person reads, and what they are asked (`Sprawling/app/spec/Accounting/Worker.lean`
-//! §8-40).
-//!
-//! The report is one line per item and one verdict per tier. A city
-//! named on the line adds one line per building that asked for what
-//! this machine lacks; `--explain <code>` answers one code instead.
-//! `--install` adds one question per absent item, in table order, each
-//! with the command it would run printed above it: nobody agrees to a
-//! command they were not shown, and nothing this city was not asked
-//! about runs.
-
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -34,26 +23,18 @@ use super::{
     examine_each, verdict, verdict_line,
 };
 
-/// What the command line asked for. The default checks and changes
-/// nothing.
 pub(crate) struct Asked {
     pub(crate) install: bool,
-    /// A city to judge building by building.
+
     pub(crate) city: Option<PathBuf>,
-    /// The directory whose disk the scanning part judges: the city named
-    /// on the line, or where `up` would put one when none is.
+
     pub(crate) scanned: PathBuf,
-    /// A refusal code to connect to this machine, instead of a report.
+
     pub(crate) explain: Option<String>,
-    /// Whether this report may use colour.
+
     pub(crate) ink: Ink,
 }
 
-/// What the command line asked of this verb, with the one environment
-/// variable a terminal answers about colour. Checking is the default;
-/// touching the machine takes the flag; the one word that is not a flag
-/// and not a flag's value is the city. `unnamed` says where `up` puts a
-/// city nobody named, and is asked only when the line names none.
 pub(crate) fn asked(
     args: &[String],
     no_color: Option<OsString>,
@@ -82,12 +63,6 @@ pub(crate) fn asked(
     }
 }
 
-/// The `doctor` verb. Exits with failure when a required item is
-/// missing, or when a building of the named city lacks what it asked
-/// for, so a script driving this learns the outcome from the exit code
-/// rather than by reading the report. `unnamed` is where `up` puts a
-/// city nobody named, which the scanning part judges when the line
-/// names no city.
 pub fn verb(args: &[String], unnamed: fn() -> PathBuf) -> ExitCode {
     let asked = asked(args, std::env::var_os("NO_COLOR"), unnamed);
     let machine = ThisMachine::new(Platform::current(), PATIENCE);
@@ -107,16 +82,6 @@ pub fn verb(args: &[String], unnamed: fn() -> PathBuf) -> ExitCode {
     }
 }
 
-/// Reports this machine, and - when asked - offers each absent item one
-/// at a time. Answers whether every required item of the use tier is
-/// present at the end, and every named building has what it asked for
-/// (a missing develop-tier item is reported, not counted), which is what
-/// the caller turns into an exit code. An explanation always answers
-/// true: it is an explanation, not a verdict.
-///
-/// # Errors
-/// Propagates what the terminal reports: a report nobody can be shown,
-/// or an answer that cannot be read, is not an answer to guess at.
 pub(crate) fn run<R: BufRead, W: Write>(
     asked: &Asked,
     machine: &dyn Machine,
@@ -138,12 +103,10 @@ pub(crate) fn run<R: BufRead, W: Write>(
         out,
         "\n  this machine ({platform}), against what this city needs:\n"
     )?;
-    // The heading is on the screen before the probes start, so a person
-    // waiting on a slow tool is not looking at an empty terminal.
+
     out.flush()?;
     let mut rows = Rows::new(out, asked.ink);
-    // Asked beside the items rather than after them, so the report still
-    // waits for the slowest question and not for the sum of them.
+
     let (findings, scanning) = std::thread::scope(|scope| {
         let scanning = scope.spawn(|| machine.scanning(&asked.scanned));
         let findings = examine_each(machine, |index, finding| rows.answered(index, finding));
@@ -180,19 +143,15 @@ pub(crate) fn run<R: BufRead, W: Write>(
     Ok(ready)
 }
 
-/// The two parts of the report, written row by row as the probes answer:
-/// a row goes out once it and every row above it on the screen have
-/// answered, so the layout is the same on every run however the answers
-/// race (`Sprawling/app/spec/Doctor.lean` §8-59).
 struct Rows<'o, W: Write> {
     out: &'o mut W,
     ink: Ink,
-    /// For each table index, where its row stands on the screen.
+
     place: Vec<usize>,
-    /// For each screen position, its part and, once answered, its row.
+
     lines: Vec<(Part, Option<String>)>,
     written: usize,
-    /// How many parts have their heading on the screen.
+
     opened: usize,
 }
 
@@ -240,8 +199,6 @@ impl<'o, W: Write> Rows<'o, W> {
         self.out.flush()
     }
 
-    /// Writes the heading of every part up to the one ranked `rank`,
-    /// closing the part before each with a blank line.
     fn open_through(&mut self, rank: usize) -> std::io::Result<()> {
         while self.opened <= rank {
             if self.opened > 0 {
@@ -255,7 +212,6 @@ impl<'o, W: Write> Rows<'o, W> {
         Ok(())
     }
 
-    /// Opens the parts no row reached, and closes the last one.
     fn close(mut self) -> std::io::Result<()> {
         self.open_through(Part::ALL.len().saturating_sub(1))?;
         writeln!(self.out)
@@ -269,9 +225,6 @@ fn rank(part: Part) -> usize {
     }
 }
 
-/// The part that says where this machine lets the core's threads stand.
-/// A thread the valve lowered is a serving city's, never the doctor's,
-/// but the arm keeps the words for every standing in this one place.
 fn priority_lines(core: &Result<Standing, AxError>) -> [String; 4] {
     let level = match core {
         Ok(Standing::Raised) => "one step above normal".to_owned(),
@@ -294,9 +247,6 @@ fn priority_lines(core: &Result<Standing, AxError>) -> [String; 4] {
     ]
 }
 
-/// One line per building that asked for what this machine lacks, and
-/// one per building whose rules will not read. Answers whether every
-/// building has what it asked for.
 fn report_city<W: Write>(
     city: &std::path::Path,
     findings: &[Finding],
@@ -336,9 +286,6 @@ fn report_city<W: Write>(
     Ok(whole)
 }
 
-/// Offers every absent item, one question at a time, and reports what
-/// was installed. Nothing runs that was not asked about and answered
-/// `y`, and nothing runs with elevation.
 fn offer<R: BufRead, W: Write>(
     findings: &[Finding],
     machine: &dyn Machine,
@@ -360,8 +307,7 @@ fn offer<R: BufRead, W: Write>(
         let name = finding.requirement.name;
         let recipe = finding.requirement.recipe.at(platform);
         writeln!(out, "\n  {name}: {}", recipe.spelled())?;
-        // The one authority on whether this city may run a recipe also
-        // holds the sentence saying what the person does instead.
+
         let runnable = match recipe.command(name) {
             Ok(runnable) => runnable,
             Err(refused) => {
@@ -372,8 +318,7 @@ fn offer<R: BufRead, W: Write>(
         write!(out, "  run it? [y/N] ")?;
         out.flush()?;
         let mut answer = String::new();
-        // End of input is not consent: an unattended stdin has nobody to
-        // ask, so the honest reading of silence is no.
+
         if input.read_line(&mut answer)? == 0 {
             writeln!(out, "\n  nobody answered; nothing was installed")?;
             break;

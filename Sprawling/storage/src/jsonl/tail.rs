@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The ledger read from its tail: the newest line first, segment by
-//! segment backwards, each segment read from its end through a window
-//! that starts at one page and doubles (the rule `first_line` uses), so
-//! a reader that wants the last N records pays for their bytes and not
-//! for the whole ledger (`Sprawling/storage/spec/Jsonl.lean` §8-1). Each line passes the same
-//! judgement a forward reader applies (`LineCheck::judge`); the chain is
-//! linked from the newer end instead.
-
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -25,15 +17,12 @@ use super::first_line::FIRST_WINDOW_BYTES;
 use super::ledger::is_segment;
 use super::verify::{CheckedLine, LineCheck, LineFault};
 
-/// One line of the ledger, newest first: its bytes and what it is.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TailLine {
     pub raw: Vec<u8>,
     pub checked: CheckedLine,
 }
 
-/// The ledger's lines from the newest back. The walk ends after the
-/// oldest line, or after the first failure it yields.
 pub struct TailLines {
     vfs: Box<dyn Vfs>,
     segments: Vec<PathBuf>,
@@ -42,15 +31,12 @@ pub struct TailLines {
     ended: bool,
 }
 
-/// What the line read before (the newer one) requires of the next.
 #[derive(Clone, Copy)]
 struct Link {
     seq: Seq,
     prev: B3Hash,
 }
 
-/// One segment being read from its end. `held` is the segment's bytes
-/// from `unread` up to the end of its last complete line.
 struct Backward {
     path: PathBuf,
     unread: u64,
@@ -59,11 +45,7 @@ struct Backward {
 }
 
 impl TailLines {
-    /// The walk over the ledger in `dir`, read only: it never opens the
-    /// ledger, never repairs and never writes.
-    ///
-    /// # Errors
-    /// The directory cannot be listed.
+
     pub fn at(dir: &Path) -> Result<Self, StorageError> {
         Self::through(Box::new(RealFs::new()), dir)
     }
@@ -84,7 +66,6 @@ impl TailLines {
         })
     }
 
-    /// The next non-empty line back, crossing into older segments.
     fn next_raw(&mut self) -> Result<Option<Vec<u8>>, StorageError> {
         loop {
             let reading = match self.reading.as_mut() {
@@ -107,8 +88,6 @@ impl TailLines {
         }
     }
 
-    /// Judges `raw` as a forward reader would and links it to the newer
-    /// line: its hash is the newer line's `prev`, its seq the one before.
     fn link(&self, raw: &[u8]) -> Result<(Link, CheckedLine), LineFault> {
         let judged = LineCheck::judge(raw)?;
         if let Some(newer) = self.newer {
@@ -132,9 +111,6 @@ impl TailLines {
         Ok((link, judged.checked))
     }
 
-    /// A refused line, named by the 1-based line the chain places it
-    /// at: the newer line's seq. The newest line has no newer one, and
-    /// is named line 0.
     fn refusal(&self, fault: LineFault) -> StorageError {
         let line = self.newer.map_or(0, |newer| newer.seq.value());
         StorageError::Envelope {
@@ -177,8 +153,7 @@ impl Iterator for TailLines {
     }
 }
 impl Backward {
-    /// The segment at `path`, its torn tail (the bytes after its last
-    /// `\n`) already set aside: they are not a line.
+
     fn open(vfs: &dyn Vfs, path: PathBuf) -> Result<Self, StorageError> {
         let unread = vfs.size(&path).map_err(io_err("size segment", &path))?;
         let mut backward = Self {
@@ -202,8 +177,6 @@ impl Backward {
         }
     }
 
-    /// The last line `held` ends with, without its `\n`; `None` once the
-    /// segment has no line left.
     fn pop_line(&mut self, vfs: &dyn Vfs) -> io::Result<Option<Vec<u8>>> {
         loop {
             let Some((_newline, body)) = self.held.split_last() else {
@@ -223,8 +196,6 @@ impl Backward {
         }
     }
 
-    /// Puts the window of bytes before `held` in front of it, and doubles
-    /// the window for the next read.
     fn read_further(&mut self, vfs: &dyn Vfs) -> io::Result<()> {
         let take = self.window.min(self.unread);
         let from = self.unread.saturating_sub(take);

@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Reading a record back out of the ledger.
-//!
-//! The writers in the parent module decide what a record says; these
-//! decide what a reader may conclude from one. They are separate
-//! because the two directions fail differently: a write fails when this
-//! build cannot encode something it holds, and a read fails when the
-//! history holds something this build cannot name.
-
 use kernel::event::record::{AttachedTuning, EndpointAttached, ModelSelected};
 use kernel::{AxError, DialectKind, ModelTag, Payload, Retries};
 
@@ -30,9 +22,7 @@ pub(crate) fn read_attached(payload: &Payload) -> Result<AttachedEndpoint, AxErr
         (Some(value), Some(name)) => AuthSpec::Header { name, value },
         (Some(reference), None) => AuthSpec::Bearer(reference),
     };
-    // A line written before this key existed was written by a build
-    // that had one registration per format, so the format is what the
-    // connection was.
+
     let connection_kind = match attached.connection_kind {
         Some(word) => ConnectionKind::parse(&word)?,
         None => match attached.dialect {
@@ -47,11 +37,7 @@ pub(crate) fn read_attached(payload: &Payload) -> Result<AttachedEndpoint, AxErr
         dialect: attached.dialect,
         connection_kind,
         auth,
-        // The line carries ids. What the provider said about each row is
-        // in the CAS blob `facts_blob` names, which whoever holds the CAS
-        // hands to `EndpointBook::learn`; until then, and for a line
-        // without one, a replay does not invent facts the history never
-        // held.
+
         models: attached
             .models
             .into_iter()
@@ -66,8 +52,6 @@ pub(crate) fn read_attached(payload: &Payload) -> Result<AttachedEndpoint, AxErr
     })
 }
 
-/// How the person set this endpoint up, as the line kept it; what the
-/// line left out reads as nothing settled.
 fn tuning_of(kept: AttachedTuning) -> Result<EndpointTuning, AxError> {
     super::super::tuning::validate_accounts(kept.accounts.as_deref())?;
     Ok(EndpointTuning {
@@ -80,12 +64,7 @@ fn tuning_of(kept: AttachedTuning) -> Result<EndpointTuning, AxError> {
             .extra_headers
             .into_iter()
             .map(|(name, text)| {
-                // Entry is where a value that reads as a credential is
-                // refused, so a line that holds one was written before
-                // that refusal existed. Replay keeps it as the literal
-                // it is: the key is already in the ledger, and dropping
-                // the header here would change how a person's endpoint
-                // is called without telling them.
+
                 let value = match HeaderValue::parse(&name, &text) {
                     Ok(value) => value,
                     Err(_) => HeaderValue::Plain(text),
@@ -95,9 +74,7 @@ fn tuning_of(kept: AttachedTuning) -> Result<EndpointTuning, AxError> {
             .collect(),
         overrides: kept.overrides,
         proxying: kept.proxying.unwrap_or_default(),
-        // A ceiling outside 1 to 256 was never admitted at entry, so a
-        // line holding one reads as nothing settled, like every other
-        // tuning key this build cannot read.
+
         max_in_flight: match kept.max_in_flight.map(MaxInFlight::try_from) {
             Some(Ok(ceiling)) => Some(ceiling),
             Some(Err(_)) | None => None,
@@ -110,9 +87,7 @@ fn tuning_of(kept: AttachedTuning) -> Result<EndpointTuning, AxError> {
 pub(crate) fn read_choice(payload: &Payload) -> Result<(ModelTag, Choice), AxError> {
     let selected: ModelSelected = payload.read()?;
     let max_output_tokens = selected.ceiling();
-    // A figure the line carries names its rung, and a figure on a line
-    // written before the rung's key existed reads as the earlier
-    // registration (gateway D37); a figure the line lacks has no rung.
+
     let rung = |present: bool, word: Option<&str>| {
         present.then(|| word.map_or(FigureSource::Registered, FigureSource::read))
     };
@@ -121,10 +96,7 @@ pub(crate) fn read_choice(payload: &Payload) -> Result<(ModelTag, Choice), AxErr
         max_output_tokens.is_some(),
         selected.ceiling_from.as_deref(),
     );
-    // A record written while this build carried a retreat arm may hold
-    // `fallback_endpoint` and `fallback_model`. Nothing ever wrote a
-    // value into them and nothing acts on them now, so they are read
-    // past in the same way as any other key this book does not own.
+
     Ok((
         selected.tag,
         Choice {

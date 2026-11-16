@@ -3,46 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! seq → (segment name, line offset), eight bytes per line.
-//!
-//! The kernel numbers lines one after another, so a line's seq is
-//! implied by its place in a column that starts at `base`: the column
-//! holds one word per line, the segment dictionary id in the high
-//! [`SEG_BITS`] bits and the byte offset in the rest. A ledger of fifty
-//! thousand lines holds fifty thousand words and one name per segment.
-//!
-//! A damaged ledger may say otherwise, and an index over a damaged
-//! ledger is exactly what a repair path needs. A seq below `base`, one
-//! so far past the end that reaching it would leave the column more
-//! holes than `max(lines it holds, MIN_REACH)`, and a location too large
-//! to pack all go to `outliers`, an
-//! ordered map that answers the same questions. Each seq lives in at
-//! most one of the two, and a seq written twice keeps the last location.
-//!
-//! Specified by `Sprawling/storage/spec/Index.lean` §8-4.
-
 use std::collections::BTreeMap;
 
 use kernel::Seq;
 
-/// The bits of a column word that carry the segment dictionary id.
 const SEG_BITS: u32 = 16;
-/// The bits that carry the byte offset: 256 TiB per segment.
+
 const OFFSET_BITS: u32 = u64::BITS - SEG_BITS;
 const OFFSET_MASK: u64 = (1 << OFFSET_BITS) - 1;
-/// A slot no line has claimed. No packed word equals it, because
-/// [`pack`] refuses the one location that would spell it.
+
 const HOLE: u64 = u64::MAX;
-/// The holes a stretched column may hold when it holds fewer lines than
-/// this. Past that the bound is the lines it holds, so holes never cost
-/// more than the lines do.
+
 const MIN_REACH: usize = 64;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub(super) struct Entries {
     base: Seq,
     column: Vec<u64>,
-    /// How many slots of `column` are not [`HOLE`].
+
     in_column: usize,
     outliers: BTreeMap<Seq, (usize, u64)>,
     segs: Vec<String>,
@@ -76,8 +54,6 @@ impl Entries {
         }
     }
 
-    /// The column slot `seq` belongs in, stretching the column with
-    /// holes to reach it; `None` when it belongs with the outliers.
     fn slot_for(&mut self, seq: Seq) -> Option<usize> {
         if self.column.is_empty() && self.outliers.is_empty() {
             self.base = seq;
@@ -108,7 +84,6 @@ impl Entries {
         *slot = word;
     }
 
-    /// The dictionary id of one segment name, minted at first sight.
     fn seg_id(&mut self, name: &str) -> usize {
         if let Some(id) = self.segs.iter().position(|held| held == name) {
             return id;
@@ -138,14 +113,10 @@ impl Entries {
         self.in_column.saturating_add(self.outliers.len())
     }
 
-    /// Every seq held, ascending, from both stores.
     pub(super) fn seqs(&self) -> Seqs<'_> {
         self.seqs_from(Seq::FIRST)
     }
 
-    /// Every seq held at or after `from`, ascending, from both stores.
-    /// The column is entered at the slot `from` sits in and the outliers
-    /// at the key it sits at, so no seq before `from` is walked.
     pub(super) fn seqs_from(&self, from: Seq) -> Seqs<'_> {
         let column_len = u64::try_from(self.column.len()).unwrap_or(u64::MAX);
         let skipped = from
@@ -178,8 +149,6 @@ impl Entries {
     }
 }
 
-/// `seg` and `offset` in one column word, or `None` when either does not
-/// fit (or the pair would spell [`HOLE`]).
 fn pack(seg: usize, offset: u64) -> Option<u64> {
     let seg = u64::try_from(seg).ok()?;
     if seg >> SEG_BITS != 0 || offset & !OFFSET_MASK != 0 {
@@ -199,7 +168,6 @@ fn unpack(word: u64) -> Option<(usize, u64)> {
     ))
 }
 
-/// The seqs the column holds, ascending, holes skipped.
 struct ColumnSeqs<'a> {
     base: u64,
     words: std::iter::Enumerate<std::slice::Iter<'a, u64>>,
@@ -238,7 +206,6 @@ impl DoubleEndedIterator for ColumnSeqs<'_> {
     }
 }
 
-/// The seqs the outliers hold from some seq on, ascending.
 struct OutlierSeqs<'a>(std::collections::btree_map::Range<'a, Seq, (usize, u64)>);
 
 impl Iterator for OutlierSeqs<'_> {
@@ -254,9 +221,6 @@ impl DoubleEndedIterator for OutlierSeqs<'_> {
     }
 }
 
-/// One ascending source with its next value from each end looked at
-/// but not yet taken. When the inner iterator runs dry, the value held
-/// at the other end is the last one left.
 struct Ends<I> {
     inner: I,
     front: Option<Seq>,
@@ -287,8 +251,6 @@ impl<I: DoubleEndedIterator<Item = Seq>> Ends<I> {
     }
 }
 
-/// Every seq [`Entries`] holds, ascending: the column and the outliers
-/// merged, which is sound because the two hold disjoint seqs.
 pub(crate) struct Seqs<'a> {
     column: Ends<ColumnSeqs<'a>>,
     outliers: Ends<OutlierSeqs<'a>>,

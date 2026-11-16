@@ -3,40 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Run modes and admission. A run sits in exactly one mode; the
-//! catalog lists only that one (progressive disclosure — the other
-//! mode's text stays out of the window).
-//!
-//! One exception, and it is one line long: [`dev_entry`] tells a run
-//! that this city's own code is changeable, and names the evidence a
-//! change can be asked to carry. Without it an agent working in this
-//! city never learns that the city's own code and SPECs are changeable
-//! at all, or under what discipline — and a capability nobody is told
-//! about is one nobody uses.
-//!
-//! The half that decides is [`admits`]: it says whether what a run
-//! produced may land, given the run policy it was dispatched under
-//! (`Sprawling/runtime/spec/Mode.lean` §8-54). The evidence arrives as plain answers rather
-//! than as an instrument's type, because the instruments live in
-//! citysim, outside this crate, and the question here is not how
-//! evidence was gathered but whether enough of it exists.
-
 use crate::catalog::CatalogEntry;
 use kernel::{AdmissionRequirement, AxCode, AxError, LandingPolicy, Mode, RunPolicy};
 use std::sync::{Arc, PoisonError, RwLock};
 
-/// The name of the catalog row that opens the developer discipline.
 pub const DEV_ENTRY: &str = "dev";
 
-/// The row that tells a run this city is changeable, and nothing more.
-///
-/// One line in the resident segment, and the whole discipline behind an
-/// expansion. That split is the point: most sessions never change this
-/// city, so they pay a line; a session that is about to change it asks
-/// once and gets the evidence a change can be asked for, the reading
-/// order and what to do next. The same progressive disclosure the tool
-/// rows use, applied to the one capability an agent would otherwise
-/// never learn it has.
 #[must_use]
 pub fn dev_entry() -> CatalogEntry {
     CatalogEntry {
@@ -57,16 +29,12 @@ pub fn dev_entry() -> CatalogEntry {
                     evidence this work needs and why, and wait for the User to dispatch it \
                     with that requirement. Choosing a requirement does not provide the evidence."
             .to_owned(),
-        // Text this build holds, not a document on a shelf: there is
-        // nothing behind it that could change while nobody is looking.
+
         hash: None,
         document: String::new(),
     }
 }
 
-/// The catalog row for this mode: disclosure one-liner plus the
-/// expansion text. The chat row is the whole of what chat mode does:
-/// one line telling the resident that the person is talking with it.
 #[must_use]
 pub fn catalog_entry(mode: Mode) -> CatalogEntry {
     let (disclosure, expansion) = match mode {
@@ -90,19 +58,6 @@ pub fn catalog_entry(mode: Mode) -> CatalogEntry {
     }
 }
 
-/// The resident tools a run in `mode` may run (`Sprawling/runtime/Spec.lean`
-/// §8-60). The request carries the union of every mode's core
-/// ([`in_some_core`]), and [`mode_admits`] refuses at the call a tool the
-/// mode in force does not run; every other admitted tool waits in the
-/// dormant index. A name here travels only where the building admitted
-/// it: the hall registers no `exec`, so `exec` is in no tier there.
-///
-/// `tool` is in every mode, because a dormant capability is reachable
-/// only through it. Chat answers the
-/// person and reads what it is asked about; work also edits and runs
-/// commands, which is what carrying out a task is made of. `status` is in
-/// both because the city prompt sends every resident to it for its
-/// situation.
 #[must_use]
 pub fn core_tools(mode: Mode) -> &'static [&'static str] {
     match mode {
@@ -123,10 +78,6 @@ pub fn core_tools(mode: Mode) -> &'static [&'static str] {
     }
 }
 
-/// Whether `name` travels as a tool in every request of a session: it is
-/// in the core of some mode. The tool array is this union in every mode
-/// (runtime D25), so a change of mode mid-session leaves its bytes
-/// alone; [`mode_admits`] is where the mode in force still decides.
 #[must_use]
 pub fn in_some_core(name: &str) -> bool {
     Mode::ALL
@@ -134,14 +85,6 @@ pub fn in_some_core(name: &str) -> bool {
         .any(|mode| core_tools(*mode).contains(&name))
 }
 
-/// The gate a resident tool asks at its call: a tool that some mode
-/// carries and the mode in force does not is refused, before it does
-/// anything (runtime D25). A tool outside every core is the catalog's
-/// to reach through `tool`'s `run`, and this gate does not judge it.
-///
-/// # Errors
-/// `E_GATE_DENIED`, naming the tool and the mode, when the mode in
-/// force does not run it.
 pub fn mode_admits(policy: &RunPolicy, name: &str) -> Result<(), AxError> {
     if !in_some_core(name) || core_tools(policy.mode).contains(&name) {
         return Ok(());
@@ -154,15 +97,6 @@ pub fn mode_admits(policy: &RunPolicy, name: &str) -> Result<(), AxError> {
     .with_recovery("answer in the conversation, or ask the User to switch this run to work mode"))
 }
 
-/// The run policy in force for one run (`Sprawling/runtime/spec/PolicyTake.lean`
-/// §8-62, runtime D28).
-///
-/// One writer and many readers. A change that reaches the run at any
-/// safe point waits in the cell, and the run's driver loop puts the
-/// last one in force at `SafePoint::BeforeWave` and nowhere else; the
-/// write gates hold a [`PolicyReader`] that they ask once per write. So
-/// every call of one wave is judged under one policy, the one in force
-/// when the wave began.
 #[derive(Debug)]
 pub struct PolicyCell {
     shared: Arc<RwLock<RunPolicy>>,
@@ -170,7 +104,7 @@ pub struct PolicyCell {
 }
 
 impl PolicyCell {
-    /// The cell a run opens with, holding `run_started.policy`.
+
     #[must_use]
     pub fn new(start: RunPolicy) -> PolicyCell {
         PolicyCell {
@@ -179,7 +113,6 @@ impl PolicyCell {
         }
     }
 
-    /// A read-only view of the policy in force, for a write gate.
     #[must_use]
     pub fn reader(&self) -> PolicyReader {
         PolicyReader {
@@ -187,43 +120,31 @@ impl PolicyCell {
         }
     }
 
-    /// A `run_policy_changed` reached the run at a safe point. It waits
-    /// for the next `BeforeWave`; a later arrival overrides it.
     pub(crate) fn arrive(&mut self, policy: RunPolicy) {
         self.arrived = Some(policy);
     }
 
-    /// At `SafePoint::BeforeWave`: puts the last arrival in force and
-    /// hands it back so the driver can append the note that tells the
-    /// model; `None` when nothing arrived, and then nothing is appended.
     pub(crate) fn take_at_wave(&mut self) -> Option<RunPolicy> {
         let taken = self.arrived.take()?;
-        // A poisoned lock still holds a whole policy: the only write is
-        // the assignment of a `Copy` value, which cannot stop halfway.
+
         *self.shared.write().unwrap_or_else(PoisonError::into_inner) = taken;
         Some(taken)
     }
 }
 
-/// What a write gate reads: the policy in force, never a change that
-/// has arrived and not yet been taken.
 #[derive(Debug, Clone)]
 pub struct PolicyReader {
     shared: Arc<RwLock<RunPolicy>>,
 }
 
 impl PolicyReader {
-    /// The policy in force now; asked once per write.
+
     #[must_use]
     pub fn now(&self) -> RunPolicy {
         *self.shared.read().unwrap_or_else(PoisonError::into_inner)
     }
 }
 
-/// The note appended after a wave's results when a change was taken. It
-/// is the only place a run's write limit is spelled to the model, so the
-/// frozen prefix and the tool descriptions stay byte for byte as they
-/// were sent (§8-62).
 #[must_use]
 pub(crate) fn policy_note(policy: &RunPolicy) -> String {
     format!(
@@ -236,25 +157,18 @@ pub(crate) fn policy_note(policy: &RunPolicy) -> String {
     )
 }
 
-/// What a run has to show for itself.
-///
-/// `None` is not `Some(false)`: a suite that was never run and a suite
-/// that failed are different facts, and a requirement that treated them
-/// alike would let "we did not check" pass as "we checked and it was
-/// fine".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Produced {
-    /// The asset's own tests ran and passed.
+
     pub tests_passed: Option<bool>,
-    /// The observable contract moved under the renovation.
+
     pub contract_moved: bool,
-    /// Held-in evidence: it did not get worse on what it was built from.
+
     pub held_in: Option<bool>,
-    /// Held-out evidence: it stands up away from what it was built from.
+
     pub held_out: Option<bool>,
 }
 
-/// Whether this may land, and if not, what to do about it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Admission {
     Lands,
@@ -264,13 +178,6 @@ pub enum Admission {
     },
 }
 
-/// Whether what a run produced may be merged, under the policy it was
-/// dispatched with (`Sprawling/runtime/spec/Mode.lean` §8-54).
-///
-/// The landing policy is asked first: an experiment lands nothing
-/// however well it went. Then the evidence requirement, exhaustively,
-/// so a new requirement has to say what it demands. The mode takes no
-/// part: talk and work produce things that meet the same merge.
 #[must_use]
 pub fn admits(policy: &RunPolicy, produced: &Produced) -> Admission {
     match policy.landing {
@@ -283,15 +190,6 @@ pub fn admits(policy: &RunPolicy, produced: &Produced) -> Admission {
     }
 }
 
-/// The evidence half of [`admits`].
-///
-/// `Standing` adds nothing: the building's own checks were made where
-/// they are made. `Tested` wants the asset proven by its own tests.
-/// `ContractKept` wants the contract to have stayed where it was,
-/// because a renovation that moves it is not a renovation.
-/// `DoubleValidated` wants both halves of the double validation: it is
-/// asked for a change to how the city behaves, so confidence is not the
-/// currency — evidence is.
 fn admits_evidence(required: AdmissionRequirement, produced: &Produced) -> Admission {
     match required {
         AdmissionRequirement::Standing => Admission::Lands,
@@ -348,9 +246,6 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
 
-    /// One thing a run meets, as `Sprawling/runtime/spec/PolicyTake.lean`
-    /// names it: a change reaching the run, a `BeforeWave`, or one call of
-    /// the wave asking a write gate.
     #[derive(Debug, Clone, Copy)]
     enum Step {
         Change(RunPolicy),
@@ -381,9 +276,6 @@ mod tests {
         ]
     }
 
-    /// The model's two properties over every trace: a wave's calls all
-    /// read the policy in force when the wave began, and a `BeforeWave`
-    /// takes the last change that arrived before it, and only then.
     fn walk(start: RunPolicy, trace: &[Step]) -> Result<(), TestCaseError> {
         let mut cell = PolicyCell::new(start);
         let gate = cell.reader();
@@ -416,8 +308,6 @@ mod tests {
         }
     }
 
-    /// The model's counterexample to reading the mailslot
-    /// (`eager_reading_splits_a_wave`), kept as the trace that bit.
     #[test]
     fn a_change_inside_a_wave_leaves_that_wave_alone() {
         let start = RunPolicy::of(Mode::Work);
@@ -428,8 +318,6 @@ mod tests {
         walk(start, &[Step::Call, Step::Change(tighter), Step::Call]).unwrap();
     }
 
-    /// The tool list is the same in every mode, so the mode in force is
-    /// asked at the call: a chat run creates nothing (runtime D25).
     #[test]
     fn a_chat_run_is_refused_an_edit_and_the_disk_is_untouched() {
         let tmp = tempfile::tempdir().unwrap();
@@ -472,8 +360,6 @@ mod tests {
         }
     }
 
-    /// A requirement chosen is not evidence held: work that asked for
-    /// its own tests and ran none does not land.
     #[test]
     fn a_work_run_without_the_evidence_it_chose_does_not_land() {
         let Admission::Refused { because, .. } =
@@ -484,7 +370,6 @@ mod tests {
         assert!(because.contains("no tests"), "{because}");
     }
 
-    /// A chat run is told one thing, to talk with the person.
     #[test]
     fn chat_is_one_line_about_the_conversation() {
         let entry = catalog_entry(Mode::Chat);
@@ -498,8 +383,6 @@ mod tests {
         assert_eq!(catalog_entry(Mode::Work).name, "mode:work");
     }
 
-    /// The building's own checks are made where they are made; the
-    /// standing requirement adds none, in either mode.
     #[test]
     fn standing_adds_nothing_in_either_mode() {
         for mode in Mode::ALL {
@@ -584,8 +467,6 @@ mod tests {
         assert!(because.contains("held-out"));
     }
 
-    /// An experiment lands nothing, whatever it proved and whatever it
-    /// was allowed to write.
     #[test]
     fn an_experiment_lands_nothing_however_well_it_went() {
         let excellent = Produced {

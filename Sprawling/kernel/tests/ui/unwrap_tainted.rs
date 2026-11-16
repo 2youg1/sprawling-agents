@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The taint ring has no exit: no field access, no into_inner — external
-// content cannot be washed clean and passed along bare.
-
 fn main() {
     let source = kernel::TaintSource::new("web:x").unwrap();
     let tainted = kernel::Tainted::new("payload".to_owned(), source);

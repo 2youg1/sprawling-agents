@@ -3,71 +3,26 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Pairing tokens: minting, the one form a person may read, and the
-//! comparison. Every listener asks for a key (`reception::decide_bind`
-//! refuses to start without one); a listener reachable from elsewhere on
-//! the network shows its key once as a pairing token.
-//!
-//! The token's whole life is here so that no other module needs its
-//! plaintext: callers hand [`PairingToken::digest`] to the server and keep
-//! the token itself, and comparison happens on digests.
-//!
-//! Entropy arrives as a parameter. This module samples nothing - the seeded
-//! RNG is handed down from the assembly layer,
-//! which is also what makes minting testable.
-
 use kernel::{AxCode, AxError, B3Hash};
 
-/// Whether the caller held this city's pairing token.
-///
-/// The verdict a door hands inward, so it is vocabulary rather than
-/// listener: the city's writer reads it without the `server` feature
-/// (wire D2).
-///
-/// An enum rather than a boolean so that neither a door nor an
-/// admission can pass the verdict the wrong way round and still
-/// compile.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Pairing {
     Held,
     Absent,
 }
 
-/// Digits and letters that survive being read aloud and typed back:
-/// `0/O`, `1/l/I` and `5/S` are absent because a pairing code is transcribed
-/// by a person, and a code that cannot be dictated fails in the one moment
-/// it exists for.
 const ALPHABET: &[u8; 29] = b"2346789abcdefghjkmnpqrtuvwxyz";
 
-/// Characters per readable group, and number of groups. Four groups of five
-/// over a 29-symbol alphabet is a little over 97 bits - far beyond what an
-/// attacker on the same network segment can exhaust, and still short enough
-/// to read to somebody in the next room.
 const GROUP_LEN: usize = 5;
 const GROUP_COUNT: usize = 4;
 
-/// The shortest configured token this module will accept. Below this a token
-/// is decoration; refusing it is cheaper than explaining later why the port
-/// was open.
 const MIN_CONFIGURED_LEN: usize = 16;
 
-/// A pairing token, held as the digest of the code and nothing else.
-///
-/// The plaintext never lives in this type. [`PairingToken::mint`] hands the
-/// readable code straight back to its caller, who shows it to a person once,
-/// and keeps only what verification needs. Sealing a value and then exposing
-/// it on the next line would be theatre; not holding it at all is the
-/// property we actually wanted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PairingToken(B3Hash);
 
 impl PairingToken {
-    /// Mints a token from caller-supplied entropy, returning the token and
-    /// the code to display exactly once.
-    ///
-    /// Deterministic in `entropy`: same bytes, same token. The randomness
-    /// lives in whoever fills `entropy`, which is the assembly layer's seeded
-    /// generator, never a sample taken here.
+
     #[must_use]
     pub fn mint(entropy: [u8; 32]) -> (Self, String) {
         let text = spell(&entropy, GROUP_LEN, GROUP_COUNT);
@@ -75,10 +30,6 @@ impl PairingToken {
         (token, text)
     }
 
-    /// Adopts a token the operator configured rather than one we minted.
-    ///
-    /// # Errors
-    /// Refuses anything too short to be worth comparing.
     pub fn from_configured(raw: &str) -> Result<Self, AxError> {
         if raw.chars().count() < MIN_CONFIGURED_LEN {
             return Err(AxError::failure(
@@ -91,17 +42,12 @@ impl PairingToken {
         Ok(Self(B3Hash::digest(raw.as_bytes())))
     }
 
-    /// What the server is given, and all it ever needs.
     #[must_use]
     pub fn digest(&self) -> B3Hash {
         self.0
     }
 }
 
-/// Spells `entropy` in the alphabet a person reads aloud: `groups` groups
-/// of `group_len` symbols joined by `-`, one symbol a byte. The one
-/// spelling of every code a person types: the pairing token above and
-/// the pairing code of this machine's door (`reception::pairing`).
 pub(crate) fn spell(entropy: &[u8], group_len: usize, groups: usize) -> String {
     let mut text = String::new();
     for (index, byte) in entropy
@@ -122,12 +68,6 @@ pub(crate) fn spell(entropy: &[u8], group_len: usize, groups: usize) -> String {
     text
 }
 
-/// Compares a presented token against a stored digest in constant time.
-///
-/// `None` is not an empty string: a peer that sent no token at all is
-/// refused without ever entering the comparison, and a peer that sent an
-/// empty one still pays the full comparison so the two are indistinguishable
-/// from outside.
 #[must_use]
 pub fn verify(presented: Option<&str>, expected: &B3Hash) -> bool {
     let Some(presented) = presented else {

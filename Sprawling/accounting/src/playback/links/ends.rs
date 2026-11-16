@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every key moment, message and call written with its two ends, once
-//! the fold has paired them and settled every deferred end
-//! (`Sprawling/accounting/spec/Playback.lean` §8-12).
-
 use std::collections::BTreeSet;
 
 use kernel::Seq;
@@ -15,8 +11,7 @@ use super::super::document::{Call, Callee, Decimal, End, Message, Moment, Took};
 use super::{CallId, Key, Links, Seat, Visibility};
 
 impl Links {
-    /// Every key moment with a member the reader sees in range, adding
-    /// to `outside` the seqs of the ends the bundle's context must hold.
+
     pub(in crate::playback) fn moments(&self, outside: &mut BTreeSet<Seq>) -> Vec<Moment> {
         self.links
             .iter()
@@ -38,7 +33,6 @@ impl Links {
             .collect()
     }
 
-    /// Every message with an end the reader sees in range.
     pub(in crate::playback) fn messages(&self, outside: &mut BTreeSet<Seq>) -> Vec<Message> {
         self.links
             .iter()
@@ -56,8 +50,6 @@ impl Links {
             .collect()
     }
 
-    /// Every call with a line the reader sees in range, in the order of
-    /// its first such line.
     pub(in crate::playback) fn calls(&self, outside: &mut BTreeSet<Seq>) -> Vec<Call> {
         let mut calls: Vec<(Seq, Call)> = self
             .links
@@ -86,7 +78,6 @@ impl Links {
     }
 }
 
-/// What a call called, by what its two lines are paired by.
 fn callee(id: &CallId, name: Option<String>) -> Callee {
     match id {
         CallId::Tool(id) => Callee::Tool {
@@ -97,8 +88,6 @@ fn callee(id: &CallId, name: Option<String>) -> Callee {
     }
 }
 
-/// One end as the bundle writes it; `absent` is what a missing end means
-/// on this side.
 fn end(seat: Option<Seat>, absent: End, outside: &mut BTreeSet<Seq>) -> End {
     match seat {
         None => absent,

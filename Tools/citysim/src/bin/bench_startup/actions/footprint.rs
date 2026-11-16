@@ -3,24 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one sample wrote under a directory: how many files, how many
-//! ledger lines, where one named file sits, and how to level it again
-//! between samples (`Tools/citysim/spec/BenchStartup.lean` §8-5).
-//!
-//! Shape: adapter. One walk of the tree answers every question here, so
-//! the counts and the lookup cannot disagree about which directories were
-//! entered, and a directory the walk could not read is reported once
-//! rather than erased per reader.
-
 use std::path::{Path, PathBuf};
 
 use kernel::{AxCode, AxError};
 
-/// Every regular file under `root`, in the order the walk reaches it.
-///
-/// Directories are entered, never returned: a directory a sample created
-/// is a name on the way to a file, and counting it as something the
-/// sample wrote would report the tree's shape as its weight.
 fn files(root: &Path) -> Result<Vec<PathBuf>, AxError> {
     let mut found = Vec::new();
     let mut frontier = vec![root.to_path_buf()];
@@ -38,18 +24,11 @@ fn files(root: &Path) -> Result<Vec<PathBuf>, AxError> {
     Ok(found)
 }
 
-/// How many files sit under `root`, directories not counted.
 pub(super) fn files_under(root: &Path) -> Result<u64, AxError> {
     let count = files(root)?.len();
     u64::try_from(count).map_err(|_| too_many("files"))
 }
 
-/// The first file under `root` named `name`, in the order the walk
-/// reaches it: the same lookup `install.sh` performs with `find`.
-///
-/// `None` is an answer rather than a failure - an archive may legitimately
-/// hold no executable - and the caller that needs one says what its
-/// absence means.
 pub(super) fn find_named(root: &Path, name: &str) -> Result<Option<PathBuf>, AxError> {
     Ok(files(root)?.into_iter().find(|path| {
         path.file_name()
@@ -57,8 +36,6 @@ pub(super) fn find_named(root: &Path, name: &str) -> Result<Option<PathBuf>, AxE
     }))
 }
 
-/// How many lines the ledger under `dir` holds: one per append, one per
-/// durability barrier.
 pub(super) fn ledger_lines(dir: &Path) -> Result<u64, AxError> {
     let mut seen = 0_u64;
     for path in files(dir)? {
@@ -79,8 +56,6 @@ pub(super) fn ledger_lines(dir: &Path) -> Result<u64, AxError> {
     Ok(seen)
 }
 
-/// Takes one sample's directory away between samples, so every sample
-/// writes a fresh name and the on-access scanner meets each one cold.
 pub(super) fn clear(dir: &Path) -> Result<(), AxError> {
     std::fs::remove_dir_all(dir).map_err(|err| {
         AxError::failure(
@@ -122,10 +97,6 @@ fn too_many(what: &str) -> AxError {
 mod tests {
     use super::{files_under, find_named, ledger_lines};
 
-    /// Two directories and three files, one directory named after the
-    /// executable the walk has to find: a count that counted directories
-    /// would answer five, and a lookup that matched a directory would
-    /// answer the wrong path.
     fn tree() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join("sprawling/inner")).unwrap();

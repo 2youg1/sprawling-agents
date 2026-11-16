@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a checkpoint line holds, and for a committed one the calls the
-//! commit is the result of and the commit it is compared with, as a
-//! playback bundle's reader may see them (`Sprawling/accounting/spec/Playback.lean` §8-12, `Sprawling/accounting/spec/Playback/Traced.lean` §8-17
-//! and 8-25, decisions 24(f), 29(d) and 37(b)).
-//!
-//! Attribution is `accounting::trace`'s: this module folds the walk's
-//! verified lines into a `trace::History`, asks it about a commit at the
-//! line that first announced it, and writes the answer down, each call by
-//! what the reader may see of its line. Asked there, the views know
-//! nothing after that line, so neither a later announcement of the same
-//! oid nor a line after the cutoff changes the answer.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -29,28 +17,21 @@ use super::reader::Readership;
 use crate::trace::History;
 use crate::views::commits::commit_facts;
 
-/// What a commit's evidence is read from: the history folded up to the
-/// line in hand, which lines announced a commit first, and what the
-/// history said at each committed checkpoint the bundle holds.
 pub(super) struct Evidence {
-    /// The city whose repository and history the evidence is read from.
+
     city_root: PathBuf,
     history: History,
-    /// Every commit a line up to here announced, and the lines that
-    /// announced one again.
+
     announced: BTreeSet<GitOid>,
     repeated: BTreeSet<Seq>,
-    /// What the history said about the commit each held checkpoint
-    /// announced first, as of that checkpoint's line.
+
     answers: BTreeMap<Seq, Result<Option<wire::CommitAnswer>, AxError>>,
 }
 
-/// What the bundle already knows about the lines a trace may name, and
-/// the index the walk built, which a trace reads its lines through.
 pub(super) struct Known<'a> {
-    /// The bundle's `events`, in ascending seq.
+
     pub(super) events: &'a [Event],
-    /// The `tool_called` lines the reader may not see.
+
     pub(super) hidden: &'a BTreeSet<Seq>,
     pub(super) links: &'a Links,
     pub(super) index: &'a LedgerIndex,
@@ -67,12 +48,6 @@ impl Evidence {
         }
     }
 
-    /// Folds one verified line in, in seq order, and notes whether it
-    /// announces a commit an earlier line announced.
-    ///
-    /// # Errors
-    /// Propagates [`commit_facts`]'s refusal of a commit payload that
-    /// does not read.
     pub(super) fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError> {
         self.history.absorb(record);
         if let Some((oid, _)) = commit_facts(record)?
@@ -83,18 +58,12 @@ impl Evidence {
         Ok(())
     }
 
-    /// Holds what the history folded so far says about `oid`, which the
-    /// checkpoint at `announced` names, unless an earlier line announced
-    /// it: the trace of a commit is its first announcement's.
     pub(super) fn hold(&mut self, announced: Seq, oid: GitOid) {
         if !self.repeated.contains(&announced) {
             self.answers.insert(announced, self.history.commit(oid));
         }
     }
 
-    /// Fills each committed checkpoint's base, diff and trace: its trace
-    /// first, because the base is the trace's previous commit, then the
-    /// diff from that base.
     pub(super) fn attach(
         &self,
         checkpoints: &mut [Checkpoint],
@@ -123,9 +92,6 @@ impl Evidence {
         }
     }
 
-    /// The base the commit announced at `announced` is compared with, and
-    /// the calls it is the result of. A trace that fails is written down
-    /// as unread, so a history the views refuse still exports.
     fn traced(&self, announced: Seq, known: &Known<'_>) -> (Base, CallTrace) {
         let ledger_dir = CityLayout::new(&self.city_root).ledger();
         let found = match self.answers.get(&announced) {
@@ -167,8 +133,6 @@ impl Evidence {
     }
 }
 
-/// The same run's previous commit; else the commit's one parent; else
-/// nothing. Never the city's adjacent commit, which may be another run's.
 fn base_of(commit: &wire::CommitAnswer) -> Base {
     match (commit.previous, commit.parents.as_deref()) {
         (Some(previous), _) => Base::Previous(previous.oid),
@@ -178,7 +142,7 @@ fn base_of(commit: &wire::CommitAnswer) -> Base {
 }
 
 impl Known<'_> {
-    /// The entry of `events` at `seq`.
+
     fn line_at(&self, seq: Seq) -> Option<&Event> {
         self.events
             .binary_search_by_key(&Decimal(seq.value()), |event| event.seq)
@@ -187,7 +151,6 @@ impl Known<'_> {
     }
 }
 
-/// One call by what the reader may see of its line.
 fn cited(at: Seq, known: &Known<'_>) -> Cited {
     if known.line_at(at).is_some() {
         Cited::At(Decimal(at.value()))
@@ -198,10 +161,6 @@ fn cited(at: Seq, known: &Known<'_>) -> Cited {
     }
 }
 
-/// What a line says about a commit or a job pin: the pin read by its own
-/// type, and every commit as `commit_facts`, the one place that tells
-/// which lines name a commit and which oid, identifies it
-/// (`Sprawling/accounting/spec/Playback.lean` §8-12, accounting D24 (f)).
 pub(super) fn checkpoint_of(record: &EventRecord) -> Result<Option<Holds>, AxError> {
     let named = commit_facts(record)?.map(|(oid, _)| oid);
     if record.kind() == EventKind::CheckpointCommitted {

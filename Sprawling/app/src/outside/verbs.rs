@@ -3,44 +3,25 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which class of verb a frame from a remote device carries
-//! (`Sprawling/app/spec/Outside/Conduit.lean` §8-139; `Sprawling/wire/Spec.lean` §19-2).
-//!
-//! The table in `Sprawling/wire/Spec.lean` §19-2 states each Command's class,
-//! and `xtask wiring` reads the arms of [`command_class`] against it, so
-//! the table and this match are one decision written twice and checked
-//! as one. The match is exhaustive: a Command added to the wire does
-//! not compile here until somebody decides its class, and the decision
-//! the table records for every new Command is `LocalOnly`.
-//!
-//! Pure: no door, no clock. Whether a session may carry the class is
-//! `remote_access::door::permits`, asked by the conduit.
-
 use remote_access::door::VerbClass;
 
-/// What the relay does with one frame a device sent.
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum Passage {
-    /// The door judges it: forwarded when the session's authority
-    /// permits the class, refused otherwise.
+
     Judged(VerbClass),
-    /// The device's greeting, which the relay sends on as the city's
-    /// own: the device does not know this city's pairing token, and
-    /// never has to.
+
     Greeting(wire::Hello),
 }
 
 pub(super) fn passage(frame: wire::ClientFrame) -> Passage {
     match frame {
         wire::ClientFrame::Hello(said) => Passage::Greeting(said),
-        // The privacy page answers with the host's settings and the values
-        // this app found before it changed them, which are the host's and
-        // not the city's (`Sprawling/wire/Spec.lean` §8-88).
+
         wire::ClientFrame::Ask(wire::Ask {
             query: wire::Query::Privacy,
             ..
         }) => Passage::Judged(VerbClass::LocalOnly),
-        // Asking and watching read the city and change nothing.
+
         wire::ClientFrame::Ask(_) | wire::ClientFrame::Monitor(_) => {
             Passage::Judged(VerbClass::Read)
         }
@@ -48,12 +29,6 @@ pub(super) fn passage(frame: wire::ClientFrame) -> Passage {
     }
 }
 
-/// The class of one Command, as `Sprawling/wire/Spec.lean` §19-2 states it.
-///
-/// `Act` is the work a person away from the machine still does: send
-/// work, change its course, stop it, answer what it asks. Everything
-/// that widens access, reaches a credential or the machine, or changes
-/// what governs the city is `LocalOnly`.
 pub(super) fn command_class(command: &wire::WireCommand) -> VerbClass {
     match command {
         wire::Command::Dispatch { .. }

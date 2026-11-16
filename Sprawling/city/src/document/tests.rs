@@ -7,17 +7,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::*;
 
-/// Long enough that one `write_all` reaches the device in several
-/// pieces, which is the window a truncating write leaves open.
 fn version(mark: char) -> Vec<u8> {
     std::iter::repeat_n(mark, 512 * 1024)
         .collect::<String>()
         .into_bytes()
 }
 
-/// The closing condition: a reader that arrives while a document is
-/// being replaced holds the old version or the new one, never a
-/// prefix of either.
 #[test]
 fn a_reader_never_meets_half_a_document() {
     let dir = tempfile::tempdir().unwrap();
@@ -46,9 +41,6 @@ fn a_reader_never_meets_half_a_document() {
     });
 }
 
-/// A writer killed between the flush and the rename leaves a staging
-/// file behind. It is not the document, and the next write reuses it
-/// rather than refusing or piling up a second one.
 #[test]
 fn a_staging_file_left_by_a_killed_writer_is_not_the_document() {
     let dir = tempfile::tempdir().unwrap();
@@ -72,9 +64,6 @@ fn a_staging_file_left_by_a_killed_writer_is_not_the_document() {
     );
 }
 
-/// Two writers of one document take turns: each reads what the other
-/// wrote, so neither change is lost. Without the lock both read the
-/// same original and the second rename erases the first's work.
 #[test]
 fn two_writers_of_one_document_do_not_overwrite_each_other() {
     let dir = tempfile::tempdir().unwrap();
@@ -102,8 +91,6 @@ fn two_writers_of_one_document_do_not_overwrite_each_other() {
     );
 }
 
-/// The directories above a document are made by the write, because
-/// every caller in the city was making them itself beforehand.
 #[test]
 fn a_document_brings_its_directories_with_it() {
     let dir = tempfile::tempdir().unwrap();
@@ -112,11 +99,6 @@ fn a_document_brings_its_directories_with_it() {
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "# the task\n");
 }
 
-/// The guard a document with two writers is written under: what gets
-/// replaced is the text the writer started from, so a file somebody else
-/// changed in the meantime is refused rather than written over. The
-/// empty base is the same rule read at the document's start, where a
-/// file that is already there is not what the writer expected to find.
 #[test]
 fn a_document_that_moved_under_its_writer_is_refused() {
     let dir = tempfile::tempdir().unwrap();
@@ -136,9 +118,6 @@ fn a_document_that_moved_under_its_writer_is_refused() {
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "second");
 }
 
-/// The bytes a revision is handed are the ones on disk at the moment it
-/// holds the lock, so two writers deciding from them take turns and
-/// neither change is lost; a document that is not there is no bytes.
 #[test]
 fn a_revision_reads_the_bytes_on_disk_and_holds_the_lock_while_it_decides() {
     let dir = tempfile::tempdir().unwrap();

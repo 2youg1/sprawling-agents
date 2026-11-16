@@ -3,40 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a snapshot minted, which generation a window is on, and the
-//! action an older view cannot buy.
-//!
-//! A `ref` here means one thing and it is worth stating exactly: **the
-//! place an element occupied on the screen at the moment the snapshot
-//! was taken**. Nothing is held open across the call — the tree walk
-//! keeps its COM objects to itself (`Sprawling/desktop/Spec.lean` section 10, design six) —
-//! so a ref is a rectangle and a generation, and that is the whole of
-//! it.
-//!
-//! From which the rule follows rather than being decreed: a window that
-//! is snapshotted again is on a new generation, and every ref of the
-//! generation before it is refused. An action decided while looking at
-//! one arrangement of a window does not land on a different arrangement
-//! of it; it is refused, and the caller looks again. `browser::act`
-//! holds the same line for a page, and the reason is the same one.
-//!
-//! A generation belongs to one window, named by its handle rather than
-//! its title, so two windows that share a title keep two records. It
-//! holds only while that window's rectangle is the one the snapshot saw:
-//! a window that moved or changed size refuses its old generation, since
-//! every ref of it now points at where the window used to be. What this
-//! does not catch is written down rather than hidden (`Sprawling/desktop/Spec.lean`
-//! D5; the model is `Sprawling.desktop.spec.Platform.Windows.Views`): a window that rearranges its inside while its outline
-//! stays put, and a handle reused by a new window that happens to take
-//! the same rectangle.
-//!
-//! A `point` carries no generation check, because a point did not come
-//! from a snapshot: the caller measured it against the window's own
-//! edges, and `geometry::Bounds::at` is what judges it.
-//!
-//! The properties this module must hold are proved in `Sprawling/desktop/spec/Platform/Windows/Views.lean`;
-//! this code is the authority on how it holds them.
-
 use crate::outline::Role;
 use crate::refusal::{Refusal, RefusalCode};
 use std::collections::BTreeMap;
@@ -44,14 +10,10 @@ use std::collections::BTreeMap;
 use super::focus::Aim;
 use super::geometry::Bounds;
 
-/// How many refs one snapshot mints before it stops walking. A tree a
-/// model cannot read to the end is a tree it has not read.
 pub(crate) const MOST_REFS_PER_SNAPSHOT: usize = 500;
 
-/// How deep a snapshot goes when the caller does not say.
 pub(crate) const DEFAULT_DEPTH: u32 = 8;
 
-/// One node of a window's tree, as a caller reads it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Node {
     pub(crate) reference: String,
@@ -61,18 +23,12 @@ pub(crate) struct Node {
     pub(crate) depth: u32,
 }
 
-/// One window as a snapshot or an action sees it: which window it is,
-/// and where it is on the screen at that moment.
-///
-/// The window is its handle rather than its title, so two windows that
-/// share a title are two windows here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Sight {
     pub(crate) aim: Aim,
     pub(crate) bounds: Bounds,
 }
 
-/// What one window's last snapshot left behind.
 #[derive(Debug, Clone)]
 struct Seen {
     generation: u64,
@@ -80,7 +36,6 @@ struct Seen {
     nodes: BTreeMap<String, Node>,
 }
 
-/// Every window this connection has looked at, by handle.
 #[derive(Debug, Default)]
 pub(crate) struct Views {
     windows: BTreeMap<Aim, Seen>,
@@ -93,13 +48,6 @@ impl Views {
         }
     }
 
-    /// Records a fresh snapshot of one window and answers with the
-    /// generation it is now on.
-    ///
-    /// The generation only ever rises, so a caller holding an old one
-    /// cannot have it come back around: `saturating_add` stops rather
-    /// than wraps, and a connection that took eighteen quintillion
-    /// snapshots has a problem this counter is not it.
     pub(crate) fn mint(&mut self, sight: Sight, nodes: Vec<Node>) -> u64 {
         let generation = self
             .windows
@@ -120,13 +68,6 @@ impl Views {
         generation
     }
 
-    /// Where a ref decided against `generation` currently is.
-    ///
-    /// # Errors
-    /// Refuses a window nobody has snapshotted, a generation that is not
-    /// this window's current one, a window that moved or changed size
-    /// since that generation was taken, and a ref that generation did
-    /// not mint.
     pub(crate) fn resolve(
         &self,
         sight: Sight,
@@ -157,15 +98,11 @@ impl Views {
         })
     }
 
-    /// The generation a window is on, for a caller that asks what it is
-    /// holding.
     pub(crate) fn generation(&self, aim: Aim) -> Option<u64> {
         self.windows.get(&aim).map(|seen| seen.generation)
     }
 }
 
-/// One recovery sentence, because there is one thing to do about every
-/// one of these: look again.
 fn stale(because: String) -> Refusal {
     Refusal::new(
         RefusalCode::InvalidArgs,
@@ -187,7 +124,6 @@ fn stale(because: String) -> Refusal {
 mod tests {
     use super::*;
 
-    /// Two windows, which may share a title; here they are two handles.
     const CALCULATOR: Aim = Aim(0x1000);
     const NOTEPAD: Aim = Aim(0x2000);
 
@@ -218,9 +154,6 @@ mod tests {
         assert_eq!(found.role, Role::Button);
     }
 
-    /// The rule this module exists for. A second snapshot retires the
-    /// first, and an action decided against the first is refused rather
-    /// than landing on whatever moved into that position.
     #[test]
     fn an_action_decided_against_an_older_view_is_refused_not_relocated() {
         let mut views = Views::new();
@@ -244,7 +177,7 @@ mod tests {
                 .unwrap()
                 .contains("fresh `desktop.snapshot`")
         );
-        // The current generation still resolves, and to the new place.
+
         assert_eq!(
             views.resolve(at(CALCULATOR, 0), 2, "e1").unwrap().bounds,
             Bounds::from_corners(900, 0, 980, 30).unwrap()
@@ -273,8 +206,6 @@ mod tests {
         );
     }
 
-    /// Two windows do not share a generation counter: looking at one
-    /// does not retire what was decided about the other.
     #[test]
     fn each_window_carries_its_own_generation() {
         let mut views = Views::new();
@@ -286,8 +217,6 @@ mod tests {
         assert!(views.resolve(at(CALCULATOR, 0), 1, "e1").is_ok());
     }
 
-    /// A ref is a place on the screen, so a window that moved or changed
-    /// size since its snapshot has no ref at that place any more.
     #[test]
     fn a_window_that_moved_since_its_snapshot_refuses_the_old_generation() {
         let mut views = Views::new();

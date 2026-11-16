@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A long turn (`Tools/citysim/spec/LongTurn.lean` §8-9, citysim D10):
-//! one run of many steps, each reading a file whose bytes change and
-//! whose length does not, so the request window of every model call can
-//! be judged against the one before it.
-//!
-//! The window is the gate because it is counted: every step adds the
-//! same bytes to the conversation, so a step that adds more - an
-//! earlier result carried twice, a copy kept per step - shows as an
-//! uneven increment on any machine. What the process holds is a reading
-//! taken from outside at the pauses this module makes (`just mem
-//! long-turn`), because process counters move with the machine.
-
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use kernel::{
@@ -28,40 +16,29 @@ use serde_json::Value;
 use crate::executor::{Scenario, run_scenario};
 use crate::script_model::{ScriptModel, concluding};
 
-/// How long the file is that every step reads.
 pub const STEP_BYTES: usize = 1024;
 
-/// The tool every step calls.
 const NOTES: &str = "notes";
 
-/// Where a long turn stops for a reading to be taken.
 pub enum Pauses {
-    /// It runs through.
+
     Never,
-    /// After every `steps`-th read, `at` is called with the number of
-    /// reads so far, and the turn goes on when it returns.
+
     Every {
         steps: u32,
         at: Box<dyn Fn(u32) -> Result<(), AxError> + Send + Sync>,
     },
 }
 
-/// What one long turn left behind.
 pub struct TurnReading {
-    /// How the run froze.
+
     pub completion: &'static str,
-    /// The bytes each model call could be billed as input, in call order.
+
     pub windows: Vec<u64>,
-    /// What the simulator's own ledger holds, which a memory reading of
-    /// this process includes.
+
     pub ledger_bytes: u64,
 }
 
-/// Runs one run of `steps` reads and a closing reply.
-///
-/// # Errors
-/// Propagates a scenario the drive refuses, and a ledger line this
-/// module cannot read its window from.
 pub fn long_turn(steps: u32, pauses: Pauses) -> Result<TurnReading, AxError> {
     let report = run_scenario(scenario(steps, pauses)?)?;
     let mut ledger_bytes: u64 = 0;
@@ -75,7 +52,6 @@ pub fn long_turn(steps: u32, pauses: Pauses) -> Result<TurnReading, AxError> {
     })
 }
 
-/// A length as the count a reading carries.
 fn counted(len: usize) -> Result<u64, AxError> {
     u64::try_from(len).map_err(|err| {
         AxError::failure(AxCode::InvalidArgs, "count a long turn", err.to_string())
@@ -83,7 +59,6 @@ fn counted(len: usize) -> Result<u64, AxError> {
     })
 }
 
-/// The `upper_bound` of every `prompt_shape_compared` line, in order.
 fn windows_of(lines: &[Vec<u8>]) -> Result<Vec<u64>, AxError> {
     let unreadable = |detail: String| {
         AxError::failure(AxCode::InvalidArgs, "read a long turn's window", detail).with_recovery(
@@ -108,8 +83,6 @@ fn windows_of(lines: &[Vec<u8>]) -> Result<Vec<u64>, AxError> {
     Ok(windows)
 }
 
-/// The long turn as a scenario: `steps` replies that each say one
-/// sentence and read the notes, then one that concludes.
 fn scenario(steps: u32, pauses: Pauses) -> Result<Scenario, AxError> {
     let addr = Address::parse("sim/lobby/room1")?;
     let mut bench = ToolBench::new(WriteDomain::new(vec![addr.clone()])?);
@@ -173,8 +146,6 @@ fn notes_meta() -> Result<ToolMeta, AxError> {
     })
 }
 
-/// The file every step reads: [`STEP_BYTES`] long, its bytes a function
-/// of how many times it has been read.
 struct Notes {
     meta: ToolMeta,
     read: AtomicU32,
@@ -202,8 +173,6 @@ impl Tool for Notes {
     }
 }
 
-/// The notes at their `read`-th reading: the step number, then letters
-/// that turn by one with every step, [`STEP_BYTES`] in all.
 fn notes_at(read: u32) -> Result<String, AxError> {
     let head = format!("step {read:06} ");
     let turn = usize::try_from(read % 26).map_err(|err| {
@@ -237,9 +206,6 @@ fn notes_at(read: u32) -> Result<String, AxError> {
 mod tests {
     use super::*;
 
-    /// citysim D10: every step of a long turn adds the same bytes
-    /// to the window, at 40 steps and at 80, so the window of the last
-    /// call is the first one plus one increment per step.
     #[test]
     fn a_long_turn_grows_its_window_by_one_step_at_a_time() {
         for steps in [40u32, 80] {

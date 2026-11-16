@@ -20,11 +20,6 @@ use crate::worker::*;
 
 mod experiment;
 
-/// The other half of the same rule: a steer-kind signal slips under
-/// the door of the run it reaches, landing at that run's next safe
-/// point with the sender's address in front of it. `collab::steer`
-/// holds both entrances, and the resident's one had no caller until
-/// now.
 #[test]
 fn a_steer_from_a_resident_lands_in_the_window_as_that_resident() {
     let dir = tempfile::tempdir().unwrap();
@@ -90,21 +85,6 @@ fn a_steer_from_a_resident_lands_in_the_window_as_that_resident() {
     );
 }
 
-/// A dispatch the city will not take leaves nothing a person can
-/// find.
-///
-/// `stage_dispatch` opens by saying so - a halted city that laid a job
-/// file down would leave a task in a room no run ever opened - and
-/// the halt was the only door that held it. The room was opened and
-/// the brief was written before the tag was resolved, so a dispatch
-/// to a building nobody raised was refused for having no model and
-/// left a building, a room and a `JOB.md` behind: files a person can
-/// see that no record in the one history mentions.
-///
-/// The code is asserted beside the disk because the two are separate
-/// promises. The caller is owed `E_MODEL_UNCHOSEN` here - nothing is
-/// attached, so no tag names a model - and moving the judgement in
-/// front of the write must not change which refusal that is.
 #[test]
 fn a_dispatch_the_city_will_not_take_leaves_no_room_behind() {
     let dir = tempfile::tempdir().unwrap();
@@ -139,9 +119,6 @@ fn a_dispatch_the_city_will_not_take_leaves_no_room_behind() {
     );
 }
 
-/// A dispatch that never says when to stop is a conversation, and the
-/// prefix says so instead of handing over a form with its one
-/// irreplaceable field blank.
 #[test]
 fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
     let dir = tempfile::tempdir().unwrap();
@@ -177,11 +154,6 @@ fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
     );
 }
 
-/// Work sent to a bare building is named by rule from the task, so the
-/// first call the provider sees is the run itself and a model's reply
-/// never becomes a room (`Sprawling/app/Spec.lean` §8-86). The run is known by
-/// its assigned opening, which points at the task in JOB.md rather than
-/// repeating it (`Sprawling/runtime/Spec.lean` §8-6).
 #[test]
 fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
     let dir = tempfile::tempdir().unwrap();
@@ -224,11 +196,6 @@ fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
     );
 }
 
-/// Keep-warm is read at the room the run works in, so the city,
-/// building, room ladder the settings page describes is the one that
-/// runs: a room whose own `CONFIG.toml` asks for it keeps its door once
-/// the run lands, though the city and the building state nothing
-/// (`Sprawling/app/Spec.lean` D80).
 #[test]
 fn a_room_that_asks_for_keep_warm_keeps_its_door_under_a_city_that_states_nothing() {
     let dir = tempfile::tempdir().unwrap();
@@ -272,11 +239,6 @@ fn a_room_that_asks_for_keep_warm_keeps_its_door_under_a_city_that_states_nothin
     );
 }
 
-/// The identifier is a function of the job, the address and the
-/// millisecond, and nothing else. Two jobs dispatched into the same
-/// millisecond are two runs. A hexadecimal round trip would add two
-/// failure points that both answer zero, and a city whose runs share an
-/// identifier cannot be read back at all.
 #[test]
 fn two_jobs_at_one_millisecond_get_two_run_ids() {
     let addr = Address::parse("lab/room1").unwrap();
@@ -297,13 +259,6 @@ fn two_jobs_at_one_millisecond_get_two_run_ids() {
     );
 }
 
-/// The instrument `Tools/xtask/budgets.toml [prepare_dispatch]` names.
-///
-/// It pins that the reading is taken and said out loud, not what the
-/// reading is: a wall-clock figure belongs to the machine that ran it,
-/// so the row records it beside that machine and this test asserts only
-/// that a dispatch reports what it spent before the lane took the
-/// drive. Run with `--nocapture` to read the figure off this fixture.
 #[test]
 fn a_dispatch_says_what_it_spent_before_the_drive() {
     let dir = tempfile::tempdir().unwrap();
@@ -322,9 +277,7 @@ fn a_dispatch_says_what_it_spent_before_the_drive() {
                     .push(runtime::diagnostics::render(entry));
             }),
         ),
-        // The city's clock leaps a minute at every read, so a span
-        // read off it would be a minute or more (`Sprawling/app/Spec.lean`
-        // §8-129-2).
+
         Hands {
             clock: std::sync::Arc::new(LeapingClock::from_now()),
             ..crate::worker::fixture::hands()

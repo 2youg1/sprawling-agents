@@ -3,33 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The names one session is frozen with (`Sprawling/accounting/spec/Worker/Freezing/Naming.lean` §8-15): what
-//! the city calls the person and the Mayor, in the city slot and at the
-//! head of the resident slot.
-
 use std::path::Path;
 
 use kernel::{Address, AxCode, AxError, B3Hash};
 
 use super::{Assembled, NEWLINE, addressed, prompt_segment};
 
-/// The names a run is frozen with, and the version a page reads them
-/// back by.
 pub(super) struct Frozen {
     naming: city::Naming,
     pub(super) version: B3Hash,
 }
 
-/// The names the session at `room` runs under: the version its room's
-/// own layer records, read back from the store; or, for a session's
-/// first run, the names as they are now, frozen into the store and
-/// recorded in that layer for every run after it.
-///
-/// # Errors
-/// Propagates the room's own layer failing to read or write, an identity
-/// area that does not read, and a store that will not take the bytes.
-/// A recorded version the store no longer holds is refused rather than
-/// replaced by the names now: that would rename a running session.
 pub(super) fn session_naming(
     city_root: &Path,
     cas: &mut storage::Cas,
@@ -60,15 +44,7 @@ pub(super) fn session_naming(
 }
 
 impl Frozen {
-    /// The city slot: the norms that govern `building`, then who works
-    /// here. Without a `City.md` of the building's own, that is the same
-    /// for every resident of the city and so stays in the one slot cached
-    /// across all of them; with one, it is still the same for every
-    /// resident of that building (`Sprawling/runtime/spec/Prefix.lean` D97).
-    ///
-    /// # Errors
-    /// As `prompt_segment` and `city::city_prompt_path`, and a path the
-    /// address grammar refuses.
+
     pub(super) fn city_slot(
         &self,
         city_root: &Path,
@@ -86,10 +62,6 @@ impl Frozen {
         Ok(slot)
     }
 
-    /// The line the resident slot opens with: what this resident is
-    /// called. It opens the resident slot rather than the city one,
-    /// because a name per agent in the city slot would make one copy of
-    /// the largest stable block in the prompt per agent.
     pub(super) fn called(&self, addr: &Address) -> Vec<u8> {
         format!("Your name: {}\n\n", self.naming.called(addr)).into_bytes()
     }

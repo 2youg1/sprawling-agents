@@ -3,22 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A stand-in on loopback reached under a preset host's own name
-//! (`Sprawling/gateway/spec/Reach/Resolve.lean` §8-32).
-//!
-//! The shape of a request depends on the host it is addressed to: the
-//! conversation header and the chat face's spelling are looked up by the
-//! host name, so a stand-in addressed as `127.0.0.1` never sees them. The
-//! stand-in here speaks TLS under a certificate signed for that one host,
-//! and [`StandIn::toward`] is the step after `client_for` that resolves
-//! the host to the stand-in, trusts that certificate alone and leaves the
-//! proxy out. The base URL is not touched, so the host, the path, the
-//! name the handshake asks for and the `Host` header are the real
-//! request's.
-//!
-//! Every item here is `#[cfg(test)]`: nothing in this module reaches a
-//! shipped binary.
-
 #![cfg(test)]
 #![allow(
     clippy::unwrap_used,
@@ -40,18 +24,15 @@ use std::thread::JoinHandle;
 
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 
-/// What the stand-in heard: one request, taken apart.
 #[derive(Debug)]
 pub(crate) struct Heard {
-    /// The path of the request line, without a query.
+
     pub(crate) path: String,
-    /// Every header, its name lower-cased.
+
     pub(crate) headers: BTreeMap<String, String>,
     pub(crate) body: serde_json::Value,
 }
 
-/// A TLS listener on loopback that answers one request meant for one
-/// host with a refusal, and hands back what it heard.
 pub(crate) struct StandIn {
     host: String,
     at: SocketAddr,
@@ -60,7 +41,7 @@ pub(crate) struct StandIn {
 }
 
 impl StandIn {
-    /// Signs a certificate for `host` and listens for one request.
+
     pub(crate) fn listening(host: &str) -> StandIn {
         let (certificate, config) = server_for(host);
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -83,8 +64,6 @@ impl StandIn {
         }
     }
 
-    /// The step after `client_for`, for this stand-in's host, address and
-    /// certificate.
     pub(crate) fn toward(
         &self,
     ) -> impl Fn(reqwest::blocking::ClientBuilder) -> reqwest::blocking::ClientBuilder
@@ -94,28 +73,21 @@ impl StandIn {
         toward(&self.host, self.at, &self.certificate)
     }
 
-    /// What the stand-in heard, once its one request has come and gone.
     pub(crate) fn heard(self) -> Heard {
         self.served.join().unwrap()
     }
 }
 
-/// A TLS listener on loopback that answers every request meant for one
-/// host with a refusal and keeps each connection open for the next, and
-/// notes which connection every request came on (`Sprawling/gateway/spec/Endpoint/Transport.lean`
-/// §8-35). Its threads live as long as the test process.
 pub(crate) struct KeptOpen {
     host: String,
     at: SocketAddr,
     certificate: Vec<u8>,
-    /// For each request in arrival order, the index of the connection,
-    /// in accept order, that carried it.
+
     served_on: Arc<Mutex<Vec<usize>>>,
 }
 
 impl KeptOpen {
-    /// Signs a certificate for `host` and serves every connection the
-    /// client opens, one thread each, until the client closes it.
+
     pub(crate) fn listening(host: &str) -> KeptOpen {
         let (certificate, config) = server_for(host);
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -143,7 +115,6 @@ impl KeptOpen {
         }
     }
 
-    /// The same step after `client_for` as [`StandIn::toward`].
     pub(crate) fn toward(
         &self,
     ) -> impl Fn(reqwest::blocking::ClientBuilder) -> reqwest::blocking::ClientBuilder
@@ -153,14 +124,11 @@ impl KeptOpen {
         toward(&self.host, self.at, &self.certificate)
     }
 
-    /// Which connection carried each request so far.
     pub(crate) fn served_on(&self) -> Vec<usize> {
         self.served_on.lock().unwrap().clone()
     }
 }
 
-/// A server configuration that answers for `host` alone, and the
-/// certificate it answers with.
 fn server_for(host: &str) -> (Vec<u8>, Arc<rustls::ServerConfig>) {
     let (certificate, key) = self_signed(host);
     let config = rustls::ServerConfig::builder_with_provider(Arc::new(
@@ -177,9 +145,6 @@ fn server_for(host: &str) -> (Vec<u8>, Arc<rustls::ServerConfig>) {
     (certificate, Arc::new(config))
 }
 
-/// The step after `client_for`: `host` resolves to `at`, the stand-in's
-/// certificate is the only one trusted, and no proxy takes the request -
-/// a proxy would be handed the name and do its own resolving.
 fn toward(
     host: &str,
     at: SocketAddr,
@@ -195,9 +160,6 @@ fn toward(
     }
 }
 
-/// Reads one HTTP/1.1 request: the head, then as many body bytes as
-/// `content-length` says. `None` when the client closed the connection
-/// before sending a byte of another request.
 fn read_request(stream: &mut impl Read) -> Option<Heard> {
     let mut bytes = Vec::new();
     let mut buf = [0u8; 16_384];
@@ -239,15 +201,12 @@ fn read_request(stream: &mut impl Read) -> Option<Heard> {
     })
 }
 
-/// Whether an answer tells the client to close the connection after it.
 #[derive(Clone, Copy)]
 enum Closing {
     Close,
     KeepOpen,
 }
 
-/// Answers with a refusal: what the client does with an answer is not
-/// what this stand-in is asked about.
 fn refuse(stream: &mut impl Write, closing: Closing) {
     let body = "{}";
     let connection = match closing {
@@ -266,14 +225,6 @@ fn refuse(stream: &mut impl Write, closing: Closing) {
     stream.flush().unwrap();
 }
 
-/// A certificate for `host` that signs itself, and its key.
-///
-/// The smallest leaf the verifier accepts: version 3, an Ed25519 key, a
-/// validity from 2000 to 2049, and one `subjectAltName` naming the host,
-/// because the name is what the verifier checks and the common name is
-/// not. No extended key usage, which the verifier reads as any use. The
-/// key is a fixed seed: the certificate protects nothing but one
-/// loopback handshake inside a test.
 fn self_signed(host: &str) -> (Vec<u8>, PrivatePkcs8KeyDer<'static>) {
     let mut pkcs8 = vec![
         0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04,
@@ -334,7 +285,6 @@ fn self_signed(host: &str) -> (Vec<u8>, PrivatePkcs8KeyDer<'static>) {
     (certificate, key)
 }
 
-/// One DER element: the tag, the definite length, the content.
 fn der(tag: u8, content: &[u8]) -> Vec<u8> {
     let length = content.len();
     let mut out = vec![tag];

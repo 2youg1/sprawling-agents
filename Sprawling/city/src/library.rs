@@ -3,29 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The city's central stock of settled work, and the reading room each
-//! building takes a subset of it into.
-//!
-//! The division is the only reason resident context does not grow with
-//! the disk. A thousand skills may sit in the library and all of them
-//! are findable; **not one byte of them enters a run's prefix** unless
-//! that building's reading room admits it, and what a reading room
-//! admits is a list a person wrote in `RULES.toml`.
-//!
-//! The library lives under the reserved prefix, which is outside every
-//! write domain. That is deliberate: a resident may read the stock and
-//! may not restock it, so an agent cannot quietly grant itself a skill
-//! by writing one.
-//!
-//! **One scan reads every shelf there is**: the city's stock, the
-//! building's own shelf, and the directories the city's configuration
-//! mounts read-only from elsewhere on this machine. A name is filed
-//! once, so a skill kept in the library and one kept by another program
-//! are one row, and which of them a run gets is the shelf order rather
-//! than a reader's preference.
-//!
-//! Specified by `Sprawling/city/spec/Library.lean` §8-8.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 mod audit;
@@ -57,31 +34,13 @@ use kernel::{Address, AxCode, AxError, B3Hash};
 
 use crate::config_layers::SHELVES_KEY;
 
-/// The city's stock, one entry per name.
-///
-/// One entry per name rather than per section and name: a reading room
-/// admits by name, so two holdings under one name would be two answers
-/// to one question and the nearer shelf would win only sometimes.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Library {
     holdings: BTreeMap<ShelfKey, Holding>,
 }
 
 impl Library {
-    /// Reads the stock from disk.
-    ///
-    /// A city with no library is an empty library, not an error: most
-    /// cities start with nothing settled.
-    ///
-    /// `home` is this person's home directory, which the city's own
-    /// configuration may name a shelf under. It is a parameter because
-    /// reading the environment is not this crate's job, and a scan in a
-    /// test then reads the directories the test made.
-    ///
-    /// # Errors
-    /// Refuses a shelf that exists and is not a directory, and
-    /// propagates a directory that exists and cannot be read - that is
-    /// a broken installation rather than an empty one.
+
     pub fn scan(
         city_root: &Path,
         building: Option<&Address>,
@@ -89,12 +48,7 @@ impl Library {
         read: &dyn Fn(&B3Hash) -> Result<Vec<u8>, AxError>,
     ) -> Result<Library, AxError> {
         let mut holdings = BTreeMap::new();
-        // The farthest shelf first, so that the nearer one replaces it
-        // under one name: the city's own stock is written by whoever
-        // keeps this city and beats a directory belonging to another
-        // program, and the building's own shelf beats the city's. That
-        // is the rule the configuration ladder already applies to the
-        // values a run is governed by.
+
         for (index, root) in crate::config_layers::city_shelves(city_root, home)?
             .into_iter()
             .enumerate()
@@ -121,8 +75,6 @@ impl Library {
         Ok(Library { holdings })
     }
 
-    /// Migrates the legacy directory shelves to CAS indexes. External
-    /// shelves stay read-only and are copied only on admission.
     pub fn migrate(
         city_root: &Path,
         building: Option<&Address>,
@@ -140,15 +92,6 @@ impl Library {
         Ok(migrated)
     }
 
-    /// Everything on the shelves, in the order a catalog lists them:
-    /// the city's stock first, then the building's own shelf, then the
-    /// external shelves in the order the city's configuration names
-    /// them; within a shelf, section then name order.
-    ///
-    /// The shelf decides that order, not the section: an external
-    /// holding has no section to sort under, so sorting every holding
-    /// by section once put the directories of other programs above the
-    /// city's own stock.
     #[must_use]
     pub fn all(&self) -> Vec<&Holding> {
         let mut shelved: Vec<&Holding> = self.holdings.values().collect();
@@ -162,11 +105,6 @@ impl Library {
         shelved
     }
 
-    /// The sections, which is the navigation a person browses by.
-    ///
-    /// One entry per section, in the order the catalog lists its first
-    /// holding: two shelves may file under the same section name, so
-    /// removing only the neighbours would leave that name twice.
     #[must_use]
     pub fn sections(&self) -> Vec<&str> {
         let mut seen: Vec<&str> = Vec::new();
@@ -179,14 +117,6 @@ impl Library {
         seen
     }
 
-    /// What one building's reading room admits.
-    ///
-    /// Matched by name alone, so a person writing the list in
-    /// `RULES.toml` does not have to know which section something was
-    /// filed under. A name on the list that is not on the shelves is
-    /// simply absent from the result: the catalog shows what a run can
-    /// actually reach, and a promise of a missing skill is worse than
-    /// its absence.
     #[must_use]
     pub fn reading_room(&self, admitted: &[String]) -> Vec<&Holding> {
         let admitted: BTreeSet<ShelfKey> = admitted.iter().map(|name| ShelfKey::of(name)).collect();
@@ -196,8 +126,6 @@ impl Library {
             .collect()
     }
 
-    /// The names on a list that the shelves do not have. Shown to the
-    /// person who wrote the list, since only they can fix it.
     #[must_use]
     pub fn missing(&self, admitted: &[String]) -> Vec<String> {
         admitted
@@ -220,8 +148,6 @@ pub mod test_store {
     use super::*;
     use std::path::PathBuf;
 
-    /// A small in-memory CAS used by shelf tests. It has the same full
-    /// read and digest contract as storage::Cas, without touching disk.
     #[derive(Default)]
     pub struct Store {
         objects: BTreeMap<B3Hash, Vec<u8>>,
@@ -249,8 +175,6 @@ pub mod test_store {
             })
         }
 
-        /// Primes the old whole-package objects and runs the production
-        /// migration, so a legacy fixture cannot skip verification.
         pub fn migrate(&mut self, city_root: &Path, building: Option<&Address>) -> Vec<Installed> {
             for (root, _) in [
                 (

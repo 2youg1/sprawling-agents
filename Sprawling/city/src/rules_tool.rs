@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The face a building's rules show a model: what this building's runs
-//! are judged by, read as it stands.
-//!
-//! **Why a run only reads.** `RULES.toml` lives in the building's
-//! reserved subtree, and no write domain reaches there, which is not an
-//! oversight to work around but the rule itself: a run may not change
-//! what governs it (`Sprawling/city/spec/RulesTool.lean` §8-2b, city D1).
-//! The tool is declared `Effect::Govern`; a `read` call answers
-//! `Effect::Read`, so a run sees what it is judged by. A model that asks
-//! to `propose` new rules is answered by the effect layer's Govern
-//! refusal, which names the file the User edits, and the tool offers no
-//! such operation (city D23).
-
 use std::path::{Path, PathBuf};
 
 use kernel::event::Scope;
@@ -27,9 +14,6 @@ use serde_json::{Map, Value};
 
 use crate::policy::{RULES_FILE, rules_path};
 
-/// The tool. It holds where the city is and which building the calling
-/// run belongs to, so a run cannot rewrite another building's rules by
-/// naming one.
 pub struct RulesTool {
     city_root: PathBuf,
     building: Address,
@@ -37,11 +21,7 @@ pub struct RulesTool {
 }
 
 impl RulesTool {
-    /// The name, disclosure and schema `new` registers. The catalog page
-    /// reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
+
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut op = Map::new();
         op.insert("type".to_owned(), Value::String("string".to_owned()));
@@ -72,9 +52,6 @@ impl RulesTool {
         })
     }
 
-    /// # Errors
-    /// Propagates a malformed parameter schema, which is a build-time
-    /// defect rather than a runtime one.
     pub fn new(city_root: &Path, building: Address) -> Result<RulesTool, AxError> {
         let defined = Self::definition()?;
         Ok(RulesTool {
@@ -93,14 +70,11 @@ impl RulesTool {
         })
     }
 
-    /// The rules as they stand. A building nobody has written rules for
-    /// has none to show, which is an answer rather than a failure.
     fn standing(&self) -> Result<String, AxError> {
         let path = rules_path(&self.city_root, &self.building);
         match std::fs::read_to_string(&path) {
             Ok(text) => Ok(text),
-            // Linux says `NotADirectory` where Windows says `NotFound`
-            // for a path through a file, as `policy::load` reads it.
+
             Err(err)
                 if matches!(
                     err.kind(),
@@ -122,20 +96,13 @@ impl RulesTool {
     }
 }
 
-/// What a call asks of the rules. Exhaustive: an unknown verb is refused
-/// rather than read as the harmless one. `Rewrite` is not offered to the
-/// model; it is read so that a model which asks to `propose` new rules
-/// meets the effect layer's Govern refusal, which says who changes them,
-/// rather than an unknown-verb refusal (city D23).
 enum Op {
     Read,
     Rewrite,
 }
 
 impl Op {
-    /// The one reading of a call's arguments, shared by `subject`,
-    /// `effect_of` and `invoke` so each refuses an unreadable call in the
-    /// same words.
+
     fn read(args: &Map<String, Value>) -> Result<Op, AxError> {
         match arg(args, "op")? {
             "read" => Ok(Op::Read),
@@ -166,8 +133,6 @@ impl Tool for RulesTool {
         &self.meta
     }
 
-    /// This building's rules are what every call is about, read or asked
-    /// to be rewritten (`Sprawling/city/spec/RulesTool.lean` §8-36).
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError> {
         Op::read(call.args.as_map())?;
         Ok(GateSubject::Scope(
@@ -175,9 +140,6 @@ impl Tool for RulesTool {
         ))
     }
 
-    /// Reading the rules changes nothing they govern, so a run may read
-    /// them; a rewrite still meets the Govern refusal
-    /// (`Sprawling/kernel/spec/Gate.lean` D26).
     fn effect_of(&self, call: &ToolCall) -> Result<Effect, AxError> {
         Ok(match Op::read(call.args.as_map())? {
             Op::Read => Effect::Read,
@@ -207,8 +169,7 @@ impl Tool for RulesTool {
             Op::Read => {
                 out.insert("text".to_owned(), Value::String(self.standing()?));
             }
-            // The bench refuses a Govern call before `invoke`; a caller
-            // that reaches here without it is refused the same way.
+
             Op::Rewrite => {
                 return Err(AxError::failure(
                     AxCode::GateDenied,
@@ -273,9 +234,6 @@ mod tests {
         assert_eq!(read.result.as_map()["text"], text);
     }
 
-    /// city D23: the bench refuses a rewrite before `invoke`; a caller
-    /// that reaches the tool without the bench is refused the same way,
-    /// and the rules stand as the User wrote them.
     #[test]
     fn a_rewrite_that_reaches_the_tool_is_refused_and_the_rules_stand() {
         let dir = tempfile::tempdir().unwrap();
@@ -293,8 +251,6 @@ mod tests {
         );
     }
 
-    /// city D23: what the model reads of this tool offers no operation
-    /// the tool always refuses.
     #[test]
     fn the_model_is_offered_the_read_alone() {
         let dir = tempfile::tempdir().unwrap();
@@ -307,9 +263,6 @@ mod tests {
         assert!(!offered.contains("propose"), "{offered}");
     }
 
-    /// The effect layer refuses a Govern call by the scope it names; a
-    /// tool that named none was refused as a wiring defect instead, with
-    /// a recovery that sent the model to report the tool.
     #[test]
     fn every_call_names_this_buildings_rules_as_the_scope_it_would_rewrite() {
         let dir = tempfile::tempdir().unwrap();
@@ -327,10 +280,6 @@ mod tests {
         );
     }
 
-    /// Derived from `Kernel.Gate.GovernReads`: over every operation, the
-    /// call's effect is `Read` exactly when the operation leaves the
-    /// rules as they stand, so a run reads them and still cannot rewrite
-    /// them (`Sprawling/kernel/spec/Gate.lean` D26).
     #[test]
     fn only_the_operation_that_reads_is_a_read_and_every_rewrite_still_governs() {
         let dir = tempfile::tempdir().unwrap();

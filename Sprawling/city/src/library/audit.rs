@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The audit state of one skill: a reading of its audits against the
-//! digest it carries now, never a stored flag, so a change to the content
-//! makes an earlier audit stale by itself.
-//!
-//! Specified by `Sprawling/city/spec/Library/Audit.lean` §8-28b (city D19).
-
 mod execution;
 pub use execution::{
     AuditFetchError, AuditReport, AuditRequest, HttpAudit, LocalScanner, SKILLS_SH_TIMEOUT,
@@ -18,25 +12,16 @@ pub use execution::{
 use kernel::event::record::AuditVerdict;
 use kernel::{B3Hash, Seq};
 
-/// What the shelf page shows about one skill's audits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuditState {
-    /// No audit was ever had for any content of this skill.
+
     Unaudited,
-    /// The latest audit of the content the skill carries now.
+
     Audited { verdict: AuditVerdict, at: Seq },
-    /// Audits exist, none of them for the content the skill carries now;
-    /// `audited` is the digest the latest of them judged.
+
     Stale { audited: B3Hash },
 }
 
-/// The audit state of a skill whose content digests to `content`, given
-/// every `skill_audited` line of it as `(digest, verdict, seq)`.
-///
-/// An `Unreachable` line records that no audit was had, so it is not an
-/// audit of anything: it never makes a skill show as audited, and it does
-/// not make one stale. The latest line is the one with the highest
-/// `seq`, whatever order the slice holds them in.
 #[must_use]
 pub fn audit_state(content: &B3Hash, audits: &[(B3Hash, AuditVerdict, Seq)]) -> AuditState {
     let had = audits

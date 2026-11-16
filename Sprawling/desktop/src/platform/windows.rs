@@ -3,28 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The Windows arm: the desk one connection holds, and which of the six
-//! carries out an admitted call.
-//!
-//! Everything above this file has already been decided by the time a
-//! call arrives: `crate::scope` has said the window is one this server
-//! may touch, and `crate::session` has said the tool exists and the
-//! handshake finished. What is left is reading the arguments the schema
-//! promised and handing them to the module that does the work.
-//!
-//! **Two things live across calls, and both are here rather than in a
-//! global**: the snapshot generations, so an action decided against an
-//! old view can be refused, and the recordings, so a `stop` knows what a
-//! `start` began. Both belong to one connection, which is why the desk
-//! is a value the session owns rather than process state — a second
-//! connection to a second scope file must not be able to stop the first
-//! one's recording.
-//!
-//! Reading arguments is deliberately strict. A missing `action`, an
-//! unknown format, a `point` outside the window: each is refused by name
-//! rather than defaulted, because every default here is a guess about
-//! what somebody wanted to happen on their own desktop.
-
 mod act;
 mod capture;
 mod clipboard;
@@ -63,17 +41,12 @@ use reading::{asked_for, generation, held, inset, missing, notches, region, text
 use strokes::Action;
 use views::{DEFAULT_DEPTH, Views};
 
-/// What one connection remembers between calls.
 pub(crate) struct Desk {
     views: Views,
     recordings: record::Recordings,
-    /// Whether this process reads the desktop in physical pixels. A desk
-    /// that could not make it so refuses every call rather than mix two
-    /// kinds of coordinate (`Sprawling/desktop/Spec.lean` D6).
+
     pixels: Result<dpi::PhysicalPixels, Refusal>,
-    /// What this desk reads trees with, started by the first snapshot:
-    /// a connection that never asks for a tree never enters COM
-    /// (`Sprawling/desktop/Spec.lean` D10).
+
     reader: Option<tree::Reader>,
 }
 
@@ -87,13 +60,6 @@ impl Desk {
         }
     }
 
-    /// Carries out one admitted call.
-    ///
-    /// # Errors
-    /// Refuses arguments the schema allows but this machine cannot act
-    /// on, a window this desktop does not have, an action decided
-    /// against a view that has moved on, and anything the operating
-    /// system itself refuses.
     pub(crate) fn perform(
         &mut self,
         tool: ToolName,
@@ -111,8 +77,6 @@ impl Desk {
         }
     }
 
-    /// `desktop.snapshot`: one window's tree as an outline, and the
-    /// generation the refs in it belong to.
     fn snapshot(&mut self, arguments: &Value) -> Result<Answer, Refusal> {
         let window = resolved(arguments)?;
         let depth = whole(arguments, "depth")?.unwrap_or(DEFAULT_DEPTH);
@@ -132,8 +96,7 @@ impl Desk {
             }),
             &walked.ending,
         );
-        // The rectangles stay here, where `desktop.act` looks a ref up;
-        // a model has no use for them (`Sprawling/desktop/Spec.lean` D10 (b)).
+
         let generation = self.views.mint(sight(&window), walked.nodes);
         Ok(Answer::outline(
             text,
@@ -145,8 +108,6 @@ impl Desk {
         ))
     }
 
-    /// `desktop.act`: one action, at a ref from a snapshot or at a point
-    /// inside the window.
     fn act(&mut self, arguments: &Value) -> Result<Value, Refusal> {
         let window = resolved(arguments)?;
         let named = text(arguments, "action").ok_or_else(|| {
@@ -159,11 +120,7 @@ impl Desk {
         })?;
         let modifiers = held(arguments)?;
         let action = self.decided(&window, named, arguments)?;
-        // Between deciding where this action lands and sending it, the
-        // desktop may have handed the keyboard to another window, and
-        // `SendInput` follows the keyboard rather than the decision.
-        // The window named here is the window the events reach, or
-        // nothing is sent (`Sprawling/desktop/Spec.lean` section 10, design ten).
+
         focus::hold(&window.handle, action.lands_at())?;
         act::perform(&action, &modifiers)?;
         Ok(json!({
@@ -173,8 +130,6 @@ impl Desk {
         }))
     }
 
-    /// Which action this call is, with every coordinate already resolved
-    /// to a place on the screen.
     fn decided(
         &self,
         window: &enumerate::Window,
@@ -216,12 +171,6 @@ impl Desk {
         })
     }
 
-    /// Where an action lands: the middle of a ref from the current
-    /// generation, or a point measured inside the window.
-    ///
-    /// The inner `Result` is deferred on purpose. `type` and `key` need
-    /// no place at all, so a call that names neither a ref nor a point
-    /// is only refused for the actions that would have used one.
     fn where_at(
         &self,
         window: &enumerate::Window,
@@ -253,15 +202,6 @@ impl Desk {
         Ok(window.bounds.at(inset))
     }
 
-    /// `desktop.record`: start or stop.
-    ///
-    /// Only a start resolves a window. A stop names the recording by
-    /// the id it was given, so it still ends a recording whose window
-    /// has since retitled itself out of every list this server reads.
-    ///
-    /// Sound is the scope's to permit: a start that asks for it hears the
-    /// one device the scope file names, or is refused at the gate before
-    /// any window is looked up.
     fn record(&mut self, arguments: &Value, admitted: &Admitted<'_>) -> Result<Answer, Refusal> {
         match record::asked(arguments)? {
             record::Wanted::Start(sound) => {
@@ -278,13 +218,6 @@ impl Desk {
     }
 }
 
-/// `desktop.windows`: what this scope's caller may name.
-///
-/// Two filters, and they answer different questions. The allowlist
-/// decides what this caller may be told exists at all — a title carries
-/// a document name and often a person's name, so a scope that lists one
-/// application discloses no other. The `process` argument then narrows
-/// that answer to what the caller asked about.
 fn listing(arguments: &Value, admitted: &Admitted<'_>) -> Result<Value, Refusal> {
     let wanted = text(arguments, "process").map(crate::scope::Pattern::new);
     let reported: Vec<Value> = enumerate::desktop()?
@@ -298,12 +231,7 @@ fn listing(arguments: &Value, admitted: &Admitted<'_>) -> Result<Value, Refusal>
         .enumerate()
         .map(|(at, window)| {
             json!({
-                // A name for this window in this connection's answers.
-                // It is deliberately not accepted back by the other
-                // tools: the scope file judges a title and a process, so
-                // a second way to name a window would be a second door
-                // onto the same permission (`Sprawling/desktop/Spec.lean` section 10, design seven
-                // pair). It carries no native handle for the same reason.
+
                 "ref": format!("w{}", at.saturating_add(1)),
                 "title": window.named.title,
                 "process": window.named.process,
@@ -314,7 +242,6 @@ fn listing(arguments: &Value, admitted: &Admitted<'_>) -> Result<Value, Refusal>
     Ok(json!({ "windows": reported }))
 }
 
-/// `desktop.screenshot`: one window, or a region of it.
 fn screenshot(arguments: &Value) -> Result<Answer, Refusal> {
     let window = resolved(arguments)?;
     let whole = capture::window(&window.handle, window.bounds)?;
@@ -343,15 +270,12 @@ fn screenshot(arguments: &Value) -> Result<Answer, Refusal> {
         "title": window.named.title,
         "width": encoded.width,
         "height": encoded.height,
-        // What the caller got rather than what it asked for. A `quality`
-        // that reached nothing is the kind of fact a reader otherwise
-        // learns from a surprising file size.
+
         "lossless": encoded.lossless,
     });
     Ok(Answer::picture(encoded.bytes, encoded.mime, &facts))
 }
 
-/// `desktop.clipboard`: get or set text.
 fn use_clipboard(arguments: &Value) -> Result<Value, Refusal> {
     let operation = text(arguments, "operation").ok_or_else(|| {
         Refusal::new(
@@ -384,7 +308,6 @@ fn use_clipboard(arguments: &Value) -> Result<Value, Refusal> {
     }
 }
 
-/// A window as the snapshot record keys and judges it.
 fn sight(window: &enumerate::Window) -> views::Sight {
     views::Sight {
         aim: focus::Aim::of(&window.handle),
@@ -392,7 +315,6 @@ fn sight(window: &enumerate::Window) -> views::Sight {
     }
 }
 
-/// The one window this call named.
 fn resolved(arguments: &Value) -> Result<enumerate::Window, Refusal> {
     let mut open = enumerate::desktop()?;
     let named: Vec<target::Named> = open.iter().map(|window| window.named.clone()).collect();

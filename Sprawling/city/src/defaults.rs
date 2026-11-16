@@ -3,42 +3,26 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The documents whose default text this build carries, and whether a
-//! copy in the city is the person's own or a default an earlier build
-//! laid down.
-//!
-//! A city keeps a copy of each of these documents so a person has a
-//! file to open and change, and the copy on disk is the exact bytes the
-//! model reads. An earlier build's default that nobody changed is moved
-//! forward to this build's default when the city opens; a copy somebody
-//! changed is left as it is and named, so the person learns that their
-//! version no longer tracks the binary.
-//!
-//! Specified by `Sprawling/city/spec/SpineFiles.lean` §8-43 (city D29).
-
 use std::path::{Path, PathBuf};
 
 use kernel::{AxCode, AxError, B3Hash};
 
 use crate::governed::Governed;
 
-/// A document whose default text this build carries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shipped {
-    /// The city's own instructions, at the city root.
+
     City,
-    /// Who the Mayor is, in the reserved subtree.
+
     Mayor,
-    /// Who the clerk is, in the reserved subtree.
+
     Clerk,
 }
 
 impl Shipped {
-    /// Every document this module keeps, in the order `follow_defaults`
-    /// visits them.
+
     pub const ALL: [Shipped; 3] = [Shipped::City, Shipped::Mayor, Shipped::Clerk];
 
-    /// This build's default text.
     #[must_use]
     pub fn text(self) -> &'static str {
         match self {
@@ -48,7 +32,6 @@ impl Shipped {
         }
     }
 
-    /// Where the city keeps its copy.
     #[must_use]
     pub fn path(self, city_root: &Path) -> PathBuf {
         match self {
@@ -58,14 +41,6 @@ impl Shipped {
         }
     }
 
-    /// The BLAKE3 of every earlier default of this document, as lowercase
-    /// hex: each version the repository's history holds under
-    /// `Sprawling/city/templates/` and, before the templates moved there,
-    /// under the repository's docs directory.
-    ///
-    /// A change to a default adds the digest of the text it replaces
-    /// here, in the same commit; a default missing from this list is
-    /// judged edited, and every city that holds it keeps the old words.
     fn earlier(self) -> &'static [&'static str] {
         match self {
             Shipped::City => EARLIER_CITY,
@@ -110,25 +85,18 @@ const EARLIER_CLERK: &[&str] = &[
     "dd9ee213d03caa843e8b408ebb653726f31d45d0cb22e28fab8a2bf0a6a9292f",
 ];
 
-/// What a copy in the city is, measured against this build's default.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CopyStanding {
-    /// No copy on disk.
+
     Absent,
-    /// The copy is this build's default.
+
     Current,
-    /// The copy is an earlier build's default that nobody changed.
+
     Earlier,
-    /// Somebody changed the copy; it is theirs.
+
     Edited,
 }
 
-/// Judges one copy against this build's default.
-///
-/// The body is judged and an identity area above it is not: the
-/// identity cards write the names a person gives into the top of
-/// `MAYOR.md` (`Sprawling/city/spec/Identity.lean` §8-33), and naming the
-/// Mayor is not editing who the Mayor is.
 #[must_use]
 pub fn standing(doc: Shipped, copy: Option<&[u8]>) -> CopyStanding {
     let Some(copy) = copy else {
@@ -146,31 +114,12 @@ pub fn standing(doc: Shipped, copy: Option<&[u8]>) -> CopyStanding {
     }
 }
 
-/// A copy somebody changed, which `follow_defaults` leaves as it is.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Edited {
     pub doc: Shipped,
     pub path: PathBuf,
 }
 
-/// Lays down every copy that is missing, moves every earlier default
-/// nobody changed forward to this build's, and answers which copies
-/// somebody changed.
-///
-/// The only writer of these three documents' defaults: forming a city
-/// and opening one both come here, so a city formed today and one formed
-/// by an earlier build hold the same bytes for every document nobody
-/// changed. A copy with an identity area keeps its area; only the body
-/// under it moves.
-///
-/// A copy is replaced only while it still holds the bytes it was judged
-/// by, through [`crate::document::edit_against`]: a person's editor can
-/// save over the file between the read and the write, and that save is
-/// theirs, so a copy that moved underneath is kept and named as edited.
-///
-/// # Errors
-/// `E_STORAGE_FATAL` naming the path, for a copy that is there and will
-/// not read, and for one that will not write.
 pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError> {
     let mut edited = Vec::new();
     for doc in Shipped::ALL {
@@ -198,16 +147,6 @@ pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError> {
     Ok(edited)
 }
 
-/// Writes this build's default back over the city's copy of `doc`,
-/// keeping an identity area above it, only while the copy still holds
-/// the version `base` names (a copy that is not there reads as no
-/// bytes). The copy is then `Current`, and follows the binary's default
-/// from here on (`Sprawling/city/Spec.lean` §8-44). Answers how long the copy
-/// now is.
-///
-/// # Errors
-/// `E_VERSION_CONFLICT` when the copy is no longer `base`, and
-/// `E_STORAGE_FATAL` naming the path when it cannot be read or written.
 pub fn restore(city_root: &Path, doc: Shipped, base: B3Hash) -> Result<usize, AxError> {
     let path = doc.path(city_root);
     crate::document::revise(&path, |held, on_disk| {
@@ -220,7 +159,6 @@ pub fn restore(city_root: &Path, doc: Shipped, base: B3Hash) -> Result<usize, Ax
     })
 }
 
-/// The copy's identity area, if it has one, over this build's default.
 fn moved_forward(doc: Shipped, copy: Option<&[u8]>) -> Vec<u8> {
     let area = copy
         .and_then(|copy| {
@@ -233,11 +171,6 @@ fn moved_forward(doc: Shipped, copy: Option<&[u8]>) -> Vec<u8> {
     out
 }
 
-/// The copy on disk, or `None` when there is none.
-///
-/// # Errors
-/// `E_STORAGE_FATAL` naming the path for every failure except a file
-/// that is not there.
 fn read_copy(path: &Path) -> Result<Option<Vec<u8>>, AxError> {
     match std::fs::read(path) {
         Ok(bytes) => Ok(Some(bytes)),

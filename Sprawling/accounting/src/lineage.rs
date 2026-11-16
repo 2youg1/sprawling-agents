@@ -3,48 +3,34 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every run of a city folded into one line that carries its parent
-//! pointers (`Sprawling/app/Spec.lean` §8-105).
-//!
-//! This is the projection the `tree` lens of `sprawling view` draws:
-//! the agent reads it as JSON lines, the interactive viewer arranges it
-//! as a tree. Whether a run is still working is not decided here; it is
-//! read off `storage::HotView`, the same fold the city's run list answers
-//! from, so the tree and the run list cannot disagree about it.
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use kernel::event::record::{ApprovalResolved, RunForked, RunStarted};
 use kernel::{Address, ApprovalItem, AxError, EventKind, EventRecord, RunId, Seq};
 
-/// One run, and where it hangs in the lineage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunLine {
     pub run: RunId,
-    /// The room the run worked in, from its `run_started` record.
+
     pub addr: Option<Address>,
-    /// The seq of the `session_opened` line that began the stretch this
-    /// run started in; `None` for a room's first stretch.
+
     pub session: Option<Seq>,
-    /// `run_forked.from` when the run is a fork, otherwise
-    /// `run_started.parent`.
+
     pub parent: Option<RunId>,
-    /// `run_forked.at_seq`: the last line of the parent the fork inherits.
+
     pub forked_at: Option<Seq>,
-    /// `run_started.predecessor`: the run this one took over from.
+
     pub predecessor: Option<RunId>,
     pub first_seq: Seq,
     pub last_seq: Seq,
     pub state: Option<storage::RunPhase>,
-    /// The `approval_requested` lines this run raised that no
-    /// `approval_resolved` has answered yet: how many questions it is
-    /// waiting on the person for.
+
     pub unanswered: usize,
 }
 
 impl RunLine {
-    /// The line `sprawling view --runs` writes for this run.
+
     pub fn to_json(&self) -> serde_json::Value {
         let state = self.state.as_ref().map(|phase| match phase {
             storage::RunPhase::Active => "active",
@@ -65,8 +51,6 @@ impl RunLine {
     }
 }
 
-/// The fold: every run seen so far, the latest stretch of each room,
-/// and the run that raised each unanswered question.
 #[derive(Default)]
 pub struct Lineage {
     runs: BTreeMap<RunId, RunLine>,
@@ -76,12 +60,7 @@ pub struct Lineage {
 }
 
 impl Lineage {
-    /// Folds one record in, in seq order.
-    ///
-    /// # Errors
-    /// Refuses a `run_started`, `run_forked`, `approval_requested` or
-    /// `approval_resolved` whose payload cannot be read, and whatever
-    /// `storage::HotView` refuses.
+
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "two kinds carry lineage; every other kind only moves last_seq"
@@ -96,8 +75,7 @@ impl Lineage {
         {
             self.stretches.insert(addr.clone(), seq);
         }
-        // An answer may land on any run, the city's included, so it is
-        // matched to the asking run by the question's id.
+
         if record.kind() == EventKind::ApprovalResolved {
             let answered = record.data().read::<ApprovalResolved>()?;
             if let Some(asker) = self.asked_by.remove(answered.id.as_str())
@@ -154,7 +132,6 @@ impl Lineage {
         Ok(())
     }
 
-    /// Every run, oldest first, with its state read off the hot view.
     pub fn lines(&self) -> impl Iterator<Item = RunLine> + '_ {
         let mut lines: Vec<&RunLine> = self.runs.values().collect();
         lines.sort_by_key(|line| line.first_seq);
@@ -165,12 +142,6 @@ impl Lineage {
     }
 }
 
-/// The lineage of the ledger kept in `ledger_dir`, read through the
-/// ledger's index.
-///
-/// # Errors
-/// The index cannot be built, a line cannot be read or parsed, or a
-/// record the fold needs is malformed.
 pub fn lineage_of(ledger_dir: &Path) -> Result<Lineage, AxError> {
     let index =
         storage::LedgerIndex::rebuild(ledger_dir).map_err(storage::StorageError::into_ax)?;

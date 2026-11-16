@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! This machine's answer, in the shape a page reads.
-//!
-//! The terminal report and this one fold the same findings: `screen`
-//! turns them into one machine's prose, and this turns them into
-//! values a browser in either language can label. Neither asks the
-//! machine a second time, and neither decides anything - what is here
-//! and what a tier needs are settled in `doctor` and in `table`.
-
 use super::scanning::{Drive, Exclusion, Scanning, Untold};
 use super::{Absence, Fault, Version};
 use super::{Finding, Machine, Need, Platform, Presence, Tier, Verdict};
@@ -19,17 +11,6 @@ use crate::serving::standing::{Held, Standing};
 use kernel::AxError;
 use std::path::Path;
 
-/// Asks `machine` once and folds what it said into the answer the
-/// wire carries. `ThisMachine`'s `accounting::Machine::report` is this.
-///
-/// Reached through `accounting::Machine::report`, which the worker calls
-/// from `DoctorRefresh` and nowhere else: every item but the
-/// browsers is a program started and asked its version, which is
-/// seconds rather than milliseconds, so neither a serve nor a query
-/// waits for it - a person opening the page that shows it asks for it,
-/// and the city holds the answer until they ask again.
-///
-/// `city` is the directory whose disk the scanning reading judges.
 pub(crate) fn answer(machine: &dyn Machine, city: &Path) -> wire::DoctorAnswer {
     let wide = MachineWide {
         sandbox: confinement(),
@@ -38,18 +19,11 @@ pub(crate) fn answer(machine: &dyn Machine, city: &Path) -> wire::DoctorAnswer {
     fold(machine, Platform::current(), wide, city)
 }
 
-/// The two machine-wide reads that are not asked of `Machine`: the box
-/// a command runs in, and where credentials rest.
 struct MachineWide {
     sandbox: wire::DoctorSandbox,
     custody: wire::DoctorCustody,
 }
 
-/// The findings, in the shape the wire carries. Separate from the ask
-/// so that a test says what this machine answered instead of having
-/// one, and separate from the two machine-wide reads below so that a
-/// verdict is judged without a machine that has a keyring and a search
-/// path.
 fn fold(
     machine: &dyn Machine,
     platform: Option<Platform>,
@@ -76,8 +50,6 @@ fn fold(
     }
 }
 
-/// The scanning reading, arm for arm as the terminal's part reads it
-/// (`Sprawling/wire/spec/Answer/Doctor.lean` D25).
 fn scanned(scanning: Scanning) -> wire::DoctorScanning {
     match scanning {
         Scanning::DoesNotApply => wire::DoctorScanning::DoesNotApply,
@@ -130,7 +102,6 @@ fn untold(why: Untold) -> wire::DoctorUntold {
     }
 }
 
-/// The level the terminal's priority part names, as the wire carries it.
 fn core_level(standing: Result<Standing, AxError>) -> wire::DoctorCore {
     match standing {
         Ok(Standing::Raised) => wire::DoctorCore::Raised,
@@ -143,11 +114,6 @@ fn core_level(standing: Result<Standing, AxError>) -> wire::DoctorCore {
     }
 }
 
-/// The arm a host command runs under here, as the wire carries it.
-///
-/// Read from the module that decides it rather than decided again here:
-/// a page naming one arm while commands run under another would be
-/// worse than no page at all.
 fn confinement() -> wire::DoctorSandbox {
     let arm = runtime::tools::Confinement::detect();
     wire::DoctorSandbox {
@@ -166,14 +132,6 @@ fn confinement() -> wire::DoctorSandbox {
     }
 }
 
-/// Where this machine's credentials rest, from the one startup probe
-/// there is.
-///
-/// The probe writes a value, reads it back and deletes it, which is what
-/// makes the answer about this machine rather than about a configuration
-/// file. It also builds the `provider_degraded` notice the ledger
-/// carries; that notice belongs to the caller that keeps the custodian,
-/// and this report has no ledger to write it to.
 fn custody() -> wire::DoctorCustody {
     let (custodian, _notice) = gateway::Custodian::probe();
     let custody = custodian.custody();
@@ -215,8 +173,6 @@ fn arm_name(arm: &runtime::tools::Confinement) -> wire::DoctorSandboxArm {
     }
 }
 
-/// The arm's name in the set a setting chooses from (wire D26). An
-/// unavailable arm runs a command on the host itself, which is `None`.
 fn chosen_name(arm: &runtime::tools::Confinement) -> wire::SandboxArm {
     match arm {
         runtime::tools::Confinement::LinuxNamespaces { .. }
@@ -241,11 +197,7 @@ fn item(found: &Finding, platform: Option<Platform>) -> wire::DoctorItem {
     wire::DoctorItem {
         name: found.requirement.name.to_owned(),
         tier: named(found.requirement.tier),
-        // A family carries `OneOf`, and the page is told `Required`:
-        // the wire says whether an item stands between a person and a
-        // running city, and the tier's `missing` says whether the group
-        // as a whole is satisfied. A third word here would be a word no
-        // reader could act on without also reading the verdict.
+
         need: match found.requirement.need {
             Need::Required | Need::OneOf(_) => wire::DoctorNeed::Required,
             Need::Optional => wire::DoctorNeed::Optional,
@@ -261,9 +213,6 @@ fn item(found: &Finding, platform: Option<Platform>) -> wire::DoctorItem {
     }
 }
 
-/// The site a page links the item's name to: the brand's own when this
-/// machine answered with a member of a browser family, so a person who
-/// runs Zen is not sent to Mozilla, and the row's otherwise.
 fn homepage(found: &Finding) -> Option<String> {
     if let super::Detection::Family(family) = &found.requirement.detect
         && let Some(member) = found
@@ -300,7 +249,7 @@ fn state(presence: &Presence) -> wire::DoctorState {
                 Fault::WillNotStart(said) => wire::DoctorFault::WillNotStart { said: said.clone() },
                 Fault::HalfWritten => wire::DoctorFault::HalfWritten,
                 Fault::Unreadable(said) => wire::DoctorFault::Unreadable { said: said.clone() },
-                // The wire keeps its existing closed fault set; the text carries both digests.
+
                 Fault::DigestMismatch { .. } => wire::DoctorFault::Unreadable {
                     said: fault.describe(),
                 },
@@ -349,8 +298,6 @@ mod tests {
     use crate::serving::standing::{Held, Standing};
     use std::path::Path;
 
-    /// The two machine-wide reads a fold is given, so that a verdict is
-    /// judged without a machine that has a search path and a keyring.
     fn stated() -> MachineWide {
         MachineWide {
             sandbox: wire::DoctorSandbox {
@@ -378,10 +325,6 @@ mod tests {
         }
     }
 
-    /// The page is told the same thing the terminal is told, item for
-    /// item and verdict for verdict - and told it in values rather than
-    /// in one machine's prose, because the browser has two languages
-    /// and only one of them is this one.
     #[test]
     fn the_answer_says_what_is_missing_and_what_would_get_it() {
         let machine =
@@ -436,8 +379,6 @@ mod tests {
         );
     }
 
-    /// A machine this project names no recipes for says so, rather than
-    /// spelling a command from another platform.
     #[test]
     fn a_platform_with_no_recipes_offers_none() {
         let machine =
@@ -452,10 +393,6 @@ mod tests {
         );
     }
 
-    /// What the page shows about the sandbox is the arm's own list, axis
-    /// for axis, rather than a second opinion about it: a report that
-    /// said "sandboxed" while the network stayed open is the failure the
-    /// arm's list exists to prevent.
     #[test]
     fn the_sandbox_rows_are_the_arms_own_assurances() {
         let machine = ScriptedMachine::missing(&[]);
@@ -480,9 +417,6 @@ mod tests {
         );
     }
 
-    /// The page is told the level the terminal report names, from the
-    /// same reading, and the platform's reason with it: a machine that
-    /// refuses the raise is the one a person has to act on.
     #[test]
     fn the_page_is_told_where_the_core_stands() {
         let machine = ScriptedMachine::missing(&[]).standing(Standing::Normal(Held::Refused(

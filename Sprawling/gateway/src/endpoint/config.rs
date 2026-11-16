@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The external-provider adapter: a self-written wire-format client over
-//! a plain HTTP transport. One call, one HTTP
-//! round trip: whether to try again is the watchdog's decision, never a
-//! hidden loop here.
-//!
-//! Credentials resolve at the last moment: the `Sealed` value is exposed
-//! only while the auth header is written, then dropped (zeroized).
-
-//! Endpoint configuration: auth, overrides, construction.
-
 use kernel::{AxCode, AxError, DialectKind, Proxying, SecretRef};
 use serde_json::Value;
 
@@ -27,84 +17,48 @@ pub enum AuthSpec {
     None,
 }
 
-/// Everything one endpoint needs, field by field — no provider
-/// abstraction layer eats any of it.
 #[derive(Debug, Clone)]
 pub struct EndpointConfig {
-    /// The full URL of the chat endpoint (e.g. `.../v1/messages`).
+
     pub base_url: String,
     pub dialect: DialectKind,
-    /// Provider-side model name; overrides the duty name from the
-    /// canonical request.
+
     pub model: String,
     pub auth: AuthSpec,
-    /// Headers every request adds. A value is a literal or a vault
-    /// reference, and which one it is decides whether it is redeemed
-    /// in the slot before the wire.
+
     pub extra_headers: Vec<(String, HeaderValue)>,
-    /// Field-by-field request overrides: JSON pointer to value, applied
-    /// last, later entries win. Missing object paths are created.
+
     pub overrides: Vec<(String, Value)>,
-    /// How long one settled call may take in total: the whole body is
-    /// read under this bound, because a settled call has nothing to
-    /// report until it has all of it.
+
     pub timeout_ms: u64,
-    /// How long a *streamed* request may go without a byte arriving.
-    /// A model that is still writing is not a model that has stopped
-    /// answering, so a stream is bounded by its silences rather than
-    /// by its length; `None` bounds each silence by `timeout_ms`.
+
     pub stream_idle_timeout_ms: Option<u64>,
-    /// Price-sheet row for settlement; `None` settles nothing (billed
-    /// stays empty and attribution sees usage only).
+
     pub pricing: Option<ModelEntry>,
-    /// Which of this endpoint's calls go through the machine's proxy.
-    /// Resolved before it gets here: the wire spells absence, and the
-    /// assembly layer turns absence into the city's own default.
+
     pub proxying: Proxying,
 }
 
-/// One endpoint, ready to call.
-///
-/// The fields are reachable inside this module tree and nowhere
-/// else: a caller that could take the transport out could also decide
-/// for itself what a non-2xx means and whether the provider's own body
-/// is quoted back, which would put those two answers under two
-/// authorities. What the rest of the crate may do with an endpoint is
-/// on `impl Endpoint`.
 pub struct Endpoint {
     pub(super) config: EndpointConfig,
     pub(super) client: reqwest::blocking::Client,
     pub(super) redemption: Redemption,
-    /// What the model this endpoint calls offers to think at, which
-    /// decides the thinking fields of every request (gateway D35).
+
     pub(super) thinking: crate::provider::thinking::ThinkingOffer,
 }
 
 impl Endpoint {
-    /// One endpoint with a client of its own, for a probe or a single
-    /// call; a chosen model shares its endpoint's client instead
-    /// ([`Endpoint::over`]).
-    ///
-    /// # Errors
-    /// `E_CONFIG_INVALID` when no client can be built for this
-    /// `base_url` and the machine's proxy settings.
+
     pub fn new(config: EndpointConfig, redemption: Redemption) -> Result<Endpoint, AxError> {
         Endpoint::over(&super::transport::Transport::default(), config, redemption)
     }
 
-    /// The provider-side name of the model this endpoint calls.
-    ///
-    /// The one thing a caller outside this module tree reads about a
-    /// configured endpoint: a name, not a handle. Whoever writes a
-    /// body that has to name the model asks for the name and gets
-    /// nothing else.
     #[must_use]
     pub(crate) fn model(&self) -> &str {
         &self.config.model
     }
 }
 
-/// Applies one JSON-pointer override, creating missing object segments.
 pub(crate) fn apply_override(
     root: &mut Value,
     pointer: &str,
@@ -241,18 +195,13 @@ mod tests {
             &AxCode::Provider,
             "silence is a provider failure, and the watchdog's business"
         );
-        // The deadline, not the far end, is what ended this call: the
-        // server holds the connection open and answers nothing, so a
-        // build whose client ignored `timeout` would sit here instead.
-        // Asserted on the reason rather than on elapsed time, because
-        // this workspace samples no clock (determinism rule two).
+
         assert!(
             err.subject().to_ascii_lowercase().contains("timed out"),
             "a provider that says nothing must end as a timeout: {}",
             err.subject()
         );
-        // The deadline passed after the request left, so whether the
-        // provider ran it is not known; the watchdog still asks again.
+
         assert_eq!(
             err.retry(),
             kernel::Retry::Unknown,

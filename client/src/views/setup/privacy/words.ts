@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The privacy page's words for what the host's answer names. The host
-// sends names only (`Sprawling/wire/src/privacy.rs`); every sentence about a
-// control, an edition or a reason is a phrase in `lang.json` keyed by
-// that name. Each key below is spelled from a closed set of the wire, so
-// a member the table has no phrase for fails the typecheck rather than
-// reaching the page as a raw key.
-
 import { isKey, type Key } from "../../../core/lang";
 import type {
   PrivacyBuildEffect,
@@ -21,7 +14,6 @@ import type {
   PrivacyOriginal,
 } from "../../../wire";
 
-// What the page says about each control, one phrase per field.
 export type ControlField =
   "title" | "does" | "benefit" | "affects" | "overlooked" | "undo" | "editions";
 
@@ -55,16 +47,11 @@ export function reasonWord(reason: PrivacyNotWritten): Key {
   return key;
 }
 
-// The research's explanation of one line the host does not write. Only
-// the lines not written have one, and which those are is the host's
-// answer, so the key is looked up rather than spelled; the binary's
-// `privacy::originals` test holds the table to exactly those lines.
 export function originalReason(item: PrivacyOriginal): Key | null {
   const key = `privacy_original_${item}_reason`;
   return isKey(key) ? key : null;
 }
 
-// The facts the page states above every entry, in the order it states them.
 export const PAGE_FACTS: readonly Key[] = [
   "privacy_page_fact_1",
   "privacy_page_fact_2",

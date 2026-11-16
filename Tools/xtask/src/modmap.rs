@@ -3,32 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Module-map gate (redline C4). `architecture.toml` is a closed list of
-//! production modules: every `.rs` under the `src/` of every package but
-//! the gates' own is either a registered module, a test module, a
-//! `lib.rs`, or a pure index file, and every `.zig` anywhere in such a
-//! package is a registered module. Status coherence
-//! is checked both ways — a file that exists while its entry still says
-//! planned means the builder skipped the "flip the status" leg of the
-//! completion evidence.
-//!
-//! **The map is data, not prose.** A table inside `ARCHITECTURE.md`
-//! would give every entry a *position* a person maintains, and a count
-//! under each heading that can go stale while the rows are right. A
-//! structured file has no positions to keep, and a reader can ask it for
-//! one module instead of scanning for one.
-//!
-//! **`lib.rs` and pure index files are exempt, and that exemption is
-//! checked** rather than trusted: an index file may hold declarations and
-//! nothing else, so exempting it costs no coverage.
-//!
-//! **A test module needs no entry** (Tools/xtask/Spec.lean D40). It
-//! compiles only under `cfg(test)`, holds no production policy, and is
-//! found from the module it tests; requiring a row for it made every
-//! regression test a registration edit. A test module that has a row is
-//! still judged like any other row, so the map never names a file that
-//! is gone.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -42,28 +16,13 @@ mod index;
 
 use index::{check_index_content, is_index_name};
 
-/// The module map. This gate is its only reader, so a field change breaks
-/// one place (Tools/xtask/Spec.lean §8-10); `specalign` names the file when
-/// reporting an anchor it could not resolve.
 pub(crate) const MAP: &str = "architecture.toml";
-/// The status column, in the language the table is written in. It moved
-/// from Chinese to English when the module table became part of what the
-/// repository publishes: a reader of `ARCHITECTURE.md` should not have to
-/// read a second language to find out whether a module exists.
+
 const STATUS_PLANNED: &str = "planned";
 const STATUSES: [&str; 4] = [STATUS_PLANNED, "building", "built", "frozen"];
 
-/// The languages whose files are modules, by extension. A Zig leaf is
-/// admitted only when this gate reads its files (ARCHITECTURE.md
-/// section 2, condition 5).
 const SOURCES: [&str; 2] = ["rs", "zig"];
 
-/// One module's entry, exactly as the map spells it.
-///
-/// `owns` is read only to refuse an empty one: an entry that does not say
-/// what its module is for has stopped being worth its line. `since` is
-/// carried by the file for a person and by no field here, because no gate
-/// has a use for the stage a module arrived in.
 #[derive(Deserialize)]
 struct Entry {
     name: String,
@@ -77,8 +36,7 @@ struct Entry {
 #[derive(Deserialize)]
 struct Map {
     module: Vec<Entry>,
-    /// What each family of modules is for, keyed by the prefix its module
-    /// names carry; read by [`duties`] alone.
+
     #[serde(default)]
     family: BTreeMap<String, Family>,
 }
@@ -96,26 +54,13 @@ struct Row {
     spec: String,
 }
 
-/// One module's claim about where its interface is specified.
-///
-/// Handed to `specalign`, which is the gate that owns "a SPEC says what
-/// the code says". This gate stays the map's only reader (Tools/xtask/Spec.lean
-/// §8-10), so a field change breaks one place. The module names
-/// itself rather than carrying a line number: an entry is found by name in
-/// a structured file, and a name does not move when the file is reordered.
 pub(crate) struct Anchor {
     pub(crate) module: String,
-    /// The row's file, which says which package the row belongs to.
+
     pub(crate) file: String,
     pub(crate) spec: String,
 }
 
-/// The map, parsed.
-///
-/// # Errors
-/// When the file is missing or will not parse: a gate whose authority has
-/// moved says so rather than reporting every file in the tree as
-/// unregistered.
 fn read_map(root: &Path) -> Result<Map, XtaskError> {
     let text = walk::read_text(&root.join(MAP))?;
     toml::from_str(&text).map_err(|err| XtaskError::Doc {
@@ -124,7 +69,6 @@ fn read_map(root: &Path) -> Result<Map, XtaskError> {
     })
 }
 
-/// Every registered module's `spec`, in the order the map states them.
 pub(crate) fn anchors(root: &Path) -> Result<Vec<Anchor>, XtaskError> {
     let mut ignored = Vec::new();
     Ok(rows(&read_map(root)?, &judged(root)?, &mut ignored)
@@ -137,12 +81,6 @@ pub(crate) fn anchors(root: &Path) -> Result<Vec<Anchor>, XtaskError> {
         .collect())
 }
 
-/// The shape each registered module states, by file path.
-///
-/// Read by `length`, which does not measure a module whose shape is
-/// `data`. It comes from this parser rather than a second one: the
-/// module table has one reader, so a change to its columns breaks one
-/// place.
 pub(crate) fn shapes(root: &Path) -> Result<BTreeMap<String, String>, XtaskError> {
     let mut ignored = Vec::new();
     Ok(rows(&read_map(root)?, &judged(root)?, &mut ignored)
@@ -151,14 +89,6 @@ pub(crate) fn shapes(root: &Path) -> Result<BTreeMap<String, String>, XtaskError
         .collect())
 }
 
-/// What each of `packages` owns, in their order: the `duty` of the family
-/// its registered modules are named for (xtask D5).
-///
-/// # Errors
-/// When the map does not parse, and when a package has no registered
-/// module, has modules named for two families, or is named for a family
-/// the map states no duty for: a table that quietly left the cell empty
-/// would read as a crate that owns nothing.
 pub(crate) fn duties(root: &Path, packages: &[Member]) -> Result<Vec<String>, XtaskError> {
     let map = read_map(root)?;
     packages
@@ -180,8 +110,6 @@ pub(crate) fn duties(root: &Path, packages: &[Member]) -> Result<Vec<String>, Xt
         .collect()
 }
 
-/// The one prefix, before the first `::`, that every registered module of
-/// `member` carries.
 fn family_of<'map>(map: &'map Map, member: &Member) -> Result<&'map str, XtaskError> {
     let prefixes: Vec<&str> = map
         .module
@@ -220,7 +148,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let rows = rows(&read_map(root)?, &scope, &mut violations);
 
     let table: BTreeMap<&str, &Row> = rows.iter().map(|row| (row.path.as_str(), row)).collect();
-    // Directories that hold registered modules; `<dir>.rs` is then an index file.
+
     let index_dirs: BTreeSet<String> = rows
         .iter()
         .filter_map(|row| row.path.rsplit_once('/').map(|(dir, _)| dir.to_owned()))
@@ -290,16 +218,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// The package these gates are compiled into. Its modules are described
-/// by Tools/xtask/Spec.lean §7 rather than by the map, and it is the one
-/// package the map does not cover (section 12-9).
 const GATES: &str = env!("CARGO_PKG_NAME");
 
-/// The packages whose files the map registers: every package the
-/// members reader lists, tools included,
-/// except the gates' own. A new tool is covered from its first file, so
-/// forgetting to register one is a red rather than a package quietly
-/// left unjudged.
 fn judged(root: &Path) -> Result<Vec<Member>, XtaskError> {
     Ok(members::members(root)?
         .into_iter()
@@ -307,12 +227,6 @@ fn judged(root: &Path) -> Result<Vec<Member>, XtaskError> {
         .collect())
 }
 
-/// The entries this gate judges: a `::` in the name, a `.rs` file inside
-/// one of `scope`'s packages, a known status, an `owns` that says
-/// something, and one entry per file.
-///
-/// An entry whose file sits in no package of `scope` is skipped here,
-/// because the walk only reaches the same packages.
 fn rows(map: &Map, scope: &[Member], violations: &mut Vec<Violation>) -> Vec<Row> {
     let mut rows = Vec::new();
     let mut seen: BTreeMap<&str, &str> = BTreeMap::new();
@@ -364,7 +278,6 @@ fn rows(map: &Map, scope: &[Member], violations: &mut Vec<Violation>) -> Vec<Row
     rows
 }
 
-/// Whether a file is written in one of the languages this map registers.
 fn is_source(file: &str) -> bool {
     Path::new(file)
         .extension()
@@ -372,9 +285,6 @@ fn is_source(file: &str) -> bool {
         .is_some_and(|extension| SOURCES.contains(&extension))
 }
 
-/// Whether a Rust file is a test module by its name: a file named
-/// `tests.rs` or `<name>_tests.rs`, or any file in a `tests/` directory
-/// under `src/`, the spellings this tree gives a `#[cfg(test)] mod`.
 fn is_test_module(rel: &str) -> bool {
     let Some((_, inside)) = rel.split_once("/src/") else {
         return false;
@@ -386,10 +296,6 @@ fn is_test_module(rel: &str) -> bool {
     file == "tests" || file.ends_with("_tests") || dirs.split('/').any(|dir| dir == "tests")
 }
 
-/// Whether a source file found in a package is a module. A Zig file is,
-/// wherever it sits, because a Zig leaf keeps its sources beside its
-/// manifest; a Rust file is when it is under `src/`, because `build.rs`
-/// and its friends are not modules.
 fn is_module(rel: &str) -> bool {
     rel.ends_with(".zig") || rel.contains("/src/")
 }

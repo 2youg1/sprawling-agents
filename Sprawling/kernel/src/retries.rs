@@ -3,45 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How many times a failed call is made again.
-//! The part `Sprawling/kernel/spec/Retries.lean` specifies this module.
-//!
-//! **One value, one absence.** The figure is a value here and its
-//! absence is [`Retries::UntilHalted`] by construction, so a dispatch,
-//! a model-list probe and the form cannot each read a missing figure
-//! their own way, and no reader can spell a fourth answer.
-//!
-//! It lives in the kernel because two layers read it and neither
-//! depends on the other: the gateway, deciding whether to send the
-//! request again, and the runtime's watchdog, deciding whether to
-//! freeze the run. One home, or the two drift.
-
-/// The ceiling a person set on retrying one endpoint.
-///
-/// Exhaustive rather than a count with a sentinel: "keep trying until
-/// somebody stops this" and "try four times" are different intentions,
-/// and a number cannot spell the first one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum Retries {
-    /// No ceiling. What stops the run is `Halt`, the city's one brake.
-    /// This is what a person who settled nothing asked for.
+
     #[default]
     UntilHalted,
-    /// Give up once this many retries have been spent. Zero is a real
-    /// answer and means "once, then report".
+
     AtMost(u32),
 }
 
 impl Retries {
-    /// How many retries a request gets where nothing can halt it.
-    ///
-    /// A person watching a settings page is waiting on one request and
-    /// holds no brake, so `UntilHalted` cannot be honoured literally
-    /// there: a probe that retried forever would hang the page it was
-    /// drawn for. It is honoured as **one** retry, which is what a
-    /// dropped connection costs and what the probe already documented
-    /// as its intent — written here so the reading is the setting's own
-    /// and not a second default at the call site.
+
     #[must_use]
     pub const fn without_a_brake(self) -> u32 {
         match self {
@@ -50,10 +22,6 @@ impl Retries {
         }
     }
 
-    /// The figure a record carries, or nothing when no ceiling was set.
-    ///
-    /// Absence on the wire and absence in the ledger are the same fact,
-    /// so both are written by this one reading.
     #[must_use]
     pub const fn stated(self) -> Option<u32> {
         match self {
@@ -62,7 +30,6 @@ impl Retries {
         }
     }
 
-    /// What a stated figure, or the absence of one, means.
     #[must_use]
     pub const fn of(stated: Option<u32>) -> Retries {
         match stated {
@@ -87,7 +54,7 @@ mod tests {
         assert_eq!(Retries::of(None), Retries::UntilHalted);
         assert_eq!(Retries::default(), Retries::UntilHalted);
         assert_eq!(Retries::UntilHalted.stated(), None);
-        // The one reading a probe takes, and it is bounded.
+
         assert_eq!(Retries::UntilHalted.without_a_brake(), 1);
     }
 

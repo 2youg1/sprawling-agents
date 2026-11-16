@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The fold that turns verified lines into a playback bundle's tables
-//! (`Sprawling/accounting/spec/Playback.lean` §8-12).
-//!
-//! Every line up to the cutoff is folded into the run lineage and the
-//! key-moment ends, because a run's state and a moment's closing are
-//! facts as of the cutoff, not as of the window. Every table the bundle
-//! carries is then built from the lines the reader may see alone: a
-//! withheld line adds to a count and to nothing else
-//! (`Sprawling/accounting/spec/Playback/Project.lean`). A committed
-//! checkpoint's evidence is asked of the history folded up to its line,
-//! and its diff and calls are read last, from the repository and through
-//! the walk's index (`Sprawling/accounting/spec/Playback/Traced.lean` §8-17, §8-25).
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -43,27 +30,24 @@ pub(super) struct Projection<'selection> {
     selection: &'selection Selection,
     readership: Readership,
     lineage: Lineage,
-    /// Every building this history has named so far: an address in a
-    /// payload counts as touching a building only when it starts with one.
+
     buildings: BTreeSet<Address>,
     links: Links,
     events: Vec<Event>,
-    /// Visible lines outside the selection that may be the far end of a
-    /// selected line's pair.
+
     candidates: BTreeMap<Seq, Event>,
     runs: BTreeSet<RunId>,
     unknown: Vec<Decimal>,
     withheld: Tally,
     checkpoints: Vec<Checkpoint>,
     attribution: storage::Attribution,
-    /// What a committed checkpoint's base, diff and trace are read from.
+
     evidence: Evidence,
-    /// The policy each run's visible `run_started` recorded.
+
     policies: BTreeMap<RunId, RunPolicy>,
-    /// The `tool_called` lines the reader may not see, which a commit's
-    /// trace may name.
+
     hidden_calls: BTreeSet<Seq>,
-    /// The credential scan, and which lines it reads.
+
     scanner: Scanner,
 }
 
@@ -102,11 +86,6 @@ impl<'selection> Projection<'selection> {
         }
     }
 
-    /// Folds one verified line in, in seq order.
-    ///
-    /// # Errors
-    /// A payload the lineage, the links or the checkpoint table must read
-    /// and cannot, and a line that is not UTF-8.
     pub(super) fn apply(&mut self, raw: &[u8], walked: Walked) -> Result<(), AxError> {
         let record = match walked {
             Walked::Known(record) => record,
@@ -150,8 +129,7 @@ impl<'selection> Projection<'selection> {
                 self.withheld.hide(record.kind());
                 self.withheld.buildings.entry(building).or_insert(reason);
             }
-            // A selected line is always scanned; a deferred one here is
-            // withheld rather than shown unscanned.
+
             (true, Fate::Credential | Fate::Deferred) => {
                 self.withheld.hide(record.kind());
                 self.withheld.credential = self.withheld.credential.saturating_add(1);
@@ -164,12 +142,6 @@ impl<'selection> Projection<'selection> {
         Ok(())
     }
 
-    /// The document, with `source` as the caller built it, and how many
-    /// lines the projection scanned for credentials; a commit's lines
-    /// are read through `index`, the one the walk built.
-    ///
-    /// # Errors
-    /// A run's count of unanswered questions past what the bundle writes.
     pub(super) fn finish(
         mut self,
         source: Source,
@@ -242,8 +214,6 @@ impl<'selection> Projection<'selection> {
         Ok((document, self.scanner.scans()))
     }
 
-    /// A selected line the reader sees: into the events, and into every
-    /// table it moves.
     fn take(&mut self, record: &EventRecord, raw: &[u8]) -> Result<(), AxError> {
         self.events.push(event(record, raw)?);
         if record.run() != RunId::CITY {
@@ -265,9 +235,6 @@ impl<'selection> Projection<'selection> {
         Ok(())
     }
 
-    /// What a later table needs of one line beyond its own fate: the
-    /// policy a visible `run_started` records, and a call the reader may
-    /// not see, which a commit's trace may still name.
     fn remember(&mut self, record: &EventRecord, visible: bool) -> Result<(), AxError> {
         if visible
             && record.kind() == EventKind::RunStarted
@@ -281,9 +248,6 @@ impl<'selection> Projection<'selection> {
         Ok(())
     }
 
-    /// Reads each committed checkpoint's base, diff and trace: from what
-    /// the history said at its line, from the city's repository, and from
-    /// the lines before it, through `index`.
     fn attach_evidence(&mut self, index: &LedgerIndex) {
         let known = Known {
             events: &self.events,
@@ -295,8 +259,6 @@ impl<'selection> Projection<'selection> {
             .attach(&mut self.checkpoints, &known, &mut self.readership);
     }
 
-    /// Adds the building a line is addressed in, and the one a
-    /// `building_created` raises, to the buildings this history has named.
     fn learn_buildings(
         &mut self,
         record: &EventRecord,
@@ -310,8 +272,6 @@ impl<'selection> Projection<'selection> {
         Ok(())
     }
 
-    /// Adds to `touched` every building a string in the payload names by
-    /// an address that starts with it.
     fn named_in_payload(&self, record: &EventRecord, touched: &mut BTreeSet<Address>) {
         let mut pending: Vec<&serde_json::Value> = record.data().as_map().values().collect();
         while let Some(value) = pending.pop() {
@@ -342,9 +302,6 @@ impl Tally {
     }
 }
 
-/// The building an address lies in. An address in the reserved subtree
-/// belongs to no building and stands for itself, so the reader's rules
-/// cannot read for it and it closes.
 pub(super) fn building_of(addr: &Address) -> Address {
     city::Building::of(addr).map_or_else(|_| addr.clone(), |building| building.addr().clone())
 }

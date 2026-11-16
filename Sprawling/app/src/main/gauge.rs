@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `sprawling gauge`: measure a served city, a running process and its
-//! descendants, or a command run n times (`Sprawling/app/spec/Main.lean` §8-129-4).
-//!
-//! The readings never enter a Ledger: they are this machine's facts at
-//! one moment, written to stdout for whoever asked (8-129-1). Durations
-//! come from the one monotonic sampling point, process figures from
-//! `monitor::tree`, shares from `monitor::spread`; this module chooses
-//! the subject, runs it, and hands each reading to `lines`.
-
 use std::ffi::OsString;
 use std::io::Write;
 use std::num::{NonZeroU32, NonZeroUsize};
@@ -27,7 +18,6 @@ use sprawling::serving::standing::monotonic_now;
 use super::exit::Exit;
 use super::grammar::Arguments;
 
-/// What one `gauge` line measures.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Subject {
     City { at: String, token: Option<String> },
@@ -35,16 +25,14 @@ pub(super) enum Subject {
     Command(Running),
 }
 
-/// A running process and its descendants, read every beat.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Watching {
     pid: u32,
     every: Every,
-    /// How many beats to read; `None` reads until the root exits.
+
     beats: Option<NonZeroU32>,
 }
 
-/// A command run `samples` times, one after another.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Running {
     program: OsString,
@@ -53,7 +41,6 @@ pub(super) struct Running {
     samples: NonZeroU32,
 }
 
-/// The subject a flag was given to, named in a `Misread`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Measured {
     City,
@@ -61,8 +48,6 @@ pub(super) enum Measured {
     Command,
 }
 
-/// A `gauge` line whose words the table accepted and whose subject
-/// cannot be chosen from them. Every arm exits 2.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Misread {
     TwoSubjects,
@@ -78,49 +63,39 @@ pub(super) enum Misread {
     NothingAfterDashes,
 }
 
-/// The time between two beats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Every(Duration);
 
-/// What one run of the command came to.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Run {
     index: u32,
-    /// The command's exit code; `None` when a signal ended it.
+
     exit: Option<i32>,
     wall: Duration,
     watched: Watched,
     child: ChildPeaks,
 }
 
-/// What the beat thread saw of one run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Watched {
     beats: u64,
     seen: Option<Seen>,
-    /// The time spent reading the process table during this run.
+
     read_cost: Duration,
 }
 
-/// The peaks the platform recorded for the direct child; `None` where
-/// the platform gives none or refused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct ChildPeaks {
     private_bytes: Option<u64>,
     working_set_bytes: Option<u64>,
 }
 
-/// The class of machine a spread was taken on, without naming it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Host {
     cores: NonZeroUsize,
     physical_bytes: u64,
 }
 
-/// Measures what the line names and writes one line per reading to
-/// stdout. Exit 0 once the measurement is made, whatever the measured
-/// command returned; 1 when the subject cannot be started or found; 2
-/// for a line no subject can be chosen from; 4 when no city answers.
 pub(super) fn verb(read: &Arguments) -> ExitCode {
     let subject = match subject(read) {
         Ok(subject) => subject,
@@ -150,12 +125,6 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
     }
 }
 
-/// The subject a line names: `--pid` a process, words after `--` a
-/// command, neither the city at `--at`.
-///
-/// # Errors
-/// A `Misread` naming the flag that does not fit and the nearest line
-/// that would.
 pub(super) fn subject(read: &Arguments) -> Result<Subject, Misread> {
     let given = |flags: [&'static str; 2]| flags.into_iter().find(|flag| read.has(flag));
     let refuse = |flag: Option<&'static str>, subject| match flag {
@@ -200,7 +169,6 @@ pub(super) fn subject(read: &Arguments) -> Result<Subject, Misread> {
     }
 }
 
-/// A `--samples` value: a whole number of at least one.
 fn count(given: &str) -> Result<NonZeroU32, Misread> {
     given.parse().map_err(|_| Misread::OutOfRange {
         flag: "--samples",
@@ -213,9 +181,6 @@ impl Every {
     const LONGEST_MS: u64 = 60_000;
     const USUAL: Every = Every(Duration::from_secs(1));
 
-    /// An `--every` value in milliseconds: 1 s when not given. Never
-    /// shorter than 250 ms, because one beat reads the whole process
-    /// table, 17-65 ms on Windows (8-129-3).
     fn read(given: Option<&str>) -> Result<Every, Misread> {
         let Some(given) = given else {
             return Ok(Every::USUAL);
@@ -233,11 +198,6 @@ impl Every {
     }
 }
 
-/// Reads the tree under `watching.pid` every beat until the root exits
-/// or the beats asked for are read.
-///
-/// # Errors
-/// `E_INVALID_ARGS` when no process has the id; a failed write to `out`.
 fn watch(watching: &Watching, audience: Audience, out: &mut impl Write) -> Result<(), AxError> {
     let mut tree = Tree::open(watching.pid);
     let began = monotonic_now();
@@ -263,8 +223,7 @@ fn watch(watching: &Watching, audience: Audience, out: &mut impl Write) -> Resul
 }
 
 impl Host {
-    /// This machine's cores and memory. A core count the platform will
-    /// not give reads as one, the least a running process has.
+
     fn here() -> Host {
         Host {
             cores: std::thread::available_parallelism().unwrap_or(NonZeroUsize::MIN),

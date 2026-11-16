@@ -3,22 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The remote door's verbs on the wire (`Sprawling/app/spec/Outside.lean`
-//! §8-140, remote_access D4): `CloseRemoteDoor` is carried at once;
-//! `OpenRemoteDoor` and `ReplaceCityKey` only print a code at the city's
-//! console and answer `E_APPROVAL_PENDING`; `ConfirmRemoteDoor` with that
-//! code, before it expires, does the verb the code was printed for.
-//!
-//! Any local client can send these frames, including a resident's browser
-//! tool driving the page, and none of them reads the console, which is
-//! the whole guard (`remote_access::confirm`). Each verb, once allowed, is
-//! the console's own line carried by `console::perform`, so the page and
-//! `/remote` do one thing.
-//!
-//! The door is kept only by a serve that has a console. Without one,
-//! nobody could read a code, so every verb but closing a door that was
-//! never opened is refused.
-
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
 use kernel::{AxCode, AxError, TimeMs};
@@ -27,43 +11,34 @@ use wire::{Command, Delivered, Reply, WireCommand};
 
 use super::console::{Lasting, Remote, RemoteLine, perform};
 
-/// How long a printed code answers (`Sprawling/remote_access/Spec.lean` §8-13).
 const CONFIRM_MS: u64 = 2 * 60 * 1000;
 
-/// What the city's listener hands each Command to.
 pub(crate) type Commands = Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Sync>;
 
-/// Where a line meant for the User goes: the city's console.
 pub(crate) type Show = Arc<dyn Fn(&str) + Send + Sync>;
 
-/// The door this serve's console keeps, once the console starts.
 #[derive(Clone, Default)]
 pub(crate) struct Front(Arc<OnceLock<Asking>>);
 
 struct Asking {
     remote: Result<Remote, AxError>,
     waiting: Mutex<Confirm<Asked>>,
-    /// The door verbs carried off the listener, one at a time; an open
-    /// whose turn comes after the guard locked is not carried, so an open
-    /// still on its way cannot undo the close (remote_access D25).
+
     carrying: Arc<Mutex<Carrying>>,
     show: Show,
 }
 
-/// What the carried door verbs share.
 #[derive(Default)]
 struct Carrying {
     locked_out: bool,
 }
 
-/// A verb that waits for its code.
 #[derive(Debug, Clone, Copy)]
 enum Asked {
     Open(Lasting),
     ReplaceKey,
 }
 
-/// One of the four door verbs a frame carried.
 enum Verb {
     Open(u64),
     ReplaceKey,
@@ -72,8 +47,7 @@ enum Verb {
 }
 
 impl Front {
-    /// The Commands the city's listener is given: the four door verbs
-    /// answered here, every other Command handed to `desk`.
+
     pub(crate) fn commands(
         &self,
         desk: impl Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Sync + 'static,
@@ -85,8 +59,6 @@ impl Front {
         })
     }
 
-    /// Hands the door the console keeps to the wire; a second call keeps
-    /// the first door.
     pub(crate) fn attend(&self, remote: &Result<Remote, AxError>, show: Show) {
         self.0.get_or_init(|| Asking {
             remote: remote.clone(),
@@ -121,7 +93,7 @@ impl Front {
 }
 
 impl Asking {
-    /// Prints a code for `asked` and answers that it waits.
+
     fn ask(&self, asked: Asked) -> Result<(), AxError> {
         let senses = self.remote.as_ref().map_err(Clone::clone)?.doorway.senses();
         let mut entropy = [0u8; CONFIRM_BYTES];
@@ -156,10 +128,6 @@ impl Asking {
         answered.map_err(Miss::refusal)
     }
 
-    /// The answer that locked the guard: something on this machine is
-    /// guessing, so an open door closes and the console says why the
-    /// page's controls stopped answering (remote_access D25). Closing
-    /// only takes access away, so it needs no code.
     fn lock_out(&self) {
         (self.show)(
             "  ten wrong codes were typed into a page since the last right one: the page's \
@@ -181,9 +149,6 @@ impl Asking {
         });
     }
 
-    /// Carries `line` off the listener's task, because opening a route
-    /// waits for it to be reachable; the console reads what it did, and
-    /// the page that asked reads a refusal.
     fn later(&self, line: RemoteLine, reply: Reply) {
         let remote = self.remote.clone();
         let show = Arc::clone(&self.show);
@@ -262,7 +227,6 @@ fn unlasting(ms: u64) -> AxError {
     .with_recovery("choose how long the door stays open again")
 }
 
-/// The door verb `command` carries, or the Command itself for the desk.
 fn door_verb(command: WireCommand) -> Result<Verb, Box<WireCommand>> {
     match command {
         Command::OpenRemoteDoor(opening) => Ok(Verb::Open(opening.lasting_ms)),
@@ -320,9 +284,7 @@ fn door_verb(command: WireCommand) -> Result<Verb, Box<WireCommand>> {
 
 #[cfg(test)]
 mod without_a_console {
-    /// `serve` alone has no console, so the recovery names the two
-    /// commands that start a city with one, in one sentence: the wrapped
-    /// source line leaves no run of spaces in what a person reads.
+
     #[test]
     fn the_recovery_is_one_sentence_naming_a_command_that_has_a_console() {
         let refused = super::no_console();

@@ -3,35 +3,31 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Stable command failures with an action, subject and recovery.
-
-/// The process-level meaning of a failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
-    /// The round or its published outputs are wrong.
+
     Rejected,
-    /// The invocation or the analyzer's own environment failed.
+
     Broken,
 }
 
-/// One failure in the command's stable text format.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{code} {action}: {subject}; {recovery}")]
 pub struct BenchError {
-    /// Stable machine-readable code.
+
     pub code: &'static str,
-    /// The attempted action.
+
     pub action: String,
-    /// The path, field or statistic being acted on.
+
     pub subject: String,
-    /// The next action a caller can take.
+
     pub recovery: String,
-    /// Which process exit this failure earns.
+
     pub severity: Severity,
 }
 
 impl BenchError {
-    /// Reject malformed or inconsistent round input.
+
     pub(crate) fn input(action: &str, subject: String, recovery: &str) -> Self {
         Self::new(
             "E_INVALID_INPUT",
@@ -44,7 +40,6 @@ impl BenchError {
         )
     }
 
-    /// Report a difference between published and recomputed artifacts.
     pub(crate) fn mismatch(subject: String) -> Self {
         Self::new(
             "E_VERIFY_MISMATCH",
@@ -57,7 +52,6 @@ impl BenchError {
         )
     }
 
-    /// Reject a command line that names no valid operation.
     pub fn usage(subject: String) -> Self {
         Self::new(
             "E_USAGE",
@@ -70,7 +64,6 @@ impl BenchError {
         )
     }
 
-    /// Report an operating-system read or write failure.
     pub(crate) fn io(action: &str, subject: String, source: std::io::Error) -> Self {
         Self::new(
             "E_IO",
@@ -83,7 +76,6 @@ impl BenchError {
         )
     }
 
-    /// Report an estimator that cannot produce a finite answer.
     pub(crate) fn numeric(action: &str, subject: String, recovery: &str) -> Self {
         Self::new(
             "E_NUMERIC",

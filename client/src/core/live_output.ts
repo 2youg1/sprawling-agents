@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What a running command has written so far, as this page holds it
-// (`Sprawling/runtime/Spec.lean` §8-28-3). A preview: the call's result in the Ledger is
-// the authority on that output, so a run's tail is dropped the moment
-// its `tool_result` arrives. Bounded by lines, because the page draws
-// lines, and the oldest are dropped first and counted, so the terminal
-// can say how many it no longer shows.
-
 import type { LiveOutput } from "../wire";
 
 export const LIVE_LINES = 400;
@@ -22,7 +15,6 @@ export interface Tail {
 
 export const NO_TAIL: Tail = { out: "", err: "", cut: 0 };
 
-// The tail with one more piece on the end of its stream.
 export function appended(tail: Tail, piece: LiveOutput, cap: number = LIVE_LINES): Tail {
   const [text, cut] = bounded((piece.stream === "out" ? tail.out : tail.err) + piece.text, cap);
   return piece.stream === "out"
@@ -30,7 +22,6 @@ export function appended(tail: Tail, piece: LiveOutput, cap: number = LIVE_LINES
     : { ...tail, err: text, cut: tail.cut + cut };
 }
 
-// The newest `cap` lines of `text`, and how many older ones went.
 function bounded(text: string, cap: number): [string, number] {
   const lines = text.split("\n");
   const cut = Math.max(0, lines.length - cap);

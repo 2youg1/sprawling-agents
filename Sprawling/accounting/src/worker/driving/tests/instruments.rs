@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Two instruments over the accounting loop the city runs
-//! (`Sprawling/app/Spec.lean` §8-84): a relay round trip, and the gap a second
-//! dispatch leaves in a run that is already going.
-//!
-//! Both drive `crate::worker::attend::attend` on a thread of its own, send
-//! work in through `CommandDesk::post`, and talk to the loopback
-//! provider. Both are ignored by `just check`, because they read the
-//! wall clock and take seconds; `just bench` runs them and prints one
-//! reading line each.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -32,28 +22,20 @@ use crate::worker::attend::attend;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// Appends timed per store: enough for a stable middle, few enough that
-/// the disk store stays inside a few seconds at a barrier each.
 const APPENDS: usize = 200;
-/// What a request asking a model to name a room is held for, which is
-/// about what a remote model takes to answer a short request. Rooms are
-/// named by rule (`Sprawling/app/Spec.lean` §8-86), so no dispatch sends one and
-/// the hold shows in the reading only if naming comes back.
+
 const NAMING: Duration = Duration::from_secs(3);
-/// The status turns run A takes before it answers.
+
 const TURNS: usize = 30;
-/// Which of A's model calls sends B in.
+
 const B_ARRIVES_AT_CALL: usize = 5;
-/// A phrase only run A's requests carry.
+
 const A_TASK: &str = "tally the east kiln";
-/// The phrase a request asking a model to name a room would carry.
+
 const NAMING_PHRASE: &str = "Name this piece of work";
-/// The longest the scenario may take before it is reported as stuck.
+
 const WITHIN: Duration = Duration::from_secs(60);
-/// The most a relay round trip over the memory store may take at its
-/// middle. Only that store is held to it: there the whole round trip is
-/// the harness, while on the disk store the middle is the device's fsync,
-/// a physical floor that differs by machine (`Sprawling/app/Spec.lean` §8-84).
+
 const ROUND_TRIP_P50: Duration = Duration::from_millis(1);
 
 #[derive(Debug, Clone, Copy)]
@@ -168,10 +150,7 @@ fn instrument_dispatch_gap() {
         gaps.get(gaps.len() / 2).copied().unwrap_or(0),
         machine()
     );
-    // Dispatching B into a bare building must not stall A. The bound is
-    // the held naming call rather than a few
-    // milliseconds, because A's widest gap also holds its own turns'
-    // checkpoints, which are A's work and not a stall B caused.
+
     let widest = gaps.last().copied().unwrap_or(0);
     let naming = u64::try_from(NAMING.as_millis()).unwrap();
     assert!(
@@ -180,9 +159,6 @@ fn instrument_dispatch_gap() {
     );
 }
 
-/// `APPENDS` relay appends, each timed, while a run is driving and
-/// held at its first model call - the shape the loop is in whenever a
-/// lane is out.
 fn relay_round_trips(store: Store) -> Vec<Duration> {
     let dir = tempfile::tempdir().unwrap();
     raise_lab(dir.path());
@@ -243,9 +219,6 @@ fn relay_round_trips(store: Store) -> Vec<Duration> {
     taken
 }
 
-/// The same appends into a ledger on the in-memory store, with no
-/// crossing: what the accounting thread's own half of a round trip
-/// costs.
 fn own_appends() -> Vec<Duration> {
     let dir = tempfile::tempdir().unwrap();
     let (mut ledger, _) = in_memory_ledger(dir.path());
@@ -273,14 +246,12 @@ fn in_memory_ledger(dir: &std::path::Path) -> (storage::JsonlLedger, storage::Op
     .unwrap()
 }
 
-/// A city with one building and one room in it, under ordinary rules.
 fn raise_lab(root: &std::path::Path) {
     crate::worker::fixture::init_city(root).unwrap();
     std::fs::create_dir_all(root.join("lab").join("east")).unwrap();
     lay_rules(root, "lab", &ordinary_rules(""));
 }
 
-/// The accounting loop on a thread of its own, as `spawn_worker` runs it.
 pub(super) fn attending(worker: RunWorker, desk: &Arc<CommandDesk>) -> std::thread::JoinHandle<()> {
     let desk = Arc::clone(desk);
     std::thread::spawn(move || {
@@ -306,7 +277,6 @@ fn nowhere() -> wire::Reply {
     wire::Reply::nowhere()
 }
 
-/// One record with nothing in it but its position.
 pub(super) fn marker() -> kernel::EventDraft {
     kernel::EventDraft {
         run: RunId::CITY,
@@ -319,7 +289,6 @@ pub(super) fn marker() -> kernel::EventDraft {
     }
 }
 
-/// The history once `runs` runs have frozen, oldest first.
 fn until_frozen(root: &std::path::Path, runs: usize) -> Vec<serde_json::Value> {
     let started = Instant::now();
     loop {
@@ -356,7 +325,6 @@ fn store_name(store: Store) -> &'static str {
     }
 }
 
-/// Prints the reading line, and hands back the middle it read.
 fn report(instrument: &str, fields: &str, mut taken: Vec<Duration>) -> Duration {
     taken.sort_unstable();
     let floor = taken.first().copied().unwrap_or_default();

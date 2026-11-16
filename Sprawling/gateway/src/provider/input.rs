@@ -3,31 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which statement about what one model accepts wins (shape 1 decision;
-//! `Sprawling/gateway/spec/Provider/Input.lean` §8-37).
-//!
-//! **A model whose vendor documents that it reads pictures was
-//! registered as reading only text.** The registration took its input
-//! from the pinned catalogue alone, which holds one row that reads
-//! pictures, while every model row of the preset table already states
-//! its input beside the page it was read from. The endpoint then
-//! refused every picture sent to that model, and the ocr tool with it.
-//!
-//! The window and the output ceiling already climb from the catalogue to
-//! the preset table to a default; this is the same ladder for the third
-//! fact a registration carries, decided here and nowhere else.
-
 use crate::market::InputKinds;
 
-/// What one model may be sent, from the first rung that states it.
-///
-/// `stated` is what the person said in `SelectModel.input`, and outranks
-/// everything in either direction (gateway D16). `pinned` is the pinned
-/// catalogue's row for this exact id; the preset table is asked with the
-/// base URL and the id, by the same prefix rule that answers for its
-/// window and ceiling. Nobody stating anything is [`InputKinds::Text`]:
-/// guessing too little costs a refusal naming the fix, guessing too much
-/// costs the provider's 400.
 #[must_use]
 pub fn accepted_input(
     stated: Option<InputKinds>,
@@ -38,10 +15,6 @@ pub fn accepted_input(
     first_stated(stated, pinned, super::preset::input_for(base_url, id))
 }
 
-/// The ladder itself, with the preset table's answer already read:
-/// `Gateway.Provider.Input.accepted_input` over the same three rungs.
-/// The preset lookup stays in the caller, so a check can walk every
-/// combination the model admits without a host to look up.
 fn first_stated(
     stated: Option<InputKinds>,
     pinned: Option<InputKinds>,
@@ -61,11 +34,6 @@ fn first_stated(
 mod tests {
     use super::*;
 
-    /// One table, every rung: the person outranks both tables in both
-    /// directions, the catalogue outranks the preset table in both
-    /// directions, the preset table answers where the catalogue is silent
-    /// (at the vendor's host and at a relay forwarding the vendor's id),
-    /// and a server on this machine or an id nobody documents reads text.
     #[test]
     fn the_first_rung_that_states_a_fact_answers() {
         let vendor = "https://api.anthropic.com/v1";
@@ -106,10 +74,6 @@ mod tests {
         );
     }
 
-    /// `every_answer_is_a_stated_fact_or_text`, checked on all 27
-    /// combinations of the three rungs, each silent or stating one of the
-    /// two kinds: the answer is the first rung that spoke, or `Text`
-    /// when none did.
     #[test]
     fn every_answer_is_a_stated_fact_or_text_on_every_combination() {
         let said = [None, Some(InputKinds::Text), Some(InputKinds::TextImage)];

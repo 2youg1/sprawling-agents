@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The living skeleton. Dispatch -> four-phase turns -> run_frozen,
-//! all through scripted adapters, chain-verified, byte-deterministic.
-//! The cancel assertions live here: cancel takes effect at phase
-//! boundaries, never inside a phase.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -23,8 +18,6 @@ use kernel::{
 };
 use runtime::bench::ToolBench;
 
-/// The bench the scenarios drive: the real one, carrying
-/// whichever tools a scenario wants registered.
 fn bench_with(tools: Vec<Box<dyn kernel::Tool>>) -> ToolBench {
     let domain = WriteDomain::new(vec![Address::parse("sim/lobby/room1").unwrap()]).unwrap();
     let mut bench = ToolBench::new(domain);
@@ -135,7 +128,7 @@ fn the_minimal_loop_closes_and_the_chain_verifies() {
             "run_frozen",
         ]
     );
-    // A6 in the account: the frozen line cites its evidence.
+
     let frozen: serde_json::Value = serde_json::from_slice(report.lines.last().unwrap()).unwrap();
     assert_eq!(frozen["data"]["completion"], "done");
     assert_eq!(frozen["data"]["evidence"][0]["kind"], "model_returned");
@@ -154,7 +147,7 @@ fn a9_cancel_before_assemble_stops_before_any_window_bytes() {
     let report = run_scenario(scenario(Some(CancelPoint::BeforeAssemble { turn: 1 }))).unwrap();
     assert_eq!(report.completion, "cancelled");
     let ks = kinds(&report.lines);
-    // The first turn ran whole; the second never assembled.
+
     assert_eq!(
         ks,
         [
@@ -217,10 +210,6 @@ fn a9_cancel_before_wave_completes_the_model_call_but_runs_no_tool() {
     );
 }
 
-/// A run ends when its own work ends, because there is no ceiling to
-/// reach. A model that asks for another probe sixteen times
-/// takes sixteen turns and then concludes on the empty wave; what stops
-/// a run somebody wants stopped is `Halt`, not a number chosen for them.
 #[test]
 fn a_run_takes_every_turn_its_work_asks_for_and_then_concludes() {
     let mut sc = scenario(None);
@@ -313,7 +302,7 @@ fn the_domain_door_bites_an_out_of_domain_write_inside_the_loop() {
 fn a_tool_error_flows_back_as_a_tool_result_and_the_loop_continues() {
     let mut sc = scenario(None);
     sc.bench = bench_with(vec![Box::new(ScriptTool::new(probe_meta(), vec![]))]);
-    // Script: one wave (tool will fail: outcome script exhausted), then conclude.
+
     let report = run_scenario(sc).unwrap();
     assert_eq!(report.completion, "done");
     let last_result = report
@@ -327,27 +316,18 @@ fn a_tool_error_flows_back_as_a_tool_result_and_the_loop_continues() {
 
 #[test]
 fn a_scenario_ledger_forks_into_a_byte_identical_prefix() {
-    // The fork face consumed from the scenario side (A19 on skeleton
-    // output): verify, cut at a mid node, compare bytes.
+
     let report = run_scenario(scenario(None)).unwrap();
     let verified = runtime::replay::verify_lines(report.lines.clone()).unwrap();
     let at = kernel::Seq::new(4);
     let prefix = runtime::fork::prefix(&verified, at).unwrap();
     assert_eq!(prefix.len(), 5);
     assert_eq!(prefix.as_slice(), &report.lines[..5]);
-    // Past the tail: refused, never clamped.
+
     let over = kernel::Seq::new(9999);
     assert!(runtime::fork::prefix(&verified, over).is_err());
 }
 
-/// One Resident, the real adapters, end to end.
-///
-/// The scripted model now speaks provider wire JSON and reaches the seam
-/// through `gateway::dialect`, the same translation the endpoint uses.
-/// The tools are the real L0 ones writing to a real directory. The gate
-/// routing is the real bench. What stays simulated is the ledger (its
-/// on-disk twin is already proven by conformance) and the HTTP face (a
-/// network call is not deterministic).
 #[test]
 fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
     use citysim::ScriptModel as Model;
@@ -361,8 +341,7 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
 
     let domain = WriteDomain::new(vec![Address::parse("sim/lobby/room1").unwrap()]).unwrap();
     let mut bench = ToolBench::new(domain.clone());
-    // The run's read stamps, shared by its read and its edit as the
-    // workbench lays them out.
+
     let seen = runtime::ReadStamps::default();
     bench
         .register(Box::new(
@@ -411,7 +390,6 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
         ))
         .unwrap();
 
-    // Three turns of wire JSON: look around, edit, conclude.
     let model = Model::from_wire(
         DialectKind::Anthropic,
         vec![
@@ -455,7 +433,7 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
         job_md: "# JOB\nEdit notes.md.".into(),
         model,
         bench,
-        // Minute stamps: the clock line rides the envelope.
+
         config: FrozenConfig {
             clock_stamp: ClockStampGranularity::Minute,
             clock_zones: Vec::new(),
@@ -468,7 +446,7 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
             search: kernel::config::SearchConfiguration::Default,
             catalog: kernel::config::CatalogExposure::default(),
         },
-        // The real net over the real tree: a checkpoint before every wave.
+
         checkpoint: Some((
             storage::Checkpoint::open(city.path()).unwrap(),
             vec!["sim/lobby/room1".to_owned()],
@@ -480,13 +458,13 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
     let report = run_scenario(scenario).unwrap();
 
     assert_eq!(report.completion, "done");
-    // The real edit landed on the real file.
+
     assert_eq!(
         std::fs::read_to_string(&target).unwrap(),
         "status: final\n",
         "the tool wrote through to disk"
     );
-    // The chain verifies offline, as every run must.
+
     runtime::replay::verify_lines(report.lines.clone()).unwrap();
 
     let ks = kinds(&report.lines);
@@ -498,9 +476,6 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
         "status and read, then edit: {ks:?}"
     );
 
-    // The per-wave checkpoint, read off the event order: every tool_called is
-    // preceded by a checkpoint_committed, so whatever the wave touches
-    // has a commit to come back from.
     for (i, kind) in ks.iter().enumerate() {
         if kind == "tool_called" {
             let checkpoint = ks
@@ -516,8 +491,6 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
         }
     }
 
-    // The clock line rode at least one envelope (granularity is Minute,
-    // and status declares itself Timestamped).
     let stamped = report
         .lines
         .iter()
@@ -529,20 +502,12 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
 
 #[test]
 fn s3_14_the_run_is_byte_identical_when_replayed() {
-    // Determinism is the point of the simulator: the same scenario twice
-    // must produce the same ledger, byte for byte.
+
     let first = run_scenario(scenario(None)).unwrap();
     let second = run_scenario(scenario(None)).unwrap();
     assert_eq!(first.lines, second.lines);
 }
 
-/// Two calls of one tool inside one wave are two calls.
-///
-/// The driver gives every call in a wave the same `t` on purpose — a wave
-/// is one instant. A key derived from that `t` is therefore constant
-/// across the wave, so a second call of the same tool collided with the
-/// first and came back deduplicated. Nothing about it is the model's
-/// fault, and the message it read said the opposite.
 #[test]
 fn two_reads_in_one_wave_are_two_calls() {
     fn args(path: &str) -> Payload {
@@ -559,8 +524,7 @@ fn two_reads_in_one_wave_are_two_calls() {
     }
 
     let report = run_scenario(Scenario {
-        // One turn carrying two calls of one tool, different arguments
-        // and different wire ids.
+
         model: ScriptModel::new(vec![
             ModelReturn {
                 usage: None,
@@ -611,17 +575,6 @@ fn two_reads_in_one_wave_are_two_calls() {
     }
 }
 
-/// **Card 3.6.** Two runs' entries interleaved on one ledger replay
-/// byte for byte.
-///
-/// The city drives runs in parallel and accounts for them in series
-/// (ARCHITECTURE section 10, rule 5), so what the simulator has to hold
-/// is the second half: one chain, two runs' lines in it, and the same
-/// bytes both times. The simulator itself stays sequential — a pool of
-/// one is what keeps a scenario replaying exactly from its script
-/// (`Sprawling/app/Spec.lean` §8-42-3), so the interleaving here is expressed as
-/// what the accounting thread would have written, not as two threads
-/// racing for it.
 #[test]
 fn two_runs_interleaved_on_one_ledger_replay_byte_identically() {
     fn other_room() -> Scenario {
@@ -658,20 +611,10 @@ fn two_runs_interleaved_on_one_ledger_replay_byte_identically() {
             "both runs wrote into the one history: {runs:?}"
         );
     }
-    // The chain is what orders them: seq and prev are the ledger's, so
-    // two runs sharing one make one sequence rather than two.
+
     citysim::check_chain(once).unwrap();
 }
 
-/// **A reply with nothing in it is not evidence that work finished.**
-///
-/// A provider that stops at the model's output ceiling answers with a
-/// truncated message and, when the ceiling is small enough, with no
-/// content at all. Freezing that as `done` tells a person their work is
-/// finished at the moment nothing was said, and cites a `model_returned`
-/// holding no content as the proof. The wire form is the one a provider
-/// actually sends, parsed by the production translation, so this pins
-/// the rule against the reply rather than against a hand-built value.
 #[test]
 fn a_reply_that_says_nothing_freezes_as_limit_rather_than_done() {
     let mut sc = scenario(None);

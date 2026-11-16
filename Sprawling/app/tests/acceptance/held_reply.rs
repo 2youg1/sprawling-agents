@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! F8: a reply one run took and never answered reaches the next run of
-//! that room (collab D8, `Sprawling/collab/spec/Delivery.lean`
-//! `leave_requeues`).
-//!
-//! The shape of the run that lost a reply in a test city: a resident
-//! pulls the reply a neighbour sent, and the run ends before any model
-//! answer that read it is on the ledger. Taking is not consuming, so the
-//! reply goes back to the room, the room is knocked, and the resident's
-//! next run reads it and is the one recorded as consuming it.
-//!
-//! Driven through `attend`, the loop a served city runs, with the
-//! production workbench and ledger; only the model is scripted. Nothing
-//! here reads a platform facility, so Windows, macOS and Linux run the
-//! same trace.
-
 use std::path::Path;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
@@ -29,13 +14,10 @@ use kernel::{
 
 use super::city::{city_with_models, move_in, raise};
 
-/// The reply the neighbour sends, read back by the resident's next run.
 const REPLY: &str = "five coins a day";
 
-/// The resident whose run takes the reply and leaves without answering.
 const ITO: &str = "market/ito";
 
-/// The neighbour who replies.
 const HANA: &str = "market/hana";
 
 #[test]
@@ -122,8 +104,6 @@ fn mentions(line: &serde_json::Value, addr: &str) -> bool {
     line.to_string().contains(&format!("\"{addr}\""))
 }
 
-/// Reads the history until `done` holds, in counted looks rather than
-/// against a clock, which test code may not read.
 fn wait_for(
     ledger_dir: &Path,
     done: impl Fn(&[serde_json::Value]) -> bool,
@@ -147,8 +127,6 @@ fn wait_for(
     panic!("the history never reached the state the test waits for");
 }
 
-/// The models of the three runs, in the order the city builds them:
-/// the resident's first run, the neighbour's, the resident's next one.
 struct Turns {
     built: Mutex<u32>,
     entered: Mutex<Option<mpsc::Sender<()>>>,
@@ -179,9 +157,6 @@ impl accounting::ModelFactory for Turns {
     }
 }
 
-/// Waits in its first call until the reply is in the room, pulls it,
-/// and then fails every call, so the run leaves with no answer that
-/// read the reply on the ledger.
 struct Leaving {
     calls: u32,
     entered: Option<mpsc::Sender<()>>,
@@ -210,7 +185,6 @@ impl Model for Leaving {
     }
 }
 
-/// Sends the reply, then stops.
 struct Replying {
     calls: u32,
 }
@@ -228,7 +202,6 @@ impl Model for Replying {
     }
 }
 
-/// Pulls what is waiting, keeps what each tool result said, then stops.
 struct Reading {
     calls: u32,
     heard: Arc<Mutex<Vec<String>>>,

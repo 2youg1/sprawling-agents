@@ -3,30 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The six tools this server offers, as data.
-//!
-//! Editing this file is editing behaviour: the names, the descriptions
-//! and the schemas are the whole of what a model is told. Every
-//! description ends with what the tool does **not** do, because the most
-//! expensive mistake a model makes with a tool table is taking one tool
-//! for the one beside it.
-//!
-//! Outside Windows every call is refused with `E_TOOL_UNAVAILABLE`
-//! (`crate::platform`), which is honest in a way that a fabricated
-//! success would not be.
-
 use kernel::consts_policy::IMAGE_QUALITY;
 use serde_json::{Value, json};
 
-/// The name of one of the six tools, as a closed set.
-///
-/// **The one authority on what this server's tools are called.** The
-/// table below, the scope decision (`crate::scope`) and the routing in
-/// `crate::platform` each used to spell the six strings out, so a
-/// seventh tool, or a renamed one, was three edits that nothing checked
-/// against each other. Routing now matches this enum and needs no arm
-/// for a name nobody offers: [`ToolName::parse`] is where an unknown
-/// name stops.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ToolName {
     Windows,
@@ -38,8 +17,7 @@ pub(crate) enum ToolName {
 }
 
 impl ToolName {
-    /// Every name there is. The order the tools are *published* in is
-    /// [`table`]'s, which a test below holds to this list's membership.
+
     pub(crate) const ALL: [ToolName; 6] = [
         ToolName::Windows,
         ToolName::Snapshot,
@@ -49,7 +27,6 @@ impl ToolName {
         ToolName::Clipboard,
     ];
 
-    /// What a caller writes in `tools/call`.
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             ToolName::Windows => "desktop.windows",
@@ -61,24 +38,17 @@ impl ToolName {
         }
     }
 
-    /// The name a call sent, or nothing when this server offers no such
-    /// tool. The caller writes the refusal, because the sentence a
-    /// person reads belongs to the door that was knocked on.
     pub(crate) fn parse(name: &str) -> Option<ToolName> {
         ToolName::ALL.into_iter().find(|tool| tool.as_str() == name)
     }
 }
 
-/// One tool, under the three fields `tools/list` publishes.
 pub(crate) struct ToolCard {
     pub(crate) name: ToolName,
     pub(crate) description: String,
     pub(crate) schema: Value,
 }
 
-/// A window is named by its title, its process, or both. The two
-/// properties are repeated on every tool that touches one window
-/// because the scope decision reads them there (`crate::scope`).
 fn naming_a_window() -> Value {
     json!({
         "title": { "type": "string", "description": "the window's title, as `desktop.windows` reported it" },
@@ -86,7 +56,6 @@ fn naming_a_window() -> Value {
     })
 }
 
-/// Merges the window-naming properties into one tool's own.
 fn properties(own: Value) -> Value {
     let mut merged = naming_a_window();
     if let (Some(into), Some(from)) = (merged.as_object_mut(), own.as_object()) {
@@ -97,15 +66,6 @@ fn properties(own: Value) -> Value {
     merged
 }
 
-/// The largest quality the city admits, which the screenshot schema
-/// states as its `maximum` (`Sprawling/desktop/Spec.lean` D16).
-///
-/// `IMAGE_QUALITY` is the one definition of the domain, and by ruling it
-/// has no getter (kernel D3): a refusal is said by the type
-/// alone. A schema bound is not a refusal, so it is read through the
-/// type's one door. `admit` takes `0..=max`, so admission ends once as
-/// the quality rises, and halving the gap between an admitted quality
-/// and a refused one finds that edge in at most thirty-two steps.
 fn largest_quality() -> u32 {
     let admits = |quality: u32| IMAGE_QUALITY.admit(quality).is_ok();
     if admits(u32::MAX) {
@@ -123,7 +83,6 @@ fn largest_quality() -> u32 {
     admitted
 }
 
-/// Every tool, in the order a reader meets them: look, then act.
 pub(crate) fn table() -> Vec<ToolCard> {
     vec![
         ToolCard {
@@ -212,10 +171,7 @@ pub(crate) fn table() -> Vec<ToolCard> {
                     },
                 })),
                 "required": ["action"],
-                // `generation` is required by what the call names, not
-                // by every call: an action at a point was decided
-                // against no snapshot, so demanding the number would
-                // make a caller invent one.
+
                 "dependentRequired": { "ref": ["generation"] },
                 "additionalProperties": false,
             }),
@@ -331,16 +287,13 @@ mod tests {
         assert_eq!(names, EXPECTED.to_vec());
         assert_eq!(ToolName::parse("desktop.act"), Some(ToolName::Act));
         assert_eq!(ToolName::parse("desktop.reboot"), None);
-        // A name in the enum with no card would be a tool the router
-        // reaches and `tools/list` never mentions.
+
         let published: Vec<ToolName> = table().iter().map(|card| card.name).collect();
         for name in ToolName::ALL {
             assert!(published.contains(&name), "{} has no card", name.as_str());
         }
     }
 
-    /// The rule this table is held to: a description says what the tool
-    /// does and then what it does not do.
     #[test]
     fn every_description_says_what_the_tool_does_not_do() {
         for card in table() {
@@ -353,8 +306,6 @@ mod tests {
         }
     }
 
-    /// A schema that is not an object is a schema the caller cannot fill
-    /// in, and `tools/call` sends `arguments` as an object.
     #[test]
     fn every_schema_is_an_object_schema_with_named_properties() {
         for card in table() {
@@ -367,18 +318,13 @@ mod tests {
         }
     }
 
-    /// `desktop.act` carries the snapshot generation for the same reason
-    /// `browser::act` does: a decision made against one view of a window
-    /// is refused against another rather than landing on whatever moved
-    /// into that position.
     #[test]
     fn acting_names_a_reference_and_the_generation_it_was_decided_against() {
         let act = card(ToolName::Act);
         let properties = &act.schema["properties"];
         assert!(properties["ref"].is_object());
         assert!(properties["generation"].is_object());
-        // What the schema demands is what the implementation demands:
-        // a generation only where a ref was named.
+
         assert_eq!(act.schema["required"], json!(["action"]));
         assert_eq!(
             act.schema["dependentRequired"],
@@ -414,15 +360,12 @@ mod tests {
             .filter_map(Value::as_str)
             .collect();
         assert_eq!(states, vec!["start", "stop"]);
-        // A stop names the recording rather than the window, so a
-        // retitled window is still one this caller can stop.
+
         assert_eq!(record.schema["properties"]["recording"]["type"], "integer");
         let clipboard = card(ToolName::Clipboard);
         assert!(clipboard.schema["required"].is_array());
     }
 
-    /// The schema states the edge of the city's quality domain: its
-    /// maximum is admitted and the next quality is refused.
     #[test]
     fn the_screenshot_schema_states_the_largest_quality_the_city_admits() {
         let stated = card(ToolName::Screenshot).schema["properties"]["quality"]["maximum"]

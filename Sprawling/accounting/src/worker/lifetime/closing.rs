@@ -3,58 +3,35 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Why the city is closing, and the line that records it: the UNLOADING
-//! end of one worker's lifetime (`Sprawling/accounting/spec/Worker.lean` §8-11).
-//!
-//! It sits beside [`super`], which holds the LOADING end, because a
-//! reader asking "what does a restart find" and "what does a close
-//! leave" is asking one question from two ends.
-
 use super::super::{RunWorker, city_segment};
 use kernel::{AxError, EventKind, Locator};
 
-/// Why the city is closing, carried from whoever decided it to the
-/// line that records it.
-///
-/// Exhaustive rather than a flag, because the handoff says a different
-/// thing for each: a close the person chose and a close serving forced
-/// are different facts for the next session, and a record that spelled
-/// both as the first would claim a choice nobody made. Which event
-/// becomes which closing is decided by the console's lifecycle
-/// (`Sprawling/app/spec/Console/Lifecycle.lean`); this type only
-/// carries the answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Closing {
-    /// Somebody or something asked the city to close: who, and what
-    /// becomes of the runs under way.
+
     Chosen { by: ClosedBy, mode: wire::CloseMode },
-    /// Serving failed and took the city down; `cause` is what failed.
+
     Broken { cause: String },
 }
 
-/// Who asked the city to close.
-///
-/// A service manager's `SIGTERM` and a person's `/quit` are different
-/// facts for whoever reads the handoff next, so each way in is named.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClosedBy {
-    /// `/quit` typed in the city's own terminal.
+
     Console,
-    /// `CloseCity` sent from a page on this machine.
+
     Page,
-    /// `SIGINT` or `CTRL_C_EVENT`, as a signal, to a city with no
-    /// terminal of its own.
+
     InterruptSignal,
-    /// Windows' Ctrl+Break.
+
     BreakSignal,
-    /// `SIGTERM`.
+
     Terminate,
-    /// The terminal the city ran in went away.
+
     TerminalLost,
 }
 
 impl ClosedBy {
-    /// Who closed it, as the handoff's overview says it.
+
     fn said(self) -> &'static str {
         match self {
             Self::Console => "with /quit in its terminal",
@@ -68,26 +45,9 @@ impl ClosedBy {
 }
 
 impl RunWorker {
-    /// Closes the city in the record, so a stop somebody chose, a stop
-    /// serving forced, and a crash are three different records rather
-    /// than one line and one silence.
-    ///
-    /// The five sections are the city's own: what the next session must
-    /// read is the city's norms, and where it left off is the position
-    /// the ledger stands at. Written through `runtime::handoff`, which
-    /// is the one construction point for the shape - a hand-built
-    /// payload here would be a second one.
-    ///
-    /// # Errors
-    /// Propagates the handoff's refusal of an empty must-read list, and
-    /// the ledger's refusal to take the line.
+
     pub(crate) fn close_city(&mut self, why: &Closing) -> Result<(), AxError> {
-        // The city's own norm, not a building's: `city::norms` answers
-        // for a run at an address, and this line belongs to the city.
-        // Through the same reader the prefix uses. What this city's
-        // norms are has one answer, and hashing zero bytes here made the
-        // must-read locator point at nothing while the handoff went on
-        // saying the next session must read them.
+
         let mut must_read = Vec::new();
         let bytes = city_segment(&self.city_root)?.bytes;
         let hash = self

@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The shelves this city mounts from elsewhere on this machine
-//! (`Sprawling/city/spec/Library.lean` §8-8).
-//!
-//! A shelf is a directory another program keeps its skills in, and the
-//! city reads it and never writes it. Which directories those are is
-//! the city's own configuration, and only the city's; `city_shelves`
-//! says why.
-
 use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
@@ -19,30 +11,10 @@ use kernel::{AxCode, AxError};
 use super::Layer;
 use super::ladder;
 
-/// The key this module mounts, spelled once for every refusal that
-/// names it.
-///
-/// The serde structure `SkillsSection` in [`super`] decides the
-/// spelling; the test at the bottom of this file parses the key as
-/// written here, so renaming the field and leaving this constant behind
-/// turns that test red.
 pub(crate) const SHELVES_KEY: &str = "[skills] shelves";
 
-/// The building's Reading Room pin table, as a refusal names it.
 pub(crate) const SKILL_PINS_KEY: &str = "[skills.pins]";
 
-/// The directories this city's own configuration mounts read-only beside
-/// its own shelves, in the order it lists them.
-///
-/// **The city's rung alone, not the ladder.** A shelf is a directory on
-/// this machine, and it is mounted for every building at once; a
-/// building or a room mounting one would be a scope admitting a file
-/// nobody who keeps this city chose.
-///
-/// # Errors
-/// Refuses an entry that is not a directory path this machine can open
-/// (see [`shelf_path`]), and propagates a configuration file that exists
-/// and cannot be read or parsed.
 pub fn city_shelves(city_root: &Path, home: &Path) -> Result<Vec<PathBuf>, AxError> {
     let stated = stated_skill_shelves(city_root)?;
     let mut shelves = Vec::with_capacity(stated.len());
@@ -52,15 +24,11 @@ pub fn city_shelves(city_root: &Path, home: &Path) -> Result<Vec<PathBuf>, AxErr
     Ok(shelves)
 }
 
-/// The city layer's entries exactly as written, including shelves that
-/// currently contain no skill; this is the table the import form edits.
 pub fn stated_skill_shelves(city_root: &Path) -> Result<Vec<String>, AxError> {
     let layer = ladder::stated(&CityLayout::new(city_root).city_config(), Layer::City)?;
     Ok(layer.shelves().unwrap_or_default().to_vec())
 }
 
-/// Judges a whole proposed table with the reader's one path rule before
-/// any setting beside it is written.
 pub fn check_skill_shelves(shelves: &[String], home: &Path) -> Result<(), AxError> {
     for raw in shelves {
         shelf_path(raw, home)?;
@@ -68,17 +36,6 @@ pub fn check_skill_shelves(shelves: &[String], home: &Path) -> Result<(), AxErro
     Ok(())
 }
 
-/// How one shelf in the city's external shelf list becomes a directory.
-///
-/// `~` means this person's home directory, and an entry it starts is the
-/// only kind that may be relative: a committed city configuration must
-/// not carry one machine's absolute paths, and every other entry is a
-/// path this machine can open as written.
-///
-/// # Errors
-/// `E_CONFIG_INVALID`, naming the entry, when it is not a directory on
-/// this machine: empty, `~` with no separator after it, or a relative
-/// path that is not `~`-rooted.
 fn shelf_path(raw: &str, home: &Path) -> Result<PathBuf, AxError> {
     let text = raw.trim();
     let named = |because: &str| {
@@ -122,10 +79,6 @@ mod tests {
     use super::*;
     use crate::config_layers::ConfigLayer;
 
-    /// The name a refusal shows is the key the parser reads: the probe
-    /// is the constant with the table broken onto its own line, so
-    /// renaming the serde field and leaving the constant behind stops
-    /// it parsing.
     #[test]
     fn the_name_a_refusal_shows_is_the_key_this_build_reads() {
         let probe = format!("{} = []\n", SHELVES_KEY.replace("] ", "]\n"));
@@ -135,9 +88,6 @@ mod tests {
         );
     }
 
-    /// The city's own file is the only one that may name a shelf; a
-    /// building's or a room's is refused where it was written rather
-    /// than read and dropped.
     #[test]
     fn a_shelf_below_the_city_layer_is_refused() {
         let dir = tempfile::tempdir().unwrap();

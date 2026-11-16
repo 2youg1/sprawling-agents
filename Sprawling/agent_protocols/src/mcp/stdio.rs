@@ -3,39 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! An MCP server run as a child process, spoken to one line at a time.
-//!
-//! The handshake and the tool calls know what to say; this module knows
-//! where the bytes go, how long they may take, and who reclaims the
-//! process.
-//!
-//! Two decisions are worth reading before changing anything here.
-//!
-//! **The reader is a thread, and the deadline is real.** A synchronous
-//! read on a pipe has no deadline of its own, so a server that never
-//! answers would hold the run's only worker forever — the exact failure
-//! this project has already met once from the other direction, when a
-//! provider went silent after `model_called` and nothing timed out. The
-//! thread turns a blocking read into a channel this side can wait on
-//! with a deadline. It cannot outlive the connection: killing the child
-//! closes the pipe, and the reader's last word, end of input, is taken
-//! by the next call or refused once the connection is dropped.
-//!
-//! **The reader holds one message at a time.** It is `mcp::reading`'s
-//! `Lines`, the same reader a harness session uses: one line is at most
-//! `MESSAGE_CEILING` bytes, and each message goes over a channel with no
-//! queue, so it reads the next only once a call has taken this one. Whatever the server
-//! writes beyond that waits in the pipe, which is the server's buffer
-//! rather than this city's (`Sprawling/agent_protocols/Spec.lean` §8-15). A line past
-//! the ceiling is refused to the call that was waiting, and the child is
-//! stopped, because the rest of that line cannot be told apart from the
-//! next message.
-//!
-//! **A deadline that passes kills the child.** A late answer arriving
-//! after its call gave up would be read as the answer to the next call,
-//! and two calls swapped is worse than a refusal. Killing ends that
-//! possibility rather than guarding against it.
-
 use std::io::Write;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -47,15 +14,11 @@ use super::reading::answer_unread;
 use super::redeeming::Redeemed;
 use super::{Heard, Lines};
 
-/// A handle on one running server. Cloning gives a second handle on the
-/// same process, which is what a server offering several tools needs:
-/// one child, one connection, one place that answers.
 #[derive(Clone)]
 pub(crate) struct StdioServer {
     inner: Arc<Mutex<Connection>>,
 }
 
-/// The process, its pipes, and the name to use when refusing.
 struct Connection {
     program: String,
     child: std::process::Child,
@@ -64,21 +27,7 @@ struct Connection {
 }
 
 impl StdioServer {
-    /// Starts `command` and keeps it running until the last handle on it
-    /// is dropped.
-    ///
-    /// `env` is added to what this process already has, name by name, so
-    /// a server still finds the search path and the home directory it
-    /// needs; what it does not get is any key that holds one of the
-    /// city's own secrets, which `child::command` removes
-    /// (`Sprawling/agent_protocols/Spec.lean` D16). **A name handed to a child
-    /// cannot be taken back**, which
-    /// is why a credential arrives here already redeemed and exists as
-    /// plaintext only inside this call.
-    ///
-    /// # Errors
-    /// Refuses a program this machine cannot start, and a child whose
-    /// pipes the operating system did not hand back.
+
     pub(crate) fn start(
         command: &str,
         args: &[String],
@@ -91,9 +40,7 @@ impl StdioServer {
             .current_dir(cwd)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
-            // The server's own diagnostics stay on its stderr and out of
-            // this city: they are not answers, and reading them here
-            // would make them look like answers.
+
             .stderr(std::process::Stdio::null())
             .spawn()
             .map_err(|err| {
@@ -121,10 +68,7 @@ impl StdioServer {
 }
 
 impl StdioServer {
-    /// Whether the child has exited. A connection left locked by a dead
-    /// thread, or a child whose state the platform will not report,
-    /// counts as ended: the caller starts a new one, which is the one
-    /// recovery either case has.
+
     pub(crate) fn has_ended(&self) -> bool {
         match self.inner.lock() {
             Ok(mut connection) => match connection.child.try_wait() {
@@ -158,9 +102,6 @@ impl crate::Outbound for StdioServer {
         connection.exchange(line, patience)
     }
 
-    /// A notification goes down the same pipe and nothing is read back,
-    /// because the far end will not answer it. Writing it is the whole
-    /// of the delivery this transport can promise.
     fn notify(&mut self, line: &str, _patience: TimeoutMs) -> Result<(), AxError> {
         let mut connection = self.inner.lock().map_err(|_| {
             AxError::failure(
@@ -175,9 +116,7 @@ impl crate::Outbound for StdioServer {
 }
 
 impl Connection {
-    /// Writes one message and does not wait. Shares the framing check
-    /// with `exchange`, because a newline splits a notification into two
-    /// messages exactly as it splits a request.
+
     fn tell(&mut self, line: &str) -> Result<(), AxError> {
         self.framed(line)?;
         writeln!(self.requests, "{line}").map_err(|err| self.broken("write to", &err))?;
@@ -186,9 +125,6 @@ impl Connection {
             .map_err(|err| self.broken("flush", &err))
     }
 
-    /// The transport is line delimited, so a newline inside a message
-    /// would silently become two messages. The framing is this module's
-    /// contract, so it is checked here rather than trusted.
     fn framed(&self, line: &str) -> Result<(), AxError> {
         if line.contains('\n') {
             return Err(AxError::failure(
@@ -209,9 +145,7 @@ impl Connection {
             .map_err(|err| self.broken("flush", &err))?;
         match self.answers.next(Duration::from_millis(patience.0)) {
             Ok(Heard::Message(answer)) => Ok(answer),
-            // The server answered with bytes this city will not read. It
-            // took the call, so what it did is unknown, and the rest of
-            // that answer is still in the pipe, so the child goes.
+
             Err(refused) => {
                 self.reclaim();
                 Err(answer_unread(&refused))
@@ -252,14 +186,11 @@ impl Connection {
         .with_recovery("the server is no longer reachable; this run continues without it")
     }
 
-    /// Ends the process. Failure here means it had already ended, which
-    /// is the state this asks for, so there is nothing left to report.
     fn reclaim(&mut self) {
         if self.child.kill().is_ok() {
             match self.child.wait() {
                 Ok(_status) => {}
-                // A child that cannot be waited for was reaped by the
-                // platform; either way it is not running.
+
                 Err(_unwaitable) => {}
             }
         }
@@ -281,20 +212,9 @@ fn pipes_missing(command: &str) -> AxError {
     .with_recovery("this build asked for piped stdin and stdout; the platform gave neither")
 }
 
-/// A server that answers every line with the same result, built from a
-/// program every supported platform has.
-///
-/// One fixed answer is enough to drive discover, list and call, because
-/// what these tests hold is the transport rather than a server's
-/// judgment. It lives outside the test module, behind `conformance`, so
-/// the assembly's own tests can start the same child; it exists in no
-/// other build.
 #[cfg(any(test, feature = "conformance"))]
 pub fn echoing(answer: &str) -> (String, Vec<String>) {
-    // A notification is passed over in silence, because a real server
-    // does not answer one. A fake that answered everything would leave
-    // one unread line in the pipe, and every later call would read the
-    // answer to the message before it.
+
     if cfg!(windows) {
         (
             "powershell".to_owned(),
@@ -321,9 +241,6 @@ pub fn echoing(answer: &str) -> (String, Vec<String>) {
     }
 }
 
-/// The server [`counting_starts`] builds, which after its start line
-/// reads nothing until `gate` exists, so a test holds a handshake open
-/// for as long as it needs and sees, from `starts`, that it has begun.
 #[cfg(feature = "conformance")]
 pub fn gated(answer: &str, starts: &Path, gate: &Path) -> (String, Vec<String>) {
     let (command, mut args) = counting_starts(answer, starts);
@@ -345,9 +262,6 @@ pub fn gated(answer: &str, starts: &Path, gate: &Path) -> (String, Vec<String>) 
     (command, args)
 }
 
-/// The server [`echoing`] builds, which also writes one line to
-/// `starts` each time it is started, so a test can count how many
-/// children a sequence of dispatches cost.
 #[cfg(feature = "conformance")]
 pub fn counting_starts(answer: &str, starts: &Path) -> (String, Vec<String>) {
     let (command, mut args) = echoing(answer);

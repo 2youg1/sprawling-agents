@@ -3,20 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every use of a skill or a tool server as one row, written as JSONL or
-//! as CSV (wire D33): the columns in one fixed order, an absent value
-//! `null` in JSONL and empty in CSV, CSV quoted by RFC 4180 with `\r\n`
-//! line ends on every platform.
-
-/// The columns of a row, in the order every row writes them.
 const COLUMNS: [&str; 10] = [
     "kind", "name", "server", "part", "run", "resident", "seq", "at_ms", "digest", "outcome",
 ];
 
-/// One row: a value, or nothing, under each column.
 pub(super) type Row = [Option<String>; 10];
 
-/// Every read of every skill, one row each.
 pub(super) fn skill_rows(answer: &wire::SkillUsageAnswer) -> Vec<Row> {
     answer
         .skills
@@ -40,7 +32,6 @@ pub(super) fn skill_rows(answer: &wire::SkillUsageAnswer) -> Vec<Row> {
         .collect()
 }
 
-/// Every call of every server's tool, one row each.
 pub(super) fn mcp_rows(answer: &wire::McpUsageAnswer) -> Vec<Row> {
     answer
         .servers
@@ -66,7 +57,6 @@ pub(super) fn mcp_rows(answer: &wire::McpUsageAnswer) -> Vec<Row> {
         .collect()
 }
 
-/// The rows as one text in `format`.
 pub(super) fn write(rows: &[Row], format: wire::ExportFormat) -> String {
     match format {
         wire::ExportFormat::Jsonl => rows.iter().map(|row| jsonl_line(row) + "\n").collect(),
@@ -82,8 +72,6 @@ pub(super) fn write(rows: &[Row], format: wire::ExportFormat) -> String {
     }
 }
 
-/// One object whose keys come in column order, which a map type would
-/// sort; each key and value is escaped by `serde_json`.
 fn jsonl_line(row: &Row) -> String {
     let fields: Vec<String> = COLUMNS
         .iter()
@@ -101,8 +89,6 @@ fn jsonl_line(row: &Row) -> String {
     format!("{{{}}}", fields.join(","))
 }
 
-/// One CSV field, quoted when it holds a comma, a quote or a line end,
-/// with each quote doubled (RFC 4180 section 2).
 fn csv_field(text: &str) -> String {
     if text.contains([',', '"', '\r', '\n']) {
         format!("\"{}\"", text.replace('"', "\"\""))

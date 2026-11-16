@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The external-provider adapter: a self-written wire-format client over
-//! a plain HTTP transport. One call, one HTTP
-//! round trip: whether to try again is the watchdog's decision, never a
-//! hidden loop here.
-//!
-//! Credentials resolve at the last moment: the `Sealed` value is exposed
-//! only while the auth header is written, then dropped (zeroized).
-
-//! Endpoint calls: one request, streamed or settled.
-
 #[cfg(test)]
 use kernel::UsdMicros;
 use kernel::consts_policy::{IMAGE_MAX_BYTES, IMAGES_PER_TURN};
@@ -27,15 +17,8 @@ use super::header::HeaderValue;
 use super::models::facts_of;
 use kernel::event::record::ModelFacts;
 
-/// The most pages one model list is followed for. A thousand rows to a
-/// page, so this bounds a list at sixteen thousand models rather than
-/// trusting a far side whose `has_more` never turns false.
 const MODEL_LIST_PAGES: usize = 16;
 
-/// Every distinct picture one conversation refers to, in the order the
-/// blocks first name its locator. The blocks a person attached and the
-/// ones a tool produced are the same value, so they are collected the
-/// same way; repeated wire positions share one CAS read and encoding.
 pub(crate) fn pictures_in<'a>(chat: &'a ChatRequest<'_>) -> Vec<&'a ImageRef> {
     let mut found = Vec::new();
     let mut seen = std::collections::BTreeSet::new();
@@ -47,7 +30,6 @@ pub(crate) fn pictures_in<'a>(chat: &'a ChatRequest<'_>) -> Vec<&'a ImageRef> {
     found
 }
 
-/// Every image position the dialect will write, including repeated locators and tool attachments.
 fn picture_parts<'a>(chat: &'a ChatRequest<'_>) -> impl Iterator<Item = &'a ImageRef> {
     chat.messages
         .iter()
@@ -65,16 +47,6 @@ fn picture_parts<'a>(chat: &'a ChatRequest<'_>) -> impl Iterator<Item = &'a Imag
         })
 }
 
-/// The id one conversation carries to a host that asks for one.
-///
-/// Derived rather than stored: the frozen prefix and the first message
-/// are the same on every turn of one conversation and differ between
-/// two, so the digest of the two is stable where it has to be without
-/// a second record of what a conversation is. The digest carries none
-/// of the text it was taken over.
-///
-/// # Errors
-/// `E_WIRE_MISMATCH` when the first message will not serialise.
 pub(crate) fn conversation_id(req: &ModelRequest) -> Result<String, AxError> {
     let mut held = Vec::new();
     for segment in &req.segments {
@@ -90,26 +62,7 @@ pub(crate) fn conversation_id(req: &ModelRequest) -> Result<String, AxError> {
 }
 
 impl Endpoint {
-    /// What the far side says it serves, and what it says about each.
-    ///
-    /// Both dialects answer `GET .../models` with `{"data":[{"id":..}]}`.
-    /// What else a row carries is the vendor's own business, so each row
-    /// is read by [`facts_of`] for everything it states and for
-    /// nothing it does not; a row this city cannot name is left out
-    /// rather than given an invented one.
-    ///
-    /// The messages face pages its list, twenty rows to a page unless
-    /// asked for more, so it is asked for a thousand and followed by
-    /// `after_id` while `has_more` holds, up to [`MODEL_LIST_PAGES`]
-    /// pages (`Sprawling/gateway/spec/Endpoint/Models.lean` §8-10). The
-    /// other faces take no paging parameter.
-    ///
-    /// Rows come back ordered by id and without repeats, so a person
-    /// reading the table twice reads it in the same order.
-    ///
-    /// # Errors
-    /// Transport failure, a non-success status, or a body without a
-    /// readable `data` array; each carries the URL that was asked.
+
     pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, AxError> {
         let mut facts = Vec::new();
         let mut after: Option<String> = None;
@@ -153,7 +106,6 @@ impl Endpoint {
         Ok(facts)
     }
 
-    /// One page of a model list, read as JSON.
     fn model_page(&self, url: &str) -> Result<Value, AxError> {
         let request = self.authorize(self.client.get(url))?;
         let response = request
@@ -175,15 +127,6 @@ impl Endpoint {
             .map_err(|err| provider_err("read the model list", &ProviderFailure::Exchange(&err)))
     }
 
-    /// The POST one chat request leaves in: every header this endpoint
-    /// adds, and the conversation's id where the host asks for one.
-    ///
-    /// A header the person named in `extra_headers` is theirs, so the
-    /// id is not written a second time under the same name.
-    ///
-    /// # Errors
-    /// Propagates a redemption failure and an unserialisable opening
-    /// message.
     pub(super) fn chat_post(
         &self,
         req: &ModelRequest,
@@ -205,19 +148,6 @@ impl Endpoint {
         self.authorize(request)
     }
 
-    /// Every header this endpoint adds, written in the last slot
-    /// before the wire.
-    ///
-    /// **Redemption happens here for both kinds of credential**: the
-    /// one the registration carries and the one a person put in a
-    /// header of their own. Each `Sealed` is exposed only while its
-    /// header is written and dropped (zeroized) immediately after, and
-    /// writing both kinds in one statement is what keeps a second,
-    /// laxer path from growing beside this one.
-    ///
-    /// # Errors
-    /// Propagates a redemption failure, naming the reference that could
-    /// not be redeemed.
     pub(super) fn authorize(
         &self,
         request: reqwest::blocking::RequestBuilder,
@@ -245,19 +175,6 @@ impl Endpoint {
         Ok(request)
     }
 
-    /// One POST of bytes this endpoint's own body writer did not
-    /// build, answered as JSON.
-    ///
-    /// The audio face sends a multipart form rather than a dialect's
-    /// request body. It asks this type for the transport, the deadline
-    /// and the status rule, so that "how a POST leaves this city, what a
-    /// non-2xx becomes, and whether the provider's body is quoted
-    /// back" is answered once for every caller.
-    ///
-    /// # Errors
-    /// `E_PROVIDER` on transport failure, on a non-success status, and
-    /// on a body that is not JSON; the URL and the status are named and
-    /// the provider's own body never is.
     pub(crate) fn post_bytes(&self, content_type: &str, body: Vec<u8>) -> Result<Value, AxError> {
         let url = &self.config.base_url;
         let request = self
@@ -287,11 +204,6 @@ impl Endpoint {
             .map_err(|err| provider_err("read provider response", &ProviderFailure::Exchange(&err)))
     }
 
-    /// The bytes for every picture this request refers to.
-    ///
-    /// Both ceilings are answered before a single byte reaches the
-    /// provider, and both refusals name the limit rather than the fact
-    /// that one exists.
     fn pictures_for(&self, chat: &ChatRequest) -> Result<ImageBytes, AxError> {
         let found = pictures_in(chat);
         IMAGES_PER_TURN.admit(found.len())?;
@@ -309,10 +221,6 @@ impl Endpoint {
         Ok(images)
     }
 
-    /// The body field this endpoint's prompt cache key goes in: the
-    /// preset row's, on the two OpenAI-compatible faces only, because
-    /// the messages face caches by its `cache_control` breakpoints and
-    /// has no such field (gateway D25).
     fn cache_key_field(&self) -> Option<&'static str> {
         match self.config.dialect {
             DialectKind::OpenAi | DialectKind::OpenAiResponses => {
@@ -328,8 +236,7 @@ impl Endpoint {
         let images = self.pictures_for(&chat)?;
         let spelling = crate::provider::preset::chat_spelling(&self.config.base_url);
         let mut wire = request_wire(self.config.dialect, &chat, &images, spelling)?;
-        // Before the cache key and the overrides, so a person who named
-        // one of these paths wins (gateway D35).
+
         if let (Some(ask), Value::Object(root)) = (self.thinking.ask(chat.effort), &mut wire) {
             for (field, value) in crate::provider::thinking::encoding::fields(
                 ask,
@@ -339,9 +246,7 @@ impl Endpoint {
                 root.insert(field.to_owned(), value);
             }
         }
-        // Typed sampling stays text in configuration and the Ledger; this
-        // request boundary is where it becomes JSON numbers. Raw
-        // overrides still run afterwards and win on the same path.
+
         if let Value::Object(root) = &mut wire {
             for (field, value) in
                 crate::provider::generation::request_values(&self.config.model, &chat.generation)?
@@ -349,7 +254,7 @@ impl Endpoint {
                 root.insert(field.to_owned(), value);
             }
         }
-        // Before the overrides, so a person who named this path wins.
+
         if let Some(field) = self.cache_key_field() {
             apply_override(
                 &mut wire,
@@ -381,9 +286,6 @@ mod tests {
     use super::*;
     use kernel::AxCode;
 
-    /// OpenCode asks for one stable id per conversation: every turn of
-    /// one conversation carries the same one, and another conversation
-    /// carries another.
     #[test]
     fn a_conversation_keeps_its_id_from_turn_to_turn() {
         let said = |role, text: &str| kernel::ChatMessage {
@@ -416,7 +318,6 @@ mod tests {
         assert_ne!(conversation_id(&other).unwrap(), id);
     }
 
-    /// A request carrying `count` pictures in one user message.
     fn seeing(count: u32) -> ModelRequest<'static> {
         let mut req = request();
         let mut content = Vec::new();
@@ -435,8 +336,7 @@ mod tests {
         });
         req
     }
-    /// One DeepSeek request carrying the bytes and dimensions the
-    /// resolver supplied, through the real host preset and chat writer.
+
     fn deepseek_picture(
         bytes: Vec<u8>,
         media_type: kernel::ImageType,
@@ -469,7 +369,6 @@ mod tests {
         (endpoint, called)
     }
 
-    /// Decode the one picture in the one-user-message fixture.
     fn wire_picture(wire: &Value) -> Vec<u8> {
         use base64::Engine as _;
         let url = wire["messages"][0]["content"][0]["image_url"]["url"]
@@ -481,8 +380,6 @@ mod tests {
             .unwrap()
     }
 
-    /// The real failure shape: a valid tall JPEG whose height is twice
-    /// DeepSeek's documented ceiling must not cross unchanged.
     #[test]
     fn a_deepseek_picture_over_the_side_ceiling_is_resized_at_the_request_edge() {
         let mut bytes = Vec::new();
@@ -504,7 +401,6 @@ mod tests {
         assert_eq!(dimensions, (678, 8192));
     }
 
-    /// CAS dimensions govern every occurrence even when references understate them.
     #[test]
     fn understated_picture_dimensions_cannot_bypass_the_ceiling() {
         let mut bytes = Vec::new();
@@ -528,7 +424,6 @@ mod tests {
         assert_eq!((sent.width(), sent.height()), (7, 8192));
     }
 
-    /// Repeated wire parts reach the lower tier while sharing one CAS redemption.
     #[test]
     fn fifteen_repeated_picture_parts_use_the_lower_ceiling() {
         let mut bytes = Vec::new();
@@ -571,8 +466,6 @@ mod tests {
         assert_eq!(reads.load(std::sync::atomic::Ordering::SeqCst), 2);
     }
 
-    /// A picture within the documented ceiling pays no decode or
-    /// re-encode: exactly the resolver's bytes reach the wire.
     #[test]
     fn a_deepseek_picture_within_the_side_ceiling_keeps_its_original_bytes() {
         let mut bytes = Vec::new();
@@ -589,8 +482,6 @@ mod tests {
         assert_eq!(wire_picture(&wire), bytes);
     }
 
-    /// Resizing a GIF into one static frame would silently discard
-    /// content. An animated picture past the ceiling is refused instead.
     #[test]
     fn an_animated_picture_over_the_side_ceiling_is_not_silently_flattened() {
         let mut bytes = Vec::new();
@@ -631,10 +522,10 @@ mod tests {
         assert_eq!(ret.billed_usd_micros, Some(UsdMicros::new(3_000_000)));
         assert_eq!(ret.stop, Some(kernel::StopReason::ToolUse));
         let seen = server.join().unwrap();
-        // Auth header, extra header, override and model name all landed.
+
         assert!(seen[0].contains("x-api-key: sk-test-0123456789"));
         assert!(seen[0].contains("anthropic-version: 2023-06-01"));
-        // Every call names this city as its client.
+
         assert!(
             seen[0]
                 .to_ascii_lowercase()
@@ -676,10 +567,9 @@ mod tests {
         let endpoint =
             Endpoint::new(config("http://127.0.0.1:1/v1/messages"), redemption()).unwrap();
         let err = endpoint.wire_request(&seeing(5)).unwrap_err();
-        // The refusal is the limit's own, whole: a caller that spelled a
-        // sentence of its own would be a second authority for one limit.
+
         assert_eq!(err, IMAGES_PER_TURN.admit(5).unwrap_err());
-        // Four is still a turn this endpoint will carry.
+
         assert!(endpoint.wire_request(&seeing(4)).is_ok());
     }
 

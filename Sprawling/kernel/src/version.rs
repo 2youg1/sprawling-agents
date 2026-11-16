@@ -3,26 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The version of one subject: a counter that starts at
-//! [`Version::FIRST`] and only moves forward, checked. A signal records
-//! the version of the room it was sent to (`room_version`).
-//! The part `Sprawling/kernel/spec/Version.lean` specifies this module.
-//!
-//! A file a run edits is guarded by the run's own read, not by a
-//! version (`Sprawling/runtime/Spec.lean` §8-64), so no write
-//! judges freshness here.
-
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AxCode, AxError};
 
-/// Monotonic per-subject version; starts at [`Version::FIRST`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Version(u64);
 
 impl Version {
-    /// The first visible version of any subject.
+
     pub const FIRST: Version = Version(1);
 
     pub fn new(value: u64) -> Self {

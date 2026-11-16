@@ -3,14 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The picture that came back
-
 use base64::Engine as _;
 use kernel::{AxCode, AxError, ImageType};
 use serde_json::Value;
 
-/// The picture that came back, with its two sides read from the bytes
-/// rather than from what anybody said they would be.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shot {
     bytes: Vec<u8>,
@@ -20,14 +16,7 @@ pub struct Shot {
 }
 
 impl Shot {
-    /// Reads a `browsingContext.captureScreenshot` result.
-    ///
-    /// # Errors
-    /// Refuses a reply with no `data`, data that is not base64, and any
-    /// format whose size this build cannot read from the bytes. The last
-    /// one is a refusal rather than a guess: the two sides are the only
-    /// scale a model has for a picture, and a wrong one is worse than
-    /// none.
+
     pub fn read(result: &Value, media: ImageType) -> Result<Shot, AxError> {
         let encoded = result.get("data").and_then(Value::as_str).ok_or_else(|| {
             AxError::failure(AxCode::WireMismatch, "read a screenshot", "no `data`")
@@ -69,12 +58,6 @@ impl Shot {
     }
 }
 
-/// The two sides, read from the bytes.
-///
-/// # Errors
-/// Refuses bytes that are not the format they claim to be, and every
-/// format except PNG — which is what this build asks for by default and
-/// the only one it can measure without a second decoder.
 fn size_of(bytes: &[u8], media: ImageType) -> Result<(u32, u32), AxError> {
     if media != ImageType::Png {
         return Err(AxError::failure(

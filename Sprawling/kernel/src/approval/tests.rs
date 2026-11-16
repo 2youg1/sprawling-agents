@@ -5,8 +5,6 @@
 
 use super::*;
 
-/// The two residents the table talks about: the appointed delegate, and
-/// anybody else.
 const DELEGATE: &str = "judge@b.1";
 const BYSTANDER: &str = "other@b.9";
 
@@ -29,8 +27,6 @@ fn resident(name: &str) -> ResidentId {
     ResidentId::new(name).unwrap()
 }
 
-/// Who is being asked to answer, spelled so a row of the table reads as
-/// a sentence.
 #[derive(Debug, Clone, Copy)]
 enum Who {
     Person,
@@ -46,24 +42,16 @@ fn answerer(who: Who) -> Answerer {
     }
 }
 
-/// The truth table of [`may_answer`], every row asserted.
-///
-/// Twelve rows: two autonomy states, three answerers, and the two
-/// actors that matter — the answerer itself, and somebody else. A row
-/// added to the table is a row asserted, which is the property this
-/// test exists for: the rule may not grow a case that nothing checks.
 #[test]
 fn the_answer_table_holds_row_by_row() {
     let delegated = Autonomy::Delegate(resident(DELEGATE));
     let table: [(&Autonomy, Who, &str, AnswerVerdict); 12] = [
-        // A person answers everything, whoever raised it, under either
-        // autonomy: appointing a delegate hands the inbox over, it does
-        // not take it away.
+
         (&Autonomy::Owner, Who::Person, DELEGATE, AnswerVerdict::May),
         (&Autonomy::Owner, Who::Person, BYSTANDER, AnswerVerdict::May),
         (&delegated, Who::Person, DELEGATE, AnswerVerdict::May),
         (&delegated, Who::Person, BYSTANDER, AnswerVerdict::May),
-        // Owner mode: no resident is appointed, so no resident answers.
+
         (
             &Autonomy::Owner,
             Who::TheDelegate,
@@ -88,8 +76,7 @@ fn the_answer_table_holds_row_by_row() {
             BYSTANDER,
             AnswerVerdict::NotTheDelegate,
         ),
-        // Delegate mode: the appointed resident answers what somebody
-        // else asked, and nobody else's ruling counts.
+
         (&delegated, Who::TheDelegate, BYSTANDER, AnswerVerdict::May),
         (
             &delegated,
@@ -103,7 +90,7 @@ fn the_answer_table_holds_row_by_row() {
             BYSTANDER,
             AnswerVerdict::NotTheDelegate,
         ),
-        // Self-approval is no approval, even for the delegate.
+
         (
             &delegated,
             Who::TheDelegate,
@@ -120,9 +107,6 @@ fn the_answer_table_holds_row_by_row() {
     }
 }
 
-/// The clerk is a delegate like any other: nothing about `hall/clerk`
-/// is a new rule in this module, which is why no `Autonomy` variant
-/// exists for it.
 #[test]
 fn the_clerk_answers_as_the_appointed_delegate_and_no_further() {
     let clerk = resident(crate::consts_policy::HALL_CLERK);
@@ -135,7 +119,7 @@ fn the_clerk_answers_as_the_appointed_delegate_and_no_further() {
         ),
         AnswerVerdict::May
     );
-    // The Mayor is not the clerk, whatever else it may do.
+
     assert_eq!(
         may_answer(
             &autonomy,
@@ -144,7 +128,7 @@ fn the_clerk_answers_as_the_appointed_delegate_and_no_further() {
         ),
         AnswerVerdict::NotTheDelegate
     );
-    // And the clerk does not answer for itself.
+
     assert_eq!(
         may_answer(
             &autonomy,
@@ -157,8 +141,7 @@ fn the_clerk_answers_as_the_appointed_delegate_and_no_further() {
 
 #[test]
 fn two_runs_raising_their_first_question_get_two_ids() {
-    // What the clock-shaped identity lost: the two lanes reach here in
-    // the same millisecond, and the inbox keys on this string.
+
     let left = RunId::from_bytes([1; 16]);
     let right = RunId::from_bytes([2; 16]);
     assert_ne!(
@@ -178,8 +161,7 @@ fn replaying_one_run_re_derives_the_same_ids() {
         .map(|at| ApprovalId::of(&run, Seq::new(at)))
         .collect();
     assert_eq!(first, again);
-    // Positions inside one run are distinct, and they sort the way the
-    // run raised them.
+
     let mut sorted = first.clone();
     sorted.sort();
     sorted.dedup();

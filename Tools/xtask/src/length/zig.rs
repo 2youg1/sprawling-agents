@@ -3,46 +3,21 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How long a Zig function is, read from Zig's tokens (Tools/xtask/Spec.lean §8-48 and
-//! xtask D15).
-//!
-//! **Counting braces is exact in Zig once four kinds of token are
-//! skipped**, which is the reason it is wrong for Rust and right here.
-//! The language reference says it of comments: "There are no multiline
-//! comments in Zig ... This allows Zig to have the property that each
-//! line of code can be tokenized out of context." A string or a
-//! character literal cannot hold a newline, and the multiline string,
-//! a line opened by `\\`, runs to the end of its line as a comment
-//! does. So a line comment, a string, a character literal and a
-//! multiline string line are skipped, and every brace and parenthesis
-//! left is structure.
-//!
-//! The one place a brace comes before a function's body is its return
-//! type, and there it follows `error`, a container keyword (with an
-//! optional parenthesised argument, as in `union(enum)`), `switch (…)`,
-//! or a block label. Those groups are passed over, and the first other
-//! `{` opens the body.
-
 use std::iter::Peekable;
 use std::ops::RangeInclusive;
 use std::str::Chars;
 
 use super::measurement::Body;
 
-/// The words after which a `{` in a return type opens a type rather
-/// than the function's body (the grammar's `ErrorSetDecl`,
-/// `ContainerDeclType` and `SwitchExpr`).
 const OPENS_TYPE: [&str; 6] = ["error", "struct", "enum", "union", "opaque", "switch"];
 
-/// What the scanner keeps of a Zig file.
 #[derive(Debug, PartialEq, Eq)]
 enum Kind {
-    /// An identifier, a keyword or a number.
+
     Word(String),
-    /// One character of punctuation; only braces, parentheses, `;` and
-    /// `:` decide anything, and the others end a run of words.
+
     Mark(char),
-    /// A string or a character literal, whose content is never structure.
+
     Literal,
 }
 
@@ -62,10 +37,6 @@ impl Token {
     }
 }
 
-/// Every named function with a body, from its `fn` to the line of its
-/// closing brace. A prototype (an `extern` declaration) has no body and
-/// is not measured, and neither is a function inside a `test`
-/// declaration, which only `zig test` compiles.
 pub(super) fn measure(text: &str) -> Vec<Body> {
     let tokens = tokens(text);
     let tests = test_spans(&tokens);
@@ -88,16 +59,12 @@ pub(super) fn measure(text: &str) -> Vec<Body> {
         .collect()
 }
 
-/// The token that ends the body of the function whose parameter list
-/// opens at `params`, or `None` for a prototype. A body left open runs
-/// to the last token, since `zig fmt --check` and the build refuse that
-/// file before anyone reads this measurement.
 fn body_end(tokens: &[Token], params: usize) -> Option<&Token> {
     if !tokens.get(params)?.is_mark('(') {
         return None;
     }
     let mut at = closing(tokens, params)?;
-    // Whether the token just read makes the next `{` a type's braces.
+
     let mut typed = false;
     loop {
         at = at.checked_add(1)?;
@@ -113,8 +80,7 @@ fn body_end(tokens: &[Token], params: usize) -> Option<&Token> {
                 at = closing(tokens, at)?;
                 typed = false;
             }
-            // `union(enum)` and `switch (x)`: the group belongs to the
-            // word before it, and the brace after it is still a type's.
+
             Kind::Mark('(') => at = closing(tokens, at)?,
             Kind::Mark(':') => typed = true,
             Kind::Word(word) => typed = OPENS_TYPE.contains(&word.as_str()),
@@ -123,8 +89,6 @@ fn body_end(tokens: &[Token], params: usize) -> Option<&Token> {
     }
 }
 
-/// The index of the token that closes the brace or parenthesis at
-/// `open`.
 fn closing(tokens: &[Token], open: usize) -> Option<usize> {
     let (opener, closer) = match tokens.get(open)?.kind {
         Kind::Mark('(') => ('(', ')'),
@@ -145,9 +109,6 @@ fn closing(tokens: &[Token], open: usize) -> Option<usize> {
     None
 }
 
-/// Where each `test` declaration lies: from the keyword to the brace
-/// that closes its block. `test` is a keyword, so it names nothing
-/// else; its optional name is a string or an identifier.
 fn test_spans(tokens: &[Token]) -> Vec<RangeInclusive<usize>> {
     tokens
         .iter()
@@ -165,9 +126,6 @@ fn test_spans(tokens: &[Token]) -> Vec<RangeInclusive<usize>> {
         .collect()
 }
 
-/// The file as words and punctuation, each with its one-based line,
-/// with comments, strings, character literals and multiline string
-/// lines left out.
 fn tokens(text: &str) -> Vec<Token> {
     let mut out = Vec::new();
     let mut line = 1_usize;
@@ -204,13 +162,10 @@ fn tokens(text: &str) -> Vec<Token> {
     out
 }
 
-/// Consumes the rest of the line, leaving its newline to be counted.
 fn to_line_end(chars: &mut Peekable<Chars<'_>>) {
     while chars.next_if(|&n| n != '\n').is_some() {}
 }
 
-/// Consumes a literal up to its closing `quote`, an escape included. A
-/// literal cannot cross a line, so the newline ends one left open.
 fn past_literal(chars: &mut Peekable<Chars<'_>>, quote: char) {
     while let Some(c) = chars.next_if(|&n| n != '\n') {
         if c == quote || (c == '\\' && chars.next_if(|&n| n != '\n').is_none()) {
@@ -230,8 +185,6 @@ mod tests {
             .collect()
     }
 
-    /// A return type may hold braces of its own; the body is the block
-    /// after it, as `leaf.zig`'s `open` and an error set show.
     #[test]
     fn braces_in_a_return_type_are_not_the_body() {
         let text = "fn open() union(enum) { held: u8, ended: u8 } {\n    return .{ .held = 0 };\n}\n\
@@ -242,9 +195,6 @@ mod tests {
         );
     }
 
-    /// The counting bug the Rust measurement names, in Zig's spellings:
-    /// a brace in a character, in a string, in a multiline string line
-    /// and in a comment is not a block.
     #[test]
     fn a_brace_inside_a_literal_or_a_comment_is_not_a_block() {
         let text = "// fn fake() void {\nfn detect() void {\n    const c = '{';\n    \
@@ -255,7 +205,6 @@ mod tests {
         );
     }
 
-    /// A prototype has no body, and a function type has no name.
     #[test]
     fn a_prototype_and_a_function_type_are_not_measured() {
         let text = "extern \"user32\" fn GetDC(window: ?HWND) callconv(.winapi) ?HDC;\n\
@@ -263,8 +212,6 @@ mod tests {
         assert!(measured(text).is_empty());
     }
 
-    /// A function inside a `test` declaration, named or not, is not
-    /// measured, as a `#[cfg(test)]` item is not.
     #[test]
     fn a_function_in_a_test_declaration_is_not_measured() {
         let text = "const a = 0;\ntest \"named\" {\n    const S = struct {\n        \

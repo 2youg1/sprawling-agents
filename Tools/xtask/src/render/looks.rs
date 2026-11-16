@@ -3,26 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every look is measured, and every look sizes itself from tokens
-//! (Tools/xtask/Spec.lean §8-13).
-//!
-//! **A look the gallery never draws is a look this gate never reads.**
-//! The roles, the names and the geometry are taken from `#/gallery`, so
-//! a `*.look.svelte` whose seat no fixture imports could drop every bag
-//! it was handed and stay green. Each look in `client/src` is therefore
-//! imported, itself or through its seat (the `.svelte` file of the same
-//! stem beside it), by a file under `client/src/views/gallery/`. A
-//! direct import rather than one reached through a screen, because the
-//! fixture that imports the seat is the one that names its states.
-//!
-//! **Alignment belongs to the layout, and sizes to the tokens.** A look
-//! that writes `w-[13px]`, or `height: 13px` in its `<style>`, carries a
-//! size no token states and that the next look will not share; the one
-//! literal a look may write is the 1px line. This reads the class text
-//! and the stylesheet lines of every look, the replacement looks under
-//! `client/swap/` among them, because a replacement is held to the
-//! contract of the look it stands in for.
-
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -30,13 +10,10 @@ use crate::report::{Violation, XtaskError};
 use crate::sheet::{self, Reading};
 use crate::walk;
 
-/// The suffix that marks a file as a look.
 const LOOK: &str = ".look.svelte";
 
-/// Where the fixtures live; a fixture may sit in a subdirectory.
 const GALLERY: &str = concat!(crate::walk::client_src!(), "/views/gallery/");
 
-/// The one length a look may spell: the hairline.
 const HAIRLINE: &str = "1";
 
 pub(super) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
@@ -71,14 +48,11 @@ pub(super) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(out)
 }
 
-/// Whether the look at `rel` or the seat beside it is among `imported`.
 fn drawn_by_gallery(rel: &str, imported: &BTreeSet<String>) -> bool {
     let seat = rel.strip_suffix(LOOK).map(|stem| format!("{stem}.svelte"));
     imported.contains(rel) || seat.is_some_and(|seat| imported.contains(&seat))
 }
 
-/// Every relative import in the file at `rel`, resolved to a repo-relative
-/// path: the quoted specifier after `from`, or inside `import(`.
 fn imports(rel: &str, text: &str) -> Vec<String> {
     let dir = rel.rsplit_once('/').map_or("", |(dir, _)| dir);
     text.lines()
@@ -89,8 +63,6 @@ fn imports(rel: &str, text: &str) -> Vec<String> {
         .collect()
 }
 
-/// `spec` read from the directory `dir`, with `.` and `..` folded away;
-/// nothing when it climbs out of the repository.
 fn resolved(dir: &str, spec: &str) -> Option<String> {
     let mut parts: Vec<&str> = dir.split('/').filter(|part| !part.is_empty()).collect();
     for part in spec.split('/') {
@@ -105,8 +77,6 @@ fn resolved(dir: &str, spec: &str) -> Option<String> {
     Some(parts.join("/"))
 }
 
-/// The look at `rel` writes no length but the hairline: no `[<n>px]`
-/// class, and no `<n>px` in its stylesheet but `0` and `1px`.
 fn sized_from_tokens(rel: &str, text: &str, out: &mut Vec<Violation>) {
     for line in sheet::lines(rel, text) {
         let spelled = match line.reading {
@@ -132,7 +102,6 @@ fn sized_from_tokens(rel: &str, text: &str, out: &mut Vec<Violation>) {
     }
 }
 
-/// The numbers of every `[<n>px]` arbitrary value on a line of markup.
 fn arbitrary_sizes(line: &str) -> Vec<String> {
     line.match_indices("px]")
         .filter_map(|(at, _)| {
@@ -144,8 +113,6 @@ fn arbitrary_sizes(line: &str) -> Vec<String> {
         .collect()
 }
 
-/// The numbers of every `<n>px` length on a stylesheet line, `-<n>px`
-/// included, and not the tail of a name such as `--gap-2px`.
 fn pixel_lengths(line: &str) -> Vec<String> {
     line.match_indices("px")
         .filter_map(|(at, _)| {
@@ -171,8 +138,6 @@ fn is_number(text: &str) -> bool {
 mod tests {
     use super::*;
 
-    /// A seat imported by a fixture in a subdirectory of the gallery
-    /// draws its look; a look whose seat nobody imports is not drawn.
     #[test]
     fn a_look_is_drawn_when_a_fixture_imports_it_or_its_seat() {
         let imported: BTreeSet<String> = imports(

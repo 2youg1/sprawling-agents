@@ -3,28 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Reading `ARCHITECTURE.md` by section, for every gate that judges it.
-//!
-//! **A table is recognised by the section it sits in, not by its shape.**
-//! `depmap` read the seam list as "any pipe row with four cells whose
-//! second cell is a `crates/**.rs` path", which is a description of a
-//! table rather than of a place: a fifth four-column table added anywhere
-//! in this document would have quietly widened the set of files allowed
-//! to declare a `pub trait`, and nothing would have said so.
-//!
-//! So the document's structure has one reader, here. A section opens
-//! with a `## <number> <title>` heading and closes at the next one;
-//! `###` subheadings belong to the section above them.
-//!
-//! **Lines carry no number**, because nothing reports one. The module
-//! map is `architecture.toml`, where an entry is found by name, and a
-//! name survives a reordering that a line number does not.
-
-/// The document every gate in this module's field of view judges.
 pub(crate) const PATH: &str = "docs/ARCHITECTURE.md";
 
-/// Every line under the `## <number>` heading, the heading excluded, or
-/// nothing when this document has no such section.
 pub(crate) fn section(text: &str, number: u32) -> Option<Vec<&str>> {
     let opening = format!("## {number} ");
     let mut lines = Vec::new();
@@ -77,8 +57,6 @@ mod tests {
         );
     }
 
-    /// A section that is not there is not an empty section: a gate whose
-    /// authority has moved must say so rather than judge against nothing.
     #[test]
     fn a_missing_section_is_absent_rather_than_empty() {
         assert!(section(DOC, 9).is_none());

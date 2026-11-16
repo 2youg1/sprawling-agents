@@ -3,27 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What `status` says about which release this is, and the one command
-//! in this binary that asks the registry whether a newer one exists.
-//!
-//! Its own file rather than another pair of functions under `status`:
-//! everything else `status` prints is read out of this binary, and this
-//! is the part that leaves the machine. The reading itself belongs to
-//! `bin::release`; this renders it for a terminal, as the machine page
-//! renders the same value for a browser.
-
 use kernel::Maturity;
 use sprawling::release;
 use sprawling::release::Built;
 use std::process::ExitCode;
 use wire::{Registry, RegistryNewest, RegistryReading, ReleaseAnswer};
 
-/// The first line `status` prints, as in
-/// `sprawling 0.0.9 (alpha), built from source`.
-///
-/// The production path passes `kernel::release::MATURITY`, the one place
-/// the maturity is written (kernel D18); taking it as a parameter is what
-/// lets a test see this line follow it (`Sprawling/app/spec/Doctor.lean` §8-162).
 pub(super) fn headline(maturity: Maturity) -> String {
     format!(
         "sprawling {} ({}){}",
@@ -33,31 +18,16 @@ pub(super) fn headline(maturity: Maturity) -> String {
     )
 }
 
-/// The day this release was cut, appended to the version line.
-///
-/// An early version number says almost nothing about how old a tree is,
-/// and how old it is, is what its reader most needs to know
-/// (CHANGELOG.md, opening note) - so the date sits beside the number in
-/// the line a person reads first, and reading it costs no network.
 fn cut() -> String {
     match release::built() {
         Ok(Built::Released(mine)) => format!(", released {}", mine.released()),
         Ok(Built::Nightly(mine)) => format!(", {}", mine.tag()),
         Ok(Built::FromSource) => String::from(", built from source"),
-        // A build that carries a tag it cannot decode is mislabelled.
-        // Saying so here is cheaper than letting every later line
-        // describe a release this binary is not.
+
         Err(err) => format!(", carrying a tag that does not decode: {}", err.recovery()),
     }
 }
 
-/// The one command in this binary that reaches the network, and only
-/// when `--check` asked it to.
-///
-/// The exit code reports whether the question was answered, never what
-/// the answer was: a release being out of date is news, not a failure,
-/// while a registry that could not be read leaves a person believing
-/// they checked when they did not.
 pub(super) fn check() -> ExitCode {
     println!();
     match release::answer() {
@@ -143,7 +113,6 @@ fn date_suffix(line: &wire::ReleaseLine) -> String {
     }
 }
 
-/// One registry's line, as the terminal prints it.
 fn registry_said(line: &RegistryNewest) -> String {
     let registry = match line.registry {
         Registry::Npm => "npm",
@@ -165,8 +134,6 @@ mod tests {
     use super::{cut, headline};
     use kernel::Maturity;
 
-    /// Entering alpha moves `kernel::release::MATURITY` and nothing else,
-    /// so the line a person reads first has to say what it is given.
     #[test]
     fn the_status_line_says_the_maturity_it_is_given() {
         assert_eq!(

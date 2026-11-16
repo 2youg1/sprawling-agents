@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Taking a setting back by sending the command that sets it again.
-//!
-//! **Undo is not a verb here.** A person who changes their mind inside
-//! the undo window sends the same command with the value it had before,
-//! and the ledger keeps both lines: what the city stands at is the last
-//! line, and what happened is all of them. A city that erased the first
-//! line would be a city whose history disagreed with the person's own
-//! memory of it.
-//!
-//! What this holds is the property that makes such a reversal safe:
-//! sending a setting twice leaves the city where sending it once did,
-//! so a reversal that crossed a reconnection and arrived twice is still
-//! one reversal (`Sprawling/app/Spec.lean` §8-46-8).
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -26,13 +12,10 @@
 )]
 
 use kernel::{IdemKey, RunId, Seq};
-// The city is formed with an in-memory vault, because these tests are
-// about the worker and must not write to the credential service of the
-// machine that runs them.
+
 use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
-/// Opens a city and the worker that runs it.
 fn a_city(dir: &std::path::Path) -> accounting::worker::RunWorker {
     form(
         dir,
@@ -48,15 +31,10 @@ fn a_city(dir: &std::path::Path) -> accounting::worker::RunWorker {
     .unwrap()
 }
 
-/// Every command carries a key, and two commands a person sent are two
-/// commands however alike they look.
 fn key(of: &[u8]) -> IdemKey {
     IdemKey::derive(&RunId::CITY, Seq::FIRST, of)
 }
 
-/// Who answers is what a person is most likely to want back within
-/// seconds of changing it: it decides whether the next question waits
-/// for them or is answered by a resident.
 #[test]
 fn setting_autonomy_back_leaves_the_city_where_it_started() {
     let dir = tempfile::tempdir().unwrap();
@@ -91,13 +69,6 @@ fn setting_autonomy_back_leaves_the_city_where_it_started() {
     );
 }
 
-/// A city with no endpoint attached refuses to choose a model, which is
-/// what makes the reverse of `select_model` conditional: it exists only
-/// while the endpoint the earlier choice named is still attached.
-///
-/// Recorded as a test rather than as a note, because the client's undo
-/// button is built on the assumption and this is where it is true or
-/// false.
 #[test]
 fn choosing_a_model_needs_the_endpoint_the_earlier_choice_named() {
     let dir = tempfile::tempdir().unwrap();

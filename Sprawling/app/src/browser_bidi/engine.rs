@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which engine this machine can hold a session with, and what starting
-//! it looks like on a command line.
-//!
-//! Firefox is the first engine because it speaks the protocol itself: a
-//! machine with Firefox on it is a machine this tool works on, with
-//! nothing downloaded. Chromium is reachable only through
-//! `chromedriver`, so it is a second road rather than a second lane —
-//! when the driver is absent this says so by name instead of falling
-//! back quietly to something the person did not ask for.
-//!
-//! Which programs exist on this machine is not decided here. The caller
-//! passes what `bin::doctor` found, because the doctor owns that
-//! question and a second answer to it would drift.
-
 use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
 
@@ -24,17 +10,14 @@ use kernel::{AxCode, AxError};
 
 use crate::doctor::Presence;
 
-/// The engine a session will be held with.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Engine {
-    /// Native BiDi: the browser is the server, and no driver stands
-    /// between them.
+
     Firefox { program: PathBuf },
-    /// BiDi through a driver process, which is the only way in.
+
     Chromium { driver: PathBuf },
 }
 
-/// What one launch runs, and where it will answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct LaunchPlan {
     pub(crate) program: PathBuf,
@@ -43,21 +26,14 @@ pub(crate) struct LaunchPlan {
 }
 
 impl LaunchPlan {
-    /// Where the frames go once the process is up.
+
     pub(crate) fn socket_url(&self) -> String {
         format!("ws://127.0.0.1:{}/session", self.port)
     }
 }
 
 impl Engine {
-    /// Picks the engine this machine can hold a session with, from what
-    /// `bin::doctor` answered about each.
-    ///
-    /// # Errors
-    /// Refuses a machine with neither, and says of each road why it is
-    /// closed: a Firefox that is here and will not start is a different
-    /// fact from no Firefox, and the recovery for it is not "install
-    /// Firefox".
+
     pub(crate) fn choose(firefox: &Presence, chromedriver: &Presence) -> Result<Engine, AxError> {
         if let Presence::Present { at, .. } = firefox {
             return Ok(Engine::Firefox {
@@ -84,13 +60,6 @@ impl Engine {
         .with_recovery(recovery))
     }
 
-    /// The command line, spelled out.
-    ///
-    /// The port arrives as a parameter rather than being drawn here: two
-    /// cities on one machine each open their own browser, and a fixed
-    /// port would quietly attach the second to the first one's session.
-    /// The profile is the building's own, so what a browser remembers
-    /// belongs to a building rather than to the machine.
     pub(crate) fn plan(&self, profile: &Path, port: u16, headless: bool) -> LaunchPlan {
         match self {
             Engine::Firefox { program } => {
@@ -118,12 +87,6 @@ impl Engine {
         }
     }
 
-    /// Starts the process this plan describes.
-    ///
-    /// # Errors
-    /// Reports a program that will not start, which on this path means
-    /// the browser was found and then could not be run — a different
-    /// fact from not having one, and the recovery says so.
     pub(crate) fn launch(plan: &LaunchPlan) -> Result<Engaged, AxError> {
         let child = child::command(&plan.program)
             .args(&plan.args)
@@ -143,26 +106,18 @@ impl Engine {
     }
 }
 
-/// A running engine, stopped when this value is dropped.
-///
-/// Dropping is the whole lifetime rule: a city that ends leaves no
-/// browser behind, and one that crashes leaves the operating system to
-/// collect it.
 pub(crate) struct Engaged {
     child: Child,
 }
 
 impl Drop for Engaged {
     fn drop(&mut self) {
-        // A browser that has already exited is the outcome this asks
-        // for, so its refusal is not news.
+
         drop(self.child.kill());
         drop(self.child.wait());
     }
 }
 
-/// The port an engine started for this city will answer on.
-///
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -213,9 +168,6 @@ mod tests {
         assert!(err.recovery().contains("Firefox"));
     }
 
-    /// A Firefox that is on this machine and will not start is refused
-    /// for that fault, in the refusal's own words, and the recovery does
-    /// not say "install Firefox" to somebody who has it.
     #[test]
     fn a_broken_firefox_is_refused_by_its_fault_not_as_absent() {
         let broken = Presence::Broken {

@@ -3,25 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How heavy a served city is, in this platform's own counters
-//! (Tools/xtask/Spec.lean §8-30).
-//!
-//! **Three counters, because they answer three questions.** Private is
-//! what the process holds that nobody shares, which is what one more
-//! session costs a machine. Peak private is the highest that figure
-//! reached, which is what a startup fold's spike cost. The working set
-//! includes shared image pages, and the system trims it to almost
-//! nothing while the process does nothing, so it is printed beside the
-//! other two and never instead of them.
-//!
-//! **What is measured is named, never defaulted.** Without a pid this
-//! raises a city of its own and serves it: a measurement that defaults
-//! to the process running it measures the tool, and that is how the
-//! register once recorded xtask's own working set as a city's.
-//!
-//! The report states no verdict. The budget and each scenario's reading
-//! live in `Tools/xtask/budgets.toml`, one row per scenario.
-
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
@@ -29,50 +10,35 @@ use std::time::Duration;
 use crate::package::{ReleaseTarget, binary_path};
 use crate::report::XtaskError;
 
-/// How long a fixture city sits idle, once it accepts, before it is
-/// read: past the startup fold, so private is the steady figure while
-/// peak private still carries the spike.
 const SETTLE: Duration = Duration::from_secs(2);
 
-/// One attempt to reach the fixture city, and the pause between two.
 const POLL: Duration = Duration::from_millis(5);
 
-/// How many attempts before a fixture city that never accepts is
-/// reported: about 300 s, because a city with 400,000 records folds its
-/// whole Ledger before it accepts, which is tens of seconds on a slow
-/// disk, and a bound this instrument hits is a reading lost.
 const ATTEMPTS: u32 = 30_000;
 
-/// What a run of this command measures. There is no value for "this
-/// process", so measuring the instrument itself by default has no
-/// spelling.
 enum Target {
     Pid(u32),
     Fixture(Fixture),
 }
 
-/// The city a fixture serves.
 enum Fixture {
-    /// Raised fresh in a temporary directory and removed afterwards.
+
     EmptyCity,
-    /// A city somebody already has, served where it lies.
+
     City(PathBuf),
 }
 
-/// One counter's reading, with the platform's name for it.
 struct Counter {
     counter: &'static str,
     bytes: u64,
 }
 
-/// The three counters, read at one moment from one process.
 struct Reading {
     private: Counter,
     peak_private: Counter,
     working_set: Counter,
 }
 
-/// Measures what `args` names: a pid, a city, or a fresh empty city.
 pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError> {
     match target(args)? {
         Target::Pid(pid) => Ok(render(&format!("process {pid}"), pid, &measure(pid)?)),
@@ -111,8 +77,6 @@ fn render(what: &str, pid: u32, reading: &Reading) -> String {
     )
 }
 
-/// Serves the fixture city on loopback, waits for it to accept, lets it
-/// settle, reads it, and stops it - whichever of those fails.
 #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn serve_and_measure(root: &Path, fixture: &Fixture) -> Result<String, XtaskError> {
     let binary = binary_path(root, &ReleaseTarget::Host).ok_or_else(|| XtaskError::Cmd {
@@ -177,7 +141,6 @@ fn raise(binary: &Path, city: &Path) -> Result<(), XtaskError> {
     })
 }
 
-/// A loopback port nobody holds right now, borrowed and handed back.
 fn free_port() -> Result<u16, XtaskError> {
     std::net::TcpListener::bind("127.0.0.1:0")
         .and_then(|listener| listener.local_addr())
@@ -185,8 +148,6 @@ fn free_port() -> Result<u16, XtaskError> {
         .map_err(|source| io(Path::new("127.0.0.1:0"), source))
 }
 
-/// Polls until the served city accepts a connection, refusing one that
-/// exits first or never accepts.
 fn accepting(child: &mut Child, port: u16) -> Result<(), XtaskError> {
     let at = std::net::SocketAddr::from(([127, 0, 0, 1], port));
     for _ in 0..ATTEMPTS {
@@ -245,7 +206,6 @@ fn measure(pid: u32) -> Result<Reading, XtaskError> {
     })
 }
 
-/// One `<name> <n> kB` line of a `/proc` file, in bytes.
 #[cfg(target_os = "linux")]
 fn kib(text: &str, name: &str) -> Result<u64, XtaskError> {
     text.lines()
@@ -354,11 +314,6 @@ fn capture(program: &str, args: &[&str]) -> Result<String, XtaskError> {
 mod tests {
     use super::*;
 
-    /// The three counters answer three questions, so a report that
-    /// prints one number cannot say which of them it answered: private
-    /// is what an extra session costs, peak private is what a startup
-    /// spike cost, and the working set carries shared image pages the
-    /// system trims at will.
     #[test]
     fn a_reading_names_private_peak_private_and_the_working_set_apart() {
         let pid = std::process::id().to_string();
@@ -372,8 +327,6 @@ mod tests {
         }
     }
 
-    /// A peak is never below the value it is the peak of; a reader that
-    /// swapped two counters would say so here first.
     #[test]
     fn peak_private_is_never_below_private() {
         let reading = measure(std::process::id()).unwrap();

@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The verbs a person sends, and what each one does to the city.
-
 use kernel::TimeMs;
 use kernel::event::record::Admittance;
 use kernel::{AxCode, AxError};
@@ -15,12 +13,6 @@ use crate::tuning::tuning_of;
 use super::super::{Assignment, Chosen, Credential, Entered, Owing, RunWorker, Stated, Unasked};
 use super::unbuilt::Unbuilt;
 
-/// What a Cancel or a Steer is told when no run answers to the id it
-/// names.
-///
-/// Both reach this file only after `Desk::interrupt_for` failed to lift
-/// them off the queue, so the subject is the id rather than the verb:
-/// the verb is built, and the run is what is missing.
 #[derive(Clone, Copy)]
 enum Unanswered {
     Cancel,
@@ -43,9 +35,6 @@ impl Unanswered {
     }
 }
 
-/// The serving binary holds the remote door and answers its four verbs
-/// before they reach the desk (`Sprawling/app/spec/Outside.lean`
-/// §8-140), so one arriving here came by a path that skipped it.
 fn the_door_is_held_elsewhere() -> AxError {
     AxError::failure(
         AxCode::ToolUnavailable,
@@ -55,9 +44,6 @@ fn the_door_is_held_elsewhere() -> AxError {
     .with_recovery("send it to the city's own listener, which serves the remote door")
 }
 
-/// A verb the serving binary carries out on its own listener, ahead of
-/// the desk (`Sprawling/app/spec/Serving.lean`), so one arriving here
-/// came by a path that skipped it.
 #[derive(Clone, Copy)]
 enum OnTheListener {
     CloseCity,
@@ -85,9 +71,6 @@ impl OnTheListener {
     }
 }
 
-/// The serving binary answers host privacy operations on its own listener
-/// (`Sprawling/app/spec/Privacy/Service.lean`), so one arriving here came
-/// by a path that skipped it.
 fn privacy_is_served_elsewhere() -> AxError {
     AxError::failure(
         AxCode::ToolUnavailable,
@@ -97,29 +80,13 @@ fn privacy_is_served_elsewhere() -> AxError {
     .with_recovery("send it to the city's own listener, which serves the privacy page")
 }
 
-/// The task and the goal a person typed, travelling together.
-///
-/// An empty goal is not a missing field: no job file is written and the
-/// prefix tells the model a person is at the other end, which is
-/// exactly the shape a single sentence typed into the composer has.
 pub(in crate::worker) struct Asked {
     pub(in crate::worker) task: String,
     pub(in crate::worker) goal: String,
 }
 
 impl RunWorker {
-    /// Takes into a lane the work a person asked for.
-    ///
-    /// The session and the effort travel into the dispatch rather than
-    /// being spent here, because opening a room and writing its
-    /// configuration are the first two things this city puts on disk,
-    /// and nothing may be written until the city has agreed to take the
-    /// work. Doing either here would leave the entrances that dispatch
-    /// without a person holding an older, wrong rule.
-    ///
-    /// # Errors
-    /// Propagates every refusal a dispatch can owe before it costs
-    /// anything.
+
     fn dispatch_asked(
         &mut self,
         at: Assignment,
@@ -131,13 +98,6 @@ impl RunWorker {
             .map(drop)
     }
 
-    /// Carries out one command, with the address its refusal goes back
-    /// to.
-    ///
-    /// The reply is a parameter rather than something the caller holds
-    /// onto, because one verb outlives this call: a `Dispatch` starts a
-    /// run in a lane and returns, so a refusal that arrives after the
-    /// drive has to know where to go (`Sprawling/app/Spec.lean` §8-46-2).
     pub(in crate::worker) fn run_command(
         &mut self,
         command: wire::Command,
@@ -155,11 +115,9 @@ impl RunWorker {
                 ..
             } => self.dispatch_asked(
                 Assignment {
-                    // Read from the room's own history rather than sent by the page: a session
-                    // that branched off another said so once, at the moment it began.
+
                     origin: self.origins.get(&addr),
-                    // The session's last change, on the ledger, outranks
-                    // the copy the page sent (`Sprawling/app/spec/Accounting/Worker.lean` §8-133).
+
                     policy: self.origins.policy(&addr).unwrap_or(policy),
                     addr,
                     session,
@@ -256,7 +214,7 @@ impl RunWorker {
                 source.as_deref().map(std::path::Path::new),
             ),
             wire::Command::RemoveBuilding { addr, .. } => self.remove_building(&addr),
-            // The person's entrance, so the answerer is a human; a delegate has its own tool.
+
             wire::Command::Approve { item, verdict, .. } => {
                 self.answer_approval(&item, verdict, &kernel::Answerer::Human)
             }
@@ -264,8 +222,7 @@ impl RunWorker {
                 scope, autonomy, ..
             } => self.set_autonomy(&scope, autonomy),
             wire::Command::HandOff { item, .. } => Err(Unbuilt::HandOff(&item).not_built()),
-            // Not recorded: the person's own layer, which no run observes and a copied city
-            // must not carry to another machine.
+
             wire::Command::PutPreferences { patch, .. } => crate::person::put(patch),
             wire::Command::PutShelved { name, .. } => Err(Unbuilt::PutShelved(name).not_built()),
             wire::Command::Pursue { addr, step, .. } => self.set_pursuit(&addr, step),
@@ -309,9 +266,7 @@ impl RunWorker {
             wire::Command::Release { scope, .. } => {
                 self.set_admission(&scope, Admittance::Released)
             }
-            // Cancel and Steer have a second door. `Desk::interrupt_for` lifts them off the
-            // queue at the next safe point of the run they name, so arriving here means no run
-            // answered - which is what the refusal says, instead of naming the verb.
+
             wire::Command::Cancel { run, .. } => Err(Unanswered::Cancel.refusal(run)),
             wire::Command::Steer { run, .. } => Err(Unanswered::Steer.refusal(run)),
             wire::Command::OpenRemoteDoor { .. }
@@ -319,38 +274,15 @@ impl RunWorker {
             | wire::Command::ConfirmRemoteDoor { .. }
             | wire::Command::CloseRemoteDoor { .. } => Err(the_door_is_held_elsewhere()),
             wire::Command::PrivacyOperation { .. } => Err(privacy_is_served_elsewhere()),
-            // Verbs the wire spells and this city cannot perform, one arm each and no
-            // catch-all, so a Command added without an executor stops the build here.
+
             wire::Command::BatchByBuilding { addr, .. } => {
                 Err(Unbuilt::BatchByBuilding(&addr).not_built())
             }
-            // The handshake is where a peer proves who it is: `Hello`
-            // carries the pairing token and `wire::server` judges it
-            // before any command is read. A second door for the same
-            // question would be a second authority on it.
+
             wire::Command::Auth { .. } => Err(Unbuilt::Auth.not_built()),
         }
     }
 
-    /// Starts whatever the schedule says should have started since the
-    /// last tick, and returns how many runs that was.
-    ///
-    /// `now` arrives as a parameter, so a test drives a year of
-    /// schedule in three calls and the city behaves the same way it
-    /// would over a real year. A fresh worker begins owing from the
-    /// moment it opened: a city that was off does not spend its first
-    /// minute running yesterday, and the ledger says when it woke.
-    ///
-    /// **Every job due in the window is started, and one that cannot be
-    /// is noted rather than swallowing the rest.** Returning on the first
-    /// refusal after the window had closed would let one mistyped
-    /// building address make every other job due that minute disappear
-    /// with nothing recorded (`Sprawling/app/Spec.lean` §8-46-2).
-    ///
-    /// # Errors
-    /// Propagates the schedule's own refusal to parse. A job that cannot
-    /// be started does not fail this call: nobody is waiting on the
-    /// answer, and the jobs behind it are owed their run.
     pub fn tick(&mut self, now: TimeMs) -> Result<u32, AxError> {
         let schedule = city::Schedule::load(&self.city_root)?;
         let due = schedule.due_after(self.last_tick, now);
@@ -363,15 +295,11 @@ impl RunWorker {
                 started = started.saturating_add(1);
             }
         }
-        // The window closes once it has been walked, never before: a
-        // schedule read that stopped halfway would leave `last_tick` past
-        // jobs no lane ever took.
+
         self.last_tick = now;
         Ok(started)
     }
 
-    /// Replaces the file manager, so a test can see what a reveal asks
-    /// for without starting a program on the host.
     #[cfg(test)]
     pub(in crate::worker) fn reveal_with(
         &mut self,

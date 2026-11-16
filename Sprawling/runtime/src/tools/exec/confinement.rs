@@ -3,51 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The confinement a host command runs under: which arm this machine
-//! gives, and what that arm promises.
-//!
-//! [`crate::sandbox`] is the other half of the execution boundary: a
-//! wasip1 guest that reaches a host directory only when a
-//! [`Mount`](crate::sandbox::Mount) named it, and reaches no network at
-//! all because wasip1 has no way to obtain a socket. A program the agent
-//! asks for is not a guest, so its isolation has to be bought from the
-//! platform, and no platform sells all of it. What this module owns is
-//! therefore a taxonomy rather than a switch: every arm states, axis by
-//! axis, what it keeps and what it does not.
-//!
-//! **An arm that cannot say what it does not hold is worse than no arm.**
-//! The agent reads [`Confinement::statement`] in the exec tool's own
-//! description before it acts; a report that said only "sandboxed" would
-//! send it into a box whose network is open.
-//!
-//! A placement is a copy of the working tree, synced to it before each
-//! command, so a command that ruins it ruins nothing of the person's and
-//! nothing the next command sees. The copy is bounded and lives in
-//! [`placing::copy`]; a tree over the bound is
-//! refused by name rather than half-copied, because a sandbox that
-//! silently answers for files it did not carry is the failure this
-//! module exists to prevent.
-
 use std::path::PathBuf;
 
-/// One axis a confinement arm can promise, or refuse to promise.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Guarantee {
-    /// Writes through the working directory land on a copy; the tree the
-    /// person has stays as it is.
+
     Filesystem,
-    /// The command cannot open a network connection.
+
     Network,
-    /// The whole process tree ends when the command ends.
+
     ProcessTree,
-    /// The command runs with an identity of its own.
+
     User,
-    /// CPU and memory ceilings are enforced, not merely asked for.
+
     Resources,
 }
 
 impl Guarantee {
-    /// Every axis, in the order a report lists them.
+
     pub const ALL: [Guarantee; 5] = [
         Guarantee::Filesystem,
         Guarantee::Network,
@@ -56,8 +29,6 @@ impl Guarantee {
         Guarantee::Resources,
     ];
 
-    /// What holding this axis means, in the words a sentence shown to a
-    /// caller may use.
     pub fn phrase(self) -> &'static str {
         match self {
             Guarantee::Filesystem => "writes through the working directory land on a copy",
@@ -68,9 +39,6 @@ impl Guarantee {
         }
     }
 
-    /// What not holding it means, as the thing the caller does not get.
-    /// Stated as a missing capability rather than as an absence, because
-    /// the list it lands in is a list of what is not bought.
     pub fn unkept(self) -> &'static str {
         match self {
             Guarantee::Filesystem => "that writes land on a copy",
@@ -82,18 +50,12 @@ impl Guarantee {
     }
 }
 
-/// Whether one arm keeps one axis.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kept {
     Yes,
     No,
 }
 
-/// What one arm promises, axis by axis.
-///
-/// Every arm states all five axes, and that is the point of the type: a
-/// new axis is a compile error in every arm's constructor, so no arm can
-/// keep a stale answer to a question that arrived after it was written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Assurances {
     pub filesystem: Kept,
@@ -104,7 +66,7 @@ pub struct Assurances {
 }
 
 impl Assurances {
-    /// The whole list, in the order [`Guarantee::ALL`] declares.
+
     pub fn of(self, axis: Guarantee) -> Kept {
         match axis {
             Guarantee::Filesystem => self.filesystem,
@@ -116,26 +78,20 @@ impl Assurances {
     }
 }
 
-/// What a machine lacks when none of its arms can take a command at all.
-///
-/// A name, never a sentence: a page supplies the words, and a machine
-/// that lacks something else gets an arm here rather than a second
-/// string field no reader can match on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Missing {
-    /// A writable directory a working tree can be copied into.
+
     ScratchDirectory,
 }
 
 impl Missing {
-    /// The thing itself, for a refusal's subject.
+
     pub fn phrase(self) -> &'static str {
         match self {
             Missing::ScratchDirectory => "a writable scratch directory",
         }
     }
 
-    /// What a person does about it.
     pub fn recovery(self) -> &'static str {
         match self {
             Missing::ScratchDirectory => {
@@ -146,41 +102,26 @@ impl Missing {
     }
 }
 
-/// The backends, by platform, each carrying what it promises.
-///
-/// On Windows the native arm is an AppContainer with no capabilities and a
-/// Job tree admitted while the child is suspended. Limits and resource
-/// ownership are specified by `Sprawling/runtime/spec/Tools/Exec/NativeWindows.lean`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Confinement {
-    /// Namespaces of its own — mount, network, process, user — made by a
-    /// wrapper program on this machine.
+
     LinuxNamespaces { wrapper: PathBuf },
-    /// A capability-free AppContainer and Job, assigned before execution.
+
     WindowsJobObject,
-    /// Seatbelt permits writes only in the copy and refuses network operations.
-    /// It does not provide a new identity, tree termination or aggregate resource limits.
+
     MacosSeatbelt { wrapper: PathBuf },
-    /// The floor every platform has: the command runs in a copy of the
-    /// working tree, and the tree itself is not what it writes to.
+
     CopiedTree,
-    /// No arm at all, and what this machine is missing.
+
     Unavailable { missing: Missing },
 }
 
 impl Confinement {
-    /// The arm this machine gives a command. One sampling point: the
-    /// scratch root, the search path and this platform are asked here
-    /// and nowhere else, so a report and a placement cannot disagree.
+
     pub fn detect() -> Confinement {
         Confinement::choose(&Offerings::this_machine())
     }
 
-    /// The arm a machine with these capabilities gives when no arm is named.
-    ///
-    /// A Windows build resolves [`Confinement::CopiedTree`] until the native
-    /// arm passes the conformance that `Sprawling/runtime/spec/Tools/Exec.lean` SB1 item 3 lists;
-    /// a building that names `native` still gets [`Confinement::WindowsJobObject`].
     pub fn choose(offered: &Offerings) -> Confinement {
         if offered.scratch.is_none() {
             return Confinement::Unavailable {
@@ -195,8 +136,6 @@ impl Confinement {
         }
     }
 
-    /// What this arm promises. A pure function of the arm, so a report
-    /// can be read without running anything.
     pub fn assurances(&self) -> Assurances {
         let all = Kept::Yes;
         let none = Kept::No;
@@ -239,8 +178,6 @@ impl Confinement {
         }
     }
 
-    /// The name a report carries. Closed and spelled once, because a
-    /// page, a refusal and a test all have to mean the same arm.
     pub fn name(&self) -> &'static str {
         match self {
             Confinement::LinuxNamespaces { .. } => "linux_namespaces",
@@ -251,9 +188,6 @@ impl Confinement {
         }
     }
 
-    /// What a command under this arm can and cannot count on, in one
-    /// sentence. Derived from [`Confinement::assurances`] rather than
-    /// written beside it, so the sentence cannot drift from the type.
     pub fn statement(&self) -> String {
         match self {
             Confinement::Unavailable { missing } => {
@@ -293,20 +227,16 @@ impl Confinement {
     }
 }
 
-/// What a machine has, read once and handed to [`Confinement::choose`]
-/// so that a test states a machine instead of borrowing one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Offerings {
-    /// The program that makes this machine's own isolation, where one
-    /// exists.
+
     pub namespace_tool: Option<PathBuf>,
-    /// A writable directory a working tree can be copied into.
+
     pub scratch: Option<PathBuf>,
 }
 
 impl Offerings {
-    /// Reads this machine: whether the platform's wrapper program is on
-    /// the search path, and whether the scratch root exists.
+
     pub fn this_machine() -> Offerings {
         let scratch = std::env::temp_dir();
         Offerings {
@@ -316,13 +246,6 @@ impl Offerings {
     }
 }
 
-/// The wrapper that gives a Linux command namespaces of its own.
-///
-/// One program, looked up by its exact name, because the arm it makes
-/// exists on Linux alone: a search path walked here is not a second
-/// authority on which programs a machine has — the doctor's requirement
-/// table is that — it is the question of whether *this* arm can be
-/// given at all.
 fn namespace_wrapper() -> Option<PathBuf> {
     if !cfg!(target_os = "linux") {
         return None;
@@ -333,7 +256,6 @@ fn namespace_wrapper() -> Option<PathBuf> {
         .find(|candidate| candidate.is_file())
 }
 
-/// A list in the shape a sentence uses: `a`, `a and b`, `a, b and c`.
 fn listed(parts: &[&str]) -> String {
     match parts {
         [] => "nothing".to_owned(),

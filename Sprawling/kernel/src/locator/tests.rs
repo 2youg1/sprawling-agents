@@ -20,8 +20,6 @@ fn cas_locator_roundtrips() {
     assert_eq!(Locator::parse(&bytes).unwrap().to_string(), bytes);
 }
 
-/// The seven callers that once spelled `cas:b3-{hash}` and parsed it
-/// back now call `Locator::cas`; this is the equivalence they rely on.
 #[test]
 fn cas_constructor_is_the_parsed_spelling_of_its_digest() {
     let hash = B3Hash::digest(b"stored bytes");
@@ -59,23 +57,23 @@ fn fail_closed_on_every_malformed_shape() {
     let cases = [
         "".to_string(),
         "cas:".to_string(),
-        format!("CAS:b3-{H64}"),                             // scheme case
-        format!("cas:B3-{H64}"),                             // tag case
-        format!("cas:sha256-{H64}"),                         // unknown algorithm tag
-        "cas:b3-abc".to_string(),                            // short hex
-        format!("cas:b3-{}", H64.to_uppercase()),            // uppercase hex
-        format!("cas:b3-{H64}#L0-5"),                        // lines are 1-based
-        format!("cas:b3-{H64}#L9-5"),                        // from > to
-        format!("cas:b3-{H64}#B01-2"),                       // leading zero (non-canonical)
-        format!("cas:b3-{H64}#B+1-2"),                       // plus sign
-        format!("cas:b3-{H64}#X1-2"),                        // unknown range unit
-        format!("cas:b3-{H64}#L1-2 "),                       // trailing junk
-        format!("file:notes.md@{OID}#"),                     // empty range
-        "file:notes.md".to_string(),                         // missing oid
-        format!("file:../up@{OID}"),                         // address grammar inside
-        format!("file:notes.md@{}", OID.get(..39).unwrap()), // short oid
-        "secret:openai/key".to_string(),                     // SecretRef never parses here
-        format!("cas:b3-{H64}extra"),                        // overlong
+        format!("CAS:b3-{H64}"),
+        format!("cas:B3-{H64}"),
+        format!("cas:sha256-{H64}"),
+        "cas:b3-abc".to_string(),
+        format!("cas:b3-{}", H64.to_uppercase()),
+        format!("cas:b3-{H64}#L0-5"),
+        format!("cas:b3-{H64}#L9-5"),
+        format!("cas:b3-{H64}#B01-2"),
+        format!("cas:b3-{H64}#B+1-2"),
+        format!("cas:b3-{H64}#X1-2"),
+        format!("cas:b3-{H64}#L1-2 "),
+        format!("file:notes.md@{OID}#"),
+        "file:notes.md".to_string(),
+        format!("file:../up@{OID}"),
+        format!("file:notes.md@{}", OID.get(..39).unwrap()),
+        "secret:openai/key".to_string(),
+        format!("cas:b3-{H64}extra"),
     ];
     for bad in &cases {
         let err = Locator::parse(bad).unwrap_err();
@@ -126,9 +124,6 @@ proptest::proptest! {
     }
 }
 
-/// A malformed range bound is refused with the rule it broke, which is
-/// what the writer of the locator fixes: a missing bound is not a number,
-/// and `01` is a number written with a leading zero.
 #[test]
 fn a_refused_range_bound_names_the_rule_it_broke() {
     for (fragment, rule) in [
@@ -148,8 +143,6 @@ fn a_refused_range_bound_names_the_rule_it_broke() {
     }
 }
 
-/// The bytes a hash lends are the bytes it was made from, and the digest
-/// of a content is BLAKE3's digest of it.
 #[test]
 fn a_hash_lends_the_bytes_it_holds() {
     let bytes: [u8; 32] = std::array::from_fn(|at| u8::try_from(at).unwrap());

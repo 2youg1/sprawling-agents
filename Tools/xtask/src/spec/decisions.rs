@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The eighth assertion of the `spec` gate (Tools/xtask/Spec.lean
-//! §8-42, D41): a decision number heads one decision in its
-//! specification.
-//!
-//! **A specification is found by where it lies**, not through
-//! `members`: a directory's `Spec.lean` and the parts under its `spec/`
-//! are one specification, which covers every package, the checker's
-//! specification and `client/` alike. A reader cites a decision of
-//! another specification as `<package> D<n>`, so the same number in two
-//! specifications names two different decisions and is no finding.
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -21,7 +10,6 @@ use crate::lean;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The opening that heads a decision (ARCHITECTURE.md section 11).
 const HEADING: &str = "/-!";
 
 pub(super) fn check(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskError> {
@@ -58,8 +46,6 @@ pub(super) fn check(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskEr
     Ok(())
 }
 
-/// The directory whose specification the file at `rel` belongs to: its
-/// own directory for an entry, the directory above `spec/` for a part.
 fn specification_of(rel: &str) -> Option<&str> {
     if let Some(dir) = rel.strip_suffix(lean::ENTRY) {
         return Some(dir.strip_suffix('/').unwrap_or(dir));
@@ -68,8 +54,6 @@ fn specification_of(rel: &str) -> Option<&str> {
     rel.find(&parts).and_then(|at| rel.get(..at))
 }
 
-/// Every decision heading in `text`, as its one-based line and its
-/// number with any letter suffix (`D42a` is not `D42`).
 fn headings(text: &str) -> Vec<(usize, String)> {
     text.lines()
         .zip(1_usize..)

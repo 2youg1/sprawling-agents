@@ -3,31 +3,23 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Who reads stdout, decided in this one place (`Sprawling/app/spec/Main.lean`
-//! §8-129-2): a person at a terminal, or an agent reading a pipe or a
-//! file. `view`, `gauge` and `gauge --at` all ask here, so a line meant
-//! for an agent cannot reach a terminal by one verb's rule and not by
-//! another's.
-
 use std::io::IsTerminal;
 
-/// Who reads what a command writes to stdout.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Audience {
-    /// A pipe or a file: one machine-readable line per reading.
+
     Agent,
-    /// A terminal: lines in units, or a redrawn screen.
+
     Person,
 }
 
 impl Audience {
-    /// Who reads this process's stdout.
+
     #[must_use]
     pub fn of_stdout() -> Audience {
         Self::of(&std::io::stdout())
     }
 
-    /// A terminal is read by a person; anything else by an agent.
     fn of(stream: &impl IsTerminal) -> Audience {
         if stream.is_terminal() {
             Audience::Person

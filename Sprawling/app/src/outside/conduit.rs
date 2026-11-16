@@ -3,24 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One remote session's frames, judged one at a time
-//! (`Sprawling/app/spec/Outside/Conduit.lean` §8-139; Sprawling/remote_access/Spec.lean §8-5, §8-10;
-//! what reaches the city is proved in `Sprawling/app/spec/Outside/Conduit.lean`).
-//!
-//! A sealed payload from the device is opened, read by its first byte,
-//! and, when it is a wire frame, classed (`outside::verbs`) and judged by
-//! the door against the session's authority at this moment. A frame the
-//! door permits goes on to the city exactly as the device wrote it; a
-//! frame it refuses goes nowhere, and the device is answered with a
-//! sealed `Refusal` frame instead. The city's own frames come back
-//! sealed. No socket is touched here, so a test drives the same steps a
-//! connection does.
-//!
-//! The point a reader most often gets wrong: a session the door no
-//! longer holds is not refused frame by frame, it ends. The door closed,
-//! the device was revoked or the time ran out, and every later frame
-//! would be refused for the same reason.
-
 use kernel::{AxCode, AxError};
 use remote_access::door::{Authority, SessionId, VerbClass, permits};
 use remote_access::handshake::Session;
@@ -29,15 +11,13 @@ use remote_access::seal::{Opener, Payload, Sealer};
 use super::keeper::Doorway;
 use super::verbs::{Passage, passage};
 
-/// What one frame from the device comes to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Step {
-    /// Text for the city's `/ws`, as the device wrote it unless it was
-    /// the greeting.
+
     Forward(String),
-    /// A sealed answer for the device; nothing reaches the city.
+
     Answer(Vec<u8>),
-    /// The device locked the door behind it.
+
     Lock,
 }
 
@@ -46,8 +26,7 @@ pub(super) struct Conduit {
     session: SessionId,
     opener: Opener,
     sealer: Sealer,
-    /// The city's own key, which the greeting carries in: every face of
-    /// the city demands one (`Sprawling/wire/Spec.lean` §8-41).
+
     token: String,
 }
 
@@ -63,11 +42,6 @@ impl Conduit {
         }
     }
 
-    /// Opens and judges one sealed payload from the device.
-    ///
-    /// # Errors
-    /// A payload that does not open or read, and a session the door no
-    /// longer holds: either ends the connection.
     pub(super) fn judge(&mut self, sealed: &[u8]) -> Result<Step, AxError> {
         let text = match Payload::from_bytes(&self.opener.open(sealed)?)? {
             Payload::Lock => return Ok(Step::Lock),
@@ -98,18 +72,11 @@ impl Conduit {
         }
     }
 
-    /// Seals one frame the city sent, for the device.
-    ///
-    /// # Errors
-    /// The session's counter is spent.
     pub(super) fn seal_for_device(&mut self, text: &str) -> Result<Vec<u8>, AxError> {
         self.sealer
             .seal(&Payload::Frame(text.to_owned()).to_bytes())
     }
 
-    /// The device's greeting, sent on with the city's own token: the
-    /// version and schema stay the device's, so the city still judges
-    /// whether the page speaks its wire.
     fn greeting(&self, said: wire::Hello) -> Result<Step, AxError> {
         let city = wire::ClientFrame::Hello(wire::Hello {
             token: Some(self.token.clone()),

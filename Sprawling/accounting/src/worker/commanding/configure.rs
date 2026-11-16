@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one reconfiguration of a building's own layer writes, and what
-//! the settings page writes into the city's own.
-//!
-//! A building's faces travel together: one command speaks for all of
-//! them, as one `wire::BuildingSettings`, and they are recorded as one
-//! event.
-
 use kernel::AxError;
 use kernel::event::EventKind;
 use kernel::event::Scope;
@@ -18,26 +11,7 @@ use kernel::event::record::GoverningDocument;
 use super::super::RunWorker;
 
 impl RunWorker {
-    /// Writes what a building's runs may reach into that building's own
-    /// configuration layer. `None` is "the page said nothing about that
-    /// face", which is not the same as an empty statement: `mcp: Some(vec![])`
-    /// writes "this building reaches no server", while `None` leaves that
-    /// face as it was.
-    ///
-    /// **The contents are not recorded; the change is.** `CONFIG.toml`
-    /// is the authority for what a run is governed by, and an event
-    /// carrying the same fact would be a second one - that part of the
-    /// original ruling stands. What it missed is that "somebody
-    /// reconfigured this building" is not in `CONFIG.toml` at all: it is
-    /// an effect the city carried out, and the Ledger is the only
-    /// history of those. For a whole stage this wrote a diagnostic line
-    /// and nothing else, so a page had no way to learn that a building
-    /// it was showing had moved, and the MCP screen guessed with a timer
-    /// three hundred milliseconds after it sent the command.
-    ///
-    /// # Errors
-    /// Propagates a configuration this build cannot read or write, and
-    /// the refusal of a second rung outside its domain.
+
     pub(super) fn configure_building(
         &mut self,
         settings: &wire::BuildingSettings,
@@ -55,10 +29,7 @@ impl RunWorker {
             idem: _,
         } = settings;
         let building = city::Building::of(addr)?;
-        // Taken before anything is written: the domain is
-        // `SecondThreshold`'s one construction point, so an out-of-domain
-        // percent refuses the frame here rather than after the faces
-        // beside it landed, or at the next read.
+
         let threshold = context_second_threshold
             .map(kernel::config::SecondThreshold::parse)
             .transpose()?;
@@ -68,13 +39,11 @@ impl RunWorker {
         if let Some(names) = reading_room {
             city::check_reading_room(&self.city_root, building.addr(), names)?;
         }
-        // Accepting an external candidate copies that exact scanned version
-        // before its pin moves. Keeping an old pin never admits the candidate.
+
         if let Some(pins) = skill_pins {
             admit_external_pins(&self.city_root, building.addr(), pins)?;
         }
-        // Judged before any other face is written, so a table the city
-        // refuses leaves the building as it was.
+
         if let Some(table) = catalog {
             city::write_catalog(&self.city_root, building.addr(), table)?;
         }
@@ -111,10 +80,7 @@ impl RunWorker {
                 threshold,
             )?;
         }
-        // Written whole and never parsed here: the connector that reads
-        // it at start-up is the authority on its syntax and fails closed,
-        // so a second reading on this side would be a second authority
-        // (`Sprawling/city/Spec.lean` §8-26).
+
         if let Some(allowlist) = desktop {
             city::write_desktop_scope(&self.city_root, building.addr(), allowlist)?;
         }
@@ -148,16 +114,6 @@ impl RunWorker {
     }
 }
 
-/// Copies only external candidates whose current digest the page accepted.
-/// Internal candidates are already in CAS; old pins kept across a candidate
-/// change do not copy or approve the new content.
-///
-/// A pin that no longer matches the shelf is honored only when an earlier
-/// save already admitted its bytes: keeping an admitted version changes
-/// nothing, while keeping a version nobody admitted leaves a pin whose
-/// manifest no read can answer — the catalog page and the building's runs
-/// both fail on the missing object (`Sprawling/accounting/spec/Connectors.lean`
-/// D119). That save refuses instead of landing half of what the page asked.
 fn admit_external_pins(
     city_root: &std::path::Path,
     building: &kernel::Address,
@@ -220,11 +176,6 @@ fn admit_external_pins(
     Ok(())
 }
 
-/// Whether a pin kept across a change still names bytes the store has. An
-/// absent object means the page accepted a version the shelf no longer
-/// holds and no save ever admitted; keeping that pin would write a
-/// locator nothing can read. Corruption and other read failures are the
-/// storage layer's own story and propagate as they are.
 fn held_pin_must_answer(
     cas: &storage::Cas,
     name: &str,
@@ -245,14 +196,7 @@ fn held_pin_must_answer(
 }
 
 impl RunWorker {
-    /// Writes a building's `RULES.toml` whole from a page, evaluated
-    /// first and only over the text the page started from, and books the
-    /// change (`Sprawling/wire/Spec.lean` §8-60).
-    ///
-    /// # Errors
-    /// Propagates the evaluation's refusal, a file that is no longer
-    /// `base`, a file that cannot be written or read back, and a history
-    /// that will not take the line.
+
     pub(in crate::worker) fn put_rules(&mut self, write: &wire::RulesWrite) -> Result<(), AxError> {
         let building = city::Building::of(&write.building)?;
         city::write_rules_against_with(
@@ -271,12 +215,6 @@ impl RunWorker {
         )
     }
 
-    /// Sets the direct sub-agent model and leaves the rest of `RULES.toml`.
-    ///
-    /// # Errors
-    /// Propagates a choice the rules reader or the endpoint book refuses,
-    /// a file that is no longer `base`, and a history that will not take
-    /// the line.
     pub(in crate::worker) fn set_workspace_choice(
         &mut self,
         write: &wire::WorkspaceChoiceWrite,
@@ -299,22 +237,6 @@ impl RunWorker {
         )
     }
 
-    /// Writes the city's own layer from the settings page, one fact at a
-    /// time, and books the change once (`Sprawling/wire/spec/Command/Step.lean`
-    /// §8-61). A frame that states nothing writes nothing and books
-    /// nothing.
-    ///
-    /// `[search]` and `[catalog]` are the facts the city refuses for what
-    /// they say, so both are judged before the first byte lands: the
-    /// catalog by `city::check_catalog`, the search by its own writer,
-    /// which judges before it writes. A refused frame leaves the file as
-    /// it was.
-    ///
-    /// # Errors
-    /// `E_CONFIG_INVALID` for a `[search]` value or a `[catalog]` key the
-    /// reader would refuse;
-    /// propagates a city layer this build cannot read or write, and a
-    /// history that will not take the line.
     pub(in crate::worker) fn configure_city(
         &mut self,
         settings: wire::CitySettings,

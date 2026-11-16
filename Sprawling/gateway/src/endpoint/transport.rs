@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One endpoint's HTTP client, and the one place a client is built.
-//!
-//! Every blocking client starts its own `reqwest-internal-sync-runtime`
-//! thread and keeps its own connection pool. A client built per call
-//! therefore held one thread per concurrent run and handshook again on
-//! every call, so the book keeps one [`Transport`] per endpoint and every
-//! call to that endpoint clones its client (`Sprawling/gateway/spec/Endpoint/Transport.lean` §8-3).
-
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use std::time::Instant;
@@ -22,31 +14,23 @@ use super::permit::{Gate, Gated};
 use super::redemption::Redemption;
 use crate::concurrency::MaxInFlight;
 
-/// One endpoint's client, built the first time a call needs it.
-///
-/// Clones share the slot, so a copy of the book hands out the same
-/// client. Building is deferred because a book is folded on every
-/// replay, and an endpoint the city never calls should hold no thread.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Transport {
     slot: Arc<OnceLock<reqwest::blocking::Client>>,
-    /// The permits every model call to this endpoint waits on
-    /// (`Sprawling/gateway/Spec.lean` §8-6).
+
     gate: Arc<Gate>,
-    /// The step a test takes after the client is configured and before
-    /// it is built (`Sprawling/gateway/spec/Reach/Resolve.lean` §8-32).
+
     #[cfg(test)]
     detour: Option<Detour>,
 }
 
 impl Transport {
-    /// How many calls the gate lets be in flight now.
+
     #[cfg(test)]
     pub(crate) fn limit(&self) -> u32 {
         self.gate.limit()
     }
 
-    /// A transport whose gate lets `ceiling` calls be in flight at once.
     pub(crate) fn admitting(ceiling: MaxInFlight) -> Transport {
         Transport {
             gate: Arc::new(Gate::admitting(ceiling)),
@@ -54,10 +38,6 @@ impl Transport {
         }
     }
 
-    /// The shared client, built from `shape` if this is the first call.
-    ///
-    /// Two callers racing on an empty slot each build one; the slot keeps
-    /// the first and the other is dropped with its thread.
     fn client(&self, shape: &ClientShape) -> Result<reqwest::blocking::Client, AxError> {
         if let Some(client) = self.slot.get() {
             return Ok(client.clone());
@@ -66,9 +46,6 @@ impl Transport {
         Ok(self.slot.get_or_init(|| built).clone())
     }
 
-    /// A transport whose client takes `step` after the endpoint's own
-    /// configuration: what a test uses to reach a stand-in under a
-    /// preset host's name (`reach::resolve`).
     #[cfg(test)]
     pub(crate) fn detoured(
         step: impl Fn(reqwest::blocking::ClientBuilder) -> reqwest::blocking::ClientBuilder
@@ -101,11 +78,9 @@ impl Transport {
     }
 }
 
-/// What an endpoint's shared client is built from: the fields of an
-/// [`EndpointConfig`] the client reads, and nothing a request carries.
 #[derive(Debug, Clone)]
 pub(crate) struct ClientShape {
-    /// The chat URL: which proxy rule applies is decided from its host.
+
     pub(crate) url: String,
     pub(crate) proxying: Proxying,
     pub(crate) timeout_ms: u64,
@@ -121,12 +96,6 @@ impl ClientShape {
     }
 }
 
-/// One endpoint's connection, opened before its first call so that call
-/// does not pay to resolve, connect and shake hands
-/// (`Sprawling/gateway/spec/Endpoint/Transport.lean` D26).
-///
-/// It holds no credential, no redemption and no header a person
-/// entered, so the one request it sends cannot carry a key.
 #[derive(Debug)]
 pub struct WarmUp {
     transport: Transport,
@@ -143,15 +112,6 @@ impl WarmUp {
         }
     }
 
-    /// Builds the endpoint's shared client and sends one `GET` to its
-    /// model list, read to the end so the connection goes back to the
-    /// pool. Blocks for that one round trip; start it on a thread of
-    /// its own.
-    ///
-    /// Reports nothing: a client that cannot be built, a connection
-    /// refused, any status and a body cut short each end this warm-up
-    /// alone, and the endpoint's first call meets the same failure and
-    /// reports it with its own action and recovery.
     pub fn open(self) {
         let Ok(client) = self.transport.client(&self.shape) else {
             return;
@@ -162,8 +122,6 @@ impl WarmUp {
     }
 }
 
-/// A step after a client's configuration, held so a transport stays
-/// `Clone` and `Debug`.
 #[cfg(test)]
 #[derive(Clone)]
 struct Detour(
@@ -178,11 +136,7 @@ impl std::fmt::Debug for Detour {
 }
 
 impl Endpoint {
-    /// One endpoint, calling through `transport`'s client.
-    ///
-    /// # Errors
-    /// `E_CONFIG_INVALID` when no client can be built for this
-    /// `base_url` and the machine's proxy settings.
+
     pub(crate) fn over(
         transport: &Transport,
         config: EndpointConfig,
@@ -196,14 +150,10 @@ impl Endpoint {
         })
     }
 
-    /// This endpoint with the thinking offer its model was attached
-    /// with; without it every request is sent no thinking field.
     pub(crate) fn offering(self, thinking: crate::provider::thinking::ThinkingOffer) -> Endpoint {
         Endpoint { thinking, ..self }
     }
 
-    /// This endpoint as a model whose every call first takes a permit
-    /// at `transport`'s gate, read against `monotonic`.
     pub(crate) fn gated(self, transport: &Transport, monotonic: fn() -> Instant) -> Gated {
         Gated::new(self, Arc::clone(&transport.gate), monotonic)
     }
@@ -230,12 +180,6 @@ mod tests {
     const BASE: &str = "https://api.anthropic.com/v1/messages";
     const MODELS: &str = "https://api.anthropic.com/v1/models";
 
-    /// `Sprawling/gateway/spec/Endpoint/Transport.lean` §8-35: every call to one endpoint goes out
-    /// over the connection the endpoint's first call opened, so resolving,
-    /// connecting and the handshake are paid once per endpoint rather than
-    /// once per call. A call through another transport opens a connection
-    /// of its own, which is what tells the stand-in's count apart from a
-    /// count that could not see a second connection.
     #[test]
     fn a_second_call_to_one_endpoint_goes_out_over_the_first_calls_connection() {
         let stand_in = KeptOpen::listening(HOST);
@@ -254,10 +198,6 @@ mod tests {
         );
     }
 
-    /// `Sprawling/gateway/spec/Endpoint/Transport.lean` D26: a warm-up opens the connection the
-    /// endpoint's first call goes out over. The stand-in has heard one
-    /// request once the warm-up returns, and the call that follows comes
-    /// on the same connection.
     #[test]
     fn a_warm_up_opens_the_connection_the_first_call_goes_out_over() {
         let stand_in = KeptOpen::listening(HOST);
@@ -275,13 +215,6 @@ mod tests {
         );
     }
 
-    /// The reading behind `Sprawling/gateway/spec/Endpoint/Transport.lean` §8-35: an endpoint's
-    /// first and second request through one client, timed apart, over
-    /// `ROUNDS` fresh clients. The difference is what the first request
-    /// pays to resolve, connect and shake hands. By default it reads the
-    /// loopback TLS stand-in; `SPRAWLING_CONNECT_PROBE` names base URLs
-    /// to read instead, comma-separated, each asked twice with a `GET`
-    /// that carries no credential.
     #[test]
     #[ignore = "an instrument: run it by name with --run-ignored only --no-capture"]
     fn instrument_first_call_connect() {

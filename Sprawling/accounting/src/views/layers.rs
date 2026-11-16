@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The prompt layers of one address, read off the disk when a page asks
-//! (`Sprawling/accounting/Spec.lean` §8-38, `Sprawling/wire/Spec.lean` §8-98).
-//!
-//! Every judgement here is one the freeze already makes: which `City.md`
-//! governs a building is `city::city_prompt_path`, a convention file is
-//! read by `prompt_chain`, and a model's note is the building's when it
-//! keeps one. The answer only lays those out in the order they are sent.
-
 use std::path::Path;
 
 use kernel::{Address, AxError, B3Hash};
@@ -24,8 +16,7 @@ use super::prepared::{Prepared, unavailable_because};
 use crate::prompt_chain::{self, Reading, addressed};
 
 impl Views {
-    /// Nothing is copied out of the views: every layer is read off the
-    /// disk once they are released.
+
     pub(in crate::views) fn layers_ask(&self, addr: &Address) -> Prepared {
         Prepared::Layers {
             city_root: self.city_root.clone(),
@@ -34,8 +25,6 @@ impl Views {
     }
 }
 
-/// The prompt documents of the next run at `addr`, or `Unavailable`
-/// with the city's reason for an address no building holds.
 pub(super) fn layers_answer(city_root: &Path, addr: Address) -> wire::Answer {
     match layers(city_root, &addr) {
         Ok(documents) => wire::Answer::Layers(Box::new(LayersAnswer { addr, documents })),
@@ -43,7 +32,6 @@ pub(super) fn layers_answer(city_root: &Path, addr: Address) -> wire::Answer {
     }
 }
 
-/// The four slots in send order, the farther layer first within each.
 fn layers(city_root: &Path, addr: &Address) -> Result<Vec<LayerDocument>, AxError> {
     let building = city::Building::of(addr)?;
     let home = building.addr();
@@ -72,8 +60,6 @@ fn layers(city_root: &Path, addr: &Address) -> Result<Vec<LayerDocument>, AxErro
     Ok(out)
 }
 
-/// The city's `City.md` and the building's own, of which the nearer one
-/// that is there governs (city D31).
 fn city_slot(city_root: &Path, home: &Address) -> Result<Vec<LayerDocument>, AxError> {
     let governing = city::city_prompt_path(city_root, home)?;
     let city = city::PromptDocument::Shipped(city::Shipped::City);
@@ -111,7 +97,6 @@ fn city_slot(city_root: &Path, home: &Address) -> Result<Vec<LayerDocument>, AxE
     ])
 }
 
-/// One convention file, read as the freeze reads it.
 fn convention_document(
     city_root: &Path,
     home: &Address,
@@ -139,9 +124,6 @@ fn convention_document(
     })
 }
 
-/// Who the resident at `addr` is: a room's own file, or for a City Hall
-/// seat the Mayor's or the clerk's, which the city keeps and this build
-/// carries a default for.
 fn identity(city_root: &Path, addr: &Address, home: &Address) -> Result<LayerDocument, AxError> {
     let path = city::urbanite_path(city_root, addr);
     let at = addressed(city_root, &path)?;
@@ -171,10 +153,6 @@ fn identity(city_root: &Path, addr: &Address, home: &Address) -> Result<LayerDoc
     })
 }
 
-/// Every note the city and the building keep, one model at a time: the
-/// city's note, replaced by the building's where the building keeps one,
-/// and the building's place for that model, absent when it keeps none,
-/// so a page can start one there without spelling the address itself.
 fn model_notes(city_root: &Path, home: &Address) -> Result<Vec<LayerDocument>, AxError> {
     let city = city::model_notes(city_root, None)?;
     let own = city::model_notes(city_root, Some(home))?;
@@ -218,11 +196,6 @@ fn note(
     }
 }
 
-/// Where a note the city listed is kept.
-///
-/// # Errors
-/// `E_INVALID_ARGS` for a name the address grammar refuses, which a note
-/// `city::model_notes` listed cannot carry.
 fn note_at(
     building: Option<&Address>,
     (provider, model): &(String, String),
@@ -237,11 +210,6 @@ fn note_at(
     })
 }
 
-/// Whether a document the city keeps in a reserved subtree, or at its
-/// root, is there for the freeze to read, and the version a step on it
-/// starts from. The freeze reads these files as they stand, so anything
-/// there that is not a plain file, or that will not read, is withheld
-/// with the disk's own words.
 fn on_disk(path: &Path) -> (LayerState, B3Hash) {
     match std::fs::read(path) {
         Ok(bytes) => (
@@ -260,18 +228,10 @@ fn on_disk(path: &Path) -> (LayerState, B3Hash) {
     }
 }
 
-/// The version of no bytes: what a document that is not there is, and
-/// the `base` a step that creates it starts from.
 fn nothing() -> B3Hash {
     B3Hash::digest(b"")
 }
 
-/// This build's default for `doc`, and the city's copy measured against
-/// it.
-///
-/// # Errors
-/// `E_STORAGE_FATAL` naming the path for a copy that is there and will
-/// not read.
 fn shipped(city_root: &Path, doc: city::Shipped) -> Result<ShippedDefault, AxError> {
     let path = doc.path(city_root);
     let copy = match std::fs::read(&path) {

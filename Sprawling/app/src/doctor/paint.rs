@@ -3,26 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The report as a table: four status words, two columns of fixed
-//! width, and colour a terminal may refuse (`Sprawling/app/Spec.lean` section
-//! 8-58).
-//!
-//! A report that is left-aligned prose makes a person read every line
-//! to find the one that is red. Here the name column is fixed, the
-//! second column is one of exactly four words, and everything after it
-//! is the shortest true detail: a version number rather than a vendor's
-//! whole banner, a fault rather than the word "absent".
-//!
-//! Nothing here writes to a terminal or reads the environment: the ink
-//! arrives as a value that `screen` decided, so a test asks for either
-//! answer without setting a variable on the machine it runs on.
-
 use std::ffi::OsString;
 
 use super::family::member_at;
 use super::{Detection, Finding, Need, Presence, Requirement, Tier};
 
-/// Whether this report may use colour.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Ink {
     Colour,
@@ -30,13 +15,7 @@ pub(crate) enum Ink {
 }
 
 impl Ink {
-    /// Plain when the environment asks for plain, whatever the command
-    /// line said.
-    ///
-    /// `NO_COLOR` is honoured whatever its value is, including an empty
-    /// one: the convention is that the variable's presence is the
-    /// request. `--no-color` says the same thing for one run, and the
-    /// two never disagree because either one is enough.
+
     pub(crate) fn or_plain(self, no_color: Option<OsString>) -> Ink {
         match no_color {
             Some(_) => Ink::Plain,
@@ -52,16 +31,15 @@ impl Ink {
     }
 }
 
-/// The four words a person reads down the second column.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Status {
-    /// Here, and it answered.
+
     Present,
-    /// Needed, and not here.
+
     Missing,
-    /// Here, and unusable.
+
     Broken,
-    /// Not here, and nothing is waiting for it.
+
     Optional,
 }
 
@@ -84,9 +62,6 @@ impl Status {
         }
     }
 
-    /// The colour a terminal that accepts colour gets: green for here,
-    /// red for what is standing in the way, yellow for what is here and
-    /// will not work, dim for what nobody is waiting for.
     fn colour(self) -> &'static str {
         match self {
             Status::Present => "32",
@@ -97,12 +72,6 @@ impl Status {
     }
 }
 
-/// Which of the report's two sections an item belongs to.
-///
-/// Required is what stands between a person and a running city;
-/// everything else - the optional items and the whole develop tier - is
-/// a recommendation. This is the one authority on that split, and the
-/// page's two columns read the same fields.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Part {
     Required,
@@ -127,15 +96,10 @@ impl Part {
     }
 }
 
-/// The width of the name column. Wide enough for the longest row name
-/// this table carries, so no name pushes its status word out of line.
 const NAME: usize = 18;
 
-/// The width of the status column, one space wider than its longest
-/// word.
 const STATUS: usize = 9;
 
-/// One row: name, status word, and the shortest true detail.
 pub(crate) fn row(finding: &Finding, ink: Ink) -> String {
     let status = Status::of(finding);
     let name = format!("{:<NAME$}", finding.requirement.name);
@@ -147,7 +111,6 @@ pub(crate) fn row(finding: &Finding, ink: Ink) -> String {
     )
 }
 
-/// What the row says after its status word.
 fn detail(finding: &Finding, status: Status) -> String {
     match (&finding.presence, status) {
         (Presence::Present { at, version }, _) => {
@@ -165,9 +128,6 @@ fn detail(finding: &Finding, status: Status) -> String {
     }
 }
 
-/// Which brand of a family was found, and what a person has to know
-/// about that brand. Empty for a row that is not a family: nothing is
-/// added to a line about `git`.
 fn brand(finding: &Finding) -> String {
     let Detection::Family(family) = &finding.requirement.detect else {
         return String::new();
@@ -180,13 +140,6 @@ fn brand(finding: &Finding) -> String {
     })
 }
 
-/// The closing three lines: how much of each section is here, and the
-/// one command that moves a person forward from where they are.
-///
-/// A family of browsers counts once. Four ways into a session, three of
-/// them closed and one open, is one thing a person has rather than a
-/// quarter of one, and a fraction that said `1 / 4` beside a verdict
-/// that said `ready to use` would make a reader distrust both.
 pub(crate) fn summary(findings: &[Finding], ink: Ink) -> Vec<String> {
     let mut lines: Vec<String> = Part::ALL
         .into_iter()
@@ -215,8 +168,6 @@ pub(crate) fn summary(findings: &[Finding], ink: Ink) -> Vec<String> {
     lines
 }
 
-/// How many of one section's items a person has, and how many there are
-/// to have. A group is one of each.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) struct Counted {
     pub(crate) here: usize,

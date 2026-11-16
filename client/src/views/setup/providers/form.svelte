@@ -4,30 +4,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
-
 <script lang="ts" module>
-  // Turning a URL and a key into models a run can be given.
-  //
-  // **Three boxes and two controls are all the form asks for.** A URL,
-  // which face the endpoint answers in, a key, and then look or attach.
-  // Above the URL stands the city's list of the vendors it knows by
-  // host (`./known`): picking one fills the URL and the face, so a
-  // person copies no address out of a vendor's documentation;
-  // the id and the display name are derived from the URL and folded
-  // into `advanced`, because they are the city's bookkeeping rather
-  // than anything the person came holding. What each field means is
-  // `./draft`; this file is what the form does with them.
-  //
-  // The key goes to the vault by its own route and comes back as a
-  // reference. **An empty key box carries no reference at all**: the
-  // city reads that as "keep what is archived under this id", so this
-  // form never decides "keep" out of what it happens to remember
-  // (`Sprawling/app/Spec.lean` §8-81). The reference is held beside the id it was
-  // filed under, because a reference held alone outlives the name that
-  // makes it true.
 
   export interface AttachFormProps {
-    // A registration went through and the form is empty again.
+
     readonly onAttached?: () => void;
   }
 </script>
@@ -75,67 +55,47 @@
   const belief = u.conn.belief;
 
   let draft = $state<Draft>(freshDraft());
-  // The reference the vault answered with, and the id it was filed
-  // under. Never one without the other.
+
   let held = $state<StoredKey | null>(null);
   let note = $state<string | null>(null);
   let report = $state<AxError | null>(null);
   let looking = $state(false);
-  // The attach this form sent and is waiting on, with the endpoints
-  // answer that stood when it left: the form starts over only once a
-  // newer answer lists the endpoint, and a refusal keeps every field.
+
   let attaching = $state.raw<{ readonly id: string; readonly before: unknown } | null>(null);
   let busy = $state(false);
   let chosen = $state<readonly ModelRow[]>([]);
-  // The probe this form sent and the answer that stood when it left:
-  // the line under the URL box speaks only for a newer answer, and only
-  // while the box and the face are what that probe was sent with.
+
   let pending = $state.raw<Sent | null>(null);
 
   const id = $derived(idOf(draft));
   const field = $derived(keyField(held, id));
   const reference = $derived(field.kind === "stored" ? field.reference : referenceOf(id));
-  // Whether the city keeps a key for the id this form is about. The
-  // reference itself never travels here - `has_credential` is the
-  // whole answer a page needs - and the city leaves what it keeps
-  // alone when this form sends no key. So an empty box on a keyed
-  // endpoint changes nothing, and the placeholder is what says so.
+
   const attached = u.conn.asking.ask(QUERIES.endpoints);
   const keyed = $derived.by(() => {
     const now = $attached;
     if (now === undefined || !("endpoints" in now)) return false;
     return now.endpoints.endpoints.some((each) => each.name === id && each.has_credential);
   });
-  // The probe's answer for the endpoint this form is about. A probe
-  // answers with a reading whether or not it could read a model list,
-  // so this is also where the reachability report comes from.
+
   const answered = $derived.by(() => {
     const found = $belief.probed;
     return found !== null && found.name === id ? found : null;
   });
   const facts = $derived(answered?.facts ?? []);
-  // The URL the city calls for the text in the box, when it wrote the
-  // text down another way. The box itself stays the person's
-  // (client/Spec.lean D102).
+
   const called = $derived(normalisedFrom($belief.probed, pending, draft));
   const complete = $derived(ID_SHAPE.test(id) && hostOf(draft.baseUrl) !== null);
-  // What the model table asks the city about each row: the attach this
-  // form would send, so its placeholders are what that attach and the
-  // picks after it register (client D103).
+
   const about = $derived.by((): TableAbout | null => {
     if (!complete) return null;
     const sent = endpointOf(draft, null);
     return { endpoint: sent.id, baseUrl: sent.baseUrl, face: sent.dialect };
   });
-  // A refusal of reachability stands beside the probe's reading; the
-  // city's refusal of the form stands under the table whose rows it is
-  // about (client D101).
+
   const unreached = $derived(report !== null && refusalOf(report.code) === "reach" ? report : null);
   const refused = $derived(report !== null && refusalOf(report.code) === "form" ? report : null);
 
-  // The vendors the city knows by host. The answer is the city's own
-  // table, so the picker offers no address and no face the city would
-  // not store.
   const knownAnswer = u.conn.asking.ask(QUERIES.knownHosts);
   const known = $derived(
     readAnswer($knownAnswer, (held) =>
@@ -145,10 +105,6 @@
   const hosts = $derived(known.kind === "held" ? known.value : []);
   const row = $derived(rowFor(hosts, draft.baseUrl));
 
-  // The face control, with the cells a known host does not answer in
-  // refused under the pointer and saying which shapes it does speak. A
-  // host the city does not know keeps every cell open: the form makes
-  // the widest judgement and never a narrower one (client/Spec.lean §4-25).
   const faces = $derived.by((): readonly Choice<WireApi>[] => {
     const offered = row === null ? null : facesOf(row);
     return wireChoices().map((choice) =>
@@ -158,9 +114,6 @@
     );
   });
 
-  // A refusal that arrives while this form is waiting for one is this
-  // form's to show, beside the field it is about; the corner is for
-  // refusals no open page is responsible for.
   $effect(() => {
     const refused = $belief.refusal;
     if (refused === null || (!looking && attaching === null)) return;
@@ -169,8 +122,7 @@
     attaching = null;
     u.conn.dismissRefusal();
   });
-  // The city took the endpoint: the answer after the one that stood when
-  // the attach left lists it. The form starts over for the next provider.
+
   $effect(() => {
     const now = $attached;
     if (
@@ -189,14 +141,11 @@
     pending = null;
     onAttached?.();
   });
-  // An endpoint that answered an empty list answered: the wait ends on
-  // the answer rather than on its length.
+
   $effect(() => {
     if (answered !== null) looking = false;
   });
 
-  // Every edit retires the last report: what it said was about the
-  // fields as they were.
   function edit(part: "baseUrl" | "key", value: string): void {
     draft[part] = value;
     report = null;
@@ -208,18 +157,10 @@
     note = null;
   }
 
-  // What the fold below edits through: the draft is this form's own
-  // state, so the only hand on it is here (the Solid original passed
-  // its store setter for the same reason).
   function setDraft<K extends keyof Draft>(part: K, value: Draft[K]): void {
     draft[part] = value;
   }
 
-  // The key is enrolled on the action that needs it, under the id the
-  // form says now. A blank box carries the reference this form enrolled
-  // for that id, if any: listing the models clears the box, and the
-  // attach that follows must not arrive without the key it just filed.
-  // A box with something in it replaces what is filed.
   function withKey(then: (e: Endpoint) => void): void {
     const typed = draft.key.trim();
     if (typed === "") {
@@ -275,9 +216,7 @@
       for (const row of rows) {
         if (row.tag !== null) u.send(selectModel(e.id, row.id, row.tag, row.stated));
       }
-      // Only a registration that went through clears the form: a
-      // refusal keeps every field, which is the one thing a person
-      // filling in a key cannot be asked to do twice.
+
       attaching = { id: e.id, before };
     });
   }
@@ -289,9 +228,7 @@
     event.preventDefault();
   }}
 >
-  <!-- Three stages on one form: where to call, how to authenticate,
-  then which models to take. Each stage is one job so a person finishes
-  one before scrolling into the next. -->
+
   <fieldset class="flex min-w-0 flex-col gap-base border-0 p-0">
     <legend class="px-0 text-note font-label text-text-quiet">
       {say($lang, "setup_form_provider")}
@@ -312,7 +249,7 @@
     />
 
     <div class="flex flex-col gap-tight">
-      <!-- wording-ok: the placeholder is the provider's documented base URL - an address, which no language translates. -->
+
       <Field
         placeholder="https://api.openai.com/v1"
         label={say($lang, "setup_base_url")}
@@ -407,8 +344,6 @@
       />
     </div>
 
-    <!-- What came back stands under the controls that asked for it,
-    then the two readings of the draft at the foot. -->
     {#if note !== null}
       <p class="text-note text-alert">{note}</p>
     {/if}

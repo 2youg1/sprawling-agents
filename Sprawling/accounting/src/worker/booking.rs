@@ -3,28 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Plan claims decided on the accounting thread at the moment a model
-//! makes them.
-//!
-//! Each run's plan desk holds the file as it stood when the run was
-//! dispatched, and runs dispatched beside each other read the same file.
-//! The accounting thread sees every claim in the order the lanes send
-//! them, so the first run to ask for a node takes it and the second is
-//! refused before it spends a call on the node (`Sprawling/app/Spec.lean` §8-42-8).
-//! The claim's `roadmap_claimed` line is appended as the node is booked,
-//! so the history says who holds a node from the moment the model took
-//! it rather than from the moment its run lands. A booking lasts until
-//! its run comes home and lands, which is when the file on disk starts
-//! to say who held the node; the run's landing is handed the lines that
-//! give its still-booked nodes back, and writes those its plan did not
-//! close, so every claim on the history is closed.
-//!
-//! A desk's copy can also be older than a node's end: a run dispatched
-//! before another run's landing stopped a node reads the node as ready.
-//! The book remembers each stop line it was shown and when, against the
-//! plan read every desk made, so the ledger's stop, not the desk's copy,
-//! answers such a claim.
-
 use std::collections::BTreeMap;
 use std::sync::mpsc;
 
@@ -34,31 +12,22 @@ use kernel::{Address, AxCode, AxError, EventDraft, EventKind, Ledger, NodeId, Pa
 use super::relay::Wake;
 use crate::effect;
 
-/// How many stop lines the book had been shown when a desk read its
-/// plan: every stop at or below it is in that desk's copy, because a
-/// landing writes the file before its lines and both happen on the
-/// accounting thread the desk is opened on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub(crate) struct PlanRead(u64);
 
-/// Who a run's claims are made for, and the clock their lines are
-/// stamped by. The six travel together from the run's dispatch to
-/// every claim it makes.
 pub(crate) struct Claimant {
-    /// The building whose plan the claimed nodes belong to.
+
     pub building: Address,
-    /// The room the run works in, which the claim's line is filed under.
+
     pub room: Address,
     pub run: RunId,
     pub who: String,
-    /// The worker's own clock (`Sprawling/accounting/spec/Clock.lean` §8-3).
+
     pub clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
-    /// The book's mark when this run's desk read the plan.
+
     pub read: PlanRead,
 }
 
-/// One claim, its `roadmap_claimed` line, the line that would hand the
-/// node back, and the address its answer goes back to.
 pub(crate) struct ClaimAsk {
     building: Address,
     node: NodeId,
@@ -68,30 +37,20 @@ pub(crate) struct ClaimAsk {
     back: mpsc::SyncSender<Result<(), AxError>>,
 }
 
-/// One node booked for a run in flight, and the line that gives it back
-/// if the run comes home without landing its plan.
 struct Booked {
     run: RunId,
     put_back: effect::Line,
 }
 
-/// Which run holds which node of which building's plan while those runs
-/// are in flight.
 #[derive(Default)]
 pub(crate) struct ClaimBook {
     held: BTreeMap<(Address, NodeId), Booked>,
-    /// Each node a stop line ended since this worker opened, with the
-    /// mark that line set; a hand-back makes the node ready again and
-    /// takes it out.
+
     stopped: BTreeMap<(Address, NodeId), PlanRead>,
-    /// How many stop lines the book has been shown.
+
     stops: PlanRead,
 }
 
-/// The lines that give back the nodes a run still had booked when it
-/// came home. Its landing closes each node as that node's closing line
-/// reaches the ledger; whatever it did not close is still owed to the
-/// history.
 #[must_use = "a claim written at call time stays open on the history until its put-back line is written"]
 pub(crate) struct OpenClaims {
     run: RunId,
@@ -99,26 +58,18 @@ pub(crate) struct OpenClaims {
 }
 
 impl OpenClaims {
-    /// A line that closes `node`'s claim is on the ledger, so the last
-    /// line the history holds for it no longer reads it as held.
+
     pub fn close(&mut self, node: &NodeId) {
         self.put_backs.remove(node);
     }
 
-    /// The run these claims belong to, and the lines still owed for them.
     pub fn owed(self) -> (RunId, Vec<effect::Line>) {
         (self.run, self.put_backs.into_values().collect())
     }
 }
 
 impl ClaimBook {
-    /// Appends the claim's line and books the node for the asking run,
-    /// or refuses because another run in flight holds it, and sends the
-    /// answer back to the lane. A line the ledger refuses books nothing,
-    /// so no run holds a node the history does not show it holding.
-    ///
-    /// Hands back the line when the ledger took it, for the folds the
-    /// accounting thread shows every line it writes.
+
     pub fn answer(&mut self, ask: ClaimAsk, ledger: &mut impl Ledger) -> Option<EventDraft> {
         let ClaimAsk {
             building,
@@ -155,26 +106,15 @@ impl ClaimBook {
             }),
         };
         let taken = answer.is_ok().then_some(line);
-        // A lane that stopped listening keeps its booking until it comes
-        // home, which is what a lane that heard the answer would do.
+
         drop(back.send(answer));
         taken
     }
 
-    /// The mark a desk opened now carries: its plan copy holds every
-    /// stop the book has been shown.
     pub fn read_mark(&self) -> PlanRead {
         self.stops
     }
 
-    /// Shows the book one line the worker wrote. A finish, a split or a
-    /// block ends a node, and a claim from a desk that read the plan
-    /// before that line is refused; a hand-back makes the node ready
-    /// again for every desk.
-    ///
-    /// # Errors
-    /// Refuses a `roadmap_*` payload that does not read as a
-    /// [`RoadmapMoved`], as `PlanHolders::absorb` does.
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "four kinds end or reopen a node; the rest of the event vocabulary does not"
@@ -203,8 +143,6 @@ impl ClaimBook {
         Ok(())
     }
 
-    /// Lets go of every node the run held, once it has come home, and
-    /// hands over the lines that give them back.
     pub fn release(&mut self, run: RunId) -> OpenClaims {
         let (theirs, others): (BTreeMap<_, _>, BTreeMap<_, _>) = std::mem::take(&mut self.held)
             .into_iter()
@@ -220,9 +158,6 @@ impl ClaimBook {
     }
 }
 
-/// The booking a run's plan desk asks through: a claim carried on the
-/// accounting thread's one queue and waited for, like a relay append.
-/// The claim's instant is taken when the model makes it.
 pub(crate) fn booking(bell: mpsc::Sender<Wake>, claimant: Claimant) -> collab::Booking {
     collab::Booking::new(move |claim: &collab::ClaimEffect| {
         let not_a_claim = || {
@@ -282,7 +217,6 @@ mod tests {
     use super::{ClaimAsk, ClaimBook, Claimant};
     use kernel::{Address, AxError, EventDraft, EventKind, EventRef, NodeId, RunId};
 
-    /// The ledger the accounting thread writes to, keeping every line.
     #[derive(Default)]
     struct Kept(Vec<EventDraft>);
 
@@ -343,9 +277,6 @@ mod tests {
         answer.recv().unwrap().is_ok()
     }
 
-    /// Two lanes that read one plan ask for one node; the accounting
-    /// thread gives it to the first and refuses the second until the
-    /// first has come home.
     #[test]
     fn the_second_run_to_ask_for_a_node_is_refused_until_the_first_lands() {
         let mut book = ClaimBook::default();
@@ -369,11 +300,6 @@ mod tests {
         collab::ClaimTool::new(std::sync::Arc::new(std::sync::Mutex::new(desk))).unwrap()
     }
 
-    /// Two runs in flight read node 1 as ready from one snapshot. Their
-    /// desks ask through the production booking, the accounting thread
-    /// serves the queue, and the second claim is refused at the call with
-    /// the holder named. The one claim that was taken is on the ledger
-    /// before either run lands, and the refused one left no line.
     #[test]
     fn two_runs_claiming_one_node_through_the_served_gate_leave_one_holder() {
         use kernel::Tool;

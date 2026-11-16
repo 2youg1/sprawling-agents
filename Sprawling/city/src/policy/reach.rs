@@ -3,18 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a building's residents may write inside their prefixes, as one
-//! line of `RULES.toml` decides it (`DomainReach`).
-//!
-//! Specified by `Sprawling/city/spec/Policy.lean` §8-20.
-
 use kernel::{AxCode, AxError};
 
-/// What a building's residents may write inside their prefixes.
-///
-/// Exhaustive rather than a flag on the prefix list: "every file here"
-/// and "the Markdown documents here" are two policies, and City Hall
-/// exists because the second one had to be sayable.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DomainReach {
     Everything,
@@ -22,18 +12,7 @@ pub enum DomainReach {
 }
 
 impl DomainReach {
-    /// Reads the `write` key.
-    ///
-    /// **Absent is refused**, and the refusal is the caller's: this
-    /// function is handed a value and judges it. What it must not do is
-    /// read an unknown value as the wider reach — a permission setting
-    /// that reads as a typo resolves toward the side nobody chose, and
-    /// that side is the one that writes everywhere.
-    ///
-    /// # Errors
-    /// Refuses a value that is neither spelling, for the reason
-    /// `confidential` is refused: a permission setting that reads as a
-    /// typo must not resolve to the permissive side.
+
     pub(super) fn parse(value: &str) -> Result<DomainReach, AxError> {
         match value {
             "everything" => Ok(DomainReach::Everything),

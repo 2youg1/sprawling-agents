@@ -5,11 +5,6 @@
 
 use super::*;
 
-/// The default supplier, reached for real: the measurement city D25's
-/// mapping rests on, repeated through the production tool. It needs
-/// the public network, so it stays out of the required suite; run it
-/// by name with `--run-ignored only` when Exa's `tools/list` may have
-/// moved, and change `default_search_supplier` if it turns red.
 #[test]
 #[ignore = "reaches https://mcp.exa.ai/mcp over the public network; run it by name with --run-ignored only"]
 fn web_search_reaches_the_default_supplier_live() {

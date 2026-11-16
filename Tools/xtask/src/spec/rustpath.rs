@@ -3,16 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Backticked Rust paths and whether each names an item in the code
-//! (Tools/xtask/Spec.lean §8-42, assertion 7, and D24): the module map
-//! says which file a module is, and a lexical scan of that file says
-//! whether the next segment is declared or re-exported there.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::theorems::has_word;
 
-/// The keywords a declared item's name follows.
 const DECLARING: [&str; 10] = [
     "fn",
     "struct",
@@ -26,8 +20,6 @@ const DECLARING: [&str; 10] = [
     "macro_rules",
 ];
 
-/// The registered modules by path, each with the text of its file (empty
-/// when the file is not on disk yet) and the names it declares.
 pub(crate) struct Modules {
     files: BTreeMap<String, Module>,
     tops: BTreeSet<String>,
@@ -55,8 +47,6 @@ impl Modules {
         Self { files, tops }
     }
 
-    /// The backticked Rust paths in `line`: a code span that is exactly
-    /// `top::segment(::segment)*` with `top` a module map crate.
     pub(crate) fn paths_in<'l>(&self, line: &'l str) -> Vec<&'l str> {
         line.split('`')
             .skip(1)
@@ -73,12 +63,6 @@ impl Modules {
             .collect()
     }
 
-    /// Whether `path` names a module, or an item declared or re-exported
-    /// in the longest registered module it starts with. The segments after
-    /// the item (a variant, a method, a field) are words of the file that
-    /// declares the item: the module itself, or for a re-export, any module
-    /// of the same crate that declares it. A re-export from outside the
-    /// crate resolves by its name alone.
     pub(crate) fn resolves(&self, path: &str) -> bool {
         let segments: Vec<&str> = path.split("::").collect();
         let found = (1..=segments.len()).rev().find_map(|cut| {
@@ -105,15 +89,13 @@ impl Modules {
             .crate_files(top)
             .filter(|file| file.declared.contains(*first))
             .peekable();
-        // A re-export from another crate has no declaring file in this one,
-        // and only its name can be judged.
+
         match declaring.peek() {
             Some(_) => declaring.any(holds_rest),
             None => later.is_empty(),
         }
     }
 
-    /// Every registered module of crate `top`, its root too.
     fn crate_files<'s>(&'s self, top: &'s str) -> impl Iterator<Item = &'s Module> + 's {
         self.files
             .iter()
@@ -127,7 +109,6 @@ impl Modules {
     }
 }
 
-/// The names `text` declares an item under, at any visibility.
 fn declared(text: &str) -> BTreeSet<String> {
     let words: Vec<&str> = text
         .split(|c: char| !(c.is_alphanumeric() || c == '_'))
@@ -142,9 +123,6 @@ fn declared(text: &str) -> BTreeSet<String> {
         .collect()
 }
 
-/// Whether some `pub` or `pub(…)` `use` statement in `text` names `name`,
-/// or re-exports a module's every item with `*`; a private `use` brings a
-/// name into scope without making a path to it.
 fn reexports(text: &str, name: &str) -> bool {
     text.match_indices("use ").any(|(at, _)| {
         let lead = text

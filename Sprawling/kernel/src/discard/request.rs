@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Discard requests: restoration routes and the planned/unplanned shapes.
-//! The part `Sprawling/kernel/spec/Discard.lean` specifies this module with the
-//! rest of `kernel::discard`.
-
 use serde::{Deserialize, Serialize};
 
 use crate::address::Address;
@@ -15,8 +11,6 @@ use crate::error::{AxCode, AxError};
 use crate::locator::Locator;
 use crate::taint::TaintSet;
 
-/// Tracked rides git (`file:`), Interred rides CAS (`cas:`), Rebuildable
-/// names its reason. No fourth storage authority exists.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -26,8 +20,6 @@ pub enum Restoration {
     Rebuildable { reason: String },
 }
 
-/// A planned discard. Private fields; the sole constructor checks the
-/// plan's scheme — C14's type half.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Discard {
     paths: Vec<Address>,
@@ -37,10 +29,7 @@ pub struct Discard {
 }
 
 impl Discard {
-    /// Restoration is mandatory and scheme-checked: Tracked wants
-    /// `file:`, Interred wants `cas:`, Rebuildable wants a non-empty
-    /// reason — violations are `E_DISCARD_IRREVERSIBLE` (an unparsable
-    /// plan is no plan). Empty paths are `E_INVALID_ARGS`.
+
     pub fn new(
         paths: Vec<Address>,
         plan: Restoration,
@@ -96,8 +85,6 @@ impl Discard {
     }
 }
 
-/// What reaches the door: a planned discard, or an unplanned request
-/// from the exec forecast path (text prediction cannot mint plans).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DiscardRequest {
     Planned(Discard),
@@ -108,14 +95,10 @@ pub enum DiscardRequest {
     },
 }
 
-/// Why a discard is refused. Two reasons, and both are rules a person
-/// can read: a delete with no way back, and a delete a run asked for
-/// because something outside the city told it to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DenyReason {
     NoRestoration,
-    /// C15: an effect derived from outside content is refused rather
-    /// than carried out, whatever its size.
+
     Tainted,
 }
 
@@ -158,7 +141,7 @@ mod tests {
             )
             .is_ok()
         );
-        // Tracked with a cas: locator is an unresolvable plan.
+
         let wrong =
             Restoration::Tracked(Locator::parse(&format!("cas:b3-{}", "cd".repeat(32))).unwrap());
         let err = Discard::new(

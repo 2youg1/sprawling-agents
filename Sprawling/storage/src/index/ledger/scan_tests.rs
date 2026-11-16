@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The read lengths of the one segment scan that builds an index: the
-//! windowed read stops at a preallocated segment's zero tail (storage
-//! D33), and a grown segment costs exactly its length.
-
 use std::path::Path;
 
 use kernel::{EventDraft, EventKind, Payload, RunId, Seq, TimeMs};
@@ -16,11 +12,6 @@ use crate::fault_fs::{FaultFs, FaultPlan, TornTail};
 use crate::jsonl::{FIRST_WINDOW_BYTES, JsonlLedger};
 use crate::vfs::Vfs as _;
 
-/// A full scan reads a preallocated segment the way a refresh does:
-/// forward in windows, stopping at the window whose records end before
-/// the window does (storage D32 and D33). The segment is the roll size
-/// from the moment it is created, so a scan that lifted the whole file
-/// would pay every zero between the last record and the roll size.
 #[test]
 fn a_full_scan_stops_at_the_zero_tail_of_a_preallocated_segment() {
     let roll: u64 = 1024 * 1024;
@@ -62,10 +53,6 @@ fn a_full_scan_stops_at_the_zero_tail_of_a_preallocated_segment() {
     );
 }
 
-/// A segment that was never preallocated rebuilds as it did: every byte
-/// of it once, every record folded. The scan reads it in windows now,
-/// so the byte count must come out as the segment's length rather than
-/// as a whole number of windows.
 #[test]
 fn a_rebuild_of_a_grown_segment_reads_it_once_and_folds_every_record() {
     let fs = FaultFs::new(FaultPlan {

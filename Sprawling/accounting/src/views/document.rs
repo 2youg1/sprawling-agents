@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One file of the city, read once from disk and answered as a version
-//! (`Sprawling/accounting/spec/Views/Document.lean` §8-21, `Sprawling/wire/Spec.lean` §8-69).
-//!
-//! Every judgement - which version, whether the bytes are text, where
-//! the first window ends - is the `documents` crate's; this module reads
-//! the disk, keeps every version it reads in the content store, where
-//! any later question reads it by its version (`Sprawling/wire/spec/Answer/Document.lean`
-//! §8-69), and spells the answer. The same text judgement
-//! answers `Content` and `Prefix`, which read bytes out of the store
-//! rather than off the tree: what makes bytes readable does not depend on
-//! where they were kept.
-
 use std::path::Path;
 
 use documents::{Format, Lifted, Reading as Judged, Span};
@@ -26,7 +14,7 @@ use super::listing::resolve;
 use super::prepared::Prepared;
 
 impl Views {
-    /// A document is read off the disk after the views are released.
+
     pub(in crate::views) fn document_ask(&self, at: &Address) -> Prepared {
         Prepared::Document {
             city_root: self.city_root.clone(),
@@ -35,10 +23,6 @@ impl Views {
     }
 }
 
-/// One file of the tree as it stands at the moment of asking.
-///
-/// Takes the city root rather than the views: it reads the disk, and
-/// runs after the view lock is released (`Sprawling/app/Spec.lean` §8-100).
 pub(super) fn document_answer(city_root: &Path, at: Address) -> wire::DocumentAnswer {
     let state = match std::fs::read(resolve(city_root, Some(&at))) {
         Ok(bytes) => state_of(city_root, &at, &bytes),
@@ -50,13 +34,10 @@ pub(super) fn document_answer(city_root: &Path, at: Address) -> wire::DocumentAn
     wire::DocumentAnswer { at, state }
 }
 
-/// What one file's bytes are, as an answer.
 fn state_of(city_root: &Path, at: &Address, bytes: &[u8]) -> DocumentState {
     let version = B3Hash::digest(bytes);
     let format = Format::of_name(at.as_str());
-    // A version the store will not keep is not one a page can read on
-    // through, compare or fetch; saying so is better than an answer
-    // whose version leads nowhere.
+
     if let Err(err) = keep(city_root, bytes) {
         return DocumentState::Unreadable {
             reason: err.to_string(),
@@ -69,8 +50,7 @@ fn state_of(city_root: &Path, at: &Address, bytes: &[u8]) -> DocumentState {
         Judged::Opaque => DocumentBody::Opaque,
         Judged::Text(encoding) => match text_body(format, encoding, bytes) {
             Ok(body) => body,
-            // A version whose head cannot be cut is not one a page can
-            // read.
+
             Err(err) => {
                 return DocumentState::Unreadable {
                     reason: err.to_string(),
@@ -86,8 +66,6 @@ fn state_of(city_root: &Path, at: &Address, bytes: &[u8]) -> DocumentState {
     }))
 }
 
-/// The first window of a text version, and whether it covers the whole
-/// of it (`Sprawling/accounting/spec/Views/Document.lean` §8-21).
 fn text_body(
     format: Format,
     encoding: documents::Encoding,
@@ -106,12 +84,6 @@ fn text_body(
     })
 }
 
-/// Puts one version in the city's content store, where `Range`, `Bytes`
-/// and `Export` read it by the address that is also its version. A
-/// version already kept costs one existence check.
-///
-/// # Errors
-/// The store will not open or will not take the bytes.
 pub(crate) fn keep(city_root: &Path, bytes: &[u8]) -> Result<(), AxError> {
     let mut store = storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
         .map_err(storage::StorageError::into_ax)?;
@@ -125,8 +97,6 @@ fn length(bytes: &[u8]) -> u64 {
     u64::try_from(bytes.len()).unwrap_or(u64::MAX)
 }
 
-/// Bytes as `Content` and `Prefix` give them: the first window, with
-/// the cut and the text judgement stated.
 pub(super) struct Reading {
     pub(super) text: String,
     pub(super) bytes: u64,
@@ -153,9 +123,7 @@ pub(super) fn read_bytes(bytes: &[u8]) -> Reading {
             bytes: size,
             binary: false,
         },
-        // Bytes judged text always cut at a boundary; were the rules ever
-        // to disagree with themselves, what nobody can read is shown as
-        // nothing rather than as noise.
+
         Err(_) => opaque,
     }
 }
@@ -194,8 +162,6 @@ mod tests {
         bytes
     }
 
-    /// The rules that govern a building are readable through the tree,
-    /// whole, as the version on disk.
     #[test]
     fn a_governing_file_reads_back_whole_as_its_version() {
         let dir = tempfile::tempdir().unwrap();
@@ -212,8 +178,6 @@ mod tests {
         assert_eq!(head.text.as_bytes(), on_disk.as_slice());
     }
 
-    /// Nothing at the address, something there that will not read, and
-    /// an empty file are three answers, not one refusal.
     #[test]
     fn missing_unreadable_and_empty_are_three_answers() {
         let dir = tempfile::tempdir().unwrap();
@@ -239,8 +203,6 @@ mod tests {
         );
     }
 
-    /// A UTF-16 file holds a NUL beside every ASCII character; its mark
-    /// says it is text, and it is read as text.
     #[test]
     fn a_utf16_file_is_text_whatever_nul_it_holds() {
         let dir = tempfile::tempdir().unwrap();
@@ -271,8 +233,6 @@ mod tests {
         assert_eq!(held.bytes, 7);
     }
 
-    /// A file longer than one window answers its head, and the version
-    /// it read is in the store, where a range read finds it.
     #[test]
     fn a_long_file_answers_its_head_and_keeps_its_version() {
         let dir = tempfile::tempdir().unwrap();
@@ -290,8 +250,6 @@ mod tests {
         assert_eq!(held.version, B3Hash::digest(&long));
     }
 
-    /// Every version a read sees is kept, whole or not, text or not, so
-    /// an older version of any file can be read back by its version.
     #[test]
     fn every_version_a_read_sees_is_kept() {
         let dir = tempfile::tempdir().unwrap();
@@ -306,8 +264,6 @@ mod tests {
         assert!(store.contains(&scan.version), "an opaque version is kept");
     }
 
-    /// `Content` and `Prefix` keep their shape and take the same text
-    /// judgement: a NUL without a mark is not text, a long text is cut.
     #[test]
     fn stored_bytes_are_judged_and_cut_by_the_document_rules() {
         let opaque = read_bytes(b"redb\0\x01\x02");

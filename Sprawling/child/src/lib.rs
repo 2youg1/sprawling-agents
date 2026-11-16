@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one place a child process of the city is configured
-//! (`Sprawling/child/Spec.lean`).
-
 mod command;
 mod environment;
 

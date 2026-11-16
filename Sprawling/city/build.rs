@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Single embed point of the shipped skills: walks this package's
-//! `skills/` and writes `shipped_skills.rs` into `OUT_DIR`, one
-//! `(path, include_bytes!(..))` entry per file of every skill, which
-//! `library::shipped` includes (`Sprawling/city/spec/Library/Install.lean`
-//! §8-28c).
-//!
-//! The directory is inside this package because a crates.io archive
-//! carries this package's directory and nothing else (city D20). Only
-//! directories holding a `SKILL.md` are skills; the licence list beside
-//! them is not one, and it is added as a row of its own because the
-//! notice an adapted skill owes has to reach the copy a city shelves
-//! (city D37). Paths are written with `/` between segments and sorted,
-//! so the table is the same on every platform.
-
 use std::path::{Path, PathBuf};
 
 const SKILLS_DIR: &str = "skills";
@@ -67,8 +53,6 @@ fn listed(dir: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(found)
 }
 
-/// Every file under `dir`, named by its path from `root` in `/`-separated
-/// segments.
 fn collect(root: &Path, dir: &Path, files: &mut Vec<(String, PathBuf)>) -> Result<(), String> {
     for path in listed(dir)? {
         if path.is_dir() {

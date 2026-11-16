@@ -3,39 +3,21 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one-time code that pairs a device, from minting to the form a
-//! person copies (Sprawling/remote_access/Spec.lean §8-2).
-//!
-//! The door keeps only the code's digest. The text goes back to the
-//! caller, who shows it once, in a QR code and as characters; nothing in
-//! this crate holds it afterwards. Entropy arrives as a parameter, so the
-//! assembly layer is the one place a random byte is drawn.
-
 use kernel::B3Hash;
 
-/// RFC 4648 base32 in lower case: a QR code reader and a clipboard both
-/// carry it unchanged, and it has no symbol a URL must escape.
 const ALPHABET: &[u8; 32] = b"abcdefghijklmnopqrstuvwxyz234567";
 
-/// Bits one symbol carries.
 const SYMBOL_BITS: u32 = 5;
 
-/// Symbols per group in the form a person reads.
 const GROUP_LEN: usize = 5;
 
-/// The bytes of entropy one code is minted from: 128 bits, which no
-/// guessing within the ten minutes a code lives can approach.
 pub const CODE_BYTES: usize = 16;
 
-/// A pairing code, held as the digest of its canonical text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PairingCode(B3Hash);
 
 impl PairingCode {
-    /// Mints a code from caller-supplied entropy and returns it with the
-    /// text to show once, grouped for reading (`abcde-fghij-…`).
-    ///
-    /// Deterministic in `entropy`: the same bytes give the same code.
+
     #[must_use]
     pub fn mint(entropy: [u8; CODE_BYTES]) -> (Self, String) {
         let canonical = encode(&entropy);
@@ -53,19 +35,12 @@ impl PairingCode {
         (Self(B3Hash::digest(canonical.as_bytes())), shown)
     }
 
-    /// The code a person typed or pasted, read the way it was shown:
-    /// case, spaces and dashes do not matter.
-    ///
-    /// Any text reads as some code; a wrong one matches no pending
-    /// pairing, and the door answers that, so this cannot fail.
     #[must_use]
     pub fn read(typed: &str) -> Self {
         Self(B3Hash::digest(canonical(typed).as_bytes()))
     }
 }
 
-/// A code as a person typed it, in the one form it was minted in: case,
-/// spaces and dashes removed. The pairing handshake carries this form.
 pub(crate) fn canonical(typed: &str) -> String {
     typed
         .chars()
@@ -74,13 +49,10 @@ pub(crate) fn canonical(typed: &str) -> String {
         .collect()
 }
 
-/// Whether `byte` is one of the 32 symbols the canonical text is made of.
 pub(crate) fn is_symbol(byte: u8) -> bool {
     ALPHABET.contains(&byte)
 }
 
-/// Base32 without padding. Every chunk of five bits becomes one symbol;
-/// the last symbol carries the leftover bits in its high end.
 pub(crate) fn encode(bytes: &[u8]) -> String {
     let mut out = String::new();
     let mut buffer: u32 = 0;
@@ -100,10 +72,6 @@ pub(crate) fn encode(bytes: &[u8]) -> String {
     out
 }
 
-/// Base32 back to bytes, or `None` at the first character outside the
-/// alphabet. Leftover bits at the end are dropped, so several texts read
-/// as the same bytes; a caller that accepts only the one canonical text
-/// encodes the bytes again and compares.
 pub(crate) fn decode(text: &str) -> Option<Vec<u8>> {
     let mut out = Vec::new();
     let mut buffer: u32 = 0;
@@ -153,7 +121,7 @@ mod tests {
 
     #[test]
     fn the_code_is_rfc_4648_base32_of_its_entropy() {
-        // RFC 4648 section 10: BASE32("foobar") = "MZXW6YTBOI======".
+
         assert_eq!(encode(b"foobar"), "mzxw6ytboi");
         let (_, shown) = PairingCode::mint([0xff; CODE_BYTES]);
         assert_eq!(shown.chars().filter(|each| *each != '-').count(), 26);

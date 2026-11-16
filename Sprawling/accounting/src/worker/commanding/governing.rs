@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The verbs a person sends, and what each one does to the city.
-
 use kernel::event::Scope;
 use kernel::event::record::{
     Admittance, ApprovalResolved, AutonomyChanged, CityHalted, GovernedDocumentWritten, RunStarted,
@@ -15,20 +13,7 @@ use kernel::{Address, AxCode, AxError, EventKind, Payload, RunId, Seq};
 use super::super::{RunWorker, Unasked, scope_of};
 
 impl RunWorker {
-    /// Shuts a scope to new work, or opens it again.
-    ///
-    /// Halting shuts a scope to new work, and stops the background
-    /// commands that scope already started.
-    ///
-    /// It still does not end a run: stopping a run in flight is
-    /// `Cancel`, and one verb that did both would leave a person unable
-    /// to ask for either alone. What changed (`Sprawling/runtime/Spec.lean` §8-28) is that
-    /// a background command is not a run. It is a child process nobody
-    /// could reach, because a run waiting on one is inside a system call
-    /// rather than at a phase boundary; leaving it going would make
-    /// "this city is stopped" false in the one case where it matters
-    /// most. The refusal a halted city gives a dispatch says which scope
-    /// refused and how to open it.
+
     pub(in crate::worker) fn set_admission(
         &mut self,
         scope: &wire::HaltScope,
@@ -50,8 +35,7 @@ impl RunWorker {
                 );
             }
         }
-        // Recorded and nothing else: the fold reads `city_halted` and
-        // sets the scope, in the one place a restart reads it too.
+
         self.record(
             EventKind::CityHalted,
             Payload::of(&CityHalted {
@@ -61,11 +45,6 @@ impl RunWorker {
         )
     }
 
-    /// Which shut scope covers this address, if one does.
-    ///
-    /// The city covers everything; a building or a workshop covers what
-    /// is inside it, by the same containment `WriteDomain` uses, so
-    /// "inside" means one thing in this city rather than two.
     pub(in crate::worker) fn halted_by(&self, addr: &Address) -> Option<Scope> {
         self.governance
             .halted
@@ -74,10 +53,6 @@ impl RunWorker {
             .cloned()
     }
 
-    /// Records who may answer for a scope from now on.
-    ///
-    /// The current value is folded from the ledger rather than mirrored
-    /// anywhere: what the panel shows is what a replay can verify.
     pub(in crate::worker) fn set_autonomy(
         &mut self,
         scope: &wire::HaltScope,
@@ -92,14 +67,6 @@ impl RunWorker {
         )
     }
 
-    /// Answers one approval item.
-    ///
-    /// The rule lives in `kernel::approval`: humans answer everything, a
-    /// resident answers only as the appointed delegate, never the three
-    /// classes, never a tainted item, and never its own action. This
-    /// method is where production consults it, so a delegate answering
-    /// its own item is refused on the same path the person's answer
-    /// takes rather than on a parallel one.
     pub(in crate::worker) fn answer_approval(
         &mut self,
         item: &kernel::ApprovalId,
@@ -134,60 +101,26 @@ impl RunWorker {
                 ));
             }
         }
-        // The cluster travels with the answer. The person was shown a
-        // group and answered the group, so what a resumed run may do
-        // without asking again is exactly that group — and reading it
-        // back from the ledger is what makes the answer survive a
-        // restart.
+
         let answered = Payload::of(&ApprovalResolved {
             id: item.clone(),
             verdict,
             cluster: pending.cluster_key.clone(),
         })?;
-        // Read before the answer is recorded, because recording it is
-        // what closes the item: the fold drops the origin along with the
-        // pending entry, and carrying the work on is this method's job
-        // rather than the record's.
+
         let blocked = self.governance.origins.get(item.as_str()).cloned();
         self.record(EventKind::ApprovalResolved, answered)?;
-        // The cluster the person allowed and the closing of the item are
-        // both folded from the line just written. Setting either field
-        // here as well would be a second authority for a rule the fold
-        // already holds.
+
         if verdict == kernel::Ruling::Allow
             && let Some(job) = blocked
             && let Some(sent) = self.sent_out(job.run)?
         {
-            // The work the person just unblocked carries on without
-            // them: an answer that still needed the same command typed
-            // again would make the inbox a place to acknowledge things
-            // rather than a place to decide them. This is the same piece
-            // of work, interrupted.
-            //
-            // Into a lane, so that answering one item does not hold the
-            // desk for the length of the run it releases; a person
-            // answering a queue of approvals would otherwise wait minutes
-            // between two clicks (`Sprawling/app/Spec.lean` §8-46-2). The
-            // room it was interrupted in already exists, so no session
-            // is opened.
-            // The start reports its own refusal; there is no run id to
-            // carry back here, because the person already left this desk.
+
             self.start_unasked(job.addr, sent.task, sent.goal, Unasked::Unblocked);
         }
         Ok(())
     }
 
-    /// What `run` was sent to do, read back from its `run_started`
-    /// through the side index: the run's lines oldest first, until that
-    /// record. `None` when the history holds no `run_started` for it.
-    ///
-    /// The read is positional and its pages stay in the operating
-    /// system's file cache, so this process keeps no copy of any run's
-    /// task (`Sprawling/app/spec/Accounting/Worker.lean` §8-25).
-    ///
-    /// # Errors
-    /// A ledger that cannot be listed or read, and a line of the run that
-    /// is no record.
     fn sent_out(&mut self, run: RunId) -> Result<Option<RunStarted>, AxError> {
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         self.index
@@ -213,19 +146,6 @@ impl RunWorker {
         Ok(None)
     }
 
-    /// Writes one of the three documents that govern this city, only if
-    /// it still holds `base`, and records that it happened.
-    ///
-    /// The bytes go to disk and the line goes to the Ledger. The line
-    /// carries which document, how long it is and the identity version
-    /// it leaves, never the text: the document is on disk and readable,
-    /// and copying it into history would put the same words under two
-    /// authorities that later disagree.
-    ///
-    /// # Errors
-    /// Propagates an identity area that does not read, a document that
-    /// is no longer `base`, a reserved subtree that cannot be written,
-    /// and a history that will not take the line announcing it.
     pub(in crate::worker) fn put_document(
         &mut self,
         which: wire::GovernedDocument,
@@ -241,13 +161,6 @@ impl RunWorker {
         self.governed_written(which, body.len(), naming)
     }
 
-    /// The identity version the city has now, for the receipt of a write
-    /// to a document that carries names; `None` when the other document's
-    /// identity area does not read, so the city has no names to give a
-    /// version of, and the page learns why from `Query::Identity`.
-    ///
-    /// # Errors
-    /// A governed document that cannot be read at all.
     pub(in crate::worker) fn naming_version(&self) -> Result<Option<kernel::B3Hash>, AxError> {
         match city::read_naming(&self.city_root)? {
             Ok(naming) => Ok(Some(naming.version()?)),
@@ -255,16 +168,6 @@ impl RunWorker {
         }
     }
 
-    /// Writes one identity card into its document, only if the document
-    /// still holds `base`, and records that it happened with the identity
-    /// version it leaves: the receipt a page waits for (`Sprawling/wire/Spec.lean`
-    /// §8-59).
-    ///
-    /// # Errors
-    /// Propagates a name outside its domain, an identity area in `base`
-    /// that does not read, a document that is no longer `base`, a
-    /// reserved subtree that cannot be written, and a history that will
-    /// not take the line announcing it.
     pub(in crate::worker) fn put_identity(
         &mut self,
         card: &wire::IdentityCard,
@@ -279,7 +182,6 @@ impl RunWorker {
         )
     }
 
-    /// The line that announces one governed document landed.
     fn governed_written(
         &mut self,
         which: city::Governed,
@@ -298,21 +200,6 @@ impl RunWorker {
         )
     }
 
-    /// Writes one of a building's own spine documents, and records that
-    /// it happened.
-    ///
-    /// Written through `city::edit_against`, so a resident writing
-    /// `Roadmap.md` through `plan` cannot be lost between this frame's
-    /// read and its write. `base` is the text the sender started from,
-    /// and a file that has moved is refused: these documents have two
-    /// writers, which is exactly the case [`Self::put_document`] says it
-    /// does not have, so the two doors hold different guards.
-    ///
-    /// # Errors
-    /// Refuses when the file is no longer the text the sender started
-    /// from, when it cannot be read for any other reason, when the
-    /// write will not land, and when the history will not take the line
-    /// announcing it.
     pub(in crate::worker) fn put_spine(
         &mut self,
         building: &Address,
@@ -334,7 +221,6 @@ impl RunWorker {
     }
 }
 
-/// The file name one spine document is written to.
 fn spine_name(which: wire::SpineDocument) -> &'static str {
     match which {
         wire::SpineDocument::Roadmap => city::ROADMAP_FILE,

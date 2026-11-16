@@ -3,12 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The window partition: which kinds decide model-request bytes.
-
 use super::EventKind;
 
-/// The two-way partition; the sole criterion is "does the payload decide
-/// model-request bytes" (C16). There is no third class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowClass {
     InWindow,
@@ -16,8 +12,7 @@ pub enum WindowClass {
 }
 
 impl EventKind {
-    /// The partition authority. Exhaustive on purpose: adding a variant
-    /// without deciding its class is a compile error, not a default.
+
     pub fn window_class(&self) -> WindowClass {
         match self {
             EventKind::PromptAssembled
@@ -29,11 +24,9 @@ impl EventKind {
             | EventKind::SteerReceived
             | EventKind::SignalConsumed
             | EventKind::AdviserAnswered
-            // The run under way appends one sentence about the new policy
-            // to its next message, so the line decides request bytes.
+
             | EventKind::RunPolicyChanged
-            // The next call is told whether a reply or the deadline woke
-            // the run, so both lines decide request bytes (kernel D32).
+
             | EventKind::SignalWaitStarted
             | EventKind::SignalWaitEnded => WindowClass::InWindow,
             EventKind::CityInitialized
@@ -41,12 +34,9 @@ impl EventKind {
             | EventKind::BuildingConfigured
             | EventKind::BuildingRemoved
             | EventKind::RunStarted
-            // Starting a session decides what the next run is given, and
-            // the bytes it is given are recorded by `prompt_assembled`;
-            // nothing here belongs to a window already on the wire.
+
             | EventKind::SessionOpened
-            // The cache shape measures what a request carries; it never
-            // decides any of those bytes.
+
             | EventKind::PromptShapeCompared
             | EventKind::RunForked
             | EventKind::GateChecked
@@ -101,58 +91,41 @@ impl EventKind {
             | EventKind::AutonomyChanged
             | EventKind::WentBack
             | EventKind::FileRestored
-            // Connecting an application changes which tools a later run
-            // is offered, and the tool table is assembled from the
-            // configuration rather than from this line, so nothing here
-            // decides model-request bytes.
+
             | EventKind::ToolkitLinkOpened
-            // An embedding or a rerank is a call for a derived value,
-            // not a turn of the conversation: the window's bytes are
-            // recorded by `prompt_assembled`, and the answer here is
-            // recorded so a cost can be read off the history.
+
             | EventKind::EmbeddingCalled
             | EventKind::RerankCalled
             | EventKind::AdviserAsked
-            // The fallback records that the city's own policy answered
-            // instead; the move it made is already written where the
-            // move itself is written.
+
             | EventKind::AdviserFellBack
             | EventKind::GovernedDocumentWritten
             | EventKind::SpineDocumentWritten
             | EventKind::RulesChanged
-            // A renewal resends a prefix already on the wire and changes
-            // no byte of any later request; the line records its cost.
+
             | EventKind::CacheRenewed
-            // What a harness said or answered never decides a request
-            // this city sends.
+
             | EventKind::HarnessReported
             | EventKind::HarnessAnswered
-            // Who may reach the city from outside its machine decides no
-            // byte a model is sent.
+
             | EventKind::RemoteOpened
             | EventKind::RemoteClosed
             | EventKind::DevicePaired
             | EventKind::DeviceRevoked
             | EventKind::RemoteSessionStarted
-            // A save, and a person's verdicts on a suggestion, change a
-            // file on disk; a later run reads that file, never this line.
+
             | EventKind::DocumentWritten
             | EventKind::ProposalOffered
             | EventKind::ProposalDecided
             | EventKind::ProposalWithdrawn
-            // A session's name is what a page shows, and an audit is what
-            // an auditor said about a skill; neither reaches a request.
+
             | EventKind::SessionNamed
             | EventKind::SkillAudited
-            // The sender already read its tool's answer; where the letter
-            // landed is what a page draws (kernel D38).
+
             | EventKind::SignalLanded
-            // Who put which version of a skill on a shelf is what the
-            // skill page shows; a run reads the skill, never this line.
+
             | EventKind::SkillShelved
-            // A wait at the gate changes no byte of the request that
-            // waited; the line says why it went out late and what the
-            // pre-warm cost (kernel D61).
+
             | EventKind::PrefixHeld => WindowClass::RecordOnly,
         }
     }

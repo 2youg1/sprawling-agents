@@ -15,19 +15,12 @@ fn exited(code: i32, stdout: &str) -> Ended {
     }
 }
 
-/// `fsutil devdrv query C:` run by an ordinary user on a Windows set to
-/// Chinese: "cannot open the volume / error 5: access denied" in the
-/// console's code page, and exit code 1. The bytes are kept as recorded,
-/// so the test reads what `asking` would hand over.
 const REFUSED_IN_GBK: [u8; 34] = [
     0xce, 0xde, 0xb7, 0xa8, 0xb4, 0xf2, 0xbf, 0xaa, 0xbe, 0xed, 0xa1, 0xa3, 0x0d, 0x0a, 0xb4, 0xed,
     0xce, 0xf3, 0x20, 0x35, 0x3a, 0x20, 0xbe, 0xdc, 0xbe, 0xf8, 0xb7, 0xc3, 0xce, 0xca, 0xa1, 0xa3,
     0x0d, 0x0a,
 ];
 
-/// A refusal is not an answer, and a localized one is not either: the
-/// doctor says it cannot tell, naming the tool, rather than reading a
-/// non-ReFS answer into a sentence it cannot read.
 #[test]
 fn fsutil_refusing_an_ordinary_user_reads_as_cannot_tell() {
     let refused = Ended::Exited {
@@ -50,9 +43,6 @@ fn fsutil_refusing_an_ordinary_user_reads_as_cannot_tell() {
     );
 }
 
-/// The three standings fsutil states in its first sentence, in the
-/// wording of its published examples; the filter lines after it say
-/// "developer volume" too and decide nothing.
 #[test]
 fn the_statement_fsutil_prints_says_whether_the_volume_is_a_dev_drive() {
     let filters = "Developer volumes are protected by antivirus filter, by default.\r\n\
@@ -86,8 +76,6 @@ fn the_statement_fsutil_prints_says_whether_the_volume_is_a_dev_drive() {
     );
 }
 
-/// `(Get-MpPreference).ExclusionPath` run by an ordinary user, exit 0,
-/// as recorded: Defender keeps the list for administrators.
 #[test]
 fn defender_hiding_its_exclusions_reads_as_cannot_tell() {
     let hidden = exited(0, "N/A: Must be an administrator to view exclusions\r\n");
@@ -105,9 +93,6 @@ fn defender_hiding_its_exclusions_reads_as_cannot_tell() {
     );
 }
 
-/// An exclusion holds the city when it is the city or an ancestor at a
-/// separator, in any case; a sibling sharing a prefix, a variable and a
-/// wildcard do not.
 #[test]
 fn an_exclusion_covers_the_city_only_at_a_directory_boundary() {
     let city = Path::new(r"D:\Work\city");
@@ -131,8 +116,6 @@ fn an_exclusion_covers_the_city_only_at_a_directory_boundary() {
     assert_eq!(listed(""), Exclusion::Outside, "no exclusions at all");
 }
 
-/// A city scanning stands in front of gets both ways out, the second as
-/// a command a person can paste; a city on a trusted Dev Drive gets none.
 #[test]
 fn the_advice_names_the_command_that_would_exclude_the_city() {
     let city = PathBuf::from(r"D:\cities\o'neil");

@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One call whose body is read as it arrives.
-//!
-//! **Separated from `call` because they change for different
-//! reasons.** Writing a request on the wire moves when a provider grows
-//! a field; reading a body in parts moves when what "in parts" has to
-//! mean changes - and it did, once, from "read it all, then walk the
-//! lines" to "walk the lines as they land".
-
 use std::io::BufRead as _;
 
 use kernel::{AxError, ModelRequest, ModelReturn};
@@ -22,20 +14,7 @@ use super::config::Endpoint;
 use super::failure::{ProviderFailure, provider_err};
 
 impl Endpoint {
-    /// One call, with the body read as it arrives.
-    ///
-    /// **The answer is still the whole answer.** This asks the provider
-    /// to stream, reports the text as it lands, and then reads the
-    /// settled response out of the terminal frame — so what comes back
-    /// is what a non-streaming call would have returned, and a stream cut
-    /// halfway is a body read error rather than a shortened reply. The
-    /// increments are a thing to watch; they are never the record.
-    ///
-    /// Two dialects carry a settled answer at the end of their stream in
-    /// two shapes, and neither is worth a second parser: the request asks
-    /// for a stream only when the caller wants increments, and the reply
-    /// is reassembled through the same `response_from_wire` a blocking
-    /// call uses.
+
     pub(crate) fn stream(
         &mut self,
         req: &ModelRequest,
@@ -45,12 +24,7 @@ impl Endpoint {
         let mut wire = self.wire_request(req)?;
         if let Some(map) = wire.as_object_mut() {
             map.insert("stream".to_owned(), Value::Bool(true));
-            // **This wire reports no usage in a stream unless it is
-            // asked to.** Without the flag every streamed call bills
-            // something and accounts for nothing, so the cost page reads
-            // zero for exactly the calls a person watched arrive. The
-            // Anthropic stream carries its counts in `message_delta` and
-            // needs no equivalent.
+
             if matches!(self.config.dialect, kernel::DialectKind::OpenAi) {
                 map.insert(
                     "stream_options".to_owned(),
@@ -59,11 +33,7 @@ impl Endpoint {
             }
         }
         let request = self.chat_post(req)?.header("accept", "text/event-stream");
-        // **A streamed call carries no deadline of its own.** The
-        // transport reads the whole body under one deadline, so any
-        // figure written here would cut an answer for being long; the
-        // bound a person set is a silence, and [`Endpoint::lines_of`]
-        // is where it is applied.
+
         let mut sending = request
             .json(&wire)
             .build()
@@ -75,8 +45,7 @@ impl Endpoint {
             .map_err(|err| provider_err("call provider", &ProviderFailure::Exchange(&err)))?;
         let status = response.status();
         if !status.is_success() {
-            // The headers outlive the body read: a retry-after is read
-            // off them after `text` has taken the response.
+
             let headers = response.headers().clone();
             return Err(provider_err(
                 "call provider",
@@ -88,9 +57,7 @@ impl Endpoint {
                 ),
             ));
         }
-        // A provider that ignores `stream: true` answers with the
-        // settled body itself, and HTTP says so in the media type; read
-        // as frames it holds none and would fail as a cut stream.
+
         let settled = if answers_whole(&response) {
             let mut body = String::new();
             self.lines_of(response, |line| {
@@ -117,37 +84,18 @@ impl Endpoint {
                 }
                 Ok(())
             })?;
-            // A cut stream is a provider failure, never a shortened
-            // reply: a return is built from the settled frame, and a
-            // body that ended before that frame arrived has none.
+
             frames.finish()?
         };
         self.returned(&settled)
     }
 
-    /// Every line of the body, handed to `each` as it lands and given
-    /// up on after one silence too long.
-    ///
-    /// **The body is read on a thread of its own so that a silence can
-    /// be measured.** A blocking read cannot be interrupted, and the
-    /// transport's own deadline covers the whole answer rather than the
-    /// gaps in it; a reader beside the caller turns "nothing has
-    /// arrived for this long" into a value the caller can act on, which
-    /// is what the setting has said all along.
-    ///
-    /// The cost is named rather than hidden: when a provider goes
-    /// silent and holds the connection open, the reader stays blocked
-    /// on it until the provider closes it. Ending the call is what a
-    /// person asked for; ending the connection is the provider's, and
-    /// no answer of ours can take it away from them.
     fn lines_of(
         &self,
         response: reqwest::blocking::Response,
         mut each: impl FnMut(String) -> Result<(), AxError>,
     ) -> Result<(), AxError> {
-        // The stream's own bound when it has one, and the settled
-        // call's when it does not: a stream nobody bounded separately
-        // is still not allowed to go quiet forever.
+
         let quiet_ms = self
             .config
             .stream_idle_timeout_ms
@@ -171,8 +119,7 @@ impl Endpoint {
                         &ProviderFailure::Cut(&err),
                     ));
                 }
-                // The reader reached the end of the body and dropped
-                // its end of the channel, which is how a stream ends.
+
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => return Ok(()),
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     return Err(provider_err(
@@ -186,9 +133,6 @@ impl Endpoint {
     }
 }
 
-/// Whether the provider answered with one settled body rather than a
-/// stream: the media type says `application/json`. An absent type is
-/// read as the stream the request asked for.
 fn answers_whole(response: &reqwest::blocking::Response) -> bool {
     response
         .headers()
@@ -198,19 +142,13 @@ fn answers_whole(response: &reqwest::blocking::Response) -> bool {
         .is_some_and(|media| media.trim().eq_ignore_ascii_case("application/json"))
 }
 
-/// The frame one line of an event stream carries, when it carries one.
 fn frame_of(line: &str) -> Option<Value> {
     let payload = line.strip_prefix("data:")?.trim();
-    // The sentinel one dialect ends with. It is not JSON, and treating
-    // it as an unreadable frame would turn every successful stream into
-    // a warning.
+
     if payload.is_empty() || payload == "[DONE]" {
         return None;
     }
-    // A frame this build cannot read is skipped rather than fatal:
-    // providers add event types, and a person watching text arrive must
-    // not lose a call because one of them was new. What cannot be
-    // skipped is the settled answer, and the caller checks that.
+
     serde_json::from_str::<Value>(payload).ok()
 }
 
@@ -235,8 +173,6 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
-    /// One complete answer, frame by frame, in the shape the Anthropic
-    /// stream carries it.
     fn whole_answer() -> Vec<String> {
         vec![
             serde_json::json!({
@@ -271,12 +207,6 @@ mod tests {
         ]
     }
 
-    /// **The bound is a silence, not a length.** Five frames 300 ms
-    /// apart run for one and a half seconds under an 800 ms bound: a
-    /// deadline would have cut this answer in half, and the model was
-    /// writing the whole time. This is the case a person met as an
-    /// answer truncated at five minutes while the wire called the
-    /// setting an idle timeout.
     #[test]
     fn a_model_that_keeps_writing_is_never_cut_off_for_writing_at_length() {
         let (url, server) =
@@ -301,9 +231,6 @@ mod tests {
         server.join().unwrap();
     }
 
-    /// A provider that stops mid-answer is given up on one bound after
-    /// its last byte, and the refusal states the bound rather than the
-    /// transport's own wording.
     #[test]
     fn a_stream_that_falls_silent_is_given_up_on_and_says_for_how_long() {
         let (url, server) = paced_stream_provider(
@@ -332,17 +259,6 @@ mod tests {
         server.join().unwrap();
     }
 
-    /// **A stream nobody forwards is a stream in name only.** The
-    /// request asked for `stream: true`, the provider answered in
-    /// increments, and the reader called `.text()` - which finishes only
-    /// at the end of the body. Every increment then reached the page in
-    /// one burst after the model had already stopped: measured against a
-    /// real provider as `model_called` at 1.9 s, twenty-five deltas in
-    /// one millisecond at 11.9 s, then `model_returned`.
-    ///
-    /// The provider fixture answers the question itself: it will not
-    /// write its closing frames until it hears that the opening ones
-    /// were handed on.
     #[test]
     fn increments_reach_the_caller_while_the_body_is_still_arriving() {
         let opening = vec![
@@ -388,9 +304,7 @@ mod tests {
                 return;
             };
             said.borrow_mut().push(text.clone());
-            // Reported once: the fixture needs to hear that one
-            // increment arrived, and a closed channel afterwards is not
-            // a failure of the thing under test.
+
             let _ = saw_opening.send(());
         };
         let ret = endpoint.stream(&request(), &mut onto, &mut |_| {}).unwrap();

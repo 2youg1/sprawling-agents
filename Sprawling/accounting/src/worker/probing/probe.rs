@@ -3,31 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A versioned probe: the same questions, asked twice, to see whether
-//! something survived a boundary.
-//!
-//! The first object is the Handoff, and the shape comes from what that
-//! has to prove: ask before the freeze, ask after the resume, compare.
-//! If the answers differ, the handoff lost something, and the probe says
-//! which question lost it rather than reporting a score.
-//!
-//! **Probes are versioned and results never mix across versions.** A
-//! probe whose questions changed is a different instrument, and
-//! comparing its readings with the old one measures the instrument. The
-//! comparison refuses it rather than averaging it away.
-
 use kernel::{AxCode, AxError};
 
-/// A probe's identity and edition. Both are compared; neither is a
-/// timestamp, because two probes built on the same day are still two
-/// probes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ProbeId {
     pub name: String,
     pub version: u32,
 }
 
-/// The questions, in the order they are asked.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Probe {
     id: ProbeId,
@@ -35,10 +18,7 @@ pub(crate) struct Probe {
 }
 
 impl Probe {
-    /// # Errors
-    /// Refuses a probe with no questions, and one with a blank question:
-    /// a blank cannot be answered, so it would read as a loss on every
-    /// comparison for as long as it stayed in the list.
+
     pub fn new(id: ProbeId, questions: Vec<String>) -> Result<Probe, AxError> {
         if questions.is_empty() {
             return Err(AxError::failure(
@@ -71,14 +51,6 @@ impl Probe {
         &self.questions
     }
 
-    /// Binds answers to this probe. The probe does not gather them: what
-    /// asks the questions is a Run, and this crate is never in the loop
-    /// that produces the material it measures.
-    ///
-    /// # Errors
-    /// Refuses a set of answers that is not the same length as the
-    /// questions — a shorter one would silently compare question three
-    /// against question four.
     pub fn answered(&self, answers: Vec<String>) -> Result<Answers, AxError> {
         if answers.len() != self.questions.len() {
             return Err(AxError::failure(
@@ -101,14 +73,6 @@ impl Probe {
     }
 }
 
-/// The handoff probe, edition 1: four questions a successor has to be
-/// able to answer from what it was handed, or the handoff lost it.
-///
-/// Data, not a decision. Changing a question is edition 2, and
-/// [`compare`] refuses to set the two editions against each other.
-///
-/// # Errors
-/// Cannot fail on this fixed list; the `Result` is the constructor's.
 pub(crate) fn handoff_probe() -> Result<Probe, AxError> {
     Probe::new(
         ProbeId {
@@ -127,7 +91,6 @@ pub(crate) fn handoff_probe() -> Result<Probe, AxError> {
     )
 }
 
-/// One reading.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Answers {
     id: ProbeId,
@@ -135,29 +98,20 @@ pub struct Answers {
 }
 
 impl Answers {
-    /// The answers, in question order. A reader compares two sets by
-    /// eye; `compare` only says which positions differ.
+
     #[must_use]
     pub fn answers(&self) -> &[String] {
         &self.answers
     }
 }
 
-/// What survived and what did not.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Comparison {
     pub kept: u32,
-    /// The indices whose answers differ, in order. Indices rather than
-    /// text: the probe says where the loss is, and the person reads the
-    /// two answers themselves rather than trusting a summary of them.
+
     pub lost: Vec<u32>,
 }
 
-/// Compares two readings of the same probe.
-///
-/// # Errors
-/// Refuses two different probes and two editions of one probe. Mixing
-/// them measures the instrument rather than the thing.
 pub fn compare(before: &Answers, after: &Answers) -> Result<Comparison, AxError> {
     if before.id != after.id {
         return Err(AxError::failure(

@@ -3,28 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The execution boundary: a seam with one method,
-//! behind which a guest program runs with exactly the capabilities it
-//! was handed and no others.
-//!
-//! **This is the guest half.** A plain host command — the exec tool's
-//! program and shell arms — is not a guest, so its isolation is bought
-//! from the platform instead; `runtime::tools` owns that half, names
-//! the arm in use, and states what the arm does not promise.
-//!
-//! The capability surface is the preopen set. A guest can reach a host
-//! directory if and only if a [`Mount`] named it; there is no ambient
-//! filesystem, no environment inheritance, and — because wasip1 has no
-//! socket host implementation — no network. That last one matters: the
-//! Python arm cannot reach the network, and the proof is structural
-//! rather than a rule someone remembered to write down.
-//!
-//! Fuel exhaustion is an outcome, not an error. Running out of fuel is
-//! the guest doing something the budget did not cover, which the caller
-//! must see and decide about; `Err` here is reserved for the host
-//! failing to run the job at all. The distinction is what lets a
-//! watchdog treat a runaway loop differently from a broken engine.
-
 use std::num::NonZeroU64;
 use std::path::PathBuf;
 
@@ -32,14 +10,9 @@ use kernel::{AxCode, AxError};
 
 use crate::backlog::{Ceiling, Shares};
 
-/// Instruction budget. Exhaustion ends the guest; it does not fail the
-/// host.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Fuel(pub u64);
 
-/// One granted capability: a host directory visible to the guest under
-/// `guest`, writable or not. The mount list is the whole of what the
-/// job can reach.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Mount {
     pub host: PathBuf,
@@ -47,23 +20,16 @@ pub struct Mount {
     pub writable: bool,
 }
 
-/// How far a guest's linear memory may grow
-/// (`Sprawling/runtime/spec/Sandbox.lean` D102).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GuestMemory {
-    /// No ceiling of the run's: only wasm32's 4 GiB address space bounds
-    /// the guest, as the ruling behind `Sprawling/runtime/spec/Tools/Exec.lean` D95 leaves a run
-    /// with no default ceiling.
+
     Wasm32,
-    /// The run's own ceiling, the same bytes its processes may commit
-    /// together; a growth past it is refused and the guest decides how to
-    /// end.
+
     Ceiling(NonZeroU64),
 }
 
 impl GuestMemory {
-    /// The ceiling a run's guest runs under: the memory half of the run's
-    /// shares, which is the one place that number is decided.
+
     #[must_use]
     pub fn of_shares(shares: Shares) -> GuestMemory {
         match shares {
@@ -89,15 +55,10 @@ pub struct SandboxOutcome {
     pub stdout: Vec<u8>,
     pub stderr: Vec<u8>,
     pub exit: SandboxExit,
-    /// `Some(Ceiling::Hit)` when a growth of the guest was refused at
-    /// [`GuestMemory::Ceiling`]; `None` when nothing was refused or no
-    /// ceiling was asked for. No other variant arises here: a guest runs
-    /// inside the process, so its ceiling is always applied and always read.
+
     pub ceiling: Option<Ceiling>,
 }
 
-/// How the guest ended. Every variant is a fact about the guest — the
-/// host never hides a guest failure behind a success.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SandboxExit {
     Success,
@@ -106,20 +67,10 @@ pub enum SandboxExit {
     Trap { message: String },
 }
 
-/// The seam. One method: hand it a job, get back what the guest did.
-/// `Send`, because the `exec` tool that holds one is `Send`
-/// (`Sprawling/app/Spec.lean` §8-44); every adapter here already was.
 pub trait Sandbox: Send {
     fn run(&mut self, job: &SandboxJob) -> Result<SandboxOutcome, AxError>;
 }
 
-/// What a binary built without an execution engine offers: a refusal
-/// that names the missing piece.
-///
-/// It exists so the absence is a verdict rather than a stand-in. An
-/// echo in this position would answer "success" to a guest that never
-/// ran, and the first person to notice would be whoever trusted the
-/// output.
 pub struct AbsentSandbox;
 
 impl Sandbox for AbsentSandbox {
@@ -133,9 +84,6 @@ impl Sandbox for AbsentSandbox {
     }
 }
 
-/// A pass-through stand-in: stdout echoes stdin, plus whatever script
-/// output the test queued. Used where the test is about the caller's
-/// logic rather than the boundary.
 #[derive(Default)]
 pub struct EchoSandbox {
     scripted: Vec<Vec<u8>>,
@@ -169,9 +117,6 @@ impl Sandbox for EchoSandbox {
     }
 }
 
-/// A fault stand-in: pops a scripted outcome per call, so a caller's
-/// handling of exhaustion and traps is testable without provoking the
-/// real engine into either.
 pub struct FaultSandbox {
     scripted: Vec<SandboxExit>,
 }
@@ -198,24 +143,19 @@ impl Sandbox for FaultSandbox {
     }
 }
 
-/// The wasmtime adapter lives in its own file, behind the `wasm`
-/// feature: the seam above is what every caller programs against.
 #[cfg(feature = "wasm")]
 mod engine;
 
 #[cfg(feature = "wasm")]
 pub use engine::WasmtimeSandbox;
 
-/// Conformance: any Sandbox must run twice in a row without the first
-/// job poisoning the second, and must return a well-formed outcome.
 #[cfg(feature = "conformance")]
 pub fn assert_sandbox_conformance<S: Sandbox>(sandbox: &mut S, job: &SandboxJob) {
     let first = sandbox.run(job);
     let second = sandbox.run(job);
     match (first, second) {
         (Ok(one), Ok(two)) => {
-            // Well-ordered back-to-back calls: the second must not
-            // inherit the first's state.
+
             assert!(
                 matches!(
                     one.exit,

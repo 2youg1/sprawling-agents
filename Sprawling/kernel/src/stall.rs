@@ -3,16 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The sole stall criterion. Watchdog consumes the
-//! verdict and decides disposal; it never re-derives the criterion —
-//! "what counts as stalled" lives here and nowhere else.
-//! The part `Sprawling/kernel/spec/Stall.lean` specifies this module.
-
 use crate::consts_policy::LOOP_REPEAT_THRESHOLD;
 use crate::locator::B3Hash;
 
-/// Fingerprint of one action's canonical bytes. The only content-hash
-/// producer is `B3Hash::digest`; this newtype names the purpose.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ActionFingerprint(B3Hash);
 
@@ -22,17 +15,12 @@ impl ActionFingerprint {
     }
 }
 
-/// Deliberately exhaustive verdict.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StallVerdict {
     Ok,
     Stall { repeats: u32 },
 }
 
-/// The sample is the recent fingerprints in time order. Only the *tail*
-/// run of identical prints counts: an older repetition broken by a newer
-/// different action already recovered itself. `repeats` saturates by
-/// contract — its only consumer compares against the threshold.
 pub fn observe(recent: &[ActionFingerprint]) -> StallVerdict {
     let Some(last) = recent.last() else {
         return StallVerdict::Ok;
@@ -85,8 +73,7 @@ mod tests {
 
     #[test]
     fn a_broken_repetition_recovered_itself() {
-        // Two repeats, then something new, then two repeats again: the
-        // tail run is 2, under the threshold of 3.
+
         let sample = [
             print("loop"),
             print("loop"),
@@ -98,7 +85,7 @@ mod tests {
     }
 
     proptest! {
-        /// The verdict only ever reads the tail run length.
+
         #[test]
         fn stall_iff_tail_run_reaches_threshold(labels in proptest::collection::vec("[ab]", 1..12)) {
             let prints: Vec<ActionFingerprint> =

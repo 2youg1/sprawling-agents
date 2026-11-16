@@ -3,24 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What running commands already wrote, kept per run so a page that
-//! opens mid-command sees it (`Sprawling/app/spec/Accounting/Worker.lean` §8-115; the bound and the
-//! order it keeps are proved in `Sprawling/app/spec/Serving/OutputRing.lean`).
-
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use kernel::{EventKind, EventRecord, RunId};
 use wire::LiveOutput;
 
-/// The most one run keeps: what the runtime reads in one second at its
-/// top rate, and enough for the page to fill both of its streams.
 const KEPT_BYTES_PER_RUN: usize = 64 * 1024;
 
-/// A bounded tail of live output for every run still running a command.
-///
-/// Holds a discardable preview: the call's result in the Ledger is the
-/// authority, which is why nothing here returns a failure.
 #[derive(Default)]
 pub(crate) struct OutputRing {
     runs: Mutex<BTreeMap<RunId, Kept>>,
@@ -33,8 +23,7 @@ struct Kept {
 }
 
 impl OutputRing {
-    /// Appends a piece to its run's tail, dropping the oldest whole
-    /// pieces past the bound. The newest piece always stays.
+
     pub(crate) fn keep(&self, piece: &LiveOutput) {
         let mut runs = self.runs();
         let kept = runs.entry(piece.run).or_default();
@@ -48,14 +37,12 @@ impl OutputRing {
         }
     }
 
-    /// Empties a run's tail once its call's result is in the Ledger.
     pub(crate) fn settle(&self, record: &EventRecord) {
         if record.kind() == EventKind::ToolResult {
             self.runs().remove(&record.run());
         }
     }
 
-    /// Every kept piece, each run's in the order it arrived.
     pub(crate) fn so_far(&self) -> Vec<LiveOutput> {
         self.runs()
             .values()
@@ -63,8 +50,6 @@ impl OutputRing {
             .collect()
     }
 
-    /// Every operation leaves the map whole within one step, so a lock
-    /// poisoned by a panic elsewhere still guards a consistent map.
     fn runs(&self) -> MutexGuard<'_, BTreeMap<RunId, Kept>> {
         self.runs.lock().unwrap_or_else(PoisonError::into_inner)
     }
@@ -98,8 +83,6 @@ mod tests {
         EventRecord::from_draft(draft, Seq::FIRST, GENESIS_PREV)
     }
 
-    /// A page opening mid-command first sees what the command already
-    /// wrote, and nothing of that run once its result has landed.
     #[test]
     fn a_page_opening_mid_command_sees_what_was_written_until_the_result_lands() {
         let (building, testing) = (RunId::from_bytes([1; 16]), RunId::from_bytes([2; 16]));
@@ -115,7 +98,6 @@ mod tests {
         assert_eq!(ring.so_far(), vec![written[1].clone()]);
     }
 
-    /// A run flooding its stdout holds at most the bound, newest last.
     #[test]
     fn a_flooding_run_keeps_only_its_newest_bytes() {
         let run = RunId::from_bytes([3; 16]);

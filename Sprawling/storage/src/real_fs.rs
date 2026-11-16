@@ -3,50 +3,22 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The production `Vfs`: `std::fs`, with one piece of state.
-//!
-//! Zero policy. Every method is the std call the trait names, and the
-//! one thing this adapter remembers — the handle on the file it is
-//! appending to — exists because opening a file costs a syscall per
-//! call rather than per byte, and a ledger appends to one segment over
-//! and over.
-//!
-//! Specified by `Sprawling/storage/spec/RealFs.lean` §8-16.
-
 use std::io;
 use std::io::{Read as _, Seek as _, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use crate::vfs::Vfs;
 
-/// std::fs, with one piece of state: the file it is appending to stays
-/// open between calls.
-///
-/// Opening a file is a syscall whose cost is paid per call rather than
-/// per byte, and the ledger appends to one segment over and over.
-/// Reopening it for the append and again for the sync put two of those
-/// under every record. Measured on windows-x86_64 NVMe, 200-byte
-/// records: 979.7 us per record when both reopened, 576.6 us when both
-/// use a held handle, of which 574 us is the barrier itself. This is the
-/// write side of what `LineReader` does on the read side, for the same
-/// reason and in the same shape.
-///
-/// The handle is let go before anything that renames, truncates or
-/// removes the file, because this process's own open handle is enough to
-/// make Windows refuse all three.
 pub(crate) struct RealFs {
     open: Option<HeldWriter>,
 }
 
-/// The file `RealFs` is writing to, where it lives, and how it writes.
 struct HeldWriter {
     path: PathBuf,
     file: std::fs::File,
     mode: WriteMode,
 }
 
-/// How the held handle writes: at the end of the file, or where the
-/// caller says.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum WriteMode {
     Append,
@@ -58,10 +30,6 @@ impl RealFs {
         RealFs { open: None }
     }
 
-    /// The handle on `path` in `mode`, opening it when the one held is
-    /// for another file or writes another way. In append mode the offset
-    /// is the end of the file at every write and no position has to be
-    /// remembered across calls; a positional write seeks first.
     fn writer(&mut self, path: &Path, mode: WriteMode) -> io::Result<&mut std::fs::File> {
         if self
             .open
@@ -83,17 +51,13 @@ impl RealFs {
         }
         match self.open.as_mut() {
             Some(held) => Ok(&mut held.file),
-            // The branch above has just filled it, so this is a defect in
-            // this function rather than a state a caller can reach. It
-            // still returns rather than panicking, because a storage
-            // adapter that can panic makes every writer above it able to.
+
             None => Err(io::Error::other(
                 "the segment handle vanished after opening it",
             )),
         }
     }
 
-    /// Lets go of the handle when it is the one on `path`.
     fn release(&mut self, path: &Path) {
         if self.open.as_ref().is_some_and(|held| held.path == path) {
             self.open = None;
@@ -138,18 +102,10 @@ impl Vfs for RealFs {
         std::fs::metadata(path).map(|meta| meta.len())
     }
 
-    /// Seek, then read at most `len` bytes. The handle is opened for
-    /// this call and dropped with it: a reader of one range of one
-    /// object has nothing in common with the next call, so there is no
-    /// position worth keeping - unlike the append handle above, which
-    /// serves record after record on the same segment.
     fn read_at(&self, path: &Path, offset: u64, len: u64) -> io::Result<Vec<u8>> {
         let mut file = std::fs::File::open(path)?;
         file.seek(SeekFrom::Start(offset))?;
-        // The buffer grows to what the file actually holds rather than
-        // to what the caller asked for: `len` is a ceiling a caller may
-        // set far above the object, and reserving it up front would let
-        // one request claim memory no file on the disk needs.
+
         let mut bytes = Vec::new();
         file.take(len).read_to_end(&mut bytes)?;
         Ok(bytes)
@@ -173,8 +129,6 @@ impl Vfs for RealFs {
         file.set_len(len)
     }
 
-    /// The same handle the write went through, so the bytes made
-    /// durable are the ones this adapter just wrote.
     fn sync_data(&mut self, path: &Path) -> io::Result<()> {
         let mode = match self.open.as_ref() {
             Some(held) if held.path == path => held.mode,
@@ -228,20 +182,11 @@ impl Vfs for RealFs {
     }
 }
 
-/// How the bytes of the file `RealFs` appends to travel to the device.
-/// Every arm still issues `sync_data` at the barrier, so the durability
-/// `append_all` answers `Ok` for is the same in each and an arm changes
-/// only the cost (`Sprawling/storage/spec/Jsonl/Barrier.lean`, storage D24).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SegmentDurability {
-    /// Buffered writes, then `File::sync_data`: `FlushFileBuffers` on
-    /// Windows, `fdatasync` on Linux, `fcntl(F_FULLFSYNC)` on macOS.
+
     SyncData,
-    /// The file opened write-through (`FILE_FLAG_WRITE_THROUGH` on
-    /// Windows, `O_DSYNC` on Linux), so each write reaches the device
-    /// before it returns and the barrier has little left to flush.
-    /// macOS has no such arm: `O_DSYNC` there leaves the bytes in the
-    /// drive's cache, which only `F_FULLFSYNC` empties.
+
     #[expect(
         dead_code,
         reason = "a candidate arm; the release-build reading chooses between the arms"
@@ -249,26 +194,18 @@ pub(crate) enum SegmentDurability {
     WriteThrough,
 }
 
-/// This platform's arm. Each stays `SyncData` until the release-build
-/// reading of the barrier (storage D24) chooses; choosing is this one
-/// value.
 #[cfg(windows)]
 pub(crate) const SEGMENT_DURABILITY: SegmentDurability = SegmentDurability::SyncData;
-/// This platform's arm; see the Windows constant.
+
 #[cfg(target_os = "linux")]
 pub(crate) const SEGMENT_DURABILITY: SegmentDurability = SegmentDurability::SyncData;
-/// This platform's arm; see the Windows constant. `F_FULLFSYNC` is the
-/// only barrier that empties the drive's cache here, so macOS (and any
-/// other platform) has `SyncData` alone.
+
 #[cfg(not(any(windows, target_os = "linux")))]
 pub(crate) const SEGMENT_DURABILITY: SegmentDurability = SegmentDurability::SyncData;
 
-/// `FILE_FLAG_WRITE_THROUGH`, from the Win32 `CreateFileW` flags.
 #[cfg(windows)]
 const FILE_FLAG_WRITE_THROUGH: u32 = 0x8000_0000;
 
-/// `O_DSYNC` on the Linux architectures whose `asm-generic` flag table
-/// gives it this value.
 #[cfg(all(
     target_os = "linux",
     any(
@@ -312,8 +249,6 @@ fn write_through(options: &mut std::fs::OpenOptions) {
     }
 }
 
-/// No write-through arm here, so a constant that names one does not
-/// compile instead of falling back in silence.
 #[cfg(not(any(
     windows,
     all(
@@ -336,9 +271,6 @@ fn write_through(_options: &mut std::fs::OpenOptions) {
     }
 }
 
-/// Windows refuses to rename over a read-only file, which a replace
-/// must do; the target loses its read-only bit so the rename can be
-/// tried once more. A refusal with any other cause is returned as it was.
 #[cfg(windows)]
 fn clear_read_only(to: &Path, refused: io::Error) -> io::Result<()> {
     let mut bits = match std::fs::metadata(to) {
@@ -365,16 +297,6 @@ mod tests {
     use super::*;
     use std::fs;
 
-    /// A handle names a file, not a path, so one kept across a rename or
-    /// a removal writes into the file that moved or the file that is
-    /// gone - and the path the caller asked for stays empty. Both moves
-    /// happen on a file this adapter has just written: CAS names an
-    /// object by renaming the temporary file it wrote, and tail recovery
-    /// removes the segment it could not repair.
-    ///
-    /// Windows does not refuse either operation - Rust opens files
-    /// sharing delete and rename - so nothing stops the stale handle.
-    /// What catches it is asking, afterwards, where the bytes went.
     #[test]
     fn a_handle_kept_across_a_rename_or_a_removal_would_write_into_the_wrong_file() {
         let dir = tempfile::tempdir().unwrap();
@@ -385,7 +307,7 @@ mod tests {
         fs.append(&half_written, b"first\n").unwrap();
         fs.sync_data(&half_written).unwrap();
         fs.rename(&half_written, &named).unwrap();
-        // The same path again is a new file, not more of the old one.
+
         fs.append(&half_written, b"second\n").unwrap();
         fs.sync_data(&half_written).unwrap();
         assert_eq!(
@@ -395,24 +317,16 @@ mod tests {
         );
         assert_eq!(fs::read(&half_written).unwrap(), b"second\n");
 
-        // And after a removal the next write recreates the file rather
-        // than disappearing into the one that was deleted.
         fs.remove_file(&named).unwrap();
         fs.append(&named, b"third\n").unwrap();
         fs.sync_data(&named).unwrap();
         assert_eq!(fs::read(&named).unwrap(), b"third\n");
 
-        // Truncation is the third repair, and the write after it must
-        // land at the shortened end.
         fs.truncate(&named, 2).unwrap();
         fs.append(&named, b"ird\n").unwrap();
         assert_eq!(fs::read(&named).unwrap(), b"third\n");
     }
 
-    /// One handle serves a stretch of appends to one file and moves when
-    /// the file does. A segment roll changes the path mid-wave, and an
-    /// adapter that kept writing through the handle it already had would
-    /// put the second half of the wave in the first segment.
     #[test]
     fn the_handle_follows_the_file_when_a_wave_rolls_to_a_new_segment() {
         let dir = tempfile::tempdir().unwrap();

@@ -3,31 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The UI Automation tree of one window: role, name, ref and bounds,
-//! read through `uiautomation`'s safe calls (`Sprawling/desktop/Spec.lean`
-//! D10).
-//!
-//! **Every element this module reads dies inside the call that read
-//! it.** A `ref` handed back to a caller is a rectangle and a
-//! generation, never a live element (`Sprawling/desktop/Spec.lean` section 10, design six),
-//! so a connection that snapshots a thousand windows holds a thousand
-//! rectangles rather than a thousand cross-process interface pointers.
-//! What does outlive a call is the [`Reader`]: the COM apartment, the
-//! automation object and the walker one desk reads every tree with,
-//! entered once and left once.
-//!
-//! The walk is bounded twice — by the depth the caller asked for and by
-//! [`views::MOST_REFS_PER_SNAPSHOT`] — because a UI Automation tree has
-//! no promise of being finite in any practical sense: one list control
-//! can present tens of thousands of items, and a snapshot a model
-//! cannot read to the end is a snapshot it has not read.
-//!
-//! The walk itself is a function over any tree that answers
-//! [`Branches`], so the order it mints refs in and where it stops can be
-//! checked on a tree a test writes down, with no window at all.
-//!
-//! [`views::MOST_REFS_PER_SNAPSHOT`]: super::views::MOST_REFS_PER_SNAPSHOT
-
 use uiautomation::types::{ControlType, Handle};
 use uiautomation::{UIAutomation, UIElement, UITreeWalker};
 use winsafe::co;
@@ -39,19 +14,12 @@ use super::views::{MOST_REFS_PER_SNAPSHOT, Node};
 use crate::outline::{self, Ending, Role};
 use crate::refusal::Refusal;
 
-/// What one desk reads trees with.
-///
-/// The fields drop in the order they are declared, and that order is
-/// the rule: the walker and the automation object are COM objects, so
-/// they go before the apartment they live in is left.
 pub(crate) struct Reader {
     walker: UITreeWalker,
     automation: UIAutomation,
     _apartment: CoUninitializeGuard,
 }
 
-/// One window's tree as a walk found it: the nodes it minted refs for,
-/// and why it stopped.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Walked {
     pub(crate) nodes: Vec<Node>,
@@ -59,15 +27,7 @@ pub(crate) struct Walked {
 }
 
 impl Reader {
-    /// Enters this thread's apartment and starts UI Automation.
-    ///
-    /// The multithreaded apartment, because this thread opens no window
-    /// that COM would have to pump messages for, which is the case
-    /// Microsoft recommends it for (`Sprawling/desktop/Spec.lean` D10).
-    ///
-    /// # Errors
-    /// Refuses when this thread cannot enter an apartment, and when UI
-    /// Automation will not start or will not open a walk.
+
     pub(crate) fn start() -> Result<Reader, Refusal> {
         let apartment = winsafe::CoInitializeEx(co::COINIT::MULTITHREADED).map_err(|err| {
             fault::com(
@@ -99,13 +59,6 @@ impl Reader {
         })
     }
 
-    /// Reads one window's tree.
-    ///
-    /// # Errors
-    /// Refuses when the window has no automation element. An element
-    /// that will not describe itself is skipped, because one unreadable
-    /// control is not a reason to report no window; one that will not
-    /// list what it holds ends the walk, which says so.
     pub(crate) fn read(&self, window: &winsafe::HWND, depth: u32) -> Result<Walked, Refusal> {
         let handle = Handle::from(windows::Win32::Foundation::HWND(window.ptr()));
         let root = self.automation.element_from_handle(handle).map_err(|err| {
@@ -121,24 +74,14 @@ impl Reader {
     }
 }
 
-/// A tree the walk can go over: what an element says of itself, and
-/// what it holds. The UI Automation tree is one; a tree a test writes
-/// down is the other.
 pub(crate) trait Branches {
     type Element;
 
-    /// The element's role, name and place, or `None` when it will not
-    /// say them.
     fn seen(&self, element: &Self::Element) -> Option<Seen>;
 
-    /// The elements `parent` holds, in the order the tree lists them.
-    ///
-    /// # Errors
-    /// The platform's words when the element will not list them.
     fn children(&self, parent: &Self::Element) -> Result<Vec<Self::Element>, String>;
 }
 
-/// What one element says of itself.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Seen {
     pub(crate) role: Role,
@@ -164,8 +107,6 @@ impl Branches for Reader {
         })
     }
 
-    /// No list longer than the most refs one snapshot mints is read in
-    /// full: the snapshot could not mint refs for the rest of it.
     fn children(&self, parent: &UIElement) -> Result<Vec<UIElement>, String> {
         let mut found: Vec<UIElement> = Vec::new();
         let mut next = listed(self.walker.get_first_child(parent))?;
@@ -180,15 +121,6 @@ impl Branches for Reader {
     }
 }
 
-/// One step along a list of elements: the next one, the end of the
-/// list, or a fault.
-///
-/// The walker answers "there is no such element" as an error whose code
-/// is zero, which is how the binding spells a call that succeeded with
-/// nothing to hand back; that is the end of a list. Any other code is
-/// the element's provider failing, and reading it as the end would hand
-/// a model a tree that looks whole and is not (`Sprawling/desktop/Spec.lean`
-/// D10).
 fn listed(step: uiautomation::Result<UIElement>) -> Result<Option<UIElement>, String> {
     match step {
         Ok(element) => Ok(Some(element)),
@@ -200,12 +132,6 @@ fn listed(step: uiautomation::Result<UIElement>) -> Result<Option<UIElement>, St
     }
 }
 
-/// The bounded walk, and the only place a ref is minted.
-///
-/// Document order: a parent before what it holds, and siblings in the
-/// order the tree lists them, so the outline reads the window top to
-/// bottom. A frame nobody named costs no ref and hides nothing: its
-/// children are read as if it were not there.
 pub(crate) fn walk<T: Branches>(tree: &T, root: T::Element, depth: u32) -> Walked {
     let mut nodes: Vec<Node> = Vec::new();
     let mut frontier: Vec<(T::Element, u32)> = vec![(root, 0)];
@@ -234,8 +160,7 @@ pub(crate) fn walk<T: Branches>(tree: &T, root: T::Element, depth: u32) -> Walke
             continue;
         }
         match tree.children(&element) {
-            // Pushed last to first, so the first child is the next
-            // popped.
+
             Ok(children) => frontier.extend(
                 children
                     .into_iter()
@@ -256,8 +181,6 @@ pub(crate) fn walk<T: Branches>(tree: &T, root: T::Element, depth: u32) -> Walke
     }
 }
 
-// The word a control type is. A match with no fallback, so a type the
-/// binding adds is a compile error here rather than a silent default.
 fn role(control: ControlType) -> Role {
     match control {
         ControlType::Button => Role::Button,
@@ -319,8 +242,6 @@ mod tests {
     use std::collections::BTreeMap;
     use winsafe::prelude::Handle as _;
 
-    /// A tree written down: each element a number, with what it says of
-    /// itself and what it holds.
     struct Toy {
         said: BTreeMap<u32, (Role, &'static str)>,
         holds: BTreeMap<u32, Result<Vec<u32>, String>>,
@@ -353,7 +274,6 @@ mod tests {
         }
     }
 
-    /// The refs a walk minted, as (ref, name, depth), and why it stopped.
     fn minted(walked: &Walked) -> (Vec<(&str, &str, u32)>, &Ending) {
         (
             walked
@@ -365,9 +285,6 @@ mod tests {
         )
     }
 
-    /// Refs are minted in document order: a parent before what it holds,
-    /// and siblings in the order the window lists them. A model reading
-    /// the outline top to bottom reads the window top to bottom.
     #[test]
     fn siblings_are_minted_in_the_order_the_window_lists_them() {
         let tree = toy(
@@ -396,8 +313,6 @@ mod tests {
         );
     }
 
-    /// A frame nobody named costs no line and no ref, and what it holds
-    /// is read as if it were not there.
     #[test]
     fn unnamed_frames_cost_no_line_and_hide_nothing() {
         let tree = toy(
@@ -414,8 +329,6 @@ mod tests {
         );
     }
 
-    /// An element that will not list what it holds ends the walk, and
-    /// the walk says so rather than reading as a window that ends there.
     #[test]
     fn a_walker_fault_ends_the_walk_and_says_so() {
         let tree = toy(
@@ -438,8 +351,6 @@ mod tests {
         );
     }
 
-    /// A tree with more elements than one snapshot mints refs for stops
-    /// at the limit and says it did.
     #[test]
     fn a_tree_past_the_ref_limit_says_so() {
         let buttons: Vec<u32> = (1..=600).collect();
@@ -458,11 +369,6 @@ mod tests {
         );
     }
 
-    /// The contract `Sprawling/desktop/Spec.lean` section 8-11 holds the tree to,
-    /// whichever interface reads it: a window's tree starts at the window,
-    /// named by its title, and names the control inside it one level
-    /// down. Roles are not compared, because they are a word this server
-    /// chooses rather than a fact the window reports.
     #[test]
     fn a_windows_tree_names_the_control_inside_it() {
         let title = format!("sprawling contract tree {}", std::process::id());
@@ -481,10 +387,6 @@ mod tests {
         assert_eq!(named, vec![(title.as_str(), 0), ("Press", 1)]);
     }
 
-    /// A window that is not there has no tree, and that is a refusal
-    /// naming a next step rather than a crash. This is the one thing
-    /// about this module that holds on a machine with no desktop
-    /// (`Sprawling/desktop/Spec.lean` §16.2).
     #[test]
     fn a_handle_that_names_no_window_is_refused_with_a_next_step() {
         let refusal = Reader::start()
@@ -501,9 +403,6 @@ mod tests {
         );
     }
 
-    /// Two readers on one thread are two entries into one apartment,
-    /// each left when its reader goes: a connection that is served
-    /// twice on one thread does not find the apartment already left.
     #[test]
     fn two_readers_on_one_thread_both_start() {
         let first = Reader::start();

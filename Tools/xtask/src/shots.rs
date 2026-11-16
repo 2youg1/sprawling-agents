@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `cargo xtask shots`: every page of the client, each fold of it, in
-//! two windows and two lightings, as PNG files and one index a person
-//! reads them through (Tools/xtask/Spec.lean §8-44 and xtask D10).
-//!
-//! **This is not a gate.** It asserts nothing and compares no two
-//! pictures; the render gate judges properties, and a person judges
-//! these. It is a command of its own so that the gate roster holds only
-//! steps that can go red.
-
 mod camera;
 mod case;
 mod pages;
@@ -25,13 +16,10 @@ use pages::{FRAMES, Shot};
 use crate::report::XtaskError;
 use crate::walk;
 
-/// Where the pictures and the index are written.
 const OUT: &str = "target/shots";
 
-/// The client's route table, whose `BARE` keys are the pages.
 const ROUTES: &str = "client/src/core/route.ts";
 
-/// The flag that photographs a served city instead of the bundle.
 const ORIGIN: &str = "--origin";
 
 pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError> {
@@ -109,8 +97,6 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError> {
     ))
 }
 
-/// Every picture of every route, in route order, then window, then fold,
-/// and each case that took a second try with why its first failed.
 fn take(camera: &Camera<'_>, routes: &[String], out: &Path) -> Result<Taken, XtaskError> {
     let mut shots = Vec::new();
     let mut retried = Vec::new();
@@ -132,12 +118,8 @@ fn take(camera: &Camera<'_>, routes: &[String], out: &Path) -> Result<Taken, Xta
     Ok((shots, retried))
 }
 
-/// The pictures one run took, and the cases it ran twice with the reason
-/// the first try failed.
 type Taken = (Vec<Shot>, Vec<(String, String)>);
 
-/// The served city named after `--origin`, if one is; any other
-/// argument is refused rather than ignored.
 fn origin_in(args: &[String]) -> Result<Option<String>, XtaskError> {
     match args {
         [] => Ok(None),

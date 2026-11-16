@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the city calls the person and the Mayor: the identity area at
-//! the top of `PREFERENCES.md` and `MAYOR.md` (`Sprawling/city/spec/Identity.lean` §8-33).
-//!
-//! **One reader.** The page, a save, a dispatch and the prefix all take
-//! the area through [`split`], so they cannot disagree about what a name
-//! is or where the area stopped reading. An area that does not read is
-//! refused with its line rather than read as "no name": a page that drew
-//! the default name would let the next save write over the line the
-//! person got wrong, and the body under it.
-//!
-//! **A name says what someone is called, never what they may do.** The
-//! Mayor is `hall/mayor` under any name; nothing here reaches an address,
-//! an actor or a permission.
-
 use std::path::Path;
 
 use kernel::consts_policy::HALL_MAYOR;
@@ -29,19 +15,13 @@ mod area;
 
 use area::{IMPORTED_FROM, NAME, USER_ID, body_start, name_key, rewrite, split};
 
-/// The longest name a person may give, in characters: long enough for a
-/// full name in any script, short enough to sit in a message header.
 pub const NAME_MAX_CHARS: usize = 64;
 
-/// A name a person gave: one line, trimmed, 1 to [`NAME_MAX_CHARS`]
-/// characters, no control characters.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DisplayName(String);
 
 impl DisplayName {
-    /// # Errors
-    /// `E_CONFIG_INVALID` for a name that is empty once trimmed, longer
-    /// than [`NAME_MAX_CHARS`], or holds a control character.
+
     pub fn parse(raw: &str) -> Result<DisplayName, AxError> {
         let trimmed = raw.trim();
         let count = trimmed.chars().count();
@@ -75,8 +55,6 @@ impl<'de> Deserialize<'de> for DisplayName {
     }
 }
 
-/// What the two documents' identity areas state, read together because a
-/// session freezes them together.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Naming {
     person: Option<DisplayName>,
@@ -85,8 +63,6 @@ pub struct Naming {
     mayor: Option<DisplayName>,
 }
 
-/// Where an identity area stopped reading: which document, which line of
-/// it counted from the first, and why.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Unreadable {
     pub document: Governed,
@@ -95,7 +71,7 @@ pub struct Unreadable {
 }
 
 impl Unreadable {
-    /// The refusal every caller that cannot go on without the names gives.
+
     #[must_use]
     pub fn into_ax(self) -> AxError {
         AxError::failure(
@@ -110,8 +86,6 @@ impl Unreadable {
     }
 }
 
-/// One identity card's values. `None` removes the key, which puts the
-/// default name back; `about: None` leaves the body as it is.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NamingEdit {
     Person {
@@ -125,7 +99,7 @@ pub enum NamingEdit {
 }
 
 impl NamingEdit {
-    /// The document this card writes.
+
     #[must_use]
     pub fn document(&self) -> Governed {
         match self {
@@ -135,34 +109,18 @@ impl NamingEdit {
     }
 }
 
-/// What one save left: the names the city now has, and how long the
-/// document it wrote is.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NamingWritten {
     pub naming: Naming,
     pub bytes: usize,
 }
 
-/// Reads both identity areas, with an area that does not read as its own
-/// answer so a page can say where.
-///
-/// # Errors
-/// `E_STORAGE_FATAL` for a document that exists and cannot be read. A
-/// document that is not there states nothing.
 pub fn read_naming(city_root: &Path) -> Result<Result<Naming, Unreadable>, AxError> {
     let preferences = text_of(city_root, Governed::Preferences)?;
     let mayor = text_of(city_root, Governed::Mayor)?;
     Ok(Naming::of(&preferences, &mayor))
 }
 
-/// Rewrites one card's keys in `base` and lands the result whole, only if
-/// the document still holds `base`.
-///
-/// # Errors
-/// `E_CONFIG_INVALID` for a name outside [`DisplayName`]'s domain and for
-/// a `base` whose identity area does not read; `E_VERSION_CONFLICT` when
-/// the document is no longer `base`; `E_STORAGE_FATAL` when it cannot be
-/// read or written.
 pub fn write_naming(
     city_root: &Path,
     edit: &NamingEdit,
@@ -181,11 +139,6 @@ pub fn write_naming(
     })
 }
 
-/// Refuses a whole document whose identity area would not read, before it
-/// is written: the raw editor's door holds the same reader as the cards.
-///
-/// # Errors
-/// `E_CONFIG_INVALID` naming the line that does not read.
 pub(crate) fn readable(which: Governed, body: &str) -> Result<(), AxError> {
     let area = split(which, body).map_err(Unreadable::into_ax)?;
     match which {
@@ -201,15 +154,11 @@ pub(crate) fn readable(which: Governed, body: &str) -> Result<(), AxError> {
     Ok(())
 }
 
-/// What a governed document says once its identity area is set aside:
-/// the bytes that follow the closing fence, or the whole document when
-/// it has no area.
 #[must_use]
 pub fn persona(written: Vec<u8>) -> Vec<u8> {
     let start = match std::str::from_utf8(&written) {
         Ok(text) => body_start(text),
-        // Not text, so not an area either: what a person wrote is passed
-        // on as it is.
+
         Err(_) => None,
     };
     match start.and_then(|start| written.get(start..)) {
@@ -219,11 +168,7 @@ pub fn persona(written: Vec<u8>) -> Vec<u8> {
 }
 
 impl Naming {
-    /// Both identity areas as they stand.
-    ///
-    /// # Errors
-    /// Everything [`read_naming`] refuses, and an area that does not read
-    /// as `E_CONFIG_INVALID` with its line.
+
     pub fn read(city_root: &Path) -> Result<Naming, AxError> {
         read_naming(city_root)?.map_err(Unreadable::into_ax)
     }
@@ -259,9 +204,6 @@ impl Naming {
         self.mayor.as_ref().map(DisplayName::as_str)
     }
 
-    /// What the resident at `addr` is called: the Mayor's name at
-    /// `hall/mayor` when one is set, and the last segment of the address
-    /// everywhere else.
     #[must_use]
     pub fn called<'a>(&'a self, addr: &'a Address) -> &'a str {
         match (addr.as_str() == HALL_MAYOR, self.mayor()) {
@@ -270,11 +212,6 @@ impl Naming {
         }
     }
 
-    /// The bytes this naming is frozen under in the content store.
-    ///
-    /// # Errors
-    /// `E_STORAGE_FATAL` if the names cannot be encoded, which a value
-    /// of plain strings never is.
     pub fn to_bytes(&self) -> Result<Vec<u8>, AxError> {
         serde_json::to_vec(self).map_err(|err| {
             AxError::failure(
@@ -286,11 +223,6 @@ impl Naming {
         })
     }
 
-    /// A naming read back from the bytes a session froze.
-    ///
-    /// # Errors
-    /// `E_STORAGE_FATAL` for bytes that are not a frozen naming, which
-    /// means the store holds something else under that version.
     pub fn from_bytes(bytes: &[u8]) -> Result<Naming, AxError> {
         serde_json::from_slice(bytes).map_err(|err| {
             AxError::failure(
@@ -302,17 +234,10 @@ impl Naming {
         })
     }
 
-    /// The version a session freezes: the digest of [`Naming::to_bytes`].
-    ///
-    /// # Errors
-    /// As [`Naming::to_bytes`].
     pub fn version(&self) -> Result<B3Hash, AxError> {
         Ok(B3Hash::digest(&self.to_bytes()?))
     }
 
-    /// The block the city segment carries after `City.md`, or `None` when
-    /// nothing is said, so a city that never named anyone sends the bytes
-    /// it always sent.
     #[must_use]
     pub fn context(&self) -> Option<String> {
         if self.person.is_none() && self.mayor.is_none() && self.about.is_empty() {
@@ -340,7 +265,6 @@ impl Naming {
     }
 }
 
-/// A governed document's text, empty when it is not there.
 fn text_of(city_root: &Path, which: Governed) -> Result<String, AxError> {
     let path = which.path(city_root);
     match std::fs::read_to_string(&path) {
@@ -373,7 +297,6 @@ mod tests {
         std::fs::write(path, text).unwrap();
     }
 
-    /// A document written before identity areas existed is all body.
     #[test]
     fn a_document_without_an_identity_area_reads_as_body() {
         let dir = tempfile::tempdir().unwrap();
@@ -384,9 +307,6 @@ mod tests {
         assert_eq!(naming.mayor(), None);
     }
 
-    /// Two writers started from one text; the second save is refused,
-    /// and the file still holds what the first one wrote, which is what
-    /// the second writer's page reads again before it tries once more.
     #[test]
     fn a_stale_identity_save_is_refused_and_the_draft_survives() {
         let dir = tempfile::tempdir().unwrap();
@@ -421,8 +341,6 @@ mod tests {
         assert_eq!(Naming::read(dir.path()).unwrap().mayor(), Some("Cat"));
     }
 
-    /// A name set and then taken away leaves the document byte for byte
-    /// as it was, and a key the card does not own survives both writes.
     #[test]
     fn a_name_set_and_removed_leaves_the_document_as_it_was() {
         let dir = tempfile::tempdir().unwrap();
@@ -449,8 +367,6 @@ mod tests {
         assert_eq!(back, "+++\ntheme = \"warm\"\n+++\nAbout me.\n");
     }
 
-    /// An area that does not read is refused with the line it fails on,
-    /// counted from the document's first line.
     #[test]
     fn an_identity_area_that_does_not_read_names_its_line() {
         let duplicated = "+++\nname = \"Cat\"\nname = \"Dog\"\n+++\nbody\n";
@@ -471,7 +387,6 @@ mod tests {
         );
     }
 
-    /// What reaches the resident segment is what follows the area.
     #[test]
     fn the_identity_area_is_not_part_of_the_persona() {
         let written = b"+++\nname = \"Cat\"\n+++\nWho the Mayor is.\n".to_vec();

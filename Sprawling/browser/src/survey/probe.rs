@@ -3,47 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a page says about itself, in one reading.
-//!
-//! **One measurement, two ways of carrying it back.** The render gate
-//! dumps a page's DOM and reads three `<pre>` sinks out of it; a
-//! resident surveying a page it opened cannot append anything to that
-//! page and takes the same three strings back as the value of one
-//! evaluation. The body below is the measurement, and it is written
-//! once: two spellings of it would drift, and the gate and the tool
-//! would then disagree about a page while both reported honestly.
-//!
-//! The body is plain ES5 on purpose. It is injected into whatever the
-//! person had open, which is not always this client.
-
 mod read;
 
 pub use read::{declared, elements};
 
 use super::{Page, PaintSource};
 
-/// What one evaluation of [`evaluated`] came back with.
-///
-/// Three strings, because three is what the measurement produces and a
-/// reader that took them apart differently on each side of the seam
-/// would judge two different pages.
 #[derive(serde::Deserialize)]
 pub struct Read {
-    /// One record per element the walk reached.
+
     pub sink: String,
-    /// One record per word the root element declares.
+
     pub declared: String,
-    /// Whether forced colours were active, and the colour scheme the
-    /// root element computed to.
+
     pub conditions: String,
 }
 
 impl Read {
-    /// The page these readings describe.
-    ///
-    /// `painted_by` is the caller's, because the two callers know it
-    /// differently: a gate demanded a pass and asserts the page obeyed,
-    /// while a resident has only what the page reports about itself.
+
     #[must_use]
     pub fn page(&self, painted_by: PaintSource) -> Page {
         Page {
@@ -53,8 +30,6 @@ impl Read {
         }
     }
 
-    /// Whether the page reported forced colours, and the colour scheme
-    /// it computed to.
     #[must_use]
     pub fn conditions(&self) -> Option<(&str, &str)> {
         let mut said = self.conditions.split_whitespace();
@@ -65,25 +40,10 @@ impl Read {
     }
 }
 
-/// What separates one record from the next in all three strings.
-///
-/// Semicolons with spaces around them, because a class attribute
-/// contains neither and a colour never does.
 pub const BETWEEN: &str = " ; ";
 
-/// How long the page is given to settle before it is measured.
-///
-/// Fonts load, a transition finishes, and a layout that is measured
-/// before either has settled reports a page nobody ever saw.
 pub const SETTLE_MS: u32 = 1200;
 
-/// The measurement, as a JavaScript function body that returns the
-/// three strings a [`Page`](super::Page) is read from.
-///
-/// A theme is written onto the root element before anything is read, so
-/// one page can be measured in each theme it offers. `None` measures
-/// the page as it was found, which is the only honest reading of a page
-/// somebody else opened.
 #[must_use]
 pub fn body(theme: Option<&str>) -> String {
     let forced = match theme {
@@ -264,16 +224,10 @@ pub fn body(theme: Option<&str>) -> String {
   }};
 "#
     );
-    // The one box reading, spliced in ahead of the walk that uses it.
+
     format!("{box_of}\n{inner}", box_of = crate::geometry::BOX_OF)
 }
 
-/// The measurement as one expression a driver can evaluate, resolving
-/// to the JSON of the three strings.
-///
-/// A promise rather than a value because the page is given time to
-/// settle first; a driver that does not await it reads the promise
-/// instead of the page.
 #[must_use]
 pub fn evaluated(theme: Option<&str>) -> String {
     let body = body(theme);

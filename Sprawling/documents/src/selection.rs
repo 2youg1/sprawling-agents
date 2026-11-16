@@ -3,14 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A reader's place in a document, carried across a save
-//! (`Sprawling/documents/Spec.lean` D10).
-
 use crate::edit::Transaction;
 use crate::span::Span;
 
-/// Where a selection was begun and where it was carried to, as byte
-/// offsets of one version; collapsed when the two are the same offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Selection {
     pub anchor: u64,
@@ -18,7 +13,7 @@ pub struct Selection {
 }
 
 impl Selection {
-    /// A caret at `at`.
+
     pub const fn collapsed(at: u64) -> Selection {
         Selection {
             anchor: at,
@@ -26,17 +21,10 @@ impl Selection {
         }
     }
 
-    /// The bytes the selection covers, whichever way it was drawn.
     pub fn span(self) -> Span {
         Span::ordered(self.anchor, self.focus)
     }
 
-    /// Where this selection stands in the version `transaction` makes.
-    ///
-    /// An offset before an edit stays put, an insertion at the offset
-    /// itself included; one after it moves by what the edit added and
-    /// removed; one inside a replaced span moves to the end of what
-    /// replaced it, because the bytes it pointed into are gone.
     pub fn mapped(self, transaction: &Transaction) -> Selection {
         Selection {
             anchor: position_after(self.anchor, transaction),
@@ -95,9 +83,6 @@ mod tests {
         .unwrap()
     }
 
-    /// A caret before, inside and after the edits of one save lands on
-    /// the same character it stood beside, or past what replaced the
-    /// bytes it stood in.
     #[test]
     fn a_selection_follows_the_text_it_stood_beside() {
         let source = b"0123456789";

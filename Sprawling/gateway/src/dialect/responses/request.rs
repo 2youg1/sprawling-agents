@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One canonical `ChatRequest` onto the responses face.
-
 use kernel::{AxError, ChatRequest, ContentBlock, ImageRef, Role};
 use serde_json::{Map, Value, json};
 
@@ -12,10 +10,6 @@ use crate::dialect::ImageBytes;
 use crate::mismatch::mismatch;
 use crate::provider::preset::{ChatSpelling, ToolPictureCarry};
 
-/// One picture as this face spells it: a data URL in an `input_image`
-/// part. `detail` is required by the schema, and `auto` is the value
-/// that leaves the choice to the provider — which is the honest
-/// statement, because nothing in this city has an opinion about it.
 fn image_part(picture: &ImageRef, images: &ImageBytes) -> Result<Value, AxError> {
     let data = images.encoded(&picture.locator)?;
     Ok(json!({
@@ -25,13 +19,6 @@ fn image_part(picture: &ImageRef, images: &ImageBytes) -> Result<Value, AxError>
     }))
 }
 
-/// The system segments, as the first input item.
-///
-/// A `developer` message rather than the `instructions` field, because
-/// `instructions` is one string and this city has four segments with
-/// cache breakpoints on their edges. Each segment becomes its own
-/// `input_text` part, and a segment marked `cache` carries the
-/// breakpoint the provider reads.
 fn system_item(req: &ChatRequest) -> Option<Value> {
     if req.system.is_empty() {
         return None;
@@ -55,12 +42,6 @@ fn system_item(req: &ChatRequest) -> Option<Value> {
     Some(json!({ "role": "developer", "content": parts }))
 }
 
-/// One user turn: every tool result it closes, then whatever the person
-/// said and showed.
-///
-/// One tool result's `output`: a string when there are no pictures or
-/// the host cannot take them here; otherwise a part list that keeps
-/// the pictures with the call they came from.
 fn function_output(
     output: &str,
     attachments: &[ImageRef],
@@ -80,8 +61,6 @@ fn function_output(
     Ok(Value::Array(parts))
 }
 
-/// The results come first because each one answers a call the previous
-/// assistant turn made, and this face reads the array in order.
 fn user_items(
     content: &[ContentBlock],
     images: &ImageBytes,
@@ -113,9 +92,7 @@ fn user_items(
             ContentBlock::ToolResult { attachments, .. }
                 if carry == ToolPictureCarry::FollowingUser =>
             {
-                // Under `FollowingUser` this face has no image part
-                // inside `function_call_output`, so what is lost is the
-                // statement that the picture came out of that call.
+
                 for picture in attachments {
                     parts.push(image_part(picture, images)?);
                 }
@@ -133,12 +110,6 @@ fn user_items(
     Ok(())
 }
 
-/// One assistant turn: what it said, then every call it made.
-///
-/// A `Thinking` block is not written. This face accepts a `reasoning`
-/// item only with the identifier and the encrypted content the provider
-/// issued, neither of which this city stores, and a reconstructed one
-/// is refused at the call.
 fn assistant_items(content: &[ContentBlock], into: &mut Vec<Value>) -> Result<(), AxError> {
     let mut said = String::new();
     for block in content {
@@ -190,18 +161,14 @@ pub(crate) fn request(
     let mut root = Map::new();
     root.insert("model".to_owned(), Value::String(req.model.clone()));
     root.insert("input".to_owned(), Value::Array(input));
-    // Absent when no catalogue row states this model's ceiling. The
-    // field may be missing on this face, and the provider's own default
-    // is a real number where a zero is a reply with nothing in it.
+
     if let Some(ceiling) = req.max_tokens {
         root.insert(
             "max_output_tokens".to_owned(),
             Value::Number(ceiling.get().into()),
         );
     }
-    // Nothing this city sends is retrievable later: it keeps its own
-    // history, and a copy held by the provider is a second one that
-    // outlives the city's decision to forget.
+
     root.insert("store".to_owned(), Value::Bool(false));
     if !req.tools.is_empty() {
         let tools: Result<Vec<Value>, AxError> = req
@@ -234,9 +201,6 @@ mod tests {
     use crate::dialect::request::{sample_request, sample_seeing};
     use crate::provider::preset::ChatSpelling;
 
-    /// What this face carries that the chat face cannot: the segment
-    /// edges this city already computes, stated to the provider rather
-    /// than left to prefix matching.
     #[test]
     fn a_cached_segment_carries_the_breakpoint_this_face_reads() {
         let wire = request(
@@ -262,10 +226,6 @@ mod tests {
         );
     }
 
-    /// A tool result is an item of its own on this face, and it comes
-    /// before whatever the person said in the same turn: it answers the
-    /// call the previous turn made, and this face reads the array in
-    /// order.
     #[test]
     fn a_tool_result_is_its_own_item_and_precedes_the_turn_it_sits_in() {
         let (chat, images) = sample_seeing();
@@ -277,15 +237,12 @@ mod tests {
             .expect("the tool result crosses as an item of its own");
         assert_eq!(input[output_at]["call_id"], "tu_1");
         assert!(input[output_at]["output"].is_string());
-        // The picture the tool produced rides in the turn that follows.
+
         let following = &input[output_at.saturating_add(1)];
         assert_eq!(following["role"], "user");
         assert_eq!(following["content"][0]["type"], "input_image");
     }
 
-    /// DeepSeek's responses face takes `input_image` inside
-    /// `function_call_output.output`, unlike its chat face. The real
-    /// host preset must preserve that difference.
     #[test]
     fn deepseek_responses_tool_pictures_stay_on_the_function_output() {
         let (chat, images) = sample_seeing();
@@ -309,13 +266,10 @@ mod tests {
             .flat_map(|item| item["content"].as_array().into_iter().flatten())
             .filter(|part| part["type"] == "input_image")
             .collect();
-        // The person's own attached picture still rides a user message;
-        // only the tool's picture stayed on the output.
+
         assert_eq!(following_images.len(), 1);
     }
 
-    /// A call the model made crosses as a `function_call` item whose
-    /// `call_id` is the id the result will answer with.
     #[test]
     fn a_call_and_the_result_that_answers_it_share_one_identifier() {
         let wire = request(

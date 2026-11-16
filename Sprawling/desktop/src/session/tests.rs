@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one connection is held to: the handshake order, the six names,
-//! and a refusal for everything this build cannot carry out.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -16,8 +13,6 @@
 
 use super::*;
 
-/// The two lines the city's own client sends first, verbatim from
-/// `agent_protocols::Rpc::initialize` and `agent_protocols::Rpc::initialized`.
 const OPENING: &str = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":\
      {\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":\
      {\"name\":\"sprawling\",\"version\":\"0.0.5\"}}}";
@@ -38,8 +33,6 @@ fn answer(server: &mut Server, method: &str, params: Value) -> Value {
     serde_json::from_str(&raw).expect("the answer is one JSON object")
 }
 
-/// The exchange the city opens every connection with, answered the way
-/// `agent_protocols::handshake` reads it.
 #[test]
 fn the_handshake_is_the_one_the_citys_client_already_speaks() {
     let mut server = Server::new(Scope::parse("windows = [\"*\"]\n"));
@@ -56,9 +49,6 @@ fn the_handshake_is_the_one_the_citys_client_already_speaks() {
     assert_eq!(server.phase, Phase::Ready);
 }
 
-/// Before the handshake finishes, nothing else is answered — which is
-/// what the specification says and what keeps a client's ordering
-/// mistake from surfacing somewhere else.
 #[test]
 fn work_asked_for_before_the_handshake_is_refused() {
     let mut server = Server::new(Scope::parse("windows = [\"*\"]\n"));
@@ -72,16 +62,11 @@ fn work_asked_for_before_the_handshake_is_refused() {
                 .contains("initialize")
         );
     }
-    // `ping` is answered at any time: it is how a caller learns the
-    // process is alive.
+
     let alive = answer(&mut server, "ping", json!({}));
     assert!(alive["result"].is_object());
 }
 
-/// The notification alone opens nothing: a client that never sent
-/// `initialize` negotiated no revision and read no capabilities, so the
-/// connection stays where it was and the tools stay closed
-/// (`Sprawling/desktop/Spec.lean` D15).
 #[test]
 fn the_notification_before_initialize_opens_nothing() {
     let mut server = Server::new(Scope::parse("windows = [\"*\"]\n"));
@@ -122,8 +107,6 @@ fn the_list_carries_the_six_names_with_a_description_and_a_schema_each() {
     }
 }
 
-/// On a machine that is not this desktop, an admitted call still gets an
-/// answer rather than a crash, and the answer names the platform.
 #[cfg(not(windows))]
 #[test]
 fn elsewhere_an_admitted_call_is_refused_by_the_platform_rather_than_answered_falsely() {
@@ -144,10 +127,6 @@ fn elsewhere_an_admitted_call_is_refused_by_the_platform_rather_than_answered_fa
     );
 }
 
-/// On Windows an admitted
-/// `desktop.windows` reaches the desktop and answers with the windows
-/// this scope lists — an array, possibly empty on a machine with nothing
-/// open, and never `E_TOOL_UNAVAILABLE`.
 #[cfg(windows)]
 #[test]
 fn listing_windows_reaches_this_desktop_rather_than_a_refusal() {
@@ -173,9 +152,6 @@ fn listing_windows_reaches_this_desktop_rather_than_a_refusal() {
     );
 }
 
-/// A window nobody has open is a refusal that says how to find
-/// out what is open — never a crash, and never an action landing on
-/// whatever else was there.
 #[cfg(windows)]
 #[test]
 fn a_window_this_machine_does_not_have_is_refused_with_the_way_to_find_out() {
@@ -201,8 +177,6 @@ fn a_window_this_machine_does_not_have_is_refused_with_the_way_to_find_out() {
     assert!(text.contains("desktop.windows"), "{answered}");
 }
 
-/// The scope is judged before the platform is reached, so a window
-/// nobody listed is refused with no call made.
 #[test]
 fn a_call_outside_the_scope_is_refused_before_the_platform_is_reached() {
     let mut server = opened("windows = [\"*Notepad*\"]\n");
@@ -237,8 +211,6 @@ fn a_method_and_a_tool_this_server_does_not_have_are_both_named_in_the_refusal()
     assert_eq!(unnamed["error"]["data"]["code"], "E_INVALID_ARGS");
 }
 
-/// The read loop answers one line per request, writes nothing for a
-/// notification, and ends when the pipe closes.
 #[test]
 fn the_loop_writes_one_line_per_request_and_none_for_a_notification() {
     let mut server = Server::new(Scope::parse("windows = [\"*\"]\n"));

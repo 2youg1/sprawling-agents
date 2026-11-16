@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Starting a session: what a room forgets, and what it keeps.
-//!
-//! Every test here writes a room the way a person would have it — the
-//! session's own record plus keys a person typed — and then asks what
-//! survives. The keys a person wrote are the point: a clearing that
-//! rewrote the file from what this build understands would take them
-//! with it.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -27,8 +19,6 @@ fn addr(raw: &str) -> Address {
     Address::parse(raw).unwrap()
 }
 
-/// A room whose first session froze a shape, with a key a person typed
-/// beside it.
 fn room_with_a_frozen_shape(city_root: &Path, room: &Address) -> String {
     write_session(
         city_root,
@@ -38,16 +28,12 @@ fn room_with_a_frozen_shape(city_root: &Path, room: &Address) -> String {
     .unwrap();
     let file = path(city_root, room, Layer::Resident).unwrap();
     let mut held = std::fs::read_to_string(&file).unwrap();
-    // A key in the same file that no session wrote: the sandbox is the
-    // person stating what a run in this room may reach, and a cleared
-    // session is not allowed to take it with it.
+
     held.push_str("\n[sandbox]\nfuel = 900\n");
     std::fs::write(&file, &held).unwrap();
     held
 }
 
-/// The question `/new` answers: after it, the room chooses its own
-/// shape again, and every key the person wrote is still there.
 #[test]
 fn clearing_a_session_forgets_the_shape_and_nothing_else() {
     let dir = tempfile::tempdir().unwrap();
@@ -73,11 +59,6 @@ fn clearing_a_session_forgets_the_shape_and_nothing_else() {
     assert!(!after.contains("m-local"), "{after}");
 }
 
-/// The half `--carry` keeps: the shape goes and the summary stays.
-///
-/// The two halves are asserted together because the pair is the ruling:
-/// a person who carries the handoff still gets to choose the model again,
-/// which is what makes the room dispatchable after they changed it.
 #[test]
 fn carrying_the_handoff_still_forgets_the_shape() {
     let dir = tempfile::tempdir().unwrap();
@@ -97,8 +78,6 @@ fn carrying_the_handoff_still_forgets_the_shape() {
     );
 }
 
-/// A new session carries nothing, and the slot is emptied rather than
-/// annotated.
 #[test]
 fn clearing_a_session_empties_the_handoff_slot() {
     let dir = tempfile::tempdir().unwrap();
@@ -119,14 +98,10 @@ fn clearing_a_session_empties_the_handoff_slot() {
         None
     );
     assert!(!handoff.exists(), "the slot is emptied, not blanked");
-    // And clearing a room that never had one is not a failure: the person
-    // asked for a new session, which is a thing that can be done.
+
     clear_session(dir.path(), &room).unwrap();
 }
 
-/// A configuration this build cannot understand is refused rather than
-/// overwritten, so a person's file survives a `/new` typed at the wrong
-/// moment.
 #[test]
 fn a_file_that_does_not_parse_is_not_overwritten() {
     let dir = tempfile::tempdir().unwrap();

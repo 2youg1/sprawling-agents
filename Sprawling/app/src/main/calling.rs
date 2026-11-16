@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `sprawling call`: one frame over the wire, and the exit code that
-//! says what was observed (`Sprawling/app/Spec.lean` §8-41, §8-103).
-
 use super::exit::Exit;
 use super::refusal::{Form, written};
 use super::router::flag_value;
@@ -13,16 +10,6 @@ use super::verbs::{self, Verb};
 use super::wire_client::{self, Listen, Spoken, Unheard, Until};
 use kernel::consts_policy::DEFAULT_AT;
 
-/// Sends one frame over the wire and prints everything that comes back.
-///
-/// An agent driving this learns the outcome from the exit code rather
-/// than by parsing JSON, and the code says exactly what was observed:
-/// 0 the city answered, 1 the city refused, 2 this command line or its
-/// frame was not readable, 3 the city said nothing before the quiet
-/// window closed, 4 nothing at `--at` answered as a city. Silence has
-/// its own code because silence is not acceptance - the city may still
-/// be working - and reading it as either of the first two is how a
-/// failure becomes a success.
 pub(super) fn call(args: &[String]) -> Exit {
     let Some(frame) = args.get(1).filter(|a| !a.starts_with("--")) else {
         if let Some(row) = verbs::row(Verb::Call) {
@@ -35,8 +22,7 @@ pub(super) fn call(args: &[String]) -> Exit {
         eprintln!("queries:  {}", wire::QUERY_NAMES.join(", "));
         return Exit::Line;
     };
-    // `-` reads the frame from stdin, which is how a frame too long for
-    // one command line, or one a script generated, gets in.
+
     let frame = if frame == "-" {
         match std::io::read_to_string(std::io::stdin()) {
             Ok(text) => text,
@@ -66,8 +52,7 @@ pub(super) fn call(args: &[String]) -> Exit {
             }
         },
     };
-    // The kind is read through `EventKind`'s own serde spelling, so the
-    // names this flag accepts are the names the wire prints.
+
     let until = match flag_value(args, "--until") {
         None => Until::Quiet,
         Some(raw) => match serde_json::from_value(serde_json::Value::String(raw.clone())) {
@@ -103,9 +88,6 @@ pub(super) fn call(args: &[String]) -> Exit {
     }
 }
 
-/// The exit code a finished wait says, in the one table `call` and
-/// `dispatch` share. Silence and an unfinished wait are both 3: neither
-/// says the work is done or refused, since the city may still be on it.
 pub(super) fn exit_of(spoken: &Spoken) -> Exit {
     match spoken {
         Spoken::Refused => Exit::Refused,
@@ -114,8 +96,6 @@ pub(super) fn exit_of(spoken: &Spoken) -> Exit {
     }
 }
 
-/// Writes why nothing was heard to stderr and returns the exit code that
-/// tells the three failures apart, for `call` and `dispatch` alike.
 pub(super) fn tell_unheard(unheard: &Unheard, form: Form) -> Exit {
     let (exit, err) = match unheard {
         Unheard::Unreadable(err) | Unheard::Unkeyed(err) => (Exit::Line, err),

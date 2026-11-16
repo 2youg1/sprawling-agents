@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A city whose process died while it was writing its history opens
-//! again by the rules (`Sprawling/app/Spec.lean` §8-127): the half-written line is
-//! cut and said, the chain verifies, a call whose answer was lost is
-//! closed as unknown rather than as failed, and the views answer from
-//! what survived, where the run that died is frozen.
-//!
-//! The death is made on the disk, not in the process: a real run writes
-//! its history, the worker is dropped, which releases the writer's lock
-//! as a killed process does, and the history is cut where the process
-//! would have died - half way through the line that answered a call.
-//! Every line after that one was never written. What a power cut adds,
-//! the loss of bytes the platform had not yet made durable, is the
-//! ledger's own contract and is held inside `storage` against its
-//! fault filesystem.
-
 use std::path::Path;
 
 use kernel::event::record::ToolAnswer;
@@ -27,24 +12,21 @@ use serde_json::json;
 use crate::city::{self, History};
 use crate::script::{self, Step, call_id};
 
-/// What a city that reopened after the death says about itself.
 #[derive(Debug, PartialEq)]
 struct Reopened {
-    /// What the startup scan reports opening cut, in its own words.
+
     opening: String,
-    /// How many calls the scan closed.
+
     closed_calls: usize,
-    /// The codes of every answer the dead call has now, in order.
+
     answers: Vec<Option<String>>,
-    /// Whether the history says, in a line of its own, that it was cut.
+
     truncation_recorded: bool,
-    /// Where the city view says each run it lists has got to.
+
     listed: Vec<Listed>,
-    /// Whether the history says, on the freeze it wrote, that the process
-    /// died: the run did not end, it was lost.
+
     death_recorded: bool,
-    /// Whether the next task sent to the same room started a run and
-    /// froze it: the room is not held by the run that died in it.
+
     room_works_again: bool,
 }
 
@@ -127,8 +109,6 @@ fn a_city_killed_while_writing_an_answer_reopens_with_the_torn_line_cut_and_the_
     );
 }
 
-/// One run as the city view lists it: whether it is frozen, how it
-/// ended, and its last line.
 #[derive(Debug, PartialEq)]
 struct Listed {
     frozen: bool,
@@ -137,7 +117,6 @@ struct Listed {
     last_seq: Seq,
 }
 
-/// What the city view says, asked the way a one-shot question asks it.
 fn city_view(city_root: &Path) -> wire::CityAnswer {
     let wire::Answer::City(view) =
         accounting::views::ask(city_root, &wire::Query::CityView).unwrap()
@@ -147,8 +126,6 @@ fn city_view(city_root: &Path) -> wire::CityAnswer {
     view
 }
 
-/// The seq of the last line `run` wrote before `next` started, read off
-/// the verified history.
 fn last_before(ledger_dir: &Path, run: RunId, next: RunId) -> Seq {
     runtime::replay::verify_ledger_dir(ledger_dir)
         .unwrap()
@@ -162,9 +139,6 @@ fn last_before(ledger_dir: &Path, run: RunId, next: RunId) -> Seq {
         .unwrap()
 }
 
-/// Cuts the history half way through the line that answered `call`,
-/// as a process that died while writing it leaves it, and answers how
-/// many bytes of that line reached the disk.
 fn die_while_answering(ledger_dir: &Path, call: &str) -> u64 {
     let needle = format!("\"tool_use_id\":\"{call}\"");
     let segment = storage::ledger_segments_at(ledger_dir)
@@ -197,8 +171,6 @@ fn die_while_answering(ledger_dir: &Path, call: &str) -> u64 {
     u64::try_from(kept).unwrap()
 }
 
-/// What a city that reopened after a death between two whole lines says
-/// about itself.
 #[derive(Debug, PartialEq)]
 struct ReopenedWhole {
     opening: String,
@@ -209,14 +181,6 @@ struct ReopenedWhole {
     room_works_again: bool,
 }
 
-/// A city killed after the dispatch's job was put in the content store
-/// and before the `checkpoint_committed` line that cites it reached the
-/// history (`Sprawling/storage/spec/Checkpoint.lean`). The blob is on disk
-/// and nothing in the history names it, so no run had started: the city
-/// opens with no line to cut and no run to freeze, the history
-/// verifies, and the room takes the same task again. The kill is made on the disk, so it is the same
-/// on Windows, macOS and Linux: a killed process (`TerminateProcess`
-/// on Windows, `SIGKILL` elsewhere) leaves exactly these bytes.
 #[test]
 fn a_city_killed_between_a_job_put_and_its_checkpoint_line_reopens_with_nothing_to_cut() {
     let dir = tempfile::tempdir().unwrap();
@@ -271,9 +235,6 @@ fn a_city_killed_between_a_job_put_and_its_checkpoint_line_reopens_with_nothing_
     );
 }
 
-/// Cuts the history at the start of the first line that carries both
-/// `kind` and `marker`, as a process killed before writing that line
-/// leaves it: every line before it whole, nothing after it.
 fn die_before(ledger_dir: &Path, kind: &str, marker: &str) {
     let hit = |line: &str| line.contains(kind) && line.contains(marker);
     let segment = storage::ledger_segments_at(ledger_dir)
@@ -315,8 +276,6 @@ fn die_before(ledger_dir: &Path, kind: &str, marker: &str) {
     }
 }
 
-/// A city whose one run wrote a file, so the city took a git checkpoint
-/// of it, and the run's history in its ledger directory.
 fn a_run_that_wrote(city_root: &Path) -> std::path::PathBuf {
     let (factory, _, _) = script::scripted(vec![Step {
         tool: "edit",
@@ -338,8 +297,6 @@ fn a_run_that_wrote(city_root: &Path) -> std::path::PathBuf {
     ledger
 }
 
-/// Every `notes.md` under the city root outside git's own metadata: the
-/// file the run's one call writes, in whichever tree the room works in.
 fn written_by_the_call(city_root: &Path) -> Vec<std::path::PathBuf> {
     let mut found = Vec::new();
     let mut open = vec![city_root.to_path_buf()];
@@ -356,7 +313,6 @@ fn written_by_the_call(city_root: &Path) -> Vec<std::path::PathBuf> {
     found
 }
 
-/// The history's lines as the verified reader hands them over.
 fn lines_of(ledger_dir: &Path) -> Vec<Vec<u8>> {
     runtime::replay::verify_ledger_dir(ledger_dir)
         .unwrap()
@@ -364,40 +320,23 @@ fn lines_of(ledger_dir: &Path) -> Vec<Vec<u8>> {
         .to_vec()
 }
 
-/// What a city killed after its checkpoint's compare-and-swap and before
-/// the line that records it says, once reopened and handed the task again.
 #[derive(Debug, PartialEq)]
 struct ReopenedAfterTheSwap {
-    /// The checkpoint's reference stood in the repository at the death:
-    /// git had taken the commit.
+
     pinned: bool,
-    /// Every line written before the death heads the reopened history,
-    /// byte for byte: nothing was lost.
+
     kept: bool,
-    /// How many lines of the reopened history name the commit: the city
-    /// does not record it on the dead run's behalf.
+
     named: usize,
-    /// How many calls the run that died has in the history: the checkpoint
-    /// comes before the wave it guards, so the call it guarded was never
-    /// written.
+
     calls: usize,
-    /// Whether the file that call would have written stands in the city
-    /// after the reopened city took the task again: the dead call is not
-    /// made on the run's behalf.
+
     effect_repeated: bool,
     death_recorded: bool,
     verifies: bool,
     room_works_again: bool,
 }
 
-/// A city killed after a checkpoint's commit and reference reached the
-/// repository and before its `checkpoint_committed` line reached the
-/// history (`Sprawling/storage/spec/Checkpoint/Concurrent.lean`, storage
-/// D25: a crashed writer leaves only garbage). The reference names a
-/// commit no line cites; the history the city reopens is the history up
-/// to the death, the run that died is frozen, and nothing is written
-/// twice. The kill is made on the disk, so it is the same on Windows,
-/// macOS and Linux.
 #[test]
 fn a_city_killed_after_a_checkpoint_swap_and_before_its_line_loses_and_doubles_nothing() {
     let dir = tempfile::tempdir().unwrap();
@@ -414,8 +353,7 @@ fn a_city_killed_after_a_checkpoint_swap_and_before_its_line_loses_and_doubles_n
         .unwrap();
 
     die_before(&ledger, "\"kind\":\"checkpoint_committed\"", &oid);
-    // The wave the checkpoint guarded never ran, so the file its call
-    // wrote is taken back off the disk, wherever the room's tree holds it.
+
     for path in written_by_the_call(dir.path()) {
         std::fs::remove_file(path).unwrap();
     }
@@ -461,30 +399,18 @@ fn a_city_killed_after_a_checkpoint_swap_and_before_its_line_loses_and_doubles_n
     );
 }
 
-/// What a city killed in the middle of a barrier says, once reopened and
-/// handed the task again.
 #[derive(Debug, PartialEq)]
 struct ReopenedMidBarrier {
     opening: String,
-    /// Every whole line before the cut heads the reopened history.
+
     kept: bool,
-    /// How often the wave's first line, which reached the disk whole,
-    /// appears in the reopened history.
+
     first_of_the_wave: usize,
     death_recorded: bool,
     verifies: bool,
     room_works_again: bool,
 }
 
-/// A city killed while the barrier of a wave of several lines was under
-/// way: the wave's first line reached the disk whole, half of its second
-/// did, and nothing after (`Sprawling/storage/spec/Jsonl/Barrier.lean`). The
-/// wave never answered `Ok`, so nobody was told of it; the reopened city
-/// cuts the torn half and says so, keeps the whole line once, freezes the
-/// run that died, and takes the task again. The wave is the one between
-/// the run's two model calls: the first answer, the read call it asked
-/// for and that call's result, which the turn holds and writes in the
-/// one barrier it pays before the next model call (runtime D36).
 #[test]
 fn a_city_killed_inside_a_barrier_keeps_the_whole_lines_once_and_cuts_the_torn_one() {
     let dir = tempfile::tempdir().unwrap();

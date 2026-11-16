@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a worker inherits, as the folds a snapshot holds before they
-//! settle (`Sprawling/app/Spec.lean` §8-101).
-
 use std::path::Path;
 
 use kernel::{AxCode, AxError, B3Hash, EventRecord};
@@ -15,15 +12,8 @@ use super::collaboration::CollaborationFold;
 use super::{Entrance, Governance, SessionOrigins, Standing};
 use crate::views::snapshot::start::SnapshotFold;
 
-/// Changed whenever a standing fold rule or the encoding of
-/// [`StandingFolds`] changes within one version of this binary. The
-/// suffix is the digest of a fixed fixture's encoding, which the tests
-/// beside this file hold, so the encoding cannot move alone.
 const STANDING_FOLD_RULES: &str = "standing-fold-e2ee39bedd7b050b";
 
-/// The five folds of [`Standing`] after the last line they read, before
-/// the collaboration fold settles: a tail folded on after a snapshot
-/// needs the signals still held aside.
 #[derive(serde::Serialize, serde::Deserialize)]
 pub(super) struct StandingFolds {
     book: gateway::EndpointBook,
@@ -34,11 +24,7 @@ pub(super) struct StandingFolds {
 }
 
 impl StandingFolds {
-    /// The standing a worker holds, and whether the snapshot of these
-    /// folds was cut.
-    ///
-    /// # Errors
-    /// What the collaboration fold says about the signals it held aside.
+
     pub(super) fn settle(self, cut: Result<(), AxError>) -> Result<Standing, AxError> {
         Ok(Standing {
             book: self.book,
@@ -102,19 +88,15 @@ impl SnapshotFold for StandingFolds {
             .absorb(record.kind(), record.run(), record.addr(), record.data())
     }
 
-    /// The standing never reads the ledger again, so the index goes.
     fn keep_index(&mut self, _index: LedgerIndex, _ledger_dir: &Path) -> Result<(), AxError> {
         Ok(())
     }
 
-    /// Nothing to bring up to the ledger: the standing holds no index.
     fn resumed(&mut self, _ledger_dir: &Path) -> Result<(), AxError> {
         Ok(())
     }
 }
 
-/// A field postcard cannot carry — a JSON value, or a struct serde
-/// flattens — written as its JSON text.
 pub(in crate::worker) fn as_json_text<T: serde::Serialize, S: serde::Serializer>(
     value: &T,
     serializer: S,
@@ -122,7 +104,6 @@ pub(in crate::worker) fn as_json_text<T: serde::Serialize, S: serde::Serializer>
     serializer.serialize_str(&serde_json::to_string(value).map_err(serde::ser::Error::custom)?)
 }
 
-/// What [`as_json_text`] wrote.
 pub(in crate::worker) fn from_json_text<'de, T, D>(deserializer: D) -> Result<T, D::Error>
 where
     T: serde::de::DeserializeOwned,

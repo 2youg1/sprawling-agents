@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The thread the views are folded on and published from, so neither
-//! the writer nor the fold waits for a reader (`Sprawling/app/spec/Assembly/Listening.lean` §8-99);
-//! it also files the session slices a served writer hands it, and
-//! counts how far it is behind the writer (8-123).
-
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant};
@@ -18,28 +13,22 @@ use super::standing::{CoreThread, monotonic_now};
 use accounting::person::CorePriority;
 use accounting::views::{Published, Views};
 
-/// The places the writer thread hands the views what it wrote, and the
-/// thread that folds it.
 pub(crate) struct Folding {
     pub(crate) observer: Box<dyn FnMut(&EventRecord) + Send>,
     pub(crate) machine: Arc<dyn Fn(wire::DoctorAnswer) + Send + Sync>,
     pub(crate) lend: Box<dyn FnOnce(Arc<Mutex<gateway::Custodian>>) + Send>,
-    /// Where a served writer hands its session slices, so the view thread
-    /// files them instead of the accounting thread (`Sprawling/app/spec/Serving.lean` §8-123).
+
     pub(crate) keep_slices: Box<dyn FnOnce(storage::Sessions) + Send>,
-    /// The records sent and not yet broadcast, for the monitor's
-    /// `view_backlog` (`Sprawling/app/Spec.lean` §8-123, §8-129-6).
+
     pub(crate) backlog: Backlog,
     pub(crate) thread: std::thread::JoinHandle<()>,
 }
 
-/// How many committed records the writer has sent the view thread that
-/// it has not yet folded and broadcast (`Sprawling/app/spec/Serving.lean` §8-123).
 #[derive(Clone, Default)]
 pub(crate) struct Backlog(Arc<AtomicU64>);
 
 impl Backlog {
-    /// The records sent and not yet broadcast, read now.
+
     pub(crate) fn records(&self) -> u64 {
         self.0.load(Ordering::Relaxed)
     }
@@ -52,8 +41,6 @@ impl Backlog {
         self.moved(|held| held.saturating_sub(records));
     }
 
-    /// One atomic step of the count. The two threads' steps may land in
-    /// either order, so each saturates rather than wraps.
     fn moved(&self, step: impl Fn(u64) -> u64) {
         let mut held = self.0.load(Ordering::Relaxed);
         while let Err(now) =
@@ -65,12 +52,8 @@ impl Backlog {
     }
 }
 
-/// More records than this sent and not yet broadcast, and a views
-/// snapshot that falls due waits: the thread catches up first
-/// (`Sprawling/app/spec/Serving.lean` §8-123).
 pub(crate) const CUT_WAITS_ABOVE: u64 = 256;
 
-/// What the writer thread hands the view fold, in the order it wrote it.
 enum Fold {
     Committed(EventRecord),
     Examined(wire::DoctorAnswer),
@@ -78,29 +61,16 @@ enum Fold {
     Slices(storage::Sessions),
 }
 
-/// The two copies of the views the fold alternates between: the one
-/// readers are handed, and its unpublished twin, which must have folded
-/// the same records (`Sprawling/app/spec/Assembly/Listening.lean` §8-99).
 pub(crate) struct Copies {
     pub(crate) published: Arc<Published>,
     pub(crate) spare: Views,
 }
 
-/// Where a folded record goes next: the clients watching the city, and
-/// the head every welcome names, moved before the record is sent so a
-/// session that reads the head has already subscribed to what follows it.
 pub(crate) struct Broadcast {
     pub(crate) to_clients: tokio::sync::broadcast::Sender<wire::Committed>,
     pub(crate) head: Arc<wire::LedgerHead>,
 }
 
-/// Starts the view fold over both copies.
-///
-/// Every half only queues: the writer's cost per record is one channel
-/// send, whatever a reader is doing with the views.
-///
-/// # Errors
-/// `StorageFatal` when the thread cannot be started.
 pub(crate) fn spawn_folding(
     copies: Copies,
     broadcast: Broadcast,
@@ -117,9 +87,7 @@ pub(crate) fn spawn_folding(
     let thread = std::thread::Builder::new()
         .name("sprawling-views".to_owned())
         .spawn(move || {
-            // Held to the fold's end: this thread is one of the city's
-            // two serial threads, and its seat is the plan's last
-            // (`Sprawling/app/spec/Serving/Placement.lean` D41).
+
             let _seat = crate::serving::placement::seat_this_thread(
                 "sprawling-views",
                 crate::serving::placement::Role::Serial,
@@ -170,16 +138,6 @@ pub(crate) fn spawn_folding(
     })
 }
 
-/// Raises this thread above the commands the city dispatches, then
-/// folds every arrival already queued into the spare copy, publishes it,
-/// broadcasts the records, and folds the same batch into the copy it
-/// replaced, until every sender is gone; the thread is lowered if it
-/// keeps a core busy (`Sprawling/app/spec/Serving/Standing.lean` §8-93). A views snapshot is cut
-/// from the spare copy when the [`Cadence`] says one is due, and once
-/// more when the channel closes (`Sprawling/app/spec/Assembly/Listening.lean` §8-91).
-///
-/// The broadcast follows the publication so a client that queries on
-/// hearing a record finds it already folded.
 fn fold_until_closed(
     copies: Copies,
     arriving: &mpsc::Receiver<Fold>,
@@ -219,25 +177,17 @@ fn fold_until_closed(
     }
 }
 
-/// How many times the cost of one cut the fold must spend before the
-/// next: cutting takes at most a tenth of the fold thread's time
-/// (`Sprawling/app/spec/Assembly/Listening.lean` §8-91).
 const CUT_SHARE_INVERSE: u32 = 10;
 
-/// When the fold thread cuts the next views snapshot, from the fold time
-/// spent since the last cut and what that cut cost, both measured here
-/// (`Sprawling/app/spec/Assembly/Listening.lean` §8-91).
 #[derive(Default)]
 struct Cadence {
     folded_since_cut: Duration,
     last_cut_cost: Option<Duration>,
-    /// The last record folded and not yet under a snapshot.
+
     uncut: Option<EventRecord>,
     cutting: Cutting,
 }
 
-/// Whether the views may still be cut: a snapshot of views that refused
-/// a record would let a start accept history a whole fold refuses.
 #[derive(Default)]
 enum Cutting {
     #[default]
@@ -245,15 +195,13 @@ enum Cutting {
     StoppedByRefusal,
 }
 
-/// How the views took one batch.
 enum Folded {
     Clean,
     Refused,
 }
 
 impl Cadence {
-    /// Counts a batch folded in `cost`, ending at `last` when it carried
-    /// a committed record.
+
     fn folded(&mut self, cost: Duration, last: Option<&EventRecord>, verdict: Folded) {
         self.folded_since_cut = self.folded_since_cut.saturating_add(cost);
         if let Some(record) = last {
@@ -265,8 +213,6 @@ impl Cadence {
         }
     }
 
-    /// The record a snapshot is due at now, when one is and the fold is
-    /// not more than [`CUT_WAITS_ABOVE`] records behind the writer.
     fn due(&self, backlog: u64) -> Option<EventRecord> {
         let spent_enough = self
             .last_cut_cost
@@ -275,7 +221,6 @@ impl Cadence {
         self.uncut().filter(|_| spent_enough && caught_up)
     }
 
-    /// The last record folded since the last cut, while cutting is open.
     fn uncut(&self) -> Option<EventRecord> {
         match self.cutting {
             Cutting::Open => self.uncut.clone(),
@@ -283,7 +228,6 @@ impl Cadence {
         }
     }
 
-    /// Starts counting afresh after a cut that took `cost`.
     fn cut(&mut self, cost: Duration) {
         self.last_cut_cost = Some(cost);
         self.folded_since_cut = Duration::ZERO;
@@ -291,9 +235,6 @@ impl Cadence {
     }
 }
 
-/// Cuts a snapshot of `views` at `record` and tells `cadence` what it
-/// cost. A cut that fails is reported and serving goes on: the snapshot
-/// only shortens the next start.
 fn cut_views_snapshot(
     views: &Views,
     record: &EventRecord,
@@ -317,10 +258,6 @@ fn last_committed(batch: &[Fold]) -> Option<&EventRecord> {
     })
 }
 
-/// Files each committed record of `batch` into the session slices once
-/// they have been handed over, in arrival order, and answers how many
-/// committed records the batch carried. A refused slice is reported and
-/// skipped, as the writer did when it filed them (`Sprawling/storage/Spec.lean` §8-24).
 fn file_slices(slices: &mut Option<storage::Sessions>, batch: Vec<Fold>) -> u64 {
     let mut committed: u64 = 0;
     for fold in batch {
@@ -338,17 +275,12 @@ fn file_slices(slices: &mut Option<storage::Sessions>, batch: Vec<Fold>) -> u64 
     committed
 }
 
-/// Moves the head past `record` and sends it to every client. The frame
-/// is spelled here, once, whatever the number of sockets that will write
-/// it (`Sprawling/wire/Spec.lean` §8-47).
 fn send_committed(broadcast: &Broadcast, record: &EventRecord) {
     broadcast.head.advance(record.seq());
     match wire::Committed::new(record.clone()) {
-        // A send with no subscribers is not a failure: a city with no
-        // browser open is a city doing its work.
+
         Ok(committed) => drop(broadcast.to_clients.send(committed)),
-        // The next record's seq gap makes every live session send
-        // `Lagged` for this one (`Sprawling/wire/Spec.lean` §8-41).
+
         Err(unframed) => {
             eprintln!("a committed record has no frame and reaches no client: {unframed}");
         }
@@ -359,9 +291,7 @@ fn fold_batch(views: &mut Views, batch: &[Fold]) -> Folded {
     batch
         .iter()
         .fold(Folded::Clean, |verdict, fold| match fold {
-            // A record the views refuse to fold is reported and skipped:
-            // the ledger already has it, and a view that stopped the fold
-            // would make history hostage to a projection.
+
             Fold::Committed(record) => match views.apply(record) {
                 Ok(()) => verdict,
                 Err(err) => {
@@ -381,9 +311,6 @@ fn fold_batch(views: &mut Views, batch: &[Fold]) -> Folded {
         })
 }
 
-/// Takes the replaced copy back once the readers that took it before the
-/// swap have let go, which they do as soon as `prepare` has copied out
-/// what a query needs.
 fn reclaim(mut retired: Arc<Views>) -> Views {
     loop {
         match Arc::try_unwrap(retired) {

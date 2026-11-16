@@ -41,7 +41,6 @@ fn changed(review: &Review) -> Vec<SliceVerdict> {
         .collect()
 }
 
-/// The stretch and the suggestion travel together: one change.
 fn offer(run: u8, source: &str, change: (usize, usize, &str)) -> Offer {
     let (start, end, after) = change;
     Offer::of(
@@ -58,9 +57,6 @@ fn offer(run: u8, source: &str, change: (usize, usize, &str)) -> Offer {
     .unwrap()
 }
 
-/// Pairs that cover the cut: sentences with and without a terminator,
-/// closers after one, whitespace before, between and after, a side of
-/// whitespace alone, an empty side, and a change of whitespace only.
 const PAIRS: [(&str, &str); 8] = [
     ("甲。乙。", "甲。丙。"),
     (
@@ -75,9 +71,6 @@ const PAIRS: [(&str, &str); 8] = [
     ("「走。」他说。\n\n下一段！", "「走吧。」他说。\n\n下一段？"),
 ];
 
-/// D14: the slices of either side read back that side byte for byte,
-/// so a card accepted whole is the suggestion and rejected whole is the
-/// original.
 #[test]
 fn the_slices_of_either_side_read_back_that_side() {
     for (before, after) in PAIRS {
@@ -89,8 +82,6 @@ fn the_slices_of_either_side_read_back_that_side() {
     }
 }
 
-/// D14: a change of whitespace alone is a change on the card, where
-/// RefRain's trimmed key aligned it as the same sentence and lost it.
 #[test]
 fn a_change_of_whitespace_alone_is_on_the_card() {
     let review = Review::of("A.  B.", "A. B.");
@@ -101,8 +92,6 @@ fn a_change_of_whitespace_alone_is_on_the_card() {
     );
 }
 
-/// D16: a sentence taken, a sentence rewritten and a sentence left out,
-/// on one card; the rewritten one keeps its whitespace.
 #[test]
 fn verdicts_take_rewrite_and_leave_out_sentences() {
     let review = Review::of("One. Two. Three.", "One. Deux. Three. Four.");
@@ -131,8 +120,6 @@ fn verdicts_take_rewrite_and_leave_out_sentences() {
     );
 }
 
-/// D16: verdicts that name no changed sentence, name one twice, or amend
-/// a deletion are refused.
 #[test]
 fn a_verdict_off_the_changed_sentences_is_refused() {
     let review = Review::of("One. Two.", "One. Deux.");
@@ -147,8 +134,6 @@ fn a_verdict_off_the_changed_sentences_is_refused() {
     }
 }
 
-/// D15: two sides with nothing in common past the table's budget are
-/// one deletion and one insertion, and still read back both sides.
 #[test]
 fn sides_past_the_alignment_budget_are_replaced_whole() {
     let before: String = (0..2100).map(|n| format!("甲{n}。")).collect();
@@ -163,8 +148,6 @@ fn sides_past_the_alignment_budget_are_replaced_whole() {
     assert_eq!(side(&review, SliceKind::Delete), after);
 }
 
-/// D13: the identity reads the same from the same line, and differs for
-/// another run offering the same words.
 #[test]
 fn the_identity_is_the_offer_and_its_run() {
     let source = "One. Two.";
@@ -182,8 +165,6 @@ fn the_identity_is_the_offer_and_its_run() {
     );
 }
 
-/// D18: an original or a suggestion longer than one window, and a
-/// reversed stretch, are not proposals.
 #[test]
 fn an_offer_past_a_window_or_reversed_is_refused() {
     let long = "x".repeat(usize::try_from(WINDOW_BYTES_MAX).unwrap() + 1);
@@ -204,9 +185,6 @@ fn an_offer_past_a_window_or_reversed_is_refused() {
     }
 }
 
-/// D17: two cards on one version land as one save; a card made on a
-/// version that has moved is refused, while rejecting it writes nothing
-/// and is not refused.
 #[test]
 fn cards_on_the_current_version_land_together_and_a_stale_one_is_refused() {
     let source = "One. Two. Three.";
@@ -228,8 +206,6 @@ fn cards_on_the_current_version_land_together_and_a_stale_one_is_refused() {
     assert_eq!(decide(both.bytes(), &[(&first, &[])]).unwrap(), None);
 }
 
-/// D17: overlapping cards, a card named twice, and a card whose
-/// original is not what its version holds there are refused.
 #[test]
 fn overlapping_twice_named_or_unmatched_cards_are_refused() {
     let source = "One. Two. Three.";

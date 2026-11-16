@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Phase order is the type: an Assembling turn has no call method — the
-// provider cannot be reached before prompt assembly is on the ledger.
-
 fn main() {
     let mut now = || -> Result<kernel::TimeMs, kernel::AxError> { Ok(kernel::TimeMs::new(0)) };
     let mut lines = runtime::turn::HeldLines::open(kernel::RunId::CITY, "who".to_owned());

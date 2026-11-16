@@ -3,33 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a `/embeddings` call looks like on the wire, in both
-//! directions (shape 1 decision).
-//!
-//! **A vector face has one shape and several servers.** OpenAI
-//! published it, and every compatible server — a relay, a local
-//! text-embeddings-inference, an infinity — copied the same request
-//! and the same answer. So the shape is written once here and cited to
-//! OpenAI's own API description, rather than once per caller that
-//! wants a vector.
-//!
-//! The request states `encoding_format` even though the vendor
-//! defaults it: the reader below understands one encoding, and a
-//! default the server could change is not a thing to read an answer
-//! against.
-//!
-//! Sources, each read at the commit `docs/third-party.md` section 1
-//! tracks it to:
-//! `openai/openai-openapi` `openapi.yaml`, schemas `CreateEmbeddingRequest`,
-//! `CreateEmbeddingResponse` and `Embedding`;
-//! `huggingface/text-embeddings-inference` `docs/openapi.json`, schemas
-//! `OpenAICompatRequest` and `OpenAICompatResponse`, which is the same
-//! shape served by a local model.
-
 use kernel::{AxCode, AxError};
 use serde_json::Value;
 
-/// One call to a vector face.
 #[derive(Debug)]
 pub struct EmbeddingRequest {
     model: String,
@@ -37,20 +13,10 @@ pub struct EmbeddingRequest {
     dimensions: Option<u32>,
 }
 
-/// The encoding this city asks for and the only one it reads. OpenAI
-/// also serves `base64`, answering each `embedding` as a string rather
-/// than a list; it halves the bytes on the wire and would need a
-/// decoder here before it may be asked for.
 const ENCODING_FORMAT: &str = "float";
 
 impl EmbeddingRequest {
-    /// One request for one or more texts.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` when no text was given, or when one of them is
-    /// empty: OpenAI's description states the input "cannot be an
-    /// empty string", so the refusal happens here rather than as a 400
-    /// a person has to read the provider's words to understand.
+
     pub fn new(model: String, inputs: Vec<String>) -> Result<EmbeddingRequest, AxError> {
         if inputs.is_empty() || inputs.iter().any(String::is_empty) {
             return Err(AxError::failure(
@@ -70,31 +36,22 @@ impl EmbeddingRequest {
         })
     }
 
-    /// Ask the model to shorten its vectors. Supported by the models
-    /// whose documentation says so, and refused by the rest, which is
-    /// the provider's answer to give rather than this city's.
     #[must_use]
     pub fn with_dimensions(mut self, dimensions: u32) -> EmbeddingRequest {
         self.dimensions = Some(dimensions);
         self
     }
 
-    /// How many texts this request carries, which is how many vectors
-    /// its answer must hold.
     #[must_use]
     pub fn texts(&self) -> usize {
         self.inputs.len()
     }
 
-    /// The width this request asks for, where it asks for one. What the
-    /// ledger line records, because a stored vector is only comparable
-    /// with one of the same width.
     #[must_use]
     pub const fn dimensions(&self) -> Option<u32> {
         self.dimensions
     }
 
-    /// The JSON body, in the field order the vendor documents.
     #[must_use]
     pub fn body(&self) -> String {
         let mut body = serde_json::json!({
@@ -111,35 +68,17 @@ impl EmbeddingRequest {
     }
 }
 
-/// What a vector face answered: one vector per text, in the order the
-/// texts were sent.
 #[derive(Debug)]
 pub struct Embeddings {
     vectors: Vec<Vec<f64>>,
-    /// Which model answered, where the provider named one. A local
-    /// server routinely names none, and `None` says that rather than
-    /// an empty name.
+
     model: Option<String>,
-    /// What the provider counted, where it counted. Absent and zero
-    /// are different answers, so they are different values.
+
     prompt_tokens: Option<u64>,
 }
 
 impl Embeddings {
-    /// Read an answer against the request that asked for it.
-    ///
-    /// The `index` field carries the order, and this reader uses it
-    /// rather than the order the items happen to arrive in: OpenAI
-    /// documents the field as "the index of the embedding in the list
-    /// of embeddings", and a caller pairing vector 3 with text 1 has
-    /// built a retrieval index that returns the wrong passage and says
-    /// nothing about it.
-    ///
-    /// # Errors
-    /// `E_PROVIDER` when the answer holds a different number of
-    /// vectors than the request had texts, when an index is repeated
-    /// or out of range, or when a vector holds something that is not a
-    /// number.
+
     pub fn parse(answer: &Value, asked: &EmbeddingRequest) -> Result<Embeddings, AxError> {
         let data = answer
             .get("data")
@@ -184,35 +123,22 @@ impl Embeddings {
         })
     }
 
-    /// The vectors, in the order of the texts that produced them.
-    ///
-    /// Held as 64-bit although the wire states 32-bit: widening is
-    /// exact, narrowing is not, and a city that bans `as` does not
-    /// need a rounding rule to carry a number it only stores and
-    /// compares.
     #[must_use]
     pub fn vectors(&self) -> &[Vec<f64>] {
         &self.vectors
     }
 
-    /// Which model answered, as the provider named it. A relay may
-    /// serve a different model than the one that was asked for, and
-    /// this is where it says so.
     #[must_use]
     pub fn model(&self) -> Option<&str> {
         self.model.as_deref()
     }
 
-    /// What the provider counted for this call, where it counted at
-    /// all. A caller settling a bill needs the difference between "no
-    /// tokens" and "no statement".
     #[must_use]
     pub const fn prompt_tokens(&self) -> Option<u64> {
         self.prompt_tokens
     }
 }
 
-/// One item's vector, refusing anything that is not a list of numbers.
 fn vector_at(item: &Value) -> Result<Vec<f64>, AxError> {
     let numbers = item
         .get("embedding")
@@ -228,7 +154,6 @@ fn vector_at(item: &Value) -> Result<Vec<f64>, AxError> {
     Ok(vector)
 }
 
-/// An answer this version cannot read, stated without quoting it.
 fn unreadable(detail: &str) -> AxError {
     AxError::failure(
         AxCode::Provider,
@@ -279,8 +204,6 @@ mod tests {
         assert!(EmbeddingRequest::new("m".to_owned(), Vec::new()).is_err());
     }
 
-    /// The order on the wire is not the order of the texts, and the
-    /// `index` field is what says so.
     #[test]
     fn vectors_are_ordered_by_the_index_the_provider_stated() {
         let answer = serde_json::json!({
@@ -325,9 +248,6 @@ mod tests {
         assert!(Embeddings::parse(&not_numbers, &asked()).is_err());
     }
 
-    /// A local text-embeddings-inference server states no usage and no
-    /// model it was not given; those two absences are facts about that
-    /// server rather than a failure to read its answer.
     #[test]
     fn a_local_server_that_counts_nothing_is_still_read() {
         let answer = serde_json::json!({

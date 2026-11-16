@@ -3,39 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Motion gate: a transition's curve and duration are named once, in the
-//! client's theme (Tools/xtask/Spec.lean §8-51, docs/frontend-method.md §4-43).
-//!
-//! The same shape as the colour scan: one production point, the theme's
-//! entry and the parts it imports (`crate::theme`), and every
-//! other file in the client refused the spellings that would make it a
-//! second one. A curve is a timing function; a duration is what Tailwind
-//! turns `duration-150` into. Both have tokens - `ease-arrive`,
-//! `ease-leave`, `duration-short`, `duration-panel`, `duration-page` - and
-//! a view that writes its own is how one kind of movement came to have
-//! five answers.
-//!
-//! A component's own stylesheet - its `<style>` block, or a `.css` file
-//! outside the theme (`sheet::lines`) - is held to the same tokens in
-//! the shape a stylesheet writes them: a transition or an animation
-//! reads `var(--transition-duration-*)` rather than a number of
-//! milliseconds, a keyframes rule is declared in the theme's motion part
-//! and nowhere else, and no motion token is declared again. Replacement
-//! looks under `client/swap/` are read like the sources they replace.
-//!
-//! **Motion off is the person's as well as the machine's.** Tailwind's
-//! `motion-reduce:` and `motion-safe:` hear only the operating system,
-//! so a person who turned motion off in the appearance group still saw
-//! a press scale; the theme's `still:` variant hears both, and the gate
-//! refuses the other two for it.
-//!
-//! **What it does not read**: an inline `animation-duration` or
-//! `animation-delay` (the city drawing's ambient loops and the stagger
-//! between its figures are not movements across the page), a stylesheet's
-//! `animation-delay` and `transition-delay`, and `delay-*` (a hover
-//! hint's intent threshold, client/Spec.lean §4-18, not a duration of
-//! motion).
-
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
@@ -43,18 +10,12 @@ use crate::sheet::{self, Reading};
 use crate::theme;
 use crate::walk;
 
-/// The client's file kinds that carry a class or a style.
 const SCAN_EXTS: [&str; 4] = ["svelte", "ts", "css", "html"];
 
-/// The two CSS timing functions whose names are also ordinary words in
-/// code: each counts only when its first argument is a number, which is
-/// all either one takes. `{#snippet steps(each)}` is a snippet.
 const NUMERIC_FUNCTIONS: [&str; 2] = ["linear(", "steps("];
 
-/// The variants that hear only the operating system's motion setting.
 const MACHINE_VARIANTS: [&str; 2] = ["motion-reduce:", "motion-safe:"];
 
-/// The custom properties the theme's motion tokens are declared under.
 const MOTION_TOKENS: [&str; 4] = [
     "--ease-",
     "--transition-duration-",
@@ -62,22 +23,19 @@ const MOTION_TOKENS: [&str; 4] = [
     "--default-transition-",
 ];
 
-/// The two properties a stylesheet times a movement with; each also
-/// counts in its `-duration` longhand.
 const TIMED: [&str; 2] = ["transition", "animation"];
 
-/// What the gate refuses on one line.
 #[derive(Clone, Copy)]
 enum Refused {
-    /// A curve or a duration spelled as a timing function or a Tailwind class.
+
     Literal(&'static str),
-    /// A variant that hears only the operating system.
+
     MachineVariant(&'static str),
-    /// A number of seconds in a stylesheet's transition or animation.
+
     Duration,
-    /// A keyframes rule outside the theme.
+
     Keyframes,
-    /// A motion token declared outside the theme.
+
     Token(&'static str),
 }
 
@@ -160,8 +118,6 @@ impl Refused {
     }
 }
 
-/// The first variant on this line that hears only the operating system,
-/// as a class: nothing that continues a class name stands before it.
 fn machine_variant(line: &str) -> Option<&'static str> {
     MACHINE_VARIANTS.into_iter().find(|variant| {
         line.match_indices(variant).any(|(at, _)| {
@@ -172,10 +128,6 @@ fn machine_variant(line: &str) -> Option<&'static str> {
     })
 }
 
-/// What a stylesheet line spells that the gate refuses. `timing` carries
-/// whether a transition or an animation value is still open from the
-/// line before, because a value may run over several lines and the
-/// literal is reported on the line that holds it.
 fn sheet_refused_at(line: &str, timing: &mut bool) -> Option<Refused> {
     let timed = timed_literal(line, timing);
     if line.contains("@keyframes") {
@@ -188,9 +140,6 @@ fn sheet_refused_at(line: &str, timing: &mut bool) -> Option<Refused> {
         .or(timed.then_some(Refused::Duration))
 }
 
-/// Whether a transition or an animation value on this line holds a
-/// duration literal (`200ms`, `.2s`). A value runs from its property's
-/// colon to the next `;` or `}`, across lines while `timing` is set.
 fn timed_literal(line: &str, timing: &mut bool) -> bool {
     let mut rest = line;
     let mut found = false;
@@ -216,10 +165,6 @@ fn timed_literal(line: &str, timing: &mut bool) -> bool {
     }
 }
 
-/// Where the first transition or animation value on `rest` begins: just
-/// after the colon of `transition`, `transition-duration`, `animation` or
-/// `animation-duration` written as a property. `transition-property` and
-/// `animation-delay` time nothing and open no value.
 fn value_start(rest: &str) -> Option<usize> {
     TIMED
         .into_iter()
@@ -239,7 +184,6 @@ fn value_start(rest: &str) -> Option<usize> {
         .min()
 }
 
-/// Whether a token of a value is a number of seconds or milliseconds.
 fn is_duration(token: &str) -> bool {
     token
         .strip_suffix("ms")
@@ -252,7 +196,6 @@ fn is_duration(token: &str) -> bool {
         })
 }
 
-/// The first spelling on this line the gate refuses.
 fn literal_at(line: &str) -> Option<&'static str> {
     if line.contains("cubic-bezier(") {
         return Some("cubic-bezier(");
@@ -266,7 +209,6 @@ fn literal_at(line: &str) -> Option<&'static str> {
     tailwind_literal(line)
 }
 
-/// Whether `function` appears with a number as its first argument.
 fn takes_a_number(line: &str, function: &str) -> bool {
     line.match_indices(function).any(|(at, _)| {
         line.get(at.saturating_add(function.len())..)
@@ -275,10 +217,6 @@ fn takes_a_number(line: &str, function: &str) -> bool {
     })
 }
 
-/// `duration-150`, `duration-[90ms]` or `ease-[…]`, as a class: the
-/// utility starts where nothing that continues a class name stands
-/// before it, so a variant's `:` begins one and `--transition-duration-`
-/// does not.
 fn tailwind_literal(line: &str) -> Option<&'static str> {
     let starts = |at: usize| {
         line.get(..at)
@@ -310,8 +248,6 @@ fn tailwind_literal(line: &str) -> Option<&'static str> {
 mod tests {
     use super::{check, literal_at};
 
-    /// A curve declared in a part the theme imports is the theme's own
-    /// spelling; the same curve in a view is a second home for it.
     #[test]
     fn a_part_the_theme_imports_may_spell_a_curve() {
         let root = std::env::temp_dir().join(format!("motion-theme-part-{}", std::process::id()));
@@ -393,10 +329,6 @@ mod tests {
         assert_eq!(literal_at("animation: none;"), None);
     }
 
-    /// A component's own stylesheet reads the motion tokens like a
-    /// class does, a replacement look under `client/swap/` is held to
-    /// the same rules, and the variants that hear only the operating
-    /// system are refused for the one that also hears the person.
     #[test]
     fn a_component_style_reads_the_tokens_and_hears_the_person() {
         let root = std::env::temp_dir().join(format!("motion-sheet-{}", std::process::id()));

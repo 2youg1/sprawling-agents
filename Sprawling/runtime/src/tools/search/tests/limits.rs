@@ -5,11 +5,6 @@
 
 use super::*;
 
-/// The test city's transcripts are one JSON object per line, tens of
-/// kilobytes each: four whole lines spent the answer's byte budget and
-/// the search stopped with every later transcript in the directory
-/// unsearched. A hit carries a window of its line around the match, so
-/// a directory of such files answers every hit.
 #[test]
 fn hits_in_long_lines_all_come_back_and_each_carries_its_match() {
     let dir = tempfile::tempdir().unwrap();
@@ -45,8 +40,6 @@ fn hits_in_long_lines_all_come_back_and_each_carries_its_match() {
     );
 }
 
-/// A search that stops at a limit says which limit and how to narrow,
-/// because `truncated: true` alone reads as a fault of the tool.
 #[test]
 fn a_search_stopped_at_the_hit_cap_says_so_and_how_to_narrow() {
     let dir = tempfile::tempdir().unwrap();
@@ -70,9 +63,6 @@ fn a_search_stopped_at_the_hit_cap_says_so_and_how_to_narrow() {
     );
 }
 
-/// One hit whose own line is wider than the window is cut to the window
-/// and marked, instead of travelling whole: a single line of a generated
-/// file would otherwise spend the answer's budget by itself.
 #[test]
 fn a_hit_on_a_line_wider_than_the_window_is_cut_to_it() {
     let dir = tempfile::tempdir().unwrap();

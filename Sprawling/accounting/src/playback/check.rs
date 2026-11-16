@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a bundle or a playback page is found to be, as five separate
-//! items (`Sprawling/accounting/spec/Playback.lean` §8-12 and `Sprawling/accounting/spec/Playback/Check.lean` §8-13, accounting D25 (g)).
-//!
-//! A bundle on its own can only be found consistent: that says nothing
-//! about whether it was changed, because a changed bundle can be made
-//! consistent again. Against another bundle it is the same bytes or not.
-//! Against its city it is recomputed with the reader the caller names
-//! and compared whole, so keeping `source` while changing a table does
-//! not pass. A page adds what it loads and what a browser saw it do; each
-//! of these is its own item, because a static pass and an observed
-//! browser are different claims.
-
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -30,45 +18,41 @@ use super::reader::Reader;
 use super::select::Selection;
 use super::{Cutoff, PROJECTION_RULES, Projected, Request, observed, offline, project};
 
-/// The city a bundle is recomputed from, and who reads it there.
 #[derive(Debug, Clone)]
 pub struct City<'a> {
     pub root: &'a Path,
     pub reader: Reader,
 }
 
-/// What a check is asked to compare the file with, beyond itself.
 #[derive(Debug, Clone, Default)]
 pub struct Asked<'a> {
-    /// Another bundle's bytes.
+
     pub bundle: Option<&'a [u8]>,
-    /// The city the file's bundle was exported from.
+
     pub city: Option<City<'a>>,
-    /// What a browser saw the page do, as the skill recorded it.
+
     pub observed: Option<&'a [u8]>,
 }
 
-/// One item's conclusion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
     Passed,
     Failed {
         found: String,
     },
-    /// Nobody asked for this item, or the file is not one it applies to.
+
     Unasked {
         why: &'static str,
     },
-    /// It was asked for and could not be done.
+
     Unable {
         why: String,
     },
 }
 
-/// The five items, and the bundle they are about when one was read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Report {
-    /// BLAKE3 over the checked file's bytes, which an observation names.
+
     pub file: B3Hash,
     pub digest: Option<B3Hash>,
     pub events: Option<usize>,
@@ -77,12 +61,12 @@ pub struct Report {
     pub source: Verdict,
     pub offline: Verdict,
     pub browser: Verdict,
-    /// The paths the browser walked, when its item passed.
+
     pub covered: Vec<String>,
 }
 
 impl Report {
-    /// No item failed, and none that was asked for went undone.
+
     #[must_use]
     pub fn holds(&self) -> bool {
         self.items()
@@ -90,9 +74,6 @@ impl Report {
             .all(|(_, verdict)| matches!(verdict, Verdict::Passed | Verdict::Unasked { .. }))
     }
 
-    /// The report as one JSON object: the file's digest, the bundle's
-    /// digest and event count when a bundle was read, then each item as `passed`, `failed` with what
-    /// was found, or `unchecked` with why.
     #[must_use]
     pub fn line(&self) -> Value {
         let mut line = Map::new();
@@ -134,8 +115,6 @@ impl Report {
     }
 }
 
-/// Checks `file`, a bundle or a playback page, item by item. A file whose
-/// first byte is `{` is a bundle; anything else is a page.
 #[must_use]
 pub fn check(file: &[u8], asked: &Asked<'_>) -> Report {
     let (opened, offline) = match file.first() {
@@ -191,8 +170,6 @@ pub fn check(file: &[u8], asked: &Asked<'_>) -> Report {
     }
 }
 
-/// A bundle that reads, is consistent, and, inside a page, whose page's
-/// references resolve against it; or what was found instead.
 fn opened(bytes: &[u8], page: Option<&Page>) -> Result<(Document, Bundle), String> {
     let (document, bundle) = decode(bytes).map_err(|err| err.subject().to_owned())?;
     consistent(&document).map_err(|err| err.subject().to_owned())?;
@@ -276,12 +253,10 @@ fn unreadable() -> Verdict {
     }
 }
 
-/// What recomputing a bundle from its city found.
 enum Recomputed {
     Same,
     Differs(&'static str),
-    /// This build, this reader or this city cannot recompute it, and the
-    /// text says what can.
+
     CannotReproduce(String),
 }
 
@@ -321,7 +296,6 @@ fn recomputed(document: &Document, root: &Path, reader: Reader) -> Result<Recomp
     })
 }
 
-/// The first section in which two documents differ, if any.
 fn first_difference(ours: &Document, theirs: &Document) -> Option<&'static str> {
     let sections: [(&'static str, bool); 12] = [
         ("schema", ours.schema == theirs.schema),

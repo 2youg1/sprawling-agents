@@ -3,26 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The fourth comparison arm: the plan's processors held by hard
-//! affinity (`Sprawling/app/spec/Serving/Placement.lean`, D41 and
-//! D103). It is built to be measured later, and it is honest about what
-//! each platform can do: a Windows Job Object holds this process to the
-//! plan's mask, Linux has the call but not through a safe Rust interface
-//! so the whole binary is started under `taskset -c` from outside, and
-//! macOS has no call at all.
-//!
-//! A job's affinity limit is inherited by every process in the job, so
-//! the harness job lets children leave it: a run's own Job Object is
-//! free to take the processors the plan did not.
-
 use super::plan::Processor;
 use super::{MODULE, notice};
 
-/// What the arm does with this machine, or why it does nothing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Did {
-    /// This process is in a Job Object whose affinity limit is this
-    /// mask of this processor group.
+
     #[cfg_attr(
         not(windows),
         expect(
@@ -35,31 +21,21 @@ pub(crate) enum Did {
         mask: u64,
         runs: runtime::backlog::RunAffinity,
     },
-    /// The call is external here: the whole binary is started under this
-    /// `taskset -c` list by whoever runs the measurement.
+
     #[cfg_attr(
         not(target_os = "linux"),
         expect(dead_code, reason = "only Linux answers with a taskset list")
     )]
     External { list: String },
-    /// No mechanism, or one that refused, and the reason the doctor's
-    /// line carries.
+
     Nothing { reason: String },
 }
 
-/// The one taking of this process, and the answer every later reader
-/// gets: the first seat takes it, and the doctor reads it back.
 static TAKEN: std::sync::OnceLock<Did> = std::sync::OnceLock::new();
 
-/// The Job Object this process was taken into, kept open for as long as
-/// the process lives: closing the last handle to a job destroys it, and
-/// with it the affinity limit.
 #[cfg(windows)]
 static JOB: std::sync::OnceLock<win32job::Job> = std::sync::OnceLock::new();
 
-/// Takes this process into the arm's mechanism, once, and says as a
-/// process notice what happened when that is not [`Did::Pinned`]; the
-/// answer is kept for [`clause`].
 pub(crate) fn take(seats: &[Processor]) -> Did {
     let did = TAKEN.get_or_init(|| acted(seats)).clone();
     if !matches!(did, Did::Pinned { .. }) {
@@ -74,7 +50,6 @@ pub(crate) fn take(seats: &[Processor]) -> Did {
     did
 }
 
-/// The run request saved before this process's affinity was narrowed.
 pub(crate) fn run_affinity() -> runtime::backlog::RunAffinity {
     match TAKEN.get() {
         Some(Did::Pinned { runs, .. }) => *runs,
@@ -84,8 +59,6 @@ pub(crate) fn run_affinity() -> runtime::backlog::RunAffinity {
     }
 }
 
-/// The arm's clause for the doctor's line (D47): what was done, or what
-/// would be done now.
 pub(crate) fn clause(seats: &[Processor]) -> String {
     let did = match TAKEN.get() {
         Some(did) => did.clone(),
@@ -106,8 +79,6 @@ fn words(did: &Did, cores: usize) -> String {
     }
 }
 
-/// The taking that needs the platform, or the answer of [`would`] when
-/// there is nothing to take.
 #[cfg(windows)]
 fn acted(seats: &[Processor]) -> Did {
     let (group, mask, runs) = match would(seats) {
@@ -148,14 +119,11 @@ fn acted(seats: &[Processor]) -> Did {
     Did::Pinned { group, mask, runs }
 }
 
-/// Nothing to take: the platform call is external (`taskset`) or absent.
 #[cfg(not(windows))]
 fn acted(seats: &[Processor]) -> Did {
     would(seats)
 }
 
-/// What the arm asks of this platform for these seats, without changing
-/// anything.
 fn would(seats: &[Processor]) -> Did {
     if seats.is_empty() {
         return Did::Nothing {
@@ -172,9 +140,7 @@ fn would(seats: &[Processor]) -> Did {
                 };
             }
         };
-        // An ideal processor and a job's affinity limit are both named
-        // inside one group, and a limit cannot exceed what this process
-        // may already use.
+
         let mask = seats
             .iter()
             .filter(|seat| seat.group == group.group)
@@ -210,8 +176,6 @@ fn would(seats: &[Processor]) -> Did {
     }
 }
 
-/// The available processors outside the core plan; an empty or
-/// unrepresentable remainder asks for no affinity (D103).
 #[cfg(any(windows, test))]
 fn remaining(available: u64, core: u64) -> runtime::backlog::RunAffinity {
     match usize::try_from(available & !core) {
@@ -233,8 +197,6 @@ fn remaining(available: u64, core: u64) -> runtime::backlog::RunAffinity {
 mod tests {
     use super::*;
 
-    /// The core reads back its planned mask, and a run child reports the
-    /// remaining mask after enrolment, independently of the run window.
     #[cfg(windows)]
     #[test]
     #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
@@ -355,9 +317,6 @@ mod tests {
         assert_eq!(u64::try_from(run_mask.get()).unwrap() & mask, 0);
     }
 
-    /// Linux has the call but not through a safe interface, so the arm
-    /// asks to be started under `taskset` rather than doing nothing
-    /// quietly.
     #[cfg(target_os = "linux")]
     #[test]
     fn linux_asks_to_be_started_under_taskset() {
@@ -379,8 +338,6 @@ mod tests {
         );
     }
 
-    /// A platform with no mechanism says so rather than silently doing
-    /// nothing.
     #[cfg(not(any(windows, target_os = "linux")))]
     #[test]
     fn a_platform_without_the_call_says_so() {
@@ -395,8 +352,6 @@ mod tests {
         assert!(clause(&seats).contains("nothing is pinned"));
     }
 
-    /// The mask partitions every small available set, including an
-    /// empty remainder and planned bits outside the available set.
     #[test]
     fn run_processors_are_available_and_outside_the_core_plan() {
         for available in 0_u64..256 {
@@ -414,7 +369,6 @@ mod tests {
         }
     }
 
-    /// No plan means nothing to pin, said rather than hidden.
     #[test]
     fn an_empty_plan_pins_nothing_and_says_so() {
         let Did::Nothing { reason } = would(&[]) else {

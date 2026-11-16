@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The three registry books: Artifact, Asset,
-//! Resident census. The load-bearing line is the Claim/Artifact split —
-//! an unverified result is testimony, and `Artifact::verify` is the only
-//! door between the two (player–referee in the type). The registry is a
-//! value, not a store: state lives with the caller and is rebuilt from
-//! the Ledger.
-//! The part `Sprawling/kernel/spec/Registry.lean` specifies this module.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
@@ -20,8 +12,6 @@ use crate::error::{AxCode, AxError};
 use crate::event::EventRef;
 use crate::locator::Locator;
 
-/// Non-empty resident identity; the `role@building.n` grammar tightens
-/// with city::resident.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ResidentId(String);
@@ -41,16 +31,12 @@ impl ResidentId {
     }
 }
 
-/// Testimony: a result nobody has verified yet. Claims never enter the
-/// registry; they only carry what to verify.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Claim {
     pub locator: Locator,
     pub by: String,
 }
 
-/// A verified product. Private fields: the only constructor demands
-/// verification evidence of a kind in `completion::CITABLE`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Artifact {
     locator: Locator,
@@ -58,8 +44,7 @@ pub struct Artifact {
 }
 
 impl Artifact {
-    /// Sole constructor: player–referee in the type. Verification evidence
-    /// must cite a kind in `completion::CITABLE`, else E_EVIDENCE_MISSING.
+
     pub fn verify(claim: Claim, evidence: EventRef) -> Result<Artifact, AxError> {
         if CITABLE.contains(&evidence.kind()) {
             return Ok(Artifact {
@@ -88,15 +73,12 @@ impl Artifact {
     }
 }
 
-/// Deliberately exhaustive registration verdict.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RegisterVerdict {
     Registered,
     AlreadyRegistered,
 }
 
-/// The three books. Keys are canonical locator spellings (Display is the
-/// canonical form by the locator round-trip law).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Registry {
     artifacts: BTreeMap<String, Artifact>,
@@ -120,9 +102,6 @@ impl Registry {
         }
     }
 
-    /// Promotion registers standing only; scoring is an instrument's (citysim). An
-    /// unregistered locator cannot be an asset — assets are promoted
-    /// artifacts, not free-floating paths.
     pub fn promote_asset(&mut self, locator: &Locator) -> Result<RegisterVerdict, AxError> {
         let key = locator.to_string();
         if !self.artifacts.contains_key(&key) {
@@ -149,16 +128,10 @@ impl Registry {
         self.artifacts.get(&locator.to_string())
     }
 
-    /// Whether this locator was promoted. The Discard door does not ask:
-    /// a planned discard of an asset is as reversible as any other
-    /// (`Sprawling/kernel/spec/Discard.lean` §8-26).
     pub fn is_asset(&self, locator: &Locator) -> bool {
         self.assets.contains(&locator.to_string())
     }
 
-    /// Address-level asset membership: a path is an
-    /// asset when any registered asset is a `file:` locator at exactly
-    /// this address (content pins differ, the place is the same).
     pub fn is_asset_at(&self, addr: &crate::address::Address) -> bool {
         self.assets.iter().any(|key| {
             matches!(
@@ -249,10 +222,6 @@ mod tests {
         assert!(registry.is_asset(&locator()));
     }
 
-    /// The registry answers yes only for what it holds, and what it holds
-    /// moves one step at a time: a registered artifact is found but is no
-    /// asset until promoted, and a promoted `file:` asset makes its own
-    /// address an asset and no other.
     #[test]
     fn each_query_answers_for_what_the_registry_holds_and_nothing_else() {
         let held = Locator::parse(&format!("file:lab/notes.md@{}", "ab".repeat(20))).unwrap();

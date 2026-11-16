@@ -5,8 +5,6 @@
 
 use super::*;
 
-/// A run judges the three widths the columns are laid out at, and the
-/// two conditions the page is painted under.
 #[test]
 fn a_run_with_no_width_named_opens_every_pass() {
     let passes = wanted().unwrap();
@@ -14,7 +12,6 @@ fn a_run_with_no_width_named_opens_every_pass() {
     assert_eq!(widths, vec![768, 1280, 2560, 1280, 1280]);
 }
 
-/// The pass names itself in the words a violation carries.
 #[test]
 fn a_pass_says_how_wide_and_how_lit_it_is() {
     let called: Vec<String> = wanted().unwrap().iter().map(|pass| pass.called()).collect();
@@ -30,8 +27,6 @@ fn a_pass_says_how_wide_and_how_lit_it_is() {
     );
 }
 
-/// A pass that asked for the light page and measured the dark one has
-/// measured some other page, and says so instead of reporting green.
 #[test]
 fn a_light_pass_that_drew_a_dark_page_is_caught() {
     let passes = wanted().unwrap();
@@ -44,8 +39,6 @@ fn a_light_pass_that_drew_a_dark_page_is_caught() {
     assert!(light.disagrees(&Reported::read("0", "light")).is_none());
 }
 
-/// And a forced-colour pass the engine did not put in forced colours.
-/// Its lighting is the system's to decide, so it is not asked about.
 #[test]
 fn a_forced_colour_pass_the_engine_ignored_is_caught() {
     let passes = wanted().unwrap();

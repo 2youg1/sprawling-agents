@@ -17,8 +17,6 @@ mod whole;
 
 const BODY: &str = "# Firing a kiln\n\nbody\n";
 
-/// One skill package in the layout a shelf outside the city files them:
-/// a directory named after the skill, holding `SKILL.md`.
 fn package(parent: &Path, name: &str, text: &str) -> PathBuf {
     let dir = parent.join(name);
     std::fs::create_dir_all(&dir).unwrap();
@@ -26,7 +24,6 @@ fn package(parent: &Path, name: &str, text: &str) -> PathBuf {
     dir
 }
 
-/// The file a shelved skill lands as.
 fn shelved(city_root: &Path, section: &str, name: &str) -> PathBuf {
     city_root
         .join(kernel::RESERVED_PREFIX)
@@ -35,7 +32,6 @@ fn shelved(city_root: &Path, section: &str, name: &str) -> PathBuf {
         .join(format!("{name}.md"))
 }
 
-/// Where a whole package lands: a directory named after the skill.
 fn shelved_package(city_root: &Path, section: &str, name: &str) -> PathBuf {
     city_root
         .join(kernel::RESERVED_PREFIX)
@@ -44,8 +40,6 @@ fn shelved_package(city_root: &Path, section: &str, name: &str) -> PathBuf {
         .join(name)
 }
 
-/// A registrar that records every byte string it was handed and answers
-/// the content hash, standing in for the assembly layer's CAS binding.
 fn counted() -> (
     Rc<RefCell<Vec<Vec<u8>>>>,
     Rc<RefCell<Store>>,
@@ -62,9 +56,6 @@ fn counted() -> (
     (seen, store, register)
 }
 
-/// Places `target` at `link` as a link, on a machine that has no symlink
-/// privilege: Windows gets a junction, which `symlink_metadata` reports
-/// through the same name-surrogate predicate a symlink is reported by.
 #[cfg(windows)]
 #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn make_link(link: &Path, target: &Path) {
@@ -82,8 +73,6 @@ fn make_link(link: &Path, target: &Path) {
     std::os::unix::fs::symlink(target, link).unwrap();
 }
 
-/// The fixture is worthless unless what it built is a link, and that is
-/// an assertion about this machine rather than about the code under test.
 fn assert_is_link(path: &Path) {
     let meta = std::fs::symlink_metadata(path).unwrap();
     assert!(meta.file_type().is_symlink(), "{path:?} is not a link");
@@ -114,16 +103,13 @@ fn an_installed_skill_is_shelved_and_read_back_whole() {
     assert!(!shelved_package(city_root.path(), "utilities", "firing").exists());
     let manifest = seen.borrow().last().unwrap().clone();
     assert_eq!(B3Hash::digest(&manifest), installed.hash);
-    // The scan reads back exactly the holding install reported: one name
-    // is one holding, and the two derivations cannot disagree.
+
     let library = store
         .borrow()
         .scan(city_root.path(), None, Path::new("no-home"));
     assert_eq!(library.all(), vec![&installed.holding]);
 }
 
-/// A resident's own document arrives as a file rather than a package,
-/// and lands the same way.
 #[test]
 fn a_residents_own_document_is_shelved_the_same_way() {
     let city_root = tempfile::tempdir().unwrap();
@@ -164,16 +150,12 @@ fn reinstalling_the_same_bytes_is_idempotent() {
     assert_eq!(seen.borrow().len(), 2, "a reinstall writes no byte");
 }
 
-/// The recheck is the whole point of the gap between deciding and
-/// landing: a package that moved underneath is refused entire, and
-/// neither the shelves nor the store are touched.
 #[test]
 fn a_package_changed_while_it_was_being_installed_is_refused_whole() {
     let city_root = tempfile::tempdir().unwrap();
     let stage = tempfile::tempdir().unwrap();
     let slot = Slot::library("utilities").unwrap();
 
-    // The document is swapped after it was checked.
     let swapped = package(stage.path(), "swapped", BODY);
     let planned = plan_install(city_root.path(), &slot, &swapped).unwrap();
     std::fs::write(swapped.join("SKILL.md"), "# Something else\n").unwrap();
@@ -189,8 +171,6 @@ fn a_package_changed_while_it_was_being_installed_is_refused_whole() {
         "a refused install leaves the shelves untouched"
     );
 
-    // The directory itself is swapped after it was checked: another
-    // entry appears, and what was checked is no longer what is there.
     let grown = package(stage.path(), "grown", BODY);
     let planned = plan_install(city_root.path(), &slot, &grown).unwrap();
     std::fs::write(grown.join("notes.md"), "loose end\n").unwrap();
@@ -200,16 +180,12 @@ fn a_package_changed_while_it_was_being_installed_is_refused_whole() {
     assert!(!shelved_package(city_root.path(), "utilities", "grown").exists());
 }
 
-/// A package reached through a link is refused whatever the link points
-/// at: its bytes are not the package's to file, and where it points can
-/// change between the check and the landing.
 #[test]
 fn a_package_reached_through_a_link_is_always_refused() {
     let city_root = tempfile::tempdir().unwrap();
     let stage = tempfile::tempdir().unwrap();
     let slot = Slot::library("utilities").unwrap();
 
-    // The package directory itself is a link.
     let real = package(stage.path(), "real", BODY);
     let linked = stage.path().join("linked");
     make_link(&linked, &real);
@@ -217,7 +193,6 @@ fn a_package_reached_through_a_link_is_always_refused() {
     let err = plan_install(city_root.path(), &slot, &linked).unwrap_err();
     assert_eq!(*err.code(), AxCode::InvalidArgs);
 
-    // The document inside the package is a link.
     let holder = stage.path().join("holder");
     std::fs::create_dir_all(&holder).unwrap();
     let pkg = stage.path().join("inner");
@@ -234,8 +209,6 @@ fn a_package_reached_through_a_link_is_always_refused() {
     );
 }
 
-/// A new version replaces only the index; the old manifest and its
-/// bytes remain addressable for buildings that still pin them.
 #[test]
 fn a_new_version_replaces_the_index_without_overwriting_the_old_cas() {
     let city_root = tempfile::tempdir().unwrap();
@@ -264,7 +237,6 @@ fn a_new_version_replaces_the_index_without_overwriting_the_old_cas() {
         second.hash
     );
 
-    // The same name under another section is still a duplicate authority.
     let err = plan_install(city_root.path(), &Slot::library("domain").unwrap(), &src).unwrap_err();
     assert_eq!(*err.code(), AxCode::InvalidArgs);
     assert_eq!(
@@ -274,9 +246,6 @@ fn a_new_version_replaces_the_index_without_overwriting_the_old_cas() {
     );
 }
 
-/// A refusal about a name that is already on the shelf names the
-/// section that holds it: the person has to know which filing to take
-/// off the shelf, and the section being installed into is not it.
 #[test]
 fn a_refusal_names_the_section_that_holds_the_taken_name() {
     let city_root = tempfile::tempdir().unwrap();

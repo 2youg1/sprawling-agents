@@ -3,19 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A committed record and its one wire frame (`Sprawling/wire/spec/Server/Committed.lean` §8-47).
-//!
-//! The frame is spelled once, before the broadcast, so a socket's share
-//! of an event is two reference counts and a write however many tabs a
-//! person has open.
-
 use std::sync::Arc;
 
 use axum::extract::ws::Utf8Bytes;
 use kernel::{AxCode, AxError, EventRecord};
 
-/// What the Ledger's writer broadcasts: a record, and the
-/// `ServerFrame::Event` text that carries it. Cloning copies no bytes.
 #[derive(Debug, Clone)]
 pub struct Committed {
     record: Arc<EventRecord>,
@@ -23,13 +15,7 @@ pub struct Committed {
 }
 
 impl Committed {
-    /// Spells the frame: `{"event":`, the record's JSON, `}` - the shape
-    /// the externally tagged `ServerFrame::Event` serialises to.
-    ///
-    /// # Errors
-    /// `WireMismatch` when the record does not serialise; that record
-    /// reaches no socket, and the gap in `seq` it leaves makes each live
-    /// session send `Lagged` at the next record (`Sprawling/wire/spec/Reception.lean` §8-41).
+
     pub fn new(record: EventRecord) -> Result<Self, AxError> {
         let unframed = |detail: String| {
             AxError::failure(AxCode::WireMismatch, "frame a committed record", detail)
@@ -46,13 +32,11 @@ impl Committed {
         })
     }
 
-    /// The record the frame carries.
     #[must_use]
     pub fn record(&self) -> &EventRecord {
         &self.record
     }
 
-    /// The frame's text, shared rather than copied.
     pub(crate) fn frame(&self) -> Utf8Bytes {
         self.frame.clone()
     }
@@ -98,8 +82,6 @@ mod tests {
         assert_eq!(committed.frame().as_str(), whole);
     }
 
-    /// Nanoseconds of CPU one event costs the fan-out: the frame spelled
-    /// once, one send, then every subscriber takes the text it writes.
     fn fanout_ns_per_event(sockets: usize) -> u128 {
         const EVENTS: u64 = 4096;
         let (events, _) = broadcast::channel::<Committed>(64);

@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The crate table a document quotes (Tools/xtask/Spec.lean §8-40): one
-//! row per package of the product graph, each cell taken from the place
-//! that already holds it. Where a package lives and what it is called
-//! come from `members`, what it may depend on from the depmap block, and
-//! what it owns from its family's duty in the module map.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -17,16 +11,9 @@ use crate::members::{self, Member};
 use crate::report::XtaskError;
 use crate::{architecture, depmap, modmap, walk};
 
-/// The table's head. English, because the document that quotes it is.
 const HEAD: &str = "| Directory | Package | Lib | Owns | May depend on | SPEC |\n\
                     |---|---|---|---|---|---|";
 
-/// The whole table, head first, without a trailing newline.
-///
-/// # Errors
-/// When cargo, the depmap block or the module map cannot be read, when a
-/// package is missing from the block or has no duty (`modmap::duties`),
-/// and when a package has no SPEC beside it.
 pub(super) fn recount(root: &Path) -> Result<String, XtaskError> {
     let product: Vec<Member> = members::members(root)?
         .into_iter()
@@ -45,9 +32,6 @@ pub(super) fn recount(root: &Path) -> Result<String, XtaskError> {
         .join("\n"))
 }
 
-/// One package's row. The directory and the SPEC are repo-relative code
-/// spans rather than links, because a link's spelling depends on the
-/// directory of the document that quotes the table.
 fn row(
     root: &Path,
     member: &Member,

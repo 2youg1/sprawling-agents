@@ -3,14 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The two automation files a page reads (`Sprawling/wire/Spec.lean` §8-62): read at
-//! the moment of asking, through the same loaders the schedule tick and
-//! the watch listener read them through.
-
 use std::path::Path;
 
-/// The schedule and the watch table as they stand, one unreadable file
-/// leaving the other listed.
 pub(crate) fn automation_answer(city_root: &Path) -> wire::Answer {
     let mut answer = wire::AutomationAnswer::default();
     match city::Schedule::load(city_root) {
@@ -26,8 +20,6 @@ pub(crate) fn automation_answer(city_root: &Path) -> wire::Answer {
     wire::Answer::Automation(Box::new(answer))
 }
 
-/// The line a page shows for a file that did not read: its name and the
-/// refusal the next tick would give.
 fn unread(file: &str, refused: &kernel::AxError) -> String {
     format!("{file}: {} ({})", refused.subject(), refused.recovery())
 }
@@ -60,8 +52,6 @@ fn source_of(source: &city::Source) -> wire::WatchedSource {
 mod tests {
     use super::*;
 
-    /// Both tables are listed as written, and a file that does not read
-    /// is named with its reason while the other is still listed.
     #[test]
     fn the_automation_query_lists_both_tables_and_names_the_one_that_does_not_read() {
         let dir = tempfile::tempdir().unwrap();

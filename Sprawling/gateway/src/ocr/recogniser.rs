@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Attached or absent, one picture shown to the chosen model, and the
-//! text read back (`Sprawling/gateway/spec/Ocr.lean` §8-34).
-//!
-//! The attached state holds the adapter [`adapter_for`](crate::adapter_for)
-//! builds for the chosen model, so a picture travels the path every other
-//! picture in this city travels: named by its locator in the request,
-//! fetched by that locator through the adapter's picture face, and
-//! written on the wire by the dialect of the face the endpoint speaks.
-
 use std::borrow::Cow;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -23,42 +14,30 @@ use kernel::{
 
 use super::picture::Picture;
 
-/// The one system block every picture is read under.
 const INSTRUCTION: &str = "\
 You read pictures for a coding agent. Write out all the text the picture \
 shows, in reading order, keeping a line break wherever the picture starts \
 a new line. Answer with that text and nothing else; when the picture shows \
 no text, answer with nothing.";
 
-/// What the user message beside the picture asks.
 const ASK: &str = "Write out the text in this picture.";
 
-/// The picture the call in flight shows, where the adapter's picture
-/// face reads it. Empty between calls.
 pub(super) type Shown = Arc<Mutex<Option<Picture>>>;
 
-/// The city's facility for reading the text in a picture, which may not
-/// exist.
-///
-/// `absent` is the ordinary state of a city nobody chose a model for
-/// `ocr` in, and every call on it is answered by a refusal rather than
-/// by silence.
 pub struct Recogniser {
     attached: Option<Seeing>,
 }
 
-/// The chosen model, and what every request to it carries.
 pub(super) struct Seeing {
     pub(super) model: Box<dyn Model + Send>,
     pub(super) model_id: String,
-    /// The ceiling the choice was registered with.
+
     pub(super) max_tokens: Option<Ceiling>,
     pub(super) shown: Shown,
 }
 
 impl Recogniser {
-    /// A city with no model chosen for `ocr`. Every `recognise` on it
-    /// refuses by name.
+
     #[must_use]
     pub fn absent() -> Recogniser {
         Recogniser { attached: None }
@@ -70,22 +49,11 @@ impl Recogniser {
         }
     }
 
-    /// Whether this city can read a picture at all.
     #[must_use]
     pub fn is_attached(&self) -> bool {
         self.attached.is_some()
     }
 
-    /// One picture, one call to the chosen model, the text it read.
-    ///
-    /// An empty answer is a real answer: a picture with no text in it
-    /// reads as nothing.
-    ///
-    /// # Errors
-    /// `E_TOOL_UNAVAILABLE` when no model is chosen; whatever the
-    /// adapter refuses, a model registered as reading text only among
-    /// it; `E_STORAGE_FATAL` when a call that died left the picture
-    /// locked.
     pub fn recognise(
         &mut self,
         picture: Picture,
@@ -101,17 +69,11 @@ impl Recogniser {
 }
 
 impl Seeing {
-    /// The request that shows `seen`: the instruction, then one user
-    /// message holding the picture and what is asked of it. No tools: a
-    /// reader asked for text has nothing to call.
+
     fn request(&self, seen: ImageRef, policy: &BuildingPolicy) -> ModelRequest<'static> {
         ModelRequest {
             policy: policy.clone(),
-            // Not a run: there is no frozen prefix, so the four segment
-            // slots carry the hash of the one block that stands where a
-            // prefix would, as the adviser's do. Nothing writes this
-            // request to a ledger; the text it brings back is what a
-            // tool result records.
+
             segments: [B3Hash::digest(INSTRUCTION.as_bytes()); 4],
             chat: ChatRequest {
                 model: self.model_id.clone(),
@@ -139,10 +101,6 @@ impl Seeing {
     }
 }
 
-/// The text blocks of an answer, in order, one per line.
-///
-/// # Errors
-/// Propagates an answer whose content does not read.
 fn text_of(message: &Payload) -> Result<String, AxError> {
     let read: Vec<String> = content_from_message(message)?
         .into_iter()
@@ -158,8 +116,6 @@ fn text_of(message: &Payload) -> Result<String, AxError> {
     Ok(read.join("\n"))
 }
 
-/// The picture slot, or the refusal a slot left locked by a call that
-/// died is answered with.
 pub(super) fn held(shown: &Shown) -> Result<MutexGuard<'_, Option<Picture>>, AxError> {
     shown.lock().map_err(|_| {
         AxError::failure(
@@ -174,12 +130,6 @@ pub(super) fn held(shown: &Shown) -> Result<MutexGuard<'_, Option<Picture>>, AxE
     })
 }
 
-/// What a city with no model chosen for `ocr` says when asked to read a
-/// picture.
-///
-/// `E_TOOL_UNAVAILABLE` for the reason `transcribe` gives: the facility
-/// is optional and this deployment does not have it, which is not
-/// something a person filled in wrongly.
 fn unconfigured() -> AxError {
     AxError::failure(
         AxCode::ToolUnavailable,
@@ -214,7 +164,6 @@ mod tests {
     use crate::provider::registry::ConnectionKind;
     use crate::router::{AttachedEndpoint, Chosen, EndpointTuning};
 
-    /// What the stand-in endpoint read in every picture.
     const READ: &str = "KILN 1280";
 
     fn picture() -> Picture {
@@ -246,7 +195,6 @@ mod tests {
         }
     }
 
-    /// The answer each face gives when it read [`READ`].
     fn answer(kind: ConnectionKind) -> String {
         match kind {
             ConnectionKind::OpenAiCompat => serde_json::json!({
@@ -269,7 +217,6 @@ mod tests {
         .to_string()
     }
 
-    /// What one face was sent and what came back from it.
     #[derive(Debug, PartialEq)]
     struct Heard {
         path: String,
@@ -278,7 +225,6 @@ mod tests {
         read: String,
     }
 
-    /// One picture shown through a stand-in that speaks `kind`.
     fn shown_on(kind: ConnectionKind) -> Heard {
         let (url, server) = fake_provider(vec![(200, answer(kind))], false);
         let endpoint = AttachedEndpoint {
@@ -324,9 +270,6 @@ mod tests {
         .unwrap()
     }
 
-    /// The picture is written in the shape of the face the chosen
-    /// endpoint speaks, to that face's path, for the model the person
-    /// chose, and what the model read comes back.
     #[test]
     fn a_picture_is_shown_on_the_face_the_chosen_endpoint_speaks() {
         let kinds = [

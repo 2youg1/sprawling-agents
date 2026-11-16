@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every line `gauge` writes, and the one place each becomes text
-//! (`Sprawling/app/spec/Main.lean` §8-129-4).
-//!
-//! For an agent a line is one JSON object: the `line` key first, then
-//! integers under keys that end in their unit, `null` where nothing was
-//! measured, in a fixed order. For a person it is the same reading in
-//! units, through the one unit table, `monitor::top::Unit`.
-
 use std::fmt::Display;
 use std::time::Duration;
 
@@ -22,15 +14,8 @@ use sprawling::monitor::tree::TreeReading;
 
 use super::{Host, Run};
 
-/// What a person sees where nothing was measured.
 const UNMEASURED: &str = "-";
 
-/// One reading of a served city: `{"line":"city"}` followed by the
-/// sample's own fields, in their order.
-///
-/// # Errors
-/// Only what `serde_json` reports; a struct of integers gives it nothing
-/// to refuse.
 pub(crate) fn city_line(sample: &Sample) -> serde_json::Result<String> {
     #[derive(serde::Serialize)]
     struct CityLine<'sample> {
@@ -44,7 +29,6 @@ pub(crate) fn city_line(sample: &Sample) -> serde_json::Result<String> {
     })
 }
 
-/// One beat of a process tree, `at` after the watch began.
 pub(super) fn tree_line(at: Duration, reading: &TreeReading, audience: Audience) -> String {
     match audience {
         Audience::Agent => object(
@@ -72,7 +56,6 @@ pub(super) fn tree_line(at: Duration, reading: &TreeReading, audience: Audience)
     }
 }
 
-/// One run of a measured command.
 pub(super) fn run_line(run: &Run, audience: Audience) -> String {
     let seen = run.watched.seen;
     let seen_of = |figure: fn(&sprawling::monitor::tree::Seen) -> u64| seen.as_ref().map(figure);
@@ -129,8 +112,6 @@ pub(super) fn run_line(run: &Run, audience: Audience) -> String {
     }
 }
 
-/// The spread of every run's wall time, `failed` of them non-zero, on
-/// a machine of `host`'s class.
 pub(super) fn spread_line(spread: &Spread, failed: u32, host: Host, audience: Audience) -> String {
     match audience {
         Audience::Agent => object(
@@ -163,8 +144,6 @@ pub(super) fn spread_line(spread: &Spread, failed: u32, host: Host, audience: Au
     }
 }
 
-/// `{"line":"<line>","key":value,...}`. Every key is a constant here
-/// and every value an integer or `null`, so nothing needs escaping.
 fn object(line: &str, fields: &[(&str, String)]) -> String {
     let body: String = fields
         .iter()

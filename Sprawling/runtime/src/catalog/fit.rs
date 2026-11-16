@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a `tool` `run` stands for, and whether its arguments fit the top
-//! level of the named tool's input schema
-//! (`Sprawling/runtime/spec/Catalog.lean` `resolveCall`, §8-61).
-//!
-//! Only the top level is checked: the arguments are an object, every
-//! `required` key is present, every declared `type` matches, and no key
-//! is extra where `additionalProperties` is `false`. Deeper shapes are
-//! the tool's own parser's to judge, and it still refuses them.
-
 use std::collections::BTreeMap;
 
 use kernel::{AxCode, AxError, ErrorDraft, Payload, ToolCall, ToolDef, ToolName};
@@ -22,8 +13,6 @@ use crate::tools::ToolTool;
 
 const ACTION: &str = "run a tool through `tool`";
 
-/// The call a `tool` `run` stands for, or the one refusal for why it
-/// stands for none.
 pub(super) fn resolve(
     tools: &BTreeMap<String, Filed>,
     call: &ToolCall,
@@ -80,15 +69,12 @@ fn refused(subject: impl Into<String>) -> ErrorDraft {
     AxError::failure(AxCode::InvalidArgs, ACTION, subject)
 }
 
-/// A recovery sentence that hands the model the schema it missed.
 fn with_schema(def: &ToolDef, what: &str) -> String {
     let schema = serde_json::to_string(&def.input_schema)
         .unwrap_or_else(|err| format!("(the schema did not print: {err})"));
     format!("{what}; `{}` takes: {schema}", def.name)
 }
 
-/// Whether `args` fits the top level of `schema`, or the first reason it
-/// does not.
 pub(super) fn fits(schema: &Map<String, Value>, args: &Map<String, Value>) -> Result<(), String> {
     let declared = schema.get("properties").and_then(Value::as_object);
     if let Some(missing) = schema
@@ -120,9 +106,6 @@ pub(super) fn fits(schema: &Map<String, Value>, args: &Map<String, Value>) -> Re
     Ok(())
 }
 
-/// Whether `value` is of the JSON Schema `type` named by `wanted`, a
-/// type name or an array of them. A type this check does not know is
-/// left to the tool.
 fn is_of(value: &Value, wanted: &Value) -> bool {
     match wanted {
         Value::String(name) => is_named(value, name),

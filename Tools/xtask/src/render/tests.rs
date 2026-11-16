@@ -7,8 +7,6 @@ use super::*;
 
 use browser::survey::{Declared, Drawn, Overflow, Page, PaintSource, Sampled};
 
-/// `Violation` has no `Debug` on purpose (it is rendered, not dumped),
-/// so failures report the rules that fired.
 fn rules(found: &[Violation]) -> String {
     found
         .iter()
@@ -17,9 +15,6 @@ fn rules(found: &[Violation]) -> String {
         .join(" | ")
 }
 
-/// One element, in the shape the probe writes: what it is, where it was
-/// drawn (`[left, top, width, height]`), and where it sits in the tree
-/// (`(depth, nearest measured ancestor)`).
 fn el(tag: &str, name: &str, at: [i64; 4], nesting: (i64, i64)) -> Drawn {
     let [left, top, width, height] = at;
     let (depth, parent) = nesting;
@@ -44,8 +39,6 @@ fn el(tag: &str, name: &str, at: [i64; 4], nesting: (i64, i64)) -> Drawn {
     }
 }
 
-/// The gallery as it stands: a rail, a main column, a heading, and three
-/// sections that share one left edge.
 fn good() -> Vec<Drawn> {
     vec![
         el("NAV", "去处", [0, 0, 44, 1061], (3, -1)),
@@ -58,15 +51,12 @@ fn good() -> Vec<Drawn> {
     ]
 }
 
-/// One clickable row of a navigation column: where it was drawn, and the centre of
-/// the first mark inside it - the dot, or the glyph.
 fn row(name: &str, top: i64, mark: i64) -> Drawn {
     let mut held = el("A", name, [0, top, 44, 44], (5, 0));
     held.first_mark = mark;
     held
 }
 
-/// The rail as it stands: every row's first mark on one x.
 fn railed() -> Vec<Drawn> {
     let mut drawn = good();
     drawn.push(row("城", 8, 21));
@@ -75,13 +65,8 @@ fn railed() -> Vec<Drawn> {
     drawn
 }
 
-/// The label a real run takes from the pass it is in; the properties
-/// only carry it into the violation, so one stands in for all of them.
 const AT: &str = "at 1280px, dark in the colours it authored";
 
-/// The gate's own loop, over a page with no declared vocabulary: these
-/// fixtures paint nothing, so the readings that compare paint against a
-/// palette have nothing to say and the geometry is what is under test.
 fn judge(drawn: Vec<Drawn>) -> Vec<Violation> {
     let mut out = Vec::new();
     every_control_is_announceable(&drawn, AT, &mut out);
@@ -110,8 +95,6 @@ fn the_rail_the_client_draws_passes() {
     assert!(found.is_empty(), "{}", rules(&found));
 }
 
-/// The defect §5.1 names: the status dot centred in its own 8 px box
-/// sits five pixels left of every glyph under it.
 #[test]
 fn a_dot_five_pixels_left_of_the_glyphs_is_caught() {
     let mut drawn = railed();
@@ -126,8 +109,6 @@ fn a_dot_five_pixels_left_of_the_glyphs_is_caught() {
     );
 }
 
-/// A bar of tabs is not a column, and rows that share one top cannot
-/// share one x without sitting on top of one another.
 #[test]
 fn a_row_of_tabs_is_not_asked_to_share_an_x() {
     let mut drawn = good();
@@ -143,8 +124,6 @@ fn a_row_of_tabs_is_not_asked_to_share_an_x() {
     assert!(found.is_empty(), "{}", rules(&found));
 }
 
-/// A row whose first mark the probe could not find is not compared
-/// against the rows whose mark it did.
 #[test]
 fn a_row_with_no_mark_inside_it_is_left_alone() {
     let mut drawn = railed();
@@ -153,8 +132,6 @@ fn a_row_with_no_mark_inside_it_is_left_alone() {
     assert!(found.is_empty(), "{}", rules(&found));
 }
 
-/// The other half of §5.2: the stylesheet underlined a link under the
-/// pointer and took the key drawn inside it along.
 #[test]
 fn an_underlined_key_is_caught() {
     let mut drawn = railed();
@@ -183,8 +160,6 @@ fn the_shape_the_client_draws_passes() {
     assert!(found.is_empty(), "{}", rules(&found));
 }
 
-/// The finding the first real run made: the composer's text box is the
-/// control the page exists for, and it was announced as nothing.
 #[test]
 fn a_control_with_no_accessible_name_is_caught() {
     let mut drawn = good();
@@ -200,8 +175,6 @@ fn a_control_with_no_accessible_name_is_caught() {
     );
 }
 
-/// A control that is not drawn is not a control a person can reach, and
-/// naming it would be a rule about markup rather than about a reader.
 #[test]
 fn a_control_with_no_area_is_not_asked_for_a_name() {
     let mut drawn = good();
@@ -249,8 +222,6 @@ fn a_page_with_no_first_heading_is_caught() {
     );
 }
 
-/// The defect this gate was written for: one region indented past the
-/// others, so the page grows a second left edge.
 #[test]
 fn a_second_left_edge_is_caught() {
     let mut drawn = good();
@@ -265,7 +236,6 @@ fn a_second_left_edge_is_caught() {
     );
 }
 
-/// A pixel of rounding is not a decision somebody made twice.
 #[test]
 fn a_single_pixel_of_rounding_is_not_a_second_edge() {
     let mut drawn = good();
@@ -276,9 +246,6 @@ fn a_single_pixel_of_rounding_is_not_a_second_edge() {
     assert!(found.is_empty(), "{}", rules(&found));
 }
 
-/// The home page whose task box floated into the top right corner: the
-/// box is still painted, every test still passes, and it is the first
-/// thing a person sees.
 #[test]
 fn a_box_that_has_left_its_container_is_caught() {
     let mut drawn = good();
@@ -293,13 +260,6 @@ fn a_box_that_has_left_its_container_is_caught() {
     );
 }
 
-/// A page longer than the window is not a layout defect.
-///
-/// The rule exists for a box painted over whatever is beside it, and a
-/// container that scrolls paints nothing over anything: what is below
-/// the fold is reached by scrolling. Without this the gate reads every
-/// page with more content than one screen as broken, which is every
-/// page this product has.
 #[test]
 fn a_section_below_the_fold_of_a_scrolling_column_is_not_an_escape() {
     let mut drawn = good();
@@ -315,8 +275,6 @@ fn a_section_below_the_fold_of_a_scrolling_column_is_not_an_escape() {
     );
 }
 
-/// And the same section in a column that does not scroll still is one:
-/// the exemption is the container's own overflow, not the direction.
 #[test]
 fn a_section_below_the_fold_of_a_fixed_column_is_still_an_escape() {
     let mut drawn = good();
@@ -331,15 +289,6 @@ fn a_section_below_the_fold_of_a_fixed_column_is_still_an_escape() {
     );
 }
 
-/// The table every screen of this client draws its rows in: the box it
-/// scrolls in is now measured, so the rows are judged against the box
-/// that actually holds them.
-///
-/// Before the probe measured scrolling boxes, the nearest measured
-/// ancestor of a cell was the section two levels out, the exemption for
-/// a scrolling container could never apply, and a table whose content
-/// was two pixels narrower than its box was two pixels from being
-/// reported as a defect by a gate that is right about everything else.
 #[test]
 fn a_row_wider_than_the_box_it_scrolls_in_is_not_an_escape() {
     let mut drawn = good();
@@ -356,8 +305,6 @@ fn a_row_wider_than_the_box_it_scrolls_in_is_not_an_escape() {
     );
 }
 
-/// A finding names the pass it was found in: the same page at two
-/// widths is two places a reader has to be sent to.
 #[test]
 fn a_finding_names_the_pass_it_was_found_in() {
     let mut drawn = good();
@@ -372,8 +319,6 @@ fn a_finding_names_the_pass_it_was_found_in() {
     });
 }
 
-/// Containment is judged against the nearest measured ancestor, so an
-/// element at the top of the page is not compared with nothing.
 #[test]
 fn an_element_with_no_measured_parent_is_left_alone() {
     let drawn = vec![el("MAIN", "页面", [44, 0, 1372, 1061], (3, -1))];

@@ -3,31 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The conversation page's standing controls (Tools/xtask/Spec.lean
-//! §8-51, refrain P2 and P11): no fixed navigation or floating action
-//! bar over the conversation, and the persistent entries of its three
-//! clusters counted against the register.
-//!
-//! **A page is recognised by what a screen reader hears.** The
-//! conversation region and the edge keys are landmarks named from
-//! `lang.json`; the nearest measured box holding both is one conversation
-//! page. The names are read in every language the phrase table has,
-//! because the gallery is drawn in the language of the browser that
-//! opens it.
-//!
-//! **The composer is found by its text box, not by its form.** The probe
-//! measures regions, controls and anything with a role, and a `<form>` is
-//! none of the three; the text box the conversation is written in is. A
-//! control that neither scrolls with the thread nor answers a refusal
-//! belongs to the composer when it reaches below the top of that box, and
-//! is a fixed bar when it stands wholly above it.
-//!
-//! **The conversation's head holds one control.** The first standing
-//! control inside a `<header>` of the region is the address line that
-//! opens the palette (client/Spec.lean 4-10a), counted with the composer;
-//! a second control in the head is a bar again (Tools/xtask/Spec.lean
-//! §8-51).
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -37,17 +12,12 @@ use super::violation;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The phrase table the landmark names come from.
 const LANG: &str = concat!(crate::walk::client_src!(), "/lang.json");
 
-/// The register row the count is held to.
 const ROW: &str = "talk_controls";
 
-/// Roles whose controls P2 does not limit: a notice a person has to act
-/// on in time, and a panel that was opened.
 const RECOVERY_ROLES: [&str; 3] = ["alert", "status", "dialog"];
 
-/// The landmark names the gate reads, each in every language.
 pub(super) struct Words {
     conversation: Vec<String>,
     edge: Vec<String>,
@@ -55,12 +25,7 @@ pub(super) struct Words {
 }
 
 impl Words {
-    /// The names `lang.json` gives the conversation region, the edge keys
-    /// and the inspect side.
-    ///
-    /// # Errors
-    /// `XtaskError::Doc` when the table does not parse or lacks one of the
-    /// keys: a gate that cannot name what it looks for cannot judge.
+
     pub(super) fn read(root: &Path) -> Result<Self, XtaskError> {
         let text = walk::read_text(&root.join(LANG))?;
         let table: BTreeMap<String, BTreeMap<String, String>> = serde_json::from_str(&text)
@@ -87,9 +52,6 @@ impl Words {
     }
 }
 
-/// Judge every conversation page of one opening, and say how many
-/// standing controls the most crowded one has; `None` when the opening
-/// drew no conversation page at all.
 pub(super) fn the_conversation_page_holds_its_controls(
     drawn: &[Drawn],
     at: &str,
@@ -143,9 +105,6 @@ pub(super) fn the_conversation_page_holds_its_controls(
     most
 }
 
-/// Hold the count of one opening to the register: none drawn at all is a
-/// gallery with nothing to judge, and a count above the accepted reading
-/// plus its slack is a regression.
 pub(super) fn talk_controls_within_register(
     counted: Option<u64>,
     register: &toml::Value,
@@ -188,8 +147,6 @@ pub(super) fn talk_controls_within_register(
     }
 }
 
-/// Every conversation page: the nearest measured box holding both a
-/// conversation region and the edge keys, with the region in it.
 fn pages(drawn: &[Drawn], words: &Words) -> Vec<(usize, usize)> {
     let edges: Vec<usize> = named(drawn, &words.edge).collect();
     named(drawn, &words.conversation)
@@ -201,9 +158,6 @@ fn pages(drawn: &[Drawn], words: &Words) -> Vec<(usize, usize)> {
         .collect()
 }
 
-/// The regions whose accessible name is one of `names`: a landmark or a
-/// named section. A word of the same spelling inside a region - the chat
-/// mode is called 对话 too - is not a region.
 fn named<'a>(drawn: &'a [Drawn], names: &'a [String]) -> impl Iterator<Item = usize> + 'a {
     drawn
         .iter()
@@ -214,7 +168,6 @@ fn named<'a>(drawn: &'a [Drawn], names: &'a [String]) -> impl Iterator<Item = us
         .map(|(index, _)| index)
 }
 
-/// The parent chain of `index` as indices, nearest first.
 fn parents(drawn: &[Drawn], index: usize) -> impl Iterator<Item = usize> + '_ {
     std::iter::successors(parent_of(drawn, index), move |up| parent_of(drawn, *up))
 }
@@ -225,13 +178,10 @@ fn parent_of(drawn: &[Drawn], index: usize) -> Option<usize> {
         .and_then(|held| usize::try_from(held.parent).ok())
 }
 
-/// Whether the element at `holder` holds the element at `index`.
 fn holds(drawn: &[Drawn], holder: usize, index: usize) -> bool {
     parents(drawn, index).any(|up| up == holder)
 }
 
-/// The top of the text box the conversation is written in: the first one
-/// in the region that does not scroll with the thread.
 fn text_box_top(drawn: &[Drawn], region: usize) -> Option<i64> {
     drawn
         .iter()
@@ -246,8 +196,6 @@ fn text_box_top(drawn: &[Drawn], region: usize) -> Option<i64> {
         .next()
 }
 
-/// The controls in the region that stand still: drawn, operable, not
-/// carried by something that scrolls, and not part of a notice or panel.
 fn standing(drawn: &[Drawn], region: usize) -> impl Iterator<Item = (usize, &Drawn)> {
     drawn.iter().enumerate().filter_map(move |(index, held)| {
         (held.operable()
@@ -258,8 +206,6 @@ fn standing(drawn: &[Drawn], region: usize) -> impl Iterator<Item = (usize, &Dra
     })
 }
 
-/// Whether a `<header>` stands between `index` and the region: the
-/// conversation's head line.
 fn in_head(drawn: &[Drawn], region: usize, index: usize) -> bool {
     parents(drawn, index)
         .take_while(|up| *up != region)
@@ -267,8 +213,6 @@ fn in_head(drawn: &[Drawn], region: usize, index: usize) -> bool {
         .any(|up| up.tag == "HEADER")
 }
 
-/// Whether something between `index` and the region scrolls (so the
-/// control moves with the thread) or is a notice or a panel.
 fn moves_or_answers(drawn: &[Drawn], region: usize, index: usize) -> bool {
     parents(drawn, index)
         .take_while(|up| *up != region)
@@ -280,8 +224,6 @@ fn moves_or_answers(drawn: &[Drawn], region: usize, index: usize) -> bool {
         })
 }
 
-/// The operable controls drawn inside a landmark of the page named one
-/// of `names`.
 fn controls_in_named(drawn: &[Drawn], page: usize, names: &[String]) -> u64 {
     let clusters: Vec<usize> = named(drawn, names)
         .filter(|cluster| holds(drawn, page, *cluster))

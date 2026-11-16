@@ -3,18 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The verb that reads every TOML file a city holds and prints each
-//! refusal as `path:line:column: code: message` (`Sprawling/app/spec/Main.lean` §8-104).
-//! What is refused, and where, is `city::check`'s; this file only
-//! spells it in the shape an editor and a terminal can jump to.
-
 use std::path::Path;
 use std::process::ExitCode;
 
 use super::city::report;
 
-/// Exit codes: 0 every file read, 1 a file refused or the city itself
-/// unreadable, 2 this command line.
 pub(super) fn verb(city: Option<&String>) -> ExitCode {
     let Some(city) = city else {
         eprintln!("usage: sprawling check <city>");
@@ -36,8 +29,6 @@ pub(super) fn verb(city: Option<&String>) -> ExitCode {
     }
 }
 
-/// One refusal, its path relative to the city and spelled with `/` on
-/// every platform, so the same line is a jump target everywhere.
 fn line(root: &Path, finding: &city::Finding) -> String {
     let path = finding
         .path

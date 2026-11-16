@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The external-provider adapter: a self-written wire-format client over
-//! a plain HTTP transport. One call, one HTTP
-//! round trip: whether to try again is the watchdog's decision, never a
-//! hidden loop here.
-//!
-//! Credentials resolve at the last moment: the `Sealed` value is exposed
-//! only while the auth header is written, then dropped (zeroized).
-
-//! The three model doors of an endpoint. They are this crate's own:
-//! a caller outside it reaches them through `permit::Gated`, which takes
-//! the endpoint's permit first (`Sprawling/gateway/Spec.lean` §8-6).
-
 use kernel::{AxCode, AxError, ModelRequest, ModelReturn, UsdMicros};
 use serde_json::Value;
 
@@ -47,10 +35,7 @@ impl Endpoint {
     }
 
     pub(crate) fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
-        // A confidential building's bytes do not leave the machine, and
-        // this type is the way off it. The refusal is here rather than
-        // only at the routing layer because a backstop that lives where
-        // the leak would happen survives a routing mistake.
+
         if req.policy.confidential {
             return Err(self.confidential_refusal());
         }
@@ -65,13 +50,7 @@ impl Endpoint {
 }
 
 impl Endpoint {
-    /// One blocking POST of `wire`, the body built for `req`, read whole
-    /// within `timeout`. The one settled exchange: a call and a pre-warm
-    /// both go out and come back through it.
-    ///
-    /// # Errors
-    /// `E_PROVIDER` on transport failure, a non-success status or a body
-    /// cut short; a redemption failure from the headers.
+
     pub(super) fn post_settled(
         &self,
         req: &ModelRequest,
@@ -86,8 +65,7 @@ impl Endpoint {
             .map_err(|err| provider_err("call provider", &ProviderFailure::Exchange(&err)))?;
         let status = response.status();
         if !status.is_success() {
-            // The headers outlive the body read: a retry-after is read
-            // off them after `text` has taken the response.
+
             let headers = response.headers().clone();
             return Err(provider_err(
                 "call provider",
@@ -99,8 +77,7 @@ impl Endpoint {
                 ),
             ));
         }
-        // A cut stream surfaces here as a body read error — no partial
-        // ModelReturn is ever fabricated.
+
         let body: Value = response.json().map_err(|err| {
             provider_err("read provider response", &ProviderFailure::Exchange(&err))
         })?;
@@ -109,13 +86,10 @@ impl Endpoint {
 }
 
 impl Endpoint {
-    /// The return a settled wire answer makes, billed when this endpoint
-    /// knows its price. Both doors end here, so a streamed call and a
-    /// blocking one given the same answer return the same value.
+
     pub(super) fn returned(&self, settled: &Value) -> Result<ModelReturn, AxError> {
         let resp = response_from_wire(self.config.dialect, settled)?;
-        // A row with no figure is nobody's price: settling it would
-        // record a measured zero where no measurement exists.
+
         let billed: Option<UsdMicros> = match &self.config.pricing {
             Some(entry) if entry.states_a_price() => {
                 Some(cost::settle(&resp.usage, None, entry)?.billed)
@@ -125,13 +99,6 @@ impl Endpoint {
         ModelReturn::from_response(resp, billed)
     }
 
-    /// What the chosen model accepts, answered before the request is
-    /// built.
-    ///
-    /// The catalogue row this endpoint was configured with is where the
-    /// choice is known, so this is where a picture meets it. Dropping
-    /// the picture instead would send a conversation that refers to
-    /// something the model was never given.
     fn refuse_pictures_a_blind_model_cannot_read(&self, req: &ModelRequest) -> Result<(), AxError> {
         if !self.blind_to_this_request(req) {
             return Ok(());
@@ -147,10 +114,6 @@ impl Endpoint {
         ))
     }
 
-    /// Whether the real call refuses this request before anything leaves
-    /// the machine: the model is registered as reading text only, and
-    /// the request carries a picture. `prewarm_for` asks it too, so a
-    /// call that ends here sends no cache write first (gateway D39).
     pub(super) fn blind_to_this_request(&self, req: &ModelRequest) -> bool {
         self.config
             .pricing
@@ -159,9 +122,6 @@ impl Endpoint {
             && !super::call::pictures_in(&req.chat).is_empty()
     }
 
-    /// The one sentence both doors say when a confidential building asks
-    /// to leave this machine. Written once because two copies of a
-    /// security refusal are two chances for one of them to soften.
     fn confidential_refusal(&self) -> AxError {
         AxError::failure(
             AxCode::GateDenied,
@@ -194,9 +154,7 @@ mod tests {
 
     #[test]
     fn a_model_that_cannot_see_refuses_the_picture_instead_of_dropping_it() {
-        // No listener: a refusal that came from the far side would be a
-        // transport error, so reaching E_INVALID_ARGS proves the check
-        // ran before the request left.
+
         let blind = crate::market::MarketSnapshot::builtin()
             .unwrap()
             .lookup("local")
@@ -257,8 +215,7 @@ mod tests {
     }
     #[test]
     fn a_confidential_building_never_reaches_a_remote_provider() {
-        // No listener at all: if the refusal were routing-level rather
-        // than here, this would fail as a transport error instead.
+
         let mut endpoint =
             Endpoint::new(config("http://127.0.0.1:1/v1/messages"), redemption()).unwrap();
         let mut confidential = request();
@@ -268,11 +225,6 @@ mod tests {
         assert!(err.recovery().contains("local model"));
     }
 
-    /// **A provider that ignores `stream: true` still answers.** Many
-    /// OpenAI-compatible servers, local ones most of all, reply to a
-    /// stream request with one `application/json` body. Read as frames
-    /// it holds none, so the call failed as a cut stream although the
-    /// whole answer had arrived, and the run backed off and asked again.
     #[test]
     fn a_whole_body_answering_a_stream_request_is_the_answer_a_call_returns() {
         let body = serde_json::json!({
@@ -290,11 +242,6 @@ mod tests {
         assert!(server.join().unwrap()[1].contains("\"stream\":true"));
     }
 
-    /// **A tool call reaches the caller while the model is still
-    /// writing.** The provider sends a complete `read` call, then waits
-    /// to hear that the caller has it before it writes the text that
-    /// follows; a door that handed the call over only after the answer
-    /// settled would leave the server waiting, and it answers `false`.
     #[test]
     fn a_tool_call_is_handed_over_before_the_answer_settles() {
         let frame = |value: serde_json::Value| value.to_string();

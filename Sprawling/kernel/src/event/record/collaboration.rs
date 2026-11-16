@@ -3,19 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What residents did together: the goals a building pursues, the
-//! ground two goals met on, and the signals they send one another.
-//!
-//! `goal_registered` has no struct here: its payload is the
-//! [`GoalEntry`](crate::GoalEntry) the goal register holds, written and
-//! read through `Payload::of` and `Payload::read` like every record.
-
 use serde::{Deserialize, Serialize};
 
 use crate::{Address, AxCode, AxError, ByteLen, GoalId, Payload, PursuitState, TimeMs, Version};
 
-/// `goal_conflict`: a goal that asked for ground another goal holds,
-/// and how far up the settling had to go.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GoalConflict {
@@ -24,9 +15,6 @@ pub struct GoalConflict {
     pub level: ConflictLevel,
 }
 
-/// Which level settles a `goal_conflict`: `serialize` runs the goal
-/// after the one it met, `arbitrate` hands both statements to a
-/// resident.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -35,11 +23,6 @@ pub enum ConflictLevel {
     Arbitrate,
 }
 
-/// `pursuit_changed`: one step a person took on a building's pursuit,
-/// and the goal the building holds after it.
-///
-/// `goal` is absent exactly when the step left no pursuit, which is a
-/// `clear`; every other step leaves one and writes its goal.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PursuitChanged {
@@ -48,7 +31,6 @@ pub struct PursuitChanged {
     pub goal: Option<String>,
 }
 
-/// Which step a `pursuit_changed` line records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -60,13 +42,7 @@ pub enum PursuitMove {
 }
 
 impl PursuitChanged {
-    /// The goal and state the building holds after this step, or `None`
-    /// when the step cleared it.
-    ///
-    /// # Errors
-    /// Refuses a step that leaves a pursuit but names no goal: a reader
-    /// that invented an empty goal for it would hold a pursuit nobody
-    /// declared.
+
     pub fn held(self) -> Result<Option<(String, PursuitState)>, AxError> {
         let state = match self.step {
             PursuitMove::Set | PursuitMove::Resume => PursuitState::Running,
@@ -85,11 +61,6 @@ impl PursuitChanged {
     }
 }
 
-/// `signal_enqueued`: the signal itself, and the line it waits in.
-///
-/// `collab::Signal` writes it and reads it back; the queue rebuilt after
-/// a restart and every view of what is waiting read the same struct, so
-/// the seven keys have one spelling.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignalEnqueued {
     pub id: SignalId,
@@ -99,27 +70,17 @@ pub struct SignalEnqueued {
     pub room_version: Version,
     pub payload: Payload,
     pub at: TimeMs,
-    /// Written for a reader outside collab and never trusted on the way
-    /// back: the lane is derived from `kind`, and reading a stored copy
-    /// would let a line say which lane it took while the derivation says
-    /// another. Absent on a line written before the key existed.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lane: Option<Lane>,
 }
 
-/// `signal_consumed`: which signal was taken, and by whom. The content
-/// is already in the enqueue line, and history does not need it twice.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignalConsumed {
     pub id: SignalId,
     pub by: String,
 }
 
-/// `signal_wait_started`: a run that sent `signal` with `wait` stopped
-/// at its safe point until a reply from `on` or the deadline
-/// (`Sprawling/kernel/spec/Event/Record.lean` D32). `deadline_ms` is a
-/// reading of the injected clock, not the wall: replay orders by seq,
-/// and the wire turns it into a wall-clock instant (wire D34).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignalWaitStarted {
     pub on: Address,
@@ -127,63 +88,47 @@ pub struct SignalWaitStarted {
     pub deadline_ms: u64,
 }
 
-/// `signal_wait_ended`: the one line that pairs with a
-/// `signal_wait_started`, and what ended the wait.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignalWaitEnded {
     pub signal: SignalId,
     pub by: WaitEnd,
 }
 
-/// What ended a reply wait. Three arms and no fourth: the model's
-/// `waits_end` holds every wait to one of them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "end")]
 pub enum WaitEnd {
-    /// The room waited on sent a signal to the waiting run's room.
+
     Reply { reply: SignalId },
-    /// The injected clock passed the deadline.
+
     Timeout,
-    /// The run left its room while it waited: cancelled, failed, or
-    /// frozen after the process died.
+
     Left,
 }
 
-/// `signal_landed`: where the accounting thread put the signal
-/// `signal` at the moment it delivered it, written right after its
-/// `signal_enqueued` (`Sprawling/kernel/spec/Event/Record.lean` D38).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignalLanded {
     pub signal: SignalId,
     pub landing: Landing,
 }
 
-/// Where one signal landed. Three arms and no fourth: the model's
-/// `one_landing_per_signal` gives every signal exactly one of them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Landing {
-    /// A run was working in the room and reads it at its next safe point.
+
     Delivered,
-    /// Nobody was working there and no new run was knocked for it: a
-    /// knock was already waiting, or the room has no resident.
+
     Queued,
-    /// Nobody was working there, and the delivery knocked for a new run.
+
     Knocked,
 }
 
-/// `worktree_opened`: the tree a resident was given to work a claimed
-/// node in, by name and measured size. It carries no path: an absolute
-/// path is a fact about one machine, and a history that holds one does
-/// not survive being moved to another.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WorktreeOpened {
     pub name: String,
     pub disk_bytes: ByteLen,
 }
 
-/// Which line a signal waits in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Lane {
@@ -191,11 +136,6 @@ pub enum Lane {
     Ordinary,
 }
 
-/// A signal's identity, and the thing duplicates are recognised by.
-///
-/// It serializes as the string [`SignalId::parse`] accepted and reads
-/// back through that same parse, so a ledger line carrying an id meets
-/// the grammar once rather than once per reader.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct SignalId(String);
@@ -215,10 +155,7 @@ impl From<SignalId> for String {
 }
 
 impl SignalId {
-    /// # Errors
-    /// Refuses an empty id and one carrying whitespace: an id is
-    /// compared, logged and replayed, and all three go wrong quietly
-    /// when it can contain a space.
+
     pub fn parse(raw: &str) -> Result<SignalId, AxError> {
         if raw.is_empty() || raw.chars().any(char::is_whitespace) {
             return Err(AxError::failure(
@@ -239,14 +176,6 @@ impl SignalId {
     }
 }
 
-/// What kind of communication a signal is. `Steer` is a fourth kind
-/// rather than a flag beside the other three: it is the only one that
-/// overtakes, and urgency has to belong to the signal for one id to
-/// always take one lane.
-///
-/// Its serde form goes through [`SignalKind::as_str`] and
-/// [`SignalKind::parse`] rather than through a derived renaming, so the
-/// four wire words are spelled in one place.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub enum SignalKind {
@@ -267,8 +196,6 @@ impl SignalKind {
         }
     }
 
-    /// # Errors
-    /// Refuses a kind this version does not know.
     pub fn parse(raw: &str) -> Result<SignalKind, AxError> {
         match raw {
             "mention" => Ok(SignalKind::Mention),
@@ -304,8 +231,6 @@ impl From<SignalKind> for String {
 mod tests {
     use super::*;
 
-    /// The bytes `accounting::worker::plans` wrote by hand: `step` always,
-    /// `goal` only while a pursuit is still held.
     #[test]
     fn a_pursuit_step_writes_the_keys_the_hand_written_map_wrote() {
         let hand = |json: serde_json::Value| {
@@ -338,8 +263,6 @@ mod tests {
         );
     }
 
-    /// The bytes `storage`'s worktree lease wrote by hand: a name and a
-    /// size, and no path.
     #[test]
     fn a_worktree_line_writes_the_keys_the_hand_written_map_wrote() {
         let opened = WorktreeOpened {
@@ -352,8 +275,6 @@ mod tests {
         );
     }
 
-    /// The bytes `collab::arbiter::conflict_payload` wrote by hand, and
-    /// the `goal_registered` entry, which serde wrote from `GoalEntry`.
     #[test]
     fn a_goal_line_writes_the_keys_the_hand_written_map_wrote() {
         let conflict = GoalConflict {

@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `sprawling dispatch <addr> <task>`: one piece of work sent to a served
-//! city, watched until its run freezes (`Sprawling/app/spec/WireClient.lean` §8-10).
-//!
-//! The frame is built here rather than typed by the caller, so nobody
-//! transcribes the wire's key format, mode spelling or session rule; and
-//! the wait ends on the run's own milestone rather than on a silence,
-//! because how long a run takes is the model's business.
-
 use super::calling::{exit_of, tell_unheard};
 use super::city::report;
 use super::exit::Exit;
@@ -22,17 +14,8 @@ use kernel::consts_policy::DEFAULT_AT;
 use std::process::ExitCode;
 use std::time::Duration;
 
-/// How long a silence ends the wait when no `--quiet-ms` is given. One
-/// model call streams nothing until it returns, and a dispatch to a
-/// building makes one to name the room before its run starts, so the
-/// window must outlast a slow call; it bounds a city that stopped
-/// speaking, and a wait it ends before the milestone exits 3.
 const QUIET_MS: u64 = 120_000;
 
-/// Sends the dispatch and prints what comes back; the exit code is the
-/// table `call` uses: 0 the run reached its milestone, 1 refused, 2 this
-/// command line, 3 nothing came back or the run did not reach its
-/// milestone, 4 no city at `--at`.
 pub(super) fn verb(read: &Arguments) -> ExitCode {
     let (Some(addr), Some(task)) = (read.positional(1), read.positional(2)) else {
         if let Some(row) = verbs::row(Verb::Dispatch) {
@@ -81,8 +64,7 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
     let at = read.value("--at").unwrap_or(DEFAULT_AT);
     match wire_client::send(at, &frame, read.value("--token"), listen) {
         Ok(heard) => {
-            // Detached, stdout carries the run id alone; attached, it is
-            // the JSONL of every frame, which a run id line would break.
+
             if let (Milestone::Started, Some(run)) = (milestone, heard.run) {
                 println!("{run}");
             }
@@ -102,8 +84,6 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
     }
 }
 
-/// The idempotency key for this one dispatch, from OS entropy: a key
-/// derived from the words would make the same task typed twice one run.
 fn minted() -> Result<kernel::IdemKey, kernel::AxError> {
     let mut origin = [0u8; 16];
     getrandom::fill(&mut origin).map_err(|err| {

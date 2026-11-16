@@ -3,23 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The class column: which class of verb each Command is when a remote
-//! device sends it (Sprawling/wire/Spec.lean section 19-2,
-//! Tools/xtask/Spec.lean §8-45).
-//!
-//! **Two sources, one decision.** The arms of `def Command.verbClass` in
-//! the wire specification state each verb's class, and the relay decides
-//! it with an exhaustive match, `command_class` in the binary's package.
-//! Neither can be derived from the other: the table is what a reader is
-//! told, the match is what a device meets. The gate reads both and says
-//! where they part, so the table cannot drift from the relay without a
-//! red.
-//!
-//! A verb with no class arm is named by its verb. Lean refuses to build a
-//! `def` that leaves out a constructor, but the gate runs without Lean,
-//! so the same finding is made here; the decision the table records for
-//! every new Command is `LocalOnly`.
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -28,15 +11,12 @@ use crate::lean;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The package whose `command_class` the relay decides with.
 const RELAY: &str = "sprawling";
-/// The function whose arms are the relay's classes.
+
 const CLASSIFIER: &str = "fn command_class";
-/// The `def` the wire specification writes the class column as.
+
 const CLASS_DEF: &str = "Command.verbClass";
 
-/// The three classes, spelled as `remote_access::door::VerbClass` spells
-/// them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Class {
     Read,
@@ -45,8 +25,7 @@ pub(super) enum Class {
 }
 
 impl Class {
-    /// One spelling, the Rust one, on both sides (Tools/xtask/Spec.lean
-    /// §8-43): the relay's `VerbClass::Act` and the table's `.Act`.
+
     fn parse(word: &str) -> Option<Self> {
         match word {
             "Read" => Some(Self::Read),
@@ -57,17 +36,12 @@ impl Class {
     }
 }
 
-/// What the wire specification states, verb by verb, and the Lean file
-/// that states it.
 pub(super) struct Stated {
     pub(super) path: String,
-    /// Each verb's class, or `None` for an arm that answers something that
-    /// is not a class.
+
     pub(super) classes: BTreeMap<String, Option<Class>>,
 }
 
-/// The arms of `def Command.verbClass`. With no such `def` every verb is
-/// unclassified, and the findings are located at the entry.
 pub(super) fn stated(root: &Path) -> Result<Stated, XtaskError> {
     let sources = super::reading::specification(root)?;
     Ok(sources
@@ -91,7 +65,6 @@ pub(super) fn stated(root: &Path) -> Result<Stated, XtaskError> {
         }))
 }
 
-/// What the relay's match decides, verb by verb.
 pub(super) fn coded(root: &Path) -> Result<BTreeMap<String, Class>, XtaskError> {
     let src = format!(
         "{}/src",
@@ -109,8 +82,6 @@ pub(super) fn coded(root: &Path) -> Result<BTreeMap<String, Class>, XtaskError> 
     })
 }
 
-/// Reads `Command::<Verb>` patterns up to each `=> VerbClass::<Class>`,
-/// to the end of the function.
 fn arms(body: &str) -> BTreeMap<String, Class> {
     let body = body
         .find("\n}")
@@ -137,8 +108,6 @@ fn arms(body: &str) -> BTreeMap<String, Class> {
     out
 }
 
-/// A violation for every verb whose class is missing from the table or
-/// disagrees with the relay.
 pub(super) fn judged(
     all: &[String],
     stated: &Stated,
@@ -177,10 +146,6 @@ pub(super) fn judged(
 mod tests {
     use super::*;
 
-    /// An arm that answers something other than a class names its verb -
-    /// the lower-case spelling the table once allowed included - and a
-    /// class the relay decides otherwise is named too, both located at the
-    /// file that holds the arms.
     #[test]
     fn a_verb_whose_class_arm_is_not_a_class_is_named_by_its_verb() {
         let root = crate::root::fixture::relocated("wiring-class");

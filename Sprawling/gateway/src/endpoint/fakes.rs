@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The loopback providers the endpoint tests stand up, and the one
-//! configuration and request they all start from.
-//!
-//! **Separated from `config` because they change for different
-//! reasons.** What an endpoint is configured with moves when a provider
-//! grows a field; what a test has to fake moves when a new failure is
-//! worth reproducing - a truncated body, a silent socket, a stream
-//! written in two parts. Keeping them in one file had that file answer
-//! both questions and cross the size budget while doing it.
-//!
-//! Every item here is `#[cfg(test)]`: nothing in this module reaches a
-//! shipped binary.
-
 #![cfg(test)]
 #![allow(
     clippy::float_arithmetic,
@@ -29,7 +16,6 @@
     reason = "test helpers"
 )]
 
-/// The monotonic clock a test hands the permit gate.
 pub(crate) fn monotonic() -> std::time::Instant {
     std::time::Instant::now()
 }
@@ -42,8 +28,7 @@ use serde_json::Value;
 use super::config::{AuthSpec, EndpointConfig};
 
 #[cfg(test)]
-/// A one-shot loopback provider: answers `responses` in order, then
-/// closes. `cut_mid_body` truncates the JSON body mid-way.
+
 #[allow(
     clippy::float_arithmetic,
     clippy::unwrap_used,
@@ -108,11 +93,6 @@ pub(crate) fn fake_provider(
     (format!("http://{addr}/v1/messages"), handle)
 }
 
-/// A loopback provider that answers every request it hears, one at a
-/// time, with what `answer` says for that request's body, and records
-/// each body in the order it arrived. It keeps listening until the test
-/// process ends, so a test that sends fewer requests than it expected
-/// fails on its assertion rather than hanging on a join.
 pub(crate) fn answering_provider(
     answer: impl Fn(&str) -> (u16, String) + Send + 'static,
 ) -> (
@@ -167,22 +147,9 @@ pub(crate) fn answering_provider(
     (addr, heard)
 }
 
-/// How long the streaming fixture waits to hear that its opening frames
-/// landed. Long enough that a loaded machine is not called a defect,
-/// short enough that a buffering reader fails rather than hangs.
 #[cfg(test)]
 const SAW_OPENING_WAIT: Duration = Duration::from_secs(2);
 
-/// A provider that answers `text/event-stream` in two parts, so a test
-/// can tell a stream forwarded as it arrives from one read to the end
-/// and replayed.
-///
-/// **The server itself is the assertion.** It writes the opening frames,
-/// flushes, and then waits to hear that the caller saw them before it
-/// writes the rest. A reader that buffers the whole body cannot report
-/// anything until the body is complete, so the wait times out and the
-/// handle answers `false`. Nothing on the test's side reads a clock, and
-/// nothing is inferred from how long anything took.
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -224,8 +191,7 @@ pub(crate) fn fake_stream_provider(
                 }
             }
         }
-        // No content-length: an event stream ends when the connection
-        // does, which is what lets the body be written in two parts.
+
         stream
             .write_all(
                 b"HTTP/1.1 200 X\r\ncontent-type: text/event-stream\r\nconnection: close\r\n\r\n",
@@ -251,17 +217,6 @@ pub(crate) fn fake_stream_provider(
     (format!("http://{addr}/v1/messages"), handle)
 }
 
-/// A provider that answers a stream at a pace, and then goes quiet
-/// for as long as it is told to.
-///
-/// This is what tells an idle bound from a deadline. A provider that
-/// writes steadily for longer than the bound is a model answering at
-/// length; a provider that stops for longer than the bound is a model
-/// that stopped. One fixture produces both, and the only difference
-/// between the two calls is where the time goes.
-///
-/// Writes after the caller has left are ignored: a client that gave up
-/// on a silence is the case under test, not a failure of the fixture.
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -322,12 +277,6 @@ pub(crate) fn paced_stream_provider(
     (format!("http://{addr}/v1/messages"), handle)
 }
 
-/// A provider that accepts the connection and then says nothing.
-///
-/// This is the shape of a hang, and it is worse than a refusal: a
-/// refusal is an answer the run can act on, while silence stops the
-/// worker thread that would have acted. The deadline is the only
-/// thing standing between the two, so it gets its own test.
 #[cfg(test)]
 #[allow(
     clippy::float_arithmetic,
@@ -345,8 +294,7 @@ pub(crate) fn silent_provider() -> String {
     let addr = listener.local_addr().unwrap();
     std::thread::spawn(move || {
         let held = listener.accept();
-        // Hold the connection open without answering, long enough
-        // for any deadline under test to pass.
+
         std::thread::sleep(Duration::from_secs(5));
         drop(held);
     });

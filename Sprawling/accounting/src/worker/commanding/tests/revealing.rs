@@ -15,20 +15,15 @@ use std::cell::RefCell;
 use crate::worker::*;
 
 thread_local! {
-    /// Every address the scripted file manager was handed, in order.
+
     static HANDED: RefCell<Vec<String>> = const { RefCell::new(Vec::new()) };
 }
 
-/// A file manager that opens nothing and remembers what it was asked
-/// to show.
 fn scripted(_city: &Path, at: &Address) -> Result<(), AxError> {
     HANDED.with(|handed| handed.borrow_mut().push(at.as_str().to_owned()));
     Ok(())
 }
 
-/// The address names nothing on disk, so a worker that still starts the
-/// host's file manager itself refuses it with `PathNotFound`, and the
-/// file manager it was handed is never asked.
 #[test]
 fn a_reveal_reaches_the_file_manager_the_worker_was_handed() {
     let dir = tempfile::tempdir().unwrap();

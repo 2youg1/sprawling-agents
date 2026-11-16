@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Ledger types: the struct, its reports, and segment grammar.
-
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -13,35 +11,18 @@ use kernel::{B3Hash, EventRecord, Seq};
 use crate::error::{StorageError, io_err};
 use crate::vfs::Vfs;
 
-/// Segment rolling threshold. Internal affair: changing it changes how
-/// files are cut, never any observable semantics (`Sprawling/storage/Spec.lean` §14).
 pub(crate) const SEGMENT_ROLL_BYTES: u64 = 64 * 1024 * 1024;
 
-/// How a segment's file is sized while it is written (storage D31).
-///
-/// Both arms keep the same durability and the same history on disk; an
-/// arm changes only what the barrier has to flush. The preallocated
-/// segment ends in zero bytes past its last record, which the reader
-/// strips (`Sprawling/storage/spec/Jsonl/Preallocate.lean`), so the writer's
-/// position is the end of the records, never the end of the file.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SegmentPreallocation {
-    /// The file grows by one append at its end per wave.
+
     Grow,
-    /// A new segment is set to the roll size (`File::set_len`) when it is
-    /// created, and each wave writes at the end of its records, inside
-    /// that length: `SetFileInformationByHandle(FileEndOfFileInfo)` on
-    /// Windows, `ftruncate` on Linux and macOS.
+
     ToRollSize,
 }
 
 impl SegmentPreallocation {
-    /// The length `open` leaves the last segment at, given the end of its
-    /// records (`keep`), the bytes of tear it drops after them
-    /// (`dropped`, zeros not counted) and its length on disk (`total`).
-    /// A grown segment ends at its records, because the next append writes
-    /// at the end of the file. A preallocated one keeps its zero tail when
-    /// nothing was torn, because the next wave writes at `keep` anyway.
+
     pub(crate) fn length_after_open(self, keep: u64, dropped: u64, total: u64) -> u64 {
         match (self, dropped) {
             (SegmentPreallocation::ToRollSize, 0) => total,
@@ -50,18 +31,8 @@ impl SegmentPreallocation {
     }
 }
 
-/// The arm every ledger this build opens writes with. It stays `Grow`
-/// until the release-build reading of the barrier with each arm (storage
-/// D31) chooses; choosing is this one value, on Windows, macOS and Linux
-/// alike.
 pub(crate) const SEGMENT_PREALLOCATION: SegmentPreallocation = SegmentPreallocation::Grow;
 
-/// Where the records in `segment` end: its length without the run of
-/// zero bytes a preallocated segment holds past its last record. A zero
-/// byte is space no write has reached yet, never a byte of a record, so
-/// `open` scans the last segment up to here and the side index stops
-/// reading at the first window whose records end before the window does
-/// (`Sprawling/storage/spec/Jsonl/Preallocate.lean`, storage D31 and D32).
 pub(crate) fn records_end(segment: &[u8]) -> usize {
     segment
         .iter()
@@ -69,8 +40,6 @@ pub(crate) fn records_end(segment: &[u8]) -> usize {
         .map_or(0, |at| at.saturating_add(1))
 }
 
-/// What open found and repaired, and what its tail recovery read and
-/// checked (`Sprawling/storage/spec/Jsonl.lean` §8-34).
 pub struct OpenReport {
     pub recovered: Option<TailTruncation>,
     pub counted: crate::ProofCount,
@@ -80,7 +49,6 @@ pub struct TailTruncation {
     pub dropped_bytes: u64,
 }
 
-/// The durable Ledger. See the module doc for the contract.
 pub struct JsonlLedger {
     pub(crate) vfs: Box<dyn Vfs>,
     pub(crate) dir: PathBuf,
@@ -89,59 +57,32 @@ pub struct JsonlLedger {
     pub(crate) next_seq: Seq,
     pub(crate) prev: B3Hash,
     pub(crate) roll_bytes: u64,
-    /// How this ledger sizes its segments; [`SEGMENT_PREALLOCATION`]
-    /// outside tests.
+
     pub(crate) preallocation: SegmentPreallocation,
-    /// Whether `seg_len`, `next_seq` and `prev` still name the end of
-    /// the segments; a failed wave leaves it broken until a reopen.
+
     pub(crate) barrier: super::barrier::Barrier,
-    /// The per-room projection of what this ledger appends, laid down
-    /// after a wave is durable. `None` for a ledger opened directly in a
-    /// directory that is not a city's, which has no buildings to file
-    /// sessions under.
+
     pub(crate) sessions: Option<crate::sessions::Sessions>,
-    /// The write-path observer, called only after the wave is durable.
+
     pub(crate) observer: Option<WriteObserver>,
-    /// This process's hold on the city's writer lock. `None` for a
-    /// directory that is not a city's ledger, and on the fault model,
-    /// whose disk no other process can reach.
+
     pub(crate) lock: Option<WriterLock>,
-    /// The stop a failed whole-chain audit trips (`Sprawling/storage/spec/Worktree/Back.lean` §8-27).
+
     pub(crate) halt: crate::chain_audit::ChainHalt,
-    /// The segments a failed wave created, while restoring the disk to
-    /// its length before that wave is still owed (`jsonl::unwind`).
+
     pub(crate) pending_unwind: Option<Vec<PathBuf>>,
 }
 
-/// This process's exclusive hold on a city's Ledger, released when the
-/// ledger that took it is dropped (`Sprawling/storage/spec/Jsonl.lean` §8-1).
-///
-/// The operating system keeps the lock on an open handle and refuses it
-/// to every other handle on the same file, in this process or in
-/// another, which is what makes "a city has one writer" hold across
-/// processes rather than only inside the one that owns the type. The
-/// file is never removed: a lock file deleted on release would let a
-/// latecomer lock a new file of the same name while the earlier holder
-/// still held the old one.
 pub(crate) struct WriterLock {
     _held: std::fs::File,
 }
 
-/// A ledger's writer lock, held by a step that writes nothing to the
-/// ledger but must know no city is running from its folder while it
-/// acts — moving that folder (`Sprawling/storage/spec/Jsonl.lean` §8-1).
-/// Released on drop.
 pub struct LedgerHold {
     _lock: WriterLock,
 }
 
 impl LedgerHold {
-    /// Takes the writer lock of the ledger directory `dir`, exactly as a
-    /// city that opens it for writing would.
-    ///
-    /// # Errors
-    /// `LedgerHeld` when a city is running from it; `Io` when the lock
-    /// file cannot be made or asked for.
+
     pub fn take(dir: &Path) -> Result<LedgerHold, StorageError> {
         Ok(LedgerHold {
             _lock: WriterLock::take(dir)?,
@@ -150,15 +91,7 @@ impl LedgerHold {
 }
 
 impl WriterLock {
-    /// Takes the writer lock of the ledger directory `dir`: the file
-    /// `<name>.lock` beside it, named from `dir` alone so that this
-    /// module, not the city layout, owns where the lock lies
-    /// (storage D18).
-    ///
-    /// # Errors
-    /// `LedgerHeld` when another handle holds the lock; `Io` when `dir`
-    /// has no name to put a sibling beside (a root, `..`), or the lock
-    /// file cannot be made, or the lock cannot be asked for.
+
     pub(crate) fn take(dir: &Path) -> Result<WriterLock, StorageError> {
         let name = dir.file_name().ok_or_else(|| {
             io_err("name the ledger lock", dir)(std::io::Error::new(
@@ -191,11 +124,8 @@ impl WriterLock {
     }
 }
 
-/// The write-path observer: what a live reader (the control surface's
-/// event stream) installs to hear each line once it is durable.
 pub type WriteObserver = Box<dyn FnMut(&EventRecord) + Send>;
 
-/// Chain state at the entrance of the last segment.
 pub(crate) struct TailBoundary {
     pub(crate) prev: B3Hash,
     pub(crate) next_seq: Seq,
@@ -207,9 +137,6 @@ pub(crate) struct PriorSegment {
     pub(crate) len: u64,
 }
 
-/// The two names a segment is made of. One home for the grammar: the
-/// writer that names a segment and the readers that recognise one, or
-/// read a sequence back off one, agree because they read these.
 const SEGMENT_PREFIX: &str = "ledger-";
 const SEGMENT_SUFFIX: &str = ".jsonl";
 
@@ -224,14 +151,6 @@ pub(crate) fn is_segment(path: &Path) -> bool {
     }
 }
 
-/// The first sequence a segment's name claims, for a reader that wants
-/// only the records after a sequence it already holds: it skips the
-/// segments that cannot contain them by reading the name, rather than by
-/// opening the file. `None` for a name that is not this grammar.
-///
-/// The inverse of [`segment_file_name`], and it lives beside it for the
-/// reason the prefix and suffix are constants here: one reader of a
-/// grammar, not two spellings of it.
 pub(crate) fn segment_first_seq(name: &str) -> Option<Seq> {
     let digits = name
         .strip_prefix(SEGMENT_PREFIX)?
@@ -239,11 +158,6 @@ pub(crate) fn segment_first_seq(name: &str) -> Option<Seq> {
     digits.parse::<u64>().ok().map(Seq::new)
 }
 
-/// The segment files of `dir`, in the ledger's own order.
-///
-/// `Vfs::list` answers files only, already sorted: zero-padded names
-/// sort lexically the way they sort numerically, so the order is the
-/// ledger's own rather than the filesystem's.
 pub(crate) fn segment_names(vfs: &dyn Vfs, dir: &Path) -> Result<Vec<String>, StorageError> {
     let mut names = Vec::new();
     for path in vfs.list(dir).map_err(io_err("list ledger dir", dir))? {
@@ -257,18 +171,10 @@ pub(crate) fn segment_names(vfs: &dyn Vfs, dir: &Path) -> Result<Vec<String>, St
     Ok(names)
 }
 
-/// A count of segment bytes or lines as the `u64` a file offset and a
-/// line number are. `usize` is at most 64 bits wide on every target this
-/// crate builds for, so this refuses only on a wider one, and it refuses
-/// rather than substitute a number the count is not.
-///
-/// # Errors
-/// `io::Error` when `count` does not fit a `u64`.
 pub(crate) fn u64_count(count: usize) -> io::Result<u64> {
     u64::try_from(count).map_err(io::Error::other)
 }
 
-/// Complete (`\n`-terminated) lines and the leftover tail bytes.
 pub(crate) fn complete_lines(bytes: &[u8]) -> (Vec<&[u8]>, usize) {
     let mut lines = Vec::new();
     let mut consumed = 0usize;
@@ -310,8 +216,6 @@ mod tests {
         }
     }
 
-    /// The ledger directory holds segments and may hold other files; only a
-    /// file named like a segment is read or repaired as one.
     #[test]
     fn a_file_not_named_like_a_segment_is_neither_read_nor_repaired() {
         let dir = tempfile::tempdir().unwrap();

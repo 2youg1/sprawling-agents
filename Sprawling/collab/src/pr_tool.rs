@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The pull request tool: the face `collab::pr` shows a model.
-//!
-//! The losing line of the whole design sits behind this one interface —
-//! the resident who wrote the work does not decide whether it is good.
-//! Three things enforce it, and none of them is a rule someone has to
-//! remember: `Pr<Open>` has no verifier to name, `Artifact` has no
-//! public constructor (`tests/ui` pins both), and this tool refuses a
-//! verification whose caller is the implementer.
-//!
-//! Verifying and merging are one action rather than two. A `Verified`
-//! request nobody merged would be a third state for a person to chase,
-//! and the merge is not a second decision: it is what verification
-//! means. A refusal is the other outcome of the same call.
-
 use std::sync::{Arc, Mutex};
 
 use kernel::{
@@ -33,18 +19,13 @@ mod request;
 
 pub use request::{MergedRequest, OpenRequest, RejectedRequest};
 
-/// What the run did to the city's requests. Exhaustive for the same
-/// reason as the other desks: every variant is a line the worker has to
-/// write, so a new one must be a compile error where the writing
-/// happens.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrEffect {
-    /// Commit this run's tree onto its branch and record the request.
+
     Opened { branch: String },
-    /// Merge the branch into the city trunk and record who checked it.
+
     Merged { request: OpenRequest, by: String },
-    /// Record a refusal. The branch stays where it is; the work is not
-    /// lost, it is not accepted.
+
     Rejected {
         request: OpenRequest,
         by: String,
@@ -52,14 +33,11 @@ pub enum PrEffect {
     },
 }
 
-/// The run's side of the request register.
 #[derive(Debug)]
 pub struct PrDesk {
     who: String,
     room: Address,
-    /// The tree this run works in, if it has one. A run without a tree
-    /// has nothing to offer, and says so rather than offering the city's
-    /// own files.
+
     branch: Option<String>,
     node: Option<NodeId>,
     open: Vec<OpenRequest>,
@@ -85,7 +63,6 @@ impl PrDesk {
         }
     }
 
-    /// What the worker has to carry out, drained so it cannot run twice.
     pub fn take_effects(&mut self) -> Vec<PrEffect> {
         std::mem::take(&mut self.effects)
     }
@@ -109,9 +86,7 @@ impl PrDesk {
                 ),
             );
         }
-        // Held as a request only after the worker commits the tree: the
-        // commit is what the record names, and naming a commit that does
-        // not exist yet would be a record about nothing.
+
         self.effects.push(PrEffect::Opened {
             branch: branch.clone(),
         });
@@ -138,8 +113,7 @@ impl PrDesk {
                 "implementer".to_owned(),
                 Value::String(request.implementer.clone()),
             );
-            // Stated rather than filtered out: a resident who cannot see
-            // its own request would think it had vanished.
+
             row.insert(
                 "yours".to_owned(),
                 Value::Bool(request.implementer == self.who),
@@ -199,10 +173,7 @@ impl PrDesk {
             });
             return Payload::new(result);
         }
-        // The typestate is walked here, not trusted: `verified` is the
-        // only door from a claim to an artifact, and it refuses a
-        // verifier who is the producer. Walking it means the refusal
-        // cannot be skipped by a caller who forgot.
+
         let digest = B3Hash::digest(request.commit.as_bytes());
         let claim = Claim::new(
             request.node.clone(),
@@ -239,11 +210,7 @@ pub struct PrTool {
 }
 
 impl PrTool {
-    /// The name, disclosure and schema `new` registers. The catalog page
-    /// reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
+
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [
@@ -285,8 +252,6 @@ impl PrTool {
         })
     }
 
-    /// # Errors
-    /// Propagates a malformed tool name or parameter schema.
     pub fn new(room: Address, desk: Arc<Mutex<PrDesk>>) -> Result<PrTool, AxError> {
         let defined = Self::definition()?;
         Ok(PrTool {

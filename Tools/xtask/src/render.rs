@@ -3,49 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Render gate: the client's own gallery is opened in a real engine, and
-//! what it drew is measured (Tools/xtask/Spec.lean §8-13 and §8-14).
-//!
-//! **This is the step the method never had.** A stylesheet's rules do not
-//! collide in either source file — they collide in the cascade. Two rules
-//! that each read correctly where they are written laid the composer out
-//! as a row and put a second left edge on every page, and the tree was
-//! green through all of it: fourteen gates, 1,338 tests, and a home page
-//! whose task box had floated into the top right corner.
-//!
-//! **Accessibility is read off the page as drawn.** Roles, accessible
-//! names and landmarks come from the rendered page rather than from
-//! what either side wrote down, because the rendered page is what a
-//! person using a screen reader actually meets, and this gate already
-//! opens a browser.
-//!
-//! **The geometry is measured elsewhere.** The left edge of the regions
-//! in the main column, the first mark of the rows of a navigation column
-//! and containment are three of the readings `xtask::survey` takes, and
-//! this gate refuses the ones that reading marks as refusable
-//! (section 8-26). A page's geometry with two homes is the defect that
-//! instrument exists to prevent, and a gate is a consumer of a
-//! measurement rather than a second place to define one.
-//!
-//! **What it asserts is a property, never a picture.** A screenshot
-//! comparison fails on a font hint and passes on a page that is wrong in
-//! a way nobody photographed.
-//!
-//! **The page is opened once per pass, and a pass is a width and a
-//! lighting.** A property that holds at one width is a property about
-//! that width; the three columns are laid out by container queries, so
-//! the same source draws a different page at 768 and at 2560. Which
-//! passes a run makes lives in `pass.rs` (section 8-16).
-//!
-//! **A missing bundle, a missing browser or a gallery that drew
-//! nothing is a violation, and each says which.** A gate that goes
-//! quiet when it cannot find its subject reports green for a page
-//! nobody looked at, which is how a broken instrument reads as a
-//! passing product. The first two name the command that supplies what
-//! is missing — `just build-web`, or a Chromium-family browser at
-//! `SPRAWLING_BROWSER` — and the third names the gallery itself as the
-//! defect, so the three are never collapsed into one message.
-
 use std::path::Path;
 
 use browser::survey::{self, Deviation, Standing};
@@ -70,56 +27,30 @@ use parts::{ROSTER, every_part_draws_its_roles};
 use pass::Pass;
 use room::{every_popover_shows_an_option, no_text_is_crushed};
 
-/// The route that draws every state worth looking at, on fixtures.
-///
-/// A route, not a URL fragment: the `#/` that carries it belongs to the
-/// one place that builds a URL out of it ([`engine`]). Spelling the
-/// `#` here would put it in a command-line argument, and a shell that
-/// rewrites `#` - which is every Git-Bash on Windows - would then hand
-/// this gate a path on disk instead of a route.
 const GALLERY: &str = "gallery";
 
-/// Where a finding is located when no pass could be made at all.
 const EVERY_PASS: &str = "in every pass";
 
-/// The flag that prints everything the instrument read, not only what
-/// this gate refuses.
 const SURVEY: &str = "--survey";
 
-/// The flag that asks for the same readings as named fields rather
-/// than as sentences, for a reader that will act on them rather than
-/// read them.
 const TAGGED: &str = "--tagged";
 
-/// The flag that opens a route other than the gallery.
 const ROUTE: &str = "--route";
 
-/// The flag that measures a bundle in another directory: the swap
-/// build, which must not land where the binary embeds its client.
 const BUNDLE: &str = "--bundle";
 
-/// What one run of this gate is for.
-///
-/// Both errands take the same readings off the same page. What differs
-/// is how much of the reading reaches a person: a gate prints what it
-/// refuses, and a survey prints the rest as well, for the loop in which
-/// somebody is changing the page rather than defending it.
 enum Errand {
     Gate,
     Survey(survey::Shape),
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    // Where the bundle lands is the build script's statement, read
-    // rather than repeated: this gate and the binary must open one
-    // directory (Tools/xtask/Spec.lean §8-18). `--bundle` names another
-    // one for the swap build alone (§8-13), which never ships.
+
     let bundle = match asked_for(BUNDLE) {
         Some(dir) => root.join(dir),
         None => crate::bundle::dist(root)?,
     };
-    // The looks are judged from their sources, so a missing bundle does
-    // not hide a look the gallery never draws.
+
     let mut violations = looks::check(root)?;
     if !bundle.join("index.html").is_file() {
         violations.push(violation(
@@ -152,12 +83,9 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     } else {
         Errand::Gate
     };
-    // The client's own sources, read once for the whole run: every
-    // finding names the line that drew it, and a survey opens the same
-    // page five times.
+
     let sources = sources::index(root)?;
-    // The conversation page is judged where the gallery draws it; another
-    // route is a page that may not hold one (Tools/xtask/Spec.lean §8-51).
+
     let talk = if route == GALLERY {
         Some((talk::Words::read(root)?, crate::budget::register(root)?))
     } else {
@@ -194,9 +122,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         }
         let readings = survey::judge(page);
         for reading in readings.iter().filter(refusable) {
-            // A refusal names the line as well as the page: a gate that
-            // says what is wrong and not where costs its reader the
-            // search every time it goes red.
+
             let located = match sources.locate(&reading.at.class) {
                 Some(found) => format!("{at} \u{b7} {found}"),
                 None => at.clone(),
@@ -221,24 +147,13 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// The processors one pass keeps busy.
-///
-/// A pass is a browser drawing the whole gallery: on one machine it held
-/// 130 CPU seconds over 54 s, about two and a half processors. Opened
-/// beyond what the machine can draw, a pass's lazy views outlast the
-/// virtual budget (`engine::BUDGET_MS`): five at once on a four-processor
-/// runner refused with `a lazily loaded view was still pending`.
 const PROCESSORS_PER_PASS: usize = 3;
 
-/// Every wanted pass measured, as many at a time as the machine can draw,
-/// handed back in the order the passes are named, so a run's findings
-/// read the same whichever engine finished first.
 fn measure_every<'p>(
     opening: &Opening,
     passes: Vec<&'p Pass>,
 ) -> Result<Vec<(&'p Pass, Measured)>, XtaskError> {
-    // A machine that cannot say how many processors it has opens one
-    // pass at a time, which is what a four-processor runner gets anyway.
+
     let at_once = match std::thread::available_parallelism() {
         Ok(processors) => (processors.get() / PROCESSORS_PER_PASS).max(1),
         Err(_) => 1,
@@ -265,16 +180,10 @@ fn measure_every<'p>(
     Ok(measured)
 }
 
-/// Whether a reading this instrument took is one this gate refuses.
 fn refusable(reading: &&Deviation<'_>) -> bool {
     matches!(reading.standing(), Standing::Refused)
 }
 
-/// Why one opening cannot be judged at all, when it cannot.
-///
-/// The pass reports itself first: a lighting the page did not take is a
-/// pass that measured some other page, and reading the properties off
-/// it would report green for a page nobody looked at.
 fn unusable(pass: &Pass, measured: &Measured, at: &str) -> Option<Violation> {
     if measured.page.drawn.is_empty() {
         return Some(violation(
@@ -296,8 +205,6 @@ fn unusable(pass: &Pass, measured: &Measured, at: &str) -> Option<Violation> {
     })
 }
 
-/// One finding, told where it was found: the same page at two widths is
-/// two places a reader has to be sent to.
 pub(super) fn violation(at: &str, rule: &str, subject: String, alternative: &str) -> Violation {
     Violation {
         gate: "render",
@@ -308,18 +215,10 @@ pub(super) fn violation(at: &str, rule: &str, subject: String, alternative: &str
     }
 }
 
-/// Whether a person wrote one of this gate's switches on the command
-/// line.
-///
-/// Read here rather than by the dispatcher for the reason `pass.rs`
-/// gives for `--width`: the names of these switches and what they mean
-/// are facts about this gate, and a dispatcher that parsed them would
-/// be their second home.
 fn flagged(flag: &str) -> bool {
     std::env::args().any(|arg| arg == flag)
 }
 
-/// The value a person wrote after one of this gate's switches.
 fn asked_for(flag: &str) -> Option<String> {
     let mut args = std::env::args();
     while let Some(arg) = args.next() {

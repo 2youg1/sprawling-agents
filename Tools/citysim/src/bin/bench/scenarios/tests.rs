@@ -3,12 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every load scenario reruns and emits the stable reading format.
-
 use super::*;
 
-/// A small fixture: the shape of the registered load at test scale, so a
-/// test pays milliseconds rather than the register's seconds.
 fn small() -> Fixture {
     Fixture {
         fold_records: 40,
@@ -21,9 +17,6 @@ fn small() -> Fixture {
     }
 }
 
-/// The key sequence of the grammar in `Tools/citysim/spec/Bench.lean` §8-6. The
-/// format's authority is `Reading::line`; this is the acceptance contract
-/// a render must keep meeting.
 const KEYS: [&str; 10] = [
     "perf",
     "load",
@@ -68,10 +61,6 @@ fn every_load_scenario_reruns_and_emits_the_stable_format() {
     }
 }
 
-/// The registered fixture writes exactly the bytes its pin names, so a
-/// change to `draft` or to a field cannot reach the register without a
-/// new pin in a commit of its own (citysim D8). When
-/// this fails, the left-hand value is the digest to pin.
 #[test]
 fn the_registered_fixture_writes_the_bytes_its_digest_pins() {
     let dir = tempfile::tempdir().unwrap();

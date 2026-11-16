@@ -20,8 +20,7 @@ const BUDGET: u64 = 100;
 #[derive(Debug, Clone)]
 enum Event {
     Ask(u64),
-    /// Gives back the n-th ticket asked so far, or a ticket never asked
-    /// when n runs past them.
+
     GiveBack(usize),
 }
 
@@ -33,11 +32,7 @@ fn event() -> impl Strategy<Value = Event> {
 }
 
 proptest! {
-    /// The three properties of `Sprawling/runtime/spec/Reserve.lean`, after
-    /// every step of any trace of asks and give-backs: held bytes within
-    /// the budget or one holder alone (`held_within_budget`), tickets
-    /// started in the order they asked (`started_in_ask_order`), and a
-    /// line that waits only behind a holder (`waits_only_behind_a_holder`).
+
     #[test]
     fn the_book_keeps_the_lean_properties(events in prop::collection::vec(event(), 0..64)) {
         let mut book = Book::new(BUDGET);
@@ -58,8 +53,6 @@ proptest! {
     }
 }
 
-/// A reservation that did not fit waits until the holder gives its bytes
-/// back, and says what stood ahead of it when it asked.
 #[test]
 fn a_reservation_past_the_budget_waits_for_the_holder() {
     let budget = MachineBudget::new(10);

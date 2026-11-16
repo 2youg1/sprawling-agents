@@ -3,29 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Where the branches come back together.
-//!
-//! Two rules hold this join. An unverified result is a claim, not an
-//! artifact, and claims do not join: the only way to build an
-//! [`Artifact`] is to verify a [`Claim`], and verification is somebody
-//! other than the node's own agent saying the done check passed.
-//!
-//! The second rule is that the judge must have read what it is judging.
-//! Before a verdict, the fan-in asks for an artifact's whole content and
-//! checks it against the digest, so an answer can only come from having
-//! opened it. A digest-derived answer would not do: the question has to
-//! name the artifact's `cas:b3-…` locator, and that locator spells the
-//! digest. This is a checkpoint rather than a proof - one read is not
-//! all reading - and the honest claim is the narrow one: a judgment
-//! passed without opening anything is refused.
-
 use std::collections::BTreeMap;
 
 use kernel::{AxCode, AxError, B3Hash, Locator};
 
 use crate::workshop::NodeId;
 
-/// A node's result before anybody checked it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Claim {
     node: NodeId,
@@ -50,24 +33,16 @@ impl Claim {
         &self.node
     }
 
-    /// Where the result is.
     #[must_use]
     pub fn at(&self) -> &Locator {
         &self.at
     }
 
-    /// The agent that produced it.
     #[must_use]
     pub fn by(&self) -> &str {
         &self.by
     }
 
-    /// Verification by someone other than the producer.
-    ///
-    /// # Errors
-    /// Refuses a verifier that is the producer - the implementer does
-    /// not test their own work, which is the point of the PR flow - and
-    /// refuses a failed done check.
     pub fn verified(self, done_check_passed: bool, verifier: &str) -> Result<Artifact, AxError> {
         if verifier == self.by {
             return Err(AxError::failure(
@@ -95,7 +70,6 @@ impl Claim {
     }
 }
 
-/// A result that somebody other than its producer checked.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Artifact {
     claim: Claim,
@@ -113,9 +87,6 @@ impl Artifact {
         self.claim.at()
     }
 
-    /// Who produced it. A parent reading what came back needs the name
-    /// of the agent that did the work, not only of the one that checked
-    /// it.
     #[must_use]
     pub fn by(&self) -> &str {
         self.claim.by()
@@ -126,16 +97,12 @@ impl Artifact {
         &self.verified_by
     }
 
-    /// Whether `content` is what this artifact stores. A final line break
-    /// lost on the way through a JSON argument is restored once, because
-    /// losing it does not mean the reader never opened the artifact.
     fn holds(&self, content: &str) -> bool {
         B3Hash::digest(content.as_bytes()) == self.claim.digest
             || B3Hash::digest(format!("{content}\n").as_bytes()) == self.claim.digest
     }
 }
 
-/// What the judge must answer before deciding.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrivateQuestion {
     node: NodeId,
@@ -148,14 +115,12 @@ impl PrivateQuestion {
         &self.node
     }
 
-    /// The question as the judge reads it.
     #[must_use]
     pub fn prompt(&self) -> &str {
         &self.prompt
     }
 }
 
-/// The join.
 #[derive(Debug, Default)]
 pub struct FanIn {
     artifacts: BTreeMap<NodeId, Artifact>,
@@ -167,18 +132,10 @@ impl FanIn {
         FanIn::default()
     }
 
-    /// Only artifacts join. The type is the rule: there is no way to put
-    /// a claim in here, because `Artifact` cannot be built without a
-    /// verifier who is not the producer.
     pub fn accept(&mut self, artifact: Artifact) {
         self.artifacts.insert(artifact.node().clone(), artifact);
     }
 
-    /// Everything that has joined, in node order.
-    ///
-    /// A join belongs to a room rather than to a run, and a room outlives
-    /// its runs, so whoever keeps it has to be able to hand a copy to the
-    /// next one.
     pub fn artifacts(&self) -> impl Iterator<Item = &Artifact> {
         self.artifacts.values()
     }
@@ -193,12 +150,6 @@ impl FanIn {
         self.artifacts.is_empty()
     }
 
-    /// The question this join asks its judge. Derived from the artifacts
-    /// in hand, so it changes when they do and cannot be answered from
-    /// the schedule alone.
-    ///
-    /// # Errors
-    /// Refuses when nothing has joined: there is nothing to have read.
     pub fn question(&self) -> Result<PrivateQuestion, AxError> {
         let (node, artifact) = self.artifacts.first_key_value().ok_or_else(|| {
             AxError::failure(
@@ -219,12 +170,6 @@ impl FanIn {
         })
     }
 
-    /// The judge's verdict, admitted only with the answer.
-    ///
-    /// # Errors
-    /// Refuses a wrong answer without saying what the right one is: a
-    /// refusal that leaks the answer teaches the shortcut it exists to
-    /// prevent.
     pub fn decide(&self, answer: &str) -> Result<Joined, AxError> {
         let question = self.question()?;
         let read = self
@@ -250,7 +195,6 @@ impl FanIn {
     }
 }
 
-/// A join that happened: which nodes came together.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Joined {
     nodes: Vec<NodeId>,
@@ -324,8 +268,6 @@ mod tests {
         assert_eq!(joined.nodes().len(), 1);
     }
 
-    /// The question names where the artifact is, and the locator spells
-    /// its digest, so an answer read off the digest needs no opening.
     #[test]
     fn a_judge_that_copies_the_question_does_not_get_to_judge() {
         let mut join = FanIn::new();

@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The socket and the files: reading one request off a connection,
-//! writing its answer back, appending the exchange to the record, and
-//! reading the script again when a first turn finds no run left
-//! (`Tools/citysim/spec/WireScript/Exchange.lean` §8-10, citysim D15).
-//!
-//! **What counts as a request is settled in one place, `read_request`.**
-//! A head up to its blank line and a body of `content-length` bytes is a
-//! request; a connection that ended before that is not, and it is
-//! neither answered nor recorded nor charged a reply, because a reply
-//! spent on it would make every later turn answer the question before
-//! it.
-
 use std::fs::File;
 use std::io::{ErrorKind, Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -26,31 +14,21 @@ use serde_json::{Value, json};
 
 use super::{Answer, Asked, Replay, Turn, WireScript};
 
-/// How long a connection may stay silent before it is given up on as
-/// carrying no request. The city writes a whole request at once; a
-/// connection quiet this long was opened by something else.
 const QUIET: Duration = Duration::from_secs(30);
 
-/// The largest request this provider reads. The city's longest prompt is
-/// a few megabytes; a stream past this is not a request from it.
 const LARGEST: usize = 64 * 1024 * 1024;
 
-/// The value a credential header is recorded with.
 const REDACTED: &str = "redacted";
 
-/// A loopback provider playing one script, one connection at a time,
-/// recording every exchange.
 pub struct ScriptedProvider {
     listener: TcpListener,
-    /// Where the script was read from, and is read again (citysim D15).
+
     script: PathBuf,
     replay: Replay,
     record: Record,
     seq: u64,
 }
 
-/// The file every exchange of one playing is appended to, and the path
-/// a failure to write it names.
 struct Record {
     file: File,
     path: PathBuf,
@@ -66,7 +44,6 @@ impl Record {
             .map_err(|err| unrecorded(path, &err))
     }
 
-    /// One exchange, as one line.
     fn append(&mut self, exchange: &Value) -> Result<(), AxError> {
         self.file
             .write_all(
@@ -81,12 +58,7 @@ impl Record {
 }
 
 impl ScriptedProvider {
-    /// Takes the listener, reads the script, and empties `record`: one
-    /// playing, one record.
-    ///
-    /// # Errors
-    /// `E_CONFIG_INVALID` when the script cannot be read, and
-    /// `E_STORAGE_FATAL` when the record cannot be created.
+
     pub fn open(
         listener: TcpListener,
         script: &Path,
@@ -101,10 +73,6 @@ impl ScriptedProvider {
         })
     }
 
-    /// The base URL a city attaches this provider under.
-    ///
-    /// # Errors
-    /// `E_TOOL_UNAVAILABLE` when the listener cannot say its address.
     pub fn url(&self) -> Result<String, AxError> {
         self.listener
             .local_addr()
@@ -112,15 +80,6 @@ impl ScriptedProvider {
             .map_err(|err| socket("say where the provider listens", &err))
     }
 
-    /// Accepts one connection, reads one request off it, records the
-    /// exchange and writes the answer.
-    ///
-    /// # Errors
-    /// `E_STORAGE_FATAL` when the record cannot be appended to, and
-    /// `E_TOOL_UNAVAILABLE` when the connection fails; the first ends a
-    /// playing, the second ends only that connection. `E_CONFIG_INVALID`
-    /// when the script read again for a first turn could not be taken,
-    /// returned after that turn was answered `no_run_left`.
     pub fn answer_one(&mut self) -> Result<(), AxError> {
         let (mut stream, _peer) = self
             .listener
@@ -159,9 +118,6 @@ impl ScriptedProvider {
         unread.map_or(Ok(()), Err)
     }
 
-    /// The answer to one request, after reading the script again when a
-    /// first turn found no run left; the failure to take the script read
-    /// again travels beside the refusal it leaves standing.
     fn answered(&mut self, request: &Request) -> (Option<Turn>, Answer, Option<AxError>) {
         let asked = Asked::of(&request.method);
         let (turn, answer) = self.replay.answer(asked, &request.body);
@@ -178,9 +134,6 @@ impl ScriptedProvider {
     }
 }
 
-/// One request as it arrived: the request line's two words, the headers
-/// in arrival order with their names lowercased and credentials
-/// redacted, and the body's text.
 struct Request {
     method: String,
     target: String,
@@ -188,8 +141,6 @@ struct Request {
     body: String,
 }
 
-/// Reads one whole request, or `None` when the connection ended, fell
-/// silent or grew past `LARGEST` before one arrived.
 fn read_request(stream: &mut TcpStream) -> Option<Request> {
     let mut bytes = Vec::new();
     let mut chunk = [0_u8; 16 * 1024];
@@ -217,7 +168,6 @@ fn read_request(stream: &mut TcpStream) -> Option<Request> {
     }
 }
 
-/// Where the head ends: the index just past its blank line.
 fn head_end(bytes: &[u8]) -> Option<usize> {
     bytes
         .windows(4)
@@ -225,8 +175,6 @@ fn head_end(bytes: &[u8]) -> Option<usize> {
         .and_then(|at| at.checked_add(4))
 }
 
-/// The body length the head states; absent is zero, unreadable is no
-/// request at all.
 fn content_length(head: &[u8]) -> Option<usize> {
     String::from_utf8_lossy(head)
         .lines()
@@ -261,13 +209,10 @@ fn request_of(bytes: &[u8], head_end: usize, length: usize) -> Option<Request> {
     })
 }
 
-/// Whether a header carries a credential, whose value never reaches the
-/// record: a check needs to know one was sent, not what it was.
 fn is_credential(name: &str) -> bool {
     matches!(name, "authorization" | "proxy-authorization") || name.ends_with("api-key")
 }
 
-/// The script at `path`, read and parsed.
 fn read_script(path: &Path) -> Result<WireScript, AxError> {
     std::fs::read_to_string(path)
         .map_err(|err| {

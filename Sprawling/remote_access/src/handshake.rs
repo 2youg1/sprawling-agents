@@ -3,23 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The handshake a paired device and its city make on every connection
-//! (Sprawling/remote_access/Spec.lean §8-4).
-//!
-//! Three messages. The device sends [`Hello`]: its id, an ephemeral
-//! X25519 key, an ephemeral ML-KEM-768 encapsulation key and a nonce. The
-//! city answers [`Reply`]: its own ephemeral X25519 key, an ML-KEM
-//! ciphertext to the device's key, a nonce, and its hybrid signature over
-//! the transcript. The device checks that signature against the city key
-//! it pinned at pairing and answers [`Finish`]: its own hybrid signature
-//! over the same transcript, which the city checks against the key it
-//! paired. Both sides then hold the same two session keys, one per
-//! direction, derived from both shared secrets under the transcript.
-//!
-//! A route between the two sees the three messages and nothing it can
-//! use: it cannot sign as either side, and the session keys need both an
-//! X25519 and an ML-KEM secret it never held.
-
 use kernel::{AxCode, AxError};
 
 use crate::door::DeviceId;
@@ -37,61 +20,49 @@ pub use pairing::{CityFingerprint, CityPairing, Claim, Claimed, DevicePairing, I
 pub use pairing::{PAIR_HELLO_BYTES, PAIR_REPLY_BYTES, PairHello, PairReply};
 pub use pairing::{city_pair_reply, device_pair_hello};
 
-/// Bytes in an X25519 public key.
 const X25519_BYTES: usize = 32;
-/// Bytes in an ML-KEM-768 encapsulation key (FIPS 203, table 3).
+
 const ML_KEM_KEY_BYTES: usize = 1184;
-/// Bytes in an ML-KEM-768 ciphertext (FIPS 203, table 3).
+
 const ML_KEM_CIPHERTEXT_BYTES: usize = 1088;
-/// Bytes in each side's nonce.
+
 pub const NONCE_BYTES: usize = 32;
-/// Bytes in a device id.
+
 const DEVICE_ID_BYTES: usize = 16;
 
-/// Bytes in [`Hello`]'s wire form.
 pub const HELLO_BYTES: usize = DEVICE_ID_BYTES + X25519_BYTES + ML_KEM_KEY_BYTES + NONCE_BYTES;
-/// Bytes in [`Reply`]'s wire form.
+
 pub const REPLY_BYTES: usize = UNSIGNED_REPLY_BYTES + SIGNATURE_BYTES;
-/// Bytes of [`Reply`] the city's signature covers through the transcript.
+
 const UNSIGNED_REPLY_BYTES: usize = X25519_BYTES + ML_KEM_CIPHERTEXT_BYTES + NONCE_BYTES;
 
-/// Opens the transcript, so a transcript of any other protocol hashes to
-/// something else.
 const PROTOCOL: &[u8] = b"sprawling remote handshake v1";
-/// What each side signs ahead of the transcript hash, so the city's
-/// signature can never be replayed as a device's, or the reverse.
+
 const CITY_SIGNS: &[u8] = b"city";
 const DEVICE_SIGNS: &[u8] = b"device";
 
-/// The device's opening message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hello {
     bytes: Box<[u8; HELLO_BYTES]>,
     device: DeviceId,
 }
 
-/// The city's answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Reply(Box<[u8; REPLY_BYTES]>);
 
-/// The device's closing message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finish(Signature);
 
-/// The two halves of a session: what this side sends with, and what it
-/// opens with.
 pub struct Session {
     pub sealer: Sealer,
     pub opener: Opener,
 }
 
-/// A device's side after it sent [`Hello`].
 pub struct DeviceWaiting {
     hello: Hello,
     ephemeral: Ephemeral,
 }
 
-/// The city's side after it sent [`Reply`].
 pub struct CityWaiting {
     device: DeviceId,
     transcript: [u8; 32],
@@ -99,8 +70,7 @@ pub struct CityWaiting {
 }
 
 impl Hello {
-    /// # Errors
-    /// Refuses bytes of any other length.
+
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, AxError> {
         let array: [u8; HELLO_BYTES] = fixed(bytes, "read a handshake hello")?;
         let (id, _) = array
@@ -125,8 +95,6 @@ impl Hello {
         &self.bytes
     }
 
-    /// The device this hello says it comes from; the city looks its key up
-    /// by this id and the signature in [`Finish`] proves the claim.
     #[must_use]
     pub fn device(&self) -> DeviceId {
         self.device
@@ -141,8 +109,7 @@ impl Hello {
 }
 
 impl Reply {
-    /// # Errors
-    /// Refuses bytes of any other length.
+
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, AxError> {
         fixed(bytes, "read a handshake reply").map(|array| Self(Box::new(array)))
     }
@@ -152,7 +119,6 @@ impl Reply {
         &self.0
     }
 
-    /// Everything but the signature, which is what the transcript covers.
     fn unsigned(&self) -> &[u8] {
         self.0.split_at(UNSIGNED_REPLY_BYTES).0
     }
@@ -166,8 +132,7 @@ impl Reply {
 }
 
 impl Finish {
-    /// # Errors
-    /// Refuses bytes of any other length.
+
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, AxError> {
         Signature::from_bytes(bytes).map(Self)
     }
@@ -178,10 +143,6 @@ impl Finish {
     }
 }
 
-/// The device opens: fresh ephemeral keys, and the hello to send.
-///
-/// # Errors
-/// Fails only when the cryptographic library refuses to generate a key.
 pub fn device_hello(device: DeviceId, nonce: [u8; NONCE_BYTES]) -> Result<DeviceWaiting, AxError> {
     let (ephemeral, public) = Ephemeral::generate()?;
     let bytes = [device.as_bytes().as_slice(), &public, &nonce].concat();
@@ -197,12 +158,6 @@ impl DeviceWaiting {
         &self.hello
     }
 
-    /// Checks the city's reply against the key pinned at pairing, and
-    /// signs the transcript with the device's own key.
-    ///
-    /// # Errors
-    /// Refuses a reply the pinned city key did not sign, and a reply whose
-    /// key material the library rejects.
     pub fn finish(
         self,
         reply: &Reply,
@@ -221,11 +176,6 @@ impl DeviceWaiting {
     }
 }
 
-/// The city answers a hello: fresh ephemeral X25519, an ML-KEM ciphertext
-/// to the device's key, and the city's signature over the transcript.
-///
-/// # Errors
-/// Refuses key material the library rejects.
 pub fn city_reply(
     hello: &Hello,
     city: &SigningKey,
@@ -247,16 +197,12 @@ pub fn city_reply(
 }
 
 impl CityWaiting {
-    /// The device the hello claimed to be; [`Self::accept`] proves it.
+
     #[must_use]
     pub fn device(&self) -> DeviceId {
         self.device
     }
 
-    /// Checks the device's signature against the key the city paired.
-    ///
-    /// # Errors
-    /// Refuses a finish that key did not sign.
     pub fn accept(self, finish: &Finish, device_key: &VerifyingKey) -> Result<Session, AxError> {
         device_key.verify(&signed(PROTOCOL, DEVICE_SIGNS, &self.transcript), &finish.0)?;
         self.keys.city_session()

@@ -3,18 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The note a person keeps for one model: sent at the end of the system
-//! prompt to that model, and to no other.
-
 use super::super::*;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
 const NOTE: &str = "Quote the failing line of every test run in full.";
 
-/// A city with one building, a note for `house/<noted>`, and a worker
-/// whose main model is `m-local` on the `house` endpoint; returns the
-/// system text of the first request the dispatch sent.
 fn system_prompt_with_a_note_for(noted: &str) -> String {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
@@ -48,8 +42,7 @@ fn system_prompt_with_a_note_for(noted: &str) -> String {
             model: None,
         })
         .unwrap();
-    // The first chat request: the endpoint also answers a model listing,
-    // which carries no body.
+
     let body: serde_json::Value = provider
         .bodies()
         .iter()

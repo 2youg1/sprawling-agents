@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Event payloads, drafts, records, and refs.
-
 use serde::{Deserialize, Serialize};
 
 use crate::address::Address;
@@ -15,22 +13,15 @@ use crate::locator::B3Hash;
 use super::identity::{RunId, Seq, TimeMs};
 use super::kind::EventKind;
 
-/// The deepest nesting a payload may carry, its own object counted as
-/// the first level: serde_json's recursion limit of 128 refuses the
-/// 128th nested container, so a line holds 127, and the [`EventRecord`]
-/// envelope spends one of them.
 const PAYLOAD_DEPTH_MAX: usize = 126;
 
-/// Ledger payload: a JSON object with every float refused, at construction
-/// and again on read (determinism rule 6). Keys serialize sorted
-/// (serde_json's default BTreeMap), which is part of the canonical bytes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Payload(serde_json::Map<String, serde_json::Value>);
 
 impl Payload {
-    /// Sole constructor.
+
     pub fn new(map: serde_json::Map<String, serde_json::Value>) -> Result<Self, AxError> {
         reject_floats_and_depth(&map)?;
         Ok(Payload(map))
@@ -40,14 +31,6 @@ impl Payload {
         Payload(serde_json::Map::new())
     }
 
-    /// The way in: one of the record structs in [`crate::event::record`],
-    /// encoded as the object a ledger line carries. Every writer goes
-    /// through here, so the keys of a kind are spelled in exactly one
-    /// place: the struct.
-    ///
-    /// # Errors
-    /// Refuses a record that does not encode to a JSON object, and any
-    /// float inside one, for the reasons [`Payload::new`] gives.
     pub fn of(record: &impl Serialize) -> Result<Self, AxError> {
         let value = serde_json::to_value(record).map_err(|err| {
             AxError::failure(
@@ -68,18 +51,6 @@ impl Payload {
         Payload::new(map)
     }
 
-    /// The way out: the record struct this payload was written from.
-    ///
-    /// A field a record written by an older build may omit carries
-    /// `#[serde(default)]` on the struct, so the tolerance is declared
-    /// once per key rather than at each reader. Unknown keys pass, so a
-    /// newer writer never breaks an older reader.
-    ///
-    /// Deserializes from the held map by reference, so a read allocates
-    /// only what `T` owns, never a second copy of the payload.
-    ///
-    /// # Errors
-    /// A payload this build cannot read as `T`.
     pub fn read<T: serde::de::DeserializeOwned>(&self) -> Result<T, AxError> {
         T::deserialize(&self.0).map_err(|err| {
             AxError::failure(
@@ -95,9 +66,6 @@ impl Payload {
         &self.0
     }
 
-    /// The map itself, for a reader that rewrites it in place and builds
-    /// a new payload from the result, so no second copy is made on the
-    /// way through.
     pub fn into_map(self) -> serde_json::Map<String, serde_json::Value> {
         self.0
     }
@@ -110,17 +78,10 @@ impl<'de> Deserialize<'de> for Payload {
     }
 }
 
-/// Refuses a float anywhere under `map`, and containers nested past
-/// [`PAYLOAD_DEPTH_MAX`], in one iterative walk over one stack: a hostile
-/// payload cannot spend the writer's stack, and a well-formed one costs a
-/// single allocation however wide or deep it is. A container is judged
-/// before anything under it, so a payload too deep for the reader is
-/// refused for its depth even when a float waits at the bottom.
 fn reject_floats_and_depth(
     map: &serde_json::Map<String, serde_json::Value>,
 ) -> Result<(), AxError> {
-    // The payload's own object is the first level, so what it holds
-    // starts one container down.
+
     let mut pending: Vec<(&serde_json::Value, usize)> =
         map.values().map(|value| (value, 1)).collect();
     while let Some((value, above)) = pending.pop() {
@@ -148,8 +109,6 @@ fn reject_floats_and_depth(
     Ok(())
 }
 
-/// The level a container sits at when `above` containers hold it, or the
-/// refusal when that passes [`PAYLOAD_DEPTH_MAX`].
 fn opened(above: usize) -> Result<usize, AxError> {
     above
         .checked_add(1)
@@ -166,8 +125,6 @@ fn opened(above: usize) -> Result<usize, AxError> {
         })
 }
 
-/// What a recording party supplies; the Ledger implementation owns the
-/// rest (seq, prev, v).
 #[derive(Debug, Clone, PartialEq)]
 pub struct EventDraft {
     pub run: RunId,
@@ -176,8 +133,7 @@ pub struct EventDraft {
     pub addr: Option<Address>,
     pub kind: EventKind,
     pub data: Payload,
-    /// "Ignorable": a future reader may skip this line without changing
-    /// any rebuild result. Writers set it only when that holds.
+
     pub ig: bool,
 }
 
@@ -185,9 +141,6 @@ fn ig_is_false(ig: &bool) -> bool {
     !*ig
 }
 
-/// One serialized history line. Fields private: the only paths to a
-/// record are [`EventRecord::from_draft`] (append side) and
-/// [`EventRecord::parse_line`] (read side).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -207,8 +160,7 @@ pub struct EventRecord {
 }
 
 impl EventRecord {
-    /// Append-side assembly: the caller (a Ledger implementation) owns seq
-    /// and prev; `v` is pinned to [`EVENT_LOG_V`].
+
     pub fn from_draft(draft: EventDraft, seq: Seq, prev: B3Hash) -> Self {
         EventRecord {
             v: EVENT_LOG_V,
@@ -224,9 +176,6 @@ impl EventRecord {
         }
     }
 
-    /// The canonical bytes (no line terminator). The one byte producer
-    /// library-wide; adapters append these bytes verbatim and hash exactly
-    /// them for the next line's prev.
     pub fn canonical_line(&self) -> Result<Vec<u8>, AxError> {
         serde_json::to_vec(self).map_err(|e| {
             AxError::failure(
@@ -240,9 +189,6 @@ impl EventRecord {
         })
     }
 
-    /// Read-side entrance: full field revalidation, fail-closed. Unknown
-    /// kinds fail here; the `ig:true` skip belongs to replay, which probes
-    /// the envelope before committing to a typed parse.
     pub fn parse_line(raw: &[u8]) -> Result<Self, AxError> {
         serde_json::from_slice(raw).map_err(|e| {
             AxError::failure(AxCode::InvalidArgs, "parse event line", e.to_string())
@@ -250,9 +196,6 @@ impl EventRecord {
         })
     }
 
-    /// Minting a reference requires holding a whole record (15.3-1): the
-    /// append path holds what it just assembled, replay holds what it just
-    /// verified. There is no third path.
     pub fn to_ref(&self) -> EventRef {
         EventRef {
             seq: self.seq,
@@ -301,8 +244,6 @@ impl EventRecord {
     }
 }
 
-/// Unforgeable pointer at a ledger line: private fields, no public
-/// constructor, no serde (deserialization would be a third mint).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct EventRef {
     seq: Seq,

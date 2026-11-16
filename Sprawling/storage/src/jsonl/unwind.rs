@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A wave that failed to reach the disk leaves nothing the next wave
-//! builds on (`Sprawling/storage/spec/Jsonl.lean` §8-1).
-
 use std::path::PathBuf;
 
 use crate::error::{StorageError, io_err};
@@ -14,9 +11,7 @@ use super::barrier::Barrier;
 use super::ledger::{JsonlLedger, SegmentPreallocation};
 
 impl JsonlLedger {
-    /// Appends one wave's bytes and makes them durable. On failure the
-    /// segments go back to their length before the wave; a restore that
-    /// fails too stays pending for [`Self::finish_unwind`].
+
     pub(crate) fn write_wave(
         &mut self,
         writes: &[(PathBuf, u64, Vec<u8>)],
@@ -32,11 +27,6 @@ impl JsonlLedger {
         written
     }
 
-    /// Completes a restore an earlier failed wave left pending. Called
-    /// before a wave decides which segments it creates, because a pending
-    /// restore may remove the segment the wave would append to. A restore
-    /// that completes mends the barrier: the segments end where the
-    /// in-memory position says again.
     pub(crate) fn finish_unwind(&mut self) -> Result<(), StorageError> {
         let Some(created) = self.pending_unwind.take() else {
             return Ok(());
@@ -53,9 +43,6 @@ impl JsonlLedger {
         }
     }
 
-    /// Each write is `(segment, offset, bytes)`: the offset is the end of
-    /// the segment's records, which a preallocated segment writes at and
-    /// a growing one reaches by appending (storage D31).
     fn land(
         &mut self,
         writes: &[(PathBuf, u64, Vec<u8>)],
@@ -89,9 +76,6 @@ impl JsonlLedger {
         Ok(())
     }
 
-    /// Puts the segments back where the in-memory position says they
-    /// end, durably: power lost before the next wave must not bring back
-    /// a segment this removed or bytes this cut off.
     fn restore(&mut self, created: &[PathBuf]) -> Result<(), StorageError> {
         let mut removed = false;
         for path in created {

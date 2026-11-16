@@ -3,30 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The ordered stack of configuration layers a run is governed by, as
-//! one value (`Sprawling/city/spec/ConfigLayers.lean` §8-4).
-//!
-//! A rung is a scope that may state a value, and the ladder is every
-//! rung that exists for one address, read once, in order from the
-//! farthest to the nearest. Resolving each concern by naming the three
-//! scopes again — one read per scope, one field per scope, three times
-//! over — would make adding a rung an edit to every concern, and a rung
-//! added to one concern and forgotten in the next would be a silent
-//! difference in what a run is governed by.
-//!
-//! Here a rung is named twice: once in the list that declares both
-//! [`Layer`] and `Layer::ALL`, so a variant cannot exist without its
-//! place in the reading order, and once as the arm of
-//! [`Ladder::resolve`] that says which slot of a `kernel::LayeredValue`
-//! it fills, an exhaustive match. A rung added later is a compiler
-//! error until it is placed, and every concern picks it up at once.
-//!
-//! Which rung wins is not decided here: `kernel::LayeredValue::resolve`
-//! answers that, and this module only says which rungs there are and
-//! what each of them states.
-//!
-//! Specified by `Sprawling/city/spec/ConfigLayers/Ladder.lean`.
-
 use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
@@ -36,22 +12,16 @@ use super::ConfigLayer;
 use super::refuse::{READ_A_LAYER, too_near};
 use crate::building::Building;
 
-/// Declares [`Layer`] and `Layer::ALL` from one list, so the order the
-/// ladder is read in names every variant and nothing else
-/// (`Sprawling/city/spec/ConfigLayers/Ladder.lean`, `Layer.ALL_complete`).
 macro_rules! rungs {
     ($($rung:ident),+ $(,)?) => {
-        /// One rung of the City -> Building -> Resident ladder, from the
-        /// farthest scope to the nearest; a farther rung orders first.
+
         #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
         pub enum Layer {
             $($rung),+
         }
 
         impl Layer {
-            /// Every rung there is, farthest first. The order the ladder
-            /// is read in and the order a nearer value overrides a
-            /// farther one.
+
             pub(crate) const ALL: [Layer; [$(Layer::$rung),+].len()] = [$(Layer::$rung),+];
         }
     };
@@ -60,22 +30,11 @@ macro_rules! rungs {
 rungs!(City, Building, Resident);
 
 impl Layer {
-    /// Where this rung's file lives for a run at `addr`.
-    ///
-    /// One expression for every rung: the scope this rung speaks for,
-    /// then that scope's own reserved subtree. The city's file is that
-    /// rule at the root scope rather than a case of its own, so a rung
-    /// added later cannot land somewhere the runs it governs may write.
-    ///
-    /// # Errors
-    /// Propagates the reserved-subtree refusal from [`Building::of`]:
-    /// an address with no building has no building rung to read.
+
     pub(crate) fn file(self, city_root: &Path, addr: &Address) -> Result<PathBuf, AxError> {
         let layout = CityLayout::new(city_root);
         Ok(match self {
-            // The city's own file is a layout answer, not a joined
-            // path: the root is the one scope no address names, so it
-            // is the one scope that needs a method of its own.
+
             Layer::City => layout.city_config(),
             Layer::Building => layout.config(Building::of(addr)?.addr()),
             Layer::Resident => layout.config(addr),
@@ -83,28 +42,13 @@ impl Layer {
     }
 }
 
-/// Every rung that exists for one address, read, farthest first.
-///
-/// A value rather than three variables: a caller folds over it and
-/// never names a rung, which is what keeps adding one from touching
-/// every concern.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Ladder {
     rungs: Vec<(Layer, ConfigLayer)>,
 }
 
 impl Ladder {
-    /// Reads every rung that exists for a run at `addr`.
-    ///
-    /// A rung whose file is one a nearer rung already read is dropped:
-    /// an address that *is* its building has two rungs, not three, and
-    /// the same file counted twice would suggest it can override
-    /// itself.
-    ///
-    /// # Errors
-    /// Refuses an address with no building, a file that cannot be read,
-    /// and a file that does not parse. A missing file is not an error:
-    /// it is the ordinary case, and it states nothing.
+
     pub(crate) fn read(city_root: &Path, addr: &Address) -> Result<Ladder, AxError> {
         let mut rungs: Vec<(Layer, ConfigLayer)> = Vec::with_capacity(Layer::ALL.len());
         let mut read: Vec<PathBuf> = Vec::with_capacity(Layer::ALL.len());
@@ -119,11 +63,6 @@ impl Ladder {
         Ok(Ladder { rungs })
     }
 
-    /// One concern across the whole ladder, each rung in the slot it
-    /// speaks for.
-    ///
-    /// `kernel::config::freeze` takes it from here and decides which rung wins
-    /// and what an unstated concern falls back to.
     pub(crate) fn resolve<T>(&self, stated: impl Fn(&ConfigLayer) -> Option<T>) -> LayeredValue<T> {
         let tagged = self.tagged(stated);
         LayeredValue {
@@ -133,15 +72,6 @@ impl Ladder {
         }
     }
 
-    /// One concern across the whole ladder, each statement carrying the
-    /// rung that made it.
-    ///
-    /// The only place a rung is matched to a slot, which is why
-    /// [`Ladder::resolve`] is this with the rung dropped rather than a
-    /// second walk of the same ladder. Which rung then wins stays
-    /// `kernel::LayeredValue::resolve`'s answer: a page that shows
-    /// where a value came from must not be able to disagree with the
-    /// run that was governed by it.
     pub(crate) fn tagged<T>(
         &self,
         stated: impl Fn(&ConfigLayer) -> Option<T>,
@@ -159,21 +89,9 @@ impl Ladder {
     }
 }
 
-/// What one file states for one rung. Absent states nothing, which is
-/// how most rungs stay: a value is written where somebody meant to
-/// depart from the default.
-///
-/// A rung nearer than a confined table may be stated on is refused here
-/// rather than read and dropped: `[skills]` and `[remote]` only on the
-/// city's own rung, `[search]` on the city's or a building's
-/// (`Sprawling/city/spec/ConfigLayers/Ladder.lean`, `Confined`).
-///
-/// Crate-internal because the city's own rung is read without an address
-/// by [`super::city_shelves`]: the missing-file rule is stated once here
-/// rather than a second time for the one caller that has no address.
 pub(crate) fn stated(file: &Path, rung: Layer) -> Result<ConfigLayer, AxError> {
     let stated = match std::fs::read_to_string(file) {
-        // Several files can fail; the refusal says which one did.
+
         Ok(text) => ConfigLayer::parse(&text).map_err(|err| in_file(file, &err))?,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => ConfigLayer::default(),
         Err(err) => {
@@ -195,10 +113,6 @@ pub(crate) fn stated(file: &Path, rung: Layer) -> Result<ConfigLayer, AxError> {
     }
 }
 
-/// A parse refusal as the ladder reports it: the file it was read from
-/// in front of the subject, and everything else as the parser wrote it.
-/// The recovery is the refusal's own, written where the refusal knew
-/// what to change; the ladder knows only which file (city D8 (a)).
 fn in_file(file: &Path, refused: &AxError) -> AxError {
     AxError::failure(
         *refused.code(),

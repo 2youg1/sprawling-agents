@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one building can do, joined to which of its runs used it.
-//!
-//! **The shelves are read at the moment of asking.** `city::Library`
-//! scans them, and an index kept beside it would be a second copy of
-//! what the disk says - the same rule `BuildingView` follows for a
-//! building's own documents.
-//!
-//! **The pins come from the history.** Every `run_started` records the
-//! skills that run's reading room admitted and what each hashed to, so
-//! "which runs used this" is a fold rather than a second scan, and a
-//! skill edited since is visible as a run pinned to a hash no shelf
-//! holds any more.
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -23,20 +10,10 @@ use kernel::{Address, B3Hash, EventRecord, RunId};
 
 use super::holding::Views;
 
-/// Which runs were frozen with each skill, by its name and the hash it
-/// had: the fold's half of the skills page, copied out under the view
-/// lock so the shelves can be scanned after it.
 pub(super) type SkillPins = BTreeMap<(String, B3Hash), Vec<RunId>>;
 
 impl Views {
-    /// Files which skills one `run_started` says that run was frozen
-    /// with.
-    ///
-    /// What a page answers with this is "which runs read these exact
-    /// bytes", so a hash is required of every pin: a record holding a
-    /// pin with no hash is left out whole rather than filed under a
-    /// guess, and `kernel::event::record::SkillPin` is where that
-    /// requirement is stated.
+
     pub(super) fn fold_skill_pins(&mut self, record: &EventRecord) {
         let Ok(started) = record.data().read::<kernel::event::record::RunStarted>() else {
             return;
@@ -50,15 +27,6 @@ impl Views {
     }
 }
 
-/// Every shelf one building reads from, with the runs that pinned
-/// each holding.
-///
-/// `None` for a building whose shelves will not scan and for one
-/// whose rules will not load. Both are a broken installation rather
-/// than an empty one: `Unavailable` says the view could not look,
-/// while an empty list would say this building can do nothing. A
-/// building with no rules file does admit nothing, and `city::load`
-/// answers that case with the default rules rather than a failure.
 pub(super) fn skills_answer(
     city_root: &Path,
     building: &Address,
@@ -69,8 +37,7 @@ pub(super) fn skills_answer(
     let cas = storage::Cas::open(&store).ok()?;
     let read = |digest: &B3Hash| cas.get(digest).map_err(storage::StorageError::into_ax);
     let shelves = city::Library::scan(city_root, Some(building), home.path(), &read).ok()?;
-    // What this building's reading room admits, so a page can show
-    // the stock and the choice in one list.
+
     let rules = city::load(city_root, building).ok()?;
     let admitted: Vec<String> = rules.reading_room().to_vec();
     let skills = shelves
@@ -94,25 +61,12 @@ pub(super) fn skills_answer(
     })
 }
 
-/// The runs frozen with this exact name and hash pinned, oldest
-/// first.
-///
-/// The hash as well as the name, because a skill edited between two
-/// runs is two different documents under one name, and a list that
-/// matched on the name alone would claim the older run read what
-/// the newer one did.
 fn pinned_by(pins: &SkillPins, name: &str, hash: &B3Hash) -> Vec<RunId> {
     pins.get(&(name.to_owned(), *hash))
         .cloned()
         .unwrap_or_default()
 }
 
-/// Which shelf a holding sits on, and where its document is.
-///
-/// A translation and not a judgement: the scan already said which shelf
-/// it was reading, so nothing here derives a shelf from a path - a
-/// derivation that could only be right about the shelves that happen to
-/// sit in different places.
 pub(super) fn shelf_of(shelf: &city::Shelf) -> wire::SkillShelf {
     match shelf {
         city::Shelf::Library => wire::SkillShelf::Library,
@@ -137,8 +91,6 @@ mod tests {
 
     use super::*;
 
-    /// One skill the way a shelf inside the city files its own: a
-    /// One single-document skill installed through the production CAS door.
     fn shelved(city_root: &Path, slot: &city::Slot, name: &str, text: &str) {
         let source = city_root.join("fixtures").join(format!("{name}.md"));
         std::fs::create_dir_all(source.parent().unwrap()).unwrap();
@@ -151,27 +103,19 @@ mod tests {
         .unwrap();
     }
 
-    /// One skill the way a shelf outside the city files it: a directory
-    /// named after the skill, holding `SKILL.md`.
     fn external(root: &Path, name: &str, text: &str) {
         let dir = root.join(name);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("SKILL.md"), text).unwrap();
     }
 
-    /// Every shelf a building reads reaches the page, and each row says
-    /// which shelf it came from and where the document is. A skill on a
-    /// shelf outside the city says which shelf of the configured list it
-    /// is and its path from that shelf's root, because it has no address
-    /// - which is the one thing the answer must not invent.
     #[test]
     fn every_shelf_reaches_the_page_with_the_place_it_sits_at() {
         let dir = tempfile::tempdir().unwrap();
         crate::worker::fixture::init_city(dir.path()).unwrap();
         let lab = Address::parse("lab").unwrap();
         city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
-        // The same name on both city shelves, so that the row also says
-        // which of them won.
+
         shelved(
             dir.path(),
             &city::Slot::library("utilities").unwrap(),
@@ -198,8 +142,7 @@ mod tests {
                 .join(city::CONFIG_FILE),
             format!(
                 "[skills]\nshelves = [\"{}\"]\n",
-                // A Windows path in a TOML string would read as escapes;
-                // the separators this city writes are forward slashes.
+
                 elsewhere.display().to_string().replace('\\', "/")
             ),
         )
@@ -245,10 +188,6 @@ mod tests {
         assert_eq!(outside.disclosure, "Diagnose first");
     }
 
-    /// A building whose rules exist and will not load answers
-    /// `Unavailable`, like a shelf that will not scan: an empty list
-    /// would say the building admits nothing, which is the answer a
-    /// fresh building gives and a broken one must not.
     #[test]
     fn rules_that_will_not_load_answer_unavailable_rather_than_admitting_nothing() {
         let dir = tempfile::tempdir().unwrap();

@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The book of attached endpoints and the models chosen from them
-//! (shape 7): a value rebuilt from the ledger, never a store. Deleting
-//! it and replaying the city produces the same book.
-//!
-//! Two questions live here and nowhere else. *What did the person
-//! attach* — a base URL, a dialect, a credential reference, and the
-//! model ids the endpoint reported. *Which model answers for a tag* —
-//! the choice a request needs, with the facts no probe returns.
-//!
-//! Duty pools and multi-axis grading are deliberately absent: with one
-//! agent per run there is no consumer for a pool, and a pool without a
-//! consumer is an authority nobody reads.
-
-//! The endpoint book: choices the city made.
-
 use std::collections::BTreeMap;
 
 use kernel::event::record::EndpointLost;
@@ -29,13 +14,12 @@ use crate::market::ModelEntry;
 
 use super::attached::AttachedEndpoint;
 use super::payload::{read_attached, read_choice};
-/// The model that answers for one tag and the endpoint it lives
-/// behind.
+
 #[derive(Debug, Clone, Copy)]
 pub struct Chosen<'b> {
     pub endpoint: &'b AttachedEndpoint,
     pub entry: &'b ModelEntry,
-    /// The client every call to this endpoint shares.
+
     pub(crate) transport: &'b Transport,
 }
 
@@ -45,7 +29,6 @@ pub(crate) struct Choice {
     pub(crate) entry: ModelEntry,
 }
 
-/// Every endpoint and every choice, rebuilt from the event stream.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct EndpointBook {
     endpoints: BTreeMap<String, Held>,
@@ -58,11 +41,6 @@ pub struct EndpointBook {
     session_rooms: BTreeMap<kernel::RunId, kernel::Address>,
 }
 
-/// One attached endpoint and the client its calls share. A second
-/// registration under the same name replaces both, because the tuning
-/// the client was built from may have changed.
-/// A snapshot keeps the endpoint alone: the client is built again on
-/// first use, as it is after an attachment.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(from = "Kept", into = "Kept")]
 struct Held {
@@ -70,16 +48,13 @@ struct Held {
     transport: Transport,
 }
 
-/// What a snapshot keeps of a [`Held`]: the endpoint alone.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct Kept {
     endpoint: AttachedEndpoint,
 }
 
 impl From<Kept> for Held {
-    /// The endpoint with a transport whose gate admits its tuning's
-    /// ceiling, or the default for its kind of connection, so an
-    /// attachment and a snapshot restore build the same gate.
+
     fn from(Kept { endpoint }: Kept) -> Held {
         let ceiling = endpoint
             .tuning
@@ -104,30 +79,10 @@ impl EndpointBook {
         EndpointBook::default()
     }
 
-    /// Folds one record. Records of other kinds pass through untouched,
-    /// so a caller may hand it the whole stream.
-    ///
-    /// # Errors
-    /// A payload of a kind this book owns that it cannot read is an
-    /// error rather than a skipped record: a book that quietly drops a
-    /// registration would send calls to an endpoint the person retired.
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError> {
         self.absorb(record.kind(), record.run(), record.addr(), record.data())
     }
 
-    /// The same fold, for the writer that has the payload in hand and
-    /// not yet a record. Both entry points read the payload with one
-    /// reader, so what the writer believes and what a rebuild produces
-    /// cannot drift.
-    ///
-    /// Besides registrations it folds successful Session account
-    /// affinity: `RunStarted` admits each Run to its room's current
-    /// Session, `ModelCalled` holds a member's last attempted account,
-    /// `ModelReturned` commits it, and `SessionOpened` revokes the room's
-    /// old Runs, whose later calls and answers then cannot bind.
-    ///
-    /// # Errors
-    /// Propagates unreadable owned records before making a decision from them.
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "three kinds move registrations and five move Session affinity; the rest of the vocabulary passes through"
@@ -203,15 +158,12 @@ impl EndpointBook {
                 self.attempts.remove(&run);
                 self.session_rooms.remove(&run);
             }
-            // The rest of the vocabulary says nothing about which
-            // endpoint answers, or with which account, which is what
-            // this book holds.
+
             _ => {}
         }
         Ok(())
     }
 
-    /// The account which last answered successfully in this Session.
     #[must_use]
     pub fn session_account(
         &self,
@@ -223,12 +175,6 @@ impl EndpointBook {
             .and_then(|bindings| bindings.get(provider))
     }
 
-    /// The model for one tag under one building's policy.
-    ///
-    /// # Errors
-    /// Refuses when nothing is chosen for the tag, when the endpoint
-    /// behind the choice is gone, and when a confidential building's
-    /// choice would leave this machine.
     pub fn select(&self, tag: ModelTag, policy: &BuildingPolicy) -> Result<Chosen<'_>, AxError> {
         let choice = self.chosen.get(&tag).ok_or_else(|| {
             AxError::failure(
@@ -265,16 +211,6 @@ impl EndpointBook {
         })
     }
 
-    /// The registered model for one complete endpoint/model reference.
-    ///
-    /// This deliberately re-enters [`Self::select`] after finding the tag,
-    /// so endpoint removal and the confidential local boundary keep their
-    /// one implementation. A model that is attached but never registered
-    /// under a tag has no resolved figures and is not selectable yet.
-    ///
-    /// # Errors
-    /// Refuses a reference with no registered choice, then propagates the
-    /// ordinary tag selection's failures.
     pub fn select_ref(
         &self,
         reference: &kernel::ModelRef,
@@ -299,9 +235,6 @@ impl EndpointBook {
         self.select(tag, policy)
     }
 
-    /// One warm-up for every attached endpoint, each sharing that
-    /// endpoint's client slot, so the connection it opens is the one the
-    /// endpoint's first call takes (`Sprawling/gateway/spec/Endpoint/Transport.lean` D26).
     pub fn warm_ups(&self) -> impl Iterator<Item = WarmUp> + '_ {
         self.endpoints.values().map(|held| {
             WarmUp::new(
@@ -312,9 +245,6 @@ impl EndpointBook {
         })
     }
 
-    /// Resolves one attachment's account list before effects or replay folding.
-    /// An omitted list preserves the existing declaration; an explicit list
-    /// replaces it atomically. See `Sprawling/gateway/spec/Router.lean` Accounts.
     #[must_use]
     pub fn accounts_for_attachment(
         &self,
@@ -332,15 +262,6 @@ impl EndpointBook {
         self.endpoints.values().map(|held| &held.endpoint)
     }
 
-    /// Puts back what an attach read about each model, from the bytes
-    /// of the CAS blob `blob` (written by
-    /// [`AttachedEndpoint::facts_bytes`]). Only an endpoint whose latest
-    /// line names this blob learns it, and only for the ids that line
-    /// admitted, so a later attach is never overwritten by an earlier
-    /// reading.
-    ///
-    /// # Errors
-    /// `E_WIRE_MISMATCH` when the bytes are not a list of model facts.
     pub fn learn(&mut self, blob: &kernel::B3Hash, bytes: &[u8]) -> Result<(), AxError> {
         let read: Vec<kernel::event::record::ModelFacts> = serde_json::from_slice(bytes)
             .map_err(|err| crate::mismatch::mismatch("model facts", &err.to_string()))?;
@@ -357,21 +278,12 @@ impl EndpointBook {
         Ok(())
     }
 
-    /// What is chosen, tag by tag.
     pub fn choices(&self) -> impl Iterator<Item = (ModelTag, &str, &ModelEntry)> {
         self.chosen
             .iter()
             .map(|(tag, choice)| (*tag, choice.endpoint.as_str(), &choice.entry))
     }
 
-    /// What `tag` is registered with while it points at `model` behind
-    /// `endpoint`: the earlier-registration rung of the ladder
-    /// (`crate::Figures::resolve`), read the same way by the pick point
-    /// and by the model table's question.
-    ///
-    /// Read by endpoint and model id rather than by tag alone: pointing
-    /// a tag at another model must not carry the old model's figures
-    /// onto the new one (`Sprawling/app/Spec.lean` §8-71).
     #[must_use]
     pub fn registered(&self, tag: ModelTag, endpoint: &str, model: &str) -> Option<&ModelEntry> {
         self.chosen
@@ -380,14 +292,6 @@ impl EndpointBook {
             .map(|choice| &choice.entry)
     }
 
-    /// Refuses an attachment whose rows leave out a model a tag points
-    /// at on this endpoint (`Sprawling/gateway/spec/Router.lean` D40). The
-    /// fold never clears a choice when an endpoint is attached again, so
-    /// this is where a role stays on a model the endpoint still holds.
-    ///
-    /// # Errors
-    /// `E_CONFIG_INVALID`, naming each such model and its tag, with the
-    /// models this attachment would register as `nearby`.
     pub fn refuse_dropping_a_role(&self, attaching: &AttachedEndpoint) -> Result<(), AxError> {
         let dropped: Vec<String> = self
             .chosen
@@ -457,8 +361,7 @@ mod tests {
             GENESIS_PREV,
         )
     }
-    /// One catalogue row as a probe that answered nothing but the id
-    /// would have left it.
+
     use crate::endpoint::ModelFacts;
     use crate::provider::registry::ConnectionKind;
 
@@ -512,11 +415,6 @@ mod tests {
         book
     }
 
-    /// An endpoint's max_in_flight rides its endpoint_attached line: the
-    /// gate a replay builds admits that ceiling, and so does the gate a
-    /// snapshot restore builds; a line without the key, as every line
-    /// written before it existed, gives the default for its kind of
-    /// connection.
     #[test]
     fn max_in_flight_survives_a_replay_and_a_snapshot() {
         let mut capped = attached("capped", "https://api.example.test/v1");
@@ -546,11 +444,6 @@ mod tests {
         assert_eq!((limits(&book), limits(&restored)), ([3, 16, 4], [3, 16, 4]));
     }
 
-    /// The per-account retry figure rides the endpoint_attached line as
-    /// the word the person chose; a line without it, as every line
-    /// written before it existed, and a line holding a word this build
-    /// cannot read both take the one default `DEFAULTS` states, and
-    /// neither refuses the line.
     #[test]
     fn account_retries_survive_a_replay_and_an_unset_line_takes_the_default() {
         use kernel::account_recovery::AccountRetries;
@@ -599,9 +492,6 @@ mod tests {
         );
     }
 
-    /// A record written while this build carried a retreat arm names
-    /// two keys nothing ever wrote a value into. Reading it must still
-    /// produce the choice it states.
     #[test]
     fn a_record_naming_a_retreat_still_reads_as_the_choice_it_carries() {
         let mut book = EndpointBook::new();

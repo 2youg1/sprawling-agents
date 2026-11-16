@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Starting a new session: the refusal that protects a running one, and
-//! the two answers to what a new session keeps.
-//!
-//! The room's queue is what says a run is working there, so the refusal
-//! test lends it the way a dispatch does rather than inventing a second
-//! book of who is busy. The two carrying tests read the ledger line the
-//! verb wrote, because that line is the only place the answer outlives
-//! the call: both of the facts it records are removals.
-
 #![allow(
     clippy::float_arithmetic,
     clippy::unwrap_used,
@@ -32,8 +23,6 @@ pub(super) fn addr(raw: &str) -> Address {
     Address::parse(raw).unwrap()
 }
 
-/// Whether the history recorded a `session_opened` at this address, and
-/// what it said about carrying.
 fn carried_in_history(city_root: &Path, at: &Address) -> Option<bool> {
     let verified =
         runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(city_root).ledger())
@@ -46,8 +35,6 @@ fn carried_in_history(city_root: &Path, at: &Address) -> Option<bool> {
         .map(|line| line["data"]["carried"].as_bool().unwrap())
 }
 
-/// A room whose first session froze a shape, and which has a summary the
-/// last one left for the next.
 fn frozen_room(city_root: &Path, room: &Address) -> std::path::PathBuf {
     city::write_session(
         city_root,
@@ -61,8 +48,6 @@ fn frozen_room(city_root: &Path, room: &Address) -> std::path::PathBuf {
     handoff
 }
 
-/// A run working in the room is the one refusal: replacing the session
-/// under it would let two stretches claim one prefix.
 #[test]
 fn a_run_working_in_the_room_refuses_a_new_session() {
     let dir = tempfile::tempdir().unwrap();
@@ -71,8 +56,6 @@ fn a_run_working_in_the_room_refuses_a_new_session() {
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     let handoff = frozen_room(dir.path(), &room);
 
-    // What a dispatch does for the length of its run: take the room's
-    // queue. Nothing else in the city says a room is being worked in.
     let running = kernel::RunId::from_bytes([9u8; 16]);
     let _lent = worker.collaborating.rooms.lend(&room, running);
 
@@ -90,9 +73,7 @@ fn a_run_working_in_the_room_refuses_a_new_session() {
         "and the two verbs in the order that works: {}",
         refused.recovery()
     );
-    // The refusal costs the person nothing: the shape is still frozen
-    // and the summary is still there, so a retry after `/stop` is the
-    // same session start it would have been.
+
     assert_eq!(
         city::own_layer(dir.path(), &room).unwrap().model(),
         Some("m-local")
@@ -101,8 +82,6 @@ fn a_run_working_in_the_room_refuses_a_new_session() {
     assert_eq!(carried_in_history(dir.path(), &room), None);
 }
 
-/// The default: a new session chooses its own shape and carries no
-/// summary, and the line says so.
 #[test]
 fn a_new_session_carries_nothing_and_says_so() {
     let dir = tempfile::tempdir().unwrap();
@@ -120,8 +99,6 @@ fn a_new_session_carries_nothing_and_says_so() {
     assert_eq!(carried_in_history(dir.path(), &room), Some(false));
 }
 
-/// `--carry`: the summary travels, and the shape is forgotten anyway -
-/// which is what made the room dispatchable again.
 #[test]
 fn carrying_the_summary_still_lets_the_room_choose_a_model() {
     let dir = tempfile::tempdir().unwrap();
@@ -139,8 +116,6 @@ fn carrying_the_summary_still_lets_the_room_choose_a_model() {
     assert_eq!(carried_in_history(dir.path(), &room), Some(true));
 }
 
-/// A person who says `--carry` in a room with no summary is not refused
-/// and is not lied to: the record says the session carried nothing.
 #[test]
 fn carrying_nothing_is_not_a_refusal() {
     let dir = tempfile::tempdir().unwrap();
@@ -161,14 +136,6 @@ fn carrying_nothing_is_not_a_refusal() {
     assert_eq!(carried_in_history(dir.path(), &room), Some(false));
 }
 
-/// A branch: the session's first run opens with the mother's own
-/// conversation, and the second run of that session does not.
-///
-/// What is asserted is what the provider was asked, because that is the
-/// only place the inheritance is visible: the messages are not in the
-/// prefix, so no segment hash records them, and the ledger holds the
-/// mother's lines rather than a copy of what the child sent. The body of
-/// the first request is the fact.
 #[test]
 fn a_branching_session_opens_with_the_mothers_conversation() {
     let dir = tempfile::tempdir().unwrap();
@@ -184,8 +151,6 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
     let room = addr("lab/room1");
     let elsewhere = addr("lab/room2");
 
-    // The mother: one turn, in another room, whose every word is in the
-    // branch's first request.
     worker
         .handle(wire::Command::Dispatch {
             addr: elsewhere.clone(),
@@ -216,7 +181,6 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
         .expect("the mother ran");
     let last = verified.tail_seq().unwrap();
 
-    // The branch: a session at another room whose first run inherits.
     worker
         .handle(wire::Command::OpenSession {
             addr: room.clone(),
@@ -260,8 +224,6 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
         messages["messages"]
     );
 
-    // The second run of the same session inherits nothing: the branch is
-    // a beginning, and the run that began it was the first one.
     let after = provider.bodies().len();
     worker
         .handle(wire::Command::Dispatch {
@@ -282,10 +244,6 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
     );
 }
 
-/// `--carry` keeps the conversation's address as well as the summary:
-/// the session's first run is told where the previous run's transcript
-/// is, as a successor handed the work down is, because the summary
-/// says what was found and only the transcript says how.
 #[test]
 fn a_carried_session_names_the_previous_runs_transcript() {
     let dir = tempfile::tempdir().unwrap();

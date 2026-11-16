@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The two ends of every key moment, every message and every call, a tool
-//! call or a model attempt (`Sprawling/accounting/spec/Playback.lean` §8-12, `Sprawling/accounting/spec/Playback/Traced.lean` §8-17 and §8-25).
-//!
-//! A key moment is a set of lines grouped under a stable key: a run, an
-//! approval, a pull request. It closes only on its real closing line,
-//! never at the edge of the selected window, so a moment closed at one
-//! cutoff stays closed at every later one
-//! (`Sprawling/accounting/spec/Playback/Project.lean`). A closing line also
-//! inherits the buildings its opening line touched, which is how an
-//! answer written on the city run stays behind the confidential
-//! building that asked the question, and a call's answer behind the
-//! building its call named.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::event::record::{ApprovalResolved, SignalConsumed, SignalEnqueued};
@@ -26,26 +13,22 @@ use crate::views::rounds::{Attempts, answered_timing, timing_of};
 
 mod ends;
 
-/// What one line is keyed to.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum Key {
     Moment(Family, String),
     Message(String),
-    /// A call: its run, and what its two lines are paired by there.
+
     Call(RunId, CallId),
 }
 
-/// What a call's two lines are paired by within its run.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum CallId {
-    /// A tool call: the id its call and its answer share.
+
     Tool(String),
-    /// A model attempt: the seq of its `model_called`, which a reply
-    /// answers by the rounds' rule.
+
     Model(Seq),
 }
 
-/// Which part of a keyed pair one line is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Role {
     Opens,
@@ -53,35 +36,28 @@ pub(super) enum Role {
     Member,
 }
 
-/// One key a line touches, and its role there.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Touch {
     pub(super) key: Key,
     pub(super) role: Role,
 }
 
-/// Whether the reader saw a line, and whether the selection holds it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Seen {
     pub(super) visibility: Visibility,
     pub(super) in_range: bool,
 }
 
-/// What the fold knows of whether the reader sees a line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Visibility {
     Visible,
     Hidden,
-    /// Its buildings all read `Open`, and its credential scan waits until
-    /// a table reads its fate: until then it gives what a visible line
-    /// gives, and [`Links::resolve`] takes that back if the scan matches
-    /// (`Sprawling/accounting/spec/Playback/Project.lean`, D47).
+
     Deferred,
 }
 
 impl Visibility {
-    /// Whether the line may give its pair a name, a sender or a time
-    /// while its fate is open.
+
     fn may_show(self) -> bool {
         match self {
             Visibility::Visible | Visibility::Deferred => true,
@@ -100,35 +76,28 @@ struct Seat {
 struct Link {
     opened: Option<Seat>,
     closed: Option<Seat>,
-    /// The buildings the opening line touched; a closing line inherits them.
+
     buildings: BTreeSet<Address>,
     members: Vec<Seq>,
-    /// `from` and `room` of a message, when its sending line was visible.
+
     sent_by: Option<(String, Address)>,
-    /// A call's tool or model name and the moment its call line recorded,
-    /// and whether that moment was measured, when the call line was
-    /// visible.
+
     asked: Option<(Option<String>, TimeMs, wire::Timing)>,
-    /// A call's measured milliseconds, when both lines were visible and
-    /// the rounds' rule says the span was measured.
+
     took: Option<u64>,
 }
 
 #[derive(Debug, Default)]
 pub(super) struct Links {
     links: BTreeMap<Key, Link>,
-    /// The key of the latest request opened on each branch.
+
     open_requests: BTreeMap<String, String>,
-    /// The latest model attempt of each run, which its next reply answers.
+
     attempts: Attempts,
 }
 
 impl Links {
-    /// The keys `record` touches. Reads the payload of the kinds that
-    /// open or close a pair.
-    ///
-    /// # Errors
-    /// A payload of one of those kinds that does not read as its type.
+
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "ten kinds open or close a pair; every other kind is at most a member of its run"
@@ -205,8 +174,6 @@ impl Links {
             .collect())
     }
 
-    /// The buildings a line inherits from the opening lines of the pairs
-    /// it closes or belongs to.
     pub(super) fn inherited(&self, touches: &[Touch]) -> BTreeSet<Address> {
         touches
             .iter()
@@ -216,12 +183,6 @@ impl Links {
             .collect()
     }
 
-    /// Records where `record` sits in each pair it touches. `room` is the
-    /// building of its envelope address, which a run inherits; `touched`
-    /// is every building it touches, which any other pair inherits.
-    ///
-    /// # Errors
-    /// A message whose sending payload does not read.
     pub(super) fn note(
         &mut self,
         record: &EventRecord,
@@ -288,13 +249,6 @@ impl Links {
         Ok(())
     }
 
-    /// Settles every deferred end of a pair with a line the reader sees
-    /// in range, before any table reads it: `credential` answers whether
-    /// the line at a seq carries one. An end that does turns hidden and
-    /// takes back the name, the sender and the time it gave its pair.
-    ///
-    /// # Errors
-    /// The first error `credential` returns.
     pub(super) fn resolve(
         &mut self,
         mut credential: impl FnMut(Seq) -> Result<bool, AxError>,
@@ -316,9 +270,6 @@ impl Links {
         Ok(())
     }
 
-    /// When the call `key` has closed with no line the reader sees in
-    /// range, where it opened, if it did: neither of its lines can become
-    /// context any more, so the fold keeps neither.
     pub(super) fn settled_unselected(&self, key: &Key) -> Option<Option<Seq>> {
         self.links
             .get(key)
@@ -326,7 +277,6 @@ impl Links {
             .map(|link| link.opened.map(|seat| seat.seq))
     }
 
-    /// What the bundle may say about another run one run points at.
     pub(super) fn related(&self, run: RunId) -> Related {
         match self
             .links
@@ -341,8 +291,6 @@ impl Links {
         }
     }
 
-    /// The key a closing line of `branch` closes: the latest request
-    /// opened on it, or one no opening line is known for.
     fn closing_request(&self, branch: &str) -> Key {
         let key = self
             .open_requests
@@ -353,8 +301,6 @@ impl Links {
     }
 }
 
-/// Scans the end at `seat` if its fate was deferred, and answers what
-/// the reader now knows of it; a missing end is visible to nobody.
 fn settle(
     seat: Option<&mut Seat>,
     credential: &mut impl FnMut(Seq) -> Result<bool, AxError>,
@@ -372,8 +318,6 @@ fn settle(
     Ok(seat.seen.visibility)
 }
 
-/// A request's stable key: its branch and the seq of the line that
-/// opened it, so a branch opened twice is two requests.
 fn request_key(branch: &str, opened: Seq) -> String {
     format!("{branch}@{}", opened.value())
 }

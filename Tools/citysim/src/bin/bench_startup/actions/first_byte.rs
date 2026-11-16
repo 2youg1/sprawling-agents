@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! First byte: `sprawling serve` spawned to the first byte of `GET /`
-//! (`Tools/citysim/spec/BenchStartup.lean` §8-5-1).
-//!
-//! Shape: adapter. The end of the boundary is a byte of the page rather
-//! than the port opening, because a person sees the page, and a server
-//! that accepts a connection it cannot answer yet is still closed to
-//! them. Each sample serves on a port borrowed from the system a moment
-//! before and is stopped once its byte has arrived and the serve has said
-//! whether it proved the history it opened from. What that serve wrote
-//! to standard error is kept in the log file the caller names, so the
-//! phases the product timed for itself - the opening line and the proof
-//! line, the moment commands are taken (`Sprawling/app/Spec.lean` §8-122) - sit
-//! beside the reading.
-
 use std::io::{Read as _, Write as _};
 use std::net::{SocketAddr, TcpStream};
 use std::path::Path;
@@ -28,20 +14,10 @@ use kernel::{AxCode, AxError};
 use super::super::samples::Samples;
 use super::super::stamp;
 
-/// One attempt to reach the server, and the pause after a refused one.
 const POLL: Duration = Duration::from_millis(2);
-/// How long one sample may take before it is reported: a city with
-/// 400,000 records folds its whole Ledger before it accepts, which is
-/// tens of seconds on a slow disk.
+
 const WITHIN: Duration = Duration::from_secs(300);
 
-/// `samples` spawns of `serve` over `city`, each timed to its first byte;
-/// each sample's standard error replaces the last one's in `log`.
-///
-/// # Errors
-/// Refuses a sample whose server exited or never answered, and
-/// propagates the operating system's refusal to spawn or stop it, or to
-/// open `log`.
 pub fn first_byte(
     binary: &Path,
     city: &Path,
@@ -96,13 +72,8 @@ fn one(binary: &Path, city: &Path, log: &Path) -> Result<Duration, AxError> {
     Ok(took)
 }
 
-/// The lines a served city writes when the proof of its history ends:
-/// whole, or the ledger stopped (`Sprawling/app/Spec.lean` §8-90).
 const PROOF_ENDS: [&str; 2] = ["the history is proved", "the ledger stopped taking writes"];
 
-/// Waits until the serve's log says how the proof of its history ended,
-/// so the log a reader is pointed at carries the moment commands were
-/// taken; the first byte is already timed.
 fn proof_settled(child: &mut Child, log: &Path) -> Result<(), AxError> {
     let started = stamp();
     while started.elapsed() < WITHIN {
@@ -129,15 +100,12 @@ fn proof_settled(child: &mut Child, log: &Path) -> Result<(), AxError> {
     .with_recovery("read the serve's log beside the fixture city"))
 }
 
-/// Polls until the page's first byte arrives.
 fn first_answer(child: &mut Child, at: SocketAddr) -> Result<(), AxError> {
     let started = stamp();
     while started.elapsed() < WITHIN {
         if let Ok(mut stream) = TcpStream::connect_timeout(&at, POLL) {
             let mut byte = [0u8; 1];
-            // The Host names the listener with its port, as a browser
-            // writes it: any other is refused at the entry
-            // (`Sprawling/wire/spec/Reception/Entry.lean` §8-94).
+
             let request = format!("GET / HTTP/1.1\r\nHost: {at}\r\nConnection: close\r\n\r\n");
             let asked = stream
                 .write_all(request.as_bytes())

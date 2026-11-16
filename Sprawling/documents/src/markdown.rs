@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One window of a Markdown version, laid out by the city's one Markdown
-//! grammar (`Sprawling/documents/spec/Markdown.lean`, D20-D26).
-//!
-//! The window is cut the way a range is cut, then, when the version runs
-//! on past it, ended where its second-to-last block ends: the last block
-//! may continue outside the window, and a block laid out from half its
-//! lines is a different block. Only the UTF-8 encodings are laid out,
-//! because a block names its bytes and only there do the bytes of the
-//! text read from a window line up with the version's.
-
 mod export;
 mod lowering;
 mod position;
@@ -31,12 +21,6 @@ use crate::layout;
 use crate::span::{Span, offset};
 use crate::window::{Lifted, Window, cut};
 
-/// The preview of the window `viewport` asks for, cut from bytes
-/// [`lift`](crate::lift) named.
-///
-/// # Errors
-/// The [`cut`] refusals: lifted bytes that do not hold the window, or
-/// that are not text in `encoding`.
 pub fn preview(encoding: Encoding, lifted: Lifted<'_>, viewport: Span) -> Result<Preview, AxError> {
     match encoding {
         Encoding::Utf16Le | Encoding::Utf16Be => Ok(Preview::Unsupported { encoding }),
@@ -44,15 +28,6 @@ pub fn preview(encoding: Encoding, lifted: Lifted<'_>, viewport: Span) -> Result
     }
 }
 
-/// The blocks of a model's reply that can no longer change, read by the
-/// grammar a preview is (D30): a settled reply is read as a version
-/// holding exactly its text, one still streaming only up to its closure
-/// point (D31). At most one window, as a preview; `span.end` is where
-/// the rest of the text is sent from.
-///
-/// # Errors
-/// The [`cut`] refusals: a text holding a NUL is not unmarked UTF-8
-/// text (D4).
 pub fn reply(text: &str, state: ReplyState) -> Result<Laid, AxError> {
     let bytes = text.as_bytes();
     let size = match state {
@@ -66,7 +41,6 @@ pub fn reply(text: &str, state: ReplyState) -> Result<Laid, AxError> {
     )
 }
 
-/// One window of UTF-8 text, cut, ended on a block, and laid out.
 fn laid(encoding: Encoding, lifted: Lifted<'_>, viewport: Span) -> Result<Laid, AxError> {
     let window = settled(cut(encoding, lifted, viewport)?, lifted.size);
     let blocks = lowering::blocks(&window.text, window.span.start());
@@ -76,10 +50,6 @@ fn laid(encoding: Encoding, lifted: Lifted<'_>, viewport: Span) -> Result<Laid, 
     })
 }
 
-/// The window, ended at its second-to-last block when the version runs
-/// on past it (`Documents.Markdown.settle`). A window whose only block
-/// runs on, or that reaches the version's end, stays as it was cut, so
-/// a reader always moves forward.
 fn settled(window: Window, size: u64) -> Window {
     if window.span.end() >= size {
         return window;

@@ -3,62 +3,26 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a model is allowed to see of a page.
-//!
-//! Raw DOM never enters the window. Not because it is large — though it
-//! is — but because it is the page author's text, and a page author is
-//! a stranger. What crosses is an accessibility tree flattened into
-//! named roles with short labels, each carrying a reference the actor
-//! can name back.
-//!
-//! References are positions in this snapshot, not identities in the
-//! page. A reference from an older snapshot addressed a page that has
-//! since moved, so [`PageSnapshot::resolve`] refuses it rather than
-//! acting on whatever now sits in that position.
-
 use kernel::{AxCode, AxError};
 use serde_json::Value;
 
-/// One line of what a model sees.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node {
-    /// What the caller names to act on this node.
+
     pub reference: String,
     pub role: String,
     pub name: String,
 }
 
-/// The page as text, plus the references that text mentions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PageSnapshot {
-    /// Which snapshot this is. A reference minted here is refused by a
-    /// later snapshot: the page moved, and acting anyway would act on
-    /// whatever took that node's place.
+
     generation: u64,
     nodes: Vec<Node>,
 }
 
-/// How much of a label survives. Long enough to tell two controls apart,
-/// short enough that a page of them is still a page: the label is a
-/// handle, and the page author chooses how long it is.
 const LABEL_MAX: usize = 120;
 
-/// What an element is, when its author did not say.
-///
-/// The one authority on the role vocabulary: the script that collects
-/// the tree is generated from this table ([`role_lookup_js`]), and the
-/// filter below admits what this table can produce. Before the table
-/// existed the script called an element by its tag name and the filter
-/// looked for ARIA roles, so the two agreed on five words out of
-/// fourteen: a page that did not hand-write `role=` had no links and no
-/// input fields in its snapshot, and a model had nothing to act on.
-///
-/// Rows are (tag name, the `type` this row is about, role). A row's
-/// `type` is `None` when the element has no `type` attribute worth
-/// consulting. An `<input>` with no `type` is a text field, which is
-/// what the HTML default says, so the generated script reads an absent
-/// `type` as `text`; an `<input>` whose type no row names — `hidden`,
-/// `file` — gets no role and does not cross.
 pub(crate) const ROLE_MAP: [(&str, Option<&str>, &str); 27] = [
     ("a", None, "link"),
     ("button", None, "button"),
@@ -89,26 +53,12 @@ pub(crate) const ROLE_MAP: [(&str, Option<&str>, &str); 27] = [
     ("form", None, "form"),
 ];
 
-/// Roles no element implies, admitted because a page that states one
-/// states something a model has to know: which control is the current
-/// tab, and what the page is complaining about.
 const ARIA_ONLY: [&str; 2] = ["tab", "alert"];
 
-/// Whether a role reaches the window. A closed vocabulary rather than a
-/// filter, because "everything except" grows silently whenever the
-/// platform adds a role, and the thing it grows into is the raw DOM
-/// again.
 fn shown(role: &str) -> bool {
     ROLE_MAP.iter().any(|(_, _, mapped)| *mapped == role) || ARIA_ONLY.contains(&role)
 }
 
-/// The role table as the JavaScript object the collecting script looks
-/// an element up in: `"tag|type"` for a row that names a type, `"tag"`
-/// for one that does not.
-///
-/// Built with `serde_json` so quoting has one author, and generated
-/// rather than written out so the script and the filter cannot come to
-/// disagree about what a `<select>` is.
 pub(crate) fn role_lookup_js() -> String {
     let mut map = serde_json::Map::new();
     for (tag, kind, role) in ROLE_MAP {
@@ -136,12 +86,7 @@ fn truncate_label(raw: &str) -> String {
 }
 
 impl PageSnapshot {
-    /// Flattens a driver's accessibility tree.
-    ///
-    /// # Errors
-    /// Refuses a value that is not the array of nodes this version
-    /// reads. A partial parse would hand a model a page with things
-    /// silently missing from it, which is worse than no page.
+
     pub fn read(generation: u64, tree: &Value) -> Result<PageSnapshot, AxError> {
         let entries = tree.as_array().ok_or_else(|| {
             AxError::failure(
@@ -154,7 +99,7 @@ impl PageSnapshot {
         let mut nodes = Vec::new();
         for entry in entries {
             let Some(role) = entry.get("role").and_then(Value::as_str) else {
-                continue; // a node without a role is furniture
+                continue;
             };
             if !shown(role) {
                 continue;
@@ -185,8 +130,6 @@ impl PageSnapshot {
         &self.nodes
     }
 
-    /// The compact text that goes into the window. Deterministic by
-    /// construction: same tree, same bytes.
     #[must_use]
     pub fn to_text(&self) -> String {
         let mut out = String::new();
@@ -204,13 +147,6 @@ impl PageSnapshot {
         out
     }
 
-    /// Turns a reference back into the node it named.
-    ///
-    /// # Errors
-    /// Refuses a reference this snapshot did not mint, and one minted
-    /// against an older generation. Both mean the same thing to the
-    /// caller — look again — and both are refusals rather than a
-    /// best-effort match on position.
     pub fn resolve(&self, reference: &str) -> Result<&Node, AxError> {
         self.nodes
             .iter()
@@ -264,9 +200,6 @@ mod tests {
         );
     }
 
-    /// The defect this table was made for: a page that writes no
-    /// `role=` attribute still has links and fields, and the script has
-    /// to call them what the filter is looking for.
     #[test]
     fn every_role_an_element_implies_is_a_role_the_window_shows() {
         for (tag, kind, role) in ROLE_MAP {
@@ -277,8 +210,6 @@ mod tests {
         }
     }
 
-    /// The other direction: a role in the vocabulary that no element
-    /// implies and no page can state is a word with no referent.
     #[test]
     fn every_role_the_window_shows_can_reach_it() {
         for aria in ARIA_ONLY {

@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The ugly paths (`Sprawling/app/spec/Doctor.lean` §8-47): a binary that will
-//! not start, a variable naming nothing, a half-written component, a
-//! tool that says nothing. Each one is a typed answer with its cause,
-//! never the word "absent" on its own.
-//!
-//! Probes use temporary directories; real scans run in a child with its
-//! own environment so other tests retain their machine state.
-
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -147,9 +139,6 @@ fn a_pinned_guest_requires_its_stdlib_even_after_a_cached_digest_match() {
     ));
 }
 
-/// A file on the search path that is not a program is found there and
-/// reported as broken with the operating system's own words, which is
-/// what a person needs to hear when the answer is not "install it".
 #[test]
 fn a_program_that_will_not_start_is_broken_not_absent() {
     let dir = tempfile::tempdir().unwrap();
@@ -178,9 +167,6 @@ fn a_program_that_will_not_start_is_broken_not_absent() {
     );
 }
 
-/// A set variable that names nothing is said so, and never falls
-/// through to the component directory: a wrong pointer that silently
-/// lost would stay wrong forever.
 #[test]
 fn a_variable_that_names_nothing_is_said_so() {
     let dir = tempfile::tempdir().unwrap();
@@ -220,8 +206,6 @@ fn a_variable_that_names_nothing_is_said_so() {
     assert_eq!(empty, unset, "an empty variable is an unset one");
 }
 
-/// A component directory that exists without its file is an install
-/// that stopped half way, and the line says what to do about it.
 #[test]
 fn a_half_written_component_directory_is_broken() {
     let dir = tempfile::tempdir().unwrap();
@@ -254,13 +238,9 @@ fn a_half_written_component_directory_is_broken() {
     );
 }
 
-/// A program that starts and says nothing is present all the same: the
-/// question presence answers is whether it is here, and a silent tool
-/// is here.
 #[test]
 fn a_present_tool_that_says_nothing_is_still_present() {
-    // `findstr /V x` and `/bin/sh -c` over an empty stdin: both start,
-    // write nothing on stdout, and exit.
+
     let (program, arg) = if cfg!(windows) {
         (PathBuf::from("findstr.exe"), "/V")
     } else {
@@ -278,12 +258,6 @@ fn a_present_tool_that_says_nothing_is_still_present() {
     assert!(answered.describe().contains("no version"));
 }
 
-/// A program is looked for under the names this platform gives it.
-///
-/// On Windows the extensionless file comes last: a directory holding
-/// both `bun` and `bun.cmd` holds one file this operating system can
-/// start and one it cannot, and taking them in the wrong order reports
-/// an installed tool as a silent one.
 #[test]
 fn a_program_is_looked_for_under_every_name_this_platform_gives_it() {
     let names = crate::doctor::probe::names_of("bun");
@@ -296,10 +270,6 @@ fn a_program_is_looked_for_under_every_name_this_platform_gives_it() {
     }
 }
 
-/// The two recipes this city may not run say what the person does
-/// instead, and neither of them says it the same way. Asked of
-/// `Recipe::command`, which is the one place a recipe is refused for
-/// not being runnable (`Sprawling/app/spec/Doctor.lean` §8-64).
 #[test]
 fn a_printed_recipe_and_a_manual_one_refuse_with_their_own_reason() {
     let printed = crate::doctor::Recipe::Print("curl -fsSL https://bun.sh/install")

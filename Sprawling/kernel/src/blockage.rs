@@ -3,58 +3,27 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Red, and how far it reaches.
-//! The part `Sprawling/kernel/spec/Blockage.lean` specifies this module.
-//!
-//! **Red is not a new mechanism.** Every source of it is a fact the city
-//! already records — a run that froze without citing anything, a door
-//! that has waited too long for a person, `crate::stall` finding a run
-//! going nowhere, or a resident saying in as many words that it is
-//! stuck. This module answers the one question those facts do not: given
-//! that `2.3.1` is red, what else in the plan cannot move?
-//!
-//! **The answer names the source, not the symptom.** A plan with one
-//! real problem produces one blockage that says which node it is and
-//! which nodes are waiting behind it, rather than seventeen red dots a
-//! person has to trace back by hand. That is the whole reason to
-//! propagate at all: the first screen has room for a cause, not for a
-//! list of consequences.
-//!
-//! Red travels two ways, and both are the same relation seen from two
-//! sides: **up the tree**, because a branch whose child is stuck is
-//! stuck, and **along the dependency edges**, because a node that waits
-//! for a red node waits for something that is not coming. Nothing here
-//! reads a clock or a disk; the caller supplies the facts and gets a
-//! verdict.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::node_id::NodeId;
 use crate::plan::{PlanTree, StopCause};
 
-/// One node the city has a reason to call red.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RedNode {
     pub at: NodeId,
     pub why: StopCause,
 }
 
-/// One cause and everything waiting behind it.
-///
-/// `reaches` never contains `source`: a reader draws the source once,
-/// and a list that repeated it would make a single problem look like
-/// two.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Blockage {
     pub source: NodeId,
     pub why: StopCause,
-    /// Every node stuck because of this one, in reading order.
+
     pub reaches: Vec<NodeId>,
 }
 
 impl Blockage {
-    /// The sentence the first screen shows: what is stuck, where, and
-    /// why. One clause each, in the order a reader needs them.
+
     #[must_use]
     pub fn line(&self) -> String {
         let branch = self
@@ -70,25 +39,14 @@ impl Blockage {
     }
 }
 
-/// Somebody to tell, and what about.
-///
-/// The city already has a way for one resident to reach another; what it
-/// lacked was a fact that triggers one without a person asking. A node
-/// going red is that fact.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Notice {
-    /// Who holds a node that is now waiting for a red one.
+
     pub to: String,
     pub about: NodeId,
     pub line: String,
 }
 
-/// Which nodes each red one reaches.
-///
-/// Reported per cause, sorted by the cause's own index, and a node
-/// already red on its own account is never listed as somebody else's
-/// consequence — it has its own entry, and a reader following the list
-/// downwards meets each problem once.
 #[must_use]
 pub fn spread(tree: &PlanTree, red: &[RedNode]) -> Vec<Blockage> {
     let sources: BTreeSet<NodeId> = red.iter().map(|held| held.at.clone()).collect();
@@ -116,12 +74,6 @@ pub fn spread(tree: &PlanTree, red: &[RedNode]) -> Vec<Blockage> {
     found.into_values().collect()
 }
 
-/// One line for each resident holding work behind a red node.
-///
-/// A resident is told once per blockage rather than once per node it
-/// holds: a mailbox with four copies of one problem is a mailbox nobody
-/// reads. The resident that caused the blockage is not told about its
-/// own — it is the one that reported it.
 #[must_use]
 pub fn notices(blocked: &[Blockage], holders: &BTreeMap<NodeId, String>) -> Vec<Notice> {
     let mut out = Vec::new();
@@ -145,10 +97,6 @@ pub fn notices(blocked: &[Blockage], holders: &BTreeMap<NodeId, String>) -> Vec<
     out
 }
 
-/// Everything downstream of one node, through both relations.
-///
-/// Bounded by the size of the plan: `seen` grows by one every time the
-/// walk goes further, and stops when it does not.
 fn walk(from: &NodeId, dependents: &BTreeMap<NodeId, Vec<NodeId>>, seen: &mut BTreeSet<NodeId>) {
     if !seen.insert(from.clone()) {
         return;
@@ -161,11 +109,6 @@ fn walk(from: &NodeId, dependents: &BTreeMap<NodeId, Vec<NodeId>>, seen: &mut BT
     }
 }
 
-/// Who waits for whom, the other way round.
-///
-/// A node's own `needs` plus the `needs` of every branch above it: a
-/// child waits for what its branch waits for, which is the same rule
-/// `PlanTree::ready` applies, read backwards.
 fn reverse_edges(tree: &PlanTree) -> BTreeMap<NodeId, Vec<NodeId>> {
     let mut edges: BTreeMap<NodeId, Vec<NodeId>> = BTreeMap::new();
     for node in tree.nodes() {
@@ -233,8 +176,6 @@ mod tests {
         assert!(!blocked[0].reaches.contains(&node("2.1")), "not itself");
     }
 
-    /// The reason this module exists: one problem is one line naming the
-    /// source, not four red dots a person has to trace.
     #[test]
     fn the_line_names_the_branch_and_the_node_it_is_stuck_at() {
         let blocked = spread(&tree(PLAN), &[stuck("2.1")]);

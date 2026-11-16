@@ -3,31 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How one window's tree reads to a model.
-//!
-//! A model acting on a window needs to know what is in it and what to
-//! call each thing, and nothing else: not where a control sits on the
-//! screen, which `desktop.act` looks up by ref, and not the nesting of
-//! containers nobody named. So a tree crosses as an outline, one line
-//! per element — its ref, its role, its name — indented by depth
-//! (`Sprawling/desktop/Spec.lean` D10 (b)).
-//!
-//! The role is a word from a closed vocabulary rather than whatever the
-//! platform says: a localized string names one button two ways on two
-//! machines, and "everything the platform says" grows whenever the
-//! platform does. The vocabulary is UI Automation's own control types,
-//! spelled as their lower-case names, and it is platform-free so that a
-//! second platform maps onto the same words.
-//!
-//! A name is the window author's text, so it is cleaned and cut before
-//! it crosses: a control character would break the line it sits on, and
-//! a name as long as a page is a page rather than a name.
-//!
-//! The properties this module must hold are proved in `Sprawling/desktop/spec/Outline.lean`;
-//! this code is the authority on how it holds them.
-
-// The tests run everywhere, but only the Windows arm reads a tree, so
-// elsewhere most of the vocabulary is never spoken, in tests included.
 #![cfg_attr(
     not(windows),
     expect(
@@ -36,16 +11,8 @@
     )
 )]
 
-/// How many characters of a name survive. Long enough to tell two
-/// controls apart, short enough that a window's outline is still a
-/// page.
 pub(crate) const LABEL_MOST: usize = 80;
 
-/// What an element is, in the words a model reads.
-///
-/// One variant per UI Automation control type, so the mapping from a
-/// type is a match with no fallback and a type the platform adds is a
-/// compile error rather than a silent default.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Role {
     Button,
@@ -92,7 +59,7 @@ pub(crate) enum Role {
 }
 
 impl Role {
-    /// The word this role is written as.
+
     pub(crate) const fn word(self) -> &'static str {
         match self {
             Role::Button => "button",
@@ -139,9 +106,6 @@ impl Role {
         }
     }
 
-    /// Whether an element of this role only frames others. A frame
-    /// nobody named is not worth a line or a ref, and what it holds is
-    /// read as if it were not there.
     pub(crate) const fn frames(self) -> bool {
         match self {
             Role::Pane | Role::Group | Role::Custom | Role::Separator => true,
@@ -186,8 +150,6 @@ impl Role {
     }
 }
 
-/// One line of an outline: an element as a model reads it. `name` has
-/// already been through [`label`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Line<'a> {
     pub(crate) reference: &'a str,
@@ -196,21 +158,16 @@ pub(crate) struct Line<'a> {
     pub(crate) depth: u32,
 }
 
-/// Why a walk over a tree stopped.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Ending {
-    /// Everything down to the depth asked for was read.
+
     Whole,
-    /// The snapshot minted the most refs one snapshot mints.
+
     RefLimit { most: usize },
-    /// An element would not list what it holds; the words are the
-    /// platform's.
+
     Fault(String),
 }
 
-/// A name as it crosses: control characters become spaces, runs of
-/// white space become one, and a name past [`LABEL_MOST`] characters is
-/// cut there and ends in `…`.
 pub(crate) fn label(raw: &str) -> String {
     let cleaned: String = raw
         .chars()
@@ -231,9 +188,6 @@ pub(crate) fn label(raw: &str) -> String {
     cut
 }
 
-/// The outline: one line per element, indented two spaces per level of
-/// depth, and a last line saying why the walk stopped when it stopped
-/// early. The same lines always fold to the same bytes.
 pub(crate) fn fold<'a>(lines: impl IntoIterator<Item = Line<'a>>, ending: &Ending) -> String {
     let mut out = String::new();
     for line in lines {
@@ -286,9 +240,6 @@ mod tests {
         }
     }
 
-    /// The shape a model reads, byte for byte: a ref, a role word and a
-    /// quoted name, two spaces of indent per level, and no quotes where
-    /// there is no name. Folding twice gives the same bytes.
     #[test]
     fn a_window_folds_to_the_same_text_every_time() {
         let lines = [
@@ -303,8 +254,6 @@ mod tests {
         assert_eq!(fold(lines, &Ending::Whole), fold(lines, &Ending::Whole));
     }
 
-    /// A walk that stopped early says so in its last line, and says why:
-    /// an outline that ends quietly reads as a window that ends there.
     #[test]
     fn an_outline_cut_short_says_where_and_why() {
         let lines = [line("e1", Role::Window, "w", 0)];
@@ -319,8 +268,6 @@ mod tests {
         );
     }
 
-    /// A name is the window author's text: a newline inside it would
-    /// break the outline, and a page of it is not a name.
     #[test]
     fn a_label_with_control_characters_and_a_long_tail_is_cleaned_and_cut() {
         assert_eq!(label("Save\nas\t\u{7}  copy "), "Save as copy");

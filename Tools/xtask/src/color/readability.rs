@@ -3,25 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Readability: the seventh token assertion, which pairs every text token
-//! with the brightest surface text may sit on and every type step with the
-//! tier its size and weight demand (Tools/xtask/Spec.lean §8-8).
-
 use super::contrast::{apca_lc, bronze_tier};
 use super::tables::{parse_text_tokens, parse_type_scale, text_surface_ceiling, tier_slack};
 use super::{Mode, token_violation};
 use crate::report::Violation;
 
-/// The seventh assertion: every text token reaches the tier it claims, and
-/// every type step claims the tier its size and weight actually demand.
-///
-/// This one is here rather than in a browser because it never needed one.
-/// The surfaces are a closed ladder and the tokens are a closed table, so
-/// the pairs are enumerable and the judgement is a pure function - what the
-/// architecture calls a missing end-to-end gate is, for contrast, a missing
-/// table. It is checked against `TEXT_SURFACE_CEILING`, the brightest
-/// surface text may sit on, because a token that passed on the page and
-/// failed on a card would be one rule with two answers.
 pub(super) fn judge_readability(
     source: &str,
     greys: &[(String, u16)],
@@ -72,11 +58,7 @@ pub(super) fn judge_readability(
     }
 
     for (name, px, weight, claimed) in &steps {
-        // A step called `body` is prose and takes the body column; every
-        // other step is something that qualifies prose and takes the
-        // content column. Bronze states different minimum sizes for the
-        // two, and merging them would let a 15px note claim a tier only a
-        // 15px sentence may claim.
+
         let derived = bronze_tier(*px, *weight, name == "body");
         match derived {
             None => violations.push(token_violation(

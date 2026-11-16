@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every bundle write and every edit a run makes, and the two ways a
-//! file reaches disk (`Sprawling/storage/Spec.lean` §8-12, §8-32): replacing a name, and
-//! creating one that nothing holds.
-//!
-//! A replacement's bytes go to a staging file beside the target, are flushed, take
-//! the original permissions, and are renamed over the name. A reader
-//! finds the old file or the whole new one, never a name removed before
-//! its replacement was on the device, and the rename replaces the
-//! directory entry, so a hard link at the name is broken rather than
-//! written through.
-
 use std::ffi::{OsStr, OsString};
 use std::io;
 use std::io::Write as _;
@@ -24,26 +13,13 @@ use crate::error::{StorageError, io_err};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
-/// Where a landed file's permissions come from.
 pub(crate) enum Bits<'a> {
-    /// A copy: the source file's permissions travel with its bytes.
+
     Of(&'a Path),
-    /// A file the bundle writes itself: the permissions of the file it
-    /// replaces, and the creation default when it replaces nothing.
+
     OfReplaced,
 }
 
-/// Lands `bytes` at `target`, consuming the cleared target so no write
-/// can reach an uncleared name.
-///
-/// Permissions are copied after the flush, because once a read-only bit
-/// is on the staging file Windows refuses the write handle a flush
-/// opens.
-///
-/// # Errors
-/// `StorageError::Io` naming the staging file or the target for a write,
-/// flush, permission copy or rename the filesystem refuses; the target
-/// keeps its previous content in every one of those cases.
 pub(crate) fn land(
     vfs: &mut dyn Vfs,
     target: WriteTarget,
@@ -78,11 +54,6 @@ pub(crate) fn land(
     }
 }
 
-/// Creates the file at `target` with `bytes` only when nothing stands at
-/// its name (`Sprawling/storage/spec/Alias.lean` §8-32).
-///
-/// # Errors
-/// As [`WriteTarget::create`](crate::WriteTarget::create).
 pub(crate) fn create(target: WriteTarget, bytes: &[u8]) -> Result<(), StorageError> {
     let path = target.as_path();
     let mut file = match std::fs::OpenOptions::new()
@@ -101,8 +72,7 @@ pub(crate) fn create(target: WriteTarget, bytes: &[u8]) -> Result<(), StorageErr
     let written = file.write_all(bytes).and_then(|()| file.sync_data());
     drop(file);
     if let Err(err) = written {
-        // The name is this call's own, so taking it back loses nothing;
-        // a file that will not go is the state the caller has to know.
+
         std::fs::remove_file(path).map_err(io_err("take back a half-created file", path))?;
         return Err(io_err("create a file", path)(err));
     }
@@ -114,8 +84,6 @@ pub(crate) fn create(target: WriteTarget, bytes: &[u8]) -> Result<(), StorageErr
     }
 }
 
-/// `.<name>.part` beside `path`, built from the name as the operating
-/// system spells it so a name that is not valid Unicode still stages.
 fn staging_path(path: &Path) -> Result<PathBuf, StorageError> {
     let name = path.file_name().ok_or_else(|| {
         io_err("stage a bundle file", path)(io::Error::new(
@@ -129,9 +97,6 @@ fn staging_path(path: &Path) -> Result<PathBuf, StorageError> {
     Ok(path.with_file_name(staged))
 }
 
-/// Whether `name` is spelled the way [`staging_path`] names a staging
-/// file. A restore cut short leaves one under the city root, and it is
-/// half of a write, not a file of the city.
 pub(crate) fn is_staging_name(name: &OsStr) -> bool {
     let spelled = name.as_encoded_bytes();
     spelled.len() > STAGING_PREFIX.len().saturating_add(STAGING_SUFFIX.len())

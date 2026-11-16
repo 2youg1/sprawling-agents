@@ -27,17 +27,11 @@ const ATTESTED: &str = "jobs:
       id-token: write
 ";
 
-/// A job that attests the glob it attaches, with both permissions,
-/// before it attaches it, is the shape every release must have; a
-/// comment that names the command is not where the command runs.
 #[test]
 fn a_release_that_attests_what_it_attaches_is_accepted() {
     assert_eq!(findings(ATTESTED), Vec::<String>::new());
 }
 
-/// Each way the release can attach an archive nobody attested is named:
-/// a permission another job holds does not count for this one, and an
-/// attestation written after `gh release create` leaves a window.
 #[test]
 fn a_release_that_attaches_an_unattested_archive_is_reported() {
     let without_permission = ATTESTED.replacen("      attestations: write\n", "", 1);
@@ -55,9 +49,6 @@ fn a_release_that_attaches_an_unattested_archive_is_reported() {
     assert_eq!(findings("jobs:\n  build:\n    runs-on: x\n").len(), 1);
 }
 
-/// A comment in an earlier job that names the command does not make that
-/// job the one that attaches, and the glob may sit on a line the command
-/// continues onto with a trailing `\`.
 #[test]
 fn the_attaching_job_is_the_one_that_runs_the_command_through_its_continuations() {
     let commented = ATTESTED.replace(

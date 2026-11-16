@@ -3,164 +3,152 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Round configuration and the executable design registry.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::BenchError;
 
-/// One design-registry status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DesignStatus {
-    /// Every round measures or explains the series.
+
     Required,
-    /// A claim decides whether the series is measured.
+
     Optional,
-    /// The instrument cannot observe it in principle.
+
     Unsupported,
 }
 
-/// The complete series boundary, shared with methodology.md's registry.
 pub fn design_status(series: &str) -> Option<DesignStatus> {
     DESIGN_REGISTRY
         .iter()
         .find_map(|(name, status)| (*name == series).then_some(*status))
 }
 
-/// One round coverage row.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Coverage {
-    /// Registry name.
+
     pub series: String,
-    /// Round outcome.
+
     pub status: String,
-    /// Why measurement was deferred or failed.
+
     pub reason: Option<String>,
-    /// Observable condition that reopens measurement.
+
     pub reopen_when: Option<String>,
-    /// Instrument used for a measured row.
+
     pub measured_by: Option<String>,
-    /// Raw source used for a measured or partially failed row.
+
     pub reading: Option<String>,
 }
 
-/// One pre-registered claim.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Claim {
-    /// Stable claim id.
+
     pub id: String,
-    /// Series whose readings the claim needs.
+
     pub series: String,
-    /// Primary raw metric.
+
     pub primary_metric: String,
-    /// Expected unit.
+
     pub unit: String,
-    /// Beneficial direction.
+
     pub direction: String,
-    /// Editorial minimum effect.
+
     pub minimum_worthwhile_change: f64,
-    /// Pre-registered multiplicity family.
+
     pub multiplicity_family: String,
-    /// Observation that would refute the claim.
+
     pub falsification_condition: String,
 }
 
-/// Quantile used by a cell's sizing rule.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Headline {
-    /// Median.
+
     P50,
-    /// 95th percentile.
+
     P95,
-    /// 99th percentile with a P95 fallback.
+
     P99,
 }
 
-/// One cell's pre-registered sizing and independence contract.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CellPlan {
-    /// The length-prefixed cell identity emitted by `CellKey::id`.
+
     pub key: String,
-    /// Explicit full baseline cell identity for outcome contrasts.
+
     #[serde(default)]
     pub baseline_key: Option<String>,
-    /// Quantile whose interval is sized.
+
     pub headline: Headline,
-    /// Positive relative or absolute width target.
+
     pub target_half_width: f64,
-    /// Observations in one fresh cohort.
+
     pub observations_per_cohort: u64,
-    /// Maximum planned observations.
+
     pub resource_ceiling: u64,
-    /// Whether independent-trial outcome formulas are admissible.
+
     pub independent_unpaired: bool,
-    /// Absolute target for a non-positive estimate.
+
     #[serde(default)]
     pub absolute_target: Option<f64>,
-    /// Near-zero memory-slope threshold.
+
     #[serde(default)]
     pub s0: Option<f64>,
-    /// Absolute memory-slope width target.
+
     #[serde(default)]
     pub h_abs: Option<f64>,
-    /// Assumed first-arm proportion for independent outcome sizing.
+
     #[serde(default)]
     pub assumed_first: Option<f64>,
-    /// Assumed second-arm proportion for independent outcome sizing.
+
     #[serde(default)]
     pub assumed_second: Option<f64>,
-    /// Multiplicity family size for conservative alpha allocation.
+
     #[serde(default)]
     pub family_size: Option<u32>,
 }
 
-/// The complete manifest shape used by the analyzer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Manifest {
-    /// Manifest schema version, currently one.
+
     pub schema_version: u64,
-    /// Immutable analyzer commit.
+
     pub analysis_revision: String,
-    /// Method version.
+
     pub method_version: String,
-    /// Estimator implementation version.
+
     pub estimator_version: String,
-    /// Root of every deterministic random stream.
+
     pub seed_string: String,
-    /// Resamples per analysis.
+
     pub resamples: u32,
-    /// Two-sided interval confidence.
+
     pub confidence: f64,
-    /// Two-sided family alpha.
+
     pub alpha: f64,
-    /// Sizing power.
+
     pub power: f64,
-    /// Independent resampling unit.
+
     pub bootstrap_unit: String,
-    /// SHA-256 of each input, keyed by file name.
+
     pub input_hashes: BTreeMap<String, String>,
-    /// Round coverage rows.
+
     pub coverage: Vec<Coverage>,
-    /// Pre-registered claims.
+
     pub claims: Vec<Claim>,
-    /// Per-cell sizing plans.
+
     pub cell_plans: Vec<CellPlan>,
-    /// Toolchain, machine, workload and other provenance not read by estimators.
+
     #[serde(flatten)]
     pub provenance: BTreeMap<String, serde_json::Value>,
 }
 
 impl Manifest {
-    /// Decode and validate a manifest without touching the filesystem.
-    ///
-    /// # Errors
-    /// Returns `E_INVALID_INPUT` for every schema or coverage violation.
+
     pub fn parse(text: &str) -> Result<Self, BenchError> {
         let manifest: Self = serde_json::from_str(text).map_err(|error| {
             BenchError::input(

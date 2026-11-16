@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The search tool: Claude Code's `Grep` over one bounded subtree, and
-//! the line number `read` continues from. What a call asks, and which of
-//! its arguments are answered, is `predicate`'s to read.
-//!
-//! **What may be searched is what may be read.** The prefix goes
-//! through `chosen_path::admit` and `chosen_path::land`, every candidate
-//! file through `Address::is_reserved`, every link through `land`, and
-//! every building the walk enters from the city root through the read
-//! bound, so a run cannot reach its own governance or a confidential
-//! building sideways through a search after `read` closed the front door.
-
 use std::path::{Path, PathBuf};
 
 use kernel::{
@@ -32,38 +21,25 @@ use descent::{Entry, Step, admissible};
 use hit::{Limit, context_block};
 use predicate::{Lines, Mode, Predicate};
 
-/// How many entries one call may bring back: hits in `content`, files in
-/// `files_with_matches`, in `count` and for a glob alone. A search that filled the window would be a
-/// search nobody can afford to run twice.
 const MATCH_CAP: usize = 64;
 
-/// How large a file may be before the walk passes over it. Reading a
-/// large object into memory to look for a match is a stall, and the
-/// material this tool is for is source and prose. A file past it is
-/// reported, because `read` can still take it an interval at a time.
 const FILE_BYTE_CAP: u64 = 1 << 20;
 
-/// How many of the places the walk could not look through are named:
-/// the count covers all of them, and a model acts on a few names.
 const UNREAD_SHOWN: usize = 16;
 
-/// What the walk has found so far, and what it could not open.
 struct Findings {
     hits: Vec<Value>,
-    /// Bytes of hit text handed back so far, against
-    /// `INTERVAL_CAP_BYTES`. Counted rather than measured at the end,
-    /// because the answer has to stop before it is over budget.
+
     spent: usize,
     unreadable: u64,
-    /// The first [`UNREAD_SHOWN`] of those, each with its reason.
+
     unread: Vec<Value>,
-    /// The limit the walk stopped at, or `None` when it looked everywhere.
+
     stopped: Option<Limit>,
 }
 
 impl Findings {
-    /// Counts a place the walk could not look through, and names it
-    /// while there is room.
+
     fn could_not_look(&mut self, rel: &str, why: String) {
         self.unreadable = self.unreadable.saturating_add(1);
         if self.unread.len() < UNREAD_SHOWN {
@@ -72,8 +48,6 @@ impl Findings {
         }
     }
 
-    /// Lists one file in a `files` or `count` answer, or stops the walk
-    /// when [`MATCH_CAP`] files are already listed.
     fn list(&mut self, entry: Value) {
         if self.hits.len() >= MATCH_CAP {
             self.stopped = Some(Limit::Files);
@@ -83,27 +57,18 @@ impl Findings {
     }
 }
 
-/// What a search answers with, and what it refuses.
 pub struct SearchTool {
-    /// The root the walk starts from, anchored once when the tool is
-    /// built (`Sprawling/runtime/spec/Tools/ChosenPath.lean` D112).
+
     city: chosen_path::CityRoot,
-    /// What this run's building may read: the prefix is admitted by it,
-    /// and a walk from the city root enters only the buildings it opens.
+
     bound: ReadBound,
     meta: ToolMeta,
 }
 
 impl SearchTool {
-    /// The name this tool answers to, read by its registration and by
-    /// `mode::core_tools`.
+
     pub const NAME: &'static str = "search";
 
-    /// The name, disclosure and schema `new` registers. The catalog page
-    /// reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
     pub fn definition() -> Result<ToolDef, AxError> {
         Ok(ToolDef {
             name: ToolName::parse(Self::NAME)?,
@@ -142,10 +107,6 @@ impl SearchTool {
         })
     }
 
-    /// # Errors
-    /// Propagates a malformed parameter schema, which is a build-time
-    /// defect rather than a runtime one, and `E_STORAGE_FATAL` when the
-    /// city root's real location does not resolve.
     pub fn new(city_root: &Path, bound: ReadBound) -> Result<SearchTool, AxError> {
         let defined = Self::definition()?;
         Ok(SearchTool {
@@ -164,8 +125,6 @@ impl SearchTool {
         })
     }
 
-    /// Where the walk starts, as an absolute path and as the city
-    /// address that prefixes every hit it reports.
     fn start(&self, call: &ToolCall) -> Result<(PathBuf, String), AxError> {
         match call.args.as_map().get("path").and_then(Value::as_str) {
             None => Ok((self.city.written().to_path_buf(), String::new())),
@@ -189,9 +148,6 @@ impl SearchTool {
         }
     }
 
-    /// Walks the subtree in name order, so the same city and the same
-    /// question answer the same way twice. A file the predicate does not
-    /// admit by name is passed over unopened.
     fn walk(&self, from: (PathBuf, String), looking: &Predicate) -> Findings {
         let root = from.1.clone();
         let mut found = Findings {
@@ -229,8 +185,7 @@ impl SearchTool {
             };
             match sorted_entries(&path) {
                 Ok(entries) => {
-                    // Reversed, because the stack hands back what was
-                    // pushed last and the answer is in name order.
+
                     for name in entries.into_iter().rev() {
                         match admissible(&rel, &name, &*self.bound) {
                             Entry::Descend(child) => {
@@ -249,8 +204,6 @@ impl SearchTool {
         found
     }
 
-    /// Looks through one file, adding what it finds until the cap; a
-    /// file found by name alone is listed without being opened.
     fn scan_file(&self, path: &Path, rel: &str, looking: &Predicate, found: &mut Findings) {
         let asked = match looking {
             Predicate::Names(_) => return found.list(Value::String(rel.to_owned())),
@@ -274,9 +227,7 @@ impl SearchTool {
             }
             Err(err) => return found.could_not_look(rel, format!("would not open: {err}")),
         };
-        // A file that is not text has no readable line, so it is passed
-        // over rather than counted as a failure: binary content in a
-        // city is ordinary, not broken.
+
         let Ok(body) = String::from_utf8(bytes) else {
             return;
         };
@@ -294,7 +245,6 @@ impl SearchTool {
         }
     }
 
-    /// Every hit in one file's text, with its context, until a cap.
     fn content_hits(body: &str, rel: &str, asked: &Lines, found: &mut Findings) {
         let lines: Vec<&str> = body.lines().collect();
         for (at, line) in lines.iter().enumerate() {
@@ -305,12 +255,7 @@ impl SearchTool {
                 found.stopped = Some(Limit::Hits);
                 return;
             }
-            // Sixty-four hits is a bound on how many answers travel, not
-            // on how large they are: nine context lines out of a
-            // generated file are nine lines of whatever that file puts
-            // on a line. The byte budget is the same ceiling `read`
-            // keeps, and for the same reason - one result may not spend
-            // the window a caller still has to think in.
+
             let (from, block) = context_block(&lines, at, asked);
             let budget = kernel::consts_policy::INTERVAL_CAP_BYTES;
             let fits = found.spent.saturating_add(block.len()) <= budget;
@@ -318,9 +263,7 @@ impl SearchTool {
                 found.stopped = Some(Limit::Bytes);
                 return;
             }
-            // The first hit is held to the budget as well, cut at its
-            // tail and marked: its line number is where `read` takes up
-            // the rest, so nothing is lost by cutting it.
+
             let text = if fits {
                 block
             } else {
@@ -333,8 +276,7 @@ impl SearchTool {
             hit.insert("path".to_owned(), Value::String(rel.to_owned()));
             hit.insert("line".to_owned(), Value::Number(at.into()));
             if from < at {
-                // Where the context starts, which the drawn answer numbers
-                // its first line from (`crate::rendering`).
+
                 hit.insert("from".to_owned(), Value::Number(from.into()));
             }
             hit.insert("text".to_owned(), Value::String(text));
@@ -346,7 +288,6 @@ impl SearchTool {
     }
 }
 
-/// One directory's entries by name, or why it will not open.
 fn sorted_entries(path: &Path) -> std::io::Result<Vec<String>> {
     let mut names: Vec<String> = std::fs::read_dir(path)?
         .filter_map(|entry| entry.ok())
@@ -381,9 +322,7 @@ impl Tool for SearchTool {
         if let Some(limit) = found.stopped {
             out.insert("stopped".to_owned(), Value::String(limit.said()));
         }
-        // What the walk could not open, rather than silence about it: a
-        // search that reports nothing is a different answer from a
-        // search that could not look.
+
         out.insert(
             "unreadable".to_owned(),
             Value::Number(found.unreadable.into()),

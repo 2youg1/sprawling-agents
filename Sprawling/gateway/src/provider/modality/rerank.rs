@@ -3,30 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a `/rerank` call looks like on the wire, in both directions
-//! (shape 1 decision).
-//!
-//! **Rerank has no OpenAI shape to copy.** The face was defined by the
-//! servers that serve it, and the two this city targets —
-//! text-embeddings-inference and infinity — answer the same request:
-//! one question, a list of passages, and an answer that is a bare
-//! array of `{index, score}` in the server's own ranked order.
-//!
-//! The ranking is the server's and is never recomputed here: scores
-//! from two models are not comparable, sorting them again would be a
-//! second authority on which passage answers a question, and this city
-//! would then disagree with the model it paid to ask.
-//!
-//! Source, read at the commit `docs/third-party.md` section 1 tracks it
-//! to:
-//! `huggingface/text-embeddings-inference` `docs/openapi.json`, the
-//! `/rerank` path with schemas `RerankRequest`, `RerankResponse` and
-//! `Rank`.
-
 use kernel::{AxCode, AxError};
 use serde_json::Value;
 
-/// One call to a rerank face.
 #[derive(Debug)]
 pub struct RerankRequest {
     query: String,
@@ -34,13 +13,7 @@ pub struct RerankRequest {
 }
 
 impl RerankRequest {
-    /// One question against the passages that might answer it.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` when the question is empty or no passage was
-    /// given: a ranking of nothing is an answer no caller can use, and
-    /// the servers differ in whether they refuse it or return an empty
-    /// array.
+
     pub fn new(query: String, passages: Vec<String>) -> Result<RerankRequest, AxError> {
         if query.is_empty() || passages.is_empty() {
             return Err(AxError::failure(
@@ -56,19 +29,11 @@ impl RerankRequest {
         Ok(RerankRequest { query, passages })
     }
 
-    /// How many passages were sent, which bounds every index the
-    /// answer may carry.
     #[must_use]
     pub fn passages(&self) -> usize {
         self.passages.len()
     }
 
-    /// The JSON body.
-    ///
-    /// `return_text` stays at the server's default of `false`: the
-    /// caller already holds the passages it sent, and asking the
-    /// server to send them back doubles the bytes to confirm what the
-    /// index already states.
     #[must_use]
     pub fn body(&self) -> String {
         serde_json::json!({
@@ -79,31 +44,21 @@ impl RerankRequest {
     }
 }
 
-/// One passage's place in the answer.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rank {
-    /// Which of the sent passages this row is about.
+
     pub passage: usize,
-    /// What the model scored it. Comparable within one answer from one
-    /// model, and meaningless between two.
+
     pub score: f64,
 }
 
-/// What a rerank face answered: the sent passages, best first.
 #[derive(Debug)]
 pub struct Ranking {
     ranks: Vec<Rank>,
 }
 
 impl Ranking {
-    /// Read an answer against the request that asked for it.
-    ///
-    /// # Errors
-    /// `E_PROVIDER` when the answer is not an array, when a row states
-    /// no readable index or score, when an index names a passage that
-    /// was never sent, or when one passage is ranked twice. An index
-    /// out of range is the failure that matters: a caller using it to
-    /// pick a passage would read the wrong one, or none.
+
     pub fn parse(answer: &Value, asked: &RerankRequest) -> Result<Ranking, AxError> {
         let rows = answer
             .as_array()
@@ -132,21 +87,17 @@ impl Ranking {
         Ok(Ranking { ranks })
     }
 
-    /// The ranks in the order the model put them: the server sorts,
-    /// and this city does not sort again.
     #[must_use]
     pub fn ranks(&self) -> &[Rank] {
         &self.ranks
     }
 
-    /// The passage the model put first, or `None` when it ranked none.
     #[must_use]
     pub fn best(&self) -> Option<Rank> {
         self.ranks.first().copied()
     }
 }
 
-/// An answer this version cannot read, stated without quoting it.
 fn unreadable(detail: &str) -> AxError {
     AxError::failure(AxCode::Provider, "read a ranking", detail.to_owned()).with_recovery(
         "check that this endpoint serves the text-embeddings-inference rerank face: a \
@@ -201,8 +152,6 @@ mod tests {
         assert!(RerankRequest::new("q".to_owned(), Vec::new()).is_err());
     }
 
-    /// The model's order is the answer. A city that re-sorted would be
-    /// a second opinion on the one thing it paid the model for.
     #[test]
     fn the_ranks_keep_the_order_the_model_put_them_in() {
         let answer = serde_json::json!([
@@ -242,9 +191,6 @@ mod tests {
         assert!(Ranking::parse(&object, &asked()).is_err());
     }
 
-    /// A server that ranks only the passages it considers relevant
-    /// answers with fewer rows than were sent, which is its judgement
-    /// rather than a short answer.
     #[test]
     fn a_shorter_answer_than_the_request_is_a_ranking_too() {
         let answer = serde_json::json!([{"index": 0, "score": 0.9}]);

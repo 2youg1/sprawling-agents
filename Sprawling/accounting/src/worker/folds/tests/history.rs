@@ -3,13 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a page reads back out of a history: the city, one session, and
-//! where a slice that stopped early resumes.
-
 use crate::worker::*;
 
-/// The live page could see nothing from before it opened, because
-/// the server broadcasts and never backfills.
 #[test]
 fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
     let dir = tempfile::tempdir().unwrap();
@@ -49,9 +44,6 @@ fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
     assert_eq!(seqs, ascending, "oldest first: that is the fold's order");
     let earlier = tail.earlier.expect("there is more behind this slice");
 
-    // Paging back reaches the genesis record and then says there is
-    // nothing behind it, rather than answering an empty slice
-    // forever.
     let wire::Answer::History(older) = views
         .prepare(&wire::Query::History {
             before: Some(earlier),
@@ -76,12 +68,6 @@ fn a_page_can_ask_for_the_history_that_happened_before_it_opened() {
     );
 }
 
-/// Opening a session that started before this tab did.
-///
-/// `Query::History` carries no run, so four sessions divided one
-/// bounded slice between them and a session older than the slice was
-/// not in it at all - the page for it was blank. This asks for one
-/// session and gets that session.
 #[test]
 fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city() {
     let dir = tempfile::tempdir().unwrap();
@@ -105,9 +91,6 @@ fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city()
     }
     let views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
 
-    // Everything a fresh city writes belongs to the city's own run,
-    // so asking for it gets those records and asking for a session
-    // nobody ever opened gets none of them.
     let wire::Answer::History(mine) = views
         .prepare(&wire::Query::RunHistory {
             run: RunId::CITY,
@@ -144,9 +127,6 @@ fn one_session_can_be_asked_for_by_itself_rather_than_filtered_out_of_the_city()
     );
 }
 
-/// Stopping on the limit has to be told apart from reaching the
-/// beginning of the session, or a busy city reads as a session with
-/// nothing in it.
 #[test]
 fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_ended() {
     let dir = tempfile::tempdir().unwrap();
@@ -170,8 +150,6 @@ fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_end
     }
     let views = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
 
-    // One record at a time, so the walk stops on the limit well
-    // before it reaches the genesis line.
     let wire::Answer::History(page) = views
         .prepare(&wire::Query::RunHistory {
             run: RunId::CITY,
@@ -191,8 +169,6 @@ fn a_run_history_that_stopped_early_says_where_to_resume_rather_than_that_it_end
         "resuming must not skip the records between"
     );
 
-    // And paging with it does reach the beginning, which is the
-    // other statement `earlier` has to be able to make.
     let mut before = Some(resume);
     let mut guard = 0;
     while let Some(at) = before {

@@ -3,28 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What changed between two screenshots.
-//!
-//! The answer is two things a caller can act on: how much of the picture
-//! moved, and where. The amount is a ten-thousandth rather than a
-//! percentage with a decimal point, because it goes into a ledger
-//! payload and this city keeps floats out of those. The places are
-//! boxes of whole pixels, for the same reason.
-//!
-//! Two pictures of different sizes are not compared. Scaling one onto
-//! the other would answer a question about the scaling algorithm rather
-//! than about the page.
-
 use kernel::{AxCode, AxError, ImageType};
 
 use crate::shot::{Rect, Shot};
 
-/// How wide a tile is. Changed pixels are grouped by tile before they
-/// are grouped into boxes, so a box is a region a person can look at
-/// rather than a list of pixels nobody can read.
 const TILE: u32 = 32;
 
-/// What one comparison found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Difference {
     changed_q4: u32,
@@ -32,26 +16,18 @@ pub struct Difference {
 }
 
 impl Difference {
-    /// How much of the picture changed, in ten-thousandths: 10_000 is
-    /// every pixel and 0 is none.
+
     #[must_use]
     pub fn changed_q4(&self) -> u32 {
         self.changed_q4
     }
 
-    /// Where it changed, in reading order: top to bottom, then left to
-    /// right. An empty list is what "nothing moved" looks like.
     #[must_use]
     pub fn boxes(&self) -> &[Rect] {
         &self.boxes
     }
 }
 
-/// Compares two screenshots.
-///
-/// # Errors
-/// Refuses two pictures of different sizes, a format this build cannot
-/// decode, and bytes that are not the picture they claim to be.
 pub fn diff(before: &Shot, after: &Shot) -> Result<Difference, AxError> {
     if before.width() != after.width() || before.height() != after.height() {
         return Err(AxError::failure(
@@ -97,8 +73,6 @@ pub fn diff(before: &Shot, after: &Shot) -> Result<Difference, AxError> {
     })
 }
 
-/// The picture divided into tiles, with the tiles something changed in
-/// marked. The four numbers describing it always travel together.
 struct Grid {
     width: u32,
     height: u32,
@@ -133,7 +107,6 @@ impl Grid {
     }
 }
 
-/// The changed share, in ten-thousandths, rounded down.
 fn share(changed: u64, area: u64) -> u32 {
     if area == 0 {
         return 0;
@@ -155,18 +128,13 @@ fn tile_index(x: u32, y: u32, across: u32) -> usize {
     usize::try_from(row.saturating_mul(across).saturating_add(column)).unwrap_or(0)
 }
 
-/// One decoded picture: the bytes, and how long one row of them is.
-///
-/// The two always travel together, because neither says anything on its
-/// own - a byte offset needs the stride to mean a pixel.
 struct Decoded {
     bytes: Vec<u8>,
     stride: usize,
 }
 
 impl Decoded {
-    /// The four bytes of one pixel, or nothing when the decoded picture
-    /// is smaller than its own header said.
+
     fn pixel(&self, x: u32, y: u32) -> Option<&[u8]> {
         let row = usize::try_from(y).ok()?.checked_mul(self.stride)?;
         let at = row.checked_add(usize::try_from(x).ok()?.checked_mul(BYTES_PER_PIXEL)?)?;
@@ -174,36 +142,24 @@ impl Decoded {
     }
 }
 
-/// Whether one pixel is the same in both pictures.
-///
-/// # Errors
-/// Reports bytes shorter than the size they declared, which is a decoded
-/// picture that lied about itself rather than a difference. The refusal
-/// names the picture to take again.
 fn same_pixel(first: &Decoded, second: &Decoded, x: u32, y: u32) -> Result<bool, AxError> {
     match (first.pixel(x, y), second.pixel(x, y)) {
-        // Both pictures reach this pixel, so this is a real comparison.
+
         (Some(left), Some(right)) => Ok(left == right),
-        // One picture ran out of bytes here and the other did not.
+
         (None, Some(_)) => Err(ended_early(Short::Before)),
         (Some(_), None) => Err(ended_early(Short::After)),
-        // Neither picture reaches this pixel, so neither is usable.
+
         (None, None) => Err(ended_early(Short::Both)),
     }
 }
 
-/// Which decoded picture held fewer bytes than its own header declared.
-///
-/// Named rather than counted, because the next step differs per variant:
-/// this says which screenshot to take again.
 enum Short {
     Before,
     After,
     Both,
 }
 
-/// The one refusal a truncated decode reports, so "this picture lied
-/// about its own size" is worded in a single place.
 fn ended_early(side: Short) -> AxError {
     let (subject, recovery) = match side {
         Short::Before => (
@@ -223,15 +179,8 @@ fn ended_early(side: Short) -> AxError {
         .with_recovery(recovery)
 }
 
-/// Every picture is decoded to eight-bit RGBA, so one number describes
-/// both of them however they were stored.
 const BYTES_PER_PIXEL: usize = 4;
 
-/// Decodes a screenshot to eight-bit RGBA.
-///
-/// # Errors
-/// Refuses a format this build cannot decode, and bytes that are not the
-/// picture they claim to be.
 fn pixels(shot: &Shot) -> Result<Decoded, AxError> {
     if shot.media() != ImageType::Png {
         return Err(AxError::failure(
@@ -276,11 +225,7 @@ fn decode_failed(err: png::DecodingError) -> AxError {
 }
 
 impl Grid {
-    /// Groups changed tiles into boxes, one box per connected group.
-    ///
-    /// Connectivity is up, down, left and right. Diagonal neighbours are
-    /// two groups, which reads as two places on a page rather than one
-    /// box covering the gap between them.
+
     fn boxes(&self) -> Vec<Rect> {
         let mut seen = vec![false; self.hot.len()];
         let mut boxes = Vec::new();
@@ -295,8 +240,6 @@ impl Grid {
         boxes
     }
 
-    /// The box covering the group this tile belongs to, or nothing when
-    /// this tile did not change or was already counted.
     fn group_from(&self, column: u32, row: u32, seen: &mut [bool]) -> Option<Rect> {
         let start = usize::try_from(row.saturating_mul(self.across).saturating_add(column)).ok()?;
         if !self.is_hot(column, row) || seen.get(start).copied().unwrap_or(true) {
@@ -337,7 +280,6 @@ impl Grid {
         }))
     }
 
-    /// The pixel box a run of tiles covers, cut to the picture's edge.
     fn box_of(&self, tiles: Tiles) -> Rect {
         let x = tiles.left.saturating_mul(TILE);
         let y = tiles.top.saturating_mul(TILE);
@@ -360,8 +302,6 @@ impl Grid {
     }
 }
 
-/// The four tile coordinates of one group, which are one value because
-/// three of them alone say nothing.
 struct Tiles {
     left: u32,
     top: u32,

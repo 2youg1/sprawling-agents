@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Pressing a key on a page: the keys a run may press, the modifiers it
-//! may hold, and the BiDi key-source frame that presses one
-//! (`Sprawling/browser/spec/Keyboard.lean`, and decision D12 of
-//! `Sprawling/browser/Spec.lean`).
-//!
-//! Every name is spelled once, in the one `spelling` of its variant: the
-//! argument reader and the frame builder both read it, so a key cannot
-//! be accepted under one name and sent under another. The names are the
-//! DOM `KeyboardEvent.key` values, because those are what a page's own
-//! key table is written in, and the code points are the WebDriver ones a
-//! driver reads.
-
 use std::collections::BTreeSet;
 
 use kernel::{AxCode, AxError};
@@ -23,7 +11,6 @@ use serde_json::{Value, json};
 use crate::port::Frame;
 use crate::session::{ContextId, Session};
 
-/// A key that has a name rather than a character.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NamedKey {
     Enter,
@@ -42,7 +29,7 @@ pub enum NamedKey {
 }
 
 impl NamedKey {
-    /// Every named key, in the order a refusal lists them.
+
     const ALL: [NamedKey; 13] = [
         NamedKey::Enter,
         NamedKey::Tab,
@@ -59,8 +46,6 @@ impl NamedKey {
         NamedKey::PageDown,
     ];
 
-    /// The DOM name of this key and the WebDriver code point that
-    /// presses it.
     fn spelling(self) -> (&'static str, char) {
         match self {
             NamedKey::Enter => ("Enter", '\u{E007}'),
@@ -80,9 +65,6 @@ impl NamedKey {
     }
 }
 
-/// One key: a named key, or the character a character key types. A
-/// capital letter is its own character; `Shift` is a separate modifier,
-/// and nothing here turns one into the other.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     Named(NamedKey),
@@ -90,10 +72,7 @@ pub enum Key {
 }
 
 impl Key {
-    /// Reads a key by its DOM name, or as the one character it types.
-    ///
-    /// # Errors
-    /// Refuses a name that is neither a named key nor one character.
+
     pub fn parse(name: &str) -> Result<Key, AxError> {
         if let Some(named) = NamedKey::ALL
             .into_iter()
@@ -116,7 +95,6 @@ impl Key {
         }
     }
 
-    /// What the driver is sent for this key.
     fn value(self) -> String {
         match self {
             Key::Named(named) => named.spelling().1.to_string(),
@@ -125,9 +103,6 @@ impl Key {
     }
 }
 
-/// A key held down while another is pressed. The declaration order is
-/// the order they go down, so one press is one byte sequence however the
-/// caller listed them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Modifier {
     Control,
@@ -137,7 +112,7 @@ pub enum Modifier {
 }
 
 impl Modifier {
-    /// Every modifier, in the order a refusal lists them.
+
     const ALL: [Modifier; 4] = [
         Modifier::Control,
         Modifier::Shift,
@@ -145,8 +120,6 @@ impl Modifier {
         Modifier::Meta,
     ];
 
-    /// The DOM name of this modifier and the WebDriver code point that
-    /// holds it.
     fn spelling(self) -> (&'static str, char) {
         match self {
             Modifier::Control => ("Control", '\u{E009}'),
@@ -156,10 +129,6 @@ impl Modifier {
         }
     }
 
-    /// Reads a modifier by its DOM name.
-    ///
-    /// # Errors
-    /// Refuses a name that is not one of the four.
     pub fn parse(name: &str) -> Result<Modifier, AxError> {
         Modifier::ALL
             .into_iter()
@@ -180,11 +149,6 @@ impl Modifier {
     }
 }
 
-/// One key press on whatever the page has focused: each modifier down in
-/// declaration order, the key down and up, the modifiers up in reverse.
-///
-/// # Errors
-/// Propagates the frame's own refusal.
 pub fn key_frame(
     session: &mut Session,
     context: &ContextId,

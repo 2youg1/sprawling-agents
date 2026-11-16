@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which models a city may reach, and what an adapter redeems at the
-//! wire.
-
 use super::super::*;
 use crate::worker::fixture::*;
 use crate::worker::*;
@@ -22,11 +19,6 @@ fn a_model_the_endpoint_never_listed_cannot_be_chosen() {
     assert!(err.subject().contains("m-invented"));
 }
 
-/// Most compatible endpoints serve no model list, so the ids the
-/// person declared are the only ids there will ever be. Attaching on
-/// them is what the four reference harnesses do; refusing would keep a
-/// working provider out of the city over an interface it never
-/// promised.
 #[test]
 fn an_endpoint_with_no_model_list_attaches_on_the_ids_the_person_named() {
     let dir = tempfile::tempdir().unwrap();
@@ -111,9 +103,7 @@ fn an_endpoint_with_neither_a_model_list_nor_a_declared_id_is_refused() {
 fn a_dispatch_without_a_provider_fails_saying_what_to_configure() {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
-    // Nothing registered: the refusal has to name the act that fixes
-    // it, because a person who has not attached a provider yet is
-    // exactly the person who does not know that is the missing step.
+
     let mut worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -198,9 +188,7 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
         .into_iter()
         .find(|head| head.starts_with("POST"))
         .expect("the dispatch called the model");
-    // Before the credential-aware route existed, a loopback endpoint
-    // with a secret went through the local adapter and this header
-    // was silently absent - the probe authenticated, the calls never.
+
     assert!(
         chat.to_ascii_lowercase()
             .contains("authorization: bearer sk-proxy-credential"),
@@ -208,11 +196,6 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
     );
 }
 
-/// The content store is opened once, when the adapter is built, rather
-/// than once per picture (`Sprawling/app/Spec.lean` §8-171). What that moves is
-/// where the failure lands: a city whose store cannot be opened says so
-/// while the adapter is being assembled, instead of half way through a
-/// conversation the model has already started.
 #[test]
 fn a_store_that_will_not_open_refuses_the_adapter_rather_than_the_first_picture() {
     let dir = tempfile::tempdir().unwrap();
@@ -228,8 +211,6 @@ fn a_store_that_will_not_open_refuses_the_adapter_rather_than_the_first_picture(
         "a city that has a content store redeems from it"
     );
 
-    // Where the store belongs there is now a file, so opening it is a
-    // failure this city cannot recover from by itself.
     let cas = dir.path().join(".sprawling").join("cas");
     std::fs::remove_dir_all(&cas).unwrap();
     std::fs::write(&cas, b"not a directory").unwrap();
@@ -240,12 +221,6 @@ fn a_store_that_will_not_open_refuses_the_adapter_rather_than_the_first_picture(
     assert_eq!(err.action(), "read a picture");
 }
 
-/// A probe answers with a reading whether or not a model list came back.
-///
-/// The host here cannot resolve, so the call stops at the first stage.
-/// Before this, the refusal came back as a transport library's sentence
-/// and nothing was written down; now the record says which stage stopped
-/// it, and carries the code beside it.
 #[test]
 fn a_probe_that_reaches_nothing_records_where_it_stopped_rather_than_refusing() {
     let dir = tempfile::tempdir().unwrap();
@@ -259,9 +234,7 @@ fn a_probe_that_reaches_nothing_records_where_it_stopped_rather_than_refusing() 
     worker
         .handle(wire::Command::ProbeEndpoint {
             name: wire::ProviderName::parse("nowhere").unwrap(),
-            // `.invalid` is reserved and resolves nowhere, on every
-            // machine, which is what makes this reading the same one
-            // twice.
+
             base_url: "https://gateway.invalid/v1".to_owned(),
             dialect: kernel::DialectKind::OpenAi,
             secret: None,
@@ -279,11 +252,6 @@ fn a_probe_that_reaches_nothing_records_where_it_stopped_rather_than_refusing() 
     );
 }
 
-/// What a provider states about its own models reaches the table.
-///
-/// The window, the ceiling, the modalities and the two prices are the
-/// provider's own figures; the city carries them and invents none. The
-/// second row states nothing but an id, and stays that way.
 #[test]
 fn a_probe_carries_the_facts_each_model_row_stated() {
     let dir = tempfile::tempdir().unwrap();
@@ -315,9 +283,6 @@ fn a_probe_carries_the_facts_each_model_row_stated() {
     );
 }
 
-/// Every record this city wrote, as one string. The ledger is the
-/// authority on what a command did, and reading it whole is how a test
-/// asks without a second door into the worker.
 pub(super) fn ledger_text(ledger_dir: &std::path::Path) -> String {
     runtime::replay::verify_ledger_dir(ledger_dir)
         .unwrap()
@@ -328,8 +293,6 @@ pub(super) fn ledger_text(ledger_dir: &std::path::Path) -> String {
         .join("\n")
 }
 
-/// The worker's book is the book a restart would fold, whoever wrote
-/// the line: a run's own line reaches it as a city line does.
 #[test]
 fn a_line_a_run_writes_reaches_the_book_the_worker_holds() {
     let dir = tempfile::tempdir().unwrap();
@@ -377,12 +340,6 @@ fn a_line_a_run_writes_reaches_the_book_the_worker_holds() {
     );
 }
 
-/// The provider's own list is the rung below the person: a pick that
-/// states nothing, for a model whose list row states a window and a
-/// ceiling, registers both and names the provider as the rung that
-/// answered (`Sprawling/gateway/Spec.lean` §8-17, gateway D45). The form
-/// no longer has to copy the list's figures into the person's boxes
-/// for the city to use them.
 #[test]
 fn a_pick_that_states_nothing_registers_what_the_providers_list_states() {
     let dir = tempfile::tempdir().unwrap();
@@ -430,8 +387,6 @@ fn a_pick_that_states_nothing_registers_what_the_providers_list_states() {
     );
 }
 
-/// The window, the ceiling and the two rungs of every `model_selected`
-/// this city wrote, in order.
 pub(super) fn selected_lines(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
     runtime::replay::verify_ledger_dir(ledger_dir)
         .unwrap()
@@ -458,12 +413,6 @@ pub(super) fn selected_lines(ledger_dir: &std::path::Path) -> Vec<serde_json::Va
         .collect()
 }
 
-/// A re-attach while the endpoint's list cannot be read changes nothing
-/// the city already knew (gateway D46): an id registered before keeps
-/// the facts the earlier probe read, and the endpoint keeps its earlier
-/// `probed`; an id named for the first time gets default facts and is
-/// marked as named, and then the list is partly the person's word, so
-/// `probed` is false.
 #[test]
 fn a_re_attach_whose_list_cannot_be_read_keeps_the_facts_already_registered() {
     let dir = tempfile::tempdir().unwrap();
@@ -522,8 +471,6 @@ fn a_re_attach_whose_list_cannot_be_read_keeps_the_facts_already_registered() {
     );
 }
 
-/// One attach, as the settings page sends it: the rows ticked on the
-/// list and the ids typed beside it, for the endpoint `relay`.
 fn attach_relay(
     worker: &mut RunWorker,
     base_url: &str,
@@ -544,8 +491,6 @@ fn attach_relay(
     })
 }
 
-/// Each registered row of `relay` with where it came from, and whether
-/// the endpoint reads as probed.
 fn relay_rows(worker: &RunWorker) -> (Vec<(String, kernel::event::record::Listing)>, bool) {
     let held = worker
         .credentials
@@ -562,9 +507,6 @@ fn relay_rows(worker: &RunWorker) -> (Vec<(String, kernel::event::record::Listin
     )
 }
 
-/// A typed id is the person's word (gateway D47): an attach after the
-/// list was read registers it beside the ticked row, marked as named
-/// rather than listed, and a role can point at it.
 #[test]
 fn a_typed_id_the_list_does_not_carry_is_registered_as_the_persons_word() {
     use kernel::event::record::Listing;
@@ -607,8 +549,6 @@ fn a_typed_id_the_list_does_not_carry_is_registered_as_the_persons_word() {
         .unwrap();
 }
 
-/// What a refused command must leave alone: the book the worker holds
-/// and every line of the ledger.
 fn untouched(worker: &RunWorker, ledger_dir: &std::path::Path) -> (serde_json::Value, String) {
     (
         serde_json::to_value(&worker.credentials.book).unwrap(),
@@ -616,11 +556,6 @@ fn untouched(worker: &RunWorker, ledger_dir: &std::path::Path) -> (serde_json::V
     )
 }
 
-/// A ticked list that matches nothing the endpoint serves, with no
-/// typed id beside it, would register an endpoint with no models and
-/// leave the next pick to fail for an unrelated reason. It is refused
-/// at the attach, naming the ids that matched nothing and offering the
-/// ones that are served, and nothing is written (gateway D47).
 #[test]
 fn a_ticked_list_that_matches_nothing_served_is_refused_and_writes_nothing() {
     let dir = tempfile::tempdir().unwrap();
@@ -641,7 +576,7 @@ fn a_ticked_list_that_matches_nothing_served_is_refused_and_writes_nothing() {
         b"second",
     )
     .expect_err("a ticked list that matches nothing is refused");
-    // `nearby` follows the order the endpoint lists its models in.
+
     let mut offered = err.nearby().to_vec();
     offered.sort();
     assert_eq!(
@@ -659,9 +594,6 @@ fn a_ticked_list_that_matches_nothing_served_is_refused_and_writes_nothing() {
     assert_eq!(untouched(&worker, &report.ledger_dir), before);
 }
 
-/// Unticking the model a role points at is refused, naming the role,
-/// rather than leaving the role on a model the book no longer holds or
-/// clearing it behind the person's back (gateway D48).
 #[test]
 fn a_re_attach_that_drops_the_model_a_role_points_at_is_refused_naming_the_role() {
     let dir = tempfile::tempdir().unwrap();

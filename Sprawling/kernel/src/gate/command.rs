@@ -3,24 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The command door: whether a run may execute a command at all.
-//! The part `Sprawling/kernel/spec/Gate.lean` specifies this module with the
-//! rest of `kernel::gate`.
-//!
-//! A command's effect is whatever its text says, and no door can list
-//! that in advance, so the only input this door reads is where the run's
-//! work came from. A run that outside content started — an MCP answer,
-//! a fetched page, a file from another building — is refused rather than
-//! asked: asking would hand the person a command the outside wrote and
-//! a button to run it.
-
 use crate::error::{AxCode, AxError, GateRefusal};
 use crate::taint::TaintSet;
 
 use super::GateOutcome;
 
-/// Allows a command from work that began inside the city; refuses one
-/// from a run carrying any external source (C15).
 #[must_use]
 pub fn command(taint: &TaintSet) -> GateOutcome {
     if taint.is_empty() {

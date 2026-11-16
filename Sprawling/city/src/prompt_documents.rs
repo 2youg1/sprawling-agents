@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The prompt documents a page may write at the city root or inside a
-//! reserved subtree, and the three whole-document steps a person takes
-//! on them (`Sprawling/city/Spec.lean` §8-44, city D33).
-//!
-//! A reserved subtree is out of every write domain so that no resident
-//! rewrites what it is told; the city's own doors still let a person
-//! write a few files there, and this module is the one list of them.
-
 use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxCode, AxError, B3Hash, RESERVED_PREFIX};
@@ -19,23 +11,17 @@ use crate::defaults::Shipped;
 use crate::spine_files::CITY_FILE;
 use crate::spine_files::hall::{CLERK_FILE, MAYOR_FILE};
 
-/// The directory under a reserved prefix that holds one directory per
-/// provider, each holding one note per model.
 const MODELS_DIR: &str = "models";
 
-/// The extension a model's note is written under.
 const NOTE_EXT: &str = "md";
 
-/// One prompt document a page may write.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromptDocument {
-    /// `City.md` at the city root, `MAYOR.md` or `CLERK.md`: the three
-    /// whose default text this build carries.
+
     Shipped(Shipped),
-    /// A building's own `City.md`, in its reserved subtree (city D31).
+
     BuildingCity { building: Address },
-    /// The note a person keeps for one model: the city's, or a
-    /// building's, which replaces the city's for that model.
+
     ModelNote {
         building: Option<Address>,
         provider: String,
@@ -43,19 +29,16 @@ pub enum PromptDocument {
     },
 }
 
-/// A whole-document step on one prompt document.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptStep {
-    /// This layer starts its own copy from the one that governs now.
+
     Own,
-    /// This layer's copy goes, and the farther one governs again.
+
     Inherit,
-    /// This build's default text is written back.
+
     Restore,
 }
 
-/// What one step left: how long the document now is, and whether it is
-/// gone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PromptWritten {
     pub bytes: usize,
@@ -63,8 +46,7 @@ pub struct PromptWritten {
 }
 
 impl PromptDocument {
-    /// The prompt document `at` names, or `None` when it is none of
-    /// them.
+
     #[must_use]
     pub fn of(at: &Address) -> Option<PromptDocument> {
         let parts: Vec<&str> = at.as_str().split('/').collect();
@@ -83,11 +65,6 @@ impl PromptDocument {
         }
     }
 
-    /// The address this document is kept at.
-    ///
-    /// # Errors
-    /// A provider or model the address grammar refuses, which a document
-    /// [`PromptDocument::of`] read cannot hold.
     pub fn at(&self) -> Result<Address, AxError> {
         let spelled = match self {
             PromptDocument::Shipped(Shipped::City) => CITY_FILE.to_owned(),
@@ -105,21 +82,10 @@ impl PromptDocument {
         Address::parse(&spelled)
     }
 
-    /// Where this document is in the city rooted at `city_root`.
-    ///
-    /// # Errors
-    /// As [`PromptDocument::at`].
     pub fn path(&self, city_root: &Path) -> Result<PathBuf, AxError> {
         Ok(city_root.join(self.at()?.as_str()))
     }
 
-    /// Refuses text this document may not hold: the Mayor's identity
-    /// area must read, by the reader the settings page's door holds, so
-    /// a word-by-word save cannot leave the Mayor nameless.
-    ///
-    /// # Errors
-    /// `E_CONFIG_INVALID` naming the line that does not read, and
-    /// `E_INVALID_ARGS` for Mayor text that is not UTF-8.
     pub fn admits(&self, text: &[u8]) -> Result<(), AxError> {
         match self {
             PromptDocument::Shipped(Shipped::Mayor) => {
@@ -139,10 +105,6 @@ impl PromptDocument {
         }
     }
 
-    /// The document one layer out, which governs where this one is
-    /// absent: the city's `City.md` for a building's, the city's note for
-    /// a building's note. `None` for a document no farther layer stands
-    /// behind.
     fn farther(&self) -> Option<PromptDocument> {
         match self {
             PromptDocument::BuildingCity { .. } => Some(PromptDocument::Shipped(Shipped::City)),
@@ -160,22 +122,11 @@ impl PromptDocument {
     }
 }
 
-/// Where the note for `model` on the endpoint named `provider` is kept:
-/// in `building`'s reserved subtree, or the city's when `building` is
-/// `None`. Spelled as an address before it is ever a path, so an id
-/// with a `..` segment names no note rather than a file outside the
-/// reserved subtree; `None` for a provider or model the grammar refuses.
 #[must_use]
 pub fn model_note_at(building: Option<&Address>, provider: &str, model: &str) -> Option<Address> {
     Address::parse(&note_spelling(building, provider, model)).ok()
 }
 
-/// Every note one layer keeps, as `(provider, model)`, in byte order: the
-/// city's when `building` is `None`.
-///
-/// # Errors
-/// `E_STORAGE_FATAL` naming the directory when it is there and cannot
-/// be listed.
 pub fn model_notes(
     city_root: &Path,
     building: Option<&Address>,
@@ -202,15 +153,6 @@ pub fn model_notes(
     Ok(notes)
 }
 
-/// Every file under `dir`, each as the names of the directories on the
-/// way to it and its own: a model id with a slash keeps its note in a
-/// directory of its own (`Sprawling/city/spec/SpineFiles.lean`).
-///
-/// Links are followed, because the freeze follows them when it reads a
-/// note, and a list that stopped at a link would leave out a note every
-/// run on that model is sent. `above` holds the resolved directories on
-/// the way down, so a link back to one of them is not walked again; a
-/// link to nothing is not listed, as the freeze reads it as no note.
 fn files_under(dir: &Path, above: &mut Vec<PathBuf>) -> Result<Vec<Vec<String>>, AxError> {
     let resolved = match std::fs::canonicalize(dir) {
         Ok(resolved) => resolved,
@@ -247,20 +189,6 @@ fn files_under(dir: &Path, above: &mut Vec<PathBuf>) -> Result<Vec<Vec<String>>,
     Ok(files)
 }
 
-/// Takes `step` on `doc`, only while the file still holds the version
-/// `base` names (a file that is not there reads as no bytes).
-///
-/// `Own` starts a copy from the farther layer's (empty when there is
-/// none) and refuses a file that is already there; `Inherit` removes the
-/// file; `Restore` writes this build's default back through
-/// [`crate::defaults::restore`], which keeps an identity area.
-///
-/// # Errors
-/// `E_INVALID_ARGS` for a step this document does not take, and for
-/// `Own` on a file already there or `Inherit` on one that is not;
-/// `E_VERSION_CONFLICT` when the file is no longer `base`;
-/// `E_STORAGE_FATAL` naming the path when a file cannot be read,
-/// written or removed.
 pub fn put_prompt(
     city_root: &Path,
     doc: &PromptDocument,
@@ -317,8 +245,6 @@ pub fn put_prompt(
     }
 }
 
-/// Refuses a file that moved since the page read the version `base`
-/// names.
 fn held_at(path: &Path, on_disk: &[u8], base: B3Hash) -> Result<(), AxError> {
     if B3Hash::digest(on_disk) == base {
         Ok(())
@@ -327,7 +253,6 @@ fn held_at(path: &Path, on_disk: &[u8], base: B3Hash) -> Result<(), AxError> {
     }
 }
 
-/// The refusal for a step `doc` does not take, with the steps it does.
 fn refused(doc: &PromptDocument, why: &str) -> AxError {
     let takes = match doc {
         PromptDocument::Shipped(_) => "write it back to this build's default (restore)",
@@ -350,17 +275,12 @@ fn refused(doc: &PromptDocument, why: &str) -> AxError {
     ))
 }
 
-/// A segment that names a building: one segment, outside every reserved
-/// subtree.
 fn a_building(segment: &str) -> Option<Address> {
     Address::parse(segment)
         .ok()
         .filter(|addr| !addr.is_reserved())
 }
 
-/// The note the segments after `provider` name, when the last carries
-/// the note extension and the whole reads back to the same address: a
-/// model id with a slash spans more than one segment.
 fn note_of(building: Option<Address>, provider: &str, note: &[&str]) -> Option<PromptDocument> {
     let model = note.join("/");
     let model = model.strip_suffix(NOTE_EXT)?.strip_suffix('.')?;
@@ -381,7 +301,6 @@ fn note_spelling(building: Option<&Address>, provider: &str, model: &str) -> Str
     }
 }
 
-/// The names in `dir`, or none when it is not there.
 fn names_in(dir: &Path) -> Result<Vec<String>, AxError> {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
@@ -398,7 +317,6 @@ fn names_in(dir: &Path) -> Result<Vec<String>, AxError> {
     Ok(names)
 }
 
-/// The file's bytes, or none when it is not there.
 fn read_or_empty(path: &Path) -> Result<Vec<u8>, AxError> {
     match std::fs::read(path) {
         Ok(bytes) => Ok(bytes),

@@ -3,23 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One case of `shots` - one measuring or one picture - as tries: the
-//! second try a failed first one gets, the failure named for the case,
-//! and the profile directory each try removes after itself
-//! (Tools/xtask/Spec.lean §8-44).
-
 use std::path::Path;
 use std::time::Duration;
 
 use crate::report::XtaskError;
 
-/// How long a profile directory is given to come free for removal.
 const PROFILE_RELEASE: Duration = Duration::from_secs(5);
 
-/// The directory under the run's output that holds each case's stderr.
 pub(super) const LOGS: &str = "engine";
 
-/// Which try of a case a launch is.
 #[derive(Clone, Copy)]
 pub(super) enum Attempt {
     First,
@@ -27,7 +19,7 @@ pub(super) enum Attempt {
 }
 
 impl Attempt {
-    /// What the stderr file of this try ends in.
+
     pub(super) fn log_suffix(self) -> &'static str {
         match self {
             Attempt::First => ".log",
@@ -36,16 +28,13 @@ impl Attempt {
     }
 }
 
-/// How a case came to succeed.
 #[derive(Debug)]
 pub(super) enum Took {
     First,
-    /// Its first try failed for this reason, and the second succeeded.
+
     Retried(String),
 }
 
-/// Runs `attempt` once, and once more when it fails; the second
-/// failure is the case's, named with both reasons.
 pub(super) fn twice<T>(
     case: &str,
     mut attempt: impl FnMut(Attempt) -> Result<T, XtaskError>,
@@ -65,8 +54,6 @@ pub(super) fn twice<T>(
     }
 }
 
-/// Removes `dir` and everything under it; a directory that is not
-/// there is already removed.
 pub(super) fn removed(dir: &Path) -> Result<(), XtaskError> {
     match std::fs::remove_dir_all(dir) {
         Ok(()) => Ok(()),
@@ -78,8 +65,6 @@ pub(super) fn removed(dir: &Path) -> Result<(), XtaskError> {
     }
 }
 
-/// Removes a launch's profile, giving a process still inside it up to
-/// [`PROFILE_RELEASE`] to let go of its files.
 pub(super) fn released(profile: &Path) -> Result<(), XtaskError> {
     let pause = Duration::from_millis(250);
     let mut waited = Duration::ZERO;

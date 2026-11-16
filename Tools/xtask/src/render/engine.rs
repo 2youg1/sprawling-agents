@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The engine half of the render gate: find a browser, open the gallery
-//! out of the bundle a person runs, and read back what was drawn.
-
 pub(crate) mod launch;
 
 use std::path::{Path, PathBuf};
@@ -19,38 +16,16 @@ use crate::walk;
 use browser::survey::probe::Read;
 use browser::survey::{Page, PaintSource};
 
-/// Where the instrumented copy and the throwaway browser profile go.
 const WORK: &str = "target/render";
 
-/// The engine switch that puts a page in a forced-colour mode.
-///
-/// Verified on this repository's own engine rather than taken from a
-/// document: run headless with it and `(forced-colors: active)` matches,
-/// run without it and it does not. The alternative - the devtools
-/// protocol's media emulation - needs a socket, and section 8-13 already
-/// settled that this gate opens no socket.
 const FORCED_COLOURS: &str = "--force-high-contrast";
 
-/// How long the engine is given to reach the moment the probe measures
-/// at, in the same virtual time the probe's own wait is counted in.
 pub(crate) const BUDGET_MS: u32 = 8000;
 
-/// How long an opening's engine may run before the gate calls it stuck:
-/// two minutes, fifteen times the virtual budget, so only an engine that
-/// will never finish reaches it.
 const PATIENCE: Duration = Duration::from_secs(120);
 
-/// The Chromium family as the doctor states it: one brand per line,
-/// with the program a shell resolves and where each platform installs
-/// it. Rendered by the doctor's own test from its family table, so the
-/// gate and the doctor look in the same places (section 8-13).
 const CHROMIUM: &str = include_str!("../../../../Sprawling/app/src/doctor/family/chromium.tsv");
 
-/// The engine to render with, in the three tiers section 8-13 fixes.
-///
-/// Each tier is an authority that already exists. The gate does not keep
-/// a list of its own, and it does not probe for what `doctor` already
-/// knows.
 pub(crate) fn browser() -> Option<PathBuf> {
     if let Some(named) = std::env::var_os("SPRAWLING_BROWSER") {
         let path = PathBuf::from(named);
@@ -69,8 +44,6 @@ pub(crate) fn browser() -> Option<PathBuf> {
     })
 }
 
-/// Each brand of the doctor's Chromium family, in its order: the
-/// program name, and the places this platform installs it.
 fn chromium_members() -> impl Iterator<Item = (&'static str, std::str::Split<'static, char>)> {
     let column = if cfg!(windows) {
         2
@@ -90,9 +63,6 @@ fn chromium_members() -> impl Iterator<Item = (&'static str, std::str::Split<'st
         })
 }
 
-/// What `doctor` installed, read as the filesystem convention it is
-/// (`Sprawling/kernel/Spec.lean` §8-22) rather than as a second probe for
-/// where a browser lives on this machine.
 fn in_components() -> Option<PathBuf> {
     let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))?;
     let components = PathBuf::from(home).join(".sprawling").join("components");
@@ -108,8 +78,6 @@ fn in_components() -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
-/// Where `program` is on `PATH`, under its own name or, on Windows,
-/// with the `.exe` a shell adds.
 fn on_path(program: &str) -> Option<PathBuf> {
     let paths = std::env::var_os("PATH")?;
     std::env::split_paths(&paths)
@@ -117,15 +85,6 @@ fn on_path(program: &str) -> Option<PathBuf> {
         .find(|candidate| candidate.is_file())
 }
 
-/// Open one route of the built client and read back every element the
-/// properties are about.
-///
-/// The bundle is copied and instrumented rather than probed in place: the
-/// probe is a `<script>` this repository does not ship, and writing it
-/// into the bundle directory would leave it in whatever `just dist`
-/// packages next.
-/// Where one opening finds what it opens: the same four paths for every
-/// pass of a run.
 pub(super) struct Opening<'a> {
     pub(super) root: &'a Path,
     pub(super) browser: &'a Path,
@@ -133,8 +92,6 @@ pub(super) struct Opening<'a> {
     pub(super) route: &'a str,
 }
 
-/// What one opening read back: the page as the instrument measures it,
-/// and what the page said about the conditions it drew in.
 pub(super) struct Measured {
     pub(super) page: Page,
     pub(super) reported: Reported,
@@ -155,9 +112,7 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
     })?;
     let page = bundle.join("index.html");
     let body = walk::read_text(&page)?;
-    // Beside the bundle, so that `./assets/…` still resolves: the copy is
-    // named for the gate and the pass, because the passes of one run open
-    // at the same time, and `just dist` writes the directory fresh.
+
     let instrumented = bundle.join(format!("sprawling-render-{}.html", pass.slug()));
     let chunks = walk::files_with_ext(&bundle.join("assets"), &["js"])?;
     let names = chunks
@@ -179,20 +134,13 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
         .arg("--headless=new")
         .arg("--disable-gpu")
         .arg("--no-sandbox")
-        // Every opening uses a fresh profile, and without these the
-        // first-run flow runs on each one; some Edge builds spend tens of
-        // seconds in its importer per opening, enough to exhaust the
-        // patience.
+
         .arg("--no-first-run")
         .arg("--no-default-browser-check")
         .arg("--hide-scrollbars")
-        // On macOS an engine that reaches for the login keychain waits for
-        // a prompt nobody on a runner can answer.
+
         .arg("--use-mock-keychain")
-        // The bundle is a module script, and a module fetched from
-        // `file://` is a cross-origin fetch. Serving it would mean a
-        // server in the gate; this flag is the same statement without
-        // one, and it applies to a throwaway profile.
+
         .arg("--allow-file-access-from-files")
         .arg(format!("--user-data-dir={}", profile.display()))
         .arg(format!("--window-size={},{HEIGHT}", pass.width))
@@ -229,10 +177,7 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
     };
     let vocabulary = declared(words);
     if vocabulary.is_empty() {
-        // Fail closed: an empty vocabulary would read as a page that
-        // declares nothing, and every colour on it would be reported as
-        // undeclared. A gate that cannot find its subject must say so
-        // rather than judge against nothing.
+
         return Err(XtaskError::Cmd {
             cmd: format!("{} --dump-dom {route}", browser.display()),
             msg: "the probe read no declared words off the root element; the engine does not \
@@ -250,9 +195,7 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
             ),
         });
     };
-    // The pass demanded the paint source and the page is asserted
-    // against it below; a resident surveying a page it did not ask for
-    // reads the same three strings and takes the page's own word.
+
     let read = Read {
         sink: records.to_owned(),
         declared: words.to_owned(),
@@ -268,7 +211,6 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
     })
 }
 
-/// What the probe left in one of its two elements, if it ran.
 fn sink<'a>(dom: &'a str, id: &str) -> Option<&'a str> {
     let open = format!("<pre id=\"{id}\">");
     let start = dom.find(&open)?.checked_add(open.len())?;
@@ -277,16 +219,6 @@ fn sink<'a>(dom: &'a str, id: &str) -> Option<&'a str> {
     rest.get(..end)
 }
 
-/// A `modulepreload` link for every script chunk in the bundle that the
-/// page does not name itself, which is every chunk a view fetches through
-/// a dynamic `import()`.
-///
-/// A module fetched from `file://` after the document has loaded does not
-/// hold the engine's virtual time, so a lazily loaded view never lands
-/// inside the budget however long the probe waits. A preload is part of
-/// the document load, which does hold virtual time; the later `import()`
-/// then finds the module already fetched. Only the gate's copy carries
-/// these links, so the shipped page stays lazy.
 pub(crate) fn preloads<'a>(body: &str, chunks: impl IntoIterator<Item = &'a str>) -> String {
     chunks
         .into_iter()
@@ -300,7 +232,6 @@ pub(crate) fn preloads<'a>(body: &str, chunks: impl IntoIterator<Item = &'a str>
         .collect()
 }
 
-/// Add the preloads to the head and append the probe to a copy of the page.
 fn instrument(body: &str, preloaded: &str, pass: &Pass) -> String {
     let body = match body.find("</head>") {
         Some(at) => {
@@ -318,7 +249,6 @@ fn instrument(body: &str, preloaded: &str, pass: &Pass) -> String {
     }
 }
 
-/// A `file://` URL for a path, in the form every engine accepts.
 pub(crate) fn url_of(path: &Path) -> String {
     let absolute = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let text = absolute.display().to_string();

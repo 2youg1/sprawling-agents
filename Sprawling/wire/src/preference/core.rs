@@ -3,12 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Performance configuration grammar (`Sprawling/wire/spec/Preference.lean` D30).
-
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroU64;
 
-/// The placement arm; platform policy belongs to serving::placement.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -21,7 +18,6 @@ pub enum CorePlacement {
     Pinned,
 }
 
-/// Whether the core's hot threads stand above normal.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -31,13 +27,12 @@ pub enum CorePriority {
     Normal,
 }
 
-/// The person's `[core]` section, read at serving startup.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CorePreferences {
     pub placement: CorePlacement,
     pub priority: CorePriority,
-    /// Absent means no memory ceiling. Only soft_shares requests it.
+
     pub memory_bytes: Option<NonZeroU64>,
 }

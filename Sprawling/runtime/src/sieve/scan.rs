@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which lines matter, and how much. Four hand-written linear scans
-//! and no pattern engine: a regular expression here would put
-//! backtracking between a model and its next turn, and the shapes
-//! being looked for are all fixed-width or delimiter-bounded.
-//!
-//! Also the spans no stage may rewrite. A URL, a device code, a
-//! `secret:` reference, a `path:line:col` and an exit code are the
-//! things a reader acts on verbatim; a line carrying one is exempt
-//! from folding and cutting, and counts as worth keeping.
-
-/// How much a line matters. Declaration order is the order of
-/// keeping: `Error` first, `Protected` last.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Priority {
     Error,
@@ -32,7 +20,6 @@ const WARNING_WORDS: [&str; 1] = ["warning"];
 const NOTE_WORDS: [&str; 2] = ["note", "help"];
 const RESULT_PHRASES: [&str; 2] = ["test result:", "exit code"];
 
-/// The priority of one line, if it is worth keeping at all.
 pub(crate) fn priority(line: &str) -> Option<Priority> {
     let lower = line.to_ascii_lowercase();
     if has_word(&lower, &ERROR_WORDS) {
@@ -56,7 +43,6 @@ pub(crate) fn priority(line: &str) -> Option<Priority> {
     None
 }
 
-/// A line no stage may fold, cut, or collapse into "unchanged".
 pub(crate) fn is_protected(line: &str) -> bool {
     let lower = line.to_ascii_lowercase();
     line.contains("://")
@@ -72,8 +58,6 @@ fn is_word_char(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
-/// Keyword as a whole word: the characters on both sides are not word
-/// characters, so `errors` and `error_count` do not count.
 fn has_word(lower: &str, words: &[&str]) -> bool {
     words.iter().any(|word| {
         let mut from = 0;
@@ -91,8 +75,6 @@ fn has_word(lower: &str, words: &[&str]) -> bool {
     })
 }
 
-/// Two to four capitals then three to five digits, bounded by
-/// non-word characters: `E0308`, `GH006`, `TS2345`.
 fn has_diagnostic_code(line: &str) -> bool {
     let chars: Vec<char> = line.chars().collect();
     let mut at = 0;
@@ -122,7 +104,6 @@ fn has_diagnostic_code(line: &str) -> bool {
     false
 }
 
-/// `secret:realm/name`: the reference form, never the plaintext.
 fn has_secret_ref(line: &str) -> bool {
     line.match_indices("secret:").any(|(at, _)| {
         line.get(at.saturating_add(7)..)
@@ -131,8 +112,6 @@ fn has_secret_ref(line: &str) -> bool {
     })
 }
 
-/// `path:line:col` — a token with a path character, then two runs of
-/// digits separated by colons. `src/main.rs:12:5`, `C:\a\b.rs:3:4`.
 fn has_location(line: &str) -> bool {
     line.split_whitespace().any(|token| {
         let mut parts = token.rsplitn(3, ':');
@@ -149,8 +128,6 @@ fn all_digits(s: &str) -> bool {
     !s.is_empty() && s.chars().all(|c| c.is_ascii_digit())
 }
 
-/// A device code: groups of four capitals or digits joined by hyphens,
-/// at least two groups, the whole token and nothing else.
 fn has_device_code(line: &str) -> bool {
     line.split_whitespace().any(|token| {
         let token = token.trim_matches(|c: char| !c.is_ascii_alphanumeric());
@@ -201,8 +178,7 @@ mod tests {
     fn the_four_shapes_are_found_without_a_pattern_engine() {
         assert!(has_diagnostic_code("code TS2345 here"));
         assert!(has_diagnostic_code("GH006"));
-        // One capital is outside the SPEC's 2-4; `error[E0308]` is an
-        // error by its keyword, not by its code.
+
         assert!(!has_diagnostic_code("E0308"));
         assert!(!has_diagnostic_code("compiled 437 files"));
         assert!(!has_diagnostic_code("ABCDEF123"));

@@ -3,17 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Refusals of a bundle whose history is short or borrowed: a pack
-//! gone missing, and a v0.0.6 repository at `city/.git` that reads
-//! objects from elsewhere (`Sprawling/storage/spec/Bundle.lean` §8-12).
-
 use super::super::fixture::city_with;
 use super::tests::{committed_twice, copy_dir, log_of};
 use super::*;
 
-/// `open_bare` follows `objects/info/alternates` to object stores
-/// elsewhere on this machine, so a forged bundle that names one would
-/// pack objects the bundle never carried into the restored city.
 #[test]
 fn a_v006_bundle_that_borrows_objects_from_elsewhere_is_refused() {
     let home = tempfile::tempdir().unwrap();
@@ -50,9 +43,6 @@ fn a_v006_bundle_that_borrows_objects_from_elsewhere_is_refused() {
     );
 }
 
-/// `open_bare` resolves `objects`, `refs` and `packed-refs` against the
-/// path a `commondir` file names, so a forged bundle that names another
-/// repository would pack that repository's history into the restored city.
 #[test]
 fn a_v006_bundle_that_borrows_a_common_dir_is_refused() {
     let home = tempfile::tempdir().unwrap();
@@ -89,9 +79,6 @@ fn a_v006_bundle_that_borrows_a_common_dir_is_refused() {
     );
 }
 
-/// A bundle that lost its pack still has refs naming the objects
-/// it held, so restoring it would land files and a ledger beside a
-/// history that points at nothing.
 #[test]
 fn a_bundle_that_lost_its_pack_restores_nothing() {
     let home = tempfile::tempdir().unwrap();
@@ -112,9 +99,6 @@ fn a_bundle_that_lost_its_pack_restores_nothing() {
     );
 }
 
-/// A v0.0.6 export copied the repository whole into `city/.git` and
-/// counted its files in the manifest; its objects and refs come back,
-/// its hooks and config do not.
 #[test]
 fn a_v006_bundle_brings_back_its_history_and_not_its_hooks() {
     let home = tempfile::tempdir().unwrap();

@@ -3,12 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How a refusal is written on the command line (`Sprawling/app/spec/Main/Exit.lean` §8-103):
-//! the text alone, so the caller decides where it goes.
-
 use kernel::AxError;
 
-/// Who reads the refusal: a person, or a program that deserializes it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Form {
     Human,
@@ -16,7 +12,7 @@ pub(super) enum Form {
 }
 
 impl Form {
-    /// `--json` anywhere on the line asks for the machine form.
+
     pub(super) fn of(args: &[String]) -> Self {
         if args.iter().any(|a| a == "--json") {
             Form::Json
@@ -26,9 +22,6 @@ impl Form {
     }
 }
 
-/// The refusal's text, ending in a newline. The json form is one line;
-/// should the error ever fail to serialize, the person's form is written
-/// with the reason, so the refusal itself is never lost.
 pub(super) fn written(err: &AxError, form: Form) -> String {
     match form {
         Form::Human => human(err),

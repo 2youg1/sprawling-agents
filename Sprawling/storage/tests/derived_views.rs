@@ -8,15 +8,6 @@
     reason = "test code: this suite names the one event kind it is               about and treats the rest as one arm, rather than               modelling an enum it does not assert on"
 )]
 
-//! Shape 7 — the disposable derived view — asserted once and
-//! instantiated twice.
-//!
-//! `index` and `hot` differ in what they store and where, but they make
-//! the same promise: throw the view away, replay the same ledger, and
-//! the observable answer comes back identical. That promise is what
-//! makes them safe to delete, and it is stated here in one place so the
-//! two cannot drift apart.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -32,9 +23,6 @@ use kernel::{B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, Ti
 use proptest::prelude::*;
 use storage::{HotView, LedgerIndex};
 
-/// The skeleton: build twice from the same records, observe both, and
-/// require the observations to agree. A view that fails this is not
-/// disposable, whatever else it does.
 fn rebuild_is_stable<V, O: PartialEq + Debug>(
     records: &[EventRecord],
     build: impl Fn(&[EventRecord], u8) -> V,
@@ -63,9 +51,6 @@ fn record(run: RunId, seq: u64, kind: EventKind, data: serde_json::Value) -> Eve
     EventRecord::from_draft(draft, Seq::new(seq), B3Hash::digest(b"prev"))
 }
 
-/// Four kinds are enough to exercise every branch the two views have:
-/// two that create rows, one that closes them, one that is plain
-/// progress.
 fn kind_of(pick: u8) -> EventKind {
     match pick % 4 {
         0 => EventKind::RunStarted,
@@ -115,8 +100,6 @@ proptest! {
         let records = script(&picks);
         let root = tempfile::tempdir().expect("tempdir");
 
-        // Instance 1 — index: the map is rebuilt from the segment, and
-        // every line it points at must come back verbatim.
         rebuild_is_stable(
             &records,
             |records, nonce| {
@@ -139,7 +122,6 @@ proptest! {
             },
         );
 
-        // Instance 2 — hot: the fold is order-stable and phase-stable.
         rebuild_is_stable(
             &records,
             |records, _| {

@@ -3,31 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which outside applications the broker offers, asked at the moment
-//! somebody wants to know.
-//!
-//! Beside `mcp_health` rather than beside the folded answers, and for
-//! the same reason: whether an account is connected is a fact about
-//! now, and a remembered one would still say "connected" an hour after
-//! the person revoked it. **This is the second read that costs
-//! seconds**, and a page asks it when somebody opens the page or comes
-//! back from the consent page they were sent to, never on a timer.
-//!
-//! Where the key lives, which proxy rule reaches the broker and who
-//! this city is to it are all `toolkit_broker`'s to answer, because
-//! the command behind the button on this page has to agree with them.
-
 use super::prepared::LiveAsk;
 use crate::toolkit_broker::broker_for;
 
 impl LiveAsk {
-    /// The shelf, or why there is no shelf to show.
+
     pub(super) fn toolkits_answer(&self) -> wire::ToolkitsAnswer {
         let held = match broker_for(self.vault.as_ref(), self.city.as_ref()) {
             Ok(Some(held)) => held,
-            // No key enrolled is the first step rather than a failure.
-            // Drawing it as an error would tell somebody opening this
-            // page for the first time that something broke.
+
             Ok(None) => return wire::ToolkitsAnswer::Unenrolled,
             Err(refusal) => {
                 return wire::ToolkitsAnswer::Refused {
@@ -47,11 +31,6 @@ impl LiveAsk {
     }
 }
 
-/// One row, in the vocabulary a page draws rather than the broker's.
-///
-/// A slug this crate will not carry drops the row instead of drawing it
-/// under a placeholder: the only thing a person can do with such a row
-/// is press it, and pressing it could not name what to connect.
 fn line_of(toolkit: agent_protocols::Toolkit) -> Option<wire::ToolkitLine> {
     let standing = match toolkit.standing {
         agent_protocols::Connection::Absent => wire::Standing::Absent,

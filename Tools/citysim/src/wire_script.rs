@@ -3,30 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The script a scripted provider plays, and what each request it
-//! receives is answered with (`Tools/citysim/spec/WireScript.lean` §8-10, §8-13).
-//!
-//! **One script format for both players.** A reply is the wire JSON a
-//! provider of the script's compatible format would send, and `parse`
-//! reads every reply through `gateway::response_from_wire`, the
-//! translation `ScriptModel::from_wire` and the city both use: a script
-//! the stand-in provider can play is a script the scripted model can
-//! play, and a mistyped key is refused here rather than reaching the
-//! city as a wire mismatch nobody meant to test.
-//!
-//! **A request is answered by its method, not by its path.** The chat
-//! path of each compatible format belongs to gateway's `chat_path`, and
-//! a copy here would be a second authority for it; the city lists models
-//! with `GET` and talks with `POST`, which is all this needs to tell
-//! apart. The path still reaches the record, where a check can read it.
-//!
-//! **A chat belongs to the run whose call ids it carries back**
-//! (citysim D11). The city sends a run's whole conversation
-//! every turn, and every call id is written once in the script, so the
-//! latest id a request carries names the run and the reply it is past.
-//! What a run is given therefore depends on how far that run has got,
-//! never on how its turns were interleaved with another run's.
-
 mod exchange;
 #[cfg(test)]
 #[allow(
@@ -44,19 +20,14 @@ use serde_json::{Value, json};
 
 pub use exchange::ScriptedProvider;
 
-/// A provider's side of a city's conversations, written down before
-/// they happen: which models its list names, and for each run the
-/// replies it is given in order. The provider hands a reply back as it
-/// was written.
 pub struct WireScript {
     face: DialectKind,
     models: Vec<String>,
     runs: Vec<Vec<Value>>,
-    /// Every call id the replies make, and the reply that makes it.
+
     ids: BTreeMap<String, Turn>,
 }
 
-/// One reply of a script: the `reply`-th of run `run`, both from 0.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Turn {
     pub(crate) run: usize,
@@ -64,17 +35,7 @@ pub(crate) struct Turn {
 }
 
 impl WireScript {
-    /// Reads `{"face": …, "models": […], "runs": [[…], …]}`.
-    ///
-    /// `face` is spelled as `kernel::DialectKind` serializes itself
-    /// (`anthropic`, `open_ai`, `open_ai_responses`); an empty `models`
-    /// is a provider that serves no model list.
-    ///
-    /// # Errors
-    /// `E_CONFIG_INVALID` naming the key path that could not be read:
-    /// a reply the city's own translation cannot read, an empty run, a
-    /// call id written twice, and a reply before a run's last that calls
-    /// no tool (`Tools/citysim/spec/WireScript.lean` §8-13).
+
     pub fn parse(text: &str) -> Result<WireScript, AxError> {
         let whole: Value =
             serde_json::from_str(text).map_err(|err| unreadable("the script", &err.to_string()))?;
@@ -126,9 +87,6 @@ impl WireScript {
     }
 }
 
-/// Every call id the runs' replies make, each read through the city's
-/// own translation, and refused when the stand-in could not place the
-/// requests that carry it back.
 fn call_ids(face: DialectKind, runs: &[Vec<Value>]) -> Result<BTreeMap<String, Turn>, AxError> {
     let mut ids = BTreeMap::new();
     for (run, replies) in runs.iter().enumerate() {
@@ -159,13 +117,11 @@ fn call_ids(face: DialectKind, runs: &[Vec<Value>]) -> Result<BTreeMap<String, T
     Ok(ids)
 }
 
-/// A script as it is being played: how many of its runs are open.
 pub(crate) struct Replay {
     script: WireScript,
     opened: usize,
 }
 
-/// What a request asks for, read from its method alone.
 #[derive(Clone, Copy)]
 pub(crate) enum Asked {
     ModelList,
@@ -183,15 +139,12 @@ impl Asked {
     }
 }
 
-/// What one request is answered with.
 pub(crate) enum Answer {
     Models(Value),
     Reply(Value),
     Refused(Refusal),
 }
 
-/// Why a request got no scripted answer. Each carries a stable code in
-/// the body, in the `error.type` field both compatible formats use.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Refusal {
     NoModelList,
@@ -237,7 +190,7 @@ impl Refusal {
 }
 
 impl Answer {
-    /// The status code and its reason phrase.
+
     pub(crate) fn status(&self) -> (u16, &'static str) {
         match self {
             Answer::Models(_) | Answer::Reply(_) => (200, "OK"),
@@ -255,14 +208,11 @@ impl Answer {
         }
     }
 
-    /// Whether this is a first turn that found no run left, which is
-    /// the one refusal reading the script again can change (citysim D15).
     pub(crate) fn wants_more_runs(&self) -> bool {
         matches!(self, Answer::Refused(Refusal::NoRunLeft))
     }
 }
 
-/// Which run a chat's body names, by the scripted call ids it carries.
 enum Carried {
     Nothing,
     Latest(Turn),
@@ -274,8 +224,6 @@ impl Replay {
         Replay { script, opened: 0 }
     }
 
-    /// The answer to one request, and the reply it was placed at; a
-    /// chat that opens a run opens it here.
     pub(crate) fn answer(&mut self, asked: Asked, body: &str) -> (Option<Turn>, Answer) {
         match asked {
             Asked::ModelList if self.script.models.is_empty() => {
@@ -297,12 +245,6 @@ impl Replay {
         }
     }
 
-    /// Takes a script read again, when it begins with every run this
-    /// replay holds: the runs already open keep the replies they had.
-    ///
-    /// # Errors
-    /// `E_CONFIG_INVALID` when the face, the model list or any run held
-    /// differs in the script read again.
     pub(crate) fn grow(&mut self, script: WireScript) -> Result<(), AxError> {
         let held = &self.script;
         if script.face != held.face
@@ -332,7 +274,6 @@ impl Replay {
         }
     }
 
-    /// A first turn opens the next run not opened yet.
     fn opening(&mut self) -> (Option<Turn>, Answer) {
         let first = Turn {
             run: self.opened,
@@ -347,7 +288,6 @@ impl Replay {
         }
     }
 
-    /// A later turn is given the reply after the one it carries back.
     fn continuing(&self, next: Turn) -> (Option<Turn>, Answer) {
         match self.script.reply(next).cloned() {
             Some(reply) => (Some(next), Answer::Reply(reply)),
@@ -355,8 +295,6 @@ impl Replay {
         }
     }
 
-    /// The scripted call ids among the body's string values, read as
-    /// the run they belong to and the latest reply among them.
     fn carried(&self, sent: &Value) -> Carried {
         let mut found = Vec::new();
         self.collect(sent, &mut found);

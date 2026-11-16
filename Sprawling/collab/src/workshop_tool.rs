@@ -3,26 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The face a workshop shows a model: split one creation into nodes,
-//! hand each down, and judge the join.
-//!
-//! Three verbs, because three different things happen. `lay_out` turns a
-//! list of nodes into a graph that can finish - duplicates, dangling
-//! dependencies and cycles are refused at construction, so a workshop
-//! that exists is one that terminates - and hands down the nodes whose
-//! dependencies have already joined. `question` asks what the join wants answered before
-//! anybody may judge it. `judge` answers it.
-//!
-//! **Nothing here starts a run and nothing here decides who may.** Every
-//! node goes through [`DelegateDesk`], so the one-level rule and the
-//! person's permission are the same two doors a single `delegate` call
-//! passes, reached by the same code. A workshop is fan-out over
-//! delegation, not a second way to spawn.
-//!
-//! A node's contract is its `JOB.md`. The contract is the whole of what
-//! its agent is answerable for, and writing a summary of it into the job
-//! file would put the authority in two places.
-
 use std::collections::BTreeSet;
 
 use kernel::{
@@ -35,23 +15,17 @@ use crate::delegate_tool::DelegateDesk;
 use crate::fanin::{Artifact, FanIn, Joined, PrivateQuestion};
 use crate::workshop::{Laid, LaidOut, NodeContract, NodeId, Underway, Workshop};
 
-/// One run's workshop: the graph it laid out, and what has come back to
-/// the room it works in.
 #[derive(Debug)]
 pub struct WorkshopDesk {
     who: String,
-    /// What the room handed down before this run, until a graph is laid
-    /// out and takes it over.
+
     handed: BTreeSet<NodeId>,
     underway: Laid,
     joined: FanIn,
 }
 
 impl WorkshopDesk {
-    /// `joined` is what the room's earlier runs got back and `handed` what
-    /// it already handed down. Both outlive one run because the nodes do:
-    /// a child may still work, and hand back, after the run that asked
-    /// for it is over.
+
     #[must_use]
     pub fn new(who: String, joined: FanIn, handed: BTreeSet<NodeId>) -> WorkshopDesk {
         WorkshopDesk {
@@ -62,18 +36,6 @@ impl WorkshopDesk {
         }
     }
 
-    /// Accepts a graph and hands down its ready set: the nodes whose
-    /// dependencies this room's join already holds and that the room has
-    /// not handed down yet. A node started before its dependency hands
-    /// back would read an output that does not exist yet, so it waits,
-    /// and the city hands it down when that handback lands.
-    ///
-    /// # Errors
-    /// Propagates the graph's own refusals - a duplicate id, a
-    /// dependency on a node that is not there, a cycle - and the
-    /// delegate desk's, which are the depth and building rules. Refuses
-    /// a second lay-out in one run: two graphs in one session is two
-    /// answers to what this run is building.
     pub fn lay_out(
         &mut self,
         contracts: Vec<NodeContract>,
@@ -119,59 +81,40 @@ impl WorkshopDesk {
         })
     }
 
-    /// The graph this run laid out, for the city to keep beside the join.
     pub fn take_underway(&mut self) -> Option<Underway> {
         self.underway.take()
     }
 
-    /// What the join asks before it will take a verdict.
-    ///
-    /// # Errors
-    /// Refuses when nothing has come back: there is nothing to have
-    /// read.
     pub fn question(&self) -> Result<PrivateQuestion, AxError> {
         self.joined.question()
     }
 
-    /// The verdict, admitted only with the answer.
-    ///
-    /// # Errors
-    /// Propagates the join's refusal of an answer that could have been
-    /// given without opening anything.
     pub fn judge(&self, answer: &str) -> Result<Joined, AxError> {
         self.joined.decide(answer)
     }
 
-    /// Who this desk speaks for.
     #[must_use]
     pub fn who(&self) -> &str {
         &self.who
     }
 
-    /// Adds one verified result to the join.
     pub fn accept(&mut self, artifact: Artifact) {
         self.joined.accept(artifact);
     }
 }
 
-/// The tool itself.
 pub struct WorkshopTool {
     desk: std::sync::Arc<std::sync::Mutex<WorkshopDesk>>,
     delegates: std::sync::Arc<std::sync::Mutex<DelegateDesk>>,
     meta: ToolMeta,
 }
 
-/// Which verbs this tool answers to is its own fact, in its own file.
 mod op;
 
 use op::Op;
 
 impl WorkshopTool {
-    /// The name, disclosure and schema `new` registers. The catalog page
-    /// reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
+
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [
@@ -220,9 +163,6 @@ impl WorkshopTool {
         })
     }
 
-    /// # Errors
-    /// Propagates a malformed parameter schema, which is a build-time
-    /// defect rather than a runtime one.
     pub fn new(
         desk: std::sync::Arc<std::sync::Mutex<WorkshopDesk>>,
         delegates: std::sync::Arc<std::sync::Mutex<DelegateDesk>>,
@@ -245,11 +185,6 @@ impl WorkshopTool {
     }
 }
 
-/// The refusal a desk this tool must lock has earned when the thread
-/// that held it died.
-///
-/// Both desks say it, so both say it once: neither can be reached
-/// again inside this process, and ending the run is the only way on.
 fn poisoned(which: &str) -> AxError {
     AxError::failure(
         AxCode::StorageFatal,
@@ -276,8 +211,6 @@ fn text(map: &Map<String, Value>, key: &str) -> Result<String, AxError> {
         })
 }
 
-/// One node as the model wrote it, turned into the contract the agent
-/// working there is answerable for.
 fn contract_of(node: &Value, owner: &str) -> Result<NodeContract, AxError> {
     let map = node.as_object().ok_or_else(|| {
         AxError::failure(AxCode::InvalidArgs, "run a workshop", "a node is an object")

@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One engine process from start to finish: what it wrote to stdout,
-//! where its stderr went, how long it may take, and what happens to the
-//! helper processes it leaves behind (Tools/xtask/Spec.lean §8-44).
-//!
-//! A Chromium-family engine starts helper processes that inherit its
-//! stdout and may outlive it. Reading stdout to its end, as
-//! `Command::output` does, waits for every one of them, and on a macOS
-//! runner that wait never ended; so the browser's own exit ends the wait
-//! for the dump, and what follows its exit is the caller's choice
-//! ([`AfterExit`]).
-
 use std::io::Read as _;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
@@ -22,71 +11,48 @@ use std::time::Duration;
 
 use crate::report::XtaskError;
 
-/// How often the engine is asked whether it has exited.
 const POLL: Duration = Duration::from_millis(100);
 
-/// How long the dump may keep arriving after the engine has exited,
-/// under [`AfterExit::Drain`]. The engine writes the whole dump before
-/// it exits, so this only drains a pipe.
 const DRAIN: Duration = Duration::from_secs(2);
 
-/// How long a killed tree is given to close the pipe it held.
 const AFTER_KILL: Duration = Duration::from_secs(5);
 
-/// How one engine process is run.
 pub(crate) struct Launch<'a> {
-    /// How a failure names the command.
+
     pub(crate) cmd: &'a str,
     pub(crate) stderr: Stderr<'a>,
-    /// How long the engine may run before its process tree is killed.
+
     pub(crate) patience: Duration,
     pub(crate) after_exit: AfterExit,
 }
 
-/// Where the engine's stderr goes.
 pub(crate) enum Stderr<'a> {
     Discarded,
-    /// A file created (or truncated) for this launch alone.
+
     KeptIn(&'a Path),
 }
 
-/// What the run waits for once the engine itself has exited.
 #[derive(Clone, Copy)]
 pub(crate) enum AfterExit {
-    /// Read what arrives until the pipe is quiet for [`DRAIN`], and leave
-    /// any helper that still holds it running.
+
     Drain,
-    /// Read until every process holding stdout has closed it, so the
-    /// next launch starts with no helper of this one alive; past the
-    /// bound the tree is killed where the platform can still find it,
-    /// and [`Tree::Stray`] says so.
+
     AwaitTree(Duration),
 }
 
-/// What one launch wrote to stdout, and whether its process tree let go.
 #[derive(Debug)]
 pub(crate) struct Ran {
     pub(crate) stdout: Vec<u8>,
     pub(crate) tree: Tree,
 }
 
-/// Whether every process of a launch closed its output before the run
-/// returned.
 #[derive(Debug)]
 pub(crate) enum Tree {
     Released,
-    /// A helper still held it; why, in words a report can carry.
+
     Stray(String),
 }
 
-/// Runs `command` and returns what it wrote to stdout.
-///
-/// # Errors
-///
-/// `XtaskError::Cmd` naming `launch.cmd` when the engine cannot start,
-/// or when it has not exited within `launch.patience`; in the second
-/// case its whole process tree has been killed first, and the message
-/// says whether the tree let go of the pipe.
 pub(crate) fn run(mut command: Command, launch: &Launch) -> Result<Ran, XtaskError> {
     let failed = |msg: String| XtaskError::Cmd {
         cmd: launch.cmd.to_owned(),
@@ -148,11 +114,6 @@ pub(crate) fn run(mut command: Command, launch: &Launch) -> Result<Ran, XtaskErr
     })
 }
 
-/// What happened to a tree that still held the output `bound` after its
-/// leader exited: killed where its process group still finds it (macOS,
-/// Linux), left running where nothing can (Windows, where `taskkill /T`
-/// needs the leader alive). Either way the launch itself succeeded, and
-/// a caller that gave it a profile of its own is not disturbed by it.
 fn stray(child: &mut Child, arrived: &Receiver<Vec<u8>>, bound: Duration) -> Tree {
     let mut late = Vec::new();
     match kill_tree(child) {
@@ -168,8 +129,6 @@ fn stray(child: &mut Child, arrived: &Receiver<Vec<u8>>, bound: Duration) -> Tre
     }
 }
 
-/// Puts the engine at the head of a process group of its own, so its
-/// helpers can be killed with it on macOS and Linux.
 fn in_own_group(command: &mut Command) {
     #[cfg(unix)]
     {
@@ -182,8 +141,6 @@ fn in_own_group(command: &mut Command) {
     }
 }
 
-/// The child's stdout, read chunk by chunk on a thread of its own; the
-/// channel closes when every process holding the pipe has closed it.
 fn read_in_background(child: &mut Child) -> Result<Receiver<Vec<u8>>, String> {
     let mut stdout = child
         .stdout
@@ -204,8 +161,6 @@ fn read_in_background(child: &mut Child) -> Result<Receiver<Vec<u8>>, String> {
     Ok(arrived)
 }
 
-/// Whether the child exited within `patience`, counted in polls so the
-/// wait samples no clock.
 fn exits_within(child: &mut Child, patience: Duration) -> std::io::Result<bool> {
     for _ in 0..polls_in(patience) {
         if child.try_wait()?.is_some() {
@@ -216,8 +171,6 @@ fn exits_within(child: &mut Child, patience: Duration) -> std::io::Result<bool> 
     Ok(child.try_wait()?.is_some())
 }
 
-/// Appends what arrives until the pipe closes, and says whether it did
-/// within `bound`; only the quiet polls count toward the bound.
 fn drained(arrived: &Receiver<Vec<u8>>, out: &mut Vec<u8>, bound: Duration) -> bool {
     let mut quiet: u128 = 0;
     while quiet < polls_in(bound) {
@@ -230,16 +183,10 @@ fn drained(arrived: &Receiver<Vec<u8>>, out: &mut Vec<u8>, bound: Duration) -> b
     false
 }
 
-/// How many [`POLL`]s fit in `span`.
 fn polls_in(span: Duration) -> u128 {
     span.as_millis().checked_div(POLL.as_millis()).unwrap_or(0)
 }
 
-/// Kills the child and every process it started, then reaps the child.
-///
-/// Windows walks the tree from the child with `taskkill /T`, which finds
-/// the helpers only while the child is alive; macOS and Linux signal the
-/// process group [`in_own_group`] made, which outlives its leader.
 fn kill_tree(child: &mut Child) -> Result<(), String> {
     let pid = child.id().to_string();
     let mut tree = tree_kill_command(&pid);
@@ -291,13 +238,9 @@ mod tests {
 
     use super::*;
 
-    /// The environment variable that turns this test binary into a
-    /// fixture engine, and what that engine does.
     const FIXTURE: &str = "XTASK_LAUNCH_FIXTURE";
     const FIXTURE_TEST: &str = "render::engine::launch::tests::fixture";
 
-    /// Not a test: the body a fixture engine runs when the launch tests
-    /// start this binary with [`FIXTURE`] set.
     #[test]
     #[ignore = "a fixture process the launch tests start"]
     fn fixture() {

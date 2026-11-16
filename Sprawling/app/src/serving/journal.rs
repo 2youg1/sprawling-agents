@@ -3,62 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one sink every diagnostic line leaves this process through, and
-//! the two mouths it leaves by: standard error, and whoever has the log
-//! lens open.
-//!
-//! **This is not a second log.** A page reads the same entry the
-//! terminal reads, at the same floor, from the same sink, and the wire
-//! frame it becomes is discardable in exactly the way `docs/logging.md`
-//! says a log is: no ledger sequence of its own, never written down,
-//! and a client that missed one has lost nothing. Nothing here reads a
-//! line back, so the rule that decision logic reads no log output is
-//! unchanged.
-//!
-//! **The clock is handed in at construction** by whoever assembles the
-//! process, from the one place sampling is sanctioned (`bin::assembly`,
-//! `docs/logging.md` section 8); the library that writes the entry is not
-//! allowed a second time source, and neither is this module. A clock
-//! that cannot be read leaves the line's `t` absent rather than dropping
-//! the line, because the ledger position is what anchors it and the
-//! diagnostic is what the reader came for.
-
 use std::sync::{Mutex, PoisonError};
 
 use kernel::{Seq, TimeMs};
 use runtime::diagnostics::{Diagnostics, Entry, Level, Sink, Site};
 
-/// Where a line's time comes from: the assembly point's clock
-/// (`Sprawling/accounting/Spec.lean` §8-3), shared with every sink this journal makes.
 pub type Clock = std::sync::Arc<dyn accounting::Clock + Send + Sync>;
 
-/// How many lines a page that stopped reading may fall behind before it
-/// starts losing them.
-///
-/// Larger than the increment channel and smaller than the event one: a
-/// city at the `wire` floor writes faster than a person reads, and what
-/// is lost here is a diagnostic rather than history.
 const DEPTH: usize = 512;
 
-/// Where a process notice goes once serving has begun: a writer into the
-/// serving journal at the city's floor, and the ledger position serving
-/// started from, which places every notice.
-///
-/// Process-wide because the code that says these notices runs where no
-/// `Diagnostics` reaches: a runtime worker's first wake, a hot thread
-/// taking its seat through a hook `accounting` holds as a function
-/// pointer, the monitor's beat file.
 static PROCESS: Mutex<Option<(Diagnostics, Seq)>> = Mutex::new(None);
 
-/// Says one notice about this process at the `refuse` level: what the
-/// platform refused, or a setting that does not read, which the city
-/// works around and the person may want to fix.
-///
-/// Once [`Journal::hears_the_process`] has run, the notice leaves the way
-/// every diagnostic does, so it reaches only the log lens while the
-/// console owns the terminal (`Sprawling/app/spec/Console.lean`
-/// §8-11). Before that it goes to standard error, because no console
-/// owns the terminal until serving has begun.
 pub(crate) fn notice(module: &'static str, message: &str) {
     let mut process = PROCESS.lock().unwrap_or_else(PoisonError::into_inner);
     match process.as_mut() {
@@ -75,19 +30,12 @@ pub(crate) fn notice(module: &'static str, message: &str) {
     }
 }
 
-/// Where the process log goes on its way out of this process.
 pub struct Journal {
     lines: tokio::sync::broadcast::Sender<wire::LogLine>,
     clock: Clock,
     mouth: Mouth,
 }
 
-/// Whether a line also leaves by standard error.
-///
-/// A console that owns the terminal draws the CLI or the quiet host
-/// there, and a diagnostic written over either is a line nobody asked
-/// for (`Sprawling/app/spec/Console.lean` §8-11); a city with no
-/// terminal of its own keeps standard error, which harnesses read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mouth {
     StandardError,
@@ -104,8 +52,6 @@ impl Journal {
         }
     }
 
-    /// The same journal with standard error closed: every line reaches
-    /// the log lens and nothing reaches the terminal.
     #[must_use]
     pub fn lens_only(self) -> Journal {
         Journal {
@@ -114,8 +60,6 @@ impl Journal {
         }
     }
 
-    /// A second writer at `log`'s floor, into this journal, for a thread
-    /// or a moment `log` itself does not reach; off when `log` is off.
     #[must_use]
     pub fn beside(
         &self,
@@ -127,13 +71,6 @@ impl Journal {
             })
     }
 
-    /// The sink a `Diagnostics` is built with: every admitted line to
-    /// standard error unless the console owns the terminal, and the same
-    /// line to whoever is watching.
-    ///
-    /// A city with no page open still writes to the terminal, because
-    /// the send failing means nobody subscribed and that is what a city
-    /// nobody is looking at looks like.
     pub fn sink(&self) -> Sink {
         let lines = self.lines.clone();
         let clock = std::sync::Arc::clone(&self.clock);
@@ -146,27 +83,16 @@ impl Journal {
         })
     }
 
-    /// Makes this journal, at `log`'s floor, where every [`notice`] goes
-    /// from now on, placed at `at`, the position serving starts from.
-    /// Called by `assembly::listen` before any console exists, so a
-    /// console that takes the terminal later never has a notice written
-    /// over it (`Sprawling/app/spec/Console.lean` §8-11).
     pub(crate) fn hears_the_process(&self, log: &Diagnostics, at: Seq) {
         let writer = self.beside(log);
         *PROCESS.lock().unwrap_or_else(PoisonError::into_inner) = Some((writer, at));
     }
 
-    /// The broadcast the socket subscribes to.
     pub(crate) fn lines(&self) -> tokio::sync::broadcast::Sender<wire::LogLine> {
         self.lines.clone()
     }
 }
 
-/// One entry in the shape the wire carries.
-///
-/// The nil run is the city speaking for itself, and it travels as an
-/// absent run: a page filtering by run would otherwise offer a
-/// session-shaped identifier that names no session.
 fn carried(entry: Entry<'_>, t: Option<TimeMs>) -> wire::LogLine {
     wire::LogLine {
         seq: entry.site.seq,
@@ -178,9 +104,6 @@ fn carried(entry: Entry<'_>, t: Option<TimeMs>) -> wire::LogLine {
     }
 }
 
-/// The one mapping between the level a terminal spells and the level a
-/// page spells. Exhaustive, so a sixth level cannot be added upstream
-/// without this file deciding what a page calls it.
 fn level(level: runtime::diagnostics::Level) -> wire::LogLevel {
     match level {
         runtime::diagnostics::Level::Refuse => wire::LogLevel::Refuse,
@@ -212,10 +135,6 @@ mod tests {
         )
     }
 
-    /// The five names a page spells are the five names a terminal
-    /// spells. Held here because `wire` cannot depend on `runtime`,
-    /// so the two enums would otherwise be free to drift apart while
-    /// both builds stayed green.
     #[test]
     fn a_level_is_named_the_same_way_on_a_terminal_and_on_a_page() {
         for level in Level::ALL {
@@ -225,9 +144,6 @@ mod tests {
         }
     }
 
-    /// The whole path, from the call a module makes to the frame a
-    /// page would receive: the floor is honoured, the fields arrive,
-    /// and the scan that protects the ledger protects this too.
     #[test]
     fn a_written_line_reaches_a_watcher_with_its_credential_already_gone() {
         let journal = Journal::new(std::sync::Arc::new(crate::assembly::SystemClock));
@@ -236,8 +152,7 @@ mod tests {
             runtime::diagnostics::Level::Effect,
             journal.sink(),
         );
-        // Assembled at runtime, so no credential-shaped literal is at
-        // rest in this repository.
+
         let token = ["sk-live-", "Zk29fQ4t", "Rr7mVx1L", "pA6c"].concat();
         let site = Site {
             run: kernel::RunId::CITY,
@@ -245,7 +160,7 @@ mod tests {
             module: "bin::doctor",
         };
         log.write(Level::Effect, site, &format!("calling with {token}"));
-        // Below the floor, so nothing of it travels.
+
         log.write(Level::Trace, site, "retrying");
         let carried = watching.try_recv().expect("the line reached the watcher");
         assert_eq!(carried.level, wire::LogLevel::Effect);
@@ -264,8 +179,6 @@ mod tests {
         );
     }
 
-    /// The city speaking for itself carries no run, and a resident's
-    /// line carries the one it was written under.
     #[test]
     fn the_city_speaks_without_a_run_and_a_resident_speaks_with_one() {
         assert_eq!(entry_at(kernel::RunId::CITY, Level::Effect).run, None);

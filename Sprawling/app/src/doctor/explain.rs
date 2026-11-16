@@ -3,35 +3,22 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One refusal code connected to the items on this machine that can
-//! raise it (`Sprawling/app/spec/Doctor.lean` §8-48).
-//!
-//! A refusal's `recovery` is written where the refusal is, and it
-//! cannot know this machine. `sprawling doctor --explain <code>` is the
-//! join: for each item that can raise the code, what this machine
-//! answered and the next move on this platform, in one line.
-
 use kernel::AxCode;
 
 use super::family::{CHROMIUM, GECKO, WEBKIT};
 use super::table::{CHROMEDRIVER, FFMPEG, MSEDGEDRIVER, PWSH, PYTHON_WASI, SANDBOX_ENGINE, SHELL};
 use super::{Finding, Platform};
 
-/// What `--explain` answers.
 #[derive(Debug)]
 pub(crate) enum Explanation {
-    /// Not a code this city has.
+
     NoSuchCode(String),
-    /// A code decided inside the city, which no item on this machine
-    /// can change.
+
     NotAboutThisMachine(AxCode),
-    /// One line per item that can raise the code.
+
     Lines(Vec<String>),
 }
 
-/// The items that can raise a code, when the code is about this
-/// machine at all. The table this function is: editing it is editing
-/// what `--explain` knows.
 #[expect(
     clippy::wildcard_enum_match_arm,
     reason = "two codes are about a missing program; the other sixty name no program"
@@ -44,7 +31,6 @@ fn items_behind(code: AxCode) -> Option<&'static [&'static str]> {
     }
 }
 
-/// Connects one code to the findings.
 pub(crate) fn explain(code: &str, findings: &[Finding], platform: Option<Platform>) -> Explanation {
     let Some(parsed) = AxCode::parse(code) else {
         return Explanation::NoSuchCode(code.to_owned());
@@ -75,7 +61,6 @@ pub(crate) fn explain(code: &str, findings: &[Finding], platform: Option<Platfor
     Explanation::Lines(lines)
 }
 
-/// The heading above the lines, and the two one-line answers.
 pub(crate) fn explanation_lines(code: &str, explanation: &Explanation) -> Vec<String> {
     match explanation {
         Explanation::NoSuchCode(raw) => vec![format!("  {raw}: not a code this city has")],

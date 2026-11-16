@@ -3,23 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A `search` answer as one header line and its entries grouped by file.
-//!
-//! The header says what the answer holds before any of it is read, so a
-//! model that asked too broad a question learns that from the first
-//! line. A hit block is marked the way a read answer that starts on the
-//! block's first line is (`super::read`), because a passage copied out of
-//! a search answer goes to `edit` as readily as one copied out of a read,
-//! and `edit` sees through only that grammar.
-
 use kernel::Payload;
 use serde_json::{Map, Value};
 
 use super::read::{Numbering, push_line};
 
-/// The header and the grouped entries of one `search` payload, or `None`
-/// when the payload is not the shape `tools::search` writes. Hit lines
-/// are 0-based indexes in the payload and drawn by `numbering`.
 pub(super) fn text(result: &Payload, numbering: Numbering) -> Option<String> {
     let map = result.as_map();
     let mut body = String::new();
@@ -44,9 +32,6 @@ pub(super) fn text(result: &Payload, numbering: Numbering) -> Option<String> {
     Some(header)
 }
 
-/// Every hit, a group per file: the path on a line of its own, then its
-/// hit blocks, each marked from its first line, which is the hit line
-/// unless context starts above it. Groups are parted by an empty line.
 fn content(matches: &[Value], numbering: Numbering, body: &mut String) -> Option<String> {
     let mut files = 0_usize;
     let mut last: Option<&str> = None;
@@ -75,7 +60,6 @@ fn content(matches: &[Value], numbering: Numbering, body: &mut String) -> Option
     ))
 }
 
-/// One path per line.
 fn files_only(files: &[Value], body: &mut String) -> Option<String> {
     for path in files {
         body.push_str(path.as_str()?);
@@ -84,7 +68,6 @@ fn files_only(files: &[Value], body: &mut String) -> Option<String> {
     Some(counted(files.len(), "file", "files"))
 }
 
-/// One `path:count` per line, and the total in the header.
 fn counts(counts: &[Value], body: &mut String) -> Option<String> {
     let mut total = 0_u64;
     for entry in counts {
@@ -100,8 +83,6 @@ fn counts(counts: &[Value], body: &mut String) -> Option<String> {
     ))
 }
 
-/// The places the walk could not look through, one per line with its
-/// reason, after an empty line.
 fn unread(map: &Map<String, Value>, body: &mut String) -> Option<()> {
     let named = map
         .get("unread")
@@ -119,7 +100,6 @@ fn unread(map: &Map<String, Value>, body: &mut String) -> Option<()> {
     Some(())
 }
 
-/// `n` with the noun that agrees with it.
 fn counted(n: usize, one: &str, many: &str) -> String {
     match n {
         1 => format!("1 {one}"),

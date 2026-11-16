@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What this page has asked, what it keeps, and when it asks again.
-//
-// A query is asked once and its answer kept; a page draws what it has
-// while a fresh answer is on its way (stale while revalidating), so a
-// route change never waits on the socket. An event that could have
-// changed an answer marks it stale, and a stale answer somebody is
-// looking at is asked again at most once per `PACE_MS` - a burst of a
-// hundred records becomes one question, not a hundred.
-//
-// Every question goes out under an `AskId` the socket mints, and its
-// answer comes back under the same id with the ledger position it was
-// read at, so the pairing is exact and an event that position already
-// holds marks nothing stale. An answer that matches nothing, and a
-// question nothing answers, are reported.
-
 import { Option, Schema } from "effect";
 import { writable } from "svelte/store";
 import type { Readable, Writable } from "svelte/store";
@@ -38,22 +23,10 @@ import type {
 
 const PACE_MS = 250;
 
-// How many answers a page keeps. A page draws a few dozen at once; the
-// rest are what a person may come back to, and past this count the one
-// used least recently and watched by nobody is dropped, so a tab left
-// open for a week holds what it holds on the first day.
 export const HELD_CAP = 128;
 
-// How long one question may go unanswered before the page stops
-// drawing a skeleton over it. One home for the deadline: the sweep
-// judges every question against `patienceOf`, and no phrase names a
-// number.
 const PATIENCE_MS = 15_000;
 
-// Every question that needs nothing said after its name, under the
-// field its answer arrives in, so a question is spelled once for the
-// whole client. The generated `Query` admits
-// only names this build can ask, so a misspelling fails to compile.
 export const QUERIES = {
   city: "city_view",
   approvals: "approval_queue",
@@ -78,53 +51,32 @@ export const QUERIES = {
   privacy: "privacy",
 } as const satisfies Readonly<Record<string, Extract<Query, string>>>;
 
-// The questions the city answers by reading its host rather than its
-// own memory, with the patience that read needs. The privacy answer
-// reads every control, four of them scheduled tasks read through
-// Windows PowerShell, and one such call took more than fifteen seconds
-// on a busy workstation (`Sprawling/app/src/privacy/windows.rs`
-// `PATIENCE`); held to the common patience, the page would report the
-// city late and ask the whole read again on every visit.
 const SLOW_MS: Readonly<Partial<Record<string, number>>> = { [QUERIES.privacy]: 120_000 };
 
 function patienceOf(query: Query): number {
   return SLOW_MS[nameOf(query)] ?? PATIENCE_MS;
 }
 
-// One page of a building's commits. The answer carries the building
-// and the bound back but not the page size, so every page asks for the
-// same size and the answer is matched by the other two.
 export const COMMITS_PAGE = 40;
 
-// The one spelling of the commits question, so the key a page asks
-// under and the key its answer is filed under cannot differ.
 export function commitsQuery(building: Address | null, before: Seq | null): Query {
   return { commits: { building, before, limit: COMMITS_PAGE } };
 }
 
-// The one spelling of the GitHub import question: the login the GitHub
-// CLI on the city's machine is signed in as for `host`, the city's
-// default host when `null`. Asked only when the person presses import
-// (`Sprawling/wire/Spec.lean` §8-67).
 export function githubLoginQuery(host: string | null): Query {
   return { github_login: host };
 }
 
-// Everything a refusal states but the sentence a person reads.
 export type Reported = Omit<AxError, "recovery">;
 
 interface Held {
   readonly value: Writable<Answer | undefined>;
-  // Whether this question has already been reported unanswered. One
-  // report per stretch of silence: a person told every fifteen seconds
-  // that the city is not answering learns nothing after the first time.
+
   reported: boolean;
   stale: boolean;
-  // The newest record that marked this answer stale while its question
-  // was out: an answer read past it already holds it.
+
   staleAt: number;
-  // The first seq the held answer does not reflect; a record before it
-  // is already in the answer.
+
   asOf: Seq | null;
   inflight: boolean;
   watchers: number;
@@ -134,13 +86,10 @@ interface Held {
 interface Pending {
   readonly key: string;
   readonly query: Query;
-  // When its patience runs out, by the clock handed to `createAsking`.
+
   readonly due: number;
 }
 
-// A refusal this page minted about its own asking. The recovery is a
-// sentence for a person and therefore `lang.json`'s: the reporter names
-// the phrase, the seam that knows the language says it.
 function minted(code: AxCode, action: string, subject: string): Reported {
   return { code, action, subject, nearby: [], retry: "no" };
 }
@@ -149,66 +98,44 @@ export const keyOf = (query: Query): string => JSON.stringify(query);
 
 const readKey = Schema.decodeOption(Schema.fromJsonString(Query));
 
-// The wire name of the question a refusal this page minted names, read
-// back from the subject `minted` was given; `null` for a subject the
-// city wrote, which never spells a question.
 export function askedIn(subject: string): string | null {
   return Option.match(readKey(subject), { onNone: () => null, onSome: nameOf });
 }
 
-// The wire name of a query, as `Query::name` spells it.
 function nameOf(query: Query): string {
   if (typeof query === "string") return query;
   return Object.keys(query)[0] ?? "";
 }
 
 export interface Asking {
-  // The answer to one question, as a store: `undefined` until the first
-  // answer lands. Subscribing counts as watching; a watched answer is
-  // refreshed when stale, an unwatched one waits until somebody looks.
+
   readonly ask: (query: Query) => Readable<Answer | undefined>;
   readonly refresh: (query: Query) => void;
   readonly answered: (askId: AskId, asOf: Seq, outcome: AskOutcome) => void;
   readonly invalidate: (record: EventRecord) => void;
-  // Everything is stale after a reconnect the page cannot resume: it
-  // missed whatever happened while the socket was down.
+
   readonly reconnected: () => void;
-  // A reconnect whose missed records are being fetched: those records
-  // invalidate what they touch, so only the questions the dead socket
-  // took with it are asked again.
+
   readonly resumed: () => void;
 }
 
-// The clock and the ear are handed in: a deadline a test cannot drive
-// is a rule nobody has checked, and this module phrases nothing for a
-// person - it names the `lang.json` phrase and the seam that knows the
-// person's language says it.
-// `send` returns the id the question went out under, or null when the
-// link is not live.
 export function createAsking(
   send: (query: Query) => AskId | null,
   now: () => number,
   noticed: (phrase: Key, error: Reported) => void,
 ): Asking {
   const held = new Map<string, Held>();
-  // Insertion order is send order; patience differs by question, so the
-  // oldest entry is not always the first one due.
+
   const pending = new Map<AskId, Pending>();
-  // Questions whose patience ran out, kept so a late answer still lands
-  // on the slot that asked; bounded like the held answers.
+
   const late = new Map<AskId, string>();
   const parsed = new Map<string, Query>();
-  // The keys held under each question name: a record is judged once per
-  // name rather than once per held answer.
+
   const byName = new Map<string, Set<string>>();
-  // One patience timer for the whole queue, set for the first question
-  // due: the clock says which questions are late, so a timer each would
-  // only be one more thing to cancel.
+
   let patience: { readonly timer: ReturnType<typeof setTimeout>; readonly due: number } | null =
     null;
 
-  // A question due before the timer set for a slower one moves the timer
-  // forward, so a fast question is never judged at a slow one's deadline.
   function watch(): void {
     const due = Math.min(...[...pending.values()].map((entry) => entry.due));
     if (due === Number.POSITIVE_INFINITY || (patience !== null && patience.due <= due)) return;
@@ -216,11 +143,6 @@ export function createAsking(
     patience = { timer: setTimeout(sweep, Math.max(0, due - now())), due };
   }
 
-  // Every question whose patience has run out: out of the queue, and
-  // its slot stale rather than empty, so an answer already on screen
-  // stays there while the page asks again. What the person gets is
-  // one refusal in the corner and in the bell, because a page that
-  // waits for ever in silence is the defect this is here for.
   function sweep(): void {
     patience = null;
     const at = now();
@@ -249,7 +171,7 @@ export function createAsking(
     if (slot.inflight) return;
     const askId = send(query);
     if (askId === null) {
-      // Not live: it is asked again when the link comes back.
+
       slot.stale = true;
       return;
     }
@@ -272,7 +194,7 @@ export function createAsking(
     const key = keyOf(query);
     const found = held.get(key);
     if (found !== undefined) {
-      // Re-inserted, so the map's order is the order of last use.
+
       held.delete(key);
       held.set(key, found);
       return [key, found];
@@ -296,9 +218,6 @@ export function createAsking(
     return [key, slot];
   }
 
-  // A slot somebody watches, or one still waiting on its answer or its
-  // pace timer, stays: dropping it would strand a subscriber or leave an
-  // answer with nowhere to land.
   function dropLeastRecent(): void {
     for (const [key, slot] of held) {
       if (slot.watchers > 0 || slot.inflight || slot.timer !== null) continue;
@@ -310,8 +229,6 @@ export function createAsking(
     }
   }
 
-  // The public face of one slot: subscribing is what makes an answer
-  // watched, so an answer nobody looks at holds nothing open.
   function watching(slot: Held): Readable<Answer | undefined> {
     return {
       subscribe(run) {
@@ -334,14 +251,11 @@ export function createAsking(
   function refresh(query: Query): void {
     const [key, slot] = slotFor(query);
     slot.stale = true;
-    // Asked for by the person, so no ledger position can satisfy it.
+
     slot.staleAt = Number.POSITIVE_INFINITY;
     dispatch(key, query, slot);
   }
 
-  // A question's outcome, under the id it went out with. A refusal
-  // leaves the slot stale for the next watcher to ask again; the
-  // socket has already put the refusal in front of the person.
   function answered(askId: AskId, asOf: Seq, outcome: AskOutcome): void {
     const done = pending.get(askId);
     pending.delete(askId);
@@ -349,11 +263,7 @@ export function createAsking(
     late.delete(askId);
     const slot = key === undefined ? undefined : held.get(key);
     if (key === undefined || slot === undefined) {
-      // Nothing here waits on it, and nothing is said: no question waits
-      // on it, so there is nothing a person could do, and a page and a
-      // city from one build are not "versions that differ". A question
-      // that does wait is still pending, where the sweep reports it once
-      // its patience runs out.
+
       return;
     }
     if (done !== undefined) slot.inflight = false;

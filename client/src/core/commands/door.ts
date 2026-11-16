@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The remote door's four commands, apart from `commands.ts` for the
-// length budget that file sits at. Opening and replacing the key only
-// ask: the city prints a code on its own console and answers
-// `E_APPROVAL_PENDING`, and the code comes back in `confirmRemoteDoor`
-// (`Sprawling/remote_access/Spec.lean` D4). Closing needs no code.
-
 import { mintIdem } from "../idem";
 import type { Command } from "../../wire";
 

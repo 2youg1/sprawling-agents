@@ -3,23 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Worktree names: one segment, no escape.
-//!
-//! Specified by `Sprawling/storage/spec/Worktree.lean` §8-9.
-
 use crate::error::StorageError;
 
-/// A node's name for its tree. A newtype because this string becomes a
-/// directory name and a git reference: the two ways it can be malformed
-/// are checked once, here.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct WorktreeName(String);
 
 impl WorktreeName {
-    /// # Errors
-    /// Refuses an empty name, a path separator, a leading dot, and any
-    /// character outside `[A-Za-z0-9._-]`. A name that walks out of its
-    /// directory is the whole isolation guarantee walking out with it.
+
     pub fn parse(raw: &str) -> Result<WorktreeName, StorageError> {
         let refuse = |detail: &str| StorageError::Worktree {
             op: "name a worktree",

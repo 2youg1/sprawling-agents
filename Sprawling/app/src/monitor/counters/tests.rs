@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A reading of this very process is not empty, and a beat reads the
-//! platform exactly as often as its watchers ask.
-
 use super::{Counters, Reads, Watched};
 use crate::monitor::Monitor;
 
@@ -29,8 +26,6 @@ fn a_reading_of_this_process_has_memory_and_free_space() {
     );
 }
 
-/// A city served from a relative path lives on the disk that holds its
-/// absolute spelling; no mount point is a prefix of `.` itself.
 #[test]
 fn a_city_opened_by_a_relative_path_reads_its_free_space() {
     let mut counters = Counters::open(std::path::PathBuf::from("."));
@@ -38,11 +33,6 @@ fn a_city_opened_by_a_relative_path_reads_its_free_space() {
     assert!(sample.volume_free_bytes > 0, "{sample:?}");
 }
 
-/// The regression gate of `Sprawling/app/spec/Main.lean` §8-129-3: a count, not a
-/// time, so it holds on a loaded runner as on a quiet desk. Nobody
-/// watching reads nothing; a summary reads this process once a beat; a
-/// whole page reads this process and the machine once a beat each; the
-/// city's sampler never reads the process table.
 #[test]
 fn a_beat_reads_the_platform_exactly_as_often_as_its_watchers_ask() {
     const BEATS: u64 = 3;
@@ -67,11 +57,6 @@ fn a_beat_reads_the_platform_exactly_as_often_as_its_watchers_ask() {
     );
 }
 
-/// The instrument the register's `[monitor_beat]` row is read from
-/// (`Sprawling/app/spec/Main.lean` §8-129-3): each kind of platform reading taken 200
-/// times, printed as floor, p50 and p99 in microseconds. A wall-clock
-/// reading belongs to the machine that took it, so it records and does
-/// not gate; the count gate above is what holds the cost.
 #[test]
 #[ignore = "a wall-clock instrument; just bench runs it"]
 fn instrument_monitor_beat() {

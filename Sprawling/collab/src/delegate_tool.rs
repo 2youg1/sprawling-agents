@@ -3,29 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The face delegation shows a model: ask for one piece of work to be
-//! carried out by somebody else, one level down.
-//!
-//! Everything this tool decides was already decided elsewhere. Whether a
-//! spawn is admitted is `kernel::gate::spawn`, and this file is its
-//! production caller: **a delegated position spawns nothing, whatever
-//! kind it asks for.** What
-//! this module adds is the desk that remembers what was asked for, so
-//! the assembly layer - the only thing that can build a run - can start
-//! it at the call (collab D7), and the [`StartCheck`] the assembly layer
-//! hands it, so a room the city could not start work in is refused at
-//! the call rather than discovered after the tool has answered (collab
-//! D18).
-//!
-//! **A request is not a run.** The tool answers with the room the work
-//! will happen in, not with a result, because starting a run inside a
-//! tool call would mean driving a run from inside another run's tool
-//! bench. The city hands over what this desk holds when it shows the
-//! lines the parent's call wrote, while the parent still drives, and the
-//! child's own `run_started` carries that room - which is how a reader
-//! connects the two without a second event kind for a fact the ledger
-//! already holds twice.
-
 use kernel::{
     Address, AxCode, AxError, CostTier, DelegateKind, Depth, Difficulty, Effect, GateOutcome,
     Payload, RenderIntent, Temporal, Tool, ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
@@ -33,34 +10,24 @@ use kernel::{
 use serde_json::{Map, Value};
 use std::sync::Arc;
 
-/// One piece of work a run asked somebody else to carry out.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Delegated {
-    /// Where the delegate works. Inside the parent's building, always:
-    /// delegation shares a building's files, and a delegate sent to
-    /// another building would be a cross-building write with no gate on
-    /// it.
+
     pub room: Address,
     pub task: String,
     pub goal: String,
     pub kind: DelegateKind,
-    /// The parent's task judgement; the city maps it through the
-    /// workspace policy instead of letting the parent name a model.
+
     pub difficulty: Option<Difficulty>,
 }
 
-/// Whether the city could start delegated work in a room, judged at the
-/// call. In the city it is the half of admission the room's files decide
-/// (accounting D53); this crate reads no building's rules, so it is handed
-/// in rather than worked out here.
 #[derive(Clone)]
 pub struct StartCheck(Arc<Judge>);
 
-/// Admits the room, or refuses it in admission's own words.
 type Judge = dyn Fn(&Address) -> Result<(), AxError> + Send + Sync;
 
 impl StartCheck {
-    /// `judge`'s refusal reaches the model unchanged, as the tool result.
+
     #[must_use]
     pub fn new(
         judge: impl Fn(&Address) -> Result<(), AxError> + Send + Sync + 'static,
@@ -75,24 +42,16 @@ impl std::fmt::Debug for StartCheck {
     }
 }
 
-/// What a run asked for, held until the city can act on it.
 #[derive(Debug)]
 pub struct DelegateDesk {
-    /// Where the asking run stands. A delegate holds `Delegated` and is
-    /// refused by the gate; the value is carried rather than inferred,
-    /// because a run that had to work out its own depth would be one
-    /// wrong answer away from a grand-delegate.
+
     depth: Depth,
-    /// The building the asking run works in, which bounds where a
-    /// delegate may be put.
+
     building: Address,
-    /// Whether the city could start the work in the room named; asked
-    /// after the two doors above, before anything is held.
+
     check: StartCheck,
     asked: Vec<Delegated>,
-    /// How many of `asked` the city has already been handed. The rest
-    /// are what [`DelegateDesk::hand_over`] gives next, while `asked`
-    /// keeps every request, because `status.children` reports them all.
+
     handed_over: usize,
 }
 
@@ -108,28 +67,16 @@ impl DelegateDesk {
         }
     }
 
-    /// A desk standing where this one stands - the same depth, the same
-    /// building, the same check - with nothing asked, for work this run's graph hands
-    /// down when a node's handback lands, which may be after the run is
-    /// over.
     #[must_use]
     pub fn beside(&self) -> DelegateDesk {
         DelegateDesk::new(self.depth, self.building.clone(), self.check.clone())
     }
 
-    /// Admits one request, or refuses it in the gate's own words.
-    ///
-    /// # Errors
-    /// `E_DELEGATION_DEPTH` when a delegate asks to delegate,
-    /// `E_CROSS_BUILDING_DENIED` when the room named is not inside the
-    /// asking run's building, and the [`StartCheck`]'s own refusal when
-    /// the city could not start work in that room.
     pub fn ask(&mut self, work: Delegated) -> Result<&Delegated, AxError> {
         match kernel::gate::spawn(self.depth, &work.kind) {
             GateOutcome::Allow => {}
             GateOutcome::Deny { refusal } => return Err(*refusal),
-            // The spawn door does not ask. Were it ever to, the call is
-            // pending, not allowed.
+
             GateOutcome::Ask { question } => return Err(*question),
         }
         if !work.room.is_within(&self.building) {
@@ -155,45 +102,30 @@ impl DelegateDesk {
         })
     }
 
-    /// What has been asked for so far, without taking it. This is what
-    /// `status.children` reports, so a run that handed work down and then
-    /// asks about its own situation is told what it handed down.
     #[must_use]
     pub fn asked(&self) -> &[Delegated] {
         &self.asked
     }
 
-    /// Every request asked since the last hand-over, in the order it was
-    /// asked for. The city calls this when it shows the lines a call
-    /// wrote, so a child starts while its parent still drives (D7);
-    /// [`DelegateDesk::asked`] still answers with every request.
     pub fn hand_over(&mut self) -> Vec<Delegated> {
         let fresh: Vec<Delegated> = self.asked.iter().skip(self.handed_over).cloned().collect();
         self.handed_over = self.asked.len();
         fresh
     }
 
-    /// Everything asked for, in the order it was asked for, leaving the
-    /// desk empty. For a desk nobody reports from: a graph's own desk,
-    /// which passes each node through the two doors and hands it on.
     pub fn take(&mut self) -> Vec<Delegated> {
         self.handed_over = 0;
         std::mem::take(&mut self.asked)
     }
 }
 
-/// The tool itself.
 pub struct DelegateTool {
     desk: std::sync::Arc<std::sync::Mutex<DelegateDesk>>,
     meta: ToolMeta,
 }
 
 impl DelegateTool {
-    /// The name, disclosure and schema `new` registers. The catalog page
-    /// reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
+
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, description) in [
@@ -263,9 +195,6 @@ impl DelegateTool {
         })
     }
 
-    /// # Errors
-    /// Propagates a malformed parameter schema, which is a build-time
-    /// defect rather than a runtime one.
     pub fn new(
         desk: std::sync::Arc<std::sync::Mutex<DelegateDesk>>,
     ) -> Result<DelegateTool, AxError> {
@@ -316,8 +245,7 @@ impl Tool for DelegateTool {
         }
         let args = call.args.as_map();
         let room = Address::parse(arg(args, "room")?)?;
-        // Exhaustive rather than permissive: an unknown word is refused
-        // instead of quietly becoming the cheaper kind.
+
         let kind = match args.get("kind").and_then(Value::as_str) {
             None | Some("ephemeral") => DelegateKind::Ephemeral,
             Some("resident") => DelegateKind::Resident,
@@ -447,8 +375,6 @@ mod tests {
         assert_eq!(desk.lock().unwrap().asked().len(), 1);
     }
 
-    /// kernel D37, collab D17: a page draws a delegation as the room and
-    /// the task, which it can only do when the line says it is one.
     #[test]
     fn the_delegate_tool_declares_the_delegate_render_intent() {
         let tool = DelegateTool::new(desk(Depth::Root)).unwrap();
@@ -473,8 +399,6 @@ mod tests {
         assert!(desk.lock().unwrap().take().is_empty(), "taken once");
     }
 
-    /// collab D7: the child's run opens at the call, while this run goes
-    /// on, so the answer must not tell the model to wait for its turn.
     #[test]
     fn the_answer_says_the_delegate_starts_while_this_run_goes_on() {
         let tool = DelegateTool::new(desk(Depth::Root)).unwrap();
@@ -483,8 +407,6 @@ mod tests {
         assert!(!starts.contains("settles"), "{starts}");
     }
 
-    /// The refusal a desk left locked by a dead thread gives reaches the
-    /// model as written, on one line.
     #[test]
     fn a_desk_a_dead_thread_held_is_refused_in_one_plain_line() {
         let desk = desk(Depth::Root);
@@ -507,8 +429,6 @@ mod tests {
         );
     }
 
-    /// The rule this whole mechanism exists to hold, now with a caller:
-    /// one level deep, whatever kind is asked for.
     #[test]
     fn a_delegate_cannot_delegate_and_the_refusal_says_what_to_do_instead() {
         let desk = desk(Depth::Delegated);
@@ -531,9 +451,6 @@ mod tests {
         assert!(err.recovery().contains("signal"));
     }
 
-    /// collab D18: a room the assembly layer would not start work in is
-    /// refused as the tool result, in the check's own words, and the
-    /// desk holds nothing for the city to hand over.
     #[test]
     fn a_room_the_city_could_not_start_is_refused_at_the_call() {
         let refusal =
@@ -560,9 +477,6 @@ mod tests {
         assert_eq!(err.code(), &AxCode::InvalidArgs);
     }
 
-    /// Fail-closed identity, the same assertion the port's conformance
-    /// suite makes, written here because this crate does not turn that
-    /// feature on.
     #[test]
     fn the_tool_refuses_another_tools_call_and_still_answers() {
         let desk = desk(Depth::Root);

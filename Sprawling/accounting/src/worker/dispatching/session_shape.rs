@@ -3,29 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a session already froze: the model it calls and how hard it
-//! thinks, chosen by its first run and kept by every run after it.
-//!
-//! A session is a room, and a provider caches a conversation's prompt
-//! prefix for as long as the shape of the calls in it does not move.
-//! The model, its output ceiling and the thinking effort all reach the
-//! wire, so any of them changing halfway makes every later turn pay
-//! full price for a prefix whose bytes never moved. The city therefore
-//! writes down what its first run froze, in the room's own
-//! `CONFIG.toml`, and reads it back at every dispatch into that room.
-//!
-//! **The room's file is the record, not a second setting.** The model a
-//! run calls is still chosen by the endpoint book, and the effort still
-//! climbs the city -> building -> room ladder; both are the authority
-//! for where a session *starts*. What the room states is what that
-//! session *started with*, so a registry that moved since is a
-//! disagreement this dispatch refuses instead of a change it makes
-//! silently. A refusal names what a person can do now: put the field
-//! back to what the session froze, or address another room, which opens
-//! a session of its own. The wording is the runtime's
-//! (`runtime::prefix::ANOTHER_ADDRESS`), so no page is promised a verb
-//! the wire does not carry.
-
 use kernel::{AxError, Effort};
 use runtime::turn::CallShape;
 
@@ -35,42 +12,7 @@ use super::super::{Assignment, RunWorker};
 mod tests;
 
 impl RunWorker {
-    /// Records the shape this dispatch freezes, or refuses a dispatch
-    /// that would move the shape the session already froze.
-    ///
-    /// Called once per dispatch, after the room exists and before
-    /// anything else is written for the run, so a refusal costs the
-    /// person no file and no record. A session's first run is the one
-    /// dispatch allowed to choose: it writes the model it chose and the
-    /// effort it was given into the room's own layer.
-    ///
-    /// Every later run in that room reads the record back and compares
-    /// the shape it would freeze against it — through
-    /// [`CallShape::verified_against`], which owns both the comparison
-    /// and the words of the refusal. The effort is compared as the
-    /// ladder resolves it here, because an effort stated nowhere is the
-    /// provider's decision rather than a value, and moving from "let the
-    /// provider decide" to a level is as much a moved shape as moving
-    /// between two levels.
-    ///
-    /// A model registered twice under two tags is one model: the book's
-    /// entry for it is found by the frozen endpoint and id (by id alone
-    /// for legacy records), and the ceiling and the window are
-    /// read from that entry rather than recorded here. They are
-    /// properties of the model, so a copy of them in this file would be
-    /// a second answer to what the book already answers.
-    ///
-    /// A level this dispatch names explicitly is first held against
-    /// what the (Endpoint, model) offers, so a level the model does not
-    /// offer is refused rather than sent or moved to a neighbour; a
-    /// stored level is never refused, the gateway sends the default rule's
-    /// level instead (`Sprawling/gateway/spec/Provider/Thinking.lean` §8-39).
-    ///
-    /// # Errors
-    /// Propagates the room's own configuration failing to read or
-    /// write, and refuses `E_CONFIG_INVALID` for an explicit level the
-    /// model does not offer and for a dispatch that would move the
-    /// model, the ceiling or the effort the session froze.
+
     pub(super) fn choose_shape(
         &mut self,
         at: &Assignment,
@@ -99,9 +41,7 @@ impl RunWorker {
             city::write_session(&self.city_root, &at.addr, &shape)?;
             return Ok(generation);
         };
-        // What the session froze. The effort is the ladder's answer at
-        // this address, which is the value the run that opened the
-        // session froze and the value this one would freeze.
+
         let settled = city::settled_effort(&self.city_root, &at.addr)?.map(|(effort, _)| effort);
         let mut frozen = self.frozen_shape(frozen_model, own.endpoint(), settled, own.generation());
         let moved = CallShape {
@@ -110,25 +50,15 @@ impl RunWorker {
             generation,
             context_tokens: model.context_tokens,
         };
-        // A legacy record had no generation keys. Keep its old raw
-        // override behaviour, while a newly typed sampling default still
-        // refuses rather than moving that session silently.
+
         if own.generation().is_none() {
             frozen.generation.overrides = moved.generation.overrides.clone();
         }
-        // The comparison and the words of the refusal are the runtime's,
-        // so that a shape moving mid-session is refused once and in one
-        // sentence wherever it is noticed.
+
         moved.verified_against(&frozen)?;
         Ok(frozen.generation)
     }
 
-    /// The shape the session froze, as the endpoint book states it now.
-    ///
-    /// A model the book no longer holds answers with no ceiling and no
-    /// window. That is not a guess: the comparison refuses on the model
-    /// before it reaches either of them, and a value invented here
-    /// would be a fact this city does not have.
     fn frozen_shape(
         &self,
         model: &str,

@@ -3,31 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one judgement a path chosen by a model gets.
-//!
-//! Two tools take a path from the model — `read` opens it, `search`
-//! bounds a walk with it — and both have to answer the same three
-//! questions before touching a disk: does this parse as an address of
-//! this city, does it reach a reserved subtree, and may this run's
-//! building read it. A second copy of those answers would be a second
-//! authority, and the copy is always the one that stops being updated;
-//! so the refusals live here, reservedness stays in
-//! `kernel::Address::is_reserved`, and the read bound in
-//! `kernel::address::may_read`.
-//!
-//! The order is fixed and cheapest first: the grammar and the reserved
-//! subtree touch no disk, and the read bound may read one building's
-//! rules.
-//!
-//! A catalog name is not judged here. Admission for a catalog entry
-//! happened when a person wrote the building's reading room, which is
-//! why a skill inside reserved space is still handed over: `read`
-//! resolves the catalog first and only unresolved names reach this.
-//!
-//! `Sprawling/runtime/spec/Tools/ChosenPath.lean` proves what the judgement
-//! must hold: an admitted path is open and outside every reserved
-//! subtree, and `land` judges where the disk really lands (§8-30-1).
-
 use std::borrow::Cow;
 use std::io::ErrorKind;
 use std::path::{Component, Path, PathBuf};
@@ -36,21 +11,8 @@ use std::sync::Arc;
 use kernel::{Address, AxCode, AxError, ReadVerdict};
 use same_file::Handle;
 
-/// What one run may read: the read bound closed over the reader's
-/// building and the city's rules. The assembly builds it once per run
-/// and hands a clone to `read` and to `search`, so both ask the same
-/// question of the same rules.
 pub type ReadBound = Arc<dyn Fn(&Address) -> ReadVerdict + Send + Sync>;
 
-/// The address a model may act on, or the refusal that says why not.
-///
-/// `action` names the tool in both errors, so a refusal a model reads
-/// says which of its own calls was turned down.
-///
-/// # Errors
-/// `E_INVALID_ARGS` when the string is not a canonical city-relative
-/// address, `E_GATE_DENIED` when it reaches a reserved subtree or a
-/// building the read bound closes.
 pub(crate) fn admit(
     asked: &str,
     action: &'static str,
@@ -105,18 +67,6 @@ pub(crate) fn admit(
     }
 }
 
-/// The city spelling of a path a model wrote: an absolute path inside
-/// the city becomes the address it names there, and anything else comes
-/// back as written.
-///
-/// The page inserts a dropped file as this machine's path to it, and a
-/// model copies the paths it is shown. The answer is only a spelling:
-/// it still goes through [`admit`] and [`land`], so the reserved
-/// subtree, the read bound and every link keep their one judgement.
-///
-/// # Errors
-/// `E_GATE_DENIED` when the path really lands outside the city;
-/// whatever [`real_location`] refuses the path or the city root with.
 pub(crate) fn within_city<'a>(
     city_root: &Path,
     asked: &'a str,
@@ -144,9 +94,6 @@ pub(crate) fn within_city<'a>(
         .ok_or_else(outside)
 }
 
-/// The city spelling of `real` under the city's real root: its segments
-/// joined by `/`. `None` when it is not under the root, or when a
-/// segment is not text and so names no address.
 fn spelled_under(root: &Path, real: &Path) -> Option<String> {
     real.strip_prefix(root)
         .ok()?
@@ -156,22 +103,13 @@ fn spelled_under(root: &Path, real: &Path) -> Option<String> {
         .map(|segments| segments.join("/"))
 }
 
-/// The root a tool reads under: the spelling the assembly handed it,
-/// and the real location that spelling resolved to once, when the tool
-/// was built (`Sprawling/runtime/spec/Tools/ChosenPath.lean` D112). A run's
-/// root does not move while the run lives, and comparing against the
-/// anchored location is fail-closed: a root swapped for a link fails
-/// the comparison instead of leading reads out of the city.
 pub(crate) struct CityRoot {
     written: PathBuf,
     real: PathBuf,
 }
 
 impl CityRoot {
-    /// Anchors the root's real location once.
-    ///
-    /// # Errors
-    /// Whatever [`real_location`] refuses the root with.
+
     pub(crate) fn anchor(written: &Path, action: &'static str) -> Result<CityRoot, AxError> {
         let real = real_location(written, action, "the city root")?.into_path();
         Ok(CityRoot {
@@ -180,28 +118,16 @@ impl CityRoot {
         })
     }
 
-    /// The spelling the assembly handed the tool, which every path a
-    /// tool opens is joined onto.
     pub(crate) fn written(&self) -> &Path {
         &self.written
     }
 
-    /// The path an address is spelled at under the written root.
     pub(crate) fn join(&self, addr: &Address) -> PathBuf {
         addr.as_str()
             .split('/')
             .fold(self.written.clone(), |path, segment| path.join(segment))
     }
 
-    /// Judges the place `real` an admitted address really reached on disk:
-    /// it must lie under the anchored root, and when its city spelling is
-    /// not `addr` a link on the way led elsewhere, so that spelling goes
-    /// through [`admit`] in turn. [`land`] and `read`'s engine both ask
-    /// this, so where a link may lead has one answer.
-    ///
-    /// # Errors
-    /// `E_GATE_DENIED` when `real` is outside the city or [`admit`] refuses
-    /// the address it names.
     pub(crate) fn judged_location(
         &self,
         addr: &Address,
@@ -217,8 +143,7 @@ impl CityRoot {
             )
             .with_recovery("name a path whose every link stays inside the city")
         })?;
-        // A path with no link on it names the address already admitted, and
-        // asking the read bound twice would read a building's rules twice.
+
         if inside == addr.as_str() {
             return Ok(addr.clone());
         }
@@ -226,23 +151,6 @@ impl CityRoot {
     }
 }
 
-/// Where an admitted address really lands on disk, judged again there.
-///
-/// The grammar judged the address the model wrote, and the disk opens
-/// whatever every link on the way leads to: a link in an open building
-/// can point into a confidential one, into a reserved subtree, or out of
-/// the city. So the real path is resolved and the address it names in
-/// this city goes through [`admit`] a second time; the one judgement
-/// stays the only one. A path that does not exist is judged at the
-/// place [`real_location`] puts it and comes back [`Located::Absent`],
-/// which no caller opens.
-///
-/// # Errors
-/// `E_GATE_DENIED` when the real path is outside the city or [`admit`]
-/// refuses the address it names; `E_STORAGE_FATAL` when the path exists
-/// and its real location cannot be resolved.
-/// A real location and the city address that names it, produced by one
-/// judgement so a reader never derives the second from the first again.
 pub(crate) struct Judged {
     pub location: Located,
     pub addr: Address,
@@ -262,16 +170,6 @@ pub(crate) fn land(
     })
 }
 
-/// Whether the file `opened` at the judged real location `judged` is
-/// still the file judged there: the location must still resolve to
-/// itself, so no link was swapped onto it after the judgement, and the
-/// file at it now must be the one opened, so no link was there during
-/// the open and gone again before the resolution. The refusal does not
-/// say where a swapped link leads. Every caller that opens what [`land`]
-/// answered asks this before reading a byte.
-///
-/// # Errors
-/// `E_GATE_DENIED`, naming `action`, when either no longer holds.
 pub(crate) fn still_judged(
     asked: &str,
     judged: &Path,
@@ -298,15 +196,10 @@ pub(crate) fn still_judged(
     }
 }
 
-/// Where a path really lands, and whether the disk had anything there
-/// when it was asked.
 pub(crate) enum Located {
-    /// Every segment exists: the path with every link on it resolved.
+
     Present(PathBuf),
-    /// The deepest existing ancestor resolved, the segments below it
-    /// appended as written. Nothing was there to judge, so a caller
-    /// reports the miss and never opens it: a link placed at an absent
-    /// segment after this answer would lead the open wherever it points.
+
     Absent(PathBuf),
 }
 
@@ -324,23 +217,6 @@ impl Located {
     }
 }
 
-/// Where `written` really lands, every link on it resolved, whether or
-/// not its last segments exist.
-///
-/// The disk resolves the deepest ancestor that exists; the segments
-/// below it exist nowhere, so no link hides in them, and they are
-/// appended as written, and the answer says so: [`Located::Absent`]. An
-/// absent file behind a link is therefore judged under the link's
-/// target, as a present one is, and never at the spelling the link
-/// stood on. Every caller that judges where a path lands asks this
-/// function, so an absent file has one answer.
-///
-/// # Errors
-/// `E_GATE_DENIED` when a segment below that ancestor is not a plain
-/// name: appended to a resolved directory, a `..` steps back out of it
-/// at a place the disk never looked. `E_STORAGE_FATAL` when an entry on
-/// the path exists and does not resolve, a link whose target is gone
-/// among them.
 pub(crate) fn real_location(
     written: &Path,
     action: &'static str,
@@ -382,33 +258,19 @@ pub(crate) fn real_location(
     Err(unresolved(ErrorKind::NotFound.into()))
 }
 
-/// Whether nothing at all is at `path`, not even a link whose target is
-/// gone: only such a segment may be appended unresolved.
 fn no_entry(path: &Path) -> bool {
     matches!(std::fs::symlink_metadata(path), Err(err) if err.kind() == ErrorKind::NotFound)
 }
 
-/// What a walk may do at one of its entries.
 pub(crate) enum Walked {
-    /// A directory reached without a link: its entries are walked.
+
     Directory(PathBuf),
-    /// A file, or the file an admitted link lands on: it is scanned.
+
     File(PathBuf),
-    /// A link [`land`] refuses at the gate, or a link to a directory,
-    /// which is not entered because a walk through links can come back
-    /// to where it started. Passed over without a word, as a closed
-    /// building is.
+
     Passed,
 }
 
-/// Judges one entry of a walk, asking the disk once about an entry that
-/// is not a link. An entry the disk will not describe is handed on as a
-/// file, so the open that follows names why it could not be looked at.
-///
-/// # Errors
-/// Whatever [`land`] refuses a link with other than `E_GATE_DENIED`:
-/// a link whose real location does not resolve is a place the walk
-/// could not look, not a closed building, and the walker reports it.
 pub(crate) fn walked(
     city: &CityRoot,
     path: PathBuf,
@@ -434,10 +296,6 @@ pub(crate) fn walked(
     }
 }
 
-/// Places a link at `link` leading to the directory `target`, on a
-/// machine that has no symlink privilege: Windows gets a junction, which
-/// `symlink_metadata` reports through the same name-surrogate predicate
-/// a symlink is reported by.
 #[cfg(all(test, windows))]
 #[expect(clippy::unwrap_used, reason = "test fixture")]
 #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
@@ -474,8 +332,6 @@ pub(super) fn make_link(link: &std::path::Path, target: &std::path::Path) {
 mod tests {
     use super::*;
 
-    /// A bound under which every address is open, so a test about the
-    /// grammar or the reserved subtree judges nothing else.
     fn open(_: &Address) -> ReadVerdict {
         ReadVerdict::Open
     }
@@ -506,9 +362,6 @@ mod tests {
         }
     }
 
-    /// A dropped file reaches the conversation as this machine's path
-    /// to it, and it lies inside the city: the model that copies it is
-    /// asking for that file's address, in either separator.
     #[test]
     fn an_absolute_path_inside_the_city_comes_back_as_its_address() {
         let city = tempfile::tempdir().unwrap();
@@ -548,9 +401,6 @@ mod tests {
         assert_eq!(addr.as_str(), "lab/room1/Memo.md");
     }
 
-    /// Both ways the read bound closes come back as the gate's refusal,
-    /// each with its own next step: a confidential building is asked
-    /// through a resident, and rules that do not read wait for a person.
     #[test]
     fn a_building_the_read_bound_closes_is_refused_with_its_own_way_out() {
         let unread = AxError::failure(AxCode::ConfigInvalid, "read a building's rules", "annex")

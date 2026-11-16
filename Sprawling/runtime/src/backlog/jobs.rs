@@ -3,23 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which processes belong to which run (`Sprawling/runtime/spec/Tools/Exec.lean` §8-13-3).
-//!
-//! A dispatched `cargo test` spends its memory in the `rustc` and test
-//! processes it starts, not in `cargo`. On Windows every run therefore
-//! gets one anonymous Job Object, and each command the backlog starts
-//! for that run joins it the moment the command enters the table; the
-//! processes a member of a job starts join the same job by themselves,
-//! so the job's process list is the run's whole process tree. The job
-//! is not kill-on-close: dropping it at `release` stops nothing, because
-//! stopping belongs to `release` and `halt` alone.
-//!
-//! Each job is made with the shares the backlog was given (D29 in the
-//! same part): a CPU weight, the same for every run, so a run whose build
-//! starts sixteen compilers takes one share of the processors and not
-//! sixteen, and with it, when asked, a limit on the memory the run's
-//! processes commit together.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::num::{NonZeroU64, NonZeroUsize};
 
@@ -30,61 +13,43 @@ use super::ceiling::{Ceiling, Mark, Unapplied};
 use super::run_job::{RUN_CPU_WEIGHT, RunJob};
 use super::{Backlog, BacklogId, Body, Claim, Member};
 
-/// The processes one run has in the backlog right now.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RunProcesses {
-    /// Each command's own pid, and every process its run's job holds.
-    /// A command that ended but was not yet harvested is still listed;
-    /// a reader finds no counters behind its pid.
+
     pub pids: BTreeSet<u32>,
-    /// How many of the run's commands were read as themselves only,
-    /// without the processes they started: on Windows the ones that
-    /// could not join the job (all of them when the job's list could
-    /// not be read), and every one of them elsewhere, where there is
-    /// no Job Object.
+
     pub unfollowed: u32,
-    /// The shares the run's processes hold right now: the ones the
-    /// backlog asked for when the platform gave them, otherwise `Unset`.
+
     pub share: Shares,
-    /// The affinity accepted for the job; `Os` when none was requested,
-    /// the request was refused, or this platform has no job.
+
     pub affinity: RunAffinity,
 }
 
-/// A group-local affinity supplied by placement (sprawling D103), never calculated
-/// from configuration inside the runtime.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum RunAffinity {
-    /// Leave placement to the operating system.
+
     #[default]
     Os,
-    /// Hold the run's job to these processors in the current group.
+
     Mask(NonZeroUsize),
 }
 
-/// How a run's processes share this machine with the other runs'
-/// processes (D29). The backlog is given the shares to ask for by the
-/// assembly, which takes them from the person's `[core] placement`
-/// (`Sprawling/app/spec/Serving/Placement.lean` D47); this crate reads
-/// no setting.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Shares {
-    /// Nothing set: the processes compete thread by thread. Also what a
-    /// run reads as when the platform has no shares or refused them.
+
     #[default]
     Unset,
-    /// Every run's processes hold the same CPU weight.
+
     Cpu,
-    /// The same CPU weight, and all of one run's processes together
-    /// commit at most `limit` bytes.
+
     CpuAndMemory {
-        /// The bytes the run's processes may commit together.
+
         limit: NonZeroU64,
     },
 }
 
 impl Shares {
-    /// The memory ceiling these shares ask for, if any.
+
     pub(super) fn memory(self) -> Option<NonZeroU64> {
         match self {
             Shares::Unset | Shares::Cpu => None,
@@ -93,11 +58,6 @@ impl Shares {
     }
 }
 
-/// Each run's job, and how many of its commands did not get into it.
-///
-/// On Linux the same work is done by a child cgroup per run
-/// ([`cgroup`](super::cgroup), D29): its parent is this process's own
-/// cgroup, and its reads and writes are plain files.
 #[derive(Default)]
 pub(super) struct Jobs {
     #[cfg(windows)]
@@ -107,11 +67,7 @@ pub(super) struct Jobs {
 }
 
 impl Backlog {
-    /// The processes of every run that has a command in the table.
-    /// A command released to nobody belongs to no run.
-    ///
-    /// # Errors
-    /// `E_STORAGE_FATAL` when the table cannot be reached.
+
     pub fn processes(&self) -> Result<BTreeMap<RunId, RunProcesses>, AxError> {
         let table = self.hold()?;
         let mut runs: BTreeMap<RunId, RunProcesses> = BTreeMap::new();
@@ -130,8 +86,6 @@ impl Backlog {
         Ok(runs)
     }
 
-    /// Enters a member into the table, and a command into its run's job,
-    /// marking how the run's memory ceiling holds for it (D95).
     pub(super) fn enrol(&self, id: BacklogId, mut member: Member) -> Result<(), AxError> {
         let mut table = self.hold()?;
         let mark = table.jobs.enter(&member, self.shares, self.affinity);
@@ -144,9 +98,7 @@ impl Backlog {
 }
 
 impl Jobs {
-    /// How the memory ceiling fared for a command of `owner` that entered
-    /// with `mark` and is collected now (D95). The run's refusal count is
-    /// read only for a mark that watches it.
+
     pub(super) fn ceiling(&mut self, owner: RunId, mark: Mark) -> Option<Ceiling> {
         let count = if mark.watching() {
             self.refusals(owner)
@@ -166,10 +118,6 @@ impl Jobs {
         self.cgroups.refusals(owner)
     }
 
-    /// The run's job for a native command, with the shares and the
-    /// ceiling's watch set, and the command's ceiling mark read before it
-    /// starts. A job that refuses the ceiling or its watch stops the
-    /// launch (`NativeWindows.lean` D54).
     #[cfg(windows)]
     pub(super) fn native_job(
         &mut self,
@@ -238,7 +186,6 @@ impl Jobs {
         self.runs.entry(owner).or_default().retiring.push(resources);
     }
 
-    /// Lets the run's job go; its processes keep running.
     #[cfg(windows)]
     pub(super) fn forget(&mut self, owner: RunId) {
         self.runs.remove(&owner);
@@ -294,7 +241,7 @@ impl Jobs {
             let reading = readings.entry(*owner).or_default();
             let listed = run.job.as_ref().map(win32job::Job::query_process_id_list);
             if let Some(Ok(pids)) = listed {
-                // A Windows pid is a DWORD; the list only widens it.
+
                 reading
                     .pids
                     .extend(pids.into_iter().filter_map(|pid| u32::try_from(pid).ok()));
@@ -328,8 +275,6 @@ mod tests {
     #[cfg(windows)]
     use super::Shares;
 
-    /// The child reads its own affinity after enrolment, so the assertion
-    /// observes the running process rather than just a job's limit record.
     #[cfg(windows)]
     #[test]
     #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
@@ -387,11 +332,6 @@ mod tests {
         backlog.release(owner);
     }
 
-    /// A run's command that asks for more than the person's ceiling is
-    /// refused there, and its result says the ceiling was hit; a command
-    /// of the same run that stays under it says nothing (Exec.lean D95).
-    /// The child waits for the gate file, so it allocates only after it
-    /// joined the run's job.
     #[cfg(windows)]
     #[test]
     #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
@@ -465,7 +405,6 @@ mod tests {
         backlog.release(owner);
     }
 
-    /// The same value seam compiles elsewhere without claiming affinity.
     #[cfg(not(windows))]
     #[test]
     #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
@@ -503,15 +442,13 @@ mod tests {
         panic!("the command finishes");
     }
 
-    /// A refused limit stays visible without turning the command into a
-    /// failed start or dropping the independently accepted CPU share.
     #[cfg(windows)]
     #[test]
     #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn a_refused_run_affinity_keeps_the_command_result_and_share() {
         let available = usize::try_from(desktop_ffi::cpu::thread_group().unwrap().mask).unwrap();
         if available == usize::MAX {
-            return; // This group has no invalid affinity bit to ask for.
+            return;
         }
         let backlog = Backlog::with_window(crate::PollBudget::new(1, 1))
             .with_shares(Shares::Cpu)
@@ -542,11 +479,6 @@ mod tests {
         );
     }
 
-    /// The first command of `owner` to finish. It waits on that condition
-    /// alone: how long `powershell.exe` takes to start depends on how busy
-    /// the machine is, so a counted budget fails a correct command on a
-    /// loaded runner, and a command that never ends is ended by nextest's
-    /// `terminate-after` instead.
     #[cfg(windows)]
     fn harvested(backlog: &Backlog, owner: kernel::RunId) -> crate::Finished {
         loop {

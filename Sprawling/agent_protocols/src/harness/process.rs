@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One consented ACP agent started as a child that speaks ACP on its pipes
-//! (`Sprawling/agent_protocols/Spec.lean` §8-19, D16, D17).
-//!
-//! The process is reclaimed when its handle is dropped, so whoever holds
-//! the handle is the one list of what to kill. Its stderr is discarded
-//! for the reason `mcp::stdio` gives: those are its diagnostics, not
-//! answers.
-
 use std::io::BufReader;
 use std::path::Path;
 use std::process::{Child, ChildStdin, Stdio};
@@ -21,22 +13,12 @@ use super::environment::passed;
 use super::{AcpSession, Consented};
 use crate::mcp::Lines;
 
-/// A running agent. Dropping it kills the child and waits for it.
 pub struct HarnessProcess {
     child: Child,
 }
 
 impl HarnessProcess {
-    /// Starts the consented agent in `cwd` and opens a session with it
-    /// there. The child sees only the whitelisted environment and the
-    /// entry's own `env`.
-    ///
-    /// # Errors
-    /// `E_CONFIG_INVALID` for an `env` value that is a vault reference,
-    /// which this release does not redeem for an agent;
-    /// `E_TOOL_UNAVAILABLE` when the program will not start, with the
-    /// command line in the recovery; and every refusal of
-    /// [`AcpSession::open`]. The child is reclaimed on each of them.
+
     pub fn start(
         agent: &Consented,
         cwd: &Path,
@@ -70,8 +52,7 @@ impl HarnessProcess {
             .stderr(Stdio::null())
             .spawn()
             .map_err(|err| unavailable(agent, &format!("{}: {err}", launch.program)))?;
-        // From here on the handle owns the child, so every early return
-        // below reclaims it.
+
         let mut process = HarnessProcess { child };
         let writer = process
             .child
@@ -94,8 +75,7 @@ impl Drop for HarnessProcess {
         if self.child.kill().is_ok() {
             match self.child.wait() {
                 Ok(_status) => {}
-                // A child that cannot be waited for was reaped by the
-                // platform; either way it is not running.
+
                 Err(_unwaitable) => {}
             }
         }

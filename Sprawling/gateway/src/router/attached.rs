@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The book of attached endpoints and the models chosen from them
-//! (shape 7): a value rebuilt from the ledger, never a store. Deleting
-//! it and replaying the city produces the same book.
-//!
-//! Two questions live here and nowhere else. *What did the person
-//! attach* — a base URL, a dialect, a credential reference, and the
-//! model ids the endpoint reported. *Which model answers for a tag* —
-//! the choice a request needs, with the facts no probe returns.
-//!
-//! Duty pools and multi-axis grading are deliberately absent: with one
-//! agent per run there is no consumer for a pool, and a pool without a
-//! consumer is an authority nobody reads.
-
-//! Attached endpoints: registration records.
-
 use kernel::DialectKind;
 
 use crate::endpoint::{AuthSpec, ModelFacts};
@@ -25,66 +10,33 @@ use crate::provider::registry::ConnectionKind;
 
 use super::payload::auth_reference;
 use super::tuning::EndpointTuning;
-/// One endpoint the person attached, as the book holds it.
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AttachedEndpoint {
     pub name: String,
-    /// The base URL the person entered, without a path of its own; the
-    /// dialect knows which paths hang off it.
+
     pub base_url: String,
     pub dialect: DialectKind,
-    /// How this endpoint is connected, resolved once when it was
-    /// attached. `dialect` beside it answers the narrower question of
-    /// which request writer runs, and two connections can share a
-    /// writer while being different registrations; a page given only
-    /// the writer cannot say which one a person set up.
+
     pub connection_kind: ConnectionKind,
     pub auth: AuthSpec,
-    /// What the endpoint said it serves, with everything it said about
-    /// each row. Kept whole rather than reduced to ids: the probe
-    /// already reads the window, the output ceiling, the modalities and
-    /// the provider's own prices out of `GET .../models`, and throwing
-    /// them away here made the settings page ask a person for figures
-    /// their provider had already stated.
+
     pub models: Vec<ModelFacts>,
-    /// Where that list came from: `true` when the endpoint answered
-    /// `GET .../models`, `false` when it did not and the person named
-    /// the ids instead. It says how much the city knows about this
-    /// list, never whether the endpoint is healthy.
+
     pub probed: bool,
-    /// How the person set this endpoint up: its label, its deadlines,
-    /// and what every request to it carries. Kept beside the
-    /// registration so a call made a week later is made the way they
-    /// set it up.
+
     pub tuning: EndpointTuning,
-    /// The CAS blob holding `models` as the attach read them, which a
-    /// replay learns back through [`super::EndpointBook::learn`]; the
-    /// line itself carries ids only (kernel D57).
+
     pub facts_blob: Option<kernel::B3Hash>,
 }
 
 impl AttachedEndpoint {
-    /// `models` as the bytes of the CAS blob `facts_blob` names: the one
-    /// writer of the format [`super::EndpointBook::learn`] reads.
-    ///
-    /// # Errors
-    /// `E_WIRE_MISMATCH` when the facts do not encode, which no
-    /// `ModelFacts` built here produces.
+
     pub fn facts_bytes(&self) -> Result<Vec<u8>, kernel::AxError> {
         serde_json::to_vec(&self.models)
             .map_err(|err| crate::mismatch::mismatch("model facts", &err.to_string()))
     }
 
-    /// Validates submitted legacy fields against the settled account list.
-    ///
-    /// Account retention is settled by the caller before this check. Only
-    /// submitted fields count: archived legacy auth remains readable during
-    /// replay. Presence includes empty text and does not parse a reference.
-    /// See `Sprawling/gateway/spec/Router.lean` D29.
-    ///
-    /// # Errors
-    /// Returns `E_CONFIG_INVALID` when an explicit list has no account target
-    /// for a submitted legacy secret or header, before any external effect.
     pub fn validate_legacy_fields(
         name: &str,
         accounts: Option<&[kernel::event::record::ProviderAccount]>,
@@ -104,25 +56,16 @@ impl AttachedEndpoint {
         Ok(())
     }
 
-    /// Whether calls to this endpoint stay on this machine. The answer
-    /// comes from the same test the local adapter applies and the proxy
-    /// decision takes, so "local" means one thing city-wide.
     #[must_use]
     pub fn is_local(&self) -> bool {
         crate::is_local(&self.base_url)
     }
 
-    /// Whether a credential was enrolled for it. The only question about
-    /// a credential this side of the vault can answer, and the only one
-    /// a settings page needs.
     #[must_use]
     pub fn has_credential(&self) -> bool {
         !self.references().is_empty()
     }
 
-    /// Every vault reference this registration calls with: each listed
-    /// account's, or the legacy credential's while it lists none. The one
-    /// answer to which keys an endpoint still needs (gateway D33).
     #[must_use]
     pub fn references(&self) -> Vec<&kernel::SecretRef> {
         match &self.tuning.accounts {
@@ -134,10 +77,6 @@ impl AttachedEndpoint {
         }
     }
 
-    /// The first declared account, or the legacy credential before migration.
-    ///
-    /// # Errors
-    /// Refuses an invalid explicit account list rather than using the old key.
     pub fn first_auth(&self) -> Result<AuthSpec, kernel::AxError> {
         Ok(self
             .account_auths()?
@@ -146,13 +85,6 @@ impl AttachedEndpoint {
             .map_or_else(|| self.auth.clone(), |(_, auth)| auth))
     }
 
-    /// Every declared account with the credential it calls with, in
-    /// priority order; empty for a registration that declares none. The
-    /// one place an account becomes a credential header, so the first
-    /// call and a Session's later selection cannot disagree on it.
-    ///
-    /// # Errors
-    /// Refuses an invalid explicit account list rather than using the old key.
     pub(crate) fn account_auths(
         &self,
     ) -> Result<Vec<(kernel::ServerLabel, AuthSpec)>, kernel::AxError> {
@@ -176,46 +108,31 @@ impl AttachedEndpoint {
             .collect())
     }
 
-    /// What to call this endpoint on screen: the label the person gave
-    /// it, or the name it was filed under.
     #[must_use]
     pub fn label(&self) -> &str {
         self.tuning.label.as_deref().unwrap_or(&self.name)
     }
 
-    /// Where a chat request goes for this dialect. The person enters a
-    /// base URL because that is what a provider's documentation prints;
-    /// the path belongs to the dialect, which is the only party that
-    /// knows it.
     #[must_use]
     pub fn chat_url(&self) -> String {
         join(&self.base_url, chat_path(self.dialect))
     }
 
-    /// What this endpoint's shared client is built from: the chat URL,
-    /// the proxy rule and the call timeout. A model call and a warm-up
-    /// both read it here, so the client the warm-up leaves in the slot
-    /// is the client a call would have built.
     pub(crate) fn client_shape(&self) -> crate::endpoint::ClientShape {
         crate::endpoint::ClientShape {
             url: self.chat_url(),
             proxying: self.tuning.proxying,
-            // The tuning answers this, because the figure an untuned
-            // endpoint is called with is the tuning's own default and
-            // is stated there.
+
             timeout_ms: self.tuning.call_timeout_ms(),
         }
     }
 
-    /// Where the model list lives for this dialect.
     #[must_use]
     pub fn models_url(&self) -> String {
         join(&self.base_url, "models")
     }
 }
 
-/// All three compatible formats list models at the same path; they
-/// differ in the chat path and in the shape of what comes back.
 fn chat_path(dialect: DialectKind) -> &'static str {
     match dialect {
         DialectKind::Anthropic => "messages",
@@ -224,9 +141,6 @@ fn chat_path(dialect: DialectKind) -> &'static str {
     }
 }
 
-/// A base URL a person entered plus the path a compatible format owns.
-/// One algorithm city-wide: the chat face, the model list and the audio
-/// face all hang paths off a base the same way.
 pub(crate) fn join(base: &str, path: &str) -> String {
     format!("{}/{}", base.trim_end_matches('/'), path)
 }
@@ -264,8 +178,7 @@ mod tests {
             GENESIS_PREV,
         )
     }
-    /// One catalogue row as a probe that answered nothing but the id
-    /// would have left it.
+
     fn facts(id: &str) -> ModelFacts {
         ModelFacts {
             id: id.to_owned(),
@@ -341,9 +254,6 @@ mod tests {
         );
     }
 
-    /// A `probed` the line spells as something other than a yes or a
-    /// no is not a probe that succeeded: reading it as one would put an
-    /// endpoint nobody reached into the book as reached.
     #[test]
     fn an_unreadable_probed_is_refused_rather_than_read_as_probed() {
         let endpoint = attached("house", "https://api.example.test/v1");

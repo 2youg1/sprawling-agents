@@ -3,16 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A branch's origin checked by the one line it names: never by a
-//! verify of the history, and refused as a damaged ledger when that line
-//! is no record at all.
-
 use super::addr;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// A worker over a fresh city whose one run, the mother, has landed in
-/// `lab/room2`, and the origin a branch of it would name.
 fn a_mother_ran(city_root: &std::path::Path) -> (RunWorker, kernel::Origin, impl Sized) {
     crate::worker::fixture::init_city(city_root).unwrap();
     let (base_url, provider) =
@@ -51,13 +45,6 @@ fn a_mother_ran(city_root: &std::path::Path) -> (RunWorker, kernel::Origin, impl
     (worker, started, provider)
 }
 
-/// Checking a branch's origin reads the line it names, not the history:
-/// the history was verified when the city opened, and a check that
-/// verified it again would cost the whole ledger on every branch.
-///
-/// A chain broken after genesis is the witness: a verify refuses it, and
-/// the check, which never reads that line, answers as it would on an
-/// intact ledger.
 #[test]
 fn checking_a_branch_origin_does_not_verify_the_history() {
     let dir = tempfile::tempdir().unwrap();
@@ -71,8 +58,6 @@ fn checking_a_branch_origin_does_not_verify_the_history() {
     );
 }
 
-/// A branch restores the mother's frozen model, effort and identity
-/// rather than keeping the shape of the session it replaces.
 #[test]
 fn a_branch_restores_the_mothers_shape() {
     let dir = tempfile::tempdir().unwrap();
@@ -95,9 +80,6 @@ fn a_branch_restores_the_mothers_shape() {
     assert!(own.naming().is_some());
 }
 
-/// A line at the origin that is no record at all is a damaged ledger,
-/// not a line of some other run, and the refusal says so with the code
-/// that sends the person to the ledger rather than to the branch.
 #[test]
 fn a_damaged_line_at_the_origin_is_refused_as_a_damaged_ledger() {
     let dir = tempfile::tempdir().unwrap();

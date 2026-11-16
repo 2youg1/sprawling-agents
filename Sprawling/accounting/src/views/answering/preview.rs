@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One window of a stored Markdown version, laid out as blocks
-//! (`Sprawling/accounting/spec/Views/Document.lean` §8-23, `Sprawling/wire/Spec.lean` §8-74).
-//!
-//! Reads the content store and nothing else, the way a range does: the
-//! version is the object's address, so a page previewing a file a
-//! resident is rewriting keeps reading the version it opened. The store
-//! is read through `range::stored`, the one read a range makes too; every
-//! judgement - which encoding, where the window is cut and where it ends,
-//! what the blocks are - is `documents::preview`'s.
-
 use std::path::Path;
 
 use documents::{Preview, Span};
@@ -23,7 +13,7 @@ use super::super::prepared::{Prepared, unavailable};
 use super::range::stored;
 
 impl Views {
-    /// A preview is read from the store after the views are released.
+
     pub(in crate::views) fn preview_ask(&self, version: B3Hash, viewport: Span) -> Prepared {
         Prepared::Preview {
             city_root: self.city_root.clone(),
@@ -33,9 +23,6 @@ impl Views {
     }
 }
 
-/// The preview of the window of `version` that `viewport` asks for, or
-/// `Unavailable` when the store does not hold that version or its bytes
-/// are not text.
 pub(in crate::views) fn preview_answer(
     city_root: &Path,
     version: B3Hash,
@@ -43,10 +30,7 @@ pub(in crate::views) fn preview_answer(
 ) -> wire::Answer {
     match preview_of(city_root, &version, viewport) {
         Ok(preview) => wire::Answer::Preview(Box::new(wire::PreviewAnswer { version, preview })),
-        // "I could not look" is the answer for every way this fails, as it
-        // is for a range: a version the store never kept, a store that
-        // will not open, bytes that are not text. The query handed back
-        // names which version.
+
         Err(_) => unavailable(format!("Preview({version})")),
     }
 }
@@ -101,10 +85,6 @@ mod tests {
         );
     }
 
-    /// A Markdown file three windows long, opened through `Document` and
-    /// previewed from 0 on from each answer's end: every window but the
-    /// last ends where a paragraph ends, and every paragraph is laid out
-    /// exactly once.
     #[test]
     fn a_long_document_previews_window_by_window_to_its_end() {
         let dir = tempfile::tempdir().unwrap();
@@ -169,8 +149,6 @@ mod tests {
         assert_eq!(read, paragraphs);
     }
 
-    /// A Markdown file one window holds whole, opened through `Document`,
-    /// previews by the version that answer named (accounting D33).
     #[test]
     fn a_short_document_previews_by_its_version() {
         let dir = tempfile::tempdir().unwrap();

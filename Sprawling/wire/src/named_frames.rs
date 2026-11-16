@@ -3,32 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One declaration of a frame family, three things generated from it:
-//! the enum, the name of each variant, and the table the schema hash is
-//! built from.
-//!
-//! **A frame's spelling has one home.** A variant, a hand-written
-//! `match` arm and a hand-written array would spell `RunHistory` three
-//! times, and the handshake hash reads only the array; an exhaustive
-//! `match` stops a new variant from compiling without a name and stops
-//! nothing about a new variant missing from the array. Here the variant
-//! list is the only place a frame is spelled, and the table cannot
-//! disagree with it because the table is the list.
-//!
-//! **The table is in declaration order**, which is the order the
-//! handshake hash mixes the names in. Moving a variant therefore
-//! changes the hash, and an older page is refused at the handshake
-//! without a `WIRE_V` bump (wire D1).
-//!
-//! One macro rather than two, because `Query` and `Command` differ in
-//! their generic carrier and in nothing else that matters here —
-//! `carried_name` already takes this shape for four newtypes.
-
-/// Declares a frame enum together with its name table.
-///
-/// The optional `<Carrier = Default>` clause carries `Command`'s secret
-/// parameter; `Query` has none and omits it. A variant is a unit, a set of
-/// named fields, or one carried value.
 macro_rules! named_frames {
     (
         $(#[$enum_attr:meta])*
@@ -55,8 +29,7 @@ macro_rules! named_frames {
             [$(stringify!($variant)),*];
 
         impl $(<$carrier>)? $frame $(<$carrier>)? {
-            /// The wire name of this frame: the variant's own spelling,
-            /// which is also its entry in the name table above.
+
             #[must_use]
             pub fn name(&self) -> &'static str {
                 match *self {

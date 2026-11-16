@@ -3,14 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The pin and found versions of one catalog drift, carried by
-//! `digest_invalidated` (`Sprawling/kernel/spec/CatalogDrift.lean` D118).
-
 use serde::{Deserialize, Serialize};
 
 use crate::{B3Hash, ServerLabel};
 
-/// Which catalog row moved.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -20,9 +16,6 @@ pub enum CatalogSubject {
     Tool { label: ServerLabel, name: String },
 }
 
-/// One observed difference. `pinned: None` marks an added item;
-/// `found: None` marks an item that disappeared. The event envelope owns
-/// the building, so it is not duplicated here.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CatalogDrift {
@@ -36,8 +29,7 @@ pub struct CatalogDrift {
 }
 
 impl CatalogDrift {
-    /// Compares two versions, returning no event for equal versions or for
-    /// the absence of both an old and a new item.
+
     #[must_use]
     pub fn between(
         subject: CatalogSubject,

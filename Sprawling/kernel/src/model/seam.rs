@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one call across the seam carries in each direction, and the two
-//! conversions between assistant content and a ledger payload.
-//! The part `Sprawling/kernel/spec/Model.lean` specifies this module with the
-//! rest of `kernel::model`.
-
 use serde::{Deserialize, Serialize};
 use serde_json::Map;
 
@@ -19,9 +14,6 @@ use crate::event::Payload;
 use crate::locator::B3Hash;
 use crate::tool::ToolCall;
 
-/// The account-side form of assistant content: the single authority for
-/// how content blocks enter `model_returned` payloads (and thus how the
-/// window is rebuilt offline, C16).
 pub fn message_payload(content: &[ContentBlock]) -> Result<Payload, AxError> {
     let blocks = serde_json::to_value(content).map_err(|err| {
         AxError::failure(
@@ -39,9 +31,6 @@ pub fn message_payload(content: &[ContentBlock]) -> Result<Payload, AxError> {
     Payload::new(map)
 }
 
-/// What the adapter needs to make one call. `segments` are the frozen
-/// prefix hashes (same source as `prompt_assembled`); `chat` is the full
-/// canonical conversation the dialect puts on the wire.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModelRequest<'a> {
     pub policy: BuildingPolicy,
@@ -50,9 +39,7 @@ pub struct ModelRequest<'a> {
 }
 
 impl ModelRequest<'_> {
-    /// The same request, owning what it borrowed: for a holder that
-    /// keeps it past the call it was assembled for. Cloning a borrowed
-    /// request first copies only the borrow, so this is the one copy.
+
     pub fn into_owned(self) -> ModelRequest<'static> {
         ModelRequest {
             policy: self.policy,
@@ -62,10 +49,6 @@ impl ModelRequest<'_> {
     }
 }
 
-/// One assistant turn. `message` is the in-window content; `calls` is the
-/// requested tool wave — empty means the turn loop may conclude the run.
-/// `usage`/`stop`/`billed_usd_micros` ride along from real dialects and
-/// stay `None` for scripted adapters that predate cost accounting.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModelReturn {
     pub message: Payload,
@@ -76,7 +59,7 @@ pub struct ModelReturn {
 }
 
 impl ModelReturn {
-    /// Scripted/minimal construction: content and wave only.
+
     pub fn bare(message: Payload, calls: Vec<ToolCall>) -> ModelReturn {
         ModelReturn {
             message,
@@ -87,8 +70,6 @@ impl ModelReturn {
         }
     }
 
-    /// The one mapping from canonical response to seam return: tool_use
-    /// blocks become the wave, everything is kept for the account.
     pub fn from_response(
         resp: ChatResponse,
         billed_usd_micros: Option<UsdMicros>,
@@ -114,13 +95,6 @@ impl ModelReturn {
     }
 }
 
-/// The inverse of [`message_payload`] for window folding and rebuild.
-///
-/// A message without a canonical `content` array folds to no blocks —
-/// defined behavior for scripted payloads, not an error path. A `content`
-/// array that is present but unreadable is an error: silently folding it
-/// to nothing would drop an assistant message the ledger still holds, and
-/// a window that disagrees with the ledger is a second history.
 pub fn content_from_message(message: &Payload) -> Result<Vec<ContentBlock>, AxError> {
     let Some(value) = message.as_map().get("content") else {
         return Ok(Vec::new());

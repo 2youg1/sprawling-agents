@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One refusal shape for every way a layer can fail to be read, so the
-//! recovery line is written once and cannot drift between callers.
-//!
-//! Specified by `Sprawling/city/spec/ConfigLayers.lean` §8-4.
-
 use std::path::Path;
 
 use kernel::layout::CONFIG_FILE;
@@ -22,32 +17,18 @@ use super::resident::{HARNESS_KEY, MODEL_NAME_KEY};
 use super::search::SEARCH_KEY;
 use super::shelves::{SHELVES_KEY, SKILL_PINS_KEY};
 
-/// What a person does when a key or a value is not one this build reads.
-/// The message names the key, so the sentence does not.
 const CHANGE_THE_VALUE: &str = "change the value the message names, or take that key out";
 
-/// What every refusal of a layer says it was doing.
 pub(super) const READ_A_LAYER: &str = "read a configuration layer";
 
-/// The refusal a layer answers with when a value it read is not one this
-/// build accepts. `subject` is the caller's: which file, and which value.
 pub(super) fn refuse(subject: String) -> AxError {
     refuse_with(subject, CHANGE_THE_VALUE)
 }
 
-/// [`refuse`] for a value whose repair is narrower than taking the key
-/// out: `recovery` says what to write instead.
 pub(super) fn refuse_with(subject: String, recovery: impl Into<String>) -> AxError {
     AxError::failure(AxCode::ConfigInvalid, READ_A_LAYER, subject).with_recovery(recovery)
 }
 
-/// The refusal for text serde itself will not read.
-///
-/// serde's message already names the key it did not recognise and the
-/// keys that table accepts, so the list of what this build reads has one
-/// home there. This function adds only where to look: the table the
-/// parser stopped in, spelled the way the document spells it, taken from
-/// the span serde reports rather than typed out here.
 pub(super) fn unreadable(text: &str, err: &toml::de::Error) -> AxError {
     let table = err.span().and_then(|span| enclosing_table(&span, text));
     let subject = match &table {
@@ -61,38 +42,26 @@ pub(super) fn unreadable(text: &str, err: &toml::de::Error) -> AxError {
     refuse_with(subject, recovery)
 }
 
-/// A table that may be stated only on the farther rungs of the ladder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Confined {
-    /// A shelf is mounted for every building at once, so a building or
-    /// a room that names one would admit a directory nobody who keeps
-    /// this city chose (`Sprawling/city/spec/Library.lean` §8-8).
+
     Shelves,
-    /// The remote door opens onto the whole city, so a building or a
-    /// room that chose its route would decide for every other one how
-    /// the outside comes in (`Sprawling/city/spec/ConfigLayers/Remote.lean` §8-39).
+
     Remote,
-    /// The settings page edits the city's choice and lists each
-    /// building's, so a room's choice would govern runs without
-    /// appearing anywhere a person looks (`Sprawling/city/spec/ConfigLayers.lean` §8-4c).
+
     Search,
-    /// An agent row names a program this machine runs as the person, so a
-    /// building or a room that added one would start it for every room
-    /// below (`Sprawling/city/spec/ConfigLayers.lean` §8-4f).
+
     Agents,
-    /// The tool array sits ahead of the system prompt in a provider's
-    /// cache, so rooms of one building that exposed different tools would
-    /// split that building's cache (`Sprawling/city/spec/ConfigLayers.lean` §8-4g).
+
     Catalog,
-    /// A building references a definition instead of copying it; rooms
-    /// receive their selection through their frozen CATALOG.toml.
+
     McpReferences,
-    /// Reading Room pins belong to a building, not one of its rooms.
+
     SkillPins,
 }
 
 impl Confined {
-    /// The nearest rung this table may be stated on.
+
     pub(super) fn nearest(self) -> Layer {
         match self {
             Confined::Shelves | Confined::Remote | Confined::Agents => Layer::City,
@@ -103,8 +72,6 @@ impl Confined {
         }
     }
 
-    /// Whether `rung` may state this table: it is no nearer than
-    /// [`Confined::nearest`]. `Layer` orders farthest first.
     pub(super) fn reached_from(self, rung: Layer) -> bool {
         rung <= self.nearest()
     }
@@ -145,8 +112,6 @@ impl Confined {
     }
 }
 
-/// The refusal for a confined table written on a rung nearer than it
-/// may be, refused where it was written rather than parsed and dropped.
 pub(super) fn too_near(file: &Path, table: Confined) -> AxError {
     let key = table.key();
     let into = match table.nearest() {
@@ -161,11 +126,6 @@ pub(super) fn too_near(file: &Path, table: Confined) -> AxError {
     )
 }
 
-/// The refusal for one layer that names a model and a harness.
-///
-/// The model is the record a session wrote at this address, and `/new`
-/// forgets it; the harness is a person's setting. Which of the two the
-/// layer meant is not a reader's to guess.
 pub(super) fn two_residents(model: &str, harness: &str) -> AxError {
     refuse_with(
         format!("{MODEL_NAME_KEY} = \"{model}\" beside {HARNESS_KEY} = \"{harness}\""),
@@ -175,11 +135,6 @@ pub(super) fn two_residents(model: &str, harness: &str) -> AxError {
     )
 }
 
-/// The table header the parser was inside, as the document spells it.
-///
-/// The span points at the key, so only whole lines above it are
-/// searched: a top-level key has no table above it, and the line the
-/// key sits on may itself begin with a bracket.
 fn enclosing_table(span: &std::ops::Range<usize>, text: &str) -> Option<String> {
     let before_span = text.get(..span.start)?;
     let newline = before_span.rfind('\n')?;

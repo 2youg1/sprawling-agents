@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! V0: "unrepresentable" is itself tested.
-//! Every file under tests/ui must fail to compile; the stderr snapshots
-//! pin the reason. The kernel crate carries its own cases.
-
 #[test]
 fn the_write_target_cannot_be_forged() {
     let cases = trybuild::TestCases::new();

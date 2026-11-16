@@ -3,23 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The three properties a screen reader meets: every control says what
-//! it is, every landmark says which region it is, and the page has one
-//! first heading (Tools/xtask/Spec.lean §8-13).
-//!
-//! They were the gate called `ax` until a browser could be opened, and
-//! they are the three that read the page's names rather than its
-//! geometry, which is why they sit together.
-
 use super::violation;
 use crate::report::Violation;
 use browser::survey::Drawn;
 
-/// Every control a person can operate says what it is.
-///
-/// The first run of this property found four: the composer's own text
-/// box, on every fixture that draws one. It is the control the whole page
-/// exists for, and to a screen reader it was an unlabelled edit field.
 pub(super) fn every_control_is_announceable(drawn: &[Drawn], at: &str, out: &mut Vec<Violation>) {
     for held in drawn
         .iter()
@@ -59,7 +46,6 @@ pub(super) fn every_landmark_is_named(drawn: &[Drawn], at: &str, out: &mut Vec<V
     }
 }
 
-/// One first heading, so a reader arriving by keyboard lands somewhere.
 pub(super) fn one_first_heading(drawn: &[Drawn], at: &str, out: &mut Vec<Violation>) {
     let headings: Vec<&Drawn> = drawn
         .iter()

@@ -3,21 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The leaf's exports as Rust sees them: every function `zig/leaf.zig`
-//! exports, declared once.
-//!
-//! Each returns a step number, which `ended` reads rather than trusts,
-//! except the two DPI calls, which return the HRESULT the operating
-//! system gave. Every pointer is lent for the call alone: the leaf keeps
-//! none of them, frees none of Rust's memory, and writes nothing past
-//! the length it was given beside the pointer.
-
 use std::ffi::c_void;
 
 use winsafe::co;
 
-// The declarations themselves assert nothing a caller can rely on; each
-// call below them states its own precondition where it is made.
 #[expect(
     unsafe_code,
     reason = "the one declaration of the leaf's exports; every call into it is an `unsafe` block of its own"

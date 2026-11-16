@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The copy a command runs in: one working tree, brought to what the
-//! working directory holds before each command, and bounded.
-//!
-//! A copy is synced rather than made again, because creating files is
-//! what a real-time scanner waits on, and a fresh copy per command would
-//! create every file of the tree per command (runtime D10). The
-//! sync leaves the copy file for file equal to the working directory, so
-//! nothing an earlier command wrote reaches a later one.
-//!
-//! The bound is a refusal rather than a partial copy. Half a tree would
-//! answer for files the copy never carried, and a command that then
-//! reads a stale or missing file has no way to tell that apart from a
-//! file somebody changed.
-
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::fs::Metadata;
@@ -26,25 +12,12 @@ use std::path::{Path, PathBuf};
 use kernel::{AxCode, AxError};
 use storage::FileWork;
 
-/// How many files one command's working tree may hold before the copy
-/// refuses to make itself. A room holding a build cache is the case
-/// this bounds: the point of the copy is a throwaway environment for
-/// one command, and a tree too large to copy in seconds is one no
-/// default path should spend on every call.
 pub(super) const MAX_FILES: u64 = 100_000;
 
-/// How many bytes those files may hold. The pair is a budget rather
-/// than a promise about the machine: past either figure the refusal
-/// names the figure, and `where: host` is the caller's own decision.
 pub(super) const MAX_BYTES: u64 = 256 * 1024 * 1024;
 
-/// How deep a working tree may nest before the copy refuses. A link
-/// that points at its own parent is a loop no walk can end, and a
-/// refusal that names the depth is better than a walk that grows until
-/// the process dies.
 const MAX_DEPTH: u32 = 64;
 
-/// Refusal for a copy that cannot be made.
 fn copy_fault(subject: &str, err: &std::io::Error) -> AxError {
     AxError::failure(
         AxCode::SandboxDenied,
@@ -57,7 +30,6 @@ fn copy_fault(subject: &str, err: &std::io::Error) -> AxError {
     )
 }
 
-/// Refusal for a tree past the budget, naming the figure that was passed.
 fn over_budget(files: u64, bytes: u64) -> AxError {
     AxError::failure(
         AxCode::SandboxDenied,
@@ -73,13 +45,10 @@ fn over_budget(files: u64, bytes: u64) -> AxError {
     )
 }
 
-/// Removal as its own step, so the failure of one is not the failure of
-/// the copy that was made.
 pub(super) fn remove(copy: &Path) {
     drop(std::fs::remove_dir_all(copy));
 }
 
-/// A directory of this machine's scratch root that no other copy holds.
 pub(super) fn fresh(root: &Path) -> Result<PathBuf, AxError> {
     let pid = std::process::id();
     for attempt in 0..64u32 {
@@ -101,12 +70,8 @@ pub(super) fn fresh(root: &Path) -> Result<PathBuf, AxError> {
     ))
 }
 
-/// How many bytes of a file and its copy are compared at a time.
 const CHUNK: usize = 64 * 1024;
 
-/// One sync of one copy: what the working directory held against the
-/// bound, what the sync cost the filesystem, and the two buffers every
-/// comparison of the walk reuses.
 pub(super) struct Budget {
     files: u64,
     bytes: u64,
@@ -126,7 +91,6 @@ impl Budget {
         }
     }
 
-    /// What bringing the copy to the working directory cost.
     pub(super) fn work(&self) -> FileWork {
         self.work
     }
@@ -141,32 +105,16 @@ impl Budget {
     }
 }
 
-/// Adds one to a count of the work.
 fn one_more(count: &mut u64) {
     *count = count.saturating_add(1);
 }
 
-/// The three directories one sync walk is made of: where it reads,
-/// where it writes, and the copy's own root, which it skips.
 pub(super) struct Stage<'a> {
     pub(super) from: &'a Path,
     pub(super) into: &'a Path,
     pub(super) copy: &'a Path,
 }
 
-/// Brings the existing directory `stage.into` to what `stage.from` holds.
-///
-/// `stage.copy` is this copy's own directory, and it is skipped: a
-/// working directory that contains the place copies go - this machine's
-/// scratch root is one - would otherwise be copied into itself. A link
-/// in the working directory is followed, so a link to a directory outside
-/// it carries that directory's content rather than a link into the
-/// person's tree; a link that points at its own parent is what
-/// [`MAX_DEPTH`] ends. What the copy holds is read without following
-/// links, because a command wrote it: an entry of another kind than the
-/// working directory's, or a file whose bytes differ, is removed and
-/// made again rather than written over, since a command can leave a
-/// name that leads out of the copy.
 pub(super) fn mirror(stage: &Stage<'_>, depth: u32, budget: &mut Budget) -> Result<(), AxError> {
     let Stage { from, into, copy } = *stage;
     if depth > MAX_DEPTH {
@@ -246,8 +194,6 @@ pub(super) fn mirror(stage: &Stage<'_>, depth: u32, budget: &mut Budget) -> Resu
     Ok(())
 }
 
-/// What the copy's directory `into` holds, by name, read without
-/// following a link.
 fn held(into: &Path, budget: &mut Budget) -> Result<BTreeMap<OsString, Metadata>, AxError> {
     let fault = |err: std::io::Error| copy_fault(&into.display().to_string(), &err);
     let mut found = BTreeMap::new();
@@ -259,8 +205,6 @@ fn held(into: &Path, budget: &mut Budget) -> Result<BTreeMap<OsString, Metadata>
     Ok(found)
 }
 
-/// Whether the copy's regular file `target` holds what `source` holds.
-/// Lengths are compared first, so only files of one length are read.
 fn same_bytes(
     source: &Path,
     target: &Path,
@@ -284,8 +228,7 @@ fn same_bytes(
         else {
             return Ok(false);
         };
-        // A file that shrank while it was read differs from the one
-        // the lengths were compared on.
+
         if ours.read_exact(a).is_err() || theirs.read_exact(b).is_err() || a != b {
             return Ok(false);
         }
@@ -294,13 +237,11 @@ fn same_bytes(
     Ok(true)
 }
 
-/// Removes one entry of the copy: a directory with what it holds, and
-/// anything else - a file, or a link of either kind - as the name alone.
 fn discard(target: &Path, kept: &Metadata) -> Result<(), AxError> {
     let gone = if kept.is_dir() {
         std::fs::remove_dir_all(target)
     } else {
-        // A link to a directory is removed as a directory on Windows.
+
         std::fs::remove_file(target).or_else(|first| match kept.is_symlink() {
             true => std::fs::remove_dir(target).map_err(|_| first),
             false => Err(first),

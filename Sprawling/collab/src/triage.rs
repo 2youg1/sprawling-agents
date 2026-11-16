@@ -3,33 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Where something from outside lands.
-//!
-//! Everything that arrives — a person's sentence, a webhook, a signal
-//! from another city — goes through here, and what comes out is always
-//! an Address. That is the whole point: the dispatch surface has one
-//! shape, and the only thing triage varies is how much machinery meets
-//! the arrival.
-//!
-//! Rules are read before the reflex is chosen, because a rule is
-//! somebody's decision and a reflex is a default. A rule that matches
-//! settles both the address and the reflex; nothing matching is not an
-//! error, it is the case where a person reads it.
-
 use kernel::{Address, AxCode, AxError};
 
-/// How much machinery meets an arrival. Four, and the fourth is a whole
-/// Resident: the ladder exists so that most arrivals do not get one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Reflex {
-    /// Recognised and not worth a line. Recorded, never acted on.
+
     Discard,
-    /// Worth knowing, not worth doing: it reaches the person's view and
-    /// starts nothing.
+
     Notify,
-    /// A small, bounded reaction — one tool, one answer, no session.
+
     Light,
-    /// A full Resident with a Run.
+
     Full,
 }
 
@@ -45,42 +29,30 @@ impl Reflex {
     }
 }
 
-/// One thing that arrived, in the only shape triage reads.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Arrival {
     pub source: String,
     pub subject: String,
-    /// Whether it came from outside the city. A tainted arrival never
-    /// gets a reflex above `Notify` from a rule alone: acting on
-    /// somebody else's text without a person in the loop is the thing
-    /// the taint ring exists to prevent.
+
     pub tainted: bool,
 }
 
-/// A decision somebody already made about a kind of arrival.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rule {
-    /// Matched against source and subject, case-insensitively, as a
-    /// substring. Not a pattern language: a rule table people write by
-    /// hand is read far more often than it is written, and a regular
-    /// expression in it would be a second thing to debug at the moment
-    /// something is already going wrong.
+
     pub matches: String,
     pub landing: Address,
     pub reflex: Reflex,
 }
 
-/// Where an arrival goes and how much meets it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Landing {
     pub addr: Address,
     pub reflex: Reflex,
-    /// Which rule decided this, or why none did. Carried because a
-    /// routing decision nobody can explain is one nobody can fix.
+
     pub because: String,
 }
 
-/// The table, plus the address that catches everything else.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Triage {
     rules: Vec<Rule>,
@@ -88,10 +60,7 @@ pub struct Triage {
 }
 
 impl Triage {
-    /// # Errors
-    /// Refuses a rule with an empty match string: it would match
-    /// everything, which is what the fallback is for, and it would
-    /// shadow every rule under it.
+
     pub fn new(rules: Vec<Rule>, fallback: Address) -> Result<Triage, AxError> {
         for rule in &rules {
             if rule.matches.trim().is_empty() {
@@ -109,12 +78,6 @@ impl Triage {
         Ok(Triage { rules, fallback })
     }
 
-    /// Decides where one arrival lands.
-    ///
-    /// First match in table order wins, so the table reads top to bottom
-    /// the way the person wrote it. Two runs of the same arrival against
-    /// the same table give the same answer — there is no clock here and
-    /// no state that survives the call.
     #[must_use]
     pub fn decide(&self, arrival: &Arrival) -> Landing {
         let haystack = format!("{} {}", arrival.source, arrival.subject).to_lowercase();
@@ -122,8 +85,7 @@ impl Triage {
             if !haystack.contains(&rule.matches.trim().to_lowercase()) {
                 continue;
             }
-            // A rule may send tainted material to a person or to the
-            // bin; it may not start work on it by itself.
+
             let reflex = if arrival.tainted && matches!(rule.reflex, Reflex::Light | Reflex::Full) {
                 Reflex::Notify
             } else {

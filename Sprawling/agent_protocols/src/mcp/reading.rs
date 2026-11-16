@@ -3,95 +3,36 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How much of one message this city will read before it refuses.
-//!
-//! An MCP server is an outside party a configuration file pointed at,
-//! and everything it writes is untrusted input. The stdio transport
-//! frames on newlines, so a server that never writes one - broken,
-//! wedged, or hostile - asks this process to grow a buffer without
-//! bound. The process that reads it is also the city's only writer, so
-//! exhausting its memory ends the history rather than one tool call.
-//!
-//! [`MESSAGE_CEILING`] is where that stops, and it is not a parameter:
-//! a ceiling a caller may choose is a ceiling each transport chooses
-//! differently, and the refusal below has to name the same number to
-//! every server. A message above the ceiling is refused whole, with the
-//! server, the ceiling and the way to change it in the refusal, because
-//! parsing the first megabytes of a message whose end nobody has seen
-//! is reading a fragment as if it were the answer.
-//!
-//! A refusal ends the connection rather than skipping one message. The
-//! unread remainder of an oversized line is indistinguishable from the
-//! next message, so a caller that read again would take the tail of a
-//! refused message for a fresh one; the transport reclaims the
-//! child instead.
-//!
-//! [`Lines`] is the one reader of a line-framed connection, the stdio
-//! transport's and a harness session's alike: a read on a pipe has no
-//! deadline of its own, so one thread per connection reads through
-//! [`read_one_message`] and hands each message over a channel the caller
-//! waits on for a bounded time. The channel holds no queue: the reader
-//! waits until the caller takes a message before it reads the next, so a
-//! connection holds at most one message read and one being read, and the
-//! peer's own pipe is the only other buffer. The thread ends when the
-//! peer closes its output, which killing a child does, after a refusal,
-//! or when the caller drops the [`Lines`].
-//!
-//! What the readers must hold - a message within the ceiling is read, one
-//! past it is refused, and a refusal is the reader's last word - is proved
-//! in `Sprawling/agent_protocols/spec/Mcp/Reading.lean`.
-
 use std::io::{BufRead, ErrorKind, Read};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::time::Duration;
 
 use kernel::{AxCode, AxError};
 
-/// The largest message this city reads from an MCP server, in bytes.
-///
-/// Derived from the largest payload the city already accepts rather
-/// than picked: one picture is at most `kernel::consts_policy`'s
-/// `IMAGE_MAX_BYTES` (4 MiB), which is 5,592,408 bytes once padded
-/// base64 encoding has grown it by four thirds, so 8 MiB leaves a tool
-/// result room for such a picture, its text, and the JSON-RPC envelope
-/// around both. What it refuses is a server streaming without end.
 pub const MESSAGE_CEILING: usize = 8_388_608;
 
-/// What one read of the transport found.
-///
-/// Two outcomes rather than an optional message, because "the server
-/// closed its output" is a state on which the caller stops reading,
-/// and an absent value would leave that decision to be re-derived at
-/// every call site.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Received {
-    /// One complete message, with its framing newline removed.
+
     Message(String),
-    /// The server closed its output between messages, which is how a
-    /// child process that has finished looks from this side.
+
     EndOfInput,
 }
 
-/// What one peer says, as the caller waits for it.
 pub struct Lines {
     heard: Receiver<Result<Received, AxError>>,
 }
 
-/// What one bounded wait found.
 pub(crate) enum Heard {
     Message(String),
-    /// The peer closed its output, or its reader is gone.
+
     Ended,
-    /// Nothing within the wait.
+
     Silent,
 }
 
 impl Lines {
-    /// Starts the reader over `reader`, which a peer named `name` writes
-    /// into; `name` is what every refusal of this connection reports.
-    ///
-    /// # Errors
-    /// `E_TOOL_UNAVAILABLE` when the machine refuses the thread.
+
     pub fn over<R: BufRead + Send + 'static>(mut reader: R, name: &str) -> Result<Lines, AxError> {
         let (sender, heard) = std::sync::mpsc::sync_channel(0);
         let named = name.to_owned();
@@ -100,10 +41,7 @@ impl Lines {
             .spawn(move || {
                 loop {
                     let read = read_one_message(&mut reader, &named);
-                    // The end of input or a refusal is the last thing this
-                    // reader has to say: the bytes after an oversized
-                    // message cannot be told apart from the next one. A
-                    // closed channel means the caller stopped listening.
+
                     let last = !matches!(read, Ok(Received::Message(_)));
                     if sender.send(read).is_err() || last {
                         break;
@@ -124,11 +62,6 @@ impl Lines {
         Ok(Lines { heard })
     }
 
-    /// Waits at most `wait` for the next message.
-    ///
-    /// # Errors
-    /// Hands on the reader's refusal of an oversized or unreadable
-    /// message, after which this connection has nothing more to say.
     pub(crate) fn next(&self, wait: Duration) -> Result<Heard, AxError> {
         match self.heard.recv_timeout(wait) {
             Ok(Ok(Received::Message(line))) => Ok(Heard::Message(line)),
@@ -139,18 +72,6 @@ impl Lines {
     }
 }
 
-/// Reads one newline-framed message from `source`, refusing anything
-/// above [`MESSAGE_CEILING`].
-///
-/// `server` is the name the refusal reports, so a city talking to four
-/// servers says which one misbehaved.
-///
-/// # Errors
-/// Refuses a message above the ceiling, a stream that ends in the
-/// middle of a message, bytes that are not UTF-8, and any failure the
-/// underlying reader reports. After any of these the caller must stop
-/// reading this source: the bytes left in it belong to a message this
-/// function has already refused.
 pub fn read_one_message(source: &mut dyn BufRead, server: &str) -> Result<Received, AxError> {
     let mut held: Vec<u8> = Vec::new();
     loop {
@@ -167,18 +88,6 @@ pub fn read_one_message(source: &mut dyn BufRead, server: &str) -> Result<Receiv
     }
 }
 
-/// Reads the whole of `source` as one message, refusing anything above
-/// [`MESSAGE_CEILING`]: the body of an HTTP answer, which carries one
-/// message and ends where the response ends.
-///
-/// The refusal comes as soon as the bytes held pass the ceiling, so a
-/// body with no end is refused while it is still arriving, and this
-/// side never holds more than the ceiling and one chunk.
-///
-/// # Errors
-/// Refuses a body above the ceiling and bytes that are not UTF-8, as
-/// `E_WIRE_MISMATCH`, and a body the reader cannot finish, as
-/// `E_TOOL_UNAVAILABLE`.
 pub(crate) fn read_whole_message(source: &mut dyn Read, server: &str) -> Result<String, AxError> {
     let mut held: Vec<u8> = Vec::new();
     let mut chunk = [0_u8; WHOLE_CHUNK_BYTES];
@@ -198,34 +107,23 @@ pub(crate) fn read_whole_message(source: &mut dyn Read, server: &str) -> Result<
     }
 }
 
-/// How much of a whole body one read asks for: the size a buffered
-/// reader of a pipe fills at a time, so both readers overrun the ceiling
-/// by at most the same amount before they refuse.
 const WHOLE_CHUNK_BYTES: usize = 8_192;
 
-/// The refusal a reader gave an answer, as the call that was waiting
-/// reads it: the server took the call and answered, so what it did is
-/// unknown (`Sprawling/agent_protocols/Spec.lean` §8-15). Every transport hands its
-/// callers this one.
 pub(super) fn answer_unread(refused: &AxError) -> AxError {
     AxError::failure(*refused.code(), refused.action(), refused.subject())
         .effect_unknown()
         .with_recovery(refused.recovery())
 }
 
-/// Where the current chunk left the message.
 enum Framing {
-    /// The framing newline was in this chunk.
+
     Complete,
-    /// The reader has no more bytes.
+
     EndOfInput,
-    /// The chunk held message bytes and no newline.
+
     More,
 }
 
-/// Appends the next chunk's message bytes to `held` and reports how many
-/// bytes of the reader they occupied, so the caller can consume exactly
-/// those and release the borrow first.
 fn next_chunk(
     source: &mut dyn BufRead,
     server: &str,
@@ -249,9 +147,6 @@ fn next_chunk(
     }
 }
 
-/// A stream that ends between messages is a server that finished; one
-/// that ends inside a message is a server that was cut off, and the
-/// bytes it left are a fragment rather than an answer.
 fn ended(held: Vec<u8>, server: &str) -> Result<Received, AxError> {
     if held.is_empty() {
         return Ok(Received::EndOfInput);
@@ -270,9 +165,6 @@ fn ended(held: Vec<u8>, server: &str) -> Result<Received, AxError> {
     ))
 }
 
-/// A message written with CRLF framing keeps no carriage return: the
-/// newline frames the message and the byte before it is framing too,
-/// so a Windows-hosted server and a Unix one produce the same message.
 fn decode(mut held: Vec<u8>, server: &str) -> Result<String, AxError> {
     if held.last() == Some(&b'\r') {
         held.truncate(held.len().saturating_sub(1));
@@ -309,9 +201,6 @@ fn unreadable(server: &str, err: &std::io::Error) -> AxError {
     .with_recovery("the server is no longer reachable; this run continues without it")
 }
 
-/// The buffered reader handed back a chunk that does not contain the
-/// position it just reported, which no implementation does; the refusal
-/// exists so this function reaches its answer without indexing.
 fn unframed(server: &str) -> AxError {
     AxError::failure(
         AxCode::WireMismatch,
@@ -338,9 +227,6 @@ mod tests {
         read_one_message(&mut source, "apps")
     }
 
-    /// One message of exactly the ceiling is an ordinary message: the
-    /// limit is the largest message that passes, not the smallest that
-    /// fails.
     #[test]
     fn a_message_at_the_ceiling_is_read() {
         let envelope = "{\"jsonrpc\":\"2.0\",\"m\":\"\"}";
@@ -366,8 +252,6 @@ mod tests {
         assert!(err.recovery().contains("MESSAGE_CEILING"));
     }
 
-    /// The refusal arrives while the server is still writing, so the
-    /// city never holds the whole of an unbounded message.
     #[test]
     fn an_endless_message_is_refused_before_it_ends() {
         struct Endless;

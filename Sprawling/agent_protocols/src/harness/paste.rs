@@ -3,30 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a person pastes, read as one agent entry: a command line, a Zed
-//! or JetBrains `agent_servers` block, or a registry `agent.json`
-//! (`Sprawling/agent_protocols/Spec.lean` §8-19).
-//!
-//! The grammar lives here and nowhere else, so the WebUI and the CLI read
-//! a paste the same way (`Query::ParseAgentSpec`). Nothing is handed to a
-//! shell: a command line is split on whitespace, a double-quoted stretch
-//! is one word, and a shell's operators are refused rather than read.
-
 use kernel::{AxCode, AxError};
 use serde_json::Value;
 
 use super::catalog::{pairs, registry_entry};
 use super::entry::{AgentEntry, AgentId, AgentSource, Launch, program_stem};
 
-/// The characters a shell reads as plumbing.
 const SHELL_OPERATORS: [char; 5] = ['|', '&', ';', '<', '>'];
 
-/// Reads one pasted agent.
-///
-/// # Errors
-/// `E_INVALID_ARGS` for empty text, a JSON block that is none of the two
-/// shapes or names other than one agent, a command line with a shell
-/// operator or an unclosed quote, and an id [`AgentId::parse`] refuses.
 pub fn pasted(text: &str) -> Result<AgentEntry, AxError> {
     let text = text.trim();
     if text.starts_with('{') {
@@ -55,11 +39,6 @@ fn block(value: &Value) -> Result<AgentEntry, AxError> {
     server_entry(name, server, AgentSource::Pasted)
 }
 
-/// One `agent_servers` item read as an entry from `source`.
-///
-/// # Errors
-/// `E_INVALID_ARGS` for an item with no command and a name that makes no
-/// agent id.
 pub(super) fn server_entry(
     name: &str,
     server: &Value,
@@ -118,8 +97,6 @@ fn command_line(text: &str) -> Result<AgentEntry, AxError> {
     })
 }
 
-/// Whitespace separates words; a double-quoted stretch is part of one
-/// word and keeps its spaces; `\"` inside quotes is a quote.
 fn words(text: &str) -> Result<Vec<String>, AxError> {
     let mut words = Vec::new();
     let mut word: Option<String> = None;
@@ -146,8 +123,6 @@ fn words(text: &str) -> Result<Vec<String>, AxError> {
     Ok(words)
 }
 
-/// An id from a name: lowercase, every character outside the id grammar
-/// turned into `-`.
 fn id_of(name: &str) -> String {
     name.trim()
         .chars()

@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Who a ledger line is attributed to.
-
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -13,44 +11,22 @@ use crate::address::Address;
 use crate::error::{AxCode, AxError};
 use crate::event::identity::RunId;
 
-/// The city's own desk, as every ledger line it writes spells it.
 const CITY: &str = "city";
 
-/// A human being, as a ledger line spells them. One word for all of
-/// them: the ledger says an instruction came from outside the machine,
-/// and which person it was is the session's business rather than the
-/// history's.
 const PERSON: &str = "person";
 
-/// The three parties a ledger line can be attributed to.
-///
-/// Every line of every history carries one of these, and until this
-/// type existed each writer spelled its own: six call sites wrote the
-/// literal `"city"` and a resident wrote its address, so a seventh
-/// spelling was one keystroke away and nothing would have refused it.
-///
-/// **The wire form is what the histories already hold.** The city is
-/// `city`, a person is `person`, and a resident is its address, exactly
-/// as before; no ledger on disk has to be re-spelled for this type to
-/// read it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Who {
-    /// The city's desk: genesis, dispatch, truncation, relaying.
+
     City,
-    /// A person, through a client.
+
     Person,
-    /// A resident of a building, at the address it is known by.
+
     Resident(Address),
 }
 
 impl Who {
-    /// A resident's attribution.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` for an address spelled `city` or `person`:
-    /// those two words are the other two parties on this wire, and a
-    /// resident answering to one of them would make a line's author
-    /// unreadable.
+
     pub fn resident(addr: Address) -> Result<Who, AxError> {
         if addr.as_str() == CITY || addr.as_str() == PERSON {
             return Err(AxError::failure(
@@ -66,7 +42,6 @@ impl Who {
         Ok(Who::Resident(addr))
     }
 
-    /// The word a ledger line carries.
     #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
@@ -76,15 +51,6 @@ impl Who {
         }
     }
 
-    /// Who handed a piece of work down, in the words a model reads in
-    /// its job file and its opening message (`Sprawling/city/spec/SpineFiles.lean`
-    /// D21).
-    ///
-    /// A resident is named with the run that handed the work down: the
-    /// predecessor when this is a succession, otherwise the delegating
-    /// parent; a knock has neither and names the address alone. Spelled
-    /// here because the city's dispatch writes the job file and the
-    /// runtime writes the opening message, and both must say the same.
     #[must_use]
     pub fn handed_down_by(&self, predecessor: Option<RunId>, parent: Option<RunId>) -> String {
         match self {
@@ -97,11 +63,6 @@ impl Who {
         }
     }
 
-    /// Reads back what [`Who::as_str`] wrote.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` for a word that is neither reserved nor a
-    /// canonical address.
     pub fn parse(raw: &str) -> Result<Who, AxError> {
         match raw {
             CITY => Ok(Who::City),
@@ -111,12 +72,6 @@ impl Who {
     }
 }
 
-/// `<`, `>` and `&` as entities, so text written into a marked-up
-/// section holds no angle bracket and cannot close that section or open
-/// another. The one escaper: the job file's sections, a resident's
-/// letter and a rebuilt opening all write through it, so what one
-/// renderer refuses the others refuse too (`Sprawling/city/spec/SpineFiles.lean`
-/// D21, `Sprawling/runtime/spec/Conversation.lean` §8-47-2).
 #[must_use]
 pub fn escape_markup(text: &str) -> String {
     text.chars()
@@ -163,9 +118,7 @@ mod tests {
     use proptest::prelude::*;
 
     proptest! {
-        /// Escaped text holds no angle bracket, so it cannot close the
-        /// section it is written into, and reading the three entities
-        /// back gives the text that was written.
+
         #[test]
         fn escaped_text_holds_no_bracket_and_reads_back(text in "[a-z<>&; ]{0,24}") {
             let escaped = escape_markup(&text);

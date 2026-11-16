@@ -5,11 +5,8 @@
 
 use super::*;
 
-/// The label a real run takes from the pass it is in.
 const AT: &str = "#/gallery at 1280px, dark in the colours it authored";
 
-/// One element, in the shape the probe writes: where it was drawn, and
-/// which measured element holds it.
 fn el(tag: &str, at: [i64; 4], parent: i64) -> Drawn {
     let [left, top, width, height] = at;
     Drawn {
@@ -45,7 +42,6 @@ fn nothing_declared() -> Declared {
     Declared::of(Vec::new(), Vec::new(), Vec::new())
 }
 
-/// The client's own ramp, cut to the three rungs these readings need.
 fn ramp() -> Declared {
     Declared::of(
         vec![
@@ -62,9 +58,6 @@ fn holder() -> Drawn {
     el("DIV", [0, 0, 400, 400], -1)
 }
 
-/// The reading the whole instrument is for: seven boxes agree and the
-/// eighth is two pixels off, so the seven are the fact and the eighth
-/// is a typing mistake with a value to write.
 #[test]
 fn a_near_miss_against_a_majority_reports_the_value_to_write() {
     let mut drawn = vec![holder()];
@@ -75,10 +68,7 @@ fn a_near_miss_against_a_majority_reports_the_value_to_write() {
     let measured = page(drawn, nothing_declared());
     let found = judge(&measured);
     let told: Vec<String> = found.iter().map(sheet::says).collect();
-    // Both vertical edges of the same box are off by the same two
-    // pixels, and both are reported: a box moved to line its left edge
-    // up may still be the wrong width, and the second reading is how a
-    // person finds that out in one pass rather than two.
+
     assert_eq!(found.len(), 2, "{told:?}");
     assert!(
         told.iter()
@@ -93,7 +83,6 @@ fn a_near_miss_against_a_majority_reports_the_value_to_write() {
     );
 }
 
-/// Two boxes that disagree are two boxes, not a scale with an outlier.
 #[test]
 fn two_boxes_do_not_make_a_scale() {
     let drawn = vec![
@@ -106,8 +95,6 @@ fn two_boxes_do_not_make_a_scale() {
     assert!(found.is_empty(), "{}", found.len());
 }
 
-/// Forty pixels is a column somebody laid out, not a number they typed
-/// twice, and reporting it is how a person learns to ignore the tool.
 #[test]
 fn a_box_far_from_the_others_is_a_different_column() {
     let mut drawn = vec![holder()];
@@ -120,9 +107,6 @@ fn a_box_far_from_the_others_is_a_different_column() {
     assert!(found.is_empty(), "{}", found.len());
 }
 
-/// The defect the render gate was written for, now read here: a box
-/// that has floated out of its container is still painted and still
-/// passes every other test.
 #[test]
 fn a_box_outside_what_holds_it_is_refused() {
     let drawn = vec![holder(), el("BUTTON", [500, 12, 200, 40], 0)];
@@ -137,8 +121,6 @@ fn a_box_outside_what_holds_it_is_refused() {
     );
 }
 
-/// A colour off the palette is one edit however many boxes take it, and
-/// the edit is the name of the nearest declared word.
 #[test]
 fn a_colour_the_page_never_declared_is_reported_with_the_word_to_write() {
     let mut off = el("DIV", [0, 0, 100, 16], -1);
@@ -152,8 +134,6 @@ fn a_colour_the_page_never_declared_is_reported_with_the_word_to_write() {
     );
 }
 
-/// A colour that is a declared word is not a finding, and neither is
-/// the size that is a declared step.
 #[test]
 fn a_page_that_uses_its_own_words_says_nothing_about_them() {
     let mut on = el("DIV", [0, 0, 100, 16], -1);
@@ -168,8 +148,6 @@ fn a_page_that_uses_its_own_words_says_nothing_about_them() {
     assert!(found.is_empty(), "{}", found.len());
 }
 
-/// The reading only a rendered page can take: a word is declared and
-/// nothing on the page was ever painted with it.
 #[test]
 fn a_declared_word_nobody_paints_is_named() {
     let mut on = el("DIV", [0, 0, 100, 16], -1);
@@ -188,7 +166,6 @@ fn a_declared_word_nobody_paints_is_named() {
     assert!(report.contains("--color-text"), "{report}");
 }
 
-/// A cut a person can see is a decision; a cut with no mark is a defect.
 #[test]
 fn only_an_unmarked_cut_is_a_finding() {
     assert!(matches!(
@@ -200,8 +177,6 @@ fn only_an_unmarked_cut_is_a_finding() {
     assert!(matches!(Cut::of(100, 101, Marking::Clip), Cut::Fits));
 }
 
-/// A clean page prints nothing at all. A count of what was inspected is
-/// a tax every run pays for an answer nobody needed.
 #[test]
 fn a_clean_page_prints_nothing() {
     let mut on = el("DIV", [0, 0, 100, 16], -1);
@@ -226,8 +201,6 @@ fn a_clean_page_prints_nothing() {
     );
 }
 
-/// Two runs over one page are a diff, so the order cannot depend on the
-/// order the readings happened to be taken in.
 #[test]
 fn the_groups_come_out_in_repair_order() {
     let mut off = el("DIV", [0, 0, 100, 16], -1);
@@ -259,9 +232,6 @@ fn the_groups_come_out_in_repair_order() {
     assert_eq!(seats, sorted, "{report}");
 }
 
-/// The sample grew when this instrument arrived, and a property that
-/// refused the frame of the page must not start refusing the boxes of
-/// words on the day it grew.
 #[test]
 fn a_run_of_words_outside_its_row_is_reported_and_not_refused() {
     let mut span = el("SPAN", [500, 12, 200, 20], 0);

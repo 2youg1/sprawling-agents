@@ -3,50 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Artifact gate: nothing written for a test is compiled into the thing
-//! a person downloads (the person's ruling, 2026-09-05).
-//!
-//! Two assertions, because test code reaches the binary two ways.
-//!
-//! **An item named for a test carries a `cfg` that keeps it out.** Four
-//! of this repository's five conformance suites sit behind
-//! `#[cfg(feature = "conformance")]`; the fifth, `browser`'s, was a plain
-//! `pub fn` re-exported from `lib.rs`, and its own lint waiver called it
-//! "dev-only by contract" while nothing held that contract. **A contract
-//! with no holder is the defect this gate exists for** - it is invisible
-//! in review precisely because the comment says the right thing.
-//!
-//! **The product binary enables no test feature.** The first assertion
-//! is worthless if `sprawling` turns `conformance` on: the code would be
-//! correctly marked and shipped anyway. `--all-features`, which
-//! `just clippy` and `just test` both pass, is the build where every
-//! suite must compile; the release build is the one where none of them
-//! may exist.
-//!
-//! Judged by name rather than by content. A doc comment on a production
-//! trait may name the suite that holds its adapters - `BrowserPort`'s
-//! does - and a gate reading item bodies would convict the trait for
-//! documenting itself.
-//!
-//! **Two more shapes of the same artefact, each read from the one place
-//! that owns it.** Where the client bundle lands is stated by the build
-//! script that embeds it (`bundle`), and which platforms a release
-//! publishes is stated by `platform`; both hold the files that restate
-//! them in YAML, shell, PowerShell and JavaScript to what the Rust says.
-//! They are here because this gate answers what a downloaded artefact is
-//! made of, and a bundle directory nobody agrees on and an archive name
-//! nobody builds are both answers to that question.
-
 use std::path::Path;
 
 use crate::members;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// What a name says when it says "this exists for a test".
-///
-/// Closed, and matched against an item's own identifier only. Every entry
-/// is a word nobody uses for production code in this tree.
 const MARKERS: [&str; 6] = [
     "conformance",
     "_for_test",
@@ -56,15 +18,8 @@ const MARKERS: [&str; 6] = [
     "dummy_",
 ];
 
-/// The features that exist to build test scaffolding, and nothing else.
-///
-/// `fault` is here with `conformance`: `storage::fault_fs` is the second
-/// adapter behind the `Vfs` inner seam, a deterministic power-loss model
-/// whose whole purpose is to be injected by a test. `fixture` is
-/// `desktop_ffi::fixture`, the window a desktop contract test opens.
 const TEST_FEATURES: [&str; 3] = ["conformance", "fault", "fixture"];
 
-/// The crate whose feature table becomes the shipped binary.
 const PRODUCT: &str = "Sprawling/app/Cargo.toml";
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
@@ -92,11 +47,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// Walks items, stopping at anything a `cfg` already excludes.
-///
-/// A `#[cfg(test)] mod tests` needs no further judgement: everything
-/// inside it is already outside the product build, and descending would
-/// convict a test double for being named like one.
 fn walk_items(rel: &str, items: &[syn::Item], out: &mut Vec<Violation>) {
     for item in items {
         let attrs = attrs_of(item);
@@ -136,10 +86,6 @@ fn has_cfg(attrs: &[syn::Attribute]) -> bool {
     attrs.iter().any(|attr| attr.path().is_ident("cfg"))
 }
 
-/// The identifiers an item introduces, which is what the rule judges.
-///
-/// A `use` contributes every leaf it names, because a re-export puts the
-/// item on this crate's public surface as surely as declaring it does.
 fn names_of(item: &syn::Item) -> Vec<String> {
     match item {
         syn::Item::Fn(it) => vec![it.sig.ident.to_string()],
@@ -190,9 +136,6 @@ fn ships(rel: &str, name: &str, marker: &str) -> Violation {
     }
 }
 
-/// The shipped binary's own feature table, which must name no test
-/// feature at all - not as a default, and not as an entry a person could
-/// switch on.
 fn product_features(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let path = root.join(PRODUCT);
     let text = walk::read_text(&path)?;
@@ -253,7 +196,6 @@ mod tests {
         out
     }
 
-    /// The defect this gate was written for, in the shape it had.
     #[test]
     fn an_unguarded_conformance_suite_is_refused() {
         let out = found("pub fn assert_port_conformance() {}\n");
@@ -261,15 +203,11 @@ mod tests {
         assert!(out[0].violation.contains("conformance"));
     }
 
-    /// The shape four of the five suites already had.
     #[test]
     fn the_same_suite_behind_a_feature_is_accepted() {
         assert!(found("#[cfg(feature = \"conformance\")]\npub mod conformance {}\n").is_empty());
     }
 
-    /// A re-export puts an item on the public surface as surely as
-    /// declaring it does, and the `browser` crate root is where the leak was
-    /// visible.
     #[test]
     fn a_re_export_is_a_declaration_for_this_purpose() {
         let out = found("pub use port::{BrowserPort, assert_port_conformance};\n");
@@ -280,9 +218,6 @@ mod tests {
         );
     }
 
-    /// A trait that documents which suite holds its adapters is not a
-    /// trait that ships one. Judging by content rather than by name
-    /// would convict every such doc comment.
     #[test]
     fn documenting_a_suite_is_not_shipping_one() {
         let source = "\
@@ -291,8 +226,6 @@ mod tests {
         assert!(found(source).is_empty());
     }
 
-    /// Everything inside a `#[cfg(test)]` module is already outside the
-    /// product build, and a test double is supposed to be named like one.
     #[test]
     fn a_double_inside_a_test_module_is_left_alone() {
         let source = "#[cfg(test)]\nmod tests {\n    pub fn mock_clock() {}\n}\n";

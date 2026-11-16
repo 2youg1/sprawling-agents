@@ -3,33 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which account of a provider a request goes out on, and after a failure
-//! whether it goes out again on the same account, moves to another, or
-//! stops.
-//! The part `Sprawling/kernel/spec/AccountRecovery.lean` specifies this
-//! module (`Sprawling/kernel/Spec.lean` §8-86, kernel D54 and D55).
-//!
-//! **One round is one logical request**, from its first send to an
-//! answer, a stop or a `Halt`. Both drivers - the model path in the
-//! runtime and the `web_search` tool in accounting - only carry out the
-//! [`AccountStep`] a round gives them, so neither grows a retry loop or
-//! an account choice of its own. [`AccountRound::next`] answers and
-//! changes nothing; [`AccountRound::apply`] changes and answers nothing.
-//!
-//! A round is neither recorded nor persisted: a restarted process opens
-//! the next round from the binding the ledger rebuilds.
-
 use std::collections::BTreeSet;
 
 use crate::error::{AccountDisposition, AxError, Retry};
 use crate::retries::Retries;
 use crate::tool::ServerLabel;
 
-/// How many more times one account is asked the same request before the
-/// round moves on. A person picks one or two on the provider's advanced
-/// form; it is read only where the roster has two accounts or more. On
-/// the wire and in the ledger `"one"` or `"two"`; the default lives in
-/// gateway's `EndpointTuning::DEFAULTS` alone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -47,76 +26,56 @@ impl AccountRetries {
     }
 }
 
-/// The accounts a round can send on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Roster {
-    /// A registration with one credential, or with one listed account:
-    /// there is no second account, so a failure is handled as it was
-    /// before accounts existed - `retry` alone decides, up to the
-    /// person's ceiling.
+
     Single,
-    /// Two accounts or more. The order is the priority.
+
     Several {
         accounts: Vec<ServerLabel>,
         retries: AccountRetries,
     },
 }
 
-/// Why a round stopped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RoundEnd {
-    /// The request itself is wrong, or the store every account shares
-    /// failed: sent again anywhere it would fail the same way.
+
     Refused,
-    /// The answer was lost on the last account's last allowed send, and
-    /// whether its effect landed is not known.
+
     Unknown,
-    /// The person's ceiling on retries was reached.
+
     Cap,
-    /// No account is left to switch to.
+
     Exhausted,
 }
 
-/// What the driver does after one failed send.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AccountStep {
-    /// Send the same request again on the same account, after the
-    /// driver's back-off.
+
     Resend,
-    /// Send the same request on this account at once.
+
     Switch { to: ServerLabel },
-    /// Send nothing more; hand the failure on.
+
     Stop { why: RoundEnd },
 }
 
-/// One round's state. Every field is private: a round moves only through
-/// [`AccountRound::apply`] and [`AccountRound::repaired`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AccountRound {
     roster: Roster,
-    /// The accounts whose reference could be redeemed when the round
-    /// opened (D55); asked once, never re-read mid-round.
+
     usable: BTreeSet<ServerLabel>,
     cap: Retries,
     current: Option<ServerLabel>,
-    /// The accounts this round has sent on.
+
     tried: BTreeSet<ServerLabel>,
-    /// Sends on the current account.
+
     here: u32,
-    /// Sends in this round.
+
     total: u32,
 }
 
 impl AccountRound {
-    /// Opens a round before its first send, and counts that send. The
-    /// account `held` - the Session's binding on the model path, absent
-    /// for `web_search` - opens the round while it is listed and
-    /// redeemable; otherwise the first redeemable account in roster
-    /// order does.
-    ///
-    /// # Errors
-    /// [`RoundEnd::Exhausted`] when no listed account is redeemable: the
-    /// round sends nothing.
+
     pub fn start(
         roster: Roster,
         usable: BTreeSet<ServerLabel>,
@@ -148,15 +107,11 @@ impl AccountRound {
         })
     }
 
-    /// The account the next send goes out on; `None` for a single-account
-    /// roster, which names none.
     #[must_use]
     pub fn current(&self) -> Option<&ServerLabel> {
         self.current.as_ref()
     }
 
-    /// What to do after `failure`, read from its `retry` and its
-    /// `account` disposition alone (D54).
     #[must_use]
     pub fn next(&self, failure: &AxError) -> AccountStep {
         match &self.roster {
@@ -194,10 +149,6 @@ impl AccountRound {
         }
     }
 
-    /// The round after the driver carried out `step`. `Stop` changes
-    /// nothing. The counts saturate rather than wrap: a single-account
-    /// round under `UntilHalted` resends until a `Halt`, and a count that
-    /// wrapped would read as a fresh account's spare sends.
     #[must_use]
     pub fn apply(self, step: &AccountStep) -> AccountRound {
         match step {
@@ -221,11 +172,6 @@ impl AccountRound {
         }
     }
 
-    /// Whether the repair stage may send the request again through the
-    /// blocking door. With several accounts that send is one more on the
-    /// current account, so it needs the account's spare sends and the
-    /// person's ceiling; a single-account roster is let through as
-    /// before.
     #[must_use]
     pub fn admits_repair(&self) -> bool {
         match &self.roster {
@@ -236,8 +182,6 @@ impl AccountRound {
         }
     }
 
-    /// The round after the repair stage sent again: one more send on the
-    /// current account with several accounts, uncounted with one.
     #[must_use]
     pub fn repaired(self) -> AccountRound {
         match self.roster {
@@ -254,9 +198,6 @@ impl AccountRound {
         }
     }
 
-    /// Switches to the first listed account that is redeemable and not
-    /// yet tried this round. Running out is said before the ceiling is,
-    /// because "no account is left" points at the way out (D54, rule 7).
     fn switch(&self) -> AccountStep {
         let Roster::Several { accounts, .. } = &self.roster else {
             return AccountStep::Stop {
@@ -276,8 +217,6 @@ impl AccountRound {
     }
 }
 
-/// Whether the person's ceiling lets one more send follow `sent` sends.
-/// `AtMost(0)` sends once and stops, as the watchdog has always read it.
 fn admits(cap: Retries, sent: u32) -> bool {
     match cap {
         Retries::UntilHalted => true,
@@ -302,9 +241,6 @@ mod tests {
     use super::*;
     use crate::error::AxCode;
 
-    /// What a driver meets in a round: the four failures the error
-    /// builders can spell (`Advance` only ever comes with `Retry::No`,
-    /// kernel D53), and the repair stage wanting to send again.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum Event {
         Busy,
@@ -336,9 +272,6 @@ mod tests {
         }
     }
 
-    /// Lean's `AccountRound.decisions`: a failure asks `next` and stops
-    /// on `Stop`; a repair asks `admits_repair`, and is `None` when it is
-    /// not let through.
     fn decisions(mut round: AccountRound, events: &[Event]) -> Vec<(Event, Option<AccountStep>)> {
         let mut out = Vec::new();
         for &event in events {
@@ -363,7 +296,6 @@ mod tests {
 
     type Decided = Option<(Option<ServerLabel>, Vec<(Event, Option<AccountStep>)>)>;
 
-    /// Lean's `vector`: open the round, then walk the events.
     fn vector(
         roster: Roster,
         missing: &[&str],
@@ -395,9 +327,6 @@ mod tests {
         Some(AccountStep::Stop { why })
     }
 
-    /// The trace vectors `Sprawling/kernel/spec/AccountRecovery.lean` prints
-    /// with `#eval`, in its order, each with the answer Lean gave, and
-    /// the `decide` example after them.
     #[test]
     fn the_lean_trace_vectors_replay_one_by_one() {
         use Event::{Busy, Lost, Refused, Repair, Unusable};
@@ -531,23 +460,10 @@ mod tests {
         ]
     }
 
-    /// Five names a roster draws from, and one it never lists, so a held
-    /// account can be one the person removed.
     const NAMES: [&str; 6] = ["a", "b", "c", "d", "e", "z"];
 
     proptest! {
-        /// The quantified theorems of `Sprawling/kernel/spec/AccountRecovery.lean`
-        /// on any roster of two to five accounts, any redeemable subset,
-        /// any ceiling, any held account (listed or not) and any trace:
-        /// `a_request_error_is_never_sent_again`,
-        /// `an_unusable_account_is_never_asked_again`,
-        /// `an_unknown_effect_never_switches`,
-        /// `sends_on_one_account_stay_within_the_budget`,
-        /// `a_round_visits_each_account_once`, `the_cap_bounds_every_round`,
-        /// `a_held_account_opens_the_round` and
-        /// `a_roster_with_nothing_redeemable_sends_nothing`. The sends are
-        /// counted here from the steps the driver carries out, not read
-        /// from the round.
+
         #[test]
         fn every_round_keeps_the_lean_properties(
             listed in 2usize..=5,
@@ -630,11 +546,6 @@ mod tests {
             }
         }
 
-        /// A single-account roster reads `retry` alone
-        /// (`a_single_account_ignores_the_disposition`): it never switches,
-        /// a refusal stops it whether or not it says to switch, the repair
-        /// stage is always let through uncounted, and the person's ceiling
-        /// bounds its sends.
         #[test]
         fn a_single_account_round_reads_retry_alone(
             cap in cap(),

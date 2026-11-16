@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One reachable server, whichever of the three transports reaches it.
-//!
-//! Whatever the transport, a call lost after its request was handed over
-//! leaves the effect unknown and is never sent again by itself; that rule
-//! is proved in `Sprawling/agent_protocols/spec/Mcp/Link.lean`.
-
 use kernel::{AxError, McpTransport, TimeoutMs};
 
 use super::http::HttpServer;
@@ -16,11 +10,6 @@ use super::redeeming::redeem;
 use super::sse::SseServer;
 use super::stdio::StdioServer;
 
-/// One reachable server, whichever way it is reached.
-///
-/// The three transports differ in where the bytes go and in nothing
-/// else, so the difference is spent here and the wiring above stays one
-/// path. A clone is a second handle on the same connection.
 #[derive(Clone)]
 pub struct McpLink(Reach);
 
@@ -32,15 +21,7 @@ enum Reach {
 }
 
 impl McpLink {
-    /// Opens one server as its transport says it is reached.
-    ///
-    /// `write_root` is the run's own root, which exists whether or not
-    /// the building lends its runs a worktree; a child process starts
-    /// there and nowhere else.
-    ///
-    /// # Errors
-    /// Propagates each transport's own refusal to open, every one of
-    /// which names the server and what a person can do about it.
+
     pub fn open(
         transport: &McpTransport,
         write_root: &std::path::Path,
@@ -70,8 +51,6 @@ impl McpLink {
         }
     }
 
-    /// The module a reader should open when a server reached this way
-    /// misbehaves.
     #[must_use]
     pub fn site(transport: &McpTransport) -> &'static str {
         match *transport {
@@ -81,9 +60,6 @@ impl McpLink {
         }
     }
 
-    /// Whether the holder must open a new connection and handshake: a
-    /// stdio child exited, or an HTTP server ended its session. Clones
-    /// share this state; SSE keeps its existing stream lifetime.
     #[must_use]
     pub fn has_ended(&self) -> bool {
         match self.0 {
@@ -116,8 +92,6 @@ impl crate::Outbound for McpLink {
 mod tests {
     use super::*;
 
-    /// A failure is filed under the module that reached the server, and
-    /// that module lives in `agent_protocols` beside the handshake it speaks.
     #[test]
     fn a_misbehaving_server_is_filed_under_the_transport_that_reached_it() {
         let stdio = McpTransport::Stdio {

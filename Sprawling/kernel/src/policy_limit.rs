@@ -3,28 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Policy limits as values (`Sprawling/kernel/spec/PolicyLimit.lean` §8-73): each type carries one
-//! ceiling's legal domain and the one refusal that says no, so a caller
-//! hands over what it observed and cannot spell a second refusal.
-//!
-//! The numbers live in `consts_policy` and the sentences live here. A
-//! limit has no public constructor, no getter, no `Display` and no
-//! serde: a caller outside this crate can neither mint a looser limit
-//! nor read the figure out to format a sentence of its own. The
-//! compile-failure counterexample is `tests/ui/forge_policy_limit.rs`.
-
 use std::io::Read as _;
 
 use crate::error::{AxCode, AxError};
 use crate::locator::Locator;
 
-/// Whether an observation is past a limit: the limit itself is
-/// admitted, one more is refused. The one boundary rule, and the one
-/// place an observation is narrowed to `u64`.
-///
-/// `usize` is at most 64 bits on every target Rust builds, so the
-/// narrowing cannot fail there; the failing arm still answers "past the
-/// limit", which keeps the rule off any target's pointer width.
 fn exceeds(limit: u64, observed: usize) -> bool {
     match u64::try_from(observed) {
         Ok(count) => count > limit,
@@ -32,26 +15,15 @@ fn exceeds(limit: u64, observed: usize) -> bool {
     }
 }
 
-/// How many distinct pictures one provider request may carry. The legal
-/// domain is `0..=max`: a request carrying exactly the limit is sent, and
-/// one more distinct picture is refused before any byte leaves for the provider.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ImagesPerTurn(u64);
 
 impl ImagesPerTurn {
-    /// The only way a value of this type exists: `consts_policy` mints
-    /// the policy instance with it, and no caller outside this crate
-    /// can mint a looser one.
+
     pub(crate) const fn new(max: u64) -> ImagesPerTurn {
         ImagesPerTurn(max)
     }
 
-    /// Whether this turn's pictures fit, refusing past the limit with
-    /// the one sentence that names it.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` when `found` is past the limit; the recovery
-    /// names the limit and what to do with the pictures that do not fit.
     pub fn admit(self, found: usize) -> Result<(), AxError> {
         let max = self.0;
         if exceeds(max, found) {
@@ -69,25 +41,15 @@ impl ImagesPerTurn {
     }
 }
 
-/// How many bytes one picture may carry to a provider. Sized so a
-/// base64 body of it stays inside what every provider this city calls
-/// accepts (the number's derivation is on the constant in
-/// `consts_policy`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ImageMaxBytes(u64);
 
 impl ImageMaxBytes {
-    /// The only way a value of this type exists; see [`ImagesPerTurn::new`].
+
     pub(crate) const fn new(max: u64) -> ImageMaxBytes {
         ImageMaxBytes(max)
     }
 
-    /// Reads one byte past this picture's limit, so the caller can
-    /// refuse an oversized file without first holding it whole.
-    ///
-    /// # Errors
-    /// Propagates a source read failure. Reaching the limit is not an
-    /// error here; [`Self::admit`] makes that decision from the bytes.
     pub fn read_from(self, source: impl std::io::Read) -> std::io::Result<Vec<u8>> {
         let mut bytes = Vec::new();
         source
@@ -96,12 +58,6 @@ impl ImageMaxBytes {
         Ok(bytes)
     }
 
-    /// Whether this picture's bytes fit, refusing past the limit with
-    /// the one sentence that names it.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` when `size` is past the limit; the recovery
-    /// names the limit and what to do with the picture.
     pub fn admit(self, at: &Locator, size: usize) -> Result<(), AxError> {
         let max = self.0;
         if exceeds(max, size) {
@@ -118,28 +74,15 @@ impl ImageMaxBytes {
     }
 }
 
-/// The quality one lossy picture may be encoded at. The legal domain is
-/// `0..=max`: the maximum is admitted and one more is refused, because a
-/// caller that asks for more has asked for something no encoder has, and
-/// a clamped answer tells it the picture is better than it is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ImageQuality(u64);
 
 impl ImageQuality {
-    /// The only way a value of this type exists; see [`ImagesPerTurn::new`].
-    ///
-    /// The type has no getter, so a caller outside this crate cannot read
-    /// the domain out to format a sentence of its own — the one refusal
-    /// below is the whole of what it says.
+
     pub(crate) const fn new(max: u64) -> ImageQuality {
         ImageQuality(max)
     }
 
-    /// Whether an encoder has this quality.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` when the asked-for quality is outside the domain;
-    /// the recovery names the domain.
     pub fn admit(self, asked: u32) -> Result<(), AxError> {
         if u64::from(asked) <= self.0 {
             return Ok(());
@@ -156,25 +99,15 @@ impl ImageQuality {
     }
 }
 
-/// How many concern zones a clock stamp may carry, the UTC row not
-/// among them. Refused rather than dropped: a configured zone that
-/// silently stops rendering is a wrong stamp, and a wrong stamp is
-/// worse than no stamp.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ClockZonesMax(u64);
 
 impl ClockZonesMax {
-    /// The only way a value of this type exists; see [`ImagesPerTurn::new`].
+
     pub(crate) const fn new(max: u64) -> ClockZonesMax {
         ClockZonesMax(max)
     }
 
-    /// Whether these configured zones fit, refusing past the limit with
-    /// the one sentence that names it.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` when `configured` is past the limit; the
-    /// recovery names the limit and where a person edits the rows.
     pub fn admit(self, configured: usize) -> Result<(), AxError> {
         let max = self.0;
         if exceeds(max, configured) {
@@ -208,9 +141,6 @@ mod tests {
         Locator::parse(&format!("cas:b3-{}", "0".repeat(64))).unwrap()
     }
 
-    /// The boundary is the limit itself admitted and one past it
-    /// refused, and the refusal is compared whole: the four parts are
-    /// the contract, so a wording change has to be deliberate.
     #[test]
     fn a_request_carries_the_limit_and_one_distinct_picture_past_it_is_refused() {
         assert!(IMAGES_PER_TURN.admit(4).is_ok());
@@ -226,8 +156,6 @@ mod tests {
         assert_eq!(IMAGES_PER_TURN.admit(5).unwrap_err(), expected);
     }
 
-    /// The same boundary, and the same whole comparison, for the quality
-    /// an encoder is asked for.
     #[test]
     fn the_quality_domain_admits_its_limit_and_refuses_one_past_it() {
         assert!(IMAGE_QUALITY.admit(100).is_ok());

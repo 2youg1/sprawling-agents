@@ -3,39 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Where a browser keeps what it remembers, and who that belongs to.
-//!
-//! Login state belongs to a Building, not to the city and not to a run.
-//! A building is one project with one set of accounts; two buildings
-//! sharing a profile would let a run reach an account nobody granted it,
-//! and the reach would be invisible because nothing was passed.
-//!
-//! **A confidential building never reaches here.** Its rules refuse the
-//! browser at evaluation time (`city::policy::evaluate`), which is the
-//! one place that reads the two settings together; this module therefore
-//! has no confidential branch, because a second one would be a second
-//! answer to the same question. What that refusal protects is the same
-//! thing this module protects: a browser that keeps nothing is a browser
-//! whose cookie jar cannot outlive the run, and a confidential building
-//! does not get one at all.
-
 use kernel::{Address, AxCode, AxError, RESERVED_PREFIX};
 
-/// Where a building's browser profile lives.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Profile {
     path: Address,
 }
 
-/// The reserved sub-path profiles live under.
 pub const PROFILES_DIR: &str = "browser-profiles";
 
 impl Profile {
-    /// Decides where `building`'s profile lives.
-    ///
-    /// # Errors
-    /// Refuses an address that is not a building — a room does not have
-    /// its own login, because a login is a property of the project.
+
     pub fn of(building: &Address) -> Result<Profile, AxError> {
         if building.is_reserved() {
             return Err(AxError::failure(
@@ -62,7 +40,6 @@ impl Profile {
         Ok(Profile { path })
     }
 
-    /// The directory itself, under the city root.
     #[must_use]
     pub fn path(&self) -> &Address {
         &self.path

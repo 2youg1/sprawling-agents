@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Putting a question into the Approval Inbox.
-//!
-//! Separate from the landing itself because the two answer to
-//! different readers: a landing is read by the run that asked for the
-//! work, and a filed question is read by the person who has to answer
-//! it before that work goes on.
-
 use kernel::{AxError, EventKind, Payload};
 
 use super::Filing;
@@ -17,14 +10,7 @@ use crate::effect;
 use crate::worker::RunWorker;
 
 impl RunWorker {
-    /// Files what the drive raised into the Approval Inbox.
-    ///
-    /// Recorded against the run and the address that raised it rather
-    /// than against the city: answering one of these later has to find
-    /// the work it was holding up.
-    ///
-    /// # Errors
-    /// Propagates a ledger that will not take the line.
+
     pub(super) fn file_the_waiting(
         &mut self,
         at: &Filing<'_>,
@@ -36,16 +22,9 @@ impl RunWorker {
             who,
             tainted,
         } = *at;
-        // An item that is waiting belongs in the inbox, not only in the
-        // refusal the model saw.
-        // Recorded against the run and the address that raised it, not
-        // against the city: answering this item later has to be able to
-        // find the work it was holding up.
+
         if tainted {
-            // C15's marker bit, set where the reason for it is known. A
-            // tainted item takes no policy and no delegate, so a run that
-            // began with a stranger's text cannot have its approvals
-            // waived by a rule somebody wrote for ordinary work.
+
             for item in raised.iter_mut() {
                 item.tainted = true;
             }

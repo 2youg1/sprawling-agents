@@ -3,51 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one request that waits for the city's console: a page asks for a
-//! verb, the console shows a code, the User types it back
-//! (`Sprawling/remote_access/spec/Confirm.lean`, remote_access D4).
-//!
-//! At most one request waits. A new request replaces the one before it,
-//! and every answer the guard reads, right or wrong, ends the request it
-//! answers, so one request gives one guess; an answer the guard does not
-//! read, too soon after the last or after the guard locked, leaves the
-//! request waiting (remote_access D25). The code is kept as the digest of its
-//! canonical text, for the reason the pairing code is (§8-2). Entropy and
-//! the expiry arrive as parameters, so the assembly layer draws and
-//! samples them.
-
 use kernel::{AxCode, AxError, B3Hash, TimeMs};
 
 use crate::pairing::{canonical, encode};
 
-/// The bytes of entropy one confirmation code is drawn from: 40 bits,
-/// eight base32 symbols. One request gives one guess before it ends, so
-/// a guesser's chance is one in 2^40 per request the User sees printed.
 pub const CONFIRM_BYTES: usize = 5;
 
-/// Symbols per group in the form the console prints.
 const GROUP_LEN: usize = 4;
 
-/// The least time between two answers the guard reads
-/// (`Sprawling/remote_access/Spec.lean` D25): one a second, the rate the
-/// pairing code is guessed at.
 pub const CONFIRM_SPACING_MS: u64 = 1_000;
 
-/// How many read answers may miss, since the last one that did its verb,
-/// before the guard refuses every request and every answer until the city
-/// restarts (D25). A client that never read the console therefore wins
-/// with chance at most this many in 2^40.
 pub const CONFIRM_MISSES_MAX: u32 = 10;
 
-/// The request that waits, if any, for the verb type `V` the caller
-/// carries out once it is confirmed, behind the guard that spaces and
-/// counts the answers (D25).
 #[derive(Debug)]
 pub struct Confirm<V> {
     pending: Option<Pending<V>>,
-    /// When the last read answer came; `None` before the first.
+
     last: Option<TimeMs>,
-    /// Read answers that missed since the last one that did its verb.
+
     misses: u32,
 }
 
@@ -58,22 +31,18 @@ struct Pending<V> {
     expires: TimeMs,
 }
 
-/// Why an answer did no verb.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Miss {
-    /// Read and refused: no request waits, the answer is not its code, or
-    /// it came too late. The request is gone.
+
     Wrong,
-    /// Not read: it came within [`CONFIRM_SPACING_MS`] of the last answer
-    /// that was. The request still waits.
+
     TooSoon,
-    /// Not read: [`CONFIRM_MISSES_MAX`] answers missed since the last one
-    /// that did its verb, and the guard holds until the city restarts.
+
     Locked,
 }
 
 impl Miss {
-    /// What the page that sent the answer reads.
+
     #[must_use]
     pub fn refusal(self) -> AxError {
         let (subject, recovery) = match self {
@@ -107,13 +76,7 @@ impl<V> Default for Confirm<V> {
 }
 
 impl<V> Confirm<V> {
-    /// Waits for `verb`, replacing any request before it, and returns the
-    /// code to print at the console, grouped for reading (`abcd-efgh`).
-    /// Nothing here keeps the text.
-    ///
-    /// # Errors
-    /// `E_GATE_DENIED` once the guard is locked: a code nobody may answer
-    /// is not printed.
+
     pub fn request(
         &mut self,
         verb: V,
@@ -142,19 +105,11 @@ impl<V> Confirm<V> {
             .join("-"))
     }
 
-    /// Answers the request that waits with `answer`, read the way it was
-    /// printed (case, spaces and dashes do not matter).
-    ///
-    /// # Errors
-    /// [`Miss::Locked`] and [`Miss::TooSoon`] for an answer the guard does
-    /// not read; [`Miss::Wrong`] for one it reads that does no verb, which
-    /// ends the request and counts toward [`CONFIRM_MISSES_MAX`].
     pub fn confirm(&mut self, answer: &str, now: TimeMs) -> Result<V, Miss> {
         if self.locked() {
             return Err(Miss::Locked);
         }
-        // A clock set back counts as spaced: the miss count bounds a
-        // guesser, and a corrected wall clock must not stall the page.
+
         let spaced = self.last.is_none_or(|last| {
             now < last || last.value().saturating_add(CONFIRM_SPACING_MS) <= now.value()
         });
@@ -175,7 +130,6 @@ impl<V> Confirm<V> {
         }
     }
 
-    /// Whether the guard refuses every request and answer (D25).
     #[must_use]
     pub fn locked(&self) -> bool {
         self.misses >= CONFIRM_MISSES_MAX
@@ -191,11 +145,6 @@ impl<V> Confirm<V> {
     reason = "test code"
 )]
 mod tests {
-    //! The trace vectors of `spec/Confirm.lean`: its `guarded`, with the
-    //! `step` it wraps, transcribed as the reference with this module's
-    //! two constants, against `Confirm` on every trace of up to four
-    //! events over an alphabet spread across the spacing, so each of the
-    //! model's five properties is judged on the Rust machine.
 
     use super::*;
 
@@ -223,11 +172,8 @@ mod tests {
         LockedOut,
     }
 
-    /// The pending request, the last read answer, the misses since the
-    /// last verb done.
     type State = (Option<(Guarded, u8, u64)>, Option<u64>, u32);
 
-    /// `RemoteConfirm.guarded`, word for word.
     fn guarded(s: State, e: Event) -> (State, Said) {
         let (pending, last, misses) = s;
         if CONFIRM_MISSES_MAX <= misses {
@@ -341,9 +287,6 @@ mod tests {
         assert!(checked > 80_000, "{checked}");
     }
 
-    /// The first three properties, one vector each: a wrong guess ends
-    /// the request, an expired code does nothing, an answer in time does
-    /// the verb.
     #[test]
     fn one_guess_per_request_and_none_after_expiry() {
         let o = Guarded::OpenDoor;
@@ -365,8 +308,6 @@ mod tests {
         );
     }
 
-    /// An answer within a second of the last read one is not read, and
-    /// the request it answers still waits for the same code.
     #[test]
     fn an_answer_inside_the_spacing_is_not_read_and_the_request_waits() {
         let o = Guarded::OpenDoor;
@@ -389,9 +330,6 @@ mod tests {
         );
     }
 
-    /// Ten read misses lock the guard: the next request prints no code
-    /// and the next answer is not read, the right one included. A verb
-    /// done before the tenth miss clears the count.
     #[test]
     fn ten_misses_lock_every_request_and_answer_and_a_verb_done_clears_the_count() {
         let o = Guarded::OpenDoor;

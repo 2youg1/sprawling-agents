@@ -3,40 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one door that asks a person.
-//! The part `Sprawling/kernel/spec/Gate.lean` specifies this module with the
-//! rest of `kernel::gate`.
-//!
-//! Every other door answers from the rules it was handed. This one
-//! cannot: what it would grant is not an action but the whole of the
-//! login state inside a browser the person is already using - mail,
-//! banking, the company console - and the per-building isolation that
-//! `browser::Profile` keeps is exactly what stops applying the moment a
-//! run attaches to the browser a person drives. The person's own
-//! action is the only answer the platform offers: they turn remote
-//! debugging on, in the running browser, themselves.
-//!
-//! So the verdict has three arms here and exactly one door in the
-//! roster returns the third. The recovery sentence is the question: it
-//! names the step only the person can take.
-
 use crate::error::{AxCode, AxError, GateRefusal};
 
 use super::{EgressTarget, GateOutcome};
 
-/// May a run attach to the person's browser?
-///
-/// `endpoint` is the address the person declared for their browser, as
-/// the egress classifier read it. `None` is a building that enabled the
-/// tool and has not said where the browser answers, which is the state
-/// the person's next action resolves.
-///
-/// # The rule
-/// A declared loopback address is the person's own machine reached from
-/// the person's own machine: attach. No declaration is a question for
-/// the person, not a refusal, because they can answer it. Any other
-/// address would read that login state over a network, and the answer
-/// there is no.
 #[must_use]
 pub fn attach(endpoint: Option<&EgressTarget>) -> GateOutcome {
     match endpoint {
@@ -86,9 +56,6 @@ pub fn attach(endpoint: Option<&EgressTarget>) -> GateOutcome {
     }
 }
 
-/// What to name as the subject of the refusal: the far end, in the
-/// terms the target was classified with. The raw declared URL never
-/// appears, because a URL can carry a credential in its query.
 fn subject_of(target: &EgressTarget) -> String {
     match target {
         EgressTarget::Loopback => "loopback".to_owned(),

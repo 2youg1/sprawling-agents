@@ -3,36 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How much of a conversation one model can be given at once.
-//! The part `Sprawling/kernel/spec/Model.lean` specifies this module with the
-//! rest of `kernel::model`.
-
 use std::num::NonZeroU64;
 
 use serde::{Deserialize, Serialize};
 
-/// The most tokens one model reads in a single call, prompt and reply
-/// together.
-///
-/// **Zero is unrepresentable, and absence is not zero.** Were a window
-/// nobody stated and a window of zero the same value, the context
-/// reminder would measure a conversation against nothing and report
-/// every session as full. A figure nobody registered is
-/// carried as `None` all the way to the reminder, which then stays
-/// silent, and every layer in between is spared the rule that zero is
-/// special.
-///
-/// A separate type from [`Ceiling`](crate::Ceiling) although both are
-/// non-zero token counts: one bounds what the model may read and the
-/// other bounds what it may write, and a call that swapped them would
-/// compile.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Window(NonZeroU64);
 
 impl Window {
-    /// `None` for zero, which is not a window.
+
     #[must_use]
     pub const fn new(tokens: u64) -> Option<Window> {
         match NonZeroU64::new(tokens) {
@@ -76,9 +57,6 @@ mod tests {
         );
     }
 
-    /// Zero on the wire is refused rather than read as "no window":
-    /// the encoding of absence is `null`, and a second encoding of it
-    /// would be a second authority for what unstated means.
     #[test]
     fn zero_on_the_wire_is_refused_rather_than_read_as_absence() {
         assert!(serde_json::from_str::<Window>("0").is_err());

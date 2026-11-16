@@ -3,23 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The sound of one recording: a second ffmpeg reading the one
-//! DirectShow device the scope file names, writing a 16 kHz mono wav
-//! into the recording's own directory (`Sprawling/desktop/Spec.lean` D11).
-//!
-//! **This server never chooses the device.** The name arrives from
-//! `scope::Admitted::sound`, which is the operator's word for which
-//! sound source a run may hear; a device nobody named is a permission
-//! nobody gave, and the gate has already refused it before this file is
-//! reached.
-//!
-//! The sound is its own process and its own file, apart from the
-//! frames: the frames come in through the first ffmpeg's stdin and the
-//! sound is the second ffmpeg's own input, and putting both in one
-//! process would mean aligning two clocks. What reaches the city is the
-//! file, as an audio block of the `stop` answer when it is short enough
-//! to carry (section 12.13).
-
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Stdio};
@@ -27,40 +10,28 @@ use std::process::{Child, ChildStdin, Stdio};
 use super::sink::{FFMPEG_FINISH_POLLS, MOST_SECONDS, POLL_EVERY};
 use crate::refusal::{Refusal, RefusalCode};
 
-/// The file the sound lands in, beside the frames.
 const SOUND_FILE: &str = "sound.wav";
 
-/// What the city's `transcribe` needs of speech: 16 kHz, one channel.
-/// More is only more bytes (`Sprawling/desktop/Spec.lean` section 14).
 const SAMPLE_RATE: &str = "16000";
 const CHANNELS: &str = "1";
 
-/// The most sound one `stop` answer carries: base64 makes it a third
-/// longer, and the whole line stays inside the city's MCP line ceiling
-/// of 8 MiB (`Sprawling/desktop/Spec.lean` D13 and section 14).
 const SOUND_CARRIED_MOST: u64 = 4 * 1024 * 1024;
 
-/// The sound's ffmpeg, while it records.
 pub(super) struct Hearing {
     child: Child,
     stdin: ChildStdin,
     into: PathBuf,
 }
 
-/// What a recording's sound came to once it stopped.
 pub(super) struct Heard {
-    /// The wav, which may be short or absent when `cut_short` says so.
+
     pub(super) into: PathBuf,
-    /// Why the sound stopped before the recording did, if it did.
+
     pub(super) cut_short: Option<Refusal>,
 }
 
 impl Hearing {
-    /// Starts hearing `device` into `into`.
-    ///
-    /// # Errors
-    /// Refuses a machine with no ffmpeg — the frame sequence a recording
-    /// falls back to has no sound — and an ffmpeg that will not start.
+
     pub(super) fn open(device: &str, into: &Path) -> Result<Hearing, Refusal> {
         let spawned = child::command("ffmpeg")
             .args(arguments(device, into))
@@ -99,9 +70,6 @@ impl Hearing {
         })
     }
 
-    /// Stops hearing: `q` on ffmpeg's stdin, which is its own key for
-    /// "finish", so it writes the wav's lengths before it exits. It is
-    /// given `FFMPEG_FINISH_POLLS` polls, and stopped after them.
     pub(super) fn close(self) -> Heard {
         let Hearing {
             mut child,
@@ -142,8 +110,7 @@ impl Hearing {
 }
 
 impl Heard {
-    /// The wav's bytes, when it is there and short enough for one
-    /// answer to carry, or the sentence that says why it is not.
+
     pub(super) fn carried(&self) -> Result<Vec<u8>, String> {
         let shown = self.into.display();
         let size = std::fs::metadata(&self.into)
@@ -168,9 +135,6 @@ fn unheard(subject: String, recovery: &str) -> Refusal {
     )
 }
 
-/// The arguments the sound's ffmpeg is started with: the named
-/// DirectShow audio input, one channel at 16 kHz, stopped at the same
-/// ceiling the frames are, into `sound.wav`.
 pub(super) fn arguments(device: &str, into: &Path) -> Vec<String> {
     let mut line: Vec<String> = ["-hide_banner", "-loglevel", "error", "-f", "dshow", "-i"]
         .map(str::to_owned)
@@ -197,9 +161,6 @@ pub(super) fn arguments(device: &str, into: &Path) -> Vec<String> {
 mod tests {
     use super::*;
 
-    /// ffmpeg is told the device the scope file names, as DirectShow
-    /// spells an audio input, and writes the 16 kHz mono wav the city's
-    /// `transcribe` takes, into the recording's own directory.
     #[test]
     fn the_device_the_scope_file_names_is_the_device_ffmpeg_hears() {
         let line = arguments("Microphone (USB Audio)", Path::new("recorded"));
@@ -224,9 +185,6 @@ mod tests {
         );
     }
 
-    /// A wav too long for one answer is left where it is, and the
-    /// sentence says how long and where, so a caller does not read a
-    /// missing audio block as silence.
     #[test]
     fn a_sound_too_long_to_carry_is_named_rather_than_carried() {
         let dir = tempfile::tempdir().unwrap();

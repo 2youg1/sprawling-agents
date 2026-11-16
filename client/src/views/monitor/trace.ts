@@ -3,27 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// One run read as what a person watching over its shoulder would see:
-// a terminal record of every call in the order it was made, and a
-// column of the files it changed, cut to the stretches that moved.
-//
-// Everything here comes from the turns the wire already carries. A
-// command's exit code is the call's own (`Call.exit_code`, which the city
-// reads off the whole result even where the line here was cut). The
-// runtime writes an exec result as `{stdout, stderr, exit_code}` and an
-// edit result as `{path, diff}` (Sprawling/runtime/src/tools/
-// exec/outcome.rs and edit.rs), and the channel hands each over as
-// compact JSON on one line, so the line cut never falls inside one.
-// A result that does not read as that shape is still drawn, as its raw
-// head, because a record that drops what it cannot parse hides the
-// calls most worth looking at. A command's duration is the span between
-// the moment the call was made and the moment it was answered, and a
-// call still running has none yet. A result whose run hit the person's
-// memory ceiling, or ran outside the ceiling the person asked for,
-// carries `memory_ceiling` (Sprawling/runtime/spec/Tools/Exec.lean D95), on
-// itself and on each background row it brings; every one is read, so
-// the terminal can say it in the alert ink under the command.
-
 import { Option, Schema } from "effect";
 
 import type { Call, Outcome, Seq, Turn } from "../../wire";
@@ -36,8 +15,6 @@ export type Ceiling =
   | { readonly state: "unapplied"; readonly limit: number; readonly why: CeilingWhy }
   | { readonly state: "unread"; readonly limit: number };
 
-// One ceiling report, and the background command it belongs to; `null`
-// for the call's own command.
 export interface CeilingNote {
   readonly handle: string | null;
   readonly ceiling: Ceiling;
@@ -58,7 +35,7 @@ export type Entry =
       readonly stderr: string;
       readonly ending: Ending;
       readonly cut: number;
-      // Milliseconds from call to answer; null while the call runs.
+
       readonly took: number | null;
       readonly ceilings: readonly CeilingNote[];
     }
@@ -92,30 +69,19 @@ export interface Touched {
   readonly hunks: readonly Hunk[];
 }
 
-// Where following lands: the file the agent changed last, or the call
-// it made last when that was not an edit.
 export type Target =
   { readonly kind: "file"; readonly path: string } | { readonly kind: "entry"; readonly at: Seq };
 
 export interface Trace {
   readonly entries: readonly Entry[];
-  // Newest first, so the file being worked on is the one on top.
+
   readonly files: readonly Touched[];
   readonly latest: Target | null;
 }
 
-// `Sprawling/runtime/src/tools/edit.rs` writes this as the base of a file
-// the call created.
-// A creation's diff is written from `/dev/null` (`unified_diff` in
-// Sprawling/runtime/src/tools/edit.rs). Results recorded while edits still
-// carried `base_version` mark a creation with the base "new" instead.
 const CREATED_FROM = "--- /dev/null\n";
 const CREATED_BASE = "new";
 
-// What an exec call asked to run, in both spellings a ledger holds: the
-// `command` or `python` a call takes now, and the `arm` an older build
-// wrote, which history keeps as it was recorded
-// (Sprawling/runtime/spec/Tools.lean D115).
 const Asked = Schema.Union([
   Schema.Struct({ command: Schema.String }),
   Schema.Struct({ python: Schema.String }),
@@ -263,11 +229,6 @@ function callOf(call: Call): Entry {
 
 const HEADER = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
 
-// A unified diff cut into hunks, each line carrying the number it has
-// on the side it exists on. Lines before the first header are the file
-// names, which the column already states. A line that opens with a
-// backslash is the "\ No newline at end of file" marker, which belongs
-// to neither side and so is neither drawn nor counted.
 function hunksOf(diff: string): readonly Hunk[] {
   const hunks: Line[][] = [];
   let old = 0;

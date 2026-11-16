@@ -22,9 +22,7 @@ use kernel::Locator;
 #[test]
 fn an_outside_editor_asks_for_work_and_a_stranger_learns_one_bit() {
     let desk = CommandDesk::default();
-    // The body travels as the JSON it arrived as: `agent_protocols::Incoming`
-    // is the only grammar for an inbound request, and nothing on this
-    // path reads a field out of it.
+
     let body = |addr: &str| {
         serde_json::json!({
             "token": "pair-me",
@@ -43,7 +41,6 @@ fn an_outside_editor_asks_for_work_and_a_stranger_learns_one_bit() {
     );
     assert!(desk.take().is_none(), "and nothing was queued for it");
 
-    // The city's own subtree is not a room, with or without a token.
     let err = acp_dispatch(&desk, &body(".sprawling/ledger"), wire::Pairing::Held).unwrap_err();
     assert_eq!(err.code(), &AxCode::OutsideWriteDomain);
     assert!(desk.take().is_none());
@@ -58,11 +55,6 @@ fn an_outside_editor_asks_for_work_and_a_stranger_learns_one_bit() {
     assert_eq!(task, "read the plan");
 }
 
-/// The defect this card exists for: a person presses a button, the
-/// city refuses, and the page says nothing at all. The refusal has
-/// to arrive at whoever caused it - found by driving a real city
-/// over its own wire, where two refused commands appeared in the
-/// server's log file and nowhere else.
 #[test]
 fn a_refused_command_reaches_the_peer_that_sent_it() {
     let dir = tempfile::tempdir().unwrap();
@@ -84,10 +76,6 @@ fn a_refused_command_reaches_the_peer_that_sent_it() {
         wire::Delivered::ToThePeer
     });
 
-    // A model chosen on an endpoint that was never attached: the
-    // same shape as the real failure, where a base URL missing its
-    // `/v1` made the attach fail and the model selection fail after
-    // it, and the page reported neither.
     worker.serve_one(Posted {
         command: wire::Command::SelectModel {
             endpoint: wire::ProviderName::parse("nowhere").unwrap(),
@@ -110,9 +98,6 @@ fn a_refused_command_reaches_the_peer_that_sent_it() {
     );
 }
 
-/// A command nobody sent - the schedule's own - is refused into a
-/// reply address that names the absence, rather than into a peer
-/// that would have to be invented for it.
 #[test]
 fn a_refusal_with_no_one_behind_it_says_so_rather_than_failing() {
     let nobody = wire::Reply::nowhere();
@@ -161,8 +146,6 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
         .record(EventKind::ApprovalRequested, payload)
         .unwrap();
 
-    // The appointed delegate is the actor of this item, so the one
-    // resident allowed to answer at all is barred from this one.
     worker
         .handle(wire::Command::SetAutonomy {
             scope: wire::HaltScope::City,
@@ -180,7 +163,6 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
     assert_eq!(err.code(), &AxCode::ApprovalDenied);
     assert!(err.subject().contains("SelfApprovalBarred"));
 
-    // The person answers it, and the history says so.
     worker
         .handle(wire::Command::Approve {
             item: kernel::ApprovalId::new("item-1").unwrap(),
@@ -199,8 +181,6 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
     assert!(history.contains("autonomy_changed"));
     assert!(history.contains("approval_resolved"));
 
-    // And a second answer finds nothing waiting: the queue drains
-    // from the ledger, not from a mirror of it.
     let err = worker
         .handle(wire::Command::Approve {
             item: kernel::ApprovalId::new("item-1").unwrap(),
@@ -210,7 +190,6 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
         .unwrap_err();
     assert!(err.recovery().contains("not waiting"));
 
-    // A worker that restarts reads the same answer out of the ledger.
     drop(worker);
     let restarted = RunWorker::new(
         dir.path(),
@@ -225,19 +204,11 @@ fn an_answer_lands_in_the_history_and_a_delegate_cannot_answer_its_own_action() 
     );
 }
 
-/// The wire promises that "double-clicking twice opens two Runs" is
-/// not reachable, and every client mints its key from what the
-/// person entered, so the same request twice is the same key twice.
-/// Nothing read that key until this desk did.
 #[test]
 fn the_approval_queue_holds_what_was_asked_and_drops_what_was_answered() {
     let dir = tempfile::tempdir().unwrap();
     let mut views = Views::new(dir.path());
-    // The payload is built the way the dispatch path builds it -
-    // by serialising the item - rather than out of field names a
-    // test invented. The invented shape was the defect: the view
-    // read a `summary` key nobody ever wrote, so every waiting item
-    // rendered as "(no summary recorded)" and no test noticed.
+
     let item = kernel::ApprovalItem {
         id: kernel::ApprovalId::new("a-1".to_owned()).unwrap(),
         actor: "urbanite-2".to_owned(),
@@ -284,10 +255,6 @@ fn the_approval_queue_holds_what_was_asked_and_drops_what_was_answered() {
         "the cluster key survives, or the inbox cannot group anything"
     );
 
-    // The three fields `governing::answer_approval` writes, because the
-    // fold reads them back through the one `ApprovalResolved` type it
-    // was written from: a payload short of the cluster is a line this
-    // build refuses rather than an allowance of unknown width.
     let mut answered = serde_json::Map::new();
     answered.insert("id".to_owned(), serde_json::Value::String("a-1".to_owned()));
     answered.insert(
@@ -319,10 +286,7 @@ fn the_approval_queue_holds_what_was_asked_and_drops_what_was_answered() {
 }
 #[test]
 fn a_command_with_no_executor_is_refused_by_name_and_not_by_stage() {
-    // The match over commands is exhaustive, so a command added without
-    // an executor stops the build rather than reaching a person as a
-    // catch-all refusal that names a build stage and nothing they can
-    // act on.
+
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(
@@ -332,10 +296,6 @@ fn a_command_with_no_executor_is_refused_by_name_and_not_by_stage() {
     )
     .unwrap();
 
-    // Cancel has a second door - the desk lifts it off the queue at
-    // the next safe point of the run it names - so arriving here
-    // means no run answered, and the refusal says that rather than
-    // naming the verb.
     let missing = worker
         .handle(wire::Command::Cancel {
             run: RunId::CITY,
@@ -350,8 +310,6 @@ fn a_command_with_no_executor_is_refused_by_name_and_not_by_stage() {
     );
     assert!(!missing.recovery().contains("cards"));
 
-    // A verb the wire spells and this city cannot perform. It says
-    // so, and says what to do instead.
     let unbuilt = worker
         .handle(wire::Command::BatchByBuilding {
             addr: Address::parse("lab").unwrap(),

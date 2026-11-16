@@ -3,28 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! CAS: content-addressed storage under BLAKE3
-//! (`Sprawling/storage/spec/Cas.lean` §8-3).
-//!
-//! Three engineering facts owned here:
-//! - writes go tmp + rename: power loss leaves half-done temp files only,
-//!   never a corrupt named object (A3 point 2). A temp name carries the
-//!   content hash, the writing process and that process's put count, so
-//!   two handles writing the same bytes at once each rename a whole file
-//!   of their own, and opening a handle sweeps only what another process
-//!   left: the tmp files of this process may belong to a put still in
-//!   flight on another handle. No randomness anywhere.
-//! - dedup is existence: a second put of the same bytes returns the hash
-//!   without re-materializing.
-//! - range retrieval follows the Locator grammar: `L` 1-based closed
-//!   (interior newlines kept, final terminator excluded), `B` 0-based
-//!   closed; out of bounds refuses, never clamps.
-//!
-//! Full reads re-verify the hash (BLAKE3 runs at GB/s); range reads
-//! trust the object as verified at put and read only the bytes they
-//! answer with, which is why an object is never lifted whole to hand
-//! back a fragment of it.
-
 mod origin;
 mod ranges;
 
@@ -45,12 +23,11 @@ pub struct Cas {
 }
 
 impl Cas {
-    /// Production entrance: std filesystem underneath.
+
     pub fn open(dir: &Path) -> Result<Cas, StorageError> {
         Cas::open_with(Box::new(RealFs::new()), dir)
     }
 
-    /// Injection point for the fault adapter (tests only).
     pub(crate) fn open_with(mut vfs: Box<dyn Vfs>, dir: &Path) -> Result<Cas, StorageError> {
         let objects = dir.join("b3");
         let tmp = dir.join("tmp");
@@ -58,8 +35,7 @@ impl Cas {
             .map_err(io_err("create cas dir", &objects))?;
         vfs.create_dir_all(&tmp)
             .map_err(io_err("create cas tmp dir", &tmp))?;
-        // Sweep crash residue: rename is atomic, so a tmp file another
-        // process wrote is a half-done write whose put never returned Ok.
+
         let leftovers = vfs.list(&tmp).map_err(io_err("list cas tmp", &tmp))?;
         for leftover in leftovers
             .into_iter()
@@ -82,8 +58,6 @@ impl Cas {
         (shard_dir, path)
     }
 
-    /// Content-addressed put: hash, dedup by existence, tmp + sync +
-    /// rename + read-only + dir sync. `Ok` means the named object is durable.
     pub fn put(&mut self, bytes: &[u8]) -> Result<B3Hash, StorageError> {
         self.write(bytes, false)
     }
@@ -128,19 +102,15 @@ impl Cas {
         Ok(hash)
     }
 
-    /// Repair an object after `get` reported `E_CAS_CORRUPT`: only this
-    /// recovery path pays to verify an existing object before deduping.
     pub fn put_repair(&mut self, bytes: &[u8]) -> Result<B3Hash, StorageError> {
         self.write(bytes, true)
     }
 
-    /// Existence judgment; no failure surface.
     pub fn contains(&self, hash: &B3Hash) -> bool {
         let (_, path) = self.object_path(hash);
         self.vfs.exists(&path)
     }
 
-    /// Full read, re-verified against the address.
     pub fn get(&self, hash: &B3Hash) -> Result<Vec<u8>, StorageError> {
         let (_, path) = self.object_path(hash);
         if !self.vfs.exists(&path) {
@@ -162,13 +132,6 @@ impl Cas {
         Ok(bytes)
     }
 
-    /// Range retrieval per the Locator grammar; out of bounds refuses.
-    ///
-    /// The answer is read where it sits, so a fragment of a two hundred
-    /// megabyte object costs the fragment. The price of that is stated
-    /// in [`ranges`]: a range read cannot re-verify an address that
-    /// covers the whole object, so it trusts what `put` verified, and a
-    /// caller that needs the address proved calls [`Cas::get`].
     pub fn get_range(&self, hash: &B3Hash, range: &Range) -> Result<Vec<u8>, StorageError> {
         let (_, path) = self.object_path(hash);
         if !self.vfs.exists(&path) {
@@ -179,12 +142,6 @@ impl Cas {
         ranges::of_object(self.vfs.as_ref(), &path, hash, range)
     }
 
-    /// The object's length in bytes, read from the filesystem rather than
-    /// from the object, so asking how long a two hundred megabyte version
-    /// is costs nothing like two hundred megabytes. A window of a stored
-    /// document version needs it to keep its request inside the object
-    /// (`Sprawling/storage/spec/Cas.lean` §8-36). Like a range read, it trusts what `put`
-    /// verified.
     pub fn size(&self, hash: &B3Hash) -> Result<u64, StorageError> {
         let (_, path) = self.object_path(hash);
         if !self.vfs.exists(&path) {
@@ -198,21 +155,17 @@ impl Cas {
     }
 }
 
-/// The puts this process has begun, across every handle it holds.
 static PUTS_BEGUN: AtomicU64 = AtomicU64::new(0);
 
-/// A put's temp file name: `<hex64>.<pid>.<put count>.part`.
 struct TmpName(String);
 
 impl TmpName {
-    /// A name no other put in this process has used or will use.
+
     fn next(hash: &B3Hash) -> TmpName {
         let count = PUTS_BEGUN.fetch_add(1, Ordering::Relaxed);
         TmpName(format!("{hash}.{}.{count}.part", std::process::id()))
     }
 
-    /// Whether this process wrote the temp file at `path`, which makes
-    /// it possibly a put in flight on another handle rather than residue.
     fn written_here(path: &Path) -> bool {
         let pid = std::process::id().to_string();
         path.file_name()
@@ -250,9 +203,6 @@ mod tests {
         assert_eq!(cas.get(&hash).unwrap(), b"hello world");
     }
 
-    /// A stored document version states its length without being read,
-    /// and a version the store never kept is named rather than measured
-    /// as empty.
     #[test]
     fn a_stored_object_states_its_size_and_a_missing_one_is_named() {
         let dir = tempfile::tempdir().unwrap();
@@ -278,9 +228,6 @@ mod tests {
         assert_eq!(tmp_entries, 0, "no leftover temp files after clean puts");
     }
 
-    /// A second handle opened while the first is between writing its
-    /// temp file and renaming it leaves that file alone, and still
-    /// sweeps what another process left behind.
     #[test]
     fn opening_a_handle_sweeps_only_what_another_process_left() {
         let dir = tempfile::tempdir().unwrap();
@@ -376,9 +323,9 @@ mod tests {
         assert_eq!(all, b"alpha\nbeta\ngamma");
 
         for bad in [
-            Range::bytes(0, 16).unwrap(),  // past the end
-            Range::bytes(16, 20).unwrap(), // fully outside
-            Range::lines(1, 4).unwrap(),   // more lines than exist
+            Range::bytes(0, 16).unwrap(),
+            Range::bytes(16, 20).unwrap(),
+            Range::lines(1, 4).unwrap(),
             Range::lines(4, 5).unwrap(),
         ] {
             let err = cas.get_range(&hash, &bad).unwrap_err();
@@ -386,13 +333,6 @@ mod tests {
         }
     }
 
-    /// A range read moves the range; a full read moves the object and
-    /// pays for the verification the range read does not do.
-    ///
-    /// The counter is the assertion, because the bytes handed back are
-    /// identical either way: an implementation that lifts the object
-    /// and slices it answers every grammar test above and charges the
-    /// length of the object for every fragment.
     #[test]
     fn a_range_read_lifts_the_range_rather_than_the_object() {
         let fs = FaultFs::new(FaultPlan {
@@ -426,13 +366,11 @@ mod tests {
             "a line near the front moved {moved} bytes of a {object_len}-byte object"
         );
 
-        // Past the end still refuses rather than answering short.
         let err = cas
             .get_range(&hash, &Range::bytes(object_len - 2, object_len).unwrap())
             .unwrap_err();
         assert_eq!(err.into_ax().code(), &AxCode::InvalidArgs);
 
-        // The verifying path is the full read, and it costs the object.
         let before = fs.bytes_read();
         assert_eq!(cas.get(&hash).unwrap(), content);
         let whole = fs.bytes_read() - before;
@@ -443,14 +381,10 @@ mod tests {
         );
     }
 
-    /// A3 point 2: power loss around CAS rename. Cut at every op of a put
-    /// script; named objects never corrupt, only tmp holds leftovers, and
-    /// a retried put lands the object.
     #[test]
     fn power_cut_matrix_leaves_only_tmp_halfware() {
         let content: &[u8] = b"the object under power loss";
 
-        // Baseline op count.
         let fs0 = FaultFs::new(FaultPlan {
             cut_at_op: None,
             cut_on_write: None,
@@ -473,7 +407,6 @@ mod tests {
                     Err(_) => false,
                 };
 
-                // Reopen (second cut impossible: plan consumed). Sweep runs.
                 let mut cas = match Cas::open_with(Box::new(fs.clone()), dir) {
                     Ok(cas) => cas,
                     Err(_) => Cas::open_with(Box::new(fs.clone()), dir).unwrap(),
@@ -487,10 +420,10 @@ mod tests {
                     );
                 }
                 if cas.contains(&hash) {
-                    // Present but never corrupt \u2014 the A3 point-2 claim.
+
                     assert_eq!(cas.get(&hash).unwrap(), content);
                 }
-                // Retry always lands the object.
+
                 cas.put(content).unwrap();
                 assert_eq!(cas.get(&hash).unwrap(), content);
             }

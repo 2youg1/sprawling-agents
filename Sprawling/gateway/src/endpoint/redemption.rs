@@ -3,32 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one endpoint redeems at the wire: the credential that authorises
-//! the call, and the pictures the conversation refers to.
-//!
-//! Both are closures the assembly point supplies, so this crate never
-//! learns where a secret is kept or where content is stored. Neither is
-//! cached: a value is resolved for one operation and dropped.
-
 use std::sync::Arc;
 
 use kernel::{AxCode, AxError, Locator, Sealed, SecretRef};
 
-/// The redemption face `credential` provides: resolve a
-/// reference into a sealed value, per operation, never cached.
 pub type SecretResolver = Box<dyn Fn(&SecretRef) -> Result<Sealed<String>, AxError> + Send>;
 
-/// The picture face `bin::assembly` provides: read the bytes a `cas:`
-/// locator names. Shared rather than owned, because one content store
-/// answers every endpoint this process builds.
 pub type ImageResolver = Arc<dyn Fn(&Locator) -> Result<Vec<u8>, AxError> + Send + Sync>;
 
-/// Everything one endpoint redeems at the wire.
-///
-/// The two closures always travel together — a call writes its auth
-/// header and fetches its pictures in the same breath — so they are one
-/// named value rather than two constructor parameters that every call
-/// site has to keep in the same order.
 pub struct Redemption {
     pub(crate) secrets: SecretResolver,
     pub(crate) images: ImageResolver,
@@ -39,13 +21,6 @@ impl Redemption {
         Redemption { secrets, images }
     }
 
-    /// Redeems the credential of the account this endpoint calls as.
-    ///
-    /// A reference the store does not hold is this account's matter, so
-    /// its `E_CREDENTIAL_MISSING` says the next account should take the
-    /// request (gateway D32); every other refusal passes through as it
-    /// came, because a locked or broken vault fails every account alike
-    /// (kernel D55).
     pub(crate) fn account_credential(
         &self,
         reference: &SecretRef,
@@ -62,12 +37,6 @@ impl Redemption {
         })
     }
 
-    /// Whether `reference` can be redeemed right now (kernel D55). The
-    /// sealed value is dropped, and so zeroed, the moment it is answered:
-    /// it never leaves this line. Only a reference the store does not hold
-    /// is unredeemable; a locked or broken store answers yes, so the send
-    /// reports the store's own failure and the round stops there instead
-    /// of blaming every account for it.
     pub(crate) fn holds(&self, reference: &SecretRef) -> bool {
         match (self.secrets)(reference) {
             Ok(_dropped) => true,
@@ -75,10 +44,6 @@ impl Redemption {
         }
     }
 
-    /// For a call that has no business carrying a picture — a probe
-    /// asking an endpoint which models it serves. A picture reaching it
-    /// is a wiring mistake, and the refusal says so rather than sending
-    /// an empty one.
     pub fn without_images(secrets: SecretResolver) -> Redemption {
         Redemption {
             secrets,
@@ -108,7 +73,7 @@ impl Redemption {
 )]
 pub(crate) fn resolver() -> SecretResolver {
     Box::new(|_reference: &SecretRef| {
-        // Runtime-assembled sample: no complete token literal at rest.
+
         let token = ["sk-test-", "0123456789"].concat();
         Ok(Sealed::new(Box::new(token)))
     })
@@ -144,10 +109,6 @@ mod tests {
     use super::super::fakes::{config, request};
     use super::*;
 
-    /// gateway D32: the credential the account calls with is this
-    /// account's matter, so its absence switches to the next account; a
-    /// reference in an extra header belongs to the endpoint every account
-    /// shares, and switching would not bring it back.
     #[test]
     fn a_missing_account_credential_switches_the_account_and_a_missing_header_does_not() {
         let account = SecretRef::parse("secret:anthropic/api").unwrap();

@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The list half of the person's face of `sprawling view`
-//! (`Sprawling/app/spec/Main.lean` §8-117): which tree rows are shown, how each is
-//! marked, the window of rows that keeps the cursor on screen, the
-//! ledger lines of the records lens on screen, and the list set beside
-//! the detail pane.
-
 use std::collections::BTreeSet;
 
 use super::arrange::Entry;
@@ -16,7 +10,6 @@ use super::follow::Row;
 use super::rounds::{Rounds, leaf_mark};
 use super::{HashWidth, chain_label};
 
-/// The entries shown: every one whose ancestors are all open.
 pub(super) fn visible(entries: &[Entry], expanded: &BTreeSet<usize>) -> Vec<usize> {
     entries
         .iter()
@@ -47,8 +40,6 @@ pub(super) fn has_children(entries: &[Entry], at: usize) -> bool {
         .is_some_and(|next| next.parent == Some(at))
 }
 
-/// One row per shown entry: indent, then `+` (children, folded), `-`
-/// (open) or the leaf mark, then the label.
 pub(super) fn tree_lines(
     entries: &[Entry],
     shown: &[usize],
@@ -69,8 +60,6 @@ pub(super) fn tree_lines(
         .collect()
 }
 
-/// The `rows` lines that end at the cursor when it is below the first
-/// screen, the cursor's line marked `>`.
 pub(super) fn scrolled(lines: Vec<String>, cursor: usize, rows: usize) -> Vec<String> {
     let skip = first_shown(cursor, rows);
     lines
@@ -82,9 +71,6 @@ pub(super) fn scrolled(lines: Vec<String>, cursor: usize, rows: usize) -> Vec<St
         .collect()
 }
 
-/// The records lens on screen: the `rows` lines `scrolled` keeps, each
-/// led by the first digits of its chain hash. Only those rows are
-/// hashed, so a frame costs what the screen holds, not the ledger.
 pub(super) fn record_lines(records: &[Row], cursor: usize, rows: usize) -> Vec<String> {
     let skip = first_shown(cursor, rows);
     let lines = records
@@ -102,14 +88,10 @@ pub(super) fn record_lines(records: &[Row], cursor: usize, rows: usize) -> Vec<S
     scrolled(lines, cursor.saturating_sub(skip), rows)
 }
 
-/// The first line on screen: the one that puts the cursor on the last
-/// row once it is below the first screen.
 fn first_shown(cursor: usize, rows: usize) -> usize {
     cursor.saturating_add(1).saturating_sub(rows)
 }
 
-/// The list on the left half and the detail on the right, split by a
-/// column of `|`.
 pub(super) fn beside(
     list: &[String],
     detail: &[String],
@@ -130,7 +112,6 @@ pub(super) fn beside(
         .collect()
 }
 
-/// `line` cut to `width` characters.
 pub(super) fn cut(line: &str, width: usize) -> String {
     line.chars().take(width).collect()
 }

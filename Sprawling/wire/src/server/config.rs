@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Serving configuration: routes and bodies. The judgements the routes
-//! apply are `wire::reception`'s; a refusal made minutes later has no way
-//! home, which is why a command carries the [`Reply`] address of whoever
-//! sent it.
-
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -43,120 +38,51 @@ use super::pairing::{accept_pairing, offer_challenge, open_session};
 use super::socket::upgrade;
 use super::uploads::{accept_acp, accept_drop, accept_recording};
 use enrolment::accept_enrolment;
-/// Answers a query from the city's derived views, with the ledger
-/// position the answer was read at. Synchronous: a query reads a
-/// projection, and a projection that needed to block would be a query
-/// pretending to be a command.
+
 pub type Answering = Arc<dyn Fn(Query) -> (Seq, Result<Answer, AxError>) + Send + Sync>;
 
 pub type SecretSink =
     Arc<dyn Fn(Command<Sealed<String>>, Reply) -> Result<(), AxError> + Send + Sync>;
 
-/// How long the enrolment route waits for the worker to say what
-/// happened.
-///
-/// Bounded because the worker may be inside a dispatch that runs for
-/// minutes, and an HTTP request that waited for it would look like a
-/// hang. Waiting longer would not help in that case and hurts in every
-/// other: what is being waited for is a queue hop and a vault write,
-/// both of which are milliseconds.
 const ENROLMENT_PATIENCE: std::time::Duration = std::time::Duration::from_secs(2);
 
-/// Everything the shell needs that it must not decide for itself.
-///
-/// Each sink is injected as a closure rather than as a trait:
-/// `wire` declares no `pub trait` (it is not on the seam list,
-/// ARCHITECTURE section 3), and one implementation is not a seam.
 pub struct ServeConfig {
-    /// The client bundle, handed in by the assembly layer so this crate
-    /// never learns where build artifacts live.
+
     pub client: Arc<ClientAssets>,
-    /// Where a recording goes, and the line of text that comes back.
-    ///
-    /// A route of its own rather than a Command, for the reason
-    /// enrolment has one: a Command is accepted and answered later
-    /// through the event stream, and the text of what somebody just said
-    /// has to come back to the tab that recorded it. A Query is the
-    /// other shape that answers, and a query that spent seconds on a
-    /// provider would be a command pretending to be a read.
-    ///
-    /// The media type travels beside the bytes because a container the
-    /// city cannot name has no media type to send, and the judgement of
-    /// which containers exist belongs to whoever speaks the audio wire.
+
     pub transcribe_sink: TranscribeSink,
-    /// A file dropped onto the composer, kept by the city.
+
     pub drop_sink: DropSink,
-    /// Where a request from an outside editor goes. Separate from
-    /// `commands` because it arrives over its own route, carries its own
-    /// authentication, and gets an answer rather than an event stream.
+
     pub acp: AcpSink,
-    /// Where an accepted Command goes. **Accepting is not running it**: a
-    /// dispatch may take hours, and awaiting it inside the socket task
-    /// would tie the work to the lifetime of one browser tab. The sink
-    /// takes the command, returns, and the progress comes back as events.
-    ///
-    /// The [`Reply`] travels with the command because the answer arrives
-    /// long after this call returned, and a refusal belongs to the peer
-    /// that caused it.
+
     pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Sync>,
-    /// The event fan-out. This crate only subscribes; the writer is
-    /// whoever owns the Ledger, because the ledger line is the event.
+
     pub events: broadcast::Sender<Committed>,
-    /// What a model is saying, while it is still saying it.
-    ///
-    /// A second channel rather than a second variant on the first,
-    /// because the two carry different kinds of thing and lag
-    /// differently: an increment a slow client missed is nothing, and an
-    /// event it missed is history it must recover. Sharing one channel
-    /// would let a burst of increments push records out of a reader's
-    /// window.
+
     pub deltas: broadcast::Sender<crate::frames::Delta>,
-    /// The process log, on its way to whoever has the log lens open.
-    ///
-    /// A third channel for the reason there is a second: what it
-    /// carries is discardable, and a slow reader that lost a line has
-    /// lost nothing. Sharing the event channel would let a city running
-    /// at the `wire` floor push history out of that reader's window.
+
     pub logs: broadcast::Sender<crate::frames::LogLine>,
-    /// What running commands write, while they still write it. A fourth
-    /// channel, so a command flooding its stdout cannot push increments
-    /// or log lines out of a slow reader's window.
+
     pub outputs: broadcast::Sender<crate::frames::LiveOutput>,
-    /// What running commands already wrote, in the order they wrote it.
-    /// A session sends it after `Welcome`, having subscribed to
-    /// `outputs` first, so a piece may arrive twice and never not at all.
+
     pub outputs_so_far: Arc<dyn Fn() -> Vec<crate::frames::LiveOutput> + Send + Sync>,
-    /// The performance monitor, for the sessions that ask to watch it.
+
     pub monitor: MonitorFeed,
-    /// Answers a query from the city's derived views.
+
     pub queries: Answering,
-    /// Where an enrolled credential goes. Takes the full [`Command`] and
-    /// not [`WireCommand`]: this is the one sink whose input has no byte
-    /// form, which is what keeps enrolment a local act.
+
     pub secrets: SecretSink,
-    /// Which city this server is. Told at the handshake, because a client
-    /// that only hears what happens next cannot know the name of a city
-    /// that was initialised last month.
+
     pub city: Option<Address>,
-    /// The seq of the last record broadcast on `events`, which every
-    /// welcome names so a reconnecting client fetches only what it
-    /// missed. The writer is whoever broadcasts, and it advances the head
-    /// before each broadcast.
+
     pub head: Arc<LedgerHead>,
-    /// The chain hash of the Ledger's first line, read once at startup:
-    /// a ledger keeps its epoch for its whole life.
+
     pub epoch: Option<B3Hash>,
-    /// This machine's door for a browser: its pairing code, open codes,
-    /// paired device keys and live session tokens (`Sprawling/wire/spec/Server.lean` §8-93).
+
     pub door: LocalDoor,
 }
 
-/// The seq of the last record the city has broadcast, readable without a
-/// lock.
-///
-/// An atomic rather than a field behind the views' lock, because a
-/// reader may hold the views for a long time and a hello must not wait
-/// for it. Stores the seq plus one, so zero is a ledger with no record.
 #[derive(Debug, Default)]
 pub struct LedgerHead(AtomicU64);
 
@@ -170,9 +96,6 @@ impl LedgerHead {
         head
     }
 
-    /// Moves the head to `seq`. A seq of `u64::MAX` has no successor to
-    /// store and leaves the head where it was; a ledger reaches it only
-    /// after `Seq::next` has refused every later record.
     pub fn advance(&self, seq: Seq) {
         if let Some(stored) = seq.value().checked_add(1) {
             self.0.store(stored, Ordering::Release);
@@ -198,9 +121,7 @@ pub(crate) struct ShellState {
     pub(crate) acp: AcpSink,
     pub(crate) transcribe_sink: TranscribeSink,
     pub(crate) drop_sink: DropSink,
-    /// Which face this listener presents, and the key it demands: the
-    /// verdict of [`crate::reception::decide_bind`], and the only thing
-    /// besides the live sessions any door reads to judge a caller.
+
     pub(crate) face: BindFace,
     pub(crate) door: LocalDoor,
     pub(crate) city: Option<Address>,
@@ -208,57 +129,24 @@ pub(crate) struct ShellState {
     pub(crate) epoch: Option<B3Hash>,
 }
 
-/// The performance monitor as a session sees it (`Sprawling/wire/spec/Frames/Monitor.lean` §8-47g).
-///
-/// Whether anybody watches is decided where the history is kept; a
-/// session holds what `watch` returned for as long as it watches, and
-/// dropping that value is how it stops counting.
 #[derive(Clone)]
 pub struct MonitorFeed {
     pub watch: Arc<dyn Fn(crate::frames::Watched) -> Box<dyn Send> + Send + Sync>,
-    /// One reading a second while anybody watches. A reading a slow
-    /// session missed is not stated: the next one is a second away.
+
     pub samples: broadcast::Sender<crate::frames::Sample>,
-    /// Sets the beat the monitor samples at and remembers it for the
-    /// city (`Sprawling/wire/spec/Frames/Monitor.lean` §8-47i).
+
     pub beat: Arc<dyn Fn(crate::frames::BeatMs) + Send + Sync>,
 }
 
-/// Where an outside request goes once the token has been judged.
-///
-/// **The body travels as the JSON it arrived as, and nothing here
-/// reads a field out of it.** The grammar of an inbound request is
-/// `agent_protocols::Incoming`, whose `parse` is the only constructor and
-/// therefore the only place the rules about it hold; a struct here
-/// with the same four fields, deserialized first and copied across
-/// field by field, would leave `parse` with no caller outside its own
-/// tests and carry the plaintext token into a value that derives
-/// `Debug`. The token is read where it is judged, below, and
-/// travels no further.
 pub type AcpSink =
     Arc<dyn Fn(&serde_json::Value, Pairing) -> Result<AcpProgress, AxError> + Send + Sync>;
 
-/// Where a recording goes: the bytes, the media type the browser
-/// recorded into, and the line of text that comes back.
 pub type TranscribeSink = Arc<dyn Fn(Vec<u8>, String) -> Result<String, AxError> + Send + Sync>;
 
-/// Where a file dropped onto the composer goes: its name and its bytes
-/// in, the absolute path the city kept it at out (`Sprawling/wire/spec/Server.lean` §8-49).
 pub type DropSink = Arc<dyn Fn(&str, &[u8]) -> Result<String, AxError> + Send + Sync>;
 
-/// The largest file `/drop` takes. axum's own default of 2 MiB refuses an
-/// ordinary screenshot or PDF; the limit sits on that one route, because
-/// the others carry a line of text or a recording.
 pub const DROP_BYTES_MAX: usize = 64 * 1024 * 1024;
 
-/// The enrolment body: a realm, a name, and the value that will never be
-/// seen again outside the vault.
-///
-/// The realm arrives as text because the caller chooses it: which word a
-/// key is filed under is a building's or a form's decision, not a set
-/// this server fixes, so nothing here enumerates the legal realms. What
-/// the two segments must spell is `kernel::SecretRef`'s grammar, and the
-/// route judges them with it before the credential moves.
 #[derive(Debug, Deserialize)]
 pub struct EnrollBody {
     pub realm: String,
@@ -266,16 +154,6 @@ pub struct EnrollBody {
     pub value: String,
 }
 
-/// Builds the route table. Split from `serve` so a test can exercise the
-/// routes over an in-process transport without owning a port.
-///
-/// `face` is the binding verdict's, so the key every door judges against
-/// is decided once, before the socket exists; `origins` are the names the
-/// same address answers to, read by the entry decision in front of every
-/// route (`Sprawling/wire/spec/Reception/Entry.lean` §8-94).
-///
-/// # Errors
-/// The listener's own headers cannot be spelled as HTTP headers.
 pub fn router(
     config: &ServeConfig,
     face: BindFace,
@@ -320,12 +198,9 @@ pub fn router(
                 post(accept_drop).layer(DefaultBodyLimit::max(DROP_BYTES_MAX)),
             ),
         )
-        // `/acp` judges the same credential from inside the handler: an
-        // editor offers it as a body key, and an unpaired editor is
-        // answered by `agent_protocols::admit` rather than at the door.
+
         .route("/acp", entered(Arrival::Door(Door::Acp), post(accept_acp)))
-        // This machine's door for a browser (`Sprawling/wire/spec/Server.lean` §8-93):
-        // the routes a browser reaches before it holds a credential.
+
         .route("/pair", entered(Arrival::Pairing, post(accept_pairing)))
         .route(
             "/session/challenge",
@@ -337,8 +212,7 @@ pub fn router(
             stamp,
         ))
         .with_state(state);
-    // The page itself: a browser has to load it before it can pair, so
-    // these routes ask for no credential, and still for this Host.
+
     let page = bundle_routes(Arc::clone(&config.client), &headers)?.route_layer(
         from_fn_with_state((Arrival::Page, Arc::clone(&names)), enter),
     );
@@ -347,17 +221,10 @@ pub fn router(
         .layer(from_fn_with_state(names, preflight)))
 }
 
-/// The body a refused HTTP request is answered with: what failed, and
-/// what to do about it.
 pub(crate) fn refusal_text(err: &AxError) -> String {
     format!("{}: {}", err.action(), err.recovery())
 }
 
-/// One door with the credential judgement in front of it.
-///
-/// The door is baked into the layer rather than read back off the
-/// request path, so the route table above is the only place a path is
-/// spelled.
 fn paired(
     door: Door,
     state: &Arc<ShellState>,
@@ -366,8 +233,6 @@ fn paired(
     handler.route_layer(from_fn_with_state((door, Arc::clone(state)), admit_request))
 }
 
-/// The layer in front of every acting door: read the offered credential,
-/// hand it to the one judgement, and pass or refuse.
 async fn admit_request(
     State((door, state)): State<(Door, Arc<ShellState>)>,
     request: Request,

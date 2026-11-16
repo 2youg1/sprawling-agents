@@ -3,33 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What `Tools/xtask/budgets.toml` states about length, read once and handed
-//! to the gate as values.
-//!
-//! The two limits and the register of exceptions all arrive from one
-//! file, and every message the gate prints names the row it came
-//! from. Keeping the row names and the reader together means a renamed
-//! row is renamed in one place, and the gate above reads as judgement
-//! rather than as table lookup.
-
 use std::collections::BTreeSet;
 use std::path::Path;
 
 use crate::budget::REGISTER;
 use crate::report::XtaskError;
 
-/// The register row that states how long a production function may be.
 pub(super) const ROW: &str = "function_length";
 
-/// The sub-table naming the signatures that were already too wide when
-/// the parameter rule was drawn.
 pub(super) const PREDATING: &str = "predating";
 
-/// The register row that states how many parameters a function may take.
 pub(super) const ARG_ROW: &str = "argument_count";
 
-/// The number one row states, whether it is stated in lines or in
-/// parameters.
 pub(super) fn limit(root: &Path, row: &str) -> Result<usize, XtaskError> {
     let register = crate::budget::register(root)?;
     let stated = register
@@ -50,7 +35,6 @@ pub(super) fn limit(root: &Path, row: &str) -> Result<usize, XtaskError> {
     })
 }
 
-/// The functions whose parameter lists predate the rule.
 pub(super) fn excused(root: &Path) -> Result<BTreeSet<String>, XtaskError> {
     let register = crate::budget::register(root)?;
     let Some(listed) = register
@@ -72,9 +56,6 @@ pub(super) fn excused(root: &Path) -> Result<BTreeSet<String>, XtaskError> {
     Ok(out)
 }
 
-/// How a function is named in the register: the file it lives in and its
-/// own name. Two functions in one file cannot share a name, and a name
-/// alone would excuse every `new` in the workspace at once.
 pub(super) fn key(rel: &str, name: &str) -> String {
     format!("{rel}::{name}")
 }

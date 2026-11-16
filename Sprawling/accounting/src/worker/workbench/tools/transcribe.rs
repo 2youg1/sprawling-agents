@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `transcribe`: a recording this run may read - a file in the city, or
-//! a block a connector stored - turned into text by the endpoint the
-//! person chose to transcribe (`Sprawling/app/Spec.lean` §8-131).
-//!
-//! Whether the tool exists is the book's answer to the question the
-//! composer's microphone asks, `select(ModelTag::Transcribe, policy)`,
-//! read under the rules of the building the run stands in. A run in a
-//! building the book gives no transcription endpoint is not offered a
-//! tool that could only fail.
-
 use std::sync::{Arc, Mutex};
 
 use kernel::{
@@ -24,16 +14,10 @@ use serde_json::{Map, Value, json};
 
 use crate::worker::workbench::{Laying, Site};
 
-/// What every refusal of this tool names as the action that failed.
 const ACTION: &str = "transcribe";
 
 impl Laying {
-    /// The transcription tool, when the endpoint book names one this
-    /// building may send a recording to.
-    ///
-    /// # Errors
-    /// Propagates an HTTP client that cannot be built for the chosen
-    /// endpoint, which would fail the run's own model calls as well.
+
     pub(super) fn transcription_tool(
         &self,
         site: &Site,
@@ -44,10 +28,7 @@ impl Laying {
             .select(kernel::ModelTag::Transcribe, site.rules.policy())
         {
             Ok(chosen) => chosen,
-            // Nothing chosen, an endpoint since detached, or a
-            // confidential building whose endpoint is off this machine:
-            // each means this building has no transcription, and the
-            // answer to that is a table without the tool.
+
             Err(_no_transcription_here) => return Ok(None),
         };
         let transcriber = gateway::transcriber_for(
@@ -58,21 +39,15 @@ impl Laying {
     }
 }
 
-/// The tool: what the run may read, and the facility that turns a
-/// recording into text.
 pub(super) struct TranscribeTool {
     reader: runtime::BoundReader,
-    /// Behind a lock because the credential resolver inside it is `Send`
-    /// and not `Sync`, while a tool is shared between the calls of a
-    /// wave; two transcriptions of one run take their turns.
+
     transcriber: Mutex<gateway::Transcriber>,
     meta: ToolMeta,
 }
 
 impl TranscribeTool {
-    /// # Errors
-    /// Refuses a name or a parameter schema that does not build, which
-    /// the literals below cannot produce.
+
     fn new(
         reader: runtime::BoundReader,
         transcriber: gateway::Transcriber,
@@ -111,27 +86,17 @@ impl TranscribeTool {
                     .to_owned(),
                 params: Payload::new(params)?,
                 effect: Effect::Read,
-                // One provider round trip: seconds, and it may be billed.
+
                 cost_tier: CostTier::Heavy,
-                // The facility's own deadline bounds the call, and a
-                // second one here would be a second authority on it.
+
                 timeout: None,
-                // What comes back is text.
+
                 render: RenderIntent::Generic,
                 temporal: Temporal::Timeless,
             },
         })
     }
 
-    /// The recording `asked` names, read through the one door every
-    /// model-chosen name is judged at.
-    ///
-    /// A file says what container it is by its name, a `file:` Locator
-    /// included; a block has no name and says it by how it starts.
-    ///
-    /// # Errors
-    /// What the door refuses the name with, a container this city cannot
-    /// send, and whatever reading the recording refuses.
     fn recording(&self, asked: &str) -> Result<gateway::Recording, AxError> {
         let opened = self.reader.open(asked, ACTION)?;
         match opened.named().clone() {
@@ -215,9 +180,6 @@ mod tests {
 
     use super::*;
 
-    /// A tool over a city in a temporary directory, where `vault` is a
-    /// confidential building seen from outside, with no endpoint behind
-    /// it: every case here is refused before anything would be sent.
     fn tool(root: &Path) -> TranscribeTool {
         let bound: runtime::ReadBound = Arc::new(|addr: &Address| {
             if addr.as_str().starts_with("vault") {
@@ -264,10 +226,6 @@ mod tests {
         format!("cas:b3-{hash}")
     }
 
-    /// What the door closes, what is not there and a container this city
-    /// cannot send are refused before anything is sent; a recording
-    /// another open building holds and a stored block reach the
-    /// facility, which here has no endpoint and says so by name.
     #[test]
     fn a_recording_is_judged_by_the_door_and_its_container_before_it_is_sent() {
         let city = tempfile::tempdir().unwrap();

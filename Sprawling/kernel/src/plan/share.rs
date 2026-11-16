@@ -3,17 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Share division: weight is conserved because [`crate::share`] is the only way to hold any.
-//! The part `Sprawling/kernel/spec/Plan.lean` specifies this module with the
-//! rest of `kernel::plan`.
-
 use crate::error::AxError;
 use crate::node_id::NodeId;
 use crate::share::Share;
 
 use super::PlanTree;
 
-/// Gives `pot` to `among` by their weights, then recurses.
 pub(crate) fn hand_out(tree: &mut PlanTree, pot: Share, among: &[NodeId]) -> Result<(), AxError> {
     if among.is_empty() {
         return Ok(());
@@ -22,9 +17,7 @@ pub(crate) fn hand_out(tree: &mut PlanTree, pot: Share, among: &[NodeId]) -> Res
         .iter()
         .map(|id| tree.nodes.get(id).map_or(1, |node| node.row.weight))
         .collect();
-    // Every weight zero is a table that says nothing about how this
-    // level divides, and an even cut is the reading that keeps the
-    // share where the rows are.
+
     let parts = if weights.iter().all(|weight| *weight == 0) {
         pot.split(&vec![1; among.len()])?
     } else {
@@ -89,10 +82,6 @@ mod tests {
         );
     }
 
-    /// The card's own claim, in numbers: splitting a branch cannot take
-    /// anything from its neighbours.
-    /// The card's own claim, in numbers: splitting a branch cannot take
-    /// anything from its neighbours.
     #[test]
     fn dividing_a_branch_generously_takes_nothing_from_the_others() {
         let before = tree(&format!(

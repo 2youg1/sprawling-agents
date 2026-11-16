@@ -3,26 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Host command ownership at the Backlog spawn boundary.
-
 use super::ceiling::Mark;
 use super::{Backlog, Body, Claim, Member, Started, Tail, process, storage};
 use kernel::{Address, AxCode, AxError, RunId};
 use std::process::{Command, Stdio};
 
 impl Backlog {
-    /// Starts a command, waits out the short window, and hands back
-    /// either its result or a handle onto it.
-    ///
-    /// The command's program, arguments, working directory and
-    /// environment are the caller's; this module owns only where the
-    /// output goes and how the waiting is done. A command that outlives
-    /// its window is owed to `owner` and to no other run.
-    ///
-    /// # Errors
-    /// `E_TOOL_UNAVAILABLE` when the program cannot be started, and
-    /// `E_STORAGE_FATAL` when the place its output goes cannot be
-    /// written.
+
     pub fn run(
         &self,
         owner: RunId,

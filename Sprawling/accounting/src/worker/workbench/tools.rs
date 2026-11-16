@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the model may see and what routes what it calls: one
-//! registration feeding the catalogue and the bench, the `status` tool
-//! that answers what this run is, and the reading room it admits.
-
 use std::sync::{Arc, Mutex};
 
 use kernel::{Address, AxError, Effect, Locator, ReservedNamespace};
@@ -28,7 +24,6 @@ mod reading_room;
 mod search;
 mod transcribe;
 
-/// The stateless nested-rule source for one run's tree and room.
 fn nested_rule_candidates(
     site: &Site,
     room: &Address,
@@ -54,23 +49,7 @@ fn nested_rule_candidates(
 }
 
 impl Laying {
-    /// Lays out what the model may see and what routes what it calls.
-    ///
-    /// It reads the city through [`Laying`] rather than the worker, so it
-    /// runs in the lane that drives the run: an MCP server that still
-    /// shakes hands holds up that lane and nothing else
-    /// (`Sprawling/app/Spec.lean` §8-113).
-    ///
-    /// The catalogue and the bench come from one registration, so a
-    /// name is on both lists or on neither. The delegate desk comes back with
-    /// them because two tools hold it and the settlement reads it after
-    /// the drive.
-    ///
-    /// # Errors
-    /// Propagates a write domain that will not resolve, a neighbourhood
-    /// that cannot be scanned, any tool that refuses to be built, a
-    /// duplicate registration on either list, and whatever the reading
-    /// room reports.
+
     pub(in crate::worker) fn lay_out_workbench(
         &self,
         site: &Site,
@@ -79,40 +58,22 @@ impl Laying {
         job_locator: &Locator,
     ) -> Result<Workbench, AxError> {
         let addr = &at.addr;
-        // The catalog is the single source of `ChatRequest.tools`: the
-        // bench routes a call, the catalog is what the model was told
-        // exists, and one registration feeds both.
-        //
-        // The admitted set is decided here and frozen with the run. It
-        // has to be: a provider hashes the tool array ahead of the system
-        // prompt, so a tool admitted mid-run would invalidate the whole
-        // conversation's cache. Progressive disclosure is about what a
-        // line says, not about when a tool appears.
+
         let catalog = Arc::new(Mutex::new(runtime::Catalog::new()));
-        // The mode a run sits in is a capability like any other: until
-        // it was set here the mode's own catalog entry reached no model.
+
         held(&catalog, "lay out the catalog")?.set_mode(at.policy.mode);
-        // The run's policy cell opens with the dispatch's policy, and the
-        // write gates read it at each write, so a change the run takes
-        // mid-way reaches them (`Sprawling/runtime/spec/PolicyTake.lean` §8-62).
+
         let policy = runtime::PolicyCell::new(at.policy);
-        // What this run has seen: `read` writes it and `edit` is admitted
-        // by it. A new table per run, so a fork, a successor or a child
-        // starts having seen nothing (`Sprawling/runtime/spec/Tools/Edit.lean` §8-64).
+
         let stamps = runtime::ReadStamps::default();
         let shown = runtime::ReadShown::default();
         let edit = self.edit_tool(site, addr, policy.reader(), stamps.clone())?;
-        // Every tool shares one keeper, so no two of them keep two keys
-        // under one name (`Sprawling/app/Spec.lean` §8-87).
+
         let keeper = std::sync::Arc::new(kept::Keeper::new(
             Arc::clone(&self.vault),
             self.staged_at.value(),
         ));
-        // Who this run can reach and what waits for each room, read at
-        // dispatch. Several runs drive at once and a signal lands at the
-        // call (collab D7), so the counts are a snapshot of that moment,
-        // as `status` says; `signal pull` reads the run's own queue
-        // live. It answers `neighbours` and `status`.
+
         let seen =
             city::Neighbourhood::scan(&self.city_root, site.building.addr(), addr, &|room| {
                 self.waiting.get(room).copied().unwrap_or(0)
@@ -134,23 +95,11 @@ impl Laying {
         let goal_tool = collab::GoalTool::new(addr.clone(), Arc::clone(&desks.goals))?;
         let pr_tool = collab::PrTool::new(addr.clone(), Arc::clone(&desks.pr))?;
         let archive_tool = desks.archive_tool(&site.write_root)?;
-        // The refusal face of the building's own governance. It reaches
-        // for the reserved subtree, which no write domain does, and
-        // `Effect::Govern` is refused at the effect layer: a run does
-        // not change what governs it (`Sprawling/city/Spec.lean` §8-2b).
+
         let rules_tool = city::RulesTool::new(&self.city_root, site.building.addr().clone())?;
-        // The one door onto the rest of the city. It is registered
-        // beside `signal` rather than behind it because the two answer
-        // different questions - who is there, and what to say to them -
-        // and until this line a model could only reach an address
-        // somebody had already handed it.
+
         let neighbours_tool = city::NeighboursTool::new(seen)?;
-        // The one tool that reads, and the only caller of the catalog's
-        // second-level disclosure: without it a building's reading room
-        // could name a skill and never hand it over. It holds the
-        // catalog rather than a copy of what is in it, so a skill
-        // admitted below this line is still reachable by name. It and
-        // `search` ask one read bound, so what one may open the other may find.
+
         let bound = self.read_bound(site);
         let candidates = nested_rule_candidates(site, addr, Arc::clone(&bound));
         let read_clock = Arc::clone(&self.clock);
@@ -166,29 +115,12 @@ impl Laying {
         .clocking(Arc::new(move || read_clock.now()))
         .noting(stamps);
         let claim_tool = self.plan_tool(site, desks, &bound)?;
-        // Reading needs an address, and until this line there was no way
-        // to find one: a symbol had to be hunted through `exec`, which
-        // means Python this machine may not have or a shell this
-        // building may have switched off. It stands beside `read`
-        // because it answers the other half of one question, and it is
-        // last in the order for the reason the comment below gives.
+
         let search = SearchTool::new(&site.write_root, Arc::clone(&bound))?;
-        // The one door out of a filling window. It stands last because
-        // it is the newest, and it takes no depth and asks no person:
-        // the successor is this same resident, in this same room, with
-        // this same table - which is why `delegate` is still on it.
+
         let succession = Arc::new(Mutex::new(runtime::SuccessionDesk::new()));
         let succeed = runtime::SucceedTool::new(Arc::clone(&succession))?;
-        // The net, not the forecast, is the defence (semantic authority
-        // 4.4). Two handles on one repository: the bench checkpoints a
-        // command its forecast suspects, and the driver checkpoints every
-        // wave, so whatever a wave deletes has a commit to come back
-        // from. Both stand where the run writes, which is its own tree
-        // when the building asks for review.
-        // One reading of the write domain feeds both: what the bench
-        // admits and what its checkpoint stages are the same set by
-        // definition (`Sprawling/storage/Spec.lean` §8-18), and taking them from
-        // one call is what keeps them that way.
+
         let domain = site.rules.write_domain()?;
         let scope: Vec<String> = domain.prefixes().map(|p| p.as_str().to_owned()).collect();
         let of = site.provenance(self.city, addr);
@@ -207,19 +139,10 @@ impl Laying {
             bench = bench.limit_egress(listed.clone());
         }
         *bench.taint_mut() = at.taint.clone();
-        // One registration feeds both. The catalogue is what the model
-        // was told exists and the bench is what routes the call it
-        // makes, so a name on one list and not the other is either a
-        // tool nobody can call or a call nobody was told about; one list
-        // leaves nothing to agree by hand.
-        // Both key by name, so this order reaches no model. Each tool is
-        // filed here under the namespace the catalog lists it in
-        // (`Sprawling/runtime/Spec.lean` §8-60): this is the one place that
-        // knows which tools are the city's own.
+
         let own =
             |tool: Box<dyn kernel::Tool>| (Namespace::Own(ReservedNamespace::Sprawling), tool);
-        // Same built-ins as `views::catalog::standing`; a tool added here
-        // and not there stays off that page until the first run.
+
         let mut admitted: Vec<Filed> = vec![
             own(Box::new(archive_tool)),
             own(Box::new(claim_tool)),
@@ -260,10 +183,6 @@ impl Laying {
         })
     }
 
-    /// City Hall plans; every other building builds (`Sprawling/city/Spec.lean` §8-22).
-    ///
-    /// # Errors
-    /// Propagates a tool that refuses to be built.
     fn push_vocation_tools(
         &self,
         admitted: &mut Vec<Filed>,
@@ -293,13 +212,6 @@ impl Laying {
         Ok(())
     }
 
-    /// The run's `edit`: the building's domain is the ceiling and the
-    /// run's write limit narrows it, both asked at every write
-    /// (`Sprawling/city/Spec.lean` §8-32); `stamps` is the table the run's
-    /// `read` writes, and the path locks are the city's one table.
-    ///
-    /// # Errors
-    /// Propagates a write domain that will not resolve.
     fn edit_tool(
         &self,
         site: &Site,
@@ -319,12 +231,6 @@ impl Laying {
         )
     }
 
-    /// The run's `plan`, whose `finish` takes the path of the file that
-    /// shows the work, pinned at that moment through the judgement
-    /// `read` gives it (`Sprawling/collab/Spec.lean` D20).
-    ///
-    /// # Errors
-    /// Propagates a desk left locked by a thread that died.
     fn plan_tool(
         &self,
         site: &Site,
@@ -344,10 +250,8 @@ impl Laying {
     }
 }
 
-/// One admitted tool and the namespace the catalog lists it under.
 type Filed = (Namespace, Box<dyn kernel::Tool>);
 
-/// What vocation admission reads from the dispatch.
 struct VocationParts<'a> {
     site: &'a Site,
     at: &'a Assignment,
@@ -355,15 +259,6 @@ struct VocationParts<'a> {
     policy: runtime::PolicyReader,
 }
 
-/// Files every built tool in the catalog, at the exposure the run's
-/// `[catalog]` tables give it, and routes on the bench every one the
-/// catalog admitted. A tool a table turned off gets no route: the catalog
-/// keeps its row for the record, and a call by its name reaches nothing
-/// (`Sprawling/runtime/Spec.lean` §8-60).
-///
-/// # Errors
-/// Propagates a catalog left locked by a thread that died, and a
-/// duplicate registration on either list.
 fn register(
     catalog: &Mutex<runtime::Catalog>,
     bench: &mut ToolBench,
@@ -380,13 +275,7 @@ fn register(
 }
 
 impl Laying {
-    /// The admitted tools the city files under a namespace other than
-    /// `sprawling` (`Sprawling/runtime/Spec.lean` §8-60): reading pictures
-    /// and recordings, the look back and the proposal, the web, and what
-    /// reaches outside the city.
-    ///
-    /// # Errors
-    /// Propagates any of those tools that refuses to be built.
+
     fn filed_beyond_sprawling(
         &self,
         site: &Site,
@@ -394,22 +283,18 @@ impl Laying {
         bound: &runtime::ReadBound,
     ) -> Result<Vec<Filed>, AxError> {
         let mut filed: Vec<Filed> = Vec::new();
-        // Present only where the book names an endpoint this building
-        // may send a recording or a picture to (`Sprawling/app/Spec.lean` §8-131,
-        // §8-142).
+
         let media = Namespace::Own(ReservedNamespace::Media);
         filed.extend(
             self.endpoint_tools(site, bound)?
                 .into_iter()
                 .map(|tool| (media.clone(), tool)),
         );
-        // A look back at the history this building may read, written
-        // into the city's playback exports (`Sprawling/app/Spec.lean` §8-132).
+
         let record = Namespace::Own(ReservedNamespace::Record);
         filed.push((record.clone(), Box::new(self.playback_tool(site, addr)?)));
         filed.push((record, Box::new(self.proposal_tool(site, addr, bound)?)));
-        // The city's own way onto the web, to the supplier `[search]`
-        // names (`Sprawling/accounting/spec/Connectors.lean` §8-35).
+
         if let Some(search) = self.search_tool(site)? {
             filed.push((Namespace::Own(ReservedNamespace::Web), Box::new(search)));
         }
@@ -422,10 +307,6 @@ impl Laying {
     }
 }
 
-/// The namespace a tool from outside the city is filed under: an external
-/// server's tools under its label, which the configuration layer keeps
-/// clear of the namespaces the city reserves, and a browser under
-/// `computer`.
 fn outside_namespace(meta: &kernel::ToolMeta) -> Namespace {
     if let Effect::Connector { label } = &meta.effect {
         Namespace::Server(label.clone())
@@ -435,28 +316,15 @@ fn outside_namespace(meta: &kernel::ToolMeta) -> Namespace {
 }
 
 impl Laying {
-    /// The tools that reach outside the city, in the order they join the
-    /// table after the built-ins: the browsers, then the MCP servers.
-    ///
-    /// # Errors
-    /// Propagates a browser the building's rules ask for and that will
-    /// not start.
+
     fn outside_tools(
         &self,
         site: &Site,
         addr: &Address,
     ) -> Result<Vec<Box<dyn kernel::Tool>>, AxError> {
-        // The browsers this building's rules ask for: its own, then the
-        // person's when they declared one. They follow the built-ins,
-        // because a provider caches the tool array by position.
-        // `city::policy` refuses both settings on a confidential
-        // building, so neither is ever reached there.
+
         let mut outside = (self.browsers)(&self.city_root, &site.block_origin(), &site.rules)?;
-        // External tools, for a building whose configuration names a
-        // server or whose rules ask for this machine's desktop. They join
-        // the table here, before the catalogue is rendered, because the
-        // tool table is frozen with the run: what the model is told
-        // exists is decided once.
+
         let servers = self.servers(site);
         for server in self.mcp_tools(ConnectorJob {
             servers: &servers,
@@ -472,23 +340,10 @@ impl Laying {
         Ok(outside)
     }
 
-    /// What this run's building may read by a path its model chose: the read bound
-    /// (`crate::prompt_chain::read_bound`, the one the convention chain is read through).
     fn read_bound(&self, site: &Site) -> runtime::ReadBound {
         crate::prompt_chain::read_bound(&self.city_root, site.building.addr().clone())
     }
 
-    /// Builds the one tool that answers what this run is, to itself.
-    ///
-    /// Everything a `status` answer holds is read here and frozen, except
-    /// what moves while the run goes on: the children from the delegate
-    /// desk, the backlog from its table, the context used from the run's
-    /// reading. A borrowed desk answers nothing rather than refusing: a
-    /// model told about `status`'s own lock could do nothing about it.
-    ///
-    /// # Errors
-    /// Propagates a write domain that will not resolve and whatever the
-    /// tool says about its own construction.
     fn status_tool(
         &self,
         site: &Site,
@@ -508,8 +363,7 @@ impl Laying {
                 trust: &self.trust,
                 context_tokens: site.model.context_tokens,
                 neighbours: reach.seen.residents(),
-                // What this resident already holds, so a model asking what it may
-                // touch is answered from the same list the conflict check reads.
+
                 locks: self.locks.clone(),
             }),
             Box::new(move || {
@@ -535,8 +389,7 @@ impl Laying {
             },
             Err(_poisoned) => None,
         };
-        // The last two lines: what this run started, and the one frozen
-        // `PromptTools` record the catalog page also answers from.
+
         Ok(tool
             .reporting(self.backlog.clone())
             .metering(reach.context.clone())
@@ -545,12 +398,6 @@ impl Laying {
     }
 }
 
-/// The built-in tools filed outside `sprawling` that a catalog page can
-/// name before a run connects anything: playback and proposal always,
-/// `web_search` when the frozen `[search]` names a supplier.
-///
-/// # Errors
-/// Propagates a definition whose schema does not build.
 pub(crate) fn catalog_builtins(
     search: Option<&kernel::config::SearchSupplier>,
 ) -> Result<Vec<(&'static str, kernel::ToolDef)>, kernel::AxError> {

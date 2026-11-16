@@ -3,31 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What has not been checkpointed yet: the branch, its drift from the
-//! upstream it tracks, and the files that differ from the last commit.
-//!
-//! **Why this is not [`crate::between`] with a different far end.**
-//! That function compares two points a caller already holds and answers
-//! nothing about where the repository itself stands. Which branch is
-//! checked out, whether it has an upstream, and how far it has run
-//! ahead of it are facts about the repository rather than about a pair
-//! of trees — and they are the three a person asks before they ask
-//! which files moved. The rows are read through `changes::collect` all
-//! the same, so what a changed file is keeps one answer.
-//!
-//! **Untracked files count.** A file an agent wrote and never staged is
-//! exactly the file a person is looking for, and a list that showed
-//! only tracked changes would report a new module as nothing at all.
-//!
-//! **A checkpoint does not move the head.** `checkpoint::wave_pre` files its
-//! commit under `refs/sprawling/`, so the head is the base commit or
-//! the last landing, and a comparison against it would report every
-//! wave since as uncommitted. The caller therefore names the checkpoint it
-//! wants compared against; the head is the fallback for a city that has
-//! checkpointed nothing.
-//!
-//! Specified by `Sprawling/storage/spec/Status.lean` §8-22.
-
 use std::path::Path;
 
 use kernel::{FileChange, GitOid};
@@ -35,25 +10,19 @@ use kernel::{FileChange, GitOid};
 use crate::changes::collect;
 use crate::error::StorageError;
 
-/// How far a branch has run from the upstream it tracks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Drift {
     pub ahead: u64,
     pub behind: u64,
 }
 
-/// Where a repository stands right now.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkingStatus {
-    /// The branch checked out; `None` on a detached head, which is a
-    /// state a person can be in and one a name cannot describe.
+
     pub branch: Option<String>,
-    /// `None` when the branch tracks no upstream — which is not the
-    /// same fact as being level with one.
+
     pub drift: Option<Drift>,
-    /// Files that differ from the named base commit (the head commit
-    /// when the caller names none), untracked ones included, in path
-    /// order.
+
     pub files: Vec<FileChange>,
 }
 
@@ -64,23 +33,6 @@ fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageError {
     }
 }
 
-/// What stands between `base` and the disk under `scope`, and where the
-/// repository itself stands.
-///
-/// `scope` is a repository-relative directory: a building is a directory
-/// and the question a building's page asks is about its own files, so
-/// filtering here costs one pathspec rather than a second pass over the
-/// answer. `base` is the checkpoint to compare against; absent falls back to
-/// the head, which is what a city that has checkpointed nothing has.
-///
-/// A repository with no commit at all answers every file as added
-/// rather than failing: a city initialised this minute has a working
-/// tree and no head, and "none of this is checkpointed" is what a reader
-/// needs to be told.
-///
-/// # Errors
-/// Propagates whatever opening the repository, reading its head,
-/// finding `base`, or walking the difference reports.
 pub fn working_status(
     city_root: &Path,
     scope: Option<&str>,
@@ -89,7 +41,7 @@ pub fn working_status(
     let repo = git2::Repository::open(city_root).map_err(git_err("open the city repository"))?;
     let head = match repo.head() {
         Ok(found) => Some(found),
-        // An unborn branch is a repository with no commit on it yet.
+
         Err(err) if err.code() == git2::ErrorCode::UnbornBranch => None,
         Err(err) => return Err(git_err("read the repository head")(err)),
     };
@@ -139,11 +91,6 @@ pub fn working_status(
     })
 }
 
-/// How far the named branch has run from its upstream.
-///
-/// `None` for a detached head and for a branch nobody set an upstream
-/// on; a branch whose upstream was deleted behind its back reads the
-/// same way, because what a reader can act on is identical.
 fn drift_of(repo: &git2::Repository, branch: Option<&str>) -> Result<Option<Drift>, StorageError> {
     let Some(name) = branch else {
         return Ok(None);
@@ -208,8 +155,6 @@ mod tests {
         )
     }
 
-    /// The file a person is looking for is the one an agent wrote and
-    /// never staged, so an untracked file is a row like any other.
     #[test]
     fn a_file_written_since_the_last_checkpoint_is_listed_untracked_included() {
         let dir = tempfile::tempdir().unwrap();
@@ -231,8 +176,6 @@ mod tests {
         assert_eq!(status.files[1].how, How::Modified);
     }
 
-    /// A building asks about its own files, so another building's work
-    /// is not in its answer.
     #[test]
     fn the_scope_keeps_another_buildings_work_out_of_the_answer() {
         let dir = tempfile::tempdir().unwrap();
@@ -263,8 +206,6 @@ mod tests {
         );
     }
 
-    /// A branch nobody set an upstream on is not a branch level with
-    /// one, and a page that read `0/0` would say the work is pushed.
     #[test]
     fn a_branch_with_no_upstream_reports_no_drift_rather_than_zero() {
         let dir = tempfile::tempdir().unwrap();
@@ -279,8 +220,6 @@ mod tests {
         assert_eq!(status.drift, None);
     }
 
-    /// A city checkpointed nothing yet still has a working tree, and every
-    /// file in it is work no commit holds.
     #[test]
     fn a_city_with_no_commit_reports_its_files_rather_than_failing() {
         let dir = tempfile::tempdir().unwrap();

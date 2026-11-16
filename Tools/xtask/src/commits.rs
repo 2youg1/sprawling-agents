@@ -3,38 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The subject line and the ruling trailer of every commit in a range,
-//! and on a pull request the title, which a squash merge of two or more
-//! commits turns into the subject main receives
-//! (Tools/xtask/Spec.lean §8-35). Not a gate: gates judge the tree, and this judges
-//! history, so it runs only where a caller names the range.
-
 use std::path::Path;
 use std::process::Command;
 
 use crate::report::{Violation, XtaskError};
 
-/// The one spelling a ruling trailer may take (AGENTS.md, *Commits*).
 const RULING: &str = "Verdict: user-approved";
 
-/// What one run judges (§8-35): a range of history, or a range plus
-/// the pull request title, which its squash merge would land on main
-/// as the subject. The title is never judged alone — no caller has
-/// one without a range.
 pub(crate) enum Target<'a> {
     Range(&'a str),
     RangeAndTitle { range: &'a str, title: &'a str },
 }
 
-/// Where the target breaks the message rules of AGENTS.md.
-///
-/// Reads non-merge commits in the target's range from the repository at
-/// `root`, then checks the title when supplied. Rule violations are returned
-/// as findings; an empty vector means no violations were found.
-///
-/// # Errors
-/// Propagates `XtaskError::Cmd` if reading the range fails; the title is
-/// not checked in that case.
 pub(crate) fn check(root: &Path, target: Target<'_>) -> Result<Vec<Violation>, XtaskError> {
     let (range, title) = match target {
         Target::Range(range) => (range, None),
@@ -53,15 +33,6 @@ pub(crate) fn check(root: &Path, target: Target<'_>) -> Result<Vec<Violation>, X
     Ok(violations)
 }
 
-/// Where the non-merge commits in `range` break the message rules of AGENTS.md.
-///
-/// Reads Git history in `root`, returning each finding with the first ten
-/// characters of its commit hash as the location. A range with no commits
-/// or no violations returns an empty vector.
-///
-/// # Errors
-/// Returns `XtaskError::Cmd` if running Git or collecting its output fails,
-/// or if Git exits unsuccessfully, including when it refuses the range.
 #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn range_violations(root: &Path, range: &str) -> Result<Vec<Violation>, XtaskError> {
     let cmd = format!("git log --no-merges {range}");
@@ -95,8 +66,6 @@ fn range_violations(root: &Path, range: &str) -> Result<Vec<Violation>, XtaskErr
         .collect())
 }
 
-/// One finding dressed for the report: the gate, the rule it broke,
-/// and the recovery a reader can act on.
 fn violation_for(location: String, violation: String, alternative: &str) -> Violation {
     Violation {
         gate: "commits",
@@ -107,7 +76,6 @@ fn violation_for(location: String, violation: String, alternative: &str) -> Viol
     }
 }
 
-/// Every way one commit message breaks the rules, one sentence each.
 fn findings(message: &str) -> Vec<String> {
     let subject = message.lines().next().unwrap_or_default();
     let carded = (!carded(subject)).then(|| {
@@ -125,8 +93,6 @@ fn findings(message: &str) -> Vec<String> {
         .collect()
 }
 
-/// Every way a pull request title breaks the subject rule. The title
-/// is one subject line: it has no body, so no ruling trailer is read.
 fn title_findings(title: &str) -> Vec<String> {
     (!carded(title))
         .then(|| {
@@ -138,7 +104,6 @@ fn title_findings(title: &str) -> Vec<String> {
         .collect()
 }
 
-/// Whether a subject matches `^CS\d+\.[0-9A-Z]+: `.
 fn carded(subject: &str) -> bool {
     subject
         .strip_prefix("CS")

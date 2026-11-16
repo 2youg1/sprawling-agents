@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The cache shape of one request: which bytes a prompt cache compares,
-//! which region of the request moved since the request before it, and
-//! how much this request can be billed for.
-//!
-//! Three regions make a request: the frozen system (its four segments),
-//! the tool table, and the conversation this run has accumulated. A
-//! cache miss is worth recording only when it says which of the three
-//! moved, which is what [`PromptShape::attribute`] answers and what
-//! `prompt_shape_compared` carries into the ledger.
-//!
-//! **The breakpoint marker is request-side only.** The breakpoint plan
-//! marks one message and that mark has no serde (kernel's
-//! `ChatMessage`), so the bytes any record holds are the same with and
-//! without it.
-
 use kernel::event::record::{
     PartChange, PromptAssembled, PromptShapeCompared, ShapeChanged, ShapePart,
 };
@@ -27,10 +12,6 @@ use serde::Deserialize;
 use super::FrozenPrefix;
 use super::segment::SegmentSlot;
 
-/// One request's cache shape: the four frozen segments, the tool table,
-/// and the conversation. The segments are the system half a prompt cache
-/// matches first; the last two are the halves that grow or change after
-/// a run is frozen, and they are what the frozen half exists to protect.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PromptShape {
     segments: [ShapePart; 4],
@@ -38,8 +19,6 @@ pub(crate) struct PromptShape {
     run: ShapePart,
 }
 
-/// The bytes of one request region, measured in the canonical encoding
-/// it travels in, and hashed with the one hash this city has.
 fn part_of(bytes: Vec<u8>) -> Result<ShapePart, AxError> {
     Ok(ShapePart {
         bytes: u64::try_from(bytes.len()).map_err(|_| {
@@ -58,12 +37,7 @@ fn part_of(bytes: Vec<u8>) -> Result<ShapePart, AxError> {
 }
 
 impl PromptShape {
-    /// The shape of the request a turn is about to send: the frozen
-    /// prefix's own hashes, the tool table's canonical JSON, and the
-    /// window's canonical JSON.
-    ///
-    /// # Errors
-    /// A region that will not serialise, or one longer than `u64` holds.
+
     pub(crate) fn of(
         prefix: &FrozenPrefix,
         tools: &[ToolDef],
@@ -116,11 +90,6 @@ impl PromptShape {
         })
     }
 
-    /// The rebuild path: a shape reassembled from the parts a record
-    /// states (`prompt_assembled` for the segments, `prompt_shape_compared`
-    /// for the other two). Same type, same judgements - a replay re-derives
-    /// an attribution with [`PromptShape::attribute`] rather than trusting
-    /// the one that was written down.
     pub(crate) fn from_parts(
         segments: [ShapePart; 4],
         tools: ShapePart,
@@ -133,15 +102,6 @@ impl PromptShape {
         }
     }
 
-    /// What moved since the request before this one, named by region and,
-    /// inside the system half, by frozen segment.
-    ///
-    /// `None` is a run's first request: it is answered as
-    /// [`ShapeChanged::FirstRequest`] rather than as a shape in which
-    /// nothing moved, because nothing moved describes two shapes that
-    /// agree and a first request has no shape to agree with. A reader who
-    /// saw `changed: false` here would expect a cache hit that cannot
-    /// happen.
     pub(crate) fn attribute(&self, baseline: Option<&PromptShape>) -> ShapeChanged {
         let Some(prior) = baseline else {
             return ShapeChanged::FirstRequest;
@@ -162,14 +122,6 @@ impl PromptShape {
         }
     }
 
-    /// The record this shape leaves behind, with the attribution its own
-    /// judgement produced and the billing bound [`PromptShape::request_upper_bound`]
-    /// computed. The segments are absent from the payload for the reason
-    /// `prompt_shape_compared` records: `prompt_assembled` already states
-    /// them.
-    ///
-    /// # Errors
-    /// A total past what a `u64` holds.
     pub(crate) fn recorded(&self, changed: ShapeChanged) -> Result<PromptShapeCompared, AxError> {
         Ok(PromptShapeCompared {
             tools: self.tools,
@@ -179,20 +131,6 @@ impl PromptShape {
         })
     }
 
-    /// The most bytes this request can be billed as input: the four
-    /// segments, the tool schemas and the conversation, counted in the
-    /// encodings they are assembled from and added with checked
-    /// arithmetic.
-    ///
-    /// An upper bound rather than an estimate because no token is shorter
-    /// than one byte of input, so this figure never falls below the input
-    /// tokens a provider may bill. The request's own framing - the model
-    /// name, the role words, the JSON keys - rides on top of these bytes
-    /// and is billed with them, which is why this is stated as a bound on
-    /// the payload rather than as the body's exact size.
-    ///
-    /// # Errors
-    /// A total past what a `u64` holds.
     pub(crate) fn request_upper_bound(&self) -> Result<u64, AxError> {
         let mut total = 0_u64;
         for part in self.segments.iter().chain([&self.tools, &self.run]) {
@@ -209,8 +147,6 @@ impl PromptShape {
     }
 }
 
-/// Two regions of the same request compared: did the cache's prefix
-/// break here or not.
 fn between(mine: ShapePart, theirs: ShapePart) -> PartChange {
     if mine == theirs {
         PartChange::Same
@@ -219,9 +155,6 @@ fn between(mine: ShapePart, theirs: ShapePart) -> PartChange {
     }
 }
 
-/// The four `prompt_assembled` rows a replay rebuilds a shape from. The
-/// payload is read through the record type, so the key spellings have
-/// one home - `kernel::event::record::PromptSegment`.
 pub(crate) fn segment_parts_of(assembled: &serde_json::Value) -> Result<[ShapePart; 4], AxError> {
     let assembled = PromptAssembled::deserialize(assembled).map_err(|err| {
         AxError::failure(

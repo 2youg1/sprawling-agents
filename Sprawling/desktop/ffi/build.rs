@@ -3,39 +3,21 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Builds the Zig leaf with the standard library alone: `zig build-lib`
-//! into this package's `OUT_DIR`, linked as a static library, on a
-//! Windows target and nowhere else (`Sprawling/desktop/Spec.lean` D12).
-//! When `DOCS_RS` is set, the script returns without Zig: docs.rs has
-//! none, and rustdoc does not link the leaf (`desktop_ffi` D7).
-//!
-//! Three checks run before anything is compiled, because they are cheaper
-//! to read here than as a link error: the leaf's step vocabulary in
-//! `zig/step.zig` is the one `src/step.rs` defines, and the `zig` on
-//! the search path is the version `zig-version` pins; the native Record
-//! fields, order and types also match the Rust declaration (desktop_ffi D5).
-
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 include!("src/step.rs");
 
-/// The file that pins the Zig version, read by this script, by the
-/// doctor's `zig` row and by CI's install step.
 const PIN: &str = "zig-version";
 
-/// The leaf's library name, which `[package] links` names as well.
 const LIBRARY: &str = "sprawling_desktop_leaf";
 
-/// The Windows libraries the leaf's `extern` declarations name.
 const SYSTEM: [&str; 6] = [
     "user32", "gdi32", "kernel32", "shcore", "advapi32", "userenv",
 ];
 
 fn main() -> Result<(), String> {
-    // docs.rs sets DOCS_RS and has no Zig; rustdoc does not link the leaf
-    // (`desktop_ffi` D7). Named so a later build without the variable
-    // reruns this script instead of reusing the skip.
+
     println!("cargo::rerun-if-env-changed=DOCS_RS");
     if documenting() {
         return Ok(());
@@ -69,7 +51,6 @@ fn main() -> Result<(), String> {
     Ok(())
 }
 
-/// Whether this build is for docs.rs documentation (`DOCS_RS`).
 fn documenting() -> bool {
     std::env::var_os("DOCS_RS").is_some()
 }
@@ -78,7 +59,6 @@ fn variable(name: &str) -> Result<String, String> {
     std::env::var(name).map_err(|err| format!("cargo set no {name}: {err}"))
 }
 
-/// Refuses a `zig/step.zig` that is not the rendering of [`Step::ALL`].
 fn spelled_alike(here: &Path) -> Result<(), String> {
     let zig = here.join("zig").join("step.zig");
     let written =
@@ -92,7 +72,6 @@ fn spelled_alike(here: &Path) -> Result<(), String> {
     ))
 }
 
-/// The Zig enum [`Step::ALL`] spells, one field per line.
 fn rendered() -> String {
     let fields: String = Step::ALL
         .iter()
@@ -101,7 +80,6 @@ fn rendered() -> String {
     format!("pub const Step = enum(u32) {{\n{fields}}};\n")
 }
 
-/// Refuses a missing `zig`, or one of another version than the pin.
 #[expect(clippy::disallowed_methods, reason = "build script (child D4)")]
 fn pinned_zig(pinned: &str) -> Result<(), String> {
     let install = format!(
@@ -121,8 +99,6 @@ fn pinned_zig(pinned: &str) -> Result<(), String> {
     ))
 }
 
-/// The Zig target for this Rust target, and the file name its static
-/// library takes there.
 fn target() -> Result<(String, String), String> {
     let arch = match variable("CARGO_CFG_TARGET_ARCH")?.as_str() {
         "x86_64" => "x86_64",
@@ -139,9 +115,6 @@ fn target() -> Result<(String, String), String> {
     })
 }
 
-/// `zig build-lib` of `zig/leaf.zig`. `ReleaseSafe` keeps every bounds
-/// and overflow check of the leaf in the shipped binary, where a failed
-/// one traps.
 #[expect(clippy::disallowed_methods, reason = "build script (child D4)")]
 fn compiled(here: &Path, out: &Path, triple: &str, file: &str) -> Result<(), String> {
     let built = Command::new("zig")

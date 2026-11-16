@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One MCP server's answer as the model reads it (`Sprawling/runtime/spec/Pipeline.lean`
-//! §8-27-10): text that fits passes untouched, text that does not is
-//! stored whole and replaced by a window the model pages with `read`,
-//! a PNG picture is stored in the content store and travels as an
-//! attachment, with a line of text where it stood, and a sound is stored
-//! there too and named by its locator in a line of its own.
-
 use base64::Engine as _;
 use kernel::consts_policy::IMAGE_MAX_BYTES;
 use kernel::{AxCode, AxError, B3Hash, ImageRef, ImageType, Locator, Payload, ToolOutcome};
@@ -19,30 +12,8 @@ use crate::offload::OffloadSite;
 
 use super::{PackContext, package};
 
-/// The most text one connector answer puts into the window.
 pub const CONNECTOR_CAP_BYTES: u64 = 16_384;
 
-/// Packages one connector answer for the window.
-///
-/// An answer without a `content` array comes back untouched. Otherwise
-/// the text comes first: if it fits [`CONNECTOR_CAP_BYTES`] it stays,
-/// and if it does not, the text blocks, joined in order, are stored
-/// whole through [`package`] and replaced by one text block holding the
-/// substitute, every other block following it in its original order,
-/// with the account of the move in the result's `offload` field. Then
-/// every `image` block is replaced where it stands: a PNG this city can
-/// measure is stored in the content store and added to the attachments,
-/// and any other picture becomes a sentence saying why it was left out.
-/// Every `audio` block is replaced the same way, by a line naming the
-/// locator it was stored under, and is no attachment: the model cannot
-/// hear it, and a tool that reads recordings takes the locator. The
-/// pictures and sounds come second so that the line standing for one is
-/// never folded into text the model has to page to find, and no base64
-/// reaches the window or the ledger either way.
-///
-/// # Errors
-/// Propagates whatever [`package`] reports about the store, and a
-/// content store that will not take a picture.
 pub fn package_connector(
     outcome: ToolOutcome,
     mut offload: OffloadSite<'_>,
@@ -59,12 +30,6 @@ pub fn package_connector(
     with_media_stored(paged, &mut offload)
 }
 
-/// Every `image` and `audio` block of an answer replaced by the words
-/// that stand for it, with the pictures this city could measure added as
-/// attachments.
-///
-/// # Errors
-/// Propagates a content store that will not take the bytes.
 fn with_media_stored(
     outcome: ToolOutcome,
     offload: &mut OffloadSite<'_>,
@@ -99,8 +64,6 @@ fn with_media_stored(
     })
 }
 
-/// The text step: an answer whose text fits comes back as it is, and
-/// one whose text does not is stored and paged.
 fn windowed(outcome: ToolOutcome, offload: OffloadSite<'_>) -> Result<ToolOutcome, AxError> {
     let Some(Value::Array(blocks)) = outcome.result.as_map().get("content") else {
         return Ok(outcome);
@@ -156,11 +119,6 @@ fn windowed(outcome: ToolOutcome, offload: OffloadSite<'_>) -> Result<ToolOutcom
     })
 }
 
-/// One `image` block as the words that stand in its place, and the
-/// attachment it became when this city could measure it.
-///
-/// # Errors
-/// Propagates a content store that will not take the bytes.
 fn pictured(
     block: &Value,
     offload: &mut OffloadSite<'_>,
@@ -169,8 +127,7 @@ fn pictured(
         Ok(measured) => measured,
         Err(why) => return Ok((text_block(format!("[picture left out: {why}]")), None)),
     };
-    // The store hashes what it takes the way `png_picture` named it, so
-    // the locator the picture already carries is the one it is kept under.
+
     offload
         .cas
         .put_for(&bytes, &offload.origin)
@@ -179,9 +136,6 @@ fn pictured(
     Ok((text_block(words), Some(picture)))
 }
 
-/// The bytes of a picture this city can carry and the picture they are,
-/// or the reason they cannot be carried, as the words the model reads in
-/// its place.
 fn measured(block: &Value) -> Result<(Vec<u8>, ImageRef), String> {
     if block.get("mimeType").and_then(Value::as_str) != Some(ImageType::Png.mime()) {
         return Err("only png is measured here; ask the tool for png".to_owned());
@@ -198,19 +152,6 @@ fn measured(block: &Value) -> Result<(Vec<u8>, ImageRef), String> {
     Ok((bytes, picture))
 }
 
-/// The picture `bytes` are, as this city carries one: a PNG inside
-/// [`IMAGE_MAX_BYTES`] whose header gives its two sides, referred to by
-/// the `cas:` locator its bytes hash to (`Sprawling/runtime/spec/Tools/BoundReader.lean` §8-59).
-///
-/// The one recognition a picture gets, whether it arrived in a
-/// connector's answer or was named to a tool. Only PNG is measured, for
-/// the reason the browser's screenshots give: another format needs a
-/// second decoder to read its sides, and a side read wrong is worse than
-/// none.
-///
-/// # Errors
-/// The refusal [`IMAGE_MAX_BYTES`] gives bytes past it, and
-/// `E_INVALID_ARGS` when the bytes are not a PNG whose header reads.
 pub fn png_picture(bytes: &[u8]) -> Result<ImageRef, AxError> {
     let locator = picture_locator(bytes)?;
     let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes));
@@ -233,8 +174,6 @@ pub fn png_picture(bytes: &[u8]) -> Result<ImageRef, AxError> {
     })
 }
 
-/// The words that stand where a picture is attached, shared by a
-/// connector answer and `read` so both teach the same locator.
 pub(crate) fn picture_line(picture: &ImageRef) -> String {
     format!(
         "[picture attached: {} {}x{}, {}]",
@@ -245,13 +184,6 @@ pub(crate) fn picture_line(picture: &ImageRef) -> String {
     )
 }
 
-/// A picture `read` can attach, or `None` when the bytes name no format
-/// the canonical conversation carries. Dimensions come from the header;
-/// pixels are never decoded.
-///
-/// # Errors
-/// `E_INVALID_ARGS` for a recognized image whose header does not read,
-/// and the shared `IMAGE_MAX_BYTES` refusal for bytes past the ceiling.
 pub(crate) fn read_picture(bytes: &[u8]) -> Result<Option<ImageRef>, AxError> {
     let reader = image::ImageReader::new(std::io::Cursor::new(bytes))
         .with_guessed_format()
@@ -282,9 +214,6 @@ pub(crate) fn read_picture(bytes: &[u8]) -> Result<Option<ImageRef>, AxError> {
     }))
 }
 
-/// The canonical conversation's reading of an image format. Other image
-/// formats remain ordinary files for `read`, rather than gaining a media
-/// type no provider request can carry.
 #[expect(
     clippy::wildcard_enum_match_arm,
     reason = "image::ImageFormat is upstream and non-exhaustive; unsupported formats return None"
@@ -299,19 +228,12 @@ fn picture_type(format: image::ImageFormat) -> Option<ImageType> {
     }
 }
 
-/// The one byte ceiling and content address every picture recognition
-/// path uses.
 fn picture_locator(bytes: &[u8]) -> Result<Locator, AxError> {
     let locator = Locator::cas(B3Hash::digest(bytes));
     IMAGE_MAX_BYTES.admit(&locator, bytes.len())?;
     Ok(locator)
 }
 
-/// One `audio` block as the line that names where it was stored, or the
-/// reason it was left out.
-///
-/// # Errors
-/// Propagates a content store that will not take the bytes.
 fn heard(block: &Value, offload: &mut OffloadSite<'_>) -> Result<Value, AxError> {
     let (bytes, media) = match sound_of(block) {
         Ok(sound) => sound,
@@ -328,9 +250,6 @@ fn heard(block: &Value, offload: &mut OffloadSite<'_>) -> Result<Value, AxError>
     )))
 }
 
-/// The bytes of a sound block and the media type it names, or the
-/// reason they cannot be carried. The container is not judged here: the
-/// tool that reads a recording judges it (runtime D15).
 fn sound_of(block: &Value) -> Result<(Vec<u8>, &str), String> {
     let media = block
         .get("mimeType")
@@ -350,17 +269,14 @@ fn sound_of(block: &Value) -> Result<(Vec<u8>, &str), String> {
     Ok((bytes, media))
 }
 
-/// Whether a block is one MCP marks `"type": "audio"`.
 fn is_sound(block: &Value) -> bool {
     block.get("type").and_then(Value::as_str) == Some("audio")
 }
 
-/// Whether a block is one MCP marks `"type": "image"`.
 fn is_picture(block: &Value) -> bool {
     block.get("type").and_then(Value::as_str) == Some("image")
 }
 
-/// One text block holding `text`.
 fn text_block(text: String) -> Value {
     let mut block = Map::new();
     block.insert("type".to_owned(), Value::String("text".to_owned()));
@@ -368,7 +284,6 @@ fn text_block(text: String) -> Value {
     Value::Object(block)
 }
 
-/// The text of a block MCP marks `"type": "text"`, and nothing else.
 fn text_of(block: &Value) -> Option<&str> {
     (block.get("type").and_then(Value::as_str) == Some("text"))
         .then(|| block.get("text").and_then(Value::as_str))

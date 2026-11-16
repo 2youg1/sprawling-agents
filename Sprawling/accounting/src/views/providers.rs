@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the settings page reads back about providers and the
-//! configuration ladder: every attached endpoint with the tuning it was
-//! attached with, the ladder of one address with its `[search]`,
-//! whether each listed account's key is there, and the window and
-//! ceiling the figure ladder answers for each row of the model table.
-//!
-//! Both answers ask the vault, and asking the vault asks the platform's
-//! credential service, so both finish after the snapshot is let go. The
-//! one reading of an account into a [`wire::KeyState`] lives here, for
-//! both (`Sprawling/accounting/spec/Views.lean` §8-36).
-
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -23,17 +12,15 @@ use kernel::{Address, AxError, DialectKind};
 
 use super::prepared::unavailable_because;
 
-/// The vault the worker lent the views.
 type Vault = Arc<Mutex<gateway::Custodian>>;
 
-/// What the two provider questions copied out of the snapshot.
 pub enum ProviderAsk {
-    /// The endpoint book as it stood, each row's keys still to read.
+
     Endpoints {
         held: wire::EndpointsAnswer,
         vault: Option<Vault>,
     },
-    /// The configuration ladder of one address.
+
     Config {
         city_root: PathBuf,
         addr: Address,
@@ -42,11 +29,7 @@ pub enum ProviderAsk {
 }
 
 impl ProviderAsk {
-    /// The answer, read with the snapshot let go.
-    ///
-    /// A ladder, a `[search]` table or a vault lock that cannot be read
-    /// is "I could not look", with what stopped it, rather than an answer
-    /// missing a part.
+
     pub(super) fn answer(self) -> wire::Answer {
         match self {
             ProviderAsk::Endpoints { held, vault } => match with_keys(held, vault.as_ref()) {
@@ -65,9 +48,6 @@ impl ProviderAsk {
     }
 }
 
-/// The settings page's read of the endpoint book, while the snapshot is
-/// held: every row with the tuning it was attached with, and no key
-/// read yet.
 pub(super) fn endpoints_answer(book: &gateway::EndpointBook) -> wire::EndpointsAnswer {
     let endpoints = book
         .endpoints()
@@ -118,7 +98,6 @@ fn parameter_summary(answer: gateway::ParameterAnswer) -> wire::ParameterAnswer 
     }
 }
 
-/// The gateway's resolved generation answer, renamed for the wire.
 fn generation_summary(answer: gateway::GenerationAnswer) -> wire::GenerationAnswer {
     wire::GenerationAnswer {
         settings: answer.settings,
@@ -130,8 +109,6 @@ fn generation_summary(answer: gateway::GenerationAnswer) -> wire::GenerationAnsw
     }
 }
 
-/// The gateway's offer as the wire spells it: the ladder is climbed
-/// once, by `gateway::provider::thinking`, and this only renames.
 fn thinking_summary(offer: gateway::ThinkingOffer) -> wire::ThinkingOffer {
     wire::ThinkingOffer {
         levels: offer.levels.iter().collect(),
@@ -153,8 +130,6 @@ fn thinking_summary(offer: gateway::ThinkingOffer) -> wire::ThinkingOffer {
     }
 }
 
-/// What the model table asks about: the endpoint, the text in the base
-/// URL box, the face picked beside it, and the rows of the table.
 pub(super) struct TableRows<'q> {
     pub(super) endpoint: &'q str,
     pub(super) base_url: &'q str,
@@ -162,13 +137,6 @@ pub(super) struct TableRows<'q> {
     pub(super) models: &'q [wire::FiguresAsked],
 }
 
-/// The window and the ceiling a pick with empty boxes would register for
-/// each row, with the rung that answered (`Sprawling/wire/spec/Answer/ModelFigures.lean`
-/// §8-97). Answered while the snapshot is held: it reads the endpoint
-/// book and tables pinned in this build, and never the vault.
-///
-/// A text the normaliser refuses is "I could not look", with the
-/// refusal, rather than rows computed against a host nobody can call.
 pub(super) fn figures_answer(book: &gateway::EndpointBook, asked: &TableRows<'_>) -> wire::Answer {
     match figures_of(book, asked) {
         Ok(models) => wire::Answer::ModelFigures(wire::ModelFiguresAnswer { models }),
@@ -176,11 +144,6 @@ pub(super) fn figures_answer(book: &gateway::EndpointBook, asked: &TableRows<'_>
     }
 }
 
-/// Each row through `gateway::Figures::resolve`, the ladder the pick
-/// point climbs, with the facts the pick point would hand it: no figure
-/// from the person, the provider's row as the page read it, what this
-/// row's tag was registered with on this same model, and the pinned
-/// catalogue, built once for the whole table.
 fn figures_of(
     book: &gateway::EndpointBook,
     asked: &TableRows<'_>,
@@ -232,8 +195,6 @@ fn figures_of(
         .collect())
 }
 
-/// The ceiling as the wire spells it; the decision was taken by
-/// `gateway::OutputCeiling`, and this only renames.
 fn ceiling_line(ceiling: gateway::OutputCeiling) -> wire::CeilingLine {
     match ceiling {
         gateway::OutputCeiling::Sent { tokens, from } => wire::CeilingLine::Sent {
@@ -244,9 +205,6 @@ fn ceiling_line(ceiling: gateway::OutputCeiling) -> wire::CeilingLine {
     }
 }
 
-/// The rung as the wire spells it, one arm per rung, so a rung the
-/// gateway gains is a compile error here rather than a word the page
-/// has no sentence for (wire D58).
 fn figure_from(source: gateway::FigureSource) -> wire::FigureFrom {
     match source {
         gateway::FigureSource::Person => wire::FigureFrom::Person,
@@ -257,8 +215,6 @@ fn figure_from(source: gateway::FigureSource) -> wire::FigureFrom {
     }
 }
 
-/// The book's rows with each listed account's key read, in the order
-/// the row lists them.
 fn with_keys(
     held: wire::EndpointsAnswer,
     vault: Option<&Vault>,
@@ -282,23 +238,6 @@ fn with_keys(
     })
 }
 
-/// What one address is governed by, value by value, with the file each
-/// value came from.
-///
-/// The ladder is climbed once, by the module that owns it, and the rung
-/// it answers with is carried through rather than re-derived: a page
-/// told only the resolved setting would have to read all three files and
-/// climb the same ladder a second time, and two climbs of one ladder are
-/// two answers to one question.
-///
-/// The figures an endpoint nobody tuned is called with are read out of
-/// `gateway::EndpointTuning::DEFAULTS`, which is their one home; a form
-/// that printed its own numbers into empty boxes is what this answer
-/// exists to retire.
-///
-/// # Errors
-/// Propagates a ladder or a `[search]` table that cannot be read, and a
-/// poisoned vault lock.
 pub(crate) fn config_answer(
     city_root: &Path,
     addr: &Address,
@@ -345,8 +284,6 @@ pub(crate) fn config_answer(
     })
 }
 
-/// `[search]` at `addr`, the city's own statement of it, and the keys
-/// of the suppliers the city lists.
 fn settled_search(
     city_root: &Path,
     addr: &Address,
@@ -379,9 +316,6 @@ fn settled_search(
     })
 }
 
-/// The one place the ladder's rung becomes the wire's. Exhaustive, so a
-/// rung added to the ladder is a compiler error here rather than a page
-/// that silently reports the wrong file.
 fn rung_of(layer: city::Layer) -> wire::ConfigLayer {
     match layer {
         city::Layer::City => wire::ConfigLayer::City,
@@ -396,7 +330,6 @@ fn lock(vault: &Vault) -> Result<std::sync::MutexGuard<'_, gateway::Custodian>, 
         .map_err(|_poisoned| crate::held_vault::poisoned_vault())
 }
 
-/// Each account's key, in the order listed.
 fn statuses(
     accounts: &[ProviderAccount],
     custodian: Option<&gateway::Custodian>,
@@ -410,10 +343,6 @@ fn statuses(
         .collect()
 }
 
-/// Where one account's key stands. `describe` answers `writable: false`
-/// only for a key an environment variable supplies, so that is the
-/// environment's pair of states, and the vault's pair is read by
-/// whether it holds a value.
 fn key_state(account: &ProviderAccount, custodian: Option<&gateway::Custodian>) -> wire::KeyState {
     let Some(reference) = &account.reference else {
         return wire::KeyState::Anonymous;
@@ -436,9 +365,6 @@ mod tests {
     use super::*;
     use kernel::config::SearchSupplier;
 
-    /// A value no file states is still answered, with the default named
-    /// as the layer it came from and the domain a file may state; a page
-    /// told `null` has to keep its own copy of both to draw anything.
     #[test]
     fn an_unstated_second_rung_is_answered_with_the_default_as_its_layer() {
         let dir = tempfile::tempdir().unwrap();
@@ -457,9 +383,6 @@ mod tests {
         );
     }
 
-    /// Both rungs the context ring draws travel on the one answer it
-    /// reads; the page keeps no copy of the first (`Sprawling/wire/Spec.lean`
-    /// §8-77).
     #[test]
     fn the_first_rung_is_answered_beside_the_second() {
         let dir = tempfile::tempdir().unwrap();
@@ -471,9 +394,6 @@ mod tests {
         );
     }
 
-    /// The figures an untuned endpoint is called with name their layer
-    /// too: no file on the ladder states them, so the answer says they
-    /// are this build's own rather than leaving the page to guess.
     #[test]
     fn the_tuning_defaults_are_answered_with_the_default_as_their_layer() {
         let dir = tempfile::tempdir().unwrap();
@@ -493,9 +413,6 @@ mod tests {
         }
     }
 
-    /// Each of the six words is what the vault says about one account:
-    /// a key stored, none, one an environment variable supplies, one it
-    /// spoils, no reference at all, and no vault to ask.
     #[test]
     fn every_key_state_is_read_from_what_the_vault_describes() {
         let mut vault = gateway::Custodian::in_memory().with_env_reader(Box::new(|key| {
@@ -546,9 +463,6 @@ mod tests {
         );
     }
 
-    /// A building that states its own `[search]` governs the room, and
-    /// the page is still handed the city's own value to edit, with the
-    /// keys of the suppliers that value lists and the default's address.
     #[test]
     fn the_search_answer_names_the_city_value_apart_from_a_building_override() {
         let dir = tempfile::tempdir().unwrap();
@@ -592,12 +506,6 @@ mod tests {
         );
     }
 
-    /// A catalogue-known id behind a relay the person typed without a
-    /// scheme answers the preset table's window on every face, and the
-    /// vendor's ceiling only on the messages face, which needs one; the
-    /// same id on a server on this machine has no window any rung states
-    /// (gateway D45). Text the normaliser refuses answers nothing, with
-    /// the refusal.
     #[test]
     fn a_relay_forwarding_a_vendors_id_answers_the_vendors_window() {
         let book = gateway::EndpointBook::new();
@@ -666,8 +574,6 @@ mod tests {
         ));
     }
 
-    /// The page reads the rung under the word `model_selected` records
-    /// it by, so a person sees the same word in the form and the account.
     #[test]
     fn each_rung_travels_under_the_word_the_ledger_records() {
         let sources = [

@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The refusal conformance matrix. Every Deny the doors can
-//! produce carries the three mandatory parts, each non-empty, and the
-//! alternative is directive prose (names a next action), because the
-//! model is the recovery subject.
-
-// The samples this file judges are compiled only with the conformance
-// feature (`gate::conformance`, kernel D3), so the
-// target is judged in that build and is empty in every other.
 #![cfg(feature = "conformance")]
 #![allow(
     clippy::unwrap_used,
@@ -22,7 +14,6 @@
 
 use kernel::gate::{DOORS, DoorId, GateOutcome, conformance};
 
-/// The matrix row: three parts present, non-empty, alternative directive.
 fn assert_complete_refusal(refusal: &kernel::AxError, door: &str) {
     let gate = refusal
         .gate()
@@ -35,9 +26,6 @@ fn assert_complete_refusal(refusal: &kernel::AxError, door: &str) {
     );
 }
 
-/// Walks `DOORS` rather than naming doors one at a time, so a door
-/// added to the enum is a door this matrix judges. The samples call the
-/// real functions, so what is judged is the answer a run receives.
 #[test]
 fn every_door_denial_carries_a_complete_teaching_refusal() {
     for door in DOORS {
@@ -59,10 +47,6 @@ fn every_door_denial_carries_a_complete_teaching_refusal() {
     }
 }
 
-/// The YOLO rule of kernel D1 is one door wide, and
-/// this is the property that says so: walking the roster, exactly one
-/// door answers Ask, and it is the attach door. A second asking door
-/// breaks this line rather than a reader's expectation.
 #[test]
 fn exactly_one_door_asks_a_person() {
     let asking: Vec<DoorId> = DOORS
@@ -78,8 +62,7 @@ fn exactly_one_door_asks_a_person() {
 
 #[test]
 fn gate_code_carriers_all_point_at_gate_denied() {
-    // The refusal codes the doors produce carry into history via
-    // gate_denied (C9): the matrix cross-checks the carrier table.
+
     use kernel::{AxCode, Carrier, EventKind};
     for code in [
         AxCode::OutsideWriteDomain,

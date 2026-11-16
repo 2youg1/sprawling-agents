@@ -27,9 +27,6 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
     crate::worker::fixture::init_city(dir.path()).unwrap();
     lay_rules(dir.path(), "vault", &shut_rules(""));
 
-    // A remote endpoint, wired as the provider for a confidential
-    // building: the refusal must come from the adapter that could
-    // leak, not from a routing table that a mistake could bypass.
     let endpoint = gateway::Endpoint::new(
         gateway::EndpointConfig {
             base_url: "http://127.0.0.1:1/v1/messages".to_owned(),
@@ -64,9 +61,7 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push((record.kind(), serde_json::to_string(record.data()).unwrap()));
     }));
-    // The keystroke is accepted; the refusal belongs to the run's own
-    // account (drive backstop). What must never happen is
-    // a chat POST reaching the endpoint.
+
     worker
         .handle(wire::Command::Dispatch {
             addr: Address::parse("vault/room1").unwrap(),
@@ -101,12 +96,6 @@ fn a_confidential_building_stops_the_run_before_a_remote_call() {
     );
 }
 
-/// The fourth thing a confidential building means: what is in it is read
-/// by nobody outside it (`Sprawling/city/Spec.lean` §8-2). A run in an ordinary building
-/// asks for a confidential building's file twice - once by path, once by
-/// a search with no path - and the provider it talks to must never see
-/// the file's bytes, because that provider is exactly where they would
-/// leave the machine.
 #[test]
 fn a_run_in_another_building_reads_nothing_of_a_confidential_one() {
     let dir = tempfile::tempdir().unwrap();
@@ -175,9 +164,7 @@ fn a_run_in_another_building_reads_nothing_of_a_confidential_one() {
 }
 #[test]
 fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
-    // Named on the host: a sandboxed command copies the room and its
-    // deletion dies with the copy, so only a host command can leave the
-    // sweep something to report (`Sprawling/runtime/Spec.lean` §8-13-2).
+
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = dir.path().join("lab").join("room1");
@@ -235,18 +222,6 @@ fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
     );
 }
 
-/// What the Ledger means by "every effect becomes an EventRecord
-/// first", read from the one place where *first* is visible: the
-/// write observer, which `storage::jsonl` runs on the appending
-/// thread **after** the line is durable.
-///
-/// One run files a decision on the building's shelf and takes a row
-/// from the shared plan. At the instant each line lands, the city
-/// must not already carry what that line announces - otherwise a
-/// process dying between the two leaves a shelf entry and a claimed
-/// row that the history never mentions, and the shelf's own comment
-/// ("nothing is on the shelf that the history does not already
-/// carry") is false.
 fn delete_command(name: &str) -> String {
     if cfg!(windows) {
         format!("cmd /C del {name}")

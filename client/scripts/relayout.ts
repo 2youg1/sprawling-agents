@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The relayout probe (Tools/xtask/budgets.toml `stream_relayout`): what one
-// streamed token costs the page in script plus forced layout, for the
-// raw shape a live turn used to draw and the block shape
-// `talk/saying.svelte` draws now, and how far the turn jumps when the
-// record takes over. Run with `bun scripts/relayout.ts [browser]`; the
-// browser defaults to Edge, the engine `xtask render` also prefers.
-// The page is built from `relayout_page.ts` and loaded headless with
-// `--dump-dom`, which prints the page after its script has run; the page
-// reports its own summary, so this half only builds, runs and prints.
-
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

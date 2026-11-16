@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the allowlist is held to: the three ways it closes, the two
-//! switches, and the windows it neither admits nor discloses.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -25,8 +22,6 @@ fn reach(tool: ToolName, title: Option<&str>) -> Reach<'_> {
     }
 }
 
-/// The rule the whole file exists for: with no scope, this server
-/// does nothing at all.
 #[test]
 fn a_missing_scope_file_refuses_everything() {
     let nowhere = Path::new("no-such-directory-here/DESKTOP.toml");
@@ -55,7 +50,6 @@ fn a_missing_scope_file_refuses_everything() {
     }
 }
 
-/// A file that cannot be read is not a file that permits everything.
 #[test]
 fn a_damaged_scope_file_closes_the_scope_rather_than_opening_it() {
     for text in ["windows = [", "windows = 3", "widnows = [\"*\"]"] {
@@ -92,8 +86,7 @@ fn a_listed_window_is_admitted_and_an_unlisted_one_is_not() {
             .unwrap()
             .contains("DESKTOP.toml")
     );
-    // A process name is judged against the other list, and a call
-    // naming both has to satisfy both.
+
     let by_process = Scope::parse("processes = [\"Notepad.exe\"]\n");
     let named = |process| Reach {
         tool: ToolName::Snapshot,
@@ -102,7 +95,7 @@ fn a_listed_window_is_admitted_and_an_unlisted_one_is_not() {
     };
     assert!(by_process.admits(&named("NOTEPAD.EXE")).is_ok());
     assert!(by_process.admits(&named("notepad2.exe")).is_err());
-    // A pattern anchored at both ends does not match a longer title.
+
     assert!(
         scope
             .admits(&reach(ToolName::Act, Some("Calculator Plus")))
@@ -110,8 +103,6 @@ fn a_listed_window_is_admitted_and_an_unlisted_one_is_not() {
     );
 }
 
-/// The scope file has no way to say "the whole screen", so the whole
-/// screen is refused rather than assumed.
 #[test]
 fn a_capture_that_names_no_window_is_refused_with_a_next_step() {
     let scope = Scope::parse("windows = [\"*\"]\nrecord = true\n");
@@ -131,8 +122,7 @@ fn a_capture_that_names_no_window_is_refused_with_a_next_step() {
             "{tool:?}"
         );
     }
-    // Listing windows names none by nature, and is how a caller
-    // learns what to name.
+
     assert!(scope.admits(&reach(ToolName::Windows, None)).is_ok());
 }
 
@@ -167,8 +157,6 @@ fn recording_and_the_clipboard_are_each_off_until_their_own_switch_is_on() {
     assert!(open.admits(&reach(ToolName::Clipboard, None)).is_ok());
 }
 
-/// An empty allowlist is a file that lists no window, which is not
-/// the same thing as a file that lists every window.
 #[test]
 fn an_empty_allowlist_admits_no_window() {
     let scope = Scope::parse("record = true\nclipboard = true\n");
@@ -199,10 +187,6 @@ fn a_scope_file_on_disk_is_read_from_the_path_it_was_given() {
     );
 }
 
-/// S-10: a window list is as disclosing as a snapshot, so the tool that
-/// reports titles is held to the allowlist that governs acting on them.
-/// A scope naming Notepad does not disclose that a password manager is
-/// open, nor what document is in the browser.
 #[test]
 fn a_window_this_scope_does_not_list_is_not_even_reported() {
     let scope = Scope::parse("windows = [\"*Notepad*\"]\n");
@@ -214,9 +198,6 @@ fn a_window_this_scope_does_not_list_is_not_even_reported() {
     assert!(!admitted.visible("Board minutes.docx — Word", "winword.exe"));
 }
 
-/// Visibility reads the two lists `admits` reads, so a window reachable
-/// by its process is reported with the title that reaches it — and a
-/// window reachable by neither identifier is reported at all.
 #[test]
 fn a_process_this_scope_lists_makes_its_windows_visible_by_that_name() {
     let by_process = Scope::parse("processes = [\"notepad.exe\"]\n");
@@ -225,8 +206,7 @@ fn a_process_this_scope_lists_makes_its_windows_visible_by_that_name() {
         .expect("listing windows names none by nature");
     assert!(admitted.visible("a.txt — Notepad", "NOTEPAD.EXE"));
     assert!(!admitted.visible("a.txt — Notepad", "notepad2.exe"));
-    // An empty allowlist shows nothing, which is the reading that makes
-    // it admit nothing.
+
     let empty = Scope::parse("record = true\n");
     let nothing = empty
         .admits(&reach(ToolName::Windows, None))
@@ -234,8 +214,6 @@ fn a_process_this_scope_lists_makes_its_windows_visible_by_that_name() {
     assert!(!nothing.visible("a.txt — Notepad", "notepad.exe"));
 }
 
-/// A closed scope hands back no admission at all, so there is no value
-/// a listing could be filtered through and the tool is refused whole.
 #[test]
 fn a_closed_scope_yields_no_admission_to_list_windows_with() {
     assert!(
@@ -245,9 +223,6 @@ fn a_closed_scope_yields_no_admission_to_list_windows_with() {
     );
 }
 
-/// The device a recording hears is the one the scope file names, and
-/// only that one: the operator's naming it is the permission
-/// (`Sprawling/desktop/Spec.lean` D11).
 #[test]
 fn a_recording_hears_the_one_device_the_scope_file_names() {
     let scope = Scope::parse(
@@ -259,9 +234,6 @@ fn a_recording_hears_the_one_device_the_scope_file_names() {
     assert_eq!(heard.ok(), Some(Some("Microphone (USB Audio)".to_owned())));
 }
 
-/// Recording is switched on and no device is named: a call that asks
-/// for sound is refused by the gate, and told where the device names
-/// are listed and which key takes one.
 #[test]
 fn asking_for_sound_without_a_named_device_is_refused_by_the_gate() {
     let scope = Scope::parse("windows = [\"Notepad\"]\nrecord = true\n");

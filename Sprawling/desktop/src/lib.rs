@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! An MCP server that gives an agent eyes and hands on this Windows
-//! desktop.
-//!
-//! Read `Sprawling/desktop/README.md` for what it is and `Sprawling/desktop/Spec.lean`
-//! for why it has this shape. The whole public surface is one function,
-//! because everything else about a server is reached through its
-//! protocol.
-
 mod answer;
 mod outline;
 mod platform;

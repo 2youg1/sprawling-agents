@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One episode per built-in tool: the call the script makes, and what
-//! the tool's own SPEC says the answer is.
-//!
-//! A tool the workbench registers without an episode here is named by
-//! the catalogue tests as offered and never called. The verdicts read
-//! the part of a result that belongs to the tool's contract rather than
-//! the whole result, so a field added for every tool later does not
-//! turn them red. A verdict that fails is either an episode that
-//! misreads its tool's SPEC, fixed here, or a product that disagrees
-//! with its SPEC, fixed in the crate that owns the tool; what the run
-//! happened to answer is never copied into a verdict.
-
 use std::path::Path;
 
 use kernel::event::record::ToolAnswer;
@@ -24,36 +12,31 @@ use serde_json::{Map, Value, json};
 use crate::city::History;
 use crate::script::Step;
 
-/// Where one catalogue test works: the building, the room the task is
-/// sent to, and a room beside it with a resident.
 pub(crate) struct Setup {
     pub(crate) building: &'static str,
     pub(crate) room: &'static str,
     pub(crate) neighbour: &'static str,
 }
 
-/// A building that builds, with a tree of its own for each room.
 pub(crate) const LAB: Setup = Setup {
     building: "lab",
     room: "lab/lead",
     neighbour: "lab/other",
 };
 
-/// City Hall, which plans (`Sprawling/city/Spec.lean` §8-22).
 pub(crate) const HALL: Setup = Setup {
     building: "hall",
     room: "hall/mayor",
     neighbour: "hall/clerk",
 };
 
-/// What a verdict may look at once the dispatch has landed.
 pub(crate) struct Observed<'a> {
     pub(crate) setup: &'a Setup,
     pub(crate) city: &'a Path,
     pub(crate) history: &'a History,
-    /// The run the script drove.
+
     pub(crate) lead: RunId,
-    /// The building's `RULES.toml` as it stood before the dispatch.
+
     pub(crate) rules_before: &'a [u8],
     pub(crate) answer: &'a ToolAnswer,
 }
@@ -63,14 +46,8 @@ pub(crate) struct Episode {
     pub(crate) holds: fn(&Observed<'_>) -> Result<(), String>,
 }
 
-/// Written into the notes and looked for again, so `read` and `search`
-/// are judged on bytes this run put there.
 const MARK: &str = "kiln-temperature-1280";
 
-/// The episodes for a building that builds, in the order they run.
-/// `web_search` comes after `exec`, because what it brings in from
-/// outside taints the run and a tainted run runs no command; `succeed`
-/// is last because the successor starts only when this run ends.
 pub(crate) fn for_builders(setup: &Setup) -> Vec<Episode> {
     let mut episodes = shared(setup);
     episodes.extend([
@@ -85,9 +62,6 @@ pub(crate) fn for_builders(setup: &Setup) -> Vec<Episode> {
     episodes
 }
 
-/// The episodes for City Hall, in the order they run. It has no tree of
-/// its own, so `pr` lists rather than opens; it has no `exec`,
-/// `delegate` or `workshop`, and it has `city`.
 pub(crate) fn for_city_hall(setup: &Setup) -> Vec<Episode> {
     let mut episodes = shared(setup);
     episodes.extend([
@@ -100,7 +74,6 @@ pub(crate) fn for_city_hall(setup: &Setup) -> Vec<Episode> {
     episodes
 }
 
-/// The episodes every building's table shares.
 fn shared(setup: &Setup) -> Vec<Episode> {
     vec![
         status(),
@@ -122,7 +95,6 @@ fn shared(setup: &Setup) -> Vec<Episode> {
     ]
 }
 
-/// The notes file the lead creates in its own room.
 fn notes(setup: &Setup) -> String {
     format!("{}/notes.md", setup.room)
 }
@@ -352,30 +324,24 @@ fn pr_list() -> Episode {
     }
 }
 
-/// The document the lead offers a change to, laid in the city before the
-/// dispatch: a proposal is about the city's copy (documents D35).
 fn draft(setup: &Setup) -> String {
     format!("{}/draft.md", setup.room)
 }
 
 const DRAFT: &str = "# Draft\n\nThe kiln is fired at noon. It cools overnight.\n";
 
-/// Where the draft lies in the city.
 fn draft_path(city: &Path, setup: &Setup) -> std::path::PathBuf {
     draft(setup)
         .split('/')
         .fold(city.to_path_buf(), |at, part| at.join(part))
 }
 
-/// Lays the draft the `proposal` episode offers a change to.
 pub(crate) fn lay_draft(city: &Path, setup: &Setup) {
     let path = draft_path(city, setup);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(path, DRAFT).unwrap();
 }
 
-/// An offer is a card the person is shown and nothing more: the
-/// document keeps its bytes (`Sprawling/accounting/Spec.lean` §8-30).
 fn proposal(setup: &Setup) -> Episode {
     Episode {
         step: Step {
@@ -411,8 +377,6 @@ fn proposal(setup: &Setup) -> Episode {
     }
 }
 
-/// Refused at the effect layer: a run does not change what governs it
-/// (`Sprawling/city/Spec.lean` §8-2b). Judged by the file staying as it was.
 fn rules() -> Episode {
     Episode {
         step: Step {
@@ -431,10 +395,6 @@ fn rules() -> Episode {
     }
 }
 
-/// A shell is off unless a building turns it on, so a command is one
-/// program and its arguments, and a line that needs a shell is refused
-/// rather than run as some other command
-/// (`Sprawling/runtime/spec/Tools/Exec.lean` D118).
 fn exec() -> Episode {
     Episode {
         step: Step {
@@ -510,8 +470,6 @@ fn succeed() -> Episode {
     }
 }
 
-/// The guide of a dormant tool: its whole disclosure, its schema, and
-/// how it is run (`Sprawling/runtime/Spec.lean` §8-60).
 fn detail() -> Episode {
     Episode {
         step: Step {
@@ -529,8 +487,6 @@ fn detail() -> Episode {
     }
 }
 
-/// The members of one namespace the dormant index folded into a line;
-/// the coverage counts them as offered (`catalogue::covered`).
 fn list(namespace: &'static str) -> Episode {
     Episode {
         step: Step {
@@ -547,9 +503,6 @@ fn list(namespace: &'static str) -> Episode {
     }
 }
 
-/// A `tool` `run` that stands for nothing reaches `tool` itself and is
-/// refused by the catalog's own sentence (§8-61); every builder call
-/// above that named a dormant tool directly passed that tool's doors.
 fn run_itself() -> Episode {
     Episode {
         step: Step {
@@ -566,8 +519,6 @@ fn run_itself() -> Episode {
     }
 }
 
-/// Refused at the effect layer: a run does not raise a building
-/// (`Sprawling/city/Spec.lean` §8-23). Judged by the building not existing.
 fn city() -> Episode {
     Episode {
         step: Step {
@@ -584,7 +535,6 @@ fn city() -> Episode {
     }
 }
 
-/// Whether a run started at `room` with the lead as its parent.
 fn started_under(seen: &Observed<'_>, room: &str) -> Result<(), String> {
     ensure(
         seen.history.started().iter().any(|started| {
@@ -603,7 +553,6 @@ fn ensure(holds: bool, otherwise: String) -> Result<(), String> {
     if holds { Ok(()) } else { Err(otherwise) }
 }
 
-/// The result of a call that answered.
 fn answered(answer: &ToolAnswer) -> Result<&Map<String, Value>, String> {
     match answer {
         ToolAnswer::Answered { result } => Ok(result.as_map()),
@@ -611,7 +560,6 @@ fn answered(answer: &ToolAnswer) -> Result<&Map<String, Value>, String> {
     }
 }
 
-/// The error of a call that failed.
 fn failed(answer: &ToolAnswer) -> Result<&Map<String, Value>, String> {
     match answer {
         ToolAnswer::Failed { error } => Ok(error.as_map()),
@@ -619,7 +567,6 @@ fn failed(answer: &ToolAnswer) -> Result<&Map<String, Value>, String> {
     }
 }
 
-/// The `text` field of a call that answered.
 pub(crate) fn answered_text(answer: &ToolAnswer) -> Result<&str, String> {
     answered(answer)?
         .get("text")
@@ -627,17 +574,10 @@ pub(crate) fn answered_text(answer: &ToolAnswer) -> Result<&str, String> {
         .ok_or_else(|| "the result carries no text".to_owned())
 }
 
-// The transcription tool (`Sprawling/app/Spec.lean` §8-131). It is offered only to
-// a city that chose an endpoint to transcribe, and the two catalogue
-// tests choose none, so the tool is covered here by cities of its own.
-
-/// What the scripted transcription endpoint hears in every recording.
 const HEARD: &str = "fire the kiln at dawn";
 
-/// The model the person chose to transcribe.
 const EARS: &str = "whisper-1";
 
-/// Rules for the lab that leave it open and writing where it works.
 pub(crate) const OPEN_LAB: &str = "confidential = false\nwrite = \"everything\"\n";
 
 #[test]
@@ -686,16 +626,12 @@ fn a_run_hears_a_recording_through_the_endpoint_chosen_to_transcribe() {
     assert!(request.contains("RIFF-a-spoken-sentence"), "{request}");
 }
 
-/// The same question the composer's microphone asks, under the rules of
-/// the building the run stands in: a confidential building is never
-/// offered an endpoint off this machine.
 #[test]
 fn a_confidential_building_is_not_offered_a_transcription_endpoint_off_this_machine() {
     let dir = tempfile::tempdir().unwrap();
     let (factory, offered, _) = crate::script::scripted(Vec::new());
     let (mut worker, _) = crate::city::city_with_a_model(dir.path(), factory);
-    // A name that never resolves (RFC 2606): not this machine, and the
-    // model list attaching it asks for fails at once.
+
     choose(
         &mut worker,
         "http://transcribe.invalid/v1",
@@ -723,14 +659,8 @@ fn a_confidential_building_is_not_offered_a_transcription_endpoint_off_this_mach
     );
 }
 
-/// A recording a connector stored: a wav block put into the city's
-/// content store for the lab, the way `runtime::pipeline::connector`
-/// stores one, named by its locator.
 const STORED: &[u8] = b"RIFF\x24\x00\x00\x00WAVEfmt a stored recording";
 
-/// The transcription tool reads a block a connector stored, by the
-/// locator the window showed for it (`Sprawling/app/Spec.lean` §8-131): no name,
-/// so the container is read from its leading bytes.
 #[test]
 fn a_run_hears_a_recording_a_connector_stored_by_its_locator() {
     let dir = tempfile::tempdir().unwrap();
@@ -769,9 +699,6 @@ fn a_run_hears_a_recording_a_connector_stored_by_its_locator() {
     );
 }
 
-/// Puts `bytes` into the city's content store for `building`, as a
-/// connector stores what a run's tool answered with, and names the run
-/// the city's own: who stored a block does not decide who may read it.
 pub(crate) fn stored_for(city: &Path, building: &str, bytes: &[u8]) -> kernel::B3Hash {
     storage::Cas::open(&kernel::layout::CityLayout::new(city).cas())
         .unwrap()
@@ -785,8 +712,6 @@ pub(crate) fn stored_for(city: &Path, building: &str, bytes: &[u8]) -> kernel::B
         .unwrap()
 }
 
-/// Attaches an endpoint at `base_url` and chooses its one model, `model`,
-/// for `tag`, as a person does on the settings page.
 pub(crate) fn choose(
     worker: &mut accounting::worker::RunWorker,
     base_url: &str,
@@ -804,8 +729,7 @@ pub(crate) fn choose(
             auth_header: None,
             admit: vec![model.to_owned()],
             named: Vec::new(),
-            // One brief try, so an endpoint that is not there fails the
-            // model list at once rather than retrying into it.
+
             tuning: wire::EndpointTuning {
                 timeout_ms: Some(2_000),
                 request_max_retries: Some(0),
@@ -827,9 +751,6 @@ pub(crate) fn choose(
         .unwrap();
 }
 
-/// A transcription endpoint on loopback that answers a transcription with
-/// [`HEARD`] and hands back the request that asked for it. Whatever it is
-/// asked before that, the model list attaching it reads, names [`EARS`].
 fn transcription_endpoint() -> (String, std::thread::JoinHandle<String>) {
     use std::io::Write as _;
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -860,7 +781,6 @@ fn transcription_endpoint() -> (String, std::thread::JoinHandle<String>) {
     (url, served)
 }
 
-/// One HTTP request: its head, then as many body bytes as it declared.
 pub(crate) fn read_request(stream: &mut std::net::TcpStream) -> String {
     use std::io::Read as _;
     let mut seen = Vec::new();
@@ -883,8 +803,7 @@ pub(crate) fn read_request(stream: &mut std::net::TcpStream) -> String {
                     .map(|length| length.trim().parse().unwrap())
             })
             .unwrap_or(0);
-        // The head is ASCII, so its length is the same count of bytes in
-        // what was read as in its lossy reading.
+
         if seen.len() >= head.len().saturating_add(4).saturating_add(declared) {
             break;
         }

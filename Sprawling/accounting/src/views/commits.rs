@@ -3,23 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which run wrote a commit, folded from the records that announced it.
-//!
-//! **Why the ledger and not git.** Every commit this city makes carries
-//! five git trailers naming the run, the resident, the model, the effort
-//! and the city. Those trailers are a projection for a reader outside
-//! the city, and reading them back to answer this question would make
-//! the projection the authority. A city exported and restored on another
-//! machine, with no `.git` beside it, still answers from here.
-//!
-//! **Two kinds of record make a commit, and one impostor looks like
-//! one.** A tool wave's checkpoint and a base commit arrive as
-//! `checkpoint_committed` under the key `oid`; the merge a review lands
-//! arrives as `pr_merged` under the key `commit`. The line that opens a
-//! dispatch is also a `checkpoint_committed`, but it pins a job rather
-//! than a commit and names no oid at all — so what is asked of a record
-//! is whether it names a commit, never which kind it is.
-
 use std::path::PathBuf;
 
 use kernel::event::record::{CheckpointCommitted, CommitAttribution};
@@ -29,11 +12,6 @@ use kernel::{
 
 use super::prepared::{Prepared, unavailable, unavailable_because};
 
-/// What one commit's own record says about the run that made it.
-///
-/// Private fields with one production point: every field is read off a
-/// record, so a set of facts about a commit nobody made cannot be
-/// assembled here a field at a time.
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct CommitFacts {
     run: RunId,
@@ -41,15 +19,14 @@ pub(crate) struct CommitFacts {
     at: kernel::TimeMs,
     actor: Address,
     chosen: storage::ModelChoice,
-    /// The commit the same run announced last before this one.
+
     previous: Option<wire::CommitAt>,
-    /// The digest of the announcing line's canonical bytes: the B3 a
-    /// person finds that line by (`Sprawling/wire/Spec.lean` §8-78).
+
     b3: Option<kernel::B3Hash>,
 }
 
 impl CommitFacts {
-    /// Whether this run worked at `building` or in a room under it.
+
     fn worked_under(&self, building: &Address) -> bool {
         let actor = self.actor.as_str();
         actor == building.as_str()
@@ -58,9 +35,6 @@ impl CommitFacts {
                 .is_some_and(|rest| rest.starts_with('/'))
     }
 
-    /// What a page or a person is handed. The lineage is this run
-    /// first, then each run it replaced, back to the first; `spent` is
-    /// what that run has been billed, whole.
     pub(super) fn answer(
         &self,
         oid: GitOid,
@@ -87,17 +61,11 @@ impl CommitFacts {
 }
 
 impl super::holding::Views {
-    /// Files the commit one record announced, when it announced one, as
-    /// [`commit_facts`] reads it.
-    ///
-    /// # Errors
-    /// Propagates [`commit_facts`]'s refusal of a payload that does not
-    /// read.
+
     pub(super) fn fold_commit(&mut self, record: &EventRecord) -> Result<(), AxError> {
         if let Some((oid, mut facts)) = commit_facts(record)? {
             facts.previous = match self.commits.get(&oid) {
-                // The same commit announced again keeps the previous one
-                // it was first folded with, rather than naming itself.
+
                 Some(first) => first.previous,
                 None => self.last_commit.get(&facts.run).copied(),
             };
@@ -114,14 +82,6 @@ impl super::holding::Views {
         Ok(())
     }
 
-    /// The commits this city made, newest first, one page at a time
-    /// (`Sprawling/wire/Spec.lean` §8-24).
-    ///
-    /// `before` is exclusive; `limit` is clamped to the same ceiling as
-    /// `History`. `more` says whether a further page exists, found by
-    /// walking one commit past the page rather than by counting: the
-    /// filter makes the count meaningless. An error when a row's run was
-    /// evicted and its records could not be read.
     pub(super) fn commits_answer(
         &self,
         building: Option<&Address>,
@@ -152,8 +112,6 @@ impl super::holding::Views {
         })
     }
 
-    /// Files which run a `run_started` says this one replaced, when it
-    /// says so.
     pub(super) fn fold_predecessor(&mut self, record: &EventRecord) {
         let Ok(started) = record.data().read::<kernel::event::record::RunStarted>() else {
             return;
@@ -163,12 +121,6 @@ impl super::holding::Views {
         }
     }
 
-    /// Which run wrote this commit, and the runs that run succeeded,
-    /// with its parents still to read once the snapshot is let go.
-    ///
-    /// A commit this city never wrote is `Unavailable`, for the reason
-    /// `Changes` gives: "I did not write it" and "it changed nothing"
-    /// are different answers, and a reader acts differently on each.
     pub(super) fn prepare_commit(&self, oid: GitOid) -> Prepared {
         let query = || format!("Commit({oid})");
         let Some(facts) = self.commits.get(&oid) else {
@@ -183,8 +135,6 @@ impl super::holding::Views {
         }
     }
 
-    /// One page of the commits, with their parents still to read once
-    /// the snapshot is let go.
     pub(super) fn prepare_commits(
         &self,
         building: Option<&Address>,
@@ -207,9 +157,6 @@ impl super::holding::Views {
         }
     }
 
-    /// The run and every predecessor behind it, nearest first. A chain
-    /// that loops - which no ledger this city wrote can hold - stops at
-    /// the first repeat rather than walking forever.
     fn lineage_of(&self, run: RunId) -> Vec<RunId> {
         let mut chain = vec![run];
         let mut at = run;
@@ -224,18 +171,6 @@ impl super::holding::Views {
     }
 }
 
-/// The commit one record announced, if it announced one.
-///
-/// `None` for every record that names no commit — including the job pin
-/// that opens a dispatch, which is a `checkpoint_committed` carrying a
-/// job locator and no oid — for a `pr_merged` whose oid this build cannot
-/// parse, and for a record naming no address, which is a commit with no
-/// actor to attribute it to.
-///
-/// # Errors
-/// A `checkpoint_committed` or a `pr_merged` attribution whose payload
-/// does not read: skipping it would drop a commit the city made from the
-/// commit views and from playback without a word.
 #[expect(
     clippy::wildcard_enum_match_arm,
     reason = "a few kinds name a commit; the rest of the event vocabulary does not"
@@ -247,9 +182,7 @@ pub(crate) fn commit_facts(record: &EventRecord) -> Result<Option<(GitOid, Commi
             CheckpointCommitted::JobPinned { .. } => return Ok(None),
             CheckpointCommitted::Committed(commit) => (commit.oid, commit.by),
         },
-        // `pr_merged` carries the same attribution beside a payload of
-        // its own, which keeps its hand-written keys until that family
-        // is typed.
+
         EventKind::PrMerged => {
             let by = data.read::<CommitAttribution>()?;
             let Some(oid) = data
@@ -279,9 +212,7 @@ pub(crate) fn commit_facts(record: &EventRecord) -> Result<Option<(GitOid, Commi
                 effort: by.effort,
             },
             previous: None,
-            // A line read back from the ledger re-serialises to the
-            // bytes the chain verified; one that does not has no B3 to
-            // give, and the answer says so rather than naming another.
+
             b3: match record.canonical_line() {
                 Ok(line) => Some(kernel::B3Hash::digest(&line)),
                 Err(_unserialisable) => None,
@@ -290,22 +221,18 @@ pub(crate) fn commit_facts(record: &EventRecord) -> Result<Option<(GitOid, Commi
     )))
 }
 
-/// A commit answer the views settled, and the repository its parents
-/// are read from after the snapshot is let go (`Sprawling/app/Spec.lean` §8-128).
 pub struct CommitsAsk {
     city_root: PathBuf,
     settled: Settled,
 }
 
-/// Which of the two questions about commits was asked.
 enum Settled {
     One(Box<wire::CommitAnswer>),
     Page(wire::CommitsAnswer),
 }
 
 impl CommitsAsk {
-    /// The answer, each commit with the parents and the message git
-    /// states for it.
+
     pub(super) fn read(self) -> wire::Answer {
         let CommitsAsk { city_root, settled } = self;
         match settled {
@@ -321,19 +248,11 @@ impl CommitsAsk {
     }
 }
 
-/// The two facts of a commit only its object holds, read once the
-/// snapshot is let go (`Sprawling/app/Spec.lean` §8-128, `Sprawling/wire/Spec.lean` §8-54).
 fn give_git_facts(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {
     give_parents(city_root, commits);
     give_messages(city_root, commits);
 }
 
-/// Gives each commit the message its object holds, from one opening of
-/// the repository: in this crate rather than in `storage` until storage's
-/// contract can take a reader of both facts (accounting D34
-/// (b)). A repository that cannot be opened, an object it does not hold
-/// and a message that is not UTF-8 each leave `message` at `None`, as
-/// `parents` is left.
 fn give_messages(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {
     let Ok(repository) = git2::Repository::open(city_root) else {
         return;
@@ -351,10 +270,6 @@ fn give_messages(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]
     }
 }
 
-/// Gives each commit the parents git states for it, from one opening of
-/// the repository. A repository that cannot be opened or read leaves
-/// every `parents` at `None`: the parents are one more fact on the row,
-/// not a condition of it, and the rest of the answer stands without them.
 fn give_parents(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {
     let oids: Vec<GitOid> = commits.iter().map(|commit| commit.oid).collect();
     let Ok(parents) = storage::parents_of(city_root, &oids) else {
@@ -365,12 +280,6 @@ fn give_parents(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer])
     }
 }
 
-/// What a person called this line of work: the room the actor worked in.
-///
-/// The room is the last segment of the address, because that is how
-/// `city::open_room` put it there. A run dispatched at a building's own
-/// address has no room, and therefore no session — which is a different
-/// fact from a session nobody named.
 fn session_of(actor: &Address) -> Option<SessionName> {
     let (_, room) = actor.as_str().rsplit_once('/')?;
     SessionName::parse(room).ok()
@@ -428,8 +337,6 @@ mod tests {
         record_at(EventKind::CheckpointCommitted, data, seq, addr)
     }
 
-    /// A checkpoint announcing `oid` at `seq`, written by the run whose
-    /// id is sixteen `run` bytes.
     fn checkpoint_by(seq: u64, oid: &str, run: u8) -> EventRecord {
         let mut data = serde_json::Map::new();
         data.insert("oid".to_owned(), serde_json::Value::String(oid.to_owned()));
@@ -456,9 +363,6 @@ mod tests {
             .previous
     }
 
-    /// The B3 a commit carries is the digest of the line that announced
-    /// it - what the next line of the chain holds as `prev` - and not
-    /// that line's own `prev` (`Sprawling/wire/Spec.lean` §8-78).
     #[test]
     fn a_commit_carries_the_b3_of_the_line_that_announced_it() {
         let dir = tempfile::tempdir().unwrap();
@@ -557,8 +461,6 @@ mod tests {
         );
     }
 
-    /// `Sprawling/wire/Spec.lean` §8-54: a commit's message is read from its object, as its
-    /// parents are; one the repository does not hold has none to read.
     #[test]
     fn a_page_of_commits_carries_each_ones_message_from_git() {
         let dir = tempfile::tempdir().unwrap();
@@ -635,7 +537,6 @@ Sprawling-Actor: lab/room1
         assert_eq!(hall.commits.len(), 1);
         assert_eq!(hall.commits.first().unwrap().actor.as_str(), "hall/mayor");
 
-        // `la` is not a prefix of a building: the filter is by segment.
         assert!(
             views
                 .commits_answer(Some(&addr("la")), None, 20)
@@ -673,8 +574,7 @@ Sprawling-Actor: lab/room1
             .unwrap()
             .unwrap();
         assert_eq!(found.to_string(), oid);
-        // A record written before the city put the model on the ledger
-        // says nothing about it, and the answer says nothing back.
+
         let said = facts.answer(found, vec![facts.run], UsdMicros::new(0));
         assert_eq!(said.model, String::new());
         assert_eq!(said.lineage.len(), 1, "a first run is its own lineage");

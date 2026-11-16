@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Sealed values reach no sink: no Serialize, so a sealed credential can
-// never ride an EventRecord payload; no Debug, so it cannot be logged.
-
 fn main() {
     let sealed = kernel::Sealed::new(Box::new("hunter2".to_owned()));
     let _ = serde_json::to_value(&sealed);

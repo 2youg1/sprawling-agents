@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one run was told, read back out of the record that froze it and
-//! the store that kept it.
-//!
-//! **Nothing here assembles a prefix.** `accounting::worker::freezing` does that
-//! once, at run start, and puts every segment in the store; this joins
-//! the hashes its `prompt_assembled` record names to the bytes behind
-//! them. A second assembly taken now would read files that have moved
-//! since and show a person a prompt nobody was ever sent.
-//!
-//! **A missing object is not an empty segment.** `stored` says which of
-//! the two a reader is looking at, because the first is a store that
-//! was pruned and the second is a slot the city had nothing to put in.
-
 use std::path::Path;
 
 use kernel::event::record::PromptTools;
@@ -25,10 +12,6 @@ use super::document::read_bytes;
 use super::holding::Views;
 use super::prepared::{LedgerAsk, unavailable, unavailable_because};
 
-/// What a `Prefix` question takes out of the views: where the run's
-/// first prompt sits on the ledger, and the ledger that holds the line.
-/// The line and the store are read by [`PrefixAsk::read`], after the
-/// views are released.
 pub struct PrefixAsk {
     ledger: LedgerAsk,
     run: RunId,
@@ -53,8 +36,6 @@ impl Views {
     }
 }
 
-/// What a `PromptShape` question takes out of the views: where the
-/// run's newest compared shape sits, and the ledger that holds it.
 pub struct PromptShapeAsk {
     ledger: LedgerAsk,
     run: RunId,
@@ -62,11 +43,7 @@ pub struct PromptShapeAsk {
 }
 
 impl PromptShapeAsk {
-    /// The tool table and conversation of the run's latest request.
-    ///
-    /// `Unavailable` without a reason when this run has not compared a
-    /// shape yet; with the ledger or parse reason when the line will
-    /// not open or will not read as a compared shape.
+
     pub(super) fn read(self) -> wire::Answer {
         let Some(seq) = self.latest else {
             return unavailable(format!("PromptShape({})", self.run));
@@ -106,12 +83,7 @@ impl PromptShapeAsk {
 }
 
 impl PrefixAsk {
-    /// The four segments the run was frozen with.
-    ///
-    /// `Unavailable` for a run this city never froze a prefix for and
-    /// for a ledger or store that will not open: a run that has not
-    /// reached its first turn has no prompt yet, and an empty answer
-    /// would read as a run that was told nothing.
+
     pub(super) fn read(self) -> wire::Answer {
         match self.segments() {
             Some((segments, tools)) => wire::Answer::Prefix(Box::new(wire::PrefixAnswer {
@@ -123,8 +95,6 @@ impl PrefixAsk {
         }
     }
 
-    /// The four segments, and the tool table the record names beside
-    /// them when it names one.
     fn segments(&self) -> Option<(Vec<wire::PrefixSegment>, Option<PromptTools>)> {
         let record = self.first_prompt()?;
         let store = store(&self.ledger.city_root)?;
@@ -135,20 +105,13 @@ impl PrefixAsk {
             .iter()
             .filter_map(|row| segment_of(row, &store))
             .collect();
-        // A table that will not read is left out rather than guessed at,
-        // as a segment row that will not read is.
+
         let tools = data
             .get("tools")
             .and_then(|table| serde_json::from_value(table.clone()).ok());
         Some((segments, tools))
     }
 
-    /// The `prompt_assembled` record that opened this run.
-    ///
-    /// The oldest one, not the newest: the prefix is frozen once for
-    /// the life of a run and every later turn records the same four
-    /// hashes, so any of them says the same thing and the first is the
-    /// one a run that never got past turn one still has.
     fn first_prompt(&self) -> Option<EventRecord> {
         let seq = self.first?;
         let line = {
@@ -161,12 +124,6 @@ impl PrefixAsk {
     }
 }
 
-/// One object of the store, cut to what travels.
-///
-/// `None` for a locator naming a path rather than an object, and
-/// for an object this city no longer holds. Both are the same
-/// answer to the caller - there is nothing here to read - and the
-/// query handed back with the refusal says which was asked.
 pub(super) fn content_answer(city_root: &Path, locator: &Locator) -> Option<wire::ContentAnswer> {
     let Locator::Cas { hash, range: _ } = locator else {
         return None;
@@ -181,20 +138,10 @@ pub(super) fn content_answer(city_root: &Path, locator: &Locator) -> Option<wire
     })
 }
 
-/// The store this city keeps, opened for reading.
-///
-/// Opened per question rather than held: this is the one read here
-/// that reaches a directory the fold does not own, and a handle
-/// kept across a rebuild would outlive the city it was opened
-/// under.
 fn store(city_root: &Path) -> Option<storage::Cas> {
     storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas()).ok()
 }
 
-/// One recorded segment row, joined to the bytes the store holds for it.
-///
-/// A row whose slot or hash will not read is left out rather than
-/// guessed at: a fifth spelling of a slot is one nothing draws.
 fn segment_of(row: &serde_json::Value, store: &storage::Cas) -> Option<wire::PrefixSegment> {
     let slot = match row.get("slot")?.as_str()? {
         "city" => wire::PrefixSlot::City,
@@ -221,8 +168,6 @@ fn segment_of(row: &serde_json::Value, store: &storage::Cas) -> Option<wire::Pre
     })
 }
 
-/// One source row, as the assembler wrote it down. A row with no
-/// address names no document and is left out.
 fn source_of(row: &serde_json::Value) -> Option<wire::PrefixSource> {
     Some(wire::PrefixSource {
         addr: Address::parse(row.get("addr")?.as_str()?).ok()?,
@@ -231,8 +176,6 @@ fn source_of(row: &serde_json::Value) -> Option<wire::PrefixSource> {
     })
 }
 
-/// One recorded count. A key the record does not carry reads as zero,
-/// which is what a payload written before that key existed means.
 fn number(row: &serde_json::Value, key: &str) -> u64 {
     row.get(key)
         .and_then(serde_json::Value::as_u64)

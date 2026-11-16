@@ -4,16 +4,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
-
 <script lang="ts" module>
-  // The city in results-only mode: two runs wait for the person, two
-  // failed, eight finished and one is still working. The finished group
-  // is longer than `FIRST`, so the fixture shows both the cut and the
-  // count of what was cut; the working run is in none of the groups.
-  // Each run began a set number of minutes before the stand's clock, so
-  // the rows fall into all three recency bands on every day it is shown,
-  // and every finished run answers the same rounds and changes, so its
-  // row carries a produced line.
+
   import type { Answer, EventKind, EventRecord, Query } from "../../wire";
   import { Address, B3Hash, GitOid, RunId, Seq, TimeMs } from "../../wire";
 
@@ -45,8 +37,6 @@
     };
   }
 
-  // Each run starts some minutes ago; then it asks, stops short,
-  // finishes or keeps going.
   const ENDINGS: readonly (readonly [number, EventKind, Record<string, unknown>] | null)[] = [
     [1, "approval_requested", { action_desc: "run cargo publish --dry-run outside the sandbox" }],
     [52, "approval_requested", { action_desc: "send a request to api.github.com" }],
@@ -62,7 +52,6 @@
     null,
   ];
 
-  // The finished runs that opened a pull request, by their index above.
   const PULLED: ReadonlyMap<number, string> = new Map([
     [4, "ledger-composer"],
     [7, "glossary-dedup"],
@@ -81,7 +70,6 @@
     });
   }
 
-  // The tree every finished run opened at, and what it changed since.
   const OPENED: GitOid = GitOid.make("3f2a9c1e7b4d5a6f8e0c1b2d3a4f5e6d7c8b9a01");
 
   export function finished(query: Query): Answer | undefined {

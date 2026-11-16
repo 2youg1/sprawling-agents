@@ -3,86 +3,47 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Whether real-time scanning stands in front of the city directory's
-//! writes (`Sprawling/app/Spec.lean` §8-166).
-//!
-//! A city writes many small files: the Ledger, the buildings' worktrees,
-//! their builds. On Windows, Defender checks each write before it
-//! lands, and two things move that check out of the way: a trusted Dev
-//! Drive, which Defender scans asynchronously, and an exclusion that
-//! holds the city. This module says which of them holds for the city's
-//! directory, or that it cannot tell and why, and what the person can
-//! do. What it says is advice; no tier's verdict reads it.
-//!
-//! **Each fact is read the way that needs no administrator first.** The
-//! file system name comes from `sysinfo`, and every Dev Drive is ReFS,
-//! so any other file system settles the question without starting a
-//! process. Only a ReFS volume is put to `fsutil devdrv query`, which an
-//! ordinary user is often refused, and which speaks the system's
-//! language; both read as "cannot tell" rather than as a guess.
-//! Defender's exclusions are read through PowerShell, and a Defender
-//! that shows them only to an administrator says so in a line this
-//! module reads.
-
 use std::path::{Path, PathBuf};
 
 use super::Platform;
 use super::asking::{self, Ended};
 
-/// How many knocks each question gets: `PATIENCE * asking::TICK` is
-/// fifteen seconds, because a cold Windows PowerShell takes seconds to
-/// start before it asks Defender anything.
 const PATIENCE: u32 = 300;
 
-/// The file system every Dev Drive is formatted with.
 const DEV_DRIVE_FILE_SYSTEM: &str = "ReFS";
 
-/// The tool that says whether a volume is a Dev Drive, as a person
-/// reads its name in a sentence.
 const DEV_DRIVE_QUERY: &str = "fsutil devdrv query";
 
-/// The cmdlet that lists Defender's settings, as a person reads it.
 const EXCLUSION_QUERY: &str = "Get-MpPreference";
 
-/// Defender's excluded paths one per line, in UTF-8 whatever the
-/// console's code page, and a non-zero exit when Defender cannot be
-/// asked at all.
 const LIST_EXCLUSIONS: &str = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; \
      $ErrorActionPreference = 'Stop'; (Get-MpPreference).ExclusionPath";
 
-/// The column the value of each line of the part starts at, as in the
-/// `priority` part above it.
 const LABEL: usize = 16;
 
-/// What this machine says about scanning in front of one directory.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Scanning {
-    /// Not Windows: Dev Drive and Defender's exclusions are Windows
-    /// features.
+
     DoesNotApply,
-    /// The thread that asked stopped before it answered.
+
     Stopped,
     Read {
-        /// The directory judged, spelled the way mount points are.
+
         city: PathBuf,
         drive: Drive,
         exclusion: Exclusion,
     },
 }
 
-/// Whether the city's volume is a Dev Drive.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Drive {
-    /// A trusted Dev Drive: Defender scans it in performance mode,
-    /// after a write rather than in front of it.
+
     Trusted,
-    /// A Dev Drive that is not trusted, which Defender scans like any
-    /// other volume.
+
     Untrusted {
         volume: String,
     },
-    /// Not a Dev Drive: not ReFS, or ReFS that fsutil says is no
-    /// developer volume.
+
     Not {
         volume: String,
         file_system: String,
@@ -90,10 +51,9 @@ pub(crate) enum Drive {
     Untold(Untold),
 }
 
-/// Whether one of Defender's exclusions holds the city.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Exclusion {
-    /// `under` is the excluded path that holds it.
+
     Inside {
         under: String,
     },
@@ -101,16 +61,13 @@ pub(crate) enum Exclusion {
     Untold(Untold),
 }
 
-/// Why a question has no answer here.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Untold {
-    /// No disk this machine lists has a mount point the path starts
-    /// with.
+
     NoDisk,
-    /// Defender shows its exclusions only to an administrator.
+
     AdminOnly,
-    /// The tool exited cleanly in words this module does not read,
-    /// such as the system's own language.
+
     Unread {
         command: &'static str,
     },
@@ -127,8 +84,6 @@ pub(crate) enum Untold {
     },
 }
 
-/// Asks this machine about the directory `city`, which need not exist
-/// yet. `ThisMachine::scanning` is this.
 pub(crate) fn read(platform: Option<Platform>, city: &Path) -> Scanning {
     match platform {
         Some(Platform::Windows) => {}
@@ -155,7 +110,6 @@ pub(crate) fn read(platform: Option<Platform>, city: &Path) -> Scanning {
     }
 }
 
-/// The Dev Drive answer for the volume a write under `city` lands on.
 fn drive(city: &Path) -> Drive {
     let disks = sysinfo::Disks::new_with_refreshed_list();
     let Some(disk) = crate::monitor::volume::holding(&disks, city) else {
@@ -177,8 +131,6 @@ fn drive(city: &Path) -> Drive {
     drive_said(&volume, &file_system, &asked)
 }
 
-/// A mount point spelled the way fsutil takes a volume: `D:\` as `D:`,
-/// a folder mount as its path.
 fn volume_named(mount: &Path) -> String {
     let spelled = mount.display().to_string();
     match spelled.strip_suffix('\\') {
@@ -187,10 +139,6 @@ fn volume_named(mount: &Path) -> String {
     }
 }
 
-/// What `fsutil devdrv query <volume>` said about a ReFS `volume`.
-///
-/// The answer is the first line that opens with `This is`; the lines
-/// after it list filters and say nothing about this volume's standing.
 pub(super) fn drive_said(volume: &str, file_system: &str, ended: &Ended) -> Drive {
     let stdout = match printed(DEV_DRIVE_QUERY, ended) {
         Ok(stdout) => stdout,
@@ -222,7 +170,6 @@ pub(super) fn drive_said(volume: &str, file_system: &str, ended: &Ended) -> Driv
     }
 }
 
-/// What `Get-MpPreference` said about the exclusions that hold `city`.
 pub(super) fn exclusion_said(city: &Path, ended: &Ended) -> Exclusion {
     let stdout = match printed(EXCLUSION_QUERY, ended) {
         Ok(stdout) => stdout,
@@ -245,13 +192,6 @@ pub(super) fn exclusion_said(city: &Path, ended: &Ended) -> Exclusion {
         })
 }
 
-/// Whether the excluded path `entry` holds `city`: the same directory,
-/// or one of its ancestors at a separator, compared without case as
-/// Windows compares paths.
-///
-/// An entry with an environment variable or a wildcard holds nothing
-/// here: expanding it is Defender's rule, and a second copy of that
-/// rule would drift from the first without anyone noticing.
 fn covers(entry: &str, city: &str) -> bool {
     if entry.contains(['%', '*', '?']) {
         return false;
@@ -264,8 +204,6 @@ fn covers(entry: &str, city: &str) -> bool {
             .is_some_and(|rest| rest.starts_with(['\\', '/']))
 }
 
-/// What a tool that exited cleanly printed, or why there is nothing
-/// of it to read.
 fn printed<'e>(command: &'static str, ended: &'e Ended) -> Result<&'e str, Untold> {
     match ended {
         Ended::Exited {
@@ -284,8 +222,6 @@ fn printed<'e>(command: &'static str, ended: &'e Ended) -> Result<&'e str, Untol
     }
 }
 
-/// The part of the terminal report that says it, closed by a blank
-/// line.
 pub(crate) fn lines(scanning: &Scanning) -> Vec<String> {
     let mut lines = vec![
         "  scanning - whether antivirus scanning holds up the city's writes".to_owned(),
@@ -365,8 +301,6 @@ fn untold_words(why: &Untold) -> String {
     }
 }
 
-/// What the person can do, when neither a trusted Dev Drive nor an
-/// exclusion moves scanning out of the way: nothing when one does.
 fn advice(city: &Path, drive: &Drive, exclusion: &Exclusion) -> Vec<String> {
     match (drive, exclusion) {
         (Drive::Trusted, _) | (_, Exclusion::Inside { .. }) => Vec::new(),

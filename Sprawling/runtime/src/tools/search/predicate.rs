@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one search call asks, read from the arguments of Claude Code's
-//! `Grep` (`Sprawling/runtime/spec/Tools/Search.lean` §8-30-2).
-//!
-//! **A regular expression that never backtracks** (D120). The pattern
-//! is compiled by the `regex` crate, the engine ripgrep uses by default,
-//! so a model writes it in the syntax it writes for `Grep`; the crate
-//! matches with finite automata in time linear in the line, so a pattern
-//! a model wrote wrong cannot stall the turn behind it.
-//!
-//! **Refused where ignoring would mislead** (D121). `multiline`, `type`,
-//! a nonzero `offset` and a pattern that spells a line break are
-//! refused, because a search that let them through would answer wrongly
-//! rather than at more length; `-n`, `-o` and `head_limit` are left
-//! unread.
-
 use globset::{GlobBuilder, GlobMatcher};
 use kernel::{AxCode, AxError, ErrorDraft, ToolCall};
 use regex::{Regex, RegexBuilder};
@@ -25,65 +10,48 @@ use regex_syntax::ParserBuilder;
 use regex_syntax::hir::{Hir, HirKind, Literal};
 use serde_json::{Map, Value};
 
-/// How many lines of context each side may be asked for.
 const CONTEXT_CAP: u8 = 4;
 
-/// The recovery for a call that asks to match across lines, whether
-/// through `multiline` or a line break in the pattern (D121).
 const ONE_LINE: &str =
     "this search matches one line at a time; write a `pattern` that matches within one line";
 
-/// What one call is looking for, settled once from the arguments so the
-/// walk carries one value.
 pub(super) enum Predicate {
-    /// The lines a pattern matches, in the files the glob, if any, names.
+
     Lines(Lines, Option<Names>),
-    /// Only the files a glob names, opened by nobody (D117).
+
     Names(Names),
 }
 
-/// The question a pattern asks of each line, and how it is answered.
 pub(super) struct Lines {
     pub(super) pattern: Regex,
     pub(super) mode: Mode,
     pub(super) context: Context,
 }
 
-/// How many lines a hit carries before and after its own.
 #[derive(Clone, Copy)]
 pub(super) struct Context {
     pub(super) before: usize,
     pub(super) after: usize,
 }
 
-/// What a call hands back for the files it matched
-/// (`Sprawling/runtime/spec/Tools/Search.lean` D109).
 #[derive(Clone, Copy)]
 pub(super) enum Mode {
-    /// Only the files that hold a match.
+
     Files,
-    /// Every match, with its line number and context.
+
     Content,
-    /// Each file that holds a match, with how many lines matched.
+
     Count,
 }
 
-/// The files a glob admits by name (D117).
 pub(super) struct Names {
     matcher: GlobMatcher,
-    /// A glob with a `/` in it is matched against the path below the
-    /// search's `path`; one without, against the file's own name.
+
     by_path: bool,
 }
 
 impl Predicate {
-    /// What `call` asks, or why it is not a question this search answers.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` when neither `pattern` nor `glob` is given, when
-    /// either does not compile, when an argument has the wrong type, when
-    /// `output_mode` is not one of the three, when a glob alone asks for
-    /// lines, and for the arguments D121 refuses.
+
     pub(super) fn asked_by(call: &ToolCall) -> Result<Predicate, AxError> {
         let args = call.args.as_map();
         refuse_misleading(args)?;
@@ -114,8 +82,6 @@ impl Predicate {
         }
     }
 
-    /// Whether the file at `rel` is one this call looks at, for a walk
-    /// started at `root`.
     pub(super) fn admits(&self, root: &str, rel: &str) -> bool {
         match self {
             Predicate::Lines(_, None) => true,
@@ -123,7 +89,6 @@ impl Predicate {
         }
     }
 
-    /// The payload key the answer's entries travel under.
     pub(super) fn key(&self) -> &'static str {
         match self {
             Predicate::Lines(lines, _) => lines.mode.key(),
@@ -133,16 +98,13 @@ impl Predicate {
 }
 
 impl Mode {
-    /// The spelling a call passes, and the one a refusal offers back.
+
     const SPELLED: [(&'static str, Mode); 3] = [
         ("files_with_matches", Mode::Files),
         ("content", Mode::Content),
         ("count", Mode::Count),
     ];
 
-    /// The payload key the entries travel under; the ledger keeps these
-    /// names whatever the call spelled (`Sprawling/runtime/spec/Rendering.lean`
-    /// §8-63 draws them).
     fn key(self) -> &'static str {
         match self {
             Mode::Files => "files",
@@ -151,7 +113,6 @@ impl Mode {
         }
     }
 
-    /// The answer `args` asked for; `files_with_matches` when it did not say.
     fn asked(args: &Map<String, Value>) -> Result<Mode, AxError> {
         let Some(asked) = args.get("output_mode") else {
             return Ok(Mode::Files);
@@ -179,9 +140,7 @@ impl Mode {
 }
 
 impl Context {
-    /// `-B` and `-A` for one side each, over `context` or its alias `-C`
-    /// for both; each side defaults to none and is capped at
-    /// [`CONTEXT_CAP`].
+
     fn asked(args: &Map<String, Value>) -> Result<Context, AxError> {
         let both = match side(args, "context")? {
             Some(lines) => lines,
@@ -195,8 +154,7 @@ impl Context {
 }
 
 impl Names {
-    /// The glob in `asked`, compiled with ripgrep's syntax, where `*`
-    /// does not cross a `/`.
+
     fn of(asked: &Value) -> Result<Names, AxError> {
         let glob = asked
             .as_str()
@@ -220,8 +178,6 @@ impl Names {
         })
     }
 
-    /// Whether the file at `rel`, below a walk started at `root`, is
-    /// named by this glob.
     fn admit(&self, root: &str, rel: &str) -> bool {
         let name = rel.rsplit('/').next().unwrap_or(rel);
         let below = match root {
@@ -237,7 +193,6 @@ impl Names {
     }
 }
 
-/// The pattern in `asked`, compiled; `-i` in `args` drops the case.
 fn compiled(asked: &Value, args: &Map<String, Value>) -> Result<Regex, AxError> {
     let pattern = asked
         .as_str()
@@ -278,11 +233,6 @@ fn compiled(asked: &Value, args: &Map<String, Value>) -> Result<Regex, AxError> 
     Ok(regex)
 }
 
-/// Whether `hir` can only match by matching a line break itself (D121):
-/// matched one line at a time, such a pattern answers "none" wherever
-/// it would have matched, as ripgrep refuses it outside multiline mode.
-/// A class that merely includes a line break, such as `\s` or `[^a]`,
-/// still matches within the line.
 fn spells_line_break(hir: &Hir) -> bool {
     match hir.kind() {
         HirKind::Empty | HirKind::Look(_) => false,
@@ -294,8 +244,6 @@ fn spells_line_break(hir: &Hir) -> bool {
     }
 }
 
-/// The lines asked for on one side under `key`, capped at
-/// [`CONTEXT_CAP`]; `None` when the call did not say.
 fn side(args: &Map<String, Value>, key: &str) -> Result<Option<usize>, AxError> {
     let Some(value) = args.get(key) else {
         return Ok(None);
@@ -305,15 +253,12 @@ fn side(args: &Map<String, Value>, key: &str) -> Result<Option<usize>, AxError> 
             "pass `{key}` as an integer from 0 to 4, or leave it out"
         ))
     })?;
-    // Above the cap is served at the cap, and so is a number no `u8`
-    // holds.
+
     Ok(Some(usize::from(
         u8::try_from(asked).map_or(CONTEXT_CAP, |fits| fits.min(CONTEXT_CAP)),
     )))
 }
 
-/// Refuses the arguments whose answer would mislead if they were left
-/// unread (D121), naming the way this search answers the same question.
 fn refuse_misleading(args: &Map<String, Value>) -> Result<(), AxError> {
     let misleading = [
         (
@@ -341,7 +286,6 @@ fn refuse_misleading(args: &Map<String, Value>) -> Result<(), AxError> {
     }
 }
 
-/// An invalid-argument refusal from this tool.
 fn refused(subject: impl Into<String>) -> ErrorDraft {
     AxError::failure(AxCode::InvalidArgs, "search", subject)
 }

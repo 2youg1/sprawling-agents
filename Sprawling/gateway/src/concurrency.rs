@@ -3,36 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One endpoint's concurrency permits: how many calls may be in flight
-//! to it now, narrowed when the provider answers 429 and widened again
-//! once it keeps answering (`Sprawling/gateway/Spec.lean` D17).
-//!
-//! A pure judgement: it reads only the instant it is handed and the
-//! outcome of each call, so it behaves the same on Windows, macOS and
-//! Linux. The properties it keeps are proved in
-//! `Sprawling/gateway/spec/Concurrency.lean`; the proptest below checks
-//! this implementation against them over random traces.
-
 use std::num::NonZeroU32;
 use std::time::{Duration, Instant};
 
 use kernel::{AxCode, AxError};
 
-/// The largest `max_in_flight` an endpoint may be configured with.
 pub(crate) const IN_FLIGHT_MAX: u32 = 256;
 
-/// The concurrency an endpoint gets when neither its configuration nor
-/// its vendor's documentation states one.
 pub(crate) const IN_FLIGHT_DEFAULT: MaxInFlight = MaxInFlight(NonZeroU32::MIN.saturating_add(15));
 
-/// The concurrency a server on this machine gets when nobody settled
-/// one: the parallel slots a local inference server commonly starts
-/// with (`Sprawling/gateway/Spec.lean` D21).
 pub(crate) const IN_FLIGHT_LOCAL: MaxInFlight = MaxInFlight(NonZeroU32::MIN.saturating_add(3));
 
-/// The concurrency an endpoint at `base_url` gets when its tuning
-/// states none. No vendor documents a concurrency today, so the table
-/// tells only this machine from the rest.
 pub(crate) fn vendor_in_flight(base_url: &str) -> MaxInFlight {
     if crate::reach::is_local(base_url) {
         IN_FLIGHT_LOCAL
@@ -41,10 +22,8 @@ pub(crate) fn vendor_in_flight(base_url: &str) -> MaxInFlight {
     }
 }
 
-/// How many successes in a row widen a narrowed limit by one.
 pub(crate) const WIDEN_AFTER: u32 = 8;
 
-/// A configured concurrency ceiling, 1 to [`IN_FLIGHT_MAX`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(try_from = "u32", into = "u32")]
 pub struct MaxInFlight(NonZeroU32);
@@ -56,7 +35,7 @@ impl From<MaxInFlight> for u32 {
 }
 
 impl MaxInFlight {
-    /// The ceiling as the number a person entered.
+
     #[must_use]
     pub fn get(self) -> u32 {
         self.0.get()
@@ -84,19 +63,16 @@ impl TryFrom<u32> for MaxInFlight {
     }
 }
 
-/// What one attempt to take a permit answers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Take {
-    /// A permit is taken; give it back once the call has an outcome.
+
     Granted,
-    /// Every permit is in use; wait for one to be given back.
+
     Full,
-    /// The provider asked for nothing to be sent before this instant,
-    /// which is always later than the instant the take was asked at.
+
     WaitUntil(Instant),
 }
 
-/// One endpoint's permit state.
 #[derive(Debug, Clone)]
 pub(crate) struct Permits {
     cap: MaxInFlight,
@@ -107,7 +83,7 @@ pub(crate) struct Permits {
 }
 
 impl Permits {
-    /// Every permit open, up to `cap`.
+
     pub(crate) fn new(cap: MaxInFlight) -> Permits {
         Permits {
             cap,
@@ -118,8 +94,6 @@ impl Permits {
         }
     }
 
-    /// Takes a permit when one is free and the provider has not asked
-    /// this endpoint to hold off; otherwise says what to wait for.
     pub(crate) fn take(&mut self, now: Instant) -> Take {
         match self.hold_until {
             Some(until) if now < until => Take::WaitUntil(until),
@@ -131,14 +105,10 @@ impl Permits {
         }
     }
 
-    /// Gives one permit back, after the call it covered has an outcome.
     pub(crate) fn give_back(&mut self) {
         self.in_use = self.in_use.saturating_sub(1);
     }
 
-    /// The provider answered 429: halve the limit (at least 1), restart
-    /// the run of successes, and hold off until `retry_after` has passed
-    /// when the provider said how long.
     pub(crate) fn rate_limited(&mut self, now: Instant, retry_after: Option<Duration>) {
         self.limit = (self.limit / 2).max(1);
         self.streak = 0;
@@ -147,9 +117,6 @@ impl Permits {
         }
     }
 
-    /// A call succeeded: after [`WIDEN_AFTER`] in a row, and never before
-    /// the instant the provider asked to be left alone until, the limit
-    /// grows by one up to the configured ceiling.
     pub(crate) fn succeeded(&mut self, now: Instant) {
         let streak = self.streak.saturating_add(1);
         if streak < WIDEN_AFTER {
@@ -161,13 +128,11 @@ impl Permits {
         }
     }
 
-    /// How many calls may be in flight now.
     #[cfg(test)]
     pub(crate) fn limit(&self) -> u32 {
         self.limit
     }
 
-    /// How many permits are taken now.
     #[cfg(test)]
     pub(crate) fn in_use(&self) -> u32 {
         self.in_use
@@ -189,8 +154,6 @@ mod tests {
 
     use super::{MaxInFlight, Permits, Take, WIDEN_AFTER};
 
-    /// One step of a trace, its instant an offset in milliseconds from
-    /// the trace's base (the Lean model's `Event`).
     #[derive(Debug, Clone)]
     enum Event {
         Take(u64),
@@ -212,8 +175,7 @@ mod tests {
     }
 
     proptest! {
-        /// The five properties of `Sprawling/gateway/spec/Concurrency.lean`,
-        /// checked after every step of a random trace.
+
         #[test]
         fn permits_keep_the_lean_properties(
             cap in 1u32..=12,
@@ -253,11 +215,7 @@ mod tests {
     }
 
     proptest! {
-        /// `run_keeps_within` of `Sprawling/gateway/spec/Concurrency.lean`:
-        /// from any state a trace can reach with no more permits in use
-        /// than the limit, a trace with no narrowing in it keeps it so
-        /// after every step. The prefix may narrow, so the suffix starts
-        /// from every limit a 429 can leave behind.
+
         #[test]
         fn a_trace_without_narrowing_keeps_in_use_within_the_limit(
             cap in 1u32..=12,
@@ -292,8 +250,6 @@ mod tests {
         }
     }
 
-    /// Eight successes after a narrowing widen by one, and not while the
-    /// provider's Retry-After still holds.
     #[test]
     fn a_narrowed_limit_widens_after_the_retry_after_instant() {
         let base = Instant::now();

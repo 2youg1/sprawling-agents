@@ -3,33 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Offline replay: re-verifies a Ledger without re-executing anything.
-//! The second and last minting point for EventRef.
-//!
-//! Refusals are fail-closed and name the 1-based line: a higher `v` and
-//! an unknown kind without `ig:true` speak direction
-//! (`E_LOG_VERSION_UNSUPPORTED`, written by a newer sprawling); a broken
-//! chain, a seq gap or non-canonical bytes are storage integrity
-//! (`E_CAS_CORRUPT`). Lines with `ig:true` and an unknown kind skip the
-//! typed parse but still count in the chain — the chain covers raw bytes,
-//! not meanings.
-
 use std::path::Path;
 
 use kernel::{Address, AxCode, AxError, B3Hash, EventRecord, EventRef, Seq};
 use storage::{CheckedLine, LedgerIndex, LineCheck, Located};
 
-/// One verified line: a typed record with its ref echo, or an explicitly
-/// ignorable line from a future vocabulary.
 #[derive(Debug, Clone, PartialEq)]
 pub enum VerifiedLine {
     Known { record: EventRecord, echo: EventRef },
     IgnoredUnknown { seq: Seq },
 }
 
-/// A verified sequence: raw bytes plus their verified reading. Forking
-/// consumes this type, never raw lines — a fork of an unverified
-/// sequence is unrepresentable (`Sprawling/runtime/Spec.lean` §10).
 #[derive(Debug)]
 pub struct VerifiedLedger {
     raw: Vec<Vec<u8>>,
@@ -51,8 +35,6 @@ impl VerifiedLedger {
     }
 }
 
-/// A2: offline chain verification over raw lines, through the one
-/// per-line check `storage::LineCheck` owns.
 pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError> {
     let mut check = LineCheck::at_genesis();
     let verified = lines
@@ -77,31 +59,11 @@ pub fn verify_lines(lines: Vec<Vec<u8>>) -> Result<VerifiedLedger, AxError> {
     })
 }
 
-/// A2 over a durable ledger directory; strictly read-only.
-///
-/// A directory holding no segment yields an empty `VerifiedLedger`, the
-/// same as a ledger holding no events. That is deliberate here: every
-/// caller of this function computes the path from a city root it already
-/// holds, and a city that has been opened but never written to has a
-/// ledger directory and no segment in it. Telling the two apart is the
-/// job of whoever took the path from a person - `sprawling replay` does
-/// it with `storage::ledger_segments_at` (`Sprawling/app/Spec.lean` section 12).
 pub fn verify_ledger_dir(dir: &Path) -> Result<VerifiedLedger, AxError> {
     let lines = storage::read_raw_lines_at(dir).map_err(storage::StorageError::into_ax)?;
     verify_lines(lines)
 }
 
-/// A2 folded instead of kept: each record the per-line check reads is
-/// lent to `each` and dropped, so what stays resident is one segment's
-/// bytes and one record rather than every raw line and every record.
-/// The same pass builds the `LedgerIndex` it returns, which covers
-/// exactly the history `each` saw.
-///
-/// # Errors
-/// The first line that does not verify, named as `verify_ledger_dir`
-/// names it, or the first error `each` returns. The records before that
-/// line were already shown to `each`, so the caller discards everything
-/// it folded.
 pub fn fold_ledger_dir(
     dir: &Path,
     mut each: impl FnMut(&EventRecord) -> Result<(), AxError>,
@@ -123,10 +85,6 @@ pub fn fold_ledger_dir(
     })
 }
 
-/// A15: recompute the four segment hashes from a `prompt_assembled`
-/// payload plus the same source documents, and check them against the
-/// recorded ones. The concatenation rule (join separator, truncation
-/// marker) is reused from `prefix` — one authority, no second copy.
 pub fn rebuild_prefix(
     data: &serde_json::Value,
     resolver: &dyn Fn(&Address) -> Option<Vec<u8>>,
@@ -236,9 +194,7 @@ pub fn rebuild_prefix(
                      the file on disk today is shorter than the span the run kept"
                 ))
             })?;
-            // Read as the typed record reads it: a row without a hash, or
-            // with a null one, predates D105; anything else that is not a
-            // string is a row nothing in this tree wrote.
+
             let recorded = match source.get("hash") {
                 None | Some(serde_json::Value::Null) => None,
                 Some(value) => Some(value.as_str().ok_or_else(|| {
@@ -304,14 +260,10 @@ pub fn rebuild_prefix(
     Ok(four)
 }
 
-/// Crash recovery - detecting a call with no outcome, and closing it -
-/// is the other half of replay and has its own file.
 mod resume;
 
 pub use resume::{DanglingCalls, outcome_unknown_draft};
 
-/// The cache shape a replay rebuilds from two records and then judges
-/// for itself.
 mod shape;
 
 pub use shape::rebuild_shape;

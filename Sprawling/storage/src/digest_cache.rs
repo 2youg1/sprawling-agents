@@ -3,25 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Content-addressed digest storage: the same bytes
-//! are digested once for their whole life.
-//!
-//! The address is the content hash, so a second put of the same content
-//! is not an update — there is nothing it could change. That is what
-//! makes the cache safe without a version field, a timestamp, or an
-//! eviction policy: entries never go stale, they only stop being
-//! wanted, and `invalidate` is the explicit way to say so.
-//!
-//! Writes go through tmp-then-rename, the same discipline as the CAS: a
-//! crash leaves a partial file in `tmp/`, never a half-written entry at
-//! its final name.
-//!
-//! **Whether an entry is there has one spelling: [`Vfs::exists`].**
-//! Asking by reading the whole file would answer "not cached" for an
-//! entry this process may not open and pay a full read to learn a
-//! yes/no. Reading is for `get`, which wants the bytes (`Sprawling/storage/spec/DigestCache.lean`
-//! §8-11).
-
 use std::path::{Path, PathBuf};
 
 use kernel::{B3Hash, Payload};
@@ -44,9 +25,7 @@ impl DigestCache {
         let tmp = dir.join("tmp");
         fs.create_dir_all(&tmp)
             .map_err(io_err("create digest cache tmp", &tmp))?;
-        // Sweep crash residue: rename is atomic, so anything still in
-        // tmp is a half-written entry from a previous process (the same
-        // discipline as the CAS, not a second one).
+
         let leftovers = fs.list(&tmp).map_err(io_err("list digest tmp", &tmp))?;
         for leftover in leftovers {
             fs.remove_file(&leftover)
@@ -62,9 +41,6 @@ impl DigestCache {
         self.dir.join(format!("{content}.json"))
     }
 
-    /// Stores a digest for content that has none. Content already
-    /// digested is left exactly as it was — same address, same bytes,
-    /// nothing to decide.
     pub fn put(&mut self, content: &B3Hash, tree_json: &[u8]) -> Result<(), StorageError> {
         let final_path = self.entry_path(content);
         if self.fs.exists(&final_path) {
@@ -99,10 +75,6 @@ impl DigestCache {
         }
     }
 
-    /// Drops an entry and returns the `digest_invalidated` payload. The
-    /// next digest of this content re-runs; invalidating something that
-    /// was never cached is not an error, because the end state is the
-    /// one the caller asked for.
     pub fn invalidate(&mut self, content: &B3Hash, reason: &str) -> Result<Payload, StorageError> {
         let path = self.entry_path(content);
         let existed = self.fs.exists(&path);
@@ -136,8 +108,7 @@ mod tests {
         let mut cache = DigestCache::open(tmp.path()).unwrap();
         let content = B3Hash::digest(b"a long document");
         cache.put(&content, br#"{"tree":"first"}"#).unwrap();
-        // A second put of the same content changes nothing: the address
-        // is the content, so there is no newer version of it.
+
         cache.put(&content, br#"{"tree":"second"}"#).unwrap();
         assert_eq!(
             cache.get(&content).unwrap().as_deref(),
@@ -164,7 +135,7 @@ mod tests {
         assert_eq!(value["existed"], true);
         assert_eq!(value["reason"], "source edited");
         assert_eq!(cache.get(&content).unwrap(), None);
-        // Invalidating an absent entry reaches the same end state.
+
         let payload = cache.invalidate(&content, "again").unwrap();
         assert_eq!(serde_json::to_value(&payload).unwrap()["existed"], false);
     }
@@ -174,7 +145,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let mut cache = DigestCache::open(tmp.path()).unwrap();
         let content = B3Hash::digest(b"doc");
-        // Simulate the torn write: a leftover part file, no final entry.
+
         std::fs::write(
             tmp.path().join("tmp").join(format!("{content}.part")),
             b"half",
@@ -185,8 +156,7 @@ mod tests {
             None,
             "no half entry is visible"
         );
-        // Reopening sweeps the debris; either way the next put must
-        // publish exactly what it was given, never debris plus content.
+
         cache.put(&content, b"{\"tree\":\"ok\"}").unwrap();
         assert_eq!(
             cache.get(&content).unwrap().as_deref(),

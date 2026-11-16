@@ -3,26 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the executor supplies at a phase change, and what a phase
-//! change answers back.
-
 use kernel::EventRef;
 
 use crate::conversation::Speaker;
 
-/// Boundary snapshot, supplied by the executor at every phase change.
-/// `Cancel` ends the turn at the boundary; `Steer` records and advances
-/// (the executor folds the text into its `Conversation`); `Policy`
-/// advances too, and the executor holds it in its `PolicyCell` until the
-/// next `SafePoint::BeforeWave` (`Sprawling/runtime/spec/PolicyTake.lean`
-/// §8-62). `Policy` writes nothing: its `run_policy_changed` line is
-/// already on the ledger, which is how it reached this run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Interrupt {
     None,
     Cancel,
-    /// Who spoke is a type, so only the entrance that builds
-    /// [`Speaker::Person`] can make a steer render as the User's.
+
     Steer {
         speaker: Speaker,
         text: String,
@@ -32,34 +21,20 @@ pub enum Interrupt {
     },
 }
 
-/// Whether the wave may start its next call, asked once before each of
-/// them.
-///
-/// Narrower than [`Interrupt`] on purpose. Between two calls of one
-/// wave, the only instruction this city can carry out at once is
-/// stopping: text that arrives to redirect the work belongs to the
-/// window the executor owns, and the executor folds it there before
-/// answering here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NextCall {
-    /// Nothing has stopped this run; the call goes ahead.
+
     Allowed,
-    /// A halt reached this run, and the wave ends where it stands.
+
     Halted,
 }
 
-/// A phase change either advances or ends the turn at the boundary.
-/// Exhaustive, as every enum in this workspace is: a new outcome
-/// must force every executor to decide, not fall through a catch-all.
 #[derive(Debug)]
 pub enum PhaseOutcome<Next> {
     Advanced(Next),
     Cancelled(TurnCancelled),
 }
 
-/// The turn ended at a boundary: `cancel_received` is on the ledger and
-/// its ref is the last entry. Freezing (handoff + run_frozen) is the run
-/// loop's move, not the turn's.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TurnCancelled {
     pub(super) refs: Vec<EventRef>,

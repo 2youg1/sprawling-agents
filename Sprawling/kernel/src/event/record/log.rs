@@ -3,15 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the ledger records about itself.
-
 use serde::{Deserialize, Serialize};
 
-/// `log_truncated`: how many bytes a crash left behind that the opening
-/// procedure could not read as records.
-///
-/// The line is written by the city, because opening the ledger is the
-/// city's own work rather than any run's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LogTruncated {
@@ -24,7 +17,6 @@ mod tests {
     use super::*;
     use crate::event::Payload;
 
-    /// The bytes `storage::jsonl::append::append_log_truncated` wrote by hand.
     #[test]
     fn a_truncation_line_writes_the_one_key_the_hand_written_map_wrote() {
         let mut hand = serde_json::Map::new();

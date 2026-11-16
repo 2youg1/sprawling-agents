@@ -3,61 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A city an earlier release kept beside the binary, and its one move
-//! to where this release keeps cities (`Sprawling/app/spec/Firstrun.lean`
-//! §8-8).
-//!
-//! Releases up to 0.0.12 put a city nobody named in `<binary's
-//! folder>/city`. An upgrade unpacks into another folder, so that city
-//! is left behind; this module moves it once, as one folder, and points
-//! the worktrees git recorded by absolute path at the new place.
-
 use std::path::{Path, PathBuf};
 
 use kernel::{AxCode, AxError};
 
-/// What [`bring_home`] found and did.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Homing {
-    /// There is no city beside the binary.
+
     NothingBeside,
-    /// The city at `from` is now at `to`. `relinked` is how many
-    /// worktrees were pointed at it, or why their links could not be
-    /// rewritten: the move stands either way, because a tree whose links
-    /// git cannot follow is taken back and checked out again the next
-    /// time the city places one (`Sprawling/app/spec/Supervising.lean`).
+
     Moved {
         from: PathBuf,
         to: PathBuf,
         relinked: Result<usize, AxError>,
     },
-    /// The city at `at` stays there, because `home` lies on another
-    /// volume and a rename cannot cross one. The city is opened where it
-    /// is; a copy across volumes is not attempted, because a copy that
-    /// stops halfway leaves half a city, while the whole one left in
-    /// place can still be moved by hand.
+
     OnAnotherVolume { at: PathBuf, home: PathBuf },
 }
 
-/// Moves the city beside the binary in `exe_dir` to `to`, when there is
-/// one.
-///
-/// The move is one rename, so a reader finds the city whole in one
-/// place or the other. The writer lock is taken first to learn that no
-/// city is running from the old folder. Outside Windows it is held
-/// through the rename, so no city can start from the old folder in
-/// between. Windows refuses to rename a folder with a file open inside,
-/// the lock file included, so there it is let go first; that same
-/// refusal turns a city that starts in between into a failed rename
-/// rather than a city moved under a running process.
-///
-/// # Errors
-/// `E_LEDGER_HELD` when a city is running from the old folder;
-/// `E_INVALID_ARGS` when `to` already holds a city or other files;
-/// `E_STORAGE_FATAL` when a folder
-/// cannot be read, made or renamed. A worktree link that cannot be
-/// rewritten after the rename is answered in [`Homing::Moved`], and a
-/// `to` on another volume in [`Homing::OnAnotherVolume`], not here.
 pub fn bring_home(exe_dir: &Path, to: &Path) -> Result<Homing, AxError> {
     let from = exe_dir.join(accounting::home::CITY_DIR);
     match city::has_history(&from)? {
@@ -79,7 +42,6 @@ pub fn bring_home(exe_dir: &Path, to: &Path) -> Result<Homing, AxError> {
     after_rename(renamed, from, to)
 }
 
-/// What the rename's outcome means for the city that was at `from`.
 fn after_rename(renamed: std::io::Result<()>, from: PathBuf, to: &Path) -> Result<Homing, AxError> {
     match renamed {
         Ok(()) => Ok(Homing::Moved {
@@ -98,8 +60,6 @@ fn after_rename(renamed: std::io::Result<()>, from: PathBuf, to: &Path) -> Resul
     }
 }
 
-/// Makes sure `to` can receive a city: absent, or an empty folder,
-/// which is removed so the rename can put the city in its place.
 fn vacate(to: &Path) -> Result<(), AxError> {
     match city::has_history(to)? {
         city::History::Present => {

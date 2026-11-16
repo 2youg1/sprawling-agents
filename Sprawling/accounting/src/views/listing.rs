@@ -3,24 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One directory of the city, read at the moment of asking.
-//!
-//! The disk is the authority, as it is for `read_building`: a listing
-//! kept beside the tree would be a second copy of what the tree says. A
-//! directory this cannot read lists as empty rather than refusing - on
-//! the page, a directory nobody can open is an empty directory, which
-//! is the same thing the building page says about a plan it cannot
-//! read.
-
 use std::path::Path;
 
 use kernel::Address;
 
-/// One level of the tree under `at`, or the city root when `at` is
-/// absent: directories first, then files, each in name order.
-///
-/// Takes the city root rather than the views: it reads the disk, and
-/// runs after the view lock is released (`Sprawling/app/Spec.lean` §8-100).
 pub(super) fn listing_answer(city_root: &Path, at: Option<Address>) -> wire::ListingAnswer {
     wire::ListingAnswer {
         entries: list(&resolve(city_root, at.as_ref())),
@@ -28,7 +14,6 @@ pub(super) fn listing_answer(city_root: &Path, at: Option<Address>) -> wire::Lis
     }
 }
 
-/// Where an address points inside this city.
 pub(super) fn resolve(city_root: &Path, at: Option<&Address>) -> std::path::PathBuf {
     match at {
         Some(addr) => city_root.join(addr.as_str()),
@@ -44,8 +29,7 @@ fn list(dir: &Path) -> Vec<wire::Entry> {
     let mut files = Vec::new();
     for entry in read.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        // `metadata` follows a link, so a link to a directory is a
-        // directory to a person walking the tree.
+
         let Ok(meta) = std::fs::metadata(entry.path()) else {
             continue;
         };
@@ -83,8 +67,6 @@ mod tests {
         entries.iter().map(|entry| entry.name.as_str()).collect()
     }
 
-    /// The city root lists its reserved subtree beside its buildings:
-    /// both are the design this view exists to show.
     #[test]
     fn the_city_root_lists_the_reserved_subtree_and_the_buildings() {
         let dir = tempfile::tempdir().unwrap();
@@ -97,17 +79,13 @@ mod tests {
         let listed = names(&answer.entries);
         assert!(listed.contains(&".sprawling"), "{listed:?}");
         assert!(listed.contains(&"hall"), "{listed:?}");
-        // The city's git, the reserved subtree, City Hall, the ignore
-        // file that keeps the reserved subtree out of that git, and the
-        // city's norms - directories first.
+
         assert_eq!(
             listed,
             vec![".git", ".sprawling", "hall", ".gitignore", "City.md"]
         );
     }
 
-    /// Directories come before files, so a tree reads the same way at
-    /// every level.
     #[test]
     fn a_building_lists_its_directories_before_its_files() {
         let dir = tempfile::tempdir().unwrap();
@@ -139,7 +117,6 @@ mod tests {
         assert!(matches!(roadmap.kind, wire::EntryKind::File { bytes } if bytes > 0));
     }
 
-    /// A directory nobody can open is an empty directory on the page.
     #[test]
     fn a_missing_directory_lists_as_empty() {
         let dir = tempfile::tempdir().unwrap();

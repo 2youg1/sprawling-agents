@@ -3,40 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The role layer: what a surface is *for*, judged against a closed
-//! vocabulary (Tools/xtask/Spec.lean §8-8).
-//!
-//! The rungs are the authority on values and the six assertions beside
-//! this file judge them. They do not answer the question a view asks -
-//! *what fills a control that has lifted off the page* - and without a
-//! role every view answers it where it stands, in hand-typed `bg-g2`
-//! and `border-g3` spellings that cannot be compared and none of which
-//! is the authority.
-//!
-//! **A role is a single hop and nothing else.** `--color-raised:
-//! var(--color-g2)`. Not an `oklch()` beside the rung it copies, which
-//! would be that value's second home and would have to be re-tuned by
-//! hand whenever the rung moved; and not a hex literal, which the six
-//! assertions cannot read at all - `tables.rs` keeps only declarations
-//! whose value parses as `oklch()`, so a `--color-raised: #2a2a2a`
-//! would have been *silently ignored*, not refused. That silence is
-//! what this file closes.
-//!
-//! **The hop is also what makes one declaration serve both lightings.**
-//! The light block restates every rung; a role that points at a rung
-//! follows it without being mentioned there, and a role that carried
-//! its own value would need a second declaration that could disagree.
-//!
-//! Four rules, and together they make the vocabulary closed in both
-//! directions: a name this file does not know cannot be declared, a
-//! name it knows cannot go undeclared, a role nothing spells is a name
-//! with no reader, and a rung spelled outside the stylesheet, as a
-//! utility or through `var()`, is a view answering the question again on
-//! its own. The walk that finds those rungs also refuses a
-//! `var(--color-*)` the theme never declares, which the engine would draw
-//! as nothing without a word, and a `--color-*` a component's stylesheet
-//! declares for itself, which would be a second home for a colour.
-
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
@@ -44,52 +10,31 @@ use crate::sheet::{self, Reading};
 use crate::theme;
 use crate::walk;
 
-/// Where the views that must speak in roles live. `walk` states the
-/// directory; this gate only says that it is the one it reads.
 use crate::walk::CLIENT_SRC as VIEWS;
 
-/// Which file kinds carry a class name or read a colour. Wider than what
-/// the client is written in, because `index.html` carries classes too
-/// and a rung spelled there draws exactly as wrongly as one spelled in a
-/// view, and a stylesheet outside the theme reads colours as a
-/// component's `<style>` block does.
 const VIEW_EXTS: [&str; 4] = ["svelte", "ts", "html", "css"];
 
-/// The closed vocabulary.
-///
-/// Ordered as the stylesheet declares them - surfaces outward from the
-/// page, then the marks, then the edges, then the one ink - because a
-/// reader looking for "which one do I want" reads this list and not the
-/// cascade.
-///
-/// **Adding a row is a design decision and costs one.** The draft of
-/// this layer carried `inert` and `resting` as two marks one rung
-/// apart, and no reader could have said which a given dot was; they are
-/// one row now. A role earns its place only when somebody can state the
-/// question it answers in a sentence that does not mention a rung.
 const ROLES: [&str; 22] = [
-    // The surfaces, outward from the page.
+
     "page",
     "chrome",
     "raised",
     "raised-hover",
-    // The one fill that lets the page behind it show through, at the
-    // opacity `glass.rs` judges.
+
     "glass",
-    // Three fills that are not a surface a person navigates.
+
     "speech",
     "track",
     "disabled",
-    // The one fill of a mark that reports rather than offers.
+
     "mark",
-    // The edges, by what can be done to the box they bound.
+
     "edge",
     "edge-panel",
     "edge-input",
-    // The one ink that goes on top of a filled coloured token.
+
     "on-accent",
-    // The city drawing, which encodes depth in a picture rather than
-    // what can be done to a box, and therefore has its own prefix.
+
     "drawn-hollow",
     "drawn-solid",
     "drawn-solid-lit",
@@ -101,8 +46,6 @@ const ROLES: [&str; 22] = [
     "drawn-figure",
 ];
 
-/// A `--color-*` declaration that is neither a rung nor a text token:
-/// its name as the stylesheet spells it, and its value.
 struct Named<'a> {
     name: &'a str,
     value: &'a str,
@@ -120,8 +63,6 @@ pub(super) fn judge_roles(root: &Path, source: &str) -> Result<Vec<Violation>, X
         })
         .collect();
 
-    // 1. Everything that is not a rung, a text token or a coloured token
-    //    is a role: a known name, and a single hop to a declared rung.
     for held in &roles {
         if !ROLES.contains(&held.name) {
             violations.push(refuse(
@@ -149,8 +90,6 @@ pub(super) fn judge_roles(root: &Path, source: &str) -> Result<Vec<Violation>, X
         }
     }
 
-    // 2. A name this file knows and the stylesheet never declares is a
-    //    role every view would spell into nothing.
     for role in ROLES {
         let found = roles.iter().filter(|held| held.name == role).count();
         if found != 1 {
@@ -162,9 +101,6 @@ pub(super) fn judge_roles(root: &Path, source: &str) -> Result<Vec<Violation>, X
         }
     }
 
-    // 3. A role nothing spells is a name with no reader. A role the
-    //    stylesheet also turns into a utility of the same name (`@utility
-    //    glass`) is read wherever a view spells that utility as a class.
     let spelled = spellings(root)?;
     for role in ROLES {
         let utility = source.contains(&format!("@utility {role} {{"));
@@ -180,15 +116,10 @@ pub(super) fn judge_roles(root: &Path, source: &str) -> Result<Vec<Violation>, X
         }
     }
 
-    // 4. A rung spelled outside the stylesheet is a view deciding for
-    //    itself how bright a surface should be - which is the defect. The
-    //    same walk refuses a colour read that the theme never declares
-    //    and a colour a component's stylesheet declares for itself.
     violations.extend(views_outside_the_theme(root, source)?);
     Ok(violations)
 }
 
-/// Every `--color-<name>: <value>` the stylesheet declares.
 fn declared(source: &str) -> impl Iterator<Item = Named<'_>> {
     source.lines().filter_map(|line| {
         let (name, tail) = line.trim().strip_prefix("--color-")?.split_once(':')?;
@@ -198,14 +129,12 @@ fn declared(source: &str) -> impl Iterator<Item = Named<'_>> {
     })
 }
 
-/// The rung a role hops to, as the stylesheet spells it (`g2`).
 pub(super) fn rung_of<'a>(source: &'a str, role: &str) -> Option<&'a str> {
     declared(source)
         .find(|held| held.name == role)
         .and_then(|held| hop(held.value))
 }
 
-/// `var(--color-g2)` is a hop to `g2`; anything else is not a hop.
 fn hop(value: &str) -> Option<&str> {
     value
         .strip_prefix("var(--color-")?
@@ -222,8 +151,6 @@ fn is_text(name: &str) -> bool {
     name == "text" || name.starts_with("text-")
 }
 
-/// The text of every view file, read once for both the reader check and
-/// the rung scan.
 fn spellings(root: &Path) -> Result<Vec<String>, XtaskError> {
     let mut held = Vec::new();
     for path in walk::files_with_ext(&root.join(VIEWS), &VIEW_EXTS)? {
@@ -235,8 +162,6 @@ fn spellings(root: &Path) -> Result<Vec<String>, XtaskError> {
     Ok(held)
 }
 
-/// Whether a file spells a role as a whole word after a utility prefix -
-/// `bg-raised` names `raised`, and `bg-raised-hover` does not.
 fn names(text: &str, role: &str) -> bool {
     text.match_indices(role).any(|(at, _)| {
         let before = text.get(..at).and_then(|head| head.bytes().next_back());
@@ -248,9 +173,6 @@ fn names(text: &str, role: &str) -> bool {
     })
 }
 
-/// Whether a file spells `word` as a whole class name: nothing that can
-/// continue a class name (a letter, a digit, `-`, `_` or a variant's `:`)
-/// on either side.
 fn class_word(text: &str, word: &str) -> bool {
     let continues = |byte: u8| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b':');
     text.match_indices(word).any(|(at, _)| {
@@ -262,9 +184,6 @@ fn class_word(text: &str, word: &str) -> bool {
     })
 }
 
-/// Every place a view, a component's stylesheet or a replacement look
-/// names a rung directly, reads a colour the theme never declares, or
-/// declares a colour of its own.
 fn views_outside_the_theme(root: &Path, source: &str) -> Result<Vec<Violation>, XtaskError> {
     let known: Vec<&str> = declared(source).map(|held| held.name).collect();
     let mut violations = Vec::new();
@@ -333,9 +252,6 @@ fn views_outside_the_theme(root: &Path, source: &str) -> Result<Vec<Violation>, 
     Ok(violations)
 }
 
-/// Every colour name a line reads through `var(--color-<name>)`. A name
-/// built at run time (`var(--color-${role})`) is not a reading the gate
-/// can resolve, and is skipped.
 fn reads(line: &str) -> impl Iterator<Item = &str> {
     const OPEN: &str = "var(--color-";
     line.match_indices(OPEN).filter_map(|(at, _)| {
@@ -350,12 +266,6 @@ fn reads(line: &str) -> impl Iterator<Item = &str> {
     })
 }
 
-/// Whether a line carries `bg-g2`, `border-g3`, `text-g0` or any other
-/// utility built straight on a rung.
-///
-/// The prefix has to be one of the three that take a colour: `gap-`,
-/// `grid-` and `group/` all start with a `g` that is not a rung, and a
-/// bare search for `-g` would report every one of them.
 fn rung_utility(line: &str) -> Option<String> {
     for prefix in [
         "bg-", "border-", "text-", "fill-", "stroke-", "ring-", "outline-",
@@ -403,10 +313,6 @@ mod tests {
     use super::judge_roles;
     use crate::color::scan::tests::SVELTE_FIXTURE;
 
-    /// A component's stylesheet speaks in roles the theme declares: a
-    /// rung read through `var()` is a view choosing a brightness again, a
-    /// misspelt role reads as nothing without a word, and a colour
-    /// declared there is a second home for it.
     #[test]
     fn a_component_style_reads_declared_roles_and_declares_no_colour() {
         let root = std::env::temp_dir().join(format!("color-roles-{}", std::process::id()));

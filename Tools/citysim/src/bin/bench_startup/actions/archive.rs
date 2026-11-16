@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The release archive as the install action meets it: the digest
-//! published with it, the unpack, and the executable that comes out
-//! (citysim D3, `Tools/citysim/spec/BenchStartup.lean` §8-5).
-//!
-//! Shape: adapter. `sha2` and `zip` are the release's own spelling of
-//! "the digest" and "the archive format", and each is named once in the
-//! workspace manifest, so the step `cargo xtask package` writes and the
-//! step this reading prices cannot come to disagree about either.
-//!
-//! The digest is not a second content hash beside the city's: it
-//! addresses an artifact of the outside world, which is what
-//! `install.sh` and `install.ps1` verify before they unpack anything.
-
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
@@ -24,8 +11,6 @@ use sha2::{Digest, Sha256};
 
 use super::footprint;
 
-/// The archive's SHA-256, read from disk the way the install scripts
-/// hash it (`sha256sum`, `Get-FileHash`).
 pub(super) fn digest_of(archive: &Path) -> Result<Vec<u8>, AxError> {
     let bytes = std::fs::read(archive).map_err(|err| {
         AxError::failure(
@@ -38,8 +23,6 @@ pub(super) fn digest_of(archive: &Path) -> Result<Vec<u8>, AxError> {
     Ok(Sha256::digest(&bytes).to_vec())
 }
 
-/// What the install path answers when the bytes and the published digest
-/// disagree. The archive is never unpacked after this.
 pub(super) fn digest_mismatch(archive: &Path) -> AxError {
     AxError::failure(
         AxCode::DigestSuspect,
@@ -52,8 +35,6 @@ pub(super) fn digest_mismatch(archive: &Path) -> AxError {
     .with_recovery("nothing is installed from an archive that fails its digest; fetch it again")
 }
 
-/// Unpacks the archive into `into` and answers the executable it holds,
-/// found by the name a shell would type.
 pub(super) fn unpack(archive: &Path, into: &Path) -> Result<PathBuf, AxError> {
     let file = std::fs::File::open(archive).map_err(|err| {
         AxError::failure(
@@ -90,19 +71,6 @@ pub(super) fn unpack(archive: &Path, into: &Path) -> Result<PathBuf, AxError> {
     })
 }
 
-/// The fixture the install action starts from: the shipped binary as one
-/// deflated zip entry under one directory, which is the shape
-/// `cargo xtask package` gives a release archive.
-///
-/// Written before any stamp: the install reading starts at "the archive is in
-/// place", and network transfer is out of the reading. Reading a release
-/// archive and writing this fixture are the same file's business, so the
-/// member a shell would find and the member this fixture writes cannot
-/// come apart.
-///
-/// The timestamp is the zip format's own epoch rather than the clock: a
-/// fixture that carried the wall clock would make two runs of one binary
-/// differ in the bytes this action hashes.
 pub(crate) fn fixture(scratch: &Path, binary: &Path) -> Result<PathBuf, AxError> {
     let bytes = std::fs::read(binary).map_err(|err| {
         AxError::failure(

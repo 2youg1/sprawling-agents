@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Opening a city for service: what the vault turned out to be, and the
-//! local server the environment names when nothing is registered yet.
-//!
-//! **The environment path is a convenience, not a second authority.**
-//! It writes the same two records the settings page writes, through the
-//! same two methods, so the book stays the only statement of what this
-//! city can call and no reader has to ask which of two ways an endpoint
-//! arrived.
-
 use kernel::{AxError, EventKind, Payload};
 
 use super::super::RunWorker;
@@ -21,12 +12,7 @@ use super::{
 use crate::worker::commanding::door::{InHand, KeptRefusal};
 
 impl RunWorker {
-    /// Attaches the endpoint the environment names and chooses its model.
-    ///
-    /// The probe leaves this thread like any other, and this waits for
-    /// its answer before choosing the model, which needs the endpoint in
-    /// the book: the city is opening and serves nobody yet, so nothing
-    /// else waits behind it.
+
     fn seed_from_environment(&mut self, base_url: &str, model: &str) -> Result<(), AxError> {
         let facts = local_model_facts(model)?;
         let (reply, refusal) = KeptRefusal::open();
@@ -60,14 +46,6 @@ impl RunWorker {
         )
     }
 
-    /// Records what the vault turned out to be, and registers the local
-    /// server named in the environment when nothing is registered yet.
-    ///
-    /// The environment path is a convenience, not a second authority:
-    /// it writes the same two records the settings page writes, so the
-    /// book stays the only statement of what this city can call. A
-    /// failure here is reported and not fatal — a city stays readable
-    /// without a provider.
     pub fn open_for_service(&mut self, vault_notice: Option<Payload>) {
         if let Some(notice) = vault_notice
             && let Err(err) = self.record(EventKind::ProviderDegraded, notice)

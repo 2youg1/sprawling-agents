@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The rows themselves: which host serves what, and where each
-//! statement was read.
-//!
-//! Split from the lookups beside them because a row is data a person
-//! checks against a vendor's page and a lookup is code a person reads
-//! for its rule, and one file holding both is read twice for two
-//! reasons.
-
 use kernel::DialectKind;
 
 use crate::market::InputKinds;
@@ -22,8 +14,6 @@ use super::{
     PresetThinking, ReasoningReturn, ToolPictureCarry,
 };
 
-/// `low` to `max`, the set every current OpenAI reasoning model page
-/// prints once `none` is left out.
 const LOW_TO_MAX: [Effort; 5] = [
     Effort::Low,
     Effort::Medium,
@@ -32,11 +22,6 @@ const LOW_TO_MAX: [Effort; 5] = [
     Effort::Max,
 ];
 
-/// The hosts this city knows without asking.
-///
-/// Short on purpose. A host belongs here when this city can cite what
-/// it serves; everything else reaches the same facts through the
-/// endpoint's own model list, which is the rung above this table.
 pub const PRESETS: [HostPreset; 13] = [
     HostPreset {
         host: "api.anthropic.com",
@@ -56,8 +41,7 @@ pub const PRESETS: [HostPreset; 13] = [
     },
     HostPreset {
         host: "api.openai.com",
-        // Chat completions and responses are both served here, and the
-        // person's own toggle says which one this registration means.
+
         faces: &[
             Face {
                 dialect: DialectKind::OpenAiResponses,
@@ -69,20 +53,13 @@ pub const PRESETS: [HostPreset; 13] = [
             },
         ],
         models: OPENAI_MODELS,
-        // `max_tokens` "is not compatible with o-series models"
-        // (`CreateChatCompletionRequest` in `openai/openai-openapi`).
-        // Tool pictures follow in a user message: chat tool content is
-        // text-only (`ChatCompletionToolMessageParam`), and the same
-        // host spelling must also serve the chat face, so responses'
-        // `function_call_output` image parts are not used here (D66).
+
         chat: ChatSpelling {
             ceiling: CeilingField::MaxCompletionTokens,
             ..ChatSpelling::DOCUMENTED
         },
         session_header: None,
-        // `prompt_cache_key` on `CreateChatCompletionRequest` and on
-        // `CreateResponse` (through `ResponseProperties`) in
-        // `openai/openai-openapi`.
+
         cache_key_field: Some("prompt_cache_key"),
         generation: GenerationPreset {
             open_ai: super::OPENAI_GENERATION,
@@ -92,14 +69,9 @@ pub const PRESETS: [HostPreset; 13] = [
         source: "https://github.com/openai/openai-openapi/blob/master/openapi.yaml",
     },
     HostPreset {
-        // The documented base URL carries no path: the chat face is
-        // `/chat/completions` straight under the host.
+
         host: "api.deepseek.com",
-        // Chat and responses both answer straight under the host, and
-        // the Anthropic-compatible face under `/anthropic`, to which
-        // the Anthropic client appends `/v1/messages`
-        // (<https://api-docs.deepseek.com/>,
-        // <https://api-docs.deepseek.com/guides/responses_api>).
+
         faces: &[
             Face {
                 dialect: DialectKind::OpenAi,
@@ -115,13 +87,7 @@ pub const PRESETS: [HostPreset; 13] = [
             },
         ],
         models: DEEPSEEK_MODELS,
-        // Thinking is on by default, and a request with tools whose
-        // history lacks the earlier `reasoning_content` answers 400;
-        // the switch is `thinking.type`, with the level beside it.
-        // Chat accepts images on user messages only; responses also
-        // takes `input_image` in `function_call_output.output`
-        // (<https://api-docs.deepseek.com/guides/vision>,
-        // <https://api-docs.deepseek.com/guides/responses_api#image-input>).
+
         chat: ChatSpelling {
             effort: EffortField::ThinkingToggle,
             reasoning: ReasoningReturn::AsReasoningContent,
@@ -136,8 +102,7 @@ pub const PRESETS: [HostPreset; 13] = [
     },
     HostPreset {
         host: "api.x.ai",
-        // Responses is the face the vendor recommends; chat completions
-        // is still served as its legacy face.
+
         faces: &[
             Face {
                 dialect: DialectKind::OpenAiResponses,
@@ -149,11 +114,7 @@ pub const PRESETS: [HostPreset; 13] = [
             },
         ],
         models: &[],
-        // `max_tokens` is deprecated in favour of
-        // `max_completion_tokens`. Tool pictures stay on the following
-        // user message: the image pages only show them on `role: user`
-        // (<https://docs.x.ai/developers/model-capabilities/images/understanding>,
-        // <https://docs.x.ai/developers/model-capabilities/legacy/chat-completions>).
+
         chat: ChatSpelling {
             ceiling: CeilingField::MaxCompletionTokens,
             ..ChatSpelling::DOCUMENTED
@@ -165,20 +126,14 @@ pub const PRESETS: [HostPreset; 13] = [
     },
     HostPreset {
         host: "openrouter.ai",
-        // Not `/v1`: this aggregator serves under `/api/v1`, and the
-        // rule that appends `/v1` to every path-less URL answers 404
-        // here.
+
         faces: &[Face {
             dialect: DialectKind::OpenAi,
             path: "/api/v1",
         }],
-        // This gateway states window, ceiling, modalities and prices in
-        // its own model list, so a row here would be a second home for
-        // a fact the endpoint already publishes.
+
         models: &[],
-        // Its own `reasoning` object carries `max`, which its
-        // `reasoning_effort` enum does not, and it takes an earlier
-        // turn's reasoning back as `reasoning_content`.
+
         chat: ChatSpelling {
             ceiling: CeilingField::MaxTokens,
             effort: EffortField::ReasoningObject,
@@ -193,8 +148,7 @@ pub const PRESETS: [HostPreset; 13] = [
     },
     HostPreset {
         host: "generativelanguage.googleapis.com",
-        // The OpenAI-compatible face. `/v1beta` alone is Gemini's own
-        // shape, which this city does not write.
+
         faces: &[Face {
             dialect: DialectKind::OpenAi,
             path: "/v1beta/openai",
@@ -207,8 +161,7 @@ pub const PRESETS: [HostPreset; 13] = [
         source: "https://ai.google.dev/gemini-api/docs/openai",
     },
     HostPreset {
-        // Zhipu's mainland platform; `api.z.ai` below is the same API
-        // served outside mainland China.
+
         host: "open.bigmodel.cn",
         faces: &[Face {
             dialect: DialectKind::OpenAi,
@@ -235,11 +188,9 @@ pub const PRESETS: [HostPreset; 13] = [
         source: "https://docs.z.ai/api-reference/llm/chat-completion",
     },
     HostPreset {
-        // OpenCode Zen. OpenCode Go hangs under `/zen/go/v1` on the
-        // same host, so a Go registration is entered with its path.
+
         host: "opencode.ai",
-        // Each model answers on the face its row names: chat,
-        // responses or messages.
+
         faces: &[
             Face {
                 dialect: DialectKind::OpenAi,
@@ -262,18 +213,9 @@ pub const PRESETS: [HostPreset; 13] = [
         source: "https://opencode.ai/docs/go/",
     },
     HostPreset {
-        // The Kimi Code membership API, which a member calls with a key
-        // from the Kimi Code console and which does not hang under
-        // `/v1` at all. Appending `/v1` to this host answers 404,
-        // which is the same defect `openrouter.ai` is listed for.
+
         host: "api.kimi.com",
-        // Called through the OpenAI client library with this base URL
-        // (`packages/kosong/src/kosong/chat_provider/openai_common.py`
-        // constructs `AsyncOpenAI(base_url=...)`). The membership guide
-        // prints the Anthropic-compatible base as `/coding/`, to which
-        // the Anthropic client appends `/v1/messages`, so both faces
-        // hang under `/coding/v1`
-        // (<https://www.kimi.com/en/help/kimi-code/membership-guide>).
+
         faces: &[
             Face {
                 dialect: DialectKind::OpenAi,
@@ -284,10 +226,7 @@ pub const PRESETS: [HostPreset; 13] = [
                 path: "/coding/v1",
             },
         ],
-        // Pending: the ceilings of the Kimi models are stated by this
-        // endpoint's own model list, which needs a member's key to
-        // read, and no vendor page reachable from this machine states
-        // them.
+
         models: &[],
         chat: MOONSHOT_CHAT,
         session_header: None,
@@ -301,8 +240,7 @@ pub const PRESETS: [HostPreset; 13] = [
             dialect: DialectKind::OpenAi,
             path: "/v1",
         }],
-        // Pending: as above, the model list is the statement and it
-        // needs a key.
+
         models: &[],
         chat: MOONSHOT_CHAT,
         session_header: None,
@@ -311,8 +249,7 @@ pub const PRESETS: [HostPreset; 13] = [
         source: "https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/auth/platforms.py",
     },
     HostPreset {
-        // The same platform served outside mainland China; one row per
-        // host because a host is what a person pastes.
+
         host: "api.moonshot.ai",
         faces: &[Face {
             dialect: DialectKind::OpenAi,
@@ -326,17 +263,14 @@ pub const PRESETS: [HostPreset; 13] = [
         source: "https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/auth/platforms.py",
     },
     HostPreset {
-        // Dashscope's compatible mode on its one fixed host; the other
-        // regions give each workspace a host of its own, entered with
-        // its path.
+
         host: "dashscope-us.aliyuncs.com",
         faces: &[Face {
             dialect: DialectKind::OpenAi,
             path: "/compatible-mode/v1",
         }],
         models: &[],
-        // Thinking is switched by `enable_thinking`, and several models
-        // default to off (<https://help.aliyun.com/zh/model-studio/deep-thinking>).
+
         chat: ChatSpelling {
             effort: EffortField::EnableThinking,
             ..ChatSpelling::DOCUMENTED
@@ -348,18 +282,6 @@ pub const PRESETS: [HostPreset; 13] = [
     },
 ];
 
-/// Moonshot's chat face: `max_tokens` is deprecated in favour of
-/// `max_completion_tokens`, and every earlier assistant message keeps
-/// its `reasoning_content`, read at
-/// <https://platform.moonshot.ai/docs/api/chat>. The Kimi Code
-/// membership API serves the same models, and `kimi-k2.7-code` keeps
-/// every earlier `reasoning_content` whatever the request says.
-///
-/// K2 models switch thinking by `thinking.type` and K3 takes a level in
-/// `reasoning_effort`, so both are written. Tool pictures ride the tool
-/// message: Kimi's multimodal tool example returns `image_url` /
-/// `video_url` parts as `role: tool` content
-/// (<https://platform.kimi.ai/docs/guide/kimi-k2-6-quickstart>).
 const MOONSHOT_CHAT: ChatSpelling = ChatSpelling {
     ceiling: CeilingField::MaxCompletionTokens,
     effort: EffortField::ThinkingToggle,
@@ -368,11 +290,6 @@ const MOONSHOT_CHAT: ChatSpelling = ChatSpelling {
     responses_tool_pictures: ToolPictureCarry::InToolContent,
 };
 
-/// Zhipu's chat face, read at
-/// <https://docs.z.ai/api-reference/llm/chat-completion>: the assistant
-/// message takes `reasoning_content`, which `clear_thinking: false`
-/// keeps in context, and thinking is switched by `thinking.type` with
-/// the level in `reasoning_effort`.
 const ZHIPU_CHAT: ChatSpelling = ChatSpelling {
     ceiling: CeilingField::MaxTokens,
     effort: EffortField::ThinkingToggle,
@@ -381,15 +298,6 @@ const ZHIPU_CHAT: ChatSpelling = ChatSpelling {
     responses_tool_pictures: ToolPictureCarry::FollowingUser,
 };
 
-/// Anthropic's documented ceilings. The Messages API requires
-/// `max_tokens` in every request, so a missing row here is a call that
-/// cannot be written at all.
-///
-/// The first four rows are the lineup the overview page lists as
-/// current, whose windows it prints as `1M` and `200K` and whose
-/// ceilings as `128K` and `64K`; each is read at a thousand to the
-/// `K`, which is never above the figure the vendor meant. The rows
-/// after them are earlier families the same page listed before.
 const ANTHROPIC_MODELS: &[ModelPreset] = &[
     ModelPreset {
         id_prefix: "claude-fable-5-1",
@@ -473,15 +381,6 @@ const ANTHROPIC_MODELS: &[ModelPreset] = &[
     },
 ];
 
-/// OpenAI's documented ceilings, and for the current reasoning models
-/// the levels each model page states: OpenAI's model list states no
-/// level, so this table is the only source for them. Each page prints a
-/// `1,050,000` window and `128,000` output tokens; `none` is left out of
-/// every set, because turning thinking off is not a level. `gpt-6-sol`
-/// and `gpt-6-luna` state no level here although their pages list
-/// `low` to `max`: the same pages say Chat Completions takes tools only
-/// with `reasoning_effort` `none`, and every dispatch carries tools on
-/// the chat face.
 const OPENAI_MODELS: &[ModelPreset] = &[
     ModelPreset {
         id_prefix: "gpt-6.1-sol",
@@ -615,13 +514,6 @@ const OPENAI_MODELS: &[ModelPreset] = &[
     },
 ];
 
-/// DeepSeek's current families and the retired Flash names. The API
-/// reference states the ceiling exactly - "between 1 and 384K
-/// (393216)" - and the models page states a `1M` window, read at a
-/// thousand to the `K` (<https://api-docs.deepseek.com/quick_start/pricing>).
-/// Vision is Flash-only; both retired Flash prefixes select that row,
-/// while the more specific Pro row remains text-only
-/// (<https://api-docs.deepseek.com/guides/vision>).
 const DEEPSEEK_MODELS: &[ModelPreset] = &[
     ModelPreset {
         id_prefix: "deepseek-flash",

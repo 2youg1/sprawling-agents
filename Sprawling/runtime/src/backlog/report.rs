@@ -3,31 +3,19 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the table tells a caller: how a start came out, what is still
-//! running, and what has stopped.
-//!
-//! Four value types and no behaviour. They sit apart from the table
-//! because they are what everything outside this module reads, while
-//! the table is how it is kept (`Sprawling/runtime/spec/Backlog.lean` §8-28-1).
-
 use kernel::Address;
 
 use super::BacklogId;
 use super::ceiling::Ceiling;
 use super::waiting::Exit;
 
-/// What the short window came to. Exhaustive rather than an optional
-/// handle: "it finished" and "it is still going" are two different
-/// things for the caller to say to a model, and a `None` would leave
-/// which one it was to be inferred.
 #[derive(Debug, PartialEq, Eq)]
 pub enum Started {
     Settled {
         exit: Exit,
         stdout: String,
         stderr: String,
-        /// How the person's memory ceiling fared while it ran; `None` when
-        /// none was asked for or it held unreached (Exec.lean D95).
+
         ceiling: Option<Ceiling>,
     },
     Backgrounded {
@@ -36,7 +24,6 @@ pub enum Started {
     },
 }
 
-/// Which of the two kinds of member a standing entry is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BacklogKind {
     Command,
@@ -53,7 +40,6 @@ impl BacklogKind {
     }
 }
 
-/// A member that is still running.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Standing {
     pub id: BacklogId,
@@ -62,7 +48,6 @@ pub struct Standing {
     pub kind: BacklogKind,
 }
 
-/// A member that has stopped, collected once and then forgotten.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finished {
     pub id: BacklogId,
@@ -70,6 +55,6 @@ pub struct Finished {
     pub exit: Exit,
     pub stdout: String,
     pub stderr: String,
-    /// How the person's memory ceiling fared while it ran (Exec.lean D95).
+
     pub ceiling: Option<Ceiling>,
 }

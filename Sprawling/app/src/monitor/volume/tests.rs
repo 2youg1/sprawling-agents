@@ -7,8 +7,6 @@
 
 use super::*;
 
-/// A city opened by a relative path lives on the same disk as its
-/// absolute spelling; reading nothing would admit work on a full disk.
 #[test]
 fn a_relative_city_path_reads_the_disk_that_holds_it() {
     let here = std::env::current_dir().unwrap();
@@ -17,8 +15,6 @@ fn a_relative_city_path_reads_the_disk_that_holds_it() {
     assert_eq!(total(Path::new(".")), total(&here));
 }
 
-/// `fs::canonicalize` spells a Windows path `\?\C:\...`; a mount point
-/// `C:\` is no prefix of that spelling unless the prefix is normalised.
 #[test]
 fn a_canonical_city_path_reads_the_disk_that_holds_it() {
     let here = std::env::current_dir().unwrap();

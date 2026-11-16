@@ -3,23 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One queue implementation serving three lanes — signals, approvals,
-//! repairs.
-//!
-//! Two orderings carry the whole design. Admission is decided before
-//! anything is stored, so a shed item never occupies a slot it was
-//! refused; and deduplication happens before consumption, so a key that
-//! has already been handed out cannot reach the consumer twice. An
-//! effect that runs twice is worse than one that never runs, and this
-//! is the module that makes the difference structural rather than
-//! careful.
-//!
-//! Nothing here is persistent. The queue is a projection of enqueued
-//! minus consumed — the Ledger is already the history, and a second
-//! durable copy would be a second answer.
-//!
-//! Specified by `Sprawling/storage/spec/Queue.lean` §8-10.
-
 use std::collections::BTreeMap;
 
 use kernel::backpressure::admit;
@@ -27,21 +10,8 @@ use kernel::{Admission, IdemKey, ItemMeta, Payload, QueueStats, TimeMs};
 
 use crate::error::StorageError;
 
-/// How long an admitted key stays recognisable as one, in milliseconds:
-/// six hours.
-///
-/// A duplicate arrives because a sender retried, and a sender retries
-/// within its own attempt, not a day later. Remembering every key ever
-/// admitted made a city that runs for weeks carry one entry per event
-/// it ever queued, for a guarantee nothing was still asking for; this
-/// window is the span over which a repeat is a retry rather than a new
-/// request.
 const IDEM_WINDOW_MS: u64 = 6 * 60 * 60 * 1000;
 
-/// Which lane a queue serves. The lanes differ in their accounting
-/// names and nothing else; the day they differ in behaviour is the day
-/// they become separate modules, and that exit condition is stated
-/// here rather than discovered later.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum QueueLane {
     Signal,
@@ -71,13 +41,7 @@ pub struct EventQueue {
     lane: QueueLane,
     items: BTreeMap<u64, QueueItem>,
     next_id: u64,
-    /// Each admitted key against the moment it was admitted.
-    ///
-    /// Membership, not occupancy: an item that has been consumed must
-    /// still be recognised as a duplicate. Bounded by time rather than
-    /// by count, because what makes a key uninteresting is that the
-    /// retry window it belongs to has closed, and dropping the oldest
-    /// key of a still-running wave would let its retry through.
+
     seen: BTreeMap<IdemKey, TimeMs>,
     capacity: u64,
     shed: u64,
@@ -97,13 +61,6 @@ impl EventQueue {
         }
     }
 
-    /// Admission first, then storage. A duplicate key is admitted-and-
-    /// ignored rather than refused: the sender did its job, and telling
-    /// it otherwise would invite a retry that changes nothing.
-    ///
-    /// # Errors
-    /// Returns nothing today; the fallible signature is the port's, and
-    /// storage that can fail is what it is there for.
     pub fn enqueue(
         &mut self,
         key: IdemKey,
@@ -118,8 +75,7 @@ impl EventQueue {
         let verdict = admit(&self.stats(), &ItemMeta { cost: 1 });
         match verdict {
             Admission::Shed { .. } => {
-                // Shedding refuses the new item and touches nothing that
-                // is already queued.
+
                 self.shed = self.shed.saturating_add(1);
                 Ok(verdict)
             }
@@ -141,12 +97,6 @@ impl EventQueue {
         }
     }
 
-    /// Drops the keys admitted longer ago than the idempotency window.
-    ///
-    /// A clock that steps backwards keeps every key rather than
-    /// dropping the wrong ones: the queue holds no opinion about the
-    /// clock, and an over-long memory only refuses to run an effect
-    /// twice.
     fn forget_stale(&mut self, now: TimeMs) {
         let Some(cutoff) = now.value().checked_sub(IDEM_WINDOW_MS) else {
             return;
@@ -154,8 +104,6 @@ impl EventQueue {
         self.seen.retain(|_, admitted| admitted.value() > cutoff);
     }
 
-    /// Takes the oldest item. The key stays in `seen`, so a late
-    /// duplicate arriving after consumption is still recognised.
     pub fn consume(&mut self) -> Option<QueueItem> {
         let id = self.items.keys().next().copied()?;
         self.items.remove(&id)
@@ -180,8 +128,6 @@ impl EventQueue {
         self.lane
     }
 
-    /// Counters for the accounting payloads: how many were refused, how
-    /// many arrived twice.
     pub fn shed_count(&self) -> u64 {
         self.shed
     }
@@ -224,8 +170,7 @@ mod tests {
         let item = queue.consume().unwrap();
         assert_eq!(item.key, k);
         assert!(queue.consume().is_none());
-        // A duplicate arriving after consumption is still a duplicate:
-        // the effect already ran once.
+
         queue.enqueue(k, payload("late"), TimeMs::new(2)).unwrap();
         assert!(queue.is_empty(), "a consumed key cannot come back");
         assert_eq!(queue.duplicate_count(), 2);
@@ -248,7 +193,7 @@ mod tests {
         assert!(matches!(verdict, Admission::Shed { .. }));
         assert_eq!(queue.len(), 2, "nothing already queued was dropped");
         assert_eq!(queue.shed_count(), 1);
-        // The shed key was never admitted, so a retry is not a duplicate.
+
         queue.consume();
         assert_eq!(
             queue
@@ -277,9 +222,6 @@ mod tests {
         assert_eq!(ids, vec![0, 1, 2, 3]);
     }
 
-    /// The dedup set is what a long-running city would otherwise carry
-    /// one entry of per event it ever queued. A key outside the window
-    /// is gone, and the same key after it is a new request.
     #[test]
     fn a_key_older_than_the_window_stops_being_a_duplicate() {
         let mut queue = EventQueue::new(QueueLane::Signal, 8);
@@ -287,13 +229,11 @@ mod tests {
         queue.enqueue(k, payload("first"), TimeMs::new(0)).unwrap();
         queue.consume();
 
-        // Inside the window: still the same request.
         let inside = TimeMs::new(IDEM_WINDOW_MS.saturating_sub(1));
         queue.enqueue(k, payload("retry"), inside).unwrap();
         assert_eq!(queue.duplicate_count(), 1);
         assert!(queue.is_empty(), "a retry inside the window runs nothing");
 
-        // Past it: the memory is gone and so is the entry holding it.
         let outside = TimeMs::new(IDEM_WINDOW_MS.saturating_add(1));
         queue.enqueue(k, payload("later"), outside).unwrap();
         assert_eq!(queue.duplicate_count(), 1, "not counted twice");

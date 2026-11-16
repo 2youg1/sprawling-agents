@@ -3,31 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `SendInput`: one action landing on one window, never a script of
-//! them.
-//!
-//! One call, one action. The tool description promises no retry, no
-//! chaining and no fallback to a nearby element, and this module is
-//! where that promise is kept: `super::strokes` decides which events the
-//! action is, and this module turns each into the event Win32 reads and
-//! sends them in one batch, through `winsafe`'s safe `SendInput`
-//! (`Sprawling/desktop/Spec.lean` D9).
-//!
-//! Mouse coordinates go out as absolute positions on the **virtual**
-//! desktop, normalised to the range Win32 wants. Relative movement would
-//! depend on where the pointer happened to be, and a click that depends
-//! on the previous click is exactly the chaining this tool does not do.
-//! The virtual desktop is measured once per action, so every event of
-//! one batch is normalised against the same geometry.
-//!
-//! A batch is inserted in order, and Win32 reports only how many of its
-//! events it inserted; it does not take back the ones it did. The usual
-//! reason for a short count is that another program holds the input
-//! desktop — a UAC prompt, a screen lock. When only part went in, this
-//! module says so, with the counts, and sends one more batch: the
-//! releases of whatever that part left held down, and nothing else
-//! (`Sprawling/desktop/Spec.lean` D4).
-
 use winsafe::co;
 
 use super::geometry::Point;
@@ -35,12 +10,6 @@ use super::keys::Modifier;
 use super::strokes::{self, Action, Edge, Motion, Released, Stroke};
 use crate::refusal::{Refusal, RefusalCode};
 
-/// Carries out one action, holding `modifiers` down for the whole of it.
-///
-/// # Errors
-/// Refuses when this desktop will not accept input, which is what a
-/// locked screen or an elevated window in the foreground looks like from
-/// here.
 pub(crate) fn perform(action: &Action, modifiers: &[Modifier]) -> Result<(), Refusal> {
     let strokes = strokes::of(action, modifiers)?;
     let screen = Screen::now();
@@ -65,7 +34,6 @@ pub(crate) fn perform(action: &Action, modifiers: &[Modifier]) -> Result<(), Ref
     Err(strokes::cut_short(accepted, strokes.len(), released))
 }
 
-/// The virtual desktop, as one batch is normalised against it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Screen {
     left: i32,
@@ -75,7 +43,7 @@ struct Screen {
 }
 
 impl Screen {
-    /// The virtual desktop at this instant, which spans every monitor.
+
     fn now() -> Screen {
         Screen {
             left: winsafe::GetSystemMetrics(co::SM::XVIRTUALSCREEN),
@@ -85,13 +53,10 @@ impl Screen {
         }
     }
 
-    /// A screen point in the 0..=65535 range `MOUSEEVENTF_ABSOLUTE`
-    /// counts in, measured across the virtual desktop rather than the
-    /// primary monitor — which is what makes a second monitor reachable.
     fn normalised(self, at: Point) -> Result<(i32, i32), Refusal> {
         let across = |value: i32, origin: i32, span: i32| {
             let offset = value.checked_sub(origin)?;
-            // 65535 is the full-scale value Win32 documents for this field.
+
             offset.checked_mul(65_535).and_then(|scaled| {
                 scaled.checked_div(span.checked_sub(1).filter(|rest| *rest > 0)?)
             })
@@ -111,18 +76,14 @@ impl Screen {
     }
 }
 
-/// The Win32 events a run of strokes is.
 fn events(strokes: &[Stroke], screen: Screen) -> Result<Vec<winsafe::HwKbMouse>, Refusal> {
     strokes.iter().map(|stroke| event(stroke, screen)).collect()
 }
 
-/// The Win32 event one stroke is.
 fn event(stroke: &Stroke, screen: Screen) -> Result<winsafe::HwKbMouse, Refusal> {
     Ok(match *stroke {
         Stroke::Key { code, edge } => keyboard(code, 0, edge_flag(edge)),
-        // `KEYEVENTF_UNICODE` is what makes typing independent of the
-        // keyboard layout: the character arrives as a character, so a
-        // model typing `@` does not have to know this machine's layout.
+
         Stroke::Unicode { unit, edge } => keyboard(
             co::VK::NoValue,
             unit,
@@ -141,8 +102,7 @@ fn event(stroke: &Stroke, screen: Screen) -> Result<winsafe::HwKbMouse, Refusal>
             winsafe::HwKbMouse::Mouse(winsafe::MOUSEINPUT {
                 dx: x,
                 dy: y,
-                // A wheel turn away from the user is negative, and the
-                // field is the same 32 bits read as unsigned.
+
                 mouseData: u32::from_ne_bytes(data.to_ne_bytes()),
                 dwFlags: flags | co::MOUSEEVENTF::ABSOLUTE | co::MOUSEEVENTF::VIRTUALDESK,
                 time: 0,
@@ -152,7 +112,6 @@ fn event(stroke: &Stroke, screen: Screen) -> Result<winsafe::HwKbMouse, Refusal>
     })
 }
 
-/// The flag a key event carries for the way it moves.
 fn edge_flag(edge: Edge) -> co::KEYEVENTF {
     match edge {
         Edge::Down => co::KEYEVENTF::NoValue,
@@ -160,8 +119,6 @@ fn edge_flag(edge: Edge) -> co::KEYEVENTF {
     }
 }
 
-/// One keyboard event: a virtual key, or a UTF-16 unit when the flags
-/// say `KEYEVENTF_UNICODE`.
 fn keyboard(key: co::VK, unit: u16, flags: co::KEYEVENTF) -> winsafe::HwKbMouse {
     winsafe::HwKbMouse::Kb(winsafe::KEYBDINPUT {
         wVk: key,
@@ -172,14 +129,6 @@ fn keyboard(key: co::VK, unit: u16, flags: co::KEYEVENTF) -> winsafe::HwKbMouse 
     })
 }
 
-/// Hands the whole batch to Win32 at once, and answers how many of its
-/// events Win32 inserted.
-///
-/// Win32 answers a batch it took none of with a zero and the reason on
-/// the calling thread, and `winsafe` turns that zero into an error. The
-/// zero is the fact section 12.4 reads, and the reason is always the
-/// one `strokes::cut_short` already tells — another program holds the
-/// input desktop — so the error is read back as the count it stands for.
 fn send(events: &[winsafe::HwKbMouse]) -> Result<usize, Refusal> {
     if events.is_empty() {
         return Ok(0);
@@ -206,11 +155,6 @@ fn send(events: &[winsafe::HwKbMouse]) -> Result<usize, Refusal> {
 mod tests {
     use super::*;
 
-    /// The contract `Sprawling/desktop/Spec.lean` section 8-11 holds input to: each
-    /// stroke becomes the one event it names, keys by their code,
-    /// typed units as units whatever the layout, and pointer events at
-    /// an absolute place on the whole virtual desktop, so the corners of
-    /// that desktop are the ends of the absolute range. Nothing is sent.
     #[test]
     fn each_stroke_becomes_the_event_it_names() {
         let screen = Screen {
@@ -289,8 +233,7 @@ mod tests {
                 dwExtraInfo: 0,
             }),
         ];
-        // `winsafe`'s event structs compare but do not print, so the
-        // comparison is spelled out.
+
         assert!(spelled == expected, "a stroke became another event");
     }
 }

@@ -3,36 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The npm gate: the dependency face of `client/` (Tools/xtask/Spec.lean
-//! §8-12).
-//!
-//! The workspace side of the tree has `cargo-deny` and `depmap` watching
-//! what it may depend on; the JavaScript side had nothing, so one
-//! `bun add` could bring in a third runtime dependency, a package under
-//! a licence this repository refuses, or a lockfile that no longer
-//! agrees with the manifest — and a green `just check` would say none of
-//! it.
-//!
-//! **Three assertions, each against a drift that costs something
-//! different.** A lockfile out of step with the manifest means this
-//! machine and CI install two different trees. A third runtime
-//! dependency is weight in a person's browser that nobody decided to
-//! add. A licence outside the allowlist is a legal fact discovered at
-//! release time rather than at commit time.
-//!
-//! **The allowlist is not this gate's.** `deny.toml` already states what
-//! this repository permits, for the workspace side; a repository has one
-//! position on licences, so this gate reads that same table rather than
-//! keeping a second copy that could drift from it.
-//!
-//! **A missing `node_modules` is a violation, not a skip.** Licences
-//! are written in the installed tree, so without it the third
-//! assertion judged nothing while the report still said this gate
-//! passed — a green line for a check that never ran. The finding names
-//! the command that supplies the tree: `bun install` in `client/`. The
-//! first two assertions read committed files only and therefore judge
-//! everywhere.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -43,35 +13,16 @@ mod lockfile;
 
 use lockfile::Manifest;
 
-/// The client this gate guards. Its absence is silence, not a finding.
 const CLIENT: &str = "client";
 
-/// What the client asks for.
 const MANIFEST: &str = "client/package.json";
 
-/// What bun solved from it.
 const LOCKFILE: &str = "client/bun.lock";
 
-/// The installed tree, which is where a licence is actually written.
 const MODULES: &str = "client/node_modules";
 
-/// The one place this repository states which licences it permits.
 const PERMITTED: &str = "deny.toml";
 
-/// What may reach a person's browser. Exactly these, in both
-/// directions: a gate that only refused additions would wave through the
-/// day `svelte` is deleted by accident. The `@lezer` packages are the
-/// syntax highlighter and its grammars, which ship as a lazy chunk the
-/// first screen never downloads (client/Spec.lean §4-26); the `@codemirror`
-/// packages are RefRain's text editor, its find and replace, and its
-/// version diff, another lazy chunk (client/Spec.lean §7N, §7-9); `pdfjs-dist`
-/// and `docx-preview` draw a PDF's pages and a DOCX laid out as pages in
-/// RefRain, each its own lazy chunk (client/Spec.lean §4-54, client D32).
-/// `@noble/post-quantum` is the remote device's ML-KEM and ML-DSA,
-/// loaded only when the remote group pairs or locks (client/Spec.lean §4-57,
-/// `Sprawling/remote_access/Spec.lean` D21). `katex` lays out a formula as
-/// MathML, loaded only when a page first draws one (client/Spec.lean
-/// §4-64a).
 const RUNTIME: [&str; 22] = [
     "@codemirror/commands",
     "@codemirror/merge",
@@ -139,7 +90,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// A file this gate cannot do without.
 fn missing(location: &str, what: &str) -> Violation {
     Violation {
         gate: "npm",
@@ -150,7 +100,6 @@ fn missing(location: &str, what: &str) -> Violation {
     }
 }
 
-/// The lockfile records what the manifest asks for, entry for entry.
 fn judge_lockfile(manifest: &Manifest, locked: &Manifest, out: &mut Vec<Violation>) {
     compare("dependencies", &manifest.runtime, &locked.runtime, out);
     compare(
@@ -161,7 +110,6 @@ fn judge_lockfile(manifest: &Manifest, locked: &Manifest, out: &mut Vec<Violatio
     );
 }
 
-/// One table of the manifest against the same table of the lockfile.
 fn compare(
     table: &str,
     asked: &BTreeMap<String, String>,
@@ -188,7 +136,6 @@ fn compare(
     }
 }
 
-/// One wording for every way the two files disagree.
 fn stale(what: String) -> Violation {
     Violation {
         gate: "npm",
@@ -199,7 +146,6 @@ fn stale(what: String) -> Violation {
     }
 }
 
-/// The runtime dependencies are exactly the ones `RUNTIME` names.
 fn judge_runtime(manifest: &Manifest, out: &mut Vec<Violation>) {
     let allowed: BTreeSet<&str> = RUNTIME.into_iter().collect();
     let asked: BTreeSet<&str> = manifest.runtime.keys().map(String::as_str).collect();
@@ -216,7 +162,6 @@ fn judge_runtime(manifest: &Manifest, out: &mut Vec<Violation>) {
     }
 }
 
-/// One wording for both directions of the runtime allowlist.
 fn runtime_violation(what: String) -> Violation {
     Violation {
         gate: "npm",
@@ -232,7 +177,6 @@ fn runtime_violation(what: String) -> Violation {
     }
 }
 
-/// Every installed package states a licence this repository permits.
 fn judge_licences(
     root: &Path,
     modules: &Path,
@@ -273,12 +217,6 @@ fn judge_licences(
     Ok(())
 }
 
-/// Every installed package and the manifest that states its licence,
-/// sorted, so two runs report the same findings in the same order.
-///
-/// Scopes hold packages rather than being packages, and a package may
-/// carry a nested tree of its own when a version could not be hoisted;
-/// both are walked, so a licence cannot hide one level down.
 fn installed(modules: &Path) -> Result<Vec<(String, PathBuf)>, XtaskError> {
     let mut out = Vec::new();
     collect(modules, "", &mut out)?;

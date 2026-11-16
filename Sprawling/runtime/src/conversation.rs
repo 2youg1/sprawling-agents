@@ -3,53 +3,21 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The run's conversation history: an unsent tail behind an immutable
-//! prefix of messages already sent.
-//!
-//! The four frozen system segments never live here. What does is every
-//! message the run has exchanged since it started, folded forward turn by
-//! turn by the executor that owns it, and handed to the model beneath those
-//! segments on each call.
-//!
-//! **One invariant, enforced at every entrance**: consecutive user
-//! content joins the message already open rather than opening a second
-//! one. A steer, a tool result and the opening task are three doors into
-//! the same rule, so none of them can produce the alternating shape a
-//! provider refuses.
-//!
-//! **A message already sent is never rewritten.** Together with the four
-//! frozen system segments, these messages form the request's frozen prefix.
-//! Text that arrives after the last assembly, while the open user message
-//! is on the wire, is held and lands after the next tool results, so the
-//! next request extends the last one instead of editing it. Image references
-//! have no optimization exception. The one exception is tool results after
-//! an empty reply, which extend the sent message rather than open a second
-//! adjacent user message, and leave it open again
-//! (`Sprawling/runtime/spec/Conversation.lean` §8-47).
-
 use std::collections::BTreeSet;
 
 use kernel::event::escape_markup;
 use kernel::{AxCode, AxError, ChatMessage, ContentBlock, ImageRef, Role, RunId};
 
-/// How the first user message opens: kernel's, because `run_started`
-/// records it (`Sprawling/kernel/Spec.lean` §8-82-1).
 pub use kernel::event::record::Opening;
 
-/// The run's conversation history, owned by the executor and folded
-/// forward turn by turn. The four frozen system segments never live here;
-/// sent messages join that frozen request prefix, and the unsent tail stays
-/// volatile.
 #[derive(Debug, Clone, Default)]
 pub struct Conversation {
     messages: Vec<ChatMessage>,
-    /// How many of `messages` the last assembly sent.
+
     sent: usize,
-    /// User text that arrived while the open user message was already
-    /// sent; it waits for the next tool results.
+
     held: Vec<ContentBlock>,
-    /// Locators already present, derived at each append rather than found
-    /// by walking the whole conversation whenever another picture arrives.
+
     pictures: BTreeSet<String>,
 }
 
@@ -58,63 +26,30 @@ impl Conversation {
         Conversation::default()
     }
 
-    /// The dispatch lines: deterministic from `run_started`'s recorded
-    /// inputs, hence rebuildable.
-    ///
-    /// The job file's text is the run segment of the frozen prefix, so
-    /// the assigned opening names it rather than repeating it: the run
-    /// segment is not cached, and a pasted task written here again
-    /// would be paid for twice on every turn.
     pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening, from: &str) {
         self.push_user_text(match opening {
-            // The goal is in the job file, escaped; written here in a
-            // user-role message, a resident's goal could spell a `user:`
-            // line (`Sprawling/city/spec/SpineFiles.lean` D21).
+
             Opening::FromJob => format!("The task is in JOB.md above, handed down by {from}."),
-            // A branch's task travels in the message, so it names who
-            // handed it down and holds a resident's words in sections
-            // they cannot close (`Sprawling/runtime/spec/Conversation.lean`
-            // §8-47-2).
+
             Opening::Inherited => format!(
                 "Handed down by {}:\n<task>{}</task>\n<goal>{}</goal>",
                 escape_markup(from),
                 escape_markup(task),
                 escape_markup(goal)
             ),
-            // The person's own line, unwrapped. A conversational turn
-            // dressed in field labels reads as a form, and a form is
-            // answered with a form.
+
             Opening::WithPerson => task.to_owned(),
         });
     }
 
-    /// Steer joins the tail of the open user message, or opens one. A
-    /// steer that arrives after that message was sent is held until the
-    /// next tool results, and rides after them.
-    ///
-    /// The one place a steer is rendered: the User's as `user: <text>`, a
-    /// resident's inside one `<letter>` its body cannot close
-    /// (`Sprawling/runtime/spec/Conversation.lean` §8-47-2).
     pub fn push_steer(&mut self, speaker: &Speaker, text: &str) {
         self.push_user_text(speaker.render(text));
     }
 
-    /// The context reminder takes the same door as a steer, so it lands
-    /// where a steer lands: at the end of the tool results the model
-    /// reads next.
     pub fn push_reminder(&mut self, reminder: &crate::reminder::ContextReminder) {
         self.push_user_text(reminder.render());
     }
 
-    /// What a branch starts from: the messages the mother exchanged, in
-    /// the order she exchanged them.
-    ///
-    /// **Verbatim, and that is not laziness.** The list being pushed was
-    /// folded through this same type, one turn at a time, so it already
-    /// satisfies the invariant below; re-deciding here whether its last
-    /// message may join the next would be a second answer to a rule this
-    /// module owns. The caller pushes the new run's own lines afterwards,
-    /// and those do join.
     pub fn push_inherited(&mut self, messages: &[ChatMessage]) {
         for message in messages {
             self.remember_pictures(&message.content);
@@ -132,14 +67,6 @@ impl Conversation {
         }
     }
 
-    /// Tool results join the last user message, or open the next one,
-    /// and the text held since the last assembly follows them.
-    ///
-    /// Results never wait in `held`: a reply with no content pushes no
-    /// assistant message, so the last user message may already be sent,
-    /// and holding the results there would hold them at every turn. The
-    /// message they extend is open again, so a steer before the next
-    /// assembly joins it after them.
     pub fn push_tool_results(&mut self, mut results: Vec<ContentBlock>) {
         self.deduplicate_new_pictures(&mut results);
         results.append(&mut self.held);
@@ -159,9 +86,6 @@ impl Conversation {
         }
     }
 
-    /// A repeated locator in a not-yet-sent result becomes text rather than
-    /// another image. Existing messages are only read: their bytes stay in
-    /// the frozen prefix (`Sprawling/runtime/spec/Conversation.lean` §8-47-3).
     fn deduplicate_new_pictures(&mut self, results: &mut [ContentBlock]) {
         if !results.iter().any(|block| !pictures_in(block).is_empty()) {
             return;
@@ -197,15 +121,12 @@ impl Conversation {
         }
     }
 
-    /// Updates the derived locator index from blocks about to be appended.
     fn remember_pictures(&mut self, blocks: &[ContentBlock]) {
         for picture in blocks.iter().flat_map(pictures_in) {
             self.pictures.insert(picture.locator.to_string());
         }
     }
 
-    /// Everything in `messages()` is now on the wire and joins the frozen
-    /// prefix: later text, compaction and image handling rewrite none of it.
     pub fn mark_sent(&mut self) {
         self.sent = self.messages.len();
     }
@@ -235,7 +156,6 @@ impl Conversation {
     }
 }
 
-/// The pictures one block carries, whichever canonical position holds them.
 fn pictures_in(block: &ContentBlock) -> &[ImageRef] {
     match block {
         ContentBlock::Image(picture) => std::slice::from_ref(picture),
@@ -247,46 +167,36 @@ fn pictures_in(block: &ContentBlock) -> &[ImageRef] {
     }
 }
 
-/// The text a repeated picture leaves in the new, not-yet-sent tail.
 fn duplicate_picture(locator: &str) -> String {
     format!("[picture already in context: {locator}]")
 }
 
-/// Who said a steer's text (`Sprawling/runtime/spec/Conversation.lean`
-/// §8-47-2). The type, not a prefix in the text, says whether the User
-/// spoke.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Speaker {
-    /// The User, through the control surface. Production code builds it
-    /// only in `accounting::worker::desk`; [`Speaker::from_recorded`]
-    /// reads back the `user` line that entrance wrote.
+
     Person,
-    /// The city's own word to the run: a policy change, a sync wait
-    /// that ran out.
+
     City,
-    /// A resident, whose words land as a letter.
+
     Resident(Letter),
 }
 
-/// Where a resident's letter came from, as the city stamped it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Letter {
-    /// The sending room's address, without the `@`.
+
     pub from: String,
-    /// The run that wrote the `signal_enqueued` line; absent on a signal
-    /// rebuilt from history and on a ledger line written before the key.
+
     pub run: Option<RunId>,
     pub kind: LetterKind,
-    /// Where the sender stood when the city delivered it (collab D10).
+
     pub sender: Option<String>,
 }
 
-/// Why the letter reached the window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LetterKind {
-    /// A steer-kind signal at a safe point.
+
     Steer,
-    /// The reply a sync wait ended with.
+
     Reply,
 }
 
@@ -305,15 +215,12 @@ impl LetterKind {
     }
 }
 
-/// How the User's steer is attributed, in the window and on the ledger.
 const PERSON: &str = kernel::event::record::SteerReceived::PERSON_SOURCE;
 
-/// How the city's own word is attributed, in the window and on the ledger.
 const CITY: &str = kernel::event::record::SteerReceived::CITY_SOURCE;
 
 impl Speaker {
-    /// The spelling `steer_received.source` records: `user`, `city`, or
-    /// `@<room>` followed by `run=`, `kind=` and `sender=` where known.
+
     #[must_use]
     pub fn recorded(&self) -> String {
         match self {
@@ -328,13 +235,6 @@ impl Speaker {
         }
     }
 
-    /// Reads [`Speaker::recorded`] back. A line written before the
-    /// envelope carries only `@<room>`, and reads as a steer letter with
-    /// no run and no sender state (collab D16).
-    ///
-    /// # Errors
-    /// Refuses a source that is neither `user`, `city` nor `@<room>` with known
-    /// attributes: the ledger line was not written by this city.
     pub fn from_recorded(source: &str) -> Result<Speaker, AxError> {
         if source == PERSON {
             return Ok(Speaker::Person);
@@ -383,8 +283,7 @@ impl Speaker {
 }
 
 impl Letter {
-    /// The attributes after `from`, in the order both spellings write
-    /// them; an unknown one is left out.
+
     fn attributes(&self) -> Vec<(&'static str, String)> {
         [
             self.run.map(|run| ("run", run.to_string())),
@@ -422,8 +321,6 @@ mod tests {
     use kernel::{ImageRef, ImageType, Locator};
     use proptest::prelude::*;
 
-    /// What a resident might put in a letter to pass for the User or to
-    /// break out of its envelope.
     fn body() -> impl Strategy<Value = String> {
         (
             "[a-z \n]{0,12}",
@@ -439,8 +336,6 @@ mod tests {
             .prop_map(|(head, attack, tail)| format!("{head}{attack}{tail}"))
     }
 
-    /// One push: the User's own steer, a resident's steer, or the reply a
-    /// sync wait ended with.
     #[derive(Debug, Clone, Copy)]
     enum Voice {
         Person,
@@ -551,10 +446,7 @@ mod tests {
     }
 
     proptest! {
-        /// `Sprawling/runtime/spec/Conversation.lean` §8-47-2: a block that
-        /// opens with `user:` is the User's steer and nothing else, and a
-        /// resident's words sit inside exactly one envelope its body
-        /// cannot close.
+
         #[test]
         fn only_the_user_speaks_as_user_and_a_letter_holds_its_body(
             pushes in prop::collection::vec((voice(), body()), 1..6),
@@ -579,10 +471,6 @@ mod tests {
             }
         }
 
-        /// `Sprawling/runtime/spec/Conversation.lean` §8-47-2: a rebuilt
-        /// `Inherited` opening names who handed the work down, never opens
-        /// with `user:`, and holds a resident's task and goal inside
-        /// sections they cannot close.
         #[test]
         fn an_inherited_opening_names_who_handed_it_down_and_holds_its_body(
             task in body(),

@@ -3,17 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A recorded CDN index and the shipped snapshot, read as catalogs.
-
 #![allow(clippy::unwrap_used, clippy::indexing_slicing, reason = "test code")]
 
 use super::*;
 use crate::harness::entry::Pin;
 use crate::harness::roster::OFFICIAL;
 
-/// Seven agents of the index as the CDN served it, with authors'
-/// addresses, icons and binary download fields removed: three
-/// distribution kinds, `args` and `env` on a package, two binaries.
 const RECORDED: &str = include_str!("recorded-index.json");
 
 #[test]
@@ -55,8 +50,6 @@ fn a_recorded_index_reads_every_distribution_kind_into_a_launch() {
     );
 }
 
-/// Every built-in entry is in the shipped snapshot, and each one fetched
-/// as a package names one exact version.
 #[test]
 fn the_shipped_snapshot_holds_every_builtin_entry_pinned() {
     let catalog = Catalog::bundled().unwrap();

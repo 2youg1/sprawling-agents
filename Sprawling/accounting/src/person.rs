@@ -3,30 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one layer that is the person's rather than a city's
-//! (`Sprawling/accounting/spec/Person.lean` §8-8).
-//!
-//! What somebody settled about how they read their cities — the
-//! language, the appearance, the chords they rebound — lives in
-//! `<home>/.sprawling/config.toml`, outside every city. A city carried
-//! to another machine therefore arrives without it, and a second
-//! browser on this machine is drawn from it rather than from whatever
-//! the first browser happened to cache.
-//!
-//! **One record, one grammar.** The `[ui]` section is
-//! `wire::PreferencesAnswer` without its separately stored `core`, so the keys the file may
-//! hold and the fields the answer states are one declaration: this
-//! module reads and writes, and states nothing about what a preference
-//! is. What a named change does to the record is the patch's own rule
-//! and lives with the patch.
-//!
-//! **Every other section keeps its keys and values.** The write is
-//! a read-modify-write of a file a person also edits by hand, held and
-//! replaced whole through `city::document` — the one implementation of
-//! whole-or-nothing writing in this tree — so a reader arriving during
-//! a write finds the version before it or the version after it, and
-//! two screens settling different facts cannot drop each other's.
-
 use std::path::{Path, PathBuf};
 
 use kernel::{AxCode, AxError};
@@ -34,50 +10,24 @@ use wire::{CorePreferences, PreferencePatch, PreferencesAnswer};
 
 use crate::home::Home;
 
-/// The section of the person's file these live under. Written once:
-/// the reader and the writer name it, and a section written under one
-/// spelling and read under another is a setting that never takes
-/// effect.
 const UI: &str = "ui";
-/// Performance settings adopted at serving startup (`Sprawling/app/Spec.lean` §8-93).
+
 const CORE: &str = "core";
-/// The top-level key naming the city a launch with none named opens
-/// (`Sprawling/accounting/spec/Person.lean` §8-8).
+
 const CITY: &str = "city";
-/// The top-level key giving the machine budget heavy work reserves from
-/// (`Sprawling/accounting/spec/Person.lean` §8-8, `Sprawling/runtime/spec/Reserve.lean` D104).
+
 const MEMORY: &str = "memory";
-/// The spelling of `memory` that leaves the budget to the city.
+
 const AUTO: &str = "auto";
-/// Everything this person settled, as their file states it.
-///
-/// A file nobody has written yet is not a failure: it is somebody who
-/// has settled nothing, and the postures this build draws are the
-/// answer.
-///
-/// # Errors
-/// `E_PATH_NOT_FOUND` when no home directory can be found,
-/// `E_CONFIG_INVALID` for a file that does not parse or holds a key
-/// this version does not read, and `E_STORAGE_FATAL` for a file that
-/// exists and cannot be read.
+
 pub fn read() -> Result<PreferencesAnswer, AxError> {
     stated(&file()?)
 }
 
-/// Lands one named change in this person's file and leaves every other
-/// section as they wrote it.
-///
-/// # Errors
-/// Everything [`read`] returns, and `E_STORAGE_FATAL` for a file that
-/// cannot be replaced.
 pub fn put(patch: PreferencePatch) -> Result<(), AxError> {
     land(&file()?, patch)
 }
 
-/// The whole of the write, against a named file: read it, land the
-/// change, put it back. Held while it reads and writes, so a second
-/// screen settling another fact waits rather than deciding from an
-/// original that is already stale.
 fn land(file: &Path, patch: PreferencePatch) -> Result<(), AxError> {
     city::edit_document(file, |held| {
         let mut document = document(file)?;
@@ -111,13 +61,6 @@ fn land(file: &Path, patch: PreferencePatch) -> Result<(), AxError> {
     })
 }
 
-/// The city this person named for a launch that names none, as their
-/// file states it; `None` when they named none.
-///
-/// # Errors
-/// Everything [`read`] returns, and `E_CONFIG_INVALID` for a `city`
-/// that is not an absolute path: a relative one has no base every
-/// reader would agree on.
 pub fn city() -> Result<Option<PathBuf>, AxError> {
     stated_city(&file()?)
 }
@@ -139,15 +82,6 @@ fn stated_city(file: &Path) -> Result<Option<PathBuf>, AxError> {
     }
 }
 
-/// Names `city` as the one a launch with none named opens. Every other
-/// section and key of the person's file keeps its value, but the file is
-/// written back from its parsed form, so comments are dropped and the
-/// order and layout of keys may change
-/// (`Sprawling/accounting/spec/Person.lean` §8-8).
-///
-/// # Errors
-/// Everything [`read`] returns; `E_CONFIG_INVALID` for a path that is
-/// not text; `E_STORAGE_FATAL` for a file that cannot be replaced.
 pub fn settle_city(city: &Path) -> Result<(), AxError> {
     name_city(&file()?, city)
 }
@@ -177,20 +111,12 @@ fn name_city(file: &Path, city: &Path) -> Result<(), AxError> {
     })
 }
 
-/// How the machine budget is set: left to the city, or a number of bytes
-/// the person wrote. Zero is a budget too: one piece of heavy work at a
-/// time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MachineMemory {
     Auto,
     Bytes(u64),
 }
 
-/// The person's top-level `memory`, `Auto` when the line is absent.
-///
-/// # Errors
-/// Everything [`read`] returns; `E_CONFIG_INVALID` for a value that is
-/// neither `"auto"` nor a whole number of bytes.
 pub fn machine_memory() -> Result<MachineMemory, AxError> {
     stated_machine_memory(&file()?)
 }
@@ -220,14 +146,8 @@ fn stated_machine_memory(file: &Path) -> Result<MachineMemory, AxError> {
     }
 }
 
-/// Whether the core's threads are raised: the setting a person turns
-/// off. Its words are the wire's, which is what a page writes it with.
 pub use wire::{CorePlacement, CorePriority};
 
-/// The priority read from the same core grammar as the preferences answer.
-///
-/// # Errors
-/// The configuration and storage failures returned by [`read`].
 pub fn core_priority() -> Result<CorePriority, AxError> {
     stated_core_priority(&file()?)
 }
@@ -236,10 +156,6 @@ fn stated_core_priority(file: &Path) -> Result<CorePriority, AxError> {
     Ok(stated(file)?.core.priority)
 }
 
-/// The placement arm read from the same core grammar as the page.
-///
-/// # Errors
-/// The configuration and storage failures returned by [`read`].
 pub fn core_placement() -> Result<CorePlacement, AxError> {
     stated_core_placement(&file()?)
 }
@@ -248,9 +164,6 @@ fn stated_core_placement(file: &Path) -> Result<CorePlacement, AxError> {
     Ok(stated(file)?.core.placement)
 }
 
-/// Where this person's file is. The home directory is `home::Home`'s
-/// answer and the name under it is `Home::person_config`'s, so nothing
-/// here joins a path.
 fn file() -> Result<PathBuf, AxError> {
     Ok(Home::detect()?.person_config())
 }
@@ -259,9 +172,6 @@ fn stated(file: &Path) -> Result<PreferencesAnswer, AxError> {
     section(&document(file)?, file)
 }
 
-/// The whole file as a table, and an empty table for a file nobody has
-/// written. Read whole so that a write puts back the sections this
-/// build does not read.
 fn document(file: &Path) -> Result<toml::Table, AxError> {
     match std::fs::read_to_string(file) {
         Ok(text) => {
@@ -280,9 +190,6 @@ fn document(file: &Path) -> Result<toml::Table, AxError> {
     }
 }
 
-/// The `[ui]` section as the record it is the serialisation of. An
-/// absent section states nothing, which is the ordinary case until
-/// somebody changes a setting.
 fn section(document: &toml::Table, file: &Path) -> Result<PreferencesAnswer, AxError> {
     if document.get(UI).and_then(|ui| ui.get(CORE)).is_some() {
         return Err(invalid(file, &"[ui] core is not stored here; use [core]"));
@@ -312,10 +219,6 @@ fn rendered(settled: &PreferencesAnswer, file: &Path) -> Result<toml::Value, AxE
     Ok(ui)
 }
 
-/// One refusal for every way this file can fail to be understood, so
-/// the recovery line is written once. The keys are not spelled again
-/// here: `PreferencesAnswer` is what states them, and a second list
-/// would be the one nobody updates.
 fn invalid(file: &Path, why: &impl std::fmt::Display) -> AxError {
     AxError::failure(
         AxCode::ConfigInvalid,
@@ -339,10 +242,6 @@ mod tests {
     use super::*;
     use wire::{Chord, Lang, SessionTags, Tag};
 
-    /// The property `adversary`'s fourth world drives over the wire,
-    /// held here against the file itself: after any sequence of
-    /// changes, what the file states and what the answer states are
-    /// one record.
     #[test]
     fn what_the_file_states_and_what_the_answer_states_are_one_record() {
         let dir = tempfile::tempdir().unwrap();
@@ -375,9 +274,6 @@ mod tests {
         assert_eq!(expected.lang, Some(Lang::En));
     }
 
-    /// The city a person named is read back whole, a relative one is
-    /// refused, and naming one leaves every other line alone and adds
-    /// no `format`: the previous release must still read this file.
     #[test]
     fn the_named_city_is_absolute_and_naming_it_touches_nothing_else() {
         let dir = tempfile::tempdir().unwrap();
@@ -399,8 +295,6 @@ mod tests {
         );
     }
 
-    /// The machine budget reads as the city's to size when absent or
-    /// `"auto"`, as bytes when a number, and refuses anything else.
     #[test]
     fn the_machine_memory_is_auto_or_bytes() {
         let dir = tempfile::tempdir().unwrap();
@@ -427,7 +321,6 @@ mod tests {
         );
     }
 
-    /// A person file from a newer build is refused for being newer.
     #[test]
     fn a_person_file_from_a_newer_build_names_the_upgrade() {
         let dir = tempfile::tempdir().unwrap();
@@ -440,8 +333,6 @@ mod tests {
         );
     }
 
-    /// A section a person wrote that this build does not read is still
-    /// theirs: a preference written from a page must not delete it.
     #[test]
     fn a_section_this_build_does_not_read_survives_a_write() {
         let dir = tempfile::tempdir().unwrap();
@@ -453,8 +344,6 @@ mod tests {
         assert!(stated(&file).unwrap().welcomed);
     }
 
-    /// The one setting that holds the core's threads at normal, read
-    /// from the file a person edits; an absent section raises them.
     #[test]
     fn a_person_who_turns_the_raise_off_gets_normal_priority() {
         let dir = tempfile::tempdir().unwrap();
@@ -486,9 +375,6 @@ priority = \"fast\"
         );
     }
 
-    /// Each spelling of `[core] placement` reads as its arm, and a
-    /// spelling this build does not know is refused rather than taken
-    /// for the default.
     #[test]
     fn each_placement_spelling_reads_as_its_arm() {
         let dir = tempfile::tempdir().unwrap();
@@ -521,8 +407,6 @@ placement = \"{arm}\"
         );
     }
 
-    /// The core priority lands in `[core]`, where the serving core reads
-    /// it, and leaves the `[ui]` record as it was.
     #[test]
     fn the_core_priority_lands_in_its_own_section_and_reads_back() {
         let dir = tempfile::tempdir().unwrap();
@@ -583,9 +467,6 @@ priority = \"normal\"
         }
     }
 
-    /// A file this build cannot read is not overwritten: the person
-    /// who wrote it is the one who can fix it, and a page that
-    /// silently replaced it would take their work away.
     #[test]
     fn a_file_that_does_not_parse_is_refused_rather_than_replaced() {
         let dir = tempfile::tempdir().unwrap();
@@ -596,10 +477,6 @@ priority = \"normal\"
         assert!(err.subject().contains("[ui]"), "{}", err.subject());
     }
 
-    /// The body size floor holds at the file, the door a person writes
-    /// by hand (`Sprawling/wire/spec/Preference.lean` D51): 11 is refused
-    /// where it is read, and a size far above the page's old ceiling is
-    /// read as written.
     #[test]
     fn a_body_size_under_the_floor_is_refused_in_the_file_and_a_large_one_is_read() {
         let dir = tempfile::tempdir().unwrap();

@@ -3,53 +3,21 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The first screen a person sees when the binary carries no command,
-//! and handing a URL to the desktop's default handler.
-//!
-//! Launching this binary from a file manager gives it no arguments and a
-//! console that closes the moment it exits. Telling that apart from a
-//! person typing `sprawling` in a shell needs `GetConsoleProcessList`,
-//! which needs `unsafe`, which the workspace forbids. So nothing here
-//! guesses how it was started: the three ways in are each named, and they
-//! meet at `up` (`Sprawling/app/spec/Firstrun.lean` §8-8).
-
 use std::io::{BufRead, Write};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-/// How long the WebUI waits for its own city. Everything a city does
-/// before it binds - verifying the chain, folding the views, starting the
-/// worker - happens first, and on a long history that is seconds. A city
-/// slower than this is one to watch starting rather than open behind.
 const PROBE_ATTEMPTS: u32 = 60;
 const PROBE_INTERVAL: Duration = Duration::from_millis(200);
 
-/// What the person answered on the first screen.
-///
-/// A city is created only through `Start`, so the genesis write - the one
-/// irreversible act in this system - always has somebody behind it.
 pub enum FirstScreen {
     Start(PathBuf),
-    /// A folder the person already works in. The city forms around it
-    /// and every folder inside becomes a building; no file already there
-    /// is moved or rewritten, and a `.gitignore` only gains the lines
-    /// that keep the city's own records out of git.
+
     Use(PathBuf),
     Quit,
 }
 
-/// Draws the first two lines of the CLI when no city is there yet, and
-/// reads the one answer they ask for (`Sprawling/app/spec/Firstrun.lean` §8-8).
-///
-/// The path is on the screen before the question, so nobody consents to a
-/// location they were not shown. End of input is `Quit`: a piped or
-/// unattended stdin has nobody to ask, and creating a city would be
-/// acting on silence.
-///
-/// # Errors
-/// Propagates what the terminal reports: a screen nobody can be shown,
-/// or an answer that cannot be read, is not an answer to guess at.
 pub fn ask<R: BufRead, W: Write>(
     city: &Path,
     input: &mut R,
@@ -80,16 +48,10 @@ pub fn ask<R: BufRead, W: Write>(
     if answer.eq_ignore_ascii_case("q") || answer.eq_ignore_ascii_case("quit") {
         return Ok(FirstScreen::Quit);
     }
-    // Anything else is a path. Whether it exists is the caller's to
-    // check and to report: a screen that guessed would either refuse a
-    // real folder over a typo in its own reading, or create one where
-    // somebody meant to point at work they already had.
+
     Ok(FirstScreen::Use(PathBuf::from(strip_quotes(answer))))
 }
 
-/// A path pasted from a file manager arrives wrapped in quotes on every
-/// platform that has spaces in its directory names, which is all of
-/// them.
 fn strip_quotes(answer: &str) -> &str {
     answer
         .strip_prefix('"')
@@ -102,9 +64,6 @@ fn strip_quotes(answer: &str) -> &str {
         .unwrap_or(answer)
 }
 
-/// The address something on this machine can actually connect to. A city
-/// bound to every interface is still opened from the browser in front of
-/// it, and `0.0.0.0` is not an address any client can dial.
 fn reachable(bind: SocketAddr) -> SocketAddr {
     if bind.ip().is_unspecified() {
         let loopback = std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
@@ -113,19 +72,12 @@ fn reachable(bind: SocketAddr) -> SocketAddr {
     bind
 }
 
-/// Opens the WebUI once the city is really listening, on a thread of its
-/// own so serving is not held up by a browser starting.
-///
-/// Waits for the port to accept rather than guessing when the bind will
-/// happen, and gives up in silence when it never does - the URL was
-/// printed before this started, so nothing is lost but the convenience.
 pub fn open_when_ready(bind: SocketAddr, url: String, door: wire::LocalDoor) {
     let addr = reachable(bind);
     std::thread::spawn(move || {
         for _ in 0..PROBE_ATTEMPTS {
             if std::net::TcpStream::connect_timeout(&addr, PROBE_INTERVAL).is_ok() {
-                // Never fatal: a machine with no handler for URLs still
-                // has a working city, and its address is on the screen.
+
                 if let Err(unopened) = open_paired(&url, &door) {
                     eprintln!("  {}: {}", unopened.action(), unopened.recovery());
                 }
@@ -136,18 +88,6 @@ pub fn open_when_ready(bind: SocketAddr, url: String, door: wire::LocalDoor) {
     });
 }
 
-/// Opens `url` in this desktop's browser already paired: an open code
-/// from `door` goes into a page only this account can read, and the
-/// browser is handed that file's path, never the code
-/// (`Sprawling/app/spec/Firstrun.lean` §8-8). The file is removed once
-/// the page redeems the code, or once the code expires.
-///
-/// Under WSL a `file:` page cannot reach the Windows browser, so the bare
-/// address opens and the pairing code on the terminal pairs it.
-///
-/// # Errors
-/// No open code could be minted, the redirect file could not be written,
-/// or the desktop's handler could not be started.
 pub(crate) fn open_paired(url: &str, door: &wire::LocalDoor) -> Result<(), kernel::AxError> {
     let unhandled = |source: std::io::Error| {
         kernel::AxError::failure(
@@ -173,8 +113,7 @@ pub(crate) fn open_paired(url: &str, door: &wire::LocalDoor) -> Result<(), kerne
     write_private(&page, &redirect).map_err(unhandled)?;
     let opened = open_in_browser(&page.to_string_lossy(), unhandled);
     std::thread::spawn(move || {
-        // Every answer ends the wait the same way - redeemed, expired, or
-        // the door gone - so which one it was is owed to nobody.
+
         let _waited: Result<(), std::sync::mpsc::RecvTimeoutError> =
             redeemed.recv_timeout(Duration::from_millis(wire::OPEN_CODE_LIFETIME_MS));
         if let Err(left) = std::fs::remove_file(&page) {
@@ -187,8 +126,6 @@ pub(crate) fn open_paired(url: &str, door: &wire::LocalDoor) -> Result<(), kerne
     opened
 }
 
-/// A new file only this account reads, in the runtime directory made
-/// private to it.
 fn write_private(path: &Path, text: &str) -> std::io::Result<()> {
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
@@ -200,20 +137,9 @@ fn write_private(path: &Path, text: &str) -> std::io::Result<()> {
     options.open(path)?.write_all(text.as_bytes())
 }
 
-/// What the redirect pages `open_paired` writes are named: the prefix,
-/// this process's id, the suffix. The sweep at start reads the same two.
 const REDIRECT_PREFIX: &str = "open-";
 const REDIRECT_SUFFIX: &str = ".html";
 
-/// Removes the redirect pages a city ended by force left behind: every
-/// `open-*.html` in the runtime directory last written more than an open
-/// code's lifetime before `now`, so its code has expired. A younger page
-/// stays, because another city of this account may have just written it
-/// for a browser that has not read it yet.
-///
-/// # Errors
-/// The runtime directory cannot be found or listed, or an expired page
-/// cannot be removed.
 pub fn sweep_expired_redirects(now: kernel::TimeMs) -> Result<(), kernel::AxError> {
     let dir = crate::serving::key_file::runtime_dir()?;
     let unswept = |source: std::io::Error| {
@@ -226,7 +152,7 @@ pub fn sweep_expired_redirects(now: kernel::TimeMs) -> Result<(), kernel::AxErro
     };
     let age = Duration::from_millis(now.value())
         .saturating_sub(Duration::from_millis(wire::OPEN_CODE_LIFETIME_MS));
-    // Past the end of the platform's time, no page can be older.
+
     let Some(cutoff) = std::time::UNIX_EPOCH.checked_add(age) else {
         return Ok(());
     };
@@ -248,17 +174,6 @@ pub fn sweep_expired_redirects(now: kernel::TimeMs) -> Result<(), kernel::AxErro
     Ok(())
 }
 
-/// Hands a URL or a file path to whatever this desktop opens them with,
-/// started as every other child of the city is (`child::command`): none
-/// of the city's secrets in its environment, which the browser it starts
-/// inherits and outlives the city with, and no standard stream of the
-/// city's, so nothing it prints lands on the CLI or the quiet host.
-///
-/// # Errors
-/// The handler could not be found or started, in `unhandled`'s words.
-/// Callers treat this as a notice rather than a fault: the URL is
-/// printed before this runs, so a machine with no handler still has a
-/// working city.
 fn open_in_browser(
     target: &str,
     unhandled: impl Fn(std::io::Error) -> kernel::AxError,
@@ -272,13 +187,10 @@ fn open_in_browser(
         .map_err(unhandled)
 }
 
-/// `cmd.exe` from `System32`, never one the search order finds first in
-/// this binary's folder (`Sprawling/app/spec/Firstrun.lean` §8-8).
 #[cfg(target_os = "windows")]
 fn handler(target: &str) -> Result<std::process::Command, kernel::AxError> {
     let mut command = child::command(crate::privacy::windows::system32("cmd.exe")?);
-    // The empty argument is `start`'s title slot: without it a quoted URL
-    // becomes the window title and nothing opens.
+
     command.args(["/C", "start", "", target]);
     Ok(command)
 }
@@ -335,8 +247,6 @@ mod tests {
         }
     }
 
-    /// The case a person with a workspace is in: they paste the folder
-    /// they already work in, and the city forms around it.
     #[test]
     fn a_pasted_path_is_a_folder_to_use_rather_than_a_place_to_start() {
         let (outcome, drawn) = screen("/tmp/already/work\n");
@@ -350,8 +260,6 @@ mod tests {
         );
     }
 
-    /// A file manager wraps a pasted path in quotes the moment it has a
-    /// space in it, which is most of them.
     #[test]
     fn a_pasted_path_keeps_its_spaces_and_loses_its_quotes() {
         let (outcome, _) = screen("\"/tmp/already/my work\"\n");

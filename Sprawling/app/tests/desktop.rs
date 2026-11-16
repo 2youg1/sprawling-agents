@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The desktop connector is a tool this binary carries and starts itself
-//! (`Sprawling/app/Spec.lean` §8-4d).
-//!
-//! A city starts the real `sprawling` executable as `sprawling desktop`
-//! for a building whose rules ask for the desktop, with no `[[mcp]]` row
-//! anywhere; the test reads the tool names the model was offered. That
-//! the six arrive is the proof that the verb answered the city's own
-//! `initialize` and `tools/list` over the child's pipes.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -26,17 +17,13 @@ use std::sync::{Arc, Mutex};
 use kernel::{
     Address, AxError, ContentBlock, IdemKey, Model, ModelRequest, ModelReturn, RunId, Seq,
 };
-// The city is formed with an in-memory vault, because these tests are
-// about the worker and must not write to the credential service of the
-// machine that runs them.
+
 use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
 const LAB: &str = "lab";
 const MODEL: &str = "scripted";
 
-/// The six tools, as the model is offered them under the city's own
-/// label for the server.
 const OFFERED: [&str; 6] = [
     "desktop_desktop_windows",
     "desktop_desktop_snapshot",
@@ -117,8 +104,6 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
         model: None,
     });
 
-    // The six are filed under the connector's label, one line of the
-    // dormant index that counts them (`Sprawling/runtime/Spec.lean` §8-60).
     let names = offered.lock().unwrap().clone();
     let line = format!("desktop ({})", OFFERED.len());
     assert!(
@@ -127,15 +112,11 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
     );
 }
 
-/// The executable cargo built for this package, standing in for
-/// `std::env::current_exe`, which in a test names the test harness.
 fn this_binary() -> std::io::Result<PathBuf> {
-    // boundary-ok: the city starts this executable as its own child in production, so the test must hand it a real one; every check still enters through RunWorker
+
     Ok(PathBuf::from(env!("CARGO_BIN_EXE_sprawling")))
 }
 
-/// Keeps the name of every tool it is offered, in its tool list or its
-/// dormant index, and ends the run on its first turn.
 struct Listening(Arc<Mutex<Vec<String>>>);
 
 impl Model for Listening {
@@ -146,8 +127,7 @@ impl Model for Listening {
                 .iter()
                 .map(|tool| tool.name.as_str().to_owned()),
         );
-        // A tool outside the mode's core is offered as a line of the
-        // dormant index (`Sprawling/runtime/Spec.lean` §8-60).
+
         self.0.lock().unwrap().extend(
             req.chat
                 .system
@@ -183,8 +163,6 @@ impl accounting::ModelFactory for Listeners {
     }
 }
 
-/// A loopback address nothing listens on: bound once for a free port,
-/// then released.
 fn refusing_url() -> String {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();

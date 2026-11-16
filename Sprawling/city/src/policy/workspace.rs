@@ -3,18 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The optional `[workspace_models]` policy in a building's `RULES.toml`.
-//!
-//! The value owns structural validation; the endpoint book owns whether a
-//! reference is registered and whether the model offers its effort. Keeping
-//! those checks separate lets this crate remain free of provider I/O.
-//! Specified by `Sprawling/city/spec/Policy.lean` §8-35.
-
 use serde::{Deserialize, Deserializer, Serialize};
 
 use kernel::{AxCode, AxError, B3Hash, Difficulty, Effort, ModelRef};
 
-/// One difficulty's model and effort recommendation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ModelRecommendation {
     #[serde(flatten)]
@@ -22,8 +14,6 @@ pub struct ModelRecommendation {
     effort: Effort,
 }
 
-/// The TOML face of a recommendation, with the model reference flattened
-/// into its table beside `effort`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct WrittenRecommendation {
@@ -49,21 +39,18 @@ impl<'de> Deserialize<'de> for ModelRecommendation {
 }
 
 impl ModelRecommendation {
-    /// The complete provider/model identity this recommendation selects.
+
     #[must_use]
     pub fn model(&self) -> &ModelRef {
         &self.model
     }
 
-    /// The exact effort the city asks for; it is never moved to a neighbour.
     #[must_use]
     pub fn effort(&self) -> Effort {
         self.effort
     }
 }
 
-/// All three recommendations, required together so no difficulty is left
-/// to an implicit fallback.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorkspaceRecommendations {
@@ -72,33 +59,29 @@ pub struct WorkspaceRecommendations {
     hard: ModelRecommendation,
 }
 
-/// The models a workspace admits and the recommendations for delegated work.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorkspaceModelPolicy {
     allowed: Vec<ModelRef>,
     max_effort: Effort,
     recommendations: WorkspaceRecommendations,
-    /// The person's direct provider, model and effort. When set, a new
-    /// child session uses it instead of the difficulty recommendations.
+
     #[serde(default)]
     choice: Option<ModelRecommendation>,
 }
 
 impl WorkspaceModelPolicy {
-    /// The registered models this policy admits.
+
     #[must_use]
     pub fn allowed(&self) -> &[ModelRef] {
         &self.allowed
     }
 
-    /// The highest effort any recommendation or explicit dispatch may use.
     #[must_use]
     pub fn max_effort(&self) -> Effort {
         self.max_effort
     }
 
-    /// Every recommendation, in the tool vocabulary's order.
     #[must_use]
     pub fn recommendations(&self) -> [&ModelRecommendation; 3] {
         [
@@ -108,7 +91,6 @@ impl WorkspaceModelPolicy {
         ]
     }
 
-    /// The recommendation for one parent-supplied difficulty.
     #[must_use]
     pub fn recommendation(&self, difficulty: Difficulty) -> &ModelRecommendation {
         match difficulty {
@@ -118,18 +100,11 @@ impl WorkspaceModelPolicy {
         }
     }
 
-    /// The provider, model and effort the person chose directly, when
-    /// they did. Absent, a new child session still follows the difficulty
-    /// recommendations.
     #[must_use]
     pub fn choice(&self) -> Option<&ModelRecommendation> {
         self.choice.as_ref()
     }
 
-    /// A stable identity for the policy a child run actually used.
-    ///
-    /// # Errors
-    /// Reports a serialization failure rather than inventing a version.
     pub fn digest(&self) -> Result<B3Hash, AxError> {
         let bytes = serde_json::to_vec(self).map_err(|err| {
             AxError::failure(
@@ -142,7 +117,6 @@ impl WorkspaceModelPolicy {
         Ok(B3Hash::digest(&bytes))
     }
 
-    /// Checks the invariants that need no provider registry.
     pub(super) fn validate(&self) -> Result<(), AxError> {
         if self.allowed.is_empty() {
             return Err(invalid("workspace_models.allowed must not be empty"));
@@ -200,18 +174,6 @@ impl WorkspaceModelPolicy {
     }
 }
 
-/// Writes `choice` into `text` and leaves every other key. A file with
-/// no `[workspace_models]` table gains one whose three recommendations
-/// equal the choice, so the section the city already requires is present.
-/// An existing recommendation table is left as the shortcut it is.
-///
-/// An empty base (no `RULES.toml` yet) opens with the ordinary
-/// `confidential` / `write` pair the template uses, then the choice
-/// section; a non-empty file that still fails evaluation is refused by
-/// `write_rules_against`, not rewritten here.
-///
-/// The result is text for `write_rules_against` to evaluate. This function
-/// does not decide that the choice is registered or offered.
 pub fn inscribe_choice(text: &str, endpoint: &str, model: &str, effort: Effort) -> String {
     let text = if text.trim().is_empty() {
         "confidential = false\nwrite = \"everything\"\n"
@@ -260,7 +222,6 @@ fn has_header(text: &str, header: &str) -> bool {
     text.lines().any(|line| is_header(line, header))
 }
 
-/// A `[table]` line, optionally followed by a TOML line comment.
 fn is_header(line: &str, header: &str) -> bool {
     let trimmed = line.trim();
     if trimmed == header {
@@ -271,7 +232,6 @@ fn is_header(line: &str, header: &str) -> bool {
         .is_some_and(|rest| rest.trim_start().starts_with('#'))
 }
 
-/// Replaces the body of `header` through the line before the next header.
 fn replace_section(text: &str, header: &str, section: &str) -> Option<String> {
     let lines: Vec<&str> = text.lines().collect();
     let start = lines.iter().position(|line| is_header(line, header))?;
@@ -314,7 +274,6 @@ fn insert_before_next_header(text: &str, header: &str, section: &str) -> String 
     out
 }
 
-/// Index of the next `[...]` header after `start`, or `lines.len()`.
 fn next_header_index(lines: &[&str], start: usize, keep: impl Fn(&str) -> bool) -> usize {
     let after = start.saturating_add(1);
     lines
@@ -397,8 +356,6 @@ fn ensure_allowed(text: &str, endpoint: &str, model: &str, effort: Effort) -> St
     out
 }
 
-/// Inserts `{ pair }` before the closing `]` of an `allowed` pool that
-/// may span several lines (the shape the building template leaves).
 fn with_pair_in_pool(pool: &str, pair: &str) -> String {
     let Some(bracket) = pool.rfind(']') else {
         return pool.to_owned();
@@ -441,7 +398,6 @@ fn insert_after_header(text: &str, header: &str, line: &str) -> String {
     out
 }
 
-/// A structurally invalid policy, rejected before any rule bytes land.
 fn invalid(subject: impl Into<String>) -> AxError {
     AxError::failure(
         AxCode::ConfigInvalid,

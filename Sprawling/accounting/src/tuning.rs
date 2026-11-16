@@ -3,33 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! An endpoint's tuning as the wire carries it and as the endpoint book
-//! keeps it, translated in both directions in one place: the worker
-//! reads a form's tuning in, and the views read the book's back out for
-//! the settings page (`Sprawling/wire/spec/Answer/Endpoints.lean` §8-85).
-//!
-//! Apart from the worker because both of them read it, and the views
-//! never name the worker.
-
 use kernel::AxError;
 
-/// The frame's tuning as the book keeps it.
-///
-/// Two readings happen here and nowhere else. **A zero is absence**: a
-/// deadline no request can meet is what an empty box reaches the wire
-/// as, and reading it as a figure would make every call fail instantly
-/// for somebody who cleared a field. **`stream_idle_timeout_ms` becomes
-/// a deadline for the whole streamed request**, which is what this
-/// city's blocking transport can enforce; the wire keeps the name the
-/// person's own `config.toml` uses, and `gateway` states what it does
-/// with it (`Sprawling/gateway/Spec.lean` §8-16).
-///
-/// A row with no name and a pointer with no path are dropped: a form
-/// that keeps an empty row open while somebody types is a form whose
-/// half-written rows must not reach a provider.
-/// # Errors
-/// `E_CONFIG_INVALID` naming the header whose value reads as a
-/// credential without being a vault reference.
 pub(crate) fn tuning_of(wire: wire::EndpointTuning) -> Result<gateway::EndpointTuning, AxError> {
     let stated = |figure: Option<u64>| figure.filter(|ms| *ms > 0);
     let mut extra_headers = Vec::new();
@@ -73,14 +48,6 @@ pub(crate) fn tuning_of(wire: wire::EndpointTuning) -> Result<gateway::EndpointT
     })
 }
 
-/// The book's tuning in the frame's shape: [`tuning_of`] read backwards,
-/// so the settings page can send an endpoint back whole with only its
-/// account list changed (`Sprawling/wire/spec/Answer/Endpoints.lean` §8-85).
-///
-/// Beside [`tuning_of`] so a field added to one direction meets the other
-/// in the same file. Every tuning [`tuning_of`] accepts comes back from
-/// `tuning_of(tuning_as_attached(..))` unchanged: the readings it drops
-/// (a zero, a blank row) are already gone from the book.
 pub(crate) fn tuning_as_attached(tuning: &gateway::EndpointTuning) -> wire::EndpointTuning {
     wire::EndpointTuning {
         accounts: tuning.accounts.clone(),

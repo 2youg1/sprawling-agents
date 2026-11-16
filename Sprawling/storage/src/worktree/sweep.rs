@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The trees a crash left behind, swept when the city opens.
-//!
-//! A released tree stays on disk for the next claim of its name within
-//! one serving; when the city opens, the ledger's writer lock means no
-//! run holds any tree, so every tree the city made is left over from an
-//! earlier serving, a crashed one included. What each leaves is three
-//! things: git's registration, the directory under the reserved subtree,
-//! and the branch git made for it. This module takes back each of them,
-//! and only what the city made (`Sprawling/storage/spec/Worktree.lean` §8-9).
-
 use std::path::{Path, PathBuf};
 
 use crate::error::StorageError;
@@ -21,19 +11,12 @@ use super::name::WorktreeName;
 use super::trees::{WORKTREE_DIR, Worktrees, open_city};
 
 impl Worktrees {
-    /// Takes back every tree under `<city>/.sprawling/worktrees/` that
-    /// no name in `held` holds, and answers the names taken, sorted.
-    ///
-    /// # Errors
-    /// Propagates a repository that cannot be read, a registration git
-    /// will not prune, a branch it will not delete, and a directory that
-    /// cannot be removed.
+
     pub fn sweep_abandoned(
         city_root: &Path,
         held: &[WorktreeName],
     ) -> Result<Vec<WorktreeName>, StorageError> {
-        // A city that has never checkpointed has no repository, and so
-        // no tree to leave behind.
+
         let repo = match open_city(city_root) {
             Ok(repo) => repo,
             Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(Vec::new()),
@@ -52,8 +35,6 @@ impl Worktrees {
         Ok(swept)
     }
 
-    /// Unregisters every tree of the city's own that nobody holds, and
-    /// the lease branch that goes with it.
     fn sweep_registered(&self, held: &[WorktreeName]) -> Result<Vec<WorktreeName>, StorageError> {
         let mut swept = Vec::new();
         for name in self.live()? {
@@ -67,12 +48,6 @@ impl Worktrees {
         Ok(swept)
     }
 
-    /// Whether git's registration of `name` is exactly `home/<name>` of
-    /// this city. The common git dir lists trees of every city and
-    /// linked checkout that shares it, so a matching path suffix proves
-    /// nothing; both sides are resolved on disk, because the city root
-    /// this process was given may be spelled differently from the one
-    /// the tree was claimed under.
     fn made_here(&self, name: &WorktreeName) -> Result<bool, StorageError> {
         let tree =
             self.repo
@@ -84,10 +59,6 @@ impl Worktrees {
         Ok(resolved(tree.path()) == resolved(&self.home.join(name.as_str())))
     }
 
-    /// Deletes the branch git made for the tree `name`, unless its tip
-    /// carries a commit the trunk does not have - that is a run's landed
-    /// offer, and the pull request names it - or the person has it
-    /// checked out, which makes it theirs.
     fn drop_lease_branch(&self, name: &WorktreeName) -> Result<(), StorageError> {
         let git_err = |op: &'static str| {
             move |err: git2::Error| StorageError::Worktree {
@@ -125,22 +96,12 @@ impl Worktrees {
         Ok(())
     }
 
-    /// Unregisters the tree `id`, taking its files with it where git will.
-    ///
-    /// A repository that has already forgotten the tree is the end
-    /// state this asks for, so it is not a failure.
     pub(super) fn forget(&self, id: &str) -> Result<(), StorageError> {
         let admin = self.repo.commondir().join(WORKTREE_DIR).join(id);
         let tree = match self.repo.find_worktree(id) {
             Ok(tree) => tree,
             Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
-            // A registration git will not read still holds the name, and the
-            // end state this asks for is the registration gone. git prunes
-            // only what it can open, so the directory goes by hand: that is
-            // what `git worktree prune` removes for a tree whose directory
-            // is gone, and the tree it pointed at is not one to keep
-            // (`Sprawling/storage/spec/Worktree/Trees/Stock.lean` §8-35, the
-            // same state `Stock::Broken` names).
+
             Err(_) if admin.is_dir() => {
                 return std::fs::remove_dir_all(&admin).map_err(|source| StorageError::Worktree {
                     op: "take back a registration git will not read",
@@ -155,7 +116,7 @@ impl Worktrees {
             }
         };
         let mut opts = git2::WorktreePruneOptions::new();
-        // A lock on a tree whose directory is gone guards nothing.
+
         opts.valid(true).locked(true).working_tree(true);
         tree.prune(Some(&mut opts))
             .map_err(|err| StorageError::Worktree {
@@ -164,18 +125,6 @@ impl Worktrees {
             })
     }
 
-    /// Removes the directory `id` under the city's tree home, which the
-    /// caller knows git has no registration for: a placement or a
-    /// stocking that failed halfway left it, and a checkout refuses to
-    /// land on a directory that exists. The whole subtree is the city's
-    /// machinery, so nothing in it is the person's.
-    ///
-    /// A name that is a link is refused rather than removed, because the
-    /// placement it precedes would refuse it too (`Sprawling/storage/spec/Alias.lean` §8-25).
-    ///
-    /// # Errors
-    /// Refuses a name that is a link, and propagates a directory that
-    /// exists and cannot be removed.
     pub(super) fn clear_unregistered(&self, id: &str) -> Result<(), StorageError> {
         let path = self.home.join(id);
         crate::alias::WriteTarget::within("place a worktree", &self.city_root, &path)?;
@@ -190,10 +139,6 @@ impl Worktrees {
         }
     }
 
-    /// Removes every directory under the city's tree home that git has
-    /// no registration for and nobody holds: a claim or a release the
-    /// process died inside. The whole subtree is the city's machinery,
-    /// so nothing in it is the person's.
     fn sweep_unregistered(&self, held: &[WorktreeName]) -> Result<Vec<WorktreeName>, StorageError> {
         let io_err = |op: &'static str, path: &Path| {
             let path = path.to_path_buf();
@@ -208,8 +153,7 @@ impl Worktrees {
         let mut swept = Vec::new();
         for entry in entries {
             let entry = entry.map_err(io_err("list the worktree home", &self.home))?;
-            // A name this module could not have written is not one it
-            // may remove.
+
             let Some(name) = entry
                 .file_name()
                 .to_str()
@@ -229,13 +173,6 @@ impl Worktrees {
     }
 }
 
-/// `path` as the disk spells it: the whole path when it exists, else its
-/// parent resolved and the last component kept, else `path` unchanged. A
-/// crash may have removed the tree's own directory while its home stays.
-///
-/// A path that cannot be resolved keeps its spelling rather than failing
-/// the sweep: the sweep then fails closed, because a registration spelled
-/// differently from the home it is compared with is left alone.
 fn resolved(path: &Path) -> PathBuf {
     std::fs::canonicalize(path)
         .or_else(|_| match (path.parent(), path.file_name()) {
@@ -256,7 +193,6 @@ mod tests {
     use super::*;
     use crate::checkpoint::Checkpoint;
 
-    /// What a sweep can touch, read straight from git and the disk.
     #[derive(Debug, PartialEq, Eq)]
     struct Left {
         registered: Vec<String>,
@@ -318,7 +254,7 @@ mod tests {
     fn a_crash_left_lease_is_swept_when_the_city_opens() {
         let dir = tempfile::tempdir().unwrap();
         let trees = city(dir.path());
-        // The process died holding the lease: nothing released it.
+
         drop(trees.claim(&name("run-1"), &[]).unwrap());
         drop(trees);
 

@@ -3,17 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The derived checks of `spec/Delivery.lean` for one room.
-
 use std::sync::Arc;
 
 use super::tests::{Posted, steer};
 use super::*;
 
-/// One step of `Collab.Delivery.Act` for one room, as the city drives
-/// it: a send drops into the queue at home or the reader's slot, a
-/// start lends the queue, a take is a safe point, an ack is a model
-/// answer landing, a leave gives the queue back.
 #[derive(Debug, Clone)]
 enum Act {
     Send,
@@ -33,14 +27,12 @@ fn act() -> impl proptest::strategy::Strategy<Value = Act> {
     ]
 }
 
-/// Where the room's queue is: at home, or lent to a reader's desk.
 #[allow(clippy::large_enum_variant, reason = "one value per trace")]
 enum Room {
     Home(Inbox),
     Lent { desk: SignalDesk, slot: Mailslot },
 }
 
-/// The ids each `signal_consumed` line names, in ledger order.
 fn consumed(posted: &Posted) -> Vec<String> {
     posted
         .lock()
@@ -55,12 +47,6 @@ fn consumed(posted: &Posted) -> Vec<String> {
         .collect()
 }
 
-/// Steps one trace and checks the `Collab.Delivery.Inv` fields one room
-/// can show after every step: `consumed_once` (no id consumed twice),
-/// D8 (consumed is exactly what a take handed out before an answer
-/// landed), and, whenever the queue is home, `no_loss` (every sent id
-/// is consumed or still queued). Nothing reads a clock or the platform,
-/// so a trace gives one result on Windows, macOS and Linux (collab D7).
 fn run_trace(acts: &[Act]) {
     let posted = Posted::default();
     let mut room = Room::Home(Inbox::new(64, 4));
@@ -136,8 +122,7 @@ fn run_trace(acts: &[Act]) {
 }
 
 proptest::proptest! {
-    /// `spec/Delivery.lean` `no_loss`, `consumed_once`, `leave_requeues`
-    /// over random traces of one room.
+
     #[test]
     fn a_room_loses_no_signal_and_consumes_none_twice(
         acts in proptest::collection::vec(act(), 0..48)
@@ -146,9 +131,6 @@ proptest::proptest! {
     }
 }
 
-/// The trace vector of F8: send, start, take, cancel. The signal is
-/// back in the queue, unconsumed, and the leaving run reports it for
-/// the one knock (`withoutRequeue_loses` is what this refuses).
 #[test]
 fn send_start_take_cancel_puts_the_signal_back() {
     run_trace(&[Act::Send, Act::Start, Act::Take, Act::Leave]);

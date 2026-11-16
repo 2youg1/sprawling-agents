@@ -3,27 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every machine that is not Windows.
-//!
-//! This server still starts, still lists its six tools and still speaks
-//! the whole protocol here, so a city on another platform learns what it
-//! is missing from the refusal rather than from a server that will not
-//! start. The refusal names the platform, because "unavailable" without
-//! a reason is a sentence nobody can act on.
-
 use crate::answer::Answer;
 use crate::refusal::{Refusal, RefusalCode};
 use crate::scope::Admitted;
 use crate::tools::ToolName;
 use serde_json::Value;
 
-/// What one connection remembers between calls — which here is
-/// nothing, because nothing happens.
-///
-/// It exists so that `crate::session` holds one type on every platform.
-/// The alternative is a `cfg` in the session, which would put "is this
-/// Windows" in two files and make the read loop something a reader has
-/// to assemble mentally per platform.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Desk;
 
@@ -32,15 +17,6 @@ impl Desk {
         Desk
     }
 
-    /// Carries out one admitted call, which here is none.
-    ///
-    /// The admission is taken and dropped: this arm reports no window,
-    /// so it has nothing to filter, and the parameter is here because
-    /// both arms present one type to `crate::session`.
-    ///
-    /// # Errors
-    /// Refuses every call, naming this platform and the tool that was
-    /// asked for.
     pub(crate) fn perform(
         &mut self,
         tool: ToolName,

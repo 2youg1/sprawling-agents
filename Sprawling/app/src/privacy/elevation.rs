@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Machine-scope writes through a short-lived UAC-elevated child that
-//! writes and never judges (`Sprawling/app/spec/Privacy/Windows.lean` D60).
-//!
-//! The parent starts this same executable as `privacy elevated-write
-//! <write>` under the `runas` verb and waits for it; the child checks the
-//! write against the control table, writes, and exits. The parent then
-//! reads the target back itself, so neither a declined prompt nor a
-//! child's exit code is taken as the outcome.
-
 use kernel::{AxCode, AxError};
 use serde::{Deserialize, Serialize};
 use winreg::enums::HKEY_LOCAL_MACHINE;
@@ -21,18 +12,10 @@ use super::controls::definition;
 use super::target::{Hive, Snapshot, Target, TaskState};
 use super::windows::{registry, task};
 
-/// The most bytes a registry value may carry through the command line;
-/// every value the control table writes is four bytes, so only an
-/// original can be longer (Privacy.Windows D60).
 const VALUE_BYTES_MAX: usize = 1024;
 
-/// `ERROR_CANCELLED`: the person declined the UAC prompt.
 const DECLINED: i32 = 1223;
 
-/// Starts the elevated child and waits for it. The child's arguments
-/// reach this script through the environment, so it carries no quoting
-/// rule; a declined prompt surfaces as a `Win32Exception` somewhere in
-/// the exception chain and exits with its code.
 const ELEVATE: &str = r"
 $ErrorActionPreference='Stop'
 $start = New-Object System.Diagnostics.ProcessStartInfo
@@ -54,8 +37,6 @@ $child.WaitForExit()
 exit $child.ExitCode
 ";
 
-/// One machine-scope write: the control and the snapshot its target is
-/// to become. The whole argument the elevated child receives.
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(in crate::privacy) struct MachineWrite {
@@ -63,27 +44,16 @@ pub(in crate::privacy) struct MachineWrite {
     pub(in crate::privacy) value: Snapshot,
 }
 
-/// Why the elevated write did not report success. None of these is an
-/// outcome: the parent reads the target back either way.
 #[derive(Debug)]
 pub(in crate::privacy) enum ElevationFault {
-    /// The person declined the UAC prompt.
+
     Declined,
-    /// The child, or the script that starts it, exited with this code.
+
     Exited(Option<i32>),
-    /// Windows PowerShell or this executable could not be named or
-    /// started.
+
     Unavailable(AxError),
 }
 
-/// Writes `write` through an elevated child and waits for it to exit.
-///
-/// The wait has no counted bound: the UAC prompt waits on a person, and a
-/// readback taken while the child might still write would judge a late
-/// write as not applied.
-///
-/// # Errors
-/// [`ElevationFault`].
 pub(in crate::privacy) fn write(write: &MachineWrite) -> Result<(), ElevationFault> {
     let encoded = serde_json::to_vec(write)
         .map_err(|source| ElevationFault::Unavailable(refused(&source.to_string())))?;
@@ -107,12 +77,6 @@ pub(in crate::privacy) fn write(write: &MachineWrite) -> Result<(), ElevationFau
     judged(status.code())
 }
 
-/// The elevated child's side: decodes `argument`, checks it against the
-/// control table, and writes. It reads nothing back and records nothing.
-///
-/// # Errors
-/// `InvalidArgs` when the argument is not one machine-scope write the
-/// control table allows; `StorageFatal` when the write fails.
 pub(in crate::privacy) fn carry_out(argument: &str) -> Result<(), AxError> {
     let json = super::windows::bytes_of_hex(argument)
         .ok_or_else(|| invalid("the argument is not lowercase hexadecimal"))?;
@@ -154,7 +118,6 @@ pub(in crate::privacy) fn carry_out(argument: &str) -> Result<(), AxError> {
     }
 }
 
-/// A write the control table allows, resolved to its target.
 #[derive(Debug, PartialEq, Eq)]
 enum Planned<'write> {
     Registry {
@@ -169,9 +132,6 @@ enum Planned<'write> {
     },
 }
 
-/// Checks `write` against its control's row: a machine-scope target, a
-/// snapshot of that target's kind, a task switched rather than created
-/// or removed, and a value inside [`VALUE_BYTES_MAX`].
 fn planned(write: &MachineWrite) -> Result<Planned<'_>, AxError> {
     match (definition(write.control).target, &write.value) {
         (
@@ -216,7 +176,6 @@ fn planned(write: &MachineWrite) -> Result<Planned<'_>, AxError> {
     }
 }
 
-/// What the starting script's exit code says.
 fn judged(code: Option<i32>) -> Result<(), ElevationFault> {
     match code {
         Some(0) => Ok(()),
@@ -269,8 +228,6 @@ mod tests {
             .map_err(|refusal| *refusal.code())
     }
 
-    /// A declined prompt and every other exit are faults the caller reads
-    /// back after; only a clean exit is success.
     #[test]
     fn the_exit_code_tells_a_declined_prompt_from_a_failed_child() {
         assert!(judged(Some(0)).is_ok());
@@ -282,9 +239,6 @@ mod tests {
         assert!(matches!(judged(None), Err(ElevationFault::Exited(None))));
     }
 
-    /// The child writes only what the control table makes a machine-scope
-    /// write: HKLM values and task switches, of the control's own kind,
-    /// within the size bound.
     #[test]
     fn only_a_machine_scope_write_of_the_controls_kind_is_carried_out() {
         let digest = [7_u8; 32];
@@ -349,8 +303,6 @@ mod tests {
         assert!(crate::privacy::windows::parses(ELEVATE));
     }
 
-    /// An argument that is not exactly one encoded write is refused
-    /// before anything is written.
     #[test]
     fn a_malformed_argument_is_refused_before_any_write() {
         let encoded = |json: &str| hex(json.as_bytes());

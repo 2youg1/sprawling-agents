@@ -3,22 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The identity a page reads (`Sprawling/accounting/spec/Worker/Freezing/Naming.lean` §8-15): the two identity
-//! areas as they stand on disk, with the texts a save names as its base.
-
 use std::path::Path;
 
-/// What the city calls the person and the Mayor now, which is what the
-/// next session freezes, or where an identity area stopped reading.
-///
-/// Read at every asking rather than held: the two files are a person's,
-/// and a copy kept in the fold would answer with what they said the last
-/// time somebody saved through a page.
 pub(crate) fn identity_answer(city_root: &Path) -> wire::Answer {
     match stated(city_root) {
         Ok(answer) => wire::Answer::Identity(Box::new(answer)),
-        // A document that exists and cannot be read is "I could not
-        // look", not a city that names nobody.
+
         Err(_) => super::super::prepared::unavailable("Identity".to_owned()),
     }
 }
@@ -49,8 +39,6 @@ fn stated(city_root: &Path) -> Result<wire::IdentityAnswer, kernel::AxError> {
     }))
 }
 
-/// The wire's name for a governed document. Total: the two sets have the
-/// same three members.
 fn document_of(which: city::Governed) -> wire::GovernedDocument {
     match which {
         city::Governed::Mayor => wire::GovernedDocument::Mayor,
@@ -59,8 +47,6 @@ fn document_of(which: city::Governed) -> wire::GovernedDocument {
     }
 }
 
-/// One governed document's text, empty when it is not there: the `base`
-/// a first save names.
 fn text_of(city_root: &Path, which: city::Governed) -> Result<String, kernel::AxError> {
     let path = which.path(city_root);
     match std::fs::read_to_string(&path) {

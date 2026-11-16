@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one door that waits: a credential is taken from a caller on this
-//! machine, and this request holds until the city says what became of it.
-
 use std::net::SocketAddr;
 use std::sync::Arc;
 
@@ -24,9 +21,6 @@ use super::refusal_text;
 use super::{ENROLMENT_PATIENCE, EnrollBody, ShellState};
 use crate::reply::{Delivered, Reply};
 
-/// The one route that carries a credential. It exists as HTTP rather
-/// than as a socket frame because the socket's Command type cannot spell
-/// a secret; here the same rule is enforced against the peer address.
 pub(super) async fn accept_enrolment(
     State(state): State<Arc<ShellState>>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
@@ -43,31 +37,22 @@ pub(super) async fn accept_enrolment(
             .into_response();
     };
     let EnrollBody { realm, name, value } = enrolment;
-    // One place decides whether a realm and a name name a vault place,
-    // and this route asks it rather than spelling `secret:<realm>/<name>`
-    // itself: text assembled here could name a place no later reader
-    // resolves, and the 201 would answer with that text.
+
     let place = match SecretRef::new(&realm, &name) {
         Ok(place) => place,
         Err(err) => {
             return (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response();
         }
     };
-    // The command carries the segments this route asked the grammar
-    // about, so the key the worker stores cannot be built from text the
-    // constructor never saw.
+
     let command = Command::PutSecret {
         realm: place.realm().to_owned(),
         name: place.name().to_owned(),
         value: Sealed::new(Box::new(value)),
     };
-    // What was asked for, named in the replies that arrive without a
-    // record: those say the credential was handed over, not that it was
-    // stored under this name.
+
     let asked = place.to_string();
-    // Subscribed before the command is posted: a worker that finished
-    // while this task was still setting up would otherwise write the one
-    // record this request is waiting for into a stream nobody is reading.
+
     let mut records = state.events.subscribe();
     let (refused, mut refusals) = tokio::sync::mpsc::unbounded_channel::<AxError>();
     let reply = Reply::to(move |err: AxError| match refused.send(err) {
@@ -78,11 +63,7 @@ pub(super) async fn accept_enrolment(
         return (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response();
     }
     let waited = tokio::time::timeout(ENROLMENT_PATIENCE, async move {
-        // The reply address is dropped when the worker finishes without
-        // refusing, so a closed refusal channel says only that no
-        // refusal is coming - never that the credential was stored. The
-        // guard stops the closed branch from spinning; the event is
-        // still what a 201 waits for.
+
         let mut refusal_possible = true;
         loop {
             tokio::select! {
@@ -96,11 +77,7 @@ pub(super) async fn accept_enrolment(
                             return Waited::Settled(Enrolled::Stored { reference: stored });
                         }
                     }
-                    // This request was overtaken: the record that says what
-                    // became of the credential may be among the ones the
-                    // subscription skipped, and a skipped record is not
-                    // sent again. Waiting for the patience to run out would
-                    // only delay an answer this wait can no longer give.
+
                     Err(broadcast::error::RecvError::Lagged(_)) => return Waited::Overtaken,
                     Err(broadcast::error::RecvError::Closed) => return Waited::Ended,
                 },
@@ -115,9 +92,7 @@ pub(super) async fn accept_enrolment(
         Ok(Waited::Settled(Enrolled::Refused(err))) => {
             (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response()
         }
-        // Nothing arrived inside the patience. Two-oh-two says so in the one
-        // word HTTP has for it, and the body says why rather than leaving the
-        // caller to read a status code as an outcome.
+
         Err(_) => (
             StatusCode::ACCEPTED,
             format!(
@@ -128,9 +103,7 @@ pub(super) async fn accept_enrolment(
             ),
         )
             .into_response(),
-        // The event stream went past this request, which is a different
-        // fact and gets its own sentence: the city may have stored the
-        // credential and this server cannot say whether it did.
+
         Ok(Waited::Overtaken) => (
             StatusCode::ACCEPTED,
             format!(
@@ -140,8 +113,7 @@ pub(super) async fn accept_enrolment(
             ),
         )
             .into_response(),
-        // The stream ended outright, which says nothing about the credential
-        // either; the city is going down, or its writer is.
+
         Ok(Waited::Ended) => (
             StatusCode::ACCEPTED,
             format!(
@@ -154,44 +126,25 @@ pub(super) async fn accept_enrolment(
     }
 }
 
-/// The reference a `secret_captured` record states, when that record is
-/// the one this request is waiting for.
-///
-/// The reply is the reference the record states, spelled as
-/// `SecretRef` spells it, rather than the text the route assembled: two
-/// spellings of one place agree until either is changed, and a record is
-/// what the vault itself said.
 fn stored_reference(record: &EventRecord, place: &SecretRef) -> Option<String> {
     if record.kind() != EventKind::SecretCaptured {
         return None;
     }
-    // A line that does not read as a capture - a `ref` outside the
-    // grammar among them - names no vault place, so it answers this
-    // request exactly as little as another writer's reference does, and
-    // the wait goes on for the record that does.
+
     let captured: SecretCaptured = record.data().read().ok()?;
     (captured.reference == *place).then(|| captured.reference.to_string())
 }
 
-/// What the city said about one enrolment, or why the wait for it ended.
-///
-/// `Stored` and `Refused` are the two answers the worker gives; the other
-/// two are the ways this route stops waiting, and they are separate arms
-/// because they are separate facts: a stream that overtook the request may
-/// have carried the answer past unread, and a stream that ended never
-/// carried it at all.
 enum Waited {
     Settled(Enrolled),
-    /// The event stream skipped records while this request waited.
+
     Overtaken,
-    /// The event stream ended outright.
+
     Ended,
 }
 
-/// What the city said about one enrolment.
 enum Enrolled {
-    /// The vault stored the credential, and this is the reference its
-    /// `secret_captured` record states — the text the 201 answers with.
+
     Stored {
         reference: String,
     },

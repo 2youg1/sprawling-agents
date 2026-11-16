@@ -3,25 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one encoding of a playback bundle (`Sprawling/accounting/spec/Playback.lean` §8-12).
-//!
-//! Compact JSON in the field order `document` declares, with `<`, `>`,
-//! `&`, U+2028 and U+2029 written as `\u` escapes. Those characters only
-//! ever occur inside JSON strings, so the escape changes no value, and a
-//! bundle's bytes can sit inside an HTML `<script>` block as they are: a
-//! log line holding `</script>` cannot end the block early. The digest
-//! is taken over these bytes, and reading a bundle back re-encodes it
-//! and requires the same bytes, which is how a duplicate key, extra
-//! whitespace or a reordered field is refused.
-
 use kernel::{AxCode, AxError, B3Hash};
 
 use super::document::Document;
 use super::{BUNDLE_MAX_BYTES, SCHEMA};
 
-/// A playback bundle: canonical bytes, built only by [`encode`] and
-/// [`decode`], so every value of this type is a bundle this build can
-/// read back to the same bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bundle {
     bytes: Vec<u8>,
@@ -29,40 +15,28 @@ pub struct Bundle {
 }
 
 impl Bundle {
-    /// The canonical bytes, safe to embed in HTML as they are.
+
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
     }
 
-    /// BLAKE3 over [`Bundle::bytes`].
     #[must_use]
     pub fn digest(&self) -> B3Hash {
         B3Hash::digest(&self.bytes)
     }
 
-    /// How many selected events the bundle holds.
     #[must_use]
     pub fn events(&self) -> usize {
         self.events
     }
 }
 
-/// Encodes a document, refusing one whose bytes exceed the ceiling.
-///
-/// serde writes through [`Escaping`] straight into the bundle's one
-/// buffer, so no compact copy and no escaped copy of the whole document
-/// exist beside it, and a document past the ceiling stops being written
-/// where it crosses it.
-///
-/// # Errors
-/// `E_INVALID_ARGS` when the bundle would exceed [`BUNDLE_MAX_BYTES`];
-/// the recovery names the flags that narrow a selection.
 pub(super) fn encode(document: &Document) -> Result<Bundle, AxError> {
     let mut escaping = Escaping::within(BUNDLE_MAX_BYTES);
     match serde_json::to_writer(&mut escaping, document) {
         Ok(()) => {}
-        // The writer's only failure is the ceiling.
+
         Err(over) if over.is_io() => {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -88,13 +62,6 @@ pub(super) fn encode(document: &Document) -> Result<Bundle, AxError> {
     })
 }
 
-/// Reads bytes back into a document, requiring that they are exactly
-/// what [`encode`] writes for it.
-///
-/// # Errors
-/// `E_INVALID_ARGS` for bytes over the ceiling, a bundle of another
-/// schema (named, with the build to read it with), bytes that are not a
-/// bundle of this schema's shape, and bytes that are not canonical.
 pub(super) fn decode(bytes: &[u8]) -> Result<(Document, Bundle), AxError> {
     let refuse = |subject: String| {
         AxError::failure(AxCode::InvalidArgs, "read a playback bundle", subject).with_recovery(
@@ -133,29 +100,17 @@ pub(super) fn decode(bytes: &[u8]) -> Result<(Document, Bundle), AxError> {
     Ok((document, bundle))
 }
 
-/// The one key a bundle of any schema carries, read before the rest so a
-/// bundle of another schema is named as one instead of failing on a
-/// field.
 #[derive(serde::Deserialize)]
 struct Schema {
     schema: String,
 }
 
-/// A writer that takes compact JSON and writes it with the five
-/// characters that can end or break an HTML script block as escapes,
-/// refusing any byte past its ceiling.
-///
-/// `<`, `>` and `&` are one byte each; U+2028 and U+2029 are the three
-/// bytes `E2 80 A8` and `E2 80 A9`, which serde may hand over across two
-/// writes, so a prefix of them is held until the byte that decides it
-/// arrives.
 struct Escaping {
     out: Vec<u8>,
     ceiling: usize,
     held: Held,
 }
 
-/// The prefix of a line or paragraph separator read so far.
 #[derive(Clone, Copy)]
 enum Held {
     Nothing,
@@ -172,15 +127,12 @@ impl Escaping {
         }
     }
 
-    /// The bytes written, a held prefix that no separator completed
-    /// written as it came.
     fn finish(mut self) -> Vec<u8> {
         let held = self.release();
         self.out.extend_from_slice(held);
         self.out
     }
 
-    /// Takes one byte of compact JSON.
     fn take(&mut self, byte: u8) -> std::io::Result<()> {
         match (self.held, byte) {
             (Held::Nothing, b'<') => self.emit(b"\\u003c"),
@@ -203,8 +155,7 @@ impl Escaping {
                 self.held = Held::Nothing;
                 self.emit(b"\\u2029")
             }
-            // The prefix was some other character's: it goes out as it
-            // came, and this byte is taken afresh.
+
             (Held::E2 | Held::E280, other) => {
                 let held = self.release();
                 self.emit(held)?;
@@ -213,7 +164,6 @@ impl Escaping {
         }
     }
 
-    /// The held prefix's bytes, and nothing held afterwards.
     fn release(&mut self) -> &'static [u8] {
         let held = match self.held {
             Held::Nothing => &[][..],
@@ -224,8 +174,6 @@ impl Escaping {
         held
     }
 
-    /// Appends `bytes`, or refuses them all when they would carry the
-    /// buffer past its ceiling.
     fn emit(&mut self, bytes: &[u8]) -> std::io::Result<()> {
         match self.out.len().checked_add(bytes.len()) {
             Some(length) if length <= self.ceiling => {
@@ -259,8 +207,6 @@ mod tests {
 
     use super::Escaping;
 
-    /// What the writer must produce for `text` written whole: every
-    /// character as it is, the five as their `\u` escapes.
     fn escaped(text: &str) -> String {
         text.chars()
             .map(|character| match character {
@@ -275,9 +221,7 @@ mod tests {
     }
 
     proptest! {
-        /// However the bytes are cut into writes, the output is the text
-        /// written whole with its five characters escaped: a separator
-        /// split between two writes is still recognised.
+
         #[test]
         fn escaping_does_not_depend_on_where_the_writes_are_cut(
             text in "[a-z<>&\u{2028}\u{2029}\u{2027}\u{e280}é]{0,40}",
@@ -297,8 +241,6 @@ mod tests {
         }
     }
 
-    /// Past its ceiling the writer refuses, and holds no more than the
-    /// ceiling.
     #[test]
     fn the_writer_stops_at_its_ceiling() {
         let mut escaping = Escaping::within(10);

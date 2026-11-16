@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The person's door onto playback: `sprawling playback export` and
-//! `sprawling playback check` (`Sprawling/app/spec/Main.lean` §8-126 and §8-132).
-//!
-//! The projection, the selection, the read bound, the page, the five
-//! checks and the landing are `accounting::playback`'s (`Sprawling/accounting/Spec.lean`
-//! §8-12 and §8-13). This module reads the command line, names the person
-//! as the reader, and decides where the bytes go: to stdout once the
-//! whole export exists, or to a new file that lands whole or not at all.
-
 use std::io::Write;
 use std::path::Path;
 use std::process::ExitCode;
@@ -28,8 +19,6 @@ use super::grammar::Arguments;
 use super::refusal::{Form, written};
 use super::view::{run_flag, seq_flag};
 
-/// Exports the bundle the command line selects, or the page a template
-/// makes of it.
 pub(super) fn export(read: &Arguments) -> ExitCode {
     let Some(city) = read.positional(1) else {
         return Exit::Line.into();
@@ -68,8 +57,6 @@ pub(super) fn export(read: &Arguments) -> ExitCode {
     }
 }
 
-/// Checks a bundle or a page, item by item, and writes what it found as
-/// one JSON line.
 pub(super) fn check(read: &Arguments) -> ExitCode {
     let Some(path) = read.positional(1) else {
         return Exit::Line.into();
@@ -106,13 +93,11 @@ pub(super) fn check(read: &Arguments) -> ExitCode {
     exit.into()
 }
 
-/// Why a command line did not become a request.
 #[derive(Debug)]
 enum Refused {
-    /// A flag value that does not read.
+
     Line(String),
-    /// A range that contradicts itself, or a time condition that does
-    /// not read.
+
     Selection(AxError),
 }
 
@@ -144,7 +129,6 @@ fn request_of(read: &Arguments) -> Result<Request, Refused> {
     })
 }
 
-/// The person, widened to confidential buildings only when they asked.
 fn person(read: &Arguments) -> Reader {
     Reader::Person(if read.has("--include-confidential") {
         Confidential::Included
@@ -153,8 +137,6 @@ fn person(read: &Arguments) -> Reader {
     })
 }
 
-/// The JSON line a check writes, and the exit it ends with: done when
-/// the report holds, refused when an item failed or could not be done.
 fn outcome(found: &Report) -> (serde_json::Value, Exit) {
     let exit = if found.holds() {
         Exit::Done
@@ -164,8 +146,6 @@ fn outcome(found: &Report) -> (serde_json::Value, Exit) {
     (found.line(), exit)
 }
 
-/// Writes the whole export to stdout. A reader that closes the pipe
-/// early leaves an export that cannot be read back, so that is a failure.
 fn write_stdout(bytes: &[u8]) -> Result<(), AxError> {
     let mut out = std::io::stdout().lock();
     out.write_all(bytes)
@@ -179,7 +159,6 @@ fn write_stdout(bytes: &[u8]) -> Result<(), AxError> {
         })
 }
 
-/// Reads `what` at `path`, refusing a file over `cap` before reading it.
 fn read_capped(path: &Path, cap: usize, what: &str) -> Result<Vec<u8>, AxError> {
     let unreadable = |err: std::io::Error| {
         AxError::failure(

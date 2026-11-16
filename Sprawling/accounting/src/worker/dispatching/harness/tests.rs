@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A room whose resident is an official harness, dispatched through the
-//! person's door. The harness is played in memory on the far side of two
-//! pipes, as `agent_protocols`' own session tests play it: no vendor's
-//! program starts here.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -27,38 +22,32 @@ use serde_json::{Value, json};
 use crate::worker::RunWorker;
 use crate::worker::driving::harness::{StartHarness, Started};
 
-/// What the played agent does once the session has sent it a request.
 #[derive(Clone)]
 enum Step {
-    /// Answer the request just read with this result.
+
     Answer(Value),
-    /// Send this message unprompted.
+
     Say(Value),
-    /// Read one more request from the client.
+
     Read,
-    /// Wait this long for the client's next message: when it comes,
-    /// answer the request read last with `heard`, and when it does not,
-    /// with `otherwise`.
+
     Heed {
         within: Duration,
         heard: Value,
         otherwise: Value,
     },
-    /// Write a file into the directory the session was opened in.
+
     Write(&'static str, String),
-    /// Read everything the session still sends, until it closes its end.
+
     Drain,
 }
 
-/// What the played agent heard, and where it was opened.
 #[derive(Default)]
 struct Heard {
     messages: Vec<Value>,
     cwd: Option<PathBuf>,
 }
 
-/// A harness that is an agent played over pipes, following `script`,
-/// with what it heard kept in `heard`.
 fn played(script: Vec<Step>, heard: Arc<Mutex<Heard>>) -> StartHarness {
     Arc::new(move |harness, cwd: &Path| -> Result<Started, AxError> {
         let (from_agent, mut agent_out) = std::io::pipe().unwrap();
@@ -135,7 +124,6 @@ fn played(script: Vec<Step>, heard: Arc<Mutex<Heard>>) -> StartHarness {
     })
 }
 
-/// The agent's side of opening a session.
 fn opening() -> Vec<Step> {
     vec![
         Step::Answer(json!({
@@ -158,7 +146,6 @@ fn said(text: &str) -> Step {
     )
 }
 
-/// A city with the building `lab`, whose layer names `harness`.
 fn city_with(harness: &str) -> (tempfile::TempDir, PathBuf, PathBuf) {
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
@@ -193,14 +180,12 @@ fn dispatch(addr: &str, model: Option<&str>) -> wire::Command {
     }
 }
 
-/// A harness that must never start: the dispatch is refused first.
 fn never() -> StartHarness {
     Arc::new(|_, _: &Path| -> Result<Started, AxError> {
         panic!("a refused dispatch started a harness")
     })
 }
 
-/// Every record the city has, in order.
 fn records(ledger: &Path) -> Vec<EventRecord> {
     runtime::replay::verify_ledger_dir(ledger)
         .unwrap()
@@ -210,8 +195,6 @@ fn records(ledger: &Path) -> Vec<EventRecord> {
         .collect()
 }
 
-/// A word that names no agent is refused naming every word that does,
-/// before the room exists.
 #[test]
 fn an_unknown_harness_is_refused_naming_the_known_words_and_leaves_no_room_behind() {
     let (dir, file, _) = city_with("claude");
@@ -236,8 +219,6 @@ fn an_unknown_harness_is_refused_naming_the_known_words_and_leaves_no_room_behin
     assert!(!dir.path().join("lab").join("room1").exists());
 }
 
-/// A confidential building's data does not leave, and a harness sends
-/// the room to its vendor.
 #[test]
 fn a_confidential_building_refuses_a_harness_before_anything_is_written() {
     let (dir, file, _) = city_with("pi");
@@ -260,9 +241,6 @@ fn a_confidential_building_refuses_a_harness_before_anything_is_written() {
     assert!(!dir.path().join("lab").join("room1").exists());
 }
 
-/// A dispatch naming a model into a harness room is refused, and the
-/// building's layer is left as the person wrote it: no `[model] name`
-/// beside the harness.
 #[test]
 fn a_dispatch_naming_a_model_into_a_harness_room_is_refused_and_writes_no_model() {
     let (dir, file, _) = city_with("pi");
@@ -287,8 +265,6 @@ fn a_dispatch_naming_a_model_into_a_harness_room_is_refused_and_writes_no_model(
     assert_eq!(std::fs::read(&file).unwrap(), before);
 }
 
-/// A harness that will not start is refused before its run exists: the
-/// history holds the tree it was lent and no `run_started`.
 #[test]
 fn a_harness_that_will_not_start_is_refused_before_its_run_exists() {
     let (dir, _, ledger) = city_with("pi");

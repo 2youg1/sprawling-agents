@@ -3,22 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The JSON Schema of the values a derive cannot state.
-//! The part `Sprawling/kernel/spec/Schema.lean` specifies this module.
-//!
-//! Every other value on the wire derives its schema from the declaration
-//! serde reads, so the two cannot drift. These are the strings a grammar
-//! judges: `Address`, `RunId`, `SessionName` and `ServerLabel` read
-//! through their own constructor, so a derive would
-//! say a field is a string and nothing about what it must say. Each
-//! schema states that grammar as a pattern, which `cargo xtask wire-ts`
-//! turns into the client's own check (`Sprawling/kernel/spec/Schema.lean` §8-45).
-//!
-//! **The pattern is not the authority.** `Address::parse` answers which
-//! rule a string broke, which is what a person can act on; two
-//! statements of one grammar drift unless something binds them, so the
-//! tests below bind every pattern to its constructor over input.
-
 use std::borrow::Cow;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator};
@@ -31,8 +15,6 @@ use crate::idem::IdemKey;
 use crate::locator::{B3Hash, GitOid, Locator};
 use crate::tool::ServerLabel;
 
-/// A string schema with a description and, where the grammar is one line
-/// long, the pattern that states it.
 fn string_schema(description: &str, pattern: Option<&str>) -> Schema {
     let mut schema = Schema::default();
     schema.insert("type".to_owned(), Value::from("string"));
@@ -43,46 +25,15 @@ fn string_schema(description: &str, pattern: Option<&str>) -> Schema {
     schema
 }
 
-/// The grammar [`Address::parse`] enforces: one segment, then further
-/// segments after a `/`; each at least one character, none of them `/`,
-/// `\`, `:` or control, and the last neither a dot nor whitespace, which
-/// is also what refuses `.` and `..`. The two properties are the ones the
-/// constructor asks: `\p{Cc}` is `char::is_control` and `\p{White_Space}`
-/// is `char::is_whitespace`, so every reader applies this with Unicode
-/// semantics - the `u` flag or its equivalent.
 const ADDRESS_PATTERN: &str = concat!(
     r"^(?:[^/\\:\p{Cc}]*[^/\\:\p{Cc}.\p{White_Space}])",
     r"(?:/[^/\\:\p{Cc}]*[^/\\:\p{Cc}.\p{White_Space}])*$"
 );
 
-/// The grammar [`RunId::parse`](crate::event::RunId::parse) enforces: the
-/// one spelling this city writes a run id in, a hyphenated uuid in lower
-/// case. `uuid::Uuid::parse_str` also reads bare hex, braces, the
-/// `urn:uuid:` prefix and upper case; a city that took those would name
-/// runs in identities its own reader calls unknown.
 const RUN_ID_PATTERN: &str = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$";
 
-/// The grammar [`ServerLabel::parse`] enforces: one or more ascii
-/// lowercase letters and digits, and nothing else - no underscore, which
-/// would make the tool names built on the label split two ways.
 const SERVER_LABEL_PATTERN: &str = "^[a-z0-9]+$";
 
-/// The grammar [`SessionName::parse`] enforces, as a pattern: the
-/// whitespace the constructor trims from either end, one address segment
-/// of one to [`SESSION_NAME_MAX`] characters that ends in neither a dot
-/// nor whitespace, and the whitespace it trims.
-///
-/// **One word parts the pattern from the constructor.** `.sprawling` is
-/// the reserved directory, and refusing one word among all words needs
-/// look-around, which neither the Rust engine nor the ECMAScript the
-/// client runs has. The pattern takes that name and
-/// `SessionName::parse` refuses it, so the client may offer a name the
-/// city will decline and may never fail to read one the city wrote; the
-/// tests here hold the disagreement to that single word.
-///
-/// The cap is read from [`SESSION_NAME_MAX`] rather than repeated: the
-/// head and the tail of the body carry one character each, and the
-/// repetition between them carries the rest.
 fn session_name_pattern() -> String {
     let head = r"^\p{White_Space}*(?:[^\p{White_Space}/\\:\p{Cc}.]|[^\p{White_Space}/\\:\p{Cc}]";
     let longest = SESSION_NAME_MAX.saturating_sub(2);
@@ -250,8 +201,6 @@ mod tests {
     use crate::address::tests::{Spelling, TABLE, Verdict};
     use crate::event::RunId;
 
-    /// Each pattern compiled the way every reader reads it: `\p{...}` is a
-    /// Unicode property, so the matcher needs Unicode semantics.
     static ADDRESS_MATCHER: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(ADDRESS_PATTERN).unwrap());
     static RUN_ID_MATCHER: LazyLock<Regex> = LazyLock::new(|| Regex::new(RUN_ID_PATTERN).unwrap());
@@ -260,12 +209,8 @@ mod tests {
     static SESSION_NAME_MATCHER: LazyLock<Regex> =
         LazyLock::new(|| Regex::new(&session_name_pattern()).unwrap());
 
-    /// Where a boundary sits: nothing, the words and dots a segment is
-    /// made of, both reserved spellings, a separator, every kind of
-    /// whitespace and non-ASCII text, and the lengths either side of the
-    /// cap. One list, read by the sweep and by the generator.
     fn boundary() -> Vec<String> {
-        // The words, separated by a character none of them carries.
+
         let mut pieces: Vec<String> = "a|ab|notes.md|.|..|.sprawling|.SPRAWLING|x."
             .split('|')
             .map(str::to_owned)
@@ -280,25 +225,14 @@ mod tests {
         pieces
     }
 
-    /// Strings assembled from those pieces, so what a longer string hides
-    /// between two of them is explored as well.
     fn boundary_text() -> impl Strategy<Value = String> {
         prop::collection::vec(prop::sample::select(boundary()), 0..5)
             .prop_map(|pieces| pieces.concat())
     }
 
-    /// A run id whose every group is spelled in one case, which is what
-    /// makes the property ask about one group alone.
     const RUN_ID_TEXT: &str =
         "([0-9a-f]{8}|[0-9A-F]{8})(-[0-9a-f]{4}|-[0-9A-F]{4}){3}(-[0-9a-f]{12}|[0-9A-F]{12})";
 
-    /// A run id: the city's spelling with each group in either case, or one
-    /// of the spellings `uuid` reads beyond it - braces, the `urn:uuid:`
-    /// prefix, the bare 32 digits - or loose text from the same alphabet.
-    ///
-    /// Either case is what makes this bite: `uuid` reads a capital and the
-    /// city writes lower, so a pattern that took the other case in one
-    /// group alone is asked about that group.
     fn run_id_text() -> impl Strategy<Value = String> {
         prop_oneof![
             3 => RUN_ID_TEXT,
@@ -309,9 +243,6 @@ mod tests {
         ]
     }
 
-    /// The serialised form of each hand-written value must satisfy the
-    /// schema this file states for it, or the client is told one grammar
-    /// and sent another.
     #[test]
     fn every_hand_written_value_serialises_inside_its_own_schema() {
         let generator = &mut SchemaGenerator::default();
@@ -333,7 +264,6 @@ mod tests {
         assert!(inside(&IdemKey::json_schema(generator), &key), "{key}");
     }
 
-    /// The pattern a schema carries, applied to a serialised value.
     fn inside(schema: &Schema, value: &Value) -> bool {
         let pattern = schema.get("pattern").and_then(Value::as_str).unwrap();
         Regex::new(pattern)
@@ -341,10 +271,6 @@ mod tests {
             .is_match(value.as_str().unwrap())
     }
 
-    /// The declaration `cargo xtask wire-ts` writes for a string schema,
-    /// read back out of what this file states: the description as the doc
-    /// comment, the name as both the binding and the brand, and the
-    /// pattern, when there is one, as a Unicode regular expression.
     fn declaration<T: JsonSchema>() -> String {
         let schema = T::json_schema(&mut SchemaGenerator::default());
         let name = T::schema_name();
@@ -366,12 +292,6 @@ mod tests {
         format!("/**\n * {description}\n */\nexport const {name} = {body};\n")
     }
 
-    /// The client reads these values through `client/src/wire.ts`, which
-    /// is generated from the schemas this file states and committed. Each
-    /// hand-written schema, its name and its grammar, is found in that file
-    /// exactly as the generator writes it, so a schema changed here without
-    /// the client regenerated is a red test rather than a page that judges
-    /// a value by a grammar the city no longer holds.
     #[test]
     fn the_committed_client_declares_every_hand_written_schema() {
         let client = std::fs::read_to_string(concat!(
@@ -412,11 +332,6 @@ mod tests {
         assert_eq!(listed, table);
     }
 
-    /// Both `\p{...}` classes are the predicates the constructors ask, so
-    /// the pattern and the generator mean the same thing by "control" and
-    /// "whitespace" rather than two tables drifting apart. Every Unicode
-    /// scalar is asked: the exceptions are exactly the characters no
-    /// hand-written list would hold.
     #[test]
     fn the_two_unicode_classes_are_the_char_predicates() {
         let control = Regex::new(r"\p{Cc}").unwrap();
@@ -431,9 +346,6 @@ mod tests {
         }
     }
 
-    /// The spellings the constructor's own tests use, judged by the pattern
-    /// the client is handed: a case added on one side is a case both
-    /// readers answer.
     #[test]
     fn the_address_table_gets_the_same_verdict_from_the_pattern() {
         for Spelling { address, verdict } in TABLE.iter() {
@@ -442,9 +354,6 @@ mod tests {
         }
     }
 
-    /// Three pieces at once, every combination there is: a sweep rather
-    /// than a sample, so a pattern that parts from its constructor is found
-    /// by walking where the two can differ.
     #[test]
     fn the_patterns_and_the_constructors_agree_at_every_boundary() {
         for first in boundary() {
@@ -460,8 +369,7 @@ mod tests {
                     let parsed = SessionName::parse(&raw).is_ok();
                     assert!(matched || !parsed, "session name {raw:?}");
                     if matched && !parsed {
-                        // A file system ignores case: `.SPRAWLING` names
-                        // the reserved directory too, and a pattern cannot say so.
+
                         assert!(raw.trim().eq_ignore_ascii_case(RESERVED_PREFIX), "{raw:?}");
                     }
                 }
@@ -470,33 +378,22 @@ mod tests {
     }
 
     proptest! {
-        /// One grammar, two statements. A pattern stricter than
-        /// `Address::parse` turns a record the city wrote into a decode
-        /// failure in the page, which a person cannot act on.
+
         #[test]
         fn the_address_pattern_answers_what_the_constructor_answers(raw in boundary_text()) {
             prop_assert_eq!(ADDRESS_MATCHER.is_match(&raw), Address::parse(&raw).is_ok());
         }
 
-        /// The same question for a server label, over the characters
-        /// either statement could get wrong: case, the underscore that
-        /// would split a tool name two ways, and the hyphen a page once
-        /// allowed.
         #[test]
         fn the_server_label_pattern_answers_what_the_constructor_answers(raw in "[a-zA-Z0-9_ -]{0,6}") {
             prop_assert_eq!(SERVER_LABEL_MATCHER.is_match(&raw), ServerLabel::parse(&raw).is_ok(), "{}", raw);
         }
 
-        /// The same question for run identity: the city takes the one
-        /// spelling it writes, and the wire says so.
         #[test]
         fn the_run_id_pattern_answers_what_the_constructor_answers(raw in run_id_text()) {
             prop_assert_eq!(RUN_ID_MATCHER.is_match(&raw), RunId::parse(&raw).is_ok(), "{}", raw);
         }
 
-        /// `SessionName::parse` refuses one word the pattern cannot: the
-        /// reserved directory's own name, in any case - a file system
-        /// that ignores case makes `.SPRAWLING` the same directory.
         #[test]
         fn the_session_name_pattern_parts_from_the_constructor_on_one_word(raw in boundary_text()) {
             let matched = SESSION_NAME_MATCHER.is_match(&raw);

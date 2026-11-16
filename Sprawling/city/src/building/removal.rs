@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Taking a building out of the city without losing a byte of it.
-//!
-//! A removed building is moved, whole, under the city's reserved subtree:
-//! [`super::all`] skips dot-prefixed directories and no write domain
-//! reaches `.sprawling/`, so what was moved is no longer a building and
-//! no resident can change it, while everything a person made there is
-//! still on disk and the building's history is still in the Ledger. A
-//! person brings it back by moving the directory to the city root and
-//! adopting it.
-//!
-//! Specified by `Sprawling/city/spec/Building.lean` §8-3.
-
 use std::path::Path;
 
 use kernel::consts_policy::HALL_BUILDING;
@@ -22,11 +10,8 @@ use kernel::{Address, AxCode, AxError, Payload, RESERVED_PREFIX};
 
 use super::Building;
 
-/// Where removed buildings are kept, under the city's reserved subtree.
 const REMOVED_DIR: &str = "removed";
 
-/// A building that has been taken out of the city, and where its files
-/// went.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Removed {
     addr: Address,
@@ -39,25 +24,12 @@ impl Removed {
         &self.addr
     }
 
-    /// Where the building's files are now, relative to the city root,
-    /// with `/` between segments on every platform.
     #[must_use]
     pub fn kept(&self) -> &str {
         &self.kept
     }
 }
 
-/// Moves the building at `addr` under `.sprawling/removed/`, at the
-/// first free name: `<name>`, then `<name>-2`, `<name>-3` and on, so a
-/// building removed twice never covers what was kept the first time.
-///
-/// One `rename`: on one volume the building is either still where it
-/// was or wholly moved, never half of each.
-///
-/// # Errors
-/// `InvalidArgs` for a room address, for City Hall, and for an address
-/// with no directory; `StorageFatal` when the directory cannot be moved,
-/// which on Windows is most often a file some program holds open.
 pub fn remove(city_root: &Path, addr: &Address) -> Result<Removed, AxError> {
     let building = Building::of(addr)?;
     let refuse = |why: &str, recovery: &str| {
@@ -98,7 +70,6 @@ pub fn remove(city_root: &Path, addr: &Address) -> Result<Removed, AxError> {
     })
 }
 
-/// The first name under `shelf` that nothing holds yet.
 fn first_free(shelf: &Path, name: &str) -> Result<String, AxError> {
     if !shelf.join(name).exists() {
         return Ok(name.to_owned());
@@ -116,11 +87,6 @@ fn first_free(shelf: &Path, name: &str) -> Result<String, AxError> {
         })
 }
 
-/// What the Ledger records about a removal: which building, and where
-/// its files are kept.
-///
-/// # Errors
-/// Propagates the payload's own refusal to hold what it was given.
 pub fn removed_payload(removed: &Removed) -> Result<Payload, AxError> {
     let mut map = serde_json::Map::new();
     map.insert(

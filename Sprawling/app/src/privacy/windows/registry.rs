@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Exact raw registry values under HKCU and HKLM
-//! (`Sprawling/app/spec/Privacy/Windows.lean`).
-//!
-//! A value is read and written as its type code and its bytes, never
-//! decoded, expanded or trimmed, so what a restore writes back is what
-//! the apply read. Every key is opened through the 64-bit view, which is
-//! where the policy templates and Settings write. The adapter judges
-//! nothing about the path it is given: which targets exist is decided by
-//! the control table alone.
-
 use std::io::ErrorKind;
 
 use winreg::enums::{
@@ -24,8 +14,6 @@ use winreg::{HKEY, RegKey, RegValue};
 
 use super::super::target::RawValue;
 
-/// The type codes `RegQueryValueExW` reports, each with the `winreg`
-/// type that writes it back; the one table both directions read.
 const REGISTRY_TYPES: [(u32, RegType); 12] = [
     (0, REG_NONE),
     (1, REG_SZ),
@@ -41,30 +29,24 @@ const REGISTRY_TYPES: [(u32, RegType); 12] = [
     (11, REG_QWORD),
 ];
 
-/// What one read of a value found.
 pub(in crate::privacy) enum Reading {
-    /// The value or its absence, and whether its key exists, which is
-    /// recorded beside the value rather than inside it (Privacy.State D61).
+
     Value { value: RawValue, key_existed: bool },
-    /// `ERROR_ACCESS_DENIED`: this account may not read the key.
+
     AccessDenied,
-    /// Any other failure, kept so the caller can say what it was.
+
     Failed(std::io::Error),
 }
 
-/// Why a write did not reach the registry.
 pub(in crate::privacy) enum WriteFault {
-    /// `ERROR_ACCESS_DENIED`: this account may not write the key.
+
     AccessDenied,
-    /// The value has no exact raw encoding (see [`rewritable`]); nothing
-    /// was written.
+
     NotRewritable,
-    /// Any other failure; the value may or may not have changed, which
-    /// only a readback can tell.
+
     Failed(std::io::Error),
 }
 
-/// Reads `name` under `key` of `hive`.
 pub(in crate::privacy) fn read(hive: HKEY, key: &str, name: &str) -> Reading {
     let opened =
         match RegKey::predef(hive).open_subkey_with_flags(key, KEY_QUERY_VALUE | KEY_WOW64_64KEY) {
@@ -96,15 +78,6 @@ pub(in crate::privacy) fn read(hive: HKEY, key: &str, name: &str) -> Reading {
     }
 }
 
-/// Makes `name` under `key` of `hive` equal `value`: a present value is
-/// written under its own type code, creating the key when it is missing;
-/// an absent one deletes only the value and keeps the key, so a key the
-/// apply created stays behind as an empty key the report can name
-/// (Privacy.State D61).
-///
-/// # Errors
-/// [`WriteFault`]; a write that fails part-way is told apart by the
-/// readback, not here.
 pub(in crate::privacy) fn write(
     hive: HKEY,
     key: &str,
@@ -144,11 +117,6 @@ pub(in crate::privacy) fn write(
     }
 }
 
-/// Whether `value` can be written back byte for byte. Absence always can;
-/// a string type only when it is whole UTF-16 code units ending in a
-/// terminator, because `RegSetValueExW` is documented only for strings
-/// whose size includes the terminator, and an original without one could
-/// come back changed. A type code outside [`REGISTRY_TYPES`] cannot.
 pub(in crate::privacy) fn rewritable(value: &RawValue) -> bool {
     match value {
         RawValue::Absent => true,
@@ -173,8 +141,6 @@ fn type_of(code: u32) -> Option<RegType> {
         .map(|(_, vtype)| vtype.clone())
 }
 
-/// `ERROR_ACCESS_DENIED` is the one failure the page names; the standard
-/// library reads it as `PermissionDenied`.
 fn unreadable(failure: std::io::Error) -> Reading {
     if failure.kind() == ErrorKind::PermissionDenied {
         Reading::AccessDenied
@@ -211,8 +177,6 @@ mod tests {
         }
     }
 
-    /// Read only: a key named by a fresh random suffix is absent, and so
-    /// is its key; nothing is created by asking.
     #[test]
     fn a_key_that_does_not_exist_reads_as_absent_without_its_key() {
         let key = format!(r"Software\{}", fresh_name());
@@ -225,9 +189,6 @@ mod tests {
         ));
     }
 
-    /// Read only: a value missing from a key that exists keeps the fact
-    /// that the key exists, and a recorded string comes back as its type
-    /// code and its terminated UTF-16 bytes.
     #[test]
     fn an_existing_key_reads_its_values_raw() {
         let key = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion";
@@ -241,8 +202,6 @@ mod tests {
         assert!(rewritable(&build));
     }
 
-    /// Every type code maps to one `winreg` type and back, so a value is
-    /// written under exactly the code it was read with.
     #[test]
     fn the_type_table_round_trips() {
         for code in 0..=11 {

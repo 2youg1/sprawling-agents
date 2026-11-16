@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The wasmtime-backed execution boundary: the only adapter that runs a
-//! real guest, the one compiled guest every clone of it shares, the
-//! ceiling a guest's memory grows under, and the rules by which its
-//! ending becomes a [`SandboxExit`](super::SandboxExit)
-//! (`Sprawling/runtime/spec/Sandbox.lean` §8-13, D101, D102).
-
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::SystemTime;
@@ -17,12 +11,6 @@ use super::{Fuel, GuestMemory, Sandbox, SandboxExit, SandboxJob, SandboxOutcome}
 use crate::backlog::Ceiling;
 use kernel::{AxCode, AxError};
 
-/// The real boundary: wasmtime running wasip1 guests.
-///
-/// A handle: every clone shares one engine and one compiled guest, so a
-/// process that hands a clone to each bench compiles its guest once
-/// (D101). Compiling holds the slot, so two benches that ask at once
-/// compile once between them rather than twice side by side.
 #[derive(Clone)]
 pub struct WasmtimeSandbox {
     shared: Arc<Shared>,
@@ -33,16 +21,11 @@ struct Shared {
     compiled: Mutex<Option<Compiled>>,
 }
 
-/// The guest last compiled, and the file it was compiled from.
 struct Compiled {
     identity: GuestIdentity,
     module: wasmtime::Module,
 }
 
-/// What a guest file is recognised by without reading it. A reinstall
-/// that replaces the component in place changes the length or the
-/// modification time, so it is compiled afresh; a replacement that keeps
-/// both is not noticed until the process restarts (D101).
 #[derive(Debug, PartialEq, Eq)]
 struct GuestIdentity {
     path: PathBuf,
@@ -50,14 +33,10 @@ struct GuestIdentity {
     modified: SystemTime,
 }
 
-/// Every refusal the host side of the sandbox raises, with the one
-/// sentence that tells its reader what to do next.
 fn host_error(op: &'static str, detail: String, recovery: &'static str) -> AxError {
     AxError::failure(AxCode::SandboxDenied, op, detail).with_recovery(recovery)
 }
 
-/// The refusal for a guest file that cannot be read, whether its
-/// metadata or its bytes.
 fn unreadable(wasm: &Path, err: &std::io::Error) -> AxError {
     host_error(
         "read guest module",
@@ -70,8 +49,7 @@ fn unreadable(wasm: &Path, err: &std::io::Error) -> AxError {
 impl WasmtimeSandbox {
     pub fn new() -> Result<WasmtimeSandbox, AxError> {
         let mut config = wasmtime::Config::new();
-        // Fuel is the only instruction budget: metering must be on before
-        // any guest is compiled, or the store's fuel is never consumed.
+
         config.consume_fuel(true);
         let engine = wasmtime::Engine::new(&config).map_err(|err| {
             host_error(
@@ -89,9 +67,6 @@ impl WasmtimeSandbox {
         })
     }
 
-    /// The compiled guest at `wasm`: the shared one when the file is the
-    /// one it was compiled from, otherwise compiled now and kept in its
-    /// place.
     fn module_for(&self, wasm: &Path) -> Result<wasmtime::Module, AxError> {
         let identity = GuestIdentity::of(wasm)?;
         let mut slot = self
@@ -122,7 +97,6 @@ impl GuestIdentity {
     }
 }
 
-/// Reads and compiles a guest: the step D101 keeps to once per process.
 fn compile(engine: &wasmtime::Engine, wasm: &Path) -> Result<wasmtime::Module, AxError> {
     let module_bytes = std::fs::read(wasm).map_err(|err| unreadable(wasm, &err))?;
     wasmtime::Module::new(engine, &module_bytes).map_err(|err| {
@@ -140,11 +114,6 @@ struct HostState {
     limiter: Limiter,
 }
 
-/// The store's limiter (D102): wasmtime's own `StoreLimits` decides every
-/// growth, and this layer only remembers whether it refused one for
-/// passing the run's ceiling. `StoreLimits` also refuses a growth past
-/// the maximum the module itself declares, and that is not the run's
-/// ceiling.
 struct Limiter {
     limits: wasmtime::StoreLimits,
     ceiling: GuestMemory,
@@ -155,8 +124,7 @@ impl Limiter {
     fn new(ceiling: GuestMemory) -> Limiter {
         let limits = match ceiling {
             GuestMemory::Wasm32 => wasmtime::StoreLimitsBuilder::new(),
-            // A ceiling past this platform's address space bounds nothing
-            // the address space does not already bound.
+
             GuestMemory::Ceiling(limit) => wasmtime::StoreLimitsBuilder::new()
                 .memory_size(usize::try_from(limit.get()).unwrap_or(usize::MAX)),
         }
@@ -168,7 +136,6 @@ impl Limiter {
         }
     }
 
-    /// The run's ceiling, when a growth was refused at it.
     fn verdict(&self) -> Option<Ceiling> {
         match (self.ceiling, self.hit) {
             (GuestMemory::Ceiling(limit), true) => Some(Ceiling::Hit { limit }),
@@ -176,9 +143,6 @@ impl Limiter {
         }
     }
 
-    /// Whether growing to `desired` bytes was refused for the run's
-    /// ceiling alone: past it, and within the maximum the module itself
-    /// declares, which would refuse the growth with no ceiling at all.
     fn past_ceiling(&self, desired: usize, maximum: Option<usize>) -> bool {
         let within_module = maximum.is_none_or(|maximum| desired <= maximum);
         match self.ceiling {
@@ -242,8 +206,7 @@ impl Sandbox for WasmtimeSandbox {
         for (key, value) in &job.env {
             builder.env(key, value);
         }
-        // The capability surface, stated one mount at a time. There
-        // is no ambient access to add to it.
+
         for mount in &job.mounts {
             let perms = if mount.writable {
                 wasmtime_wasi::FsPerms::ReadWrite
@@ -290,9 +253,7 @@ impl Sandbox for WasmtimeSandbox {
 
         let instance = match linker.instantiate(&mut store, &module) {
             Ok(instance) => instance,
-            // The guest's initial memory alone passes the run's ceiling:
-            // a fact about this guest under this ceiling, told as the
-            // ceiling it hit rather than as a broken build (D102).
+
             Err(err) if store.data().limiter.verdict().is_some() => {
                 return Ok(SandboxOutcome {
                     stdout: Vec::new(),
@@ -326,8 +287,7 @@ impl Sandbox for WasmtimeSandbox {
         let result = start.call(&mut store, ());
         let exit = classify(result, &store)?;
         let ceiling = store.data().limiter.verdict();
-        // The pipes are only recoverable once every other handle is
-        // gone; the store holds one until here.
+
         drop(store);
         let stdout = stdout.try_into_inner().ok_or_else(|| {
             host_error(
@@ -354,11 +314,6 @@ impl Sandbox for WasmtimeSandbox {
     }
 }
 
-/// Turns the engine's outcome into ours. Fuel exhaustion and guest
-/// exits are guest facts; a host malfunction — an engine that never
-/// metered the fuel it was asked to meter — is an `Err`, because
-/// reporting "not exhausted" without having measured would be a
-/// guess dressed as a fact.
 fn classify(
     result: Result<(), wasmtime::Error>,
     store: &wasmtime::Store<HostState>,
@@ -370,9 +325,7 @@ fn classify(
         if exit.0 == 0 {
             return Ok(SandboxExit::Success);
         }
-        // WASI pins exit codes to [0, 126); a negative one would mean
-        // the guest bypassed proc_exit's own check, which is a broken
-        // engine rather than a program that merely failed.
+
         let code = u64::try_from(exit.0).map_err(|_| {
             host_error(
                 "read guest exit code",
@@ -388,9 +341,7 @@ fn classify(
     {
         return Ok(SandboxExit::FuelExhausted);
     }
-    // Some builds surface exhaustion only through the remaining
-    // budget, so the budget is consulted before this is called a
-    // trap. An engine that cannot report its fuel was never metering.
+
     let remaining = store.get_fuel().map_err(|err| {
         host_error(
             "read remaining fuel",

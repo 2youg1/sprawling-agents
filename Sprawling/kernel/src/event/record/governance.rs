@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a person's standing decisions record: who may answer, what is
-//! shut, how a question was answered, and which governing document was
-//! written.
-
 use serde::{Deserialize, Serialize};
 
 use crate::address::Address;
@@ -16,51 +12,26 @@ use crate::event::scope::Scope;
 use crate::locator::B3Hash;
 use crate::registry::ResidentId;
 
-/// `approval_resolved`: how one inbox item was answered.
-///
-/// The verdict is the [`Ruling`] itself rather than a word formatted
-/// from it, so every reader parses one spelling: a word compared against
-/// a literal at each reader could read as a refusal on one side and as
-/// consent on the other. A [`Ruling`] a reader cannot parse is a refusal
-/// to read the line at all.
-///
-/// No field defaults: all three keys have been written on every
-/// `approval_resolved` line since the kind existed, and an answer
-/// missing its verdict is a line to refuse rather than to guess at.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ApprovalResolved {
-    /// The item answered.
+
     pub id: ApprovalId,
-    /// What the answerer decided.
+
     pub verdict: Ruling,
-    /// The group the person was shown and answered as one. A resumed
-    /// run may act again within it without asking, which is why the
-    /// group travels with the answer rather than being re-derived.
+
     pub cluster: ClusterKey,
 }
 
-/// The word the ledger writes for who answers a scope's Approval
-/// Inbox, and its reader.
-///
-/// `owner` is the person; `delegate:<resident>` is the resident they
-/// appointed, whose address travels in the value so a replay knows who
-/// was appointed. The two halves sit together because they are one
-/// spelling: a writer and a reader in different modules is how an
-/// autonomy written by one build came back as `Owner` in the next.
 pub mod autonomy_word {
     use super::{Autonomy, AxCode, AxError, ResidentId};
 
-    /// The word before an appointed resident's address.
     const DELEGATE: &str = "delegate";
 
-    /// The person who owns the city.
     const OWNER: &str = "owner";
 
-    /// What separates the appointment from the resident it names.
     const AT: char = ':';
 
-    /// The word a line carries.
     #[must_use]
     pub fn spell(autonomy: &Autonomy) -> String {
         match autonomy {
@@ -71,14 +42,6 @@ pub mod autonomy_word {
         }
     }
 
-    /// Reads back what [`spell`] wrote.
-    ///
-    /// # Errors
-    /// `E_WIRE_MISMATCH` for any other word. Falling back to the person
-    /// would read as the strict side and is not: a city
-    /// whose history appointed a delegate this build cannot read would
-    /// have shown the person questions the delegate was answering, and
-    /// said nothing about the line it could not read.
     pub fn read(word: &str) -> Result<Autonomy, AxError> {
         let unreadable = |detail: &str| {
             AxError::failure(AxCode::WireMismatch, "read who answers for a scope", detail)
@@ -113,19 +76,10 @@ pub mod autonomy_word {
     }
 }
 
-/// `autonomy_changed`: who answers the Approval Inbox for a scope from
-/// now on.
-///
-/// Both values are the words the ledger has always held: the scope as
-/// [`Scope`] spells it, the appointment as [`autonomy_word`] does. This
-/// struct is the only way in and out of the line, so no writer formats
-/// it and no reader splits it by hand.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AutonomyChanged {
-    /// What the appointment applies to. A line written before the key
-    /// existed carries no scope and appointed the answerer for the
-    /// whole city, which is what [`city_wide`] reads it as.
+
     #[serde(default = "city_wide")]
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub scope: Scope,
@@ -134,32 +88,20 @@ pub struct AutonomyChanged {
     pub autonomy: Autonomy,
 }
 
-/// What an `autonomy_changed` line with no scope applies to.
 fn city_wide() -> Scope {
     Scope::City
 }
 
-/// Whether a scope is shut or open.
-///
-/// The two words a `city_halted` record carries are spelled here and
-/// nowhere else, so every fold reads an unrecognised word the same way;
-/// constants compared by hand at each fold let one read it as a release
-/// while another ignored the line (`Sprawling/app/Spec.lean` §8-74).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Admittance {
-    /// Nothing may be dispatched into this scope.
+
     Halted,
-    /// The scope takes work again.
+
     Released,
 }
 
-/// `city_halted`: one scope stopped taking work, or started again.
-///
-/// One kind for both directions, because halting and releasing are one
-/// fact changing value, and a second kind would let a reader see a
-/// release with no halt before it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CityHalted {
@@ -168,94 +110,64 @@ pub struct CityHalted {
     pub state: Admittance,
 }
 
-/// `governed_document_written`: which document that governs runs a
-/// person wrote, and how long it now is.
-///
-/// Never the text. The document is on disk and readable there, and a
-/// copy here would be a second authority for words a person edits.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GovernedDocumentWritten {
-    /// The document's file name, as `city::Governed::file` gives it.
+
     pub which: String,
-    /// The length of what was written, in bytes.
+
     pub bytes: usize,
-    /// The identity version the city has once this write landed: the
-    /// receipt a page waits for before it calls a save saved
-    /// (`Sprawling/kernel/spec/Event/Record.lean` §8-79). Absent for `CLERK.md`, which names nobody,
-    /// and in lines written before the key existed.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub naming: Option<B3Hash>,
-    /// Where the document is, for a prompt document other than the three
-    /// in the city's reserved subtree: a building's `City.md` or a model
-    /// note is not named by its file name alone.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub at: Option<Address>,
-    /// The step removed the document rather than writing it, so the
-    /// farther layer governs again; `bytes` is then zero.
+
     #[serde(default, skip_serializing_if = "core::ops::Not::not")]
     pub removed: bool,
 }
 
-/// `rules_changed`: a document a dispatch stands under holds other bytes
-/// than the last line booked for it.
-///
-/// Never the text, for the reason [`GovernedDocumentWritten`] gives; the
-/// two digests are what a replay compares instead. One line's `after`
-/// is the next line's `before` for the same document as long as nothing
-/// wrote it between them, so a gap in that chain says a hand reached the
-/// file outside every door.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RulesChanged {
-    /// What the document governs: the city, or one existing building.
+
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub scope: Scope,
-    /// Which of the scope's documents moved; a building holds both, so
-    /// the scope alone cannot say.
+
     pub which: GoverningDocument,
-    /// What the last line left the document as. Absent opens the
-    /// document's account rather than claiming a change that never was.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub before: Option<B3Hash>,
-    /// What the document is now.
+
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub after: B3Hash,
-    /// The length of what now stands, in bytes.
+
     pub bytes: usize,
 }
 
-/// The two documents a scope is judged by, spelled on the wire as the
-/// file names they live under.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum GoverningDocument {
-    /// A building's `RULES.toml`.
+
     #[serde(rename = "RULES.toml")]
     Rules,
-    /// A `CONFIG.toml` layer, the city's or a building's.
+
     #[serde(rename = "CONFIG.toml")]
     Config,
 }
 
-/// `spine_document_written`: which of a building's own spine documents
-/// a person wrote, and how long it now is.
-///
-/// Carries the building because these four live at a building's root
-/// while the three governed ones live in the city's own reserved
-/// subtree. Never the text, for the reason [`GovernedDocumentWritten`]
-/// gives.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SpineDocumentWritten {
-    /// The building the document belongs to.
+
     pub building: String,
-    /// The document's file name.
+
     pub which: String,
-    /// The length of what was written, in bytes.
+
     pub bytes: usize,
 }
 
@@ -273,8 +185,6 @@ mod tests {
     use crate::approval::ApprovalClass;
     use crate::event::Payload;
 
-    /// The bytes these structs write are the bytes the hand-written
-    /// writers wrote, key for key and word for word.
     #[test]
     fn an_answered_item_writes_the_keys_the_histories_already_hold() {
         let answered = ApprovalResolved {
@@ -302,8 +212,6 @@ mod tests {
         );
     }
 
-    /// The two words that used to fall back to the strict side, and the
-    /// scope that used to be read with `split_once(':')`.
     #[test]
     fn an_appointment_this_build_cannot_read_is_refused_rather_than_defaulted() {
         let line = serde_json::json!({"scope": "city", "autonomy": "anybody"});
@@ -364,8 +272,6 @@ mod tests {
         );
     }
 
-    /// The file names a replay reads, and the absent `before` that opens
-    /// a document's account.
     #[test]
     fn a_rules_change_carries_the_file_name_and_two_digests_never_the_text() {
         let opening = RulesChanged {

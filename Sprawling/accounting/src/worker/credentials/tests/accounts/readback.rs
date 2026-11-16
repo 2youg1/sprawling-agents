@@ -3,16 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the settings page reads back about the two accounts and a third
-//! whose key was never filed: the tuning the endpoint was attached with,
-//! and each account's key, read through the vault the worker lends the
-//! views (`Sprawling/wire/spec/Answer/Endpoints.lean` §8-85).
-
 use super::*;
 
-/// The page is handed the list in the order it was filed, with the
-/// per-account figure it was given and every other figure absent, and
-/// each account's key in the same order: read only once a vault is lent.
 #[test]
 fn each_account_reads_its_key_state_and_the_tuning_reads_back_as_attached() {
     let mut rig = Rig::new(Vec::new(), Vec::new(), unpaced());
@@ -61,7 +53,6 @@ fn each_account_reads_its_key_state_and_the_tuning_reads_back_as_attached() {
     );
 }
 
-/// The one endpoint the rig attached, from the settings page's read.
 fn house(answer: wire::Answer) -> wire::EndpointSummary {
     let wire::Answer::Endpoints(book) = answer else {
         panic!("the settings page reads the endpoint book: {answer:?}");

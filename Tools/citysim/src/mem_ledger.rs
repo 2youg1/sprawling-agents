@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The in-memory Ledger: second adapter of the kernel port. Bytes come from the same canonical producer as the durable
-//! adapter, so simulation histories and real histories are comparable
-//! byte for byte.
-//!
-//! Specified by `Tools/citysim/spec/MemLedger.lean` §8-1.
-
 use kernel::ledger::chain_hash;
 use kernel::ledger::conformance::LedgerInspect;
 use kernel::{AxError, B3Hash, EventDraft, EventRecord, EventRef, GENESIS_PREV, Ledger, Seq};
@@ -28,9 +22,6 @@ impl MemLedger {
         }
     }
 
-    /// The inherent read face (`Tools/citysim/spec/MemLedger.lean` §8-1):
-    /// the executor's report and byte comparisons read here; the
-    /// `LedgerInspect` impl below stays the conformance suite's door.
     pub fn raw_lines(&self) -> &[Vec<u8>] {
         &self.lines
     }
@@ -46,8 +37,7 @@ impl Ledger for MemLedger {
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
         let record = EventRecord::from_draft(draft, self.next_seq, self.prev);
         let line = record.canonical_line()?;
-        // Every fallible step comes before the first write, so a refused
-        // draft leaves the ledger as it found it.
+
         self.next_seq = self.next_seq.next()?;
         self.prev = chain_hash(&line);
         self.lines.push(line);
@@ -66,9 +56,6 @@ impl LedgerInspect for MemLedger {
 mod tests {
     use super::*;
 
-    /// A ledger whose next seq is the last one a u64 holds has no seq to
-    /// advance to, so it refuses the draft and is left as the refusal
-    /// found it: no line, no seq and no chain digest moved.
     #[test]
     fn an_append_past_the_last_seq_leaves_the_ledger_unchanged() {
         let draft = EventDraft {

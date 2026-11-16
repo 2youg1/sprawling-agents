@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Module directions inside one crate (Tools/xtask/Spec.lean §8-33).
-//!
-//! The crate edges in the `depmap` block cannot see a cycle between two
-//! modules of the same crate: `sprawling` compiles as one unit whichever
-//! way its modules name each other. The `directions` block in
-//! ARCHITECTURE.md names, for a module, the paths its production code
-//! never names, and this module reads every file of that module for them.
-//!
-//! The reading is by text, one line at a time. A comment line is not
-//! code, and a test is not production: a file named `tests.rs` or
-//! ending in `_tests.rs`, a file under a `tests` directory, and the item
-//! under a `#[cfg(test)]` line are skipped, because a test may build its fixture through the
-//! assembly point without the module it tests depending on it.
-
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -27,11 +13,9 @@ use super::ARCH;
 
 const TEST_ATTRIBUTE: &str = "#[cfg(test)]";
 
-/// One line of the block: a module, and the paths it never names.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Direction {
-    /// Repo-relative, without extension: both `<module>.rs` and every
-    /// `.rs` file under `<module>/` belong to it.
+
     module: String,
     forbidden: BTreeSet<String>,
 }
@@ -76,11 +60,6 @@ pub(super) fn check(
     Ok(())
 }
 
-/// Parse the ```` ```directions ```` fenced block: `module: path, path`.
-///
-/// # Errors
-/// When the block is absent or a line has no colon: a gate whose
-/// authority has moved says so rather than judging nothing.
 pub(super) fn parse_block(text: &str) -> Result<Vec<Direction>, XtaskError> {
     let doc_error = |msg: String| XtaskError::Doc {
         file: ARCH.to_owned(),
@@ -139,9 +118,6 @@ fn is_test_file(rel: &str) -> bool {
     })
 }
 
-/// Every production line that names a forbidden path, with its 1-based
-/// number. The item under `#[cfg(test)]` is skipped whole: one line when
-/// it ends in `;`, otherwise until its braces close.
 pub(super) fn named<'a>(source: &str, forbidden: &'a BTreeSet<String>) -> Vec<(usize, &'a str)> {
     let mut found = Vec::new();
     let mut skipping = Skip::No;
@@ -167,7 +143,6 @@ pub(super) fn named<'a>(source: &str, forbidden: &'a BTreeSet<String>) -> Vec<(u
     found
 }
 
-/// Where a `#[cfg(test)]` item stands after one more of its lines.
 #[derive(Clone, Copy)]
 enum Skip {
     No,
@@ -190,9 +165,6 @@ fn after(skipping: Skip, code: &str) -> Skip {
     }
 }
 
-/// `code` with its string and char literals removed, so the braces left
-/// are the ones that open and close blocks. A `'` that does not start a
-/// char literal starts a lifetime and is dropped alone.
 fn without_literals(code: &str) -> String {
     let mut kept = String::with_capacity(code.len());
     let mut chars = code.chars();
@@ -220,7 +192,6 @@ fn without_literals(code: &str) -> String {
     kept
 }
 
-/// Advance past the next `end` that no backslash escapes.
 fn skip_past(chars: &mut std::str::Chars<'_>, end: char) {
     while let Some(c) = chars.next() {
         if c == '\\' {
@@ -231,8 +202,6 @@ fn skip_past(chars: &mut std::str::Chars<'_>, end: char) {
     }
 }
 
-/// Whether `code` names `path` as a whole path segment, so that
-/// `crate::assembly` is not found inside `crate::assembly_line`.
 fn names(code: &str, path: &str) -> bool {
     code.match_indices(path).any(|(at, _)| {
         code.get(at.saturating_add(path.len())..)
@@ -324,8 +293,6 @@ mod tests {
         );
     }
 
-    /// A test module split off beside the code it judges is named
-    /// `<subject>_tests.rs`, and is test code as much as `tests.rs` is.
     #[test]
     fn a_split_off_test_file_is_not_production() {
         assert_eq!(

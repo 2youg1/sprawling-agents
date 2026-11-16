@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which tree this run judges (xtask D3).
-
 use std::path::{Path, PathBuf};
 
 use crate::report::XtaskError;
@@ -13,18 +11,8 @@ use crate::report::XtaskError;
 #[allow(clippy::unwrap_used, reason = "test code")]
 pub(crate) mod fixture;
 
-/// The name of the file cargo writes at a workspace's root, and so the
-/// mark of a checkout wherever its tools sit inside it.
 const LOCKFILE: &str = "Cargo.lock";
 
-/// The checkout this run judges: the checkout `cwd` is in. `built` is
-/// the xtask manifest directory compiled into the binary; when its
-/// checkout is not the one found here, the binary is another checkout's
-/// build (a copied target directory that cargo took for fresh), so its
-/// gates are not this tree's gates and the run refuses with `StaleBuild`
-/// rather than judge either tree silently. The path returned is the one
-/// found from `cwd`, not its canonical form, because a verbatim `\\?\`
-/// path breaks the tools gates spawn.
 pub(crate) fn judged(built: &Path, cwd: &Path) -> Result<PathBuf, XtaskError> {
     let here = checkout_of(cwd)?;
     let stale = || XtaskError::StaleBuild {
@@ -41,13 +29,6 @@ pub(crate) fn judged(built: &Path, cwd: &Path) -> Result<PathBuf, XtaskError> {
     }
 }
 
-/// The checkout `dir` lies in: the first directory from `dir` upward that
-/// holds `Cargo.lock`, which is where cargo puts the workspace root. How
-/// many levels below it xtask sits is a fact about the layout, so nothing
-/// counts parent directories to find the root (xtask D3).
-///
-/// # Errors
-/// `no-checkout` when no directory from `dir` upward holds the lockfile.
 pub(crate) fn checkout_of(dir: &Path) -> Result<&Path, XtaskError> {
     dir.ancestors()
         .find(|candidate| candidate.join(LOCKFILE).is_file())
@@ -56,7 +37,6 @@ pub(crate) fn checkout_of(dir: &Path) -> Result<&Path, XtaskError> {
         })
 }
 
-/// The checkout this test binary was built from, found by the same rule.
 #[cfg(test)]
 #[expect(clippy::unwrap_used, reason = "test code")]
 pub(crate) fn this_checkout() -> &'static Path {
@@ -90,8 +70,6 @@ mod tests {
         assert_eq!(same.unwrap(), here);
     }
 
-    /// xtask two levels down still finds the checkout, because the lockfile
-    /// marks it, not xtask's own directory.
     #[test]
     fn a_relocated_xtask_still_finds_its_checkout() {
         let root = super::fixture::relocated("root");

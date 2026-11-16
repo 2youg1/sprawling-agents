@@ -3,22 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The folded index: seq to (segment, byte offset), and what indexing
-//! one line means.
-//!
-//! The maps are built from the segments, and [`crate::index::LedgerIndex`]
-//! keeps them for the life of a process so a query costs one directory
-//! listing plus the bytes appended since the last look. They are
-//! persisted only inside the views snapshot, as a projection: `scanned`
-//! says how far each segment was folded, so a segment that shrank or
-//! vanished since rebuilds them rather than being trusted
-//! (`Sprawling/storage/spec/Index.lean` §8-4).
-//!
-//! The storage is one implicit-seq column over lines and a span table
-//! over runs ([`Entries`], [`RunTable`]). The public queries are the
-//! contract; the layout is theirs to change, and `tests` holds the
-//! BTreeMap-shaped oracle that pins the answers.
-
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
@@ -43,8 +27,6 @@ impl Folded {
         }
     }
 
-    /// Indexes the complete lines of `tail`, which begins at `from` in
-    /// the segment. Returns how many bytes those complete lines took.
     pub(crate) fn fold_segment(&mut self, name: &str, from: u64, tail: &[u8]) -> u64 {
         let mut offset = from;
         let mut complete_bytes = 0u64;
@@ -63,23 +45,12 @@ impl Folded {
         complete_bytes
     }
 
-    /// What indexing one line means, in one place: where it sits, and
-    /// whose it is. A line that does not parse is skipped rather than
-    /// reported — the caller is looking at a ledger that may be damaged,
-    /// and an index is how such a ledger gets repaired.
-    ///
-    /// The seq column and the run span table are written here and only
-    /// here, so the two cannot tell different stories about who wrote a
-    /// line: the seq join that carries a run's name is registered with
-    /// its spans in the same call.
     pub(crate) fn insert_line(&mut self, name: &str, offset: u64, body: &[u8]) {
         if let Some(located) = locate(body) {
             self.insert_located(name, offset, located);
         }
     }
 
-    /// Indexes a line whose place in the history a caller has already
-    /// read, so the line is not parsed a second time.
     pub(crate) fn insert_located(&mut self, name: &str, offset: u64, located: Located) {
         self.entries.insert(located.seq, name, offset);
         if let Some(run) = located.run {
@@ -87,12 +58,10 @@ impl Folded {
         }
     }
 
-    /// Where one line sits, and under which segment name.
     pub(crate) fn loc_of(&self, seq: Seq) -> Option<(&str, u64)> {
         self.entries.loc_of(seq)
     }
 
-    /// The seq values one run wrote, newest first, below `before`.
     pub(crate) fn run_seqs_before(
         &self,
         run: RunId,
@@ -122,29 +91,18 @@ impl Folded {
     }
 }
 
-/// run → the seq values it wrote, as ascending disjoint spans.
-///
-/// A run is a burst of contiguous writes, so its seq set collapses into
-/// spans of consecutive values: the tail span extends on touch, and
-/// truly interleaved runs carry a handful of spans instead of one id per
-/// line. Spans hold only values both endpoints were seen at — two spans
-/// merge exactly when the gap between them has been written too — so a
-/// span never claims a seq nobody wrote.
 #[derive(serde::Serialize, serde::Deserialize)]
 struct RunTable {
-    /// Sorted by run, so one lookup is one binary search.
+
     runs: Vec<RunSpans>,
 }
 
-/// One run's spans: ascending, disjoint, and never adjacent, because
-/// adjacent spans merge the moment they touch.
 #[derive(serde::Serialize, serde::Deserialize)]
 struct RunSpans {
     run: RunId,
     spans: Vec<Span>,
 }
 
-/// An inclusive span of seq values, `start..=end`.
 #[derive(Clone, Copy, serde::Serialize, serde::Deserialize)]
 struct Span {
     start: Seq,
@@ -176,8 +134,6 @@ impl RunTable {
         }
     }
 
-    /// Lazy, span by span from the newest: a caller that takes `n`
-    /// values walks `n` values, however long the run is.
     fn seqs_before(&self, run: RunId, before: Option<Seq>) -> impl Iterator<Item = Seq> {
         let spans: &[Span] = match self
             .runs
@@ -188,8 +144,7 @@ impl RunTable {
             Some(held) => &held.spans,
             None => &[],
         };
-        // The highest value a caller may be answered; `None` when
-        // `before` is the first seq there is, so nothing sits below it.
+
         let ceiling = match before {
             None => Some(u64::MAX),
             Some(before) => before.value().checked_sub(1),
@@ -208,7 +163,7 @@ impl RunTable {
 impl RunSpans {
     fn add(&mut self, seq: Seq) {
         let at = match self.spans.binary_search_by(|span| span.place(seq)) {
-            Ok(_) => return, // the span already covers this value
+            Ok(_) => return,
             Err(at) => at,
         };
         let joins_below = self.spans.get(at).is_some_and(|span| span.abuts_after(seq));
@@ -247,8 +202,7 @@ impl RunSpans {
 }
 
 impl Span {
-    /// Where this span sits around `seq`, as `binary_search_by` wants
-    /// it: the ordering of the element (this span) against the target.
+
     fn place(&self, seq: Seq) -> Ordering {
         if seq < self.start {
             Ordering::Greater
@@ -259,31 +213,21 @@ impl Span {
         }
     }
 
-    /// True when `seq` is the value right below this span, so writing
-    /// it stretches the span up one without leaving a hole.
     fn abuts_before(&self, seq: Seq) -> bool {
         self.end.value().checked_add(1) == Some(seq.value())
     }
 
-    /// True when `seq` is the value right above this span.
     fn abuts_after(&self, seq: Seq) -> bool {
         seq.value().checked_add(1) == Some(self.start.value())
     }
 }
 
-/// Where a line sits in the history and whose it is.
 pub struct Located {
     pub seq: Seq,
-    /// `None` when the line names no run that reads back as one. The
-    /// line is still indexed by seq: an index over a damaged ledger is
-    /// exactly what a repair path needs, and a line dropped here would
-    /// be invisible to every reader.
+
     pub run: Option<RunId>,
 }
 
-/// Reads two fields off one parse. Indexing must not depend on the
-/// record parsing cleanly as an `EventRecord`, so this asks the raw
-/// document rather than the typed one.
 pub(crate) fn locate(line: &[u8]) -> Option<Located> {
     let value: serde_json::Value = serde_json::from_slice(line).ok()?;
     let seq = Seq::new(value.get("seq")?.as_u64()?);

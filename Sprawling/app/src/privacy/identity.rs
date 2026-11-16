@@ -3,17 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Read-only principal sampling (`Sprawling/app/spec/Privacy/Cli.lean` D55).
-
 use kernel::{AxCode, AxError};
 use zeroize::Zeroizing;
 
-/// The current Windows user's SID, asked of the PowerShell under the
-/// protected installation path.
-///
-/// # Errors
-/// `ToolUnavailable` when the installation path, the query or its answer
-/// fails; the refusal never repeats the answer.
 #[cfg(windows)]
 pub(super) fn read() -> Result<Zeroizing<String>, AxError> {
     use super::windows::{PATIENCE, powershell};
@@ -49,9 +41,6 @@ pub(super) fn read() -> Result<Zeroizing<String>, AxError> {
     ))
 }
 
-/// The answer, kept only when it is a SID: `S-1-`, an identifier
-/// authority and at least one sub-authority, each a non-empty run of
-/// decimal digits.
 #[cfg(windows)]
 fn principal(answer: Zeroizing<String>) -> Result<Zeroizing<String>, AxError> {
     let decimal =
@@ -79,10 +68,6 @@ fn refused(subject: &str) -> AxError {
 mod tests {
     use super::*;
 
-    /// The production path end to end: the protected installation path,
-    /// the PowerShell query through `doctor::asking`, and the line it
-    /// keeps, which `principal` accepts only as a SID. It only reads, and
-    /// a refusal names no answer.
     #[test]
     fn the_running_account_answers_with_a_sid() {
         read().unwrap();

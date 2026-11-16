@@ -3,39 +3,19 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The lines around `old_string` as the file now reads, shown when the file
-//! moved after the run's last look.
-//!
-//! The passage is a window read: the refusal records the current stamp
-//! (`Sprawling/runtime/spec/Tools/Edit.lean` §8-64), so a model that fixes
-//! `old_string` from these lines retries at once instead of reading the whole
-//! file again. Because the refusal counts as a look, it always shows a
-//! window: where the first line of `old_string` is gone, the window is the head
-//! of the file, so the run is never admitted on a look at nothing. The
-//! lines go back unmarked, the way the file holds them, so they can be
-//! copied into `old_string` as they stand.
-
-/// Lines kept on each side of the passage.
 const AROUND: usize = 3;
-/// The most lines a passage carries, and the most bytes: a refusal is
-/// one line of advice and a window, not a second read of the file.
+
 const MOST_LINES: usize = 40;
 const MOST_BYTES: usize = 4096;
 
-/// Where the window opened.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Opened {
-    /// Three lines above where the first line of `old_string` now stands.
+
     AroundOld,
-    /// At the head of the file, because the first line of `old_string` is no
-    /// longer anywhere in it.
+
     AtHead,
 }
 
-/// The window around where `old_string` begins in `text`, or at the head of
-/// `text` when the first line of `old_string` is gone, with a header naming its
-/// lines the way the current renderer numbers them
-/// (`Sprawling/runtime/spec/Rendering.lean` D119).
 pub(super) fn around(text: &str, old: &str) -> (Opened, String) {
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
     let found = old
@@ -100,8 +80,6 @@ mod tests {
         );
     }
 
-    /// The refusal records a look, so it shows lines even where `old_string`
-    /// left nothing to stand beside.
     #[test]
     fn a_gone_old_opens_the_window_at_the_head() {
         let text: String = (0..20).map(|n| format!("line {n}\n")).collect();

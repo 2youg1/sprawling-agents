@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The stand-in provider as a process (`Tools/citysim/spec/WireScript.lean` §8-10):
-//! `provider <script.json> <record.jsonl> [<listen>]`.
-//!
-//! It binds a loopback port, prints `SPRAWLING_PROVIDER=<url>` as its
-//! first line so the recipe that started it can hand the URL on, and
-//! then plays the script until it is stopped. It writes no text of its
-//! own into a reply: every reply is a line of the script.
-
 use std::convert::Infallible;
 use std::io::Write as _;
 use std::net::{SocketAddr, TcpListener};
@@ -20,12 +12,8 @@ use std::process::ExitCode;
 use citysim::ScriptedProvider;
 use kernel::{AxCode, AxError};
 
-/// Where the provider listens when the command names nowhere: any free
-/// port on this machine's loopback address.
 const LISTEN: &str = "127.0.0.1:0";
 
-/// The variable the printed line assigns, which the recipe exports to
-/// the check it starts.
 const VARIABLE: &str = "SPRAWLING_PROVIDER";
 
 fn main() -> ExitCode {
@@ -39,8 +27,6 @@ fn main() -> ExitCode {
     }
 }
 
-/// Plays the script until the record cannot be written; a connection
-/// that fails ends that connection only.
 fn serve() -> Result<Infallible, AxError> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let (script, record, listen) = match args.as_slice() {

@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The thread that ticks the monitor once every ten memory beats and
-//! sends each fresh reading to the watching sessions, and notes this
-//! process's private bytes on every memory beat in between
-//! (`Sprawling/app/spec/Monitor.lean` §8-96). The memory beat is the
-//! one a page sets (`super::beat`), 100 ms until it does.
-
 use std::sync::{Arc, Mutex, PoisonError, Weak};
 use std::time::{Duration, Instant};
 
@@ -20,16 +14,12 @@ use super::counters::Counters;
 use super::{Monitor, Sample};
 use accounting::worker::health::Health;
 
-/// Memory beats in one beat of the monitor.
 const MEMORY_BEATS_PER_BEAT: u32 = 10;
 
-/// What a beat adds to the counters it read: the accounting queue's two
-/// counts (`Sprawling/app/spec/Accounting/Worker.lean` §8-98), the view fold's backlog (8-123), and
-/// how long the beat before this one took to read (8-129-6).
 pub(crate) struct Gauges<B> {
     health: Health,
     backlog: B,
-    /// The sampler's own monotonic clock; a script in a test.
+
     clock: fn() -> Instant,
     last_read: Duration,
 }
@@ -44,10 +34,6 @@ impl<B: Fn() -> u64> Gauges<B> {
         }
     }
 
-    /// Reads through `read`, timed by the sampler's own clock, and fills
-    /// in what the counters cannot know. The read's own time is reported
-    /// on the next beat, because this beat's sample is written before the
-    /// read is over.
     pub(crate) fn sample(&mut self, read: impl FnOnce() -> Sample) -> Sample {
         let started = (self.clock)();
         let counted = read();
@@ -61,13 +47,6 @@ impl<B: Fn() -> u64> Gauges<B> {
     }
 }
 
-/// Starts the `sprawling-monitor` thread, at the beat the city at
-/// `volume` kept (`super::beat`, D48), and hands back that beat so a
-/// page can set it. The thread ends at the first beat after the monitor
-/// it was handed has been dropped.
-///
-/// # Errors
-/// `StorageFatal` when the thread cannot be started.
 pub(crate) fn spawn_sampler(
     monitor: Weak<Mutex<Monitor>>,
     samples: broadcast::Sender<Sample>,
@@ -97,8 +76,6 @@ pub(crate) fn spawn_sampler(
         })
 }
 
-/// What the thread measures and how often: the city's volume and the
-/// beat a page sets, which travel together into the thread.
 struct Measured {
     volume: std::path::PathBuf,
     beat: Arc<Beat>,
@@ -139,8 +116,6 @@ fn sample_until_dropped(
     }
 }
 
-/// One beat: ticks the monitor and, when that read the counters, sends
-/// the one reading it kept.
 pub(crate) fn beat(
     monitor: &Mutex<Monitor>,
     samples: &broadcast::Sender<Sample>,
@@ -150,15 +125,12 @@ pub(crate) fn beat(
     lock(monitor).tick(|watched| *fresh.insert(read(watched)));
     if let Some(sample) = fresh {
         match samples.send(sample) {
-            // No subscriber is not a failure: a session that stopped
-            // watching between the tick and the send asked for nothing.
+
             Ok(_) | Err(broadcast::error::SendError(_)) => {}
         }
     }
 }
 
-/// A poisoned lock guards no half-written state: the watcher count is
-/// an atomic and the history a whole `VecDeque`.
 fn lock(monitor: &Mutex<Monitor>) -> std::sync::MutexGuard<'_, Monitor> {
     monitor.lock().unwrap_or_else(PoisonError::into_inner)
 }

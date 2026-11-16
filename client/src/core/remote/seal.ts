@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Every frame of a session, sealed (`Sprawling/remote_access/Spec.lean`
-// §8-5): AES-256-GCM, the nonce a four-byte direction tag then an
-// eight-byte big-endian count that never travels, because the socket
-// delivers in order and each side knows the next number. A frame that
-// will not open ends the session: no frame is worth skipping.
-//
-// The count is taken when `seal` or `open` is called, before anything
-// is awaited, so two seals in flight never share a nonce.
-
 import { Result } from "effect";
 
 export type Direction = "device_to_city" | "city_to_device";
@@ -21,13 +12,10 @@ export interface Sealer {
 }
 
 export interface Opener {
-  // Null when the frame was changed, replayed, dropped or sent the other
-  // way; the count does not move, and the caller ends the session.
+
   readonly open: (sealed: Uint8Array<ArrayBuffer>) => Promise<Uint8Array<ArrayBuffer> | null>;
 }
 
-// What a sealed frame of a session carries, told by its first byte:
-// a wire text frame, or the lock (D13).
 export type Payload = { readonly kind: "frame"; readonly text: string } | { readonly kind: "lock" };
 
 const FRAME = 0;
@@ -93,8 +81,6 @@ export function payloadBytes(payload: Payload): Uint8Array<ArrayBuffer> {
   }
 }
 
-// Null for an empty payload, an unknown first byte, bytes after a lock,
-// or a frame that is not UTF-8: the city's `E_WIRE_MISMATCH` cases.
 export function payloadOf(bytes: Uint8Array<ArrayBuffer>): Payload | null {
   const [first, ...rest] = bytes;
   if (first === LOCK) return rest.length === 0 ? { kind: "lock" } : null;

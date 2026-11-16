@@ -3,32 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One creation split into nodes, and the order they run in.
-//!
-//! A node contract is the whole task authority for the agent that takes
-//! the node: what to reach, what it may read at which version, where it
-//! may write, how done is decided, and when to stop. Written to disk it
-//! is that node's `JOB.md`, so the mechanism costs nothing in the prefix.
-//!
-//! Scheduling is deterministic because replay is: the same graph and the
-//! same ledger must produce the same order, or a failure cannot be
-//! reproduced. Ties are broken by node id, and every collection here is
-//! ordered for that reason.
-//!
-//! The graph's authority is the building's `Roadmap.md`. This module
-//! keeps no second store of what the plan is; it is handed contracts and
-//! answers what may run.
-
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use kernel::{Address, AxCode, AxError, Locator, Version};
 use serde::{Deserialize, Serialize};
 
-/// A node's name within one workshop.
-///
-/// It serializes as the string [`NodeId::parse`] accepted and reads
-/// back through that same parse, so a ledger line carrying a node id
-/// meets the grammar once rather than once per reader.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct NodeId(String);
@@ -48,9 +27,7 @@ impl From<NodeId> for String {
 }
 
 impl NodeId {
-    /// # Errors
-    /// Refuses an empty id and one carrying whitespace: the id names a
-    /// directory and a ledger field.
+
     pub fn parse(raw: &str) -> Result<NodeId, AxError> {
         if raw.is_empty() || raw.chars().any(char::is_whitespace) {
             return Err(AxError::failure(
@@ -69,7 +46,6 @@ impl NodeId {
     }
 }
 
-/// One node's contract: the whole of what its agent is answerable for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeContract {
     id: NodeId,
@@ -83,13 +59,7 @@ pub struct NodeContract {
 }
 
 impl NodeContract {
-    /// Sole constructor.
-    ///
-    /// # Errors
-    /// Refuses a contract with no owner, no goal, no stop condition or
-    /// no done check. Each of the four is what somebody would otherwise
-    /// have to guess, and a guessed stop condition is a run that does
-    /// not stop.
+
     #[expect(
         clippy::too_many_arguments,
         reason = "the contract is eight fields by design; a builder would hide which are required"
@@ -148,7 +118,6 @@ impl NodeContract {
         self.depends_on.iter()
     }
 
-    /// What this node may read, each pinned to a version.
     #[must_use]
     pub fn reads(&self) -> &[(Locator, Version)] {
         &self.reads
@@ -174,8 +143,6 @@ impl NodeContract {
         &self.stop
     }
 
-    /// The body of this node's `JOB.md`: the contract itself, because
-    /// the agent's task authority and this record are the same thing.
     #[must_use]
     pub fn job_text(&self) -> String {
         let mut text = format!(
@@ -196,8 +163,6 @@ impl NodeContract {
     }
 }
 
-/// A graph split by what has already joined: the whole order, the ready
-/// set handed down now, and the nodes still waiting on a dependency.
 #[derive(Debug)]
 pub struct LaidOut {
     pub schedule: Vec<NodeId>,
@@ -205,17 +170,13 @@ pub struct LaidOut {
     pub waiting: Vec<NodeId>,
 }
 
-/// A graph of contracts that can actually be run.
 #[derive(Debug)]
 pub struct Workshop {
     nodes: BTreeMap<NodeId, NodeContract>,
 }
 
 impl Workshop {
-    /// # Errors
-    /// Refuses a duplicate id, a dependency on a node that is not in the
-    /// graph, and a cycle. All three are refused at construction, so a
-    /// workshop that exists is one that can finish.
+
     pub fn new(contracts: Vec<NodeContract>) -> Result<Workshop, AxError> {
         let mut nodes = BTreeMap::new();
         for contract in contracts {
@@ -246,7 +207,7 @@ impl Workshop {
                 }
             }
         }
-        // A cycle is detected by the schedule failing to cover the graph.
+
         let order = workshop.order();
         if order.len() != workshop.nodes.len() {
             let stuck: Vec<String> = workshop
@@ -267,16 +228,11 @@ impl Workshop {
         Ok(workshop)
     }
 
-    /// The order the nodes run in. Deterministic: dependencies first,
-    /// ties broken by id, so the same graph schedules the same way on
-    /// every machine and every replay.
     #[must_use]
     pub fn schedule(&self) -> Vec<NodeId> {
         self.order()
     }
 
-    /// What may start now, given what has finished. Several nodes can be
-    /// ready at once; that is the fan-out.
     #[must_use]
     pub fn ready(&self, done: &BTreeSet<NodeId>) -> Vec<NodeId> {
         self.nodes
@@ -302,8 +258,6 @@ impl Workshop {
         self.nodes.is_empty()
     }
 
-    /// Kahn's algorithm over ordered collections: the queue is drained in
-    /// id order, so the result is a function of the graph alone.
     fn order(&self) -> Vec<NodeId> {
         let mut remaining: BTreeMap<NodeId, usize> = self
             .nodes

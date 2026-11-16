@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Serving the client bundle over HTTP: headers on, policy out. Which
-//! bytes answer a path is `wire::assets`' decision.
-
 use std::sync::Arc;
 
 use axum::Router;
@@ -22,19 +19,6 @@ use crate::reception::PageHeaders;
 use super::config::refusal_text;
 use super::guard::{Stamp, Stored, stamp};
 
-/// The two routes that answer the client bundle: `/` and every path
-/// below it that no other route of the same table claims.
-///
-/// The city's own port and the remote listener (`bin::outside`) serve
-/// the page through this one table, so a device that opens the remote
-/// address gets the same bytes as a browser on this machine
-/// (`Sprawling/wire/Spec.lean` §8-2); `headers` are the listener's own,
-/// generated once per listener (`Sprawling/wire/spec/Reception/Entry.lean`
-/// §8-94). The routes take no credential: a browser has to load the page
-/// before it has anywhere to pair.
-///
-/// # Errors
-/// `headers` cannot be spelled as HTTP headers.
 pub fn bundle_routes<S>(
     client: Arc<ClientAssets>,
     headers: &PageHeaders,
@@ -61,7 +45,6 @@ async fn serve_asset(
     asset_response(client.lookup(&asset))
 }
 
-/// The shell around [`ClientAssets::lookup`]: headers on, policy out.
 fn asset_response(reply: AssetReply) -> Response {
     match reply {
         AssetReply::Found {

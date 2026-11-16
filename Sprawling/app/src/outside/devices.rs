@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The device table on disk: the devices this city paired, kept across
-//! restarts at `kernel::layout::CityLayout::devices` (`Sprawling/app/spec/Outside/Conduit.lean`
-//! §8-139).
-//!
-//! The file is TOML, one `[[device]]` table per device, and is written
-//! whole: a new file beside the old one, then renamed over it, so a
-//! crash leaves either the table before the change or the table after
-//! it. The spellings of an id, a key and an authority are the remote
-//! door's own (`remote_access::door`); this module only arranges them.
-//!
-//! The point a reader most often gets wrong: an absent file is an empty
-//! table, because a city that never paired a device has never written
-//! one; an unreadable file is refused, because guessing a table would be
-//! guessing who may enter.
-
 use std::path::Path;
 
 use kernel::{AxCode, AxError};
@@ -38,11 +23,6 @@ struct Row {
     key: String,
 }
 
-/// The paired devices the table at `path` holds.
-///
-/// # Errors
-/// `E_STORAGE_FATAL`, naming the file, when it cannot be read or does
-/// not read as a device table.
 pub(super) fn read(path: &Path) -> Result<Vec<Device>, AxError> {
     let text = match std::fs::read_to_string(path) {
         Ok(text) => text,
@@ -66,11 +46,6 @@ pub(super) fn read(path: &Path) -> Result<Vec<Device>, AxError> {
         .map_err(|refused| fatal("read the device table", path, refused.subject()))
 }
 
-/// Replaces the table at `path` with `devices`.
-///
-/// # Errors
-/// `E_STORAGE_FATAL`, naming the file, when the directory cannot be made
-/// or the file cannot be written or renamed into place.
 pub(super) fn write(path: &Path, devices: &[Device]) -> Result<(), AxError> {
     let table = Table {
         device: devices

@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Attached or absent, and the refusal absence answers with.
-//!
-//! The attached state holds a real `Endpoint`, so the credential
-//! travels the one path every other call in this crate uses: resolved
-//! at the last moment, exposed only while the header is written. A
-//! second way to hold a credential would be a second way to leak one.
-
 use kernel::{AxCode, AxError, DialectKind};
 use serde_json::Value;
 
@@ -19,41 +12,28 @@ use crate::router::join;
 use super::recording::Recording;
 use super::wire::{form_body, transcription_of, transcription_path};
 
-/// What a person entered when they attached a transcription endpoint.
 pub struct TranscriberConfig {
-    /// The provider's base URL, without a path of its own: the audio
-    /// wire format knows which path hangs off it.
+
     pub base_url: String,
-    /// The provider-side name of the model that transcribes.
+
     pub model: String,
     pub auth: AuthSpec,
     pub timeout_ms: u64,
-    /// Settled on the endpoint this facility was chosen from, so a
-    /// recording takes the same path to the provider that a chat call
-    /// to the same endpoint takes.
+
     pub proxying: kernel::Proxying,
 }
 
-/// The city's transcription facility, which may not exist.
-///
-/// `absent` is not a degraded `attach`: it is the ordinary state of a
-/// city nobody gave a transcription endpoint, and every call on it is
-/// answered by a refusal rather than by silence.
 pub struct Transcriber {
     attached: Option<Endpoint>,
 }
 
 impl Transcriber {
-    /// A city with no transcription endpoint. Every `transcribe` on it
-    /// refuses by name.
+
     #[must_use]
     pub fn absent() -> Transcriber {
         Transcriber { attached: None }
     }
 
-    /// # Errors
-    /// `E_CONFIG_INVALID` when the HTTP client cannot be built for the
-    /// deadline given.
     pub fn attach(
         config: TranscriberConfig,
         secrets: SecretResolver,
@@ -61,8 +41,7 @@ impl Transcriber {
         let endpoint = Endpoint::new(
             EndpointConfig {
                 base_url: join(&config.base_url, transcription_path()),
-                // The audio face is the OpenAI-compatible one; there is
-                // no second audio wire in this build to route between.
+
                 dialect: DialectKind::OpenAi,
                 model: config.model,
                 auth: config.auth,
@@ -73,9 +52,7 @@ impl Transcriber {
                 pricing: None,
                 proxying: config.proxying,
             },
-            // A recording is not a picture: this endpoint resolves a
-            // credential and nothing else, and a locator reaching it
-            // would be a wiring mistake rather than an attachment.
+
             Redemption::without_images(secrets),
         )?;
         Ok(Transcriber {
@@ -83,30 +60,15 @@ impl Transcriber {
         })
     }
 
-    /// Whether this city can transcribe at all. The only question a
-    /// settings page needs, and the one a caller should ask before
-    /// drawing a control.
     #[must_use]
     pub fn is_attached(&self) -> bool {
         self.attached.is_some()
     }
 
-    /// One recording, one HTTP round trip, one line of text.
-    ///
-    /// An empty answer is a real answer — silence transcribes to
-    /// nothing — so emptiness never stands in for a failure here.
-    ///
-    /// # Errors
-    /// `E_TOOL_UNAVAILABLE` when no endpoint is attached;
-    /// `E_PROVIDER` on transport failure or a non-success status, with
-    /// the status and URL and never the provider's own body;
-    /// `E_WIRE_MISMATCH` when the answer carries no `text`.
     pub fn transcribe(&self, recording: &Recording) -> Result<String, AxError> {
         let endpoint = self.attached.as_ref().ok_or_else(unconfigured)?;
         let body = form_body(endpoint.model(), recording);
-        // What went wrong on the wire is the endpoint's to state; what
-        // a person does about it is this facility's, because only this
-        // side knows the work can be done by typing instead.
+
         let wire: Value = endpoint
             .post_bytes(&body.content_type, body.bytes)
             .map_err(|err| err.rewrite_recovery("record again, or type the message instead"))?;
@@ -114,13 +76,6 @@ impl Transcriber {
     }
 }
 
-/// What a city with no transcription endpoint says when asked to
-/// transcribe.
-///
-/// `E_TOOL_UNAVAILABLE` is the base-table code for a facility this
-/// deployment does not have. `E_CONFIG_INVALID` would say the person
-/// filled something in wrongly, and nothing here is filled in wrongly:
-/// the facility is optional and was not taken.
 fn unconfigured() -> AxError {
     AxError::failure(
         AxCode::ToolUnavailable,

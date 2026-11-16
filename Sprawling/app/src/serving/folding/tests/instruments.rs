@@ -3,25 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How far the view fold falls behind a burst of records
-//! (`Sprawling/app/spec/Assembly/Listening.lean` §8-99).
-//!
-//! The instrument drives the fold thread the city runs, `spawn_folding`,
-//! with a writer sending a burst through `observer` and a reader asking
-//! the published views between batches. It is ignored by `just check`,
-//! because it reads the wall clock; `just bench` runs it and prints three
-//! reading lines: record to broadcast, then the two halves of that wait:
-//! fold lag, from the writer's send to the first answer a
-//! reader gets that has folded the record, and broadcast lag, from that
-//! answer to the record reaching a client's channel. The fold instant is
-//! the one a reader sees, so it is late by at most one query. It asserts nothing about time, since the wall clock
-//! differs by machine.
-//!
-//! The burst is signal lines as `collab` writes them, the same shape the
-//! bench Main's `draft` gives its fold scenario; this second spelling of
-//! that shape exists only for this instrument, which cannot reach a bin
-//! of another package.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -45,10 +26,8 @@ use crate::serving::standing::monotonic_now;
 use accounting::person::CorePriority;
 use accounting::views::{Published, Views, answer_outside_the_lock};
 
-/// Records sent in the burst, beside the lines `init` writes.
 const BURST: u64 = 2_000;
-/// The longest the fold may take to broadcast the whole burst before the
-/// instrument reports it stuck.
+
 const WITHIN: Duration = Duration::from_secs(60);
 
 #[test]
@@ -175,7 +154,6 @@ fn instrument_view_backlog() {
     }
 }
 
-/// One reading line: the samples' count and their p50, p99, p999 and max.
 fn print_reading(name: &str, samples: &mut [Duration]) {
     samples.sort_unstable();
     let Some(max) = samples.last() else {
@@ -193,13 +171,10 @@ fn print_reading(name: &str, samples: &mut [Duration]) {
     );
 }
 
-/// The nearest-rank index of `per_mille` in a sorted vector of `count`.
 fn percentile_tenths(count: usize, per_mille: usize) -> usize {
     (count * per_mille / 1_000).min(count - 1)
 }
 
-/// Every line of a city `init` formed with `BURST` signal lines written
-/// after its own, parsed back the way the writer's observer hands them.
 fn burst_over(city_root: &std::path::Path) -> Vec<EventRecord> {
     let report = init_city(city_root).unwrap();
     let (mut ledger, _report) =
@@ -213,7 +188,6 @@ fn burst_over(city_root: &std::path::Path) -> Vec<EventRecord> {
         .collect()
 }
 
-/// A signal line as `collab` writes it.
 fn signal(n: u64) -> EventDraft {
     let mut body = serde_json::Map::new();
     body.insert("n".to_owned(), serde_json::Value::from(n));
@@ -244,7 +218,6 @@ fn signal(n: u64) -> EventDraft {
     }
 }
 
-/// The nearest-rank index of `percent` in a sorted vector of `count`.
 fn percentile(count: usize, percent: usize) -> usize {
     (count * percent / 100).min(count - 1)
 }

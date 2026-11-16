@@ -3,18 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A checkout whose packages do not sit at `crates/<name>`: the
-//! directory, the package name and the lib name are three different
-//! spellings, so a gate that derives a path from any one of them finds
-//! nothing.
-
 use std::path::{Path, PathBuf};
 
-/// `sprawling-k` (lib `k`) under `tools/k`, and `sprawling-j` (lib `j`)
-/// under `crates/j`, which depends on it; an `ARCHITECTURE.md` whose
-/// depmap block allows exactly that edge, and a module map with one row
-/// under `tools/`. Each test passes its own `label`, so tests running at
-/// once never share a directory.
 pub(crate) fn relocated(label: &str) -> PathBuf {
     let root = std::env::temp_dir().join(format!("xtask-relocated-{label}-{}", std::process::id()));
     if root.exists() {

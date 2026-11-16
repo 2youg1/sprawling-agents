@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Ledger opening: version probes and tail recovery.
-
 use std::path::{Path, PathBuf};
 
 use kernel::{AxCode, AxError, GENESIS_PREV, Seq, TimeMs};
@@ -22,25 +20,11 @@ use super::ledger::{
 use super::verify::{LineCheck, LineFault};
 
 impl JsonlLedger {
-    /// Production entrance: std filesystem underneath, and the ledger
-    /// directory's writer lock, taken before anything is read or
-    /// repaired and held for as long as the returned ledger lives.
-    ///
-    /// # Errors
-    /// `LedgerHeld` when another writer holds this ledger, in this
-    /// process or another; otherwise whatever reading and repairing the
-    /// segments reports.
+
     pub fn open(dir: &Path, now: TimeMs) -> Result<(Self, OpenReport), StorageError> {
         JsonlLedger::open_locked(dir, now, TailProof::Strict)
     }
 
-    /// [`JsonlLedger::open`], with the last segment's verified-prefix
-    /// record in `records` standing in for checking its prefix line by
-    /// line when the record holds (`Sprawling/storage/spec/Jsonl.lean` §8-34). Records are read,
-    /// never written: the proof that holds the writer lock writes them.
-    ///
-    /// # Errors
-    /// Those of [`JsonlLedger::open`].
     pub fn open_reusing(
         dir: &Path,
         now: TimeMs,
@@ -61,18 +45,6 @@ impl JsonlLedger {
         Ok((ledger, report))
     }
 
-    /// The `fault` entrance: the same ledger, over the deterministic
-    /// power-loss model, for a caller that needs one named write to fail.
-    ///
-    /// Takes the concrete adapter rather than the trait, so the `Vfs`
-    /// seam stays inner (`Sprawling/storage/spec/Jsonl.lean` §8-1) and no `pub trait` leaves this
-    /// crate. What comes back is the same `JsonlLedger` production uses -
-    /// a caller above this crate exercises its real code and loses only
-    /// the write it named.
-    ///
-    /// # Errors
-    /// Propagates whatever [`JsonlLedger::open`] would, and the power
-    /// loss itself when the plan cuts during the open.
     #[cfg(any(test, feature = "fault"))]
     pub fn open_faulty(
         fs: crate::fault_fs::FaultFs,
@@ -82,8 +54,6 @@ impl JsonlLedger {
         JsonlLedger::open_with(Box::new(fs), dir, now)
     }
 
-    /// Injection point for the second Vfs adapter, checking the last
-    /// segment line by line; `open_faulty` is its entrance.
     #[cfg(any(test, feature = "fault"))]
     pub(crate) fn open_with(
         vfs: Box<dyn Vfs>,
@@ -103,8 +73,6 @@ impl JsonlLedger {
         ledger.resume(&segments, now, proof)
     }
 
-    /// The ledger at the root of an empty chain, with the segments `dir`
-    /// holds, before anything on them is read.
     fn unopened(mut vfs: Box<dyn Vfs>, dir: &Path) -> Result<(Self, Vec<PathBuf>), StorageError> {
         vfs.create_dir_all(dir)
             .map_err(io_err("create ledger dir", dir))?;
@@ -125,10 +93,7 @@ impl JsonlLedger {
             roll_bytes: SEGMENT_ROLL_BYTES,
             preallocation: SEGMENT_PREALLOCATION,
             barrier: super::barrier::Barrier::Whole,
-            // The projection exists only when this ledger is a city's:
-            // it is what tells a writer handed the ledger directory
-            // alone where the buildings' sessions lie. A store opened
-            // directly has no buildings, and files nothing.
+
             sessions: crate::sessions::Sessions::for_ledger(dir),
             observer: None,
             lock: None,
@@ -138,8 +103,6 @@ impl JsonlLedger {
         Ok((ledger, segments))
     }
 
-    /// Reads the version and the tail of `segments` and puts the writer
-    /// at the end of the surviving records.
     fn resume(
         mut self,
         segments: &[PathBuf],
@@ -170,10 +133,6 @@ impl JsonlLedger {
         Ok((self, OpenReport { recovered, counted }))
     }
 
-    /// Tail-truncation recovery over the last segment, taking its
-    /// verified prefix from `proof` when the record holds (`Sprawling/storage/spec/Jsonl.lean`
-    /// §8-34). Returns dropped bytes and what was read and checked; on
-    /// return the ledger state points at the surviving tail.
     fn recover_tail(
         &mut self,
         segments: &[PathBuf],
@@ -251,9 +210,7 @@ impl JsonlLedger {
 
         if self.preallocation.length_after_open(keep, dropped, total) < total {
             if valid_len == 0 {
-                // Whole last segment is torn. Remove it; the tail falls
-                // back to the prior segment (or to an empty city when this
-                // was the only one — the genesis append never returned Ok).
+
                 self.vfs
                     .truncate(last, 0)
                     .map_err(io_err("truncate segment", last))?;
@@ -296,19 +253,16 @@ impl JsonlLedger {
     }
 }
 
-/// What tail recovery may take in place of checking the last segment's
-/// prefix line by line.
 #[derive(Clone, Copy)]
 enum TailProof<'a> {
-    /// Every line of the last segment is checked.
+
     Strict,
-    /// The last segment's record in these, when it holds (`Sprawling/storage/spec/Jsonl.lean` §8-34).
+
     Records(&'a ProofRecords),
 }
 
 impl TailProof<'_> {
-    /// Where checking the last segment at `last` begins when
-    /// the chain state entering it is `entry`.
+
     fn start(self, vfs: &dyn Vfs, last: &Path, entry: LineCheck) -> std::io::Result<TailStart> {
         match self {
             TailProof::Strict => Ok(TailStart::strict(entry)),
@@ -325,10 +279,6 @@ fn chain_refusal(last: &Path, line: u64) -> StorageError {
     }
 }
 
-/// The refusal a line below the first ledger version earns.
-///
-/// One sentence for both readers, because "nobody ever wrote this" is
-/// one fact whether the probe or the tail scan meets it first.
 pub(super) fn unversioned(v: u64) -> AxError {
     AxError::failure(
         AxCode::InvalidArgs,
@@ -360,9 +310,7 @@ mod preallocated;
 
 #[cfg(test)]
 impl JsonlLedger {
-    /// The `fault` entrance with the preallocating arm, whatever
-    /// [`SEGMENT_PREALLOCATION`] says, so its tests judge the arm the
-    /// build does not select (storage D31).
+
     pub(crate) fn open_preallocated(
         fs: crate::fault_fs::FaultFs,
         dir: &Path,

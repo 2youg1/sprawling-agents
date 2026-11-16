@@ -3,16 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the model table's placeholders say, against what a pick with
-//! empty boxes registers (`Sprawling/wire/spec/Answer/ModelFigures.lean`
-//! §8-97, wire D58).
-
 use super::endpoints::selected_lines;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// One `SelectModel` that states no figure, as a form with empty boxes
-/// sends it.
 fn pick(worker: &mut RunWorker, model: &str, tag: kernel::ModelTag, stated: Option<u64>) {
     worker
         .handle(wire::Command::SelectModel {
@@ -27,8 +21,6 @@ fn pick(worker: &mut RunWorker, model: &str, tag: kernel::ModelTag, stated: Opti
         .unwrap();
 }
 
-/// The answer's rows in the shape `selected_lines` reads a
-/// `model_selected` line in, so the two can be compared whole.
 fn as_selected(answer: &wire::Answer) -> Vec<serde_json::Value> {
     let wire::Answer::ModelFigures(answer) = answer else {
         return Vec::new();
@@ -56,13 +48,6 @@ fn as_selected(answer: &wire::Answer) -> Vec<serde_json::Value> {
         .collect()
 }
 
-/// The placeholder is what a pick with empty boxes registers: the
-/// provider's list for a row that states its figures, what a person
-/// stated at an earlier pick of the same model under the same tag, and
-/// for an id no rung knows on a server on this machine an unknown
-/// window and the provider's own default ceiling on the chat face. The
-/// question carries the text the person typed, which the city
-/// normalises as the attach did.
 #[test]
 fn the_placeholder_answers_what_a_pick_with_empty_boxes_registers() {
     let dir = tempfile::tempdir().unwrap();

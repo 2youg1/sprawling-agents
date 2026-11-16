@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A building's base checkpoint, written as one pack.
-
 use std::io::Write;
 
 use kernel::TimeMs;
@@ -19,49 +17,29 @@ use super::opening::{HeadMove, IndexOwner, commit_refused};
 use super::provenance::Provenance;
 use super::scan::CommitPlan;
 
-/// How far a base checkpoint has got, reported as each step lands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BaseProgress {
-    /// The building's files are in the index and their blobs in memory.
+
     Staged { files: usize },
-    /// The one pack holding every object the checkpoint wrote is on disk.
+
     Packed { bytes: usize },
 }
 
-/// What one base checkpoint stages and how it signs: three values a caller
-/// never passes apart.
 pub(super) struct BaseOf<'a> {
     pub(super) scopes: &'a [String],
     pub(super) t: TimeMs,
     pub(super) of: &'a Provenance,
 }
 
-/// Where a base checkpoint's commit is filed, decided under `HEAD_MOVES`.
 pub(super) enum BaseTarget {
-    /// The city has no commit: the commit becomes the branch HEAD names,
-    /// created only if that branch is still absent.
+
     Head,
-    /// The city has history: the commit is filed like a wave checkpoint.
+
     Filed,
 }
 
 impl Checkpoint {
-    /// Stages `scopes`, scans them and commits, with every object held
-    /// in memory until the end and then written as one pack.
-    ///
-    /// Takes the handle by value: the in-memory store is installed on
-    /// this handle's object database and cannot be taken off again, so
-    /// the handle goes with it, and no later checkpoint can write an object
-    /// into a store nobody dumps (`Sprawling/storage/spec/Checkpoint.lean` §8-8).
-    ///
-    /// The commit moves HEAD when the city has none, under `HEAD_MOVES` and
-    /// by compare-and-swap (storage D27), and is otherwise filed under
-    /// `refs/sprawling/runs/<run>/<oid>` like a wave checkpoint.
-    ///
-    /// # Errors
-    /// Propagates staging, the staged-secret scan, the commit, a pack the
-    /// object database refuses, a reference it will not write, and a HEAD
-    /// another writer created after this one read it as absent.
+
     pub fn base_checkpoint(
         self,
         scopes: &[String],
@@ -80,11 +58,6 @@ impl Checkpoint {
         self.write_held(&BaseOf { scopes, t, of }, target, progress)
     }
 
-    /// A second handle on the same repository and the same index file, for
-    /// a caller that keeps its own handle and still writes one base pack.
-    ///
-    /// # Errors
-    /// A repository or a writer's index that does not open.
     pub(super) fn reopened(&self) -> Result<Checkpoint, StorageError> {
         let repo = git2::Repository::open(self.repo.path())
             .map_err(git_err("open the city repository for a base"))?;
@@ -105,8 +78,6 @@ impl Checkpoint {
         })
     }
 
-    /// The mempack write itself; the caller decided `target` under
-    /// `HEAD_MOVES` when it is [`BaseTarget::Head`].
     pub(super) fn write_held(
         mut self,
         base: &BaseOf<'_>,
@@ -118,8 +89,7 @@ impl Checkpoint {
             op: "open the object store",
             detail: format!("{} is not valid UTF-8", objects.display()),
         })?;
-        // The disk store is an alternate, and libgit2 writes to no
-        // alternate: every object this checkpoint makes lands in memory.
+
         let odb = git2::Odb::new().map_err(git_err("open an in-memory object store"))?;
         let held = odb
             .add_new_mempack_backend(1)
@@ -161,12 +131,9 @@ impl Checkpoint {
             .map_err(git_err("write the base checkpoint pack"))?;
         progress(BaseProgress::Packed { bytes: pack.len() });
 
-        // Only now are the objects on disk, so only now may the index and
-        // a reference name them: a failure above leaves both as they were.
         super::scan::write_index(&mut self.repo.index().map_err(git_err("read index"))?)?;
         match target {
-            // Created only while absent: the swap from the "no HEAD" this
-            // writer read (`a_held_base_moves_head_only_from_what_it_read`).
+
             BaseTarget::Head => {
                 let branch = self
                     .repo

@@ -3,24 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The machine this process runs on, as the privacy page sees it
-//! (`Sprawling/app/spec/Privacy/Service.lean` D71): on Windows the
-//! production host (`bin::privacy::windows::host`) with the facts its
-//! version record states; anywhere else a host that has no privacy
-//! controls, refuses every operation and is never read.
-
 use wire::PrivacyHost;
 
 use super::service::Machine;
 
-/// The machine this process runs on.
 #[cfg(windows)]
 pub(crate) type System = super::windows::host::WindowsHost<crate::assembly::SystemClock>;
-/// The machine this process runs on.
+
 #[cfg(not(windows))]
 pub(crate) type System = Elsewhere;
 
-/// A fresh handle on the machine this process runs on.
 pub(crate) const fn this_machine() -> System {
     #[cfg(windows)]
     {
@@ -47,7 +39,6 @@ impl<C: accounting::Clock + Send> Machine for super::windows::host::WindowsHost<
     }
 }
 
-/// A host that is not Windows: privacy controls are Windows settings.
 #[cfg(not(windows))]
 pub(crate) struct Elsewhere;
 
@@ -101,7 +92,6 @@ impl Machine for Elsewhere {
     }
 }
 
-/// Why `action` is refused on a host that is not Windows.
 #[cfg(not(windows))]
 pub(super) fn windows_only(action: &'static str) -> kernel::AxError {
     kernel::AxError::failure(
@@ -120,10 +110,6 @@ mod tests {
     use super::super::service::Service;
     use super::*;
 
-    /// The page's production path end to end on this machine, reading
-    /// only: the version record, then every control through the adapters
-    /// the CLI write verbs use. A history in a fresh directory keeps the
-    /// person's own history out of it, and nothing is written.
     #[test]
     fn the_page_reads_every_control_of_this_machine() {
         let dir = tempfile::tempdir().unwrap();

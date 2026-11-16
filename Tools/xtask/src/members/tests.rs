@@ -5,10 +5,6 @@
 
 use super::*;
 
-/// The roster this tree gives: the kernel where its directory is, the
-/// desktop server and the seam nested in its directory each as a package
-/// of its own, the gates' own package declared a tool, and no package at
-/// the root, which holds the workspace table rather than a package.
 #[test]
 fn this_checkout_lists_its_members_and_the_package_nested_in_one() {
     let found = members(crate::root::this_checkout()).unwrap();
@@ -32,8 +28,6 @@ fn this_checkout_lists_its_members_and_the_package_nested_in_one() {
     assert!(found.iter().all(|m| !m.dir.is_empty()), "{found:?}");
 }
 
-/// A package whose manifest sits outside the checkout is refused: kept
-/// absolute, it would be read from another tree.
 #[test]
 fn a_package_outside_the_checkout_is_refused() {
     let metadata = serde_json::json!({
@@ -53,7 +47,6 @@ fn a_package_outside_the_checkout_is_refused() {
     );
 }
 
-/// One package, as a fixture names it.
 fn member(package: &str, dir: &str) -> Member {
     Member {
         package: package.to_owned(),
@@ -66,9 +59,6 @@ fn member(package: &str, dir: &str) -> Member {
     }
 }
 
-/// What `check-branch` selects tests by: the workspace packages holding a
-/// changed path, each once. Documents, Lean models and deleted paths
-/// select nothing.
 #[test]
 fn owning_names_each_workspace_package_once_and_skips_the_rest() {
     let found = [
@@ -90,10 +80,6 @@ fn owning_names_each_workspace_package_once_and_skips_the_rest() {
     );
 }
 
-/// A path inside a package nested in another belongs to the nested one:
-/// `Sprawling/desktop/ffi` is a package of its own, though the directory of
-/// `Sprawling/desktop` holds it too, so a change to the seam selects the
-/// seam's tests and a change beside it selects the server's.
 #[test]
 fn a_path_in_a_nested_package_belongs_to_the_nested_package() {
     let found = [

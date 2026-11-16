@@ -3,20 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The endpoint form's tuning figures. The city holds the three numbers
-// an untuned endpoint is called with (`gateway::EndpointTuning::DEFAULTS`)
-// and says them through `Query::Config`; a form that sends nothing for
-// a box nobody touched lets the city apply them, and a form that
-// pre-filled its own numbers attached a differently tuned endpoint
-// while the person had filled in nothing.
-
 import { describe, expect, test } from "bun:test";
 
 import { BASE_URL, freshDraft, hostOf, tuningHints, tuningOf } from "./draft";
 import type { TuningDefaults } from "../../../wire";
 
-// Bun's `navigator` carries no language, and the preference record a
-// fresh draft reads its proxy rule from is opened with one.
 Object.defineProperty(navigator, "language", { value: "en", configurable: true });
 
 describe("an untouched endpoint form", () => {
@@ -30,10 +21,6 @@ describe("an untouched endpoint form", () => {
   });
 });
 
-// The boxes the person left empty show the figure the city would use,
-// and that figure has to be the one the city derives: an idle timeout
-// nobody set falls back to the call timeout, the typed one when the box
-// holds it (`Sprawling/gateway/src/endpoint/stream.rs`).
 describe("the figures an empty tuning box shows", () => {
   const DEFAULTS: TuningDefaults = {
     from: "default",
@@ -61,9 +48,6 @@ describe("the figures an empty tuning box shows", () => {
   });
 });
 
-// The box's `pattern` attribute is compiled with the `v` flag, and a
-// pattern that does not compile there is dropped without a word: the
-// box then checks nothing while the person types.
 describe("the base_url shape", () => {
   test("compiles under the flag the browser compiles a pattern with", () => {
     expect(() => new RegExp(BASE_URL.source, "v")).not.toThrow();

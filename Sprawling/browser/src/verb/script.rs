@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The scripts a verb sends, and the one shape every reply comes back
-//! in.
-//!
-//! Every script this crate sends returns one JSON string, so there is
-//! one reply shape to read rather than the driver's whole remote-value
-//! vocabulary. Keeping the scripts beside that reader is what makes the
-//! promise checkable in one place.
-
 use kernel::{AxCode, AxError, Payload};
 use serde_json::{Value, json};
 
@@ -38,11 +30,6 @@ pub(super) fn read_references(args: &Payload) -> Result<Vec<String>, AxError> {
     Ok(references)
 }
 
-/// Builds the expression that measures the named nodes.
-///
-/// Every reference goes through the snapshot first, so a reference the
-/// model invented is refused here rather than answered with a box that
-/// belongs to something else.
 pub(crate) fn measure_script(
     snapshot: &PageSnapshot,
     references: &[String],
@@ -65,21 +52,8 @@ pub(crate) fn measure_script(
     ))
 }
 
-/// How much of a fetched body crosses the socket, in UTF-16 units: a
-/// ceiling on what the page hands back, reported with the length it cut
-/// from. How far a tool result is shortened after that is the pipeline's
-/// decision (decision D6 of `Sprawling/browser/Spec.lean`).
 const FETCH_TEXT_MAX_CHARS: usize = 65_536;
 
-/// The page's own `fetch`, run where the page runs.
-///
-/// The request leaves from the open page with its cookies and under its
-/// same-origin and CORS rules; a redirect stops at the redirect, so every
-/// host that receives a request is one the egress door judged. HTML is
-/// parsed with `DOMParser` and never attached to the live document, which
-/// would fetch its images and run its scripts, then walked to text with a
-/// line break around each block element. A body that is not text is not
-/// read: a byte count is feedback a model can use, and mojibake is not.
 const FETCH_SCRIPT: &str = concat!(
     "(async () => { const url = __URL__; const max = __MAX__; let r; ",
     "try { r = await fetch(url, { credentials: 'include', redirect: 'manual' }); } ",
@@ -118,21 +92,12 @@ const FETCH_SCRIPT: &str = concat!(
     "return JSON.stringify({ ...base, text: body.slice(0, max), cut: chars > max, chars }); })()"
 );
 
-/// Builds the expression that fetches `url` from the open page. The
-/// address enters as a JSON string literal, so nothing in it is read as
-/// code, and it enters last, so nothing in it is taken for a placeholder.
 pub(crate) fn fetch_script(url: &str) -> String {
     FETCH_SCRIPT
         .replacen("__MAX__", &FETCH_TEXT_MAX_CHARS.to_string(), 1)
         .replacen("__URL__", &json!(url).to_string(), 1)
 }
 
-/// Reads what an evaluate came back with: the one JSON string every
-/// script in this module returns.
-///
-/// # Errors
-/// Refuses a reply whose shape this version does not read, and a string
-/// that is not the JSON the script promised.
 pub fn read_json(result: &Value) -> Result<Value, AxError> {
     let text = result
         .get("result")
@@ -156,9 +121,6 @@ pub fn read_json(result: &Value) -> Result<Value, AxError> {
     })
 }
 
-/// Whether the console said anything the development loop should stop
-/// for. Error level only: a warning is the page talking, an error is the
-/// page failing.
 #[must_use]
 pub fn complained(console: &Value) -> bool {
     console.as_array().is_some_and(|entries| {

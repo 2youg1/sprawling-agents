@@ -3,39 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Aliases, and the write target that refuses them (`Sprawling/storage/spec/Alias.lean` §8-25).
-//!
-//! A name in a working tree can point at a file other than itself: a
-//! symlink or a junction makes the path lead somewhere else, and a hard
-//! link gives one inode two names. A write through such a name lands
-//! where the name does not say - and a name inside a write domain that
-//! points at `.git` is privilege escalation past every address-level
-//! check, because the address the gate judged is not the file the disk
-//! opens.
-//!
-//! The rule this module owns: **the alias family is refused whole** -
-//! junction, symlink and hard link alike, literally, on every platform.
-//! The alternative, skipping an alias and counting it, lands part of a
-//! write and breaks the all-or-nothing contract the restore face is
-//! built on.
-
 use std::path::{Path, PathBuf};
 
 use crate::error::StorageError;
 
-/// The aliases one name can be. On Windows a junction and a symbolic
-/// link are both reparse points and `file_type().is_symlink()` answers
-/// true for either, which is why they share a variant: refusing the
-/// family is one rule, not one rule per reparse tag. The third member
-/// of the family - the hard link - is a regular file whose link count is
-/// above one (`Sprawling/storage/spec/Alias.lean` §8-25, `Sprawling/storage/Spec.lean` §3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AliasKind {
-    /// A symbolic link or a directory junction: the name leads
-    /// somewhere else entirely.
+
     Link,
-    /// A file with more than one name: one write lands in every name at
-    /// once.
+
     HardLink,
 }
 
@@ -48,14 +24,6 @@ impl std::fmt::Display for AliasKind {
     }
 }
 
-/// What one name is, right now: absent, plain, or an alias.
-///
-/// Absent is an answer, not a failure - a write target that is not
-/// there yet is the ordinary way a file gets created. The question is
-/// asked with `symlink_metadata`, so a dangling link answers `Link`
-/// rather than disappearing. A hard link is one inode under two names,
-/// and a write at one name changes the other, so a regular file with a
-/// link count above one is one.
 pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, StorageError> {
     let meta = match std::fs::symlink_metadata(path) {
         Ok(meta) => meta,
@@ -71,8 +39,7 @@ pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, StorageError> {
     if meta.file_type().is_symlink() {
         return Ok(Some(AliasKind::Link));
     }
-    // Only a regular file counts: a directory's link count measures its
-    // subdirectories, not aliasing.
+
     if !meta.is_file() {
         return Ok(None);
     }
@@ -82,26 +49,16 @@ pub(crate) fn kind_at(path: &Path) -> Result<Option<AliasKind>, StorageError> {
     })
 }
 
-/// How many names the regular file at `path` has; `None` when it is gone
-/// since `meta` was read.
 #[cfg(unix)]
 fn links_of(_path: &Path, meta: &std::fs::Metadata) -> Result<Option<u64>, StorageError> {
     use std::os::unix::fs::MetadataExt;
     Ok(Some(meta.nlink()))
 }
 
-/// How many names the regular file at `path` has, read through a handle,
-/// because std reports the count on Windows only on the unstable
-/// `windows_by_handle` feature. The handle asks for no data access, so it
-/// collides with no other handle's share mode - a file another process
-/// holds exclusively is counted like any other - and it does not follow
-/// a reparse point, although a link never reaches here. `None` when the
-/// file is gone since `_meta` was read.
 #[cfg(windows)]
 fn links_of(path: &Path, _meta: &std::fs::Metadata) -> Result<Option<u64>, StorageError> {
     use std::os::windows::fs::OpenOptionsExt;
-    /// `FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS`, as the
-    /// Win32 headers spell them.
+
     const NO_FOLLOW: u32 = 0x0020_0000 | 0x0200_0000;
     let counted = std::fs::OpenOptions::new()
         .access_mode(0)
@@ -119,7 +76,6 @@ fn links_of(path: &Path, _meta: &std::fs::Metadata) -> Result<Option<u64>, Stora
     }
 }
 
-/// The refusal every face greets an alias with.
 pub(crate) fn refused(op: &'static str, path: &Path, kind: AliasKind) -> StorageError {
     StorageError::Alias {
         op,
@@ -128,21 +84,8 @@ pub(crate) fn refused(op: &'static str, path: &Path, kind: AliasKind) -> Storage
     }
 }
 
-/// A write target the city has cleared: no alias at the name or at any
-/// directory above it, so a write here lands exactly where the name
-/// says.
-///
-/// The invariant lives at the one constructor and the field is private,
-/// so an unchecked path cannot be spelled - every write face takes this
-/// value and nothing else (trybuild `tests/ui/write_target.rs`). What
-/// the value proves is that the name held no alias at the moment
-/// `at` asked; the window between that question and the write is the
-/// filesystem's, which is why the walking faces ask the same rule at
-/// their own sampling point.
 pub struct WriteTarget(PathBuf);
 
-/// Names the path it cleared and nothing else: there is no hidden
-/// state to show and a write target's whole story is where it lands.
 impl std::fmt::Debug for WriteTarget {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("WriteTarget").field(&self.0).finish()
@@ -150,12 +93,7 @@ impl std::fmt::Debug for WriteTarget {
 }
 
 impl WriteTarget {
-    /// The one constructor: `path` and every directory above it are
-    /// examined, and any alias refuses the write whole.
-    ///
-    /// # Errors
-    /// `StorageError::Alias` naming the alias and its kind;
-    /// `StorageError::Io` when a component exists and cannot be examined.
+
     pub fn at(op: &'static str, path: &Path) -> Result<WriteTarget, StorageError> {
         for parent in path.ancestors().skip(1) {
             if let Some(kind) = kind_at(parent)? {
@@ -168,22 +106,6 @@ impl WriteTarget {
         Ok(WriteTarget(path.to_path_buf()))
     }
 
-    /// Clears `path` for a write inside `root`, the directory the person
-    /// chose: `path` and every directory between it and `root` are
-    /// examined, and `root` and everything above it are not, because
-    /// where a person keeps a city is their placement rather than a
-    /// write a run could redirect (`Sprawling/storage/spec/Bundle.lean` §8-12). A `path` outside
-    /// `root` is examined up to the filesystem root, as [`WriteTarget::at`]
-    /// does.
-    ///
-    /// The bound is found by comparing path components as spelled, so the
-    /// caller builds `path` by joining onto the same `root` it passes; a
-    /// `root` in another spelling (a trailing separator, a `.` component,
-    /// other case on Windows) is not found, and the walk falls back to the
-    /// filesystem root, which is safe but loses the bound.
-    ///
-    /// # Errors
-    /// As [`WriteTarget::at`], for an alias at or below the bound.
     pub fn within(op: &'static str, root: &Path, path: &Path) -> Result<WriteTarget, StorageError> {
         for at in path.ancestors().take_while(|at| *at != root) {
             if let Some(kind) = kind_at(at)? {
@@ -198,14 +120,6 @@ impl WriteTarget {
         &self.0
     }
 
-    /// Replaces the file at this name with `bytes`: a staging file
-    /// beside it, flushed, given the replaced file's permissions and
-    /// renamed over the name (`Sprawling/storage/Spec.lean` §8-12, §8-32). A reader finds
-    /// the old file or the whole new one.
-    ///
-    /// # Errors
-    /// `StorageError::Io` for a write, flush, permission copy or rename
-    /// the filesystem refuses; the name keeps its previous content.
     pub fn replace(self, bytes: &[u8]) -> Result<(), StorageError> {
         crate::bundle::landing::land(
             &mut crate::real_fs::RealFs::new(),
@@ -215,14 +129,6 @@ impl WriteTarget {
         )
     }
 
-    /// Creates the file at this name only when nothing stands there:
-    /// the name is claimed by the filesystem at the moment of the write,
-    /// so of two racing creates one succeeds (`Sprawling/storage/spec/Alias.lean` §8-32).
-    ///
-    /// # Errors
-    /// `StorageError::NameTaken` when anything stands at the name, with
-    /// nothing written; `StorageError::Io` for a create, write or flush
-    /// the filesystem refuses.
     pub fn create(self, bytes: &[u8]) -> Result<(), StorageError> {
         crate::bundle::landing::create(self, bytes)
     }
@@ -241,9 +147,6 @@ pub(crate) mod tests {
     use crate::bundle::landing::{Bits, land};
     use crate::real_fs::RealFs;
 
-    /// Places a junction at `to` leading to `from` (a symlink off
-    /// Windows). `false` when this machine hands out no link at all -
-    /// in that arm nothing on the disk has changed.
     #[cfg(windows)]
     #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     pub(crate) fn place_link(_file: bool, from: &Path, to: &Path) -> bool {
@@ -271,8 +174,7 @@ pub(crate) mod tests {
     #[test]
     fn a_plain_name_clears_and_so_does_one_that_is_not_there_yet() {
         let tmp = tempfile::tempdir().unwrap();
-        // Resolved first: `at` walks to the filesystem root, and on macOS
-        // every temporary directory sits below `/var`, which is a link.
+
         let root = tmp.path().canonicalize().unwrap();
         let plain = root.join("work").join("a.txt");
         std::fs::create_dir_all(plain.parent().unwrap()).unwrap();
@@ -281,11 +183,6 @@ pub(crate) mod tests {
         WriteTarget::at("write a file", &root.join("work").join("new.txt")).unwrap();
     }
 
-    /// The hard-link arm is judged by the link count on every platform:
-    /// both names of a file with two are hard links, and a file that is
-    /// only read-only, or held open by another handle that shares
-    /// nothing, is not an alias - the count is read without asking for
-    /// any access that could collide with either.
     #[test]
     #[allow(
         clippy::permissions_set_readonly_false,
@@ -326,8 +223,6 @@ pub(crate) mod tests {
         );
     }
 
-    /// The link arm of the alias family: at the name or above it, a
-    /// junction or symlink refuses the write whole.
     #[test]
     fn a_link_at_the_name_or_above_it_is_refused() {
         let tmp = tempfile::tempdir().unwrap();
@@ -337,7 +232,6 @@ pub(crate) mod tests {
         std::fs::write(&hook, b"hook-body").unwrap();
         std::fs::create_dir_all(tmp.path().join("work")).unwrap();
 
-        // At the name: the name itself leads into `.git`.
         let at_name = tmp.path().join("work").join("a-dir");
         if place_link(true, &hooks, &at_name) {
             let err = WriteTarget::at("write a file", &at_name).unwrap_err();
@@ -352,7 +246,7 @@ pub(crate) mod tests {
                 "{err}"
             );
         }
-        // Above the name: the directory the write lands in leads there.
+
         let above = tmp.path().join("work").join("alias-dir");
         if place_link(true, &hooks, &above) {
             let err = WriteTarget::at("write a file", &above.join("pre-run")).unwrap_err();
@@ -372,12 +266,7 @@ pub(crate) mod tests {
 
     proptest::proptest! {
         #![proptest_config(proptest::prelude::ProptestConfig { cases: 32, ..proptest::prelude::ProptestConfig::default() })]
-        /// 别名永不落盘: whatever alias this machine can make - a hard
-        /// link at the name, a link at the name, a link above the name
-        /// - aimed at protected or plain metadata, not one byte lands
-        /// through it. A machine that grants no link privilege changes
-        /// nothing either, which is the same property from the other
-        /// side.
+
         #[test]
         fn an_alias_never_lands(
             kind in 0..3u8,
@@ -398,8 +287,6 @@ pub(crate) mod tests {
             let zone = root.join("work");
             std::fs::create_dir_all(&zone).unwrap();
 
-            // 0: a hard link at the name; 1: a link at the name;
-            // 2: a link above the name.
             let (target, placed) = match kind {
                 0 => {
                     let at = zone.join("out.txt");
@@ -422,8 +309,7 @@ pub(crate) mod tests {
                 let mut vfs = RealFs::new();
                 match WriteTarget::at("write a bundle file", &target) {
                     Ok(cleared) => {
-                        // Every alias above is refused; a name that
-                        // cleared lands in a fresh entry all the same.
+
                         land(&mut vfs, cleared, b"landed", Bits::OfReplaced).unwrap();
                     }
                     Err(StorageError::Alias { .. }) => {}
@@ -434,9 +320,6 @@ pub(crate) mod tests {
         }
     }
 
-    /// Eight creates of one name, released together: the filesystem
-    /// claims the name for one of them, every other meets the name
-    /// taken, and the bytes on the disk are the winner's.
     #[test]
     fn two_racing_creates_admit_one() {
         let tmp = tempfile::tempdir().unwrap();

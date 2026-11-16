@@ -3,43 +3,33 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a privacy control writes, and what a read of it returns
-//! (`Sprawling/app/spec/Privacy/Controls.lean`).
-//!
-//! A target names a place on the host; its operation kind and its scope
-//! follow from the place and are not stored beside it (Privacy D68).
-
 use kernel::{AxCode, AxError};
 use serde::{Deserialize, Serialize};
 use wire::{PrivacyScope, PrivacyTarget, PrivacyValue};
 
-/// Which registry hive a registry target lives in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Hive {
     CurrentUser,
     LocalMachine,
 }
 
-/// One place on the host a control writes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Target {
-    /// A value under `path` in `hive`, read and written in the 64-bit view.
+
     Registry {
         hive: Hive,
         path: &'static str,
         name: &'static str,
     },
-    /// A variable of the user's persistent environment: the value `name`
-    /// under `HKCU\Environment`, announced to running programs after a write.
+
     UserEnvironment { name: &'static str },
-    /// The enabled state of the task `name` in the task folder `path`.
+
     ScheduledTask {
         path: &'static str,
         name: &'static str,
     },
 }
 
-/// How a control is written: the closed set of four operation kinds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum OperationKind {
     RegistryValueHklm,
@@ -66,9 +56,7 @@ impl Target {
 }
 
 impl OperationKind {
-    /// Whose settings a write of this kind changes. Machine scope is
-    /// written through an elevated child, which needs administrator
-    /// approval (Privacy.Windows D60).
+
     pub(crate) const fn scope(self) -> PrivacyScope {
         match self {
             Self::RegistryValueHklm | Self::ScheduledTaskEnabled => PrivacyScope::Machine,
@@ -106,10 +94,6 @@ impl From<&Target> for PrivacyTarget {
     }
 }
 
-/// A registry value exactly as the host holds it: absent, or a type code
-/// and the raw bytes. Nothing is expanded, trimmed or decoded, so a value
-/// written back is the value that was read (Privacy.State D61: whether the
-/// parent key existed is recorded beside the value, not inside it).
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
 pub(crate) enum RawValue {
@@ -117,9 +101,6 @@ pub(crate) enum RawValue {
     Present { kind: u32, bytes: Vec<u8> },
 }
 
-/// A scheduled task as the host holds it. The digest covers the task's
-/// definition with its enabled flag removed, so disabling a task leaves
-/// its digest unchanged and any other edit to the task changes it.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
 pub(crate) enum TaskState {
@@ -128,7 +109,6 @@ pub(crate) enum TaskState {
     Disabled { definition_sha256: [u8; 32] },
 }
 
-/// One read of a control's target.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub(crate) enum Snapshot {
@@ -136,21 +116,17 @@ pub(crate) enum Snapshot {
     Task(TaskState),
 }
 
-/// One successful read of a control's target: its snapshot, and whether a
-/// registry value's parent key exists, which is recorded beside the value
-/// and never compared as part of it (Privacy.State D61).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Reading {
     pub(crate) value: Snapshot,
     pub(crate) key_existed: bool,
 }
 
-/// The registry type codes the controls write and the wire spells.
 const REG_SZ: u32 = 1;
 const REG_DWORD: u32 = 4;
 
 impl RawValue {
-    /// A `REG_DWORD`.
+
     pub(crate) fn dword(number: u32) -> Self {
         Self::Present {
             kind: REG_DWORD,
@@ -158,7 +134,6 @@ impl RawValue {
         }
     }
 
-    /// A `REG_SZ`: `text` in UTF-16 with its terminating NUL.
     pub(crate) fn text(text: &str) -> Self {
         Self::Present {
             kind: REG_SZ,
@@ -172,7 +147,7 @@ impl RawValue {
 }
 
 impl From<&Snapshot> for PrivacyValue {
-    /// The one spelling of `snapshot` on the wire (wire D50).
+
     fn from(snapshot: &Snapshot) -> Self {
         match snapshot {
             Snapshot::Registry(RawValue::Absent) => Self::Absent,
@@ -204,8 +179,6 @@ fn present(kind: u32, bytes: &[u8]) -> PrivacyValue {
     }
 }
 
-/// The text a `REG_SZ` holds when its bytes are UTF-16 ending in exactly
-/// one terminating NUL; any other bytes have no text spelling.
 fn text(kind: u32, bytes: &[u8]) -> Option<String> {
     let units: Vec<u16> = bytes
         .chunks(2)
@@ -245,9 +218,6 @@ fn bytes_of_hex(hex: &str) -> Option<Vec<u8>> {
 impl TryFrom<&PrivacyValue> for Snapshot {
     type Error = AxError;
 
-    /// The snapshot `value` spells, refused unless `value` is that
-    /// snapshot's one spelling (wire D50), so two spellings of one value
-    /// never reach a comparison.
     fn try_from(value: &PrivacyValue) -> Result<Self, AxError> {
         let digest =
             |hex: &str| bytes_of_hex(hex).and_then(|bytes| <[u8; 32]>::try_from(bytes).ok());
@@ -303,8 +273,7 @@ mod tests {
     }
 
     proptest! {
-        /// Every snapshot has one wire spelling and comes back from it
-        /// byte for byte (wire D50).
+
         #[test]
         fn a_snapshot_survives_its_wire_spelling(snapshot in snapshots()) {
             let value = PrivacyValue::from(&snapshot);
@@ -312,8 +281,6 @@ mod tests {
         }
     }
 
-    /// A value spelled any other way than the host spells it is refused,
-    /// so the comparison with a fresh read never meets two spellings.
     #[test]
     fn only_the_hosts_spelling_is_accepted() {
         let raw = |kind, hex: &str| PrivacyValue::Raw {

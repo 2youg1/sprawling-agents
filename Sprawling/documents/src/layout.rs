@@ -2,27 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
-// Portions copyright (c) 2026 2youg1 and the RefRain contributors
-
-//! Where a document's blocks lie in its bytes (`Sprawling/documents/Spec.lean`
-//! D6), migrated from RefRain's `source_layout`.
-//!
-//! The source stays bytes. A layout only records which byte intervals are
-//! blocks; gaps, line endings, indentation and every byte between blocks
-//! stay where they are, so blocks and gaps together reproduce the source
-//! byte for byte. Only the scanning rules came across: RefRain kept a
-//! digest beside the intervals so a layout could not slice other bytes,
-//! and here a layout never outlives the bytes it was read from.
 
 use crate::format::Format;
 use crate::span::{Span, offset};
 
-/// The block intervals of `source` under `format`'s rule, in order.
-///
-/// Reads bytes, never characters: the rules look for `\n`, `\r`,
-/// spaces, tabs and the two delimiter bytes, which mean the same in
-/// every encoding that keeps ASCII as itself, and the caller reads a
-/// layout only for such an encoding.
 pub(crate) fn blocks(format: Format, source: &[u8]) -> Vec<Span> {
     match format {
         Format::Markdown => markdown_blocks(source),
@@ -30,15 +13,6 @@ pub(crate) fn blocks(format: Format, source: &[u8]) -> Vec<Span> {
     }
 }
 
-/// Where the blocks that can no longer change end, in Markdown still
-/// being written (`Sprawling/documents/Spec.lean` D31, `closedUpTo`).
-///
-/// Just past the last complete line that is blank outside a code block,
-/// is an ATX heading at the margin, or closes a code block opened at the
-/// margin. The line still being written closes nothing, because what
-/// follows may join it; an indented fence or heading may sit inside a
-/// list item or a quote that the next line continues. Fences are read by
-/// the rule [`blocks`] reads them by.
 pub(crate) fn closed(source: &[u8]) -> u64 {
     let mut closed = 0_u64;
     let mut code: Option<(Delimiter, Margin)> = None;
@@ -59,8 +33,6 @@ pub(crate) fn closed(source: &[u8]) -> u64 {
     closed
 }
 
-/// Where a code block's opening line began: at the margin, or indented
-/// one to three columns, where it may belong to a list item or a quote.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Margin {
     At,
@@ -76,8 +48,6 @@ impl Margin {
     }
 }
 
-/// Every line that ends with a `\n`, and the offset just past it; the
-/// last line, when nothing ends it yet, is left out.
 fn complete_lines(source: &[u8]) -> impl Iterator<Item = (Line<'_>, u64)> {
     source
         .split_inclusive(|byte| *byte == b'\n')
@@ -92,8 +62,6 @@ fn complete_lines(source: &[u8]) -> impl Iterator<Item = (Line<'_>, u64)> {
         })
 }
 
-/// One line of the source: where it starts, and its content up to but
-/// not including its `\r\n` or `\n`.
 struct Line<'a> {
     start: u64,
     content: &'a [u8],
@@ -108,8 +76,6 @@ impl Line<'_> {
         self.content.iter().all(u8::is_ascii_whitespace)
     }
 
-    /// An ATX heading opened in the first column: one to six `#`, then a
-    /// space, a tab or the end of the line (CommonMark 0.31.2 section 4.2).
     fn is_margin_heading(&self) -> bool {
         let marks = self
             .content
@@ -124,7 +90,6 @@ impl Line<'_> {
     }
 }
 
-/// Every line, including the empty one after a final newline.
 fn lines(source: &[u8]) -> impl Iterator<Item = Line<'_>> {
     source
         .split(|byte| *byte == b'\n')
@@ -138,8 +103,6 @@ fn lines(source: &[u8]) -> impl Iterator<Item = Line<'_>> {
         })
 }
 
-/// Blank lines separate blocks; a code block between two delimiter lines
-/// holds its blank lines.
 fn markdown_blocks(source: &[u8]) -> Vec<Span> {
     let mut spans = Vec::new();
     let mut open: Option<u64> = None;
@@ -166,16 +129,12 @@ fn markdown_blocks(source: &[u8]) -> Vec<Span> {
     spans
 }
 
-/// Every line one block, empty ones included. A block holds no line
-/// ending; those bytes stay in the gaps.
 fn plain_blocks(source: &[u8]) -> Vec<Span> {
     lines(source)
         .map(|line| Span::ordered(line.start, line.content_end()))
         .collect()
 }
 
-/// A line that opens or closes a code block: three or more of one
-/// delimiter byte, indented by fewer than four columns.
 #[derive(Debug, Clone, Copy)]
 struct Delimiter {
     byte: u8,
@@ -201,8 +160,6 @@ impl Delimiter {
         (width >= 3).then_some(Delimiter { byte, width })
     }
 
-    /// Whether this line closes the block `opened` began: the same byte,
-    /// at least as many of it.
     fn closes(self, opened: Delimiter) -> bool {
         self.byte == opened.byte && self.width >= opened.width
     }

@@ -3,26 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which header a credential travels in — a fact about the compatible
-//! format, not about the person filling in a form.
-//!
-//! Anthropic wants an API key in `x-api-key`; `Authorization: Bearer`
-//! there carries a short-lived federation token only, so a key sent
-//! that way is answered 401. The OpenAI-compatible shape wants
-//! `Bearer`. One constructor holds both, because a registration page
-//! that chose for itself would be a second authority on a question the
-//! compatible format already answers.
-
 use kernel::{DialectKind, SecretRef};
 
 use super::config::AuthSpec;
 
 impl AuthSpec {
-    /// The credential header for one compatible format.
-    ///
-    /// `header` is what the person typed, and it always wins: a
-    /// third-party endpoint may want a name neither first party uses,
-    /// and this build cannot know them all.
+
     #[must_use]
     pub fn for_dialect(
         dialect: DialectKind,
@@ -38,21 +24,14 @@ impl AuthSpec {
                 name: ANTHROPIC_KEY_HEADER.to_owned(),
                 value: reference,
             },
-            // Anything not spelled here is served by the
-            // OpenAI-compatible shape, which is where `Bearer` comes
-            // from.
+
             (None, _) => AuthSpec::Bearer(reference),
         }
     }
 }
 
-/// The header Anthropic's own documentation prints for an API key.
-/// <https://platform.claude.com/docs/en/api/messages>
 const ANTHROPIC_KEY_HEADER: &str = "x-api-key";
 
-/// A provider that answers a model list to `x-api-key` and 401 to
-/// `Authorization: Bearer` — which is what the first party and the
-/// endpoints written against it actually do.
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,

@@ -3,23 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which session a commit came out of, as five git trailers.
-//!
-//! A person reading `git log` in a city this harness works in has to be
-//! able to answer "who wrote this line, on whose behalf, with which
-//! model" without opening the Ledger. That answer is a **projection**:
-//! the Ledger stays the authority for what happened, and the two sides
-//! reconcile on the commit oid, which is written into
-//! `checkpoint_committed` and into every `file_discarded` restoration.
-//! Where a trailer and the Ledger disagree, the trailer is the side that
-//! is wrong.
-//!
-//! The block is rendered as git's own trailer syntax rather than as a
-//! prefix language of this repository's invention, so
-//! `git interpret-trailers --parse` reads it with no help from us.
-//!
-//! Specified by `Sprawling/storage/spec/Checkpoint/Provenance.lean` §8-17.
-
 use std::path::Path;
 
 use kernel::event::record::CommitAttribution;
@@ -29,25 +12,14 @@ use crate::error::StorageError;
 use crate::jsonl::{first_line, ledger_segments_at};
 use crate::real_fs::RealFs;
 
-/// The model a run was given, and the thinking budget it was asked for.
-///
-/// The two always travel together — a model id without the effort asked
-/// of it does not say what the call was — so they arrive as one value
-/// rather than as two parameters a caller can hand over half of.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModelChoice {
-    /// The endpoint's own model id. Empty when the caller genuinely does
-    /// not know it: an invented id would be worse than an absent one.
+
     pub id: String,
-    /// Absent leaves the choice to the provider, which is not the same
-    /// fact as `Effort::None` asking it not to think.
+
     pub effort: Option<Effort>,
 }
 
-/// Who made a commit, and on whose behalf.
-///
-/// Private fields with one construction point, so a commit signed by a
-/// run that does not exist cannot be assembled a field at a time.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Provenance {
     run: RunId,
@@ -59,7 +31,7 @@ pub struct Provenance {
 }
 
 impl Provenance {
-    /// The one construction point.
+
     pub fn new(run: RunId, actor: Address, city: B3Hash, chosen: ModelChoice) -> Provenance {
         Provenance {
             run,
@@ -71,30 +43,16 @@ impl Provenance {
         }
     }
 
-    /// Names the run this one replaced, so a commit can be asked for
-    /// its lineage. A sixth trailer, present only when there is one.
     #[must_use]
     pub fn succeeding(mut self, predecessor: RunId) -> Provenance {
         self.predecessor = Some(predecessor);
         self
     }
 
-    /// The run this one replaced, when it is a successor.
     pub fn predecessor(&self) -> Option<RunId> {
         self.predecessor
     }
 
-    /// The city's identity: the chain hash of its genesis line.
-    ///
-    /// Only the first line of the first segment is read. A city's whole
-    /// history can be tens of megabytes, and reading it to learn one
-    /// hash would make every checkpoint pay for the length of the city's
-    /// life.
-    ///
-    /// # Errors
-    /// Propagates a ledger directory that cannot be listed or read, and
-    /// refuses a directory holding no ledger at all — a city with no
-    /// genesis line has no identity to sign with.
     pub fn city_of(ledger_dir: &Path) -> Result<B3Hash, StorageError> {
         let vfs = RealFs::new();
         for segment in ledger_segments_at(ledger_dir)? {
@@ -114,30 +72,20 @@ impl Provenance {
         })
     }
 
-    /// Who this commit is signed as.
     pub fn actor(&self) -> &Address {
         &self.actor
     }
 
-    /// The run this commit belongs to, which names the reference a wave
-    /// checkpoint is filed under.
     pub fn run(&self) -> RunId {
         self.run
     }
 
-    /// The git author line: the resident's address, at a mailbox derived
-    /// from the city it lives in. The domain is unroutable on purpose —
-    /// it identifies a city rather than promising to deliver mail.
     pub(crate) fn email(&self) -> String {
         let city = self.city.to_string();
         let short = city.get(..CITY_PREFIX_HEX).unwrap_or(city.as_str());
         format!("{}@{short}.sprawling", self.actor.as_str())
     }
 
-    /// Which session made this commit, in the shape every record that
-    /// names a commit carries it. Both `checkpoint_committed` and
-    /// `pr_merged` are stamped from here, so the two cannot describe
-    /// one commit differently.
     pub fn attribution(&self) -> CommitAttribution {
         CommitAttribution {
             model: self.model.clone(),
@@ -146,9 +94,6 @@ impl Provenance {
         }
     }
 
-    /// The trailers block, in this order and this spelling, one per line
-    /// and newline-terminated. The sixth line appears only for a run
-    /// that replaced another.
     pub fn trailers(&self) -> String {
         let mut out = format!(
             "Sprawling-Run: {}\nSprawling-Actor: {}\nSprawling-Model: {}\nSprawling-Effort: {}\nSprawling-City: {}\n",
@@ -165,19 +110,8 @@ impl Provenance {
     }
 }
 
-/// How much of the city hash the author domain carries. Twelve hex
-/// digits distinguish every city a person will ever have on one machine
-/// while still fitting in a terminal beside the address.
 const CITY_PREFIX_HEX: usize = 12;
 
-/// How an effort nobody asked for is recorded: as [`Effort::None`].
-///
-/// The distinction `Option` draws — the provider chose, against we asked
-/// it not to think — has never reached the git trailer or the ledger,
-/// both of which have written `none` for either since the first checkpoint.
-/// Every output that has to pick a word goes through here, so one place
-/// decides it and a record written today still reads back the way a
-/// year-old build wrote it.
 #[must_use]
 pub fn recorded_effort(effort: Option<Effort>) -> Effort {
     effort.unwrap_or(Effort::None)
@@ -256,8 +190,7 @@ mod tests {
 
     #[test]
     fn an_effort_nobody_asked_for_is_recorded_as_the_level_none() {
-        // What the ledger record and the git trailer have always said,
-        // now settled once instead of at each output.
+
         assert_eq!(recorded_effort(None), Effort::None);
         assert_eq!(recorded_effort(Some(Effort::High)), Effort::High);
         assert_eq!(recorded_effort(None).as_str(), "none");

@@ -3,29 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The constructor every child process of the city starts from
-//! (`Sprawling/child/Spec.lean` §8, D1 and D2).
-
 use std::ffi::OsStr;
 use std::process::Command;
 
 use crate::environment::scrubbed;
 
-/// Windows' `CREATE_NO_WINDOW`: the child gets a console of its own with
-/// no window, instead of the city's, so it cannot read the city's screen
-/// buffer or keyboard input.
-///
-/// `creation_flags` replaces the flags rather than adding to them, so a
-/// caller that sets its own (a priority class) ORs this in.
 #[cfg(windows)]
 pub const NO_WINDOW: u32 = 0x0800_0000;
 
-/// A [`Command`] for `program`, ready for arguments, stdio and `spawn`.
-///
-/// Off the city's console on Windows, in a process group of its own on
-/// Unix, and without any environment key that holds one of the city's
-/// secrets. A key the caller sets with `env` afterwards is passed on: that
-/// is a value the caller chose to hand over.
 #[must_use]
 #[expect(
     clippy::disallowed_methods,

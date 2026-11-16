@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// One file of the city as the pages that show it draw it: the text of
-// its first window, how long the file is, whether it is text at all, and
-// whether the window left some of it out. The city answers a document as
-// a version (`Sprawling/wire/Spec.lean` §8-69); this is the one place a page turns that
-// answer into what it draws, so the three pages that read a file agree.
-
 import { readAnswer, type Answered } from "./answered";
 import type { Answer, DocumentAnswer } from "../wire";
 
@@ -24,9 +18,6 @@ export function readDocument(answer: Answer | undefined): Answered<DocumentText>
   return read.kind === "held" ? documentText(read.value) : read;
 }
 
-// A file that is not there and one that will not read are both "the
-// city could not show this file", named by the question a person asked;
-// an empty file is a file with no text.
 function documentText(document: DocumentAnswer): Answered<DocumentText> {
   const state = document.state;
   const asked = `Document(${document.at})`;

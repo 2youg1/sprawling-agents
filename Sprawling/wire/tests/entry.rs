@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The regression the local door was rebuilt for: a page on another
-//! site, or a request naming another host, reached the city's socket and
-//! its acting doors on loopback without presenting anything
-//! (`Sprawling/wire/spec/Reception/Entry.lean` §8-94).
-//!
-//! Driven in process through `tower::ServiceExt::oneshot`, as the other
-//! route tests are: this judges the router's own table, and a test that
-//! raised the product's server and spoke HTTP from outside would be
-//! `Tools/adversary/`'s ground (`xtask boundary`).
-
 #![cfg(feature = "server")]
 #![allow(
     clippy::unwrap_used,
@@ -84,9 +74,6 @@ fn config() -> ServeConfig {
     }
 }
 
-/// One request at the router of a city listening on [`AT`], with the
-/// headers a browser or a native client would send, answered with its
-/// status.
 async fn status(method: &str, path: &str, headers: &[(&str, &str)]) -> u16 {
     let at: SocketAddr = AT.parse().unwrap();
     let wire::BindVerdict::Serve(face) =
@@ -108,14 +95,11 @@ async fn status(method: &str, path: &str, headers: &[(&str, &str)]) -> u16 {
         .as_u16()
 }
 
-/// What a browser sends to open the socket, less the Origin and Host
-/// each case chooses.
 const UPGRADE: [(&str, &str); 4] = [
     ("connection", "upgrade"),
     ("upgrade", "websocket"),
     ("sec-websocket-version", "13"),
-    // The sample key of RFC 6455 section 1.3, in fragments short enough
-    // that the secret scanner reads them as the text they are.
+
     (
         "sec-websocket-key",
         concat!("dGhl", "IHNh", "bXBs", "ZSBu", "b25j", "ZQ=="),

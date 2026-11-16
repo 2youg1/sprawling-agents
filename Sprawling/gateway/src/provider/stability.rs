@@ -3,31 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The guard on one property of the supply layer: **under one
-//! configuration, two dispatches send the same system prefix, byte for
-//! byte**.
-//!
-//! The property exists because of what a third-party endpoint does with
-//! a prompt. A compatible relay keys its prompt cache on the whole
-//! prompt text, so one byte that changes per request moves the key
-//! every turn and every call pays full price for a prefix that never
-//! semantically changed. An upstream client is reported to prepend a
-//! per-request line carrying a `cch=` parameter to the system prompt on
-//! the messages face, which its own vendor's server recognises and a
-//! relay cannot: **this city must never add such a line**, and the
-//! assertions below are how that stays true rather than a paragraph
-//! somebody remembers.
-//!
-//! The assertions run no network and need no endpoint. They cover the
-//! half of the path this crate owns — from the blocks handed to the
-//! supply layer to the bytes leaving it. The other half, whether the
-//! blocks themselves repeat across two dispatches, belongs to
-//! `runtime::prefix`, which freezes them once per run.
-//!
-//! A deliberate exception is recorded in `Sprawling/gateway/spec/Provider/Registry.lean` §8-18: changing
-//! effort changes the prefix on purpose, and an intended miss is not
-//! the accident guarded here.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -42,18 +17,12 @@ use crate::dialect::{ImageBytes, request_wire};
 use crate::provider::preset::ChatSpelling;
 use crate::provider::registry::ConnectionKind;
 
-/// Every way this city connects, so a connection added without a
-/// thought for caching fails here rather than on somebody's bill.
 const EVERY_CONNECTION: [ConnectionKind; 3] = [
     ConnectionKind::OpenAiCompat,
     ConnectionKind::Responses,
     ConnectionKind::AnthropicNative,
 ];
 
-/// One conversation with a system prefix a person would recognise,
-/// built here rather than taken from a shared sample: this file states
-/// the case it guards, and a sample edited for another test would
-/// quietly change what is guarded.
 fn dispatch() -> ChatRequest<'static> {
     ChatRequest {
         model: "a-model".to_owned(),
@@ -83,7 +52,6 @@ fn dispatch() -> ChatRequest<'static> {
     }
 }
 
-/// The system text as it leaves for the endpoint, in either shape.
 fn system_on_the_wire(kind: ConnectionKind, chat: &ChatRequest) -> String {
     let wire = request_wire(
         kind.wire(),
@@ -101,11 +69,7 @@ fn system_on_the_wire(kind: ConnectionKind, chat: &ChatRequest) -> String {
             .collect::<Vec<String>>()
             .join("\n\n"),
         DialectKind::OpenAi => wire["messages"][0]["content"].as_str().unwrap().to_owned(),
-        // The responses writer puts the system segments in the first
-        // input item, as a `developer` message whose parts are the
-        // segments; `instructions` is one string and would lose the
-        // cache breakpoints on their edges. Read part by part, so this
-        // guard still reads the bytes that leave the city.
+
         DialectKind::OpenAiResponses => wire["input"][0]["content"]
             .as_array()
             .unwrap()
@@ -142,9 +106,6 @@ fn two_dispatches_of_one_configuration_send_the_same_bytes() {
     }
 }
 
-/// The assertion against the reported upstream behaviour: what reaches
-/// the endpoint is what the city handed over, with nothing in front of
-/// it.
 #[test]
 fn the_supply_layer_prepends_nothing_to_the_system_prefix() {
     let chat = dispatch();
@@ -170,10 +131,6 @@ fn the_supply_layer_prepends_nothing_to_the_system_prefix() {
     }
 }
 
-/// The first block is where a relay's cache key starts, so a per-turn
-/// value there costs the whole prefix. Stated separately from the
-/// equality above because this is the sentence a reviewer checks a new
-/// prefix component against.
 #[test]
 fn the_first_system_block_is_the_one_the_city_put_first() {
     let chat = dispatch();

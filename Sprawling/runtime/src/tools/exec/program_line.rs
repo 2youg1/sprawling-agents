@@ -3,36 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A command line read without a shell: one program and its arguments
-//! (`Sprawling/runtime/spec/Tools/Exec.lean` §8-13-4, D118).
-//!
-//! A building that offers no shell still runs `command`, as the program
-//! its first word names. The grammar is the part of a shell's that
-//! changes nothing about what a line reaches: words split on blanks,
-//! and quotes that hold blanks inside one word. Every character a shell
-//! would act on is refused outside quotes, because passed on as an
-//! argument it runs a different command from the one the model wrote,
-//! and the model would not know.
-
 use kernel::{AxCode, AxError};
 
-/// The characters a shell gives a meaning to. Outside quotes each one is
-/// refused rather than passed on as text.
 const SHELL_SYNTAX: [char; 18] = [
     '|', '&', ';', '<', '>', '(', ')', '$', '`', '*', '?', '[', ']', '{', '}', '~', '#', '\n',
 ];
 
-/// The program a line names and the arguments it hands it.
-///
-/// Blanks outside quotes end a word. A pair of single or double quotes
-/// adds what it holds, blanks included, to the word it stands in, and
-/// nothing inside it is expanded; the quotes themselves are dropped. A
-/// backslash is an ordinary character, since on Windows it separates a
-/// path.
-///
-/// # Errors
-/// `E_INVALID_ARGS` for shell syntax outside quotes, naming the
-/// character, for a quote left open, and for a line with no word.
 pub(crate) fn program_line(text: &str) -> Result<(String, Vec<String>), AxError> {
     let mut words: Vec<String> = Vec::new();
     let mut word: Option<String> = None;

@@ -3,30 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The red team's two arms: the same conclusions, kept with and without
-//! a verification run, and the quality of what each arm keeps
-//! (`Tools/citysim/spec/RedTeam.lean` §8-7).
-//!
-//! The arms differ only in whether [`Citation::against`] is called, so a
-//! difference in the tallies is the verification run's and nothing else's.
-//! The script stands where the provider stands: a real provider replaces
-//! the author of the conclusions, never the judgment.
-
 use collab::{Citation, Reading};
 use kernel::{B3Hash, Locator};
 
-/// Which arm of the comparison a run belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Arm {
-    /// Every conclusion the author hands in is kept.
+
     Unverified,
-    /// A conclusion is kept only when its citation holds against the
-    /// pinned draft.
+
     Verified,
 }
 
-/// What the red team planted in a conclusion: its ground truth, which
-/// neither arm reads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Plant {
     Faithful,
@@ -35,21 +22,18 @@ pub enum Plant {
     PastEnd,
 }
 
-/// One conclusion: the citation it rests on and what was planted in it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Claim {
     pub citation: Citation,
     pub plant: Plant,
 }
 
-/// A draft under review and the conclusions an author run handed in.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Case {
     pub draft: String,
     pub claims: Vec<Claim>,
 }
 
-/// Where each conclusion ended up in one arm.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Tally {
     pub kept_faithful: usize,
@@ -58,14 +42,12 @@ pub struct Tally {
     pub dropped_planted: usize,
 }
 
-/// Both arms over the same script.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Comparison {
     pub unverified: Tally,
     pub verified: Tally,
 }
 
-/// Runs the script once per arm.
 pub fn compare(cases: &[Case]) -> Comparison {
     Comparison {
         unverified: tally(cases, Arm::Unverified),
@@ -74,8 +56,7 @@ pub fn compare(cases: &[Case]) -> Comparison {
 }
 
 impl Tally {
-    /// Faithful conclusions per thousand kept; `None` when nothing was
-    /// kept, because zero over zero is not a quality.
+
     pub fn precision_per_mille(&self) -> Option<usize> {
         let kept = self.kept_faithful.checked_add(self.kept_planted)?;
         self.kept_faithful.checked_mul(1000)?.checked_div(kept)

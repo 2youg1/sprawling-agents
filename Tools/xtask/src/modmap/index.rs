@@ -3,19 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What an index file is and what it may hold. `lib.rs` and a file named
-//! for a directory of registered modules are exempt from the map, and
-//! the exemption costs no coverage because their lines are checked to be
-//! declarations and nothing else.
-
 use std::collections::BTreeSet;
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// Line prefixes allowed in `lib.rs` and pure index files: single-line
-/// declarations only, which is what makes exempting them free.
 const INDEX_PREFIXES: [&str; 8] = [
     "//",
     "#![",

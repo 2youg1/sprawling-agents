@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The slash verbs a person types, one table for the CLI and the WebUI
-//! (`Sprawling/wire/spec/Slash.lean` §8-96).
-//!
-//! Every fact about a verb is one arm of a `const fn` on [`Slash`], so
-//! adding a verb makes the compiler ask for its spelling, its argument,
-//! where it is offered and the sentence that explains it. The client
-//! reads the same table through the `SLASH` constant `cargo xtask
-//! wire-ts` generates into `client/src/wire.ts`.
-
-/// One verb a person can type after a `/`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Slash {
     Help,
@@ -33,7 +23,6 @@ pub enum Slash {
     Wire,
 }
 
-/// Where a verb is offered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Offered {
     Cli,
@@ -42,7 +31,7 @@ pub enum Offered {
 }
 
 impl Offered {
-    /// The spelling the generated client table carries.
+
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -52,7 +41,6 @@ impl Offered {
         }
     }
 
-    /// Whether the terminal offers a verb offered here.
     #[must_use]
     pub const fn in_the_cli(self) -> bool {
         match self {
@@ -63,7 +51,7 @@ impl Offered {
 }
 
 impl Slash {
-    /// Every verb, in the order `/help` lists them.
+
     pub const ALL: [Slash; 16] = [
         Self::Help,
         Self::Room,
@@ -83,7 +71,6 @@ impl Slash {
         Self::Wire,
     ];
 
-    /// The verb as a person types it, slash included.
     #[must_use]
     pub const fn spelling(self) -> &'static str {
         match self {
@@ -106,7 +93,6 @@ impl Slash {
         }
     }
 
-    /// What follows the spelling; empty when the verb takes nothing.
     #[must_use]
     pub const fn takes(self) -> &'static str {
         match self {
@@ -121,7 +107,6 @@ impl Slash {
         }
     }
 
-    /// Where a person finds the verb.
     #[must_use]
     pub const fn offered(self) -> Offered {
         match self {
@@ -141,7 +126,6 @@ impl Slash {
         }
     }
 
-    /// The one sentence `/help` prints beside the verb.
     #[must_use]
     pub const fn says(self) -> &'static str {
         match self {
@@ -166,7 +150,6 @@ impl Slash {
         }
     }
 
-    /// The verb a word names, with or without its leading `/`.
     #[must_use]
     pub fn parse(word: &str) -> Option<Slash> {
         let bare = word.strip_prefix('/').unwrap_or(word);

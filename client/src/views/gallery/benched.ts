@@ -3,32 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The world layer as docs/frontend-method.md §7H and client/Spec.lean §7K draw it, in a made-up city
-// of three buildings: the panorama workbench on a building room with a
-// commit picked, the same room in the blend tier, the workbench with
-// the right pane open, and the two readings of the third pane that
-// follow the workspace - the city beside the Mayor's room and the
-// files beside a building's - and, closer, what the wire's run-level
-// fields draw: who is listening, as the palette's foot draws it, the session
-// pane at the width a panorama gives it, and a picked commit's B3.
-// The panorama is drawn at 1440 and at 1920, and the instrument sheet
-// alone at a phone's 390, because the sheet's two speed cells must
-// hold their figures uncut at each of the three.
-//
-// The room's session ran three turns that read, ran and edited, and
-// checkpointed twice; its building's history holds a branch that
-// another room's session merged back, so the swimlane graph has a
-// lane leaving and rejoining. The session's figures are chosen to be
-// told apart: 1.2 million tokens read, a fifth of them from the cache,
-// a median time to first content of 412 ms. The run works in its own
-// worktree under the tested-and-ordinary policy, its finished command
-// exited 0, and each commit carries the B3 of its checkpoint line.
-//
-// The made-up city lives in this file rather than in the fixture's
-// module script, because typescript-eslint cannot resolve a named export
-// of a `.svelte` module: the fixtures of the world layer's controls one
-// at a time (`world.svelte`) read the same city.
-
 import type {
   Answer,
   Call,
@@ -52,8 +26,6 @@ export const run = (n: number): RunId =>
   RunId.make(`0199c0de-0000-4000-8000-${n.toString(16).padStart(12, "0")}`);
 export const oid = (digit: string): GitOid => GitOid.make(digit.repeat(40));
 
-// Who ran where, and how each run stands: still going, waiting for the
-// person, or frozen.
 const RUNS: readonly (readonly [string, string, EventKind | null])[] = [
   ["lab/room1", "read the city's document contract", "run_frozen"],
   ["lab/room2", "nextest coverage for the city", "run_frozen"],
@@ -119,10 +91,6 @@ function call(at: number, tool: string, subject: string, ms: number | null): Cal
   };
 }
 
-// The commits of building `lab`, newest first. The fifth digit is a
-// commit the page does not hold, so the oldest lane runs off the foot.
-// Each commit's time is seconds after the session's start: the two
-// the live session made land on its two checkpoints.
 const HISTORY: readonly (readonly [string, readonly string[], string, number, string, number])[] = [
   ["e", ["d"], "edit document.rs", 6, "lab/room1", 32.4],
   ["d", ["c"], "read the specification", 6, "lab/room1", 22.2],
@@ -148,8 +116,6 @@ const COMMITS: readonly CommitAnswer[] = HISTORY.map(
   }),
 );
 
-// The live session's three turns: it read and ran, edited and
-// checkpointed, then checkpointed again and is running the tests.
 interface Shape {
   readonly calls: readonly Call[];
   readonly notes: Turn["notes"];
@@ -212,8 +178,6 @@ export const OPENING: Opening = {
   effort: "medium",
 };
 
-// What the live run was told, segment by segment; the building's
-// segment lost the end of its file to the budget.
 const SEGMENTS: readonly (readonly [PrefixSlot, number, string, number])[] = [
   ["city", 2_140, "CITY.md", 0],
   ["building", 6_812, "lab/AGENTS.md", 1_204],
@@ -345,11 +309,7 @@ export function answering(query: Query): Answer | undefined {
       },
     };
   }
-  // Files only, and names of one length: `building/tree.svelte` draws a
-  // file row's glyph box with no height, so `cargo xtask render` takes
-  // the name's centre for the row's first mark, and a folder at the top
-  // opens by itself into rows indented off that line. Both are the
-  // tree's to fix; this fixture draws the rows the tree draws straight.
+
   if ("prefix" in query) {
     const segments = SEGMENTS.map(([slot, bytes, addr, dropped], at) => ({
       slot,
@@ -376,6 +336,4 @@ export function answering(query: Query): Answer | undefined {
   return undefined;
 }
 
-// The commit the first case shows picked: the session's own last
-// checkpoint.
 export const PICKED = COMMITS[0];

@@ -3,30 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! This machine answering (`Sprawling/app/Spec.lean` §8-40 and §8-47).
-//!
-//! Three questions and one act live here, and nothing else does: is the
-//! program on the search path or at a place this platform installs it,
-//! is the component where the variable or the component directory says,
-//! is the interpreter the platform names there - and, after a person has
-//! agreed to one named command, handing that command to
-//! `doctor::running`, which is the one place this binary starts an
-//! install program. Whether this build carries its engine is answered in
-//! `host`, beside the engine, and what scanning does to the city's
-//! writes in `scanning`.
-//!
-//! **A version call has a deadline.** A tool installed half-way can hang
-//! on start-up, and a doctor that hangs is worse than a tool that is
-//! missing. The shape is `agent_protocols::mcp::stdio`'s: the read happens on a
-//! thread, the wait happens on a channel that has a deadline, and a
-//! deadline that passes kills the child. The deadline itself arrives as
-//! a parameter, so no clock is sampled here.
-//!
-//! The functions below `ThisMachine` take what they read as parameters:
-//! the search path, a variable's value, the component directory. The
-//! tests hand them a temporary directory and never touch this process's
-//! environment.
-
 use std::ffi::OsString;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
@@ -41,34 +17,15 @@ use crate::serving::standing::{Standing, raise_this_thread};
 use super::scanning::Scanning;
 use super::{Absence, Detection, Fault, Platform, Presence, Requirement, Version};
 
-/// What is asked of the machine under this city, item by item. Two
-/// implementations: `ThisMachine`, and the scripted one the tests
-/// drive, which is what lets a verdict be judged without the machine
-/// that produced it.
-///
-/// **An install goes through the parent trait.** This trait adds only
-/// `look`, so the terminal and the worker start a package manager
-/// through the one `accounting::Machine::install` (`Sprawling/accounting/Spec.lean`
-/// §8-4), and a script that replaces it replaces every install. `Sync`,
-/// because a report asks every item at once, one thread per item.
 pub(crate) trait Machine: accounting::Machine + Sync {
-    /// Whether this item is here, and in what condition.
+
     fn look(&self, requirement: &Requirement) -> Presence;
 
-    /// Where this machine lets a core thread stand under the person's
-    /// setting (`Sprawling/app/spec/Serving/Standing.lean` §8-93).
-    ///
-    /// # Errors
-    /// Reports a setting that does not read, and a thread that could not
-    /// be started to ask.
     fn core_standing(&self) -> Result<Standing, AxError>;
 
-    /// Whether real-time scanning stands in front of the writes under
-    /// the directory `city` (`doctor::scanning`).
     fn scanning(&self, city: &Path) -> Scanning;
 }
 
-/// The machine this process is running on.
 pub(crate) struct ThisMachine {
     platform: Option<Platform>,
     patience: Duration,
@@ -98,8 +55,7 @@ impl Machine for ThisMachine {
                     Some(path) => ask_version(&path, version_arg, self.patience),
                 }
             }
-            // A listing without the wanted line is reported as the
-            // program's absence: the item is not where it resolves.
+
             Detection::Listed {
                 program,
                 args,
@@ -156,8 +112,6 @@ impl Machine for ThisMachine {
         }
     }
 
-    /// Asks on a thread of its own that ends with the answer, so the
-    /// doctor's own threads keep their level.
     fn core_standing(&self) -> Result<Standing, AxError> {
         let setting = accounting::person::core_priority()?;
         let unasked = |cause: String| {
@@ -196,10 +150,6 @@ impl accounting::Machine for ThisMachine {
     }
 }
 
-/// The regular face of an installed font, in the user and system
-/// directories the platform's own font manager reads. Scoop is covered
-/// beside Windows' per-user directory because that is where its
-/// Maple-Mono-NF-CN package lands.
 pub(super) fn font_at(
     platform: Platform,
     home: Option<PathBuf>,
@@ -225,16 +175,12 @@ pub(super) fn font_at(
     )
 }
 
-/// The supplied locations keep tests independent of the host's font directories.
 struct FontLocations {
     home: Option<PathBuf>,
     local_app_data: Option<OsString>,
     system: Result<Vec<PathBuf>, UnreadableRoot>,
 }
 
-/// A system font root that could not be read, with the registry value
-/// that was to name it: a fault and where it sits are one report, so
-/// they travel as one value.
 struct UnreadableRoot {
     at: PathBuf,
     said: String,
@@ -252,12 +198,10 @@ fn windows_font_root() -> Result<Vec<PathBuf>, UnreadableRoot> {
 
 #[cfg(not(windows))]
 fn windows_font_root() -> Result<Vec<PathBuf>, UnreadableRoot> {
-    // The caller supplies Windows' system roots here, so this platform
-    // never reads the installation record (Doctor §8-174).
+
     Ok(Vec::new())
 }
 
-/// Searches user locations first, then system locations in platform order.
 fn font_in(platform: Platform, locations: FontLocations, files: &[&str]) -> Presence {
     let mut roots = Vec::new();
     if let Platform::Windows = platform
@@ -290,11 +234,7 @@ fn font_in(platform: Platform, locations: FontLocations, files: &[&str]) -> Pres
     } else {
         0
     };
-    // A read error ends that one candidate's search, not the probe's:
-    // any listed file satisfies the detection, so a directory that
-    // cannot be read must not turn an installed second candidate into
-    // `Broken`. The first error is kept and answered only when no
-    // candidate answered anywhere (Doctor §8-174).
+
     let mut trouble: Option<Presence> = None;
     for root in roots {
         for file in files {
@@ -338,7 +278,6 @@ fn font_in(platform: Platform, locations: FontLocations, files: &[&str]) -> Pres
     }
 }
 
-/// Examines a root before its sorted children, without following directory links.
 fn font_under(root: &Path, file: &str, depth: usize) -> Option<Presence> {
     let candidate = root.join(file);
     match std::fs::metadata(&candidate) {
@@ -401,14 +340,6 @@ fn font_under(root: &Path, file: &str, depth: usize) -> Option<Presence> {
     None
 }
 
-/// The file names one program can carry on this platform, in the order
-/// a shell resolves them.
-///
-/// The extensionless name comes last on Windows, and that ordering is
-/// load-bearing: a package manager can leave both `bun` (a shell script
-/// no Windows process starts) and `bun.cmd` in one directory, and
-/// taking the first of them reports an installed tool as one that will
-/// not say its version.
 pub(super) fn names_of(program: &str) -> Vec<String> {
     match super::Platform::current() {
         Some(super::Platform::Windows) => ["exe", "cmd", "bat"]
@@ -422,12 +353,10 @@ pub(super) fn names_of(program: &str) -> Vec<String> {
     }
 }
 
-/// The first directory on the search path holding this program.
 pub(crate) fn on_search_path(search_path: &OsString, program: &str) -> Option<PathBuf> {
     let separator = match super::Platform::current() {
         Some(platform) => platform.search_path_separator(),
-        // A fourth platform is read the POSIX way: it is the spelling
-        // every system but Windows uses.
+
         None => super::Platform::Linux.search_path_separator(),
     };
     let search_path = search_path.to_str()?.to_owned();
@@ -439,9 +368,6 @@ pub(crate) fn on_search_path(search_path: &OsString, program: &str) -> Option<Pa
         .find(|candidate| candidate.is_file())
 }
 
-/// The first of this platform's standard install locations holding it.
-/// Firefox is why this exists: on Windows and macOS it is installed
-/// where no shell resolves it.
 fn at_a_known_place(places: &[&str]) -> Option<PathBuf> {
     places
         .iter()
@@ -449,8 +375,6 @@ fn at_a_known_place(places: &[&str]) -> Option<PathBuf> {
         .find(|candidate| candidate.is_file())
 }
 
-/// The interpreter a variable names, or the platform's own when the
-/// variable is unset or empty.
 fn interpreter_named(value: Option<OsString>, fallback: &str) -> PathBuf {
     match value {
         Some(named) if !named.is_empty() => PathBuf::from(named),
@@ -458,11 +382,6 @@ fn interpreter_named(value: Option<OsString>, fallback: &str) -> PathBuf {
     }
 }
 
-/// Where a component is: the variable when set, the directory otherwise.
-///
-/// A set variable that names nothing is an answer, not a fall-through:
-/// a person pointed somewhere, and the fault they need to hear about is
-/// that the pointer is wrong.
 pub(super) fn component_at(
     variable: &'static str,
     value: Option<OsString>,
@@ -524,22 +443,16 @@ pub(super) fn component_at(
     }
 }
 
-/// Starts the program and takes the first line it writes, under a
-/// deadline. A program that will not start is broken, not absent; one
-/// that starts and says nothing is present all the same.
 pub(super) fn ask_version(program: &Path, version_arg: &str, patience: Duration) -> Presence {
     ask(program, &[version_arg], Wanted::First, patience)
 }
 
-/// Which line of a program's output answers the question.
 #[derive(Clone, Copy)]
 enum Wanted {
     First,
     StartingWith(&'static str),
 }
 
-/// Starts the program with `args` and takes the line `wanted` names,
-/// under a deadline; `ask_version` is the first-line case.
 fn ask(program: &Path, args: &[&str], wanted: Wanted, patience: Duration) -> Presence {
     let spawned = child::command(program)
         .args(args)
@@ -560,19 +473,13 @@ fn ask(program: &Path, args: &[&str], wanted: Wanted, patience: Duration) -> Pre
         Some(stdout) => line_of(stdout, wanted, patience),
         None => Version::Silent,
     };
-    // The child is done with either way: a late line would be read as
-    // the answer to a question nobody is asking any more. Ended through
-    // `running::stop`, which is where this binary decides what ending a
-    // child it started means.
+
     match super::running::stop(&mut child) {
         None => Presence::Present {
             at: program.to_path_buf(),
             version,
         },
-        // A version call this machine would not let the city stop
-        // leaves a process behind, and that outranks the version it
-        // printed: the person has to deal with the process before any
-        // answer about this item is worth reading.
+
         Some(trouble) => Presence::Broken {
             at: program.to_path_buf(),
             fault: Fault::Unreadable(trouble),
@@ -580,7 +487,6 @@ fn ask(program: &Path, args: &[&str], wanted: Wanted, patience: Duration) -> Pre
     }
 }
 
-/// The wanted line a pipe yields before the deadline.
 fn line_of(stdout: std::process::ChildStdout, wanted: Wanted, patience: Duration) -> Version {
     let (sender, answers) = std::sync::mpsc::channel();
     let reader = std::thread::Builder::new()
@@ -595,8 +501,7 @@ fn line_of(stdout: std::process::ChildStdout, wanted: Wanted, patience: Duration
                     })
                 }),
             };
-            // Either end finishing ends the reader: a closed pipe means
-            // the program is gone, a closed channel means nobody waits.
+
             drop(sender.send(first));
         });
     if reader.is_err() {
@@ -616,9 +521,6 @@ fn line_of(stdout: std::process::ChildStdout, wanted: Wanted, patience: Duration
 mod tests {
     use super::*;
 
-    /// The font row closes after installation: both the platform's
-    /// ordinary user-font directory and Scoop's layout answer Present,
-    /// while a missing face is an explicit absence (`Doctor.lean` §8-174).
     #[test]
     fn font_files_are_found_in_user_font_directories_and_absence_is_explicit() {
         const FILE: &str = "MapleMono-NF-CN-Regular.ttf";
@@ -752,11 +654,7 @@ mod tests {
 
     #[test]
     fn a_broken_first_candidate_does_not_hide_a_present_second_one() {
-        // The first name carries an interior NUL, which every platform's
-        // stat refuses with an error other than NotFound, so one test
-        // covers the branch everywhere; the realistic unreadable-file
-        // shape of the same branch is `unreadable_font_metadata_is_broken`,
-        // which only unix can build.
+
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join(".local/share/fonts");
         std::fs::create_dir_all(&root).unwrap();

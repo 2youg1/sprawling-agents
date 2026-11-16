@@ -3,78 +3,54 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The processes a supervised city runs as: `serve` in a child, and
-//! `resume` in a child after each crash (`Sprawling/app/spec/Supervising.lean` §8-109).
-//!
-//! Thin on purpose. The exit a child leaves is read as served or failed
-//! and judged by `CrashBudget::after`; this file only spawns, waits,
-//! measures elapsed time, and prints what the person needs to see.
-
 use super::{CrashBudget, Next};
 use crate::serving::standing::monotonic_now;
 use kernel::{AxCode, AxError, TimeMs};
 use std::path::Path;
 use std::process::Command;
 
-/// How a supervised city stopped being supervised.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ended {
-    /// The person closed the city.
+
     Chosen,
-    /// The crash budget ran out and nobody lifted it.
+
     Degraded,
 }
 
-/// Which child `serve` this is, so only the first may open the browser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Launch {
     First,
     Again,
 }
 
-/// What `serve_city` decided for the child `serve`; this file only turns
-/// the decisions into flags, so neither is worked out a second time.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Child {
-    /// The person's flags with their values, less `--supervise` and the
-    /// four flags `first` and `console` stand for.
+
     pub forwarded: Vec<String>,
-    /// Whether the first child opens the browser; every later one leaves it.
+
     pub first: Window,
-    /// Whether every child enters the console.
+
     pub console: Console,
 }
 
-/// Whether a child `serve` opens the person's browser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Window {
     Open,
     Leave,
 }
 
-/// Whether a child `serve` enters the city's console.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Console {
     Enter,
     Skip,
 }
 
-/// Serves `city` at `addr` in a child process and raises it again after
-/// each crash until the person closes it or the crash budget runs out.
-///
-/// `child` carries what the unsupervised run would have decided.
-///
-/// # Errors
-/// Returns the failure to find this binary or to start a child; a child
-/// that fails is a crash, not an error.
 pub fn supervise(city: &Path, addr: &str, child: &Child) -> Result<Ended, AxError> {
     let exe = std::env::current_exe().map_err(|err| {
         AxError::failure(AxCode::PathNotFound, "find this binary", err.to_string())
             .with_recovery("run the binary by its path rather than through a shim")
     })?;
-    // Crashes are counted against elapsed time, not the wall clock: a
-    // clock the system steps back would keep an old crash in the window,
-    // and one stepped forward would drop a recent one.
+
     let supervised = monotonic_now();
     let mut budget = CrashBudget::fresh();
     let mut launch = Launch::First;
@@ -100,17 +76,13 @@ pub fn supervise(city: &Path, addr: &str, child: &Child) -> Result<Ended, AxErro
                 budget = CrashBudget::fresh();
             }
         }
-        // A resume that fails is printed by the child itself; the serve
-        // after it meets the same fault and spends the budget.
+
         if let Err(failure) = run(&exe, &resume_line(city))? {
             eprintln!("supervise: resume did not finish ({failure}); serving anyway");
         }
     }
 }
 
-/// Whether the person pressed Enter; end of input means nobody is there,
-/// and a terminal that cannot be read is said out loud before the city
-/// stays down.
 fn lifted() -> bool {
     let mut answer = String::new();
     match std::io::stdin().read_line(&mut answer) {
@@ -122,7 +94,6 @@ fn lifted() -> bool {
     }
 }
 
-/// Runs one child to its end and reads its exit as served or failed.
 #[expect(
     clippy::disallowed_methods,
     reason = "the supervising parent's child is the city itself and keeps this console on purpose (child §3)"

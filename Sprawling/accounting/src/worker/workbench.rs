@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one run works at: where it stands, and the bench it is given.
-//!
-//! The values are declared here and the methods that build them live
-//! below: `standing` settles the site, `desks` opens what the run
-//! writes to, `tools` lays out the bench, `servers` connects what the
-//! building's configuration names, and `engine` is the machine's own
-//! half of `exec`. A child reads its parent's private fields, so the
-//! split opened none of them.
-
 use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxCode, AxError, RunId};
@@ -31,30 +22,19 @@ pub(super) use standing::{Lending, Placing, lend_tree};
 
 pub(crate) use tools::catalog_builtins;
 
-/// What laying out a run's bench reads from the city: handles that
-/// clone, and values read when the dispatch was staged, so the bench is
-/// laid out in the lane that drives the run (`Sprawling/app/Spec.lean` §8-113).
-///
-/// The folds the accounting thread rewrites - who has mail waiting, who
-/// holds which goal, how far the city trusts its residents - arrive as
-/// the values they had when the dispatch was staged, which is the moment
-/// the worker read them before the bench moved into the lane.
-/// One drift and the building its event envelope names.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct LocatedDrift {
     pub(super) building: Address,
     pub(super) drift: kernel::event::record::CatalogDrift,
 }
 
-/// The drift lines already written, shared with every lane so one observed
-/// difference reaches the Ledger once across runs and across a restart.
 #[derive(Clone, Default)]
 pub(super) struct DriftBook {
     seen: std::sync::Arc<std::sync::Mutex<std::collections::BTreeSet<LocatedDrift>>>,
 }
 
 impl DriftBook {
-    /// Rebuilds the book from the same Ledger the views read.
+
     pub(super) fn from_history(city_root: &Path) -> Result<DriftBook, AxError> {
         let book = DriftBook::default();
         for line in storage::read_raw_lines_at(&kernel::layout::CityLayout::new(city_root).ledger())
@@ -80,8 +60,6 @@ impl DriftBook {
         Ok(book)
     }
 
-    /// Writes a difference once. The key is inserted only after the append
-    /// succeeds, so a failed append does not hide it from the next run.
     pub(super) fn record(
         &self,
         next: &LocatedDrift,
@@ -97,13 +75,11 @@ impl DriftBook {
     }
 }
 
-/// One connector admission job: the selected definitions, their matching
-/// references and the building whose pins decide what may be offered.
 pub(in crate::worker) struct ConnectorJob<'a> {
     pub(in crate::worker) servers: &'a [kernel::McpServer],
     pub(in crate::worker) references: &'a [kernel::McpReference],
     pub(in crate::worker) building: &'a Address,
-    /// The room whose frozen legacy reference adopts this first listing too.
+
     pub(in crate::worker) session: &'a Address,
     pub(in crate::worker) write_root: &'a Path,
     pub(in crate::worker) confidential: bool,
@@ -111,48 +87,43 @@ pub(in crate::worker) struct ConnectorJob<'a> {
 
 pub(in crate::worker) struct Laying {
     pub(in crate::worker) city_root: PathBuf,
-    /// The city's genesis line, which signs every checkpoint.
+
     pub(in crate::worker) city: kernel::B3Hash,
     vault: std::sync::Arc<std::sync::Mutex<gateway::Custodian>>,
     connectors: std::sync::Arc<dyn crate::Connectors + Send + Sync>,
-    /// The browser tools a building's rules ask for (`RunWorker::browsers`).
+
     browsers: super::Browsers,
-    /// Where the desktop server a building's rules ask for is started
-    /// from (`RunWorker::desktop_program`).
+
     desktop_program: super::DesktopProgram,
     exec_host: super::hands::ExecHost,
     backlog: runtime::Backlog,
-    /// The city's table of files an edit is landing on (`Flight::edits`).
+
     edits: runtime::PathLocks,
-    /// The store the lanes share (`RunWorker::lane_store`).
+
     pub(in crate::worker) store: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
     pub(in crate::worker) notes: super::recording::Notes,
-    /// The worker's one clock, also used for read's racy-stamp judgement.
+
     clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
-    /// How long starting the building's servers took (`Hands.monotonic`).
+
     monotonic: fn() -> std::time::Instant,
-    /// Where the ledger stood when the dispatch was staged: what the
-    /// keeper counts from, and where each line written here is anchored.
+
     pub(in crate::worker) staged_at: kernel::Seq,
     trust: kernel::Autonomy,
-    /// How many signals each room with any waiting was holding.
+
     waiting: std::collections::BTreeMap<Address, u32>,
-    /// The goals this run's resident already holds, which `status`
-    /// answers from the list the conflict check reads.
+
     locks: Vec<String>,
-    /// The endpoints and the choices made from them, which the
-    /// transcription and OCR tools ask under this building's rules
-    /// (`Sprawling/app/Spec.lean` §8-131, §8-142).
+
     book: gateway::EndpointBook,
     proposing: tools::proposal::Proposing,
-    /// Differences found while this run's catalog is assembled.
+
     drift: std::sync::Mutex<Vec<LocatedDrift>>,
-    /// The history's already-written differences.
+
     pub(super) drift_book: DriftBook,
 }
 
 impl Laying {
-    /// Records one difference without deciding when it reaches the Ledger.
+
     pub(super) fn note_drift(
         &self,
         building: &Address,
@@ -165,7 +136,6 @@ impl Laying {
         Ok(())
     }
 
-    /// Takes the differences found by this one assembly.
     pub(super) fn take_drift(&self) -> Result<Vec<LocatedDrift>, AxError> {
         Ok(std::mem::take(&mut *held(
             &self.drift,
@@ -173,18 +143,10 @@ impl Laying {
         )?))
     }
 
-    /// Writes one diagnostic line, anchored where the dispatch was staged.
     fn note(&self, level: runtime::diagnostics::Level, module: &str, message: &str) {
         self.notes.write(level, self.staged_at, module, message);
     }
 
-    /// Opens the bench's checkpoint net on `writer`'s own index. The
-    /// repository was made when the city opened, so no lane creates one
-    /// or writes its configuration (`Sprawling/app/spec/Accounting/Views.lean` §8-46-13).
-    ///
-    /// # Errors
-    /// Propagates a repository that will not open and an index that cannot
-    /// be seeded.
     fn open_checkpoint(
         &self,
         root: &std::path::Path,
@@ -198,11 +160,7 @@ impl Laying {
 }
 
 impl super::RunWorker {
-    /// What laying out a bench for `who` reads from this worker, taken
-    /// now.
-    ///
-    /// # Errors
-    /// Propagates a city whose genesis line cannot be read.
+
     pub(in crate::worker) fn laying(&self, who: &str) -> Result<Laying, AxError> {
         Ok(Laying {
             city_root: self.city_root.clone(),
@@ -236,113 +194,66 @@ impl super::RunWorker {
     }
 }
 
-/// Who checks a delegate's own done check. Not the delegate: the whole
-/// point of `Claim::verified` is that a producer's verdict on its own
-/// work is not verification.
 pub(super) const CITY_VERIFIER: &str = "city";
 
-/// Where one run stands before anything is built for it: the rules over
-/// it, the model it may reach, who it runs as, and the tree it writes in.
-///
-/// One value rather than three, because the three readings of this phase
-/// interlock: the lease is named after the run, the run's id is minted
-/// after a credential renewal that may go to the network, and that
-/// renewal is chosen by the building's own rules. Splitting them would
-/// move a clock sample, and where the one sampling point lands is not
-/// something a structural change may alter (ARCHITECTURE.md section 10).
 pub(super) struct Site {
     pub(super) building: city::Building,
     pub(super) rules: city::BuildingRules,
-    /// City, building and resident layers, resolved once and frozen for
-    /// the whole run.
+
     pub(super) config: kernel::FrozenConfig,
-    /// The Reading Room names this session froze, independent of later edits.
+
     pub(super) reading_room: Vec<String>,
     pub(super) model: gateway::ModelEntry,
-    /// Why this run selected the model, recorded by its charter.
+
     pub(super) routing: kernel::event::record::ModelRouting,
-    /// The effective generation this session's requests carry.
+
     pub(super) generation: kernel::FrozenGeneration,
-    /// The endpoint the model is reached through (`Sprawling/app/Spec.lean` §8-85).
+
     pub(super) provider: String,
     pub(super) adapter: Option<super::keeping_warm::Door>,
     pub(super) identity: city::Identity,
     pub(super) who: String,
     pub(super) run_id: RunId,
-    /// The run this one replaces, when a resident succeeded itself.
-    /// Signed into every checkpoint this run raises, so a commit can be
-    /// asked for its lineage.
+
     pub(super) predecessor: Option<RunId>,
-    /// Some when the building asks for review: the tree this run writes
-    /// in, which goes back whether the run finished or failed.
+
     pub(super) lease: Option<storage::WorktreeLease>,
     pub(super) write_root: PathBuf,
     branch: Option<String>,
-    /// What survives a command's output in this run, resolved from the
-    /// city's and the building's `FILTERS.toml` and frozen with the run
-    /// (`Sprawling/app/Spec.lean` §8-43).
+
     pub(super) filters: runtime::FilterTable,
-    /// The moment this run's driver read its clock last, which `status`
-    /// and a command's clock line report (`Sprawling/app/Spec.lean` §8-125).
+
     pub(super) clock: runtime::ClockReading,
-    /// Carried from the endpoint this run was given, frozen with
-    /// everything else the run was set up with.
+
     pub(super) retries: kernel::Retries,
 }
 
-/// What the model may see, what routes what it calls, and who it may
-/// hand work down to.
-///
-/// `ToolBench` routes one call; this is the whole bench a run works at:
-/// the catalogue the model was told about, the router behind it, and
-/// the delegate desk two of the tools write to. The catalogue is kept
-/// rather than the tool definitions it renders, so there is one answer
-/// to what this run admits rather than a list and a copy of it.
 pub(super) struct Workbench {
     pub(super) catalog: std::sync::Arc<std::sync::Mutex<runtime::Catalog>>,
-    /// Drift found before any tool was registered.
+
     pub(super) drift: Vec<LocatedDrift>,
-    /// The bench, until the drive takes it. `Option` is the vehicle of
-    /// that move and not a second state - the same handling `Site`
-    /// gives its adapter - because a drive owns everything it runs on
-    /// and may leave this thread with it (`Sprawling/app/Spec.lean` §8-46-1).
+
     bench: Option<ToolBench>,
-    /// The run's policy cell, until the plan takes it: built here,
-    /// before the tools, because `edit` and `exec` hold its reader and
-    /// the run's driver is its one writer (`Sprawling/runtime/spec/PolicyTake.lean`
-    /// §8-62). `Option` for the reason `bench` is one.
+
     policy: Option<runtime::PolicyCell>,
-    /// Whether this run asked to be replaced, read when it concludes.
+
     pub(super) succession: std::sync::Arc<std::sync::Mutex<runtime::SuccessionDesk>>,
-    /// Where the run records the provider's count, which `status` reads.
+
     pub(super) context: runtime::ContextReading,
-    /// Complete read intervals this run has confirmed into its window.
+
     shown: runtime::ReadShown,
-    /// The stateless nested-rule source shared by `read` and `Placing`.
+
     rule_candidates: runtime::RuleCandidates,
 }
 
-/// Who this run can reach: the residents beside it, and the sub-agents
-/// under it.
-///
-/// Both are read by one answer - what `status` tells the model about the
-/// city around it - so they arrive as one value rather than as two
-/// parameters a caller could hand over half of.
 pub(super) struct Reach<'a> {
     pub(super) seen: &'a city::Neighbourhood,
     pub(super) delegates: &'a std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
     pub(super) context: &'a runtime::ContextReading,
-    /// The catalog whose frozen `PromptTools` status and the page share.
+
     pub(super) catalog: &'a std::sync::Arc<std::sync::Mutex<runtime::Catalog>>,
 }
 
-/// Takes a desk, or says why it cannot be taken.
-///
-/// The one reading of a poisoned lock in this assembly. Under
-/// `panic = "abort"` a thread cannot die holding a desk, so the error
-/// arm is unreachable in the shipped binary and still written, because
-/// a test build unwinds and a desk left locked there is a fact worth a
-/// stable code rather than a second panic (`Sprawling/app/Spec.lean` §8-44).
 pub(super) fn held<'a, T>(
     desk: &'a std::sync::Mutex<T>,
     what: &'static str,
@@ -358,7 +269,7 @@ pub(super) fn held<'a, T>(
 }
 
 impl Workbench {
-    /// The table shared by `read` and the ordered wave settlement.
+
     pub(super) fn shown(&self) -> runtime::ReadShown {
         self.shown.clone()
     }
@@ -367,11 +278,6 @@ impl Workbench {
         self.rule_candidates.clone()
     }
 
-    /// Hands the bench to the drive, once.
-    ///
-    /// # Errors
-    /// Refuses a second ask, which is a defect in the caller rather
-    /// than a state a run can be in: one dispatch drives once.
     pub(super) fn take_bench(&mut self) -> Result<ToolBench, AxError> {
         self.bench.take().ok_or_else(|| {
             AxError::failure(
@@ -383,10 +289,6 @@ impl Workbench {
         })
     }
 
-    /// Hands the run's policy cell to the plan, once.
-    ///
-    /// # Errors
-    /// Refuses a second ask, as [`Workbench::take_bench`] does.
     pub(super) fn take_policy(&mut self) -> Result<runtime::PolicyCell, AxError> {
         self.policy.take().ok_or_else(|| {
             AxError::failure(
@@ -400,25 +302,7 @@ impl Workbench {
 }
 
 impl Site {
-    /// What a checkpoint covers for this run.
-    ///
-    /// Under review the worktree is this run's alone, so everything that
-    /// changed inside it is this run's to offer - the shelf entries it
-    /// filed included, which sit at the building rather than in the
-    /// room.
-    ///
-    /// Without a lease the checkpoint is **the run's write domain**, which is
-    /// the building's own subtree plus whatever else its `RULES.toml`
-    /// declares, as `Sprawling/storage/Spec.lean` §8-18 states. The room would be
-    /// narrower than the gate: `city::policy::write_domain` defaults to
-    /// the whole building, and City Hall's residents reach every document
-    /// under theirs. Anything a run wrote outside a room-sized checkpoint would
-    /// be staged by no checkpoint, reach no `changes` answer, and have no
-    /// `file_discarded` record that could restore it.
-    ///
-    /// # Errors
-    /// Propagates a building whose declared prefixes its own rules
-    /// refuse.
+
     pub(super) fn checkpoint_scope(&self) -> Result<Vec<String>, AxError> {
         if self.lease.is_some() {
             return Ok(tree_scope(&self.building));
@@ -432,25 +316,10 @@ impl Site {
     }
 }
 
-/// What a building under review writes in its tree: its own subtree.
-/// The tree is claimed, checkpointed and offered over this one scope, so a
-/// claim that checked out less than the checkpoint stages, or an offer that
-/// staged more than the claim checked out, cannot happen.
 pub(in crate::worker) fn tree_scope(building: &city::Building) -> Vec<String> {
     vec![building.addr().as_str().to_owned()]
 }
 
-/// What a run can be told about itself at the moment it starts.
-///
-/// Every field here is read from something, never a constant: the run policy,
-/// the write domain the building granted, the budget, the context limit
-/// and the locks. City.md tells a model to call `status` for exactly
-/// those, and a row of constants would teach a model that obeyed not to
-/// ask again.
-///
-/// The context used and the children are not here: both move while the
-/// run goes on, so `status` reads them live, and so is the worktree's
-/// size, which `status` walks the tree for at each call.
 pub(super) struct Situation<'a> {
     pub(super) addr: &'a Address,
     pub(super) who: &'a str,

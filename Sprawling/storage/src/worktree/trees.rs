@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Worktrees: claim, merge, release.
-
 use std::path::{Path, PathBuf};
 
 use kernel::{ByteLen, consts_policy::WORKTREE_MAX_BYTES};
@@ -20,23 +18,16 @@ use kept::Standing;
 mod kept;
 mod stock;
 
-/// Where the trees live: inside the reserved subtree, because they are
-/// the city's own machinery rather than anybody's writable space. What a
-/// run may write is judged against the tree it works in.
 pub(super) const WORKTREE_DIR: &str = "worktrees";
 
-/// The city's trees.
 pub struct Worktrees {
     pub(super) repo: git2::Repository,
     pub(super) home: PathBuf,
-    /// Where the person placed the city; the alias check stops here.
+
     pub(super) city_root: PathBuf,
     ceiling: ByteLen,
 }
 
-// Hand-written because a git repository handle has no Debug: what a
-// reader of a failure needs is where the trees go and what they may
-// cost, not the handle.
 impl std::fmt::Debug for Worktrees {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Worktrees")
@@ -47,12 +38,7 @@ impl std::fmt::Debug for Worktrees {
 }
 
 impl Worktrees {
-    /// Opens the city's repository as the source every tree branches
-    /// from.
-    ///
-    /// # Errors
-    /// Refuses a city with no repository. Initialising one here would
-    /// make two modules able to create the city's history.
+
     pub fn open(city_root: &Path) -> Result<Worktrees, StorageError> {
         let repo = open_city(city_root).map_err(|err| StorageError::Worktree {
             op: "open the city repository",
@@ -61,7 +47,6 @@ impl Worktrees {
         Ok(Worktrees::over(repo, city_root))
     }
 
-    /// The trees of a repository already open at `city_root`.
     pub(super) fn over(repo: git2::Repository, city_root: &Path) -> Worktrees {
         Worktrees {
             repo,
@@ -71,13 +56,6 @@ impl Worktrees {
         }
     }
 
-    /// Lends one node its tree: the one it was given before when that
-    /// tree is still on disk, reset to the node's branch, and a new one
-    /// otherwise.
-    ///
-    /// # Errors
-    /// Refuses a tree somebody holds, a city whose working tree exceeds
-    /// the ceiling, and a repository with no commit to branch from.
     pub fn claim(
         &self,
         name: &WorktreeName,
@@ -93,9 +71,6 @@ impl Worktrees {
         }
     }
 
-    /// Places a new tree for `name`, locked from the moment it exists:
-    /// the stock taken over when there is one to take, and a checkout of
-    /// the whole tree otherwise (`Sprawling/storage/spec/Worktree/Trees/Stock.lean` §8-35).
     fn place(&self, name: &WorktreeName) -> Result<WorktreeLease, StorageError> {
         let city = self.refuse_oversized(name.as_str())?;
         if self.repo.head().is_err() {
@@ -105,16 +80,12 @@ impl Worktrees {
                     .to_owned(),
             });
         }
-        // `standing` found no registration, so a directory under this
-        // name is what a placement that failed halfway left behind.
+
         self.clear_unregistered(name.as_str())?;
         if let Some(lease) = self.adopt(name, &city)? {
             return Ok(lease);
         }
-        // A node that has held a tree before still has its branch: the
-        // tree is a materialization, the branch is the line of work.
-        // Reattaching is what makes releasing a tree cheap enough to do
-        // between sessions.
+
         let branch = match self
             .repo
             .find_branch(name.as_str(), git2::BranchType::Local)
@@ -131,9 +102,6 @@ impl Worktrees {
         self.add_tree(name, branch.as_ref().map(git2::Branch::get), &city)
     }
 
-    /// Refuses a tree before it exists when the city working tree it
-    /// copies is over the ceiling, and otherwise answers what that
-    /// working tree weighed. `id` names the tree in the refusal.
     pub(super) fn refuse_oversized(&self, id: &str) -> Result<Weight, StorageError> {
         let source = self.repo.workdir().ok_or_else(|| StorageError::Worktree {
             op: "find the city working tree",
@@ -153,9 +121,6 @@ impl Worktrees {
         Ok(city)
     }
 
-    /// Checks out the tree for `name` on `reference` when one is given
-    /// and on a new branch from the trunk otherwise. `city` is the walk
-    /// the ceiling was judged on, counted into the lease's work.
     pub(super) fn add_tree(
         &self,
         name: &WorktreeName,
@@ -175,8 +140,6 @@ impl Worktrees {
         })
     }
 
-    /// Registers the tree `id` under the tree home, locked, and checks it
-    /// out whole; answers where it is and what the checkout wrote.
     pub(super) fn check_out_tree(
         &self,
         id: &str,
@@ -188,8 +151,7 @@ impl Worktrees {
             source,
         })?;
         let path = self.home.join(id);
-        // The checkout lands at this name, and a name that is an alias
-        // would write the whole tree through it (`Sprawling/storage/spec/Alias.lean` §8-25).
+
         crate::alias::WriteTarget::within("place a worktree", &self.city_root, &path)?;
         let mut opts = git2::WorktreeAddOptions::new();
         opts.lock(true);
@@ -201,28 +163,10 @@ impl Worktrees {
                     op: "add a worktree",
                     detail: format!("{id}: {err}"),
                 })?;
-        // The size is read from the index the checkout just wrote rather
-        // than by walking the tree it wrote (`Sprawling/storage/spec/Worktree.lean` §8-31).
+
         Ok((path, written(&tree)?))
     }
 
-    /// Decides a merge without making it.
-    ///
-    /// Fast-forward only. A node whose trunk moved underneath it does
-    /// not get its work merged on top of somebody else's by a machine:
-    /// it rebuilds on the trunk as it now stands and is verified again.
-    /// This is the same stance the draft desk takes about a room that
-    /// moved, and for the same reason - the party who knows whether the
-    /// work is still right is the one who did it.
-    ///
-    /// Every refusal happens here, before anything moves, and the commit
-    /// the trunk will point at is already known - so a caller can write
-    /// the line that announces the merge before the merge exists, and
-    /// still never announce one that was going to be refused.
-    ///
-    /// # Errors
-    /// Refuses an unknown branch, a repository with no commit, and a
-    /// merge that is not a fast-forward.
     pub fn plan_merge(&self, name: &WorktreeName) -> Result<PlannedMerge<'_>, StorageError> {
         let refuse = |op: &'static str, detail: String| StorageError::Worktree { op, detail };
         let branch = self
@@ -240,10 +184,7 @@ impl Worktrees {
         let ours = head
             .peel_to_commit()
             .map_err(|err| refuse("read the city trunk", err.to_string()))?;
-        // A git failure here is not an answer to the ancestry question.
-        // Reading it as "not a descendant" would report a stale trunk
-        // to somebody whose trunk is fine, and send them to rebuild
-        // work that needed no rebuilding.
+
         let descends = theirs.id() == ours.id()
             || self
                 .repo
@@ -265,8 +206,6 @@ impl Worktrees {
         })
     }
 
-    /// Writes the merge commit [`Worktrees::plan_merge`] settled on: two
-    /// parents, the node's tree, and the merging run's trailers.
     pub(super) fn land_merge(
         &self,
         target: git2::Oid,
@@ -284,8 +223,7 @@ impl Worktrees {
             .repo
             .find_commit(target)
             .map_err(|err| refuse("read the node commit", err.to_string()))?;
-        // The node's tree: the trunk is an ancestor by the fast-forward
-        // judgement, so it has nothing the node does not carry.
+
         let tree = theirs
             .tree()
             .map_err(|err| refuse("read the node tree", err.to_string()))?;
@@ -319,11 +257,6 @@ impl Worktrees {
         Ok(())
     }
 
-    /// Gives a tree back and keeps its files for the node's next run:
-    /// the lock is the lease, so lifting it is the whole release.
-    ///
-    /// # Errors
-    /// Propagates a repository that cannot find or unlock the tree.
     pub fn release(&self, lease: WorktreeLease) -> Result<(), StorageError> {
         let refuse = |op: &'static str, err: git2::Error| StorageError::Worktree {
             op,
@@ -336,11 +269,6 @@ impl Worktrees {
             .map_err(|err| refuse("unlock a worktree", err))
     }
 
-    /// Every node's tree the repository knows about, sorted. The stock
-    /// is no node's tree, and is not among them.
-    ///
-    /// # Errors
-    /// Propagates a repository that cannot list its worktrees.
     pub fn live(&self) -> Result<Vec<WorktreeName>, StorageError> {
         let names = self
             .repo
@@ -350,8 +278,7 @@ impl Worktrees {
                 detail: err.to_string(),
             })?;
         let mut out = Vec::new();
-        // A name git cannot render as UTF-8 was not written by this
-        // module, and it is not a tree this city can address.
+
         for name in names.iter().flatten().flatten() {
             if name != stock::STOCK {
                 out.push(WorktreeName::parse(name)?);
@@ -362,19 +289,14 @@ impl Worktrees {
     }
 }
 
-/// Opens the city's repository with only its own config file read.
 pub(super) fn open_city(city_root: &Path) -> Result<git2::Repository, git2::Error> {
     own_config(git2::Repository::open(city_root)?)
 }
 
-/// Opens the repository of one of the city's trees the same way.
 pub(super) fn open_tree(tree: &git2::Worktree) -> Result<git2::Repository, git2::Error> {
     own_config(git2::Repository::open_from_worktree(tree)?)
 }
 
-// A User's global, XDG or system file can vanish between libgit2's look and
-// its stat (`Sprawling/storage/spec/Worktree.lean` §8-9), so no later call
-// reads them.
 fn own_config(repo: git2::Repository) -> Result<git2::Repository, git2::Error> {
     let mut config = git2::Config::new()?;
     config.add_file(

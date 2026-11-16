@@ -3,15 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a published package may compile in: its own files and its build
-//! script's output, judged along the module tree cargo would compile,
-//! with test code and unpublished packages left alone.
-
 use super::*;
 use crate::root::fixture::write;
 
-/// A workspace of three packages: `p`, published, with the package `q`
-/// nested in its directory, and `t`, which says `publish = false`.
 fn workspace(label: &str) -> PathBuf {
     let root = std::env::temp_dir().join(format!("xtask-packaged-{label}-{}", std::process::id()));
     if root.exists() {
@@ -78,12 +72,6 @@ fn locations(found: &[Violation]) -> Vec<&str> {
     found.iter().map(|it| it.location.as_str()).collect()
 }
 
-/// The defect this gate exists for, in each place a production module
-/// can hide it: the crate root, a file loaded through `#[path]`, a file
-/// two `mod` declarations down, a call nested inside another macro, and
-/// a path into a package nested in this one's directory, which cargo
-/// leaves out of this one's archive. Test code, the build script's
-/// output and the package's own files are not reported.
 #[test]
 fn every_file_a_published_package_reaches_outside_itself_is_named() {
     let root = workspace("reach");
@@ -112,9 +100,6 @@ fn every_file_a_published_package_reaches_outside_itself_is_named() {
     );
 }
 
-/// An argument whose path this gate cannot read is a finding rather
-/// than a pass: a guess here would be a green gate over a build that
-/// fails on the first `cargo install`.
 #[test]
 fn an_argument_the_gate_cannot_read_is_named() {
     let root = workspace("unread");
@@ -134,8 +119,6 @@ fn an_argument_the_gate_cannot_read_is_named() {
     assert!(unread[0].alternative.contains("OUT_DIR"), "{unread:#?}");
 }
 
-/// A `mod` declaration whose file is not there leaves the gate unable
-/// to say what the package compiles, which is a refusal to judge.
 #[test]
 fn a_module_without_its_file_is_a_gate_that_cannot_judge() {
     let root = workspace("missing");
@@ -153,8 +136,6 @@ fn meta(text: &str) -> syn::Meta {
     syn::parse_str(text).unwrap()
 }
 
-/// Which `cfg` predicates keep an item out of every build that is not a
-/// test build: the ones that cannot hold while `test` is false.
 #[test]
 fn a_predicate_excludes_production_only_when_it_cannot_hold_without_test() {
     let read: Vec<(&str, bool)> = [

@@ -3,31 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one row of a `/models` answer states, and what it does not.
-//!
-//! **An OpenAI-shaped model list is an id and whatever else the vendor
-//! felt like putting there.** One gateway states `context_length` and
-//! `max_completion_tokens`; another nests the same two under
-//! `top_provider`; a third states input modalities under
-//! `architecture`; most state nothing at all. A reading that insisted
-//! on one spelling would report an empty row for every provider but the
-//! one it was written against.
-//!
-//! So this module reads a row as a set of questions, each answered from
-//! the first key that carries it, and **absent when no key does**. A
-//! figure this city invented would outrank the figure that bills, so
-//! nothing here supplies a default, a zero, or a guess.
-//!
-//! Prices are carried as the provider's own text. Their unit is the
-//! provider's too - per token, per million tokens, in dollars or in
-//! cents - and a converted number nobody can check against the invoice
-//! is worse than the string the provider printed.
-
 use kernel::event::record::{ModelFacts, ThinkingStatement};
 use kernel::{Ceiling, Effort, GenerationSupport, ParameterSupport};
 use serde_json::Value;
 
-/// The keys a context window arrives under, first one wins.
 const CONTEXT_KEYS: [&str; 5] = [
     "context_length",
     "context_window",
@@ -36,10 +15,6 @@ const CONTEXT_KEYS: [&str; 5] = [
     "max_input_tokens",
 ];
 
-/// The keys an output ceiling arrives under, first one wins.
-///
-/// `max_tokens` sits last: a few gateways use it for the window rather
-/// than for the ceiling, so it answers only when nothing clearer did.
 const OUTPUT_KEYS: [&str; 4] = [
     "max_completion_tokens",
     "max_output_tokens",
@@ -47,14 +22,8 @@ const OUTPUT_KEYS: [&str; 4] = [
     "max_tokens",
 ];
 
-/// The objects a row nests the same facts inside. Read after the row's
-/// own keys, so a row that states a figure twice is read at the top.
 const NESTS: [&str; 3] = ["top_provider", "limits", "architecture"];
 
-/// A count, from a row's own key or from one of the objects it nests.
-///
-/// A count spelled as a string (`"128000"`) is read as the count it
-/// spells: several gateways quote every number in their catalogue.
 fn count(row: &Value, keys: &[&str]) -> Option<u64> {
     for key in keys {
         if let Some(found) = number(row.get(key)) {
@@ -80,8 +49,6 @@ fn number(value: Option<&Value>) -> Option<u64> {
     }
 }
 
-/// What the row says the model accepts, sorted and without repeats so
-/// two rows stating the same set read the same.
 fn modalities(row: &Value) -> Vec<String> {
     let mut found = Vec::new();
     for at in [
@@ -107,9 +74,6 @@ fn modalities(row: &Value) -> Vec<String> {
     found
 }
 
-/// A price as the provider printed it. A number is rendered back to its
-/// own text rather than through a float, which is how `0.0000004`
-/// survives the trip.
 fn price(row: &Value, keys: [&str; 2]) -> Option<String> {
     let pricing = row.get("pricing");
     for key in keys {
@@ -125,8 +89,6 @@ fn price(row: &Value, keys: [&str; 2]) -> Option<String> {
     None
 }
 
-/// What the row says about thinking, from the first vendor's keys that
-/// carry it (`Sprawling/gateway/spec/Endpoint/Models.lean` §8-10).
 fn thinking(row: &Value) -> Option<ThinkingStatement> {
     openrouter(row)
         .or_else(|| xai(row))
@@ -135,9 +97,6 @@ fn thinking(row: &Value) -> Option<ThinkingStatement> {
         .or_else(|| moonshot(row))
 }
 
-/// `reasoning.{supported_efforts, default_effort, default_enabled}`.
-/// A `null` set is every level the gateway takes; a missing one is a
-/// switch with no levels.
 fn openrouter(row: &Value) -> Option<ThinkingStatement> {
     let said = row.get("reasoning").filter(|said| said.is_object())?;
     let levels = match said.get("supported_efforts") {
@@ -158,8 +117,6 @@ fn openrouter(row: &Value) -> Option<ThinkingStatement> {
     })
 }
 
-/// `capabilities.{reasoning_effort, default_reasoning_effort}`, or the
-/// same two keys at the top of the row.
 fn xai(row: &Value) -> Option<ThinkingStatement> {
     let held = [row.get("capabilities"), Some(row)]
         .into_iter()
@@ -173,8 +130,6 @@ fn xai(row: &Value) -> Option<ThinkingStatement> {
     })
 }
 
-/// `capabilities.effort.<level>.supported` and
-/// `capabilities.thinking.types.adaptive.supported`.
 fn anthropic(row: &Value) -> Option<ThinkingStatement> {
     let capabilities = row.get("capabilities")?;
     let effort = capabilities
@@ -204,7 +159,6 @@ fn anthropic(row: &Value) -> Option<ThinkingStatement> {
     })
 }
 
-/// `effort.{supported_levels, default_level}`.
 fn deepseek(row: &Value) -> Option<ThinkingStatement> {
     let said = row.get("effort")?;
     Some(ThinkingStatement {
@@ -215,7 +169,6 @@ fn deepseek(row: &Value) -> Option<ThinkingStatement> {
     })
 }
 
-/// `supports_reasoning`: a switch and nothing more.
 fn moonshot(row: &Value) -> Option<ThinkingStatement> {
     Some(ThinkingStatement {
         on: Some(row.get("supports_reasoning")?.as_bool()?),
@@ -223,9 +176,6 @@ fn moonshot(row: &Value) -> Option<ThinkingStatement> {
     })
 }
 
-/// The levels a list of upstream words names, in the city's ascending
-/// order. A word outside the city's seven is not a level, and neither is
-/// `none`, because turning thinking off is not one.
 fn levels(words: &[Value]) -> Vec<Effort> {
     let named: Vec<Effort> = words.iter().filter_map(level).collect();
     Effort::ALL
@@ -241,9 +191,6 @@ fn level(word: &Value) -> Option<Effort> {
         .find(|level| level.as_str().eq_ignore_ascii_case(word))
 }
 
-/// Machine-readable sampling support, either in `generation` or under
-/// `capabilities.generation`. Booleans and the three closed words are
-/// accepted; any other value leaves that parameter unstated.
 fn generation(row: &Value) -> Option<GenerationSupport> {
     let said = row
         .get("generation")
@@ -268,11 +215,6 @@ fn generation(row: &Value) -> Option<GenerationSupport> {
         .then_some(answer)
 }
 
-/// The upstream's own identity for the model across providers:
-/// OpenRouter's `hugging_face_id`, where it is not empty. Its
-/// `canonical_slug` is not read: it carries a release date the
-/// vendor's own id does not, so it would keep apart two rows the
-/// fallback rule of `provider::identity` joins.
 fn canonical(row: &Value) -> Option<String> {
     row.get("hugging_face_id")
         .and_then(Value::as_str)
@@ -281,11 +223,6 @@ fn canonical(row: &Value) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// One row read for everything it states.
-///
-/// `None` when the row carries no id: a model this city cannot name
-/// is a model it cannot call, and inventing a name for it would put
-/// an uncallable row in front of a person choosing one.
 #[must_use]
 pub(crate) fn facts_of(row: &Value) -> Option<ModelFacts> {
     let id = row
@@ -348,8 +285,6 @@ mod tests {
         );
     }
 
-    /// The shape a multi-vendor gateway answers with: the two ceilings
-    /// under their own names, modalities beside them, prices quoted.
     #[test]
     fn a_row_is_read_for_every_fact_it_carries() {
         let facts = facts_of(&serde_json::json!({
@@ -376,7 +311,6 @@ mod tests {
         );
     }
 
-    /// The other shape: the same two figures one object further down.
     #[test]
     fn a_nested_row_is_read_as_deeply_as_it_states_its_facts() {
         let facts = facts_of(&serde_json::json!({
@@ -390,9 +324,6 @@ mod tests {
         assert_eq!(facts.input_modalities, vec!["text".to_owned()]);
     }
 
-    /// Zero is not a ceiling, and a row that states one states none.
-    /// The old reading of an unknown ceiling reached a provider as
-    /// `max_tokens: 0`, which answers with no content at all.
     #[test]
     fn a_zero_ceiling_is_an_absent_ceiling() {
         let facts = facts_of(&serde_json::json!({ "id": "m-4", "max_output_tokens": 0 })).unwrap();
@@ -404,12 +335,6 @@ mod tests {
         assert_eq!(facts_of(&serde_json::json!({ "object": "model" })), None);
     }
 
-    /// Five model lists read the way a probe reads them, and each row
-    /// climbed into the offer the picker is given. OpenRouter's is
-    /// rows of its public list; Anthropic's, DeepSeek's and xAI's are
-    /// the example answers their API references print; Ollama's is the
-    /// shape its OpenAI compatibility page documents for `/v1/models`,
-    /// which says nothing about thinking, so every row is unknown.
     #[test]
     fn recorded_listings_are_read_into_offers() {
         use crate::provider::thinking::{EffortSet, OfferSource, Switch, ThinkingOffer};

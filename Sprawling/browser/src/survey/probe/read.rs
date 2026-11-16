@@ -3,28 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The reading half of the probe's sentence.
-//!
-//! **A child of the file that writes it, not a sibling.** The record is
-//! a line of positional fields with no schema behind it, so a field
-//! inserted on one side and not the other silently shifts every field
-//! after it and the gate goes on reporting numbers that are no longer
-//! what they are named. Keeping the reader directly under the writer is
-//! the whole of the defence available here: the two are one sentence,
-//! and a reader who finds either finds both.
-
 use super::super::{Cut, Declared, Drawn, Marking, Overflow, Paint, Sampled, TextRun};
 use super::BETWEEN;
 
-/// Every element in one sink, as the probe wrote them.
 pub fn elements(records: &str) -> Vec<Drawn> {
     records.split(BETWEEN).filter_map(element).collect()
 }
 
-/// `tag role name left top width height depth parent across down
-/// sampled first-mark underlined fill class text`, as the probe writes
-/// it. The name and the class are percent-encoded, because they are the
-/// two fields that hold a person's words and those contain spaces.
 fn element(record: &str) -> Option<Drawn> {
     let mut field = record.split_whitespace();
     let tag = field.next()?.to_owned();
@@ -53,8 +38,6 @@ fn element(record: &str) -> Option<Drawn> {
     Some(drawn)
 }
 
-/// The page's own vocabulary, as the probe resolved it: one `name value`
-/// per record, colours in hex and lengths in hundredths of a pixel.
 pub fn declared(records: &str) -> Declared {
     let mut colours = Vec::new();
     let mut type_steps = Vec::new();
@@ -81,7 +64,6 @@ pub fn declared(records: &str) -> Declared {
     Declared::of(colours, type_steps, spacing)
 }
 
-/// `shows`, `clips` or `scrolls`, in the three words the probe writes.
 fn overflow(field: &str) -> Option<Overflow> {
     match field {
         "shows" => Some(Overflow::Shows),
@@ -91,7 +73,6 @@ fn overflow(field: &str) -> Option<Overflow> {
     }
 }
 
-/// `frame` or `words`: what put this element into the measurement.
 fn sampled(field: &str) -> Option<Sampled> {
     match field {
         "frame" => Some(Sampled::Frame),
@@ -100,8 +81,6 @@ fn sampled(field: &str) -> Option<Sampled> {
     }
 }
 
-/// `rrggbb`, or nothing when the probe could not decide what was
-/// painted there.
 fn paint(field: &str) -> Option<Paint> {
     if field.len() != 6 {
         return None;
@@ -113,8 +92,6 @@ fn paint(field: &str) -> Option<Paint> {
     Some(Paint::of(channel(0)?, channel(2)?, channel(4)?))
 }
 
-/// `ink,px-hundredths,shown,needs,mark`, or `-` when the element draws
-/// no text of its own.
 fn text_run(field: &str) -> Option<TextRun> {
     let mut part = field.split(',');
     let ink = paint(part.next()?);
@@ -125,8 +102,7 @@ fn text_run(field: &str) -> Option<TextRun> {
         "ellipsis" => Marking::Ellipsis,
         "spills" => Marking::Spills,
         "clip" => Marking::Clip,
-        // A word this file did not write is a record it cannot read,
-        // and a dropped record is honest where a default is not.
+
         _ => return None,
     };
     Some(TextRun {
@@ -136,7 +112,6 @@ fn text_run(field: &str) -> Option<TextRun> {
     })
 }
 
-/// Percent-decoding, which is all the probe needs on this side.
 fn decode(field: &str) -> String {
     if field == "-" {
         return String::new();

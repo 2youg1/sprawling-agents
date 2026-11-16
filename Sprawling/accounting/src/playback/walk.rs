@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One strict pass over a city's Ledger, from genesis to the cutoff
-//! (`Sprawling/accounting/spec/Playback.lean` §8-12, accounting D24 (c)).
-//!
-//! Every line passes `storage::LineCheck`, the lines a selection will
-//! leave out included, so a missing line, a broken chain or a repeated
-//! seq refuses the whole export. The segments are read through
-//! `storage::LedgerIndex::folding`, one segment resident at a time; a
-//! torn tail is not a line there, which is the storage crate's rule and
-//! not repaired here. The raw bytes each line was verified as are what
-//! the fold receives, so nothing is read twice.
-
 use std::path::Path;
 
 use kernel::ledger::chain_hash;
@@ -22,37 +11,25 @@ use storage::{CheckedLine, LedgerIndex, LineCheck, Located};
 
 use super::Cutoff;
 
-/// One verified line, as the fold receives it.
 pub(super) enum Walked {
     Known(EventRecord),
-    /// An ignorable line of a newer vocabulary: only its seq is read.
+
     Unknown(Seq),
 }
 
-/// The last line the walk verified: the cutoff.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Tip {
     pub(super) seq: Seq,
     pub(super) chain_hash: B3Hash,
 }
 
-/// Where one walk stopped, and the index it built on the way.
 pub(super) struct Reached {
-    /// The line the walk stopped at; `None` for a ledger with no line.
+
     pub(super) tip: Option<Tip>,
-    /// Every line the walk passed, by seq, and the lines after the
-    /// cutoff located without being checked: a reader of this index
-    /// reads past the cutoff only if it asks for a seq after it.
+
     pub(super) index: LedgerIndex,
 }
 
-/// Walks the ledger in `ledger_dir` up to `cutoff`, lending each line's
-/// bytes and reading to `each`, and answers where it stopped.
-///
-/// # Errors
-/// The first line that does not verify, as `LineFault::into_ax` names
-/// it; a directory that cannot be read; the first error `each` returns.
-/// Nothing before the failure is usable, so the caller discards it.
 pub(super) fn walk(
     ledger_dir: &Path,
     cutoff: Cutoff,

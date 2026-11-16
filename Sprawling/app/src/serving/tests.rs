@@ -16,13 +16,6 @@
 
 use super::door::*;
 
-/// **The property the whole card exists for.** A minted code has to
-/// be the code that opens the door, and the two halves reach that
-/// digest by different routes: `PairingToken::mint` hashes the text
-/// it just produced, while `serve` hashes the text it is handed back
-/// through `from_configured`. If those ever stop agreeing, an
-/// exposed city refuses the person who started it, holding a key it
-/// minted for them.
 #[test]
 fn the_key_this_city_mints_is_the_key_its_own_door_accepts() {
     let exposed = "0.0.0.0:2501".parse().expect("a literal address");
@@ -39,9 +32,6 @@ fn the_key_this_city_mints_is_the_key_its_own_door_accepts() {
     assert!(!wire::verify(None, &digest), "silence is not the key");
 }
 
-/// One-time means one time. Two serves of the same address must not
-/// produce the same code, or a key read off yesterday's terminal
-/// still works today.
 #[test]
 fn two_serves_of_one_address_mint_two_different_keys() {
     let exposed = "0.0.0.0:2501".parse().expect("a literal address");
@@ -50,8 +40,6 @@ fn two_serves_of_one_address_mint_two_different_keys() {
     assert_ne!(first.code(), second.code());
 }
 
-/// What the operator configured is adopted, never replaced. Minting
-/// over it would break every browser already paired with this city.
 #[test]
 fn a_configured_token_is_adopted_rather_than_replaced() {
     let exposed = "0.0.0.0:2501".parse().expect("a literal address");
@@ -62,8 +50,6 @@ fn a_configured_token_is_adopted_rather_than_replaced() {
     );
 }
 
-/// A loopback listener holds a key too, and nobody is shown it: the
-/// loopback port is no credential (wire D54).
 #[test]
 fn a_loopback_listener_mints_a_key_nobody_is_shown() {
     let local = "127.0.0.1:2501".parse().expect("a literal address");

@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The face the neighbourhood shows a model
-//! (`Sprawling/city/spec/NeighboursTool.lean` §8-15b): this building's
-//! addresses, or the city's buildings by name.
-//!
-//! The first line of every answer says that an address this does not
-//! list has no reader. That sentence is the defect this tool was built
-//! for, stated where a model reads first: `signal` will queue a message
-//! for any address inside the building, whether or not anybody stands
-//! there to take it.
-
 use kernel::{
     AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolDef,
     ToolMeta, ToolName, ToolOutcome,
@@ -21,19 +11,13 @@ use serde_json::{Map, Value};
 
 use crate::neighbourhood::{Neighbourhood, Occupancy};
 
-/// The tool. It holds the neighbourhood the run was dispatched into, so
-/// a run cannot read another building's residents by naming one.
 pub struct NeighboursTool {
     seen: Neighbourhood,
     meta: ToolMeta,
 }
 
 impl NeighboursTool {
-    /// The name, disclosure and schema `new` registers. The catalog page
-    /// reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
+
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut scope = Map::new();
         scope.insert("type".to_owned(), Value::String("string".to_owned()));
@@ -60,9 +44,6 @@ impl NeighboursTool {
         })
     }
 
-    /// # Errors
-    /// Propagates a malformed tool name or parameter schema, neither of
-    /// which can happen with the literals below.
     pub fn new(seen: Neighbourhood) -> Result<NeighboursTool, AxError> {
         let defined = Self::definition()?;
         Ok(NeighboursTool {
@@ -81,9 +62,6 @@ impl NeighboursTool {
     }
 }
 
-/// How far the question reaches. The two words are the configuration
-/// ladder's own rungs (`Layer::City`, `Layer::Building`) rather than a
-/// second vocabulary for near and far.
 enum Scope {
     Building,
     City,
@@ -106,12 +84,6 @@ impl Scope {
     }
 }
 
-/// This building, one address per line.
-///
-/// Empty rooms are listed with the residents rather than after them:
-/// address order is the order a reader can predict, and a second
-/// ordering by occupancy would make a place's position depend on
-/// whether somebody happened to be living in it.
 fn render_building(seen: &Neighbourhood) -> String {
     let here = seen.here();
     if here.is_empty() {
@@ -144,7 +116,6 @@ fn render_building(seen: &Neighbourhood) -> String {
     out
 }
 
-/// The city, by building name only.
 fn render_city(seen: &Neighbourhood) -> String {
     let mut out = String::from(
         "Buildings in this city. Only the one you are in lists who is inside it; work that \

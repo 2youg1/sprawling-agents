@@ -3,30 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One lock per file an edit lands on, shared by every run in the
-//! process.
-//!
-//! Inside it an edit takes the file's stamp, reads its bytes, judges the
-//! admission, replaces the one match and takes the new stamp, so two runs
-//! editing one file cannot both land on the same look and lose each
-//! other's change (`Sprawling/runtime/spec/Tools/Edit.lean` §8-64). It
-//! serialises edit with edit only: `exec` and the person's editor do not
-//! take it.
-//!
-//! The key is the path in the tree the run writes to, so one address in
-//! two worktrees is two files and two locks. It is compared with its case
-//! folded, because Windows and macOS volumes name one file by every
-//! spelling of its case, and two runs that spelled it differently would
-//! otherwise hold two locks on one file; on a case-sensitive volume the
-//! folding only makes two files that differ by case wait on each other.
-//! A path is in the table only while somebody holds it, so the table is
-//! as large as the edits in flight.
-
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 
-/// The city's table of files an edit is landing on.
 #[derive(Debug, Clone, Default)]
 pub struct PathLocks {
     table: Arc<Table>,
@@ -38,7 +18,6 @@ struct Table {
     freed: Condvar,
 }
 
-/// The lock on one path; dropping it lets the next edit of that path in.
 #[derive(Debug)]
 pub(crate) struct PathGuard {
     table: Arc<Table>,
@@ -46,7 +25,7 @@ pub(crate) struct PathGuard {
 }
 
 impl PathLocks {
-    /// Waits until no other edit holds `path`, then holds it.
+
     pub(crate) fn hold(&self, path: &Path) -> PathGuard {
         let key = path.to_string_lossy().to_lowercase();
         let mut held = self.table.held();
@@ -66,8 +45,7 @@ impl PathLocks {
 }
 
 impl Table {
-    /// A poisoned table is taken back: each entry is inserted or removed
-    /// whole, so a thread that died holding the table left no half-entry.
+
     fn held(&self) -> MutexGuard<'_, BTreeSet<String>> {
         self.held.lock().unwrap_or_else(PoisonError::into_inner)
     }
@@ -88,9 +66,6 @@ mod tests {
     use std::sync::mpsc;
     use std::time::Duration;
 
-    /// Two spellings of one name on a case-insensitive volume are one
-    /// file, so the second edit waits for the first rather than landing
-    /// on the same look.
     #[test]
     fn a_path_spelled_in_another_case_waits_for_the_holder() {
         let locks = PathLocks::default();

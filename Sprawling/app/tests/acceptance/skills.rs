@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every skill this repository ships, installed into the city library
-//! and admitted by a building's reading room, is pinned when a run
-//! starts and read by name (`Sprawling/accounting/Spec.lean` section 2, the ninth
-//! assertion).
-//!
-//! The set of skills is the `skills/` directory itself. They go in
-//! through the city library, the path that lands every file of a
-//! package inside the city, so a file a package carries is read here
-//! too (accounting D23); `shelf_outside.rs`
-//! mounts the same directory as a shelf outside the city.
-
 use std::path::{Path, PathBuf};
 
 use kernel::B3Hash;
@@ -22,17 +11,15 @@ use serde_json::json;
 use crate::city::{self, History};
 use crate::script::{self, Step};
 
-/// The file inside a package the run reads by `<name>/<relative path>`.
 const CARRIED: &str = "how/references/critique-rubric.md";
 
-/// What the run was dispatched with and what reached the model.
 #[derive(Debug, PartialEq)]
 struct Seen {
-    /// The skills `run_started` pinned, with their hashes.
+
     pinned: Vec<(String, B3Hash)>,
-    /// The skills whose `SKILL.md` came back from a `read` by name.
+
     read: Vec<String>,
-    /// Whether the first line of the carried file came back.
+
     packaged: bool,
 }
 
@@ -91,12 +78,10 @@ fn every_shipped_skill_a_building_admits_is_read_by_name_and_pinned() {
     );
 }
 
-/// One package under `skills/`.
 pub(crate) struct Shipped {
     pub(crate) name: String,
     pub(crate) dir: PathBuf,
-    /// The `name:` line of its `SKILL.md`, which a read by name hands
-    /// back whatever else the result is wrapped in.
+
     pub(crate) name_line: String,
 }
 
@@ -104,7 +89,6 @@ pub(crate) fn skills_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../city/skills")
 }
 
-/// Every directory under `skills/` that holds a `SKILL.md`, by name.
 pub(crate) fn shipped() -> Vec<Shipped> {
     let mut shipped: Vec<Shipped> = std::fs::read_dir(skills_dir())
         .unwrap()
@@ -126,8 +110,6 @@ pub(crate) fn shipped() -> Vec<Shipped> {
     shipped
 }
 
-/// The calls the script makes: every skill read by its name, in the
-/// order the reading room admits them, then one file a package carries.
 fn steps(shipped: &[Shipped]) -> Vec<Step> {
     shipped
         .iter()
@@ -140,10 +122,6 @@ fn steps(shipped: &[Shipped]) -> Vec<Step> {
         .collect()
 }
 
-/// Installs every package into the city library, and answers the
-/// `SKILL.md` hash each install reported for what the scan reads back.
-/// The whole package's hash is the store's key and answers another
-/// question (`Sprawling/city/Spec.lean` §8-28).
 fn install(city_root: &Path, shipped: &[Shipped]) -> Vec<(String, B3Hash)> {
     let mut cas = storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas()).unwrap();
     let mut register = |bytes: &[u8]| cas.put(bytes).map_err(storage::StorageError::into_ax);

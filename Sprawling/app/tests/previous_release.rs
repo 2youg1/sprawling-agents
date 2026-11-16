@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A city the previous release wrote, opened by this build after the
-//! move home (`Sprawling/app/spec/Firstrun.lean` §8-8).
-//!
-//! `tests/cities/v0.0.12` is what the 0.0.12 release binary wrote with
-//! `sprawling init city` beside itself and then served once, kept byte
-//! for byte (`.gitattributes` turns off conversion for it). Three names
-//! are spelled differently in the tree so that this repository's git
-//! does not read them as its own: `dot-git` is the city's `.git`, and
-//! each `dot-gitignore` is a `.gitignore` the city wrote.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -25,10 +15,8 @@ use std::path::Path;
 
 use sprawling::beside_binary::{Homing, bring_home};
 
-/// The fixture's spelling of each name and the name the city wrote.
 const RESPELLED: [(&str, &str); 2] = [("dot-git", ".git"), ("dot-gitignore", ".gitignore")];
 
-/// Copies the fixture to `to`, putting back the names it respells.
 fn unpack(from: &Path, to: &Path) {
     std::fs::create_dir_all(to).unwrap();
     for entry in std::fs::read_dir(from).unwrap() {

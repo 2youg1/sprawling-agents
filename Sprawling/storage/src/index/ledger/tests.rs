@@ -11,8 +11,6 @@ fn write_ledger(dir: &Path, count: u64) -> Vec<Vec<u8>> {
     write_ledger_rolling(dir, count, count.max(1))
 }
 
-/// Writes `count` records into segments that roll every
-/// `per_segment` lines, and returns each line in seq order.
 fn write_ledger_rolling(dir: &Path, count: u64, per_segment: u64) -> Vec<Vec<u8>> {
     let run = RunId::from_bytes([7u8; 16]);
     let mut lines = Vec::new();
@@ -76,11 +74,6 @@ fn write_interleaved(dir: &Path, runs: &[RunId], count: u64) -> Vec<(RunId, Vec<
     owned
 }
 
-/// The whole point of the run index: one session's lines are found
-/// without reading anybody else's. The assertion is on the seqs the
-/// index hands back, because that set *is* what the reader will open
-/// the segment for - a walk that returned the other runs' seqs and
-/// left the filtering to the caller would have read them all.
 #[test]
 fn rebuild_finds_every_line_and_seeking_returns_it_verbatim() {
     let tmp = tempfile::tempdir().unwrap();
@@ -95,11 +88,6 @@ fn rebuild_finds_every_line_and_seeking_returns_it_verbatim() {
     }
 }
 
-// A fresh cache, a stale one and a corrupt one used to have their own
-// tests here. The cache has no writer left, so the three questions it
-// answered are gone with it: this index is rebuilt from the segments
-// whenever it is opened, and the tests below cover that rebuild.
-
 #[test]
 fn a_torn_tail_is_skipped_and_the_intact_prefix_still_indexes() {
     let tmp = tempfile::tempdir().unwrap();
@@ -113,8 +101,6 @@ fn a_torn_tail_is_skipped_and_the_intact_prefix_still_indexes() {
     assert_eq!(index.tail_seq(), Some(Seq::new(2)));
 }
 
-/// The refresh reads what was appended and nothing else, and a
-/// segment that lost its tail is not patched but rebuilt.
 #[test]
 fn a_resident_index_folds_what_arrived_and_rebuilds_what_was_truncated() {
     let tmp = tempfile::tempdir().unwrap();
@@ -122,11 +108,9 @@ fn a_resident_index_folds_what_arrived_and_rebuilds_what_was_truncated() {
     let mut index = LedgerIndex::rebuild(tmp.path()).unwrap();
     assert_eq!(index.len(), 3);
 
-    // Nothing moved: refreshing is a no-op, and the map is unchanged.
     index.refresh(tmp.path()).unwrap();
     assert_eq!(index.len(), 3);
 
-    // Appended: the new lines land, and the old offsets still read.
     let lines = write_ledger(tmp.path(), 7);
     index.refresh(tmp.path()).unwrap();
     assert_eq!(index.len(), 7);
@@ -137,8 +121,6 @@ fn a_resident_index_folds_what_arrived_and_rebuilds_what_was_truncated() {
         assert_eq!(&got, expected, "line {i} still reads after a refresh");
     }
 
-    // Truncated: the offsets held for that segment describe bytes
-    // that are gone, so the whole map is rebuilt rather than patched.
     let path = tmp.path().join("ledger-00000000000000000000.jsonl");
     let bytes = std::fs::read(&path).unwrap();
     let keep = bytes.len() / 2;
@@ -154,12 +136,6 @@ fn a_resident_index_folds_what_arrived_and_rebuilds_what_was_truncated() {
     }
 }
 
-/// A refresh reads the appended tail, not the segment that holds it.
-///
-/// The assertion is on bytes, because that is the whole difference: an
-/// index that lifted the segment and then sliced its tail folds exactly
-/// the same records and answers exactly the same queries, while paying
-/// the length of the ledger on every query that follows an append.
 #[test]
 fn a_refresh_reads_the_appended_tail_rather_than_the_segment() {
     let tmp = tempfile::tempdir().unwrap();
@@ -168,7 +144,6 @@ fn a_refresh_reads_the_appended_tail_rather_than_the_segment() {
     let path = tmp.path().join("ledger-00000000000000000000.jsonl");
     let segment_bytes = std::fs::metadata(&path).unwrap().len();
 
-    // Nothing grew, so nothing is opened at all.
     assert_eq!(index.refresh(tmp.path()).unwrap(), Refreshed::Unchanged);
 
     let after = write_ledger(tmp.path(), 401);
@@ -195,7 +170,6 @@ fn a_refresh_reads_the_appended_tail_rather_than_the_segment() {
     assert_eq!(index.len(), 401);
     assert_eq!(index.tail_seq(), Some(Seq::new(400)));
 
-    // The offsets folded before the append still name the right lines.
     let mut reader = index.reader(tmp.path());
     assert_eq!(
         &reader.line_at(Seq::new(0)).unwrap(),
@@ -206,17 +180,11 @@ fn a_refresh_reads_the_appended_tail_rather_than_the_segment() {
         after.get(400).unwrap()
     );
 
-    // A segment that lost its tail is rebuilt, and says so.
     let bytes = std::fs::read(&path).unwrap();
     std::fs::write(&path, bytes.get(..bytes.len() / 2).unwrap()).unwrap();
     assert_eq!(index.refresh(tmp.path()).unwrap(), Refreshed::Rebuilt);
 }
 
-/// A preallocated segment (storage D31) is the roll size from the
-/// moment it is created, so its length no longer says whether a record
-/// arrived. The refresh reads forward and stops at the window that
-/// reaches the zero tail (storage D32): one window per refresh, whether
-/// a record arrived or not, rather than every zero up to the roll size.
 #[test]
 fn a_refresh_stops_at_the_zero_tail_of_a_preallocated_segment() {
     use crate::fault_fs::{FaultFs, FaultPlan, TornTail};
@@ -266,8 +234,6 @@ fn a_refresh_stops_at_the_zero_tail_of_a_preallocated_segment() {
     );
 }
 
-/// A folded segment that is no longer listed holds offsets into bytes
-/// that are gone, so the refresh rebuilds rather than keeps them.
 #[test]
 fn a_segment_that_vanished_rebuilds_the_index() {
     let tmp = tempfile::tempdir().unwrap();
@@ -284,8 +250,6 @@ fn a_segment_that_vanished_rebuilds_the_index() {
     );
 }
 
-/// Writes `count` records that cycle through `runs`, so no run owns a
-/// contiguous stretch of the ledger. Returns the seqs each run wrote.
 #[test]
 fn the_run_map_survives_a_refresh() {
     let tmp = tempfile::tempdir().unwrap();
@@ -295,8 +259,6 @@ fn the_run_map_survives_a_refresh() {
     let mut index = LedgerIndex::rebuild(tmp.path()).unwrap();
     assert_eq!(index.run_seqs_before(mine, None).count(), 2);
 
-    // Appended: the refresh folds the new lines into both maps, and a
-    // reopened index reads the same answer from the segments.
     write_interleaved(tmp.path(), &[mine, yours], 10);
     index.refresh(tmp.path()).unwrap();
     assert_eq!(index.run_seqs_before(mine, None).count(), 5);
@@ -306,9 +268,6 @@ fn the_run_map_survives_a_refresh() {
     assert_eq!(reopened.run_seqs_before(mine, None).count(), 5);
 }
 
-/// A line whose `run` cannot be read still belongs in the seq map:
-/// an index over a damaged ledger is what a repair path needs, and
-/// dropping the line would hide it from every reader.
 #[test]
 fn a_line_with_no_readable_run_is_still_indexed_by_seq() {
     let tmp = tempfile::tempdir().unwrap();
@@ -336,10 +295,6 @@ fn a_missing_seq_is_a_caller_error_not_a_corrupt_ledger() {
     assert!(matches!(err, StorageError::SeqMissing { seq: 77 }));
 }
 
-/// What rebuilding a view costs, counted rather than timed: every
-/// record is folded once and every byte of the ledger is read once, so
-/// a rebuild that starts re-reading segments shows up here as read
-/// amplification rather than as a slow afternoon.
 #[test]
 fn a_view_rebuild_folds_every_record_and_reads_the_ledger_once() {
     let dir = tempfile::tempdir().unwrap();

@@ -3,14 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Gate refusals: the three mandatory parts.
-//! The part `Sprawling/kernel/spec/Error.lean` specifies this module with the
-//! rest of `kernel::error`.
-
 use serde::{Deserialize, Serialize};
 
-/// The three mandatory parts of a gate refusal: rule | violation |
-/// compliant alternative (three-part refusal).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GateRefusal {

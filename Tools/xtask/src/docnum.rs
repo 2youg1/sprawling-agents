@@ -3,34 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `cargo xtask docnum [--write]`: the numbers a document quotes, taken
-//! from the code that decides them.
-//!
-//! A document may mark a span as managed by a fact:
-//!
-//! ```text
-//! <!-- xtask:begin gate_count -->
-//! 20
-//! <!-- xtask:end -->
-//! ```
-//!
-//! The gate recounts every fact and refuses a span whose text is not
-//! what the recount says; `--write` replaces the text instead. Markers
-//! sitting on their own lines wrap the value in newlines, and markers
-//! written around a value on one line keep it on one line, so a table
-//! cell and a paragraph can both hold a managed span.
-//!
-//! A key may carry one argument after a colon — `dep_version:toml`,
-//! `budget_reading:frontend_artifact` — so one generator serves a family
-//! of facts.
-//!
-//! The `facts` module is the authority for which facts a document may
-//! quote. Every entry names the code it recounts from, so a number in a
-//! document has the same home as the number in the binary — the defect
-//! this gate closes is a document that stated `WIRE_V` as 15 while the
-//! wire had reached 31, which the next reader (a person or a model)
-//! writes code against.
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -40,21 +12,14 @@ use crate::walk;
 pub(crate) mod facts;
 mod installers;
 
-/// What opens a managed span, up to the fact's key.
 const BEGIN: &str = "<!-- xtask:begin ";
 
-/// What closes the opening marker, after the key.
 const OPENED: &str = " -->";
 
-/// What closes a managed span.
 const END: &str = "<!-- xtask:end -->";
 
-/// Every reading this run has already taken, so a fact scanning the
-/// whole tree is recounted once however many documents quote it. A key
-/// no fact owns is absent, which is what a refusal reports.
 type Readings = BTreeMap<String, String>;
 
-/// Today's reading for every key these spans name.
 fn readings(root: &Path, found: &[Span], into: &mut Readings) -> Result<(), XtaskError> {
     for span in found {
         if into.contains_key(&span.key) {
@@ -87,10 +52,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// `cargo xtask docnum --write`: every managed span rewritten to what
-/// its fact says today. A span naming no fact stops the write, because
-/// a writer that skips what it cannot recount leaves the document
-/// looking regenerated while one number stays stale.
 pub(crate) fn write(root: &Path) -> Result<String, XtaskError> {
     let mut values = Readings::new();
     let mut changed = 0_usize;
@@ -117,11 +78,6 @@ pub(crate) fn write(root: &Path) -> Result<String, XtaskError> {
     Ok(format!("docnum: {changed} document(s) rewritten\n"))
 }
 
-/// Every document a reader can receive: the Markdown ones, and the Lean
-/// specifications, whose block comments hold a span as well as a Markdown
-/// paragraph does (Tools/xtask/Spec.lean §8-43). The isolation zone holds
-/// one machine's working notes and is never published, so a marker there
-/// is nobody's authority.
 fn documents(root: &Path) -> Result<Vec<std::path::PathBuf>, XtaskError> {
     let all = walk::files_with_ext(root, &["md", "lean"])?;
     Ok(all
@@ -130,22 +86,18 @@ fn documents(root: &Path) -> Result<Vec<std::path::PathBuf>, XtaskError> {
         .collect())
 }
 
-/// One managed span: the key it names, where it starts, and the text
-/// between the two markers.
 #[derive(Debug)]
 struct Span {
     key: String,
     line: usize,
-    /// Byte range of the text between the markers.
+
     from: usize,
     to: usize,
     content: String,
 }
 
 impl Span {
-    /// What this span should read, in the shape its author chose: a
-    /// value on its own line when the markers are, inline when they
-    /// are.
+
     fn framed(&self, value: &str) -> String {
         if self.content.contains('\n') {
             format!("\n{value}\n")
@@ -155,7 +107,6 @@ impl Span {
     }
 }
 
-/// A marker pair this module cannot read, and where it starts.
 #[derive(Debug)]
 struct Malformed {
     line: usize,
@@ -205,7 +156,6 @@ fn judge(rel: &str, span: &Span, values: &Readings, out: &mut Vec<Violation>) {
     });
 }
 
-/// Every managed span in one document, in the order they appear.
 fn spans(text: &str) -> Result<Vec<Span>, Malformed> {
     let mut out: Vec<Span> = Vec::new();
     let mut cursor = 0_usize;
@@ -259,7 +209,6 @@ fn spans(text: &str) -> Result<Vec<Span>, Malformed> {
     Ok(out)
 }
 
-/// The document with every managed span replaced by today's reading.
 fn rewrite(text: &str, found: &[Span], values: &Readings, rel: &str) -> Result<String, XtaskError> {
     let mut out = String::with_capacity(text.len());
     let mut done = 0_usize;
@@ -282,7 +231,6 @@ fn rewrite(text: &str, found: &[Span], values: &Readings, rel: &str) -> Result<S
     Ok(out)
 }
 
-/// The one-based line a byte offset sits on.
 fn line_of(text: &str, offset: usize) -> usize {
     text.get(..offset)
         .unwrap_or_default()

@@ -3,22 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The CPU set records `GetSystemCpuSetInformation` writes, read in safe
-//! Rust on every platform (`Sprawling/desktop/ffi/Spec.lean` D4 and the
-//! record walk proved in its section 10). The leaf copies the records out
-//! unread; this module walks them by each record's own `Size`, so a record
-//! that claims less than a CPU set record or runs past the buffer stops
-//! the walk instead of being read past.
-
-/// The bytes of one `SYSTEM_CPU_SET_INFORMATION` record of the CPU set
-/// type, and the least a record of any type may claim.
 const RECORD: usize = 32;
 
-/// `CpuSetInformation`, the one record type the SDK defines.
 const CPU_SET_TYPE: u32 = 0;
 
-/// One logical processor as Windows describes it. `core` and `cache` are
-/// numbered inside the processor's group; `class` grows with speed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CpuSet {
     pub group: u16,
@@ -30,42 +18,32 @@ pub struct CpuSet {
     pub flags: Flags,
 }
 
-/// The record's flag byte.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Flags(pub u8);
 
 impl Flags {
-    /// The processor is parked to save power at this moment.
+
     #[must_use]
     pub fn parked(self) -> bool {
         self.0 & 0x1 != 0
     }
 
-    /// The processor is allocated to some process for its exclusive use.
     #[must_use]
     pub fn allocated(self) -> bool {
         self.0 & 0x2 != 0
     }
 
-    /// The process the records were read for holds that allocation.
     #[must_use]
     pub fn allocated_to_this_process(self) -> bool {
         self.0 & 0x4 != 0
     }
 }
 
-/// The record at `offset` claims less than a record, or runs past the end
-/// of the buffer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Malformed {
     pub offset: usize,
 }
 
-/// Every CPU set record in `bytes`, in the order written.
-///
-/// # Errors
-/// [`Malformed`] at the first record whose `Size` is below a record's or
-/// reaches past `bytes`; nothing after it is read.
 pub fn parse(bytes: &[u8]) -> Result<Vec<CpuSet>, Malformed> {
     let mut sets = Vec::new();
     let mut offset = 0usize;
@@ -161,8 +139,7 @@ mod tests {
     }
 
     proptest! {
-        /// The Rust side's fuzz of the walk: any bytes at all are read
-        /// without a panic, and an answer is a list or the first bad record.
+
         #[test]
         fn any_bytes_are_walked_without_reading_past_them(bytes in proptest::collection::vec(any::<u8>(), 0..512)) {
             match parse(&bytes) {

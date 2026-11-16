@@ -3,16 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How long a probe took is read off the monotonic clock, whatever the
-//! city's clock does meanwhile.
-
 use super::endpoints::ledger_text;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// How long a probe took is a span, read off the monotonic clock: a
-/// city clock that leaps a minute at every read leaves it well under a
-/// minute (`Sprawling/app/Spec.lean` §8-62, §8-129-2).
 #[test]
 fn a_probe_times_itself_on_the_monotonic_clock() {
     let dir = tempfile::tempdir().unwrap();
@@ -54,7 +48,6 @@ fn a_probe_times_itself_on_the_monotonic_clock() {
     );
 }
 
-/// The first `elapsed_ms` anywhere in a record.
 fn elapsed_ms(value: &serde_json::Value) -> Option<u64> {
     match value {
         serde_json::Value::Object(map) => map
@@ -69,22 +62,15 @@ fn elapsed_ms(value: &serde_json::Value) -> Option<u64> {
     }
 }
 
-/// How long the stand-in endpoint stays silent when nobody releases it:
-/// long enough that an accounting thread waiting on it is seen waiting,
-/// short enough that a red run ends on its assertion.
 const SILENCE: std::time::Duration = std::time::Duration::from_secs(5);
 
-/// A probe waits on its endpoint off the accounting thread: while the
-/// endpoint is silent, the next command is still answered, and the
-/// probe's reading is written once the endpoint answers.
 #[test]
 fn a_probe_held_by_a_silent_provider_leaves_the_next_command_answered() {
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let (release, held) = std::sync::mpsc::channel::<()>();
     let (said, heard) = std::sync::mpsc::channel();
-    // The first request the endpoint reads waits to be released; the
-    // ones after it pass, so a released probe finishes at once.
+
     let silence = std::sync::Mutex::new(Some(held));
     let endpoint_said = said.clone();
     let pace: Pace = std::sync::Arc::new(move |_: &str| {
@@ -123,7 +109,7 @@ fn a_probe_held_by_a_silent_provider_leaves_the_next_command_answered() {
             wire::Delivered::ToThePeer
         }),
     });
-    // A provider that already stopped waiting has dropped its end.
+
     release.send(()).unwrap_or(());
     worker.land_the_rest().unwrap();
     let heard_in_order: Vec<&str> = (0..2)

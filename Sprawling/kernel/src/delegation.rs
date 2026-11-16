@@ -3,19 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Delegation: two delegate kinds, one level deep.
-//! The guard is two-layered on purpose: statically, a `Delegate` value
-//! has no delegate method — minting a grandchild cannot be spelled;
-//! dynamically, `admit` re-checks depth at every spawn so a hand-rolled
-//! path cannot sneak past the type. One level is an invariant, not a
-//! constant — a constant would imply it is tunable.
-//! The part `Sprawling/kernel/spec/Delegation.lean` specifies this module.
-
 use serde::{Deserialize, Serialize};
 
-/// How difficult the parent Session judges one delegated task. The city
-/// turns this closed vocabulary into a model and effort; the parent never
-/// names either of those itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -25,8 +14,6 @@ pub enum Difficulty {
     Hard,
 }
 
-/// Resident delegates join society and answer for output; Ephemerals are
-/// tools — one clarification channel up, nothing else.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DelegateKind {
@@ -35,9 +22,7 @@ pub enum DelegateKind {
 }
 
 impl DelegateKind {
-    /// The one spelling. Both the tool that parses these words and the
-    /// status line that prints them read it here, so a rename cannot
-    /// half-happen.
+
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -47,14 +32,11 @@ impl DelegateKind {
     }
 }
 
-/// The depth-zero position: the only type with a `delegate` method
-/// (15.3-10). Who holds a `Delegator` is assembly's discipline; what a
-/// `Delegate` value can mint is this module's — nothing.
 #[derive(Debug)]
 pub struct Delegator(());
 
 impl Delegator {
-    /// Minting point: assembly and citysim only.
+
     pub fn root() -> Delegator {
         Delegator(())
     }
@@ -64,8 +46,6 @@ impl Delegator {
     }
 }
 
-/// A delegated position. No delegate method — the compile error is the
-/// design (trybuild counterexample).
 #[derive(Debug)]
 pub struct Delegate {
     kind: DelegateKind,
@@ -77,27 +57,22 @@ impl Delegate {
     }
 }
 
-/// Where a spawner stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Depth {
     Root,
     Delegated,
 }
 
-/// Deliberately exhaustive verdict; the refusal (E_DELEGATION_DEPTH,
-/// three parts) is shaped by gate::spawn — the sole gate-code producer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DelegationVerdict {
     Allow,
     Deny,
 }
 
-/// The dynamic half of the two-layer guard: a delegated position spawns
-/// nothing, whatever kind it asks for.
 pub fn admit(parent: Depth, kind: &DelegateKind) -> DelegationVerdict {
     match parent {
         Depth::Root => {
-            // Exhaustive on purpose: a new kind must decide its depth rule.
+
             match kind {
                 DelegateKind::Resident | DelegateKind::Ephemeral => DelegationVerdict::Allow,
             }
@@ -142,7 +117,6 @@ mod tests {
         let root = Delegator::root();
         let child = root.delegate(DelegateKind::Ephemeral);
         assert_eq!(child.kind(), &DelegateKind::Ephemeral);
-        // `child.delegate(...)` does not compile — pinned by the
-        // trybuild case; this test documents the runtime-visible half.
+
     }
 }

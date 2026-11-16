@@ -3,23 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which calls a commit is the result of (`Sprawling/accounting/spec/Trace.lean` §8-16).
-//!
-//! A commit is traced back from what `Query::Commit` already answers:
-//! the run that wrote it and the commit that run announced before it.
-//! Between the two, the run's own calls are the candidates, read with
-//! the pairing rule the rounds fold owns; the other runs that called
-//! tools in the same building meanwhile are counted beside them,
-//! because their writes share the building's tree and may have landed
-//! in the same commit.
-//!
-//! Two readers ask it. `whose --trace` asks [`trace`], which folds the
-//! whole history once for one commit. A playback export folds its
-//! history once, up to its cutoff, into a `History` and asks each
-//! commit of it at the line that announced it; `trace_through` then
-//! reads that commit's lines through the index the export built, so no
-//! answer reads past the cutoff (`Sprawling/accounting/spec/Playback/Traced.lean` §8-25).
-
 use std::collections::BTreeMap;
 use std::ops::Range;
 use std::path::Path;
@@ -30,35 +13,24 @@ use storage::{LedgerIndex, LineReader, StorageError};
 
 use crate::views::Views;
 
-/// One commit, the calls its run made since its previous commit, and
-/// who else called tools in the same building in that span.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Trace {
-    /// The same value `Query::Commit` answers: run, actor, previous,
-    /// parents.
+
     pub commit: wire::CommitAnswer,
-    /// The run's calls in the span, oldest first.
+
     pub calls: Vec<wire::Call>,
-    /// Every other run that called tools in the same building in the
-    /// span, one entry each, by run id.
+
     pub nearby: Vec<Nearby>,
 }
 
-/// Another run that called tools in the commit's building in the span.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Nearby {
     pub run: RunId,
-    /// The address of its first such call in the span.
+
     pub actor: Address,
     pub calls: u64,
 }
 
-/// The trace of `oid`, read from the city's own history; `None` when
-/// this city never wrote that commit.
-///
-/// # Errors
-/// Whatever `views::ask` refuses (a chain that does not verify), and a
-/// line that cannot be read or parsed after it.
 pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError> {
     #[cfg(test)]
     counted::views_folded();
@@ -71,13 +43,8 @@ pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError> {
     trace_through(&index, &ledger_dir, *commit).map(Some)
 }
 
-/// A city's history folded one verified line at a time, in the order a
-/// strict pass reads it up to a cutoff. A commit is asked of it as of the
-/// lines folded so far, so what a later line says, or whether it
-/// verifies, cannot change the answer (`Sprawling/accounting/spec/Playback/Traced.lean` §8-25).
 pub(crate) struct History {
-    /// The views of the lines folded so far, or the first refusal to fold
-    /// one, after which nothing more is folded.
+
     views: Result<Box<Views>, AxError>,
 }
 
@@ -90,8 +57,6 @@ impl History {
         }
     }
 
-    /// Folds one verified line, in seq order. The first line the views
-    /// refuse ends the fold: every later question answers that refusal.
     pub(crate) fn absorb(&mut self, record: &EventRecord) {
         let refused = match &mut self.views {
             Ok(views) => views.apply(record).err(),
@@ -102,13 +67,6 @@ impl History {
         }
     }
 
-    /// What `Query::Commit` answers about `oid` from the lines folded so
-    /// far: the run, the actor, the seq of its latest announcement among
-    /// them, the run's previous commit, and the parents git states.
-    /// `None` when no line folded so far announced it.
-    ///
-    /// # Errors
-    /// The views' refusal to fold an earlier line.
     pub(crate) fn commit(&self, oid: GitOid) -> Result<Option<wire::CommitAnswer>, AxError> {
         let views = self.views.as_ref().map_err(AxError::clone)?;
         let wire::Answer::Commit(commit) = views.prepare(&wire::Query::Commit { oid }).finish()
@@ -119,14 +77,6 @@ impl History {
     }
 }
 
-/// The calls `commit`'s run made in its span, and who else called tools
-/// in its building meanwhile, every line read through `index`, which must
-/// hold the lines before the commit's own. No line at or after
-/// `commit.seq` is read.
-///
-/// # Errors
-/// A line that cannot be read or parsed, and an actor in the reserved
-/// subtree, which belongs to no building.
 pub(crate) fn trace_through(
     index: &LedgerIndex,
     ledger_dir: &Path,
@@ -155,9 +105,6 @@ pub(crate) fn trace_through(
     })
 }
 
-/// The commit's run's lines before the commit, oldest first: back past
-/// `after` to the nearest `model_called` at or before it, so the turn
-/// the span opens in is folded whole and its calls keep their answers.
 fn run_records(
     index: &LedgerIndex,
     reader: &mut LineReader<'_>,
@@ -177,8 +124,6 @@ fn run_records(
     Ok(newest_first)
 }
 
-/// The other runs whose `tool_called` lines in `span` were addressed
-/// within the commit's building, counted by run.
 fn nearby(
     index: &LedgerIndex,
     reader: &mut LineReader<'_>,
@@ -207,17 +152,12 @@ fn nearby(
             actor: at.clone(),
             calls: 0,
         });
-        // A count of ledger lines cannot reach u64::MAX: the seq that
-        // numbers them is a u64 too.
+
         counted.calls = counted.calls.saturating_add(1);
     }
     Ok(found.into_values().collect())
 }
 
-/// How many folds of a city's views this module began on this thread,
-/// and how many index entries each nearby walk took: the probes the
-/// count gates in `playback::tests::tracing` read (`Sprawling/accounting/spec/Playback/Traced.lean`
-/// §8-25).
 #[cfg(test)]
 pub(crate) mod counted {
     use std::cell::{Cell, RefCell};
@@ -229,8 +169,6 @@ pub(crate) mod counted {
         static NEARBY_WALKS: RefCell<Vec<u64>> = const { RefCell::new(Vec::new()) };
     }
 
-    /// The index entries one nearby walk takes, written down when the
-    /// walk is dropped.
     pub(super) struct Walked<I> {
         entries: I,
         taken: u64,
@@ -257,7 +195,6 @@ pub(crate) mod counted {
         }
     }
 
-    /// The entries each nearby walk on this thread took, oldest first.
     pub(crate) fn nearby_walks() -> Vec<u64> {
         NEARBY_WALKS.with(|walks| walks.borrow().clone())
     }
@@ -296,7 +233,6 @@ mod tests {
         Address::parse(raw).unwrap()
     }
 
-    /// What one line of the script says: who, where, what.
     type Line = (RunId, &'static str, EventKind, Value);
 
     fn called(id: &str, tool: &str, effect: Value) -> Value {
@@ -311,8 +247,6 @@ mod tests {
         json!({"oid": oid(n).to_string()})
     }
 
-    /// A city whose ledger carries `script` after its genesis, each line
-    /// at its own moment; the seq of the script's first line.
     fn city(script: Vec<Line>) -> (tempfile::TempDir, u64) {
         let dir = tempfile::tempdir().unwrap();
         let report = crate::worker::fixture::init_city(dir.path()).unwrap();
@@ -336,9 +270,6 @@ mod tests {
         (dir, first.unwrap())
     }
 
-    /// Run 1 works in `lab/room1` and commits twice inside one turn; run
-    /// 2 works in `lab/room2` and commits in between; run 3 works in
-    /// another building.
     fn interleaved() -> (tempfile::TempDir, u64) {
         let read = || json!("read");
         let write = || json!({"write": {"domain": "lab"}});
@@ -433,9 +364,6 @@ mod tests {
         ])
     }
 
-    /// What a trace says, in the terms a reader checks it by: the
-    /// previous commit, each call's seq, tool, registration and outcome,
-    /// and who else called in the building.
     type Said = (
         Option<wire::CommitAt>,
         Vec<(Seq, String, Option<kernel::Effect>, wire::Outcome)>,
@@ -454,11 +382,6 @@ mod tests {
         )
     }
 
-    /// The run's second commit is traced to the calls it made since its
-    /// first - across the turn that commit fell in the middle of, and past
-    /// the other run's commit in between - and the other run in the same
-    /// building is counted beside them; the run in another building is
-    /// not.
     #[test]
     fn a_trace_names_the_calls_its_run_made_since_its_previous_commit() {
         let (dir, first) = interleaved();
@@ -491,8 +414,6 @@ mod tests {
         );
     }
 
-    /// A run's first commit is traced from the run's first line, and a
-    /// commit this city never wrote has no trace.
     #[test]
     fn a_first_commit_is_traced_from_its_runs_first_line() {
         let (dir, first) = interleaved();

@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A child process is read while it runs and is gone once it exits.
-
 #![allow(clippy::unwrap_used, reason = "test code")]
 
 use std::process::{Child, Command, Stdio};
@@ -13,7 +11,6 @@ use std::time::Duration;
 use super::{Tree, TreeReading};
 use crate::monitor::counters::Reads;
 
-/// A child that waits about half a minute and does nothing else.
 #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn sleeper() -> Child {
     let mut command = if cfg!(windows) {
@@ -39,8 +36,6 @@ fn a_child_is_read_while_it_runs_and_is_gone_once_it_exits() {
     let mut tree = Tree::open(child.id());
     let mut read = Vec::new();
 
-    // A child just spawned may not be in the table, or not yet hold its
-    // own memory, on a loaded runner; the read is asked again until it is.
     let running = read_until(&mut tree, Duration::ZERO, &mut read, |reading| {
         reading.is_some_and(|reading| reading.working_set_bytes > 0)
     })
@@ -48,9 +43,7 @@ fn a_child_is_read_while_it_runs_and_is_gone_once_it_exits() {
     child.kill().unwrap();
     child.wait().unwrap();
     drop(child);
-    // Windows wakes the waiters of a process before it takes the process
-    // out of the table a snapshot walks, so a read taken right after
-    // `wait` can still find the dying root, its memory mostly released.
+
     let gone = read_until(
         &mut tree,
         Duration::from_millis(250),
@@ -82,9 +75,6 @@ fn a_child_is_read_while_it_runs_and_is_gone_once_it_exits() {
     );
 }
 
-/// Reads the tree until `settled` holds of a reading, 25 ms apart and at
-/// most 400 times, keeping every reading in `read`; `None` when it never
-/// held.
 fn read_until(
     tree: &mut Tree,
     elapsed: Duration,

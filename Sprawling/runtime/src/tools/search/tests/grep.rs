@@ -3,12 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a search answers when it is asked in Claude Code's `Grep` shape
-//! (`Sprawling/runtime/spec/Tools/Search.lean` §8-30-2, D117, D120, D121).
-
 use super::*;
 
-/// The paths a `files` answer lists, in the order it lists them.
 fn files(outcome: &ToolOutcome) -> Vec<String> {
     outcome.result.as_map()["files"]
         .as_array()
@@ -18,8 +14,6 @@ fn files(outcome: &ToolOutcome) -> Vec<String> {
         .collect()
 }
 
-/// D120: a pattern is a regular expression in ripgrep's syntax, matched
-/// one line at a time, and `-i` drops the case.
 #[test]
 fn a_pattern_is_a_regular_expression_and_dash_i_drops_the_case() {
     let dir = city();
@@ -48,8 +42,6 @@ fn a_pattern_is_a_regular_expression_and_dash_i_drops_the_case() {
     );
 }
 
-/// A pattern the engine cannot compile is refused with the engine's
-/// reason, so the model can correct it.
 #[test]
 fn a_pattern_that_does_not_compile_is_refused() {
     let dir = city();
@@ -64,9 +56,6 @@ fn a_pattern_that_does_not_compile_is_refused() {
     );
 }
 
-/// D117: a glob without a pattern lists the files whose names match, in
-/// name order; one without `/` is matched against the file name, one
-/// with `/` against the path below `path`.
 #[test]
 fn a_glob_alone_lists_the_files_its_name_matches() {
     let dir = city();
@@ -94,7 +83,6 @@ fn a_glob_alone_lists_the_files_its_name_matches() {
     );
 }
 
-/// A glob beside a pattern keeps the search to the files it names.
 #[test]
 fn a_glob_beside_a_pattern_narrows_the_files_searched() {
     let dir = city();
@@ -110,8 +98,6 @@ fn a_glob_beside_a_pattern_narrows_the_files_searched() {
     assert_eq!(files(&outcome), ["lab/ledger.rs"]);
 }
 
-/// Finding a file by name opens nothing, so a file too large to search
-/// and a file that is not text are listed like any other.
 #[test]
 fn a_glob_alone_lists_files_it_would_not_search() {
     let dir = city();
@@ -135,9 +121,6 @@ fn a_glob_alone_lists_files_it_would_not_search() {
     );
 }
 
-/// D115: a call spelled the way an older build spelled a search names
-/// neither a pattern nor a glob, and is refused in words that name both.
-/// A glob alone has no lines to show or count.
 #[test]
 fn a_call_with_no_pattern_is_refused_unless_it_finds_files_by_name() {
     let dir = city();
@@ -167,9 +150,6 @@ fn a_call_with_no_pattern_is_refused_unless_it_finds_files_by_name() {
     );
 }
 
-/// D121: an argument whose answer would mislead if it were not read is
-/// refused, with the way this search answers the same question; one that
-/// only shortens the answer is not read.
 #[test]
 fn an_argument_ignoring_would_mislead_is_refused_and_one_it_would_not_is_left() {
     let dir = city();
@@ -207,8 +187,6 @@ fn an_argument_ignoring_would_mislead_is_refused_and_one_it_would_not_is_left() 
     }
 }
 
-/// `-B` and `-A` ask for context on one side each, and override the
-/// two-sided `context` (or its alias `-C`) on their side.
 #[test]
 fn context_is_asked_for_each_side_or_both() {
     let dir = tempfile::tempdir().unwrap();
@@ -248,11 +226,6 @@ fn context_is_asked_for_each_side_or_both() {
     );
 }
 
-/// D121: a pattern that spells a line break can match no single line, so
-/// matched line by line it would answer "none" where the file holds the
-/// two lines; it is refused, as ripgrep refuses it outside multiline mode.
-/// A class that merely includes a line break, like `\s`, is matched
-/// within the line.
 #[test]
 fn a_pattern_that_spells_a_line_break_is_refused() {
     let dir = city();

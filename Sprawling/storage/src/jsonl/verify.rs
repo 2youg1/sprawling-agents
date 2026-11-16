@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one per-line check every Ledger reader applies: the envelope
-//! (version direction, chain, seq), the kind split (typed or ignorable),
-//! and the writer-canonical echo. `JsonlLedger::open`'s tail scan and
-//! `runtime::replay` both walk a ledger through a `LineCheck`, so a line
-//! one of them accepts the other cannot refuse (`Sprawling/storage/spec/Jsonl/Verify.lean` §8-1).
-//!
-//! The check holds the chain state only - the previous line's hash and
-//! the seq expected next - never a line, so a reader that feeds it one
-//! line at a time holds one line at a time.
-
 use std::borrow::Cow;
 
 use kernel::consts_external::{LogVersion, readable_log_v};
@@ -21,45 +11,38 @@ use kernel::{AxCode, AxError, B3Hash, EventKind, EventRecord, GENESIS_PREV, Seq}
 use serde::Deserialize;
 use serde::de::IntoDeserializer;
 
-/// Chain state between two lines: what the next line must continue.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LineCheck {
     prev: B3Hash,
     expected: Seq,
 }
 
-/// A line that passed: a typed record, or an explicitly ignorable line
-/// from a newer vocabulary that still counts in the chain.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CheckedLine {
     Known(EventRecord),
     IgnoredUnknown(Seq),
 }
 
-/// Why a line did not pass, in the order the check asks.
 #[derive(Debug, Clone, PartialEq)]
 pub enum LineFault {
-    /// The bytes do not carry a ledger envelope: torn or foreign bytes.
+
     NotALine(String),
-    /// Written by a newer build (`readable_log_v` answers `Ahead`).
+
     VersionAhead(u64),
-    /// Below the first version any build wrote.
+
     NotAVersion(u64),
-    /// `prev` does not hash the previous line.
+
     ChainBreak,
-    /// The seq is not the one the chain expects.
+
     SeqGap { found: Seq, expected: Seq },
-    /// An unknown kind without `ig:true`: a newer writer's vocabulary.
+
     UnknownKind(String),
-    /// A known kind whose record does not parse, or whose bytes are not
-    /// what the writer would have written.
+
     NotCanonical(String),
-    /// The seq space is exhausted after this line.
+
     SeqExhausted(AxError),
 }
 
-/// Enough of any line to judge version, chain and kind before a typed
-/// parse. Unknown extra fields pass: this shape reads lines from the future.
 #[derive(Deserialize)]
 struct Envelope<'a> {
     v: u64,
@@ -72,17 +55,15 @@ struct Envelope<'a> {
 }
 
 impl LineCheck {
-    /// The state before a ledger's first line.
+
     pub fn at_genesis() -> Self {
         Self::after(GENESIS_PREV, Seq::FIRST)
     }
 
-    /// The state after a line already verified elsewhere.
     pub(crate) fn after(prev: B3Hash, expected: Seq) -> Self {
         Self { prev, expected }
     }
 
-    /// The seq the next line must carry.
     pub fn expected(&self) -> Seq {
         self.expected
     }
@@ -91,20 +72,12 @@ impl LineCheck {
         self.prev
     }
 
-    /// Whether `raw` carries a ledger envelope at all: a torn write never
-    /// does, so a line that does is history, whatever else is wrong with it.
-    /// A run of zero bytes is preallocated space a write had not reached,
-    /// not part of a line, so the bytes after the last zero are judged on
-    /// their own (`Sprawling/storage/spec/Jsonl/Preallocate.lean`,
-    /// `zeros_before_a_line_are_not_the_end`).
     pub(crate) fn carries_envelope(raw: &[u8]) -> bool {
         raw.rsplit(|byte| *byte == 0)
             .next()
             .is_some_and(|after| serde_json::from_slice::<Envelope>(after).is_ok())
     }
 
-    /// Judge one line (without its `\n`) and, when it passes, advance the
-    /// chain past it. A fault leaves the state where it was.
     pub fn advance(&mut self, raw: &[u8]) -> Result<CheckedLine, LineFault> {
         let envelope = readable_envelope(raw)?;
         if envelope.prev != self.prev {
@@ -122,10 +95,6 @@ impl LineCheck {
         Ok(checked)
     }
 
-    /// Everything `advance` asks of one line except where it sits in the
-    /// chain, for a reader that links the chain from the other end
-    /// (`jsonl::tail`): the line passes or fails here exactly as it
-    /// would going forward.
     pub(super) fn judge(raw: &[u8]) -> Result<Judged, LineFault> {
         let envelope = readable_envelope(raw)?;
         let (seq, prev) = (envelope.seq, envelope.prev);
@@ -134,25 +103,16 @@ impl LineCheck {
     }
 }
 
-/// One line judged on its own: the chain position it claims, and what
-/// it is.
 pub(super) struct Judged {
     pub(super) seq: Seq,
     pub(super) prev: B3Hash,
     pub(super) checked: CheckedLine,
 }
 
-/// Judge one line (without its newline) as a record this build reads,
-/// without the chain: the same answer `LineCheck::advance` gives about
-/// the line's own bytes, for a reader that reached the line through an
-/// index whose fold already walked the chain.
 pub fn read_line(raw: &[u8]) -> Result<CheckedLine, LineFault> {
     readable_envelope(raw).and_then(|envelope| classify(envelope, raw))
 }
 
-/// The seq a line claims in its envelope, read without judging the rest:
-/// where a reader looks for a line, never whether the line is good, which
-/// the chain check that follows decides.
 pub(crate) fn claimed_seq(raw: &[u8]) -> Option<Seq> {
     readable_envelope(raw).ok().map(|envelope| envelope.seq)
 }
@@ -167,8 +127,6 @@ fn readable_envelope(raw: &[u8]) -> Result<Envelope<'_>, LineFault> {
     }
 }
 
-/// The one rule for what a line of a readable envelope is: a record of a
-/// kind this build knows, an ignorable line of a newer kind, or a fault.
 fn classify(envelope: Envelope<'_>, raw: &[u8]) -> Result<CheckedLine, LineFault> {
     let known = EventKind::deserialize(
         IntoDeserializer::<serde::de::value::Error>::into_deserializer(envelope.kind.as_ref()),
@@ -195,10 +153,7 @@ fn canonical_record(raw: &[u8]) -> Result<EventRecord, LineFault> {
 }
 
 impl LineFault {
-    /// The refusal a reader that walks a whole ledger gives, naming the
-    /// 1-based line: a newer writer speaks direction
-    /// (`E_LOG_VERSION_UNSUPPORTED`), everything else is storage
-    /// integrity (`E_CAS_CORRUPT`).
+
     pub fn into_ax(self, line_no: u64) -> AxError {
         let newer = |detail: String| {
             AxError::failure(AxCode::LogVersionUnsupported, "verify ledger", detail).with_recovery(

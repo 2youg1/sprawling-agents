@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A route that is a command the person wrote, run for as long as the
-//! route is open (Sprawling/remote_access/Spec.lean §8-9).
-//!
-//! The command learns the loopback address from `SPRAWLING_REMOTE_LOCAL`
-//! and, once outside can reach it, prints one line
-//! `{"url": "https://…"}`. Lines before it are noise.
-//!
-//! **The reader is a thread.** A blocking read on a pipe has no deadline,
-//! and a command that never prints must not hold the caller forever; the
-//! thread turns the read into a channel the caller waits on with one, the
-//! same reason `agent_protocols::mcp::stdio` gives. After the address it
-//! keeps reading and discards, so a command that goes on printing never
-//! blocks on a full pipe; the pipe closes when the command ends, and the
-//! thread returns.
-
 use std::io::{BufRead, BufReader};
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -29,20 +14,16 @@ use kernel::{AxCode, AxError, TimeoutMs};
 
 use super::{Opened, Permanence, PublicUrl, Route, Running};
 
-/// The environment variable that carries `local` to the command.
 pub const LOCAL_ENV: &str = "SPRAWLING_REMOTE_LOCAL";
 
-/// The longest part of a wrong line quoted back in a refusal.
 const QUOTED_CHARS: usize = 120;
 
-/// The command, as the person configured it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RouteCommand {
     pub program: PathBuf,
     pub args: Vec<String>,
 }
 
-/// The command route.
 pub struct CommandRoute {
     command: RouteCommand,
     permanence: Permanence,
@@ -50,15 +31,13 @@ pub struct CommandRoute {
     running: Option<Running>,
 }
 
-/// One line of the command's output, as this route reads it.
 enum Line {
     Noise,
     Address(Result<PublicUrl, AxError>),
 }
 
 impl CommandRoute {
-    /// A closed route that runs `command`, answers `permanence` because
-    /// the person stated it, and waits up to `patience` for the address.
+
     #[must_use]
     pub fn new(command: RouteCommand, permanence: Permanence, patience: TimeoutMs) -> Self {
         Self {
@@ -120,8 +99,6 @@ impl Route for CommandRoute {
     }
 }
 
-/// Starts the thread that reads the command's output, and answers the
-/// channel its address line arrives on.
 fn watch(running: &mut Running) -> Result<Receiver<Result<PublicUrl, AxError>>, AxError> {
     let refused = |subject: String| {
         AxError::failure(AxCode::ToolUnavailable, "open a route command", subject)
@@ -138,7 +115,6 @@ fn watch(running: &mut Running) -> Result<Receiver<Result<PublicUrl, AxError>>, 
     Ok(address)
 }
 
-/// Sends the first address line, then drains the pipe until it closes.
 fn read(stdout: ChildStdout, sender: &mpsc::Sender<Result<PublicUrl, AxError>>) {
     let mut lines = BufReader::new(stdout).split(b'\n');
     for bytes in lines.by_ref() {
@@ -160,11 +136,6 @@ fn read(stdout: ChildStdout, sender: &mpsc::Sender<Result<PublicUrl, AxError>>) 
     }
 }
 
-/// A line is the address when it opens with `{`. It must then be exactly
-/// `{"url": "<address>"}`, with blanks allowed around the parts and no
-/// backslash in the address: a subset of JSON, so no JSON parser is
-/// needed for one line, and a line that meant to give the address but got
-/// it wrong is refused rather than skipped.
 fn classify(text: &str) -> Line {
     let line = text.trim();
     if !line.starts_with('{') {

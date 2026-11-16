@@ -3,22 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The agents this machine shows evidence of, found without running
-//! anything (`Sprawling/agent_protocols/Spec.lean` §8-19).
-//!
-//! Two kinds of evidence, both read from files: an agent the person
-//! configured in another ACP client, and a built-in entry whose vendor
-//! directory exists. Evidence orders and hints; only `initialize` after
-//! consent proves an agent works.
-
 use serde_json::Value;
 
 use super::entry::{AgentEntry, AgentSource};
 use super::paste::server_entry;
 use super::roster::{OFFICIAL, Roster, SetUpDir};
 
-/// The files other ACP clients keep the agents a person configured in,
-/// each where its vendor documents it.
 pub const CLIENT_CONFIGS: [SetUpDir; 2] = [
     SetUpDir {
         variable: None,
@@ -32,12 +22,6 @@ pub const CLIENT_CONFIGS: [SetUpDir; 2] = [
     },
 ];
 
-/// Every agent one client configuration names under `agent_servers`,
-/// without its `env`: another client's file may hold a key there, and a
-/// value enters this city only through the vault.
-///
-/// A file that is not JSON (Zed allows comments) and an item that names
-/// no command are no evidence, and say nothing.
 #[must_use]
 pub fn configured(text: &str) -> Vec<AgentEntry> {
     let Ok(config) = serde_json::from_str::<Value>(text) else {
@@ -55,8 +39,7 @@ pub fn configured(text: &str) -> Vec<AgentEntry> {
                             entry.launch.env.clear();
                             Some(entry)
                         }
-                        // An item the paste grammar would refuse is not an
-                        // agent this machine shows evidence of.
+
                         Err(_not_an_agent) => None,
                     }
                 })
@@ -65,9 +48,6 @@ pub fn configured(text: &str) -> Vec<AgentEntry> {
         .unwrap_or_default()
 }
 
-/// The agents this machine shows evidence of: those configured in another
-/// client, then each built-in entry whose vendor directory `set_up` finds,
-/// each id once.
 #[must_use]
 pub fn detected(
     roster: &Roster,
@@ -100,8 +80,6 @@ pub fn detected(
 mod tests {
     use super::*;
 
-    /// Another client's agents are offered without their environment
-    /// values, and a vendor directory offers its built-in entry.
     #[test]
     fn evidence_offers_other_clients_agents_without_env_and_builtins_by_directory() {
         let roster = Roster::new(

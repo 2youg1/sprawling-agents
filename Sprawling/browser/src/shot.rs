@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A screenshot: what was asked for, and what came back.
-//!
-//! Every number a caller gives is an integer, including the two the
-//! protocol spells as fractions. Quality and scale arrive as percentages
-//! and become JSON numbers by formatting digits, so no floating-point
-//! value exists in this crate at all — which is what lets a screenshot
-//! request sit in a ledger payload beside everything else.
-
 mod cap;
 mod clip;
 mod result;
@@ -27,15 +19,13 @@ use crate::port::Frame;
 use crate::session::{ContextId, Session};
 use crate::snapshot::PageSnapshot;
 
-/// What one screenshot was asked for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShotRequest {
     clip: Option<Clip>,
     format: ImageType,
-    /// 0..=100. Read by the two lossy formats and ignored by PNG, which
-    /// is what the protocol does with it too.
+
     quality: Option<u8>,
-    /// A percentage of the device pixel ratio; 100 leaves it alone.
+
     scale: Option<u32>,
 }
 
@@ -104,11 +94,7 @@ fn unreadable(percent: u32) -> AxError {
 }
 
 impl ShotRequest {
-    /// Reads the four optional fields of a `screenshot` call.
-    ///
-    /// # Errors
-    /// Refuses a clip missing one of its four sides, a format this city
-    /// does not carry, and any number that is not whole.
+
     pub fn read(args: &Payload) -> Result<ShotRequest, AxError> {
         let rect = match args.as_map().get("clip") {
             None | Some(Value::Null) => None,
@@ -146,9 +132,7 @@ impl ShotRequest {
         };
         let quality = match integer(args, "quality")? {
             None => None,
-            // The domain is the encoder's, refused rather than clamped:
-            // a caller that asked for 120 asked for a picture no encoder
-            // writes, and a number quietly cut to 100 agrees with it.
+
             Some(percent) => {
                 kernel::consts_policy::IMAGE_QUALITY.admit(percent)?;
                 Some(u8::try_from(percent).map_err(|_| unreadable(percent))?)
@@ -167,26 +151,11 @@ impl ShotRequest {
         self.format
     }
 
-    /// Whether the page has to answer before this shot can be captured:
-    /// an element it names, or a set of boxes it reports.
     #[must_use]
     pub fn waits_for_page(&self) -> bool {
         self.clip.as_ref().is_some_and(Clip::waits_for_page)
     }
 
-    /// The frames one screenshot needs.
-    ///
-    /// A scale other than 100 changes the device pixel ratio first,
-    /// because the protocol has no per-capture scale and a caller who
-    /// asked for one wants more pixels rather than a bigger file. A shot
-    /// that names an element ends here: the page has to name the element
-    /// before the capture can cover it, so this is the resolve frame and
-    /// [`ShotRequest::capture_frame`] is the one after it — the two-phase
-    /// shape `Verb::Act` already uses for a drag from a reference.
-    ///
-    /// # Errors
-    /// Refuses a shot by reference with no snapshot to resolve it in, and
-    /// propagates the frames' own refusals.
     pub(crate) fn frames(
         &self,
         session: &mut Session,
@@ -208,9 +177,7 @@ impl ShotRequest {
             Some(Clip::Union(union)) => {
                 let looked = crate::verb::looked_at(snapshot, "photograph a page")?;
                 crate::act::ensure_fresh(looked, union.generation())?;
-                // The boxes come from the script `measure` sends, so the
-                // region a shot covers and the region a measurement
-                // reports are read once and cannot disagree.
+
                 frames.push(session.evaluate(
                     context,
                     &crate::verb::script::measure_script(looked, union.references())?,
@@ -227,17 +194,6 @@ impl ShotRequest {
         Ok(frames)
     }
 
-    /// The capture frame, once the page has answered about the region.
-    ///
-    /// `reply` is the frame this shot sent first: the resolve frame's
-    /// reply for an element, the measure frame's for a set of boxes. The
-    /// handle or the boxes are read out of it here rather than handed in,
-    /// so no caller can crop to an element or a region the page never
-    /// reported.
-    ///
-    /// # Errors
-    /// Refuses a shot that covers a rectangle, which had nothing to
-    /// resolve, and propagates a reply this build cannot read.
     pub fn capture_frame(
         &self,
         session: &mut Session,
@@ -265,18 +221,6 @@ impl ShotRequest {
         }
     }
 
-    /// The frame that captures this region again, small enough to fit.
-    ///
-    /// A capture that came back with a side past the cap is asked for
-    /// once more at the density that brings that side down to the cap,
-    /// composed with the density the caller asked for. It is the only
-    /// lever the protocol gives: `imageSize` is stated and ignored, and
-    /// the cost — a page that queries `resolution` may lay out
-    /// differently at the new ratio — is paid only where the alternative
-    /// is a refusal of the shot.
-    ///
-    /// # Errors
-    /// Refuses a side this build cannot state a density for.
     pub fn refit_frame(
         &self,
         session: &mut Session,
@@ -290,8 +234,6 @@ impl ShotRequest {
         )
     }
 
-    /// The device-ratio change a scale asks for, which comes before
-    /// anything is captured.
     fn density_frames(
         &self,
         session: &mut Session,
@@ -307,7 +249,6 @@ impl ShotRequest {
         Ok(frames)
     }
 
-    /// One capture frame, with the clip the caller has already resolved.
     fn capture(
         &self,
         session: &mut Session,

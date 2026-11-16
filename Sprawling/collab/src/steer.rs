@@ -3,38 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Speaking into a run that is already working.
-//!
-//! Two entrances, one landing. The User's steer arrives as a control
-//! surface command and never travels through the Inbox; an agent's steer
-//! is a signal that overtakes the queue. Both land in the same place —
-//! appended to the end of the next tool result — because the model
-//! should have to recognise one shape, not two.
-//!
-//! The entrances stay apart for a different reason than the landing
-//! stays together: content that claims to come from the User must not
-//! be able to render as the User. The two are two types: a [`Steer`] is
-//! the User's text and nothing else, and a [`Letter`] carries the
-//! resident who sent it, which `runtime::conversation` renders inside an
-//! envelope its body cannot close (collab D16).
-
 use kernel::{AxCode, AxError, RunId};
 
 use crate::inbox::{SenderState, Signal};
 use kernel::event::record::SignalKind;
 
-/// The User's steer at its landing: what the User said.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Steer {
     text: String,
 }
 
 impl Steer {
-    /// The control surface's entrance.
-    ///
-    /// # Errors
-    /// Refuses empty text: an interruption that says nothing costs a
-    /// turn and gives the run nothing to act on.
+
     pub fn from_person(text: &str) -> Result<Steer, AxError> {
         Ok(Steer {
             text: non_empty(text)?,
@@ -47,17 +27,14 @@ impl Steer {
     }
 }
 
-/// Why a resident's words reached a working run's window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LetterKind {
-    /// A steer-kind signal, taken at a safe point.
+
     Steer,
-    /// The reply a sync wait ended with (collab D9).
+
     Reply,
 }
 
-/// A resident's words at their landing, with who sent them as the city
-/// stamped it rather than as the body claims (collab D16).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Letter {
     from: String,
@@ -68,12 +45,7 @@ pub struct Letter {
 }
 
 impl Letter {
-    /// The Inbox's entrance: a steer-kind signal, attributed to the
-    /// resident that sent it.
-    ///
-    /// # Errors
-    /// Refuses a signal of any other kind — an ordinary mention does not
-    /// get to interrupt — and one whose payload carries no text.
+
     pub fn from_signal(signal: &Signal) -> Result<Letter, AxError> {
         if signal.kind() != SignalKind::Steer {
             return Err(AxError::failure(
@@ -91,8 +63,6 @@ impl Letter {
         })
     }
 
-    /// The reply a sync wait ended with, whatever kind of signal carried
-    /// it. An empty reply still ends the wait, so it is not refused.
     pub(crate) fn reply(signal: &Signal) -> Letter {
         Letter {
             from: signal.from().to_owned(),
@@ -110,14 +80,11 @@ impl Letter {
         }
     }
 
-    /// The sending room's address, without the `@`.
     #[must_use]
     pub fn from(&self) -> &str {
         &self.from
     }
 
-    /// The run that wrote the `signal_enqueued` line, where the city
-    /// stamped it.
     #[must_use]
     pub fn run(&self) -> Option<RunId> {
         self.run
@@ -128,21 +95,17 @@ impl Letter {
         self.kind
     }
 
-    /// Where the sender stood when the city delivered it (collab D10).
     #[must_use]
     pub fn sender(&self) -> Option<SenderState> {
         self.sender
     }
 
-    /// The body as the sender wrote it, trimmed; the renderer escapes it.
     #[must_use]
     pub fn text(&self) -> &str {
         &self.text
     }
 }
 
-/// What a `pull` row says about where the sender stood when the signal
-/// was delivered (collab D10).
 pub(crate) fn sender_note(state: SenderState) -> String {
     format!(
         "(the sender's run was {} when this arrived)",
@@ -176,8 +139,6 @@ mod tests {
     use kernel::event::record::SignalId;
     use kernel::{Address, Payload, TimeMs, Version};
 
-    /// A signal from `lab/room1` to `lab/room2` carrying `text`, as
-    /// `SignalDesk::send` writes one.
     fn signal(kind: SignalKind, text: &str) -> Signal {
         let mut body = serde_json::Map::new();
         body.insert(
@@ -196,9 +157,6 @@ mod tests {
         .unwrap()
     }
 
-    /// D10, D16: the landing carries where the sender stood when the
-    /// city delivered the signal and the run that sent it, as stamps
-    /// rather than words in the body.
     #[test]
     fn a_delivered_steer_lands_with_the_stamps_of_its_delivery() {
         let run = RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000001").unwrap();

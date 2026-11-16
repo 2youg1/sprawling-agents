@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! An agent played in memory on the far side of two pipes: it reads
-//! what the session sends, line by line, and answers from a script.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -24,26 +21,23 @@ use serde_json::{Value, json};
 
 use super::*;
 
-/// What the played agent does once the session has sent it a request.
 enum Step {
-    /// Answer the request just read with this result.
+
     Answer(Value),
-    /// Send this message unprompted.
+
     Say(Value),
-    /// Send this request and read the client's answer to it.
+
     Ask(Value),
-    /// Read one more request from the client.
+
     Read,
-    /// Close the output without another word.
+
     Hang,
-    /// Say nothing for this long.
+
     Wait(Duration),
-    /// Read everything the session still sends, until it closes its end.
+
     Drain,
 }
 
-/// Starts an agent that follows `script`, and hands back the session's
-/// two ends and what the agent read.
 fn played(
     script: Vec<Step>,
 ) -> (
@@ -97,8 +91,6 @@ fn played(
     (BufReader::new(from_agent), to_agent, agent)
 }
 
-/// The session's end of a played agent, read the way production reads a
-/// child's output.
 fn opened(
     script: Vec<Step>,
     name: &str,
@@ -118,10 +110,6 @@ fn opening() -> Vec<Step> {
     ]
 }
 
-/// A whole turn: the agent reports, asks, reaches for a capability this
-/// client never offered, and ends. Every report arrives in order, the
-/// ask is answered with the caller's choice, and the reach is refused
-/// by name rather than left hanging.
 #[test]
 fn a_turn_hands_back_what_the_agent_reported_and_answers_what_it_asked() {
     let mut script = opening();
@@ -209,9 +197,6 @@ fn a_turn_hands_back_what_the_agent_reported_and_answers_what_it_asked() {
     assert_eq!(wire[4]["error"]["code"], -32_601);
 }
 
-/// An agent that stops talking in the middle of a turn may already
-/// have acted, so the refusal says the effect is unknown rather than
-/// inviting a blind retry.
 #[test]
 fn an_agent_that_goes_quiet_mid_turn_leaves_the_effect_unknown() {
     let mut script = opening();
@@ -223,7 +208,6 @@ fn an_agent_that_goes_quiet_mid_turn_leaves_the_effect_unknown() {
     agent.join().unwrap();
 }
 
-/// A stop reason this client cannot name is refused, not guessed.
 #[test]
 fn a_stop_reason_nobody_defined_is_refused() {
     let mut script = opening();
@@ -234,8 +218,6 @@ fn a_stop_reason_nobody_defined_is_refused() {
     agent.join().unwrap();
 }
 
-/// A listener nothing happens to: no halt, and every report and ask let
-/// through unrecorded.
 fn quiet() -> Listener<'static> {
     Listener {
         halted: Box::leak(Box::new(|| false)),
@@ -245,10 +227,6 @@ fn quiet() -> Listener<'static> {
     }
 }
 
-/// A halt that arrives while the agent says nothing still becomes a
-/// cancel, once, and the cancel is booked and sent before the next
-/// report is handed on (Sprawling/agent_protocols/spec/Harness/Session.lean,
-/// `a_halt_is_a_cancel_before_anything_else`).
 #[test]
 fn a_halt_while_the_agent_is_silent_is_a_cancel_before_the_next_report() {
     let mut script = opening();

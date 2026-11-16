@@ -3,15 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! This process's own counters, read through its own handle rather than
-//! the whole process table, so one reading costs about a microsecond
-//! (`Sprawling/app/spec/Monitor.lean` §8-96).
-
 use std::time::Duration;
 
 use cpu_time::ProcessTime;
 
-/// The five figures of this process one sample carries.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct OwnReading {
     pub(crate) cpu_permille: u64,
@@ -21,9 +16,6 @@ pub(crate) struct OwnReading {
     pub(crate) written_bytes: u64,
 }
 
-/// The previous reading's CPU time, which the next reading's CPU share
-/// is measured against, and the highest private bytes noted since the
-/// previous reading.
 pub(crate) struct OwnProcess {
     previous: Option<Duration>,
     peak_private: u64,
@@ -37,18 +29,11 @@ impl OwnProcess {
         }
     }
 
-    /// Reads private bytes alone, between two readings, so the next
-    /// reading reports the highest of them (`Sprawling/app/spec/Monitor.lean` §8-96).
     pub(crate) fn note_private(&mut self) {
         let now = private_bytes(memory_stats::memory_stats().as_ref());
         self.peak_private = self.peak_private.max(now);
     }
 
-    /// Reads this process once; `elapsed` is the wall time since the
-    /// previous reading. The first reading has nothing to compare with,
-    /// so its CPU reads 0; a figure the platform refuses reads 0. Private
-    /// bytes are the highest of this reading and those noted since the
-    /// previous one.
     pub(crate) fn read(&mut self, elapsed: Duration) -> OwnReading {
         let cpu = ProcessTime::try_now().ok().map(|time| time.as_duration());
         let cpu_permille = match (cpu, self.previous) {
@@ -71,17 +56,11 @@ impl OwnProcess {
     }
 }
 
-/// Windows reads `PagefileUsage`, the committed private bytes; macOS
-/// reads the virtual size, which overstates them, until a safe interface
-/// reaches `phys_footprint` (`Sprawling/app/spec/Serving/Memory.lean` D43).
 #[cfg(not(target_os = "linux"))]
 fn private_bytes(memory: Option<&memory_stats::MemoryStats>) -> u64 {
     memory.map_or(0, |stats| widen(stats.virtual_mem))
 }
 
-/// Linux sums the private lines of `/proc/self/smaps_rollup`, and reads
-/// `RssAnon` from `/proc/self/status` where the kernel has no rollup;
-/// both are plain files std reads safely (Memory.lean D43).
 #[cfg(target_os = "linux")]
 fn private_bytes(_memory: Option<&memory_stats::MemoryStats>) -> u64 {
     let read = |path: &str| std::fs::read_to_string(path).ok();
@@ -91,8 +70,6 @@ fn private_bytes(_memory: Option<&memory_stats::MemoryStats>) -> u64 {
         .unwrap_or(0)
 }
 
-/// The sum, in bytes, of the `kB` lines named by `fields`; `None` when
-/// the text carries none of them.
 #[cfg(any(target_os = "linux", test))]
 fn kib_sum(text: &str, fields: &[&str]) -> Option<u64> {
     text.lines()
@@ -108,15 +85,12 @@ fn kib_sum(text: &str, fields: &[&str]) -> Option<u64> {
         })
 }
 
-/// The bytes this process has read from and written to storage.
 #[derive(Default)]
 struct StorageBytes {
     read: u64,
     written: u64,
 }
 
-/// Linux keeps them in `/proc/self/io`, a plain file std reads safely;
-/// a line the kernel does not offer reads 0.
 #[cfg(target_os = "linux")]
 fn storage_bytes() -> StorageBytes {
     let Ok(io) = std::fs::read_to_string("/proc/self/io") else {
@@ -134,15 +108,11 @@ fn storage_bytes() -> StorageBytes {
     }
 }
 
-/// Elsewhere the counter is reachable only through `unsafe`, which this
-/// workspace forbids, so both read 0 (`Sprawling/app/spec/Monitor.lean` §8-96, decision 1).
 #[cfg(not(target_os = "linux"))]
 fn storage_bytes() -> StorageBytes {
     StorageBytes::default()
 }
 
-/// CPU time spent over wall time elapsed, spread over every core, as
-/// permille of the whole machine, clamped to `0..=1000`.
 fn permille(spent: Duration, elapsed: Duration) -> u64 {
     let cores = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
     let capacity = elapsed

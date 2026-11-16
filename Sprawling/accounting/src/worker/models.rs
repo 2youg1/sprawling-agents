@@ -3,18 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The production `crate::ModelFactory`, and the one door that
-//! swaps it for another (`Sprawling/accounting/spec/Models.lean` §8-1).
-
 use kernel::AxError;
 
 use super::RunWorker;
 use super::credentials::dialect_headers;
 
-/// Reaches a chosen model the way the endpoint book describes it: the
-/// dialect's own headers, then `gateway::adapter_for`.
 pub(crate) struct GatewayModels {
-    /// The clock every permit wait is read against (`Hands.monotonic`).
+
     pub(crate) monotonic: fn() -> std::time::Instant,
 }
 
@@ -37,13 +32,7 @@ impl crate::ModelFactory for GatewayModels {
 }
 
 impl RunWorker {
-    /// The same worker, reaching every model through `models` instead of
-    /// the endpoint book's own adapters.
-    ///
-    /// The door citysim and the dispatch tests drive a worker through:
-    /// what a run's model says is theirs to script, while choosing the
-    /// model, renewing its credential and accounting for the run stay
-    /// the worker's.
+
     #[must_use]
     pub fn with_models(self, models: Box<dyn crate::ModelFactory + Send>) -> RunWorker {
         RunWorker { models, ..self }

@@ -9,13 +9,10 @@ fn addr(raw: &str) -> Address {
     Address::parse(raw).unwrap()
 }
 
-/// A rules file that declares the two required answers and whatever
-/// else the test is about, so each test below states one thing.
 fn ordinary(rest: &str) -> String {
     format!("confidential = false\nwrite = \"everything\"\n{rest}")
 }
 
-/// The same, for a building whose data does not leave.
 fn shut(rest: &str) -> String {
     format!("confidential = true\nwrite = \"everything\"\n{rest}")
 }
@@ -26,16 +23,13 @@ fn a_building_without_a_file_is_an_ordinary_building() {
     let rules = load(dir.path(), &addr("lab")).unwrap();
     assert!(!rules.policy().confidential);
     assert_eq!(rules.model_pool(), ModelPool::Any);
-    // With nothing declared, a building may write itself and no more.
+
     assert_eq!(rules.write_domain().unwrap().prefixes().count(), 1);
     std::fs::write(dir.path().join("NOTES.md"), "a file, so it has no rules").unwrap();
     let file = load(dir.path(), &addr("NOTES.md")).unwrap();
     assert_eq!(file.policy(), rules.policy());
 }
 
-/// The rules of a building are not writable by the runs they govern,
-/// and the write domain those rules declare is the one that has to
-/// fail to reach them.
 #[test]
 fn a_buildings_rules_sit_where_its_own_runs_cannot_write() {
     let dir = tempfile::tempdir().unwrap();
@@ -49,9 +43,6 @@ fn a_buildings_rules_sit_where_its_own_runs_cannot_write() {
     let target = Address::parse(&relative).unwrap();
     assert!(target.is_reserved(), "{relative}");
 
-    // The domain a building with no declarations gets: itself. It
-    // must still fail to reach the file that would have declared
-    // something else.
     let domain = load(dir.path(), &lab).unwrap().write_domain().unwrap();
     assert!(
         matches!(
@@ -62,12 +53,6 @@ fn a_buildings_rules_sit_where_its_own_runs_cannot_write() {
     );
 }
 
-/// Rules held in a document this version does not read must not come
-/// back silently defaulted: `load` treats an absent file as an ordinary
-/// building, so a confidential one would quietly stop being
-/// confidential. Two documents can be holding them — the Markdown this
-/// format replaced, at the building root the layout moved away from or
-/// in the reserved subtree — and both get the same refusal.
 #[test]
 fn rules_in_a_document_this_version_does_not_read_are_refused_rather_than_ignored() {
     for stale in [
@@ -112,10 +97,6 @@ fn a_typo_in_the_privacy_setting_does_not_resolve_to_the_permissive_side() {
     assert!(err.subject().contains("confidential"), "{}", err.subject());
 }
 
-/// A key this version does not know is refused rather than passed over.
-/// While the rules were prose the reader skipped what it did not
-/// recognise, so a misspelled setting was a permission that silently
-/// never arrived.
 #[test]
 fn a_key_this_version_does_not_know_is_refused_rather_than_skipped() {
     let err = evaluate(&addr("lab"), &ordinary("desktopp = true\n")).unwrap_err();
@@ -123,9 +104,6 @@ fn a_key_this_version_does_not_know_is_refused_rather_than_skipped() {
     assert!(err.subject().contains("desktopp"), "{}", err.subject());
 }
 
-/// The commented TOML block a person uncovers to route delegated work:
-/// from the commented `[workspace_models]` header to the last commented
-/// line after it. The prose above it stays commented.
 fn placeholder(lines: &[&str]) -> Option<(usize, usize)> {
     let header = lines.iter().position(|line| {
         line.strip_prefix("# ")
@@ -138,8 +116,6 @@ fn placeholder(lines: &[&str]) -> Option<(usize, usize)> {
     Some((header, end))
 }
 
-/// The same template with the placeholder uncovered, as a person leaves
-/// it once they have filled in a provider, a model and an effort.
 fn uncovered(template: &str) -> Option<String> {
     let lines: Vec<&str> = template.lines().collect();
     let (start, end) = placeholder(&lines)?;
@@ -153,10 +129,6 @@ fn uncovered(template: &str) -> Option<String> {
     Some(out.join("\n"))
 }
 
-/// A building laid out by the city arrives with the routing table written
-/// out as a placeholder: commented, so nothing is enabled until a person
-/// fills in a provider, a model and an effort for each difficulty, and
-/// accepted by this reader the moment they uncover it.
 #[test]
 fn the_template_hands_a_building_a_working_routing_placeholder() {
     let dir = tempfile::tempdir().unwrap();
@@ -200,8 +172,6 @@ effort = "high"
     )
 }
 
-/// A workspace names whole endpoint/model pairs and all three difficulty
-/// recommendations in the same rules document the city already enforces.
 #[test]
 fn a_workspace_model_policy_is_read_from_the_rules() {
     let rules = evaluate(&addr("shop"), &workspace_rules()).unwrap();
@@ -366,8 +336,6 @@ fn a_workspace_policy_rejects_an_empty_pool_an_outside_model_and_an_effort_above
     }
 }
 
-/// The prose keys are part of the schema, so a person who misspells one
-/// is told rather than left writing a paragraph nothing keeps.
 #[test]
 fn the_prose_a_person_writes_is_part_of_the_schema() {
     evaluate(
@@ -379,10 +347,6 @@ fn the_prose_a_person_writes_is_part_of_the_schema() {
     assert!(err.subject().contains("convention"), "{}", err.subject());
 }
 
-/// The blank form the city lays a building out with is a file this
-/// reader accepts, and the confidential variant differs from it by the
-/// one value. Read back rather than eyeballed, for the reason the
-/// template's own refusal gives.
 #[test]
 fn the_form_a_building_is_laid_out_with_is_one_this_reader_accepts() {
     let dir = tempfile::tempdir().unwrap();
@@ -397,8 +361,6 @@ fn the_form_a_building_is_laid_out_with_is_one_this_reader_accepts() {
     }
 }
 
-/// A User's direct edit is read by the same door as a page's edit; only
-/// a resident's tool write is outside the write domain.
 #[test]
 fn a_user_can_hand_edit_the_rules_in_the_buildings_reserved_subtree() {
     let dir = tempfile::tempdir().unwrap();
@@ -413,8 +375,6 @@ fn a_user_can_hand_edit_the_rules_in_the_buildings_reserved_subtree() {
     assert!(load(dir.path(), &lab).unwrap().review());
 }
 
-/// A malformed User edit is a configuration error with a usable repair,
-/// not the resident permission refusal whose recovery this used to share.
 #[test]
 fn a_malformed_user_edit_is_not_reported_as_a_resident_permission_refusal() {
     let err = evaluate(&addr("lab"), "confidential = false\nwrite = [").unwrap_err();
@@ -506,9 +466,6 @@ fn an_ordinary_building_may_declare_prefixes_beyond_itself() {
     assert_eq!(rules.write_domain().unwrap().prefixes().count(), 2);
 }
 
-/// City Hall's fixed rules give its residents a documents domain: they
-/// write Markdown, and the plan file has one editing entrance that is
-/// not `edit`.
 #[test]
 fn the_hall_template_writes_documents_and_never_the_plan() {
     let dir = tempfile::tempdir().unwrap();
@@ -540,10 +497,6 @@ fn the_hall_template_writes_documents_and_never_the_plan() {
     ));
 }
 
-/// A `write` value that is neither spelling is refused rather than read
-/// as the permissive one — and so is no value at all. While the rules
-/// were prose, an absent `write:` line resolved to `Everything`, so a
-/// person who never met the setting got the widest one.
 #[test]
 fn a_write_reach_that_reads_as_a_typo_is_refused_and_so_is_its_absence() {
     let lab = Address::parse("lab").unwrap();
@@ -580,9 +533,6 @@ fn a_browser_line_that_reads_as_a_typo_is_refused_rather_than_guessed() {
     assert!(err.subject().contains("browser"), "{}", err.subject());
 }
 
-/// A building hands its person's desktop over only by saying
-/// so. Absent the line, no — the same reading `browser:` gets, and for a
-/// stronger reason: a click on somebody's desktop has no way back.
 #[test]
 fn a_building_that_says_nothing_about_the_desktop_has_none() {
     let silent = evaluate(&addr("lab"), &ordinary("")).unwrap();
@@ -592,15 +542,10 @@ fn a_building_that_says_nothing_about_the_desktop_has_none() {
     );
     let asked = evaluate(&addr("lab"), &ordinary("desktop = true\n")).unwrap();
     assert!(asked.desktop());
-    // The two switches are independent: one is a browser, the other is
-    // this machine.
+
     assert!(!asked.browser());
 }
 
-/// A confidential building never gets the desktop. What is on a desktop
-/// belongs to whoever is sitting at it, not to this building, so
-/// "data enters and does not leave" and "this building may photograph
-/// this machine" cannot both be true.
 #[test]
 fn a_confidential_building_cannot_ask_for_the_desktop() {
     let err = evaluate(&addr("lab"), &shut("desktop = true\n")).unwrap_err();
@@ -612,8 +557,6 @@ fn a_confidential_building_cannot_ask_for_the_desktop() {
     );
 }
 
-/// A value that reads as a typo does not resolve to the permissive side,
-/// which is the rule every switch in this file is held to.
 #[test]
 fn a_desktop_line_that_reads_as_a_typo_is_refused_rather_than_guessed() {
     let err = evaluate(&addr("lab"), &ordinary("desktop = \"yes\"\n")).unwrap_err();
@@ -621,9 +564,6 @@ fn a_desktop_line_that_reads_as_a_typo_is_refused_rather_than_guessed() {
     assert!(err.subject().contains("desktop"), "{}", err.subject());
 }
 
-/// The person's browser is switched on by the address itself: a person
-/// who wrote the line has answered both whether and where, and two lines
-/// would be two answers that can disagree.
 #[test]
 fn the_person_browser_is_switched_on_by_the_address_they_declared() {
     let silent = evaluate(&addr("lab"), &ordinary("")).unwrap();
@@ -644,8 +584,6 @@ fn the_person_browser_is_switched_on_by_the_address_they_declared() {
     assert!(off.usersbrowser().is_none());
 }
 
-/// The key is its own: `usersbrowser` is not `browser` with a prefix,
-/// so the two are two settings rather than one read twice.
 #[test]
 fn the_person_browser_and_the_citys_own_browser_are_two_settings() {
     let both = evaluate(
@@ -663,9 +601,6 @@ fn the_person_browser_and_the_citys_own_browser_are_two_settings() {
     assert!(!only_person.browser());
 }
 
-/// Attaching to the person's browser reads every login in it, so a
-/// confidential building cannot ask: the per-building isolation these
-/// rules keep is exactly what the attachment dissolves.
 #[test]
 fn a_confidential_building_cannot_ask_for_the_persons_browser() {
     let err = evaluate(&addr("lab"), &shut("usersbrowser = true\n")).unwrap_err();

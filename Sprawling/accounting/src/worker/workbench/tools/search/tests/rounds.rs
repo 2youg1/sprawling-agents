@@ -3,17 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What `web_search` does with each step of its account round, against
-//! the loopback supplier: a rejected key switches, every account
-//! rejected is one exhausted failure, and a lost answer goes again only
-//! on its own account.
-
 use kernel::account_recovery::AccountRetries;
 
 use super::*;
 
-/// A rejected key switches to the next account at once: the rejected
-/// account is asked once, and the next one answers.
 #[test]
 fn web_search_switches_to_the_next_account_at_once_when_a_key_is_rejected() {
     let dir = tempfile::tempdir().unwrap();
@@ -43,8 +36,6 @@ fn web_search_switches_to_the_next_account_at_once_when_a_key_is_rejected() {
     );
 }
 
-/// Every account rejected is one `E_PROVIDER_ACCOUNTS_EXHAUSTED` that
-/// names the supplier and each account, and no key.
 #[test]
 fn web_search_reports_every_account_rejected_as_one_exhausted_failure() {
     let dir = tempfile::tempdir().unwrap();
@@ -67,9 +58,6 @@ fn web_search_reports_every_account_rejected_as_one_exhausted_failure() {
     assert_eq!(seen.lock().unwrap().len(), 2, "each account is asked once");
 }
 
-/// An answer lost after the supplier took the call goes again only on
-/// the same account, within its budget, and the round then stops with
-/// the effect still unknown; the next account is never asked.
 #[test]
 fn web_search_sends_a_lost_answer_again_only_on_the_same_account() {
     let dir = tempfile::tempdir().unwrap();

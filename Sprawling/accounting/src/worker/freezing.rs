@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a run is frozen with: its plan, and the handoff that resumes it.
-
 use std::path::Path;
 
 use kernel::Locator;
@@ -18,21 +16,13 @@ use super::{Assignment, Given, Site, Workbench, held, prompt_segment};
 use model_note::model_note;
 use run_slot::{Predecessor, run_segment};
 
-/// Bytes about to be frozen into one slot, and the documents they were
-/// read from.
-///
-/// The two travel together everywhere: a segment whose sources were
-/// computed separately would let the bytes and the account of them
-/// drift, and the account is what a person reads to learn which of
-/// their files their agent was actually given.
 pub(super) struct Assembled {
     pub(super) bytes: Vec<u8>,
     pub(super) sources: Vec<SegmentSource>,
 }
 
 impl Assembled {
-    /// Bytes this build carries rather than reads: no document on this
-    /// disk holds them.
+
     pub(super) fn of_nothing(bytes: Vec<u8>) -> Assembled {
         Assembled {
             bytes,
@@ -40,7 +30,6 @@ impl Assembled {
         }
     }
 
-    /// One document, whole.
     pub(super) fn of_one(addr: Address, bytes: Vec<u8>) -> Assembled {
         Assembled {
             sources: vec![SegmentSource::whole(addr, &bytes)],
@@ -48,10 +37,6 @@ impl Assembled {
         }
     }
 
-    /// Appends one document's bytes after a blank line, and accounts it.
-    ///
-    /// The separator is written only between documents, so a segment
-    /// that opens with a document does not open with a blank line.
     fn extend(&mut self, at: Address, bytes: &[u8]) {
         if !self.bytes.is_empty() {
             self.bytes.push(NEWLINE);
@@ -61,57 +46,15 @@ impl Assembled {
         self.sources.push(SegmentSource::whole(at, bytes));
     }
 
-    /// Freezes these bytes into one slot, keeping the account with
-    /// them.
     fn freeze(self, slot: SegmentSlot) -> FrozenSegment {
         FrozenSegment::assembled(slot, self.bytes, self.sources)
     }
 }
 
-/// One line ending, named once. The prefix joins documents with it, and
-/// a literal `10` at four call sites is four chances to mean something
-/// else.
 pub(super) const NEWLINE: u8 = 10;
 
-/// The building slot: which building this is, then the rules it stands
-/// under.
-///
-/// The building's address opens it, not the run's room: every resident
-/// of one building carries this slot byte for byte
-/// (`Sprawling/runtime/spec/Prefix.lean` D97), and a room's address here
-/// would split it by room. The room opens the resident slot instead.
-///
-/// `RULES.toml` is here rather than left for the agent to open because
-/// it is exactly as stable as the resident's own file — a person writes
-/// it, no run may write it, and it does not move for the length of a
-/// session. A rule an agent has to fetch before it can obey it is a rule
-/// that gets obeyed one turn late, or not at all.
-///
-/// **`AGENTS.md` is here for that same sentence.** A building that was
-/// adopted rather than raised arrives with conventions its authors wrote
-/// for whoever works on that project, and a resident sent to fetch them
-/// reads them after its first edit or never. Matched by exact name in
-/// the building's own root: no parent's copy, no other spelling, nothing
-/// resolved by search — an address a reader cannot predict from the rule
-/// is an address nobody can check. The rooms below the building's root
-/// bring theirs at the end of the resident slot (`room_conventions`).
-///
-/// It follows the rules rather than leading them, and says so, because
-/// the two can disagree: `RULES.toml` is what this city enforces, while
-/// the project's file was written for whatever harness its authors had.
-/// A resident told to run a test suite by a building with no `exec` has
-/// to know which of the two to believe.
-///
-/// # Errors
-/// A path inside the city that this platform spells in a way the
-/// address grammar refuses. The bytes would still be right, but the
-/// account of where they came from would name a file nobody can open,
-/// and a source row a reader cannot follow is worse than a refusal.
-/// `E_STORAGE_FATAL` for a convention file that is there and will not
-/// read, as `Assembled::extend_conventions` says.
 pub(super) fn building_segment(city_root: &Path, building: &Address) -> Result<Assembled, AxError> {
-    // The building's address opens the slot and is not a document, so
-    // it is accounted to nothing.
+
     let mut out = Assembled::of_nothing(building.as_str().as_bytes().to_vec());
     let rules_at = city::rules_path(city_root, building);
     if let Ok(rules) = std::fs::read(&rules_at) {
@@ -126,19 +69,7 @@ pub(super) fn building_segment(city_root: &Path, building: &Address) -> Result<A
 }
 
 impl Assembled {
-    /// Appends each convention file a run of `building` is sent, under
-    /// its heading, in order, and accounts it.
-    ///
-    /// Read by [`prompt_chain::read_convention`], the reading the layers
-    /// answer gives a page: a file that is not there, a directory, and a
-    /// link the read bound refuses are left out, and the page says why
-    /// (`Sprawling/accounting/Spec.lean` §8-38). Written only when the file
-    /// is sent: a heading over nothing would tell a resident to follow
-    /// conventions that do not exist.
-    ///
-    /// # Errors
-    /// As [`prompt_chain::read_convention`] and
-    /// [`prompt_chain::addressed`].
+
     fn extend_conventions(
         &mut self,
         city_root: &Path,
@@ -167,37 +98,18 @@ impl Assembled {
     }
 }
 
-/// What freezing a plan reads from outside the run's own site, as
-/// values rather than as the worker that holds them, so a plan can be
-/// frozen on whichever thread prepares the run (`Sprawling/app/Spec.lean` §8-113).
 pub(super) struct Freezing<'a> {
     pub(super) city_root: &'a Path,
-    /// The store the prefix and the norms are pinned in. Content
-    /// addressed, so a second handle on the same store writes the same
-    /// files.
+
     pub(super) cas: &'a mut storage::Cas,
-    /// The conversation this run opens with, rebuilt where the ledger
-    /// and its index are held, because that is also where its lineage
-    /// line is written.
+
     pub(super) inherited: Vec<kernel::ChatMessage>,
-    /// The run a carried session continues from, when the room's last
-    /// session was carried rather than begun fresh; read from the
-    /// session origins where the ledger is held, as `inherited` is.
+
     pub(super) carried_from: Option<kernel::RunId>,
 }
 
 impl Freezing<'_> {
-    /// Puts every segment of a frozen prefix into the store, so the
-    /// hashes `prompt_assembled` records can be read back as text.
-    ///
-    /// All four, not the two that happen to be pinned elsewhere. A hash
-    /// with nothing behind it is a reference a person cannot follow,
-    /// and "what was this agent told" is answerable only if every
-    /// segment is there. Content addressing pays for it: one building's
-    /// rules are one object however many runs are frozen under them.
-    ///
-    /// # Errors
-    /// Propagates a store that will not take the bytes.
+
     fn intern_prefix(&mut self, prefix: &FrozenPrefix) -> Result<(), AxError> {
         for segment in prefix.segments() {
             self.cas
@@ -207,13 +119,6 @@ impl Freezing<'_> {
         Ok(())
     }
 
-    /// The run slot: the task, and after it the note the person keeps
-    /// for the model this run is sent to, which therefore ends the
-    /// system prompt (`Sprawling/app/Spec.lean` §8-85).
-    ///
-    /// # Errors
-    /// Propagates a run segment that will not read and a note that is
-    /// there and will not read.
     fn assemble_run_slot(
         &self,
         site: &Site,
@@ -239,19 +144,6 @@ impl Freezing<'_> {
         Ok(slot)
     }
 
-    /// Freezes what this run is: the plan it drives on, and the handoff
-    /// that says what to read to pick it up again.
-    ///
-    /// One phase because the two are one decision. The prefix is
-    /// assembled for this plan and frozen with it, the handoff quotes
-    /// the plan's own task line, and the job locator ends up in both -
-    /// pinned in the store, so what a resumed run reads is the bytes the
-    /// run segment carried rather than a file somebody edited since.
-    ///
-    /// # Errors
-    /// Propagates a city or run segment that will not read, a norm on
-    /// the must-read list that will not open, a store that will not take
-    /// the bytes, and a handoff the runtime refuses.
     pub(super) fn freeze_plan(
         mut self,
         site: &Site,
@@ -267,16 +159,9 @@ impl Freezing<'_> {
             job,
         } = given;
         let tools = held(&workbench.catalog, "read the catalog")?.tool_defs();
-        // The catalog is part of the resident segment, not a fifth slot:
-        // what a resident may reach is as much a standing fact about it
-        // as who it is, and both are frozen for the whole run so the
-        // prefix stays cacheable across the run's life. Assembled here
-        // rather than earlier because the catalog does not exist until
-        // the tools, the reading room and the mode are known.
+
         let names = naming::session_naming(self.city_root, self.cas, addr)?;
-        // Where this run stands opens the resident slot, which belongs
-        // to one address, rather than the building slot, which the whole
-        // building shares.
+
         let mut resident = format!("{}\n\n", addr.as_str()).into_bytes();
         resident.extend_from_slice(&names.called(addr));
         resident.extend_from_slice(&site.identity.segment_bytes());
@@ -301,9 +186,7 @@ impl Freezing<'_> {
             self.assemble_run_slot(site, at, &brief)?
                 .freeze(SegmentSlot::Run),
         )?;
-        // The tool table rides with the prefix: the array is kept in the
-        // store beside the four segments, and every `prompt_assembled`
-        // names it (`Sprawling/runtime/Spec.lean` §8-60).
+
         let table = held(&workbench.catalog, "read the catalog")?.tool_table()?;
         self.cas
             .put(&table.array)
@@ -322,8 +205,7 @@ impl Freezing<'_> {
             addr: addr.clone(),
             task,
             goal,
-            // The city decided this when it laid the brief down; the
-            // window and the run segment read the one decision.
+
             opening: match &brief {
                 city::RunBrief::Job { .. } => runtime::Opening::FromJob,
                 city::RunBrief::Principal => runtime::Opening::WithPerson,
@@ -337,12 +219,10 @@ impl Freezing<'_> {
             inherited: std::mem::take(&mut self.inherited),
             shape: runtime::turn::CallShape {
                 model: site.model.id.clone(),
-                // Stated in CONFIG.toml, resolved down the three-layer
-                // ladder, and frozen with the run.
+
                 effort: site.config.effort,
                 generation: site.generation.clone(),
-                // The window the reminder measures against: the book's
-                // figure, which is what `status` already reports.
+
                 context_tokens: site.model.context_tokens,
             },
             second_threshold: site.config.second_threshold,
@@ -352,21 +232,14 @@ impl Freezing<'_> {
             prefix,
             policy: site.rules.policy().clone(),
             tools,
-            // From the catalog rather than from a second scan of the
-            // shelves: the catalog already decided what this run can
-            // reach, and reading the shelf again would answer that
-            // question a second time at a different instant.
+
             skills: held(&workbench.catalog, "read the catalog")?.skill_pins(),
             retries: site.retries,
             naming: Some(names.version),
         };
 
-        // The norms are filled by the machine: their addresses are known
-        // when the building is laid out, and a model asked to recite the
-        // list from memory gets one entry wrong eventually.
         let mut must_read = Vec::new();
-        // Put for this run at this building, so the next session's `read`
-        // judges each norm where it was read from rather than refusing it.
+
         let origin = storage::BlockOrigin {
             run: site.run_id,
             building: addr.clone(),
@@ -392,8 +265,6 @@ impl Freezing<'_> {
     }
 }
 
-/// Where a session's origin becomes a conversation, declared here because a
-/// module lives where the crate root says it does.
 mod inherited;
 pub(in crate::worker) use inherited::InheritedContext;
 mod model_note;

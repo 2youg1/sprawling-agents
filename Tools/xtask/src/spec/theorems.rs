@@ -3,34 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The four classes of a specification part (Tools/xtask/Spec.lean §8-42,
-//! assertion 6, and D22), read off the part's code with comments and
-//! strings blanked (`lean::code`).
-
-/// What a part proves, and whether a Rust check is derived from it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Class {
-    /// No `theorem` or `lemma` at all.
+
     TextOnly,
-    /// Theorems, none of which binds a variable.
+
     ClosedOnly,
-    /// A quantified theorem, and no Rust check names one.
+
     QuantifiedUnchecked,
-    /// A quantified theorem that a Rust check names.
+
     QuantifiedChecked,
 }
 
-/// One theorem: its short name and whether it binds a variable.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Theorem {
     pub(crate) name: String,
     pub(crate) quantified: bool,
 }
 
-/// The theorems declared in `code`, a part's text after `lean::code`.
-///
-/// A declaration opens a line (after optional attributes and `private` or
-/// `protected`) with `theorem` or `lemma`; its head runs to the first `:=`.
 pub(crate) fn theorems(code: &str) -> Vec<Theorem> {
     let lines: Vec<&str> = code.lines().collect();
     lines
@@ -55,8 +45,6 @@ pub(crate) fn theorems(code: &str) -> Vec<Theorem> {
         .collect()
 }
 
-/// The class of a part with `found` theorems, where `checked` says whether
-/// a Rust check names a given quantified theorem.
 pub(crate) fn classify(found: &[Theorem], checked: impl Fn(&str) -> bool) -> Class {
     let quantified: Vec<&Theorem> = found.iter().filter(|t| t.quantified).collect();
     match (found.is_empty(), quantified.is_empty()) {
@@ -67,12 +55,10 @@ pub(crate) fn classify(found: &[Theorem], checked: impl Fn(&str) -> bool) -> Cla
     }
 }
 
-/// Whether a Rust file holds a check (D22): `#[test]` or `proptest!`.
 pub(crate) fn holds_check(text: &str) -> bool {
     text.contains("#[test]") || text.contains("proptest!")
 }
 
-/// Whether `text` holds `name` as a whole word.
 pub(crate) fn has_word(text: &str, name: &str) -> bool {
     !name.is_empty()
         && text.match_indices(name).any(|(at, _)| {
@@ -84,7 +70,6 @@ pub(crate) fn has_word(text: &str, name: &str) -> bool {
         })
 }
 
-/// The text after `theorem`/`lemma` and the space, when `line` opens one.
 fn declared(line: &str) -> Option<&str> {
     let mut rest = line;
     while let Some(attribute) = rest.strip_prefix("@[") {
@@ -101,7 +86,6 @@ fn declared(line: &str) -> Option<&str> {
         .map(str::trim_start)
 }
 
-/// The head of a declaration: `first` and the lines after it, up to `:=`.
 fn head_from(first: &str, after: &[&str]) -> String {
     if let Some((before, _)) = first.split_once(":=") {
         return before.to_owned();
@@ -121,8 +105,6 @@ fn head_from(first: &str, after: &[&str]) -> String {
     head
 }
 
-/// Whether a head binds a variable: a quantifier, an arrow, or a binder
-/// `(x :` or `{x :`.
 fn binds(head: &str) -> bool {
     ["∀", "∃", "→", "forall"]
         .iter()
@@ -145,7 +127,6 @@ fn binds(head: &str) -> bool {
         })
 }
 
-/// The last dotted segment of a Lean name.
 fn short(name: &str) -> &str {
     name.rsplit('.').next().unwrap_or(name)
 }

@@ -3,54 +3,26 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a settled asset is worth, from what it cost and what it was
-//! used for.
-//!
-//! Assets are scored; agents are not. A run freezes and there is no "it"
-//! left to keep a reputation for, so the thing that carries value across
-//! sessions is what was written down — a document, a skill, a tool — and
-//! that is what gets a number.
-//!
-//! The number is deliberately dull: uses against resident cost, in per
-//! mille, with no weighting anyone has to defend. It exists to sort a
-//! list so a person can look at the bottom of it. **It never decides
-//! anything by itself** — deciding is `metabolism`'s, and adopting is a
-//! mode's.
-//!
-//! Specified by `Tools/citysim/spec/Metabolism.lean` §8-8-2.
-
 use kernel::ByteLen;
 
-/// What is known about one asset over a period.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct AssetUse {
-    /// How many runs actually reached for it.
+
     pub uses: u32,
-    /// What it costs to keep in front of a model: the bytes it occupies
-    /// in a prefix every time it is disclosed.
+
     pub resident: ByteLen,
-    /// Days since something used it.
+
     pub idle_days: u32,
 }
 
-/// One asset's standing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Score {
-    /// Uses per thousand resident bytes. An asset that earns its place
-    /// is one that gets reached for often enough to pay for the space it
-    /// takes in every prompt that discloses it.
+
     pub per_mille: u32,
-    /// Carried alongside rather than folded in: an asset can be cheap
-    /// and useless or expensive and indispensable, and a single number
-    /// that hid which was which would be worse than two.
+
     pub idle_days: u32,
 }
 
-/// Scores one asset.
-///
-/// An asset that occupies nothing scores by uses alone — a rule of the
-/// city rather than a special case: something that costs no resident
-/// bytes cannot be charged for them.
 #[must_use]
 pub fn score(usage: &AssetUse) -> Score {
     let bytes = usage.resident.get();
@@ -69,12 +41,6 @@ pub fn score(usage: &AssetUse) -> Score {
     }
 }
 
-/// Sorts assets worst first, which is the order the list is read in.
-///
-/// Worst is lowest score, and idleness breaks the tie: between two
-/// assets nobody uses, the one nobody has used for longer goes first.
-/// Ties beyond that keep the caller's order, which is stable, so the
-/// same register renders the same list twice.
 #[must_use]
 pub fn worst_first<T: Clone>(assets: &[(T, Score)]) -> Vec<(T, Score)> {
     let mut sorted = assets.to_vec();

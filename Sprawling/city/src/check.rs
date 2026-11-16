@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every TOML file a city holds, read by the parser that reads it at run
-//! time, with the first refusal of each placed at a line and a column
-//! (`Sprawling/city/spec/Check.lean` §8-29).
-//!
-//! The parser's verdict is the verdict. Only when it refuses is the file
-//! read a second time with the same shape, to take the span `toml`
-//! reports; a refusal that comes after the shape was read has no span,
-//! and gets no invented position.
-
 use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
@@ -24,15 +15,12 @@ use crate::policy::{RulesShape, evaluate, rules_path};
 use crate::schedule::{Schedule, ScheduleFile, schedule_path};
 use crate::watch::{Watch, WatchFile, watch_path};
 
-/// Where in a file a refusal points, both counted from one. The column
-/// counts characters, not bytes, which is what an editor jumps to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Position {
     pub line: usize,
     pub column: usize,
 }
 
-/// One file the city holds that its parser refused.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finding {
     pub path: PathBuf,
@@ -40,15 +28,12 @@ pub struct Finding {
     pub error: AxError,
 }
 
-/// What reading every file found: how many files were read, and the
-/// refusals among them.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Report {
     pub read: usize,
     pub findings: Vec<Finding>,
 }
 
-/// The kind of file, which names the parser that reads it.
 pub(crate) enum Kind {
     Config,
     Rules(Address),
@@ -56,11 +41,6 @@ pub(crate) enum Kind {
     Watch,
 }
 
-/// Reads every TOML file the city holds.
-///
-/// # Errors
-/// Propagates a failure to list the buildings or rooms, or to read a
-/// file that exists: then whether the city has an error cannot be told.
 pub fn check(city_root: &Path) -> Result<Report, AxError> {
     let mut report = Report::default();
     for (path, kind) in files(city_root)? {
@@ -74,13 +54,6 @@ pub fn check(city_root: &Path) -> Result<Report, AxError> {
     Ok(report)
 }
 
-/// Every TOML file a city may hold, present or not, with the kind that
-/// reads it: the one list both [`check`] and
-/// [`crate::format::bring_city_forward`] walk, so a layer added later
-/// is checked and brought forward alike.
-///
-/// # Errors
-/// Propagates a failure to list the buildings or rooms.
 pub(crate) fn files(city_root: &Path) -> Result<Vec<(PathBuf, Kind)>, AxError> {
     let mut files = vec![(CityLayout::new(city_root).city_config(), Kind::Config)];
     for building in crate::building::all(city_root)? {
@@ -99,8 +72,7 @@ pub(crate) fn files(city_root: &Path) -> Result<Vec<(PathBuf, Kind)>, AxError> {
 }
 
 impl Kind {
-    /// The `format` ladder this kind of file climbs, if it carries one
-    /// (`Sprawling/city/spec/Format.lean` §8-42).
+
     pub(crate) fn versioned(&self) -> Option<FormatFile> {
         match self {
             Kind::Config => Some(FormatFile::LayerConfig),
@@ -118,7 +90,6 @@ impl Kind {
         }
     }
 
-    /// Where the shape this kind is read with stops reading `text`.
     fn locate(&self, text: &str) -> Option<Position> {
         match self {
             Kind::Config => span_of::<ConfigFile>(text),
@@ -141,8 +112,6 @@ fn span_of<Shape: DeserializeOwned>(text: &str) -> Option<Position> {
     })
 }
 
-/// A file's text, or nothing when the city never wrote it: an absent
-/// file is the default, not an error.
 fn read(path: &Path) -> Result<Option<String>, AxError> {
     match std::fs::read_to_string(path) {
         Ok(text) => Ok(Some(text)),

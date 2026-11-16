@@ -3,28 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Hex-run detection: a pure-hex run is reported only when it is the
-//! value of a credential name (`Sprawling/kernel/spec/Secret.lean` §8-25).
-
 use super::scan::{Work, names_a_credential};
 
-/// Shortest hex run reported: 32 hex chars carry 128 bits, the smallest
-/// key size in common use. Moves with `Sprawling/kernel/Spec.lean` §14 only.
 pub(crate) const HEX_SPAN_MIN_BYTES: usize = 32;
 
-/// Per-char entropy floor for a hex run, in millibits. Every random
-/// sample of 32 chars or more in the SPEC's measurement reads above it,
-/// and it sits above the 3000 that eight evenly repeated symbols give.
 pub(crate) const HEX_ENTROPY_MIN_MILLIBITS: u64 = 3100;
 
-/// Whether the token run `bytes[start..end]` is a hex secret: pure hex,
-/// at least [`HEX_SPAN_MIN_BYTES`] long, the value of a name that
-/// [`names_a_credential`] accepts, and at least
-/// [`HEX_ENTROPY_MIN_MILLIBITS`] per char. The label is what separates a
-/// random key from a blake3 or git oid, whose entropy reads the same; it
-/// is judged before the entropy because the entropy reading is the
-/// costly step and most hex runs in the city's text are unlabelled
-/// hashes.
 pub(super) fn is_labelled_hex_secret(
     bytes: &[u8],
     start: usize,
@@ -43,8 +27,6 @@ pub(super) fn is_labelled_hex_secret(
         && work.entropy_of(run) >= HEX_ENTROPY_MIN_MILLIBITS
 }
 
-/// The name a value follows: the name, optional blanks and quotes, one
-/// `=` or `:`, then optional blanks and quotes up to the value.
 pub(super) fn label_before(head: &[u8]) -> Option<&str> {
     let (separator, head) = without_padding(head).split_last()?;
     if !matches!(separator, b'=' | b':') {
@@ -56,7 +38,7 @@ pub(super) fn label_before(head: &[u8]) -> Option<&str> {
         .rposition(|b| !(b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.')))
         .map_or(0, |at| at.saturating_add(1));
     let name = head.get(name_start..).filter(|name| !name.is_empty())?;
-    // Every byte of `name` is ASCII, so the conversion cannot fail.
+
     std::str::from_utf8(name).ok()
 }
 
@@ -73,8 +55,6 @@ fn without_padding(head: &[u8]) -> &[u8] {
 mod tests {
     use crate::secret::scan;
 
-    /// Probes are assembled at runtime so this file never holds a
-    /// scannable span (`xtask secret` runs on it).
     fn hex40() -> String {
         ["9f3c1a7e5b", "20d48c6f1e", "a7b3905d2c", "e81f64b07a"].concat()
     }

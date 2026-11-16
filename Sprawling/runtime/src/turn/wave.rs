@@ -3,26 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Boundary 3: the tool wave, accounted in call order.
-//!
-//! The reads a turn started while the model was still generating
-//! (`super::speculation`) are accounted here like every other call, each
-//! taking its cached result; `Sprawling/runtime/spec/Turn/Speculation.lean` is the
-//! authority on why that leaves the lines, in the order and with the
-//! payloads, that serial execution writes.
-//!
-//! Each call's two lines carry their own moments: the start is read once
-//! the call is admitted and before its tool runs, the answer before the
-//! tool face packages it, so a stamp the face renders is the answer's
-//! moment (runtime D8). The turn reads both; the face holds none.
-//!
-//! A call that only reads runs without waiting for its `tool_called` to
-//! be durable; a call with any other effect waits for its `tool_called`
-//! and everything held before it to be durable before its tool runs, and
-//! its `tool_result` rides the next barrier (runtime D24). Which
-//! properties that order keeps on every crash point is
-//! `Sprawling/runtime/spec/Turn/Durability.lean`.
-
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
 use kernel::{
     AxCode, AxError, ContentBlock, Effect, Ledger, ModelUsage, Payload, RenderIntent, TimeMs, Tool,
@@ -42,77 +22,44 @@ mod reorder;
 use reorder::all_at_once;
 pub(super) use reorder::lost_answer;
 
-/// A wave's tools in three stages, so the calls that only read can run
-/// at once while everything they decide stays in call order.
-///
-/// The leading run of calls whose tool declares `Effect::Read` is
-/// admitted one call at a time, in call order; the tools of the calls it
-/// clears then run at once, each on its own scoped thread; and every
-/// answer is accounted one call at a time, in call order. The first
-/// call with any other effect waits until every one of them has
-/// answered, and from there the wave is serial. The Ledger sees the same
-/// lines in the same order either way: results wait in a reorder buffer
-/// and are written in call order.
-///
-/// A trait rather than three closures: admitting and accounting write
-/// the same dedup table and taint that `tool` lends out, and three
-/// closures cannot each borrow one bench.
 pub trait ConcurrentInvoke {
-    /// The registration of the call's tool: its effect decides whether
-    /// the call is read-only, and `tool_called` copies its effect and
-    /// render (`Sprawling/runtime/spec/Turn.lean` §8-51). `None` is a tool the bench does not
-    /// know, which is not read-only.
+
     fn meta_of(&self, call: &ToolCall) -> Option<&ToolMeta>;
-    /// The call behind a `tool` `run`, resolved before anything
-    /// reads a registration (`Sprawling/runtime/Spec.lean` §8-61).
+
     fn resolve_call(&self, call: ToolCall) -> ToolCall {
         call
     }
-    /// The tool a read-only call would run on, lent out before the call
-    /// is admitted so it can start while the model is still generating.
-    /// What it returns reaches the model only if `admit` later clears the
-    /// same call. `None`, the default, starts nothing early.
+
     fn ahead(&self, _call: &ToolCall) -> Option<&dyn Tool> {
         None
     }
-    /// Stage one, serial in call order: whether the call may run, at the
-    /// turn's stamp. An answer that needs no tool (a replay, a door's
-    /// refusal) comes back here.
+
     fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted;
-    /// Stage two: the tool a cleared call runs on. It takes `&self`, so
-    /// every cleared call's tool is lent out at once and invoked from
-    /// several threads; a tool is `Sync` where the implementor need not be.
+
     fn tool(&self, ticket: &Ticket) -> Result<&dyn Tool, AxError>;
-    /// Stage three, serial in call order: records what the tool answered
-    /// and returns what the model reads back.
+
     fn account(
         &mut self,
         call: &ToolCall,
         ticket: Ticket,
         answered: Result<ToolOutcome, AxError>,
     ) -> Result<ToolOutcome, AxError>;
-    /// Closes delivery bookkeeping after the wave's compaction, before
-    /// the compacted blocks enter the conversation. The default has no
-    /// delivery state, as citysim and closure-driven tests do not.
+
     fn complete_wave(&mut self, _shortened: &std::collections::BTreeSet<String>) {}
 }
 
-/// What admitting one call decided.
 #[derive(Debug)]
 pub enum Admitted {
-    /// Answered without running a tool; the answer goes to the model.
+
     Answered(Result<ToolOutcome, AxError>),
-    /// The call may run: `tool` and then `account` take the ticket.
+
     Cleared(Ticket),
 }
 
-/// Whether the call's tool is registered as only reading.
 pub(super) fn reads_only(tools: &dyn ConcurrentInvoke, call: &ToolCall) -> bool {
     matches!(tools.meta_of(call), Some(meta) if meta.effect == Effect::Read)
 }
 
-/// A call, the moment it started (after admission, before its tool
-/// ran), and its tool's registration, which `tool_called` copies.
 struct Intent<'c> {
     call: &'c ToolCall,
     started: Moment,
@@ -132,8 +79,6 @@ impl<'c> Intent<'c> {
     }
 }
 
-/// When one call started and when it answered: its `tool_result` is
-/// stamped with the answer and carries the microseconds between the two.
 #[derive(Clone, Copy)]
 struct Timing {
     started: Moment,
@@ -141,36 +86,15 @@ struct Timing {
 }
 
 impl<'h> Turn<'h, ToolWave> {
-    /// The calls this wave is about to make, in call order.
+
     pub(crate) fn calls(&self) -> &[ToolCall] {
         &self.state.calls
     }
 
-    /// What the provider counted for the call that asked for this wave.
     pub(crate) fn usage(&self) -> Option<&ModelUsage> {
         self.state.usage.as_ref()
     }
 
-    /// Boundary 3 (before tool execution), accounted in call order, with
-    /// the leading read-only calls run at once (see [`ConcurrentInvoke`]).
-    /// A tool Err is not a turn Err — it lands in `tool_result` and goes
-    /// back to the model (the model is the recovery subject).
-    ///
-    /// Both tool events reach the ledger through `append_redacted`: a
-    /// tool's arguments and its result are the two payloads most likely
-    /// to quote a credential the work just read.
-    ///
-    /// `still_going` is asked before every call, with that call's index.
-    /// One question per wave left a halted scope running whatever the
-    /// model asked for in one reply: eight edits are eight effects, and
-    /// the person who stopped the city waited for all of them. What it
-    /// answers is consumed through the one boundary consumer, so a steer
-    /// between two calls is recorded here, before the next assembly
-    /// hands it to the model. For the leading reads it is asked for every
-    /// call before any starts, in call order, and a cancel starts only
-    /// the calls a serial wave would have made before it. Each answer is
-    /// consumed just before its call is accounted, so a steer lands on
-    /// the ledger where a serial wave writes it.
     pub fn execute_concurrent(
         mut self,
         interrupt: Interrupt,
@@ -257,12 +181,6 @@ impl<'h> Turn<'h, ToolWave> {
         exchange
     }
 
-    /// One call through all three stages on this thread: how every call
-    /// after the leading reads runs. The start is read once the call is
-    /// admitted; the answer before the face's `account` packages it. A
-    /// cleared call that does not only read is an outside effect, so its
-    /// `tool_called` and everything held before it are made durable before
-    /// its tool runs: the intent is on the ledger first.
     fn alone(
         &mut self,
         ledger: &mut dyn Ledger,
@@ -291,7 +209,6 @@ impl<'h> Turn<'h, ToolWave> {
         self.settle(exchange, call, timing, answered)
     }
 
-    /// Appends one call's `tool_called` line.
     fn intend(&mut self, intent: Intent<'_>) -> Result<(), AxError> {
         let Intent {
             call,
@@ -314,9 +231,6 @@ impl<'h> Turn<'h, ToolWave> {
         Ok(())
     }
 
-    /// Appends one call's `tool_result` line and pushes its result block:
-    /// the one place a wave's answers are accounted, whichever way the
-    /// call was run.
     fn settle(
         &mut self,
         exchange: &mut Exchange,
@@ -340,8 +254,7 @@ impl<'h> Turn<'h, ToolWave> {
                 true,
             ),
         };
-        // The text is drawn from the answer the line records, by the one
-        // renderer a rebuild of this line draws it with again.
+
         let content = crate::rendering::shown(crate::rendering::CURRENT, &call.name, &answer)?;
         let result = ToolResult {
             tool_use_id: call.id.clone(),
@@ -353,17 +266,14 @@ impl<'h> Turn<'h, ToolWave> {
                 AxError::failure(AxCode::InvalidArgs, "count a shown answer", call.id.clone())
                     .with_recovery("this machine cannot count the answer's bytes in a u64")
             })?),
-            // The window and its rebuild read the same references; the
-            // content store continues to hold the bytes (kernel D128).
+
             attachments: pictures.clone(),
         };
         exchange.push_result(ContentBlock::ToolResult {
             tool_use_id: call.id.clone(),
             content,
             is_error,
-            // What the tool produced, carried through unchanged: the
-            // bytes are already in the content store, so this is a
-            // reference and four integers whatever the picture is.
+
             attachments: pictures,
         });
         self.journal.append_redacted(

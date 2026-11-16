@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The city's git history in a bundle: one pack of every object the refs
-//! reach, and the refs themselves (`Sprawling/storage/spec/Bundle.lean` §8-12).
-//!
-//! Two files and nothing else travel. A repository's `hooks/` and
-//! `config` are what a forged bundle would plant, so the restoring side
-//! takes both from a fresh `init` and never from the bundle. A v0.0.6
-//! bundle carried the repository whole at `city/.git`; its objects and
-//! refs are packed here the way an export packs them, and nothing else
-//! of it lands.
-
 use std::io::Write;
 use std::path::Path;
 
@@ -23,7 +13,6 @@ use crate::vfs::Vfs;
 use super::landing::{Bits, land};
 use super::manifest::CITY;
 
-/// The bundle's directory for the history.
 pub(crate) const HISTORY: &str = "history";
 const PACK: &str = "history.pack";
 const REFS: &str = "refs";
@@ -37,8 +26,6 @@ fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageError {
     }
 }
 
-/// How much history a bundle's `history/` directory holds, the count
-/// its manifest states and a restore checks before it copies anything.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) struct Carried {
     pub(crate) packs: u64,
@@ -46,11 +33,7 @@ pub(crate) struct Carried {
 }
 
 impl Carried {
-    /// Counts the packs and ref lines under `bundle`'s history
-    /// directory; a bundle with none carries zero of each.
-    ///
-    /// # Errors
-    /// I/O failures naming the path.
+
     pub(crate) fn of(vfs: &dyn Vfs, bundle: &Path) -> Result<Carried, StorageError> {
         let dir = bundle.join(HISTORY);
         let at = dir.join(REFS);
@@ -70,14 +53,6 @@ impl Carried {
     }
 }
 
-/// Packs the history of the repository at `city_root` into `dest`.
-/// A city that is no repository has no history, and its bundle carries
-/// no history directory.
-///
-/// # Errors
-/// `StorageError::Bundle` for a repository that cannot be read, git2's
-/// own refusal of a ref name that is not UTF-8 among them; I/O failures
-/// naming the path.
 pub(crate) fn export(vfs: &mut dyn Vfs, city_root: &Path, dest: &Path) -> Result<(), StorageError> {
     let repo = match git2::Repository::open(city_root) {
         Ok(repo) => repo,
@@ -96,8 +71,6 @@ pub(crate) fn export(vfs: &mut dyn Vfs, city_root: &Path, dest: &Path) -> Result
     land(vfs, target, refs.as_bytes(), Bits::OfReplaced)
 }
 
-/// One pack of every object the refs of `repo` reach, `None` when they
-/// reach none, and the refs in the bundle's line format.
 fn pack_of(
     repo: &git2::Repository,
     op: &'static str,
@@ -129,28 +102,18 @@ fn pack_of(
     Ok((Some(bytes.to_vec()), refs))
 }
 
-/// One ref as the bundle states it.
 enum Target {
     Object(git2::Oid),
     Symbolic(String),
 }
 
-/// A bundle's history, read and checked before anything is restored.
 pub(crate) struct History {
     pack: Option<Vec<u8>>,
     refs: Vec<(String, Target)>,
 }
 
 impl History {
-    /// Reads the history a bundle carries, from `history/` or from the
-    /// repository a v0.0.6 bundle carried whole at `city/.git`, refusing
-    /// it whole when a ref is malformed, when the bundle carries both, or
-    /// when `city_root` already holds a repository.
-    ///
-    /// # Errors
-    /// `StorageError::Bundle` naming the first malformed line, the second
-    /// history, a `city/.git` that is no repository, or the occupied
-    /// repository; I/O failures naming the path.
+
     pub(crate) fn read(
         vfs: &dyn Vfs,
         bundle: &Path,
@@ -165,8 +128,7 @@ impl History {
             return Ok(None);
         }
         let occupied = city_root.join(kernel::GIT_METADATA);
-        // A link or a gitfile named `.git` occupies the name as surely
-        // as a directory does, so the name is asked about, not followed.
+
         if occupied.symlink_metadata().is_ok() {
             return Err(StorageError::Bundle {
                 op: "restore",
@@ -197,9 +159,7 @@ impl History {
             };
             (pack, text, at)
         } else {
-            // `open_bare` reads objects through `alternates` and resolves
-            // objects and refs against the path `commondir` names, both in
-            // stores the bundle never carried, so either one refuses.
+
             for borrowed in [
                 whole.join("objects").join("info").join("alternates"),
                 whole.join("commondir"),
@@ -238,13 +198,6 @@ impl History {
         Ok(Some(History { pack, refs }))
     }
 
-    /// Initialises a repository at `city_root`, indexes the pack into
-    /// it, sets every ref, and reads `HEAD`'s tree into the index, so
-    /// `git status` reports only what was uncommitted at export.
-    ///
-    /// # Errors
-    /// `StorageError::Bundle` for any git failure, including a pack that
-    /// does not index; I/O failures naming the path.
     pub(crate) fn land(self, city_root: &Path) -> Result<(), StorageError> {
         let repo = git2::Repository::init(city_root).map_err(git_err("restore"))?;
         if let Some(bytes) = self.pack {
@@ -274,8 +227,6 @@ impl History {
     }
 }
 
-/// One line of the refs file; `None` for anything a ref cannot be.
-/// Only `HEAD` and names under `refs/` are refs a restore may write.
 fn parse(line: &str) -> Option<(String, Target)> {
     let (target, name) = line.split_once(' ')?;
     let admitted = |ref_name: &str| ref_name == "HEAD" || ref_name.starts_with("refs/");

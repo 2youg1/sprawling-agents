@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How one shelf becomes holdings: the city's two, and the ones it
-//! mounts from elsewhere on this machine.
-//!
-//! One map keyed by name for every shelf, filled farthest first, so
-//! that the nearer shelf replacing the farther one is the order of
-//! these calls rather than a reader's judgement.
-//!
-//! Specified by `Sprawling/city/spec/Library.lean` §8-8.
-
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -25,18 +16,6 @@ use super::shelf::{Holding, HoldingSource, OwnShelf, Shelf};
 
 pub(super) use kernel::layout::SKILL_FILE;
 
-/// Reads one shelf into the map. A shelf that is not there is an empty
-/// shelf: most cities start with nothing settled, and most buildings
-/// never keep a skill of their own.
-///
-/// A holding read from a nearer shelf replaces one of the same name
-/// read earlier, which is what makes a building's own copy of a skill
-/// the one its residents get.
-///
-/// # Errors
-/// Propagates a directory that exists and cannot be read, a holding
-/// that cannot be read, a name this machine spells outside Unicode, and
-/// a path the city cannot spell as an address.
 pub(super) fn shelve(
     city_root: &Path,
     shelf: &OwnShelf,
@@ -69,8 +48,6 @@ pub(super) fn shelve(
     Ok(())
 }
 
-/// Reads one admitted manifest and its SKILL.md through verified full
-/// reads, so the disclosure and document always come from one version.
 pub fn skill_document(
     read: &dyn Fn(&B3Hash) -> Result<Vec<u8>, AxError>,
     digest: &B3Hash,
@@ -88,8 +65,6 @@ pub fn skill_document(
     read_text(read, document)
 }
 
-/// A full, verified manifest read, then the document it names. The index
-/// is trusted only as a locator, never as proof of the bytes.
 pub(super) fn read_manifest(
     read: &dyn Fn(&B3Hash) -> Result<Vec<u8>, AxError>,
     digest: &B3Hash,
@@ -112,22 +87,6 @@ pub(super) fn read_text(
     })
 }
 
-/// Reads one skill off a shelf the city does not keep: one directory per
-/// skill, holding [`SKILL_FILE`].
-///
-/// The shelf's layout belongs to the harness that wrote it, and pi,
-/// claude and agents all file a skill that one way, so this is the one
-/// place this city states it. A directory without that file is not a
-/// skill and is passed over rather than reported: an external shelf
-/// holds whatever its owner keeps there.
-///
-/// The section of such a holding is empty - see `Holding::section` -
-/// because that tree has no section level to read one from.
-///
-/// # Errors
-/// Refuses a shelf that exists and is not a directory, and propagates a
-/// directory that exists and cannot be read and a name this machine
-/// spells outside Unicode.
 pub(super) fn shelve_external(
     index: u32,
     root: &Path,
@@ -175,7 +134,6 @@ pub(super) fn shelve_external(
     Ok(())
 }
 
-/// One holding's bytes, or the refusal that names the file.
 pub(super) fn read_holding(item: &Path) -> Result<String, AxError> {
     std::fs::read_to_string(item).map_err(|err| {
         AxError::failure(
@@ -190,11 +148,6 @@ pub(super) fn read_holding(item: &Path) -> Result<String, AxError> {
     })
 }
 
-/// The last element of a path, as the city has to be able to write it.
-///
-/// A name this machine spells outside Unicode is reported rather than
-/// dropped: a skill silently absent from every reading room is the one
-/// failure a person cannot see from the catalog.
 pub(super) fn spelled(path: &Path) -> Result<String, AxError> {
     path.file_name()
         .and_then(|name| name.to_str())

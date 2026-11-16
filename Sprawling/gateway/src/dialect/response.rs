@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Response translation and stream retention for the three provider dialects.
-//!
-//! `StreamFrames` buffers frames until EOF, then routes settlement to each
-//! dialect.
-//! Final parsing remains `response_from_wire` on both call paths.
-//!
-//! Spec: `Sprawling/gateway/spec/Endpoint/Stream.lean` §8-13.
-
 use kernel::{AxError, ChatResponse, DialectKind, Increment, ToolCall};
 use serde_json::Value;
 
@@ -29,8 +21,6 @@ pub fn increment_of(kind: DialectKind, frame: &Value) -> Option<Increment> {
     })
 }
 
-/// Frames retained until EOF; transport failures are decided before settlement.
-/// Spec: `Sprawling/gateway/spec/Endpoint/Stream.lean` §8-13.
 pub(crate) struct StreamFrames {
     kind: DialectKind,
     frames: Vec<Value>,
@@ -69,7 +59,6 @@ impl StreamFrames {
     }
 }
 
-/// Wire response into the canonical shape.
 pub fn response_from_wire(kind: DialectKind, wire: &Value) -> Result<ChatResponse, AxError> {
     match kind {
         DialectKind::Anthropic => anthropic::response_from(wire),
@@ -78,8 +67,6 @@ pub fn response_from_wire(kind: DialectKind, wire: &Value) -> Result<ChatRespons
     }
 }
 
-/// Canonical response onto the wire: the provider's reply as a test
-/// writes it, and the other half of the round-trip proof.
 #[cfg(test)]
 pub(crate) fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<Value, AxError> {
     match kind {
@@ -108,9 +95,7 @@ mod tests {
     use serde_json::{Map, json};
     #[test]
     fn anthropic_returns_thinking_blocks_exactly_as_it_issued_them() {
-        // Official rule: "Include the complete unmodified block back to
-        // the API"; altering it earns a 400 saying the thinking blocks
-        // "cannot be modified". So both directions must be byte-exact.
+
         let wire = json!({
             "content": [
                 { "type": "thinking", "thinking": "two parts", "signature": "WaUjzkyp" },
@@ -140,7 +125,6 @@ mod tests {
             "a thinking block that made a round trip is no longer the one Claude signed"
         );
 
-        // And on the way back out, inside a request's message history.
         let mut req = sample_request();
         req.messages.to_mut()[1].content.insert(
             0,
@@ -170,8 +154,6 @@ mod tests {
         assert!(err.subject().contains("pause_turn"));
     }
 
-    /// A cache count the provider left out is not a zero hit (kernel D36);
-    /// a count it must report reads as zero when absent.
     #[test]
     fn missing_cache_counts_read_as_unreported() {
         let wire = json!({
@@ -209,8 +191,7 @@ mod tests {
             ]
         );
     }
-    /// Anthropic counts only the uncached input in `input_tokens`; the
-    /// city's count is the whole prompt, as both OpenAI faces report it.
+
     #[test]
     fn every_dialect_counts_the_whole_prompt_as_input() {
         let anthropic = json!({
@@ -248,8 +229,7 @@ mod tests {
             }
         })
     }
-    /// A count a `dialect` wire can spell: the whole prompt is at least
-    /// its cached parts, and only Anthropic's wire has a cache-write slot.
+
     fn usage_strategy(dialect: DialectKind) -> impl Strategy<Value = ModelUsage> {
         (0u64..9999, 0u64..9999, 0u64..9999, 0u64..9999).prop_map(move |(i, o, r, w)| {
             let write = if dialect == DialectKind::Anthropic {
@@ -257,8 +237,7 @@ mod tests {
             } else {
                 0
             };
-            // The chat face has no slot for a cache write, so it never
-            // reports one; the other two report what they were given.
+
             let cache_write_tokens = match dialect {
                 DialectKind::OpenAi => CacheCount::Unreported,
                 DialectKind::Anthropic | DialectKind::OpenAiResponses => {
@@ -282,11 +261,6 @@ mod tests {
         ]
     }
 
-    /// A provider that answers 200 with a nulled `choices` has not spoken
-    /// a shape we do not know - it has dropped the request. Found on a
-    /// real hosted endpoint, where `max_tokens` above the model's own
-    /// ceiling produced exactly this and the refusal that reached the
-    /// person said "expected array" with an empty recovery.
     #[test]
     fn a_dropped_request_is_told_apart_from_a_shape_we_cannot_read() {
         let dropped = serde_json::json!({
@@ -304,12 +278,7 @@ mod tests {
             refused.recovery()
         );
     }
-    /// **A path without the value sends a person to curl the provider.**
-    /// ModelScope repeats a streaming tool call's name as an empty
-    /// string in every chunk after the first, and the refusal read
-    /// `tool_calls[0].name: not a tool name` - true, and not enough to
-    /// tell an empty name from a name with a space in it. Finding out
-    /// which took a hand-written request to the endpoint.
+
     #[test]
     fn a_name_this_dialect_cannot_read_is_quoted_in_the_refusal() {
         for (found, quoted) in [("", "\"\""), ("two words", "\"two words\"")] {
@@ -332,9 +301,6 @@ mod tests {
         }
     }
 
-    /// Every shape mismatch carries a way out. An empty `recovery` is
-    /// the contract `AxError` states being broken in the one place a
-    /// person meets it.
     #[test]
     fn no_translation_refusal_leaves_a_person_with_nothing_to_try() {
         let alien = serde_json::json!({ "choices": "not an array", "usage": {} });
@@ -356,7 +322,7 @@ mod tests {
     }
 
     proptest! {
-        /// Anthropic response round-trip is lossless: wire -> canonical -> wire.
+
         #[test]
         fn anthropic_response_roundtrip(
             blocks in proptest::collection::vec(prop_oneof![text_block(), tool_use_block()], 0..4),
@@ -369,8 +335,6 @@ mod tests {
             prop_assert_eq!(back, resp);
         }
 
-        /// OpenAI response round-trip within its wire's expressiveness:
-        /// at most one text block, no distinct cache-write slot.
         #[test]
         fn openai_response_roundtrip(
             text in proptest::option::of(text_block()),
@@ -387,8 +351,6 @@ mod tests {
             prop_assert_eq!(back, resp);
         }
 
-        /// Usage integers survive the Anthropic wire, whose `input_tokens`
-        /// is the part of the prompt that missed the cache.
         #[test]
         fn usage_is_preserved_verbatim(usage in usage_strategy(DialectKind::Anthropic)) {
             let resp = ChatResponse { content: vec![], stop: StopReason::EndTurn, usage };

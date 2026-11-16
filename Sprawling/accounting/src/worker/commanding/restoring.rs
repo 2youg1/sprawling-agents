@@ -3,19 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Putting one recycle-bin row back by the way back it carries
-//! (`Sprawling/app/Spec.lean` §8-107).
-
 use crate::worker::RunWorker;
 use kernel::{AxCode, AxError, EventKind, Locator, Payload, Restoration};
 
 impl RunWorker {
-    /// Writes the discarded file back, then records that it came back.
-    ///
-    /// # Errors
-    /// Refuses a way back this city cannot follow, and propagates the
-    /// checkpoint that cannot find or write the bytes and the ledger
-    /// that refuses the append.
+
     pub(in crate::worker) fn restore_discard(
         &mut self,
         restoration: &Restoration,
@@ -46,13 +38,11 @@ impl RunWorker {
                 return Err(refused("rebuildable".to_owned(), reason.clone()));
             }
         };
-        // Disk first, ledger second: the history never says a file came
-        // back that the disk does not hold.
+
         storage::Checkpoint::open(&self.city_root)
             .and_then(|checkpoint| checkpoint.restore(address, oid))
             .map_err(storage::StorageError::into_ax)?;
-        // The same shape as the `file_discarded` it closes, so one
-        // reader folds both (§8-107).
+
         let restored = Payload::new(serde_json::Map::from_iter([
             (
                 "paths".to_owned(),
@@ -76,13 +66,7 @@ impl RunWorker {
 }
 
 impl RunWorker {
-    /// Takes one file of the city's own tree back to what a checkpoint
-    /// holds, then records the step (`Sprawling/wire/Spec.lean` §8-62).
-    ///
-    /// # Errors
-    /// Refuses `E_BUSY` while a run works in that building, naming the
-    /// room and the run; propagates what the checkpoint refuses and a
-    /// ledger that refuses the record.
+
     pub(in crate::worker) fn take_back(
         &mut self,
         at: &kernel::Address,
@@ -100,7 +84,7 @@ impl RunWorker {
                  the run writing beside it",
             ));
         }
-        // Disk first, ledger second, as every other restore here.
+
         let restored = storage::Checkpoint::open(&self.city_root)
             .and_then(|checkpoint| checkpoint.take_back(at, &point))
             .map_err(storage::StorageError::into_ax)?;

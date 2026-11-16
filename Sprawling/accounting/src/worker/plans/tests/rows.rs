@@ -6,14 +6,6 @@
 use super::super::*;
 use crate::worker::fixture::*;
 
-/// A plan nobody could read and a plan somebody else changed are two
-/// different facts, and only one of them is the person's to fix.
-///
-/// The distinction is not cosmetic: the claim path already refuses to
-/// overwrite a row that moved, and it reports that refusal by name.
-/// Reading the file as empty makes every claim look like it lost a
-/// race that never happened, which sends the person to ask a resident
-/// instead of to look at a file.
 #[test]
 fn a_plan_that_cannot_be_read_is_refused_by_name_rather_than_blamed_on_a_neighbour() {
     let dir = tempfile::tempdir().unwrap();
@@ -21,10 +13,7 @@ fn a_plan_that_cannot_be_read_is_refused_by_name_rather_than_blamed_on_a_neighbo
     let building = dir.path().join("lab");
     std::fs::create_dir_all(building.join("room1")).unwrap();
     lay_rules(dir.path(), "lab", &ordinary_rules(""));
-    // A directory where the plan belongs. `read_to_string` then fails
-    // for a reason that is not "it is not there yet" - the one reason
-    // an empty plan is the right answer to - without this test having
-    // to negotiate file permissions with the host.
+
     let plan = building.join(city::ROADMAP_FILE);
     let _ = std::fs::remove_file(&plan);
     std::fs::create_dir_all(&plan).unwrap();
@@ -49,14 +38,6 @@ fn a_plan_that_cannot_be_read_is_refused_by_name_rather_than_blamed_on_a_neighbo
     );
 }
 
-/// The other half of the rule: not only "the line comes before the
-/// change", but "no line, no change".
-///
-/// The ledger here is the real `JsonlLedger` over the deterministic
-/// power-loss model, told to lose exactly the write carrying
-/// `roadmap_claimed`. Everything else in the city is on a real disk,
-/// which is the point: the plan the run wanted to rewrite is a file
-/// somebody could go and read afterwards.
 #[test]
 fn a_line_the_history_refused_is_a_change_the_city_never_made() {
     let dir = tempfile::tempdir().unwrap();
@@ -78,11 +59,6 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
         ],
     );
 
-    // The one write that dies. Named by what it carries rather than
-    // by an ordinal: how many filesystem operations run before it is
-    // not something a caller up here knows, and any number written
-    // here would stop meaning this line the moment anything upstream
-    // read one more file.
     let mut worker = attach_provider(
         worker_over_faults(dir.path(), Some("roadmap_claimed")),
         &base_url,
@@ -107,8 +83,7 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
         after, PLAN_TWO_FREE_ROWS,
         "the line never landed, so the plan on disk must stand exactly as it was"
     );
-    // The claim's line is written when the model makes it, so the
-    // refusal went to the model as the claim's answer and the run went on.
+
     assert!(outcome.is_ok(), "the run goes on past a refused claim");
 }
 
@@ -173,13 +148,6 @@ fn a_run_takes_a_row_from_the_plan_and_the_next_run_cannot_take_the_same_one() {
     );
 }
 
-/// A booking lasts as long as the run that holds it, and no longer.
-///
-/// The first run takes node 1 and hands it back, so the plan on disk
-/// reads node 1 as free again when the second run is dispatched; the
-/// only thing left that could refuse the second run is a booking the
-/// first run never gave up when it came home, which would keep the
-/// node from every later run until the city restarted.
 #[test]
 fn a_node_handed_back_by_a_run_that_came_home_can_be_taken_by_the_next_run() {
     let dir = tempfile::tempdir().unwrap();
@@ -250,8 +218,7 @@ fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
     std::fs::write(&plan, PLAN_ONE_FREE_ROW).unwrap();
     let evidence = format!("cas:b3-{}", "ab".repeat(32));
-    // Two calls, because the plan gate admits no shortcut: a run
-    // closes the node it took, and this run has to take it first.
+
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![
@@ -309,11 +276,6 @@ fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
     assert!(history.contains("roadmap_finished"));
 }
 
-/// A run that ends while holding a node spends it on
-/// `FrozeWithoutEvidence`: the row turns red instead of staying
-/// `In progress` for ever, which is what lets `pursue` see its ready
-/// set shrink (`Sprawling/app/Spec.lean` `pursue` termination; `ClaimDesk::abandon`
-/// in `Sprawling/collab/Spec.lean`).
 #[test]
 fn a_run_that_ends_holding_a_row_leaves_it_blocked_rather_than_in_progress() {
     let dir = tempfile::tempdir().unwrap();

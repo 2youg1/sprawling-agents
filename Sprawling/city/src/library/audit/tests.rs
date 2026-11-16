@@ -3,17 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The trace-vector table derived from `Sprawling/city/spec/Library/Audit.lean`:
-//! each row is a trace of the model's five events and the answer the
-//! model's `shown` gives on it, and every row also replays the model's
-//! four properties against [`audit_state`].
-
 use kernel::event::record::AuditVerdict;
 use kernel::{B3Hash, Seq};
 
 use super::{AuditState, audit_state};
 
-/// One step of the model's `Event`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Event {
     Install(u8),
@@ -23,7 +17,6 @@ enum Event {
     FetchFailed(u8),
 }
 
-/// The model's `Shown`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Shown {
     Absent,
@@ -36,9 +29,6 @@ fn digest(byte: u8) -> B3Hash {
     B3Hash::digest(&[byte])
 }
 
-/// The shelf after a trace, the model's `run empty`: the content's digest,
-/// and every `skill_audited` line with its seq. A failed fetch is a line
-/// too, with `Unreachable`, because that is what the ledger holds.
 fn replay(trace: &[Event]) -> (Option<B3Hash>, Vec<(B3Hash, AuditVerdict, Seq)>) {
     let mut content = None;
     let mut lines = Vec::new();
@@ -69,7 +59,6 @@ fn shown(trace: &[Event]) -> Shown {
 use AuditVerdict::{Fail, Pass, Warn};
 use Event::{Audit, Edit, FetchFailed, Install, Refused};
 
-/// Each row: a trace, and what Audit.lean's `shown` answers on it.
 const VECTORS: &[(&[Event], Shown)] = &[
     (&[], Shown::Absent),
     (&[Refused], Shown::Absent),
@@ -84,9 +73,9 @@ const VECTORS: &[(&[Event], Shown)] = &[
         &[Install(1), Audit(1, Pass), Edit(2), Audit(2, Fail)],
         Shown::Audited(Fail),
     ),
-    // A late audit of the old digest does not audit the new content.
+
     (&[Install(1), Edit(2), Audit(1, Pass)], Shown::Stale),
-    // Editing back to audited bytes finds their audit again.
+
     (
         &[Install(1), Audit(1, Pass), Edit(2), Edit(1)],
         Shown::Audited(Pass),
@@ -113,8 +102,6 @@ fn every_trace_vector_reads_as_the_model_shows_it() {
     assert_eq!(read, VECTORS.to_vec());
 }
 
-/// `audited_only_what_was_audited`: shown as audited means the trace
-/// holds an audit of the content now on the shelf, with that verdict.
 #[test]
 fn shown_audited_only_for_an_audit_of_the_content_now() {
     for (trace, _) in VECTORS {
@@ -130,9 +117,6 @@ fn shown_audited_only_for_an_audit_of_the_content_now() {
     }
 }
 
-/// `changed_content_is_never_shown_audited`: an edit to bytes nobody
-/// audited, followed by anything that keeps the content and audits
-/// nothing of it, never shows as audited.
 #[test]
 fn content_changed_to_unaudited_bytes_is_never_shown_audited() {
     let afters: [&[Event]; 4] = [
@@ -149,8 +133,6 @@ fn content_changed_to_unaudited_bytes_is_never_shown_audited() {
     }
 }
 
-/// `failed_fetches_change_nothing`: dropping every failed fetch from a
-/// trace leaves the answer as it was.
 #[test]
 fn failed_fetches_change_nothing() {
     for (trace, _) in VECTORS {
@@ -163,8 +145,6 @@ fn failed_fetches_change_nothing() {
     }
 }
 
-/// `a_failed_fetch_never_blocks_an_install`: an install at the end of any
-/// trace lands its digest.
 #[test]
 fn a_failed_fetch_never_blocks_an_install() {
     for (before, _) in VECTORS {

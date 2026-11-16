@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The privacy command verbs (`Sprawling/app/spec/Privacy/Cli.lean`):
-//! status and inspect read; apply, restore, restore-all and reconcile run
-//! through the one coordinator; elevated-write is the elevated child's.
-
 use accounting::home::Home;
 use kernel::{AxCode, AxError, SecretRef};
 use serde::Serialize;
@@ -16,12 +12,6 @@ use zeroize::Zeroizing;
 use super::coordinator::Command;
 use super::target::Snapshot;
 
-/// Reads local operation receipts without creating or settling history,
-/// and shows them only to the identity their owner reference is bound to.
-///
-/// # Errors
-/// Identity sampling, owner binding, home detection, busy or malformed history,
-/// IO, and JSON encoding failures.
 pub fn status() -> Result<String, AxError> {
     status_at(
         &Home::detect()?.privacy_history(),
@@ -30,12 +20,6 @@ pub fn status() -> Result<String, AxError> {
     )
 }
 
-/// One JSON line per control (only `control` when one is named): what its
-/// target reads now, and what this app owns of it.
-///
-/// # Errors
-/// An unknown control name, identity sampling, home detection, owner
-/// verification and history faults; `ToolUnavailable` off Windows.
 pub fn inspect(clock: impl accounting::Clock, control: Option<&str>) -> Result<String, AxError> {
     let only = control.map(named).transpose()?;
     #[cfg(windows)]
@@ -53,11 +37,6 @@ pub fn inspect(clock: impl accounting::Clock, control: Option<&str>) -> Result<S
     }
 }
 
-/// Writes the value the controls table holds for `control`, provided its
-/// target still reads `expected`, the reading `inspect` printed.
-///
-/// # Errors
-/// Malformed arguments, and every privacy fault, worded by its stable code.
 pub fn apply(
     clock: impl accounting::Clock,
     control: Option<&str>,
@@ -72,11 +51,6 @@ pub fn apply(
     )
 }
 
-/// Writes back the original of the latest change this app owns of
-/// `control`, provided its target still reads `expected`.
-///
-/// # Errors
-/// As [`apply`].
 pub fn restore(
     clock: impl accounting::Clock,
     control: Option<&str>,
@@ -91,11 +65,6 @@ pub fn restore(
     )
 }
 
-/// Records the person's check of the unresolved operation; writes nothing
-/// to the host.
-///
-/// # Errors
-/// As [`apply`].
 pub fn reconcile(clock: impl accounting::Clock, expected: Option<&str>) -> Result<String, AxError> {
     run(
         clock,
@@ -105,13 +74,6 @@ pub fn reconcile(clock: impl accounting::Clock, expected: Option<&str>) -> Resul
     )
 }
 
-/// Restores, control by control, every change this app still owns, each
-/// against what its target reads just before (Privacy D63). `emit`
-/// receives one line per control as it ends; the first failure stops the
-/// rest.
-///
-/// # Errors
-/// The first failure, after the lines of the controls before it.
 pub fn restore_all(clock: impl accounting::Clock, emit: impl FnMut(String)) -> Result<(), AxError> {
     #[cfg(windows)]
     {
@@ -124,15 +86,6 @@ pub fn restore_all(clock: impl accounting::Clock, emit: impl FnMut(String)) -> R
     }
 }
 
-/// Carries out one machine-scope write as the elevated child the privacy
-/// page starts (`Sprawling/app/spec/Privacy/Windows.lean` D60): checks
-/// it against the control table and writes, reading nothing back and
-/// recording nothing.
-///
-/// # Errors
-/// `InvalidArgs` when `write` is missing or is not one machine-scope write
-/// the control table allows; `StorageFatal` when the write fails;
-/// `ToolUnavailable` off Windows.
 pub fn elevated_write(write: Option<&str>) -> Result<(), AxError> {
     let refused = |code, subject: &str, recovery: &str| {
         AxError::failure(code, "check an elevated privacy write", subject).with_recovery(recovery)
@@ -160,7 +113,6 @@ pub fn elevated_write(write: Option<&str>) -> Result<(), AxError> {
 
 const RESTORE_ALL: &str = "restore all privacy controls";
 
-/// What one control reads now and what this app owns of it.
 #[cfg(windows)]
 #[derive(Serialize)]
 struct Inspected<'h> {
@@ -192,7 +144,6 @@ struct Owned<'h> {
     modified: &'h Snapshot,
 }
 
-/// One control's line of `restore-all`.
 #[cfg(windows)]
 #[derive(Serialize)]
 struct Ended {
@@ -275,8 +226,6 @@ fn restored_all(
     Ok(())
 }
 
-/// The holdings a reader that will not write may see: a recorded owner
-/// is verified against `identity`, and an empty history asks nothing.
 #[cfg(windows)]
 fn reader<'h>(
     history: &'h super::state::History,
@@ -358,8 +307,6 @@ fn encoded(value: &impl Serialize) -> Result<String, AxError> {
     })
 }
 
-/// The identity is sampled before the history is opened, so a failed
-/// sample says nothing about the history, not even whether it is intact.
 fn status_at(
     path: &std::path::Path,
     identity: impl FnOnce() -> Result<Zeroizing<String>, AxError>,

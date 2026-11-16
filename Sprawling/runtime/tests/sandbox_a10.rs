@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A10's three assertions, on the real engine.
-//!
-//! The guests are hand-written WAT, so the gate proves the boundary
-//! without needing a 30 MB CPython artifact on disk. Each module does
-//! exactly one thing:
-//!
-//! 1. succeeds inside its fuel budget,
-//! 2. tries to open a path it was never granted, and fails visibly,
-//! 3. loops until the fuel runs out.
-//!
-//! The point of assertion 2 is that the host does not cover for the
-//! guest: a denied capability surfaces as a guest-visible failure, not
-//! as a silent success or an empty read.
-
 #![cfg(feature = "wasm")]
 #![allow(
     clippy::unwrap_used,
@@ -35,7 +21,6 @@ use runtime::{
     Ceiling, Fuel, GuestMemory, Mount, Sandbox, SandboxExit, SandboxJob, WasmtimeSandbox,
 };
 
-/// Writes a WAT source out as a .wasm module and returns its path.
 fn build(dir: &Path, name: &str, wat: &str) -> PathBuf {
     let bytes = wat::parse_str(wat).expect("assemble wat");
     let path = dir.join(format!("{name}.wasm"));
@@ -43,7 +28,6 @@ fn build(dir: &Path, name: &str, wat: &str) -> PathBuf {
     path
 }
 
-/// Writes `msg` to fd 1 and returns cleanly.
 const WAT_SUCCEEDS: &str = r#"
 (module
   (import "wasi_snapshot_preview1" "fd_write"
@@ -59,9 +43,6 @@ const WAT_SUCCEEDS: &str = r#"
 )
 "#;
 
-/// Tries to open "secret.txt" relative to fd 3. With no preopen granted
-/// there is no fd 3 at all, so the call fails and the guest exits
-/// non-zero — the failure is the guest's, and it is visible.
 const WAT_DENIED: &str = r#"
 (module
   (import "wasi_snapshot_preview1" "path_open"
@@ -88,7 +69,6 @@ const WAT_DENIED: &str = r#"
 )
 "#;
 
-/// Spins forever. Only the fuel budget can end this.
 const WAT_BURNS_FUEL: &str = r#"
 (module
   (memory (export "memory") 1)
@@ -125,7 +105,7 @@ fn a10_1_a_guest_inside_its_budget_succeeds() {
 fn a10_2_an_ungranted_capability_is_refused_and_the_guest_sees_it() {
     let tmp = tempfile::tempdir().unwrap();
     let module = build(tmp.path(), "denied", WAT_DENIED);
-    // A file exists on the host, but no mount names its directory.
+
     let outside = tmp.path().join("outside");
     std::fs::create_dir_all(&outside).unwrap();
     std::fs::write(outside.join("secret.txt"), b"not yours").unwrap();
@@ -148,8 +128,6 @@ fn a10_2_an_ungranted_capability_is_refused_and_the_guest_sees_it() {
         "no preopen means the open fails and the guest exits non-zero: {outcome:?}"
     );
 
-    // Granting the directory changes the answer — which is what makes
-    // the refusal above a capability decision rather than a broken test.
     let granted = sandbox
         .run(&SandboxJob {
             wasm: module,
@@ -193,13 +171,7 @@ fn a10_3_fuel_exhaustion_stops_the_guest_and_is_not_a_host_error() {
 
 #[test]
 fn the_boundary_has_no_network_because_no_socket_can_be_opened() {
-    // The Python arm's no-network proof is structural, and it is worth
-    // stating precisely. wasip1 *does* export sock_send and sock_recv —
-    // they operate on an already-open socket and answer ENOTSOCK for
-    // anything else. What it exports no way of doing is *obtaining* a
-    // socket: there is no sock_open, no sock_connect, no sock_bind. So
-    // a guest asking for one fails to link, and every fd it can reach
-    // came from a preopen, which is a directory.
+
     let tmp = tempfile::tempdir().unwrap();
     let module = build(
         tmp.path(),
@@ -249,7 +221,6 @@ fn back_to_back_jobs_do_not_poison_each_other() {
     assert_eq!(first, second, "each job starts from a clean store");
 }
 
-/// Asks for sixteen more pages and exits 9 when the host refuses them.
 const WAT_GROWS: &str = r#"
 (module
   (import "wasi_snapshot_preview1" "proc_exit" (func $proc_exit (param i32)))
@@ -272,11 +243,6 @@ fn job_for(wasm: PathBuf, memory: GuestMemory) -> SandboxJob {
     }
 }
 
-/// The compiled module outlives the call (`Sprawling/runtime/spec/Sandbox.lean`
-/// D101): once a clone has run a guest, another clone runs it again
-/// without reading the file, which is shown by overwriting the file with
-/// bytes that are not WebAssembly while keeping its length and
-/// modification time — the identity the engine recognises a guest by.
 #[test]
 fn a_second_guest_reuses_the_compiled_module() {
     let tmp = tempfile::tempdir().unwrap();
@@ -301,10 +267,6 @@ fn a_second_guest_reuses_the_compiled_module() {
     );
 }
 
-/// A guest grows no further than its run's ceiling, ends as it chooses
-/// when refused, and the refusal is reported as the run's ceiling being
-/// hit (`Sprawling/runtime/spec/Sandbox.lean` D102). Without a ceiling the
-/// same growth succeeds and nothing is reported.
 #[test]
 fn a_guest_grows_no_further_than_the_run_ceiling() {
     let tmp = tempfile::tempdir().unwrap();
@@ -328,9 +290,6 @@ fn a_guest_grows_no_further_than_the_run_ceiling() {
     );
 }
 
-/// A guest whose initial memory alone passes the run's ceiling never
-/// starts, and says so as the ceiling it hit, not as a broken build
-/// (`Sprawling/runtime/spec/Sandbox.lean` D102).
 #[test]
 fn a_guest_that_starts_past_the_run_ceiling_reports_the_ceiling() {
     let tmp = tempfile::tempdir().unwrap();

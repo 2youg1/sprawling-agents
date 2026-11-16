@@ -6,18 +6,6 @@
 use super::super::*;
 use crate::worker::fixture::*;
 
-/// A graph of nodes runs in dependency order, each in its own room
-/// with its contract as its `JOB.md`, and what comes back verified
-/// joins - so the next run in that room can be asked a question only
-/// somebody who opened the results can answer.
-///
-/// The graph is laid out once. The node that waits is handed down when
-/// what it waits on hands back, so no later run in the room has to lay
-/// the same graph out again for the work to go on.
-///
-/// `collab::workshop` and `collab::fanin` had no callers outside
-/// their own files before this; the whole layer was a set of types
-/// nobody had run.
 #[test]
 fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
     let dir = tempfile::tempdir().unwrap();
@@ -76,9 +64,7 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
             model: None,
         })
         .unwrap();
-    // Laying out a graph is a spawn like any other, and a spawn is
-    // nobody's to approve: how deep work may be handed down is a type,
-    // so the graph is laid out without anybody being asked.
+
     assert!(
         worker.governance.pending.is_empty(),
         "a spawn is decided by the type, not by a person"
@@ -132,21 +118,6 @@ fn a_workshop_runs_its_nodes_in_order_and_what_comes_back_joins() {
     );
 }
 
-/// **Card 3.5's property.** A pursuit takes the whole ready set: three
-/// nodes nothing blocks are three runs going at once, not three runs one
-/// after another.
-///
-/// The assertion is on the lanes rather than on a stopwatch: the
-/// pursuit takes its rows off and returns, and nothing lands a run until
-/// the loop below serves the crossing, so a sequential pursuit has one
-/// run in the air at that moment and this one has three. The history
-/// cannot say it: each run's preparation happens in its own lane, so how
-/// its first line interleaves with another run's freeze is a race.
-///
-/// Each node's room is named by rule, so no reply is spent on a name;
-/// the turns are concurrent and all get the same reply, which is what
-/// keeps this test's provider script order-free where the order is not
-/// this test's to decide.
 #[test]
 fn three_ready_nodes_drive_three_runs_at_once() {
     let dir = tempfile::tempdir().unwrap();
@@ -191,11 +162,6 @@ fn three_ready_nodes_drive_three_runs_at_once() {
     assert_eq!(frozen, 3, "every run the pursuit started has to freeze");
 }
 
-/// Every ledger line naming a word, joined for an assertion message.
-///
-/// A join count of one instead of two says a handback went missing and
-/// nothing about which one, so the message carries the lines that would
-/// have recorded it.
 fn mentioned(history: &str, word: &str) -> String {
     let mut out: Vec<&str> = history.lines().filter(|line| line.contains(word)).collect();
     if out.is_empty() {
@@ -204,17 +170,8 @@ fn mentioned(history: &str, word: &str) -> String {
     out.join("\n")
 }
 
-/// The ledger line around a byte offset, for an assertion that would
-/// otherwise fail with two numbers and no page to look at.
-///
-/// The first mention of a node's address in the history is not always
-/// the node's own record: a plan is laid out by naming every room in it,
-/// and that naming is one line the history holds. An assertion that
-/// compares two `find` offsets has to show the line it landed on, or the
-/// next person re-derives which of the two it meant.
 fn excerpt(history: &str, at: usize) -> String {
-    // Byte offsets into a ledger line, which is ASCII JSON, so the
-    // slicing clippy warns about cannot land inside a character here.
+
     let before = history.get(..at).unwrap_or_default();
     let start = before
         .rfind(char::from(10))

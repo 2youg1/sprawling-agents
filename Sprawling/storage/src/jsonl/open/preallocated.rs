@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The three properties of `Sprawling/storage/spec/Jsonl/Preallocate.lean`,
-//! checked on real segments: trailing zeros change no scan, a tear
-//! before zeros is still truncated, and zeros before a line are not the
-//! end of the segment.
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -30,8 +25,6 @@ fn draft(t: u64) -> EventDraft {
     }
 }
 
-/// The lines (each with its `\n`) of a one-segment ledger of `count`
-/// records, and that segment's file name.
 fn written(count: u64) -> (Vec<Vec<u8>>, PathBuf) {
     let root = tempfile::tempdir().unwrap();
     let dir = root.path().join("ledger");
@@ -54,7 +47,6 @@ fn written(count: u64) -> (Vec<Vec<u8>>, PathBuf) {
     (lines, PathBuf::from(name))
 }
 
-/// A ledger directory under `root` whose one segment holds `bytes`.
 fn segment_of(root: &Path, name: &Path, bytes: &[u8]) -> PathBuf {
     let dir = root.join("ledger");
     fs::create_dir_all(&dir).unwrap();
@@ -65,9 +57,6 @@ fn segment_of(root: &Path, name: &Path, bytes: &[u8]) -> PathBuf {
 proptest! {
     #![proptest_config(ProptestConfig { cases: 24, ..ProptestConfig::default() })]
 
-    /// `trailing_zeros_change_no_scan`, and the writer position is the
-    /// length after the zeros: the next wave lands where the last record
-    /// ended, so the ledger reopens whole with nothing recovered.
     #[test]
     fn trailing_zeros_change_no_scan(count in 1u64..5, zeros in 1usize..9000) {
         let (lines, name) = written(count);
@@ -87,8 +76,6 @@ proptest! {
         prop_assert_eq!(reopened.read_raw_lines().unwrap().len(), lines.len().saturating_add(1));
     }
 
-    /// `a_tear_before_zeros_is_still_truncated`: the records before the
-    /// tear survive, and only they.
     #[test]
     fn a_tear_before_zeros_is_still_truncated(
         count in 1u64..5,
@@ -113,9 +100,6 @@ proptest! {
         );
     }
 
-    /// `zeros_before_a_line_are_not_the_end`: a record after a run of
-    /// zeros makes the zeros damage inside the segment, and open refuses
-    /// instead of truncating that record away.
     #[test]
     fn zeros_before_a_line_are_not_the_end(count in 1u64..5, zeros in 1usize..200_000) {
         let (lines, name) = written(count.saturating_add(1));
@@ -136,8 +120,6 @@ proptest! {
     }
 }
 
-/// The ledger behind `fs`, reopened with the preallocating arm until an
-/// opening survives the power cut the plan may still hold.
 fn reopened(fs: &FaultFs, dir: &Path, roll: u64) -> JsonlLedger {
     let (mut ledger, _) = JsonlLedger::open_preallocated(fs.clone(), dir, TimeMs::new(9))
         .or_else(|_| JsonlLedger::open_preallocated(fs.clone(), dir, TimeMs::new(9)))
@@ -146,9 +128,6 @@ fn reopened(fs: &FaultFs, dir: &Path, roll: u64) -> JsonlLedger {
     ledger
 }
 
-/// Every record of the ledger behind `ledger`, each with its seq, the
-/// chain checked line by line. A cut the waves never reached may fall on
-/// this read, so it is read again once.
 fn chained(ledger: &JsonlLedger) -> Vec<u64> {
     let mut prev = kernel::GENESIS_PREV;
     ledger
@@ -168,14 +147,6 @@ fn chained(ledger: &JsonlLedger) -> Vec<u64> {
 proptest! {
     #![proptest_config(ProptestConfig { cases: 48, ..ProptestConfig::default() })]
 
-    /// Derived from `a_record_written_at_the_stripped_end_resumes_the_segment`
-    /// and `writer_position_is_the_stripped_end`: with the preallocating
-    /// arm (storage D31), a writer that reopens between any two waves, or
-    /// after power is lost at any operation, resumes at the end of its
-    /// records. Every wave that answered `Ok` reads back, the seqs run
-    /// without a gap and the chain holds; a log_truncated line appears
-    /// only where a cut tore a wave, and the last segment keeps its
-    /// preallocated length when nothing was torn.
     #[test]
     fn a_preallocated_writer_resumes_after_every_reopen_and_every_cut(
         waves in proptest::collection::vec(1u64..4, 1..6),
@@ -195,7 +166,7 @@ proptest! {
         for wave in waves {
             let drafts = (0..wave).map(|i| draft(t.saturating_add(i))).collect();
             t = t.saturating_add(wave);
-            // A refused wave is what the cut tore; it owes nothing back.
+
             if let Ok(refs) = ledger.append_all(drafts) {
                 acknowledged = acknowledged.saturating_add(u64::try_from(refs.len()).unwrap());
             }

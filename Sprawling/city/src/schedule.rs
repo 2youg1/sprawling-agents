@@ -3,53 +3,31 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Work that starts by itself.
-//!
-//! Two rules shape this module. Time is a parameter: `due` is asked
-//! "between these two instants, what should have started", and it never
-//! reads a clock, so a replay of the same window produces the same
-//! dispatches. And a window returns each entry at most once, however
-//! long the window is: an hourly job missed for eight hours is one run
-//! owed, not eight. How wide the window is on a fresh start is the
-//! caller's decision, not this module's.
-//!
-//! Cadences are counted from the epoch in whole minutes, which is why
-//! they are stated in UTC and why the calendar shapes cron usually
-//! carries - day of month, month - are refused rather than approximated.
-//! Those need a calendar, a calendar needs an authority, and the city
-//! does not have one yet. Concern time zones are a rendering matter and
-//! live with the clock stamp.
-//!
-//! Specified by `Sprawling/city/spec/Schedule.lean` §8-6.
-
 use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxCode, AxError, TimeMs};
 use serde::Deserialize;
 
-/// The city's schedule, at the city root.
 pub const SCHEDULE_FILE: &str = "SCHEDULE.toml";
 
 const MINUTE_MS: u64 = 60_000;
 const DAY_MINUTES: u64 = 1_440;
 const WEEK_MINUTES: u64 = 10_080;
-/// 1970-01-01 was a Thursday; weekday 0 is Monday.
+
 const EPOCH_WEEKDAY_OFFSET: u64 = 3;
 
-/// How often an entry runs. Exhaustive: a fourth cadence is a change
-/// here, not a string somebody smuggles through the file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cadence {
-    /// Every `n` minutes, counted from the epoch.
+
     EveryMinutes(u64),
-    /// Once a day at this minute of the day, UTC.
+
     DailyAt(u64),
-    /// Once a week, at this minute of the week, UTC.
+
     WeeklyAt(u64),
 }
 
 impl Cadence {
-    /// The last instant at or before `now` at which this cadence fired.
+
     fn last_firing(self, now_minutes: u64) -> u64 {
         match self {
             Cadence::EveryMinutes(period) => {
@@ -83,7 +61,6 @@ impl Cadence {
     }
 }
 
-/// One scheduled job.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
     name: String,
@@ -109,7 +86,6 @@ impl Entry {
         &self.task
     }
 
-    /// What counts as done. Required, like every other dispatch's goal.
     #[must_use]
     pub fn goal(&self) -> &str {
         &self.goal
@@ -121,18 +97,13 @@ impl Entry {
     }
 }
 
-/// The city's scheduled work.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Schedule {
     entries: Vec<Entry>,
 }
 
 impl Schedule {
-    /// Reads a schedule file.
-    ///
-    /// # Errors
-    /// Refuses a file that does not parse, a key this version does not
-    /// read, an address that is not one, and a cadence it cannot spell.
+
     pub fn parse(text: &str) -> Result<Schedule, AxError> {
         let file: ScheduleFile = toml::from_str(text).map_err(|err| refuse(err.to_string()))?;
         let mut entries = Vec::new();
@@ -148,11 +119,6 @@ impl Schedule {
         Ok(Schedule { entries })
     }
 
-    /// Reads the city's schedule. A city with no schedule file has no
-    /// scheduled work, which is the ordinary case.
-    ///
-    /// # Errors
-    /// Propagates an unreadable file and a file that does not parse.
     pub fn load(city_root: &Path) -> Result<Schedule, AxError> {
         let path = schedule_path(city_root);
         match std::fs::read_to_string(&path) {
@@ -167,11 +133,6 @@ impl Schedule {
         }
     }
 
-    /// What should have started in `(after, now]`.
-    ///
-    /// An entry whose firing was slept through appears once, however
-    /// long the sleep was: the city owes one morning run after a night
-    /// off, not one per hour it was down.
     #[must_use]
     pub fn due(&self, after: TimeMs, now: TimeMs) -> Vec<&Entry> {
         let after_minutes = after.value().checked_div(MINUTE_MS).unwrap_or(0);
@@ -190,12 +151,6 @@ impl Schedule {
         &self.entries
     }
 
-    /// What should have started in `(after, now]`, as owned dispatches.
-    ///
-    /// The same window as [`Schedule::due`]; the triple is what a
-    /// dispatch is made of, so the caller keeps only the loop. `due`
-    /// stays because it is this module's own public face and removing
-    /// it would break its readers.
     #[must_use]
     pub fn due_after(&self, after: TimeMs, now: TimeMs) -> Vec<(Address, String, String)> {
         self.due(after, now)
@@ -211,7 +166,6 @@ impl Schedule {
     }
 }
 
-/// Where the schedule lives.
 #[must_use]
 pub fn schedule_path(city_root: &Path) -> PathBuf {
     city_root.join(SCHEDULE_FILE)
@@ -310,7 +264,6 @@ fn read_weekly(raw: &str) -> Result<Cadence, AxError> {
     ))
 }
 
-/// One refusal shape, so the recovery line is written once.
 fn refuse(subject: String) -> AxError {
     AxError::failure(AxCode::ConfigInvalid, "read the city schedule", subject).with_recovery(
         "each job takes name, addr, task, goal and exactly one of `every = \"30m\"`, \

@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A stretch of one city's history, exported as a playback bundle, and a
-//! bundle checked against another or recomputed from its city
-//! (`Sprawling/accounting/spec/Playback.lean` §8-12).
-//!
-//! The properties the export holds are proved in
-//! `Sprawling/accounting/spec/Playback/Select.lean` and
-//! `Sprawling/accounting/spec/Playback/Project.lean`; this module is how
-//! they hold. The command line (`bin::main::playback`) and the
-//! resident's tool (`worker::workbench::tools::playback`) are thin doors
-//! onto [`export`], [`embed`], [`check`] and [`land`]
-//! (`Sprawling/accounting/spec/Playback/Check.lean` §8-13).
-
 use std::path::Path;
 
 use kernel::layout::CityLayout;
@@ -47,38 +35,24 @@ pub use page::{BUNDLE_BLOCK, embed};
 pub use reader::{Confidential, Reader};
 pub use select::{Selection, Window};
 
-/// The schema a bundle names; a reader refuses any other.
 pub const SCHEMA: &str = "sprawling.playback/3";
 
-/// The version of the rules a bundle is projected under. It moves with
-/// every change to what a bundle holds or how a table is derived, so a
-/// bundle this build cannot recompute says so instead of differing.
 pub const PROJECTION_RULES: u32 = 4;
 
-/// The most bytes a bundle may have. An initial value until the export
-/// peak on a multi-day fixture is measured; it bounds the bundle, not
-/// the memory an export uses.
 pub const BUNDLE_MAX_BYTES: usize = 32 * 1024 * 1024;
 
-/// The most bytes of patch text one committed checkpoint shows across
-/// its files. An initial value, like the bundle's.
 pub const DIFF_MAX_BYTES: usize = 64 * 1024;
 
-/// The most bytes a checked file may have: a bundle's ceiling and 16 MiB
-/// for the page around it and the fonts and pictures it carries. An
-/// initial value, measured on the same fixture as the bundle's.
 pub const PAGE_MAX_BYTES: usize = BUNDLE_MAX_BYTES + 16 * 1024 * 1024;
 
-/// Where an export stops reading.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cutoff {
-    /// The last complete line when the export starts.
+
     Latest,
-    /// This seq: what a recomputation of an earlier bundle reads to.
+
     At(Seq),
 }
 
-/// One export: which lines, for whom, up to where.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Request {
     pub selection: Selection,
@@ -86,13 +60,6 @@ pub struct Request {
     pub cutoff: Cutoff,
 }
 
-/// The bundle `request` selects from the city at `city_root`. Reads
-/// only; writes nothing.
-///
-/// # Errors
-/// The first ledger line that does not verify; a ledger that ends before
-/// a pinned cutoff; a payload the projection must read and cannot; a
-/// bundle over [`BUNDLE_MAX_BYTES`]. No partial bundle is ever returned.
 pub fn export(city_root: &Path, request: &Request) -> Result<Bundle, AxError> {
     match project(city_root, request, Scanning::Lazy)? {
         Projected::Whole { document, .. } => encode::encode(&document),
@@ -108,10 +75,8 @@ pub fn export(city_root: &Path, request: &Request) -> Result<Bundle, AxError> {
     }
 }
 
-/// What one projection reached.
 enum Projected {
-    /// The whole document, and how many lines the projection scanned for
-    /// credentials on the way.
+
     Whole {
         document: Box<Document>,
         #[cfg_attr(
@@ -123,12 +88,10 @@ enum Projected {
         )]
         scans: u64,
     },
-    /// The ledger ended before the pinned cutoff, at this seq.
+
     EndsAt(Option<Seq>),
 }
 
-/// The projection `request` asks of the city at `city_root`, scanning
-/// for credentials as `scanning` says.
 fn project(city_root: &Path, request: &Request, scanning: Scanning) -> Result<Projected, AxError> {
     let ledger = CityLayout::new(city_root).ledger();
     let city = storage::Provenance::city_of(&ledger).map_err(storage::StorageError::into_ax)?;

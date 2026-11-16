@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Worktree leases: a held tree and its measure.
-
 use std::path::{Path, PathBuf};
 
 use kernel::event::record::WorktreeOpened;
@@ -14,7 +12,6 @@ use crate::error::StorageError;
 
 use super::name::WorktreeName;
 
-/// A live tree: what it is called, where it is, and what it costs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorktreeLease {
     pub(crate) name: WorktreeName,
@@ -23,25 +20,15 @@ pub struct WorktreeLease {
     pub(crate) work: FileWork,
 }
 
-/// What putting a tree in place cost the filesystem, counted by the code
-/// that did the work (`Sprawling/storage/spec/Worktree.lean` §8-31).
-///
-/// A wall-clock reading of the same work moves with the machine and its
-/// real-time scanner, which waits on every file created; these four
-/// numbers do not, so they, and not the clock, are what a regression is
-/// judged by. Directories made along the way are not counted: the
-/// scanner waits on files.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct FileWork {
-    /// Files written where no file stood.
+
     pub created: u64,
-    /// Files written over because they differed from what the tree
-    /// should hold.
+
     pub rewritten: u64,
-    /// Entries taken away because the tree should not hold them; a
-    /// directory counts once, with whatever it held.
+
     pub removed: u64,
-    /// Directory entries read.
+
     pub walked: u64,
 }
 
@@ -51,31 +38,21 @@ impl WorktreeLease {
         &self.name
     }
 
-    /// The root a run in this node writes against.
     #[must_use]
     pub fn path(&self) -> &Path {
         &self.path
     }
 
-    /// What the tree occupied when it was opened. `status` reports this,
-    /// which is why it is measured rather than estimated.
     #[must_use]
     pub fn disk(&self) -> ByteLen {
         self.disk
     }
 
-    /// What claiming this tree cost the filesystem.
     #[must_use]
     pub fn work(&self) -> FileWork {
         self.work
     }
 
-    /// The `worktree_opened` payload: a name and a size, no path. An
-    /// absolute path is a fact about this machine, and a history that
-    /// carries one does not survive being moved to another.
-    ///
-    /// # Errors
-    /// Propagates the payload's refusal to hold what it was given.
     pub fn opened_payload(&self) -> Result<Payload, StorageError> {
         Payload::of(&WorktreeOpened {
             name: self.name.as_str().to_owned(),

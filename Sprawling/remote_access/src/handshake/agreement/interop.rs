@@ -3,22 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The vectors and the one-way fixture a browser must reproduce
-//! (Sprawling/remote_access/Spec.lean §8-12, remote_access D11), written into
-//! `Tools/fixtures/remote-handshake/` by this module and read back by it.
-//!
-//! Without `GOLDEN_WRITE=1` every test only reads and compares. With it,
-//! the three files with no randomness in them are written again, byte for
-//! byte the same while the protocol stands, and the signature and the
-//! fixture, which carry randomness, are written again only when the
-//! committed copy no longer verifies here.
-//!
-//! The module sits under `agreement` because the fixture's device holds
-//! two fixed ephemeral private keys, and the fields of [`Ephemeral`] are
-//! private to `agreement`: a child reaches them, and the release binary
-//! keeps `Ephemeral::generate` as the only way a device's ephemeral keys
-//! come to be.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -39,32 +23,26 @@ use file::{Fields, dir, kept, known, read, text};
 
 mod file;
 
-/// The seed of `keys.txt` and `signature-rust.txt`. Distinct bytes, so a
-/// reader that reverses or shifts them gets another answer.
 const SEED: [u8; SEED_BYTES] = *b"sprawling remote vector seed 001";
-/// The message `signature-rust.txt` signs.
+
 const MESSAGE: &[u8] = b"sprawling remote signature vector";
 
-/// The three inputs of `session-keys.txt`; no handshake drew them.
 const TRANSCRIPT: [u8; 32] = *b"session keys vector: transcript.";
 const X25519_SECRET: [u8; 32] = *b"session keys vector: x25519 key.";
 const ML_KEM_SECRET: [u8; 32] = *b"session keys vector: ml-kem key.";
 
-/// The city-to-device key of `seal.txt`, and the frame sealed under it.
 const SEAL_KEY: [u8; 32] = *b"seal vector: city to device key.";
 const SEAL_FRAME: &str = "a frame the city seals first";
 
-/// The fixture's city, its device, and what the device holds fixed.
 const CITY_SEED: [u8; SEED_BYTES] = *b"sprawling remote fixture city 01";
 const DEVICE_SEED: [u8; SEED_BYTES] = *b"sprawling remote fixture device1";
 const DEVICE_ID: [u8; 16] = *b"fixture device 1";
 const X25519_PRIVATE: [u8; 32] = *b"fixture device x25519 ephemeral!";
 const DEVICE_NONCE: [u8; NONCE_BYTES] = *b"fixture device nonce, 32 bytes..";
 const CITY_NONCE: [u8; NONCE_BYTES] = *b"fixture city nonce, 32 bytes....";
-/// The agreed plaintext: the text of the first frame the city seals.
+
 const FIRST_FRAME: &str = "sprawling remote fixture: the city speaks first";
 
-/// The field names of each file, in the order §8-12 gives them.
 const KEYS: [&str; 4] = ["seed", "ed25519_seed", "ml_dsa_44_seed", "public"];
 const SESSION_KEYS: [&str; 5] = [
     "transcript",
@@ -152,8 +130,6 @@ fn seal_vector_is_what_the_sealer_writes() {
         ),
     );
 
-    // The nonce a browser reads is the one the sealer used: plain
-    // AES-256-GCM under it gives the sealed bytes the file holds.
     let by_hand = |payload: &str, nonce: &str| {
         let key = LessSafeKey::new(UnboundKey::new(&AES_256_GCM, fields.get("key")).unwrap());
         let nonce = Nonce::try_assume_unique_for_key(fields.get(nonce)).unwrap();
@@ -218,7 +194,6 @@ fn fixture_opens_on_a_device_with_its_fixed_ephemeral_keys() {
     );
 }
 
-/// The Rust signature: the key of `keys.txt` signs [`MESSAGE`].
 fn signature() -> Fields {
     let key = SigningKey::from_seed(&SEED).unwrap();
     Fields::of(
@@ -248,9 +223,6 @@ fn verifies(fields: &Fields) -> Result<(), String> {
         .map_err(text)
 }
 
-/// One handshake against the fixed device: a fresh ML-KEM key, whose
-/// private half goes into the file, then the city's reply, the device's
-/// finish, and the first frame the city seals.
 fn fixture() -> Fields {
     let ml_kem = DecapsulationKey::generate(&ML_KEM_768).unwrap();
     let ml_kem_private = ml_kem.key_bytes().unwrap().as_ref().to_vec();
@@ -310,8 +282,6 @@ fn opens_to_the_agreed_plaintext(fields: &Fields) -> Result<(), String> {
     Ok(())
 }
 
-/// What a device holding the fixture's two ephemeral private keys reads
-/// from its first frame, going through the device's half of §8-4.
 fn opens(fields: &Fields) -> Result<Vec<u8>, String> {
     let hello = Hello::from_bytes(fields.try_get("hello")?).map_err(text)?;
     let waiting = fixed_device(
@@ -329,8 +299,6 @@ fn opens(fields: &Fields) -> Result<Vec<u8>, String> {
         .map_err(text)
 }
 
-/// The test seam of §8-12: a device whose ephemeral keys are the two
-/// private keys given, not ones `Ephemeral::generate` drew.
 fn fixed_device(hello: &Hello, x25519: &[u8], ml_kem: &[u8]) -> Result<DeviceWaiting, String> {
     Ok(DeviceWaiting {
         hello: hello.clone(),

@@ -3,41 +3,20 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a building remembers between runs.
-//!
-//! Four kinds, and the list is closed: a preference somebody stated, a
-//! decision somebody made, a correction somebody had to make twice, and
-//! a fact about the world that was expensive to find out. Anything that
-//! does not fit one of those four is a note, and notes belong in the
-//! documents a person already reads.
-//!
-//! **Recall is structural, not semantic.** An entry is filed by kind and
-//! date, the index says where it is, and reading it means reading the
-//! original. No vector store, no embedding, no similarity: the recall
-//! this needs is "what did we decide about X", and an index answers that
-//! without a second copy of the text to drift from the first.
-//!
-//! The index is a projection. Delete it and it rebuilds from the
-//! entries, which is why it may be stored as plainly as it is.
-//!
-//! Specified by `Sprawling/city/spec/Archive.lean` §8-9.
-
 use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
 use kernel::{AxCode, AxError, TimeMs};
 
-/// The four kinds. Closed on purpose: a fifth would need a reason, and
-/// "it did not fit" is the reason a category list rots.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Kind {
-    /// How the person wants things done.
+
     Preference,
-    /// What was chosen, and what was chosen against.
+
     Decision,
-    /// Something that went wrong and the way it was put right.
+
     Correction,
-    /// Something true about the world that cost work to establish.
+
     Fact,
 }
 
@@ -52,8 +31,6 @@ impl Kind {
         }
     }
 
-    /// # Errors
-    /// Refuses a kind outside the four.
     pub fn parse(raw: &str) -> Result<Kind, AxError> {
         match raw {
             "preference" => Ok(Kind::Preference),
@@ -70,44 +47,22 @@ impl Kind {
     }
 }
 
-/// One filed entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
     pub kind: Kind,
-    /// Whole days since the epoch. Days rather than milliseconds because
-    /// the index is browsed by a person, and because a stamp with more
-    /// precision than the question needs invites comparisons nobody
-    /// meant to make.
+
     pub day: u64,
-    /// One line, which is what the index shows.
+
     pub subject: String,
-    /// The file the entry lives in. Reading the entry means reading it.
+
     pub at: PathBuf,
 }
 
-/// Whole days from an injected instant. Time only ever arrives as a
-/// parameter here, as everywhere.
 #[must_use]
 pub fn day_of(at: TimeMs) -> u64 {
     at.value().saturating_div(86_400_000)
 }
 
-/// What one entry is and where it goes, decided before anything is
-/// written.
-///
-/// The path is `<building>/Archive/<kind>/<day>-<slug>.md`, which sorts
-/// by date inside each kind without an index having to exist yet.
-///
-/// Separate from [`file`] because the ledger line an entry becomes is
-/// built out of `kind`, `day` and `subject` alone: all three are
-/// functions of what the caller passed in, so the line can be written
-/// before the shelf is touched. That order is the Ledger's own rule,
-/// and it is only available to a caller who can name the entry without
-/// filing it.
-///
-/// # Errors
-/// Refuses an empty subject: the index line is the only thing most
-/// entries are ever read by.
 pub fn entry(
     city_root: &Path,
     building: &kernel::Address,
@@ -135,24 +90,11 @@ pub fn entry(
     })
 }
 
-/// Puts one entry on its building's shelf, at the place [`entry`] chose.
-///
-/// # Errors
-/// Propagates whatever creating the directory or writing the file
-/// reports.
 pub fn file(entry: &Entry, body: &str) -> Result<(), AxError> {
     let text = format!("# {}\n\n{body}\n", entry.subject);
     crate::document::replace(&entry.at, text.as_bytes())
 }
 
-/// Everything filed in one building, kind then day then subject.
-///
-/// This is the index, and it is computed rather than stored: a stored
-/// one would be a second account of what is on the disk, and the disk is
-/// the one that is true.
-///
-/// # Errors
-/// Propagates a directory that exists and cannot be read.
 pub fn index(city_root: &Path, building: &kernel::Address) -> Result<Vec<Entry>, AxError> {
     let root = CityLayout::new(city_root).archive(building);
     let mut entries = Vec::new();
@@ -242,9 +184,6 @@ fn subject_of(text: &str) -> String {
         .to_owned()
 }
 
-/// A file name from a subject: lowercase, letters and digits, dashes
-/// between. Long subjects are cut rather than hashed, because a person
-/// looking at the directory should recognise the file.
 fn slug(subject: &str) -> String {
     let mut out = String::new();
     for ch in subject.trim().chars() {

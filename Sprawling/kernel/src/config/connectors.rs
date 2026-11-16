@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Connector definitions and the references a building selects, resolved
-//! without copying a definition into another scope
-//! (`Sprawling/kernel/spec/Config.lean` D117).
-
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -14,36 +10,30 @@ use serde::{Deserialize, Serialize};
 use super::{LayeredValue, McpServer};
 use crate::{AxCode, AxError, B3Hash, ServerLabel};
 
-/// A server definition as one configuration layer states it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct McpDefinition {
     pub server: McpServer,
-    /// Permits this definition to differ from one with the same label at a
-    /// farther scope. Without this explicit mark, the duplicate is refused.
+
     #[serde(default)]
     pub conflict: bool,
 }
 
-/// A building's reference to one server and the versions it approved.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct McpReference {
     pub label: ServerLabel,
-    /// The definition's canonical JSON digest. `None` only while a legacy
-    /// reference is waiting for its first listing to be pinned.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub definition: Option<B3Hash>,
-    /// Catalog tool name to definition digest. `None` has the same legacy
-    /// meaning as a missing definition pin; an empty map selects no tools.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools: Option<BTreeMap<String, B3Hash>>,
 }
 
 impl McpReference {
-    /// The selection a pre-pin configuration makes, before its first listing
-    /// can establish the approved versions.
+
     #[must_use]
     pub fn legacy(label: ServerLabel) -> McpReference {
         McpReference {
@@ -53,15 +43,12 @@ impl McpReference {
         }
     }
 
-    /// Whether this reference still needs its initial versions pinned.
     #[must_use]
     pub fn is_legacy(&self) -> bool {
         self.definition.is_none() || self.tools.is_none()
     }
 }
 
-/// The two kinds of connector rows one layer may state. Each `Option`
-/// distinguishes silence from an explicitly empty selection.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct McpLayer {
     pub definitions: Option<Vec<McpDefinition>>,
@@ -81,11 +68,6 @@ impl McpLayer {
     }
 }
 
-/// The definition's content identity. The digest never contains plaintext
-/// credentials: configuration admits only secret references.
-///
-/// # Errors
-/// `E_INVALID_ARGS` if the definition cannot be serialised as canonical JSON.
 pub fn definition_digest(server: &McpServer) -> Result<B3Hash, AxError> {
     serde_json::to_vec(server)
         .map(|bytes| B3Hash::digest(&bytes))
@@ -101,11 +83,6 @@ pub fn definition_digest(server: &McpServer) -> Result<B3Hash, AxError> {
         })
 }
 
-/// Resolves one ladder into the selected definitions and their references.
-///
-/// Equal duplicates are references awaiting migration. Different definitions
-/// of one label are admitted only when the nearer one explicitly declares the
-/// conflict; otherwise the nearer scope would silently hide the farther one.
 pub(super) fn resolve(
     stated: &LayeredValue<McpLayer>,
 ) -> Result<(Vec<McpServer>, Vec<McpReference>), AxError> {

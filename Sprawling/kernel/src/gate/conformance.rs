@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One refusal per door, produced by the door itself.
-//! The part `Sprawling/kernel/spec/Gate.lean` specifies this module with the
-//! rest of `kernel::gate`.
-
 use std::collections::BTreeMap;
 
 use super::{DoorId, GateOutcome};
@@ -21,17 +17,6 @@ use crate::taint::{TaintSet, TaintSource};
 use crate::tool::{ServerLabel, ToolName};
 use crate::write_domain::{WriteDomain, WriteLimit};
 
-/// Whatever this door answers when its sample calls it.
-///
-/// The samples call the real functions with inputs that deny (or,
-/// for the one asking door, inputs the person must answer), so what
-/// the matrix judges is the answer a run would receive rather than a
-/// copy of it written for the test.
-///
-/// # Errors
-/// Returns the door when it answered Allow, which is a defect in
-/// this function rather than in the door: every sample is built to
-/// provoke something other than Allow.
 pub fn sample(door: DoorId) -> Result<GateOutcome, DoorId> {
     let answered = match door {
         DoorId::Domain => domain_sample(),
@@ -140,23 +125,10 @@ fn undoable_sample() -> Option<GateOutcome> {
     ))
 }
 
-/// The one door that asks: a building that enabled the tool and
-/// declared no address is the state the person's next action
-/// resolves.
 fn attach_sample() -> Option<GateOutcome> {
     outcome_of(super::attach(None))
 }
 
-/// Which doors a taint set alone turns into a refusal: for each door
-/// that reads taint, whether the same input is refused with a taint set
-/// and not refused without one.
-///
-/// The one place an effect derived from outside content is stopped
-/// is [`super::undoable`]; the discard door stops it too, through
-/// `DiscardVerdict`. A caller that wants to know whether taint is
-/// wired at all asks here instead of grepping. Both halves are asked,
-/// because a door that refused every input would refuse a tainted one
-/// too and still read nothing.
 #[must_use]
 pub fn taint_readers() -> BTreeMap<DoorId, bool> {
     let source = TaintSource::new("web:evil");

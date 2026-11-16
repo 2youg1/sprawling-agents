@@ -3,24 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a picture is on the canonical conversation.
-//! The part `Sprawling/kernel/spec/Model.lean` specifies this module with the
-//! rest of `kernel::model`.
-//!
-//! The ledger holds a reference and four integers, never bytes: the
-//! bytes live in `storage::cas` under the locator this value carries, so
-//! a history stays a file a person can read and the float ban holds
-//! without an exception for pixels.
-
 use serde::{Deserialize, Serialize};
 
 use crate::locator::Locator;
 
-/// The picture formats this city carries.
-///
-/// Closed rather than `non_exhaustive`, because this is not a vocabulary
-/// a provider hands us: it is the set we decided to accept, and adding
-/// one has to answer [`ImageType::mime`] in the same edit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -32,7 +18,7 @@ pub enum ImageType {
 }
 
 impl ImageType {
-    /// The media type both provider wires spell this format with.
+
     #[must_use]
     pub fn mime(&self) -> &'static str {
         match self {
@@ -44,20 +30,10 @@ impl ImageType {
     }
 }
 
-/// One picture, as everything except the wire refers to it.
-///
-/// The same value stands in a [`crate::ContentBlock::Image`] block and in
-/// a tool result's attachments, because they are the same four facts. A
-/// second definition of them would be a second authority: adding a field
-/// would then have to be remembered twice.
-///
-/// `width` and `height` are pixel counts, so they are integers; a
-/// display that wants a ratio computes it where the drawing happens.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ImageRef {
-    /// A `cas:` locator. The bytes are fetched from the content store by
-    /// whoever is about to send them, and never travel in the ledger.
+
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub locator: Locator,
     pub media_type: ImageType,

@@ -5,10 +5,6 @@
 
 use super::*;
 
-/// Every door in the roster answers something other than Allow, and
-/// every Deny says all three parts. Adding a door adds a row here by
-/// adding an arm to `sample`, which does not compile until it is
-/// written.
 #[test]
 fn every_door_in_the_roster_has_an_answer_with_three_parts() {
     for door in DOORS {
@@ -35,8 +31,6 @@ fn every_door_in_the_roster_has_an_answer_with_three_parts() {
     }
 }
 
-/// The roster names each door once, and the names are the function
-/// names a reader greps for.
 #[test]
 fn the_roster_holds_every_door_exactly_once() {
     let mut names: Vec<&str> = DOORS.iter().map(|door| door.as_str()).collect();
@@ -50,8 +44,6 @@ fn the_roster_holds_every_door_exactly_once() {
     assert_eq!(all.len(), before);
 }
 
-/// Taint reaches a decision rather than a sentence in a refusal:
-/// both doors that see a taint set refuse on it (C15).
 #[test]
 fn the_doors_that_see_taint_refuse_on_it() {
     assert_eq!(
@@ -64,8 +56,6 @@ fn the_doors_that_see_taint_refuse_on_it() {
     );
 }
 
-/// The attach door's own three answers, one test apiece: the
-/// question, the loopback allow, and the network refusal.
 #[test]
 fn the_attach_door_asks_then_allows_loopback_then_refuses_a_network() {
     assert!(matches!(super::attach(None), GateOutcome::Ask { .. }));
@@ -81,9 +71,6 @@ fn the_attach_door_asks_then_allows_loopback_then_refuses_a_network() {
     ));
 }
 
-/// Each private range of RFC 1918 and the link-local range is the
-/// private network on its own, and an address just outside every one of
-/// them is a public host: one octet does not make a range.
 #[test]
 fn each_private_range_is_private_on_its_own() {
     for host in [
@@ -114,15 +101,12 @@ fn each_private_range_is_private_on_its_own() {
     }
 }
 
-/// An allowlist is empty exactly when nothing was entered on it.
 #[test]
 fn an_allowlist_is_empty_only_when_nothing_was_entered() {
     assert!(EgressAllowlist::new(Vec::new()).is_empty());
     assert!(!EgressAllowlist::new(vec!["example.com".to_owned()]).is_empty());
 }
 
-/// A refused attachment names the far end in the terms the address was
-/// classified with, never the declared address itself.
 #[test]
 fn a_refused_attachment_names_the_far_end_by_its_class() {
     for (target, subject) in [

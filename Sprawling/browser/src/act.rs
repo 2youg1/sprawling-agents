@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Turning an intention into frames.
-//!
-//! Every action names a reference from the snapshot the caller is
-//! looking at, so acting on a page nobody looked at is not expressible.
-//! The generation travels with the action for the same reason: a click
-//! decided against one view of a page is refused against another rather
-//! than landing on whatever moved into that position.
-
 use std::collections::BTreeSet;
 
 use crate::keyboard::{Key, Modifier};
@@ -19,33 +11,20 @@ use crate::session::{ContextId, Session};
 use crate::snapshot::PageSnapshot;
 use kernel::{AxCode, AxError};
 
-/// A viewport position in CSS pixels. Negative `y` in a scroll delta is
-/// a wheel turned up; a pointer coordinate outside the viewport is the
-/// page's own business rather than something to clamp here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Point {
     pub x: i64,
     pub y: i64,
 }
 
-/// Where a pointer action starts.
-///
-/// Exhaustive: either the snapshot named the element, or the caller
-/// named a point. A drag that starts nowhere is not expressible, which
-/// is the point of the type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Origin {
-    /// A reference the snapshot minted. The page is asked for the
-    /// element's own id before the input frame is built, because BiDi
-    /// names an input origin by element reference and not by selector.
+
     Reference(String),
-    /// A viewport point.
+
     Point(Point),
 }
 
-/// What a run wants done. Exhaustive: an action this crate cannot spell
-/// should be a compile error at the caller, not a string that reaches a
-/// page.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
     Click {
@@ -58,35 +37,28 @@ pub enum Action {
     Read {
         reference: String,
     },
-    /// A pointer press at `from`, moved to `to`, released. `steps` is
-    /// how many intermediate moves the pointer makes on the way, which
-    /// is what a page that tracks a drag reads.
+
     Drag {
         from: Origin,
         to: Point,
         steps: u32,
     },
-    /// One wheel turn at `at` (or at the viewport's own origin), by
-    /// `by` in CSS pixels.
+
     Scroll {
         at: Option<Point>,
         by: Point,
     },
-    /// One key pressed on whatever the page has focused, with
-    /// `modifiers` held around it (`Sprawling/browser/spec/Keyboard.lean`).
+
     Press {
         key: Key,
         modifiers: BTreeSet<Modifier>,
     },
 }
 
-/// How many intermediate pointer moves one drag may make. A ceiling on
-/// what crosses the socket, not a taste: a page that needs more than
-/// this to notice the drag is a page a person cannot drag either.
 pub const STEPS_MAX: u32 = 32;
 
 impl Action {
-    /// The snapshot reference this action names, when it names one.
+
     #[must_use]
     pub fn reference(&self) -> Option<&str> {
         match self {
@@ -106,8 +78,6 @@ impl Action {
         }
     }
 
-    /// Whether this action needs the page to name an element between
-    /// two frames before its input frame can be built.
     #[must_use]
     pub fn resolves_element(&self) -> bool {
         matches!(
@@ -120,8 +90,6 @@ impl Action {
     }
 }
 
-/// Escapes a string for a JavaScript single-quoted literal. Page text is
-/// somebody else's, and the one place it becomes code is here.
 fn quote(raw: &str) -> String {
     let mut out = String::with_capacity(raw.len().saturating_add(2));
     out.push('\'');
@@ -140,20 +108,6 @@ fn quote(raw: &str) -> String {
     out
 }
 
-/// Builds the frame that performs `action` against the page `snapshot`
-/// describes.
-///
-/// Input actions ([`Action::Drag`], [`Action::Scroll`], [`Action::Press`])
-/// do not come through here: they are BiDi `input.performActions`, which
-/// is a different module of the protocol, and they are built by
-/// [`crate::input`] and [`crate::keyboard`]. The refusal below is a guard
-/// against a caller that routes one here, not a state a run reaches.
-///
-/// # Errors
-/// Refuses a reference the snapshot did not mint, one minted against
-/// a different generation — the second is the stale-page case, and it is
-/// refused rather than retried because the caller has to look again to
-/// know what it is now clicking — and an input action routed here.
 pub fn frame_for(
     session: &mut Session,
     context: &ContextId,
@@ -189,16 +143,6 @@ pub fn frame_for(
     session.evaluate(context, &expression)
 }
 
-/// The frame whose reply names the element a pointer action starts from.
-///
-/// BiDi's `input.performActions` names an element origin by the page's
-/// own shared id, which only a `script.evaluate` that returns the node
-/// carries back. The caller sends this frame, reads
-/// [`crate::input::shared_id_of`] out of the reply, and then builds the
-/// input frame.
-///
-/// # Errors
-/// Propagates a reference the snapshot did not mint.
 pub fn resolve_frame(
     session: &mut Session,
     context: &ContextId,
@@ -208,14 +152,6 @@ pub fn resolve_frame(
     session.evaluate(context, &selector_of(snapshot, reference)?)
 }
 
-/// Refuses a decision made against a page that has since changed.
-///
-/// One authority for the rule: `frame_for` and the element-origin resolve
-/// both ask it, so a caller that checks freshness once checks it the same
-/// way the other arm does.
-///
-/// # Errors
-/// Refuses a generation older or newer than the snapshot's own.
 pub(crate) fn ensure_fresh(snapshot: &PageSnapshot, generation: u64) -> Result<(), AxError> {
     if generation == snapshot.generation() {
         return Ok(());
@@ -231,18 +167,6 @@ pub(crate) fn ensure_fresh(snapshot: &PageSnapshot, generation: u64) -> Result<(
     .with_recovery("take a fresh snapshot and decide again"))
 }
 
-/// The expression that names one node of `snapshot` in the page.
-///
-/// One authority for the whole crate: acting on a node and measuring one
-/// have to reach the same element, and two spellings of "which element"
-/// would drift the moment either was corrected.
-///
-/// The page's own text goes in as data through [`quote`], never as code,
-/// and the position is counted among the nodes sharing this node's role
-/// — which is the list the expression filters, so the two agree.
-///
-/// # Errors
-/// Propagates a reference this snapshot did not mint.
 pub(crate) fn selector_of(snapshot: &PageSnapshot, reference: &str) -> Result<String, AxError> {
     let node = snapshot.resolve(reference)?;
     let ordinal = index_of(reference)?;
@@ -259,8 +183,6 @@ pub(crate) fn selector_of(snapshot: &PageSnapshot, reference: &str) -> Result<St
     ))
 }
 
-/// The zero-based position a reference names. References are minted as
-/// `e1`, `e2`, … by the snapshot, so this is the inverse of that.
 fn index_of(reference: &str) -> Result<usize, AxError> {
     let digits = reference.strip_prefix('e').ok_or_else(|| {
         AxError::failure(

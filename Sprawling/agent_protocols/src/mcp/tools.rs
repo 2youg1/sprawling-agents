@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! MCP tools: listing, naming, calling.
-//!
-//! Two servers offering one verb stay two tools, a constructed tool is
-//! outside a confidential building and has a deadline, and a reply's
-//! `isError` and `_meta` decide how it is read: the properties are proved
-//! in `Sprawling/agent_protocols/spec/Mcp/Tools.lean`.
-
 use std::sync::Mutex;
 
 use super::handshake::Rpc;
@@ -20,23 +13,13 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-/// The `_meta` key a server sets on an `isError` result when part of the
-/// call may already have taken effect (`Sprawling/agent_protocols/Spec.lean` §8-1c).
-/// The desktop server sets it by reading it from here
-/// (`Sprawling/desktop/Spec.lean` D14).
 pub const EFFECT_META_KEY: &str = "sprawling/effect-unknown";
 
-/// How much of a server's own failure text reaches the subject: a refusal
-/// and its recovery fit, a stack trace or a whole page does not
-/// (`Sprawling/agent_protocols/Spec.lean` §8-1c).
 pub(crate) const ERROR_TEXT_CAP_BYTES: usize = 4_096;
 
-/// What a caller does after a tool reported its own failure.
 const FAILED_RECOVERY: &str = "the server said what failed and what to do instead in the words \
                                above; follow them rather than repeating the call unchanged";
 
-/// What a caller does after a failure the server marked as possibly
-/// half done.
 const UNKNOWN_RECOVERY: &str = "the server says part of this call may already have taken \
                                 effect; look at what it acted on before calling again, and do \
                                 not repeat it unchanged";
@@ -70,24 +53,13 @@ pub(crate) fn float_at(value: &Value, path: String) -> Option<String> {
     }
 }
 
-/// One tool a server offers, under both of its names.
-///
-/// The two travel together because the function that derives one from
-/// the other is the only place that knows both: a caller that had to
-/// pair a list of registrations with a list of remote names by position
-/// would be one reordering away from calling the wrong tool.
 pub struct Listed {
-    /// The name the server knows it by, which is what goes back out.
+
     pub remote: String,
-    /// The name this city knows it by, which is what the model sees.
+
     pub meta: ToolMeta,
 }
 
-/// Turns a `tools/list` result into the registrations a catalog admits.
-///
-/// # Errors
-/// Refuses a result whose shape this version does not read, and a tool
-/// whose name cannot be spelled after prefixing.
 pub fn tools_from(server: &ServerLabel, result: &Value) -> Result<Vec<Listed>, AxError> {
     let listed = result
         .get("tools")
@@ -127,19 +99,14 @@ pub fn tools_from(server: &ServerLabel, result: &Value) -> Result<Vec<Listed>, A
                 name,
                 disclosure,
                 params: Payload::new(params)?,
-                // Every external call leaves this process. Naming the
-                // connector is what routes it to the gate that can say
-                // no, and what tells that gate where it goes: the
-                // destination is this server, on every call, so there is
-                // nothing here for a model to fill in.
+
                 effect: Effect::Connector {
                     label: server.clone(),
                 },
                 cost_tier: CostTier::Heavy,
                 timeout: Some(EXTERNAL_CALL_PATIENCE),
                 render: RenderIntent::Generic,
-                // The far end is a live service, so the answer is about
-                // now.
+
                 temporal: Temporal::Timestamped,
             },
         });
@@ -159,14 +126,11 @@ fn sanitise(raw: &str) -> String {
         .collect()
 }
 
-/// A tool a server offers, ready to be registered on the tool seam.
 pub struct McpTool {
     meta: ToolMeta,
     remote: String,
     patience: TimeoutMs,
-    /// The request id and the connection it numbers are one lock: a
-    /// reply is read off the same connection the request went out on,
-    /// so two calls on one server take turns.
+
     link: Mutex<Link>,
 }
 
@@ -176,15 +140,7 @@ struct Link {
 }
 
 impl McpTool {
-    /// # Errors
-    /// Refuses to exist inside a confidential building. That mark means
-    /// what happens here leaves no trace outside the run, and an
-    /// outbound call is the largest trace there is — so the refusal is
-    /// at construction, where there is nothing yet to leak.
-    ///
-    /// Refuses a registration that declares no timeout: an outbound tool
-    /// with no deadline is a tool that can hang a run, and the run has
-    /// no second way to notice.
+
     pub fn new(
         meta: ToolMeta,
         remote: String,
@@ -218,7 +174,6 @@ impl McpTool {
         })
     }
 
-    /// The server-side name, which is what goes back out on the wire.
     #[must_use]
     pub fn remote(&self) -> &str {
         &self.remote
@@ -281,9 +236,6 @@ impl Tool for McpTool {
     }
 }
 
-/// A `tools/call` result the server marked `isError`, read as the failure
-/// it is: the text blocks in order are the subject, and a `_meta` that
-/// marks the effect unknown turns it into an outcome nobody can see.
 fn reported_failure(remote: &str, result: &Value) -> AxError {
     let blocks = result
         .get("content")
@@ -319,8 +271,6 @@ fn reported_failure(remote: &str, result: &Value) -> AxError {
     }
 }
 
-/// The server's text, cut at a character boundary once it passes
-/// `ERROR_TEXT_CAP_BYTES`, with the length of what was cut.
 fn capped(text: &str) -> String {
     let end = text.floor_char_boundary(ERROR_TEXT_CAP_BYTES);
     match text.get(..end) {
@@ -359,9 +309,6 @@ mod tests {
         ] })
     }
 
-    /// A server's results carry fractional numbers such as relevance
-    /// scores, and the ledger holds no floats, so an answer keeps each
-    /// such number as its own digits instead of failing the call.
     #[test]
     fn a_servers_fractional_numbers_survive_as_their_own_digits() {
         let answered = serde_json::json!({
@@ -371,18 +318,16 @@ mod tests {
         let recordable = digits_for_floats(answered);
         assert_eq!(recordable["results"][0]["score"], "1249.4");
         assert_eq!(recordable["cost"]["total"], "0.005");
-        // Integers are numbers still: this is not a blanket stringifier.
+
         assert_eq!(recordable["results"][0]["rank"], 1);
         assert_eq!(recordable["results"][0]["title"], "a page");
-        // And the whole thing is now something the ledger will take.
+
         let Value::Object(map) = recordable else {
             panic!("an object stays an object");
         };
         Payload::new(map).expect("a payload with no floats left in it");
     }
 
-    /// A far end that answers `initialize` with no version is not
-    /// speaking this protocol, and is refused rather than assumed.
     #[test]
     fn two_servers_offering_the_same_verb_stay_two_tools() {
         let one = tools_from(&label(), &listing()).unwrap();
@@ -409,7 +354,7 @@ mod tests {
             .unwrap_err();
         assert!(err.subject().contains("amount"), "{}", err.subject());
         assert!(err.recovery().contains("ledger"));
-        // The tool is still usable with a shape that can be recorded.
+
         assert!(rpc.call_tool("x", &json!({ "amount": 2 })).is_ok());
         let nested = rpc
             .call_tool("x", &json!({ "a": { "b": [1, 2.25] } }))
@@ -427,8 +372,6 @@ mod tests {
         assert_eq!(err.code(), &AxCode::ToolUnavailable);
     }
 
-    /// The tool that answers `line` with `answer`, and the call that
-    /// reaches it, both through the doors production uses.
     fn answering(answer: &str) -> (McpTool, ToolCall) {
         let arguments = json!({ "title": "kiln" });
         let line = Rpc::new()
@@ -453,8 +396,6 @@ mod tests {
         (tool, call)
     }
 
-    /// A tool that says it failed has failed: the model reads the
-    /// server's own words as an error, not as a strange answer.
     #[test]
     fn a_tool_that_reports_its_own_failure_is_a_failure_in_the_servers_words() {
         let (tool, call) = answering(
@@ -471,8 +412,6 @@ mod tests {
         );
     }
 
-    /// A failure the server marks as possibly half done is not a call to
-    /// repeat, and says so through the retry the city reads.
     #[test]
     fn a_failure_whose_effect_is_unknown_says_so() {
         let (tool, call) = answering(

@@ -3,78 +3,62 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// This file is the one definition of the leaf's step vocabulary. The
-// library declares it as a module, and `build.rs` includes it to hold
-// `zig/step.zig` to the same names and numbers on every build, so the
-// Zig spelling cannot drift without the build refusing
-// (`Sprawling/desktop/Spec.lean` D12).
-
-/// Where one call into the Zig leaf ended: finished, or the part of the
-/// operation that stopped it.
-///
-/// A step is what lets the caller say *what* this machine refused to do
-/// in a caller's words; the Win32 error code beside it says why, in the
-/// machine's own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
-    /// The operation did what it was asked.
+
     Finished,
-    /// The operation finished and found nothing: no text on the clipboard.
+
     Absent,
-    /// The caller's buffer is shorter than the answer; the count beside
-    /// the step says how long the answer is.
+
     NoRoom,
-    /// A size the caller gave does not describe the buffer it lent, or a
-    /// size overflows the type it is counted in.
+
     Measuring,
-    /// `EnumWindows` refused.
+
     Listing,
-    /// No window was named, and a null window means the whole screen.
+
     NoWindow,
-    /// `GetDC` gave no drawing context for the window.
+
     Context,
-    /// No compatible memory context or bitmap of this size.
+
     Bitmap,
-    /// The bitmap could not be selected into the memory context.
+
     Selecting,
-    /// `PrintWindow` refused to draw the window.
+
     Drawing,
-    /// `GetDIBits` read no rows back.
+
     Reading,
-    /// `GetDIBits` read back fewer rows than the window has.
+
     ShortRows,
-    /// The message-only window that owns the clipboard was not made.
+
     Owner,
-    /// Another program holds the clipboard.
+
     Opening,
-    /// The clipboard reported text and then gave no block for it.
+
     Fetching,
-    /// The clipboard's block would not lock.
+
     Locking,
-    /// The clipboard's block reported a size of nothing.
+
     EmptyBlock,
-    /// No global block for the new text.
+
     Allocating,
-    /// The clipboard would not be emptied before writing.
+
     Emptying,
-    /// The clipboard was emptied and refused the new block.
+
     Handing,
-    /// `GetSystemCpuSetInformation` refused.
+
     CpuSets,
-    /// `GetThreadGroupAffinity` refused.
+
     Affinity,
-    /// `SetProcessInformation` refused the power-throttling state.
+
     Throttling,
-    /// A job refused its CPU weight, or the reading or writing of its
-    /// memory limit; with no reason of the machine's, no job was named.
+
     JobShare,
-    /// A job's completion port was not made, attached or read; with no
-    /// reason of the machine's, no job or port was named.
+
     JobWatch,
 }
 
 impl Step {
-    /// Every step, in the order of its number.
+
     pub const ALL: [Step; 25] = [
         Step::Finished,
         Step::Absent,
@@ -103,7 +87,6 @@ impl Step {
         Step::JobWatch,
     ];
 
-    /// The number this step crosses the boundary as.
     pub const fn number(self) -> u32 {
         match self {
             Step::Finished => 0,

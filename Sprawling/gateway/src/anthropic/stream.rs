@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one Anthropic stream settles into.
-//!
-//! A thinking block arrives in two streams: its text in
-//! `thinking_delta` and the provider's `signature_delta` at the end.
-//! The signature is what the provider verifies the reasoning against on
-//! the next turn, so a block rebuilt without it is refused rather than
-//! sent back: <https://platform.claude.com/docs/en/build-with-claude/thinking>.
-
 use kernel::AxError;
 use kernel::{ContentBlock, Increment, ToolCall};
 use serde_json::{Value, json};
@@ -18,11 +10,6 @@ use serde_json::{Value, json};
 use crate::endpoint::failure::{ProviderFailure, provider_err};
 use crate::mismatch::{settled_tool_arguments, stream_cut};
 
-/// What one `content_block_delta` carries, if it carries either stream.
-///
-/// Reading the delta's own type rather than the presence of a field is
-/// what keeps a tool's arguments out of a person's reading pane: a
-/// partial `input_json_delta` is not a shorter tool argument.
 pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<Increment> {
     let delta = map.get("delta")?.as_object()?;
     match delta.get("type")?.as_str()? {
@@ -34,10 +21,6 @@ pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<Incre
     }
 }
 
-/// Anthropic streams one `content_block_start` per block, then deltas
-/// against it by index, then `message_delta` with the stop reason and the
-/// output count. The blocks are rebuilt in index order so a tool call
-/// that arrived interleaved with text still lands where it was.
 pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
     let Rebuilt {
         content,
@@ -52,11 +35,6 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
     Ok(json!({ "content": content, "stop_reason": stop, "usage": usage }))
 }
 
-/// The tool call the last frame completes, when that frame is a
-/// `content_block_stop`.
-///
-/// # Errors
-/// As [`completed_call`].
 pub(crate) fn call_completed_by(frames: &[Value]) -> Result<Option<ToolCall>, AxError> {
     let stopped = frames
         .last()
@@ -69,20 +47,6 @@ pub(crate) fn call_completed_by(frames: &[Value]) -> Result<Option<ToolCall>, Ax
     }
 }
 
-/// The tool call the `content_block_stop` at index `at` completes, read
-/// by the same `block_from` the settled answer is read by, so the call
-/// handed over early and the one in the `ModelReturn` are equal.
-///
-/// `None` when the block at `at` is not a tool call.
-///
-/// What a caller may do with the call before the answer settles is fixed
-/// by `Sprawling/runtime/spec/Turn/Speculation.lean`: start it only when it reads and
-/// no writing call precedes it, keep its result out of the ledger until
-/// the answer settles, and discard it when the answer is cut.
-///
-/// # Errors
-/// `E_PROVIDER` when the arguments stop in the middle of a value, and
-/// `E_WIRE_MISMATCH` when the block is not one this dialect spells.
 fn completed_call(frames: &[Value], at: u64) -> Result<Option<ToolCall>, AxError> {
     let Rebuilt { content, .. } = rebuilt(
         frames
@@ -106,8 +70,6 @@ fn completed_call(frames: &[Value], at: u64) -> Result<Option<ToolCall>, AxError
     }
 }
 
-/// What the frames rebuild into: the blocks in index order, the usage
-/// as last counted, and the stop reason when its frame has arrived.
 struct Rebuilt {
     content: Vec<Value>,
     usage: Value,
@@ -150,8 +112,7 @@ fn rebuilt<'f>(frames: impl Iterator<Item = &'f Value>) -> Result<Rebuilt, AxErr
                 if let Some(said) = delta.get("thinking").and_then(Value::as_str) {
                     text.entry(at).or_default().push_str(said);
                 }
-                // Sent in parts like every other delta, and joined the
-                // same way: the provider verifies the whole string.
+
                 if let Some(said) = delta.get("signature").and_then(Value::as_str) {
                     signature.entry(at).or_default().push_str(said);
                 }
@@ -160,8 +121,7 @@ fn rebuilt<'f>(frames: impl Iterator<Item = &'f Value>) -> Result<Rebuilt, AxErr
                 if let Some(held) = map.get("delta").and_then(|held| held.get("stop_reason")) {
                     stop = held.as_str().map(str::to_owned);
                 }
-                // The output count arrives here rather than at the start,
-                // because it is not known until the model stops.
+
                 if let Some(held) = map.get("usage").and_then(Value::as_object)
                     && let Some(counted) = usage.as_object_mut()
                 {
@@ -229,8 +189,6 @@ mod tests {
     use kernel::DialectKind;
     use serde_json::json;
 
-    /// The frames one thinking block arrives in: the block first, then
-    /// its text, then the signature the provider verifies next turn.
     fn thinking_stream(signature: Option<&str>) -> Vec<serde_json::Value> {
         let mut frames = vec![
             json!({"type": "message_start", "message": {"usage": {"input_tokens": 4}}}),
@@ -251,9 +209,6 @@ mod tests {
         frames
     }
 
-    /// The provider verifies the signature against the reasoning it
-    /// issued, so a stream that dropped it earns a 400 on the next turn
-    /// of the same conversation rather than here.
     #[test]
     fn a_signature_delta_reaches_the_next_turn_byte_for_byte() {
         let settled = settled(&thinking_stream(Some("WaUjzkyp"))).unwrap();
@@ -270,9 +225,6 @@ mod tests {
         );
     }
 
-    /// An empty signature is not a thinking block with less in it: it
-    /// is one this build must not send back. Refusing here names the
-    /// stream that lost it, instead of leaving a 400 next turn.
     #[test]
     fn a_thinking_block_that_lost_its_signature_is_refused_here() {
         let settled = settled(&thinking_stream(None)).unwrap();
@@ -282,8 +234,6 @@ mod tests {
         assert!(!refused.recovery().is_empty());
     }
 
-    /// Anthropic reports an overload that starts mid-answer as an
-    /// `error` frame on a stream that already answered 200.
     #[test]
     fn an_error_frame_mid_stream_is_the_failure_it_reports() {
         let frames = vec![
@@ -300,8 +250,6 @@ mod tests {
         );
     }
 
-    /// Half a tool call is not a tool call with fewer arguments: an
-    /// `exec {}` assembled from a cut stream passes the gates and runs.
     #[test]
     fn tool_arguments_cut_mid_value_are_refused_not_emptied() {
         let frames = vec![
@@ -322,9 +270,6 @@ mod tests {
         );
     }
 
-    /// A tool call is complete when its block stops, not when the
-    /// message does: the call handed over at `content_block_stop` is
-    /// the one the settled answer carries, before any later prose.
     #[test]
     fn a_tool_call_is_handed_over_when_its_block_stops() {
         let frames = vec![

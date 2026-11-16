@@ -3,41 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The face succession shows a model: ask to be replaced by a successor
-//! at the same address, the same depth, and therefore with the same
-//! tools — and the desk that holds the ask until the run freezes.
-//!
-//! **Succession is not delegation.** `delegate` adds one to the depth
-//! and hands part of the work to somebody else; `succeed` hands all of
-//! it to the next run of the same resident, which is why a successor
-//! may still delegate. No person is asked: nothing outside the run's
-//! own room changes, and no depth is added. What bounds a chain of
-//! successions is the hop counter its landing is checked against, in
-//! `Sprawling/accounting/src/worker/driving/owing.rs`, whose ceilings are
-//! recorded in `Sprawling/app/Spec.lean` §8-46-12. `Halt` answers a different
-//! question: it shuts a scope to new work.
-//!
-//! **A request is not a run.** The tool answers with where the successor
-//! will start, not with a result, for the reason `delegate` gives: a run
-//! is built by the assembly layer, and a tool that drove one would be
-//! driving a run from inside another run's tool bench. The desk is read
-//! when the run concludes; a cancelled run is not succeeded.
-
 use kernel::{
     AxCode, AxError, CostTier, Effect, Payload, RenderIntent, Temporal, Tool, ToolCall, ToolDef,
     ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
-/// What a run said when it asked to be replaced.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Succession {
     pub reason: String,
 }
 
-/// Holds at most one ask. A second ask replaces the first, reason
-/// included: the run is replaced once whatever it says, and the last
-/// reason it gave is the one worth keeping.
 #[derive(Debug, Default)]
 pub struct SuccessionDesk {
     asked: Option<Succession>,
@@ -58,25 +34,18 @@ impl SuccessionDesk {
         self.asked.as_ref()
     }
 
-    /// Takes the ask, leaving the desk empty. Called once when the run
-    /// concludes.
     pub fn take(&mut self) -> Option<Succession> {
         self.asked.take()
     }
 }
 
-/// The tool itself.
 pub struct SucceedTool {
     desk: std::sync::Arc<std::sync::Mutex<SuccessionDesk>>,
     meta: ToolMeta,
 }
 
 impl SucceedTool {
-    /// The name, disclosure and schema `new` registers. The catalog page
-    /// reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
+
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut reason = Map::new();
         reason.insert("type".to_owned(), Value::String("string".to_owned()));

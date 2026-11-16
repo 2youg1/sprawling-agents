@@ -3,22 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The handoff probe, asked of a predecessor and of its successor, and
-//! the line that records what survived the crossing.
-//!
-//! `probe` owns the questions and the comparison and is never in
-//! the loop that produces what it measures; this module is that loop.
-//! The first reading is taken over the predecessor's transcript before
-//! it hands over, the second over the successor's frozen prefix before
-//! its first working turn, and the two are compared position by
-//! position. The result is an `eval_run` line carrying both sets of
-//! answers: `lost` says where to look, and a person reads the two
-//! answers themselves rather than a summary of them.
-//!
-//! **A reading that could not be taken is a row of empty answers**, not
-//! an absent reading. The comparison then marks every position lost,
-//! which is the truth about a successor nobody could ask.
-
 use kernel::event::record::EvalRun;
 use kernel::{AxError, EventKind, Ledger, Model, RunId};
 
@@ -28,13 +12,8 @@ use super::{Handover, RunWorker, Site, Stamping};
 
 pub(super) mod probe;
 
-/// The most a probe answer may cost. Four one-line answers do not need
-/// more, and a ceiling is what stops a model that decided to explain
-/// itself from charging a person for the measurement.
 const PROBE_TOKENS: Option<kernel::Ceiling> = kernel::Ceiling::new(256);
 
-/// How the model is asked to answer, so the two readings are shaped
-/// alike enough to be compared: one line per question, in order.
 const PROBE_FRAME: &str = "Answer each numbered question on its own line, in order, in as few \
      words as the question allows. Write nothing else.";
 
@@ -47,9 +26,6 @@ fn questions_block(probe: &probe::Probe) -> String {
     text
 }
 
-/// One line per question, padded with empty strings so the count always
-/// matches: an answer the model did not give is a loss, not a refusal
-/// to compare.
 fn answers_from(said: &str, count: usize) -> Vec<String> {
     let mut answers: Vec<String> = said
         .lines()
@@ -67,8 +43,6 @@ fn answers_from(said: &str, count: usize) -> Vec<String> {
     answers
 }
 
-/// What a model said as plain text, or nothing when it said nothing a
-/// reader could compare.
 fn text_of(returned: &kernel::ModelReturn) -> String {
     kernel::model::content_from_message(&returned.message)
         .ok()
@@ -87,14 +61,7 @@ fn text_of(returned: &kernel::ModelReturn) -> String {
 }
 
 impl RunWorker {
-    /// The first reading: the predecessor asked over its own transcript.
-    ///
-    /// A model that will not answer reads as a row of empty answers and
-    /// the diagnostic log says why; the succession goes on.
-    ///
-    /// # Errors
-    /// Propagates a shipped probe that does not construct, which is a
-    /// build defect rather than a run's.
+
     pub(super) fn probe_before(
         &mut self,
         adapter: Option<&mut super::keeping_warm::Door>,
@@ -153,12 +120,7 @@ impl RunWorker {
 }
 
 impl Site {
-    /// The second reading, over the successor's frozen prefix, and the
-    /// `eval_run` line comparing it with the first.
-    ///
-    /// # Errors
-    /// Propagates a ledger that refuses the line. The model call itself
-    /// never fails this: an unanswerable successor reads as empty.
+
     pub(super) fn probe_after<L: Ledger>(
         &mut self,
         plan: &runtime::RunPlan,
@@ -215,11 +177,6 @@ impl Site {
     }
 }
 
-/// A reading with nothing in it, for a probe nobody could ask.
-///
-/// # Errors
-/// Propagates a shipped probe that does not construct, which is a
-/// build defect rather than a run's.
 fn empty_reading() -> Result<probe::Answers, AxError> {
     let probe = probe::handoff_probe()?;
     let count = probe.questions().len();

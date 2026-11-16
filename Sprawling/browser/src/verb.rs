@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The actions the `browser` tool offers, read from arguments and
-//! turned into frames.
-//!
-//! One action can need more than one frame — opening a page navigates
-//! and then installs the console recorder, a screenshot at a different
-//! scale changes the device pixel ratio first — so the answer is a list.
-//! Nothing here sends anything: the caller owns the socket, and this
-//! module owns which bytes it should put on it.
-
 mod read;
 pub(crate) mod script;
 
@@ -28,9 +19,6 @@ use script::{fetch_script, measure_script, read_references};
 
 pub use script::{complained, read_json};
 
-/// Installs the console recorder. Wrapping rather than replacing keeps
-/// the page's own logging working, which matters because the thing being
-/// developed is often the page.
 const RECORDER_SCRIPT: &str = concat!(
     "(() => { if (window.__sprawling_console) { return 'ready'; } ",
     "window.__sprawling_console = []; ",
@@ -44,25 +32,10 @@ const RECORDER_SCRIPT: &str = concat!(
     "return 'ready'; })()"
 );
 
-/// Reads the recorder back. A string comes home rather than a structure,
-/// because the reply's own value shape is the driver's and a string is
-/// one thing to parse instead of two.
 const CONSOLE_SCRIPT: &str = "JSON.stringify(window.__sprawling_console || [])";
 
-/// How much of an accessible name the page is asked for. A ceiling on
-/// what crosses the socket, not the label a model reads: the snapshot
-/// cuts that to its own handle length.
 const NAME_MAX_JS: usize = 200;
 
-/// Collects the accessibility tree the snapshot reads. Role first,
-/// accessible name second, and nothing else crosses.
-///
-/// The role an element states wins; otherwise the element is looked up
-/// in the table `snapshot` keeps, and an element the table does not
-/// name has no role and is dropped by the snapshot. Generated rather
-/// than written out, because a page that calls a `<select>` something
-/// other than what the filter looks for is a page with no controls in
-/// it.
 fn tree_script() -> String {
     format!(
         "JSON.stringify([...document.querySelectorAll('*')].map(e => {{ \
@@ -76,11 +49,6 @@ fn tree_script() -> String {
     )
 }
 
-/// One thing a run wants the browser to do.
-///
-/// Exhaustive, and each variant is one of the names the tool
-/// offers. A ninth action is a change here, not a string that reaches a
-/// page.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verb {
     Open {
@@ -96,8 +64,7 @@ pub enum Verb {
         references: Vec<String>,
     },
     Survey,
-    /// One address fetched by the open page's own Fetch API and read
-    /// back as text (decision D6 of `Sprawling/browser/Spec.lean`).
+
     Fetch {
         url: String,
     },
@@ -110,16 +77,7 @@ pub enum Verb {
 }
 
 impl Verb {
-    /// The host this call's bytes would leave for, when it names one.
-    ///
-    /// The tool's own grammar answers this, so the bench reads no
-    /// argument name by hand. A URL with no authority —
-    /// `about:blank`, a `file:` path — names no host, so there is no
-    /// egress to judge.
-    ///
-    /// # Errors
-    /// Refuses an authority this build cannot read, which would leave an
-    /// egress unjudged.
+
     pub fn destination(&self) -> Result<Option<String>, AxError> {
         self.address()
             .map(kernel::gate::host_of)
@@ -127,9 +85,6 @@ impl Verb {
             .map(Option::flatten)
     }
 
-    /// The whole address `Open` and `Fetch` name, port included, which is
-    /// what the guard against the city's own listeners reads (D13); the
-    /// other verbs act on the page the tab is already on.
     #[must_use]
     pub fn address(&self) -> Option<&str> {
         match self {
@@ -145,15 +100,6 @@ impl Verb {
         }
     }
 
-    /// The frame an input action becomes once its origin is resolved.
-    ///
-    /// `origin` is `Some` exactly when [`Action::resolves_element`] said
-    /// so; a drag from a point takes the point out of its own arguments
-    /// and needs nothing between the frames.
-    ///
-    /// # Errors
-    /// Refuses an action that is not a pointer action, and a resolved
-    /// origin that does not match the action's own.
     pub fn input_frame(
         &self,
         session: &mut Session,
@@ -220,13 +166,6 @@ impl Verb {
         }
     }
 
-    /// Reads one call's arguments.
-    ///
-    /// # Errors
-    /// Refuses an action name this version does not offer, and a
-    /// required field that is absent or of the wrong kind. Nothing is
-    /// defaulted: a click with no reference is a mistake, and inventing
-    /// one would act on a page nobody named.
     pub fn read(args: &Payload) -> Result<Verb, AxError> {
         let action = text_of(args, "action")?;
         match action.as_str() {
@@ -264,12 +203,6 @@ impl Verb {
         }
     }
 
-    /// The frames this action puts on the wire, in the order they go.
-    ///
-    /// # Errors
-    /// Refuses an action that needs a page nobody has looked at — acting
-    /// and measuring both name references a snapshot minted — and
-    /// propagates the refusals of the frames themselves.
     pub fn frames(
         &self,
         session: &mut Session,
@@ -289,8 +222,7 @@ impl Verb {
                         let Some(reference) = action.reference() else {
                             return Err(origin_mismatch());
                         };
-                        // The page names the element first; the input
-                        // frame follows once its reply arrives.
+
                         crate::act::ensure_fresh(looked, *generation)?;
                         Ok(vec![resolve_frame(session, context, looked, reference)?])
                     } else {
@@ -312,8 +244,7 @@ impl Verb {
                 context,
                 &measure_script(looked_at(snapshot, "measure a page")?, references)?,
             )?]),
-            // The page is measured as it was found: a survey that
-            // forced a theme would report a page nobody was looking at.
+
             Verb::Survey => {
                 Ok(vec![session.evaluate(
                     context,

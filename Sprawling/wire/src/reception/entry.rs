@@ -3,55 +3,37 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Whether one request may knock at this city's door at all, before any
-//! credential is read (`Sprawling/wire/spec/Reception/Entry.lean` §8-94,
-//! wire D54).
-//!
-//! The names and origins a listener answers to are computed once, from
-//! the address it holds, into [`ListenerOrigins`]; the Host check, the
-//! Origin check, the URL a person is given and the residents' browser
-//! guard all read that one value.
-
 use std::net::{IpAddr, SocketAddr};
 
 use kernel::{AxCode, AxError};
 
 use super::Door;
 
-/// The one value `Sec-Fetch-Site` may carry on a request this city
-/// answers. A page on another port of this machine sends `same-site`.
 const SAME_ORIGIN: &str = "same-origin";
 
-/// The port a browser leaves out of `Host` and `Origin`.
 const DEFAULT_HTTP_PORT: u16 = 80;
 
-/// The port a browser leaves out of an `https` address.
 const DEFAULT_HTTPS_PORT: &str = ":443";
 
-/// The names and origins one listener answers to, computed once from
-/// the address it holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListenerOrigins {
     hosts: Hosts,
     url: String,
 }
 
-/// Which `Host` values a listener admits.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Hosts {
-    /// The listener's own names, each with its port, and the origins of
-    /// the pages it serves.
+
     Named {
         names: Vec<String>,
         origins: Vec<String>,
     },
-    /// A listener on every interface: any IP literal with this port, the
-    /// unspecified address itself excepted, and the loopback names.
+
     AnyAddress { port: u16, loopback: Vec<String> },
 }
 
 impl ListenerOrigins {
-    /// The names a listener bound to `local` answers to.
+
     #[must_use]
     pub fn of(local: SocketAddr) -> Self {
         let port = local.port();
@@ -86,9 +68,6 @@ impl ListenerOrigins {
         }
     }
 
-    /// The names the remote listener bound to `local` answers to: its
-    /// loopback names, and the host of `public`, the `https://` address
-    /// its route gave (wire D56).
     #[must_use]
     pub fn routed(local: SocketAddr, public: &str) -> Self {
         let mut listener = Self::of(local);
@@ -101,17 +80,11 @@ impl ListenerOrigins {
         listener
     }
 
-    /// The address a person on this machine opens: `http://127.0.0.1:<port>`
-    /// for a loopback or every-interface listener. One spelling, because a
-    /// browser keeps its device key per origin and a second spelling of
-    /// the same listener is a second origin with no key in it.
     #[must_use]
     pub fn url(&self) -> &str {
         &self.url
     }
 
-    /// Whether `host`, as a request's `Host` header spells it, names this
-    /// listener.
     #[must_use]
     pub fn admits_host(&self, host: &str) -> bool {
         match &self.hosts {
@@ -123,13 +96,6 @@ impl ListenerOrigins {
         }
     }
 
-    /// Whether `origin` is one of this listener's own, for a request whose
-    /// admitted `Host` is `host`.
-    ///
-    /// A named listener admits any of its origins; a listener on every
-    /// interface admits only the origin of the host the request was sent
-    /// to, because "any IP literal" would let a page on another machine of
-    /// the network in.
     #[must_use]
     pub fn admits_origin(&self, origin: &str, host: &str) -> bool {
         match &self.hosts {
@@ -144,17 +110,13 @@ impl ListenerOrigins {
 }
 
 impl Hosts {
-    /// A listener answering to `names`, whose pages are served over
-    /// `http` under the same names.
+
     fn named(names: Vec<String>) -> Self {
         let origins = names.iter().map(|name| format!("http://{name}")).collect();
         Self::Named { names, origins }
     }
 }
 
-/// The host of a route's `https://` address as a browser writes it in
-/// `Host`: lowercase, without `:443`. `None` when the address is not
-/// `https` or has no host (wire D56).
 fn public_name(public: &str) -> Option<String> {
     let (scheme, rest) = public.split_once("://")?;
     let authority = rest.split(['/', '?']).next()?.to_ascii_lowercase();
@@ -165,8 +127,6 @@ fn public_name(public: &str) -> Option<String> {
     (scheme.eq_ignore_ascii_case("https") && !name.is_empty()).then_some(name)
 }
 
-/// The name `host:port`, and the bare name too when the port is the one a
-/// browser leaves out.
 fn spelled(name: &str, port: u16) -> Vec<String> {
     let mut names = vec![format!("{name}:{port}")];
     if port == DEFAULT_HTTP_PORT {
@@ -175,7 +135,6 @@ fn spelled(name: &str, port: u16) -> Vec<String> {
     names
 }
 
-/// An address as a `Host` header writes it: IPv6 in brackets.
 fn literal(ip: IpAddr) -> String {
     match ip {
         IpAddr::V4(v4) => v4.to_string(),
@@ -183,8 +142,6 @@ fn literal(ip: IpAddr) -> String {
     }
 }
 
-/// Whether `host` is an IP literal other than the unspecified address,
-/// carrying `port` (or no port, when `port` is the default one).
 fn ip_literal_on(host: &str, port: u16) -> bool {
     let address = host.parse::<SocketAddr>().ok().or_else(|| {
         (port == DEFAULT_HTTP_PORT)
@@ -200,20 +157,13 @@ fn ip_literal_on(host: &str, port: u16) -> bool {
     address.is_some_and(|address| address.port() == port && !address.ip().is_unspecified())
 }
 
-/// The response headers a listener answers with, as names and values;
-/// the shell turns them into HTTP headers once per listener.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PageHeaders {
     lines: Vec<(&'static str, String)>,
 }
 
 impl PageHeaders {
-    /// The headers every listener answers with: the city's own port and
-    /// the remote listener serve the same page under the same headers
-    /// (wire D20). `connect-src 'self'` admits the page's socket on its
-    /// own host and port, `ws:` from an `http:` page and `wss:` from an
-    /// `https:` one, in every engine that has the WebCrypto Ed25519 a
-    /// paired browser needs.
+
     #[must_use]
     pub fn every_listener() -> Self {
         let policy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; \
@@ -232,15 +182,12 @@ impl PageHeaders {
         }
     }
 
-    /// Every header, in the order it is written.
     #[must_use]
     pub fn lines(&self) -> &[(&'static str, String)] {
         &self.lines
     }
 }
 
-/// The three headers of a request that say who is knocking. One value,
-/// because the entry decision reads all three together.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Presented<'a> {
     pub host: Option<&'a str>,
@@ -248,43 +195,38 @@ pub struct Presented<'a> {
     pub sec_fetch_site: Option<&'a str>,
 }
 
-/// Which route a request arrived at, as the route table names it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Arrival {
-    /// A GET of the client bundle.
+
     Page,
-    /// An `OPTIONS` request at any route.
+
     Preflight,
-    /// The socket upgrade at `/ws`.
+
     Socket,
-    /// One of the HTTP doors that act.
+
     Door(Door),
-    /// `/pair`, `/session/challenge` or `/session`.
+
     Pairing,
 }
 
-/// Who is knocking, once the entry decision has let them knock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Caller {
-    /// A program on this machine: it sends no `Origin`.
+
     Native,
-    /// A page served by this listener.
+
     Browser,
 }
 
-/// The verdict of [`decide_entry`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Entry {
-    /// The client bundle, served with this listener's headers and without
-    /// a credential.
+
     Page,
-    /// A caller who may now present a credential.
+
     Caller(Caller),
-    /// Refused with 403 before anything else happens.
+
     Refused(EntryRefusal),
 }
 
-/// Why a request was refused at the entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntryRefusal {
     ForeignHost,
@@ -295,7 +237,7 @@ pub enum EntryRefusal {
 }
 
 impl EntryRefusal {
-    /// The refusal a person or a program reads.
+
     #[must_use]
     pub fn error(self) -> AxError {
         let (subject, recovery) = match self {
@@ -325,10 +267,6 @@ impl EntryRefusal {
     }
 }
 
-/// Decides whether one request may knock at all, in the order of
-/// `Sprawling/wire/spec/Reception/Entry.lean` §8-94: Host, page, preflight,
-/// Origin, `Sec-Fetch-Site`, then the pairing routes for browsers only.
-/// Pure; the credential is judged after this, by [`super::Keys`].
 #[must_use]
 pub fn decide_entry(
     origins: &ListenerOrigins,
@@ -393,9 +331,6 @@ mod tests {
         Arrival::Pairing,
     ];
 
-    /// The five properties of `Sprawling/wire/spec/Reception/Entry.lean`,
-    /// checked cell by cell over every input the model admits: each host,
-    /// origin and fetch-site class a request can present, at every route.
     #[test]
     fn every_entry_property_holds_over_every_input() {
         let origins = loopback();
@@ -470,9 +405,6 @@ mod tests {
         assert!(!origins.admits_origin("http://10.0.0.5:2501", "192.168.1.10:2501"));
     }
 
-    /// Wire D56: a route may pass the browser's `Host` on or rewrite it
-    /// to the loopback port, and the page on the route sends the public
-    /// `https` origin; anything else is another site.
     #[test]
     fn a_routed_listener_admits_its_loopback_names_and_the_public_name_only() {
         let origins = ListenerOrigins::routed(

@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The throughput bench (`Tools/citysim/spec/Throughput.lean` §8-14): N
-//! runs dispatched at once into N rooms of one building, each taking M
-//! tool calls that alternate a read and a write, against a loopback
-//! provider that holds every model call for the latency arm's time.
-//!
-//! `instrument_throughput` reads the wall clock and is ignored by
-//! `just check`; `throughput_counts` checks the scenario's counts, which
-//! depend on the script alone, so every platform's CI runs it.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -33,23 +24,19 @@ use crate::worker::fixture::*;
 use crate::worker::*;
 use lines::{chosen, wait_line};
 
-/// The run counts the bench reads, unless `SPRAWLING_TP1_RUNS` names others.
 const RUN_COUNTS: [usize; 4] = [1, 4, 16, 64];
-/// Tool calls per run before it answers: half reads, half writes.
+
 const TOOL_CALLS: usize = 4;
-/// The fewest samples a wait needs before its p999 is printed.
+
 const P999_FLOOR: usize = 1_000;
 
 mod lines;
-/// The test city's model-call latencies, `model_called` to
-/// `model_returned`, at p10 through p90 and p95 of 261 calls; p99 and
-/// the max (89 s, 111 s) are left out so that one run does not hold a
-/// reading for two minutes. Taken in turn, one per model call.
+
 const MEASURED_LATENCY_MS: [u64; 10] =
     [991, 1462, 1901, 2753, 3281, 4605, 6409, 8711, 14898, 29415];
-/// The longest a reading may take before it is reported as stuck.
+
 const WITHIN: Duration = Duration::from_secs(30 * 60);
-/// How often the relay sampler sends one append while runs are driving.
+
 const RELAY_BEAT: Duration = Duration::from_millis(2);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,7 +57,6 @@ impl Latency {
         }
     }
 
-    /// What the provider holds the `call`-th model request for.
     fn hold(self, call: usize) -> Duration {
         match self {
             Latency::Zero => Duration::ZERO,
@@ -82,16 +68,12 @@ impl Latency {
     }
 }
 
-/// What one reading of the scenario left: the history, the relay round
-/// trips sampled while it ran, when the runs were posted, and the wall
-/// time from the first post to the last freeze.
 struct Taken {
     lines: Vec<serde_json::Value>,
     relay: Vec<Duration>,
-    /// Relay queue waits and the accounting thread's sleep, µs (§8-98).
+
     relay_queue: Vec<u64>,
-    /// Pure lane waits: a staged run's wait for its lane, µs
-    /// (`Sprawling/app/Spec.lean` §8-46-3).
+
     lane_wait: Vec<u64>,
     idle_us: u64,
     posted_ms: u64,
@@ -138,7 +120,6 @@ fn instrument_throughput() {
     }
 }
 
-/// One reading: `runs` rooms, one run each, all posted at once.
 fn scenario(runs: usize, latency: Latency) -> Taken {
     let dir = tempfile::tempdir().unwrap();
     raise_rooms(dir.path(), runs);
@@ -214,13 +195,10 @@ fn scenario(runs: usize, latency: Latency) -> Taken {
     }
 }
 
-/// A phrase only room `room`'s requests carry.
 fn task(room: usize) -> String {
     format!("tally kiln k{room:02}x")
 }
 
-/// `TOOL_CALLS` calls alternating `status` and an `edit` that creates a
-/// file only this run writes, then the answer.
 fn script(room: usize) -> Vec<String> {
     (0..TOOL_CALLS)
         .map(|call| {
@@ -235,7 +213,6 @@ fn script(room: usize) -> Vec<String> {
         .collect()
 }
 
-/// A city with one building and `runs` rooms in it, under ordinary rules.
 fn raise_rooms(root: &std::path::Path, runs: usize) {
     init_city(root).unwrap();
     for room in 0..runs {
@@ -244,8 +221,6 @@ fn raise_rooms(root: &std::path::Path, runs: usize) {
     lay_rules(root, "lab", &ordinary_rules(""));
 }
 
-/// One relay append every `RELAY_BEAT` until `done`, each timed: the
-/// round trip a lane's append takes while the city is under load.
 fn sample_relay(mut relay: Relay, done: Arc<AtomicBool>) -> std::thread::JoinHandle<Vec<Duration>> {
     std::thread::spawn(move || {
         let mut taken = Vec::new();
@@ -260,7 +235,6 @@ fn sample_relay(mut relay: Relay, done: Arc<AtomicBool>) -> std::thread::JoinHan
     })
 }
 
-/// The same round trips in a city with no run in it.
 fn relay_idle() -> Vec<Duration> {
     let dir = tempfile::tempdir().unwrap();
     raise_rooms(dir.path(), 1);
@@ -296,7 +270,6 @@ fn history(root: &std::path::Path) -> Vec<serde_json::Value> {
         .collect()
 }
 
-/// The history once `runs` runs have frozen.
 fn until_frozen(root: &std::path::Path, runs: usize) -> Vec<serde_json::Value> {
     let started = Instant::now();
     loop {
@@ -323,7 +296,7 @@ fn throughput_line(head: &str, taken: &Taken) -> String {
             .count()
     };
     let runs = count("run_frozen");
-    // The sampler's markers are the one record kind no run writes.
+
     let records = taken.lines.len() - count("city_initialized");
     let tool_calls = count("tool_called");
     let wall_us = taken.wall.as_micros().max(1);
@@ -337,13 +310,12 @@ fn throughput_line(head: &str, taken: &Taken) -> String {
         per_s(records),
         per_s(tool_calls),
         taken.idle_us,
-        // The accounting thread's busy share: the wall it did not sleep.
+
         wall_us.saturating_sub(u128::from(taken.idle_us)) * 1000 / wall_us,
         machine()
     )
 }
 
-/// Each wait the bench reads, in microseconds (§8-14's table).
 fn waits(taken: &Taken, idle: &[Duration]) -> Vec<(&'static str, Vec<u64>)> {
     let micros = |samples: &[Duration]| {
         samples

@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Nightly snapshot identity (`Sprawling/app/spec/Nightly.lean` D105).
-
 use kernel::{AxCode, AxError};
 
 fn refused(tag: &str) -> AxError {
@@ -19,7 +17,6 @@ fn is_lower_hex(text: &str) -> bool {
         .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-/// A UTC-dated tag and the complete main commit it identifies.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NightlyBuild {
     tag: String,
@@ -27,10 +24,7 @@ pub struct NightlyBuild {
 }
 
 impl NightlyBuild {
-    /// Reads the identity carried by a nightly build or release.
-    ///
-    /// # Errors
-    /// When the tag or full source SHA does not satisfy the contract.
+
     pub fn new(tag: &str, source_sha: &str) -> Result<NightlyBuild, AxError> {
         let body = tag.strip_prefix("nightly-").ok_or_else(|| refused(tag))?;
         let (date, commit) = body.split_once('-').ok_or_else(|| refused(tag))?;
@@ -54,12 +48,10 @@ impl NightlyBuild {
         })
     }
 
-    /// The UTC-dated nightly tag, without a curated version number.
     pub fn tag(&self) -> &str {
         &self.tag
     }
 
-    /// The complete source commit used for idempotency and comparison.
     pub fn source_sha(&self) -> &str {
         &self.source_sha
     }
@@ -83,8 +75,7 @@ mod tests {
     fn malformed_identities_are_refused() {
         for (tag, full) in [
             ("v0.0.15-Alpha-261102", SOURCE),
-            // A real month and day carry a full SHA, so the date bounds are
-            // the only thing wrong with these two.
+
             (
                 "nightly-261300-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 SOURCE,

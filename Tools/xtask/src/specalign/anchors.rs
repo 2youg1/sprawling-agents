@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The fifth assertion of `specalign`: every module row's `spec` anchor
-//! resolves to where that module is specified (Tools/xtask/Spec.lean
-//! §8-10 and §8-43).
-//!
-//! A package that has not migrated names a section of its Markdown SPEC,
-//! `<crate>-SPEC.md#8-N`. A package that has migrated names the Lean
-//! module that specifies the row, `Sprawling.browser.spec.Act`, and that
-//! module has to be a file inside the same package: a row cites its own
-//! crate's specification. Which of the two forms a row may use is decided
-//! by one fact, whether the package holds a `Spec.lean`, so a crate never
-//! answers in both.
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -24,10 +12,6 @@ use crate::modmap::{self, Anchor, MAP};
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// What a `<crate>-SPEC.md` cell finds on disk, looked for in every
-/// package directory (Tools/xtask/Spec.lean §8-10). The file name is the
-/// whole address: which directory holds it is cargo's answer, never a
-/// path spelled here.
 enum Spec {
     Text(String),
     Unreadable(String),
@@ -53,14 +37,6 @@ impl Spec {
     }
 }
 
-/// True when `section` labels a section of `spec`.
-///
-/// A SPEC's section 8 is written one of two ways, and both are the real
-/// shape of this tree: a `### 8-N …` heading, or a `// 8-N …` line inside
-/// the one interface fence that is section 8 (browser, protocol, desktop
-/// and parts of web and runtime write it that way). Accepting both is not
-/// a widening — accepting only headings would redden six crates for how
-/// their SPEC has always been written.
 pub(super) fn section_present(spec: &str, section: &str) -> bool {
     spec.lines().any(|line| {
         let trimmed = line.trim_start();
@@ -77,12 +53,6 @@ pub(super) fn section_present(spec: &str, section: &str) -> bool {
     })
 }
 
-/// Every module row's anchor resolves.
-///
-/// Existence is asserted, uniqueness is not: section numbers repeat
-/// inside several Markdown SPECs because successive cards numbered
-/// independently, and renumbering them is its own work (Tools/xtask/Spec.lean
-/// §8-10 records the condition for tightening this).
 pub(super) fn check(root: &Path, violations: &mut Vec<Violation>) -> Result<(), XtaskError> {
     let found = members::members(root)?;
     let dirs: Vec<String> = found.iter().map(|member| member.dir.clone()).collect();
@@ -126,8 +96,6 @@ pub(super) fn check(root: &Path, violations: &mut Vec<Violation>) -> Result<(), 
     Ok(())
 }
 
-/// A migrated crate's anchor: the module it names is a file of that
-/// crate.
 fn lean_part(
     root: &Path,
     anchor: &Anchor,
@@ -154,8 +122,6 @@ fn lean_part(
     ))
 }
 
-/// A Markdown anchor, `<crate>-SPEC.md#8-N`, of a crate that has not
-/// migrated.
 fn markdown_section(
     root: &Path,
     dirs: &[String],
@@ -205,7 +171,6 @@ fn markdown_section(
     }
 }
 
-/// One finding about a module row's anchor, located at that row.
 fn anchored(at: String, rule: &str, violation: String, alternative: &str) -> Violation {
     Violation {
         gate: "specalign",
@@ -232,7 +197,6 @@ mod tests {
         assert!(!section_present("a paragraph mentioning 8-27", "8-27"));
     }
 
-    /// Every violation `check` reports on the fixture, as its text.
     fn found(root: &std::path::Path) -> Vec<String> {
         let mut out = Vec::new();
         let ran = check(root, &mut out);
@@ -241,8 +205,6 @@ mod tests {
         out.into_iter().map(|v| v.violation).collect()
     }
 
-    /// A module row under tools/ is read, and its anchor resolves in the SPEC
-    /// beside its package, which has no section 8-9.
     #[test]
     fn a_relocated_package_has_its_anchors_checked() {
         let root = fixture::relocated("specalign");
@@ -250,8 +212,6 @@ mod tests {
         assert_eq!(found(&root), ["k::a: k-SPEC.md has no section 8-9"]);
     }
 
-    /// A crate that migrated names its parts; a part that is not on disk,
-    /// a part of another crate and a Markdown anchor are each refused.
     #[test]
     fn a_migrated_crate_anchors_its_rows_to_lean_parts_of_its_own() {
         let root = fixture::relocated("specalign-lean");

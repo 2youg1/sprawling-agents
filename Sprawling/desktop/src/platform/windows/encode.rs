@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Pixels scaled by a percentage and encoded as png, jpeg or webp.
-//!
-//! Nothing here touches a desktop, which is the point: what a caller
-//! most easily gets wrong about a screenshot is the size it asked for
-//! and the format it named, and both are decided here where they can be
-//! checked on a machine with no windows at all.
-//!
-//! Two facts about the encoders are the outside world's rather than
-//! ours, and a caller is told about them rather than left to discover
-//! them (`Sprawling/desktop/Spec.lean` §14). This build's webp encoder is **lossless**,
-//! so `quality` does not reach it; and jpeg has no alpha channel, so the
-//! window is composited onto white before it is encoded — which is a
-//! visible choice, not a silent one.
-
 use crate::refusal::{Refusal, RefusalCode};
 use image::codecs::jpeg::JpegEncoder;
 use image::codecs::png::PngEncoder;
@@ -24,9 +10,6 @@ use image::codecs::webp::WebPEncoder;
 use image::imageops::FilterType;
 use image::{ExtendedColorType, ImageEncoder, RgbImage, RgbaImage};
 
-/// What `format` may say. Exhaustive, so a fourth format is a change to
-/// this enum and to the tool schema in one edit rather than a string
-/// that quietly falls through to a default.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Format {
     Png,
@@ -35,8 +18,7 @@ pub(crate) enum Format {
 }
 
 impl Format {
-    /// # Errors
-    /// Refuses a format outside the three the tool schema offers.
+
     pub(crate) fn parse(named: &str) -> Result<Format, Refusal> {
         match named {
             "png" => Ok(Format::Png),
@@ -59,34 +41,19 @@ impl Format {
         }
     }
 
-    /// Whether `quality` means anything to this encoder. `false` is not
-    /// a defect to hide: a caller that asked for quality 10 and got a
-    /// lossless file should be told, or it will read the file size as a
-    /// failure.
     fn honours_quality(self) -> bool {
         matches!(self, Format::Jpeg)
     }
 }
 
-/// The default when a caller names no format: the one that loses
-/// nothing, because a model asking for a picture of a window has not
-/// asked to be shown a worse one.
 pub(crate) const DEFAULT_FORMAT: Format = Format::Png;
 
-/// The default when a caller names no scale: the window's own size.
 pub(crate) const DEFAULT_SCALE: u32 = 100;
 
-/// The default jpeg quality, which is what a caller who named `jpeg` and
-/// nothing else gets.
 pub(crate) const DEFAULT_QUALITY: u8 = 85;
 
-/// The scale domain: a percentage of the window's own pixels, which is a
-/// different quantity from the city's browser tool, where the same word
-/// is a percentage of the device pixel ratio.
 pub(crate) const SCALE_MAX: u32 = 100;
 
-/// What a caller asked for, since the three always travel together and
-/// no one of them decides anything alone.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Wanted {
     pub(crate) format: Format,
@@ -104,27 +71,17 @@ impl Default for Wanted {
     }
 }
 
-/// One encoded picture and the facts a caller reads beside it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Encoded {
     pub(crate) bytes: Vec<u8>,
     pub(crate) mime: &'static str,
-    /// The size that came out, which a `scale` makes differ from the
-    /// size that went in.
+
     pub(crate) width: u32,
     pub(crate) height: u32,
-    /// Whether the encoder dropped nothing, which is also whether a
-    /// `quality` reached it.
+
     pub(crate) lossless: bool,
 }
 
-/// Scales and encodes one window's pixels.
-///
-/// # Errors
-/// Refuses a scale that leaves no pixels, and an encoder that will not
-/// take these bytes. An encoder failure is this server's own defect
-/// rather than the caller's, and the refusal says so instead of blaming
-/// the arguments.
 pub(crate) fn render(pixels: &RgbaImage, wanted: Wanted) -> Result<Encoded, Refusal> {
     let (width, height) = super::geometry::scaled(pixels.width(), pixels.height(), wanted.scale)?;
     let scaled = if (width, height) == (pixels.width(), pixels.height()) {
@@ -141,7 +98,6 @@ pub(crate) fn render(pixels: &RgbaImage, wanted: Wanted) -> Result<Encoded, Refu
     })
 }
 
-/// One image, in one format.
 fn encode(pixels: &RgbaImage, wanted: Wanted) -> Result<Vec<u8>, Refusal> {
     let (width, height) = (pixels.width(), pixels.height());
     let mut bytes: Vec<u8> = Vec::new();
@@ -179,19 +135,10 @@ fn encode(pixels: &RgbaImage, wanted: Wanted) -> Result<Vec<u8>, Refusal> {
     Ok(bytes)
 }
 
-/// The window composited onto white, for an encoder with no alpha
-/// channel.
-///
-/// White rather than black: a window is nearly always a document, and a
-/// transparent corner rendered black reads as a rendering failure to
-/// whoever looks at the picture next.
 fn onto_white(pixels: &RgbaImage) -> RgbImage {
     let mut opaque = RgbImage::new(pixels.width(), pixels.height());
     for (x, y, source) in pixels.enumerate_pixels() {
-        // `channel * alpha + white * (1 - alpha)`, in whole numbers over
-        // a denominator of 255 rather than in floating point: this file
-        // is on no decision path, but a ratio spelled as a float is a
-        // second way of spelling a ratio, and the city has one.
+
         let blend = |channel: u8, alpha: u8| {
             let over = u32::from(channel).saturating_mul(u32::from(alpha));
             let clear = u32::from(u8::MAX.saturating_sub(alpha));
@@ -230,8 +177,6 @@ mod tests {
         })
     }
 
-    /// Each of the three formats writes something, says what it wrote,
-    /// and reports the size it actually produced.
     #[test]
     fn all_three_formats_encode_and_name_themselves() {
         for (format, mime) in [
@@ -253,9 +198,6 @@ mod tests {
         }
     }
 
-    /// The two magic numbers a reader can check by eye, so a format
-    /// mislabelled in the `mime` field would be caught here rather than
-    /// by whoever opened the file.
     #[test]
     fn the_bytes_are_the_format_the_answer_claims() {
         let png = render(&window(8, 8), Wanted::default()).unwrap().bytes;
@@ -283,8 +225,6 @@ mod tests {
         assert_eq!(&webp[8..12], b"WEBP");
     }
 
-    /// `scale` is a percentage of the original, and the answer reports
-    /// the size that came out rather than the size that went in.
     #[test]
     fn a_scale_changes_the_size_and_the_answer_states_the_new_one() {
         let answer = render(
@@ -296,8 +236,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!((answer.width, answer.height), (50, 25));
-        // Scaling to nothing is refused rather than answered with an
-        // empty picture.
+
         let refusal = render(
             &window(8, 8),
             Wanted {
@@ -309,8 +248,6 @@ mod tests {
         assert_eq!(refusal.as_error()["data"]["code"], "E_INVALID_ARGS");
     }
 
-    /// A caller that asked for quality on a lossless encoder is told
-    /// that it did not reach anything.
     #[test]
     fn the_answer_says_whether_quality_reached_the_encoder() {
         let lossy = render(
@@ -337,8 +274,6 @@ mod tests {
         }
     }
 
-    /// A transparent window reaches jpeg as white rather than as black,
-    /// so a corner nobody drew does not read as a rendering failure.
     #[test]
     fn a_transparent_pixel_reaches_a_jpeg_as_white() {
         let clear = RgbaImage::from_pixel(8, 8, image::Rgba([0, 0, 0, 0]));

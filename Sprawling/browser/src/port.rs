@@ -3,33 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The browser seam.
-//!
-//! The port carries frames, not intentions. Everything above it —
-//! which command a snapshot needs, what an action turns into, when a
-//! development loop should look again — is decided by pure code in this
-//! crate; everything below it is one socket somebody else owns.
-//!
-//! That line is where the testability comes from. A WebDriver session
-//! is a long-lived bidirectional connection, and a crate that owned one
-//! would need an async runtime to be tested at all. Here the adapters
-//! are: two transports in the binary (`browser_bidi::socket` and the
-//! lazily started engine that wraps it), and the recording in
-//! [`crate::session`] that replays a conversation offline.
-//!
-//! The transports are what this seam exists for, and no assertion in
-//! this repository runs against them: CI has no browser driver
-//! (ARCHITECTURE.md section 11). What the offline suite proves is the
-//! frame and reply algebra above the seam, which is pure.
-
 use kernel::{AxCode, AxError};
 use serde_json::Value;
 
-/// One request on the wire, already shaped as the remote end expects.
-///
-/// The id is minted by the caller rather than the transport, because a
-/// recorded session has to replay to the same bytes and a transport
-/// that numbered its own frames would renumber them on the way back.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Frame {
     id: u64,
@@ -38,10 +14,7 @@ pub struct Frame {
 }
 
 impl Frame {
-    /// # Errors
-    /// Refuses an empty method and params that are not an object: both
-    /// are refused by the remote end anyway, and refusing here names the
-    /// caller instead of the wire.
+
     pub fn new(id: u64, method: &str, params: Value) -> Result<Frame, AxError> {
         if method.is_empty() {
             return Err(AxError::failure(
@@ -81,9 +54,6 @@ impl Frame {
         &self.params
     }
 
-    /// The bytes that go out. Field order is fixed here rather than left
-    /// to a map's iteration order, so a recorded session compares byte
-    /// for byte on every platform.
     #[must_use]
     pub fn to_wire(&self) -> String {
         let mut out = String::new();
@@ -98,8 +68,6 @@ impl Frame {
     }
 }
 
-/// What came back for one frame. Errors from the remote end are values,
-/// not transport failures: "this page has no such element" is an answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Reply {
     Success {
@@ -114,13 +82,7 @@ pub enum Reply {
 }
 
 impl Reply {
-    /// Reads one line from the remote end.
-    ///
-    /// # Errors
-    /// Refuses anything that is not a JSON object carrying `id` and a
-    /// recognised `type`. A reply this version cannot read is a version
-    /// mismatch, and guessing at it would put invented text in front of
-    /// a model.
+
     pub fn parse(line: &str) -> Result<Reply, AxError> {
         let value: Value = serde_json::from_str(line).map_err(|err| {
             AxError::failure(
@@ -176,12 +138,6 @@ impl Reply {
         }
     }
 
-    /// The result, or the remote end's refusal turned into ours.
-    ///
-    /// # Errors
-    /// Carries the driver's own code and message through, because the
-    /// caller can act on "no such node" and cannot act on "browser said
-    /// no".
     pub fn into_result(self) -> Result<Value, AxError> {
         match self {
             Reply::Success { result, .. } => Ok(result),
@@ -195,24 +151,8 @@ impl Reply {
     }
 }
 
-/// The seam. One method, because a browser session is a request and a
-/// reply however elaborate the thing on the other side is.
-///
-/// Three implementations: `browser_bidi::socket::BidiSocket` and
-/// `browser_bidi::lazy::LazyEngine` in the binary, and
-/// [`crate::session::Recording`] for replay. The two in the binary are
-/// why this is a trait and not one concrete type.
-///
-/// There is no conformance suite behind it: the only adapter that could
-/// run one here is the recording, and it echoes an id by construction,
-/// so the suite would assert nothing. A suite belongs here when a transport can run
-/// it: that needs the reply-routing rule (read past events, match on
-/// id) to live in this crate as pure code, and a socket pair in the
-/// binary's test to drive it.
 pub trait BrowserPort {
-    /// # Errors
-    /// Transport failures only. A refusal from the remote end arrives as
-    /// [`Reply::Error`], which is an answer rather than a fault.
+
     fn send(&mut self, frame: &Frame) -> Result<Reply, AxError>;
 }
 

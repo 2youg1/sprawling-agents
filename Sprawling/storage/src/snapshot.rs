@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The chain-hash snapshot: what a fold held after one line of the
-//! Ledger, with that line's seq and chain hash (`Sprawling/storage/spec/Snapshot.lean` §8-26).
-//!
-//! A projection, never history: a start that finds no snapshot, a
-//! damaged one, or one whose line hash does not match the line on disk
-//! folds the whole ledger, as it did before snapshots existed. That
-//! resuming is sound at all is `Sprawling/storage/spec/Snapshot.lean`'s
-//! `resumeIsWhole`.
-
 use std::path::Path;
 
 use kernel::ledger::chain_hash;
@@ -28,12 +19,9 @@ pub use start::{SnapshotStart, WholeFold, start_from_snapshot, tail_after};
 
 const MAGIC: &[u8; 8] = b"SPRSNAP1";
 const FILE: &str = "chain.snap";
-/// Written whole and synced here first, then renamed over [`FILE`], so a
-/// write torn by a crash never leaves half a snapshot under that name.
+
 const STAGED: &str = "chain.snap.staged";
 
-/// What a fold held after the line at `seq`, and the chain hash that
-/// names that line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChainSnapshot {
     fold_version: u32,
@@ -42,28 +30,23 @@ pub struct ChainSnapshot {
     views: Vec<u8>,
 }
 
-/// Whether the line a positioned read found at the snapshot's seq is
-/// the line the snapshot was cut at.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SnapshotFit {
     Fits,
-    /// Another line sits at that seq: the ledger is not the one the
-    /// snapshot was cut from, so its state must not be resumed.
+
     Stale,
 }
 
-/// What the snapshot directory holds.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StoredSnapshot {
     Absent,
-    /// Bytes that are not a whole snapshot, with the reason; a caller
-    /// discards them and folds the whole ledger.
+
     Damaged(String),
     Present(ChainSnapshot),
 }
 
 impl ChainSnapshot {
-    /// Cut a snapshot after `line`, the raw line (without its `\n`) at `seq`.
+
     pub fn cut(fold_version: u32, seq: Seq, line: &[u8], views: Vec<u8>) -> ChainSnapshot {
         ChainSnapshot {
             fold_version,
@@ -85,13 +68,10 @@ impl ChainSnapshot {
         &self.views
     }
 
-    /// Whether `other` was cut at the same line of the same ledger: the
-    /// same seq and the same chain hash, whatever each fold holds.
     pub fn same_line(&self, other: &ChainSnapshot) -> bool {
         self.seq == other.seq && self.line_hash == other.line_hash
     }
 
-    /// Judge the raw line a positioned read found at [`Self::seq`].
     pub fn fit(&self, line_at_seq: &[u8]) -> SnapshotFit {
         if chain_hash(line_at_seq) == self.line_hash {
             SnapshotFit::Fits
@@ -100,16 +80,10 @@ impl ChainSnapshot {
         }
     }
 
-    /// The chain state after the snapshot's line: the next line must
-    /// carry `prev = line_hash` and the seq after `seq`.
-    ///
-    /// # Errors
-    /// What `Seq::next` says when `seq` is the last seq there is.
     pub fn resume(&self) -> Result<LineCheck, AxError> {
         Ok(LineCheck::after(self.line_hash, self.seq.next()?))
     }
 
-    /// `MAGIC | fold_version u32 LE | seq u64 LE | line_hash | blake3(views) | views`.
     fn encode(&self) -> Vec<u8> {
         let digest = B3Hash::digest(&self.views);
         [
@@ -145,11 +119,6 @@ impl ChainSnapshot {
     }
 }
 
-/// Write `snapshot` into `dir` (created when absent), replacing the one
-/// there.
-///
-/// # Errors
-/// `StorageError::Snapshot` naming the step that failed.
 pub fn write_snapshot(dir: &Path, snapshot: &ChainSnapshot) -> Result<(), StorageError> {
     let mut vfs = RealFs::new();
     let (file, staged) = (dir.join(FILE), dir.join(STAGED));
@@ -168,11 +137,6 @@ pub fn write_snapshot(dir: &Path, snapshot: &ChainSnapshot) -> Result<(), Storag
     vfs.sync_dir(dir).map_err(refused("sync snapshot dir", dir))
 }
 
-/// Read the snapshot `dir` holds.
-///
-/// # Errors
-/// `StorageError::Snapshot` when the file exists and cannot be read; bytes that
-/// are not a snapshot are `StoredSnapshot::Damaged`, not an error.
 pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, StorageError> {
     let file = dir.join(FILE);
     match RealFs::new().read(&file) {
@@ -183,8 +147,6 @@ pub fn read_snapshot(dir: &Path) -> Result<StoredSnapshot, StorageError> {
     }
 }
 
-/// The constructor of a snapshot's I/O failure, as `io_err` is the
-/// ledger's.
 fn refused(op: &'static str, path: &Path) -> impl FnOnce(std::io::Error) -> StorageError {
     let path = path.to_path_buf();
     move |source| StorageError::Snapshot { op, path, source }

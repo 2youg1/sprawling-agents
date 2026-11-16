@@ -3,43 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! ClockStamp: pure formatting of an injected instant against
-//! already-resolved zone offsets, and the one spelling of a moment a
-//! person or a model reads: ISO 8601, UTC, to the second. Nothing here
-//! samples a clock; the calendar is integer arithmetic so replay and
-//! live share one algorithm and no tz database.
-//!
-//! Emission (`StampGate`): `Off` emits never (A18 zero-byte); the first
-//! result of a run emits once; `Timestamped` tools emit every result;
-//! `Timeless` tools emit only when the granularity bucket changed. The
-//! bucket decides how often, never what a stamp says: a stamp always
-//! carries the reading it was given.
-//!
-//! [`ClockReading`] is how a tool face learns what time it is without a
-//! clock of its own (`Sprawling/runtime/spec/Clock.lean` §8-53).
-
 use std::sync::{Arc, Mutex, PoisonError};
 
 use kernel::consts_policy::CLOCK_ZONES_MAX;
 use kernel::{AxCode, AxError, ClockStampGranularity, ClockZone, Temporal, TimeMs};
 
-/// One instant in ISO 8601, UTC, to the second:
-/// `2026-05-14T09:31:07Z`. The clock line and `status` both write a
-/// moment through this; a reader that parses one back belongs beside it.
 pub fn iso(at: TimeMs) -> String {
     format_at(at, 0)
 }
 
-/// The moment `raw` spells in the one shape [`iso`] writes,
-/// `2026-05-14T09:31:07Z`: UTC, to the second. The two are inverses:
-/// `parse_iso(&iso(t))` is `t` with its milliseconds dropped, and
-/// `iso(parse_iso(s)?)` is `s`.
-///
-/// # Errors
-/// `E_INVALID_ARGS` for every other spelling - a zone offset, a fraction
-/// of a second, a date alone, a lowercase `t` or `z`, a day the calendar
-/// does not have, `24:00:00`, a leap second, a moment before 1970 - with
-/// a recovery that shows the shape (`Sprawling/runtime/spec/Clock.lean` §8-10).
 pub fn parse_iso(raw: &str) -> Result<TimeMs, AxError> {
     let refused = || {
         AxError::failure(AxCode::InvalidArgs, "read a UTC moment", raw).with_recovery(
@@ -55,8 +27,6 @@ pub fn parse_iso(raw: &str) -> Result<TimeMs, AxError> {
         .map_err(|_before_1970| refused())
 }
 
-/// Where each separator of `YYYY-MM-DDTHH:MM:SSZ` stands, and each of
-/// its six numbers.
 const ISO_SEPARATORS: [(usize, u8); 6] = [
     (4, b'-'),
     (7, b'-'),
@@ -67,8 +37,6 @@ const ISO_SEPARATORS: [(usize, u8); 6] = [
 ];
 const ISO_FIELDS: [(usize, usize); 6] = [(0, 4), (5, 7), (8, 10), (11, 13), (14, 16), (17, 19)];
 
-/// Year, month, day, hour, minute and second, when `bytes` is exactly
-/// `YYYY-MM-DDTHH:MM:SSZ` with ASCII digits.
 fn civil_fields(bytes: &[u8]) -> Option<[i128; 6]> {
     let shaped = bytes.len() == 20
         && ISO_SEPARATORS
@@ -86,9 +54,6 @@ fn civil_fields(bytes: &[u8]) -> Option<[i128; 6]> {
     Some([year?, month?, day?, hour?, minute?, second?])
 }
 
-/// Milliseconds since 1970 of a civil UTC moment, when the calendar has
-/// that day and the clock that second. Whether the day exists is asked
-/// of `civil_from_days`, so the calendar has one algorithm.
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "every field is at most four decimal digits, so the day count and the \
@@ -108,12 +73,6 @@ fn millis_of([year, month, day, hour, minute, second]: [i128; 6]) -> Option<i128
         .then_some((days * 86_400 + hour * 3_600 + minute * 60 + second) * 1_000)
 }
 
-/// The moments a selection by time keeps: `[since, until)` in UTC, an
-/// absent end left open (`Sprawling/runtime/spec/Clock.lean` §8-57).
-///
-/// It judges one moment at a time and assumes no order: a ledger's `t`
-/// does not rise with `seq`, so a reader asks about every line and never
-/// stops at the first one past `until`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct UtcSpan {
     since: Option<TimeMs>,
@@ -121,10 +80,7 @@ pub struct UtcSpan {
 }
 
 impl UtcSpan {
-    /// # Errors
-    /// `E_INVALID_ARGS` when `until` is not after `since`: such a span
-    /// holds no moment, and selecting by it would read as a stretch of
-    /// history in which nothing happened.
+
     pub fn new(since: Option<TimeMs>, until: Option<TimeMs>) -> Result<UtcSpan, AxError> {
         if let (Some(start), Some(end)) = (since, until)
             && end <= start
@@ -152,15 +108,12 @@ impl UtcSpan {
         self.until
     }
 
-    /// Whether `at` is at or after `since` and before `until`.
     #[must_use]
     pub fn contains(&self, at: TimeMs) -> bool {
         self.since.is_none_or(|since| since <= at) && self.until.is_none_or(|until| at < until)
     }
 }
 
-/// One configured zone's row: the offset it was computed from and the
-/// same second in that zone, `2026-05-14T18:31:07+09:00`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ZoneEntry {
     pub id: String,
@@ -168,9 +121,6 @@ pub struct ZoneEntry {
     pub local: String,
 }
 
-/// The stamp a result envelope carries: the reading itself, and the
-/// rows of the zones the run was frozen with (none, in a real city:
-/// the city refuses `[clock] zones`, `Sprawling/city/Spec.lean` §8-31).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClockStamp {
     pub utc_ms: TimeMs,
@@ -178,8 +128,7 @@ pub struct ClockStamp {
 }
 
 impl ClockStamp {
-    /// The envelope's clock line: `clock: 2026-05-14T09:31:07Z;`, then
-    /// ` <id> <local>;` for each zone.
+
     pub fn render(&self) -> String {
         let mut out = format!("clock: {};", iso(self.utc_ms));
         for zone in &self.zones {
@@ -202,7 +151,6 @@ fn bucket_ms(granularity: ClockStampGranularity) -> Option<u64> {
     }
 }
 
-/// Civil date from days since 1970-01-01 (era-based integer algorithm).
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "era arithmetic on i128: the input is u64 milliseconds plus an i32 offset in \
@@ -223,8 +171,6 @@ fn civil_from_days(days: i128) -> (i128, i128, i128) {
     (year, m, d)
 }
 
-/// `at` in the zone `offset_min` minutes east of UTC, to the second,
-/// with `Z` for UTC itself and `+HH:MM` or `-HH:MM` otherwise.
 #[expect(
     clippy::arithmetic_side_effects,
     reason = "i128 values bounded by u64 milliseconds plus an i32 offset in minutes times \
@@ -256,8 +202,6 @@ fn offset_suffix(offset_min: i32) -> String {
     format!("{sign}{:02}:{:02}", whole / 60, whole % 60)
 }
 
-/// Formats one stamp of the reading `now` and every configured zone.
-/// Zones beyond `CLOCK_ZONES_MAX` are refused, not silently dropped.
 pub fn stamp(now: TimeMs, zones: &[ClockZone]) -> Result<ClockStamp, AxError> {
     CLOCK_ZONES_MAX.admit(zones.len())?;
     Ok(ClockStamp {
@@ -273,8 +217,6 @@ pub fn stamp(now: TimeMs, zones: &[ClockZone]) -> Result<ClockStamp, AxError> {
     })
 }
 
-/// Decides, per tool result, whether a stamp rides the envelope. One
-/// per run, built from the run's frozen configuration.
 #[derive(Debug)]
 pub struct StampGate {
     granularity: ClockStampGranularity,
@@ -283,8 +225,7 @@ pub struct StampGate {
 }
 
 impl StampGate {
-    /// `granularity` and `zones` are the run's `FrozenConfig`
-    /// `clock_stamp` and `clock_zones`.
+
     pub fn new(granularity: ClockStampGranularity, zones: Vec<ClockZone>) -> StampGate {
         StampGate {
             granularity,
@@ -293,7 +234,6 @@ impl StampGate {
         }
     }
 
-    /// The emission rule, in one place.
     pub fn observe(
         &mut self,
         now: TimeMs,
@@ -325,30 +265,15 @@ impl StampGate {
     }
 }
 
-/// The moment a run's driver read its clock last, shared with the tool
-/// faces that report the time (`Sprawling/runtime/spec/Clock.lean` §8-53).
-///
-/// The driver's clock hook is the one sampling point of a run, and a
-/// tool face receives readings rather than sampling: the hook `keep`s
-/// each reading before handing it on, and a command's stamp or
-/// `status`'s `now:` line reads `latest`. What they report is therefore
-/// always some line's `t`. Cloned, it is one cell.
-///
-/// "Not read yet" is a state of its own rather than an integer standing
-/// for one. The lock holds one `Copy` value replaced whole, so a thread
-/// that panicked while holding it cannot have left half a value behind,
-/// and a poisoned lock is read like any other.
 #[derive(Debug, Clone, Default)]
 pub struct ClockReading(Arc<Mutex<Option<TimeMs>>>);
 
 impl ClockReading {
-    /// Records one reading the driver took.
+
     pub fn keep(&self, at: TimeMs) {
         *self.0.lock().unwrap_or_else(PoisonError::into_inner) = Some(at);
     }
 
-    /// The last reading kept; `None` before the driver has read its
-    /// clock.
     #[must_use]
     pub fn latest(&self) -> Option<TimeMs> {
         *self.0.lock().unwrap_or_else(PoisonError::into_inner)
@@ -396,8 +321,7 @@ mod tests {
 
     #[test]
     fn a_zone_row_is_the_same_second_with_its_offset_across_midnight_both_ways() {
-        // 2026-08-01 12:00:07 UTC at +540 is 21:00:07 the same day; at
-        // -780 it crosses back to 23:00:07 of July 31.
+
         let west = ClockZone {
             id: "west".to_owned(),
             offset_min: -780,
@@ -419,8 +343,7 @@ mod tests {
             })
             .collect();
         let err = stamp(TimeMs::new(0), &too_many).unwrap_err();
-        // The refusal is the limit's own, whole: a caller that spelled a
-        // sentence of its own would be a second authority for one limit.
+
         assert_eq!(err, CLOCK_ZONES_MAX.admit(5).unwrap_err());
     }
 
@@ -436,20 +359,19 @@ mod tests {
     #[test]
     fn first_result_emits_once_then_timeless_deduplicates_within_a_bucket() {
         let mut gate = StampGate::new(ClockStampGranularity::Minute, Vec::new());
-        // First result of the run always stamps (even Timeless).
+
         assert!(
             gate.observe(TimeMs::new(1_000), Temporal::Timeless)
                 .unwrap()
                 .is_some()
         );
-        // Same minute bucket: no stamp.
+
         assert!(
             gate.observe(TimeMs::new(30_000), Temporal::Timeless)
                 .unwrap()
                 .is_none()
         );
-        // Next minute: stamps again, with the reading itself - the
-        // bucket decides how often, never what the stamp says.
+
         let s = gate
             .observe(TimeMs::new(61_000), Temporal::Timeless)
             .unwrap()
@@ -457,19 +379,16 @@ mod tests {
         assert_eq!(s.utc_ms, TimeMs::new(61_000));
     }
 
-    /// Every second from 1970 to 9999 is written by `iso` and read back
-    /// by `parse_iso` to the same second; the milliseconds `iso` drops are
-    /// the only difference.
     #[test]
     fn an_iso_moment_reads_back_to_the_second_it_was_written() {
-        let last = 253_402_300_799_999u64; // 9999-12-31T23:59:59.999Z
-        let step = 7_919_999_999u64; // not a whole day, so the sweep walks every hour
+        let last = 253_402_300_799_999u64;
+        let step = 7_919_999_999u64;
         let moments = (0..=last / step).map(|k| k * step).chain([
             0,
             999,
-            951_782_400_000,   // 2000-02-29T00:00:00Z
-            1_709_251_199_999, // 2024-02-29T23:59:59.999Z
-            4_107_542_400_000, // 2100-03-01T00:00:00Z
+            951_782_400_000,
+            1_709_251_199_999,
+            4_107_542_400_000,
             last,
         ]);
         for at in moments {
@@ -486,8 +405,6 @@ mod tests {
         );
     }
 
-    /// Every spelling but the one `iso` writes is refused, and the refusal
-    /// shows the shape it wanted.
     #[test]
     fn parse_iso_refuses_every_spelling_iso_does_not_write() {
         for raw in [
@@ -520,8 +437,6 @@ mod tests {
         }
     }
 
-    /// `[since, until)`: the start is kept, the end is not, and an absent
-    /// end bounds nothing.
     #[test]
     fn a_span_keeps_its_start_and_leaves_out_its_end() {
         let at = TimeMs::new;
@@ -540,8 +455,6 @@ mod tests {
         assert!(UtcSpan::default().contains(at(0)));
     }
 
-    /// A span that holds no moment is refused when it is built, naming
-    /// both ends.
     #[test]
     fn a_span_with_no_moment_in_it_is_refused() {
         let at = TimeMs::new;

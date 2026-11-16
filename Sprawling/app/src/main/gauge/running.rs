@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A command run n times under `gauge`: each run timed from before its
-//! spawn until `wait` sees it exit, its process tree read on a beat
-//! thread meanwhile, and the spread of the runs' wall times at the end
-//! (`Sprawling/app/spec/Main.lean` §8-129-4).
-
 use std::io::Write;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
@@ -21,12 +16,6 @@ use sprawling::serving::standing::monotonic_now;
 
 use super::{ChildPeaks, Every, Host, Run, Running, Watched, emit, lines};
 
-/// Runs the command `running.samples` times, one line per run, then the
-/// spread of their wall times. The first run is kept: it is the cold
-/// one, and the spread shows what it cost.
-///
-/// # Errors
-/// The program cannot be started or waited for; a failed write to `out`.
 pub(super) fn run(
     running: &Running,
     audience: Audience,
@@ -49,9 +38,6 @@ pub(super) fn run(
     emit(out, &lines::spread_line(&spread, failed, host, audience))
 }
 
-/// One run, from before the spawn until `wait` sees the exit. The
-/// command reads nothing and writes to this process's stderr, so stdout
-/// carries readings alone.
 #[expect(
     clippy::disallowed_methods,
     reason = "gauge runs the person's command in the foreground of the person's terminal, where Ctrl+C must reach it (child D4)"
@@ -68,9 +54,7 @@ fn run_once(running: &Running, index: u32) -> Result<Run, AxError> {
     let beating = match Beating::start(child.id(), running.every) {
         Ok(beating) => beating,
         Err(err) => {
-            // The refusal to report is the thread's; a child that
-            // already exited, or will not be stopped, changes nothing
-            // about it.
+
             drop(child.kill().and_then(|()| child.wait()));
             return Err(err);
         }
@@ -96,8 +80,6 @@ fn run_once(running: &Running, index: u32) -> Result<Run, AxError> {
     })
 }
 
-/// The `sprawling-gauge` thread, reading the tree under one run's
-/// process every beat until told to stop or the process is gone.
 struct Beating {
     stop: mpsc::Sender<()>,
     thread: std::thread::JoinHandle<Watched>,
@@ -120,15 +102,12 @@ impl Beating {
             })
     }
 
-    /// Stops the beats and takes what they saw.
     fn stop(self) -> Watched {
-        // A thread that already ended, its root gone, dropped the
-        // receiver; it has nothing more to be told.
+
         match self.stop.send(()) {
             Ok(()) | Err(mpsc::SendError(())) => {}
         }
-        // A beat thread that died measured nothing this run can trust,
-        // which the lines write as null (8-129-4, decision 7).
+
         self.thread.join().unwrap_or(Watched {
             beats: 0,
             seen: None,
@@ -159,9 +138,6 @@ fn beat_until_stopped(root: u32, every: Every, stopped: &mpsc::Receiver<()>) -> 
     }
 }
 
-/// The direct child's peak commit and working set, which Windows keeps
-/// until the child's handle closes; read after `wait`, so exact rather
-/// than a beat's sample.
 #[cfg(windows)]
 fn child_peaks(child: &Child) -> ChildPeaks {
     use std::os::windows::io::AsRawHandle;
@@ -174,13 +150,11 @@ fn child_peaks(child: &Child) -> ChildPeaks {
             private_bytes: widen(counters.peak_pagefile_usage),
             working_set_bytes: widen(counters.peak_working_set_size),
         },
-        // A refused read is a peak nobody measured, written null rather
-        // than 0 (8-129-4, decision 7).
+
         Err(_) => ChildPeaks::UNREAD,
     }
 }
 
-/// Elsewhere the platform keeps no peak this crate can read safely.
 #[cfg(not(windows))]
 fn child_peaks(_child: &Child) -> ChildPeaks {
     ChildPeaks::UNREAD

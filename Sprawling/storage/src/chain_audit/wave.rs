@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One wave of a proof: up to `PROOF_WAVE` segments read whole and their
-//! recorded prefixes hashed side by side, before the walk checks the
-//! chain through them in order (`Sprawling/storage/spec/ChainAudit.lean` §8-37). What a segment's own
-//! bytes decide is all a wave computes; the chain state entering each
-//! segment is the walk's.
-
 use std::path::Path;
 
 use crate::error::{StorageError, io_err};
@@ -16,18 +10,8 @@ use crate::real_fs::RealFs;
 use crate::verified_prefix::{ProofRecords, SegmentRecord};
 use crate::vfs::Vfs;
 
-/// Segments one wave reads side by side, and so the threads it reads them
-/// on, the calling thread being the first (`Sprawling/storage/spec/ChainAudit.lean` §8-37). With
-/// `SEGMENT_ROLL_BYTES` it bounds the bytes a proof holds at once.
 pub(super) const PROOF_WAVE: usize = 8;
 
-/// Reads the segments of one wave side by side, in their order: the first
-/// on this thread, each other one on a scoped thread of its own, every
-/// one joined before this returns.
-///
-/// # Errors
-/// `StorageError::Io` when a segment cannot be read, a thread cannot be
-/// started, or a thread ends without its segment.
 pub(super) fn read_wave(
     dir: &Path,
     wave: &[String],
@@ -60,15 +44,11 @@ pub(super) fn read_wave(
     })
 }
 
-/// One segment as its wave read it: every byte, and the prefix its record
-/// names already hashed when the record may stand in for it.
 pub(super) struct Read {
     pub(super) bytes: Vec<u8>,
     pub(super) hashed: Option<Hashed>,
 }
 
-/// A segment's record, and a hasher that has hashed exactly the `len`
-/// bytes of the prefix it names.
 pub(super) struct Hashed {
     pub(super) record: SegmentRecord,
     pub(super) len: usize,
@@ -76,9 +56,7 @@ pub(super) struct Hashed {
 }
 
 impl Read {
-    /// Reads the segment `name` once and hashes the prefix its record
-    /// names (`SegmentRecord::prefix`); the chain state entering the
-    /// segment is not known yet and is not needed to hash.
+
     fn ahead(
         dir: &Path,
         name: &str,

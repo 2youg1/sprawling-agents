@@ -10,7 +10,6 @@ use kernel::{B3Hash, ImageRef, ImageType, Locator, Payload};
 use serde_json::{Value, json};
 use storage::Cas;
 
-/// A one-pixel PNG.
 const ONE_PIXEL_PNG: [u8; 70] = [
     0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
     0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
@@ -19,9 +18,6 @@ const ONE_PIXEL_PNG: [u8; 70] = [
     0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
 ];
 
-/// The same bytes as base64, the way an MCP image block carries them,
-/// put together from short pieces so the secret gate does not read one
-/// long run of high-entropy text.
 fn one_pixel_png_base64() -> String {
     [
         "iVBORw0KGgoAAAAN",
@@ -45,9 +41,6 @@ fn answer(content: Value) -> ToolOutcome {
     }
 }
 
-/// A converted document longer than the window leaves it whole: the
-/// model reads a substitute with a path to page, the picture beside it
-/// survives, and the move is accounted.
 #[test]
 fn a_long_connector_answer_is_stored_and_paged_rather_than_read_whole() {
     let dir = tempfile::tempdir().unwrap();
@@ -78,7 +71,7 @@ fn a_long_connector_answer_is_stored_and_paged_rather_than_read_whole() {
         window.len() < document.len(),
         "the window is not the document"
     );
-    // "AAAA" is base64 for three zero bytes, which no PNG header reads.
+
     assert_eq!(content[1]["type"], "text");
     assert!(
         content[1]["text"]
@@ -106,9 +99,6 @@ fn a_long_connector_answer_is_stored_and_paged_rather_than_read_whole() {
     assert_eq!(kept, short, "an answer that fits is not touched");
 }
 
-/// A picture a tool answers with reaches the model as a picture, from
-/// the content store, and its base64 never enters the window or the
-/// ledger.
 #[test]
 fn a_picture_block_is_stored_and_travels_as_an_attachment() {
     let dir = tempfile::tempdir().unwrap();
@@ -152,8 +142,6 @@ fn a_picture_block_is_stored_and_travels_as_an_attachment() {
     );
 }
 
-/// A picture this city cannot measure is left out with the reason, as
-/// words the model reads, and none of its bytes reach the window.
 #[test]
 fn a_picture_this_city_cannot_measure_is_left_out_in_words() {
     let dir = tempfile::tempdir().unwrap();
@@ -188,9 +176,6 @@ fn a_picture_this_city_cannot_measure_is_left_out_in_words() {
     );
 }
 
-/// The opening bytes of a wav, which is what a recording's sound block
-/// carries; the connector judges the container by the block's media type
-/// and never decodes the sound.
 const WAVE_HEAD: &[u8] = b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00";
 
 fn sounded(block: Value) -> (ToolOutcome, Cas, tempfile::TempDir) {
@@ -210,11 +195,6 @@ fn sounded(block: Value) -> (ToolOutcome, Cas, tempfile::TempDir) {
     (out, cas, dir)
 }
 
-/// A recording a tool answers with is stored in the content store and
-/// named in the window by its locator, where a tool that reads a
-/// recording can be pointed at it. Its base64 reaches neither the window
-/// nor the ledger, and it is not a picture attachment: the model cannot
-/// hear it (runtime D15).
 #[test]
 fn a_sound_block_is_stored_and_named_by_its_locator() {
     use base64::Engine as _;
@@ -240,10 +220,6 @@ fn a_sound_block_is_stored_and_named_by_its_locator() {
     assert!(!Value::Array(content).to_string().contains(&data));
 }
 
-/// A sound block whose bytes do not decode, or whose media type is not
-/// audio, is left out with the reason, as words the model reads. Which
-/// containers a transcription endpoint takes is the reader's to judge,
-/// not the connector's (runtime D15).
 #[test]
 fn a_sound_this_city_cannot_carry_is_left_out_in_words() {
     for block in [

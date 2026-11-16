@@ -3,20 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Reading the roster out of the source that declares it.
-//!
-//! Everything here answers one question: which `#[kani::proof]`
-//! functions exist, what are they called, and which of them carry a
-//! reason for not being proved. The gate and the two commands live in
-//! the parent module and take this answer as given.
-
 use super::{ATTRIBUTE, EXCUSED, Harness};
 
-/// The module path a file contributes, from its path inside `src/`.
-///
-/// The crate root contributes nothing; a leaf file and a directory's
-/// own `mod` file both contribute that name. A binary root is not a
-/// module path at all.
 pub(super) fn module_base(rel: &str) -> Option<String> {
     let stem = rel.strip_suffix(".rs")?;
     match stem {
@@ -29,9 +17,6 @@ pub(super) fn module_base(rel: &str) -> Option<String> {
     }
 }
 
-/// Every harness one file declares, with its inline module nesting
-/// resolved: the ones in this tree all sit in `#[cfg(kani)] mod
-/// verification`, and that segment is part of the name kani matches.
 pub(super) fn in_file(text: &str, package: &str, rel: &str, base: &str) -> Vec<Harness> {
     let mut out = Vec::new();
     let mut stack: Vec<(String, usize)> = Vec::new();
@@ -96,17 +81,14 @@ pub(super) fn push_segment(path: &mut String, segment: &str) {
     path.push_str(segment);
 }
 
-/// The module a line opens, if it opens one.
 pub(super) fn declared_module(code: &str) -> Option<String> {
     identifier_after(code, "mod")
 }
 
-/// The function a line declares, if it declares one.
 pub(super) fn declared_fn(code: &str) -> Option<String> {
     identifier_after(code, "fn")
 }
 
-/// The identifier following a keyword used as a whole word.
 pub(super) fn identifier_after(code: &str, keyword: &str) -> Option<String> {
     let mut rest = code;
     loop {
@@ -128,9 +110,6 @@ pub(super) fn identifier_after(code: &str, keyword: &str) -> Option<String> {
     }
 }
 
-/// A line with its comments and string literals removed, so brace
-/// counting reads code and not prose. `in_block` carries `/* */` across
-/// lines.
 pub(super) fn strip(line: &str, in_block: &mut bool) -> String {
     let mut out = String::new();
     let mut chars = line.chars().peekable();
@@ -162,8 +141,7 @@ pub(super) fn strip(line: &str, in_block: &mut bool) -> String {
             }
             '"' => in_string = true,
             '\'' => {
-                // A char literal, or a lifetime. Only the literal can
-                // hold a brace, and it is at most three more characters.
+
                 let mut ahead = chars.clone();
                 match ahead.next() {
                     Some('\\') => {

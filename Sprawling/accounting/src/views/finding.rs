@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The files under one address whose name holds a text, found by one
-//! bounded walk of the tree `Query::Listing` reads
-//! (`Sprawling/wire/spec/Answer/Find.lean` §8-82).
-//!
-//! The disk is the authority, as it is for `listing`: an index kept
-//! beside the tree would be a second copy of what the tree says (wire
-//! D19). The walk goes level by level, each level in name order, so the
-//! shallow files come first and two machines answer in one order.
-
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 
@@ -21,17 +12,12 @@ use super::holding::Views;
 use super::prepared::Prepared;
 
 impl Views {
-    /// The walk reads the disk, so it runs after the views are released.
+
     pub(in crate::views) fn find_ask(&self, under: &Address, text: &str) -> Prepared {
         Prepared::Find(self.city_root.clone(), under.clone(), text.to_owned())
     }
 }
 
-/// The files under `under` whose name holds `text`, without regard to
-/// case.
-///
-/// Takes the city root rather than the views: it reads the disk, and
-/// runs after the view lock is released, as `listing_answer` does.
 pub(in crate::views) fn find_answer(
     city_root: &Path,
     under: Address,
@@ -46,8 +32,6 @@ pub(in crate::views) fn find_answer(
     }
 }
 
-/// One level at a time from `root`, each level in name order, until the
-/// tree ends or a bound is reached.
 fn walk(root: &Path, needle: &str) -> (Vec<Address>, wire::Walked) {
     let mut found = Vec::new();
     let mut seen: usize = 0;
@@ -74,10 +58,6 @@ fn walk(root: &Path, needle: &str) -> (Vec<Address>, wire::Walked) {
     (found, wire::Walked::Whole)
 }
 
-/// One directory's names in name order, each with whether it is a
-/// directory to descend into. A link is neither descended into nor
-/// listed, because a link to a parent turns the walk into a circle; a
-/// directory that cannot be read has no names, as `listing` says.
 fn entries(dir: &Path) -> Vec<(String, bool)> {
     let Ok(read) = std::fs::read_dir(dir) else {
         return Vec::new();
@@ -119,9 +99,6 @@ mod tests {
         std::fs::write(path, b"x").unwrap();
     }
 
-    /// A name matches without regard to case, a directory's own name
-    /// never does, the repository's metadata is not walked, and the
-    /// shallow file comes before the deep one.
     #[test]
     fn the_files_whose_name_holds_the_text_come_shallow_first() {
         let dir = tempfile::tempdir().unwrap();
@@ -146,8 +123,6 @@ mod tests {
         );
     }
 
-    /// More matches than one answer carries: the answer stops at the
-    /// bound and says the walk was cut.
     #[test]
     fn more_matches_than_the_bound_are_cut_and_say_so() {
         let dir = tempfile::tempdir().unwrap();
@@ -164,8 +139,6 @@ mod tests {
         assert_eq!(answer.walked, wire::Walked::Cut);
     }
 
-    /// An address with nothing under it is an empty answer, not a
-    /// refusal: the page asked about a tree, and that tree is empty.
     #[test]
     fn a_missing_address_finds_nothing_and_walked_it_whole() {
         let dir = tempfile::tempdir().unwrap();

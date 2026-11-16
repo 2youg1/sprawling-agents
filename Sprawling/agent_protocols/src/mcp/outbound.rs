@@ -3,51 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! MCP outbound: one line per request.
-
 use kernel::{AxCode, AxError, TimeoutMs};
 use serde_json::Value;
 
 pub const EXTERNAL_CALL_PATIENCE: TimeoutMs = TimeoutMs(60_000);
 
-/// The wire this module speaks over. Adapters: [`crate::McpLink`] over
-/// stdio, HTTP or SSE, and [`ScriptedOutbound`] for replay.
-///
-/// A request and a notification, both synchronous, because a tool call is a question
-/// with an answer. Where the bytes go and how long they take belongs to
-/// the adapter. `Send`, because the tool that holds one is `Send`
-/// (`Sprawling/app/Spec.lean` §8-44).
 pub trait Outbound: Send {
-    /// Sends one JSON-RPC line and returns the line that answered it,
-    /// giving up after `patience`.
-    ///
-    /// The deadline is an argument rather than a property of the
-    /// transport because it is the tool's declared timeout: a
-    /// `TimeoutMs` in a registration promises the call can be given up
-    /// on, and a promise nobody executes is decoration.
-    ///
-    /// # Errors
-    /// Transport failures and the deadline. A server's own refusal comes
-    /// back as a JSON-RPC error inside a successful exchange.
+
     fn call(&mut self, line: &str, patience: TimeoutMs) -> Result<String, AxError>;
 
-    /// Sends one JSON-RPC notification and does not wait for an answer,
-    /// because a notification has none.
-    ///
-    /// Separate from [`Outbound::call`] rather than folded into it: over
-    /// HTTP a notification is answered with 202 and an empty body, so a
-    /// caller that read it as a request would refuse a correct server
-    /// for having said nothing.
-    ///
-    /// # Errors
-    /// Transport failures and the deadline.
     fn notify(&mut self, line: &str, patience: TimeoutMs) -> Result<(), AxError>;
 }
 
-/// The protocol revision this client speaks.
-///
-/// A constant that follows the outside world: the specification names
-/// the revision by date, and a server answering with a different one has
 pub fn digits_for_floats(value: Value) -> Value {
     match value {
         Value::Number(n) if !n.is_i64() && !n.is_u64() => Value::String(n.to_string()),
@@ -61,11 +28,6 @@ pub fn digits_for_floats(value: Value) -> Value {
     }
 }
 
-/// The second adapter: answers somebody already collected.
-///
-/// Keyed by the request's method and params rather than by arrival
-/// order, so a run that legitimately reorders two independent calls
-/// still replays.
 #[derive(Debug, Default)]
 pub struct ScriptedOutbound {
     answers: std::collections::BTreeMap<String, String>,
@@ -78,11 +40,6 @@ impl ScriptedOutbound {
         ScriptedOutbound::default()
     }
 
-    /// Records the answer for a request line, ignoring its id.
-    ///
-    /// # Errors
-    /// Refuses a request line it cannot read, since a key derived from
-    /// an unreadable line would never match anything.
     pub fn answer(&mut self, request: &str, answer: &str) -> Result<(), AxError> {
         self.answers.insert(key_of(request)?, answer.to_owned());
         Ok(())
@@ -108,11 +65,7 @@ fn key_of(request: &str) -> Result<String, AxError> {
 }
 
 impl Outbound for ScriptedOutbound {
-    // A recorded answer is instant, so the deadline has nothing to bound
-    // here; it stays in the signature because the seam, not the adapter,
-    // is what the tool's declared timeout travels through.
-    // A notification is recorded as having been sent and nothing more:
-    // there is no answer to script.
+
     fn notify(&mut self, line: &str, _patience: TimeoutMs) -> Result<(), AxError> {
         key_of(line).map(|_| ())
     }

@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The files one package compiles outside a test build, and every
-//! `include!`, `include_str!` and `include_bytes!` written in them.
-//!
-//! Module files are found by the rules of the Rust reference's "Modules"
-//! chapter: a `mod` without `#[path]` sits in the declaring file's module
-//! directory - the file's own directory for a crate root, a `mod.rs` or
-//! a file loaded through `#[path]`, a directory named for the file
-//! otherwise - and a `#[path]` is joined onto the declaring file's own
-//! directory, with the names of any inline modules around it in between.
-
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -26,44 +16,31 @@ use crate::members::Member;
 use crate::report::XtaskError;
 use crate::walk;
 
-/// The three macros that compile a file's bytes into the crate.
 const INCLUDES: [&str; 3] = ["include", "include_str", "include_bytes"];
 
-/// One call of an [`INCLUDES`] macro, where it is written and what it
-/// reads.
 pub(super) struct Include {
-    /// Repo-relative, `/`-separated.
+
     pub(super) file: String,
     pub(super) line: usize,
-    /// The argument as written, for the report.
+
     pub(super) written: String,
     pub(super) target: Target,
 }
 
-/// What an [`Include`] reads.
 pub(super) enum Target {
-    /// A file, its `.` and `..` resolved by spelling.
+
     Path(PathBuf),
-    /// Under `OUT_DIR`, which the build script wrote.
+
     BuildOutput,
-    /// An argument the gate cannot read a path out of, as written.
+
     Unread(String),
 }
 
-/// One module file still to be read, and the directory its own
-/// file-backed `mod` declarations resolve in.
 struct Module {
     file: PathBuf,
     children: PathBuf,
 }
 
-/// Every [`Include`] in the files `member` compiles when it is built
-/// from its archive.
-///
-/// # Errors
-/// When a module file cannot be read or does not parse, and when a
-/// `mod` declaration names a file that is not there: the gate then
-/// cannot say what the package compiles.
 pub(super) fn includes(root: &Path, member: &Member) -> Result<Vec<Include>, XtaskError> {
     let package = normal(&root.join(&member.dir));
     let mut pending: Vec<Module> = member
@@ -101,7 +78,6 @@ pub(super) fn includes(root: &Path, member: &Member) -> Result<Vec<Include>, Xta
     Ok(found)
 }
 
-/// A crate root's submodules sit beside it.
 fn crate_root(file: &Path) -> Module {
     Module {
         file: file.to_path_buf(),
@@ -113,19 +89,18 @@ fn parent(file: &Path) -> PathBuf {
     file.parent().map(Path::to_path_buf).unwrap_or_default()
 }
 
-/// One module file, read for its includes and its submodules.
 struct Reader<'a> {
     package: &'a Path,
     rel: String,
-    /// The directory this file is in.
+
     here: PathBuf,
-    /// The directory its file-backed submodules resolve in.
+
     children: PathBuf,
-    /// The inline `mod name { … }` blocks the visit is inside.
+
     inline: Vec<String>,
     found: &'a mut Vec<Include>,
     pending: &'a mut Vec<Module>,
-    /// The first declaration whose file is not there.
+
     missing: Option<XtaskError>,
 }
 
@@ -172,15 +147,14 @@ impl<'ast> Visit<'ast> for Reader<'_> {
 }
 
 impl Reader<'_> {
-    /// The file a `mod name;` declaration loads.
+
     fn declared(&self, attrs: &[syn::Attribute], name: &str) -> Result<Module, XtaskError> {
         let inner = self
             .inline
             .iter()
             .fold(self.children.clone(), |dir, segment| dir.join(segment));
         let candidates = match path_attribute(attrs) {
-            // A path outside any inline block is the declaring file's
-            // own directory's; inside one, the inline names come first.
+
             Some(path) if self.inline.is_empty() => vec![self.here.join(path)],
             Some(path) => vec![inner.join(path)],
             None => vec![
@@ -195,9 +169,7 @@ impl Reader<'_> {
                 file: self.rel.clone(),
                 msg: format!("`mod {name};` names no file this gate can find"),
             })?;
-        // A file loaded through `#[path]` resolves its own submodules
-        // beside itself, as a `mod.rs` does; any other file in a
-        // directory named for it.
+
         let children = match path_attribute(attrs) {
             Some(_) => parent(&file),
             None => inner.join(name),
@@ -205,8 +177,6 @@ impl Reader<'_> {
         Ok(Module { file, children })
     }
 
-    /// Every include call nested in a macro's tokens, which the syntax
-    /// tree leaves unparsed: `format!("{}", include_str!(…))`.
     fn nested(&mut self, tokens: TokenStream) {
         let trees: Vec<TokenTree> = tokens.into_iter().collect();
         for tree in &trees {
@@ -240,10 +210,6 @@ impl Reader<'_> {
     }
 }
 
-/// What an include call's argument reads: a literal is joined onto the
-/// directory of the file it is written in, `concat!(env!("OUT_DIR"), …)`
-/// is the build script's output, and `concat!(env!("CARGO_MANIFEST_DIR"),
-/// …)` is joined onto the package's directory.
 fn target(args: TokenStream, here: &Path, package: &Path) -> Target {
     let shown = args.to_string();
     let Ok(argument) = syn::parse2::<syn::Expr>(args) else {
@@ -272,7 +238,6 @@ fn target(args: TokenStream, here: &Path, package: &Path) -> Target {
     Target::Unread(shown)
 }
 
-/// The value of a string literal expression.
 fn literal(expr: &syn::Expr) -> Option<String> {
     if let syn::Expr::Lit(found) = expr
         && let syn::Lit::Str(text) = &found.lit
@@ -282,7 +247,6 @@ fn literal(expr: &syn::Expr) -> Option<String> {
     None
 }
 
-/// The variable an `env!("NAME")` expression reads.
 fn environment(expr: &syn::Expr) -> Option<String> {
     if let syn::Expr::Macro(called) = expr
         && called.mac.path.is_ident("env")
@@ -293,7 +257,6 @@ fn environment(expr: &syn::Expr) -> Option<String> {
     None
 }
 
-/// The value of a `#[path = "…"]` attribute.
 fn path_attribute(attrs: &[syn::Attribute]) -> Option<String> {
     attrs
         .iter()

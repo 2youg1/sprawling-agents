@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What `tool` answers to `list`, `find` and `detail` (runtime D22,
-//! D110): the namespaces and their members, the closest capabilities to
-//! a few words by a fixed grading of where each word was found, and an
-//! admitted capability's whole guide by its whole name.
-
 use std::collections::BTreeMap;
 
 use kernel::{AxCode, AxError, ReservedNamespace};
@@ -16,25 +11,19 @@ use serde_json::Value;
 use super::{Catalog, Expansion, Filed, dormant};
 use crate::tools::ToolTool;
 
-/// How many capabilities one `find` lists at most.
 pub const FIND_HITS: usize = 8;
 
-/// The most bytes one `list` of a namespace spends on hints; past it the
-/// members are listed by name alone, because a server of two hundred
-/// tools would otherwise answer with a page nobody reads.
 pub const LIST_CEILING: usize = 4096;
 
-/// How a word was found in one capability, best first. Each word counts
-/// the best grade it reaches; a capability's score is the sum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Grade {
-    /// The text: description, parameter names, parameter descriptions.
+
     Text,
-    /// Somewhere inside the name.
+
     Inside,
-    /// The start of the name or of its member part.
+
     Prefix,
-    /// The whole name, or the whole member part.
+
     Exact,
 }
 
@@ -49,7 +38,6 @@ impl Grade {
     }
 }
 
-/// One capability as `find` grades it.
 struct Candidate<'a> {
     namespace: &'a str,
     label: String,
@@ -59,10 +47,7 @@ struct Candidate<'a> {
 }
 
 impl Catalog {
-    /// What `tool` `list` answers: every namespace with its member count
-    /// and hint when `namespace` is `None`, and otherwise each member of
-    /// that namespace by name and hint, by name alone past
-    /// [`LIST_CEILING`].
+
     #[must_use]
     pub fn list(&self, namespace: Option<&str>) -> String {
         let Some(asked) = namespace.map(str::trim) else {
@@ -107,12 +92,9 @@ impl Catalog {
             .collect()
     }
 
-    /// What `tool` `find` answers: at most [`FIND_HITS`] capabilities
-    /// ranked by where `query`'s words were found, grouped by namespace.
     #[must_use]
     pub fn find(&self, query: &str) -> String {
-        // A name joins its words with `_`, so `_` stays inside a word and
-        // every other mark a model writes around one is dropped.
+
         let words: Vec<String> = query
             .split(|c: char| !(c.is_alphanumeric() || c == '_'))
             .filter(|word| !word.is_empty())
@@ -151,19 +133,6 @@ impl Catalog {
         out
     }
 
-    /// What `tool` `detail` answers for `asked`: the guide of the
-    /// capability it names.
-    ///
-    /// A tool's guide is its description and input schema as registered,
-    /// unshortened, with how to run it; a skill's is its line and the
-    /// name `read` opens it by, because `read` is the one door that
-    /// opens a shelf; the mode and developer entries answer their own
-    /// text.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` for a name nothing admitted here answers to,
-    /// with the closest names, and a tool schema that does not print as
-    /// JSON, which its registration already printed once.
     pub fn detail(&self, asked: &str) -> Result<String, AxError> {
         let asked = asked.trim();
         if let Some(filed) = self.tools.get(asked) {
@@ -189,7 +158,7 @@ impl Catalog {
                 filed.def.description
             ));
         }
-        // The index spells a skill `skill <name>`; either spelling names it.
+
         let skill = asked.strip_prefix("skill ").unwrap_or(asked);
         if let Some(admitted) = self.skills.get(skill) {
             return Ok(format!(
@@ -217,8 +186,6 @@ impl Catalog {
         .with_recovery("`tool` `find` a few words of what you need, then `detail` a name it gives"))
     }
 
-    /// Every admitted capability `find` grades: the tools, core included,
-    /// then the skills.
     fn candidates(&self) -> Vec<Candidate<'_>> {
         self.tools
             .iter()
@@ -240,8 +207,6 @@ impl Catalog {
     }
 }
 
-/// A tool's text as `find` reads it, lowercased: its description, and the
-/// name and description of each top-level parameter.
 fn searchable(filed: &Filed) -> String {
     let parameters = filed
         .def
@@ -263,8 +228,6 @@ fn searchable(filed: &Filed) -> String {
     format!("{} {parameters}", filed.def.description).to_lowercase()
 }
 
-/// How well `candidate` answers `words`: each word counts the weight of
-/// the best [`Grade`] it reaches, and a word found nowhere counts nothing.
 fn score(words: &[String], candidate: &Candidate<'_>) -> u32 {
     let label = candidate.label.to_lowercase();
     let member = candidate.member.to_lowercase();
@@ -275,7 +238,6 @@ fn score(words: &[String], candidate: &Candidate<'_>) -> u32 {
         .fold(0, u32::saturating_add)
 }
 
-/// The best grade `word` reaches in one capability, if any.
 fn grade(word: &str, label: &str, member: &str, text: &str) -> Option<Grade> {
     if word == label || word == member {
         Some(Grade::Exact)

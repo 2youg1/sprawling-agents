@@ -3,66 +3,30 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `cargo xtask wire-ts [--write]`: the TypeScript client's wire types,
-//! generated from the Rust wire so both ends of the socket have one
-//! authority (Sprawling/wire/Spec.lean section 8-16).
-//!
-//! Without `--write` this is a comparison: the file on disk against the
-//! text the wire produces now, refused at the first line that differs.
-//! With `--write` it is the only file this command ever writes: a gate
-//! that generates its own record and then holds the tree to it.
-
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
 
 mod emit;
 
-/// Where the generated file lives, relative to the repository root.
-/// The directory is `walk`'s one spelling of it; only the file name is
-/// this generator's to choose.
 const TARGET: &str = concat!(crate::walk::client_src!(), "/wire.ts");
 
-/// What the generated file states before any type: the wire version
-/// both ends compare, the schema hash the server checks, the run
-/// identity a city-level record carries, the body size floor, the default
-/// thinking level and the slash verbs. Values that always travel together
-/// and are never chosen independently, so they travel as one.
 pub(super) struct Constants {
     pub(super) wire_v: u32,
     pub(super) hash: String,
-    /// `kernel::RunId::CITY`, the nil uuid. The client used to write it
-    /// out by hand, and a client that spells this identity differently
-    /// folds every city-level record into a run that does not exist.
+
     pub(super) city_run: String,
-    /// `wire::BODY_PX_MIN`, the smallest body size `wire::BodyPx`
-    /// admits; the appearance page's box reads this floor rather than a
-    /// copy of its own.
+
     pub(super) body_px_min: u32,
-    /// `wire::LINE_HEIGHT_MIN`, the smallest line box `wire::LineHeight`
-    /// admits, in thousandths of the font size, and
-    /// `wire::TRACKING_MIN`, the tightest spacing `wire::Tracking`
-    /// admits, in thousandths of an em. The two boxes beside the body
-    /// size's read these floors rather than copies of their own.
+
     pub(super) line_height_min: u32,
     pub(super) tracking_min: i32,
-    /// `kernel::consts_policy::DEFAULT_EFFORT` as the wire spells it: the
-    /// level a request uses when nobody stated one the model offers. The
-    /// picker marks the level a request would use, and a copy of its own
-    /// would mark a level the city no longer sends.
+
     pub(super) default_effort: &'static str,
-    /// `wire::Slash::ALL`, one row per verb: spelling, argument, where it
-    /// is offered, and the sentence that explains it. The client's own
-    /// table reads these rather than spelling a verb a second time.
+
     pub(super) slash: Vec<[&'static str; 4]>,
 }
 
-/// The text the wire produces now.
-///
-/// The three constants come from the types that define them rather than
-/// from anything written here: the city's own run identity is
-/// `kernel::RunId::CITY`, and a client that spelled that nil uuid itself
-/// would fold every city-level record into a run that does not exist.
 fn render() -> Result<String, XtaskError> {
     let constants = Constants {
         wire_v: wire::WIRE_V,
@@ -119,7 +83,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     }])
 }
 
-/// `cargo xtask wire-ts --write`: the one file this command writes.
 pub(crate) fn write(root: &Path) -> Result<String, XtaskError> {
     let text = render()?;
     let path = root.join(TARGET);
@@ -136,9 +99,6 @@ pub(crate) fn write(root: &Path) -> Result<String, XtaskError> {
     Ok(format!("written: {TARGET}\n"))
 }
 
-/// The first line where two texts part: its one-based number, what was
-/// expected there, and what was found. A text that ends early is found
-/// to have an empty line where the other goes on.
 fn first_difference(expected: &str, actual: &str) -> Option<(usize, String, String)> {
     let mut wanted = expected.lines();
     let mut found = actual.lines();

@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Frozen prefix assembly: four segments, assembled
-//! once at Run start, never reassembled within the Run. Volatile types
-//! (TimeMs, usage, signals) have no conversion into `FrozenSegment` — the
-//! absence of those impls is the isolation guarantee (15.3-4).
-
 use std::collections::BTreeSet;
 
 use kernel::consts_policy::{BYTES_PER_TOKEN, PREFIX_SLOTS, STARTUP_BUDGET_TOKENS};
@@ -27,21 +22,14 @@ pub use breakpoint::{Breakpoint, BreakpointPlan};
 pub(crate) use segment::ANOTHER_ADDRESS;
 pub use segment::{FrozenSegment, SegmentSlot, SegmentSource};
 
-/// Documents inside one segment join on this separator; the rebuilder
-/// (replay) reuses it — one authority for the concatenation rule.
 pub(crate) const DOC_JOIN: &str = "\n\n";
 
-/// One prefix source document: address plus its frozen bytes, `None`
-/// when missing or unreadable (the skip itself is accounted).
 #[derive(Debug, Clone)]
 pub struct SourceDoc {
     pub addr: Address,
     pub bytes: Option<Vec<u8>>,
 }
 
-/// Per-slot byte budgets in bytes, converted from a token budget at
-/// [`BYTES_PER_TOKEN`] and divided across [`PREFIX_SLOTS`]. Callers
-/// derive them from config; the default splits the startup budget.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SegmentCaps {
     pub city: u64,
@@ -62,7 +50,6 @@ impl SegmentCaps {
     }
 }
 
-/// The four source lists plus caps: everything `build_prefix` needs.
 #[derive(Debug, Clone)]
 pub struct PrefixPlan {
     pub city: Vec<SourceDoc>,
@@ -72,11 +59,6 @@ pub struct PrefixPlan {
     pub caps: SegmentCaps,
 }
 
-/// Builds the four segments from source documents: UTF-8 only, per-slot
-/// caps with explicit truncation markers, cross-slot dedup by address
-/// (first slot wins), skips accounted in the notes. The notes travel
-/// inside the returned prefix and surface in `prompt_assembled` — they
-/// are what makes the prefix offline-rebuildable (A15, C16).
 pub fn build_prefix(plan: PrefixPlan) -> Result<FrozenPrefix, AxError> {
     let mut seen: BTreeSet<String> = BTreeSet::new();
     let mut skipped = Vec::new();
@@ -172,18 +154,14 @@ fn build_segment(
             continue;
         }
         let kept = elision::boundary_before(body, remaining.saturating_sub(worst_marker));
-        // The kept bytes, the marker and the count it carries are one
-        // assembly, and `elision` owns it: a tail cut spelled again here
-        // is how a marker and its number come apart.
+
         let cut = elision::splice(body, kept, body.len(), Elided::Tail);
         if joiner > 0 {
             text.push_str(DOC_JOIN);
         }
         text.push_str(&cut.text);
         seen.insert(addr.clone());
-        // `boundary_before` answers a char boundary inside `body`, so
-        // the span is always there; a refusal names the document if
-        // that contract ever breaks rather than hashing the wrong span.
+
         let kept_bytes = body.as_bytes().get(..kept).ok_or_else(|| {
             AxError::failure(
                 AxCode::InvalidArgs,
@@ -204,37 +182,22 @@ fn build_segment(
     ))
 }
 
-/// The same assertion over the copy of the segments a request carries:
-/// four cache-marked system blocks, hashed and compared against the
-/// hashes the run froze. The request is what the provider reads, so this
-/// is the check that the wire form and the record agree.
-///
-/// **The judgement lives in `prefix/segment.rs`**, next to the bytes it
-/// hashes; this line is the path a caller uses.
 pub use segment::verified_system_hashes;
 
-/// The assembled prefix: city, building, resident, run — in that order,
-/// enforced at the only constructor.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrozenPrefix {
     city: FrozenSegment,
     building: FrozenSegment,
     resident: FrozenSegment,
     run: FrozenSegment,
-    /// What each slot left out, in slot order, as `build_prefix` found
-    /// it. `None` is a prefix assembled from bytes the caller already
-    /// held, which skipped nothing because it was never offered a list
-    /// of documents.
+
     skipped: Option<Vec<Vec<PromptSkip>>>,
-    /// The tool table the requests carry beside these four segments, as
-    /// the catalog recorded it. `None` for a prefix assembled without a
-    /// catalog, whose record then names no table.
+
     tools: Option<PromptTools>,
 }
 
 impl FrozenPrefix {
-    /// Slot order is the type: a segment in the wrong position is
-    /// `E_INVALID_ARGS` (fail-closed, never silently reordered).
+
     pub fn assemble(
         city: FrozenSegment,
         building: FrozenSegment,
@@ -267,9 +230,6 @@ impl FrozenPrefix {
         })
     }
 
-    /// This prefix, recording `tools` as the table its requests carry
-    /// (`Sprawling/runtime/spec/Catalog.lean` §8-60). Frozen with the prefix,
-    /// so every turn's `prompt_assembled` names the same table.
     #[must_use]
     pub fn with_tools(self, tools: PromptTools) -> FrozenPrefix {
         FrozenPrefix {
@@ -278,11 +238,6 @@ impl FrozenPrefix {
         }
     }
 
-    /// The wire form of the frozen prefix: four system blocks, each
-    /// carrying the edge breakpoint [`BreakpointPlan::marks_edge`] gives
-    /// its slot.
-    /// Segments must be UTF-8 (build_prefix guarantees it; hand-built
-    /// test prefixes must comply to reach the wire).
     pub fn system_blocks(&self) -> Result<Vec<SystemBlock>, AxError> {
         self.segments()
             .iter()
@@ -309,9 +264,6 @@ impl FrozenPrefix {
             .collect()
     }
 
-    /// How many leading system blocks every resident of this building
-    /// carries: the slots [`SegmentSlot::shared_by_building`] answers
-    /// for, counted from the front (`Sprawling/runtime/spec/Prefix.lean` D97).
     pub fn shared_part(&self) -> kernel::SharedPrefix {
         std::num::NonZeroUsize::new(
             self.segments()
@@ -338,16 +290,6 @@ impl FrozenPrefix {
         ]
     }
 
-    /// The four segment hashes, recomputed from the bytes that will be
-    /// sent and checked against the hashes recorded at assembly.
-    ///
-    /// [`segment_hashes`](Self::segment_hashes) answers with the values
-    /// fixed at construction, and nothing in the tree compared them
-    /// against the bytes. A turn that recalculates here cannot send
-    /// bytes the recorded prefix does not describe.
-    ///
-    /// # Errors
-    /// A segment whose bytes no longer hash to what the run froze.
     pub fn verified_segment_hashes(&self) -> Result<[B3Hash; 4], AxError> {
         let [city, building, resident, run] = self.segments();
         Ok([
@@ -358,20 +300,6 @@ impl FrozenPrefix {
         ])
     }
 
-    /// The `prompt_assembled` payload: four rows, each naming its slot,
-    /// its hash, its length, the documents it was assembled from and
-    /// what it left out, and the breakpoints `plan` puts in the request.
-    ///
-    /// One branch, not two. The source rows are read back by an offline
-    /// rebuild (A15, C16) and by the page that shows a person what
-    /// their agent was told, and they come from the segments themselves
-    /// — so a prefix assembled at the city's desk records the same rows
-    /// under the same keys as one built from a plan, and a segment made
-    /// of no documents says so with an empty list.
-    ///
-    /// # Errors
-    /// A segment longer than `u64` can hold, and a payload the Ledger
-    /// refuses.
     pub fn prompt_payload(&self, plan: &BreakpointPlan) -> Result<Payload, AxError> {
         let mut segments = Vec::new();
         for (index, segment) in self.segments().into_iter().enumerate() {

@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One window of a stored document version (`Sprawling/accounting/spec/Views/Document.lean` §8-21,
-//! `Sprawling/wire/Spec.lean` §8-70).
-//!
-//! Reads the content store and nothing else: the version is the
-//! object's address, so a page reading on through a file a resident is
-//! rewriting keeps reading the version it opened. Only the bytes the
-//! window needs are lifted - its length and its first three bytes, then
-//! the stretch `documents::lift` names - so the third screen of a large
-//! file costs the third screen.
-
 use std::path::Path;
 
 use documents::{Encoding, Lifted, Span, Window};
@@ -23,7 +13,7 @@ use super::super::holding::Views;
 use super::super::prepared::{Prepared, unavailable};
 
 impl Views {
-    /// A range is read from the store after the views are released.
+
     pub(in crate::views) fn range_ask(&self, version: B3Hash, range: Span) -> Prepared {
         Prepared::Range {
             city_root: self.city_root.clone(),
@@ -33,8 +23,6 @@ impl Views {
     }
 }
 
-/// The window of `version` that `range` asks for, or `Unavailable`
-/// when the store does not hold that version or its bytes are not text.
 pub(in crate::views) fn range_answer(
     city_root: &Path,
     version: B3Hash,
@@ -42,9 +30,7 @@ pub(in crate::views) fn range_answer(
 ) -> wire::Answer {
     match window_of(city_root, &version, range) {
         Ok(window) => wire::Answer::Range(Box::new(wire::RangeAnswer { version, window })),
-        // "I could not look" is the answer for every way this fails: a
-        // version the store never kept, a store that will not open, bytes
-        // that are not text. The query handed back names which version.
+
         Err(_) => unavailable(format!("Range({version})")),
     }
 }
@@ -54,9 +40,6 @@ fn window_of(city_root: &Path, version: &B3Hash, wanted: Span) -> Result<Window,
     documents::cut(stored.encoding, stored.lifted(), wanted)
 }
 
-/// The bytes of one stored version a window needs, and the encoding its
-/// mark names: the one read of the store a range and a preview both make
-/// (`Sprawling/accounting/spec/Views/Document.lean` §8-21, accounting D41).
 pub(super) struct Stored {
     pub(super) encoding: Encoding,
     at: u64,
@@ -74,12 +57,6 @@ impl Stored {
     }
 }
 
-/// Reads `version`'s length and first three bytes, then the stretch
-/// `documents::lift` names for a window asked for as `wanted`.
-///
-/// # Errors
-/// The store will not open, does not hold `version`, or will not read
-/// the range.
 pub(super) fn stored(city_root: &Path, version: &B3Hash, wanted: Span) -> Result<Stored, AxError> {
     let store = Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
         .map_err(StorageError::into_ax)?;
@@ -94,7 +71,6 @@ pub(super) fn stored(city_root: &Path, version: &B3Hash, wanted: Span) -> Result
     })
 }
 
-/// The bytes of one half-open span of a stored object.
 pub(super) fn read(store: &Cas, version: &B3Hash, span: Span) -> Result<Vec<u8>, AxError> {
     if span.is_empty() {
         return Ok(Vec::new());
@@ -146,8 +122,6 @@ mod tests {
         std::fs::write(dir.join("lab/notes.txt"), bytes).unwrap();
     }
 
-    /// A page reads on from the head, one window at a time, and the
-    /// windows laid end to end are the file, byte for byte.
     #[test]
     fn reading_on_from_the_head_gives_back_every_byte() {
         let dir = tempfile::tempdir().unwrap();
@@ -171,8 +145,6 @@ mod tests {
         assert_eq!(text.as_bytes(), bytes.as_slice());
     }
 
-    /// The file moves after the page opened it; the page goes on reading
-    /// the version it opened.
     #[test]
     fn an_opened_version_reads_on_after_the_file_moves() {
         let dir = tempfile::tempdir().unwrap();

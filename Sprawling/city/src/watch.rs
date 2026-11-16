@@ -3,43 +3,19 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the city is listening to, and which building answers.
-//!
-//! The shape is `schedule`'s: a table on disk, a pure question over it,
-//! and dispatches as the answer. The difference is where the trigger
-//! comes from. A schedule fires because time passed, which the city can
-//! observe on its own; a watch fires because something happened
-//! elsewhere, which it cannot.
-//!
-//! So the city does not ask. Polling would be a timer nobody reads,
-//! running whether or not anything happened, and it would be a second
-//! authority on what arrived first. The service that holds the
-//! connection pushes, and this module only decides where a push lands.
-//!
-//! A building that no longer exists is no longer listening. A building
-//! is one line of business; when the line ends the building goes, and
-//! its subscriptions go with it rather than needing a second list
-//! somebody has to remember to prune.
-//!
-//! Specified by `Sprawling/city/spec/Watch.lean` §8-7.
-
 use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxCode, AxError, TimeMs};
 use serde::Deserialize;
 
-/// The city's watch table, at the city root.
 pub const WATCH_FILE: &str = "WATCH.toml";
 
-/// One thing the city listens to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Source {
     name: String,
     matches: String,
     addr: Address,
-    /// Whether an arrival from here may start work, or only be noticed.
-    /// Default is to notice: something arriving from outside is not by
-    /// itself a reason to spend a model.
+
     starts_work: bool,
 }
 
@@ -49,10 +25,6 @@ impl Source {
         &self.name
     }
 
-    /// The substring that routes an arrival here. Not a pattern
-    /// language, for `triage`'s reason: a routing table is read far more
-    /// often than it is written, and a regular expression adds one more
-    /// thing to debug on the day something goes wrong.
     #[must_use]
     pub fn matches(&self) -> &str {
         &self.matches
@@ -68,7 +40,6 @@ impl Source {
         self.starts_work
     }
 
-    /// Which building owns this source — the first path segment.
     #[must_use]
     pub fn building(&self) -> &str {
         self.addr
@@ -79,12 +50,6 @@ impl Source {
     }
 }
 
-/// Whether the city is currently hearing a source, and since when.
-///
-/// Recorded rather than repaired. A machine or a router that stops
-/// working is something a person notices; what the city owes is not a
-/// backfill but an honest answer to "when was this building not
-/// listening", which needs both edges written down.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Link {
     Live { since: TimeMs },
@@ -105,20 +70,13 @@ impl Link {
     }
 }
 
-/// The whole table.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Watch {
     sources: Vec<Source>,
 }
 
 impl Watch {
-    /// Reads a watch table.
-    ///
-    /// # Errors
-    /// Refuses a file that does not parse, a key this version does not
-    /// read, an address that is not one, and an empty match string —
-    /// an empty substring matches everything, which is a routing table
-    /// with one row written as if it had several.
+
     pub fn parse(text: &str) -> Result<Watch, AxError> {
         let file: WatchFile = toml::from_str(text).map_err(|err| refuse(err.to_string()))?;
         let mut sources = Vec::new();
@@ -146,11 +104,6 @@ impl Watch {
         Ok(Watch { sources })
     }
 
-    /// Reads the city's watch table. A city that listens to nothing has
-    /// no file, which is the ordinary case.
-    ///
-    /// # Errors
-    /// Propagates an unreadable file and a file that does not parse.
     pub fn load(city_root: &Path) -> Result<Watch, AxError> {
         let path = watch_path(city_root);
         match std::fs::read_to_string(&path) {
@@ -170,12 +123,6 @@ impl Watch {
         &self.sources
     }
 
-    /// The sources whose building still stands.
-    ///
-    /// `standing` is the list of buildings the city currently has. A
-    /// source whose building was demolished is dropped here rather than
-    /// deleted from the file: the file is the person's, and a city that
-    /// edited it would be answering a question nobody asked.
     #[must_use]
     pub fn listening(&self, standing: &[Address]) -> Vec<&Source> {
         self.sources
@@ -189,7 +136,6 @@ impl Watch {
     }
 }
 
-/// Where the watch table lives.
 #[must_use]
 pub fn watch_path(city_root: &Path) -> PathBuf {
     city_root.join(WATCH_FILE)

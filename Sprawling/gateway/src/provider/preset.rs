@@ -3,29 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a provider's own documentation says, written down once.
-//!
-//! **Most endpoints answer a model list that states nothing but an id.**
-//! The provider's documentation states the rest — the path the API hangs
-//! under, the request shape, the window and the output ceiling of each
-//! model it names — and without this table those facts reach the city
-//! only by a person typing them into a form.
-//!
-//! Every row cites the page it was read from, because a pinned figure
-//! whose source nobody can open is a figure nobody can recheck. A fact
-//! no page states is absent from the row: the ladder in
-//! [`super::ceiling`] then falls to its next rung, which is what "do not
-//! invent a number" means in code.
-//!
-//! Two readers share this one table. [`for_host`] answers the
-//! normalisation algorithm's two questions about a host, so that
-//! `router::normalise` carries no host names of its own; [`model_for`]
-//! answers the ceiling ladder's question about one model id. Host
-//! defaults and model facts are one table because they are one
-//! statement by one vendor. Which row answers for an id is modelled in
-//! `Sprawling/gateway/spec/Provider/Preset.lean`; the table's interface is
-//! `Sprawling/gateway/spec/Provider.lean` §8-17.
-
 mod rows;
 
 pub use rows::PRESETS;
@@ -34,47 +11,24 @@ use kernel::{Ceiling, DialectKind};
 
 use crate::market::InputKinds;
 
-/// What one vendor serves, and where.
-///
-/// `host` is the authority a base URL carries, lower-cased and without
-/// a port — the spelling `reach::split` produces and `normalise` asks
-/// with.
-///
-/// The faces column is read by the `HostDefaults` answer that
-/// `router::normalise` takes, and by [`known_hosts`], which is what the
-/// settings page offers a person to pick from.
 pub struct HostPreset {
     pub host: &'static str,
-    /// The faces this host's documentation says it answers on, and the
-    /// path each hangs under, the vendor's main face first. Spelled in
-    /// the enum a registration is stored under, so that the table
-    /// states what it would register rather than a second vocabulary
-    /// for the same shapes.
+
     pub faces: &'static [Face],
-    /// The models this vendor documents, longest matching id prefix
-    /// first at lookup time. Empty where the endpoint states its own
-    /// facts in its model list, which outranks this table anyway.
+
     pub models: &'static [ModelPreset],
-    /// How this vendor spells what its chat face leaves to the vendor.
+
     pub chat: ChatSpelling,
-    /// The header this vendor asks to carry one conversation's id, so
-    /// that its routing and prompt cache see a conversation as one.
+
     pub session_header: Option<&'static str>,
-    /// The body field this vendor's OpenAI-compatible faces take a
-    /// prompt cache key in, so that requests sharing one conversation's
-    /// prefix are routed to one cache (gateway D25).
+
     pub cache_key_field: Option<&'static str>,
-    /// Sampling support by request face, stated only where the cited
-    /// schema answers for the model rather than for one exceptional row.
+
     pub generation: GenerationPreset,
-    /// Where `faces`, `chat`, `session_header`, `cache_key_field` and
-    /// `generation` were read.
+
     pub source: &'static str,
 }
 
-/// Sampling support on each face a host serves. `None` in a
-/// `GenerationSupport` field means the schema does not answer for every
-/// model on that face.
 #[derive(Debug, Clone, Copy)]
 pub struct GenerationPreset {
     pub anthropic: kernel::GenerationSupport,
@@ -108,27 +62,19 @@ pub(crate) const ANTHROPIC_GENERATION: kernel::GenerationSupport = kernel::Gener
     top_k: Some(kernel::ParameterSupport::Supported),
 };
 
-/// OpenAI's schemas omit `top_k`; they warn that sampling support differs
-/// on reasoning models, so temperature and top-p stay unstated here.
 pub(crate) const OPENAI_GENERATION: kernel::GenerationSupport = kernel::GenerationSupport {
     temperature: None,
     top_p: None,
     top_k: Some(kernel::ParameterSupport::Unsupported),
 };
 
-/// One face a host answers on, and the path it hangs under, leading
-/// slash included. The path is filled in only when the person entered
-/// a host with no path at all.
 pub struct Face {
     pub dialect: DialectKind,
     pub path: &'static str,
 }
 
 impl HostPreset {
-    /// The shape this host answers in when neither the pasted URL nor
-    /// the person said: its one face, or `None` where it serves several
-    /// and choosing one for the person would be a guess with a 404 in
-    /// it.
+
     #[must_use]
     pub fn default_dialect(&self) -> Option<DialectKind> {
         match self.faces {
@@ -137,9 +83,6 @@ impl HostPreset {
         }
     }
 
-    /// The path the face the person chose hangs under. A face this host
-    /// does not list, or no face chosen yet, takes the main face's
-    /// path: the vendor put that face first.
     #[must_use]
     pub fn path_for(&self, dialect: Option<DialectKind>) -> Option<&'static str> {
         dialect
@@ -149,21 +92,12 @@ impl HostPreset {
     }
 }
 
-/// One host the settings page offers, with the base URL each of its
-/// faces is called at.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct KnownHost {
     pub host: &'static str,
     pub faces: Vec<(DialectKind, String)>,
 }
 
-/// Every host this table lists, each face's base URL computed by the
-/// same normalisation an attach runs, so the address a form fills is
-/// the address the city would store.
-///
-/// # Errors
-/// A row whose host the normaliser refuses, which is a defect of this
-/// table that a test holds shut.
 pub fn known_hosts() -> Result<Vec<KnownHost>, kernel::AxError> {
     PRESETS
         .iter()
@@ -187,9 +121,6 @@ pub fn known_hosts() -> Result<Vec<KnownHost>, kernel::AxError> {
         .collect()
 }
 
-/// The OpenAI-compatible fields whose spelling each vendor's
-/// documentation decides for itself. Picture placement is per face:
-/// DeepSeek's chat and responses faces document different locations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ChatSpelling {
     pub ceiling: CeilingField,
@@ -200,16 +131,7 @@ pub struct ChatSpelling {
 }
 
 impl ChatSpelling {
-    /// What a host this table does not list is sent.
-    ///
-    /// `max_tokens` although the OpenAI specification deprecates it:
-    /// local inference servers and most compatible servers read
-    /// only that name, and a ceiling under a name a server ignores is a
-    /// ceiling silently dropped. `reasoning_effort` because it is the
-    /// specification's own field. An earlier turn's reasoning is not
-    /// sent back, because the specification's assistant message has no
-    /// field that carries it. On either face a tool picture follows in
-    /// a user message unless that face documents a tool-result slot.
+
     pub const DOCUMENTED: ChatSpelling = ChatSpelling {
         ceiling: CeilingField::MaxTokens,
         effort: EffortField::ReasoningEffort,
@@ -219,117 +141,80 @@ impl ChatSpelling {
     };
 }
 
-/// Where a picture a tool produced rides on the OpenAI-compatible faces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolPictureCarry {
-    /// The face takes no picture on its tool result, so the picture
-    /// lands in the user message that follows.
+
     FollowingUser,
-    /// This face's schema takes image parts on the tool result itself:
-    /// Kimi/Moonshot chat `tool` content arrays and DeepSeek responses
-    /// `function_call_output.output` lists document this shape.
+
     InToolContent,
 }
 
-/// Which field carries the output ceiling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CeilingField {
     MaxTokens,
-    /// The specification's replacement; OpenAI's reasoning models
-    /// answer 400 to `max_tokens`.
+
     MaxCompletionTokens,
 }
 
-/// Which fields carry a thinking level and thinking on. The fields
-/// each variant writes are `provider::thinking::encoding`'s.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EffortField {
-    /// A string at the top level, as the specification spells it, and
-    /// no switch.
+
     ReasoningEffort,
-    /// `reasoning: { effort }` and `reasoning: { enabled }`, OpenRouter's
-    /// own parameter and the one its documentation lets carry `max`.
+
     ReasoningObject,
-    /// `thinking: { type: "enabled" }` beside `reasoning_effort`: the
-    /// switch DeepSeek, Moonshot and Zhipu document.
+
     ThinkingToggle,
-    /// `enable_thinking: true` beside `reasoning_effort`: DashScope's
-    /// switch, without which a model whose default is off never thinks.
+
     EnableThinking,
 }
 
-/// Whether an earlier turn's reasoning goes back to the provider.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReasoningReturn {
     Dropped,
-    /// As `reasoning_content` on the assistant message it came with.
-    /// DeepSeek answers 400 to a request with tools whose history
-    /// lacks it.
+
     AsReasoningContent,
 }
 
-/// What one vendor documents about a family of models.
-///
-/// Matched by id prefix rather than by exact id: a vendor prints
-/// `claude-sonnet-4-5-20250929` and serves it as `claude-sonnet-4-5`
-/// and as `claude-sonnet-4-5-latest`, and three rows for one
-/// documented figure is three chances to update two of them.
-///
-/// The window and modality columns reach a registration through the
-/// same caller as the host columns above: the window through
-/// [`window_for`], the modality through the ladder in [`super::input`].
 pub struct ModelPreset {
     pub id_prefix: &'static str,
     pub context_tokens: u64,
-    /// Non-zero by the table's own rule: zero is not a ceiling, and a
-    /// row that cannot state one states nothing instead.
+
     pub max_output_tokens: u64,
     pub input: InputKinds,
-    /// The vendor's largest accepted image side, where it states one.
+
     pub image_max_side: Option<std::num::NonZeroU32>,
-    /// The thinking levels this vendor documents for the model; `None`
-    /// where its page states none, which is not "no thinking".
+
     pub thinking: Option<PresetThinking>,
-    /// The shortest prompt prefix this vendor's page says the model
-    /// caches, in tokens; `None` where the page was not read for it,
-    /// and [`CACHE_MIN_TOKENS_DEFAULT`] answers instead (gateway D39).
+
     pub cache_min_tokens: Option<u64>,
-    /// Where the two figures were read.
+
     pub source: &'static str,
 }
 
-/// The thinking levels one vendor page documents for a model.
 pub struct PresetThinking {
-    /// Ascending; never `none`, because turning thinking off is not a
-    /// level.
+
     pub levels: &'static [kernel::Effort],
-    /// The level the page says the model uses when sent none.
+
     pub default: Option<kernel::Effort>,
-    /// The page the levels were read from.
+
     pub source: &'static str,
 }
 
-/// The row for one host, or `None` when this city has never been told
-/// what that host serves.
 #[must_use]
 pub fn for_host(host: &str) -> Option<&'static HostPreset> {
     PRESETS.iter().find(|row| row.host == host)
 }
 
-/// How the chat face at one base URL is spelled.
 #[must_use]
 pub fn chat_spelling(base_url: &str) -> ChatSpelling {
     host_row(base_url).map_or(ChatSpelling::DOCUMENTED, |row| row.chat)
 }
 
-/// The header the vendor at one base URL asks a conversation's id in.
 #[must_use]
 pub fn session_header(base_url: &str) -> Option<&'static str> {
     host_row(base_url)?.session_header
 }
 
-/// The body field the host at one base URL takes a prompt cache key in,
-/// where its documentation names one (gateway D25).
 #[must_use]
 pub(crate) fn cache_key_field(base_url: &str) -> Option<&'static str> {
     host_row(base_url)?.cache_key_field
@@ -340,20 +225,6 @@ fn host_row(base_url: &str) -> Option<&'static HostPreset> {
     for_host(&host)
 }
 
-/// The row for one model at one base URL.
-///
-/// The host's own rows answer first. A host with no model rows of its
-/// own that is not on this machine - a relay forwarding a vendor's id -
-/// is answered from the rows of the vendor that published the id:
-/// relays rarely state a ceiling in their model list, and the vendor's
-/// documented figure is closer to the relay's fact than a policy figure
-/// that belongs to neither (`Sprawling/gateway/spec/Provider.lean` §8-17). A server on this
-/// machine borrows nothing, because the window of a model it serves is
-/// its own configuration.
-///
-/// The longest matching prefix wins, so a row for a family and a row
-/// for one member of it can both stand and the more specific one
-/// answers.
 #[must_use]
 pub fn model_for(base_url: &str, id: &str) -> Option<&'static ModelPreset> {
     row_for(
@@ -364,11 +235,6 @@ pub fn model_for(base_url: &str, id: &str) -> Option<&'static ModelPreset> {
     )
 }
 
-/// Which row answers for `id`, over any row table:
-/// `Gateway.Provider.Preset.model_for` with `own` the host's own model
-/// rows, `vendors` every model row in table order, and `local` whether
-/// the base URL is on this machine. The table is a parameter so a check
-/// can drive the rule over tables [`PRESETS`] does not hold.
 fn row_for<'rows>(
     own: &'rows [ModelPreset],
     vendors: impl Iterator<Item = &'rows ModelPreset>,
@@ -382,13 +248,8 @@ fn row_for<'rows>(
         .max_by_key(|row| row.id_prefix.len())
 }
 
-/// The shortest prefix a model is taken to cache when its row states
-/// none: the largest minimum the vendor's prompt-caching page lists, so a
-/// prefix the model cannot cache is not pre-warmed for nothing (gateway
-/// D39).
 pub(crate) const CACHE_MIN_TOKENS_DEFAULT: u64 = 4_096;
 
-/// The shortest prefix, in tokens, one model at one base URL caches.
 #[must_use]
 pub(crate) fn cache_min_tokens_for(base_url: &str, id: &str) -> u64 {
     model_for(base_url, id)
@@ -396,29 +257,21 @@ pub(crate) fn cache_min_tokens_for(base_url: &str, id: &str) -> u64 {
         .unwrap_or(CACHE_MIN_TOKENS_DEFAULT)
 }
 
-/// The ceiling this table states for one model, as a ceiling rather
-/// than as a count.
 #[must_use]
 pub fn ceiling_for(base_url: &str, id: &str) -> Option<Ceiling> {
     Ceiling::new(model_for(base_url, id)?.max_output_tokens)
 }
 
-/// The context window this table states for one model, as a window
-/// rather than as a count.
 #[must_use]
 pub fn window_for(base_url: &str, id: &str) -> Option<kernel::Window> {
     kernel::Window::new(model_for(base_url, id)?.context_tokens)
 }
 
-/// What this table states one model accepts. Read only by the ladder
-/// in [`super::input`], which decides whether this rung answers.
 #[must_use]
 pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds> {
     model_for(base_url, id).map(|row| row.input)
 }
 
-/// The largest picture side this model's vendor documents. The request
-/// edge reads the same row as modality, window and ceiling.
 #[must_use]
 pub(crate) fn image_max_side(
     base_url: &str,
@@ -434,17 +287,11 @@ pub(crate) fn image_max_side(
     }
 }
 
-/// The thinking levels this table documents for one model. Read only by
-/// the ladder in [`super::thinking`], which decides whether this rung
-/// answers.
 #[must_use]
 pub(crate) fn thinking_for(base_url: &str, id: &str) -> Option<&'static PresetThinking> {
     model_for(base_url, id)?.thinking.as_ref()
 }
 
-/// Sampling support stated for one documented host and face. Hosts and
-/// faces without a machine-checked statement leave every parameter
-/// unstated rather than guessing from a model id.
 pub(crate) fn generation_for(base_url: &str, dialect: DialectKind) -> kernel::GenerationSupport {
     let Some(row) = host_row(base_url) else {
         return kernel::GenerationSupport::default();
@@ -456,13 +303,6 @@ pub(crate) fn generation_for(base_url: &str, dialect: DialectKind) -> kernel::Ge
     }
 }
 
-/// The preset table as the host authority the normaliser reads.
-///
-/// A zero-sized handle rather than a free function, because
-/// `router::normalise` must not know that a table exists at all: it
-/// asks whoever it was handed what a host serves, and this is the
-/// answer the shipped build hands it. The mapping from a stored
-/// `DialectKind` to the hint the form speaks is here and nowhere else.
 pub struct Presets;
 
 impl crate::router::HostDefaults for Presets {
@@ -507,9 +347,6 @@ mod tests {
         assert_eq!(path_of("llm.example.test"), None);
     }
 
-    /// A bare host becomes the URL the vendor's documentation prints:
-    /// the chat face straight under the host for DeepSeek, and under
-    /// `/openai` for Gemini, whose `/v1beta` alone is another shape.
     #[test]
     fn a_bare_host_reaches_the_chat_face_its_vendor_documents() {
         use crate::router::{DialectHint, normalise_entered};
@@ -534,9 +371,6 @@ mod tests {
         );
     }
 
-    /// A host that hangs its Anthropic-compatible face under another
-    /// path than its OpenAI one is reached on the path of the face the
-    /// person chose (`Sprawling/gateway/spec/Provider.lean` §8-17).
     #[test]
     fn a_bare_host_reaches_the_path_of_the_face_the_person_chose() {
         use crate::router::{DialectHint, normalise_entered};
@@ -574,8 +408,7 @@ mod tests {
             chat_spelling("https://api.deepseek.com").responses_tool_pictures,
             ToolPictureCarry::InToolContent
         );
-        // Kimi's multimodal tool example puts image/video parts on
-        // `role: tool`; the three Moonshot hosts share that spelling.
+
         for base in [
             "https://api.moonshot.ai/v1",
             "https://api.moonshot.cn/v1",
@@ -587,8 +420,7 @@ mod tests {
                 "{base}"
             );
         }
-        // OpenAI chat tool content is text-only; xAI only documents
-        // images on user messages — both keep the following-user carry.
+
         assert_eq!(
             chat_spelling("https://api.openai.com/v1").chat_tool_pictures,
             ToolPictureCarry::FollowingUser
@@ -631,10 +463,6 @@ mod tests {
         assert!(row.source.starts_with("https://"), "every row cites a page");
     }
 
-    /// A relay's model list rarely states a ceiling, so the vendor that
-    /// published the id it forwards answers for it; a server on this
-    /// machine does not borrow the vendor's figures, because its window
-    /// is its own configuration.
     #[test]
     fn a_relay_forwarding_a_vendors_id_reads_the_vendors_row_and_a_local_server_does_not() {
         assert_eq!(
@@ -650,8 +478,6 @@ mod tests {
         assert!(window_for("http://127.0.0.1:8000/v1", "claude-sonnet-4-5").is_none());
     }
 
-    /// The current lineup on the vendor's own page, and DeepSeek's two
-    /// families, whose ceiling the API reference states exactly.
     #[test]
     fn the_documented_lineup_is_read_as_the_vendors_page_states_it() {
         let at = |base: &str, id: &str| {
@@ -676,8 +502,6 @@ mod tests {
         assert_eq!(at(deepseek, "deepseek-v4-pro"), Some((1_000_000, 393_216)));
     }
 
-    /// The retired Flash names are served by the vision-capable Flash
-    /// model, while V4 Pro remains text-only on the vendor's model table.
     #[test]
     fn deepseek_model_names_keep_their_documented_image_capabilities() {
         let answered = [
@@ -707,9 +531,6 @@ mod tests {
         );
     }
 
-    /// The pinned catalogue and this table are one rung of the ladder
-    /// reached through two indexes — an exact id and a host with a
-    /// prefix — so no id may reach both. One fact, one home.
     #[test]
     fn no_pinned_catalogue_row_is_also_matched_by_this_table() {
         let catalogue = crate::market::MarketSnapshot::builtin().unwrap();
@@ -730,8 +551,6 @@ mod tests {
         }
     }
 
-    /// Zero is not a ceiling: the Anthropic wire refuses it and the
-    /// OpenAI wire sends a request that answers with no content.
     #[test]
     fn every_row_states_a_ceiling_that_can_be_called_with() {
         for row in PRESETS {
@@ -758,9 +577,6 @@ mod tests {
         }
     }
 
-    /// The page is offered one base URL per face, and it is the one
-    /// attaching would store, so a vendor picked on the page is the
-    /// vendor the city calls.
     #[test]
     fn every_known_host_offers_each_face_at_the_address_attaching_stores() {
         let hosts = known_hosts().unwrap();
@@ -804,7 +620,6 @@ mod tests {
         assert_eq!(hosts.len(), listed, "a host with two rows is two answers");
     }
 
-    /// A model row with only the prefix this rule reads.
     fn row(id_prefix: &'static str) -> ModelPreset {
         ModelPreset {
             id_prefix,
@@ -818,8 +633,6 @@ mod tests {
         }
     }
 
-    /// The prefixes of a random row table; rows are built in the test,
-    /// because `ModelPreset` carries no `Debug` for proptest to print.
     fn prefixes() -> impl proptest::strategy::Strategy<Value = Vec<&'static str>> {
         proptest::collection::vec(
             proptest::sample::select(vec!["", "a", "ab", "abc", "b", "ba", "c"]),
@@ -828,9 +641,7 @@ mod tests {
     }
 
     proptest::proptest! {
-        /// The three theorems of `Sprawling/gateway/spec/Provider/Preset.lean`
-        /// over random row tables and ids, rather than over the shipped
-        /// table alone.
+
         #[test]
         fn the_row_rule_keeps_the_lean_properties(
             own in prefixes(),
@@ -841,16 +652,16 @@ mod tests {
             let own: Vec<ModelPreset> = own.into_iter().map(row).collect();
             let vendors: Vec<ModelPreset> = vendors.into_iter().map(row).collect();
             let found = row_for(&own, vendors.iter(), local, &id);
-            // a_server_on_this_machine_borrows_no_vendor_row
+
             if own.is_empty() && local {
                 proptest::prop_assert!(found.is_none());
             }
             if let Some(answer) = found {
-                // a_host_with_rows_of_its_own_answers_from_them
+
                 if !own.is_empty() {
                     proptest::prop_assert!(own.iter().any(|mine| std::ptr::eq(mine, answer)));
                 }
-                // the_answer_is_a_prefix_of_the_id
+
                 proptest::prop_assert!(id.starts_with(answer.id_prefix));
             }
         }

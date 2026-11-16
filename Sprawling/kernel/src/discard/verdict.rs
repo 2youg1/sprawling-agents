@@ -3,29 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Discard verdicts: the decision table.
-//! The part `Sprawling/kernel/spec/Discard.lean` specifies this module with the
-//! rest of `kernel::discard`.
-
 use super::request::{DenyReason, DiscardRequest};
 
-/// Deliberately exhaustive verdict.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiscardVerdict {
     Allow,
     Deny { reason: DenyReason },
 }
 
-/// The decision table, in fixed order: no plan denies, taint
-/// denies, the rest passes.
-///
-/// Scale and ownership pass because a planned discard carries a
-/// restoration and is therefore reversible: no file count, byte count
-/// or other resident's registered asset interrupts a person, because an
-/// interruption is not a rule. What still bounds a delete in advance is written where
-/// rules live — the write domain says which files a resident reaches
-/// at all, and the registry keeps the evidence that puts a deleted
-/// asset back.
 pub fn decide(req: &DiscardRequest) -> DiscardVerdict {
     let taint = match req {
         DiscardRequest::Unplanned { .. } => {
@@ -71,7 +56,7 @@ mod tests {
 
     #[test]
     fn the_decision_table_holds_in_order() {
-        // Allow: planned and clean-handed, at any scale.
+
         assert_eq!(
             decide(&DiscardRequest::Planned(clean(vec![addr("b/x.md")], 100))),
             DiscardVerdict::Allow
@@ -82,7 +67,7 @@ mod tests {
             DiscardVerdict::Allow,
             "a big delete that can be put back is a delete"
         );
-        // Tainted denies, whatever the scale.
+
         let tainted = Discard::new(
             vec![addr("b/x.md")],
             tracked(),
@@ -96,7 +81,7 @@ mod tests {
                 reason: DenyReason::Tainted
             }
         );
-        // Unplanned denies: no restoration, no delete.
+
         assert_eq!(
             decide(&DiscardRequest::Unplanned {
                 paths: vec![addr("b/x.md")],
@@ -110,9 +95,3 @@ mod tests {
     }
 }
 
-// No kani harness lives here. Deciding a discard takes a `Vec` of
-// addresses and a `BTreeSet` of taint sources, and CBMC cannot bound
-// those loops: one run burned six hours and a second ran forty-five
-// minutes under `--default-unwind 32`, both on `tainted_never_allows`,
-// and neither returned. The fail-closed propositions are held by the
-// tests above (`Sprawling/kernel/Spec.lean` §2).

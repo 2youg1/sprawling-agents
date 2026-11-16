@@ -3,83 +3,30 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Wiring gate: every verb on the wire is reachable from the side that is
-//! supposed to reach it, and no other side pretends it is
-//! (Sprawling/wire/Spec.lean section 19).
-//!
-//! **Both directions have failed here, and they fail differently.**
-//!
-//! Drawing a control the city cannot perform is loud: somebody clicks it
-//! and gets a refusal. v0.0.3 shipped three of those - `Takeover`,
-//! `Rollback` and `CreatePolicy` were on the wire, drawn in the client,
-//! and executable by nothing - and
-//! `accounting::worker::naming::not_built` already carried the rule in
-//! its own rustdoc: "A verb answered here must not appear as
-//! a control in the client." Nothing was reading it.
-//!
-//! The other direction is silent, and that is what makes it worse. A
-//! capability the city can perform and no control reaches produces no
-//! complaint, because a button that does not exist is a button nobody
-//! fails to press. `Pursue` - the whole of "the city keeps working until
-//! the work runs out" - and `SetAutonomy` were both built, tested, and
-//! unreachable from a browser. That is the mechanical reason v0.0.3's
-//! second completion criterion was never accepted: you could not turn it
-//! on.
-//!
-//! **Three sources, no copies.** The variants come from the real `enum
-//! Command` parsed out of whichever `wire` module declares it; whether
-//! the city can perform one comes from the arms of
-//! `accounting::worker::commanding::routing::run_command`;
-//! whether a person can ask for one comes from `client/src`. The
-//! specification contributes the one fact none of the three can state -
-//! which side is *supposed* to reach it - as the arms of
-//! `def Command.reach`, and the gate reads them as data, so "the table
-//! drifted" and "the enum grew silently" are the same red.
-//!
-//! The same table carries a second fact, the class of verb a frame is
-//! when a remote device sends it, as the arms of `def Command.verbClass`;
-//! `class` reads it beside the relay's own match (Sprawling/wire/Spec.lean
-//! section 19-2).
-
 use std::collections::BTreeSet;
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The wire crate's directory, whose Lean specification holds the reach
-/// and class tables (Tools/xtask/Spec.lean §8-43).
 const WIRE_CRATE: &str = "Sprawling/wire";
-/// Where a reader is sent to change a row.
+
 const TABLE: &str = "`def Command.reach` (Sprawling/wire/Spec.lean section 19-2)";
 const WIRE_DIR: &str = "Sprawling/wire/src";
-/// The package the city's one writer lives in, whose `src` is searched.
-/// A package rather than a file: the gate wants the declaration of
-/// `run_command`, not its address, and pinning the address meant that
-/// splitting the worker moved the arms out from under the gate while
-/// leaving the gate green about it. Its directory is asked of `members`,
-/// the one reader of where a package lives, so moving the package moves
-/// the search with it.
+
 const WORKER: &str = "sprawling-accounting";
-/// Where the client's controls live. A directory for the same reason
-/// `WORKER` names a package, and `walk`'s spelling of it because five gates
-/// asked this question and five gates answered it.
+
 use crate::walk::CLIENT_SRC as CLIENT;
 
-/// Which side is supposed to reach a verb.
-///
-/// Exhaustive rather than a pair of flags: a verb has exactly one way in,
-/// and two booleans would make "drawn and pushed" spellable when it is
-/// not a thing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Reach {
-    /// A person's verb. The client draws it and the city performs it.
+
     Client,
-    /// An outside service pushes it. Nothing draws it.
+
     Push,
-    /// The handshake consumes it before `run_command` sees it.
+
     Handshake,
-    /// It has no byte form, so no client can spell it.
+
     Sealed,
 }
 
@@ -101,7 +48,6 @@ mod settings;
 
 use reading::{declared, variants};
 
-/// A finding at `location`, the Lean file that holds the arm it is about.
 fn violation(location: &str, rule: &str, subject: String, alternative: String) -> Violation {
     Violation {
         gate: "wiring",
@@ -112,10 +58,6 @@ fn violation(location: &str, rule: &str, subject: String, alternative: String) -
     }
 }
 
-/// The verbs the city can actually carry out.
-///
-/// An arm answering with `not_built` is on the wire and has no executor,
-/// which is exactly the state the client may not draw a control for.
 fn performed(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError> {
     let worker_src = format!(
         "{}/src",
@@ -142,8 +84,7 @@ fn performed(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError
         let Some(at) = arm_start(body, &arm) else {
             continue;
         };
-        // The arm runs to the next one; `not_built` inside that slice is
-        // this verb's answer rather than a neighbour's.
+
         let rest = body.get(at.saturating_add(arm.len())..).unwrap_or_default();
         let end = rest
             .find("\n            wire::Command::")
@@ -155,10 +96,6 @@ fn performed(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError
     Ok(out)
 }
 
-/// The tag a variant travels under on the wire, which is the key the
-/// client writes: `PutDocument` is `put_document`. Computed rather than
-/// tabulated, because a table would restate what `wire` already
-/// decides with `rename_all = "snake_case"`.
 fn wire_tag(variant: &str) -> String {
     let mut tag = String::new();
     for (index, character) in variant.char_indices() {
@@ -170,10 +107,6 @@ fn wire_tag(variant: &str) -> String {
     tag
 }
 
-/// Where an arm for exactly this verb begins. A plain `find` matches a
-/// longer variant starting with the same letters: `Attach` is a prefix of
-/// `AttachEndpoint`, so the gate read the endpoint's arm and called an
-/// unimplemented verb built, invisibly, while the client side shared it.
 fn arm_start(body: &str, arm: &str) -> Option<usize> {
     let mut from: usize = 0;
     loop {
@@ -191,12 +124,6 @@ fn arm_start(body: &str, arm: &str) -> Option<usize> {
     }
 }
 
-/// The verbs a person can ask for, read from the client that draws them.
-/// A command frame is an object keyed by the verb, so the shape looked for
-/// is `<tag>: {`. A bare mention is not enough: `import { halt }` names the
-/// verb and draws nothing. Test files are not controls either - a test may
-/// spell a frame no person may send, and counting it would make the sealed
-/// verbs unspellable in their own tests.
 fn emitted(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError> {
     let mut seen = BTreeSet::new();
     let base = root.join(CLIENT);
@@ -310,8 +237,6 @@ mod tests {
         crate::root::this_checkout().to_path_buf()
     }
 
-    /// The three sources are read from the real thing, so this fails the
-    /// day one of them moves rather than the day somebody notices.
     #[test]
     fn the_wire_the_worker_and_the_client_are_all_readable() {
         let root = root();
@@ -328,7 +253,6 @@ mod tests {
         assert!(emitted.contains("Dispatch"), "the client draws dispatch");
     }
 
-    /// Every verb is classified and every classification names a verb.
     #[test]
     fn the_reach_table_and_the_enum_are_the_same_list() {
         let root = root();
@@ -343,15 +267,11 @@ mod tests {
         assert!(Reach::parse("push").is_some());
         assert!(Reach::parse("handshake").is_some());
         assert!(Reach::parse("sealed").is_some());
-        // An arm that answers anything else is not a reach, and the
-        // reader refuses it rather than skip the verb.
+
         assert!(Reach::parse("value").is_none());
         assert!(Reach::parse("").is_none());
     }
 
-    /// The reach of each verb is an arm of `def Command.reach`, and a
-    /// finding about one is located at the file that holds the arms
-    /// (Tools/xtask/Spec.lean §8-43).
     #[test]
     fn a_migrated_wire_specification_answers_the_reach_of_each_verb() {
         let root = crate::root::fixture::relocated("wiring-lean");

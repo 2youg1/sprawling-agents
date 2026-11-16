@@ -3,35 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The OpenAI Chat Completions wire, in both directions, and every loss
-//! the translation takes.
-//!
-//! **Read the provider's own documentation before changing anything
-//! here.** Every field is the provider's shape, not ours; a shape that
-//! looks wrong is usually a shape that changed.
-//!
-//! - Request and response:
-//!   <https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create/>
-//! - `reasoning_effort` and its accepted values: `ReasoningEffort` in
-//!   `openai/openai-openapi`'s `openapi.yaml`, and
-//!   <https://developers.openai.com/api/docs/guides/reasoning>. The
-//!   thinking fields are written by `provider::thinking::encoding`, not
-//!   here (gateway D35).
-//!
-//! **Loss accounting is explicit, because this dialect is not the
-//! canonical shape.** This wire has no explicit cache breakpoints
-//! (provider caching is implicit prefix-matching), so `cache` markers
-//! drop on this path; the specification's assistant message has no
-//! field for a thinking block, so one is not sent rather than sent as
-//! prose, except to a host whose documentation reads it back as
-//! `reasoning_content`; and where the host's `tool` message accepts
-//! only a string (`ToolPictureCarry::FollowingUser`), pictures a tool
-//! produced ride in the user message that immediately follows it — the
-//! pictures arrive, and what is lost is the statement that they came
-//! out of that tool call. A host whose schema takes image parts on the
-//! tool message (`InToolContent`) keeps that attribution. All three
-//! are asserted in tests.
-
 use kernel::{
     AxCode, AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind, ModelUsage,
     Role, StopReason,
@@ -48,16 +19,6 @@ mod stream;
 
 pub(crate) use stream::{increment_of, settled};
 
-/// The provider took the request, answered 200, and put nothing in it.
-///
-/// Told apart from every other shape mismatch because it is not one: the
-/// envelope is this dialect's, every field is where it belongs, and
-/// `choices` is null. Observed on a hosted OpenAI-compatible endpoint
-/// when `max_tokens` is above what the chosen model allows - the request
-/// is neither refused nor answered, it is dropped, and the only trace is
-/// a nulled answer with a zeroed usage block. A person reading
-/// "expected array" learns nothing they can act on, which is why this
-/// case says what to change.
 fn empty_answer() -> AxError {
     AxError::failure(
         AxCode::Provider,
@@ -84,11 +45,6 @@ fn joined_text(content: &[ContentBlock]) -> String {
     out
 }
 
-/// The reasoning one assistant turn goes back with, when its host reads
-/// it back.
-///
-/// Only the text: a signature is a first-party provider's proof over
-/// its own reasoning, and no host on this face checks one.
 fn reasoning_returned(content: &[ContentBlock], reasoning: ReasoningReturn) -> Option<String> {
     match reasoning {
         ReasoningReturn::Dropped => None,
@@ -109,8 +65,6 @@ fn reasoning_returned(content: &[ContentBlock], reasoning: ReasoningReturn) -> O
     }
 }
 
-/// One picture, as this wire spells it: a data URL inside a content
-/// part, which is the only place this dialect accepts image bytes.
 fn image_part(picture: &kernel::ImageRef, images: &ImageBytes) -> Result<Value, AxError> {
     let data = images.encoded(&picture.locator)?;
     Ok(json!({
@@ -119,9 +73,6 @@ fn image_part(picture: &kernel::ImageRef, images: &ImageBytes) -> Result<Value, 
     }))
 }
 
-/// Every picture that should ride a following user message for
-/// `carry`: the message's own `Image` blocks always, and tool
-/// attachments only when they cannot ride the tool message itself.
 fn pictures_following(
     content: &[ContentBlock],
     images: &ImageBytes,
@@ -148,9 +99,6 @@ fn pictures_following(
     Ok(parts)
 }
 
-/// One tool result as this host spells its content: a string when there
-/// are no pictures or the host cannot take them here; otherwise a part
-/// array that keeps the pictures with the call they came from.
 fn tool_content(
     content: &str,
     attachments: &[kernel::ImageRef],
@@ -174,8 +122,7 @@ pub(crate) fn request(
 ) -> Result<Value, AxError> {
     let mut messages = Vec::new();
     if !req.system.is_empty() {
-        // Explicit breakpoints have no OpenAI wire slot; the marker drops
-        // here by design (provider caching is implicit prefix matching).
+
         let system: Vec<&str> = req.system.iter().map(|b| b.text.as_str()).collect();
         messages.push(json!({ "role": "system", "content": system.join("\n\n") }));
     }
@@ -202,11 +149,7 @@ pub(crate) fn request(
                         }));
                     }
                 }
-                // Under `FollowingUser`, pictures a tool produced cannot
-                // ride the tool message, so they land in the user
-                // message that follows it. Under `InToolContent` they
-                // already rode the tool message above; only `Image`
-                // blocks the person attached still need this slot.
+
                 let text = joined_text(&message.content);
                 let pictures =
                     pictures_following(&message.content, images, spelling.chat_tool_pictures)?;
@@ -258,10 +201,7 @@ pub(crate) fn request(
     }
     let mut root = Map::new();
     root.insert("model".to_owned(), Value::String(req.model.clone()));
-    // Absent when no catalogue row states this model's ceiling: this
-    // wire permits the field to be missing, and the provider's own
-    // default is a real number, where a zero is a reply with nothing in
-    // it that reads downstream as work that finished.
+
     if let Some(ceiling) = req.max_tokens {
         let field = match spelling.ceiling {
             CeilingField::MaxTokens => "max_tokens",
@@ -293,8 +233,7 @@ pub(crate) fn request(
 
 pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
     let offered = require(wire, "response", "choices")?;
-    // A null here is a provider that dropped the request rather than a
-    // provider speaking a shape we do not know.
+
     if offered.is_null() {
         return Err(empty_answer());
     }
@@ -306,10 +245,7 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
         .ok_or_else(|| mismatch("response.choices", "empty"))?;
     let message = require(first, "response.choices[0]", "message")?;
     let mut content = Vec::new();
-    // First, because it is what the model did first, and because a
-    // page that folds it needs it to sit above the answer it produced.
-    // The signature is empty: this wire has none to carry, and an
-    // invented one would be sent back to a provider that checks it.
+
     if let Some(thinking) = message.as_object().and_then(stream::reasoning_in) {
         content.push(ContentBlock::Thinking {
             thinking,
@@ -363,7 +299,7 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
         input_tokens: tokens_or_zero(usage_value, "prompt_tokens", "response.usage")?,
         output_tokens: tokens_or_zero(usage_value, "completion_tokens", "response.usage")?,
         cache_read_tokens: cache_read,
-        // No OpenAI chat wire slot: a cache write is never reported.
+
         cache_write_tokens: CacheCount::Unreported,
         dialect: Some(DialectKind::OpenAi),
     };

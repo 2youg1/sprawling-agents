@@ -3,16 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The environment an ACP agent is started with: a whitelist, not the
-//! city's whole environment (`Sprawling/agent_protocols/Spec.lean` §8-19, D17).
-
 use std::ffi::OsString;
 
 use super::roster::OFFICIAL;
 
-/// What an agent needs from the city's environment to run at all, to find
-/// its own home and network, and to tell whether it is on a remote host
-/// (which decides the login it offers: `SSH_*`, `NO_BROWSER`).
 const PASSED: [&str; 48] = [
     "PATH",
     "PATHEXT",
@@ -64,12 +58,6 @@ const PASSED: [&str; 48] = [
     "NODE_EXTRA_CA_CERTS",
 ];
 
-/// The pairs of `city` an agent is handed: every name on the whitelist and
-/// every directory variable an official harness documents.
-///
-/// Names compare without regard to ASCII case on Windows, where the
-/// environment does, and exactly elsewhere; proxies are passed in either
-/// case, as tools write them both ways.
 pub fn passed(city: impl Iterator<Item = (OsString, OsString)>) -> Vec<(OsString, OsString)> {
     let vendor = OFFICIAL
         .iter()
@@ -95,8 +83,6 @@ pub fn passed(city: impl Iterator<Item = (OsString, OsString)>) -> Vec<(OsString
 mod tests {
     use super::*;
 
-    /// A city secret and another vendor's key never reach the agent; what
-    /// it needs to run and to judge its login does.
     #[test]
     fn only_the_whitelist_and_vendor_homes_pass() {
         let city = [

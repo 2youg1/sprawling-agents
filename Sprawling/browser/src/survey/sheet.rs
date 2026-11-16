@@ -3,77 +3,22 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every word this instrument says, and the order it says them in.
-//!
-//! **A clean page prints nothing.** Not a count of what was inspected:
-//! a person's glance over their own screen is free and an agent's is
-//! paid for, so a run that found nothing has to cost nothing to read,
-//! or it will be dropped from the loop that makes it useful.
-//!
-//! **One line is one edit, never one observation.** Thirty boxes
-//! painted the same undeclared colour are one edit at thirty sites, and
-//! printing them as thirty findings asks for thirty decisions where
-//! there is one.
-//!
-//! **The groups are printed in the order a repair invalidates the
-//! next** ([`Group::IN_ORDER`]), because a reader who starts with
-//! alignment will fix a column, repaint it, and find the column moved.
-//! Getting that order out of the report and into a person's head is the
-//! difference between one pass and an oscillation.
-
 use std::collections::BTreeMap;
 
 mod tagged;
 
 use super::{Deviation, Finding, Group, Near, Page, Population, Sources, vocabulary};
 
-/// How many sites of one repeated finding are listed before the rest
-/// are counted.
 const LISTED: usize = 3;
 
-/// Who the report is written for.
-///
-/// **Two readers, one set of readings.** A person scans: prose, the
-/// sentence first, the numbers inside it. An agent does not scan - it
-/// pays per token and matches on shape - so the same reading is worth
-/// more to it as named fields and worth less as a sentence it has to
-/// parse back into fields.
-///
-/// The tagged form is **denser than the prose, not looser**, which is
-/// the condition for it to exist at all: this module's first rule is
-/// that a clean page costs nothing to read. Everything a machine acts
-/// on is an attribute; the one sentence of prose hangs off the edit
-/// rather than off each of its sites, where the prose form repeats it.
-///
-/// **Tags rather than JSON, for two reasons.** A report cut off by a
-/// token budget is still readable as far as it goes and shows that it
-/// was cut, where a truncated JSON document is not a document. And a
-/// tag is an attention anchor to the models that read this: they are
-/// trained on tagged prompts, so `<why>` and `<fix>` work on them the
-/// way a subheading works on a person, which a JSON key in the middle
-/// of a line does not.
-///
-/// That is also why the split between attribute and element is where
-/// it is. **Attributes hold short machine values** - the rule key, the
-/// counts, the source line - because they are matched, not read.
-/// **Elements hold the two sentences** - why it is a finding, and what
-/// to do - because each one is a thing the reader has to attend to,
-/// and a paragraph buried in an opening tag among six other
-/// attributes is a paragraph nobody attends to.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Shape {
-    /// Sentences, for somebody changing a stylesheet.
+
     Prose,
-    /// Named fields, for something that will act on them.
+
     Tagged,
 }
 
-/// One page as this instrument read it: where it is, what is drawn on
-/// it, what came back off it, and where each class was written.
-///
-/// The four travel together through every sentence this module writes,
-/// because no reading means anything without the page it was taken
-/// from and the source it can be traced back to.
 #[derive(Clone, Copy)]
 pub struct Survey<'a> {
     pub page: &'a Page,
@@ -82,7 +27,6 @@ pub struct Survey<'a> {
     pub sources: &'a Sources,
 }
 
-/// The whole report over one page, or nothing at all.
 pub fn written(survey: Survey<'_>, shape: Shape) -> String {
     let census = vocabulary::unpainted(survey.page);
     if survey.found.is_empty() && census.is_none() {
@@ -114,7 +58,6 @@ pub fn written(survey: Survey<'_>, shape: Shape) -> String {
     out
 }
 
-/// One group: its heading, then one paragraph per edit.
 fn written_group(group: Group, members: &[&Deviation<'_>], sources: &Sources) -> String {
     let mut edits: BTreeMap<String, Vec<&Deviation<'_>>> = BTreeMap::new();
     for one in members {
@@ -143,8 +86,6 @@ fn written_group(group: Group, members: &[&Deviation<'_>], sources: &Sources) ->
     out
 }
 
-/// The property a reading is about, in one sentence. Two readings that
-/// share this sentence are one edit.
 pub fn rule(one: &Deviation<'_>) -> String {
     match one.finding {
         Finding::OutOfStep { among, .. } => among_says(among),
@@ -175,7 +116,6 @@ pub fn rule(one: &Deviation<'_>) -> String {
     }
 }
 
-/// What was read, and where.
 pub fn says(one: &Deviation<'_>) -> String {
     let at = one.at;
     match one.finding {
@@ -240,7 +180,6 @@ pub fn says(one: &Deviation<'_>) -> String {
     }
 }
 
-/// The edit that ends a reading.
 pub fn remedy(one: &Deviation<'_>) -> String {
     match one.finding {
         Finding::OutOfStep {
@@ -297,16 +236,11 @@ fn remedy_out_of_step(among: Population, moved: i64, step: Option<&str>) -> Stri
     format!("move it {moved:+}{named}: {sentence}")
 }
 
-/// One place a repeated edit has to be made, named by the literal a
-/// reader greps for rather than by an identifier they would have to
-/// resolve first.
 fn site(one: &Deviation<'_>, sources: &Sources) -> String {
     match sources.locate(&one.at.class) {
-        // The line that drew it, which is one `edit` away.
+
         Some(found) => format!("{found} \u{b7} {}", says(one)),
-        // Nothing in the tree accounts for what this box is wearing,
-        // so the class is printed for a person to grep. A wrong
-        // location would cost more than an absent one.
+
         None if one.at.class.is_empty() => says(one),
         None => format!("{} class=\"{}\"", says(one), one.at.class),
     }
@@ -338,7 +272,6 @@ fn among_axis(among: Population) -> &'static str {
     }
 }
 
-/// A size in hundredths of a pixel, written the way a person reads it.
 fn pixels(px_x100: u32) -> String {
     let whole = px_x100.checked_div(100).unwrap_or(0);
     let rest = px_x100.checked_rem(100).unwrap_or(0);
@@ -349,8 +282,6 @@ fn pixels(px_x100: u32) -> String {
     }
 }
 
-/// The nearest declared word, when one is near enough that somebody
-/// meant it.
 fn nearby(near: Option<&Near<'_>>) -> String {
     match near {
         Some(near) => format!("; nearest `{}`, {} off", near.token, near.apart),

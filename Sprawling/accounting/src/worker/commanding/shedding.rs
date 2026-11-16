@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Whether the city takes on new work while its volume is close to full
-//! (`Sprawling/app/Spec.lean` §8-116).
-
 #[cfg(test)]
 use std::path::Path;
 
@@ -17,13 +14,7 @@ use kernel::{AxCode, AxError};
 use super::super::RunWorker;
 
 impl RunWorker {
-    /// Reads the city's volume once and refuses new work while it is
-    /// below its free-space floor. A volume that cannot be read admits:
-    /// not knowing is not a full disk.
-    ///
-    /// # Errors
-    /// `BackpressureShed` naming the city's root, whose recovery says
-    /// how many bytes to free.
+
     pub(in crate::worker) fn room_for_new_work(&self) -> Result<(), AxError> {
         (self.read_volume)(&self.city_root)
             .map_or(Ok(()), degradation::admit_work)
@@ -46,8 +37,6 @@ impl RunWorker {
             })
     }
 
-    /// Replaces the volume reader, so a test can inject a volume close
-    /// to full.
     #[cfg(test)]
     pub(in crate::worker) fn read_volume_with(&mut self, read: fn(&Path) -> Option<VolumeSpace>) {
         self.read_volume = read;

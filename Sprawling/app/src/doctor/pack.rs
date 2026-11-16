@@ -3,19 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The rows a page draws as one (`Sprawling/app/spec/Doctor.lean` §8-58).
-//!
-//! Each member of a pack stays a row of the table: it is detected,
-//! judged and installed on its own, and `just prereqs` reads it on its
-//! own. What a pack adds is only that a page shows a person one row and
-//! one install control for the lot, instead of one per cargo subcommand.
-
-/// A set of table rows a page draws as one.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Pack {
-    /// Every cargo subcommand this repository's recipes, workflows and
-    /// documents call. Which ones those are is decided by where the
-    /// repository calls them, and the test below holds the table to it.
+
     RustTools,
 }
 
@@ -40,7 +30,6 @@ mod tests {
     use super::Pack;
     use crate::doctor::{Detection, REQUIREMENTS};
 
-    /// The subcommands cargo carries itself, which no row installs.
     const BUILT_IN: &[&str] = &[
         "add",
         "bench",
@@ -84,17 +73,12 @@ mod tests {
         "xtask",
     ];
 
-    /// Subcommands documents name that no recipe, workflow or check runs,
-    /// so no contributor needs them on every machine: install ways into
-    /// sprawling itself, and tools this repository deliberately keeps off
-    /// the gates (see docs/verification.md § Why Miri is not a gate).
     const WAYS_IN: &[&str] = &["binstall", "miri"];
 
     fn repository() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
     }
 
-    /// Every file under `dir` whose name ends in one of `endings`.
     fn files_under(dir: &Path, endings: &[&str], found: &mut Vec<PathBuf>) {
         let Ok(entries) = std::fs::read_dir(dir) else {
             return;
@@ -112,10 +96,6 @@ mod tests {
         }
     }
 
-    /// The text of one file that can call a program: a recipe or a
-    /// workflow step rather than its comments, in prose only what is
-    /// set as code, and in Rust only a string that starts with `cargo `,
-    /// which is how a command line is spelled there.
     fn commands_of(path: &Path, text: &str) -> Vec<String> {
         let name = path.to_string_lossy();
         if name.ends_with(".md") {
@@ -138,10 +118,6 @@ mod tests {
             .collect()
     }
 
-    /// The cargo tools some command text calls: each `cargo <sub>`
-    /// (past a `+toolchain`) whose `<sub>` cargo does not carry, and
-    /// each `cargo-*` name on an install action's `tool:` line, spelled
-    /// as the program each one installs.
     fn called_in(lines: &[String], called: &mut BTreeSet<String>) {
         let subcommand = |word: &str| {
             word.chars().next().is_some_and(|c| c.is_ascii_lowercase())
@@ -179,9 +155,6 @@ mod tests {
         }
     }
 
-    /// The pack is exactly the cargo tools this repository calls, so a
-    /// tool a recipe starts calling joins it and a tool nothing calls
-    /// any more leaves it; the failure names the difference both ways.
     #[test]
     fn the_rust_tools_pack_is_every_cargo_tool_this_repository_calls() {
         let root = repository();

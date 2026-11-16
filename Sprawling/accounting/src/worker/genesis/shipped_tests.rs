@@ -5,9 +5,6 @@
 
 use crate::worker::*;
 
-/// The skill names the source tree ships: every directory under the city
-/// package's `skills/` that holds a `SKILL.md`, read off the tree rather
-/// than listed, so a skill added there is a skill this test expects.
 fn shipped_names() -> Vec<(String, String)> {
     let skills = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../city/skills");
     let mut names: Vec<(String, String)> = std::fs::read_dir(skills)
@@ -40,10 +37,6 @@ fn shelved(city_root: &std::path::Path) -> Vec<(String, String)> {
     found
 }
 
-/// A new city has every built-in skill on its library shelf, under the
-/// `shipped` section, and a second forming - refused, because history
-/// starts once - leaves that shelf as it was (`Sprawling/city/spec/Library/Install.lean`
-/// §8-28c, city D20).
 #[test]
 fn a_formed_city_has_every_shipped_skill_on_its_shelf() {
     let dir = tempfile::tempdir().unwrap();
@@ -58,9 +51,6 @@ fn a_formed_city_has_every_shipped_skill_on_its_shelf() {
     assert_eq!(shelved(dir.path()), expected);
 }
 
-/// Forming writes one `skill_shelved` per shipped skill, after line zero,
-/// whose digest is the whole-package hash the shelf holds and whose
-/// source is `Shipped` (kernel D23, `Sprawling/city/spec/Library/Install.lean` §8-28c).
 #[test]
 fn a_formed_city_records_each_shipped_skill_it_shelved() {
     use kernel::event::record::{ShelvedFrom, SkillShelved};

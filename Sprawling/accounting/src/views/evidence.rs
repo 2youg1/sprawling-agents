@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a run wrote down that somebody can check it by.
-//!
-//! Two records write a locator a reader can go and look at: the browser
-//! tool storing a screenshot (`bin::browser_tool::storing::stored`) and a plan
-//! node being closed with a completion (`collab::ClaimEffect::PutDown`).
-//! This folds those two and nothing else, so the answer is exactly the
-//! set of things the Ledger says can be looked at again.
-//!
-//! **No bytes.** A row carries the locator and, for a picture, its two
-//! sides; fetching the content is the asset endpoint's. A query that
-//! inlined the pixels would charge "what did this run do" the price of
-//! every screenshot it took.
-
 use kernel::Locator;
 use kernel::event::record::{RoadmapMoved, RoadmapStep};
 use wire::{EventRecord, RunId};
@@ -24,7 +11,7 @@ use super::kinds::Evidence;
 use super::prepared::LedgerAsk;
 
 impl LedgerAsk {
-    /// Every locator this run left behind, oldest first.
+
     pub(super) fn evidence_answer(&self, run: RunId) -> wire::EvidenceAnswer {
         let items = self
             .records_of(run)
@@ -35,11 +22,6 @@ impl LedgerAsk {
     }
 }
 
-/// The one evidence row this record carries, if it carries one.
-///
-/// A record whose locator will not parse produces no row: inventing a
-/// row that points at nothing is worse than one row fewer, and the
-/// record itself is still in the history where the reader can see it.
 fn evidence_in(record: &EventRecord) -> Option<wire::EvidenceItem> {
     let map = record.data().as_map();
     let at = record.seq();
@@ -72,11 +54,6 @@ fn evidence_in(record: &EventRecord) -> Option<wire::EvidenceItem> {
     }
 }
 
-/// The two sides and the media type, when the record wrote all three.
-///
-/// All three or none: a picture with one side is not a size a reader can
-/// lay out with, and half a shape is what invites somebody to default
-/// the other half.
 fn picture_in(result: &serde_json::Map<String, serde_json::Value>) -> Option<wire::Picture> {
     let side = |name: &str| {
         result

@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The seat each hot thread takes from the placement plan: the first
-//! free one, or none when every seat is taken, kept until the thread
-//! exits, and handed to the platform as a soft ideal processor so the
-//! scheduler stays in charge and moves the thread on at once when that
-//! core is busy (`Sprawling/app/spec/Serving/Placement.lean`, D41 and
-//! D45-D47). The seats are the plan `plan` makes of the topology
-//! `reading` reports; `tests` checks this table against the seat model.
-//! This module is also the one place that decides what each arm of the
-//! person's `[core] placement` turns on (D47), the runs' shares included,
-//! and how large the machine budget those shares reserve from is
-//! (`Sprawling/runtime/spec/Reserve.lean` D104).
-
 mod pinned;
 pub(crate) mod plan;
 pub(crate) mod reading;
@@ -33,16 +21,11 @@ use seats::{Holder, Seats};
 
 use super::journal::notice;
 
-/// Where this module's notices say they come from.
 const MODULE: &str = "bin::serving::placement";
 
-/// The one seat table every hot thread of this process sits at, built
-/// from the topology read at the first seat.
 static TABLE: Mutex<Option<Seats>> = Mutex::new(None);
 static NEXT_HOLDER: AtomicU64 = AtomicU64::new(0);
 
-/// A hot thread's seat; dropping it, which a thread does as it exits,
-/// gives the seat back.
 #[derive(Debug)]
 pub(crate) struct Seat(Option<Holder>);
 
@@ -57,9 +40,6 @@ impl Drop for Seat {
     }
 }
 
-/// Takes a seat of `role`'s pool for the calling thread and makes its
-/// processor the thread's soft ideal processor. A refusal is told as a
-/// process notice, here, and the thread runs where the scheduler puts it.
 pub(crate) fn seat_this_thread(name: &'static str, role: Role) -> Seat {
     let holder = Holder(NEXT_HOLDER.fetch_add(1, Ordering::Relaxed));
     let seat = {
@@ -82,17 +62,10 @@ pub(crate) fn seat_this_thread(name: &'static str, role: Role) -> Seat {
     Seat(Some(holder))
 }
 
-/// A driving lane's seat, through the hook `accounting` calls at the top
-/// of every lane (D46); the seat goes back when the lane drops it, so
-/// the lane pool turns over from one run to the next.
 pub(crate) fn seat_lane() -> Box<dyn std::any::Any> {
     Box::new(seat_this_thread("sprawling-drive", Role::Lane))
 }
 
-/// The table of the first seat. With placement off it has no seat;
-/// otherwise power throttling is lifted for the whole process (D40), the
-/// topology read, and the plan's seats kept where the platform has a soft
-/// call to give them to (D41).
 fn first_table() -> Seats {
     match setting() {
         CorePlacement::Off => Seats::new(Vec::new()),
@@ -101,9 +74,6 @@ fn first_table() -> Seats {
     }
 }
 
-/// The person's `[core] placement`, read once for the process. A setting
-/// that does not read is told as a process notice once, here, and
-/// placement stays on (D47).
 fn setting() -> CorePlacement {
     static ARM: OnceLock<CorePlacement> = OnceLock::new();
     *ARM.get_or_init(|| {
@@ -114,25 +84,14 @@ fn setting() -> CorePlacement {
     })
 }
 
-/// The shares each run's commands ask for under the person's arm (D47),
-/// handed to the runtime through `Hands`.
 pub(crate) fn run_shares() -> Shares {
     shares_of(setting(), memory_ceiling())
 }
 
-/// What the operating system keeps for itself under `memory = "auto"`:
-/// the 2 to 2.5 GiB a desktop system takes before any application, at
-/// its lower end (`Sprawling/app/spec/Serving/Memory.lean` §8-173).
 const SYSTEM_KEEPS_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
-/// What the browser tab showing the city is estimated to take under
-/// `memory = "auto"`: the upper end of the 150 to 400 MiB one tab takes.
 const VIEW_KEEPS_BYTES: u64 = 400 * 1024 * 1024;
 
-/// The machine budget every run's heavy work reserves its ceiling from,
-/// one book for the process (`Sprawling/runtime/spec/Reserve.lean` D104). A
-/// `memory` that does not read is told as a process notice once, here,
-/// and the city sizes the budget as if it said `"auto"`.
 pub(crate) fn machine_budget() -> runtime::MachineBudget {
     static BUDGET: OnceLock<runtime::MachineBudget> = OnceLock::new();
     BUDGET
@@ -152,10 +111,6 @@ pub(crate) fn machine_budget() -> runtime::MachineBudget {
         .clone()
 }
 
-/// The budget's bytes: what the person wrote, or under `"auto"` the
-/// physical memory less what the system, the city's page and the city's
-/// own resident budget keep. A machine smaller than those reads as zero,
-/// which starts one piece of heavy work at a time.
 fn budget_bytes(setting: MachineMemory, physical: u64) -> u64 {
     match setting {
         MachineMemory::Bytes(bytes) => bytes,
@@ -166,9 +121,6 @@ fn budget_bytes(setting: MachineMemory, physical: u64) -> u64 {
     }
 }
 
-/// The pinned arm's remaining processors, saved before the core joins
-/// its job. Initialise the same table the first seat uses, so assembly
-/// before that seat still receives the saved mask.
 pub(crate) fn run_affinity() -> runtime::backlog::RunAffinity {
     if setting() != CorePlacement::Pinned {
         return runtime::backlog::RunAffinity::Os;
@@ -180,7 +132,6 @@ pub(crate) fn run_affinity() -> runtime::backlog::RunAffinity {
     pinned::run_affinity()
 }
 
-/// Reads only a User-entered ceiling; invalid settings are reported.
 fn memory_ceiling() -> Option<NonZeroU64> {
     entered_ceiling().unwrap_or_else(|err| {
         notice(MODULE, &format!("run memory ceiling cannot be read: {err}"));
@@ -188,15 +139,12 @@ fn memory_ceiling() -> Option<NonZeroU64> {
     })
 }
 
-/// The ceiling the person entered, or why their file does not read.
 fn entered_ceiling() -> Result<Option<NonZeroU64>, String> {
     accounting::person::read()
         .map(|answer| answer.core.memory_bytes)
         .map_err(|err| err.to_string())
 }
 
-/// What the doctor adds when an entered ceiling does not apply: the arm
-/// is not `"soft_shares"`, or the person's file does not read (D47).
 fn ceiling_note(arm: CorePlacement, entered: &Result<Option<NonZeroU64>, String>) -> String {
     match (arm, entered) {
         (_, Err(err)) => format!("; the memory ceiling does not read, so none applies: {err}"),
@@ -211,7 +159,6 @@ fn ceiling_note(arm: CorePlacement, entered: &Result<Option<NonZeroU64>, String>
     }
 }
 
-/// Only soft_shares requests the explicitly entered memory ceiling.
 fn shares_of(arm: CorePlacement, limit: Option<NonZeroU64>) -> Shares {
     match (arm, limit) {
         (CorePlacement::Off, _) => Shares::Unset,
@@ -222,8 +169,6 @@ fn shares_of(arm: CorePlacement, limit: Option<NonZeroU64>) -> Shares {
     }
 }
 
-/// Lifts this process out of the throttling background work gets,
-/// telling the reason once when the platform refuses (D40).
 fn lift() {
     if let Err(reason) = full_speed() {
         notice(
@@ -233,8 +178,6 @@ fn lift() {
     }
 }
 
-/// The seats of a reading: empty when the plan is left to the operating
-/// system.
 fn seats_of(read: &Result<Topology, Unread>) -> Vec<Processor> {
     match read.as_ref().map(plan::plan) {
         Ok(Plan::Seats(seats)) => seats,
@@ -242,8 +185,6 @@ fn seats_of(read: &Result<Topology, Unread>) -> Vec<Processor> {
     }
 }
 
-/// The plan for a topology read now, with the reason there is none told
-/// once when the topology cannot be read (D45).
 fn planned() -> Vec<Processor> {
     let read = reading::read();
     if let Err(Unread(reason)) = &read {
@@ -255,18 +196,11 @@ fn planned() -> Vec<Processor> {
     seats_of(&read)
 }
 
-/// The seats a hot thread may prefer: none where the platform has no soft
-/// ideal-processor call to hand one to (D41, Windows alone).
 fn soft_table() -> Seats {
     lift();
     Seats::new(if SOFT_CALL { planned() } else { Vec::new() })
 }
 
-/// The pinned arm's table: the soft seats where the platform has them,
-/// and the hard affinity taking this process (D41, D103). Where the
-/// platform has no hard call, or the plan names no processor, the arm says
-/// so and the seats stay soft. One reading serves both, so the mask and
-/// the seats cannot name different processors.
 fn pinned_table() -> Seats {
     lift();
     let seats = planned();
@@ -274,9 +208,6 @@ fn pinned_table() -> Seats {
     Seats::new(if SOFT_CALL { seats } else { Vec::new() })
 }
 
-/// The doctor's line: the topology this machine reports, what the plan
-/// does with it, and what each run's commands share, in the User's words
-/// (D47).
 pub(crate) fn report() -> String {
     let (arm, unread) = match accounting::person::core_placement() {
         Ok(arm) => (arm, String::new()),
@@ -303,11 +234,6 @@ pub(crate) fn report() -> String {
     format!("{threads}; {runs}{ceiling}{unread}")
 }
 
-/// What each run's commands share on this machine, given what the arm
-/// asks for and what the platform can set: Windows sets both halves on
-/// the run's job, macOS has the CPU half alone (`taskpolicy`), and
-/// Linux sets both where its cgroup is delegated, nothing where it is
-/// not (D29, D33).
 fn runs_share(asked: Shares, platform: PlatformShares) -> String {
     const ALONE: &str = "runs' commands compete thread by thread";
     const NOT_DELEGATED: &str = "runs' commands compete thread by thread and run below the core: \
@@ -330,7 +256,6 @@ fn runs_share(asked: Shares, platform: PlatformShares) -> String {
     }
 }
 
-/// [`report`] for a reading already made.
 pub(crate) fn describe(read: &Result<Topology, Unread>) -> String {
     let topology = match read {
         Ok(topology) => topology,
@@ -387,7 +312,6 @@ fn classes(shape: &Shape) -> String {
     }
 }
 
-/// The words for each class, fastest first.
 fn class_names(count: usize) -> Vec<&'static str> {
     match count {
         0 | 1 => vec![""],
@@ -399,11 +323,8 @@ fn class_names(count: usize) -> Vec<&'static str> {
     }
 }
 
-/// Whether the platform has a soft ideal-processor call to hand a seat
-/// to (D41): Windows alone.
 const SOFT_CALL: bool = cfg!(windows);
 
-/// A Windows without power throttling has nothing to lift (D40).
 #[cfg(windows)]
 fn full_speed() -> Result<(), String> {
     desktop_ffi::cpu::full_speed()
@@ -411,16 +332,11 @@ fn full_speed() -> Result<(), String> {
         .map_err(|err| format!("Windows refused to lift it ({err:?})"))
 }
 
-/// macOS and Linux throttle no process for running in the background,
-/// so there is nothing to lift (D40).
 #[cfg(not(windows))]
 fn full_speed() -> Result<(), String> {
     Ok(())
 }
 
-/// The seat as the calling thread's ideal processor, when the thread is
-/// in the seat's processor group: an ideal processor is named inside
-/// the thread's own group.
 #[cfg(windows)]
 fn prefer(seat: Processor) -> Result<(), String> {
     let group = desktop_ffi::cpu::thread_group()

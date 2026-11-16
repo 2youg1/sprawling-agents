@@ -3,22 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Four of the five load scenarios: large-ledger fold, large-worktree
-//! placement, kept-worktree reclaim, and long-session streaming forward.
-//!
-//! The fifth, multi-run parallel, is measured inside `sprawling` by
-//! `instrument_relay_round_trip`, which drives the accounting loop the
-//! city runs. Its relay face is `pub(crate)`, so a scenario here could
-//! only time a copy of that loop, and a copy reads what the copy costs
-//! (citysim D18).
-//!
-//! Each is a thin measuring loop over the product's own public faces
-//! (`Tools/citysim/spec/Bench.lean` §8-6). The load every recorded reading was
-//! taken under is `REGISTERED`, and readings are comparable only within
-//! one fixture. This module lives in the bench Main's tree: the
-//! simulator's scenarios keep their counted clock, and every `Instant`
-//! outside `bin::assembly` is this tree's alone.
-
 use std::path::Path;
 
 use kernel::{Address, B3Hash, Effort, EventDraft, EventRecord, Ledger as _, RunId, TimeMs};
@@ -26,38 +10,24 @@ use storage::{Checkpoint, ModelChoice, Provenance, WorktreeName, Worktrees};
 
 use super::reading::{Load, Reading, SubMetric, Taken};
 
-/// How many of `draft`'s lines the fixture digest is taken over: enough
-/// to cover every field `draft` varies, few enough to cost milliseconds
-/// (citysim D8).
 pub(crate) const PINNED_DRAFTS: u64 = 1_000;
 
-/// The fixed load each scenario runs under. Data, not policy: change a
-/// field, or the shape of `draft`, and the new readings are not
-/// comparable with the register's, which is what `pinned` catches.
 pub(crate) struct Fixture {
-    /// The ledger the fold walks, and how many rebuilds are sampled.
+
     pub(crate) fold_records: u64,
     pub(crate) fold_rounds: u32,
-    /// The placed tree: how many files, how large each one is.
+
     pub(crate) tree_files: u32,
     pub(crate) tree_file_bytes: u32,
-    /// How many trees are placed, and how many events are forwarded.
+
     pub(crate) placements: u32,
     pub(crate) forward_events: u32,
-    /// The 64 hex digits `Fixture::digest` gives for these bytes, so a
-    /// change to them is refused before anything is measured.
+
     pub(crate) pinned: &'static str,
 }
 
 impl Fixture {
-    /// The digest of the bytes this fixture measures: the first
-    /// `PINNED_DRAFTS` of `draft`'s lines, written into a new ledger under
-    /// `scratch` by the product's own writer, digested by
-    /// `citysim::ledger_digest`; then those 32 bytes joined with the
-    /// little-endian bytes of every numeric field, digested once more.
-    ///
-    /// # Errors
-    /// Whatever the writer or the digest refused.
+
     pub(crate) fn digest(&self, scratch: &Path) -> Result<B3Hash, String> {
         let dir = scratch.join("fixture-digest");
         match std::fs::remove_dir_all(&dir) {
@@ -86,7 +56,6 @@ impl Fixture {
     }
 }
 
-/// The registered load: the fixture every baseline reading names.
 pub(crate) const REGISTERED: Fixture = Fixture {
     fold_records: 50_000,
     fold_rounds: 5,
@@ -97,10 +66,6 @@ pub(crate) const REGISTERED: Fixture = Fixture {
     pinned: "1dc560ad5766de65f16ac021f4a5b9cf2dd089cfae4cfc1378cb142e05b6ed28",
 };
 
-/// Runs every load scenario and returns its readings.
-///
-/// # Errors
-/// Propagates whatever a scenario's public face refused.
 pub(crate) fn all(scratch: &Path, fixture: &Fixture, taken: Taken) -> Result<Vec<Reading>, String> {
     let mut readings = Vec::new();
     for load in Load::ALL {
@@ -115,8 +80,6 @@ pub(crate) fn all(scratch: &Path, fixture: &Fixture, taken: Taken) -> Result<Vec
     Ok(readings)
 }
 
-/// Large-ledger fold: the whole production rebuild over a large ledger -
-/// verify the chain, parse every line, fold it into every view.
 fn large_ledger_fold(
     scratch: &Path,
     fixture: &Fixture,
@@ -147,11 +110,6 @@ fn large_ledger_fold(
     )?])
 }
 
-/// Large-worktree placement: one claim places a new node's tree by
-/// taking over the stock, which is checked out at the trunk before the
-/// clock starts, where the city checks it out while nobody waits
-/// (citysim D13). The seam does not split the rename
-/// from git's bookkeeping, so the reading is priced whole.
 fn large_worktree_placement(
     scratch: &Path,
     fixture: &Fixture,
@@ -179,9 +137,6 @@ fn large_worktree_placement(
     )?])
 }
 
-/// Kept-worktree reclaim: a node's second run takes back the tree its
-/// first run left, with the trunk unmoved in between. Priced whole for
-/// the same reason as the first placement.
 fn kept_worktree_reclaim(
     scratch: &Path,
     fixture: &Fixture,
@@ -214,8 +169,6 @@ fn kept_worktree_reclaim(
     )?])
 }
 
-/// A city of `fixture.tree_files` files under `bulk`, with the base
-/// commit every worktree branches from.
 fn placement_city(city_root: &Path, fixture: &Fixture) -> Result<Worktrees, String> {
     let bulk = city_root.join("bulk");
     std::fs::create_dir_all(&bulk).map_err(|why| format!("{why}"))?;
@@ -245,10 +198,6 @@ fn node(i: u32) -> Result<WorktreeName, String> {
     WorktreeName::parse(&format!("node-{i}")).map_err(|why| format!("{}", why.into_ax()))
 }
 
-/// Long-session streaming forward: every event of one long session,
-/// framed and serialised the way the socket would send it. The network
-/// is deliberately outside the timed span - the reading is the local
-/// processing latency this harness owns.
 fn long_session_forwarding(fixture: &Fixture, taken: Taken) -> Result<Vec<Reading>, String> {
     let mut ledger = citysim::MemLedger::new();
     for n in 0..fixture.forward_events {

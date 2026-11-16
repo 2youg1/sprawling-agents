@@ -3,17 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One assertion suite for every tool implementation (V3).
-//! The part `Sprawling/kernel/spec/Tool.lean` specifies this module with the
-//! rest of `kernel::tool`.
-
 use super::{Tool, ToolCall, ToolName};
 use crate::error::AxCode;
 use crate::event::Payload;
 
-/// Asserts the meta is complete and the identity is fail-closed:
-/// a wrong-name call is refused with `E_INVALID_ARGS`, and the tool
-/// still answers after refusing (no poisoned state).
 #[cfg(feature = "conformance")]
 #[allow(
     clippy::panic,

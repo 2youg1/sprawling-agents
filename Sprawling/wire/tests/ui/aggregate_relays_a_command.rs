@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Constitution 13.6: "the aggregation layer forwards Queries and Events and
-// never forwards a Command." Not a check inside `ask` - `ask` accepts a
-// Query, and there is no sibling that accepts a Command, so relaying one
-// has no spelling.
-
 fn main() {
     let aggregate = wire::Aggregate::new();
     let elsewhere = wire::CityLabel::parse("attic").unwrap();

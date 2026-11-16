@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The first line of a segment, read without reading the segment.
-//!
-//! The version probe and the city's identity both need line 1 alone,
-//! and a segment grows to tens of megabytes: lifting it whole to split
-//! off one line made a single-segment ledger cost two full reads on
-//! every open (`Sprawling/storage/spec/Jsonl.lean` §8-1). The window starts at one page and
-//! doubles, so a line of any length costs at most twice its own bytes.
-
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -23,20 +15,8 @@ use crate::vfs::Vfs;
 use super::ledger::{JsonlLedger, u64_count};
 use super::open::unversioned;
 
-/// The first window a reader of a line of unknown length asks for; each
-/// next window is twice the last. `jsonl::tail` reads backwards by the
-/// same rule (`Sprawling/storage/spec/Jsonl.lean` §8-1), and the side
-/// index reads a segment's new records forward by it (storage D32).
 pub(crate) const FIRST_WINDOW_BYTES: u64 = 4096;
 
-/// The first `\n`-terminated line of `path`, without its `\n`.
-///
-/// `None` when the file holds no terminated line: an empty segment, or
-/// one whose first line is torn, which is tail recovery's to judge.
-///
-/// # Errors
-/// Propagates a read the filesystem refuses, and a line longer than a
-/// `u64` counts.
 pub(crate) fn first_line(vfs: &dyn Vfs, path: &Path) -> io::Result<Option<Vec<u8>>> {
     let mut line = Vec::new();
     let mut window = FIRST_WINDOW_BYTES;
@@ -56,8 +36,7 @@ pub(crate) fn first_line(vfs: &dyn Vfs, path: &Path) -> io::Result<Option<Vec<u8
 }
 
 impl JsonlLedger {
-    /// Direction-aware version refusal, before any repair or parse
-    /// (never a partial read of a newer ledger).
+
     pub(super) fn probe_version(&mut self, segments: &[PathBuf]) -> Result<(), StorageError> {
         let Some(first) = segments.first() else {
             return Ok(());
@@ -65,14 +44,10 @@ impl JsonlLedger {
         let Some(first_line) =
             first_line(self.vfs.as_ref(), first).map_err(io_err("read segment", first))?
         else {
-            // Empty or torn-before-first-line segment: version unknowable;
-            // tail recovery decides what remains.
+
             return Ok(());
         };
-        // A mangled first line in a single-segment ledger is tail damage:
-        // it carries no version information, and tail recovery owns it.
-        // With more segments behind it the same damage is non-tail and
-        // must refuse instead (`Sprawling/storage/spec/Jsonl.lean` §8-1).
+
         let probed = serde_json::from_slice::<serde_json::Value>(&first_line)
             .ok()
             .and_then(|value| value.get("v").and_then(serde_json::Value::as_u64));
@@ -96,8 +71,7 @@ impl JsonlLedger {
             None => return Ok(()),
         };
         match readable_log_v(v) {
-            // An older ledger opens: the history is append-only and the
-            // lines an earlier build wrote are still its history.
+
             LogVersion::Current | LogVersion::Older => Ok(()),
             LogVersion::Ahead => Err(StorageError::VersionAhead {
                 path: first.clone(),
@@ -138,9 +112,6 @@ mod tests {
         }
     }
 
-    /// With more segments behind it, a first line that carries no version is
-    /// damage inside the history, not a torn tail: open refuses at line 1
-    /// rather than reading past it (`Sprawling/storage/spec/Jsonl.lean` §8-1).
     #[test]
     fn a_mangled_first_line_with_segments_behind_it_is_refused() {
         let dir = tempfile::tempdir().unwrap();
@@ -164,9 +135,6 @@ mod tests {
         );
     }
 
-    /// The first line is read whole however far it runs past the first
-    /// window, so a long first record is probed for its version rather than
-    /// read as torn.
     #[test]
     fn a_first_line_longer_than_the_first_window_is_read_whole() {
         let dir = tempfile::tempdir().unwrap();

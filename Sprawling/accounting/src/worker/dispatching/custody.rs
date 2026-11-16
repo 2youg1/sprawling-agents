@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A key a person pastes into a dispatch goes to the vault, and the
-//! dispatch carries its `secret:` reference instead (`Sprawling/app/Spec.lean`
-//! §8-87).
-
 use kernel::{AxCode, AxError, Sealed, SecretRef};
 use zeroize::Zeroizing;
 
@@ -16,21 +12,10 @@ use super::super::credentials::signing::Arrival;
 #[cfg(test)]
 mod tests;
 
-/// The realm every pasted key is kept under.
 const REALM: &str = "pasted";
 
 impl RunWorker {
-    /// Moves every provider-shaped key in `text` into the vault and
-    /// returns the text with each key replaced by its reference.
-    ///
-    /// Only shape-table hits are taken: an entropy hit is as often a
-    /// commit hash the resident has to read as it is a credential. Text
-    /// with no hit comes back as it arrived, without a copy.
-    ///
-    /// # Errors
-    /// Propagates the vault refusing the key and the ledger refusing
-    /// its `secret_captured` record. The caller must not go on with the
-    /// original text, because that is the leak this exists to close.
+
     pub(in crate::worker) fn take_custody(&mut self, text: String) -> Result<String, AxError> {
         match kept_text(&text, |provider, key| self.keep_pasted(provider, key))? {
             Some(kept) => {
@@ -41,9 +26,6 @@ impl RunWorker {
         }
     }
 
-    /// Puts one pasted key in the vault under a name no earlier key
-    /// holds: the ledger's next position, which the `secret_captured`
-    /// record this writes moves past.
     fn keep_pasted(&mut self, provider: &str, key: &str) -> Result<SecretRef, AxError> {
         let reference = SecretRef::new(
             REALM,
@@ -58,15 +40,6 @@ impl RunWorker {
     }
 }
 
-/// `text` with every provider-shaped key replaced by what `keep` puts in
-/// its place, or `None` when `text` holds no such key.
-///
-/// Only shape-table hits are taken: an entropy hit is as often a commit
-/// hash the resident has to read as it is a credential.
-///
-/// # Errors
-/// Propagates `keep` refusing a key, and a span off the text's character
-/// boundaries.
 pub(in crate::worker) fn kept_text<InPlace: std::fmt::Display>(
     text: &str,
     mut keep: impl FnMut(&str, &str) -> Result<InPlace, AxError>,
@@ -91,10 +64,6 @@ pub(in crate::worker) fn kept_text<InPlace: std::fmt::Display>(
     Ok(Some(kept))
 }
 
-/// A span `scan` returned that does not fall on the text's character
-/// boundaries. `scan` promises in-bounds spans over ASCII shapes, so this
-/// is a defect in that promise, and the dispatch stops rather than
-/// sending the text on.
 fn outside_text() -> AxError {
     AxError::failure(
         AxCode::InvalidArgs,

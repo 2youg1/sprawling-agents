@@ -3,29 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What this crate's twelve modules say when persistence refuses, and
-//! the one door that turns it into an `AxError`
-//! (`Sprawling/storage/spec/Error.lean` §8-14).
-//!
-//! **Why this is a module of its own.** `Sprawling/storage/Spec.lean` §7 recorded
-//! the condition when the type was born: it lived beside the ledger
-//! while fewer than three modules aggregated here, and moved out at
-//! three. Most of the crate's modules import it today, and most of its
-//! variants describe failures the ledger cannot produce — a corrupt CAS
-//! object, a bundle that is not a city, a worktree that is behind
-//! the trunk. Executing a decision whose stated condition has arrived
-//! needs no new argument.
-//!
-//! One rule holds the type together: **a variant carries the operation,
-//! the subject and the recovery, and never the bytes**, and
-//! `SecretEgress` is where that is load-bearing.
-
 use std::io;
 use std::path::{Path, PathBuf};
 
 use kernel::{AxCode, AxError};
 
-/// Crate root error; crosses the crate boundary only via [`StorageError::into_ax`].
 #[derive(Debug, thiserror::Error)]
 pub enum StorageError {
     #[error("{op} failed at {path}: {source}")]
@@ -59,69 +41,50 @@ pub enum StorageError {
     SeqMissing { seq: u64 },
     #[error("checkpoint {op} failed: {detail}")]
     Checkpoint { op: &'static str, detail: String },
-    /// The refusal's code, scope, locations and reasons. The matched bytes
-    /// are never carried — proving a secret leaked by reprinting it would be
-    /// the leak. The same report is written as `secret_egress_blocked`.
+
     #[error("staged content matches known secret shapes at {}", .0.locations())]
     SecretEgress(kernel::event::record::SecretEgressBlocked),
-    /// An export or restore that is well-formed I/O but not a city:
-    /// an occupied destination, a bundle whose manifest disagrees with
-    /// what arrived, a chain with a gap.
+
     #[error("bundle {op} refused: {detail}")]
     Bundle { op: &'static str, detail: String },
-    /// A tree that cannot be opened, added or pruned. Environment, not
-    /// policy: the repository or the filesystem said no.
+
     #[error("worktree {op} failed: {detail}")]
     Worktree { op: &'static str, detail: String },
-    /// A tree that cannot be granted now: the node already holds one, or
-    /// granting it would cross the ceiling. Both are answered by giving
-    /// a tree back, which is why they share a code.
+
     #[error("worktree {name} cannot be opened: {detail}")]
     WorktreeBusy { name: String, detail: String },
-    /// A node's work that no longer sits on top of the trunk. Not a
-    /// storage fault: the work is intact, and whether it still applies
-    /// is the question a machine must not answer by itself.
+
     #[error("worktree {name} is behind the trunk: {detail}")]
     MergeStale { name: String, detail: String },
-    /// A merge that would overwrite or delete a tracked file the person
-    /// changed in the city folder and has not committed.
+
     #[error("merging would discard uncommitted changes to {}", paths.join(", "))]
     MergeWouldDiscard { paths: Vec<String> },
-    /// A name that is an alias. The family is refused whole (`Sprawling/storage/spec/Alias.lean`
-    /// §8-25): a write through one lands where the name does not say.
+
     #[error("{op} refused at {path}: that name is a {kind}")]
     Alias {
         op: &'static str,
         path: PathBuf,
         kind: crate::alias::AliasKind,
     },
-    /// Something already stands at the name a create asked for: the
-    /// file system answered at the moment of the write, so a second of
-    /// two racing creates meets this (`Sprawling/storage/spec/Alias.lean` §8-32).
+
     #[error("{} already exists", path.display())]
     NameTaken { path: PathBuf },
-    /// Another handle holds this city's writer lock: a second process,
-    /// or a second ledger in this one (`Sprawling/storage/spec/Jsonl.lean` §8-1).
+
     #[error("the ledger at {dir} is held by another writer")]
     LedgerHeld { dir: PathBuf },
-    /// A wave's write or barrier failed, so what the disk holds past
-    /// `at` is unknown to this handle; only a reopen can judge it
-    /// (`Sprawling/storage/spec/Jsonl.lean` §8-1).
+
     #[error("the ledger at {} lost its barrier at seq {}", dir.display(), at.value())]
     LedgerBroken { dir: PathBuf, at: kernel::Seq },
-    /// A whole-chain audit found a broken line, so this writer stopped
-    /// taking new lines; `source` is the audit's own reason (8-30).
+
     #[error("the ledger stopped taking writes because its chain failed verification")]
     ChainHalted {
         #[source]
         source: AxError,
     },
-    /// This writer waits for the proof of the history it opened from, and
-    /// writes nothing until the proof is whole (8-30).
+
     #[error("the ledger takes no line until the history it opened from is proved")]
     Unproven,
-    /// The disk refused a snapshot read or write. A snapshot is a cache
-    /// the Ledger rebuilds, so its advice differs from `Io`'s (8-26).
+
     #[error("{op} failed at {path}: {source}")]
     Snapshot {
         op: &'static str,
@@ -132,11 +95,10 @@ pub enum StorageError {
 }
 
 impl StorageError {
-    /// The only exit across the crate boundary.
+
     pub fn into_ax(self) -> AxError {
         match self {
-            // Storage write failure is process-fatal; E_STORAGE_FATAL is its loadtime
-            // code.
+
             StorageError::Io { op, path, source } => {
                 AxError::failure(AxCode::StorageFatal, op, path.display().to_string())
                     .with_recovery(format!(
@@ -218,8 +180,7 @@ impl StorageError {
                         path.display()
                     ))
             }
-            // An absent seq is the caller asking for a line that was
-            // never written — not damage, so not a storage fault.
+
             StorageError::SeqMissing { seq } => {
                 AxError::failure(AxCode::InvalidArgs, "read ledger line", seq.to_string())
                     .with_recovery("ask for a seq the ledger actually holds")
@@ -280,10 +241,6 @@ impl StorageError {
     }
 }
 
-/// Wraps a failed filesystem call in the operation and path that were
-/// being attempted. Written as a closure so a caller reads
-/// `.map_err(io_err("read a bundle file", &path))?` at the call it
-/// describes.
 pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) -> StorageError {
     let path = path.to_path_buf();
     move |source| StorageError::Io { op, path, source }
@@ -293,9 +250,6 @@ pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) ->
 mod tests {
     use super::StorageError;
 
-    /// A recovery the User reads is one sentence: a string continued
-    /// across source lines without its `\` once carried the next line's
-    /// indentation into the snapshot advice.
     #[test]
     fn a_snapshot_recovery_reads_as_one_sentence() {
         let refused = StorageError::Snapshot {

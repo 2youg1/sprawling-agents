@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a drive left, on the ledger before it is made true.
-
 use kernel::AxError;
 
 use crate::effect;
@@ -12,22 +10,7 @@ use crate::effect;
 use super::super::{Assignment, Desks, Reporter, RunWorker, Settling, Site, held};
 
 impl RunWorker {
-    /// Settles the three desks that leave lines behind, in the order the
-    /// history takes them.
-    ///
-    /// Each one goes through `RunWorker::settle`, which appends before it
-    /// changes anything: `effect::Then` has no source but
-    /// `Landing::record`, so a change that outran its own line cannot be
-    /// written from here (section 8-24).
-    ///
-    /// The room's queue is already home by the time this runs: it is
-    /// given back in `return_borrowed`, before the drive's own outcome
-    /// is read, because a queue returned only on the happy path is a
-    /// queue lost exactly when the disk went wrong.
-    ///
-    /// # Errors
-    /// Propagates a payload that will not build, any line the ledger
-    /// refuses, and a shared plan that cannot be read or written.
+
     pub(in crate::worker) fn settle_desks(
         &mut self,
         site: &Site,
@@ -42,41 +25,22 @@ impl RunWorker {
         } = settling;
         let (addr, who, run_id) = (&at.addr, site.who.as_str(), site.run_id);
         let building = &site.building;
-        // What the run said is already on the ledger, in its rooms, and
-        // knocked on where nobody was working: each line crossed the
-        // relay at the call and was delivered there (collab D7). What is
-        // left is the one knock on this run's own room when it left with
-        // signals no recorded answer read (collab D8).
+
         let unread = held(&desks.signals, "settle the signal desk")?.take_unread();
         self.knock_for_returned(&unread, at.policy, &chain)?;
-        // Every desk below settles through one door, and that door
-        // appends before it changes anything: `effect::Then` has no
-        // other source than `Landing::record`, so a change that outran
-        // its own line cannot be written here.
-        // The sweep the forecast cannot replace. A command can be
-        // obfuscated past a text prediction; what is missing from the
-        // working tree cannot be talked out of. The base is the first
-        // checkpoint of this drive, so everything the whole drive deleted is
-        // reported once rather than once per wave.
-        // The diff itself was read on the lane before the run came home
-        // (`Sprawling/app/spec/Accounting/Landing.lean` D37); only its
-        // lines are written here.
+
         if let Some(swept) = sweep.swept {
             let base = swept.base;
             let discarded = swept.discarded?;
             let swept = discarded.len();
             let lost = effect::Landing::discards(discarded, addr, who);
             self.settle(at, run_id, lost, &chain)?;
-            // Over the threshold a person is told, and the class is one
-            // no policy can waive. Each file is restorable on its own;
-            // what the count says is that nobody meant this.
+
             if swept
                 > usize::try_from(kernel::consts_policy::DISCARD_FILES_MAX).unwrap_or(usize::MAX)
             {
                 let item = kernel::ApprovalItem {
-                    // The sweep's own slot in this run: one escalation
-                    // per run, at a position the run's call counter
-                    // never reaches (`Sprawling/kernel/Spec.lean` §8-21).
+
                     id: kernel::ApprovalId::of_sweep(&run_id),
                     actor: who.to_owned(),
                     artifact: sweep.job_locator.clone(),
@@ -99,10 +63,7 @@ impl RunWorker {
                 );
             }
         }
-        // What the run did to the plan. This is the freeze path: a node
-        // still held here was neither finished nor stopped, and the
-        // `Held` dies with the desk, so it is spent on its one exit now
-        // or the row stays `In progress` for ever.
+
         let (claim_effects, plan_changed) = {
             let mut desk = held(&desks.plan, "settle the plan desk")?;
             desk.abandon()?;
@@ -110,11 +71,7 @@ impl RunWorker {
         };
         if plan_changed {
             let on_disk = city::roadmap(&self.city_root, building.addr())?;
-            // A node's claim is closed the moment its closing line is on
-            // the ledger, not when `Roadmap.md` is rewritten or the whole
-            // landing is: a refusal part-way leaves owed only the nodes
-            // whose last line still reads them as held (`Sprawling/app/Spec.lean`
-            // §8-42-8).
+
             let mut close =
                 |closing: effect::Closing| self.record_closing(run_id, closing, open_claims);
             match effect::Claims::of(&claim_effects, &on_disk, desks.plan_path.clone(), addr, who)?

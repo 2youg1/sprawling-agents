@@ -3,26 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One node, one working tree (`Sprawling/storage/spec/Worktree.lean` §8-9).
-//!
-//! Concurrency inside a building is not held apart by discipline but by
-//! the filesystem: each node works in its own checkout, so two agents
-//! cannot see each other's half-finished state, and what comes back
-//! comes back through the PR flow.
-//!
-//! The trees are git worktrees of the repository `crate::checkpoint`
-//! already keeps, so objects are shared and only the working files are
-//! duplicated. A tree is refused before it is created, never halfway
-//! through: the size of the tree to be copied is measured against
-//! `WORKTREE_MAX_BYTES` first, and the refusal states both numbers.
-//!
-//! Copy-on-write cloning (reflink) is the cheaper path on filesystems
-//! that offer it, and this module does not attempt it: there is no CoW
-//! interface without unsafe FFI or a new dependency, so every tree is a
-//! full checkout under the ceiling. What moves the checkout off the path
-//! a run waits on is the stock: one tree checked out ahead of time and
-//! taken over by the next placement with a rename (`Sprawling/storage/spec/Worktree/Trees/Stock.lean` §8-35).
-
 mod back;
 mod landing;
 mod lease;

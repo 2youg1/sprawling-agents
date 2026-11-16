@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A dispatch driven against the models the worker was handed
-//! (`Sprawling/accounting/Spec.lean` section 2).
-//!
-//! The endpoint the city is pointed at refuses every connection, so a
-//! scripted answer can reach the history only through the factory the
-//! worker received. A worker that still built its own adapter out of the
-//! endpoint book would call the dead port and never meet the script.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -26,9 +18,7 @@ use kernel::{
     Address, AxCode, AxError, ContentBlock, EventKind, EventRecord, IdemKey, Model, ModelRequest,
     ModelReturn, RunId, Seq,
 };
-// The city is formed with an in-memory vault, because these tests are
-// about the worker and must not write to the credential service of the
-// machine that runs them.
+
 use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
@@ -36,11 +26,9 @@ const LAB: &str = "lab";
 const MAIN: &str = "scripted";
 const DIGEST: &str = "namer";
 const ANSWER: &str = "the answer the script wrote";
-/// The room the rule names from the task `Answer.`.
+
 const ROOM: &str = "answer";
 
-/// Answers every call with the same text and no tool calls, so a run
-/// ends on its first turn.
 struct Script(&'static str);
 
 impl Model for Script {
@@ -54,8 +42,6 @@ impl Model for Script {
     }
 }
 
-/// Hands out a `Script` for every model, and keeps the id of each model
-/// it was asked for.
 struct Scripted {
     says: &'static str,
     asked: Arc<Mutex<Vec<String>>>,
@@ -81,8 +67,6 @@ fn scripted(says: &'static str) -> (Scripted, Arc<Mutex<Vec<String>>>) {
     (factory, asked)
 }
 
-/// A loopback address nothing listens on: bound once for a free port,
-/// then released.
 fn refusing_url() -> String {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -94,9 +78,6 @@ fn idem(what: &[u8]) -> IdemKey {
     IdemKey::derive(&RunId::CITY, Seq::FIRST, what)
 }
 
-/// A city whose main and digest models both sit on `base_url`, whose
-/// one building is raised from `template`, and whose worker reaches
-/// every model through `factory`; with the directory its ledger is in.
 fn city_on(
     dir: &Path,
     base_url: String,
@@ -126,8 +107,7 @@ fn city_on(
             auth_header: None,
             admit: vec![MAIN.to_owned(), DIGEST.to_owned()],
             named: Vec::new(),
-            // One try, briefly: a worker that still calls the dead port
-            // should fail its test at once rather than retry into it.
+
             tuning: wire::EndpointTuning {
                 timeout_ms: Some(2_000),
                 request_max_retries: Some(0),
@@ -180,7 +160,6 @@ fn dispatch(
     })
 }
 
-/// Whether the history holds a line of `kind` that carries `text`.
 fn history_says(ledger: &Path, kind: EventKind, text: &str) -> bool {
     runtime::replay::verify_ledger_dir(ledger)
         .unwrap()
@@ -197,11 +176,7 @@ fn a_dispatch_reaches_the_model_the_worker_was_handed() {
     let dir = tempfile::tempdir().unwrap();
     let (factory, _) = scripted(ANSWER);
     let (mut worker, ledger) = city_on(dir.path(), refusing_url(), "minimal", factory);
-    // Named, so the room is opened rather than named from the task:
-    // this test is about the run's model and nothing else.
-    // Judged on the history rather than on this result: a run that met
-    // the dead port is a history with a failure in it, not necessarily a
-    // refused command.
+
     let dispatched = dispatch(&mut worker, Some(kernel::SessionName::parse("s1").unwrap()));
 
     assert!(
@@ -215,9 +190,7 @@ fn an_unnamed_dispatch_asks_the_factory_for_the_run_model_alone() {
     let dir = tempfile::tempdir().unwrap();
     let (factory, asked) = scripted(ANSWER);
     let (mut worker, ledger) = city_on(dir.path(), refusing_url(), "minimal", factory);
-    // No session, so the room is named from the task's own words by
-    // rule (`Sprawling/app/Spec.lean` §8-86): the factory is asked for the run's
-    // model and never for a digest model to name the room with.
+
     let dispatched = dispatch(&mut worker, None);
 
     assert_eq!(
@@ -234,11 +207,7 @@ fn an_unnamed_dispatch_asks_the_factory_for_the_run_model_alone() {
 fn a_confidential_building_refuses_before_the_factory_is_asked() {
     let dir = tempfile::tempdir().unwrap();
     let (factory, asked) = scripted(ANSWER);
-    // A name in the reserved `.invalid` domain (RFC 6761): not on this
-    // machine, so the confidential gate refuses it, and its lookup fails
-    // at once on every platform. Attaching the endpoint probes it; a
-    // documentation address (RFC 5737) was dropped rather than refused
-    // on some hosts, so that probe waited out its whole deadline.
+
     let (mut worker, _) = city_on(
         dir.path(),
         "http://confidential.invalid/v1".to_owned(),

@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Going back to a point, and taking one file back from a point.
-//!
-//! `Sprawling/storage/spec/Worktree/Back.lean` holds which properties these two
-//! must keep (`Sprawling/storage/spec/Worktree/Back.lean` §8-27): a tree opened at a point holds that
-//! point's files, a live name or an existing line of work is refused
-//! rather than replaced, and neither step touches the trunk or another
-//! run's tree.
-
 use std::path::{Component, Path};
 
 use kernel::GitOid;
@@ -26,14 +18,7 @@ use super::name::WorktreeName;
 use super::trees::Worktrees;
 
 impl Worktrees {
-    /// Opens a new tree whose branch starts at `point`. The trunk and the
-    /// city working tree do not move: another run may be writing, and
-    /// the trunk is where its work lands.
-    ///
-    /// # Errors
-    /// `WorktreeBusy` when the name holds a live tree or a branch, or the
-    /// city working tree is over the ceiling; `Worktree` when `point` is
-    /// not a commit of the city.
+
     pub fn claim_at(
         &self,
         name: &WorktreeName,
@@ -48,8 +33,7 @@ impl Worktrees {
         }
         let city = self.refuse_oversized(name.as_str())?;
         let commit = self.commit_at(point)?;
-        // Never forced: an existing branch is a line of work, and
-        // replacing it would drop somebody's writes.
+
         let branch = self
             .repo
             .branch(name.as_str(), &commit, false)
@@ -66,8 +50,7 @@ impl Worktrees {
         match self.add_tree(name, Some(branch.get()), &city) {
             Ok(lease) => Ok(lease),
             Err(refusal) => {
-                // The branch was made for this tree alone; left behind, it
-                // would hold the name as a line of work nobody started.
+
                 let mut branch = branch;
                 branch.delete().map_err(|err| StorageError::Worktree {
                     op: "remove the branch of a tree that did not open",
@@ -78,15 +61,6 @@ impl Worktrees {
         }
     }
 
-    /// Takes `path` back from `point` into the tree `lease` holds: the
-    /// point's bytes when it holds the file, and no file when it does
-    /// not. No other tree and not the trunk are touched. Returns the
-    /// `file_restored` record of this step for the caller to append.
-    ///
-    /// # Errors
-    /// Refuses a path that is empty, absolute, climbs, or names the
-    /// reserved subtree; a point that is not a commit of the city; and a
-    /// path the point holds as something other than a file.
     pub fn restore_file(
         &self,
         lease: &WorktreeLease,
@@ -156,12 +130,6 @@ impl Worktrees {
     }
 }
 
-/// `path` in the spelling a git tree uses, or `None` when it is empty,
-/// leaves the tree, names the reserved subtree, or holds a segment Win32
-/// folds onto another name (a trailing `.` or space, a `:` stream
-/// suffix, or a `~` and a digit, the shape of an 8.3 short name), because
-/// `.git.` and, where the volume makes short names, `GIT~1` there name
-/// the tree's `.git` link.
 fn in_tree(path: &Path) -> Option<String> {
     let segments = path
         .components()

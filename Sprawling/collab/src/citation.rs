@@ -3,39 +3,23 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A quote checked against the version pinned for review.
-//!
-//! The citation is the smallest form that can be checked mechanically:
-//! the quoted words and the `cas:` or `file:` [`Locator`] range they
-//! claim to come from. A verification run calls [`Citation::against`]
-//! once per citation and reports every reading that is not
-//! [`Reading::Holds`]; what to check and why stays with the model.
-
 use kernel::{Locator, Range};
 
-/// A quote and the place it claims to come from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Citation {
     quote: String,
     at: Locator,
 }
 
-/// What comparing one citation with the pinned version found.
-///
-/// An outcome rather than an error: a misquote is what a verification
-/// run exists to report, not a fault for `?` to carry away.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Reading {
-    /// After normalisation, the range says exactly the quote.
+
     Holds,
-    /// The citation names a different version from the pinned one, so
-    /// matching words would prove nothing about the text under review.
+
     OtherVersion,
-    /// The range runs past the pinned version, or lands on bytes that
-    /// are not UTF-8.
+
     OutOfRange,
-    /// The range exists and says something else; `found` is its
-    /// normalised text, for the report to quote.
+
     Differs { found: String },
 }
 
@@ -55,8 +39,6 @@ impl Citation {
         &self.at
     }
 
-    /// Compares the quote with `bytes`, the content `pinned` resolves
-    /// to. The version is judged before any text is read.
     #[must_use]
     pub fn against(&self, pinned: &Locator, bytes: &[u8]) -> Reading {
         if !same_version(&self.at, pinned) {
@@ -79,8 +61,6 @@ impl Citation {
     }
 }
 
-/// Whether two locators name the same content, whatever range each
-/// carries.
 fn same_version(cited: &Locator, pinned: &Locator) -> bool {
     match (cited, pinned) {
         (Locator::Cas { hash: a, .. }, Locator::Cas { hash: b, .. }) => a == b,
@@ -107,9 +87,6 @@ fn range_of(at: &Locator) -> Option<Range> {
     }
 }
 
-/// The text a range selects, or `None` when it runs past the end or
-/// is not UTF-8. Line ranges are 1-based and byte ranges 0-based, both
-/// closed, as the Locator grammar defines them.
 fn cited_text(range: Option<Range>, bytes: &[u8]) -> Option<String> {
     match range {
         None => std::str::from_utf8(bytes).ok().map(str::to_owned),
@@ -134,9 +111,6 @@ fn cited_text(range: Option<Range>, bytes: &[u8]) -> Option<String> {
     }
 }
 
-/// Line breaks and indentation are layout, not content; anything
-/// further (case, punctuation) would let a quote that changed the
-/// meaning pass.
 fn normalised(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }

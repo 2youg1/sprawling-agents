@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The `browser` tool: every action over one session.
-//!
-//! It lives in the assembly layer rather than in `browser` because a
-//! screenshot has to land in `storage::cas`, and the browser crate has no
-//! dependency on memory and should not grow one. What crosses between
-//! them is a `Shot` — bytes and two integer sides — so the decisions
-//! stay in the pure crate and the bytes stay here.
-
 use std::sync::Mutex;
 
 use browser::{
@@ -38,43 +30,31 @@ pub(crate) use guarding::{Served, serve};
 use person::PERSON_DISCLOSURE;
 pub(crate) use person::Role;
 
-/// The tool a building whose rules say `browser = true` gets.
 pub(crate) struct BrowserTool {
     meta: ToolMeta,
-    /// One tab, driven by one call at a time: two calls interleaving
-    /// their frames would each act on a page the other changed.
+
     browser: Mutex<Browser>,
 }
 
-/// What driving the tab holds between calls.
 struct Browser {
     port: Box<dyn BrowserPort + Send>,
     session: Session,
-    /// The tab this tool drives, opened on the first call rather than at
-    /// construction: a building that admits the tool and never uses it
-    /// should not start a browser.
+
     context: Option<ContextId>,
-    /// The page as it was last looked at. A reference is a position in
-    /// this, which is why acting without it is refused rather than
-    /// guessed.
+
     snapshot: Option<PageSnapshot>,
     generation: u64,
     cas: Cas,
-    /// The run and building a screenshot is pinned for.
+
     origin: storage::BlockOrigin,
-    /// The development loop. Every look folds into it, so "change
-    /// something, look at it, decide" is one object rather than a habit
-    /// the model has to remember.
+
     devloop: DevLoop,
-    /// Whether the last console read found an error. Carried because a
-    /// look and a complaint arrive in two different calls.
+
     complained: bool,
 }
 
 impl BrowserTool {
-    /// # Errors
-    /// Refuses a name this build cannot spell, which the literals below
-    /// cannot produce, and a parameter schema that does not build.
+
     pub(crate) fn new(
         role: Role,
         port: Box<dyn BrowserPort + Send>,
@@ -86,9 +66,7 @@ impl BrowserTool {
                 ToolName::BROWSER,
                 BUILDING_DISCLOSURE,
                 Payload::empty(),
-                // Every page a browser opens leaves this machine, so the
-                // egress door decides it - which is also what keeps a
-                // confidential building from ever holding one.
+
                 Effect::Egress,
             ),
             Role::PersonAt { host } => (
@@ -137,13 +115,6 @@ impl Tool for BrowserTool {
         &self.meta
     }
 
-    /// The host this call names, read by the same grammar `invoke`
-    /// reads, so the bench and the tool cannot disagree about which host
-    /// a call names.
-    ///
-    /// # Errors
-    /// Refuses arguments this tool cannot read, which is what `invoke`
-    /// would refuse them with.
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError> {
         match Verb::read(&call.args)?.destination()? {
             Some(host) => Ok(GateSubject::Host(host)),
@@ -178,12 +149,10 @@ impl Tool for BrowserTool {
 }
 
 impl Browser {
-    /// One call against the tab, after `invoke` has checked the name.
+
     fn drive(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         let verb = Verb::read(&call.args)?;
-        // Neither browser acts on the city's own pages (sprawling D74):
-        // the address an action names, the page it would act on, and the
-        // page an `open` lands on are each checked.
+
         let own = guarding::own();
         if let Some(address) = verb.address() {
             own.refuse("drive a browser", address)?;
@@ -201,13 +170,9 @@ impl Browser {
         if opens {
             self.refuse_own_page(&own, &context)?;
         }
-        // The frames that produced `last`, kept for the one case that has to
-        // ask the same thing twice: a picture past the cap.
+
         let mut sent = frames;
-        // A drag from a reference is two frames: the page names the
-        // element, and the input frame then acts on it. The vocabulary
-        // is `desktop.act`'s — a ref or a point, to a point — so the
-        // same gesture has one description on both sides.
+
         if let Verb::Act { action, .. } = &verb
             && action.resolves_element()
         {
@@ -215,10 +180,7 @@ impl Browser {
             let frame = verb.input_frame(&mut self.session, &context, Some(origin))?;
             last = self.port.send(&frame)?.into_result()?;
         }
-        // A shot by reference is the same two frames: the page names the
-        // element, and the capture then covers it. The handle is read out
-        // of the reply by the request itself, so nothing else can crop to
-        // an element the page never named.
+
         if let Verb::Screenshot(request) = &verb
             && request.waits_for_page()
         {
@@ -226,11 +188,7 @@ impl Browser {
             last = self.port.send(&frame)?.into_result()?;
             sent.push(frame);
         }
-        // A picture past the cap is asked for once more: the density that
-        // fits it is set, and then the same frames are replayed, because
-        // the capture itself is what has to come back smaller. The cost of
-        // touching the page's density is paid only here, where the
-        // alternative is refusing the shot.
+
         if let Verb::Screenshot(request) = &verb {
             let shot = Shot::read(&last, request.format())?;
             if SHOT_MAX_EDGE_PX.exceeds(shot.width(), shot.height()) {
@@ -247,13 +205,7 @@ impl Browser {
 }
 
 impl Browser {
-    /// Refuses when the tab is on one of the city's own pages, read from
-    /// the browser's own account of where the tab is. Nothing to read
-    /// when no listener is registered.
-    ///
-    /// # Errors
-    /// `E_GATE_DENIED` for the city's own page; propagates a tree the
-    /// browser will not give.
+
     fn refuse_own_page(&mut self, own: &OwnListeners, context: &ContextId) -> Result<(), AxError> {
         if own.is_empty() {
             return Ok(());
@@ -266,18 +218,6 @@ impl Browser {
         }
     }
 
-    /// The tab this tool drives, opening the session the first time: the
-    /// first one that is not on one of the city's own pages.
-    ///
-    /// Both frames are minted by this tool's own `Session`, so the ids
-    /// on one socket stay unique: a second counter would send two
-    /// frames numbered one and take the wrong reply for each.
-    ///
-    /// # Errors
-    /// Propagates a session the engine refuses to open, and a browser
-    /// with no tab in it - which is a browser that is closing, and is
-    /// not a page anybody can act on - or with every tab on one of the
-    /// city's own pages.
     fn tab(&mut self, own: &OwnListeners) -> Result<ContextId, AxError> {
         if let Some(open) = &self.context {
             return Ok(open.clone());

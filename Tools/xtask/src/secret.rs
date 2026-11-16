@@ -3,30 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Gate: no secret shape anywhere in the repository (C13). The judge is
-//! `kernel::secret::scan` — one detector, one home; this gate only walks
-//! and reports. Findings carry file + offset + length, never the bytes.
-//! There is no inline waiver: a waiver comment would be a hole injected
-//! content could drive through. Also enforces the `Sealed::expose` call
-//! site whitelist ('s redemption points).
-//!
-//! **The subject is plaintext credentials reaching the tree**, not
-//! high-entropy bytes existing somewhere. So the gate scans **authored**
-//! files. A **derived** file - one whose bytes a tool computed from inputs
-//! this same gate already scans - is not a place where a credential can
-//! first arrive, and judging it re-judges its inputs through a lossy copy.
-//! `is_derived` names the two classes the tree holds, each with the input
-//! that is scanned in its place.
-//!
-//! Priced this way because `client/bun.lock` and two insta snapshots
-//! produced 268 findings and zero credentials. The
-//! alternative was a table of 268 byte offsets, which the next
-//! `bun install` invalidates in full - a category question written down as
-//! coordinates. The known limit is recorded in Tools/xtask/Spec.lean §8-9:
-//! a test that read a live credential from the environment and recorded it
-//! into a snapshot would pass here, and the defect in that case is the
-//! test.
-
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
@@ -38,73 +14,17 @@ mod nix;
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod nix_tests;
 
-/// The only files allowed to say `.expose(` under crates/*/src: the
-/// defining module and each redemption point, with its reason beside it.
 const EXPOSE_WHITELIST: [&str; 5] = [
     "Sprawling/kernel/src/secret/sealed.rs",
     "Sprawling/gateway/src/endpoint/call.rs",
-    // An MCP server's configured header or environment variable may
-    // name a credential instead of carrying one. This is the one place
-    // the reference is redeemed for all three transports; what travels
-    // onward is a `Redeemed`, which yields plaintext only to whoever
-    // names `Redeemed::plaintext` in the last slot before the wire.
-    // Listed rather than redeemed one layer up, because the
-    // alternative put plaintext in the composition root, which is what this
-    // list exists to prevent.
+
     "Sprawling/agent_protocols/src/mcp/redeeming.rs",
-    // The broker that holds an outside application's OAuth is reached
-    // with a project key in an `x-api-key` header, which is the same
-    // last slot before the wire as the redemption points above. The
-    // alternative was handing the broker a plaintext key from the
-    // assembly, which is the thing this list exists to prevent.
+
     "Sprawling/agent_protocols/src/mcp/broker.rs",
-    // The city's remote signing key is derived from a seed the vault
-    // keeps. The seed is read back to bytes inside the one function that
-    // derives the key from it, and nowhere else. The alternative put the
-    // plaintext seed in the composition root (`bin::outside::keeper`),
-    // which is what this list exists to prevent
-    // (Sprawling/remote_access/Spec.lean D23).
+
     "Sprawling/remote_access/src/keys.rs",
 ];
 
-/// Exact literals the detector flags that are not credentials.
-///
-/// The detector is right to flag them and stays unchanged: it exists to
-/// capture anything key-shaped at the entrance, where a false positive
-/// costs nothing. This gate answers a different question — "is a
-/// credential committed here" — where a false positive costs a build,
-/// and a vendor's own API identifier cannot be a credential.
-///
-/// Why a table here rather than a waiver comment at the site: a comment
-/// is a hole that injected content could drive through, because content
-/// can write comments. Content cannot write this table. Every entry is
-/// an exact match, is reviewed, and lands with a `Verdict:` trailer,
-/// since this path is inside the guard's protected face.
-///
-/// - `CC_x86_64_unknown_linux_musl` — Cargo's per-target C compiler
-///   variable, quoted in `Sprawling/app/Spec.lean` where the static Linux
-///   archive is argued. No workflow sets it: that archive is held back
-///   until it is settled where a Linux install keeps a credential, and
-///   `release.yml` says so. The entry stays because the name is not a
-///   credential either way — it is the *name* of an environment variable and so can
-///   never itself hold a value; the target triple's digits and
-///   underscores are what trip the mixed-alphabet rule.
-/// - The six `Win32_*` names — Cargo features of the `windows` crate,
-///   listed in `Sprawling/desktop/Cargo.toml` to select the API surfaces the
-///   Windows arm calls: data exchange for the clipboard, threading and
-///   variant for COM, accessibility for the UI Automation tree, HiDPI
-///   for per-monitor scaling, keyboard and mouse for `SendInput`, and
-///   windows-and-messaging for enumeration. A Cargo feature name is
-///   read by the resolver and can never hold a value; the digits in
-///   `Win32` beside the underscores are what trip the mixed-alphabet
-///   rule. Only the six names of twenty bytes or more are listed, since
-///   a shorter one never reaches the entropy detector.
-///
-/// The shields.io badge path `io/badge/Ask-DeepWiki-2B6CB0` — the words
-/// on the DeepWiki badge and its colour, carried in the badge URLs of
-/// both READMEs. A badge path is public by construction and can never
-/// hold a value; the colour's hex beside the mixed case is what trips
-/// the mixed-alphabet rule. Exact and whole, like every other entry.
 const NOT_CREDENTIALS: [&str; 8] = [
     "CC_x86_64_unknown_linux_musl",
     "io/badge/Ask-DeepWiki-2B6CB0",
@@ -116,20 +36,12 @@ const NOT_CREDENTIALS: [&str; 8] = [
     "Win32_UI_WindowsAndMessaging",
 ];
 
-/// Whether these exact bytes are one of the reviewed identifiers.
-///
-/// Exact and whole: a token that merely starts with or contains a
-/// reviewed name is still a finding, so nothing can be smuggled past
-/// this by wearing one as a prefix.
 fn is_reviewed_identifier(found: &[u8]) -> bool {
     NOT_CREDENTIALS
         .iter()
         .any(|known| known.as_bytes() == found)
 }
 
-/// Whether these bytes are one whole PascalCase name, such as a Win32
-/// API field: capitalised lowercase words, then optional trailing digits.
-/// A base64 or hex key breaks that shape within a few bytes.
 fn is_pascal_case_identifier(found: &[u8]) -> bool {
     found.first().is_some_and(u8::is_ascii_uppercase)
         && !found.last().is_some_and(u8::is_ascii_uppercase)
@@ -140,28 +52,13 @@ fn is_pascal_case_identifier(found: &[u8]) -> bool {
         })
 }
 
-/// Lockfiles: a package manager writes every byte from a manifest and a
-/// registry, and the `sha512-`/`sha256-` runs in them are integrity
-/// digests of published artifacts, meant for anybody to read. A hand
-/// edit here does not survive the next resolution.
 const LOCKFILES: [&str; 2] = ["Cargo.lock", "bun.lock"];
 
-/// Whether a tool wrote this file rather than a person.
-///
-/// Two classes, and each is scanned at its input instead: a resolved
-/// lockfile, and an insta snapshot - which records what a test produced
-/// from inputs that live in a source file this gate scans.
 fn is_derived(rel: &str) -> bool {
     let name = rel.rsplit('/').next().unwrap_or(rel);
     LOCKFILES.contains(&name) || (rel.contains("/snapshots/") && rel.ends_with(".snap"))
 }
 
-/// Whether this path is inside a city's reserved subtree - the Ledger,
-/// the content store and the documents a city writes about itself.
-///
-/// The prefix is `kernel::RESERVED_PREFIX` rather than a second spelling
-/// of it, so a city that renames its records is followed here without
-/// anybody remembering to edit this gate.
 fn in_city_records(rel: &str) -> bool {
     rel == kernel::RESERVED_PREFIX
         || rel
@@ -169,14 +66,6 @@ fn in_city_records(rel: &str) -> bool {
             .is_some_and(|tail| tail.starts_with('/'))
 }
 
-/// What a finding inside a city's records means, as against a finding in
-/// an authored source file.
-///
-/// A credential reaching the Ledger is worse than one reaching a source
-/// file: the Ledger is replayed, is copied into a bundle, and is the one
-/// place every tool of this city may read. The rule is therefore stated
-/// separately, and the recovery names the custodian rather than a
-/// `secret:` literal, because nobody hand-edits a ledger line.
 const LEDGER_RULE: &str =
     "no credential in cleartext may reach a city's records, which every tool can read (C13)";
 const LEDGER_RECOVERY: &str = "capture the value through gateway::credential::Custodian before \
@@ -195,17 +84,12 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             path: rel.clone(),
             source,
         })?;
-        // Neither class carries a `.rs` name, so the expose whitelist
-        // below loses nothing by this skip.
+
         if is_derived(&rel) {
             continue;
         }
         let records = in_city_records(&rel);
-        // A content-addressed object is bytes a run produced - a picture,
-        // an archive, a compiled artefact - and the detector's entropy
-        // rule says nothing about them. Judging them anyway reports the
-        // whole store on the first screen and buries the one line that
-        // matters. A credential is text, so text is what is judged here.
+
         if records && std::str::from_utf8(&bytes).is_err() {
             continue;
         }
@@ -279,14 +163,10 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 mod tests {
     use super::*;
 
-    /// Assembled at runtime from short pieces: a literal key-shaped
-    /// sample in the source would be a finding about this file.
     fn key_shaped() -> String {
         ["sk", "9fQ2xZ", "7Lm4Rt", "0Bv8Kd", "3Wp6"].join("")
     }
 
-    /// A fresh directory at `root` that cargo reads as a workspace with
-    /// no packages, because `check` asks cargo which packages ship.
     fn empty_workspace(root: &Path) {
         let _ = std::fs::remove_dir_all(root);
         crate::root::fixture::write(
@@ -301,9 +181,7 @@ resolver = \"3\"
 
     #[test]
     fn a_reviewed_identifier_is_matched_whole_and_nothing_else_is() {
-        // Derived from the table rather than spelled out: a long literal
-        // here would be a finding about this file, which is the same
-        // rule this gate applies to everyone else.
+
         let reviewed = NOT_CREDENTIALS[0];
         assert!(is_reviewed_identifier(reviewed.as_bytes()));
         let longer = format!("{reviewed}Extra");
@@ -319,11 +197,6 @@ resolver = \"3\"
         assert!(!is_reviewed_identifier(key_shaped().as_bytes()));
     }
 
-    /// A derived file is not where a credential first reaches the tree.
-    ///
-    /// The lockfile and the snapshot below carry the same key-shaped run
-    /// as the source file; only the source file is authored, so only it
-    /// is reported.
     #[test]
     fn a_derived_file_is_judged_by_the_inputs_that_produced_it() {
         let root = std::env::temp_dir().join(format!("secret-derived-{}", std::process::id()));
@@ -349,12 +222,6 @@ resolver = \"3\"
         std::fs::remove_dir_all(&root).unwrap();
     }
 
-    /// The records of a city are scanned, and its content store is not
-    /// judged by a rule written for text.
-    ///
-    /// Both files carry the same key-shaped run, assembled at runtime;
-    /// the object is not valid UTF-8, which is what separates a stored
-    /// artefact from a ledger line.
     #[test]
     fn a_ledger_line_is_reported_against_the_records_rule_and_an_object_is_not() {
         let root = std::env::temp_dir().join(format!("secret-records-{}", std::process::id()));
@@ -402,10 +269,6 @@ resolver = \"3\"
         std::fs::remove_dir_all(&root).unwrap();
     }
 
-    /// A shields.io badge URL is not a credential: its path carries the
-    /// badge's words and its colour, and the colour's hex is what trips
-    /// the mixed-alphabet rule. Assembled from fragments so the sample
-    /// below is data, not a second copy of a reviewed name.
     #[test]
     fn a_shields_badge_url_is_not_reported_and_a_key_still_is() {
         let root = std::env::temp_dir().join(format!("secret-badge-{}", std::process::id()));

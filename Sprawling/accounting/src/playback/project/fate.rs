@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What becomes of one line, and which lines the credential scan reads
-//! (`Sprawling/accounting/spec/Playback/Project.lean`, last section, D47).
-//!
-//! A selected line, and a line whose fate a table reads without pairing
-//! it, is scanned as it is folded. Any other line outside the selection
-//! whose buildings all read `Open` is deferred: [`Scanner::settle`]
-//! scans it once the fold has ended, only if it is the far end of a
-//! pair with a selected line the reader sees. The model proves the two
-//! scans hand every table the same fates.
-
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -24,20 +14,15 @@ use super::super::document::{Event, Reason};
 use super::super::links::{Links, Visibility};
 use super::super::reader::Sight;
 
-/// Which lines the projection runs the credential scan on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::playback) enum Scanning {
-    /// Every line whose buildings all read `Open`: the reference the lazy
-    /// scan is compared against.
+
     #[cfg(test)]
     Full,
-    /// Only the lines whose fate some table reads.
+
     Lazy,
 }
 
-/// What becomes of one line: shown, closed by a building, withheld
-/// because the credential scan matched it, or, outside the selection,
-/// open until a table reads it.
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Fate {
     Shown,
@@ -47,7 +32,7 @@ pub(super) enum Fate {
 }
 
 impl Fate {
-    /// What the links know of the line while they pair it.
+
     pub(super) fn visibility(&self) -> Visibility {
         match self {
             Fate::Shown => Visibility::Visible,
@@ -57,11 +42,10 @@ impl Fate {
     }
 }
 
-/// The credential scan of one projection, and how many lines it read.
 pub(super) struct Scanner {
     scanning: Scanning,
     scans: u64,
-    /// Where a deferred line's bytes are read back from by offset.
+
     ledger: PathBuf,
 }
 
@@ -74,9 +58,6 @@ impl Scanner {
         }
     }
 
-    /// The fate of the line `raw`, by what the reader may see of its
-    /// buildings and, when `now` says the scan reads it as it is
-    /// folded, by its bytes.
     pub(super) fn fate(&mut self, sight: Sight, raw: &[u8], now: bool) -> Fate {
         match sight {
             Sight::Closed(building, reason) => Fate::Closed(building, reason),
@@ -86,10 +67,6 @@ impl Scanner {
         }
     }
 
-    /// Whether a line is scanned as it is folded: it is selected, or a
-    /// table reads its fate without pairing it to a selected line —
-    /// `remember()` the `run_started` and `tool_called` lines, and
-    /// `Links::related` the opening line of a run another run points at.
     pub(super) fn scans_now(&self, record: &EventRecord, in_range: bool) -> bool {
         match self.scanning {
             #[cfg(test)]
@@ -104,12 +81,6 @@ impl Scanner {
         }
     }
 
-    /// Scans the deferred far ends of every selected pair: from the copy
-    /// `held` keeps for the bundle's context, or read back by offset
-    /// through `index`.
-    ///
-    /// # Errors
-    /// A line the index locates and its segment cannot give back.
     pub(super) fn settle(
         &mut self,
         links: &mut Links,
@@ -126,7 +97,6 @@ impl Scanner {
         })
     }
 
-    /// How many lines this projection has scanned.
     pub(super) fn scans(&self) -> u64 {
         self.scans
     }

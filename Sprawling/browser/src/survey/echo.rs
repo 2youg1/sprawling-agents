@@ -3,72 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One fact, painted in two places (Tools/xtask/Spec.lean §8-26).
-//!
-//! **This is the repository's own defect, read off the screen.**
-//! `AGENTS.md` hunts one family above all others - a fact with more
-//! than one home - and every other gate hunts it in the source: a
-//! constant beside a literal, two structs describing one thing, a
-//! grammar ported by hand across a wire. None of them can see the
-//! frontend's version of it, because on a page the second home is not
-//! a second declaration. It is a second *box*, and it only exists once
-//! the page has been laid out and the queries have answered.
-//!
-//! The shape it catches: one fact, such as the model in force, drawn
-//! by two subtrees that read two different answers with no link
-//! between them, so a command that writes one of them leaves the two
-//! saying different things and the page does not know. No source gate
-//! can find it. Two boxes painting the same string, in two different
-//! landmarks, is what it looks like from here.
-//!
-//! **What is a finding and what is a list.** A table repeats a word
-//! down a column and a legend repeats it beside a swatch; those are one
-//! fact drawn once and referred to, not two homes. Three conditions
-//! separate them, and all three have to hold:
-//!
-//! 1. the boxes sit in **different landmarks** - a `<nav>` and a
-//!    `<main>` are two views of a city, a `<ul>` is one view of a list;
-//! 2. there are **few of them** - a string painted six times is a
-//!    column, and a column has one writer;
-//! 3. the string **carries information** - `—`, `0` and `·` are
-//!    punctuation this page uses to mean "nothing here", and they are
-//!    supposed to repeat.
-//!
-//! **It reports; it never refuses.** Two boxes may legitimately say the
-//! same word, and the instrument cannot know which. What it can do is
-//! put the pair in front of a person with both locations, so that the
-//! question - *do these two have one source?* - gets asked once instead
-//! of never.
-
 use std::collections::BTreeMap;
 
 use super::{Deviation, Drawn, Finding, Sampled};
 
-/// How short a string has to be before repeating it means nothing.
-///
-/// Measured in characters rather than bytes: the client is drawn in
-/// Chinese as often as in English, and three Han characters are a
-/// sentence where three ASCII letters are a word.
 const TOO_SHORT: usize = 3;
 
-/// How many times a string may be painted before it is a column rather
-/// than a duplicated fact.
-///
-/// Four is the count at which a person stops reading the instances and
-/// starts reading the pattern: a fact with two homes is a defect, a
-/// fact with five is a table.
 const A_COLUMN: usize = 4;
 
-/// The strings that are punctuation this page uses for absence. They
-/// are supposed to repeat, and the day one of them stops repeating is
-/// the day something is wrong the other way.
 const PUNCTUATION: [&str; 6] = ["—", "–", "…", "·", "n/a", "N/A"];
 
-/// The roles that separate one view of the page from another.
-///
-/// A landmark is the unit a person navigates between, so two boxes in
-/// two landmarks are two places a reader will meet the same fact -
-/// which is exactly the case where nobody notices the two disagreeing.
 const LANDMARKS: [&str; 7] = [
     "navigation",
     "main",
@@ -95,8 +39,7 @@ pub(super) fn one_fact_has_one_home<'a>(drawn: &'a [Drawn], out: &mut Vec<Deviat
             .iter()
             .filter_map(|seat| drawn.get(*seat).map(|_| (*seat, landmark(drawn, *seat))))
             .collect();
-        // Every pair in one landmark is one list; a pair across two is
-        // two views of one fact.
+
         let Some((first, where_first)) = homes.first().copied() else {
             continue;
         };
@@ -119,9 +62,6 @@ pub(super) fn one_fact_has_one_home<'a>(drawn: &'a [Drawn], out: &mut Vec<Deviat
     }
 }
 
-/// Whether this box paints something worth comparing: words a person
-/// reads, long enough to mean something, and not the punctuation this
-/// page uses for absence.
 fn carries_a_fact(box_: &Drawn) -> bool {
     if !matches!(box_.sampled, Sampled::Words) || box_.text.is_none() {
         return false;
@@ -132,14 +72,9 @@ fn carries_a_fact(box_: &Drawn) -> bool {
         && said.chars().any(char::is_alphanumeric)
 }
 
-/// The landmark a box sits in, walking the measured ancestors until one
-/// of them is a region a person navigates to. A box under none of them
-/// is in the page itself, which is one place like any other.
 fn landmark(drawn: &[Drawn], seat: usize) -> &str {
     let mut here = seat;
-    // The tree is finite and `parent` always points nearer the root, so
-    // the walk ends; the bound is belt and braces against a probe that
-    // ever reports a cycle.
+
     for _ in 0..drawn.len() {
         let Some(box_) = drawn.get(here) else {
             return "the page";

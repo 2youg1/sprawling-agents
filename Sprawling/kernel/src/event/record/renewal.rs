@@ -3,73 +3,50 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one keep-warm renewal cost, so a person can read off the history
-//! what keeping a prefix's cache alive spends.
-//!
-//! The request is absent for the reason `ModelCalled` carries no body: a
-//! renewal resends a prefix whose bytes the run already recorded, and the
-//! room address the line is written under says which one.
-
 use serde::{Deserialize, Serialize};
 
 use crate::budget::{Tokens, UsdMicros};
 use crate::error::AxError;
 use crate::model::{CacheCount, ModelUsage};
 
-/// `cache_renewed`: one renewal a worker sent, answered or refused.
-///
-/// A refusal is a line of its own rather than a note in the diagnostic
-/// log, because a provider that refuses renewals is a fact about what
-/// keep-warm costs, and the log is not the history.
-///
-/// `Refused` is tried first when reading: every field of `Answered` may
-/// be absent, so it would read any line.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(untagged)]
 pub enum CacheRenewed {
-    /// The provider refused the renewal; its refusal, unchanged.
+
     Refused {
-        /// The failure the provider returned.
+
         refused: AxError,
     },
-    /// The provider answered the renewal.
+
     Answered {
-        /// Four token counts, as the provider reported them. Absent when
-        /// it reported none, which is not the same fact as zero.
+
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[cfg_attr(
             feature = "schema",
             schemars(with = "Option<std::collections::BTreeMap<String, u64>>")
         )]
         usage: Option<ModelUsage>,
-        /// What the provider itself billed, when it returns a figure.
+
         #[serde(default, skip_serializing_if = "Option::is_none")]
         billed_usd_micros: Option<UsdMicros>,
     },
 }
 
-/// What one renewal shows about the cache it was sent to keep.
-///
-/// The one reading of a `cache_renewed` line that a cost view counts by
-/// (`Sprawling/kernel/spec/KeepWarm.lean` §8-74, storage D35).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RenewalOutcome {
-    /// The provider reported no cache write: the renewal reached the
-    /// entry while it was alive.
+
     Read,
-    /// The provider reported cache write tokens above zero: the entry
-    /// had expired, and the renewal paid the write price for the prefix
-    /// instead of the read price.
+
     Late,
-    /// The provider answered without a cache write count.
+
     Unreported,
-    /// The provider refused the renewal.
+
     Refused,
 }
 
 impl CacheRenewed {
-    /// What this renewal shows about the cache it was sent to keep.
+
     pub fn outcome(&self) -> RenewalOutcome {
         match self {
             CacheRenewed::Refused { .. } => RenewalOutcome::Refused,

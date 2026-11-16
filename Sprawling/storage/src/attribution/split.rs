@@ -3,27 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Where the money went. Four independent cuts of
-//! one authoritative total: by Run, by actor, by prefix segment, by
-//! tool.
-//!
-//! The invariant that makes the report trustworthy (A20) is that each
-//! cut sums to exactly the billed total — not approximately, not after
-//! rounding. Percentages cannot promise that, so nothing here is a
-//! percentage: shares are split by the largest-remainder method, which
-//! distributes the floor divisions and then hands the leftover units
-//! out one at a time, in a fixed order. What is billed is what is
-//! attributed, to the microdollar.
-//!
-//! The total comes from the `billed_usd_micros` a provider reported for
-//! a call (`model_returned`) or a keep-warm renewal (`cache_renewed`),
-//! and nowhere else. This module never prices a call — that authority is
-//! `gateway::cost`, and a second one would be a second answer.
-//!
-//! Specified by `Sprawling/storage/spec/Attribution.lean` §8-7.
-
-//! Attribution splits: dividing a bill by weight.
-
 use std::collections::BTreeMap;
 
 use kernel::UsdMicros;
@@ -41,8 +20,6 @@ pub(crate) fn quantify(map: &BTreeMap<String, u64>) -> Vec<(String, UsdMicros)> 
         .collect()
 }
 
-/// The prefix shape as the ledger recorded it: four segment slots plus
-/// the in-window history, weighted by bytes.
 pub(crate) fn segment_weights(data: &serde_json::Map<String, Value>) -> Vec<(String, u64)> {
     let mut weights = Vec::new();
     if let Some(segments) = data.get("segments").and_then(Value::as_array) {
@@ -62,9 +39,6 @@ pub(crate) fn segment_weights(data: &serde_json::Map<String, Value>) -> Vec<(Str
     weights
 }
 
-/// Largest remainder: floor every share, then hand the leftover units
-/// to the largest remainders, ties broken by bucket name. The result
-/// sums to `total` exactly, for any weights, including all-zero ones.
 pub(crate) fn split(total: u64, weights: &[(String, u64)], fallback: &str) -> Vec<(String, u64)> {
     let sum: u64 = weights.iter().map(|(_, w)| *w).fold(0, u64::saturating_add);
     if weights.is_empty() || sum == 0 {
@@ -82,8 +56,7 @@ pub(crate) fn split(total: u64, weights: &[(String, u64)], fallback: &str) -> Ve
         assigned = assigned.saturating_add(floor_u64);
         shares.push((bucket.clone(), floor_u64, remainder));
     }
-    // Order by remainder descending, then by name ascending, so the
-    // leftover units land in the same place on every machine.
+
     let mut order: Vec<usize> = (0..shares.len()).collect();
     order.sort_by(|a, b| {
         let left = shares.get(*a);
@@ -103,8 +76,7 @@ pub(crate) fn split(total: u64, weights: &[(String, u64)], fallback: &str) -> Ve
             leftover = leftover.saturating_sub(1);
         }
     }
-    // Buckets repeating a name (two segments in one slot) merge, so the
-    // caller never sees the same key twice with different amounts.
+
     let mut merged: BTreeMap<String, u64> = BTreeMap::new();
     for (bucket, share, _) in shares {
         let slot = merged.entry(bucket).or_insert(0);

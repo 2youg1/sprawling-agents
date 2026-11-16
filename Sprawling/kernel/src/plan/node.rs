@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Plan nodes: the types a plan is made of, without the tree that hangs them.
-//! The part `Sprawling/kernel/spec/Plan.lean` specifies this module with the
-//! rest of `kernel::plan`.
-
 use serde::{Deserialize, Serialize};
 
 use crate::locator::Locator;
@@ -14,29 +10,23 @@ use crate::node_id::NodeId;
 use crate::share::Share;
 use crate::spine::{RoadmapRow, RoadmapStatus};
 
-/// Why a held node was put down without evidence.
-///
-/// Exhaustive, and the whole point of the enum is the division it draws:
-/// a resident that hands work back leaves it ready for somebody else,
-/// while every other cause leaves it red.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StopCause {
-    /// A resident says this node cannot proceed, and why.
+
     Blocked { note: String },
-    /// A resident is not the one to do this after all. Not red: the node
-    /// goes back where another run can take it.
+
     HandedBack { note: String },
-    /// The run holding it ended without citing anything.
+
     FrozeWithoutEvidence,
-    /// `crate::stall` found the run going nowhere.
+
     Stalled { repeats: u32 },
-    /// A door was escalated to a person and nobody has answered.
+
     GateOverdue { waited_ms: u64 },
 }
 
 impl StopCause {
-    /// What the status column says afterwards.
+
     #[must_use]
     pub fn status(&self) -> RoadmapStatus {
         match self {
@@ -48,13 +38,11 @@ impl StopCause {
         }
     }
 
-    /// Whether this stop is one the plan reports as red.
     #[must_use]
     pub fn is_red(&self) -> bool {
         !matches!(self, StopCause::HandedBack { .. })
     }
 
-    /// One line, for a person reading the first screen.
     #[must_use]
     pub fn line(&self) -> String {
         match self {
@@ -72,15 +60,6 @@ impl StopCause {
     }
 }
 
-/// A node this run holds.
-///
-/// **There is no third way to put it down.** The type has one private
-/// field, so it is minted only by [`super::PlanTree::claim`], and it is
-/// consumed only by [`Held::finish`] and [`Held::stop`] — one takes
-/// evidence, the other takes a cause. A run that simply stops working
-/// leaves the value with its owner, and the owner's freeze path spends
-/// it on [`StopCause::FrozeWithoutEvidence`], which is where the red in
-/// `crate::blockage` comes from.
 #[derive(Debug)]
 #[must_use = "a held node has to be finished with evidence or stopped with a cause"]
 pub struct Held(NodeId);
@@ -95,7 +74,6 @@ impl Held {
         &self.0
     }
 
-    /// Green: the work is done and here is where to look.
     pub fn finish(self, evidence: Locator) -> PlanExit {
         PlanExit::Finished {
             id: self.0,
@@ -103,14 +81,11 @@ impl Held {
         }
     }
 
-    /// Red, or back in the pool: either way it says why.
     pub fn stop(self, why: StopCause) -> PlanExit {
         PlanExit::Stopped { id: self.0, why }
     }
 }
 
-/// How a held node left. Exhaustive, and every arm carries its reason —
-/// which is the whole of the plan gate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlanExit {
     Finished { id: NodeId, evidence: Locator },
@@ -125,7 +100,6 @@ impl PlanExit {
         }
     }
 
-    /// The status the row carries after this exit.
     #[must_use]
     pub fn status(&self) -> RoadmapStatus {
         match self {
@@ -134,9 +108,6 @@ impl PlanExit {
         }
     }
 
-    /// The evidence cell after this exit: an exit without evidence
-    /// clears it rather than leaving the last run's citation on a row
-    /// that is no longer done.
     #[must_use]
     pub fn evidence(&self) -> Option<&Locator> {
         match self {
@@ -146,14 +117,12 @@ impl PlanExit {
     }
 }
 
-/// One node, placed: the row as written plus what the tree worked out.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlanNode {
     pub row: RoadmapRow,
-    /// This node's part of the whole plan.
+
     pub share: Share,
-    /// Its children, in table order. Empty means a leaf, and only
-    /// leaves carry progress.
+
     pub children: Vec<NodeId>,
 }
 
@@ -191,8 +160,6 @@ mod tests {
         Locator::parse(&format!("cas:b3-{}", "ab".repeat(32))).unwrap()
     }
 
-    /// The plan gate: a held node leaves green with evidence or stopped
-    /// with a cause, and handing back is the one stop that is not red.
     #[test]
     fn a_held_node_leaves_by_one_of_two_doors() {
         let plan = tree(&format!(

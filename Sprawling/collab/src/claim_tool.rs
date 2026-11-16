@@ -3,28 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The plan tool: the face `Roadmap.md` shows a model.
-//!
-//! The plan file is the only register. A second table of who-holds-what
-//! would be a second answer to the same question, and the one that
-//! drifts is always the one nobody reads — while this file is read by
-//! the person, counted by `kernel::PlanTree`, and edited here.
-//!
-//! **Seven actions on one catalog line.** `list` and `claim` are how a run
-//! finds work without being told what to do; `finish`, `block` and
-//! `release` are the ways a held node is put down; `split` is how a run
-//! that has found more work says so; `add` is how the Mayor writes the
-//! first line of an empty plan. They are actions of the entry that
-//! already existed rather than a second tool, because the number of
-//! lines a model reads every turn is a cost and the number of verbs
-//! behind one line is not.
-//!
-//! Which transitions are legal is decided by `kernel::PlanTree` from the
-//! plan's own state, not from what the caller says it is doing — and the
-//! refusal names both the state the node is actually in and a node that
-//! is ready, because "no" teaches a model to rephrase and try again
-//! while "2.3 is being worked on, 2.4 is ready" does not.
-
 use crate::claim_effect::ClaimEffect;
 use kernel::spine::check_roadmap_shape;
 use kernel::{
@@ -33,62 +11,32 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-/// The run's side of the plan: the file as it stood when the run was
-/// dispatched, plus what this run has changed that the ledger does not
-/// know yet.
 #[derive(Debug)]
 pub struct ClaimDesk {
     who: String,
     room: Address,
     text: String,
     changed: bool,
-    /// The node this run holds. One at a time: a run holding two nodes
-    /// makes both nodes' progress unreadable, because the node is the
-    /// unit of "what is being worked on now".
-    ///
-    /// The value itself is the plan gate: it is minted only by
-    /// `PlanTree::claim` and spent only on an exit, so a run cannot put
-    /// work down without saying how it went.
+
     held: Option<Held>,
     effects: Vec<ClaimEffect>,
     booking: Booking,
 }
 
-/// Where a claim is decided at the moment a model makes it.
-///
-/// The desk's own copy of the plan is the file as it stood when this run
-/// was dispatched, and a second run dispatched beside it read the same
-/// file; only an authority every run asks can refuse the second claim
-/// before either run spends a call on the node. In the city that
-/// authority is the accounting thread, reached through the relay.
 pub struct Booking(Box<Ask>);
 
-/// Books one node for the run the booking belongs to. It is handed the
-/// whole claim rather than the node alone, because the authority records
-/// the claim as it books it and the claim's line is the effect's own.
 type Ask = dyn FnMut(&ClaimEffect) -> Result<(), AxError> + Send;
 
 impl Booking {
-    /// `ask` books the node for this run and records the claim, or
-    /// refuses because another run holds it; its refusal reaches the
-    /// model unchanged.
+
     #[must_use]
     pub fn new(ask: impl FnMut(&ClaimEffect) -> Result<(), AxError> + Send + 'static) -> Booking {
         Booking(Box::new(ask))
     }
 }
 
-/// Where `finish` turns a path the model wrote into the Locator of the
-/// file's bytes at that moment (`Sprawling/collab/Spec.lean` D20).
-///
-/// The assembly layer hands it in because judging a path for reading
-/// takes the read bound, which this crate cannot see; a desk that judged
-/// paths itself would be a second authority on what a run may read. Its
-/// refusal reaches the model unchanged, and the node stays held.
 pub struct Pinner(Box<Pin>);
 
-/// Judges `asked` as a path the run may read and answers the Locator of
-/// its whole bytes.
 type Pin = dyn Fn(&str) -> Result<Locator, AxError> + Send + Sync;
 
 impl Pinner {
@@ -97,13 +45,6 @@ impl Pinner {
         Pinner(Box::new(pin))
     }
 
-    /// The Locator `evidence` stands for: itself when it is one, and the
-    /// pin of the file it names when it is a path. A string that starts
-    /// like a Locator and does not parse is refused as one, rather than
-    /// looked for as a file named `cas:...`.
-    ///
-    /// # Errors
-    /// The Locator grammar's refusal, or the pin's.
     pub(crate) fn evidence(pinner: Option<&Pinner>, evidence: &str) -> Result<Locator, AxError> {
         let spelled_as_locator = ["cas:", "file:"]
             .iter()
@@ -143,14 +84,10 @@ impl ClaimDesk {
         }
     }
 
-    /// What the worker has to record, drained so it cannot run twice.
     pub fn take_effects(&mut self) -> Vec<ClaimEffect> {
         std::mem::take(&mut self.effects)
     }
 
-    /// The plan as this run left it, or `None` when the run did not
-    /// touch it. Writing an unchanged file would put a modification time
-    /// on a plan nobody edited.
     #[must_use]
     pub fn roadmap(&self) -> Option<&str> {
         if self.changed { Some(&self.text) } else { None }
@@ -161,23 +98,11 @@ impl ClaimDesk {
         &self.who
     }
 
-    /// The node this run is holding, if any.
     #[must_use]
     pub fn holding(&self) -> Option<&NodeId> {
         self.held.as_ref().map(Held::id)
     }
 
-    /// Spends a still-held node on the one exit a run that simply ended
-    /// has earned.
-    ///
-    /// **This is where red comes from.** A run that froze while holding
-    /// work did not release it and did not finish it; leaving the node
-    /// `In progress` for ever would strand the branch behind it, and
-    /// calling it done would be a lie. The freeze path calls this, and
-    /// it is a no-op for a run that put its node down properly.
-    ///
-    /// # Errors
-    /// Propagates the plan's refusal to record the exit.
     pub fn abandon(&mut self) -> Result<(), AxError> {
         let Some(held) = self.held.take() else {
             return Ok(());
@@ -200,7 +125,6 @@ impl ClaimDesk {
         }
     }
 
-    /// Writes an exit into the file and queues the record.
     fn record(&mut self, exit: PlanExit) -> Result<(), AxError> {
         let tree = self.tree()?;
         let item = tree
@@ -213,8 +137,6 @@ impl ClaimDesk {
         })
     }
 
-    /// Writes an effect into the desk's copy and queues it for the
-    /// worker, which replays the same effect onto the file at landing.
     fn take(&mut self, effect: ClaimEffect) -> Result<(), AxError> {
         self.text = effect.apply(&self.text)?;
         self.changed = true;
@@ -236,8 +158,7 @@ impl ClaimDesk {
                 RoadmapStatus::Blocked | RoadmapStatus::AwaitingApproval => {
                     red.push(Value::Object(entry));
                 }
-                // A branch in progress is its leaves' work, and a row
-                // nobody started or everybody finished asks nothing.
+
                 RoadmapStatus::InProgress | RoadmapStatus::NotStarted | RoadmapStatus::Done => {}
             }
         }
@@ -250,14 +171,11 @@ impl ClaimDesk {
             ready.push(Value::Object(entry));
         }
         let mut result = Map::new();
-        // Ready rather than unclaimed: a node whose dependencies are not
-        // done is not work anybody can take, and offering it would send
-        // a run to a door that is locked.
+
         result.insert("ready".to_owned(), Value::Array(ready));
         result.insert("in_progress".to_owned(), Value::Array(working));
         result.insert("blocked".to_owned(), Value::Array(red));
-        // The denominator is on screen for the person; it is here so the
-        // model does not have to count the array to know where it stands.
+
         result.insert(
             "nodes_total".to_owned(),
             Value::Number(u64::try_from(tree.len()).unwrap_or(u64::MAX).into()),
@@ -285,9 +203,7 @@ impl ClaimDesk {
             id: id.clone(),
             item: item.clone(),
         };
-        // The desk's copy answers first because its refusal names a
-        // ready node; the booking answers for every run dispatched beside
-        // this one, and nothing is written until it has.
+
         (self.booking.0)(&claimed)?;
         self.take(claimed)?;
         self.held = Some(held);
@@ -298,8 +214,6 @@ impl ClaimDesk {
         Payload::new(result)
     }
 
-    /// The one door out of a held node that needs a locator; the other
-    /// two go through [`Self::put_down`].
     fn finish(&mut self, id: &NodeId, evidence: Locator) -> Result<Payload, AxError> {
         let held = self.take_held(id)?;
         self.record(held.finish(evidence.clone()))?;
@@ -321,14 +235,6 @@ impl ClaimDesk {
         Payload::new(result)
     }
 
-    /// Divides the node this run holds into children and leaves the run
-    /// holding nothing: the work it took has become several pieces, and
-    /// one of them is what it should take next.
-    ///
-    /// Only the held node, and this is the one place that decides it
-    /// (collab D6): the split then rides on a claim the booking granted,
-    /// so two runs cannot each divide one row, and the landing checks
-    /// that claim instead of judging the split a second time.
     fn split(&mut self, id: &NodeId, children: &[NewChild]) -> Result<Payload, AxError> {
         self.refuse_unless_holding(id)?;
         let effect = ClaimEffect::Split {
@@ -342,9 +248,7 @@ impl ClaimDesk {
                 .collect(),
         };
         let grown = effect.apply(&self.text)?;
-        // Built before it is written: a split that would not parse, or
-        // that would push the plan past its depth, is refused with the
-        // file untouched rather than repaired afterwards.
+
         let RoadmapShape::WellFormed { rows } = check_roadmap_shape(&grown) else {
             return Err(AxError::failure(
                 AxCode::InvalidArgs,
@@ -380,8 +284,6 @@ impl ClaimDesk {
         Payload::new(result)
     }
 
-    /// Refuses a split of anything but the node this run holds, naming
-    /// what it holds and the claim that would make the split possible.
     fn refuse_unless_holding(&self, id: &NodeId) -> Result<(), AxError> {
         let refuse = |subject: String, recovery: String| {
             AxError::failure(AxCode::InvalidArgs, "split a plan node", subject)
@@ -400,11 +302,6 @@ impl ClaimDesk {
         }
     }
 
-    /// Takes the held node, refusing when it is not the one named.
-    ///
-    /// The run may only put down what it took: a run that could close
-    /// somebody else's node could hand out evidence for work it never
-    /// saw.
     fn take_held(&mut self, id: &NodeId) -> Result<Held, AxError> {
         match self.held.take() {
             Some(held) if held.id() == id => Ok(held),

@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The same readings as named fields.
-//!
-//! One `<edit>` per repair, one `<at>` per place it has to be made.
-//! `id` is the key an agent suppresses or diffs on and never changes
-//! when a sentence is reworded; `fix` and `by` are the verb and the
-//! operand, kept apart from the prose so that acting on them needs no
-//! sentence parsing; `cohort` is how many of the population agreed,
-//! which is what decides whether a repair is safe to make without
-//! asking - eleven of twelve is a typing mistake and three of five is
-//! a column that never had a consensus.
-
 use std::collections::BTreeMap;
 
 use super::super::{Deviation, Group};
@@ -69,8 +58,6 @@ pub(super) fn tagged(survey: Survey<'_>, census: Option<&str>) -> String {
     out
 }
 
-/// The five characters that would otherwise close a tag somebody is
-/// still inside. A name on this page can hold any of them.
 fn escaped(raw: &str) -> String {
     raw.replace('&', "&amp;")
         .replace('<', "&lt;")

@@ -3,24 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The version every one of the workspace's own packages is pinned to
-//! (Tools/xtask/Spec.lean §8-49).
-//!
-//! `[workspace.package] version` is the one authority for which release
-//! this tree is. A path dependency cannot be published without a
-//! `version`, and cargo's dependency tables cannot inherit one, so each
-//! of the workspace's own packages carries a pin of its own in
-//! `[workspace.dependencies]`: copies, by necessity. **A copy is a
-//! second home for a fact**, and nothing else ties these to the
-//! version, so this holds every pin to it. A member that names a package
-//! by `path` itself would be a pin this table does not see, and is
-//! refused for that reason.
-
 use super::{ROOT_MANIFEST, diverged, shown};
 use crate::report::Violation;
 
-/// The dependency tables a manifest writes, at its top level and under
-/// each `[target.'<cfg>']`.
 const TABLES: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
 pub(super) fn pins(workspace: &toml::Value, members: &[(String, toml::Value)]) -> Vec<Violation> {
@@ -40,7 +25,6 @@ pub(super) fn pins(workspace: &toml::Value, members: &[(String, toml::Value)]) -
     out
 }
 
-/// Every path dependency of `[workspace.dependencies]`, held to `wanted`.
 fn pinned(workspace: &toml::Value, wanted: &str, out: &mut Vec<Violation>) {
     let listed = workspace
         .get("workspace")
@@ -66,8 +50,6 @@ fn pinned(workspace: &toml::Value, wanted: &str, out: &mut Vec<Violation>) {
     }
 }
 
-/// Every dependency a member names by `path` rather than through the
-/// workspace table, in any of its dependency tables.
 fn by_path(dir: &str, member: &toml::Value, out: &mut Vec<Violation>) {
     let mut tables: Vec<(String, &toml::Value)> = TABLES
         .iter()

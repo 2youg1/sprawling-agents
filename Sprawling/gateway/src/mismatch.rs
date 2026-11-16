@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Reading a value out of a provider's JSON, and the one word for what
-//! it means when the shape is not the one this build asked for.
-//!
-//! Both dialects need the same four readers and fail the same way, so
-//! the readers and the failure live together and each dialect module
-//! depends on this one rather than on the other. Every accessor takes
-//! the path it is reading, because "expected string" without a path
-//! sends a person to read a whole response body to find the field.
-//!
-//! `E_WIRE_MISMATCH` is a loadtime code: what it means is that the
-//! endpoint's declared dialect does not match what answered it, so the
-//! recovery says exactly that rather than "try again".
-
 use kernel::{AxCode, AxError, CacheCount, Payload, Tokens};
 use serde_json::Value;
 
@@ -32,26 +19,12 @@ pub(crate) fn mismatch(path: &str, detail: &str) -> AxError {
     )
 }
 
-/// The most characters of a provider's value a refusal will repeat.
-///
-/// A refusal is a sentence a person reads; a provider can answer with a
-/// megabyte, and a sentence that long is one nobody finishes.
 const FOUND_MAX: usize = 40;
 
-/// A mismatch that repeats the value it could not read.
-///
-/// The module note above argues that a path without the expectation
-/// sends a person to read a whole response body. This is the same
-/// argument one step further: `tool_calls[0].name: not a tool name` is
-/// true and does not distinguish an empty name from one with a space in
-/// it, and finding out which took a request written by hand against the
-/// endpoint.
 pub(crate) fn mismatch_found(path: &str, detail: &str, found: &str) -> AxError {
     mismatch(path, &format!("{detail}: {}", quoted(found)))
 }
 
-/// The value as a reader meets it: quoted, so an empty one is visible,
-/// and marked when there was more of it than a sentence holds.
 fn quoted(found: &str) -> String {
     let head: String = found.chars().take(FOUND_MAX).collect();
     if head.chars().count() < found.chars().count() {
@@ -61,14 +34,6 @@ fn quoted(found: &str) -> String {
     }
 }
 
-/// The arguments a streamed tool call was assembled from, or the
-/// refusal that says the stream stopped in the middle of them.
-///
-/// **Half a tool call is not a tool call with fewer arguments.** A cut
-/// stream that is read as `{}` becomes a real call with no arguments:
-/// `exec {}` and `write {}` are recorded, pass the gates, and run. Both
-/// dialects assemble arguments from parts, so both refuse a cut one
-/// here, with one code and one sentence.
 pub(crate) fn settled_tool_arguments(tool: &str, at: u64, raw: &str) -> Result<Value, AxError> {
     serde_json::from_str(raw).map_err(|err| {
         stream_cut(&format!(
@@ -92,8 +57,6 @@ pub(crate) fn stream_cut(detail: &str) -> AxError {
     )
 }
 
-/// One field of a JSON object, or a mismatch naming the path it is
-/// missing from.
 pub(crate) fn require<'v>(wire: &'v Value, path: &str, key: &str) -> Result<&'v Value, AxError> {
     wire.get(key)
         .ok_or_else(|| mismatch(&format!("{path}.{key}"), "missing"))
@@ -111,14 +74,10 @@ fn as_u64(value: &Value, path: &str) -> Result<u64, AxError> {
         .ok_or_else(|| mismatch(path, "expected unsigned integer"))
 }
 
-/// A count every reply carries; a provider that leaves it out spent none.
 pub(crate) fn tokens_or_zero(usage: &Value, key: &str, path: &str) -> Result<Tokens, AxError> {
     Ok(cache_count(Some(usage), key, path)?.or_zero())
 }
 
-/// A cache count, which a provider may not report at all: an absent
-/// object, an absent key and `null` are each `Unreported`, never a zero
-/// hit (`Sprawling/kernel/spec/Model.lean` D36).
 pub(crate) fn cache_count(
     usage: Option<&Value>,
     key: &str,
@@ -133,9 +92,6 @@ pub(crate) fn cache_count(
     }
 }
 
-/// The float ban is not restated here: `Payload`'s `Deserialize` runs
-/// `Payload::new`, which refuses a float anywhere in the tree and says
-/// why, and this face reports that refusal as the mismatch it is.
 pub(crate) fn payload_from(value: &Value, path: &str) -> Result<Payload, AxError> {
     serde_json::from_value(value.clone()).map_err(|err| mismatch(path, &err.to_string()))
 }

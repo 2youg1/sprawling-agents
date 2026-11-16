@@ -3,42 +3,28 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What each phase of opening a served city cost, and the one line that
-//! says it (`Sprawling/app/Spec.lean` §8-121).
-//!
-//! Shape: value. It reads no clock of its own: the clock is the function
-//! [`OpeningCost::begin`] is handed, which `listen` takes from the one
-//! monotonic sampling point, `serving::standing::monotonic_now`
-//! (`Sprawling/app/Spec.lean` §8-93). A phase is the difference of two monotonic
-//! samples, so a wall clock set back by a person cannot make one negative.
-
 use std::time::{Duration, Instant};
 
 use crate::views::snapshot::start::TailFrom;
 
-/// One phase of opening a served city, in the order `listen` does them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
-    /// The port taken.
+
     Bind,
-    /// The writer lock taken, the format probed, the tail recovered.
+
     OpenLedger,
-    /// The one pass that checks and folds the lines the views and the
-    /// standing have not folded yet, from the earlier of their snapshots
-    /// or from genesis (`Sprawling/app/Spec.lean` §8-122).
+
     FoldTail { lines: u64, from: TailFrom },
-    /// The standing snapshot cut at the last line folded.
+
     CutStanding,
-    /// The views snapshot cut at the same line.
+
     CutViews,
-    /// The second copy of the views, made through the snapshot encoding
-    /// (`Sprawling/app/Spec.lean` §8-99).
+
     Twin,
-    /// The writer thread started.
+
     StartWorker,
 }
 
-/// The phases of one opening as they are lapped.
 pub struct OpeningCost {
     clock: fn() -> Instant,
     began: Instant,
@@ -47,7 +33,7 @@ pub struct OpeningCost {
 }
 
 impl OpeningCost {
-    /// Starts timing now, on `clock`.
+
     pub fn begin(clock: fn() -> Instant) -> OpeningCost {
         let began = clock();
         OpeningCost {
@@ -58,8 +44,6 @@ impl OpeningCost {
         }
     }
 
-    /// Records `phase` as the span from the previous lap, or from the
-    /// beginning, to now.
     pub fn lap(&mut self, phase: Phase) {
         let now = (self.clock)();
         self.laps
@@ -67,15 +51,10 @@ impl OpeningCost {
         self.last = now;
     }
 
-    /// When opening began, the point every readiness moment is measured
-    /// from, including the proof that ends after the first byte
-    /// (`Sprawling/app/Spec.lean` §8-122).
     pub fn began(&self) -> Instant {
         self.began
     }
 
-    /// The one rendering: the whole opening, then each phase in the order
-    /// it was lapped.
     pub fn line(&self) -> String {
         let phases: Vec<String> = self
             .laps
@@ -108,9 +87,6 @@ fn phase_part(phase: Phase, took: Duration) -> String {
     }
 }
 
-/// A span in milliseconds with three decimals, converted from whole
-/// microseconds rather than through a float. A span past `u64::MAX`
-/// microseconds, half a million years, is written as that maximum.
 pub fn millis(span: Duration) -> String {
     let micros = u64::try_from(span.as_micros()).unwrap_or(u64::MAX);
     format!(

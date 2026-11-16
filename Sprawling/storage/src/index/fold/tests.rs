@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Observational equivalence of [`Folded`] against the map-shaped
-//! implementation it replaced.
-//!
-//! [`Oracle`] is that implementation, byte for byte: a `BTreeMap` per
-//! line and a `BTreeSet` per run. The two see the same lines through
-//! the same door ([`Folded::insert_line`]) and must answer every public
-//! query the same way — including out-of-order and repeated seqs,
-//! unparseable run names and lines that are not documents at all.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::{RunId, Seq};
@@ -19,8 +10,6 @@ use proptest::prelude::*;
 
 use super::{Folded, locate};
 
-/// The maps this module used to be, kept as the oracle for the layout
-/// it was replaced by.
 struct Oracle {
     entries: BTreeMap<Seq, (String, u64)>,
     runs: BTreeMap<RunId, BTreeSet<Seq>>,
@@ -58,9 +47,6 @@ impl Oracle {
     }
 }
 
-/// One line to index: which segment and offset it claims, its seq, and
-/// its run as raw text — raw, because a spelling the ledger would never
-/// write is exactly what the damaged-ledger path must survive.
 #[derive(Debug, Clone)]
 struct Line {
     seg: u8,
@@ -70,7 +56,7 @@ struct Line {
 }
 
 fn run_names() -> impl Strategy<Value = Option<String>> {
-    // Three mints plus nil, and a fourth spelling no `RunId` accepts.
+
     let valid = prop_oneof![Just(0u8), Just(1u8), Just(2u8), Just(u8::MAX),];
     prop_oneof![
         8 => valid.prop_map(|byte| Some(run_id(byte).to_string())),
@@ -86,10 +72,7 @@ fn run_id(byte: u8) -> RunId {
 }
 
 fn lines() -> impl Strategy<Value = Vec<Line>> {
-    // A small seq space forces repeats and out-of-order arrivals; the
-    // occasional large value keeps the tail honest. An offset too wide
-    // to pack sends a line to the outliers, and when its slot is already
-    // in the column that slot becomes a hole.
+
     let seq = prop_oneof![6 => 0u64..12, 1 => 12u64..4000];
     let offset = prop_oneof![8 => 0u64..65536, 1 => (1u64 << 48)..(1u64 << 49)];
     let line = (0u8..4, offset, seq, run_names()).prop_map(|(seg, offset, seq, run)| Line {
@@ -111,7 +94,6 @@ fn body_of(line: &Line) -> Vec<u8> {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(512))]
 
-    /// Every public query must answer exactly what the maps answered.
     #[test]
     fn folded_answers_as_the_maps_did(held in lines(), probes in proptest::collection::vec(0u64..4000, 12)) {
         let mut folded = Folded::empty();
@@ -145,8 +127,7 @@ proptest! {
             folded.seqs().rev().collect::<Vec<_>>(),
             ascending.iter().rev().copied().collect::<Vec<_>>()
         );
-        // Both ends taken in turn meet in the middle without losing or
-        // repeating a seq.
+
         let mut from_both = Vec::new();
         let mut seqs = folded.seqs();
         while let Some(low) = seqs.next() {
@@ -180,8 +161,6 @@ proptest! {
     }
 }
 
-/// A healthy ledger numbers its lines one after another, so the seq of
-/// each line is implied by its place and only the offset is held.
 #[test]
 fn a_contiguous_ledger_costs_eight_bytes_per_record() {
     let mut folded = Folded::empty();
@@ -196,8 +175,6 @@ fn a_contiguous_ledger_costs_eight_bytes_per_record() {
     );
 }
 
-/// A damaged ledger whose seqs double from line to line must not double
-/// the column with them: holes stay bounded by the lines the column holds.
 #[test]
 fn doubling_seqs_leave_the_column_bounded_by_its_lines() {
     let mut folded = Folded::empty();

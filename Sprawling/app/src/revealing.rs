@@ -3,34 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Showing a person the file a page is talking about, in the file
-//! manager they already use.
-//!
-//! **A path printed on a page is a fact a person cannot act on.** They
-//! can read the address of a building's own configuration file, copy it,
-//! and then find their own way to it; every step after the reading is
-//! work the city made them do. This hands the whole path to the desktop's own file manager,
-//! selected rather than merely opened, so what they were reading about
-//! is what is highlighted when the window appears.
-//!
-//! **The grammar is the guard.** The address is an `Address`, which
-//! cannot climb out of the city, and the path handed to the file manager
-//! is the city root joined with it. A caller cannot ask this to reveal
-//! something outside the city because there is no way to spell one.
-
 use std::path::Path;
 
 use kernel::{Address, AxCode, AxError};
 
 use crate::doctor::Platform;
 
-/// Opens the desktop's file manager with this address selected.
-///
-/// # Errors
-/// When the address points at nothing on disk, or when the desktop's
-/// file manager cannot be started. Both are refusals a person can act
-/// on: the first says the city has no such file, the second says this
-/// machine has no handler.
 pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError> {
     let path = city_root.join(at.as_str());
     if !path.exists() {
@@ -41,8 +19,7 @@ pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError> {
         )
         .with_recovery("this city holds no such file; the page may be older than the tree"));
     }
-    // The file manager outlives the city, so it is handed no terminal to
-    // write on after the city has gone (`Sprawling/app/Spec.lean` D73).
+
     manager(&path)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
@@ -55,24 +32,11 @@ pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError> {
         })
 }
 
-/// What selects a path in this platform's file manager.
-///
-/// Windows and macOS both take the file itself and select it. Everything
-/// else opens the directory: `xdg-open` has no selection argument, and
-/// the desktops that do have one spell it differently per file manager,
-/// which is a table this city would then have to keep current.
-///
-/// One match over `Platform` rather than three functions behind
-/// `#[cfg]`: the three answers are then readable side by side, and a
-/// fourth platform is a compile error here rather than a silent fall
-/// through to the last arm.
 fn manager(path: &Path) -> std::process::Command {
     match Platform::current() {
         Some(Platform::Windows) => {
             let mut command = child::command("explorer");
-            // No space after the comma: `explorer` parses
-            // `/select,<path>` as one argument and opens the person's
-            // home directory when it is two.
+
             command.arg(format!("/select,{}", path.display()));
             command
         }
@@ -107,10 +71,6 @@ mod tests {
         );
     }
 
-    /// The argument a file manager is handed, without starting one. The
-    /// Windows spelling is the whole finding here: a space after the
-    /// comma opens the home directory instead, silently and with a
-    /// zero exit status.
     #[test]
     fn the_selected_path_travels_as_one_argument() {
         let path = std::path::PathBuf::from("C:/city/hall/JOB.md");
@@ -119,8 +79,7 @@ mod tests {
             .get_args()
             .map(|arg| arg.to_string_lossy().into_owned())
             .collect();
-        // `xdg-open` cannot select a file, so on Linux the manager opens
-        // the directory that holds it.
+
         let named = if cfg!(target_os = "linux") {
             "hall"
         } else {

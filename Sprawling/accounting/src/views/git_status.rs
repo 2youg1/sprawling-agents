@@ -3,35 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one building has written since its last checkpoint, and where the
-//! repository stands.
-//!
-//! **Two authorities, one answer, and they are not interchangeable.**
-//! Which files moved is git's, because a working tree is what a person
-//! is looking at and the Ledger records checkpoints rather than edits. Which
-//! commit was the last checkpoint is the Ledger's, for the reason
-//! `views::commits` gives: the trailers on a commit are a projection
-//! for readers outside the city, and answering from them would make the
-//! projection the authority.
-//!
-//! **The checkpoint is the base, not the head.** `checkpoint::wave_pre`
-//! files its commit under `refs/sprawling/` and leaves the head where
-//! it was, so a comparison against the head would report every wave the
-//! city has ever run as uncommitted work.
-
-//! **The walk of the disk happens after the views are released.** The
-//! views hand over only the checkpoint and the root; `git status` over a
-//! large tree takes tens of milliseconds, and the fold waits for every
-//! one of them it is run under (`Sprawling/app/Spec.lean` §8-100).
-
 use std::path::PathBuf;
 
 use kernel::{Address, AxError};
 
 use super::holding::Views;
 
-/// What `git status` for one building needs from the views, copied out
-/// while they are held.
 pub struct GitStatusAsk {
     city_root: PathBuf,
     building: Address,
@@ -39,18 +16,12 @@ pub struct GitStatusAsk {
 }
 
 impl Views {
-    /// The building's last checkpoint and the city root, for a read of the
-    /// working tree after the views are released.
-    /// An error when the newest checkpoint's row cannot be read, which
-    /// the caller answers as `Unavailable`, as the commits column does.
+
     pub(super) fn git_status_ask(&self, building: &Address) -> Result<GitStatusAsk, AxError> {
         Ok(GitStatusAsk {
             city_root: self.city_root.clone(),
             building: building.clone(),
-            // The newest commit the city checkpointed at this building or
-            // under it, asked of the same page the commits column
-            // reads, so the row shown beside the changes is the row the
-            // list opens with.
+
             checkpoint: self
                 .commits_answer(Some(building), None, 1)?
                 .commits
@@ -61,11 +32,7 @@ impl Views {
 }
 
 impl GitStatusAsk {
-    /// The working tree of one building, with the last checkpoint behind it.
-    ///
-    /// `Unavailable` for a city with no repository: "there is nothing to
-    /// compare against" and "nothing has changed" are different answers,
-    /// and a person acts differently on each.
+
     pub(super) fn read(self) -> wire::Answer {
         let Ok(status) = storage::working_status(
             &self.city_root,

@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `cargo xtask acp-catalog`: the ACP registry's index, read once from its
-//! CDN and written as the catalog snapshot this build ships
-//! (`Sprawling/agent_protocols/Spec.lean` §8-19, D13).
-//!
-//! Only the fields the city reads are kept - `id`, `name`, `version`,
-//! `license`, `distribution`, and of a binary target its `cmd`, `args` and
-//! `env` - so authors' addresses, icons, links and download URLs never
-//! enter the tree; the index's `Date` and `ETag` are written beside them.
-//! A person runs it when a release refreshes the catalog; no gate does,
-//! because a gate that reached the network would go red for the CDN's
-//! reasons. `curl` fetches, as it is on every machine that builds this.
-
 use std::path::Path;
 use std::process::Command;
 
@@ -22,18 +10,12 @@ use serde_json::{Map, Value};
 
 use crate::report::XtaskError;
 
-/// Where the registry publishes its index.
 const INDEX: &str = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";
 
-/// The snapshot `agent_protocols::Catalog::bundled` reads.
 const SNAPSHOT: &str = "Sprawling/agent_protocols/catalog/registry.json";
 
-/// The fields of one agent the city reads.
 const KEPT: [&str; 5] = ["distribution", "id", "license", "name", "version"];
 
-/// The fields of one binary target the city reads: binaries are found on
-/// the search path, not downloaded, so the archive and its checksum stay
-/// out until the city installs them.
 const KEPT_BINARY: [&str; 3] = ["args", "cmd", "env"];
 
 #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]

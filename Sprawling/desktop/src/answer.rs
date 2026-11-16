@@ -3,26 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a `tools/call` that was carried out answers.
-//!
-//! MCP gives a tool's answer one shape, `CallToolResult`: an array of
-//! content blocks. The facts of an answer travel as one text block
-//! holding their JSON on one line, a picture travels as an image block,
-//! so a model that reads images sees the picture rather than a page of
-//! base64 (`Sprawling/desktop/Spec.lean` D2), and a recording's sound
-//! travels as an audio block the city stores (`Sprawling/desktop/Spec.lean` D13). The
-//! base64 is written here and nowhere else.
-
 use base64::Engine as _;
 use serde_json::{Value, json};
 
-/// One answer, as the blocks it is made of.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Answer {
     blocks: Vec<Block>,
 }
 
-/// One content block.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(
     not(any(windows, test)),
@@ -38,7 +26,7 @@ enum Block {
 }
 
 impl Answer {
-    /// The facts of an answer, as one text block of single-line JSON.
+
     #[cfg_attr(
         not(any(windows, test)),
         expect(
@@ -52,9 +40,6 @@ impl Answer {
         }
     }
 
-    /// An outline of a window, then the facts about it: the outline
-    /// comes first because it is what was asked for, and it travels as
-    /// the text it already is rather than as a JSON string of it.
     #[cfg_attr(
         not(any(windows, test)),
         expect(
@@ -68,9 +53,6 @@ impl Answer {
         }
     }
 
-    /// A picture, then the facts about it: the image block comes first
-    /// because it is what was asked for, and the text beside it says
-    /// what the picture is.
     #[cfg_attr(
         not(any(windows, test)),
         expect(
@@ -84,9 +66,6 @@ impl Answer {
         }
     }
 
-    /// A recording's sound, then the facts about the recording: the
-    /// same order a picture takes, so the city reads both answers one
-    /// way (`Sprawling/desktop/Spec.lean` D13).
     #[cfg_attr(
         not(any(windows, test)),
         expect(
@@ -100,7 +79,6 @@ impl Answer {
         }
     }
 
-    /// The `result` of the JSON-RPC answer.
     pub(crate) fn as_result(&self) -> Value {
         let content: Vec<Value> = self
             .blocks
@@ -150,9 +128,6 @@ mod tests {
         );
     }
 
-    /// A recording's sound reaches the city as MCP audio content, in
-    /// front of the facts, the same shape a screenshot has
-    /// (`Sprawling/desktop/Spec.lean` D13).
     #[test]
     fn a_recordings_sound_travels_as_audio_content_before_its_facts() {
         let answer = Answer::sound(

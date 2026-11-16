@@ -3,27 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The edit tool: an exact replacement admitted by what this run has
-//! seen, and creation where nothing stands.
-//!
-//! Two refusals carry the design. A file this run never read, or one
-//! that changed after its last look, is refused - a replacement judged
-//! against an understanding that is out of date is most likely wrong in
-//! a city where many residents edit at once - and the second refusal
-//! carries the passage as it now reads, which counts as a look. And an
-//! `old_string` that matches zero times, or many times without
-//! `replace_all`, is refused with the count, because "replace the first
-//! one" is a guess about which occurrence was meant. `Sprawling/runtime/spec/Tools/Edit.lean` §8-64
-//! models the admission and proves it loses no run's update.
-//!
-//! The arguments are Claude Code's `Edit`'s, by name and by value
-//! (`Sprawling/runtime/spec/Tools.lean` §8-14-1, D114).
-//!
-//! The echo is a unified diff. Per-edit diffs are the restoration
-//! granularity: a checkpoint restores a wave, but a diff restores one
-//! change, and that is the difference between undoing a mistake and
-//! undoing an afternoon.
-
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
@@ -40,43 +19,31 @@ mod passage;
 
 pub struct EditTool {
     city_root: PathBuf,
-    /// The run's write domain. Every model-chosen path is judged against
-    /// it before the filesystem is touched.
+
     writable: kernel::WriteDomain,
     desk: EditDesk,
     meta: ToolMeta,
 }
 
-/// The live state an edit consults at each call besides the path.
 #[derive(Clone)]
 pub struct EditDesk {
-    /// The run's policy cell, asked at each write for what the run may do
-    /// to a file that already exists (`Sprawling/runtime/spec/Tools.lean`
-    /// §8-55, `Sprawling/runtime/spec/PolicyTake.lean` §8-62).
+
     pub policy: crate::mode::PolicyReader,
-    /// What this run has seen; the same table its `read` writes.
+
     pub seen: ReadStamps,
-    /// The city's one table of files an edit is landing on, shared by
-    /// every run, so that two runs cannot land on one look.
+
     pub locks: PathLocks,
 }
 
 impl EditTool {
-    /// The name this tool answers to, read by `mode::core_tools` too.
+
     pub const NAME: &'static str = "edit";
 
-    /// The argument names, spelled once for the schema, the reads and
-    /// the refusals.
     const FILE_PATH: &'static str = "file_path";
     const OLD_STRING: &'static str = "old_string";
     const NEW_STRING: &'static str = "new_string";
     const REPLACE_ALL: &'static str = "replace_all";
 
-    /// The name, disclosure and schema `new` registers. The catalog page
-    /// reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
     pub fn definition() -> Result<ToolDef, AxError> {
         Ok(ToolDef {
             name: ToolName::parse(Self::NAME)?,
@@ -116,9 +83,7 @@ impl EditTool {
             desk,
             meta: ToolMeta {
                 name: defined.name,
-                // The write limit is not spelled here: it can change
-                // while the run goes, and these bytes are frozen with the
-                // tool list (§8-62); the note a change appends spells it.
+
                 disclosure: defined.description,
                 params: defined.input_schema,
                 effect: Effect::Write { domain },
@@ -133,9 +98,6 @@ impl EditTool {
     }
 }
 
-/// One string argument. A call spelled the way an older build's
-/// history spells it lands here too, and the recovery names the
-/// arguments this build takes (`Sprawling/runtime/spec/Tools.lean` D115).
 fn arg<'a>(args: &'a Map<String, Value>, key: &str) -> Result<&'a str, AxError> {
     args.get(key).and_then(Value::as_str).ok_or_else(|| {
         AxError::failure(
@@ -153,7 +115,6 @@ fn arg<'a>(args: &'a Map<String, Value>, key: &str) -> Result<&'a str, AxError> 
     })
 }
 
-/// Whether the call asked for every occurrence; absent is one.
 fn replacing_all(args: &Map<String, Value>) -> Result<bool, AxError> {
     match args.get(EditTool::REPLACE_ALL) {
         None => Ok(false),
@@ -176,10 +137,6 @@ impl Tool for EditTool {
         &self.meta
     }
 
-    /// The one file the call names. A path that does not parse wrote
-    /// nothing, since `invoke` refuses it before touching the disk, but
-    /// the answer stays `Domain` so that no reading of it can come out
-    /// narrower than the truth.
     fn writes(&self, call: &ToolCall) -> kernel::Writes {
         match arg(call.args.as_map(), Self::FILE_PATH)
             .and_then(|asked| super::chosen_path::within_city(&self.city_root, asked, "edit file"))
@@ -202,7 +159,7 @@ impl Tool for EditTool {
                 self.meta.name.as_str()
             )));
         }
-        // Read once: every door below judges this call under one policy.
+
         let policy = self.desk.policy.now();
         crate::mode::mode_admits(&policy, Self::NAME)?;
         let args = call.args.as_map();
@@ -231,12 +188,6 @@ impl Tool for EditTool {
             )));
         }
 
-        // The path is judged before the filesystem is touched, and by the
-        // same two authorities everything else uses: Address::parse kills
-        // traversal, and the write-domain gate judges the file the way
-        // the bench judged the declared area. The bench only ever sees
-        // the tool's own declaration; a model-chosen path is judged
-        // here, and by the same door.
         let target = kernel::Address::parse(rel).map_err(|err| {
             AxError::failure(
                 AxCode::InvalidArgs,
@@ -247,22 +198,16 @@ impl Tool for EditTool {
         })?;
         match kernel::gate::domain(&self.writable, &target, &kernel::TaintSet::empty()) {
             kernel::GateOutcome::Allow => {}
-            // The write doors do not ask. Were one ever to, the call is
-            // pending, not allowed.
+
             kernel::GateOutcome::Deny { refusal } => return Err(*refusal),
             kernel::GateOutcome::Ask { question } => return Err(*question),
         }
 
         let path = self.city_root.join(rel);
-        // A name that is a link lands a write somewhere the gate never
-        // judged - `.git/hooks` through a junction is privilege
-        // escalation (`Sprawling/storage/Spec.lean` §8-25) - so it is
-        // refused before the stamps are asked, and before the creating
-        // arm makes a parent directory through it.
+
         storage::WriteTarget::within("edit file", &self.city_root, &path)
             .map_err(storage::StorageError::into_ax)?;
-        // Inside the lock the stamp, the bytes and the landing are one
-        // step, so two runs cannot both land on one look (§8-64).
+
         let _held = self.desk.locks.hold(&path);
         let intent = if old.is_empty() {
             Intent::Create
@@ -275,7 +220,7 @@ impl Tool for EditTool {
                 Stamp::of(&path).map_err(|err| unreadable(rel, &err))?,
             ),
             Intent::Replace => {
-                // A replacement changes a file that is already there.
+
                 match kernel::gate::replacing(policy.write, &target) {
                     kernel::GateOutcome::Allow => {}
                     kernel::GateOutcome::Deny { refusal } => return Err(*refusal),
@@ -310,7 +255,7 @@ impl Tool for EditTool {
                 )));
             }
             Admission::Moved => {
-                // The passage is a window read of the file as it stands.
+
                 self.desk.seen.look(&target, current.clone(), current);
                 let why = match passage::around(&text, old) {
                     (passage::Opened::AroundOld, window) => {
@@ -352,13 +297,7 @@ impl Tool for EditTool {
                  occurrence, or set `replace_all: true` to change all of them",
             )),
         }?;
-        // The replacement lands the way every city write does: a staging
-        // file renamed over the name, so a failed write leaves the old
-        // file and a hard link's other names keep their bytes
-        // (`Sprawling/storage/Spec.lean` §8-32). The name is cleared of links
-        // again here, because the clearing above came before the wait for
-        // the lock and the read, and a link placed since would carry the
-        // write past the gate.
+
         storage::WriteTarget::within("edit file", &self.city_root, &path)
             .and_then(|cleared| cleared.replace(updated.as_bytes()))
             .map_err(storage::StorageError::into_ax)?;
@@ -371,12 +310,7 @@ impl Tool for EditTool {
 }
 
 impl EditTool {
-    /// The creating arm, admitted where nothing stood and cleared of
-    /// links by `invoke` before any parent directory is made. The
-    /// filesystem still claims the name at the write, judged again once
-    /// the parents exist, so a writer outside the lock
-    /// that took it since is refused too, under either write limit
-    /// (`Sprawling/storage/Spec.lean` §8-32).
+
     fn create(
         &self,
         target: &kernel::Address,
@@ -403,8 +337,6 @@ impl EditTool {
         })
     }
 
-    /// Records what this run now knows the file to be - its own write -
-    /// so the next edit of it needs no read in between.
     fn note_landing(
         &self,
         target: &kernel::Address,
@@ -417,19 +349,6 @@ impl EditTool {
     }
 }
 
-/// The passage and its replacement as the file spells them.
-///
-/// A passage copied out of a `read` answer may carry the line marks that
-/// answer drew (`crate::rendering::Copied`). It is tried as it came
-/// first, and an exact match is never second-guessed, because a file may
-/// hold lines that look like marks. Only when it matches nothing are its
-/// marks taken off, and only marks the file confirms: the unmarked
-/// passage has to start on the very line its marks number, for exactly
-/// one reading of them. The replacement loses the marks with those
-/// numbers and keeps every other line as it came, because a model that
-/// copied the marks into `old_string` copied them into `new_string`,
-/// while a numbered line it adds in `new_string` is text it means to
-/// write.
 fn as_the_file_spells<'a>(text: &str, old: &'a str, new: &'a str) -> (Cow<'a, str>, Cow<'a, str>) {
     if text.contains(old) {
         return (Cow::Borrowed(old), Cow::Borrowed(new));
@@ -449,8 +368,6 @@ fn as_the_file_spells<'a>(text: &str, old: &'a str, new: &'a str) -> (Cow<'a, st
     }
 }
 
-/// Whether `passage` occurs in `text` starting at the beginning of the
-/// 0-based line `line`, numbered the way `read` numbers lines.
 fn begins_on_line(text: &str, passage: &str, line: u64) -> bool {
     !passage.is_empty()
         && text.match_indices(passage).any(|(at, _)| {
@@ -461,10 +378,6 @@ fn begins_on_line(text: &str, passage: &str, line: u64) -> bool {
         })
 }
 
-/// The file's text and the stamp it was read under, or no stamp when
-/// nothing stands at the path. Stamps taken on each side of the read
-/// that differ mean another writer was in the middle of it, and the
-/// bytes belong to neither side.
 fn read_whole(rel: &str, path: &Path) -> Result<(String, Option<Stamp>), AxError> {
     let before = Stamp::of(path).map_err(|err| unreadable(rel, &err))?;
     if before.is_none() {
@@ -499,8 +412,6 @@ fn unreadable(rel: &str, err: &std::io::Error) -> AxError {
         .with_recovery("check the path; to create a new file pass old_string:\"\"")
 }
 
-/// The answer: the path and the diff. Per-edit diffs are the
-/// restoration granularity.
 fn echo(rel: &str, before: &str, after: &str) -> Result<Payload, AxError> {
     let mut result = Map::new();
     result.insert("path".to_owned(), Value::String(rel.to_owned()));
@@ -511,9 +422,6 @@ fn echo(rel: &str, before: &str, after: &str) -> Result<Payload, AxError> {
     Payload::new(result)
 }
 
-/// Why a create did not land. A name another writer took since the
-/// admission is the same refusal as one that already stood; anything
-/// else is storage's.
 fn refused_create(err: storage::StorageError, rel: &str) -> AxError {
     if !matches!(err, storage::StorageError::NameTaken { .. }) {
         return err.into_ax();
@@ -521,7 +429,6 @@ fn refused_create(err: storage::StorageError, rel: &str) -> AxError {
     already_exists(rel)
 }
 
-/// A create where a file stands: it is read and changed instead.
 fn already_exists(rel: &str) -> AxError {
     AxError::failure(
         AxCode::VersionConflict,
@@ -531,11 +438,6 @@ fn already_exists(rel: &str) -> AxError {
     .with_recovery("read the file and replace a passage in it, or choose another path")
 }
 
-/// A minimal unified diff: enough to see what changed and where, and no
-/// dependency for the eighty lines it takes. An empty `before` is a
-/// creation - no `old_string` matches once in an empty text - and is written
-/// from `/dev/null`, the way unified diffs mark a new file, which is how
-/// a reader of the echo tells a creation from a change.
 fn unified_diff(path: &str, before: &str, after: &str) -> String {
     let old_lines: Vec<&str> = before.lines().collect();
     let new_lines: Vec<&str> = after.lines().collect();

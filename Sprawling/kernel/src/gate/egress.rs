@@ -3,19 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The egress doors: whether bytes may leave and whether a host may be
-//! reached.
-//! The part `Sprawling/kernel/spec/Gate.lean` specifies this module with the
-//! rest of `kernel::gate`.
-
 use crate::error::{AxCode, AxError, GateRefusal};
 use crate::secret::SecretSpan;
 
-/// address resolution; kernel never resolves names.
-///
-/// Closed: the kinds of destination a city can distinguish still grow,
-/// and every module that decides about a destination has to be shown
-/// the new kind by the compiler on the day it is added.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EgressTarget {
     Loopback,
@@ -23,22 +13,16 @@ pub enum EgressTarget {
     Public {
         host: String,
     },
-    /// An external server this building configured. The city names the
-    /// connector rather than a host because a connector's own
-    /// destination is not visible from here: claiming a host would be
-    /// inventing one, and claiming loopback would understate where the
-    /// bytes can end up.
+
     Connector {
         label: crate::tool::ServerLabel,
     },
 }
 
-/// Deliberately exhaustive.
 #[derive(Debug)]
 pub enum EgressOutcome {
     Allow {
-        /// True exactly once per run: the pipeline hangs the net notice
-        /// on this flag (4.3). Loopback and private targets never set it.
+
         first_public_egress: bool,
     },
     Deny {
@@ -46,10 +30,6 @@ pub enum EgressOutcome {
     },
 }
 
-/// The Egress door: secret shapes never leave (C13), and the first
-/// public egress of a run is named. The subject counts spans and offsets
-/// — the matched bytes never appear (the error message is itself an
-/// egress surface).
 pub fn egress(
     spans: &[SecretSpan],
     target: &EgressTarget,
@@ -85,10 +65,7 @@ pub fn egress(
             ),
         };
     }
-    // A connector counts as leaving, for the same reason a public host
-    // does: the run has reached a service outside itself, and the one
-    // notice a run gets about that must not depend on whether the city
-    // could name the far end.
+
     let leaves_the_machine = matches!(
         target,
         EgressTarget::Public { .. } | EgressTarget::Connector { .. }
@@ -99,18 +76,13 @@ pub fn egress(
     }
 }
 
-/// Which hosts a run may reach. A suffix list, because a building names
-/// domains rather than addresses, and an empty list is the honest way to
-/// say "nothing public" — a confidential building holds exactly this.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EgressAllowlist {
     suffixes: Vec<String>,
 }
 
 impl EgressAllowlist {
-    /// Builds the list. Entries are lowercased and stripped of a leading
-    /// dot, so `.example.com` and `example.com` are the same rule rather
-    /// than two rules with different behaviour.
+
     #[must_use]
     pub fn new(entries: Vec<String>) -> EgressAllowlist {
         let mut suffixes: Vec<String> = entries
@@ -132,9 +104,6 @@ impl EgressAllowlist {
         self.suffixes.iter().map(String::as_str)
     }
 
-    /// True when `host` is the domain itself or one of its subdomains.
-    /// Matching is on label boundaries: `notexample.com` does not match
-    /// `example.com`, which a plain suffix test would let through.
     #[must_use]
     pub fn admits(&self, host: &str) -> bool {
         let host = host.trim_end_matches('.').to_ascii_lowercase();
@@ -147,22 +116,6 @@ impl EgressAllowlist {
     }
 }
 
-/// The host a URL names, when it names one.
-///
-/// One authority for the whole workspace: the browser tool reading a page
-/// address and a building reading the address a person declared for
-/// their browser are the same question, and two parsers would answer it
-/// differently the first time either was corrected. The URL is read by
-/// the WHATWG URL Standard, the parser browsers follow, so the host the
-/// egress door judges is the host a browser connects to (D59): a
-/// backslash ends the authority of a special scheme, the host is
-/// percent-decoded and lowercased, and a number spells an IPv4 address.
-/// A URL with no authority - `about:blank`, a `file:` path, text with no
-/// scheme - names no host.
-///
-/// # Errors
-/// Refuses a URL this build cannot read, which would leave an egress
-/// unjudged.
 pub fn host_of(url: &str) -> Result<Option<String>, AxError> {
     let parsed = match url::Url::parse(url.trim()) {
         Ok(parsed) => parsed,
@@ -188,18 +141,6 @@ fn malformed_host() -> AxError {
     .with_recovery("pass an absolute url, for example `https://example.com/page`")
 }
 
-/// Classifies a host name or address for the egress doors.
-///
-/// The one authority for what this city counts as loopback and as the
-/// private network around it: the target kind decides whether the first
-/// public egress notice is due and whether an attachment to a person's
-/// browser is on this machine at all. The host arrives already resolved
-/// to a name or an address; this function never resolves anything, and
-/// a host it cannot read as an address is public, which is the side
-/// that keeps the notice rather than the side that drops it.
-///
-/// Brackets around an IPv6 literal are stripped, so `[::1]` and `::1`
-/// are one address rather than two rules.
 #[must_use]
 pub fn target_of(host: &str) -> EgressTarget {
     let bare = host
@@ -225,8 +166,7 @@ pub fn target_of(host: &str) -> EgressTarget {
         }
     }
     if let Some(leading) = ipv6_leading(&bare) {
-        // fc00::/7 unique-local and fe80::/10 link-local: the mask keeps
-        // the prefix bits and compares the group that carries them.
+
         if (leading & 0xfe00) == 0xfc00 || (leading & 0xffc0) == 0xfe80 {
             return EgressTarget::Private;
         }
@@ -236,9 +176,6 @@ pub fn target_of(host: &str) -> EgressTarget {
     }
 }
 
-/// Four octets when the string is a dotted IPv4 address, `None`
-/// otherwise. Anything dotted but out of range is a name, which lands
-/// on the public side.
 fn ipv4_octets(host: &str) -> Option<[u8; 4]> {
     let mut octets = [0u8; 4];
     let mut at = 0usize;
@@ -251,7 +188,6 @@ fn ipv4_octets(host: &str) -> Option<[u8; 4]> {
     if at == 4 { Some(octets) } else { None }
 }
 
-/// The first sixteen-bit group of an IPv6 literal, when this is one.
 fn ipv6_leading(host: &str) -> Option<u16> {
     if !host.contains(':') {
         return None;
@@ -260,20 +196,9 @@ fn ipv6_leading(host: &str) -> Option<u16> {
     u16::from_str_radix(first, 16).ok()
 }
 
-/// The destination half of the egress question: may this run reach this
-/// host at all? The payload half stays with [`egress`] — "may these bytes
-/// leave" and "may this host be reached" are two questions, and a caller
-/// that asks only one of them should not look as if it asked both.
-///
-/// Loopback and private targets are not on the list: a local model or a
-/// machine on the same network is not egress, and putting them behind a
-/// domain list would mean a confidential building could not reach its own
-/// inference server.
 #[must_use]
 pub fn egress_target(list: &EgressAllowlist, target: &EgressTarget) -> EgressOutcome {
-    // A connector is admitted by the building's own server table, frozen
-    // at run start; this list answers a different question, about hosts,
-    // and a connector label is not a host.
+
     if let EgressTarget::Connector { .. } = target {
         return EgressOutcome::Allow {
             first_public_egress: true,

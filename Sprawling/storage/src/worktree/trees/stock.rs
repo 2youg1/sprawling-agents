@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The stock: one tree checked out at the trunk before any node asks for
-//! it, so that placing a node's tree is a rename rather than a checkout
-//! (`Sprawling/storage/spec/Worktree/Trees/Stock.lean` §8-35).
-//!
-//! A checkout waits on the real-time scanner once for every file it
-//! creates, so any placement that creates the tree's files while a run
-//! waits costs what the tree holds. Taking the stock over creates none:
-//! the stock's directory and its registration are renamed to the node's,
-//! and the two link files git keeps between them are rewritten.
-
 use std::path::{Path, PathBuf};
 
 use super::super::lease::{FileWork, WorktreeLease};
@@ -23,40 +13,30 @@ use super::kept::restore;
 use super::open_tree;
 use crate::error::StorageError;
 
-/// The stock's id: its registration, its directory under the tree home
-/// and its branch. `+` is outside `WorktreeName`'s alphabet, so no node
-/// can be named this and no claim, release or merge reaches the stock;
-/// git admits it in a branch name.
 pub(super) const STOCK: &str = "+spare";
 
-/// Why a stock is locked: it is being checked out, and a tree half
-/// written is not one to hand to a node.
 const STOCKING: &str = "being stocked by sprawling";
 
-/// What the tree home holds under the stock's id.
 enum Stock {
     Absent,
-    /// Being checked out by another call.
+
     Busy,
-    /// Registered, but its directory or a link file is not what this
-    /// module writes: taken back and placed anew rather than handed out.
+
     Broken,
     Ready(git2::Worktree, Links),
 }
 
-/// The two link files between the stock's directory and its
-/// registration, as git wrote them, and where each lives.
 struct Links {
     tree: PathBuf,
     admin: PathBuf,
-    /// The tree's `.git` file, up to the stock's id.
+
     dot_git: String,
-    /// The registration's `gitdir` file, up to the stock's id.
+
     gitdir: String,
 }
 
 impl Links {
-    /// The two files as they read once the stock is `name`'s.
+
     fn of(&self, name: &str) -> (String, String) {
         (
             format!("{}worktrees/{name}/\n", self.dot_git),
@@ -66,18 +46,7 @@ impl Links {
 }
 
 impl Worktrees {
-    /// Keeps one tree checked out at the trunk for the next placement to
-    /// take over, and answers what that cost the filesystem: a whole
-    /// checkout when there is no stock, and the files the trunk changed
-    /// since the stock was last brought to it otherwise. A stock that
-    /// another call is checking out is left to it, at no cost.
-    ///
-    /// Call it where nobody waits on it: its cost is the placement's.
-    ///
-    /// # Errors
-    /// Refuses a city whose working tree exceeds the ceiling and a
-    /// repository with no commit, and propagates whatever git or the
-    /// disk refuses while the stock is checked out.
+
     pub fn stock(&self) -> Result<FileWork, StorageError> {
         match self.stock_standing()? {
             Stock::Absent => self.place_stock(),
@@ -90,14 +59,6 @@ impl Worktrees {
         }
     }
 
-    /// Takes the stock over as `name`'s tree and lends it, or answers
-    /// `None` when there is no stock to take: none was made, another
-    /// call is making it, or another placement took it first. `city` is
-    /// the walk the ceiling was judged on.
-    ///
-    /// The directory is renamed first, because that rename is the one
-    /// step two placements cannot both make; every later step leaves a
-    /// state the next claim of `name` takes back (`Sprawling/storage/spec/Worktree/Trees/Stock.lean` §8-35).
     pub(super) fn adopt(
         &self,
         name: &WorktreeName,
@@ -134,31 +95,18 @@ impl Worktrees {
         }))
     }
 
-    /// Where the stock stands, read from git and the disk.
     fn stock_standing(&self) -> Result<Stock, StorageError> {
         let admin = self.repo.commondir().join(super::WORKTREE_DIR).join(STOCK);
         let tree = match self.repo.find_worktree(STOCK) {
             Ok(tree) => tree,
             Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(Stock::Absent),
-            // A registration git will not read is one a cut takeover left
-            // behind - the tree renamed out from under it, or the write of
-            // its link torn - and `Broken` is the state for it: `forget`
-            // takes the registration back and the placement after it makes
-            // the stock whole (`Sprawling/storage/spec/Worktree/Trees/Stock.lean`
-            // §8-35: 接管的步骤…进程可能在任何一步之后死掉，而 standing
-            // 收回指向不存在目录的登记; `every_cut_is_recovered`). Where no
-            // registration stands at all, the repository itself refused and
-            // the reason is carried.
+
             Err(_) if admin.is_dir() => return Ok(Stock::Broken),
             Err(err) => return Err(git("find the stock", STOCK, &err)),
         };
         let lock = match tree.is_locked() {
             Ok(lock) => lock,
-            // The registration went away between the lookup and this read:
-            // a lane putting the stock back, or a `forget` taking back one
-            // git would not read. No registration is the state the next
-            // placement wants, so it is asked for rather than carried as a
-            // failure of the repository.
+
             Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(Stock::Absent),
             Err(err) => return Err(git("read the stock's lock", STOCK, &err)),
         };
@@ -194,7 +142,6 @@ impl Worktrees {
         })
     }
 
-    /// Checks a new stock out at the trunk, locked until it is whole.
     fn place_stock(&self) -> Result<FileWork, StorageError> {
         let city = self.refuse_oversized(STOCK)?;
         self.clear_unregistered(STOCK)?;
@@ -209,8 +156,7 @@ impl Worktrees {
             .map_err(|err| git("branch the stock", STOCK, &err))?;
         let (_, written) = match self.check_out_tree(STOCK, Some(branch.get())) {
             Ok(placed) => placed,
-            // A registration left behind locked would read as a stocking
-            // in progress for the rest of this serving.
+
             Err(refusal) => return Err(self.take_back(refusal)),
         };
         let tree = self
@@ -227,7 +173,6 @@ impl Worktrees {
         })
     }
 
-    /// Brings a whole stock up to the trunk, locked while it moves.
     fn refresh_stock(&self, tree: &git2::Worktree) -> Result<FileWork, StorageError> {
         tree.lock(Some(STOCKING))
             .map_err(|err| git("lock the stock", STOCK, &err))?;
@@ -239,18 +184,13 @@ impl Worktrees {
         self.repo
             .branch(STOCK, &trunk, true)
             .map_err(|err| git("move the stock to the trunk", STOCK, &err))?;
-        // Unlocked even when the restore failed: a stock half moved is
-        // whole again after the restore a placement makes of it, while a
-        // lock left behind would read as a stocking in progress.
+
         let work = restore(tree, STOCK, &[]).and_then(|work| cache_trees(tree).map(|()| work));
         tree.unlock()
             .map_err(|err| git("unlock the stock", STOCK, &err))?;
         work
     }
 
-    /// Unregisters a stock whose checkout failed and answers the
-    /// failure, or the failure to unregister it with the checkout's
-    /// failure in its detail.
     fn take_back(&self, refusal: StorageError) -> StorageError {
         match self.forget(STOCK) {
             Ok(()) => refusal,
@@ -261,9 +201,6 @@ impl Worktrees {
         }
     }
 
-    /// Makes `name`'s branch at the trunk unless the node already has
-    /// one: a node's branch is its line of work, and the stock is only
-    /// where its files come from.
     fn branch_at_trunk(&self, name: &WorktreeName) -> Result<(), StorageError> {
         match self
             .repo
@@ -286,12 +223,6 @@ impl Worktrees {
     }
 }
 
-/// Reads the stock's index back from its head and writes it, so that the
-/// index carries the tree cache: the placement that takes the stock over
-/// then learns that the index writes the head's tree without hashing a
-/// single tree (`kept::index_writes_tree`). Reading back keeps the stat
-/// data of every entry whose blob and mode are unchanged, and writing the
-/// index after the checkout's last file leaves no entry racily clean.
 fn cache_trees(tree: &git2::Worktree) -> Result<(), StorageError> {
     let repo = open_tree(tree).map_err(|err| git("open the stock", STOCK, &err))?;
     let head = repo
@@ -307,7 +238,6 @@ fn cache_trees(tree: &git2::Worktree) -> Result<(), StorageError> {
         .map_err(|err| git("cache the stock's trees", STOCK, &err))
 }
 
-/// Writes one link file whole.
 fn write(path: &Path, text: &str) -> Result<(), StorageError> {
     std::fs::write(path, text).map_err(|source| io("rewrite a worktree link", path, source))
 }
@@ -349,17 +279,6 @@ mod tests {
         u64::try_from(std::fs::read_dir(dir).unwrap().count()).unwrap()
     }
 
-    /// A cut takeover leaves the spare's registration pointing at a tree
-    /// that is gone, and the next `stock` takes that registration back and
-    /// makes the spare whole (`Sprawling/storage/spec/Worktree/Trees/Stock.lean`
-    /// §8-35: 接管的步骤…进程可能在任何一步之后死掉，而 `standing` 收回指向
-    /// 不存在目录的登记; `every_cut_is_recovered`).
-    ///
-    /// The cut drawn here is a torn write of the registration's link, the
-    /// state libgit2 refuses to read outright: the lookup answers an error
-    /// that is not `NotFound`, so a `standing` that propagated it turned a
-    /// cut takeover into `E_STORAGE_FATAL` where the model promises a
-    /// stocking.
     #[test]
     fn a_registration_git_will_not_read_is_stocked_again() {
         let dir = tempfile::tempdir().unwrap();
@@ -383,10 +302,6 @@ mod tests {
         );
     }
 
-    /// `Sprawling/storage/spec/Worktree/Trees/Stock.lean` §8-35: a placement from the stock creates no file,
-    /// whatever the tree holds - the files were written when the stock
-    /// was, where nobody waited. Judged at two sizes, so a placement
-    /// whose file count grows with the tree is a failure here.
     #[test]
     fn a_placement_from_the_stock_creates_no_file_at_either_size() {
         for files in [32, 64] {
@@ -419,10 +334,6 @@ mod tests {
         }
     }
 
-    /// A stock made before the trunk moved is placed at the trunk: the
-    /// placement writes what the trunk changed since, the node's tree
-    /// is on the node's own branch, and what the node offers from it
-    /// merges like the offer of any other tree.
     #[test]
     fn a_stock_behind_the_trunk_is_placed_at_the_trunk_and_merges() {
         let dir = tempfile::tempdir().unwrap();
@@ -479,12 +390,6 @@ mod tests {
         );
     }
 
-    /// Storage D28, counted: a room placed while the stock is still being
-    /// checked out pays one whole checkout of its own (N files at N, 2N
-    /// and 4N), and the stock being made is not lost - the next room
-    /// takes it over and creates nothing. Waiting for the stock instead
-    /// would save the second room's N files and no checkout overall,
-    /// because the stock it took would have to be made again.
     #[test]
     fn a_room_placed_while_the_stock_is_being_made_checks_out_once_and_the_stock_survives() {
         for files in [8, 16, 32] {
@@ -510,8 +415,6 @@ mod tests {
         }
     }
 
-    /// The stock is nobody's tree: no node lists it, the sweep at open
-    /// leaves it, and the first placement after that takes it over.
     #[test]
     fn the_stock_is_no_nodes_tree_and_outlives_the_sweep() {
         let dir = tempfile::tempdir().unwrap();

@@ -3,39 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Where each tool server one address reaches stands, asked at the
-//! moment somebody wants to know.
-//!
-//! It is here rather than beside the folded answers because it folds
-//! nothing: a server's state is a fact about now - a program that
-//! starts, a host that answers, an account that is still valid - and a
-//! remembered one would tell a person their server is up an hour after
-//! it stopped. The configuration is read the same way `Document` and
-//! `Listing` read the tree, and the handshake is the one a run opens
-//! with, so what a person is shown and what a model is given cannot
-//! disagree.
-//!
-//! **This is the one read that costs seconds**, and a page asks it when
-//! somebody opens the MCP page or adds a server rather than on a timer.
-
 use kernel::{Address, AxCode, AxError, TimeoutMs};
 
 use super::prepared::LiveAsk;
 use agent_protocols::McpLink;
 
-/// How long one server is given to finish `initialize` and list what it
-/// offers. Shorter than a tool call's patience, because a person is
-/// waiting in front of this answer rather than a model: a server that
-/// has said nothing in this long is one they need told about.
 const HANDSHAKE_PATIENCE: TimeoutMs = TimeoutMs(15_000);
 
 impl LiveAsk {
-    /// Reaches every server this address's configuration names, in the
-    /// order it names them.
-    ///
-    /// A configuration this city cannot read answers an empty list
-    /// rather than a refusal: the address exists, it reaches no server,
-    /// and the page draws that as a building with none.
+
     pub(super) fn mcp_health_answer(&self, addr: &Address) -> wire::McpHealthAnswer {
         let servers = match city::load_config(&self.city_root, addr) {
             Ok(config) => config
@@ -51,7 +27,6 @@ impl LiveAsk {
         }
     }
 
-    /// One server: how it is reached, and what happened when it was.
     fn reached(&self, server: &kernel::McpServer) -> wire::McpServerHealth {
         let (transport, target) = spelled(&server.transport);
         wire::McpServerHealth {
@@ -62,14 +37,6 @@ impl LiveAsk {
         }
     }
 
-    /// The handshake, turned into the three answers a person acts on
-    /// differently.
-    ///
-    /// `CredentialMissing` is `Authenticating` rather than a failure
-    /// because the server is up and understood the request: what to do
-    /// about it is sign in, not check the address. Every transport
-    /// raises that code from one place, so this mapping has nothing to
-    /// guess (`agent_protocols::mcp::http`, `agent_protocols::mcp::sse`).
     fn handshake(&self, server: &kernel::McpServer) -> wire::McpState {
         match self.listed(server) {
             Ok(state) => state,
@@ -84,12 +51,6 @@ impl LiveAsk {
         }
     }
 
-    /// Opens the connection, agrees a revision, and asks what it offers.
-    ///
-    /// # Errors
-    /// Propagates the transport's refusal to open, the far end's refusal
-    /// to handshake, and a tool list this build cannot read - each of
-    /// which already names the action, the subject and a recovery.
     fn listed(&self, server: &kernel::McpServer) -> Result<wire::McpState, AxError> {
         use agent_protocols::Outbound as _;
 
@@ -102,9 +63,7 @@ impl LiveAsk {
             .with_recovery("this city has no vault open; serve it and ask again")
         })?;
         let resolve = crate::held_vault::resolving(std::sync::Arc::clone(vault));
-        // A server is reached from the city root rather than from a
-        // run's worktree: nothing is running, and the tree a run would
-        // have does not exist yet.
+
         let mut link = McpLink::open(&server.transport, &self.city_root, &resolve)?;
         let mut rpc = agent_protocols::Rpc::new();
         let opened = agent_protocols::handshake(&mut link, &mut rpc, HANDSHAKE_PATIENCE)?;
@@ -127,11 +86,6 @@ impl LiveAsk {
     }
 }
 
-/// The word a person chose for this transport, and the one line that
-/// says where it goes.
-///
-/// Exhaustive, so a transport added to the configuration cannot reach a
-/// page as a blank target.
 fn spelled(transport: &kernel::McpTransport) -> (String, String) {
     match *transport {
         kernel::McpTransport::Stdio {
@@ -162,8 +116,6 @@ fn spelled(transport: &kernel::McpTransport) -> (String, String) {
 mod tests {
     use super::*;
 
-    /// The target line is what a person compares against what they
-    /// typed, so a command carries its arguments and a url is itself.
     #[test]
     fn every_transport_spells_its_word_and_the_line_that_says_where_it_goes() {
         assert_eq!(
@@ -190,8 +142,6 @@ mod tests {
         );
     }
 
-    /// An address with no configuration reaches no server. That is a
-    /// building with none, not a city that could not look.
     #[test]
     fn an_address_that_configures_no_server_answers_an_empty_list() {
         let dir = tempfile::tempdir().unwrap();

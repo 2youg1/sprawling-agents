@@ -3,32 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Locator: the one grammar for referring to content across events and
-//! sessions. The part `Sprawling/kernel/spec/Locator.lean` specifies this
-//! module. Two schemes only:
-//!
-//! `cas:b3-<hex64>[#(L|B)<a>-<b>]` | `file:<address>@<hex40>[#(L|B)<a>-<b>]`
-//!
-//! Invariants owned here:
-//! - fail-closed: whatever is not exactly the grammar is `E_LOCATOR_INVALID`;
-//!   unknown schemes and unknown algorithm tags are errors, never fallbacks.
-//! - canonical echo: `parse` additionally requires `Display(parsed) == raw`,
-//!   which closes every non-canonical spelling (uppercase hex, leading
-//!   zeros, `+` signs) with one rule.
-//! - `secret:` never parses here: SecretRef has a separate parser by
-//!   design, so a read path can never redeem a credential.
-//! - range semantics: `L` is 1-based closed (editor precedent), `B` is
-//!   0-based closed (HTTP Range precedent); `from <= to` always.
-//!
-//! [`B3Hash`] lives here because `b3-` is part of this grammar; the event
-//! chain and CAS reuse the same type (one hash function library-wide).
-
 use serde::{Deserialize, Serialize};
 
 use crate::address::Address;
 use crate::error::{AxCode, AxError};
 
-/// BLAKE3 digest, 32 bytes; displayed as 64 lowercase hex digits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct B3Hash([u8; 32]);
 
@@ -41,9 +20,6 @@ impl B3Hash {
         &self.0
     }
 
-    /// The library-wide content-hash producer. Every non-chain hash (prefix
-    /// segment hashes, stall fingerprints) comes through here so blake3 has
-    /// exactly one home outside `chain_hash`.
     pub fn digest(bytes: &[u8]) -> Self {
         B3Hash(*blake3::hash(bytes).as_bytes())
     }
@@ -106,8 +82,6 @@ impl<'de> Deserialize<'de> for B3Hash {
     }
 }
 
-/// Git object id, 40 lowercase hex digits (SHA-1 repositories; other
-/// lengths are rejected; SHA-256 repositories are not accepted).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GitOid([u8; 20]);
 
@@ -116,17 +90,6 @@ impl GitOid {
         GitOid(bytes)
     }
 
-    /// The hex spelling, read back.
-    ///
-    /// Public because a checkpoint identity travels as a string in more
-    /// than one direction: the wire deserialises one, and a client that
-    /// was shown a checkpoint in a sentence has to turn it back into an
-    /// oid to act on it. Without this the caller decodes its own hex,
-    /// which is a second definition of what an oid looks like - the exact
-    /// thing the note on `Deserialize` below says stays here.
-    ///
-    /// `None` on anything that is not exactly forty lowercase hex digits:
-    /// a wrong length is a refusal, never a padded guess.
     #[must_use]
     pub fn parse(raw: &str) -> Option<Self> {
         decode_hex_fixed::<20>(raw).map(GitOid)
@@ -146,16 +109,12 @@ impl Serialize for GitOid {
 }
 
 impl<'de> Deserialize<'de> for GitOid {
-    /// The shape authority stays here, so the wire (`wire::frames`) has no
-    /// second definition of what an oid looks like.
+
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         read_digest(deserializer).map(GitOid)
     }
 }
 
-/// A digest as its format wants it (`Sprawling/kernel/spec/Locator.lean` §8-84): the hex spelling
-/// wherever a person or a frame reads it, the bytes themselves in a
-/// binary format, which only this binary reads back (a snapshot).
 fn write_digest<const N: usize, S: serde::Serializer>(
     spelled: &impl std::fmt::Display,
     bytes: &[u8; N],
@@ -171,9 +130,6 @@ where
     }
 }
 
-/// What [`write_digest`] wrote. A human-readable format is read through
-/// the one hex spelling, and a wrong length is a refusal rather than a
-/// padded guess.
 fn read_digest<'de, const N: usize, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<[u8; N], D::Error>
@@ -192,7 +148,6 @@ where
     })
 }
 
-/// Sub-content range. `Lines` is 1-based closed; `Bytes` is 0-based closed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Range {
     Lines { from: u64, to: u64 },
@@ -200,7 +155,7 @@ pub enum Range {
 }
 
 impl Range {
-    /// 1-based closed line range; rejects `from == 0` and `from > to`.
+
     pub fn lines(from: u64, to: u64) -> Result<Self, AxError> {
         if from == 0 || from > to {
             return Err(range_error("lines", from, to));
@@ -208,7 +163,6 @@ impl Range {
         Ok(Range::Lines { from, to })
     }
 
-    /// 0-based closed byte range; rejects `from > to`.
     pub fn bytes(from: u64, to: u64) -> Result<Self, AxError> {
         if from > to {
             return Err(range_error("bytes", from, to));
@@ -235,7 +189,6 @@ impl std::fmt::Display for Range {
     }
 }
 
-/// The two-scheme reference grammar.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Locator {
     Cas {
@@ -250,18 +203,15 @@ pub enum Locator {
 }
 
 impl Locator {
-    /// The whole stored object behind `hash`. Infallible because a
-    /// `B3Hash` is already a digest the grammar accepts, so a caller that
-    /// holds one never spells the locator as text and parses it back.
+
     #[must_use]
     pub const fn cas(hash: B3Hash) -> Self {
         Locator::Cas { hash, range: None }
     }
 
-    /// Fail-closed parser: exact grammar or `E_LOCATOR_INVALID`.
     pub fn parse(raw: &str) -> Result<Self, AxError> {
         let parsed = Locator::parse_inner(raw)?;
-        // Canonical echo: one rule closes every non-canonical spelling.
+
         let echo = parsed.to_string();
         if echo != raw {
             return Err(invalid(
@@ -350,8 +300,6 @@ fn invalid(raw: &str, violation: impl Into<String>) -> AxError {
     AxError::failure(AxCode::LocatorInvalid, "parse locator", raw).with_recovery(violation.into())
 }
 
-/// Splits an optional `#(L|B)<a>-<b>` suffix off `rest`; `raw` only feeds
-/// error context.
 fn split_range(raw: &str, rest: &str) -> Result<(String, Option<Range>), AxError> {
     match rest.split_once('#') {
         None => Ok((rest.to_owned(), None)),
@@ -386,7 +334,6 @@ fn parse_range(raw: &str, fragment: &str) -> Result<Range, AxError> {
     range.map_err(|_| invalid(raw, "range bounds are out of order or out of base"))
 }
 
-/// Digits only, no leading zeros (except "0" itself), no signs.
 fn parse_canonical_u64(raw: &str, digits: &str) -> Result<u64, AxError> {
     if digits.is_empty() || !digits.chars().all(|c| c.is_ascii_digit()) {
         return Err(invalid(raw, "range bound must be decimal digits"));
@@ -413,7 +360,6 @@ fn write_range(f: &mut std::fmt::Formatter<'_>, range: &Option<Range>) -> std::f
     }
 }
 
-/// Strict lowercase hex into a fixed-width array; `None` on any deviation.
 pub(crate) fn decode_hex_fixed<const N: usize>(raw: &str) -> Option<[u8; N]> {
     if raw.len() != N.checked_mul(2)? {
         return None;
@@ -428,7 +374,6 @@ pub(crate) fn decode_hex_fixed<const N: usize>(raw: &str) -> Option<[u8; N]> {
     <[u8; N]>::try_from(out.as_slice()).ok()
 }
 
-/// Lowercase-only nibble; uppercase is non-canonical and refused.
 fn nibble(c: u8) -> Option<u8> {
     match c {
         b'0'..=b'9' => c.checked_sub(b'0'),

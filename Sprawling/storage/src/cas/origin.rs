@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Whose a block is: the run and the building it was put for, recorded
-//! when it is put (`Sprawling/storage/spec/Cas.lean` §8-3).
-//!
-//! The same bytes may be put for two buildings, so a block keeps every
-//! origin it was put for, one line each, in `<dir>/from/<shard>/<hex>`.
-//! A line that does not read back - the tail of an append a crash cut -
-//! grants nothing, which is the side a read bound fails towards.
-
 use std::path::PathBuf;
 
 use kernel::{Address, B3Hash, RunId};
@@ -18,7 +10,6 @@ use kernel::{Address, B3Hash, RunId};
 use super::Cas;
 use crate::error::{StorageError, io_err};
 
-/// The run and the building a block was put for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockOrigin {
     pub run: RunId,
@@ -26,12 +17,7 @@ pub struct BlockOrigin {
 }
 
 impl Cas {
-    /// Puts the bytes and records the origin they were put for. `Ok`
-    /// means both the object and the record are durable; a second put
-    /// with the same origin adds nothing.
-    ///
-    /// # Errors
-    /// `StorageError::Io` naming the path the store would not take.
+
     pub fn put_for(&mut self, bytes: &[u8], origin: &BlockOrigin) -> Result<B3Hash, StorageError> {
         let hash = self.put(bytes)?;
         let line = format!("{} {}", origin.run, origin.building.as_str());
@@ -48,8 +34,7 @@ impl Cas {
             {
                 return Ok(hash);
             }
-            // A crash can cut an append short; the new record starts on
-            // a line of its own, or it would read back as part of that tail.
+
             if held.last().is_some_and(|byte| *byte != b'\n') {
                 record.insert(0, '\n');
             }
@@ -69,11 +54,6 @@ impl Cas {
         Ok(hash)
     }
 
-    /// Every origin recorded for a block, oldest first; empty for a
-    /// block put with no origin and for a hash the store never saw.
-    ///
-    /// # Errors
-    /// `StorageError::Io` when a record exists and cannot be read.
     pub fn origins(&self, hash: &B3Hash) -> Result<Vec<BlockOrigin>, StorageError> {
         let (_, path) = self.origin_path(hash);
         if !self.vfs.exists(&path) {

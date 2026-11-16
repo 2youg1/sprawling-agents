@@ -3,30 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A whole-document step on one prompt document, and the line that
-//! records it (`Sprawling/accounting/Spec.lean` §8-22,
-//! `Sprawling/wire/Spec.lean` §8-98).
-//!
-//! Which documents take which step, and the version check, are the
-//! city's (`city::put_prompt`); this module turns the frame into that
-//! call and writes the line.
-
 use kernel::event::record::GovernedDocumentWritten;
 use kernel::{AxCode, AxError, EventKind, Payload};
 
 use super::super::RunWorker;
 
 impl RunWorker {
-    /// Takes the write's step on the prompt document at its `at`, only
-    /// while that file still holds the version its `base` names, and
-    /// records what it left.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` for an address that is not on the city's list of
-    /// prompt documents; whatever `city::put_prompt` refuses (a step the
-    /// document does not take, a file that moved since `base`, a file that
-    /// will not read, write or go); and a history that will not take the
-    /// line.
+
     pub(in crate::worker) fn put_prompt(
         &mut self,
         write: &wire::PromptWrite,
@@ -44,8 +27,7 @@ impl RunWorker {
             )
         })?;
         let written = city::put_prompt(&self.city_root, &doc, write.base, step_of(write.step))?;
-        // The three in the city's reserved subtree are named by their file
-        // alone; every other prompt document needs its address.
+
         let (naming, place) = match doc {
             city::PromptDocument::Shipped(city::Shipped::Mayor) => (self.naming_version()?, None),
             city::PromptDocument::Shipped(city::Shipped::Clerk) => (None, None),
@@ -70,7 +52,6 @@ impl RunWorker {
     }
 }
 
-/// The city's spelling of the step the frame names.
 fn step_of(step: wire::PromptStep) -> city::PromptStep {
     match step {
         wire::PromptStep::Own => city::PromptStep::Own,

@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The session: which frames a conversation with a browser is made of,
-//! and the recording that plays one back.
-//!
-//! `Session` mints ids and builds frames; it never holds a socket. That
-//! is what lets a whole browser conversation be asserted without a
-//! browser. The recording below is the offline adapter of the seam: it
-//! answers from a conversation somebody already had, so the assertions
-//! it carries are about the frames this crate builds, not about the
-//! transport in the binary.
-
 use std::collections::BTreeMap;
 
 use kernel::{AxCode, AxError};
@@ -20,15 +10,11 @@ use serde_json::{Value, json};
 
 use crate::port::{BrowserPort, Frame, Reply};
 
-/// A browsing context — a tab, a frame, a popup. Opaque on purpose: the
-/// string is the remote end's, and inventing one has no meaning.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ContextId(String);
 
 impl ContextId {
-    /// # Errors
-    /// Refuses an empty id, which is the shape a missing field takes
-    /// after a partial parse.
+
     pub fn parse(raw: &str) -> Result<ContextId, AxError> {
         if raw.is_empty() {
             return Err(AxError::failure(
@@ -47,19 +33,12 @@ impl ContextId {
     }
 }
 
-/// Which capabilities a session asks for. Kept minimal deliberately:
-/// every capability is a thing the remote end may then do, and a session
-/// that asked for less is a session that can do less.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SessionRequest {
-    /// Whether the session subscribes to network events. Off by default:
-    /// a subscription that nobody reads is bytes crossing a boundary for
-    /// no reason.
+
     pub network: bool,
 }
 
-/// Builds the frames of one conversation, in order, with ids nobody else
-/// mints.
 #[derive(Debug, Default)]
 pub struct Session {
     next: u64,
@@ -76,11 +55,6 @@ impl Session {
         self.next
     }
 
-    /// `session.new`: the first frame of every conversation.
-    ///
-    /// # Errors
-    /// Propagates the frame's own refusal, which the literals below
-    /// cannot provoke.
     pub fn begin(&mut self, request: SessionRequest) -> Result<Frame, AxError> {
         let mut events = Vec::new();
         if request.network {
@@ -93,34 +67,14 @@ impl Session {
         )
     }
 
-    /// One frame of a command this module has no named builder for,
-    /// numbered by the same counter as every other frame.
-    ///
-    /// The id is what this type owns, and a caller that minted its own
-    /// would renumber a replay — which is why composing params
-    /// elsewhere is allowed and composing ids is not.
-    ///
-    /// # Errors
-    /// Propagates the frame's own refusal: an empty method, or params
-    /// that are not an object.
     pub fn frame(&mut self, method: &str, params: Value) -> Result<Frame, AxError> {
         Frame::new(self.mint(), method, params)
     }
 
-    /// `browsingContext.getTree`: which tabs exist.
-    ///
-    /// # Errors
-    /// Propagates the frame's own refusal.
     pub fn tree(&mut self) -> Result<Frame, AxError> {
         Frame::new(self.mint(), "browsingContext.getTree", json!({}))
     }
 
-    /// `browsingContext.navigate`, waiting for the document to be
-    /// complete. Anything earlier hands a model a page that is still
-    /// arriving, and the difference is invisible in the text.
-    ///
-    /// # Errors
-    /// Refuses an empty url, and propagates the frame's own refusal.
     pub fn navigate(&mut self, context: &ContextId, url: &str) -> Result<Frame, AxError> {
         if url.is_empty() {
             return Err(
@@ -135,10 +89,6 @@ impl Session {
         )
     }
 
-    /// `script.evaluate` in the page's own realm, awaiting promises.
-    ///
-    /// # Errors
-    /// Propagates the frame's own refusal.
     pub fn evaluate(&mut self, context: &ContextId, expression: &str) -> Result<Frame, AxError> {
         Frame::new(
             self.mint(),
@@ -151,18 +101,10 @@ impl Session {
         )
     }
 
-    /// `session.end`.
-    ///
-    /// # Errors
-    /// Propagates the frame's own refusal.
     pub fn end(&mut self) -> Result<Frame, AxError> {
         Frame::new(self.mint(), "session.end", json!({}))
     }
 
-    /// Reads `browsingContext.getTree`'s answer.
-    ///
-    /// # Errors
-    /// Refuses a result whose shape this version does not read.
     pub fn read_tree(result: &Value) -> Result<Vec<ContextId>, AxError> {
         let contexts = result
             .get("contexts")
@@ -194,17 +136,10 @@ impl Session {
     }
 }
 
-/// The second adapter: a conversation somebody already had.
-///
-/// It answers by method and by the frame's own bytes rather than by
-/// arrival order, so a caller that legitimately reorders two independent
-/// commands still replays, while a caller that changed what it asks
-/// fails loudly instead of receiving somebody else's answer.
 #[derive(Debug, Default)]
 pub struct Recording {
     answers: BTreeMap<String, Value>,
-    /// Frames that arrived with no recorded answer, for the assertion
-    /// that a replay covered the conversation it claims to.
+
     missed: Vec<String>,
 }
 
@@ -214,14 +149,10 @@ impl Recording {
         Recording::default()
     }
 
-    /// Records what this frame's method-and-params were answered with.
-    /// The id is deliberately excluded from the key: a replay mints its
-    /// own ids and they are not part of what was asked.
     pub fn answer(&mut self, frame: &Frame, result: Value) {
         self.answers.insert(key_of(frame), result);
     }
 
-    /// Frames this recording could not answer, in arrival order.
     #[must_use]
     pub fn missed(&self) -> &[String] {
         &self.missed

@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The readers behind [`super::FACTS`]: each one opens the code that
-//! decides a fact and renders it the way a document writes it.
-//!
-//! Nothing here holds a value. A reader that cannot find its subject
-//! refuses with the file it looked in, because a fact that quietly
-//! recounts to zero would rewrite a document into a lie.
-
 use std::path::Path;
 
 use crate::budget::REGISTER;
@@ -19,13 +12,6 @@ use crate::walk;
 
 use super::{register_row, root_manifest};
 
-/// The wire tags of one frame family, as a document writes them:
-/// `` `dispatch`, `wake`, … `` in the order the schema declares.
-///
-/// The tags are read out of the schema rather than lower-cased from the
-/// variant names, because `rename_all = "snake_case"` is `wire`'
-/// decision and a second implementation of it here would be a second
-/// authority for how a frame is spelled on the wire.
 pub(super) fn wire_tags(kind: &str) -> Result<String, XtaskError> {
     let schema = wire::wire_schema();
     let members = schema
@@ -39,9 +25,7 @@ pub(super) fn wire_tags(kind: &str) -> Result<String, XtaskError> {
         })?;
     let mut tags = Vec::with_capacity(members.len());
     for member in members {
-        // A variant with a payload is an object whose one property is
-        // the tag; the variants that carry nothing arrive together as
-        // one member listing their tags as a string enum.
+
         if let Some(properties) = member
             .get("properties")
             .and_then(serde_json::Value::as_object)
@@ -79,19 +63,10 @@ pub(super) fn wire_tags(kind: &str) -> Result<String, XtaskError> {
     Ok(tags.join(", "))
 }
 
-/// How many packages the lockfile resolves, workspace members included,
-/// which is the number `sprawling status --deps` lists.
-///
-/// Counted by `budget::lockfile_packages`, which is also what
-/// `cargo xtask budget` prints beside the register's `dependency_count`
-/// row: a document quoting one number and a report printing another
-/// would be two answers to how large this tree's dependency graph is.
 pub(super) fn dependency_count(root: &Path) -> Result<String, XtaskError> {
     Ok(crate::budget::lockfile_packages(root)?.to_string())
 }
 
-/// How many Rust files sit in one directory of every package: the shape
-/// `crates/*/tests/ui` has, where each file is one counterexample.
 pub(super) fn files_under(root: &Path, inside: &str, what: &str) -> Result<String, XtaskError> {
     let mut found = 0_usize;
     for member in members(root)? {
@@ -104,7 +79,6 @@ pub(super) fn files_under(root: &Path, inside: &str, what: &str) -> Result<Strin
     refuse_if_empty(found, inside, what)
 }
 
-/// How many Rust files sit in one directory of the tree.
 pub(super) fn in_directory(root: &Path, dir: &str, what: &str) -> Result<String, XtaskError> {
     let base = root.join(dir);
     if !base.is_dir() {
@@ -116,10 +90,6 @@ pub(super) fn in_directory(root: &Path, dir: &str, what: &str) -> Result<String,
     refuse_if_empty(walk::files_with_ext(&base, &["rs"])?.len(), dir, what)
 }
 
-/// How many citysim scenario modules the suite harness loads.
-///
-/// The harness's `mod` list is the authority: a helper file under
-/// `scenarios/` is not a scenario, and `main.rs` itself is not one either.
 pub(super) fn citysim_scenarios(root: &Path) -> Result<String, XtaskError> {
     let harness = "Tools/citysim/tests/scenarios/main.rs";
     let text = walk::read_text(&root.join(harness))?;
@@ -136,11 +106,6 @@ pub(super) fn citysim_scenarios(root: &Path) -> Result<String, XtaskError> {
     refuse_if_empty(found, harness, "scenario file")
 }
 
-/// The version this workspace pins for one crate.
-///
-/// Every manifest is read, and two manifests pinning one crate at two
-/// versions is itself the refusal: the document cannot quote a version
-/// that the tree does not agree on.
 pub(super) fn dep_version(root: &Path, crate_name: &str) -> Result<String, XtaskError> {
     let mut found: Vec<(String, String)> = Vec::new();
     if let Some(pinned) = pinned_in(&root_manifest(root)?, crate_name) {
@@ -176,9 +141,6 @@ pub(super) fn dep_version(root: &Path, crate_name: &str) -> Result<String, Xtask
     Ok(first.clone())
 }
 
-/// The version one manifest states for a crate, wherever a manifest may
-/// state it: the workspace table, this package's own table, and the
-/// per-target tables a platform arm uses.
 fn pinned_in(manifest: &toml::Value, crate_name: &str) -> Option<String> {
     let direct = manifest
         .get("workspace")
@@ -199,8 +161,6 @@ fn pinned_in(manifest: &toml::Value, crate_name: &str) -> Option<String> {
     })
 }
 
-/// The version a dependency table states, in either spelling: a bare
-/// string, or a table with a `version` key.
 fn version_of(table: &toml::Value, crate_name: &str) -> Option<String> {
     let entry = table.get(crate_name)?;
     match entry {
@@ -209,18 +169,10 @@ fn version_of(table: &toml::Value, crate_name: &str) -> Option<String> {
     }
 }
 
-/// One byte count of a register row, grouped the way a document writes
-/// it: `288,972 B`.
 pub(super) fn grouped_bytes(root: &Path, row: &str, field: &str) -> Result<String, XtaskError> {
     Ok(format!("{} B", grouped(bytes_of(root, row, field)?)))
 }
 
-/// One integer field of a register row, grouped the way a document
-/// writes it and without a unit, because the unit is the field's to
-/// name: `views_rebuild_per_mb.best_p50_us` reads `2,759`.
-///
-/// # Errors
-/// The argument carries no `.field`, or the row or field is absent.
 pub(super) fn figure(root: &Path, argument: &str) -> Result<String, XtaskError> {
     let (row, field) = argument.split_once('.').ok_or_else(|| XtaskError::Doc {
         file: REGISTER.to_owned(),
@@ -229,14 +181,10 @@ pub(super) fn figure(root: &Path, argument: &str) -> Result<String, XtaskError> 
     Ok(grouped(bytes_of(root, row, field)?))
 }
 
-/// How many times the budget of a register row exceeds its reading, to
-/// one decimal: `7.3×`.
 pub(super) fn headroom(root: &Path, row: &str) -> Result<String, XtaskError> {
     let budget = bytes_of(root, row, "budget_bytes")?;
     let reading = bytes_of(root, row, "best_bytes")?;
-    // Rounded to the nearest tenth rather than truncated: a document
-    // that states 7.2 where the ratio is 7.257 is the same kind of
-    // wrong this gate exists to stop.
+
     let tenths = budget
         .checked_mul(10)
         .and_then(|scaled| scaled.checked_add(reading.checked_div(2)?))
@@ -252,7 +200,6 @@ pub(super) fn headroom(root: &Path, row: &str) -> Result<String, XtaskError> {
     ))
 }
 
-/// One unsigned field of a register row.
 fn bytes_of(root: &Path, row: &str, field: &str) -> Result<u64, XtaskError> {
     let stated = register_row(root, row)?
         .get(field)
@@ -267,8 +214,6 @@ fn bytes_of(root: &Path, row: &str, field: &str) -> Result<u64, XtaskError> {
     })
 }
 
-/// A byte count with a comma every three digits, which is how every
-/// size in this repository's documents is written.
 fn grouped(value: u64) -> String {
     let digits = value.to_string();
     let mut out = String::with_capacity(digits.len().saturating_add(digits.len() / 3));
@@ -282,8 +227,6 @@ fn grouped(value: u64) -> String {
     out
 }
 
-/// A count of zero means the reader looked in the wrong place, so it is
-/// a refusal rather than a number a document would be rewritten to.
 fn refuse_if_empty(found: usize, where_looked: &str, what: &str) -> Result<String, XtaskError> {
     if found == 0 {
         return Err(XtaskError::Doc {

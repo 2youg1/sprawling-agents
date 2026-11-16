@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The facts a person writes into the city's own layer from the settings
-//! page (`Sprawling/city/spec/Policy.lean` §8-34).
-//!
-//! The city's layer is the far end of the ladder: what it states holds
-//! wherever a building or a room states nothing. It is written through
-//! the same read-modify-write as every other layer, so a key a person
-//! wrote there by hand survives a write from the page.
-
 use std::path::Path;
 
 use kernel::config::ExposureTable;
@@ -19,25 +11,16 @@ use kernel::{AxError, Effort, KeepWarm};
 
 use super::write::{Change, change_at};
 
-/// One fact of the city's own layer a page may write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CitySetting<'a> {
     KeepWarm(KeepWarm),
     Effort(Effort),
-    /// The city's whole `[catalog]` table, the default every building
-    /// that states nothing reads (`Sprawling/city/spec/ConfigLayers.lean`
-    /// §8-4g); an empty table takes the key out.
+
     Catalog(&'a ExposureTable),
-    /// The city's whole ordered external skill shelf table.
+
     SkillShelves(&'a [String]),
 }
 
-/// Writes one fact into the city's own `CONFIG.toml`.
-///
-/// # Errors
-/// `E_CONFIG_INVALID`, before any byte is written, for a `[catalog]` key
-/// the reader would refuse; propagates a city layer that exists and
-/// cannot be read or parsed, and a directory that cannot be written.
 pub fn write_city_setting(city_root: &Path, setting: CitySetting<'_>) -> Result<(), AxError> {
     let change = match setting {
         CitySetting::KeepWarm(setting) => Change::KeepWarm(setting),
@@ -57,8 +40,6 @@ mod tests {
     use super::*;
     use kernel::Address;
 
-    /// A room that states nothing reads what the city's layer was given,
-    /// and the effort says it came from the city.
     #[test]
     fn a_city_setting_lands_in_the_city_layer_and_the_rooms_read_it() {
         let dir = tempfile::tempdir().unwrap();

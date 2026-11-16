@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The door's state: open or closed and in which epoch, the pairings
-//! still pending, the devices paired, and the sessions they hold
-//! (Sprawling/remote_access/Spec.lean §8-1).
-//!
-//! Specified by `Sprawling/remote_access/spec/Door.lean`, which proves the six
-//! properties this module keeps: a closed door admits nothing, closing
-//! ends every session, a code is used once in its own epoch before it
-//! expires, a revoked device holds nothing, a session never outlives the
-//! door, and a remote session never reaches a local-only verb.
-//!
-//! Time and entropy are parameters. The assembly layer samples the clock
-//! and draws the random bytes, so every decision here replays.
-
 use kernel::{AxCode, AxError, TimeMs};
 
 use crate::pairing::PairingCode;
@@ -24,8 +11,6 @@ mod spelling;
 #[cfg(test)]
 mod tests;
 
-/// Drawn fresh each time the door opens. Nothing issued in one epoch is
-/// honoured in another.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Epoch([u8; 16]);
 
@@ -36,7 +21,6 @@ impl Epoch {
     }
 }
 
-/// A paired device, by the id the city gave it at pairing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DeviceId([u8; 16]);
 
@@ -52,7 +36,6 @@ impl DeviceId {
     }
 }
 
-/// One session a paired device holds after its handshake.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SessionId([u8; 16]);
 
@@ -63,8 +46,6 @@ impl SessionId {
     }
 }
 
-/// The public half of a device's key, as the device sent it at pairing.
-/// The handshake reads it; the door only keeps it with the device.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeviceKey(Vec<u8>);
 
@@ -80,16 +61,13 @@ impl DeviceKey {
     }
 }
 
-/// What the person called a device when they paired it: `iPad`, `phone`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeviceName(String);
 
 impl DeviceName {
-    /// The longest name kept, in characters.
+
     pub const MAX_CHARS: usize = 64;
 
-    /// # Errors
-    /// Refuses an empty name and one longer than [`Self::MAX_CHARS`].
     pub fn parse(raw: &str) -> Result<Self, AxError> {
         let trimmed = raw.trim();
         if trimmed.is_empty() || trimmed.chars().count() > Self::MAX_CHARS {
@@ -111,27 +89,22 @@ impl DeviceName {
     }
 }
 
-/// What a paired device may do once it holds a session.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Authority {
-    /// Read the city, and nothing else.
+
     Watch,
-    /// Read, and act on work: dispatch, steer, stop, halt, release, answer.
+
     Act,
 }
 
-/// The three kinds of verb a frame can carry, as the door judges them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VerbClass {
     Read,
     Act,
-    /// Widening access or reaching credentials: opening the door, pairing,
-    /// attaching an endpoint, writing rules or configuration.
+
     LocalOnly,
 }
 
-/// Whether a remote session with `authority` may carry a verb of `class`.
-/// A local-only verb is refused whatever the authority.
 #[must_use]
 pub fn permits(authority: Authority, class: VerbClass) -> bool {
     match (authority, class) {
@@ -143,7 +116,6 @@ pub fn permits(authority: Authority, class: VerbClass) -> bool {
     }
 }
 
-/// A device the door knows, kept across restarts by the caller.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Device {
     pub id: DeviceId,
@@ -175,7 +147,6 @@ struct Session {
     expires: TimeMs,
 }
 
-/// The whole state of one city's remote door.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Door {
     epoch: Epoch,
@@ -186,9 +157,7 @@ pub struct Door {
 }
 
 impl Door {
-    /// The door a city starts with: closed, holding the devices it paired
-    /// before. `epoch` is drawn fresh so that opening later cannot land on
-    /// the epoch a previous process used.
+
     #[must_use]
     pub fn start(devices: Vec<Device>, epoch: Epoch) -> Self {
         Self {
@@ -200,12 +169,6 @@ impl Door {
         }
     }
 
-    /// Opens the door until `closes_at`, in a new epoch. Nothing pending and
-    /// no session survives into it.
-    ///
-    /// # Errors
-    /// Refuses to open in the epoch it already stands in, which is the one
-    /// way an old code or session could come back.
     pub fn open(&mut self, epoch: Epoch, closes_at: TimeMs) -> Result<(), AxError> {
         if epoch == self.epoch {
             return Err(AxError::failure(
@@ -225,15 +188,12 @@ impl Door {
         Ok(())
     }
 
-    /// Closes the door: every pending pairing and every session ends, and
-    /// the paired devices stay paired.
     pub fn close(&mut self) {
         self.phase = Phase::Closed;
         self.pending.clear();
         self.sessions.clear();
     }
 
-    /// Closes the door once its time is up, and forgets what expired.
     pub fn tick(&mut self, now: TimeMs) {
         if let Phase::Open { closes_at } = self.phase
             && now >= closes_at
@@ -244,11 +204,6 @@ impl Door {
         self.sessions.retain(|session| now < session.expires);
     }
 
-    /// Registers a pairing code for the current epoch; the caller minted it
-    /// with [`PairingCode::mint`] and shows its text once.
-    ///
-    /// # Errors
-    /// Refuses while the door is closed.
     pub fn expect_pairing(
         &mut self,
         code: PairingCode,
@@ -267,12 +222,6 @@ impl Door {
         Ok(())
     }
 
-    /// Pairs the device that presented `code` with its public `key`. The
-    /// code is removed whether or not it was still good, so it answers once.
-    ///
-    /// # Errors
-    /// Refuses a closed door, a code this door is not waiting for, one from
-    /// an earlier epoch, and one past its expiry.
     pub fn pair(
         &mut self,
         code: PairingCode,
@@ -304,11 +253,6 @@ impl Door {
         }
     }
 
-    /// Forgets a paired device and ends every session it holds.
-    ///
-    /// # Errors
-    /// Refuses an id no device holds, so a typo is not mistaken for a
-    /// revocation.
     pub fn revoke(&mut self, id: DeviceId) -> Result<(), AxError> {
         if !self.devices.iter().any(|device| device.id == id) {
             return Err(AxError::failure(
@@ -323,12 +267,6 @@ impl Door {
         Ok(())
     }
 
-    /// Opens a session for a paired device whose handshake proved its key.
-    /// The session ends at `expires` or when the door closes, whichever is
-    /// first.
-    ///
-    /// # Errors
-    /// Refuses a closed door and a device that is not paired.
     pub fn admit(
         &mut self,
         session: SessionId,
@@ -353,9 +291,6 @@ impl Door {
         Ok(())
     }
 
-    /// The authority a session carries at `now`, or `None` when it is no
-    /// longer valid: the door closed, its epoch passed, its device was
-    /// revoked, or it expired.
     #[must_use]
     pub fn authority(&self, session: SessionId, now: TimeMs) -> Option<Authority> {
         if matches!(self.phase, Phase::Closed) {
@@ -371,19 +306,16 @@ impl Door {
             .map(|device| device.authority)
     }
 
-    /// The paired device with `id`, whose key a handshake checks.
     #[must_use]
     pub fn device(&self, id: DeviceId) -> Option<&Device> {
         self.devices.iter().find(|device| device.id == id)
     }
 
-    /// Every paired device, for the caller to keep across restarts.
     #[must_use]
     pub fn devices(&self) -> &[Device] {
         &self.devices
     }
 
-    /// When the door closes by itself, or `None` while it is closed.
     #[must_use]
     pub fn closes_at(&self) -> Option<TimeMs> {
         match self.phase {

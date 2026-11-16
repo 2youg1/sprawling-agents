@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How one session's event arm writes in frames
-//! (`Sprawling/wire/spec/Server/Socket.lean` §8-47h): every record already
-//! queued when it wakes becomes its own `Event` frame, and the socket is
-//! flushed once. The model there proves that where the frames are cut
-//! changes nothing the page is told, that records are told in seq order
-//! and none twice, and that every seq not told as a record is inside a
-//! told `Lagged` range.
-
 use axum::extract::ws::{Message, WebSocket};
 use futures_util::SinkExt as _;
 use kernel::Seq;
@@ -21,32 +13,24 @@ use crate::frames::{Lagged, ServerFrame};
 use crate::reception::{SessionState, Stream};
 use crate::server::committed::Committed;
 
-/// What one session took from its subscription: a record and its seq,
-/// or a skip the subscription reported.
 pub(crate) enum Arrival<R> {
     Record(Seq, R),
     Skipped,
 }
 
-/// What one session tells the page: a range to ask for, or a record.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Said<R> {
     Lagged(Lagged),
     Record(R),
 }
 
-/// The most arrivals one frame takes: a frame this long is written out
-/// first, so a long burst does not starve the session's other arms.
 pub(crate) const FRAME_RECORDS_MAX: usize = 256;
 
-/// Whether the subscription is still open after a frame was drained.
 pub(super) enum Ending {
     Open,
     Closed,
 }
 
-/// `first` and every arrival already queued behind it, at most
-/// [`FRAME_RECORDS_MAX`], and whether the subscription closed meanwhile.
 pub(super) fn drained(
     first: Arrival<Committed>,
     events: &mut broadcast::Receiver<Committed>,
@@ -63,9 +47,6 @@ pub(super) fn drained(
     (arrivals, Ending::Open)
 }
 
-/// What a session in `phase` tells the page for one frame of arrivals,
-/// and the stream state after it: each record in turn through
-/// [`Stream::before`], each skip through [`Stream::skipped`]. Pure.
 pub(crate) fn framed<R>(
     stream: Stream,
     phase: SessionState,
@@ -82,15 +63,13 @@ pub(crate) fn framed<R>(
                 said.push(Said::Record(record));
                 next
             }
-            // A session that has not been welcomed is shown no stream.
+
             Arrival::Record(..) => stream,
             Arrival::Skipped => stream.skipped(live),
         });
     (said, after)
 }
 
-/// Feeds each thing said to the socket as its own frame, then flushes
-/// once.
 pub(super) async fn write_frame(
     socket: &mut WebSocket,
     said: Vec<Said<Committed>>,
@@ -121,9 +100,6 @@ mod tests {
     use super::{Arrival, Said, framed};
     use crate::reception::{SessionState, Stream};
 
-    /// The arrivals a subscription hands over for `ledger` when the
-    /// records `skipped` marks are lost: a run of lost records is one
-    /// `Skipped`, as a lagged `broadcast` reports it.
     fn arrivals(ledger: &[u64], skipped: &[bool]) -> Vec<Arrival<u64>> {
         let mut arrivals = Vec::new();
         let mut lost = false;
@@ -138,7 +114,6 @@ mod tests {
         arrivals
     }
 
-    /// `arrivals` cut into frames at `cuts` and told frame by frame.
     fn told_in_frames(
         arrivals: Vec<Arrival<u64>>,
         cuts: &[usize],
@@ -164,14 +139,7 @@ mod tests {
     }
 
     proptest! {
-        /// `Sprawling/wire/spec/Server/Socket.lean`: cutting the arrivals
-        /// into frames anywhere tells what one frame tells
-        /// (`framing_is_invisible`); a live session tells exactly the
-        /// records it was handed, in seq order (`records_said`,
-        /// `said_in_seq_order`); every seq between its first and last
-        /// told record is a told record or inside a told `Lagged`
-        /// (`every_seq_up_to_the_last_is_told`); a session not yet
-        /// welcomed tells nothing (`nothing_said_before_welcome`).
+
         #[test]
         fn framing_tells_every_record_once_in_order(
             start in 0u64..3,

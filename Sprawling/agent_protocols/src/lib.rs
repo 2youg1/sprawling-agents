@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Two protocols, pointing opposite ways: `mcp` lets a resident reach an
-//! outside service, `acp` lets an outside editor ask this city for work,
-//! and `harness` is ACP the other way round - this city asking an ACP
-//! agent the person consented to for work.
-//!
-//! The asymmetry is the design. Reaching out is something a resident
-//! chose and the egress gate can refuse; reaching in is something a
-//! stranger did, so it produces nothing until it has been authenticated
-//! and reduced to an ordinary dispatch.
-
 mod acp;
 mod harness;
 mod mcp;

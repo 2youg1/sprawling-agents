@@ -3,31 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Whether words had room to stand and a popover room to open
-//! (Tools/xtask/Spec.lean §8-38).
-//!
-//! **Both are defects every other reading passes.** A notice squeezed
-//! to one glyph a line has not overflowed and has not left its
-//! container, and a list cut to a sliver by the box that holds it is
-//! still inside that box: containment and cut text are green on both,
-//! and a person reads neither.
-
 use browser::survey::{Drawn, Overflow};
 
 use super::violation;
 use crate::report::Violation;
 
-/// How many glyphs wide a sentence must be, and how many glyphs tall a
-/// box must reach before it counts as folded onto more than one line.
 const CRUSHED_EMS: i64 = 2;
 
-/// No sentence is set narrower than two glyphs and folded onto lines.
-///
-/// Words that carry their own line breaks were folded by their author,
-/// not by the engine: a code gutter is one number a line by design.
-///
-/// A name of one glyph is left alone: a close button is one glyph in a
-/// box its padding makes taller than wide, and that is its shape.
 pub(super) fn no_text_is_crushed(drawn: &[Drawn], at: &str, out: &mut Vec<Violation>) {
     for held in drawn.iter().filter(|held| held.shows()) {
         let Some(run) = &held.text else { continue };
@@ -62,11 +44,6 @@ pub(super) fn no_text_is_crushed(drawn: &[Drawn], at: &str, out: &mut Vec<Violat
     }
 }
 
-/// Every popover shows at least its first option.
-///
-/// Visible height is the popover's box cut by every measured ancestor
-/// that does not let its contents show downward; a list with no option
-/// measured is not judged, because there is nothing to compare it with.
 pub(super) fn every_popover_shows_an_option(drawn: &[Drawn], at: &str, out: &mut Vec<Violation>) {
     for (index, popover) in drawn
         .iter()
@@ -100,8 +77,6 @@ pub(super) fn every_popover_shows_an_option(drawn: &[Drawn], at: &str, out: &mut
     }
 }
 
-/// Whether the element at `ancestor` holds `held`, by the measured
-/// parent chain.
 fn holds(drawn: &[Drawn], ancestor: usize, held: &Drawn) -> bool {
     let mut up = usize::try_from(held.parent).ok();
     while let Some(at) = up {
@@ -115,12 +90,6 @@ fn holds(drawn: &[Drawn], ancestor: usize, held: &Drawn) -> bool {
     false
 }
 
-/// The height of `popover` left after every ancestor cut it.
-///
-/// A clipping holder cuts by position. A scrolling holder cuts only by
-/// its own height, because a person can scroll the rest into view: a
-/// list scrolled away above the fold is reachable, a list taller than
-/// its window is not wholly.
 fn visible_height(drawn: &[Drawn], popover: &Drawn) -> i64 {
     let (mut top, mut bottom) = (popover.top, popover.top.saturating_add(popover.height));
     let mut window = popover.height;

@@ -3,16 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The verbs the wire spells before this city can perform them, and the
-//! refusal each one is answered with.
-
 use kernel::AxError;
 
 use super::super::not_built;
 
-/// A verb the wire spells and this city cannot perform, with what the
-/// refusal names. Each is answered by its own arm of `run_command`, so a
-/// command added without an executor stops the build there.
 pub(super) enum Unbuilt<'a> {
     HandOff(&'a kernel::ApprovalId),
     PutShelved(String),
@@ -22,9 +16,7 @@ pub(super) enum Unbuilt<'a> {
 }
 
 impl Unbuilt<'_> {
-    /// The `not_built` refusal the city owes a peer that asks for this
-    /// verb anyway; each arm of `run_command` names it, which is how the
-    /// wiring gate reads that the verb has no executor.
+
     pub(super) fn not_built(self) -> AxError {
         match self {
             Unbuilt::HandOff(item) => not_built(

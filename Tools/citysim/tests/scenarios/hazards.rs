@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The three hazards a control surface can hand a city, driven through
-//! the same modules the city runs.
-//!
-//! A person pastes a credential into a field. A command arrives that would
-//! delete something. A machine is restarted and the work resumes. Each one
-//! has a rule, and each rule is worth exercising from outside the module
-//! that owns it - a rule only tested by its author is a rule tested against
-//! the same misunderstanding that wrote it.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -29,16 +20,9 @@ use kernel::{
 };
 use runtime::redact::{Marker, redact_text};
 
-// ------------------------------------------------------- a pasted credential
-
 #[test]
 fn a_pasted_credential_leaves_no_plaintext_behind_it() {
-    // A13 as a scenario rather than as a unit: what a person actually does
-    // is paste a blob into a field, and everything after that must hold.
-    // Scanning and replacing has one home, `runtime::redact`, so that is
-    // where this scenario is driven from.
-    // Built at run time so no high-entropy literal sits in this file for
-    // `xtask secret` to find - the gate is right to bite those.
+
     let pasted = format!("sk-ant-{}{}", "A7bQ2xLm".repeat(2), "Zk91Rp4T");
     let line = format!("the person pasted {pasted} into the field");
 
@@ -56,8 +40,6 @@ fn a_pasted_credential_leaves_no_plaintext_behind_it() {
         "no recognisable span of it survives either"
     );
 
-    // Two occurrences of one value read alike, and a diagnostic line says
-    // only that something was there.
     let (again, _) = redact_text(&pasted, Marker::Fingerprinted);
     assert!(replaced.contains(again.trim()), "one value, one marker");
     let (plain, _) = redact_text(&pasted, Marker::Plain);
@@ -80,19 +62,13 @@ fn a_configured_reference_resolves_sealed_and_describes_without_telling() {
         "redemption returns the real value"
     );
 
-    // Describing is what an interface may do. It says whether something is
-    // configured, never what it is.
     let described = format!("{:?}", custodian.describe(&reference));
     assert!(!described.contains(&secret));
 }
 
-// -------------------------------------------------------- an injected delete
-
 #[test]
 fn a_delete_with_no_way_back_is_refused_rather_than_queued() {
-    // Constitution 7.2. The refusal is the point: a Discard that cannot be
-    // undone never becomes an event, which is why the Recycle Bin can
-    // promise every row a return path.
+
     let unplanned = DiscardRequest::Unplanned {
         paths: vec![Address::parse("notes/draft.md").unwrap()],
         taint: TaintSet::default(),
@@ -125,13 +101,7 @@ fn a_delete_with_a_checkpoint_behind_it_is_allowed() {
 
 #[test]
 fn the_forecaster_is_advisory_and_the_checkpoint_is_the_defence() {
-    // A forecast hit routes conservatively
-    // - it forces the checkpoint up first - rather than refusing every
-    // command containing `rm`. Refusing outright would break the tool for
-    // honest use and still not stop a determined one.
-    //
-    // This test asserts both halves, including the unflattering one. The
-    // obvious spelling is seen:
+
     let obvious = ExecArm::Shell {
         text: "rm -rf build".to_owned(),
     };
@@ -140,17 +110,11 @@ fn the_forecaster_is_advisory_and_the_checkpoint_is_the_defence() {
         "the plain form must be seen"
     );
 
-    // ...and an ordinary command is not:
     let quiet = ExecArm::Shell {
         text: "cargo test".to_owned(),
     };
     assert_eq!(forecast(&quiet), DiscardForecast::Clear);
 
-    // ...and a trivially rearranged one is *also* not seen, because the
-    // matcher looks for `rm ` with its trailing space. This is not a defect
-    // to file: kernel::discard says in its own comment that text prediction
-    // is obfuscatable by design. Recording it here keeps anyone from later
-    // mistaking the forecaster for a defence and removing the net that is.
     let rearranged = ExecArm::Shell {
         text: "find . -name '*.tmp' | xargs rm".to_owned(),
     };
@@ -161,14 +125,9 @@ fn the_forecaster_is_advisory_and_the_checkpoint_is_the_defence() {
     );
 }
 
-// ------------------------------------------------------- resume idempotence
-
 #[test]
 fn resuming_the_same_handoff_twice_does_not_double_the_work() {
-    // Constitution 6.1: resume consumes a Handoff and mints a new RunId, so
-    // "wake the old Run" has no spelling. Two resumes of one Handoff are
-    // therefore two new Runs, not one Run advanced twice - the mother's
-    // frozen state is untouched either way.
+
     use runtime::handoff::Handoff;
     let oid = "7c".repeat(20);
     let job = Locator::parse(&format!("file:sim/lobby/room1/JOB.md@{oid}")).unwrap();

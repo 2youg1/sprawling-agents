@@ -2,27 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
-// Portions copyright (c) 2026 2youg1 and the RefRain contributors
-
-//! The sentences of a text with the whitespace around them, and the
-//! alignment of two such lists (`Sprawling/documents/Spec.lean` D14, D15).
-//!
-//! Migrated from RefRain's `manuscript::review` (the sentence cut) and
-//! `manuscript::align` (the common-subsequence table). Two things moved:
-//! a sentence is compared with its whitespace, so the sentences of either
-//! side read back that side byte for byte; and the anchored segmentation
-//! RefRain needs for a whole manuscript is not here, because a proposal
-//! is at most one window on each side.
 
 use super::{Slice, SliceKind};
 
-/// How many cells the common-subsequence table may hold: `u32` each,
-/// sixteen MiB in all (D15). Past it the middle of the two lists is one
-/// deletion and one insertion: still exact, only coarser.
 pub const ALIGN_CELLS_MAX: usize = 1 << 22;
 
-/// One sentence: the whitespace before it, the sentence, and - for the
-/// last sentence of a text only - the whitespace after it.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub(super) struct Piece {
     lead: String,
@@ -57,12 +41,6 @@ impl Piece {
     }
 }
 
-/// Cuts `text` into sentences that read back as `text`, byte for byte.
-///
-/// A sentence ends at a terminator, taking with it the terminators and
-/// closing marks that follow at once. Whitespace after the last
-/// sentence is that sentence's trail; a text of whitespace alone is one
-/// sentence with an empty `text`.
 pub(super) fn pieces(text: &str) -> Vec<Piece> {
     let mut found = Vec::new();
     let mut building = Piece::default();
@@ -100,8 +78,6 @@ fn is_closer(character: char) -> bool {
     )
 }
 
-/// The two lists as one card: what both hold, what only the first holds,
-/// what only the second holds, in reading order.
 pub(super) fn align(before: Vec<Piece>, after: Vec<Piece>) -> Vec<Slice> {
     let head = before
         .iter()
@@ -143,8 +119,6 @@ pub(super) fn align(before: Vec<Piece>, after: Vec<Piece>) -> Vec<Slice> {
     slices
 }
 
-/// The middle of the two lists, aligned by their longest common
-/// subsequence, or deleted then inserted whole past the table's budget.
 fn middle_slices(gone: Vec<Piece>, come: Vec<Piece>) -> Vec<Slice> {
     let Some(table) = Table::of(&gone, &come) else {
         return gone
@@ -179,16 +153,13 @@ fn middle_slices(gone: Vec<Piece>, come: Vec<Piece>) -> Vec<Slice> {
     slices
 }
 
-/// The length of the longest common subsequence of every pair of
-/// suffixes, `width` columns to a row.
 struct Table {
     cells: Vec<u32>,
     width: usize,
 }
 
 impl Table {
-    /// The table for two lists, or `None` when it would pass
-    /// [`ALIGN_CELLS_MAX`].
+
     fn of(gone: &[Piece], come: &[Piece]) -> Option<Table> {
         let width = come.len();
         let size = gone.len().checked_mul(width)?;
@@ -221,9 +192,6 @@ impl Table {
         Some(table)
     }
 
-    /// The common length of the suffixes from `left` and `right`. A
-    /// suffix past the end of either list is empty, and an empty suffix
-    /// has nothing in common with anything: that is what zero states.
     fn at(&self, left: usize, right: usize) -> u32 {
         self.cell(left, right)
             .and_then(|at| self.cells.get(at))

@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The platform counters one [`Sample`] is read from: this process, the
-//! machine, and the volume the city lives on (`Sprawling/app/spec/Monitor.lean` §8-96).
-//!
-//! A `Counters` exists only while somebody watches; the sampler drops it
-//! when the last watcher leaves, so its handles and process table are
-//! not resident in an unwatched city.
-
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -20,8 +13,6 @@ use own_process::OwnProcess;
 
 pub(crate) mod own_process;
 
-/// This process's handle, the machine's handles while the whole page is
-/// watched, and the volume whose free space is read.
 pub(crate) struct Counters {
     own: OwnProcess,
     machine: Option<Machine>,
@@ -29,10 +20,6 @@ pub(crate) struct Counters {
     reads: Reads,
 }
 
-/// How many platform readings were taken, by kind: this process through
-/// its own handle, the machine through `sysinfo`, and the whole process
-/// table (`Sprawling/app/spec/Main.lean` §8-129-3). A count rather than a time, so a
-/// test can hold the sampling cost exactly on any machine.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct Reads {
     pub(crate) own: u64,
@@ -40,18 +27,13 @@ pub(crate) struct Reads {
     pub(crate) table: u64,
 }
 
-/// The `sysinfo` handles, which cost milliseconds a reading; only a
-/// watcher of the whole page pays for them.
 struct Machine {
     system: System,
     disks: Disks,
 }
 
 impl Counters {
-    /// Opens this process's handle; the machine's wait for the first
-    /// reading of [`Watched::Everything`]. The first reading has no
-    /// earlier one to compare with, so both CPU figures read 0. The
-    /// volume is resolved once, here, the way the entry resolves it.
+
     pub(crate) fn open(volume: PathBuf) -> Self {
         Self {
             own: OwnProcess::new(),
@@ -61,10 +43,6 @@ impl Counters {
         }
     }
 
-    /// Reads one sample; `elapsed` is the wall time since the previous
-    /// reading. [`Watched::Summary`] reads this process alone and closes
-    /// the machine's handles. The core-health fields are not read here
-    /// and stay 0 (8-96, current state).
     pub(crate) fn read(&mut self, watched: Watched, elapsed: Duration) -> Sample {
         let core = self.own.read(elapsed);
         self.reads.own = self.reads.own.saturating_add(1);
@@ -90,15 +68,10 @@ impl Counters {
         }
     }
 
-    /// Notes this process's private bytes between two readings, so the
-    /// next [`Self::read`] reports the highest of them.
     pub(crate) fn note_private(&mut self) {
         self.own.note_private();
     }
 
-    /// The platform readings taken since this was opened. The table
-    /// count stays 0: the city's sampler has no path to the process
-    /// table, which only `monitor::tree` reads.
     #[cfg_attr(
         not(test),
         expect(
@@ -119,8 +92,6 @@ impl Machine {
         }
     }
 
-    /// Refreshes the machine's counters into `own`. Memory is read where
-    /// the city reads it everywhere else, [`super::memory::refreshed`].
     fn read(&mut self, volume: &std::path::Path, own: Sample) -> Sample {
         self.system.refresh_cpu_usage();
         let memory = super::memory::refreshed(&mut self.system);
@@ -135,7 +106,6 @@ impl Machine {
     }
 }
 
-/// A load in percent, as permille.
 #[expect(
     clippy::as_conversions,
     reason = "sysinfo reports load only as f32; it is clamped to 0..=1000 first, so the cast is exact to the permille"

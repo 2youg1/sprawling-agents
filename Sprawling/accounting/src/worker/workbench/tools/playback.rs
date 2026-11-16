@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `playback`: a resident exports a stretch of the history its building
-//! may read, as a bundle or a playback page, and checks an export of its
-//! building against the city (`Sprawling/app/Spec.lean` §8-132).
-//!
-//! The reader is bound when the bench is laid out: the building the run
-//! stands in. No argument names a reader, and an argument this tool does
-//! not know is refused, so a resident cannot widen what it reads.
-//! Exports land under the city's playback exports, in the building's own
-//! directory, through the one landing every export takes
-//! (`Sprawling/accounting/spec/Playback/Check.lean` §8-13).
-
 use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
@@ -29,20 +18,16 @@ use crate::playback::{
 };
 use crate::worker::workbench::{Laying, Site};
 
-/// What every refusal of this tool names as the action that failed.
 const ACTION: &str = "playback";
 
-/// The longest export name.
 const NAME_MAX: usize = 64;
 
-/// The tool: the city it reads, and the building whose resident reads it.
 pub(super) struct PlaybackTool {
     city_root: PathBuf,
     building: Address,
     meta: ToolMeta,
 }
 
-/// The arguments of `export`, besides the action.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Export {
@@ -57,14 +42,12 @@ struct Export {
     page: Option<String>,
 }
 
-/// The arguments of `check`, besides the action.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Check {
     file: String,
 }
 
-/// The two kinds of export file, by what they hold.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Kind {
     Bundle,
@@ -81,11 +64,7 @@ impl Kind {
 }
 
 impl Laying {
-    /// The playback tool for a run in `room`, answering as the building
-    /// of `site` and writing into this city's playback exports.
-    ///
-    /// # Errors
-    /// Propagates [`PlaybackTool::new`]'s refusal.
+
     pub(super) fn playback_tool(
         &self,
         site: &Site,
@@ -96,11 +75,7 @@ impl Laying {
 }
 
 impl PlaybackTool {
-    /// The name, disclosure and schema `new` registers.
-    ///
-    /// # Errors
-    /// Refuses a name or a parameter schema that does not build, which
-    /// the literals below cannot produce.
+
     pub(super) fn definition() -> Result<ToolDef, AxError> {
         let params = json!({
             "type": "object",
@@ -164,10 +139,6 @@ impl PlaybackTool {
         })
     }
 
-    /// The tool for a run in `room`, whose building is `building`.
-    ///
-    /// # Errors
-    /// Propagates [`Self::definition`].
     fn new(city_root: &Path, building: Address, room: Address) -> Result<PlaybackTool, AxError> {
         let defined = Self::definition()?;
         Ok(PlaybackTool {
@@ -177,10 +148,9 @@ impl PlaybackTool {
                 name: defined.name,
                 disclosure: defined.description,
                 params: defined.input_schema,
-                // An export writes a file. The effect is the registration's,
-                // so `check` rides the same door and is never run ahead.
+
                 effect: Effect::Write { domain: room },
-                // One strict pass over the whole ledger.
+
                 cost_tier: CostTier::Heavy,
                 timeout: None,
                 render: RenderIntent::Generic,
@@ -189,7 +159,6 @@ impl PlaybackTool {
         })
     }
 
-    /// The building's own directory of exports.
     fn exports(&self) -> PathBuf {
         self.building.as_str().split('/').fold(
             CityLayout::new(&self.city_root).playback_exports(),
@@ -311,14 +280,11 @@ impl Tool for PlaybackTool {
         })
     }
 
-    /// An export lands in the city's reserved subtree, outside the tree
-    /// a checkpoint stages, and a check writes nothing.
     fn writes(&self, _call: &ToolCall) -> Writes {
         Writes::Nothing
     }
 }
 
-/// One action's arguments, every field known.
 fn arguments<T: for<'de> Deserialize<'de>>(args: Map<String, Value>) -> Result<T, AxError> {
     serde_json::from_value(Value::Object(args)).map_err(|err| {
         AxError::failure(AxCode::InvalidArgs, ACTION, err.to_string()).with_recovery(
@@ -328,7 +294,6 @@ fn arguments<T: for<'de> Deserialize<'de>>(args: Map<String, Value>) -> Result<T
     })
 }
 
-/// `name`, when it is a name an export may have.
 fn named(name: &str) -> Result<&str, AxError> {
     let mut chars = name.chars();
     let lawful = chars
@@ -359,7 +324,6 @@ fn building_of(raw: &str) -> Result<Address, AxError> {
     })
 }
 
-/// The bytes of an export, refusing one that is not there or too large.
 fn read_export(path: &Path, file: &str) -> Result<Vec<u8>, AxError> {
     let size = match std::fs::metadata(path) {
         Ok(meta) => meta.len(),

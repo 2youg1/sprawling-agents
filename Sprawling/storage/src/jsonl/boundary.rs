@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The chain state entering the last segment, read off the last line of
-//! the segment before it, and that line alone.
-
 use std::path::{Path, PathBuf};
 
 use kernel::ledger::chain_hash;
@@ -18,10 +15,7 @@ use super::verify::{LineCheck, LineFault};
 use crate::vfs::Vfs;
 
 impl JsonlLedger {
-    /// Boundary state entering the last segment: chain root, or the
-    /// previous segment's last line, judged by the same rule as every
-    /// other line (`LineCheck::judge`), so an ignorable line of a newer
-    /// kind closes a segment as lawfully as it sits inside one.
+
     pub(super) fn boundary(
         &mut self,
         segments: &[PathBuf],
@@ -79,15 +73,8 @@ impl JsonlLedger {
     }
 }
 
-/// How far back from a segment's end the first read reaches for its last
-/// line; the window doubles until the line's start is in it, so a line of
-/// any length costs at most twice its own bytes and a segment's length
-/// costs nothing (`Sprawling/storage/spec/Jsonl.lean` §8-1).
 const BOUNDARY_WINDOW: u64 = 16 * 1024;
 
-/// The last complete line of the segment at `path`, `len` bytes long,
-/// without its `\n`, read from the end; `None` when the segment holds no
-/// complete line.
 fn last_line_of(vfs: &dyn Vfs, path: &Path, len: u64) -> std::io::Result<Option<Vec<u8>>> {
     let mut window = BOUNDARY_WINDOW;
     loop {
@@ -117,10 +104,6 @@ fn last_line_of(vfs: &dyn Vfs, path: &Path, len: u64) -> std::io::Result<Option<
     }
 }
 
-/// Which line of `prior` its last line is, read off the two segments'
-/// names rather than by counting: each name carries the seq of its first
-/// line and every line carries the next seq. Zero when a name does not
-/// say, which only a message ever reads.
 fn line_count(prior: &Path, last: &Path) -> u64 {
     let first = |path: &Path| {
         path.file_name()
@@ -133,9 +116,6 @@ fn line_count(prior: &Path, last: &Path) -> u64 {
     }
 }
 
-/// How open refuses the prior segment's last line: a newer writer by
-/// its version, anything else as damage at that line, the same way
-/// `recover_tail` refuses a line of the last segment.
 fn refusal(prior: &Path, line: u64, fault: LineFault) -> StorageError {
     match fault {
         LineFault::VersionAhead(v) => StorageError::VersionAhead {

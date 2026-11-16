@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One turn of a harness run over its session: the four callbacks the
-//! session asks while the harness works, what counts as a cut, and the
-//! city's words for what the harness said (`Sprawling/app/Spec.lean` §8-124).
-
 use std::cell::{Cell, RefCell};
 
 use agent_protocols::{Answer, Listener, PermissionAsk, Permit, PermitKind, StopReason, Update};
@@ -19,11 +15,8 @@ use runtime::run::{Cut, HarnessRun};
 use super::super::lane::{DriveContext, scope_stopping};
 use super::{HarnessHalf, Prompting};
 
-/// What a turn leaves: the run, how the prompt ended, and the first line
-/// the turn could not book.
 type Turned<'a> = (HarnessRun<'a>, Result<Answer, AxError>, Option<AxError>);
 
-/// Sends the prompt and books what the harness says until it stops.
 pub(super) fn take_the_turn<'a, L: Ledger>(
     half: &HarnessHalf,
     turning: Turning<'a, '_, L>,
@@ -77,14 +70,12 @@ pub(super) fn take_the_turn<'a, L: Ledger>(
     (run, prompted, failed)
 }
 
-/// The run and the ledger it writes through, shared by the four
-/// callbacks a session asks.
 pub(super) struct Turning<'a, 'l, L> {
     pub(super) run: HarnessRun<'a>,
     pub(super) ledger: &'l mut L,
-    /// When the building's ceiling cuts the turn.
+
     pub(super) deadline: TimeMs,
-    /// The first line a callback that cannot fail could not book.
+
     pub(super) failed: Option<AxError>,
 }
 
@@ -93,7 +84,6 @@ impl<L: Ledger> Turning<'_, '_, L> {
         self.run.report(&mut *self.ledger, reported, t)
     }
 
-    /// A permission ask and the city's answer to it, one line each.
     fn book_permit(
         &mut self,
         ask: &PermissionAsk,
@@ -123,14 +113,6 @@ impl<L: Ledger> Turning<'_, '_, L> {
     }
 }
 
-/// Whether the turn is cut now, and why: the ceiling first, because a
-/// run that ran out of time hit something; then a stopping scope and a
-/// person's cancel, which are a halt. A clock that cannot be read says
-/// nothing about the ceiling, and the next tick asks again.
-///
-/// A steer is taken and not delivered: ACP gives a client nothing to
-/// send an agent in the middle of a turn, so the line says it went
-/// nowhere rather than letting it vanish (`Sprawling/app/Spec.lean` §8-124).
 fn cut_now(half: &HarnessHalf, context: &DriveContext, deadline: TimeMs) -> Option<Cut> {
     if context
         .clock
@@ -148,8 +130,7 @@ fn cut_now(half: &HarnessHalf, context: &DriveContext, deadline: TimeMs) -> Opti
         .map_or(runtime::Interrupt::None, |ask| ask(half.chartered.run));
     match asked {
         runtime::Interrupt::Cancel => Some(Cut::Halt),
-        // A harness's turn has no write gate of its own to re-judge, and
-        // its next run reads the change from `run_started.policy`.
+
         runtime::Interrupt::None | runtime::Interrupt::Policy { .. } => None,
         runtime::Interrupt::Steer { speaker, .. } => {
             half.notes.write(
@@ -168,9 +149,6 @@ fn cut_now(half: &HarnessHalf, context: &DriveContext, deadline: TimeMs) -> Opti
     }
 }
 
-/// The city's answer to a permission ask (`Sprawling/app/Spec.lean` §8-4e rule
-/// 9): the first "allow once", else the first "reject once", else
-/// cancelled. Never "always": that would decide for later calls.
 fn permitted(ask: &PermissionAsk) -> Permit {
     let first = |kind: PermitKind| {
         ask.options
@@ -183,7 +161,6 @@ fn permitted(ask: &PermissionAsk) -> Permit {
         .unwrap_or(Permit::Cancelled)
 }
 
-/// One report in the city's own words (kernel D9).
 fn reported(update: Update) -> HarnessReported {
     match update {
         Update::Text(text) => HarnessReported::Said { text },
@@ -209,7 +186,6 @@ fn permit_kind(kind: PermitKind) -> HarnessPermitKind {
     }
 }
 
-/// The answer in the city's own words.
 pub(super) fn answered(answer: Answer) -> HarnessAnswered {
     HarnessAnswered {
         stop: match answer.stop {

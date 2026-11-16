@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The listening end, and the humble half of it (ARCHITECTURE section
-//! 9). Every branch here is a send, a receive, or the end of a session;
-//! the judgements it applies are `wire::reception`'s and the bytes
-//! it serves are `wire::assets`'.
-//!
-//! Six jobs and no policy: serve the client bundle, upgrade a
-//! WebSocket, accept an upload, take a credential from a caller on this
-//! machine, pair a browser, and let an outside editor drive the city;
-//! every route stands behind the entry decision.
-//!
-//! A refusal made minutes later has no way home, which is why a command
-//! carries the [`Reply`](crate::Reply) address of whoever sent it.
-
 mod bundle;
 mod committed;
 mod config;

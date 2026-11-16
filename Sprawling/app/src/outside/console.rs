@@ -3,22 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `/remote` on the city's console: open, pair, close, devices, revoke,
-//! replace-key (`Sprawling/app/spec/Outside.lean` §8-140).
-//!
-//! `/remote` is not on the wire, so no frame - from a browser, a remote
-//! device or a tool a resident holds - can pair or revoke a device; the
-//! page's open and replace-key reach [`perform`] only after the User
-//! types back the code this console printed (`super::asking`,
-//! remote_access D4). The console reads the line here ([`parse`], pure)
-//! and carries it out here ([`carry`]), and what it prints is the whole
-//! answer: a refusal prints its three parts.
-//!
-//! `/remote pair` prints the invitation as a QR code drawn with block
-//! characters, the light modules as blocks and the dark ones as spaces,
-//! because a terminal draws text light on dark and a scanner wants dark
-//! on light.
-
 use gateway::Persistence;
 use kernel::AxError;
 use kernel::event::record::RemoteClosing;
@@ -29,19 +13,17 @@ use remote_access::route::{Opened, Permanence};
 use super::keeper::{Doorway, Inviting, Revoking};
 use super::listener::Reaching;
 
-/// How long the door stays open when `--for` is not given.
 const DEFAULT_HOURS: u64 = 12;
-/// The longest a door may be opened for at once.
+
 const LONGEST_HOURS: u64 = 7 * 24;
 const MS_PER_MINUTE: u64 = 60 * 1000;
-/// Light modules around the code, which a scanner needs to find it.
+
 const QUIET: i32 = 2;
 
 const USAGE: &str = "/remote open [--for <30m|12h|2d>], /remote pair <name> [--watch], \
                      /remote close, /remote devices, /remote revoke <name>|--all, \
                      /remote replace-key";
 
-/// One `/remote` line, read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RemoteLine {
     Open(Lasting),
@@ -52,13 +34,12 @@ pub(crate) enum RemoteLine {
     Close,
     Devices,
     Revoke(Revoking),
-    /// A new city key; every paired device pairs again.
+
     ReplaceKey,
-    /// A line that is none of these; the console prints the usage.
+
     Unreadable,
 }
 
-/// How long the door stays open, in milliseconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Lasting(u64);
 
@@ -67,8 +48,6 @@ impl Lasting {
         self.0
     }
 
-    /// A length a page sent, in milliseconds, inside the bounds `read`
-    /// holds a typed one to: a minute at least, a week at most.
     pub(crate) fn of_ms(ms: u64) -> Option<Lasting> {
         (MS_PER_MINUTE
             ..=LONGEST_HOURS
@@ -78,7 +57,6 @@ impl Lasting {
             .then_some(Lasting(ms))
     }
 
-    /// `30m`, `12h` or `2d`: a whole number, then its unit, at most a week.
     pub(super) fn read(text: &str) -> Option<Lasting> {
         let unit = text.chars().last()?;
         let count: u64 = text.strip_suffix(unit)?.parse().ok()?;
@@ -93,14 +71,12 @@ impl Lasting {
     }
 }
 
-/// What `/remote` reaches the door through, assembled once per serve.
 #[derive(Clone)]
 pub(crate) struct Remote {
     pub(crate) doorway: Doorway,
     pub(crate) reaching: Reaching,
 }
 
-/// Reads what follows `/remote`.
 pub(crate) fn parse(tail: &str) -> RemoteLine {
     let tail = tail.trim();
     let (verb, rest) = tail.split_once(char::is_whitespace).unwrap_or((tail, ""));
@@ -143,17 +119,10 @@ pub(crate) fn parse(tail: &str) -> RemoteLine {
     }
 }
 
-/// Carries out one `/remote` line and says what happened.
 pub(crate) fn carry(remote: &Result<Remote, AxError>, line: RemoteLine) -> String {
     perform(remote, line).unwrap_or_else(|refused| refusal(&refused))
 }
 
-/// Carries out one `/remote` line: what to print, or the refusal. The
-/// console and the door's wire verbs (`super::asking`) both come here, so
-/// a verb does the same thing from either.
-///
-/// # Errors
-/// The door this serve could not keep, and every refusal of the verb.
 pub(crate) fn perform(
     remote: &Result<Remote, AxError>,
     line: RemoteLine,
@@ -230,10 +199,6 @@ fn opening(opened: &Opened, lasting: Lasting, keeps: Persistence) -> String {
     )
 }
 
-/// How long a paired device stays paired, which is how long this
-/// machine's vault keeps the city key (`Sprawling/gateway/spec/Credential.lean`
-/// §8-4). Where the key lives is the doctor's report; this says only what
-/// it costs a device.
 fn kept_for(keeps: Persistence) -> &'static str {
     match keeps {
         Persistence::AcrossReboots => {
@@ -263,7 +228,6 @@ fn invitation(inviting: &Inviting) -> Result<String, AxError> {
     ))
 }
 
-/// The link as a QR code, two rows of modules to a line of text.
 fn qr(link: &str) -> Result<String, AxError> {
     let code = QrCode::encode_text(link, QrCodeEcc::Low).map_err(|too_long| {
         AxError::failure(

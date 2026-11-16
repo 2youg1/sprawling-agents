@@ -10,14 +10,6 @@
     reason = "test code"
 )]
 
-//! What a run reads back from a cgroup root: nothing where the root may
-//! not be written, and the weight and the limit the arm asked for where
-//! it may (`Sprawling/runtime/spec/Tools/Exec.lean` D29, D33).
-//!
-//! Every test builds a fake `/sys/fs/cgroup` under the temp directory,
-//! so the same checks run on the machine the code is written on and on
-//! the one it ships to.
-
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -26,15 +18,12 @@ use super::{Cgroups, RUN_CPU_WEIGHT};
 use crate::backlog::ceiling::{Mark, Unapplied, verdict};
 use crate::{Ceiling, Shares};
 
-/// How many fake roots this process has made.
 static ROOTS: AtomicU64 = AtomicU64::new(0);
 
-/// A fake `/sys/fs/cgroup`, removed when it drops.
 struct FakeRoot(PathBuf);
 
 impl FakeRoot {
-    /// One whose parent cgroup may be written: the two files the probe
-    /// opens exist, as the kernel gives them.
+
     fn delegated() -> FakeRoot {
         let root = FakeRoot::fresh();
         for name in ["cgroup.procs", "cgroup.subtree_control"] {
@@ -43,7 +32,6 @@ impl FakeRoot {
         root
     }
 
-    /// One that may not be written: no cgroup files at all.
     fn plain() -> FakeRoot {
         FakeRoot::fresh()
     }
@@ -62,7 +50,6 @@ impl FakeRoot {
         &self.0
     }
 
-    /// One file of the fake root as a whole string.
     fn read(&self, relative: &str) -> String {
         std::fs::read_to_string(self.0.join(relative)).unwrap()
     }
@@ -83,8 +70,6 @@ impl Drop for FakeRoot {
     }
 }
 
-/// Where the cgroup may not be written, a run reads as unshared, nothing
-/// is made, and an asked ceiling is reported as not applied.
 #[test]
 fn a_run_reads_unshared_where_the_root_cannot_be_written() {
     let root = FakeRoot::plain();
@@ -110,8 +95,6 @@ fn a_run_reads_unshared_where_the_root_cannot_be_written() {
     );
 }
 
-/// Two runs get the same weight, only the requested memory ceiling,
-/// and each command's pid joins its own run's cgroup.
 #[test]
 fn two_runs_hold_the_same_weight_and_the_limit_the_arm_asked_for() {
     let root = FakeRoot::delegated();
@@ -148,7 +131,6 @@ fn two_runs_hold_the_same_weight_and_the_limit_the_arm_asked_for() {
     assert_eq!(cgroups.held(first), Shares::Unset);
 }
 
-/// A restarted harness can reuse a run directory after its user clears the ceiling.
 #[test]
 fn cpu_only_clears_a_previous_ceiling_when_a_run_directory_is_reused() {
     let root = FakeRoot::delegated();
@@ -171,10 +153,6 @@ fn cpu_only_clears_a_previous_ceiling_when_a_run_directory_is_reused() {
     );
 }
 
-/// The `oom` line of `memory.events` is the run's refusal count: a
-/// command collected after it moved reports the hit, one collected after
-/// only the `max` line moved (a reclaim that succeeded) reports nothing,
-/// and a count that stops reading is reported as unread (Exec.lean D95).
 #[test]
 fn the_oom_line_alone_tells_a_hit_from_a_reclaim() {
     let root = FakeRoot::delegated();
@@ -203,9 +181,6 @@ fn the_oom_line_alone_tells_a_hit_from_a_reclaim() {
     );
 }
 
-/// A run cgroup that cannot be made, and a pid that cannot join it, both
-/// leave the command running outside the ceiling, and its mark says
-/// which (Exec.lean D95).
 #[test]
 fn a_command_outside_its_run_cgroup_says_why() {
     let root = FakeRoot::delegated();

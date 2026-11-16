@@ -3,28 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What changed between two checkpoints, as paths and counts.
-//!
-//! The write side of this city is git-native — every tool wave is
-//! checkpointed by a real commit — and nothing anywhere could read
-//! two of those commits back and say what moved between them. This is
-//! that read.
-//!
-//! **The scope is already right, and it is right for free.** A checkpoint
-//! stages `<scope>/*` and nothing wider, so the difference between two of
-//! them cannot contain a file the Run merely read. Other harnesses report
-//! a session diff that includes everything the session opened, and their
-//! users cannot tell what the agent actually wrote; the checkpoint being the
-//! write domain is what spares this one that.
-//!
-//! **Counts, never patch text.** `checkpoint::scan_staged` refuses to
-//! echo the bytes that matched a secret shape, because printing them to
-//! prove a leak is the leak. Patch text is file content on a socket, and
-//! that is the same question — so a hunk has to be its own request,
-//! answered through the same scan, and it is not this module.
-//!
-//! Specified by `Sprawling/storage/spec/Changes.lean` §8-13.
-
 use std::cell::{Cell, RefCell};
 use std::path::Path;
 
@@ -32,11 +10,6 @@ use kernel::{FileChange, GitOid, How, Lines};
 
 use crate::error::StorageError;
 
-/// The far end of the comparison.
-///
-/// Exhaustive rather than `Option<GitOid>`: "against the working tree" is
-/// a statement about now, and spelling it as an absent commit invites the
-/// caller to read it as "against nothing".
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Head {
     Commit(GitOid),
@@ -50,15 +23,6 @@ fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageError {
     }
 }
 
-/// What moved between `base` and `head`, one row per file, path order.
-///
-/// Path order rather than size order: a reader looking for one file finds
-/// it in the same place every time, and a list that reorders itself as
-/// the numbers change is a list nobody can scan twice.
-///
-/// # Errors
-/// Propagates whatever opening the repository, finding the commits, or
-/// walking the difference reports.
 pub fn between(
     city_root: &Path,
     base: GitOid,
@@ -75,17 +39,14 @@ pub fn between(
     };
     let old = find(base)?;
     let mut options = git2::DiffOptions::new();
-    // Renames are detected below rather than assumed here; this only asks
-    // git not to expand a whole file into a hunk it will never show.
+
     options.context_lines(0);
     let mut diff = match head {
         Head::Commit(oid) => {
             let new = find(oid)?;
             repo.diff_tree_to_tree(Some(&old), Some(&new), Some(&mut options))
         }
-        // Index included, so a file the wave staged but has not committed
-        // still counts as moved: what a person is looking at is the tree
-        // on disk, not the tree git last recorded.
+
         Head::WorkingTree => repo.diff_tree_to_workdir_with_index(Some(&old), Some(&mut options)),
     }
     .map_err(git_err("compare two checkpoints"))?;
@@ -94,13 +55,6 @@ pub fn between(
     collect(&diff)
 }
 
-/// Each commit's parents, in the order the commit object states them;
-/// `None` for an oid the repository does not hold. The repository is
-/// opened once for the whole list.
-///
-/// # Errors
-/// Propagates whatever opening the repository or reading a commit that
-/// is there reports.
 pub fn parents_of(
     city_root: &Path,
     oids: &[GitOid],
@@ -130,14 +84,6 @@ pub fn parents_of(
         .collect()
 }
 
-/// Reads one prepared diff into rows.
-///
-/// Separate from [`between`] because everything above is git and
-/// everything here is this module's own reading of it: which deltas earn
-/// a row, and what a row says when git has no line count for it. Shared
-/// with `crate::status`, which prepares a different diff and needs the
-/// same reading of it — what a changed file is must have one answer
-/// whether the far end is a checkpoint or the disk.
 pub(crate) fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, StorageError> {
     let mut rows: Vec<FileChange> = Vec::new();
     let stats: Vec<(u32, u32)> = line_counts(diff)?;
@@ -148,9 +94,7 @@ pub(crate) fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, StorageE
             .or_else(|| delta.old_file().path())
             .and_then(Path::to_str)
         else {
-            // A path this platform cannot spell is left out rather than
-            // shown under a mangled name; the count of what is listed is
-            // always the count of what a reader can act on.
+
             continue;
         };
         #[expect(
@@ -158,9 +102,7 @@ pub(crate) fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, StorageE
             reason = "git2::Delta is an upstream open enum; every status we do not name is a change to content"
         )]
         let how = match delta.status() {
-            // Untracked belongs with Added: a file the working tree
-            // holds and no commit does is a file this wave added,
-            // whether or not anybody staged it.
+
             git2::Delta::Added | git2::Delta::Copied | git2::Delta::Untracked => How::Added,
             git2::Delta::Deleted => How::Deleted,
             git2::Delta::Renamed => How::Renamed {
@@ -173,8 +115,7 @@ pub(crate) fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, StorageE
             },
             _ => How::Modified,
         };
-        // `is_binary` is only set once git has looked at the content,
-        // which `find_similar` above has made it do.
+
         let binary = delta.new_file().is_binary() || delta.old_file().is_binary();
         let lines = match (binary, stats.get(at)) {
             (false, Some(&(added, removed))) => Lines::Counted { added, removed },
@@ -190,22 +131,14 @@ pub(crate) fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, StorageE
     Ok(rows)
 }
 
-/// Added and removed lines per delta, in delta order.
-///
-/// Walked once with a callback rather than asked per file: `git2` counts
-/// lines while it walks, so one pass answers for every row and a second
-/// pass per file would diff the same trees again.
 fn line_counts(diff: &git2::Diff<'_>) -> Result<Vec<(u32, u32)>, StorageError> {
-    // Shared by two callbacks that `git2` calls one after the other and
-    // never at the same time, which is what makes a `Cell` the right
-    // amount of machinery here.
+
     let counts = RefCell::new(vec![(0u32, 0u32); diff.deltas().len()]);
     let at = Cell::new(0usize);
     let started = Cell::new(false);
     diff.foreach(
         &mut |_, _| {
-            // The file callback opens each delta, so the first one is row
-            // zero and every later one steps forward.
+
             if started.replace(true) {
                 at.set(at.get().saturating_add(1));
             }
@@ -272,8 +205,6 @@ mod tests {
         GitOid::parse(&raw).expect("a checkpoint names a git object")
     }
 
-    /// Two checkpoints, and what a person wants to know about the wave between
-    /// them: which files, and how much of each.
     #[test]
     fn two_checkpoints_report_the_files_between_them_and_how_much_moved() {
         let dir = tempfile::tempdir().unwrap();
@@ -313,7 +244,6 @@ mod tests {
         );
     }
 
-    /// A wave that changed nothing is not a wave that could not be read.
     #[test]
     fn two_identical_checkpoints_report_nothing_rather_than_failing() {
         let dir = tempfile::tempdir().unwrap();
@@ -333,10 +263,6 @@ mod tests {
         assert!(between(root, base, Head::Commit(head)).unwrap().is_empty());
     }
 
-    /// What the person is looking at is the tree on disk. A wave still
-    /// running has written files that no checkpoint holds yet, and a
-    /// change list that ignored them would describe the session as it was
-    /// one checkpoint ago.
     #[test]
     fn work_not_yet_checkpointed_still_counts_against_the_working_tree() {
         let dir = tempfile::tempdir().unwrap();
@@ -362,8 +288,6 @@ mod tests {
         );
     }
 
-    /// A binary file has no line count, and saying `+0 −0` would be a
-    /// measurement nobody made.
     #[test]
     fn a_binary_file_says_so_rather_than_reporting_nothing_moved() {
         let dir = tempfile::tempdir().unwrap();
@@ -383,9 +307,6 @@ mod tests {
         assert_eq!(rows[0].lines, Lines::Binary, "{:?}", rows[0]);
     }
 
-    /// A checkpoint that is not in this repository is a refusal, never an
-    /// empty change list: "nothing moved" and "I could not look" are
-    /// different answers and a reader acts differently on each.
     #[test]
     fn a_checkpoint_this_city_does_not_hold_is_refused_rather_than_read_as_empty() {
         let dir = tempfile::tempdir().unwrap();

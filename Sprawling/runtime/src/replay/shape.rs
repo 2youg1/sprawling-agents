@@ -3,27 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Rebuilding one request's cache shape from the records it rests on,
-//! and refusing either record when the rebuild disagrees with it.
-
 use kernel::event::record::PromptShapeCompared;
 use kernel::{AxCode, AxError};
 use serde::Deserialize;
 
-/// A15 over one request's cache shape: rebuild it from two records -
-/// `prompt_shape_compared` for the tool table and the conversation, and
-/// for the four segments the run's most recent `prompt_assembled` at or
-/// before that line, because a run records `prompt_assembled` once and
-/// `prompt_shape_compared` once per request - re-derive what moved since the request before it, and refuse either
-/// line when the rebuild disagrees with what was written down. A replay
-/// re-derives an attribution; it does not trust one.
-///
-/// `previous` is the same pair of payloads for the request before this
-/// one; `None` is a run's first request.
-///
-/// # Errors
-/// A payload that does not parse, or a line whose recorded judgement or
-/// billing bound disagrees with the parts it states.
 pub fn rebuild_shape(
     previous: Option<(&serde_json::Value, &serde_json::Value)>,
     assembled: &serde_json::Value,
@@ -50,8 +33,6 @@ pub fn rebuild_shape(
     Ok(())
 }
 
-/// One rebuilt shape, and the `prompt_shape_compared` line it was
-/// rebuilt from.
 fn rebuild_one(
     assembled: &serde_json::Value,
     compared: &serde_json::Value,

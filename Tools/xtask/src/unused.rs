@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Dead dependencies: a key a manifest declares that no source file of
-//! its package names, and a workspace dependency no package inherits
-//! (Tools/xtask/Spec.lean §8-37). rustc's `dead_code` already refuses a
-//! dead private item under `-D warnings`; a dead manifest entry is the
-//! kind of dead code no compiler pass reports.
-
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -16,18 +10,12 @@ use crate::docnum::facts;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The dependency tables a manifest may hold, at its top level and under
-/// each `[target.*]` table alike.
 const TABLES: [&str; 3] = ["dependencies", "dev-dependencies", "build-dependencies"];
 
 const RULE: &str = "every dependency a manifest declares is named by the code that compiles against it (Tools/xtask/Spec.lean §8-37)";
 
-/// Where a manifest lists the dependencies it declares only to constrain
-/// resolution, which no source is expected to name.
 const PINS: &str = "[package.metadata.unused] pins";
 
-/// Every declared dependency no source of its package names, then every
-/// workspace dependency no package inherits.
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
     let mut inherited = BTreeSet::new();
@@ -58,10 +46,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// One package's findings: a declared key no source names unless its
-/// manifest pins it, a pin some source names after all, and a pin no
-/// dependency table declares. Every declared key is added to
-/// `inherited`, which the workspace half of the gate reads.
 fn package_findings(
     root: &Path,
     package: &str,
@@ -110,7 +94,6 @@ fn package_findings(
     Ok(violations)
 }
 
-/// The package's manifest, parsed.
 fn manifest(root: &Path, package: &str) -> Result<toml::Table, XtaskError> {
     let file = format!("{package}/Cargo.toml");
     toml::from_str(&walk::read_text(&root.join(&file))?).map_err(|err| XtaskError::Doc {
@@ -119,8 +102,6 @@ fn manifest(root: &Path, package: &str) -> Result<toml::Table, XtaskError> {
     })
 }
 
-/// `(table, key)` for every dependency the manifest declares, in
-/// manifest order, `[target.*]` tables after the top-level ones.
 fn declared(manifest: &toml::Table) -> Vec<(&'static str, String)> {
     let targets = manifest
         .get("target")
@@ -142,12 +123,6 @@ fn declared(manifest: &toml::Table) -> Vec<(&'static str, String)> {
         .collect()
 }
 
-/// The keys the manifest pins, in the order it lists them; none when the
-/// manifest has no `pins`.
-///
-/// # Errors
-/// Refuses a `pins` that is not an array of strings, because a pin the
-/// gate cannot read is an exemption nobody can check.
 fn pins(manifest: &toml::Table, package: &str) -> Result<Vec<String>, XtaskError> {
     let Some(listed) = manifest
         .get("package")
@@ -169,7 +144,6 @@ fn pins(manifest: &toml::Table, package: &str) -> Result<Vec<String>, XtaskError
         .collect()
 }
 
-/// Every `.rs` file under the package directory, joined into one text.
 fn sources(dir: &Path) -> Result<String, XtaskError> {
     walk::files_with_ext(dir, &["rs"])?
         .iter()
@@ -177,8 +151,6 @@ fn sources(dir: &Path) -> Result<String, XtaskError> {
         .collect()
 }
 
-/// Whether `ident` occurs in `text` as a whole identifier rather than as
-/// part of a longer one.
 fn names(text: &str, ident: &str) -> bool {
     let is_ident = |c: char| c.is_alphanumeric() || c == '_';
     text.match_indices(ident).any(|(at, _)| {
@@ -249,10 +221,6 @@ mod tests {
         );
     }
 
-    /// A dependency declared only to constrain resolution is exempt from
-    /// naming when its manifest lists it under `pins`, and a pin that
-    /// points at nothing or is no longer needed is itself a finding
-    /// (Tools/xtask/Spec.lean §8-37).
     #[test]
     fn a_dependency_declared_to_pin_a_resolution_is_listed_in_its_manifest() {
         let root = std::env::temp_dir().join(format!("xtask-unused-pins-{}", std::process::id()));

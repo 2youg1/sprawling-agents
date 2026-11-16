@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The record a session writes at its own address, read back as it was
-//! written.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -21,13 +18,6 @@ fn addr(raw: &str) -> Address {
     Address::parse(raw).unwrap()
 }
 
-/// A session's record round-trips through the file grammar: what
-/// `write_session` states is what `own_layer` reads back, and the model
-/// is stated even when the person chose no effort.
-///
-/// The record is one act because the two values are one choice, so the
-/// round trip is one test: a write that lost either half would leave a
-/// later run reading half a shape.
 #[test]
 fn a_session_record_is_read_back_exactly_as_it_was_written() {
     let dir = tempfile::tempdir().unwrap();
@@ -47,9 +37,6 @@ fn a_session_record_is_read_back_exactly_as_it_was_written() {
         "and the ladder every run climbs answers with it"
     );
 
-    // No effort chosen is not the same fact as an effort of `none`: a
-    // room whose person chose none keeps the key out, and the ladder
-    // goes on answering nothing for it.
     let fresh = addr("lab/fresh");
     write_session(
         dir.path(),
@@ -69,8 +56,6 @@ fn a_session_record_is_read_back_exactly_as_it_was_written() {
         Some("m-local")
     );
 
-    // An empty name states nothing at all, which is a mistake in the
-    // file rather than a model: it is refused where it is read.
     assert!(
         ConfigLayer::parse(
             "[model]

@@ -3,44 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Two goals want the same resource. Who decides, and how far up.
-//!
-//! Detection is `kernel::goal`'s and stays there; this module holds the
-//! two levels and the way between them. The split is the point:
-//! deciding *that* two goals clash is mechanical, deciding *what to do*
-//! usually is not.
-//!
-//! Level one is serialisation: when the clash is mechanically decidable
-//! (the same paths, one goal standing and one not), the later goal
-//! waits, and no judgment is involved. Level two is an arbitration
-//! agent: reading two goal statements and telling whether they really
-//! conflict is reading, which is a model's work.
-//!
-//! There is no third level. A clash a resident cannot settle is a
-//! question about the design, and a question goes to the Approval
-//! Inbox as a question rather than as a goal that quietly failed to
-//! register; a gate refusal is not a clash at all, because the run
-//! that was refused holds no ground to clash over.
-
 use kernel::event::record::{ConflictLevel, GoalConflict};
 use kernel::{AxError, GoalEntry, GoalId, GoalResource, GoalVerdict, Payload};
 
-/// Who settles this clash.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Level {
-    /// One after the other; nobody has to judge anything.
+
     Serialize { after: GoalId },
-    /// A resident reads both statements and decides.
+
     Arbitrate { with: GoalId },
 }
 
-/// Decides who settles a clash between `candidate` and the goals already
-/// registered.
-///
-/// Returns `None` when there is nothing to settle. The order of the
-/// checks is fixed - serialisation first, then arbitration - so the
-/// same pair always lands at the same level, which is what makes a
-/// replay comparable.
 #[must_use]
 pub fn arbitrate(registered: &[GoalEntry], candidate: &GoalEntry) -> Option<Level> {
     let GoalVerdict::Conflict { with } = kernel::goal::detect_conflict(registered, candidate)
@@ -48,9 +21,7 @@ pub fn arbitrate(registered: &[GoalEntry], candidate: &GoalEntry) -> Option<Leve
         return None;
     };
     let held = registered.iter().find(|entry| entry.id == with);
-    // Mechanically decidable: both sides claim paths, and exactly one of
-    // them is a standing goal, so "the standing one first" needs no
-    // judgment. Anything else is a reading.
+
     let mechanical = held.is_some_and(|entry| {
         entry.standing != candidate.standing
             && entry
@@ -65,10 +36,6 @@ pub fn arbitrate(registered: &[GoalEntry], candidate: &GoalEntry) -> Option<Leve
     Some(Level::Arbitrate { with })
 }
 
-/// The `goal_conflict` record: the pair and the level that settles it.
-///
-/// # Errors
-/// Propagates the payload's refusal to hold what it was given.
 pub fn conflict_payload(candidate: &GoalEntry, level: &Level) -> Result<Payload, AxError> {
     let (with, level) = match level {
         Level::Serialize { after } => (after, ConflictLevel::Serialize),
@@ -132,8 +99,7 @@ mod tests {
 
     #[test]
     fn a_clash_that_needs_reading_goes_to_a_resident() {
-        // Two standing goals on the same path: which comes first is not
-        // decidable from the entries, so somebody has to read them.
+
         let registered = vec![goal("a", "lab/one", true)];
         assert_eq!(
             arbitrate(&registered, &goal("b", "lab/one", true)),
@@ -142,8 +108,6 @@ mod tests {
             })
         );
 
-        // An external resource is a name, not a tree: overlap says
-        // nothing about order.
         let registered = vec![external("a", "the printer")];
         assert!(matches!(
             arbitrate(&registered, &external("b", "the printer")),

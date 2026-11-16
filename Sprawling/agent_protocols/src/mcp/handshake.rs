@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! MCP handshake: initialize, initialized, ready.
-
 use super::outbound::Outbound;
 use super::tools::float_at;
 use kernel::{AxCode, AxError, TimeoutMs};
@@ -12,26 +10,14 @@ use serde_json::{Value, json};
 
 pub const PROTOCOL_VERSION: &str = "2025-06-18";
 
-/// What a completed handshake learned.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Handshake {
-    /// The revision the far end agreed to, which is not always the one
-    /// that was asked for.
+
     pub protocol_version: String,
-    /// What the server calls itself. Recorded for diagnostics, never
-    /// branched on: a name is not a capability.
+
     pub server: String,
 }
 
-/// Opens a connection: `initialize`, then `notifications/initialized`.
-///
-/// One authority for the lifecycle, above every transport, because the
-/// specification requires `initialize` before any other request and a
-/// transport that opened its own way would drift from the others.
-///
-/// # Errors
-/// Refuses a far end that will not answer `initialize`, and one whose
-/// answer carries no protocol version.
 pub fn handshake(
     out: &mut dyn Outbound,
     rpc: &mut Rpc,
@@ -57,8 +43,7 @@ pub fn handshake(
         .and_then(Value::as_str)
         .unwrap_or("unnamed")
         .to_owned();
-    // Required before any other request. A server that never receives it
-    // is entitled to refuse everything that follows.
+
     out.notify(&Rpc::initialized(), patience)?;
     Ok(Handshake {
         protocol_version,
@@ -66,8 +51,6 @@ pub fn handshake(
     })
 }
 
-/// Builds request lines and reads answer lines. Holds an id counter and
-/// nothing else.
 #[derive(Debug, Default)]
 pub struct Rpc {
     next: u64,
@@ -84,9 +67,6 @@ impl Rpc {
         self.next
     }
 
-    /// One JSON-RPC request, on one line. The transport is line
-    /// delimited and a message may not contain a newline, so the line is
-    /// assembled here rather than left to a pretty printer.
     fn request(&mut self, method: &str, params: Value) -> String {
         let id = self.mint();
         format!(
@@ -96,14 +76,6 @@ impl Rpc {
         )
     }
 
-    /// `initialize`: the first message of every connection.
-    ///
-    /// Carries the three things the specification requires - a protocol
-    /// version, this client's capabilities, and who this client is. The
-    /// capability object is empty on purpose: roots, sampling and
-    /// elicitation are things a server may ask *us* for, and declaring a
-    /// capability this city does not implement would invite a request it
-    /// would then have to refuse.
     pub fn initialize(&mut self) -> String {
         self.request(
             "initialize",
@@ -115,29 +87,15 @@ impl Rpc {
         )
     }
 
-    /// `notifications/initialized`: sent once the server has answered
-    /// `initialize`, and required before any other request.
-    ///
-    /// A notification has no `id`, which is what tells the far end not
-    /// to answer it.
     #[must_use]
     pub fn initialized() -> String {
         "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\",\"params\":{}}".to_owned()
     }
 
-    /// `tools/list`.
     pub fn list_tools(&mut self) -> String {
         self.request("tools/list", json!({}))
     }
 
-    /// `tools/call`.
-    ///
-    /// # Errors
-    /// Refuses arguments carrying a floating point number. Every call is
-    /// written to the ledger, ledger payloads carry no floats, and a
-    /// call that cannot be recorded is a call the city cannot replay.
-    /// The refusal is scoped to the call rather than the tool: one
-    /// badly-shaped argument is not evidence that the tool is unusable.
     pub fn call_tool(&mut self, name: &str, arguments: &Value) -> Result<String, AxError> {
         if let Some(path) = float_at(arguments, String::new()) {
             return Err(AxError::failure(
@@ -156,12 +114,6 @@ impl Rpc {
         ))
     }
 
-    /// Reads one answer line.
-    ///
-    /// # Errors
-    /// Refuses a line that is not a JSON-RPC answer, and turns a
-    /// server's error object into a refusal that keeps the server's own
-    /// words.
     pub fn read(line: &str) -> Result<Value, AxError> {
         let value: Value = serde_json::from_str(line).map_err(|err| {
             AxError::failure(AxCode::WireMismatch, "read an mcp answer", err.to_string())
@@ -222,10 +174,6 @@ mod tests {
         );
     }
 
-    /// The opening message is the one the specification names. Before
-    /// this, both transports opened with `server/discover`, which MCP
-    /// does not define, and a hosted server answered `-32601: Method
-    /// not found` to the first thing this city ever said to it.
     #[test]
     fn a_connection_opens_with_initialize_carrying_its_three_required_parts() {
         let line = Rpc::new().initialize();
@@ -236,8 +184,6 @@ mod tests {
         assert_eq!(sent["params"]["clientInfo"]["name"], "sprawling");
     }
 
-    /// An id here would leave a client waiting for a reply that a
-    /// correct server will never send.
     #[test]
     fn the_initialized_notification_carries_no_id() {
         let sent: Value = serde_json::from_str(&Rpc::initialized()).unwrap();
@@ -245,9 +191,6 @@ mod tests {
         assert!(sent.get("id").is_none());
     }
 
-    /// The handshake reads what was negotiated rather than assuming its
-    /// own version was accepted, and it sends the notification the
-    /// specification requires before anything else may be asked.
     #[test]
     fn a_handshake_records_what_was_negotiated_and_says_it_is_ready() {
         let mut server = ScriptedOutbound::new();
@@ -269,8 +212,6 @@ mod tests {
         );
     }
 
-    /// A far end that answers `initialize` with no version is not
-    /// speaking this protocol, and is refused rather than assumed.
     #[test]
     fn a_server_that_names_no_protocol_version_is_refused() {
         let mut server = ScriptedOutbound::new();
@@ -291,9 +232,6 @@ mod tests {
         }
     }
 
-    /// An adapter that answers instantly and counts what it was asked,
-    /// so what one connection costs can be read as messages rather than
-    /// as the speed of whatever machine ran the test.
     struct Counting {
         calls: u32,
         notifications: u32,
@@ -317,16 +255,6 @@ mod tests {
         }
     }
 
-    /// What opening one connection costs, which is what a standing
-    /// connection table would save per dispatch (`Sprawling/agent_protocols/Spec.lean` §8-16).
-    ///
-    /// Two answered requests and one notification, per server, every
-    /// time: `initialize`, `notifications/initialized`, `tools/list`.
-    /// The count is asserted rather than the time, because the count is
-    /// the same on every machine and the time is not - and because this
-    /// city samples the clock in one place, which is not a test. The
-    /// cost a standing table would remove is the process start and the
-    /// round trips, and both belong to the transports.
     #[test]
     fn opening_one_connection_costs_two_round_trips_and_one_notification() {
         let mut server = Counting {

@@ -3,32 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The durability barrier's state: whether the ledger's in-memory
-//! position still names what the disk holds (`Sprawling/storage/spec/Jsonl/Barrier.lean` §8-1).
-//!
-//! `Sprawling/storage/spec/Jsonl/Barrier.lean` states the property this holds -
-//! every seq a handle answered `Ok` for survives a reopen - and proves it
-//! for any run of waves, with the counterexample for a handle that keeps
-//! writing after a failed wave.
-
 use std::path::Path;
 
 use kernel::Seq;
 
 use crate::error::StorageError;
 
-/// Whether the ledger's in-memory position is the end of what its
-/// segments hold.
-///
-/// A wave breaks the barrier before its first byte goes out and mends
-/// it only after every segment it touched is synced. A write that dies
-/// partway leaves bytes the position does not account for - a torn
-/// line, or whole lines whose sync failed - and a wave appended after
-/// them would sit behind bytes the next open truncates, so its `Ok`
-/// would claim a record the disk then loses. A broken handle refuses
-/// every later wave until the position is true again: either
-/// `jsonl::unwind` has cut the segments back to their length before the
-/// failed wave, or a reopen has read the tail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Barrier {
     Whole,
@@ -36,8 +16,7 @@ pub(crate) enum Barrier {
 }
 
 impl Barrier {
-    /// `Ok` while the position is the end of the segments; otherwise the
-    /// refusal that sends the caller to a reopen.
+
     pub(crate) fn admit(&self, dir: &Path, at: Seq) -> Result<(), StorageError> {
         match self {
             Barrier::Whole => Ok(()),
@@ -78,12 +57,6 @@ mod tests {
         }
     }
 
-    /// A wave whose write dies partway leaves torn bytes at the tail. A
-    /// ledger that keeps appending after them buries a later wave behind
-    /// the tear, and the next open truncates that wave away although its
-    /// `append_all` answered `Ok`. Whatever the ledger answers after a
-    /// failed barrier, no `Ok` may name a record the reopened ledger
-    /// does not hold.
     #[test]
     fn no_append_after_a_failed_barrier_claims_a_record_the_disk_loses() {
         let fs = FaultFs::new(FaultPlan {

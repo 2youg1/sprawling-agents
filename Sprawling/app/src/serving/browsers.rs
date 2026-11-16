@@ -3,22 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The browsers paired at this machine's door, kept in the city's
-//! reserved subtree (`kernel::layout::CityLayout::browsers`,
-//! `Sprawling/app/spec/Serving.lean`): public keys, labels and times,
-//! never a secret.
-//!
-//! The rules of pairing are `wire::reception::pairing`'s; this reads the
-//! table once when the city opens and writes the whole of it back after
-//! every change, through a file beside it renamed into place.
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use kernel::{AxCode, AxError, TimeMs};
 use serde::{Deserialize, Serialize};
 
-/// The file's shape: one `[[browser]]` table per paired browser.
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct Table {
     #[serde(default, rename = "browser")]
@@ -35,10 +25,6 @@ struct Row {
     last_seen: Option<u64>,
 }
 
-/// Every browser paired before; none when the city never paired one.
-///
-/// # Errors
-/// The file exists and cannot be read, or a line in it holds no key.
 pub(crate) fn load(path: &Path) -> Result<Vec<wire::PairedBrowser>, AxError> {
     let text = match std::fs::read_to_string(path) {
         Ok(text) => text,
@@ -63,7 +49,6 @@ pub(crate) fn load(path: &Path) -> Result<Vec<wire::PairedBrowser>, AxError> {
         .collect()
 }
 
-/// Where the door keeps its table: the whole of it, written to `path`.
 pub(crate) fn keeping(path: PathBuf) -> wire::KeepBrowsers {
     Arc::new(move |browsers: &[wire::PairedBrowser]| {
         let table = Table {

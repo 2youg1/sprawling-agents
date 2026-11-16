@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Three-layer config resolution, specified by `Sprawling/kernel/spec/Config.lean`.
-//! `FrozenConfig` and `LiveConfig` share no field; tests check this property.
-
 use serde::{Deserialize, Serialize};
 
 use crate::consts_policy::CLOCK_STAMP_DEFAULT;
@@ -27,25 +24,13 @@ pub use interpreter::Interpreter;
 pub use sandbox::{SandboxArm, SandboxLimits};
 pub use search::{SearchConfiguration, SearchSupplier};
 
-/// One environment variable name a scope declares its runs may inherit.
-///
-/// A `String` would put the judgement in whichever caller remembered it.
-/// This has one constructor, and that constructor is reached where a
-/// configuration file is read — which is the only moment the refusal is
-/// still worth anything, because a name handed to a child process is a
-/// name the child cannot be asked to forget.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EnvVarName(String);
 
 impl EnvVarName {
-    /// Sole constructor.
-    ///
-    /// # Errors
-    /// Refuses an empty name, a name carrying the `=` that separates a
-    /// name from a value, a name carrying a control character, and a
-    /// name [`crate::secret::names_a_credential`] reads as a credential.
+
     pub fn parse(raw: &str) -> Result<EnvVarName, AxError> {
         let reject = |violation: &str| {
             Err(AxError::failure(
@@ -99,8 +84,6 @@ impl From<EnvVarName> for String {
     }
 }
 
-/// Clock-stamp cadence for result envelopes. The
-/// granularity rides the enum; `Off` costs zero bytes in the window.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClockStampGranularity {
@@ -110,24 +93,12 @@ pub enum ClockStampGranularity {
     Hour,
 }
 
-/// Where the context reminder's second rung sits: a whole percent of the
-/// window, `31` through `90` (the three numbers live in `consts_policy`).
-///
-/// One construction point, [`SecondThreshold::parse`], so a rung the city
-/// refuses cannot be spelled, and its refusal carries the domain: that is
-/// the only sentence a person editing a `CONFIG.toml` gets. Why the domain
-/// is bounded is `consts_policy::INTERVAL_CAP_BYTES`'s derivation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "u64", into = "u64")]
 pub struct SecondThreshold(u64);
 
 impl SecondThreshold {
-    /// Sole constructor. `raw` is a whole percent of the window.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS`, naming the value and the domain it is outside,
-    /// when `raw` is not `31..=90`. Never clamped: a file that states 30
-    /// means something its writer has to be told is not accepted.
+
     pub fn parse(raw: u64) -> Result<SecondThreshold, AxError> {
         let floor = crate::consts_policy::CTX_REMINDER_SECOND_MIN;
         let ceiling = crate::consts_policy::CTX_REMINDER_SECOND_MAX;
@@ -146,7 +117,6 @@ impl SecondThreshold {
         )))
     }
 
-    /// The rung, as a whole percent of the window.
     #[must_use]
     pub fn percent(self) -> u64 {
         self.0
@@ -167,25 +137,12 @@ impl From<SecondThreshold> for u64 {
     }
 }
 
-/// Absolute context lock for a building, in input tokens: the effective
-/// window is `min(model.context_tokens, lock)`, so a long-window model
-/// still costs like the lock. One construction point,
-/// [`ContextLock::parse`], so a zero lock cannot be spelled.
-///
-/// Lives in the building's `RULES.toml` as `context_lock_tokens`, not in
-/// `CONFIG.toml`: a hard lock is a building capability, not a run-reminder
-/// rung (`Sprawling/city/spec/Policy.lean`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "u64", into = "u64")]
 pub struct ContextLock(u64);
 
 impl ContextLock {
-    /// Sole constructor. `raw` is a whole token count.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` when `raw` is zero: a lock of nothing would make
-    /// every turn sound the lock, and leaving the key out is how a
-    /// building says it has no hard lock.
+
     pub fn parse(raw: u64) -> Result<ContextLock, AxError> {
         if raw == 0 {
             return Err(AxError::failure(
@@ -201,13 +158,11 @@ impl ContextLock {
         Ok(ContextLock(raw))
     }
 
-    /// The lock, as whole input tokens.
     #[must_use]
     pub fn tokens(self) -> crate::Tokens {
         crate::Tokens::new(self.0)
     }
 
-    /// The effective window: the smaller of the model's window and this lock.
     #[must_use]
     pub fn effective(self, model_window: crate::Tokens) -> crate::Tokens {
         crate::Tokens::new(self.0.min(model_window.get()))
@@ -228,8 +183,6 @@ impl From<ContextLock> for u64 {
     }
 }
 
-/// One value across the City -> Building -> Resident override ladder.
-/// Lower layers win; absence falls through upward.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LayeredValue<T> {
     pub city: Option<T>,
@@ -237,8 +190,6 @@ pub struct LayeredValue<T> {
     pub resident: Option<T>,
 }
 
-// Manual impl: the derive would demand `T: Default`, an undesired bound —
-// an all-None ladder is a valid default for any T.
 impl<T> Default for LayeredValue<T> {
     fn default() -> Self {
         LayeredValue {
@@ -258,23 +209,12 @@ impl<T> LayeredValue<T> {
     }
 }
 
-/// One concern timezone: an already-resolved offset, never a tz name —
-/// re-resolving names against a moving tz database would fork replayed
-/// history.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockZone {
     pub id: String,
     pub offset_min: i32,
 }
 
-/// One external tool server this run may reach, as its configuration
-/// states it: a label, a program on this machine, and that program's
-/// arguments.
-///
-/// The command and its arguments are host facts, for the same reason
-/// the sandbox keeps them out: a city carried to another machine must
-/// not carry this machine's paths inside its history. They live in
-/// `CONFIG.toml` and never in a ledger payload.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct McpServer {
@@ -282,119 +222,57 @@ pub struct McpServer {
     pub transport: McpTransport,
 }
 
-/// How this city reaches one server. Exhaustive rather than a URL that
-/// might also be a command: the three are different machines to start
-/// talking to, they fail differently, and a configuration that leaves it
-/// to be guessed is one that guesses wrong on the day it matters.
-///
-/// Closed rather than `#[non_exhaustive]`: every reader of this enum is
-/// inside this one binary, so a wildcard arm here would buy nothing and
-/// would hide the next transport from the three modules that must
-/// decide about it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum McpTransport {
-    /// A program on this machine, spoken to over its own pipes.
+
     Stdio {
         command: String,
         args: Vec<String>,
-        /// What the child is started with, name before value, in the
-        /// order the configuration lists them.
-        ///
-        /// A value may be a `secret:realm/name` reference, which is
-        /// redeemed at the moment the process is started and never
-        /// written into the configuration: an API key a server needs is
-        /// still a credential, and `claude mcp add -e KEY=value` is the
-        /// place people are used to putting one.
+
         env: Vec<(String, String)>,
     },
-    /// A server reached over HTTP, which is how a hosted catalogue is
-    /// published. The city holds no account with it: whatever it needs
-    /// travels in the headers the configuration names.
+
     Http {
         url: String,
-        /// Headers to send, name before value. A value may be a
-        /// `secret:realm/name` reference, redeemed at the last slot
-        /// before the wire.
-        ///
-        /// A list rather than one header, because a hosted server
-        /// commonly wants an account header beside its key, and a
-        /// configuration that can spell only one of the two describes a
-        /// server nobody can reach.
+
         headers: Vec<(String, String)>,
     },
-    /// A server that answers on a stream of server-sent events: the
-    /// stream is opened first and names where messages are posted, and
-    /// every answer comes back down the stream rather than in the body
-    /// of the request that asked.
-    ///
-    /// Its own variant rather than a flag on [`McpTransport::Http`],
-    /// because the two open differently and fail differently: an HTTP
-    /// server refuses a request, and this one can accept every request
-    /// and answer none.
+
     Sse {
         url: String,
-        /// As [`McpTransport::Http`], and sent on both the stream and
-        /// the posts.
+
         headers: Vec<(String, String)>,
     },
 }
 
-/// Frozen at Run start, never re-read within the Run.
-/// Fields only grow.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FrozenConfig {
     pub clock_stamp: ClockStampGranularity,
     pub clock_zones: Vec<ClockZone>,
-    /// Frozen for the same reason the tool table is: what a run may
-    /// reach decides what it was told it could do, and a capability that
-    /// widens mid-run is one nobody reviewed.
+
     pub sandbox: SandboxLimits,
-    /// External tool servers, frozen for the same reason as the tool
-    /// table itself: their tools enter the catalog at run start, a
-    /// provider hashes that array ahead of the system prompt, and a
-    /// table that widened mid-run would both discard the cache and
-    /// hand the model a capability nobody reviewed.
+
     pub mcp: Vec<McpServer>,
-    /// The references and approved versions for `mcp`, one per selected label.
+
     #[serde(default)]
     pub mcp_references: Vec<McpReference>,
-    /// Reading Room names pinned to canonical skill manifests.
+
     #[serde(default)]
     pub skill_pins: std::collections::BTreeMap<String, B3Hash>,
-    /// How hard the model may think. Frozen rather than live because the
-    /// provider renders it into the cached prompt prefix: changing the
-    /// effort value mid-run invalidates the message cache breakpoints,
-    /// so a run that could retune itself would keep paying to rebuild
-    /// the cache it just discarded. A change applies to the next run.
+
     pub effort: Option<Effort>,
-    /// Where the context reminder's second rung sits. `None` when no
-    /// layer states one: the rung falls back to
-    /// `consts_policy::CTX_REMINDER_SECOND_DEFAULT` where it is read.
-    /// Frozen with the run: a rung that moved mid-run would make "each
-    /// rung sounds once per run" depend on when somebody edited a file.
+
     pub second_threshold: Option<SecondThreshold>,
-    /// Which supplier `web_search` reaches, frozen for the reason `mcp`
-    /// is: the tool and its parameters enter the catalog at run start,
-    /// and a supplier changed mid-run would change who receives the
-    /// run's queries without anybody reviewing it. Absent in a snapshot
-    /// written before search existed, which reads as `Default`.
+
     #[serde(default)]
     pub search: SearchConfiguration,
-    /// The `[catalog]` tables of the city and the building, frozen for
-    /// the reason `mcp` is: they decide which tools travel in the tool
-    /// array, which a provider caches ahead of the system prompt.
-    /// Absent in a snapshot written before `[catalog]` existed, which
-    /// reads as two tables that state nothing.
+
     #[serde(default)]
     pub catalog: CatalogExposure,
 }
 
-/// Every concern's ladder, handed to [`freeze`] together: the values
-/// always travel from the configuration reader to the freeze as one, so
-/// a concern added later is a field here and `freeze` keeps its
-/// signature.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct StatedConfig {
     pub clock_stamp: LayeredValue<ClockStampGranularity>,
@@ -408,14 +286,9 @@ pub struct StatedConfig {
     pub catalog: LayeredValue<ExposureTable>,
 }
 
-/// Hot-reloadable surface. Empty: the type exists so the no-field-overlap
-/// assertion guards every field added to it.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LiveConfig {}
 
-/// Resolves the ladder into the Run-start snapshot. Absence everywhere
-/// falls back to the policy default; the zones ladder overrides as a
-/// whole list (a building that writes zones replaces the city list).
 pub fn freeze(stated: &StatedConfig) -> Result<FrozenConfig, AxError> {
     let (mcp, mcp_references) = connectors::resolve(&stated.mcp)?;
     Ok(FrozenConfig {
@@ -427,13 +300,9 @@ pub fn freeze(stated: &StatedConfig) -> Result<FrozenConfig, AxError> {
         mcp_references,
         skill_pins: stated.skill_pins.resolve().cloned().unwrap_or_default(),
         second_threshold: stated.second_threshold.resolve().copied(),
-        // Silence on every rung is the default supplier, which is what
-        // a city written before `[search]` existed meant.
+
         search: stated.search.resolve().cloned().unwrap_or_default(),
-        // Not one value up the ladder: a tool key the building does not
-        // write still falls to the city's, so both tables are kept and
-        // `CatalogExposure::stated` reads them in order. A room's rung
-        // is refused where the file is read.
+
         catalog: CatalogExposure {
             city: stated.catalog.city.clone().unwrap_or_default(),
             building: stated.catalog.building.clone().unwrap_or_default(),

@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The sieve's world in a scenario: a CAS and a room whose rest
-//! directory holds the tee, one filter table, and the run's history. An `exec`
-//! result goes through `runtime::package_exec`, the same door the city
-//! uses, so the window a scenario replays is the window the product
-//! showed.
-//!
-//! Specified by `Tools/citysim/spec/Executor.lean` §8-3.
-
 use std::path::PathBuf;
 
 use kernel::{Address, AxError, ToolCall, ToolOutcome};
@@ -28,9 +20,7 @@ pub struct SieveWorld {
 }
 
 impl SieveWorld {
-    /// Opens the CAS under `root` and materializes rest files beside it.
-    /// Opening the same root twice is the same world: the CAS is
-    /// content-addressed and a rest file is written once.
+
     pub fn open(root: &std::path::Path, table: FilterTable) -> Result<SieveWorld, AxError> {
         let cas = Cas::open(&root.join("cas")).map_err(storage::StorageError::into_ax)?;
         Ok(SieveWorld {
@@ -43,7 +33,6 @@ impl SieveWorld {
     }
 }
 
-/// One `exec` outcome, sieved and packaged through the product's door.
 pub(crate) fn package_exec(
     call: &ToolCall,
     outcome: &ToolOutcome,

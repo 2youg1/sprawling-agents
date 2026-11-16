@@ -3,31 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How a device is written down: the text of its id and key, and the
-//! word for its authority (Sprawling/remote_access/Spec.lean §8-11).
-//!
-//! The device table and the ledger lines both read these spellings, so
-//! they live beside the types they spell rather than in either reader.
-//! The ids and keys take the base32 the pairing code and the city's
-//! fingerprint already use, one alphabet for every byte string a person
-//! may meet.
-
 use kernel::{AxCode, AxError};
 
 use super::{Authority, DeviceId, DeviceKey};
 use crate::pairing::{decode, encode};
 
 impl DeviceId {
-    /// The id as 26 base32 symbols, lowercase.
+
     #[must_use]
     pub fn text(&self) -> String {
         encode(&self.0)
     }
 
-    /// Reads [`Self::text`] back.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` when the text is not the spelling of 16 bytes.
     pub fn read(text: &str) -> Result<Self, AxError> {
         decode(text.trim())
             .filter(|bytes| encode(bytes) == text.trim())
@@ -38,16 +25,12 @@ impl DeviceId {
 }
 
 impl DeviceKey {
-    /// The key's bytes in base32.
+
     #[must_use]
     pub fn text(&self) -> String {
         encode(&self.0)
     }
 
-    /// Reads [`Self::text`] back.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` when the text is not base32.
     pub fn read(text: &str) -> Result<Self, AxError> {
         decode(text.trim())
             .map(Self)
@@ -56,7 +39,7 @@ impl DeviceKey {
 }
 
 impl Authority {
-    /// `watch` or `act`.
+
     #[must_use]
     pub fn word(self) -> &'static str {
         match self {
@@ -65,10 +48,6 @@ impl Authority {
         }
     }
 
-    /// Reads [`Self::word`] back.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` for any other word.
     pub fn from_word(word: &str) -> Result<Self, AxError> {
         [Self::Watch, Self::Act]
             .into_iter()

@@ -3,24 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Scheduled task presence, enabled state and definition digest, and
-//! enabling or disabling one task (`Sprawling/app/spec/Privacy/Windows.lean`).
-//!
-//! The `ScheduledTasks` module has no safe Rust binding, so Windows
-//! PowerShell under the protected installation path asks it. A task is
-//! named by the control table alone and reaches the script through two
-//! environment variables, never through the script text, so a task name
-//! with spaces or quotes needs no quoting rule. This adapter never
-//! registers, deletes or edits a task: it only flips the enabled flag.
-
 use serde::Deserialize;
 
 use super::super::target::TaskState;
 
-/// Reads the task `name` in folder `path`: absent, or its enabled state
-/// and the SHA-256 of its exported definition with the settings'
-/// `Enabled` element removed, so disabling a task leaves the digest as it
-/// was and any other edit changes it. One JSON line answers.
 const READ: &str = r"
 $ErrorActionPreference='Stop'
 [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
@@ -41,7 +27,6 @@ $state = if ($task.Settings.Enabled) { 'enabled' } else { 'disabled' }
 [ordered]@{ state = $state; definition_sha256 = [BitConverter]::ToString($digest).Replace('-', '').ToLowerInvariant() } | ConvertTo-Json -Compress
 ";
 
-/// Enables or disables the task named as [`READ`] names it.
 const SWITCH: &str = r"
 $ErrorActionPreference='Stop'
 $path = $env:SPRAWLING_TASK_PATH; $name = $env:SPRAWLING_TASK_NAME
@@ -52,39 +37,26 @@ if ($env:SPRAWLING_TASK_SWITCH -eq 'enable') {
 } else { exit 4 }
 ";
 
-/// Which way a write flips a task.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::privacy) enum Switch {
     Enable,
     Disable,
 }
 
-/// Why a task could not be read or switched.
 #[derive(Debug)]
 pub(in crate::privacy) enum TaskFault {
-    /// Windows PowerShell could not be named or started, or did not
-    /// answer in its counted wait.
+
     Unavailable(kernel::AxError),
-    /// The script ran and exited with this code: the task exists but
-    /// could not be queried or switched, access denied among the causes.
+
     Refused(Option<i32>),
-    /// The script answered with a line that is not one task state.
+
     Malformed,
 }
 
-/// Reads the task `name` in folder `path`.
-///
-/// # Errors
-/// [`TaskFault`]; a fault is never read as an absent task.
 pub(in crate::privacy) fn read(path: &str, name: &str) -> Result<TaskState, TaskFault> {
     decoded(&asked(READ, path, name, None)?)
 }
 
-/// Flips the task `name` in folder `path` to `switch`. Machine scope: the
-/// elevated child is the caller.
-///
-/// # Errors
-/// [`TaskFault`]; whether the flag moved is told by the readback.
 pub(in crate::privacy) fn write(path: &str, name: &str, switch: Switch) -> Result<(), TaskFault> {
     let word = match switch {
         Switch::Enable => "enable",
@@ -93,7 +65,6 @@ pub(in crate::privacy) fn write(path: &str, name: &str, switch: Switch) -> Resul
     asked(SWITCH, path, name, Some(word)).map(drop)
 }
 
-/// The one answer line `script` printed, after a clean exit.
 fn asked(script: &str, path: &str, name: &str, switch: Option<&str>) -> Result<String, TaskFault> {
     use crate::doctor::asking::{self, Ended};
 
@@ -131,7 +102,6 @@ fn asked(script: &str, path: &str, name: &str, switch: Option<&str>) -> Result<S
     }
 }
 
-/// The script's answer: a closed set of states, unknown fields refused.
 #[derive(Deserialize)]
 #[serde(tag = "state", rename_all = "snake_case", deny_unknown_fields)]
 enum Answer {
@@ -140,7 +110,6 @@ enum Answer {
     Disabled { definition_sha256: String },
 }
 
-/// Decodes one answer line.
 fn decoded(line: &str) -> Result<TaskState, TaskFault> {
     match serde_json::from_str::<Answer>(line).map_err(|_| TaskFault::Malformed)? {
         Answer::Absent {} => Ok(TaskState::Absent),
@@ -153,8 +122,6 @@ fn decoded(line: &str) -> Result<TaskState, TaskFault> {
     }
 }
 
-/// A SHA-256 written as 64 lowercase hex digits, the one spelling the
-/// script prints.
 fn digest(hex: &str) -> Result<[u8; 32], TaskFault> {
     let bytes = super::bytes_of_hex(hex).ok_or(TaskFault::Malformed)?;
     <[u8; 32]>::try_from(bytes).map_err(|_| TaskFault::Malformed)
@@ -201,9 +168,6 @@ mod tests {
         }
     }
 
-    /// An answer this adapter does not know is refused rather than read
-    /// as some state: an unknown field, an unknown state, a missing or
-    /// malformed digest, a digest on an absent task, or no answer at all.
     #[test]
     fn an_answer_outside_the_closed_set_is_refused() {
         for line in [
@@ -229,8 +193,6 @@ mod tests {
         assert!(!super::super::parses("if ("));
     }
 
-    /// Read only, through the production path: a task folder that cannot
-    /// exist reads as absent, not as a fault.
     #[test]
     fn a_task_that_does_not_exist_reads_as_absent() {
         assert!(read(r"\sprawling-absent\", "probe").unwrap() == TaskState::Absent);

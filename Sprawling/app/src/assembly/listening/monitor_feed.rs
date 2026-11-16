@@ -3,22 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The monitor a served city offers its sessions, and the thread that
-//! samples it (`Sprawling/app/spec/Monitor.lean` §8-94, §8-96), apart from the listening
-//! it is handed to.
-
 use kernel::AxError;
 use std::sync::Arc;
 
 use crate::monitor::sampler::Gauges;
 
-/// The monitor a session watches over the socket, and the thread that
-/// samples it once a second (`Sprawling/app/spec/Monitor.lean` §8-94, §8-96). Whether
-/// anybody watches is the monitor's count; a session holds its
-/// [`crate::monitor::Watch`] for as long as it watches.
-///
-/// # Errors
-/// `StorageFatal` when the sampler's thread cannot be started.
 pub(super) fn watched(
     city_root: &std::path::Path,
     gauges: Gauges<impl Fn() -> u64 + Send + 'static>,
@@ -34,8 +23,7 @@ pub(super) fn watched(
     Ok(wire::MonitorFeed {
         beat: Arc::new(move |chosen| beat.set(chosen)),
         watch: Arc::new(move |watched| -> Box<dyn Send> {
-            // The count is an atomic, so a poisoned lock guards no
-            // half-written state and the watcher still counts.
+
             let held = monitor
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);

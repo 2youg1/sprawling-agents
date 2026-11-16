@@ -3,54 +3,39 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Whether a served city that just ended is left down, raised again, or
-//! handed to the person (`Sprawling/app/spec/Supervising.lean` §8-109; the budget's
-//! properties are proved in `Sprawling/app/spec/Supervising.lean`).
-//!
-//! The decision alone: no process, no clock. `children` runs the
-//! processes, samples the time and reads a child's exit code as served
-//! or failed; who closed the city and how is written in the child's own
-//! handoff, which this module never needs to read.
-
 mod children;
 
 pub use children::{Child, Console, Ended, Window, supervise};
 
 use kernel::{AxError, TimeMs};
 
-/// How long a crash counts against the budget.
 pub(crate) const CRASH_WINDOW_MS: u64 = 60_000;
-/// How many crashes inside the window make the city degraded.
+
 pub(crate) const CRASH_LIMIT: usize = 3;
 
-/// The crashes still inside the window, oldest first; never more than
-/// `CRASH_LIMIT`, because the one that reaches it ends the budget.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CrashBudget {
     crashes: Vec<TimeMs>,
 }
 
-/// What the supervisor does after a served city ended.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Next {
-    /// The person closed the city; supervising ends with it.
+
     Stop,
-    /// A crash inside the budget: resume, then serve again.
+
     Restart(CrashBudget),
-    /// The budget is spent: nothing restarts until the person lifts it.
+
     Degraded { crashes: usize, cause: String },
 }
 
 impl CrashBudget {
-    /// A budget with no crash counted, which is also what lifting a
-    /// degraded city starts from.
+
     pub(crate) fn fresh() -> Self {
         Self {
             crashes: Vec::with_capacity(CRASH_LIMIT),
         }
     }
 
-    /// Spends this budget on one ending observed at `at`.
     pub(crate) fn after(mut self, served: &Result<(), AxError>, at: TimeMs) -> Next {
         match served {
             Ok(()) => Next::Stop,
@@ -91,7 +76,6 @@ mod tests {
         .with_recovery("start it again"))
     }
 
-    /// Feeds crashes at the given seconds and returns every verdict.
     fn verdicts(seconds: &[u64]) -> Vec<Next> {
         let mut budget = CrashBudget::fresh();
         let mut seen = Vec::new();

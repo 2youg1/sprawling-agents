@@ -18,8 +18,6 @@ const PLAN: &str = "\
 | 1 | wire the kiln | 1 |  | Not started |  |
 ";
 
-/// The authority both runs ask, standing in for the accounting thread:
-/// one set of booked nodes, the first asker wins.
 fn book(booked: &Arc<Mutex<BTreeSet<NodeId>>>) -> Booking {
     let booked = Arc::clone(booked);
     Booking::new(move |claim| {
@@ -58,11 +56,6 @@ fn claim_one() -> ToolCall {
     }
 }
 
-/// **P0-6.** Two runs dispatched beside each other read one plan, and
-/// each desk's own copy says node 1 is ready. The second claim is refused
-/// when the model makes it, so the second run holds nothing, queues no
-/// effect and leaves the file alone, instead of doing the work and
-/// finding out at landing.
 #[test]
 fn a_node_two_runs_read_as_ready_is_taken_by_the_first_to_ask() {
     let booked = Arc::new(Mutex::new(BTreeSet::new()));

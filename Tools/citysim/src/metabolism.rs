@@ -3,47 +3,19 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Clearing out.
-//!
-//! Accumulation without metabolism is debt: every settled asset costs
-//! resident bytes in the prompts that disclose it, disk in every export,
-//! and attention in every list it appears in. So the city has a cycle
-//! that says what stops being carried.
-//!
-//! Two rules keep this from being destructive. **Nothing is deleted** —
-//! the strongest verdict is `Retire`, which stops an asset being
-//! disclosed and leaves it exactly where it is; the Discard register is
-//! the only thing that removes anything, and it is reversible by
-//! construction. And **the reason travels with the verdict**, because a
-//! list of things that vanished with no explanation teaches people to
-//! stop trusting the cycle that vanished them.
-//!
-//! Specified by `Tools/citysim/spec/Metabolism.lean` §8-8-2.
-
 use crate::score::{AssetUse, Score};
 
-/// How long an asset may sit unused before the cycle notices it. Stated
-/// here rather than taken from a caller, so two cities run the same
-/// cycle. The kernel's idle window for policies went with the policy
-/// classes (the removals listed in `Sprawling/kernel/spec/Gate.lean`), so this
-/// is the only idle window the cycle reads.
 pub const ASSET_IDLE_DAYS: u32 = 90;
 
-/// The score below which an asset is not paying for the room it takes.
-/// One use per thousand resident bytes over the period.
 pub const ASSET_FLOOR_PER_MILLE: u32 = 1_000;
 
-/// What the cycle decided about one asset.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Disposal {
-    /// It is carrying its weight; nothing happens.
+
     Keep,
-    /// Nobody has used it for a season. It stays disclosed for one more
-    /// cycle and is named in the report, which is how a person gets the
-    /// chance to say it matters before it stops being offered.
+
     Warn { because: String },
-    /// It stops being disclosed. The bytes stay on disk and in history;
-    /// what ends is its place in every prompt.
+
     Retire { because: String },
 }
 
@@ -57,12 +29,6 @@ impl Disposal {
     }
 }
 
-/// One asset, one verdict.
-///
-/// The order is the point. Idleness is read before value, because an
-/// asset nobody has touched for a season is a fact that needs no
-/// arithmetic; and a warning always precedes a retirement, so nothing
-/// stops being offered in the same cycle that first noticed it.
 #[must_use]
 pub fn dispose(usage: &AssetUse, score: Score, warned_already: bool) -> Disposal {
     let idle = usage.idle_days >= ASSET_IDLE_DAYS;
@@ -90,11 +56,6 @@ pub fn dispose(usage: &AssetUse, score: Score, warned_already: bool) -> Disposal
     }
 }
 
-/// One pass of the cycle over a register.
-///
-/// Returns the verdicts in the caller's order, so a report reads the way
-/// the register does. Nothing here writes anything: the cycle decides,
-/// and `kernel::registry` is the only place an asset's standing changes.
 #[must_use]
 pub fn sweep<T: Clone>(assets: &[(T, AssetUse, Score, bool)]) -> Vec<(T, Disposal)> {
     assets

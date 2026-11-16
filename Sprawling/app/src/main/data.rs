@@ -3,27 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The subcommands that move a city's data rather than stand a city up:
-//! `enrol`, `install`, `export`, `restore`, `fork`, `adopt`,
-//! `replay` and `status`.
-//!
-//! Each function here owns only the part a person sees — the usage
-//! line, the sentence printed about what happened, and the exit code —
-//! while the work itself stays in `storage`, `assembly`, `install` and
-//! `wire_client`. That is why every one of them takes the arguments
-//! `router` already read and returns an `ExitCode` instead of a value:
-//! for an agent driving this binary, the exit code is the result.
-//!
-//! Exit codes are the vocabulary `exit::Exit` defines. A refusal
-//! carrying an `AxError` is printed by `bin::main::city::report`, so its failure
-//! line and its recovery line have one spelling across the whole binary.
-//!
-//! The point a reader most often gets wrong: `fork`, `adopt`, `replay`
-//! and `export` read the city directory directly and never speak to a
-//! serving process, while `enrol` (like `calling::call`) speaks only over
-//! the wire and never touches the directory — the two routes to the same
-//! city share nothing.
-
 use super::city::report;
 use super::grammar::Arguments;
 use super::router::{client_summary, log_floor, log_levels};
@@ -33,10 +12,6 @@ use kernel::consts_policy::DEFAULT_AT;
 use sprawling::{assembly, serving};
 use std::process::ExitCode;
 
-/// Hands a credential to a city on this machine, reading it from stdin.
-///
-/// Never from `argv`: a key on a command line is in the process table,
-/// in shell history, and in the log of whatever started this process.
 pub(super) fn enrol(read: &Arguments) -> ExitCode {
     let Some(reference) = read.positional(1) else {
         return ExitCode::from(2);
@@ -64,8 +39,7 @@ pub(super) fn enrol(read: &Arguments) -> ExitCode {
     match wire_client::enrol(at, realm, name, &value) {
         Ok(reference) => {
             println!("{reference}");
-            // Accepted, not yet stored: the route answers before the
-            // worker has taken it (`Sprawling/wire/Spec.lean` §8).
+
             eprintln!("accepted; the city stores it as soon as its worker is free");
             ExitCode::SUCCESS
         }
@@ -73,9 +47,6 @@ pub(super) fn enrol(read: &Arguments) -> ExitCode {
     }
 }
 
-/// Makes `sprawling` a word this machine's shells resolve, or unmakes
-/// it. Nothing here needs administrator rights, because nothing outside
-/// the person's own profile is touched.
 pub(super) fn install(args: &[String]) -> ExitCode {
     let direction = if args.iter().any(|a| a == "--uninstall") {
         install::Direction::Uninstall
@@ -111,8 +82,6 @@ pub(super) fn install(args: &[String]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// Writes a bundle: the history, the objects it points at, and the work.
-/// Credentials are not in it, because they are not in the city.
 pub(super) fn export(city: Option<&String>, dest: Option<&String>) -> ExitCode {
     let (Some(city), Some(dest)) = (city, dest) else {
         eprintln!("usage: sprawling export <city-dir> <bundle-dir>");
@@ -133,9 +102,6 @@ pub(super) fn export(city: Option<&String>, dest: Option<&String>) -> ExitCode {
     }
 }
 
-/// Reads a bundle back into an empty directory. The chain is walked and
-/// compared against the manifest before this reports success, so a short
-/// copy is refused here rather than discovered later.
 pub(super) fn restore(bundle: Option<&String>, city: Option<&String>) -> ExitCode {
     let (Some(bundle), Some(city)) = (bundle, city) else {
         eprintln!("usage: sprawling restore <bundle-dir> <city-dir>");
@@ -153,8 +119,7 @@ pub(super) fn restore(bundle: Option<&String>, city: Option<&String>) -> ExitCod
         Err(err) => report(err.into_ax()),
     }
 }
-/// Records a fork: a new run identity branched from an event node. The
-/// lineage is the record; dispatching into it is the person's next move.
+
 pub(super) fn fork(args: &[String]) -> ExitCode {
     let (Some(dir), Some(run_raw), Some(seq_raw)) = (args.get(1), args.get(2), args.get(3)) else {
         eprintln!("usage: sprawling fork <city-dir> <run-id> <at-seq> [addr]");
@@ -174,8 +139,7 @@ pub(super) fn fork(args: &[String]) -> ExitCode {
         Some(Err(err)) => return report(err),
     };
     let (vault, _notice) = serving::open_vault();
-    // Which room the branch lands in: the address the person named, or
-    // the one the mother ran in.
+
     let Some(room) = addr else {
         eprintln!("usage: sprawling fork <city-dir> <run> <seq> <addr>");
         eprintln!("a branch opens a session in a room; name the room it opens in");
@@ -208,8 +172,6 @@ pub(super) fn fork(args: &[String]) -> ExitCode {
     }
 }
 
-/// Adopts an existing directory under the city as a building: RULES.toml
-/// and the missing spine files are laid, nothing found is overwritten.
 pub(super) fn adopt(dir: Option<&String>, addr: Option<&String>) -> ExitCode {
     let (Some(dir), Some(addr_raw)) = (dir, addr) else {
         eprintln!("usage: sprawling adopt <city-dir> <addr>");
@@ -240,7 +202,6 @@ pub(super) fn adopt(dir: Option<&String>, addr: Option<&String>) -> ExitCode {
     }
 }
 
-/// Offline chain verification (A2); strictly read-only.
 pub(super) fn replay(dir: Option<&String>) -> ExitCode {
     let Some(dir) = dir else {
         eprintln!("usage: sprawling replay <ledger-dir>");
@@ -259,18 +220,6 @@ pub(super) fn replay(dir: Option<&String>) -> ExitCode {
     }
 }
 
-/// The line `replay` prints when the chain holds.
-///
-/// The path came from a person, so "there is no ledger here" is a thing
-/// that happens, and it must not read as "the chain verified": a scripted
-/// integrity check would otherwise score a mistyped argument as a pass.
-/// An empty ledger is a different fact and still verifies, which is why
-/// the question asked is whether a segment exists rather than whether a
-/// line does (`Sprawling/app/Spec.lean` section 12).
-///
-/// # Errors
-/// `E_PATH_NOT_FOUND` when the directory holds no ledger segment, and
-/// whatever chain verification says about a ledger that is there.
 pub(super) fn verified_chain(dir: &std::path::Path) -> Result<String, kernel::AxError> {
     let segments = storage::ledger_segments_at(dir).map_err(storage::StorageError::into_ax)?;
     if segments.is_empty() {
@@ -284,8 +233,7 @@ pub(super) fn verified_chain(dir: &std::path::Path) -> Result<String, kernel::Ax
              rather than at the city that contains it",
         ));
     }
-    // Seqs run from 0 without a gap on a whole chain, so the tail seq is
-    // the line count less one.
+
     match storage::audit_chain(dir).map_err(storage::StorageError::into_ax)? {
         storage::ChainAudit::Whole { lines } => Ok(format!(
             "chain verified: {lines} line(s), tail seq {}",

@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The `[search]` table read, resolved, refused and written back
-//! (`Sprawling/city/spec/ConfigLayers.lean` §8-4c and its model
-//! `City.ConfigLayers.Search`).
-
 use super::*;
 use kernel::{AxCode, SecretRef};
 
@@ -22,7 +18,6 @@ fn id(raw: &str) -> ServerLabel {
     ServerLabel::parse(raw).unwrap()
 }
 
-/// A keyed supplier the settings page could have written.
 fn keyed(name: &str) -> SearchSupplier {
     SearchSupplier {
         id: id(name),
@@ -53,17 +48,12 @@ fn custom(selected: &str, suppliers: Vec<SearchSupplier>) -> SearchConfiguration
     }
 }
 
-/// Writes `text` as the file of `layer` for `addr`, the way a person
-/// edits one by hand.
 fn handwrite(root: &Path, addr: &Address, layer: Layer, text: &str) {
     let file = super::super::path(root, addr, layer).unwrap();
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
     std::fs::write(file, text).unwrap();
 }
 
-/// A city whose files were written before `[search]` existed still
-/// reads, and a ladder that says nothing about search resolves to the
-/// default supplier, the one `default_search_supplier` declares.
 #[test]
 fn an_old_config_without_search_reads_and_resolves_to_the_default_supplier() {
     let dir = tempfile::tempdir().unwrap();
@@ -89,11 +79,6 @@ fn an_old_config_without_search_reads_and_resolves_to_the_default_supplier() {
     assert_eq!(reached.remote, "web_search_exa");
 }
 
-/// `City.ConfigLayers.Search`, checked over every list of distinct ids
-/// drawn from three names and every selection from four: `Custom`
-/// reaches a supplier exactly when its selection is listed, that
-/// supplier is the one named, and an unlisted selection is refused
-/// rather than answered with the default or another listed supplier.
 #[test]
 fn a_custom_search_reaches_exactly_its_selection_and_never_falls_back() {
     let names = ["alpha", "beta", "gamma"];
@@ -131,9 +116,6 @@ fn a_custom_search_reaches_exactly_its_selection_and_never_falls_back() {
     assert_eq!(search_supplier(&SearchConfiguration::Off).unwrap(), None);
 }
 
-/// What the settings page writes is what the city's rung reads back,
-/// for each of the three arms, and a key a person wrote by hand in the
-/// same file survives the write.
 #[test]
 fn a_written_search_choice_is_read_back_from_the_city_rung() {
     let dir = tempfile::tempdir().unwrap();
@@ -162,9 +144,6 @@ fn a_written_search_choice_is_read_back_from_the_city_rung() {
     assert!(text.contains("stamp"), "{text}");
 }
 
-/// A building's `[search]` replaces the city's whole value and says it
-/// came from the building; a room's is refused on the ladder with the
-/// file named and the building or city named as where it belongs.
 #[test]
 fn a_building_search_overrides_the_city_and_a_room_search_is_refused() {
     let dir = tempfile::tempdir().unwrap();
@@ -204,8 +183,6 @@ fn a_building_search_overrides_the_city_and_a_room_search_is_refused() {
     );
 }
 
-/// Every value the reader refuses is refused by the write face before a
-/// byte is written, so the city's file keeps the bytes it had.
 #[test]
 fn a_search_value_the_reader_refuses_is_not_written() {
     let dir = tempfile::tempdir().unwrap();
@@ -247,11 +224,6 @@ fn a_search_value_the_reader_refuses_is_not_written() {
     }
 }
 
-/// The reader refuses what the file syntax alone can get wrong: a key
-/// written as plaintext where a vault reference belongs, `selected` or
-/// `suppliers` beside an arm that takes neither, a `custom` choice that
-/// selects nothing, a spelling outside the three, and a key it does not
-/// read.
 #[test]
 fn a_handwritten_search_table_is_refused_where_it_is_read() {
     let supplier = "[[search.suppliers]]\nid = \"alpha\"\nurl = \"https://alpha.example/mcp\"\n\

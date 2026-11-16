@@ -3,26 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A model's reply, sent back by the page that holds its text, laid out
-//! by the grammar a preview is (`Sprawling/accounting/spec/Views/Document.lean` §8-29, `Sprawling/wire/Spec.lean`
-//! §8-75).
-//!
-//! Reads nothing of the city: the answer depends on the text in the
-//! question alone. Every judgement - where a streaming reply's closure
-//! point is, where a window ends, what the blocks are - is
-//! `documents::reply`'s.
-
 use documents::ReplyState;
 
 use super::super::prepared::unavailable;
 
-/// The blocks of `text` that can no longer change, or `Unavailable`
-/// when the text is not one the grammar reads (it holds a NUL).
 pub(in crate::views) fn reply_answer(text: &str, state: ReplyState) -> wire::Answer {
     match documents::reply(text, state) {
         Ok(laid) => wire::Answer::Reply(Box::new(laid)),
-        // The page draws text the grammar does not read as it arrived,
-        // which is what it does with the open tail anyway.
+
         Err(_) => unavailable("Reply".to_owned()),
     }
 }
@@ -44,8 +32,6 @@ mod tests {
 
     use crate::views::Views;
 
-    /// A reply carrying a heading, a list, a table, a fenced block and a
-    /// footnote.
     const SAID: &str = "# Plan\n\nTwo steps, **in order**:\n\n- read `lib.rs`\n- write the test\n\n| step | cost |\n|---|---|\n| read | 1 |\n\n```rust\nlet a = 1;\n```\n\nDone.[^1]\n\n[^1]: Checked by hand.\n";
 
     fn kept(dir: &Path, bytes: &[u8]) -> B3Hash {
@@ -62,9 +48,6 @@ mod tests {
         })
     }
 
-    /// The finish line of U9's Rust half: one reply's text, read through
-    /// the conversation's door and through the document preview's, is one
-    /// tree.
     #[test]
     fn a_settled_reply_reads_as_the_preview_of_the_same_bytes() {
         let dir = tempfile::tempdir().unwrap();
@@ -87,9 +70,6 @@ mod tests {
         );
     }
 
-    /// A reply cut inside its second paragraph answers the heading and
-    /// the paragraph a blank line closed, and stops where the open one
-    /// begins.
     #[test]
     fn a_streaming_reply_answers_only_its_closed_blocks() {
         let dir = tempfile::tempdir().unwrap();

@@ -3,42 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The read tool: one argument that is either a path this city lets a
-//! model choose, or a name its reading room already admitted.
-//!
-//! **Two ways in, and the difference is who chose.** A path is chosen by
-//! the model, so it is judged: it must parse as an address, it must not
-//! reach a reserved subtree — the accounting, the configuration, the
-//! rules and the history stay unreadable to the thing they govern — and
-//! the read bound must let this run's building read it. A
-//! catalog name was chosen by the person who wrote the building's
-//! reading room, and admission happened when they wrote it; the skill it
-//! resolves to may therefore sit in reserved space, because the answer to
-//! "may this run see it" was given before the run existed.
-//!
-//! Without this tool the catalog could name a skill and never hand it
-//! over, and every file the prompt asks an agent to consult had to be
-//! reached by writing Python inside `exec` — which a city with no
-//! sandbox and no shell cannot do at all.
-//!
-//! A text answer is an interval and says what it is part of; a PNG,
-//! JPEG, WebP or GIF answer carries the picture as an attachment instead
-//! of trying to decode its bytes as UTF-8.
-//!
-//! **A text answer is an interval, and it says what it is part of.** Whole-
-//! file reading made every long document an all-or-nothing call: the
-//! kernel's own SPEC is fourteen hundred lines, and a read of it either
-//! spent the window or was cut somewhere by the pipeline — usually
-//! through the passage the caller wanted. So a call takes `offset` and
-//! `limit`, at most 512 lines, and a truncated answer carries the total
-//! and the offset to continue from, which is the number `search`
-//! reports for a hit.
-//!
-//! The arguments are Claude Code's `Read`'s, by name and by value: a
-//! `file_path`, and an `offset` that is the 1-based number of the first
-//! line (`Sprawling/runtime/spec/Tools.lean` §8-14-1, D119). The answer
-//! keeps 0-based indexes, which the renderer draws as line numbers.
-
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
@@ -60,13 +24,8 @@ use super::shown::{Claim, Observation, ReadShown, Span};
 use super::stamp::ReadStamps;
 use crate::catalog::{Catalog, Expansion};
 
-/// The clock used only to decide whether a stamp needs a content
-/// comparison. Tests inject a counted clock; production reads UTC.
 pub type ReadClock = Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>;
 
-/// One nested convention a read may carry. `dropped` is the number of
-/// source bytes already known to be omitted from `text`; accounting
-/// removes it from the final payload after it applies the shared budget.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuleCandidate {
     pub room: Address,
@@ -75,8 +34,7 @@ pub struct RuleCandidate {
 }
 
 impl RuleCandidate {
-    /// The final delivery's JSON shape. `dropped` is internal budgeting
-    /// evidence; its user-visible consequence is already in `text`.
+
     #[must_use]
     pub fn into_json(self) -> Value {
         let mut rule = Map::new();
@@ -88,8 +46,6 @@ impl RuleCandidate {
         Value::Object(rule)
     }
 
-    /// Reads a candidate produced by `into_json`; malformed input is not
-    /// a candidate and never becomes delivery evidence.
     #[must_use]
     pub fn from_json(value: &Value) -> Option<RuleCandidate> {
         let room = value.get("room")?.as_str()?;
@@ -107,8 +63,6 @@ impl RuleCandidate {
     }
 }
 
-/// The ordinary-path facts accounting needs to discover nested rules.
-/// This context is removed before the answer enters the ledger.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RuleContext {
     pub admitted: Address,
@@ -129,7 +83,6 @@ impl RuleContext {
         Value::Object(context)
     }
 
-    /// Reads the internal context; malformed input offers no candidates.
     #[must_use]
     pub fn from_json(value: &Value) -> Option<RuleContext> {
         let admitted = value.get("admitted")?.as_str()?;
@@ -141,65 +94,39 @@ impl RuleContext {
     }
 }
 
-/// A stateless source of candidates. `skip` is the ordered settlement's
-/// confirmed and pending rooms; discovery skips their files before it
-/// spends any read or retained-text budget. The last argument polls cancellation;
-/// cancelled scans produce no candidates. The closure marks nothing.
 pub type RuleCandidates = Arc<
     dyn Fn(&Address, &Address, &BTreeSet<Address>, &mut dyn FnMut() -> bool) -> Vec<RuleCandidate>
         + Send
         + Sync,
 >;
 
-/// The most lines one call may bring back, and the default: a default
-/// below the cap would hide the cap from every caller that never sets
-/// `limit`. A `u16`, so widening it to `usize` cannot fail.
 const LINE_CAP: u16 = 512;
 
-/// Where the answer to one call comes from.
 enum Found {
-    /// An admitted address the model chose, read by `engine`.
+
     Chosen(kernel::Address),
-    /// Text an admitted catalog entry or CAS object supplied.
+
     Text(String),
-    /// A picture whose bytes the same admission already released.
+
     Picture { picture: ImageRef, bytes: Vec<u8> },
 }
 
-/// The interval of one answer: where it starts and how much of it there
-/// is at most. `offset` is the 0-based index of the line the caller
-/// numbered, kept as the caller's width until it meets the text it
-/// counts the lines of.
 struct Interval {
     offset: u64,
     limit: u16,
 }
 
-/// What one interval took out of a document, and what the taking left.
-///
-/// `total_lines` and `next_offset` are present only when they say
-/// something: a whole small file needs neither, and an offset past the
-/// end gets the total without a `next_offset`, because handing one back
-/// would invite a call that reads the same nothing again.
 struct Taken {
     text: String,
     total_lines: Option<usize>,
     next_offset: Option<usize>,
-    /// Actual lines delivered, and the exact total even when the public
-    /// `total_lines` field is omitted because the answer reached EOF.
+
     lines: usize,
     total: usize,
 }
 
 impl Interval {
-    /// The caller's `offset` is a line number counted from 1; 0 reads as
-    /// the first line too, since it can mean nothing else.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` when `offset` or `limit` is not a whole number,
-    /// or when `limit` is zero. A `limit` above the cap is served at the
-    /// cap rather than refused: the answer carries the truth about what
-    /// it left behind, so a refusal would only cost the caller a turn.
+
     fn asked_for(call: &ToolCall) -> Result<Interval, AxError> {
         let args = call.args.as_map();
         let whole = |field: &'static str| -> Result<Option<u64>, AxError> {
@@ -219,8 +146,7 @@ impl Interval {
             }
         };
         let offset = whole("offset")?.map_or(0, |line| line.saturating_sub(1));
-        // Above the cap is served at the cap, and a number no `u16`
-        // holds is above it.
+
         let limit = whole("limit")?.map_or(LINE_CAP, |asked| {
             u16::try_from(asked).map_or(LINE_CAP, |fits| fits.min(LINE_CAP))
         });
@@ -235,24 +161,9 @@ impl Interval {
         Ok(Interval { offset, limit })
     }
 
-    /// Cuts on line ends rather than on lines: every line travels with
-    /// its own terminator, so reading a whole short file returns the
-    /// bytes the file holds and `bytes` keeps the meaning it had.
-    ///
-    /// **Two ceilings, and the tighter one decides.** 512 lines bounds
-    /// how much structure an answer carries;
-    /// [`INTERVAL_CAP_BYTES`](kernel::consts_policy::INTERVAL_CAP_BYTES)
-    /// bounds how much of the window it spends, because a line is about
-    /// forty bytes in ordinary source and a whole minified bundle in a
-    /// generated one. The byte ceiling is applied here rather than
-    /// downstream for one reason: `next_offset` is how a caller
-    /// continues, so a cut made after this function had already reported
-    /// one would leave that number pointing past lines nobody delivered,
-    /// and the gap would be silent.
     fn cut(&self, text: &str) -> Taken {
         let mut lines = text.split_inclusive('\n');
-        // Where line `offset` starts. An offset no `usize` holds is past
-        // the end of every text this machine can hold.
+
         let start = usize::try_from(self.offset).ok();
         let mut from = 0usize;
         let mut skipped = 0usize;
@@ -285,9 +196,7 @@ impl Interval {
         while taken < usize::from(self.limit) {
             let Some(line) = lines.peek() else { break };
             let after = spent.saturating_add(line.len());
-            // The first line travels however long it is. A call that
-            // returned nothing would hand back the offset it was given,
-            // and the caller would ask the same question forever.
+
             if after > budget && taken > 0 {
                 break;
             }
@@ -319,24 +228,16 @@ impl Interval {
     }
 }
 
-/// What a read answers with, and what it refuses.
 pub struct ReadTool {
-    /// The same catalog the model was shown, shared: a copy would be a
-    /// second authority on what this run may open, and copies drift.
+
     catalog: Arc<Mutex<Catalog>>,
-    /// The tree this run reads in, what its building may read - asked
-    /// of every path the model chooses and of the building a Locator's
-    /// bytes belong to - and where this city keeps content blocks, which
-    /// a worktree does not hold. A Locator's bytes are read through it.
+
     reader: BoundReader,
-    /// Whose CAS origins pictures read by this run are stored for.
+
     picture_origin: Option<storage::BlockOrigin>,
-    /// The root `reader` reads under, its real location anchored once
-    /// (`Sprawling/runtime/spec/Tools/ChosenPath.lean` D112).
+
     city: CityRoot,
-    /// What this run has seen, written at every read of a file that
-    /// counts as a look and read by `edit` (`Sprawling/runtime/spec/Tools/Edit.lean`
-    /// §8-64).
+
     seen: ReadStamps,
     shown: ReadShown,
     clock: Option<ReadClock>,
@@ -345,22 +246,13 @@ pub struct ReadTool {
 }
 
 impl ReadTool {
-    /// The name this tool answers to, read by its registration and by
-    /// `mode::core_tools`.
+
     pub const NAME: &'static str = "read";
 
-    /// The argument that names what to read, spelled once for the
-    /// schema, the reading, the refusal and the ledger's readers.
     pub const FILE_PATH: &'static str = "file_path";
 
-    /// Internal ordinary-path context, removed by ordered accounting.
     pub const RULE_CONTEXT: &'static str = "rule_context";
 
-    /// The name, disclosure and schema `new` registers. The catalog page
-    /// reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
@@ -410,10 +302,6 @@ impl ReadTool {
         })
     }
 
-    /// # Errors
-    /// Propagates a malformed parameter schema, which is a build-time
-    /// defect rather than a runtime one, and `E_STORAGE_FATAL` when the
-    /// city root's real location does not resolve.
     pub fn new(
         city_root: &Path,
         catalog: Arc<Mutex<Catalog>>,
@@ -443,11 +331,6 @@ impl ReadTool {
         })
     }
 
-    /// Where one argument points, or why it points nowhere.
-    ///
-    /// Catalog entries are tried first: a building that admits a skill
-    /// called `review` has said what that word means here, and a file
-    /// that happens to share the name must not be able to shadow it.
     fn resolve(&self, asked: &str) -> Result<Found, AxError> {
         if let Some(read) = locator::open_locator(asked, &self.reader, "read") {
             let (_, bytes) = read?;
@@ -475,9 +358,7 @@ impl ReadTool {
                 Expansion::Skill { manifest } => {
                     package::open_document(&self.reader.block_store, &manifest, asked)
                 }
-                // The catalog's own second level. The prompt carries one
-                // line per entry, and this is what that line stood for,
-                // so it is handed over rather than refused.
+
                 Expansion::Said { text } => Ok(Found::Text(text)),
             };
         }
@@ -485,31 +366,22 @@ impl ReadTool {
             return inside;
         }
         drop(catalog);
-        // The judgement every model-chosen path gets, in the one place
-        // it is written. `search` asks the same function the same
-        // question, so what is reserved and what is closed have one
-        // answer each.
+
         let spelled = super::chosen_path::within_city(self.city.written(), asked, "read")?;
         let addr = super::chosen_path::admit(&spelled, "read", &*self.reader.bound)?;
         Ok(Found::Chosen(addr))
     }
 
-    /// This tool, writing what it reads into `seen`: the run's table,
-    /// shared with its `edit`. A tool never given one writes into a
-    /// table of its own that no edit reads.
     #[must_use]
     pub fn noting(self, seen: ReadStamps) -> ReadTool {
         ReadTool { seen, ..self }
     }
 
-    /// Shares this run's confirmed window evidence. A new run starts
-    /// empty; this is deliberately not inherited like rule delivery.
     #[must_use]
     pub fn recalling(self, shown: ReadShown) -> ReadTool {
         ReadTool { shown, ..self }
     }
 
-    /// Supplies the clock for the racy-stamp content comparison.
     #[must_use]
     pub fn clocking(self, clock: ReadClock) -> ReadTool {
         ReadTool {
@@ -518,8 +390,6 @@ impl ReadTool {
         }
     }
 
-    /// Supplies the run and building whose CAS origins pictures are put
-    /// for. Text-only callers need no origin and keep the old behavior.
     #[must_use]
     pub fn storing_pictures(self, origin: storage::BlockOrigin) -> ReadTool {
         ReadTool {
@@ -528,9 +398,6 @@ impl ReadTool {
         }
     }
 
-    /// Enables nested-rule context on a successful ordinary read. The
-    /// closure itself runs in accounting's ordered settlement, never in
-    /// this concurrent invocation; no delivery is marked here.
     #[must_use]
     pub fn ruling(self, candidates: RuleCandidates) -> ReadTool {
         ReadTool {
@@ -539,13 +406,6 @@ impl ReadTool {
         }
     }
 
-    /// Reads a path whose extension names an image, returning `None`
-    /// when its bytes are not a picture the canonical conversation
-    /// carries so the ordinary text path can answer instead.
-    ///
-    /// # Errors
-    /// The read bound's refusal, `E_STORAGE_FATAL` for a file that will
-    /// not read, and the picture recognition or size refusal.
     fn picture_at(&self, asked: &str) -> Result<Option<(ImageRef, Vec<u8>)>, AxError> {
         let mut opened = self.reader.open(asked, Self::NAME)?;
         let bytes = kernel::consts_policy::IMAGE_MAX_BYTES
@@ -558,12 +418,6 @@ impl ReadTool {
         Ok(picture.map(|picture| (picture, bytes)))
     }
 
-    /// Stores an admitted picture for this run and returns both its
-    /// locator-shaped result and the attachment the model actually sees.
-    ///
-    /// # Errors
-    /// `E_CONFIG_INVALID` when no run origin was supplied, a content
-    /// store failure, or a result payload that cannot be encoded.
     fn present_picture(
         &self,
         asked: &str,
@@ -689,8 +543,7 @@ impl Tool for ReadTool {
                 }
             },
         };
-        // Where the interval starts, as an index the drawn header and line
-        // marks number from (`crate::rendering`); absent means index 0.
+
         if interval.offset != 0 {
             out.insert("offset".to_owned(), Value::Number(interval.offset.into()));
         }
@@ -703,9 +556,7 @@ impl Tool for ReadTool {
                 RuleContext { admitted, landed }.into_json(),
             );
         }
-        // A whole answer is a look, and so is a window the caller asked
-        // for by offset or limit; a whole read the cap truncated is not,
-        // because the caller believes it saw the file (§8-64).
+
         let windowed = ["offset", "limit"]
             .iter()
             .any(|key| call.args.as_map().contains_key(*key));
@@ -754,9 +605,7 @@ impl Tool for ReadTool {
             if let Some(next) = taken.next_offset {
                 out.insert("next_offset".to_owned(), Value::Number(next.into()));
             }
-            // The count the model needs to decide whether it has the whole
-            // thing: a result the pipeline shortened says so in its own
-            // envelope, and this is what it was shortened from.
+
             out.insert("bytes".to_owned(), Value::Number(taken.text.len().into()));
             out.insert("text".to_owned(), Value::String(taken.text));
         }

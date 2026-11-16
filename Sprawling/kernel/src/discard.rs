@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Discard: deletion as an effect class, judged by effect and never by
-//! intent. C14 in the type: a Discard without a
-//! restoration plan cannot be constructed; the unplanned path exists only
-//! as a request shape for exec forecasts — and the door denies it.
-//! This module is the discard door's sole authority; `gate::discard`
-//! delegates wholly and only shapes the refusal.
-//! The part `Sprawling/kernel/spec/Discard.lean` specifies this module.
-
 mod forecast;
 mod request;
 mod verdict;

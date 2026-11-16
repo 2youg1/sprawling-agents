@@ -3,33 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What this browser remembers about the person, as one value with one
-// door in front of it.
-//
-// **Every row the client keeps is named here and nowhere else.** The
-// settings screens, the shell and the keymap each used to spell their
-// own row names against the same store, which is how a key written
-// one way and read another goes unnoticed; now they read
-// `PreferenceDoor` and this file is the only reader of `ROWS`.
-//
-// **Two layers keep these, and the city wins.** The person's own
-// `~/.sprawling/config.toml` is the authority (roadmap 3.1) and this
-// browser's store is the cache in front of it: the cache draws the
-// first paint so no screen flashes the posture it ships with, and
-// `adopt` replaces the whole record the moment the city answers. A
-// change made before the city has answered is kept in this browser
-// alone, and `keeper()` says so on the settings page rather than
-// leaving a person to find out when they clear the browser's data.
-//
-// **A guess this build cannot read is dropped rather than repaired.**
-// An unreadable row falls back to the posture the client ships with,
-// which the theme already draws, so a cache can never become a
-// second authority for a value somebody else owns.
-//
-// How hard the model thinks is deliberately absent. It is the city's
-// `[model] effort`, and a copy kept here would ride on every dispatch
-// from this browser and quietly overrule the city's own file.
-
 import { derived, get, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
@@ -65,16 +38,10 @@ import type { Notifying } from "./notify";
 import { SHOWINGS, type Showing } from "./results";
 import { readWorkbench, spelledWorkbench, type Workbench } from "./workbench";
 
-// ------------------------------------------------------------- the rows
-
-// Every row this client keeps, by the name it is kept under. Two of
-// them are families rather than single rows: a draft is kept per place
-// a person writes, and a chord per action the person rebound, so those
-// two are prefixes and the rest are whole names.
 const ROWS = {
   lang: "sprawling.lang",
   welcomed: "sprawling.welcomed",
-  // Whether the artefact panel beside a conversation is open.
+
   panel: "sprawling.talk.panel",
   lighting: "sprawling.appearance.lighting",
   sans: "sprawling.appearance.sans",
@@ -82,14 +49,13 @@ const ROWS = {
   sansStack: "sprawling.appearance.sans_stack",
   monoStack: "sprawling.appearance.mono_stack",
   reading: "sprawling.appearance.reading",
-  // The two slots of the fallback chain, in the order they are tried; an
-  // empty slot has no row.
+
   fallback1: "sprawling.appearance.fallback1",
   fallback2: "sprawling.appearance.fallback2",
-  // The bundled face's features turned on, joined by commas.
+
   features: "sprawling.appearance.features",
   body: "sprawling.appearance.body",
-  // A line box and a tracking in thousandths (wire D126).
+
   lineHeight: "sprawling.appearance.line_height",
   tracking: "sprawling.appearance.tracking",
   weight: "sprawling.appearance.weight",
@@ -98,76 +64,38 @@ const ROWS = {
   motion: "sprawling.appearance.motion",
   glass: "sprawling.appearance.glass",
   blend: "sprawling.appearance.blend",
-  // The colours laid over the built-in theme, as the wire spells them
-  // (`Sprawling/wire/spec/Preference.lean` D29), so the cache and the
-  // city's record read through one grammar.
+
   theme: "sprawling.appearance.theme",
-  // Which rule a provider attached from now on starts with. A person
-  // behind a relay settles it once, on the network screen, instead of
-  // on every form they open; an endpoint already attached keeps the
-  // rule the city recorded for it.
+
   proxying: "sprawling.network.proxying",
-  // Whether this browser raises a notification for an approval that
-  // arrives while the window is away (client D7).
+
   notifying: "sprawling.notify",
-  // Whether a room and the city open drawing the whole of what runs did
-  // or only their results. The switch on either page writes it, so the
-  // last choice is the default the next page opens with.
+
   showing: "sprawling.showing",
-  // One unsent message per place a person writes, kept across a reload
-  // or a page change; the rest of the name is the room or the run.
+
   draft: "sprawling.draft.",
-  // One chord per action the person rebound; the rest of the name is
-  // the action. An action left at its shipped chord has no row.
+
   chord: "sprawling.key.",
   editor: "sprawling.editor",
   cityFolder: "sprawling.editor.folder",
-  // The panorama workbench's pane order and widths (client/Spec.lean §7K): a
-  // fact of this screen, so it stays in this browser (client D24).
+
   workbench: "sprawling.workbench",
-  // Whether this browser has opened the command palette once; until it
-  // has, the address line says what a press on it does (client/Spec.lean
-  // 4-10a). A fact of this browser, because the lesson is about this
-  // screen's keys and touch, not about the person's city.
+
   paletteFound: "sprawling.palette.found",
 } as const;
 
-// ------------------------------------------------------------ the shell
-
-// How much of the world layer the page draws: none of it (`zen`), whole
-// panels beside the conversation (`blend`), or all of it as the
-// workspace with the conversation as a band along the bottom
-// (`panorama`). Named for what is drawn rather than for a share of
-// opacity, because the three are three layouts and not three points on
-// one slider (docs/frontend-method.md §7H, client D17).
-// Spelled by the wire (`wire::Tier`), in whose order the layers key
-// cycles them: out from the conversation alone to the world, then back.
 export type Tier = WireTier;
 export const TIERS: readonly Tier[] = TierSchema.literals;
 
-// The tier every launch opens in, whatever the last visit chose: the
-// page is opened to talk (client/Spec.lean D47). The tier is held by
-// this tab alone, so nothing stored or answered by the city brings an
-// earlier one back.
 const LAUNCH_TIER: Tier = "zen";
 
-// Read out of the wire's own union rather than spelled again, so a rule
-// the city adds is offered here without a second list to forget.
 export const PROXYING_RULES: readonly Proxying[] = Proxying.members.map((rule) => rule.literal);
 
 export const NOTIFYINGS: readonly Notifying[] = ["off", "on"];
 
-// ---------------------------------------------------------- the reading
-
-// The person's preferences, whole. One value rather than a dozen
-// accessors because that is the shape the city will answer with, and
-// because a screen that changes two of them at once must not be able
-// to write one and drop the other.
 export interface Preferences {
   readonly lang: Lang;
-  // Whether this browser has walked through the welcome once. The city
-  // decides whether setup is *needed*; this only decides whether a
-  // person who skipped it is nagged again.
+
   readonly welcomed: boolean;
   readonly panel: boolean;
   readonly tier: Tier;
@@ -178,66 +106,39 @@ export interface Preferences {
   readonly showing: Showing;
 }
 
-// The one way to the person's preferences: the record as it stands,
-// who is keeping it, the city's answer coming the other way, named
-// changes to it, and the families read by name because they have one
-// row each per place, per action, or per screen.
-//
-// Named changes rather than one `write`, because each of them is its
-// own `PutPreferences` patch: a caller that handed over a whole record
-// would send the city every field to change one, and a caller that says
-// which fact it is changing sends that fact. The bell and how a
-// conversation is shown stay in this browser, since the city's record
-// has no field for them; the workbench's order and widths stay here
-// because they are a fact of this screen (client D24). `adopt` is the other
-// direction and is therefore whole -
-// an answer states every value at once, and a record applied field by
-// field could be half of one answer and half of the last.
 export interface PreferenceDoor {
   readonly held: Readable<Preferences>;
   readonly keeper: Readable<Keeper>;
-  // The city's whole record, taken as the one that counts: it becomes
-  // what `held` answers, it is mirrored into the cache so the next
-  // first paint draws it rather than the shipped postures, and it is
-  // the only thing that makes `keeper` say `city`. The chords it names
-  // replace this browser's rows for those actions.
+
   readonly adopt: (stated: Preferences, chords: readonly Chord[]) => void;
-  // Where each named change is told once it is made: the city's
-  // `PutPreferences`, joined by `core/prefs_city.ts`. Until then a
-  // change stays in this browser alone.
+
   readonly tell: (send: (patch: PreferencePatch) => void) => void;
   readonly setLang: (lang: Lang) => void;
   readonly setWelcomed: (done: boolean) => void;
   readonly setPanel: (open: boolean) => void;
-  // Changes this tab's tier only: nothing stored, nothing told (D47).
+
   readonly setTier: (tier: Tier) => void;
   readonly setAppearance: (next: Appearance) => void;
   readonly setTheme: (next: Theme) => void;
   readonly setProxying: (rule: Proxying) => void;
   readonly setNotifying: (switched: Notifying) => void;
   readonly setShowing: (showing: Showing) => void;
-  // The chord the person set for one action, or `""` for an action
-  // they left alone. The spelling is the keymap's grammar, not this
-  // file's: what is kept here is a name and a string.
+
   readonly chord: (action: string) => string;
   readonly setChord: (action: string, spelled: string) => void;
-  // What was typed and not sent, by where it was typed. Not a signal:
-  // the box that owns it reads it once when it mounts.
+
   readonly draft: (at: string) => string;
   readonly setDraft: (at: string, text: string) => void;
-  // Whether that draft lives in this tab alone, the browser having refused it (4-63).
+
   readonly draftUnkept: (at: string) => Readable<boolean>;
-  // Facts of the machine this browser runs on, never the city's (client/Spec.lean §4-39).
+
   readonly editor: () => Pick<Opening, "editor" | "folder">;
-  // Same facts as a store so a seat that draws the city folder can redraw
-  // when the advanced settings card writes a new one.
+
   readonly editorHeld: Readable<Pick<Opening, "editor" | "folder">>;
   readonly setEditor: (next: Pick<Opening, "editor" | "folder">) => void;
   readonly workbench: Readable<Workbench>;
   readonly setWorkbench: (next: Workbench) => void;
-  // Whether the command palette has been opened in this browser; once
-  // set it stays set, so the address line's lesson is said until it is
-  // used and never again.
+
   readonly paletteFound: Readable<boolean>;
   readonly findPalette: () => void;
 }
@@ -250,9 +151,7 @@ function readAppearance(rows: Rows): Appearance {
     sansStack: readStack(rows.getItem(ROWS.sansStack)),
     monoStack: readStack(rows.getItem(ROWS.monoStack)),
     reading: readOne(READING_FACES, rows.getItem(ROWS.reading), "interface"),
-    // A slot with nothing in it is not a member of the chain: the two
-    // rows are read in order and the empty one is dropped, so the chain
-    // never holds a gap.
+
     fallbacks: [
       readFamily(rows.getItem(ROWS.fallback1)),
       readFamily(rows.getItem(ROWS.fallback2)),
@@ -277,8 +176,7 @@ function writeAppearance(rows: Rows, next: Appearance): void {
   rows.setItem(ROWS.sansStack, next.sansStack);
   rows.setItem(ROWS.monoStack, next.monoStack);
   rows.setItem(ROWS.reading, next.reading);
-  // A slot with nothing in it has no row, so the chain is read back
-  // without a gap whatever order the two were emptied in.
+
   const [first, second] = next.fallbacks;
   if (first === undefined) rows.removeItem(ROWS.fallback1);
   else rows.setItem(ROWS.fallback1, first);
@@ -296,9 +194,6 @@ function writeAppearance(rows: Rows, next: Appearance): void {
   writeFigure(rows, ROWS.blend, next.blend);
 }
 
-// The two words a yes-or-no row is written and read with. Each row is
-// compared against one of them, because an absent `welcomed` is false
-// (nobody walked the welcome yet) and an absent `panel` is open.
 const YES = "yes";
 const NO = "no";
 
@@ -316,8 +211,6 @@ function readPreferences(rows: Rows, browserLang: string): Preferences {
   };
 }
 
-// The whole record into the cache, the inverse of `readPreferences`:
-// what the city last answered is what the next first paint draws.
 function writePreferences(rows: Rows, next: Preferences): void {
   rows.setItem(ROWS.lang, next.lang);
   rows.setItem(ROWS.welcomed, next.welcomed ? YES : NO);
@@ -329,8 +222,6 @@ function writePreferences(rows: Rows, next: Preferences): void {
   rows.setItem(ROWS.showing, next.showing);
 }
 
-// The door onto one store: a test hands it a map and a language tag,
-// the page reaches the browser's through `preferences()`.
 export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor {
   const held = writable<Preferences>(readPreferences(rows, browserLang));
   const keeper = writable<Keeper>("browser");
@@ -340,9 +231,7 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
     editor: readOne(EDITORS, rows.getItem(ROWS.editor), "none"),
     folder: rows.getItem(ROWS.cityFolder) ?? "",
   });
-  // One write path for every kept change, the city's answer included: the
-  // cache and the store move together, so a reader that redraws and a
-  // reader that reloads the page never see two different records.
+
   const settle = (next: Preferences): void => {
     writePreferences(rows, next);
     held.set(next);
@@ -431,9 +320,6 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
   };
 }
 
-// The preferences this page runs on, one per document like the keymap:
-// the shell, the settings screens and the face the page is drawn in all
-// look at one record, and a second copy would let a change go unseen.
 let shared: PreferenceDoor | undefined;
 
 export function preferences(): PreferenceDoor {

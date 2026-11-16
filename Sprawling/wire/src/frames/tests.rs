@@ -5,8 +5,6 @@
 
 use super::*;
 
-/// The table is the variant list, so what is left to check is that
-/// one frame reads back the entry the generator wrote for it.
 #[test]
 fn a_query_names_itself_with_its_entry_in_the_table() {
     assert_eq!(Query::CityView.name(), "CityView");
@@ -14,8 +12,6 @@ fn a_query_names_itself_with_its_entry_in_the_table() {
     assert!(QUERY_NAMES.contains(&Query::NewestRelease.name()));
 }
 
-/// The query that asks npm is named for what it answers, so it
-/// cannot be read as the verb that releases a halted scope.
 #[test]
 fn the_newest_release_query_is_not_spelled_like_the_release_verb() {
     assert!(QUERY_NAMES.contains(&"NewestRelease"));
@@ -33,10 +29,6 @@ fn a_client_frame_round_trips_through_json() {
     assert_eq!(frame, back);
 }
 
-/// The document names both roots, every command by its wire name,
-/// and the one frame a socket cannot spell as a value nothing
-/// satisfies — so the client generated from it refuses the same
-/// bytes the server refuses.
 #[cfg(feature = "schema")]
 #[test]
 fn the_schema_document_holds_both_roots_and_every_command() {

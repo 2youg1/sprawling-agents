@@ -3,23 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The kani harness roster, derived from the source that declares it.
-//!
-//! A harness is declared in exactly one place — the `#[kani::proof]`
-//! attribute above a function — and until this module existed the roster
-//! had three more homes: two harness names written out in
-//! `.github/workflows/ci.yml`, and a total written into prose. All three
-//! drifted. `kani --harness` does not fail when its filter matches
-//! nothing, so a renamed harness made CI prove one proposition less and
-//! stay green; ARCHITECTURE said ten harnesses while seven were in the
-//! tree.
-//!
-//! So: [`harnesses`] reads the source and is the only authority.
-//! [`list`] prints it for CI to consume, [`run`] proves each entry, and
-//! [`check`] is the gate that keeps the other homes from coming back —
-//! the workflow may not name a harness, and a stated total must be the
-//! total that is there.
-
 use std::path::Path;
 use std::process::Command;
 
@@ -32,48 +15,26 @@ mod roster;
 
 use roster::{in_file, module_base};
 
-/// The attribute that declares a harness. One spelling, matched whole.
 pub(super) const ATTRIBUTE: &str = "#[kani::proof]";
 
-/// The marker a harness carries when it is written but not proved.
-///
-/// Five of the harnesses in this tree build a `Vec`, a `String` or a
-/// `BTreeSet`, and CBMC cannot bound those loops: they were run for six
-/// hours, then for forty-five minutes under a bounded unwind, and
-/// returned nothing either time. Which ones those are is a fact about
-/// the harness, so it lives above the harness rather than in a list
-/// somewhere else \u2014 the same self-cleaning shape the length gate's
-/// `predating` table has. Deleting the marker is how one comes back.
 pub(super) const EXCUSED: &str = "// not-proved:";
 
-/// The workflow that must not name a harness, because a second copy of
-/// the roster there would drift from the source.
 const CI: &str = ".github/workflows/ci.yml";
 
-/// The document whose §11 states how many harnesses exist.
 use crate::architecture::PATH as ARCH;
 
-/// The phrase a stated total is attached to, in the document's own words.
 const STATED: &str = "kani harness";
 
-/// What CI must run instead of naming harnesses itself.
 const ENTRY: &str = "cargo xtask proof";
 
-/// One `#[kani::proof]` function: the package to prove it in, the
-/// attribute line that declares it, and the name `kani --harness`
-/// matches it by.
 pub(crate) struct Harness {
     pub(crate) package: String,
     pub(crate) location: String,
     pub(crate) name: String,
-    /// Why this one is not proved, when it is not. `None` means it runs.
+
     pub(crate) excuse: Option<String>,
 }
 
-/// Every harness in the product graph's packages, ordered by location so
-/// two runs agree. A tool package is not read: the gates' own tests spell
-/// the attribute inside the fixtures they judge, and none of it is a
-/// proposition about the product.
 pub(crate) fn harnesses(root: &Path) -> Result<Vec<Harness>, XtaskError> {
     let mut out = Vec::new();
     for member in members::members(root)? {
@@ -96,9 +57,6 @@ pub(crate) fn harnesses(root: &Path) -> Result<Vec<Harness>, XtaskError> {
     Ok(out)
 }
 
-/// The roster CI proves: one fully qualified name per line, the excused
-/// ones left out because this is the list a prover consumes. [`run`]
-/// prints what it skipped and why, so nothing disappears in silence.
 pub(crate) fn list(root: &Path) -> Result<String, XtaskError> {
     let found = harnesses(root)?;
     let mut out = String::new();
@@ -109,14 +67,6 @@ pub(crate) fn list(root: &Path) -> Result<String, XtaskError> {
     Ok(out)
 }
 
-/// Prove every harness, one `cargo kani` invocation each.
-///
-/// A machine without kani says so and succeeds. That is the same honest
-/// shape `just adversary` has for Lean: kani has no Windows host, this
-/// project is developed on Windows, and a local command that fails for
-/// the absence of a tool it cannot install is a command people stop
-/// running. CI's Linux job is where the absence is a defect, and there
-/// the install step fails before this one runs.
 #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 pub(crate) fn run(root: &Path) -> Result<String, XtaskError> {
     if !installed(root) {
@@ -125,8 +75,7 @@ pub(crate) fn run(root: &Path) -> Result<String, XtaskError> {
             list(root)?
         ));
     }
-    // A run that proves nothing must not read as a run that proved
-    // everything: the roster shrinking to zero is a defect, not a pass.
+
     if harnesses(root)?.iter().all(|h| h.excuse.is_some()) {
         return Err(XtaskError::Cmd {
             cmd: ENTRY.to_owned(),
@@ -160,7 +109,6 @@ pub(crate) fn run(root: &Path) -> Result<String, XtaskError> {
     Ok(out)
 }
 
-/// The gate: no second home for the roster, and no stale total.
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let found = harnesses(root)?;
     let mut violations = Vec::new();
@@ -170,8 +118,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// A harness that is not proved says why, and says it where the reader
-/// can check: the reason names the document that holds the decision.
 pub(crate) fn every_excuse_cites_where_it_was_decided(found: &[Harness], out: &mut Vec<Violation>) {
     for harness in found {
         let Some(reason) = &harness.excuse else {
@@ -195,7 +141,6 @@ pub(crate) fn every_excuse_cites_where_it_was_decided(found: &[Harness], out: &m
     }
 }
 
-/// The `proof` job runs the roster; it does not hold one.
 fn workflow_names_no_harness(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskError> {
     let text = walk::read_text(&root.join(CI))?;
     let job: Vec<(usize, &str)> = job_lines(&text, "proof");
@@ -229,7 +174,6 @@ fn workflow_names_no_harness(root: &Path, out: &mut Vec<Violation>) -> Result<()
     Ok(())
 }
 
-/// A total stated in prose is the total the tree holds.
 fn stated_total_is_the_total(
     root: &Path,
     total: usize,
@@ -269,12 +213,6 @@ fn stated_total_is_the_total(
     Ok(())
 }
 
-/// One job's own lines, with their line numbers.
-///
-/// A workflow job is a two-space key and everything indented under it,
-/// which is enough structure to read without a YAML parser — and a
-/// parser here would be a second reader of a file `actions/checkout`
-/// already validates.
 fn job_lines<'a>(text: &'a str, job: &str) -> Vec<(usize, &'a str)> {
     let opener = format!("  {job}:");
     let mut out = Vec::new();
@@ -298,7 +236,6 @@ fn job_lines<'a>(text: &'a str, job: &str) -> Vec<(usize, &'a str)> {
     out
 }
 
-/// Whether this machine can prove anything at all.
 #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn installed(root: &Path) -> bool {
     Command::new("cargo")

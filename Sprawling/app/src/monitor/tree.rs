@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A running process and every descendant it has, read beat by beat
-//! from the process table (`Sprawling/app/spec/Main.lean` §8-129-4).
-//!
-//! Only `sprawling gauge` reads it, in its own process: one reading
-//! walks the whole table, 17-65 ms on Windows, so the city's sampler has
-//! no path here (8-129-3). Public because `gauge` lives in the binary
-//! half of this package.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
@@ -18,21 +10,14 @@ use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 
 use super::counters::Reads;
 
-/// The shortest whole-process-table beat, in milliseconds. The command-line
-/// bound and other tree readers share this value because the table walk,
-/// rather than any one caller, is the expensive operation.
 pub const MINIMUM_BEAT_MS: u64 = 250;
-/// The same bound as a duration for callers that schedule reads.
+
 pub const MINIMUM_BEAT: Duration = Duration::from_millis(MINIMUM_BEAT_MS);
 
-/// The tree as one beat found it: every process still alive under the
-/// root, the root included, summed.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TreeReading {
     pub processes: u64,
-    /// The tree's CPU time since the previous beat over the wall time
-    /// since then and every core, as permille of the machine; `None` at
-    /// the first beat, which has nothing to compare with.
+
     pub cpu_permille: Option<u64>,
     pub private_bytes: u64,
     pub working_set_bytes: u64,
@@ -40,10 +25,6 @@ pub struct TreeReading {
     pub written_bytes: u64,
 }
 
-/// What every beat together saw. CPU and storage are the sums of each
-/// process's last reading, the peaks the largest whole-tree sum of one
-/// beat; a process born and gone between two beats is in none of them,
-/// so each is a lower bound.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Seen {
     pub cpu_ms: u64,
@@ -53,11 +34,10 @@ pub struct Seen {
     pub peak_working_set_bytes: u64,
 }
 
-/// One process tree under watch.
 pub struct Tree {
     system: System,
     root: Pid,
-    /// Each process seen at any beat, by id, with its last figures.
+
     last: BTreeMap<u32, Last>,
     peak_private_bytes: u64,
     peak_working_set_bytes: u64,
@@ -65,7 +45,6 @@ pub struct Tree {
     table_reads: u64,
 }
 
-/// The cumulative figures of one process at its latest beat.
 #[derive(Debug, Clone, Copy)]
 struct Last {
     cpu_ms: u64,
@@ -73,8 +52,6 @@ struct Last {
     written_bytes: u64,
 }
 
-/// One member's figures, copied out of the table so the table can be
-/// read again while they are kept.
 struct Member {
     pid: u32,
     last: Last,
@@ -83,8 +60,7 @@ struct Member {
 }
 
 impl Tree {
-    /// Watches the process `root` and its descendants. Nothing is read
-    /// until the first [`Tree::read`].
+
     #[must_use]
     pub fn open(root: u32) -> Tree {
         Tree {
@@ -98,9 +74,6 @@ impl Tree {
         }
     }
 
-    /// Reads the whole process table once and sums the tree; `elapsed`
-    /// is the wall time since the previous reading. `None` once the
-    /// root is no longer running.
     pub fn read(&mut self, elapsed: Duration) -> Option<TreeReading> {
         self.system.refresh_processes_specifics(
             ProcessesToUpdate::All,
@@ -142,7 +115,6 @@ impl Tree {
         Some(reading)
     }
 
-    /// What every beat together saw; `None` when no beat found the root.
     #[must_use]
     pub fn seen(&self) -> Option<Seen> {
         if self.beats == 0 {
@@ -163,7 +135,6 @@ impl Tree {
         })
     }
 
-    /// The process-table readings taken since this was opened.
     #[cfg_attr(
         not(test),
         expect(
@@ -180,9 +151,6 @@ impl Tree {
     }
 }
 
-/// The root and every process descending from it, as the table stands;
-/// `None` when the root is not in it. A process whose parent id was
-/// reused can point back into the tree, so each id is visited once.
 fn members(system: &System, root: Pid) -> Option<Vec<Member>> {
     system.process(root)?;
     let mut children: BTreeMap<u32, Vec<u32>> = BTreeMap::new();
@@ -219,8 +187,6 @@ fn members(system: &System, root: Pid) -> Option<Vec<Member>> {
     Some(found)
 }
 
-/// CPU milliseconds spent over wall time elapsed, spread over every
-/// core, as permille of the whole machine, clamped to `0..=1000`.
 fn permille(spent_ms: u64, elapsed: Duration) -> u64 {
     let cores = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
     let capacity = elapsed

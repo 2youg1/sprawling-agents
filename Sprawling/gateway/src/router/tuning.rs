@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a person settled about one endpoint, as the book keeps it,
-//! and what holds for an endpoint they settled nothing about.
-//!
-//! The registration says where an endpoint is and how to prove who is
-//! calling. This says how the call is made: what to call the endpoint on
-//! screen, how long it may take, how many times a failed request is made
-//! again, how long a streamed answer may go silent, the headers every
-//! request adds, and the body fields every request writes.
-//!
-//! **An override's value is kept as text.** A ledger that held `0.2`
-//! would hold a float, and this city keeps floats out of its records;
-//! the text a person typed round-trips exactly, and what it means as
-//! JSON is answered here, once, by [`EndpointTuning::applied_overrides`].
-
 use kernel::Proxying;
 
 use crate::concurrency::MaxInFlight;
@@ -27,84 +13,49 @@ use crate::endpoint::HeaderValue;
 use kernel::Retries;
 use kernel::account_recovery::AccountRetries;
 
-/// What every endpoint is called with until a person says otherwise.
-///
-/// **The one home of these three figures.** A form that printed its own
-/// numbers into empty boxes made an endpoint attached from a form
-/// behave differently from one attached from a configuration file,
-/// while the person had filled in nothing either way; the form shows
-/// these as the placeholders they are, through the configuration query.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TuningDefaults {
-    /// How long one settled request may take, in total.
+
     pub timeout_ms: u64,
-    /// The ceiling on making a failed request again.
+
     pub retries: Retries,
-    /// How long a streamed answer may go silent. Absent means a stream
-    /// is held to the same bound as a settled call, which is the only
-    /// figure this city can state without inventing one.
+
     pub stream_idle_timeout_ms: Option<u64>,
-    /// How many more times one account is asked the same request before
-    /// the next account takes it; read only with two accounts or more.
+
     pub account_retries: AccountRetries,
 }
 
-/// How a person set one endpoint up.
-///
-/// `Default` is "nothing was settled", which is what the caller sends
-/// when it has no opinion and what an older record replays as.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct EndpointTuning {
-    /// Explicit ordered accounts; absence leaves the existing accounts intact.
+
     #[serde(default)]
     pub accounts: Option<Vec<kernel::event::record::ProviderAccount>>,
-    /// What to call this endpoint on screen; absent means its id.
+
     pub label: Option<String>,
-    /// How long one settled request may take.
+
     pub timeout_ms: Option<u64>,
-    /// How many times a request worth making again is made again.
-    /// Absence is a value here rather than a question each reader
-    /// answers for itself.
+
     pub request_max_retries: Retries,
-    /// How long a streamed request may go without a byte arriving
-    /// before the city gives up on it. **This is an idle bound, not a
-    /// deadline on the whole answer**: the blocking transport applies
-    /// it to each read of the body, so a model that keeps writing is
-    /// never cut off for writing a long answer, and one that stops
-    /// mid-answer is given up on this long after its last byte.
+
     pub stream_idle_timeout_ms: Option<u64>,
-    /// Headers every request to this endpoint adds, name and value.
+
     pub extra_headers: Vec<(String, HeaderValue)>,
-    /// Body fields every request writes: a JSON pointer, and the text
-    /// of the value to write there.
+
     pub overrides: Vec<(String, String)>,
-    /// Which of this endpoint's calls go through the machine's proxy.
-    /// A value rather than an `Option`, because every call has to make
-    /// this decision and "nobody settled it" is the default, not a
-    /// third state a caller has to handle.
+
     pub proxying: Proxying,
-    /// How many calls may be in flight at once; absent means the
-    /// default for this kind of connection (`Sprawling/gateway/Spec.lean` D21).
+
     pub max_in_flight: Option<MaxInFlight>,
-    /// How many more times one account is asked before the next account
-    /// takes the request; absent means [`EndpointTuning::DEFAULTS`].
+
     #[serde(default)]
     pub account_retries: Option<AccountRetries>,
-    /// Per-model generation defaults and the person's capability
-    /// corrections; an empty list means nobody settled either.
+
     #[serde(default)]
     pub generation: Vec<kernel::ModelGeneration>,
 }
 
 impl EndpointTuning {
-    /// What an endpoint nobody tuned is called with.
-    ///
-    /// The deadline is long because a reasoning model answering a hard
-    /// question is not a stalled one; the retry ceiling is absent
-    /// because `Halt` is this city's brake; the idle bound is absent
-    /// because no figure this city could write down would be the
-    /// provider's; two sends more on one account outlast a short rate
-    /// limit, and past that the next account is the better ask.
+
     pub const DEFAULTS: TuningDefaults = TuningDefaults {
         timeout_ms: 120_000,
         retries: Retries::UntilHalted,
@@ -112,35 +63,23 @@ impl EndpointTuning {
         account_retries: AccountRetries::Two,
     };
 
-    /// How many more times one account of this endpoint is asked the
-    /// same request before the next account takes it.
     #[must_use]
     pub fn account_retries(&self) -> AccountRetries {
         self.account_retries
             .unwrap_or(Self::DEFAULTS.account_retries)
     }
 
-    /// How long one settled call to this endpoint may take.
     #[must_use]
     pub fn call_timeout_ms(&self) -> u64 {
         self.timeout_ms.unwrap_or(Self::DEFAULTS.timeout_ms)
     }
 
-    /// How long a streamed call to this endpoint may go silent, when
-    /// that is not its call timeout.
     #[must_use]
     pub fn idle_timeout_ms(&self) -> Option<u64> {
         self.stream_idle_timeout_ms
             .or(Self::DEFAULTS.stream_idle_timeout_ms)
     }
 
-    /// The overrides as the values they spell.
-    ///
-    /// The reading is total and has one rule: text that parses as JSON
-    /// is that JSON, and text that does not is the string it looks
-    /// like. That is what makes `/reasoning/effort` = `high` mean
-    /// `"high"` while `/temperature` = `0.2` means the number, without
-    /// asking a person to quote anything.
     #[must_use]
     pub fn applied_overrides(&self) -> Vec<(String, Value)> {
         self.overrides
@@ -195,8 +134,6 @@ mod tests {
         );
     }
 
-    /// An endpoint nobody tuned is called with the defaults, and the
-    /// defaults are read from the one place that states them.
     #[test]
     fn an_untouched_endpoint_takes_the_figures_this_module_states() {
         let untouched = EndpointTuning::default();

@@ -3,19 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A browser is an engine, and one machine's brand of it
-//! (`Sprawling/app/spec/Doctor.lean` §8-57).
-
 use std::collections::BTreeSet;
 
 use crate::doctor::family::{Confidence, Family, member_at};
 use crate::doctor::{Detection, Platform, REQUIREMENTS, Tier};
 
-/// Every family is a row of the tier that runs a city, and every such
-/// row that detects a family is a family: the two lists cannot drift
-/// apart, because the name a capability tries is the name the table
-/// carries. The develop tier's render browser is a second reason to
-/// have a Chromium browser, not a fourth engine.
 #[test]
 fn every_family_is_a_row_and_every_member_says_where_it_is_installed() {
     let detected: BTreeSet<&str> = REQUIREMENTS
@@ -40,9 +32,7 @@ fn every_family_is_a_row_and_every_member_says_where_it_is_installed() {
                 member.name
             );
             for platform in Platform::ALL {
-                // Judged by spelling rather than by `is_absolute`,
-                // which answers about the platform running the test and
-                // not about the platform the column describes.
+
                 for place in member.places.at(platform).iter() {
                     assert!(
                         place.starts_with('/') || place.contains(":\\"),
@@ -55,10 +45,6 @@ fn every_family_is_a_row_and_every_member_says_where_it_is_installed() {
     }
 }
 
-/// A brand is found by its own installed path before its program name,
-/// because two brands can ship a program under one name: Firefox
-/// Developer Edition's is called `firefox`, and only its directory
-/// tells the two apart.
 #[test]
 fn a_found_browser_is_reported_by_the_brand_it_is() {
     let developer = std::path::Path::new(r"C:\Program Files\Firefox Developer Edition\firefox.exe");
@@ -81,14 +67,6 @@ fn a_found_browser_is_reported_by_the_brand_it_is() {
     );
 }
 
-/// A browser's version is read out of the files beside it and never
-/// asked of the browser (`Sprawling/app/spec/Doctor.lean` §8-80).
-///
-/// On Windows a Chromium browser given `--version` opens a window
-/// instead of printing a line, and when one is already running the new
-/// process hands the request over and exits, so the window outlives the
-/// child this city can stop. `family` is the one file that could bring
-/// that spawn back, and this holds it to reading rather than running.
 #[test]
 fn no_browser_is_started_to_learn_its_version() {
     let looking = include_str!("../family.rs");
@@ -100,9 +78,6 @@ fn no_browser_is_started_to_learn_its_version() {
     }
 }
 
-/// The two members this project cannot simply promise are last in their
-/// families, so a machine with an ordinary browser never answers with
-/// the awkward one.
 #[test]
 fn a_member_that_needs_confirming_is_never_the_first_answer() {
     let gecko = Family::Gecko.members();
@@ -131,10 +106,6 @@ fn a_member_that_needs_confirming_is_never_the_first_answer() {
     );
 }
 
-/// `cargo xtask render` finds its engine through `chromium.tsv`, which
-/// is this family rendered, so the gate and the doctor look in the same
-/// places for the same brands; when they differ this prints the file
-/// the family wants.
 #[test]
 fn the_chromium_file_is_the_family_rendered() {
     let path =

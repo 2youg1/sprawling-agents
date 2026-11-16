@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Pure decision functions: values in, verdicts out. Zero internal deps.
-//! Holds no I/O handles, no clock, no global state (ARCHITECTURE.md paragraph 1).
-//! The entry `Sprawling/kernel/Spec.lean` specifies this crate, and each module
-//! names the part under `Sprawling/kernel/spec/` that specifies it.
-//!
-//! **This file is an index, and the modules are the library.** Every
-//! module is public and a caller reaches a decision through the module
-//! that owns it — `gate::domain`, `discard::decide`, `approval::may_answer`
-//! — so the module name says which authority answered. What the root
-//! re-exports is the vocabulary those signatures are written in: the
-//! value types a caller names in its own fields and arguments. A
-//! function is never re-exported here, and nothing is renamed on the
-//! way out, because a second spelling of one name is the defect
-//! `xtask lexicon` exists to catch.
-
 pub mod account_recovery;
 pub mod address;
 pub mod approval;

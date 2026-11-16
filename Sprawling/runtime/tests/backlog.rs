@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the backlog promises a caller: a short command still feels
-//! synchronous, a command that outlives its window keeps running where
-//! somebody can reach it, and a command that never ends is stopped by
-//! `halt` rather than by the end of the universe.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -23,9 +18,6 @@ use runtime::{Backlog, Started};
 
 const RUN: RunId = RunId::CITY;
 
-/// A program every supported host has, which does not stop on its own
-/// and starts no grandchild — so terminating it terminates the whole of
-/// what was started.
 #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn never_ends() -> Command {
     let mut command = if cfg!(windows) {
@@ -82,8 +74,7 @@ fn halt_terminates_a_command_that_never_ends_and_the_run_returns_to_a_boundary()
     let addr = Address::parse("lab/room1").unwrap();
     let stopper = backlog.clone();
     let building = Address::parse("lab").unwrap();
-    // The command is waited on inside the window, which is exactly where
-    // a blocking `Command::output()` could not be reached.
+
     let brake = std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(300));
         stopper.halt(Some(&building)).unwrap()
@@ -102,8 +93,7 @@ fn halt_terminates_a_command_that_never_ends_and_the_run_returns_to_a_boundary()
 
 #[test]
 fn a_command_that_outlives_the_window_keeps_running_where_halt_can_reach_it() {
-    // A one-poll window: the command never ends, so waiting out the
-    // ten-second default would only make the suite ten seconds slower.
+
     let backlog = Backlog::with_window(runtime::PollBudget::new(1, 1));
     let addr = Address::parse("lab/room1").unwrap();
     let started = backlog
@@ -122,8 +112,7 @@ fn a_command_that_outlives_the_window_keeps_running_where_halt_can_reach_it() {
     );
 
     assert_eq!(backlog.halt(None).unwrap(), 1);
-    // The child is stopped; the result is collected once and then the
-    // table forgets it.
+
     let mut collected = Vec::new();
     for _ in 0..100 {
         collected = backlog.harvest(RUN).unwrap();
@@ -138,9 +127,6 @@ fn a_command_that_outlives_the_window_keeps_running_where_halt_can_reach_it() {
     assert!(backlog.standing(&addr).unwrap().is_empty());
 }
 
-/// A run that has ended leaves what it started in the background to
-/// nobody: another run's harvest lets it go once it stops, and never
-/// reads its output back to that other run.
 #[test]
 #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_released_command_is_let_go_without_reaching_another_run() {

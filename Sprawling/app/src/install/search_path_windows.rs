@@ -3,19 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Editing the user search path on Windows: the registry value, read
-//! and written under its own type, and the broadcast that tells the
-//! desktop it moved.
-
 use super::{PathEdit, PathOutcome, PathRemoval, plan_append, plan_remove};
 use kernel::{AxCode, AxError};
 
-/// Reads `HKCU\Environment\Path` without expanding it, and says which
-/// registry type it has.
-///
-/// The raw value is what has to be rewritten: expanding `%VAR%` and
-/// writing the result back is how a search path silently stops
-/// following the variables a person put in it.
 const READ: &str = r"
 $ErrorActionPreference='Stop'
 $k = Get-Item -LiteralPath 'HKCU:\Environment'
@@ -27,14 +17,6 @@ if ($k.GetValueNames() -contains 'Path') {
 Write-Output $kind
 ";
 
-/// Writes the value back under the type it was read as.
-///
-/// `[Environment]::SetEnvironmentVariable` is the obvious call and
-/// the wrong one: it always writes REG_SZ, which demotes a
-/// REG_EXPAND_SZ search path so its `%VAR%` entries stop expanding
-/// (dotnet/runtime#1442). Writing the registry directly means the
-/// broadcast is ours to send, which `sprawling::environment_broadcast`
-/// does once the value is in place.
 const WRITE: &str = r#"
 $ErrorActionPreference='Stop'
 $v = [IO.File]::ReadAllText($env:SPRAWLING_PATH_FILE, (New-Object Text.UTF8Encoding $false))
@@ -113,12 +95,10 @@ fn write(raw: &Raw, value: &str) -> Result<Option<String>, AxError> {
         .with_recovery("no change was made")
     })?;
     let outcome = powershell(WRITE, &raw.carrier, Some(&raw.kind));
-    // The carrier held nothing secret, but it held the whole of this
-    // person's search path, so it does not outlive the edit.
+
     drop(std::fs::remove_file(&raw.carrier));
     outcome?;
-    // The path is written whether or not the desktop heard about it, so a
-    // failed announcement is a line for the person, not a failure.
+
     Ok(match sprawling::environment_broadcast::announce() {
         Ok(()) => None,
         Err(unannounced) => Some(format!(

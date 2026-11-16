@@ -3,33 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `RULES.toml` evaluated into rules a machine can hold.
-//!
-//! A confidential building means four things at once, and each of them
-//! is held somewhere that cannot be talked out of it: the model pool is
-//! local, the write domain stops at the building's own subtree, data
-//! does not leave, and nobody outside the building reads what is in it.
-//! This module decides the first two from the file; the third is the
-//! egress door's, and the fourth is `kernel::address::may_read`, asked
-//! with the answer [`load`] gives for the building a path lands in.
-//!
-//! A building with no `RULES.toml` is an ordinary building. One that
-//! exists and does not say whether it is confidential is an error:
-//! defaulting a privacy decision quietly is the failure this whole
-//! surface exists to prevent.
-//!
-//! **One document, read by the city and by every resident.** The
-//! prefix carries this file's own bytes, so what an agent reads is what
-//! the city enforces. It was Markdown until the reader had to find keys
-//! in prose and matched them on any line: a sentence that began
-//! `desktop: true` granted this machine's desktop, and a `write:` line
-//! nobody wrote resolved to `Everything`. Both failed towards the
-//! permissive side. Splitting the prose into a second document would
-//! have fixed that and bought a worse thing — two descriptions of one
-//! building, free to disagree.
-//!
-//! Specified by `Sprawling/city/spec/Policy.lean` §8-2.
-
 use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
@@ -46,7 +19,7 @@ mod workspace;
 
 pub use cache::RulesCache;
 pub use desktop::{DESKTOP_SCOPE_FILE, desktop_scope_path, write_desktop_scope};
-/// The shape `evaluate` reads, for `check` to locate a refusal in.
+
 pub(crate) use evaluate::Written as RulesShape;
 pub use evaluate::{
     RulesEdit, check_reading_room, evaluate, write_reading_room, write_rules_against,
@@ -57,33 +30,22 @@ pub use workspace::{
     ModelRecommendation, WorkspaceModelPolicy, WorkspaceRecommendations, inscribe_choice,
 };
 
-/// What a building is and what it may do: the one file this module
-/// parses, and the one a resident is given.
 pub const RULES_FILE: &str = "RULES.toml";
 
-/// The name this version no longer writes or reads. It exists for the
-/// single refusal that tells a person where their rules went; nothing
-/// opens a file at this name.
 const SUPERSEDED_FILE: &str = "BUILDING.md";
 
-/// How many minutes a harness run takes at most in a building whose
-/// rules do not say (city D8 (b)).
 const HARNESS_MINUTES_DEFAULT: u32 = 60;
 
 mod user_browser;
 
 pub use user_browser::{UserBrowser, UserBrowserEndpoint};
 
-/// Which models a run in this building may reach. Exhaustive rather than
-/// a bool, because "any" and "local only" are two policies and a third
-/// (a named pool) is a change to this enum, not a new flag beside it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ModelPool {
     Any,
     LocalOnly,
 }
 
-/// A building's rules, as evaluated from its file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BuildingRules {
     addr: Address,
@@ -92,30 +54,26 @@ pub struct BuildingRules {
     reach: DomainReach,
     egress: Option<EgressAllowlist>,
     review: bool,
-    /// Whether residents here are given the browser tool.
+
     browser: bool,
-    /// Whether residents here are given the tool that drives the
-    /// browser the person is already using, and where that browser
-    /// answers.
+
     usersbrowser: Option<UserBrowser>,
-    /// Whether residents here are given this machine's own desktop.
+
     desktop: bool,
-    /// The skills this building takes into its catalog, by name. The
-    /// city's shelves may hold a thousand; what costs resident bytes is
-    /// this list, and a person writes it.
+
     reading_room: Vec<String>,
-    /// How long a harness run here may take, when the file says.
+
     harness_minutes: Option<std::num::NonZeroU32>,
-    /// How delegated work in this building chooses a native model.
+
     workspace_models: Option<WorkspaceModelPolicy>,
-    /// Exact repository paths whose entropy-only checkpoint hits are exempt.
+
     checkpoint_entropy_allow: EntropyAllowlist,
-    /// Absolute context lock in input tokens, when the file states one.
+
     context_lock: Option<ContextLock>,
 }
 
 impl BuildingRules {
-    /// The policy value that rides along on every model call.
+
     #[must_use]
     pub fn policy(&self) -> &BuildingPolicy {
         &self.policy
@@ -126,126 +84,57 @@ impl BuildingRules {
         &self.addr
     }
 
-    /// The domains this building may reach, when its file lists them;
-    /// `None` is a building that wrote no `egress` key and is held to no
-    /// domain list (`Sprawling/city/spec/Policy.lean` D27).
-    ///
-    /// A confidential building has the empty list, whatever its file
-    /// says: "data enters and does not leave" is the meaning of the
-    /// setting, so a declared list under it would be a contradiction the
-    /// reader would have to resolve. The list it declared is refused at
-    /// evaluation.
     #[must_use]
     pub fn egress(&self) -> Option<&EgressAllowlist> {
         self.egress.as_ref()
     }
 
-    /// Whether work done here has to be checked by someone else before
-    /// it reaches the building.
-    ///
-    /// A building that says yes gives each run its own tree, and nothing
-    /// a run writes is visible until another resident merges it. Absent
-    /// the line, the answer is no: a person who dispatches one agent to
-    /// one room and watches it work should see the file change, and
-    /// requiring a second agent for that would be a discipline nobody
-    /// asked for.
     #[must_use]
     pub fn review(&self) -> bool {
         self.review
     }
 
-    /// Whether a resident of this building may drive a browser.
-    ///
-    /// Absent the line, no. That is the opposite reading from
-    /// `confidential`, and the difference is which way each one fails:
-    /// a privacy setting read as the permissive side is an accident,
-    /// while a tool nobody was given is one tool fewer. A confidential
-    /// building never gets one, because a browser that opens any URL is
-    /// an egress path and "data does not leave" is the whole of what
-    /// that setting means.
     #[must_use]
     pub fn browser(&self) -> bool {
         self.browser
     }
 
-    /// What this building says about driving the browser a person is
-    /// already using, and where that browser answers.
-    ///
-    /// Absent the line, nothing: the same reading `browser` gets, and
-    /// for a stronger reason — a browser this city started holds one
-    /// building's logins, while the person's own browser holds every
-    /// account that person has. A confidential building never gets the
-    /// tool, because the attachment is exactly what its per-building
-    /// isolation does not survive.
     #[must_use]
     pub fn usersbrowser(&self) -> Option<&UserBrowser> {
         self.usersbrowser.as_ref()
     }
 
-    /// Whether a resident of this building may reach this machine's own
-    /// desktop, through the desktop server this binary carries.
-    ///
-    /// Absent the line, no — the same reading `browser` gets, and for a
-    /// stronger reason: what `desktop.act` presses on somebody's own
-    /// machine carries no way back, so a building that was never asked
-    /// about it has not agreed to it. A confidential building never gets
-    /// one, because a desktop holds other programs, other windows and
-    /// one shared clipboard, none of which are this building's.
-    ///
-    /// **This decides whether the connector may be attached at all, not
-    /// what it may then touch.** That second question is the
-    /// `DESKTOP.toml` allowlist's, window by window, and the two doors
-    /// are deliberately not merged: one asks whether this building does
-    /// this kind of work, the other asks which windows on this machine —
-    /// and one door asking both would leave one of the questions unasked.
     #[must_use]
     pub fn desktop(&self) -> bool {
         self.desktop
     }
 
-    /// The names under `## Reading room`, in the order the file lists
-    /// them. Absent section means an empty reading room: a building
-    /// starts with the tools it is given and nothing else, because the
-    /// alternative is every building paying for every skill the city has
-    /// ever settled.
     #[must_use]
     pub fn reading_room(&self) -> &[String] {
         &self.reading_room
     }
 
-    /// How many minutes a harness run in this building may take before
-    /// the city cancels it and freezes it as limit (`Sprawling/app/Spec.lean`
-    /// §8-124). Absent the line, `HARNESS_MINUTES_DEFAULT`: a harness
-    /// that neither speaks nor ends would otherwise hold a lane until a
-    /// person noticed (city D8 (b)).
     #[must_use]
     pub fn harness_minutes(&self) -> u32 {
         self.harness_minutes
             .map_or(HARNESS_MINUTES_DEFAULT, std::num::NonZeroU32::get)
     }
 
-    /// The workspace's native-model routing policy, or `None` for the
-    /// unchanged room-frozen / `main` behaviour.
     #[must_use]
     pub fn workspace_models(&self) -> Option<&WorkspaceModelPolicy> {
         self.workspace_models.as_ref()
     }
 
-    /// Exact paths whose entropy-only checkpoint findings are exempt.
-    /// Known provider shapes never consult this list.
     #[must_use]
     pub fn checkpoint_entropy_allow(&self) -> &EntropyAllowlist {
         &self.checkpoint_entropy_allow
     }
 
-    /// Absolute context lock in input tokens, or `None` when the file
-    /// leaves the key out (reminder-only behaviour).
     #[must_use]
     pub fn context_lock(&self) -> Option<ContextLock> {
         self.context_lock
     }
 
-    /// What this building's residents may write inside their prefixes.
     #[must_use]
     pub fn reach(&self) -> DomainReach {
         self.reach
@@ -260,12 +149,6 @@ impl BuildingRules {
         }
     }
 
-    /// The write domain a run in this building gets.
-    ///
-    /// # Errors
-    /// Refuses a confidential building that declares a prefix outside
-    /// itself. Trimming it silently would leave the file saying one thing
-    /// and the city doing another; refusing says which line to change.
     pub fn write_domain(&self) -> Result<WriteDomain, AxError> {
         let mut prefixes = Vec::new();
         for prefix in &self.write_prefixes {
@@ -291,24 +174,11 @@ impl BuildingRules {
     }
 }
 
-/// Where a building's rules live: in the building's own reserved
-/// subtree, which no write domain reaches.
-///
-/// A person writes this file and the runs it governs only read it. That
-/// was the first line of the file and nothing held it until the path
-/// moved (ARCHITECTURE.md section 6).
 #[must_use]
 pub fn rules_path(city_root: &Path, addr: &Address) -> PathBuf {
     governed(city_root, addr).join(RULES_FILE)
 }
 
-/// Where a project keeps the conventions it came with.
-///
-/// The building's own root rather than its reserved subtree, and that
-/// placement is the point: the file belongs to the project, a person
-/// edits it, and the tools a resident already has can reach it. The
-/// reserved subtree is where the *city* keeps what it owns, and this is
-/// not that.
 #[must_use]
 pub fn agents_path(city_root: &Path, addr: &Address) -> PathBuf {
     CityLayout::new(city_root)
@@ -316,19 +186,6 @@ pub fn agents_path(city_root: &Path, addr: &Address) -> PathBuf {
         .join(crate::spine_files::AGENTS_FILE)
 }
 
-/// Where each room on the way from a building's root down to `room`
-/// keeps the conventions it came with, the one nearest the building
-/// first; the building's own root is not among them, because
-/// [`agents_path`] answers for it.
-///
-/// Every level, not only the room itself: a monorepo is one building
-/// whose packages are rooms, and a package two levels down works under
-/// its parent's conventions as well as its own. An address outside
-/// `building` has no levels and answers an empty list.
-///
-/// # Errors
-/// Propagates a level the address grammar refuses, which a `room` that
-/// parsed cannot produce.
 pub fn room_agents_paths(
     city_root: &Path,
     building: &Address,
@@ -354,21 +211,11 @@ pub fn room_agents_paths(
         .collect()
 }
 
-/// Where the workspace this city formed around keeps its conventions:
-/// the city root, which is either the project itself or the folder that
-/// holds the projects its buildings are.
 #[must_use]
 pub fn city_agents_path(city_root: &Path) -> PathBuf {
     city_root.join(crate::spine_files::AGENTS_FILE)
 }
 
-/// more, if one is on this disk.
-///
-/// Two of them can be: the rules were Markdown before they were TOML,
-/// and before that they sat at the building's root rather than under
-/// its reserved subtree. One question rather than one guard per move,
-/// because every answer has the same consequence — a confidential
-/// building loading as an ordinary one.
 fn superseded(city_root: &Path, addr: &Address) -> Option<PathBuf> {
     let layout = CityLayout::new(city_root);
     [
@@ -379,30 +226,17 @@ fn superseded(city_root: &Path, addr: &Address) -> Option<PathBuf> {
     .find(|path| path.is_file())
 }
 
-/// A scope's own reserved subtree: where what governs that scope sits,
-/// out of reach of every write domain.
 pub(super) fn governed(city_root: &Path, addr: &Address) -> PathBuf {
     CityLayout::new(city_root)
         .scope(addr)
         .join(kernel::RESERVED_PREFIX)
 }
 
-/// Loads and evaluates a building's rules.
-///
-/// # Errors
-/// Propagates an unreadable file, and refuses one that does not state
-/// whether the building is confidential.
 pub fn load(city_root: &Path, addr: &Address) -> Result<BuildingRules, AxError> {
     let path = rules_path(city_root, addr);
     match std::fs::read_to_string(&path) {
         Ok(text) => evaluate(addr, &text),
-        // An absent file is an ordinary building - unless a document
-        // this version no longer reads is holding the rules, in which
-        // case reading "absent" would turn a confidential building into
-        // an ordinary one without anybody being told. A path through a
-        // file is absent too: Linux says `NotADirectory` where Windows
-        // says `NotFound`, and a file at the city root has to get one
-        // answer from the read bound on both.
+
         Err(err)
             if matches!(
                 err.kind(),

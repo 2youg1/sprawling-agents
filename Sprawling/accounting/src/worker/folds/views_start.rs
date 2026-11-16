@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The snapshot a served city cuts of its views (`Sprawling/app/Spec.lean` §8-91);
-//! where the views start folding is `views::snapshot::start`.
-
 use std::path::Path;
 
 use kernel::{AxError, RunId, Seq};
@@ -18,21 +15,6 @@ use crate::worker::opening_cost::{OpeningCost, Phase};
 
 use super::{Standing, fold_city};
 
-/// What `serve` starts from: [`fold_city`] over the ledger opened at
-/// `now`, then a views snapshot cut at the last line the views folded, so
-/// the next start and a one-shot read afterwards fold only what arrives
-/// after it (`Sprawling/app/Spec.lean` §8-91); nothing is cut when the views resumed
-/// from their snapshot and folded nothing past it.
-///
-/// A cut that fails is a `Refuse` line in `log`, not an error: the
-/// snapshot only shortens a later read, which folds from the older
-/// snapshot or from genesis to the same views.
-///
-/// The phases of [`fold_city`] and the views cut are lapped on `cost`
-/// (`Sprawling/app/Spec.lean` §8-121).
-///
-/// # Errors
-/// Those of [`fold_city`].
 pub fn start_served_views(
     ledger_dir: &Path,
     now: kernel::TimeMs,

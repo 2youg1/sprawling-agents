@@ -3,22 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Freezing and resume. A Handoff is the five-section
-//! crossing point between a frozen Run and its successor. It is never a
-//! new authority: on conflict, fresh reads and real execution win.
-
 use kernel::event::record::HandoffWritten;
 use kernel::{AxCode, AxError, Locator, Payload, RunId};
 
-/// Five sections, always present: must-read / overview / progress /
-/// context / next step. Prose quality is the handoff probe's business;
-/// the type enforces structure only.
-///
-/// It writes a [`HandoffWritten`], whose field names are the line's
-/// keys, and is never read back from one: [`Handoff::new`] is the only
-/// way to hold one, and a reader that built one from a line would be a
-/// second door past that constructor's refusal of an empty must-read
-/// list.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Handoff {
     must_read: Vec<Locator>,
@@ -29,9 +16,7 @@ pub struct Handoff {
 }
 
 impl Handoff {
-    /// Sole constructor: the must-read list is non-empty and every entry
-    /// is an already-parsed Locator by type (the same move
-    /// as `Completion::Done(Evidence)`).
+
     pub fn new(
         must_read: Vec<Locator>,
         overview: String,
@@ -79,10 +64,6 @@ impl Handoff {
         &self.next_step
     }
 
-    /// The `handoff_written` payload: these five fields, encoded.
-    ///
-    /// # Errors
-    /// Propagates whatever `Payload::of` says about the encoding.
     pub fn payload(&self) -> Result<Payload, AxError> {
         Payload::of(&HandoffWritten {
             must_read: self.must_read.clone(),
@@ -94,17 +75,12 @@ impl Handoff {
     }
 }
 
-/// What a successor starts from. No method returns to the frozen Run:
-/// resume consumes a Handoff and a *new* identity supplied by the caller
-/// (kernel never generates randomness).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResumeSeed {
     pub run: RunId,
     pub must_read: Vec<Locator>,
 }
 
-/// Rebirth, not revival (meta-principle six): the frozen Run is not a
-/// parameter — there is no way to spell "wake the old Run up".
 pub fn resume(handoff: &Handoff, new_run: RunId) -> ResumeSeed {
     ResumeSeed {
         run: new_run,

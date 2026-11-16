@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The first two assertions of the `spec` gate (Tools/xtask/Spec.lean
-//! §8-42): a package holds exactly one effective specification, and prose
-//! names no SPEC the tree does not have.
-//!
-//! A migration that stops halfway leaves two specifications a builder
-//! has to choose between (`Sprawling/city/skills/sdd`, migration step 5); a migration
-//! that deleted the Markdown SPEC and left its citations behind sends a
-//! reader to a file that is gone. The second has already happened
-//! without any migration: a gate's rustdoc cited a `web` SPEC long after
-//! that crate stopped existing.
-
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -22,17 +11,12 @@ use crate::members::{self, Member};
 use crate::release;
 use crate::report::{Violation, XtaskError};
 
-/// How every Markdown SPEC's file name ends.
 const MARKDOWN: &str = "-SPEC.md";
 
-/// How a SPEC is cited in prose, with or without its extension.
 const CITED: &str = "-SPEC";
 
-/// The one document whose SPEC names are history: each of its sections
-/// describes the tree of that release.
 const HISTORY: &str = "docs/CHANGELOG.md";
 
-/// The extensions whose prose lines `release::is_prose` can tell apart.
 const PROSE: [&str; 4] = [".md", ".html", ".rs", ".lean"];
 
 pub(super) fn one_per_package(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskError> {
@@ -55,17 +39,13 @@ pub(super) fn one_per_package(root: &Path, out: &mut Vec<Violation>) -> Result<(
             held @ [..] => out.push(two_held(&member.dir, held)),
         }
     }
-    // The checker is no package, and its specification is held to the same
-    // count; having none is not judged here, because no cargo package
-    // promises that the directory exists.
+
     if let held @ [_, _, ..] = held_in(root, super::CHECKER)?.as_slice() {
         out.push(two_held(super::CHECKER, held));
     }
     Ok(())
 }
 
-/// The specifications sitting in `dir`: its Markdown SPECs, then its
-/// `Spec.lean` when it has migrated.
 fn held_in(root: &Path, dir: &str) -> Result<Vec<String>, XtaskError> {
     let mut held = markdown_in(root, dir)?;
     if lean::migrated(root, dir) {
@@ -74,7 +54,6 @@ fn held_in(root: &Path, dir: &str) -> Result<Vec<String>, XtaskError> {
     Ok(held)
 }
 
-/// A directory holding more than one effective specification.
 fn two_held(dir: &str, held: &[String]) -> Violation {
     finding(
         dir.to_owned(),
@@ -86,7 +65,6 @@ fn two_held(dir: &str, held: &[String]) -> Violation {
     )
 }
 
-/// The Markdown SPECs sitting directly in `dir`, repo-relative, sorted.
 fn markdown_in(root: &Path, dir: &str) -> Result<Vec<String>, XtaskError> {
     let io = |source| XtaskError::Io {
         path: dir.to_owned(),
@@ -119,7 +97,7 @@ pub(super) fn no_dangling_names(root: &Path, out: &mut Vec<Violation>) -> Result
         if rel == HISTORY || !PROSE.iter().any(|ext| rel.ends_with(ext)) {
             continue;
         }
-        // Bytes that are not UTF-8 are fixtures, as `release` reads them.
+
         let Ok(text) = std::fs::read_to_string(root.join(rel)) else {
             continue;
         };
@@ -143,9 +121,6 @@ pub(super) fn no_dangling_names(root: &Path, out: &mut Vec<Violation>) -> Result
     Ok(())
 }
 
-/// Every `<name>-SPEC` a line names, with or without `.md`. A name made
-/// of anything but letters, digits and underscores is a pattern such as
-/// `<lib>-SPEC.md`, not a citation.
 fn cited(line: &str) -> Vec<&str> {
     let part = |c: char| c.is_ascii_alphanumeric() || c == '_';
     line.match_indices(CITED)
@@ -166,8 +141,6 @@ fn cited(line: &str) -> Vec<&str> {
         .collect()
 }
 
-/// Where a reader should look instead: the Lean specification of the
-/// package of that name, when it has migrated.
 fn successor(root: &Path, found: &[Member], stem: &str) -> String {
     found
         .iter()

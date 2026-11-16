@@ -3,21 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The taint ring. One axiom: external content is
-//! always data. `Tainted::new` is the city-wide sole entrance for foreign
-//! bytes; reads hand out borrows, derivation unions provenance, and no
-//! method ever returns the bare value — "washing it clean" is a compile
-//! error, not a review finding.
-//! The part `Sprawling/kernel/spec/Taint.lean` specifies this module.
-//!
-//! Deliberately absent: serde on `Tainted` (deserialization would be a
-//! second entrance and a forged-empty-taint hole) and any `into_inner`.
-
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
-/// Non-empty provenance label, e.g. `web:example.com`, `file:upload`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct TaintSource(String);
 
@@ -36,9 +25,6 @@ impl TaintSource {
     }
 }
 
-/// Union semilattice of provenance. Empty means internally produced.
-/// Serializable (event payloads and approval items carry source lists);
-/// order is BTreeSet's, hence deterministic.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TaintSet(BTreeSet<TaintSource>);
 
@@ -74,8 +60,6 @@ impl TaintSet {
     }
 }
 
-/// The sources, comma-separated in the set's order: the one wording
-/// every C15 refusal uses to say where a run's content came from.
 impl std::fmt::Display for TaintSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.iter().enumerate().try_for_each(|(at, source)| {
@@ -85,9 +69,6 @@ impl std::fmt::Display for TaintSet {
     }
 }
 
-/// External content with its provenance welded on. The value is private;
-/// `peek` lends, `map`/`join` derive with automatic union, and nothing
-/// returns `T` by value.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tainted<T> {
     value: T,
@@ -95,9 +76,7 @@ pub struct Tainted<T> {
 }
 
 impl<T> Tainted<T> {
-    /// City-wide sole entrance for external content. Custody (secret scan
-    /// before CAS) composes at this call site in the effect layer;
-    /// the type itself stays pure.
+
     pub fn new(value: T, source: TaintSource) -> Tainted<T> {
         Tainted {
             value,
@@ -105,7 +84,6 @@ impl<T> Tainted<T> {
         }
     }
 
-    /// Borrow the content: you can read it, you cannot walk away with it.
     pub fn peek(&self) -> &T {
         &self.value
     }
@@ -114,8 +92,6 @@ impl<T> Tainted<T> {
         &self.taint
     }
 
-    /// Derivation keeps the full provenance. The closure borrows — moving
-    /// the value out through it cannot be spelled.
     pub fn map<U>(self, f: impl FnOnce(&T) -> U) -> Tainted<U> {
         Tainted {
             value: f(&self.value),
@@ -123,7 +99,6 @@ impl<T> Tainted<T> {
         }
     }
 
-    /// Two-source derivation: the result carries the union.
     pub fn join<U, V>(self, other: Tainted<U>, f: impl FnOnce(&T, &U) -> V) -> Tainted<V> {
         Tainted {
             value: f(&self.value, &other.value),
@@ -131,11 +106,6 @@ impl<T> Tainted<T> {
         }
     }
 }
-
-// No kani harness lives here. Union monotonicity is a proposition about
-// a `BTreeSet` of `String`s, which gives CBMC loops it cannot bound, and
-// a harness over two fixed labels would only restate the proptest below
-// over a narrower domain (`Sprawling/kernel/Spec.lean` §2).
 
 #[cfg(test)]
 #[allow(
@@ -174,15 +144,12 @@ mod tests {
     fn peek_lends_without_moving() {
         let tainted = Tainted::new(vec![1u8, 2], source("mail:inbound"));
         assert_eq!(tainted.peek().len(), 2);
-        // Still usable afterwards: peek did not consume.
+
         assert_eq!(tainted.taint().len(), 1);
     }
 
     proptest! {
-        /// A set built by union holds exactly the labels it was built
-        /// from, in sorted order, and says so in one comma-separated
-        /// line: the wording every C15 refusal gives for where content
-        /// came from.
+
         #[test]
         fn a_set_holds_and_names_exactly_its_sources(
             labels in proptest::collection::btree_set("[a-z]{1,6}", 0..5),
@@ -200,7 +167,6 @@ mod tests {
             prop_assert_eq!(set.to_string(), expected.join(", "));
         }
 
-        /// The kani mirror (union monotonicity), runnable on every host.
         #[test]
         fn join_output_contains_both_inputs(labels_a in proptest::collection::vec("[a-z]{1,8}", 1..4),
                                             labels_b in proptest::collection::vec("[a-z]{1,8}", 1..4)) {

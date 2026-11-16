@@ -3,43 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A fixture city with a history (`Tools/citysim/spec/BenchStartup.lean` §8-5-1).
-//!
-//! Shape: adapter. The city is raised by `init_city` and its history is
-//! written through `storage::jsonl::append`, so the segments,
-//! the chain and the canonical bytes are the product's and no line is
-//! spelled here. What this file owns is the shape of one run's history,
-//! which is sized like the records of a city that has been working.
-//!
-//! A city is generated under a `.partial` name and renamed when it is
-//! whole, so an interrupted generation is regenerated rather than reused.
-
 use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxCode, AxError, EventDraft, EventKind, Payload, RunId, TimeMs};
 use serde_json::{Value, json};
 
-/// How much history a fixture city carries.
 pub enum History {
-    /// The three records `init` writes.
+
     Empty,
-    /// That many runs of fifty records each, after the genesis.
+
     Runs(u32),
 }
 
-/// Turns per run: with `run_started` and `run_frozen`, fifty records.
 const TURNS: u32 = 8;
-/// Rooms the runs are spread over.
+
 const ROOMS: u32 = 40;
-/// Runs handed to the ledger per `append_all`: 10,000 records, so the
-/// drafts held at once stay a few megabytes whatever the city's length.
+
 const RUNS_PER_WAVE: u32 = 200;
 
-/// The city `name` under `cities`, generated if it is not there yet.
-///
-/// # Errors
-/// Propagates the product's refusals while raising the city or writing
-/// its history, and the filesystem's while clearing or renaming.
 pub fn fixture_city(cities: &Path, name: &str, history: History) -> Result<PathBuf, AxError> {
     let city = cities.join(name);
     if city.is_dir() {
@@ -86,7 +67,6 @@ fn write_runs(ledger_dir: &Path, runs: u32) -> Result<(), AxError> {
     Ok(())
 }
 
-/// One run's fifty drafts, sized like the records of a working city.
 fn one_run(index: u32, t: &mut u64, into: &mut Vec<EventDraft>) -> Result<(), AxError> {
     let [a, b, c, d] = index.to_le_bytes();
     let run = RunId::from_bytes([a, b, c, d, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x5e]);
@@ -171,7 +151,6 @@ fn one_run(index: u32, t: &mut u64, into: &mut Vec<EventDraft>) -> Result<(), Ax
     )
 }
 
-/// Ordinary prose of about `bytes` bytes.
 fn prose(bytes: usize) -> String {
     "the parser reads a line and writes a record then checks the chain before it moves on "
         .chars()

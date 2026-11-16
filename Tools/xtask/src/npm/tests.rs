@@ -8,10 +8,6 @@ use std::collections::BTreeSet;
 use super::lockfile::{allowed, document, lock_of, manifest_of, permitted, read_jsonc};
 use super::{RUNTIME, judge_lockfile, judge_runtime};
 
-/// What `bun.lock` actually looks like: trailing commas after the last
-/// entry of every object. A reader that handed this to `serde_json`
-/// unchanged would fail on the first table and report the whole client
-/// as drift.
 #[test]
 fn the_lockfile_bun_writes_is_read_despite_its_trailing_commas() {
     let text = r#"{
@@ -36,18 +32,12 @@ fn the_lockfile_bun_writes_is_read_despite_its_trailing_commas() {
     assert_eq!(locked.development.len(), 1);
 }
 
-/// A comma inside a string is content, and a `//` inside one is a URL.
-/// A normaliser that edited either would change what is compared.
 #[test]
 fn a_comma_or_a_slash_inside_a_string_survives_normalisation() {
     let text = r#"{"home": "https://example.test/a,b", "range": ">=1, <2"}"#;
     assert_eq!(read_jsonc(text), text);
 }
 
-/// The two files disagreeing is the drift this assertion exists for, and
-/// each of the three shapes it takes is named separately: a version that
-/// moved, an entry the lockfile never learned, and one it kept after the
-/// manifest dropped it.
 #[test]
 fn every_way_the_lockfile_and_the_manifest_disagree_is_named() {
     let manifest = manifest_of(
@@ -73,9 +63,6 @@ fn every_way_the_lockfile_and_the_manifest_disagree_is_named() {
     assert!(said.iter().any(|held| held.contains("left-pad")));
 }
 
-/// Both directions. A gate that only refused additions would wave
-/// through the day `svelte` is deleted by accident, and that is the
-/// half a person would notice last.
 #[test]
 fn the_runtime_allowlist_is_judged_in_both_directions() {
     let judged = |names: &[&str]| {
@@ -109,9 +96,6 @@ fn the_runtime_allowlist_is_judged_in_both_directions() {
     assert!(judged(&RUNTIME).is_empty());
 }
 
-/// An `OR` offers a choice and an `AND` imposes all of it. Reading them
-/// the other way round would either refuse half the ecosystem or admit a
-/// licence this repository does not permit.
 #[test]
 fn an_spdx_expression_is_read_the_way_cargo_deny_reads_it() {
     let permitted: BTreeSet<String> = ["MIT".to_owned(), "Apache-2.0".to_owned()].into();
@@ -126,9 +110,6 @@ fn an_spdx_expression_is_read_the_way_cargo_deny_reads_it() {
     );
 }
 
-/// Parentheses group before an `OR` splits them, `WITH` binds its
-/// exception to one licence, and an expression that does not parse is a
-/// licence nobody stated (Tools/xtask/Spec.lean §8-12).
 #[test]
 fn parentheses_group_before_an_or_splits_them() {
     let permitted: BTreeSet<String> = [
@@ -147,9 +128,6 @@ fn parentheses_group_before_an_or_splits_them() {
     assert!(!allowed("MIT AND", &permitted));
 }
 
-/// The allowlist has one home. A second copy inside this gate would let
-/// the two sides of the tree carry different licences and call both
-/// green.
 #[test]
 fn the_permitted_licences_are_this_repositorys_own_and_not_a_second_copy() {
     let text = std::fs::read_to_string(root().join("deny.toml")).unwrap();
@@ -160,16 +138,6 @@ fn the_permitted_licences_are_this_repositorys_own_and_not_a_second_copy() {
     assert!(permitted("[bans]\ndeny = []\n").is_err());
 }
 
-/// Every workflow that runs these gates prepares what they judge.
-///
-/// This gate refuses an absent `client/node_modules` and `render`
-/// refuses an absent bundle, so a workflow that runs either on a bare
-/// runner is red for a reason no source change explains. Three
-/// workflows spelled that preparation themselves and two were never
-/// updated when the gates stopped skipping: `release.yml` cut v0.0.6
-/// red, and `platforms.yml` was spared only by its schedule taking the
-/// skip branch. The preparation is one composite action so that this
-/// assertion has a single name to look for.
 #[test]
 fn every_workflow_running_the_gates_prepares_what_they_judge() {
     const PREPARES: &str = "./.github/actions/client-artifacts";
@@ -184,8 +152,7 @@ fn every_workflow_running_the_gates_prepares_what_they_judge() {
     for entry in std::fs::read_dir(root().join(".github/workflows")).unwrap() {
         let path = entry.unwrap().path();
         let text = std::fs::read_to_string(&path).unwrap();
-        // A comment names these commands to explain them; only a line
-        // that runs one puts the gates in front of a tree.
+
         let judges = text
             .lines()
             .filter(|line| !line.trim_start().starts_with('#'))

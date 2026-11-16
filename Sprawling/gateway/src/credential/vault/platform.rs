@@ -3,24 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The operating system's credential store on this target, and the name
-//! a secret reference takes inside it (`Sprawling/gateway/spec/Credential.lean` §8-4).
-
 use std::collections::HashMap;
 
 use kernel::{AxCode, AxError, SecretRef};
 use keyring_core::api::CredentialStoreApi as _;
 
-/// The entry `reference` names in this target's credential store.
-///
-/// The store is built on every call rather than set as the process's
-/// default store, so no code outside the vault can change where a key
-/// lands. Building an entry touches nothing in the store; setting,
-/// reading or deleting it does.
-///
-/// # Errors
-/// `E_CONFIG_INVALID` when the store cannot be opened or refuses the
-/// name, with the recovery that names this target's service.
 pub(super) fn entry(reference: &SecretRef) -> Result<keyring_core::Entry, AxError> {
     let service = service(reference);
     let named = modifiers(reference);
@@ -41,18 +28,10 @@ pub(super) fn entry(reference: &SecretRef) -> Result<keyring_core::Entry, AxErro
     })
 }
 
-/// The service a reference's realm is kept under, on every target.
 fn service(reference: &SecretRef) -> String {
     format!("sprawling/{}", reference.realm())
 }
 
-/// The store-specific modifiers that fix where this reference lives.
-///
-/// They spell the names keyring 3 wrote, so a key stored before the
-/// move to keyring-core is found where it was left: the Windows target
-/// name is `<name>.<service>`, and the Linux keyutils description is
-/// `keyring-rs:<name>@<service>`. The keychain on macOS is addressed by
-/// service and account alone, so it takes no modifier.
 pub(super) fn modifiers(reference: &SecretRef) -> Vec<(&'static str, String)> {
     let (name, service) = (reference.name(), service(reference));
     if cfg!(windows) {
@@ -91,8 +70,6 @@ fn built(
     linux_keyutils_keyring_store::Store::new()?.build(service, user, Some(modifiers))
 }
 
-/// A target with no credential store this build links: the probe reads
-/// the refusal and keeps the city's secrets in session memory.
 #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
 fn built(
     _service: &str,
@@ -109,9 +86,6 @@ fn built(
 mod tests {
     use super::*;
 
-    /// Windows Credential Manager finds a credential by its target name
-    /// alone, so a key a person stored before the move to keyring-core
-    /// is found only under the name keyring 3 gave it.
     #[cfg(windows)]
     #[test]
     fn on_windows_a_reference_keeps_the_target_name_keyring_3_wrote() {
@@ -122,8 +96,6 @@ mod tests {
         );
     }
 
-    /// The kernel keyring finds a key by its description, and the
-    /// keyutils store's own default prefix is not the one keyring 3 wrote.
     #[cfg(target_os = "linux")]
     #[test]
     fn on_linux_a_reference_keeps_the_description_keyring_3_wrote() {

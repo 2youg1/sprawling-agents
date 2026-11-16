@@ -3,27 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one run actually saw, written beside its room when it freezes.
-//!
-//! One `ChatMessage` per line, in the serde form the wire uses, so a
-//! line number `search` reports is a message index `read` continues
-//! from. The frozen prefix is not here: it is the half of every request
-//! that never changes, and the ledger's `prompt_assembled` already
-//! holds its hash.
-//!
-//! **This is not the ledger, and it must not point at it.** The ledger
-//! lives under the reserved subtree `read` refuses, and it is one chain
-//! for the whole city — handing it to one resident hands over a
-//! confidential building's events as well. A transcript is one run's,
-//! written in that run's room, and who may read it is the read bound's
-//! answer for that room: `read` and `search` ask it of a transcript's
-//! path as of any other, so a confidential building's transcripts stay
-//! inside it (`Sprawling/city/Spec.lean` §8-2).
-//!
-//! Three steps in a fixed order: scanned for credentials, pinned into
-//! the CAS, then materialised. Scanned before pinned, because a key that
-//! reached the content store cannot be taken back out.
-
 use std::path::Path;
 
 use kernel::layout::TRANSCRIPT_EXT;
@@ -34,9 +13,6 @@ use storage::Cas;
 use crate::conversation::Conversation;
 use crate::redact;
 
-/// The messages one run's model saw, one JSON line each, already
-/// scanned. Private fields: a transcript that skipped the scan cannot
-/// be assembled a line at a time.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transcript {
     run: RunId,
@@ -44,7 +20,6 @@ pub struct Transcript {
     redacted: u32,
 }
 
-/// Where a transcript landed, and the way back to its bytes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TranscriptRecord {
     pub address: Address,
@@ -53,11 +28,7 @@ pub struct TranscriptRecord {
 }
 
 impl Transcript {
-    /// Renders and scans every message of the window.
-    ///
-    /// # Errors
-    /// Refuses a message that will not serialise, which is a defect in
-    /// the wire types rather than in the conversation.
+
     pub fn of(run: RunId, conversation: &Conversation) -> Result<Transcript, AxError> {
         let mut lines = Vec::with_capacity(conversation.messages().len());
         let mut redacted: u32 = 0;
@@ -106,11 +77,6 @@ impl Transcript {
         })
     }
 
-    /// `<room>/<run-id>.jsonl`. Pure, so a handoff can name the address
-    /// before the run it belongs to has taken a turn.
-    ///
-    /// # Errors
-    /// Propagates a room whose address cannot take another segment.
     pub fn address(room: &Address, run: RunId) -> Result<Address, AxError> {
         Address::parse(&format!("{}/{run}.{TRANSCRIPT_EXT}", room.as_str()))
     }
@@ -123,12 +89,10 @@ impl Transcript {
         &self.lines
     }
 
-    /// How many secret-shaped spans the scan replaced.
     pub fn redacted(&self) -> u32 {
         self.redacted
     }
 
-    /// The bytes of the file: every line newline-terminated.
     pub fn bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         for line in &self.lines {
@@ -138,16 +102,6 @@ impl Transcript {
         out
     }
 
-    /// Pins the transcript in the store, then writes it read-only at
-    /// its address under `city_root`.
-    ///
-    /// Writing the same transcript twice is writing it once: the store
-    /// deduplicates by content, and a file already at the address is
-    /// left as it is.
-    ///
-    /// # Errors
-    /// Propagates a store that will not take the bytes and a room that
-    /// will not take the file, each naming the path.
     pub fn materialise(
         &self,
         cas: &mut Cas,

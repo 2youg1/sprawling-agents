@@ -3,28 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The runs a process death left open, and the line that freezes each
-//! one (`Sprawling/accounting/spec/Worker/Genesis/Lost.lean` §8-18-1, ARCHITECTURE.md 13.7 `Lost --> Frozen`).
-//!
-//! The scan that reads them runs only once the worker holds the writer's
-//! lock and before it drives anything, so a run with a `run_started` and
-//! no `run_frozen` is one the last process was driving when it died: no
-//! process will ever freeze it but this one.
-
 use std::collections::BTreeMap;
 
 use kernel::event::record::RunFrozen;
 use kernel::{AxError, EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};
 
-/// Every run still open in the records observed so far: the seq of its
-/// `run_started`, which orders the freezes, and the author of its latest
-/// line, which writes them.
 #[derive(Debug, Default)]
 pub(super) struct OpenRuns {
     open: BTreeMap<RunId, Open>,
 }
 
-/// One open run, as far as the freeze needs it.
 #[derive(Debug)]
 struct Open {
     started: Seq,
@@ -32,12 +20,7 @@ struct Open {
 }
 
 impl OpenRuns {
-    /// Reads one record, in ledger order.
-    ///
-    /// The author follows the run's latest line because `run_started` is
-    /// written as the city and every later line as the run's resident;
-    /// the freeze is counted against the resident, as the closing
-    /// `tool_result` of a dangling call is.
+
     pub(super) fn observe(&mut self, record: &EventRecord) {
         let run = record.run();
         let kind = record.kind();
@@ -56,12 +39,6 @@ impl OpenRuns {
         }
     }
 
-    /// One `run_frozen` per run still open, stamped `t`, in the order the
-    /// runs started.
-    ///
-    /// # Errors
-    /// Propagates a freeze the payload refuses, which `RunFrozen::lost`
-    /// never builds.
     pub(super) fn into_drafts(self, t: TimeMs) -> Result<Vec<EventDraft>, AxError> {
         let mut open: Vec<(RunId, Open)> = self.open.into_iter().collect();
         open.sort_by_key(|(_, one)| one.started);
@@ -71,8 +48,7 @@ impl OpenRuns {
                     run,
                     t,
                     who: one.who,
-                    // As `runtime::run::Charter::close` writes a freeze:
-                    // the room is on the run's `run_started`.
+
                     addr: None,
                     kind: EventKind::RunFrozen,
                     data: Payload::of(&RunFrozen::lost())?,
@@ -95,10 +71,6 @@ mod tests {
     use crate::worker::RunWorker;
     use crate::worker::fixture::{hands, init_city};
 
-    /// A run the process died in has its opening line and no freeze: the
-    /// scan closes its call, then freezes it cancelled with the cause, as
-    /// the resident whose lines it wrote; a second scan writes nothing
-    /// (`Sprawling/accounting/spec/Worker/Genesis/Lost.lean` §8-18-1).
     #[test]
     fn a_run_the_process_died_in_is_frozen_once() {
         let dir = tempfile::tempdir().unwrap();

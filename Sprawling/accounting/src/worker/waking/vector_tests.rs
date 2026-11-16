@@ -12,16 +12,6 @@
     reason = "test code"
 )]
 
-//! The derived check of `Sprawling/collab/spec/Workshop.lean`: its four
-//! trace vectors replayed through the production hand-over, with the
-//! parent standing in as a desk pair and its ending given as
-//! `GraphAfter`, and the children as real runs that land and hand back.
-//!
-//! Every vector is replayed through the same doors production uses:
-//! `RunWorker::hand_over_at_call`, the child runs' landings and
-//! handbacks, and `end_hand_over`. `laid_out` builds the drive once for
-//! all four.
-
 use std::collections::BTreeSet;
 use std::sync::{Arc, Condvar, Mutex};
 
@@ -31,7 +21,6 @@ use crate::worker::waking::handing::{GraphAfter, Handing};
 
 const PARENT: &str = "lab/room1";
 
-/// The diamond of the model: 1 first, 2 and 3 after 1, 4 after both.
 fn diamond() -> Vec<collab::NodeContract> {
     [
         ("n1", &[][..]),
@@ -58,12 +47,6 @@ fn diamond() -> Vec<collab::NodeContract> {
     .collect()
 }
 
-/// A city with the building, a worker whose provider ends every node
-/// Done except those named in `stopping`, whose empty reply ends them
-/// Limit and so hands back `Handback::Stopped`, every model call
-/// passed through `pace` first, and the parent's graph laid out on
-/// its desks and handed to the city the way a call is:
-/// `hand_over_at_call`.
 fn laid_out(
     dir: &std::path::Path,
     stopping: &[&str],
@@ -126,8 +109,6 @@ fn laid_out(
     (worker, report.ledger_dir, Box::new(provider))
 }
 
-/// The node rooms in the order their runs started: the model's
-/// `handed`.
 fn handed(ledger_dir: &std::path::Path) -> Vec<String> {
     runtime::replay::verify_ledger_dir(ledger_dir)
         .unwrap()
@@ -139,17 +120,12 @@ fn handed(ledger_dir: &std::path::Path) -> Vec<String> {
         .collect()
 }
 
-/// A pace that lets every model call through.
 fn unpaced() -> Pace {
     Arc::new(|_: &str| {})
 }
 
-/// Opened once by the test; until then a held model call waits.
 type Gate = Arc<(Mutex<bool>, Condvar)>;
 
-/// A pace that holds every model call naming `key` until `gate`
-/// opens, so the node's landing follows a step the test takes
-/// rather than whichever lane is faster.
 fn holding(key: &'static str, gate: &Gate) -> Pace {
     let gate = Arc::clone(gate);
     Arc::new(move |request: &str| {
@@ -174,8 +150,6 @@ fn open(gate: &Gate) {
     gate.1.notify_all();
 }
 
-/// How many handbacks reached the parent's room: the model's `backs`,
-/// which counts a stopped node as well as a finished one.
 fn handed_back(ledger_dir: &std::path::Path) -> usize {
     runtime::replay::verify_ledger_dir(ledger_dir)
         .unwrap()
@@ -194,9 +168,6 @@ fn joined(worker: &RunWorker) -> usize {
         .map_or(0, |join| join.artifacts().count())
 }
 
-/// Serves the crossing until `count` nodes have joined, or until no
-/// run is left driving, so an implementation that hands nothing down
-/// fails the test's assertions instead of hanging it.
 fn until_joined(worker: &mut RunWorker, count: usize) {
     while joined(worker) < count && worker.driving() {
         worker
@@ -205,8 +176,6 @@ fn until_joined(worker: &mut RunWorker, count: usize) {
     }
 }
 
-/// `vectorEarly`: every node lands before the parent ends Done, and
-/// the graph hands 1, then 2 and 3, then 4, and closes when joined.
 #[test]
 fn vector_early_hands_every_node_once_in_dependency_order() {
     let dir = tempfile::tempdir().unwrap();
@@ -230,8 +199,6 @@ fn vector_early_hands_every_node_once_in_dependency_order() {
     );
 }
 
-/// `vectorCancelled`: node 1 lands, the parent is cancelled, 2 and 3
-/// still run to the end and hand back, and 4 is never handed down.
 #[test]
 fn vector_cancelled_hands_nothing_after_the_parent_ends() {
     let dir = tempfile::tempdir().unwrap();
@@ -262,10 +229,6 @@ fn vector_cancelled_hands_nothing_after_the_parent_ends() {
     );
 }
 
-/// `vectorFailed`: 1 and 2 land, the parent fails, and 3, still in
-/// flight, hands back after it, so 4 is never handed down. Node 3's
-/// model call is held until the parent has ended, which makes the
-/// order the vector's rather than the lanes'.
 #[test]
 fn vector_failed_hands_nothing_after_the_parent_fails() {
     let dir = tempfile::tempdir().unwrap();
@@ -299,15 +262,6 @@ fn vector_failed_hands_nothing_after_the_parent_fails() {
     );
 }
 
-/// `vectorStopped`: the parent ends Limit first, which leaves the
-/// graph open; 1 finishes, 2 stops, 3 finishes. All three hand back,
-/// but the stopped node does not join, so 4 never becomes ready and
-/// the graph stays registered for a join that cannot come. This is
-/// the behaviour the model states while the open question of
-/// `Sprawling/collab/Spec.lean` §3, what a stopped node does to its
-/// graph, stands; settling it changes the model first and this test
-/// with it. The model's last act, a second landing of 2, has no
-/// production door: a run lands once.
 #[test]
 fn vector_stopped_leaves_the_graph_open_and_hands_no_more() {
     let dir = tempfile::tempdir().unwrap();

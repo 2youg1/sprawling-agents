@@ -3,27 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Opening a Locator: `cas:` bytes and `file:` bytes at a commit
-//! (`Sprawling/runtime/spec/Tools/Read.lean` §8-29-5).
-//!
-//! **A content block is judged at the building it was put for.** The
-//! same bytes may sit in the store because a confidential building put
-//! them there, and a hash can be copied from anywhere, so the only
-//! answer to whose a block is comes from the record the store wrote when
-//! it took the bytes. [`judged_at`] is the one place that decides which
-//! address a Locator is judged at; the judgement itself stays
-//! `chosen_path::admit`.
-
 use kernel::{Address, AxCode, AxError, B3Hash, Locator, ReadVerdict};
 use storage::StorageError;
 
 use crate::tools::BoundReader;
 use crate::tools::chosen_path::admit;
 
-/// The Locator a `cas:` or `file:` argument names and the bytes behind
-/// it, or `None` when the argument is not a Locator and belongs to the
-/// catalog or a path. `read` and [`BoundReader`] both open Locators
-/// here; `action` names the tool in every refusal.
 pub(in crate::tools) fn open_locator(
     asked: &str,
     reader: &BoundReader,
@@ -92,14 +77,6 @@ fn read_admitted(
     Ok((locator, bytes))
 }
 
-/// The building whose read bound decides a `cas:` block: the first
-/// building it was put for that this reader may read, or, when there is
-/// none, the first it was put for, so that `admit` refuses with that
-/// building's reason. A `file:` is judged at its own address and needs
-/// no decision.
-///
-/// # Errors
-/// `E_GATE_DENIED` for a block put for no building.
 fn judged_at(
     hash: &B3Hash,
     origins: &[storage::BlockOrigin],

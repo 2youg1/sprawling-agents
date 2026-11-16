@@ -3,19 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The measurement half: APCA lightness contrast on the hue axis, and
-//! the Bronze Simple Mode size tables a type step is judged against.
-
 use super::{GRAY_CHROMA, HUE_AXIS};
 
-/// The APCA-RC Bronze Simple Mode minimum sizes, transcribed from the
-/// published criterion: for each tier, the smallest size each weight may
-/// use. Body text and everything else have different tables, which is the
-/// whole reason the two are kept apart.
-///
-/// Lc 30 is deliberately absent. Its published scope is placeholder text,
-/// disabled controls and non-text elements - it is not a floor content may
-/// fall back to, and treating it as one makes every size pass.
 const BRONZE_BODY: [(u16, &[(u16, u16)]); 2] = [
     (90, &[(300, 18), (400, 14)]),
     (75, &[(300, 24), (400, 18), (500, 16), (700, 14)]),
@@ -37,17 +26,11 @@ const BRONZE_CONTENT: [(u16, &[(u16, u16)]); 4] = [
     (45, &[(400, 36), (700, 24)]),
 ];
 
-/// The lowest tier that admits this size at this weight, or `None` when no
-/// tier does - which means the step is too small to be content at any
-/// contrast, and is a defect in the type scale rather than in the palette.
 pub(super) fn bronze_tier(px: u16, weight: u16, body: bool) -> Option<u16> {
     let rows: &[(u16, &[(u16, u16)])] = if body { &BRONZE_BODY } else { &BRONZE_CONTENT };
     rows.iter()
         .filter(|(_, mins)| {
-            // A heavier face is legible smaller, so a weight the table does
-            // not list takes the heaviest listed weight at or below it, and
-            // failing that the lightest listed - which is the strictest
-            // reading available.
+
             let floor = mins
                 .iter()
                 .filter(|(w, _)| *w <= weight)
@@ -59,15 +42,6 @@ pub(super) fn bronze_tier(px: u16, weight: u16, body: bool) -> Option<u16> {
         .min()
 }
 
-/// APCA lightness contrast between two on-axis tokens, both given as
-/// lightness in per mille. Reverse polarity (light text on a dark surface)
-/// reports negative, and the absolute value is what the tiers compare
-/// against.
-///
-/// Constants are apca-w3 0.1.9 / 0.98G-4g. The 8-bit quantisation is
-/// reproduced because a browser displays quantised channels, and the
-/// difference decides a boundary case; it is done in floating point so that
-/// no lossy integer conversion appears anywhere in this file.
 pub(super) fn apca_lc(text: u16, surface: u16) -> f64 {
     lc_between(
         screen_luminance(axis_encoded(text)),
@@ -75,13 +49,6 @@ pub(super) fn apca_lc(text: u16, surface: u16) -> f64 {
     )
 }
 
-/// APCA lightness contrast between an on-axis text token and a fill laid
-/// at `percent` opacity over an on-axis backdrop: the glass role over the
-/// surface behind it (Tools/xtask/Spec.lean §8-51).
-///
-/// The two are mixed channel by channel in the encoded space, which is
-/// how an engine composites a translucent fill over what it already drew;
-/// the result is then quantised like any other displayed colour.
 pub(super) fn apca_lc_over(text: u16, fill: u16, backdrop: u16, percent: u16) -> f64 {
     let alpha = f64::from(percent.min(100)) / 100.0;
     let mut mixed = [0.0; 3];
@@ -97,7 +64,6 @@ pub(super) fn apca_lc_over(text: u16, fill: u16, backdrop: u16, percent: u16) ->
     )
 }
 
-/// The APCA-W3 contrast of text on a surface, both as screen luminance.
 fn lc_between(text_y: f64, surface_y: f64) -> f64 {
     let text_y = soft_clamp(text_y);
     let surface_y = soft_clamp(surface_y);
@@ -114,8 +80,6 @@ fn lc_between(text_y: f64, surface_y: f64) -> f64 {
     (raw * 100.0).abs()
 }
 
-/// An on-axis token as gamma-encoded sRGB: OKLCH through OKLab to linear
-/// sRGB, clipped to the gamut, then the sRGB transfer curve.
 fn axis_encoded(lightness: u16) -> [f64; 3] {
     let l = f64::from(lightness) / 1000.0;
     let chroma = f64::from(GRAY_CHROMA) / 1000.0;
@@ -139,8 +103,6 @@ fn axis_encoded(lightness: u16) -> [f64; 3] {
     })
 }
 
-/// Screen luminance of an encoded colour: quantised to eight bits, as a
-/// browser displays it, then APCA's own simple transfer curve.
 fn screen_luminance(encoded: [f64; 3]) -> f64 {
     let coefficients = [0.212_672_9, 0.715_152_2, 0.072_175_0];
     encoded
@@ -150,8 +112,6 @@ fn screen_luminance(encoded: [f64; 3]) -> f64 {
         .sum()
 }
 
-/// APCA lifts the darkest values so that near-black pairs do not report
-/// more contrast than an eye finds there.
 fn soft_clamp(y: f64) -> f64 {
     if y > 0.022 {
         y

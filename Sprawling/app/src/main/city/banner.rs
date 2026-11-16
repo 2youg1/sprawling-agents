@@ -3,14 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The banner a city with no face of its own prints once it listens
-//! (`Sprawling/app/spec/Firstrun.lean` §8-8): a harness reads the URL
-//! from it, so it stays plain lines on standard output.
-
 use sprawling::serving;
 
-/// What a person reads once the city listens: where it is, where to
-/// open it, what client it serves, and the key when one was minted.
 pub(super) fn print_banner(
     city: &std::path::Path,
     url: &str,
@@ -30,11 +24,7 @@ pub(super) fn print_banner(
             println!("    key      the one you configured; this city will ask for it");
             println!();
         }
-        // Shown here and nowhere else a person reads; the key file this
-        // account alone reads holds it for programs on this machine.
-        // Never inside an address: an address goes into the browser's
-        // history, its bookmarks and screenshots, and the page reads no
-        // key from it (`Sprawling/app/spec/Keying.lean` §8-22).
+
         serving::Keyed::Minted(code) => {
             println!("    key      {code}");
             println!();
@@ -48,19 +38,13 @@ pub(super) fn print_banner(
     println!();
 }
 
-/// Who reads the lines this city prints, which decides how a person
-/// pairs a browser with it.
 pub(super) enum Reader {
-    /// The line console: `/web` is typed here.
+
     LineConsole,
-    /// Nobody at a console; usually a log.
+
     Log,
 }
 
-/// How a browser is paired with a city that has no face of its own. The
-/// pairing code is not printed: this output is usually a log, a code in
-/// it stays good until its first guess, and it is never printed again
-/// when a guess replaces it (`Sprawling/app/spec/Firstrun.lean` §8-8).
 pub(super) fn print_pairing(reader: Reader) {
     match reader {
         Reader::LineConsole => {

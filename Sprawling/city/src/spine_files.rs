@@ -3,27 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The documents a building keeps its long work in, and the job file a
-//! run starts from.
-//!
-//! Three of the four spine documents are laid out here — `Roadmap.md`
-//! and `Memo.md` with the building, `Handoff.md` with each room. The
-//! fourth, `RULES.toml`, is written where its meaning lives
-//! (`crate::building`, read by `crate::policy`): one file, one writer.
-//!
-//! The handoff is the room's rather than the building's:
-//! two sessions of one building can freeze at once, and one file for
-//! both would be two contents fighting over one name.
-//!
-//! Nothing here overwrites. A building that has been working keeps its
-//! plan, its decisions and its handoff, whatever is run against it
-//! afterwards. The one file that is rewritten is `JOB.md`, because it
-//! holds the task of the current session rather than a record of past
-//! ones — and the record of past ones is in the ledger, where a rewrite
-//! cannot reach it.
-//!
-//! Specified by `Sprawling/city/spec/SpineFiles.lean` §8-5.
-
 use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxCode, AxError};
@@ -37,44 +16,26 @@ use blank::{empty_roadmap, is_blank_form};
 
 pub use hall::{CLERK_FILE, MAYOR_FILE, hall_discipline, hall_identity_path};
 
-/// The plan: the single denominator for progress in a building.
-///
-/// Named in `kernel` beside the table grammar that reads it, and spelled
-/// here so a caller of this module has one place to look. One authority,
-/// one alias — not two.
 pub const ROADMAP_FILE: &str = kernel::ROADMAP_FILE;
-/// Decisions and corrections.
+
 pub const MEMO_FILE: &str = "Memo.md";
-/// What the next agent needs before it starts. Named in
-/// `kernel::layout` beside the path it is laid down at, and spelled
-/// here for the same reason `ROADMAP_FILE` is.
+
 pub const HANDOFF_FILE: &str = kernel::layout::HANDOFF_FILE;
-/// What this building is and the decisions it holds, written before the
-/// code that follows them. The one spine document that is committed:
-/// a promise a clone cannot read is not a promise.
+
 pub const SPEC_FILE: &str = "SPEC.md";
-/// The city's own instructions, read into every prefix.
+
 pub const CITY_FILE: &str = "City.md";
-/// The bytes this build's default [`CITY_FILE`] holds, handed out only
-/// through `defaults::Shipped::City` so the one writer of the city's
-/// copy is `defaults::follow_defaults` (`Sprawling/city/spec/SpineFiles.lean`
-/// §8-41).
+
 pub(crate) const CITY_TEMPLATE: &str = include_str!("../templates/City.md");
-/// The conventions a project brings with it. **The city neither writes
-/// this file nor owns it**; it is listed here because a resident is
-/// given it rather than sent to fetch it. How it is matched and where
-/// it lands in the prompt is `accounting::worker::freezing::building_segment`.
+
 pub const AGENTS_FILE: &str = "AGENTS.md";
 
 const ROADMAP_TEMPLATE: &str = include_str!("../templates/Roadmap.md");
 const MEMO_TEMPLATE: &str = include_str!("../templates/Memo.md");
 const HANDOFF_TEMPLATE: &str = include_str!("../templates/Handoff.md");
-/// The condensed form of the seventeen-section crate SPEC: the same
-/// section order, with the sections that only a crate in this workspace
-/// owes left out. One template, so a building's SPEC and a crate's SPEC
-/// stay one shape rather than two competing ones.
+
 const SPEC_TEMPLATE: &str = include_str!("../templates/SPEC.md");
-/// The job file and the three markers `write_job` fills: one form, one home.
+
 const JOB_TEMPLATE: &str = include_str!("../templates/JOB.md");
 const FROM_PLACEHOLDER: &str = "<fill-from>";
 const TASK_PLACEHOLDER: &str = "<fill-task>";
@@ -83,49 +44,29 @@ use crate::building::template::NAME_PLACEHOLDER;
 
 const PROJECT_PLACEHOLDER: &str = "<project name>";
 
-/// What a dispatch knows about the work when the job file is written.
 pub struct JobBrief<'a> {
-    /// Who handed this work down, as `kernel::event::Who::handed_down_by`
-    /// renders it (`Sprawling/city/spec/SpineFiles.lean` D21).
+
     pub from: &'a str,
-    /// One line: what to produce.
+
     pub task: &'a str,
-    /// What counts as success, what counts as failure, when to stop.
+
     pub goal: &'a str,
 }
 
-/// What one session was given to work from.
-///
-/// Whoever assigns the work writes it. The file lands on disk before the
-/// run's first event, so the task exists before the Run does; that
-/// ordering is this type's caller's to keep, which is why the fact lives
-/// here rather than in the form every agent reads.
-///
-/// Exhaustive, and the two arms are different situations rather than a
-/// present and an absent value: a session either carries out a task
-/// somebody wrote down, or works with the person directly and takes the
-/// work from the conversation. The prefix says which, because an agent
-/// told to read a job file that nobody wrote spends its first turn
-/// looking for it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RunBrief {
-    /// The job file's own text, as it was written to the room.
+
     Job { text: String },
-    /// Nobody assigned this session a task: the person is here.
+
     Principal,
 }
 
-/// What the prefix says when there is no job file.
-///
-/// It states the situation rather than the absence, because "there is no
-/// JOB.md" describes the disk and what the agent needs is what to do
-/// instead.
 const PRINCIPAL_BRIEF: &str = "No task file was written for this session. You are working with the \
      User directly: what to do arrives in the conversation, and you \
      answer there.\n";
 
 impl RunBrief {
-    /// The bytes this brief contributes to the prefix's run segment.
+
     #[must_use]
     pub fn segment_text(&self) -> &str {
         match self {
@@ -135,20 +76,6 @@ impl RunBrief {
     }
 }
 
-/// Lays down this session's brief and answers which of the two it is.
-///
-/// A stated goal is what makes a task a job: the file's one irreplaceable
-/// section says when to stop, and a form with that field blank teaches an
-/// agent that stopping is undefined. So a dispatch that states a goal
-/// gets a job file, and one that does not is a conversation.
-///
-/// **The brief is this dispatch's, never what an earlier session left in
-/// the room.** A job file from last week is still on disk and can still
-/// be read; what it may not do is present itself as the task of a session
-/// nobody assigned one to.
-///
-/// # Errors
-/// Propagates a room that cannot be created or written.
 pub fn write_brief(
     city_root: &Path,
     addr: &Address,
@@ -161,31 +88,11 @@ pub fn write_brief(
     Ok(RunBrief::Job { text })
 }
 
-/// Where a room's handoff lives.
-///
-/// The one place this path is spelled, for the same reason `job_path`
-/// and `roadmap_path` are.
 #[must_use]
 pub fn handoff_path(city_root: &Path, room: &Address) -> PathBuf {
     kernel::layout::CityLayout::new(city_root).handoff(room)
 }
 
-/// Empties a room's handoff slot, so the next session in it carries
-/// nothing.
-///
-/// **Removed, not blanked.** The blank form this module lays down when a
-/// room is opened answers `handoff` with `None` exactly as a missing file
-/// does, so writing one would leave two states where one says the same
-/// thing. This discards the only copy of what the last session wrote:
-/// `handoff_written` holds the dispatcher's handoff, not this file.
-///
-/// **A slot that is already empty is not a failure.** The caller asked
-/// for a new session, which is a thing that can be done whatever the
-/// previous one left behind (`Sprawling/app/Spec.lean` §8-82).
-///
-/// # Errors
-/// `E_STORAGE_FATAL` naming the path, for every failure except a file
-/// that is not there.
 pub fn clear_handoff(city_root: &Path, room: &Address) -> Result<(), AxError> {
     let path = handoff_path(city_root, room);
     match std::fs::remove_file(&path) {
@@ -203,10 +110,6 @@ pub fn clear_handoff(city_root: &Path, room: &Address) -> Result<(), AxError> {
     }
 }
 
-/// Lays the blank handoff form down in a room that was just opened.
-///
-/// # Errors
-/// Propagates a room that cannot be written.
 pub(crate) fn lay_out_handoff(room_dir: &Path, room: &Address) -> Result<(), AxError> {
     write_new(
         &room_dir.join(HANDOFF_FILE),
@@ -214,18 +117,6 @@ pub(crate) fn lay_out_handoff(room_dir: &Path, room: &Address) -> Result<(), AxE
     )
 }
 
-/// What the last run in this room left for the next one.
-///
-/// `None` says one thing only: there is nothing here worth carrying -
-/// either no file, or a form still holding the template's own
-/// parenthetical guidance, which in the prefix costs the same bytes as a
-/// filled one and carries nothing. A file that exists and cannot be read
-/// is a third fact and is reported, because a prefix that quietly omits
-/// it tells the next session there was no handoff.
-///
-/// # Errors
-/// `E_STORAGE_FATAL` naming the path, for every failure except a file
-/// that is not there.
 pub fn handoff(city_root: &Path, room: &Address) -> Result<Option<String>, AxError> {
     let path = handoff_path(city_root, room);
     let text = match std::fs::read_to_string(&path) {
@@ -249,10 +140,6 @@ pub fn handoff(city_root: &Path, room: &Address) -> Result<Option<String>, AxErr
     Ok(Some(text))
 }
 
-/// Lays out the spine documents a building starts with.
-///
-/// # Errors
-/// Propagates a directory that cannot be created or written.
 pub(crate) fn lay_out(building_root: &Path, addr: &Address) -> Result<(), AxError> {
     std::fs::create_dir_all(building_root).map_err(|err| storage(building_root, &err))?;
     let name = addr.as_str();
@@ -271,17 +158,11 @@ pub(crate) fn lay_out(building_root: &Path, addr: &Address) -> Result<(), AxErro
     Ok(())
 }
 
-/// Where the job file of a run at `addr` lives.
 #[must_use]
 pub fn job_path(city_root: &Path, addr: &Address) -> PathBuf {
     kernel::layout::CityLayout::new(city_root).job(addr)
 }
 
-/// Where a building's plan lives.
-///
-/// The one place this path is spelled. A caller that joins
-/// `city_root/<addr>/Roadmap.md` for itself becomes a second authority
-/// for where the plan is, and it keeps working after the real one moves.
 #[must_use]
 pub fn roadmap_path(city_root: &Path, building_addr: &Address) -> PathBuf {
     kernel::layout::CityLayout::new(city_root)
@@ -289,19 +170,6 @@ pub fn roadmap_path(city_root: &Path, building_addr: &Address) -> PathBuf {
         .join(ROADMAP_FILE)
 }
 
-/// A building's plan as it stands, or an empty document when the
-/// building has not been given one yet.
-///
-/// "Not laid out yet" and "could not be read" are different facts, and
-/// only the first one means an empty plan. Everything else - a directory
-/// where the file belongs, a permission this process does not have, a
-/// device that stopped answering - is reported, because a caller that
-/// reads those as an empty plan goes on to tell somebody their claim
-/// lost a race that never ran.
-///
-/// # Errors
-/// `E_STORAGE_FATAL` naming the path, for every failure except a file
-/// that is not there.
 pub fn roadmap(city_root: &Path, building_addr: &Address) -> Result<String, AxError> {
     let path = roadmap_path(city_root, building_addr);
     match std::fs::read_to_string(&path) {
@@ -319,11 +187,6 @@ pub fn roadmap(city_root: &Path, building_addr: &Address) -> Result<String, AxEr
     }
 }
 
-/// The job form with the brief written into it.
-///
-/// The task and the goal are escaped, whoever wrote them, so neither can
-/// close its element (`Sprawling/city/spec/SpineFiles.lean` D21); holding no
-/// `<`, neither can spell a marker, so the markers fill one after another.
 fn filled(brief: &JobBrief<'_>) -> String {
     JOB_TEMPLATE
         .replace(TASK_PLACEHOLDER, &kernel::event::escape_markup(brief.task))
@@ -331,12 +194,6 @@ fn filled(brief: &JobBrief<'_>) -> String {
         .replace(FROM_PLACEHOLDER, brief.from)
 }
 
-/// Writes the job file for one run and returns the bytes written, so the
-/// caller can record the same text as history without reading the file
-/// back and hoping it is unchanged.
-///
-/// # Errors
-/// Propagates a room that cannot be created or written.
 pub fn write_job(
     city_root: &Path,
     addr: &Address,
@@ -348,25 +205,6 @@ pub fn write_job(
     Ok(text)
 }
 
-/// Where the `City.md` that governs runs in `building` is: the
-/// building's own, in its reserved subtree beside `RULES.toml`, when it
-/// has one; otherwise the city's, at the city root.
-///
-/// The nearer replaces the farther rather than joining it, because the
-/// two answer one question - what an agent here is told about the city
-/// it works in - and a building that rewrote the answer has said the
-/// city's does not hold there. The reserved subtree, because no write
-/// domain reaches it: a resident cannot rewrite its own instructions.
-/// Reads the disk to answer, so the answer is as of this call. Only a
-/// building's file that is not there falls back to the city's: anything
-/// else at that path is the building's answer, and a reader that cannot
-/// open it refuses rather than sends the city's words in its place. The
-/// entry itself is looked at, not what it points to, so a link whose
-/// target is gone is a broken answer rather than no answer.
-///
-/// # Errors
-/// `E_STORAGE_FATAL` naming the path when the disk cannot say whether
-/// the building's own file is there.
 pub fn city_prompt_path(city_root: &Path, building: &Address) -> Result<PathBuf, AxError> {
     let own = crate::policy::governed(city_root, building).join(CITY_FILE);
     match std::fs::symlink_metadata(&own) {
@@ -381,18 +219,6 @@ pub fn city_prompt_path(city_root: &Path, building: &Address) -> Result<PathBuf,
     }
 }
 
-/// The norm documents a run at `addr` is aligned by, in reading order:
-/// how the city works, then how this building works.
-///
-/// The progress documents (`Roadmap.md`, `Memo.md`, the last frozen
-/// point) are not here — they are what a run reads to know where the
-/// work stands, and they are named per run, not per address.
-///
-/// # Errors
-/// Propagates the reserved-subtree refusal: an address with no building
-/// has no building norms.
-/// As [`city_prompt_path`] when the building's own `City.md` cannot be
-/// looked for.
 pub fn norms(city_root: &Path, addr: &Address) -> Result<Vec<PathBuf>, AxError> {
     let building = crate::building::Building::of(addr)?;
     let mut out = vec![city_prompt_path(city_root, building.addr())?];
@@ -411,7 +237,7 @@ fn write_new(path: &Path, text: &str) -> Result<(), AxError> {
     {
         Ok(mut handle) => std::io::Write::write_all(&mut handle, text.as_bytes())
             .map_err(|err| storage(path, &err)),
-        // A document that is already there is the building's own work.
+
         Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => Ok(()),
         Err(err) => Err(storage(path, &err)),
     }

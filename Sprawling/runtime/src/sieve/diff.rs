@@ -3,22 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What this run already saw from the same command, and only what
-//! changed since. `cargo check` run ten times in a development loop
-//! prints nine outputs that are mostly the previous one; the model is
-//! better served by "this error is new" than by reading both.
-//!
-//! The history holds locators, never text: the original is in the CAS
-//! by invariant 3, and the previous output is read back from there.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::Locator;
 
 use crate::sieve::CommandKey;
 
-/// The last original this run saw per command key. Owned by whoever
-/// owns the run; one per run, never shared across runs.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct SieveHistory(BTreeMap<CommandKey, Locator>);
 
@@ -33,19 +23,12 @@ impl SieveHistory {
     }
 }
 
-/// A run of unchanged lines at least this long is said as a count.
-/// Below it the count line would be as long as what it replaces.
 const UNCHANGED_RUN_FOLDS_AT: usize = 2;
 
 fn unchanged_line(count: usize) -> String {
     format!("[unchanged: {count} lines, as in the previous run]")
 }
 
-/// Current lines with every run of lines the previous output also
-/// contained collapsed to a count. Membership, not alignment: a line
-/// that moved is still not news. A protected line is not rewritten by
-/// this — it is counted, verbatim in the rest file, and was already
-/// read once — so a repeated diagnostic block folds whole.
 pub(crate) fn only_changes(current: &[String], previous: &[String]) -> Vec<String> {
     let seen: BTreeSet<&str> = previous.iter().map(String::as_str).collect();
     let mut out = Vec::with_capacity(current.len());

@@ -3,22 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the remote door of a served city is made of (`Sprawling/app/spec/Outside/Conduit.lean`
-//! §8-139): the device table's path, the writer's relay for its five
-//! lines, this machine's clock and random source, where the city's own
-//! listener answers on this machine and the page it serves, and the
-//! route the city's `[remote]` table names (`Sprawling/app/spec/Assembly.lean`
-//! §8-151).
-//!
-//! Assembled here because the clock is sampled in `bin::assembly` only,
-//! and because the relay exists only once the writer thread runs. The
-//! city key arrives already named (`CityKey::of`, by the genesis line and
-//! in the city's one vault), because the vault is handed out only there.
-//!
-//! [`chosen`] is the one place a route is built: the door asks it at
-//! each `/remote open`, so a person who edits the table opens the door
-//! on the new route without restarting the city.
-
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -33,33 +17,24 @@ use crate::outside::console::Remote;
 use crate::outside::keeper::{CityKey, Doorway, Keeping, Senses};
 use crate::outside::listener::Reaching;
 
-/// The program a Cloudflare route runs when the table names none: the
-/// one on `PATH`.
 const CLOUDFLARED: &str = "cloudflared";
 
-/// The longest one `/remote open` waits for its route to be reachable.
-/// The console's thread waits, and the door's lock is held, for as long
-/// as this; `cloudflared` reaches its edge in one to a few seconds
-/// (`Sprawling/app/spec/Assembly.lean` §8-151).
 const ROUTE_PATIENCE: TimeoutMs = TimeoutMs(30_000);
 
-/// The parts a remote door is kept with, gathered while the city opens.
 pub(super) struct Outdoors {
     city_root: PathBuf,
     relay: accounting::worker::Relay,
     port: CityPort,
-    /// Where the city's signing key lives, or why it has no name yet.
+
     key: Result<CityKey, AxError>,
 }
 
-/// The city's own listener, as the remote relay on this machine reaches
-/// it and as the remote listener repeats its page.
 pub(super) struct CityPort {
-    /// The address that listener holds.
+
     pub(super) at: SocketAddr,
-    /// The key it asks every caller for.
+
     pub(super) token: String,
-    /// The client bundle it serves, which the remote listener serves too.
+
     pub(super) page: Arc<wire::ClientAssets>,
 }
 
@@ -78,24 +53,15 @@ impl Outdoors {
         }
     }
 
-    /// Keeps the door on a thread of its own and hands it to `then`
-    /// there: the city key it reads can wait on a Keychain dialog nobody
-    /// answers, and the serve that called this listens for Ctrl-C at
-    /// once (`Sprawling/app/spec/Console.lean`).
     pub(super) fn keep_aside(self, then: impl FnOnce(Result<Remote, AxError>) + Send + 'static) {
         let runtime = tokio::runtime::Handle::try_current();
         std::thread::spawn(move || {
-            // Outside a runtime `keep` refuses with its own reason.
+
             let _inside_the_runtime = runtime.as_ref().map(tokio::runtime::Handle::enter);
             then(self.keep());
         });
     }
 
-    /// The door this serve keeps, closed, with the devices paired before.
-    ///
-    /// # Errors
-    /// A ledger with no genesis line to name the city key by; an
-    /// unreadable device table; a vault or a random source that refuses.
     fn keep(self) -> Result<Remote, AxError> {
         let Outdoors {
             city_root,
@@ -122,8 +88,7 @@ impl Outdoors {
                 }),
             },
         })?;
-        // A city bound to every interface is reached on this machine at
-        // loopback, where its relay connects from.
+
         let city = if at.ip().is_unspecified() {
             SocketAddr::from((Ipv4Addr::LOCALHOST, at.port()))
         } else {
@@ -149,11 +114,6 @@ impl Outdoors {
     }
 }
 
-/// The route the city's `[remote]` table names, built and closed.
-///
-/// # Errors
-/// The city's own layer names no route or cannot be read; a tunnel name
-/// or an address `remote_access` refuses.
 fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError> {
     Ok(match city::remote_route(city_root)? {
         RemoteRoute::Cloudflare {
@@ -197,8 +157,6 @@ mod tests {
         std::fs::write(file, text).unwrap();
     }
 
-    /// What opening the route the city's file names comes to, as the
-    /// three parts a person reads.
     fn opening(city_root: &Path) -> (AxCode, String, String) {
         let refused = chosen(city_root)
             .and_then(|mut route| route.open(SocketAddr::from((Ipv4Addr::LOCALHOST, 9))))
@@ -231,10 +189,6 @@ mod tests {
         );
     }
 
-    /// Each arm builds its own route: the program a route could not
-    /// start is the one the table named, and the recovery is that
-    /// route's own; an address that is not `https://` is refused before
-    /// anything starts.
     #[test]
     fn the_route_the_table_names_is_the_one_that_opens() {
         let dir = tempfile::tempdir().unwrap();

@@ -3,54 +3,32 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A playback export written as a new file that lands whole or not at
-//! all (`Sprawling/accounting/spec/Playback/Check.lean` §8-13, accounting D25 (h)).
-//!
-//! Both doors write through here: the person's `--out` and a resident's
-//! export into the city's playback exports. The bytes go to a staged
-//! file beside the target, which is hard-linked to the target name and
-//! then removed, so the target never exists half-written, an existing
-//! file is never replaced, and every failure removes the staged copy.
-
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 use kernel::layout::CityLayout;
 use kernel::{AxCode, AxError, PROTECTED_METADATA};
 
-/// Where an export lands.
 #[derive(Debug, Clone, Copy)]
 pub enum Place<'a> {
-    /// A path the person chose: anywhere outside protected metadata and
-    /// the files git tracks.
+
     Chosen(&'a Path),
-    /// A file under the playback exports of the city at `city_root`:
-    /// reached through no link, and kept out of git's history.
+
     Exports { city_root: &'a Path, file: &'a Path },
 }
 
-/// What git makes of a name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Standing {
-    /// No repository holds it.
+
     Outside,
-    /// A repository holds it and ignores it.
+
     Ignored,
-    /// A repository holds it and would list it as new work.
+
     Carried,
-    /// A repository's index tracks it.
+
     Tracked,
 }
 
-/// Writes `bytes` as a new file at `place`.
-///
-/// # Errors
-/// `E_OUTSIDE_WRITE_DOMAIN` for a target in protected metadata, outside
-/// the city's playback exports, or carried into git's history from
-/// there; `E_INVALID_ARGS` for a target that exists or that git tracks;
-/// the alias refusal for a link on the way to an export; `E_PATH_NOT_FOUND`
-/// for a chosen parent that does not resolve; `E_STORAGE_FATAL` for any
-/// write or link that fails. The staged file is removed on every path.
 pub fn land(place: Place<'_>, bytes: &[u8]) -> Result<(), AxError> {
     let target = cleared(place)?;
     let refuse = |code: AxCode, recovery: &str| {
@@ -84,7 +62,6 @@ pub fn land(place: Place<'_>, bytes: &[u8]) -> Result<(), AxError> {
     }
 }
 
-/// The target `place` names, once the rules of its kind of place hold.
 fn cleared(place: Place<'_>) -> Result<PathBuf, AxError> {
     match place {
         Place::Chosen(path) => chosen(path),
@@ -92,8 +69,6 @@ fn cleared(place: Place<'_>) -> Result<PathBuf, AxError> {
     }
 }
 
-/// A chosen path, its parent resolved through every link, refused when
-/// any segment is protected metadata.
 fn chosen(target: &Path) -> Result<PathBuf, AxError> {
     let refuse = |code: AxCode, recovery: String| {
         AxError::failure(
@@ -128,8 +103,6 @@ fn chosen(target: &Path) -> Result<PathBuf, AxError> {
     Ok(landing)
 }
 
-/// A file under the city's playback exports, reached through no link,
-/// with the directories above it made.
 fn exported(city_root: &Path, file: &Path) -> Result<PathBuf, AxError> {
     let exports = CityLayout::new(city_root).playback_exports();
     let (Some(name), Some(parent)) = (file.file_name(), file.parent()) else {
@@ -170,8 +143,6 @@ fn outside_exports(file: &Path) -> AxError {
     .with_recovery("a resident's export lands under the city's playback exports and nowhere else")
 }
 
-/// Whether any segment of `path` is protected metadata, compared without
-/// ASCII case the way `Address::is_reserved` compares it.
 fn protected(path: &Path) -> bool {
     path.components().any(|component| match component {
         Component::Normal(segment) => segment.to_str().is_some_and(|segment| {
@@ -185,7 +156,6 @@ fn protected(path: &Path) -> bool {
     })
 }
 
-/// What git makes of `target`, whose parent is already resolved.
 fn standing(target: &Path) -> Result<Standing, AxError> {
     let failed = |err: git2::Error| {
         AxError::failure(
@@ -230,7 +200,6 @@ fn standing(target: &Path) -> Result<Standing, AxError> {
     })
 }
 
-/// Stages `bytes` beside `target` and links the stage into place.
 fn through_staged(target: &Path, bytes: &[u8]) -> Result<(), AxError> {
     let refuse = |recovery: String| {
         AxError::failure(
@@ -256,15 +225,12 @@ fn through_staged(target: &Path, bytes: &[u8]) -> Result<(), AxError> {
     }
 }
 
-/// The staged file beside `target`, named for this process so two
-/// exports to one directory never share one.
 fn staged_beside(target: &Path) -> PathBuf {
     let mut name = target.as_os_str().to_owned();
     name.push(format!(".partial-{}", std::process::id()));
     PathBuf::from(name)
 }
 
-/// Writes `bytes` to a file that must not exist yet, through to the disk.
 fn stage(staged: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let mut file = std::fs::OpenOptions::new()
         .write(true)

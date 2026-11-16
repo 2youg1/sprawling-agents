@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Where each package lives, what it is called, and whether it ships
-//! (Tools/xtask/Spec.lean §8-39).
-//!
-//! The one reader of `cargo metadata`. A gate that derives a directory
-//! for itself assumes that the directory, the package name and the lib
-//! name are one spelling; when they part, or a package moves, the
-//! derived path holds nothing and the gate judges nothing without
-//! saying so. Every gate that needs a package's directory asks here, so
-//! a package is found by all of them or by none.
-
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::path::Path;
@@ -22,76 +12,55 @@ use serde_json::Value;
 
 use crate::report::XtaskError;
 
-/// Whether a package ships, declared by the package itself
-/// (xtask D4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Role {
-    /// Part of what a person downloads; every product gate judges it.
-    /// A manifest that declares nothing is this, so a tool that forgets
-    /// to declare itself meets the stricter gates rather than fewer.
+
     Product,
-    /// A tool of this repository, declared with
-    /// `[package.metadata.sprawling] role = "tool"`.
+
     Tool,
 }
 
-/// One workspace member, as cargo places it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Member {
-    /// The name `cargo -p` takes.
+
     pub(crate) package: String,
-    /// The lib target's name; `None` for a package with binaries only.
+
     pub(crate) lib: Option<String>,
-    /// Repo-relative, `/`-separated.
+
     pub(crate) dir: String,
     pub(crate) role: Role,
-    /// Every package its normal and build dependencies name; dev
-    /// dependencies are left out, since tests may reach anything.
+
     pub(crate) depends_on: BTreeSet<String>,
-    /// Whether `cargo publish` may send this package to a registry.
+
     pub(crate) publish: Publish,
-    /// The source file of every target a published copy of this package
-    /// compiles - its lib, binaries, build script and proc macro -
-    /// repo-relative and `/`-separated. Tests, benches and examples are
-    /// left out: `cargo install` and the packaging check build none of
-    /// them.
+
     pub(crate) roots: Vec<String>,
 }
 
-/// Whether a package can be published, as its manifest's `publish`
-/// field says (Tools/xtask/Spec.lean §8-49).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Publish {
-    /// No `publish` field, `publish = true`, or a list of registries.
+
     Registry,
-    /// `publish = false`, which cargo's metadata reports as an empty list.
+
     Never,
 }
 
 impl Member {
-    /// The name the repository's documents use for this package: the
-    /// depmap block, a SPEC file, an API baseline. Its lib name, or its
-    /// package name when it has no lib.
+
     pub(crate) fn name(&self) -> &str {
         self.lib.as_deref().unwrap_or(&self.package)
     }
 
-    /// Whether `rel`, a repo-relative `/`-separated path, lies inside
-    /// this package's directory.
     pub(crate) fn holds(&self, rel: &str) -> bool {
         rel.strip_prefix(self.dir.as_str())
             .is_some_and(|tail| tail.starts_with('/'))
     }
 
-    /// Whether this package is a node of the product's crate graph: it
-    /// ships. The depmap block and the proof roster name exactly these.
     pub(crate) fn in_product_graph(&self) -> bool {
         self.role == Role::Product
     }
 }
 
-/// The target kinds a published package compiles. Every other kind -
-/// `test`, `bench`, `example` - is built only from a checkout.
 const COMPILED: [&str; 8] = [
     "lib",
     "rlib",
@@ -103,8 +72,6 @@ const COMPILED: [&str; 8] = [
     "custom-build",
 ];
 
-/// The arguments one `cargo metadata` run takes. `--no-deps` resolves
-/// nothing, so `--offline` costs nothing and keeps a gate off the network.
 const METADATA: [&str; 5] = [
     "metadata",
     "--format-version",
@@ -115,17 +82,9 @@ const METADATA: [&str; 5] = [
 
 const USAGE: &str = "usage: cargo xtask members --owning [<path>...] | --dir <package>";
 
-/// Every package of the checkout at `root`, sorted by directory.
-///
-/// # Errors
-/// When cargo cannot be started or refuses, when its output lacks a
-/// field this reader needs, when a package sits outside the checkout
-/// (`member-outside-checkout`), and when a manifest declares a role
-/// that is not one (`unknown-role`).
 #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 pub(crate) fn members(root: &Path) -> Result<Vec<Member>, XtaskError> {
-    // `cargo xtask` and `cargo nextest` both set CARGO, so the gates run
-    // the toolchain this checkout pins rather than whatever is on PATH.
+
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
     let output = Command::new(cargo)
         .args(METADATA)
@@ -149,7 +108,6 @@ pub(crate) fn members(root: &Path) -> Result<Vec<Member>, XtaskError> {
     read(&metadata)
 }
 
-/// The packages that ship: every [`Role::Product`] package.
 pub(crate) fn product(root: &Path) -> Result<Vec<Member>, XtaskError> {
     Ok(members(root)?
         .into_iter()
@@ -157,11 +115,6 @@ pub(crate) fn product(root: &Path) -> Result<Vec<Member>, XtaskError> {
         .collect())
 }
 
-/// The package `name` names, by its package name or by its lib name.
-///
-/// # Errors
-/// `unknown-package` when no package goes by `name`, listing the ones
-/// that do.
 pub(crate) fn find<'a>(found: &'a [Member], name: &str) -> Result<&'a Member, XtaskError> {
     found
         .iter()
@@ -176,10 +129,6 @@ pub(crate) fn find<'a>(found: &'a [Member], name: &str) -> Result<&'a Member, Xt
         })
 }
 
-/// The package that owns `rel`, a repo-relative `/`-separated path: of
-/// the packages whose directory holds it, the one whose directory is
-/// longest. A package nested in another's directory (`Sprawling/desktop/ffi`
-/// in `Sprawling/desktop`) owns its own paths.
 pub(crate) fn owner<'a>(found: &'a [Member], rel: &str) -> Option<&'a Member> {
     found
         .iter()
@@ -187,10 +136,6 @@ pub(crate) fn owner<'a>(found: &'a [Member], rel: &str) -> Option<&'a Member> {
         .max_by_key(|member| member.dir.len())
 }
 
-/// `cargo xtask members`: `--owning [<path>...]` prints the workspace
-/// packages holding those paths, reading the paths from standard input
-/// when none are given; `--dir <package>` prints where that package
-/// lives.
 pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError> {
     match args.split_first() {
         Some((flag, paths)) if flag == "--owning" => {
@@ -215,12 +160,6 @@ pub(crate) fn run(root: &Path, args: &[String]) -> Result<String, XtaskError> {
     }
 }
 
-/// The workspace packages that hold `paths`, each named once.
-///
-/// A Markdown or Lean path selects nothing, because a document or a
-/// model changes no Rust test's outcome. A path no workspace package
-/// holds is skipped rather than refused: a branch's own diff names the
-/// paths it deleted.
 fn owning<'a>(found: &'a [Member], paths: &[String]) -> BTreeSet<&'a str> {
     paths
         .iter()
@@ -231,8 +170,6 @@ fn owning<'a>(found: &'a [Member], paths: &[String]) -> BTreeSet<&'a str> {
         .collect()
 }
 
-/// One path per line. A rename branch lists hundreds of paths, more
-/// than one Windows command line holds.
 fn standard_input() -> Result<Vec<String>, XtaskError> {
     std::io::stdin()
         .lines()
@@ -245,7 +182,6 @@ fn standard_input() -> Result<Vec<String>, XtaskError> {
         .collect()
 }
 
-/// The workspace members `metadata` describes, sorted by directory.
 fn read(metadata: &Value) -> Result<Vec<Member>, XtaskError> {
     let root = Path::new(text(metadata, "workspace_root")?);
     let packages = metadata
@@ -294,7 +230,6 @@ fn publish_of(package: &Value) -> Publish {
     }
 }
 
-/// The source files of the targets a published copy compiles.
 fn roots_of(root: &Path, package: &Value, name: &str) -> Result<Vec<String>, XtaskError> {
     targets(package)?
         .iter()
@@ -320,9 +255,6 @@ fn targets(package: &Value) -> Result<&Vec<Value>, XtaskError> {
         .ok_or_else(|| missing("a `targets` array for every package"))
 }
 
-/// `dir` below `root`, `/`-separated. A package outside the checkout is
-/// refused rather than kept absolute: joined onto the root, an absolute
-/// path still reads files, and the gate would judge another tree.
 fn relative(root: &Path, dir: &Path, package: &str) -> Result<String, XtaskError> {
     let tail = dir
         .strip_prefix(root)

@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The keep-warm door a run's model calls go through, and the doors a
-//! worker keeps once the run has landed (`Sprawling/app/Spec.lean` §8-112).
-//!
-//! Which prefix is due is decided inside each door by
-//! `kernel::keep_warm`, and the `cache_renewed` lines are written on the
-//! accounting thread; the renewal itself is sent from a thread of its
-//! own, so a silent provider holds up nothing but its own door.
-
 use super::RunWorker;
 use super::errand::Answer;
 use kernel::event::Payload;
@@ -19,41 +11,21 @@ use kernel::{Address, AxError, EventKind, ModelReturn, TimeMs};
 use runtime::prefix::warmth::Lead;
 use std::collections::BTreeMap;
 
-/// The chosen adapter, wrapped so every request a run sends enters the
-/// keep-warm account (`Sprawling/runtime/Spec.lean` §8-4-2), timed on the worker's own
-/// clock (`Sprawling/accounting/spec/Clock.lean` §8-3).
 pub(crate) type Door = runtime::prefix::warmth::Warmed<DoorClock>;
 
-/// What a door reads the time through: the worker's clock, carried into
-/// the lane the run is driven on.
 pub(crate) type DoorClock = Box<dyn FnMut() -> Result<TimeMs, AxError> + Send>;
 
-/// The doors that still owe a renewal, one per room, and the lead each
-/// endpoint's renewals leave with.
-///
-/// One per room rather than one per run: a later run in the same room
-/// sent the prefix the next run will use, so the earlier door would only
-/// pay to keep a cache nobody reads.
 #[derive(Default)]
 pub(in crate::worker) struct Kept {
     doors: BTreeMap<Address, Door>,
-    /// One reading per endpoint name, shared by every door that reaches
-    /// it, so a renewal's round trip times every room on that endpoint
-    /// (`Sprawling/runtime/spec/Prefix.lean` D100).
+
     leads: BTreeMap<String, Lead>,
-    /// The rooms whose door is out on a renewal, each with the token the
-    /// door left with: a door that comes back with a token its room no
-    /// longer holds was superseded meanwhile, by a newer door kept for
-    /// the room or by a newer renewal already out.
+
     away: BTreeMap<Address, u64>,
-    /// The token the next door to leave takes. It wraps: a room compares
-    /// equal or not, and 2^64 renewals of one city do not happen.
+
     next_out: u64,
 }
 
-/// A door back from its renewal: whose room it keeps, the token it left
-/// with, the door itself, and what the provider answered to each renewal
-/// it sent.
 pub(crate) struct Renewed {
     pub(in crate::worker) room: Address,
     pub(in crate::worker) out: u64,
@@ -62,15 +34,11 @@ pub(crate) struct Renewed {
 }
 
 impl Kept {
-    /// The lead of the endpoint named `endpoint`, opened at no reading
-    /// the first time a door reaches it.
+
     pub(in crate::worker) fn lead_of(&mut self, endpoint: &str) -> Lead {
         self.leads.entry(endpoint.to_owned()).or_default().clone()
     }
 
-    /// Keeps `door` for `room` when it owes a renewal, replacing that
-    /// room's earlier door, at home or out; a door that owes none is
-    /// dropped here, which is why the default setting leaves this empty.
     pub(in crate::worker) fn keep(&mut self, room: Address, door: Door) {
         self.away.remove(&room);
         if door.next_due().is_some() {
@@ -80,14 +48,10 @@ impl Kept {
         }
     }
 
-    /// The earliest instant any door at home is due. A door out on a
-    /// renewal is not counted, so nothing wakes for it twice.
     pub(in crate::worker) fn next_due(&self) -> Option<u64> {
         self.doors.values().filter_map(Door::next_due).min()
     }
 
-    /// Takes out every door due by `now_ms`, each to renew on a thread
-    /// of its own, and remembers its room as away.
     pub(in crate::worker) fn take_due(&mut self, now_ms: u64) -> Vec<(Address, u64, Door)> {
         let due: Vec<Address> = self
             .doors
@@ -106,11 +70,6 @@ impl Kept {
             .collect()
     }
 
-    /// Takes a door back from its renewal and returns its room with what
-    /// each renewal cost or why it was refused. The door comes home when
-    /// it still owes a renewal and no newer door replaced it meanwhile; a
-    /// door whose renewal failed is let go, so a provider that refused a
-    /// renewal is not asked again every wake.
     pub(in crate::worker) fn came_back(
         &mut self,
         renewed: Renewed,
@@ -139,8 +98,6 @@ impl Kept {
         (room, lines)
     }
 
-    /// Forgets that `room`'s door is out: it never left, because its
-    /// thread would not start.
     pub(in crate::worker) fn lost(&mut self, room: &Address, out: u64) {
         if self.away.get(room) == Some(&out) {
             self.away.remove(room);
@@ -148,7 +105,6 @@ impl Kept {
     }
 }
 
-/// The cost a provider reported for one renewal.
 fn answered(answer: ModelReturn) -> CacheRenewed {
     CacheRenewed::Answered {
         usage: answer.usage,
@@ -157,17 +113,11 @@ fn answered(answer: ModelReturn) -> CacheRenewed {
 }
 
 impl RunWorker {
-    /// When the next kept door is due, if any is kept at home.
+
     pub(crate) fn warm_due(&self) -> Option<u64> {
         self.warm.next_due()
     }
 
-    /// Hands every door due at `now` to a thread of its own, which sends
-    /// its renewals; the answers are recorded by [`Self::record_renewal`]
-    /// when they come back (`Sprawling/app/Spec.lean` §8-112, D78).
-    ///
-    /// A door whose thread will not start is recorded as refused and let
-    /// go, as a door the provider refused is.
     pub(crate) fn renew_warm(&mut self, now: TimeMs) {
         for (room, out, mut door) in self.warm.take_due(now.value()) {
             let at = room.clone();
@@ -187,8 +137,6 @@ impl RunWorker {
         }
     }
 
-    /// Takes a door back from its renewal and writes one `cache_renewed`
-    /// line per renewal under its room, answered or refused.
     pub(in crate::worker) fn record_renewal(&mut self, renewed: Renewed) {
         let (room, lines) = self.warm.came_back(renewed);
         for line in lines {
@@ -196,9 +144,6 @@ impl RunWorker {
         }
     }
 
-    /// Writes one `cache_renewed` line. Only a line the ledger would not
-    /// take goes to the diagnostic log, and it does not stop the city,
-    /// as a schedule that cannot be read does not.
     fn write_renewal(&mut self, room: Address, renewed: CacheRenewed) {
         let written = Payload::of(&renewed)
             .and_then(|line| self.record_at(EventKind::CacheRenewed, room, line));
@@ -232,7 +177,6 @@ mod tests {
     const USED_AT: u64 = 1_000_000;
     const TTL_MS: u64 = PROMPT_CACHE_TTL_SECS * 1000;
 
-    /// What the answering provider reports each call cost.
     fn usage() -> ModelUsage {
         ModelUsage {
             input_tokens: Tokens::new(3),
@@ -248,8 +192,6 @@ mod tests {
             .with_recovery("renewal is skipped until the next real request")
     }
 
-    /// Counts the calls that reach the provider; from the call numbered
-    /// `refuses_from` on, it refuses.
     struct Provider {
         calls: Arc<AtomicUsize>,
         refuses_from: usize,
@@ -272,7 +214,6 @@ mod tests {
         }
     }
 
-    /// A door that sent one real request at `USED_AT`.
     fn door_after_one_run(setting: KeepWarm, provider: impl Model + Send + 'static) -> Door {
         let clock: DoorClock = Box::new(|| Ok(TimeMs::new(USED_AT)));
         let mut door = Door::new(Box::new(provider), setting, clock, Lead::default());
@@ -285,8 +226,6 @@ mod tests {
         door
     }
 
-    /// Sends every renewal due at `now_ms` on this thread, as each
-    /// door's own thread would, and takes every door back.
     fn renew_here(kept: &mut Kept, now_ms: u64) -> Vec<(Address, CacheRenewed)> {
         kept.take_due(now_ms)
             .into_iter()
@@ -303,8 +242,6 @@ mod tests {
             .collect()
     }
 
-    /// Wakes `kept` at every second through two cache lifetimes and
-    /// returns every renewal it reported.
     fn renewals_through_two_lifetimes(kept: &mut Kept) -> Vec<(Address, CacheRenewed)> {
         let renewals = (USED_AT..=USED_AT + 2 * TTL_MS)
             .step_by(1_000)
@@ -314,8 +251,6 @@ mod tests {
         renewals
     }
 
-    /// A worker that kept the door of one run which sent one request;
-    /// returns how many calls reached the provider in all.
     fn calls_after_one_run(setting: KeepWarm) -> usize {
         let calls = Arc::new(AtomicUsize::new(0));
         let door = door_after_one_run(
@@ -373,10 +308,6 @@ mod tests {
         );
     }
 
-    /// A door out on a renewal whose room got a newer door meanwhile: the
-    /// old door's return must neither clear the newer door's away marker
-    /// nor take its place, and the newer door comes home with its
-    /// remaining renewals.
     #[test]
     fn a_superseded_doors_late_return_drops_neither_the_marker_nor_the_newer_door() {
         let room = Address::parse("city/room").unwrap();
@@ -396,8 +327,6 @@ mod tests {
         let round_a = door_a.renew_due(due_a);
         assert_eq!(round_a.answers.len(), 1);
 
-        // The newer door: two prefixes used a minute apart, so after the
-        // first renewal one is still owed.
         let now = Arc::new(AtomicU64::new(USED_AT));
         let reading = now.clone();
         let clock: DoorClock = Box::new(move || Ok(TimeMs::new(reading.load(Ordering::SeqCst))));
@@ -448,14 +377,8 @@ mod tests {
         );
     }
 
-    /// How long a stand-in provider stays silent when nobody releases
-    /// it: long enough that an accounting thread waiting on it is seen
-    /// waiting, short enough that a red run ends on its assertion.
     const SILENCE: std::time::Duration = std::time::Duration::from_secs(5);
 
-    /// Answers the first call at once, as the run's real request; every
-    /// later call, a renewal, waits until released or until [`SILENCE`]
-    /// has passed, and says so when it answers.
     struct Silent {
         calls: usize,
         release: std::sync::mpsc::Receiver<()>,
@@ -477,7 +400,6 @@ mod tests {
         }
     }
 
-    /// A line a lane writes through its relay.
     fn lane_line() -> kernel::EventDraft {
         kernel::EventDraft {
             run: kernel::RunId::CITY,
@@ -490,10 +412,6 @@ mod tests {
         }
     }
 
-    /// A renewal waits on its provider off the accounting thread: while
-    /// the provider is silent, a relay request from another lane is
-    /// still answered, and the renewal's line is written under its room
-    /// once the provider answers.
     #[test]
     fn a_renewal_held_by_a_silent_provider_leaves_a_relay_answered() {
         let dir = tempfile::tempdir().unwrap();
@@ -531,7 +449,7 @@ mod tests {
                 .unwrap();
             heard_first.extend(heard.try_recv());
         }
-        // A provider that already stopped waiting has dropped its end.
+
         release.send(()).unwrap_or(());
         worker.land_the_rest().unwrap();
         lane.join().unwrap();

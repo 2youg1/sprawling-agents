@@ -3,54 +3,32 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The loopback provider a fixture talks to, the scripts it answers
-//! with, and the refusals and lost answers a reply can be.
-
-/// A loopback provider that answers a model list and then a fixed
-/// number of chat completions, registered the way a person would
-/// register one so nothing reaches the worker by a door the production
-/// path does not have. Tests that only need it to answer bind it as
-/// `_provider`; tests about what went out on the wire read `bodies()`,
-/// the one place a claim about the wire can be checked.
 pub(in crate::worker) struct FakeProvider {
     seen: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
     listing: std::sync::Arc<std::sync::atomic::AtomicBool>,
     _handle: std::thread::JoinHandle<()>,
 }
 
-/// What this provider does with the first chat request it reads.
-/// [`FirstChat::Dropped`] stages the transient disconnect a test
-/// otherwise cannot hit on purpose: the request arrives whole, the
-/// connection closes, no byte of an answer goes back. It spends no
-/// scripted reply and joins no record, so every later turn answers
-/// the question it was written for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::worker) enum FirstChat {
     Answered,
     Dropped,
 }
 
-/// What the provider sends back for one chat request.
-///
-/// A script of answers is what most tests need; a refusal and a lost
-/// answer are what a test of the account round needs, and only the
-/// status, its headers and the wire's silence tell those apart.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::worker) enum Reply {
-    /// This status, these extra headers, this body.
+
     Status {
         status: u16,
         headers: Vec<(String, String)>,
         body: String,
     },
-    /// The request is read whole and recorded, and the connection closes
-    /// without a byte of answer: the request may have run, and nobody
-    /// can say.
+
     Lost,
 }
 
 impl Reply {
-    /// A 200 carrying `body`.
+
     pub(in crate::worker) fn answered(body: String) -> Reply {
         Reply::Status {
             status: 200,
@@ -59,7 +37,6 @@ impl Reply {
         }
     }
 
-    /// A refusal with this status and this structured error body.
     pub(in crate::worker) fn refused(status: u16, error: &serde_json::Value) -> Reply {
         Reply::Status {
             status,
@@ -68,7 +45,6 @@ impl Reply {
         }
     }
 
-    /// The same reply with one more header.
     pub(in crate::worker) fn with_header(self, name: &str, value: &str) -> Reply {
         match self {
             Reply::Status {
@@ -105,18 +81,12 @@ impl FakeProvider {
         self.seen.lock().unwrap().clone()
     }
 
-    /// From now on `GET .../models` answers 404, as a server does whose
-    /// list stopped answering while its chat still does.
     pub(in crate::worker) fn stop_listing(&self) {
         self.listing
             .store(false, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
-/// An empty `models` list means this provider serves no model list at
-/// all: `GET .../models` answers 404, the way a gateway or an
-/// Anthropic-format third party does - the shape a city has to attach
-/// on the ids the person declared.
 #[cfg(test)]
 pub(in crate::worker) fn fake_openai(
     models: &[&str],
@@ -125,24 +95,6 @@ pub(in crate::worker) fn fake_openai(
     fake_openai_with(models, replies, FirstChat::Answered)
 }
 
-/// What a chat request is answered with.
-///
-/// **Two shapes, because two kinds of test ask different questions.** A
-/// script in arrival order is what one conversation needs: its requests
-/// are one run's turns one after another, so the order *is* the
-/// scenario. A script keyed by what the request names is what several
-/// runs at once need, and the reason is a flake this fixture had: two
-/// node runs call the provider concurrently with the room above them,
-/// the machine decides which request arrives first, and an order-based
-/// script then hands one node the reply written for the other - the
-/// node reports `E_EVIDENCE_MISSING` against a done check it was never
-/// given the answer for, and a test that passed a minute ago fails.
-///
-/// A keyed route holds a phrase the request carries when it is *that*
-/// work: a request naming exactly one route takes that route's replies,
-/// and one naming two or none - the room above them, whose prefix holds
-/// both - takes the ordered fallback. Which is the whole rule, and it
-/// makes a node's answer independent of who asked first.
 enum Script {
     InOrder {
         queued: std::vec::IntoIter<Reply>,
@@ -154,7 +106,6 @@ enum Script {
     },
 }
 
-/// One route of a [`Script::Routed`]: the phrase, and what to answer.
 struct Route {
     key: String,
     queued: std::vec::IntoIter<Reply>,
@@ -170,10 +121,6 @@ impl Route {
         }
     }
 
-    /// The next reply, or the last one again.
-    ///
-    /// The last reply repeats because a test says what the interesting
-    /// turns are, not how many turns the loop will take.
     fn take(&mut self) -> Reply {
         let next = self
             .queued
@@ -206,12 +153,6 @@ impl Script {
     }
 }
 
-/// A provider that answers each piece of work by what the request names.
-///
-/// `routes` pairs a phrase with the replies for the run whose request
-/// carries it; `fallback` is the ordered script for a request that names
-/// two routes or none (`Script::Routed` says why that is the room above
-/// them). Use it for a fixture with more than one run in flight.
 #[cfg(test)]
 pub(in crate::worker) fn fake_openai_routed(
     models: &[&str],
@@ -221,7 +162,6 @@ pub(in crate::worker) fn fake_openai_routed(
     fake_openai_routed_with(models, routes, fallback, FirstChat::Answered)
 }
 
-/// The same, told what to do with the first chat request.
 #[cfg(test)]
 pub(in crate::worker) fn fake_openai_routed_with(
     models: &[&str],
@@ -232,13 +172,8 @@ pub(in crate::worker) fn fake_openai_routed_with(
     serve(models, routed(routes, fallback), first_chat, unpaced())
 }
 
-/// What a paced provider calls with each whole request, headers
-/// included, before it answers: an instrument holds a run at its model
-/// call by blocking here, and makes one kind of request slow by
-/// sleeping.
 pub(in crate::worker) type Pace = std::sync::Arc<dyn Fn(&str) + Send + Sync>;
 
-/// A routed provider that hands every request to `pace` first.
 #[cfg(test)]
 pub(in crate::worker) fn fake_openai_paced(
     models: &[&str],
@@ -249,13 +184,6 @@ pub(in crate::worker) fn fake_openai_paced(
     serve(models, routed(routes, fallback), FirstChat::Answered, pace)
 }
 
-/// A provider that answers each request by the credential it carries.
-///
-/// `keys` pairs a key's value with the replies for the requests that
-/// carry it, the last one repeating; a request that carries none of them,
-/// or two, is refused with 401, as a real provider refuses a key it does
-/// not know. `pace` sees every request first, as in
-/// [`fake_openai_paced`].
 #[cfg(test)]
 pub(in crate::worker) fn fake_openai_keyed(
     models: &[&str],
@@ -293,7 +221,6 @@ fn unpaced() -> Pace {
     std::sync::Arc::new(|_: &str| {})
 }
 
-/// The same provider, told what to do with the first chat request.
 #[cfg(test)]
 pub(in crate::worker) fn fake_openai_with(
     models: &[&str],
@@ -311,12 +238,6 @@ pub(in crate::worker) fn fake_openai_with(
     serve(models, script, first_chat, unpaced())
 }
 
-/// One row of the fake's model list. A model whose id ends in
-/// `-thinks` states the levels it offers the way DeepSeek's list does,
-/// so a test can follow a level from a configuration layer to the wire;
-/// one whose id ends in `-stated` states [`LISTED_WINDOW`] and
-/// [`LISTED_CEILING`] the way OpenRouter's list does; every other row
-/// states nothing but its id, and is offered no level.
 #[cfg(test)]
 fn listed_row(id: &str) -> serde_json::Value {
     if id.ends_with("-thinks") {
@@ -335,15 +256,12 @@ fn listed_row(id: &str) -> serde_json::Value {
     }
 }
 
-/// The window a `-stated` row of the fake's model list states.
 #[cfg(test)]
 pub(in crate::worker) const LISTED_WINDOW: u64 = 131_072;
 
-/// The output ceiling a `-stated` row of the fake's model list states.
 #[cfg(test)]
 pub(in crate::worker) const LISTED_CEILING: u64 = 16_384;
 
-/// One listener serving `script`, on a port of its own.
 #[cfg(test)]
 fn serve(
     models: &[&str],
@@ -365,19 +283,12 @@ fn serve(
     .to_string();
     let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
     let recorder = std::sync::Arc::clone(&seen);
-    // The script is shared because every connection is served on a
-    // thread of its own.
+
     let script = std::sync::Arc::new(std::sync::Mutex::new(script));
     let drops = std::sync::atomic::AtomicBool::new(first_chat == FirstChat::Dropped);
     let dropping = std::sync::Arc::new(drops);
     let handle = std::thread::spawn(move || {
-        // **One thread per accepted connection.** Two handdown runs go
-        // into two lanes and call this provider at once; serving them
-        // one after the other leaves the second client waiting on a
-        // socket nobody reads, a timing window the city never has
-        // against a real provider. One bad socket ends that socket, not
-        // the server; the bound is there so a listener that is
-        // genuinely gone stops rather than spins.
+
         let mut refused = 0_u32;
         for stream in listener.incoming() {
             let Ok(mut stream) = stream else {
@@ -401,9 +312,7 @@ fn serve(
                 let mut whole = false;
                 loop {
                     let n = match std::io::Read::read(&mut stream, &mut buf) {
-                        // An end of stream, and nothing else, ends the
-                        // reading; a signal or a would-block leaves the
-                        // rest of a request still on its way.
+
                         Ok(0) => break,
                         Ok(n) => n,
                         Err(e)
@@ -433,27 +342,20 @@ fn serve(
                         }
                     }
                 }
-                // What counts as a request is settled here and nowhere
-                // else. Settled twice - the record asking for a header
-                // terminator and the reply for nothing at all - a socket
-                // carrying no request would stay off the record and still
-                // spend a scripted reply, and every turn after it would
-                // answer the question before it.
+
                 if !whole {
                     return;
                 }
                 let a_chat = !head.starts_with("GET ");
-                // The request landed; the answer never starts.
+
                 if a_chat && dropping.swap(false, std::sync::atomic::Ordering::SeqCst) {
                     return;
                 }
                 pace(&head);
-                // The whole exchange, headers included: a test about
-                // what went out on the wire needs the headers too.
+
                 recorder.lock().unwrap().push(head.clone());
                 let reply = if a_chat {
-                    // Chosen under the lock, so two requests never take
-                    // one reply between them.
+
                     script.lock().unwrap().answer(&head)
                 } else if lists.load(std::sync::atomic::Ordering::SeqCst) {
                     Reply::answered(list)
@@ -490,9 +392,6 @@ fn serve(
     )
 }
 
-/// One reply that calls a named tool with the arguments given. The
-/// arguments are the tool's real contract, because an invented shape
-/// here once hid the fact that no canary edit had ever landed on disk.
 pub(in crate::worker) fn completion_with(
     text: &str,
     tool: &str,

@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a strict walk of the chain proved, one record per segment, so the
-//! next proof reads and hashes those bytes instead of checking them line
-//! by line again (`Sprawling/storage/spec/ChainAudit.lean` §8-30).
-//!
-//! A projection: a record that is missing, damaged, of another rule
-//! version, or out of step with the chain state entering its segment is
-//! not used, and that segment is checked line by line. That reusing a
-//! record gives the strict verdict is `cachedVerifyIsStrict` in
-//! `Sprawling/storage/spec/Snapshot.lean`.
-
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -24,33 +14,24 @@ use crate::jsonl::{JsonlLedger, LineCheck};
 use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
-/// Changed whenever the per-line check changes what it accepts within one
-/// version of this binary; a new version discards every record anyway,
-/// because [`line_check_version`] hashes the version in with this. The
-/// suffix is the digest of a fixed fixture's verdicts, which
-/// `chain_audit::tests` holds, so the rule cannot move alone.
 pub(crate) const LINE_CHECK_RULES: &str = "line-check-40e703f48b222ca7";
 
 const MAGIC: &[u8; 8] = b"SPRPRF01";
 const SUFFIX: &str = ".proof";
 const STAGED: &str = ".staged";
 
-/// The rule version a record is written and accepted under.
 pub fn line_check_version() -> u32 {
     let rules = [env!("CARGO_PKG_VERSION"), LINE_CHECK_RULES].join("\n");
     let [a, b, c, d, ..] = *B3Hash::digest(rules.as_bytes()).as_bytes();
     u32::from_le_bytes([a, b, c, d])
 }
 
-/// Where a city's records live, and whether this holder may write them.
 #[derive(Debug, Clone)]
 pub struct ProofRecords {
     dir: PathBuf,
     may: May,
 }
 
-/// Only a handle that holds the writer lock writes records, so a
-/// read-only command never touches the disk (`Sprawling/storage/spec/ChainAudit.lean` §8-30).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum May {
     Read,
@@ -58,8 +39,7 @@ enum May {
 }
 
 impl ProofRecords {
-    /// Records read, never written: `ask`, `replay`, and any holder that
-    /// does not hold the writer lock.
+
     pub fn read_only(dir: &Path) -> ProofRecords {
         ProofRecords {
             dir: dir.to_path_buf(),
@@ -67,10 +47,6 @@ impl ProofRecords {
         }
     }
 
-    /// The record of the segment named `segment`, when there is one this
-    /// build can read. Absent, unreadable and damaged all answer `None`:
-    /// the segment is then checked line by line, which is the answer this
-    /// projection gives to every doubt.
     pub(crate) fn read(&self, segment: &str) -> Option<SegmentRecord> {
         let path = self.path_of(segment);
         match RealFs::new().read(&path) {
@@ -79,11 +55,6 @@ impl ProofRecords {
         }
     }
 
-    /// Writes `record` for `segment`, replacing the one there; nothing
-    /// for a read-only holder.
-    ///
-    /// # Errors
-    /// `StorageError::Snapshot` naming the step that failed.
     pub(crate) fn keep(&self, segment: &str, record: &SegmentRecord) -> Result<(), StorageError> {
         match self.may {
             May::Read => Ok(()),
@@ -116,9 +87,6 @@ impl ProofRecords {
     }
 }
 
-/// Where checking a ledger's last segment begins when the ledger is
-/// opened: the byte, the lines before it, the chain state there, and what
-/// was read and hashed to get there (`Sprawling/storage/spec/Jsonl.lean` §8-34).
 pub(crate) struct TailStart {
     pub(crate) from: usize,
     pub(crate) lines: u64,
@@ -127,7 +95,7 @@ pub(crate) struct TailStart {
 }
 
 impl TailStart {
-    /// At the segment entrance, before any bytes have been read.
+
     pub(crate) fn strict(entry: LineCheck) -> TailStart {
         TailStart {
             from: 0,
@@ -139,9 +107,7 @@ impl TailStart {
 }
 
 impl ProofRecords {
-    /// Hashes the recorded prefix through bounded windows. A mismatch
-    /// starts a fresh strict scan; a match consumes the hashed prefix's
-    /// exit state. The caller holds the writer lock throughout both reads.
+
     pub(crate) fn tail_start(
         &self,
         vfs: &dyn Vfs,
@@ -194,8 +160,7 @@ impl ProofRecords {
 }
 
 impl JsonlLedger {
-    /// The records of this ledger's proofs, kept in `dir`: writable when
-    /// this handle holds the ledger's writer lock, read-only otherwise.
+
     pub fn proof_records(&self, dir: &Path) -> ProofRecords {
         ProofRecords {
             dir: dir.to_path_buf(),
@@ -207,11 +172,10 @@ impl JsonlLedger {
     }
 }
 
-/// What a strict walk proved about the first `len` bytes of one segment.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SegmentRecord {
     pub(crate) version: u32,
-    /// The length of the proved prefix: always the end of a complete line.
+
     pub(crate) len: u64,
     pub(crate) lines: u64,
     pub(crate) entry: LineCheck,
@@ -220,9 +184,7 @@ pub(crate) struct SegmentRecord {
 }
 
 impl SegmentRecord {
-    /// `MAGIC | version u32 | len u64 | lines u64 | entry | exit | digest |
-    /// blake3 of everything before it`, a chain state being its `prev`
-    /// hash and the seq it expects, little-endian.
+
     fn encode(&self) -> Vec<u8> {
         let body = [
             MAGIC.as_slice(),
@@ -240,7 +202,6 @@ impl SegmentRecord {
         [body.as_slice(), seal.as_bytes()].concat()
     }
 
-    /// The record `encode` wrote; `None` for bytes that are not one.
     fn decode(bytes: &[u8]) -> Option<SegmentRecord> {
         let (body, seal) = bytes.split_last_chunk::<32>()?;
         if B3Hash::digest(body).as_bytes() != seal {
@@ -267,31 +228,18 @@ impl SegmentRecord {
     }
 }
 
-/// The judgement of one record, in two halves a proof can take apart:
-/// what the segment's own bytes decide, which a wave hashes before the
-/// walk reaches the segment, and what the chain entering it decides
-/// (`Sprawling/storage/Spec.lean` §8-30, §8-34, §8-37). Together they are `reuses` in
-/// `Sprawling/storage/spec/Snapshot.lean`, whose `cachedVerifyIsStrict`
-/// says a record that stands gives the strict verdict.
 impl SegmentRecord {
-    /// The recorded prefix length when its rule version and the
-    /// segment's current length permit reuse, for both read strategies.
+
     pub(crate) fn prefix_length(&self, total: u64, version: u32) -> Option<u64> {
         (self.version == version && self.len <= total).then_some(self.len)
     }
 
-    /// The first `len` bytes of `bytes` this record names, when it was
-    /// written under rule version `version` and the segment still holds
-    /// that much; `None` otherwise, and nothing is to be hashed.
     pub(crate) fn prefix<'a>(&self, bytes: &'a [u8], version: u32) -> Option<&'a [u8]> {
         self.prefix_length(u64::try_from(bytes.len()).ok()?, version)
             .and_then(|len| usize::try_from(len).ok())
             .and_then(|len| bytes.get(..len))
     }
 
-    /// Whether this record stands in for the prefix `hashed` has hashed,
-    /// entered at `entry`: its entry and its digest must both match. The
-    /// answer is the lines the prefix held and the chain state after them.
     pub(crate) fn stands(
         &self,
         entry: LineCheck,
@@ -314,8 +262,6 @@ fn chain_state(bytes: &[u8]) -> Option<(LineCheck, &[u8])> {
     ))
 }
 
-/// The constructor of a record's I/O failure. A record is a projection
-/// like a snapshot, so it shares the snapshot's advice.
 fn refused(op: &'static str, path: &Path) -> impl FnOnce(io::Error) -> StorageError {
     let path = path.to_path_buf();
     move |source| StorageError::Snapshot { op, path, source }

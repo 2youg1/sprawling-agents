@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every tool on the bench with custody on both sides of it: a key in
-//! the arguments reaches the tool as its `secret:` reference, and a key
-//! in the result reaches the model the same way (`Sprawling/app/Spec.lean` §8-87).
-
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
@@ -22,13 +18,11 @@ use crate::held_vault::poisoned_vault;
 #[cfg(test)]
 mod tests;
 
-/// Which side of a tool a key was found on, and so the realm it is kept
-/// under.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Side {
-    /// The arguments the model wrote: what `edit` and `exec` would write.
+
     Written,
-    /// The result a tool returned: what the model would read.
+
     Output,
 }
 
@@ -41,11 +35,9 @@ impl Side {
     }
 }
 
-/// What a key found in a tool's arguments or result is replaced with.
 enum InPlace {
     Kept(SecretRef),
-    /// The vault refused a key in a result the tool has already produced:
-    /// the model reads this marker, never the key, and the call stands.
+
     Withheld(AxCode),
 }
 
@@ -58,15 +50,11 @@ impl std::fmt::Display for InPlace {
     }
 }
 
-/// The vault and the naming every tool of one run shares, so that no
-/// two tools keep two keys under one name.
 pub(in crate::worker) struct Keeper {
     vault: Arc<Mutex<gateway::Custodian>>,
-    /// The ledger position when this run's bench was laid out: no two
-    /// runs share it, because each writes before its bench is laid out.
+
     run: u64,
-    /// The reference each distinct key this run's tools have kept holds,
-    /// found by the key's digest so that no plaintext outlives the call.
+
     kept: Mutex<BTreeMap<(Side, B3Hash), SecretRef>>,
 }
 
@@ -79,9 +67,6 @@ impl Keeper {
         }
     }
 
-    /// The reference `key` is kept under: the one it already holds in
-    /// this run, or a new vault entry under a name no other key of this
-    /// run or of any other run holds.
     fn keep(&self, side: Side, provider: &str, key: &str) -> Result<SecretRef, AxError> {
         let mut kept = self.kept.lock().map_err(|_| poisoned_vault())?;
         let digest = (side, B3Hash::digest(key.as_bytes()));
@@ -108,10 +93,6 @@ impl Keeper {
         Ok(reference)
     }
 
-    /// What stands in `key`'s place. A refused key in the arguments stops
-    /// the call before the tool acts; a refused key in a result is
-    /// withheld, because the tool has already acted and an error would
-    /// invite the model to act again.
     fn in_place(&self, side: Side, provider: &str, key: &str) -> Result<InPlace, AxError> {
         match (side, self.keep(side, provider, key)) {
             (Side::Written | Side::Output, Ok(reference)) => Ok(InPlace::Kept(reference)),
@@ -120,8 +101,6 @@ impl Keeper {
         }
     }
 
-    /// `value` with every key in every string kept, or `None` when no
-    /// string held one, so an untouched value is handed on uncopied.
     fn kept_value(&self, side: Side, value: &Value) -> Result<Option<Value>, AxError> {
         match value {
             Value::String(text) => {
@@ -162,7 +141,6 @@ impl Keeper {
         Ok(changed)
     }
 
-    /// `payload` with every key kept, or `None` when it held none.
     fn kept_payload(&self, side: Side, payload: &Payload) -> Result<Option<Payload>, AxError> {
         self.kept_map(side, payload.as_map())?
             .map(Payload::new)
@@ -170,7 +148,6 @@ impl Keeper {
     }
 }
 
-/// One tool with custody in front of and behind it.
 pub(in crate::worker) struct Kept {
     tool: Box<dyn Tool>,
     keeper: Arc<Keeper>,
@@ -187,10 +164,6 @@ impl Tool for Kept {
         self.tool.meta()
     }
 
-    /// # Errors
-    /// Everything the tool refuses, and the vault refusing a key in the
-    /// arguments, which stops the tool before it runs. A key the vault
-    /// refuses in the result is withheld instead (`InPlace::Withheld`).
     fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         let outcome = match self.keeper.kept_payload(Side::Written, &call.args)? {
             Some(args) => self.tool.invoke(&ToolCall {
@@ -210,8 +183,6 @@ impl Tool for Kept {
         self.tool.subject(call)
     }
 
-    /// What the kept tool writes: custody rewrites the text, not the
-    /// path.
     fn writes(&self, call: &ToolCall) -> kernel::Writes {
         self.tool.writes(call)
     }

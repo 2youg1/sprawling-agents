@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the projection reads from the Ledger's segments: the lines of
-//! one address, and the first sequence of every address. Both are the
-//! slow path a missing or doubtful slice takes (`Sprawling/storage/spec/Sessions.lean` §8-24); a
-//! room the Ledger never carried before reaches neither.
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -17,14 +12,13 @@ use crate::error::{StorageError, io_err};
 use crate::jsonl::{complete_lines, segment_first_seq, segment_names};
 use crate::vfs::Vfs;
 
-/// One city's Ledger segments, read through the projection's own adapter.
 pub(super) struct Segments<'a> {
     pub(super) vfs: &'a dyn Vfs,
     pub(super) ledger: &'a Path,
 }
 
 impl Segments<'_> {
-    /// The first sequence of every address in the Ledger's segments.
+
     pub(super) fn first_seen(&self) -> Result<BTreeMap<Address, Seq>, StorageError> {
         let (vfs, ledger) = (self.vfs, self.ledger);
         let mut folded = BTreeMap::new();
@@ -46,13 +40,6 @@ impl Segments<'_> {
         Ok(folded)
     }
 
-    /// The canonical lines of the Ledger that carry `addr`, after `after`
-    /// and no later than `through`, in ledger order.
-    ///
-    /// A segment whose successor begins at or before `after` cannot hold a
-    /// newer record and is skipped unread; a line that is not this
-    /// build's record grammar cannot carry an address or a sequence, so
-    /// it is passed over rather than filed under a guess.
     pub(super) fn lines_of(
         &self,
         addr: &Address,
@@ -91,7 +78,6 @@ impl Segments<'_> {
     }
 }
 
-/// Whether the segment at `index` can hold a record newer than `after`.
 fn holds_a_later_record(names: &[String], index: usize, after: Option<Seq>) -> bool {
     let Some(after) = after else {
         return true;
@@ -101,8 +87,7 @@ fn holds_a_later_record(names: &[String], index: usize, after: Option<Seq>) -> b
         .and_then(|name| segment_first_seq(name))
     {
         Some(next) => next > after,
-        // The last segment is always read, and a name this grammar cannot
-        // read is read rather than trusted.
+
         None => true,
     }
 }

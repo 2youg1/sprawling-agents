@@ -3,25 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! AxError: the one error shape of the whole city, and ErrorDraft, the
-//! only way to reach it.
-//! The part `Sprawling/kernel/spec/Error.lean` specifies this module with the
-//! rest of `kernel::error`.
-
 use serde::{Deserialize, Serialize};
 
 use super::code::AxCode;
 use super::provider::{AccountDisposition, ProviderFailureKind};
 use super::refusal::GateRefusal;
 
-/// The unified error shape: seven wire fields and two that are left out
-/// when absent, serialized in declaration order (determinism rule 6).
-/// The model is the recovery subject: `nearby` and `recovery` must hold
-/// directly executable information, not apologies.
-///
-/// Everything but `code` sits behind one Box so the type stays cheap in
-/// every seam's return slot (`result_large_err`); serde flatten keeps the
-/// wire shape flat and the field order unchanged.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error)]
 #[error("{code}: cannot {} on {}", detail.action, detail.subject)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -50,21 +37,15 @@ struct ErrorDetail {
     provider: Option<ProviderFailureKind>,
 }
 
-/// Whether the same request may go out again, said together with
-/// whether its effect already landed. On the wire `"yes"`, `"no"` or
-/// `"unknown"`; a ledger record written as `retriable: true/false`
-/// reads as `Yes`/`No`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Retry {
-    /// The effect did not land, and the same request may succeed later.
+
     Yes,
-    /// The same request would fail the same way again.
+
     No,
-    /// The request went out and its answer was lost: whether its effect
-    /// landed is not known, so only a caller who knows the action is
-    /// idempotent sends it again.
+
     Unknown,
 }
 
@@ -92,12 +73,6 @@ impl<'de> Deserialize<'de> for Retry {
     }
 }
 
-/// An error that still owes the reader its recovery sentence.
-///
-/// Both constructors return this rather than an [`AxError`], and
-/// [`ErrorDraft::with_recovery`] is the only way across, so a failure that
-/// never says what to do next cannot be spelled. Shaping happens here;
-/// an `AxError` is finished the moment it exists.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[must_use = "an ErrorDraft becomes an AxError only through with_recovery"]
 pub struct ErrorDraft {
@@ -105,8 +80,7 @@ pub struct ErrorDraft {
 }
 
 impl AxError {
-    /// Non-gate failure. `retry` starts `No` (fail-closed) and
-    /// `nearby` starts empty; both grow on the draft.
+
     pub fn failure(
         code: AxCode,
         action: impl Into<String>,
@@ -130,9 +104,6 @@ impl AxError {
         }
     }
 
-    /// Gate refusal: the only constructor that sets the three mandatory
-    /// parts. Gate-carrier codes must come through here (kernel::gate is
-    /// their sole producer).
     pub fn refusal(
         code: AxCode,
         action: impl Into<String>,
@@ -144,10 +115,6 @@ impl AxError {
         draft
     }
 
-    /// An `E_PROVIDER` error that names the kind of failure a model
-    /// call met. `retry` starts `No` like any failure: whether the
-    /// request may go out again is decided by the gateway's
-    /// `ProviderFailure::retry`, which sees more than the kind does.
     pub fn provider(
         kind: ProviderFailureKind,
         action: impl Into<String>,
@@ -182,14 +149,10 @@ impl AxError {
         self.detail.retry
     }
 
-    /// The least the raiser says to wait before asking again, when it
-    /// said one; present only on a `Retry::Yes` error.
     pub fn retry_after_ms(&self) -> Option<u64> {
         self.detail.retry_after_ms
     }
 
-    /// Whether the account this request went out on can still take it;
-    /// `Advance` comes only with `Retry::No` (D53).
     pub fn account(&self) -> AccountDisposition {
         self.detail.account
     }
@@ -202,10 +165,6 @@ impl AxError {
         self.detail.provider
     }
 
-    /// Replaces the recovery sentence of an error raised further down,
-    /// for a caller who knows a better next step than its raiser did.
-    /// Named apart from [`ErrorDraft::with_recovery`] because it destroys
-    /// a sentence rather than supplying the first one.
     #[must_use]
     pub fn rewrite_recovery(mut self, recovery: impl Into<String>) -> Self {
         self.detail.recovery = recovery.into();
@@ -214,26 +173,18 @@ impl AxError {
 }
 
 impl ErrorDraft {
-    /// Names the spellings the caller could have used instead. Directly
-    /// usable values only, not a description of them.
+
     pub fn with_nearby(mut self, nearby: Vec<String>) -> Self {
         self.pending.detail.nearby = nearby;
         self
     }
 
-    /// Declares the action safe to retry as-is. Explicit opt-in only.
-    /// Puts the account back to `Keep`: a request worth sending again
-    /// on this account is no reason to leave it.
     pub fn retriable(mut self) -> Self {
         self.pending.detail.retry = Retry::Yes;
         self.pending.detail.account = AccountDisposition::Keep;
         self
     }
 
-    /// Declares that the request went out and its answer was lost, so
-    /// whether its effect landed is not known. Drops any wait set
-    /// before it, because a wait belongs to `Retry::Yes` alone, and keeps
-    /// the account, because a lost answer is no evidence against it.
     pub fn effect_unknown(mut self) -> Self {
         self.pending.detail.retry = Retry::Unknown;
         self.pending.detail.retry_after_ms = None;
@@ -241,10 +192,6 @@ impl ErrorDraft {
         self
     }
 
-    /// Declares that the account the request went out on cannot take it,
-    /// so the next account should (D53). Sets `Retry::No` and drops any
-    /// wait in the same step: the same request on the same account would
-    /// fail the same way, however long it waited.
     pub fn account_unusable(mut self) -> Self {
         self.pending.detail.retry = Retry::No;
         self.pending.detail.retry_after_ms = None;
@@ -252,16 +199,11 @@ impl ErrorDraft {
         self
     }
 
-    /// Declares the action safe to retry, and no sooner than `wait_ms`
-    /// from now: the other side's own word on when it recovers.
     pub fn retriable_after(mut self, wait_ms: u64) -> Self {
         self.pending.detail.retry_after_ms = Some(wait_ms);
         self.retriable()
     }
 
-    /// Writes the one sentence that tells the reader what to do next, and
-    /// hands back the finished error. The reader is as often a model as a
-    /// person, so the sentence names a key, a file and line, or a command.
     pub fn with_recovery(mut self, recovery: impl Into<String>) -> AxError {
         self.pending.detail.recovery = recovery.into();
         self.pending
@@ -301,9 +243,6 @@ mod tests {
         assert_eq!(json.get("gate"), None);
     }
 
-    /// A wait belongs to a retriable error and to nothing else: the
-    /// raiser's word on when to ask again reads back as given, and
-    /// declaring the effect unknown takes it away with the retry.
     #[test]
     fn a_stated_wait_reads_back_until_the_effect_is_declared_unknown() {
         let draft = AxError::failure(AxCode::Provider, "call model", "429").retriable_after(1500);
@@ -322,8 +261,6 @@ mod tests {
         );
     }
 
-    /// A provider error names the kind of failure it met, and an error
-    /// raised any other way names none.
     #[test]
     fn only_a_provider_error_names_a_provider_failure() {
         let kind = ProviderFailureKind::Refused { status: 503 };
@@ -336,12 +273,6 @@ mod tests {
         assert_eq!(plain.provider_failure(), None);
     }
 
-    /// A switch is never said beside a resend: whatever order the
-    /// builders run in, `Advance` comes with `Retry::No` and no wait, and
-    /// a wait comes with `Retry::Yes` alone. Derived from
-    /// `Sprawling/kernel/spec/Error.lean`
-    /// (`no_order_of_calls_advances_a_resendable_failure`,
-    /// `no_order_of_calls_waits_without_retrying`).
     #[derive(Debug, Clone)]
     enum Builder {
         Retriable,
@@ -384,9 +315,6 @@ mod tests {
         }
     }
 
-    /// `Keep` is the absence of the field, so a ledger line written
-    /// before the field existed keeps its bytes and reads back as `Keep`;
-    /// `Advance` is spelled `"advance"`.
     #[test]
     fn only_a_switch_is_written_and_an_old_record_reads_as_keep() {
         let kept = AxError::failure(AxCode::Provider, "call model", "s").with_recovery("r");

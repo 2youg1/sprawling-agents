@@ -3,30 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The status tool: the model's view of its own situation, in the
-//! fourteen lines, in that order.
-//!
-//! The order is not cosmetic. A model reading its status reads the top
-//! first, so identity and mode come before the context reading, and that
-//! comes before the long tail of locks and children. Freezing the order
-//! means a Resident's habits transfer across versions instead of being
-//! relearned each time the field list grows - which is why the last
-//! field went on the end rather than beside the one it belongs with.
-//!
-//! **No ceiling is reported, because there is none**. The context
-//! reading reports what bounds a run: the tokens it has actually used
-//! against the window it was given.
-//!
-//! Nothing here samples. The snapshot is frozen at dispatch, and what
-//! moves while the run goes on - its children, its backlog, its context
-//! used, the time - is read from the one place that records it. The
-//! time is the driver's latest reading (`Sprawling/runtime/spec/Clock.lean` §8-53): a tool that
-//! read a clock of its own would be a second sampling point in the run,
-//! and its "now" could name a moment no line of the ledger records.
-//! The worktree's size is the one reading taken at the call, from the
-//! disk rather than a clock: the tree is what the run is changing, so a
-//! size frozen at dispatch would be wrong after its first write.
-
 use kernel::{
     Address, AxCode, AxError, ByteLen, CostTier, DelegateKind, Effect, Payload, RenderIntent,
     Temporal, TimeMs, Tokens, Tool, ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
@@ -40,9 +16,6 @@ use kernel::RunPolicy;
 use kernel::event::record::PromptTools;
 use std::path::{Path, PathBuf};
 
-/// How the gateway is currently able to serve. Degraded and LocalOnly
-/// are situations the model should plan around, so they are reported
-/// rather than hidden behind a retry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderMode {
     Normal,
@@ -60,94 +33,52 @@ impl ProviderMode {
     }
 }
 
-/// One piece of work this run handed down.
-///
-/// Two fields, because two facts exist. A child starts after the run
-/// that asked for it has frozen, so while that run is still reading its
-/// own status the child has no id, no phase and no context reading - and
-/// a field that can only ever hold zero says "zero" where the truth is
-/// "not yet".
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChildStatus {
     pub room: Address,
     pub kind: DelegateKind,
 }
 
-/// The frozen fields. `backlog` is read live from the table, and the
-/// context used and the time from the run's readings, rather than
-/// frozen here, for the reason `children` is a closure: they change
-/// while the run goes on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StatusSnapshot {
     pub who: String,
     pub addr: Address,
-    /// The run policy this run was dispatched under; its mode heads
-    /// the line and the other three values follow it.
+
     pub policy: RunPolicy,
     pub ctx_limit: Tokens,
     pub trust: String,
     pub write_domain: String,
     pub locks: Vec<String>,
-    /// The tree this run writes; its size is read at each call.
+
     pub worktree: PathBuf,
     pub signals_pending: u32,
     pub provider_mode: ProviderMode,
-    /// How many residents this run can reach, itself excluded. A count
-    /// rather than a list: the list grows with the building's population
-    /// and this text does not, so the names live behind the `neighbours`
-    /// tool and what stands here is whether asking is worth a call.
-    ///
-    /// People, not places. An empty room takes messages nobody reads, so
-    /// counting one would make `neighbours: 1` mean the opposite of what
-    /// it says.
+
     pub neighbours: u32,
 }
 
 pub struct StatusTool {
     snapshot: StatusSnapshot,
     children: Box<dyn Fn() -> Vec<ChildStatus> + Send + Sync>,
-    /// The table this run's background commands stand in. `None` in a
-    /// tool built without one, which reports `backlog: none` truthfully:
-    /// nothing was started through a table that does not exist.
+
     backlog: Option<Backlog>,
-    /// The run's context reading. A tool built without one reports zero,
-    /// which is true of a run that has made no call.
+
     context: ContextReading,
-    /// The driver's latest clock reading. A tool built without one
-    /// reports `not stamped`: nothing has told it what time it is.
+
     clock: ClockReading,
-    /// The same frozen `PromptTools` record the catalog page reads.
+
     catalog: Box<dyn Fn() -> Option<PromptTools> + Send + Sync>,
     meta: ToolMeta,
 }
 
 impl StatusTool {
-    /// The name this tool answers to, read by its registration and by
-    /// `mode::core_tools`.
+
     pub const NAME: &'static str = "status";
 
-    /// A run that hands nothing down.
-    ///
-    /// # Errors
-    /// Propagates a malformed parameter schema.
     pub fn new(snapshot: StatusSnapshot) -> Result<StatusTool, AxError> {
         StatusTool::watching(snapshot, Box::new(Vec::new))
     }
 
-    /// A run whose delegate desk is asked every time the model calls
-    /// `status`.
-    ///
-    /// A closure rather than a field, because delegation happens after
-    /// this tool is built: a snapshot taken before the run started is
-    /// empty for the whole run. A closure rather than a seam, because
-    /// the desk lives in `collab` and this crate may not depend on it -
-    /// the assembly layer owns both ends and hands one to the other.
-    ///
-    /// The name, disclosure and schema `watching` registers. The catalog
-    /// page reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut params = Map::new();
         params.insert("type".to_owned(), Value::String("object".to_owned()));
@@ -164,8 +95,6 @@ impl StatusTool {
         })
     }
 
-    /// # Errors
-    /// Propagates a malformed parameter schema.
     pub fn watching(
         snapshot: StatusSnapshot,
         children: Box<dyn Fn() -> Vec<ChildStatus> + Send + Sync>,
@@ -191,27 +120,18 @@ impl StatusTool {
         })
     }
 
-    /// The reading the run records the provider's count into, which the
-    /// `ctx` line reports (`Sprawling/runtime/spec/Tools.lean` §8-14, `status`).
     #[must_use]
     pub fn metering(mut self, context: ContextReading) -> StatusTool {
         self.context = context;
         self
     }
 
-    /// The reading the run's clock hook keeps, which the `now` line
-    /// reports (`Sprawling/runtime/spec/Clock.lean` §8-53). It reports the time whatever the
-    /// run's stamp granularity: `now` is a field of this tool's answer,
-    /// not an envelope attachment, and a city that turned stamps off
-    /// has not asked its model to stop knowing the time.
     #[must_use]
     pub fn clocked(mut self, clock: ClockReading) -> StatusTool {
         self.clock = clock;
         self
     }
 
-    /// Reads the frozen `PromptTools` behind the fourteenth line. The
-    /// accounting side returns the catalog's own `ToolTable.record`.
     #[must_use]
     pub fn cataloging(
         mut self,
@@ -221,18 +141,12 @@ impl StatusTool {
         self
     }
 
-    /// The table whose members at this run's address the thirteenth
-    /// line reports (`Sprawling/runtime/spec/Backlog.lean` §8-28-2).
     #[must_use]
     pub fn reporting(mut self, backlog: Backlog) -> StatusTool {
         self.backlog = Some(backlog);
         self
     }
 
-    /// What stands in the backlog at this run's address. A table that
-    /// cannot be reached reads as empty: the tool reports the run's
-    /// situation, and a poisoned lock is a fact about the process that
-    /// a model can do nothing with.
     fn standing(&self) -> Vec<Standing> {
         self.backlog
             .as_ref()
@@ -242,13 +156,7 @@ impl StatusTool {
 }
 
 impl StatusSnapshot {
-    /// The frozen order, one field per line.
-    ///
-    /// The result is text rather than a JSON object because a JSON
-    /// object has no order a reader can rely on — `serde_json`'s map
-    /// sorts its keys, so "the frozen order" would silently become
-    /// alphabetical. Order is a property of what the model reads, so it
-    /// is expressed where the model reads it.
+
     fn render(&self, live: &Live<'_>) -> String {
         let Live {
             used,
@@ -304,8 +212,6 @@ impl StatusSnapshot {
     }
 }
 
-/// What moves while the run goes on, read at the call and rendered in
-/// the frozen order beside the snapshot.
 struct Live<'a> {
     used: Tokens,
     now: Option<TimeMs>,
@@ -315,11 +221,6 @@ struct Live<'a> {
     catalog: Option<&'a PromptTools>,
 }
 
-/// Every regular file under `root`, summed. The city's own state under
-/// `.sprawling` is left out, because a run can read none of it, and a
-/// link is neither followed nor counted, so a link back up the tree
-/// cannot make the walk loop. `DirEntry::file_type` does not follow
-/// links on any platform, which is what keeps the second promise.
 fn tree_bytes(root: &Path) -> std::io::Result<ByteLen> {
     let mut total: u64 = 0;
     let mut pending = vec![root.to_path_buf()];
@@ -339,10 +240,6 @@ fn tree_bytes(root: &Path) -> std::io::Result<ByteLen> {
     Ok(ByteLen::new(total))
 }
 
-/// What is still running at this run's address, or the word for none.
-/// One line, for the reason `render_children` gives. No duration: this
-/// table samples no clock, and a status that sampled one to say "for
-/// forty seconds" would be a second sampling point.
 fn render_standing(standing: &[Standing]) -> String {
     if standing.is_empty() {
         return "none".to_owned();
@@ -354,9 +251,6 @@ fn render_standing(standing: &[Standing]) -> String {
         .join("; ")
 }
 
-/// Where each piece of handed-down work went, or the word for none.
-/// One line, because `status` is read as lines and a list that wrapped
-/// would break the field order the whole tool exists to keep.
 fn render_children(children: &[ChildStatus]) -> String {
     if children.is_empty() {
         return "none".to_owned();

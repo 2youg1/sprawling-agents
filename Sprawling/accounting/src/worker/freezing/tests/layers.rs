@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The two layers a building may override the city's prompt at: its own
-//! `City.md` and its own note for a model, each in the building's
-//! reserved subtree, each replacing the city's rather than joining it.
-
 use super::super::*;
 use crate::worker::fixture::*;
 use crate::worker::*;
@@ -15,9 +11,6 @@ const CITY_NOTE: &str = "The city's note: answer in one paragraph.";
 const BUILDING_NOTE: &str = "The lab's note: answer with a table.";
 const BUILDING_PROMPT: &str = "# City.md - the lab\n\nThe lab speaks only of voltages.\n";
 
-/// What one dispatch to `room` sent as its system prompt, in a city with
-/// the buildings `lab` and `shop`, where `lay` has written whatever
-/// overrides the case needs.
 fn system_prompt_at(room: &str, lay: impl FnOnce(&std::path::Path)) -> String {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
@@ -82,8 +75,6 @@ fn both_notes(root: &std::path::Path) {
     );
 }
 
-/// A building's own `City.md` is what its runs are told, and the city's
-/// is not; a building without one is told the city's.
 #[test]
 fn a_buildings_city_md_replaces_the_citys_there_and_only_there() {
     let lab = system_prompt_at("lab/room1", lab_prompt);
@@ -95,8 +86,6 @@ fn a_buildings_city_md_replaces_the_citys_there_and_only_there() {
     assert!(!shop.contains("The lab speaks only of voltages."), "{shop}");
 }
 
-/// A building's own note for a model ends the prompt in its place of the
-/// city's; elsewhere the city's note stands.
 #[test]
 fn a_buildings_note_for_a_model_replaces_the_citys_there_and_only_there() {
     let lab = system_prompt_at("lab/room1", both_notes);

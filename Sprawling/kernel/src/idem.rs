@@ -3,27 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! IdemKey: the dedup key for outward actions.
-//! The part `Sprawling/kernel/spec/Idem.lean` specifies this module.
-//!
-//! Derivation is the whole point: `BLAKE3-XOF(run(16B) || seq(8B LE) ||
-//! action_canonical)` taken as a direct 16-byte output (not a truncation),
-//! plus one version byte carried alongside so a future derivation change
-//! cannot collide old keys with new ones. No `From<Uuid>`, no randomness,
-//! no timestamps: resume and replay must re-derive the identical key, or
-//! the double-payment defense dies exactly on the recovery path.
-
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 
 use crate::event::{RunId, Seq};
 
-/// Current derivation-scheme version byte.
 pub const IDEM_DERIVE_V: u8 = 1;
 
-/// Idempotency key: 16 digest bytes plus the derivation version.
-/// Private fields; [`IdemKey::derive`] is the only mint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct IdemKey {
     v: u8,
@@ -31,9 +18,7 @@ pub struct IdemKey {
 }
 
 impl IdemKey {
-    /// The sole construction point (`kernel::idem::derive`).
-    /// Fixed-width run and seq make the framing injective without length
-    /// prefixes; the action canonicalization rule is `ToolCall::action`'s.
+
     pub fn derive(run: &RunId, seq: Seq, action_canonical: &[u8]) -> IdemKey {
         let mut hasher = blake3::Hasher::new();
         hasher.update(run.as_bytes());
@@ -61,31 +46,19 @@ impl IdemKey {
     }
 }
 
-/// The right to perform one unreplayable side effect, once.
-///
-/// A guard exists only because [`claim`] put its key into a seen set,
-/// and the entrance to every effect that cannot be replayed —
-/// decrypting, billing, outward delivery (8.2) — asks for one by
-/// reference. That turns "judge duplicates before you act" from a
-/// sentence in a comment into something the compiler checks: an
-/// entrance that wants a guard cannot be called by a caller that never
-/// claimed.
 #[derive(Debug, PartialEq, Eq)]
 pub struct IdemGuard {
     key: IdemKey,
 }
 
 impl IdemGuard {
-    /// The key this guard was claimed under, for the record the effect
-    /// writes.
+
     #[must_use]
     pub fn key(&self) -> &IdemKey {
         &self.key
     }
 }
 
-/// A key that was already claimed. The caller answers with what the
-/// first claim produced rather than doing the work twice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Duplicate {
     key: IdemKey,
@@ -98,16 +71,6 @@ impl Duplicate {
     }
 }
 
-/// Claims `key` in the caller's seen set, handing back the right to
-/// act once.
-///
-/// The set stays the caller's state — kernel holds none — and the
-/// claim is the only way to add to it, so a key that is in the set is
-/// a key some caller was already given the right for.
-///
-/// # Errors
-/// [`Duplicate`] when the key is already in the set, carrying that key
-/// so the caller can look up the answer it gave the first time.
 pub fn claim(seen: &mut BTreeSet<IdemKey>, key: IdemKey) -> Result<IdemGuard, Duplicate> {
     if seen.contains(&key) {
         return Err(Duplicate { key });

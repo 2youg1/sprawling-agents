@@ -3,25 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One endpoint's permit gate, and the model face that passes it before
-//! a request leaves (`Sprawling/gateway/Spec.lean` §8-6, D20).
-//!
-//! Every call takes a ticket and waits in arrival order; only the ticket
-//! at the head of the queue asks [`Permits`] for a permit, so who gets
-//! the next permit is decided by the ticket and not by which thread the
-//! operating system wakes. The order is proved in
-//! `Sprawling/gateway/spec/Concurrency.lean` (`grants_follow_arrival`); the
-//! proptest below checks this queue against it. The clock is the
-//! injected `fn() -> Instant`, so the gate behaves the same on Windows,
-//! macOS and Linux.
-//!
-//! Before a call takes its ticket it passes the prefix hold
-//! (`Sprawling/gateway/spec/Concurrency.lean` §8-40): the first call to
-//! reach a cold shared prefix sends one pre-warm of it, the calls with
-//! the same key wait for that one, and all of them then take tickets
-//! like any other call. The hold lives under the queue's lock and wakes
-//! its waiters on the queue's condition variable.
-
 use std::collections::VecDeque;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
@@ -35,22 +16,16 @@ use crate::hold::{Arrival, Holds, PrefixKey, Prewarm};
 use super::config::Endpoint;
 use super::prewarm::Prewarming;
 
-/// The longest a call waits in an endpoint's queue before it is refused.
 pub(crate) const QUEUE_WAIT_MAX: Duration = Duration::from_secs(600);
 
-/// The status a provider answers when it wants fewer calls at once.
 const TOO_MANY_REQUESTS: u32 = 429;
 
-/// One endpoint's permits and the tickets waiting for them, shared by
-/// every clone of its transport.
 #[derive(Debug)]
 pub(crate) struct Gate {
     state: Mutex<Admission>,
     turn: Condvar,
 }
 
-/// What the gate's one lock guards: the ticket queue, and the prefix
-/// hold a call passes before it takes a ticket.
 #[derive(Debug)]
 struct Admission {
     queue: Queue,
@@ -64,7 +39,7 @@ impl Default for Gate {
 }
 
 impl Gate {
-    /// A gate that lets `ceiling` calls be in flight at once.
+
     pub(crate) fn admitting(ceiling: MaxInFlight) -> Gate {
         Gate {
             state: Mutex::new(Admission {
@@ -75,13 +50,6 @@ impl Gate {
         }
     }
 
-    /// Waits in arrival order for a permit and returns the guard that
-    /// holds it. `bound` is how long the call may wait: [`QUEUE_WAIT_MAX`]
-    /// for a call, what is left of its hold for a pre-warm (gateway D41).
-    ///
-    /// # Errors
-    /// `E_BACKPRESSURE_SHED` once the call has waited `bound`; its ticket
-    /// leaves the queue and the next one moves up.
     fn admit(
         self: &Arc<Gate>,
         monotonic: fn() -> Instant,
@@ -118,8 +86,6 @@ impl Gate {
         }
     }
 
-    /// A call carrying `key` reached the hold at `now`. Lapsed pre-warms
-    /// are taken off first, and the calls they held are woken.
     fn arrive(&self, key: PrefixKey, now: Instant) -> Arrival {
         let mut state = self.lock();
         state.holds.expire(now);
@@ -129,8 +95,6 @@ impl Gate {
         arrival
     }
 
-    /// Waits until pre-warm `on` of `key` no longer holds, at most until
-    /// `until`, and answers how it ended.
     fn wait_for(
         &self,
         key: &PrefixKey,
@@ -143,27 +107,22 @@ impl Gate {
             let now = monotonic();
             state.holds.expire(now);
             if !state.holds.waits(on) {
-                // A waiter woken later than the cache lifetime finds its
-                // pre-warm's mark gone; it waited at least `HOLD_MAX`.
+
                 let ended = state.holds.ended(key, on).unwrap_or(PrewarmEnd::TimedOut);
                 drop(state);
                 self.turn.notify_all();
                 return ended;
             }
-            // `expire` took off every pre-warm sent `HOLD_MAX` ago, so
-            // `until` is still ahead of `now`.
+
             state = self.sleep(state, until.saturating_duration_since(now));
         }
     }
 
-    /// Pre-warm `prewarm` ended as `ended` at `now`: every call it held
-    /// goes on.
     fn settle_prewarm(&self, prewarm: Prewarm, ended: PrewarmEnd, now: Instant) {
         self.lock().holds.settle(prewarm, ended, now);
         self.turn.notify_all();
     }
 
-    /// Sleeps on the gate's condition variable for at most `wait`.
     fn sleep<'g>(
         &self,
         state: MutexGuard<'g, Admission>,
@@ -179,9 +138,6 @@ impl Gate {
         self.lock().queue.permits.limit()
     }
 
-    /// The queue and the hold, recovered from a holder that panicked:
-    /// they hold only counters, tickets and marks, and refusing every
-    /// later call to the endpoint would turn one panic into an outage.
     fn lock(&self) -> MutexGuard<'_, Admission> {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
@@ -199,7 +155,6 @@ fn shed(endpoint: &str, waited: Duration) -> AxError {
     )
 }
 
-/// The permits and the tickets in arrival order.
 #[derive(Debug, Clone)]
 struct Queue {
     permits: Permits,
@@ -207,11 +162,10 @@ struct Queue {
     waiting: VecDeque<u64>,
 }
 
-/// What one ticket's attempt answers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Turn {
     Granted,
-    /// Wait to be woken, or until the instant when there is one.
+
     Wait(Option<Instant>),
 }
 
@@ -224,7 +178,6 @@ impl Queue {
         }
     }
 
-    /// Issues the next ticket and puts it at the back of the queue.
     fn arrive(&mut self) -> u64 {
         let ticket = self.next;
         self.next = self.next.saturating_add(1);
@@ -232,7 +185,6 @@ impl Queue {
         ticket
     }
 
-    /// Takes a permit for `ticket` when it is at the head of the queue.
     fn try_take(&mut self, ticket: u64, now: Instant) -> Turn {
         if self.waiting.front() != Some(&ticket) {
             return Turn::Wait(None);
@@ -252,8 +204,6 @@ impl Queue {
     }
 }
 
-/// A permit held for one call: settled with the call's outcome, given
-/// back when dropped, on every return path.
 #[derive(Debug)]
 #[must_use = "dropping the guard gives the permit back before the call ran"]
 struct Admitted {
@@ -262,9 +212,7 @@ struct Admitted {
 }
 
 impl Admitted {
-    /// Tells the permits how the call went: a success counts toward
-    /// widening, a 429 narrows and holds off until the provider's
-    /// `Retry-After` instant.
+
     fn settle(&self, outcome: &Result<ModelReturn, AxError>) {
         let now = (self.monotonic)();
         let mut state = self.gate.lock();
@@ -293,10 +241,6 @@ impl Drop for Admitted {
     }
 }
 
-/// The pre-warm one call sent, settled exactly once: by the call when it
-/// comes back, or as abandoned when the thread that sent it unwinds, so
-/// no call is left held behind a pre-warm nobody will settle (gateway
-/// D41).
 #[must_use = "dropping the guard releases the held calls before the pre-warm came back"]
 struct Sending {
     gate: Option<Arc<Gate>>,
@@ -322,21 +266,18 @@ impl Drop for Sending {
     }
 }
 
-/// An endpoint reached as a model: every door passes the endpoint's
-/// gate first, and holds the permit until the answer is whole.
 pub(crate) struct Gated {
     endpoint: Endpoint,
     gate: Arc<Gate>,
     monotonic: fn() -> Instant,
-    /// The Provider the accounts belong to; empty while `accounts` is.
+
     provider: String,
-    /// The declared accounts in priority order, each with its credential.
+
     accounts: Vec<(kernel::ServerLabel, super::AuthSpec)>,
     active: usize,
-    /// How many more times one account is asked before the next one.
+
     retries: kernel::account_recovery::AccountRetries,
-    /// The wait the last call took at the prefix hold (kernel D60);
-    /// cleared as each call begins.
+
     held: Option<PrefixHeld>,
 }
 
@@ -366,9 +307,6 @@ impl Gated {
         self
     }
 
-    /// Whether an account's credential can be redeemed now. Asked only
-    /// where there is another account to move to: a single account is
-    /// sent on whatever it holds, as it always was.
     fn usable(&self, auth: &super::AuthSpec) -> bool {
         if self.accounts.len() < 2 {
             return true;
@@ -382,8 +320,6 @@ impl Gated {
         }
     }
 
-    /// Passes the prefix hold, takes a permit, and calls through `door`
-    /// (`Sprawling/gateway/spec/Concurrency.lean` §8-40, steps one to five).
     fn through(
         &mut self,
         req: &ModelRequest,
@@ -404,9 +340,6 @@ impl Gated {
         outcome
     }
 
-    /// Waits at the hold for `prewarming`'s key, sending the pre-warm
-    /// when this call is the first to reach the key cold (gateway D37);
-    /// the wait it took, or `None` when the key was warm.
     fn hold(&mut self, prewarming: &Prewarming) -> Option<PrefixHeld> {
         let arrived = (self.monotonic)();
         let (ended, sent) = match self.gate.arrive(prewarming.key, arrived) {
@@ -429,9 +362,6 @@ impl Gated {
         })
     }
 
-    /// Sends the pre-warm this call was chosen to send, bounded by
-    /// `until` both in the queue and on the wire (gateway D41, D42), and
-    /// releases every call behind it however it ends.
     fn send(
         &mut self,
         prewarming: &Prewarming,
@@ -568,10 +498,6 @@ mod tests {
     use super::{Gate, QUEUE_WAIT_MAX, Queue, Turn};
     use crate::concurrency::{MaxInFlight, Permits, WIDEN_AFTER};
 
-    /// One step of a trace over the ticket queue (the Lean model's
-    /// `QueueEvent`, with the head's grant split into any waiting
-    /// ticket's attempt so a queue that lets another ticket through is
-    /// caught).
     #[derive(Debug, Clone)]
     enum Step {
         Arrive,
@@ -590,8 +516,7 @@ mod tests {
     }
 
     proptest! {
-        /// `grants_follow_arrival`: over any trace, the tickets that get a
-        /// permit are strictly increasing.
+
         #[test]
         fn grants_follow_arrival(
             cap in 1u32..=4,
@@ -634,13 +559,11 @@ mod tests {
     static TICKS: AtomicU64 = AtomicU64::new(0);
     static BASE: OnceLock<Instant> = OnceLock::new();
 
-    /// A clock that moves a minute on every reading.
     fn counted() -> Instant {
         let base = *BASE.get_or_init(Instant::now);
         base + Duration::from_secs(60 * TICKS.fetch_add(1, Ordering::SeqCst))
     }
 
-    /// A clock that never moves.
     fn still() -> Instant {
         *BASE.get_or_init(Instant::now)
     }
@@ -651,16 +574,12 @@ mod tests {
 
     const URL: &str = "http://127.0.0.1:1/v1/messages";
 
-    /// A call that finds every permit taken waits, and is refused with
-    /// `E_BACKPRESSURE_SHED` once its queue time passes the bound; its
-    /// ticket leaves, and the permit given back serves the next call.
     #[test]
     fn a_call_that_waits_past_the_bound_is_shed_and_the_next_one_gets_the_permit() {
         let gate = gate_of(1);
         let held = gate.admit(counted, QUEUE_WAIT_MAX, URL).unwrap();
         let done = Arc::new(AtomicBool::new(false));
-        // The counted clock moves only when read, so a waker stands in for
-        // the minutes a real condvar wait would sleep through.
+
         let waker = {
             let (gate, done) = (Arc::clone(&gate), Arc::clone(&done));
             std::thread::spawn(move || {
@@ -686,8 +605,6 @@ mod tests {
         );
     }
 
-    /// A 429 halves the endpoint's limit and holds it until the
-    /// provider's Retry-After; a run of successes after that widens it.
     #[test]
     fn a_429_narrows_the_endpoint_and_a_run_of_successes_widens_it_again() {
         let gate = gate_of(4);
@@ -710,11 +627,6 @@ mod tests {
         );
     }
 
-    /// The provider queue's reading (gateway D21): `callers` threads at
-    /// once against a gate of four permits, each holding its permit for
-    /// `HOLD`, and how long each waited from asking to holding. It
-    /// asserts nothing about time, since the wall clock differs by
-    /// machine.
     #[test]
     #[ignore = "a wall-clock instrument; just bench runs it"]
     fn instrument_provider_queue() {

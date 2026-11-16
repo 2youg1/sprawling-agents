@@ -3,26 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The run's side of the city's signal traffic: the room's queue on
-//! loan, the post every signal line goes through, and the signals the
-//! run holds.
-//!
-//! Three orderings carry the design. A send takes effect at the call
-//! (collab D7): the desk hands the signal to its [`Post`], which puts
-//! the `signal_enqueued` line on the ledger and only then delivers it,
-//! because a projection may only change as a consequence of a record
-//! that already exists. A signal taken out of the queue is *held* until
-//! a recorded model answer has read it (collab D8): only then is its
-//! `signal_consumed` line written, and a run that leaves first gives it
-//! back. And the room's inbox is *lent* to the desk for the length of
-//! the run rather than copied into it: two queues would be two
-//! authorities on what order signals arrive in, and the one that drifts
-//! is always the one nobody reads.
-//!
-//! Reach is handed in, not worked out here. Which building an address
-//! belongs to is `city`'s answer, and this crate cannot name that crate;
-//! what it can do is refuse anything outside the boundary it was given.
-
 use kernel::{Address, AxCode, AxError, Payload, RunId, TimeMs, Version};
 use serde_json::{Map, Value};
 
@@ -31,30 +11,18 @@ use kernel::event::record::{SignalId, SignalKind, SignalWaitEnded, SignalWaitSta
 
 use crate::reply_wait::ReplyWait;
 
-/// One line of the city's signal traffic, handed to the [`Post`] at the
-/// moment it happens.
-///
-/// Exhaustive on purpose, unlike most enums that cross a crate boundary
-/// here: every variant is something the post must write down, so a new
-/// one has to be a compile error at the place that writes, not a runtime
-/// arm nobody reaches until a signal quietly goes unrecorded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SignalEffect {
-    /// Sent: the line goes on the ledger, then the signal into its room.
+
     Enqueued(Signal),
-    /// Read by a recorded model answer, or taken and unreadable.
+
     Consumed { signal: Signal, by: String },
-    /// A send with `wait` stopped the run until a reply or the deadline
-    /// (collab D9, kernel D32).
+
     WaitStarted(SignalWaitStarted),
-    /// The one end of a [`SignalEffect::WaitStarted`]: the reply, the
-    /// deadline, or the run leaving its room.
+
     WaitEnded(SignalWaitEnded),
 }
 
-/// The authority that records a signal line at the call and acts on it:
-/// in the city, the relay to the accounting thread, which appends the
-/// line and delivers what was sent. Its refusal reaches the model.
 pub struct Post(pub(crate) Box<Write>);
 
 type Write = dyn FnMut(&SignalEffect) -> Result<(), AxError> + Send;
@@ -72,10 +40,6 @@ impl std::fmt::Debug for Post {
     }
 }
 
-/// What a run is lent of its room's mail: the queue, the slot the city
-/// drops new signals into while the run holds the queue, and the post
-/// its own lines go through. The three travel together because a desk
-/// with any one missing either loses mail or records none.
 #[derive(Debug)]
 pub struct RoomMail {
     pub inbox: Inbox,
@@ -83,8 +47,6 @@ pub struct RoomMail {
     pub post: Post,
 }
 
-/// The run's side of the city's signal traffic: its own inbox, on loan,
-/// and the signals it has taken that no recorded answer has read yet.
 pub struct SignalDesk {
     run: RunId,
     pub(crate) room: Address,
@@ -111,9 +73,7 @@ impl std::fmt::Debug for SignalDesk {
 }
 
 impl SignalDesk {
-    /// `reach` bounds where this run may send: an address outside it is
-    /// refused. `at` is the run's stamp — the tool face has no clock, and
-    /// time only ever arrives as a parameter.
+
     #[must_use]
     pub fn new(
         run: RunId,
@@ -140,37 +100,11 @@ impl SignalDesk {
         }
     }
 
-    /// What `status` reports as `signals_pending` for this room.
     #[must_use]
     pub fn pending(&self) -> u32 {
         self.inbox.pending()
     }
 
-    /// Takes one steer waiting for this run, ready to land at its next
-    /// safe point, or `None` when nothing is waiting for it.
-    ///
-    /// The landing is the same one the User's steer uses, and the type
-    /// is what keeps them apart: [`crate::Letter::from_signal`] carries
-    /// the sender's address as the city stamped it, and only a
-    /// [`crate::Steer`] renders as `user` (collab D16). A resident
-    /// reading its own window can therefore tell who spoke, and the
-    /// letter's `from` is the address it answers to — which is what
-    /// makes a reply possible at all.
-    ///
-    /// A steer the run can read is *held*, not consumed: the model reads
-    /// it in its next request, and [`SignalDesk::answered`] records the
-    /// consumption once that answer is on the ledger (collab D8). A
-    /// steer the run cannot read is recorded as consumed at once,
-    /// because no model will read it and delivering it again would only
-    /// be refused again at the next safe point.
-    ///
-    /// # Errors
-    /// Propagates [`crate::Letter::from_signal`]'s refusal when a consumed
-    /// signal is not a steer this run can read. `Ok(None)` and `Err` are
-    /// two facts — an empty queue and a message that arrived unreadable —
-    /// and folding the second into the first is what this refuses to do.
-    /// How a safe point treats the refusal is the caller's decision, and
-    /// a slot or a post that fails is refused the same way.
     pub fn take_steer(&mut self) -> Result<Option<crate::Letter>, AxError> {
         self.collect()?;
         let Some(signal) = self.inbox.take_steer() else {
@@ -191,14 +125,6 @@ impl SignalDesk {
         }
     }
 
-    /// Records that a model answer has landed since every signal now
-    /// held was taken, so each of them has been read: one
-    /// `signal_consumed` line per signal, written now (collab D8).
-    ///
-    /// # Errors
-    /// Propagates the post's refusal; the signals not yet recorded stay
-    /// held, so a later answer or the run's leaving still accounts for
-    /// them.
     pub fn answered(&mut self) -> Result<(), AxError> {
         let mut held = std::mem::take(&mut self.held).into_iter();
         while let Some(signal) = held.next() {
@@ -216,13 +142,6 @@ impl SignalDesk {
         Ok(())
     }
 
-    /// Gives the room its inbox back, with every signal this run held
-    /// unread, the reply kept for its wait, and every one still in the
-    /// slot put back at the front.
-    /// The caller must do this on both the failing and the succeeding
-    /// path — an inbox left in a dropped desk is a queue the city forgot
-    /// it had. A slot that cannot be read is left for the room table,
-    /// which reads it again when the queue comes home.
     #[must_use]
     pub fn take_inbox(&mut self) -> Inbox {
         let mut unread = std::mem::take(&mut self.held);
@@ -235,17 +154,10 @@ impl SignalDesk {
         std::mem::replace(&mut self.inbox, Inbox::new(0, 1))
     }
 
-    /// The signals [`SignalDesk::take_inbox`] put back unread: the room
-    /// they are in is knocked once, so somebody reads them
-    /// (`spec/Delivery.lean` `leave_requeues`).
     pub fn take_unread(&mut self) -> Vec<Signal> {
         std::mem::take(&mut self.unread)
     }
 
-    /// Moves what the city dropped into the slot since the last safe
-    /// point into the lent queue.
-    /// While a wait is asked, the first reply from the room waited on
-    /// is kept for it instead (collab D15).
     fn collect(&mut self) -> Result<(), AxError> {
         for signal in self.slot.take()? {
             let queued = match self.waiting.as_mut() {
@@ -259,7 +171,6 @@ impl SignalDesk {
         Ok(())
     }
 
-    /// Puts one signal out of the slot into the lent queue.
     pub(crate) fn admit(&mut self, signal: &Signal) -> Result<(), AxError> {
         match self.inbox.deliver(signal)? {
             kernel::Admission::Shed { .. } => Err(AxError::failure(
@@ -309,8 +220,7 @@ impl SignalDesk {
             kind,
             self.who.clone(),
             to.clone(),
-            // No room carries a version until drafts have a writer: the
-            // sender saw a room nobody has revised.
+
             Version::FIRST,
             Payload::new(payload)?,
             self.at,
@@ -367,8 +277,7 @@ impl SignalDesk {
         }
         let mut result = Map::new();
         result.insert("signals".to_owned(), Value::Array(rows));
-        // The count in `status` is the fact as it stood when the run was
-        // dispatched; this one is the fact as it stands now.
+
         result.insert(
             "remaining".to_owned(),
             Value::Number(self.inbox.pending().into()),

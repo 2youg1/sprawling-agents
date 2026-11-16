@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every built-in tool a run is offered is called once and answers the
-//! way its own SPEC says (`Sprawling/accounting/Spec.lean` section 2, the seventh and
-//! eighth assertions).
-
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -16,11 +12,8 @@ use crate::city::{self, History};
 use crate::episodes::{self, Episode, Observed, Setup};
 use crate::script;
 
-/// Rules that let the lead write where it works and give each room a
-/// tree of its own, so `pr` has something to offer.
 const REVIEWED: &str = "confidential = false\nwrite = \"everything\"\nreview = true\n";
 
-/// One plan node ready to claim.
 const PLAN: &str = "\
 # Roadmap
 
@@ -43,13 +36,12 @@ fn every_tool_a_builder_is_offered_is_called_and_answered() {
 #[test]
 fn every_tool_city_hall_is_offered_is_called_and_answered() {
     let setup = &episodes::HALL;
-    // The founding raised City Hall; nothing more to raise.
+
     let (short, context) = run_the_script(setup, &episodes::for_city_hall(setup), |_, _| {});
 
     assert_eq!(short, Vec::<String>::new(), "{context}");
 }
 
-/// Everything the script's run left behind that a verdict reads.
 struct Landing<'a> {
     city: &'a Path,
     setup: &'a Setup,
@@ -58,9 +50,6 @@ struct Landing<'a> {
     rules_before: &'a [u8],
 }
 
-/// Founds a city, lets `raise` build what the setup needs, sends the
-/// lead's room its task, and answers every shortfall of the coverage,
-/// with what the model was offered and what the dispatch answered.
 fn run_the_script(
     setup: &Setup,
     episodes: &[Episode],
@@ -106,9 +95,6 @@ fn steps_of(episodes: &[Episode]) -> Vec<script::Step> {
         .collect()
 }
 
-/// Every way the lead's run fell short of the coverage, all at once:
-/// a tool offered and never called, a call without exactly one result,
-/// and each verdict that did not hold, prefixed with its tool.
 fn covered(landing: &Landing<'_>, episodes: &[Episode]) -> Vec<String> {
     let history = landing.history;
     let Some(lead) = history.started().first().map(|started| started.run) else {
@@ -137,7 +123,7 @@ fn covered(landing: &Landing<'_>, episodes: &[Episode]) -> Vec<String> {
         }
     }
     for episode in episodes {
-        // Several episodes call `tool`, with different arguments.
+
         let Some(result) = calls
             .iter()
             .find(|call| {
@@ -170,11 +156,6 @@ fn covered(landing: &Landing<'_>, episodes: &[Episode]) -> Vec<String> {
     short
 }
 
-/// The offered names with each namespace line of the dormant index
-/// replaced by the members a `tool` `list` of it answered, so a tool
-/// folded into a namespace still has to be called. A namespace nobody
-/// listed, or one that listed a different number of members than its
-/// line counted, is a shortfall.
 fn unfolded(offered: &[String], calls: &[city::Call], short: &mut Vec<String>) -> Vec<String> {
     let resident: BTreeSet<&str> = offered
         .iter()

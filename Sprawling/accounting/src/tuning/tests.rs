@@ -3,20 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The settings page reads an endpoint's tuning back and attaches it
-//! again with only the account list changed, so reading back and
-//! attaching must land the tuning the book already held
-//! (`Sprawling/wire/spec/Answer/Endpoints.lean` §8-85).
-
 use kernel::account_recovery::AccountRetries;
 use kernel::event::record::ProviderAccount;
 use proptest::prelude::*;
 
 use super::{tuning_as_attached, tuning_of};
 
-/// An ordered account list the book accepts, or none: each account
-/// keyed by a reference of its own or anonymous, and a named header only
-/// beside a reference.
 fn accounts() -> impl Strategy<Value = Option<Vec<ProviderAccount>>> {
     proptest::option::of(
         proptest::collection::vec((any::<bool>(), any::<bool>()), 1..4).prop_map(|rows| {
@@ -50,8 +42,6 @@ fn retries() -> impl Strategy<Value = Option<AccountRetries>> {
     ])
 }
 
-/// Header and override rows as a form sends them, blank names included;
-/// a value is a short literal or a vault reference.
 fn rows() -> impl Strategy<Value = Vec<(String, String)>> {
     proptest::collection::vec(
         (
@@ -98,8 +88,7 @@ prop_compose! {
 }
 
 proptest! {
-    /// Whatever a form sent and the city accepted, the tuning read back
-    /// from the book attaches to the same tuning.
+
     #[test]
     fn a_tuning_read_back_attaches_to_the_same_tuning(entered in entered()) {
         let Ok(held) = tuning_of(entered) else {

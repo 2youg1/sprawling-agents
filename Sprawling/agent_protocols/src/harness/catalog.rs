@@ -3,38 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The ACP registry's index read as agent entries, and the snapshot of it
-//! this build ships (`Sprawling/agent_protocols/Spec.lean` §8-19, D12, D13).
-//!
-//! One reader for both: the snapshot `cargo xtask acp-catalog` commits is
-//! the CDN index with the fields this city does not read taken out, so a
-//! full index fetched on refresh and the shipped snapshot are read by the
-//! same code.
-
 use kernel::{AxCode, AxError};
 use serde_json::Value;
 
 use super::entry::{AgentEntry, AgentId, AgentSource, Launch, Launcher};
 
-/// The shipped snapshot, with the index's `Date` and `ETag` beside it.
 const BUNDLED: &str = include_str!("../../catalog/registry.json");
 
-/// The agents of one registry index this machine can start.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Catalog {
     pub entries: Vec<AgentEntry>,
-    /// The index's `Date` header.
+
     pub date: String,
-    /// The index's `ETag` header.
+
     pub etag: String,
 }
 
 impl Catalog {
-    /// The snapshot this build ships.
-    ///
-    /// # Errors
-    /// `E_WIRE_MISMATCH` when the committed snapshot does not read, which
-    /// `catalog::tests` would have caught before the build shipped.
+
     pub fn bundled() -> Result<Catalog, AxError> {
         let index: Value = serde_json::from_str(BUNDLED).map_err(|err| unreadable(&err))?;
         let header = |key: &str| text(&index, key).unwrap_or_default().to_owned();
@@ -42,11 +28,6 @@ impl Catalog {
         Catalog::of(&index, date, etag)
     }
 
-    /// One registry index, as the CDN serves it.
-    ///
-    /// # Errors
-    /// `E_WIRE_MISMATCH` for text that is not JSON, an index with no
-    /// `agents` list, and an agent [`registry_entry`] refuses.
     pub fn read(index: &str, date: String, etag: String) -> Result<Catalog, AxError> {
         let index: Value = serde_json::from_str(index).map_err(|err| unreadable(&err))?;
         Catalog::of(&index, date, etag)
@@ -68,7 +49,6 @@ impl Catalog {
         })
     }
 
-    /// The entry the registry lists under `registry_id`.
     #[must_use]
     pub fn find(&self, registry_id: &str) -> Option<&AgentEntry> {
         self.entries
@@ -77,17 +57,6 @@ impl Catalog {
     }
 }
 
-/// One registry `agent.json` read as an entry, or `None` when it offers
-/// nothing this platform can start.
-///
-/// `npx` and `uvx` come first, in that order: they are pinned by the
-/// package string. A `binary` distribution is not downloaded in this
-/// release; its command for this platform is looked for on the search
-/// path under its file name, unpinned.
-///
-/// # Errors
-/// `E_WIRE_MISMATCH` for an agent without an `id`, a `name` or a
-/// `distribution`, and an id [`AgentId::parse`] refuses.
 pub fn registry_entry(agent: &Value, source: AgentSource) -> Result<Option<AgentEntry>, AxError> {
     let field =
         |key: &str| text(agent, key).ok_or_else(|| refused(&format!("an agent has no `{key}`")));
@@ -142,7 +111,6 @@ fn launch_of(distribution: &Value) -> Option<Launch> {
     })
 }
 
-/// This build's platform as the registry spells it (`FORMAT.md`).
 fn platform() -> &'static str {
     match (std::env::consts::OS, std::env::consts::ARCH) {
         ("macos", "aarch64") => "darwin-aarch64",
@@ -166,8 +134,6 @@ fn strings(list: Option<&Value>) -> Vec<String> {
         .unwrap_or_default()
 }
 
-/// A JSON object of strings as name/value pairs, in the order `serde_json`
-/// keeps them (sorted), so one entry always yields one digest.
 pub(super) fn pairs(table: Option<&Value>) -> Vec<(String, String)> {
     table
         .and_then(Value::as_object)

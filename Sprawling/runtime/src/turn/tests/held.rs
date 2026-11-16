@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The checks derived from the held-run half of
-//! `Sprawling/runtime/spec/Turn/Durability.lean` (runtime D36), driven
-//! through a whole run: the lines a turn holds cross into the next
-//! turn, so each turn pays `1 + writes` barriers and the run one more at
-//! its end, a power cut at any line still leaves a prefix of the
-//! uncut history with no write ahead of its intent, and resume over the
-//! history any barrier left concludes what `closedTurn` concludes at
-//! the crash point with the same disk.
-
 #![allow(clippy::arithmetic_side_effects, reason = "test code")]
 
 use std::sync::Arc;
@@ -25,17 +16,12 @@ use crate::run::{RunHooks, SafePoint};
 use kernel::{EventDraft, EventRef, ModelRequest, RunId};
 use proptest::prelude::*;
 
-/// A ledger whose every call is one disk barrier, counted where the
-/// model can read the count too. The power goes out when it is about to
-/// write line `cut_at`: that line and every later one never reach the
-/// disk.
 struct Tape {
     inner: TestLedger,
     durable: Durable,
     barriers: Arc<AtomicUsize>,
     cut_at: usize,
-    /// How many lines were on disk after each barrier: the Rust half of
-    /// `cutsOf`.
+
     cuts: Vec<usize>,
 }
 
@@ -86,16 +72,12 @@ impl Ledger for Tape {
     }
 }
 
-/// What the model saw when it was asked: the barriers paid so far and
-/// the last durable line.
 #[derive(Debug, Clone, PartialEq)]
 struct Asked {
     barriers: usize,
     last: Option<String>,
 }
 
-/// A model that asks for one wave per turn, in order, and then answers
-/// with text and no call, which ends the run as done.
 struct Waves {
     waves: std::vec::IntoIter<Vec<ToolCall>>,
     durable: Durable,
@@ -118,7 +100,6 @@ impl Model for Waves {
     }
 }
 
-/// The wave a model asks for: `true` is a write, `false` a read.
 fn wave_of(turn: usize, writes: &[bool]) -> Vec<ToolCall> {
     writes
         .iter()
@@ -131,8 +112,6 @@ fn wave_of(turn: usize, writes: &[bool]) -> Vec<ToolCall> {
         .collect()
 }
 
-/// What one run leaves: whether it froze, what reached the disk, what
-/// the model and each tool saw when they ran.
 struct Ran {
     froze: bool,
     durable: Vec<String>,
@@ -193,8 +172,6 @@ fn run_of(waves: &[Vec<bool>], cut_at: usize) -> Ran {
     }
 }
 
-/// The lines the reference order appends between the dispatch pair and
-/// the freeze, kind by kind (`tf1_records_match_reference`).
 fn reference(waves: &[Vec<bool>]) -> Vec<String> {
     let mut lines = vec!["prompt_assembled".to_owned()];
     for writes in waves.iter().map(Vec::as_slice).chain([&[][..]]) {
@@ -206,9 +183,6 @@ fn reference(waves: &[Vec<bool>]) -> Vec<String> {
     lines
 }
 
-/// What resume concludes from a history: the calls it closes with
-/// `E_TOOL_OUTCOME_UNKNOWN`, the turn the run takes next, and the run
-/// the closing lines are written for.
 #[derive(Debug, Clone, PartialEq)]
 struct Verdict {
     unknown: Vec<String>,
@@ -226,10 +200,6 @@ impl Verdict {
     }
 }
 
-/// Resume over the first `cut` lines: every record verified on the way
-/// through `DanglingCalls`, every dangling call closed by
-/// `outcome_unknown_draft`, and the next turn counted from the replies
-/// that reached the disk.
 fn resume_over(lines: &[Vec<u8>], cut: usize) -> Verdict {
     let mut calls = crate::replay::DanglingCalls::default();
     let mut next_turn = 0;
@@ -267,13 +237,6 @@ fn resume_over(lines: &[Vec<u8>], cut: usize) -> Verdict {
     }
 }
 
-/// `closedTurn`'s crash points over the uncut history, each with the
-/// verdict the model gives it: after a turn's `model_called` nothing is
-/// open and the turn reruns; after a write's `tool_called` that write
-/// is open and the next turn follows; after a turn's last line nothing
-/// is open. Lines before the first turn and after the last, which the
-/// turn model does not cover, close nothing and leave the next turn
-/// where the turns left it.
 fn closed_cuts(waves: &[Vec<bool>], whole: usize) -> std::collections::BTreeMap<usize, Verdict> {
     let dispatch = 3;
     let mut cuts: std::collections::BTreeMap<usize, Verdict> =
@@ -311,12 +274,7 @@ fn waves() -> impl Strategy<Value = Vec<Vec<bool>>> {
 }
 
 proptest! {
-    /// `tf1_turn_barriers` and `tf1_run_refs_complete` through a run:
-    /// from one model call to the next the run pays one barrier for each
-    /// write and one for the next model call, and from the last model
-    /// call to the end it pays one for its held lines and the freeze's
-    /// own; every line the reference appends is on disk at the end, in
-    /// the reference order.
+
     #[test]
     fn tf1_held_lines_cost_one_barrier_plus_one_per_write(waves in waves()) {
         let ran = run_of(&waves, usize::MAX);
@@ -345,11 +303,6 @@ proptest! {
         );
     }
 
-    /// `tf1_effect_after_durability` and `tf1_write_intent_durable`
-    /// through a run, and `held_cut_is_closed_cut`'s prefix half under a
-    /// power cut at any line: every model call and every write sees its
-    /// own intent as the last durable line, and what reached the disk is
-    /// a prefix of the uncut run's lines.
     #[test]
     fn tf1_a_power_cut_in_a_held_run_leaves_a_prefix(waves in waves(), cut in 0usize..48) {
         let whole = run_of(&waves, usize::MAX).durable;
@@ -367,10 +320,6 @@ proptest! {
         }
     }
 
-    /// The crash-point replay `held_cut_is_closed_cut` licenses: cut
-    /// the held run after every barrier, resume over what reached the
-    /// disk, and the verdict is the one `closedTurn` gives at the crash
-    /// point that left the same disk.
     #[test]
     fn tf1_resume_over_every_held_cut_agrees_with_a_closed_cut(waves in waves()) {
         let ran = run_of(&waves, usize::MAX);

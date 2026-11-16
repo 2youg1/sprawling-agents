@@ -2,8 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
-//! What this crate believes about the encrypted vault file, stated
-//! against a file it writes in a scratch directory of its own.
 
 #![allow(
     clippy::unwrap_used,
@@ -27,15 +25,12 @@ fn scratch(name: &str) -> PathBuf {
     dir.join("credentials.vault")
 }
 
-/// The round trip, the ciphertext, and the wrong passphrase — one
-/// test, because they are one fact about one file.
 #[test]
 fn a_stored_credential_returns_and_a_wrong_passphrase_is_refused() {
     let path = scratch("roundtrip");
     let _ = std::fs::remove_file(&path);
     let reference = SecretRef::parse("secret:anthropic/key").unwrap();
-    // Assembled at runtime: a key-shaped literal in this file would
-    // be a finding of the `secret` gate about this file (C13).
+
     let value = ["sk", "-vault", "-sample", "-value"].concat();
 
     let mut vault = FileVault::open(path.clone(), &passphrase("open sesame")).unwrap();
@@ -47,29 +42,24 @@ fn a_stored_credential_returns_and_a_wrong_passphrase_is_refused() {
         Some(value.clone())
     );
 
-    // What a tool call reading the file would see.
     let on_disk = String::from_utf8(std::fs::read(&path).unwrap()).unwrap();
     assert!(
         !on_disk.contains(&value),
         "the file a grep reaches holds ciphertext"
     );
 
-    // A second process, right passphrase: the value is still there.
     let reopened = FileVault::open(path.clone(), &passphrase("open sesame")).unwrap();
     assert_eq!(
         reopened.get(&reference).unwrap().map(|v| v.to_string()),
         Some(value)
     );
 
-    // Wrong passphrase: a refusal that says what to do, and the
-    // file is left exactly as it was.
     let refused = FileVault::open(path.clone(), &passphrase("wrong"))
         .err()
         .expect("a wrong passphrase is refused rather than opening an empty vault");
     assert_eq!(refused.code(), &AxCode::ConfigInvalid);
     assert!(refused.recovery().contains("passphrase"), "{refused:?}");
-    // A line continuation that lost its backslash keeps the next line's
-    // indent inside the sentence.
+
     assert!(!refused.recovery().contains("  "), "{refused:?}");
     assert_eq!(
         String::from_utf8(std::fs::read(&path).unwrap()).unwrap(),
@@ -82,10 +72,6 @@ fn a_stored_credential_returns_and_a_wrong_passphrase_is_refused() {
     let _ = std::fs::remove_file(&path);
 }
 
-/// The additional data binds the entry's name, so a record moved to
-/// another name does not open. This is the property that stops a
-/// reader with write access from swapping one credential for
-/// another it can already read.
 #[test]
 fn a_record_moved_to_another_name_does_not_open() {
     let path = scratch("aad");

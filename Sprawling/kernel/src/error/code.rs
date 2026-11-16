@@ -3,27 +3,19 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Error codes: the closed AxCode set and its carrier events.
-//! The part `Sprawling/kernel/spec/Error.lean` specifies this module with the
-//! rest of `kernel::error`.
-
 use serde::{Deserialize, Serialize};
 
 use crate::event::EventKind;
 
-/// Where an AxCode surfaces in history: its carrier event, or the loadtime
-/// class (the closed C9 exception: the Ledger is not writable yet).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Carrier {
     Event(EventKind),
     Loadtime,
 }
 
-/// Closed set of error codes.
-/// Extension is additive only; the wire spelling lives in [`AxCode::as_str`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AxCode {
-    // Base table (15).
+
     PathNotFound,
     ToolUnknown,
     ToolUnavailable,
@@ -38,34 +30,21 @@ pub enum AxCode {
     LoopSuspected,
     LocatorInvalid,
     SandboxDenied,
-    /// The address or resource this names is taken right now.
-    ///
-    /// Distinct from `WorktreeBusy` and `RepairBusy`, which are
-    /// about those two mechanisms in particular: this one says a
-    /// *run* is working where the caller wants to act, and names the
-    /// run so the caller can stop it and act.
+
     Busy,
-    // Collaboration (5). A sixth, `SignalUnknown`, was defined away:
-    // signal payloads are written and read by one module, the kind is
-    // an exhaustive enum, and a kind this version does not know
-    // can only come from a newer binary's ledger — which the version
-    // door already refuses.
+
     DraftStale,
     GoalConflict,
     TaintedAction,
     RepairBusy,
     DelegationDepth,
-    // Governance and facilities (15).
+
     ApprovalPending,
     ApprovalDenied,
     CrossBuildingDenied,
     DigestSuspect,
     CredentialMissing,
-    /// No model is chosen for the tag a caller asked for. Apart from
-    /// `ConfigInvalid` because its recovery differs: a new city starts
-    /// here and is sent to the settings page, while `ConfigInvalid`
-    /// also answers a room whose frozen model changed, which a new
-    /// session recovers.
+
     ModelUnchosen,
     ConfigInvalid,
     CasCorrupt,
@@ -75,41 +54,28 @@ pub enum AxCode {
     EndpointDialectUnsupported,
     WireMismatch,
     LogVersionUnsupported,
-    /// Another process holds this city's Ledger for writing. Loadtime,
-    /// because the process it refuses is the one that may not write.
+
     LedgerHeld,
-    /// A served city is still proving the history it opened from, and
-    /// its writer takes no line until the proof is whole. Loadtime for
-    /// the same reason as `LedgerHeld`: the refused process may not write
-    /// yet (`Sprawling/storage/Spec.lean` §8-30).
+
     HistoryUnproven,
-    // Privacy and Discard (2).
+
     SecretEgress,
     DiscardIrreversible,
-    // Backpressure (1). A shed signal is a refused delivery, not a lost
-    // one: the line is on the ledger, the queue never took it, and the
-    // caller learns it here rather than by reading the queue back.
+
     BackpressureShed,
-    // Unknown outcome (1).
+
     ToolOutcomeUnknown,
-    // Plan (1). A standing goal set on a building with no plan; the
-    // subject is always `<building address>: <goal>`, which is the shape
-    // the client's form recovery reads.
+
     PlanMissing,
-    // Accounts (1). Every redeemable account of a provider was tried in
-    // one round and none answered; the carrier is `E_PROVIDER`'s, because
-    // the fact is the same one, said by every account
-    // (`Sprawling/kernel/spec/AccountRecovery.lean` §8-86).
+
     ProviderAccountsExhausted,
-    // Admission (2). An ACP agent answered that it needs a login first;
-    // a pairing or open code was refused at this machine's door.
+
     AuthRequired,
     PairingRefused,
 }
 
 impl AxCode {
-    /// Every code, in the order the SPEC table lists them. Data face for tests and
-    /// `xtask specalign`.
+
     pub const ALL: [AxCode; 44] = [
         AxCode::PathNotFound,
         AxCode::ToolUnknown,
@@ -157,7 +123,6 @@ impl AxCode {
         AxCode::PairingRefused,
     ];
 
-    /// The wire spelling. Sole spelling authority; serde and Display reuse it.
     pub fn as_str(&self) -> &'static str {
         match self {
             AxCode::PathNotFound => "E_PATH_NOT_FOUND",
@@ -207,17 +172,10 @@ impl AxCode {
         }
     }
 
-    /// Wire spelling back to code; `None` is the caller's fail-closed branch.
     pub fn parse(raw: &str) -> Option<AxCode> {
         AxCode::ALL.into_iter().find(|code| code.as_str() == raw)
     }
 
-    /// The carrier declaration (C9): which event carries this code into
-    /// history. Sole declaration site, exhaustive on purpose — a new code
-    /// without a carrier decision is a compile error. The loadtime arm is
-    /// the closed whitelist of codes that arise only while this process
-    /// cannot write the Ledger; `Sprawling/kernel/Spec.lean` §12 gives each one's
-    /// reason.
     pub fn carrier(&self) -> Carrier {
         match self {
             AxCode::GateDenied
@@ -303,9 +261,7 @@ mod tests {
 
     #[test]
     fn axcode_is_the_declared_length_and_spelling_is_bijective() {
-        // The length is the close of the table, so it is stated once:
-        // a code added without a spelling, or two codes sharing one,
-        // fails here rather than at a caller.
+
         assert_eq!(AxCode::ALL.len(), 44);
         let spellings: BTreeSet<&str> = AxCode::ALL.iter().map(AxCode::as_str).collect();
         assert_eq!(spellings.len(), 44);

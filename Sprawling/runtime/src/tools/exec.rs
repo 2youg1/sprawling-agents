@@ -3,29 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The exec tool: exactly three arms, each with its own failure story.
-//!
-//! A call names a `command` or a `python` script, the way Claude Code's
-//! `Bash` takes a `command` (`Sprawling/runtime/spec/Tools/Exec.lean`
-//! §8-13-4, D118). The building decides which arm a command takes: the
-//! shell when it offers one, and otherwise the program the line names,
-//! read by `program_line`, which refuses shell syntax rather than pass
-//! it on as text.
-//!
-//! Program runs a host process with a pinned working directory and an
-//! environment allowlist — secrets are never passed through, because a
-//! child process inherits whatever it is given and cannot be asked to
-//! forget. Its chosen confinement applies unless the call names `where: host`; disclosure states
-//! which arm that is and what the arm does not hold. Python runs inside
-//! the wasip1 sandbox, where the capability surface is the mount list and
-//! there is no network at all. A building that asked for a shell this
-//! machine does not have is refused, rather than having its line run
-//! as a program: a line written for a shell is a different command
-//! without one.
-//!
-//! A missing component is `E_TOOL_UNAVAILABLE` carrying the alternative
-//! that would work, so the caller redirects instead of guessing.
-
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 
@@ -59,20 +36,11 @@ pub use confinement::{
 pub use outcome::{FailureClass, ShellCount, ShellTally};
 pub use shell::Shell;
 
-/// The argument names a call is read by, spelled once for the schema,
-/// the reading and the refusals.
 const COMMAND: &str = "command";
 const PYTHON: &str = "python";
 
-/// Environment variables a child may inherit. Everything else is
-/// dropped: an allowlist stays safe when the process environment grows,
-/// which a denylist does not.
 const ENV_ALLOWLIST: [&str; 4] = ["PATH", "LANG", "LC_ALL", "TZ"];
 
-/// One CPython interpreter and the standard-library capability it needs.
-///
-/// Keeping them together prevents a caller from selecting a guest without
-/// the stdlib layout its `sys.path` expects.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PythonGuest {
     wasm: PathBuf,
@@ -80,14 +48,12 @@ pub struct PythonGuest {
 }
 
 impl PythonGuest {
-    /// Uses the `lib/` directory beside `wasm` as the guest's stdlib.
+
     pub fn at(wasm: PathBuf) -> PythonGuest {
         let stdlib = wasm.parent().unwrap_or_else(|| Path::new("")).join("lib");
         PythonGuest::with_stdlib(wasm, stdlib)
     }
 
-    /// Pairs a wasm path with an explicit stdlib source, for a benchmark's
-    /// private wasm snapshot.
     pub fn with_stdlib(wasm: PathBuf, stdlib: PathBuf) -> PythonGuest {
         PythonGuest {
             wasm,
@@ -99,42 +65,32 @@ impl PythonGuest {
         }
     }
 
-    /// The interpreter module to compile.
     pub fn wasm(&self) -> &Path {
         &self.wasm
     }
 
-    /// The read-only standard-library capability to append to a run's mounts.
     pub fn stdlib(&self) -> &Mount {
         &self.stdlib
     }
 }
 
-/// What one run's execution boundary is made of.
-///
-/// Values that always travel together and are never chosen apart: read
-/// out of one frozen configuration, one machine and one dispatch, they
-/// reach this tool as one thing rather than as a parameter list nobody
-/// can call correctly from memory. `policy` is the run's cell (§8-55, §8-62).
 pub struct ExecSetup {
     pub workdir: PathBuf,
     pub mounts: Vec<Mount>,
     pub python_wasm: Option<PythonGuest>,
     pub shell: Shell,
     pub fuel: Fuel,
-    /// The names this building declared its children may inherit, on top
-    /// of [`ENV_ALLOWLIST`].
+
     pub env_passthrough: Vec<EnvVarName>,
     pub domain: kernel::Address,
-    /// The run this tool serves: a command it hands to the background
-    /// is owed to this run, and its output reaches no other.
+
     pub run: RunId,
     pub policy: crate::mode::PolicyReader,
 }
 
 pub struct ExecTool {
     setup: ExecSetup,
-    /// `Sandbox::run` mutates the guest; `invoke` borrows the tool.
+
     sandbox: Mutex<Box<dyn Sandbox>>,
     backlog: Backlog,
     confinement: Mutex<Confined>,
@@ -144,12 +100,7 @@ pub struct ExecTool {
 }
 
 impl ExecTool {
-    /// The schema `new` registers, with `disclosure` as its description.
-    /// A run passes the sentence [`disclosure::describe`] builds; the
-    /// catalog page passes [`Self::standing_definition`].
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
+
     pub fn definition(disclosure: String) -> Result<ToolDef, AxError> {
         Ok(ToolDef {
             name: ToolName::parse("exec")?,
@@ -169,13 +120,6 @@ impl ExecTool {
         })
     }
 
-    /// The definition a page shows before a run freezes one. Confinement
-    /// is this machine's, the probe a run makes. `shell` is whether the
-    /// frozen sandbox offers the shell arm; the interpreter's path is
-    /// named only once a run resolves it.
-    ///
-    /// # Errors
-    /// Propagates [`Self::definition`].
     pub fn standing_definition(shell: bool) -> Result<ToolDef, AxError> {
         let confinement = Confined::detect();
         let shell_sentence = if shell {
@@ -262,18 +206,13 @@ impl ExecTool {
         let result = held(&self.sandbox)?.run(&job)?;
         let waited = reservation.as_ref().and_then(Reservation::waited);
         drop(reservation);
-        // A guest refused at its run's ceiling says so under the same key
-        // a command does, whichever way it then ended (`Sandbox.lean` D102).
+
         with_wait(
             with_ceiling(python_answer(&result)?, result.ceiling)?,
             waited,
         )
     }
 
-    /// One heavy call's reservation from the machine budget: the run's
-    /// ceiling when the run asks for one, and none otherwise
-    /// (`Sprawling/runtime/spec/Reserve.lean` D104). Blocks until the line
-    /// starts it, holding no other lock of this tool while it waits.
     fn reservation(&self) -> Option<Reservation> {
         match self.backlog.shares() {
             Shares::CpuAndMemory { limit } => Some(self.backlog.budget().reserve(limit.get())),
@@ -292,15 +231,13 @@ impl ExecTool {
     }
 }
 
-/// The python arm's result for how its guest ended.
 fn python_answer(result: &SandboxOutcome) -> Result<ToolOutcome, AxError> {
     let exit = match &result.exit {
         SandboxExit::Success => Exit::Ended { code: 0 },
         SandboxExit::Failure { code } => Exit::Ended {
             code: i32::try_from(*code).unwrap_or(i32::MAX),
         },
-        // Exhaustion and traps are guest facts the caller must see as
-        // themselves, not flattened into a generic non-zero exit.
+
         SandboxExit::FuelExhausted => {
             return exceptional(&result.stdout, &result.stderr, "fuel_exhausted", None);
         }
@@ -338,11 +275,6 @@ fn no_host_python() -> AxError {
     )
 }
 
-/// Reads what the call asks to run: a `command` is a shell line here,
-/// whichever arm the building later gives it, so the deletion forecast
-/// and the sieve read the same text in every building; a `python` is a
-/// script (§8-13-4). A call that names neither, or both, is refused
-/// rather than guessed at, and so is the older `arm` spelling (D115).
 pub fn parse_arm(args: &Map<String, Value>) -> Result<ExecArm, AxError> {
     match (text_of(args, COMMAND)?, text_of(args, PYTHON)?) {
         (Some(text), None) => Ok(ExecArm::Shell { text }),
@@ -366,8 +298,6 @@ pub fn parse_arm(args: &Map<String, Value>) -> Result<ExecArm, AxError> {
     }
 }
 
-/// One of the two texts a call can carry: absent, or a string that says
-/// something.
 fn text_of(args: &Map<String, Value>, key: &str) -> Result<Option<String>, AxError> {
     match args.get(key) {
         None => Ok(None),
@@ -401,17 +331,13 @@ impl Tool for ExecTool {
         crate::mode::mode_admits(&self.setup.policy.now(), kernel::ToolName::EXEC)?;
         let placement = parse_placement(call.args.as_map())?.opened_by(&self.setup)?;
         let answer = match parse_arm(call.args.as_map())? {
-            // A building that offers no shell runs the program the line
-            // names (D118).
+
             ExecArm::Shell { text } if self.setup.shell == Shell::Absent => {
                 let (path, args) = program_line::program_line(&text)?;
                 self.run_program(&path, &args, placement)
             }
             ExecArm::Program { path, args } => self.run_program(&path, &args, placement),
-            // The Python arm has no host form: its interpreter is a
-            // component this build runs as a wasip1 guest, and a host
-            // `python` would be a different program than the one the
-            // arm promises.
+
             ExecArm::Python { code } => match placement {
                 Placement::Sandbox => self.run_python(&code),
                 Placement::Host => Err(no_host_python()),
@@ -424,8 +350,6 @@ impl Tool for ExecTool {
     }
 }
 
-/// One of this tool's own locks, or the refusal that says a thread died
-/// holding it.
 fn held<T>(lock: &Mutex<T>) -> Result<MutexGuard<'_, T>, AxError> {
     lock.lock().map_err(|_| {
         AxError::failure(
@@ -437,7 +361,6 @@ fn held<T>(lock: &Mutex<T>) -> Result<MutexGuard<'_, T>, AxError> {
     })
 }
 
-/// Releases background commands when the run drops its tool bench.
 impl Drop for ExecTool {
     fn drop(&mut self) {
         self.backlog.release(self.setup.run);

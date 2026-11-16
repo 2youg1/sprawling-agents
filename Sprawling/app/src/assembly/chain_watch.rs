@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The proof of the whole history a served city runs beside its writer
-//! (`Sprawling/app/spec/Assembly/Listening.lean` §8-90, §8-122). The halt it sets the verdict on is
-//! attached by the worker (`chain_halt`); this file starts the thread
-//! and says what it found. Which outcome settles the halt how is
-//! proved in `Sprawling/app/spec/Assembly/ChainWatch.lean`.
-
 use std::time::Instant;
 
 use kernel::{AxCode, AxError, RunId};
@@ -18,18 +12,6 @@ use crate::serving::standing::monotonic_now;
 use accounting::worker::chain_halt::ChainUnderAudit;
 use accounting::worker::opening_cost::millis;
 
-/// Proves the whole chain `watch` names on a thread of its own.
-///
-/// The thread holds the ledger directory, the halt, the records and
-/// `log`, never the writer, so the writer never waits for the proof. A
-/// whole chain lets the writer take lines; a broken one trips the halt,
-/// and from then on every append is refused with the proof's own reason,
-/// which goes to `log` too. `began` is when opening the city began, so
-/// the moment commands are taken is read from the same point as the
-/// first byte.
-///
-/// # Errors
-/// `StorageFatal` when the thread cannot be started.
 pub(super) fn audit_in_background(
     watch: ChainUnderAudit,
     log: Diagnostics,
@@ -48,10 +30,6 @@ pub(super) fn audit_in_background(
         })
 }
 
-/// Trips the halt it holds when dropped. The first verdict wins, so once
-/// the proof has set one this does nothing; it matters only when the
-/// thread unwinds without a verdict, so a writer waiting to close is
-/// never left waiting.
 struct Unsettled<'a>(&'a storage::ChainHalt);
 
 impl Drop for Unsettled<'_> {
@@ -67,10 +45,6 @@ impl Drop for Unsettled<'_> {
     }
 }
 
-/// Runs the proof, sets the verdict, and says what it found. A ledger
-/// that could not be read trips the halt too: a proof that did not finish
-/// proved nothing whole, and the views and the standing resumed from
-/// snapshots have only this proof reading the lines before them.
 fn report_proof(watch: ChainUnderAudit, mut log: Diagnostics, began: Instant) {
     let ChainUnderAudit {
         halt,

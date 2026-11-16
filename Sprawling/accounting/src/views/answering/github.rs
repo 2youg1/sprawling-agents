@@ -3,20 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which host a GitHub import asks, whether it names a host at all, and
-//! the reader the served city handed in (`Sprawling/accounting/spec/Views/Answering/Github.lean` §8-18-3,
-//! `Sprawling/wire/Spec.lean` §8-67).
-//!
-//! Starting `gh` reaches this machine and the network, so the reader is
-//! the binary's (`bin::doctor::github`) and arrives as a `fn` pointer;
-//! what is judged here is the city's own reading of the question.
-
 use super::super::holding::Views;
 use super::super::prepared::{Prepared, unavailable};
 
 impl Views {
-    /// One import, asked once the snapshot is let go, because it starts
-    /// a program.
+
     pub(in crate::views) fn github_of(&self, host: Option<&str>) -> Prepared {
         Prepared::GithubLogin {
             ask: self.reach.github,
@@ -25,13 +16,8 @@ impl Views {
     }
 }
 
-/// The host an import asks when the page names none, written once.
 pub(crate) const DEFAULT_HOST: &str = "github.com";
 
-/// The answer to one import: the host asked, and what the reader the
-/// served city handed in says about it. A string that is not a host
-/// name is answered without starting anything, and views nobody served
-/// answer `Unavailable` rather than reaching this machine.
 pub(crate) fn github_answer(
     ask: Option<fn(&str) -> wire::GithubReading>,
     host: Option<&str>,
@@ -51,9 +37,6 @@ pub(crate) fn github_answer(
     })
 }
 
-/// Whether `host` can be handed to `gh` as the value of `--hostname`:
-/// letters, digits, `.`, `-` and `:` for a port, not empty, and not
-/// opening with `-`, which `gh` would read as an option of its own.
 fn is_host(host: &str) -> bool {
     !host.is_empty()
         && !host.starts_with('-')
@@ -69,10 +52,8 @@ mod tests {
 
     use super::Views;
 
-    /// Every host the scripted reader was asked, in order.
     static ASKED: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
-    /// A reader that finds the same login on every host it is asked.
     fn scripted(host: &str) -> wire::GithubReading {
         ASKED.lock().unwrap().push(host.to_owned());
         wire::GithubReading::Found {
@@ -93,9 +74,6 @@ mod tests {
         })
     }
 
-    /// The page that names no host asks `github.com`; a string `gh` would
-    /// read as an option of its own never reaches it; views nobody served
-    /// do not reach this machine at all.
     #[test]
     fn a_github_login_is_asked_of_the_reader_the_views_were_handed() {
         let dir = tempfile::tempdir().unwrap();

@@ -5,10 +5,6 @@
 
 use crate::worker::*;
 
-/// Adopting a folder checkpoints it at once, as one pack: the first dispatch
-/// into a building of thousands of files would otherwise hash every one
-/// of them and write each as a loose object before its first tool call
-/// (`Sprawling/storage/Spec.lean` §8-8, the base checkpoint).
 #[test]
 fn adopting_a_folder_checkpoints_it_as_one_pack_before_any_dispatch() {
     let dir = tempfile::tempdir().unwrap();
@@ -48,11 +44,6 @@ fn adopting_a_folder_checkpoints_it_as_one_pack_before_any_dispatch() {
     assert_eq!((carried, loose, packs), (true, 0, 1));
 }
 
-/// A city formed around a project's own folder keeps its records beside
-/// the project's files, and the project's git would list the ledger and
-/// the object store as untracked work. Genesis adds one anchored line
-/// for the city's reserved subtree to the root's `.gitignore`, keeping
-/// every line the project already had (`Sprawling/city/Spec.lean` §8-21).
 #[test]
 fn forming_a_city_keeps_its_own_subtree_out_of_the_workspaces_git() {
     let dir = tempfile::tempdir().unwrap();
@@ -74,17 +65,10 @@ fn forming_a_city_keeps_its_own_subtree_out_of_the_workspaces_git() {
         ignored.lines().any(|line| line.trim() == "/.sprawling/"),
         "the city's own subtree is not ignored at the root: {ignored}"
     );
-    // Once, however often a city is formed or opened here.
+
     assert_eq!(ignored.matches("/.sprawling/\n").count(), 1);
 }
 
-/// No working document and no conversation record the city writes in a
-/// project folder is visible to that project's git (city D5).
-/// A dispatch sent straight to a room address nobody opened writes its
-/// task and its transcript in a room the city made; one sent to a
-/// directory the project already had writes them among the project's
-/// files, which the city must not seal, so a new source file there is
-/// still work git sees.
 #[test]
 fn a_dispatch_leaves_nothing_the_projects_git_would_pick_up_as_work() {
     use crate::worker::fixture::{completion, fake_openai, worker_with_provider};
@@ -157,8 +141,6 @@ fn a_dispatch_leaves_nothing_the_projects_git_would_pick_up_as_work() {
     );
 }
 
-/// A building raised before a rule existed gets that rule the next time
-/// the city opens, so the ruling holds for a city already running.
 #[test]
 fn opening_a_city_gives_an_older_building_the_rules_it_lacks() {
     let dir = tempfile::tempdir().unwrap();

@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A thousand sessions, and what is left afterwards.
-//!
-//! The claim a long-running city makes is that freezing a run returns
-//! everything it held. That is not a claim about speed, so it is not
-//! tested by timing anything: it is a claim about what a handoff keeps
-//! and what a resume asks for, and the way it fails is that one of them
-//! grows with the number of sessions that came before.
-//!
-//! The invariant is therefore a shape, not a number: the thousandth
-//! resume must ask for exactly what the first one did.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -50,10 +39,7 @@ fn a_thousand_freezes_leave_the_same_thing_behind_as_the_first() {
     for session in 1..SESSIONS {
         let handoff = handoff_of(session);
         last = resume(&handoff, RunId::from_bytes([1u8; 16]));
-        // Checked inside the loop rather than only at the end: a leak
-        // that grew and then was trimmed would pass an assertion made
-        // once, and that is exactly the shape of a leak with a cache in
-        // front of it.
+
         assert_eq!(
             last.must_read.len(),
             first.must_read.len(),
@@ -68,10 +54,7 @@ fn a_thousand_freezes_leave_the_same_thing_behind_as_the_first() {
 
 #[test]
 fn a_resume_is_a_new_run_every_time_and_never_the_old_one() {
-    // Rebirth, not revival. The frozen run is not a parameter, so there
-    // is nothing to leak across the boundary in the first place - this
-    // asserts that the identity the caller supplies is the one that
-    // comes back, a thousand times over.
+
     let handoff = handoff_of(0);
     for session in 0..SESSIONS {
         let mut bytes = [0u8; 16];
@@ -84,8 +67,7 @@ fn a_resume_is_a_new_run_every_time_and_never_the_old_one() {
 
 #[test]
 fn a_handoff_that_asks_for_nothing_cannot_be_built_however_many_times_it_is_tried() {
-    // The one refusal that keeps the must-read list from decaying into
-    // an empty formality after a long night of sessions.
+
     for _ in 0..SESSIONS {
         assert!(
             Handoff::new(

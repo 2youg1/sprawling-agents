@@ -3,24 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Packaged gate: a package that can be published compiles only files it
-//! carries (Tools/xtask/Spec.lean §8-49).
-//!
-//! **A `.crate` is one package directory.** `cargo package` archives what
-//! a package's directory holds, and the packaging check and every
-//! `cargo install` compile that archive unpacked somewhere else. An
-//! `include_str!` that reaches `../../docs/` compiles in this checkout
-//! and fails there, and nobody sees it fail until a release is cut or a
-//! stranger installs. This gate sees it on every `just check`.
-//!
-//! **What is judged is what cargo compiles.** The walk starts at the
-//! targets cargo's metadata names and follows `mod` declarations the way
-//! the compiler does, leaving out whatever a `cfg` keeps out of every
-//! build that is not a test build (section 12-16). A file name says
-//! nothing here: this tree loads tests through `#[path]`, through
-//! `*_tests.rs` and through `mod tests;`, and the module tree is the one
-//! answer that does not guess.
-
 use std::path::{Component, Path, PathBuf};
 
 use syn::punctuated::Punctuated;
@@ -61,9 +43,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         .collect())
 }
 
-/// Where one published package ends: its own directory, minus the
-/// directories of the packages nested in it, which cargo leaves out of
-/// its archive because each carries a `Cargo.toml` of its own.
 struct Reach<'a> {
     root: &'a Path,
     package: &'a Path,
@@ -71,8 +50,7 @@ struct Reach<'a> {
 }
 
 impl Reach<'_> {
-    /// One call, judged: `None` when it reads a file this package
-    /// carries or its build script's output.
+
     fn judge(&self, include: &Include) -> Option<Violation> {
         let location = format!("{}:{}", include.file, include.line);
         match &include.target {
@@ -114,9 +92,6 @@ fn packaged(location: String, violation: String) -> Violation {
     }
 }
 
-/// `path` with `.` and `..` resolved by spelling alone, the way the
-/// compiler joins an `include_str!` argument onto a directory before it
-/// opens anything.
 fn normal(path: &Path) -> PathBuf {
     path.components().fold(PathBuf::new(), |mut at, part| {
         match part {
@@ -132,12 +107,6 @@ fn normal(path: &Path) -> PathBuf {
     })
 }
 
-/// Whether a `cfg` predicate cannot hold while `test` is false, which
-/// keeps its item out of every build a published package makes.
-///
-/// `not(…)` and every other predicate count as able to hold: the error
-/// in that direction is a finding somebody reads, and the other one is
-/// a published package that fails to build.
 fn excludes_production(predicate: &syn::Meta) -> bool {
     match predicate {
         syn::Meta::Path(path) => path.is_ident("test"),
@@ -151,22 +120,17 @@ fn excludes_production(predicate: &syn::Meta) -> bool {
     }
 }
 
-/// Whether an item's own `cfg` attributes keep it out of every build
-/// that is not a test build.
 fn test_only(attrs: &[syn::Attribute]) -> bool {
     attrs
         .iter()
         .filter(|attr| attr.path().is_ident("cfg"))
         .any(|attr| match attr.parse_args::<syn::Meta>() {
             Ok(predicate) => excludes_production(&predicate),
-            // A predicate this gate cannot read may hold, so its item is
-            // judged.
+
             Err(_unreadable) => false,
         })
 }
 
-/// The predicates inside `all(…)` or `any(…)`; `None` when they do not
-/// read as predicates, which its caller takes as "may hold".
 fn nested(list: &syn::MetaList) -> Option<Vec<syn::Meta>> {
     match list.parse_args_with(Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated) {
         Ok(parts) => Some(parts.into_iter().collect()),

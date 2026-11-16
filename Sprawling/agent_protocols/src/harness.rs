@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The ACP agents this city drives: what an entry is and how a person
-//! consents to it (`entry`), the registry catalog (`catalog`), the five
-//! official harnesses as built-in entries (`roster`), a pasted agent
-//! (`paste`), the environment a child sees (`environment`), and one
-//! session with an agent (`process`, `session`)
-//! (`Sprawling/agent_protocols/Spec.lean` §8-19).
-
 mod catalog;
 mod detect;
 mod entry;

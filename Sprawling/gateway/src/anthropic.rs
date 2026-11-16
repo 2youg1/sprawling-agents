@@ -3,28 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The Anthropic Messages wire, in both directions.
-//!
-//! This is the canonical shape's own dialect, so translation here is
-//! mostly transcription — which is exactly why the losses are somewhere
-//! else and this module carries none.
-//!
-//! **Read the provider's own documentation before changing anything
-//! here.** Every field is the provider's shape, not ours; a shape that
-//! looks wrong is usually a shape that changed.
-//!
-//! - Request and response: <https://platform.claude.com/docs/en/api/messages>
-//! - Thinking blocks, `signature`, preservation across tool use:
-//!   <https://platform.claude.com/docs/en/build-with-claude/thinking>
-//! - Effort levels: <https://platform.claude.com/docs/en/build-with-claude/effort>;
-//!   written by `provider::thinking::encoding`, not here (gateway D35)
-//! - What invalidates a cache breakpoint:
-//!   <https://platform.claude.com/docs/en/build-with-claude/prompt-caching>
-//! - The 400 that a modified thinking block earns:
-//!   <https://platform.claude.com/docs/en/agents-and-tools/tool-use/troubleshooting-tool-use>
-//! - Pictures, and the base64 source block:
-//!   <https://platform.claude.com/docs/en/build-with-claude/vision>
-
 use kernel::{
     AxError, CacheCount, ChatRequest, ChatResponse, ContentBlock, DialectKind, ModelUsage, Role,
     StopReason, Tokens,
@@ -47,7 +25,6 @@ fn role_str(role: Role) -> &'static str {
     }
 }
 
-/// One picture, as this wire spells it.
 fn image_wire(picture: &kernel::ImageRef, images: &ImageBytes) -> Result<Value, AxError> {
     Ok(json!({
         "type": "image",
@@ -62,9 +39,7 @@ fn image_wire(picture: &kernel::ImageRef, images: &ImageBytes) -> Result<Value, 
 fn block_wire(block: &ContentBlock, images: &ImageBytes) -> Result<Value, AxError> {
     match block {
         ContentBlock::Text { text } => Ok(json!({ "type": "text", "text": text })),
-        // Verbatim in both directions: the provider verifies `signature`
-        // against the reasoning it issued, and a modified thinking block
-        // is refused with a 400 rather than tolerated.
+
         ContentBlock::Thinking {
             thinking,
             signature,
@@ -78,9 +53,7 @@ fn block_wire(block: &ContentBlock, images: &ImageBytes) -> Result<Value, AxErro
                 .map_err(|err| mismatch("tool_use.input", &err.to_string()))?,
         })),
         ContentBlock::Image(picture) => image_wire(picture, images),
-        // A tool result with pictures spells its content as blocks; one
-        // without keeps the string form, so every request that carried
-        // no picture crosses byte for byte as it did before.
+
         ContentBlock::ToolResult {
             tool_use_id,
             content,
@@ -107,10 +80,7 @@ fn block_wire(block: &ContentBlock, images: &ImageBytes) -> Result<Value, AxErro
 pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, AxError> {
     let mut root = Map::new();
     root.insert("model".to_owned(), Value::String(req.model.clone()));
-    // This wire requires the field, so a model whose ceiling nobody
-    // registered is refused here rather than sent a number chosen in
-    // this file: a ceiling invented at the call site truncates runs for
-    // a reason that appears nowhere in the account.
+
     let ceiling = req.max_tokens.ok_or_else(|| {
         AxError::failure(
             kernel::AxCode::ConfigInvalid,
@@ -144,8 +114,7 @@ pub(crate) fn request(req: &ChatRequest, images: &ImageBytes) -> Result<Value, A
             .iter()
             .map(|block| block_wire(block, images))
             .collect::<Result<Vec<Value>, AxError>>()?;
-        // This wire carries a message's breakpoint on its last block:
-        // the cached region ends where that block ends.
+
         if req.carries_breakpoint(index)
             && let Some(Value::Object(last)) = blocks.last_mut()
         {
@@ -183,10 +152,7 @@ fn block_from(value: &Value, path: &str) -> Result<ContentBlock, AxError> {
                 require(value, path, "signature")?,
                 &format!("{path}.signature"),
             )?;
-            // The provider verifies this against the reasoning it
-            // issued and answers 400 when it does not match, so an
-            // empty one is refused on the turn that produced it rather
-            // than on the turn that would have sent it back.
+
             if signature.is_empty() {
                 return Err(mismatch(
                     &format!("{path}.signature"),
@@ -229,9 +195,7 @@ fn block_from(value: &Value, path: &str) -> Result<ContentBlock, AxError> {
                 .get("is_error")
                 .and_then(Value::as_bool)
                 .unwrap_or(false),
-            // This provider answers with assistant content, never with
-            // a tool result it produced, so nothing arrives here to
-            // attach; inventing one would be a picture nobody sent.
+
             attachments: Vec::new(),
         }),
         other => Err(mismatch(&format!("{path}.type"), other)),
@@ -274,8 +238,7 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
         "cache_creation_input_tokens",
         "response.usage",
     )?;
-    // This wire's `input_tokens` counts only what missed the cache; the
-    // city's count is the whole prompt (`Sprawling/kernel/Spec.lean` §8-24, `ModelUsage`).
+
     let input_tokens = [cache_read_tokens, cache_write_tokens]
         .into_iter()
         .map(CacheCount::or_zero)
@@ -307,8 +270,6 @@ fn stop_str(stop: StopReason) -> &'static str {
     }
 }
 
-/// The response direction carries no pictures: a provider answers with
-/// text, thinking and tool calls, so there is nothing to resolve.
 #[cfg(test)]
 pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
     let empty = ImageBytes::default();

@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Table rewrites: status changes and child insertions.
-//! The part `Sprawling/kernel/spec/Spine.lean` specifies this module with the
-//! rest of `kernel::spine`.
-
 use crate::error::{AxCode, AxError};
 use crate::locator::Locator;
 use crate::node_id::NodeId;
@@ -14,8 +10,6 @@ use crate::node_id::NodeId;
 use super::grammar::{body_row, check_roadmap_shape, locate_table, split_table_row};
 use super::row::{NewChild, ROADMAP_COLUMNS, RoadmapRow, RoadmapShape, RoadmapStatus};
 
-/// One row as the table writes it. The normal form: the same edit twice
-/// renders the same bytes.
 fn draw_row(row: &RoadmapRow, status: RoadmapStatus, evidence: Option<&Locator>) -> String {
     let needs = row
         .needs
@@ -33,16 +27,6 @@ fn draw_row(row: &RoadmapRow, status: RoadmapStatus, evidence: Option<&Locator>)
     )
 }
 
-/// Rewrites one row of the first table, returning the whole text.
-///
-/// This is the table's only status-editing entrance.
-///
-/// # Errors
-/// Refuses a text whose table does not parse, an index no row carries,
-/// and a `Done` without evidence — that last one is exactly the row
-/// `crate::plan` declines to count, and a writer that can produce it is
-/// a writer that can make a plan look finished while the figure stands
-/// still.
 pub fn set_roadmap_status(
     text: &str,
     id: &NodeId,
@@ -76,19 +60,6 @@ pub fn set_roadmap_status(
     }))
 }
 
-/// Hangs new children under a node, returning the whole text.
-///
-/// The children land directly below the node's last descendant, so the
-/// table stays in reading order and the numbers a person saw yesterday
-/// still point at the same work. New ordinals continue after the
-/// node's existing children rather than reusing a gap: a plan index is
-/// a name, and reusing one would silently move somebody's evidence.
-///
-/// # Errors
-/// Refuses a table that does not parse, an index no row carries, an
-/// empty list of children, a child whose text is blank, a weight of
-/// zero (a node worth nothing is a row nobody will ever be given), and
-/// a split that would push the plan past `plan::NODE_DEPTH_MAX`.
 pub fn insert_children(
     text: &str,
     parent: &NodeId,
@@ -132,8 +103,7 @@ pub fn insert_children(
             "repair the table before splitting a node",
         ));
     };
-    // The insertion point: after the parent's last descendant, or after
-    // the parent itself when it has none.
+
     let mut after = None;
     for (n, line) in text.split('\n').enumerate() {
         if n < first || n > last {
@@ -155,20 +125,6 @@ pub fn insert_children(
     Ok(insert_after(text, after.unwrap_or(last), &drawn))
 }
 
-/// Appends one top-level row under the plan's root, returning the whole
-/// text.
-///
-/// The row lands after the table's last line, so a plan with a header
-/// and no rows gets its first line. `id` is the index the caller chose
-/// from the plan it read, and it is checked against this text rather
-/// than recomputed: a caller that goes on to claim the row it added
-/// names it by that index, and renumbering here would point the claim at
-/// a row it never wrote.
-///
-/// # Errors
-/// Refuses a table that does not parse or is not there, an `id` that is
-/// not top-level or that a row already carries, and a child the table
-/// cannot hold (blank, carrying `|`, weighted zero).
 pub fn append_top_level(text: &str, id: &NodeId, child: &NewChild) -> Result<String, AxError> {
     let refuse = |subject: String, recovery: &str| {
         AxError::failure(AxCode::InvalidArgs, "add a plan row", subject)
@@ -197,8 +153,6 @@ pub fn append_top_level(text: &str, id: &NodeId, child: &NewChild) -> Result<Str
     Ok(insert_after(text, last, &[drawn]))
 }
 
-/// One new row as the table writes it, or the refusal that says why the
-/// table cannot hold it.
 fn draw_child(id: &NodeId, child: &NewChild, action: &'static str) -> Result<String, AxError> {
     let refuse = |subject: String, recovery: &str| {
         AxError::failure(AxCode::InvalidArgs, action, subject).with_recovery(recovery.to_owned())
@@ -230,7 +184,6 @@ fn draw_child(id: &NodeId, child: &NewChild, action: &'static str) -> Result<Str
     ))
 }
 
-/// The text with `drawn` inserted after line `seam` of `text.split('\n')`.
 fn insert_after(text: &str, seam: usize, drawn: &[String]) -> String {
     let mut out: Vec<String> = Vec::new();
     for (n, line) in text.split('\n').enumerate() {
@@ -242,8 +195,6 @@ fn insert_after(text: &str, seam: usize, drawn: &[String]) -> String {
     out.join("\n")
 }
 
-/// The rows of a well-formed table, or the refusal that says which line
-/// is wrong.
 fn well_formed(text: &str, action: &'static str) -> Result<Vec<RoadmapRow>, AxError> {
     match check_roadmap_shape(text) {
         RoadmapShape::WellFormed { rows } => Ok(rows),
@@ -259,8 +210,6 @@ fn well_formed(text: &str, action: &'static str) -> Result<Vec<RoadmapRow>, AxEr
     }
 }
 
-/// Replaces the body rows of the first table for which `chosen` returns
-/// a replacement, leaving every other byte alone.
 fn rewrite(text: &str, mut chosen: impl FnMut(&[String]) -> Option<String>) -> String {
     let mut out = String::with_capacity(text.len());
     let mut in_table = false;
@@ -276,7 +225,7 @@ fn rewrite(text: &str, mut chosen: impl FnMut(&[String]) -> Option<String>) -> S
             in_table = true;
         } else if in_table {
             in_table = false;
-            done = true; // the first table ended; later tables are not ours
+            done = true;
         }
         let hit = if done {
             None

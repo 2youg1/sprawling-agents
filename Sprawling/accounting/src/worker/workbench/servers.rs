@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The external tools a building's configuration names, pinned to the
-//! versions its references approved before they reach the catalog.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::event::record::{CatalogDrift, CatalogSubject};
@@ -16,23 +13,13 @@ use crate::Reached;
 use super::{ConnectorJob, Laying, held};
 
 impl Laying {
-    /// The external tools this run may reach, each connected and checked
-    /// against its building's pins.
-    ///
-    /// A server that cannot be started or listed is left out without
-    /// inventing removals. A listed tool whose pin is missing or different
-    /// is withheld; a legacy reference adopts and persists its first list.
+
     pub(in crate::worker) fn mcp_tools(
         &self,
         job: ConnectorJob<'_>,
     ) -> Vec<agent_protocols::McpTool> {
         if job.confidential && !job.servers.is_empty() {
-            // Process lifetime is this layer's own business, and an MCP
-            // server is a program that may reach the network the moment
-            // it starts. Nothing is started here. The tool-level refusal
-            // in `agent_protocols::McpTool::new` stays the authority on whether
-            // such a tool may exist; this is the earlier consequence of
-            // that rule, not a second copy of it.
+
             self.note(
                 runtime::diagnostics::Level::Refuse,
                 "accounting::worker",
@@ -40,18 +27,12 @@ impl Laying {
             );
             return Vec::new();
         }
-        // The half of `[prepare_dispatch]` this file owns: starting
-        // every server this building declares and shaking hands with
-        // each of them. Held apart from the whole-phase reading because
-        // it is the part the resident connection table removes on every
-        // dispatch after the first, and a figure that mixed the two could
-        // not say how much.
+
         let began = (self.monotonic)();
         let mut offered = Vec::new();
         let resolve = crate::held_vault::resolving(std::sync::Arc::clone(&self.vault));
         for server in job.servers {
-            // The module a reader is sent to is the transport that
-            // failed, not whichever one was written first.
+
             let site = agent_protocols::McpLink::site(&server.transport);
             match self
                 .connectors
@@ -101,9 +82,6 @@ impl Laying {
         offered
     }
 
-    /// Applies one server's reference to a successful listing. The binary's
-    /// desktop server has no configuration reference and is already governed
-    /// by its own rule and allowlist.
     fn select_listing(
         &self,
         job: &ConnectorJob<'_>,
@@ -197,8 +175,6 @@ impl Laying {
         offered
     }
 
-    /// Stores the canonical definition and returns its catalog name and CAS
-    /// address. The same bytes later answer the page's old/new comparison.
     fn pin_tool(&self, tool: &agent_protocols::McpTool) -> Result<(String, B3Hash), AxError> {
         let meta = kernel::Tool::meta(tool);
         let bytes = ToolDef {
@@ -213,8 +189,6 @@ impl Laying {
         Ok((meta.name.as_str().to_owned(), digest))
     }
 
-    /// Collects one actual difference. A pin failure is diagnostic like a
-    /// failed connection and never turns into an invented listing state.
     fn compare(
         &self,
         building: &Address,

@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Secret scanning: shape-table-first, entropy-second, float-free.
-//! The part `Sprawling/kernel/spec/Secret.lean` specifies this module with the
-//! rest of `kernel::secret`.
-
 use crate::consts_external::{SECRET_SHAPES, SecretCharset};
 use crate::consts_policy::SECRET_ENTROPY_MIN;
 
@@ -16,17 +12,13 @@ use crate::Address;
 use std::collections::BTreeSet;
 use std::sync::LazyLock;
 
-/// Exact repository-relative paths whose entropy hits a checkpoint may
-/// commit without recording a finding. Known provider shapes never consult
-/// this list. Elements enter as validated [`Address`] values; matching is
-/// exact, never a prefix or a glob.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct EntropyAllowlist {
     paths: BTreeSet<String>,
 }
 
 impl EntropyAllowlist {
-    /// Whether `path` is exactly one of the entered repository paths.
+
     pub fn allows(&self, path: &str) -> bool {
         self.paths.contains(path)
     }
@@ -54,21 +46,10 @@ fn charset_admits(charset: SecretCharset, byte: u8) -> bool {
     }
 }
 
-/// Entropy-detector alphabet: the union of common token charsets.
-/// `=` is deliberately absent: as base64 padding it only trails (the
-/// pre-padding run still crosses the length floor), while as an
-/// assignment sign it welds two identifiers into one fake token
-/// (`NAME=value` — a false-positive class).
 fn token_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'+' | b'/')
 }
 
-/// The entropy detector only fires on mixed-alphabet runs (upper AND
-/// lower AND digit): unknown-shape API keys are mixed-case base62/64,
-/// while the city's own artifacts — blake3 hex, uuids, digit runs — are
-/// single-case by construction and must not light up every ledger line.
-/// An all-lowercase secret evades this detector; the shape table stays
-/// the primary net and rotation the last remedy.
 fn mixed_alphabet(bytes: &[u8]) -> bool {
     let (mut upper, mut lower, mut digit) = (false, false, false);
     for byte in bytes {
@@ -79,20 +60,14 @@ fn mixed_alphabet(bytes: &[u8]) -> bool {
     upper && lower && digit
 }
 
-/// Minimum span for the entropy detector: mainstream API keys start
-/// around 20 chars; anything shorter is prose noise. Internal affair —
-/// changing it changes recall, so it moves with this SPEC only.
 pub(crate) const ENTROPY_SPAN_MIN_BYTES: usize = 20;
 
-/// log2 in Q10 fixed point (10 fractional bits), shift-and-square.
-/// Zero input returns zero (callers guard); the loop bound is the
-/// constant 10, so termination is by construction (V5).
 fn log2_q10(x: u64) -> u64 {
     if x == 0 {
         return 0;
     }
     let int_part = u64::from(x.ilog2());
-    // Normalize the mantissa into [1, 2) as Q32 in u128.
+
     let mantissa_q32: u128 = (u128::from(x) << 32) >> x.ilog2();
     let mut y = mantissa_q32;
     let mut frac: u64 = 0;
@@ -107,12 +82,9 @@ fn log2_q10(x: u64) -> u64 {
     (int_part << 10) | frac
 }
 
-/// Shannon entropy per char in millibits (1/1000 bit). Saturation can
-/// only over-approximate, which errs toward detection — the recoverable
-/// direction (entrance replaces, never refuses).
 pub(super) fn entropy_millibits_per_char(bytes: &[u8]) -> u64 {
     let Ok(n) = u64::try_from(bytes.len()) else {
-        return 0; // unreachable on real targets; zero reads as low entropy
+        return 0;
     };
     if n == 0 {
         return 0;
@@ -133,7 +105,7 @@ pub(super) fn entropy_millibits_per_char(bytes: &[u8]) -> u64 {
         let term = count.saturating_mul(log_n.saturating_sub(log2_q10(count)));
         sum_q10 = sum_q10.saturating_add(term);
     }
-    // Q10 -> millibits: * 1000 / 1024, then / n for the per-char figure.
+
     sum_q10
         .saturating_mul(1000)
         .checked_div(1024)
@@ -145,18 +117,15 @@ fn entropy_passes(bytes: &[u8], work: &mut Work) -> bool {
     let mb = work.entropy_of(bytes);
     let num = u64::from(SECRET_ENTROPY_MIN.num);
     let den = u64::from(SECRET_ENTROPY_MIN.den);
-    // mb >= (num / den) * 1000  <=>  mb * den >= num * 1000
+
     mb.saturating_mul(den) >= num.saturating_mul(1000)
 }
 
-/// What one scan did, counted rather than timed, so a test can hold how
-/// the work grows with the input (`Sprawling/kernel/spec/Secret.lean` §8-25).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Work {
-    /// Bytes a detector loop read, once per loop that read them.
+
     pub(super) bytes_read: u64,
-    /// Entropy readings taken: a 256-slot count table each, and one
-    /// fixed-point logarithm per byte value present.
+
     pub(super) entropy_readings: u64,
 }
 
@@ -167,7 +136,6 @@ impl Work {
             .saturating_add(u64::try_from(bytes).unwrap_or(u64::MAX));
     }
 
-    /// The entropy of `run` in millibits per char, counted as one reading.
     pub(super) fn entropy_of(&mut self, run: &[u8]) -> u64 {
         self.entropy_readings = self.entropy_readings.saturating_add(1);
         self.read(run.len());
@@ -175,14 +143,10 @@ impl Work {
     }
 }
 
-/// Custody's detection half. Shape table first;
-/// entropy second over token runs of at least [`ENTROPY_SPAN_MIN_BYTES`]
-/// that no shape already claimed. Pure, total, deterministic.
 pub fn scan(bytes: &[u8]) -> Vec<SecretSpan> {
     scan_counting(bytes).0
 }
 
-/// [`scan`], with the work it did.
 pub(super) fn scan_counting(bytes: &[u8]) -> (Vec<SecretSpan>, Work) {
     let mut work = Work::default();
     let mut hits = find_shape_hits(bytes, &mut work);
@@ -220,8 +184,6 @@ pub(super) fn scan_counting(bytes: &[u8]) -> (Vec<SecretSpan>, Work) {
     (hits, work)
 }
 
-/// Whether some shape prefix starts with this byte, so the shape pass
-/// compares prefixes only where one can begin.
 static OPENS_A_SHAPE: LazyLock<[bool; 256]> = LazyLock::new(|| {
     let mut table = [false; 256];
     for shape in &SECRET_SHAPES {
@@ -237,9 +199,6 @@ static OPENS_A_SHAPE: LazyLock<[bool; 256]> = LazyLock::new(|| {
     table
 });
 
-/// The shape hits, sorted by start and length. One pass over the bytes;
-/// each shape resumes after the prefix of its own previous match, which
-/// is the hit set a pass per shape gives.
 fn find_shape_hits(bytes: &[u8], work: &mut Work) -> Vec<SecretSpan> {
     let mut resume = [0usize; SECRET_SHAPES.len()];
     let mut hits = Vec::new();
@@ -278,13 +237,10 @@ fn find_shape_hits(bytes: &[u8], work: &mut Work) -> Vec<SecretSpan> {
     hits
 }
 
-/// The spans the shape table claimed, asked in rising order of start
-/// whether a token run overlaps one of them. Each span is passed once,
-/// so the questions of one scan cost the number of spans in total.
 struct Claimed<'a> {
     spans: &'a [SecretSpan],
     next: usize,
-    /// The furthest end of every span that starts before the last run asked.
+
     reach: usize,
 }
 
@@ -297,8 +253,6 @@ impl<'a> Claimed<'a> {
         }
     }
 
-    /// Whether `start..end` overlaps a claimed span; `start` never falls
-    /// between two calls.
     fn overlaps(&mut self, start: usize, end: usize) -> bool {
         while let Some(span) = self.spans.get(self.next).filter(|s| s.start < start) {
             self.reach = self.reach.max(span.start.saturating_add(span.len));
@@ -315,19 +269,6 @@ impl<'a> Claimed<'a> {
     }
 }
 
-/// Whether a *name* reads as the name of a credential.
-///
-/// The other half of this module judges bytes that might be a secret;
-/// this half judges a label that would sit in front of one, which is
-/// what a configuration file offers when it declares an environment
-/// variable. Both live here so "what looks like a credential" has one
-/// authority rather than two.
-///
-/// Case-insensitive substring match against
-/// [`crate::consts_policy::CREDENTIAL_NAME_MARKERS`]. Over-inclusive on
-/// purpose: the caller refuses with an alternative, and a false refusal
-/// costs a person one line of configuration while a missed one leaks a
-/// key into every child process the run starts.
 #[must_use]
 pub fn names_a_credential(name: &str) -> bool {
     let folded = name.to_ascii_lowercase();
@@ -361,10 +302,6 @@ mod tests {
         assert_eq!(&text.as_bytes()[hit.start..prefix_end], b"sk-ant-");
     }
 
-    /// A shape's body runs over every byte of its charset: the `-`, `_`
-    /// and `=` a base64url key carries, and both the capitals and the
-    /// digits of an upper-base36 one. A body cut at the first of them
-    /// would leave the rest of the key outside the span, or drop the hit.
     #[test]
     fn a_shape_s_body_runs_over_every_byte_of_its_charset() {
         let url_body = format!("ab-cd_ef={}", "x".repeat(20));
@@ -383,9 +320,6 @@ mod tests {
         }
     }
 
-    /// A prefix that overlaps itself opens one key, not two: `AKIA`
-    /// ends with the letter it starts with, and the second `AKIA` inside
-    /// `AKIAKIA` lies within the first key's prefix.
     #[test]
     fn a_self_overlapping_prefix_opens_one_key() {
         let text = format!(
@@ -403,8 +337,6 @@ mod tests {
         );
     }
 
-    /// A scan looks at every byte it is given at least once, and counts
-    /// that it did: the work the growth test compares is work done.
     #[test]
     fn a_scan_counts_every_byte_it_reads() {
         let text = format!("note: {} and prose", "a1B2c3D4e5".repeat(3));
@@ -417,8 +349,7 @@ mod tests {
 
     #[test]
     fn high_entropy_tokens_hit_and_prose_does_not() {
-        // The probe token is assembled at runtime so the source file
-        // itself never holds a scannable span (xtask secret runs on us).
+
         let token = ["kJ8vQ2xR9m", "W4nZ7pL3sT", "6yB1cD5fG0", "hN8aE2iU4o"].concat();
         let noisy = format!("token = {token} ok");
         let hits = scan(noisy.as_bytes());
@@ -431,13 +362,13 @@ mod tests {
 
     #[test]
     fn city_native_artifacts_do_not_light_up() {
-        // blake3 hex64: all-lowercase hex — no mixed alphabet, no hit.
+
         let hex = format!("prev: {}", "ab".repeat(32));
         assert!(scan(hex.as_bytes()).is_empty());
-        // uuid: lowercase hex + hyphens.
+
         let uuid = b"run: 0198f6a2-7c4a-7bbb-9d1e-000000000001";
         assert!(scan(uuid).is_empty());
-        // digit runs (timestamps, sizes).
+
         let digits = b"t: 17555443211234567890123";
         assert!(scan(digits).is_empty());
     }
@@ -452,13 +383,7 @@ mod tests {
 
     #[test]
     fn aggregator_tokens_with_lowercase_hex_bodies_are_found() {
-        // Every probe is assembled at runtime: `xtask secret` scans this
-        // file, and a literal token here would be a finding in itself.
-        //
-        // These three matter because the entropy detector cannot reach
-        // them. Their bodies are all-lowercase hex, so `mixed_alphabet`
-        // is false and the second detector never fires - the shape table
-        // is the only net.
+
         let hex64 = "0f1e2d3c".repeat(8);
         for (prefix, provider) in [("sk-or-v1-", "openrouter"), ("sk-ai-v1-", "zenmux")] {
             let text = format!("KEY={prefix}{hex64}");
@@ -474,8 +399,7 @@ mod tests {
 
     #[test]
     fn a_bare_hex_run_still_does_not_hit_without_its_prefix() {
-        // The guard on the entry above: these shapes must not turn every
-        // blake3 hash in the ledger into a finding.
+
         let hex64 = "0f1e2d3c".repeat(8);
         assert!(scan(format!("prev: {hex64}").as_bytes()).is_empty());
     }
@@ -485,21 +409,21 @@ mod tests {
         assert_eq!(log2_q10(1), 0);
         assert_eq!(log2_q10(2), 1 << 10);
         assert_eq!(log2_q10(4), 2 << 10);
-        // log2(3) = 1.58496...; Q10 => 1623.0 => 1623 (truncated toward 0)
+
         let three = log2_q10(3);
         assert!((1622..=1624).contains(&three), "{three}");
     }
 
     #[test]
     fn uniform_bytes_have_full_entropy() {
-        // 64 distinct byte values once each: log2(64) = 6 bits/char.
+
         let bytes: Vec<u8> = (0u8..64).collect();
         let mb = entropy_millibits_per_char(&bytes);
         assert!((5900..=6000).contains(&mb), "{mb}");
     }
 
     proptest! {
-        /// Total on arbitrary inputs, spans in bounds.
+
         #[test]
         fn scan_is_total_and_in_bounds(bytes in proptest::collection::vec(any::<u8>(), 0..256)) {
             for hit in scan(&bytes) {
@@ -507,24 +431,18 @@ mod tests {
             }
         }
 
-        /// The scanner reports exactly the spans the reference reports,
-        /// on text built to reach every detector and every boundary.
         #[test]
         fn scan_reports_what_the_reference_reports(pieces in proptest::collection::vec(piece(), 0..24)) {
             let text = pieces.concat();
             prop_assert_eq!(scan(text.as_bytes()), reference::scan(text.as_bytes()));
         }
 
-        /// The same on arbitrary bytes, which reach the boundaries no
-        /// generator above was written for.
         #[test]
         fn scan_matches_the_reference_on_any_bytes(bytes in proptest::collection::vec(any::<u8>(), 0..512)) {
             prop_assert_eq!(scan(&bytes), reference::scan(&bytes));
         }
     }
 
-    /// The probes the other tests of this module and of `hex_run` use,
-    /// each assembled at runtime so this file holds no scannable span.
     #[test]
     fn scan_matches_the_reference_on_the_test_corpus() {
         let mixed = "a1B2c3D4e5".repeat(9);
@@ -556,10 +474,6 @@ mod tests {
         }
     }
 
-    /// One piece of generated text: a provider shape with a body of its
-    /// own charset (some too short), a hex run behind a credential name
-    /// or another name (some of low entropy), a mixed token, prose with
-    /// multibyte characters, or a separator.
     fn piece() -> impl Strategy<Value = String> {
         let shape = (0..SECRET_SHAPES.len(), "[A-Za-z0-9_=-]{0,90}").prop_map(|(at, body)| {
             let prefix = SECRET_SHAPES.get(at).map_or("", |s| s.prefix);
@@ -597,10 +511,6 @@ mod tests {
         ]
     }
 
-    /// Today's scanner, kept as the judge of every faster one: a shape
-    /// pass per table entry, the overlap test against every hit, and the
-    /// hex run's entropy read before its label. It counts its work the
-    /// way [`Work`] does, so the growth test can compare the two.
     mod reference {
         use super::super::{
             ENTROPY_SPAN_MIN_BYTES, SECRET_ENTROPY_MIN, Work, charset_admits,
@@ -732,8 +642,6 @@ mod tests {
         }
     }
 
-    /// Text shaped like history: hashes and oids, a labelled key, a
-    /// provider token, a mixed token, prose, repeated `lines` times.
     fn history(lines: usize) -> String {
         let hex64 = "9f3c1a7e5b20d48c6f1ea7b3905d2ce81f64b07a".repeat(2);
         let token = ["kJ8vQ2xR9m", "W4nZ7pL3sT", "6yB1cD5fG0", "hN8aE2iU4o"].concat();
@@ -746,9 +654,6 @@ mod tests {
         line.repeat(lines)
     }
 
-    /// The work a scan does grows no faster than its input, and is less
-    /// than the reference's at every size: the growth a slower scanner
-    /// would bring back is seen here as a count, not as a timing.
     #[test]
     fn scan_work_is_linear_and_below_the_reference() {
         let sizes = [64usize, 128, 256];
@@ -781,18 +686,6 @@ mod tests {
 
 #[cfg(kani)]
 mod verification {
-    //! V5: the fixed-point logarithm terminates and never panics on any
-    //! `u64`. The loop bound is the constant ten, so CBMC derives it and
-    //! no global unwind is passed.
-    //!
-    //! The whole-function property stops here on purpose:
-    //! `entropy_millibits_per_char` calls `log2_q10` once per slot of a
-    //! 256-slot count table and each call squares a `u128` ten times, so
-    //! a harness over the table hands the solver some 2,560 symbolic
-    //! non-linear multiplications and returns no verdict. Totality of
-    //! the whole scan is held by the proptest above; proving it here
-    //! would need a per-slot function this module does not have
-    //! (`Sprawling/kernel/Spec.lean` §2).
 
     use super::*;
 

@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The views as the bytes a snapshot holds (`Sprawling/app/Spec.lean` §8-91).
-
 use std::path::Path;
 
 use std::sync::{Arc, Mutex};
@@ -19,31 +17,18 @@ pub mod start;
 
 use start::SnapshotFold;
 
-/// Changed whenever a fold rule or the encoding of `Views` changes within
-/// one version of this binary; a new version discards every snapshot
-/// anyway, because `views_fold_version` hashes the version in with this.
-/// The suffix is the digest of a fixed fixture's encoding, which the
-/// tests beside this file hold, so the encoding cannot move alone.
 const VIEWS_FOLD_RULES: &str = "views-fold-0376b6783767b594";
 
-/// The `fold_version` a views snapshot is cut and accepted under.
 pub(crate) fn views_fold_version() -> u32 {
     let rules = [env!("CARGO_PKG_VERSION"), VIEWS_FOLD_RULES].join("\n");
     let [a, b, c, d, ..] = *B3Hash::digest(rules.as_bytes()).as_bytes();
     u32::from_le_bytes([a, b, c, d])
 }
 
-/// The index a new `Views` starts with: empty, until a fold hands over
-/// the index it built or the first question that reads the ledger
-/// refreshes it.
 pub(super) fn fresh_index() -> std::sync::Arc<std::sync::Mutex<storage::LedgerIndex>> {
     std::sync::Arc::new(std::sync::Mutex::new(storage::LedgerIndex::empty()))
 }
 
-/// The ledger index as a snapshot holds it: the index itself, not the
-/// lock the two copies of the views share it through. A lock a panic
-/// poisoned is taken as it stands: the index is a projection that
-/// `refresh` rebuilds on any doubt (`Sprawling/storage/Spec.lean` §8-4).
 pub(super) fn encode_index<S: serde::Serializer>(
     index: &Arc<Mutex<LedgerIndex>>,
     serializer: S,
@@ -56,7 +41,6 @@ pub(super) fn encode_index<S: serde::Serializer>(
     )
 }
 
-/// The index `encode_index` wrote, behind a lock of its own.
 pub(super) fn decode_index<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Arc<Mutex<LedgerIndex>>, D::Error> {
@@ -64,8 +48,6 @@ pub(super) fn decode_index<'de, D: serde::Deserializer<'de>>(
         .map(|index| Arc::new(Mutex::new(index)))
 }
 
-/// The plan cache as a snapshot holds it: the cache itself, not the lock
-/// the two copies of the views share it through (`Sprawling/app/Spec.lean` §8-99).
 pub(super) fn encode_plans<S: serde::Serializer>(
     plans: &Arc<Mutex<PlanView>>,
     serializer: S,
@@ -73,7 +55,6 @@ pub(super) fn encode_plans<S: serde::Serializer>(
     serde::Serialize::serialize(&*PlanView::take_back(plans), serializer)
 }
 
-/// The plan cache `encode_plans` wrote, behind a lock of its own.
 pub(super) fn decode_plans<'de, D: serde::Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Arc<Mutex<PlanView>>, D::Error> {
@@ -104,15 +85,10 @@ impl SnapshotFold for Views {
         self.apply(record)
     }
 
-    /// The views answer later questions through the index, and name the
-    /// history by the epoch read from its genesis line.
     fn keep_index(&mut self, index: LedgerIndex, ledger_dir: &Path) -> Result<(), AxError> {
         self.hold_index(index, ledger_dir)
     }
 
-    /// The index the snapshot carried is brought up to the ledger: only
-    /// the bytes appended since the cut are read, and a segment that
-    /// shrank or vanished rebuilds it (`Sprawling/storage/Spec.lean` §8-4).
     fn resumed(&mut self, ledger_dir: &Path) -> Result<(), AxError> {
         let mut index = self
             .index
@@ -126,10 +102,7 @@ impl SnapshotFold for Views {
 }
 
 impl Views {
-    /// The folded state, without the fields `Views::new` rebuilds.
-    ///
-    /// # Errors
-    /// `StorageFatal` when a field refuses to serialise.
+
     pub fn encode(&self) -> Result<Vec<u8>, AxError> {
         postcard::to_allocvec(self).map_err(|fault| {
             AxError::failure(AxCode::StorageFatal, "encode the views", fault.to_string())
@@ -139,27 +112,10 @@ impl Views {
         })
     }
 
-    /// A second copy of these views, folded to the same record and sharing
-    /// their ledger index, plan cache, vault and halt, for the fold thread
-    /// to alternate with (`Sprawling/app/Spec.lean` §8-99): a clone, which copies
-    /// every folded field and shares what sits behind an `Arc`, so the
-    /// copy starts where this one stands without the history being read
-    /// again (`Sprawling/accounting/spec/Views/Snapshot.lean` §8-19).
-    ///
-    /// # Errors
-    /// None today; the `Result` stays until its caller in
-    /// `bin::assembly::listening` drops the `?` (`Sprawling/app/Spec.lean` §8-144).
     pub fn twin(&self) -> Result<Views, AxError> {
         Ok(self.clone())
     }
 
-    /// Cuts a snapshot of these views at `record`, the last record they
-    /// folded. Its `canonical_line` is the ledger's line, so the cut reads
-    /// nothing back from the ledger (`Sprawling/app/Spec.lean` §8-91).
-    ///
-    /// # Errors
-    /// `InvalidArgs` when the record does not serialise, and those of
-    /// [`start::cut_at`].
     pub fn cut_snapshot_at(&self, record: &EventRecord) -> Result<(), AxError> {
         let last = (record.seq(), record.canonical_line()?);
         start::cut_at(
@@ -169,11 +125,6 @@ impl Views {
         )
     }
 
-    /// The views `encode` wrote, served from `city_root`.
-    ///
-    /// # Errors
-    /// `CasCorrupt` when the bytes are not an encoding of this build's
-    /// `Views`; the caller folds from genesis instead.
     pub fn decode(city_root: &Path, bytes: &[u8]) -> Result<Views, AxError> {
         let folded: Views = postcard::from_bytes(bytes).map_err(|fault| {
             AxError::failure(AxCode::CasCorrupt, "decode the views", fault.to_string())

@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The losing line "the implementer tests its own work", end to end: a
-//! node works in its own tree, someone else verifies it, and only then
-//! does anything reach the building.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -21,7 +17,6 @@ use collab::{Claim, NodeId, Pr};
 use kernel::{Address, B3Hash, Locator, RunId, TimeMs};
 use storage::{Checkpoint, Landing, ModelChoice, Provenance, WorktreeName, Worktrees};
 
-/// Who the commits in this scenario are signed as.
 fn of(room: &str) -> Provenance {
     Provenance::new(
         RunId::CITY,
@@ -34,7 +29,6 @@ fn of(room: &str) -> Provenance {
     )
 }
 
-/// A city with one checkpoint, which is what a node's tree branches from.
 fn city(root: &Path) -> Worktrees {
     std::fs::create_dir_all(root.join("lab")).unwrap();
     std::fs::write(root.join("lab").join("notes.md"), b"before\n").unwrap();
@@ -54,8 +48,6 @@ fn a_node_reaches_the_building_only_through_someone_elses_verification() {
         .claim(&WorktreeName::parse("node-1").unwrap(), &["lab".to_owned()])
         .unwrap();
 
-    // The implementer works in its own tree and commits there. The
-    // building has not moved: nobody can see this yet.
     let produced = b"after: measured in metres\n";
     std::fs::write(tree.path().join("lab").join("notes.md"), produced).unwrap();
     Checkpoint::open(tree.path())
@@ -80,7 +72,6 @@ fn a_node_reaches_the_building_only_through_someone_elses_verification() {
     )
     .unwrap();
 
-    // A test resident runs the done check and produces the artifact.
     let digest = B3Hash::digest(produced);
     let claim = Claim::new(
         node,
@@ -92,7 +83,6 @@ fn a_node_reaches_the_building_only_through_someone_elses_verification() {
     let verified = request.verified(&artifact).unwrap();
     assert_eq!(verified.verified_by(), "lab/tests");
 
-    // Only now does anything move, and the record says who checked it.
     let planned = trees
         .plan_merge(&WorktreeName::parse(verified.branch()).unwrap())
         .unwrap();
@@ -105,10 +95,7 @@ fn a_node_reaches_the_building_only_through_someone_elses_verification() {
             reviewed_by_person: true,
         })
         .unwrap();
-    // The record of a merge is written by `pr_tool::request::OpenRequest`,
-    // which is the one authority for that payload; this test therefore
-    // ends where the typestate does — at a verification the worktree
-    // has landed.
+
     assert_eq!(
         std::fs::read_to_string(dir.path().join("lab").join("notes.md")).unwrap(),
         "after: measured in metres

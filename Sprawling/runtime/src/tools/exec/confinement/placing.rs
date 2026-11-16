@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Places commands in bounded, synchronized copies and probes their platform wrapper.
-//! Selection belongs to `Confinement`; copy lifetime belongs to this adapter.
-
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -16,7 +13,6 @@ use crate::backlog::{BacklogId, Finished};
 
 use super::{Confinement, Missing, Offerings};
 
-/// Owns reusable copies and holds background copies until their member ends (D10).
 pub struct Confined {
     arm: Confinement,
     scratch: Option<PathBuf>,
@@ -24,13 +20,11 @@ pub struct Confined {
     outstanding: BTreeMap<BacklogId, Mirror>,
 }
 
-/// One copy, and the working directory it mirrors.
 struct Mirror {
     of: PathBuf,
     at: PathBuf,
 }
 
-/// A command's copy claim, returned after its execution ends.
 pub struct Placed {
     copy: Option<Mirror>,
     work: storage::FileWork,
@@ -43,15 +37,13 @@ impl Placed {
             .ok_or_else(|| no_arm(Missing::ScratchDirectory))
     }
 
-    /// What putting the copy in place cost the filesystem (`Sprawling/storage/Spec.lean`
-    /// §8-31).
     pub fn work(&self) -> storage::FileWork {
         self.work
     }
 }
 
 impl Confined {
-    /// The arm this machine gives, and where its copies go.
+
     pub fn detect() -> Confined {
         let offered = Offerings::this_machine();
         Confined {
@@ -62,8 +54,6 @@ impl Confined {
         }
     }
 
-    /// An arm stated rather than found: a test's machine, or a report
-    /// about one.
     pub fn with_arm(arm: Confinement, scratch: Option<PathBuf>) -> Confined {
         Confined {
             arm,
@@ -77,22 +67,10 @@ impl Confined {
         &self.arm
     }
 
-    /// What this arm promises and does not, for the caller's own
-    /// description of itself.
     pub fn statement(&self) -> String {
         self.arm.statement()
     }
 
-    /// Places one command under this machine's arm: the tool's copy of
-    /// `workdir`, synced to it, for the command to run in, wrapped in the
-    /// platform's isolation where the arm is one that has a wrapper.
-    ///
-    /// # Errors
-    /// `E_SANDBOX_DENIED` when this machine has no arm, when the arm
-    /// cannot be given by any build of this crate, or when the working
-    /// tree is too large or too deep to copy. On Linux, namespace setup
-    /// must succeed with a required unprivileged user namespace before
-    /// the working tree is copied.
     pub fn place(
         &mut self,
         mut command: Command,
@@ -190,21 +168,18 @@ impl Confined {
         ))
     }
 
-    /// Retains a settled command's copy for reuse.
     pub fn settled(&mut self, placed: Placed) {
         if let Some(copy) = placed.copy {
             self.keep(copy);
         }
     }
 
-    /// Holds a background command's copy until its member reports.
     pub fn handed(&mut self, id: BacklogId, placed: Placed) {
         if let Some(copy) = placed.copy {
             self.outstanding.insert(id, copy);
         }
     }
 
-    /// Releases copies whose background members have ended.
     pub fn reaped(&mut self, finished: &[Finished]) {
         for member in finished {
             if let Some(copy) = self.outstanding.remove(&member.id) {
@@ -213,14 +188,6 @@ impl Confined {
         }
     }
 
-    /// Keeps `copy` for the next command when no copy is kept yet, and
-    /// removes it otherwise.
-    ///
-    /// A copy that cannot be removed costs disk space rather than the
-    /// answer, so the command's ending is not turned into a failure of
-    /// the tool: the judgment is `backlog/member.rs`'s about the place
-    /// a child's output was written, and it is recorded here rather than
-    /// repeated there.
     fn keep(&mut self, copy: Mirror) {
         match self.idle {
             None => self.idle = Some(copy),
@@ -228,8 +195,6 @@ impl Confined {
         }
     }
 
-    /// The copy kept for the next command, or a fresh one, brought to
-    /// what `workdir` holds.
     fn synced(&mut self, workdir: &Path) -> Result<(Mirror, storage::FileWork), AxError> {
         let root = self
             .scratch
@@ -261,11 +226,7 @@ impl Confined {
         ) {
             Ok(()) => Ok((copy, budget.work())),
             Err(fault) => {
-                // The half-synced copy goes before the refusal is
-                // returned: a scratch root that grew a tree per refusal
-                // would be a leak nothing reports. A removal that fails
-                // here is the secondary failure and stays unstated rather
-                // than replacing the one that caused it.
+
                 remove(&copy.at);
                 Err(fault)
             }
@@ -275,18 +236,13 @@ impl Confined {
 
 impl Drop for Confined {
     fn drop(&mut self) {
-        // The copy kept for a next command that will not come, and those
-        // of commands still running when the tool ended. There is no
-        // caller left to tell, and the alternative is a panic, which this
-        // crate forbids: a directory that will not go stays behind in the
-        // scratch root, where an operating system clears it.
+
         for copy in self.idle.iter().chain(self.outstanding.values()) {
             remove(&copy.at);
         }
     }
 }
 
-/// The refusal for a machine that cannot take a command at all.
 fn no_arm(missing: Missing) -> AxError {
     AxError::failure(
         AxCode::SandboxDenied,
@@ -296,7 +252,6 @@ fn no_arm(missing: Missing) -> AxError {
     .with_recovery(missing.recovery())
 }
 
-/// Refuses the unavailable job-object arm instead of silently weakening it.
 #[cfg(not(windows))]
 fn no_job_object() -> AxError {
     AxError::failure(
@@ -315,9 +270,6 @@ pub(super) mod copy;
 
 use copy::{Budget, Stage, fresh, mirror, remove};
 
-/// The command as the platform's wrapper runs it: the whole machine
-/// readable, the copy bound over the working directory, and every
-/// namespace the wrapper knows how to separate.
 fn namespaced(wrapper: &Path, copy: &Path, workdir: &Path, command: &Command) -> Command {
     let mut wrapped = child::command(wrapper);
     wrapped

@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The three posted bodies: an outside editor's request, a recording,
-//! and a file dropped onto the composer. Each is read just far enough to
-//! hand inward, and the city's answer comes back as the response to the
-//! same request.
-
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -22,14 +17,6 @@ use crate::reception::{Admission, Door, decide_admission};
 use super::config::ShellState;
 use super::config::refusal_text;
 
-/// An outside editor's request. The token is judged here and the
-/// verdict travels inward; an unauthenticated request still reaches the
-/// admission, because what it may learn is that admission's to decide.
-///
-/// The body is read as JSON and passed on unread. Which keys make a
-/// request, and what each of them must hold, is `agent_protocols::Incoming`'s
-/// single answer; a second reading here would be a second grammar, and
-/// the two would first disagree about an empty field.
 pub(crate) async fn accept_acp(State(state): State<Arc<ShellState>>, body: Bytes) -> Response {
     let Ok(request) = serde_json::from_slice::<serde_json::Value>(&body) else {
         return (
@@ -38,11 +25,7 @@ pub(crate) async fn accept_acp(State(state): State<Arc<ShellState>>, body: Bytes
         )
             .into_response();
     };
-    // The token is judged by `decide_admission`, which is the same
-    // judgement the acting doors are layered with; this door differs
-    // only in where the token is written (a body key, because that is
-    // what an editor sends) and in admitting an unpaired caller so the
-    // admission can word what it may learn.
+
     let offered = match state.door.pairing(
         &state.face,
         request.get("token").and_then(serde_json::Value::as_str),
@@ -62,20 +45,12 @@ pub(crate) async fn accept_acp(State(state): State<Arc<ShellState>>, body: Bytes
     }
 }
 
-/// One recording in, one line of text back.
-///
-/// The media type is read off the request rather than guessed from the
-/// bytes: a browser records into whatever container it has, and it is
-/// the only party that knows which. A request with none is refused by
-/// name, because a container nobody declared cannot be sent on.
 pub(crate) async fn accept_recording(
     State(state): State<Arc<ShellState>>,
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-    // The parameters a browser appends (`; codecs=opus`) name the codec
-    // inside the container, and what the audio wire routes on is the
-    // container, so a value of parameters alone declares none.
+
     let Some(container) = headers
         .get(header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
@@ -95,11 +70,6 @@ pub(crate) async fn accept_recording(
     }
 }
 
-/// One dropped file in, the absolute path the city kept it at back.
-///
-/// The name rides the query string rather than a header, because a
-/// header value carries ASCII reliably and a person's file names are
-/// often not ASCII (`Sprawling/wire/spec/Server.lean` §8-49).
 pub(crate) async fn accept_drop(
     State(state): State<Arc<ShellState>>,
     Query(params): Query<HashMap<String, String>>,

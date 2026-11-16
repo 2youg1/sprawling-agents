@@ -3,33 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A set of real tasks, split into the part a change may learn from and
-//! the part it may not.
-//!
-//! The split is the whole mechanism. A change that improves the tasks it
-//! was built against has shown nothing; a change that also holds on the
-//! tasks nobody looked at has shown something. So the two sets are
-//! declared once, at construction, and a task that appears in both is
-//! refused there — leakage is not a warning to read later, it is a suite
-//! that cannot be built.
-//!
-//! `holdout` was going to be its own module. It is not, because it has
-//! exactly one consumer and no state of its own: the split is a property
-//! of the suite, and a second module would have been a second place to
-//! ask which set a task is in.
-//!
-//! Specified by `Tools/citysim/spec/Suite.lean` §8-8-1.
-
 use std::collections::BTreeMap;
 
 use kernel::{AxCode, AxError, Locator};
 
-/// Which half a task belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Half {
-    /// Visible to whoever is making the change.
+
     HeldIn,
-    /// Not visible. The evidence that a change generalises.
+
     HeldOut,
 }
 
@@ -43,11 +25,6 @@ impl Half {
     }
 }
 
-/// One task, sampled from work the city actually did.
-///
-/// `at` points at the real material rather than carrying a copy: EVAL
-/// corpora are drawn from real tasks, never synthesised, and a task that
-/// carries its own text would drift from the work it came from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Task {
     pub id: String,
@@ -55,19 +32,12 @@ pub struct Task {
     pub half: Half,
 }
 
-/// One task's result on one run of the suite.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Outcome {
     pub id: String,
     pub passed: bool,
 }
 
-/// How one half did: how many were tried, how many passed, and the
-/// ratio in per mille.
-///
-/// Per mille rather than a float: the ledger bans floats, comparisons
-/// have to be exact, and "87.5%" and "875" carry the same information
-/// while only one of them compares the same way twice.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Tally {
     pub tried: u32,
@@ -87,14 +57,11 @@ impl Tally {
     }
 }
 
-/// Both halves of one run of the suite.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Report {
     pub held_in: Tally,
     pub held_out: Tally,
-    /// Outcomes naming a task this suite does not have. Reported rather
-    /// than ignored: a run that answered questions nobody asked was not
-    /// this suite's run.
+
     pub unknown: u32,
 }
 
@@ -104,10 +71,7 @@ pub struct Suite {
 }
 
 impl Suite {
-    /// # Errors
-    /// Refuses a task with an empty id, and refuses the same id twice —
-    /// which is what leakage looks like from here, whether the second
-    /// copy landed in the same half or the other one.
+
     pub fn new(tasks: Vec<Task>) -> Result<Suite, AxError> {
         let mut held: BTreeMap<String, Task> = BTreeMap::new();
         for task in tasks {
@@ -140,8 +104,6 @@ impl Suite {
         Ok(Suite { tasks: held })
     }
 
-    /// The tasks in one half, in id order, which is the order they are
-    /// executed in: the same suite runs the same way twice.
     #[must_use]
     pub fn half(&self, half: Half) -> Vec<&Task> {
         self.tasks
@@ -160,12 +122,6 @@ impl Suite {
         self.tasks.is_empty()
     }
 
-    /// Folds one run's outcomes into a report.
-    ///
-    /// An outcome for a task that is not in the suite counts as unknown
-    /// rather than as a pass or a failure. A task in the suite with no
-    /// outcome is simply not tried, and shows as the gap between `tried`
-    /// and the half's size.
     #[must_use]
     pub fn report(&self, outcomes: &[Outcome]) -> Report {
         let mut held_in = Tally {

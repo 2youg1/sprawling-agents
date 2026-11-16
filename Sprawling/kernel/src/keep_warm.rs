@@ -3,44 +3,26 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Keep-warm: whether, and when, a prompt cache still in use is renewed
-//! before the provider lets it expire.
-//! The part `Sprawling/kernel/spec/KeepWarm.lean` specifies this module.
-//!
-//! **Off unless the city enables it.** A renewal is a request the person
-//! pays for, so [`KeepWarm::Off`] is the default and plans nothing. Spend
-//! is observed where every request's usage is recorded; this decision
-//! reads no balance and refuses nothing.
-
 use crate::consts_external::{PROMPT_CACHE_RENEWAL_MARGIN_SECS, PROMPT_CACHE_TTL_SECS};
 use serde::{Deserialize, Serialize};
 
-/// Whether this city renews a warm prompt cache before it expires.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum KeepWarm {
-    /// No renewal is ever planned: the city sends no request of its own.
+
     #[default]
     Off,
-    /// A prefix a real request carried within the last cache lifetime is
-    /// renewed once, just before that lifetime ends.
+
     FiveMinute,
 }
 
-/// One prefix's cache as last seen: when a real request carried it, in
-/// milliseconds, and whether that use still owes its one renewal.
-///
-/// The renewal is recorded rather than inferred from the times, so the
-/// bound of one renewal per real use holds whatever lead a caller
-/// passes (kernel D62).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CacheUse {
     used_ms: u64,
     renewal: Renewal,
 }
 
-/// Whether a real use has had its renewal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Renewal {
     Owed,
@@ -48,8 +30,7 @@ enum Renewal {
 }
 
 impl CacheUse {
-    /// A real request carrying the prefix was sent at `at_ms`; the use
-    /// owes one renewal.
+
     pub fn sent(at_ms: u64) -> CacheUse {
         CacheUse {
             used_ms: at_ms,
@@ -57,8 +38,6 @@ impl CacheUse {
         }
     }
 
-    /// The renewal this use owed has been sent; the use owes none until
-    /// the next real request.
     #[must_use]
     pub fn renewed(self) -> CacheUse {
         CacheUse {
@@ -68,14 +47,6 @@ impl CacheUse {
     }
 }
 
-/// The instant the next renewal request is sent, or `None` when none is.
-///
-/// `lead_ms` is how long a request to the caller's endpoint takes from
-/// leaving the city to the provider starting it, as the caller measured
-/// it. The renewal is due that long, plus
-/// [`PROMPT_CACHE_RENEWAL_MARGIN_SECS`], before the lifetime the real
-/// use started ends, so a renewal no slower than the lead starts while
-/// the entry is still alive. A use whose renewal was sent plans none.
 pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u64> {
     match (setting, cache.renewal) {
         (KeepWarm::Off, Renewal::Owed | Renewal::Spent)
@@ -122,18 +93,12 @@ mod tests {
         assert_eq!(renewal_due(KeepWarm::FiveMinute, renewed, LEAD_MS), None);
     }
 
-    /// What a door meets, as `Event` in `Sprawling/kernel/spec/KeepWarm.lean`:
-    /// a real request carrying the prefix sent at an instant, or a wake at
-    /// an instant with the lead its endpoint reads then.
     #[derive(Debug, Clone, Copy)]
     enum Event {
         Used { at_ms: u64 },
         Woke { now_ms: u64, lead_ms: u64 },
     }
 
-    /// Instants within a few lifetimes of each other, and leads from none
-    /// to longer than a lifetime, so a wake can fall before, at or after
-    /// any renewal's due instant.
     fn event() -> impl Strategy<Value = Event> {
         prop_oneof![
             (0..4 * TTL_MS).prop_map(|at_ms| Event::Used { at_ms }),
@@ -147,11 +112,7 @@ mod tests {
     }
 
     proptest! {
-        /// `at_most_one_renewal_per_use`, `every_renewal_leaves_the_margin`
-        /// and `off_sends_nothing` of `Sprawling/kernel/spec/KeepWarm.lean`,
-        /// on any trace of uses and wakes with any lead at each wake. The
-        /// door is driven here as `Door.step` drives it, and the renewals
-        /// are counted from the ones this driver sends.
+
         #[test]
         fn every_trace_keeps_the_lean_properties(
             setting in setting(),

@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The engine half of `shots`: open one route in one window, and either
-//! read how far its main region scrolls or photograph one fold of it
-//! (Tools/xtask/Spec.lean §8-44).
-//!
-//! **The engine is the render gate's.** Which browser, how its dump is
-//! waited for, and how a bundle opened from `file://` gets its lazily
-//! loaded chunks inside the virtual-time budget are answered in
-//! `render::engine`, so the two tools open a page the same way.
-//!
-//! **Each launch is a case of its own.** It gets a fresh profile that is
-//! removed after it, a stderr file under `target/shots/engine/`, and a
-//! patience past which its process tree is killed and the case is run
-//! once more; the next launch starts only once the tree of this one has
-//! let go of its output.
-
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -33,60 +18,36 @@ use crate::render::probe::{PENDING, POLL_MS};
 use crate::report::XtaskError;
 use crate::walk;
 
-/// The copy of the bundle's page that carries the placing script,
-/// written beside it so `./assets/...` still resolves.
 const COPY: &str = "sprawling-shots.html";
 
-/// The element the placing script writes what it measured into.
 const SINK: &str = "sprawling-shots";
 
-/// The most folds one page is photographed in. A main region taller
-/// than this many windows is a page that does not stop growing, and
-/// photographing it would not end either. The gallery carries every
-/// fixture and measures 372 folds at 1440x900 and 251 at 1920x1080, so
-/// the cap sits above it with room for the next fixture (D26).
 const MOST_FOLDS: usize = 512;
 
-/// How long one case (one measuring or one picture) may take before its
-/// tree is killed and the case is run again. The slowest case seen on a
-/// four-core Windows machine took 15 s; three times that leaves room for
-/// a busy runner and still ends a stalled run in minutes, not at the
-/// job's timeout.
 pub(super) const CASE_PATIENCE: Duration = Duration::from_secs(45);
 
-/// How long the helpers of a launch may hold its output after the
-/// engine itself exited: the two seconds the render gate drains for.
-/// On Edge under Windows a helper routinely holds it longer, and a run
-/// of some six hundred launches pays this bound on each of them.
 const TREE_PATIENCE: Duration = Duration::from_secs(2);
 
-/// Where the pages come from.
 #[derive(Clone, Copy)]
 pub(super) enum Source<'a> {
-    /// The bundle `just build-web` wrote, opened from disk with no city.
+
     Bundle(&'a Path),
-    /// A served city's origin, whose pages carry real data and take no
-    /// script, so each is photographed as one fold.
+
     Origin(&'a str),
 }
 
-/// An engine readied for one run: its browser, where each launch's
-/// profile and stderr go, and where the pages come from.
 pub(super) struct Camera<'a> {
     browser: &'a Path,
     profiles: PathBuf,
     launches: Cell<u32>,
     logs: PathBuf,
-    /// Each launch whose helpers outlived it, or whose profile they kept.
+
     strays: RefCell<Vec<String>>,
     source: Source<'a>,
 }
 
 impl<'a> Camera<'a> {
-    /// A directory for this run's profiles under the system's temporary
-    /// directory, so every page is drawn at its default lighting, a fresh
-    /// stderr directory under `work`, and in bundle mode the instrumented
-    /// copy.
+
     pub(super) fn open(
         browser: &'a Path,
         work: &Path,
@@ -125,10 +86,6 @@ impl<'a> Camera<'a> {
         })
     }
 
-    /// Removes the profiles and the instrumented copy, so the next
-    /// `just dist` does not package it, and returns each launch whose
-    /// helpers outlived it. A stray helper does not fail the run: its
-    /// profile was its own, so no later launch met it.
     pub(super) fn close(self) -> Result<Vec<String>, XtaskError> {
         let mut strays = self.strays.into_inner();
         if let Err(err) = released(&self.profiles) {
@@ -147,9 +104,6 @@ impl<'a> Camera<'a> {
         }
     }
 
-    /// Per fold of `route` in `frame`, the names of the states whose
-    /// section begins in it. A page whose main region the script could
-    /// not read is one fold with no states named.
     pub(super) fn folds(
         &self,
         route: &str,
@@ -169,8 +123,6 @@ impl<'a> Camera<'a> {
         Ok((folds_in(&String::from_utf8_lossy(&dumped)), took))
     }
 
-    /// Photographs one shot into `picture`; a try that exits without a
-    /// picture counts as a failed one.
     pub(super) fn shoot(&self, shot: &Shot, picture: &Path) -> Result<Took, XtaskError> {
         let file = shot.file();
         let case = file.trim_end_matches(".png");
@@ -194,8 +146,6 @@ impl<'a> Camera<'a> {
         .map(|((), took)| took)
     }
 
-    /// One try of one case: a fresh profile, the engine's stderr kept in
-    /// the case's file, and the profile removed once the tree let go.
     fn launch(
         &self,
         case: &str,
@@ -229,8 +179,6 @@ impl<'a> Camera<'a> {
         ran.map(|ran| ran.stdout)
     }
 
-    /// The engine in one window and one colour scheme, with its own
-    /// profile, before the page.
     #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
     fn engine(&self, frame: Frame, scheme: u8, profile: &Path) -> Command {
         let mut command = Command::new(self.browser);
@@ -238,8 +186,7 @@ impl<'a> Camera<'a> {
             .arg("--headless=new")
             .arg("--disable-gpu")
             .arg("--no-sandbox")
-            // Skip the first-run flow on each fresh profile, as in
-            // render::engine.
+
             .arg("--no-first-run")
             .arg("--no-default-browser-check")
             .arg("--hide-scrollbars")
@@ -262,8 +209,6 @@ impl<'a> Camera<'a> {
     }
 }
 
-/// The page with the preloads in its head and the placing script at the
-/// end of its body.
 fn instrument(body: &str, preloaded: &str) -> String {
     let body = match body.find("</head>") {
         Some(at) => {
@@ -281,15 +226,6 @@ fn instrument(body: &str, preloaded: &str) -> String {
     }
 }
 
-/// Once no view is pending, scrolls the main region to the fold the URL
-/// names, waits one IntersectionObserver round and two animation frames,
-/// and keeps writing its reading until the budget is nearly spent, so the
-/// engine's own output carries the last reading the page has to give. A
-/// CodeMirror editor measures itself only in the frames after it scrolled
-/// into view, and the virtual clock jumps between timers without drawing
-/// one, so the wait keeps a load of the page's own copy in flight: the
-/// loads are its clock, running until the frames arrive, and a page that
-/// never draws pays the budget (Spec.lean D25).
 fn script() -> String {
     format!(
         r#"<pre id="{SINK}" hidden></pre>
@@ -360,8 +296,6 @@ fn script() -> String {
     )
 }
 
-/// What the placing script wrote, read back out of a dumped page: per
-/// fold, the states that begin in it.
 fn folds_in(dom: &str) -> Vec<Vec<String>> {
     let written = dom
         .find(&format!("id=\"{SINK}\""))
@@ -394,7 +328,6 @@ fn folds_in(dom: &str) -> Vec<Vec<String>> {
     folds
 }
 
-/// A text node as a dumped page escapes it, read back.
 fn unescape(text: &str) -> String {
     text.replace("&lt;", "<")
         .replace("&gt;", ">")
@@ -407,10 +340,6 @@ fn unescape(text: &str) -> String {
 mod tests {
     use super::*;
 
-    /// A page whose one state labels itself only in a frame after it was
-    /// seen, the way a CodeMirror editor measures itself only once it is
-    /// in view, and which only starts looking when the placing script
-    /// scrolls, so nothing but frames after the scroll can label it.
     const FRAME_LATE: &str = r#"<!doctype html>
 <html><head></head><body>
 <main style="display:block;height:400px;overflow:auto"><div id="view" style="height:2000px"></div></main>
@@ -431,12 +360,6 @@ setTimeout(function () {
 </body></html>
 "#;
 
-    /// A page whose one state is written by a timer `LATE_MS` in, long
-    /// after the single reading an opening used to write about a second
-    /// in, so only a reading that keeps up with the engine carries it. It
-    /// takes no frame to appear, which is what separates it from
-    /// `FRAME_LATE`: that one asks whether the frames after the scroll
-    /// were waited for, this one where the reading was taken at all.
     const TIMER_LATE: &str = r#"<!doctype html>
 <html><head></head><body>
 <main style="display:block;height:400px;overflow:auto"><div id="view" style="height:2000px"></div></main>
@@ -450,15 +373,8 @@ setTimeout(function () {
 </body></html>
 "#;
 
-    /// How long the timer fixture waits before it writes its state: past
-    /// the reading the camera used to stop at, early enough inside
-    /// `BUDGET_MS` that a reading which keeps up reaches it.
     const LATE_MS: u32 = 3000;
 
-    /// The engine on this machine reads the fixture pages, and every state
-    /// a page has by the time the engine takes its output is in that
-    /// reading. Where no engine is installed the render gate already
-    /// fails, so this test has nothing to drive and ends.
     #[test]
     fn the_reading_carries_a_state_written_late_in_the_budget() {
         reads_the_state(
@@ -467,20 +383,6 @@ setTimeout(function () {
         );
     }
 
-    /// The frame after the scroll writes a state the reading carries.
-    ///
-    /// **Run by hand** (`just shots-frames`), because a hosted runner's
-    /// engine draws no frame at all inside a dump run: its virtual clock
-    /// jumps from timer to timer, and the load that holds the clock still
-    /// (D25) buys no frame there, so the fixture's `requestAnimationFrame`
-    /// never runs and the reading carries nothing to assert. The premise
-    /// is absent on that machine rather than false, and a check that stays
-    /// red wherever no frame is drawn is a check nobody can act on: it was
-    /// red on every CI run for two days, and the report each time was
-    /// `measured in view is not in [[], [], [], [], []]`. The parameter
-    /// that would re-open this is an engine mode where the caller drives
-    /// the frames (D25: BeginFrame), or a way for the page to say when to
-    /// take the output.
     #[test]
     #[ignore = "a hosted runner's engine draws no frame in a dump run; `just shots-frames` runs this on a machine whose engine draws"]
     fn a_frame_after_the_scroll_writes_a_state_the_reading_carries() {
@@ -490,8 +392,6 @@ setTimeout(function () {
         );
     }
 
-    /// One opening of `page`, asserted to read `wanted` as one of the
-    /// states it places in a fold.
     fn reads_the_state(page: String, wanted: &str) {
         let Some(browser) = crate::render::engine::browser() else {
             return;

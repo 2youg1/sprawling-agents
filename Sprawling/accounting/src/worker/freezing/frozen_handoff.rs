@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The handoff a run is frozen with: what its room's `Handoff.md` says,
-//! with the file's own bytes pinned for the successor to read.
-
 use kernel::{AxError, Locator};
 use runtime::handoff::Handoff;
 use runtime::run::RunPlan;
@@ -13,24 +10,10 @@ use runtime::run::RunPlan;
 use super::Freezing;
 use super::run_slot::task_line;
 
-/// What a section says when the room's handoff did not write it. Plain
-/// absence, because a sentence that points elsewhere reads as a finding
-/// and sends the successor looking for something nobody wrote.
 const NOT_RECORDED: &str = "not recorded: the room's Handoff.md does not say";
 
 impl Freezing<'_> {
-    /// The handoff for `plan`, built from its room's `Handoff.md` when
-    /// that file was filled in, and appending the file's bytes, pinned in
-    /// the store, to `must_read`.
-    ///
-    /// The transcript's address is a pure function of the room and the
-    /// run, so the handoff names it before a turn is taken. It names the
-    /// room's file and never the ledger: the ledger is one chain for the
-    /// whole city, under a subtree `read` refuses.
-    ///
-    /// # Errors
-    /// Propagates a handoff file that exists and will not read, a store
-    /// that will not take its bytes, and a handoff the runtime refuses.
+
     pub(super) fn frozen_handoff(
         &mut self,
         plan: &RunPlan,

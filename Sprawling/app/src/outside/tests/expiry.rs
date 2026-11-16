@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The door closes itself when its time is up, through the listener's
-//! own tick (`Sprawling/app/spec/Outside/Conduit.lean` §8-139).
-//!
-//! Everything from `listener::open` on is the production path; the
-//! clock is one the test turns, and the route is a stand-in that
-//! remembers the port it was asked to reach and how often it closed.
-
 use std::net::{SocketAddr, TcpStream};
 use std::time::Duration;
 
@@ -20,7 +13,6 @@ use remote_access::route::Route;
 use super::super::listener::{Reaching, open};
 use super::*;
 
-/// Every record a door wrote, whole, so a reader can see why it closed.
 #[derive(Clone, Default)]
 struct Records(Arc<Mutex<Vec<EventRecord>>>);
 
@@ -33,8 +25,6 @@ impl Ledger for Records {
     }
 }
 
-/// What the stand-in route saw: the loopback port it was opened to, and
-/// how many times it was closed.
 #[derive(Clone, Default)]
 struct Seen(Arc<Mutex<(Option<SocketAddr>, u32)>>);
 
@@ -52,13 +42,9 @@ impl Route for StandIn {
     }
 }
 
-/// How often, and how many times, a check looks again: twenty seconds
-/// for the listener's one-second tick to notice, counted in naps rather
-/// than read off a clock this crate keeps to `bin::assembly`.
 const NAP: Duration = Duration::from_millis(50);
 const NAPS: u32 = 400;
 
-/// Looks until `done` holds or the naps run out, and says which.
 fn within(done: impl Fn() -> bool) -> bool {
     (0..NAPS).any(|_| {
         done() || {

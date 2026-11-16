@@ -3,31 +3,23 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The identity area's grammar (`Sprawling/city/spec/Identity.lean` §8-33): where it starts and
-//! ends, the names it states and the line each one sits on, and how one
-//! card's keys are written back into it.
-
 use kernel::{AxCode, AxError};
 
 use super::{DisplayName, NamingEdit, Unreadable};
 use crate::governed::Governed;
 
-/// The line that opens and closes an identity area.
 pub(super) const FENCE: &str = "+++";
 pub(super) const USER_ID: &str = "user_id";
 pub(super) const IMPORTED_FROM: &str = "imported_from";
 pub(super) const NAME: &str = "name";
 
-/// One document split at its identity area.
 pub(super) struct Split<'a> {
     pub(super) document: Governed,
-    /// The area's table, and the line its text starts on.
+
     pub(super) area: Option<(toml::Table, &'a str)>,
     pub(super) body: &'a str,
 }
 
-/// Splits a document at its identity area: a first line holding only
-/// `+++`, TOML, and a line holding only `+++`.
 pub(super) fn split(document: Governed, text: &str) -> Result<Split<'_>, Unreadable> {
     let Some((opened, closed)) = fences(text) else {
         return Ok(Split {
@@ -56,9 +48,6 @@ pub(super) fn split(document: Governed, text: &str) -> Result<Split<'_>, Unreada
     })
 }
 
-/// Where the area's text starts, and where the closing fence line starts
-/// and ends; `None` when the first line is not a fence, and an inner
-/// `None` when no line closes it.
 fn fences(text: &str) -> Option<(usize, Option<(usize, usize)>)> {
     let mut lines = text.split_inclusive('\n');
     let first = lines.next()?;
@@ -76,16 +65,12 @@ fn fences(text: &str) -> Option<(usize, Option<(usize, usize)>)> {
     Some((first.len(), None))
 }
 
-/// Where the body starts, by the fences alone: the area itself is not
-/// read here.
 pub(super) fn body_start(text: &str) -> Option<usize> {
     fences(text)
         .and_then(|(_, closed)| closed)
         .map(|(_, end)| end)
 }
 
-/// The line of the document a byte of the area's text sits on, counting
-/// the opening fence as line 1.
 fn line_in(area_text: &str, at: usize) -> u32 {
     let before = area_text.get(..at).unwrap_or(area_text);
     let newlines = before.bytes().filter(|byte| *byte == b'\n').count();
@@ -94,8 +79,6 @@ fn line_in(area_text: &str, at: usize) -> u32 {
         .saturating_add(2)
 }
 
-/// One name the area states, refused with the line it is on when it is
-/// not a string or not a name.
 pub(super) fn name_key(split: &Split<'_>, key: &str) -> Result<Option<DisplayName>, Unreadable> {
     let Some((table, area_text)) = &split.area else {
         return Ok(None);
@@ -117,8 +100,6 @@ pub(super) fn name_key(split: &Split<'_>, key: &str) -> Result<Option<DisplayNam
     }
 }
 
-/// The line `key = ...` sits on, or the opening fence when no line starts
-/// with it (a key spelled inside an inline table, which TOML allows).
 fn key_line(area_text: &str, key: &str) -> u32 {
     area_text
         .lines()
@@ -132,8 +113,6 @@ fn key_line(area_text: &str, key: &str) -> u32 {
         })
 }
 
-/// Writes one card's keys into `base`'s identity area and gives back the
-/// whole document.
 pub(super) fn rewrite(which: Governed, base: &str, edit: &NamingEdit) -> Result<String, AxError> {
     let split = split(which, base).map_err(Unreadable::into_ax)?;
     let mut area = split.area.map(|(table, _)| table).unwrap_or_default();
@@ -155,7 +134,6 @@ pub(super) fn rewrite(which: Governed, base: &str, edit: &NamingEdit) -> Result<
     compose(&area, body)
 }
 
-/// Writes one name into the area, or takes the key out.
 fn set(area: &mut toml::Table, key: &str, value: Option<&str>) -> Result<(), AxError> {
     match value {
         Some(raw) => {
@@ -169,9 +147,6 @@ fn set(area: &mut toml::Table, key: &str, value: Option<&str>) -> Result<(), AxE
     Ok(())
 }
 
-/// The whole document: the area between its fences, then the body. An
-/// area with nothing left in it is dropped fences and all, so a name set
-/// and then removed leaves the document as it was.
 fn compose(area: &toml::Table, body: &str) -> Result<String, AxError> {
     if area.is_empty() {
         return Ok(body.to_owned());

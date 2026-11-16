@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The scenarios a control surface makes possible.
-//!
-//! Steer and Cancel from a person, a pasted credential, an injected
-//! Discard, a resume that stays idempotent, and the fault surface exercised
-//! end to end. Each one drives the real code the city runs; only the world
-//! outside is scripted.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -76,7 +69,6 @@ fn kinds(lines: &[Vec<u8>]) -> Vec<String> {
         .collect()
 }
 
-/// Two waves then a conclusion, so an intervention has a boundary to land on.
 fn two_wave_scenario(cancel: Option<CancelPoint>, steer: Option<(u32, String)>) -> Scenario {
     Scenario {
         run: RunId::parse("0198f6a2-7c4a-7bbb-9d1e-00000000040a").unwrap(),
@@ -124,10 +116,7 @@ fn two_wave_scenario(cancel: Option<CancelPoint>, steer: Option<(u32, String)>) 
 
 #[test]
 fn a_steer_advances_the_run_instead_of_stopping_it() {
-    // Constitution 1.7: a Steer appends to the next result and does not
-    // interrupt the action in flight. So the assertion is that the loop
-    // *carried on* - a Steer that stopped a Run would be a Cancel with a
-    // friendlier name.
+
     let steered = run_scenario(two_wave_scenario(
         None,
         Some((0, "try the other branch".to_owned())),
@@ -153,8 +142,7 @@ fn a_steer_advances_the_run_instead_of_stopping_it() {
 
 #[test]
 fn a_cancel_at_the_same_boundary_beats_a_steer() {
-    // Stopping and redirecting are contradictory instructions. Stopping is
-    // the one that waiting cannot undo, so it wins.
+
     let both = run_scenario(two_wave_scenario(
         Some(CancelPoint::BeforeWave { turn: 0 }),
         Some((0, "keep going".to_owned())),
@@ -170,8 +158,7 @@ fn a_cancel_at_the_same_boundary_beats_a_steer() {
 
 #[test]
 fn a_steered_run_is_still_byte_identical_on_a_second_pass() {
-    // An intervention must not become a source of drift: the same script
-    // with the same steer produces the same Ledger.
+
     let steer = || Some((1, "narrow the search".to_owned()));
     let first = run_scenario(two_wave_scenario(None, steer())).unwrap();
     let second = run_scenario(two_wave_scenario(None, steer())).unwrap();
@@ -180,9 +167,7 @@ fn a_steered_run_is_still_byte_identical_on_a_second_pass() {
 
 #[test]
 fn a_steer_after_the_last_wave_never_lands_and_changes_nothing() {
-    // The boundary it names does not arrive. The Ledger must be identical
-    // to the un-steered run, not merely similar - an intervention that
-    // silently half-applied would be worse than one that failed loudly.
+
     let plain = run_scenario(two_wave_scenario(None, None)).unwrap();
     let late = run_scenario(two_wave_scenario(None, Some((99, "too late".to_owned())))).unwrap();
     assert_eq!(plain.lines, late.lines);
@@ -204,15 +189,6 @@ fn the_chain_still_verifies_after_every_intervention() {
     }
 }
 
-/// The first golden Ledger of a *full* loop enters the fixture
-/// library. `golden-s1` pins a synthetic script; this one pins a Run that
-/// went through the real turn machine, the real bench and a real
-/// intervention - which is the thing a future version has to stay
-/// compatible with.
-///
-/// It passes `xtask secret` before entering the repository, like every
-/// fixture; a Ledger is exactly the sort of file that quietly acquires a
-/// credential.
 #[test]
 fn golden_p0_pins_a_whole_intervened_run() {
     let report = run_scenario(two_wave_scenario(

@@ -3,30 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The corpus: each thing a resident of this city must be able to do,
-//! and the phrase in `Sprawling/city/templates/City.md` that grants it.
-//!
-//! **Data, not behaviour.** Editing this list is editing what the
-//! ablation measures, and the run refuses outright when a `cue` here is
-//! no longer said anywhere in the document — a corpus that has drifted
-//! away from the text grades its own staleness rather than the text.
-//!
-//! A `cue` is a phrase copied out of the document, short enough to
-//! survive a rewording of the sentence around it and long enough to
-//! appear in one place on purpose. Two capabilities may point at the
-//! same passage; that is how a passage earns a cost larger than one.
-//!
-//! **A capability granted by a tool rather than by this document has no
-//! row here.** `signal`, `goal`, `pr`, `plan` and the browser's own
-//! descriptions grant what they grant; a row for one of them would
-//! grade a phrase the document no longer says.
-//!
-//! Specified by `Tools/citysim/spec/Ablation.lean` §8-8-4.
-
 use super::Capability;
 
-/// What a resident must be able to do, in the reading order of the
-/// document that grants it.
 pub(crate) const CITY_CAPABILITIES: &[Capability] = &[
     Capability {
         name: "know that its address sets what it may write",

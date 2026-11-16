@@ -3,25 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which runs claimed one plan node, and what they were billed.
-//!
-//! **Nothing here prices anything.** `gateway::cost` prices a call and
-//! `storage::attribution` decides which run a billed call belongs to;
-//! this module joins those two facts to the node a run claimed and adds
-//! the result up. A second place that priced a call would be a second
-//! answer to what a city spent, and the one that drifted would be the
-//! one nobody was looking at.
-
 use kernel::{AxError, NodeId, RunId, UsdMicros};
 
 use super::holding::Views;
 
 impl Views {
-    /// What one plan node has cost so far.
-    ///
-    /// A node nobody has claimed answers zero with an empty list rather
-    /// than `Unavailable`: "no run has held this node" is a true answer,
-    /// while an error says the view could not read a run's records.
+
     pub(super) fn cost_of_answer(&self, node: &NodeId) -> Result<wire::CostOfAnswer, AxError> {
         let held = self.claims.get(node).cloned().unwrap_or_default();
         let mut runs: Vec<(RunId, UsdMicros)> = Vec::with_capacity(held.len());
@@ -38,10 +25,6 @@ impl Views {
         })
     }
 
-    /// What each named run was billed, in the order asked and cut at
-    /// `wire::RUN_COSTS_MAX`; a run whose records cannot be read has
-    /// no row, because one unreadable run must not blank the others and
-    /// the answer has no place for a reason per row.
     pub(super) fn run_costs_answer(&self, runs: &[RunId]) -> wire::RunCostsAnswer {
         wire::RunCostsAnswer {
             asked: runs.to_vec(),
@@ -53,12 +36,6 @@ impl Views {
         }
     }
 
-    /// What one run was billed, the one answer every view that shows a
-    /// run's money reads (`Sprawling/app/Spec.lean` §8-106): the
-    /// attribution's row while it holds one, the run's own records in
-    /// the Ledger once the hot view evicted it, and zero for a run no
-    /// priced call was attributed to. An error when the Ledger could not
-    /// be read.
     pub(super) fn billed_to(&self, run: RunId) -> Result<UsdMicros, AxError> {
         match self.attribution.billed_to(&run) {
             Some(billed) => Ok(billed),
@@ -98,8 +75,6 @@ mod tests {
         )
     }
 
-    /// The join the card asks for: the node a run claimed, and what
-    /// `storage::attribution` says that run was billed.
     #[test]
     fn a_claimed_node_costs_what_the_runs_that_held_it_were_billed() {
         let dir = tempfile::tempdir().unwrap();
@@ -134,8 +109,6 @@ mod tests {
         assert_eq!(answer.runs, vec![(run, kernel::UsdMicros::new(12_500))]);
     }
 
-    /// A node nobody claimed is answered, not refused: "no run has held
-    /// this" is a fact, while `Unavailable` says the view could not look.
     #[test]
     fn a_node_nobody_claimed_costs_nothing_rather_than_being_unavailable() {
         let dir = tempfile::tempdir().unwrap();

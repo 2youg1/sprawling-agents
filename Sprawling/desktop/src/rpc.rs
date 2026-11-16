@@ -3,43 +3,20 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One JSON-RPC 2.0 message per line, read and written.
-//!
-//! The framing contract is the same one `agent_protocols::mcp::stdio` checks from the
-//! other end: the transport is line delimited, so a message may not carry
-//! a newline. `serde_json::to_string` writes none, and nothing here
-//! pretty-prints, so the contract holds by construction rather than by
-//! inspection.
-//!
-//! An `id` is the caller's, so it is echoed back untouched — never
-//! parsed, never renumbered. A message with no `id` is a notification and
-//! has no answer at all; answering one would leave a line in the pipe,
-//! and every later call would read the answer to the message before it.
-
 use crate::refusal::{Refusal, RefusalCode};
 use serde_json::{Value, json};
 
-/// The revision this server speaks: the city's client's own, because the
-/// two ends have to agree (`Sprawling/desktop/Spec.lean` section 14).
 pub(crate) use agent_protocols::PROTOCOL_VERSION;
 
-/// One request line, read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Request {
-    /// Absent for a notification, which is what says "do not answer".
+
     pub(crate) id: Option<Value>,
     pub(crate) method: String,
-    /// Always an object; a request that omits `params` reads as an empty
-    /// one, which is what the specification allows and what the city's
-    /// own `notifications/initialized` sends.
+
     pub(crate) params: Value,
 }
 
-/// Reads one line.
-///
-/// # Errors
-/// Refuses a line that is not a JSON object, one with no `method`, and
-/// one whose `params` is present but not an object.
 pub(crate) fn read(line: &str) -> Result<Request, Refusal> {
     let value: Value = serde_json::from_str(line).map_err(|err| {
         Refusal::new(
@@ -88,13 +65,10 @@ pub(crate) fn read(line: &str) -> Result<Request, Refusal> {
     })
 }
 
-/// One answer line.
 pub(crate) fn result_line(id: &Value, result: Value) -> String {
     json!({ "jsonrpc": "2.0", "id": id, "result": result }).to_string()
 }
 
-/// One refusal line. A refusal that cannot name the request it answers
-/// carries a null id, which is what JSON-RPC reserves for exactly that.
 pub(crate) fn error_line(id: Option<&Value>, refusal: &Refusal) -> String {
     json!({
         "jsonrpc": "2.0",
@@ -115,9 +89,6 @@ pub(crate) fn error_line(id: Option<&Value>, refusal: &Refusal) -> String {
 mod tests {
     use super::*;
 
-    /// The transport frames on newlines, so a message containing one
-    /// would silently become two. Nothing here pretty-prints, and the
-    /// field order is the map's own, which is stable for the same input.
     #[test]
     fn every_line_this_server_writes_is_one_line() {
         let answer = result_line(&json!(7), json!({ "tools": [{ "name": "desktop.act" }] }));
@@ -139,8 +110,6 @@ mod tests {
         assert!(refused.contains("\"id\":null"));
     }
 
-    /// The id is the caller's. A string id and a numeric id both come
-    /// back exactly as they went out.
     #[test]
     fn an_id_comes_back_untouched_and_a_notification_has_none() {
         let request = read("{\"jsonrpc\":\"2.0\",\"id\":\"a-1\",\"method\":\"ping\"}").unwrap();

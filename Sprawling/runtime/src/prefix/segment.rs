@@ -3,24 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One segment: its slot, its bytes, the documents behind it, and the
-//! one row shape those documents are recorded in.
-//!
-//! **Why the row has a single author.** `prompt_assembled` is what an
-//! offline rebuild reads to reconstruct a prefix (A15), and it is also
-//! what a page reads to show a person which files their agent was given.
-//! Two producers of that row — one for a prefix built from a plan, one
-//! for a prefix assembled by hand at the city's own desk — would be two
-//! spellings of the same fact, and `replay::rebuild_prefix` would only
-//! understand whichever it was written against.
-
 use kernel::event::record::PromptSource;
 use kernel::{Address, AxCode, AxError, B3Hash, SystemBlock};
 
 use super::BreakpointPlan;
 
-/// The four slots in stability order; the order is the cache economics.
-/// Exactly four — deliberately exhaustive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SegmentSlot {
     City,
@@ -30,8 +17,7 @@ pub enum SegmentSlot {
 }
 
 impl SegmentSlot {
-    /// The four slots in prefix order, which is also the order the
-    /// cache breakpoints are declared in on the wire.
+
     pub const ALL: [SegmentSlot; 4] = [
         SegmentSlot::City,
         SegmentSlot::Building,
@@ -39,10 +25,6 @@ impl SegmentSlot {
         SegmentSlot::Run,
     ];
 
-    /// Whether every resident of one building carries this slot byte
-    /// for byte (`Sprawling/runtime/spec/Prefix.lean` D97): the Resident
-    /// slot is built from an identity and a catalog, and the Run slot
-    /// belongs to one run.
     pub fn shared_by_building(self) -> bool {
         match self {
             SegmentSlot::City | SegmentSlot::Building => true,
@@ -60,9 +42,6 @@ impl SegmentSlot {
     }
 }
 
-/// One frozen segment: static bytes from frozen sources, hashed at
-/// construction. The sole constructor takes bytes, not values — there is
-/// deliberately no `From<TimeMs>` or any other volatile conversion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FrozenSegment {
     slot: SegmentSlot,
@@ -72,14 +51,11 @@ pub struct FrozenSegment {
 }
 
 impl FrozenSegment {
-    /// A segment whose bytes name no documents - the resident slot is
-    /// built from an identity and a catalog rather than from files.
+
     pub fn new(slot: SegmentSlot, bytes: Vec<u8>) -> FrozenSegment {
         FrozenSegment::assembled(slot, bytes, Vec::new())
     }
 
-    /// A segment and the documents it was assembled from, which is what
-    /// `prompt_assembled` records and what a page shows a person.
     pub fn assembled(
         slot: SegmentSlot,
         bytes: Vec<u8>,
@@ -106,12 +82,6 @@ impl FrozenSegment {
         &self.hash
     }
 
-    /// Recomputes this segment's hash from the bytes a request will
-    /// carry and checks it against the hash fixed at construction.
-    ///
-    /// # Errors
-    /// The bytes and the recorded hash disagree — which is the one thing
-    /// a frozen prefix may not survive.
     pub(crate) fn verified_hash(&self) -> Result<B3Hash, AxError> {
         let fresh = B3Hash::digest(&self.bytes);
         if fresh != self.hash {
@@ -124,9 +94,6 @@ impl FrozenSegment {
         Ok(fresh)
     }
 
-    /// A segment whose stored hash does not describe its bytes, so the
-    /// invariant check has something to refuse. Only a test can build
-    /// one; production reaches the check through the bytes it sends.
     #[cfg(test)]
     pub(crate) fn mislabelled(slot: SegmentSlot, bytes: Vec<u8>, hash: B3Hash) -> FrozenSegment {
         FrozenSegment {
@@ -142,15 +109,6 @@ impl FrozenSegment {
     }
 }
 
-/// One document a segment was assembled from, as the assembler saw it.
-///
-/// `kept` is how many bytes of that document reached the segment and
-/// `dropped` is what the slot's budget cut off the end of it, so the
-/// pair states both what the model read and what it did not. A document
-/// that fitted whole reports `dropped: 0`, which is a measurement
-/// rather than an absence. `hash` is the BLAKE3 of the kept bytes,
-/// computed from the same bytes as `kept`, so the two cannot describe
-/// different spans (`Sprawling/runtime/spec/Prefix.lean` D105).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SegmentSource {
     pub addr: Address,
@@ -160,13 +118,11 @@ pub struct SegmentSource {
 }
 
 impl SegmentSource {
-    /// A document that reached its segment whole.
+
     pub fn whole(addr: Address, bytes: &[u8]) -> SegmentSource {
         SegmentSource::cut(addr, bytes, 0)
     }
 
-    /// A document whose first `kept` bytes reached its segment and whose
-    /// last `dropped` bytes the slot's budget cut off.
     pub fn cut(addr: Address, kept: &[u8], dropped: u64) -> SegmentSource {
         SegmentSource {
             addr,
@@ -176,11 +132,6 @@ impl SegmentSource {
         }
     }
 
-    /// The `prompt_assembled` row for this document.
-    ///
-    /// `marker` is carried because the rebuild reads it: it says a
-    /// truncation marker follows the kept bytes, and the concatenation
-    /// rule cannot be recovered from the byte counts alone.
     pub(crate) fn row(&self) -> PromptSource {
         PromptSource {
             addr: self.addr.clone(),
@@ -192,21 +143,9 @@ impl SegmentSource {
     }
 }
 
-/// The one way out of a frozen session a person can take today, in the
-/// words the verb is spelled with.
-///
-/// Every refusal meaning "this session cannot take this turn" ends
-/// here, so no refusal promises a verb the wire does not carry: every
-/// client can send a task to another address, and this sentence is
-/// where that way out is spelled, once (`Sprawling/runtime/spec/Prefix.lean` §8-4-1).
 pub(crate) const ANOTHER_ADDRESS: &str =
     "send this task to another address, which opens a session of its own";
 
-/// The refusal a prefix that no longer matches its own record earns.
-///
-/// A session cannot send one prefix and keep calling it frozen, and the
-/// run's recorded history belongs to the bytes it was told; the way out
-/// leaves this run's ledger alone.
 fn prefix_drifted(subject: String) -> AxError {
     AxError::failure(AxCode::CasCorrupt, "send the frozen prefix", subject).with_recovery(format!(
         "{ANOTHER_ADDRESS}: the prefix this turn would send is not the one the session \
@@ -214,19 +153,6 @@ fn prefix_drifted(subject: String) -> AxError {
     ))
 }
 
-/// The same assertion over the copy of the segments a request carries:
-/// four system blocks, hashed and compared against the hashes the run
-/// froze. The request is what the provider reads, so this is the check
-/// that the wire form and the record agree.
-///
-/// The edge breakpoints are checked here too, against
-/// [`BreakpointPlan::marks_edge`], because the record states the plan
-/// and the wire must carry what the record states.
-///
-/// # Errors
-/// A request that does not carry four blocks, one that moved a
-/// breakpoint off its edge or added one where the tail anchor lives, or
-/// whose blocks hash to something the run did not freeze.
 pub fn verified_system_hashes(
     system: &[SystemBlock],
     frozen: &[B3Hash; 4],
@@ -274,8 +200,6 @@ pub fn verified_system_hashes(
 mod tests {
     use super::*;
 
-    /// The keys `replay::rebuild_prefix` reads, by the names it reads
-    /// them under.
     #[test]
     fn a_row_names_the_keys_a_rebuild_reads() {
         let source = SegmentSource::cut(Address::parse("City.md").unwrap(), b"city rules: ", 4);
@@ -291,8 +215,6 @@ mod tests {
         );
     }
 
-    /// A document that fitted whole says nothing was cut, rather than
-    /// leaving a reader to infer it from a missing key.
     #[test]
     fn a_whole_document_reports_nothing_dropped_and_no_marker() {
         let source = SegmentSource::whole(Address::parse("City.md").unwrap(), b"the city.");

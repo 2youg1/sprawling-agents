@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Serving the privacy page (`Sprawling/app/spec/Privacy/Service.lean`):
-//! the answer to `Query::Privacy`, read off the host with the history
-//! disclosed only to the account it belongs to, and the operations
-//! `Command::PrivacyOperation` asks for, carried out one at a time with
-//! their results kept under the page's `idem` (Privacy D70).
-
 use std::collections::{BTreeSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -22,44 +16,33 @@ use super::coordinator::{self, Command, Done, Host};
 use super::journal::{self, LockedJournal};
 use super::target::Snapshot;
 
-/// How many results an answer carries; older ones give way (Privacy D70).
 const KEPT: usize = 64;
 
-/// The machine the page reads: the coordinator's port, and the facts its
-/// version record states.
 pub(crate) trait Machine: Host + Send {
     fn facts(&mut self) -> PrivacyHost;
 }
 
-/// The privacy page of one served city.
 pub(crate) struct Service<M> {
     machine: Box<dyn Fn() -> M + Send + Sync>,
     history: PathBuf,
     kept: Mutex<Kept>,
-    /// Held for the whole of one operation, so operations run one after
-    /// another in the order they reached it.
+
     turn: Mutex<()>,
 }
 
-/// The results an answer carries, and every `idem` ever accepted.
 #[derive(Default)]
 struct Kept {
     outcomes: VecDeque<PrivacyOutcome>,
     accepted: BTreeSet<IdemKey>,
 }
 
-/// An accepted operation that has not run yet.
 pub(super) struct Operation {
     idem: IdemKey,
     command: Command,
 }
 
 impl Service<super::system::System> {
-    /// The page of the machine this process runs on, over the person's
-    /// own privacy history.
-    ///
-    /// # Errors
-    /// The person's home could not be found.
+
     pub(crate) fn of_this_machine() -> Result<Self, AxError> {
         Ok(Self::new(
             super::system::this_machine,
@@ -69,8 +52,7 @@ impl Service<super::system::System> {
 }
 
 impl<M: Machine + 'static> Service<M> {
-    /// A page served from the history at `history`, through a machine
-    /// `machine` makes for each answer and each operation.
+
     pub(super) fn new(machine: impl Fn() -> M + Send + Sync + 'static, history: PathBuf) -> Self {
         Self {
             machine: Box::new(machine),
@@ -80,12 +62,6 @@ impl<M: Machine + 'static> Service<M> {
         }
     }
 
-    /// Reads the host and answers the page. Every failure of a read is a
-    /// part of the answer, so the page always learns what was read.
-    ///
-    /// The results are copied before the history is read (Privacy.Service
-    /// D72): an operation records its conclusion before its result settles,
-    /// so a concluded result never outruns the history beside it.
     pub(crate) fn answer(&self) -> PrivacyAnswer {
         let outcomes = self.kept().outcomes.iter().cloned().collect();
         let mut machine = (self.machine)();
@@ -100,13 +76,6 @@ impl<M: Machine + 'static> Service<M> {
         )
     }
 
-    /// Accepts `action` under `idem` and carries it out on a thread of its
-    /// own, after every operation accepted before it.
-    ///
-    /// # Errors
-    /// `expected` is not the host's spelling of a value, an `idem` whose
-    /// result already gave way arrives again, or the thread could not be
-    /// started; nothing is carried out.
     pub(crate) fn carry_out(
         self: &Arc<Self>,
         action: PrivacyAction,
@@ -131,12 +100,6 @@ impl<M: Machine + 'static> Service<M> {
             })
     }
 
-    /// Records `action` as running under `idem` and hands it back to be
-    /// performed; an `idem` accepted before is not accepted again.
-    ///
-    /// # Errors
-    /// `expected` is not the host's spelling of a value, or `idem` was
-    /// accepted before and its result already gave way.
     pub(super) fn accept(
         &self,
         action: PrivacyAction,
@@ -166,12 +129,9 @@ impl<M: Machine + 'static> Service<M> {
         Ok(Some(Operation { idem, command }))
     }
 
-    /// Runs `operation` through the coordinator, after every operation
-    /// accepted before it, and keeps its result.
     pub(super) fn perform(&self, operation: Operation) {
         let result = {
-            // The gate guards no data: an earlier holder that stopped
-            // halfway left nothing here to be inconsistent.
+
             let _turn = self.turn.lock().unwrap_or_else(PoisonError::into_inner);
             let mut machine = (self.machine)();
             match coordinator::run(
@@ -189,8 +149,6 @@ impl<M: Machine + 'static> Service<M> {
         self.kept().settle(operation.idem, result);
     }
 
-    /// The history as this account may see it (Privacy.Cli D54): read
-    /// without a lock, and released only once the identity check passed.
     fn disclosed(&self, machine: &mut M) -> PrivacyHistory {
         let history = match journal::read(&self.history) {
             Ok(history) => history,
@@ -200,7 +158,7 @@ impl<M: Machine + 'static> Service<M> {
                 };
             }
         };
-        // An empty history has no owner, so no identity is sampled for it.
+
         let released = history.holdings(|recorded| match recorded {
             None => Ok(()),
             Some(owner) => {
@@ -214,9 +172,6 @@ impl<M: Machine + 'static> Service<M> {
         }
     }
 
-    /// The results table. A holder that stopped halfway can only have
-    /// left a whole table behind, because every change to it is one push,
-    /// one pop or one assignment.
     fn kept(&self) -> MutexGuard<'_, Kept> {
         self.kept.lock().unwrap_or_else(PoisonError::into_inner)
     }
@@ -240,7 +195,6 @@ impl Kept {
         }
     }
 
-    /// Drops an accepted operation that never started.
     fn forget(&mut self, idem: IdemKey) {
         self.accepted.remove(&idem);
         self.outcomes.retain(|outcome| outcome.idem != idem);
@@ -302,7 +256,6 @@ mod tests {
     use super::super::target::{RawValue, Reading};
     use super::*;
 
-    /// What the test host holds, shared by every machine a service makes.
     #[derive(Default)]
     struct World {
         values: BTreeMap<PrivacyControl, Snapshot>,
@@ -311,7 +264,7 @@ mod tests {
         identities: usize,
         reads: usize,
         writes: usize,
-        /// Runs once, at the next identity sample, outside the world's lock.
+
         on_identity: Option<Box<dyn FnOnce() + Send>>,
     }
 
@@ -429,9 +382,6 @@ mod tests {
         outcome.unwrap().result.clone()
     }
 
-    /// The account the history belongs to sees the value this app found;
-    /// any other account is answered without a single recorded value, and
-    /// the current values are still read for it.
     #[test]
     fn only_the_owning_account_is_shown_a_recorded_value() {
         let (_dir, machine, service) = served();
@@ -469,7 +419,6 @@ mod tests {
         );
     }
 
-    /// An empty history has no owner: no identity is sampled to answer.
     #[test]
     fn an_empty_history_samples_no_identity() {
         let (_dir, machine, service) = served();
@@ -485,7 +434,6 @@ mod tests {
         assert_eq!(machine.world().identities, 0);
     }
 
-    /// A host that is not Windows is not read, and every control says so.
     #[test]
     fn a_host_that_is_not_windows_is_not_read() {
         let (_dir, machine, service) = served();
@@ -500,8 +448,6 @@ mod tests {
         assert_eq!(machine.world().reads, 0);
     }
 
-    /// A value spelled otherwise than the host spells it is refused before
-    /// anything is kept, and the same idem may then be sent right.
     #[test]
     fn a_value_not_spelled_by_the_host_keeps_nothing() {
         let (_dir, machine, service) = served();
@@ -517,9 +463,6 @@ mod tests {
         assert!(right.unwrap().is_some());
     }
 
-    /// One idem is carried out once: a replay while its result is kept
-    /// does nothing, and a replay after its result gave way is refused
-    /// rather than run against a host that has moved on.
     #[test]
     fn an_idem_is_carried_out_once() {
         let (_dir, machine, service) = served();
@@ -544,10 +487,6 @@ mod tests {
         assert_eq!(machine.world().writes, 0);
     }
 
-    /// An operation that concludes while an answer is being read is never
-    /// reported concluded by an answer whose history lacks its conclusion
-    /// (Privacy.Service D72): the page stops asking on that answer and draws
-    /// its ownership and buttons from it.
     #[test]
     fn an_answer_reports_no_conclusion_its_history_lacks() {
         let (_dir, machine, service) = served();
@@ -587,8 +526,6 @@ mod tests {
         assert_eq!(machine.world().values[&CONTROL], dword(0));
     }
 
-    /// An accepted operation reads as running until it is performed, and
-    /// then as what the coordinator concluded.
     #[test]
     fn an_accepted_operation_runs_until_performed() {
         let (_dir, machine, service) = served();

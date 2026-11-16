@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One round per preset host and face (`Sprawling/gateway/spec/Reach/Resolve.lean` §8-32):
-//! the request the production path writes for that host, heard by a
-//! stand-in, against what the host's vendor documents.
-
 use kernel::{AxCode, DialectKind, SecretRef};
 
 use super::{Heard, StandIn};
@@ -14,25 +10,22 @@ use crate::endpoint::{AuthSpec, Transport};
 use crate::provider::preset::{CeilingField, Face, HostPreset, PRESETS};
 use crate::router::{AttachedEndpoint, Chosen, DialectHint, EndpointTuning, normalise_entered};
 
-/// The key the test redemption hands out for every reference.
 const KEY: &str = "sk-test-0123456789";
 
-/// What one request looked like, in the terms a vendor documents it.
 #[derive(Debug, PartialEq)]
 struct Shape {
-    /// Which round this is: the host and the face.
+
     round: String,
     path: String,
     host: Option<String>,
-    /// The header the credential travelled in, and its value.
+
     credential: Option<(String, String)>,
-    /// Every conversation header any preset host asks for that arrived.
+
     sessions: Vec<String>,
     dialect: DialectKind,
-    /// For the chat face: the field the output ceiling was written in.
+
     ceiling: Option<&'static str>,
-    /// The prompt cache key field the body carried, when its value is
-    /// this request's conversation id.
+
     cache_key: Option<&'static str>,
 }
 
@@ -51,7 +44,6 @@ fn round(row: &HostPreset, face: &Face) -> String {
     format!("{} {:?}", row.host, face.dialect)
 }
 
-/// What the vendor documents for one face of one host.
 fn owed(row: &HostPreset, face: &Face) -> Shape {
     let (suffix, credential) = match face.dialect {
         DialectKind::Anthropic => ("messages", ("x-api-key", KEY.to_owned())),
@@ -82,9 +74,6 @@ fn owed(row: &HostPreset, face: &Face) -> Shape {
     }
 }
 
-/// What a stand-in heard when the production path called one face of
-/// one host: the base URL attaching stores, the connection it resolves
-/// to, the credential header its face takes, and `adapter_for`.
 fn heard(row: &HostPreset, face: &Face) -> Shape {
     let stand_in = StandIn::listening(row.host);
     let hint = DialectHint::of(face.dialect);
@@ -123,8 +112,7 @@ fn heard(row: &HostPreset, face: &Face) -> Shape {
         crate::endpoint::fakes::monotonic,
     )
     .unwrap();
-    // A system prompt, so the three bodies differ where `shape_of`
-    // reads them.
+
     let mut request = crate::endpoint::fakes::request();
     request.chat.system.push(kernel::SystemBlock {
         text: "Answer briefly.".to_owned(),
@@ -136,7 +124,6 @@ fn heard(row: &HostPreset, face: &Face) -> Shape {
     shape_of(round(row, face), &stand_in.heard(), &conversation)
 }
 
-/// One request taken apart into the terms `owed` speaks in.
 fn shape_of(round: String, heard: &Heard, conversation: &str) -> Shape {
     let header = |name: &str| heard.headers.get(name).cloned();
     let credential = ["x-api-key", "authorization"]
@@ -150,9 +137,7 @@ fn shape_of(round: String, heard: &Heard, conversation: &str) -> Shape {
         .collect();
     sessions.sort_unstable();
     sessions.dedup();
-    // The three bodies differ at the top: Responses sends `input`,
-    // Anthropic sends `system` beside its messages, and the chat face
-    // sends its system prompt as one of the messages.
+
     let dialect = if heard.body.get("input").is_some() {
         DialectKind::OpenAiResponses
     } else if heard.body.get("system").is_some() {

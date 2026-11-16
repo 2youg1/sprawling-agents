@@ -3,18 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which region a screenshot covers.
-//!
-//! One region, two spellings, never both: a rectangle the caller named
-//! in CSS pixels, or an element a snapshot named. An element's box is
-//! reported by the page to the driver rather than measured here, so
-//! nothing rounds and there is no second measurement that could disagree
-//! with the picture.
-
 use kernel::{AxCode, AxError, Payload};
 use serde_json::{Value, json};
 
-/// The rectangle of the page a screenshot covers, in CSS pixels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Rect {
     pub x: u32,
@@ -23,11 +14,6 @@ pub struct Rect {
     pub height: u32,
 }
 
-/// The element a screenshot covers, as a snapshot named it.
-///
-/// The generation travels with the reference because a reference is a
-/// position in one snapshot: `act::ensure_fresh` is the one authority on
-/// that rule, and this carries what it judges.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Element {
     reference: String,
@@ -54,12 +40,6 @@ impl Element {
     }
 }
 
-/// The elements a screenshot covers together, as a snapshot named them.
-///
-/// The boxes are the ones `measure` reads — the same script, the same
-/// rounding — so the region a shot covers and the region a measurement
-/// reports cannot disagree. A union is the one clip the protocol cannot
-/// state, so it is measured first and then captured as a rectangle.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Union {
     references: Vec<String>,
@@ -85,12 +65,6 @@ impl Union {
         self.generation
     }
 
-    /// The rectangle covering every box the page reported.
-    ///
-    /// # Errors
-    /// Refuses a reply that carries no boxes, and one whose numbers this
-    /// build cannot read — an element that moved off the page is a box of
-    /// zero, which is still a box, so only a broken answer refuses.
     pub(crate) fn around(reply: &Value) -> Result<Rect, AxError> {
         let boxes = crate::verb::read_json(reply)?;
         let mut union: Option<Rect> = None;
@@ -110,11 +84,6 @@ impl Union {
     }
 }
 
-/// One side of one reported box.
-///
-/// # Errors
-/// Refuses a box missing a side, and a number that is not a whole one
-/// inside a rectangle's range.
 fn side(entry: &Value, field: &str) -> Result<u32, AxError> {
     let raw = entry.get(field).and_then(Value::as_u64).ok_or_else(|| {
         AxError::failure(
@@ -143,12 +112,6 @@ fn no_boxes() -> AxError {
     .with_recovery("name at least one reference the snapshot minted")
 }
 
-/// The reference a call names, when it names one.
-///
-/// # Errors
-/// Refuses a `ref` that is present and is not a reference: silently
-/// ignoring it would photograph the whole page while the caller believed
-/// it had asked for one element.
 pub(crate) fn reference_of(args: &Payload) -> Result<Option<String>, AxError> {
     match args.as_map().get("ref") {
         None | Some(Value::Null) => Ok(None),
@@ -162,11 +125,6 @@ pub(crate) fn reference_of(args: &Payload) -> Result<Option<String>, AxError> {
     }
 }
 
-/// The references a call names to cover together, when it names any.
-///
-/// # Errors
-/// Refuses `refs` that is not a list of references, and a list with
-/// nothing in it: a union of no boxes has no region to cover.
 pub(crate) fn references_of(args: &Payload) -> Result<Option<Vec<String>>, AxError> {
     let not_a_list = || {
         AxError::failure(
@@ -200,11 +158,6 @@ pub(crate) fn references_of(args: &Payload) -> Result<Option<Vec<String>>, AxErr
     }
 }
 
-/// The snapshot generation a reference was read against.
-///
-/// # Errors
-/// Refuses a missing or malformed generation: a reference without one is
-/// a position in no snapshot, and `act` refuses it the same way.
 pub(crate) fn generation_of(args: &Payload) -> Result<u64, AxError> {
     let bad = || {
         AxError::failure(
@@ -220,7 +173,6 @@ pub(crate) fn generation_of(args: &Payload) -> Result<u64, AxError> {
     }
 }
 
-/// The one region a screenshot covers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Clip {
     Rect(Rect),
@@ -229,7 +181,7 @@ pub enum Clip {
 }
 
 impl Rect {
-    /// Whether this box covers the pixel at `(x, y)`.
+
     #[must_use]
     pub fn covers(&self, x: u32, y: u32) -> bool {
         let right = self.x.saturating_add(self.width);
@@ -237,11 +189,6 @@ impl Rect {
         x >= self.x && x < right && y >= self.y && y < bottom
     }
 
-    /// The smallest rectangle covering both.
-    ///
-    /// # Errors
-    /// Refuses a rectangle whose sides cannot be added, which is a page
-    /// no longer describing itself in pixels.
     pub(crate) fn covering(self, other: Rect) -> Result<Rect, AxError> {
         let unreadable = || {
             AxError::failure(
@@ -273,12 +220,7 @@ impl Rect {
 }
 
 impl Clip {
-    /// The region a call named, refusing a call that named more than one.
-    ///
-    /// # Errors
-    /// Refuses any pair of a rectangle, a reference and a set of
-    /// references: a shot covers one region, and a caller that named more
-    /// than one has not said which.
+
     pub fn of(
         rect: Option<Rect>,
         element: Option<Element>,
@@ -319,22 +261,11 @@ impl Clip {
         )
     }
 
-    /// Whether the page has to answer before this clip can be captured:
-    /// an element the page names, or a set of boxes it reports.
     #[must_use]
     pub fn waits_for_page(&self) -> bool {
         matches!(self, Clip::Element(_) | Clip::Union(_))
     }
 
-    /// The clip as the capture states it.
-    ///
-    /// `element` is the handle the page minted for this clip's element,
-    /// read out of the resolve frame's reply. A rectangle states itself
-    /// and is handed `None`.
-    ///
-    /// # Errors
-    /// Refuses an element without a handle, and a rectangle with one:
-    /// neither is a request the protocol can carry.
     pub(crate) fn wire(&self, element: Option<&str>) -> Result<Value, AxError> {
         match (self, element) {
             (Clip::Rect(rect), None) => Ok(json!({
@@ -361,10 +292,6 @@ impl Clip {
     }
 }
 
-/// A clip the caller and the resolve frame disagree about.
-///
-/// The two arms are reached by two different calls, so this is a defect
-/// in the caller rather than a page's answer: the recovery says so.
 fn mismatch(what: &str) -> AxError {
     AxError::failure(AxCode::InvalidArgs, "photograph a page", what).with_recovery(
         "report this against browser::shot::clip: an element clip is built from the resolve \

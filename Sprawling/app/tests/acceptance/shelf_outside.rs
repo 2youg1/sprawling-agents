@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every skill this repository ships, on a shelf the city mounts from
-//! outside itself and admitted by a building's reading room, is pinned
-//! when a run starts and read by name as the bytes the pin names
-//! (`Sprawling/runtime/Spec.lean` §8-29-6; `docs/getting-started.md`, "Tools, skills
-//! and MCP").
-//!
-//! A shipped skill's pinned bytes are the staged ones, the licence list
-//! riding inside (`city` D37): the library shelf is nearer than the
-//! mounted one (`Library.lean` §8-8), so for a shipped name the city's
-//! staged copy is the holding the pin names.
-//!
-//! The shelf is the `skills/` directory itself, named in the city's own
-//! configuration the way the guide tells a person to name one.
-
 use std::path::Path;
 
 use kernel::B3Hash;
@@ -26,12 +12,11 @@ use crate::city::{self, History};
 use crate::script::{self, Step};
 use crate::skills::{Shipped, shipped, skills_dir};
 
-/// What the run was dispatched with and what reached the model.
 #[derive(Debug, PartialEq)]
 struct Seen {
-    /// The skills `run_started` pinned, with their hashes.
+
     pinned: Vec<(String, B3Hash)>,
-    /// The skills whose `SKILL.md` came back from a `read` by name.
+
     read: Vec<String>,
 }
 
@@ -95,8 +80,6 @@ fn every_shipped_skill_on_a_shelf_outside_the_city_is_read_by_name_and_pinned() 
     );
 }
 
-/// Names `skills/` as the city's one shelf from outside, in the city's
-/// own configuration, as an absolute path.
 fn mount(city_root: &std::path::Path) {
     let config = kernel::layout::CityLayout::new(city_root).city_config();
     let shelf = std::fs::canonicalize(skills_dir()).unwrap();
@@ -110,11 +93,6 @@ fn mount(city_root: &std::path::Path) {
     std::fs::write(&config, text).unwrap();
 }
 
-/// The canonical manifest digest a run pins for a shipped skill: the
-/// staged bytes, the licence list riding inside (`city` D37). The
-/// library is the nearer shelf (`Library.lean` §8-8), so its staged
-/// copy of a shipped name is the holding a run pins, not the raw
-/// directory the mounted shelf holds.
 fn as_shelved(skill: &Shipped) -> (String, B3Hash) {
     let staged = tempfile::tempdir().unwrap();
     copy_dir(&skill.dir, staged.path());
@@ -129,7 +107,6 @@ fn as_shelved(skill: &Shipped) -> (String, B3Hash) {
     )
 }
 
-/// Copies one directory tree without changing a byte.
 fn copy_dir(from: &Path, to: &Path) {
     std::fs::create_dir_all(to).unwrap();
     for entry in std::fs::read_dir(from).unwrap() {

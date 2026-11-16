@@ -15,9 +15,6 @@ fn items(source: &str) -> Vec<syn::Item> {
     syn::parse_file(source).unwrap().items
 }
 
-/// The reading this module exists for: the path comes out of the build
-/// script rather than out of a copy kept here, and it stays under the
-/// workspace root.
 #[test]
 fn the_path_is_read_from_the_file_that_embeds_the_bundle() {
     let stated = stated_path(&root()).unwrap();
@@ -32,8 +29,6 @@ fn the_path_is_read_from_the_file_that_embeds_the_bundle() {
     assert_eq!(under_root.join("/"), stated);
 }
 
-/// A constant of another name is not this one, and a build script that
-/// lost the declaration is a gate failure rather than a guess.
 #[test]
 fn only_the_named_declaration_answers() {
     assert_eq!(

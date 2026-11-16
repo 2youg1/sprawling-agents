@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Forming a city in a directory, and saying what was already there.
-
 use std::path::{Path, PathBuf};
 
 use city::{History, has_history};
@@ -22,34 +20,18 @@ use super::{Hands, RunWorker, ScanReport};
 pub struct InitReport {
     pub ledger_dir: PathBuf,
     pub genesis: EventRef,
-    /// What was already in the directory when the city formed, so the
-    /// person who pointed at a year of their own work is told what was
-    /// laid down beside it and what was left alone.
+
     pub standing: city::Standing,
-    /// The folders that became buildings. Empty unless the caller asked
-    /// for it: what is already on disk becomes governed only because
-    /// somebody said so.
+
     pub adopted: Vec<Address>,
 }
 
-/// Whether the folders already in a directory become buildings.
-///
-/// Exhaustive rather than a flag, because the two are different acts: one
-/// forms a city beside existing work and leaves it alone, and the other
-/// puts that work under rules. A boolean would make them look like one
-/// act with a setting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Adopt {
     Nothing,
     EveryFolder,
 }
 
-/// What a directory holds, read from the directory itself.
-///
-/// The decision is `city::survey`'s; this only does the reading. A
-/// directory that cannot be listed reads as empty, and the city forms -
-/// the alternative is refusing to start over a permission error that the
-/// next write would report anyway, with a better sentence.
 pub(super) fn standing_of(city_root: &Path, history: History) -> city::Standing {
     let mut entries: Vec<(String, bool)> = Vec::new();
     if let Ok(listing) = std::fs::read_dir(city_root) {
@@ -61,22 +43,6 @@ pub(super) fn standing_of(city_root: &Path, history: History) -> city::Standing 
     city::survey(&entries, history == History::Present)
 }
 
-/// Forms a city in a directory with `hands`, and says what was already
-/// there: the genesis write. The city is born when `city_initialized`
-/// becomes line zero; a second forming refuses — history starts once.
-///
-/// `Adopt::EveryFolder` is the case a person with a workspace wants:
-/// each top-level folder becomes a building with its own rules, its
-/// files untouched.
-///
-/// The two genesis lines are stamped with the time `hands.clock` reads,
-/// and the worker that raises City Hall is built with the same hands, so
-/// a scripted clock and vault hold from line zero (`Sprawling/accounting/spec/Clock.lean`
-/// §8-3, accounting D19).
-///
-/// # Errors
-/// Refuses a directory that already has history, and propagates whatever
-/// the ledger, the store or the filesystem says.
 pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, AxError> {
     let history = has_history(city_root)?;
     let standing = standing_of(city_root, history);
@@ -100,9 +66,7 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
              write, then run `sprawling init` again",
         )
     })?;
-    // Before line zero, so a forming refused here leaves no history and
-    // the next forming finds what already landed as already shelved
-    // (`Sprawling/city/spec/Library/Install.lean` section 8-28c).
+
     let shipped = shelve_shipped(city_root)?;
     let now = crate::Clock::now(&*hands.clock)?;
     let (mut ledger, report) =
@@ -111,22 +75,16 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
         run: RunId::CITY,
         t: now,
         who: "city".to_owned(),
-        // The city's own name, recorded where every other fact about
-        // this city is recorded. Without it the name lived only in a
-        // directory entry, and every interface said "no city" over a
-        // city that had been running for a month.
+
         addr: kernel::layout::CityLayout::new(city_root).city_address(),
         kind: EventKind::CityInitialized,
         data: Payload::of(&kernel::event::record::CityInitialized {})?,
         ig: false,
     })?;
     record_shelved(&mut ledger, now, &shipped)?;
-    // The city's own records stay out of the workspace's git before
-    // anything else is laid beside the project's files.
+
     city::ignore_city_records(city_root)?;
-    // Who answers the approval inbox, written down rather than baked
-    // into a default: the person can appoint somebody else, and a
-    // change needs a line to change.
+
     let delegation = AutonomyChanged {
         scope: kernel::event::Scope::City,
         autonomy: kernel::Autonomy::Delegate(
@@ -149,12 +107,7 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
         data: Payload::of(&delegation)?,
         ig: false,
     })?;
-    // City Hall happens after line zero, because a building is recorded
-    // against a city and there is no city before then. The city's own
-    // prompt and the hall's two identity files are laid down by the
-    // worker as it opens (`city::follow_defaults`, city D29).
-    // The writer that wrote line zero goes on writing: a second one
-    // opened here would be refused the city's writer lock.
+
     let mut worker = RunWorker::over(
         city_root,
         runtime::diagnostics::Diagnostics::off(),
@@ -166,9 +119,7 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
     worker.create_building(hall.clone(), template.name())?;
     let mut adopted = Vec::new();
     if let (Adopt::EveryFolder, city::Standing::Work { adoptable, .. }) = (adopt, &standing) {
-        // Through the same door `sprawling adopt` uses, so a folder
-        // taken in at genesis and one taken in a month later end up
-        // governed by the same rules.
+
         for addr in adoptable {
             worker.adopt_building(addr.clone())?;
             adopted.push(addr.clone());
@@ -182,8 +133,6 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
     })
 }
 
-/// Puts the skills the binary carries on the new city's library shelf,
-/// each registered in the city's store before it lands.
 fn shelve_shipped(city_root: &Path) -> Result<Vec<city::Installed>, AxError> {
     let mut cas = storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
         .map_err(storage::StorageError::into_ax)?;
@@ -192,10 +141,6 @@ fn shelve_shipped(city_root: &Path) -> Result<Vec<city::Installed>, AxError> {
     })
 }
 
-/// One `skill_shelved` per shipped skill that landed, written after line
-/// zero because the ledger does not exist while they land; a skill a
-/// refused forming already left on the shelf is `AlreadyShelved` and
-/// gets no line (kernel D23).
 fn record_shelved(
     ledger: &mut JsonlLedger,
     now: kernel::TimeMs,
@@ -224,16 +169,6 @@ fn record_shelved(
     Ok(())
 }
 
-/// The city segment as this city has it: the file on its disk, which
-/// `city::follow_defaults` laid down or kept when the city opened.
-///
-/// There is no built-in fallback. A run handed the binary's text while
-/// the disk held something else, or nothing, would obey bytes no person
-/// can open (`Sprawling/city/spec/SpineFiles.lean` D29).
-///
-/// # Errors
-/// `E_STORAGE_FATAL` naming the path, for a file that is not there and
-/// for every other failure to read it.
 pub(super) fn city_segment(city_root: &Path) -> Result<Assembled, AxError> {
     prompt_segment(
         &city_root.join(city::CITY_FILE),
@@ -241,11 +176,6 @@ pub(super) fn city_segment(city_root: &Path) -> Result<Assembled, AxError> {
     )
 }
 
-/// One `City.md` read for the city slot, the city's own or a building's
-/// (`city::city_prompt_path` says which), accounted to `at`.
-///
-/// # Errors
-/// As [`city_segment`].
 pub(super) fn prompt_segment(path: &Path, at: Address) -> Result<Assembled, AxError> {
     match std::fs::read(path) {
         Ok(bytes) => Ok(Assembled::of_one(at, bytes)),
@@ -262,27 +192,13 @@ pub(super) fn prompt_segment(path: &Path, at: Address) -> Result<Assembled, AxEr
 }
 
 impl RunWorker {
-    /// Lays out a building, then records that it exists.
-    ///
-    /// The file lands before the event because the event says the
-    /// building is there: a history that claims a directory nobody made
-    /// would be replayed as confidently as a true one.
+
     pub(super) fn create_building(&mut self, addr: Address, template: &str) -> Result<(), AxError> {
         let template = city::BuildingTemplate::parse(template)?;
         let building = city::create_building(&self.city_root, &addr, template)?;
         self.built(&building, template)
     }
 
-    /// Raises the building a person asked for: laid out where no
-    /// directory stands, or the directory already there adopted, which
-    /// the city decides by looking (`city::raise_building`). `rules` is the
-    /// text the person wrote, evaluated before anything lands; `None`
-    /// lays the template's own.
-    ///
-    /// # Errors
-    /// Propagates the template name, the address and the rules the city
-    /// refuses, an adoption's base checkpoint, and a history that will
-    /// not take the line.
     pub(super) fn raise_building(
         &mut self,
         addr: &Address,
@@ -311,7 +227,6 @@ impl RunWorker {
         }
     }
 
-    /// Records a building laid out from `template`.
     fn built(
         &mut self,
         building: &city::Building,
@@ -330,26 +245,11 @@ impl RunWorker {
         self.record(EventKind::BuildingCreated, payload)
     }
 
-    /// Adopts a directory that already sits under the city as a
-    /// building; the record says it was found, not built.
-    ///
-    /// # Errors
-    /// Propagates what `city::adopt_building` reports — a path that is
-    /// not a directory under this city among them — and whatever the
-    /// ledger says about the record.
     pub fn adopt_building(&mut self, addr: Address) -> Result<(), AxError> {
         let building = city::adopt_building(&self.city_root, &addr)?;
         self.adopted(&building, city::BuildingTemplate::Minimal)
     }
 
-    /// Takes an adopted directory's base checkpoint, then records that it
-    /// was found rather than built.
-    ///
-    /// # Errors
-    /// The base checkpoint's refusal, after the rules the adoption drew
-    /// are taken back so the folder waits to be adopted again
-    /// (`Sprawling/city/Spec.lean` §8-3); and whatever the ledger says about
-    /// the record.
     fn adopted(
         &mut self,
         building: &city::Building,
@@ -366,10 +266,7 @@ impl RunWorker {
         };
         let payload = city::building_adopted_payload(building, template)?;
         self.record(EventKind::BuildingCreated, payload)?;
-        // The base commit is the one checkpoint no run's wave made, so its
-        // scan findings have no `checkpoint_committed` line unless this one
-        // writes it. After the building exists, because the record is filed
-        // under the address it adopted.
+
         if let Some(base) = base {
             self.record_at(
                 EventKind::CheckpointCommitted,
@@ -380,11 +277,6 @@ impl RunWorker {
         Ok(())
     }
 
-    /// `refused`, once the rules the unfinished adoption of `building`
-    /// drew have been taken back; when they cannot be, its recovery also
-    /// names the file the person has to delete before adopting again,
-    /// because the next press would otherwise be refused as a building
-    /// that already has rules.
     fn withdrawn(&self, building: &city::Building, refused: AxError) -> AxError {
         match city::withdraw_adoption(&self.city_root, building) {
             Ok(()) => refused,
@@ -399,17 +291,9 @@ impl RunWorker {
         }
     }
 
-    /// The base checkpoint of an adopted directory.
-    ///
-    /// # Errors
-    /// The city's hash, the clock, and a checkpoint the store refuses,
-    /// a staged credential among them.
     fn adoption_base(&mut self, building: &city::Building) -> Result<Option<Commit>, AxError> {
         let addr = building.addr();
-        // The base checkpoint is paid here rather than by the first dispatch,
-        // which would otherwise hash every file of the folder before its
-        // first tool call (`Sprawling/storage/Spec.lean` §8-8). No run and no model exist
-        // yet, and an invented model id would be worse than none.
+
         let of = storage::Provenance::new(
             RunId::CITY,
             addr.clone(),
@@ -437,8 +321,7 @@ impl RunWorker {
         match made {
             Ok(record) => Ok(Some(record)),
             Err(err) => {
-                // A refusal tells the person to run `sprawling secrets`; the
-                // report it names has to be in the ledger before that.
+
                 let failure = runtime::CheckpointFailure::from(err);
                 if let Some(report) = failure.refusal() {
                     self.record_at(
@@ -452,20 +335,8 @@ impl RunWorker {
         }
     }
 
-    /// The startup scan: closes the account of every
-    /// tool call whose outcome the last process death left unknown,
-    /// freezes every run that death left open, and reports what is still
-    /// waiting on a person. Read-only apart from the closing `tool_result`
-    /// drafts, which state E_TOOL_OUTCOME_UNKNOWN rather than guessing an
-    /// outcome, and the freezes after them (`Sprawling/accounting/spec/Worker/Genesis/Lost.lean` §8-18-1).
-    ///
-    /// # Errors
-    /// Propagates whatever the chain says about itself: a history that
-    /// does not verify is not a history to append closing drafts to.
     pub fn startup_scan(&mut self) -> Result<ScanReport, AxError> {
-        // Verifying the chain and finding the open calls are one
-        // streamed pass: what stays resident is one segment's bytes and
-        // the calls not yet closed, never the whole ledger.
+
         let mut calls = runtime::replay::DanglingCalls::default();
         let mut runs = lost::OpenRuns::default();
         let index = runtime::replay::fold_ledger_dir(
@@ -482,8 +353,7 @@ impl RunWorker {
             self.ledger.append(draft)?;
             closed = closed.saturating_add(1);
         }
-        // After the calls: a dead run's unknown outcomes belong to it, so
-        // they land before the line that freezes it.
+
         let freezes = runs.into_drafts(self.clock.now()?)?;
         let frozen = freezes.len();
         for freeze in freezes {

@@ -10,20 +10,8 @@
     reason = "test code"
 )]
 
-//! What the backlog is held to from inside: one scratch directory name
-//! per member of one backlog of one process, and a run's end that
-//! reaches every command the run left running.
-
 use super::{Backlog, PlatformShares, Shares, platform_shares};
 
-/// Two backlogs opened separately must not name one directory.
-///
-/// Judged on the name rather than by racing two commands, because
-/// the defect is not a race: both backlogs mint id 1 and the old
-/// name was built from the id alone, so the collision is certain and
-/// only the damage was timing-dependent. A city ran a command that
-/// exited zero and produced nothing, because the other backlog's
-/// `collect` had deleted the directory this one was writing into.
 #[test]
 fn two_backlogs_of_one_process_name_different_directories() {
     let mine = Backlog::new();
@@ -37,8 +25,6 @@ fn two_backlogs_of_one_process_name_different_directories() {
     assert_ne!(mine.scratch.dir(first), theirs.scratch.dir(first));
 }
 
-/// A clone is another handle onto one backlog, so it keeps naming
-/// that backlog's directories rather than opening its own.
 #[test]
 fn a_clone_shares_the_directories_of_the_backlog_it_came_from() {
     let mine = Backlog::new();
@@ -46,7 +32,6 @@ fn a_clone_shares_the_directories_of_the_backlog_it_came_from() {
     assert_eq!(mine.clone().scratch.dir(id), mine.scratch.dir(id));
 }
 
-/// One backlog's members never share a directory either.
 #[test]
 fn two_members_of_one_backlog_name_different_directories() {
     let mine = Backlog::new();
@@ -56,7 +41,6 @@ fn two_members_of_one_backlog_name_different_directories() {
     );
 }
 
-/// A command that outlives the window by `seconds`, started for `owner`.
 #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_background_command(backlog: &Backlog, owner: kernel::RunId, seconds: u8) {
     let mut slow = if cfg!(windows) {
@@ -74,10 +58,6 @@ fn a_background_command(backlog: &Backlog, owner: kernel::RunId, seconds: u8) {
     assert!(matches!(started, crate::Started::Backgrounded { .. }));
 }
 
-/// A run's end reaches the table even after another thread died holding
-/// it. `release` is called from `ExecTool`'s drop, which has nobody to
-/// hand a failure to, so a release that could fail would leave the
-/// ended run's commands running for a run that no longer exists.
 #[test]
 fn a_release_reaches_a_table_a_dead_thread_left_locked() {
     let backlog = Backlog::with_window(crate::PollBudget::new(1, 1));
@@ -93,9 +73,6 @@ fn a_release_reaches_a_table_a_dead_thread_left_locked() {
     assert_eq!(backlog.release(ended), 1);
 }
 
-/// A run's end terminates what it left running: nothing can read its
-/// outcome any more, and a sandboxed command's copied tree is deleted
-/// in the same drop that releases it.
 #[test]
 fn a_release_terminates_what_the_ended_run_left_running() {
     let backlog = Backlog::with_window(crate::PollBudget::new(1, 1));
@@ -116,9 +93,6 @@ fn a_release_terminates_what_the_ended_run_left_running() {
     panic!("a released command is still running five seconds later");
 }
 
-/// A watched command's output reaches the sink while the command still
-/// runs, in pieces no larger than one poll reads, so a page can show a
-/// build's first line before the build is handed to the background.
 #[test]
 #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_watched_command_hands_its_output_to_the_sink_while_it_runs() {
@@ -128,12 +102,7 @@ fn a_watched_command_hands_its_output_to_the_sink_while_it_runs() {
     let backlog = Backlog::with_window(window).with_sink(super::Sink::new(move |chunk| {
         seen.lock().unwrap().push(chunk)
     }));
-    // The command outlives any stretch of the window: forty polls of
-    // 10 ms took 2.1 s on a loaded macOS runner, and a command that lived
-    // two seconds came back `Settled`. On Unix `exec` makes the sleeper
-    // itself the child `release` kills, so its length costs nothing; on
-    // Windows `release` kills `cmd`, and the `ping` it started runs out
-    // its ten seconds alone.
+
     let mut talking = if cfg!(windows) {
         let mut command = std::process::Command::new("cmd");
         command.args(["/C", "echo live& ping -n 11 127.0.0.1 >NUL"]);
@@ -166,8 +135,6 @@ fn a_watched_command_hands_its_output_to_the_sink_while_it_runs() {
     backlog.release(owner);
 }
 
-/// Past its window, a command's output keeps reaching the sink through
-/// its own run's harvest, from where the window stopped reading.
 #[test]
 #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_backgrounded_command_keeps_reaching_the_sink_through_harvest() {
@@ -219,10 +186,6 @@ fn a_backgrounded_command_keeps_reaching_the_sink_through_harvest() {
     );
 }
 
-/// A run owns the processes its commands started, and nothing another
-/// run started; once released it owns none. On Windows the reading
-/// follows a command into what it starts, so `cmd /C ping` is two
-/// processes of one run, and no command is read as itself only.
 #[test]
 #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_run_owns_the_processes_its_commands_started() {
@@ -246,8 +209,7 @@ fn a_run_owns_the_processes_its_commands_started() {
         .run(mine, &addr, "nested".to_owned(), nested)
         .unwrap();
     assert!(matches!(started, crate::Started::Backgrounded { .. }));
-    // Windows may add the console host to the job, so a tree of at
-    // least two; elsewhere the command itself, read as itself only.
+
     let followed = |seen: &(usize, u32)| {
         if cfg!(windows) {
             seen.0 >= 2 && seen.1 == 0
@@ -272,11 +234,6 @@ fn a_run_owns_the_processes_its_commands_started() {
     assert!(!backlog.processes().unwrap().contains_key(&mine));
 }
 
-/// A run holds the shares its backlog asks for where the platform has
-/// them: on Windows its job takes the CPU weight and, when asked, the
-/// memory limit; on Linux its child cgroup takes them where this
-/// machine's own cgroup is delegated to writing; on macOS, and where
-/// the platform refuses, the run reads as unshared (D29, D33).
 #[test]
 fn a_run_holds_the_shares_its_backlog_asks_for() {
     let limit = std::num::NonZeroU64::new(8 << 30).unwrap();

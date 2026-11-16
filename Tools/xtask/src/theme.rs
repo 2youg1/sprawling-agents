@@ -3,56 +3,28 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Where the browser client's theme lives, and in which order it is read
-//! (Tools/xtask/Spec.lean §8-8, §8-51).
-//!
-//! The theme is one entry stylesheet and the parts it imports. The entry
-//! is the file `main.ts` imports; each part is a contiguous piece of the
-//! cascade, imported by one `@import "./theme/<name>.css";` line, and the
-//! order of those lines is the order the cascade reads them in. That
-//! order has exactly one home, the entry, so this module reads it there
-//! rather than sorting file names: a numbered prefix on every part would
-//! have been a second place to state it.
-//!
-//! The gates that judge colour read the theme as one text, the entry with
-//! each import line replaced by the part it names, because the light
-//! block restates the tokens other parts declare and the readings of the
-//! two lightings are built across that boundary. A violation still names
-//! the part that declares what it is about (`Theme::declaring`).
-
 use std::path::Path;
 
 use crate::report::XtaskError;
 use crate::walk;
 
-/// The theme's entry, the stylesheet the client imports.
 pub(crate) const ENTRY: &str = concat!(crate::walk::client_src!(), "/theme.css");
 
-/// The directory every part sits in, beside the entry.
 const PARTS: &str = concat!(crate::walk::client_src!(), "/theme/");
 
-/// How the entry imports a part: the opening up to the part's name, and
-/// what follows the name.
 const IMPORT_OPEN: &str = "@import \"./theme/";
 const IMPORT_CLOSE: &str = "\";";
 
-/// One file of the theme, by its repo-relative path.
 struct Part {
     rel: String,
     text: String,
 }
 
-/// The entry and its parts, the entry first and the parts in the order
-/// the entry imports them.
 pub(crate) struct Theme {
     entry: String,
     parts: Vec<Part>,
 }
 
-/// Whether a repo-relative path is a file of the theme: the entry, or a
-/// stylesheet directly in the parts directory. A stylesheet there that
-/// the entry does not import is refused by `Theme::read`, so the path
-/// alone answers this question.
 pub(crate) fn is_theme(rel: &str) -> bool {
     rel == ENTRY
         || rel
@@ -61,14 +33,7 @@ pub(crate) fn is_theme(rel: &str) -> bool {
 }
 
 impl Theme {
-    /// Read the entry and every part it imports.
-    ///
-    /// # Errors
-    ///
-    /// `Io` when a file cannot be read; `ThemePartMissing` when the entry
-    /// imports a part that is not on disk; `ThemePartUnimported` when the
-    /// parts directory holds a stylesheet the entry never imports, which
-    /// would otherwise be a file every gate exempts and no page draws.
+
     pub(crate) fn read(root: &Path) -> Result<Self, XtaskError> {
         let entry = walk::read_text(&root.join(ENTRY))?;
         let mut parts = Vec::new();
@@ -101,8 +66,6 @@ impl Theme {
         Ok(Self { entry, parts })
     }
 
-    /// The theme as one stylesheet: the entry, with each import of a part
-    /// replaced by that part's text.
     pub(crate) fn inlined(&self) -> String {
         let mut parts = self.parts.iter();
         self.entry
@@ -115,9 +78,6 @@ impl Theme {
             .join("\n")
     }
 
-    /// The file that holds `needle` first, in cascade order: the part
-    /// that declares a token or opens a block, for a violation to name.
-    /// The entry when no part holds it.
     pub(crate) fn declaring(&self, needle: &str) -> &str {
         self.parts
             .iter()
@@ -126,7 +86,6 @@ impl Theme {
     }
 }
 
-/// The part a line of the entry imports, by its file name.
 fn imported(line: &str) -> Option<&str> {
     line.trim()
         .strip_prefix(IMPORT_OPEN)?
@@ -155,9 +114,6 @@ mod tests {
         root
     }
 
-    /// The parts are read in the order the entry imports them, not the
-    /// order their names sort in, and inlining puts each where its
-    /// import stood.
     #[test]
     fn the_entry_decides_the_order_and_each_part_stands_where_it_is_imported() {
         let root = tree(

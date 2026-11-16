@@ -3,71 +3,28 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! External-fact constants: values that follow the
-//! outside world. Changing one requires evidence that the world changed,
-//! never our own preference.
-//! The part `Sprawling/kernel/spec/ConstsExternal.lean` specifies this module.
-//!
-//! Data, plus the classifications that read that data and nothing else:
-//! [`readable_log_v`] answers a question only [`EVENT_LOG_V`] can answer
-//! and every home it could have had instead would have been a second
-//! place to decide which ledgers this build opens.
-
-/// Provider-side explicit cache breakpoint ceiling.
 pub const CACHE_BREAKPOINTS_MAX: u32 = 4;
 
-/// Prompt-cache lifetime treated as the async-discipline horizon (6.4).
 pub const PROMPT_CACHE_TTL_SECS: u64 = 300;
 
-/// How long before the end of a prompt-cache lifetime a keep-warm
-/// renewal must already be due, beyond the lead the caller measured.
-///
-/// Not an external fact: it is subtracted from [`PROMPT_CACHE_TTL_SECS`]
-/// and nowhere else, so it lives beside it. It covers the delays the lead
-/// cannot measure - a timer that wakes a little late, a renewal thread
-/// that starts a little late - and costs that many seconds of a warm
-/// window that lasts 300 (`Sprawling/kernel/spec/KeepWarm.lean`, kernel D62).
 pub const PROMPT_CACHE_RENEWAL_MARGIN_SECS: u64 = 5;
 
-/// EventRecord `v`: one monotonic integer, no major/minor split (3.1).
-/// 2: the four lines a turn waits for record their own moment
-/// (kernel D10).
 pub const EVENT_LOG_V: u32 = 2;
 
-/// Where a ledger line's `v` stands against the version this build
-/// writes. The one authority for "which ledgers open"; every reader that
-/// compares a `v` asks [`readable_log_v`] rather than comparing again.
-///
-/// Exhaustive on purpose: a reader that handles three of these and
-/// defaults the fourth is how an unversioned line came to be reported as
-/// a broken chain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogVersion {
-    /// Exactly what this build writes. Readable, and appendable.
+
     Current,
-    /// Written by an older build, at or above the first version.
-    /// Readable: the ledger is append-only and its history stays on
-    /// disk, so every version from 1 upwards still parses.
+
     Older,
-    /// Written by a newer build. Refused whole rather than read in part:
-    /// a line this build does not fully understand must not become the
-    /// prefix of a chain it then extends.
+
     Ahead,
-    /// Below the first version anybody ever wrote, `0` included. No
-    /// build produced this, so it is a damaged or foreign line rather
-    /// than an old one.
+
     NotAVersion,
 }
 
-/// The first `v` any build of this ledger format wrote. A line below it
-/// was never written by us.
 const EVENT_LOG_V_FIRST: u64 = 1;
 
-/// Classifies one ledger line's `v`.
-///
-/// Takes `u64` because that is what JSON hands a reader before anything
-/// has been validated; a `v` too large for [`EVENT_LOG_V`]'s type is
-/// [`LogVersion::Ahead`] like any other future version.
 #[must_use]
 pub fn readable_log_v(v: u64) -> LogVersion {
     let current = u64::from(EVENT_LOG_V);
@@ -82,38 +39,29 @@ pub fn readable_log_v(v: u64) -> LogVersion {
     }
 }
 
-/// The L0 tool set: always present, never discovered (5.1).
 pub const L0_TOOLS: [&str; 3] = [crate::ToolName::EXEC, "edit", "status"];
 
-/// One secret shape: prefix + charset + length window. The table is
-/// data, not code; it grows with providers, and `kernel::secret::scan`
-/// plus `xtask secret` are its only consumers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SecretShape {
     pub provider: &'static str,
     pub prefix: &'static str,
     pub charset: SecretCharset,
-    /// Closed interval over the length of the whole token, prefix
-    /// included. `scan` measures from the first byte of the prefix to
-    /// the last byte the charset admits, so a window written against the
-    /// body alone is short by `prefix.len()`.
+
     pub len: (u16, u16),
 }
 
-/// Character sets that public token formats draw from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SecretCharset {
-    /// `[A-Za-z0-9]`
+
     Base62,
-    /// `[A-Za-z0-9_-]`
+
     Base64Url,
-    /// `[0-9a-f]`
+
     HexLower,
-    /// `[A-Z0-9]`
+
     UpperBase36,
 }
 
-/// Public provider token shapes, per each provider's published format.
 pub const SECRET_SHAPES: [SecretShape; 11] = [
     SecretShape {
         provider: "anthropic",
@@ -163,12 +111,7 @@ pub const SECRET_SHAPES: [SecretShape; 11] = [
         charset: SecretCharset::Base64Url,
         len: (35, 35),
     },
-    // The three below are aggregators, and they share one property that
-    // decides they must be listed: their bodies are all-lowercase hex or
-    // single-case base62, so `secret::scan`'s entropy detector - which
-    // fires only on mixed upper/lower/digit runs, so that the city's own
-    // blake3 hashes stay quiet - cannot reach them. For these, the shape
-    // table is not the primary net; it is the only one.
+
     SecretShape {
         provider: "openrouter",
         prefix: "sk-or-v1-",

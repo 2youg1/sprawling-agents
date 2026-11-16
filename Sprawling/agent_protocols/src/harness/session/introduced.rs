@@ -3,25 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What an agent says about itself in `initialize`, and the refusal its
-//! `-32000` becomes (`Sprawling/agent_protocols/Spec.lean` §8-19, D14, D18).
-
 use kernel::{AxCode, AxError};
 use serde_json::{Value, json};
 
-/// The protocol version this client speaks.
 pub(super) const PROTOCOL_VERSION: u64 = 1;
 
-/// ACP's "Authentication required".
 pub(super) const AUTH_REQUIRED: i64 = -32_000;
 
-/// The login this city never starts on a person's behalf: the claude.ai
-/// subscription login `claude-agent-acp` declares (D18).
 const NEVER_STARTED: &str = "claude-ai-login";
 
-/// What the city tells an agent in `initialize`: who it is, that it offers
-/// no file system and no terminal, and that it can rerun the agent's own
-/// program in an interactive terminal for a login (D14).
 pub(super) fn initialize_params() -> Value {
     json!({
         "protocolVersion": PROTOCOL_VERSION,
@@ -34,17 +24,14 @@ pub(super) fn initialize_params() -> Value {
     })
 }
 
-/// What the agent said about itself.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Introduced {
-    /// `agentInfo.version`, when the agent stated one.
+
     pub version: Option<String>,
-    /// The logins the agent offers, without the one this city never
-    /// starts.
+
     pub auth_methods: Vec<AuthMethod>,
 }
 
-/// One login an agent offers.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuthMethod {
     pub id: String,
@@ -52,21 +39,14 @@ pub struct AuthMethod {
     pub kind: LoginKind,
 }
 
-/// The two kinds of ACP's stable schema.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LoginKind {
-    /// The agent signs in through `authenticate`.
+
     Agent,
-    /// The agent's own program signs in on an interactive terminal.
+
     Terminal,
 }
 
-/// Reads the answer to `initialize`.
-///
-/// # Errors
-/// `E_WIRE_MISMATCH` when the agent speaks a protocol version other than
-/// 1, which the specification says the client closes on, and for a login
-/// whose `type` is neither of the two.
 pub(super) fn introduced(name: &str, answer: &Value) -> Result<Introduced, AxError> {
     let spoken = answer.get("protocolVersion").and_then(Value::as_u64);
     if spoken != Some(PROTOCOL_VERSION) {
@@ -116,8 +96,6 @@ pub(super) fn introduced(name: &str, answer: &Value) -> Result<Introduced, AxErr
     })
 }
 
-/// The refusal an agent's `-32000` becomes: which logins it offers, by id
-/// in `nearby` and by name in the recovery.
 pub(super) fn auth_required(name: &str, method: &str, offered: &[AuthMethod]) -> AxError {
     let names = offered
         .iter()

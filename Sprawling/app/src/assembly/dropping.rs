@@ -3,42 +3,22 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A file a person dropped onto the composer, kept in the city so the
-//! words they send can name it (`Sprawling/app/spec/Assembly.lean` §8-119).
-//!
-//! It lands at `<city>/hall/dropped/<hash>/<name>`: in the hall, which
-//! every city has, rather than in a top-level directory of its own,
-//! because every top-level directory is a building (`city::buildings`);
-//! outside the reserved subtree, so a resident's `read` reaches it by its
-//! city-relative address; in a directory named by the bytes, so the same
-//! file dropped twice is one file and two files of one name are two.
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use kernel::consts_policy::HALL_BUILDING;
 use kernel::{Address, AxCode, AxError, B3Hash};
 
-/// The directory under the hall that holds what was dropped.
 pub(super) const DROPPED_DIR: &str = "dropped";
 
-/// How many hex characters of the content hash name a file's directory:
-/// 64 bits, far past any number of files one person drops.
 const HASH_CHARS: usize = 16;
 
-/// The sink the served page's `/drop` route hands its files to.
 pub(super) fn dropping(city_root: PathBuf) -> wire::DropSink {
     Arc::new(move |name: &str, bytes: &[u8]| {
         keep_dropped(&city_root, name, bytes).map(|kept| kept.display().to_string())
     })
 }
 
-/// Keeps one dropped file and answers the absolute path it is at.
-///
-/// # Errors
-/// `E_INVALID_ARGS` when the name cannot be the last segment of a city
-/// address, and `E_STORAGE_FATAL` naming the path when the disk will
-/// not take the bytes.
 pub(super) fn keep_dropped(city_root: &Path, name: &str, bytes: &[u8]) -> Result<PathBuf, AxError> {
     let hash = B3Hash::digest(bytes).to_string();
     let folder = hash.get(..HASH_CHARS).unwrap_or(&hash);
@@ -63,7 +43,6 @@ pub(super) fn keep_dropped(city_root: &Path, name: &str, bytes: &[u8]) -> Result
     Ok(path)
 }
 
-/// The refusal a disk that would not take a dropped file earns.
 fn stored(path: &Path, err: &std::io::Error) -> AxError {
     AxError::failure(
         AxCode::StorageFatal,
@@ -83,9 +62,6 @@ fn stored(path: &Path, err: &std::io::Error) -> AxError {
 mod tests {
     use super::*;
 
-    /// The path answered is absolute, lies under the hall's `dropped/`,
-    /// and holds the bytes that were dropped; the same bytes again
-    /// answer the same path.
     #[test]
     fn a_dropped_file_is_kept_under_the_hall_and_named_by_its_bytes() {
         let city = tempfile::tempdir().unwrap();
@@ -105,8 +81,6 @@ mod tests {
         );
     }
 
-    /// A name that is not one address segment is refused before anything
-    /// is written.
     #[test]
     fn a_name_that_is_not_one_segment_is_refused_and_nothing_is_written() {
         let city = tempfile::tempdir().unwrap();

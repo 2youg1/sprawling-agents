@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a checkpoint stages, scans and commits: the scope boundary, the
-//! staged-secret refusal, and the boundary an empty scope means.
-
 use super::super::provenance::{ModelChoice, Provenance};
 use super::*;
 use kernel::{Address, B3Hash, Effort, RunId};
@@ -54,14 +51,10 @@ fn a_staged_secret_refuses_the_commit_and_never_echoes_it() {
     assert_eq!(*ax.code(), kernel::AxCode::SecretEgress);
 }
 
-/// A document can quote a path that this same checkpoint stages. The
-/// mixed-alphabet, 22-byte path reaches the entropy detector on the old
-/// rule; an existing repository path is not a credential.
 #[test]
 fn a_relative_path_written_in_a_document_does_not_refuse_the_commit() {
     let tmp = tempfile::tempdir().unwrap();
-    // Assembled at runtime so the repository's own source scanner sees
-    // two short fragments rather than the credential-shaped fixture.
+
     let quoted = ["work/Zx9yQ2mK4pL7", "vB1n"].join("/");
     write(tmp.path(), &quoted, "fixture\n");
     write(
@@ -77,8 +70,6 @@ fn a_relative_path_written_in_a_document_does_not_refuse_the_commit() {
     );
     assert!(!outcome.unwrap().as_map().contains_key("withheld"));
 
-    // Existence is load-bearing: once that name leaves the index, the same
-    // bytes are an ordinary entropy finding rather than a path exemption.
     std::fs::remove_file(tmp.path().join(&quoted)).unwrap();
     write(
         tmp.path(),
@@ -90,9 +81,6 @@ fn a_relative_path_written_in_a_document_does_not_refuse_the_commit() {
     assert_eq!(payload.as_map()["withheld"].as_array().unwrap().len(), 1);
 }
 
-/// The scanner stops an entropy run at `.`, so a quoted file name with an
-/// extension arrives as its stem alone. The exemption asks the index about
-/// the path token around the hit, not the truncated run.
 #[test]
 fn a_quoted_path_with_an_extension_is_recognised_by_its_whole_spelling() {
     let tmp = tempfile::tempdir().unwrap();
@@ -113,9 +101,6 @@ fn a_quoted_path_with_an_extension_is_recognised_by_its_whole_spelling() {
     assert!(!outcome.unwrap().as_map().contains_key("withheld"));
 }
 
-/// An allowlist matches the path the index holds, never a spelling this
-/// build normalised out of it: on Unix `docs/a\b.md` is one file, and an
-/// entry for `docs/a/b.md` says nothing about it.
 #[cfg(unix)]
 #[test]
 fn an_allowlist_entry_matches_only_a_path_the_index_spells_the_same_way() {
@@ -141,17 +126,13 @@ fn an_allowlist_entry_matches_only_a_path_the_index_spells_the_same_way() {
     assert_eq!(withheld[0]["path"], "work/a\\b.md");
 }
 
-/// A reference whose prefix this repository does not hold is not the file
-/// its suffix names. The backslash is refused as a path boundary, so the
-/// exemption cannot be claimed through the suffix alone.
 #[test]
 fn a_reference_before_a_backslash_does_not_borrow_a_suffix_exemption() {
     let tmp = tempfile::tempdir().unwrap();
     let name = ["Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
     let path = format!("work/{name}.md");
     write(tmp.path(), &path, "fixture\n");
-    // The reference is `other\work/...`: the backslash is the
-    // boundary this test asks about, and it reaches the file as one byte.
+
     let quoted = format!("other\\{path}");
     write(
         tmp.path(),
@@ -167,9 +148,6 @@ fn a_reference_before_a_backslash_does_not_borrow_a_suffix_exemption() {
     assert_eq!(withheld[0]["path"], "work/SPEC.md");
 }
 
-/// One scan can meet a known shape and an ordinary entropy hit. The refusal
-/// carries both, so `sprawling secrets` lists everything this checkpoint
-/// met without waiting for a later commit to report the rest.
 #[test]
 fn a_refusal_reports_the_entropy_findings_it_also_met() {
     let tmp = tempfile::tempdir().unwrap();
@@ -193,9 +171,6 @@ fn a_refusal_reports_the_entropy_findings_it_also_met() {
     assert!(!report.locations().contains(&token));
 }
 
-/// Entropy without a known provider shape is evidence to retain, not a
-/// reason to stop every later write. The record identifies the withheld
-/// line without carrying its bytes.
 #[test]
 fn an_entropy_hit_is_committed_and_recorded_without_echoing_the_line() {
     let tmp = tempfile::tempdir().unwrap();
@@ -218,8 +193,6 @@ fn an_entropy_hit_is_committed_and_recorded_without_echoing_the_line() {
     assert!(!serde_json::to_string(&payload).unwrap().contains(&token));
 }
 
-/// The User can exempt one file's entropy findings by its exact path. That
-/// exemption never reaches a known provider shape in the same file.
 #[test]
 fn an_entropy_allowlist_is_file_exact_and_never_exempts_a_known_shape() {
     let tmp = tempfile::tempdir().unwrap();
@@ -242,10 +215,6 @@ fn an_entropy_allowlist_is_file_exact_and_never_exempts_a_known_shape() {
     assert!(matches!(refused, Err(StorageError::SecretEgress(_))));
 }
 
-/// Five trailers, in the order and the spelling a reader outside the
-/// city was promised. Read as git reads them: the message is parsed
-/// line by line off the commit object, which is what
-/// `git interpret-trailers --parse` walks.
 #[test]
 fn every_commit_the_city_makes_names_the_session_that_made_it() {
     let tmp = tempfile::tempdir().unwrap();
@@ -285,12 +254,6 @@ fn every_commit_the_city_makes_names_the_session_that_made_it() {
     );
 }
 
-/// A restart must not open a window a credential can walk through.
-/// A new process remembers no checkpoint, so the scan compares against
-/// HEAD - which a wave checkpoint deliberately does not move, and which is
-/// therefore an ancestor of the last checkpoint. Comparing against an
-/// ancestor reads more, never less, so what changed before the
-/// restart is still read.
 #[test]
 fn a_change_made_before_a_restart_is_still_read_after_it() {
     let tmp = tempfile::tempdir().unwrap();
@@ -316,11 +279,6 @@ fn a_change_made_before_a_restart_is_still_read_after_it() {
     assert!(!rendered.contains(&token), "positions only: {rendered}");
 }
 
-/// The alias rule at the checkpoint door (`Sprawling/storage/spec/Alias.lean` §8-25): a scope
-/// whose path crosses a link refuses the whole wave, because a name
-/// that leads into `.git` would capture reserved bytes under a lying
-/// name - and a `file_discarded` restoration would write back through
-/// it.
 #[test]
 fn a_wave_whose_scope_crosses_a_link_is_refused() {
     let tmp = tempfile::tempdir().unwrap();
@@ -344,9 +302,6 @@ fn a_wave_whose_scope_crosses_a_link_is_refused() {
     );
 }
 
-/// A HEAD that cannot be read is not an empty city. Read as "no
-/// history", it would make the checkpoint a parentless root commit and cut
-/// the Ledger's oid off from everything before it, with nobody told.
 #[test]
 fn a_head_that_cannot_be_read_refuses_the_checkpoint_instead_of_orphaning_it() {
     let tmp = tempfile::tempdir().unwrap();
@@ -379,8 +334,6 @@ fn a_head_that_cannot_be_read_refuses_the_checkpoint_instead_of_orphaning_it() {
     );
 }
 
-/// Removes the loose object a staged file was written as, so the scan meets
-/// an index entry whose bytes it cannot read.
 fn lose_the_object_of(root: &Path, rel: &str) {
     let id = git2::Repository::open(root)
         .unwrap()
@@ -394,9 +347,6 @@ fn lose_the_object_of(root: &Path, rel: &str) {
     std::fs::remove_file(root.join(".git").join("objects").join(dir).join(file)).unwrap();
 }
 
-/// A staged blob the scan cannot read refuses the checkpoint, on the first
-/// checkpoint (every index entry) and on a later one (the staged diff):
-/// skipping it would let bytes into the tree that no scan read.
 #[test]
 fn a_staged_blob_the_scan_cannot_read_refuses_the_checkpoint() {
     let first = tempfile::tempdir().unwrap();
@@ -421,9 +371,6 @@ fn a_staged_blob_the_scan_cannot_read_refuses_the_checkpoint() {
     assert_eq!((refused(on_first), refused(on_later)), (true, true));
 }
 
-/// A nested repository's work belongs to the outer checkpoint; only its
-/// metadata belongs to the nested repository. A city adopted before imports
-/// skipped `.git` must not fail every later wave at this directory.
 #[test]
 fn a_nested_repository_contributes_its_work_but_not_its_metadata() {
     let tmp = tempfile::tempdir().unwrap();
@@ -445,10 +392,6 @@ fn a_nested_repository_contributes_its_work_but_not_its_metadata() {
     );
 }
 
-/// A file the nested repository lost leaves the outer checkpoint with it,
-/// which is what the SPEC promises when it says that repository's work keeps
-/// a restoration address: `add_all` still reaches the index entries under the
-/// root it skipped, and the walk below only ever adds.
 #[test]
 fn a_file_deleted_inside_a_nested_repository_leaves_the_checkpoint() {
     let tmp = tempfile::tempdir().unwrap();
@@ -471,10 +414,6 @@ fn a_file_deleted_inside_a_nested_repository_leaves_the_checkpoint() {
     );
 }
 
-/// A staging file is half of somebody's write, and the writer renames it
-/// away whenever it likes: the walk must not open it, whether a prefix
-/// scope walks past it or a wave names it as the file it touched
-/// (storage D30). Both spellings are asked of their one authority.
 #[test]
 fn a_staging_file_beside_a_document_is_never_staged() {
     let tmp = tempfile::tempdir().unwrap();

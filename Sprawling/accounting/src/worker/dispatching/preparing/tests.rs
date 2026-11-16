@@ -19,13 +19,6 @@ use super::*;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// `Sprawling/app/Spec.lean` §8-145, §8-161: the lane that drove a run in a room
-/// under review hands the run home first and puts the stock back after.
-/// `fly` is the whole of what a lane runs and `land` is what the
-/// accounting thread runs once the run is home, so a stock that is
-/// absent when the run is handed home and stands ready when `fly`
-/// returns, with nothing landed, is a stock no accounting thread made
-/// and no landing waited for.
 #[test]
 fn a_lane_puts_the_stock_back_after_its_run_comes_home() {
     let dir = tempfile::tempdir().unwrap();
@@ -49,11 +42,6 @@ fn a_lane_puts_the_stock_back_after_its_run_comes_home() {
     );
 }
 
-/// `Sprawling/app/Spec.lean` §8-145: the stock a lane put back is what the next
-/// room's first placement takes over, so that placement creates,
-/// rewrites and removes no file; and the lane that drove the next room
-/// puts a new stock back in its place. The first room is dispatched the
-/// way a person's dispatch goes, through a lane and a landing.
 #[test]
 fn the_next_room_takes_the_stock_and_creates_no_file() {
     let dir = tempfile::tempdir().unwrap();
@@ -72,8 +60,7 @@ fn the_next_room_takes_the_stock_and_creates_no_file() {
         )
         .unwrap();
     worker.land_the_rest().unwrap();
-    // The first room's lane puts the stock back after its run has
-    // landed (8-161), so the second room waits for the stock to stand.
+
     let stocked = (0..2_000).any(|_| {
         std::thread::sleep(std::time::Duration::from_millis(5));
         stock_is_ready(dir.path())
@@ -96,13 +83,6 @@ fn the_next_room_takes_the_stock_and_creates_no_file() {
     );
 }
 
-/// `Sprawling/app/Spec.lean` §8-161: a run lands while its lane is still putting
-/// the stock back. The test holds the table of cities being stocked, so
-/// the lane's restock waits on it; the run still comes home through a
-/// real lane and lands, with no stock in the city yet. Once the table is
-/// let go, closing the worker waits for that lane, and the stock stands.
-/// The bound on serving only keeps a lane that never comes home from
-/// hanging the test.
 #[test]
 fn a_run_lands_while_its_lane_still_puts_the_stock_back() {
     let dir = tempfile::tempdir().unwrap();
@@ -134,12 +114,6 @@ fn a_run_lands_while_its_lane_still_puts_the_stock_back() {
     );
 }
 
-/// `Sprawling/app/Spec.lean` §8-155: a lane that finds the city's turn taken
-/// skips, and the turn it found stays with the lane that holds it; once
-/// that lane gives it back, the city's turn can be taken again. Two
-/// lanes of one city stocking at once is what the acceptance catalogue's
-/// builder run does, and the second take used to build a turn and drop
-/// it under the table's own lock, which hung both lanes.
 #[test]
 fn a_lane_that_finds_the_turn_taken_skips_and_leaves_it_standing() {
     let city = tempfile::tempdir().unwrap();
@@ -160,8 +134,7 @@ fn a_lane_that_finds_the_turn_taken_skips_and_leaves_it_standing() {
         drop(first);
         StockingTurn::take(&root).is_some()
     } else {
-        // The second lane hangs holding the table's lock, so giving the
-        // first turn back would hang this thread as well.
+
         std::mem::forget(first);
         false
     };
@@ -172,14 +145,6 @@ fn a_lane_that_finds_the_turn_taken_skips_and_leaves_it_standing() {
     );
 }
 
-/// Reads production placement and the stock put back after it, in
-/// milliseconds, over a building whose trunk carries 512 files of 16 KB
-/// (`Sprawling/app/Spec.lean` §8-155). The first room's placement makes the
-/// city's first commit and checks the trunk out whole; the second room's
-/// takes the stock over. Each lane then hands its run home, which is
-/// all the landing waits for after the run's last line, and puts a stock
-/// back, which lies between that hand-over and `fly` returning
-/// (`Sprawling/app/Spec.lean` §8-161).
 #[test]
 #[ignore = "a wall-clock instrument; prints one reading line per room"]
 #[allow(
@@ -241,8 +206,6 @@ fn instrument_production_placement() {
     }
 }
 
-/// A ledger that keeps the moment its `worktree_opened` line and its
-/// last line were written, over the one it writes to.
 struct Timed<'a, L> {
     ledger: &'a mut L,
     opened: Option<Instant>,
@@ -266,9 +229,6 @@ impl<L: kernel::Ledger> kernel::Ledger for Timed<'_, L> {
     }
 }
 
-/// A city with one building under review, `lab`, and the named rooms in
-/// it, each holding one file, so the commit the first placement makes
-/// carries files a whole checkout has to create.
 fn lay_review_city(city_root: &Path, rooms: &[&str]) {
     crate::worker::fixture::init_city(city_root).unwrap();
     for room in rooms {
@@ -279,7 +239,6 @@ fn lay_review_city(city_root: &Path, rooms: &[&str]) {
     lay_rules(city_root, "lab", &ordinary_rules("review = true\n"));
 }
 
-/// A dispatch to `room` the person asked for.
 fn asked(room: &str) -> Assignment {
     Assignment {
         addr: Address::parse(room).unwrap(),
@@ -296,10 +255,6 @@ fn asked(room: &str) -> Assignment {
     }
 }
 
-/// Stages a dispatch to `room` and flies it on this thread, through the
-/// city's own ledger: everything a lane does for the run, and nothing
-/// the accounting thread does once it is home. Answers what the lane
-/// handed home, and whether the city held a ready stock at that moment.
 fn fly_here(worker: &mut RunWorker, room: &str) -> (Flown, bool) {
     let (staged, _continuation) = worker
         .stage_dispatch(asked(room), "work".to_owned(), "work".to_owned())
@@ -313,17 +268,6 @@ fn fly_here(worker: &mut RunWorker, room: &str) -> (Flown, bool) {
     homed.unwrap()
 }
 
-/// Whether the city holds a stock the next placement can take over:
-/// registered, its directory in place, and no stocking under way.
-///
-/// **A reading, not a claim.** A lane puts the stock back on another
-/// thread while this asks (8-161), so the registration can go away
-/// between the two questions - and a registration that went away is a
-/// stock the next placement cannot take over. An earlier version
-/// unwrapped both answers, and the release's verify job, where one
-/// machine runs the whole suite at once, met
-/// `could not find '…/.git/worktrees/+spare/locked' to open` between
-/// them while this machine never did.
 fn stock_is_ready(city_root: &Path) -> bool {
     let Ok(repo) = git2::Repository::open(city_root) else {
         return false;
@@ -334,11 +278,6 @@ fn stock_is_ready(city_root: &Path) -> bool {
     tree.validate().is_ok() && matches!(tree.is_locked(), Ok(git2::WorktreeLockStatus::Unlocked))
 }
 
-/// `Sprawling/app/spec/Accounting/Landing.lean` D37, derived from
-/// `the_landing_work_never_delays_a_relay`: the transcript is the heavy
-/// half of a landing, so the lane writes it before it hands the run home,
-/// and the accounting thread's `land` has nothing of it left to do while
-/// relay requests wait behind it.
 #[test]
 fn tp4_a_lane_keeps_the_transcript_before_its_run_comes_home() {
     let dir = tempfile::tempdir().unwrap();

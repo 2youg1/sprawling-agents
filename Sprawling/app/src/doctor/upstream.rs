@@ -3,30 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The newest release of one item, asked of its publisher
-//! (`Sprawling/app/spec/Doctor.lean` §8-120).
-//!
-//! **Only official sources**: crates.io for a crate, the Rust and rustup
-//! release channels for those two, python.org for Python, and a
-//! project's own GitHub releases for the rest. Every call leaves through
-//! `gateway::client_for`, the proxy rule every other outbound call of
-//! this city follows.
-//!
-//! **The question never waits on the network.** A session answers its
-//! questions one at a time, so a page asking thirty publishers in turn
-//! would hold every other question it has for as long as the slowest
-//! took. The first question about an item starts one thread that asks
-//! the publisher and answers `Asking`; a later question reads what the
-//! thread left.
-//!
-//! **A reading that arrived is kept for the life of this process.**
-//! GitHub gives a caller without credentials sixty questions an hour,
-//! and a page that asked again on every opening would spend them in an
-//! afternoon. A refusal is handed out once and then forgotten, so the
-//! next opening asks again. Nothing expires by time, because this binary
-//! reads the clock in `bin::assembly` alone; a restarted city asks
-//! afresh.
-
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -35,26 +11,22 @@ use wire::{DoctorNewest, DoctorUnread, DoctorUpstream};
 
 use super::REQUIREMENTS;
 
-/// Where an item's newest release is read.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Upstream {
-    /// A crate on crates.io, by its crate name.
+
     Crate(&'static str),
-    /// A GitHub repository's latest release, `owner/name`.
+
     GitHub(&'static str),
-    /// The stable Rust release channel's manifest.
+
     RustChannel,
-    /// rustup's own release channel.
+
     RustupChannel,
-    /// python.org's list of published releases.
+
     PythonOrg,
-    /// Nothing to ask, and the reason a page words.
+
     Unread(DoctorUnread),
 }
 
-/// One manifest is at most a megabyte, so a reader waiting on it has
-/// been answered or is not going to be; the same patience the release
-/// check gives npm.
 const PATIENCE: std::time::Duration = std::time::Duration::from_secs(10);
 
 const RUST_CHANNEL: &str = "https://static.rust-lang.org/dist/channel-rust-stable.toml";
@@ -62,12 +34,8 @@ const RUSTUP_CHANNEL: &str = "https://static.rust-lang.org/rustup/release-stable
 const PYTHON_RELEASES: &str =
     "https://www.python.org/api/v2/downloads/release/?is_published=true&pre_release=false";
 
-/// What this process knows about each item's publisher, by item.
 static KNOWN: Mutex<BTreeMap<String, DoctorNewest>> = Mutex::new(BTreeMap::new());
 
-/// The newest release of `item` as far as this process knows it, or
-/// why there is none to show. Never fails and never waits: an item not
-/// asked about yet starts its reading and is answered `Asking`.
 pub(crate) fn newest(item: &str) -> DoctorUpstream {
     let answer = |newest| DoctorUpstream {
         item: item.to_owned(),
@@ -101,8 +69,6 @@ pub(crate) fn newest(item: &str) -> DoctorUpstream {
     }
 }
 
-/// Starts the one thread that asks `item`'s publisher and leaves the
-/// reading in `KNOWN`; what the caller is told meanwhile.
 fn start_reading(item: &'static str, upstream: Upstream) -> DoctorNewest {
     let started = std::thread::Builder::new()
         .name(format!("upstream-{item}"))
@@ -125,7 +91,6 @@ fn start_reading(item: &'static str, upstream: Upstream) -> DoctorNewest {
     }
 }
 
-/// Asks the source `upstream` names.
 fn read(upstream: Upstream) -> DoctorNewest {
     let reading = match upstream {
         Upstream::Unread(why) => return DoctorNewest::Unread { why },
@@ -145,7 +110,6 @@ fn read(upstream: Upstream) -> DoctorNewest {
     }
 }
 
-/// The body `url` answers with, or where the call stopped.
 fn fetch(url: &str) -> Result<String, String> {
     let client = gateway::client_for(Proxying::ExceptLocal, url)
         .timeout(PATIENCE)
@@ -169,8 +133,6 @@ fn host_of(url: &str) -> &str {
     url.split('/').nth(2).unwrap_or(url)
 }
 
-/// The first dotted number in `text`: `bun-v1.4.2` and
-/// `v2.55.0.windows.5` both read as the version a page compares.
 pub(crate) fn dotted(text: &str) -> Option<String> {
     let start = text.find(|c: char| c.is_ascii_digit())?;
     let rest = text.get(start..)?;
@@ -201,7 +163,6 @@ fn of_github(body: &str) -> Result<String, String> {
         .ok_or_else(|| "the latest release carried no version".to_owned())
 }
 
-/// The `version` under `[pkg.rust]`, which reads `1.97.1 (hash date)`.
 fn of_rust_channel(body: &str) -> Result<String, String> {
     body.split_once("\n[pkg.rust]\n")
         .and_then(|(_, rest)| rest.lines().find(|line| line.starts_with("version")))
@@ -216,7 +177,6 @@ fn of_rustup_channel(body: &str) -> Result<String, String> {
         .ok_or_else(|| "the rustup channel named no version".to_owned())
 }
 
-/// The greatest `Python X.Y.Z` among the published final releases.
 fn of_python_org(body: &str) -> Result<String, String> {
     let releases = json(body)?;
     releases
@@ -240,7 +200,6 @@ fn of_python_org(body: &str) -> Result<String, String> {
 mod tests {
     use super::*;
 
-    /// One answer of each source's shape, cut down to what is read.
     #[test]
     fn each_source_is_read_as_the_version_it_names() {
         let rust = "manifest-version = \"2\"\n[pkg.cargo]\nversion = \"0.99.0 (797e8a9bc 2026-08-05)\"\n\
@@ -268,8 +227,6 @@ mod tests {
         );
     }
 
-    /// A body in some other shape is a refusal that says so, never a
-    /// version made up out of whatever number the body held.
     #[test]
     fn an_answer_in_another_shape_is_refused() {
         assert_eq!(
@@ -282,7 +239,6 @@ mod tests {
         );
     }
 
-    /// An item with nothing to ask is answered at once, from the table.
     #[test]
     fn an_item_with_no_source_is_answered_without_asking_anyone() {
         assert_eq!(

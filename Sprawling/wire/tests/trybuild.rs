@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! V0 for the process boundary: the two frames a remote peer
-//! must not be able to spell are proven unspellable by the
-//! compiler, not by a runtime check.
-
 #[test]
 fn the_wire_counterexamples_do_not_compile() {
     let cases = trybuild::TestCases::new();

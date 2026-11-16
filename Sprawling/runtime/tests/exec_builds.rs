@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What this asserts: a resident inside the city can build
-//! a Rust program.
-//!
-//! Before the declaration existed this failed on Windows and nowhere
-//! else, which is the worst shape a defect can have. `env_clear()` plus
-//! a four-name allowlist takes `%ProgramFiles(x86)%` away; rustc's MSVC
-//! linker reads `vswhere.exe` from under that directory to find
-//! `link.exe`, and without it falls back to a bare `link.exe` — which on
-//! a machine with Git installed is coreutils' `link`, whose answer is
-//! `link: missing operand`.
-//!
-//! The test builds a crate with no dependencies into a target directory
-//! of its own, so it neither reaches the network nor waits on this
-//! workspace's build lock.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -29,9 +14,6 @@
 use kernel::{Address, EnvVarName, Payload, RunId, Tool, ToolCall, ToolName};
 use runtime::{Backlog, EchoSandbox, ExecSetup, ExecTool, Fuel};
 
-/// What a building on this machine has to declare for a Rust build to
-/// find its linker. Host facts, which is why they are the building's
-/// declaration rather than this repository's constant.
 #[cfg(windows)]
 const DECLARED: [&str; 8] = [
     "ProgramFiles(x86)",
@@ -64,8 +46,7 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
         .iter()
         .map(|name| EnvVarName::parse(name).unwrap())
         .collect();
-    // Also a host fact: rustup's shim reads these, and defaults them
-    // from the profile directory when they are absent.
+
     for optional in ["CARGO_HOME", "RUSTUP_HOME", "USERPROFILE"] {
         if std::env::var(optional).is_ok() {
             declared.push(EnvVarName::parse(optional).unwrap());
@@ -84,9 +65,7 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
         run,
         policy: runtime::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
     };
-    // The table is shared, so this handle reaches what the tool started:
-    // whatever settles after the short window is collected here rather
-    // than read back out of the call that outlived it.
+
     let backlog = Backlog::new();
     let tool = ExecTool::new(setup, Box::new(EchoSandbox::new()), backlog.clone()).unwrap();
     #[cfg(windows)]
@@ -115,14 +94,7 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
         })
         .unwrap();
     let mut result = serde_json::to_value(&outcome.result).unwrap();
-    // A slow machine settles the build after the short window, and the
-    // verdict of that call stays backgrounded: the exit code arrives at
-    // the table, not in the answered call. The harvest ends at the build's
-    // exit; its bound keeps the short window and the harvest together
-    // (160 s) under the suite's three-minute limit, so a build that hangs
-    // fails here with its own message. A build that settles between the
-    // window closing and the call's own harvest is answered in this same
-    // call, as its `background` row, and the table is then empty.
+
     if result.get("exit_code").is_none()
         && let Some(finished) = result["background"]
             .as_array()
@@ -156,7 +128,6 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
     );
 }
 
-/// `cargo` itself, resolved off the search path the child would get.
 fn which_cargo() -> Result<String, ()> {
     let name = if cfg!(windows) { "cargo.exe" } else { "cargo" };
     let path = std::env::var_os("PATH").ok_or(())?;

@@ -3,24 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The broker that holds an outside application's OAuth, in three calls
-//! and nothing else: what is on the shelf, an auth config to connect
-//! through, and the consent page to send a person to.
-//!
-//! The transports beside this module reach any tool server and have never
-//! heard of a particular one. This is the single module allowed to know
-//! that a given server is Composio's. How a call leaves this machine is
-//! still decided once, by `gateway::client_for`; one broker exists, so
-//! there is no trait here.
-//!
-//! **The field names below are read defensively on purpose.** They are
-//! this module's reading of somebody else's JSON, and a missing field
-//! costs one row rather than the whole answer - a directory that
-//! refuses to draw because one application grew a field is worse than a
-//! directory with one unnamed row. What pins the reading is the fake
-//! server in the tests, which is this crate's statement of what it
-//! believes the broker sends.
-
 use std::time::Duration;
 
 use gateway::client_for;
@@ -30,73 +12,46 @@ use serde_json::{Value, json};
 #[cfg(test)]
 mod tests;
 
-/// Where the broker answers.
 const BASE: &str = "https://backend.composio.dev/";
 
-/// The header the broker reads its project key from.
 const KEY_HEADER: &str = "x-api-key";
 
-/// How long one call to the broker may take.
-///
-/// A person is watching a page through every one of these. The bound is
-/// short enough that "the broker is unreachable" arrives as an answer
-/// rather than as a spinner nobody can interpret, and three calls at
-/// this bound still finish inside what somebody will sit through.
 const DEADLINE: Duration = Duration::from_secs(10);
 
-/// One application on the broker's shelf.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Toolkit {
     pub slug: String,
     pub name: String,
-    /// How it authenticates, in the broker's own word. Carried rather
-    /// than reduced to a flag: this city is not the authority on which
-    /// schemes exist, and the word decides what the person is shown.
+
     pub auth: String,
     pub standing: Connection,
 }
 
-/// Where one application stands for one person.
-///
-/// Every arm is the broker's reading rather than something remembered
-/// here: a consent page opened yesterday is not evidence that anybody
-/// finished with it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Connection {
-    /// Nothing has connected it.
+
     Absent,
-    /// A consent page exists and has not been completed.
+
     Awaiting { consent_url: String },
-    /// Connected, under the account name the broker returned.
+
     Connected { alias: String },
-    /// The broker still reports the last attempt as failed.
+
     Refused { refusal: AxError },
 }
 
-/// A reachable broker holding one project's key.
-///
-/// Constructed once per read, because the key is redeemed once per read
-/// and this type is what holds it. The proxy rule is settled at
-/// construction and never re-decided: `gateway::reach` is the one
-/// authority on whether a call goes through the machine's proxy.
 pub struct Broker {
     client: reqwest::blocking::Client,
     key: Sealed<String>,
-    /// Where this broker answers. A field rather than the constant
-    /// alone, because a test that cannot point the three calls at a
-    /// server it controls cannot state what this module believes the
-    /// broker sends.
+
     base: reqwest::Url,
 }
 
 impl Broker {
-    /// Binds a key to a client that reaches the broker the way this
-    /// machine is configured to.
+
     pub fn new(key: Sealed<String>, rule: Proxying) -> Result<Self, AxError> {
         Self::built(key, rule, BASE)
     }
 
-    /// The same broker, answering somewhere else. Test seam.
     #[cfg(test)]
     fn at(base: &str, key: Sealed<String>) -> Result<Self, AxError> {
         Self::built(key, Proxying::ExceptLocal, base)
@@ -121,13 +76,6 @@ impl Broker {
         })
     }
 
-    /// The shelf, joined with where each row stands for this person.
-    ///
-    /// Two calls rather than one: the directory is the same for
-    /// everybody and the standings are this person's, and the broker
-    /// publishes them separately. A row the directory names but the
-    /// standings do not is `Absent`, which is the truth about a row
-    /// nobody has connected.
     pub fn shelf(&self, user: &str) -> Result<Vec<Toolkit>, AxError> {
         let directory = self.get("api/v3/toolkits", &[])?;
         let standings = self.standings(user)?;
@@ -150,13 +98,6 @@ impl Broker {
         Ok(shelf)
     }
 
-    /// Opens a consent session and answers with the page to send the
-    /// person to.
-    ///
-    /// The auth config is found or created first. Creating one needs no
-    /// visit to the broker's own dashboard and no OAuth client of the
-    /// person's: the broker keeps a managed application for exactly
-    /// this, which is what makes one press enough.
     pub fn connect(&self, slug: &str, user: &str) -> Result<String, AxError> {
         let config = self.auth_config_for(slug)?;
         let opened = self.post(
@@ -175,11 +116,6 @@ impl Broker {
             })
     }
 
-    /// An auth config for this application, reused when one exists.
-    ///
-    /// Reused rather than created every time, because each one is a
-    /// lasting record on the broker's side and a city that made a fresh
-    /// one per press would leave a trail nobody asked for.
     fn auth_config_for(&self, slug: &str) -> Result<String, AxError> {
         let held = self.get("api/v3/auth_configs", &[("toolkit_slug", slug)])?;
         if let Some(found) = items_of(&held).iter().find_map(|item| text_at(item, "id")) {
@@ -204,7 +140,6 @@ impl Broker {
             })
     }
 
-    /// Where this person's connections stand, by application slug.
     fn standings(&self, user: &str) -> Result<Vec<(String, Connection)>, AxError> {
         let held = self.get("api/v3/connected_accounts", &[("user_ids", user)])?;
         Ok(items_of(&held)
@@ -239,13 +174,6 @@ impl Broker {
     }
 }
 
-/// The broker's word for a connection, read into the four states a
-/// person acts on.
-///
-/// An unrecognised word reads as `Absent` rather than as a failure: a
-/// state this build has not heard of is a state in which nothing here
-/// has connected anything, and offering the button again is the one
-/// action that cannot make it worse.
 fn standing_of(item: &Value) -> Connection {
     let alias = text_at(item, "alias")
         .or_else(|| text_at(item, "id"))
@@ -269,8 +197,6 @@ fn standing_of(item: &Value) -> Connection {
     }
 }
 
-/// Which authentication scheme a directory row names, in the broker's
-/// own word.
 fn scheme_of(item: &Value) -> String {
     item.get("auth_schemes")
         .and_then(Value::as_array)
@@ -279,7 +205,6 @@ fn scheme_of(item: &Value) -> String {
         .map_or_else(|| "oauth2".to_owned(), str::to_lowercase)
 }
 
-/// The rows of a paged answer, or none when this is not one.
 fn items_of(body: &Value) -> Vec<&Value> {
     body.get("items")
         .or_else(|| body.get("data"))
@@ -288,12 +213,10 @@ fn items_of(body: &Value) -> Vec<&Value> {
         .unwrap_or_default()
 }
 
-/// One string field, absent when it is missing or is not a string.
 fn text_at(body: &Value, field: &str) -> Option<String> {
     body.get(field).and_then(Value::as_str).map(str::to_owned)
 }
 
-/// One base url, parsed once.
 fn parsed(base: &str) -> Result<reqwest::Url, AxError> {
     reqwest::Url::parse(base).map_err(|bad| {
         AxError::failure(
@@ -309,11 +232,7 @@ fn parsed(base: &str) -> Result<reqwest::Url, AxError> {
 }
 
 impl Broker {
-    /// Builds a request url with every pair percent-encoded.
-    ///
-    /// Encoding lives here because this is what builds the path: a slug
-    /// arrives from a client frame, and the only thing standing between
-    /// it and the query string is this method.
+
     fn url_for(&self, path: &str, pairs: &[(&str, &str)]) -> Result<reqwest::Url, AxError> {
         let mut target = self.base.join(path).map_err(|bad| {
             AxError::failure(
@@ -337,7 +256,6 @@ impl Broker {
     }
 }
 
-/// Reads one answer, turning a status into a code a person can act on.
 fn read(sent: reqwest::Result<reqwest::blocking::Response>, path: &str) -> Result<Value, AxError> {
     let response = sent.map_err(|failed| {
         let draft = AxError::failure(
@@ -345,9 +263,7 @@ fn read(sent: reqwest::Result<reqwest::blocking::Response>, path: &str) -> Resul
             "reach the application broker",
             failed.to_string(),
         );
-        // A timeout while connecting is a request that never left; any
-        // later timeout left the broker holding a request it may have
-        // carried out, such as making an auth config.
+
         let draft = match (failed.is_timeout(), failed.is_connect()) {
             (true, true) => draft.retriable(),
             (true, false) => draft.effect_unknown(),
@@ -358,8 +274,7 @@ fn read(sent: reqwest::Result<reqwest::blocking::Response>, path: &str) -> Resul
     let status = response.status();
     let body = response.text();
     if status.is_success() {
-        // The broker did what was asked and only its answer was lost, so
-        // asking again could make a second auth config.
+
         let body = body.map_err(|cut| {
             AxError::failure(
                 AxCode::Provider,
@@ -382,7 +297,6 @@ fn read(sent: reqwest::Result<reqwest::blocking::Response>, path: &str) -> Resul
     Err(refusal_for(status, path, &nearby))
 }
 
-/// One refused status, as the code and recovery a person acts on.
 fn refusal_for(status: reqwest::StatusCode, path: &str, body: &str) -> AxError {
     let subject = format!("{path} answered {status}");
     match status.as_u16() {

@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A stored object as bytes, and a stored Markdown version exported
-//! (`Sprawling/accounting/spec/Views/Document.lean` §8-21, `Sprawling/wire/spec/Answer/DocumentBytes.lean`
-//! §8-80, §8-81).
-//!
-//! Both read the content store and nothing else, after the view lock is
-//! released, the way a range does: the version is the object's address,
-//! so what a page reads is the version it named, whatever the file on
-//! disk has become since.
-
 use std::path::PathBuf;
 
 use base64::Engine as _;
@@ -23,18 +14,16 @@ use super::super::holding::Views;
 use super::super::prepared::{Prepared, unavailable};
 use super::range::read;
 
-/// A read of one stored object, still to be made.
 pub struct StoredAsk {
     city_root: PathBuf,
     version: B3Hash,
     read: StoredRead,
 }
 
-/// What is read of the object.
 enum StoredRead {
-    /// One window of its bytes.
+
     Bytes(Span),
-    /// The whole of it, exported as HTML titled by the document's name.
+
     Export(Address),
 }
 
@@ -57,8 +46,7 @@ impl Views {
 }
 
 impl StoredAsk {
-    /// The answer, or `Unavailable` naming the question when the store
-    /// does not hold the object or the export is refused.
+
     pub(in crate::views) fn answer(self) -> wire::Answer {
         let store = match Cas::open(&kernel::layout::CityLayout::new(&self.city_root).cas()) {
             Ok(store) => store,
@@ -74,9 +62,7 @@ impl StoredAsk {
                 }))
             }),
         };
-        // "I could not look" is the answer for every way this fails, as
-        // it is for a range: an object the store never kept, a store that
-        // will not read, a version the export refuses.
+
         answered.unwrap_or_else(|_| self.unanswered())
     }
 
@@ -88,8 +74,6 @@ impl StoredAsk {
     }
 }
 
-/// The window of the object `range` asks for: from its start, at most
-/// [`wire::BYTES_WINDOW_MAX`] bytes, never past the end.
 fn bytes_of(store: &Cas, version: B3Hash, range: Span) -> Result<wire::BytesAnswer, AxError> {
     let size = store.size(&version).map_err(StorageError::into_ax)?;
     let start = range.start().min(size);
@@ -107,7 +91,6 @@ fn bytes_of(store: &Cas, version: B3Hash, range: Span) -> Result<wire::BytesAnsw
     })
 }
 
-/// The whole version, exported under the document's file name.
 fn export_of(store: &Cas, version: B3Hash, at: &Address) -> Result<String, AxError> {
     let bytes = store.get(&version).map_err(StorageError::into_ax)?;
     let title = at.as_str().rsplit('/').next().unwrap_or(at.as_str());

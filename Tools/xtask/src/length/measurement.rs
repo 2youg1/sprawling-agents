@@ -3,32 +3,20 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How long a function is, and how many parameters it takes, read
-//! from the parsed item rather than from the text around it.
-
 use syn::spanned::Spanned;
 
-/// One function body, as the gate sees it in any language it measures:
-/// its name, the line of its `fn`, and how many lines it spans.
 pub(crate) struct Body {
     pub(crate) name: String,
     pub(crate) line: usize,
     pub(crate) lines: usize,
 }
 
-/// One Rust function: its body, and the parameters its signature takes.
 pub(crate) struct Found {
     pub(crate) body: Body,
-    /// Parameters, not counting a receiver. `self` is what the method is
-    /// for, never an argument somebody had to decide to pass.
+
     pub(crate) args: usize,
 }
 
-/// Walks items, skipping what is not measured, and measures the rest.
-///
-/// Recurses into `mod` and `impl` blocks because that is where most
-/// functions in this repository live; a nested `#[cfg(test)] mod tests`
-/// therefore drops out at its own level rather than by file position.
 pub(super) fn measure(items: &[syn::Item]) -> Vec<Found> {
     let mut out = Vec::new();
     for item in items {
@@ -70,7 +58,7 @@ pub(super) fn measure(items: &[syn::Item]) -> Vec<Found> {
                         continue;
                     };
                     let Some(body) = &function.default else {
-                        continue; // a signature is not a function body
+                        continue;
                     };
                     if skipped(&function.attrs) {
                         continue;
@@ -93,10 +81,7 @@ fn found(signature: &syn::Signature, body: proc_macro2::Span) -> Found {
             line: start,
             lines: end.saturating_sub(start).saturating_add(1),
         },
-        // A receiver is not a parameter. `&self` is what makes the
-        // function a method, not a value somebody chose to thread
-        // through it, and counting it would charge every method one
-        // argument it never had a say in.
+
         args: signature
             .inputs
             .iter()
@@ -105,7 +90,6 @@ fn found(signature: &syn::Signature, body: proc_macro2::Span) -> Found {
     }
 }
 
-/// Whether this item is the one kind the gate does not measure.
 fn skipped(attrs: &[syn::Attribute]) -> bool {
     attrs.iter().any(|attr| {
         if !attr.path().is_ident("cfg") {

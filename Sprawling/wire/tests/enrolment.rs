@@ -9,28 +9,6 @@
     reason = "test code: this stand-in drops what a production reader               would act on, because the assertion is about the status               the route answers and not about the reply reaching anyone"
 )]
 
-//! The enrolment route answers what happened to the credential, not what
-//! happened to the request.
-//!
-//! Answering 201 the moment the command reached the desk would let a
-//! vault that refused tell nobody while a person watched a success
-//! message for a key that was never stored. So there are three outcomes,
-//! each with its own status: stored, refused, and neither within a
-//! bounded wait.
-//!
-//! The three are told apart by a worker this test stands in for, which
-//! is what makes this a white-box check: it drives the router in
-//! process, through `tower::ServiceExt::oneshot`, with the peer address
-//! supplied the way axum supplies it for tests. Nothing here raises the
-//! product's server or writes an HTTP request by hand - a check that did
-//! would be standing outside, and outside is `Tools/adversary/`'s ground
-//! (`xtask boundary`).
-
-// The route this file drives exists only in a build with the listener.
-// Without it there is no router, no axum and no tokio, and a test file
-// that named them anyway turned `--no-default-features` red for the one
-// build that has no business carrying them (`Sprawling/wire/spec/Server.lean`
-// §8-22).
 #![cfg(feature = "server")]
 #![allow(
     clippy::unwrap_used,
@@ -50,14 +28,12 @@ use kernel::{EventDraft, EventKind, EventRecord, GENESIS_PREV, Payload, RunId, S
 use tower::ServiceExt;
 use wire::{Answer, AxCode, AxError, Command, Reply, ServeConfig};
 
-/// What the worker does with the credential this test hands it.
 enum Worker {
-    /// Writes `secret_captured` for the reference, as the real one does.
+
     Stores,
-    /// Refuses through the reply address the route gave it.
+
     Refuses,
-    /// Takes it and says nothing, which is what a worker inside a long
-    /// dispatch looks like from here.
+
     Silent,
 }
 
@@ -121,9 +97,7 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
                 let Command::PutSecret { realm, name, .. } = command else {
                     return Ok(());
                 };
-                // The stand-in stores under the place the real worker
-                // builds, so the reference the route answers with can be
-                // compared with what this vault was told it stored.
+
                 let place = kernel::SecretRef::new(&realm, &name)
                     .expect("the body states a realm and a name in the grammar");
                 let reference = place.to_string();
@@ -169,10 +143,7 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
         )
         .unwrap(),
     };
-    // The peer is this machine, which is the one peer the route admits;
-    // the address arrives the way axum hands it to a handler under test.
-    // The face comes from the same verdict the listener uses, so the
-    // route under test judges a caller by the rule the served city does.
+
     let wire::BindVerdict::Serve(face) = wire::decide_bind(
         &"127.0.0.1:2501".parse().unwrap(),
         Some(kernel::B3Hash::digest(b"native-key")),
@@ -200,8 +171,6 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
     (status, String::from_utf8_lossy(&bytes).into_owned())
 }
 
-/// `Worker` is moved into a `Fn` closure, which may run more than once;
-/// this reads it without taking it.
 fn worker_of(worker: &Worker) -> Worker {
     match worker {
         Worker::Stores => Worker::Stores,
@@ -215,8 +184,7 @@ const BODY: &str = r#"{"realm":"house","name":"key","value":"sk-not-a-real-key"}
 #[tokio::test]
 async fn a_stored_credential_answers_with_the_reference_that_replaced_it() {
     let (status, said) = ask(Worker::Stores, BODY).await;
-    // The whole body, not a field of it: the reference the route answers
-    // with is the one the vault recorded, and nothing else is appended.
+
     assert_eq!((status, said.as_str()), (201, "secret:house/key"));
     assert!(
         !said.contains("sk-not-a-real-key"),
@@ -224,8 +192,6 @@ async fn a_stored_credential_answers_with_the_reference_that_replaced_it() {
     );
 }
 
-/// The case the route could not express at all: the worker refused and
-/// the person was told it had worked.
 #[tokio::test]
 async fn a_refusal_reaches_the_request_that_carried_the_credential() {
     let (status, said) = ask(Worker::Refuses, BODY).await;

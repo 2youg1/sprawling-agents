@@ -17,12 +17,6 @@
 use super::data::verified_chain;
 use super::{CLIENT_BUNDLE_DIR, CLIENT_COMPLETE, CLIENT_FILES};
 
-/// A place with no ledger in it is not a verified chain.
-///
-/// `replay` must not answer `chain verified: 0 line(s), tail seq none`
-/// and exit 0 for an empty directory as it does for a city with no
-/// events, or a scripted integrity check pointed at the wrong argument
-/// scores a pass.
 #[test]
 fn a_place_holding_no_ledger_is_refused_rather_than_verified() {
     let dir = tempfile::tempdir().unwrap();
@@ -35,18 +29,13 @@ fn a_place_holding_no_ledger_is_refused_rather_than_verified() {
     );
 }
 
-/// What `replay` answers for a whole chain, and how it refuses a broken
-/// one, is the shape the adversary parses from outside: the line count
-/// and the tail seq, or the three-part refusal naming the first line
-/// that does not continue the chain.
 #[test]
 fn replay_names_the_lines_it_verified_and_the_tail_seq() {
     let dir = tempfile::tempdir().unwrap();
     sprawling::assembly::init_city(dir.path()).unwrap();
     let layout = kernel::layout::CityLayout::new(dir.path());
     let ledger_dir = layout.ledger();
-    // Three lines of its own, and one `skill_shelved` per shipped skill
-    // (kernel D23).
+
     let cas = storage::Cas::open(&layout.cas()).unwrap();
     let shipped = city::Library::scan(dir.path(), None, dir.path(), &|digest| {
         cas.get(digest).map_err(storage::StorageError::into_ax)
@@ -63,9 +52,6 @@ fn replay_names_the_lines_it_verified_and_the_tail_seq() {
         ))
     );
 
-    // One hex digit of the third line's prev changes: the line still
-    // carries a readable envelope and canonical JSON, and only the chain
-    // can tell.
     let segment = storage::ledger_segments_at(&ledger_dir).unwrap().remove(0);
     let mut bytes = std::fs::read(&segment).unwrap();
     let third = bytes
@@ -89,8 +75,6 @@ fn replay_names_the_lines_it_verified_and_the_tail_seq() {
     );
 }
 
-/// The embed chain delivers a file table with the page shell in it;
-/// when the wasm client was built, the table carries it too.
 #[test]
 fn embedded_client_table_is_present_and_marked() {
     let index = CLIENT_FILES
@@ -99,9 +83,7 @@ fn embedded_client_table_is_present_and_marked() {
         .expect("the page shell is always embedded");
     assert!(!index.gz.is_empty());
     if CLIENT_COMPLETE {
-        // Named by their directory rather than by file name: every chunk
-        // the bundler writes carries a content hash, so the names change
-        // on every build and only the shape of the path is stable.
+
         assert!(
             CLIENT_FILES
                 .iter()
@@ -117,14 +99,6 @@ fn embedded_client_table_is_present_and_marked() {
     }
 }
 
-/// The binary embeds the bundle `just build-web` wrote into this
-/// package, wherever cargo puts its own output.
-///
-/// With `CARGO_TARGET_DIR` pointing outside the workspace, a build
-/// script that looked for the bundle there would find nothing and ship
-/// the placeholder page beside a real bundle it never read. Under the
-/// default target directory both places coincide, so this test can only
-/// tell the two readings apart where the variable is set.
 #[test]
 fn the_embedded_client_is_the_bundle_the_workspace_built() {
     let dist = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(CLIENT_BUNDLE_DIR);
@@ -162,20 +136,13 @@ fn files_under(root: &std::path::Path, dir: &std::path::Path, found: &mut Vec<St
     }
 }
 
-/// `call`'s rows of the exit-code table: each way a call can end
-/// reaches its own code, and none of these touch a city that exists.
-///
-/// A frame the wire cannot carry is this command line's fault (2), and
-/// an address where nothing answers is no city at all (4). Neither is
-/// 1, which an agent reads as "the city refused" and answers by fixing
-/// a frame the city never saw.
 #[test]
 fn each_way_a_call_ends_has_its_own_exit_code() {
     use super::calling::call;
     use super::exit::Exit;
     const CITY_VIEW: &str = r#"{"ask":{"ask_id":1,"query":"city_view"}}"#;
     const NO_SUCH_QUERY: &str = r#"{"ask":{"ask_id":1,"query":"no_such"}}"#;
-    // A port that was bound and released: nothing listens on it.
+
     let vacant = std::net::TcpListener::bind("127.0.0.1:0")
         .unwrap()
         .local_addr()
@@ -203,8 +170,6 @@ fn each_way_a_call_ends_has_its_own_exit_code() {
     assert_eq!(observed, table.to_vec());
 }
 
-/// A refusal names the nearby names to a person, and reaches a program
-/// as the `AxError` it was, so neither reader loses a field.
 #[test]
 fn a_refusal_reads_the_same_to_a_person_and_to_a_program() {
     use super::refusal::{Form, written};
@@ -221,10 +186,6 @@ fn a_refusal_reads_the_same_to_a_person_and_to_a_program() {
     );
 }
 
-/// A supervised child receives the flags of the served line with their
-/// values, and none of the ones the supervisor decides again for it: a
-/// dropped value would start the child on a different log level or
-/// client directory than the person asked for.
 #[test]
 fn a_supervised_child_is_forwarded_the_served_flags_with_their_values() {
     let line = [
@@ -245,11 +206,6 @@ fn a_supervised_child_is_forwarded_the_served_flags_with_their_values() {
     );
 }
 
-/// `whose --trace` on a city whose run committed twice, with a second
-/// run working in the same building in between: the commit's facts,
-/// the span since the run's previous commit, the one call it made
-/// there with the first line it answered, and the other run counted as
-/// nearby - byte for byte.
 #[test]
 fn whose_trace_names_the_run_its_calls_and_who_else_called_in_the_building() {
     use kernel::{EventDraft, EventKind, EventRecord, Payload, RunId, Seq, TimeMs};

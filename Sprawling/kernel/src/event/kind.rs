@@ -3,55 +3,28 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Event kinds: the closed set and its window classes.
-
 use serde::{Deserialize, Serialize};
 
 mod window;
 pub use window::WindowClass;
 
-/// The closed event vocabulary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum EventKind {
-    // Genesis and space (4).
+
     CityInitialized,
     BuildingCreated,
-    /// A person changed what one building's runs may reach.
-    ///
-    /// The payload says which faces were written, never what they now
-    /// hold: `CONFIG.toml` is the authority for what a run is governed
-    /// by, and a copy of it here would be a second one. What this adds
-    /// is the fact the file cannot carry - that the change happened,
-    /// when, and to which building.
+
     BuildingConfigured,
-    /// A person took a building out of the city.
-    ///
-    /// The payload names the building and where its files are kept
-    /// under the reserved subtree; nothing is deleted, and every record
-    /// the building wrote stays in this history.
+
     BuildingRemoved,
-    // Base set (19).
-    /// A session started at an address: the shape the last one froze
-    /// was forgotten, and the summary it left was carried or not.
-    ///
-    /// A separate kind from `run_started` because it is a separate
-    /// fact: the first run of a session and the fifth are both
-    /// `run_started`, and only this line says where one session ended
-    /// and the next began. `carried` is recorded even when it is
-    /// false, because "this session carries nothing" is the answer to
-    /// the question a person asks when the model behaves as if it had
-    /// never met them.
+
     SessionOpened,
     RunStarted,
     RunForked,
     PromptAssembled,
-    /// One request's cache shape, and which of its regions moved since
-    /// the request before it. The line that turns a cache miss into a
-    /// named cause: system, tools or the conversation. It measures the
-    /// request rather than deciding any of its bytes, which is why it is
-    /// record-only.
+
     PromptShapeCompared,
     ModelCalled,
     ModelReturned,
@@ -68,7 +41,7 @@ pub enum EventKind {
     BudgetLimit,
     RunFrozen,
     LogTruncated,
-    // Collaboration (19).
+
     SignalEnqueued,
     SignalConsumed,
     DraftHeld,
@@ -85,20 +58,13 @@ pub enum EventKind {
     RoadmapClaimed,
     RoadmapFinished,
     RoadmapReleased,
-    /// A branch was divided into children. The plan grew rather than
-    /// moved, which is a different fact from any row changing state and
-    /// is the only one that changes what the denominator is made of.
+
     RoadmapSplit,
-    /// A node cannot proceed, and why. Distinct from `roadmap_released`:
-    /// a released node is back in the ready set, a blocked one is red
-    /// and everything behind it is waiting.
+
     RoadmapBlocked,
-    /// A city was given a goal to keep working towards, or that goal
-    /// was paused, resumed or cleared. Recorded because it is the one
-    /// thing in the city that starts work without a person asking, and
-    /// "who set this running" has to be answerable afterwards.
+
     PursuitChanged,
-    // Governance and facilities (18).
+
     ApprovalRequested,
     ApprovalResolved,
     PolicyCreated,
@@ -109,163 +75,87 @@ pub enum EventKind {
     BackpressureShed,
     DigestInvalidated,
     EndpointAttached,
-    /// What a base URL says it serves, asked before anything is
-    /// attached. A separate fact from `EndpointAttached`: a person may
-    /// look at what a key buys and register none of it.
+
     EndpointProbed,
     EndpointLost,
     ModelSelected,
     ProviderDegraded,
-    /// A subscription login an older build began. This build signs in
-    /// to no subscription and writes none; the kind stays so a ledger
-    /// that holds one still reads, and nothing reads its payload
-    /// (`Sprawling/gateway/Spec.lean` §8-5).
+
     LoginStarted,
     EvalRun,
     AssetArchived,
     CredentialLent,
-    // Privacy and Discard (5).
+
     SecretCaptured,
     SecretEgressBlocked,
     FileDiscarded,
     DiscardRestored,
     AutonomyChanged,
-    // Unified history (2).
+
     WentBack,
     FileRestored,
-    /// One of the three documents that govern a city was written by a
-    /// person. Recorded because what governs a city decides what every
-    /// later run is given, and "who changed this, and when" has to be
-    /// answerable from the one history rather than from a file's
-    /// modification time.
+
     GovernedDocumentWritten,
-    /// A person wrote one of a building's own spine documents.
+
     SpineDocumentWritten,
-    /// One of the documents a dispatch stands under — the city's
-    /// `CONFIG.toml`, or a building's `CONFIG.toml` or `RULES.toml` —
-    /// holds other bytes than the last line booked. Booked after the city
-    /// agreed to the work and before the run reads a rule, so a replay
-    /// names the entry the change reached the city in.
+
     RulesChanged,
-    /// A person asked to connect an outside application, and the broker
-    /// that holds its OAuth opened a consent session.
-    ///
-    /// The request is history and belongs here; **where that application
-    /// stands right now is not, and is deliberately absent from the
-    /// payload** (`Sprawling/wire/Spec.lean` §8-35b): a recorded standing
-    /// would still read "connected" an hour after the person revoked
-    /// it. The consent page's own url is absent for a second reason -
-    /// it is a capability, and anybody replaying this log would be
-    /// holding one.
+
     ToolkitLinkOpened,
 
-    // The two faces of an endpoint that are not the conversation (2).
-    /// One call to an attached endpoint's embeddings face, and what came
-    /// back for it. The vectors are absent for the reason `ModelCalled`
-    /// carries no request body: a replay recomputes them from the inputs
-    /// the call recorded.
     EmbeddingCalled,
-    /// One call to an attached endpoint's rerank face, and how many
-    /// passages and ranks it was about.
+
     RerankCalled,
 
-    // The adviser port, consulted about the window (3).
-    /// A judgment was asked of the adviser port about the window.
-    ///
-    /// Asking decides nothing on its own: whether the bytes the model
-    /// reads include the item in question is decided by the answer, or
-    /// by the fallback when none came.
     AdviserAsked,
-    /// The adviser answered. This is the line a replay reads instead of
-    /// asking again, which is why the answer decides model-request bytes
-    /// and the question that produced it does not.
+
     AdviserAnswered,
-    /// No adviser answer was used, and why. The deterministic strategy
-    /// answered instead, and this is the only line that says so: without
-    /// it a window an adviser shaped and a window the city's own policy
-    /// shaped would fold to the same history.
+
     AdviserFellBack,
 
-    // Keep-warm (1).
-    /// One keep-warm renewal a worker sent for a room's cached prefix:
-    /// what the provider reported it cost, or its refusal. The request is
-    /// absent because it resends a prefix the run already recorded.
     CacheRenewed,
 
-    // Harness residents (2).
-    /// One thing an official harness reported during a run: a piece of
-    /// its answer or reasoning, a tool call it started and its status,
-    /// or a permission it asked for and the city's answer. Written after
-    /// the harness said it, and never read back as a decision of the city.
     HarnessReported,
-    /// The harness's answer to the city's prompt: the stop reason and the
-    /// text it answered with this turn, written as the stop reason arrives
-    /// and before the run freezes.
+
     HarnessAnswered,
 
-    // The remote door (5).
-    /// The person opened the remote door: until when, and the address a
-    /// device reaches it at.
     RemoteOpened,
-    /// The remote door closed, and who closed it: the person at the
-    /// console, a device that locked it behind itself, or its own time.
+
     RemoteClosed,
-    /// A device presented a good pairing code and the city keeps it.
+
     DevicePaired,
-    /// The person took a device's pairing away.
+
     DeviceRevoked,
-    /// A paired device proved its key and holds a remote session.
+
     RemoteSessionStarted,
 
-    // Documents (4).
-    /// A save through the page landed: which document, from which
-    /// version to which, and how long it now is; never the text.
     DocumentWritten,
-    /// A run suggested replacing one stretch of one document version.
+
     ProposalOffered,
-    /// A person decided a proposal card, sentence by sentence.
+
     ProposalDecided,
-    /// The run that offered a card took it back while it was open.
+
     ProposalWithdrawn,
 
-    // Sessions and the shelf (3).
-    /// The room's run policy, changed while a session is open
-    /// (`Sprawling/kernel/spec/Event/Record.lean` D21).
     RunPolicyChanged,
-    /// The name a person gave one session (D22).
+
     SessionNamed,
-    /// One audit of one version of a skill on the shelf (D23).
+
     SkillAudited,
 
-    // The reply wait (2).
-    /// A run that sent with `wait` stopped at its safe point for a reply
-    /// (`Sprawling/kernel/spec/Event/Record.lean` D32).
     SignalWaitStarted,
-    /// The one line that ends a `signal_wait_started`: the reply came,
-    /// the deadline passed, or the run left its room (D32).
+
     SignalWaitEnded,
 
-    // Where a letter landed (1).
-    /// Where the accounting thread put one `signal_enqueued`: a running
-    /// run's slot, the queue, or a knock (`Sprawling/kernel/spec/Event/Record.lean` D38).
     SignalLanded,
 
-    // The shelf (1).
-    /// One version of a skill landed on a shelf through the city's door,
-    /// and where it came from (`Sprawling/kernel/spec/Event/Record.lean` D23).
     SkillShelved,
 
-    // The prefix hold (1).
-    /// One wait a model call took at its endpoint's gate behind a
-    /// pre-warm of the prefix a building shares, how the pre-warm ended,
-    /// and on the call that sent it what it cost
-    /// (`Sprawling/kernel/spec/Event/Record.lean` D61).
     PrefixHeld,
 }
 
 impl EventKind {
-    /// Every kind, in the order the SPEC table lists them. Data face for counting tests
-    /// and `xtask specalign`.
+
     pub const ALL: [EventKind; 97] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,

@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The face of `tool` (`Sprawling/runtime/Spec.lean` §8-60, §8-61): what an
-//! admitted capability is, read from the run's catalog, and the one way
-//! to run a tool that is not in the request's tool list. Its answers are
-//! ordinary tool results appended at the end of the conversation, so the
-//! request's tool list and its prompt cache do not move (runtime D21).
-//!
-//! A `run` is resolved at the tool face's entrance into the call it
-//! stands for, which then passes its own tool's doors; this tool sees a
-//! `run` only when that resolution refused, and answers the catalog's
-//! refusal, so the refusal has one author.
-
 use std::sync::{Arc, Mutex};
 
 use kernel::{
@@ -26,14 +15,11 @@ use crate::catalog::Catalog;
 
 const ACTION: &str = "tool";
 
-/// The tool itself; it holds the catalog rather than a copy, as `read`
-/// does, so what it answers is what the run was admitted.
 pub struct ToolTool {
     catalog: Arc<Mutex<Catalog>>,
     meta: ToolMeta,
 }
 
-/// What one `tool` call asks for.
 enum Op<'a> {
     List { namespace: Option<&'a str> },
     Find { query: &'a str },
@@ -42,22 +28,11 @@ enum Op<'a> {
 }
 
 impl ToolTool {
-    /// The name this tool answers to, read by its registration, by
-    /// `mode::core_tools` and by the catalog's resolution.
+
     pub const NAME: &'static str = "tool";
 
-    /// The `op` that runs another tool: the only one the tool face
-    /// resolves into the call it stands for.
     pub const RUN: &'static str = "run";
 
-    /// # Errors
-    /// Propagates a malformed parameter schema, which is a build-time
-    /// defect rather than a runtime one.
-    /// The name, disclosure and schema `new` registers. The catalog page
-    /// reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
     pub fn definition() -> Result<ToolDef, AxError> {
         Ok(ToolDef {
             name: ToolName::parse(Self::NAME)?,
@@ -85,9 +60,6 @@ impl ToolTool {
         })
     }
 
-    /// # Errors
-    /// Propagates a malformed parameter schema, which is a build-time
-    /// defect rather than a runtime one.
     pub fn new(catalog: Arc<Mutex<Catalog>>) -> Result<ToolTool, AxError> {
         let defined = Self::definition()?;
         Ok(ToolTool {
@@ -130,9 +102,7 @@ impl Tool for ToolTool {
             Op::Detail { name } => catalog.detail(name)?,
             Op::Run => {
                 let resolved = catalog.resolve_run(call)?;
-                // Resolution succeeds here only when the tool face that
-                // drove this call skipped it; running the tool from here
-                // would pass none of its doors.
+
                 return Err(AxError::failure(
                     AxCode::ToolUnavailable,
                     "run a tool through `tool`",
@@ -151,7 +121,6 @@ impl Tool for ToolTool {
     }
 }
 
-/// The op one call asks for, with the argument that op reads.
 fn op(call: &ToolCall) -> Result<Op<'_>, AxError> {
     let given = call.args.as_map();
     let text = |key: &str| given.get(key).and_then(Value::as_str);
@@ -187,8 +156,6 @@ fn op(call: &ToolCall) -> Result<Op<'_>, AxError> {
     }
 }
 
-/// The catalog's lock was left by a thread that died; the same answer
-/// `read` gives (`Sprawling/runtime/spec/Tools/Read.lean`).
 fn poisoned() -> AxError {
     AxError::failure(
         AxCode::StorageFatal,

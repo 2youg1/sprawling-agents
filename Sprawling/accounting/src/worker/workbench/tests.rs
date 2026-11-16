@@ -34,10 +34,6 @@ fn a_building_whose_rules_do_not_parse_stops_the_run_rather_than_guessing() {
     assert!(err.recovery().contains(city::RULES_FILE));
 }
 
-/// Until this tool existed a run could only signal an address
-/// somebody had already handed it, and a guessed one opened a queue
-/// nobody read. The evidence has to come through the production
-/// path, because what is being claimed is that the model is *told*.
 #[test]
 fn a_run_is_told_who_shares_its_building_and_what_to_bring_them() {
     let dir = tempfile::tempdir().unwrap();
@@ -198,18 +194,11 @@ fn the_shell_arm_exists_only_where_a_layer_asked_for_it() {
     assert_eq!(opened.sandbox.fuel, 1000);
 }
 
-/// The Mayor writes Markdown and plans; it does not build. What holds
-/// that is the tool table the run is given, not the wording of
-/// `MAYOR.md`: an invariant a prompt is asked to keep is not one.
-///
-/// The evidence comes through the production path, because what is
-/// being claimed is about the bytes the provider receives.
 #[test]
 fn a_resident_of_the_hall_is_given_no_way_to_build() {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
-    // The run opens the city's own namespace once, so the provider sees
-    // what the hall was filed there.
+
     let (base_url, provider) = fake_openai(
         &["m-local"],
         vec![
@@ -243,8 +232,7 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
             "the hall was offered {absent}; the Mayor plans, it does not build"
         );
     }
-    // Both wait in the dormant index under the city's own namespace, and
-    // the hall reaches them through `tool` (`Sprawling/runtime/Spec.lean` §8-60).
+
     let listed = |name: &str| {
         offered.contains(&format!("- {name}:")) || offered.contains(&format!("- {name}\\n"))
     };
@@ -259,24 +247,11 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
     assert!(offered.contains("\"tool\""));
 }
 
-/// The symptom this pins came out of a live city: the Mayor wrote a
-/// document beside its own room, the file sat in the working tree, and
-/// asking git's whole history for that path answered nothing. Every
-/// checkpoint had staged the room, while the door that admitted the
-/// write judges it against the building. Anything written in that gap
-/// reached no checkpoint, so `Query::Changes` was empty for a city that
-/// had been writing all along, and `file_discarded` had nothing to
-/// restore from.
-///
-/// Through the production path, because the claim is about what the
-/// repository ends up holding rather than about one function's return.
 #[test]
 fn a_checkpoint_carries_what_the_run_may_write_and_not_only_its_room() {
     let dir = tempfile::tempdir().unwrap();
     let repo = a_note_beside_the_hall(dir.path());
 
-    // The room is `hall/mayor`; the note is one level up, inside the
-    // building the Mayor's domain covers.
     assert!(
         dir.path().join("hall").join("note.md").exists(),
         "the write has to land before a checkpoint can be asked to carry it"
@@ -300,12 +275,6 @@ fn a_checkpoint_carries_what_the_run_may_write_and_not_only_its_room() {
     );
 }
 
-/// The checkpoint after a wave stages the paths that wave's calls said they
-/// wrote, not the whole write domain: `edit` knows its one file, so the
-/// closing checkpoint has no reason to walk the building for it
-/// (`Sprawling/runtime/Spec.lean` §8-45). The first checkpoint of the run still takes
-/// the whole domain, because no commit of this run vouches for the tree
-/// before it.
 #[test]
 fn the_checkpoint_after_an_edit_stages_the_edited_path_and_not_the_domain() {
     let dir = tempfile::tempdir().unwrap();
@@ -329,9 +298,6 @@ fn the_checkpoint_after_an_edit_stages_the_edited_path_and_not_the_domain() {
     );
 }
 
-/// Dispatches the Mayor, through the production path, to leave a note
-/// in the hall beside its room with one `edit`, and opens the city's
-/// repository afterwards.
 fn a_note_beside_the_hall(city: &std::path::Path) -> git2::Repository {
     crate::worker::fixture::init_city(city).unwrap();
     let (base_url, _provider) = fake_openai(
@@ -357,10 +323,6 @@ fn a_note_beside_the_hall(city: &std::path::Path) -> git2::Repository {
     git2::Repository::open(city).unwrap()
 }
 
-/// The city's genesis hash is read from the ledger once and remembered:
-/// it is the one fact about a city that cannot change without the city
-/// being a different one, so no checkpoint, landing or merge re-reads the
-/// front of the history to learn it (`Sprawling/app/Spec.lean` §8-51).
 #[test]
 fn the_citys_genesis_hash_is_read_once_and_survives_the_ledger_going_away() {
     let dir = tempfile::tempdir().unwrap();
@@ -373,8 +335,7 @@ fn the_citys_genesis_hash_is_read_once_and_survives_the_ledger_going_away() {
     .unwrap();
 
     let first = worker.city_hash().unwrap();
-    // Nothing can read it now. An answer that still comes back is an
-    // answer that was remembered rather than re-read.
+
     std::fs::remove_dir_all(&report.ledger_dir).unwrap();
     assert_eq!(worker.city_hash().unwrap(), first);
 }

@@ -3,21 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The spawn admission: who may hand work down, and how far.
-//! The part `Sprawling/kernel/spec/Gate.lean` specifies this module with the
-//! rest of `kernel::gate`.
-//!
-//! Handing work to a second agent needs no person's answer: the depth
-//! rule bounds it, one level and no further, and a rule the type system
-//! already carries is not a question.
-
 use crate::delegation::{self, DelegateKind, DelegationVerdict, Depth};
 use crate::error::{AxCode, AxError, GateRefusal};
 
 use super::GateOutcome;
 
-/// Delegates do not delegate (10.1). The refusal teaches the
-/// alternative instead of hiding the tool.
 pub fn spawn(parent: Depth, kind: &DelegateKind) -> GateOutcome {
     match delegation::admit(parent, kind) {
         DelegationVerdict::Allow => GateOutcome::Allow,

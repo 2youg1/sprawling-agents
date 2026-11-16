@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The bytes a model named, read after the one judgement `read` gives a
-//! path (`Sprawling/runtime/spec/Tools/BoundReader.lean` §8-59).
-//!
-//! `read` hands back text or a picture attachment. A tool that sends
-//! bytes to an endpoint needs the bytes themselves, and they may sit in another building the
-//! read bound opens or in a block a connector stored. Whether a model may
-//! read what it named is decided in `chosen_path`; a tool outside this
-//! crate that judged a path itself would be a second authority on it, so
-//! the judgement is offered here as one call that hands back a reader.
-//!
-//! The reader carries no ceiling: how much of it is read is the value
-//! that takes the bytes to decide, because that value owns its own
-//! limit (`gateway::Recording` reads one byte past its own).
-
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 
@@ -25,9 +11,6 @@ use same_file::Handle;
 
 use super::chosen_path::{self, Located, ReadBound};
 
-/// What one run may read by a name its model wrote: the city it reads
-/// in, the read bound, and the store blocks are kept in. Cloned to every
-/// tool that reads bytes, so all of them ask one bound.
 #[derive(Clone)]
 pub struct BoundReader {
     pub(in crate::tools) city_root: PathBuf,
@@ -36,9 +19,7 @@ pub struct BoundReader {
 }
 
 impl BoundReader {
-    /// `city_root` is the tree the run reads in, its own worktree under
-    /// review; `block_store` is the city's, which a worktree does not
-    /// hold.
+
     #[must_use]
     pub fn new(city_root: &Path, bound: ReadBound, block_store: &Path) -> BoundReader {
         BoundReader {
@@ -48,19 +29,6 @@ impl BoundReader {
         }
     }
 
-    /// The bytes `asked` names, once the judgement `read` gives it has
-    /// let them through: a `cas:` or `file:` Locator is opened where its
-    /// bytes belong, and anything else is a path, judged as written,
-    /// judged again where its links lead, and checked once more after it
-    /// is opened. `action` names the tool in every refusal.
-    ///
-    /// # Errors
-    /// The codes `read` answers the same argument with: `E_INVALID_ARGS`
-    /// for a name that does not parse, a file that is not there and a
-    /// directory; `E_GATE_DENIED` for a reserved subtree, a building the
-    /// read bound closes, a place outside the city, a block stored for
-    /// no building, and a file that changed after it was judged;
-    /// `E_STORAGE_FATAL` for a file that is there and will not open.
     pub fn open(&self, asked: &str, action: &'static str) -> Result<Opened, AxError> {
         if let Some(found) = super::read::locator::open_locator(asked, self, action) {
             let (locator, bytes) = found?;
@@ -75,9 +43,7 @@ impl BoundReader {
         }
         let spelled = chosen_path::within_city(&self.city_root, asked, action)?;
         let addr = chosen_path::admit(&spelled, action, &*self.bound)?;
-        // Not a hot path: anchoring here costs what re-resolving the
-        // root inside `land` used to cost on every call
-        // (`Sprawling/runtime/spec/Tools/ChosenPath.lean` D112).
+
         let city = chosen_path::CityRoot::anchor(&self.city_root, action)?;
         let real = match chosen_path::land(&city, &addr, action, &*self.bound)?.location {
             Located::Present(real) if real.is_file() => real,
@@ -101,14 +67,6 @@ impl BoundReader {
         })
     }
 
-    /// The Locator of the whole bytes `asked` names at this moment,
-    /// judged exactly as [`Self::open`] judges it: what `plan finish`
-    /// records when a model names the file that shows its work
-    /// (`Sprawling/collab/Spec.lean` D20, kernel `spec/Locator.lean` D27).
-    ///
-    /// # Errors
-    /// Every refusal of [`Self::open`], and `E_STORAGE_FATAL` when the
-    /// opened bytes cannot be read.
     pub fn pin(&self, asked: &str, action: &'static str) -> Result<Locator, AxError> {
         let mut bytes = Vec::new();
         self.open(asked, action)?
@@ -121,15 +79,11 @@ impl BoundReader {
     }
 }
 
-/// The refusal for a file that was not there when it was judged.
 fn not_there(asked: &str, action: &'static str) -> AxError {
     AxError::failure(AxCode::InvalidArgs, action, format!("{asked} is not there"))
         .with_recovery("name a file that exists; `search` finds files by name")
 }
 
-/// The refusal for a judged file that did not open: gone since it was
-/// judged is the caller's mistake, as a miss is; anything else is
-/// storage, and a person has to make the file readable.
 fn unopened(asked: &str, action: &'static str, err: &std::io::Error) -> AxError {
     if err.kind() == std::io::ErrorKind::NotFound {
         return not_there(asked, action);
@@ -138,33 +92,25 @@ fn unopened(asked: &str, action: &'static str, err: &std::io::Error) -> AxError 
         .with_recovery("the User has to make the file readable")
 }
 
-/// The bytes one name led to, and where they came from.
 pub struct Opened {
     named: Named,
     source: Source,
 }
 
-/// Where the bytes of an [`Opened`] are read from.
 enum Source {
-    /// A file judged and opened on disk, read as it is asked for.
+
     Disk(Handle),
-    /// Bytes the store or a commit handed over whole.
+
     Held(Cursor<Vec<u8>>),
 }
 
 impl Opened {
-    /// What the name was: a file, which has a name to read a format
-    /// from, or a block, which has only its bytes.
+
     #[must_use]
     pub fn named(&self) -> &Named {
         &self.named
     }
 
-    /// The object's total byte length, without moving its read cursor.
-    /// This is sizing information, not permission to skip validation.
-    ///
-    /// # Errors
-    /// Whatever the open file's metadata query returns.
     pub fn byte_len(&self) -> std::io::Result<u64> {
         match &self.source {
             Source::Disk(handle) => handle.as_file().metadata().map(|meta| meta.len()),
@@ -182,9 +128,6 @@ impl Read for Opened {
     }
 }
 
-/// What a model named: a file of this city, by its address, whether it
-/// was read from the tree or from a commit, or a content block, by its
-/// hash.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Named {
     File(Address),
@@ -206,8 +149,6 @@ mod tests {
 
     use super::*;
 
-    /// A bound under which `vault` is a confidential building seen from
-    /// outside and every other building is open.
     fn vault_closed() -> ReadBound {
         Arc::new(|addr: &Address| {
             if addr.as_str().starts_with("vault") {
@@ -232,9 +173,6 @@ mod tests {
         }
     }
 
-    /// The same argument, the same refusal: the door and `read` give one
-    /// code for a closed building, a reserved subtree and a block nobody
-    /// stored, and the door's names the tool that asked.
     #[test]
     fn the_door_refuses_what_read_refuses_with_the_same_code() {
         let city = tempfile::tempdir().unwrap();
@@ -281,8 +219,6 @@ mod tests {
         assert_eq!(codes, owed);
     }
 
-    /// A file of another open building and a block stored for one come
-    /// back byte for byte, each saying what it was.
     #[test]
     fn a_file_and_a_block_come_back_as_their_bytes_and_what_they_were() {
         let city = tempfile::tempdir().unwrap();
@@ -320,8 +256,6 @@ mod tests {
         );
     }
 
-    /// A file that is not there is the caller's mistake, as it is to
-    /// `read`, and a directory is not a file's bytes.
     #[test]
     fn a_file_that_is_not_there_or_is_a_directory_is_the_callers_mistake() {
         let city = tempfile::tempdir().unwrap();

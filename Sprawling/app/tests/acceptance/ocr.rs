@@ -3,25 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The OCR tool (`Sprawling/app/Spec.lean` §8-142). It is offered only to a city
-//! that chose a model for `ocr`, and the two catalogue tests choose
-//! none, so the tool is covered here by cities of its own.
-
 use serde_json::json;
 
 use crate::city::History;
 use crate::episodes::{LAB, OPEN_LAB, answered_text, choose, read_request, stored_for};
 use crate::script::Step;
 
-/// What the scripted OCR endpoint reads in every picture.
 const READ: &str = "KILN 1280";
 
-/// The model the person chose for `ocr`: the row of the built-in
-/// catalogue that is registered as reading pictures (`Sprawling/app/Spec.lean`
-/// §8-142 says why it has to be that row).
 const EYES: &str = "claude-sonnet";
 
-/// A one-pixel PNG.
 const ONE_PIXEL_PNG: [u8; 70] = [
     0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
     0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
@@ -30,9 +21,6 @@ const ONE_PIXEL_PNG: [u8; 70] = [
     0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
 ];
 
-/// The same bytes as base64, the way a request carries them, put
-/// together from short pieces so the secret gate does not read one long
-/// run of high-entropy text.
 fn one_pixel_png_base64() -> String {
     [
         "iVBORw0KGgoAAAAN",
@@ -45,9 +33,6 @@ fn one_pixel_png_base64() -> String {
     .concat()
 }
 
-/// A PNG in the lab and a screenshot a connector stored for the lab are
-/// each read by the model chosen for `ocr`, on its chat face, with the
-/// picture in the request.
 #[test]
 fn a_run_reads_a_png_and_a_stored_screenshot_through_the_model_chosen_for_ocr() {
     let dir = tempfile::tempdir().unwrap();
@@ -107,9 +92,6 @@ fn a_run_reads_a_png_and_a_stored_screenshot_through_the_model_chosen_for_ocr() 
     assert_eq!(shown, vec![(true, true, true); 2]);
 }
 
-/// An OCR endpoint on loopback that answers `calls` chat requests with
-/// [`READ`] and hands back the requests. Whatever it is asked before
-/// that, the model list attaching it reads, names [`EYES`].
 fn ocr_endpoint(calls: usize) -> (String, std::thread::JoinHandle<Vec<String>>) {
     use std::io::Write as _;
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();

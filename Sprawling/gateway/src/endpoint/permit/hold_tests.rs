@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The prefix hold at the gate, end to end through `Gated`
-//! (`Sprawling/gateway/spec/Concurrency.lean` §8-40): threads that call one
-//! endpoint at once with one cold shared prefix, against a loopback
-//! provider reached under a name that is not this machine's, because
-//! D39 never holds a call to this machine.
-
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 use std::sync::{Arc, Barrier, Mutex};
@@ -25,17 +19,12 @@ use crate::endpoint::fakes::{answering_provider, config, monotonic, request};
 use crate::endpoint::redemption::redemption;
 use crate::endpoint::{Endpoint, Transport};
 
-/// The name the provider is reached under; the transport resolves it to
-/// the loopback port.
 const NAME: &str = "provider.test";
 
 const ANSWER: &str = r#"{"content":[{"type":"text","text":"ok"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}"#;
 
-/// How long the provider takes over a pre-warm: long enough that every
-/// caller of a wave is at the gate before it answers.
 const PREWARM_TAKES: Duration = Duration::from_millis(500);
 
-/// A provider at one name, and every request body it heard.
 struct Standing {
     transport: Transport,
     url: String,
@@ -51,9 +40,6 @@ fn standing(answer: impl Fn(&str) -> (u16, String) + Send + 'static) -> Standing
     }
 }
 
-/// A request the real call refuses before anything leaves the machine
-/// sends no cache write first (D39, item 6): a model registered as
-/// reading text only, given a picture, is not pre-warmed.
 #[test]
 fn a_call_the_gate_refuses_locally_sends_no_prewarm() {
     let blind = crate::market::MarketSnapshot::builtin()
@@ -87,8 +73,6 @@ fn is_prewarm(body: &str) -> bool {
     serde_json::from_str::<Value>(body).unwrap()["max_tokens"] == 1
 }
 
-/// A turn whose two leading system blocks every resident of a building
-/// carries, together well past the default minimum a prefix is cached at.
 fn shared_request() -> ModelRequest<'static> {
     let long = |word: &str| word.repeat(20_000 / word.len());
     let mut req = request();
@@ -116,9 +100,6 @@ fn shared_request() -> ModelRequest<'static> {
     req
 }
 
-/// `callers` threads, each with a model of its own over the one
-/// endpoint, calling at once; each call's outcome and the wait it
-/// reports.
 fn wave(
     standing: &Standing,
     callers: usize,
@@ -143,8 +124,6 @@ fn wave(
         .collect()
 }
 
-/// Each call's success, how the pre-warm it waited for ended, and
-/// whether its line carries the pre-warm's own answer.
 fn seen(
     calls: &[(Result<ModelReturn, AxError>, Option<PrefixHeld>)],
 ) -> Vec<(bool, Option<(PrewarmEnd, bool)>)> {
@@ -161,9 +140,6 @@ fn seen(
     seen
 }
 
-/// A cold wave of three: one pre-warm of the shared part goes out
-/// first, then the three calls, and each reports the wait; only the
-/// call that sent the pre-warm carries its answer.
 #[test]
 fn a_cold_wave_sends_one_prewarm_and_then_every_call() {
     let standing = standing(|body| {
@@ -201,8 +177,6 @@ fn a_cold_wave_sends_one_prewarm_and_then_every_call() {
     );
 }
 
-/// A wave whose prefix a call has just used goes out with no hold and
-/// no second pre-warm.
 #[test]
 fn a_prefix_just_used_is_not_held() {
     let standing = standing(|_| (200, ANSWER.to_owned()));
@@ -226,8 +200,6 @@ fn a_prefix_just_used_is_not_held() {
     );
 }
 
-/// A pre-warm the provider refuses releases all three calls, and each
-/// completes on its own request.
 #[test]
 fn a_refused_prewarm_releases_every_call() {
     let standing = standing(|body| {
@@ -258,10 +230,6 @@ fn a_refused_prewarm_releases_every_call() {
     );
 }
 
-/// What gateway D38 costs each call on the messages face: building the
-/// pre-warm's body and its key for a turn whose shared part is about
-/// ten thousand tokens. It asserts nothing about time, since the wall
-/// clock differs by machine.
 #[test]
 #[ignore = "a wall-clock instrument: run it by name with --run-ignored only --no-capture"]
 #[allow(clippy::print_stdout, reason = "an instrument prints its reading")]

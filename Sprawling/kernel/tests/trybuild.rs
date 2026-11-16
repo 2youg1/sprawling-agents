@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! V0: "unrepresentable" is itself tested.
-//! Every file under tests/ui must fail to compile; the stderr snapshots
-//! pin the reason. The runtime crate carries the prefix/turn cases.
-
 #[test]
 fn the_hardening_counterexamples_do_not_compile() {
     let cases = trybuild::TestCases::new();

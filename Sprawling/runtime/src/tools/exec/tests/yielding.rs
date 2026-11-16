@@ -3,16 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A dispatched command starts below the core, on every platform
-//! (`Sprawling/runtime/spec/Tools/Exec.lean` §8-13-3).
-
 #![allow(clippy::arithmetic_side_effects, reason = "test code")]
 
 use super::*;
 
-/// A command that prints the scheduling priority it itself runs at, and
-/// the variables it needs to start: PowerShell does not start without
-/// `SystemRoot`.
 fn reads_its_own_priority() -> (String, Vec<String>, Vec<&'static str>) {
     if cfg!(windows) {
         (
@@ -26,8 +20,7 @@ fn reads_its_own_priority() -> (String, Vec<String>, Vec<&'static str>) {
             vec!["SystemRoot"],
         )
     } else {
-        // `ps` rather than a bare `nice`: BSD `nice` without a utility
-        // prints nothing on macOS, while `ps -o nice=` answers on both.
+
         (
             "sh".to_owned(),
             vec!["-c".to_owned(), "ps -o nice= -p $$".to_owned()],
@@ -36,8 +29,6 @@ fn reads_its_own_priority() -> (String, Vec<String>, Vec<&'static str>) {
     }
 }
 
-/// Where a printed priority stands, higher meaning more CPU: a Windows
-/// priority class by name, or a Unix niceness, where more is less.
 fn rank(printed: &str) -> i64 {
     let printed = printed.trim();
     match printed {
@@ -98,8 +89,6 @@ fn a_dispatched_command_runs_below_the_core() {
         "the dispatched priority probe must report a priority: {result}"
     );
 
-    // Windows sets an absolute class, so a core that a CI runner already
-    // starts at BelowNormal leaves its commands beside it, not beneath it.
     let floor = rank("BelowNormal");
     assert!(
         rank(dispatched) < rank(&core) || (rank(dispatched) == rank(&core) && rank(&core) <= floor),
@@ -108,8 +97,6 @@ fn a_dispatched_command_runs_below_the_core() {
     );
 }
 
-/// `ionice` with no arguments prints the IO class it itself runs in, so
-/// run through exec it reads back the level a dispatched command gets.
 #[cfg(target_os = "linux")]
 #[test]
 fn a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level() {
@@ -129,9 +116,6 @@ fn a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level() {
     );
 }
 
-/// `nice` starts even when the program it is asked to run does not exist,
-/// so without a lookup of its own a missing program would come back as a
-/// settled exit 127 instead of the typed refusal with its recovery.
 #[cfg(unix)]
 #[test]
 fn a_missing_program_still_refuses_under_nice() {

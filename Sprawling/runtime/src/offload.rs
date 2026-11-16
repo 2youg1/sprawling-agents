@@ -3,27 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The shared shrink primitive: lossy-but-restorable,
-//! owned here and nowhere else. Four invariants, each enforced in code:
-//! store-before-cut; substitute (hint included) never larger than the
-//! original nor the cap; only lossy transforms store; the substitute
-//! always carries a materialized read-only rest path. CAS dedup makes
-//! repeated offloads of the same bytes idempotent.
-
 use std::path::Path;
 
 use kernel::{Address, AxCode, AxError, Locator};
 use storage::Cas;
 
-/// The directory inside the room that holds materialized rest files.
 pub const REST_DIR: &str = ".rest";
 
-/// Where offloaded bytes live: the CAS for the original, and the room
-/// whose `REST_DIR` holds the materialized rest file. The room travels
-/// as its city address because the model's read tool resolves every
-/// path from the city root. `origin` is the run and building the
-/// original is pinned for, so that a `cas:` read of it is judged where
-/// the output was made.
 pub struct OffloadSite<'a> {
     pub cas: &'a mut Cas,
     pub city_root: &'a Path,
@@ -31,8 +17,6 @@ pub struct OffloadSite<'a> {
     pub origin: storage::BlockOrigin,
 }
 
-/// The outcome: a substitute that fits the cap, the original pinned in
-/// CAS, and a read-only path the model can keep reading from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OffloadRecord {
     pub substitute: Vec<u8>,
@@ -45,10 +29,6 @@ fn hint_line(total: u64, rest_path: &str, locator: &Locator) -> String {
     format!("\n[offloaded: total {total} bytes; rest at {rest_path}; original {locator}]")
 }
 
-/// Writes the rest file under the room and answers its city address,
-/// `<room>/.rest/rest-<hash>.dat`: the spelling the model's read tool
-/// admits and resolves from the city root, and the same bytes in the
-/// ledger on every machine.
 fn materialized(
     bytes: &[u8],
     site: &OffloadSite<'_>,
@@ -98,17 +78,12 @@ fn materialize(bytes: &[u8], dir: &Path, name: &str) -> Result<(), AxError> {
     Ok(())
 }
 
-/// The way back from a cut: the original pinned in the CAS and
-/// materialized as a read-only rest file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Tee {
     pub(crate) original: Locator,
     pub(crate) rest_path: String,
 }
 
-/// Pins the full original before anything is cut from it: invariants 1
-/// and 4 in one call, so no cutter can run without the way back
-/// existing first. Repeating it on the same bytes is idempotent.
 pub(crate) fn tee(bytes: &[u8], site: &mut OffloadSite<'_>) -> Result<Tee, AxError> {
     let hash = site
         .cas
@@ -122,9 +97,6 @@ pub(crate) fn tee(bytes: &[u8], site: &mut OffloadSite<'_>) -> Result<Tee, AxErr
     })
 }
 
-/// Shrinks `bytes` to at most `cap_bytes`. Callers only come here for
-/// lossy cases (`len > cap`); a lossless call is refused — invariant 3
-/// says only lossy transforms may store.
 pub fn offload(
     bytes: &[u8],
     cap_bytes: u64,
@@ -147,8 +119,7 @@ pub fn offload(
              stores only what it has to cut",
         ));
     }
-    // Invariant 1: the full original enters the CAS before any cut.
-    // Invariant 4: the substitute always points at a readable rest file.
+
     let Tee {
         original,
         rest_path,
@@ -176,7 +147,7 @@ pub fn offload(
     })?;
     let mut substitute = bytes.get(..head_len).unwrap_or_default().to_vec();
     substitute.extend_from_slice(hint.as_bytes());
-    // Invariant 2: substitute (hint included) within both bounds.
+
     let substitute_len = u64::try_from(substitute.len()).map_err(|_| {
         AxError::failure(
             AxCode::InvalidArgs,
@@ -207,8 +178,6 @@ pub fn offload(
     })
 }
 
-/// Restores the rest file from the CAS after external cleanup; the bytes
-/// are the original, verbatim (A7's third assertion).
 pub fn rematerialize(locator: &Locator, site: &mut OffloadSite<'_>) -> Result<String, AxError> {
     let Locator::Cas { hash, .. } = locator else {
         return Err(AxError::failure(
@@ -262,7 +231,7 @@ pub(crate) mod tests {
             .map(|i| u8::try_from(i % 251).unwrap())
             .collect();
         let record = offload(&original, 4_096, &mut s).unwrap();
-        // Substitute within both bounds, hint included.
+
         assert!(record.substitute.len() <= 4_096);
         assert!(record.substitute.len() < original.len());
         assert!(
@@ -272,17 +241,17 @@ pub(crate) mod tests {
             String::from_utf8_lossy(&record.substitute).contains("; rest at room/.rest/rest-"),
             "the hint names the rest file by its address in the room"
         );
-        // The rest path serves the full original.
+
         assert_eq!(
             std::fs::read(dir.path().join(&record.rest_path)).unwrap(),
             original
         );
-        // The CAS serves the full original by locator.
+
         let Locator::Cas { hash, .. } = &record.original else {
             panic!("expected a cas locator");
         };
         assert_eq!(s.cas.get(hash).unwrap(), original);
-        // External cleanup, then rematerialize: bytes identical.
+
         let mut perms = std::fs::metadata(dir.path().join(&record.rest_path))
             .unwrap()
             .permissions();

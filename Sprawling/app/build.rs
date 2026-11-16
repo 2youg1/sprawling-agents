@@ -3,87 +3,29 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Single embed point: gzips the web client bundle into OUT_DIR and
-//! generates `client_embed.rs`, the file table main.rs includes; writes
-//! the dependency list the lockfile names, and the toolchain pins the
-//! doctor reports, beside it. Windows targets also link product resources
-//! derived from Cargo's package metadata (`Sprawling/app/Spec.lean` §8-157).
-//!
-//! The bundle is whatever `just build-web` left at [`BUNDLE_DIR`] in this
-//! package's directory: the client's own `index.html` and the hashed
-//! assets Vite wrote beside it. There is no
-//! second shell in this repository, because the one the client builds is
-//! the one the product serves.
-//!
-//! **Every path here works in three trees**: this checkout, the
-//! directory `cargo package` verifies its archive in, and the registry
-//! directory `cargo install` unpacks it into (`Sprawling/app/Spec.lean` §8-157).
-//! So nothing is found by counting parent directories: the bundle is
-//! inside this package, the lockfile is found by cargo's own rule, and
-//! a pin file outside the package is read when it is there and left
-//! unpinned when it is not.
-//!
-//! When the bundle is absent the binary still builds - it carries a
-//! placeholder page, `CLIENT_COMPLETE` is false, and a warning says so -
-//! because `just check` must not demand a JavaScript toolchain. The
-//! release gate (`xtask budget`) refuses a release binary whose file
-//! table has no client assets, so an incomplete client cannot ship
-//! silently.
-//!
-//! Gzip is deterministic here: fixed compression level, zeroed mtime.
-//! The same source bytes embed identically on every build, which the
-//! reproducible-build fixture (`cargo xtask repro`) relies on.
-
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-/// Where the built client lands: a path relative to this package's
-/// directory, in `/`-separated segments.
-///
-/// **This declaration is the one home of that location.** It is the whole
-/// path rather than a name each reader places, because the parent
-/// directory spelled separately in each reader is how the bundler and this
-/// file came to disagree: the bundle is bun's output, not cargo's, so it
-/// stays here whatever `CARGO_TARGET_DIR` says. It is inside this package
-/// because a crates.io archive carries this package's directory and
-/// nothing else, and this is the only reader that has to work there and
-/// in the published tree, neither of which carries `Tools/xtask/`; `xtask`
-/// reads this constant out of this file, and its artifact gate refuses a
-/// client build script or a justfile that spells the path differently.
 const BUNDLE_DIR: &str = "web-dist";
 
-/// The files that pin the toolchains this code is developed with, each
-/// relative to the checkout's root and named by the constant `pins.rs`
-/// gives it. None is in this package, so a build from the crates.io
-/// archive finds none of them, and the doctor reports those tools as
-/// unpinned (`Sprawling/app/Spec.lean` §8-157).
 const PINS: [(&str, &str); 3] = [
     ("RUST_TOOLCHAIN_FILE", "rust-toolchain.toml"),
     ("LEAN_TOOLCHAIN_FILE", "lean-toolchain"),
     ("ZIG_VERSION_FILE", "Sprawling/desktop/ffi/zig-version"),
 ];
 
-/// What a binary built without the client serves.
-///
-/// It says which command was not run rather than showing an empty page,
-/// because the person meeting it is a contributor who built from source
-/// and the answer they need is one line long.
 const PLACEHOLDER: &str = r#"<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><title>sprawling</title></head>
 <body><p>This binary was built without the client bundle. Run <code>just build-web</code> and rebuild.</p></body></html>
 "#;
 
 fn main() {
-    // Which release this binary is, set by `release.yml` and by nothing
-    // else. Declared here rather than only read through `option_env!`,
-    // because cargo otherwise reuses a binary compiled under the previous
-    // tag and every copy of it would name the wrong release.
+
     println!("cargo::rerun-if-env-changed=SPRAWLING_RELEASE_TAG");
     println!("cargo::rerun-if-env-changed=SPRAWLING_NIGHTLY_TAG");
     println!("cargo::rerun-if-env-changed=SPRAWLING_SOURCE_SHA");
     if let Err(msg) = embed() {
-        // cargo >= 1.84: `cargo::error` fails the build loudly instead of
-        // leaving a stale or missing asset for include_bytes! to trip on.
+
         println!("cargo::error=binary resource generation failed: {msg}");
     }
 }
@@ -106,14 +48,9 @@ fn embed() -> Result<(), String> {
     let dist = BUNDLE_DIR
         .split('/')
         .fold(PathBuf::from(&manifest), |at, segment| at.join(segment));
-    // Emitted even when absent: the first `just build-web` after a
-    // placeholder build must trigger a re-embed, not wait for luck.
+
     println!("cargo::rerun-if-changed={}", dist.display());
 
-    // A bundle is complete when the page exists and something was built
-    // beside it. Both halves are asked for: Vite writes `index.html`
-    // first, so a build interrupted between the two leaves a page whose
-    // every script tag points at nothing.
     let mut files: Vec<(String, PathBuf)> = Vec::new();
     let assets = dist.join("assets");
     let built = dist.join("index.html").is_file()
@@ -168,10 +105,6 @@ fn embed() -> Result<(), String> {
     Ok(())
 }
 
-/// The first directory from this package's upward that holds a
-/// `Cargo.lock`, which is where cargo writes it: the workspace root in a
-/// checkout, and this package's own directory in an archive, because
-/// `cargo package` puts the lockfile at the archive's root.
 fn checkout_root(manifest: &Path) -> Result<PathBuf, String> {
     manifest
         .ancestors()
@@ -186,10 +119,6 @@ fn checkout_root(manifest: &Path) -> Result<PathBuf, String> {
         })
 }
 
-/// The embedded dependency list (release item: the binary can name what
-/// it is made of). Parsed from Cargo.lock with a ten-line reader rather
-/// than a toml dependency: the lockfile's [[package]] blocks are stable,
-/// machine-written lines.
 fn embed_dependency_list(root: &Path, out_dir: &str) -> Result<(), String> {
     let lock = root.join("Cargo.lock");
     println!("cargo::rerun-if-changed={}", lock.display());
@@ -215,9 +144,6 @@ fn embed_dependency_list(root: &Path, out_dir: &str) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
-/// `pins.rs`: one constant per row of [`PINS`], holding that file's whole
-/// text, or nothing when the file is absent. Only absence reads as
-/// nothing; a pin file that exists and cannot be read fails the build.
 fn embed_pins(root: &Path, out_dir: &str) -> Result<(), String> {
     let mut generated = String::from(
         "// Generated by build.rs from the pin files beside the lockfile; an empty string is a \
@@ -238,7 +164,6 @@ fn embed_pins(root: &Path, out_dir: &str) -> Result<(), String> {
     std::fs::write(PathBuf::from(out_dir).join("pins.rs"), generated).map_err(|e| e.to_string())
 }
 
-/// Walks `dist` recursively, recording each file under its request path.
 fn collect(root: &Path, dir: &Path, files: &mut Vec<(String, PathBuf)>) -> Result<(), String> {
     let entries = std::fs::read_dir(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     for entry in entries {
@@ -258,7 +183,6 @@ fn collect(root: &Path, dir: &Path, files: &mut Vec<(String, PathBuf)>) -> Resul
     Ok(())
 }
 
-/// Deterministic gzip: fixed level, zeroed mtime.
 fn gzip(bytes: &[u8]) -> Result<Vec<u8>, String> {
     let mut encoder = flate2::GzBuilder::new()
         .mtime(0)

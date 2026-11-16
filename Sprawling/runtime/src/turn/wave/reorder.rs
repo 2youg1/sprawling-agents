@@ -3,19 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The leading reads of a wave run at once, and their answers handed back
-//! in call order.
-
 use kernel::{AxCode, AxError, Tool, ToolCall, ToolOutcome};
 
 use super::{Admitted, ConcurrentInvoke};
 
-/// Runs the tool of every cleared call that holds no answer from while
-/// the model was generating, all at once, and answers in call order, one
-/// answer per such call: the reorder buffer. The first runs on this
-/// thread, so a wave of one read starts no thread at all. The scope is
-/// this module's exception to the one spawn point (ARCHITECTURE §10
-/// rule 3): every thread it starts is joined before it returns.
 pub(super) fn all_at_once(
     tools: &dyn ConcurrentInvoke,
     calls: &[&ToolCall],

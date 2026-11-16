@@ -33,7 +33,6 @@ fn a_scheduled_job_starts_by_itself_and_only_once_per_firing() {
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
 
-    // Time arrives as a parameter, so an hour passes in two calls.
     let minute = 60_000;
     worker.last_tick = kernel::TimeMs::new(14 * minute);
     assert_eq!(worker.tick(kernel::TimeMs::new(15 * minute)).unwrap(), 1);
@@ -85,16 +84,12 @@ fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
         "a second frame of the same ask is a second bill, not a second piece of work"
     );
 
-    // A repeat that arrives while the work is going is the same ask
-    // once more: the run it wants is already running.
     desk.post(asked(), wire::Reply::nowhere());
     assert!(
         matches!(desk.next(|_| false), DeskWait::Idle),
         "the ask is still being carried out; a repeat adds nothing"
     );
 
-    // ...and once it is over, asking again is asking for a second
-    // run, which is a thing a person is allowed to want.
     drop(carrying);
     desk.post(asked(), wire::Reply::nowhere());
     assert!(
@@ -103,9 +98,6 @@ fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
     );
 }
 
-/// Work already accepted finishes first: a close that dropped a
-/// queued command would make "stopped" and "lost" the same thing in
-/// the record.
 #[test]
 fn a_close_lands_between_commands_and_never_inside_one() {
     let desk = CommandDesk::default();
@@ -134,9 +126,6 @@ fn a_close_lands_between_commands_and_never_inside_one() {
     ));
 }
 
-/// A serve that failed closes the city as `Broken`, not through the door
-/// `/quit` uses: a handoff saying the person closed it would record a
-/// choice nobody made and a failure the next session never heard of.
 #[test]
 fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
     let dir = tempfile::tempdir().unwrap();
@@ -170,11 +159,6 @@ fn a_city_that_serving_brought_down_does_not_say_the_person_closed_it() {
     );
 }
 
-/// One job in a window must not take the rest of that window with it:
-/// a tick that closed the window first and returned on the first refusal
-/// would leave the other jobs due that minute unrun, with nothing
-/// recording that they had not run. Every due job is attempted, and a
-/// refusal is written to the log instead of to the other jobs.
 #[test]
 fn a_scheduled_job_that_cannot_start_does_not_take_the_others_with_it() {
     let dir = tempfile::tempdir().unwrap();
@@ -194,11 +178,7 @@ fn a_scheduled_job_that_cannot_start_does_not_take_the_others_with_it() {
 
     let minute = 60_000;
     worker.last_tick = kernel::TimeMs::new(14 * minute);
-    // Both are taken into a lane, because a lane is where a dispatch
-    // is judged now: the schedule's job is a request, and whether the
-    // building behind it exists is the drive's answer rather than the
-    // tick's. What the tick promises is that it walked the whole
-    // window.
+
     assert_eq!(
         worker.tick(kernel::TimeMs::new(15 * minute)).unwrap(),
         2,
@@ -207,8 +187,7 @@ fn a_scheduled_job_that_cannot_start_does_not_take_the_others_with_it() {
     worker.land_the_rest().unwrap();
 
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
-    // The two lanes drive at once, so which opening lands first is a
-    // race; the promise is that each did once, not their order.
+
     let mut started: Vec<String> = verified
         .raw_lines()
         .iter()

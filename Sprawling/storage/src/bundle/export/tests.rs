@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Fixtures for exporting, restoring and weighing a bundle (`Sprawling/storage/spec/Bundle.lean` §8-12).
-
 use super::super::files::open_restored;
 use super::super::fixture::city_with;
 use super::super::manifest::RESERVED;
@@ -23,15 +21,13 @@ fn a_city_comes_back_in_an_empty_directory_and_its_chain_verifies() {
     let elsewhere = tempfile::tempdir().unwrap();
     let restored = Bundle::restore(carried.path(), elsewhere.path()).unwrap();
     assert_eq!(restored, exported);
-    // The work came with it, not only the history.
+
     assert!(elsewhere.path().join("City.md").exists());
     assert!(elsewhere.path().join("lab").join("Roadmap.md").exists());
-    // And the restored city is one a writer can continue.
+
     open_restored(elsewhere.path(), TimeMs::new(9)).unwrap();
 }
 
-/// A filesystem that accepts one write and does not keep it, which
-/// is what a full disk and a cancelled copy look like from here.
 struct LosesRoadmap(RealFs);
 
 impl LosesRoadmap {
@@ -100,9 +96,6 @@ impl crate::vfs::Vfs for LosesRoadmap {
     }
 }
 
-/// The manifest is read back from the bundle, so on its own it
-/// cannot tell a complete bundle from a short one. This is the case
-/// that the source-side counts exist for.
 #[test]
 fn a_city_file_the_bundle_never_received_fails_the_export() {
     let home = tempfile::tempdir().unwrap();
@@ -129,7 +122,6 @@ fn a_short_copy_is_refused_rather_than_restored_quietly() {
     let carried = tempfile::tempdir().unwrap();
     Bundle::export(home.path(), carried.path()).unwrap();
 
-    // Lose the last record, as an interrupted copy would.
     let segment = std::fs::read_dir(carried.path().join(LEDGER))
         .unwrap()
         .filter_map(Result::ok)
@@ -154,10 +146,6 @@ fn a_short_copy_is_refused_rather_than_restored_quietly() {
     );
 }
 
-/// A bundle can lose every object it carries and still verify as a
-/// history: the chain is intact, and each Locator in it points at
-/// nothing. Only the object count says so, which is why restore
-/// compares four numbers rather than two.
 #[test]
 fn a_bundle_that_lost_its_objects_is_refused_rather_than_restored_empty() {
     let home = tempfile::tempdir().unwrap();
@@ -170,7 +158,6 @@ fn a_bundle_that_lost_its_objects_is_refused_rather_than_restored_empty() {
     let exported = Bundle::export(home.path(), carried.path()).unwrap();
     assert_eq!(exported.cas_objects(), 1);
 
-    // The copy reached another machine with its objects missing.
     std::fs::remove_dir_all(carried.path().join(CAS)).unwrap();
 
     let elsewhere = tempfile::tempdir().unwrap();
@@ -188,15 +175,10 @@ fn a_city_is_never_restored_on_top_of_another() {
     let carried = tempfile::tempdir().unwrap();
     Bundle::export(home.path(), carried.path()).unwrap();
 
-    // The city it came from still has its ledger, so restoring back
-    // onto it would be a merge of two histories.
     let err = Bundle::restore(carried.path(), home.path()).unwrap_err();
     assert!(err.into_ax().subject().contains("already holds a ledger"));
 }
 
-/// The acceptance at the restore door: a write whose path crosses a
-/// link into the reserved subtree is refused whole, and the file
-/// the link reaches keeps - or gains - nothing.
 #[test]
 fn a_restore_through_a_link_to_a_reserved_path_is_refused() {
     let home = tempfile::tempdir().unwrap();
@@ -208,8 +190,7 @@ fn a_restore_through_a_link_to_a_reserved_path_is_refused() {
     let root = elsewhere.path();
     std::fs::create_dir_all(root.join(".git")).unwrap();
     if !crate::alias::tests::place_link(true, &root.join(".git"), &root.join("lab")) {
-        // This machine hands out no link: nothing could have been
-        // written through one.
+
         return;
     }
     let err = Bundle::restore(carried.path(), root).unwrap_err();
@@ -224,20 +205,13 @@ fn a_restore_through_a_link_to_a_reserved_path_is_refused() {
     );
 }
 
-/// A restore whose destination reaches a protected path through a
-/// link is refused whole, and the link's target gains no directory:
-/// the alias check precedes directory creation, so no parent is ever
-/// made through the link (`Sprawling/storage/spec/Alias.lean` §8-25).
 #[test]
 fn a_restore_through_a_link_lands_no_directory_at_the_link_target() {
     let home = tempfile::tempdir().unwrap();
     city_with(1, home.path());
     let carried = tempfile::tempdir().unwrap();
     Bundle::export(home.path(), carried.path()).unwrap();
-    // A nested city file, so its parent must be created at the
-    // destination - that creation is the step the rule guards. The
-    // shallow sibling is removed so this nested file is the first
-    // one the walk reaches under the link.
+
     let lab = carried.path().join(CITY).join("lab");
     std::fs::remove_file(lab.join("Roadmap.md")).unwrap();
     let nested = lab.join("room").join("Notes.md");
@@ -259,9 +233,6 @@ fn a_restore_through_a_link_lands_no_directory_at_the_link_target() {
     );
 }
 
-/// The reserved predicate reaches write targets at the restore door:
-/// git metadata is no city file, never travels, and a bundle that
-/// carries it is forged - restoring it would plant hooks.
 #[test]
 fn a_bundle_carrying_git_metadata_is_refused_rather_than_planted() {
     let home = tempfile::tempdir().unwrap();
@@ -276,8 +247,6 @@ fn a_bundle_carrying_git_metadata_is_refused_rather_than_planted() {
         "git metadata is no city file and never travels"
     );
 
-    // What a forged bundle looks like: the metadata arrives beside
-    // the city files after the export.
     let planted = carried.path().join(CITY).join(".git").join("hooks");
     std::fs::create_dir_all(&planted).unwrap();
     std::fs::write(planted.join("post-checkout"), b"escalate").unwrap();
@@ -294,8 +263,6 @@ fn a_bundle_carrying_git_metadata_is_refused_rather_than_planted() {
     );
 }
 
-/// Every commit subject from `HEAD` back, newest first; a directory
-/// that is no repository has no history to list.
 pub(super) fn log_of(root: &std::path::Path) -> Vec<String> {
     let Ok(repo) = git2::Repository::open(root) else {
         return Vec::new();
@@ -309,9 +276,6 @@ pub(super) fn log_of(root: &std::path::Path) -> Vec<String> {
     .collect()
 }
 
-/// The history is part of the city: a restored city that lost its
-/// commits has lost every checkpoint a rollback could reach.
-/// Makes `root` a repository of two commits and returns its log.
 pub(super) fn committed_twice(root: &std::path::Path) -> Vec<String> {
     let repo = git2::Repository::init(root).unwrap();
     let who = git2::Signature::new("owner", "owner@city", &git2::Time::new(1, 0)).unwrap();

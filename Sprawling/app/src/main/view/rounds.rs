@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The rounds of one run and the calls in each, folded the first time
-//! the person opens the run (`Sprawling/app/spec/Main.lean` §8-117).
-
 use std::collections::BTreeMap;
 
 use kernel::{AxError, EventRecord, RunId};
@@ -15,13 +12,8 @@ use wire::Turn;
 use super::arrange::{Entry, NodeKey};
 use super::follow::Row;
 
-/// What each run the person has opened folded into.
 pub(super) type Rounds = BTreeMap<RunId, Result<Vec<Turn>, AxError>>;
 
-/// The turns of `run`, through the fold the rounds page uses.
-///
-/// # Errors
-/// The first line of `run` that does not parse as a Ledger record.
 pub(super) fn fold(run: RunId, rows: &[Row]) -> Result<Vec<Turn>, AxError> {
     let records = rows
         .iter()
@@ -31,9 +23,6 @@ pub(super) fn fold(run: RunId, rows: &[Row]) -> Result<Vec<Turn>, AxError> {
     Ok(accounting::views::turns(&records))
 }
 
-/// The mark of a tree entry with no child entries: `+` on a run whose
-/// rounds are not folded yet, since whether it has any is known only
-/// once the person opens it; a blank on everything else.
 pub(super) fn leaf_mark(rounds: &Rounds, key: &NodeKey) -> char {
     match key {
         NodeKey::Run(run) if !rounds.contains_key(run) => '+',
@@ -47,8 +36,6 @@ pub(super) fn leaf_mark(rounds: &Rounds, key: &NodeKey) -> char {
     }
 }
 
-/// Pushes the rounds of the run entry at `at`, each followed by its
-/// calls; an unreadable run gets one entry naming the failure instead.
 pub(super) fn append_below(
     entries: &mut Vec<Entry>,
     at: usize,

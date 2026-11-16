@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The desks one dispatch lends out: opened together, lent what they
-//! hold, and taken back together when the drive ends.
-
 use std::path::PathBuf;
 
 use kernel::{Address, AxError};
@@ -14,24 +11,7 @@ use super::super::RunWorker;
 use super::Site;
 
 impl RunWorker {
-    /// Opens the desks this run works at, and lends them what they hold.
-    ///
-    /// Every desk is a place a tool writes to and the settlement reads
-    /// back, so they open together and come back as one value. The
-    /// room's queue moves into the signal desk rather than being copied
-    /// there: one queue per room at all times, and a copy would be a
-    /// second answer to what arrived first.
-    ///
-    /// A second run in the same room is given a queue of its own and
-    /// told so in [`Desks::holding`]: the room table lends its queue to
-    /// one reader, and what arrives meanwhile waits there for that
-    /// reader to land (`Sprawling/app/Spec.lean` §8-46-9).
-    ///
-    /// # Errors
-    /// Propagates a plan that cannot be read and a shelf that cannot be
-    /// indexed - both before a model is called, since a run built on
-    /// either would spend a call to produce claims the city was always
-    /// going to drop.
+
     pub(in crate::worker) fn open_desks(
         &mut self,
         site: &Site,
@@ -48,11 +28,6 @@ impl RunWorker {
             self.collaborating.requests.clone(),
         )));
 
-        // The room's queue is lent to the desk for the length of the
-        // drive and given back when the run lands. The table keeps the
-        // loan rather than the queue being lifted out of it, so a
-        // second run in the same room is answered instead of being
-        // handed a queue that would overwrite the first one's.
         let lent = self.collaborating.rooms.lend(addr, site.run_id);
         let waiting = lent.inbox.pending();
         let signals = std::sync::Arc::new(std::sync::Mutex::new(collab::SignalDesk::new(
@@ -73,17 +48,8 @@ impl RunWorker {
             &site.who,
         )));
 
-        // The plan is shared ground, so it is read from and written back
-        // to the city even when the run writes everywhere else in its
-        // own tree. A claim nobody else can see is not a claim; the work
-        // stays private until it is checked, the fact that somebody is
-        // doing it does not.
         let plan_path = city::roadmap_path(&self.city_root, site.building.addr());
-        // A plan that is not there yet reads as empty; every other reason
-        // this file cannot be read is reported here, before a model is
-        // called. Reading them as empty spent a call to produce claims
-        // that the compare-and-swap below was always going to drop, and
-        // told the person a neighbour had moved their row.
+
         let plan_text = city::roadmap(&self.city_root, site.building.addr())?;
         let plan = std::sync::Arc::new(std::sync::Mutex::new(collab::ClaimDesk::new(
             site.who.clone(),
@@ -102,13 +68,6 @@ impl RunWorker {
             ),
         )));
 
-        // What the building already knows, computed from the shelf
-        // rather than kept beside it. An index that was stored would be
-        // a second copy of what the files say, and the files are the
-        // ones that are true.
-        // `archive_index` already answers `Ok(empty)` for a building with
-        // no shelf, so anything it reports is a real failure and telling
-        // the model this building knows nothing would be a lie about it.
         let held: Vec<collab::Held> = city::archive_index(&self.city_root, site.building.addr())?
             .into_iter()
             .map(|entry| collab::Held {
@@ -122,8 +81,7 @@ impl RunWorker {
             held,
             self.filer(site, addr, std::sync::Arc::clone(&shelf_root)),
         )));
-        // Copied rather than lent: the join and the graph stay with the
-        // worker, which answers a handback while this run is still going.
+
         let mut joined = collab::FanIn::new();
         if let Some(existing) = self.collaborating.joins.get(addr) {
             for artifact in existing.artifacts() {
@@ -148,9 +106,7 @@ impl RunWorker {
             shelf_root,
             pr,
             workshop,
-            // Where this run stands, carried rather than worked out: a
-            // run that inferred its own depth would be one wrong answer
-            // away from a delegate that delegates.
+
             delegates: std::sync::Arc::new(std::sync::Mutex::new(collab::DelegateDesk::new(
                 depth,
                 site.building.addr().clone(),
@@ -163,10 +119,6 @@ impl RunWorker {
         })
     }
 
-    /// The post a run's signal desk writes through: each line crosses
-    /// the relay at the call, so it is on the ledger while the run is
-    /// still going, and the accounting thread delivers what it sent
-    /// when it shows the line (collab D7).
     fn post(&self, run: kernel::RunId, room: &Address, who: &str) -> collab::Post {
         let mut relay = self.flight.gate.issue();
         let clock = std::sync::Arc::clone(&self.clock);
@@ -179,24 +131,13 @@ impl RunWorker {
                 clock: clock.as_ref(),
             };
             match landing.record(&mut |line| stamping.record_for(run, line))? {
-                // Delivered on the accounting thread, which shows the
-                // relayed line to the room table (`RunWorker::show_relayed`).
+
                 crate::effect::Then::Deliver(_) | crate::effect::Then::Nothing => Ok(()),
                 crate::effect::Then::Roadmap { .. } | crate::effect::Then::Shelf(_) => Ok(()),
             }
         })
     }
 
-    /// The filer a run's archive desk writes through: each record's
-    /// `asset_archived` line crosses the relay at the call, then the
-    /// entry is filed in the tree this run writes, so the run's own
-    /// recall reads it back and the history has it before the tool
-    /// answers (kernel `spec/Event/Record.lean` D24).
-    ///
-    /// The desks open before the lane places a review room's tree, so
-    /// the tree is read from `shelf_root` at the call, where the lane
-    /// put it once placed: a root captured here would be the city's,
-    /// and the entry would reach the building's shelf unchecked.
     fn filer(
         &self,
         site: &Site,
@@ -254,9 +195,6 @@ impl RunWorker {
         })
     }
 
-    /// The goal desk a run registers its ground through: each entry is
-    /// decided on the accounting thread at the call, and its line is
-    /// filed under `room`.
     pub(in crate::worker) fn goal_desk(
         &self,
         run: kernel::RunId,
@@ -272,13 +210,7 @@ impl RunWorker {
 }
 
 impl BenchDesks {
-    /// The archive tool, its shelf pointed at `tree`: the lane has placed
-    /// the run's tree by the time it lays out the bench, so under review
-    /// the shelf files inside the checkpoint nobody has checked yet.
-    ///
-    /// # Errors
-    /// Refuses a shelf already pointed at another tree, and propagates
-    /// the tool's own refusal to be built.
+
     pub(in crate::worker) fn archive_tool(
         &self,
         tree: &std::path::Path,
@@ -299,45 +231,27 @@ impl BenchDesks {
     }
 }
 
-/// The desks one dispatch lends out, and takes back when the drive ends.
-///
-/// Grouped because they are lent and taken back together: five handles
-/// passed side by side are five chances to take four of them back. Three
-/// of them settle in one order in `settle_desks`, `goals` is answered at
-/// each call on the accounting thread, and `pr` settles after,
-/// once the run has something to show for itself, and it belongs here
-/// all the same - what makes them one value is the lending, not the
-/// settling.
 pub(in crate::worker) struct Desks {
     pub(in crate::worker) signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
     pub(in crate::worker) goals: std::sync::Arc<std::sync::Mutex<collab::GoalDesk>>,
     pub(in crate::worker) plan: std::sync::Arc<std::sync::Mutex<collab::ClaimDesk>>,
     pub(in crate::worker) shelf: std::sync::Arc<std::sync::Mutex<collab::ArchiveDesk>>,
-    /// The tree the shelf files in, set once the lane has placed it.
+
     pub(in crate::worker) shelf_root: std::sync::Arc<std::sync::OnceLock<PathBuf>>,
     pub(in crate::worker) pr: std::sync::Arc<std::sync::Mutex<collab::PrDesk>>,
-    /// The room's workshop (what it got back and handed down, so nothing
-    /// is handed twice) and the run's delegate desk, read at the call.
+
     pub(in crate::worker) workshop: std::sync::Arc<std::sync::Mutex<collab::WorkshopDesk>>,
     pub(in crate::worker) delegates: std::sync::Arc<std::sync::Mutex<collab::DelegateDesk>>,
-    /// Where the shared plan lives, so the claims that survive are
-    /// written back to the file they were checked against.
+
     pub(in crate::worker) plan_path: PathBuf,
-    /// What was already in the room's queue when it was lent out, which
-    /// is what `status` reports as waiting. Read before the queue goes
-    /// to the desk, so it is counted here or not at all.
+
     pub(in crate::worker) waiting: u32,
-    /// This run's tenure over its room's queue, shown when it lands:
-    /// only the holder gives a queue back (`Sprawling/app/Spec.lean` §8-46-9).
+
     pub(in crate::worker) tenure: crate::worker::QueueTenure,
-    /// Where a change of the room's run policy waits for this run.
+
     pub(in crate::worker) policy: crate::worker::rooms::PolicySlot,
 }
 
-/// The desks a run's bench holds while it drives: clones of the handles
-/// in [`Desks`], for the lane that lays the bench out. The room's queue
-/// and the tenure over it stay in [`Desks`], with the landing, because
-/// only the holder gives a queue back.
 pub(in crate::worker) struct BenchDesks {
     pub(in crate::worker) signals: std::sync::Arc<std::sync::Mutex<collab::SignalDesk>>,
     pub(in crate::worker) goals: std::sync::Arc<std::sync::Mutex<collab::GoalDesk>>,

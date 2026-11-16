@@ -3,20 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one OpenAI stream settles into.
-
 use kernel::{AxError, Increment};
 use serde_json::{Value, json};
 
 use crate::endpoint::failure::{ProviderFailure, provider_err};
 use crate::mismatch::{settled_tool_arguments, stream_cut};
 
-/// What one chunk carries, if it carries either stream. Absent on the
-/// frames that carry a tool call or a finish reason.
-///
-/// Prose wins when a chunk holds both, which no provider sends: a chunk
-/// that did would be answering and reasoning at the same instant, and
-/// the answer is the part a person is waiting for.
 pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<Increment> {
     let delta = map
         .get("choices")?
@@ -33,12 +25,6 @@ pub(crate) fn increment_of(map: &serde_json::Map<String, Value>) -> Option<Incre
     reasoning_in(delta).map(Increment::Thought)
 }
 
-/// The reasoning a chunk or a settled message carries.
-///
-/// **Two spellings, because the providers disagree and neither is
-/// wrong.** OpenRouter-shaped gateways send `reasoning`; DeepSeek-shaped
-/// ones send `reasoning_content`. Reading both here is what keeps every
-/// other reader from having to know that.
 pub(crate) fn reasoning_in(held: &serde_json::Map<String, Value>) -> Option<String> {
     for key in ["reasoning", "reasoning_content"] {
         if let Some(text) = held.get(key).and_then(Value::as_str)
@@ -50,9 +36,6 @@ pub(crate) fn reasoning_in(held: &serde_json::Map<String, Value>) -> Option<Stri
     None
 }
 
-/// OpenAI streams one `choices[0].delta` per chunk and the finish reason
-/// on the last one. Tool calls arrive by index with their arguments split
-/// across chunks, which is why they are joined before being read.
 pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
     let mut said = String::new();
     let mut thought = String::new();
@@ -69,8 +52,7 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
         {
             usage = Some(held.clone());
         }
-        // Rate limits name their reason in `code` and a bare category
-        // (`requests`, `tokens`) in `type`, so `code` is read first.
+
         if let Some(error) = map.get("error").and_then(Value::as_object) {
             let kind = ["code", "type"]
                 .into_iter()
@@ -111,8 +93,7 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
             };
             let at = one.get("index").and_then(Value::as_u64).unwrap_or_default();
             let held = calls.entry(at).or_default();
-            // A later chunk may repeat the id and the name as the empty
-            // string (vLLM-shaped providers do); the first spelling stands.
+
             if let Some(id) = one.get("id").and_then(Value::as_str)
                 && !id.is_empty()
             {
@@ -137,8 +118,7 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
         ));
     };
     let mut message = json!({ "role": "assistant", "content": said });
-    // Settled into the one spelling the settled reader takes, so a
-    // stream and a plain call reach that reader the same way.
+
     if !thought.is_empty()
         && let Some(map) = message.as_object_mut()
     {
@@ -149,10 +129,7 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
     {
         let mut wired = Vec::new();
         for (at, (id, name, arguments)) in calls {
-            // Checked here and carried on as the text this wire spells
-            // it in: a stream cut mid-value is refused with the code
-            // the other dialect uses, rather than reaching the settled
-            // reader as a shape complaint about the dialect itself.
+
             settled_tool_arguments(&name, at, &arguments)?;
             wired.push(json!({
                 "id": id,
@@ -179,9 +156,6 @@ mod tests {
     use super::settled;
     use serde_json::json;
 
-    // What a vLLM-shaped provider (ModelScope serving DeepSeek and GLM,
-    // 2026-09-10) streams: the name and id arrive in the first chunk,
-    // and every later chunk repeats them as the empty string.
     #[test]
     fn a_later_chunk_with_an_empty_name_or_id_does_not_erase_the_first() {
         let frames = vec![
@@ -197,9 +171,6 @@ mod tests {
         assert_eq!(call["function"]["arguments"], "{\"path\": \"a.md\"}");
     }
 
-    /// The same fact as on the other wire, refused with the same code:
-    /// arguments that stop mid-value are half a tool call, and half a
-    /// tool call spent as `exec {}` reaches the gates and runs.
     #[test]
     fn tool_arguments_cut_mid_value_are_refused_not_emptied() {
         let frames = vec![
@@ -215,9 +186,6 @@ mod tests {
         );
     }
 
-    /// A provider that fails after answering 200 sends one chunk with an
-    /// `error` object and no `choices`; the rate limit names its reason
-    /// in `code` and a bare category in `type`.
     #[test]
     fn an_error_chunk_mid_stream_is_the_failure_it_reports() {
         let reported = |error: serde_json::Value| {

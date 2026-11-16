@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The `[search]` table: which outside service a run's `web_search`
-//! reaches, read from the file, judged, written back, and resolved to
-//! one supplier.
-//!
-//! The default supplier is declared here and nowhere else: the settings
-//! page reads its address back through a query, and `kernel` holds only
-//! the shape (city D25).
-//!
-//! Specified by `Sprawling/city/spec/ConfigLayers.lean` §8-4c.
-
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -29,19 +19,8 @@ use super::write::{Change, change_at};
 mod section;
 pub(super) use section::{SearchSection, spelled, stated};
 
-/// The table's header, as a refusal names it.
 pub(crate) const SEARCH_KEY: &str = "[search]";
 
-/// The one supplier `web_search` reaches under `configuration`, or
-/// `None` when this layer offers no web search.
-///
-/// `Custom` reaches exactly the supplier its `selected` names and never
-/// falls back to the default or to another listed supplier: switching
-/// would hand the run's queries to a receiver nobody chose (city D25).
-///
-/// # Errors
-/// `E_CONFIG_INVALID` when `selected` names no listed supplier, which
-/// only a value built around the reader can carry.
 pub fn search_supplier(
     configuration: &SearchConfiguration,
 ) -> Result<Option<SearchSupplier>, AxError> {
@@ -60,15 +39,6 @@ pub fn search_supplier(
     }
 }
 
-/// The supplier `Default` reaches, declared once.
-///
-/// The parameter names are the ones the service's own `tools/list`
-/// reports for `web_search_exa`: `query` and `objective` required,
-/// `numResults` optional (city D25).
-///
-/// # Errors
-/// Propagates `kernel`'s refusal of a label, which a fixed label that
-/// stays in its grammar never meets.
 pub fn default_search_supplier() -> Result<SearchSupplier, AxError> {
     Ok(SearchSupplier {
         id: ServerLabel::parse("exa")?,
@@ -85,13 +55,6 @@ pub fn default_search_supplier() -> Result<SearchSupplier, AxError> {
     })
 }
 
-/// What the ladder settled for `[search]` at `addr`, and the rung that
-/// said it. `None` is a ladder that states nothing, which resolves to
-/// `Default`.
-///
-/// # Errors
-/// Refuses an address with no building, an unreadable file, and a file
-/// that does not parse, exactly as [`super::load`] does.
 pub fn settled_search(
     city_root: &Path,
     addr: &Address,
@@ -102,14 +65,6 @@ pub fn settled_search(
         .cloned())
 }
 
-/// What the city's own `CONFIG.toml` states for `[search]`, and nothing a
-/// building states: the value the settings page edits. No address names
-/// the city's root, so this reads that one rung directly, through the
-/// same reader the ladder uses for it.
-///
-/// # Errors
-/// Refuses a city file that cannot be read or does not parse, exactly as
-/// [`settled_search`] does.
 pub fn city_search(city_root: &Path) -> Result<Option<SearchConfiguration>, AxError> {
     Ok(
         super::ladder::stated(&CityLayout::new(city_root).city_config(), Layer::City)?
@@ -118,14 +73,6 @@ pub fn city_search(city_root: &Path) -> Result<Option<SearchConfiguration>, AxEr
     )
 }
 
-/// Writes the city's own `[search]`: the one rung the settings page
-/// edits. `Default` is written out too, so what is read back is what
-/// was written.
-///
-/// # Errors
-/// `E_CONFIG_INVALID`, before any byte is written, for every value the
-/// reader would refuse; propagates a city layer that exists and cannot
-/// be read or parsed, and a directory that cannot be written.
 pub fn write_search(city_root: &Path, configuration: &SearchConfiguration) -> Result<(), AxError> {
     check(configuration)?;
     change_at(
@@ -134,12 +81,6 @@ pub fn write_search(city_root: &Path, configuration: &SearchConfiguration) -> Re
     )
 }
 
-/// Judges a whole configuration, for the reader and the writer alike.
-///
-/// # Errors
-/// `E_CONFIG_INVALID` for a `Custom` value whose list is empty, repeats
-/// an id or does not hold `selected`, and for any supplier [`supplier`]
-/// refuses.
 fn check(configuration: &SearchConfiguration) -> Result<(), AxError> {
     let SearchConfiguration::Custom {
         selected,
@@ -167,8 +108,6 @@ fn check(configuration: &SearchConfiguration) -> Result<(), AxError> {
     Ok(())
 }
 
-/// Judges one supplier: its address by the `[[mcp]]` url judgement, its
-/// three parameter names, and its accounts by the provider account rules.
 fn supplier(supplier: &SearchSupplier) -> Result<(), AxError> {
     let id = supplier.id.as_str();
     super::mcp::check_url(&supplier.id, &supplier.url)?;
@@ -200,8 +139,7 @@ fn supplier(supplier: &SearchSupplier) -> Result<(), AxError> {
             err.recovery(),
         )
     })?;
-    // A header value is redeemed whole, so a key reaches the service only
-    // as the value of a header the account names.
+
     match supplier
         .accounts
         .iter()
@@ -225,9 +163,8 @@ fn unlisted(selected: &ServerLabel) -> AxError {
     ))
 }
 
-/// `ConfigLayer`'s reading of its own `[search]`.
 impl ConfigLayer {
-    /// What this layer says about web search, as written.
+
     #[must_use]
     pub fn search(&self) -> Option<&SearchConfiguration> {
         self.search.as_ref()

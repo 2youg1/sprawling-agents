@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The beat the monitor samples at: one atomic the sampling thread reads
-//! on every wake, and the file under the city's reserved subtree that
-//! keeps it from one serve to the next (`Sprawling/app/spec/Monitor.lean` §8-96, D48).
-
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
@@ -15,13 +11,11 @@ use kernel::{AxCode, AxError};
 use serde::{Deserialize, Serialize};
 use wire::BeatMs;
 
-/// The file's one row.
 #[derive(Debug, Serialize, Deserialize)]
 struct Kept {
     beat_ms: u32,
 }
 
-/// The monitor's beat and where the city keeps it.
 #[derive(Debug)]
 pub(crate) struct Beat {
     ms: AtomicU32,
@@ -29,12 +23,7 @@ pub(crate) struct Beat {
 }
 
 impl Beat {
-    /// The beat this city kept, or the default when it kept none.
-    ///
-    /// A file that does not read, or holds a beat out of range, gives
-    /// the default and says so as a process notice: the beat shapes a curve a
-    /// person reads and decides nothing, so a broken file must not stop
-    /// a city from serving.
+
     pub(crate) fn open(city_root: &Path) -> Beat {
         let file = kernel::layout::CityLayout::new(city_root).monitor();
         let kept = match read(&file) {
@@ -50,19 +39,14 @@ impl Beat {
         }
     }
 
-    /// The beat in force now.
     pub(crate) fn now(&self) -> BeatMs {
         BeatMs::new(self.ms.load(Ordering::Relaxed)).unwrap_or(BeatMs::DEFAULT)
     }
 
-    /// One beat as a sleep.
     pub(crate) fn duration(&self) -> Duration {
         Duration::from_millis(u64::from(self.now().ms()))
     }
 
-    /// Samples at `beat` from the next wake on, and keeps it for the
-    /// city. A file that cannot be written is said as a process notice;
-    /// the new beat holds until the city stops either way.
     pub(crate) fn set(&self, beat: BeatMs) {
         self.ms.store(beat.ms(), Ordering::Relaxed);
         if let Err(error) = write(&self.file, beat) {
@@ -71,12 +55,10 @@ impl Beat {
     }
 }
 
-/// A beat file that failed, told with its recovery, which carries why.
 fn said(error: &AxError) {
     crate::serving::journal::notice("bin::monitor", &format!("{error}; {}", error.recovery()));
 }
 
-/// The kept beat; `None` when the city never set one.
 fn read(file: &Path) -> Result<Option<BeatMs>, AxError> {
     let text = match std::fs::read_to_string(file) {
         Ok(text) => text,
@@ -87,7 +69,6 @@ fn read(file: &Path) -> Result<Option<BeatMs>, AxError> {
     BeatMs::new(kept.beat_ms).map(Some)
 }
 
-/// The whole file, replaced through the city's one document writer.
 fn write(file: &Path, beat: BeatMs) -> Result<(), AxError> {
     let text = toml::to_string(&Kept { beat_ms: beat.ms() })
         .map_err(|error| failure(file, "write", &error))?;
@@ -110,9 +91,6 @@ fn failure(file: &Path, verb: &str, why: &impl std::fmt::Display) -> AxError {
 mod tests {
     use super::*;
 
-    /// A beat a page sets holds at once and is the beat the next serve of
-    /// the same city opens with; a city that kept none, or kept one out of
-    /// range, samples at the default.
     #[test]
     fn a_beat_set_holds_and_the_next_serve_of_the_city_opens_with_it() {
         let city = tempfile::tempdir().unwrap();

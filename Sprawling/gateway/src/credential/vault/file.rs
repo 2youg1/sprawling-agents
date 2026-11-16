@@ -2,18 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
-//! The encrypted vault file: the backend for a machine whose credential
-//! service keeps nothing across a reboot.
-//!
-//! The threat this answers is a tool call that reads files: an agent of
-//! this city can grep the machine it runs on, so a credential in
-//! cleartext beside the configuration is one the agent can put in a
-//! window. Whoever already holds the passphrase is not kept out, and
-//! disk theft is a different question (`Sprawling/gateway/spec/Credential/Vault/File.lean` §8-21).
-//!
-//! One entry is sealed on its own with ChaCha20-Poly1305 under a fresh
-//! 96-bit nonce, and the additional data binds the format version and
-//! the entry's name, so a ciphertext only opens where it was sealed.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -29,26 +17,20 @@ use zeroize::Zeroizing;
 
 use super::{Persistence, Vault};
 
-/// A file written by a later format opens with nothing from this one.
 const FORMAT_VERSION: u8 = 1;
 const SALT_LEN: usize = 16;
 const NONCE_LEN: usize = 12;
 const KEY_LEN: usize = 32;
-/// Argon2id cost, RFC 9106's second recommended setting: 64 MiB, three
-/// passes, one lane. The one home for it — the file records the salt and
-/// not these numbers, so changing them raises `FORMAT_VERSION`.
+
 const MEMORY_KIB: u32 = 65_536;
 const TIME_COST: u32 = 3;
 const LANES: u32 = 1;
-/// The one entry that holds no credential: opening it is how a wrong
-/// passphrase becomes a refusal at the door.
+
 const VERIFIER_SUBJECT: &str = "verifier";
 const VERIFIER_PLAINTEXT: &[u8] = b"sprawling encrypted vault";
-/// What a person does with a file this build cannot make sense of.
+
 const START_OVER: &str = "move this file aside and store the credentials again";
 
-/// The file, as it lies on disk: every byte is either public (version,
-/// salt) or sealed, so a grep of it reads base64 of ciphertext.
 #[derive(Serialize, Deserialize)]
 struct Document {
     version: u8,
@@ -57,10 +39,6 @@ struct Document {
     entries: BTreeMap<String, String>,
 }
 
-/// A vault kept in one encrypted file, unlocked by a passphrase. The
-/// derived key stays in memory for the life of the process: Argon2id is
-/// deliberately slow, and deriving it per read would put a second of
-/// latency on every model call.
 pub(crate) struct FileVault {
     path: PathBuf,
     key: Zeroizing<[u8; KEY_LEN]>,
@@ -72,14 +50,6 @@ impl FileVault {
     pub(crate) const SOURCE: &'static str = "encrypted-file";
     pub(crate) const PERSISTENCE: Persistence = Persistence::AcrossRebootsWithPassphrase;
 
-    /// Open the file at `path`, or create it, deriving the key from
-    /// `passphrase`.
-    ///
-    /// # Errors
-    /// `E_CONFIG_INVALID` when the file cannot be read or written, when
-    /// its bytes are not this format, or when the passphrase does not
-    /// open it — never a panic, and never an empty vault that loses
-    /// what the file holds.
     pub(crate) fn open(path: PathBuf, passphrase: &Zeroizing<String>) -> Result<Self, AxError> {
         let Some(bytes) = read_if_present(&path)? else {
             let mut salt = [0_u8; SALT_LEN];
@@ -140,9 +110,6 @@ impl FileVault {
         Ok(opened)
     }
 
-    /// The additional data of one sealed piece: format version, then
-    /// what the piece is — so a ciphertext only opens where it was
-    /// sealed.
     fn aad(subject: &str) -> Vec<u8> {
         let mut aad = Vec::from(b"sprawling-vault/".as_slice());
         aad.push(FORMAT_VERSION);
@@ -229,11 +196,6 @@ impl FileVault {
         Ok(Zeroizing::new(plain))
     }
 
-    /// Write the whole file, and leave either the old file or the new
-    /// one behind — never a half-written one.
-    ///
-    /// **This module owns the replacement of this one file**, and
-    /// `Sprawling/gateway/spec/Credential/Vault/File.lean` §8-21 records why it is not `city::document`.
     fn save(&self) -> Result<(), AxError> {
         let document = Document {
             version: FORMAT_VERSION,
@@ -292,8 +254,6 @@ impl Vault for FileVault {
     }
 }
 
-/// One shape for every refusal here: the action, what stopped it, and
-/// what the person can do.
 fn refusal(action: &'static str, subject: String, recovery: &'static str) -> AxError {
     AxError::failure(AxCode::ConfigInvalid, action, subject).with_recovery(recovery)
 }
@@ -362,12 +322,6 @@ fn read_if_present(path: &Path) -> Result<Option<Vec<u8>>, AxError> {
     }
 }
 
-/// Write bytes where only this account can read them.
-///
-/// On Unix the mode is set before the first byte, because a file created
-/// at the default mode is world-readable for as long as it takes to
-/// chmod it. Windows inherits the directory's ACL, which is the same
-/// guarantee expressed by the platform.
 fn write_private(path: &Path, bytes: &[u8]) -> Result<(), AxError> {
     use std::io::Write as _;
 

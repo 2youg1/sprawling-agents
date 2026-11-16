@@ -3,14 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The three verbs a workshop answers to, and the refusal that names
-//! them.
-
 use kernel::{AxCode, AxError};
 
-/// The three things this tool does. Exhaustive: an unknown verb is
-/// refused rather than rounded to the harmless one, because the harmless
-/// one here would silently drop a graph somebody meant to run.
 pub(super) enum Op {
     LayOut,
     Question,

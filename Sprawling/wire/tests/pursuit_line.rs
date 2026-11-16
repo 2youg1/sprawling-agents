@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A pursuit's verdict crosses the wire as the kernel's kind, not as a
-//! sentence: the client takes the words for it from `lang.json`, so a
-//! page in any language reads the same fact.
-
 #![allow(clippy::unwrap_used, reason = "test code")]
 
 use serde_json::json;

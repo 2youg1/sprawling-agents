@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! An `E_PROVIDER` error carries the kind of failure on the wire, so a
-//! page can say it in the reader's language and keep the city's English
-//! sentence for the fold.
-
 #![allow(clippy::unwrap_used, reason = "test code")]
 
 use kernel::AxError;

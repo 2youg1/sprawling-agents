@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The domain doors: whether a run may write one file, reach a declared
-//! area, or change a file already there, each read from its WriteDomain.
-//! The part `Sprawling/kernel/spec/Gate.lean` specifies this module with the
-//! rest of `kernel::gate`.
-
 use crate::address::Address;
 use crate::error::{AxCode, AxError, GateRefusal};
 use crate::taint::TaintSet;
@@ -15,8 +10,6 @@ use crate::write_domain::{DocumentReason, DomainVerdict, WriteDomain, WriteLimit
 
 use super::GateOutcome;
 
-/// Whether one file may be written: inside the prefixes, and the kind
-/// of file this domain writes.
 pub fn domain(domain: &WriteDomain, target: &Address, taint: &TaintSet) -> GateOutcome {
     match domain.admits(target) {
         DomainVerdict::Within => GateOutcome::Allow,
@@ -25,10 +18,6 @@ pub fn domain(domain: &WriteDomain, target: &Address, taint: &TaintSet) -> GateO
     }
 }
 
-/// Whether a declared area is reachable at all. A tool declares the
-/// room it works in, not a file, so this asks only the prefix question:
-/// a documents domain asked whether `hall/mayor` is Markdown would say
-/// no, and the Mayor could write nothing.
 pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutcome {
     if domain.reaches(area) {
         GateOutcome::Allow
@@ -41,14 +30,6 @@ pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutc
     }
 }
 
-/// Whether a write that may change a file already there is open under
-/// this run's write limit (`Sprawling/kernel/spec/WriteDomain.lean` §8-78).
-///
-/// Asked by every write path before it touches a file that exists, or
-/// before it starts anything that could: the edit tool's replacing arm,
-/// and a command placed on the host. Whether the target exists is not
-/// asked here; a create that finds its name taken is refused by the
-/// filesystem at the moment of the write, under either limit.
 #[must_use]
 pub fn replacing(limit: WriteLimit, target: &Address) -> GateOutcome {
     match limit {
@@ -78,8 +59,6 @@ pub fn replacing(limit: WriteLimit, target: &Address) -> GateOutcome {
     }
 }
 
-/// The one refusal for a target beyond the prefixes, whether it is a
-/// file or an area.
 fn outside(target: &Address, prefixes: Vec<String>, taint: &TaintSet) -> GateOutcome {
     let mut violation = format!("target {} is outside the write domain", target.as_str());
     if !taint.is_empty() {
@@ -111,9 +90,6 @@ fn outside(target: &Address, prefixes: Vec<String>, taint: &TaintSet) -> GateOut
     }
 }
 
-/// The refusal a documents domain owes a target inside its own
-/// prefixes: the target is reachable, and this actor still does not
-/// write that kind of file.
 fn not_writable(target: &Address, reason: DocumentReason) -> GateOutcome {
     let (violation, alternative) = match reason {
         DocumentReason::NotMarkdown => (
@@ -197,7 +173,7 @@ mod tests {
             panic!("refusal shape asserted above")
         };
         assert_eq!(refusal.nearby(), ["b1/room"]);
-        // Tainted violations name their provenance in the violation part.
+
         let tainted = TaintSet::of(TaintSource::new("web:evil").unwrap());
         let outcome = domain(&wd, &outside, &tainted);
         let GateOutcome::Deny { refusal } = outcome else {
@@ -206,10 +182,6 @@ mod tests {
         assert!(refusal.gate().unwrap().violation().contains("web:evil"));
     }
 
-    /// The full limit adds nothing to the domain; the create limit
-    /// refuses every write that would change a file already there, with
-    /// the target as the subject and the way to a new file as the
-    /// alternative.
     #[test]
     fn the_create_limit_refuses_a_replacing_write_and_the_full_one_does_not() {
         let existing = Address::parse("b1/room/notes.md").unwrap();
@@ -232,9 +204,6 @@ mod tests {
         );
     }
 
-    /// City Hall's residents write Markdown and nothing else, and the
-    /// plan file is refused to them at whatever depth it sits: the
-    /// `plan` tool is its one editing entrance.
     #[test]
     fn a_documents_domain_takes_markdown_refuses_code_and_never_the_plan() {
         let wd = WriteDomain::documents(vec![Address::parse("hall").unwrap()]).unwrap();
@@ -273,8 +242,6 @@ mod tests {
             );
         }
 
-        // The reserved subtree is still Outside rather than
-        // NotWritable: it is not this actor's ground at all.
         assert!(matches!(
             wd.admits(&Address::parse("hall/.sprawling/MAYOR.md").unwrap()),
             crate::write_domain::DomainVerdict::Outside { .. }

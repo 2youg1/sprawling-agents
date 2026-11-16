@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Checkpoint scans: staged secrets and scoped commits.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::TimeMs;
@@ -17,29 +15,21 @@ use super::commit::{Checkpoint, CommitDetails, commit_record, git_err};
 use super::opening::{HeadMove, commit_refused};
 use super::provenance::Provenance;
 
-/// The index mode of a submodule entry: a commit of another repository,
-/// which this repository's object database does not hold.
 const GITLINK: u32 = 0o160_000;
 
-/// One staged blob and the index that proves whether a quoted path exists.
 struct StagedBlob<'a> {
     id: git2::Oid,
-    /// The path as the repository records it, never a lossy respelling: a
-    /// finding reports the lossy text, but an `Address` cannot spell any
-    /// bytes but UTF-8, so only a valid path may match an allowlist entry.
+
     path: &'a [u8],
     index: &'a git2::Index,
 }
 
-/// Findings partitioned by the action their evidence justifies.
 #[derive(Default)]
 struct ScanFindings {
     refused: Vec<CheckpointFinding>,
     withheld: Vec<CheckpointFinding>,
 }
 
-/// Converts a scanner's native offset or length into the Ledger's integer
-/// shape without truncating it.
 fn checkpoint_size(value: usize, path: &str) -> Result<u64, StorageError> {
     u64::try_from(value).map_err(|_| StorageError::Checkpoint {
         op: "record a checkpoint scan",
@@ -47,15 +37,6 @@ fn checkpoint_size(value: usize, path: &str) -> Result<u64, StorageError> {
     })
 }
 
-/// Whether the matched text is a relative path this index actually stages.
-/// This is deliberately a small byte predicate rather than a regex: every
-/// segment is non-empty and uses only ASCII alphanumerics, `.`, `_` or `-`.
-///
-/// The scanner stops the entropy run at the first byte no token charset
-/// holds, and `.` is one of those, so a quoted `docs/glossary.md` arrives as
-/// `docs/glossary`: the path is the token around the span, not the span itself.
-/// A trailing `.` may also be the sentence's, so the longest spelling that
-/// names a staged file wins.
 fn names_staged_path(content: &[u8], span: &SecretSpan, index: &git2::Index) -> bool {
     let Some(span_end) = span.start.checked_add(span.len) else {
         return false;
@@ -74,10 +55,7 @@ fn names_staged_path(content: &[u8], span: &SecretSpan, index: &git2::Index) -> 
     while content.get(end).copied().is_some_and(path_byte) {
         end = end.saturating_add(1);
     }
-    // A backslash just outside the token belongs to the same reference on
-    // one platform and is a legal file-name byte on another. Reading the
-    // token as the whole reference would exempt `other\docs/glossary.md` on the
-    // strength of `docs/glossary.md`, so the backslash boundary is refused.
+
     if content.get(first.saturating_sub(1)) == Some(&b'\\') || content.get(end) == Some(&b'\\') {
         return false;
     }
@@ -96,7 +74,7 @@ fn names_staged_path(content: &[u8], span: &SecretSpan, index: &git2::Index) -> 
         if named {
             return true;
         }
-        // Only a dot beyond the span can be the sentence's.
+
         let last = end.checked_sub(1).and_then(|at| content.get(at));
         if end <= span_end || last != Some(&b'.') {
             return false;
@@ -105,8 +83,6 @@ fn names_staged_path(content: &[u8], span: &SecretSpan, index: &git2::Index) -> 
     }
 }
 
-/// The bytes a relative path this repository could stage is spelled with:
-/// the segment alphabet plus the `/` between segments.
 fn path_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-' | b'/')
 }
@@ -117,12 +93,6 @@ mod stage_filter;
 pub(super) use index_lock::write_index;
 use stage_filter::{StageFilter, workdir};
 
-/// One commit, decided before anything is written.
-///
-/// Four values that are meaningless apart — a subject without the
-/// provenance that signs it, an instant without the commit it stamps —
-/// so they arrive as one value rather than as four parameters a caller
-/// can put in the wrong order.
 pub(crate) struct CommitPlan<'a> {
     pub(crate) t: TimeMs,
     pub(crate) of: &'a Provenance,
@@ -131,9 +101,7 @@ pub(crate) struct CommitPlan<'a> {
 }
 
 impl Checkpoint {
-    /// Scans what this checkpoint would newly write into the tree.
-    /// Known provider shapes refuse; other entropy findings are returned for
-    /// the committed record. Positions and reasons only, never matched bytes.
+
     pub fn scan_staged(
         &mut self,
         scopes: &[String],
@@ -141,8 +109,7 @@ impl Checkpoint {
         let index = self.repo.index().map_err(git_err("read index"))?;
         let mut findings = ScanFindings::default();
         match self.last_tree()? {
-            // No previous tree to compare against: this checkpoint is
-            // writing all of it, so all of it is read.
+
             None => {
                 for entry in index.iter() {
                     if entry.mode != GITLINK {
@@ -157,9 +124,7 @@ impl Checkpoint {
                     }
                 }
             }
-            // git is asked what changed, the same way `wave_post` asks it
-            // what went missing, so "what counts as a change" has one
-            // answer in this module rather than two.
+
             Some(tree) => {
                 let diff = self
                     .repo
@@ -167,8 +132,7 @@ impl Checkpoint {
                     .map_err(git_err("diff checkpoint against the staged tree"))?;
                 for delta in diff.deltas() {
                     let staged = delta.new_file();
-                    // A deletion names no new content, and a submodule's
-                    // commit is not this repository's to read.
+
                     if staged.id().is_zero() || staged.mode() == git2::FileMode::Commit {
                         continue;
                     }
@@ -187,9 +151,7 @@ impl Checkpoint {
         if refused.is_empty() {
             return Ok(withheld);
         }
-        // The refusal carries every finding of the same scan: a person
-        // reading `sprawling secrets` should not have to wait for a later
-        // checkpoint to learn about the entropy hits this one also met.
+
         let mut all = refused;
         all.extend(withheld);
         Err(StorageError::SecretEgress(SecretEgressBlocked::checkpoint(
@@ -198,15 +160,6 @@ impl Checkpoint {
         )))
     }
 
-    /// One blob against the secret shapes. The line cursor follows the
-    /// scanner's ordered starts, so locating every hit still reads the blob
-    /// once rather than once per hit.
-    ///
-    /// # Errors
-    /// A blob the object database will not hand back: a byte that enters
-    /// the tree unread breaks "every byte that entered the tree was scanned
-    /// once" (`Sprawling/storage/spec/Checkpoint.lean` §8-8), so the checkpoint
-    /// is refused rather than the blob skipped.
     fn scan_blob(
         &self,
         staged: StagedBlob<'_>,
@@ -220,9 +173,7 @@ impl Checkpoint {
                 op: "scan a staged file",
                 detail: format!("{path}: {}", err.message()),
             })?;
-        // An allowlist entry is an `Address`, and an `Address` is UTF-8:
-        // a path the repository spells in other bytes cannot be the one the
-        // User entered, so it is never silently exempt.
+
         let allowed =
             std::str::from_utf8(staged.path).is_ok_and(|path| self.entropy_allow.allows(path));
         let content = blob.content();
@@ -253,16 +204,6 @@ impl Checkpoint {
         Ok(())
     }
 
-    /// The tree the last checkpoint committed, or `None` when this city
-    /// has never been checkpointed. An unborn HEAD is a state, not a failure -
-    /// it is what an empty repository looks like.
-    ///
-    /// A wave checkpoint does not move HEAD, so the last
-    /// checkpoint is remembered here rather than read off the branch. A
-    /// process that has just opened this repository remembers nothing
-    /// and falls back to HEAD, which is older: the scan then re-reads
-    /// blobs it has already cleared, which costs time and gives up no
-    /// safety.
     fn last_tree(&self) -> Result<Option<git2::Tree<'_>>, StorageError> {
         let commit = match self.last {
             Some(oid) => self
@@ -280,12 +221,6 @@ impl Checkpoint {
             .map_err(git_err("read the last checkpoint's tree"))
     }
 
-    /// The commit HEAD names, or `None` when the city has none yet.
-    ///
-    /// Only an unborn branch and a missing reference mean "none yet";
-    /// anything else that stops HEAD being read is an error, because
-    /// reading it as "none" would turn the next checkpoint into a parentless
-    /// root commit cut off from the history before it (`Sprawling/storage/spec/Checkpoint.lean` §8-8).
     pub(super) fn head_commit(
         repo: &git2::Repository,
     ) -> Result<Option<git2::Commit<'_>>, StorageError> {
@@ -306,36 +241,12 @@ impl Checkpoint {
         }
     }
 
-    /// Stages every file under `scope`, including deletions. Paths
-    /// outside the scope are never touched — the write domain is the
-    /// boundary, and a wider `add` would stage what the Run never held.
-    ///
-    /// One `add_all`, which stages removals as well: libgit2 walks the
-    /// index against the working tree once and skips each unchanged file
-    /// by its stat data, and a second `update_all` walk repaid nothing.
-    ///
-    /// **A session slice is never staged.** It is a disposable
-    /// projection the city's own accounting thread appends to while the
-    /// wave runs, and a checkpoint that staged it would ask git to read a
-    /// workdir file it believes it already knows; a file still growing
-    /// under an open handle makes that read refuse the whole wave
-    /// (`Sprawling/storage/Spec.lean` §8-8, §8-24). Nor does one ever stage protected
-    /// metadata or an alias - [`StageFilter`] owns that rule.
-    ///
-    /// Returns the paths whose staged blob this call added, changed or
-    /// removed, in byte order: the difference between the index it found
-    /// and the index it wrote, which is what the checkpoint touched and not
-    /// what the city holds.
     pub(crate) fn stage_scopes(&mut self, scopes: &[String]) -> Result<Vec<String>, StorageError> {
         let files = self.stage_scopes_held(scopes)?;
         write_index(&mut self.repo.index().map_err(git_err("read index"))?)?;
         Ok(files)
     }
 
-    /// Stages `scopes` into the repository's index in memory and leaves
-    /// the file on disk as it was, for a caller whose objects are not on
-    /// disk yet: an index written before them names blobs a failure
-    /// would drop, and later checkpoints skip those entries by their stat data.
     pub(crate) fn stage_scopes_held(
         &mut self,
         scopes: &[String],
@@ -368,9 +279,7 @@ impl Checkpoint {
         nested.sort();
         nested.dedup();
         for root in nested {
-            // A checkpoint written by an older build may hold a gitlink at
-            // this root. Its files replace that pointer; the two shapes
-            // cannot occupy the same tree path.
+
             if index.get_path(&root, 0).is_some() {
                 index.remove_path(&root).map_err(git_err("stage scope"))?;
             }
@@ -391,8 +300,7 @@ impl Checkpoint {
                 changed.insert(entry.path);
             }
         }
-        // Only a removal leaves a found path unmatched, so the second
-        // pass is paid by the waves that deleted something.
+
         if present < found.len() {
             let staged: BTreeSet<Vec<u8>> = index.iter().map(|entry| entry.path).collect();
             changed.extend(found.into_keys().filter(|path| !staged.contains(path)));
@@ -403,9 +311,6 @@ impl Checkpoint {
             .collect())
     }
 
-    /// Stages one file the wave wrote, or its removal, by its literal
-    /// path: a pathspec walk would cost the whole domain for one file.
-    /// The same admission and the same ignore rule as the walk.
     fn stage_file(
         &self,
         index: &mut git2::Index,
@@ -427,9 +332,6 @@ impl Checkpoint {
         .map_err(git_err("stage scope"))
     }
 
-    /// Stages the ordinary files below a nested repository root. The outer
-    /// `add_all` skips that root; this walk supplies its contents without
-    /// following a directory link or admitting protected metadata.
     fn stage_nested(
         &self,
         index: &mut git2::Index,
@@ -458,13 +360,6 @@ impl Checkpoint {
         Ok(())
     }
 
-    /// Commits the index at the injected time. An unchanged tree still
-    /// commits: a rebuildable chain is worth more than a saved object.
-    ///
-    /// The signature is the session's, not a fixed machine identity: the
-    /// author is the resident's address at a mailbox naming the city,
-    /// and the five `Sprawling-*` trailers say which run, which model
-    /// and which effort produced it.
     pub(crate) fn commit(&mut self, plan: &CommitPlan<'_>) -> Result<git2::Oid, StorageError> {
         let mut index = self.repo.index().map_err(git_err("read index"))?;
         let tree_oid = index.write_tree().map_err(git_err("write tree"))?;
@@ -506,31 +401,6 @@ impl Checkpoint {
         Ok(oid)
     }
 
-    /// Puts this tree on the branch, under the session that produced it.
-    ///
-    /// This is what a reviewing run does when it offers its work: the
-    /// wave checkpoints behind it are dangling commits nobody merges, and
-    /// what a verifier judges has to be a commit on the run's own
-    /// branch. Time stays a parameter here as everywhere else — the
-    /// signature carries the injected instant, so the same script lands
-    /// the same oid.
-    ///
-    /// Only `scopes` is staged, as a checkpoint stages it: a kept tree is
-    /// checked out again over its scope alone, so its files outside the
-    /// scope may trail the branch, and staging them would take back
-    /// what the trunk changed there (`Sprawling/storage/spec/Worktree.lean` §8-9). Entries outside
-    /// the scope go into the commit as the index holds them. No scope
-    /// stages the whole tree except the reserved subtree, whose rule
-    /// [`StageFilter`] owns.
-    ///
-    /// # Errors
-    /// Propagates staging, the staged-secret scan, and the commit.
-    ///
-    /// The record it answers with is the `checkpoint_committed` value for the
-    /// commit it wrote, its `files` and its findings included: a run that
-    /// wrote after its last wave checkpoint has its work committed here, and
-    /// a caller that dropped this record would drop the only account of what
-    /// this landing scanned.
     pub fn land(
         &mut self,
         scopes: &[String],
@@ -540,9 +410,7 @@ impl Checkpoint {
     ) -> Result<Commit, StorageError> {
         let _head_moves = super::opening::moving_head()?;
         let files = self.stage_scopes(scopes)?;
-        // The run's closing wave checkpoint already recorded the entropy
-        // findings of what it scanned; this landing's own scan may see more,
-        // and its record is where they live.
+
         let withheld = self.scan_staged(scopes)?;
         let oid = self.commit(&CommitPlan {
             t,
@@ -562,16 +430,13 @@ impl Checkpoint {
     }
 }
 
-/// Whether a scope names one file rather than a prefix: a file in the
-/// working tree, or a path the index holds as a file and the tree no
-/// longer has.
 fn names_a_file(root: &std::path::Path, index: &git2::Index, scope: &str) -> bool {
     match std::fs::symlink_metadata(root.join(scope)) {
         Ok(meta) => meta.is_file(),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
             index.get_path(std::path::Path::new(scope), 0).is_some()
         }
-        // Any other failure is left to the walk, which reports it.
+
         Err(_) => false,
     }
 }

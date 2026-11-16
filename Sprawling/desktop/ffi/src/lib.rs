@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The desktop server's one FFI seam: the Win32 call groups that have no
-//! admitted safe interface, carried out by a Zig leaf behind a
-//! `(ptr, len)` boundary and offered to the server as safe functions
-//! (`Sprawling/desktop/Spec.lean` sections 8-12 and D12; the boundary's properties
-//! are proved in `Sprawling/desktop/ffi/Spec.lean`).
-//!
-//! Every `unsafe` in the desktop server's production code is one call
-//! into the leaf, here, with the precondition that makes it sound
-//! written beside it. What the server decides — which window, which
-//! refusal, what a black picture means — stays on the Rust side; the
-//! leaf owns no wording and no policy.
-
 #[cfg(windows)]
 pub mod confinement;
 pub mod cpu_set;

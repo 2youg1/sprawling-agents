@@ -3,31 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The second client of `wire::frames` (`Sprawling/app/Spec.lean` section
-//! 8-10).
-//!
-//! ARCHITECTURE section 8 says the wire is the whole API and that a
-//! second client writes against it. Until this existed there was one
-//! client, which by the repository's own test (section 4: one adapter is
-//! a hypothetical seam, two make it real) left `wire::frames` a
-//! hypothetical seam.
-//!
-//! The handshake is computed here from `wire::WIRE_V` and
-//! `wire::schema_hash()` rather than copied, so a command renamed in
-//! `frames.rs` cannot leave this client behind.
-
 use futures_util::{SinkExt, StreamExt};
 use kernel::{AxCode, AxError};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::Message;
 
-/// When a call stops listening is a decision about the wire's frames,
-/// with no socket in it, so it has its own file.
 mod ending;
-/// Enrolment is a credential handed to an HTTP route rather than a
-/// frame spoken on the socket, so it has its own file.
+
 mod enrolment;
-/// `sprawling gauge --at` holds its socket open until the city stops.
+
 mod watching;
 
 use ending::{Awaited, Echo, Ending, Heard, Reply};
@@ -35,49 +19,33 @@ pub(crate) use ending::{Milestone, Spoken, Until};
 pub(crate) use enrolment::{enrol, split_reference};
 pub(crate) use watching::top;
 
-/// How long a call listens: the silence that ends it, and what it waits
-/// for before then. They are read together at every frame, so they
-/// travel as one value.
 pub(crate) struct Listen {
     pub(crate) quiet: Duration,
     pub(crate) until: Until,
 }
 
-/// Why nothing was heard: the three failures `call` tells apart,
-/// because each asks the caller for a different next step.
 #[derive(Debug)]
 pub(crate) enum Unheard {
-    /// The frame is not one this wire can carry; nothing was sent.
+
     Unreadable(AxError),
-    /// `--at` names another machine and no `--token` was given: this
-    /// machine's key file does not answer for it, so nothing was sent.
+
     Unkeyed(AxError),
-    /// Nothing at the address completed the greeting, so no city heard
-    /// the frame.
+
     NoCity(AxError),
-    /// The conversation started and then broke, or this process could
-    /// not start one.
+
     Broken(AxError),
 }
 
-/// Where `--at` points, as far as this machine's key file is concerned
-/// (`Sprawling/app/spec/WireClient.lean`).
 #[derive(Debug, PartialEq, Eq)]
 enum Reach {
-    /// A loopback literal or `localhost`, on this port: the key file of
-    /// the city at that port may answer.
+
     ThisMachine(u16),
-    /// This machine, with no port this client can read, so no key file
-    /// names it.
+
     Portless,
-    /// Any other host. Its key is not this machine's to hand over.
+
     Elsewhere,
 }
 
-/// Reads the host and port of `at`. The host is judged by
-/// `kernel::gate::target_of`, which names `localhost`, `127.0.0.0/8` and
-/// `::1` loopback without resolving anything: a name is only as local as
-/// the resolver says, and `localhost.example.com` can point anywhere.
 fn reach(at: &str) -> Reach {
     let (host, port) = at.rsplit_once(':').unwrap_or((at, ""));
     match kernel::gate::target_of(host) {
@@ -90,16 +58,6 @@ fn reach(at: &str) -> Reach {
     }
 }
 
-/// The credential a call presents: the token given with `--token`, or
-/// else, for a city on this machine, the key it keeps in its key file
-/// (`Sprawling/app/spec/Keying.lean` §8-22). A key file that cannot be
-/// read is said once and the greeting goes without; the city's refusal
-/// then says how to get in.
-///
-/// # Errors
-/// `CredentialMissing` when `at` names another machine and no token was
-/// given: that city's key is not in a file here, and this machine's key
-/// must not travel to it.
 fn credential(at: &str, given: Option<&str>) -> Result<Option<String>, AxError> {
     if let Some(given) = given {
         return Ok(Some(given.to_owned()));
@@ -125,7 +83,6 @@ fn credential(at: &str, given: Option<&str>) -> Result<Option<String>, AxError> 
     }
 }
 
-/// The greeting this build sends, computed rather than transcribed.
 fn hello(token: Option<&str>) -> wire::ClientFrame {
     wire::ClientFrame::Hello(wire::Hello {
         wire_v: wire::WIRE_V,
@@ -150,42 +107,19 @@ fn malformed(what: &str, why: &str) -> AxError {
     )
 }
 
-/// Sends one frame and prints every frame that comes back, as one JSON
-/// object per line, until the frame's [`Ending`]: a query stops on its
-/// answer or refusal, a command on what `listen.until` names or once
-/// nothing has arrived for `listen.quiet`.
-///
-/// Quiet is a duration rather than a frame count because how many events
-/// one dispatch produces is the city's business, not this client's; for
-/// a query it only bounds an answer that never comes.
-///
-/// # Errors
-/// Fails when the city cannot be reached, when the greeting is refused,
-/// or when the frame is not one this wire can carry. A refusal of the
-/// frame itself is not an error here - it is the answer, and it is
-/// printed like any other - but it does change the exit code, and so
-/// does hearing nothing at all: see [`Spoken`].
 pub(crate) fn call(
     at: &str,
     frame: &str,
     token: Option<&str>,
     listen: Listen,
 ) -> Result<Heard, Unheard> {
-    // The frame is parsed before the socket is opened: a typo should
-    // cost nothing and should be reported against the text a person
-    // wrote, not against whatever the server made of it.
+
     let outgoing: wire::ClientFrame = serde_json::from_str(frame).map_err(|err| {
         Unheard::Unreadable(malformed("read the frame to send", &err.to_string()))
     })?;
     send(at, &outgoing, token, listen)
 }
 
-/// Sends a frame this process built and prints what comes back until
-/// the [`Ending`] the frame's kind and `listen.until` decide; [`call`]
-/// is this for a frame a person wrote.
-///
-/// # Errors
-/// As [`call`], less the frame this process could not read.
 pub(crate) fn send(
     at: &str,
     outgoing: &wire::ClientFrame,
@@ -222,8 +156,6 @@ pub(crate) fn send(
     runtime.block_on(converse(at, &greeting, &mut sending, listen.quiet))
 }
 
-/// The frame on its way out, and when to stop listening for what it
-/// brings back; the second is read off the first, so they travel as one.
 struct Sending {
     body: String,
     ending: Ending,
@@ -252,9 +184,7 @@ async fn converse(
         awaited: sending.ending.not_yet(),
         run: None,
     };
-    // The greeting is answered before anything else is sent: a client
-    // that shouted its command at a server which then refused the
-    // handshake would have to guess whether the command was seen.
+
     let welcome = next_frame(&mut socket, quiet)
         .await
         .map_err(Unheard::NoCity)?;
@@ -285,13 +215,11 @@ async fn converse(
         }
     }
     heard.run = sending.ending.run();
-    // Closing rather than dropping: a city that is told the peer has
-    // gone stops holding a session open for it.
+
     let _closed = socket.close(None).await;
     Ok(heard)
 }
 
-/// One text frame, or `None` once the city has been quiet long enough.
 async fn next_frame<S>(socket: &mut S, quiet: Duration) -> Result<Option<String>, AxError>
 where
     S: StreamExt<Item = Result<Message, tokio_tungstenite::tungstenite::Error>> + Unpin,
@@ -302,10 +230,9 @@ where
         };
         match incoming {
             Some(Ok(Message::Text(text))) => return Ok(Some(text.to_string())),
-            // A close or a stream end is the city going quiet for good.
+
             Some(Ok(Message::Close(_))) | None => return Ok(None),
-            // Pings and binary frames are the transport's, not the
-            // wire's; tungstenite answers pings itself.
+
             Some(Ok(_)) => {}
             Some(Err(err)) => {
                 return Err(AxError::failure(
@@ -319,11 +246,6 @@ where
     }
 }
 
-/// Prints one frame and counts it.
-///
-/// Printed as it arrived rather than reformatted: inventing a display
-/// form here would be a second, drifting description of every type on
-/// the wire.
 fn report(text: &str, reply: &Reply, echo: &Echo, heard: &mut Heard) {
     match echo {
         Echo::Stdout => println!("{text}"),
@@ -351,10 +273,6 @@ mod tests {
     };
     use kernel::{EventDraft, EventKind, EventRecord, GENESIS_PREV, Payload, RunId, Seq, TimeMs};
 
-    /// A city double at a fresh port: it answers the greeting with a
-    /// `Welcome`, says `said` in order, and then holds the session open
-    /// for `linger`, as a served city does, so only the client under
-    /// test can end the call early.
     fn city_saying(
         said: Vec<wire::ServerFrame>,
         linger: Duration,
@@ -369,15 +287,9 @@ mod tests {
                 let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
                 ready.send(listener.local_addr().unwrap().port()).unwrap();
                 let (stream, _from) = listener.accept().await.unwrap();
-                // The token's reason is that a WebSocket client can only be
-                // talking to our server. This accepts rather than connects: the
-                // double is the city, the client under test is ours, and the
-                // socket therefore points inward - the direction the gate says
-                // it measures.
-                // boundary-ok: accept_async makes this a city double, not a client of one
+
                 let mut socket = tokio_tungstenite::accept_async(stream).await.unwrap();
-                // The greeting is answered, because a client that never
-                // got a Welcome reports an unreachable city instead.
+
                 let _greeting = socket.next().await;
                 let welcome = wire::ServerFrame::Welcome(wire::Welcome {
                     wire_v: wire::WIRE_V,
@@ -413,7 +325,6 @@ mod tests {
         )))
     }
 
-    /// A command frame whose consequences are events.
     fn cancelling() -> String {
         let run = serde_json::to_string(&RunId::CITY).unwrap();
         format!(
@@ -421,20 +332,6 @@ mod tests {
         )
     }
 
-    /// A city that answers the greeting and then says nothing is the
-    /// third answer, and it must not read as the first.
-    ///
-    /// The defect this pins: `call` exited 0 whenever no refusal
-    /// arrived inside the quiet window, while its own documentation
-    /// promised 1 means "the city refused". An agent branching on the
-    /// exit code read a refusal it never received as a success - which
-    /// the out-of-tree checker measured against a real city
-    /// (`Tools/adversary/Spec.lean` section 4).
-    /// The key file answers only for a host on this machine: a loopback
-    /// literal, with or without brackets, or `localhost` in any case. A
-    /// name that only starts like one is another machine, and so is a
-    /// LAN address or the unspecified address. A regression: the key of
-    /// the city at a port here once went to whatever host `--at` named.
     #[test]
     fn only_a_host_on_this_machine_is_answered_from_the_key_file() {
         for at in [
@@ -486,10 +383,6 @@ mod tests {
         let _joined = scripted.join();
     }
 
-    /// A query has exactly one reply, so `call` ends on it rather than
-    /// holding the process open for a quiet window that can bring
-    /// nothing more: the city's answer arrives in milliseconds, and
-    /// waiting out the window would add whole seconds to every query.
     #[test]
     fn a_query_returns_on_its_answer_before_the_quiet_window_ends() {
         let quiet = Duration::from_millis(1_000);
@@ -520,8 +413,6 @@ mod tests {
         let _joined = scripted.join();
     }
 
-    /// A command told what it waits for ends on that event, after
-    /// printing the events before it, instead of on the window.
     #[test]
     fn a_command_returns_on_the_event_it_waits_for_before_the_quiet_window_ends() {
         let quiet = Duration::from_millis(1_000);
@@ -543,9 +434,6 @@ mod tests {
         let _joined = scripted.join();
     }
 
-    /// Events that arrive while the awaited one never does are not the
-    /// answer the caller asked for, so the call reads as unfinished: the
-    /// work may still be running, and exit 0 would call it done.
     #[test]
     fn a_command_whose_awaited_event_never_comes_is_unfinished_not_answered() {
         let said = vec![event(EventKind::RunStarted)];
@@ -563,10 +451,6 @@ mod tests {
         let _joined = scripted.join();
     }
 
-    /// The whole reason this module exists: the greeting is derived from
-    /// `wire`, so there is no second place where the wire version or
-    /// the schema hash is written down. The probe this replaces had both
-    /// copied out into a file outside the workspace.
     #[test]
     fn the_greeting_is_this_build_s_own_and_not_a_transcription() {
         let wire::ClientFrame::Hello(said) = hello(None) else {

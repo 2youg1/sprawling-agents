@@ -3,29 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Where Windows records a browser that no shell resolves
-//! (`Sprawling/app/spec/Doctor.lean` §8-57).
-//!
-//! Windows installs a per-user browser under a directory whose spelling
-//! carries the person's own account name, so no literal path in the
-//! table can find it. The two keys every installer writes do:
-//! `App Paths` says what a program name resolves to, and
-//! `StartMenuInternet` says what a browser's "open" command is.
-//!
-//! **Read through `reg.exe`, not through a registry crate.** The
-//! alternative is one more dependency in a binary a person downloads,
-//! for one platform and one question; `reg.exe` ships with the
-//! operating system that has the keys. Nothing here writes: every call
-//! is `reg query`.
-
 use std::path::PathBuf;
 
-/// The path a browser is installed at, by whichever key names it.
-///
-/// `None` off Windows, and `None` when neither key answers. A key whose
-/// value is not a path this machine has is no answer: the caller goes
-/// on to the next member rather than reporting a browser nobody can
-/// start.
 pub(super) fn installed_at(program: &str, start_menu: &str) -> Option<PathBuf> {
     match super::Platform::current() {
         Some(super::Platform::Windows) => {}
@@ -50,7 +29,6 @@ pub(super) fn installed_at(program: &str, start_menu: &str) -> Option<PathBuf> {
         .find(|path| path.is_file())
 }
 
-/// The default value of one key, as `reg.exe` prints it.
 fn default_value(key: &str) -> Option<String> {
     let output = child::command("reg")
         .args(["query", key, "/ve"])
@@ -67,12 +45,6 @@ fn default_value(key: &str) -> Option<String> {
         .map(|(_, value)| value.trim().to_owned())
 }
 
-/// The program a command line starts, without its arguments.
-///
-/// A `StartMenuInternet` command is a quoted path followed by whatever
-/// the installer wanted passed; an `App Paths` value is the path alone.
-/// Both are read the same way: what is inside the quotes, or everything
-/// before the first argument.
 fn program_in(value: &str) -> &str {
     if let Some(quoted) = value.strip_prefix('"') {
         return quoted.split('"').next().unwrap_or(quoted);
@@ -88,8 +60,6 @@ fn program_in(value: &str) -> &str {
 mod tests {
     use super::program_in;
 
-    /// Both spellings of the value read back as one path, so a browser
-    /// registered either way is found once rather than twice.
     #[test]
     fn a_command_line_reads_back_as_the_program_it_starts() {
         assert_eq!(

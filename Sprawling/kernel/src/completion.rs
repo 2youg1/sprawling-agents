@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Completion and progress. Claiming done makes
-//! nothing done: `Completion::Done` cannot be built without evidence the
-//! city recorded itself (the runtime checks depth). Progress
-//! is honest in the type: only a planned run owns a ratio method —
-//! an unplanned run has nothing to ask a percentage from.
-//! The part `Sprawling/kernel/spec/Completion.lean` specifies this module.
-
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -17,19 +10,12 @@ use crate::budget::BudgetUse;
 use crate::error::{AxCode, AxError};
 use crate::event::{EventKind, EventRef};
 
-/// The kinds evidence may cite: the records the city wrote itself of an
-/// answer to a request it sent. [`Evidence::new`] and
-/// `registry::Artifact::verify` both read this one table, and a refusal
-/// names its kinds from here.
 pub(crate) const CITABLE: [EventKind; 3] = [
     EventKind::ToolResult,
     EventKind::ModelReturned,
     EventKind::HarnessAnswered,
 ];
 
-/// Non-empty, and every ref kind is in `CITABLE`.
-/// There is no other constructor and no Deserialize anywhere in the
-/// chain — history cannot be claimed, only cited.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Evidence(Vec<EventRef>);
 
@@ -59,8 +45,6 @@ impl Evidence {
     }
 }
 
-/// The [`CITABLE`] kinds as the Ledger spells them, joined for the
-/// recovery of a refusal.
 pub(crate) fn citable_words() -> Result<String, AxError> {
     let words = CITABLE
         .iter()
@@ -83,8 +67,6 @@ pub(crate) fn citable_words() -> Result<String, AxError> {
     Ok(words.join(", "))
 }
 
-/// The three endings; a fourth cannot be represented (frozen surface,
-/// 14.1). `Limit` is not a kind of done — record limit, not completion.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Completion {
     Done(Evidence),
@@ -101,9 +83,6 @@ impl Completion {
         }
     }
 
-    /// One-way projection into an event payload: `completion` plus, for
-    /// Done, the evidence as `{seq, kind}` pairs. Deliberately no serde —
-    /// deserializing a Completion would mint EventRefs out of thin air.
     pub fn extend_payload(&self, map: &mut Map<String, Value>) -> Result<(), AxError> {
         map.insert(
             "completion".to_owned(),
@@ -137,49 +116,29 @@ impl Completion {
     }
 }
 
-/// Progress with a denominator: the leaves of the plan tree.
-///
-/// Unlike [`Completion`], progress carries serde: it is a reading of a
-/// file that the interface renders, not a claim that work finished. What
-/// must not be deserialisable is a `Done` — and that still is not.
-///
-/// **Two figures, because either alone misleads.** The share says how
-/// much of the plan is behind you and moves when a branch is divided
-/// generously; the leaf count says how many pieces the plan turned out
-/// to have and does not. A reader seeing `83% / 4 leaves left` can tell
-/// the difference between work finished and work redistributed, and a
-/// reader seeing one number cannot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PlannedProgress {
     pub done: u32,
     pub blocked: u32,
     pub total: u32,
-    /// The share of the whole plan that is done, in billionths
-    /// (`kernel::share::WHOLE_PPB`). An integer, so two readings compare
-    /// the same way on every machine.
+
     pub done_ppb: u64,
-    /// The share that is blocked or waiting for a person.
+
     pub blocked_ppb: u64,
 }
 
 impl PlannedProgress {
-    /// `(done, total)` — the renderer computes its own percentage from a
-    /// real fraction, never from a claim.
+
     pub fn ratio(&self) -> (u32, u32) {
         (self.done, self.total)
     }
 
-    /// `(done, whole)` in billionths: the same reading weighted by how
-    /// the plan divides itself, rather than by how many rows it has.
     pub fn weighted(&self) -> (u64, u64) {
         (self.done_ppb, crate::share::WHOLE_PPB)
     }
 }
 
-/// Progress without a denominator: steps walked and budget burned. No
-/// ratio method exists — the interface cannot paint what it cannot know
-/// (A17's type half).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct UnplannedProgress {
@@ -187,7 +146,6 @@ pub struct UnplannedProgress {
     pub budget: BudgetUse,
 }
 
-/// Deliberately exhaustive: both faces must be handled by every renderer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -273,8 +231,7 @@ mod tests {
             "a quarter of the plan behind three of nine rows: the two \
              figures are not the same reading"
         );
-        // UnplannedProgress has no ratio method — nothing to assert at
-        // runtime; the trybuild case pins the absence.
+
         let unplanned = UnplannedProgress {
             steps: 12,
             budget: BudgetUse::default(),

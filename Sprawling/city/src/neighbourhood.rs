@@ -3,71 +3,32 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Who a run can reach, and who stands there (`Sprawling/city/spec/Neighbourhood.lean` §8-15).
-//!
-//! This building has speech and had no address book. `signal` takes the
-//! address of whoever you are talking to, the refusal names the boundary
-//! rather than the residents inside it, and delivery opens a queue for
-//! whatever address it is given - so a guessed name returned
-//! `queued: true` and was read by nobody. What is scanned here is the
-//! answer to the question that guess was standing in for.
-//!
-//! **Detail decays with distance.** This building's addresses come with
-//! the line each resident wrote about what to bring them; the rest of
-//! the city comes as building names and nothing else. That is not a new
-//! rule - it is the boundary `signal` already draws, made visible, so
-//! that what a run can see and what it can say to are the same set.
-
 use std::path::Path;
 
 use kernel::{Address, AxError};
 
 use crate::resident::Identity;
 
-/// The heading `Sprawling/city/templates/URBANITE.md` asks a resident to write the
-/// kind of work that belongs with them under. A roster's one line is
-/// taken from there when it exists, because "why would I go to them" is
-/// exactly what that section answers.
 const BRING_HEADING: &str = "<bring>";
 
-/// Who stands at an address. Exhaustive: either somebody with a standing
-/// identity lives there, or the place is open.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Occupancy {
-    /// A standing identity, and the one line it offers whoever is
-    /// deciding what to bring it. Empty when the resident's description
-    /// says nothing about itself, which is the author's choice rather
-    /// than a defect.
+
     Resident { bring: String },
-    /// A place with nobody standing in it: somewhere to send an
-    /// ephemeral worker, or to move somebody into.
+
     Empty,
 }
 
-/// One address a run can reach, occupied or not.
-///
-/// An empty room is a neighbour in the sense that matters here: it is a
-/// place this run can name. Leaving it out would read as "this address
-/// does not exist", and the address is exactly what `delegate` takes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Neighbour {
     pub addr: Address,
-    /// The last segment of the address, which is the word a person typed
-    /// when they made the place.
+
     pub name: String,
     pub occupancy: Occupancy,
-    /// Signals waiting in that room, as they stood when this run was
-    /// dispatched.
-    ///
-    /// Not "is somebody running there": in a city that drives one run at
-    /// a time, the answer is always no, and a column that is always the
-    /// same word teaches nothing. What a waiting count says is worth
-    /// knowing - somebody has already spoken to them and they have not
-    /// answered yet, so a second question may be one too many.
+
     pub waiting: u32,
 }
 
-/// What one run can see of the city around it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Neighbourhood {
     building: Address,
@@ -76,27 +37,7 @@ pub struct Neighbourhood {
 }
 
 impl Neighbourhood {
-    /// Reads the neighbourhood of a run at `me`, inside `building`.
-    ///
-    /// The building's own address is a place like any other - a resident
-    /// may stand at the building root - so it is scanned alongside the
-    /// rooms. `me` is left out: a neighbour is somebody else.
-    ///
-    /// `waiting` answers how deep each room's queue is. It is handed in
-    /// rather than read: the queues are the assembly layer's, folded
-    /// from the ledger, and this crate cannot see that far. Everything
-    /// else here is a function of the disk.
-    ///
-    /// A snapshot taken at dispatch is as current as anything can be. The
-    /// city drives one run at a time, and a signal this run sends is
-    /// delivered after it freezes, so no queue moves under it.
-    ///
-    /// # Errors
-    /// Propagates a directory that exists and cannot be read, and a
-    /// resident description that exists and cannot be read. The second
-    /// one matters: `Identity::load` refuses to downgrade an unreadable
-    /// description to "nobody lives here", and a roster that did would
-    /// quietly report a resident as an empty room.
+
     pub fn scan(
         city_root: &Path,
         building: &Address,
@@ -136,27 +77,16 @@ impl Neighbourhood {
         &self.building
     }
 
-    /// Every address in this building except this run's own, in address
-    /// order.
     #[must_use]
     pub fn here(&self) -> &[Neighbour] {
         &self.here
     }
 
-    /// The city's buildings by name, this one included: a run that could
-    /// not see the building it is in would have no way to read the list
-    /// as a map.
     #[must_use]
     pub fn buildings(&self) -> &[Address] {
         &self.buildings
     }
 
-    /// How many of the addresses here have somebody standing at them.
-    ///
-    /// People rather than places, because this is the number `status`
-    /// reports and an empty room has no reader. Saturating is the
-    /// documented answer for a building with more residents than a `u32`
-    /// can count, which no disk holds.
     #[must_use]
     pub fn residents(&self) -> u32 {
         let count = self
@@ -168,13 +98,6 @@ impl Neighbourhood {
     }
 }
 
-/// The one line a roster shows for a resident.
-///
-/// The `<bring>` section first, and the first line of prose only when
-/// that section is absent or empty. This is deliberately not
-/// `library::first_line`, which takes a holding's *title*: a shelf entry
-/// is named by its heading and a resident is described by their prose,
-/// so the two documents are read by two rules that live in two places.
 fn bring_line(text: &str) -> String {
     if let Some((_, tail)) = text.split_once(BRING_HEADING)
         && let Some(line) = section_line(tail)
@@ -184,9 +107,6 @@ fn bring_line(text: &str) -> String {
     first_prose(text).unwrap_or_default()
 }
 
-/// The first line of a section, or nothing when the section is empty.
-/// A heading or a section tag ends it: reading past one would report the
-/// next section's content as this one's.
 fn section_line(tail: &str) -> Option<String> {
     for line in tail.lines() {
         let trimmed = line.trim();
@@ -201,10 +121,6 @@ fn section_line(tail: &str) -> Option<String> {
     None
 }
 
-/// The first line of prose in a document: not a heading, not a
-/// blockquote, and not a section tag. The template's guidance to the
-/// author is a blockquote, and showing it would give every unedited
-/// resident the same sentence about themselves.
 fn first_prose(text: &str) -> Option<String> {
     text.lines()
         .map(str::trim)
@@ -315,9 +231,6 @@ mod tests {
         );
     }
 
-    /// The reserved subtree and the archive are directories inside a
-    /// building that nobody stands in; listing them as places to talk to
-    /// would send signals into the building's own filing.
     #[test]
     fn a_buildings_own_filing_is_not_a_neighbour() {
         let dir = city();
@@ -362,9 +275,6 @@ mod tests {
         );
     }
 
-    /// The heading this module reads is the template's. If the template
-    /// renames it and this file does not move, every roster silently
-    /// falls back to the first line of prose.
     #[test]
     fn the_shipped_template_still_carries_the_section_this_reads() {
         let template = include_str!("../templates/URBANITE.md");

@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The usage table of every skill and every tool server, folded from the
-//! whole ledger after the view lock is released
-//! (`Sprawling/accounting/spec/Views/Usage.lean` §8-34, accounting D49).
-//!
-//! What counts as a use is wire D33's: a skill read by a run whose
-//! `run_started` pinned it, and a call whose recorded effect names a tool
-//! server. The fold reads the ledger alone; the shelves and the
-//! configuration are read once the fold is done, by [`UsageAsk::answer`].
-//! The same pass hands every tool result to `runtime::ShellTally`, whose
-//! reading is the shell table (wire D48), and files every call by the
-//! tool it names, which is the evidence `Query::Catalog` reads
-//! ([`Usage::tool_evidence`], accounting D55).
-
 use std::borrow::Borrow;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -58,25 +45,18 @@ mod tests;
 
 pub(super) use shelves::Shelved;
 
-/// The part of a skill a `tool` `detail` reads.
 const GUIDE_PART: &str = "guide";
-/// The part of a skill a `read` of its bare name reads.
+
 const DOCUMENT_PART: &str = "SKILL.md";
-/// The prefix the dormant index spells a skill with, which `tool`
-/// `detail` also accepts.
+
 const SKILL_PREFIX: &str = "skill ";
-/// The tool a ledger written before `tool` existed fetched a guide with;
-/// its lines are history and still count as reads of the guide.
+
 const EARLIER_DESCRIBE: &str = "describe";
-/// The tool a ledger written before `tool` existed ran a dormant tool
-/// through; an unresolved line of it still counts as a server call.
+
 const EARLIER_CALL: &str = "call";
-/// The argument a ledger written before `read` took Claude Code's names
-/// named the file with; its lines keep it, because recorded calls are
-/// never re-spelled (`Sprawling/runtime/spec/Tools.lean` D115).
+
 const EARLIER_READ_PATH: &str = "path";
 
-/// Which of the three usage questions a page asked.
 pub enum UsageQuestion {
     Skills(Option<String>),
     Mcp(Option<String>),
@@ -84,13 +64,11 @@ pub enum UsageQuestion {
     Shells,
 }
 
-/// What the usage questions need once the view lock is let go.
 pub struct UsageAsk {
     pub(super) ledger: LedgerAsk,
     pub(super) question: UsageQuestion,
 }
 
-/// One call that used something, before its outcome is paired.
 #[derive(Debug, Clone)]
 struct Use {
     run: RunId,
@@ -100,14 +78,11 @@ struct Use {
     call: String,
 }
 
-/// Whether a call of `tool` is a `tool` call of `op`, or a call of the
-/// tool an earlier build spelled that op as.
 fn is_op(tool: &str, argument: &impl Fn(&str) -> Option<String>, op: &str, earlier: &str) -> bool {
     tool == earlier
         || (tool == runtime::tools::ToolTool::NAME && argument("op").as_deref() == Some(op))
 }
 
-/// One read of a skill.
 #[derive(Debug, Clone)]
 struct SkillRead {
     name: String,
@@ -116,9 +91,6 @@ struct SkillRead {
     used: Use,
 }
 
-/// One call of a tool server's tool. `label` is the server the record's
-/// effect names; an unresolved `tool` `run` line names none, and `tool`
-/// is then the whole name it asked for.
 #[derive(Debug, Clone)]
 struct McpCall {
     label: Option<String>,
@@ -126,32 +98,27 @@ struct McpCall {
     used: Use,
 }
 
-/// The fold: pure over the records it is given, so a replay of the same
-/// ledger answers the same table.
 #[derive(Debug, Default)]
 pub(crate) struct Usage {
     pins: BTreeMap<RunId, BTreeMap<String, B3Hash>>,
     versions: BTreeMap<String, Vec<wire::SkillVersion>>,
-    /// Every skill name a `skill_shelved` line has named so far.
+
     shelved: BTreeSet<String>,
     reads: Vec<SkillRead>,
     calls: Vec<McpCall>,
     audits: BTreeMap<String, Vec<(B3Hash, AuditVerdict, Seq)>>,
     outcomes: BTreeMap<(RunId, String), wire::UseOutcome>,
     shells: runtime::ShellTally,
-    /// Every run that started at an address, in ledger order.
+
     started: Vec<(RunId, Address, TimeMs)>,
-    /// The newest record time, which dates the 30-day evidence window.
+
     latest: Option<TimeMs>,
-    /// Catalog drift in ledger order, with the building its envelope names.
+
     drifts: Vec<(Address, Seq, CatalogDrift)>,
-    /// The tools each run called, each with the moment of its last call.
-    /// A `tool` `run` line records the tool it stood for, so this counts
-    /// capabilities rather than the door they were reached through.
+
     tool_calls: BTreeMap<RunId, BTreeMap<String, TimeMs>>,
 }
 
-/// How a building's runs used its tools and skills in the last 30 days.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct CatalogEvidence {
     pub(crate) runs_seen: u32,
@@ -159,13 +126,10 @@ pub(crate) struct CatalogEvidence {
     pub(crate) by_skill: BTreeMap<String, (u32, TimeMs)>,
 }
 
-/// Thirty days in milliseconds; the window ends at the Ledger's latest record.
 const EVIDENCE_WINDOW_MS: u64 = 2_592_000_000;
 
 impl UsageAsk {
-    /// Folds the whole ledger, reads the shelves and the configuration,
-    /// and answers. A ledger this city cannot index is "I could not look",
-    /// with the reason (wire D47).
+
     pub(super) fn answer(self) -> wire::Answer {
         let usage = match self.ledger.usage() {
             Ok(usage) => usage,
@@ -216,9 +180,7 @@ impl UsageAsk {
 }
 
 impl LedgerAsk {
-    /// Every record from the first to the tail, folded. A line that will
-    /// not read ends the fold rather than emptying it: what was read is
-    /// still true, the rule `history` follows.
+
     pub(super) fn usage(&self) -> Result<Usage, storage::StorageError> {
         let (index, dir) = self.indexed()?;
         let Some(tail) = index.tail_seq() else {
@@ -243,7 +205,7 @@ impl LedgerAsk {
 }
 
 impl Usage {
-    /// Folds a run of records in ledger order.
+
     pub(crate) fn fold(records: impl IntoIterator<Item = impl Borrow<EventRecord>>) -> Usage {
         let mut usage = Usage::default();
         records
@@ -252,10 +214,6 @@ impl Usage {
         usage
     }
 
-    /// Moves the table by one record. A payload that does not read as
-    /// its kind adds nothing: the record is the writer's, and a guess at
-    /// what it meant would be a use nobody made. Five kinds move it, so
-    /// the test is by kind rather than a match over every kind there is.
     fn apply(&mut self, record: &EventRecord) {
         self.latest = Some(self.latest.map_or(record.t(), |at| at.max(record.t())));
         let kind = record.kind();
@@ -308,8 +266,6 @@ impl Usage {
         }
     }
 
-    /// Files who put one content of a skill on its shelf: the version it
-    /// names gains its author, or begins with this line (wire D33).
     fn shelving(&mut self, record: &EventRecord, shelved: SkillShelved) {
         let author = wire::VersionAuthor::Shelved {
             seq: record.seq(),
@@ -337,9 +293,6 @@ impl Usage {
         self.shelved.insert(shelved.skill);
     }
 
-    /// Files the skills one run was frozen with, and the first run that
-    /// read each content no shelving line named: changed outside the
-    /// city's doors when the name was shelved before, unrecorded when not.
     fn pinned(&mut self, record: &EventRecord, started: RunStarted) {
         let pins = self.pins.entry(record.run()).or_default();
         for pin in started.skills {
@@ -362,8 +315,6 @@ impl Usage {
         }
     }
 
-    /// Run counts and last use inside the 30 days before the Ledger's
-    /// newest record. Skills use their recorded reads; tools use calls.
     pub(crate) fn catalog_evidence(&self, building: &Address) -> CatalogEvidence {
         let within =
             |addr: &Address| city::Building::of(addr).is_ok_and(|held| held.addr() == building);
@@ -418,7 +369,6 @@ impl Usage {
         }
     }
 
-    /// Every catalog difference recorded for one building, oldest first.
     pub(crate) fn catalog_drifts(&self, building: &Address) -> Vec<(Seq, CatalogDrift)> {
         self.drifts
             .iter()
@@ -427,7 +377,6 @@ impl Usage {
             .collect()
     }
 
-    /// The verdict of the current skill content and whether it is stale.
     pub(crate) fn skill_audit(&self, name: &str, content: &B3Hash) -> (Option<AuditVerdict>, bool) {
         let audits = self.audits.get(name).map_or(&[][..], Vec::as_slice);
         match city::audit_state(content, audits) {
@@ -446,8 +395,6 @@ impl Usage {
         }
     }
 
-    /// Files one call as a skill read, a server call, or nothing, and
-    /// under the tool it names.
     fn called(&mut self, record: &EventRecord, called: &ToolCalled) {
         self.tool_calls
             .entry(record.run())
@@ -498,9 +445,6 @@ impl Usage {
         }
     }
 
-    /// The skill and the part of it one call read, when the run pinned
-    /// that skill: wire D33 recognises the pin, never the spelling of a
-    /// path alone.
     fn skill_part(
         &self,
         run: RunId,
@@ -529,7 +473,6 @@ impl Usage {
         None
     }
 
-    /// The outcome the call's paired result recorded.
     fn outcome(&self, used: &Use) -> wire::UseOutcome {
         self.outcomes
             .get(&(used.run, used.call.clone()))
@@ -538,8 +481,6 @@ impl Usage {
     }
 }
 
-/// Uses per UTC calendar day, oldest day first, the day read off
-/// `runtime::clock::iso` so the calendar has one implementation.
 fn per_day(moments: impl IntoIterator<Item = TimeMs>) -> Vec<wire::DayCount> {
     let mut days: BTreeMap<String, u32> = BTreeMap::new();
     for at in moments {
@@ -553,5 +494,4 @@ fn per_day(moments: impl IntoIterator<Item = TimeMs>) -> Vec<wire::DayCount> {
         .collect()
 }
 
-/// `YYYY-MM-DD`, the head of an ISO 8601 stamp.
 const DAY_LEN: usize = 10;

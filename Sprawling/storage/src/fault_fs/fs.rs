@@ -3,30 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! FaultFs: the second Vfs adapter — a deterministic power-loss model
-//!. Compiled for tests and for citysim under the
-//! `fault` feature; never in a production build.
-//!
-//! The model is stricter than any real platform so the write discipline
-//! it enforces holds on every platform (`Sprawling/storage/spec/FaultFs.lean` §8-2):
-//! - every file has two planes: `durable` (survives power loss) and
-//!   `live` (what the running process observes). `sync_data` promotes
-//!   live to durable; a power cut drops the unsynced delta, except a
-//!   `TornTail` prefix that models a torn write reaching the platter.
-//! - a created file's directory entry survives only after `sync_dir` on
-//!   its parent — even when its bytes were synced (stricter than POSIX).
-//! - removals are instantly durable (simplification: the only remover is
-//!   tail recovery, and a resurrected empty segment is harmless — reopen
-//!   tolerates it).
-//! - the op hitting `cut_at_op` fails with "power lost"; the plan is then
-//!   consumed, so the same instance serves the powered reopen. Appends
-//!   land on `live` before the cut check so the tear can bite the very
-//!   write that died.
-//!
-//! Everything is explicit in [`FaultPlan`]; there is no randomness.
-
-//! The fault filesystem: power cuts on demand.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -35,10 +11,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use crate::vfs::Vfs;
 
 use super::plan::{FaultPlan, FileState, State, TornTail};
-/// Shared-state handle: clone it, hand one clone to the ledger, keep one
-/// to cut power and to reopen after the crash. `Arc<Mutex<_>>` rather
-/// than `Rc<RefCell<_>>` because the inner seam it implements is `Send`
-/// (`Sprawling/app/Spec.lean` §8-44): a store that holds one has to cross a thread.
+
 #[derive(Clone)]
 pub struct FaultFs(Arc<Mutex<State>>);
 
@@ -53,14 +26,10 @@ impl FaultFs {
         })))
     }
 
-    /// The state, whatever a thread that held it did before it died: a
-    /// power-loss model has no invariant a panic could leave half-kept,
-    /// so a poisoned lock is taken as it stands.
     fn state(&self) -> MutexGuard<'_, State> {
         self.0.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Power loss now: see the module doc for the exact semantics.
     pub fn power_cut(&self) {
         let mut state = self.state();
         cut(&mut state);
@@ -70,18 +39,10 @@ impl FaultFs {
         self.state().op
     }
 
-    /// How many bytes every read through this adapter has returned.
-    ///
-    /// What a caller checks when the question is read amplification:
-    /// fetching ten bytes out of a ten megabyte object must move ten
-    /// bytes, not ten megabytes.
     pub fn bytes_read(&self) -> u64 {
         self.state().bytes_read
     }
 
-    /// Charges a write whose bytes are already on the live plane, so the
-    /// tear model can bite exactly this write: the content needle first,
-    /// then the op count.
     fn charge_write(&self, bytes: &[u8], op_name: &'static str) -> io::Result<()> {
         {
             let mut state = self.state();
@@ -100,8 +61,6 @@ impl FaultFs {
         self.charge(op_name)
     }
 
-    /// Counts the op; when it hits the plan, power dies: the cut applies
-    /// and the op itself fails.
     fn charge(&self, op_name: &'static str) -> io::Result<()> {
         let mut state = self.state();
         state.op = state.op.saturating_add(1);
@@ -121,9 +80,7 @@ fn cut(state: &mut State) {
     let torn = state.plan.torn_tail;
     state.files.retain(|_, file| file.durable_entry);
     for file in state.files.values_mut() {
-        // The unsynced write starts where the live plane first differs
-        // from the durable one: the end of the file for an append, inside
-        // it for a write over preallocated space.
+
         let common = file
             .durable
             .iter()
@@ -143,8 +100,6 @@ fn cut(state: &mut State) {
     }
 }
 
-/// Substring search over raw bytes: the ledger line is UTF-8 JSON, but a
-/// `Vfs` sees bytes and must not assume otherwise.
 fn contains(haystack: &[u8], needle: &[u8]) -> bool {
     if needle.is_empty() {
         return true;
@@ -166,7 +121,7 @@ impl Vfs for FaultFs {
     }
 
     fn list(&self, dir: &Path) -> io::Result<Vec<PathBuf>> {
-        // A read op still charges: the process can die mid-read too.
+
         FaultFs::charge(self, "list")?;
         let state = self.state();
         let mut files: Vec<PathBuf> = state
@@ -207,9 +162,6 @@ impl Vfs for FaultFs {
         Ok(bytes)
     }
 
-    /// The live plane's length: what a stat of the running process's
-    /// view reports, so a power cut that dropped an unsynced tail is
-    /// visible here as a segment that shrank.
     fn size(&self, path: &Path) -> io::Result<u64> {
         FaultFs::charge(self, "size")?;
         let state = self.state();
@@ -217,9 +169,6 @@ impl Vfs for FaultFs {
         Ok(u64::try_from(file.live.len()).unwrap_or(u64::MAX))
     }
 
-    /// The live plane from `offset`, capped at `len`. A file shorter
-    /// than the request answers what it has, the same short answer a
-    /// real read gives at the end of a file.
     fn read_at(&self, path: &Path, offset: u64, len: u64) -> io::Result<Vec<u8>> {
         FaultFs::charge(self, "read_at")?;
         let mut state = self.state();
@@ -284,10 +233,7 @@ impl Vfs for FaultFs {
             let Some(mut file) = state.files.remove(from) else {
                 return Err(not_found(from));
             };
-            // The target's dir entry is new: it survives only after a
-            // sync_dir. Stricter than reality — a cut here loses the
-            // object entirely, but its put never returned Ok, so no
-            // acknowledged effect is lost (`Sprawling/storage/spec/Cas.lean` §8-3).
+
             file.durable_entry = false;
             state.files.insert(to.to_path_buf(), file);
         }
@@ -295,8 +241,7 @@ impl Vfs for FaultFs {
     }
 
     fn sync_data(&mut self, path: &Path) -> io::Result<()> {
-        // Charge first: when power dies during the barrier, the barrier
-        // never happened.
+
         self.charge("sync_data")?;
         let mut state = self.state();
         let file = state.files.get_mut(path).ok_or_else(|| not_found(path))?;
@@ -325,8 +270,6 @@ impl Vfs for FaultFs {
         self.charge("remove_file")
     }
 
-    /// The model carries no permission bits, so there is nothing to
-    /// copy; both names still have to exist, as on a real disk.
     fn copy_permissions(&mut self, from: &Path, to: &Path) -> io::Result<()> {
         for path in [from, to] {
             if !self.exists(path) {
@@ -336,8 +279,6 @@ impl Vfs for FaultFs {
         self.charge("copy_permissions")
     }
 
-    /// The model carries no permission bits; the operation and its
-    /// failure point still exist, as they do on a real disk.
     fn make_readonly(&mut self, path: &Path) -> io::Result<()> {
         if !self.exists(path) {
             return Err(not_found(path));

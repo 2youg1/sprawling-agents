@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The canonical conversation vocabulary: what a request and a response
-//! are made of, in the city dialect every adapter translates from.
-//! The part `Sprawling/kernel/spec/Model.lean` specifies this module with the
-//! rest of `kernel::model`.
-
 use std::borrow::Cow;
 use std::num::NonZeroU64;
 
@@ -17,9 +12,7 @@ use crate::event::Payload;
 use crate::model::image::ImageRef;
 use crate::model::usage::ModelUsage;
 use crate::tool::ToolName;
-/// One model at one registered endpoint. The endpoint is part of the
-/// identity: the same model id at two providers can have different facts,
-/// prices and request capabilities.
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -34,13 +27,9 @@ impl std::fmt::Display for ModelRef {
     }
 }
 
-/// Building-level constraints riding along the call. It carries the one
-/// load-bearing bit; further fields only grow, and each one is
-/// added at every construction site the compiler names.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuildingPolicy {
-    /// Confidential buildings lock the call to the local model pool;
-    /// content never leaves the machine (11.4).
+
     pub confidential: bool,
 }
 
@@ -50,7 +39,6 @@ impl BuildingPolicy {
     }
 }
 
-/// Message author on the canonical (Anthropic-shaped) conversation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
@@ -58,8 +46,6 @@ pub enum Role {
     Assistant,
 }
 
-/// Why the provider stopped. Wire-borne and closed: a fourth reason has
-/// to be answered by every dialect that maps one (14.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StopReason {
@@ -68,21 +54,13 @@ pub enum StopReason {
     MaxTokens,
 }
 
-/// The most a model may emit in one response, thinking included.
-///
-/// **Zero is unrepresentable, and absence is not zero.** A provider
-/// answers a zero ceiling with nothing at all, and a reply with nothing
-/// in it reads downstream as work that finished — so a figure nobody
-/// registered has to be carried as a figure nobody registered, and the
-/// dialect that cannot write the request without one refuses the call
-/// instead of inventing a number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Ceiling(NonZeroU64);
 
 impl Ceiling {
-    /// `None` for zero, which is not a ceiling.
+
     pub const fn new(tokens: u64) -> Option<Ceiling> {
         match NonZeroU64::new(tokens) {
             Some(tokens) => Some(Ceiling(tokens)),
@@ -101,72 +79,39 @@ impl std::fmt::Display for Ceiling {
     }
 }
 
-/// One frozen-prefix block on the wire. `cache` marks an explicit prompt
-/// cache breakpoint (breakpoints sit on segment edges).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SystemBlock {
     pub text: String,
     pub cache: bool,
 }
 
-/// Which wire the far side speaks. Closed: a fourth dialect is a
-/// compile error at every entrance of `gateway::dialect`, which is how
-/// it is kept from being approximated with the nearest of the three
-/// already written.
-///
-/// Lives here rather than in `gateway` for the same reason
-/// [`BuildingPolicy`] does: two outer crates must name it (the gateway
-/// translates it, the wire carries it) and neither may name the other.
-/// `gateway::dialect` is its evaluator, not its definition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DialectKind {
     Anthropic,
-    /// OpenAI's chat completions face, which most relays, most local
-    /// servers and most other laboratories also serve.
+
     OpenAi,
-    /// OpenAI's responses face: a different request body, a different
-    /// reply shape and a different set of stream event names.
-    ///
-    /// Registered apart from [`DialectKind::OpenAi`] because a person
-    /// who pasted a responses URL said which face they meant, and a
-    /// registration that folded the two would send chat bodies to a
-    /// path that answers 404.
+
     OpenAiResponses,
 }
 
-/// What a chosen model is for. Exhaustive rather than a free label: a
-/// tag exists because some code asks for a model by it, so a tag with no
-/// asker is a setting the person can fill in and never see used. It
-/// grows when a caller appears, not when a name is imagined.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ModelTag {
-    /// The model a resident thinks with.
+
     Main,
-    /// The small model that reads long documents so the main one does
-    /// not have to: summaries, structure trees, search results.
+
     Digest,
-    /// The model that turns a recording into text.
-    ///
-    /// A tag rather than a store of its own, because "which endpoint and
-    /// which model answer this kind of job" already has a mechanism: a
-    /// person attaches an endpoint and chooses a model for a tag. A
-    /// second form and a second file would be a second answer to one
-    /// question, and the credential would need a second way into the
-    /// vault.
+
     Transcribe,
-    /// The model that reads text out of a picture: one a person
-    /// registered as able to read images. The city's OCR tool asks for
-    /// it, and with none chosen that tool says so rather than handing a
-    /// picture to a model that only reads text (`Sprawling/kernel/spec/Model.lean` §8-80).
+
     Ocr,
 }
 
 impl ModelTag {
-    /// Every tag, in the order a settings page should offer them.
+
     pub const ALL: [ModelTag; 4] = [
         ModelTag::Main,
         ModelTag::Digest,
@@ -191,16 +136,6 @@ impl std::fmt::Display for ModelTag {
     }
 }
 
-/// How hard the provider should think, least to most, in the upstreams' words. Which levels one
-/// (Endpoint, model) offers is the upstream's statement, answered by the gateway's thinking
-/// ladder and never by a table here (`Sprawling/kernel/spec/Model.lean` D56); a level outside the
-/// offer is refused, never moved to a neighbour. Check the vendors before changing the ladder:
-/// <https://platform.claude.com/docs/en/build-with-claude/effort>,
-/// <https://developers.openai.com/api/docs/guides/reasoning>.
-///
-/// Absence (`Option::None`) is not `Effort::None`: absence means nobody stated a level and the
-/// default rule resolves one ([`crate::consts_policy::DEFAULT_EFFORT`]). `Effort::None` survives
-/// only so ledgers that asked a provider not to think read back; no picker offers it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -216,12 +151,7 @@ pub enum Effort {
 }
 
 impl Effort {
-    /// Every setting, in the order a person is offered them.
-    ///
-    /// The one list. A refusal that spells the allowed values, a form
-    /// that offers them and a document that names them all read this,
-    /// so an eighth setting cannot appear in one of the three and be
-    /// missing from the other two.
+
     pub const ALL: [Effort; 7] = [
         Effort::None,
         Effort::Minimal,
@@ -232,7 +162,6 @@ impl Effort {
         Effort::Max,
     ];
 
-    /// The word the wire and every configuration file spell it with.
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -247,34 +176,16 @@ impl Effort {
     }
 }
 
-/// One piece of what a model is producing, before the call it belongs to
-/// has settled.
-///
-/// **Reasoning and prose are two streams, not one.** A model that spends
-/// most of a call reasoning sends almost nothing on the prose stream,
-/// and a page that appended both to one buffer would either show a
-/// person their own model's scratch work as its answer or show them an
-/// empty thread for three minutes. Which stream a piece came from is
-/// therefore part of the piece, and no reader has to guess.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Increment {
-    /// Prose, which is the answer as it arrives.
+
     Said(String),
-    /// Reasoning, which is how the answer was arrived at.
+
     Thought(String),
 }
 
-/// Canonical content block. Tool inputs are [`Payload`] — the float ban
-/// holds here because these bytes become ledger payloads verbatim.
-///
-/// `Thinking` and `RedactedThinking` are carried unchanged end to end:
-/// the provider verifies `signature` against the reasoning it issued, and
-/// altering either block earns a 400 that names them as unmodifiable.
-/// The block shapes are the city dialect's, so
-/// <https://platform.claude.com/docs/en/build-with-claude/thinking> is
-/// what a change to them has to agree with.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ContentBlock {
@@ -293,19 +204,13 @@ pub enum ContentBlock {
         name: ToolName,
         input: Payload,
     },
-    /// A picture the model can see. Carries the reference and the
-    /// dimensions; the bytes are fetched at the wire by whoever is about
-    /// to send them (`gateway::endpoint`), so this block stays a thing a
-    /// ledger can hold.
+
     Image(ImageRef),
     ToolResult {
         tool_use_id: String,
         content: String,
         is_error: bool,
-        /// Pictures the tool produced. Absent from every tool result
-        /// written before this field existed, which is why it reads as
-        /// an empty list rather than as a broken record: an old history
-        /// has to replay.
+
         #[serde(default)]
         attachments: Vec<ImageRef>,
     },
@@ -317,15 +222,6 @@ pub struct ChatMessage {
     pub content: Vec<ContentBlock>,
 }
 
-/// Which message of a request carries an explicit prompt-cache
-/// breakpoint.
-///
-/// A request-side annotation rather than a mark on a message, so a
-/// request can borrow the conversation it carries: marking a message
-/// would need a writable copy of it. `runtime::prefix::BreakpointPlan`
-/// is the only producer, and it anchors the tail - so everything a
-/// request carries, trailing tool results included, sits inside the
-/// region a later request can hit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MessageBreakpoint {
     #[default]
@@ -333,14 +229,6 @@ pub enum MessageBreakpoint {
     Tail,
 }
 
-/// How many of a request's leading system blocks every resident of one
-/// building carries byte for byte (`Sprawling/kernel/spec/Model.lean` D60).
-///
-/// A request-side annotation like [`MessageBreakpoint`]: `runtime` sets
-/// it from the frozen prefix, and the gateway's prefix hold reads it
-/// through [`ChatRequest::shared_system`] to build the one pre-warm a
-/// cold wave of calls waits behind. Zero is not a count here: a request
-/// that shares nothing says [`SharedPrefix::Unshared`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SharedPrefix {
     #[default]
@@ -348,7 +236,6 @@ pub enum SharedPrefix {
     Leading(std::num::NonZeroUsize),
 }
 
-/// A tool as the provider sees it; sourced from catalog `tool_defs` only.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ToolDef {
@@ -359,10 +246,7 @@ pub struct ToolDef {
 }
 
 impl ToolDef {
-    /// The canonical bytes a connector-tool pin covers and the CAS stores.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` if the schema cannot be serialised.
+
     pub fn pin_bytes(&self) -> Result<Vec<u8>, crate::AxError> {
         serde_json::to_vec(self).map_err(|err| {
             crate::AxError::failure(
@@ -374,49 +258,32 @@ impl ToolDef {
         })
     }
 
-    /// The pin and CAS address of this definition.
-    ///
-    /// # Errors
-    /// Propagates [`ToolDef::pin_bytes`].
     pub fn digest(&self) -> Result<crate::B3Hash, crate::AxError> {
         self.pin_bytes().map(|bytes| crate::B3Hash::digest(&bytes))
     }
 }
 
-/// The canonical request conversation (city dialect = Anthropic Messages). Both production dialects and the scripted model
-/// consume this one shape — the seam carries it so replay, citysim and
-/// the real gateway argue about the same object.
-///
-/// `messages` and `tools` are borrowed on the turn's path, because a
-/// request lives for one call; a holder that keeps a request past the
-/// call (the keep-warm renewal) owns a `ChatRequest<'static>`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChatRequest<'a> {
     pub model: String,
-    /// Absent when no catalogue row states this model's ceiling. The
-    /// OpenAI wire then omits the field and takes the provider's own
-    /// default; the Anthropic wire, which requires it, refuses.
+
     pub max_tokens: Option<Ceiling>,
     pub system: Vec<SystemBlock>,
     pub messages: Cow<'a, [ChatMessage]>,
     pub tools: Cow<'a, [ToolDef]>,
-    /// Outside serde, like every request-side annotation: the bytes a
-    /// ledger or a transcript records are the same with and without it.
+
     #[serde(skip)]
     pub breakpoint: MessageBreakpoint,
-    /// Outside serde for the same reason as `breakpoint`.
+
     #[serde(skip)]
     pub shared: SharedPrefix,
-    /// Frozen at run start: changing it mid-run would start a new cached
-    /// prompt prefix, so the value rides in from [`crate::FrozenConfig`].
+
     pub effort: Option<Effort>,
-    /// Sampling values for this request, still text until the dialect
-    /// writes JSON numbers at the provider boundary.
+
     #[serde(default)]
     pub generation: crate::GenerationSettings,
 }
 
-/// The canonical response: dialect output, endpoint input.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ChatResponse {
     pub content: Vec<ContentBlock>,
@@ -425,8 +292,7 @@ pub struct ChatResponse {
 }
 
 impl ChatRequest<'_> {
-    /// An empty conversation shell for adapters and tests that argue
-    /// about hashes, not content.
+
     pub fn empty(model: &str, max_tokens: Ceiling) -> ChatRequest<'static> {
         ChatRequest {
             model: model.to_owned(),
@@ -441,9 +307,6 @@ impl ChatRequest<'_> {
         }
     }
 
-    /// Whether the message at `index` carries this request's breakpoint.
-    /// The one reading of [`MessageBreakpoint`]; a dialect only spells
-    /// the answer on its wire.
     pub fn carries_breakpoint(&self, index: usize) -> bool {
         match self.breakpoint {
             MessageBreakpoint::Unmarked => false,
@@ -451,9 +314,6 @@ impl ChatRequest<'_> {
         }
     }
 
-    /// The system blocks every resident of one building carries: the
-    /// one reading of [`SharedPrefix`]. `None` when the request shares
-    /// nothing, or names more blocks than it carries.
     pub fn shared_system(&self) -> Option<&[SystemBlock]> {
         match self.shared {
             SharedPrefix::Unshared => None,
@@ -461,8 +321,6 @@ impl ChatRequest<'_> {
         }
     }
 
-    /// The same request, owning what it borrowed: for a holder that
-    /// keeps it past the call it was assembled for.
     pub fn into_owned(self) -> ChatRequest<'static> {
         ChatRequest {
             model: self.model,

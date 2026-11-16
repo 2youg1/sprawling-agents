@@ -3,23 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a run is told about work it handed down.
-//!
-//! **The way back is the parent's room, not the parent's run.** A child
-//! starts at the call that asked for it (collab D7) and may outlive the
-//! run that asked, so its account lands wherever the parent's room is
-//! by then: in the parent's run at its next safe point when that run
-//! still drives, or in the room's next run when it does not. The door
-//! that already carries a fact across runs is that room's `Inbox`. A second door would be a second
-//! answer to "what is waiting for this resident", so the way back is an
-//! ordinary [`Signal`] and `status.signals_pending` counts it without
-//! being taught anything new.
-//!
-//! The city, not the child, is the verifier. `Claim::verified` refuses a
-//! producer judging its own work, and `Completion::Done(Evidence)` is
-//! something the city observed rather than something the child said -
-//! which is exactly what makes an [`Artifact`] constructible here.
-
 use kernel::{Address, AxCode, AxError, Locator, Payload, TimeMs, Version};
 use serde::{Deserialize, Serialize};
 
@@ -28,28 +11,16 @@ use crate::inbox::Signal;
 use crate::workshop::NodeId;
 use kernel::event::record::{SignalId, SignalKind};
 
-/// How one piece of handed-down work came back. Exhaustive: a delegate
-/// that finished and one that stopped are different facts, and a parent
-/// told only that something came back would have to guess which.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Handback {
-    /// The child's own done check passed, and somebody other than the
-    /// child said so. The name avoids `Verified`, which this crate
-    /// already uses for a pull request's phase.
+
     Finished(Artifact),
-    /// It stopped without evidence, or its claim did not verify.
-    /// `because` carries the refusal's own words rather than a summary
-    /// of them.
+
     Stopped { claim: Claim, because: String },
 }
 
 impl Handback {
-    /// Verifies the child's claim on the city's behalf.
-    ///
-    /// A refusal is an outcome here rather than a failure: a parent that
-    /// is told nothing when its delegate stopped can only find out by
-    /// waiting, which is the one thing an agent must never be asked to
-    /// do.
+
     #[must_use]
     pub fn of(claim: Claim, done_check_passed: bool, verifier: &str) -> Handback {
         match claim.clone().verified(done_check_passed, verifier) {
@@ -61,10 +32,6 @@ impl Handback {
         }
     }
 
-    /// A child the city could not start. It comes back stopped, the way a
-    /// child that stopped does, and the reason is the refusal's code,
-    /// subject and recovery, which is what the parent needs to correct
-    /// the room or tell the person (collab D19).
     #[must_use]
     pub fn unstarted(claim: Claim, refusal: &AxError) -> Handback {
         Handback::Stopped {
@@ -73,8 +40,6 @@ impl Handback {
         }
     }
 
-    /// Which room the work was done in. The node id is that room's
-    /// address: a delegate's identity is where it worked.
     #[must_use]
     pub fn node(&self) -> &NodeId {
         match self {
@@ -83,7 +48,6 @@ impl Handback {
         }
     }
 
-    /// Who did the work.
     #[must_use]
     pub fn by(&self) -> &str {
         match self {
@@ -92,14 +56,6 @@ impl Handback {
         }
     }
 
-    /// The signal the asking run's room receives.
-    ///
-    /// `Thread` rather than `Mention`: this answers something that room
-    /// asked for, and the lane it takes is derived from that kind rather
-    /// than chosen here.
-    ///
-    /// # Errors
-    /// Propagates the payload's and the signal's own refusals.
     pub fn signal(&self, id: SignalId, to: Address, at: TimeMs) -> Result<Signal, AxError> {
         let body = match self {
             Handback::Finished(artifact) => HandbackBody::Finished {
@@ -133,19 +89,6 @@ impl Handback {
         )
     }
 
-    /// The one inverse of [`signal`](Self::signal).
-    ///
-    /// `None` is an ordinary signal between residents, which reports no
-    /// handed-down work. A signal that says it is a handback and cannot
-    /// be read as one is an error rather than a `None`: answering `None`
-    /// to both would make a delegate that stopped and a line this build
-    /// cannot parse arrive at the parent as the same silence.
-    ///
-    /// # Errors
-    /// `E_WIRE_MISMATCH` for a handback body this build cannot read and
-    /// an account that is not a CAS locator; [`Claim::verified`]'s own
-    /// refusal, `E_EVIDENCE_MISSING`, for a claim whose recorded
-    /// verifier is its producer.
     pub fn from_signal(signal: &Signal) -> Result<Option<Handback>, AxError> {
         if !signal.payload().as_map().contains_key(HandbackBody::TAG) {
             return Ok(None);
@@ -174,12 +117,6 @@ impl Handback {
     }
 }
 
-/// The handback signal's payload: the one authority for its keys.
-///
-/// Internally tagged, so the line reads exactly as the hand-written
-/// writer left it - `handback` beside the fields, not wrapping them -
-/// and so the two outcomes cannot be confused for one shape with
-/// optional halves.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "handback", rename_all = "snake_case")]
 enum HandbackBody {
@@ -198,9 +135,7 @@ enum HandbackBody {
 }
 
 impl HandbackBody {
-    /// The key that says a signal is a handback at all, spelled here
-    /// because the serde tag above and the probe in
-    /// [`Handback::from_signal`] are the same key.
+
     const TAG: &'static str = "handback";
 }
 
@@ -248,7 +183,6 @@ mod tests {
         assert!(body["text"].as_str().unwrap().contains("finished"));
     }
 
-    /// The one the parent would otherwise never hear about.
     #[test]
     fn a_delegate_that_stopped_still_reaches_the_run_that_asked() {
         let back = Handback::of(claim("lab/helper"), false, "city");
@@ -270,8 +204,6 @@ mod tests {
         assert!(body.contains_key("because"));
     }
 
-    /// The writer's own inverse: a delegate that stopped comes back as a stop with its reason
-    /// rather than as the same `None` an ordinary signal answers.
     #[test]
     fn the_signal_reads_back_as_the_handback_that_wrote_it() {
         let finished = Handback::of(claim("lab/helper"), true, "city");
@@ -311,8 +243,6 @@ mod tests {
         assert_eq!(Handback::from_signal(&ordinary).unwrap(), None);
     }
 
-    /// collab D19: the parent reads the refusal's code and recovery, and
-    /// the line reads back as the stop it is.
     #[test]
     fn a_child_that_could_not_start_comes_back_stopped_with_the_refusal() {
         let refusal = AxError::failure(
@@ -338,8 +268,6 @@ mod tests {
         assert_eq!(Handback::from_signal(&signal).unwrap(), Some(back));
     }
 
-    /// The rule `Claim::verified` holds, reached through this door: the
-    /// city may verify, the child may not verify itself.
     #[test]
     fn the_child_is_not_allowed_to_be_its_own_verifier() {
         let back = Handback::of(claim("lab/helper"), true, "lab/helper");

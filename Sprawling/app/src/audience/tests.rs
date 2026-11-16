@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A file is never a terminal, so what is written into one is read by
-//! an agent.
-
 #![allow(clippy::unwrap_used, reason = "test code")]
 
 use super::Audience;

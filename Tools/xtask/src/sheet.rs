@@ -3,44 +3,20 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which lines of a client file are a stylesheet (Tools/xtask/Spec.lean
-//! §8-8 D35).
-//!
-//! A `.css` or `.html` file is a stylesheet from its first line to its
-//! last. A `.svelte` file is markup with one stylesheet inside it, its
-//! top-level `<style>` block, and the two are read by different rules:
-//! in markup `#` opens a block or a fragment far more often than it
-//! names a colour (`{#each}` would read as `#eac`), while in the block a
-//! bare `#1a2b3c` is a colour and `transition: opacity 200ms` is a
-//! duration. `color` and `motion` both ask which reading a line takes,
-//! so the answer lives here once.
-
-/// How a gate reads one line of a client file.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Reading {
-    /// A line of a stylesheet: a `.css` or `.html` file, or a line inside
-    /// a `.svelte` file's top-level `<style>` block.
+
     Sheet,
-    /// Script, markup, or a language that is not a stylesheet.
+
     Code,
 }
 
-/// One line of a file: its 1-based number, its text, and its reading.
 pub(crate) struct Line<'t> {
     pub(crate) number: usize,
     pub(crate) text: &'t str,
     pub(crate) reading: Reading,
 }
 
-/// Every line of `text`, which is the file at the repo-relative `rel`.
-///
-/// The block of a `.svelte` file is what lies between a line that starts
-/// with `<style` and the next line that starts with `</style>`; the two
-/// tag lines are markup, and a block opened and closed on one line is
-/// read whole as a sheet. Svelte compiles only a top-level block as the
-/// component's stylesheet, and a top-level tag starts its line, so a
-/// `<style>` written inside a string or a template literal, which is
-/// indented, stays code.
 pub(crate) fn lines<'t>(rel: &str, text: &'t str) -> impl Iterator<Item = Line<'t>> {
     let whole = [".css", ".html"].iter().any(|ext| rel.ends_with(ext));
     let component = rel.ends_with(".svelte");
@@ -72,10 +48,6 @@ pub(crate) fn lines<'t>(rel: &str, text: &'t str) -> impl Iterator<Item = Line<'
         })
 }
 
-/// The names a stylesheet line declares under a custom-property prefix:
-/// `--color-mine: …` declares `mine` under `--color-`, and
-/// `var(--color-mine)` reads it and declares nothing. A declaration
-/// starts its line or follows whitespace, `{` or `;`.
 pub(crate) fn declared<'l>(line: &'l str, prefix: &'l str) -> impl Iterator<Item = &'l str> {
     line.match_indices(prefix).filter_map(move |(at, _)| {
         let opens = line

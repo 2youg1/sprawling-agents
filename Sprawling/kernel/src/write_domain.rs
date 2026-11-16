@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! WriteDomain prefix checking and edit-war detection. C17 is enforced twice on purpose: a reserved prefix cannot be
-//! *constructed into* a domain, and a reserved target is refused at
-//! judgment even so — fail-closed has no single point of failure.
-//! The part `Sprawling/kernel/spec/WriteDomain.lean` specifies this module.
-
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -17,24 +12,13 @@ use crate::consts_policy::EDIT_WAR_FREEZE;
 use crate::error::{AxCode, AxError};
 use crate::event::RunId;
 
-/// A validated set of prefixes.
-///
-/// The one construction point C17 is enforced at, and the reason
-/// [`WriteDomain`] can be an enum with public variants without gaining a
-/// second way in: a variant is spellable, but only with a value that has
-/// already been checked.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DomainPrefixes {
     prefixes: Vec<Address>,
 }
 
 impl DomainPrefixes {
-    /// C17 at the construction point: any member under the reserved
-    /// prefix refuses the whole set. An empty set is legal (a read-only
-    /// actor writes nowhere).
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` naming the reserved member.
+
     pub fn new(prefixes: Vec<Address>) -> Result<DomainPrefixes, AxError> {
         if let Some(reserved) = prefixes.iter().find(|p| p.is_reserved()) {
             return Err(AxError::failure(
@@ -55,35 +39,20 @@ impl DomainPrefixes {
     }
 }
 
-/// The set of prefixes one actor may write under, and what it may write
-/// inside them.
-///
-/// Exhaustive rather than a set plus a flag: "every file here" and "the
-/// Markdown documents here" are two policies, and the second one is what
-/// City Hall's residents are given so that a planner which may not build
-/// is a type rather than a sentence in a prompt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WriteDomain {
-    /// Every file under the prefixes.
+
     Everything(DomainPrefixes),
-    /// Markdown documents under the prefixes, and never a plan file:
-    /// `Roadmap.md` has one editing entrance, and it is the `plan` tool.
+
     Documents(DomainPrefixes),
 }
 
 impl WriteDomain {
-    /// The ordinary domain: every file under these prefixes.
-    ///
-    /// # Errors
-    /// Propagates [`DomainPrefixes::new`].
+
     pub fn new(prefixes: Vec<Address>) -> Result<WriteDomain, AxError> {
         Ok(WriteDomain::Everything(DomainPrefixes::new(prefixes)?))
     }
 
-    /// The documents-only domain.
-    ///
-    /// # Errors
-    /// Propagates [`DomainPrefixes::new`].
     pub fn documents(prefixes: Vec<Address>) -> Result<WriteDomain, AxError> {
         Ok(WriteDomain::Documents(DomainPrefixes::new(prefixes)?))
     }
@@ -94,18 +63,11 @@ impl WriteDomain {
         }
     }
 
-    /// Whether a declared area lies inside this domain at all: the
-    /// prefix half of [`admits`](Self::admits), for the subject that
-    /// has no file name. A tool declares the room it works in, and a
-    /// room is neither Markdown nor code.
     #[must_use]
     pub fn reaches(&self, area: &Address) -> bool {
         !area.is_reserved() && self.prefixes().any(|p| area.is_within(p))
     }
 
-    /// The domain door's primitive. Reserved targets are Outside no
-    /// matter what the set says, and a documents domain answers a third
-    /// way: inside the prefixes, and still not a file it writes.
     pub fn admits(&self, target: &Address) -> DomainVerdict {
         if !self.reaches(target) {
             return DomainVerdict::Outside {
@@ -123,31 +85,20 @@ impl WriteDomain {
     }
 }
 
-/// What a run may do to a file that already exists inside its write
-/// domain (`Sprawling/kernel/spec/WriteDomain.lean` §8-78).
-///
-/// It narrows the domain and never widens it: the domain answers where
-/// a run may write and what kind of file, this answers whether a write
-/// may change a file that is already there. Whether the target exists
-/// is the filesystem's fact at the moment of the write, so the check
-/// that makes `Create` hold is the writer's atomic create; the rule and
-/// its refusal are [`crate::gate::replacing`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum WriteLimit {
-    /// No narrowing beyond the write domain.
+
     Full,
-    /// Create files that do not exist; change, remove and rename none,
-    /// including one this run created itself.
+
     Create,
 }
 
 impl WriteLimit {
-    /// Both limits, the one that narrows nothing first.
+
     pub const ALL: [WriteLimit; 2] = [WriteLimit::Full, WriteLimit::Create];
 
-    /// The word this limit travels under.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -157,14 +108,11 @@ impl WriteLimit {
     }
 }
 
-/// The last segment of an address: its file name.
 fn file_name(target: &Address) -> &str {
     let raw = target.as_str();
     raw.rsplit('/').next().unwrap_or(raw)
 }
 
-/// What a documents domain says about one target already known to be
-/// inside its prefixes.
 fn document_verdict(target: &Address) -> DomainVerdict {
     let name = file_name(target);
     if name == crate::spine::ROADMAP_FILE {
@@ -181,30 +129,26 @@ fn document_verdict(target: &Address) -> DomainVerdict {
     }
 }
 
-/// Deliberately exhaustive verdict; `prefixes` feeds the refusal's
-/// nearby list.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainVerdict {
     Within,
     Outside {
         prefixes: Vec<String>,
     },
-    /// Inside the prefixes, and still not a file this domain writes.
+
     NotWritable {
         reason: DocumentReason,
     },
 }
 
-/// Why a documents domain refuses a target that is inside its prefixes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocumentReason {
-    /// Not a Markdown document.
+
     NotMarkdown,
-    /// The plan file, whose one editing entrance is the `plan` tool.
+
     ThePlan,
 }
 
-/// One observed write, in time order (slice order is the clock).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EditSample {
     pub addr: Address,
@@ -217,10 +161,6 @@ pub enum EditWarVerdict {
     Freeze { addr: Address },
 }
 
-/// Edit-war detection: a "reclaim" is run X editing a
-/// file back after run Y took it (X, Y, X). Reclaims at or over
-/// `EDIT_WAR_FREEZE` freeze that file. Per-address, deterministic:
-/// addresses are examined in BTreeMap order, first hit wins.
 pub fn observe_edit_war(samples: &[EditSample]) -> EditWarVerdict {
     let mut per_addr: BTreeMap<&Address, Vec<RunId>> = BTreeMap::new();
     for sample in samples {
@@ -249,12 +189,6 @@ pub fn observe_edit_war(samples: &[EditSample]) -> EditWarVerdict {
     }
     EditWarVerdict::Calm
 }
-
-// No kani harness lives here. Every value this module judges is an
-// `Address`, which owns a `String`, so a symbolic harness would hand
-// CBMC loops it cannot bound, and a harness over one fixed address
-// would restate the test below at a higher price (`Sprawling/kernel/Spec.lean`
-// §2).
 
 #[cfg(test)]
 #[allow(
@@ -340,7 +274,7 @@ mod tests {
             })
             .collect();
         assert_eq!(observe_edit_war(&one_reclaim), EditWarVerdict::Calm);
-        // Consecutive edits by the same run collapse: no alternation, no war.
+
         let bursts: Vec<EditSample> = [run(1), run(1), run(2), run(2), run(1), run(1)]
             .into_iter()
             .map(|r| EditSample {
@@ -351,8 +285,6 @@ mod tests {
         assert_eq!(observe_edit_war(&bursts), EditWarVerdict::Calm);
     }
 
-    /// A file passed on from run to run, none of them taking it back, is
-    /// work handed along rather than a war.
     #[test]
     fn a_file_handed_along_without_a_reclaim_stays_calm() {
         let file = addr("b/relay.md");
@@ -378,7 +310,7 @@ mod tests {
         .into_iter()
         .map(|(a, r)| EditSample { addr: a, run: r })
         .collect();
-        // Each file saw only one reclaim; interleaving does not add up.
+
         assert_eq!(observe_edit_war(&samples), EditWarVerdict::Calm);
     }
 }

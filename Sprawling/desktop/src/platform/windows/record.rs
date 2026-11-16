@@ -3,35 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Start and stop: which windows this connection is recording, and
-//! what each recording is being written by.
-//!
-//! This file is the bookkeeping. What writes the bytes and where they
-//! land is `sink`'s, so the two questions a reader asks separately are
-//! answered separately: *may this recording begin* here, *how is it
-//! written* there.
-//!
-//! A recording cannot outlive the connection that started it: the desk
-//! is dropped with the connection, and dropping it stops what it was
-//! running.
-//!
-//! **A recording is named by the id `start` handed back, not by the
-//! window's title.** A title changes while the recording runs — a
-//! document is saved under a new name, a tab is switched — and a key
-//! that changes under the recording is a recording the caller can no
-//! longer stop. The window itself is identified by its handle, which is
-//! what makes "this window is already being recorded" hold across a
-//! title change too.
-//!
-//! Two recordings of one window at once is refused rather than merged.
-//! Whichever of the two files a caller then asked for would be a guess,
-//! and stopping would be ambiguous in a way no answer resolves.
-//!
-//! Sound is heard only from the one device the scope file names
-//! (`Sprawling/desktop/Spec.lean` D11): `hearing` runs it, and `stop` hands
-//! the sound back as an audio block when it is short enough to carry
-//! (section 12.13).
-
 mod hearing;
 mod sink;
 
@@ -46,35 +17,22 @@ use crate::refusal::{Refusal, RefusalCode};
 use hearing::Hearing;
 use sink::{Sink, somewhere};
 
-/// One recording of this connection, as the caller names it.
-///
-/// A counter rather than a timestamp because this package samples no
-/// clock, and a counter cannot collide with itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct RecordingId(u64);
 
-/// What a `desktop.record` call asks for.
 pub(crate) enum Wanted {
-    /// Begin recording the window this call names, with or without sound.
+
     Start(Sound),
-    /// End the recording this id was handed back for.
+
     Stop(RecordingId),
 }
 
-/// Whether a start asks for sound.
 pub(crate) enum Sound {
     Silent,
-    /// The scope file's device, which the gate is asked for before any
-    /// window is looked up.
+
     Asked,
 }
 
-/// Reads one `desktop.record` call.
-///
-/// # Errors
-/// Refuses a call that says neither start nor stop, an `audio` that is
-/// not true or false, and a stop that does not say which recording it
-/// ends.
 pub(crate) fn asked(arguments: &Value) -> Result<Wanted, Refusal> {
     let state = arguments
         .get("state")
@@ -84,9 +42,7 @@ pub(crate) fn asked(arguments: &Value) -> Result<Wanted, Refusal> {
         "start" => match arguments.get("audio") {
             None | Some(Value::Bool(false)) => Ok(Wanted::Start(Sound::Silent)),
             Some(Value::Bool(true)) => Ok(Wanted::Start(Sound::Asked)),
-            // A caller who sent something else believes it said
-            // something, and is told what `audio` takes rather than
-            // being given a guess.
+
             Some(other) => Err(Refusal::new(
                 RefusalCode::InvalidArgs,
                 "record a window",
@@ -119,10 +75,8 @@ fn named_neither(subject: String) -> Refusal {
     )
 }
 
-/// One recording in progress.
 struct Running {
-    /// The window being recorded, by the only name of it that cannot
-    /// change: the handle the operating system gave it.
+
     of: usize,
     title: String,
     into: PathBuf,
@@ -130,13 +84,10 @@ struct Running {
     heard_by: Option<Hearing>,
 }
 
-/// Every recording this connection started, by the id it was given.
 #[derive(Default)]
 pub(crate) struct Recordings {
     running: BTreeMap<RecordingId, Running>,
-    /// How many recordings this desk has begun, which is both the next
-    /// id and what makes two recordings of one window land in two
-    /// directories.
+
     begun: u64,
 }
 
@@ -148,13 +99,6 @@ impl Recordings {
         }
     }
 
-    /// Begins recording one window, hearing `device` when one is given,
-    /// and answers with the id that ends it.
-    ///
-    /// # Errors
-    /// Refuses a second recording of the same window, a place on this
-    /// machine that cannot be written to, and a sound this machine
-    /// cannot record.
     pub(crate) fn start(&mut self, window: Window, device: Option<&str>) -> Result<Value, Refusal> {
         let of = window.handle.ptr().addr();
         if let Some(already) = self.running.values().find(|running| running.of == of) {
@@ -170,9 +114,7 @@ impl Recordings {
         let id = RecordingId(self.begun);
         let into = somewhere(&window.named.title, self.begun)?;
         let title = window.named.title;
-        // The sound starts first: it is the half that refuses a machine
-        // without ffmpeg, and a refusal before the frames begin leaves
-        // nothing running to stop.
+
         let heard_by = device
             .map(|device| Hearing::open(device, &into))
             .transpose()?;
@@ -203,13 +145,6 @@ impl Recordings {
         Ok(answer)
     }
 
-    /// Ends one recording and answers with where it landed, and with
-    /// its sound in front of the facts when it heard one that one answer
-    /// can carry.
-    ///
-    /// # Errors
-    /// Refuses an id this connection is not recording under, which is
-    /// the honest answer to "stop what?".
     pub(crate) fn stop(&mut self, id: RecordingId) -> Result<Answer, Refusal> {
         let Some(running) = self.running.remove(&id) else {
             return Err(Refusal::new(
@@ -229,8 +164,7 @@ impl Recordings {
             "as": closed.kind,
             "frames": closed.frames,
         });
-        // A recording that stopped before it was asked to says why, so
-        // a caller does not read a short file as the whole of it.
+
         if let (Some(object), Some(early)) = (answer.as_object_mut(), closed.cut_short) {
             object.insert("ended_early".to_owned(), json!(early.summary()));
         }
@@ -255,9 +189,7 @@ impl Recordings {
 }
 
 impl Drop for Recordings {
-    /// A connection that closes mid-recording stops what it started.
-    /// Leaving a thread grabbing frames of somebody's desktop after the
-    /// caller has gone is the kind of thing this server exists to not do.
+
     fn drop(&mut self) {
         let running: Vec<RecordingId> = self.running.keys().copied().collect();
         for id in running {
@@ -278,8 +210,6 @@ mod tests {
     use super::*;
     use crate::platform::windows::target::Named;
 
-    /// A window with a handle no recording thread can draw from, which
-    /// is what makes these tests about the bookkeeping alone.
     fn window(title: &str, handle: usize) -> Window {
         Window {
             named: Named {
@@ -287,21 +217,17 @@ mod tests {
                 process: "test.exe".to_owned(),
             },
             bounds: super::super::geometry::Bounds::from_corners(0, 0, 32, 32).unwrap(),
-            // The one call that hands this made-up handle to Win32, the
-            // recording thread's capture, refuses it as a window that does
-            // not exist.
+
             handle: desktop_ffi::fixture::made_up(handle),
         }
     }
 
     impl Recordings {
-        /// A start with no sound, which is what every test here asks for:
-        /// no device is named on a machine running tests.
+
         fn start_silent(&mut self, window: Window) -> Result<Value, Refusal> {
             self.start(window, None)
         }
 
-        /// A stop, as the facts it answers with.
         fn stop_facts(&mut self, id: RecordingId) -> Result<Value, Refusal> {
             self.stop(id).map(|answer| {
                 let result = answer.as_result();
@@ -323,9 +249,6 @@ mod tests {
         RecordingId(answer["recording"].as_u64().expect("a start names its id"))
     }
 
-    /// The two bookkeeping rules, which hold whatever this machine has
-    /// installed: one recording per window, and nothing to stop until
-    /// something started.
     #[test]
     fn one_window_records_once_and_stops_once() {
         let mut recordings = Recordings::new();
@@ -350,14 +273,11 @@ mod tests {
             .expect("the recording ends");
         assert_eq!(landed(&ended), into);
         assert!(matches!(ended["as"].as_str(), Some("mp4" | "frames")));
-        // Stopping twice is the same refusal as stopping something that
-        // never started, rather than a second file.
+
         assert!(recordings.stop(id_of(&started)).is_err());
         let _tidied = std::fs::remove_dir_all(&into);
     }
 
-    /// The defect this id exists for: the title a recording started
-    /// under is not the title the window carries when it is stopped.
     #[test]
     fn a_window_that_renames_itself_mid_recording_can_still_be_stopped() {
         let mut recordings = Recordings::new();
@@ -371,9 +291,6 @@ mod tests {
         let _tidied = std::fs::remove_dir_all(landed(&started));
     }
 
-    /// `audio` is read as what it says: true asks for the scope's
-    /// device, false or absent asks for none, and anything else is
-    /// refused by name rather than read as either.
     #[test]
     fn audio_is_true_or_false_and_nothing_else() {
         assert!(matches!(
@@ -390,8 +307,6 @@ mod tests {
         assert_eq!(refusal.as_error()["data"]["code"], "E_INVALID_ARGS");
     }
 
-    /// A stop that names no recording is refused by name, because the
-    /// alternative is stopping whichever one this desk happens to hold.
     #[test]
     fn a_stop_says_which_recording_it_ends() {
         assert!(matches!(
@@ -408,8 +323,6 @@ mod tests {
         assert_eq!(neither.as_error()["data"]["code"], "E_INVALID_ARGS");
     }
 
-    /// Two windows record independently, and neither stop reaches the
-    /// other.
     #[test]
     fn two_windows_record_and_stop_independently() {
         let mut recordings = Recordings::new();
@@ -426,10 +339,6 @@ mod tests {
         }
     }
 
-    /// Dropping the desk stops what it was running, so a connection that
-    /// closes does not leave a thread grabbing frames of somebody's
-    /// desktop. If the drop did not join the thread, this is the test
-    /// that would hang rather than the one that would fail.
     #[test]
     fn dropping_the_table_stops_every_recording_it_held() {
         let landing = {

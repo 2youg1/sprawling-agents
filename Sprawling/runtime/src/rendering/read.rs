@@ -3,38 +3,22 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A `read` answer as one header line and the text it carries, with a
-//! line number marked every ten lines.
-//!
-//! The marks are the one grammar `edit` has to see through: a model
-//! copies a passage out of what it was shown, marks included, and
-//! [`Copied`] is how `edit` gets the file's own bytes back. The
-//! grammar is written here once, so the mark drawn and the mark removed
-//! cannot drift apart.
-
 use kernel::Payload;
 use kernel::event::record::Rendering;
 use serde_json::Value;
 
-/// Every line whose number is a multiple of this is marked, and so is
-/// the first line of an answer, so a reader never counts more than this
-/// many lines to name one.
 const MARK_EVERY: u64 = 10;
 
-/// How a renderer numbers the lines it draws. The ledger keeps 0-based
-/// indexes under every version; the number a model reads is the index
-/// plus the base (`Sprawling/runtime/spec/Rendering.lean` D119).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Numbering {
-    /// The line at index 0 is line 0 (V1 and V2).
+
     FromZero,
-    /// The line at index 0 is line 1, as Claude Code and a compiler
-    /// count (V3).
+
     FromOne,
 }
 
 impl Numbering {
-    /// The numbering a renderer draws with.
+
     #[must_use]
     pub fn of(rendering: Rendering) -> Numbering {
         match rendering {
@@ -43,8 +27,6 @@ impl Numbering {
         }
     }
 
-    /// The number the line at `index` is drawn with; `None` only past
-    /// the largest number.
     pub(crate) fn shown(self, index: u64) -> Option<u64> {
         match self {
             Numbering::FromZero => Some(index),
@@ -52,7 +34,6 @@ impl Numbering {
         }
     }
 
-    /// The index of the line drawn with `number`.
     fn index(self, number: u64) -> Option<u64> {
         match self {
             Numbering::FromZero => Some(number),
@@ -61,29 +42,16 @@ impl Numbering {
     }
 }
 
-/// What separates a mark from the line it numbers.
 const MARK_END: char = '|';
 
-/// The header and the marked text of one `read` payload, or `None` when
-/// the payload is not the shape `tools::read` writes.
-///
-/// The payload holds 0-based indexes and `numbering` draws them; the
-/// interval is closed, and the numbers drawn are the ones `offset` and
-/// a `search` hit drawn by the same version take, so a number read off
-/// the header or a mark is one a call can pass back unchanged. A payload
-/// without `offset` started at index 0. A payload without `total_lines`
-/// reached the end of its text, so the total is the last index shown
-/// plus one.
 pub(super) fn text(result: &Payload, numbering: Numbering) -> Option<String> {
     draw(result, numbering, Additions::Omitted)
 }
 
-/// V4: V3's body with the two additions recorded inside a read result.
 pub(super) fn text_v4(result: &Payload) -> Option<String> {
     draw(result, Numbering::FromOne, Additions::Included)
 }
 
-/// Whether the version draws read-result additions.
 enum Additions {
     Omitted,
     Included,
@@ -157,8 +125,6 @@ fn draw(result: &Payload, numbering: Numbering, additions: Additions) -> Option<
     Some(out)
 }
 
-/// Every fact that determines an unchanged stub. Grouping them keeps
-/// the renderer and read's breakeven decision on the same request.
 pub(crate) struct Stub<'a> {
     pub(crate) path: &'a str,
     pub(crate) offset: u64,
@@ -167,8 +133,6 @@ pub(crate) struct Stub<'a> {
     pub(crate) numbering: Numbering,
 }
 
-/// Draws a stub. `lines == 0` is valid only for an empty file or an
-/// offset past the known end.
 pub(crate) fn unchanged(stub: Stub<'_>) -> Option<String> {
     const SENTENCE: &str = "unchanged since your earlier read; not repeated";
     if stub.lines == 0 {
@@ -195,8 +159,6 @@ pub(crate) fn unchanged(stub: Stub<'_>) -> Option<String> {
     ))
 }
 
-/// The recorded rule files, or `None` when the field is not their
-/// declared shape. An absent field and an empty array add no bytes.
 fn rules(map: &serde_json::Map<String, Value>) -> Option<Vec<(&str, &str)>> {
     let Some(value) = map.get("rules") else {
         return Some(Vec::new());
@@ -208,8 +170,6 @@ fn rules(map: &serde_json::Map<String, Value>) -> Option<Vec<(&str, &str)>> {
         .collect()
 }
 
-/// Reserves the rendered heading, priority and separator bytes for a rule.
-/// Includes a trailing newline even when the retained text lacks one.
 pub fn rule_overhead(room: &str) -> usize {
     let mut rendered = String::from("body");
     append_rules(&mut rendered, vec![(room, "")]);
@@ -219,9 +179,6 @@ pub fn rule_overhead(room: &str) -> usize {
         .saturating_add(1)
 }
 
-/// Appends the project conventions without passing them through the
-/// numbered-body grammar. Every pair of blocks has one blank line
-/// between it, including a body whose last line had no terminator.
 fn append_rules(out: &mut String, rules: Vec<(&str, &str)>) {
     const PRIORITY: &str = "How work is done in this part of the project, from the project itself. Where this and the building's rules above disagree, the rules decide: they are what the city enforces.";
     if rules.is_empty() {
@@ -241,10 +198,6 @@ fn append_rules(out: &mut String, rules: Vec<(&str, &str)>) {
     }
 }
 
-/// Writes the line at index `at` of a passage whose first line is at
-/// index `first`, behind the mark [`is_marked`] places there, in the one
-/// grammar [`Copied`] takes off again; `None` only for an index whose
-/// number overflows.
 pub(super) fn push_line(
     out: &mut String,
     numbering: Numbering,
@@ -259,17 +212,10 @@ pub(super) fn push_line(
     Some(())
 }
 
-/// Whether the line numbered `at` of a passage whose first line is
-/// numbered `first` carries a mark: the first line does, and so does
-/// every line whose number is a multiple of [`MARK_EVERY`]. Drawing and
-/// [`Copied`] both ask this, so a mark is taken off exactly where one
-/// can have been drawn.
 fn is_marked(first: u64, at: u64) -> bool {
     at == first || at.is_multiple_of(MARK_EVERY)
 }
 
-/// A key that is absent reads as `Some(None)`; one that is present and
-/// not a whole number reads as `None`, which is not a `read` payload.
 fn number(value: Option<&Value>) -> Option<Option<u64>> {
     match value {
         None => Some(None),
@@ -277,33 +223,20 @@ fn number(value: Option<&Value>) -> Option<Option<u64>> {
     }
 }
 
-/// A passage copied out of a `read` answer, each line with the mark it
-/// may carry.
-///
-/// A line that starts with digits and the separator may be a mark the
-/// renderer drew or text the file holds, and the passage alone cannot
-/// say which. What can say is where the passage sits: a mark is drawn
-/// only on the line whose number it spells under the numbering that drew
-/// it, and only where [`is_marked`] places one. [`Copied::drawn_from`]
-/// keeps to that rule, and `edit` checks the result against the file
-/// before it trusts it.
 pub struct Copied<'a> {
     lines: Vec<CopiedLine<'a>>,
     numbering: Numbering,
 }
 
-/// One line of a [`Copied`] passage.
 struct CopiedLine<'a> {
-    /// The line as it came, line end included.
+
     whole: &'a str,
-    /// The number its leading mark spells and the line after the mark,
-    /// or `None` when it starts with no mark.
+
     mark: Option<(u64, &'a str)>,
 }
 
 impl<'a> Copied<'a> {
-    /// The passage split into lines, each line's mark read as
-    /// `numbering` draws marks.
+
     #[must_use]
     pub fn of(text: &'a str, numbering: Numbering) -> Copied<'a> {
         let lines = text
@@ -325,8 +258,6 @@ impl<'a> Copied<'a> {
         Copied { lines, numbering }
     }
 
-    /// Each 0-based file index the passage's first line could sit at for
-    /// one of its marks to have been drawn there, in ascending order.
     #[must_use]
     pub fn starts(&self) -> std::collections::BTreeSet<u64> {
         (0_u64..)
@@ -341,10 +272,6 @@ impl<'a> Copied<'a> {
             .collect()
     }
 
-    /// The passage with the marks taken off that a read answer would
-    /// have drawn had the passage's first line been at file index
-    /// `start`, and the numbers those marks spelled; `None` when no line
-    /// carries such a mark.
     #[must_use]
     pub fn drawn_from(&self, start: u64) -> Option<(String, std::collections::BTreeSet<u64>)> {
         let first = self.numbering.shown(start)?;
@@ -365,11 +292,6 @@ impl<'a> Copied<'a> {
         (!taken.is_empty()).then_some((out, taken))
     }
 
-    /// The passage with every mark that spells one of `numbers` taken
-    /// off, and every other line as it came: what a replacement holds
-    /// once the marks copied into it from the passage it replaces are
-    /// gone, while a line it means to write with digits and a separator
-    /// in front stays.
     #[must_use]
     pub fn without(&self, numbers: &std::collections::BTreeSet<u64>) -> String {
         self.lines

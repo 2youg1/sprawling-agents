@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one turn records: the prefix it assembled, the call it sent,
-//! the reply that came back, and the steer that arrived at a boundary.
-
 use serde::{Deserialize, Serialize};
 
 use crate::address::Address;
@@ -15,116 +12,77 @@ use crate::event::payload::Payload;
 use crate::locator::B3Hash;
 use crate::model::{ModelUsage, StopReason};
 
-/// `prompt_assembled`: the four segments a request was built from, and
-/// the cache breakpoints it carried.
-///
-/// This is the line an offline rebuild reads (A15): every segment says
-/// which documents went into it and how much of each one survived the
-/// slot's byte cap, so the bytes the model read can be reconstructed
-/// from the files without the request being kept.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PromptAssembled {
     #[serde(default)]
     pub segments: Vec<PromptSegment>,
-    /// The explicit cache breakpoints the request carried, in request
-    /// order: a slot name for a segment edge, `tail` for the last
-    /// message. The plan has one author, `runtime::prefix::BreakpointPlan`,
-    /// and this key carries what that author printed. A ledger written
-    /// before the plan existed holds the four slot names here instead.
+
     #[serde(default)]
     pub breakpoints: Vec<String>,
-    /// The tool table the request carried and every tool the building
-    /// admitted beside it (`Sprawling/runtime/spec/Catalog.lean` §8-60).
-    /// Absent on a line written before the table was recorded, and on
-    /// a prefix assembled without a catalog.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools: Option<PromptTools>,
 }
 
-/// The tools a run was frozen with: the array every request carries,
-/// kept whole in the content store, and one row per tool the assembler
-/// built, whatever its exposure.
-///
-/// A row is written for an `Off` tool as well, because the page that
-/// turns a tool back on reads its rows here: a tool that was not admitted
-/// is still one the building could admit.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PromptTools {
-    /// The BLAKE3 of the core tool array as the catalog serialises it,
-    /// which the content store holds under this hash.
+
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub hash: B3Hash,
-    /// Bytes of that array.
+
     pub len: u64,
-    /// Bytes of the dormant index in the resident segment.
+
     pub index: u64,
-    /// Bytes of Always skills' pinned SKILL.md text.
+
     #[serde(default)]
     pub reading: u64,
-    /// Tools at Core, tools at Dormant, and admitted skills at either position.
+
     #[serde(default)]
     pub always: u32,
     #[serde(default)]
     pub dormant: u32,
     #[serde(default)]
     pub skills: u32,
-    /// One row per tool, in name order.
+
     pub rows: Vec<PromptTool>,
 }
 
-/// One tool of a frozen table.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PromptTool {
     pub name: String,
-    /// The namespace the catalog files it under.
+
     pub namespace: String,
     pub exposure: crate::config::Exposure,
     pub from: crate::config::ExposureFrom,
-    /// The definition's canonical JSON digest and CAS address. Absent in a
-    /// record written before connector pins existed.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub digest: Option<crate::B3Hash>,
-    /// Bytes of this tool's definition as the array spells it, counted
-    /// whatever its exposure: what moving it into the core would add.
+
     pub len: u64,
-    /// The first sentence of its description, cut as the dormant index
-    /// cuts a hint.
+
     pub hint: String,
 }
 
-/// One frozen segment, as `prompt_assembled` states it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PromptSegment {
     pub slot: String,
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub hash: B3Hash,
-    /// Bytes this segment contributed to the request.
+
     pub len: u64,
-    /// The documents behind the segment, in concatenation order.
-    /// Written even when empty: a segment built from an identity rather
-    /// than from files names none, and that is a fact rather than an
-    /// omission.
+
     #[serde(default)]
     pub sources: Vec<PromptSource>,
-    /// The documents the slot was offered and did not take.
+
     #[serde(default)]
     pub skipped: Vec<PromptSkip>,
 }
 
-/// One document a segment was assembled from.
-///
-/// `kept` and `dropped` state both what the model read and what the cap
-/// cut off; `marker` says a truncation marker follows the kept bytes,
-/// which the byte counts alone cannot say. `hash` is the BLAKE3 of the
-/// kept bytes, so a rebuild names the one document that changed
-/// (`Sprawling/runtime/spec/Prefix.lean` D105); a row written before rows
-/// carried it reads as `None` and is checked by its segment's hash
-/// alone.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PromptSource {
@@ -136,7 +94,6 @@ pub struct PromptSource {
     pub hash: Option<B3Hash>,
 }
 
-/// One document a slot was offered and left out, and why.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PromptSkip {
@@ -144,121 +101,82 @@ pub struct PromptSkip {
     pub reason: SkipReason,
 }
 
-/// Why a document did not reach its segment. Closed: an assembler that
-/// finds a fifth reason states it here, where every reader sees it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum SkipReason {
-    /// An earlier slot already carried this document; the first slot
-    /// wins, because the earlier slot is the more cacheable one.
+
     Duplicate,
-    /// The resolver returned no bytes for the address.
+
     Unreadable,
-    /// The bytes are not UTF-8, and a prompt is text.
+
     NotUtf8,
-    /// The slot's byte cap was already spent.
+
     NoBudget,
 }
 
-/// `model_called`: which prefix went out, under which model name.
-///
-/// The request body is deliberately absent: it is reconstructible from
-/// [`PromptAssembled`] plus the window, and a copy of it here would be
-/// the second home of every message the run ever sent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ModelCalled {
-    /// The account attempted, never its credential or reference.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_account: Option<super::ProviderAccountBinding>,
-    /// The four segment hashes, in prefix order.
+
     #[cfg_attr(feature = "schema", schemars(with = "Vec<String>"))]
     #[serde(default)]
     pub segments: Vec<B3Hash>,
-    /// The endpoint's own model id; absent in legacy incomplete call records.
+
     #[serde(default)]
     pub model: String,
 }
 
-/// `model_returned`: the reply, the size of the wave it asked for, and
-/// what the provider said it cost.
-///
-/// Every field but `message` and `calls` is absent when the provider
-/// did not report it, which is not the same fact as reporting zero.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ModelReturned {
-    /// The assistant message, in the canonical content-block shape.
+
     pub message: Payload,
-    /// How many tool calls the reply asked for.
+
     pub calls: u64,
-    /// Four token counts in the one meaning `ModelUsage` states, the
-    /// dialect that reported them, and the meaning's version `v`.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
         feature = "schema",
         schemars(with = "Option<std::collections::BTreeMap<String, serde_json::Value>>")
     )]
     pub usage: Option<ModelUsage>,
-    /// Why the provider stopped, when it said.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub stop: Option<StopReason>,
-    /// What the provider itself billed, when it returns a figure; the
-    /// city's own price list is what fills the gap when it does not.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub billed_usd_micros: Option<UsdMicros>,
-    /// When the reply's first non-empty prose or reasoning reached the
-    /// city, read from the turn's clock (`Sprawling/kernel/spec/Event/Record.lean` §8-75). A moment,
-    /// not a duration: the time to first content is this minus the
-    /// `model_called` line's `t`. Absent when the reply came through a
-    /// door that reports nothing before it settles, when it streamed
-    /// only tool calls, and on every line written before the key
-    /// existed - none of which is a zero.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub first_at: Option<TimeMs>,
-    /// Whole microseconds from the moment the attempt that returned went
-    /// out to its first non-empty prose or reasoning, on the turn's
-    /// monotonic clock (`Sprawling/kernel/spec/Event/Record.lean` D20).
-    /// Absent exactly where `first_at` is.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub first_us: Option<u64>,
-    /// Whole microseconds from the moment the attempt that returned went
-    /// out to the moment its reply was whole, on the same clock. Absent
-    /// on every line written before the key existed.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub took_us: Option<u64>,
 }
 
-/// `steer_received`: text added to a run at a phase boundary, and who
-/// spoke it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SteerReceived {
-    /// [`SteerReceived::PERSON_SOURCE`], [`SteerReceived::CITY_SOURCE`],
-    /// or a resident's `@<room>` followed by its letter's attributes.
+
     pub source: String,
     pub text: String,
 }
 
 impl SteerReceived {
-    /// The `source` of a steer the person spoke. `runtime::conversation`
-    /// writes it and `wire::note_of` reads it; the spelling lives here
-    /// because both depend on this crate and neither on the other
-    /// (`Sprawling/wire/spec/Reading.lean` D41).
+
     pub const PERSON_SOURCE: &'static str = "user";
-    /// The `source` of the city's own word to a run: a policy change, a
-    /// sync wait that ran out.
+
     pub const CITY_SOURCE: &'static str = "city";
 }
 
-/// One part of a request's cache shape, as a record states it: how many
-/// bytes the part carries, and their hash.
-///
-/// Both figures because two questions read this row. A prompt cache
-/// compares the hash; a person asking why a request is expensive needs
-/// the bytes, which no hash can answer for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ShapePart {
@@ -267,9 +185,6 @@ pub struct ShapePart {
     pub hash: B3Hash,
 }
 
-/// Whether one region of a request differs from the request before it.
-/// A closed pair rather than a bare `bool`, so a reader meets the word
-/// that says which way it went.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -278,44 +193,25 @@ pub enum PartChange {
     Moved,
 }
 
-/// What moved between one request's cache shape and the previous one.
-///
-/// `FirstRequest` is a variant rather than a silent "nothing moved": a
-/// run's first request has no earlier shape to compare against, and
-/// recording it as unchanged would read as a cache hit about to happen.
-/// A miss is explained by naming what moved, which is what the second
-/// variant is for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "basis", rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ShapeChanged {
     FirstRequest,
     Compared {
-        /// The frozen segments whose bytes differ, by slot name, in
-        /// prefix order. Empty means the system half is unchanged.
+
         system: Vec<String>,
         tools: PartChange,
         run: PartChange,
     },
 }
 
-/// `prompt_shape_compared`: one request's cache shape where a prompt
-/// cache looks at it, and which of its regions moved since the request
-/// before it in the same run.
-///
-/// The four segments are deliberately absent: `prompt_assembled`,
-/// written immediately before this line, already states each one's hash
-/// and length, and a second copy here would be a second home for them.
-/// What this adds are the two regions that record never names - the tool
-/// table and the conversation - and the comparison itself.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PromptShapeCompared {
     pub tools: ShapePart,
     pub run: ShapePart,
-    /// The most bytes this request can be billed as input, counted from
-    /// the parts above and the segments `prompt_assembled` states, added
-    /// with checked arithmetic.
+
     pub upper_bound: u64,
     pub changed: ShapeChanged,
 }

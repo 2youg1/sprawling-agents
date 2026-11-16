@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The wire contract the rest of the system is allowed to rely on:
-//! the command and query counts, the schema hash that gates a connection,
-//! the binding decision, and the two shapes that must stay unspellable.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -19,8 +15,6 @@
 #[cfg(feature = "server")]
 use std::net::SocketAddr;
 
-// The binding and handshake decisions belong to the listener, so this
-// file asserts them only in a build that has one.
 #[cfg(feature = "server")]
 use kernel::AxCode;
 use kernel::{Address, Sealed, Seq};
@@ -40,11 +34,9 @@ fn exposed() -> SocketAddr {
     "192.168.1.20:2501".parse().unwrap()
 }
 
-// ---------------------------------------------------------------- wire counts
-
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
-    // The counts are the wire's closed surface, not a style choice.
+
     assert_eq!(COMMAND_NAMES.len(), 50, "command table");
     assert_eq!(QUERY_NAMES.len(), 64, "query table");
 
@@ -61,9 +53,7 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
 
 #[test]
 fn every_command_name_is_registered_in_the_table() {
-    // `Command::name` is an exhaustive match, so a new variant cannot compile
-    // without appearing here; this test closes the other half - it must also
-    // appear in the name table that feeds the schema hash.
+
     for command in sample_of_every_command() {
         let name = command.name();
         assert!(
@@ -73,16 +63,10 @@ fn every_command_name_is_registered_in_the_table() {
     }
 }
 
-// ------------------------------------------------------------- schema hashing
-
 #[test]
 fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
     assert_eq!(schema_hash(), schema_hash(), "hash is a pure function");
-    // Golden: this pins the current wire. Changing a variant changes the hash,
-    // so a change to the wire is a visible change to this line.
-    // A changed name moves the hash the handshake compares; `WIRE_V` rises
-    // only for a shape change under names that stay, once between two
-    // pushes (wire D1).
+
     assert_eq!(
         schema_hash().to_string(),
         WIRE_SCHEMA_GOLDEN,
@@ -94,9 +78,6 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
     );
 }
 
-/// The event kinds reach a page inside every event frame, so a renamed,
-/// added or removed kind must move the hash a page is admitted by, as a
-/// renamed frame does. The recipe is the one wire D1 states.
 #[test]
 fn the_schema_hash_covers_every_event_kind_name() {
     let mut material = b"sprawling/wire/".to_vec();
@@ -111,14 +92,8 @@ fn the_schema_hash_covers_every_event_kind_name() {
     assert_eq!(schema_hash(), kernel::B3Hash::digest(&material));
 }
 
-/// A function of WIRE_V, the two frame name tables and the event kind
-/// names, so any change to the protocol surface lands here first.
 const WIRE_SCHEMA_GOLDEN: &str = "edccfc623a2c07088052f273da697dfebc14c671240d737ed9992d6060c19902";
 
-/// The schema hash reads names only, so a field added under names that
-/// stay leaves it where it was. This digest reads the whole shape with the
-/// prose taken out: it turns red on every shape change, and the person who
-/// sees it decides whether this change is the one that raises `WIRE_V`.
 #[cfg(feature = "schema")]
 #[test]
 fn the_wire_shape_is_pinned_so_a_change_meets_the_version_rule() {
@@ -133,9 +108,6 @@ fn the_wire_shape_is_pinned_so_a_change_meets_the_version_rule() {
     );
 }
 
-/// Removes every doc string the schema carries, so an edited comment
-/// leaves the digest alone. Only string values go: a field that happens to
-/// be called `description` is an object under `properties` and stays.
 #[cfg(feature = "schema")]
 fn strip_prose(value: &mut serde_json::Value) {
     match value {
@@ -151,19 +123,13 @@ fn strip_prose(value: &mut serde_json::Value) {
     }
 }
 
-/// The digest of `wire_schema()` with its prose removed.
 #[cfg(feature = "schema")]
 const WIRE_SHAPE_GOLDEN: &str = "a3a6221d2774e42b59806125a7da6644f9b1168d7ae40048e17732fbdf92205d";
-
-// -------------------------------------------------------------- binding face
 
 #[cfg(feature = "server")]
 #[test]
 fn the_binding_face_refuses_exactly_when_no_key_is_given() {
-    // Loopback by default; every face demands a key, loopback included
-    // (wire D54); no key means refuse to *start*, not refuse to connect.
-    // The key the served face demands comes back inside the verdict, so
-    // the shell that carries it cannot demand something else.
+
     let secret = kernel::B3Hash::digest(b"pair-me-during-binding");
     for addr in [loopback(), exposed()] {
         let BindVerdict::Refuse(err) = decide_bind(&addr, None) else {
@@ -188,8 +154,6 @@ fn the_binding_face_refuses_exactly_when_no_key_is_given() {
         BindVerdict::Serve(BindFace::Exposed { .. })
     ));
 }
-
-// ------------------------------------------------------------------ handshake
 
 #[cfg(feature = "server")]
 #[test]
@@ -222,12 +186,9 @@ fn a_mismatched_schema_hash_is_rejected_before_anything_else() {
     assert_eq!(*err.code(), AxCode::WireMismatch);
 }
 
-/// The key a loopback test city holds.
 #[cfg(feature = "server")]
 const LOOSE_KEY: &str = "native-key-0123456789";
 
-/// A loopback city holding [`LOOSE_KEY`], and no browser session; the
-/// two are leaked once, which a test process can afford.
 #[cfg(feature = "server")]
 fn loose() -> wire::Keys<'static> {
     keys_of(BindFace::Loopback {
@@ -289,24 +250,16 @@ fn an_exposed_server_rejects_a_wrong_token_and_accepts_the_right_one() {
         ),
         "a missing token is not an empty token"
     );
-    // The same hello on a loopback face is refused too: no face demands
-    // nothing (wire D54).
+
     assert!(matches!(
         decide_handshake(&absent, &expected, &loose()),
         HandshakeVerdict::Reject(_)
     ));
 }
 
-// --------------------------------------------------- the two unspellable shapes
-
 #[test]
 fn put_secret_has_no_byte_form_in_either_direction() {
-    // A13 continues onto the wire. The outbound half is a *compile* error -
-    // `Command<Sealed<String>>` has no `Serialize` because `Sealed` has none,
-    // so the trybuild case in tests/compile_fail is the real proof and this
-    // test cannot even spell the attempt. The inbound half is checked here:
-    // bytes that name the variant are refused, and the refusal stays silent
-    // about what it was protecting.
+
     let json = r#"{"put_secret":{"realm":"anthropic","name":"api","value":"sk-not-a-real-key"}}"#;
     let decoded: Result<wire::WireCommand, _> = serde_json::from_str(json);
     let err = decoded.expect_err("PutSecret has no wire form");
@@ -315,8 +268,6 @@ fn put_secret_has_no_byte_form_in_either_direction() {
         "the refusal must not echo the very bytes it is protecting"
     );
 
-    // The in-process shape still exists - that is the whole point: the host
-    // may enrol a credential, a socket may not.
     let local = Command::PutSecret {
         realm: "anthropic".to_owned(),
         name: "api".to_owned(),
@@ -328,7 +279,7 @@ fn put_secret_has_no_byte_form_in_either_direction() {
 
 #[test]
 fn every_state_changing_command_carries_an_idempotency_key() {
-    // Constitution 8.3: "double-clicking twice does not open two Runs."
+
     for command in sample_of_every_command() {
         let name = command.name();
         if name == "Auth" || name == "PutSecret" {
@@ -345,14 +296,6 @@ fn every_state_changing_command_carries_an_idempotency_key() {
     }
 }
 
-// ----------------------------------------------------------- retired frames
-
-/// The two frames that left the wire rather than staying on it answered
-/// with `not_built` for ever (`Sprawling/wire/spec/Command.lean` §8-44,
-/// kernel D2). Their bytes still spell what they
-/// spelled, and that is no longer a command: what a client gets for them
-/// is the grammar's own unknown-variant refusal, not a verb it may offer
-/// a person.
 #[test]
 fn a_frame_that_left_the_wire_fails_to_decode() {
     let run = kernel::RunId::from_bytes([7u8; 16]);
@@ -371,8 +314,6 @@ fn a_frame_that_left_the_wire_fails_to_decode() {
         );
     }
 }
-
-// ------------------------------------------------------------------- fixtures
 
 fn sample_of_every_command() -> Vec<Command> {
     let addr = Address::parse("acme/floor1").unwrap();
@@ -699,12 +640,6 @@ title = \"a window\"
     ]
 }
 
-/// A branch names the run and the line; a session that begins without
-/// one sends `null`, which is how every optional field of a Command is
-/// spelled on this wire (`Dispatch.session` and `effort` are the other
-/// two). The ledger's records spell absence by leaving a key out, and
-/// that difference is deliberate: a record is read by this build, and a
-/// frame is read by whatever is on the other end of a socket.
 #[test]
 fn a_session_frame_says_what_it_branches_from_and_omits_it_when_it_does_not() {
     let run = kernel::RunId::from_bytes([9u8; 16]);
@@ -749,19 +684,13 @@ fn the_command_sample_covers_the_whole_table() {
 
 #[test]
 fn a_query_never_carries_an_idempotency_key() {
-    // Queries are side-effect free by construction, so there is nothing to
-    // deduplicate; if one ever needs a key it has stopped being a Query.
+
     for name in QUERY_NAMES {
         assert!(!name.is_empty());
     }
     assert!(matches!(Query::ApprovalQueue, Query::ApprovalQueue));
 }
 
-/// Narrowing history to one session survives the wire, and stays a
-/// different frame from the unfiltered slice.
-///
-/// Asked as one question, four sessions would divide one bounded slice
-/// between them, and a session older than that slice would open blank.
 #[test]
 fn asking_for_one_session_is_a_different_frame_from_asking_for_the_city() {
     let run = kernel::RunId::from_bytes([4u8; 16]);
@@ -787,13 +716,6 @@ fn asking_for_one_session_is_a_different_frame_from_asking_for_the_city() {
     );
 }
 
-/// The range a slow session lost travels with both of its ends, and the
-/// question that fills it is a frame of its own.
-///
-/// A reader told only how many records went by cannot ask for them: the
-/// count names no endpoint. It is deliberately not `History`, because an
-/// answer to that carries a cursor for a walk backwards and a gap has a
-/// near end as well as a far one.
 #[test]
 fn a_skipped_range_travels_with_both_of_its_ends() {
     let frame = wire::ServerFrame::Lagged(wire::Lagged {
@@ -829,9 +751,6 @@ fn a_skipped_range_travels_with_both_of_its_ends() {
     );
 }
 
-/// Nobody can price a piece of work before it runs, so the frame that
-/// starts one carries no ceiling. The one brake is `Halt`,
-/// which shuts a scope and stops what that scope already started.
 #[test]
 fn a_dispatch_frame_carries_no_spend_ceiling() {
     let addr = Address::parse("acme/floor1").unwrap();
@@ -853,8 +772,6 @@ fn a_dispatch_frame_carries_no_spend_ceiling() {
     );
 }
 
-/// The three documents that govern a city are written by one frame, and
-/// what was decided on the person's behalf is one question.
 #[test]
 fn the_governance_frames_are_on_the_wire() {
     assert!(
@@ -878,8 +795,6 @@ fn the_governance_frames_are_on_the_wire() {
     assert_eq!(Query::Governance.name(), "Governance");
 }
 
-/// A hunk is its own request: one file, both ends named, and a line that
-/// matched a credential shape reported rather than echoed.
 #[test]
 fn one_files_patch_is_a_frame_of_its_own() {
     assert!(
@@ -895,8 +810,7 @@ fn one_files_patch_is_a_frame_of_its_own() {
     let bytes = serde_json::to_vec(&query).unwrap();
     let back: Query = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(back, query);
-    // Counts and patch text are two questions with two costs, so they
-    // are two frames.
+
     assert_ne!(
         bytes,
         serde_json::to_vec(&Query::Changes {

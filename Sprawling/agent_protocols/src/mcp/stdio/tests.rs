@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the child-process transport is held to: a real child answering
-//! over a real pipe, a deadline that ends the process rather than
-//! risking two answers swapped, and one process behind every handle.
-
 use super::*;
 use crate::Outbound;
 
@@ -28,8 +24,6 @@ fn silent_server() -> (String, Vec<String>) {
     }
 }
 
-/// A child that reads the one line it is sent and then exits without an
-/// answer: the call was handed over whole, so what it did is unknown.
 fn taking_one_line_then_exiting() -> (String, Vec<String>) {
     if cfg!(windows) {
         (
@@ -83,8 +77,7 @@ fn a_server_that_never_answers_is_given_up_on_and_stopped() {
         (&AxCode::Timeout, kernel::Retry::Unknown)
     );
     assert!(err.recovery().contains("late answer"));
-    // The child was stopped, so the next call cannot be answered by
-    // the one that never arrived.
+
     let second = server.call("{\"id\":2}", TimeoutMs(200)).unwrap_err();
     assert!(
         matches!(second.code(), &AxCode::ToolUnavailable | &AxCode::Timeout),
@@ -92,8 +85,6 @@ fn a_server_that_never_answers_is_given_up_on_and_stopped() {
     );
 }
 
-/// The line was written and flushed before the child went away, so the
-/// server may have acted on it: the lost answer is not a call to repeat.
 #[test]
 fn a_server_that_exits_after_taking_the_call_leaves_the_effect_unknown() {
     let dir = tempfile::tempdir().unwrap();
@@ -108,8 +99,6 @@ fn a_server_that_exits_after_taking_the_call_leaves_the_effect_unknown() {
     );
 }
 
-/// A child that reads the one line it is sent and answers with one line
-/// a byte longer than the ceiling.
 fn answering_past_the_ceiling() -> (String, Vec<String>) {
     let over = crate::MESSAGE_CEILING + 1;
     if cfg!(windows) {
@@ -135,10 +124,6 @@ fn answering_past_the_ceiling() -> (String, Vec<String>) {
     }
 }
 
-/// The reader stops at the ceiling rather than growing one line without
-/// bound, and the call that was waiting learns why. The server did
-/// answer, so what it did is unknown; the child is stopped, because the
-/// rest of that line cannot be told apart from the next message.
 #[test]
 fn an_answer_past_the_ceiling_is_refused_and_the_server_stopped() {
     let dir = tempfile::tempdir().unwrap();
@@ -182,9 +167,6 @@ fn two_handles_are_two_tools_talking_to_one_process() {
     );
 }
 
-/// A name handed to a child cannot be taken back, so what a
-/// building writes beside a server is exactly what that server is
-/// started with - and the child is the only thing that can prove it.
 #[test]
 fn what_a_building_writes_beside_a_server_reaches_the_child() {
     let dir = tempfile::tempdir().unwrap();
@@ -215,8 +197,6 @@ fn what_a_building_writes_beside_a_server_reaches_the_child() {
     );
 }
 
-/// A child that answers every message with the value of the variable
-/// `name` in its own environment, empty when it has none.
 fn reporting_its_environment(name: &str) -> (String, Vec<String>) {
     if cfg!(windows) {
         (
@@ -246,16 +226,8 @@ fn reporting_its_environment(name: &str) -> (String, Vec<String>) {
     }
 }
 
-/// The name of the secret the test below plants: a key under the vault's
-/// prefix, so it is one of the city's secrets by the rule every child
-/// process is started under.
 const PLANTED: &str = "SPRAWLING_SECRET_PROBE_KEY";
 
-/// Found in the security scan: an MCP server inherited the city's whole
-/// environment, so every `SPRAWLING_SECRET_*` key the vault reads reached
-/// whatever package the server's command pulled in. A test cannot set a
-/// variable in its own process without `unsafe`, so it starts its own
-/// binary again with the key set, and that copy starts the server.
 #[test]
 #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_server_inherits_none_of_the_city_secret_keys() {
@@ -288,7 +260,6 @@ fn a_server_inherits_none_of_the_city_secret_keys() {
     }
 }
 
-/// What a server started by this process finds in `name`.
 fn seen_by_a_server(name: &str) -> String {
     let dir = tempfile::tempdir().unwrap();
     let (command, args) = reporting_its_environment(name);

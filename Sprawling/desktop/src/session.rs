@@ -3,27 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One connection: a blocking read loop, one reply per request.
-//!
-//! No async runtime. A server that answers one caller over one pair of
-//! pipes has one thing to wait for, and a reactor to wait for one thing
-//! is a dependency bought with nothing.
-//!
-//! The handshake order is enforced rather than assumed. The
-//! specification puts `initialize` first and the
-//! `notifications/initialized` notification second, and a server that
-//! lets work through before them turns a client's ordering mistake into
-//! a failure somewhere else, wearing some other shape.
-//!
-//! A request answers in one of two ways. A fault in the protocol — the
-//! handshake unfinished, a method or tool this server does not have, a
-//! line it cannot read — is a JSON-RPC error. Everything a named tool
-//! says, a refusal included, is a `CallToolResult`, and a refusal sets
-//! its `isError`.
-//!
-//! The properties this module must hold are proved in `Sprawling/desktop/spec/Session.lean`;
-//! this code is the authority on how it holds them.
-
 use crate::answer::Answer;
 use crate::platform;
 use crate::refusal::{Refusal, RefusalCode};
@@ -34,9 +13,6 @@ use serde_json::{Value, json};
 use std::io::{BufRead, Write};
 use std::path::Path;
 
-/// Where this connection has got to. Exhaustive, because "has the
-/// handshake finished" has three answers and not two: nothing said yet,
-/// `initialize` answered, and the notification received.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Phase {
     Fresh,
@@ -45,13 +21,7 @@ pub(crate) enum Phase {
 }
 
 impl Phase {
-    /// The phase `notifications/initialized` leaves a connection in:
-    /// only one that has answered `initialize` opens
-    /// (`Sprawling/desktop/Spec.lean` D15).
-    ///
-    /// # Errors
-    /// Refuses the notification on a fresh connection, which stays fresh:
-    /// a client that never sent `initialize` negotiated no revision.
+
     fn opened(self) -> Result<Phase, Refusal> {
         match self {
             Phase::Fresh => Err(unfinished("finish the handshake")),
@@ -60,29 +30,12 @@ impl Phase {
     }
 }
 
-/// One connection: the scope it is bounded by, and the desk it works
-/// at.
-///
-/// The desk is the connection's, not the process's. Two things live on
-/// it between calls — the snapshot generations and the recordings — and
-/// both are answers to "what did *this* caller do a moment ago", which
-/// a second caller under a second scope file must not be able to reach.
-/// Dropping the server therefore stops what the server started.
 pub(crate) struct Server {
     scope: Scope,
     phase: Phase,
     desk: platform::Desk,
 }
 
-/// Serves one connection over this process's own pipes, under the scope
-/// file at `scope_path`.
-///
-/// This is the whole public surface of this package. Everything else is
-/// reached through the protocol, which is the point of a server.
-///
-/// # Errors
-/// Returns what the operating system said when a read or a write failed.
-/// End of input is not a failure: it is how a connection closes.
 pub fn serve_stdio(scope_path: Option<&Path>) -> std::io::Result<()> {
     let mut server = Server::new(Scope::read(scope_path));
     let input = std::io::stdin();
@@ -99,11 +52,6 @@ impl Server {
         }
     }
 
-    /// Reads lines until the caller closes the pipe, answering each one.
-    ///
-    /// # Errors
-    /// Returns what the operating system said when a read or a write
-    /// failed.
     pub(crate) fn serve(
         &mut self,
         input: impl BufRead,
@@ -122,9 +70,6 @@ impl Server {
         Ok(())
     }
 
-    /// Answers one line. `None` is the answer to a notification, and it
-    /// means nothing is written: a line written back for a notification
-    /// would be read as the answer to the next request.
     pub(crate) fn answer(&mut self, line: &str) -> Option<String> {
         let request = match rpc::read(line) {
             Ok(request) => request,
@@ -138,7 +83,6 @@ impl Server {
         })
     }
 
-    /// One method, one answer.
     fn dispatch(&mut self, request: &Request) -> Result<Value, Refusal> {
         match request.method.as_str() {
             "initialize" => {
@@ -175,8 +119,6 @@ impl Server {
         }
     }
 
-    /// # Errors
-    /// Refuses anything asked before the handshake finished.
     fn handshaken(&self, action: &str) -> Result<(), Refusal> {
         match self.phase {
             Phase::Ready => Ok(()),
@@ -184,13 +126,6 @@ impl Server {
         }
     }
 
-    /// One `tools/call`: named, admitted, then carried out.
-    ///
-    /// A call that names no tool, or a tool this server does not have, is
-    /// a protocol fault and answers with a JSON-RPC error. Once the tool
-    /// is named, every refusal is the tool's own and answers as a result
-    /// with `isError` set, so the model reads all three parts
-    /// (`Sprawling/desktop/Spec.lean` D2).
     fn call(&mut self, params: &Value) -> Result<Value, Refusal> {
         let name = params.get("name").and_then(Value::as_str).ok_or_else(|| {
             Refusal::new(
@@ -218,25 +153,17 @@ impl Server {
         })
     }
 
-    /// One named tool, admitted by the scope and then performed.
     fn carried_out(&mut self, tool: tools::ToolName, arguments: &Value) -> Result<Answer, Refusal> {
         let admitted = self.scope.admits(&Reach {
             tool,
             title: arguments.get("title").and_then(Value::as_str),
             process: arguments.get("process").and_then(Value::as_str),
         })?;
-        // The scope is judged before the desk is reached, and that
-        // order is the whole of the server-side enforcement: a window
-        // this file does not list is refused with no Win32 call made.
-        // The admission travels on into the desk because one tool's
-        // *answer* is scoped as well as its permission: `desktop.windows`
-        // reports only the windows this allowlist could name.
+
         self.desk.perform(tool, arguments, &admitted)
     }
 }
 
-/// The refusal for `action` asked of a connection whose handshake has not
-/// finished.
 fn unfinished(action: &str) -> Refusal {
     Refusal::new(
         RefusalCode::GateDenied,
@@ -247,7 +174,6 @@ fn unfinished(action: &str) -> Refusal {
     )
 }
 
-/// The tool table as `tools/list` publishes it.
 fn listing() -> Vec<Value> {
     tools::table()
         .into_iter()

@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The scenes the Lean model of selection states, run through the
-//! production export (`Sprawling/accounting/spec/Playback.lean` §8-12, accounting D25 (i)).
-//!
-//! `Sprawling/accounting/spec/Playback/Select.lean` proves that its model
-//! selects each scene's seqs from its ledger. This test reads the same
-//! ledger and the same scenes out of that file, line by line, writes the
-//! ledger, and asks the export for each scene. A behaviour comparison,
-//! not a proof that the Rust refines the model.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -29,11 +20,8 @@ use serde_json::json;
 use super::super::{Confidential, Cutoff, Reader, Request, Selection, export};
 use super::{addr, lines_at, parsed, run, seqs, write};
 
-/// The model, read as the text it is.
 const MODEL: &str = include_str!("../../../spec/Playback/Select.lean");
 
-/// One scene: the six conditions (first, last, run, building, since,
-/// before), the cutoff, and the seqs the model selects.
 #[derive(Debug)]
 struct Scene {
     conditions: [Option<u64>; 6],
@@ -41,15 +29,12 @@ struct Scene {
     seqs: Vec<String>,
 }
 
-/// The words of a table line, its brackets, parentheses and commas
-/// dropped.
 fn words(line: &str) -> Vec<&str> {
     line.split(|c: char| c.is_whitespace() || "(),[]".contains(c))
         .filter(|word| !word.is_empty())
         .collect()
 }
 
-/// `some n` or `none`, taken from the front of `words`.
 fn option(words: &mut std::slice::Iter<'_, &str>) -> Option<u64> {
     match words.next() {
         Some(&"none") => None,
@@ -58,7 +43,6 @@ fn option(words: &mut std::slice::Iter<'_, &str>) -> Option<u64> {
     }
 }
 
-/// The model's ledger: `(seq, run, building, t)` per `line` row.
 fn ledger() -> Vec<(u64, u64, Option<u64>, u64)> {
     MODEL
         .lines()
@@ -78,7 +62,6 @@ fn ledger() -> Vec<(u64, u64, Option<u64>, u64)> {
         .collect()
 }
 
-/// The model's scenes, one per `scene` row and one per `window` row.
 fn scenes() -> Vec<Scene> {
     MODEL
         .lines()
@@ -109,7 +92,6 @@ fn scenes() -> Vec<Scene> {
         .collect()
 }
 
-/// The model's run `n`: run 0 is the city's own.
 fn run_of(n: u64) -> RunId {
     if n == 0 {
         RunId::CITY
@@ -118,7 +100,6 @@ fn run_of(n: u64) -> RunId {
     }
 }
 
-/// The room a line of building `b` is addressed in.
 fn room_of(building: u64) -> &'static str {
     match building {
         0 => "b0/room",

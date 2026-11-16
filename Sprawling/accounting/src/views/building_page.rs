@@ -3,20 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One building, as the files in it say it is.
-
 use std::path::Path;
 
 use kernel::Address;
 
-/// One building, as the files in it say it is.
-///
-/// The files are the authority, so the documents, the rooms and the
-/// archive are read at the moment of asking rather than kept as a second
-/// copy of what the disk says. The plan arrives already read, from the
-/// one projection that reads it: a second parse here would be a second
-/// answer to "what is stuck and why", and only one of them would be
-/// folding the records that say why.
 pub(crate) fn read_building(
     city_root: &Path,
     addr: &Address,
@@ -33,22 +23,14 @@ pub(crate) fn read_building(
         blocked,
         ready: _,
     } = plan;
-    // What counts as a room is `city::rooms`, which the model-facing
-    // roster reads too: a page and an agent disagreeing about which
-    // rooms a building has would be two answers to one question. A
-    // directory this cannot read has no rooms to draw, which is what a
-    // page owes its reader - the roster propagates the same failure
-    // instead, because a resident told it is alone would act on it.
+
     let rooms: Vec<String> = city::rooms(city_root, addr)
         .unwrap_or_default()
         .iter()
         .map(|room| room.name().to_owned())
         .collect();
     let mut docs = Vec::new();
-    // The rules, read by their own path: a building's rules live inside
-    // a dot directory, and the walk below reads files rather than
-    // directories, so a page that only walked would have quietly lost
-    // the tab that shows what this building is allowed to do.
+
     if let Ok(bytes) = std::fs::read(city::rules_path(city_root, addr)) {
         docs.push(doc_from(city::RULES_FILE.to_owned(), &bytes));
     }
@@ -80,9 +62,7 @@ pub(crate) fn read_building(
             subject: entry.subject,
         })
         .collect();
-    // The building's own rung of the ladder, not the resolved value: a
-    // form filled from the resolved value would write the city's
-    // setting into the building the first time anybody pressed save.
+
     let own = city::config_path(city_root, addr, city::Layer::Building)
         .ok()
         .and_then(|path| std::fs::read_to_string(path).ok())
@@ -111,12 +91,6 @@ pub(crate) fn read_building(
     })
 }
 
-/// One document as a page receives it, cut to the bytes one document
-/// answer carries, `documents::WINDOW_BYTES_MAX`.
-///
-/// These files grow for as long as a building works, and the interface
-/// reads them rather than edits them. A cut is stated on the answer, so
-/// a reader who needs the rest knows there is a rest.
 pub(super) fn doc_from(name: String, bytes: &[u8]) -> wire::BuildingDoc {
     let size = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
     let head = usize::try_from(size.min(documents::WINDOW_BYTES_MAX))
@@ -129,10 +103,6 @@ pub(super) fn doc_from(name: String, bytes: &[u8]) -> wire::BuildingDoc {
     }
 }
 
-/// Reading order for a building's documents: the plan, then the record of
-/// decisions, then the handoff, then the rules. A person opening a
-/// building wants to know what it is doing before they read what it is
-/// allowed to do.
 pub(super) fn doc_order(name: &str) -> (u8, String) {
     let rank = match name {
         city::ROADMAP_FILE => 0,

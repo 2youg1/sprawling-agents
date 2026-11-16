@@ -3,28 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What `sprawling top` prints: one JSON line per sample when stdout is
-//! not a terminal, and one curve per counter when it is
-//! (`Sprawling/app/spec/Monitor.lean` §8-95). Pure: the caller owns the terminal.
-
 use super::Sample;
 
-/// The line printed each second when stdout is not a terminal: one JSON
-/// object keyed by the [`Sample`] field names, without the newline.
-///
-/// # Errors
-///
-/// Only what `serde_json` reports; a struct of integers gives it nothing
-/// to refuse, and the caller treats it as a failed write to stdout.
 pub fn json_line(sample: &Sample) -> serde_json::Result<String> {
     serde_json::to_string(sample)
 }
 
-/// The eight heights a curve is drawn in, lowest first.
 const LEVELS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
-/// The last `width` values as one block character each, scaled from the
-/// window's own minimum (`▁`) to its maximum (`█`); a flat window is `▁`.
 #[must_use]
 pub fn sparkline(values: impl IntoIterator<Item = u64>, width: usize) -> String {
     let all: Vec<u64> = values.into_iter().collect();
@@ -36,9 +22,6 @@ pub fn sparkline(values: impl IntoIterator<Item = u64>, width: usize) -> String 
         .collect()
 }
 
-/// The character `offset` above the window's minimum reaches in a window
-/// `span` tall. A flat window has no height to divide, so it draws the
-/// lowest level; `offset <= span` keeps the rank inside [`LEVELS`].
 fn level(offset: u64, span: u64) -> Option<char> {
     let top = u128::try_from(LEVELS.len().checked_sub(1)?).ok()?;
     let rank = u128::from(offset)
@@ -48,8 +31,6 @@ fn level(offset: u64, span: u64) -> Option<char> {
     LEVELS.get(usize::try_from(rank).ok()?).copied()
 }
 
-/// One terminal screen: a row per counter with its label, its latest
-/// reading and its last `curve_width` points; empty with no samples.
 #[must_use]
 pub fn screen(samples: &[Sample], curve_width: usize) -> String {
     let Some(latest) = samples.last() else {
@@ -66,16 +47,12 @@ pub fn screen(samples: &[Sample], curve_width: usize) -> String {
         .join("\n")
 }
 
-/// One counter as the screen shows it.
 struct Row {
     label: &'static str,
     read: fn(&Sample) -> u64,
     unit: Unit,
 }
 
-/// What a counter's integer counts, which decides how it is written.
-/// The one table of units: `gauge`'s lines for a person are written
-/// through it too (`Sprawling/app/spec/Main.lean` §8-129-4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Unit {
     Permille,
@@ -84,7 +61,6 @@ pub enum Unit {
     Count,
 }
 
-/// The counters in [`Sample`] field order.
 const ROWS: [Row; 15] = [
     Row {
         label: "core cpu",
@@ -164,9 +140,7 @@ const ROWS: [Row; 15] = [
 ];
 
 impl Unit {
-    /// `value` in this unit, one decimal truncated where a larger unit
-    /// applies; a duration below 1 µs is written in ns, below 10 ms in
-    /// whole µs, and from 10 ms in ms.
+
     #[must_use]
     pub fn reading(&self, value: u64) -> String {
         match self {
@@ -178,9 +152,6 @@ impl Unit {
     }
 }
 
-/// A duration in nanoseconds as a person reads it: below 1 µs in ns,
-/// below 10 ms in whole µs, from 10 ms in ms to one decimal, truncated
-/// (`Sprawling/app/spec/Main.lean` §8-129-2, *单位*).
 fn duration(nanos: u64) -> String {
     match nanos {
         0..1_000 => format!("{nanos} ns"),
@@ -192,8 +163,6 @@ fn duration(nanos: u64) -> String {
     }
 }
 
-/// `value` in the largest of `units` (each `base` times the one before)
-/// that it reaches at least 1 of; the first unit is written whole.
 fn scaled(value: u64, base: u64, units: &[&str]) -> String {
     let value = u128::from(value);
     let (divisor, unit) = units
@@ -214,7 +183,6 @@ fn scaled(value: u64, base: u64, units: &[&str]) -> String {
     }
 }
 
-/// A count of tenths as a number with one decimal, `123` as `12.3`.
 fn tenths(count: u128) -> String {
     format!(
         "{}.{}",

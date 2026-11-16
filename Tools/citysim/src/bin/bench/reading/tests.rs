@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The reading line's stable format, and the machine-class and fixture
-//! fields every reading carries.
-
 use super::*;
 
 fn hundred(at: u64) -> Vec<Duration> {
@@ -19,8 +16,6 @@ fn taken() -> Taken {
     }
 }
 
-/// The label the line must print: the first sixteen hex digits of the
-/// fixture digest, taken here from its full spelling.
 fn label() -> String {
     taken().fixture.to_string().chars().take(16).collect()
 }
@@ -44,12 +39,6 @@ fn a_reading_line_is_stable_and_carries_its_machine_class() {
     );
 }
 
-/// The floor is what the path costs on a quiet machine and the middle
-/// is what it cost beside everything else the machine did, so a line
-/// that drops the first cannot tell a slower design from a busier day.
-/// The shares are the nearest rank, `ceil(n * p / 100)` counted from
-/// one, the reading `bench_startup` and `sprawling gauge` print for the
-/// same samples (`Sprawling/app/Spec.lean` §8-129-2).
 #[test]
 fn a_reading_line_carries_its_floor_beside_the_middle() {
     let reading = Reading::of(

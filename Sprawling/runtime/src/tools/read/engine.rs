@@ -3,26 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The whole text of a path a model chose, read through one buffered
-//! open and judged where the handle it is read from really lies
-//! (`Sprawling/runtime/spec/Tools/Read.lean` §8-29-4-1, D113).
-//!
-//! The judged path (`chosen_path::land`, then `miss::text_at`) resolves
-//! a path, opens it and resolves it again; on Windows each resolution is
-//! itself an open, and a read paid four of them before the first byte.
-//! Here the place the bytes come from is the place that is judged, so
-//! there is no window between the two for a link to be swapped into.
-//!
-//! Every call this path cannot finish — an open, a metadata query, a
-//! final-path query or a read that fails, a directory, bytes that are
-//! not UTF-8 — is answered again by the judged path, whose refusals and
-//! `nearby` lists are the ones a model has always been given. Only calls
-//! that end in an error or a directory take it.
-//!
-//! The one-handle path exists on Windows, Linux and macOS, because each
-//! can ask an open handle where it really lies. Every other platform
-//! reads through the judged path and never answers with a stub.
-
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 use kernel::B3Hash;
 use kernel::{Address, AxError, ReadVerdict};
@@ -34,8 +14,6 @@ use crate::tools::shown::Recall;
 use crate::tools::shown::{Answer, ReadShown, Span};
 use crate::tools::stamp::Stamp;
 
-/// One chosen-path read: its judgement inputs and the window evidence
-/// that may answer it. These values travel through every fast-path arm.
 #[derive(Clone, Copy)]
 pub(super) struct Request<'a> {
     pub(super) city: &'a CityRoot,
@@ -60,8 +38,6 @@ pub(super) struct Request<'a> {
     pub(super) want: Span,
 }
 
-/// A file's text, or a reference to an interval already in the window.
-/// Both arms carry the judged address and the handle's stamp.
 pub(super) enum Looked {
     Text {
         text: String,
@@ -94,13 +70,6 @@ impl Looked {
     }
 }
 
-/// The whole text at the admitted address `addr`, which the model wrote
-/// as `asked`, or an unchanged reply backed by confirmed evidence.
-///
-/// # Errors
-/// `E_GATE_DENIED` when the file the handle reached lies outside the
-/// city or in a place [`chosen_path::admit`] refuses; every other
-/// refusal is the judged path's, byte for byte.
 pub(super) fn text_of(request: Request<'_>) -> Result<Looked, AxError> {
     match handle_read(request)? {
         Some(looked) => Ok(looked),
@@ -108,9 +77,6 @@ pub(super) fn text_of(request: Request<'_>) -> Result<Looked, AxError> {
     }
 }
 
-/// The judged path: resolve, judge, open, judge the handle again. It
-/// always returns text; without the one-handle fast path it cannot make
-/// an unchanged claim.
 pub(super) fn judged_read(
     city: &CityRoot,
     addr: &Address,
@@ -126,12 +92,6 @@ pub(super) fn judged_read(
     Ok(Looked::text(text.0, text.1, text.2, judged.addr))
 }
 
-/// Opens the file once and judges the handle where it lies (Windows).
-/// `Ok(None)` hands the call to the judged path.
-///
-/// The open follows every link on the way, as the open inside
-/// `std::fs::canonicalize` does on this platform, so it opens nothing
-/// the judged path did not already open.
 #[cfg(windows)]
 fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
     let Ok(file) = std::fs::File::open(request.city.join(request.addr)) else {
@@ -146,12 +106,6 @@ fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
     Ok(read_handle(file, landed, request))
 }
 
-/// Resolves, judges, opens the judged location, and checks the handle
-/// still lies there (Linux). `Ok(None)` hands the call to the judged
-/// path.
-///
-/// Resolving first keeps the open after the judgement: a FIFO behind an
-/// unjudged link would block an open made before it.
 #[cfg(target_os = "linux")]
 fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
     use std::os::fd::AsRawFd as _;
@@ -168,17 +122,11 @@ fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
     let fd = std::path::Path::new("/proc/self/fd").join(file.as_raw_fd().to_string());
     match std::fs::read_link(fd) {
         Ok(now) if now == real => Ok(read_handle(file, landed, request)),
-        // Moved since the judgement, or a machine without procfs: the
-        // judged path checks the handle its own way and says which.
+
         Ok(_) | Err(_) => Ok(None),
     }
 }
 
-/// Resolves, judges, opens the judged location, and compares the
-/// opened handle with the file that location now names (macOS).
-///
-/// Identity is checked against the judged name, then F_GETPATH judges
-/// the held descriptor's actual location before any content is read.
 #[cfg(target_os = "macos")]
 fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
     use std::os::unix::{ffi::OsStrExt as _, fs::MetadataExt as _};
@@ -209,15 +157,11 @@ fn handle_read(request: Request<'_>) -> Result<Option<Looked>, AxError> {
     Ok(read_handle(file, landed, request))
 }
 
-/// Every other platform reads through the judged path.
 #[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 fn handle_read(_request: Request<'_>) -> Result<Option<Looked>, AxError> {
     Ok(None)
 }
 
-/// Decides from the handle's first facts whether any bytes are needed.
-/// `Repeat` reads none. `Compare` reads once and returns a stub only
-/// when the stamps stayed equal and the complete content hash matches.
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 fn read_handle(file: std::fs::File, addr: Address, request: Request<'_>) -> Option<Looked> {
     let facts = Stamp::facts(&file).ok()?;
@@ -252,15 +196,10 @@ fn read_handle(file: std::fs::File, addr: Address, request: Request<'_>) -> Opti
     }
 }
 
-/// Reads the file once, sized by the length the handle reports, with a
-/// stamp on each side; `None` for a failed read or query or non-UTF-8
-/// bytes, which the judged path answers.
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]
 fn read_text(mut file: std::fs::File, len: u64, before: Stamp) -> Option<(String, Stamp, Stamp)> {
     use std::io::Read as _;
 
-    // One past the reported length, so a file that grew since the query
-    // still ends in a single read rather than a reallocation.
     let capacity = usize::try_from(len).ok()?.checked_add(1)?;
     let mut bytes = Vec::with_capacity(capacity);
     file.read_to_end(&mut bytes).ok()?;

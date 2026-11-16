@@ -58,8 +58,6 @@ fn call(path: &str) -> ToolCall {
     }
 }
 
-/// A window from the line at 0-based `index`, asked for the way a caller
-/// asks: by its line number, counted from 1 (D119).
 fn interval(path: &str, index: u64, limit: Option<u64>) -> ToolCall {
     let mut args = Map::new();
     args.insert("file_path".to_owned(), Value::String(path.to_owned()));
@@ -77,9 +75,6 @@ fn interval(path: &str, index: u64, limit: Option<u64>) -> ToolCall {
     }
 }
 
-/// D119: `offset` is the line number a model reads off an answer, a
-/// compiler or `rg -n`, counted from 1; 0 can only mean the first line.
-/// The answer keeps the 0-based index the renderer numbers from.
 #[test]
 fn an_offset_is_a_line_number_counted_from_one() {
     let dir = tempfile::tempdir().unwrap();
@@ -116,8 +111,6 @@ fn an_offset_is_a_line_number_counted_from_one() {
     );
 }
 
-/// D115: a read spelled the way an older build's history spells it is
-/// refused by the name this build takes.
 #[test]
 fn a_read_spelled_the_older_way_is_refused_with_the_name_it_takes() {
     let dir = tempfile::tempdir().unwrap();
@@ -160,8 +153,6 @@ fn encoded_picture(format: image::ImageFormat) -> Vec<u8> {
     bytes
 }
 
-/// A picture is an attachment, not UTF-8 text. Each format the canonical
-/// ImageType carries reaches the model with its own bytes in CAS.
 #[test]
 fn pictures_come_back_as_attachments_instead_of_utf8_errors() {
     let dir = tempfile::tempdir().unwrap();
@@ -207,8 +198,6 @@ fn pictures_come_back_as_attachments_instead_of_utf8_errors() {
     }
 }
 
-/// A content-addressed screenshot has no filename to judge a format by;
-/// its bytes answer that question and still never meet a UTF-8 decoder.
 #[test]
 fn a_cas_picture_is_recognized_by_its_bytes() {
     let dir = tempfile::tempdir().unwrap();
@@ -229,8 +218,6 @@ fn a_cas_picture_is_recognized_by_its_bytes() {
     assert_eq!(outcome.attachments[0].locator, Locator::cas(hash));
 }
 
-/// The picture cap is four MiB, and a recognizable picture one byte past
-/// it gets the cap's refusal rather than a text-decoding failure.
 #[test]
 fn a_picture_one_byte_past_four_mib_is_refused_by_the_picture_cap() {
     let dir = tempfile::tempdir().unwrap();
@@ -245,9 +232,6 @@ fn a_picture_one_byte_past_four_mib_is_refused_by_the_picture_cap() {
     assert!(err.recovery().contains("4194304"), "{err}");
 }
 
-/// The rule that keeps a run from reading its own governance is the
-/// same predicate the write side uses, so there is one answer to
-/// "what is reserved" rather than two.
 #[test]
 fn a_model_chosen_path_cannot_reach_a_reserved_subtree() {
     let dir = tempfile::tempdir().unwrap();
@@ -266,9 +250,6 @@ fn a_model_chosen_path_cannot_reach_a_reserved_subtree() {
     }
 }
 
-/// Admission happened when a person wrote the reading room, so the
-/// skill it names opens even though it lives where no model-chosen
-/// path may go.
 #[test]
 fn the_reading_room_hands_over_what_a_path_could_not_reach() {
     let dir = tempfile::tempdir().unwrap();
@@ -294,8 +275,6 @@ fn the_reading_room_hands_over_what_a_path_could_not_reach() {
     assert_eq!(outcome.result.as_map()["text"], "check the diff first\n");
 }
 
-/// The catalog's own second level: the prompt carries one line per
-/// entry, and this is the tool that fetches what the line stood for.
 #[test]
 fn an_entry_the_catalog_holds_is_handed_over_not_refused() {
     let dir = tempfile::tempdir().unwrap();
@@ -320,19 +299,11 @@ fn a_missing_file_is_the_callers_mistake_not_the_disks() {
     assert_eq!(err.code(), &AxCode::InvalidArgs);
 }
 
-/// 512 lines is a bound on structure, not on size. A line is about 40
-/// bytes in this repository's source and can be a whole minified bundle
-/// elsewhere, so the line cap alone let one call carry an unbounded
-/// number of bytes into a context window.
-///
-/// The byte budget cuts on a line end, never inside one: `next_offset`
-/// is the only way a caller continues, and a cut that left it pointing
-/// past undelivered lines would skip them in silence.
 #[test]
 fn a_wide_file_is_cut_on_a_line_end_and_continues_without_a_gap() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(dir.path().join("lab")).unwrap();
-    // 400 lines of 1 KiB: inside the line cap, far past the byte budget.
+
     let wide: String = (0..400)
         .map(|n| format!("{n:04}{}\n", "x".repeat(1_019)))
         .collect();
@@ -350,8 +321,6 @@ fn a_wide_file_is_cut_on_a_line_end_and_continues_without_a_gap() {
     );
     assert!(text.ends_with('\n'), "the cut lands on a line end");
 
-    // The offset it hands back is the first line it did not deliver, so
-    // reading from there loses nothing.
     let delivered = text.lines().count();
     assert_eq!(map["next_offset"], serde_json::json!(delivered));
     let rest = tool
@@ -368,9 +337,6 @@ fn a_wide_file_is_cut_on_a_line_end_and_continues_without_a_gap() {
     );
 }
 
-/// One line larger than the whole budget still travels, because a call
-/// that returned nothing would hand back the offset it was given and the
-/// caller would ask the same question forever.
 #[test]
 fn a_single_line_past_the_budget_still_makes_progress() {
     let dir = tempfile::tempdir().unwrap();
@@ -386,10 +352,6 @@ fn a_single_line_past_the_budget_still_makes_progress() {
     assert_eq!(map["next_offset"], 1, "the caller can always move on");
 }
 
-/// A file longer than the cap comes back one cap's worth at a time, and
-/// the answer says what it is part of: the total, and the offset the
-/// next call continues from. Without those two numbers a reader has to
-/// guess whether it holds the whole thing.
 #[test]
 fn a_long_file_answers_with_the_cap_a_total_and_the_next_offset() {
     let dir = tempfile::tempdir().unwrap();
@@ -417,10 +379,6 @@ fn a_long_file_answers_with_the_cap_a_total_and_the_next_offset() {
     );
 }
 
-/// A continuation is drawn numbered from where it starts: the answer
-/// carries its `offset`, which is all the renderer has to number the
-/// header and the marks from, so a model that passes a mark back to
-/// `read` or `edit` lands on the line it saw.
 #[test]
 fn a_continuation_is_drawn_numbered_from_where_it_starts() {
     let dir = tempfile::tempdir().unwrap();
@@ -440,8 +398,7 @@ fn a_continuation_is_drawn_numbered_from_where_it_starts() {
         },
     )
     .unwrap();
-    // The version segment is the one part of the header this test does
-    // not judge: whether it is drawn is `edit`'s contract, not the marks'.
+
     let first_lines: Vec<&str> = drawn
         .lines()
         .take(7)
@@ -461,9 +418,6 @@ fn a_continuation_is_drawn_numbered_from_where_it_starts() {
     );
 }
 
-/// A caller that asks for more than the cap is served the cap rather
-/// than refused: a refusal would cost it a turn to learn a number the
-/// answer can carry.
 #[test]
 fn a_limit_over_the_cap_is_clamped_and_a_short_file_stays_whole() {
     let dir = tempfile::tempdir().unwrap();
@@ -487,8 +441,6 @@ fn a_limit_over_the_cap_is_clamped_and_a_short_file_stays_whole() {
     assert!(!map.contains_key("next_offset"));
 }
 
-/// Past the end is not an error and not a loop: the total says why the
-/// answer is empty, and no `next_offset` invites another call.
 #[test]
 fn an_offset_past_the_end_answers_empty_with_the_total() {
     let dir = tempfile::tempdir().unwrap();
@@ -540,8 +492,6 @@ fn the_tool_refuses_another_tools_call_and_still_answers() {
     kernel::tool::conformance::assert_tool_conformance(&mut tool);
 }
 
-/// A catalog whose lock a dying thread left behind is not trusted, and
-/// its names do not fall through to a file that happens to share one.
 #[test]
 fn a_poisoned_catalog_refuses_rather_than_falls_through() {
     let dir = tempfile::tempdir().unwrap();
@@ -562,8 +512,6 @@ fn a_poisoned_catalog_refuses_rather_than_falls_through() {
     );
 }
 
-/// A miss names what is there instead, and points at a tool every
-/// building has rather than at `exec`, which City Hall does not.
 #[test]
 fn a_miss_offers_the_nearest_directorys_entries() {
     let dir = tempfile::tempdir().unwrap();
@@ -581,9 +529,6 @@ fn a_miss_offers_the_nearest_directorys_entries() {
     assert!(!err.recovery().contains("exec"), "{}", err.recovery());
 }
 
-/// The page inserts a dropped file as this machine's path to it; the
-/// file lies in the city, so `read` answers with it rather than asking
-/// for the address the person never saw.
 #[test]
 fn an_absolute_path_inside_the_city_is_read_as_its_address() {
     let dir = tempfile::tempdir().unwrap();
@@ -600,9 +545,6 @@ fn an_absolute_path_inside_the_city_is_read_as_its_address() {
     assert_eq!(outcome.result.as_map()["text"], "the plan\n");
 }
 
-/// A directory is a question about what is in it. Opening one failed
-/// as storage - access denied on Windows, EISDIR on Unix - and the
-/// model got `retry: no` and no entries.
 #[test]
 fn a_directory_is_answered_with_its_entries() {
     let dir = tempfile::tempdir().unwrap();

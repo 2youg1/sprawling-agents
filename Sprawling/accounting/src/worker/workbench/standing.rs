@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Where one run stands, settled once the city has agreed to take the
-//! work: its rules, its model, who it runs as, and the tree it writes in.
-
 use std::path::{Path, PathBuf};
 
 use kernel::event::record::CheckpointCommitted;
@@ -16,11 +13,6 @@ use crate::effect;
 use super::super::{Agreed, Assignment, Given, RunWorker, Stamping, run_id_for};
 use super::Site;
 
-/// What a commit this run makes is signed with.
-///
-/// The city hash arrives rather than being read here: one read of the
-/// genesis line serves a whole city, and `RunWorker::city_hash` is where
-/// that read happens (`Sprawling/app/Spec.lean` §8-51).
 pub(in crate::worker) fn provenance(
     city: kernel::B3Hash,
     addr: &Address,
@@ -30,17 +22,6 @@ pub(in crate::worker) fn provenance(
     storage::Provenance::new(run_id, addr.clone(), city, chosen)
 }
 
-/// The filter table that governs this run: the building's file over
-/// the city's over the built-in three, whole-value (`Sprawling/runtime/Spec.lean` §8-27-6).
-///
-/// A file that is not there is no layer; a file that cannot be read is
-/// reported, because a run sieving under the built-in table while the
-/// building wrote its own would be a rule silently unapplied
-/// (`Sprawling/app/Spec.lean` §8-26).
-///
-/// # Errors
-/// Propagates a file that exists and cannot be read, and a table that
-/// does not parse.
 fn filter_table(city_root: &Path, building: &Address) -> Result<runtime::FilterTable, AxError> {
     let layer = |file: PathBuf| -> Result<Option<String>, AxError> {
         match std::fs::read_to_string(&file) {
@@ -54,10 +35,7 @@ fn filter_table(city_root: &Path, building: &Address) -> Result<runtime::FilterT
             .with_recovery("make the file readable, or remove it to fall back a layer")),
         }
     };
-    // The city's layer is the same rule at the city's own scope, which
-    // `CityLayout` states through the reserved subtree and the file
-    // name it owns; the building's layer is one call because a building
-    // has an address.
+
     let layout = kernel::layout::CityLayout::new(city_root);
     let city = layer(
         city_root
@@ -69,8 +47,7 @@ fn filter_table(city_root: &Path, building: &Address) -> Result<runtime::FilterT
 }
 
 impl Site {
-    /// Whose reads and captures are pinned when this run puts bytes in
-    /// the city's content store.
+
     pub(in crate::worker) fn block_origin(&self) -> storage::BlockOrigin {
         storage::BlockOrigin {
             run: self.run_id,
@@ -78,9 +55,6 @@ impl Site {
         }
     }
 
-    /// What this run signs its commits with: its id, the room it works
-    /// in, the model it was given and the effort it was asked for.
-    ///
     pub(in crate::worker) fn provenance(
         &self,
         city: kernel::B3Hash,
@@ -102,23 +76,15 @@ impl Site {
     }
 }
 
-/// What placing a room's tree reads from the city, as values rather
-/// than as the worker that holds them, so the placement runs on
-/// whichever thread prepares the run (`Sprawling/app/Spec.lean` §8-113).
 pub(in crate::worker) struct Placing<'a> {
     pub(in crate::worker) city_root: &'a Path,
     pub(in crate::worker) city: kernel::B3Hash,
-    /// What time it is, for the base commit a first placement makes.
+
     pub(in crate::worker) clock: &'a (dyn crate::Clock + Send + Sync),
 }
 
 impl Site {
-    /// Whether this run writes in the room's own tree rather than in the
-    /// city: always for an experiment, which lands nothing whatever the
-    /// building says, and otherwise when the building asks for review
-    /// (`Sprawling/app/Spec.lean` §8-133). The one answer both `name_tree` and
-    /// `place_tree` read, so the branch the desks are told and the tree
-    /// the run writes in cannot disagree.
+
     fn works_apart(&self, at: &super::super::Assignment) -> bool {
         match at.policy.landing {
             kernel::LandingPolicy::Experiment => true,
@@ -126,23 +92,6 @@ impl Site {
         }
     }
 
-    /// Lends a room that works apart its tree, kept between the room's
-    /// runs, and points this run's writes there instead of at the city:
-    /// nothing it writes is visible until somebody else checks it, and
-    /// an experiment's never is. A run that does not work apart is left
-    /// writing in the city.
-    ///
-    /// The checkpoint goes up first: a worktree branches from a commit, so
-    /// the city needs one before it can lend anything out.
-    ///
-    /// `worktree_opened` carries the command's key: for a review dispatch
-    /// whose rules did not change it is the one line that does, and a
-    /// restart recognises the command again from it.
-    ///
-    /// # Errors
-    /// Propagates whatever the checkpoint or the worktree says about
-    /// lending a tree out, and the ledger's refusal of the line that
-    /// records it.
     pub(in crate::worker) fn place_tree<L: kernel::Ledger>(
         &mut self,
         at: &super::super::Assignment,
@@ -153,9 +102,7 @@ impl Site {
             return Ok(());
         }
         let addr = &at.addr;
-        // The base commit carries the same trailers every other commit
-        // the city makes carries, so the first line of an adopted
-        // repository's history already says which session put it there.
+
         let of = provenance(
             placing.city,
             addr,
@@ -184,9 +131,6 @@ impl Site {
     }
 }
 
-/// Whom a room's tree is lent to: the room, the building whose subtree
-/// it checks out, the run the `worktree_opened` line is written for,
-/// and what the base commit is signed with.
 pub(in crate::worker) struct Lending<'a> {
     pub(in crate::worker) addr: &'a Address,
     pub(in crate::worker) building: &'a city::Building,
@@ -196,14 +140,6 @@ pub(in crate::worker) struct Lending<'a> {
     pub(in crate::worker) entropy_allow: &'a kernel::EntropyAllowlist,
 }
 
-/// Lends a room its tree, kept between the room's runs: the city's
-/// base commit first, because a worktree branches from a commit, then
-/// the claim and the line that records it. A review building's run and
-/// a harness run take their tree here alike (`Sprawling/app/Spec.lean` §8-124).
-///
-/// # Errors
-/// Propagates whatever the checkpoint or the worktree says about lending
-/// a tree out, and the ledger's refusal of the line that records it.
 pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
     lending: &Lending<'_>,
     placing: &Placing<'_>,
@@ -218,9 +154,7 @@ pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
             lending.of,
         )
         .map_err(storage::StorageError::into_ax)?;
-    // The city's first commit is the one checkpoint no run's wave made, and
-    // its scan findings have nowhere else to live: record it for the run
-    // that needed the tree.
+
     if let Some(base) = base {
         lines.record_for(
             lending.run_id,
@@ -254,13 +188,7 @@ pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
 }
 
 impl Site {
-    /// Names the branch a room that works apart writes on before its tree is
-    /// placed. The branch is the tree's name, a function of the room
-    /// alone, so the desks opened on the accounting thread know it while
-    /// the lane still places the tree (`Sprawling/app/Spec.lean` §8-113).
-    ///
-    /// # Errors
-    /// Propagates a room whose tree name will not parse.
+
     pub(in crate::worker) fn name_tree(
         &mut self,
         at: &super::super::Assignment,
@@ -273,28 +201,7 @@ impl Site {
 }
 
 impl RunWorker {
-    /// Settles where this run stands, once the city has agreed to take
-    /// the work.
-    ///
-    /// What the agreement answered arrives as `agreed` rather than being
-    /// asked again: asking twice would put a second authority behind a
-    /// credential renewal that may reach the network. What is left is
-    /// one phase because it interlocks - the run's id is minted after
-    /// that renewal - so cutting it apart would move a clock sample,
-    /// which a structural change may not relocate. The tree a room under
-    /// review writes in is placed afterwards by [`Site::place_tree`],
-    /// which needs nothing from this worker (`Sprawling/app/Spec.lean` §8-113).
-    ///
-    /// The frozen configuration is read here rather than in the
-    /// agreement, and the reason is the room: a dispatch that names an
-    /// effort writes it into the room's own layer as the room is opened,
-    /// so a configuration frozen any earlier would leave this run blind
-    /// to the setting it just made.
-    ///
-    /// # Errors
-    /// Propagates configuration that will not load, a resident
-    /// description that cannot be read, and whatever the checkpoint or
-    /// the worktree says about lending a tree out.
+
     pub(in crate::worker) fn stand_up(
         &mut self,
         agreed: Agreed,
@@ -312,22 +219,13 @@ impl RunWorker {
             adapter,
             retries,
         } = agreed;
-        // City, building and resident layers, resolved once and frozen
-        // for the whole run: re-reading them mid-run would let the two
-        // halves of one session be shaped by two different settings.
+
         let mut config = city::load_config(&self.city_root, addr)?;
         let selection = city::catalog_for_session(&self.city_root, addr, &rules, &mut config)?;
-        // Who runs this: the address's own URBANITE.md when it has one,
-        // and an ephemeral worker when it does not. The identity supplies
-        // the resident segment, so the same resident reads the same
-        // instructions on every run and the prefix stays cacheable across
-        // its whole life.
+
         let identity = city::Identity::load(&self.city_root, addr)?;
         let who = identity.who();
 
-        // The run's identity is fixed before the tools are built: three
-        // of them mint ids from it, and an id minted from a run that did
-        // not exist yet would not be the same id on a replay.
         let run_id = run_id_for(&given.job, addr, self.clock.now()?);
 
         let filters = filter_table(&self.city_root, building.addr())?;
@@ -355,10 +253,6 @@ impl RunWorker {
     }
 }
 
-/// The tree a room under review works in, named after the room so that
-/// its next run takes the same tree back. An address may hold any
-/// character a tree name may not, so the name carries the leading 16
-/// hex digits of the address's digest rather than the address itself.
 fn tree_of(addr: &Address) -> Result<storage::WorktreeName, AxError> {
     let digest: String = kernel::B3Hash::digest(addr.as_str().as_bytes())
         .to_string()

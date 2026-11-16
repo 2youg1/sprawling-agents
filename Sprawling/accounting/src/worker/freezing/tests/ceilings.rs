@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a frozen run runs under.
-//!
-//! **No spend ceiling is carried with work**: nobody can price a piece
-//! of work before it runs, and the one brake is `Halt`. What a run is
-//! frozen under is the effort its configuration layer states, which is
-//! the case below.
-
 use crate::worker::fixture::*;
 use crate::worker::*;
 
@@ -25,9 +18,6 @@ fn the_effort_a_config_layer_states_is_what_goes_out_on_the_wire() {
     std::fs::create_dir_all(building_layer.parent().unwrap()).unwrap();
     std::fs::write(&building_layer, "[model]\neffort = \"xhigh\"\n").unwrap();
 
-    // The model's list states the levels it offers, so the level the
-    // layers resolve is sent rather than left to the provider; the list
-    // reaches the call through the facts the attach kept in the CAS.
     let (base_url, provider) = fake_openai(&["m-thinks"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-thinks").unwrap();
     worker

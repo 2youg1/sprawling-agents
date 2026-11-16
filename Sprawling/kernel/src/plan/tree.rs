@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The plan as a tree: placement, division, queries, claims, and progress.
-//! The part `Sprawling/kernel/spec/Plan.lean` specifies this module with the
-//! rest of `kernel::plan`.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::completion::{PlannedProgress, Progress};
@@ -19,15 +15,7 @@ use super::PlanTree;
 use super::node::{Held, PlanNode};
 
 impl PlanTree {
-    /// Places every row and works out what each one is worth.
-    ///
-    /// # Errors
-    /// Fail-closed, in the same shape as `crate::locator`: a plan that
-    /// cannot be read is refused rather than guessed at, because every
-    /// progress figure in the city is divided by it. Five refusals — a
-    /// repeated index, a node whose parent is missing, a dependency on a
-    /// node that is not there, a dependency in a circle, and a branch
-    /// marked done over a child that is not.
+
     pub fn build(rows: Vec<RoadmapRow>) -> Result<PlanTree, AxError> {
         let mut nodes: BTreeMap<NodeId, PlanNode> = BTreeMap::new();
         for row in rows {
@@ -68,8 +56,6 @@ impl PlanTree {
         Ok(tree)
     }
 
-    /// Every dependency names a node that exists, is not the node
-    /// itself, and does not close a circle.
     fn check_dependencies(nodes: &BTreeMap<NodeId, PlanNode>) -> Result<(), AxError> {
         for (id, node) in nodes {
             for need in &node.row.needs {
@@ -100,9 +86,6 @@ impl PlanTree {
         Ok(())
     }
 
-    /// A branch that says `Done` over a child that is not is refused,
-    /// which is what lets the status column of a branch be read as a
-    /// summary instead of as a second opinion.
     fn check_branch_claims(nodes: &BTreeMap<NodeId, PlanNode>) -> Result<(), AxError> {
         for (id, node) in nodes {
             if node.children.is_empty() || node.row.status != RoadmapStatus::Done {
@@ -125,7 +108,6 @@ impl PlanTree {
         Ok(())
     }
 
-    /// Divides the whole plan down the tree, top-level rows first.
     fn divide(&mut self) -> Result<(), AxError> {
         let roots: Vec<NodeId> = self
             .nodes
@@ -142,7 +124,6 @@ impl PlanTree {
         self.nodes.get(id)
     }
 
-    /// Every node, in table order.
     pub fn nodes(&self) -> impl Iterator<Item = &PlanNode> {
         self.nodes.values()
     }
@@ -157,10 +138,6 @@ impl PlanTree {
         self.nodes.is_empty()
     }
 
-    /// What a node waits for, including everything its ancestors wait
-    /// for. A child of a branch that is waiting is waiting too;
-    /// answering otherwise would let `2.3.1` start while the reason
-    /// `2.3` cannot start is still unresolved.
     #[must_use]
     pub fn needs_of(&self, id: &NodeId) -> BTreeSet<NodeId> {
         let mut found = BTreeSet::new();
@@ -176,12 +153,6 @@ impl PlanTree {
         found
     }
 
-    /// What may be started right now: leaves nobody has taken, whose
-    /// dependencies — their own and their branch's — are all done.
-    ///
-    /// Pure, and that is the point: a city with no ready nodes and
-    /// nothing running has finished, and a stop condition that depended
-    /// on I/O could not be trusted to say so.
     #[must_use]
     pub fn ready(&self) -> Vec<NodeId> {
         self.nodes
@@ -198,14 +169,6 @@ impl PlanTree {
             .collect()
     }
 
-    /// Takes a node to work on.
-    ///
-    /// # Errors
-    /// Refuses everything [`Self::ready`] leaves out, and says which of
-    /// the three reasons applies: the index is not in the table, the
-    /// node is a branch or already taken, or it is still waiting on
-    /// something. The third names what it waits for, because "no" sends
-    /// a model round the loop again while "1.4 is not done" does not.
     pub fn claim(&self, id: &NodeId) -> Result<Held, AxError> {
         let node = self.nodes.get(id).ok_or_else(|| {
             super::blocking::refusal(
@@ -222,8 +185,7 @@ impl PlanTree {
             ));
         }
         if node.row.status != RoadmapStatus::NotStarted {
-            // Two runs wanting one node is a goal conflict, and the
-            // caller reads the code rather than the sentence.
+
             return Err(AxError::failure(
                 AxCode::GoalConflict,
                 "claim a plan node",
@@ -251,7 +213,6 @@ impl PlanTree {
         Ok(Held::of(id.clone()))
     }
 
-    /// The third part of a refusal: a node the caller may actually take.
     fn somewhere_else(&self) -> String {
         self.ready().first().map_or_else(
             || "nothing is ready; report to the User rather than picking a node".to_owned(),
@@ -259,14 +220,6 @@ impl PlanTree {
         )
     }
 
-    /// The plan's own reading of itself: leaves counted, and the share
-    /// of the whole those leaves carry.
-    ///
-    /// Both figures travel because they answer different questions and
-    /// mislead alone. A share says how much of the plan is behind you; a
-    /// leaf count says how many pieces the plan turned out to have, and
-    /// it is the figure that does not move when somebody divides their
-    /// own branch generously.
     #[must_use]
     pub fn progress(&self) -> Progress {
         let mut done: u32 = 0;

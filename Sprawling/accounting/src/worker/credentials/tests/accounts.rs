@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One provider with two accounts, driven through the worker a city
-//! runs: which account each request went out on, what the ledger says
-//! about it, and which account the Session keeps
-//! (`Sprawling/kernel/Spec.lean` §8-86, `Sprawling/gateway/spec/Router.lean`
-//! D30).
-//!
-//! The provider answers each request by the key it carries, so what a
-//! test reads off the wire is the account the city chose, and the
-//! ledger's `model_called` lines must name the same accounts in the same
-//! order.
-
 mod affinity;
 mod forgetting;
 mod readback;
@@ -25,19 +14,16 @@ use kernel::{Address, IdemKey, RunId, Seq};
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// The first account's key, as the vault holds it.
 const ALPHA: &str = "sk-alpha-0001";
-/// The second account's key.
+
 const BRAVO: &str = "sk-bravo-0002";
-/// The room every run of these tests goes to.
+
 const ROOM: &str = "lab/room1";
 
-/// A model answer that ends the run.
 fn answer() -> Reply {
     Reply::answered(completion("answered", None))
 }
 
-/// A busy provider: the same account answers later.
 fn busy() -> Reply {
     Reply::refused(
         429,
@@ -45,12 +31,10 @@ fn busy() -> Reply {
     )
 }
 
-/// A key the provider does not accept.
 fn rejected() -> Reply {
     Reply::refused(401, &serde_json::json!({ "code": "invalid_api_key" }))
 }
 
-/// An account whose quota is used up.
 fn spent() -> Reply {
     Reply::refused(
         429,
@@ -58,19 +42,16 @@ fn spent() -> Reply {
     )
 }
 
-/// A provider that never paces a request.
 fn unpaced() -> Pace {
     std::sync::Arc::new(|_: &str| {})
 }
 
-/// A city with the two accounts filed, in the order `a`, `b`, and the
-/// one model chosen, as the Provider page would leave it.
 struct Rig {
     dir: tempfile::TempDir,
     worker: RunWorker,
     provider: FakeProvider,
     base_url: String,
-    /// Commands sent so far, which keeps every idempotency key distinct.
+
     sent: u32,
 }
 
@@ -101,15 +82,12 @@ impl Rig {
         rig
     }
 
-    /// Sends one command, under an idempotency key of its own.
     fn command(&mut self, of: impl FnOnce(IdemKey) -> wire::Command) {
         self.sent = self.sent.saturating_add(1);
         let idem = IdemKey::derive(&RunId::CITY, Seq::FIRST, &self.sent.to_be_bytes());
         self.worker.handle(of(idem)).unwrap();
     }
 
-    /// Files the account list in `order`, with the per-account retry
-    /// figure the advanced form would send.
     fn attach(&mut self, order: &[&str], retries: Option<AccountRetries>) {
         let accounts = order
             .iter()
@@ -137,7 +115,6 @@ impl Rig {
         });
     }
 
-    /// One piece of work for the room, run to its end.
     fn dispatch(&mut self) {
         self.command(|idem| wire::Command::Dispatch {
             addr: Address::parse(ROOM).unwrap(),
@@ -151,10 +128,6 @@ impl Rig {
         });
     }
 
-    /// The city closed, its snapshot removed, and opened again, so what
-    /// the new worker knows it folded from the ledger alone. The test
-    /// vault keeps nothing across, so both keys are filed again, as a
-    /// person's keyring would hand them back.
     fn reopened_without_snapshot(self) -> Rig {
         let Rig {
             dir,
@@ -177,8 +150,6 @@ impl Rig {
         }
     }
 
-    /// The account each model request went out on, read off its
-    /// authorization header: `a` or `b`, `both` or `none`.
     fn wire_accounts(&self) -> Vec<&'static str> {
         self.provider
             .exchanges()
@@ -199,7 +170,6 @@ impl Rig {
             .collect()
     }
 
-    /// The ledger, one string per line.
     fn ledger(&self) -> Vec<String> {
         runtime::replay::verify_ledger_dir(
             &kernel::layout::CityLayout::new(self.dir.path()).ledger(),
@@ -211,7 +181,6 @@ impl Rig {
         .collect()
     }
 
-    /// The ledger's lines of one kind, decoded.
     fn records(&self, kind: &str) -> Vec<serde_json::Value> {
         self.ledger()
             .iter()
@@ -220,7 +189,6 @@ impl Rig {
             .collect()
     }
 
-    /// What the watchdog did after each failure, in order.
     fn watchdog(&self) -> Vec<String> {
         self.records("watchdog_fired")
             .iter()
@@ -234,7 +202,6 @@ impl Rig {
             .collect()
     }
 
-    /// The account the Session in the room is bound to.
     fn bound(&self) -> Option<String> {
         self.worker
             .credentials
@@ -243,10 +210,6 @@ impl Rig {
             .map(|account| account.as_str().to_owned())
     }
 
-    /// What every test asks of the wire and the ledger together: each
-    /// request carried exactly the key of the account its `model_called`
-    /// line names, in the same order, and neither key's value is
-    /// anywhere in the ledger.
     fn assert_keys_stay_in_the_vault(&self) {
         let named = self
             .records("model_called")
@@ -274,7 +237,6 @@ impl Rig {
     }
 }
 
-/// A worker over the city at `root`, with both keys filed.
 fn opened(root: &std::path::Path) -> RunWorker {
     let mut worker = RunWorker::new(
         root,

@@ -3,90 +3,63 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a probe of a base URL found before anything was attached: how
-//! far the call got, and what the model list said.
-
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Serialize, Serializer};
 
 use crate::model::{Ceiling, Effort};
 use crate::reach::Reach;
 
-/// What a model list said about one model.
-///
-/// Everything but the id is optional, because for most providers
-/// everything but the id is missing. The endpoint book carries these
-/// rows into the postcard snapshots of the views and the standing, so
-/// `Serialize` is written by hand: an absent `thinking` or `canonical`
-/// is omitted only in a human-readable format (kernel D58).
 #[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ModelFacts {
     pub id: String,
-    /// How many tokens the model reads in one call.
+
     pub context_tokens: Option<u64>,
-    /// How many tokens it may write back.
+
     pub max_output_tokens: Option<Ceiling>,
-    /// What it accepts, in the provider's own words (`text`, `image`,
-    /// `audio`). Empty means the row said nothing, never "text only".
+
     pub input_modalities: Vec<String>,
-    /// The provider's own input price, verbatim, unit included when the
-    /// provider stated one.
+
     pub input_price: Option<String>,
-    /// The provider's own output price, verbatim.
+
     pub output_price: Option<String>,
-    /// What the row said about thinking levels, read by the gateway's
-    /// thinking ladder (`Sprawling/gateway/spec/Provider/Thinking.lean`).
-    /// Absent on a row that said nothing and on a line written before
-    /// the key existed.
+
     #[serde(default)]
     pub thinking: Option<ThinkingStatement>,
-    /// The upstream's own identity for this model across providers,
-    /// where it states one (`Sprawling/gateway/spec/Provider/Identity.lean`).
-    /// Machine-readable sampling support stated by the provider.
+
     #[serde(default)]
     pub generation: Option<crate::GenerationSupport>,
     #[serde(default)]
     pub canonical: Option<String>,
-    /// Whether the endpoint's own list carried this row, or the person
-    /// named an id the list did not carry (kernel D63). A row the
-    /// person named states nothing else, because nobody asked the
-    /// provider about it.
+
     #[serde(default)]
     pub listing: Listing,
 }
 
-/// Where one registered model row came from (kernel D63).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Listing {
-    /// The endpoint's `/models` listed it.
+
     #[default]
     Listed,
-    /// The person named the id at attach and the endpoint did not list
-    /// it this time: its list left it out, or could not be read.
+
     Named,
 }
 
-/// What one model list said about a model's thinking, in the city's
-/// spelling of each level. Carried into the snapshots inside
-/// [`ModelFacts`], and serialised by hand for the same reason.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ThinkingStatement {
-    /// The levels the row named, ascending and without repeats; never
-    /// `none`, because turning thinking off is not a level. Empty when
-    /// the row stated only a switch.
+
     #[serde(default)]
     pub levels: Vec<Effort>,
-    /// The level the row says it uses when sent none.
+
     #[serde(default)]
     pub default: Option<Effort>,
-    /// Whether the row says the model may be asked to think.
+
     #[serde(default)]
     pub on: Option<bool>,
-    /// Whether the row says the model thinks when sent nothing.
+
     #[serde(default)]
     pub default_on: Option<bool>,
 }
@@ -121,10 +94,6 @@ impl Serialize for ThinkingStatement {
     }
 }
 
-/// How a format carries a key whose value is absent (kernel D58): a
-/// human-readable format leaves the key out, which is what every line
-/// and CAS blob already holds; postcard is not self-describing and
-/// reads fields by position, so a binary format writes every field.
 #[derive(Clone, Copy)]
 enum Absence {
     Omitted,
@@ -154,9 +123,6 @@ impl Absence {
         }
     }
 
-    /// `listed` is what a row without the key reads as, so a
-    /// human-readable format leaves it out and the bytes written before
-    /// the key existed stay as they were.
     fn listing<S: SerializeStruct>(self, fields: &mut S, value: Listing) -> Result<(), S::Error> {
         match (self, value) {
             (Absence::Omitted, Listing::Listed) => fields.skip_field("listing"),
@@ -180,27 +146,20 @@ impl Absence {
     }
 }
 
-/// `endpoint_probed`: a base URL was asked what it serves, and nothing
-/// was attached.
-///
-/// A probe that could not read a model list still writes this line:
-/// `models` and `facts` are then empty rather than absent, and `failed`
-/// tells the two apart.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EndpointProbed {
     pub name: String,
     pub base_url: String,
-    /// How far the call got, stage by stage.
+
     pub reach: Reach,
     pub models: Vec<String>,
     pub facts: Vec<ModelFacts>,
-    /// Why the model list could not be read, when it could not.
+
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failed: Option<ProbeFailure>,
 }
 
-/// The refusal a probe met, as its stable code and subject.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ProbeFailure {
@@ -214,9 +173,6 @@ mod tests {
     use super::*;
     use crate::event::Payload;
 
-    /// The golden bytes the hand-written writer spelled: a probe that
-    /// could not read a model list keeps both lists, empty, beside
-    /// `failed`.
     #[test]
     fn a_probed_line_keeps_the_bytes_its_ledger_already_holds() {
         let line = concat!(
@@ -236,10 +192,6 @@ mod tests {
         );
     }
 
-    /// The hand-written `Serialize` leaves a human-readable line exactly
-    /// as the derived one with `skip_serializing_if` wrote it (kernel
-    /// D58): a row 0.0.10 wrote, a row that stated part of its thinking,
-    /// and a row that stated a switch only, with no `null` added.
     #[test]
     fn a_probed_line_with_thinking_facts_keeps_its_bytes() {
         let line = concat!(

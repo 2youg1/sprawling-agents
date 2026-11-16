@@ -3,60 +3,27 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The diagnostic log: write-only, five levels, three required fields.
-//! The design this implements is `docs/logging.md`.
-//!
-//! **Decision and recovery logic reads no log output.** That rule is held
-//! by shape rather than by discipline: this surface has write methods and
-//! no read method, so reading a line back inside the code cannot be
-//! spelled. The consequence is the one the design cares about — deleting
-//! every log leaves behaviour, replay and totals byte-identical, because
-//! nothing downstream could have depended on them.
-//!
-//! A line carries `seq` and never a timestamp. The Ledger position is
-//! what anchors a log line to the only history, and it is an integer
-//! two timelines can be lined up on; a wall clock sampled here would
-//! also be a second sampling point in a library that is not allowed one.
-//! A sink that wants a clock is free to add one — the assembly layer is
-//! where sampling is sanctioned.
-//!
-//! A sink receives an [`Entry`] rather than a rendered line, because a
-//! sink that had to read the fields back out of the text would be a
-//! second authority on what a line is made of. [`render`] is the one
-//! way text is produced, and a sink that wants text calls it.
-
 use crate::redact::Marker;
 use kernel::{RunId, Seq};
 
-/// Who reads a line, and when. Ordered from the widest audience to the
-/// narrowest: a floor admits every level at or before it.
-///
-/// The names answer "who reads this" rather than "how bad is this",
-/// because that is the question with a checkable answer. A severity
-/// ladder would invite the other one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {
-    /// The person, live: what a door refused, in three parts.
+
     Refuse,
-    /// The person, afterwards: which file was written, which provider
-    /// was called.
+
     Effect,
-    /// The builder, when behaviour is wrong: why a verdict took the
-    /// value it did.
+
     Decide,
-    /// The builder, when reproducing a defect: phase changes, locks,
-    /// retries.
+
     Trace,
-    /// The builder, when a protocol does not connect: the bytes.
+
     Wire,
 }
 
 impl Level {
-    /// The default floor. `refuse` and `effect` together answer nine of
-    /// ten questions a person has, and are small enough to leave on.
+
     pub const DEFAULT: Level = Level::Effect;
 
-    /// Every level, in declaration order, for a command line to offer.
     pub const ALL: [Level; 5] = [
         Level::Refuse,
         Level::Effect,
@@ -76,10 +43,6 @@ impl Level {
         }
     }
 
-    /// Reads a level by name, for `--log <level>`. `off` is not a level
-    /// here: turning logging off is [`Diagnostics::off`], and letting
-    /// one word mean both a floor and the absence of one is how a
-    /// setting becomes ambiguous.
     #[must_use]
     pub fn parse(raw: &str) -> Option<Level> {
         Level::ALL.into_iter().find(|level| level.as_str() == raw)
@@ -92,21 +55,14 @@ impl std::fmt::Display for Level {
     }
 }
 
-/// The three fields every line carries. Required rather than optional:
-/// a line that cannot be placed in the history is a line nobody can act
-/// on later.
 #[derive(Debug, Clone, Copy)]
 pub struct Site<'a> {
     pub run: RunId,
-    /// The Ledger position at the time. The load-bearing field.
+
     pub seq: Seq,
     pub module: &'a str,
 }
 
-/// One line, before anything has decided what it looks like.
-///
-/// `message` has already passed the secret scan, so a sink may write it
-/// anywhere it writes the rest of the entry.
 #[derive(Debug, Clone, Copy)]
 pub struct Entry<'a> {
     pub level: Level,
@@ -114,23 +70,15 @@ pub struct Entry<'a> {
     pub message: &'a str,
 }
 
-/// Where lines go. A closure rather than a trait: this crate opens no
-/// files, and one implementation is not a seam.
 pub type Sink = Box<dyn FnMut(Entry<'_>) + Send>;
 
-/// The write-only logging surface.
-///
-/// Holding one is the only way to write a log line in this crate, and it
-/// offers no way to read one back.
 pub struct Diagnostics {
     floor: Option<Level>,
     sink: Sink,
 }
 
 impl std::fmt::Debug for Diagnostics {
-    /// The sink is not printable, and the floor is the only state worth
-    /// seeing. Manual rather than derived so a future field does not
-    /// quietly acquire a `Debug` that prints what it logged.
+
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Diagnostics")
             .field("floor", &self.floor)
@@ -139,7 +87,7 @@ impl std::fmt::Debug for Diagnostics {
 }
 
 impl Diagnostics {
-    /// Writes every level at or before `floor` to `sink`.
+
     #[must_use]
     pub fn new(floor: Level, sink: Sink) -> Diagnostics {
         Diagnostics {
@@ -148,8 +96,6 @@ impl Diagnostics {
         }
     }
 
-    /// Writes nothing at all. The state the deletion-invariance test
-    /// runs in, and a legitimate way to run the city.
     #[must_use]
     pub fn off() -> Diagnostics {
         Diagnostics {
@@ -158,28 +104,16 @@ impl Diagnostics {
         }
     }
 
-    /// The current floor, for `status` to report. `None` is off.
     #[must_use]
     pub fn floor(&self) -> Option<Level> {
         self.floor
     }
 
-    /// Whether a level would be written. Offered so a caller can skip
-    /// building an expensive message, not so it can branch on it.
     #[must_use]
     pub fn admits(&self, level: Level) -> bool {
         self.floor.is_some_and(|floor| level <= floor)
     }
 
-    /// Writes one line, if the floor admits it.
-    ///
-    /// The message passes the same secret scan the Ledger uses — the
-    /// same function, not a second one, because the scanner nobody
-    /// watches is the one that misses something. A hit is replaced in
-    /// place: dropping the line would lose the diagnostic entirely, and
-    /// the surrounding words are usually what the reader needed. A log
-    /// line marks plainly: see [`crate::redact::Marker`] for why history
-    /// and a log differ in that one argument and in nothing else.
     pub fn write(&mut self, level: Level, site: Site<'_>, message: &str) {
         if !self.admits(level) {
             return;
@@ -193,12 +127,6 @@ impl Diagnostics {
     }
 }
 
-/// One JSON object per line, for the same reason the wire format is:
-/// the receiver may be a browser, and a person can still read it.
-///
-/// The one place a log line becomes text. A sink that writes to a
-/// terminal calls it; a sink that carries the fields onward does not,
-/// and so cannot disagree with this about what a line holds.
 #[must_use]
 pub fn render(entry: Entry<'_>) -> String {
     let Entry {
@@ -289,16 +217,14 @@ mod tests {
         }
         assert_eq!(parsed["seq"], Seq::FIRST.value());
         assert_eq!(parsed["module"], "runtime::turn");
-        // No timestamp: the position in the ledger is the anchor, and a
-        // clock sampled here would be a second time source.
+
         assert!(parsed.get("t").is_none());
         assert!(parsed.get("timestamp").is_none());
     }
 
     #[test]
     fn a_credential_that_reaches_a_line_does_not_leave_in_it() {
-        // Assembled at runtime, for the same reason the gate wants: no
-        // credential-shaped literal at rest in the repository.
+
         let token = ["sk-live-", "Zk29fQ4t", "Rr7mVx1L", "pA6c"].concat();
         let (mut log, held) = recorder();
         log.write(
@@ -309,8 +235,7 @@ mod tests {
         let lines = held.lock().unwrap();
         assert!(!lines[0].contains(&token), "line: {}", lines[0]);
         assert!(lines[0].contains(&Marker::Plain.spell(token.as_bytes())));
-        // The words around it survive: a redaction that ate the sentence
-        // would cost the reader the thing they came for.
+
         assert!(lines[0].contains("calling the provider with"));
     }
 
@@ -330,9 +255,7 @@ mod tests {
         assert_eq!(log.floor(), None);
         for level in Level::ALL {
             assert!(!log.admits(level));
-            // Reaches the sink or not is the whole question; `off` holds
-            // a sink that could not report either way, which is the
-            // point — nothing downstream can depend on a log.
+
             log.write(level, site(), "ignored");
         }
     }

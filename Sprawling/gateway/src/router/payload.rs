@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The book of attached endpoints and the models chosen from them
-//! (shape 7): a value rebuilt from the ledger, never a store. Deleting
-//! it and replaying the city produces the same book.
-//!
-//! Two questions live here and nowhere else. *What did the person
-//! attach* — a base URL, a dialect, a credential reference, and the
-//! model ids the endpoint reported. *Which model answers for a tag* —
-//! the choice a request needs, with the facts no probe returns.
-//!
-//! Duty pools and multi-axis grading are deliberately absent: with one
-//! agent per run there is no consumer for a pool, and a pool without a
-//! consumer is an authority nobody reads.
-
-//! Payload faces: references on the wire, never credentials.
-
 use kernel::event::record::{AttachedTuning, EndpointAttached, ModelSelected};
 use kernel::{AxError, ModelTag, Payload, Proxying, SecretRef};
 
@@ -32,13 +17,8 @@ mod reading;
 
 pub(crate) use reading::{read_attached, read_choice};
 
-/// The one place an `endpoint_attached` payload is formed.
-///
-/// # Errors
-/// Propagates payload construction failure.
 pub fn attached_payload(endpoint: &AttachedEndpoint) -> Result<Payload, AxError> {
-    // The reference, never the credential: this is the byte that makes
-    // "plaintext only enters the vault" true of the ledger as well.
+
     let auth = auth_reference(&endpoint.auth).cloned();
     let auth_header = match &endpoint.auth {
         AuthSpec::Header { name, .. } => Some(name.clone()),
@@ -58,9 +38,6 @@ pub fn attached_payload(endpoint: &AttachedEndpoint) -> Result<Payload, AxError>
     })
 }
 
-/// The registration's `tuning` object, present only when the person
-/// settled something, so a line says "nothing was settled" by staying
-/// silent about it.
 fn settled(tuning: &EndpointTuning) -> Option<AttachedTuning> {
     let kept = AttachedTuning {
         accounts: tuning.accounts.clone(),
@@ -68,12 +45,9 @@ fn settled(tuning: &EndpointTuning) -> Option<AttachedTuning> {
         timeout_ms: tuning.timeout_ms,
         stream_idle_timeout_ms: tuning.stream_idle_timeout_ms,
         request_max_retries: tuning.request_max_retries.stated(),
-        // The default stays silent, the same way every other figure
-        // here does.
+
         proxying: (tuning.proxying != Proxying::default()).then_some(tuning.proxying),
-        // A header's value is written as the person's own spelling,
-        // which for a credential is the reference and never the key:
-        // that is what keeps `endpoint_attached` exportable.
+
         extra_headers: tuning
             .extra_headers
             .iter()
@@ -95,18 +69,6 @@ pub(crate) fn auth_reference(auth: &AuthSpec) -> Option<&SecretRef> {
     }
 }
 
-/// The one place a `model_selected` payload is formed.
-///
-/// The entry carries the rung each figure came from (gateway D37), and
-/// this is where those rungs reach the account: `anthropic.rs` once
-/// carried the note that a ceiling invented at the call site truncates
-/// runs for a reason that appears nowhere in the account, and here the
-/// reason appears, in the spellings [`crate::FigureSource::as_str`] and
-/// [`crate::OutputCeiling::word`] own. An entry with no ceiling is
-/// called with none, which is the provider's own default.
-///
-/// # Errors
-/// Propagates payload construction failure.
 pub fn selected_payload(
     tag: ModelTag,
     endpoint: &str,

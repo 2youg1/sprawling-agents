@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Serves a city in a process group of its own, so the acceptance walk can
-//! close it in order on Windows (Tools/adversary/Spec.lean D8).
-//!
-//! `serve_grouped <sprawling> <argument>...` starts `<sprawling> <argument>...`
-//! and then reads its own stdin. The line `close` asks the city to close the way
-//! a User at its console would: Ctrl-Break to the city's process group on
-//! Windows, `SIGINT` elsewhere. The end of stdin ends the city at once. The
-//! launcher waits for the city and exits with its success or failure.
-//!
-//! On Windows the city also sits in a job that ends with the launcher, so a walk
-//! that terminates the launcher leaves no city behind holding its port.
-
 use std::io::BufRead;
 use std::process::{Child, Command, ExitCode};
 
@@ -28,16 +16,15 @@ fn main() -> ExitCode {
     }
 }
 
-/// Why the launcher could not serve, close or wait for a city.
 #[derive(Debug)]
 enum Failure {
-    /// No program was named.
+
     Usage,
-    /// The city could not be started or placed in its group.
+
     Start(std::io::Error),
-    /// The request to close could not be sent.
+
     Close(String),
-    /// The launcher's stdin or the city could not be read.
+
     Wait(std::io::Error),
 }
 
@@ -78,7 +65,6 @@ fn serve(arguments: Vec<std::ffi::OsString>) -> Result<ExitCode, Failure> {
     })
 }
 
-/// Reads stdin until the walk asks for a close or goes away, and acts on it.
 fn await_request(city: &mut Child) -> Result<(), Failure> {
     for line in std::io::stdin().lock().lines() {
         if line.map_err(Failure::Wait)?.trim() == "close" {
@@ -95,12 +81,8 @@ mod grouped {
     use std::os::windows::process::CommandExt;
     use std::process::{Child, Command};
 
-    /// `CREATE_NEW_PROCESS_GROUP`: the city's id is its group's id, and Ctrl-C is
-    /// off inside it, so only a Ctrl-Break sent to that group reaches it.
     const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
 
-    /// Starts the city in a new process group, inside a job that ends it when
-    /// the launcher ends. The job is returned so it lives as long as the launcher.
     pub(super) fn start(command: &mut Command) -> Result<(Child, win32job::Job), Failure> {
         let city = command
             .creation_flags(CREATE_NEW_PROCESS_GROUP)
@@ -117,11 +99,6 @@ mod grouped {
         Ok((city, job))
     }
 
-    /// Sends Ctrl-Break to the city's group. `GenerateConsoleCtrlEvent` is reached
-    /// through the `powershell` every Windows ships, because no crate offers it
-    /// behind a safe surface and this workspace forbids `unsafe`
-    /// (Tools/adversary/Spec.lean D8). `powershell` shares the launcher's console
-    /// and is not in the city's group, so the event reaches the city alone.
     #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
     pub(super) fn close(city: &Child) -> Result<(), Failure> {
         let id = city.id();
@@ -147,8 +124,6 @@ mod grouped {
     use super::Failure;
     use std::process::{Child, Command};
 
-    /// Starts the city as an ordinary child: `SIGINT` reaches one process
-    /// without a group of its own, which is why the walk uses no launcher here.
     pub(super) fn start(command: &mut Command) -> Result<(Child, ()), Failure> {
         command
             .spawn()
@@ -156,7 +131,6 @@ mod grouped {
             .map_err(Failure::Start)
     }
 
-    /// Sends `SIGINT` through `kill`, the same request the walk sends directly.
     #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
     pub(super) fn close(city: &Child) -> Result<(), Failure> {
         let id = city.id();

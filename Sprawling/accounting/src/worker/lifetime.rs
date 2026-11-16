@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A worker opened over a history: the LOADING end of one lifetime.
-//!
-//! `RunWorker::new`, `over` and `holding` fold, or are handed, what the
-//! ledger says before the worker acts on anything, and the sweeps
-//! beside them take back what a crash left: abandoned trees and
-//! checkpoint indexes as the worker opens, and the runs a death left open
-//! once a served city's history is proved. The other end is
-//! [`closing`], which records why the city stopped. They sit together
-//! because a reader asking "what does a restart find" and "what does a
-//! close leave" is asking one question from two ends.
-
 mod closing;
 
 pub use closing::{ClosedBy, Closing};
@@ -28,15 +17,11 @@ use kernel::event::record::{ShelvedFrom, SkillAudited, SkillShelved};
 use kernel::{AxError, B3Hash, EventDraft, EventKind, EventRecord, Ledger, Payload, RunId, TimeMs};
 use storage::{Cas, JsonlLedger, OpenReport};
 
-/// What opening the ledger repaired before this worker read a line of
-/// it (`Sprawling/app/Spec.lean` §8-102). The ledger records the cut as
-/// `log_truncated`, but no page draws that line, so the worker keeps
-/// this value to tell the person at the two doors a city opens through.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum LedgerOpening {
-    /// Every byte on disk was a whole, chained line.
+
     Intact,
-    /// A crash left the last line half-written; opening cut these bytes.
+
     TailDropped { bytes: u64 },
 }
 
@@ -52,8 +37,7 @@ impl From<OpenReport> for LedgerOpening {
 }
 
 impl LedgerOpening {
-    /// The one sentence a person reads about the cut: what, why, and
-    /// what to do. `None` when nothing was cut.
+
     pub fn notice(self) -> Option<String> {
         match self {
             LedgerOpening::Intact => None,
@@ -93,13 +77,7 @@ fn old_skill_bindings(
 }
 
 impl RunWorker {
-    /// Opens the city's ledger at the time `hands.clock` reads, and
-    /// builds the worker over it with `hands` (`Sprawling/accounting/spec/Worker.lean` §8-11).
-    ///
-    /// # Errors
-    /// Propagates whatever opening the ledger or the store reports, and
-    /// whatever the ledger says about its own chain: a worker that
-    /// cannot read the city's history cannot know what is attached.
+
     pub fn new(
         city_root: &Path,
         log: runtime::diagnostics::Diagnostics,
@@ -113,21 +91,6 @@ impl RunWorker {
         RunWorker::over(city_root, log, hands, opened)
     }
 
-    /// Builds a worker around a ledger somebody else opened, together
-    /// with what that open repaired (LOADING; UNLOADING: `close_city`).
-    ///
-    /// Where the history comes from is not this worker's decision to
-    /// make, and taking it as a parameter is the same correction
-    /// ARCHITECTURE.md section 3 already asks for on the model adapter:
-    /// a component that builds its own dependency cannot be driven
-    /// against a second one. The ledger is a concrete `JsonlLedger` on
-    /// both paths - the `Vfs` underneath it is what differs - so nothing
-    /// here becomes a seam and no `pub trait` moves.
-    ///
-    /// # Errors
-    /// Propagates whatever opening the store reports, and whatever the
-    /// ledger says about its own chain: a worker that cannot read the
-    /// city's history cannot know what is attached.
     pub fn over(
         city_root: &Path,
         log: runtime::diagnostics::Diagnostics,
@@ -138,9 +101,6 @@ impl RunWorker {
         RunWorker::holding(city_root, log, hands, (ledger, report, standing))
     }
 
-    /// `holding` takes a ledger already opened, its writer lock held, and
-    /// what opening it repaired, and the standing folded from it under
-    /// that lock. The schedule starts from the time `hands.clock` reads.
     pub fn holding(
         city_root: &Path,
         mut log: runtime::diagnostics::Diagnostics,
@@ -165,18 +125,12 @@ impl RunWorker {
             budget,
         } = hands;
         let now = crate::Clock::now(&*clock)?;
-        // Holding the one writer is what makes every worktree lock a
-        // lock nobody alive holds (`Sprawling/storage/Spec.lean` §8-9).
+
         storage::Worktrees::lift_abandoned_leases(city_root, &ledger)
             .map_err(storage::StorageError::into_ax)?;
-        // A rule the ignore table gained since a building was raised
-        // reaches it now: no working record of this city enters git,
-        // however old the building (city D5).
+
         city::keep_records_out_of_git(city_root)?;
-        // A default an earlier build laid down and nobody changed reads
-        // as this build's from now on; a copy somebody changed stays
-        // theirs, and is named here so its owner learns it no longer
-        // tracks the binary (city D29).
+
         for edited in city::follow_defaults(city_root)? {
             log.write(
                 runtime::diagnostics::Level::Effect,
@@ -219,9 +173,7 @@ impl RunWorker {
             Cas::open(&kernel::layout::CityLayout::new(city_root).cas())
                 .map_err(storage::StorageError::into_ax)?,
         ));
-        // The one place a `Delegator` is minted in this process, which
-        // is what makes "a sub-agent cannot set the city working" a
-        // fact about the code rather than a rule somebody follows.
+
         let delegator = kernel::Delegator::root();
         let pursuits = collaboration.pursuits(&delegator);
         let mut worker = RunWorker {
@@ -287,8 +239,6 @@ impl RunWorker {
         Ok(worker)
     }
 
-    /// Moves legacy skill shelves to CAS indexes and carries their old
-    /// source and audit bindings to the new manifest digest.
     fn migrate_skills(&mut self, now: TimeMs) -> Result<(), AxError> {
         let store = kernel::layout::CityLayout::new(&self.city_root).cas();
         let mut cas = Cas::open(&store).map_err(storage::StorageError::into_ax)?;
@@ -366,12 +316,6 @@ impl RunWorker {
         Ok(())
     }
 
-    /// Takes back the trees a crash left behind (`Sprawling/app/Spec.lean` §8-108).
-    ///
-    /// Nothing is held yet: the ledger this worker holds is locked to
-    /// this process, and no run has been dispatched. A tree that will
-    /// not go is told and left for the next open, because one stuck
-    /// directory is no reason to keep the person out of their city.
     fn sweep_abandoned_trees(&mut self) {
         let told = match storage::Worktrees::sweep_abandoned(&self.city_root, &[]) {
             Ok(swept) if swept.is_empty() => return,
@@ -395,14 +339,6 @@ impl RunWorker {
         );
     }
 
-    /// Brings every configuration file the city holds to this build's
-    /// format, its original bytes kept under `~/.sprawling/backups`
-    /// (`Sprawling/app/spec/Accounting/Worker.lean` §8-108).
-    ///
-    /// Under the ledger's writer lock no run reads these files yet. Each
-    /// file rewritten or refused is told; nothing here keeps the person
-    /// out of their city, because a refused file is refused again, in
-    /// its reader's words, when it is read.
     fn bring_configuration_forward(&mut self) {
         let told: Vec<String> = match crate::home::Home::detect()
             .and_then(|home| city::bring_city_forward(&self.city_root, &home.backups()))
@@ -440,8 +376,6 @@ impl RunWorker {
         }
     }
 
-    /// Makes the checkpoint repository before a lane asks for a writer's index, and takes back
-    /// the indexes a crash left: no run is live yet (`Sprawling/app/spec/Accounting/Views.lean` §8-46-13).
     fn open_checkpoints(&mut self) {
         let opened = storage::Checkpoint::open(&self.city_root)
             .and_then(|_| storage::Checkpoint::sweep_writers(&self.city_root));
@@ -456,19 +390,6 @@ impl RunWorker {
         self.note(level, "accounting::worker", &told);
     }
 
-    /// Freezes the runs the last process left open, and closes the calls
-    /// whose outcome it left unknown, through the scan `sprawling resume`
-    /// runs (`Sprawling/accounting/spec/Worker/Genesis/Lost.lean` §8-18-1,
-    /// D30).
-    ///
-    /// For a served city: call it after the observer is attached and
-    /// before the accounting thread reads the desk, so every freeze
-    /// reaches the views and the page as it is written, and no run this
-    /// process drives exists yet to be taken for a dead one. It waits for
-    /// the proof's verdict first, because until then the writer takes no
-    /// line. A scan the ledger refuses is said and the city goes on
-    /// serving: a city that cannot freeze a dead run is still one the
-    /// person can read.
     pub fn take_back_the_lost(&mut self) {
         self.await_proof();
         let (level, told) = match self.startup_scan() {
@@ -491,34 +412,20 @@ impl RunWorker {
         self.note(level, "accounting::worker", &told);
     }
 
-    /// What opening this worker's ledger repaired.
     pub fn opening(&self) -> LedgerOpening {
         self.opening
     }
 
-    /// The same worker, reading every time through `clock` instead of
-    /// the wall clock (`Sprawling/accounting/spec/Clock.lean` §8-3).
-    ///
-    /// The door citysim and the tests drive a worker through: when
-    /// things happen is theirs to script, while what the worker writes
-    /// at those times stays its own. The ledger was opened before this
-    /// door, at the time the clock in the worker's `Hands` read.
     #[must_use]
     pub fn with_clock(self, clock: std::sync::Arc<dyn crate::Clock + Send + Sync>) -> RunWorker {
         RunWorker { clock, ..self }
     }
 
-    /// The same worker, taking the browser tools a building's rules ask
-    /// for from `browsers` instead of starting a browser on this host
-    /// (`Sprawling/app/Spec.lean` §8-45-2).
     #[must_use]
     pub fn with_browsers(self, browsers: super::Browsers) -> RunWorker {
         RunWorker { browsers, ..self }
     }
 
-    /// The same worker, starting the desktop server a building's rules
-    /// ask for from `program` instead of from this executable
-    /// (`Sprawling/app/Spec.lean` §8-4d).
     #[must_use]
     pub fn with_desktop_program(self, program: super::DesktopProgram) -> RunWorker {
         RunWorker {
@@ -527,9 +434,6 @@ impl RunWorker {
         }
     }
 
-    /// The same worker, starting the harness a room's resident names
-    /// through `start` instead of on this host (`Sprawling/app/Spec.lean` §8-124).
-    /// Only a test plays a harness; production starts the vendor's own.
     #[cfg(test)]
     #[must_use]
     pub(crate) fn with_harnesses(self, start: super::driving::harness::StartHarness) -> RunWorker {
@@ -546,8 +450,6 @@ mod tests {
     use crate::worker::RunWorker;
     use std::io::Write;
 
-    /// A crash mid-write leaves half a line; the next open cuts it and
-    /// the person who runs `resume` has to be told what was cut.
     #[test]
     fn a_torn_tail_is_told_in_the_startup_scan() {
         let dir = tempfile::tempdir().unwrap();
@@ -579,9 +481,6 @@ mod tests {
         );
     }
 
-    /// A run whose process died keeps its tree until the city next
-    /// opens; that open is the one point no other process can hold the
-    /// city, and the sweep has to happen on it.
     #[test]
     fn a_crash_left_worktree_is_gone_once_the_city_opens() {
         let dir = tempfile::tempdir().unwrap();

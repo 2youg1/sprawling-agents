@@ -3,18 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Consent is asked one item at a time: a no installs nothing, and the
-//! default checks and installs nothing.
-
 use super::ScriptedMachine;
 use crate::doctor::paint::Ink;
 use crate::doctor::screen::{Asked, run};
 use crate::doctor::{Platform, REQUIREMENTS};
 
-/// Consent is asked item by item, and a no installs nothing.
-///
-/// The command is on the screen before the question, so nobody agrees to
-/// a command they were not shown.
 #[test]
 fn nothing_is_installed_without_a_yes_to_that_one_item() {
     let Some(platform) = Platform::current() else {
@@ -55,9 +48,7 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
     );
 
     let machine = ScriptedMachine::missing(&["just", "git"]);
-    // The table asks about git before just: it is in install order. On
-    // Linux git's recipe only prints, because it needs `sudo`, so just is
-    // the one question asked there.
+
     let answers: &[u8] = if cfg!(target_os = "linux") {
         b"y\n"
     } else {
@@ -85,7 +76,6 @@ fn nothing_is_installed_without_a_yes_to_that_one_item() {
     );
 }
 
-/// Checking is what the default does, and it changes nothing.
 #[test]
 fn the_default_checks_and_installs_nothing() {
     let machine =
@@ -117,9 +107,6 @@ fn the_default_checks_and_installs_nothing() {
     );
 }
 
-/// A name the requirement table does not carry is refused, and the
-/// refusal says where a working name comes from: the items this machine
-/// answered with.
 #[test]
 fn a_name_the_table_does_not_carry_says_where_a_working_name_comes_from() {
     let refused = crate::doctor::recipe_for("curl | sh")

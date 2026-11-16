@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Bundle files: walking, counting, copying.
-
 use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -73,17 +71,6 @@ pub(crate) fn read_lines(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<Vec<Vec<u8>
     Ok(out)
 }
 
-/// Every file under `root`, at any depth, in a deterministic order.
-///
-/// A directory that cannot be listed stops the walk with its own
-/// failure: a subdirectory silently contributing zero files is how a
-/// bundle comes out short and agrees with itself about it. So does an
-/// alias: walking one would read through it, and a copy that followed a
-/// link would carry bytes no name in the bundle accounts for
-/// (`Sprawling/storage/spec/Alias.lean` §8-25).
-///
-/// An explicit worklist rather than recursion: a city's depth is not
-/// this module's to assume, and a stack overflow is not catchable.
 pub(crate) fn walk(vfs: &dyn Vfs, root: &Path) -> Result<Vec<PathBuf>, StorageError> {
     let mut found = Vec::new();
     let mut pending = vec![root.to_path_buf()];
@@ -106,7 +93,6 @@ pub(crate) fn walk(vfs: &dyn Vfs, root: &Path) -> Result<Vec<PathBuf>, StorageEr
     Ok(found)
 }
 
-/// One entry against the alias rule, refused whole.
 fn refuse_alias(path: &Path) -> Result<(), StorageError> {
     match crate::alias::kind_at(path)? {
         Some(kind) => Err(crate::alias::refused("walk a store or bundle", path, kind)),
@@ -114,16 +100,6 @@ fn refuse_alias(path: &Path) -> Result<(), StorageError> {
     }
 }
 
-/// What travels as a city file: the open tree and each scope's
-/// governance, never git metadata and never the city's own stores.
-///
-/// Root `.sprawling` holds the two stores, and they travel through
-/// faces of their own; a nested one is a building's own rules and is
-/// part of the city. `.git` at any depth is protected metadata, and a
-/// bundle that carried it would plant hooks on restore (`Sprawling/kernel/spec/Address.lean`
-/// §8-73). The names come from kernel's one list; nothing here
-/// re-spells them. A staging file a crashed restore left is half of a
-/// write, and `landing` alone knows its spelling.
 fn travels(relative: &Path) -> bool {
     !relative.starts_with(RESERVED)
         && !relative.file_name().is_some_and(is_staging_name)
@@ -135,18 +111,6 @@ fn travels(relative: &Path) -> bool {
         })
 }
 
-/// The restore door's half of the same rule: a bundle may carry city
-/// files and nothing else. Export **selects** what travels; restore
-/// **refuses** what never could - all or nothing, never a skip.
-///
-/// The one entry admitted without travelling is the repository a v0.0.6
-/// export copied whole into `city/.git`: `history` imports its objects
-/// and refs, no file of it is copied, and the count returned is how many
-/// files it holds, which that export's manifest counted as city files.
-///
-/// # Errors
-/// `StorageError::Bundle` naming the first entry that is not a city
-/// file; `StorageError::Alias` from the walk.
 pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, StorageError> {
     let mut repository = 0u64;
     for path in walk(vfs, root)? {
@@ -173,11 +137,6 @@ pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, Storage
     Ok(repository)
 }
 
-/// A directory that is not there holds nothing, which is an answer; a
-/// directory that refuses to be read is not.
-///
-/// A city with no object store yet has no `cas/` to walk, and export
-/// asks about it before anything has put an object in it.
 fn present(
     listing: io::Result<Vec<PathBuf>>,
     dir: &Path,
@@ -189,9 +148,6 @@ fn present(
     }
 }
 
-/// Copies every file under `from` into `to`, keeping relative paths;
-/// `root` is the directory the person named, which bounds the alias
-/// check on every write.
 pub(crate) fn copy_tree(
     vfs: &mut dyn Vfs,
     root: &Path,
@@ -210,9 +166,7 @@ pub(crate) fn copy_tree(
             continue;
         };
         let target = to.join(relative);
-        // Cleared before any directory is made: making a parent through
-        // a link would land a directory inside what the link reaches,
-        // before the file write is refused (`Sprawling/storage/spec/Alias.lean` §8-25).
+
         let cleared = WriteTarget::within("copy a bundle file", root, &target)?;
         if let Some(parent) = target.parent() {
             vfs.create_dir_all(parent)
@@ -227,8 +181,6 @@ pub(crate) fn copy_tree(
     Ok(copied)
 }
 
-/// The city's own files: everything outside the reserved prefix, bounded
-/// by `root` as [`copy_tree`] is.
 pub(crate) fn copy_city_files(
     vfs: &mut dyn Vfs,
     root: &Path,
@@ -253,8 +205,7 @@ pub(crate) fn copy_city_files(
         .map_err(io_err("make a bundle directory", to))?;
     for (relative, path) in seen {
         let target = to.join(&relative);
-        // Cleared before any directory is made, for the reason the
-        // sibling walk gives.
+
         let cleared = WriteTarget::within("copy a city file", root, &target)?;
         if let Some(parent) = target.parent() {
             vfs.create_dir_all(parent)
@@ -283,11 +234,6 @@ pub(crate) fn count_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, StorageErro
     Ok(count)
 }
 
-/// Opens the restored ledger, so the city is one a writer can continue.
-///
-/// # Errors
-/// Whatever opening reports; a restored city that cannot be opened is
-/// not restored.
 pub fn open_restored(city_root: &Path, now: kernel::TimeMs) -> Result<PathBuf, StorageError> {
     let dir = kernel::layout::CityLayout::new(city_root).ledger();
     let (_ledger, _report) = JsonlLedger::open(&dir, now)?;
@@ -308,9 +254,6 @@ mod tests {
     use super::super::manifest::CITY;
     use super::*;
 
-    /// The permission a city file carries is part of the file: a
-    /// read-only note (or, on Unix, an executable script) comes back
-    /// the way it left.
     #[test]
     fn a_read_only_city_file_comes_back_read_only() {
         let home = tempfile::tempdir().unwrap();
@@ -335,8 +278,6 @@ mod tests {
         );
     }
 
-    /// A read-only city file already in the bundle is replaced like any
-    /// other, so an export can be repeated over the bundle it made.
     #[test]
     fn an_export_repeats_over_a_bundle_holding_a_read_only_file() {
         let home = tempfile::tempdir().unwrap();
@@ -355,8 +296,6 @@ mod tests {
         assert_eq!(again, Ok(()));
     }
 
-    /// The city root is the person's choice, so a link above it is
-    /// where they keep the city rather than a write a run redirected.
     #[test]
     fn a_city_kept_under_a_link_exports_and_restores() {
         let tmp = tempfile::tempdir().unwrap();
@@ -381,8 +320,7 @@ mod tests {
     fn nothing_under_the_reserved_prefix_travels_as_a_city_file() {
         let home = tempfile::tempdir().unwrap();
         city_with(1, home.path());
-        // A side index is disposable; carrying one would be a second
-        // statement of what happened.
+
         let cache = home.path().join(RESERVED).join("index");
         std::fs::create_dir_all(&cache).unwrap();
         std::fs::write(cache.join("ledger.idx"), b"derived").unwrap();
@@ -393,8 +331,6 @@ mod tests {
         assert!(!carried.path().join(CITY).join("index").exists());
     }
 
-    /// A restore cut short leaves its staging file under the city root;
-    /// the next export must not carry it as the person's file.
     #[test]
     fn a_staging_file_a_crash_left_does_not_travel() {
         let home = tempfile::tempdir().unwrap();

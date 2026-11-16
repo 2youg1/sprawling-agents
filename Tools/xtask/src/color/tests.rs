@@ -7,8 +7,6 @@ use super::contrast::{apca_lc, bronze_tier};
 use super::tables::{parse_text_tokens, parse_type_scale, text_surface_ceiling};
 use super::*;
 
-/// `Violation` has no `Debug` on purpose (it is rendered, not dumped),
-/// so failures report the rules that fired.
 fn rules(found: &[Violation]) -> String {
     found
         .iter()
@@ -17,8 +15,6 @@ fn rules(found: &[Violation]) -> String {
         .join(" | ")
 }
 
-/// The shape the client ships: the `@theme` token block, and beside it the
-/// three inputs the proof needs that an `oklch()` call cannot carry.
 const GOOD: &str = r"
 @theme {
   --color-*: initial;
@@ -96,10 +92,6 @@ fn the_real_shape_passes() {
     assert_eq!(parse_type_scale(GOOD).len(), 6);
 }
 
-/// The names the rest of the repository uses, which are not the names CSS
-/// spells. A finding names the rung `G1`; the stylesheet declares
-/// `--color-g1`, and the reader who goes looking for either finds one
-/// thing.
 #[test]
 fn a_token_is_reported_by_the_name_the_repository_uses() {
     let rungs = grey_ramp(GOOD);
@@ -122,7 +114,6 @@ fn a_token_is_reported_by_the_name_the_repository_uses() {
     assert_eq!(text_surface_ceiling(GOOD).as_deref(), Some("G2"));
 }
 
-/// Tailwind's reset lines declare no token and must not become one.
 #[test]
 fn a_reset_declaration_is_not_a_token() {
     assert!(
@@ -131,10 +122,6 @@ fn a_reset_declaration_is_not_a_token() {
     );
 }
 
-/// The reading this gate exists to make mechanical: these are the
-/// measured values the design was solved against, so a change to the
-/// transfer curve, the constants or the quantisation shows up here
-/// rather than as a page that is quietly harder to read.
 #[test]
 fn the_measurement_reproduces_the_readings_the_design_was_solved_against() {
     for (text, surface, expected) in [
@@ -157,8 +144,7 @@ fn the_measurement_reproduces_the_readings_the_design_was_solved_against() {
 
 #[test]
 fn a_text_token_that_does_not_reach_its_tier_is_caught() {
-    // G9 is the rung a designer would reach for when "a bit quieter"
-    // is wanted. It reaches Lc 70.8 on a card, and body needs 90.
+
     let broken = GOOD.replace("--color-text: oklch(0.930", "--color-text: oklch(0.825");
     let found = judge_tokens(&broken, Mode::Dark);
     assert!(
@@ -183,8 +169,6 @@ fn a_type_step_claiming_the_wrong_tier_is_caught() {
     );
 }
 
-/// A type step below every Bronze minimum is a failure no colour
-/// repairs, so the remedy is in the type scale and not in the greys.
 #[test]
 fn a_step_too_small_for_any_tier_is_caught() {
     let broken = GOOD.replace("--text-label: 14px", "--text-label: 11px");
@@ -198,12 +182,6 @@ fn a_step_too_small_for_any_tier_is_caught() {
     );
 }
 
-/// The other step was legal and still had to go, which is a different
-/// finding and worth its own assertion: 12px at weight 400 is admitted,
-/// but only at the top tier, so the only token that may paint it is the
-/// one body text uses. **A 12px line cannot be quieter than the prose
-/// beside it** - and "quieter" was its entire job. Quiet has to be
-/// bought with size here, not with grey.
 #[test]
 fn a_twelve_pixel_step_is_legal_and_still_cannot_be_quiet() {
     assert_eq!(bronze_tier(12, 400, false), Some(90));
@@ -221,8 +199,7 @@ fn a_twelve_pixel_step_is_legal_and_still_cannot_be_quiet() {
 
 #[test]
 fn text_on_a_surface_the_ladder_may_not_reach_is_caught() {
-    // G3 is where the ladder stops carrying text. Pointing the ceiling
-    // at it must make the body token illegal, because it is.
+
     let broken = GOOD.replace("--surface-ceiling: g2", "--surface-ceiling: g3");
     let found = judge_tokens(&broken, Mode::Dark);
     assert!(
@@ -246,9 +223,6 @@ fn a_third_hue_is_caught() {
     );
 }
 
-/// The checkpoints are the only exceptions, and each only on its own hue:
-/// moving one off it is caught, and so is another token taking a
-/// checkpoint's hue.
 #[test]
 fn a_checkpoint_keeps_its_own_hue_and_lends_it_to_nobody() {
     let moved = GOOD.replace(
@@ -301,8 +275,7 @@ fn a_ramp_that_stops_short_of_the_ceiling_is_caught() {
 
 #[test]
 fn an_interaction_variant_may_sit_above_the_ramp_ceiling() {
-    // ALERT_HOVER at 945 is legal and the theme ships it; only
-    // pure white is not.
+
     let found = judge_tokens(GOOD, Mode::Dark);
     assert!(found.is_empty(), "{}", rules(&found));
 }
@@ -318,10 +291,6 @@ fn a_third_ratio_is_caught() {
     );
 }
 
-/// A resolved chroma with no share beside it is the failure this gate
-/// would otherwise pass silently: `oklch()` keeps the product and throws
-/// away the multiplier, so a token that stops declaring its ratio simply
-/// leaves the table it is judged by.
 #[test]
 fn a_coloured_token_that_declares_no_ratio_is_named() {
     let broken = GOOD.replace("--ratio-alert-hover: 70", "--ratio-nothing: 70");
@@ -335,9 +304,6 @@ fn a_coloured_token_that_declares_no_ratio_is_named() {
     );
 }
 
-/// The axis chroma is a property of every rung, not of a constant that
-/// says so. A stylesheet can declare the right number and then write a
-/// rung that departs from it.
 #[test]
 fn a_rung_off_the_axis_chroma_is_caught() {
     let broken = GOOD.replace(

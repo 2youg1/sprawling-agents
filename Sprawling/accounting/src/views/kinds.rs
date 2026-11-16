@@ -3,48 +3,39 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What each event kind is to a question the views ask
-//! (`Sprawling/accounting/spec/Views.lean` D50).
-//!
-//! One table per question, each naming every kind, so a kind the kernel
-//! adds is a compile error here rather than a record that silently
-//! changes nothing. The callers match on the class exhaustively.
-
 use kernel::EventKind;
 
-/// What a record of each kind changes in what the views hold
-/// (`Views::apply`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Holding {
-    /// The city's own address.
+
     City,
-    /// A signal joins its room's queue.
+
     SignalQueued,
-    /// A signal leaves every queue.
+
     SignalTaken,
-    /// A room's pursuit is set or cleared.
+
     Pursuit,
-    /// Files are set aside.
+
     Discarded,
-    /// Files set aside come back.
+
     Restored,
-    /// A run claims a plan node.
+
     Claimed,
-    /// Work lands in a commit.
+
     Commit,
-    /// A run starts: its predecessor and its skill pins.
+
     RunStarted,
-    /// An asset enters the registry.
+
     Asset,
-    /// An approval is answered.
+
     Ruling,
-    /// A document is saved.
+
     Document,
-    /// A run's first prompt.
+
     Prompt,
-    /// A run's request shape compared for this turn.
+
     PromptShape,
-    /// Nothing the views hold beyond the folds every record passes.
+
     Nothing,
 }
 
@@ -151,15 +142,13 @@ impl Holding {
     }
 }
 
-/// Which records carry a locator a reader can check a run by
-/// (`evidence_in`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Evidence {
-    /// A tool result, which carries one when it stored a picture.
+
     ToolResult,
-    /// A plan node closed with its completion.
+
     Finished,
-    /// No locator.
+
     Nothing,
 }
 

@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A worker stamping its lines with the clock it was handed
-//! (`Sprawling/accounting/Spec.lean` section 2).
-//!
-//! The scripted clock stands still at a moment long past, so a line
-//! stamped by any write point that still reads the wall clock carries
-//! today's time and not the script's.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -21,13 +14,10 @@
 use std::sync::Arc;
 
 use kernel::{Address, AxError, EventRecord, IdemKey, RunId, Seq, TimeMs};
-// The city is formed with an in-memory vault, because these tests are
-// about the worker and must not write to the credential service of the
-// machine that runs them.
+
 use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
-/// A moment no wall clock reads today.
 const STILL: u64 = 1_000_000;
 
 struct Stopped;

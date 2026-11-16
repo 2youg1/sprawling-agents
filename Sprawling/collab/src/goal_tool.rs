@@ -3,24 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The goal tool: the face `kernel::goal` and `collab::arbiter` show a
-//! model.
-//!
-//! Three layers, none of them duplicated here. Detection answers whether
-//! two goals clash; arbitration answers who settles it; this module only
-//! joins them into something a resident can call, and refuses to
-//! register anything that clashed.
-//!
-//! The register is the city's, not the desk's: two runs dispatched side
-//! by side read the same register, so the desk hands each entry to the
-//! authority every run asks ([`GoalBooking`]) and keeps no copy.
-//!
-//! A refusal is where the design lives. "No" alone teaches a model to
-//! rephrase and try again, so the refusal carries the level that decides
-//! the clash — wait for the other goal, or go and agree with its owner
-//! (collab D1 leaves no third level) — and the model can act on exactly
-//! the one it is given.
-
 use std::sync::{Arc, Mutex};
 
 use kernel::{
@@ -31,19 +13,12 @@ use serde_json::{Map, Value};
 
 use crate::arbiter::Level;
 
-/// The authority that decides a registration at the call: it arbitrates
-/// the entry against the whole register, records the outcome, and
-/// answers. In the city that authority is the accounting thread, reached
-/// through the relay.
 pub struct GoalBooking(Box<Ask>);
 
-/// Registers one entry, or refuses it with [`conflict_refusal`] because
-/// the ground is held. Handed the whole entry, because the authority
-/// records it as it registers it.
 type Ask = dyn FnMut(&GoalEntry) -> Result<(), AxError> + Send;
 
 impl GoalBooking {
-    /// `ask`'s refusal reaches the model unchanged.
+
     #[must_use]
     pub fn new(ask: impl FnMut(&GoalEntry) -> Result<(), AxError> + Send + 'static) -> GoalBooking {
         GoalBooking(Box::new(ask))
@@ -56,8 +31,6 @@ impl std::fmt::Debug for GoalBooking {
     }
 }
 
-/// The run's side of the goal register: who registers, the ids it mints,
-/// and the authority that decides each registration.
 #[derive(Debug)]
 pub struct GoalDesk {
     run: RunId,
@@ -130,9 +103,6 @@ impl GoalDesk {
     }
 }
 
-/// The refusal a model is handed when `entry` clashes: `E_GOAL_CONFLICT`,
-/// with the one move the level that decides the clash leaves it. Spelled
-/// here alone, so the authority that arbitrates says it the one way.
 #[must_use]
 pub fn conflict_refusal(entry: &GoalEntry, level: &Level) -> AxError {
     AxError::failure(
@@ -143,8 +113,6 @@ pub fn conflict_refusal(entry: &GoalEntry, level: &Level) -> AxError {
     .with_recovery(next_move(level))
 }
 
-/// The third part of the refusal: one thing to do, named after the level
-/// that decides the clash.
 fn next_move(level: &Level) -> String {
     match level {
         Level::Serialize { after } => format!(
@@ -164,14 +132,7 @@ pub struct GoalTool {
 }
 
 impl GoalTool {
-    /// `room` is what the tool declares it writes into; the register
-    /// itself is the city's, and the gate that matters is the clash.
-    ///
-    /// The name, disclosure and schema `new` registers. The catalog page
-    /// reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
+
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [
@@ -221,8 +182,6 @@ impl GoalTool {
         })
     }
 
-    /// # Errors
-    /// Propagates a malformed tool name or parameter schema.
     pub fn new(room: Address, desk: Arc<Mutex<GoalDesk>>) -> Result<GoalTool, AxError> {
         let defined = Self::definition()?;
         Ok(GoalTool {
@@ -309,8 +268,6 @@ fn strings(args: &Map<String, Value>, key: &str) -> Vec<String> {
 mod tests {
     use super::*;
 
-    /// A goal tool whose authority is a register held in the test: it
-    /// arbitrates as the accounting thread does and keeps what it takes.
     fn tool(registered: Vec<GoalEntry>) -> GoalTool {
         let mut held = registered;
         let booking = GoalBooking::new(move |entry| match crate::arbitrate(&held, entry) {

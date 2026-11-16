@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Ledger appends: waves, reads, and the kernel Ledger face.
-
 use std::path::PathBuf;
 
 use kernel::ledger::chain_hash;
@@ -39,12 +37,8 @@ impl JsonlLedger {
         self.append_all(vec![draft]).map(|_| ())
     }
 
-    /// Group commit: one durability barrier for the whole wave
-    /// (`Sprawling/storage/Spec.lean` §3, item 1: the batch is what the wave delivered).
     pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, StorageError> {
-        // A restore a failed wave left owed runs first: it is what mends
-        // the barrier, and it may remove the segment this wave would
-        // append to.
+
         self.finish_unwind()?;
         self.barrier.admit(&self.dir, self.next_seq)?;
         self.halt.admit()?;
@@ -101,11 +95,6 @@ impl JsonlLedger {
         self.next_seq = seq;
         self.prev = prev;
 
-        // The per-room projection is laid down only now, after the wave
-        // is durable: the bytes it copies exist before it runs. A
-        // refusal is reported and skipped rather than returned - the
-        // history already has the record, and a disposable artifact
-        // must never fail history's caller (`Sprawling/storage/spec/Sessions.lean` §8-24).
         if let Some(sessions) = self.sessions.as_mut() {
             for record in &records {
                 if let Err(error) = sessions.absorb(record) {
@@ -114,9 +103,6 @@ impl JsonlLedger {
             }
         }
 
-        // Only now, with the bytes synced, does anyone else hear about
-        // them: an observer that saw an event the disk never got would be
-        // telling the interface something the history does not contain.
         if let Some(observer) = self.observer.as_mut() {
             for record in &records {
                 observer(record);
@@ -125,34 +111,19 @@ impl JsonlLedger {
         Ok(records.iter().map(EventRecord::to_ref).collect())
     }
 
-    /// Hands this ledger's session slices to whoever will file them from
-    /// now on; this writer files none after it. `None` for a ledger that
-    /// is not a city's, and for one that already handed them off
-    /// (`Sprawling/storage/spec/Sessions.lean` §8-24).
     pub fn hand_off_session_slices(&mut self) -> Option<crate::sessions::Sessions> {
         self.sessions.take()
     }
 
-    /// The position a record written now would take.
-    ///
-    /// A position, never content: this is what anchors a diagnostic log
-    /// line to the only history (`docs/logging.md` section 4), and a
-    /// reader accessor that returned records would invite decision logic
-    /// to consult the ledger it is in the middle of writing.
     #[must_use]
     pub fn position(&self) -> Seq {
         self.next_seq
     }
 
-    /// Installs the write-path observer, replacing any earlier one. The
-    /// sink runs on the appending thread after durability, so it must not
-    /// block; a bounded send that drops on lag is the shape this expects.
     pub fn observe(&mut self, sink: WriteObserver) {
         self.observer = Some(sink);
     }
 
-    /// The read face for replay, fixtures and inspection: every canonical
-    /// line (no terminators), segments flattened in order.
     pub fn read_raw_lines(&self) -> Result<Vec<Vec<u8>>, StorageError> {
         let mut out = Vec::new();
         let segments: Vec<PathBuf> = self
@@ -187,7 +158,6 @@ impl kernel::Ledger for JsonlLedger {
         })
     }
 
-    /// One buffer, one write and one barrier for the whole wave.
     fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError> {
         JsonlLedger::append_all(self, drafts).map_err(StorageError::into_ax)
     }
@@ -271,10 +241,6 @@ mod tests {
         verify_chain(&reopened.read_raw_lines().unwrap());
     }
 
-    /// What one production append costs the disk, counted rather than
-    /// timed: `kernel::Ledger::append` is a batch of one, so every
-    /// record pays a whole durability barrier. The op count is the
-    /// budget reading; the wall clock belongs to the machine.
     #[test]
     fn one_append_costs_a_fixed_number_of_disk_operations() {
         let dir = tempfile::tempdir().unwrap();
@@ -331,8 +297,6 @@ mod tests {
             .collect()
     }
 
-    /// Group commit: a wave of three records in one segment costs the
-    /// disk what a wave of one costs - one write and one barrier.
     #[test]
     fn a_wave_costs_one_write_and_one_barrier_whatever_it_carries() {
         let dir = tempfile::tempdir().unwrap();
@@ -347,8 +311,6 @@ mod tests {
         assert_eq!(three, one);
     }
 
-    /// A wave that crosses the roll puts each line in the segment its
-    /// seq names, so the names stay the authority on where a seq lives.
     #[test]
     fn a_wave_across_the_roll_puts_each_line_in_the_segment_named_for_it() {
         let dir = tempfile::tempdir().unwrap();
@@ -379,8 +341,6 @@ mod tests {
         assert_eq!(held, expected);
     }
 
-    /// The roll is for a line that would carry a segment past its
-    /// budget; a line that fills it exactly stays.
     #[test]
     fn a_line_that_fills_the_segment_exactly_does_not_roll() {
         let dir = tempfile::tempdir().unwrap();
@@ -398,8 +358,6 @@ mod tests {
         );
     }
 
-    /// The observer hears every record of a wave, in seq order, once the
-    /// wave is durable.
     #[test]
     fn the_observer_hears_each_record_of_a_wave_in_order() {
         let dir = tempfile::tempdir().unwrap();
@@ -413,8 +371,6 @@ mod tests {
         assert_eq!(*heard.lock().unwrap(), vec![0, 1, 2]);
     }
 
-    /// The port's batch append echoes one reference per draft, the
-    /// reference of the line it wrote.
     #[test]
     fn the_port_s_batch_append_echoes_what_it_wrote() {
         let dir = tempfile::tempdir().unwrap();
@@ -429,9 +385,6 @@ mod tests {
         assert_eq!(echoed, written);
     }
 
-    /// A segment a crash created before its first byte is appended to,
-    /// not created again: its directory entry is already durable, so the
-    /// first wave pays no directory barrier.
     #[test]
     fn an_empty_segment_a_crash_left_is_appended_to_without_a_directory_barrier() {
         let dir = tempfile::tempdir().unwrap();
@@ -440,8 +393,7 @@ mod tests {
             cut_on_write: None,
             torn_tail: crate::fault_fs::TornTail::None,
         });
-        // The opening reads the tail and keeps the empty segment where
-        // it is (`Sprawling/storage/Spec.lean` §8-1 step 5: nothing is cut).
+
         let mut seeded = fs.clone();
         crate::vfs::Vfs::create_dir_all(&mut seeded, dir.path()).unwrap();
         crate::vfs::Vfs::append(
@@ -487,7 +439,7 @@ mod tests {
             let (reopened, _) = JsonlLedger::open(dir.path(), TimeMs::new(999)).unwrap();
             let lines = reopened.read_raw_lines().unwrap();
             verify_chain(&lines);
-            // Every surviving pre-damage line is a byte-exact prefix entry.
+
             let survivors = lines
                 .iter()
                 .filter(|l| {

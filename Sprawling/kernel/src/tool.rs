@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The tool seam (seam registry ARCHITECTURE 3).
-//! `ToolMeta` is the eight-field registration: a tool without a complete
-//! meta is invisible to the model. `effect` decides which gate a call
-//! passes; `temporal` decides whether its envelope carries a clock stamp.
-//! The part `Sprawling/kernel/spec/Tool.lean` specifies this module.
-
 use serde::{Deserialize, Serialize};
 
 use crate::address::Address;
@@ -17,23 +11,15 @@ use crate::event::Payload;
 
 pub mod writes;
 
-/// Tool identity as it appears in catalog and events: non-empty ASCII
-/// lowercase, digits, underscore.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ToolName(String);
 
 impl ToolName {
-    /// The built-in browser tool's name. One authority, because the
-    /// tool's own `ToolMeta`, the building rule that admits it and the
-    /// ledger fixtures that name its record all spell it.
+
     pub const BROWSER: &'static str = "browser";
 
-    /// The tool that drives the browser a person already has open, with
-    /// that person's own profile.
     pub const USER_BROWSER: &'static str = "usersbrowser";
 
-    /// The three-arm execution tool. One authority, because the discard
-    /// forecast, the lane's command count and its sieve all route on it.
     pub const EXEC: &'static str = "exec";
 
     pub fn parse(raw: &str) -> Result<Self, AxError> {
@@ -62,30 +48,24 @@ impl std::fmt::Display for ToolName {
     }
 }
 
-/// A namespace the catalog files the city's own tools under
-/// (`Sprawling/runtime/spec/Catalog.lean` §8-60).
-///
-/// An external server's label is the namespace of every tool it offers,
-/// so a server labelled with one of these would have its tools listed
-/// as the city's own; the configuration layer refuses such a label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ReservedNamespace {
-    /// The browsers and whatever else drives a screen.
+
     Computer,
-    /// Reading pictures and recordings.
+
     Media,
-    /// Looking back at the city's history and proposing changes to it.
+
     Record,
-    /// The skills a building's reading room admits.
+
     Skill,
-    /// The city's own capabilities: collaboration and a run's own state.
+
     Sprawling,
-    /// The city's own way onto the web.
+
     Web,
 }
 
 impl ReservedNamespace {
-    /// Every reserved namespace, in name order.
+
     pub const ALL: [ReservedNamespace; 6] = [
         ReservedNamespace::Computer,
         ReservedNamespace::Media,
@@ -95,7 +75,6 @@ impl ReservedNamespace {
         ReservedNamespace::Web,
     ];
 
-    /// The name a model reads and a `tool list` takes.
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -108,7 +87,6 @@ impl ReservedNamespace {
         }
     }
 
-    /// The reserved namespace spelled `raw`, if any.
     #[must_use]
     pub fn named(raw: &str) -> Option<ReservedNamespace> {
         Self::ALL
@@ -117,28 +95,12 @@ impl ReservedNamespace {
     }
 }
 
-/// How one external server is named inside this city.
-///
-/// The label is the first segment of every tool that server offers
-/// (`{label}_{tool}`), so two servers that both offer `search` stay two
-/// tools rather than becoming one that sometimes does the wrong thing.
-/// Its grammar is [`ToolName`]'s minus the underscore: allowing one
-/// would let `apps_foo_bar` be read as two different splits, and this
-/// name routes a call.
-///
-/// It lives here rather than beside the protocol that uses it because
-/// the rule it enforces is a rule about tool names, and a rule written
-/// in two crates is a rule with two authorities.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct ServerLabel(String);
 
 impl ServerLabel {
-    /// Sole constructor.
-    ///
-    /// # Errors
-    /// Refuses anything a tool name cannot contain, and the underscore
-    /// that would make the resulting tool name ambiguous.
+
     pub fn parse(raw: &str) -> Result<ServerLabel, AxError> {
         let well_formed = !raw.is_empty()
             && raw
@@ -193,13 +155,9 @@ impl<'de> Deserialize<'de> for ToolName {
     }
 }
 
-/// Declaring a timeout is a promise of cooperative cancellation; absence
-/// means no deadline.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TimeoutMs(pub u64);
 
-/// What kind of boundary a call crosses — this field routes the call to
-/// its gate; it is machine input, not documentation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -208,47 +166,25 @@ pub enum Effect {
     Write {
         domain: Address,
     },
-    /// Leaves this machine for a destination the call names.
+
     Egress,
-    /// Leaves this process for an external server the building
-    /// configured. The destination is fixed by the registration rather
-    /// than named per call, because every call to one connector tool
-    /// goes to the same place — and a model filling in a `host`
-    /// argument would be inventing a fact the city already knows.
+
     Connector {
         #[cfg_attr(feature = "schema", schemars(with = "String"))]
         label: ServerLabel,
     },
-    /// Starts a second agent on part of this work. Its own class rather
-    /// than a `Read`: what a spawn costs and what it can reach is not
-    /// bounded by anything the calling run's other gates check, and the
-    /// only thing that bounds it is the person.
+
     Spawn,
-    /// Changes what governs a scope - the rules its own runs are judged
-    /// by. Deliberately not a `Write`: the reserved subtree is outside
-    /// every write domain, so the write door would refuse it, and the
-    /// reason it refuses is that this decision is the person's.
+
     Govern,
-    /// Attaches to a browser the person is already driving, with that
-    /// person's own login state.
-    ///
-    /// Its own class rather than an `Egress`: the bytes a call sends are
-    /// the smaller half of what it reaches for, and a run allowed to
-    /// open pages in a browser this city started has not thereby been
-    /// granted every account that browser is signed into. The address
-    /// is the registration's, not the call's; `None` is a person who
-    /// enabled the tool without saying where it answers, which the
-    /// attach door answers with a question.
+
     AttachUserBrowser {
         address: Option<String>,
     },
-    /// Moves money. No tool in this build declares it; the bench refuses
-    /// it with `E_TOOL_UNAVAILABLE`, so the first tool that does meets a
-    /// door rather than a gap (`Sprawling/runtime/spec/Tools.lean`).
+
     Spend,
 }
 
-/// Whether "now" is load-bearing for this tool's results (4.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Temporal {
@@ -256,7 +192,6 @@ pub enum Temporal {
     Timestamped,
 }
 
-/// Cost bucket for budget and routing; the tool layer consumes it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CostTier {
@@ -265,13 +200,6 @@ pub enum CostTier {
     Heavy,
 }
 
-/// Presentation intent; per-call `locations` are a pure function of args
-/// (tool side). Meta-level declarations use an empty list.
-///
-/// `Signal` and `Delegate` carry nothing for the same reason: who a
-/// letter goes to and which room takes the work are per call, so a page
-/// reads them from the call's arguments (`Sprawling/kernel/spec/Tool.lean`
-/// D37).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -281,14 +209,12 @@ pub enum RenderIntent {
     Diff {
         locations: Vec<Address>,
     },
-    /// Speaking to another resident, or taking what waits for this one.
+
     Signal,
-    /// Handing one piece of work to another room, one level down.
+
     Delegate,
 }
 
-/// The eight-field registration, none optional in spirit: `timeout: None`
-/// is itself a declaration (no deadline), not an omission.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolMeta {
     pub name: ToolName,
@@ -303,26 +229,14 @@ pub struct ToolMeta {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolCall {
-    /// Wire identity: `tool_use` and `tool_result` pair by this id on
-    /// both dialects. Scripted adapters synthesize deterministic ids.
+
     pub id: String,
     pub name: ToolName,
     pub args: Payload,
 }
 
 impl ToolCall {
-    /// The bytes that say what this call does, for `IdemKey::derive` to
-    /// take as its `action_canonical`.
-    ///
-    /// The name and the arguments together are the action: two calls of
-    /// one tool with different arguments are two actions, and a key that
-    /// read only the name made them one. `id` stays out, because two
-    /// calls differing only by wire id are the same action.
-    ///
-    /// # Errors
-    /// Propagates arguments that do not serialise, which keeps the key
-    /// honest: substituting an empty string would collide
-    /// two different calls into one key.
+
     pub fn action(&self) -> Result<Vec<u8>, AxError> {
         let mut action = self.name.as_str().as_bytes().to_vec();
         let args = serde_json::to_string(&self.args).map_err(|err| {
@@ -344,96 +258,43 @@ impl ToolCall {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolOutcome {
     pub result: Payload,
-    /// Pictures this call produced, already in the content store.
-    ///
-    /// They ride here rather than inside `result` because the model has
-    /// to see them: the turn loop puts them into the tool result block's
-    /// own attachments, and a locator buried in a payload would only
-    /// ever be text.
+
     #[serde(default)]
     pub attachments: Vec<crate::ImageRef>,
 }
 
-/// What one call is about, in the terms its own grammar names it.
-///
-/// The tool owning the call's grammar is the only place that can read
-/// it off the arguments. A sixth kind is a change here, not a
-/// string that reaches a gate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GateSubject {
-    /// A city position a call names as its target.
+
     Area(Address),
-    /// The room a call names when it works in one.
+
     Room(Address),
-    /// The scope a governance call would rewrite.
+
     Scope(String),
-    /// The host a call's own bytes would leave for.
+
     Host(String),
-    /// This call names no subject; the tool's grammar has none for it.
-    /// A door judges such a call against this machine rather than
-    /// skipping it, and refuses it when its effect needs a subject.
+
     None,
 }
 
-/// The tool port. Adapters: runtime L0 three, browser, protocol;
-/// second adapter: citysim scripted tools.
-///
-/// `Send`, because a bench of tools is driven on a pool thread rather
-/// than on the thread that built it (`Sprawling/app/Spec.lean` §8-44). A tool that
-/// holds something a thread cannot give up has no place on a bench.
-///
-/// `Sync`, and `invoke` takes `&self`, because the read-only calls at
-/// the head of a wave run at the same time (`Sprawling/runtime/Spec.lean` §8-3), so one
-/// tool can be inside `invoke` on several threads at once. A tool with
-/// state of its own keeps that state behind its own lock.
 pub trait Tool: Send + Sync {
     fn meta(&self) -> &ToolMeta;
 
-    /// Fail-closed identity: a call whose name differs from `meta().name`
-    /// must return `E_INVALID_ARGS`, never route silently.
     fn invoke(&self, call: &ToolCall) -> Result<ToolOutcome, AxError>;
 
-    /// What this call is about, read by the grammar this tool already
-    /// parses its arguments with.
-    ///
-    /// The default is [`GateSubject::None`] rather than an inference: a
-    /// bench that guessed a subject from an argument name has already
-    /// been wrong once. `None` says the tool read the call and it names
-    /// none; a door then judges it against this machine, never skips it.
-    ///
-    /// # Errors
-    /// Refuses arguments this tool cannot read - the same refusal its
-    /// `invoke` would produce.
     fn subject(&self, _call: &ToolCall) -> Result<GateSubject, AxError> {
         Ok(GateSubject::None)
     }
 
-    /// The effect this one call has, which picks the door it meets.
-    ///
-    /// The default is the registered [`ToolMeta::effect`]. A tool whose
-    /// operations differ in kind overrides it: a governance tool answers
-    /// [`Effect::Read`] for an operation that only reads the rules, so a
-    /// run can see what it is judged by while every operation that
-    /// rewrites them still meets the Govern refusal
-    /// (`Sprawling/kernel/spec/Gate.lean` D26).
-    ///
-    /// # Errors
-    /// Refuses arguments this tool cannot read - the same refusal its
-    /// `invoke` would produce.
     fn effect_of(&self, _call: &ToolCall) -> Result<Effect, AxError> {
         Ok(self.meta().effect.clone())
     }
 
-    /// What this call may have written to the city's tree once it ran;
-    /// the default reads the declared effect and nothing more.
     fn writes(&self, _call: &ToolCall) -> writes::Writes {
         writes::Writes::of(&self.meta().effect)
     }
 }
 
-/// The exec three-arm shape. Lives on the tool face because
-/// `discard::forecast` consumes it and kernel cannot depend on runtime.
-/// Exactly three arms — deliberately exhaustive.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecArm {

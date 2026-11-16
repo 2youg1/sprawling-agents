@@ -3,19 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A stretch of one document version, counted in bytes from its first
-//! byte (`Sprawling/documents/Spec.lean` D2).
-
 use kernel::{AxCode, AxError};
 use serde::{Deserialize, Serialize};
 
-/// A half-open byte interval `[start, end)` of one document version.
-///
-/// Half-open, so an empty span - an insertion point, the whole of an
-/// empty document - can be spelled, which the closed byte range of a
-/// `Locator` cannot do. [`Span::new`] is the one construction point and
-/// the wire reads through it, so a span whose start lies past its end
-/// is never held.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(try_from = "SpanFields", into = "SpanFields")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -25,10 +15,7 @@ pub struct Span {
 }
 
 impl Span {
-    /// The interval from `start` up to, not including, `end`.
-    ///
-    /// # Errors
-    /// `E_INVALID_ARGS` naming both offsets when `start` lies past `end`.
+
     pub fn new(start: u64, end: u64) -> Result<Span, AxError> {
         if start > end {
             return Err(AxError::failure(
@@ -41,7 +28,6 @@ impl Span {
         Ok(Span { start, end })
     }
 
-    /// The empty span at `at`: where an insertion lands.
     pub const fn at(at: u64) -> Span {
         Span { start: at, end: at }
     }
@@ -54,7 +40,6 @@ impl Span {
         self.end
     }
 
-    /// How many bytes the span covers.
     pub const fn len(self) -> u64 {
         self.end.saturating_sub(self.start)
     }
@@ -63,8 +48,6 @@ impl Span {
         self.start == self.end
     }
 
-    /// The span from the lesser of two offsets to the greater, for the
-    /// callers in this crate that computed both and know their order.
     pub(crate) fn ordered(one: u64, other: u64) -> Span {
         Span {
             start: one.min(other),
@@ -72,8 +55,6 @@ impl Span {
         }
     }
 
-    /// The same span as indices into a byte slice of `len` bytes, or
-    /// `None` when it reaches past the slice.
     pub(crate) fn within(self, len: usize) -> Option<(usize, usize)> {
         let start = usize::try_from(self.start).ok()?;
         let end = usize::try_from(self.end).ok()?;
@@ -81,13 +62,10 @@ impl Span {
     }
 }
 
-/// A byte count or index as an offset. Every slice this crate reads fits
-/// in a `u64`, so the ceiling is never reached on a machine this runs on.
 pub(crate) fn offset(index: usize) -> u64 {
     u64::try_from(index).unwrap_or(u64::MAX)
 }
 
-/// The wire spelling of a [`Span`], read back through [`Span::new`].
 #[derive(Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "schema", schemars(rename = "Span"))]

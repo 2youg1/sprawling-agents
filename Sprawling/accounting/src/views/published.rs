@@ -3,21 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The views the fold last finished, published to every reader, and a
-//! query answered from a snapshot of them with every slow read done
-//! after the snapshot is let go.
-
 use std::sync::{Arc, Mutex, PoisonError};
 
 use kernel::AxError;
 
 use super::holding::Views;
 
-/// The views the fold last finished, handed to every reader
-/// (`Sprawling/app/Spec.lean` §8-99).
-///
-/// The lock covers one `Arc` copy or swap and nothing that can panic,
-/// so even a poisoned lock holds a whole `Arc`, and it is read as one.
 pub struct Published {
     current: Mutex<Arc<Views>>,
 }
@@ -29,15 +20,10 @@ impl Published {
         }
     }
 
-    /// The views as the fold last published them. Held only while a
-    /// query copies out what it needs, because the fold takes a retired
-    /// copy back only once no reader holds it.
     pub fn snapshot(&self) -> Arc<Views> {
         Arc::clone(&self.current.lock().unwrap_or_else(PoisonError::into_inner))
     }
 
-    /// Publishes `latest` and hands back the copy it replaces, which is
-    /// dropped or reclaimed outside the lock.
     pub fn replace(&self, latest: Arc<Views>) -> Arc<Views> {
         std::mem::replace(
             &mut *self.current.lock().unwrap_or_else(PoisonError::into_inner),
@@ -46,18 +32,6 @@ impl Published {
     }
 }
 
-/// Answers one query from a snapshot of the views, holding it only while
-/// [`Views::prepare`] copies out what the query needs: the disk, git or
-/// network read in [`Prepared::finish`] runs after the snapshot is let
-/// go, so neither the fold nor another reader waits on it.
-///
-/// The answer is dated by the snapshot it is prepared from, so the date
-/// is exactly the first record the answer does not reflect.
-///
-/// The `Result` is the shape the console's `Answering` takes. The
-/// snapshot refuses nothing, because it is an `Arc` taken whole and has
-/// no poisoned state; a question the views refuse outright, such as a
-/// paste that reads as no agent, is the refusal.
 pub fn answer_outside_the_lock(
     views: &Published,
     query: &wire::Query,

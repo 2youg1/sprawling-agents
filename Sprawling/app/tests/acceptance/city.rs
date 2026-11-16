@@ -3,29 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The city an acceptance test stands up, the commands it sends, and
-//! the history it reads back.
-
 use std::path::{Path, PathBuf};
 
 use kernel::event::record::{RunStarted, ToolCalled, ToolResult};
 use kernel::{Address, AxError, EventKind, EventRecord, IdemKey, RunId, Seq};
-// The city is formed with an in-memory vault, because these tests are
-// about the worker and must not write to the credential service of the
-// machine that runs them.
+
 use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
 use crate::script::Scripted;
 
-/// The one model the city is given. Every model the worker builds is
-/// this one, so the factory never has to tell a digest call apart.
 const MODEL: &str = "scripted";
 
-/// Builds the worker the way the product does, handed `factory`.
-///
-/// The one place in this binary that constructs a worker, so a change
-/// to the constructor changes this function and nothing else.
 pub(crate) fn open_worker(
     dir: &Path,
     models: Box<dyn accounting::ModelFactory + Send>,
@@ -39,9 +28,6 @@ pub(crate) fn open_worker(
     .with_models(models)
 }
 
-/// A founded city whose main model sits on an endpoint that refuses
-/// every connection, so only the factory can answer; with the directory
-/// its ledger is in.
 pub(crate) fn city_with_a_model(
     dir: &Path,
     factory: Scripted,
@@ -49,8 +35,6 @@ pub(crate) fn city_with_a_model(
     city_with_models(dir, Box::new(factory))
 }
 
-/// [`city_with_a_model`] for any factory, such as one that hands each
-/// run it builds a model of its own.
 pub(crate) fn city_with_models(
     dir: &Path,
     models: Box<dyn accounting::ModelFactory + Send>,
@@ -72,8 +56,7 @@ pub(crate) fn city_with_models(
             auth_header: None,
             admit: vec![MODEL.to_owned()],
             named: Vec::new(),
-            // One try, briefly: a worker that called the dead port
-            // should fail at once rather than retry into it.
+
             tuning: wire::EndpointTuning {
                 timeout_ms: Some(2_000),
                 request_max_retries: Some(0),
@@ -96,7 +79,6 @@ pub(crate) fn city_with_models(
     (worker, founded.ledger_dir)
 }
 
-/// Raises a building at `addr` from `template`.
 pub(crate) fn raise(worker: &mut accounting::worker::RunWorker, addr: &str, template: &str) {
     worker
         .handle(wire::Command::CreateBuilding {
@@ -109,15 +91,12 @@ pub(crate) fn raise(worker: &mut accounting::worker::RunWorker, addr: &str, temp
         .unwrap();
 }
 
-/// Writes the building's own `RULES.toml` through the door the User's
-/// page writes it through.
 pub(crate) fn rules(dir: &Path, building: &str, text: &str) {
     let addr = Address::parse(building).unwrap();
     let base = std::fs::read_to_string(city::rules_path(dir, &addr)).unwrap_or_default();
     city::write_rules_against(dir, &addr, &base, text).unwrap();
 }
 
-/// Gives the room at `addr` a resident.
 pub(crate) fn move_in(dir: &Path, addr: &str) {
     let room = addr
         .split('/')
@@ -130,7 +109,6 @@ pub(crate) fn move_in(dir: &Path, addr: &str) {
     .unwrap();
 }
 
-/// Sends one task to the room at `addr`.
 pub(crate) fn dispatch(
     worker: &mut accounting::worker::RunWorker,
     addr: &str,
@@ -147,8 +125,6 @@ pub(crate) fn dispatch(
     })
 }
 
-/// A loopback address nothing listens on: bound once for a free port,
-/// then released.
 fn refusing_url() -> String {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -160,16 +136,13 @@ fn idem(what: &[u8]) -> IdemKey {
     IdemKey::derive(&RunId::CITY, Seq::FIRST, what)
 }
 
-/// The city's history as it stands, oldest line first.
 pub(crate) struct History(Vec<(EventRecord, String)>);
 
-/// One call a run made, with every line that answered it.
 pub(crate) struct Call {
     pub(crate) called: ToolCalled,
     pub(crate) results: Vec<ToolResult>,
 }
 
-/// A run the city started, with where it started.
 pub(crate) struct Started {
     pub(crate) run: RunId,
     pub(crate) addr: Option<Address>,
@@ -193,7 +166,6 @@ impl History {
         )
     }
 
-    /// Every run the city started, in the order it started them.
     pub(crate) fn started(&self) -> Vec<Started> {
         self.0
             .iter()
@@ -206,7 +178,6 @@ impl History {
             .collect()
     }
 
-    /// Every call `run` made, each with the results filed under its id.
     pub(crate) fn calls_of(&self, run: RunId) -> Vec<Call> {
         let mut calls: Vec<Call> = self
             .0
@@ -232,14 +203,12 @@ impl History {
         calls
     }
 
-    /// Whether a line of `kind` carries `text` anywhere in its bytes.
     pub(crate) fn says(&self, kind: EventKind, text: &str) -> bool {
         self.0
             .iter()
             .any(|(record, raw)| record.kind() == kind && raw.contains(text))
     }
 
-    /// Whether `run` wrote a line of `kind`.
     pub(crate) fn wrote(&self, run: RunId, kind: EventKind) -> bool {
         self.0
             .iter()

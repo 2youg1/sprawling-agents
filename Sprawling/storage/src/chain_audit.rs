@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The whole chain proved from genesis, one segment after another,
-//! reusing what an earlier strict walk proved, the segments read and
-//! their recorded prefixes hashed in waves side by side; and the verdict
-//! the writer waits for or halts on (`Sprawling/storage/spec/ChainAudit.lean` §8-30, §8-37). The proof
-//! is a query; setting the verdict is the caller's command.
-
 use std::path::Path;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 
@@ -22,32 +16,26 @@ use wave::{Hashed, PROOF_WAVE, Read, read_wave};
 
 mod wave;
 
-/// What walking the whole chain found.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChainAudit {
-    /// Every complete line continues the chain.
+
     Whole { lines: u64 },
-    /// The first line that did not, as the reason a person reads.
+
     Broken(AxError),
 }
 
-/// What one proof read and computed: counts rather than time, so a test
-/// can hold them at two sizes of history.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ProofCount {
-    /// Lines checked one by one through `LineCheck`.
+
     pub lines_checked: u64,
-    /// Segments whose record stood in for checking their prefix.
+
     pub segments_by_digest: u64,
     pub bytes_read: u64,
     pub bytes_hashed: u64,
-    /// Waves the segments were read in, each wave read side by side
-    /// before the chain is walked through it (`Sprawling/storage/spec/ChainAudit.lean` §8-37).
+
     pub waves: u64,
 }
 
-/// A proof's verdict, what it cost, and the first record it could not
-/// write, which changes no verdict.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Proven {
     pub audit: ChainAudit,
@@ -55,8 +43,6 @@ pub struct Proven {
     pub unkept: Option<AxError>,
 }
 
-/// The verdict a writer shares with the proof of its history: once set it
-/// stays, and it carries the reason every refused write repeats.
 #[derive(Debug, Clone, Default)]
 pub struct ChainHalt {
     verdict: Arc<(Mutex<Option<Verdict>>, Condvar)>,
@@ -69,20 +55,17 @@ enum Verdict {
     Broken(AxError),
 }
 
-/// What the writer does before there is a verdict.
 #[derive(Debug, Clone, Copy, Default)]
 enum Before {
-    /// The history was proved when the writer opened (`resume`, `fork`,
-    /// a one-shot command), so nothing waits for a background proof.
+
     #[default]
     Admit,
-    /// A served city opened from its snapshots: nothing is written after
-    /// history nobody has walked yet.
+
     Refuse,
 }
 
 impl ChainHalt {
-    /// A halt that refuses every append until a verdict is set.
+
     pub fn awaiting_proof() -> ChainHalt {
         ChainHalt {
             verdict: Arc::default(),
@@ -90,18 +73,14 @@ impl ChainHalt {
         }
     }
 
-    /// The chain is whole. The first verdict wins.
     pub fn prove(&self) {
         self.settle(Verdict::Whole);
     }
 
-    /// Stop taking new work. The first verdict wins; a later reason is
-    /// dropped, because the chain broke where the first proof said.
     pub fn trip(&self, reason: AxError) {
         self.settle(Verdict::Broken(reason));
     }
 
-    /// Why new work is refused, when the chain is broken.
     pub fn reason(&self) -> Option<AxError> {
         match &*self.held() {
             Some(Verdict::Broken(reason)) => Some(reason.clone()),
@@ -109,13 +88,10 @@ impl ChainHalt {
         }
     }
 
-    /// Whether a proof found the chain whole.
     pub fn proved(&self) -> bool {
         matches!(&*self.held(), Some(Verdict::Whole))
     }
 
-    /// Blocks until there is a verdict; returns at once for a halt that
-    /// admits before one.
     pub fn await_verdict(&self) {
         match self.before {
             Before::Admit => {}
@@ -150,8 +126,6 @@ impl ChainHalt {
         }
     }
 
-    /// The verdict as it stands. A panic while it was held cannot leave it
-    /// half-written: it is one assignment of a whole value.
     fn held(&self) -> MutexGuard<'_, Option<Verdict>> {
         self.verdict
             .0
@@ -161,51 +135,28 @@ impl ChainHalt {
 }
 
 impl JsonlLedger {
-    /// Share `halt` with this writer: every later `append_all` asks it
-    /// before framing a line.
+
     pub fn halt_on(&mut self, halt: ChainHalt) {
         self.halt = halt;
     }
 
-    /// Blocks until the proof this writer waits for has a verdict.
     pub fn await_verdict(&self) {
         self.halt.await_verdict();
     }
 
-    /// Whether this writer takes a line now, asked before a caller does
-    /// anything a refused line would leave behind.
-    ///
-    /// # Errors
-    /// `Unproven` before the verdict of a proof this writer awaits;
-    /// `ChainHalted` after a broken one.
     pub fn admits(&self) -> Result<(), StorageError> {
         self.halt.admit()
     }
 }
 
-/// Walk every complete line of the ledger in `dir` from genesis, each
-/// through the one per-line check, reading no record and writing none.
-/// Read-only; holds one segment at a time.
-///
-/// # Errors
-/// `StorageError::Io` when a segment cannot be listed or read.
 pub fn audit_chain(dir: &Path) -> Result<ChainAudit, StorageError> {
     walk(dir, None).map(|proven| proven.audit)
 }
 
-/// Prove the ledger in `dir` from genesis, taking a segment's record in
-/// place of checking its prefix line by line when the record's rule
-/// version, entry state and digest all match, and writing a record for
-/// every segment proved when `records` may be written.
-///
-/// # Errors
-/// `StorageError::Io` when a segment cannot be listed or read.
 pub fn prove_chain(dir: &Path, records: &ProofRecords) -> Result<Proven, StorageError> {
     walk(dir, Some(records))
 }
 
-/// The one walk behind both faces: each wave is read whole before the
-/// chain is walked through its segments in order.
 fn walk(dir: &Path, records: Option<&ProofRecords>) -> Result<Proven, StorageError> {
     let version = line_check_version();
     let mut walked = Walked {
@@ -242,7 +193,6 @@ fn walk(dir: &Path, records: Option<&ProofRecords>) -> Result<Proven, StorageErr
     })
 }
 
-/// The chain state and the counts, between two segments.
 struct Walked {
     check: LineCheck,
     lines: u64,
@@ -251,9 +201,7 @@ struct Walked {
 }
 
 impl Walked {
-    /// Prove one segment's complete lines and answer the record of what
-    /// was proved. The bytes checked and the bytes hashed are the same
-    /// read (`Sprawling/storage/spec/ChainAudit.lean` §8-30).
+
     fn segment(&mut self, read: Read, version: u32) -> Result<SegmentRecord, AxError> {
         let Read { bytes, hashed } = read;
         self.counted.bytes_read = self.counted.bytes_read.saturating_add(len_of(&bytes));
@@ -289,11 +237,6 @@ impl Walked {
         })
     }
 
-    /// Takes the record in place of checking the prefix it names when it
-    /// stands for it (`SegmentRecord::stands`), answering where checking
-    /// goes on, how many lines the prefix held, and the hasher that has
-    /// hashed it. `None` leaves the chain state where it was; the prefix
-    /// was hashed either way, and is counted.
     fn reuse(&mut self, hashed: Hashed) -> Option<(usize, u64, blake3::Hasher)> {
         let Hashed {
             record,

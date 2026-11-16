@@ -10,16 +10,12 @@
     reason = "test code"
 )]
 
-/// A serve that cannot take its port leaves the Ledger exactly as it
-/// found it. The socket is the first thing a serve takes, so a busy
-/// port is refused before a writer exists, rather than after a writer
-/// has opened the city and recorded a close nobody asked for.
 #[test]
 fn a_serve_refused_at_the_socket_writes_no_line() {
     let city = tempfile::tempdir().expect("a temporary directory");
     crate::assembly::init_city(city.path()).expect("a city forms");
     let ledger = kernel::layout::CityLayout::new(city.path()).ledger();
-    // As text, so a failure shows the line that was written.
+
     let lines = || -> Vec<String> {
         storage::read_raw_lines_at(&ledger)
             .expect("the ledger reads")
@@ -45,10 +41,6 @@ fn a_serve_refused_at_the_socket_writes_no_line() {
     );
 }
 
-/// A serve whose city another writer holds is refused with
-/// `E_LEDGER_HELD`, and the refusal hands its port back: the socket is
-/// taken first, so a serve that stops at the Ledger must not keep a
-/// port nobody will answer on.
 #[test]
 fn a_serve_of_a_held_city_is_refused_and_lets_its_port_go() {
     let city = tempfile::tempdir().expect("a temporary directory");
@@ -83,10 +75,6 @@ fn a_serve_of_a_held_city_is_refused_and_lets_its_port_go() {
     drop(held);
 }
 
-/// The phases of opening a served city, in the order `listen` does them
-/// (`Sprawling/app/spec/Assembly/Listening.lean` §8-121). The fold
-/// names how many lines the city holds, which the test reads off the
-/// ledger `init` wrote: one `skill_shelved` per shipped skill moves it.
 const OPENING_PHASES: [&str; 7] = [
     "bind",
     "open the ledger",
@@ -97,10 +85,6 @@ const OPENING_PHASES: [&str; 7] = [
     "start the worker",
 ];
 
-/// A listening city says in one line, at the effect floor and through the
-/// same sink as every other diagnostic, what each phase of opening it
-/// cost, so the first byte a person waits for can be split by the product
-/// itself rather than inferred from outside.
 #[test]
 fn a_listening_city_says_what_opening_it_cost() {
     let city = tempfile::tempdir().expect("a temporary directory");
@@ -137,8 +121,7 @@ fn a_listening_city_says_what_opening_it_cost() {
             opening.push(line.line);
         }
     }
-    // Where each phase's name falls in the line, so the durations, which
-    // differ on every run, stay out of the comparison.
+
     let named_in_order = |line: &str| -> Vec<&'static str> {
         let mut found: Vec<(usize, &'static str)> = OPENING_PHASES
             .iter()
@@ -167,11 +150,6 @@ fn a_listening_city_says_what_opening_it_cost() {
     drop(listening);
 }
 
-/// Every line the writer puts down while the city opens reaches the
-/// views, as every later line does: a vault that fell back to session
-/// memory is disclosed by a `provider_degraded` line `open_for_service`
-/// writes, and the views' answers come to stand after it
-/// (`Sprawling/app/spec/Assembly/Listening.lean` D81).
 #[test]
 fn every_line_written_while_opening_reaches_the_views() {
     let city = tempfile::tempdir().expect("a temporary directory");
@@ -205,8 +183,7 @@ fn every_line_written_while_opening_reaches_the_views() {
         .expect("the ledger verifies")
         .raw_lines()
         .len();
-    // The views fold on their own thread, so the answer is asked again
-    // for up to five seconds, twenty milliseconds apart.
+
     let mut folded = (listening.answering)(wire::Query::CityView).0;
     for _ in 0..250 {
         if folded.value() >= u64::try_from(written).expect("a count") {

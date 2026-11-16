@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Choosing which model one tag points at, and the ceiling that call
-//! is made with.
-//!
-//! Separate from attaching because the two fail for different reasons:
-//! an attach fails when a machine cannot be reached, and a choice fails
-//! when the endpoint this city already reached does not serve what was
-//! asked for. The ladder for the window and the ceiling is
-//! `gateway::Figures::resolve`, called here with the facts this city
-//! holds, so a run cannot be called with a figure invented at the call
-//! site and a query about a model cannot answer with a different one.
-
 use kernel::event::EventKind;
 use kernel::{AxCode, AxError};
 
@@ -21,18 +10,7 @@ use crate::worker::RunWorker;
 use crate::worker::credentials::{Chosen, Stated};
 
 impl RunWorker {
-    /// Points one tag at one model.
-    ///
-    /// **A figure the person left empty is not a figure they erased.**
-    /// The settings page sends the whole row on every pick, so re-picking
-    /// an already registered model with an empty box must not overwrite
-    /// its ceiling with nothing: the next call on the Anthropic wire
-    /// would be refused for a field it could not write (`Sprawling/app/Spec.lean`
-    /// §8-71). An empty box leaves the figure to the ladder in
-    /// `gateway::Figures::resolve`, which this method hands the facts it
-    /// holds: what the person sent, the provider's own row for this id in
-    /// the book, and what this same model was registered with, read back
-    /// by `EndpointBook::registered`.
+
     pub(in crate::worker) fn select_model(
         &mut self,
         chosen: Chosen,
@@ -93,25 +71,19 @@ impl RunWorker {
                 wire: known.dialect,
             },
         );
-        // What a model accepts is what the person said, else the
-        // vendor's fact read off the catalogue or the preset table
-        // (`Sprawling/gateway/Spec.lean` §8-37, gateway D16).
+
         let input = gateway::accepted_input(
             stated_input,
             priced.map(|row| row.input),
             &known.base_url,
             &model,
         );
-        // Prices come from the pinned catalog when it knows the model
-        // and are zero when it does not: an unpriced call is reported as
-        // unpriced rather than as free-looking guesswork.
+
         let price =
             |of: fn(&gateway::ModelEntry) -> kernel::UsdMicros| priced.map(of).unwrap_or_default();
         let entry = gateway::ModelEntry {
             id: model,
-            // The catalogue row carries a plain figure; a window nobody
-            // stated is zero there and `None` on the wire, and this is
-            // the one place the two spellings meet.
+
             context_tokens: figures.window.map_or(0, |window| window.tokens.get()),
             window_from: figures.window.map(|window| window.from),
             max_output_tokens: figures.ceiling.and_then(gateway::OutputCeiling::tokens),
@@ -135,10 +107,6 @@ mod tests {
 
     use crate::worker::RunWorker;
 
-    /// A model the pinned catalogue does not know, whose vendor's page says
-    /// it reads pictures, is registered as reading them, so the endpoint
-    /// shows it the picture ocr hands it instead of refusing
-    /// (`Sprawling/gateway/Spec.lean` §8-37).
     #[test]
     fn a_preset_model_that_reads_pictures_is_registered_as_reading_them() {
         let dir = tempfile::tempdir().unwrap();
@@ -187,10 +155,6 @@ mod tests {
         );
     }
 
-    /// The person's statement is the first rung: a model the pinned
-    /// catalogue lists as reading text, on a server no preset row speaks
-    /// for, is registered as reading pictures when the person says so
-    /// (`Sprawling/gateway/Spec.lean` §8-37, gateway D16).
     #[test]
     fn a_model_the_person_says_reads_pictures_is_registered_as_reading_them() {
         let dir = tempfile::tempdir().unwrap();

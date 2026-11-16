@@ -3,40 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One reading, taken off what this checkout actually holds.
-//!
-//! The register states what a number may be; this module answers what
-//! it is today. The two are apart because they fail apart: a register
-//! row is wrong when the design changed and nobody said so, and a
-//! reading is wrong when the thing it weighs was never built.
-//!
-//! **A metric this module does not know weighs nothing rather than
-//! passing.** `measure` answers `None` for a name it cannot take a
-//! reading for, and the gate stays silent on it, so a row added to the
-//! register before its reader exists is an unmeasured row instead of a
-//! budget that quietly holds.
-
 use std::path::Path;
 
 use crate::package::{ReleaseTarget, binary_path};
 use crate::report::XtaskError;
 
-/// How many packages the resolved lockfile names, workspace members
-/// included.
-///
-/// The one home for that count. `docnum`'s `dependency_count` fact
-/// quotes this reading into the documents that state it, and
-/// `cargo xtask budget` prints it beside the register's
-/// `[dependency_count]` row, so the number a reader meets in
-/// `ARCHITECTURE.md`, the number `docs/third-party.md` states and the
-/// number the report prints are one reading taken once. No count is
-/// refused (Tools/xtask/Spec.lean §8-25).
-///
-/// # Errors
-/// Refuses a lockfile it cannot read, and one that resolves no package
-/// at all, which is what a changed lockfile format looks like, and a
-/// count that quietly fell to zero would rewrite every document that
-/// quotes it.
 pub(crate) fn lockfile_packages(root: &Path) -> Result<u64, XtaskError> {
     let text = crate::walk::read_text(&root.join("Cargo.lock"))?;
     let found = text.lines().filter(|line| *line == "[[package]]").count();
@@ -52,25 +23,18 @@ pub(crate) fn lockfile_packages(root: &Path) -> Result<u64, XtaskError> {
     })
 }
 
-/// Weighs one metric, or says it is not built.
 pub(crate) fn measure(root: &Path, name: &str) -> Result<Option<u64>, XtaskError> {
     match name {
-        // Where the bundle lands is stated by the build script that
-        // embeds it, so the scale and the binary weigh one directory.
+
         "frontend_artifact" => gzipped_total(&crate::bundle::dist(root)?),
         "release_binary" => Ok(binary_bytes(root)),
-        // Read off the lockfile rather than off a build, so this row
-        // answers in a checkout nobody has compiled.
+
         "dependency_count" => lockfile_packages(root).map(Some),
-        // A gated row with no way to weigh it would silently pass; it is
-        // an unmeasured row until this match learns it.
+
         _ => Ok(None),
     }
 }
 
-/// What the browser downloads: every file in the bundle, compressed.
-/// Recursive, because the bundle nests (`snippets/<crate>/...`), and a
-/// weight that skipped subdirectories would flatter the artifact.
 fn gzipped_total(dist: &Path) -> Result<Option<u64>, XtaskError> {
     let Ok(entries) = std::fs::read_dir(dist) else {
         return Ok(None);
@@ -96,8 +60,6 @@ fn gzipped_total(dist: &Path) -> Result<Option<u64>, XtaskError> {
     Ok(found.then_some(total))
 }
 
-/// The compressed length, computed rather than shelled out for, so the
-/// number does not depend on which gzip is on the path.
 fn gzipped_len(bytes: &[u8]) -> u64 {
     let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::best());
     use std::io::Write as _;
@@ -125,8 +87,6 @@ fn binary_bytes(root: &Path) -> Option<u64> {
 mod tests {
     use super::*;
 
-    /// The lockfile is counted once, and both the document fact and
-    /// the report read that one count.
     #[test]
     fn the_lockfile_is_counted_once_for_the_document_and_the_report() {
         let root = crate::root::this_checkout();
@@ -139,8 +99,7 @@ mod tests {
     fn a_metric_this_gate_cannot_weigh_reports_nothing_rather_than_passing() {
         let root = std::env::temp_dir();
         assert_eq!(measure(&root, "ledger_append").unwrap(), None);
-        // A weighable row answers from this checkout, and answers
-        // `None` rather than failing when nothing has been built.
+
         let here = crate::root::this_checkout();
         measure(here, "frontend_artifact").unwrap();
     }

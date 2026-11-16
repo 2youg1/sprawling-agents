@@ -6,9 +6,6 @@
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// A room under review works in one tree across its runs: the second
-/// run takes back the tree the first one left instead of checking the
-/// whole city out into a new one.
 #[test]
 fn two_runs_in_one_room_under_review_work_in_one_tree() {
     let dir = tempfile::tempdir().unwrap();
@@ -43,9 +40,6 @@ fn two_runs_in_one_room_under_review_work_in_one_tree() {
     );
 }
 
-/// A process that died mid-run left its tree locked, and the city has
-/// one writer: the next writer lifts that lock instead of refusing the
-/// room its tree for good.
 #[test]
 fn a_tree_left_locked_by_a_dead_writer_is_lent_again() {
     let dir = tempfile::tempdir().unwrap();
@@ -79,7 +73,7 @@ fn a_tree_left_locked_by_a_dead_writer_is_lent_again() {
     dispatch(&mut worker, b"first").unwrap();
     drop(worker);
     let name = storage::WorktreeName::parse(&trees_opened(&report.ledger_dir)[0]).unwrap();
-    // The lease a run that never came home still holds.
+
     drop(
         storage::Worktrees::open(dir.path())
             .unwrap()
@@ -92,11 +86,6 @@ fn a_tree_left_locked_by_a_dead_writer_is_lent_again() {
     assert_eq!(trees_opened(&report.ledger_dir).len(), 2);
 }
 
-/// A room under review whose rules were booked by an earlier run writes
-/// one line under the command's key before take-off, `worktree_opened`,
-/// and a restart recognises the command again from that line alone: the
-/// placement of the tree keeps stamping it wherever it runs
-/// (`Sprawling/app/Spec.lean` §8-113).
 #[test]
 fn a_review_dispatch_sent_again_after_a_restart_is_answered_once() {
     let dir = tempfile::tempdir().unwrap();
@@ -118,7 +107,7 @@ fn a_review_dispatch_sent_again_after_a_restart_is_answered_once() {
             completion("third", None),
         ],
     );
-    // Through the desk's door, which is the one that honours the key.
+
     let dispatch = |worker: &mut RunWorker, idem: &[u8]| {
         worker.serve_one(Posted {
             command: wire::Command::Dispatch {
@@ -149,7 +138,6 @@ fn a_review_dispatch_sent_again_after_a_restart_is_answered_once() {
     );
 }
 
-/// The name of every tree a `worktree_opened` line records, in order.
 fn trees_opened(ledger_dir: &std::path::Path) -> Vec<String> {
     runtime::replay::verify_ledger_dir(ledger_dir)
         .unwrap()
@@ -161,11 +149,6 @@ fn trees_opened(ledger_dir: &std::path::Path) -> Vec<String> {
         .collect()
 }
 
-/// A room under review whose tree cannot be placed yet does not hold
-/// the desk: the first placement commits the city's index, and while
-/// somebody else holds `.git/index.lock` that commit waits and then
-/// fails in the lane that drives the run, not on the accounting thread
-/// that took the command (`Sprawling/app/Spec.lean` §8-113).
 #[test]
 fn a_tree_that_waits_on_the_index_lock_is_placed_in_the_lane() {
     let dir = tempfile::tempdir().unwrap();
@@ -205,17 +188,12 @@ fn a_tree_that_waits_on_the_index_lock_is_placed_in_the_lane() {
     );
 }
 
-/// A lane that placed the room's tree and then failed gives the tree
-/// back on its way home: the next dispatch to the room claims it again
-/// instead of finding it held by a run that is over (`Sprawling/app/Spec.lean`
-/// §8-113).
 #[test]
 fn a_lane_that_fails_after_placing_the_tree_gives_it_back() {
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
-    // The tree is claimed over the building's own subtree; the write
-    // domain, resolved later when the bench is laid out, refuses.
+
     lay_rules(
         dir.path(),
         "lab",

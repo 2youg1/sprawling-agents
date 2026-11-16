@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Taking on work: the run id a dispatch derives, the ACP request
-//! turned into that dispatch, and `agree_to_work`, which decides whether
-//! the city may take it before anything is written.
-
 use kernel::event::Scope;
 use kernel::event::record::{GoverningDocument, RulesChanged};
 use kernel::{Address, AxCode, AxError, EventKind, Payload};
@@ -18,14 +14,6 @@ use crate::worker::CommandDesk;
 use super::super::RunWorker;
 use super::{Agreed, Assignment, HarnessSeat, Seat};
 
-/// A run's identity, derived rather than drawn: the same job dispatched
-/// at the same millisecond to the same address is the same run, and no
-/// randomness enters the ledger's identifiers.
-/// The identifier is the digest's first sixteen bytes, taken from the
-/// hash itself rather than from its printed form: the round trip
-/// through hexadecimal had two failure points that both answered zero,
-/// so a digest this build could not print became run `00000…`
-/// (`Sprawling/app/Spec.lean` §8-73).
 pub(in crate::worker) fn run_id_for(job: &Locator, addr: &Address, now: TimeMs) -> RunId {
     let seed = format!("{job}|{}|{}", addr.as_str(), now.value());
     let digest = kernel::B3Hash::digest(seed.as_bytes());
@@ -36,25 +24,13 @@ pub(in crate::worker) fn run_id_for(job: &Locator, addr: &Address, now: TimeMs) 
     RunId::from_bytes(bytes)
 }
 
-/// An outside editor's request, turned into the city's usual dispatch.
-///
-/// Not a second control surface: the admission decides what a stranger
-/// may learn, and everything after it is the path a person's dispatch
-/// takes. The run identifier is minted when the worker takes the work,
-/// so what an editor is told now is the honest thing - accepted, and
-/// nothing finished yet.
 pub fn acp_dispatch(
     desk: &CommandDesk,
     body: &serde_json::Value,
     pairing: wire::Pairing,
 ) -> Result<wire::AcpProgress, AxError> {
     if matches!(pairing, wire::Pairing::Absent) {
-        // The refusal says nothing about whether the address exists, the
-        // building is real, or the token was close: an unpaired caller
-        // learns one bit. `Sprawling/agent_protocols/Spec.lean` section 9 gives this
-        // judgement to the inbound middleware in `wire`; until that
-        // middleware refuses on the route, the door the request already
-        // reached is the one place that can.
+
         return Err(AxError::failure(
             AxCode::GateDenied,
             "admit an external request",
@@ -62,9 +38,7 @@ pub fn acp_dispatch(
         )
         .with_recovery("pair the client from the settings page, then send the token it shows"));
     }
-    // The body travels as the JSON it arrived as: `Incoming::parse` is
-    // the only constructor the inbound grammar has, and a struct read
-    // here first would be a second reading of the same four keys.
+
     let agent_protocols::Admitted::Dispatch { addr, task, goal } =
         agent_protocols::admit(agent_protocols::Incoming::parse(body)?)?;
     let idem = kernel::IdemKey::derive(
@@ -72,9 +46,7 @@ pub fn acp_dispatch(
         kernel::Seq::FIRST,
         format!("acp:{}:{task}", addr.as_str()).as_bytes(),
     );
-    // An editor gets its answer from this function and then stops
-    // listening, so there is no peer left for a later refusal to reach.
-    // Saying that in the type beats a silent third meaning of `Reply`.
+
     desk.post(
         wire::Command::Dispatch {
             addr,
@@ -82,10 +54,9 @@ pub fn acp_dispatch(
             goal,
             policy: wire::RunPolicy::of(wire::Mode::Work),
             idem,
-            // An editor drives an address it already chose.
+
             session: None,
-            // ...and says nothing about how hard to think, so the
-            // layers above answer.
+
             effort: None,
             model: None,
         },
@@ -99,27 +70,7 @@ pub fn acp_dispatch(
 }
 
 impl RunWorker {
-    /// Every refusal this dispatch can owe before it costs anything.
-    ///
-    /// **Nothing here writes, and that is the whole of the phase.** A
-    /// halted city that laid a job file down would leave a task in a
-    /// room no run ever opened, and so would a city with no model behind
-    /// the tag; the two are one rule, so they are answered in one place
-    /// and the first thing written happens on the other side of it.
-    ///
-    /// The order of the judgements is the order a caller is entitled to
-    /// them. A halted city answers "halted" rather than "no model is
-    /// chosen", because the halt is the one a person can lift and the
-    /// recovery line is the third part of what an `AxError` promises.
-    ///
-    /// # Errors
-    /// Refuses a halted scope, the reserved subtree, and rules that will
-    /// not load; for a room whose resident is an ACP agent, a word that
-    /// names neither an `[[agent]]` row nor a built-in entry, a row changed
-    /// after its consent, a confidential building and a dispatch that
-    /// names a model; otherwise a tag with no model behind it, an
-    /// endpoint that is no longer attached, and a confidential building
-    /// whose model would leave this machine.
+
     pub(super) fn agree_to_work(&mut self, at: &mut Assignment) -> Result<Seat, AxError> {
         let addr = &at.addr;
         if let Some(scope) = self.halted_by(addr) {
@@ -133,9 +84,7 @@ impl RunWorker {
                  unaffected - stopping one is `cancel`"
             )));
         }
-        // What the room's files decide comes before a model is chosen,
-        // and the delegate desk asks the same judgement at the call
-        // (accounting D53).
+
         let (building, rules, judged) = match seat_from_files(&self.city_root, &Asked::of(at))? {
             RoomSeat::Harness(seat) => return Ok(Seat::Harness(seat)),
             RoomSeat::Model {
@@ -150,9 +99,7 @@ impl RunWorker {
         let provider = chosen.endpoint.name.clone();
         let adapter = self.models.build(&chosen, self.redemption()?)?;
         let retries = chosen.endpoint.tuning.request_max_retries;
-        // Every request the run sends goes through the keep-warm door,
-        // so a landed run can have its prefix renewed (`Sprawling/app/Spec.lean`
-        // §8-112); under the default setting the door only forwards.
+
         let clock = std::sync::Arc::clone(&self.clock);
         let adapter = crate::worker::keeping_warm::Door::new(
             adapter,
@@ -171,22 +118,6 @@ impl RunWorker {
         }))
     }
 
-    /// Books what a run is about to stand under: the city's
-    /// `CONFIG.toml` and, when the building exists, its own
-    /// `CONFIG.toml` and `RULES.toml`.
-    ///
-    /// Each document is compared with what the governance fold last
-    /// booked, and one that moved gets a `rules_changed` line before the
-    /// run starts, so one line's `after` is the next line's `before` for
-    /// as long as nothing wrote the file in between. An absent file is
-    /// booked as zero bytes, the same reading `city::load` gives it. A
-    /// building that does not exist opens no account: a mistyped name
-    /// would otherwise leave the history holding a building the city
-    /// never had (`Sprawling/app/Spec.lean` §8-40).
-    ///
-    /// # Errors
-    /// `E_STORAGE_FATAL` for a document or a building root that cannot
-    /// be read; propagates a history that will not take the line.
     pub(super) fn book_rules(&mut self, building: &city::Building) -> Result<(), AxError> {
         let mut documents = vec![(
             Scope::City,
@@ -213,16 +144,6 @@ impl RunWorker {
         Ok(())
     }
 
-    /// Books one governing document: compared with what the governance
-    /// fold last booked for it, and a `rules_changed` line when it moved.
-    ///
-    /// The one place such a line is written, so a dispatch that finds a
-    /// document moved and a page that has just written it book the change
-    /// in one shape, and the chain of `before` and `after` stays unbroken.
-    ///
-    /// # Errors
-    /// `E_STORAGE_FATAL` for a document that cannot be read; propagates a
-    /// history that will not take the line.
     pub(in crate::worker) fn book_document(
         &mut self,
         scope: Scope,
@@ -249,19 +170,6 @@ impl RunWorker {
         self.record(EventKind::RulesChanged, Payload::of(&changed)?)
     }
 
-    /// The tag whose registration a dispatch runs on, so the endpoint,
-    /// the window and the policy check come with the model.
-    ///
-    /// A model the dispatch names runs under the tag that registered
-    /// it. A dispatch that names none - a successor, a wake knock, a
-    /// follow-up without `-m` - continues on the model its room froze
-    /// while a tag still registers it, and otherwise runs on `main`:
-    /// the session's shape check then refuses the moved model with the
-    /// way out a person can take (`Sprawling/app/Spec.lean` §8-79), which a
-    /// refusal here could not name.
-    ///
-    /// # Errors
-    /// Refuses a named id no tag registered, before anything is written.
     pub(super) fn tag_for(
         &self,
         named: Option<&str>,
@@ -282,7 +190,6 @@ impl RunWorker {
         })
     }
 
-    /// The tag the model `id` is registered under, if any is.
     fn tag_registering(&self, id: &str) -> Option<kernel::ModelTag> {
         self.credentials
             .book
@@ -291,8 +198,6 @@ impl RunWorker {
     }
 }
 
-/// What admission reads from a dispatch: where the work goes, the
-/// session it opens there, and the model it names.
 struct Asked<'a> {
     addr: &'a Address,
     session: Option<&'a kernel::SessionName>,
@@ -308,8 +213,6 @@ impl<'a> Asked<'a> {
         }
     }
 
-    /// Work handed down to `room`, which names no session and no model:
-    /// the assignment `hand_over_at_call` dispatches it under.
     fn handed_down(room: &'a Address) -> Asked<'a> {
         Asked {
             addr: room,
@@ -319,39 +222,21 @@ impl<'a> Asked<'a> {
     }
 }
 
-/// Who stands in a room by its files: an ACP agent seated by the room's
-/// configuration, or a model still to be chosen under the building's
-/// rules.
 enum RoomSeat {
     Harness(HarnessSeat),
     Model {
         building: city::Building,
         rules: city::BuildingRules,
-        /// The address the room's own settings are read at: the building
-        /// for a dispatch that opens a room, the room itself otherwise.
+
         judged: Address,
     },
 }
 
-/// The half of admission the city's files decide, which needs nothing
-/// the accounting thread holds: the building that governs the address,
-/// its rules, and the resident the room's configuration seats
-/// (accounting D53).
-///
-/// # Errors
-/// Refuses the reserved subtree and rules that will not load; for a room
-/// whose resident is an ACP agent, a word that names neither an
-/// `[[agent]]` row nor a built-in entry, a row changed after its consent,
-/// a confidential building and a dispatch that names a model.
 fn seat_from_files(city_root: &Path, asked: &Asked<'_>) -> Result<RoomSeat, AxError> {
-    // The building's own rules decide which models this run may reach,
-    // so they are read before one is chosen.
+
     let building = city::Building::of(asked.addr)?;
     let rules = city::load(city_root, building.addr())?;
-    // A room a harness runs needs no model. A dispatch that opens a room
-    // is judged at its building, because the new room's own layer is
-    // empty and the address's own session record belongs to another
-    // room.
+
     let judged = if super::session::opens_a_room(asked.addr, asked.session) {
         building.addr().clone()
     } else {
@@ -378,27 +263,17 @@ fn seat_from_files(city_root: &Path, asked: &Asked<'_>) -> Result<RoomSeat, AxEr
     }))
 }
 
-/// What a run's delegate desk asks before it holds a request: whether
-/// the room's files would admit work handed down there, judged by the
-/// same [`seat_from_files`] a dispatch passes through (collab D18,
-/// accounting D53).
 pub(in crate::worker) fn start_check(city_root: PathBuf) -> collab::StartCheck {
     collab::StartCheck::new(move |room: &Address| {
         seat_from_files(&city_root, &Asked::handed_down(room)).map(|_seated| ())
     })
 }
 
-/// The word a room's configuration names its resident by, and the layer
-/// file that wrote it, which is where a person changes it.
 struct Named<'a> {
     word: &'a str,
     file: &'a std::path::Path,
 }
 
-/// The agent a room's configuration names, or the refusal a dispatch to
-/// it is owed before anything is written: a word that names no agent, a
-/// row changed after its consent, a confidential building, and a dispatch
-/// that named a model (`Sprawling/app/Spec.lean` §8-124).
 fn seated_harness(
     asked: &Asked<'_>,
     named: Named<'_>,
@@ -452,7 +327,6 @@ fn seated_harness(
     Ok(harness)
 }
 
-/// A document a run would stand under that this process cannot read.
 fn unreadable(path: &std::path::Path, err: &std::io::Error) -> AxError {
     AxError::failure(
         AxCode::StorageFatal,

@@ -3,39 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The work still running while a run goes on, and the one place it is
-//! stopped.
-//!
-//! `runtime::turn` consumes an interruption at a phase boundary. A child
-//! process waited on inside a system call is not at a phase boundary, so
-//! a command blocked there cannot be stopped. Every command therefore
-//! enters this table before it is waited on: the wait
-//! is a bounded number of short polls against a member somebody else can
-//! reach, rather than one blocking call nobody can interrupt.
-//!
-//! Two facts about the wait are deliberate. It is counted rather than
-//! timed, because the clock is sampled at one point in this city and a
-//! module that sampled it to wait ten seconds would be the second one.
-//! And a child's output goes to files rather than to pipes, because a
-//! pipe buffer that fills stops the child inside a write — which is the
-//! same hang this module exists to remove, wearing another name.
-//!
-//! How many polls that wait is, and how an ending is read, both belong
-//! to [`waiting`]: the window is carried by the table rather than read
-//! from a constant here, so a caller can choose one short enough to
-//! observe both answers.
-//!
-//! The table has two kinds of member: a background command, which a
-//! halt kills, and a run a resident handed down, which a halt marks and
-//! which stops itself at its next safe point by asking [`Backlog::stopping`]
-//! (`Sprawling/runtime/spec/Backlog.lean` §8-28-2). One table, one `halt`, so a stopped scope has
-//! nothing left going in it under either name.
-
 use std::collections::BTreeMap;
 
 use kernel::{Address, AxCode, AxError, RunId};
 
-/// One member of the table, for as long as this process lives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BacklogId(u64);
 
@@ -45,10 +16,6 @@ impl std::fmt::Display for BacklogId {
     }
 }
 
-/// The table itself. Cloning gives another handle onto the same table,
-/// which is how the assembly point can stop what a tool started without
-/// either of them knowing about the other. A clone carries `scratch`
-/// too, so it keeps naming that backlog's directories.
 #[derive(Clone)]
 pub struct Backlog {
     table: std::sync::Arc<std::sync::Mutex<Table>>,
@@ -74,39 +41,27 @@ struct Table {
 }
 
 impl Backlog {
-    /// The same table, asking these shares for every run whose command
-    /// it starts (`Sprawling/runtime/spec/Tools/Exec.lean` D29).
+
     #[must_use]
     pub fn with_shares(self, shares: Shares) -> Backlog {
         Backlog { shares, ..self }
     }
 
-    /// The shares this table asks for each run.
     #[must_use]
     pub fn shares(&self) -> Shares {
         self.shares
     }
 
-    /// The same table, reserving from this machine budget. A table made
-    /// without one is unmetered: every reservation fits.
     #[must_use]
     pub fn with_budget(self, budget: crate::reserve::MachineBudget) -> Backlog {
         Backlog { budget, ..self }
     }
 
-    /// The machine budget a run's heavy work reserves its ceiling from
-    /// (`Sprawling/runtime/spec/Reserve.lean` D104).
     #[must_use]
     pub fn budget(&self) -> &crate::reserve::MachineBudget {
         &self.budget
     }
 
-    /// Enters a run a resident handed down, so a halt on its scope can
-    /// reach it. The assembly layer calls this before the drive and
-    /// [`Backlog::leave`] after it.
-    ///
-    /// # Errors
-    /// `E_STORAGE_FATAL` when the table cannot be reached.
     pub fn enrol_run(&self, scope: &Address, what: String) -> Result<BacklogId, AxError> {
         let id = self.mint()?;
         self.enrol(
@@ -120,12 +75,6 @@ impl Backlog {
         Ok(id)
     }
 
-    /// Whether a halt has reached this member. A run asks at each safe
-    /// point and answers `true` with `Interrupt::Cancel`; a member that
-    /// has already left the table is not stopping, it is gone.
-    ///
-    /// # Errors
-    /// `E_STORAGE_FATAL` when the table cannot be reached.
     pub fn stopping(&self, id: BacklogId) -> Result<bool, AxError> {
         let table = self.hold()?;
         Ok(table
@@ -134,28 +83,12 @@ impl Backlog {
             .is_some_and(|member| matches!(member.body, Body::Run(RunState::Stopping))))
     }
 
-    /// Takes a run member out once it has frozen. A run that stayed
-    /// would be reported standing after its own `run_frozen` line.
-    ///
-    /// # Errors
-    /// `E_STORAGE_FATAL` when the table cannot be reached.
     pub fn leave(&self, id: BacklogId) -> Result<(), AxError> {
         let mut table = self.hold()?;
         table.members.remove(&id);
         Ok(())
     }
 
-    /// Stops every member inside a scope, or every member in the city
-    /// when no scope is named. Returns how many were reached.
-    ///
-    /// A member is stopped where it stands, and the run that
-    /// started it comes back to its next boundary rather than staying
-    /// inside a system call. A run member is marked rather than killed:
-    /// it comes back to its own next safe point and cancels there.
-    ///
-    /// # Errors
-    /// `E_STORAGE_FATAL` when the table cannot be reached, which means
-    /// a thread died holding it.
     pub fn halt(&self, scope: Option<&Address>) -> Result<usize, AxError> {
         let mut table = self.hold()?;
         let mut reached = 0usize;
@@ -188,18 +121,6 @@ impl Backlog {
         }
     }
 
-    /// Takes every background member of `owner` that has stopped, in
-    /// table order, and lets go of every stopped member whose run has
-    /// ended.
-    ///
-    /// A member is reported once and then forgotten: this is what a
-    /// caller appends to the tail of its next tool result, and a result
-    /// delivered twice would read as the command having run twice. A
-    /// member another run started is never reported here, because that
-    /// tail goes into this run's model and onto its lines of the ledger.
-    ///
-    /// # Errors
-    /// `E_STORAGE_FATAL` when the table cannot be reached.
     pub fn harvest(&self, owner: RunId) -> Result<Vec<Finished>, AxError> {
         let mut table = self.hold()?;
         let mut done = Vec::new();
@@ -240,8 +161,7 @@ impl Backlog {
                     ceiling: jobs.ceiling(owner, *ceiling),
                 });
             } else {
-                // Output owed to nobody is not read at all. A directory
-                // that will not go costs disk, never the harvest.
+
                 drop(std::fs::remove_dir_all(dir));
             }
         }
@@ -255,17 +175,6 @@ impl Backlog {
         Ok(done)
     }
 
-    /// Terminates every background command `owner` started, marks each
-    /// as owed to nobody, and returns how many there were. The run has
-    /// ended, so no later tool result of its own can carry them; the
-    /// next harvest by any run lets their process handles and files go
-    /// without reading their output to anyone.
-    ///
-    /// Infallible by construction: lowering a claim and killing a
-    /// process hold on any state of the table, so a table a dead thread
-    /// left locked is still reached, while every other call keeps
-    /// answering `E_STORAGE_FATAL`. The caller is a drop, which has
-    /// nobody to hand a failure to.
     pub fn release(&self, owner: RunId) -> usize {
         let mut table = self
             .table
@@ -278,11 +187,7 @@ impl Backlog {
                 && matches!(*claim, Claim::Window(run) | Claim::Run(run) if run == owner)
             {
                 *claim = Claim::Nobody;
-                // `Child::kill` answers `Ok` for a child that already
-                // exited, so an error here is a kill the system refused.
-                // The member is still owed to nobody and the next harvest
-                // reaps it once it stops; the caller is a drop with
-                // nobody to hand the refusal to.
+
                 if let Err(err) = child.stop() {
                     eprintln!("backlog cleanup retained for retry: {err}");
                 }
@@ -292,10 +197,6 @@ impl Backlog {
         released
     }
 
-    /// What is still running at or under one address.
-    ///
-    /// # Errors
-    /// `E_STORAGE_FATAL` when the table cannot be reached.
     pub fn standing(&self, scope: &Address) -> Result<Vec<Standing>, AxError> {
         let table = self.hold()?;
         Ok(table

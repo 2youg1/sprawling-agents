@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The privacy controls: what each one writes, where, and what the
-//! sources say about it (`Sprawling/app/spec/Privacy/Controls.lean`).
-//!
-//! This table is the one authority for a control's target, written value,
-//! category, edition lists and build effect; the wire carries only the
-//! control's name, and the page's words live in the client's `lang.json`.
-//! The rows sit in one file per category; [`definition`] is the one
-//! exhaustive map from a name to its row, so a control without a row does
-//! not compile.
-
 mod activity_sync;
 mod app_permissions;
 mod cloud_services;
@@ -29,7 +19,6 @@ use wire::{
 
 use super::target::{OperationKind, RawValue, Snapshot, Target, TaskState};
 
-/// One privacy control as the research settled it.
 #[derive(Debug)]
 pub(crate) struct Control {
     pub(crate) target: Target,
@@ -39,28 +28,22 @@ pub(crate) struct Control {
     pub(crate) build_effect: PrivacyBuildEffect,
 }
 
-/// The value a control writes. A registry or environment target takes a
-/// fixed value; a task is disabled with its definition left as it is, so
-/// what the write leaves depends on the task the host has.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Written {
-    /// A `REG_DWORD`.
+
     Dword(u32),
-    /// A `REG_SZ`, written with its terminating NUL.
+
     Text(&'static str),
-    /// The task disabled, its definition unchanged.
+
     Disabled,
 }
 
-/// Where Microsoft's documentation says a control is honoured and where it
-/// is ignored; an edition in neither list is not stated.
 #[derive(Debug)]
 pub(crate) struct Editions {
     pub(crate) honoured: &'static [PrivacyEdition],
     pub(crate) ignored: &'static [PrivacyEdition],
 }
 
-/// The row of `control`.
 pub(crate) const fn definition(control: PrivacyControl) -> &'static Control {
     match control {
         PrivacyControl::PowershellTelemetryOptout => &diagnostics::POWERSHELL_TELEMETRY_OPTOUT,
@@ -161,10 +144,7 @@ pub(crate) const fn definition(control: PrivacyControl) -> &'static Control {
 }
 
 impl Written {
-    /// What the target reads after this write, given what it reads now;
-    /// `None` when the host has nothing this write can apply to (a task the
-    /// host does not have). Mirrors `Recommendation.target` in
-    /// `Sprawling/app/spec/Privacy.lean`.
+
     pub(crate) fn target(self, current: &Snapshot) -> Option<Snapshot> {
         match self {
             Self::Dword(value) => Some(Snapshot::Registry(RawValue::dword(value))),
@@ -183,8 +163,7 @@ impl Written {
 }
 
 impl Editions {
-    /// How these lists read for a host of `edition`; a host whose edition
-    /// is not one of the named editions reads as not stated (Privacy D67).
+
     pub(crate) fn fit(&self, edition: Option<PrivacyEdition>) -> PrivacyEditionFit {
         match edition {
             Some(edition) if self.honoured.contains(&edition) => PrivacyEditionFit::Honoured,
@@ -194,14 +173,12 @@ impl Editions {
     }
 }
 
-/// What the whole table holds, counted at compile time so that a row added,
-/// dropped or retyped without the specification moving fails the build.
 struct Tally {
     hklm: usize,
     hkcu: usize,
     environment: usize,
     task: usize,
-    /// Every row's written value suits its operation kind.
+
     suited: bool,
 }
 
@@ -251,8 +228,6 @@ const _: () = assert!(TALLY.suited);
 mod tests {
     use super::*;
 
-    /// The page draws sections in `PrivacyCategory::ALL` order and rows in
-    /// `PrivacyControl::ALL` order, so the two orders must agree.
     #[test]
     fn controls_run_in_category_order_with_disjoint_edition_lists() {
         let places: Vec<usize> = PrivacyControl::ALL
@@ -297,9 +272,6 @@ mod tests {
         );
     }
 
-    /// Derived from `Recommendation.target`: a fixed value whatever the
-    /// target reads now; a task keeps its definition, and an absent task
-    /// is not written.
     #[test]
     fn written_values_keep_raw_encoding_and_task_definition() {
         let definition_sha256 = [7; 32];

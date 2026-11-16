@@ -3,21 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Event identity: run, sequence, and time.
-
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AxCode, AxError};
 
-/// Run identity; uuid v7 for humans, nil for the city itself. No
-/// generation here — the assembly layer (or a seeded simulator) mints.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct RunId(#[serde(deserialize_with = "read_run_id")] uuid::Uuid);
 
 impl RunId {
-    /// City-level records (genesis, tail truncation) carry the nil id;
-    /// real runs use uuid v7, whose timestamp bits never collide with nil.
+
     pub const CITY: RunId = RunId(uuid::Uuid::nil());
 
     pub fn from_bytes(bytes: [u8; 16]) -> Self {
@@ -36,9 +31,7 @@ impl RunId {
             Ok(parsed) => parsed,
             Err(_) => return reject(),
         };
-        // Canonical echo, as `kernel::locator` does: the value's own
-        // spelling is the only input accepted, which closes bare hex,
-        // braces, the `urn:uuid:` prefix and upper case in one rule.
+
         if parsed.hyphenated().to_string() != raw {
             return reject();
         }
@@ -50,14 +43,6 @@ impl RunId {
     }
 }
 
-/// Reads a run id through [`RunId::parse`], so an identity that arrives
-/// in a frame or a ledger line cannot be read in a spelling the
-/// constructor refuses. The derived `Deserialize` would otherwise ask
-/// `uuid::Uuid` directly, which takes four spellings to this type's one.
-///
-/// A binary format has no spelling: `uuid::Uuid` writes its sixteen bytes
-/// there, and a snapshot of the views is read back through the same
-/// format it was written in, so only a human-readable format is parsed.
 fn read_run_id<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<uuid::Uuid, D::Error> {
     if !deserializer.is_human_readable() {
         return uuid::Uuid::deserialize(deserializer);
@@ -74,14 +59,13 @@ impl std::fmt::Display for RunId {
     }
 }
 
-/// Event sequence number; contiguous from [`Seq::FIRST`], checked arithmetic.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Seq(u64);
 
 impl Seq {
-    /// The genesis line's number.
+
     pub const FIRST: Seq = Seq(0);
 
     pub fn new(value: u64) -> Self {
@@ -100,8 +84,6 @@ impl Seq {
     }
 }
 
-/// UTC milliseconds as an integer (determinism rule 6). Always a
-/// parameter, never sampled inside kernel or memory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -145,18 +127,15 @@ mod tests {
         assert_eq!(run.to_string(), "0198f6a2-7c4a-7bbb-9d1e-000000000001");
         for refused in [
             "not-a-uuid",
-            "0198f6a27c4a7bbb9d1e000000000001",       // bare hex
-            "{0198f6a2-7c4a-7bbb-9d1e-000000000001}", // braced
-            "urn:uuid:0198f6a2-7c4a-7bbb-9d1e-000000000001", // urn
-            "0198F6A2-7C4A-7BBB-9D1E-000000000001",   // upper case
+            "0198f6a27c4a7bbb9d1e000000000001",
+            "{0198f6a2-7c4a-7bbb-9d1e-000000000001}",
+            "urn:uuid:0198f6a2-7c4a-7bbb-9d1e-000000000001",
+            "0198F6A2-7C4A-7BBB-9D1E-000000000001",
         ] {
             assert!(RunId::parse(refused).is_err(), "{refused}");
         }
     }
 
-    /// What arrives in a frame or a ledger line is read by the same
-    /// constructor the city writes with, so a spelling the city would
-    /// never write cannot arrive and be believed.
     #[test]
     fn serde_reads_a_run_id_through_its_sole_constructor() {
         let written = "\"0198f6a2-7c4a-7bbb-9d1e-000000000001\"";

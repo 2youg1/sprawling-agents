@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The third adapter of `kernel::Ledger`: a write from a driving thread,
-//! carried to the accounting thread and waited for.
-//!
-//! The first two adapters own a medium — `storage::jsonl` owns segments on disk, citysim's
-//! owns a `Vec`. This one owns neither. It owns a crossing: the driving pool holds `Relay`
-//! and nothing else that can write, so "a city has one writer" is held by the types rather
-//! than by discipline (ARCHITECTURE section 10, `Sprawling/app/Spec.lean` §8-42).
-
 use std::collections::VecDeque;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -23,82 +15,49 @@ use super::health::Health;
 use super::pool::Arrival;
 use super::registering::GoalAsk;
 
-/// One batch of appends, and the address its answer goes back to.
-///
-/// The two travel together because a driving thread is blocked on the
-/// second until the first has been written: an append with no way back
-/// is a thread that never wakes. A batch is what a turn held back until
-/// its next outside effect (runtime D24), so it crosses as one request
-/// and is answered once, with one ref per draft in draft order.
 pub(crate) struct RelayRequest {
     drafts: Vec<EventDraft>,
-    /// A rendezvous channel, so there is no third state between "the
-    /// accounting thread wrote it" and "the driving thread knows".
+
     back: mpsc::SyncSender<Result<Vec<EventRef>, AxError>>,
-    /// When the lane queued it, on the gate's monotonic clock: the
-    /// accounting thread reads its queue wait off it
-    /// (`Sprawling/app/spec/Accounting/Worker.lean` §8-98).
+
     queued: Instant,
 }
 
-/// Everything that wakes the accounting thread, on the one queue it
-/// blocks on.
-///
-/// One queue, because a thread blocks on one thing at a time: a queue
-/// per mouth is polled with timeouts that every request waits out
-/// (`Sprawling/app/Spec.lean` §8-42-4, `Sprawling/accounting/spec/Worker/Attend.lean`).
 pub(crate) enum Wake {
-    /// A lane's append, waiting for its answer.
+
     Relay(RelayRequest),
-    /// A lane's claim on a plan node, decided in queue order.
+
     Claim(ClaimAsk),
-    /// A lane's goal registration, decided against the city's register.
+
     Goal(GoalAsk),
-    /// A run home from its lane, boxed because it carries a whole
-    /// drive's outcome.
+
     Home(Box<Arrival>),
-    /// What a provider request handed off this thread came back with,
-    /// boxed because a keep-warm door travels in it.
+
     Answered(Box<Answer>),
-    /// A command was posted; it stays on the desk for a run's safe points.
+
     Command,
-    /// The city is stopping; the desk says so too.
+
     Close,
 }
 
-/// What one look at the queue leaves the accounting thread.
 pub(crate) struct Drained {
-    /// Every line the ledger took, in ledger order: a line a lane wrote
-    /// is history as much as one the accounting thread wrote, so the
-    /// same folds are shown it (`Sprawling/app/Spec.lean` §8-110).
+
     pub written: Vec<EventDraft>,
-    /// Registrations in arrival order, left to the thread that holds the
-    /// goal register: a copy of the register here would be a second
-    /// answer to who holds the ground (`Sprawling/app/Spec.lean` §8-42-8).
+
     pub goals: Vec<GoalAsk>,
-    /// Answers to provider requests handed off, in arrival order, left
-    /// to the thread that records them (`Sprawling/app/Spec.lean` §8-42-9).
+
     pub answers: Vec<Answer>,
 }
 
-/// How long one look at the queue may wait for its first wake.
 pub(crate) enum Patience {
-    /// Not at all: serve what is already queued.
+
     Now,
-    /// At most this long: an idle city's one unasked wake, the schedule.
+
     For(Duration),
-    /// Until something is queued.
+
     Unbounded,
 }
 
-/// The face a driving thread writes history through, and the only
-/// `kernel::Ledger` it is given.
-///
-/// Cloned per driving thread, and once for the remote door, whose five
-/// lines the assembly writes from outside any run (`Sprawling/app/Spec.lean`
-/// §8-139). Nothing here decides anything: seq, prev and the bytes stay
-/// with the adapter on the accounting side, which is what keeps one city
-/// to one writer.
 #[derive(Clone)]
 pub struct Relay {
     asking: mpsc::Sender<Wake>,
@@ -107,18 +66,7 @@ pub struct Relay {
 }
 
 impl Ledger for Relay {
-    /// Sends the draft to the accounting thread and **blocks** until it
-    /// answers.
-    ///
-    /// Blocking is the contract rather than a cost: `kernel::ledger`
-    /// says `Ok(ref)` means the record is durable, so a relay that
-    /// answered on hand-off would let a run's `model_called` reach the
-    /// history before its own `run_started`.
-    ///
-    /// # Errors
-    /// Refuses when the accounting thread is gone, which is the one
-    /// failure this crossing adds: a driving thread must be able to
-    /// freeze its run rather than wait for a writer that ended.
+
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
         self.append_all(vec![draft])?
             .into_iter()
@@ -126,19 +74,12 @@ impl Ledger for Relay {
             .ok_or_else(|| gone("the accounting thread answered one draft with no ref"))
     }
 
-    /// Sends the whole batch as one request and **blocks** until it is
-    /// durable: one round trip, and one disk barrier shared with whatever
-    /// else is queued, however many drafts the batch holds.
-    ///
-    /// # Errors
-    /// As [`Relay::append`]; a refusal answers the whole batch.
     fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError> {
         if drafts.is_empty() {
             return Ok(Vec::new());
         }
         let (back, answer) = mpsc::sync_channel(0);
-        // Read before the count rises, so a reader that sees the request
-        // queued sees a wait that has already started.
+
         let queued = (self.monotonic)();
         self.health.asked();
         self.asking
@@ -157,20 +98,13 @@ impl Ledger for Relay {
     }
 }
 
-/// The face the accounting thread serves the one queue through.
-///
-/// It holds a sender of its own so the channel stays connected while a
-/// city is served: a gate that had handed out every sender would report
-/// "nobody is writing" as "the writer is gone".
 pub(crate) struct RelayGate {
     wakes: mpsc::Receiver<Wake>,
     issuing: mpsc::Sender<Wake>,
     pub booked: ClaimBook,
-    /// How many appends wait and how many are not yet durable
-    /// (`Sprawling/app/Spec.lean` §8-98).
+
     health: Health,
-    /// The worker's monotonic clock (`Hands.monotonic`), which every
-    /// wait this gate records is read off.
+
     monotonic: fn() -> Instant,
 }
 
@@ -186,12 +120,10 @@ impl RelayGate {
         }
     }
 
-    /// A handle onto this gate's counts, for the sampler's thread.
     pub fn health(&self) -> Health {
         self.health.clone()
     }
 
-    /// One handle for one driving thread.
     pub(crate) fn issue(&self) -> Relay {
         Relay {
             asking: self.issuing.clone(),
@@ -200,29 +132,17 @@ impl RelayGate {
         }
     }
 
-    /// A sender for the lanes coming home and for the desk.
     pub(crate) fn bell(&self) -> mpsc::Sender<Wake> {
         self.issuing.clone()
     }
 
-    /// Waits as `patience` allows for the first wake, then takes every
-    /// wake already queued: relay requests are written before anything
-    /// lands (`Sprawling/app/Spec.lean` §8-42-2), claims are answered in queue
-    /// order, runs home go on `homes`, goal registrations and provider
-    /// answers into the returned [`Drained`] in arrival order, and a
-    /// command or a close only ends the wait.
-    ///
-    /// **Everything queued rides one disk barrier**, which costs the
-    /// same for fifty records as for one. Each answer still goes back
-    /// only after the write is durable, because that is what makes an
-    /// `EventRef` a reference to a history that exists.
     pub fn serve(
         &mut self,
         patience: Patience,
         ledger: &mut impl Ledger,
         homes: &mut VecDeque<Arrival>,
     ) -> Drained {
-        // The gate's own sender keeps the queue connected: empty is "not yet".
+
         let asleep = (self.monotonic)();
         let first = match patience {
             Patience::Now => self.wakes.try_recv().ok(),
@@ -270,9 +190,7 @@ impl RelayGate {
         self.health.taken(batch);
         match ledger.append_all(drafts) {
             Ok(echoes) => {
-                // Positional, the port's own promise: each request takes the
-                // next `size` echoes, so a short answer leaves a caller told
-                // it was refused, never one told a lie.
+
                 let mut echoes = echoes.into_iter();
                 for (back, size) in senders.into_iter().zip(sizes) {
                     let theirs: Vec<EventRef> = echoes.by_ref().take(size).collect();
@@ -283,8 +201,7 @@ impl RelayGate {
                             "the ledger answered a batch with fewer refs than drafts",
                         ))
                     };
-                    // A driving thread that stopped listening does not undo the line: the
-                    // history is what the city believes, and it was written before this send.
+
                     drop(back.send(answer));
                 }
                 written.extend(kept);
@@ -304,8 +221,6 @@ impl RelayGate {
     }
 }
 
-/// The one refusal this crossing owns, in the three parts every refusal
-/// here is made of.
 fn gone(why: &str) -> AxError {
     AxError::failure(AxCode::StorageFatal, "append through the relay", why)
         .with_recovery("the city is closing; resume it and the run replays from its last line")
@@ -326,11 +241,6 @@ mod tests {
     use kernel::ledger::conformance::{LedgerInspect, assert_ledger_conformance};
     use kernel::{AxError, EventDraft, EventRef, Ledger};
 
-    /// The relay, with the accounting thread it writes through.
-    ///
-    /// `LedgerInspect` is the suite's verification-only read-back, and `kernel::ledger` says
-    /// production never reads through a Ledger handle — so the read-back is answered here, off
-    /// the segments the accounting thread wrote, rather than by opening a hole in the relay.
     struct Relayed {
         relay: Relay,
         dir: tempfile::TempDir,
@@ -386,27 +296,16 @@ mod tests {
 
     impl LedgerInspect for Relayed {
         fn raw_lines(&self) -> Result<Vec<Vec<u8>>, AxError> {
-            // Read off the segments rather than through a second handle:
-            // the accounting thread still holds the one that is
-            // appending, and a city has one writer.
+
             storage::read_raw_lines_at(self.dir.path()).map_err(storage::StorageError::into_ax)
         }
     }
 
-    /// **The property the card exists for.** The suite is the contract of
-    /// the port, and it runs here one word unchanged: an adapter that
-    /// hands the seq, the prev and the bytes to another thread is still
-    /// held to the same six assertions as the one that writes them
-    /// itself.
     #[test]
     fn the_relay_passes_the_ledger_conformance_suite() {
         assert_ledger_conformance(Relayed::open);
     }
 
-    /// A relay whose accounting thread is gone refuses rather than
-    /// blocking for ever. A driving thread waiting on a writer that
-    /// ended is the one failure this crossing adds, so it has to be an
-    /// error a run can be frozen with.
     #[test]
     fn a_relay_whose_accounting_thread_is_gone_refuses() {
         let mut orphan = {
@@ -425,9 +324,6 @@ mod tests {
         assert!(refused.is_err(), "a writer that is gone is not a success");
     }
 
-    /// A lane's append counts as queued until the accounting thread takes
-    /// it, then as not yet durable until its batch is written, then as
-    /// neither (`Sprawling/app/Spec.lean` §8-98).
     #[test]
     fn the_accounting_queue_counts_what_waits_and_what_is_not_yet_durable() {
         use crate::worker::health::Health;
@@ -501,12 +397,6 @@ mod tests {
         );
     }
 
-    /// A relay request's queue wait is read off the gate's clock at both
-    /// ends (`Sprawling/app/spec/Accounting/Worker.lean` §8-98). The
-    /// clock steps one microsecond per reading: the lane reads it once
-    /// as it queues, the gate once before and once after its sleep and
-    /// once as it takes the request, so the wait is three steps on every
-    /// platform, whatever the machine's own clock does.
     #[test]
     fn a_relay_request_waits_on_the_gates_clock() {
         #[allow(
@@ -553,11 +443,6 @@ mod tests {
         assert_eq!(health.relay_queue_us(), vec![3]);
     }
 
-    /// **The measurement this batching exists for, expressed as a
-    /// count.** A drain that holds four drafts must reach the store
-    /// once: a disk barrier costs the same for four records as for one,
-    /// and a barrier per record would pay four. The counting store
-    /// is the second adapter the port already allows for.
     #[test]
     fn everything_already_waiting_reaches_the_store_in_one_wave() {
         struct Counting {
@@ -592,13 +477,6 @@ mod tests {
             }
         }
 
-        // **"Already waiting" is arranged, not waited for.** Four driving threads racing to
-        // queue before a wave begins makes the scheduler decide what is being measured: on a
-        // busy machine the server answers the first before the fourth has sent, four waves of
-        // one is then correct behaviour, and a test that retried the arrangement until it saw
-        // batching failed on CI for being unlucky rather than for being wrong. The requests are
-        // therefore put on the channel directly, which is the state the property is about -
-        // `serve` drains what it finds, and what it finds here is four.
         let mut gate = RelayGate::open(crate::worker::fixture::monotonic);
         let mut answers = Vec::new();
         for stamp in 1..=4 {
@@ -644,9 +522,6 @@ mod tests {
         }
     }
 
-    /// **A turn's held-back records cross in one round trip** (runtime
-    /// D24). Three drafts sent through `append_all` reach the store as one
-    /// wave and come back as one answer, one ref per draft in draft order.
     #[test]
     fn tf1_relay_answers_a_batch_in_one_round_trip() {
         struct Waves(Vec<usize>);

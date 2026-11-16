@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Privacy owner verification and binding (`Sprawling/gateway/spec/Credential.lean`
-//! D31, D34).
-
 use super::vault::{KeyringVault, Vault};
 use kernel::{AxCode, AxError, SecretRef};
 use zeroize::Zeroizing;
@@ -13,18 +10,10 @@ use zeroize::Zeroizing;
 const VERIFY: &str = "verify privacy owner";
 const BIND: &str = "bind privacy owner";
 
-/// Compares a sampled OS identity with a platform Vault binding without exposing it.
-///
-/// # Errors
-/// Missing, mismatched or inaccessible bindings refuse disclosure. No probe or write occurs.
 pub fn verify_platform_identity(reference: &SecretRef, observed: &str) -> Result<(), AxError> {
     verify_identity_binding(reference, observed, |reference| KeyringVault.get(reference))
 }
 
-/// Verifies an identity through a read-only binding source without returning its value.
-///
-/// # Errors
-/// Missing, mismatched or inaccessible bindings refuse disclosure; source diagnostics are removed.
 pub fn verify_identity_binding(
     reference: &SecretRef,
     observed: &str,
@@ -39,17 +28,10 @@ pub fn verify_identity_binding(
     Ok(())
 }
 
-/// Binds a sampled OS identity to a fresh reference in the platform Vault,
-/// so [`verify_platform_identity`] accepts it from now on.
-///
-/// # Errors
-/// An empty identity, a reference that already holds any value, and a
-/// refused read or write; nothing existing is overwritten or deleted.
 pub fn bind_platform_identity(reference: &SecretRef, observed: &str) -> Result<(), AxError> {
     bind_identity(reference, observed, &mut KeyringVault)
 }
 
-/// The one implementation of a privacy owner binding, over the Vault seam.
 pub(crate) fn bind_identity(
     reference: &SecretRef,
     observed: &str,
@@ -67,15 +49,12 @@ pub(crate) fn bind_identity(
         .map_err(unavailable)
 }
 
-/// Why an owner was not verified; each reason carries the one recovery
-/// that answers it, and none carries what the binding source said.
 enum Refusal {
-    /// The source refused the read; its code is kept, its words are not,
-    /// because they may repeat the private input.
+
     Unavailable(AxCode),
     Missing,
     Foreign,
-    /// A fresh binding was asked for under a reference that holds a value.
+
     Occupied,
 }
 
@@ -148,8 +127,6 @@ mod tests {
         }
     }
 
-    /// A binding is written only under an unused reference, and once
-    /// written it is the binding verification reads.
     #[test]
     fn a_binding_takes_a_fresh_reference_and_verifies_afterwards() {
         let reference = SecretRef::new("privacy", "owner-fixture").unwrap();

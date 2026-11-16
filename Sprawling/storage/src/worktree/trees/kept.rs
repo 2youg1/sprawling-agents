@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A tree kept for its node between runs: whether somebody holds it,
-//! and how it is taken back into use.
-
 use super::super::lease::{FileWork, WorktreeLease};
 use super::super::name::WorktreeName;
 use super::super::weight::measure;
@@ -13,10 +10,8 @@ use super::Worktrees;
 use super::open_tree;
 use crate::error::StorageError;
 
-/// Why a tree is locked: a run holds it.
 const LEASE_REASON: &str = "held by a sprawling run";
 
-/// What [`Worktrees::claim`] finds under a name.
 pub(super) enum Standing {
     Held,
     Kept(git2::Worktree),
@@ -24,16 +19,7 @@ pub(super) enum Standing {
 }
 
 impl Worktrees {
-    /// Lifts every lease a previous writer of this city left behind.
-    ///
-    /// A city has one writer, and `_writer` is the proof that the caller
-    /// is it: while it is held, no lock can belong to a run that is
-    /// still alive, so every lock is one a dead process never gave
-    /// back. A city with no repository has no trees to free.
-    ///
-    /// # Errors
-    /// Propagates a repository that cannot list, read or unlock its
-    /// trees.
+
     pub fn lift_abandoned_leases(
         city_root: &std::path::Path,
         _writer: &crate::JsonlLedger,
@@ -67,14 +53,6 @@ impl Worktrees {
         Ok(())
     }
 
-    /// Where `name` stands: held under a lock, kept on disk for its
-    /// node, or not there at all.
-    ///
-    /// A registration with no directory under it is what an interrupted
-    /// placement or a person deleting the tree by hand leaves, and it is
-    /// taken back here - the same reflex the index has about a cache it
-    /// doubts - so that `E_WORKTREE_BUSY` keeps meaning that somebody is
-    /// working.
     pub(super) fn standing(&self, name: &WorktreeName) -> Result<Standing, StorageError> {
         let tree = match self.repo.find_worktree(name.as_str()) {
             Ok(tree) => tree,
@@ -100,23 +78,6 @@ impl Worktrees {
         })
     }
 
-    /// Takes a kept tree back into use: the node's branch moved up to
-    /// the trunk when the trunk already holds all of it, the index read
-    /// back from that branch head, every tracked file under `scopes`
-    /// forced to it and every untracked one there removed, then the
-    /// lock. Git rewrites only the files that differ, and only inside
-    /// the scope, so a node's second run costs what it left behind in
-    /// its own scope, not the size of the city.
-    ///
-    /// The index is read back whole before the narrowed checkout, unless
-    /// it already writes the branch head's tree, because that checkout
-    /// moves only the entries it writes: an entry outside the scope that
-    /// names anything but the branch head - the last run's commit after
-    /// the branch followed the trunk, or a path a run staged and never
-    /// offered - would be committed by the next scoped offer. The
-    /// comparison comes first because reading back walks the whole tree,
-    /// and a reclaim that finds the branch and the index where the last
-    /// run left them is the common case.
     pub(super) fn reattach(
         &self,
         name: &WorktreeName,
@@ -142,9 +103,6 @@ impl Worktrees {
         })
     }
 
-    /// Moves `name`'s branch to the trunk when the trunk descends from
-    /// it. A branch with work the trunk lacks stays where it is: that
-    /// work is still waiting for its merge.
     fn follow_trunk(&self, name: &WorktreeName) -> Result<(), StorageError> {
         let refuse = |op: &'static str, err: git2::Error| StorageError::Worktree {
             op,
@@ -180,20 +138,6 @@ impl Worktrees {
     }
 }
 
-/// Puts `tree` on `branch` and forces every tracked file under `scopes`
-/// to its head, removing what is untracked there, and counts what that
-/// wrote (`Sprawling/storage/spec/Worktree.lean` §8-31). The index is read back from the head first
-/// when it does not already write the head's tree, for the reason
-/// [`Worktrees::reattach`] gives.
-///
-/// The worktree's HEAD is pointed at `branch` when it names anything
-/// else: a stock taken over by a node still names the stock's branch
-/// (`Sprawling/storage/spec/Worktree/Trees/Stock.lean` §8-35), and a checkout of the wrong head would hand the
-/// node another line of work.
-///
-/// # Errors
-/// Propagates a tree whose repository, head, index or checkout git
-/// refuses.
 pub(super) fn restore(
     tree: &git2::Worktree,
     branch: &str,
@@ -248,11 +192,6 @@ pub(super) fn restore(
     Ok(work)
 }
 
-/// Counts one change a reattaching checkout announced before making it
-/// (`Sprawling/storage/spec/Worktree.lean` §8-31). `present` says whether the branch head holds the
-/// path and whether the disk does: a tracked file the head lacks is
-/// removed, one the disk lacks is created, and any other is rewritten;
-/// an untracked entry is removed.
 fn count_change(work: &mut FileWork, kind: git2::CheckoutNotificationType, present: (bool, bool)) {
     let count = if kind.contains(git2::CheckoutNotificationType::UNTRACKED) {
         &mut work.removed
@@ -266,13 +205,6 @@ fn count_change(work: &mut FileWork, kind: git2::CheckoutNotificationType, prese
     *count = count.saturating_add(1);
 }
 
-/// Writes the tree `index` holds into the object store and says whether
-/// it is `tree`.
-///
-/// Where no entry changed since the index last wrote or read a tree, the
-/// index's own tree cache answers without hashing anything; otherwise
-/// only the subtrees whose entries changed are written. An index holding
-/// a conflict writes no tree, and so is not `tree`.
 fn index_writes_tree(index: &mut git2::Index, tree: git2::Oid) -> Result<bool, git2::Error> {
     match index.write_tree() {
         Ok(written) => Ok(written == tree),
@@ -299,11 +231,6 @@ mod tests {
         std::fs::read_to_string(path).unwrap()
     }
 
-    /// `Sprawling/storage/spec/Worktree.lean` §8-31: a placement writes the tree's files once and walks
-    /// the city once; a reclaim writes what the last run changed in its
-    /// scope and nothing else. Judged at two sizes, so a cost that grows
-    /// with the tree where it should not is a failure here rather than a
-    /// slower reading somewhere else.
     #[test]
     fn claiming_a_tree_costs_what_it_places_and_restores() {
         for files in [32, 64] {
@@ -353,9 +280,6 @@ mod tests {
         }
     }
 
-    /// A kept tree claimed again writes only its scope, and what the node
-    /// offers from it moves only that scope: the trunk's work elsewhere,
-    /// which this tree never checked out, lands in the city untouched.
     #[test]
     fn a_kept_tree_claimed_again_checks_out_only_its_scope_and_offers_only_that() {
         let dir = tempfile::tempdir().unwrap();
@@ -456,10 +380,6 @@ mod tests {
         );
     }
 
-    /// A path a run staged outside its scope and never offered does not
-    /// ride along with the node's next offer, although the trunk did not
-    /// move in between: the next claim finds an index that no longer
-    /// names the branch head, and reads it back.
     #[test]
     fn a_path_staged_outside_the_scope_does_not_ride_along_with_the_next_offer() {
         let dir = tempfile::tempdir().unwrap();
@@ -500,9 +420,6 @@ mod tests {
         );
     }
 
-    /// A node's next run finds its tree where it left it: releasing gives
-    /// the lease back and keeps the files, so the next claim neither
-    /// measures the city nor checks the whole tree out again.
     #[test]
     fn a_released_tree_stays_on_disk_for_the_nodes_next_run() {
         let dir = tempfile::tempdir().unwrap();
@@ -517,8 +434,7 @@ mod tests {
         assert_eq!(trees.live().unwrap(), vec![name("node-1")]);
 
         let again = trees.claim(&name("node-1"), &[]).unwrap();
-        // The same directory, spelled two ways: git answers with the long
-        // name, and a Windows runner's temp directory hands out its 8.3 one.
+
         assert_eq!(
             std::fs::canonicalize(again.path()).unwrap(),
             std::fs::canonicalize(&path).unwrap()
@@ -531,10 +447,6 @@ mod tests {
         assert!(dir.path().join("lab").join("notes.md").exists());
     }
 
-    /// A kept tree whose node has nothing unmerged follows the trunk: a
-    /// node that starts from where the city was when it last ran would do
-    /// its next work on files somebody has since changed, and every merge
-    /// of it would be refused as stale.
     #[test]
     fn a_kept_tree_with_nothing_unmerged_starts_from_the_trunk_as_it_now_stands() {
         let dir = tempfile::tempdir().unwrap();

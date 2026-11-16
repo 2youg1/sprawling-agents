@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The signal tool: the face `collab::inbox` shows a model, a thin
-//! router onto the run's [`SignalDesk`], which owns what a send and a
-//! pull do (`crate::signal_desk`).
-
 use std::sync::{Arc, Mutex};
 
 use kernel::{
@@ -17,26 +13,15 @@ use serde_json::{Map, Value};
 
 use crate::signal_desk::{SignalDesk, text};
 
-/// How long a send with `wait` stops its run at most, in milliseconds
-/// of the injected clock (collab D9): shorter than the providers'
-/// prompt-cache lifetime, so the call after a reply still reads the
-/// cached prefix. A city setting that replaces it replaces this value.
 pub const PATIENCE_MS: u64 = 240_000;
 
-/// The tool itself: a thin router onto the desk, which is shared with
-/// the worker because a registered tool is behind a `Box<dyn Tool>` and
-/// nothing can reach into it afterwards.
 pub struct SignalTool {
     meta: ToolMeta,
     desk: Arc<Mutex<SignalDesk>>,
 }
 
 impl SignalTool {
-    /// The name, disclosure and schema `new` registers. The catalog page
-    /// reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
+
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, description) in [
@@ -87,10 +72,6 @@ impl SignalTool {
         })
     }
 
-    /// # Errors
-    /// Propagates a malformed tool name or parameter schema, neither of
-    /// which can happen with the literals below — the fallibility is the
-    /// constructors' contract, not a runtime condition — and a desk left locked.
     pub fn new(desk: Arc<Mutex<SignalDesk>>) -> Result<SignalTool, AxError> {
         let defined = Self::definition()?;
         let room = desk
@@ -174,8 +155,6 @@ mod tests {
     use crate::signal_desk::{Post, RoomMail};
     use kernel::{Address, RunId, TimeMs};
 
-    /// kernel D37, collab D17: a page draws a send as who it went to and
-    /// what it said, which it can only do when the line says it is one.
     #[test]
     fn the_signal_tool_declares_the_signal_render_intent() {
         let desk = SignalDesk::new(

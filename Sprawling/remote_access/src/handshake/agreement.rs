@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The key agreement both handshakes share (Sprawling/remote_access/Spec.lean §8-4,
-//! §8-6): the device's ephemeral keys, the city's answer to them, the
-//! transcript both sign, and the two session keys they end with.
-//!
-//! The handshake a paired device makes on every connection and the one an
-//! unpaired device makes to pair differ in what they carry and who signs;
-//! the agreement under them is the same, so it is written once.
-
 use aws_lc_rs::agreement::{self, PrivateKey, UnparsedPublicKey, X25519};
 use aws_lc_rs::digest::{SHA256, digest};
 use aws_lc_rs::hkdf::{HKDF_SHA256, Salt};
@@ -24,30 +16,25 @@ use crate::seal::{Direction, Opener, Sealer};
 #[cfg(test)]
 mod interop;
 
-/// The two session keys, one for each direction.
 pub(super) struct Keys {
     device_to_city: [u8; 32],
     city_to_device: [u8; 32],
 }
 
-/// A device's fresh ephemeral keys. Both handshakes open with them.
 pub(super) struct Ephemeral {
     x25519: PrivateKey,
     ml_kem: DecapsulationKey,
 }
 
-/// The city's half of the key agreement, as both handshakes answer.
 pub(super) struct Answer {
-    /// Its fresh X25519 public key, then the ML-KEM ciphertext, as they
-    /// travel.
+
     pub(super) public: Vec<u8>,
     x_secret: [u8; 32],
     kem_secret: SharedSecret,
 }
 
 impl Ephemeral {
-    /// Fresh keys, and their public halves as they travel: X25519, then
-    /// the ML-KEM-768 encapsulation key.
+
     pub(super) fn generate() -> Result<(Self, Vec<u8>), AxError> {
         let x25519 =
             PrivateKey::generate(&X25519).map_err(|_| crypto_failure("generate an X25519 key"))?;
@@ -64,7 +51,6 @@ impl Ephemeral {
         Ok((Self { x25519, ml_kem }, public))
     }
 
-    /// Both session keys, from the city's answer to these keys.
     pub(super) fn keys(
         &self,
         transcript: &[u8; 32],
@@ -81,8 +67,7 @@ impl Ephemeral {
 }
 
 impl Answer {
-    /// Answers a device's two public keys: a fresh X25519 key, and an
-    /// ML-KEM ciphertext to the device's encapsulation key.
+
     pub(super) fn new(x_peer: &[u8], kem_peer: &[u8]) -> Result<Self, AxError> {
         let x25519 =
             PrivateKey::generate(&X25519).map_err(|_| crypto_failure("generate an X25519 key"))?;
@@ -107,7 +92,7 @@ impl Answer {
 }
 
 impl Keys {
-    /// The device's session: it seals toward the city.
+
     pub(super) fn device_session(&self) -> Result<Session, AxError> {
         Ok(Session {
             sealer: Sealer::new(&self.device_to_city, Direction::DeviceToCity)?,
@@ -115,7 +100,6 @@ impl Keys {
         })
     }
 
-    /// The city's session: it seals toward the device.
     pub(super) fn city_session(&self) -> Result<Session, AxError> {
         Ok(Session {
             sealer: Sealer::new(&self.city_to_device, Direction::CityToDevice)?,
@@ -124,10 +108,6 @@ impl Keys {
     }
 }
 
-/// SHA-256 of a protocol label, the opening message and the answer
-/// without its signature. SHA-256 rather than the city's BLAKE3, because
-/// the other end is a browser, whose WebCrypto has SHA-256 and HKDF and no
-/// BLAKE3.
 pub(super) fn record(label: &[u8], opening: &[u8], unsigned_answer: &[u8]) -> [u8; 32] {
     sha256(&[label, opening, unsigned_answer].concat())
 }
@@ -138,7 +118,6 @@ pub(super) fn sha256(input: &[u8]) -> [u8; 32] {
     out
 }
 
-/// What one side signs: the protocol label, its role, and the transcript.
 pub(super) fn signed(label: &[u8], role: &[u8], transcript: &[u8; 32]) -> Vec<u8> {
     [label, role, transcript].concat()
 }
@@ -155,7 +134,6 @@ fn agree(mine: &PrivateKey, peer: &[u8]) -> Result<[u8; 32], AxError> {
     .map_err(|()| refused("agree an X25519 secret"))
 }
 
-/// Both session keys from both secrets, under the transcript as salt.
 fn derive(transcript: &[u8; 32], x_secret: &[u8; 32], kem_secret: &[u8]) -> Result<Keys, AxError> {
     let prk =
         Salt::new(HKDF_SHA256, transcript).extract(&[x_secret.as_slice(), kem_secret].concat());

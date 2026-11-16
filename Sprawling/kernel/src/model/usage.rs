@@ -3,23 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a provider reports a call cost in tokens, and how a stored row
-//! of it reads under each meaning `input_tokens` has had.
-//! The part `Sprawling/kernel/spec/Model.lean` specifies this module with the
-//! rest of `kernel::model`.
-
 use serde::{Deserialize, Serialize};
 
 use crate::budget::Tokens;
 use crate::model::wire::DialectKind;
 
-/// One cache count as a provider reported it: a number, or nothing at all.
-///
-/// A provider that never reports its cache and one that reports a zero
-/// hit are different facts to the User, so the two do not share a value
-/// (`Sprawling/kernel/spec/Model.lean` D36). A stored row spells
-/// `Unreported` by leaving the key out; an absent key or `null` reads
-/// back as `Unreported`, a present `0` as `Reported(0)`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum CacheCount {
     Reported(Tokens),
@@ -28,7 +16,7 @@ pub enum CacheCount {
 }
 
 impl CacheCount {
-    /// The count when the provider gave one.
+
     #[must_use]
     pub const fn reported(self) -> Option<Tokens> {
         match self {
@@ -37,10 +25,6 @@ impl CacheCount {
         }
     }
 
-    /// The count for arithmetic that subtracts the cached part from the
-    /// whole prompt (pricing, the context gauge): an unreported count is
-    /// read as nothing cached, the reading those sums had before the
-    /// distinction existed.
     #[must_use]
     pub const fn or_zero(self) -> Tokens {
         match self {
@@ -59,18 +43,6 @@ impl From<Option<Tokens>> for CacheCount {
     }
 }
 
-/// Provider-reported token counts.
-///
-/// `input_tokens` is every prompt token of the request, cached or not,
-/// whichever dialect reported it; `cache_read_tokens` and
-/// `cache_write_tokens` are parts of it, each [`CacheCount::Unreported`]
-/// when the provider gave no number. `dialect` is `None` for a
-/// count no provider wire produced (scripted models, tests).
-///
-/// Serialised rows carry the meaning's version as `v`. A row without `v` was
-/// written before the one meaning existed and names no dialect, so
-/// deserialisation reads it as Anthropic's uncached count exactly when
-/// its cache parts exceed it, which no whole-prompt count can do.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(into = "UsageRow", try_from = "UsageRow")]
 pub struct ModelUsage {
@@ -81,13 +53,8 @@ pub struct ModelUsage {
     pub dialect: Option<DialectKind>,
 }
 
-/// The version of the meaning `ModelUsage.input_tokens` has in a stored
-/// row: the whole prompt. The ledger is append-only, so a row written
-/// under an older meaning keeps its bytes and is converted on read.
 const USAGE_MEANING: u8 = 1;
 
-/// `ModelUsage` as a row spells it: the version travels in the row
-/// rather than in the type, because only a reader of old bytes needs it.
 #[derive(Serialize, Deserialize)]
 struct UsageRow {
     input_tokens: Tokens,

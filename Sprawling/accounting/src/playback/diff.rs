@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What each file a commit names became between its base and the commit
-//! (`Sprawling/accounting/spec/Playback/Traced.lean` §8-17, accounting D29 (e)).
-//!
-//! Only two immutable oids are compared, never a working tree, and the
-//! patch text comes through `storage::hunks`, so a key-shaped line is
-//! held back by the same scan a checkpoint uses. A diff is an attachment
-//! to the ledger's stretch: a repository that is gone or lacks an object
-//! is a state written down, not a failed export.
-
 use std::path::Path;
 
 use kernel::{Address, GitOid};
@@ -22,17 +13,12 @@ use super::document::{Base, Change, Decimal, DiffLine, FileDiff, HiddenLine};
 use super::project::building_of;
 use super::reader::Readership;
 
-/// The two commits a diff compares: what the commit is compared with,
-/// and the commit.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Between {
     pub(super) base: Base,
     pub(super) head: GitOid,
 }
 
-/// Each of `files`, in order, as it changed from the base to the head;
-/// none when there is no base. The patch text shown across all of them
-/// stays within [`DIFF_MAX_BYTES`].
 pub(super) fn changes(
     city_root: &Path,
     Between { base, head }: Between,
@@ -57,9 +43,6 @@ pub(super) fn changes(
         .collect()
 }
 
-/// Whether the building `path` lies in is closed to the reader. A path
-/// that is not an address belongs to no building the reader can be
-/// cleared for, so it closes.
 fn closed(path: &str, readership: &mut Readership) -> bool {
     match Address::parse(path) {
         Ok(addr) => readership.closes(&building_of(&addr)).is_some(),
@@ -87,8 +70,6 @@ fn change(
     }
 }
 
-/// The patch's lines up to what is left of the budget; once one line does
-/// not fit, the budget is spent and every later line is cut.
 fn shown(patch: storage::FilePatch, budget: &mut usize) -> Change {
     let mut lines = Vec::new();
     let mut cut = 0u64;
@@ -125,9 +106,6 @@ fn shown(patch: storage::FilePatch, budget: &mut usize) -> Change {
     }
 }
 
-/// Whether the blob at `path` is binary in the first of `commits` that
-/// holds it: the commit, or its base when the file was deleted. A path
-/// neither holds is not binary.
 fn binary(city_root: &Path, commits: [GitOid; 2], path: &str) -> Result<bool, git2::Error> {
     let repo = git2::Repository::open(city_root)?;
     for oid in commits {

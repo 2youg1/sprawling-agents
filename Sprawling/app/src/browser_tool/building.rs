@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The building's own browser - this city starts it, and its profile
-//! is the building's - and the one call that says which browser tools a
-//! building's rules ask for, in the order the catalogue hashes.
-
 use kernel::{AxCode, AxError};
 use storage::Cas;
 
@@ -14,7 +10,6 @@ use super::BrowserTool;
 use super::Role;
 use super::person::for_user_browser;
 
-/// What the model is told about the building's own browser.
 pub(super) const BUILDING_DISCLOSURE: &str = "drive this machine's browser: open a page, look at it, act on it, \
      take a screenshot, measure boxes, fetch an address as text, read the console, resize, \
      close. `fetch` runs in the open page, so it carries that page's cookies and keeps its \
@@ -27,16 +22,6 @@ pub(super) const BUILDING_DISCLOSURE: &str = "drive this machine's browser: open
      reference carries the snapshot's generation, and one from an older snapshot is refused and \
      not misdirected.";
 
-/// Builds the tool a building whose rules say `browser = true` gets.
-///
-/// The profile is the building's own, so what a browser remembers - a
-/// login, a cookie, a permission - belongs to one line of business
-/// rather than to the machine. The port is derived from the city
-/// directory, so two cities on one machine drive two browsers.
-///
-/// # Errors
-/// Propagates a profile path this city cannot make, and a content store
-/// that will not open.
 pub(crate) fn for_building(
     city_root: &std::path::Path,
     origin: storage::BlockOrigin,
@@ -53,8 +38,7 @@ pub(crate) fn for_building(
     let cas = open_cas(city_root)?;
     let port = crate::browser_bidi::port_for(city_root);
     BrowserTool::new(
-        // A window a person can watch is the default; `-headless` is on
-        // the launch plan for the caller that asks for it.
+
         Role::Building,
         Box::new(crate::browser_bidi::LazyEngine::new(profile, false, port)),
         cas,
@@ -67,16 +51,6 @@ pub(super) fn open_cas(city_root: &std::path::Path) -> Result<Cas, AxError> {
         .map_err(storage::StorageError::into_ax)
 }
 
-/// Every browser tool this building's rules ask for, in table order.
-///
-/// One call rather than a branch at the registration site: the order is
-/// the catalogue's (the resident segment is hashed with it), and a
-/// building's own browser comes before the person's. A confidential
-/// building asks for neither - `city::policy` refuses both settings.
-///
-/// # Errors
-/// Propagates a profile path this city cannot make and a content store
-/// that will not open.
 pub(crate) fn for_rules(
     city_root: &std::path::Path,
     origin: &storage::BlockOrigin,

@@ -23,9 +23,6 @@ fn planner() -> Speaker {
     })
 }
 
-/// A `steer_received` line written before the envelope carries only
-/// `@<room>`, and still folds, as a steer letter (collab D16); a new
-/// line reads back as the speaker that wrote it.
 #[test]
 fn a_recorded_source_reads_back_as_its_speaker() {
     let speaker = Speaker::Resident(Letter {
@@ -56,10 +53,6 @@ fn a_recorded_source_reads_back_as_its_speaker() {
     assert!(Speaker::from_recorded("lab/room1").is_err());
 }
 
-/// The two openings are two situations, and the words differ.
-/// A session nobody assigned a task to gets the person's own line,
-/// because a conversational turn wrapped in field labels reads as a
-/// form and is answered as one.
 #[test]
 fn a_session_with_a_person_opens_in_the_persons_own_words() {
     let mut assigned = Conversation::new();
@@ -72,10 +65,7 @@ fn a_session_with_a_person_opens_in_the_persons_own_words() {
     let ContentBlock::Text { text } = &assigned.messages()[0].content[0] else {
         panic!("the dispatch lines are text");
     };
-    // The task and the goal are the run segment of the prefix already;
-    // repeating them here would carry the person's line twice in every
-    // request, and a resident's goal in a user-role message could spell
-    // a `user:` line (`Sprawling/city/spec/SpineFiles.lean` D21).
+
     assert_eq!(
         text,
         "The task is in JOB.md above, handed down by the User."
@@ -94,9 +84,6 @@ fn a_session_with_a_person_opens_in_the_persons_own_words() {
     assert_eq!(text, "what do you make of this");
 }
 
-/// Work a resident handed down says so in the opening, naming the
-/// address and the run that handed it down, so the model does not take
-/// a delegated task for one the User gave.
 #[test]
 fn a_delegated_opening_names_the_resident_that_handed_the_work_down() {
     let parent = kernel::RunId::parse("0198f6a2-7c4a-7bbb-9d1e-000000000001").unwrap();
@@ -117,9 +104,6 @@ fn a_delegated_opening_names_the_resident_that_handed_the_work_down() {
     );
 }
 
-/// The job file's text is the prefix's run segment, so nothing sends
-/// the agent to fetch what it was already handed, and no opening line
-/// carries a `cas:` hash no tool in the city can resolve.
 #[test]
 fn no_opening_line_points_at_a_file_the_agent_already_has() {
     for (goal, opening) in [
@@ -163,9 +147,6 @@ fn the_window_folds_steer_into_the_open_user_message() {
     );
 }
 
-/// A reply with no content pushes no assistant message, so the results
-/// that follow meet a user message already on the wire. They still land
-/// in the window, and a steer held since the send rides after them.
 #[test]
 fn tool_results_after_an_empty_reply_reach_the_window() {
     let mut conversation = Conversation::new();
@@ -196,9 +177,6 @@ fn tool_results_after_an_empty_reply_reach_the_window() {
     );
 }
 
-/// Results that rewrote a sent message leave it open again: a steer
-/// that arrives before the next assembly joins it after those results
-/// instead of waiting one more wave.
 #[test]
 fn a_steer_after_results_on_a_sent_message_joins_them() {
     let mut conversation = Conversation::new();

@@ -3,30 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! SBOM writer: a CycloneDX bill of materials from `cargo metadata`,
-//! deterministic (components sorted by name@version) so two runs over
-//! one lockfile produce identical bytes. Release三件 item two's file
-//! half; the embedded half is the dependency list build.rs bakes into
-//! the binary (`sprawling status --deps`).
-//!
-//! The npm packages the client bundles are not components here; their
-//! names, versions and licence texts ship inside the binary as the
-//! client's `THIRD-PARTY-NOTICES.txt` (client D13).
-
 use std::path::Path;
 use std::process::Command;
 
 use crate::report::XtaskError;
 
-/// The bill of materials, as this module writes it: one path, relative to
-/// the repository root.
-///
-/// The archive's contents table reads this same constant, and takes the
-/// entry name from its last segment. A second spelling on either side
-/// would let the writer and the packager disagree while the archive still
-/// assembled, and no test would say so: an archive holding a file nobody
-/// wrote is a file missing from it, under a name the reader was told to
-/// expect.
 pub(crate) const SBOM: &str = "target/sbom.cdx.json";
 
 #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
@@ -50,9 +31,7 @@ pub(crate) fn run(root: &Path) -> Result<String, XtaskError> {
             file: "cargo metadata".to_owned(),
             msg: err.to_string(),
         })?;
-    // Read by key rather than by index throughout: `Value`'s `Index` impl
-    // panics on a shape that does not match, and this reads a tool's
-    // output rather than a value this crate constructed.
+
     let field = |value: &serde_json::Value, key: &str| value.get(key).cloned();
     let workspace: Vec<String> = field(&metadata, "workspace_members")
         .as_ref()
@@ -76,7 +55,7 @@ pub(crate) fn run(root: &Path) -> Result<String, XtaskError> {
                 .to_owned()
         };
         if workspace.contains(&text("id")) {
-            continue; // the workspace is the application, not a component
+            continue;
         }
         let (name, version) = (text("name"), text("version"));
         let key = format!("{name}@{version}");

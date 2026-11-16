@@ -3,20 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What failed about one provider call, and the one place that decides
-//! whether it may be asked again, whether the account that met it can
-//! still take it, and what the person does next
-//! (`Sprawling/gateway/spec/Endpoint/Failure.lean`, gateway D2, D3 and D32).
-
 use kernel::{AccountDisposition, AxError, ProviderFailureKind, Retry};
 
-/// A transport failure as its whole chain states it.
-///
-/// `reqwest`'s own `Display` says only that sending failed; whether it
-/// was a refused connection, an unresolvable name or a passed deadline
-/// lives one link further down - and that link is the entire difference
-/// between "the provider is down" and "the provider is slow" for the
-/// person reading the refusal.
 fn transport_detail(err: &reqwest::Error) -> String {
     let mut out = err.to_string();
     let mut cause = std::error::Error::source(err);
@@ -28,65 +16,38 @@ fn transport_detail(err: &reqwest::Error) -> String {
     out
 }
 
-/// What failed about one provider call, said by the call site that saw
-/// it rather than guessed later from the text of a message.
-///
-/// **This enum is the one home of "may this be tried again".** An
-/// exchange that never completed carries no answer, so the same request
-/// may go out again, and so may one the provider answered with "busy"
-/// or "broken"; an answer that says the request itself is wrong would
-/// be given identically next time. Every call site builds its error
-/// through this type, so the default `Retries::UntilHalted` holds for
-/// every retriable failure and one transient disconnect does not end a
-/// sub-run.
 #[derive(Debug)]
 pub(crate) enum ProviderFailure<'e> {
-    /// The exchange never completed: the request did not reach the
-    /// provider, or the answer's body stopped before its end, or the
-    /// transport's deadline passed.
+
     Exchange(&'e reqwest::Error),
-    /// A streamed body could not be read further off the socket.
+
     Cut(&'e std::io::Error),
-    /// A stream stayed open and silent past the bound set for silence.
+
     Silence { quiet_ms: u64 },
-    /// The provider answered with a status that is not 2xx. The
-    /// provider's own body is never quoted back; its headers are read
-    /// for the one hint they may carry, how long to wait.
+
     Refused {
         url: &'e str,
         status: reqwest::StatusCode,
         headers: &'e reqwest::header::HeaderMap,
     },
-    /// The provider refused the request because this account's quota is
-    /// used up, said in the refusal's structured error rather than in its
-    /// message (D32). Unlike a busy 429, waiting does not mend it.
+
     AccountUnavailable {
         url: &'e str,
         status: reqwest::StatusCode,
     },
-    /// The provider refused the request because it no longer fits the
-    /// model's context window. Sent again it would not fit again; what
-    /// fits it is a shorter conversation or a wider model.
+
     Overflow {
         url: &'e str,
         status: reqwest::StatusCode,
     },
-    /// The provider answered 2xx and the body is not a shape this city
-    /// can read.
+
     Unreadable(String),
-    /// A stream that already answered 2xx carried an error frame of
-    /// this type or code. Its message is not quoted, like a refusal's body.
+
     Reported { kind: &'e str },
-    /// The request could not even be built — a URL, a header or a body
-    /// this side wrote wrong. Deterministic: the identical build fails
-    /// identically, which is why the one failure here that never
-    /// reached a provider is classed with the refusals.
+
     Unbuilt(&'e reqwest::Error),
 }
 
-/// What a provider's refusal says when the request outgrew the model's
-/// window, lowercased: the OpenAI and Anthropic dialects both refuse
-/// with 400 and name the window only in the body.
 const WINDOW_MARKERS: [&str; 4] = [
     "context_length_exceeded",
     "prompt is too long",
@@ -94,15 +55,8 @@ const WINDOW_MARKERS: [&str; 4] = [
     "context window",
 ];
 
-/// The structured code, or failing it the type, an OpenAI-dialect error
-/// carries when the account's quota is used up: in a 429's body, and in
-/// an error chunk part-way through a stream (D32).
 const QUOTA_EXHAUSTED: &str = "insufficient_quota";
 
-/// Whether a refusal's body says, in its structured `error` object, that
-/// the quota is used up: `error.code`, or `error.type` where the code is
-/// absent or null. The message is never read, and a body that is not
-/// JSON says nothing.
 fn names_an_exhausted_quota(said: &str) -> bool {
     let Ok(body) = serde_json::from_str::<serde_json::Value>(said) else {
         return false;
@@ -120,11 +74,7 @@ fn names_an_exhausted_quota(said: &str) -> bool {
 }
 
 impl<'e> ProviderFailure<'e> {
-    /// A non-2xx answer, classed by its status and by what its body says:
-    /// the window first (D3), then the quota (D32).
-    ///
-    /// The body is read to classify and never quoted back; a body that
-    /// could not be read classes the refusal by its status alone.
+
     pub(crate) fn refusal(
         url: &'e str,
         status: reqwest::StatusCode,
@@ -167,8 +117,6 @@ impl ProviderFailure<'_> {
         }
     }
 
-    /// What the wire carries so a page can say this failure in its
-    /// reader's language.
     fn kind(&self) -> ProviderFailureKind {
         let status = |code: &reqwest::StatusCode| u32::from(code.as_u16());
         match self {
@@ -192,12 +140,6 @@ impl ProviderFailure<'_> {
         }
     }
 
-    /// Whether the identical request may succeed if sent again later,
-    /// and whether its effect landed. A connection that never opened
-    /// carried no request, and a provider answering 408, 429 or 5xx (529
-    /// is Anthropic's overload) says it is busy or broken now, not that
-    /// the request is wrong. Any other exchange that stopped did so after
-    /// the request left, so the provider may have run it and billed it.
     fn retry(&self) -> Retry {
         match self {
             ProviderFailure::Exchange(err) if err.is_connect() => Retry::Yes,
@@ -233,12 +175,6 @@ impl ProviderFailure<'_> {
         }
     }
 
-    /// Whether the account this request went out on can still take it
-    /// (D32): a rejected key (401) and a used-up quota, refused or
-    /// reported mid-stream, send the request to the next account. Every
-    /// other failure keeps the account - a busy provider is asked again
-    /// on it, a malformed request would fail on any account, and a lost
-    /// answer is no evidence against it.
     fn account_disposition(&self) -> AccountDisposition {
         match self {
             ProviderFailure::Refused { status, .. }
@@ -261,10 +197,6 @@ impl ProviderFailure<'_> {
         }
     }
 
-    /// The provider's own word on how long to wait: `retry-after-ms`
-    /// first, then `retry-after` in whole seconds. The HTTP-date form is
-    /// not read, because turning a date into a wait needs a clock this
-    /// crate does not sample; the watchdog's schedule covers it.
     fn retry_after_ms(&self) -> Option<u64> {
         let ProviderFailure::Refused { headers, .. } = self else {
             return None;
@@ -313,9 +245,6 @@ impl ProviderFailure<'_> {
     }
 }
 
-/// One provider failure as an `E_PROVIDER` error, its kind, its
-/// retriability, its account disposition and its way out taken from
-/// [`ProviderFailure`], never decided here.
 pub(crate) fn provider_err(action: &str, failure: &ProviderFailure<'_>) -> AxError {
     let draft = AxError::provider(failure.kind(), action, failure.subject());
     let draft = match (
@@ -468,13 +397,6 @@ mod tests {
         );
     }
 
-    /// Derived from `Sprawling/gateway/spec/Endpoint/Failure.lean`: every
-    /// status a provider refuses with, crossed with whether the body names
-    /// the window and whether it says the quota is used up, lands on the
-    /// kind, the retry and the account disposition the model gives
-    /// (`a_refusal_advances_exactly_for_a_rejected_key_or_an_exhausted_quota`,
-    /// `a_refusal_is_an_overflow_exactly_when_it_names_the_window`,
-    /// `the_status_table`).
     #[test]
     fn a_refusal_advances_exactly_for_a_rejected_key_or_an_exhausted_quota() {
         let headers = reqwest::header::HeaderMap::new();
@@ -527,10 +449,6 @@ mod tests {
         }
     }
 
-    /// The structured `error.code` names the quota; a null or absent code
-    /// leaves it to `error.type`. Nothing else grants a switch: not the
-    /// words of the message, not a body that is not JSON, not a body that
-    /// could not be read.
     #[test]
     fn only_the_structured_code_or_type_says_the_quota_is_used_up() {
         let headers = reqwest::header::HeaderMap::new();
@@ -566,9 +484,6 @@ mod tests {
         );
     }
 
-    /// A stream that reports an exhausted quota part-way switches the
-    /// account and is not asked again; one that reports a busy provider is
-    /// asked again on the same account.
     #[test]
     fn a_reported_error_advances_exactly_for_an_exhausted_quota() {
         let said = |kind: &str| {
@@ -593,9 +508,6 @@ mod tests {
         );
     }
 
-    /// A request that went out and lost its answer never switches the
-    /// account (`unknown_keeps_account`): another account would bill the
-    /// same request again.
     #[test]
     fn an_unknown_effect_keeps_the_account() {
         let cut = std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "the body stopped");
@@ -612,10 +524,6 @@ mod tests {
         }
     }
 
-    /// Both dialects refuse an over-long request with a 400 and say why
-    /// in the body; the advice for a refusal in general (check the model
-    /// name, the credential and the dialect) points at three settings
-    /// that are not wrong here.
     #[test]
     fn a_request_that_outgrew_the_window_is_told_how_to_fit_again() {
         use super::super::config::Endpoint;

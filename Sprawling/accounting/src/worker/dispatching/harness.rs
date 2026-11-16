@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A dispatch whose resident is an official harness, on the accounting
-//! thread: what the lane is handed, and what the city does with the run
-//! once it comes home (`Sprawling/app/Spec.lean` §8-124).
-//!
-//! The lane half - the tree, the harness, the turn - is
-//! `driving::harness`. What is here writes on this thread: the run's
-//! identity and its origin in the store before the lane, and after it
-//! the request the harness cannot open itself, the tree given back and
-//! what the city owed whoever asked.
-
 use kernel::{AxError, Completion};
 
 use super::super::driving::harness::{Chartered, HarnessDriven, HarnessHalf, harness_provenance};
@@ -24,15 +14,7 @@ use super::running::Continuation;
 use super::{Assignment, Dispatched, Given, HarnessSeat, run_id_for};
 
 impl RunWorker {
-    /// Everything the accounting thread decides for a harness run once
-    /// the room and the brief exist: who runs, under which id, and the
-    /// half the lane drives.
-    ///
-    /// # Errors
-    /// Propagates a resident description that cannot be read, a clock
-    /// this machine will not read, a store that will not take the
-    /// brief's origin, a backlog that will not take the run, and a
-    /// handoff the runtime refuses.
+
     pub(super) fn stage_harness(
         &mut self,
         at: Assignment,
@@ -56,9 +38,7 @@ impl RunWorker {
                 },
             )
             .map_err(storage::StorageError::into_ax)?;
-        // The run begins the room's session. What a branched session
-        // carried is spent here and not handed on: ACP opens a session
-        // with no history (`Sprawling/app/Spec.lean` §8-124).
+
         self.origins.started(&at.addr, run);
         let member = match at.parent {
             Some(_) => Some(
@@ -120,14 +100,6 @@ impl RunWorker {
         Ok((Staged::Harness { at, half }, Continuation::Harness))
     }
 
-    /// Puts a harness run's landing on the history: the backlog place
-    /// and the tree go back whatever happened, and whoever asked is told
-    /// how it ended.
-    ///
-    /// # Errors
-    /// Propagates the drive's own failure, a backlog that will not take
-    /// the member back, a tree that will not go back, and what the city
-    /// owed a parent that will not take it.
     pub(super) fn land_harness(
         &mut self,
         at: Assignment,
@@ -144,9 +116,7 @@ impl RunWorker {
             lease,
             outcome,
         } = driven;
-        // Both loans go back before either failure is propagated, for the
-        // reason a model run's landing gives (`Sprawling/app/Spec.lean` §8-46-9);
-        // a run frozen done first offers the tree it worked in.
+
         let left = member.map_or(Ok(()), |id| self.flight.backlog.leave(id));
         let offered = match (&outcome, &lease) {
             (Ok(Completion::Done(_)), Some(tree)) => self.offer_for_harness(
@@ -189,13 +159,7 @@ impl RunWorker {
 }
 
 impl RunWorker {
-    /// Opens the request a harness run cannot open itself: harness
-    /// residents reach none of the city's tools (`Sprawling/app/Spec.lean` §8-4e
-    /// rule 7). A branch that already has a request waiting keeps it,
-    /// and the verifier judges the branch as it now stands.
-    ///
-    /// # Errors
-    /// Propagates [`RunWorker::offer`]'s refusals.
+
     fn offer_for_harness(&mut self, offering: &Offering<'_>, branch: &str) -> Result<(), AxError> {
         if self
             .collaborating
@@ -217,7 +181,6 @@ impl RunWorker {
     }
 }
 
-/// A minute on the city's clock.
 const MINUTE_MS: u64 = 60_000;
 
 #[cfg(test)]

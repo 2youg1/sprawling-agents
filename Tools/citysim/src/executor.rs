@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The thin executor, second Main. The loop itself lives in
-//! `runtime::run`: this file supplies the simulated world — a counter
-//! clock, scripted interruptions, the checkpoint net and the tool bench —
-//! and the city runs the same driver against real ones.
-//!
-//! Event order (no cancel, natural conclusion):
-//! checkpoint_committed, run_started, prompt_assembled once per run
-//! (`Sprawling/runtime/Spec.lean` §8-39 item 5), then per turn prompt_shape_compared,
-//! model_called, model_returned, (tool_called, tool_result)*, and finally
-//! handoff_written, run_frozen.
-//!
-//! Specified by `Tools/citysim/spec/Executor.lean` §8-2 to §8-4.
-
 use std::cell::Cell;
 
 use kernel::{
@@ -36,7 +23,6 @@ use crate::mem_ledger::MemLedger;
 use crate::script_model::ScriptModel;
 use crate::sieving::{SieveWorld, package_exec};
 
-/// Where the cancel arrives, in boundary vocabulary. Turns count from 0.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CancelPoint {
     BeforeAssemble { turn: u32 },
@@ -52,26 +38,16 @@ pub struct Scenario {
     pub goal: String,
     pub job_md: String,
     pub model: ScriptModel,
-    /// The real bench: gate routing is the turn layer's, and the
-    /// simulator drives the same code the city runs.
+
     pub bench: ToolBench,
-    /// Frozen configuration, evaluated once per run: the stamp gate reads
-    /// its granularity and zone ladder from here, never from a sample.
+
     pub config: FrozenConfig,
-    /// The checkpoint net, when the scenario runs against a real tree.
-    /// The checkpoint is per wave, not per suspicious command: the
-    /// checkpoint goes up before every wave, so anything a wave deletes has a
-    /// commit to come back from. An unchanged wave still commits — a
-    /// chain that rebuilds is worth more than a saved object.
+
     pub checkpoint: Option<(Checkpoint, Vec<String>)>,
     pub cancel: Option<CancelPoint>,
-    /// A human Steer, delivered at the wave boundary of the given turn.
-    /// It appends to the next result and does not interrupt the action in
-    /// flight, so the scenario asserts the loop carries on rather than
-    /// that it stops.
+
     pub steer: Option<(u32, String)>,
-    /// The sieve's world, when the scenario puts `exec` results through
-    /// it. `None` packages every result the same way, unsieved.
+
     pub sieve: Option<SieveWorld>,
 }
 
@@ -84,18 +60,12 @@ fn payload(map: Map<String, Value>) -> Result<Payload, AxError> {
     Payload::new(map)
 }
 
-/// The JOB.md pin: a deterministic fake git oid derived from the content
-/// hash — the simulated adapter's whole job is to forge the outside world
-/// while keeping the event shapes identical to the real city's.
 fn job_locator(addr: &Address, job_md: &str) -> Result<Locator, AxError> {
     let digest = B3Hash::digest(job_md.as_bytes()).to_string();
     let oid: String = digest.chars().take(40).collect();
     Locator::parse(&format!("file:{}@{}", addr.as_str(), oid))
 }
 
-/// The scenario's answer at a safe point. Cancel wins over Steer at the
-/// same boundary: stopping and redirecting are contradictory instructions,
-/// and stopping is the one that cannot be undone by waiting.
 fn answer_at(
     point: SafePoint,
     cancel: Option<CancelPoint>,
@@ -105,9 +75,7 @@ fn answer_at(
         SafePoint::BeforeAssemble { turn } => (CancelPoint::BeforeAssemble { turn }, turn),
         SafePoint::BeforeCall { turn } => (CancelPoint::BeforeCall { turn }, turn),
         SafePoint::BeforeWave { turn } => (CancelPoint::BeforeWave { turn }, turn),
-        // A scenario cancels at a turn, and these two sit inside one:
-        // the point they name is reached many times in a turn, so a
-        // scenario cannot address them by number.
+
         SafePoint::BeforeToolCall { .. } | SafePoint::BeforeSpawn { .. } => {
             return Interrupt::None;
         }
@@ -137,12 +105,6 @@ fn clock_overflow() -> AxError {
     )
 }
 
-/// The place of the next tool call in this run (citysim D20); `None`
-/// once the last place a u64 holds has been handed out.
-///
-/// The call after that is refused, because a saturated place would give
-/// it the key of the call before and the bench would answer it as a
-/// duplicate.
 fn next_place(placed: &Cell<Option<u64>>) -> Result<Seq, AxError> {
     let at = placed.get().ok_or_else(|| {
         AxError::failure(AxCode::InvalidArgs, "place a tool call", "u64 overflow").with_recovery(
@@ -153,26 +115,11 @@ fn next_place(placed: &Cell<Option<u64>>) -> Result<Seq, AxError> {
     Ok(Seq::new(at))
 }
 
-/// Runs one scenario to its frozen end, on a ledger of its own. Every
-/// path out of here has passed through handoff_written + run_frozen;
-/// the report names which ending.
-///
-/// # Errors
-/// Propagates whatever the drive refuses.
 pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
     let mut ledger = MemLedger::new();
     run_scenario_on(&mut ledger, scenario)
 }
 
-/// Runs one scenario on a ledger that may already hold history.
-///
-/// This is what makes two runs on one ledger expressible: the second
-/// run continues the first one's chain, so the report carries both
-/// runs' lines and `seq` orders them the way one city would have
-/// written them (`Sprawling/app/Spec.lean` §8-46-5).
-///
-/// # Errors
-/// Propagates whatever the drive refuses.
 pub fn run_scenario_on(
     ledger: &mut MemLedger,
     scenario: Scenario,
@@ -195,9 +142,6 @@ pub fn run_scenario_on(
     let mut stamps = StampGate::new(config.clock_stamp, config.clock_zones.clone());
     let job = job_locator(&addr, &job_md)?;
 
-    // The scenario clock: ticks are handed out in the order the driver
-    // asks for them, which is what makes a failure replay from the
-    // script rather than from a stopwatch.
     let tick = Cell::new(0u64);
     let mut now = || {
         let value = tick.get();
@@ -235,8 +179,7 @@ pub fn run_scenario_on(
         routing: None,
         run_policy: runtime::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)),
         naming: None,
-        // A simulated run is nobody's branch: it is a scenario's own
-        // first run.
+
         inherited: Vec::new(),
         shape: CallShape {
             model: "script".to_owned(),
@@ -258,25 +201,17 @@ pub fn run_scenario_on(
         retries: kernel::Retries::UntilHalted,
     };
 
-    // Where this call sits in this run, counted rather than read off the
-    // clock: a wave hands every call in it the same instant on purpose,
-    // so a clock reading would give two calls of one tool inside one wave
-    // one key, and the second would come back deduplicated. Determinism
-    // rule 7 rules a clock out of a key outright (citysim D20).
     let placed = Cell::new(Some(0u64));
     let mut invoke = |call: &kernel::ToolCall, t: TimeMs| {
-        // Every door the call must pass is the bench's to route; the
-        // simulator stays thin (`spec/Executor.lean` §8-3).
+
         let key = IdemKey::derive(&run, next_place(&placed)?, &call.action()?);
         let temporal = bench
             .meta_of(&call.name)
             .map_or(Temporal::Timeless, |meta| meta.temporal);
         match bench.invoke(call, &key, t)? {
-            // A replay carries the first call's own result, and is
-            // packaged exactly as that result was (`Sprawling/runtime/Spec.lean` §8-35).
+
             BenchOutcome::Ran { outcome, .. } | BenchOutcome::Duplicate { outcome } => {
-                // The envelope is the caller's to hang: a clock line when
-                // one is due, inside this result's byte budget.
+
                 let stamp = stamps.observe(t, temporal)?;
                 if let Some(world) = sieve.as_mut()
                     && call.name.as_str() == kernel::ToolName::EXEC
@@ -300,7 +235,7 @@ pub fn run_scenario_on(
                         reminder: None,
                         offload: None,
                         sieve: None,
-                        // A scenario has no adviser endpoint: nobody asked.
+
                         adviser: None,
                     },
                 )?;
@@ -311,18 +246,14 @@ pub fn run_scenario_on(
                     attachments: Vec::new(),
                 })
             }
-            // A refusal reaches the model as this call's error, which the
-            // turn records as a tool_result: boundary feedback, not a dead
-            // turn.
+
             BenchOutcome::Refused { refusal } => Err(*refusal),
         }
     };
 
     let frozen = match checkpoint.as_mut() {
         Some((net, scope)) => {
-            // A checkpoint is signed by the session that raised it. The
-            // scenario has no endpoint, so the model id is the
-            // scripted one and no effort was asked for.
+
             let of = storage::Provenance::new(
                 run,
                 addr.clone(),
@@ -338,7 +269,7 @@ pub fn run_scenario_on(
             };
             let mut hooks = RunHooks {
                 now: &mut now,
-                // A scenario replays byte for byte, so its stopwatch stands still.
+
                 monotonic_us: &mut || 0,
                 interrupt: &mut interrupt,
                 checkpoint: Some(&mut checkpoint),
@@ -352,7 +283,7 @@ pub fn run_scenario_on(
         None => {
             let mut hooks = RunHooks {
                 now: &mut now,
-                // A scenario replays byte for byte, so its stopwatch stands still.
+
                 monotonic_us: &mut || 0,
                 interrupt: &mut interrupt,
                 checkpoint: None,
@@ -376,9 +307,6 @@ pub fn run_scenario_on(
 mod tests {
     use super::*;
 
-    /// citysim D20: two calls of one run never share a place, so the last
-    /// place a u64 holds is handed out once and the call after it is
-    /// refused rather than keyed like the one before.
     #[test]
     fn the_call_after_the_last_place_is_refused() {
         let placed = Cell::new(Some(u64::MAX));

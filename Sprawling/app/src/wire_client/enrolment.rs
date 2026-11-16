@@ -3,25 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Handing a credential to this city's enrolment route, and the name
-//! that comes back in its place.
-//!
-//! The plaintext travels in an HTTP body over loopback and never
-//! through `argv`, which is readable in the process table, in shell
-//! history, and by whatever started this process.
-
 use std::time::Duration;
 
 use kernel::{AxCode, AxError};
 
 use super::{credential, unreachable_city};
 
-/// Splits `realm/name` into its two halves.
-///
-/// Fail-closed on anything else: a reference with no realm, an empty
-/// half, or a second slash is not a credential name this city can hold,
-/// and guessing which half was meant would put a key under a name its
-/// owner did not choose.
 pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)> {
     let (realm, name) = raw.split_once('/')?;
     if realm.is_empty() || name.is_empty() || name.contains('/') {
@@ -29,17 +16,7 @@ pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)> {
     }
     Some((realm, name))
 }
-/// Hands a credential to the local enrolment route and returns the
-/// reference that replaces it.
-///
-/// The value never travels through `argv`, which is readable in the
-/// process table, in shell history, and in whatever started this
-/// process. That is what makes this better custody than the browser
-/// path, where the page holds the plaintext first.
-///
-/// # Errors
-/// Fails when the route refuses - which it does for any peer that is not
-/// on this machine - or when the city cannot be reached.
+
 pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<String, AxError> {
     let body = serde_json::json!({ "realm": realm, "name": name, "value": value });
     let client = gateway::client_for(kernel::Proxying::ExceptLocal, &format!("http://{at}"))
@@ -52,8 +29,7 @@ pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<St
                      and no proxy is consulted for it",
                 )
         })?;
-    // `/enroll` asks for a credential like every door: the city's key
-    // from its key file on this machine.
+
     let mut request = client.post(format!("http://{at}/enroll")).json(&body);
     if let Some(key) = credential(at, None)? {
         request = request.bearer_auth(key);
@@ -62,15 +38,11 @@ pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<St
         .send()
         .map_err(|err| unreachable_city(at, &err.to_string()))?;
     let status = answer.status();
-    // The reply body is this city's own text, so quoting it is quoting
-    // ourselves rather than a stranger's error page.
+
     let said = answer.text().unwrap_or_default();
     match status.as_u16() {
         201 => Ok(said),
-        // The city took it and has not said what became of it. Reported
-        // as a failure because the caller must not go on as though the
-        // reference resolves - but with the city's own words, which say
-        // what to check rather than what went wrong.
+
         202 => Err(
             AxError::failure(AxCode::CredentialMissing, "enrol a credential", said).with_recovery(
                 "the city is busy; ask it again once the run it is inside has finished",

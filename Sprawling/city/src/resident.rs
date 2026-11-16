@@ -3,31 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Standing identity. A resident is an address plus the file that says
-//! how it works, and that file is the resident segment of every prefix it
-//! runs under — so two residents with different URBANITE files solve the
-//! same task differently, which is the point rather than a defect.
-//!
-//! The dossier is a projection, not a second file: what a resident has
-//! done is already in the ledger, and a stored summary beside it would be
-//! a second account of the same past.
-//!
-//! Specified by `Sprawling/city/spec/Resident.lean` §8-1.
-
 use std::path::{Path, PathBuf};
 
 use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, B3Hash, EventKind, EventRecord, RunId, Seq};
 
-/// What a prefix's resident segment says when nobody has written an
-/// URBANITE.md. Ephemeral workers run under this: no standing identity,
-/// and the text says so rather than pretending to a character.
 const EPHEMERAL_SEGMENT: &str = "You have no standing identity and you take no work below you. Finish \
      the task in JOB.md, and say what you did and what you found by writing it into the documents in \
      your workspace. Nothing about you outlives this run.\n";
 
-/// Standing identity, or the absence of one. Exhaustive: a run is either
-/// carried out by someone the city knows or by a worker it does not.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Identity {
     Resident(Resident),
@@ -35,14 +19,7 @@ pub enum Identity {
 }
 
 impl Identity {
-    /// Loads the identity at `addr`. An address with an URBANITE.md is a
-    /// resident; one without is ephemeral. Reading no file is not a
-    /// failure — most rooms hold no standing identity.
-    ///
-    /// # Errors
-    /// Propagates a file that exists and cannot be read, because a
-    /// resident whose description is unreadable must not silently become
-    /// an ephemeral one with different behaviour.
+
     pub fn load(city_root: &Path, addr: &Address) -> Result<Identity, AxError> {
         let path = urbanite_path(city_root, addr);
         match std::fs::read(&path) {
@@ -62,10 +39,6 @@ impl Identity {
         }
     }
 
-    /// The bytes this identity contributes as the prefix's resident
-    /// segment. Byte-stable for as long as the file is: the same resident
-    /// produces the same segment on every run, which is what makes the
-    /// prefix cacheable across a resident's whole life.
     #[must_use]
     pub fn segment_bytes(&self) -> Vec<u8> {
         match self {
@@ -82,36 +55,24 @@ impl Identity {
         }
     }
 
-    /// Who the ledger records as the actor.
     #[must_use]
     pub fn who(&self) -> String {
         self.addr().as_str().to_owned()
     }
 }
 
-/// The description a resident is known by, set between the two parts of
-/// the discipline the city carries for its seat.
-///
-/// Composed at load rather than kept apart, so the content hash over
-/// `Resident::urbanite` covers all three: two builds whose disciplines
-/// differ never produce the same digest for the same file.
 fn described(addr: &Address, written: Vec<u8>) -> Vec<u8> {
     let Some(discipline) = crate::spine_files::hall_discipline(addr) else {
         return written;
     };
     let mut out = Vec::new();
     paragraph(&mut out, discipline.opening.as_bytes());
-    // The identity area is not who the seat is: the name it holds opens
-    // the resident slot on its own line (`Sprawling/city/spec/Identity.lean` §8-33), and one
-    // name said twice in one request is two answers to one question.
+
     paragraph(&mut out, &crate::identity::persona(written));
     paragraph(&mut out, discipline.closing.as_bytes());
     out
 }
 
-/// Appends one part after a blank line, ending it with a line break;
-/// an empty part adds nothing, so a seat with no opening does not open
-/// with a blank line.
 fn paragraph(out: &mut Vec<u8>, part: &[u8]) {
     const NEWLINE: u8 = 10;
     if part.is_empty() {
@@ -126,7 +87,6 @@ fn paragraph(out: &mut Vec<u8>, part: &[u8]) {
     }
 }
 
-/// A standing identity and the description it is known by.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Resident {
     addr: Address,
@@ -149,22 +109,12 @@ impl Resident {
         &self.addr
     }
 
-    /// The description's content hash. Two runs whose resident digests
-    /// differ read different instructions, and that difference is visible
-    /// without diffing the text.
     #[must_use]
     pub fn digest(&self) -> B3Hash {
         self.digest
     }
 }
 
-/// Where a resident's description lives.
-///
-/// City Hall's two residents are described by files in the city's own
-/// reserved subtree rather than at their own address, so that neither of
-/// them can edit who it is. Asked here rather than branched on by
-/// callers: `Identity::load` reads one path, and "an address with a
-/// description is a resident" stays one rule.
 #[must_use]
 pub fn urbanite_path(city_root: &Path, addr: &Address) -> PathBuf {
     if let Some(hall) = crate::spine_files::hall_identity_path(city_root, addr) {
@@ -173,11 +123,6 @@ pub fn urbanite_path(city_root: &Path, addr: &Address) -> PathBuf {
     CityLayout::new(city_root).urbanite(addr)
 }
 
-/// What a resident has done, folded from the ledger.
-///
-/// This is a projection: delete it and rebuild from the same events and
-/// the answer is identical. Nothing here is stored beside the ledger,
-/// because a dossier on disk would be a second account of the same past.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Dossier {
     runs_started: u32,
@@ -192,7 +137,6 @@ impl Dossier {
         Dossier::default()
     }
 
-    /// Folds one record in, keeping only records this resident acted in.
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "two kinds count a resident's runs; the rest of the vocabulary is not about them"
@@ -230,9 +174,6 @@ impl Dossier {
         self.last_run
     }
 
-    /// A resident is live when a run of theirs started and has not been
-    /// frozen. Counted rather than flagged: a flag would need someone to
-    /// clear it, and nobody clears a flag after a crash.
     #[must_use]
     pub fn is_live(&self) -> bool {
         self.runs_started > self.runs_frozen
@@ -308,8 +249,6 @@ mod tests {
         assert_eq!(first.segment_bytes(), second.segment_bytes());
         assert_eq!(first, second);
 
-        // Editing the description changes the digest, which is what makes
-        // "this run read different instructions" visible without a diff.
         std::fs::write(urbanite_path(dir.path(), &addr), "now different\n").unwrap();
         let third = Identity::load(dir.path(), &addr).unwrap();
         assert_ne!(first.segment_bytes(), third.segment_bytes());

@@ -6,8 +6,6 @@
 use super::*;
 use crate::Outbound as _;
 
-/// A vault holding one credential, so a configured header that names
-/// one can be redeemed the way a real building's would be.
 fn vault() -> gateway::SecretResolver {
     Box::new(|reference: &kernel::SecretRef| {
         Ok(kernel::Sealed::new(Box::new(format!(
@@ -17,7 +15,6 @@ fn vault() -> gateway::SecretResolver {
     })
 }
 
-/// A server that answers one POST with `status` and `body`.
 #[cfg(test)]
 fn fake_server(status: u16, body: String) -> (String, std::thread::JoinHandle<String>) {
     use std::io::{Read as _, Write as _};
@@ -93,11 +90,6 @@ fn a_refusing_server_states_the_status_without_quoting_its_page() {
     let _ = server.join();
 }
 
-/// A server that answers 401 or 403 is up and understood the request,
-/// and what it wants is an account. That is a different thing for a
-/// person to do than checking the address, so it is a different code -
-/// and the health view reads it as `authenticating` rather than as a
-/// failure.
 #[test]
 fn a_server_wanting_an_account_refuses_with_the_credential_code() {
     let (url, server) = fake_server(401, "{\"error\":\"sign in\"}".to_owned());
@@ -110,10 +102,6 @@ fn a_server_wanting_an_account_refuses_with_the_credential_code() {
     let _ = server.join();
 }
 
-/// What a refused status tells the caller about its account and about
-/// asking again: a rejected key moves to the next account, a server that
-/// did not handle the request now may handle it later, and every other
-/// status keeps the fail-closed answer.
 #[test]
 fn a_refused_status_says_whether_to_switch_accounts_or_ask_again() {
     use kernel::AccountDisposition::{Advance, Keep};
@@ -144,8 +132,6 @@ fn a_refused_status_says_whether_to_switch_accounts_or_ask_again() {
     );
 }
 
-/// A server that answers `rounds` requests, each with `body`, and
-/// hands out `session` on the first. Returns everything it was sent.
 fn sessioned_server(
     rounds: usize,
     session: &'static str,
@@ -180,10 +166,6 @@ fn sessioned_server(
     (format!("http://{addr}/mcp"), handle)
 }
 
-/// A session id handed out at
-/// initialization has to travel on every later request, and so does
-/// the negotiated protocol version. Without them a server that
-/// keeps state answers 400 to everything after the handshake.
 #[test]
 fn a_session_handed_out_at_initialization_travels_on_every_later_request() {
     const OPENED: &str = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-03-26\",\"capabilities\":{},\"serverInfo\":{\"name\":\"hosted\",\"version\":\"1\"},\"tools\":[]}}";
@@ -213,10 +195,6 @@ fn a_session_handed_out_at_initialization_travels_on_every_later_request() {
     assert!(sent[1].contains("notifications/initialized"));
 }
 
-/// A 404 on a request carrying a session id means the server ended
-/// the session. The id is dropped so the next handshake opens a new
-/// one, which is what the specification asks for; keeping it would
-/// make every later request fail the same way for ever.
 #[test]
 fn a_session_the_server_ended_is_forgotten_rather_than_kept() {
     let (url, server) = fake_server(404, "{}".to_owned());
@@ -265,9 +243,6 @@ fn a_session_the_server_ended_is_forgotten_rather_than_kept() {
     server.join().unwrap();
 }
 
-/// A 404 on a request that carried no session id says the address is
-/// wrong, and asking again only earns the same answer: a retryer that
-/// reads `retry()` does not send the call again.
 #[test]
 fn a_404_without_a_session_is_a_wrong_address_and_is_not_asked_again() {
     let (url, server) = fake_server(404, "{}".to_owned());
@@ -285,10 +260,6 @@ fn a_404_without_a_session_is_a_wrong_address_and_is_not_asked_again() {
     );
 }
 
-/// A paid server's key belongs in the vault, not in a building's
-/// `CONFIG.toml`. `xtask secret` cannot see a city's configuration,
-/// because a city is not in this repository - so nothing but this
-/// would have caught a key written out there in plaintext.
 #[test]
 fn a_header_naming_a_credential_carries_the_key_and_never_the_reference() {
     let (url, server) = fake_server(
@@ -311,8 +282,6 @@ fn a_header_naming_a_credential_carries_the_key_and_never_the_reference() {
     );
 }
 
-/// The value is never in `Debug` either: a diagnostic line is the
-/// easiest place for a credential to escape to.
 #[test]
 fn the_debug_face_names_the_header_and_never_its_value() {
     let held = HttpServer::open(
@@ -326,9 +295,6 @@ fn the_debug_face_names_the_header_and_never_its_value() {
     assert!(!drawn.contains("held-api"));
 }
 
-/// A header with no name is a row somebody started and did not finish,
-/// and it is refused where it is written rather than sent as a header
-/// the far end cannot read.
 #[test]
 fn a_header_with_no_name_is_refused_before_any_request() {
     let err = HttpServer::open(
@@ -341,7 +307,6 @@ fn a_header_with_no_name_is_refused_before_any_request() {
     assert!(!err.subject().contains("opaque-value"), "{}", err.subject());
 }
 
-/// A JSON-RPC answer of exactly `len` bytes, padded inside its result.
 fn answer_of_length(len: usize) -> String {
     let envelope = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"pad\":\"\"}}";
     let filling = "x".repeat(len.saturating_sub(envelope.len()));
@@ -350,8 +315,6 @@ fn answer_of_length(len: usize) -> String {
     body
 }
 
-/// The ceiling is the largest body that passes, as it is the largest
-/// line that passes on a pipe.
 #[test]
 fn an_answer_at_the_ceiling_is_read() {
     let (url, server) = fake_server(200, answer_of_length(crate::MESSAGE_CEILING));
@@ -365,9 +328,6 @@ fn an_answer_at_the_ceiling_is_read() {
     assert_eq!(answer.len(), crate::MESSAGE_CEILING);
 }
 
-/// An HTTP answer is held in memory whole, so it is read under the same
-/// ceiling as a line on a pipe: one byte past it is refused rather than
-/// read to its end, and the call it answered may already have run.
 #[test]
 fn an_answer_past_the_ceiling_is_refused_rather_than_read_whole() {
     let (url, server) = fake_server(

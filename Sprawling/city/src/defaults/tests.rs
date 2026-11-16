@@ -5,7 +5,6 @@
 
 use super::*;
 
-/// The Mayor and the clerk as v0.0.12 laid them down, byte for byte.
 const V0_0_12_MAYOR: &str = include_str!("tests/v0.0.12-MAYOR.md");
 const V0_0_12_CLERK: &str = include_str!("tests/v0.0.12-CLERK.md");
 
@@ -23,8 +22,6 @@ fn on_disk(dir: &tempfile::TempDir, doc: Shipped) -> Vec<u8> {
     std::fs::read(doc.path(dir.path())).unwrap()
 }
 
-/// A city an earlier build formed, whose Mayor and clerk nobody touched,
-/// reads this build's defaults once it opens.
 #[test]
 fn an_unedited_v0_0_12_copy_follows_the_default() {
     let dir = city_with(&[
@@ -41,8 +38,6 @@ fn an_unedited_v0_0_12_copy_follows_the_default() {
     }
 }
 
-/// A copy somebody changed by one byte is theirs: it stays, and it is
-/// named.
 #[test]
 fn an_edited_copy_is_kept_and_named() {
     let mine = format!("{V0_0_12_MAYOR}\nThe Mayor speaks like a harbour pilot.\n");
@@ -60,8 +55,6 @@ fn an_edited_copy_is_kept_and_named() {
     assert_eq!(on_disk(&dir, Shipped::Mayor), mine.as_bytes());
 }
 
-/// Naming the Mayor writes an identity area into `MAYOR.md`; the body
-/// under it still follows the default, and the names stay.
 #[test]
 fn an_identity_area_stays_while_the_body_follows_the_default() {
     let area = "+++\nmayor_name = \"Ada\"\n+++\n";
@@ -75,8 +68,6 @@ fn an_identity_area_stays_while_the_body_follows_the_default() {
     );
 }
 
-/// A city with no copy gets this build's default, so every dispatch's
-/// must-read list has a file to read.
 #[test]
 fn a_missing_copy_is_laid_down() {
     let dir = tempfile::tempdir().unwrap();
@@ -88,9 +79,6 @@ fn a_missing_copy_is_laid_down() {
     }
 }
 
-/// A change to a default that forgot to move the old text into the
-/// earlier list leaves every old city on the old words; a default that
-/// lists itself as earlier would rewrite it forever.
 #[test]
 fn no_default_lists_itself_as_earlier() {
     for doc in Shipped::ALL {

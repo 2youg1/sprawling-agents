@@ -3,28 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Repair leases: when the environment itself is
-//! broken, repair is serialized — one live lease per scope subtree, so
-//! two runs can never "fix" the same breakage into a bigger one. The
-//! active table is the caller's state; kernel only judges.
-//! The part `Sprawling/kernel/spec/Repair.lean` specifies this module.
-
 use std::collections::BTreeMap;
 
 use crate::address::Address;
 use crate::event::RunId;
 
-/// Deliberately exhaustive verdict. Queued is a legal outcome, not an
-/// error — E_REPAIR_BUSY only carries it across the tool surface.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RepairVerdict {
     Lease,
     Queued { holder: RunId },
 }
 
-/// Overlap either way queues (same rule as goal resources); the same
-/// holder re-requesting its exact scope re-leases (idempotent recovery).
-/// First overlapping holder wins the report, in BTreeMap order.
 pub fn request(active: &BTreeMap<Address, RunId>, scope: &Address, who: &RunId) -> RepairVerdict {
     for (held, holder) in active {
         let overlaps = scope.is_within(held) || held.is_within(scope);
@@ -93,8 +82,7 @@ mod tests {
             request(&active, &addr("b/env"), &run(1)),
             RepairVerdict::Lease
         );
-        // But a narrower scope by the same holder still queues: one lease,
-        // one scope — narrowing is a release-and-reacquire, not a nest.
+
         assert_eq!(
             request(&active, &addr("b/env/x"), &run(1)),
             RepairVerdict::Queued { holder: run(1) }

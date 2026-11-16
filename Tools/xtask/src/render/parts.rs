@@ -3,80 +3,40 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The parts roster: every gallery region that draws a part carries the
-//! roles that part's contract names (Tools/xtask/Spec.lean §8-13,
-//! client/spec/Views/Parts.lean §7-10).
-//!
-//! **A look that forgets to spread a wire bag drops the role with it.**
-//! A part is a seat that owns the wiring and a look that draws it
-//! (client/Spec.lean, seats and looks): the seat hands the look a bag of
-//! `role`, `aria-*` and handlers, and the look spreads it onto the
-//! element it draws. A look that draws its own `<button>` in place of the
-//! bag's still renders, still lines up and still passes every other
-//! reading of this gate, while a screen reader meets a row of unnamed
-//! buttons where a radio group stood. The roles are what the engine
-//! reports for the drawn page, so this is where the swap test bites.
-//!
-//! **A region is found by its name, never by a class.** `gallery/case.svelte`
-//! draws every fixture as `<section aria-label={label}>`, and a label opens
-//! with the part's name and a middle dot (`segmented · two cells`). The
-//! name is the one the source gives the part, so a fixture moved between
-//! files keeps its place on the roster.
-//!
-//! **A part with no fixture on the gallery is judged when one arrives.**
-//! The roster names a part's contract, not a count of its fixtures: the
-//! line that adds the first `tabs ·` case is judged by this table without
-//! touching it.
-//!
-//! **A case named for the empty state owes nothing.** `table · empty`
-//! draws the empty-state part in the table's place, so no header is on
-//! the page; a label whose state opens with the word `empty` is read as
-//! that case for every part on the roster.
-
 use super::violation;
 use crate::report::Violation;
 use browser::survey::Drawn;
 
-/// The first word of the state a case draws when the part has nothing
-/// to show (`table · empty`).
 const EMPTY: &str = "empty";
 
-/// What a region must hold for one part, and where the contract says so.
 pub(super) struct Entry {
-    /// The first word of every fixture label for this part.
+
     part: &'static str,
-    /// The section of `client/spec/Views/Parts.lean` this row reads.
+
     contract: &'static str,
     needs: &'static [Need],
 }
 
-/// One role a region must draw, how many times, and whether each must be
-/// named.
 struct Need {
     shown: Shown,
     least: usize,
     naming: Naming,
 }
 
-/// How a required element is recognised on the drawn page.
 #[derive(Clone, Copy)]
 enum Shown {
-    /// An explicit `role` attribute, which is what the probe records.
+
     Role(&'static str),
-    /// One of several roles, when the contract lets the caller pick.
+
     AnyRole(&'static [&'static str]),
-    /// A native element whose role the platform gives without an
-    /// attribute.
+
     Tag(&'static str),
 }
 
-/// Whether the element must carry an accessible name.
 #[derive(Clone, Copy)]
 enum Naming {
     Named,
-    /// A panel is named by the tab that controls it, through
-    /// `aria-labelledby`, which the drawn page may resolve to the tab's
-    /// text or to nothing while the panel is empty.
+
     Any,
 }
 
@@ -88,17 +48,6 @@ const fn named(shown: Shown, least: usize) -> Need {
     }
 }
 
-/// The roster. Four parts are absent, each because the page this gate
-/// reads cannot show what its contract names. `row`: `Row` carries no
-/// role of its own (Parts.lean §7-1) and `RowList` owes keys rather than
-/// roles (§7-4), so nothing a drawn page reports tells a row whose look
-/// dropped its bag from one that kept it. `dialog`: a fixture that draws
-/// the trigger with the sheet closed has no `<dialog>` on the drawn page.
-/// `tip`: the tooltip is `display: none` until hover or focus (§7-3), and
-/// the probe records only what the engine draws. `combobox`: the
-/// `combobox` role is on the filter box of the open popup (§7-5), and a
-/// popup drawn open on load closes as soon as another fixture takes the
-/// focus, which leaves the trigger, a plain button.
 pub(super) const ROSTER: &[Entry] = &[
     Entry {
         part: "segmented",
@@ -152,8 +101,6 @@ pub(super) const ROSTER: &[Entry] = &[
     },
 ];
 
-/// Every region named for a part on the roster draws what that part's
-/// contract needs.
 pub(super) fn every_part_draws_its_roles(
     roster: &[Entry],
     drawn: &[Drawn],
@@ -194,8 +141,6 @@ pub(super) fn every_part_draws_its_roles(
     }
 }
 
-/// Whether `region` is a gallery case for `part` that owes the part's
-/// roles: every case but the one drawing the empty state.
 fn names(region: &Drawn, part: &str) -> bool {
     region.tag == "SECTION"
         && region
@@ -205,8 +150,6 @@ fn names(region: &Drawn, part: &str) -> bool {
             .is_some_and(|state| !draws_the_empty_state(state))
 }
 
-/// Whether a case's state, the label after the middle dot, opens with
-/// the word that names the empty state.
 fn draws_the_empty_state(state: &str) -> bool {
     state
         .split(|c: char| !c.is_alphanumeric())
@@ -214,10 +157,6 @@ fn draws_the_empty_state(state: &str) -> bool {
         == Some(EMPTY)
 }
 
-/// Whether the element at `inner` sits inside the element at `outer`,
-/// read up the chain of nearest measured ancestors. The probe records an
-/// ancestor before its descendants, so every step up lowers the index and
-/// the walk ends.
 fn within(drawn: &[Drawn], inner: usize, outer: usize) -> bool {
     let mut at = inner;
     while let Some(up) = drawn
@@ -300,9 +239,6 @@ mod tests {
             .collect()
     }
 
-    /// The look that drew its own buttons in place of the bags: the
-    /// region still renders two named controls, and the roster names
-    /// both roles it lost.
     #[test]
     fn a_segmented_look_that_dropped_its_bags_is_refused() {
         let drawn = [
@@ -333,9 +269,6 @@ mod tests {
         assert!(judged(&drawn).is_empty());
     }
 
-    /// The roles are counted inside the region alone: a radio group in
-    /// the next case does not stand in for one this case lost, and an
-    /// unnamed cell does not count as a named one.
     #[test]
     fn roles_count_inside_their_own_region_and_only_when_named() {
         let drawn = [
@@ -357,8 +290,6 @@ mod tests {
         );
     }
 
-    /// The empty table draws the empty-state part and no header; a case
-    /// whose state only mentions emptiness further on is still judged.
     #[test]
     fn a_case_drawing_the_empty_state_owes_no_roles() {
         let drawn = [
@@ -376,8 +307,6 @@ mod tests {
         );
     }
 
-    /// A label that only starts with a part's letters is another part:
-    /// `notices · toasts` is not a `notice ·` case.
     #[test]
     fn a_region_belongs_to_a_part_by_its_whole_first_word() {
         let drawn = [

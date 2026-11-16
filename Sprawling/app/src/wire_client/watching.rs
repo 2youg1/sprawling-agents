@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `sprawling gauge --at`: watch a served city's monitor over the wire
-//! and write each reading to stdout (`Sprawling/app/spec/WireClient.lean` §8-97).
-
 use std::collections::VecDeque;
 use std::io::Write;
 use std::time::Duration;
@@ -20,25 +17,14 @@ use tokio_tungstenite::tungstenite::Message;
 use super::{Unheard, credential, hello, malformed, next_frame, unreachable_city};
 use crate::gauge::lines::city_line;
 
-/// Five empty beats: the city has stopped, or stopped sending.
 const SILENCE: Duration = Duration::from_secs(5);
 
-/// The columns a screen row spends before its curve: label and reading.
 const BEFORE_CURVE: usize = 36;
 
-/// The terminal width assumed when `COLUMNS` says nothing.
 const COLUMNS: usize = 80;
 
-/// Clears the terminal and puts the cursor top left.
 const REDRAW: &str = "\u{1b}[H\u{1b}[2J";
 
-/// Watches the city at `at` until it closes the socket or falls silent,
-/// writing each reading in the form `audience` reads.
-///
-/// # Errors
-/// `Unheard::NoCity` when nothing at `at` takes the connection or the
-/// opening frames; `Unheard::Broken` when a frame breaks mid-read,
-/// writing to stdout fails, or this process cannot start the runtime.
 pub(crate) fn top(at: &str, token: Option<&str>, audience: Audience) -> Result<(), Unheard> {
     let key = credential(at, token).map_err(Unheard::Unkeyed)?;
     let greeting = serde_json::to_string(&hello(key.as_deref()))
@@ -106,8 +92,6 @@ async fn watch_until_silent(
     Ok(())
 }
 
-/// The text one received frame puts on stdout, keeping the reading in
-/// `history`; `None` for a frame that is not a monitor reading.
 pub(crate) fn shown(
     text: &str,
     history: &mut VecDeque<Sample>,

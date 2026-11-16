@@ -3,28 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The `[context]` table: where a layer moves the second rung of the
-//! context reminder.
-//!
-//! The value's shape and its legal domain are `kernel`'s to answer
-//! (`kernel::config::SecondThreshold`). What this module owns is how one
-//! layer's `CONFIG.toml` spells that value, and the rule that an
-//! out-of-domain percent is refused where the file is parsed rather than
-//! read into a value nobody can diagnose.
-//!
-//! Specified by `Sprawling/city/spec/ConfigLayers.lean` §8-4.
-
 use serde::Deserialize;
 
-/// What one layer's `[context]` table states, read as written rather
-/// than as a parsed type: the domain is `SecondThreshold`'s answer, and
-/// a deserializer that enforced it here would be the second place that
-/// rule lives (the `McpSection` rule, `Sprawling/city/spec/ConfigLayers.lean` §8-4).
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct ContextSection {
-    /// A whole percent of the window. Checked where it becomes a
-    /// `SecondThreshold`, which is the one construction point.
+
     pub(super) second_threshold: u64,
 }
 
@@ -39,10 +23,6 @@ pub(super) struct ContextSection {
 mod tests {
     use crate::config_layers::ConfigLayer;
 
-    /// The refusal is the only sentence a person editing this file
-    /// gets, so it carries the legal domain (`Sprawling/kernel/Spec.lean` §8-22). No
-    /// clamping: a file that states 30 means something its writer has
-    /// to be told is not accepted.
     #[test]
     fn a_second_threshold_outside_31_through_90_is_refused_with_the_domain() {
         for refused in [30, 91] {

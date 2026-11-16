@@ -3,17 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A closure as a tool face: it answers every call as it admits it and
-//! declares no effect, so its waves are serial.
-
 use kernel::{AxCode, AxError, TimeMs, Tool, ToolCall, ToolMeta, ToolOutcome};
 
 use super::{Admitted, ConcurrentInvoke};
 use crate::bench::Ticket;
 
-/// A closure is a tool face that answers every call as it admits it:
-/// it declares no effect, so its waves are serial. citysim and the tests
-/// that script a tool's answer drive a run through this one.
 impl<F> ConcurrentInvoke for F
 where
     F: FnMut(&ToolCall, TimeMs) -> Result<ToolOutcome, AxError>,

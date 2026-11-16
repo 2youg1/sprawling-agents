@@ -3,33 +3,20 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `provider_degraded`: something this city leans on answered less than
-//! it should, and the line says which of two things that was.
-
 use serde::{Deserialize, Serialize};
 
 use crate::error::AxError;
 
-/// `provider_degraded` has two writers with two shapes.
-///
-/// The carrier table in `kernel::error` sends `E_PROVIDER` here, written
-/// as the error itself; the vault's startup probe writes its fallback to
-/// session memory. A reader tells them apart by reading, not by guessing
-/// from a key, and a line that is neither does not read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(untagged)]
 pub enum ProviderDegraded {
-    /// A provider refused a call; this is the refusal, flat.
+
     Refused(AxError),
-    /// The platform credential service failed its startup round trip.
+
     VaultFellBack(VaultFellBack),
 }
 
-/// Tries the refusal, then the fallback, and when neither reads names
-/// what each shape missed: a derived untagged enum reports only that no
-/// variant matched, which leaves the reader of an unreadable line without
-/// the field to look at.
 impl<'de> Deserialize<'de> for ProviderDegraded {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let line = serde_json::Value::deserialize(deserializer)?;
@@ -48,17 +35,16 @@ impl<'de> Deserialize<'de> for ProviderDegraded {
     }
 }
 
-/// The vault's fallback, as the startup probe writes it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct VaultFellBack {
-    /// Which part degraded; the probe writes `vault`.
+
     pub component: String,
-    /// Where credentials rest instead; the probe writes `session-memory`.
+
     pub fallback: String,
-    /// `gateway::Persistence` in its own spelling.
+
     pub persistence: String,
-    /// Why the platform service was not used.
+
     pub reason: String,
 }
 
@@ -98,7 +84,6 @@ mod tests {
     }
 }
 
-/// One ordered account declaration; plaintext credentials stay in the vault.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ProviderAccount {
@@ -110,10 +95,6 @@ pub struct ProviderAccount {
     pub header: Option<String>,
 }
 
-/// Validates the ordered account authority before registration or replay.
-///
-/// # Errors
-/// Refuses an empty list, repeated id/reference, or an anonymous header.
 pub fn validate_provider_accounts(
     accounts: Option<&[ProviderAccount]>,
 ) -> Result<(), crate::AxError> {
@@ -155,7 +136,6 @@ pub fn validate_provider_accounts(
     Ok(())
 }
 
-/// The non-secret identity of an account attempted by a model call.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ProviderAccountBinding {

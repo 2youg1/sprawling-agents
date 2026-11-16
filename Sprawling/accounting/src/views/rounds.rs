@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One session's records folded into the rounds a page reads.
-//!
-//! **This fold runs on the server, not in the browser.** A fold held by
-//! one client would make a second client write the same fold again to
-//! draw a session, and the wire would stop being the whole API.
-//!
-//! Reading one payload is [`wire::reading`]'s, because the client
-//! still folds the pushed stream forward into what it believes and that
-//! reading has to have one authority.
-
 mod opening;
 mod paired;
 
@@ -37,14 +27,7 @@ use wire::{EventKind, EventRecord, RunId, UsdMicros};
 use super::prepared::LedgerAsk;
 
 impl LedgerAsk {
-    /// The newest [`wire::HISTORY_MAX`] records of one run, oldest
-    /// first.
-    ///
-    /// The same width a client asks for with `Query::RunHistory`, so the
-    /// fold sees as much of a session as a client reading the history
-    /// would. A line that will
-    /// not read ends the slice rather than emptying it - what was read is
-    /// still true.
+
     pub(super) fn records_of(&self, run: RunId) -> Vec<EventRecord> {
         let Ok((index, dir)) = self.indexed() else {
             return Vec::new();
@@ -66,12 +49,6 @@ impl LedgerAsk {
         records
     }
 
-    /// One session, folded into the rounds a person reads.
-    ///
-    /// # Errors
-    /// A `run_frozen` whose payload does not read: an empty ending would
-    /// tell the reader the run said nothing when it said something this
-    /// build cannot read.
     pub(super) fn rounds_answer(&self, run: RunId) -> Result<wire::RoundsAnswer, kernel::AxError> {
         let records = self.records_of(run);
         let mut turns = turns(records.iter());
@@ -95,12 +72,6 @@ impl LedgerAsk {
     }
 }
 
-/// The checkpoint a session's changes are measured from.
-///
-/// The first checkpoint of the session, because that is the tree as the work
-/// found it; measuring from the latest one would answer "what moved in
-/// the last wave", which is a different question and not the one a
-/// person opening a session is asking.
 #[must_use]
 fn opened_at(turns: &[wire::Turn]) -> Option<kernel::GitOid> {
     turns
@@ -108,8 +79,7 @@ fn opened_at(turns: &[wire::Turn]) -> Option<kernel::GitOid> {
         .flat_map(|turn| turn.notes.iter())
         .find_map(|note| match note {
             wire::Note::Checkpointed { oid, .. } => Some(*oid),
-            // The other notes say what happened in the session;
-            // none of them names the commit it opened at.
+
             wire::Note::Refused { .. }
             | wire::Note::Waiting { .. }
             | wire::Note::Arrived { .. }
@@ -119,9 +89,6 @@ fn opened_at(turns: &[wire::Turn]) -> Option<kernel::GitOid> {
         })
 }
 
-/// The name of the tree the run was lent, from its first
-/// `worktree_opened` in the window; a line this build cannot read
-/// answers no name rather than a guessed one.
 #[must_use]
 fn worktree(records: &[EventRecord]) -> Option<String> {
     let opened = records
@@ -136,19 +103,13 @@ fn worktree(records: &[EventRecord]) -> Option<String> {
     }
 }
 
-/// How the session closed, from the first `run_frozen` in the window.
-///
-/// # Errors
-/// That record's payload does not read as a `run_frozen`.
 fn closing(records: &[EventRecord]) -> Result<Option<wire::Closing>, kernel::AxError> {
     records
         .iter()
         .find(|record| record.kind() == EventKind::RunFrozen)
         .map(|record| {
             let frozen = record.data().read::<kernel::event::record::RunFrozen>()?;
-            // Only a cancelled close was stopped by something; a run that
-            // finished or was cut by the ceiling met its carrier on the way
-            // and did not stop there.
+
             let failure = match frozen.failure {
                 Some(failed) => Some(failed),
                 None if frozen.completion == Completion::Cancelled.name() => {
@@ -165,11 +126,6 @@ fn closing(records: &[EventRecord]) -> Result<Option<wire::Closing>, kernel::AxE
         .transpose()
 }
 
-/// The failure an older ledger carried beside `run_frozen`, when the
-/// freeze predates the `failure` key. Its carrier event wrote the same
-/// error flat into history, and the rounds fold dropped carrier rows it
-/// could not pair with a call; recovery reads the close's own evidence
-/// so an adopted city still shows why it stopped.
 #[expect(
     clippy::wildcard_enum_match_arm,
     reason = "three kinds write a carrier; every other record is not one"
@@ -191,13 +147,6 @@ fn old_carrier_failure(records: &[EventRecord]) -> Option<kernel::AxError> {
     })
 }
 
-/// Folds a session's events into turns, oldest first.
-///
-/// Events before the first `model_called` belong to no turn and are left
-/// out: they are the session opening, which the head of the page already
-/// states. A `tool_result` with no call in this window is dropped for the
-/// same reason - the window is bounded, so its first rows can be answers
-/// to calls nobody here saw.
 #[must_use]
 #[expect(
     clippy::wildcard_enum_match_arm,
@@ -205,9 +154,7 @@ fn old_carrier_failure(records: &[EventRecord]) -> Option<kernel::AxError> {
 )]
 pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire::Turn> {
     let mut folded: Vec<wire::Turn> = Vec::new();
-    // Which turn each outstanding call sits in, by the id the runtime
-    // gave it. Answers arrive after other calls have been made, so the
-    // pairing cannot be positional.
+
     let mut awaiting: Vec<(String, usize, usize)> = Vec::new();
     let mut attempts = Attempts::default();
     for record in records {
@@ -233,8 +180,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                 });
             }
             EventKind::ToolCalled => {
-                // Nothing open means this is the session's own opening,
-                // which belongs to no round.
+
                 let turn_at = match folded.len() {
                     0 => continue,
                     open => open.saturating_sub(1),
@@ -269,9 +215,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                 turn.calls.push(call);
             }
             EventKind::ModelReturned => {
-                // The answer belongs to the turn its attempt opened.
-                // No attempt before it means this record is the
-                // session's own opening, which no round owns.
+
                 let Some(turn) = attempts
                     .answered_by(record)
                     .and_then(|opened| folded.iter_mut().rev().find(|turn| turn.opened == opened))
@@ -333,8 +277,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                 }
             }
             kind => {
-                // Everything else is a note when it changed what this
-                // turn did or what it waits on, and nothing otherwise.
+
                 let Some(note) = wire::note_of(kind, record) else {
                     continue;
                 };
@@ -347,28 +290,19 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
     folded
 }
 
-/// Which `model_called` each `model_returned` answers: the latest one its
-/// run recorded before it. Every attempt lands on the ledger, so a resend
-/// after a repair is a second `model_called`, and the attempt it replaced
-/// is never answered. The one rule a page's rounds and a playback
-/// bundle's calls pair a reply by (`Sprawling/accounting/spec/Playback/Traced.lean` §8-25).
 #[derive(Debug, Default)]
 pub(crate) struct Attempts {
     latest: BTreeMap<RunId, kernel::Seq>,
 }
 
 impl Attempts {
-    /// Notes `record` when it sends an attempt; every other line leaves
-    /// the attempts as they were.
+
     pub(crate) fn note(&mut self, record: &EventRecord) {
         if record.kind() == EventKind::ModelCalled {
             self.latest.insert(record.run(), record.seq());
         }
     }
 
-    /// The seq of the `model_called` that `reply` answers; `None` for a
-    /// line that is no reply, and for a reply whose run sent no attempt
-    /// among the lines noted.
     pub(crate) fn answered_by(&self, reply: &EventRecord) -> Option<kernel::Seq> {
         if reply.kind() == EventKind::ModelReturned {
             self.latest.get(&reply.run()).copied()
@@ -378,8 +312,6 @@ impl Attempts {
     }
 }
 
-/// Whether this line's `t` is the moment its own event happened
-/// (`Sprawling/kernel/Spec.lean` §8-4, "what the envelope `t` records").
 pub(crate) fn timing_of(record: &EventRecord) -> wire::Timing {
     match record.moment() {
         Some(_) => wire::Timing::Measured,
@@ -387,11 +319,6 @@ pub(crate) fn timing_of(record: &EventRecord) -> wire::Timing {
     }
 }
 
-/// Whether a call's two times are measured once `answer` is paired with
-/// it, given how the call's own line read (`asked`): the one rule a page's
-/// rounds and a playback bundle's calls both time a call by, a tool call
-/// or a model attempt (`Sprawling/accounting/spec/Playback/Traced.lean` §8-17, §8-25). An answer the city wrote itself after a
-/// restart makes the span unmeasured either way.
 pub(crate) fn answered_timing(asked: wire::Timing, answer: &EventRecord) -> wire::Timing {
     if supplied_by_the_city(answer.data().as_map().get("error")) {
         return wire::Timing::Unmeasured;
@@ -402,9 +329,6 @@ pub(crate) fn answered_timing(asked: wire::Timing, answer: &EventRecord) -> wire
     }
 }
 
-/// Whether an answer is the one the city wrote itself after a restart,
-/// which records when the city wrote it rather than when the tool
-/// answered. Read through `AxError` itself, so the code is spelled once.
 fn supplied_by_the_city(error: Option<&serde_json::Value>) -> bool {
     error
         .and_then(|value| <kernel::AxError as serde::Deserialize>::deserialize(value).ok())

@@ -3,21 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Every frame of a remote session, sealed end to end (Sprawling/remote_access/Spec.lean §8-5).
-//!
-//! AES-256-GCM under the session key of one direction. The nonce is the
-//! direction and a counter, and the counter is not sent: the socket
-//! delivers frames in order, so each side knows the next number, and a
-//! frame replayed, dropped or reordered on the way fails to open. A
-//! failure ends the session; there is no frame worth skipping.
-
 use aws_lc_rs::aead::{AES_256_GCM, Aad, LessSafeKey, NONCE_LEN, Nonce, UnboundKey};
 use kernel::{AxCode, AxError};
 
 use crate::keys::crypto_failure;
 
-/// Which way a frame travels. It is part of the nonce, so a frame sealed
-/// one way cannot be opened the other way even under a mistaken key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
     DeviceToCity,
@@ -33,25 +23,20 @@ impl Direction {
     }
 }
 
-/// What one sealed frame of a session carries, told apart by its first
-/// byte (Sprawling/remote_access/Spec.lean §8-5, remote_access D13): the door's own verb, the
-/// lock, never travels on the wire protocol, so it is spoken here.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Payload {
-    /// One wire-protocol text frame, carried in both directions and
-    /// forwarded as it arrived rather than parsed and written again.
+
     Frame(String),
-    /// A device locking the door as it leaves; any authority may send it.
+
     Lock,
 }
 
-/// The first byte of a [`Payload::Frame`].
 const FRAME: u8 = 0;
-/// The one byte of a [`Payload::Lock`].
+
 const LOCK: u8 = 1;
 
 impl Payload {
-    /// The bytes to seal.
+
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         match self {
@@ -65,12 +50,6 @@ impl Payload {
         }
     }
 
-    /// Reads an opened frame back.
-    ///
-    /// # Errors
-    /// Refuses an empty payload, an unknown first byte, a lock followed by
-    /// more bytes, and a frame that is not UTF-8; the caller ends the
-    /// connection.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, AxError> {
         match bytes.split_first() {
             Some((&FRAME, text)) => std::str::from_utf8(text)
@@ -91,14 +70,12 @@ fn unreadable(subject: String) -> AxError {
         .with_recovery("the device and the city are on different versions; reload the page")
 }
 
-/// Seals the frames one side sends.
 pub struct Sealer {
     key: LessSafeKey,
     direction: Direction,
     next: u64,
 }
 
-/// Opens the frames one side receives, in the order they were sealed.
 pub struct Opener {
     key: LessSafeKey,
     direction: Direction,
@@ -114,11 +91,6 @@ impl Sealer {
         })
     }
 
-    /// Seals one frame and advances the counter.
-    ///
-    /// # Errors
-    /// Refuses once the counter is spent, which a session reaches only
-    /// after 2^64 frames.
     pub fn seal(&mut self, frame: &[u8]) -> Result<Vec<u8>, AxError> {
         let nonce = nonce(self.direction, self.next);
         self.next = advance(self.next)?;
@@ -139,11 +111,6 @@ impl Opener {
         })
     }
 
-    /// Opens the next frame.
-    ///
-    /// # Errors
-    /// Refuses a frame that was changed, replayed, dropped before this one,
-    /// or sealed for the other direction. The caller ends the session.
     pub fn open(&mut self, sealed: &[u8]) -> Result<Vec<u8>, AxError> {
         let nonce = nonce(self.direction, self.next);
         let mut buffer = sealed.to_vec();
@@ -167,7 +134,6 @@ fn aes(key: &[u8; 32]) -> Result<LessSafeKey, AxError> {
         .map_err(|_| crypto_failure("load a session key"))
 }
 
-/// Four bytes of direction, then the counter in big-endian order.
 fn nonce(direction: Direction, counter: u64) -> Nonce {
     let mut bytes = [0u8; NONCE_LEN];
     let (tag, count) = bytes.split_at_mut(4);

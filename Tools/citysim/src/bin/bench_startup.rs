@@ -3,23 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The four-action pressure reading (`Tools/citysim/spec/BenchStartup.lean`
-//! §8-5): install, startup, raise a city, open a session - and
-//! the first byte a served city answers with, over three lengths of
-//! history (section 8-5-1). `bench_startup first-byte` takes that last
-//! reading alone.
-//!
-//! This is a measuring Main, the third sanctioned sampling point besides
-//! `bin::assembly` and `citysim::bench`: every `Instant::now` here carries
-//! the same `#[expect]` the first two carry. It measures and gates
-//! nothing; `Tools/xtask/budgets.toml` is where a reading is recorded.
-//!
-//! The shipped binary is the one beside this executable - the build
-//! profile directory is the one place `cargo build` puts both - and
-//! `just bench-startup` builds it first, so a run can never be driven by
-//! a stale artifact. Nothing here searches for one and nothing here is
-//! found by a check crossing a process boundary.
-
 #[path = "bench_startup/actions.rs"]
 mod actions;
 #[path = "bench_startup/samples.rs"]
@@ -35,13 +18,11 @@ use actions::Action;
 use actions::history::History;
 use samples::{Share, Tier};
 
-/// Which readings one invocation takes.
 enum Part {
     Everything,
     FirstByte,
 }
 
-/// The one place this family reads a clock.
 #[expect(
     clippy::disallowed_methods,
     reason = "a bench harness is a measuring Main; time is its subject, not its input"
@@ -78,20 +59,10 @@ fn main() -> ExitCode {
     }
 }
 
-/// The name the shipped executable carries in an archive and beside
-/// itself: the stem `install.rs` installs it under, plus this platform's
-/// suffix.
-///
-/// The fact has one authority, the per-platform `binary` field of
-/// `Tools/xtask/src/platform.rs`, and this crate cannot reach it: the bin's
-/// `install` module is not importable and `xtask` is tooling. The
-/// restatement, its reason, and what would retire it are recorded as
-/// citysim D5.
 fn executable_name() -> String {
     format!("sprawling{}", std::env::consts::EXE_SUFFIX)
 }
 
-/// The readings the command line asked for.
 fn run() -> Result<(), AxError> {
     let binary = shipped_binary()?;
     match std::env::args().nth(1).as_deref() {
@@ -111,9 +82,6 @@ fn run() -> Result<(), AxError> {
     first_bytes(&binary)
 }
 
-/// The first byte of `GET /` over the three fixture cities, which are
-/// kept beside the build directory and reused (`Tools/citysim/spec/BenchStartup.lean`
-/// §8-5-1).
 fn first_bytes(binary: &Path) -> Result<(), AxError> {
     let Some(cities) = binary
         .parent()
@@ -170,7 +138,6 @@ first byte: `serve` spawned to the first byte of GET /, fixture cities in {}",
     Ok(())
 }
 
-/// The four actions in order, their fixture, and their report.
 fn four_actions(binary: &Path) -> Result<(), AxError> {
     let scratch = scratch_dir()?;
     let archive = actions::archive::fixture(&scratch, binary)?;
@@ -189,9 +156,7 @@ fn four_actions(binary: &Path) -> Result<(), AxError> {
     let install = actions::install(&scratch, &archive)?;
     let startup = actions::startup(binary)?;
     let raising = actions::raise_city(&scratch)?;
-    // The city the session action is measured in. Its name is this run's
-    // own: nothing here spells the path a session slice lies at, which
-    // `xtask slices` refuses because `storage::sessions` is its one writer.
+
     let session_city = scratch.join("session-city");
     let session = actions::open_session(&session_city)?;
     let rows: [(&str, &Action); 4] = [
@@ -208,7 +173,6 @@ fn four_actions(binary: &Path) -> Result<(), AxError> {
     Ok(())
 }
 
-/// The table, the three-piece line of every action, and the sub-metrics.
 fn report(rows: &[(&str, &Action)], archive_bytes: u64) {
     println!(
         "{:<12} {:>9} {:>9} {:>9} {:>9} {:>9}   suspicious",
@@ -286,13 +250,10 @@ fn report(rows: &[(&str, &Action)], archive_bytes: u64) {
     );
 }
 
-/// Milliseconds as a report figure. Floats appear here and nowhere else:
-/// no reading feeds a decision.
 fn ms(duration: std::time::Duration) -> f64 {
     duration.as_secs_f64() * 1_000.0
 }
 
-/// Where this run keeps its fixtures and its raised cities.
 fn scratch_dir() -> Result<PathBuf, AxError> {
     let dir = std::env::temp_dir().join(format!("sprawl-bench-startup-{}", std::process::id()));
     std::fs::create_dir_all(&dir).map_err(|err| {
@@ -306,8 +267,6 @@ fn scratch_dir() -> Result<PathBuf, AxError> {
     Ok(dir)
 }
 
-/// The binary this bench measures: the one beside its own executable,
-/// which is where the build profile directory puts both.
 fn shipped_binary() -> Result<PathBuf, AxError> {
     let here = std::env::current_exe().map_err(|err| {
         AxError::failure(

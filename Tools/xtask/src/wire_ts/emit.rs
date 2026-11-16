@@ -3,24 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One JSON Schema document in, one `wire.ts` out, written for Effect 4.
-//!
-//! The emitter reads the subset serde produces for this wire and nothing
-//! more: objects, the five primitive types, arrays and tuples, string
-//! enums and constants, `oneOf`/`anyOf`, `$ref` into `$defs`, a type
-//! list that adds `null`, and the two boolean schemas. Any other keyword
-//! is refused with its place, because a generator that guesses is a
-//! generator that emits a wrong type without saying so.
-//!
-//! Definitions come out in dependency order with names as the tie-break:
-//! an Effect `Schema` is a runtime value, so what a struct refers to must
-//! already be defined when the struct is. A definition that reaches
-//! itself through its references is the exception: its references into
-//! the cycle are `Schema.suspend`, read when a value is decoded rather
-//! than when the file loads, and its two types are written out, because
-//! TypeScript cannot infer a type from an initialiser that refers to
-//! itself.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 
@@ -33,7 +15,6 @@ use values::Values;
 mod types;
 mod values;
 
-/// Where the emitter stopped, and on what.
 #[derive(Debug)]
 pub(super) struct Refused {
     pub(super) at: String,
@@ -119,9 +100,6 @@ fn refuse(at: &str, why: impl Into<String>) -> Refused {
     }
 }
 
-/// Every definition, each after the ones it refers to outside a cycle.
-/// Depth-first from the names in order, so ties fall alphabetically and
-/// the output is the same on every machine.
 fn ordered(edges: &BTreeMap<String, BTreeSet<String>>) -> Result<Vec<String>, Refused> {
     let mut done = Vec::new();
     let mut trail = Vec::new();
@@ -131,9 +109,6 @@ fn ordered(edges: &BTreeMap<String, BTreeSet<String>>) -> Result<Vec<String>, Re
     Ok(done)
 }
 
-/// A name already on the trail closes a cycle. The definitions on a
-/// cycle reach each other through `Schema.suspend`, so no order is owed
-/// among them.
 fn visit(
     name: &str,
     edges: &BTreeMap<String, BTreeSet<String>>,
@@ -155,7 +130,6 @@ fn visit(
     Ok(())
 }
 
-/// Every definition and the definitions it refers to.
 fn edges(defs: &BTreeMap<&str, &Value>) -> BTreeMap<String, BTreeSet<String>> {
     defs.iter()
         .map(|(name, schema)| {
@@ -166,8 +140,6 @@ fn edges(defs: &BTreeMap<&str, &Value>) -> BTreeMap<String, BTreeSet<String>> {
         .collect()
 }
 
-/// The definitions that reach themselves through their references:
-/// every member of a cycle, and nothing that only refers into one.
 fn recursive(edges: &BTreeMap<String, BTreeSet<String>>) -> BTreeSet<String> {
     edges
         .keys()
@@ -205,11 +177,6 @@ fn refs_within(schema: &Value, out: &mut BTreeSet<String>) {
     }
 }
 
-/// One `export const` and its `export type`, with the description as a
-/// doc comment. A named bare primitive is a newtype and gets its brand;
-/// every other definition carries its name as the identifier a decode
-/// error prints. A recursive definition states its two types first and
-/// annotates its value with them.
 fn definition(name: &str, schema: &Value, recursive: &BTreeSet<String>) -> Result<String, Refused> {
     if !is_identifier(name) {
         return Err(refuse(name, "not a TypeScript identifier"));
@@ -226,9 +193,7 @@ fn definition(name: &str, schema: &Value, recursive: &BTreeSet<String>) -> Resul
     let is_recursive = recursive.contains(name);
     let suspended = if is_recursive { recursive } else { &none };
     let body = Values { suspended }.expression(schema, name, 0)?;
-    // A brand already prints as `string & Brand<"Name">` in a decode
-    // error; everything else is named so the error says `Command`
-    // rather than spelling the whole union out.
+
     let body = if is_bare_primitive(schema) {
         format!("{body}.pipe(Schema.brand(\"{name}\"))")
     } else {
@@ -248,8 +213,6 @@ fn definition(name: &str, schema: &Value, recursive: &BTreeSet<String>) -> Resul
     Ok(out)
 }
 
-/// One side of a recursive definition's type, as the client's lint
-/// spells it: an object type is an `interface`, anything else a `type`.
 fn declared(
     name: &str,
     side: Side,
@@ -286,8 +249,6 @@ fn is_bare_primitive(schema: &Value) -> bool {
         && !map.contains_key("const")
 }
 
-/// A string as a TypeScript literal: the JSON spelling is a valid one,
-/// so the escaping rule is serde_json's rather than a second one here.
 fn quoted(text: &str) -> String {
     Value::String(text.to_owned()).to_string()
 }

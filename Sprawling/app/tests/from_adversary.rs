@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The traces the adversary found, kept here so this repository remembers them.
-//!
-//! Written by `Tools/adversary/src/Sprawling/Regression.lean` and compared against it
-//! byte for byte. Change the trace there; changing it here turns the adversary
-//! red, which is exactly what should happen when the two disagree.
-//!
-//! The adversary drives the shipped binary over the wire. This enters by the
-//! same door `wire::server` does, so the trace runs without a port.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -21,9 +12,7 @@
 )]
 
 use kernel::{Address, AxCode, IdemKey, RunId, Seq};
-// The city is formed with an in-memory vault, because these tests are
-// about the worker and must not write to the credential service of the
-// machine that runs them.
+
 use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
@@ -37,8 +26,6 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
     )
     .unwrap();
 
-    // The vault is the in-session one: a test that reached the platform
-    // credential service would write to the machine running it.
     let mut worker = accounting::worker::RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -69,8 +56,7 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
         })
         .unwrap_err();
     assert_eq!(*refused2.code(), AxCode::ModelUnchosen);
-    // A refusal is a promise in three parts; a code with no way forward
-    // keeps only one of them.
+
     assert!(!refused2.recovery().is_empty());
 
     worker
@@ -93,8 +79,7 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
         })
         .unwrap_err();
     assert_eq!(*refused4.code(), AxCode::GateDenied);
-    // A refusal is a promise in three parts; a code with no way forward
-    // keeps only one of them.
+
     assert!(!refused4.recovery().is_empty());
 }
 
@@ -108,8 +93,6 @@ fn every_spelling_of_one_endpoint_is_registered_as_one_url() {
     )
     .unwrap();
 
-    // The vault is the in-session one: a test that reached the platform
-    // credential service would write to the machine running it.
     let mut worker = accounting::worker::RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -117,9 +100,6 @@ fn every_spelling_of_one_endpoint_is_registered_as_one_url() {
     )
     .unwrap();
 
-    // A provider prints one endpoint several ways and a person pastes
-    // whichever one they were shown. Nothing listens on this address, so
-    // every attachment below is one the person's own model id carried.
     attach(&mut worker, "relay-0", "http://127.0.0.1:47199/v1").unwrap();
     attach(&mut worker, "relay-1", "http://127.0.0.1:47199/v1/").unwrap();
     attach(&mut worker, "relay-2", "http://127.0.0.1:47199/v1/messages").unwrap();
@@ -131,9 +111,7 @@ fn every_spelling_of_one_endpoint_is_registered_as_one_url() {
         kernel::EventKind::EndpointAttached,
         "base_url",
     );
-    // One registration per spelling, and the same URL in each: what is
-    // asserted is the relation between the readings, so no normalisation
-    // is recomputed here.
+
     assert_eq!(written.len(), 5);
     assert!(
         written.windows(2).all(|pair| pair[0] == pair[1]),
@@ -151,8 +129,6 @@ fn a_model_no_catalogue_prices_is_registered_with_a_ceiling() {
     )
     .unwrap();
 
-    // The vault is the in-session one: a test that reached the platform
-    // credential service would write to the machine running it.
     let mut worker = accounting::worker::RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -161,9 +137,7 @@ fn a_model_no_catalogue_prices_is_registered_with_a_ceiling() {
     .unwrap();
 
     attach(&mut worker, "relay", "http://127.0.0.1:47199/v1").unwrap();
-    // The box a person left empty. The Anthropic wire requires
-    // `max_tokens` in every request, so a registration that kept the
-    // ceiling unstated is a model this city cannot call at all.
+
     worker
         .handle(wire::Command::SelectModel {
             endpoint: wire::ProviderName::parse("relay").unwrap(),
@@ -188,9 +162,7 @@ fn a_model_no_catalogue_prices_is_registered_with_a_ceiling() {
             .is_some_and(|tokens| tokens > 0),
         "a model nobody priced was registered with {ceilings:?}"
     );
-    // Which rung answered, read back in the ladder's own spelling: this
-    // id is in no catalogue and under no preset host, so the policy
-    // default is the rung that was left.
+
     let rungs = stated(
         &raised.ledger_dir,
         kernel::EventKind::ModelSelected,
@@ -202,13 +174,6 @@ fn a_model_no_catalogue_prices_is_registered_with_a_ceiling() {
     );
 }
 
-/// One endpoint attached under a name of its own, with the model id the
-/// person named.
-///
-/// The id is named rather than left to the probe: most compatible
-/// endpoints serve no model list, and this address serves nothing at
-/// all, so an attachment that declared no id would be refused for an
-/// interface the endpoint never promised.
 fn attach(
     worker: &mut accounting::worker::RunWorker,
     name: &str,
@@ -227,12 +192,6 @@ fn attach(
     })
 }
 
-/// What this city's history states under one kind of record and one
-/// field, oldest first.
-///
-/// The ledger is the only reading these tests take: what a city
-/// registered is what its history says it registered, and a field read
-/// off a live structure would be a second account of the same fact.
 fn stated(
     ledger: &std::path::Path,
     kind: kernel::EventKind,

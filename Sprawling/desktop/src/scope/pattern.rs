@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One line of the allowlist, and what it matches.
-//!
-//! `*` stands for any run of characters, including none; every other
-//! character stands for itself; comparison ignores ASCII case, which is
-//! how Windows compares a process name.
-//!
-//! A regular expression language was rejected. This list is what a
-//! person writes to say what they are handing over, and a permission
-//! nobody can read at a glance is a permission nobody checked.
-//!
-//! The properties this module must hold are proved in `Sprawling/desktop/spec/Scope/Pattern.lean`;
-//! this code is the authority on how it holds them.
-
-/// One allowlist line, held as characters so that matching never slices
-/// a string in the middle of a character.
 #[derive(Debug)]
 pub(crate) struct Pattern {
     glob: Vec<char>,
@@ -39,8 +24,7 @@ impl Pattern {
 fn matches(glob: &[char], text: &[char]) -> bool {
     let mut at_pattern: usize = 0;
     let mut at_text: usize = 0;
-    // Where the most recent `*` sits, and how much of the text it has
-    // swallowed so far.
+
     let mut star: Option<(usize, usize)> = None;
     loop {
         let advanced = match (glob.get(at_pattern), text.get(at_text)) {
@@ -60,8 +44,7 @@ fn matches(glob: &[char], text: &[char]) -> bool {
         if advanced {
             continue;
         }
-        // Backtrack: let the last `*` swallow one more character. When it
-        // has already swallowed everything, nothing is left to try.
+
         let Some((at_star, swallowed)) = star else {
             return false;
         };
@@ -95,8 +78,6 @@ mod tests {
         assert!(!Pattern::new("*.exe").matches("notepad.exe.bak"));
     }
 
-    /// A pattern with no star is anchored at both ends, so a longer
-    /// title is a different window.
     #[test]
     fn a_pattern_without_a_star_matches_the_whole_name_and_no_more() {
         assert!(Pattern::new("Calculator").matches("Calculator"));
@@ -105,8 +86,6 @@ mod tests {
         assert!(!Pattern::new("").matches("anything"));
     }
 
-    /// Windows compares a process name without regard to case, so this
-    /// list does too.
     #[test]
     fn matching_ignores_ascii_case() {
         assert!(Pattern::new("Notepad.exe").matches("NOTEPAD.EXE"));
@@ -114,8 +93,6 @@ mod tests {
         assert!(!Pattern::new("notepad.exe").matches("notepad2.exe"));
     }
 
-    /// Backtracking has to terminate on a name that keeps nearly
-    /// matching; the text index only ever moves forward.
     #[test]
     fn a_name_that_nearly_matches_many_times_still_ends() {
         assert!(!Pattern::new("*aaaaaaaaab").matches("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"));

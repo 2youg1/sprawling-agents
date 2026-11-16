@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The tools that hand bytes this run may read to an endpoint the book
-//! names: `transcribe`, then `ocr` (`Sprawling/app/Spec.lean` §8-131, §8-142).
-//!
-//! They are one phase of laying out the bench because they share one
-//! door: a `runtime::BoundReader` over the read bound `read` and
-//! `search` ask, the tree the run reads in and the city's block store,
-//! so what one tool may open the others may send (`Sprawling/runtime/Spec.lean` §8-59).
-
 use std::sync::Arc;
 
 use kernel::AxError;
@@ -18,12 +10,7 @@ use kernel::AxError;
 use crate::worker::workbench::{Laying, Site};
 
 impl Laying {
-    /// The tools of this phase that the book offers this building, in
-    /// their order on the table.
-    ///
-    /// # Errors
-    /// Propagates a facility that cannot be built for its chosen
-    /// endpoint.
+
     pub(super) fn endpoint_tools(
         &self,
         site: &Site,

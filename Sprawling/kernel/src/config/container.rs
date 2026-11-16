@@ -3,17 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Explicit container limits and a local immutable image identity
-//! (`Sprawling/kernel/spec/Config.lean`, container input contract).
-
 use std::num::{NonZeroU32, NonZeroU64};
 
 use serde::{Deserialize, Serialize};
 
 use crate::{AxCode, AxError};
 
-/// A locally installed image ID. Registry references and mutable tags
-/// cannot reach an execution request through this type.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct ContainerImage(String);
@@ -22,10 +17,7 @@ impl ContainerImage {
     pub(crate) const PREFIX: &str = "sha256:";
     pub(crate) const DIGEST_LENGTH: usize = 64;
     pub(crate) const HEX_DIGITS: &str = "0123456789abcdef";
-    /// Parses an immutable image ID without consulting a registry.
-    ///
-    /// # Errors
-    /// `E_CONFIG_INVALID` for anything except a full lowercase sha256 ID.
+
     pub fn parse(image: &str) -> Result<Self, AxError> {
         if image.strip_prefix(Self::PREFIX).is_some_and(|digest| {
             digest.len() == Self::DIGEST_LENGTH
@@ -65,8 +57,6 @@ impl From<ContainerImage> for String {
     }
 }
 
-/// Every limit is explicit and nonzero. CPU is in millicpu, memory is
-/// in bytes, and the process count bounds descendants as well as PID 1.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]

@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A resident replacing itself: the same address, the same depth, the
-//! same tools, and a lineage a commit can be asked for.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -17,12 +14,6 @@
 use crate::worker::fixture::*;
 use kernel::{Address, EventKind, EventRecord, RunId};
 
-/// The tool table of every request that carried one, in the order the
-/// provider saw them.
-///
-/// Two kinds of body are skipped rather than read: the model-list
-/// request, which has no JSON body at all, and the handoff probe, which
-/// offers no tools because it asks questions rather than works.
 fn tool_tables(bodies: &[String]) -> Vec<Vec<String>> {
     bodies
         .iter()
@@ -40,11 +31,6 @@ fn tool_tables(bodies: &[String]) -> Vec<Vec<String>> {
         .collect()
 }
 
-/// Three successions, no person in the loop. The successor's tool table
-/// equals its predecessor's name for name, and every dormant index files
-/// as many of the city's own tools as the first, `delegate` among them,
-/// because succession conserves depth — and the commit the fourth run
-/// checkpoints answers a lineage of four.
 #[test]
 fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
     let dir = tempfile::tempdir().unwrap();
@@ -58,11 +44,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
             serde_json::json!({ "reason": "the window is filling" }),
         )
     };
-    // Four replies per succession, not two. The run asks and the run
-    // ends, and then the handoff probe puts its questions twice: once
-    // to the departing run over its own transcript, once to the
-    // successor over what it was handed. Both readings are what the
-    // decay comparison is made from.
+
     let probed = || completion("1. the lexer\n2. nothing yet\n3. no", None);
     let (base_url, provider) = fake_openai(
         &["m-local"],
@@ -79,8 +61,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
             completion("over to you", None),
             probed(),
             probed(),
-            // A call that may write, because only such a wave is checkpointed
-            // (`Sprawling/runtime/Spec.lean` §8-45): a read-only one changes no file.
+
             tool_completion(
                 "noting",
                 "tu_4",
@@ -141,9 +122,7 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
     let first = tables.first().expect("the first run called the model");
     let last = tables.last().expect("the fourth run called the model");
     assert!(first.contains(&"tool".to_owned()), "{first:?}");
-    // `delegate` and `succeed` wait in every run's dormant index, under
-    // the city's own namespace, which a successor freezes from the same
-    // table (`Sprawling/runtime/Spec.lean` §8-60).
+
     let own = |body: &str| {
         body.split("- sprawling (")
             .nth(1)
@@ -184,9 +163,6 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
     );
 }
 
-/// The handoff a run writes lives in its room, so two rooms of one
-/// building freezing at once do not fight over one file — and it is
-/// what the successor's prompt carries.
 #[test]
 fn the_handoff_in_the_room_reaches_the_successor() {
     let dir = tempfile::tempdir().unwrap();

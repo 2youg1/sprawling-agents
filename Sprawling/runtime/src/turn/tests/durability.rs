@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The checks derived from `Sprawling/runtime/spec/Turn/Durability.lean`
-//! (runtime D24): how many barriers a turn pays, that a write's intent
-//! is durable before the write runs, and what a power cut at any line of
-//! the ledger's write sequence leaves on disk.
-
 use std::sync::{Arc, Mutex};
 
 use super::super::*;
@@ -17,14 +12,8 @@ use crate::conversation::Opening;
 use kernel::{Effect, EventDraft, EventRef, IdemKey, Seq, Tool, ToolOutcome};
 use proptest::prelude::*;
 
-/// The kinds of the lines a ledger holds, shared with the tools so a
-/// tool can read what is durable at the moment it runs.
 pub(super) type Durable = Arc<Mutex<Vec<String>>>;
 
-/// A ledger that counts its barriers: each call into it is one round
-/// trip through the relay, and so one disk barrier. The power goes out
-/// when it is about to write line `cut_at` (counted from zero): that line
-/// and every later one never reach the disk.
 struct Barriers {
     inner: TestLedger,
     durable: Durable,
@@ -78,8 +67,6 @@ impl Ledger for Barriers {
     }
 }
 
-/// A tool that answers with nothing and, when it watches, writes down
-/// what was durable each time it ran.
 struct Witness {
     meta: kernel::ToolMeta,
     durable: Durable,
@@ -114,9 +101,6 @@ fn meta(name: &str, effect: Effect) -> kernel::ToolMeta {
     }
 }
 
-/// A face over a bench holding `read` and `write`. The bench clears both
-/// as reads, so no door stands in the way; the face names `write` as a
-/// write, which is what decides the wave's order.
 pub(super) struct Face {
     bench: ToolBench,
     write: kernel::ToolMeta,
@@ -198,9 +182,6 @@ fn call(id: &str, tool: &str) -> ToolCall {
     }
 }
 
-/// One whole turn whose model asks for `calls`, on `ledger`, and the
-/// barrier the run pays at its end; how many refs the run's lines hold
-/// then, and what each tool saw durable when it ran, in call order.
 fn turn_of(ledger: &mut Barriers, calls: Vec<ToolCall>) -> (usize, Vec<Vec<String>>) {
     let saw = Arc::default();
     let refs = run_turn(ledger, calls, &saw).unwrap();
@@ -208,7 +189,6 @@ fn turn_of(ledger: &mut Barriers, calls: Vec<ToolCall>) -> (usize, Vec<Vec<Strin
     (refs, saw)
 }
 
-/// The same turn, ending on the ledger's refusal instead of unwrapping it.
 fn run_turn(
     ledger: &mut Barriers,
     calls: Vec<ToolCall>,
@@ -247,9 +227,6 @@ fn run_turn(
     Ok(lines.refs().len())
 }
 
-/// `tf1_write_intent_durable`: when a write runs, its own `tool_called`
-/// and every line before it are already on the ledger, while the read
-/// before it ran without waiting for its own or for `model_returned`.
 #[test]
 fn tf1_write_intent_is_durable_before_the_write_runs() {
     let mut ledger = Barriers::new();
@@ -272,11 +249,6 @@ fn tf1_write_intent_is_durable_before_the_write_runs() {
     );
 }
 
-/// `tf1_turn_barriers`: a turn pays one barrier for its model call,
-/// which carries a first turn's `prompt_assembled` too, and one for each
-/// write, however many reads it makes; the run's barrier at its end
-/// carries the rest, and then every line the turn wrote has its ref
-/// (`tf1_run_refs_complete`).
 #[test]
 fn tf1_turn_barriers() {
     let mut ledger = Barriers::new();
@@ -296,7 +268,6 @@ fn tf1_turn_barriers() {
     );
 }
 
-/// The wave a model asks for: `true` is a write, `false` a read.
 fn wave_of(writes: &[bool]) -> Vec<ToolCall> {
     writes
         .iter()
@@ -309,11 +280,7 @@ fn wave_of(writes: &[bool]) -> Vec<ToolCall> {
 }
 
 proptest! {
-    /// `tf1_write_intent_durable` and `tf1_durable_is_reference_prefix`
-    /// under a power cut at any line of the ledger's write sequence:
-    /// every write that ran saw its own `tool_called` as the last durable
-    /// line, with one `tool_called` per call before it, and what reached
-    /// the disk is a prefix of the lines the uncut turn writes.
+
     #[test]
     fn tf1_a_power_cut_leaves_a_prefix_and_no_write_without_its_intent(
         writes in proptest::collection::vec(any::<bool>(), 0..8),

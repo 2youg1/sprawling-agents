@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `specalign`'s reading of the kernel's Lean specification
-//! (Tools/xtask/Spec.lean §8-43): the carrier of every `AxCode`, the
-//! window class of every `EventKind`, and every `inductive` that shares a
-//! name with a kernel enum, each against what the kernel compiles.
-//!
-//! The specification writes the two tables as a `def` with one arm per
-//! line and the rosters as an `inductive` with one constructor per line.
-//! The names are the Rust names, spelled the same, so the comparison is
-//! one of equal strings. An `inductive` is never abbreviated, so no
-//! roster is skipped as a pointer elsewhere.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -22,7 +11,6 @@ use kernel::{AxCode, Carrier, EventKind, WindowClass};
 use crate::lean::{self, Source, Table};
 use crate::report::{Violation, XtaskError};
 
-/// The two tables, by the `def` that holds each and the enum it covers.
 const CARRIERS: &str = "AxCode.carrier";
 const WINDOWS: &str = "EventKind.windowClass";
 
@@ -44,9 +32,6 @@ pub(super) fn check(
     rosters(root, sources, out)
 }
 
-/// The right-hand side the carrier table owes `code`, spelled as the
-/// kernel spells `Carrier`, because the specification declares that
-/// enum too and its roster is held to the same names.
 fn carrier_of(code: AxCode) -> String {
     match code.carrier() {
         Carrier::Loadtime => ".Loadtime".to_owned(),
@@ -54,8 +39,6 @@ fn carrier_of(code: AxCode) -> String {
     }
 }
 
-/// The right-hand side the window table owes `kind`, spelled as the
-/// kernel spells `WindowClass`, for the reason `carrier_of` gives.
 fn window_of(kind: EventKind) -> String {
     match kind.window_class() {
         WindowClass::InWindow => ".InWindow".to_owned(),
@@ -63,18 +46,11 @@ fn window_of(kind: EventKind) -> String {
     }
 }
 
-/// A table, and the file it was read from.
 struct Located {
     path: String,
     table: Table,
 }
 
-/// The table `def` names, from whichever file of the specification
-/// holds it.
-///
-/// # Errors
-/// When no file does: a gate that found no table would otherwise pass
-/// every variant.
 fn located(sources: &[Source], def: &str) -> Result<Located, XtaskError> {
     sources
         .iter()
@@ -93,8 +69,6 @@ fn located(sources: &[Source], def: &str) -> Result<Located, XtaskError> {
         })
 }
 
-/// Every variant has exactly the arm the kernel owes it, and every arm
-/// is a variant.
 fn compare(found: &Located, expected: &[(String, String)], def: &str, out: &mut Vec<Violation>) {
     let mut arms: BTreeMap<&str, (usize, &str)> = found
         .table
@@ -126,7 +100,6 @@ fn compare(found: &Located, expected: &[(String, String)], def: &str, out: &mut 
     }
 }
 
-/// Every `inductive` named like a kernel enum lists exactly its variants.
 fn rosters(root: &Path, sources: &[Source], out: &mut Vec<Violation>) -> Result<(), XtaskError> {
     let compiled = super::enums::compiled(root)?;
     for source in sources {
@@ -177,8 +150,6 @@ fn finding(location: String, violation: String, alternative: &str) -> Violation 
 mod tests {
     use crate::root::fixture;
 
-    /// Every carrier arm the real kernel owes, with one left out and one
-    /// changed, and a roster one constructor short.
     #[test]
     fn a_lean_kernel_specification_is_held_to_the_compiled_enums() {
         let root = fixture::relocated("specalign-tables");
@@ -229,11 +200,6 @@ mod tests {
         );
     }
 
-    /// A specification that declares `Carrier` and `WindowClass` as the
-    /// kernel spells them, and writes its two tables in that spelling,
-    /// with one carrier arm left out: the one absent arm is the only
-    /// finding, so the two tables and the two rosters agree on one
-    /// spelling.
     #[test]
     fn the_tables_are_spelled_as_the_rosters_they_point_into() {
         let root = fixture::relocated("specalign-spelled");

@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The read-only verb that shows one city's Ledger from disk
-//! (`Sprawling/app/spec/Main.lean` §8-105).
-//!
-//! What it writes into a pipe or a file is what an agent already parses:
-//! Ledger lines byte for byte, or with `--runs` one JSON line per run
-//! from `accounting::lineage`. At a terminal each Ledger line is led by
-//! its chain hash, the value a person writes down to find the line
-//! again. Nothing here decides what a record means, so a new event kind
-//! needs no line in this file.
-
 use super::city::report;
 use super::grammar::{Arguments, nearest};
 use kernel::event::record::{CheckpointCommitted, CheckpointFinding, SecretEgressBlocked};
@@ -23,8 +13,6 @@ use std::io::{BufWriter, ErrorKind, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-/// Which Ledger lines the `records` lens writes. Every condition given
-/// must hold; `tail` then keeps the last lines that passed.
 #[derive(Debug, Default)]
 pub(super) struct Selection {
     pub(super) tail: Option<usize>,
@@ -33,12 +21,10 @@ pub(super) struct Selection {
     pub(super) kind: Option<EventKind>,
     pub(super) who: Option<String>,
     pub(super) grep: Option<String>,
-    /// The moments a line's own `t` must fall in (`Sprawling/app/spec/Main.lean` §8-137).
+
     pub(super) span: UtcSpan,
 }
 
-/// Who reads stdout, decided once per command: an agent reading a pipe
-/// or a file, or a person at a terminal (`Sprawling/app/spec/Main.lean` §8-105).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Audience {
     Agent,
@@ -53,9 +39,6 @@ impl Audience {
         }
     }
 
-    /// Writes one Ledger line and its `\n` in the form this audience
-    /// reads: byte for byte for an agent; for a person, led by the
-    /// line's whole chain hash.
     fn write_line(self, line: &[u8], out: &mut impl Write) -> std::io::Result<()> {
         let label = match self {
             Audience::Agent => String::new(),
@@ -67,22 +50,16 @@ impl Audience {
     }
 }
 
-/// How many hex digits of a line's chain hash stand before it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HashWidth {
-    /// All 64, where the line is written whole.
+
     Whole,
-    /// The first `GLANCE_DIGITS`, where a row is cut to its column.
+
     Glance,
 }
 
-/// Enough digits to tell two lines apart by eye in a ledger of
-/// hundreds of thousands of lines; the whole hash is in the detail pane.
 const GLANCE_DIGITS: usize = 12;
 
-/// The chain hash of the Ledger line `line` as a person reads it before
-/// the line: the hex digits `width` keeps, then two spaces. The hash is
-/// of the bytes given; `view` never checks it against the next `prev`.
 fn chain_label(line: &[u8], width: HashWidth) -> String {
     let hex = kernel::ledger::chain_hash(line).to_string();
     let kept = match width {
@@ -93,7 +70,6 @@ fn chain_label(line: &[u8], width: HashWidth) -> String {
     format!("{digits}  ")
 }
 
-/// Why the verb could not finish writing.
 #[derive(Debug)]
 pub(super) enum ViewError {
     Ledger(AxError),
@@ -118,8 +94,6 @@ impl From<std::io::Error> for ViewError {
     }
 }
 
-/// Exit codes: 0 written, 1 the ledger could not be read, 2 this
-/// command line.
 pub(super) fn verb(read: &Arguments) -> ExitCode {
     let Some(city) = read.positional(1) else {
         eprintln!("usage: sprawling view <city-dir> [--runs | --shells | filters]");
@@ -146,7 +120,7 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
     };
     match written.and_then(|()| out.flush().map_err(ViewError::Write)) {
         Ok(()) => ExitCode::SUCCESS,
-        // A reader that stopped early (`| head`) has what it asked for.
+
         Err(ViewError::Write(err)) if err.kind() == ErrorKind::BrokenPipe => ExitCode::SUCCESS,
         Err(ViewError::Write(err)) => {
             eprintln!("sprawling: view: stdout: {err}");
@@ -157,8 +131,7 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
 }
 
 impl Selection {
-    /// Whether no condition narrows the lines: only then does a person
-    /// at a terminal get the interactive face instead of the lines.
+
     fn is_everything(&self) -> bool {
         matches!(
             self,
@@ -188,10 +161,6 @@ impl Selection {
         })
     }
 
-    /// Whether one raw Ledger line passes the conditions that read its
-    /// bytes; the run and the lower seq bound are settled by the walk.
-    /// The span is asked of every line, because `t` does not rise with
-    /// seq (`Sprawling/app/spec/Main.lean` §8-137).
     fn admits(&self, line: &[u8]) -> Result<bool, AxError> {
         if let Some(text) = &self.grep
             && !text.is_empty()
@@ -216,7 +185,6 @@ impl Selection {
     }
 }
 
-/// The whole number `flag` was given, or the line that says it is not one.
 fn whole_number(read: &Arguments, flag: &str) -> Result<Option<u64>, String> {
     read.value(flag)
         .map(|raw| {
@@ -226,9 +194,6 @@ fn whole_number(read: &Arguments, flag: &str) -> Result<Option<u64>, String> {
         .transpose()
 }
 
-/// The span `--since` and `--until` give, each end read by
-/// `runtime::clock::parse_iso`, or the line that says which end could
-/// not be read and what shape it wants.
 fn utc_span(read: &Arguments) -> Result<UtcSpan, String> {
     let moment = |flag: &str| {
         read.value(flag)
@@ -239,21 +204,16 @@ fn utc_span(read: &Arguments) -> Result<UtcSpan, String> {
         .map_err(|err| format!("--since and --until: {}", err.recovery()))
 }
 
-/// The seq `flag` names. `view --from` and the playback range read a seq
-/// the same way (`Sprawling/app/spec/Main.lean` §8-126).
 pub(super) fn seq_flag(read: &Arguments, flag: &str) -> Result<Option<Seq>, String> {
     whole_number(read, flag).map(|seq| seq.map(Seq::new))
 }
 
-/// The run `--run` names, read the same way by `view` and by playback.
 pub(super) fn run_flag(read: &Arguments) -> Result<Option<RunId>, String> {
     read.value("--run")
         .map(|raw| RunId::parse(raw).map_err(|_| format!("'{raw}' is not a run id")))
         .transpose()
 }
 
-/// The event kind spelled `raw`, or the line that says it is not one
-/// and which spellings are close.
 fn kind_named(raw: &str) -> Result<EventKind, String> {
     let names: Vec<String> = EventKind::ALL
         .iter()
@@ -274,8 +234,6 @@ fn kind_named(raw: &str) -> Result<EventKind, String> {
     })
 }
 
-/// Writes the lines `chosen` selects, oldest first, each ending in `\n`
-/// and, for a person, led by its chain hash.
 pub(super) fn write_records(
     dir: &Path,
     chosen: &Selection,
@@ -295,8 +253,6 @@ pub(super) fn write_records(
     }
 }
 
-/// Hands `emit` the lines of `walk`, an ascending run of seqs, that
-/// `chosen` admits.
 fn write_walk(
     reader: &mut storage::LineReader<'_>,
     walk: impl DoubleEndedIterator<Item = Seq>,
@@ -333,7 +289,6 @@ fn write_walk(
     Ok(())
 }
 
-/// Whether a finding's checkpoint committed or was refused.
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "snake_case")]
 enum FindingOutcome {
@@ -341,8 +296,6 @@ enum FindingOutcome {
     Refused,
 }
 
-/// The CLI's one-finding projection. It flattens the kernel's finding
-/// unchanged, so no second definition of its location fields can drift.
 #[derive(Serialize)]
 struct FindingLine<'a> {
     run: RunId,
@@ -355,7 +308,6 @@ struct FindingLine<'a> {
     finding: &'a CheckpointFinding,
 }
 
-/// One event's findings and the facts they share.
 struct FindingBatch<'a> {
     outcome: FindingOutcome,
     code: Option<&'a str>,
@@ -363,16 +315,12 @@ struct FindingBatch<'a> {
     findings: &'a [CheckpointFinding],
 }
 
-/// Writes every checkpoint finding in Ledger order, one JSON object per
-/// finding. Only record payloads are read; the worktree and matched bytes
-/// are never opened.
 pub(super) fn write_secret_findings(dir: &Path, out: &mut impl Write) -> Result<(), ViewError> {
     let index = storage::LedgerIndex::rebuild(dir)?;
     let mut reader = index.reader(dir);
     for seq in index.seqs() {
         let record = EventRecord::parse_line(&reader.line_at(seq)?)?;
-        // Two kinds carry findings and the rest carry none; asking each in
-        // turn keeps this reader from having to list the whole vocabulary.
+
         if record.kind() == EventKind::CheckpointCommitted
             && let CheckpointCommitted::Committed(commit) =
                 record.data().read::<CheckpointCommitted>()?
@@ -405,7 +353,6 @@ pub(super) fn write_secret_findings(dir: &Path, out: &mut impl Write) -> Result<
     Ok(())
 }
 
-/// Writes one event's findings, preserving their order inside the payload.
 fn write_finding_lines(
     record: &EventRecord,
     batch: FindingBatch<'_>,
@@ -429,7 +376,6 @@ fn write_finding_lines(
     Ok(())
 }
 
-/// `sprawling secrets <city>`: the self-service read of checkpoint findings.
 pub(super) fn secrets(read: &Arguments) -> ExitCode {
     let Some(city) = read.positional(1) else {
         eprintln!("usage: sprawling secrets <city>");
@@ -450,7 +396,6 @@ pub(super) fn secrets(read: &Arguments) -> ExitCode {
     }
 }
 
-/// Writes one JSON line per run, oldest first.
 pub(super) fn write_runs(dir: &Path, out: &mut impl Write) -> Result<(), ViewError> {
     for line in accounting::lineage::lineage_of(dir)?.lines() {
         serde_json::to_writer(&mut *out, &line.to_json()).map_err(std::io::Error::from)?;

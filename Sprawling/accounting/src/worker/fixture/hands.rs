@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The hands a worker under test is built with, the clocks they read, and
-//! a city formed with them (`Sprawling/accounting/spec/Worker.lean` §8-11, accounting D19).
-
 use std::path::{Path, PathBuf};
 
 use kernel::{Address, AxError, TimeMs};
@@ -14,15 +11,6 @@ use crate::worker::Memory;
 use crate::worker::genesis::{Adopt, InitReport, form};
 use crate::worker::hands::{ExecHost, Hands};
 
-/// The hands a worker under test is built with: none of them reaches
-/// this machine (`Sprawling/accounting/spec/Worker.lean` §8-11).
-///
-/// An in-memory vault, a clock that reads the wall, a machine with
-/// nothing on it, roomy memory and volume, a file manager and a desktop
-/// program that refuse, no browsers, a requirement table that carries
-/// nothing, no interpreter and no shell, and no execution engine. A test
-/// that needs a real hand puts that one in: `Hands { reveal, ..hands() }`
-/// or a `with_*` door.
 pub(crate) fn hands() -> Hands {
     Hands {
         vault: gateway::Custodian::in_memory(),
@@ -68,13 +56,10 @@ pub(crate) fn hands() -> Hands {
     }
 }
 
-/// A lane in a test takes no seat.
 fn no_seat() -> Box<dyn std::any::Any> {
     Box::new(())
 }
 
-/// The wall clock, read the way the production clock reads it, for the
-/// tests that write lines at the present time.
 pub(crate) struct WallClock;
 
 impl crate::Clock for WallClock {
@@ -90,14 +75,10 @@ impl crate::Clock for WallClock {
     }
 }
 
-/// A city clock that leaps a minute forward at every read, from the
-/// wall's present: what a person setting the wall clock, or a laptop
-/// waking, does to a span read off the city's clock.
 pub(crate) struct LeapingClock(std::sync::atomic::AtomicU64);
 
 impl LeapingClock {
-    /// How far one read moves the clock: a span read off it as two
-    /// reads apart is at least this long.
+
     pub(crate) const LEAP_MS: u64 = 60_000;
 
     pub(crate) fn from_now() -> LeapingClock {
@@ -115,8 +96,6 @@ impl crate::Clock for LeapingClock {
     }
 }
 
-/// The monotonic clock, read the way the served city's one monotonic
-/// sampling point reads it, for the tests that lap an opening.
 #[allow(
     clippy::disallowed_methods,
     reason = "test code: the fixture reads the monotonic clock like the production point"
@@ -125,7 +104,6 @@ pub(crate) fn monotonic() -> std::time::Instant {
     std::time::Instant::now()
 }
 
-/// A machine with nothing on it, which installs nothing.
 struct NoMachine;
 
 impl crate::Machine for NoMachine {
@@ -158,13 +136,10 @@ impl crate::Machine for NoMachine {
     }
 }
 
-/// A city formed with the test hands, adopting nothing: what the
-/// worker's tests stand on (accounting D19).
 pub(crate) fn init_city(city_root: &Path) -> Result<InitReport, AxError> {
     form(city_root, Adopt::Nothing, hands())
 }
 
-/// Memory with far more room than any run asks for.
 fn roomy_memory() -> Memory {
     Memory {
         physical: 1 << 40,
@@ -213,7 +188,6 @@ fn absent_engine() -> Result<Box<dyn runtime::Sandbox>, AxError> {
     Ok(Box::new(runtime::AbsentSandbox))
 }
 
-/// A volume with far more free space than any floor asks for.
 pub(crate) fn roomy_volume(_city: &Path) -> Option<kernel::degradation::VolumeSpace> {
     Some(kernel::degradation::VolumeSpace {
         free_bytes: 1 << 50,

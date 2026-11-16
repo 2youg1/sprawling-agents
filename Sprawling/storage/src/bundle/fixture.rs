@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one city the bundle tests export, restore and weigh.
-//!
-//! One fixture for the three bundle test modules, so they assert
-//! against one shape of a city (`Sprawling/storage/spec/Bundle.lean` §8-21).
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -22,9 +17,6 @@ use kernel::{EventDraft, EventKind, Ledger, Payload, RunId, TimeMs};
 
 use crate::jsonl::JsonlLedger;
 
-/// A city with `records` lines in its history, two files a bundle has to
-/// carry, and a content store. The chain is walked as it is written,
-/// which is what proves the records are one history rather than a pile.
 pub(crate) fn city_with(records: u64, root: &Path) {
     let layout = kernel::layout::CityLayout::new(root);
     let dir = layout.ledger();

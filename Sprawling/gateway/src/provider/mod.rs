@@ -3,41 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What this city knows about a provider before it has asked one.
-//!
-//! Three questions live here. *What does this host serve, and where* —
-//! the path it answers under, the shape it answers in, and the ceilings
-//! of the models whose names it prints in its own documentation
-//! (`preset`). *Which statement about a context window and an output
-//! ceiling wins* — the one ladder from the person's own figure down to
-//! the city's policy default (`ceiling`). *What may one model be sent* — the same ladder
-//! for the input a registration carries (`input`).
-//!
-//! *Which thinking levels one (Endpoint, model) offers, and which one a
-//! request is sent* — the ladder from the upstream's model list down to
-//! nobody, and the fields each face writes a level in (`thinking`).
-//!
-//! *How one attached endpoint is connected* — resolved once at attach
-//! and recorded, so that no call path derives it again (`registry`),
-//! together with the faces beyond a conversation that connection
-//! serves (`modality`).
-//!
-//! The table is a data plane: every row carries the vendor page or the
-//! measurement it came from, and a fact no row states is left unstated
-//! rather than invented. A figure this city made up would outrank the
-//! one that bills.
-
 pub mod ceiling;
 pub mod generation;
 pub mod identity;
 pub mod input;
-// Both are re-exported by the crate root, so the attach path in
-// `bin::assembly` reaches them by name the day `WIRE_V` carries
-// `connection_kind`.
+
 pub mod modality;
 pub mod preset;
 pub mod registry;
-/// The guard on the system prefix this city sends.
+
 #[cfg(test)]
 mod stability;
 pub mod thinking;

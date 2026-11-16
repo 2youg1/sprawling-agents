@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Frozen execution policy reaches the admitted host mechanism here.
-
 use super::super::super::{Assignment, mounts_under};
 use super::super::engine::machine_half;
 use super::super::{Laying, Site};
@@ -12,16 +10,7 @@ use kernel::AxError;
 use runtime::ExecTool;
 
 impl Laying {
-    /// Builds the execution boundary.
-    ///
-    /// What the run may reach is the frozen configuration's answer;
-    /// where the engine and the interpreter live is the machine's, so a
-    /// city carried elsewhere does not carry this machine's paths with
-    /// it.
-    ///
-    /// # Errors
-    /// Propagates a build with no execution engine and whatever the
-    /// tool says about its own construction.
+
     pub(super) fn exec_tool(
         &self,
         site: &Site,
@@ -37,14 +26,11 @@ impl Laying {
                 python_wasm: machine.python_wasm.map(runtime::PythonGuest::at),
                 shell: machine.shell,
                 fuel: runtime::Fuel(site.config.sandbox.fuel),
-                // What a child may inherit is the building's own
-                // declaration: the four-name floor is enough to run a
-                // program and not enough to link one.
+
                 env_passthrough: site.config.sandbox.env_passthrough.clone(),
                 domain: addr.clone(),
                 run: site.run_id,
-                // The run's write limit, read at each command: under
-                // `Create` a command runs only in the copy (`Sprawling/runtime/Spec.lean` §8-55).
+
                 policy,
             },
             machine.engine,
