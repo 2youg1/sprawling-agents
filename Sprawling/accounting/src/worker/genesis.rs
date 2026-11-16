@@ -393,3 +393,13 @@ mod adoption_tests;
 #[cfg(test)]
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod shipped_tests;
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
+mod startup_tests;

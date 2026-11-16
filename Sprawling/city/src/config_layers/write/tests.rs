@@ -12,7 +12,7 @@
 )]
 
 use super::*;
-use kernel::ServerLabel;
+use kernel::{AxCode, McpTransport, ServerLabel};
 
 fn room() -> Address {
     Address::parse("lab/room1").unwrap()

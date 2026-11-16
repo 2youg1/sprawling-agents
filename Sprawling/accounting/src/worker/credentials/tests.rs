@@ -8,4 +8,5 @@ mod endpoints;
 mod figures;
 mod kept;
 mod probing;
+mod relay;
 mod signing;

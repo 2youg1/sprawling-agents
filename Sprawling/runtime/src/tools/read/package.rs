@@ -11,7 +11,7 @@ use std::path::Path;
 
 use kernel::{AxCode, AxError, B3Hash, SkillManifest};
 
-use super::Found;
+use super::interval::Found;
 use crate::catalog::{Catalog, Expansion};
 
 /// Opens a skill's `SKILL.md` through its admitted manifest.

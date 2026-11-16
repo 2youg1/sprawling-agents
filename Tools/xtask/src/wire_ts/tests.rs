@@ -297,4 +297,3 @@ fn the_first_differing_line_is_named_with_both_spellings() {
         Some((3, "c".to_owned(), String::new()))
     );
 }
-

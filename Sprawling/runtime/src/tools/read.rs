@@ -3,13 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use kernel::{
-    Address, AxCode, AxError, B3Hash, CostTier, Effect, ImageRef, Payload, RenderIntent, Temporal,
-    TimeMs, Tool, ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
+    AxCode, AxError, B3Hash, CostTier, Effect, ImageRef, Payload, RenderIntent, Temporal, TimeMs,
+    Tool, ToolCall, ToolDef, ToolMeta, ToolName, ToolOutcome,
 };
 use serde_json::{Map, Value};
 
@@ -17,6 +16,9 @@ mod engine;
 pub(super) mod locator;
 mod miss;
 mod package;
+
+mod interval;
+mod rules;
 
 use super::BoundReader;
 use super::chosen_path::{CityRoot, ReadBound};
@@ -26,204 +28,8 @@ use crate::catalog::{Catalog, Expansion};
 
 pub type ReadClock = Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RuleCandidate {
-    pub room: Address,
-    pub text: String,
-    pub dropped: u64,
-}
-
-impl RuleCandidate {
-    #[must_use]
-    pub fn into_json(self) -> Value {
-        let mut rule = Map::new();
-        rule.insert(
-            "room".to_owned(),
-            Value::String(self.room.as_str().to_owned()),
-        );
-        rule.insert("text".to_owned(), Value::String(self.text));
-        Value::Object(rule)
-    }
-
-    #[must_use]
-    pub fn from_json(value: &Value) -> Option<RuleCandidate> {
-        let room = value.get("room")?.as_str()?;
-        let room = match Address::parse(room) {
-            Ok(room) => room,
-            Err(_) => return None,
-        };
-        let text = value.get("text")?.as_str()?.to_owned();
-        let dropped = value.get("dropped").and_then(Value::as_u64).unwrap_or(0);
-        Some(RuleCandidate {
-            room,
-            text,
-            dropped,
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RuleContext {
-    pub admitted: Address,
-    pub landed: Address,
-}
-
-impl RuleContext {
-    fn into_json(self) -> Value {
-        let mut context = Map::new();
-        context.insert(
-            "admitted".to_owned(),
-            Value::String(self.admitted.as_str().to_owned()),
-        );
-        context.insert(
-            "landed".to_owned(),
-            Value::String(self.landed.as_str().to_owned()),
-        );
-        Value::Object(context)
-    }
-
-    #[must_use]
-    pub fn from_json(value: &Value) -> Option<RuleContext> {
-        let admitted = value.get("admitted")?.as_str()?;
-        let landed = value.get("landed")?.as_str()?;
-        match (Address::parse(admitted), Address::parse(landed)) {
-            (Ok(admitted), Ok(landed)) => Some(RuleContext { admitted, landed }),
-            _ => None,
-        }
-    }
-}
-
-pub type RuleCandidates = Arc<
-    dyn Fn(&Address, &Address, &BTreeSet<Address>, &mut dyn FnMut() -> bool) -> Vec<RuleCandidate>
-        + Send
-        + Sync,
->;
-
-const LINE_CAP: u16 = 512;
-
-enum Found {
-    Chosen(kernel::Address),
-
-    Text(String),
-
-    Picture { picture: ImageRef, bytes: Vec<u8> },
-}
-
-struct Interval {
-    offset: u64,
-    limit: u16,
-}
-
-struct Taken {
-    text: String,
-    total_lines: Option<usize>,
-    next_offset: Option<usize>,
-
-    lines: usize,
-    total: usize,
-}
-
-impl Interval {
-    fn asked_for(call: &ToolCall) -> Result<Interval, AxError> {
-        let args = call.args.as_map();
-        let whole = |field: &'static str| -> Result<Option<u64>, AxError> {
-            match args.get(field) {
-                None => Ok(None),
-                Some(value) => value.as_u64().map(Some).ok_or_else(|| {
-                    AxError::failure(
-                        AxCode::InvalidArgs,
-                        "read",
-                        format!("`{field}` is not a whole number of lines"),
-                    )
-                    .with_recovery(
-                        "pass `offset` and `limit` as non-negative integers, or leave them out \
-                         to read from the start",
-                    )
-                }),
-            }
-        };
-        let offset = whole("offset")?.map_or(0, |line| line.saturating_sub(1));
-
-        let limit = whole("limit")?.map_or(LINE_CAP, |asked| {
-            u16::try_from(asked).map_or(LINE_CAP, |fits| fits.min(LINE_CAP))
-        });
-        if limit == 0 {
-            return Err(AxError::failure(
-                AxCode::InvalidArgs,
-                "read",
-                "`limit` is zero, which asks for no lines at all",
-            )
-            .with_recovery("pass a `limit` from 1 to 512, or leave it out"));
-        }
-        Ok(Interval { offset, limit })
-    }
-
-    fn cut(&self, text: &str) -> Taken {
-        let mut lines = text.split_inclusive('\n');
-
-        let start = usize::try_from(self.offset).ok();
-        let mut from = 0usize;
-        let mut skipped = 0usize;
-        while Some(skipped) != start {
-            let Some(line) = lines.next() else {
-                return Taken {
-                    text: String::new(),
-                    total_lines: Some(skipped),
-                    next_offset: None,
-                    lines: 0,
-                    total: skipped,
-                };
-            };
-            from = from.saturating_add(line.len());
-            skipped = skipped.saturating_add(1);
-        }
-        let mut lines = lines.peekable();
-        if lines.peek().is_none() {
-            return Taken {
-                text: String::new(),
-                total_lines: Some(skipped),
-                next_offset: None,
-                lines: 0,
-                total: skipped,
-            };
-        }
-        let budget = kernel::consts_policy::INTERVAL_CAP_BYTES;
-        let mut taken = 0usize;
-        let mut spent = 0usize;
-        while taken < usize::from(self.limit) {
-            let Some(line) = lines.peek() else { break };
-            let after = spent.saturating_add(line.len());
-
-            if after > budget && taken > 0 {
-                break;
-            }
-            spent = after;
-            taken = taken.saturating_add(1);
-            lines.next();
-        }
-        let text = text
-            .get(from..from.saturating_add(spent))
-            .unwrap_or_default()
-            .to_owned();
-        let end = skipped.saturating_add(taken);
-        match lines.count() {
-            0 => Taken {
-                text,
-                total_lines: None,
-                next_offset: None,
-                lines: taken,
-                total: end,
-            },
-            left => Taken {
-                text,
-                total_lines: Some(end.saturating_add(left)),
-                next_offset: Some(end),
-                lines: taken,
-                total: end.saturating_add(left),
-            },
-        }
-    }
-}
+use interval::{Found, Interval};
+pub use rules::{RuleCandidate, RuleCandidates, RuleContext};
 
 pub struct ReadTool {
     catalog: Arc<Mutex<Catalog>>,
