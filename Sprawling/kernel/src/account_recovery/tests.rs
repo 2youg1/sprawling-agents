@@ -41,7 +41,10 @@ fn several(names: &[&str], retries: AccountRetries) -> Roster {
     }
 }
 
-fn decisions(mut round: AccountRound, events: &[RecoveryEvent]) -> Vec<(RecoveryEvent, Option<AccountStep>)> {
+fn decisions(
+    mut round: AccountRound,
+    events: &[RecoveryEvent],
+) -> Vec<(RecoveryEvent, Option<AccountStep>)> {
     let mut out = Vec::new();
     for &event in events {
         match failure(event) {
@@ -63,7 +66,10 @@ fn decisions(mut round: AccountRound, events: &[RecoveryEvent]) -> Vec<(Recovery
     out
 }
 
-type Decided = Option<(Option<ServerLabel>, Vec<(RecoveryEvent, Option<AccountStep>)>)>;
+type Decided = Option<(
+    Option<ServerLabel>,
+    Vec<(RecoveryEvent, Option<AccountStep>)>,
+)>;
 
 struct Trace<'a> {
     roster: Roster,

@@ -5,7 +5,7 @@
 
 use super::Need::{Optional, Required};
 use super::Takes::Nothing;
-use super::{AfterDashes, Effect, JSON, MEI_REPLAY, Row, SERVED, Takes, Verb, flag};
+use super::{AfterDashes, Effect, JSON, MEI_REPLAY, Row, SERVED, Verb, flag};
 
 pub(super) const MEI: Row = Row {
     verb: Verb::Mei,

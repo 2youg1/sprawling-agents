@@ -5,7 +5,7 @@
 
 use super::Need::{Optional, Required};
 use super::Takes::{Nothing, Value};
-use super::{AT, AfterDashes, Effect, INCLUDE_CONFIDENTIAL, JSON, LOG, Row, Takes, Verb, flag};
+use super::{AT, AfterDashes, Effect, Flag, INCLUDE_CONFIDENTIAL, JSON, LOG, Row, Verb, flag};
 
 pub(super) const CALL: Row = Row {
     verb: Verb::Call,

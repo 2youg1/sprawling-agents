@@ -21,7 +21,6 @@ const NICENESS_BELOW_THE_CORE: &str = "10";
 const IO_BELOW_THE_CORE: [&str; 4] = ["-c", "2", "-n", "7"];
 
 #[cfg(windows)]
-
 pub(super) fn one_level_down(mut command: Command, _shares: Shares) -> Result<Command, AxError> {
     use std::os::windows::process::CommandExt;
     command.creation_flags(child::NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS);

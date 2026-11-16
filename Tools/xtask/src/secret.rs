@@ -105,12 +105,9 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                 continue;
             }
             let end = span.start.saturating_add(span.len);
-            if bytes
-                .get(span.start..end)
-                .is_some_and(|t| {
-                    is_reviewed_identifier(t) || is_pascal_case_identifier(t) || is_tree_path(t)
-                })
-            {
+            if bytes.get(span.start..end).is_some_and(|t| {
+                is_reviewed_identifier(t) || is_pascal_case_identifier(t) || is_tree_path(t)
+            }) {
                 continue;
             }
             let what = span

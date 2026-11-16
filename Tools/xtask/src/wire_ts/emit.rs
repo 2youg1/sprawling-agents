@@ -71,12 +71,15 @@ pub(super) fn emit(document: &Value, constants: &Constants) -> Result<Bundle, Re
     for (name, piece) in pieces {
         let piece_lines = piece.lines().count();
         let current_needs_piece = body_mentions(&current_body, &name);
-        let current_needs_later = remaining.iter().any(|later| {
-            later != &name && body_mentions(&current_body, later)
-        });
+        let current_needs_later = remaining
+            .iter()
+            .any(|later| later != &name && body_mentions(&current_body, later));
         let cluster = forward_cluster_lines(
             &current_body,
-            Piece { name: &name, body: &piece },
+            Piece {
+                name: &name,
+                body: &piece,
+            },
             &remaining,
             &by_name,
         );

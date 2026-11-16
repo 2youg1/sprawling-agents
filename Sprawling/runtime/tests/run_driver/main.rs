@@ -3,13 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-#![expect(
-    clippy::wildcard_enum_match_arm,
-    reason = "test code: this driver names the outcomes it asserts on               and treats the rest as one arm, rather than modelling an               enum the assertion does not reach"
-)]
-
-//! pin that sequence and the three ways a run can end, so a later change
-//! to the loop has to argue with the event order rather than with prose.
+//! Pin the event order a later change to the loop must argue with.
 
 #![allow(
     clippy::unwrap_used,

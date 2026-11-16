@@ -134,8 +134,6 @@ describe("a malformed frame", () => {
   test("fails with a message that names the field and the mismatch", () => {
     const frame = { command: { steer: { run: 5, text: "x", idem } } };
     const message = refused(decodeClient(frame));
-    // Effect 4 states each failed branch as what it expected and the
-    // path it expected it at, from the frame's own root down to the field.
     expect(message).toContain('Expected string\n  at ["command"]["steer"]["run"]');
   });
 
@@ -145,6 +143,6 @@ describe("a malformed frame", () => {
     };
     const message = refused(decodeServer(frame));
     expect(message).toContain('at ["event"]["kind"]');
-    expect(message).toContain('Expected "city_initialized" | ');
+    expect(message).toContain("Expected EventKind");
   });
 });

@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-#![expect(
-    clippy::wildcard_enum_match_arm,
-    reason = "test code: this driver names the outcomes it asserts on               and treats the rest as one arm, rather than modelling an               enum the assertion does not reach"
-)]
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -17,17 +13,13 @@
     reason = "test code"
 )]
 
-use kernel::ledger::chain_hash;
 use kernel::model::message_payload;
 use kernel::{
-    Address, AxError, B3Hash, BuildingPolicy, Completion, ContentBlock, EventDraft, EventRef,
-    GENESIS_PREV, Ledger, Locator, Model, ModelRequest, ModelReturn, Payload, RunId, TimeMs,
-    ToolCall, ToolName, ToolOutcome,
+    AxError, Completion, ContentBlock, Model, ModelRequest, ModelReturn, Payload, TimeMs, ToolCall,
+    ToolName, ToolOutcome,
 };
-use runtime::handoff::Handoff;
-use runtime::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};
-use runtime::run::{Advance, Run, RunHooks, RunPlan, SafePoint, drive};
-use runtime::turn::{CallShape, Interrupt};
+use runtime::run::{RunHooks, SafePoint, drive};
+use runtime::turn::Interrupt;
 
 use super::concurrency::{READING, SlowRead, WRITING, one_read_while_generating};
 use super::meeting::{OneByOne, Placed, read_meta};
