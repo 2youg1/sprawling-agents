@@ -284,8 +284,7 @@ layout = "current"
 [[product_root]]
 name = "RefRain"
 path = "RefRain"
-layout = "planned"
-transition = "client"
+layout = "current"
 [[product_root]]
 name = "Mei"
 path = "Mei"
@@ -295,7 +294,7 @@ path = "crates"
 status = "{status}"
 [[legacy_path]]
 path = "client"
-status = "live"
+status = "retired"
 "#
         )
     }
@@ -309,15 +308,16 @@ status = "live"
         fixture::write(&root, "Cargo.lock", "");
         std::fs::create_dir_all(root.join("Calyx")).unwrap();
         std::fs::create_dir_all(root.join("Mei")).unwrap();
+        std::fs::create_dir_all(root.join("RefRain")).unwrap();
         root
     }
 
     #[test]
-    fn the_checkout_layout_is_green_after_crates_retire() {
+    fn the_checkout_layout_is_green_after_refrain_r0() {
         let violations = check(this_checkout()).unwrap();
         assert!(
             violations.is_empty(),
-            "residue must stay green on the post-F2 layout: {violations:?}"
+            "residue must stay green on the post-F3 layout: {violations:?}"
         );
     }
 

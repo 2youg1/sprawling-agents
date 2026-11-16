@@ -6,8 +6,14 @@
 #![expect(
     clippy::wildcard_enum_match_arm,
     clippy::let_underscore_must_use,
-    clippy::let_underscore_untyped,
-    reason = "A gate reads somebody else's vocabulary: `syn`'s syntax               tree and `serde_json`'s value are `#[non_exhaustive]`               upstream, so a wildcard over them is the correct arm               rather than an erased decision, and no arm this package               writes can be made exhaustive by changing this tree. The               other two relax at one remove, for reports written to a               stream nobody reads back. This is the only exception in the               tree, and `expect` makes it self-cleaning: the day no               site needs it, the build says so. It does not extend to a               gate matching on a kernel enum - that arm belongs in the               crate that owns the enum."
+    reason = "A gate reads somebody else's vocabulary: `syn`'s syntax               tree and `serde_json`'s value are `#[non_exhaustive]`               upstream, so a wildcard over them is the correct arm               rather than an erased decision, and no arm this package               writes can be made exhaustive by changing this tree. The               second relaxes at one remove, for reports written to a               stream nobody reads back. `expect` makes it self-cleaning: the               day no site needs it, the build says so. It does not extend to               a gate matching on a kernel enum - that arm belongs in the               crate that owns the enum."
+)]
+#![cfg_attr(
+    test,
+    expect(
+        clippy::let_underscore_untyped,
+        reason = "test fixtures remove temporary directories after the assertion; a cleanup failure does not change the verdict being asserted"
+    )
 )]
 
 //! Gate runner. One gate per module; `gates` runs them all in order.

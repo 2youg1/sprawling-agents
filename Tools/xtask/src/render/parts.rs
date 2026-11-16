@@ -122,7 +122,7 @@ pub(super) fn every_part_draws_its_roles(
                 &format!("{at} \u{b7} {}", region.name),
                 &format!(
                     "every part on the gallery draws the roles its contract names \
-                     (client/spec/Views/Parts.lean {})",
+                     (RefRain/spec/Views/Parts.lean {})",
                     entry.contract
                 ),
                 format!(

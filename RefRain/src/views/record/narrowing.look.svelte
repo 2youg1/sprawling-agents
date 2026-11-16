@@ -1,0 +1,26 @@
+<!--
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+-->
+
+<script lang="ts">
+  import type { NarrowingLook } from "./narrowing";
+  const look: NarrowingLook = $props();
+</script>
+
+<label class="flex items-center gap-snug text-note text-text-faint">
+  {look.label}
+  <select
+    {...look.wire}
+    class={[
+      "h-control-sm max-w-[24ch] rounded-control bg-raised px-snug font-mono text-note text-text transition-colors still:transition-none",
+      "ease-leave hover:bg-raised-hover hover:ease-arrive",
+    ]}
+  >
+    {#each look.options as option (option.value)}
+      <option value={option.value}>{option.label}</option>
+    {/each}
+  </select>
+</label>

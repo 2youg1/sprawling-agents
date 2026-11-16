@@ -14,14 +14,14 @@ A violation turns the check red with a message naming the rule, the violation an
 | `xtask packaged` | files a publishable package compiles in production (`include!`, `include_str!`, `include_bytes!`) lie inside its directory or its build script's `OUT_DIR`, since crates.io carries nothing else |
 | `xtask depmap` | `pub(crate)` by default; `pub` traits only on the seam list |
 | `xtask unused` | every declared dependency named by its package's code; every workspace dependency inherited by some package |
-| `xtask npm` | client lockfile in step with its manifest; runtime dependencies exactly `RUNTIME` in `Tools/xtask/src/npm.rs`, each admitted with the reason `client/Spec.lean` §7-9 records; every licence on the `deny.toml` list |
+| `xtask npm` | client lockfile in step with its manifest; runtime dependencies exactly `RUNTIME` in `Tools/xtask/src/npm.rs`, each admitted with the reason `RefRain/Spec.lean` §7-9 records; every licence on the `deny.toml` list |
 | `xtask secret` | credentials as `secret:realm/name` references; plaintext reaches the vault and nowhere else |
-| `xtask color` | colour from the client's theme (the `@theme` blocks `client/src/theme.css` imports from `client/src/theme/`) as a ratio of the gamut limit; text on glass legible over the brightest surface behind it |
-| `xtask motion` | transition curve and duration from the motion tokens (`client/src/theme/tokens-motion.css`), never spelled in a view |
-| `xtask wording` | every word a reader is given comes from `client/src/lang.json` |
+| `xtask color` | colour from the client's theme (the `@theme` blocks `RefRain/src/theme.css` imports from `RefRain/src/theme/`) as a ratio of the gamut limit; text on glass legible over the brightest surface behind it |
+| `xtask motion` | transition curve and duration from the motion tokens (`RefRain/src/theme/tokens-motion.css`), never spelled in a view |
+| `xtask wording` | every word a reader is given comes from `RefRain/src/lang.json` |
 | `xtask render` | every role, accessible name and landmark a settled screen wrote down is offered by the shipped screen; no box outside its container; no fixed bar over the conversation; standing controls within `talk_controls` |
 | `xtask wiring` | every verb the city can carry out reached by some control, or classified on the wire seam with the reason a person may not ask for it |
-| `xtask wire-ts` | `client/src/wire.ts` regenerated whenever `WIRE_V` moves |
+| `xtask wire-ts` | `RefRain/src/wire.ts` regenerated whenever `WIRE_V` moves |
 | `xtask docnum` | every number a document quotes, and every kernel enum table a SPEC carries, equal to the code that decides it |
 | `xtask proof` | kani roster read from the `#[kani::proof]` attributes: no workflow names a harness, a stated total is the total, a harness left unproved cites where that was decided |
 | `xtask budget` | sizes inside their budget |

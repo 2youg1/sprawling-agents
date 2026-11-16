@@ -13,13 +13,13 @@ mod lockfile;
 
 use lockfile::Manifest;
 
-const CLIENT: &str = "client";
+const CLIENT: &str = "RefRain";
 
-const MANIFEST: &str = "client/package.json";
+const MANIFEST: &str = "RefRain/package.json";
 
-const LOCKFILE: &str = "client/bun.lock";
+const LOCKFILE: &str = "RefRain/bun.lock";
 
-const MODULES: &str = "client/node_modules";
+const MODULES: &str = "RefRain/node_modules";
 
 const PERMITTED: &str = "deny.toml";
 
@@ -84,7 +84,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             location: MODULES.to_owned(),
             rule: "the installed tree is present, so every licence can be read".to_owned(),
             violation: format!("{MODULES} is not installed, so no licence was judged"),
-            alternative: "run `bun install` in client/".to_owned(),
+            alternative: "run `bun install` in RefRain/".to_owned(),
         });
     }
     Ok(violations)
@@ -96,7 +96,7 @@ fn missing(location: &str, what: &str) -> Violation {
         location: location.to_owned(),
         rule: "the client's lockfile and manifest are both in the tree".to_owned(),
         violation: what.to_owned(),
-        alternative: "run `bun install` in client/ and commit what it writes".to_owned(),
+        alternative: "run `bun install` in RefRain/ and commit what it writes".to_owned(),
     }
 }
 
@@ -142,7 +142,7 @@ fn stale(what: String) -> Violation {
         location: LOCKFILE.to_owned(),
         rule: "the lockfile states what the manifest asks for, entry for entry".to_owned(),
         violation: what,
-        alternative: "run `bun install` in client/ and commit the lockfile it writes".to_owned(),
+        alternative: "run `bun install` in RefRain/ and commit the lockfile it writes".to_owned(),
     }
 }
 
@@ -172,7 +172,7 @@ fn runtime_violation(what: String) -> Violation {
         ),
         violation: what,
         alternative: "put the package in devDependencies if it is toolchain, or record the \
-                      decision in client/Spec.lean before it reaches a person's browser"
+                      decision in RefRain/Spec.lean before it reaches a person's browser"
             .to_owned(),
     }
 }

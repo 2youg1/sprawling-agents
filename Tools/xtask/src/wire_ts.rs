@@ -64,8 +64,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         violations.push(Violation {
             gate: "wire-ts",
             location: LEGACY_FILE.to_owned(),
-            rule: "the client's wire types live under client/src/wire/".to_owned(),
-            violation: "client/src/wire.ts is still present".to_owned(),
+            rule: "the client's wire types live under RefRain/src/wire/".to_owned(),
+            violation: "RefRain/src/wire.ts is still present".to_owned(),
             alternative: "run `cargo xtask wire-ts --write` and commit the result".to_owned(),
         });
     }

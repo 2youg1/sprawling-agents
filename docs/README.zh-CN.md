@@ -209,7 +209,7 @@ Agent 的能力和规模越强，人的注意力就越昂贵。我拒绝让 spra
 
 至于 Agent 记忆，它的确是通往 RSI 的重要路径，但绝不是靠 Harness 在底下搞黑盒注入。**你的文件、代码和文档库本身就是最好的记忆**；在 LLM 脱离无状态之前，硬要让 Agent 靠复杂注入“陪你一起成长”的尝试，绝大多数时候只是在对模型帮倒忙。
 
-如果你手头已经有自己用顺手的 Harness，只要它支持 ACP 协议，就能直接作为居民住进这座城市（[接入文档](integrations.md)）。除了迁移必要的业务 Skill、MCP 和 ACP 之外，我建议初期尽量保持精简，在实际使用中遇到真问题时再手动追加规则，毕竟同一个模型搭配不同的 Harness，展现出的行为脾气完全不同。我目前也正在筹备另一个辅助搭建聊天软件的项目 `kasanagi`，未来会作为 MCP 服务解决多个 sprawling 实例之间的远程协作。
+如果你手头已经有自己用顺手的 Harness，只要它支持 ACP 协议，就能直接作为居民住进这座城市（[接入文档](integrations.md)）。除了迁移必要的业务 Skill、MCP 和 ACP 之外，我建议初期尽量保持精简，在实际使用中遇到真问题时再手动追加规则，毕竟同一个模型搭配不同的 Harness，展现出的行为脾气完全不同。我目前也正在筹备另一个辅助搭建聊天软件的项目 [Kasanagi](../Kasanagi/README.md)，未来会作为 MCP 服务解决多个 sprawling 实例之间的远程协作。
 
 另外两点很现实的原因：
 1. **我自己的电脑配置不高**，所以我绝不会放任多 Agent 造成性能开销指数级爆炸。这也让 sprawling 天然适合跑在你的旧笔记本或者廉价云主机上。
@@ -240,7 +240,11 @@ Agent 的能力和规模越强，人的注意力就越昂贵。我拒绝让 spra
 | [`AGENTS.md`](../AGENTS.md) | 每次改动都要守的规则与检查命令，人和 Agent 动手前都先读它 |
 | [`docs/CONTRIBUTING.md`](CONTRIBUTING.md) | 贡献前的准备、功能准入五项测试与提交流程 |
 | [`docs/frontend-method.md`](frontend-method.md) | 界面屏幕怎么搭、怎么验收，以及已经批准的视觉设计规范 |
-| [`Sprawling/README.md`](../Sprawling/README.md) | 每个 crate 管什么、规格在哪；规格 `crates/<dir>/Spec.lean` 记录该 crate 的接口、决定和形式化证明，注释为中文 |
+| [`Sprawling/README.md`](../Sprawling/README.md) | 每个 crate 管什么、规格在哪；规格 `Sprawling/<dir>/Spec.lean` 记录该 crate 的接口、决定和形式化证明，注释为中文 |
+| [`RefRain/README.md`](../RefRain/README.md) | 浏览器客户端的工具链、常用命令与源码布局 |
+| [`Calyx/README.md`](../Calyx/README.md) | 城市与 Mei 的原生终端外壳，以及 Zig/Rust 边界 |
+| [`Mei/README.md`](../Mei/README.md) | 独立的 headless Agent Harness 与它的 Calyx 交互界面 |
+| [`Kasanagi/README.md`](../Kasanagi/README.md) | 规划中的私密 Agent 消息项目与未来 MCP 集成 |
 | [`Sprawling/city/templates/`](../Sprawling/city/templates/) | 城市写进每栋楼的脚手架表单模板，Agent 会读，你也可以直接读 |
 | [`Sprawling/city/skills/`](../Sprawling/city/skills/) | 随发行版一起内置分发的 Skills |
 | [`docs/logging.md`](logging.md) | 什么进诊断日志、什么进 Ledger，以及两者为什么要严格分开 |

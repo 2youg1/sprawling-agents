@@ -19,8 +19,8 @@ set -euo pipefail
 mode=$1
 manifest=$2
 # Untracked inputs: the bundle Sprawling/app/build.rs embeds, built from
-# client/ by the step before this one, and identical byte for byte when
-# client/ is.
+# RefRain/ by the step before this one, and identical byte for byte when
+# RefRain/ is.
 extra=Sprawling/app/web-dist
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT

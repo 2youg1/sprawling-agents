@@ -269,7 +269,7 @@ mod tests {
     fn exactly_the_lines_not_written_have_a_reason_in_both_languages() {
         let words: serde_json::Value = serde_json::from_str(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../client/src/lang.json"
+            "/../../RefRain/src/lang.json"
         )))
         .unwrap();
         let wrong: Vec<String> = PrivacyOriginal::ALL

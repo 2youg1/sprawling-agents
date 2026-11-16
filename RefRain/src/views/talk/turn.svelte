@@ -1,0 +1,105 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at https://mozilla.org/MPL/2.0/.
+Copyright (c) 2026 2youg1 and the sprawling contributors -->
+
+<script lang="ts">
+  import { fill, say } from "../../core/lang";
+  import { count } from "../../core/time";
+  import type { Doing } from "../../core/doing";
+  import type { RunId, Turn } from "../../wire";
+  import { ui } from "../../ui";
+  import Prose from "../prose.svelte";
+  import type { Phase } from "../runs/lineage";
+  import { arrivalsOf } from "./arrivals.svelte";
+  import Calls from "./calls.svelte";
+  import ForkButton from "./fork_button.svelte";
+  import Head from "./head.svelte";
+  import NoteLine from "./note_line.svelte";
+  import Reasoning from "./reasoning.svelte";
+  import { noteAt } from "./note_line";
+  import { rhythmOf } from "./rhythm";
+  import { cutOff, silentTurn } from "./silence";
+  import type { Phase as Live } from "./silence";
+  import type { ForkEntry, ForkPlan } from "./forking";
+  import { tpsOf, ttftTookOf } from "./timing";
+
+  interface Props {
+    readonly turn: Turn;
+    readonly run: RunId;
+    readonly who: string;
+
+    readonly model: string | null;
+    readonly live: Live;
+
+    readonly doing: Doing | undefined;
+
+    readonly showEmpty: boolean;
+    readonly ceiling: number | null;
+
+    readonly whole: boolean;
+    readonly onFork?: ((plan: ForkPlan) => void) | undefined;
+    readonly onHover: (entry: ForkEntry | null) => void;
+  }
+  const { turn, run, who, model, live, doing, showEmpty, ceiling, whole, onFork, onHover }: Props =
+    $props();
+  const { lang } = ui();
+
+  const said = $derived(turn.said ?? "");
+  const empty = $derived(silentTurn(turn, live));
+  const cut = $derived(cutOff(turn.stopped));
+  const phase = $derived.by((): Phase => {
+    if (turn.notes.some((note) => "waiting" in note)) return "person";
+    return turn.calls.length > 0 ? "tool" : "model";
+  });
+  const arrivals = $derived(arrivalsOf(run, turn.opened));
+  const rhythm = $derived(arrivals === null ? null : rhythmOf(arrivals));
+</script>
+
+<div class="flex flex-col gap-snug pb-section last:pb-0" data-wear={phase}>
+  {#each turn.notes.filter((note) => "arrived" in note) as note (noteAt(note))}
+    <NoteLine {note} {turn} {run} {onFork} {onHover} />
+  {/each}
+
+  {#if said !== "" || model !== null || (turn.thought && whole)}
+    <div class="group flex flex-col gap-snug">
+      {#if said !== "" || model !== null}
+        <div class="flex items-start justify-between gap-snug">
+          <Head
+            {who}
+            at={turn.t}
+            {model}
+            ttft={said === "" ? null : ttftTookOf(turn)}
+            tps={said === "" ? null : tpsOf(turn)}
+            {rhythm}
+          />
+          {#if onFork !== undefined}
+            <ForkButton entry={{ kind: "turn", turn }} {run} {onFork} {onHover} />
+          {/if}
+        </div>
+      {/if}
+      {#if turn.thought && whole}
+        <Reasoning text={turn.thought} open={false} />
+      {/if}
+      {#if said !== ""}
+        <div class="text-body"><Prose text={said} /></div>
+      {/if}
+    </div>
+  {/if}
+  {#if turn.calls.length > 0 && whole}
+    <Calls calls={turn.calls} {run} {turn} {doing} {onFork} {onHover} />
+  {/if}
+  {#if empty && showEmpty}
+    <div class="rounded-card border border-alert/40 px-base py-snug text-note text-alert">
+      {ceiling === null
+        ? say($lang, "talk_said_nothing")
+        : fill(say($lang, "talk_said_nothing_capped"), { n: count(ceiling) })}
+    </div>
+  {/if}
+  {#if cut !== null}
+    <div class="text-note text-alert">{fill(say($lang, "talk_cut_off"), { why: cut })}</div>
+  {/if}
+  {#each turn.notes.filter((note) => !("arrived" in note)) as note (noteAt(note))}
+    <NoteLine {note} {turn} {run} {onFork} {onHover} />
+  {/each}
+</div>

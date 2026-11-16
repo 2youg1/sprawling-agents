@@ -36,7 +36,7 @@ pub(super) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                 location: rel.clone(),
                 rule: "every look is drawn by a fixture on the gallery this gate measures"
                     .to_owned(),
-                violation: "no file under client/src/views/gallery/ imports this look or its seat"
+                violation: "no file under RefRain/src/views/gallery/ imports this look or its seat"
                     .to_owned(),
                 alternative: "import the seat in a gallery case named for its part \
                               (`<part> · <state>`), so the roles and boxes it draws are read"
@@ -141,19 +141,19 @@ mod tests {
     #[test]
     fn a_look_is_drawn_when_a_fixture_imports_it_or_its_seat() {
         let imported: BTreeSet<String> = imports(
-            "client/src/views/gallery/parts/segmented.svelte",
+            "RefRain/src/views/gallery/parts/segmented.svelte",
             "  import Segmented from \"../../parts/segmented.svelte\";\n\
              const lazy = import(\"./other.svelte\");",
         )
         .into_iter()
         .collect();
         assert!(drawn_by_gallery(
-            "client/src/views/parts/segmented.look.svelte",
+            "RefRain/src/views/parts/segmented.look.svelte",
             &imported
         ));
-        assert!(imported.contains("client/src/views/gallery/parts/other.svelte"));
+        assert!(imported.contains("RefRain/src/views/gallery/parts/other.svelte"));
         assert!(!drawn_by_gallery(
-            "client/src/views/parts/tabs.look.svelte",
+            "RefRain/src/views/parts/tabs.look.svelte",
             &imported
         ));
     }
@@ -164,7 +164,7 @@ mod tests {
                     <style>\n  .a { height: 13px; border: 1px solid; margin: 0; }\n\
                     .b { top: -2px; }\n  .c { gap: var(--gap-2px); inset: 0px; }\n</style>\n";
         let mut out = Vec::new();
-        sized_from_tokens("client/swap/views/parts/x.look.svelte", text, &mut out);
+        sized_from_tokens("RefRain/swap/views/parts/x.look.svelte", text, &mut out);
         let found: Vec<String> = out
             .iter()
             .map(|v| format!("{} {}", v.location, v.violation))
@@ -172,9 +172,9 @@ mod tests {
         assert_eq!(
             found,
             [
-                "client/swap/views/parts/x.look.svelte:1 this line spells 13px",
-                "client/swap/views/parts/x.look.svelte:3 this line spells 13px",
-                "client/swap/views/parts/x.look.svelte:4 this line spells 2px",
+                "RefRain/swap/views/parts/x.look.svelte:1 this line spells 13px",
+                "RefRain/swap/views/parts/x.look.svelte:3 this line spells 13px",
+                "RefRain/swap/views/parts/x.look.svelte:4 this line spells 2px",
             ]
         );
     }

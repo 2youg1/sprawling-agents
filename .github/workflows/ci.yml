@@ -11,7 +11,7 @@
 #             source half (fmt, source gates, commits, Zig leaf tests) and
 #             artifact half (bundle gates) in parallel; `gates` collects
 #             both so branch protection keeps one name
-#   swap      every look under client/swap/ drawn in place of the shipped
+#   swap      every look under RefRain/swap/ drawn in place of the shipped
 #             one, and judged by render as the shipped bundle is
 #   models    the Lean specifications under `Sprawling/` and `Tools/`
 #   clippy    the zero-warning build of every target and feature, and the
@@ -76,7 +76,7 @@
 #
 # Rust cache hashes the installed toolchains, Cargo/Rust environment and
 # dependency files; shared-key separates each compilation use. Bun keys on
-# `client/bun.lock`. Rust and Bun entries are written only by main: a pull
+# `RefRain/bun.lock`. Rust and Bun entries are written only by main: a pull
 # request's save is readable by that pull request alone and pushes the shared
 # entry out of the cache budget by age. The small `ci-tools` entries are the
 # exception: pull requests may save them, and pressure pruning removes them.
@@ -172,8 +172,8 @@ jobs:
               - 'Cargo.toml'
               - 'Cargo.lock'
               - 'justfile'
-              - 'client/package.json'
-              - 'client/bun.lock'
+              - 'RefRain/package.json'
+              - 'RefRain/bun.lock'
               - 'Sprawling/app/build.rs'
               - 'Sprawling/app/Cargo.toml'
               - 'Sprawling/desktop/ffi/zig-version'
@@ -200,7 +200,7 @@ jobs:
               - 'deny.toml'
             # Client sources and the formatter config that judges them.
             client:
-              - 'client/**'
+              - 'RefRain/**'
               - 'bunfig.toml'
             # Either product face: kept for readers that still want one bit.
             code:
@@ -208,7 +208,7 @@ jobs:
               - 'Tools/**'
               - 'Calyx/**'
               - 'Mei/**'
-              - 'client/**'
+              - 'RefRain/**'
               - 'Cargo.toml'
               - 'Cargo.lock'
               - 'rust-toolchain.toml'
@@ -281,7 +281,7 @@ jobs:
       # `fmt-check` includes `bun fmt --check`, so Bun has to be present.
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version-file: client/package.json
+          bun-version-file: RefRain/package.json
       - name: native payloads in system channel validation
         if: ${{ !cancelled() }}
         env:
@@ -371,7 +371,7 @@ jobs:
           test "${{ needs.gates-sources.result }}" = success
           test "${{ needs.gates-artifacts.result }}" = success
 
-  # Every replacement look under client/swap/ drawn in place of the
+  # Every replacement look under RefRain/swap/ drawn in place of the
   # shipped one, and the client still typechecks, keeps its wiring tests
   # and passes render (Tools/xtask/Spec.lean section 8-13).
   #
@@ -472,7 +472,7 @@ jobs:
   # that has not changed since, so cargo compiles the packages a change
   # reached and nothing else. Rust cache keeps only Cargo's registry here,
   # because the warm target carries the dependencies' artifacts too, and
-  # the bundle comes from its own cache entry when `client/` is unchanged.
+  # the bundle comes from its own cache entry when `RefRain/` is unchanged.
   test-build:
     name: test build
     needs: changes
@@ -683,14 +683,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version-file: client/package.json
+          bun-version-file: RefRain/package.json
       - uses: ./.github/actions/ci-tools
         with:
           tool: just
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
+          key: bun-${{ runner.os }}-${{ hashFiles('RefRain/bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
       # eslint's own cache, which is what makes this lane cost seconds
       # instead of the two minutes the type-aware rules take: every rule
@@ -701,8 +701,8 @@ jobs:
       # starts from nothing rather than from a stale verdict.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
-          path: client/node_modules/.cache/eslint
-          key: eslint-${{ runner.os }}-${{ hashFiles('client/eslint.config.ts', 'client/tsconfig.json', 'client/bun.lock') }}
+          path: RefRain/node_modules/.cache/eslint
+          key: eslint-${{ runner.os }}-${{ hashFiles('RefRain/eslint.config.ts', 'RefRain/tsconfig.json', 'RefRain/bun.lock') }}
           restore-keys: eslint-${{ runner.os }}-
       - name: lint, typecheck and test the client
         run: just check-client

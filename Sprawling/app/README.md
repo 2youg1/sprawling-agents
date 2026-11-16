@@ -76,7 +76,7 @@ The table is `bin::main::exit`, and the model proves the five codes pairwise dif
 The compile embeds the client bundle, so build the bundle first:
 
 ```bash
-just build-web                      # cd client && bun install --frozen-lockfile && bun run build
+just build-web                      # cd RefRain && bun install --frozen-lockfile && bun run build
 cargo run -p sprawling -- --help    # the overview, built from the table in src/main/verbs.rs
 cargo run -p sprawling -- serve --help
 ```

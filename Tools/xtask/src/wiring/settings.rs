@@ -35,7 +35,7 @@ pub(super) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
                         location: walk::rel(root, &file),
                         rule: "every settable field has a settings control or a recorded reason".to_owned(),
                         violation: format!("{field} has no valid coverage record in {spec}"),
-                        alternative: format!("add `settings-control {field} client/src/path` or `settings-reason {field} <reason>` to its owning SPEC"),
+                        alternative: format!("add `settings-control {field} RefRain/src/path` or `settings-reason {field} <reason>` to its owning SPEC"),
                     });
                 }
             }
@@ -104,7 +104,7 @@ fn covered(root: &Path, records: &str, field: &str) -> bool {
         };
         match kind {
             Some("settings-control") => {
-                detail.starts_with("client/src/") && root.join(detail).is_file()
+                detail.starts_with("RefRain/src/") && root.join(detail).is_file()
             }
             Some("settings-reason") => true,
             _ => false,
@@ -136,7 +136,7 @@ mod tests {
         ));
         assert!(!covered(
             &fixture,
-            "settings-control Config.added client/src/missing.svelte",
+            "settings-control Config.added RefRain/src/missing.svelte",
             "Config.added"
         ));
         assert!(!covered(

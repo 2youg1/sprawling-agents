@@ -310,7 +310,7 @@ mod tests {
     fn a_component_style_reads_declared_roles_and_declares_no_colour() {
         let root = std::env::temp_dir().join(format!("color-roles-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        let path = root.join("client/src/views/panel.svelte");
+        let path = root.join("RefRain/src/views/panel.svelte");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, SVELTE_FIXTURE).unwrap();
         let source = "  --color-g3: oklch(0.3 0.014 250);
@@ -321,13 +321,13 @@ mod tests {
         assert_eq!(
             found
                 .iter()
-                .filter(|v| v.location.starts_with("client/src/views/"))
+                .filter(|v| v.location.starts_with("RefRain/src/views/"))
                 .map(|v| v.location.as_str())
                 .collect::<Vec<_>>(),
             [
-                "client/src/views/panel.svelte:8",
-                "client/src/views/panel.svelte:9",
-                "client/src/views/panel.svelte:10",
+                "RefRain/src/views/panel.svelte:8",
+                "RefRain/src/views/panel.svelte:9",
+                "RefRain/src/views/panel.svelte:10",
             ]
         );
         std::fs::remove_dir_all(&root).unwrap();

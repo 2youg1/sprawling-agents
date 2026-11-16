@@ -27,7 +27,7 @@ on:
       - .github/workflows/privacy-windows-acceptance.yml
       - .github/workflows/privacy-ui.mjs
       - .github/workflows/acceptance-focus.mjs
-      - client/src/views/setup/privacy/**
+      - RefRain/src/views/setup/privacy/**
   workflow_dispatch:
 permissions:
   contents: read

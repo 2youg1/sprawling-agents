@@ -177,7 +177,7 @@ impl Site {
 
 - **帧到账**：`Command::Dispatch.policy` 原样进 `Assignment.policy`，经 `RunPlan.run_policy`（harness run 经 `Chartered.policy`）由 `runtime::run::Charter::open` 写进 `run_started.policy`。城自己派的活——计划节点、追的目标、编辑器经 ACP、控制台与 `sprawling dispatch` 这个动词——取 `RunPolicy::of(Mode::Work)`；委派、交回与敲门叫醒继承说话那一方的整份策略，所以一次只读可新建的试验不会因为交给了别的居民就放宽或落地。
 - **写门**：`workbench::tools` 用 `Assignment.policy` 开一个 `PolicyCell`（`Sprawling/runtime/src/mode.rs`），把它的 `PolicyReader` 交给 `EditTool` 与 `ExecSetup`，楼的写域照旧取自 `RULES.toml`，两道判定在每次写时各问一次（`Sprawling/city/Spec.lean` §8-32、`Sprawling/runtime/Spec.lean` §8-55、§8-62）。开始时的 `policy.mode` 决定目录里那一行（`Catalog::set_mode`），会话中换 mode 不改它。
-- **会话中换策略**：`Command::ChangeRunPolicy` 让城经 `record_at` 写一行 `run_policy_changed`（`Sprawling/kernel/Spec.lean` D21）；这一行落账之后，`change_run_policy` 经 `RoomQueues::post_policy` 把它放进那个房间的策略槽 `PolicySlot`（`Sprawling/accounting/src/worker/rooms.rs`，与房间的 `Mailslot` 一同借给正在跑的 run，只留最后一条）；lane 的中断源 `ask()` 在问过人的那张台子之后、问邻居的 steer 之前取它，交给 run 作 `Interrupt::Policy`，run 在下一个 `SafePoint::BeforeWave` 取用（`Sprawling/runtime/Spec.lean` D28）。同一房间的第二个 run 拿的是备用队列，它的策略槽没有人投；房间空着就只留在账上，由派活来读：`accounting::worker::folds::session::SessionOrigins` 记下每个房间这一 session 里最后一行 `run_policy_changed`（`session_opened` 清掉它；`record_at` 把城自己写的每一行也交给这个 fold，所以 `change_run_policy` 落账即记下），人派的活（`Command::Dispatch`）在这一份存在时用它作 `Assignment.policy`，没有时才用帧里的 `Command::Dispatch.policy`。权威是账上房间的这一行，不是页面的那一份：会话菜单（`client/src/views/world/session_menu.svelte`）与对话页把「session 开始之后最后一次改动，否则开场策略」当作房间的状态给人看，而 composer 发出的是这一页自己持有的策略（`client/src/ui.ts` 的 `policy`，从 `FIRST_POLICY` 起），它不知道账上有什么，也没有时间可比；让 client 去比要在页面上再算一遍账已经算过的事，是同一事实的第二个定义。代价是：人改过房间策略之后再在 composer 里换一个，这一 session 里仍是房间那一份说了算，要换就再改一次房间策略。城自己派的活不读这一份，仍按上一条取策略。一个 run 读到改动而在下一个 `BeforeWave` 之前离开，改动同样留给下一次 run，不另敲门：换策略不是要人回话的事。
+- **会话中换策略**：`Command::ChangeRunPolicy` 让城经 `record_at` 写一行 `run_policy_changed`（`Sprawling/kernel/Spec.lean` D21）；这一行落账之后，`change_run_policy` 经 `RoomQueues::post_policy` 把它放进那个房间的策略槽 `PolicySlot`（`Sprawling/accounting/src/worker/rooms.rs`，与房间的 `Mailslot` 一同借给正在跑的 run，只留最后一条）；lane 的中断源 `ask()` 在问过人的那张台子之后、问邻居的 steer 之前取它，交给 run 作 `Interrupt::Policy`，run 在下一个 `SafePoint::BeforeWave` 取用（`Sprawling/runtime/Spec.lean` D28）。同一房间的第二个 run 拿的是备用队列，它的策略槽没有人投；房间空着就只留在账上，由派活来读：`accounting::worker::folds::session::SessionOrigins` 记下每个房间这一 session 里最后一行 `run_policy_changed`（`session_opened` 清掉它；`record_at` 把城自己写的每一行也交给这个 fold，所以 `change_run_policy` 落账即记下），人派的活（`Command::Dispatch`）在这一份存在时用它作 `Assignment.policy`，没有时才用帧里的 `Command::Dispatch.policy`。权威是账上房间的这一行，不是页面的那一份：会话菜单（`RefRain/src/views/world/session_menu.svelte`）与对话页把「session 开始之后最后一次改动，否则开场策略」当作房间的状态给人看，而 composer 发出的是这一页自己持有的策略（`RefRain/src/ui.ts` 的 `policy`，从 `FIRST_POLICY` 起），它不知道账上有什么，也没有时间可比；让 client 去比要在页面上再算一遍账已经算过的事，是同一事实的第二个定义。代价是：人改过房间策略之后再在 composer 里换一个，这一 session 里仍是房间那一份说了算，要换就再改一次房间策略。城自己派的活不读这一份，仍按上一条取策略。一个 run 读到改动而在下一个 `BeforeWave` 之前离开，改动同样留给下一次 run，不另敲门：换策略不是要人回话的事。
 - **试验写在自己的树里**：一次 run 在不在自己的工作树里写，由 `Site::works_apart` 一处回答——`landing` 为 `Experiment` 时恒是，`Ordinary` 时照楼的 `review`。所以没有评审的楼里，试验也借房间的树（与评审楼同一个 `lend_tree`，写 `worktree_opened`），它写的东西不出现在楼里；树与分支留着，人与居民都读得到。
 - **合并时的准入**：`reviewing::settle_requests` 在 `PrEffect::Merged` 写 `pr_merged` 之前问 `runtime::admits(&ended, produced)`，`ended` 是那个 run 冻结时策略格里的值（`Sprawling/runtime/Spec.lean` §8-54）：试验恒拒，常规落地按准入证据要求判；拒时写 `pr_rejected`，理由是拒词的两句。没有任何一条路把试验的树自动合并，所以「没有隐式落地」不靠一条额外的检查。
 - 验收：`dispatching` 测试 `an_experiment_writes_in_a_tree_of_its_own_in_a_building_without_review`（没有评审的楼里，一次试验新建的文件不出现在楼里，账上有它的 `worktree_opened` 与带 `"landing":"experiment"` 的 `run_started`）；`commanding` 测试 `a_policy_changed_while_the_room_is_idle_rules_the_next_dispatch`（房间空着时改成 chat，下一次帧里带 work 的派活，`run_started.policy` 是 chat）。
@@ -1777,10 +1777,10 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 ## 8-152 页面保存一份文档、决定修改提案、读提交说明，服务中的城怎么做（`accounting::worker::commanding::saving`、`accounting::views::proposals`、`accounting::views::commits`；`Sprawling/wire/Spec.lean` §8-72、§8-73、§8-54）
 
 - **两条写命令走 worker 的同一扇门。** `PutRange` 与 `DecideProposals` 经 desk 进 `run_command`，各有一臂，交给 `commanding::saving`（`Sprawling/accounting/Spec.lean` §8-22）；`idem` 由 `commanding::entrance` 判，所以页面丢了答复再发一次，城答第一次的结果，不写第二行。
-- **回执是事件流上的一行。** 成功的保存写 `document_written`，带这条命令的 `idem`；页面在 `core/belief` 的折叠里见到带自己 `idem` 的那一行才把「保存中」换成「已保存」，`version` 换成新的基线。`client/src/core/staleness.ts` 让这一行使 `document` 与 `proposals` 两种答复过期，页面再问一次就读到新版本与剩下的卡。
+- **回执是事件流上的一行。** 成功的保存写 `document_written`，带这条命令的 `idem`；页面在 `core/belief` 的折叠里见到带自己 `idem` 的那一行才把「保存中」换成「已保存」，`version` 换成新的基线。`RefRain/src/core/staleness.ts` 让这一行使 `document` 与 `proposals` 两种答复过期，页面再问一次就读到新版本与剩下的卡。
 - **`Query::Proposals` 读视图里的 `Governance.proposals`**，锁外读盘取文件此刻的版本（同 §8-52 的 `document`，§8-100 的锁外规矩）。
 - **提交说明随父提交一起读**：`Query::Commit` 与 `Query::Commits` 的 `CommitsAsk::read` 在锁外各补 `parents` 与 `message`（§8-128）。
-- **客户端今天只有发出点，没有画面**：`client/src/core/commands/document.ts` 拼 `put_range` 与 `decide_proposals` 两种帧；编辑页与请决定卡还没有画出来，画它们的依据是 `Sprawling/wire/Spec.lean` §8-72、§8-73 与 refrain 路线图 §4-8、§4-10。
+- **客户端今天只有发出点，没有画面**：`RefRain/src/core/commands/document.ts` 拼 `put_range` 与 `decide_proposals` 两种帧；编辑页与请决定卡还没有画出来，画它们的依据是 `Sprawling/wire/Spec.lean` §8-72、§8-73 与 refrain 路线图 §4-8、§4-10。
 - 验收：见 `Sprawling/accounting/Spec.lean` §8-22 列的测试；远程门对两条命令的分类见 D26「写文档的两条命令在远程门外」。
 -/
 
@@ -1792,7 +1792,7 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 - **不新起一条命令**：`ConfigureBuilding` 问的就是「这栋楼的 runs 够得到什么」，沙箱、外部服务器与运行中的机器上的窗口是同一个问题的三面，各自可缺省。
 - **不解析**：`city::write_desktop_scope` 整份覆写，字节即人给的字节。语法的权威是读它的那台 server，且它 fail closed。
 - **载荷是四个面**：`city::Written { sandbox, mcp, desktop, context }` 取代四个裸布尔——调用点写 `(true, false, true, false)` 说不出哪一位是哪一面；四个面进来时也已经是一个值（`commanding::configure::Reconfiguration`），所以 `configure_building` 收两个参数而不是五个。
-- **页面**：`client/src/views/desktop.svelte` 一个框装整份文件，读用 `Query::Document`（`<building>/.sprawling/DESKTOP.toml`），写用 `configure_building`。一个「每个窗口一行」的表单会是这一侧对那份语法的第二次解读。
+- **页面**：`RefRain/src/views/desktop.svelte` 一个框装整份文件，读用 `Query::Document`（`<building>/.sprawling/DESKTOP.toml`），写用 `configure_building`。一个「每个窗口一行」的表单会是这一侧对那份语法的第二次解读。
 - **验收**：`Sprawling/accounting/src/worker/building_page_tests.rs` 的 `the_desktop_allowlist_is_written_where_no_resident_reaches_it`——人写的字节落在 `desktop_scope_path` 上，且那条地址 `is_reserved` 为真（任何写域都够不到）。
 -/
 
@@ -1843,7 +1843,7 @@ impl kernel::Tool for OcrTool { … }   // 名 `ocr`；参数 `{ path }`：PNG �
 - **效果照 8-131**：`Effect::Read`（读一个文件，城里什么都不写；图出门去的是按本楼 policy 选出的端点）、`CostTier::Heavy`（一次 provider 往返，可能计费）、`timeout: None`（端点自己的调用期限是上限）、`render: Generic`（产出的是文字）。
 - **在目录里的位置**：它不在任何 mode 的常驻核心，所以不进工具表，只在休眠索引里随它的命名空间那一行出现，经 `tool` 找、看、调（`Sprawling/runtime/Spec.lean` §8-60）。
 - **验收**：`Sprawling/app/tests/acceptance/ocr.rs`。选了 OCR 模型的城（回环端点、chat 面），run 以楼里的一个 PNG 与一个为这座楼存进 CAS 的截图各调一次 `ocr`，拿回端点读出的字；端点收到的两次请求走 `chat/completions`、带人选的模型名与那张图的 base64。没选 OCR 的城不上这件工具，由 catalogue 的两条覆盖测试守着。工具自己的拒绝（不是 PNG、机密楼的路径、没有设施）由 `ocr` 模块的测试守着。
-- **本节接口的当前状态**：线上已有的 `SelectModel` 能为 `Ocr` 选模型，登记的 `input` 是 `gateway::accepted_input` 那架梯子的答案（`Sprawling/gateway/Spec.lean` §8-37）：钉版目录、预置表、`Text`，先说者胜。所以预置表写着 `text_image` 的模型（例如 `api.anthropic.com` 上的 `claude-sonnet-4-5`，或中转站转发的同一个 id）选为 `Ocr` 之后，`ocr` 在它上面读得出字；两张表都不认识的模型仍按 `Text` 登记，`ocr` 在它上面由端点拒绝。梯子最高的一档——人自己说「这个模型读图」——的线上字段已经落地：`SelectModel.input: Option<InputKinds>`，出现时排在目录之前，一个目录写着 `text` 的模型带 `input: TextImage` 选为 `Ocr` 之后，`ocr` 在它上面读得出字（gateway D16）。只差设置页的控件（client/Spec.lean 的模型表仍是三行，`Sprawling/kernel/Spec.lean` §8-80），控件归前端；页面今天不带这一格（线上缺席即 `None`），梯子照旧。
+- **本节接口的当前状态**：线上已有的 `SelectModel` 能为 `Ocr` 选模型，登记的 `input` 是 `gateway::accepted_input` 那架梯子的答案（`Sprawling/gateway/Spec.lean` §8-37）：钉版目录、预置表、`Text`，先说者胜。所以预置表写着 `text_image` 的模型（例如 `api.anthropic.com` 上的 `claude-sonnet-4-5`，或中转站转发的同一个 id）选为 `Ocr` 之后，`ocr` 在它上面读得出字；两张表都不认识的模型仍按 `Text` 登记，`ocr` 在它上面由端点拒绝。梯子最高的一档——人自己说「这个模型读图」——的线上字段已经落地：`SelectModel.input: Option<InputKinds>`，出现时排在目录之前，一个目录写着 `text` 的模型带 `input: TextImage` 选为 `Ocr` 之后，`ocr` 在它上面读得出字（gateway D16）。只差设置页的控件（RefRain/Spec.lean 的模型表仍是三行，`Sprawling/kernel/Spec.lean` §8-80），控件归前端；页面今天不带这一格（线上缺席即 `None`），梯子照旧。
 -/
 
 /-!
@@ -1942,7 +1942,7 @@ impl RoomQueues {
 - `Command::RemoveBuilding` 走这里。城拥有 `city::remove_building` 不知道的两件事：楼里有没有 run 正在跑，以及 Ledger 记什么。
 - **一个拒绝**：楼里某个房间的队列正借给一个 run（`worked_within`），拒 `E_BUSY`，主语点名房间与 run，恢复是先停下它。房间队列是城里唯一说「这里有人在干活」的账，另开一本会与它分歧；逐个看全部房间，因为地址序把 `lab-2` 排在 `lab` 与 `lab/room1` 之间，按前缀截区间会漏。
 - **先搬后记**：文件先搬进 `.sprawling/removed/`，再写 `building_removed`（载荷 addr、kept），因为这一行说的是「已经搬了」。楼以前写过的每一行都留在账里，什么都不删。
-- 客户端（`client/src/core/removal.ts`）在 City Hall 上不画这个控件，楼里有 run 在跑时画成不可用并说明原因；确认走 `parts/dialog`。城仍自己拒这两种情况，页面只是不把一个只会被拒的按钮交给人。
+- 客户端（`RefRain/src/core/removal.ts`）在 City Hall 上不画这个控件，楼里有 run 在跑时画成不可用并说明原因；确认走 `parts/dialog`。城仍自己拒这两种情况，页面只是不把一个只会被拒的按钮交给人。
 
 ### 8-115 还在跑的命令写出的字节，给后来打开页面的会话留一段（`bin::serving::output_ring`）
 

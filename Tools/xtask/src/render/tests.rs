@@ -329,3 +329,11 @@ fn an_element_with_no_measured_parent_is_left_alone() {
         rules(&found)
     );
 }
+
+#[test]
+fn pass_batches_stay_within_the_cpu_share_and_the_concurrency_cap() {
+    assert_eq!(passes_at_once(1), 1);
+    assert_eq!(passes_at_once(3), 1);
+    assert_eq!(passes_at_once(6), 2);
+    assert_eq!(passes_at_once(16), 2);
+}

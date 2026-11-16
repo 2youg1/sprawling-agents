@@ -81,7 +81,7 @@ pub(crate) fn in_isolation_zone(rel: &str) -> bool {
 /// Macro form feeds `concat!` at compile time without a second literal.
 macro_rules! client_src {
     () => {
-        "client/src"
+        "RefRain/src"
     };
 }
 pub(crate) use client_src;
@@ -89,7 +89,7 @@ pub(crate) use client_src;
 pub(crate) const CLIENT_SRC: &str = client_src!();
 
 /// Swap-build replacement looks under the mirrored path of [`CLIENT_SRC`].
-pub(crate) const CLIENT_SWAP: &str = "client/swap";
+pub(crate) const CLIENT_SWAP: &str = "RefRain/swap";
 
 /// Client sources and replacement looks (the latter only when present).
 pub(crate) fn client_files(root: &Path, keep: &[&str]) -> Result<Vec<PathBuf>, XtaskError> {

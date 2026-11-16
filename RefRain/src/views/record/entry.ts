@@ -1,0 +1,115 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+import type { Lang } from "../../core/lang";
+import { fill, say } from "../../core/lang";
+import { hhmmssms, isoInstant } from "../../core/time";
+import type { EventRecord, Seq } from "../../wire";
+import { factsOf, whatHappened } from "./event";
+import { LEVEL_NAMES } from "./timeline";
+import type { Entry } from "./timeline";
+
+export interface OpenWire {
+  readonly type: "button";
+  readonly "aria-expanded": boolean;
+  readonly onclick: () => void;
+}
+
+export interface MomentLook {
+  readonly text: string;
+  readonly at: string;
+}
+
+export interface DayLook {
+  readonly day: string;
+  readonly zone: string;
+}
+
+export type RowLook =
+  | {
+      readonly kind: "record";
+      readonly when: MomentLook;
+      readonly seq: string;
+      readonly what: string;
+      readonly facts: string;
+      readonly where: string;
+      readonly open: boolean;
+      readonly wire: OpenWire;
+      readonly rawLabel: string;
+      readonly raw: string | undefined;
+    }
+  | {
+      readonly kind: "log";
+      readonly when: MomentLook | undefined;
+      readonly seq: string;
+      readonly level: string;
+      readonly line: string;
+      readonly module: string;
+    };
+
+export interface EntryLook {
+  readonly day: DayLook | undefined;
+  readonly row: RowLook;
+}
+
+export interface EntryProps {
+  readonly entry: Entry;
+  readonly day: string | null;
+  readonly open: boolean;
+  readonly onToggle: (seq: Seq) => void;
+}
+
+export function lookOf(props: EntryProps, lang: Lang): EntryLook {
+  return {
+    day: props.day === null ? undefined : { day: props.day, zone: say(lang, "rec_local") },
+    row: rowOf(props, lang),
+  };
+}
+
+function rowOf(props: EntryProps, lang: Lang): RowLook {
+  const { entry } = props;
+  switch (entry.kind) {
+    case "record": {
+      const { record } = entry;
+      return {
+        kind: "record",
+        when: momentOf(record.t),
+        seq: `#${String(record.seq)}`,
+        what: say(lang, whatHappened(record.kind)),
+        facts: factLine(record),
+        where: record.addr ?? fill(say(lang, "rec_by"), { who: record.who }),
+        open: props.open,
+        wire: {
+          type: "button",
+          "aria-expanded": props.open,
+          onclick: () => {
+            props.onToggle(record.seq);
+          },
+        },
+        rawLabel: say(lang, "rec_raw"),
+        raw: props.open ? JSON.stringify(record, null, 2) : undefined,
+      };
+    }
+    case "log":
+      return {
+        kind: "log",
+        when: entry.t === null ? undefined : momentOf(entry.t),
+        seq: `#${String(entry.line.seq)}`,
+        level: say(lang, LEVEL_NAMES[entry.line.level]),
+        line: entry.line.line,
+        module: entry.line.module,
+      };
+  }
+}
+
+function momentOf(t: number): MomentLook {
+  return { text: hhmmssms(t), at: isoInstant(t) };
+}
+
+function factLine(record: EventRecord): string {
+  return factsOf(record.data)
+    .map((fact) => `${fact.name}: ${fact.value}`)
+    .join(" · ");
+}

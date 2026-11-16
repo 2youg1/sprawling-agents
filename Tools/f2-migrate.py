@@ -280,11 +280,11 @@ def update_product_table() -> None:
     arch_text = arch.read_text(encoding="utf-8")
     old = (
         "During transition the table may list planned roots beside the paths\n"
-        "  the tree still holds (`crates/`, `client/`)."
+        "  the tree still holds (`crates/`, `RefRain/`)."
     )
     new = (
         "After the crates split, `Sprawling/` and `Tools/` are current and\n"
-        "  `crates/` is retired; `client/` remains live until RefRain R0."
+        "  `crates/` is retired; `RefRain/` remains live until RefRain R0."
     )
     if old in arch_text:
         arch.write_text(arch_text.replace(old, new, 1), encoding="utf-8", newline="\n")

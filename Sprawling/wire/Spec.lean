@@ -132,14 +132,14 @@ import Sprawling.wire.spec.Slash
 - **Signal 不在 Command 面**：Signal 的投递与消费住 `collab::inbox`。
 - **`Welcome.resume_from` 读自 `LedgerHead`，`Welcome.epoch` 是创世记录的链哈希**：`decide_frame` 的第四个参数是 `WelcomeFacts { city, head, epoch }`——城名、账本头与 epoch 合成一个值，因为 `decide_frame` 已占满 4 个参数。`LedgerHead` 是 `ServeConfig.head` 递进来的一个 `AtomicU64`：装配层以重建视图时读到的最后一条记录的 `seq` 起头，折叠线程在每条记录**广播之前**把头推到它的 `seq`，socket 在 hello 时读一次。头放在原子量里而不放在视图锁里，因为读者可能长时间持有视图，而 hello 跑在 tokio 任务上，读头只是一次 Acquire load。先推头、后广播，加上会话在 hello 之前已订阅事件流，保证 `resume_from` 之后的记录必在流上：头之前而在订阅之后广播的记录会同时出现在流上与补拉里，所以边界上只可能重复、不可能缺失。`epoch` 是 `kernel::ledger::chain_hash(创世行)`，装配层在重建视图时读一次，由 `ServeConfig.epoch` 递进来：同一份账本的 epoch 永不改变，换了账本（重新 init、换了城目录）epoch 必变，所以客户端见到与上次不同的 epoch 就丢弃 belief、按快照重建，而不是拿旧水位去新账本里补拉。
 
-- **V0.0.9 的线上改形已定形、尚未落进类型**：D22 到 D34 写下了形状；`Command` 与 `Query` 的帧名表由 `specalign` 与 schema golden 逐项对账，所以新帧与新字段由实现它们的那一个变更集同时加进 Rust、`spec/Command/Kind.lean`、golden 与 `client/src/wire.ts`，届时删去本条。信号与派活发出即生效若要新帧，形状由它的设计写成本规格的下一条决定。
+- **V0.0.9 的线上改形已定形、尚未落进类型**：D22 到 D34 写下了形状；`Command` 与 `Query` 的帧名表由 `specalign` 与 schema golden 逐项对账，所以新帧与新字段由实现它们的那一个变更集同时加进 Rust、`spec/Command/Kind.lean`、golden 与 `RefRain/src/wire.ts`，届时删去本条。信号与派活发出即生效若要新帧，形状由它的设计写成本规格的下一条决定。
 
 模型自己的假设写在定理的假设里，不写成公理：哈希对名字表单射是 `distinct_grammars_never_handshake` 的前提（blake3 的抗碰撞给出它）；名字不变而改形必进位是同一条定理的前提（D1 给出它，`tests/wire_contract/main.rs` 的形状摘要提醒改的人）；`decide_lag` 的 `checked_add` 溢出一支在模型里不写，因为产出 `next` 的账本到不了那一步。
 -/
 
 /-! ## 4 现状分析
 
-装配消费者是 `Sprawling/app`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
+装配消费者是 `Sprawling/app`（`serve` 把处理器注入 `ServeConfig`）；客户端 `RefRain/` 读的 `RefRain/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
 -/
 
 /-! ## 5 权威信源
@@ -181,7 +181,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 /-! ## 8 接口先行
 
-客户端是 TypeScript 的 `client/`，它的 SPEC 是 `client/Spec.lean`。
+客户端是 TypeScript 的 `RefRain/`，它的 SPEC 是 `RefRain/Spec.lean`。
 
 三条不可动摇的形状约定，它们决定接口而非被接口决定：
 
@@ -432,7 +432,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 /-! ## 15 影响面
 
-- 改 `Command`／`Query`／帧：名字变了，schema golden 随之变；名字不变而形状变了，按 D1 进 `WIRE_V`；`client/src/wire.ts` 重新生成（`cargo xtask wire-ts`），`Sprawling/app` 的处理器穷尽匹配随之改，§19-2 的 reach 表增删一行（`xtask wiring`）。
+- 改 `Command`／`Query`／帧：名字变了，schema golden 随之变；名字不变而形状变了，按 D1 进 `WIRE_V`；`RefRain/src/wire.ts` 重新生成（`cargo xtask wire-ts`），`Sprawling/app` 的处理器穷尽匹配随之改，§19-2 的 reach 表增删一行（`xtask wiring`）。
 - 改 `ServeConfig`：波及 `Sprawling/app` 的 `serve` 装配点。
 -/
 
@@ -456,18 +456,18 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 - 按帧写出：`server::socket::framing::tests` 的 proptest `framing_tells_every_record_once_in_order`，生成器覆盖 `spec/Server/Socket.lean` 的到达序列与切帧方式。
 - 会话令牌的寿命：`reception::sessions::tests` 的 proptest `forgotten_and_lapsed_tokens_stay_ended_and_seated_ones_stay_good`，生成器覆盖 `spec/Server/Sessions.lean` 的步骤，只是从不把表填满。
 - `PutSecret`：`tests/trybuild.rs` 的两个反例与 `put_secret_has_no_byte_form_in_either_direction`。
-- reach 与 class：`cargo xtask gates wiring` 把 `Command.reach`、`Command.verbClass` 的臂与 `enum Command`、`run_command`、`client/src`、`command_class` 逐个动词对照；Lean 侧的 `def` 漏一个构造子即编不过。
+- reach 与 class：`cargo xtask gates wiring` 把 `Command.reach`、`Command.verbClass` 的臂与 `enum Command`、`run_command`、`RefRain/src`、`command_class` 逐个动词对照；Lean 侧的 `def` 漏一个构造子即编不过。
 - 带基线的保存：accounting 的 `worker::commanding::tests::saving`。
 - 干预：`control` 旁的测试。
 - 携带的名字：`carried_name` 的 `a_carried_name_rejects_empty_and_control_characters`。
 
-没有 Lean 模型的分部，其要求由类型与 `cargo nextest run -p sprawling-wire --all-features` 的测试守住：信封与名表（`named_frames!` 与 `tests/wire_contract/main.rs` 的计数）、`wire_schema` 与 `client/src/wire.ts` 的生成（`cargo xtask wire-ts`）、各答面的形状、`aggregate` 只转发 Query（trybuild 反例）、常数时间比较、`Committed` 拼出的帧与 `ServerFrame::Event` 逐字节相等、读不出的帧不关连接。
+没有 Lean 模型的分部，其要求由类型与 `cargo nextest run -p sprawling-wire --all-features` 的测试守住：信封与名表（`named_frames!` 与 `tests/wire_contract/main.rs` 的计数）、`wire_schema` 与 `RefRain/src/wire.ts` 的生成（`cargo xtask wire-ts`）、各答面的形状、`aggregate` 只转发 Query（trybuild 反例）、常数时间比较、`Committed` 拼出的帧与 `ServerFrame::Event` 逐字节相等、读不出的帧不关连接。
 -/
 
 /-! ## 17 文档关系
 
 - ARCHITECTURE 模块表的 wire 各行。
-- `client/Spec.lean`：线上形状变了的那一侧。
+- `RefRain/Spec.lean`：线上形状变了的那一侧。
 - `Sprawling/app/Spec.lean`：`serve` 子命令的装配面。
 
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；它改了，分部的路径与 `architecture.toml` 里 wire 各行的 `spec` 锚点一起重看。ARCHITECTURE.md §7「The wire」与 §8 的「a new `Command` or `Query` frame」一行引 D1。

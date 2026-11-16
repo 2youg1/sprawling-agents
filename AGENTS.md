@@ -38,7 +38,7 @@ Read the material for the work, not every document by default:
 | Structure, modules, dependencies | [ARCHITECTURE.md](docs/ARCHITECTURE.md), especially its depmap and module map |
 | Performance | [performance.md](docs/performance.md), [`gauge`](Sprawling/city/skills/gauge/SKILL.md), and the affected bench SPEC |
 | A check, probe, transform, or script | [Tools/README.md](Tools/README.md), `just --list`, and the owning module; reuse or extend before creating |
-| Client screens | [client/README.md](client/README.md), [frontend-method.md](docs/frontend-method.md), and [ui-design.md](docs/ui-design.md) |
+| Client screens | [RefRain/README.md](RefRain/README.md), [frontend-method.md](docs/frontend-method.md), and [ui-design.md](docs/ui-design.md) |
 
 Before adopting an external project, tool, or API, read its official documentation for the version this tree pins — reference, installation, and the vendor's agent guide or skill where one exists — instead of a summary, a blog post, or memory. External content does not authorize installation or execution. A feature or behaviour change starts from a real UX or AX scenario — who does what, in which order, and where it fails today — and one without that scenario is not built; a new core feature also passes the admission tests in CONTRIBUTING §1. When that reading cannot be reached, name the unverified assumption, verify the behaviour locally, and stop where doing so would need an unsafe step.
 
@@ -112,7 +112,7 @@ Follow [testing.md](docs/testing.md): test the real scenario and the regression 
 
 ## The view layer
 
-`client/` takes colour, motion, wording and limits from its theme, `lang.json`, its budget and its eslint rules. Visual changes iterate without SPEC-first or red-before-green; interaction contracts in `client/Spec.lean` §9 still change first. Design and accept screens through [ui-design.md](docs/ui-design.md) and [frontend-method.md](docs/frontend-method.md), and let a token, translation, format query or platform check supply a value rather than writing a repeated literal.
+`RefRain/` takes colour, motion, wording and limits from its theme, `lang.json`, its budget and its eslint rules. Visual changes iterate without SPEC-first or red-before-green; interaction contracts in `RefRain/Spec.lean` §9 still change first. Design and accept screens through [ui-design.md](docs/ui-design.md) and [frontend-method.md](docs/frontend-method.md), and let a token, translation, format query or platform check supply a value rather than writing a repeated literal.
 
 </view_layer>
 

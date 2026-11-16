@@ -118,7 +118,7 @@ pub enum ExecArm { Program { path: String, args: Vec<String> }, Python { code: S
 
 **决定**：`RenderIntent` 多两个单元变体 `Signal` 与 `Delegate`。`signal` 工具登记 `Signal`，`delegate` 工具登记 `Delegate`（`Sprawling/collab/Spec.lean` D17）；`tool_called` 行照旧在调用那一刻抄下登记的 `render`，线上 `Call.render` 原样带它。变体不带字段：收信地址、正文、房间与任务都在这一次调用的 `args` 里，页面从 `Call.arguments` 读，与 `Diff` 的 meta 级空 `locations` 同一条规矩——逐调用的东西是 args 的纯函数，不进登记。三个平台上是同一份登记数据与同一种序列化，没有平台分支；写在这两个变体之前的旧账本行带的是 `generic`，页面照旧按 `effect` 画。
 
-**理由**：页面按登记选词，不按工具名（client/Spec.lean §4-26）。两件工具登记为 `Generic` 时，页面只剩 `effect` 可读：发信是 `Write`，读作「写入 send」；派活是 `Spawn`，读作「派生 <goal>」。人看不出信发给了谁、活交给了哪个房间。一个呈现意图说的就是「这一行该怎么画」，所以加在这里，而不是让页面认工具名。
+**理由**：页面按登记选词，不按工具名（RefRain/Spec.lean §4-26）。两件工具登记为 `Generic` 时，页面只剩 `effect` 可读：发信是 `Write`，读作「写入 send」；派活是 `Spawn`，读作「派生 <goal>」。人看不出信发给了谁、活交给了哪个房间。一个呈现意图说的就是「这一行该怎么画」，所以加在这里，而不是让页面认工具名。
 
 **被否**：①页面按工具名 `signal`／`delegate` 分支——那是 §4-26 拒掉的第二张登记表，换一个名字或多一件发信工具就静悄悄落回「写入」；②变体带上 `to`／`room` 字段——登记是一件工具的，不是一次调用的，填不出来；要让它逐调用，就得让工具波另写一份逐调用的意图，同一个事实在 `args` 与 `render` 里各写一遍；③只改 `ToolCalled::subject_of` 的键序让主体读成地址——主体只有一个字符串，放不下正文与任务。
 

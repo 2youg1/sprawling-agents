@@ -53,7 +53,7 @@ pub enum ServerFrame {
 }
 pub struct Hello   { pub wire_v: u32, pub schema: B3Hash, pub token: Option<Sealed<String>> }
 pub struct Welcome { pub wire_v: u32, pub schema: B3Hash, pub resume_from: Option<Seq>, pub city: Option<Address>, pub epoch: Option<B3Hash> }
-// resume_from：账本头（最后广播的记录）的 seq，读自 ServeConfig.head: Arc<LedgerHead>；客户端据此把断线期间的缺口经 HistoryRange 补齐（client/Spec.lean §4-40）。
+// resume_from：账本头（最后广播的记录）的 seq，读自 ServeConfig.head: Arc<LedgerHead>；客户端据此把断线期间的缺口经 HistoryRange 补齐（RefRain/Spec.lean §4-40）。
 ```
 
 **三个形状决定及其理由**：
@@ -112,7 +112,7 @@ pub struct Delta { pub run: RunId, pub increment: kernel::Increment }
 /-!
 ### 8-16 线的另一端由这一端生成（`wire_schema`，feature `schema`）
 
-**需求**：`client/`（TypeScript）要与 `Sprawling/wire` 说同一门语言，而 §8 从头到尾只承认一个权威——Rust 的类型声明。手写一份 TS 类型就是第二个权威，它会在握手通过之后才被发现漂了。故 TS 面由这一端**生成**：`cargo xtask wire-ts` 读本 crate 的 JSON Schema，写出 `client/src/wire.ts`（每个类型一条 TS `type` 加一条 Effect `Schema` 值，外加 `WIRE_V` 与 `WIRE_HASH`）；不带 `--write` 时只比对盘上文件，第一处不同的行即门红。
+**需求**：`RefRain/`（TypeScript）要与 `Sprawling/wire` 说同一门语言，而 §8 从头到尾只承认一个权威——Rust 的类型声明。手写一份 TS 类型就是第二个权威，它会在握手通过之后才被发现漂了。故 TS 面由这一端**生成**：`cargo xtask wire-ts` 读本 crate 的 JSON Schema，写出 `RefRain/src/wire.ts`（每个类型一条 TS `type` 加一条 Effect `Schema` 值，外加 `WIRE_V` 与 `WIRE_HASH`）；不带 `--write` 时只比对盘上文件，第一处不同的行即门红。
 
 **接口**（feature `schema`，缺省关；`web` 以 `default-features = false` 依赖本 crate，产品二进制不开它）：
 
@@ -294,7 +294,7 @@ end Wire.Frames
 
 /-! D22 V0.0.9 的线上改形一次进位，由一个变更集落地
 
-**决定**：V0.0.9 的全部线上改形——`Call`／`Used` 的微秒耗时（D28）、`SessionLine` 的五件与 `NameSession`、`ChangeRunPolicy` 两帧（D27）、`ReleaseAnswer` 的注册表与更新命令（D24）、`DoctorAnswer.scanning`（D25）、沙箱臂名（D26）、skill 与 MCP 的三个查询（D28）、`theme` 偏好（D29）——在同一个变更集里落地，`WIRE_V` 按 D1 只进一位；同一个变更集重生 schema golden、`client/src/wire.ts`（`cargo xtask wire-ts`）、docnum，并改 `Tools/adversary/` 的 Door 与 Regression。之后的车道不再改线；确有一处必须改时，由整合者在合并时重生上面这几样，`WIRE_V` 在两次推送之间仍至多进一位。
+**决定**：V0.0.9 的全部线上改形——`Call`／`Used` 的微秒耗时（D28）、`SessionLine` 的五件与 `NameSession`、`ChangeRunPolicy` 两帧（D27）、`ReleaseAnswer` 的注册表与更新命令（D24）、`DoctorAnswer.scanning`（D25）、沙箱臂名（D26）、skill 与 MCP 的三个查询（D28）、`theme` 偏好（D29）——在同一个变更集里落地，`WIRE_V` 按 D1 只进一位；同一个变更集重生 schema golden、`RefRain/src/wire.ts`（`cargo xtask wire-ts`）、docnum，并改 `Tools/adversary/` 的 Door 与 Regression。之后的车道不再改线；确有一处必须改时，由整合者在合并时重生上面这几样，`WIRE_V` 在两次推送之间仍至多进一位。
 
 **理由**：升版的代价是 `wire.ts` 重生与客户端同改，与改动的数量无关（§8-39），分十次就付十次，而且十条车道同时改帧表会在合并时十次冲突。先把形状写定、再一次实现，是 V0.0.9 的执行规则（接口先定）。
 
@@ -309,7 +309,7 @@ wire shape golden 与客户端协议。-/
 
 /-! D53 V0.0.11 的线上改形一次进位，由第一条车道落地
 
-**决定**：V0.0.11 的线上改形在一个变更集里落地，`WIRE_V` 从 64 进到 65，只进这一次：`Effort` 多一级 `minimal`（kernel D56）；四个新命令 `CloseCity`、`AddAgent`、`AgentLogin`、`ForgetDevice`，class 都是 `LocalOnly`（§19-2）；三个新查询 `AgentCatalog`、`ParseAgentSpec`、`Devices`（§8-90、§8-91）；端点的模型行多 `thinking` 与 `canonical`（§8-92）；本地门的三条配对与会话路由（§8-93）；`AxCode` 多两个码。同一个变更集重生 schema golden、wire shape golden、`client/src/wire.ts`（`cargo xtask wire-ts`）与 docnum。其余车道照这些形状实现执行者，不再改形；确有一处必须改时，由整合者在合并时重生上面这几样，`WIRE_V` 在两次推送之间仍至多进一位。
+**决定**：V0.0.11 的线上改形在一个变更集里落地，`WIRE_V` 从 64 进到 65，只进这一次：`Effort` 多一级 `minimal`（kernel D56）；四个新命令 `CloseCity`、`AddAgent`、`AgentLogin`、`ForgetDevice`，class 都是 `LocalOnly`（§19-2）；三个新查询 `AgentCatalog`、`ParseAgentSpec`、`Devices`（§8-90、§8-91）；端点的模型行多 `thinking` 与 `canonical`（§8-92）；本地门的三条配对与会话路由（§8-93）；`AxCode` 多两个码。同一个变更集重生 schema golden、wire shape golden、`RefRain/src/wire.ts`（`cargo xtask wire-ts`）与 docnum。其余车道照这些形状实现执行者，不再改形；确有一处必须改时，由整合者在合并时重生上面这几样，`WIRE_V` 在两次推送之间仍至多进一位。
 
 **理由**：与 D22 相同：升版的代价是 `wire.ts` 重生与客户端同改，与改动的数量无关；九条车道同时改帧表，每次合并都会冲突。帧先落地、执行者后到，靠的是 `not_built` 与 `Answer::Unavailable` 两种现成的回答：它们让一个还没有执行者的动词在线上可拼、被问时如实回绝，而 `xtask wiring` 保证客户端在执行者落地之前不画它。
 
@@ -342,7 +342,7 @@ wire shape golden 与客户端协议。-/
 
 /-! D59 建楼页：`CreateBuilding` 带人写的规则与可缺的主机导入源，楼行标出可收编的文件夹，模板字节可先问
 
-**决定**：`CreateBuilding` 带 `rules: Option<String>` 与 `source: Option<String>`。`rules = None` 照模板的字节，`Some` 是人在建楼页里写的整份 `RULES.toml`，城先求值、被拒什么都不落。`source = None` 时新建还是收编由城看目标目录（city D32）；`Some` 是运行城市的主机上的绝对目录路径，城把它复制到目标地址再收编，路径不写入账本。`BuildingProgress` 带必填的 `adoptable: bool`：顶层文件夹还没有规则，在它的地址上不带 `source` 的 `CreateBuilding` 就是收编它。查询 `Template { template, addr }` 答 `TemplateAnswer { template, addr, rules }`，房间与保留子树答 `Unavailable`。本批名字不变的改形共用一次 `WIRE_V` 进位，并重生 schema golden、wire shape golden 与 `client/src/wire.ts`。
+**决定**：`CreateBuilding` 带 `rules: Option<String>` 与 `source: Option<String>`。`rules = None` 照模板的字节，`Some` 是人在建楼页里写的整份 `RULES.toml`，城先求值、被拒什么都不落。`source = None` 时新建还是收编由城看目标目录（city D32）；`Some` 是运行城市的主机上的绝对目录路径，城把它复制到目标地址再收编，路径不写入账本。`BuildingProgress` 带必填的 `adoptable: bool`：顶层文件夹还没有规则，在它的地址上不带 `source` 的 `CreateBuilding` 就是收编它。查询 `Template { template, addr }` 答 `TemplateAnswer { template, addr, rules }`，房间与保留子树答 `Unavailable`。本批名字不变的改形共用一次 `WIRE_V` 进位，并重生 schema golden、wire shape golden 与 `RefRain/src/wire.ts`。
 
 **理由**：建楼要一页填完、一次写下楼与它的规则。先 `CreateBuilding` 再 `PutRules` 是两次写，第二次被拒时一栋按模板规则立起的楼已经留在城里。页面不写也不判 TOML（城是这门语法唯一的读者），所以预填的字节要向城问，判定也在城里做。可收编的文件夹本来就在楼列表里（`city::buildings` 不要求规则），所以标在楼行上，而不是另开一张会与楼列表重复的清单。主机路径只在 `LocalOnly` 的这一命令里携带：远程设备不能借它复制主机目录；页面不把路径改写成 `Address`，Windows 与 POSIX 的读法都留在城那一侧。
 
@@ -353,7 +353,7 @@ wire shape golden 与客户端协议。-/
 
 /-! D57 人打的 id 走 `AttachEndpoint.named`，模型行带 `listing`
 
-**决定**：`AttachEndpoint` 多一个必填的 `named: Vec<String>`，装人在「端点没有列出的模型 id」框里打的 id，与 `admit`（人在端点列出的模型里勾的）分开；城读到列表时也收下它们（gateway D47）。`ModelFactsSummary` 多一个必填的 `listing: Listing`（`listed`｜`named`，kernel D63），页面据此标出人点名、端点没列出的行。`WIRE_V` 从 66 进到 67，同一个变更集重生 schema golden、wire shape golden、`client/src/wire.ts`（`cargo xtask wire-ts`），并改 `Tools/adversary/src/Sprawling/Door.lean` 的帧与 `Tools/adversary/src/Sprawling/Regression.lean` 的渲染。
+**决定**：`AttachEndpoint` 多一个必填的 `named: Vec<String>`，装人在「端点没有列出的模型 id」框里打的 id，与 `admit`（人在端点列出的模型里勾的）分开；城读到列表时也收下它们（gateway D47）。`ModelFactsSummary` 多一个必填的 `listing: Listing`（`listed`｜`named`，kernel D63），页面据此标出人点名、端点没列出的行。`WIRE_V` 从 66 进到 67，同一个变更集重生 schema golden、wire shape golden、`RefRain/src/wire.ts`（`cargo xtask wire-ts`），并改 `Tools/adversary/src/Sprawling/Door.lean` 的帧与 `Tools/adversary/src/Sprawling/Regression.lean` 的渲染。
 
 **理由**：`admit` 的定义是「这个端点供应的模型里城收哪些」；人打的 id 也塞进这一张，城就分不出哪个该从列表里挑、哪个该照人的话登记，读到列表时人打的 id 被当作列表外的勾选略去，一次登记登记出零个模型。收下人打的 id 是人定下的规矩：中转站常常服务列表里没有的 id，人打一个 id 就是要它被用上。标记由城写在行上，不让页面拿自己手里的列表去比：页面的列表是上一次探测读到的，登记时城读的可能是另一份。
 

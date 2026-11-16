@@ -1,0 +1,73 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+     License, v. 2.0. If a copy of the MPL was not distributed with this
+     file, You can obtain one at https://mozilla.org/MPL/2.0/.
+     Copyright (c) 2026 2youg1 and the sprawling contributors -->
+
+<script lang="ts">
+  import type { Snippet } from "svelte";
+
+  import { QUERIES } from "../../core/asking";
+  import { ui } from "../../ui";
+  import type { Address, RoundsAnswer } from "../../wire";
+  import { openContext } from "../inspect/open.svelte";
+  import Look from "./gauge.look.svelte";
+  import { contextOf, lockOfConfig, remindersOf, ringOf, sessionRunOf } from "./gauge";
+  import type { Reminders } from "./gauge";
+
+  interface Props {
+    readonly room: Address | null;
+    readonly children: Snippet;
+  }
+
+  const { room, children }: Props = $props();
+
+  const u = ui();
+  const { lang } = u;
+  const belief = u.conn.belief;
+  const endpoints = u.conn.asking.ask(QUERIES.endpoints);
+
+  const run = $derived(room === null ? undefined : sessionRunOf($belief, room));
+
+  let rounds = $state<RoundsAnswer | undefined>(undefined);
+  $effect(() => {
+    const at = run;
+    rounds = undefined;
+    if (at === undefined) return;
+    return u.conn.asking.ask({ rounds: { run: at } }).subscribe((held) => {
+      rounds = held !== undefined && "rounds" in held ? held.rounds : undefined;
+    });
+  });
+
+  let reminders = $state<Reminders>(remindersOf(undefined));
+  let lockTokens = $state<number | null>(null);
+  $effect(() => {
+    const at = room;
+    reminders = remindersOf(undefined);
+    lockTokens = null;
+    if (at === null) return;
+    return u.conn.asking.ask({ config: { addr: at } }).subscribe((held) => {
+      reminders = remindersOf(held);
+      lockTokens = lockOfConfig(held);
+    });
+  });
+
+  const ring = $derived(
+    ringOf(
+      $lang,
+      contextOf(
+        rounds?.turns ?? [],
+        $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints.endpoints : [],
+        reminders,
+        lockTokens,
+      ),
+    ),
+  );
+
+  function open(): void {
+    const at = run;
+    if (at === undefined) return;
+    openContext({ run: at, room });
+  }
+</script>
+
+<Look {ring} onOpen={run === undefined ? null : open}>{@render children()}</Look>

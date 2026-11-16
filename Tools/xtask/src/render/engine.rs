@@ -22,7 +22,8 @@ const FORCED_COLOURS: &str = "--force-high-contrast";
 
 pub(crate) const BUDGET_MS: u32 = 8000;
 
-const PATIENCE: Duration = Duration::from_secs(120);
+const PATIENCE: Duration = Duration::from_secs(300);
+const PROFILE_RELEASE: Duration = Duration::from_secs(5);
 
 const CHROMIUM: &str = include_str!("../../../../Sprawling/app/src/doctor/family/chromium.tsv");
 
@@ -112,8 +113,14 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
     })?;
     let page = bundle.join("index.html");
     let body = walk::read_text(&page)?;
+    let profile = work.join(format!("profile-{}-{}", pass.slug(), std::process::id()));
+    released(&profile)?;
 
-    let instrumented = bundle.join(format!("sprawling-render-{}.html", pass.slug()));
+    let instrumented = bundle.join(format!(
+        "sprawling-render-{}-{}.html",
+        std::process::id(),
+        pass.slug()
+    ));
     let chunks = walk::files_with_ext(&bundle.join("assets"), &["js"])?;
     let names = chunks
         .iter()
@@ -125,7 +132,6 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
             source,
         }
     })?;
-    let profile = work.join(format!("profile-{}", pass.slug()));
     let mut command = Command::new(browser);
     if pass.draws_forced_colours() {
         command.arg(FORCED_COLOURS);
@@ -153,8 +159,18 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
             after_exit: launch::AfterExit::Drain,
         },
     );
-    let _ = std::fs::remove_file(&instrumented);
-    let dumped = dumped?.stdout;
+    let cleaned = clean_up(&profile, &instrumented);
+    let dumped = match (dumped, cleaned) {
+        (Ok(done), Ok(())) => done.stdout,
+        (Err(err), Ok(())) => return Err(err),
+        (Ok(_), Err(err)) => return Err(err),
+        (Err(engine), Err(cleanup)) => {
+            return Err(XtaskError::Cmd {
+                cmd: format!("{} --dump-dom {route}", browser.display()),
+                msg: format!("{engine}; cleaning the per-run profile also failed: {cleanup}"),
+            });
+        }
+    };
     let dom = String::from_utf8_lossy(&dumped);
     if let Some(thrown) = sink(&dom, FAILED).filter(|said| !said.trim().is_empty()) {
         return Err(XtaskError::Cmd {
@@ -205,6 +221,57 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
         }),
         reported: Reported::read(forced, scheme),
     })
+}
+
+fn clean_up(profile: &Path, instrumented: &Path) -> Result<(), XtaskError> {
+    let mut failed = Vec::new();
+    if let Err(err) = remove_file(instrumented) {
+        failed.push(err.to_string());
+    }
+    if let Err(err) = released(profile) {
+        failed.push(err.to_string());
+    }
+    if failed.is_empty() {
+        return Ok(());
+    }
+    Err(XtaskError::Cmd {
+        cmd: "clean up a render run".to_owned(),
+        msg: failed.join("; "),
+    })
+}
+
+fn remove_file(path: &Path) -> Result<(), XtaskError> {
+    std::fs::remove_file(path).or_else(|source| {
+        if source.kind() == std::io::ErrorKind::NotFound {
+            Ok(())
+        } else {
+            Err(XtaskError::Io {
+                path: path.display().to_string(),
+                source,
+            })
+        }
+    })
+}
+
+fn released(profile: &Path) -> Result<(), XtaskError> {
+    let pause = Duration::from_millis(250);
+    let mut waited = Duration::ZERO;
+    loop {
+        match std::fs::remove_dir_all(profile) {
+            Ok(()) => return Ok(()),
+            Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(source) if waited >= PROFILE_RELEASE => {
+                return Err(XtaskError::Io {
+                    path: profile.display().to_string(),
+                    source,
+                });
+            }
+            Err(_) => {
+                std::thread::sleep(pause);
+                waited = waited.saturating_add(pause);
+            }
+        }
+    }
 }
 
 fn sink<'a>(dom: &'a str, id: &str) -> Option<&'a str> {

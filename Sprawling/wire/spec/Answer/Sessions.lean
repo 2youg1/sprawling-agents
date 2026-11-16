@@ -70,7 +70,7 @@ pub struct SessionLine {
 }
 ```
 
-命令面多两帧，都是 `Reach::client`、`VerbClass::Act`：`Command::NameSession { room: Address, began: Seq, name: String, idem }` 写 `session_named`；`Command::ChangeRunPolicy { room: Address, policy: kernel::RunPolicy, idem }` 写 `run_policy_changed`（kernel D21），正在跑的 run 在下一个安全点生效。标签不加帧：它们照旧经 `PutPreferences` 的 `tags`（D21）；没有标签时页面按 `workspace` 给一个默认标签。两帧与上面的五件随 V0.0.9 的那一次 `WIRE_V` 进位（D22）；`Command` 的 `inductive` 由实现它们的变更集同时加臂（`specalign` 逐臂对账），`client/src/wire.ts` 与 `xtask wiring` 的可达表同改。
+命令面多两帧，都是 `Reach::client`、`VerbClass::Act`：`Command::NameSession { room: Address, began: Seq, name: String, idem }` 写 `session_named`；`Command::ChangeRunPolicy { room: Address, policy: kernel::RunPolicy, idem }` 写 `run_policy_changed`（kernel D21），正在跑的 run 在下一个安全点生效。标签不加帧：它们照旧经 `PutPreferences` 的 `tags`（D21）；没有标签时页面按 `workspace` 给一个默认标签。两帧与上面的五件随 V0.0.9 的那一次 `WIRE_V` 进位（D22）；`Command` 的 `inductive` 由实现它们的变更集同时加臂（`specalign` 逐臂对账），`RefRain/src/wire.ts` 与 `xtask wiring` 的可达表同改。
 
 **理由**：检阅页要每行说出模型、思考强度与工作区，预览要最后一条回复；这些都在视图已经折叠的那张按地址的表能读到的行里，所以作答仍在锁内、不读盘。`preview` 设上限，是因为一条回复可以很长，而这一答一次带至多 `SESSIONS_MAX` 段。
 

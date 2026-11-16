@@ -292,7 +292,7 @@ nix run .#default --no-update-lock-file -- status
 nix run .#default --no-update-lock-file -- up ./cities/first
 ```
 
-[flake](../flake.nix) 从 `rust-toolchain.toml` 读固定的编译器，从 `Cargo.lock` 读 Rust 依赖，从 `client/bun.lock` 读客户端依赖，`flake.lock` 固定 Nix 侧的构建工具。Nix 先取回锁定的依赖，再在网络沙箱里构建；构建会调用既有的客户端命令并嵌入产物，所以成品带着页面、随附的 skills、模板和许可。首次构建可能先编译一堆依赖。
+[flake](../flake.nix) 从 `rust-toolchain.toml` 读固定的编译器，从 `Cargo.lock` 读 Rust 依赖，从 `RefRain/bun.lock` 读客户端依赖，`flake.lock` 固定 Nix 侧的构建工具。Nix 先取回锁定的依赖，再在网络沙箱里构建；构建会调用既有的客户端命令并嵌入产物，所以成品带着页面、随附的 skills、模板和许可。首次构建可能先编译一堆依赖。
 
 版本行由二进制报告。没有发布来源信息的 checkout 构建显示 `built from source`——单看版本号无法确定是哪个已发布 tag。要更新，就换到另一个实际 tag 或 commit，重跑上面的命令。`nix develop` 打开开发环境，不会启动城市。
 

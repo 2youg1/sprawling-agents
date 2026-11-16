@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The grammar's corpus. The CommonMark cases are the ones
-//! `client/src/core/prose.test.ts` pinned for the page's own reader; the
+//! `RefRain/src/core/prose.test.ts` pinned for the page's own reader; the
 //! rest are the extensions this grammar turns on, the source kept by
 //! what it does not draw, and the nesting cap (D22, D24, D26). Every
 //! block is compared whole, with the bytes of the version it names.

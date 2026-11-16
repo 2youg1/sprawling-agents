@@ -45,9 +45,9 @@ pub(crate) fn files_in(root: &Path, scope: Option<&Scope>) -> Result<Vec<PathBuf
         members.iter().map(|member| member.dir.as_str()),
         &["rs"],
     )?;
-    let client = root.join("client");
-    if client.is_dir() {
-        files.extend(walk::files_with_ext(&client, &["ts", "tsx", "svelte"])?);
+    let page = root.join("RefRain");
+    if page.is_dir() {
+        files.extend(walk::files_with_ext(&page, &["ts", "tsx", "svelte"])?);
     }
     files.sort_by_key(|path| walk::rel(root, path));
     files.dedup();

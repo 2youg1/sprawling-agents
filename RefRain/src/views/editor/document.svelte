@@ -1,0 +1,206 @@
+<!--
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+-->
+
+<script lang="ts">
+  import { draftPlace } from "../../core/document_save";
+  import { fill, say } from "../../core/lang";
+  import { kib } from "../../core/time";
+  import { ui } from "../../ui";
+  import type { Address, B3Hash, ProposalCard } from "../../wire";
+  import Empty from "../parts/empty.svelte";
+  import Unanswered from "../parts/unanswered.svelte";
+  import Unkept from "../parts/unkept.svelte";
+  import { carried, type Carried } from "./carry";
+  import Conflict from "./conflict.svelte";
+  import { drawnAs } from "./formats/format";
+  import HtmlPreview from "./formats/html.svelte";
+  import Opaque from "./formats/opaque.svelte";
+  import Head from "./head.svelte";
+  import Line from "./line.look.svelte";
+  import Preview from "./preview.svelte";
+  import Proposals from "./proposals.svelte";
+  import { Session } from "./session.svelte";
+  import type { Locked } from "./session.svelte";
+  import { phrasesIn, short, type Reading } from "./reading";
+  import Versions from "./versions.svelte";
+
+  interface Props {
+    readonly at: Address;
+    readonly building: Address;
+    readonly version: B3Hash | null;
+
+    readonly reading?: Reading;
+  }
+
+  const { at, building, version, reading: first = "source" }: Props = $props();
+
+  const u = ui();
+  const lang = u.lang;
+  // svelte-ignore state_referenced_locally (a session belongs to one document and version; refrain.svelte keys this component on both)
+  const session = new Session(u, at, version);
+
+  // svelte-ignore state_referenced_locally (one document per component, as above)
+  const unkept = u.prefs.draftUnkept(draftPlace(at));
+  const drafted = $derived(session.receipt.kind !== "clean" && session.receipt.kind !== "saved");
+
+  // svelte-ignore state_referenced_locally (the first reading only; the person picks the rest)
+  let reading = $state<Reading>(first);
+
+  let anchor = $state<number | null>(null);
+  let top = 0;
+
+  const name = $derived(at.slice(at.lastIndexOf("/") + 1));
+  const markdown = $derived(
+    session.file?.kind === "text" && session.file.gathering.format === "markdown",
+  );
+
+  const html = $derived(session.file?.kind === "text" && drawnAs(at) === "html");
+
+  const phrases = $derived(phrasesIn($lang));
+
+  function pick(next: Reading): void {
+    const editing = session.editing;
+    const base = session.positions;
+    let scrollTo: number | null = null;
+    if (editing !== null && base !== null) {
+      const carry: Carried = markdown
+        ? carried(reading, next, { top: editing.toBaseline(editing.top()) }, top)
+        : { kind: "nothing" };
+      switch (carry.kind) {
+        case "preview_at":
+          anchor = base.bytes(carry.offset);
+          break;
+        case "editor_at":
+          scrollTo = editing.fromBaseline(base.editorAt(carry.byte));
+          break;
+        case "nothing":
+          break;
+      }
+      editing.diffing(next === "diff");
+    }
+    reading = next;
+    if (next === "source" || next === "diff") {
+      queueMicrotask(() => {
+        editing?.measure();
+        if (scrollTo !== null) editing?.scrollTop(scrollTo);
+      });
+    }
+  }
+
+  function lockedLine(locked: Locked): string {
+    switch (locked.kind) {
+      case "gathering":
+        return fill(say($lang, "refrain_gathering"), {
+          through: kib(locked.through),
+          total: kib(locked.total),
+        });
+      case "too_large":
+        return fill(say($lang, "refrain_too_large"), {
+          through: kib(locked.through),
+          total: kib(locked.total),
+        });
+      case "recorded":
+        return fill(say($lang, "refrain_recorded"), { version: short(locked.version) });
+      case "lost":
+        return fill(say($lang, "refrain_lost"), { version: short(locked.version) });
+    }
+  }
+
+  const editorShown = $derived(reading === "source" || reading === "diff");
+
+  function unshowable(card: ProposalCard): string | undefined {
+    return session.editing !== null && session.positions?.version === card.baseline
+      ? undefined
+      : say($lang, "proposal_show_why");
+  }
+
+  function show(card: ProposalCard): void {
+    const editing = session.editing;
+    const base = session.positions;
+    if (editing === null || base === null) return;
+    if (!editorShown) pick("source");
+    editing.reveal(editing.fromBaseline(base.editorAt(card.span.start)));
+    editing.focus();
+  }
+</script>
+
+<div class="refrain flex min-h-0 flex-1 flex-col bg-page">
+  <Head {at} {session} {reading} previewed={markdown || html} onPick={pick} />
+  {#if session.locked !== null && session.file?.kind === "text"}
+    <Line tone="faint">{lockedLine(session.locked)}</Line>
+  {/if}
+  {#if session.receipt.kind === "refused"}
+    <Line tone="alert">{session.receipt.error.recovery}</Line>
+  {:else if session.receipt.kind === "pending"}
+    <Line tone="faint">{say($lang, "refrain_receipt_pending_why")}</Line>
+  {/if}
+  {#if $unkept && drafted}
+    <Line tone="alert"><Unkept words={() => session.editing?.text() ?? ""} /></Line>
+  {/if}
+  {#if session.lostDraft !== null}
+    <Line tone="alert">
+      {fill(say($lang, "refrain_draft_lost"), { version: short(session.lostDraft) })}
+    </Line>
+  {/if}
+  {#if reading === "diff" && session.positions !== null && (session.receipt.kind === "clean" || session.receipt.kind === "saved")}
+    <Line tone="faint">
+      {fill(say($lang, "refrain_diff_same"), { version: short(session.positions.version) })}
+    </Line>
+  {/if}
+  {#if session.receipt.kind === "conflict"}
+    <div class="px-wide py-snug">
+      <Conflict
+        {name}
+        {session}
+        onCompare={() => {
+          pick("versions");
+        }}
+      />
+    </div>
+  {/if}
+  <Proposals doc={at} {unshowable} onShow={show} />
+  {#if session.read.kind === "asking"}
+    <p class="p-pane text-text-faint">…</p>
+  {:else if session.read.kind === "unavailable"}
+    <div class="p-pane">
+      <Unanswered query={session.read.query} asked={{ document: { at } }} />
+    </div>
+  {:else if session.file?.kind === "missing"}
+    <Empty missing="file_missing" />
+  {:else if session.file?.kind === "unreadable"}
+    <p class="p-pane text-note text-text-quiet">
+      {fill(say($lang, "refrain_unreadable"), { reason: session.file.reason })}
+    </p>
+  {:else if session.file?.kind === "opaque"}
+    <Opaque path={at} version={session.file.version} bytes={session.file.bytes} />
+  {:else if session.opening === null}
+    <p class="p-pane text-text-faint">…</p>
+  {:else}
+    <div class={["min-h-0 flex-1 flex-col", editorShown ? "flex" : "hidden"]}>
+      {#await import("./source.svelte") then { default: Source }}
+        <Source {session} label={name} {phrases} />
+      {/await}
+    </div>
+    {#if reading === "preview" && html && session.positions !== null}
+      <HtmlPreview text={session.editing?.text() ?? session.positions.editor} {drafted} {name} />
+    {:else if reading === "preview" && session.positions !== null}
+      <Preview
+        positions={session.positions}
+        {building}
+        {at}
+        {drafted}
+        {anchor}
+        onTop={(byte) => {
+          top = byte;
+          anchor = null;
+        }}
+      />
+    {:else if reading === "versions"}
+      <Versions {at} {session} label={name} {phrases} />
+    {/if}
+  {/if}
+</div>

@@ -1,0 +1,221 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+     License, v. 2.0. If a copy of the MPL was not distributed with this
+     file, You can obtain one at https://mozilla.org/MPL/2.0/.
+     Copyright (c) 2026 2youg1 and the sprawling contributors -->
+
+<script lang="ts">
+  // The remote group drawn from one standing (RefRain/Spec.lean §4-57): what
+  // the door is, the numbered steps of a pairing with the console verbs
+  // each step types (`STEPS`), and what a restart of the city's computer
+  // does to a pairing (`restartOf`), an invitation to
+  // pair, the seed shown once, and the device this browser holds. Every
+  // press goes back to the caller; the one status line is always
+  // mounted, so what a press came back with is announced when it lands.
+  // Drawn by `remote.svelte` in the settings panel and, one standing at
+  // a time, by the gallery.
+
+  import { tick } from "svelte";
+
+  import { fill, say } from "../../core/lang";
+  import { encode } from "../../core/remote/base32";
+  import { isoInstant, moment } from "../../core/time";
+  import { ui } from "../../ui";
+  import Button from "../parts/button.svelte";
+  import Dialog from "../parts/dialog.svelte";
+  import type { DoctorCustodyLifetime } from "../../wire";
+  import Copy from "../parts/copy.svelte";
+  import { LACKS, STEPS, VERBS, grouped, restartOf, toldKey, type Standing } from "./remote";
+
+  interface Props {
+    readonly standing: Standing;
+    // How long the city's vault keeps a credential, once the doctor has
+    // answered; it decides what a restart does to a pairing.
+    readonly keeps: DoctorCustodyLifetime | null;
+    readonly onPair: () => void;
+    readonly onSeen: () => void;
+    readonly onLock: () => void;
+    readonly onForget: () => void;
+  }
+
+  const { standing, keeps, onPair, onSeen, onLock, onForget }: Props = $props();
+  const { lang } = ui();
+  const uid = $props.id();
+
+  let forgetting = $state(false);
+  let deviceHeading = $state<HTMLElement | undefined>(undefined);
+  let forgetButton = $state<HTMLElement | undefined>(undefined);
+
+  // The seed leaves the page by a press, and the focus lands on the
+  // device it belongs to rather than on the body.
+  let was: Standing["kind"] = "reading";
+  $effect(() => {
+    const now = standing.kind;
+    if (was === "seed" && now === "paired") void tick().then(() => deviceHeading?.focus());
+    was = now;
+  });
+
+  const told = $derived(
+    (standing.kind === "invited" || standing.kind === "paired") && standing.told !== null
+      ? toldKey(standing.told)
+      : null,
+  );
+
+  const LABEL = "text-note text-text-faint";
+  // Spaces first, then anywhere: a fingerprint wraps between its groups of
+  // four, and a device id with no space still fits a phone.
+  const VALUE = "font-mono text-note text-text wrap-anywhere";
+</script>
+
+<div class="flex flex-col gap-wide">
+  {#if standing.kind === "unpaired" || standing.kind === "unreadable" || standing.kind === "lacking"}
+    <p class="text-body text-text-quiet">{say($lang, "remote_about")}</p>
+    {#if standing.kind === "unreadable"}
+      <p class="text-body text-alert">{say($lang, "remote_unreadable")}</p>
+    {:else if standing.kind === "lacking"}
+      <p class="text-body text-alert">{say($lang, LACKS[standing.lack])}</p>
+    {/if}
+    <section class="flex flex-col gap-snug" aria-labelledby={`${uid}-steps`}>
+      <h3 id={`${uid}-steps`} class="text-label font-label text-text">
+        {say($lang, "remote_steps")}
+      </h3>
+      <ol class="flex flex-col">
+        {#each STEPS as step, at (step.key)}
+          <li class="grid grid-cols-[2rem_minmax(0,1fr)] gap-x-snug border-b border-edge py-snug">
+            <span class="font-mono text-label text-text-quiet" aria-hidden="true"
+              >{String(at + 1)}</span
+            >
+            <div class="flex min-w-0 flex-col gap-tight">
+              <p class="text-note text-text">{say($lang, step.key)}</p>
+              {#if step.spelling !== null}
+                <div class="flex min-w-0 items-start gap-tight">
+                  <code
+                    class="min-w-0 flex-1 break-all rounded-control bg-chrome px-snug py-tight font-mono text-note text-text-quiet"
+                    >{step.spelling}</code
+                  >
+                  <Copy text={step.spelling} />
+                </div>
+              {/if}
+            </div>
+          </li>
+        {/each}
+        <li class="grid grid-cols-[2rem_minmax(0,1fr)] gap-x-snug py-snug">
+          <span class="font-mono text-label text-text-quiet" aria-hidden="true"
+            >{String(STEPS.length + 1)}</span
+          >
+          <p class="text-note text-text">{say($lang, restartOf(keeps))}</p>
+        </li>
+      </ol>
+    </section>
+    <section class="flex flex-col" aria-labelledby={`${uid}-console`}>
+      <h3 id={`${uid}-console`} class="pb-tight text-label font-label text-text">
+        {say($lang, "remote_console")}
+      </h3>
+      <dl class="flex flex-col">
+        {#each VERBS as [spelling, does] (spelling)}
+          <div
+            class="grid grid-cols-[minmax(0,16rem)_minmax(0,1fr)] gap-x-base border-b border-edge py-snug @max-measure/page:grid-cols-1"
+          >
+            <dt><code class="font-mono text-note text-text">{spelling}</code></dt>
+            <dd class="text-note text-text-quiet">{say($lang, does)}</dd>
+          </div>
+        {/each}
+      </dl>
+    </section>
+    {#if standing.kind === "unpaired"}
+      <p class="text-note text-text-faint">{say($lang, "remote_not_paired")}</p>
+    {/if}
+  {:else if standing.kind === "invited"}
+    <section class="flex flex-col gap-base" aria-labelledby={`${uid}-invited`}>
+      <h3 id={`${uid}-invited`} class="text-label font-label text-text">
+        {say($lang, "remote_invited")}
+      </h3>
+      <p class={VALUE}>
+        {fill(say($lang, "remote_invited_city"), {
+          fingerprint: grouped(encode(standing.invitation.city).slice(0, 12)),
+        })}
+      </p>
+      <p class="text-body text-text-quiet">{say($lang, "remote_invited_about")}</p>
+      <div>
+        <Button
+          label={say($lang, standing.busy ? "remote_pairing" : "remote_pair")}
+          tone="primary"
+          loading={standing.busy}
+          onPress={onPair}
+        />
+      </div>
+    </section>
+  {:else if standing.kind === "seed"}
+    <section class="flex flex-col gap-base" aria-labelledby={`${uid}-seed`}>
+      <h3 id={`${uid}-seed`} class="text-label font-label text-text">
+        {say($lang, "remote_seed")}
+      </h3>
+      <output
+        class="asks rounded-card px-base py-snug font-mono text-heading text-text"
+        aria-label={say($lang, "remote_seed")}>{grouped(standing.seed)}</output
+      >
+      <p class="text-body text-text-quiet">{say($lang, "remote_seed_about")}</p>
+      {#if !standing.persisted}
+        <p class="text-note text-text-faint">{say($lang, "remote_persist_refused")}</p>
+      {/if}
+      <div>
+        <Button label={say($lang, "remote_seed_seen")} tone="primary" onPress={onSeen} />
+      </div>
+    </section>
+  {:else if standing.kind === "paired"}
+    <section class="flex flex-col gap-base" aria-labelledby={`${uid}-device`}>
+      <h3
+        id={`${uid}-device`}
+        bind:this={deviceHeading}
+        tabindex="-1"
+        class="text-label font-label text-text"
+      >
+        {say($lang, "remote_device")}
+      </h3>
+      <dl class="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)] gap-x-base gap-y-snug">
+        <dt class={LABEL}>{say($lang, "remote_device_city")}</dt>
+        <dd class={VALUE}>{grouped(encode(standing.device.fingerprint))}</dd>
+        <dt class={LABEL}>{say($lang, "remote_device_id")}</dt>
+        <dd class={VALUE}>{encode(standing.device.id)}</dd>
+        <dt class={LABEL}>{say($lang, "remote_device_at")}</dt>
+        <dd class={VALUE}>
+          <time datetime={isoInstant(standing.device.at)}>{moment(standing.device.at)}</time>
+        </dd>
+      </dl>
+      <p class="text-note text-text-faint">{say($lang, restartOf(keeps))}</p>
+      <div class="flex flex-wrap gap-snug">
+        <Button
+          label={say($lang, standing.busy ? "remote_locking" : "remote_lock")}
+          loading={standing.busy}
+          onPress={onLock}
+        />
+        <span bind:this={forgetButton} class="contents">
+          <Button
+            label={say($lang, "remote_forget")}
+            tone="destructive"
+            onPress={() => (forgetting = true)}
+          />
+        </span>
+      </div>
+    </section>
+  {/if}
+  <p role="status" class="text-body text-text-quiet empty:hidden">
+    {told === null ? "" : fill(say($lang, told.key), { code: told.code ?? "" })}
+  </p>
+</div>
+
+<Dialog
+  open={forgetting}
+  title={say($lang, "remote_forget_title")}
+  detail={say($lang, "remote_forget_detail")}
+  confirmLabel={say($lang, "remote_forget_confirm")}
+  cancelLabel={say($lang, "part_cancel")}
+  destructive
+  onConfirm={() => {
+    forgetting = false;
+    onForget();
+  }}
+  onCancel={() => {
+    forgetting = false;
+    forgetButton?.querySelector("button")?.focus();
+  }}
+/>

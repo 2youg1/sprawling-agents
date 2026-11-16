@@ -48,7 +48,7 @@ pub fn admit_work(volume: VolumeSpace) -> Result<(), Degradation>;
 pub fn free_space_floor(volume_bytes: u64) -> u64;
 ```
 
-- 依据即变体字段：每种降级带着判定它的读数，显示面不再回头读第二份。恢复办法是类型，措辞在 `client/src/lang.json`。
+- 依据即变体字段：每种降级带着判定它的读数，显示面不再回头读第二份。恢复办法是类型，措辞在 `RefRain/src/lang.json`。
 - 盘慢：`durable_lag` 同时超过 `commit_floor × DISK_SLOW_FACTOR` 与 `DISK_SLOW_MIN`。前者随设备走（旋转盘的 fsync 本来就慢，不算降级），后者挡住快盘上的微秒级抖动。
 - 盘快满：`volume.free_bytes < free_space_floor(volume.total_bytes)`；地板取卷容量的 `1 / FREE_SPACE_FLOOR_DIVISOR`，夹在 `FREE_SPACE_FLOOR_MIN` 与 `FREE_SPACE_FLOOR_MAX` 之间。恢复办法给出回到地板以上至少要腾出的字节数。
 - 内存紧：`queued_runs > 0`。排队由装配层按可用内存决定（运行因一个也装不下而等待），这里只把它说出来。

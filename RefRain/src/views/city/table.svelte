@@ -1,0 +1,33 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+     License, v. 2.0. If a copy of the MPL was not distributed with this
+     file, You can obtain one at https://mozilla.org/MPL/2.0/.
+     Copyright (c) 2026 2youg1 and the sprawling contributors -->
+
+<script lang="ts">
+  import { ui } from "../../ui";
+  import type { Address, CityAnswer } from "../../wire";
+  import type { BoardRun } from "../runs/lineage";
+  import { lookOf } from "./table";
+  import Look from "./table.look.svelte";
+
+  interface Props {
+    readonly city: CityAnswer;
+    readonly runs: readonly BoardRun[];
+    readonly now: number;
+    readonly picked: Address | null;
+    readonly onPick: (addr: Address) => void;
+  }
+
+  const { city, runs, now, picked, onPick }: Props = $props();
+  const u = ui();
+  const { lang } = u;
+  const editor = u.prefs.editorHeld;
+
+  const look = $derived(
+    lookOf({ city, runs, now, picked, lang: $lang, cityFolder: $editor.folder }, (addr) => {
+      onPick(addr);
+    }),
+  );
+</script>
+
+<Look {...look} />

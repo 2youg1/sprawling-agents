@@ -86,7 +86,7 @@ impl ClientAssets { pub fn lookup(&self, request_path: &str) -> AssetReply; }
 pub fn bundle_routes<S: Clone + Send + Sync + 'static>(client: Arc<ClientAssets>, headers: &PageHeaders) -> Router<S>;
 ```
 
-**客户端是一张资产表，不是一个文件**：`ServeConfig` 携 `client: Arc<ClientAssets>`，因为 `client/` 的构建产物是 `index.html` 加它引用的脚本、样式与字体，只携一个文件的形状会让页面壳引用一条服务端没有的路由。资产表是封闭清单：路径穿越（`..`、空段、盘符、点头文件）在判定层拒，miss 报文件名并给出重建口令。`Disk` 臂逐请求读盘，专供开发回路（改前端刷新即见），发布路径恒不构造它。
+**客户端是一张资产表，不是一个文件**：`ServeConfig` 携 `client: Arc<ClientAssets>`，因为 `RefRain/` 的构建产物是 `index.html` 加它引用的脚本、样式与字体，只携一个文件的形状会让页面壳引用一条服务端没有的路由。资产表是封闭清单：路径穿越（`..`、空段、盘符、点头文件）在判定层拒，miss 报文件名并给出重建口令。`Disk` 臂逐请求读盘，专供开发回路（改前端刷新即见），发布路径恒不构造它。
 
 **送页面的路由只有一张表**（D20）：城自己的端口把 `bundle_routes` 并进 `router`，远程监听（`Sprawling/remote_access/Spec.lean` §8-10）也并进它自己的那张表，所以设备打开远程地址拿到的字节与这台电脑上的浏览器拿到的相同；响应头按监听器生成、作为参数交进来（§8-94 末节）。
 
@@ -148,7 +148,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 
 **`ApprovalsAnswer.items` 携 `kernel::ApprovalItem` 全项，不另设摘要类型。** 摘要会丢掉 `cluster_key` 与 `created`，于是界面无法按类聚合、也排不出「谁等得最久」，服务端为了填它还要从事件载荷里猜一个从来没被写过的字段。载荷本身就是 `ApprovalItem` 的序列化，原样送过去既少一次有损转换，也让「什么算一类」只由客户端读 `cluster_key` 这一处回答。
 
-- **为什么是强类型答面而不是一团 `Payload`**：客户端读帧的词汇是 `client/src/wire.ts`，由 `cargo xtask wire-ts` 从本 crate 的 schema 生成，故发帧的边界 crate 欠对方一套有类型的读帧词汇（同 kernel 再导出的理由）。一个无类型载荷会把解析责任推给每一个视图模块，每一个都得自己猜一遍形状。
+- **为什么是强类型答面而不是一团 `Payload`**：客户端读帧的词汇是 `RefRain/src/wire.ts`，由 `cargo xtask wire-ts` 从本 crate 的 schema 生成，故发帧的边界 crate 欠对方一套有类型的读帧词汇（同 kernel 再导出的理由）。一个无类型载荷会把解析责任推给每一个视图模块，每一个都得自己猜一遍形状。
 - **`Answer::Unavailable { query, reason }` 是一个真答案**：不求值的视图报自己的名字，而不是返回空结果——空城与未实现在界面上必须长得不一样。看了却没看成的视图在 `reason` 里说出没看成的原因（D47）；`reason` 缺席时视图只报名字：这份构建不求值这个查询，或这个读面还没有说出原因。
 - **`CityAnswer.buildings: Vec<BuildingProgress>`**：每栋楼一行，携 `Progress` 与 `problems`。解析不出的行进 `problems` 并照显——悄悄丢掉读不懂的行，等于按一个没人选过的分母报进度。
 - **五维成本携权威总额**：`CostAnswer.total` 与 actor、segment、tool、skill 四个维度各自求和相等；`by_run` 只带活跃的跑与花得最多的前几个（`Sprawling/app/Spec.lean` §8-90），和可以小于 `total`。界面按 `total` 算占比而不自己归一，未归因余额与列表之外的跑因此都看得见。
@@ -169,7 +169,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 
 **五个查询各有自己的答**（`InboxView`／`DiscardView`／`RegistryView`／`ArchiveSearch`／`Metrics`）。三条口径：①**队列折叠着看不消费着看**（`Inbox::pull` 要拿走才给内容，看一眼就取走的视图会改变它所报告的对象）；②归档在被问的那一刻读盘（同 `BuildingView`，文件是权威）；③**`Metrics` 恒不携钱**——钱是 `CostView` 的，一个数字两个主人就是两个数字开始互相矛盾的起点。
 
-**`DiscardLine.restoration` 携 `Option<Restoration>` 而非一个句子**。回收站那一行的「怎么拿回来」的唯一措辞处在客户端（`client/src/views/record/bin.svelte` 按 `tracked`／`interred`／`rebuildable` 三臂措辞）；服务端若把它拼成一句话，就是**一件事两个渲染权威**，而服务端那句还拼不出可执行的那句话。所以计划以它自己的形状上线（载荷本来就是 `Restoration` 序列化出来的，故读得回去）；`None` 的意思是**这一条记录用了本构建读不懂的方案**，界面据此画一行而不给动作——行恒不隐藏，因为藏起一件被删的东西比承认读不懂它的方案更糟。这类「语法换形而名字没换」的改动不动 `QUERY_NAMES` 与 `COMMAND_NAMES`，故只能由 `WIRE_V` 进位让旧页面在握手期被拒。
+**`DiscardLine.restoration` 携 `Option<Restoration>` 而非一个句子**。回收站那一行的「怎么拿回来」的唯一措辞处在客户端（`RefRain/src/views/record/bin.svelte` 按 `tracked`／`interred`／`rebuildable` 三臂措辞）；服务端若把它拼成一句话，就是**一件事两个渲染权威**，而服务端那句还拼不出可执行的那句话。所以计划以它自己的形状上线（载荷本来就是 `Restoration` 序列化出来的，故读得回去）；`None` 的意思是**这一条记录用了本构建读不懂的方案**，界面据此画一行而不给动作——行恒不隐藏，因为藏起一件被删的东西比承认读不懂它的方案更糟。这类「语法换形而名字没换」的改动不动 `QUERY_NAMES` 与 `COMMAND_NAMES`，故只能由 `WIRE_V` 进位让旧页面在握手期被拒。
 
 **`POST /acp` 与 `AcpSink`**。外来编辑器的请求走自己的路由，不挤 Command 面：它自带鉴权、要一个当场的回答，而 Command 面的回答是事件流。三条口径：①**令牌在本 crate 判**（配对令牌住这里，常数时间比对也就住这里），只把 `authentic` 一位传进去——拒词由 `agent_protocols::admit` 措辞，「未配对者只学到一位」因此只有一个权威；②回给编辑器的只有 `AcpProgress` 三字段，run id 是工人接单时才铸的，故受理那一刻诚实的答案是「已受理、未完成」；③编辑器出示native key（读钥匙文件，`Sprawling/app/spec/Keying.lean` §8-22）或一个会话令牌，与 control surface 同一条规矩。
 

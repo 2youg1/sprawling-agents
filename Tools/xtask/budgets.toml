@@ -56,7 +56,7 @@
 # 311,050 B recorded here. The ratchet is not being loosened: the slack
 # stays at 20 KB, so the next gradual regression is caught exactly as
 # before, against a figure that describes what ships today.
-# The syntax highlighter (client/Spec.lean §4-26) is weighed here too, though
+# The syntax highlighter (RefRain/Spec.lean §4-26) is weighed here too, though
 # the first screen never downloads it: the directory holds it, and the
 # binary embeds every byte the directory holds. It adds 166,127 B
 # gzipped - the highlighter chunk 9,918 B and ten grammar chunks from
@@ -74,7 +74,7 @@ what = "the client the browser downloads, gzipped, the three shipped families in
 budget_bytes = 2097152
 # The bundle the deliverable ships, gzipped, fonts included: the view
 # tree carries the storybook and its fixture tables, which ship with
-# the client on the `#/gallery` route (client/Spec.lean §7), and this is
+# the client on the `#/gallery` route (RefRain/Spec.lean §7), and this is
 # what the client weighs with them. The row is a reading, not a gate:
 # runtime speed comes before size, so the bytes are printed and nothing
 # refuses them; best_bytes is the last recorded reading. The
@@ -796,17 +796,17 @@ status = "measured, not gated: serial 153.0 ms; concurrent 51-60 ms on an idle m
 # into a run the `$state` table holds tells them nothing at all.
 [client_fold]
 what = "one animation frame of 50 token deltas folded into a belief of R runs, one subscriber reading the run table"
-measured_by = "bun test --conditions=browser client/src/core/belief/fold_cost.test.ts (the frame test prints one client_fold line per R and holds the subscriber to one read per city answer; the delta test holds R=1e4 within 5x of R=1e2 in the same run)"
+measured_by = "bun test --conditions=browser RefRain/src/core/belief/fold_cost.test.ts (the frame test prints one client_fold line per R and holds the subscriber to one read per city answer; the delta test holds R=1e4 within 5x of R=1e2 in the same run)"
 status = "measured, not gated here: per frame with the `$state` run table 30-37 us at R=1e3 and 30-54 us at R=1e4, and 30 us at R=1e2 once warm (the first size measured pays the runes runtime warm-up, 94-330 us), against 29-34 us, 58-73 us and 471-539 us with belief.batch alone, interleaved on the same instrument (x86_64 desktop class). A wall-clock figure is the machine's, so this register records it and the test guards only what every machine agrees on: the read count and the ratio between two sizes. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and the bun test in measured_by retakes it"
 
 # What the page pays to read one event frame off the socket. Event and
 # delta frames arrive once per ledger record and once per token, so they
 # skip the Effect schema for JSON.parse and a narrow guard taken from it
-# (client/Spec.lean §4-6); the schema path is measured beside it so the gap the
+# (RefRain/Spec.lean §4-6); the schema path is measured beside it so the gap the
 # guard buys stays visible.
 [client_frame_decode]
 what = "one event frame decoded from its text, by the hot decoder and by the Effect schema it stands in for"
-measured_by = "cd client && bun scripts/frame_cost.ts (prints one client_frame_decode line: the fastest of 15 batches of 2000 decodes, per path)"
+measured_by = "cd RefRain && bun scripts/frame_cost.ts (prints one client_frame_decode line: the fastest of 15 batches of 2000 decodes, per path)"
 status = "measured, not gated: on Effect 4, hot 1.1-1.3 us against 6.9-8.4 us for the schema path, interleaved on the same instrument (x86_64 desktop class, 16 cores, other builds beside it). On Effect 3 the floor read 3.7-8.6 us with 32 busy loops beside it, so a wall-clock bound held as a unit test failed on a loaded machine; the register records the reading and nothing gates it. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and bun scripts/frame_cost.ts retakes it"
 
 # What one streamed token costs the page while a reply is still arriving
@@ -819,7 +819,7 @@ status = "measured, not gated: on Effect 4, hot 1.1-1.3 us against 6.9-8.4 us fo
 # carries the finer figure. Not gated: a wall-clock reading is the machine's.
 [stream_relayout]
 what = "one streamed token in a live turn: script plus forced layout, and how far the turn jumps when the record takes over"
-measured_by = "cd client && bun scripts/relayout.ts - headless Edge, a 2,753-character reply with lists, tables, code and headings in 689 four-character tokens, 7 interleaved rounds of each shape"
+measured_by = "cd RefRain && bun scripts/relayout.ts - headless Edge, a 2,753-character reply with lists, tables, code and headings in 689 four-character tokens, 7 interleaved rounds of each shape"
 status = "measured, not gated: on windows-x86_64, 16 cores, NVMe, three runs each - raw shape mean 426-441 us, p99 1.0 ms, takeover 3.8-4.3 ms, jump 793 px; block shape mean 72-80 us, p99 0.5-0.6 ms, takeover 2.5-2.8 ms, jump 0 px. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and bun scripts/relayout.ts retakes it"
 
 # What the city pays, in results-only mode, to sort its runs into the
@@ -827,8 +827,8 @@ status = "measured, not gated: on windows-x86_64, 16 cores, NVMe, three runs eac
 # page then draws at most three times `FIRST` rows, so this triage is
 # the only part of the frame that grows with the city.
 [city_results]
-what = "one triage of a 200-run city into waiting, failed and done, each cut to its FIRST newest (client/src/core/results.ts)"
-measured_by = "bun test --conditions=browser client/src/core/results.test.ts (prints one city_results line and holds a triage to 1600 us, a tenth of a 16 ms frame)"
+what = "one triage of a 200-run city into waiting, failed and done, each cut to its FIRST newest (RefRain/src/core/results.ts)"
+measured_by = "bun test --conditions=browser RefRain/src/core/results.test.ts (prints one city_results line and holds a triage to 1600 us, a tenth of a 16 ms frame)"
 status = "measured, not gated here: 45-124 us per city across three runs (x86_64 desktop class, other builds running beside it). A wall-clock figure is the machine's, so this register records it and the test guards only what every machine agrees on: the read count and the ratio between two sizes. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and the bun test in measured_by retakes it"
 
 # How many controls stand on the conversation page at once (refrain P11,
@@ -851,7 +851,7 @@ status = "held by render, not weighed by budget"
 # reach the design's 8. The row stays a ratchet: a change that folds a
 # control away still lowers it.
 # 14: the run policy's one control in the settings row before a session
-# starts (client/Spec.lean §4-60), which folds the write limit, the
+# starts (RefRain/Spec.lean §4-60), which folds the write limit, the
 # admission requirement and the landing policy into one menu.
 best_count = 14
 slack_count = 0

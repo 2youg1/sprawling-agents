@@ -1,0 +1,48 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+License, v. 2.0. If a copy of the MPL was not distributed with this
+file, You can obtain one at https://mozilla.org/MPL/2.0/.
+Copyright (c) 2026 2youg1 and the sprawling contributors -->
+
+<script lang="ts">
+  import { say } from "../../core/lang";
+  import { ui } from "../../ui";
+  import type { Delivery } from "./delivery";
+  import NotePlace from "./note_place.svelte";
+
+  interface Props {
+    readonly delivery: Exclude<Delivery, { readonly kind: "none" }>;
+  }
+
+  const { delivery }: Props = $props();
+
+  const { lang } = ui();
+
+  const state = $derived.by(() => {
+    switch (delivery.kind) {
+      case "held":
+        return say($lang, "talk_delivery_held");
+      case "pending":
+        return say($lang, "talk_delivery_pending");
+      case "accepted":
+        return say($lang, "talk_delivery_accepted");
+      case "unknown":
+        return say($lang, "talk_delivery_unknown");
+    }
+  });
+</script>
+
+<NotePlace rhythm="shape" data-local-feedback={delivery.kind}>
+  <div class="flex flex-col items-end">
+    <div
+      class="max-w-[83%] rounded-panel bg-speech px-pane py-base text-body leading-read whitespace-pre-wrap text-text-quiet wrap-anywhere"
+    >
+      {delivery.words}
+    </div>
+    <div
+      class={["mt-tight text-note", delivery.kind === "unknown" ? "text-alert" : "text-text-faint"]}
+      role="status"
+    >
+      {state}
+    </div>
+  </div>
+</NotePlace>

@@ -148,7 +148,7 @@ D10 `usersbrowser` 驱动人已经开着的那个浏览器，用的是那个人�
 
 D11 一页哪里画错了，由一份测量、一套判决回答，门（`xtask render`）与工具（`survey` 动作）读同一份；它住产品 crate，门与工具各留一份就会分叉到「门说干净、住户说坏」而二者各自诚实。`probe::body` 是注入页面的 ES5，返回三个字符串（元素、声明的词、绘制条件）：门渲染一次并 dump DOM，三串写进三个 `<pre>`；住户勘察的是人自己打开的页面，不许往上加任何东西，所以 `probe::evaluated` 把同一段包进一个 promise，三串作为一次 `script.evaluate` 的值回来。主题由调用方决定：门为每个 pass 强制一个主题，住户传 `None`，因为强制主题报的是没人看过的那一页；`PaintSource` 同理。源码索引在有源码树的那一侧：`Sources` 的查找随判决进产品 crate，走源码树的那一步留在 `xtask`，住户得到的每条发现只点名盒子，这是诚实的空状态（`Sources::default()`）。结果答一个 tagged 字符串（一个 `<edit>` 一处修复、一个 `<at>` 一个落点），拆成结构化载荷等于第二种渲染。量具的两条规则：容差 `SLACK`（1 px）在每一次缘比较上都加；群体先从几何读出容器的堆叠方向，只比容器不分发的那一轴。行容器的交叉轴不扫：带里的位置由 `align-items` 决定，本库到处用居中，不同行高的子元素按设计就有不同顶缘；正确读它要比较顶、中、底里多数实际持有的那一个，这把尺子还没有这个读数（§3）。
 
-D12 一个 run 能按键：`Action::Press { key, modifiers }`，一帧 `input.performActions` 的 `key` 源（`spec/Keyboard.lean`）。客户端的键表（`client/Spec.lean` §9）因此有了机器读者，验收可以由本产品驱动本产品。键名与修饰键名取 DOM `KeyboardEvent.key` 的值，一个字符键就写那个字符；名字、WebDriver 码位与枚举在 `keyboard` 的一处对应，`Key::parse`、`Modifier::parse` 与 `key_frame` 都读它，`verb::read` 经这两个 `parse` 取值。按键落在焦点上：`Press` 不带 ref，不需要第二帧；要先让某个元素得到焦点，是先做一次 `click`。没有快照即拒，没有 ref 所以不核 generation。不换算大小写：`K` 送出的就是 `K`，`Shift` 另是一个修饰键。读参：`kind` 为 `press`，`key` 必填，`modifiers` 可选、是字符串数组；未知的名字各以 `E_INVALID_ARGS` 拒绝，恢复语列出能用的名字。被否决的备选：在 `Type` 的文字里夹转义（同一个字符串既是文字又是键）；`"Ctrl+K"` 形式的小语言（键名之外的第二套文法）。
+D12 一个 run 能按键：`Action::Press { key, modifiers }`，一帧 `input.performActions` 的 `key` 源（`spec/Keyboard.lean`）。客户端的键表（`RefRain/Spec.lean` §9）因此有了机器读者，验收可以由本产品驱动本产品。键名与修饰键名取 DOM `KeyboardEvent.key` 的值，一个字符键就写那个字符；名字、WebDriver 码位与枚举在 `keyboard` 的一处对应，`Key::parse`、`Modifier::parse` 与 `key_frame` 都读它，`verb::read` 经这两个 `parse` 取值。按键落在焦点上：`Press` 不带 ref，不需要第二帧；要先让某个元素得到焦点，是先做一次 `click`。没有快照即拒，没有 ref 所以不核 generation。不换算大小写：`K` 送出的就是 `K`，`Shift` 另是一个修饰键。读参：`kind` 为 `press`，`key` 必填，`modifiers` 可选、是字符串数组；未知的名字各以 `E_INVALID_ARGS` 拒绝，恢复语列出能用的名字。被否决的备选：在 `Type` 的文字里夹转义（同一个字符串既是文字又是键）；`"Ctrl+K"` 形式的小语言（键名之外的第二套文法）。
 
 D13 「这个地址是不是城自己的一个监听」是本 crate 的一个纯判定：`OwnListeners::new(listeners)` 收城此刻监听的 `SocketAddr`，`OwnListeners::holds(url)` 答一个 `http`、`https`、`ws` 或 `wss` 地址是否落在其中之一上：端口相同（不写端口时取 scheme 的默认端口），并且主机是回环（`localhost`、`*.localhost`、回环地址，`::ffff:127.0.0.1` 也算），或者等于那个监听绑定的地址，或者那个监听绑定在未指定地址（`0.0.0.0`、`::`）上而主机是一个 IP 字面量。`page_address(tree, context)` 从 `browsingContext.getTree` 的答复里读出一个 tab 此刻的地址。装配层持登记、按它拒（`Sprawling/app/spec/BrowserBidi.lean` §8-45-6，sprawling D74）。不解析名字：一次 DNS 查询会让判定依赖网络。被否：按主机名单判（`127.0.0.1`、`localhost`）不看端口——居民在回环上起的开发服务器也会被拒。
 
@@ -199,6 +199,6 @@ D13 「这个地址是不是城自己的一个监听」是本 crate 的一个纯
 
 - `architecture.toml` 里 browser 各行（锚点指向本文件与分部）与 ARCHITECTURE.md §4 缝清单（`BrowserPort`）；ARCHITECTURE.md §11 的 V3 一行引 D1。
 - `docs/glossary.md` 的 **browser** 行（D4）与新增词汇。
-- `Sprawling/desktop/Spec.lean` §8-7（拖拽与滚动的同一份词汇，D9）；client/Spec.lean §9（键表，D12）；`Sprawling/city/Spec.lean` §8-2 的 policy（confidential 与 `usersbrowser`，D10）；`Tools/xtask/Spec.lean` 的 `render` 一节与 §8-26 `survey`（D11）；`Sprawling/app/Spec.lean` 的 `browser_tool` 一节。这些节改了，重读本文件对应的决定。
+- `Sprawling/desktop/Spec.lean` §8-7（拖拽与滚动的同一份词汇，D9）；RefRain/Spec.lean §9（键表，D12）；`Sprawling/city/Spec.lean` §8-2 的 policy（confidential 与 `usersbrowser`，D10）；`Tools/xtask/Spec.lean` 的 `render` 一节与 §8-26 `survey`（D11）；`Sprawling/app/Spec.lean` 的 `browser_tool` 一节。这些节改了，重读本文件对应的决定。
 - 本 crate 没有 `conformance` feature（D1）。
 -/

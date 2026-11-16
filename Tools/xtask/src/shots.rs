@@ -18,7 +18,7 @@ use crate::walk;
 
 const OUT: &str = "target/shots";
 
-const ROUTES: &str = "client/src/core/route.ts";
+const ROUTES: &str = "RefRain/src/core/route.ts";
 
 const ORIGIN: &str = "--origin";
 

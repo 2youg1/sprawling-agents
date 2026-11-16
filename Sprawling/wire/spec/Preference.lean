@@ -43,7 +43,7 @@
 
 /-! D14 档位、玻璃与混合档透明度随偏好进城，三者都可缺
 
-**决定**：`PreferencesAnswer` 加 `tier: Option<Tier>`，`PreferencePatch` 加 `Tier(Tier)` 一件；`Appearance` 加 `glass: Option<Glass>` 与 `blend_percent: Option<u32>`，两者带 `#[serde(default)]`，随整份外观一起写。三者缺席都是「这个人没说过」：档位缺席时页面开在它自己的首档，玻璃缺席时页面画它自己的姿态，透明度缺席时画样式表自己的值。滑块的取值域只由页面声明（`client/src/core/appearance.ts` 的 `BLEND_PERCENT`），城照存，页面读回时把域外的数读成缺席。`WIRE_V` 不动（D13 同理：新字段可缺；新问题 `OpenProposals` 本身已改动握手哈希）。
+**决定**：`PreferencesAnswer` 加 `tier: Option<Tier>`，`PreferencePatch` 加 `Tier(Tier)` 一件；`Appearance` 加 `glass: Option<Glass>` 与 `blend_percent: Option<u32>`，两者带 `#[serde(default)]`，随整份外观一起写。三者缺席都是「这个人没说过」：档位缺席时页面开在它自己的首档，玻璃缺席时页面画它自己的姿态，透明度缺席时画样式表自己的值。滑块的取值域只由页面声明（`RefRain/src/core/appearance.ts` 的 `BLEND_PERCENT`），城照存，页面读回时把域外的数读成缺席。`WIRE_V` 不动（D13 同理：新字段可缺；新问题 `OpenProposals` 本身已改动握手哈希）。
 
 **理由**：这三件原先只在一个浏览器里，换一个浏览器或清掉缓存就丢，而人的文件本来就是偏好的权威（§8-39 七）。档位是一件自己的事而不是外观的一格：◐ 键一按就写，单独一件补丁不会把外观整份再送一次。缺席而不是一个本 build 挑的值：与 `lang` 同理，城里写死一个首档会在每一台没按过那个键的机器上盖掉页面的首档，而页面的首档只该有一个家。
 
@@ -54,7 +54,7 @@
 
 /-! D51 正文字号的下限是类型 `BodyPx`，没有上限
 
-**决定**：`Appearance.body_px` 是 `Option<BodyPx>`（`Sprawling/wire/src/preference/body.rs`）。`BodyPx(u32)` 的唯一构造点是 `BodyPx::new`，`TryFrom<u32>` 经它；小于 `BODY_PX_MIN`（12）的数拒为 `E_INVALID_ARGS`，恢复语句写出下限。serde 经 `try_from = "u32"` 读、经 `into = "u32"` 写，所以人的文件 `[ui]` 里写 `body_px = 11` 在读入处即被拒（`accounting::person` 报 `ConfigInvalid` 并点名 `[ui]`，不改写那份文件），一帧 `PutPreferences` 带 11 在解码处即被拒；12 以上的任何整数照收。schema 内联为 `{"type": "integer", "minimum": 12}`，生成的 `client/src/wire.ts` 因此按同一个下限判页面读到的答案；`cargo xtask wire-ts` 另发 `BODY_PX = { min }`（`Tools/xtask/Spec.lean` §8-36），外观组的字号框与 `client/src/core/sizing.ts` 读它。`body_px` 缺席时画样式表自己的字号，缺省是 15px（`client/src/theme/tokens-type.css` 的 `--text-body`）。schema 多了 `minimum` 而名字没变，按 D1 `WIRE_V` 进一位。
+**决定**：`Appearance.body_px` 是 `Option<BodyPx>`（`Sprawling/wire/src/preference/body.rs`）。`BodyPx(u32)` 的唯一构造点是 `BodyPx::new`，`TryFrom<u32>` 经它；小于 `BODY_PX_MIN`（12）的数拒为 `E_INVALID_ARGS`，恢复语句写出下限。serde 经 `try_from = "u32"` 读、经 `into = "u32"` 写，所以人的文件 `[ui]` 里写 `body_px = 11` 在读入处即被拒（`accounting::person` 报 `ConfigInvalid` 并点名 `[ui]`，不改写那份文件），一帧 `PutPreferences` 带 11 在解码处即被拒；12 以上的任何整数照收。schema 内联为 `{"type": "integer", "minimum": 12}`，生成的 `RefRain/src/wire.ts` 因此按同一个下限判页面读到的答案；`cargo xtask wire-ts` 另发 `BODY_PX = { min }`（`Tools/xtask/Spec.lean` §8-36），外观组的字号框与 `RefRain/src/core/sizing.ts` 读它。`body_px` 缺席时画样式表自己的字号，缺省是 15px（`RefRain/src/theme/tokens-type.css` 的 `--text-body`）。schema 多了 `minimum` 而名字没变，按 D1 `WIRE_V` 进一位。
 
 **理由**：区间原先只有页面在查，Rust 里没有一个读者：`[ui]` 写 11 照读，页面再把同一个数读成拒绝，两个家对一个数各说一句。下限做成类型之后，文件、帧与页面都由这一条规则判。上限由人的决定去掉：12px 已是给少数人的极端选项，往上没有一个尺寸是本 build 有理由替人拒绝的。12px 不另算对比度，颜色门读 `@theme` 里缺省的那一行字号并保持绿即可（人的决定）。
 
@@ -65,7 +65,7 @@
 
 /-! D52 阅读正文的字体是外观里的一格 `reading`，两个值，缺席即没说过
 
-**决定**：`Appearance` 加 `reading: Option<ReadingFace>`，带 `#[serde(default)]`，随整份外观一起写。`ReadingFace` 是闭集，两个值：`interface`——阅读正文跟界面同一种字体，也就是外观组给界面选的那一种（缺省 Maple Mono）；`libron`——随包发的衬线字体 Libron（`client/src/fonts/Libron-*.woff2`，`docs/third-party.md` §4）。阅读正文是对话里的消息、文档与报告的正文；控件、标签、数字、代码、路径与命令不读这一格，仍是界面的字体与等宽字体。缺席与 `glass` 同理（D14）：这个人没说过，页面画它自己的姿态，即 `interface`。页面在根元素上写 `data-read`，`client/src/theme/preference.css` 据它把 `--font-read` 换成 `"Libron", serif`；栈以泛称 `serif` 结尾，不点名任何中文字体，中文落到设备自带的衬线字体。答面的既有帧加了字段，按 D1 `WIRE_V` 进一位。
+**决定**：`Appearance` 加 `reading: Option<ReadingFace>`，带 `#[serde(default)]`，随整份外观一起写。`ReadingFace` 是闭集，两个值：`interface`——阅读正文跟界面同一种字体，也就是外观组给界面选的那一种（缺省 Maple Mono）；`libron`——随包发的衬线字体 Libron（`RefRain/src/fonts/Libron-*.woff2`，`docs/third-party.md` §4）。阅读正文是对话里的消息、文档与报告的正文；控件、标签、数字、代码、路径与命令不读这一格，仍是界面的字体与等宽字体。缺席与 `glass` 同理（D14）：这个人没说过，页面画它自己的姿态，即 `interface`。页面在根元素上写 `data-read`，`RefRain/src/theme/preference.css` 据它把 `--font-read` 换成 `"Libron", serif`；栈以泛称 `serif` 结尾，不点名任何中文字体，中文落到设备自带的衬线字体。答面的既有帧加了字段，按 D1 `WIRE_V` 进一位。
 
 **理由**：Maple Mono 适合大部分界面，长段的阅读正文换一种衬线字体是人的要求（人的决定），而它只管读的那部分字，所以是一格自己的选择，不是 `sans` 的第四个值：`sans` 换的是整个界面，把衬线字体放进去会把按钮与数字一起换掉。两个值而不是「字体名加一段自写的栈」：随包的衬线字体只有一种，`sans` 已经有自写栈的门，再开一扇就是第二个家。
 
@@ -76,7 +76,7 @@
 
 /-! D123 内置字体槽位是 Paper Mono，`Face` 的四值不带读取别名
 
-**决定**：`Face` 是 `paper｜maple｜system｜custom`，`Appearance::default()` 的 `sans` 与 `mono` 都是 `Paper`；`client/src/core/appearance.ts` 的 `FACES`、`core/prefs.ts` 的缺省值与 `client/src/theme/colour.css` 的 `--face-sans`／`--face-mono` 同样是 Paper Mono。`Maple` 仍是一个真实可选值，因为 Maple Mono 的三个 woff2 仍随客户端发布（`client/src/fonts/MapleMono-*.woff2`）。**没有读取别名**：`geist` 不在本 build 的任何产物里，读到它即按 D1 所说不认；`maple` 仍指 Maple Mono，不指 Paper。`Face` 多一个值、加五个字段是 D1 所说「名字不变而形状变」，`WIRE_V` 75 → 76，schema golden、shape golden 与 `client/src/wire.ts` 同集重生。
+**决定**：`Face` 是 `paper｜maple｜system｜custom`，`Appearance::default()` 的 `sans` 与 `mono` 都是 `Paper`；`RefRain/src/core/appearance.ts` 的 `FACES`、`core/prefs.ts` 的缺省值与 `RefRain/src/theme/colour.css` 的 `--face-sans`／`--face-mono` 同样是 Paper Mono。`Maple` 仍是一个真实可选值，因为 Maple Mono 的三个 woff2 仍随客户端发布（`RefRain/src/fonts/MapleMono-*.woff2`）。**没有读取别名**：`geist` 不在本 build 的任何产物里，读到它即按 D1 所说不认；`maple` 仍指 Maple Mono，不指 Paper。`Face` 多一个值、加五个字段是 D1 所说「名字不变而形状变」，`WIRE_V` 75 → 76，schema golden、shape golden 与 `RefRain/src/wire.ts` 同集重生。
 
 **理由**：人的决定是把内置西文面从 Maple Mono 换成 Paper Mono，同时不把 Maple Mono 移出构建物。两件事同时成立时，「旧默认名读成新默认名」的别名不再成立：`maple` 已经指一个仍然随包的面，把它读成 Paper 会改掉一个真实的存值。换默认因此只动不涉及他人数据的那两处——城里的 `Appearance::default()` 与浏览器缓存缺省值：一份从未写过 `[ui.appearance]` 的配置、一个从未改过外观的浏览器读到的就是 Paper Mono，而文件里写着 `maple` 的人得到 Maple Mono，那是他的文件说的话。
 
@@ -87,7 +87,7 @@
 
 /-! D124 缺字的回退链是 `Appearance.fallbacks`：至多两个家族名，按顺序试
 
-**决定**：`Appearance` 加 `fallbacks: Vec<String>`，带 `#[serde(default)]`，缺省为空表，至多两个家族名。页面把这条链插在每个角色的正体之后、系统通用家族之前（`client/src/theme/tokens-type.css` 的 `var(--face-fallback)`），`libron` 那条衬线栈同样插入，所以「代码用 Paper Mono、中文用 Maple Mono NF CN、回复正文用 Libron」是三处选择：界面与代码选 Paper Mono、回复正文选 Libron、回退一填 `Maple Mono NF CN`。**文法由页面守**：一格一个家族名，字符是 Unicode 字母、数字、空格、`-`、`_` 或 `.`（`client/src/core/appearance.ts` 的 `FAMILY_SHAPE`），与 `sans_stack`（D29 之前的自写栈）同一条分工——城照存不解析，页面读回时把不合文法或超出两个的名字读成缺席；线形多了一个字段，按 D1 进一位。
+**决定**：`Appearance` 加 `fallbacks: Vec<String>`，带 `#[serde(default)]`，缺省为空表，至多两个家族名。页面把这条链插在每个角色的正体之后、系统通用家族之前（`RefRain/src/theme/tokens-type.css` 的 `var(--face-fallback)`），`libron` 那条衬线栈同样插入，所以「代码用 Paper Mono、中文用 Maple Mono NF CN、回复正文用 Libron」是三处选择：界面与代码选 Paper Mono、回复正文选 Libron、回退一填 `Maple Mono NF CN`。**文法由页面守**：一格一个家族名，字符是 Unicode 字母、数字、空格、`-`、`_` 或 `.`（`RefRain/src/core/appearance.ts` 的 `FAMILY_SHAPE`），与 `sans_stack`（D29 之前的自写栈）同一条分工——城照存不解析，页面读回时把不合文法或超出两个的名字读成缺席；线形多了一个字段，按 D1 进一位。
 
 **理由**：汉字今天没有门，只能把 `Paper Mono, Maple Mono NF CN` 手写进「自写栈」，而自写栈是**替换**内置面，不是排在它后面——为补一种文字重写整条栈，正是人说的不清晰。缺字的回退是字形覆盖的选择而不是角色的选择，所以它是外观里的一格、一条有序链，不是第四种字体；两个槽放得下「中文一种 ＋ 符号一种」，再多就成了一份藏在设置里的样式表。名字而不是整条栈：线上只存家族名，引号、逗号与先后由页面拼，一处文法。
 
@@ -98,9 +98,9 @@
 
 /-! D125 随包字体的六项特性是 `Appearance.features`，闭集 `TypeFeature`
 
-**决定**：`Appearance` 加 `features: Vec<TypeFeature>`，带 `#[serde(default)]`，缺省为空表。`TypeFeature` 是闭集，拼写即 Paper Mono 自己 name 表里的六个特性名：`coding_ligatures`（`ss01` Coding ligatures）、`duospace`（`ss02` Duospace glyphs）、`narrow_space`（`ss03` Narrow space）、`small_arrows`（`ss04` Small arrows）、`single_story_a`（`cv01` Single-story a）、`slashed_zero`（`zero` Slashed zero）。页面把开着的名字写成根元素上一个空格分隔的属性（`data-features="duospace single_story_a"`，词就是 serde 拼写），`client/src/theme/preference.css` 据它置各自的 tag 槽。**关掉的特性不发这一项**，不是发 `"tag" 0`：`--figures` 已用 `font-variant-numeric: slashed-zero` 给数字列一个读不成 O 的零，而 `font-feature-settings` 会压过 `font-variant-*`，发 `"zero" 0` 会把那一列的零抹平。同一意图在另一种随包字体里的拼写由 theme 逐一对应（Maple Mono 的 `calt`、`cv02`、`zero`），它没有声明的三项，页面把那一格画成不可选并说出原因（`Segmented` 的 `why`）。
+**决定**：`Appearance` 加 `features: Vec<TypeFeature>`，带 `#[serde(default)]`，缺省为空表。`TypeFeature` 是闭集，拼写即 Paper Mono 自己 name 表里的六个特性名：`coding_ligatures`（`ss01` Coding ligatures）、`duospace`（`ss02` Duospace glyphs）、`narrow_space`（`ss03` Narrow space）、`small_arrows`（`ss04` Small arrows）、`single_story_a`（`cv01` Single-story a）、`slashed_zero`（`zero` Slashed zero）。页面把开着的名字写成根元素上一个空格分隔的属性（`data-features="duospace single_story_a"`，词就是 serde 拼写），`RefRain/src/theme/preference.css` 据它置各自的 tag 槽。**关掉的特性不发这一项**，不是发 `"tag" 0`：`--figures` 已用 `font-variant-numeric: slashed-zero` 给数字列一个读不成 O 的零，而 `font-feature-settings` 会压过 `font-variant-*`，发 `"zero" 0` 会把那一列的零抹平。同一意图在另一种随包字体里的拼写由 theme 逐一对应（Maple Mono 的 `calt`、`cv02`、`zero`），它没有声明的三项，页面把那一格画成不可选并说出原因（`Segmented` 的 `why`）。
 
-**理由**：人要求能调这六项，而这六项是随包字体自己声明的词汇，不是本 build 发明的，所以开关的名字来自字体的 name 表，落到哪个 tag 由 theme 一处决定。默认全关：今天的页面把 `liga`／`calt` 关掉以保「屏幕上的就是 shell 跑的」（`client/src/theme/tokens-type.css`），连字是人的口味，不是页面的默认。
+**理由**：人要求能调这六项，而这六项是随包字体自己声明的词汇，不是本 build 发明的，所以开关的名字来自字体的 name 表，落到哪个 tag 由 theme 一处决定。默认全关：今天的页面把 `liga`／`calt` 关掉以保「屏幕上的就是 shell 跑的」（`RefRain/src/theme/tokens-type.css`），连字是人的口味，不是页面的默认。
 
 **被否**：①让开关发原始 tag（人自己填 `ss01`、`calt`）——页面上出现字体内部编号，而同一个编号在另一种字体里是另一件事；②六个布尔字段——闭集列在文件里更短，加一项只增一个枚举值；③每个角色各存一份——六格乘三，而口味是整页的。
 
@@ -112,8 +112,8 @@
 **决定**：`Appearance` 加三件可缺的字段，三者缺席都是「这个人没说过」，页面画样式表自己的姿态。
 
 1. `line_height: Option<LineHeight>`（`Sprawling/wire/src/preference/leading.rs`）：行盒相对字号的千分数，下限 `LINE_HEIGHT_MIN` = 1200（1.2 倍），无上限。页面把 `--leading-read` 写在根元素上，读正文的元素用 `leading-read`（缺省 1.625，与今天的 `leading-relaxed` 同值，所以没说过的人看不出变化）。
-2. `letter_spacing: Option<Tracking>`（`Sprawling/wire/src/preference/tracking.rs`）：字距的千分之一 em，下限 `TRACKING_MIN` = -50，无上限。页面写 `--tracking`，`client/src/theme/base.css` 的 `:root` 与 `:root:lang(zh)` 两条规则都读它，中文缺省仍是 0。
-3. `weight: Option<Weight>`：闭集 `light｜regular｜medium`，页面写 `data-weight`，`client/src/theme/preference.css` 把它换成 `--font-weight-body` 的 300／400／500，四个强档随它升高 200。
+2. `letter_spacing: Option<Tracking>`（`Sprawling/wire/src/preference/tracking.rs`）：字距的千分之一 em，下限 `TRACKING_MIN` = -50，无上限。页面写 `--tracking`，`RefRain/src/theme/base.css` 的 `:root` 与 `:root:lang(zh)` 两条规则都读它，中文缺省仍是 0。
+3. `weight: Option<Weight>`：闭集 `light｜regular｜medium`，页面写 `data-weight`，`RefRain/src/theme/preference.css` 把它换成 `--font-weight-body` 的 300／400／500，四个强档随它升高 200。
 
 三件都与 `BodyPx`（D51）同一条理由走类型：行高低于 1.2 倍时相邻两行的字开始相碰，字距收到 -0.05em 以下时相邻字母相碰，这是画得出来与画不出来之分，不是口味，所以在文件、帧与页面三处由一条规则拒；往上任何值只是更松，与人去掉字号上限的理由相同。
 
@@ -143,8 +143,8 @@ pub enum PreferencePatch { /* … */ Tags(SessionTags) }
 - **标签是人的分类，不是城的历史。** 它不改变任何 run 能观察到的东西，所以不进账本、没有事件，住在人自己的 `~/.sprawling/config.toml` 的 `[ui]` 节里，与和弦同一扇门（§8-39 七）。手机连到同一座城，问 `Query::Preferences` 得到的是同一份。
 - **一段 session 的身份是 `(city, room, began)`。** `began` 是账本给这一段第一行的序号，由 `Query::Sessions` 答出（§8-71），一座城里一行一个序号，所以 `(room, began)` 在一座城里唯一，且这一段后来再长多少行都不变。`city` 不能省：人的文件在他所有的城之间共用，而每座城的 `hall/mayor` 第一段都从很小的序号开始，只按 `(room, began)` 存，两座城的标签会落到彼此身上。
 - **`Tags` 是整段的标签集，不是加一个或减一个。** 它把这一段的标签换成帧里那一组；空组删除这一条。与 `Chord` 同一个理由：一帧说一件事，这件事是「这一段的标签」。`apply` 之后整表按 `(city, room, began)` 排序，每段的标签按字典序且去重，所以两台机器以不同顺序打上同样的标签，写出同一份文件。
-- **`Tag` 的文法：1 到 `TAG_MAX` 个字符，每个字符是字母（Unicode `Alphabetic`，任何文字）、数字（`\p{N}`）、`-` 或 `_`。** 没有空白，所以 `/tag <name>` 读一个词，一个标签在窄窗格里画成一枚不折行的小签；24 个字符放得下一个英文复合词或十来个汉字，再长就是一句话而不是一个分类。大小写不在文法里：页面在人输入时把它折成小写（`client/src/core/tags.ts`），所以 `Bug` 与 `bug` 是同一个标签；手写进文件的大写标签照读，只是另一个标签。模式（`^[-_\p{Alphabetic}\p{N}]{1,24}$`）与构造点逐字符同义：`char::is_alphabetic` 即 `Alphabetic`，`char::is_numeric` 即 `\p{N}`，两边都按码点计长度——客户端读得懂城写下的每一个标签，城不会收下客户端读不懂的。
-- **`pin` 是页面的保留词，不是线上的。** 置顶是页面怎么排这些行的事（`client/src/core/tags.ts`）；线上的 `pin` 只是一个合法的标签。Mayor 当前那一段的置顶由页面推出、不存储。
+- **`Tag` 的文法：1 到 `TAG_MAX` 个字符，每个字符是字母（Unicode `Alphabetic`，任何文字）、数字（`\p{N}`）、`-` 或 `_`。** 没有空白，所以 `/tag <name>` 读一个词，一个标签在窄窗格里画成一枚不折行的小签；24 个字符放得下一个英文复合词或十来个汉字，再长就是一句话而不是一个分类。大小写不在文法里：页面在人输入时把它折成小写（`RefRain/src/core/tags.ts`），所以 `Bug` 与 `bug` 是同一个标签；手写进文件的大写标签照读，只是另一个标签。模式（`^[-_\p{Alphabetic}\p{N}]{1,24}$`）与构造点逐字符同义：`char::is_alphabetic` 即 `Alphabetic`，`char::is_numeric` 即 `\p{N}`，两边都按码点计长度——客户端读得懂城写下的每一个标签，城不会收下客户端读不懂的。
+- **`pin` 是页面的保留词，不是线上的。** 置顶是页面怎么排这些行的事（`RefRain/src/core/tags.ts`）；线上的 `pin` 只是一个合法的标签。Mayor 当前那一段的置顶由页面推出、不存储。
 - **线形变了，`WIRE_V` 升一（D1）。** `PreferencesAnswer` 多一个字段，`PreferencePatch` 多一个变体；旧客户端读不懂带 `tags` 的答案（`deny_unknown_fields` 的对面是生成的严格 schema）。
 -/
 
@@ -167,7 +167,7 @@ pub enum PreferencePatch { /* … */ Tags(SessionTags) }
 pub struct ThemeOverride { pub tokens: BTreeMap<String, String>, pub css: Option<String> }
 ```
 
-`tokens` 的键是 `client/src/theme.css` 的 `@theme` 块里的 CSS 变量名，值是一段 CSS 颜色；`css` 是人在 RefRain 里写的整段覆盖文本。空的 `ThemeOverride` 即「恢复默认」。覆盖与其余偏好一样存在人的偏好文件 `config.toml` 的 `[ui]` 里（D21 说的「人的那一层」），所以换浏览器、换设备也在；页面把 `tokens` 逐个写在根元素的内联样式上（`document.documentElement.style`），内联样式压过 `@theme` 块给的值；只有 `css` 放进一个追加在内置主题之后的 `<style>` 元素（`client/src/views/setup/colours.ts`）。两处都在页面里改，改动立刻生效。变量放在内联样式上，是因为一个变量的覆盖不必与内置样式表比先后，追加的 `<style>` 只留给人自己写的整段规则。易读性按 `xtask color` 的规则在页面上照算，不合格只提示，不拒写。随 V0.0.9 的那一次 `WIRE_V` 进位（D22）。没有账本事件：与 D21 同一个理由，配色是人的偏好，不是城里发生过的事。
+`tokens` 的键是 `RefRain/src/theme.css` 的 `@theme` 块里的 CSS 变量名，值是一段 CSS 颜色；`css` 是人在 RefRain 里写的整段覆盖文本。空的 `ThemeOverride` 即「恢复默认」。覆盖与其余偏好一样存在人的偏好文件 `config.toml` 的 `[ui]` 里（D21 说的「人的那一层」），所以换浏览器、换设备也在；页面把 `tokens` 逐个写在根元素的内联样式上（`document.documentElement.style`），内联样式压过 `@theme` 块给的值；只有 `css` 放进一个追加在内置主题之后的 `<style>` 元素（`RefRain/src/views/setup/colours.ts`）。两处都在页面里改，改动立刻生效。变量放在内联样式上，是因为一个变量的覆盖不必与内置样式表比先后，追加的 `<style>` 只留给人自己写的整段规则。易读性按 `xtask color` 的规则在页面上照算，不合格只提示，不拒写。随 V0.0.9 的那一次 `WIRE_V` 进位（D22）。没有账本事件：与 D21 同一个理由，配色是人的偏好，不是城里发生过的事。
 
 **理由**：主题在构建时编进页面包，运行时没有一个 theme.css 文件可以打开（roadmap CT 已更正这条前提）；覆盖的变量集就是 `@theme` 那一组，所以键用变量名。键是否在 `@theme` 名单里、值是不是一段颜色，都由页面校验：`theme.css` 是客户端的文件，`wire` 包不能编进包目录以外的文件（`xtask packaged`），在服务端另抄一份名单就是这份名单的第二个权威；服务端只按 `deny_unknown_fields` 守住 `ThemeOverride` 自己的两个字段。
 
@@ -187,38 +187,38 @@ none、soft、soft_shares、pinned；配置读者与客户端 schema 共用此�
 -/
 
 /-! 设置覆盖：记录的是声明字段；TOML 拼写仍由 serde 类型决定。
-settings-control PreferencesAnswer.lang client/src/views/setup.svelte
-settings-control PreferencesAnswer.core client/src/views/settings/performance.svelte
-settings-control PreferencesAnswer.panel client/src/views/right.svelte
-settings-control PreferencesAnswer.appearance client/src/views/setup/appearance.svelte
-settings-control PreferencesAnswer.proxying client/src/views/setup.svelte
-settings-control PreferencesAnswer.chords client/src/views/setup/keys.svelte
-settings-control PreferencesAnswer.tags client/src/views/world/session_menu.svelte
-settings-control PreferencesAnswer.theme client/src/views/setup/colours.svelte
-settings-control CorePreferences.placement client/src/views/settings/performance.svelte
-settings-control CorePreferences.priority client/src/views/settings/performance.svelte
-settings-control CorePreferences.memory_bytes client/src/views/settings/performance.svelte
-settings-control ThemeOverride.tokens client/src/views/setup/colours.svelte
-settings-control ThemeOverride.css client/src/views/setup/colours.svelte
-settings-control Chord.action client/src/views/setup/keys.svelte
-settings-control Chord.spelled client/src/views/setup/keys.svelte
-settings-control Appearance.lighting client/src/views/setup/appearance.svelte
-settings-control Appearance.sans client/src/views/setup/appearance_type.svelte
-settings-control Appearance.mono client/src/views/setup/appearance_type.svelte
-settings-control Appearance.sans_stack client/src/views/setup/appearance_type.svelte
-settings-control Appearance.mono_stack client/src/views/setup/appearance_type.svelte
-settings-control Appearance.body_px client/src/views/setup/appearance_type.svelte
-settings-control Appearance.reading client/src/views/setup/appearance_type.svelte
-settings-control Appearance.fallbacks client/src/views/setup/appearance_type.svelte
-settings-control Appearance.features client/src/views/setup/appearance_type.svelte
-settings-control Appearance.line_height client/src/views/setup/appearance_type.svelte
-settings-control Appearance.letter_spacing client/src/views/setup/appearance_type.svelte
-settings-control Appearance.weight client/src/views/setup/appearance_type.svelte
-settings-control Appearance.density client/src/views/setup/appearance.svelte
-settings-control Appearance.chroma client/src/views/setup/appearance.svelte
-settings-control Appearance.motion client/src/views/setup/appearance.svelte
-settings-control Appearance.glass client/src/views/setup/appearance.svelte
-settings-control Appearance.blend_percent client/src/views/setup/appearance.svelte
+settings-control PreferencesAnswer.lang RefRain/src/views/setup.svelte
+settings-control PreferencesAnswer.core RefRain/src/views/settings/performance.svelte
+settings-control PreferencesAnswer.panel RefRain/src/views/right.svelte
+settings-control PreferencesAnswer.appearance RefRain/src/views/setup/appearance.svelte
+settings-control PreferencesAnswer.proxying RefRain/src/views/setup.svelte
+settings-control PreferencesAnswer.chords RefRain/src/views/setup/keys.svelte
+settings-control PreferencesAnswer.tags RefRain/src/views/world/session_menu.svelte
+settings-control PreferencesAnswer.theme RefRain/src/views/setup/colours.svelte
+settings-control CorePreferences.placement RefRain/src/views/settings/performance.svelte
+settings-control CorePreferences.priority RefRain/src/views/settings/performance.svelte
+settings-control CorePreferences.memory_bytes RefRain/src/views/settings/performance.svelte
+settings-control ThemeOverride.tokens RefRain/src/views/setup/colours.svelte
+settings-control ThemeOverride.css RefRain/src/views/setup/colours.svelte
+settings-control Chord.action RefRain/src/views/setup/keys.svelte
+settings-control Chord.spelled RefRain/src/views/setup/keys.svelte
+settings-control Appearance.lighting RefRain/src/views/setup/appearance.svelte
+settings-control Appearance.sans RefRain/src/views/setup/appearance_type.svelte
+settings-control Appearance.mono RefRain/src/views/setup/appearance_type.svelte
+settings-control Appearance.sans_stack RefRain/src/views/setup/appearance_type.svelte
+settings-control Appearance.mono_stack RefRain/src/views/setup/appearance_type.svelte
+settings-control Appearance.body_px RefRain/src/views/setup/appearance_type.svelte
+settings-control Appearance.reading RefRain/src/views/setup/appearance_type.svelte
+settings-control Appearance.fallbacks RefRain/src/views/setup/appearance_type.svelte
+settings-control Appearance.features RefRain/src/views/setup/appearance_type.svelte
+settings-control Appearance.line_height RefRain/src/views/setup/appearance_type.svelte
+settings-control Appearance.letter_spacing RefRain/src/views/setup/appearance_type.svelte
+settings-control Appearance.weight RefRain/src/views/setup/appearance_type.svelte
+settings-control Appearance.density RefRain/src/views/setup/appearance.svelte
+settings-control Appearance.chroma RefRain/src/views/setup/appearance.svelte
+settings-control Appearance.motion RefRain/src/views/setup/appearance.svelte
+settings-control Appearance.glass RefRain/src/views/setup/appearance.svelte
+settings-control Appearance.blend_percent RefRain/src/views/setup/appearance.svelte
 settings-reason PreferencesAnswer.welcomed 由 welcome 流程记录是否已走过，不提供任意改写历史的开关；设置中的 welcome 入口可再次打开。
 settings-reason PreferencesAnswer.tier tier 只属于当前 tab；持久文件字段仍可读但不覆盖每次启动的 zen，层键提供当前 tab 控制。
 settings-reason SessionTags.city 标签通过 session 控件整体设置，定位字段来自 session 的身份，不另提供原始字段编辑。

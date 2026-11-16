@@ -8,7 +8,7 @@
 
 规定 `answer::catalog`（`Sprawling/wire/src/` 下同名的文件），以及 `ConfigureBuilding`、`CitySettings` 的 `catalog` 面与 `PrefixAnswer.tools`。一栋楼的每件工具怎样到达它的 run、谁定的、用得怎样，以及人改它的那两扇门。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面一节保留它在 wire 规格里的标签 §8-99，别处引作 `Sprawling/wire/Spec.lean §8-99`，决定引作 `wire D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract/main.rs` 钉住的 wire schema（`wire::schema_hash`）守住。页面草稿的性质在 `client/spec/Views/Catalog.lean`。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract/main.rs` 钉住的 wire schema（`wire::schema_hash`）守住。页面草稿的性质在 `RefRain/spec/Views/Catalog.lean`。
 -/
 
 /-!

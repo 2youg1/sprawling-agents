@@ -31,9 +31,9 @@ open Lean (Json)
 /-- The client's page table and its command table, relative to the repository
 root `just acceptance` runs in. Spelled with forward slashes because the same
 text is printed under a heading, and every platform opens it. -/
-def routeTable : String := "client/src/core/route.ts"
+def routeTable : String := "RefRain/src/core/route.ts"
 
-def slashTable : String := "client/src/core/slash.ts"
+def slashTable : String := "RefRain/src/core/slash.ts"
 
 /-- The lines of a TypeScript table: those after the line that opens it, up to
 the line that closes it. -/

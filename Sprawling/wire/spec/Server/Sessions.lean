@@ -20,7 +20,7 @@ pub struct Keys<'a> { pub face: &'a BindFace, pub sessions: &'a Sessions, pub no
 ```
 
 - **会话记得自己属于哪台设备，socket 记得自己出示的是哪个令牌**：令牌签出时记下签它的设备；一条 socket 以会话令牌完成 hello 时在门上「入座」（seat），占用记在那个会话上，socket 结束时离座（unseat）。native key 不属于任何设备，以它完成 hello 的 socket 不入座。
-- **撤销即断开**：`LocalDoor::forget` 删掉设备行和它的全部会话，然后通知每一条 socket（一个 `tokio::sync::watch`）；socket 被通知时用 hello 时出示的凭据再问一次 `Keys::pairing`，不再握着就回一条 `E_GATE_DENIED` 拒绝并关闭。入座之后 socket 自己先判一次，所以在 hello 判定与入座之间被忘掉的设备同样被关掉。页面断线后照常重连，重连前的续签被拒，页面就忘掉自己的设备钥，回到配对页（`client/src/core/local/entering.ts`）。
+- **撤销即断开**：`LocalDoor::forget` 删掉设备行和它的全部会话，然后通知每一条 socket（一个 `tokio::sync::watch`）；socket 被通知时用 hello 时出示的凭据再问一次 `Keys::pairing`，不再握着就回一条 `E_GATE_DENIED` 拒绝并关闭。入座之后 socket 自己先判一次，所以在 hello 判定与入座之间被忘掉的设备同样被关掉。页面断线后照常重连，重连前的续签被拒，页面就忘掉自己的设备钥，回到配对页（`RefRain/src/core/local/entering.ts`）。
 - **空闲即失效**：一个令牌被至少一条 socket 占着时一直有效；没有 socket 占着时（刚签出、或最后一条 socket 刚结束），`SESSION_IDLE_MS` 之内不再入座就失效。POST 只判、不入座，所以 POST 不延长令牌的寿命。失效判在被问的那一刻（`holds` 带 `now`）；签新令牌时顺手清掉已失效的，表因此不涨。
 - **容量**：至多 `SESSIONS_MAX` 个令牌。签新令牌时表还是满的，就丢最旧的空闲令牌；全都被占着才丢最旧的那个，门照样通知，它的 socket 随之关闭。容量淘汰不在下面的模型里：模型的性质对表没满的每一条序列成立，Rust 侧的 proptest 也只生成这样的序列。
 - **时钟坏了**：判凭据要读时钟，读不到就拒绝这次请求或这次 hello，并带上时钟的错误；socket 离座时读不到时钟，就直接结束那个令牌，不按空闲计，因为页面每次拨号前都会重新签一个。
@@ -30,7 +30,7 @@ pub struct Keys<'a> { pub face: &'a BindFace, pub sessions: &'a Sessions, pub no
 
 **决定**：`SESSION_IDLE_MS` 是 60 000 ms，从令牌签出、或占着它的最后一条 socket 结束时算起；被 socket 占着的令牌不过期。
 
-**理由**：页面每次拨号之前都用设备钥重新签一个令牌（`client/src/core/local/dial.ts`），所以一个令牌在没有 socket 的时候只需要盖住两段：签出到 hello 之间，与断线后页面在退避阶梯上（最长 10 s 一步）等待重拨、其间发出的 POST。60 s 盖得住这两段，又把一个被页面里的脚本偷走的令牌在页面关掉之后还能用的时间压到一分钟。这与 nonce 的寿命（`NONCE_LIFETIME_MS`）同一量级，都是「城刚铸出、马上要用」的东西。
+**理由**：页面每次拨号之前都用设备钥重新签一个令牌（`RefRain/src/core/local/dial.ts`），所以一个令牌在没有 socket 的时候只需要盖住两段：签出到 hello 之间，与断线后页面在退避阶梯上（最长 10 s 一步）等待重拨、其间发出的 POST。60 s 盖得住这两段，又把一个被页面里的脚本偷走的令牌在页面关掉之后还能用的时间压到一分钟。这与 nonce 的寿命（`NONCE_LIFETIME_MS`）同一量级，都是「城刚铸出、马上要用」的东西。
 
 **被否**：①令牌不过期，只靠容量淘汰与进程退出——关掉的页面留下的令牌在城的整个寿命里都有效；②按绝对寿命过期（签出后 N 分钟，不论有没有 socket）——一条开了一整天的 socket 会在中途失去凭据，而 socket 是只在 hello 时出示凭据的；③POST 也延长寿命——一个偷到令牌的脚本只要不断 POST，令牌就永远不失效。
 
