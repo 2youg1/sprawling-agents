@@ -56,7 +56,7 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 - 普通一行派给当前房间（`Dispatch`，`Mode::Work`），带 `/model` 与 `/effort` 选下的模型与档位。人提交的一行进转写，前面是本地时刻与 `›`。选中房间的一个 run 照 WebUI 的会话页进转写：第一次请求模型时一行头（住户、模型、模式、档位），每一轮推理的长度，每次工具调用在它答复时一行（名字、对象、用时，失败的标 `failed`），答复的正文（反引号里的代码原样、反引号淡色，`**` 之间加粗，围栏里的行保留空白），最后一行结局与总用时。时刻是这台电脑所在时区的 `HH:MM:SS`（`calyx::console::local_time`），由记录的 `t` 换算，不另取时钟。一条记录属于这个房间，当它的地址是这个房间、写它的是这个房间的住户、或它是这个房间里正在工作的那个 run 的一行：run 的请求、调用、答复与冻结不带地址。别的房间与城级的记录不进转写。拒绝与斜杠动词的回答作为控制台自己的一行进转写。
 - 活动区自上而下：最早的待批请求（`?`、它的说明、`y approve   n deny`）；正在工作的 run（`●`、住户、开始的时刻、`esc stops it`）；进行中的调用（至多最新三个，`running`）；`/quit` 问的那一句；然后是 composer——字在上，下一行一条线跟着字走，再下一行左边是房间、右边是平线问的模型与档位。窗口尚有空行时整个活动区贴底，转写增多后照常滚动（`Calyx/ffi/Spec.lean` D8）。活动区只在有事发生时重画：一条记录、一个键、一个粘贴、一次缩放，从不自己动（`Calyx/ffi/Spec.lean` D4）。
 - 键（全部不用 Ctrl 组合键：Ctrl+C 与 Ctrl+V 是几乎所有人都会的两个键，归终端；Alt 在 macOS 默认终端里输入特殊字符、在 Windows Terminal 里是全屏与窗格）：Enter 发送；行尾的 `\` 加 Enter，或终端分得清时的 Shift+Enter，是换行；Esc 依次关菜单、清空输入、中断当前房间的 run（发 `Cancel`）；↑/↓ 是本次会话的历史；←/→、Home、End 移动；Alt+Backspace 删一个词，Alt+←/→ 按词移动；输入为空且有待批请求时 y、n 答它。
-- **斜杠菜单**（`calyx::console::ui::menu`）：Tab 补全斜杠动词，以及 `/model` 与 `/effort` 的参数；只有一个合适的就直接换上，几个合适的就打开菜单，光标在第一个——按 `wire::Slash` 的次序，所以 `/w` 加 Tab 加 Enter 是 `/web`。菜单开着时 Tab 与 ↓ 往下，Shift+Tab 与 ↑ 往上，Enter 取光标所在的那一项：不带参数的动词与参数取了就发送，带参数的动词写成「动词加空格」等参数；再打字时菜单跟着筛，什么都不合适就关上。菜单至多显示五项，下面一行说还有几项。
+- **斜杠菜单**（`Calyx/shell/menu.zig`）：Tab 补全斜杠动词，以及 `/model` 与 `/effort` 的参数；只有一个合适的就直接换上，几个合适的就打开菜单，光标在第一个——按 `wire::Slash` 的次序，所以 `/w` 加 Tab 加 Enter 是 `/web`。菜单开着时 Tab 与 ↓ 往下，Shift+Tab 与 ↑ 往上，Enter 取光标所在的那一项：不带参数的动词与参数取了就发送，带参数的动词写成「动词加空格」等参数；再打字时菜单跟着筛，什么都不合适就关上。菜单至多显示五项，下面一行说还有几项。
 - 在 Unix 上，控制台向终端要两样东西：不含糊的键（kitty 键盘协议的第一级，Shift+Enter 因此与 Enter 分得开）与整段粘贴（bracketed paste）；不认得的终端忽略这两个请求。Windows 上读键走控制台 API，两样都没有。交还终端之前两样都撤回，光标形状也还原。
 - `/quit` 是关闭城市唯一的键盘路径。没有 run 在跑：`Stopping(Drain)`。有 run 在跑：同一行问 `N runs are going   Enter wait for them   n stop them now   Esc keep serving`，Enter 是 `Drain`，n 是 `Interrupt`，Esc 取消。
 - **参数补全从当前的 offer 取**（`Session::arguments`）：每按一次 Tab 问一次 `Query::EndpointView`，不另列一份模型表或档位表，也不缓存，因为接上或卸下一个 endpoint 之后，下一次 Tab 就该看见。`/model` 补全每个 endpoint 所服务的模型 id，去重后按字母排；`/effort` 补全当前（Endpoint，模型）的 `thinking.levels`。当前模型是 `/model` 选下的那个，没选就是 `main` 标签指向的那个；`/model` 选下的 id 先在 `main` 所在的 endpoint 上找，找不到才取第一个服务它的 endpoint。模型没有思考控制、或答询答不出来时，`/effort` 什么也不补。
@@ -69,23 +69,23 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 
 -/
 
-/-! D106 拒绝帧不留队重试（`calyx::console::screen`，adapter）：渲染器拒绝当前帧时，这一批转写全部丢弃，不复制、不保留到后续事件；`previous` 仍指向最后成功画出的转写。拒绝原因与「转写已丢弃、请到 WebUI 查看」一起印出；相同原因连续出现只报告一次，成功一帧后重新允许报告。后续事件只画自己的转写与当前活动区。取舍：不设等待队列，避免持续拒绝时内存与重复布局工作随历史增长；代价是缩放后不补画被拒绝的转写，正文仍可从 WebUI 的会话读取。相较只限条数的队列，这也避免一条超大答复一直阻塞后续帧。
+/-! D106 拒绝帧不留队重试（`Calyx/shell/screen.zig`，adapter）：渲染器拒绝当前帧时，这一批转写全部丢弃，不复制、不保留到后续事件；`previous` 仍指向最后成功画出的转写。拒绝原因与「转写已丢弃、请到 WebUI 查看」一起印出；相同原因连续出现只报告一次，成功一帧后重新允许报告。后续事件只画自己的转写与当前活动区。取舍：不设等待队列，避免持续拒绝时内存与重复布局工作随历史增长；代价是缩放后不补画被拒绝的转写，正文仍可从 WebUI 的会话读取。相较只限条数的队列，这也避免一条超大答复一直阻塞后续帧。
 
 -/
 
 /-!
-**终端只有一个写者**（`calyx::console::ui`）：一条 UI 线程拥有终端，每一帧经渲染器写成字节，包在一次同步更新（mode 2026）里——先擦掉上一帧的活动区，写下新的转写行，再画活动区并把光标放回 composer；不认 2026 的终端照样画出同样的字节。别的线程经一个有界通道（`UI_DEPTH`，256 条）交给它一行；满了就丢，与诊断可丢同义，worker 与记账线程因此从不在终端上阻塞（旧 conhost 在选中文字时会暂停输出）。读键在另一条线程上，经同一个通道交进来。生命周期的面经 `tokio::sync::watch` 告诉 UI 线程，UI 线程按面切屏；面到了 `Stopping(_, Cut)` 时终端已经没了，UI 线程不再写任何东西。进入 raw 模式时装一个 panic hook：先擦掉备用屏、退出备用屏与 raw 模式，再交给原来的 hook，然后照常 abort。
+**终端只有一个写者**（`Calyx/shell/city_ui.zig`，经 `calyx::console::host`）：一条 UI 线程拥有终端，每一帧经渲染器写成字节，包在一次同步更新（mode 2026）里——先擦掉上一帧的活动区，写下新的转写行，再画活动区并把光标放回 composer；不认 2026 的终端照样画出同样的字节。别的线程经一个有界通道（`UI_DEPTH`，256 条）交给它一行；满了就丢，与诊断可丢同义，worker 与记账线程因此从不在终端上阻塞（旧 conhost 在选中文字时会暂停输出）。读键在另一条线程上，经同一个通道交进来。生命周期的面经 `tokio::sync::watch` 告诉 UI 线程，UI 线程按面切屏；面到了 `Stopping(_, Cut)` 时终端已经没了，UI 线程不再写任何东西。进入 raw 模式时装一个 panic hook：先擦掉备用屏、退出备用屏与 raw 模式，再交给原来的 hook，然后照常 abort。
 
 **事件流与诊断行不再印到终端**（sprawling D44）。服务中的城每提交一行账本、每写一条诊断，终端零写入：诊断只进页面的 log 透镜（`serving::Journal` 的终端出口在控制台拥有终端时关掉），CLI 只印选中房间的记录。标准输入输出不是终端时（`Headless`），诊断照旧写标准错误，工装读它。**原因**：一条记录里有人打的字与模型的回复，终端会被旁人看到、被录屏、留在回滚里；CLI 印正文是因为人选了 CLI，这正是「正文只在人要时才印」本来的条件。**被否掉的做法**：保留默认每条记录一行的事件流——它在 CLI 里与答复抢屏，在安静宿主里违背「只有两行」，而 1024 条的广播通道订阅了却不读会让带正文的记录一直驻留。
 
-**写不出去的一行归一处**：`console::ui` 是唯一决定「终端写失败怎么办」的地方——写不进去的终端是没人在读的终端，UI 线程把它当作终端没了，交给生命周期。
+**写不出去的一行归一处**：Zig 城面是唯一决定「终端写失败怎么办」的地方——写不进去的终端是没人在读的终端，UI 线程把它当作终端没了，交给生命周期。
 
 **本节接口的当前状态。**
 
 - 进程级的一次性通知（`serving::standing` 的优先级、`serving::placement` 的座位与节流、`monitor::beat` 的节拍文件）走 `serving::journal::notice`，是 `Diagnostics` 的 `refuse` 级一行：控制台拥有终端时只进 log 透镜。`assembly::listen` 装上这个出口之前（这时还没有控制台）它们写标准错误。`supervising::children` 的几行不在其中：它们在子进程退出之后、由监护进程写在终端上，「按 Enter 再试」要人读到，那时没有控制台占着终端。
 - 在 Windows 上粘贴多行文本时每个换行仍是一次 Enter，粘贴会被拆成几次发送：控制台 API 不报告粘贴，要统一处理需要另一种判断。Unix 上终端把粘贴整段交来，换行留在输入里。
 
-**本章测试**：`calyx::console::lifecycle` 逐行回放 `Console/Lifecycle.lean` §5 的转移向量；`/wire` 的投影含每个可经 socket 带的 Command 与每个 Query；行控制台把一行答在那一行之后，同一行敲两次是两次派活；`calyx::console::tests::stream` 把一个 run 的记录逐条读成转写行，不带地址的调用与答复也算这个房间的；`calyx::console::ui::menu` 的测试守住 `/w` 加 Tab 加 Enter 是 `/web`，以及菜单的窗口总含着光标所在的那一项。
+**本章测试**：`calyx::console::lifecycle` 逐行回放 `Console/Lifecycle.lean` §5 的转移向量；`/wire` 的投影含每个可经 socket 带的 Command 与每个 Query；行控制台把一行答在那一行之后，同一行敲两次是两次派活；`calyx::console::tests::stream` 把一个 run 的记录逐条读成转写行，不带地址的调用与答复也算这个房间的；`Calyx/shell/menu.zig` 的测试守住 `/w` 加 Tab 加 Enter 是 `/web`，以及菜单的窗口总含着光标所在的那一项。
 -/
 
 /-!

@@ -69,7 +69,7 @@ const Ui = struct {
     hinted: bool = false,
     lost: bool = false,
     dry: bool = false,
-    poll_buf: [64 * 1024]u8 align(@alignOf(host_mod.FaceBytes)) = undefined,
+    poll_buf: []u8 = &.{},
 
     fn init(gpa: std.mem.Allocator, config: *const host_mod.CityConfig, host: *const host_mod.Host) !Ui {
         return .{
@@ -81,6 +81,7 @@ const Ui = struct {
             .held_arena = .init(gpa),
             .frame_arena = .init(gpa),
             .pairing = try gpa.dupe(u8, ""),
+            .poll_buf = try gpa.alloc(u8, 64 * 1024),
         };
     }
 
@@ -94,6 +95,7 @@ const Ui = struct {
         self.held_back.deinit(self.gpa);
         self.held_arena.deinit();
         self.frame_arena.deinit();
+        if (self.poll_buf.len > 0) self.gpa.free(self.poll_buf);
         self.* = undefined;
     }
 
@@ -158,7 +160,7 @@ const Ui = struct {
         var guard: usize = 0;
         while (guard < 64) : (guard += 1) {
             var written: usize = 0;
-            const kind_u = self.host.poll(self.host.ctx, &self.poll_buf, self.poll_buf.len, &written);
+            const kind_u = self.host.poll(self.host.ctx, self.poll_buf.ptr, self.poll_buf.len, &written);
             const kind: host_mod.HostEventKind = std.enums.fromInt(host_mod.HostEventKind, kind_u) orelse .empty;
             if (kind == .empty) return;
             const payload = self.poll_buf[0..written];

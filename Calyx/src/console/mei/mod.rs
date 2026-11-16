@@ -34,16 +34,12 @@ fn calyx_program() -> Result<PathBuf, String> {
             "set CALYX_BIN to the Zig `calyx` binary from `zig build` / cargo target dir",
         ));
     }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let sibling = dir.join(if cfg!(windows) {
-                "calyx.exe"
-            } else {
-                "calyx"
-            });
-            if sibling.is_file() && sibling != exe {
-                return Ok(sibling);
-            }
+    if let Ok(exe) = std::env::current_exe()
+        && let Some(dir) = exe.parent()
+    {
+        let sibling = dir.join(if cfg!(windows) { "calyx.exe" } else { "calyx" });
+        if sibling.is_file() && sibling != exe {
+            return Ok(sibling);
         }
     }
     which("calyx").ok_or_else(|| {
@@ -108,8 +104,25 @@ fn exec_calyx(program: &Path, replay: Option<&str>) -> ExitCode {
     }
 }
 
+fn toml_basic(value: &str) -> String {
+    let mut out = String::with_capacity(value.len().saturating_add(8));
+    for ch in value.chars() {
+        match ch {
+            '\\' => out.push_str("\\\\"),
+            '"' => out.push_str("\\\""),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 fn face_missing(action: &str, subject: impl Into<String>, recovery: &str) -> String {
-    let subject = subject.into();
+    let subject = toml_basic(&subject.into());
+    let action = toml_basic(action);
+    let recovery = toml_basic(recovery);
     format!(
         "```toml\n\
          code = \"E_CALYX_FACE\"\n\
@@ -148,5 +161,22 @@ mod tests {
         );
         assert!(err.contains("E_CALYX_FACE"), "{err}");
         assert!(err.contains("open CALYX_BIN"), "{err}");
+    }
+
+    #[test]
+    fn face_missing_escapes_backslashes_and_quotes_in_toml() {
+        let text = face_missing(
+            "open CALYX_BIN",
+            r"D:\build\out\calyx.exe",
+            r#"set CALYX_BIN to "calyx""#,
+        );
+        assert!(
+            text.contains(r#"subject = "D:\\build\\out\\calyx.exe""#),
+            "{text}"
+        );
+        assert!(
+            text.contains(r#"recovery = "set CALYX_BIN to \"calyx\"""#),
+            "{text}"
+        );
     }
 }

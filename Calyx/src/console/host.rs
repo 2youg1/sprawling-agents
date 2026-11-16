@@ -14,7 +14,7 @@ use crate::scene::Scene;
 use console_ffi::{CityConfig, CityHost, run_city_ui};
 
 use super::cli::{Next, Say, Session};
-use super::lifecycle::{Asker, Event, Face};
+use super::lifecycle::{Asker, Event, Face, Surface};
 use super::local_time;
 use super::terminal::{Inside, Started, Terminal};
 use wire::CloseMode;
@@ -37,6 +37,21 @@ enum HostEventKind {
     Asking = 7,
 }
 
+impl HostEventKind {
+    const fn code(self) -> u32 {
+        match self {
+            Self::Empty => 0,
+            Self::Face => 1,
+            Self::Notice => 2,
+            Self::Pairing => 3,
+            Self::Entries => 4,
+            Self::LiveMeta => 5,
+            Self::Lost => 6,
+            Self::Asking => 7,
+        }
+    }
+}
+
 #[repr(u32)]
 enum FaceTag {
     Opening = 0,
@@ -45,6 +60,19 @@ enum FaceTag {
     Headless = 3,
     Stopping = 4,
     Gone = 5,
+}
+
+impl FaceTag {
+    const fn code(self) -> u32 {
+        match self {
+            Self::Opening => 0,
+            Self::Cli => 1,
+            Self::QuietHost => 2,
+            Self::Headless => 3,
+            Self::Stopping => 4,
+            Self::Gone => 5,
+        }
+    }
 }
 
 #[repr(C)]
@@ -81,8 +109,10 @@ pub(super) fn start(
 ) -> Started {
     let (to, from) = std::sync::mpsc::sync_channel::<String>(UI_DEPTH);
     let notice_tx = to.clone();
-    let notice: Say = Arc::new(move |line: String| {
-        let _ = to.try_send(line);
+    let notice: Say = Arc::new(move |line: String| match to.try_send(line) {
+        Ok(()) => {}
+        Err(std::sync::mpsc::TrySendError::Full(_)) => {}
+        Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {}
     });
     let pairing = inside.door.pairing_code();
     let session = match Session::begin() {
@@ -123,7 +153,7 @@ impl Bridge {
     fn push(&self, kind: HostEventKind, bytes: Vec<u8>) {
         if let Ok(mut q) = self.queue.lock() {
             if q.len() >= UI_DEPTH {
-                let _ = q.pop_front();
+                q.pop_front();
             }
             q.push_back(Queued { kind, bytes });
         }
@@ -134,8 +164,8 @@ impl Bridge {
         let city = self.terminal.city.clone();
         let token = self.terminal.token.clone().unwrap_or_default();
         let surface = match self.terminal.surface {
-            super::lifecycle::Surface::QuietHost => 1u32,
-            _ => 0u32,
+            Surface::QuietHost => 1u32,
+            Surface::Cli | Surface::Headless => 0u32,
         };
         let config = CityConfig {
             url_ptr: url.as_ptr(),
@@ -150,13 +180,19 @@ impl Bridge {
             token_len: token.len(),
             surface,
         };
-        let _ = run_city_ui(&config, self.as_ref());
+        let code: i32 = run_city_ui(&config, self.as_ref());
+        if code != 0 {
+            // Zig city UI ended with a non-zero status; the host has no further surface.
+        }
     }
 
     fn pump(&self) {
         if let Ok(mut face) = self.face.lock() {
             let now = *face.borrow_and_update();
-            let mut shown = self.shown.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut shown = self
+                .shown
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             if now != *shown {
                 *shown = now;
                 self.push(HostEventKind::Face, face_bytes(now));
@@ -245,25 +281,27 @@ impl Bridge {
 
         let mut bytes = Vec::new();
         bytes.extend_from_slice(
-            &u32::try_from(waiting_more).unwrap_or(u32::MAX).to_le_bytes(),
+            &u32::try_from(waiting_more)
+                .unwrap_or(u32::MAX)
+                .to_le_bytes(),
         );
         bytes.extend_from_slice(&working_since.to_le_bytes());
         bytes.extend_from_slice(&calling_count.to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(room.len()).unwrap_or(u32::MAX).to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(offer.len()).unwrap_or(u32::MAX).to_le_bytes());
         bytes.extend_from_slice(
-            &u32::try_from(room.len()).unwrap_or(u32::MAX).to_le_bytes(),
-        );
-        bytes.extend_from_slice(
-            &u32::try_from(offer.len()).unwrap_or(u32::MAX).to_le_bytes(),
-        );
-        bytes.extend_from_slice(
-            &u32::try_from(waiting.len()).unwrap_or(u32::MAX).to_le_bytes(),
+            &u32::try_from(waiting.len())
+                .unwrap_or(u32::MAX)
+                .to_le_bytes(),
         );
         bytes.extend_from_slice(room.as_bytes());
         bytes.extend_from_slice(offer.as_bytes());
         bytes.extend_from_slice(waiting.as_bytes());
         if calling_count > 0 {
             bytes.extend_from_slice(
-                &u32::try_from(call_name.len()).unwrap_or(u32::MAX).to_le_bytes(),
+                &u32::try_from(call_name.len())
+                    .unwrap_or(u32::MAX)
+                    .to_le_bytes(),
             );
             bytes.extend_from_slice(call_name.as_bytes());
             bytes.extend_from_slice(
@@ -282,13 +320,13 @@ impl CityHost for Bridge {
         self.pump();
         let Some(Queued { kind, bytes }) = self.queue.lock().ok().and_then(|mut q| q.pop_front())
         else {
-            return (HostEventKind::Empty as u32, 0);
+            return (HostEventKind::Empty.code(), 0);
         };
-        if bytes.len() > into.len() {
-            return (HostEventKind::Empty as u32, 0);
-        }
-        into[..bytes.len()].copy_from_slice(&bytes);
-        (kind as u32, bytes.len())
+        let Some(slot) = into.get_mut(..bytes.len()) else {
+            return (HostEventKind::Empty.code(), 0);
+        };
+        slot.copy_from_slice(&bytes);
+        (kind.code(), bytes.len())
     }
 
     fn tell(&self, event: u32, _arg: u32) {
@@ -305,8 +343,10 @@ impl CityHost for Bridge {
 
     fn carry_line(&self, line: &str) {
         let tx = self.notice_tx.clone();
-        let say: Say = Arc::new(move |text: String| {
-            let _ = tx.try_send(text);
+        let say: Say = Arc::new(move |text: String| match tx.try_send(text) {
+            Ok(()) => {}
+            Err(std::sync::mpsc::TrySendError::Full(_)) => {}
+            Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {}
         });
         let next = {
             let Ok(mut session) = self.session.lock() else {
@@ -347,10 +387,10 @@ impl CityHost for Bridge {
 
     fn carry_remote(&self, tail: &str, into: &mut [u8]) -> Result<usize, i32> {
         let text = (self.inside.carry_remote)(tail);
-        if text.len() > into.len() {
+        let Some(slot) = into.get_mut(..text.len()) else {
             return Err(2);
-        }
-        into[..text.len()].copy_from_slice(text.as_bytes());
+        };
+        slot.copy_from_slice(text.as_bytes());
         Ok(text.len())
     }
 
@@ -365,31 +405,31 @@ impl CityHost for Bridge {
 fn face_bytes(face: Face) -> Vec<u8> {
     let packed = match face {
         Face::Opening => FaceBytes {
-            tag: FaceTag::Opening as u32,
+            tag: FaceTag::Opening.code(),
             mode: 0,
             sinks: 0,
             handoff: 0,
         },
         Face::Cli => FaceBytes {
-            tag: FaceTag::Cli as u32,
+            tag: FaceTag::Cli.code(),
             mode: 0,
             sinks: 0,
             handoff: 0,
         },
         Face::QuietHost => FaceBytes {
-            tag: FaceTag::QuietHost as u32,
+            tag: FaceTag::QuietHost.code(),
             mode: 0,
             sinks: 0,
             handoff: 0,
         },
         Face::Headless => FaceBytes {
-            tag: FaceTag::Headless as u32,
+            tag: FaceTag::Headless.code(),
             mode: 0,
             sinks: 0,
             handoff: 0,
         },
         Face::Stopping { mode, sinks } => FaceBytes {
-            tag: FaceTag::Stopping as u32,
+            tag: FaceTag::Stopping.code(),
             mode: match mode {
                 CloseMode::Drain => 0,
                 CloseMode::Interrupt => 1,
@@ -401,7 +441,7 @@ fn face_bytes(face: Face) -> Vec<u8> {
             handoff: 0,
         },
         Face::Gone(handoff) => FaceBytes {
-            tag: FaceTag::Gone as u32,
+            tag: FaceTag::Gone.code(),
             mode: 0,
             sinks: 0,
             handoff: match handoff {
@@ -430,10 +470,11 @@ mod tests {
         }]);
         let bytes = scene.bytes();
         assert!(bytes.len() > 4);
-        assert_eq!(
-            u32::from_le_bytes(bytes[0..4].try_into().expect("count")),
-            1
-        );
+        let count = bytes
+            .get(..4)
+            .and_then(|prefix| <[u8; 4]>::try_from(prefix).ok())
+            .map(u32::from_le_bytes);
+        assert_eq!(count, Some(1));
     }
 
     #[test]
@@ -441,6 +482,6 @@ mod tests {
         assert_eq!(std::mem::size_of::<FaceBytes>(), 16);
         let bytes = face_bytes(Face::QuietHost);
         assert_eq!(bytes.len(), 16);
-        assert_eq!(bytes[0], FaceTag::QuietHost as u8);
+        assert_eq!(bytes.first().copied(), Some(2));
     }
 }

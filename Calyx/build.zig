@@ -43,14 +43,16 @@ pub fn build(b: *std.Build) void {
         .pic = pic,
         .imports = &shell_imports,
         .link_libc = true,
+        // Rust links this archive on Windows without Zig's compiler_rt; stack
+        // probes would pull LdrRegisterDllNotification. City UI poll buffers
+        // are heap-allocated so frames stay small.
+        .stack_check = false,
     });
     const shell = b.addLibrary(.{
         .name = "sprawling_calyx_shell",
         .linkage = .static,
         .root_module = shell_mod,
     });
-    // Rust links this archive; without compiler_rt, large Zig frames miss __zig_probe_stack.
-    shell.bundle_compiler_rt = true;
     b.getInstallStep().dependOn(&b.addInstallArtifact(shell, .{}).step);
 
     const calyx_mod = b.createModule(.{

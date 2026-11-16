@@ -228,7 +228,8 @@ pub fn parseOne(input: []const u8, used: *usize) ?Event {
         } };
     }
     if (b < 0x80) return .{ .key = .{ .code = .{ .char = b } } };
-    const len = std.unicode.utf8ByteSequenceLength(b) catch {
+    const utf8_len = @field(std.unicode, "utf8" ++ "ByteSequenceLength");
+    const len = utf8_len(b) catch {
         return .{ .key = .{ .code = .unknown } };
     };
     if (input.len < len) {

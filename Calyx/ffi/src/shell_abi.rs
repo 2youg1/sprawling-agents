@@ -5,7 +5,8 @@
 
 //! C ABI into the Zig city shell (`Calyx/shell/host.zig`). Safe Rust hosts
 //! implement [`CityHost`]; this module owns the only `unsafe` trampolines
-//! (`Calyx/Spec.lean` D7).
+//! (`Calyx/Spec.lean` D7). Production adapter: `calyx::console::host::Bridge`.
+//! Second adapter: [`ScriptedCityHost`] in this module's tests.
 
 use std::ffi::c_void;
 
@@ -109,13 +110,17 @@ pub fn run_city_ui<H: CityHost>(config: &CityConfig, host: &H) -> i32 {
     )]
     // SAFETY: config and abi are live for this call; Zig keeps none past return.
     // erased.host borrows `host` for the same duration.
-    unsafe { calyx_city_ui_run(config, &abi) }
+    unsafe {
+        calyx_city_ui_run(config, &abi)
+    }
 }
 
 fn shim_poll<H: CityHost>(host: *const c_void, into: &mut [u8]) -> (u32, usize) {
     #[expect(unsafe_code, reason = "Calyx Spec D7: recover typed host")]
     // SAFETY: host is &H from run_city_ui for the UI call.
-    unsafe { (*host.cast::<H>()).poll(into) }
+    unsafe {
+        (*host.cast::<H>()).poll(into)
+    }
 }
 
 fn shim_tell<H: CityHost>(host: *const c_void, event: u32, arg: u32) {
@@ -137,7 +142,9 @@ fn shim_carry_line<H: CityHost>(host: *const c_void, line: &str) {
 fn shim_open_paired<H: CityHost>(host: *const c_void, url: &str) -> i32 {
     #[expect(unsafe_code, reason = "Calyx Spec D7: recover typed host")]
     // SAFETY: host is &H from run_city_ui for the UI call.
-    unsafe { (*host.cast::<H>()).open_paired(url) }
+    unsafe {
+        (*host.cast::<H>()).open_paired(url)
+    }
 }
 
 fn shim_carry_remote<H: CityHost>(
@@ -147,19 +154,25 @@ fn shim_carry_remote<H: CityHost>(
 ) -> Result<usize, i32> {
     #[expect(unsafe_code, reason = "Calyx Spec D7: recover typed host")]
     // SAFETY: host is &H from run_city_ui for the UI call.
-    unsafe { (*host.cast::<H>()).carry_remote(tail, into) }
+    unsafe {
+        (*host.cast::<H>()).carry_remote(tail, into)
+    }
 }
 
 fn shim_clock_ms<H: CityHost>(host: *const c_void) -> Result<u64, i32> {
     #[expect(unsafe_code, reason = "Calyx Spec D7: recover typed host")]
     // SAFETY: host is &H from run_city_ui for the UI call.
-    unsafe { (*host.cast::<H>()).clock_ms() }
+    unsafe {
+        (*host.cast::<H>()).clock_ms()
+    }
 }
 
 fn shim_post_json<H: CityHost>(host: *const c_void, json: &str) -> i32 {
     #[expect(unsafe_code, reason = "Calyx Spec D7: recover typed host")]
     // SAFETY: host is &H from run_city_ui for the UI call.
-    unsafe { (*host.cast::<H>()).post_json(json) }
+    unsafe {
+        (*host.cast::<H>()).post_json(json)
+    }
 }
 
 fn shim_answer_json<H: CityHost>(
@@ -169,13 +182,20 @@ fn shim_answer_json<H: CityHost>(
 ) -> Result<usize, i32> {
     #[expect(unsafe_code, reason = "Calyx Spec D7: recover typed host")]
     // SAFETY: host is &H from run_city_ui for the UI call.
-    unsafe { (*host.cast::<H>()).answer_json(json, into) }
+    unsafe {
+        (*host.cast::<H>()).answer_json(json, into)
+    }
 }
 
 fn erased<'a>(ctx: *mut c_void) -> &'a Erased {
-    #[expect(unsafe_code, reason = "Calyx Spec D7: recover Erased from trampoline ctx")]
+    #[expect(
+        unsafe_code,
+        reason = "Calyx Spec D7: recover Erased from trampoline ctx"
+    )]
     // SAFETY: ctx is &Erased formed in run_city_ui for this call.
-    unsafe { &*ctx.cast::<Erased>() }
+    unsafe {
+        &*ctx.cast::<Erased>()
+    }
 }
 
 #[expect(
@@ -189,10 +209,7 @@ unsafe extern "C" fn trampoline_poll(
     written: *mut usize,
 ) -> u32 {
     let erased = erased(ctx);
-    #[expect(
-        unsafe_code,
-        reason = "Calyx Spec D7: slice from Zig-lent poll buffer"
-    )]
+    #[expect(unsafe_code, reason = "Calyx Spec D7: slice from Zig-lent poll buffer")]
     // SAFETY: Zig lends `into`/`written` for this call only.
     let (into, written) = unsafe {
         (
@@ -218,11 +235,7 @@ unsafe extern "C" fn trampoline_tell(ctx: *mut c_void, event: u32, arg: u32) {
     unsafe_code,
     reason = "Calyx Spec D7: C trampoline into CityHost::carry_line"
 )]
-unsafe extern "C" fn trampoline_carry_line(
-    ctx: *mut c_void,
-    line_ptr: *const u8,
-    line_len: usize,
-) {
+unsafe extern "C" fn trampoline_carry_line(ctx: *mut c_void, line_ptr: *const u8, line_len: usize) {
     let erased = erased(ctx);
     #[expect(unsafe_code, reason = "Calyx Spec D7: read Zig-lent line bytes")]
     // SAFETY: Zig lends the line for this call.
@@ -268,13 +281,18 @@ unsafe extern "C" fn trampoline_carry_remote(ctx: *mut c_void, io: *mut BufIo) -
 )]
 unsafe extern "C" fn trampoline_clock_ms(ctx: *mut c_void, out: *mut u64) -> i32 {
     let erased = erased(ctx);
-    #[expect(unsafe_code, reason = "Calyx Spec D7: write clock into Zig out pointer")]
-    // SAFETY: out is live for this call.
     match (erased.clock_ms)(erased.host) {
-        Ok(ms) => unsafe {
-            *out = ms;
+        Ok(ms) => {
+            #[expect(
+                unsafe_code,
+                reason = "Calyx Spec D7: write clock into Zig out pointer"
+            )]
+            // SAFETY: Zig lends `out` for this call.
+            unsafe {
+                *out = ms;
+            }
             0
-        },
+        }
         Err(code) => code,
     }
 }
@@ -290,7 +308,7 @@ unsafe extern "C" fn trampoline_post_json(
 ) -> i32 {
     let erased = erased(ctx);
     #[expect(unsafe_code, reason = "Calyx Spec D7: read Zig-lent JSON bytes")]
-    // SAFETY: Zig lends JSON for this call.
+    // SAFETY: Zig lends the JSON for this call.
     let json = unsafe { std::slice::from_raw_parts(json_ptr, json_len) };
     let Ok(text) = std::str::from_utf8(json) else {
         return 1;
@@ -336,5 +354,58 @@ fn buf_io_callback(
             *written = 0;
             code
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::cell::RefCell;
+
+    /// Offline second adapter for the city-host seam: scripted poll payloads.
+    struct ScriptedCityHost {
+        events: RefCell<Vec<(u32, Vec<u8>)>>,
+        lines: RefCell<Vec<String>>,
+    }
+
+    impl CityHost for ScriptedCityHost {
+        fn poll(&self, into: &mut [u8]) -> (u32, usize) {
+            let Some((kind, bytes)) = self.events.borrow_mut().pop() else {
+                return (0, 0);
+            };
+            let Some(slot) = into.get_mut(..bytes.len()) else {
+                return (0, 0);
+            };
+            slot.copy_from_slice(&bytes);
+            (kind, bytes.len())
+        }
+
+        fn tell(&self, _event: u32, _arg: u32) {}
+
+        fn carry_line(&self, line: &str) {
+            self.lines.borrow_mut().push(line.to_owned());
+        }
+
+        fn open_paired(&self, _url: &str) -> i32 {
+            0
+        }
+
+        fn carry_remote(&self, _tail: &str, _into: &mut [u8]) -> Result<usize, i32> {
+            Ok(0)
+        }
+
+        fn clock_ms(&self) -> Result<u64, i32> {
+            Ok(0)
+        }
+    }
+
+    #[test]
+    fn scripted_host_records_carry_line() {
+        let host = ScriptedCityHost {
+            events: RefCell::new(Vec::new()),
+            lines: RefCell::new(Vec::new()),
+        };
+        host.carry_line("/web");
+        assert_eq!(host.lines.borrow().as_slice(), &["/web".to_owned()]);
     }
 }

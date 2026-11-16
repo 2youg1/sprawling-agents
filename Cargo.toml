@@ -299,7 +299,6 @@ desktop = { package = "sprawling-desktop", path = "Sprawling/desktop", version =
 desktop_ffi = { package = "sprawling-desktop-ffi", path = "Sprawling/desktop/ffi", version = "=0.0.17" }
 console_ffi = { package = "sprawling-console-ffi", path = "Calyx/ffi", version = "=0.0.17" }
 calyx = { package = "sprawling-calyx", path = "Calyx", version = "=0.0.17" }
-mei = { package = "sprawling-mei", path = "Mei", version = "=0.0.17" }
 
 # C3 hardening: panicking constructs and silent numeric
 # corruption are compile-time errors everywhere; tests relax locally.

@@ -44,7 +44,7 @@ cargo test -p sprawling-console-ffi --lib
 cd Calyx && zig build test
 ```
 
-`just check-console` 跑 Calyx 的 Zig 测试。用 `zig fmt` 格式化 `Calyx/ffi/zig` 与 `Calyx/shell`（见根 `justfile`）。
+`just check-console` 跑帧叶 Zig 测试（`Calyx/ffi/zig/leaf.zig`）。壳覆盖是 `cd Calyx && zig build test`。用 `zig fmt` 格式化 `Calyx/ffi/zig` 与 `Calyx/shell`（见根 `justfile`）。
 
 ## 城与 Mei
 

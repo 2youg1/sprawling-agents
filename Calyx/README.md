@@ -44,7 +44,7 @@ cargo test -p sprawling-console-ffi --lib
 cd Calyx && zig build test
 ```
 
-`just check-console` runs the Calyx Zig tests. Format Zig with `zig fmt` on `Calyx/ffi/zig` and `Calyx/shell` (see the root `justfile`).
+`just check-console` runs the frame-leaf Zig tests (`Calyx/ffi/zig/leaf.zig`). Shell coverage is `cd Calyx && zig build test`. Format Zig with `zig fmt` on `Calyx/ffi/zig` and `Calyx/shell` (see the root `justfile`).
 
 ## City vs Mei
 

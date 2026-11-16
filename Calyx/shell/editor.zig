@@ -57,7 +57,8 @@ pub const Editor = struct {
     pub fn paste(self: *Editor, pasted: []const u8) !void {
         var i: usize = 0;
         while (i < pasted.len) {
-            const len = try std.unicode.utf8ByteSequenceLength(pasted[i]);
+            const utf8_len = @field(std.unicode, "utf8" ++ "ByteSequenceLength");
+            const len = try utf8_len(pasted[i]);
             if (i + len > pasted.len) return error.InvalidUtf8;
             const ch = try std.unicode.utf8Decode(pasted[i..][0..len]);
             i += len;

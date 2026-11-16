@@ -125,7 +125,11 @@ fn lines_to_stdout() -> Say {
             }
         }
     });
-    Arc::new(move |line: String| drop(to.try_send(line)))
+    Arc::new(move |line: String| {
+        if to.send(line).is_err() {
+            // Reader gone; headless surface is finished.
+        }
+    })
 }
 
 pub(super) fn drive<R: BufRead>(terminal: &Terminal, inside: &Inside, input: &mut R, say: &Say) {

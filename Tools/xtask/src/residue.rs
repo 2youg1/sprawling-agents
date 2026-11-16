@@ -35,6 +35,8 @@ const CALYX_SHELL_RESIDUE: &[&str] = &[
     "Calyx/src/console/ui.rs",
     "Calyx/src/console/editor.rs",
     "Calyx/src/console/screen.rs",
+    "Calyx/src/console/program_status",
+    "Calyx/src/console/program_status.rs",
 ];
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
@@ -50,7 +52,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 }
 
 fn calyx_shell_residue(root: &Path) -> Vec<Violation> {
-    let rule = "Calyx shell implementation stays in Zig; Rust under Calyx/src/console/{ui,editor,screen} is permanent residue (Calyx Spec D7)";
+    let rule = "Calyx shell implementation stays in Zig; Rust under Calyx/src/console/{ui,editor,screen,program_status} is permanent residue (Calyx Spec D7)";
     let mut violations = Vec::new();
     for rel in CALYX_SHELL_RESIDUE {
         let path = root.join(rel);
@@ -161,11 +163,7 @@ fn retired_residue(
     let mut violations = Vec::new();
     let path = root.join(&legacy.path);
     if path.exists() {
-        let kind = if path.is_dir() {
-            "directory"
-        } else {
-            "file"
-        };
+        let kind = if path.is_dir() { "directory" } else { "file" };
         violations.push(Violation {
             gate: GATE,
             location: legacy.path.clone(),
@@ -449,6 +447,25 @@ status = "live"
             violations
                 .iter()
                 .any(|v| v.location.contains("Calyx/src/console/ui.rs")),
+            "{violations:?}"
+        );
+    }
+
+    #[test]
+    fn calyx_shell_residue_refuses_a_restored_program_status_module() {
+        let root = scratch("calyx-shell-ps");
+        fixture::write(&root, modmap::MAP, &minimal_table(false));
+        fixture::write(
+            &root,
+            "Calyx/src/console/program_status/mod.rs",
+            "// restored\n",
+        );
+        let violations = check(&root).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(
+            violations
+                .iter()
+                .any(|v| v.location.contains("Calyx/src/console/program_status")),
             "{violations:?}"
         );
     }
