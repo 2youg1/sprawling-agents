@@ -3,6 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+#![cfg(test)]
+
 use super::super::config::EndpointConfig;
 use super::super::fakes::{config, fake_stream_provider, paced_stream_provider, request};
 use super::super::redemption::redemption;

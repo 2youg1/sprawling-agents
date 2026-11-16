@@ -23,7 +23,6 @@ export interface DevicePairing {
 export type DeviceWaiting = DevicePairing;
 
 export interface Claimed {
-
   readonly sealed: Uint8Array<ArrayBuffer>;
 
   readonly city: Uint8Array<ArrayBuffer>;

@@ -25,10 +25,25 @@ import {
 } from "./c04";
 
 import {
+  Carry,
   Origin,
   SessionRef,
-  SessionStart,
 } from "./c06";
+
+export const SessionStart = Schema.Union([
+  Schema.Struct({
+    dispatched: Schema.Struct({
+      by: Schema.optional(Schema.NullOr(Schema.String)),
+    }),
+  }),
+  Schema.Struct({
+    opened: Schema.Struct({
+      carry: Carry,
+      from: Schema.optional(Schema.NullOr(Origin)),
+    }),
+  }),
+]).annotate({ identifier: "SessionStart" });
+export type SessionStart = typeof SessionStart.Type;
 
 export const SessionLine = Schema.Struct({
   at: TimeMs,

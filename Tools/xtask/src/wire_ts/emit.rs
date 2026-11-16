@@ -39,6 +39,7 @@ impl Bundle {
 
 const REF_PREFIX: &str = "#/$defs/";
 const CHUNK_BODY_LIMIT: usize = 400;
+const FILE_BODY_CAP: usize = 460;
 const WIRE_DIR: &str = "wire";
 
 pub(super) fn emit(document: &Value, constants: &Constants) -> Result<Bundle, Refused> {
@@ -51,23 +52,48 @@ pub(super) fn emit(document: &Value, constants: &Constants) -> Result<Bundle, Re
         .collect();
     let edges = edges(&defs);
     let recursive = recursive(&edges);
+    let order = ordered(&edges)?;
+    let mut pieces: Vec<(String, String)> = Vec::with_capacity(order.len());
+    for name in &order {
+        let schema = defs
+            .get(name.as_str())
+            .ok_or_else(|| refuse(name, "named by a `$ref` and absent from `$defs`"))?;
+        let piece = definition(name, schema, &recursive)?;
+        pieces.push((name.clone(), piece));
+    }
+    let all_names: BTreeSet<String> = pieces.iter().map(|(name, _)| name.clone()).collect();
+    let by_name: BTreeMap<String, String> = pieces.iter().cloned().collect();
     let mut bodies: Vec<(BTreeSet<String>, String)> = Vec::new();
     let mut current_names: BTreeSet<String> = BTreeSet::new();
     let mut current_body = String::new();
     let mut current_lines = 0_usize;
-    for name in ordered(&edges)? {
-        let schema = defs
-            .get(name.as_str())
-            .ok_or_else(|| refuse(&name, "named by a `$ref` and absent from `$defs`"))?;
-        let piece = definition(&name, schema, &recursive)?;
+    let mut remaining: BTreeSet<String> = all_names.clone();
+    for (name, piece) in pieces {
         let piece_lines = piece.lines().count();
-        if current_lines > 0 && current_lines.saturating_add(piece_lines) > CHUNK_BODY_LIMIT {
+        let current_needs_piece = body_mentions(&current_body, &name);
+        let current_needs_later = remaining.iter().any(|later| {
+            later != &name && body_mentions(&current_body, later)
+        });
+        let cluster = forward_cluster_lines(
+            &current_body,
+            Piece { name: &name, body: &piece },
+            &remaining,
+            &by_name,
+        );
+        let exceed_soft = current_lines.saturating_add(piece_lines) > CHUNK_BODY_LIMIT;
+        let exceed_file = current_lines.saturating_add(cluster) > FILE_BODY_CAP;
+        if current_lines > 0
+            && !current_needs_piece
+            && !current_needs_later
+            && (exceed_soft || exceed_file)
+        {
             bodies.push((
                 std::mem::take(&mut current_names),
                 std::mem::take(&mut current_body),
             ));
             current_lines = 0;
         }
+        remaining.remove(&name);
         current_names.insert(name);
         current_body.push_str(&piece);
         current_lines = current_lines.saturating_add(piece_lines);
@@ -92,6 +118,10 @@ pub(super) fn emit(document: &Value, constants: &Constants) -> Result<Bundle, Re
             let _ = write!(header, "import {{\n");
             for name in &imports {
                 let _ = writeln!(header, "  {name},");
+                let encoded = format!("{name}Encoded");
+                if body_mentions(&body, &encoded) {
+                    let _ = writeln!(header, "  type {encoded},");
+                }
             }
             let _ = writeln!(header, "}} from \"./c{earlier:02}\";\n");
         }
@@ -178,6 +208,54 @@ fn body_mentions(body: &str, name: &str) -> bool {
         rest = &rest[at.saturating_add(1)..];
     }
     false
+}
+
+struct Piece<'a> {
+    name: &'a str,
+    body: &'a str,
+}
+
+fn forward_cluster_lines(
+    current_body: &str,
+    piece: Piece<'_>,
+    remaining: &BTreeSet<String>,
+    by_name: &BTreeMap<String, String>,
+) -> usize {
+    let mut want: BTreeSet<String> = BTreeSet::new();
+    want.insert(piece.name.to_owned());
+    let mut stack: Vec<String> = remaining
+        .iter()
+        .filter(|later| {
+            *later != piece.name
+                && (body_mentions(current_body, later) || body_mentions(piece.body, later))
+        })
+        .cloned()
+        .collect();
+    while let Some(at) = stack.pop() {
+        if !want.insert(at.clone()) {
+            continue;
+        }
+        let Some(body) = by_name.get(&at) else {
+            continue;
+        };
+        for later in remaining {
+            if !want.contains(later) && body_mentions(body, later) {
+                stack.push(later.clone());
+            }
+        }
+    }
+    want.iter()
+        .map(|at| {
+            if at == piece.name {
+                piece.body.lines().count()
+            } else {
+                by_name
+                    .get(at)
+                    .map(|body| body.lines().count())
+                    .unwrap_or(0)
+            }
+        })
+        .fold(0_usize, usize::saturating_add)
 }
 
 fn ordered(edges: &BTreeMap<String, BTreeSet<String>>) -> Result<Vec<String>, Refused> {

@@ -49,6 +49,15 @@ fn is_pascal_case_identifier(found: &[u8]) -> bool {
         })
 }
 
+const TREE_ROOTS: [&str; 5] = ["Sprawling/", "Tools/", "Calyx/", "client/", "docs/"];
+
+fn is_tree_path(found: &[u8]) -> bool {
+    let Ok(text) = std::str::from_utf8(found) else {
+        return false;
+    };
+    TREE_ROOTS.iter().any(|root| text.starts_with(root))
+}
+
 const LOCKFILES: [&str; 2] = ["Cargo.lock", "bun.lock"];
 
 fn is_derived(rel: &str) -> bool {
@@ -98,7 +107,9 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             let end = span.start.saturating_add(span.len);
             if bytes
                 .get(span.start..end)
-                .is_some_and(|t| is_reviewed_identifier(t) || is_pascal_case_identifier(t))
+                .is_some_and(|t| {
+                    is_reviewed_identifier(t) || is_pascal_case_identifier(t) || is_tree_path(t)
+                })
             {
                 continue;
             }

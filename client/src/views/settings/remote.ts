@@ -12,9 +12,7 @@ import type { DoctorCustodyLifetime } from "../../wire";
 export type Lack = "insecure" | "crypto" | "storage";
 
 export type Standing =
-
   | { readonly kind: "reading" }
-
   | { readonly kind: "unpaired" }
   | { readonly kind: "unreadable" }
   | { readonly kind: "lacking"; readonly lack: Lack }
@@ -24,7 +22,6 @@ export type Standing =
       readonly told: Told | null;
       readonly busy: boolean;
     }
-
   | {
       readonly kind: "seed";
       readonly seed: string;

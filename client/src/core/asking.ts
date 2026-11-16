@@ -108,7 +108,6 @@ function nameOf(query: Query): string {
 }
 
 export interface Asking {
-
   readonly ask: (query: Query) => Readable<Answer | undefined>;
   readonly refresh: (query: Query) => void;
   readonly answered: (askId: AskId, asOf: Seq, outcome: AskOutcome) => void;
@@ -171,7 +170,6 @@ export function createAsking(
     if (slot.inflight) return;
     const askId = send(query);
     if (askId === null) {
-
       slot.stale = true;
       return;
     }
@@ -194,7 +192,6 @@ export function createAsking(
     const key = keyOf(query);
     const found = held.get(key);
     if (found !== undefined) {
-
       held.delete(key);
       held.set(key, found);
       return [key, found];
@@ -263,7 +260,6 @@ export function createAsking(
     late.delete(askId);
     const slot = key === undefined ? undefined : held.get(key);
     if (key === undefined || slot === undefined) {
-
       return;
     }
     if (done !== undefined) slot.inflight = false;

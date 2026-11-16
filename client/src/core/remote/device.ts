@@ -6,7 +6,6 @@
 import type { DeviceKey } from "./keys";
 
 export interface Device {
-
   readonly city: Uint8Array<ArrayBuffer>;
 
   readonly fingerprint: Uint8Array<ArrayBuffer>;

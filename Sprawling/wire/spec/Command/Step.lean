@@ -54,7 +54,7 @@ Command::OpenSession { addr: Address, carry: Carry, from: Option<Origin>, idem: 
 
 **`Carry` 是枚举而不是 `bool`。** 两个状态都是有名字的行为，而且落到磁盘上的结果不同：`Nothing` 连 `Handoff.md` 的槽位一起清空，`Handoff` 留着它。`carry: true` 在调用点读不出是哪一个，`Nothing` 也不是「没有值」而是一个答案——它是第一个变体，`Default` 因此不需要人再写一遍。
 
-**本章测试**：`Sprawling/wire/tests/wire_contract.rs` 的命令样本（表长、名表去重、golden 哈希）；`Carry` 的默认值在 `wire` 侧有一条断言，因为它是这份规格里唯一被写成「第一个变体」的默认。
+**本章测试**：`Sprawling/wire/tests/wire_contract/main.rs` 的命令样本（表长、名表去重、golden 哈希）；`Carry` 的默认值在 `wire` 侧有一条断言，因为它是这份规格里唯一被写成「第一个变体」的默认。
 -/
 
 /-!

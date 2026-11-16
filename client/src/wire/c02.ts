@@ -313,11 +313,11 @@ export type Coverage = typeof Coverage.Type;
 export const Encoding = Schema.Literals(["utf8", "utf8_bom", "utf16_le", "utf16_be"]).annotate({ identifier: "Encoding" });
 export type Encoding = typeof Encoding.Type;
 
-export const Window = Schema.Struct({
+export const Window2 = Schema.Struct({
   span: Span,
   text: Schema.String,
-}).annotate({ identifier: "Window" });
-export type Window = typeof Window.Type;
+}).annotate({ identifier: "Window2" });
+export type Window2 = typeof Window2.Type;
 
 export const DocumentBody = Schema.Union([
   Schema.Literal("opaque"),
@@ -325,7 +325,7 @@ export const DocumentBody = Schema.Union([
     text: Schema.Struct({
       coverage: Coverage,
       encoding: Encoding,
-      head: Window,
+      head: Window2,
     }),
   }),
 ]).annotate({ identifier: "DocumentBody" });

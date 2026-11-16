@@ -5,9 +5,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-
   export interface ProviderDoorProps {
-
     readonly onAttached?: () => void;
 
     readonly openModels?: boolean;
@@ -50,6 +48,7 @@
         <p class="text-note text-text-faint">{say($lang, "setup_step_connected_hint")}</p>
       </header>
 
+      <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
       {@render listed()}
     </section>
     <section class="flex min-w-0 max-w-talk flex-col gap-snug border-t border-edge pt-wide">
@@ -62,7 +61,7 @@
   </div>
 {:else}
   <div class="flex flex-col gap-base">
-
+    <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
     {@render listed()}
     <AttachForm {...onAttached === undefined ? {} : { onAttached }} />
   </div>

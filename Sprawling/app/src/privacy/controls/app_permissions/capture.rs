@@ -8,7 +8,7 @@ use wire::{PrivacyBuildEffect as Effect, PrivacyCategory, PrivacyEdition as Edit
 use super::super::{Control, Editions, Written};
 use crate::privacy::target::{Hive, Target};
 
-pub(super) const APP_CAMERA: Control = Control {
+pub(crate) const APP_CAMERA: Control = Control {
     target: Target::Registry {
         hive: Hive::LocalMachine,
         path: r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
@@ -29,7 +29,7 @@ pub(super) const APP_CAMERA: Control = Control {
     build_effect: Effect::Documented,
 };
 
-pub(super) const APP_MICROPHONE: Control = Control {
+pub(crate) const APP_MICROPHONE: Control = Control {
     target: Target::Registry {
         hive: Hive::LocalMachine,
         path: r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
@@ -50,7 +50,7 @@ pub(super) const APP_MICROPHONE: Control = Control {
     build_effect: Effect::Documented,
 };
 
-pub(super) const APP_NOTIFICATIONS: Control = Control {
+pub(crate) const APP_NOTIFICATIONS: Control = Control {
     target: Target::Registry {
         hive: Hive::LocalMachine,
         path: r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
@@ -71,7 +71,7 @@ pub(super) const APP_NOTIFICATIONS: Control = Control {
     build_effect: Effect::Documented,
 };
 
-pub(super) const APP_BACKGROUND: Control = Control {
+pub(crate) const APP_BACKGROUND: Control = Control {
     target: Target::Registry {
         hive: Hive::LocalMachine,
         path: r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
@@ -92,7 +92,7 @@ pub(super) const APP_BACKGROUND: Control = Control {
     build_effect: Effect::Documented,
 };
 
-pub(super) const APP_SCREEN_CAPTURE_PROGRAMMATIC: Control = Control {
+pub(crate) const APP_SCREEN_CAPTURE_PROGRAMMATIC: Control = Control {
     target: Target::Registry {
         hive: Hive::LocalMachine,
         path: r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
@@ -113,7 +113,7 @@ pub(super) const APP_SCREEN_CAPTURE_PROGRAMMATIC: Control = Control {
     build_effect: Effect::Documented,
 };
 
-pub(super) const APP_SCREEN_CAPTURE_BORDERLESS: Control = Control {
+pub(crate) const APP_SCREEN_CAPTURE_BORDERLESS: Control = Control {
     target: Target::Registry {
         hive: Hive::LocalMachine,
         path: r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
@@ -134,7 +134,7 @@ pub(super) const APP_SCREEN_CAPTURE_BORDERLESS: Control = Control {
     build_effect: Effect::Documented,
 };
 
-pub(super) const APP_GAZE_INPUT: Control = Control {
+pub(crate) const APP_GAZE_INPUT: Control = Control {
     target: Target::Registry {
         hive: Hive::LocalMachine,
         path: r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
@@ -155,7 +155,7 @@ pub(super) const APP_GAZE_INPUT: Control = Control {
     build_effect: Effect::Documented,
 };
 
-pub(super) const APP_HUMAN_PRESENCE: Control = Control {
+pub(crate) const APP_HUMAN_PRESENCE: Control = Control {
     target: Target::Registry {
         hive: Hive::LocalMachine,
         path: r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
@@ -176,7 +176,7 @@ pub(super) const APP_HUMAN_PRESENCE: Control = Control {
     build_effect: Effect::Documented,
 };
 
-pub(super) const APP_FOREGROUND_TEXT: Control = Control {
+pub(crate) const APP_FOREGROUND_TEXT: Control = Control {
     target: Target::Registry {
         hive: Hive::LocalMachine,
         path: r"SOFTWARE\Policies\Microsoft\Windows\AppPrivacy",
@@ -196,7 +196,7 @@ pub(super) const APP_FOREGROUND_TEXT: Control = Control {
     build_effect: Effect::Documented,
 };
 
-pub(super) const CAMERA_DEVICE: Control = Control {
+pub(crate) const CAMERA_DEVICE: Control = Control {
     target: Target::Registry {
         hive: Hive::LocalMachine,
         path: r"SOFTWARE\Policies\Microsoft\Camera",

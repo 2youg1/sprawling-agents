@@ -402,7 +402,7 @@ A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）�
 形式化的义务由证明清偿：`lake build Sprawling.runtime.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
 
 - 回合的边界：`turn::tests::phases`（`cancel_at_the_call_boundary_stops_before_any_model_bytes`、`steer_at_a_boundary_records_and_advances`、`a_wave_halted_between_two_calls_does_not_make_the_second`）。
-- run 的出口与 checkpoint：`Sprawling/runtime/tests/run_driver.rs`（`a_checkpoint_runs_before_the_wave_and_carries_the_turns_stamp`、`a_run_that_calls_nothing_puts_up_no_checkpoint`、`a_read_only_wave_puts_up_no_checkpoint`）与 `run::lifecycle::tests`。
+- run 的出口与 checkpoint：`Sprawling/runtime/tests/run_driver/lifecycle.rs`（`a_checkpoint_runs_before_the_wave_and_carries_the_turns_stamp`、`a_run_that_calls_nothing_puts_up_no_checkpoint`、`a_read_only_wave_puts_up_no_checkpoint`）与 `run::lifecycle::tests`。
 - 分叉：`fork::tests`（`a_cut_inside_a_wave_moves_back_to_the_safe_point`、`a_cut_the_history_does_not_hold_is_refused`）、`fork::request_tests` 与 `Sprawling/runtime/tests/replay_fork.rs`。
 - 打戳与时间段：`clock` 的测试（`off_emits_never_even_for_timestamped_tools`、`first_result_emits_once_then_timeless_deduplicates_within_a_bucket`、`timestamped_emits_every_result_with_its_own_reading`、`a_span_keeps_its_start_and_leaves_out_its_end`、`a_span_with_no_moment_in_it_is_refused`）。
 - 准入：`mode` 的测试，每种要求、每种落地各自的拒与放。

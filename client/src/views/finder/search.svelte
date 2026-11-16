@@ -3,7 +3,6 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 <script lang="ts">
-
   import { ui } from "../../ui";
   import type { Address, FindAnswer } from "../../wire";
   import { openDocument } from "../inspect/open.svelte";
@@ -11,7 +10,6 @@
   import Look from "./search.look.svelte";
 
   interface Props {
-
     readonly under: Address;
 
     readonly titleId: string;

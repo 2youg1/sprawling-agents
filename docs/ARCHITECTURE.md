@@ -305,7 +305,7 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `agent_protocols::mcp` | Sprawling/agent_protocols/src/mcp/outbound.rs | stdio child process, HTTP, or SSE | `ScriptedOutbound` for offline replay |
 | `accounting::models` | Sprawling/accounting/src/models.rs | `accounting::worker::models`: the endpoint book's adapters | the scripted factory in `Sprawling/app/tests/model_factory.rs` |
 | `accounting::clock` | Sprawling/accounting/src/clock.rs | `bin::assembly::production::SystemClock`: the wall clock, the one sampling point, handed in through `Hands.clock` | the stopped clock in `Sprawling/app/tests/clock.rs` |
-| `accounting::connectors` | Sprawling/accounting/src/connectors.rs | `accounting::worker::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `Sprawling/app/tests/connectors.rs` |
+| `accounting::connectors` | Sprawling/accounting/src/connectors.rs | `accounting::worker::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `Sprawling/app/tests/connectors/offering.rs` |
 | `accounting::machine` | Sprawling/accounting/src/machine.rs | `bin::doctor::ThisMachine`: the doctor's report and its one install runner, handed in through `Hands.machine` | the scripted machine in `Sprawling/app/tests/machine.rs` |
 | `accounting::views::snapshot::start` | Sprawling/accounting/src/views/snapshot/start.rs | `accounting::views::Views`: the fold every page is answered from | `accounting::worker::folds::standing_start`: the standing a worker judges from |
 

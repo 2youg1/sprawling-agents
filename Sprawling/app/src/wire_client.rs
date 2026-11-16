@@ -284,7 +284,7 @@ mod tests {
                 let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
                 ready.send(listener.local_addr().unwrap().port()).unwrap();
                 let (stream, _from) = listener.accept().await.unwrap();
-
+                // boundary-ok: accept_async makes this a city double, not a client of one
                 let mut socket = tokio_tungstenite::accept_async(stream).await.unwrap();
 
                 let _greeting = socket.next().await;

@@ -104,7 +104,7 @@ export function privacyPage(source: Source): PrivacyPage {
     confirm,
     restoreAll: (models) => {
       for (const model of models) {
-
+        // wording-ok: the wire name of a privacy action, not a word for a reader
         feed(model, { kind: "press", action: "restore" });
         confirm(model);
       }

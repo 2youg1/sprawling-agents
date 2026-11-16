@@ -59,7 +59,6 @@ export function ttftTookOf(turn: Turn): Took | null {
 export type CallTime =
   | { readonly kind: "landed"; readonly took: Took }
   | { readonly kind: "running"; readonly ms: number }
-
   | { readonly kind: "starting" }
   | { readonly kind: "unmeasured" };
 

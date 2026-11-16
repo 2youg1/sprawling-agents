@@ -113,7 +113,10 @@ fn files_of(root: &Path, module: &str) -> Result<Vec<std::path::PathBuf>, XtaskE
 
 fn is_test_file(rel: &str) -> bool {
     rel.split('/').any(|segment| {
-        segment == "tests" || segment == "tests.rs" || segment.ends_with("_tests.rs")
+        segment == "tests"
+            || segment == "tests.rs"
+            || segment.ends_with("_tests.rs")
+            || (segment.ends_with("_tests") && !segment.contains('.'))
     })
 }
 

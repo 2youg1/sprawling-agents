@@ -226,6 +226,7 @@ fn admits(cap: Retries, sent: u32) -> bool {
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
     reason = "test code"
 )]
 mod tests;

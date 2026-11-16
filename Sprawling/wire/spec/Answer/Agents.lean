@@ -8,7 +8,7 @@
 
 规定 `answer::agents`（`Sprawling/wire/src/` 下同名的文件）：ACP 页读的 agent 目录、一段粘贴读成的一个 agent 条目，以及已添加的 agent。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract.rs` 钉住的 wire schema 守住。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract/main.rs` 钉住的 wire schema 守住。
 -/
 
 /-!

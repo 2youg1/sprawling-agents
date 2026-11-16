@@ -16,9 +16,7 @@ import type {
 } from "../../wire";
 
 export type Standing =
-  | { readonly kind: "current" }
-
-  | { readonly kind: "stale"; readonly now: B3Hash | null };
+  { readonly kind: "current" } | { readonly kind: "stale"; readonly now: B3Hash | null };
 
 export function standingOf(card: ProposalCard, version: B3Hash | null): Standing {
   return card.baseline === version ? { kind: "current" } : { kind: "stale", now: version };
@@ -66,7 +64,6 @@ export function rejectionOf(card: ProposalCard): ProposalDecision {
 export type Deciding =
   | { readonly kind: "idle" }
   | { readonly kind: "sent"; readonly command: Command }
-
   | { readonly kind: "pending"; readonly command: Command }
   | { readonly kind: "refused"; readonly error: AxError };
 

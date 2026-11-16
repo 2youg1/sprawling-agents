@@ -17,6 +17,7 @@ const REACH: u64 = 3;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(title = "Window2"))]
 pub struct Window {
     pub span: Span,
     pub text: String,

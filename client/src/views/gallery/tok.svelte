@@ -5,7 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-
   import type { Key } from "../../core/lang";
   import type { GlyphName } from "../parts/glyph";
 
@@ -17,7 +16,8 @@
 
   const BEHIND = Array.from(
     { length: 9 },
-    (_, n) => `Sprawling/city/src/document.rs:${String(40 + n * 7)} reads the version the person saw`,
+    (_, n) =>
+      `Sprawling/city/src/document.rs:${String(40 + n * 7)} reads the version the person saw`,
   );
 
   const CORNERS: readonly { readonly box: string; readonly size: string }[] = [
@@ -67,12 +67,12 @@
 {/snippet}
 
 <Case label="surfaces · the edge keys as glass over a page of words" width={360}>
-
+  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
   {@render keysOver("on")}
 </Case>
 
 <Case label="surfaces · the edge keys with glass turned solid" width={360}>
-
+  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression -->
   {@render keysOver("off")}
 </Case>
 

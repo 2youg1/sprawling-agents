@@ -12,7 +12,6 @@ export interface Sealer {
 }
 
 export interface Opener {
-
   readonly open: (sealed: Uint8Array<ArrayBuffer>) => Promise<Uint8Array<ArrayBuffer> | null>;
 }
 

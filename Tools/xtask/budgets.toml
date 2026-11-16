@@ -786,7 +786,7 @@ status = "measured, not gated: summary floor 2 us, p50 2 us, p99 3 us; page floo
 # takes is the machine's, so it is recorded here and never asserted.
 [tool_wave_reads]
 what = "one wave of three read calls of 50 ms each, from the first call started to the last result accounted"
-measured_by = "not instrumented: taken with a wall-clock bound before that bound became the rendezvous check, which now lives in Sprawling/runtime/tests/run_driver.rs"
+measured_by = "not instrumented: taken with a wall-clock bound before that bound became the rendezvous check, which now lives in Sprawling/runtime/tests/run_driver/main.rs"
 status = "measured, not gated: serial 153.0 ms; concurrent 51-60 ms on an idle machine and 82.8 ms under a merge-train build (debug build, windows-x86_64, 16 cores). A wall-clock figure is the machine's, so it is recorded, never gated. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and no recipe retakes it yet (measured_by names what is missing)"
 
 # What the client pays to fold one animation frame of stream into the

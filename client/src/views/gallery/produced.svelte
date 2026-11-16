@@ -5,7 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-
   import type { Call, Output, Turn } from "../../wire";
   import { Address, RunId, Seq, TimeMs } from "../../wire";
 
@@ -124,7 +123,6 @@ const HIDDEN: usize = 0;
 </script>
 
 {#snippet framed(path: string, text: string)}
-
   <div class="flex h-output flex-col rounded-card border border-edge-panel">
     <Code {path} {text} />
   </div>
@@ -171,16 +169,16 @@ const HIDDEN: usize = 0;
 </Case>
 
 <Case label="code · line numbers and a trail that wraps">
-
+  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
   {@render framed(TRAILED, A_FILE.output?.head ?? "")}
 </Case>
 
 <Case label="code · a comment crossing lines, and one that never closes">
-
+  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
   {@render framed("Sprawling/kernel/src/limit.rs", BLOCK_COMMENT)}
 </Case>
 
 <Case label="code · no file was named, so no trail and no colour">
-
+  <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
   {@render framed("", UNNAMED)}
 </Case>

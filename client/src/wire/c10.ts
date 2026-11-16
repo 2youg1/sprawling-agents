@@ -38,6 +38,7 @@ import {
   GuideProgress,
   ResidentId,
   Ruling,
+  Window,
 } from "./c03";
 
 import {
@@ -205,7 +206,7 @@ export const Command = Schema.Union([
   }),
   Schema.Struct({
     select_model: Schema.Struct({
-      context_tokens: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)))),
+      context_tokens: Schema.optional(Schema.NullOr(Window)),
       endpoint: ProviderName,
       idem: IdemKey,
       input: Schema.optional(Schema.NullOr(InputKinds)),

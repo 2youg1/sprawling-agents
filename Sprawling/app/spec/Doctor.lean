@@ -658,7 +658,7 @@ impl RunWorker {
 - **模型比的是登记面现在的答案**：`SelectModel` 改的是城级 tag→model 登记，在那里拦会把正常配置一起禁掉；被挡的是它落到一个已开会话上的那一步。会话记下的模型仍在 endpoint book 里时，上限与窗口从那一行读（它们是模型的属性，抄一份进房间的配置就是同一个事实的第二个家）；模型已不在登记面时，模型那一臂先拒。
 - **`[model] name` 不是「这个 Run 用哪个模型」的权威**：Run 的模型仍由 `EndpointBook::select` 选，会话记录只说它当初从哪个模型开始。两者不一致时这次派活被拒，而不是两个家各说各话（`Sprawling/city/Spec.lean` §8-14、§8-4 的 `own_layer`）。
 - **地址就是楼时，地址自己就是会话**：那种地址的「自己那份 `CONFIG.toml`」就是楼的 `CONFIG.toml`（`Layer::Resident` 与 `Layer::Building` 同一文件，`Sprawling/city/Spec.lean` §8-4）。
-- **本章测试**：`accounting::worker::dispatching::session_shape::tests::a_session_keeps_the_shape_it_froze_and_refuses_a_different_effort`——同一房间连续两次派活，四条前缀逐槽位哈希相同且 CAS 里的字节相等；第三次改 effort 被拒（`E_CONFIG_INVALID`，恢复语给出两条出路），会话的 effort 一行未动、没有多出一条 `prompt_assembled`；第四次相同请求照跑并再次冻下同一批字节。`a_model_chosen_after_a_session_opened_does_not_reach_it`——已开会话之后改城级登记，往该会话的派活被拒，房间记录仍是原来的模型，而新会话拿到新模型。
+- **本章测试**：`accounting::worker::dispatching::session_shape::tests::shape::a_session_keeps_the_shape_it_froze_and_refuses_a_different_effort`——同一房间连续两次派活，四条前缀逐槽位哈希相同且 CAS 里的字节相等；第三次改 effort 被拒（`E_CONFIG_INVALID`，恢复语给出两条出路），会话的 effort 一行未动、没有多出一条 `prompt_assembled`；第四次相同请求照跑并再次冻下同一批字节。`a_model_chosen_after_a_session_opened_does_not_reach_it`——已开会话之后改城级登记，往该会话的派活被拒，房间记录仍是原来的模型，而新会话拿到新模型。
 
 ### 8-80 浏览器的版本读自它旁边的文件，而不是跑它一次（`bin::doctor::version_file`）
 
@@ -740,7 +740,7 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 - **客户端走同一条路**：`core/commands.ts` 的 `openSession(addr, carry)`；`core/slash.ts` 的 `/new [--carry]`；composer 上方那行的「新对话」按钮；以及拒绝通知上的动作（§8-4-1 的那句话从此指向一个真存在的动词）。
 
 **本章测试**（路线图原先写的 citysim `session_rotates.toml` 没有落点：citysim 的场景是 Rust 结构体，不是 toml，而且这条链路——派活被拒、`/new`、再派活——属于动词所在的 `sprawling`，不属于 runtime 的回合循环；改记在这里）：
-- `accounting::worker::dispatching::session_shape::tests::a_new_session_lets_the_room_use_the_model_chosen_since`：dispatch（模型 A）→ `select_model`（B）→ dispatch 被 `E_CONFIG_INVALID` 拒 → `open_session` → dispatch 成功，且房间这次冻的是 B。
+- `accounting::worker::dispatching::session_shape::tests::model::a_new_session_lets_the_room_use_the_model_chosen_since`：dispatch（模型 A）→ `select_model`（B）→ dispatch 被 `E_CONFIG_INVALID` 拒 → `open_session` → dispatch 成功，且房间这次冻的是 B。
 - `accounting::worker::commanding::sessions::tests` 的五条：房间里有 run 工作时 `E_BUSY` 且房间一字未动；`Nothing` 清形状也清槽位、事件写 `carried: false`；`Handoff` 留摘要、照样清形状、事件写 `carried: true`；没有摘要时 `--carry` 不拒也不撒谎；带过来的一段的第一跑读到上一跑 transcript 的地址（`a_carried_session_names_the_previous_runs_transcript`）。
 
 **本章验收**：`cargo nextest run -p sprawling -p sprawling-city -p sprawling-wire -p sprawling-kernel` 绿；`cargo xtask wire-ts`、`wiring`、`specalign` 绿。

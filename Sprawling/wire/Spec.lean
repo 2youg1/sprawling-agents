@@ -64,7 +64,7 @@ import Sprawling.wire.spec.Slash
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被模块图的旧锚点与别的规格里的引用锚住，所以不重排，也不补空号。「每个动词从哪里够得到」那一节保留它的标签 §19 与 §19-1 到 §19-3，住在 `spec/Command/Kind.lean`，`xtask wiring` 读它。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `wire D<n>`；D1 到 D12 沿用这份规格在 Markdown 时 §12 的条目号，§12 末尾列出每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：握手与 `WIRE_V` 的进位（`spec/Frames.lean`）、绑定面与丢帧之后的区间（`spec/Reception.lean`）、HTTP 门的配对判定（`spec/Reception/Admission.lean`）、套接字拼不出 `PutSecret`（`spec/Command.lean`）、reach 与 class 两张表的性质（`spec/Command/Kind.lean`）、带基线的保存（`spec/Command/Step.lean`）、干预欠不欠 Handoff（`spec/Control.lean`）、携带的名字只拒空与控制字符（`spec/CarriedName.lean`）、答复反映到哪一条（`spec/Frames/Ask.lean`）、事件按帧写出时每条记录按 seq 次序到达且不重复、没说到的都被 `Lagged` 点名（`spec/Server/Socket.lean`）、撤销设备与会话令牌的寿命（`spec/Server/Sessions.lean`）。其余分部只有节注释：它们写的是线上的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例、`tests/wire_contract.rs` 的 golden 与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：握手与 `WIRE_V` 的进位（`spec/Frames.lean`）、绑定面与丢帧之后的区间（`spec/Reception.lean`）、HTTP 门的配对判定（`spec/Reception/Admission.lean`）、套接字拼不出 `PutSecret`（`spec/Command.lean`）、reach 与 class 两张表的性质（`spec/Command/Kind.lean`）、带基线的保存（`spec/Command/Step.lean`）、干预欠不欠 Handoff（`spec/Control.lean`）、携带的名字只拒空与控制字符（`spec/CarriedName.lean`）、答复反映到哪一条（`spec/Frames/Ask.lean`）、事件按帧写出时每条记录按 seq 次序到达且不重复、没说到的都被 `Lagged` 点名（`spec/Server/Socket.lean`）、撤销设备与会话令牌的寿命（`spec/Server/Sessions.lean`）。其余分部只有节注释：它们写的是线上的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例、`tests/wire_contract/main.rs` 的 golden 与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -86,9 +86,9 @@ import Sprawling.wire.spec.Slash
 
 /-! ## 2 验收标准
 
-- **wire**：Command 与 Query 的变体数由计数断言钉住，数字只写在 `tests/wire_contract.rs` 里（§16；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
+- **wire**：Command 与 Query 的变体数由计数断言钉住，数字只写在 `tests/wire_contract/main.rs` 里（§16；两张名表由 `named_frames!` 从变体表生成，故计数断言核的是「变体数没被无声改动」，不再是「两张手写表与枚举是否一致」——见 §8-38）；每个改状态 Command 携 `IdemKey`（类型强制，无可省字段）；`PutSecret` 的 `value: Sealed<String>` 不实现 `Serialize`——**「远程录凭证」这条帧编译不出来**，以 trybuild 反例钉死。
 - **握手**：版本＋schema 哈希不配即断连并回 `E_WIRE_MISMATCH`（装载期码，无 carrier）；schema 哈希由 wire 类型集派生，改一个 variant 即变。golden 钉住当前哈希，改哈希必须与本规格 同集变更。
-  当前 schema 与 shape 的 golden 由 `tests/wire_contract.rs` 定义，版本由 `frames::WIRE_V` 定义；帧表与查询表的当前内容见 §8 各章。
+  当前 schema 与 shape 的 golden 由 `tests/wire_contract/main.rs` 定义，版本由 `frames::WIRE_V` 定义；帧表与查询表的当前内容见 §8 各章。
   `PutSecret` 无线格式——它经 `/enroll` 路由在进程内成形，见 §8-2 录入口。
 
 **`Query::RunHistory { run, before, limit }` → `Answer::History`**：一个会话的历史按 run 取。`Query::History` 是城全局的最后一页，按它在客户端过滤，一个较早的会话就不在那一页里；`Query::RunView` 回答「这个 run 在不在、走到哪」，不回答「这个会话是什么」。
@@ -134,7 +134,7 @@ import Sprawling.wire.spec.Slash
 
 - **V0.0.9 的线上改形已定形、尚未落进类型**：D22 到 D34 写下了形状；`Command` 与 `Query` 的帧名表由 `specalign` 与 schema golden 逐项对账，所以新帧与新字段由实现它们的那一个变更集同时加进 Rust、`spec/Command/Kind.lean`、golden 与 `client/src/wire.ts`，届时删去本条。信号与派活发出即生效若要新帧，形状由它的设计写成本规格的下一条决定。
 
-模型自己的假设写在定理的假设里，不写成公理：哈希对名字表单射是 `distinct_grammars_never_handshake` 的前提（blake3 的抗碰撞给出它）；名字不变而改形必进位是同一条定理的前提（D1 给出它，`tests/wire_contract.rs` 的形状摘要提醒改的人）；`decide_lag` 的 `checked_add` 溢出一支在模型里不写，因为产出 `next` 的账本到不了那一步。
+模型自己的假设写在定理的假设里，不写成公理：哈希对名字表单射是 `distinct_grammars_never_handshake` 的前提（blake3 的抗碰撞给出它）；名字不变而改形必进位是同一条定理的前提（D1 给出它，`tests/wire_contract/main.rs` 的形状摘要提醒改的人）；`decide_lag` 的 `checked_add` 溢出一支在模型里不写，因为产出 `next` 的账本到不了那一步。
 -/
 
 /-! ## 4 现状分析
@@ -438,7 +438,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 /-! ## 16 测试与约束
 
-- 计数断言：`tests/wire_contract.rs` 逐名核两张名表与枚举变体数是否同步；**数字不写在这里**——一个被抄进本文的计数就是同一条规则的第二个家（同 §8-1 对 golden 的处置：本文只记哈希值本身，因为那是一个不可推导的输出而不是一条可重算的规则）。
+- 计数断言：`tests/wire_contract/main.rs` 逐名核两张名表与枚举变体数是否同步；**数字不写在这里**——一个被抄进本文的计数就是同一条规则的第二个家（同 §8-1 对 golden 的处置：本文只记哈希值本身，因为那是一个不可推导的输出而不是一条可重算的规则）。
 - trybuild 两反例：远程 `PutSecret`（含 `Sealed` 的帧不可序列化）；`aggregate` 发 Command（发送面无该入口）。
 - 常数时间比较的性质测试：差异位置不影响比较耗时。
 - 握手 golden：schema 哈希入快照；改 wire 类型必须同时改快照与本规格。
@@ -448,8 +448,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 形式化的义务由证明清偿：`lake build Sprawling.wire.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些检查守住，它们是行为比对，不是精化证明：
 
-- 握手与 `WIRE_V`：`tests/wire_contract.rs` 的 schema 哈希 golden 与 `the_wire_shape_is_pinned_so_a_change_meets_the_version_rule`。
-- 绑定面与丢帧区间：`tests/wire_contract.rs` 的 `the_binding_face_has_exactly_one_refusing_cell`；`reception::tests` 里 `decide_lag` 与 `Stream` 的测试。
+- 握手与 `WIRE_V`：`tests/wire_contract/main.rs` 的 schema 哈希 golden 与 `the_wire_shape_is_pinned_so_a_change_meets_the_version_rule`。
+- 绑定面与丢帧区间：`tests/wire_contract/main.rs` 的 `the_binding_face_has_exactly_one_refusing_cell`；`reception::tests` 里 `decide_lag` 与 `Stream` 的测试。
 - HTTP 门：`reception::admission` 旁的测试与 `tests/enrolment.rs`。
 - 入口判定：`reception::entry` 旁的穷尽表测试 `every_entry_property_holds_over_every_input`，逐格对照 `spec/Reception/Entry.lean` 的五条性质；`tests/entry.rs` 的回归。
 - 配对：`reception::pairing` 旁的 proptest `every_trace_judges_each_code_once_and_a_second_apart`，生成器覆盖 `spec/Reception/Pairing.lean` 的猜测序列（到达时刻、猜对或猜错、每步的熵）。
@@ -461,7 +461,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 - 干预：`control` 旁的测试。
 - 携带的名字：`carried_name` 的 `a_carried_name_rejects_empty_and_control_characters`。
 
-没有 Lean 模型的分部，其要求由类型与 `cargo nextest run -p sprawling-wire --all-features` 的测试守住：信封与名表（`named_frames!` 与 `tests/wire_contract.rs` 的计数）、`wire_schema` 与 `client/src/wire.ts` 的生成（`cargo xtask wire-ts`）、各答面的形状、`aggregate` 只转发 Query（trybuild 反例）、常数时间比较、`Committed` 拼出的帧与 `ServerFrame::Event` 逐字节相等、读不出的帧不关连接。
+没有 Lean 模型的分部，其要求由类型与 `cargo nextest run -p sprawling-wire --all-features` 的测试守住：信封与名表（`named_frames!` 与 `tests/wire_contract/main.rs` 的计数）、`wire_schema` 与 `client/src/wire.ts` 的生成（`cargo xtask wire-ts`）、各答面的形状、`aggregate` 只转发 Query（trybuild 反例）、常数时间比较、`Committed` 拼出的帧与 `ServerFrame::Event` 逐字节相等、读不出的帧不关连接。
 -/
 
 /-! ## 17 文档关系

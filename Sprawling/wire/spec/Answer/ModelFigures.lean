@@ -8,7 +8,7 @@
 
 规定 `answer::model_figures`（`Sprawling/wire/src/` 下同名的文件）与 `Query::ModelFigures`。人把两个数字格留空时，城会为一个端点的每个模型登记什么窗口与上限，各由哪一级说出。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住，梯子的性质由 `Sprawling/gateway/spec/Provider/Ceiling.lean` 证明。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract/main.rs` 钉住的 wire schema（`wire::schema_hash`）守住，梯子的性质由 `Sprawling/gateway/spec/Provider/Ceiling.lean` 证明。
 -/
 
 /-!

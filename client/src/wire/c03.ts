@@ -13,7 +13,6 @@ import {
   ClusterKey,
   Locator,
   Payload,
-  Span,
   TimeMs,
 } from "./c00";
 
@@ -108,9 +107,12 @@ export const ThinkingOffer = Schema.Struct({
 }).annotate({ identifier: "ThinkingOffer" });
 export type ThinkingOffer = typeof ThinkingOffer.Type;
 
+export const Window = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)).pipe(Schema.brand("Window"));
+export type Window = typeof Window.Type;
+
 export const ModelFactsSummary = Schema.Struct({
   canonical: Schema.String,
-  context_tokens: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)))),
+  context_tokens: Schema.optional(Schema.NullOr(Window)),
   generation: GenerationAnswer,
   id: Schema.String,
   input_modalities: Schema.Array(Schema.String),
@@ -431,12 +433,4 @@ export const Inline: Schema.Codec<Inline, InlineEncoded> = Schema.Union([
 
 export const Check = Schema.Literals(["not_a_task", "open", "done"]).annotate({ identifier: "Check" });
 export type Check = typeof Check.Type;
-
-export interface ListItem { readonly blocks: readonly Block[]; readonly check: typeof Check.Type; readonly span: typeof Span.Type }
-export interface ListItemEncoded { readonly blocks: readonly BlockEncoded[]; readonly check: typeof Check.Encoded; readonly span: typeof Span.Encoded }
-export const ListItem: Schema.Codec<ListItem, ListItemEncoded> = Schema.Struct({
-  blocks: Schema.Array(Schema.suspend((): Schema.Codec<Block, BlockEncoded> => Block)),
-  check: Check,
-  span: Span,
-}).annotate({ identifier: "ListItem" });
 

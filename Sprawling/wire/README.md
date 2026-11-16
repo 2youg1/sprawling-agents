@@ -150,7 +150,7 @@ lake build Sprawling.wire.Spec                          # the proofs; `just mode
 cargo xtask gates wire-ts wiring                     # the client types are current, every verb is reachable
 ```
 
-`tests/wire_contract.rs` holds what the rest of the system may rely on: the
+`tests/wire_contract/main.rs` holds what the rest of the system may rely on: the
 command and query tables against the enums, the schema hash, the binding
 judgement in all four of its cells, and the two shapes that must stay
 unspellable. `tests/trybuild.rs` shows the compiler refusing both of those:

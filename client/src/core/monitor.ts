@@ -41,7 +41,6 @@ export function summary(latest: Sample): { readonly cpu: string; readonly memory
 }
 
 export interface Plot {
-
   readonly bars: readonly number[];
 
   readonly p50: number;

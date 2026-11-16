@@ -31,11 +31,17 @@ import {
   Glass,
   Laid,
   Lighting,
-  Motion,
   PrefixSlot,
-  ReadingFace,
-  TypeFeature,
 } from "./c04";
+
+export const Motion = Schema.Literals(["system", "on", "off"]).annotate({ identifier: "Motion" });
+export type Motion = typeof Motion.Type;
+
+export const ReadingFace = Schema.Literals(["interface", "libron"]).annotate({ identifier: "ReadingFace" });
+export type ReadingFace = typeof ReadingFace.Type;
+
+export const TypeFeature = Schema.Literals(["coding_ligatures", "duospace", "narrow_space", "small_arrows", "single_story_a", "slashed_zero"]).annotate({ identifier: "TypeFeature" });
+export type TypeFeature = typeof TypeFeature.Type;
 
 export const Weight = Schema.Literals(["light", "regular", "medium"]).annotate({ identifier: "Weight" });
 export type Weight = typeof Weight.Type;
@@ -427,10 +433,4 @@ export const PrivacyAnswer = Schema.Struct({
   outcomes: Schema.Array(PrivacyOutcome),
 }).annotate({ identifier: "PrivacyAnswer" });
 export type PrivacyAnswer = typeof PrivacyAnswer.Type;
-
-export const ShapePart = Schema.Struct({
-  bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  hash: Schema.String,
-}).annotate({ identifier: "ShapePart" });
-export type ShapePart = typeof ShapePart.Type;
 

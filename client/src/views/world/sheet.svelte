@@ -3,7 +3,6 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 <script lang="ts">
-
   import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";
   import { fill, say } from "../../core/lang";

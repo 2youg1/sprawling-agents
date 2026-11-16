@@ -217,11 +217,11 @@ Unavailable {
 -/
 
 /-!
-### 8-22 没有监听器的那份构建，测试也不许提它（`tests/enrolment.rs`、`tests/wire_contract.rs`）
+### 8-22 没有监听器的那份构建，测试也不许提它（`tests/enrolment.rs`、`tests/wire_contract/main.rs`）
 
-`cargo clippy -p sprawling-wire --no-default-features --all-targets` 要绿：`tests/enrolment.rs` 整份都在驱动 `wire::router`，`tests/wire_contract.rs` 有三条断言在问 `decide_bind`／`decide_handshake`，而这三样连同 `axum`、`tokio` 都由 feature `server` 带进来。**这份构建正是 `accounting` 用的那一份**（`Sprawling/accounting/Cargo.toml` 依赖本 crate 而不开 `server`，D2）——它需要本 crate 的词汇而不要 TCP 栈；一个在这里名词都拼不出来的测试文件，把它自己的红判在了产品的一条真路径上。
+`cargo clippy -p sprawling-wire --no-default-features --all-targets` 要绿：`tests/enrolment.rs` 整份都在驱动 `wire::router`，`tests/wire_contract/main.rs` 有三条断言在问 `decide_bind`／`decide_handshake`，而这三样连同 `axum`、`tokio` 都由 feature `server` 带进来。**这份构建正是 `accounting` 用的那一份**（`Sprawling/accounting/Cargo.toml` 依赖本 crate 而不开 `server`，D2）——它需要本 crate 的词汇而不要 TCP 栈；一个在这里名词都拼不出来的测试文件，把它自己的红判在了产品的一条真路径上。
 
-**按测试真正需要的东西设门，而不是把 feature 打开**：`tests/enrolment.rs` 首行 `#![cfg(feature = "server")]`（整份文件都是路由的事）；`tests/wire_contract.rs` 只给那三条断言与它们的两个辅助函数、以及 `Hello`／`Welcome`／`AxCode`／`SocketAddr` 这几个只被它们用到的名字加 `#[cfg(feature = "server")]`——命令表、查询表、schema 哈希与那两个不可拼写的形状**在两份构建里都被判**，因为它们在两份构建里都成立。
+**按测试真正需要的东西设门，而不是把 feature 打开**：`tests/enrolment.rs` 首行 `#![cfg(feature = "server")]`（整份文件都是路由的事）；`tests/wire_contract/main.rs` 只给那三条断言与它们的两个辅助函数、以及 `Hello`／`Welcome`／`AxCode`／`SocketAddr` 这几个只被它们用到的名字加 `#[cfg(feature = "server")]`——命令表、查询表、schema 哈希与那两个不可拼写的形状**在两份构建里都被判**，因为它们在两份构建里都成立。
 -/
 
 /-!

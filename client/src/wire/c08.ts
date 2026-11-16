@@ -54,6 +54,7 @@ import {
   IdentityAnswer,
   InboxAnswer,
   KnownHostsAnswer,
+  Window,
 } from "./c03";
 
 import {
@@ -316,7 +317,7 @@ export const Answered = Schema.Struct({
 export type Answered = typeof Answered.Type;
 
 export const FiguresAsked = Schema.Struct({
-  context_tokens: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)))),
+  context_tokens: Schema.optional(Schema.NullOr(Window)),
   id: Schema.String,
   max_output_tokens: Schema.optional(Schema.NullOr(Ceiling)),
   tag: Schema.optional(Schema.NullOr(ModelTag)),

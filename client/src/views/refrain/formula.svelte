@@ -5,7 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-
   export interface Formula {
     readonly tex: string;
     readonly placed: "inline" | "display";
@@ -27,7 +26,6 @@
 </script>
 
 <script lang="ts">
-
   import { Result } from "effect";
 
   interface Props {

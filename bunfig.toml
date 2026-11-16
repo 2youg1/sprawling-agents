@@ -20,7 +20,7 @@ ignorePatterns = [
   # A file a generator writes is the generator's. Formatting one makes the
   # producer's next `--write` run a diff, and `wire-ts` would then judge code
   # against a shape it cannot emit.
-  "client/src/wire.ts", # `cargo xtask wire-ts`
+  "client/src/wire/**", # `cargo xtask wire-ts`
   "Sprawling/agent_protocols/catalog/registry.json", # `cargo xtask acp-catalog`
   "lake-manifest.json", # lake
   # The offline playback page: `assemble.js` builds `template.html` out of

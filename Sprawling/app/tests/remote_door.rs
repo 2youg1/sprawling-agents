@@ -24,6 +24,7 @@ use remote_access::handshake::{self, CityFingerprint, Invitation, PairReply, Rep
 use remote_access::keys::{SigningKey, VerifyingKey};
 use remote_access::route::command::LOCAL_ENV;
 use remote_access::seal::Payload;
+// boundary-ok: the device's half of the remote door exists only in remote_access, so this check speaks it from Rust (`Sprawling/app/Spec.lean` §8-151)
 use tokio_tungstenite::tungstenite::Message;
 
 #[test]

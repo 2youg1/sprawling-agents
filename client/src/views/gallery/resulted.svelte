@@ -5,7 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-
   import type { Answer, EventKind, EventRecord, Query } from "../../wire";
   import { Address, B3Hash, GitOid, RunId, Seq, TimeMs } from "../../wire";
 

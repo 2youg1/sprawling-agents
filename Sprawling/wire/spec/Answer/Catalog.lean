@@ -8,7 +8,7 @@
 
 规定 `answer::catalog`（`Sprawling/wire/src/` 下同名的文件），以及 `ConfigureBuilding`、`CitySettings` 的 `catalog` 面与 `PrefixAnswer.tools`。一栋楼的每件工具怎样到达它的 run、谁定的、用得怎样，以及人改它的那两扇门。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面一节保留它在 wire 规格里的标签 §8-99，别处引作 `Sprawling/wire/Spec.lean §8-99`，决定引作 `wire D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。页面草稿的性质在 `client/spec/Views/Catalog.lean`。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract/main.rs` 钉住的 wire schema（`wire::schema_hash`）守住。页面草稿的性质在 `client/spec/Views/Catalog.lean`。
 -/
 
 /-!
@@ -85,7 +85,7 @@ pub struct PrefixAnswer { pub run: RunId, pub segments: Vec<PrefixSegment>,
 - **`BuildingSettings` 是一个具名的值**：一栋楼的五个面总是一起从页面走到 `accounting` 的 `configure_building`，一起走的值是一个值；它与 `CitySettings` 同形，外部标记的 JSON 与原来的结构体变体逐字节相同，所以页面与旧帧不受影响，只有 Rust 的匹配写法变了。
 - **`PrefixAnswer.tools`**：run 页的 prompt 透镜在 City 段之前画「工具」一块，用的是这一格；`None` 是工具表入账之前冻结的 run。
 - **字节是本城序列化的字节**：各家 provider 的兼容格式拼法不同，账要一把对所有兼容格式都一样的尺；页面只写字节，不换算 token（客户端没有分词器，系数因模型而异）。
-- 验收：`Sprawling/app/tests/connectors.rs` 的 `a_namespace_a_building_turns_off_leaves_the_next_run_and_stays_listed`（两百件工具的模拟服务器在这一问里有两百行；楼把它的命名空间设为 `off` 之后，下一个 run 的工具表与休眠索引里都没有它，这一问仍列出两百行，档位 `Off`、来自楼）；city 的 `the_city_and_a_building_state_how_tools_reach_a_run_and_a_room_may_not`；runtime 的 `a_catalog_table_moves_tools_between_core_dormant_and_off`。
+- 验收：`Sprawling/app/tests/connectors/offering.rs` 的 `a_namespace_a_building_turns_off_leaves_the_next_run_and_stays_listed`（两百件工具的模拟服务器在这一问里有两百行；楼把它的命名空间设为 `off` 之后，下一个 run 的工具表与休眠索引里都没有它，这一问仍列出两百行，档位 `Off`、来自楼）；city 的 `the_city_and_a_building_state_how_tools_reach_a_run_and_a_room_may_not`；runtime 的 `a_catalog_table_moves_tools_between_core_dormant_and_off`。
 -/
 
 /-! D112 `Query::Catalog` 是统一目录的唯一问答，版本正文按 digest 从 CAS 读，保存只写引用与 pin

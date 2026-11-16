@@ -13,7 +13,7 @@ use crate::privacy::target::{Hive, Target};
 
 mod capture;
 
-pub(super) use capture::*;
+pub(crate) use capture::*;
 
 pub(super) const APP_LOCATION: Control = Control {
     target: Target::Registry {

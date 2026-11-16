@@ -155,11 +155,12 @@ pub fn target_of(host: &str) -> EgressTarget {
             return EgressTarget::Private;
         }
     }
-    if let Some(leading) = ipv6_leading(&bare) {
-        if (leading & 0xfe00) == 0xfc00 || (leading & 0xffc0) == 0xfe80 {
-            return EgressTarget::Private;
-        }
+    if let Some(leading) = ipv6_leading(&bare)
+        && ((leading & 0xfe00) == 0xfc00 || (leading & 0xffc0) == 0xfe80)
+    {
+        return EgressTarget::Private;
     }
+
     EgressTarget::Public {
         host: bare.to_owned(),
     }

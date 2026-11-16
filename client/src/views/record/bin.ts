@@ -38,7 +38,6 @@ export function lookOf(rows: readonly DiscardLine[], lang: Lang, restore: Restor
 
 function rowOf(row: DiscardLine, lang: Lang, restore: Restore): BinRowLook {
   return {
-
     key: `${String(row.at)}\u0000${row.path}`,
     path: row.path,
     when: clock(lang, row.at),

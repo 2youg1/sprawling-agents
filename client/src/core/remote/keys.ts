@@ -33,7 +33,6 @@ const ED25519_PKCS8 = Uint8Array.of(
 );
 
 export interface DeviceKey {
-
   readonly public: Uint8Array<ArrayBuffer>;
   readonly ed25519: CryptoKey;
   readonly mlDsa: Uint8Array<ArrayBuffer>;

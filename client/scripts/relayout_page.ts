@@ -107,7 +107,6 @@ function blockTurn(root: HTMLElement): Turn {
     feed(text) {
       const closed = closedIn(text);
       if (closed !== laidLength) {
-
         laid.append(...blocksBefore(text, closed).slice(laid.childElementCount).map(drawBlock));
         laidLength = closed;
       }

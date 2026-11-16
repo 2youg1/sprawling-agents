@@ -3,7 +3,6 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 <script lang="ts">
-
   import type { Snippet } from "svelte";
 
   import { say } from "../../core/lang";
@@ -24,7 +23,6 @@
   import { askStretches } from "./stretches.svelte";
 
   interface Props {
-
     readonly here: Address;
     readonly session?: Seq | undefined;
 

@@ -25,16 +25,18 @@ import {
 import {
   Ceiling,
   GenerationSettings,
-  Window,
+  Window2,
 } from "./c02";
 
 import {
   AxError,
 } from "./c04";
 
-import {
-  ShapePart,
-} from "./c05";
+export const ShapePart = Schema.Struct({
+  bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  hash: Schema.String,
+}).annotate({ identifier: "ShapePart" });
+export type ShapePart = typeof ShapePart.Type;
 
 export const PromptShapeAnswer = Schema.Struct({
   conversation: ShapePart,
@@ -74,7 +76,7 @@ export type ProposalsAnswer = typeof ProposalsAnswer.Type;
 
 export const RangeAnswer = Schema.Struct({
   version: B3Hash,
-  window: Window,
+  window: Window2,
 }).annotate({ identifier: "RangeAnswer" });
 export type RangeAnswer = typeof RangeAnswer.Type;
 
@@ -417,19 +419,4 @@ export type SessionRef = typeof SessionRef.Type;
 
 export const Carry = Schema.Literals(["nothing", "handoff"]).annotate({ identifier: "Carry" });
 export type Carry = typeof Carry.Type;
-
-export const SessionStart = Schema.Union([
-  Schema.Struct({
-    dispatched: Schema.Struct({
-      by: Schema.optional(Schema.NullOr(Schema.String)),
-    }),
-  }),
-  Schema.Struct({
-    opened: Schema.Struct({
-      carry: Carry,
-      from: Schema.optional(Schema.NullOr(Origin)),
-    }),
-  }),
-]).annotate({ identifier: "SessionStart" });
-export type SessionStart = typeof SessionStart.Type;
 

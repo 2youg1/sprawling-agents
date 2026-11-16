@@ -175,54 +175,54 @@ export const NOTICE_DAYS: readonly NoticeDay[] = [
   {
     heading: "notices_today",
     rows: [
-
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
       {
         code: "E_CONFIG_INVALID",
         action: "dispatch",
         subject: "the model changed from `fake-small` to `fake-chat`",
         at: "09:12",
         count: 2,
-
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
         recovery: "the room is frozen against this session; set main back in setup, or run /new",
       },
-
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
       {
         code: "E_BUSY",
         action: "open session",
         subject: "hall/mayor",
         at: "09:04",
         count: 1,
-
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
         recovery: "a run is working in this room; run /stop first, then /new",
       },
-
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
       {
         code: "E_TIMEOUT",
         action: "probe",
         subject: "api.example.test",
         at: "08:47",
         count: 3,
-
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
         recovery: "the provider did not answer in time; ask the link to try again",
       },
-
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
       {
         code: "E_PATH_NOT_FOUND",
         action: "read",
         subject: "city/lab/west/NOTES.md",
         at: "08:31",
         count: 1,
-
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
         recovery: "that path is not on the listing this building answers with",
       },
-
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
       {
         code: "E_TOOL_UNAVAILABLE",
         action: "call",
         subject: "browser",
         at: "08:02",
         count: 1,
-
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
         recovery: "no engine is installed for this tool; run the doctor's recipe first",
       },
     ],
@@ -230,44 +230,44 @@ export const NOTICE_DAYS: readonly NoticeDay[] = [
   {
     heading: "notices_yesterday",
     rows: [
-
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
       {
         code: "E_MODEL_UNCHOSEN",
         action: "choose the main model",
         subject: "lab/east",
         at: "18:22",
         count: 1,
-
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
         recovery: "attach a provider on the settings page and pick a model for this tag",
       },
-
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
       {
         code: "E_GATE_DENIED",
         action: "write",
         subject: "hall/.sprawling/rules.md",
         at: "17:50",
         count: 1,
-
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
         recovery: "a rule stopped this write; the rule names the alternative",
       },
-
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
       {
         code: "E_CREDENTIAL_MISSING",
         action: "probe",
         subject: "api.deepseek.com",
         at: "16:11",
         count: 2,
-
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
         recovery: "file a key for this endpoint in setup, then probe again",
       },
-
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
       {
         code: "E_INVALID_ARGS",
         action: "steer",
         subject: "run 0199c0de",
         at: "15:39",
         count: 1,
-
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
         recovery: "the city could not read this request; the wire shape is in the SPEC",
       },
     ],
@@ -275,85 +275,92 @@ export const NOTICE_DAYS: readonly NoticeDay[] = [
   {
     heading: "rec_earlier",
     rows: [
-
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
       {
         code: "E_BUDGET_EXHAUSTED",
         action: "dispatch",
         subject: "lab/west",
         at: "11:26",
         count: 1,
-
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
         recovery: "this run has spent all it may; raise the budget or start another run",
       },
-
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
       {
         code: "E_WORKTREE_BUSY",
         action: "checkout",
         subject: "lab/west",
         at: "10:58",
         count: 1,
-
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
         recovery: "another run holds this worktree; run /stop to let go of it",
       },
-
+      // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
       {
         code: "E_LOOP_SUSPECTED",
         action: "dispatch",
         subject: "hall/mayor",
         at: "09:41",
         count: 4,
-
+        // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
         recovery: "the watchdog suspected a loop and stopped the run; steer it elsewhere",
       },
     ],
   },
 ];
 
+// The corner three deep, as a page that lost its link meets them. The
+// fourth refusal goes to the drawer rather than into a taller stack.
 export const TOASTS: readonly NoticeLine[] = [
-
+  // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
   {
     code: "E_WIRE_MISMATCH",
     action: "connect",
     subject: "sprawling 0.0.6",
     at: "03:35",
     count: 1,
-
+    // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
     recovery: "the client and the city disagree on the wire; reload after the city updates",
   },
-
+  // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
   {
     code: "E_TIMEOUT",
     action: "ask",
     subject: "hall/mayor",
     at: "03:31",
     count: 2,
-
+    // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
     recovery: "the city did not answer in time; ask the link to try again",
   },
-
+  // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
   {
     code: "E_PROVIDER",
     action: "dispatch",
     subject: "api.example.test",
     at: "03:29",
     count: 1,
-
+    // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
     recovery: "the provider failed to answer; the city kept the words for another try",
   },
 ];
 
+// One refusal with a home: it sits under the field it was refused at,
+// and leaves the moment that field is edited.
 export const REFUSED_FIELD: NoticeLine = {
   code: "E_ENDPOINT_DIALECT_UNSUPPORTED",
-
+  // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
   action: "attach",
-
+  // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
   subject: "api_gateway.internal",
   at: "03:35",
   count: 1,
-
+  // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
   recovery: "this endpoint speaks another dialect; pick the shape it answers in",
 };
 
+// One round of a room: the task the person sent and the answer that
+// came back. `EARLIER_SEGMENT` is the round the session divider folds
+// away - the same shape, one session ago.
 export interface Utterance {
   readonly speaker: "person" | "resident";
   readonly text: string;

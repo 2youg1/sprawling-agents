@@ -97,7 +97,6 @@ const OPEN_AI: Group = { label: "OpenAI", tone: "plain" };
 const ANTHROPIC: Group = { label: "Anthropic", tone: "alert" };
 
 export function wireChoices(): readonly Choice<WireApi>[] {
-
   return WIRE_APIS.map((api) => ({
     value: api,
     label: api,
@@ -151,7 +150,6 @@ export function tuningOf(draft: Draft): Tuning {
       .filter((row) => row.name.trim() !== "")
       .map((row) => ({ name: row.name.trim(), value: row.value }));
   return {
-
     label: draft.label.kind === "typed" ? draft.label.value : null,
     timeoutMs: figureIn(draft.timeoutMs),
     requestMaxRetries: figureIn(draft.requestRetries),

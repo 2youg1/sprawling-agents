@@ -38,6 +38,9 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             file: rel.clone(),
             msg: format!("this file does not parse as Rust: {err}"),
         })?;
+        if has_cfg(&parsed.attrs) {
+            continue;
+        }
         walk_items(&rel, &parsed.items, &mut violations);
     }
     violations.extend(product_features(root)?);
@@ -230,5 +233,16 @@ mod tests {
     fn a_double_inside_a_test_module_is_left_alone() {
         let source = "#[cfg(test)]\nmod tests {\n    pub fn mock_clock() {}\n}\n";
         assert!(found(source).is_empty());
+    }
+
+    #[test]
+    fn a_file_gated_for_tests_is_left_alone() {
+        let source = "#![cfg(test)]\npub fn fake_clock() {}\n";
+        let parsed = syn::parse_file(source).unwrap();
+        let mut out = Vec::new();
+        if !has_cfg(&parsed.attrs) {
+            walk_items("Sprawling/x/src/y/tests.rs", &parsed.items, &mut out);
+        }
+        assert!(out.is_empty(), "{out:#?}");
     }
 }

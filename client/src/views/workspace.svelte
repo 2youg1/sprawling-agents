@@ -3,7 +3,6 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 <script lang="ts">
-
   import { untrack } from "svelte";
 
   import { newestWorking } from "../core/belief/live";
@@ -172,12 +171,10 @@
   class="workspace col-span-full row-start-2 -m-margin grid min-h-0 grid-cols-subgrid grid-rows-[minmax(0,1fr)_auto] p-margin narrow:relative narrow:-mx-pane narrow:mt-0 narrow:-mb-pane narrow:px-pane narrow:pt-0 narrow:pb-pane"
   aria-label={seat === "page" ? say($lang, "region_main") : title}
 >
-
   <svelte:element this={seat === "page" ? "h1" : "h2"} tabindex="-1" class="sr-only"
     >{title}</svelte:element
   >
   {#if layout.world !== "none"}
-
     <div
       class={[
         sheet
@@ -219,7 +216,6 @@
           aria-labelledby={sheet ? `${uid}-tab-${placed.pane}` : undefined}
           hidden={sheet && placed.pane !== shown}
         >
-
           <div
             class={[
               "flex min-h-0 flex-1 flex-col",
@@ -273,7 +269,6 @@
     </section>
   </div>
   {#if open}
-
     <div
       class={[
         "row-[1/3] -mt-margin -mr-margin -mb-margin flex min-h-0 border-l border-edge-panel narrow:absolute narrow:inset-0 narrow:z-(--layer-sheet) narrow:col-auto narrow:row-auto narrow:m-0 narrow:border-l-0",

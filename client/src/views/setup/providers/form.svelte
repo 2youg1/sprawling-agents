@@ -5,9 +5,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-
   export interface AttachFormProps {
-
     readonly onAttached?: () => void;
   }
 </script>
@@ -228,7 +226,6 @@
     event.preventDefault();
   }}
 >
-
   <fieldset class="flex min-w-0 flex-col gap-base border-0 p-0">
     <legend class="px-0 text-note font-label text-text-quiet">
       {say($lang, "setup_form_provider")}
@@ -249,7 +246,7 @@
     />
 
     <div class="flex flex-col gap-tight">
-
+      <!-- wording-ok: the placeholder is the provider's documented base URL - an address, which no language translates. -->
       <Field
         placeholder="https://api.openai.com/v1"
         label={say($lang, "setup_base_url")}

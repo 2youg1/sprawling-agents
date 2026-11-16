@@ -23,7 +23,7 @@ are read from the module that owns them, so a cast changed there is a file
 rendered differently here.
 
 The emitted test enters by the door `wire::server` uses —
-`accounting::worker::RunWorker::handle` — rather than by a socket. The adversary attacks
+`accounting::worker::commanding::door::handle` — rather than by a socket. The adversary attacks
 the binary over the wire because that is where an agent stands; the regression it
 hands back runs in-process because a committed test should not need a port, and
 the policy under accusation is the same on both paths.

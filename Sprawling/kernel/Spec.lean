@@ -453,7 +453,7 @@ gate ──▶ 上述全部（组合面）＋idem
 
 /-! ## 15 影响面
 
-storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部消费本 crate 的公开面；全部 kernel 决断模块建立在 error/event 之上。公开面变更须与本规格同一变更集；守它的是编译器（下游 crate 不编译）与 `Sprawling/wire/tests/wire_contract.rs` 的 schema golden，xtask 不存公开面基线（`Tools/xtask/Spec.lean` §8-32）。
+storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部消费本 crate 的公开面；全部 kernel 决断模块建立在 error/event 之上。公开面变更须与本规格同一变更集；守它的是编译器（下游 crate 不编译）与 `Sprawling/wire/tests/wire_contract/main.rs` 的 schema golden，xtask 不存公开面基线（`Tools/xtask/Spec.lean` §8-32）。
 
 改 `AccountRound` 的一种处置（`spec/AccountRecovery.lean`），同一个变更集改它的两个驱动方：模型路径的 `Watchdog` 与 `drive`（`Sprawling/runtime/spec/Watchdog.lean` §8-9）与 accounting 的 `web_search` 工具；改 `AccountDisposition` 的一臂，同一个变更集改 gateway 的分类（`Sprawling/gateway/spec/Endpoint/Failure.lean` D32）。
 

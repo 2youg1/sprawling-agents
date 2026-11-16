@@ -5,7 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-
   import type { Sample } from "../wire";
 
   export const BEATS = ["50", "100", "250", "500", "1000"] as const;
@@ -86,7 +85,6 @@
     {#if shown.length === 0}
       <p class="text-note text-text-faint">{say($lang, "monitor_waiting")}</p>
     {:else}
-
       <ul>
         {#each shown as row (row.label)}
           {@const across = Math.max(points, row.plot.bars.length, 1)}

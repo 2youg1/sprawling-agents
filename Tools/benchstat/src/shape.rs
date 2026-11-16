@@ -165,7 +165,6 @@ fn supported_basins(
 }
 
 /// Sheather–Jones solve-the-equation bandwidth with bounded bracketing and bisection.
-
 fn numeric(action: &str, subject: &str) -> BenchError {
     BenchError::numeric(
         action,

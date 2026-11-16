@@ -135,7 +135,7 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call
 
 **决定**：`Warmed` 自己实现 `call`、`call_streaming`、`call_speculating`，每一扇都经同一个 `recorded` 转发给它拥有的 adapter，并照同一口径记账；`provider_account`、`account_roster`、`select_account` 也照样转发。turn loop 走哪扇门由 `turn::speculation::Generating` 决定，门只管把那扇门原样交给 adapter。
 
-**理由**：`kernel::Model` 的缺省方法对「没有流」「说不出调用何时完整」的 adapter 是诚实的，所以一扇门漏转发时什么都不失败，只是变慢：缺省的 `call_speculating` 丢掉提前调用的接收端、改调 `call_streaming`，生产路径上的只读工具于是全等整段回答写完才开始。漏掉的覆盖没有 lint 或 `#[deny]` 能抓，守住它的是 `Sprawling/runtime/tests/run_driver.rs` 里经 `Warmed` 驱动替身模型、看只读调用在模型返回之前开始的那条测试。
+**理由**：`kernel::Model` 的缺省方法对「没有流」「说不出调用何时完整」的 adapter 是诚实的，所以一扇门漏转发时什么都不失败，只是变慢：缺省的 `call_speculating` 丢掉提前调用的接收端、改调 `call_streaming`，生产路径上的只读工具于是全等整段回答写完才开始。漏掉的覆盖没有 lint 或 `#[deny]` 能抓，守住它的是 `Sprawling/runtime/tests/run_driver/handoff.rs` 里经 `Warmed` 驱动替身模型、看只读调用在模型返回之前开始的那条测试。
 
 **被否**：只转发阻塞门与流式门、推测门交给缺省——那正是让提前读在城里失效的形状；另造一个包装 trait 列出「必须转发」的方法——它在 `Model` 之外又写一份方法清单，两份会各自漂，而 `Model` 只有这一个包装者。
 

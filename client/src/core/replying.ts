@@ -8,7 +8,6 @@ import { utf16At } from "./document_pos";
 import type { Block, Laid, ReplyState } from "../wire";
 
 export interface Laying {
-
   readonly blocks: readonly Block[];
 
   readonly reached: number;

@@ -73,7 +73,6 @@ function worked(turn: Turn, to: number): Stretch[] {
 }
 
 function cut(number: number, from: number, to: number, calls: readonly Call[]): Stretch[] {
-
   let earliest = Number.POSITIVE_INFINITY;
   let latest = Number.NEGATIVE_INFINITY;
   for (const call of calls) {

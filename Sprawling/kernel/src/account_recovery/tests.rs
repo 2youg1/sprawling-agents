@@ -11,7 +11,7 @@ use super::*;
 use crate::error::AxCode;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Event {
+enum RecoveryEvent {
     Busy,
     Unusable,
     Refused,
@@ -19,14 +19,14 @@ enum Event {
     Repair,
 }
 
-fn failure(event: Event) -> Option<AxError> {
+fn failure(event: RecoveryEvent) -> Option<AxError> {
     let draft = AxError::failure(AxCode::Provider, "call model", "account");
     match event {
-        Event::Busy => Some(draft.retriable().with_recovery("r")),
-        Event::Unusable => Some(draft.account_unusable().with_recovery("r")),
-        Event::Refused => Some(draft.with_recovery("r")),
-        Event::Lost => Some(draft.effect_unknown().with_recovery("r")),
-        Event::Repair => None,
+        RecoveryEvent::Busy => Some(draft.retriable().with_recovery("r")),
+        RecoveryEvent::Unusable => Some(draft.account_unusable().with_recovery("r")),
+        RecoveryEvent::Refused => Some(draft.with_recovery("r")),
+        RecoveryEvent::Lost => Some(draft.effect_unknown().with_recovery("r")),
+        RecoveryEvent::Repair => None,
     }
 }
 
@@ -41,7 +41,7 @@ fn several(names: &[&str], retries: AccountRetries) -> Roster {
     }
 }
 
-fn decisions(mut round: AccountRound, events: &[Event]) -> Vec<(Event, Option<AccountStep>)> {
+fn decisions(mut round: AccountRound, events: &[RecoveryEvent]) -> Vec<(RecoveryEvent, Option<AccountStep>)> {
     let mut out = Vec::new();
     for &event in events {
         match failure(event) {
@@ -63,14 +63,14 @@ fn decisions(mut round: AccountRound, events: &[Event]) -> Vec<(Event, Option<Ac
     out
 }
 
-type Decided = Option<(Option<ServerLabel>, Vec<(Event, Option<AccountStep>)>)>;
+type Decided = Option<(Option<ServerLabel>, Vec<(RecoveryEvent, Option<AccountStep>)>)>;
 
 struct Trace<'a> {
     roster: Roster,
     missing: &'a [&'a str],
     cap: Retries,
     held: Option<&'a str>,
-    events: &'a [Event],
+    events: &'a [RecoveryEvent],
 }
 
 fn vector(
@@ -108,7 +108,7 @@ fn stop(why: RoundEnd) -> Option<AccountStep> {
 
 #[test]
 fn the_lean_trace_vectors_replay_one_by_one() {
-    use Event::{Busy, Lost, Refused, Repair, Unusable};
+    use RecoveryEvent::{Busy, Lost, Refused, Repair, Unusable};
     let two = || several(&["a", "b"], AccountRetries::Two);
     let a = Some(label("a"));
     let b = Some(label("b"));
@@ -252,13 +252,13 @@ fn switched(step: &AccountStep) -> bool {
     matches!(step, AccountStep::Switch { .. })
 }
 
-fn event() -> impl Strategy<Value = Event> {
+fn event() -> impl Strategy<Value = RecoveryEvent> {
     prop_oneof![
-        Just(Event::Busy),
-        Just(Event::Unusable),
-        Just(Event::Refused),
-        Just(Event::Lost),
-        Just(Event::Repair),
+        Just(RecoveryEvent::Busy),
+        Just(RecoveryEvent::Unusable),
+        Just(RecoveryEvent::Refused),
+        Just(RecoveryEvent::Lost),
+        Just(RecoveryEvent::Repair),
     ]
 }
 
@@ -322,12 +322,12 @@ proptest! {
             };
             let step = round.next(&err);
             match event {
-                Event::Refused => {
+                RecoveryEvent::Refused => {
                     prop_assert_eq!(&step, &AccountStep::Stop { why: RoundEnd::Refused });
                 }
-                Event::Unusable => prop_assert_ne!(&step, &AccountStep::Resend),
-                Event::Lost => prop_assert_ne!(switched(&step), true),
-                Event::Busy | Event::Repair => {}
+                RecoveryEvent::Unusable => prop_assert_ne!(&step, &AccountStep::Resend),
+                RecoveryEvent::Lost => prop_assert_ne!(switched(&step), true),
+                RecoveryEvent::Busy | RecoveryEvent::Repair => {}
             }
             match &step {
                 AccountStep::Resend => {
@@ -371,10 +371,10 @@ proptest! {
             };
             let step = round.next(&err);
             match event {
-                Event::Refused | Event::Unusable => {
+                RecoveryEvent::Refused | RecoveryEvent::Unusable => {
                     prop_assert_eq!(&step, &AccountStep::Stop { why: RoundEnd::Refused });
                 }
-                Event::Busy | Event::Lost | Event::Repair => {
+                RecoveryEvent::Busy | RecoveryEvent::Lost | RecoveryEvent::Repair => {
                     prop_assert_ne!(switched(&step), true);
                 }
             }

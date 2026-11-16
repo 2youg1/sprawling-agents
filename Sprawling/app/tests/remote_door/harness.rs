@@ -25,7 +25,9 @@ use remote_access::keys::{SigningKey, VerifyingKey};
 use remote_access::route::command::LOCAL_ENV;
 use remote_access::seal::Payload;
 use tokio::net::TcpStream;
+// boundary-ok: the device's half of the remote door exists only in remote_access, so this check speaks it from Rust (`Sprawling/app/Spec.lean` §8-151)
 use tokio_tungstenite::tungstenite::Message;
+// boundary-ok: the same device, on the remote listener this city opened
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
 
 pub(crate) type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
@@ -329,6 +331,7 @@ pub(crate) struct Served {
 impl Served {
     #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     pub(crate) fn start(city_root: &Path) -> Served {
+        // boundary-ok: the remote door is opened from the served city's console, so the check starts the city it reaches (`Sprawling/app/Spec.lean` §8-151)
         let mut child = Command::new(env!("CARGO_BIN_EXE_sprawling"))
             .arg("serve")
             .arg(city_root)

@@ -26,10 +26,20 @@ import {
 } from "./c02";
 
 import {
+  Check,
   Construct,
   Inline,
-  ListItem,
+  type InlineEncoded,
+  Window,
 } from "./c03";
+
+export interface ListItem { readonly blocks: readonly Block[]; readonly check: typeof Check.Type; readonly span: typeof Span.Type }
+export interface ListItemEncoded { readonly blocks: readonly BlockEncoded[]; readonly check: typeof Check.Encoded; readonly span: typeof Span.Encoded }
+export const ListItem: Schema.Codec<ListItem, ListItemEncoded> = Schema.Struct({
+  blocks: Schema.Array(Schema.suspend((): Schema.Codec<Block, BlockEncoded> => Block)),
+  check: Check,
+  span: Span,
+}).annotate({ identifier: "ListItem" });
 
 export const Order = Schema.Union([
   Schema.Literal("bullet"),
@@ -377,7 +387,7 @@ export type InputKinds = typeof InputKinds.Type;
 
 export const WindowLine = Schema.Struct({
   from: FigureFrom,
-  tokens: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+  tokens: Window,
 }).annotate({ identifier: "WindowLine" });
 export type WindowLine = typeof WindowLine.Type;
 
@@ -420,13 +430,4 @@ export type Glass = typeof Glass.Type;
 
 export const Lighting = Schema.Literals(["system", "dark", "light"]).annotate({ identifier: "Lighting" });
 export type Lighting = typeof Lighting.Type;
-
-export const Motion = Schema.Literals(["system", "on", "off"]).annotate({ identifier: "Motion" });
-export type Motion = typeof Motion.Type;
-
-export const ReadingFace = Schema.Literals(["interface", "libron"]).annotate({ identifier: "ReadingFace" });
-export type ReadingFace = typeof ReadingFace.Type;
-
-export const TypeFeature = Schema.Literals(["coding_ligatures", "duospace", "narrow_space", "small_arrows", "single_story_a", "slashed_zero"]).annotate({ identifier: "TypeFeature" });
-export type TypeFeature = typeof TypeFeature.Type;
 

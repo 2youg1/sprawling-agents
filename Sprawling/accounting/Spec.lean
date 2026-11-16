@@ -75,7 +75,7 @@ import Sprawling.accounting.spec.Worker.Workbench.Tools
 | `an_unnamed_dispatch_asks_the_factory_for_the_run_model_alone` | 没有 session 的 dispatch 按规则从任务的词里取房间名（`Sprawling/app/Spec.lean` §8-86），不做命名调用：工厂只被问到 run 的主模型，run 在规则给出的房间里开始。 |
 | `a_confidential_building_refuses_before_the_factory_is_asked` | 机密楼的拒绝在 worker 的选择里，不在工厂里：端点不是 loopback 地址时 dispatch 以 `GateDenied` 被拒，脚本工厂一次也没被问到。换掉工厂不能绕开机密。 |
 
-第四条在 `Sprawling/app/tests/connectors.rs`：`a_run_is_offered_the_tools_the_worker_was_handed`。楼的配置写了一个 MCP server，它的命令在任何主机上都不存在；worker 接收了一个脚本 `Connectors`，它给出一个工具。一个绕过端口、自己启动 server 的 worker 起不来这个 server，模型收到的工具表与休眠索引里也就都没有那个工具。
+第四条在 `Sprawling/app/tests/connectors/offering.rs`：`a_run_is_offered_the_tools_the_worker_was_handed`。楼的配置写了一个 MCP server，它的命令在任何主机上都不存在；worker 接收了一个脚本 `Connectors`，它给出一个工具。一个绕过端口、自己启动 server 的 worker 起不来这个 server，模型收到的工具表与休眠索引里也就都没有那个工具。
 
 第五条在 `Sprawling/app/tests/clock.rs`：`a_worker_stamps_its_lines_with_the_clock_it_was_handed`。worker 接收一个停在固定时刻的脚本 `Clock` 之后写下的每一行，`t` 都是那个时刻；一个自己读墙钟的写点写下的 `t` 是现在的时间。
 

@@ -5,7 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-
   import { fill, say } from "../../../core/lang";
   import { ui } from "../../../ui";
   import type { PopoverColumn } from "../../parts/popover";

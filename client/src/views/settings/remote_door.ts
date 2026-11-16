@@ -110,7 +110,6 @@ export function step(door: Door, event: DoorEvent): Stepped {
           ]
         : same;
     case "unsent":
-
       return phase.kind === "requesting" || phase.kind === "confirming"
         ? [
             { phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: phase.opener } },

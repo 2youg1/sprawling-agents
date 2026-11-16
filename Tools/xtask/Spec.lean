@@ -808,7 +808,7 @@ fn run(root: &Path, args: &[String]) -> Result<String, XtaskError>;
 
 **决定**：xtask 不保存也不比较任何 crate 的公开面基线；`Tools/xtask/` 下没有基线目录、没有渲染器钉子文件，nightly 工具链不为它安装。这是人的裁决：编译型语言的公开面由编译器守，不为它另设 nightly。
 
-**为什么**：比较基线要一个带日期的 nightly rustdoc 加一个钉住版本的 cargo-public-api，两者任一浮动都会让一行源码没动的基线报漂移；它守的读者（`Tools/adversary/` 与客户端的 `wire.ts`）各自已有更近的守门：`wire.ts` 由 `wire-ts` 门对生成结果逐字比对，wire 的线形由 `Sprawling/wire/tests/wire_contract.rs` 的 schema golden 判，kernel 与 wire 的公开类型一变，下游 crate 不编译。
+**为什么**：比较基线要一个带日期的 nightly rustdoc 加一个钉住版本的 cargo-public-api，两者任一浮动都会让一行源码没动的基线报漂移；它守的读者（`Tools/adversary/` 与客户端的 `wire.ts`）各自已有更近的守门：`wire.ts` 由 `wire-ts` 门对生成结果逐字比对，wire 的线形由 `Sprawling/wire/tests/wire_contract/main.rs` 的 schema golden 判，kernel 与 wire 的公开类型一变，下游 crate 不编译。
 
 **败给的方案**：留着基线只给 kernel 与 wire、由夜间作业跑：每晚多装一个 nightly，换来的是一张已经由 golden 与编译器覆盖的差异表。
 
