@@ -33,7 +33,7 @@ Markdown 时的标签 `8-n`，别处引作 `Tools/xtask/Spec.lean §8-n`。
 | modmap | 每个包（§8-39，工具包 citysim 在内）目录下的 `src/**/*.rs` 与每个 `.zig`（§8-48）↔ `architecture.toml` 里文件落在这些目录下的条目一一对应，测试模块无条目也可（D40）；状态一致；`owns` 非空；索引文件零逻辑。本门所在的包 xtask 除外，它的模块由本规格 §7 描述（D9） |
 | depmap | crate 依赖边 ⊆ ARCHITECTURE §3 的 `depmap` 围栏块；一个 crate 之内的模块方向服从 `directions` 块（§8-33）；`pub trait` 只现于缝那一节（ARCHITECTURE §4）列出的文件 |
 | guard | 唯一一张自己的 lint 表（`Sprawling/desktop/ffi` 的）与根 `[workspace.lints]` 逐键相等，例外只在 `RECORDED`；其余每个成员都继承根表（§8-46）；工作区自己的包在 `[workspace.dependencies]` 里各钉 `=` 加工作区版本（§8-49） |
-| residue | 产品根只从 `architecture.toml` 的 `[[product_root]]` 读；`[[legacy_path]]` 在 `status = "retired"` 后不得以根目录或活动配置（toml／yaml／nix／json／sh／ps1／just／justfile／`.github/`）里的路径记号（`crates/` 形，含 `./`）残留；隔离区 `local/` 在遍历时跳过，历史内容按 `CHANGELOG.md` 文件名范围排除（无逐行豁免）；引号标签（如 CI 的 `'client'`）不算路径；`layout = "current"` 的根须在盘且拒绝错误大小写的同级目录（D45） |
+| residue | 产品根只从 `architecture.toml` 的 `[[product_root]]` 读；`[[legacy_path]]` 在 `status = "retired"` 后不得以根目录或活动配置（toml／yaml／nix／json／sh／ps1／just／justfile／`.github/`）里的路径记号（`crates/` 形，含 `./`）残留；隔离区 `local/` 在遍历时跳过，历史内容按 `CHANGELOG.md` 文件名范围排除（无逐行豁免）；引号标签（如 CI 的 `'client'`）不算路径；`layout = "current"` 的根须在盘且拒绝错误大小写的同级目录（D45）；永久拒绝 `Calyx/src/console/{ui,ui.rs,editor.rs,screen.rs}` 壳实现残留（`Calyx/Spec.lean` D7） |
 | wording | 读者拿到的词出自短语表 `client/src/lang.json`：`.svelte` 标记里文本节点与朗读型属性的字面量（`wording::markup`），`.ts` 里拒绝各段的实参（`wording::refusal`，§8-24），去掉插值后不得剩下相邻两个字母；`wording-ok:` 豁免它所在的块里的专名；生成的文件由它的生成器作证 |
 | render | `#/gallery` 在真引擎里画出来，量盒子落在哪；性质见 §8-13、§8-14、§8-17、§8-38 与 §8-51 |
 | wiring | 城能执行的动词必须从客户端够得到；三个来源零副本（wire crate 在 `command/kind.rs` 里声明的 `enum Command`、`run_command` 的臂、`client/src`），wire 的规格（`Sprawling/wire/Spec.lean` §19-2 的 `def Command.reach`）只提供三者都说不出的那一件事——这个动词该由哪一侧够到 |
