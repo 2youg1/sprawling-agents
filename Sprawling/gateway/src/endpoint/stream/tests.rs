@@ -142,7 +142,7 @@ fn increments_reach_the_caller_while_the_body_is_still_arriving() {
             return;
         };
         said.borrow_mut().push(text.clone());
-        let _ = saw_opening.send(());
+        if let Ok(()) = saw_opening.send(()) {}
     };
     let ret = endpoint.stream(&request(), &mut onto, &mut |_| {}).unwrap();
 
