@@ -20,7 +20,7 @@ conformance = []
 [dependencies]
 # An MCP stdio server and an ACP agent both start from `child::command`:
 # off the city's console, without the city's secret keys
-# (`crates/agent_protocols/Spec.lean` D16, `crates/child/Spec.lean`).
+# (`Sprawling/agent_protocols/Spec.lean` D16, `Sprawling/child/Spec.lean`).
 child = { workspace = true }
 kernel = { workspace = true }
 # An MCP server reached over HTTP gets its client from

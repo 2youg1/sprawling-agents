@@ -6,7 +6,7 @@
 /-!
 # accounting::worker
 
-规定 `crates/accounting/src/worker.rs` 与 `crates/accounting/src/worker/hands.rs`：城的唯一写者，和它从外面收下的手。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+规定 `Sprawling/accounting/src/worker.rs` 与 `Sprawling/accounting/src/worker/hands.rs`：城的唯一写者，和它从外面收下的手。本文件是 `Sprawling/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `Sprawling/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
 -/
 
 /-!
@@ -18,16 +18,16 @@
 pub struct Hands {
     pub vault: gateway::Custodian,                       // 生产：Custodian::probe 打开的那一个；脚本：Custodian::in_memory()
     pub clock: Arc<dyn Clock + Send + Sync>,             // §8-3
-    pub monotonic: fn() -> Instant,                      // 量时长的单调钟：派活准备、mcp_tools、probe 的用时（`crates/sprawling/Spec.lean` §8-129-2）
+    pub monotonic: fn() -> Instant,                      // 量时长的单调钟：派活准备、mcp_tools、probe 的用时（`Sprawling/app/Spec.lean` §8-129-2）
     pub machine: Box<dyn Machine + Send>,                // §8-4
-    pub read_memory: fn() -> Memory,                     // `crates/sprawling/Spec.lean` §8-46-3
-    pub read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,   // `crates/sprawling/Spec.lean` §8-116
-    pub reveal: fn(&Path, &kernel::Address) -> Result<(), AxError>,         // `crates/sprawling/Spec.lean` §8-60
-    pub browsers: Browsers,                              // `crates/sprawling/Spec.lean` §8-45-2
-    pub desktop_program: DesktopProgram,                 // `crates/sprawling/Spec.lean` §8-4d
+    pub read_memory: fn() -> Memory,                     // `Sprawling/app/Spec.lean` §8-46-3
+    pub read_volume: fn(&Path) -> Option<kernel::degradation::VolumeSpace>,   // `Sprawling/app/Spec.lean` §8-116
+    pub reveal: fn(&Path, &kernel::Address) -> Result<(), AxError>,         // `Sprawling/app/Spec.lean` §8-60
+    pub browsers: Browsers,                              // `Sprawling/app/Spec.lean` §8-45-2
+    pub desktop_program: DesktopProgram,                 // `Sprawling/app/Spec.lean` §8-4d
     pub recipe_for: fn(&str) -> Result<&'static Recipe, AxError>,
     pub exec_host: ExecHost,
-    pub seat_lane: SeatLane,                             // 每条车道在自己的线程上开头调一次，答的东西活到车道结束；生产交 `bin::serving::placement::seat_lane`（`crates/sprawling/spec/Serving/Placement.lean` D46）
+    pub seat_lane: SeatLane,                             // 每条车道在自己的线程上开头调一次，答的东西活到车道结束；生产交 `bin::serving::placement::seat_lane`（`Sprawling/app/spec/Serving/Placement.lean` D46）
     pub affinity: runtime::backlog::RunAffinity,          // sprawling D103 的值，车队原样交进 Backlog::with_affinity
     pub shares: runtime::Shares,                         // 车队的表给每个 run 的份额；生产交 `bin::serving::placement::run_shares` 的答案（同一分部 D47），本 crate 只转交给 `runtime::Backlog::with_shares`
 }
@@ -45,7 +45,7 @@ pub type DesktopProgram = fn() -> std::io::Result<PathBuf>;
 // accounting::worker::pool
 pub struct Memory { pub physical: u64, pub available: u64 }
 // accounting::worker::health
-pub struct Health(/* 私有 */);   // 记账线程的两个计数，别的线程可读（`crates/sprawling/Spec.lean` §8-98）
+pub struct Health(/* 私有 */);   // 记账线程的两个计数，别的线程可读（`Sprawling/app/Spec.lean` §8-98）
 
 // accounting::worker
 pub struct RunWorker { /* 私有 */ }
@@ -83,7 +83,7 @@ impl CommandDesk {
 }
 ```
 
-`Chosen` 带上谁关的城与怎样对待还在跑的 run，交接照实写：`Drain` 写「every run under way landed before this line」，`Interrupt` 写「runs still under way were stopped at their next safe point」，`overview` 点名 `by`（控制台的 `/quit`、同一台电脑上的页面、哪一种信号、终端没了）。**原因**：一份把 `Interrupt` 写成「nothing was interrupted mid-command」的交接会让下一任以为每条 run 都按自己的步调落了地；一份把信号写成人主动选择的交接同样说了没发生的事。**否决的方案**：只给 `Chosen` 加一个布尔 `interrupted`——它说不出是谁关的，而服务管理器的 `SIGTERM` 与人的 `/quit` 对下一任是两件事。`Interrupt` 不写 `city_halted`：后台命令经 `Backlog::halt(None)` 停下，lane 在安全点经 `CommandDesk::interrupt_for` 读到 `Cancel`，下次开城这座城不是冻着的。从哪一面、由哪个事件进入收口的权威是 `crates/sprawling/spec/Console/Lifecycle.lean`；本 crate 只照 `Closing` 写交接，不判断缘由。关城路径上的失败经诊断写出，不直接写终端：终端此刻可能已经没了，而写一个没了的终端会 panic。
+`Chosen` 带上谁关的城与怎样对待还在跑的 run，交接照实写：`Drain` 写「every run under way landed before this line」，`Interrupt` 写「runs still under way were stopped at their next safe point」，`overview` 点名 `by`（控制台的 `/quit`、同一台电脑上的页面、哪一种信号、终端没了）。**原因**：一份把 `Interrupt` 写成「nothing was interrupted mid-command」的交接会让下一任以为每条 run 都按自己的步调落了地；一份把信号写成人主动选择的交接同样说了没发生的事。**否决的方案**：只给 `Chosen` 加一个布尔 `interrupted`——它说不出是谁关的，而服务管理器的 `SIGTERM` 与人的 `/quit` 对下一任是两件事。`Interrupt` 不写 `city_halted`：后台命令经 `Backlog::halt(None)` 停下，lane 在安全点经 `CommandDesk::interrupt_for` 读到 `Cancel`，下次开城这座城不是冻着的。从哪一面、由哪个事件进入收口的权威是 `Sprawling/app/spec/Console/Lifecycle.lean`；本 crate 只照 `Closing` 写交接，不判断缘由。关城路径上的失败经诊断写出，不直接写终端：终端此刻可能已经没了，而写一个没了的终端会 panic。
 
 - **`Hands` 只装直接碰这台电脑的东西。** 墙钟、doctor、内存与卷的计数器、文件管理器、浏览器、正在运行的可执行文件、需求表、exec 的解释器与引擎，以及 vault。它们各自的生产实现住在 `sprawling`，由 `bin::assembly::production::hands` 一处装好。`ModelFactory` 与 `Connectors` 的生产实现不在里面：`GatewayModels` 与 `Residents` 随 worker 住在本 crate，由 `new` 装上（D18）。
 - **构造器收一个值，不收九个参数。** 生产的调用方写 `RunWorker::new(root, log, bin::assembly::hands(vault))`；换掉一只手写 `Hands { clock: …, ..hands(vault) }`，或者构造之后调原有的 `with_*` 门。
@@ -151,7 +151,7 @@ impl CommandDesk {
 
 /-! ### 接口仍写在 sprawling 规格里的模块
 
-下面这些模块的接口与取舍今天写在 `crates/sprawling/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
+下面这些模块的接口与取舍今天写在 `Sprawling/app/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
 
 | sprawling 的标签 | 模块 |
 |---|---|
@@ -196,7 +196,7 @@ impl CommandDesk {
 -/
 
 /-!
-### 8-37 从 vault 删一把 Key（`accounting::worker::credentials::signing`；`crates/wire/spec/Command/Kind.lean` 的 `ForgetSecret`，gateway D33）
+### 8-37 从 vault 删一把 Key（`accounting::worker::credentials::signing`；`Sprawling/wire/spec/Command/Kind.lean` 的 `ForgetSecret`，gateway D33）
 
 ```rust
 impl RunWorker {

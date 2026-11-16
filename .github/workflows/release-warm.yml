@@ -1,7 +1,7 @@
 # Warm the three-platform `release` Rust cache after a green CI run on
 # main whose commit touched the cache key inputs. Tag builds restore
 # those entries; the fat-LTO profile is unchanged
-# (`crates/xtask/Spec.lean` D27). Kept out of `ci.yml` so a cold C
+# (`Tools/xtask/Spec.lean` D27). Kept out of `ci.yml` so a cold C
 # dependency or a flaky archive does not paint the required CI check red.
 name: release warm
 on:
@@ -17,7 +17,7 @@ permissions:
 # `workflow_run` is a low-trust trigger: without an explicit write-capable
 # cache-mode the three-platform `release` save is skipped and the warm
 # does nothing. `decide` still admits only a successful `push` CI on main
-# (`crates/xtask/Spec.lean` D27).
+# (`Tools/xtask/Spec.lean` D27).
 cache-mode: write
 
 concurrency:
@@ -69,7 +69,7 @@ jobs:
     uses: ./.github/workflows/release.yml
     # Same static ceiling as nightly-release: GitHub expands the called
     # graph before job `if`, and archive still declares contents:read so
-    # this warm receives no publish or OIDC grant (`crates/xtask/Spec.lean` D27).
+    # this warm receives no publish or OIDC grant (`Tools/xtask/Spec.lean` D27).
     permissions:
       contents: write
       id-token: write

@@ -43,14 +43,14 @@ Calyx 不实现模型环、不声明工具、不注入 AGENTS。
 帧叶在 `Calyx/ffi`（包名 `sprawling-console-ffi`）。城与 Mei 后端在 `Calyx/src/console*`。
 `calyx` 二进制用 `calyx::clock::Wall` 采样并进入 `console::mei::verb`。
 sprawling 经 `calyx::console` 装配城钩子。Console 合同正文仍在
-`crates/sprawling/spec/Console.lean`（本 Spec 引用之，不复制全文）。
+`Sprawling/app/spec/Console.lean`（本 Spec 引用之，不复制全文）。
 -/
 
 /-! ## 5 权威信源
 
 - User ruling：顶层 `Calyx/`；生产包；服务 sprawling 与 Mei；Mei 不含壳；一次完成、不留债；
   npm 以机制装配交互面（TTY → Calyx，`-p`/管道 → 无头）。
-- `crates/sprawling/spec/Console.lean` §8-174（Mei 斜杠与会话）。
+- `Sprawling/app/spec/Console.lean` §8-174（Mei 斜杠与会话）。
 - `Mei/Spec.lean` 进程 Face。
 -/
 

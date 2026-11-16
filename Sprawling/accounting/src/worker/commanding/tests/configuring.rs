@@ -7,7 +7,7 @@
 
 //! The city's own layer written from the settings page through
 //! `ConfigureCity`, and read back through `Query::Config`
-//! (`crates/wire/spec/Command/Step.lean` §8-61).
+//! (`Sprawling/wire/spec/Command/Step.lean` §8-61).
 
 use kernel::config::{SearchConfiguration, SearchSupplier};
 use kernel::{Address, IdemKey, RunId, Seq};

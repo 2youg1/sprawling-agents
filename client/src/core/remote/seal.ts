@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Every frame of a session, sealed (`crates/remote_access/Spec.lean`
+// Every frame of a session, sealed (`Sprawling/remote_access/Spec.lean`
 // §8-5): AES-256-GCM, the nonce a four-byte direction tag then an
 // eight-byte big-endian count that never travels, because the socket
 // delivers in order and each side knows the next number. A frame that

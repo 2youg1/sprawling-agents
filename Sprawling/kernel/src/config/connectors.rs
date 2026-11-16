@@ -5,7 +5,7 @@
 
 //! Connector definitions and the references a building selects, resolved
 //! without copying a definition into another scope
-//! (`crates/kernel/spec/Config.lean` D117).
+//! (`Sprawling/kernel/spec/Config.lean` D117).
 
 use std::collections::BTreeMap;
 

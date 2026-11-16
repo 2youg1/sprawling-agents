@@ -6,7 +6,7 @@
 /-!
 # runtime::rendering
 
-规定 `rendering`、`rendering::read`、`rendering::refusal`、`rendering::search`（`crates/runtime/src/` 下同名的文件）。模型读到的工具结果文本，由账本里那一行和它记下的渲染器画出。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `rendering`、`rendering::read`、`rendering::refusal`、`rendering::search`（`Sprawling/runtime/src/` 下同名的文件）。模型读到的工具结果文本，由账本里那一行和它记下的渲染器画出。本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `Sprawling/runtime/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::rendering::tests`、`runtime::fork::tests` 的 `each_result_line_is_rebuilt_by_the_renderer_it_names`、`runtime::fork::request_tests` 的 `a_branch_is_shown_the_mothers_reads_and_refusals_as_she_was`、`runtime::tools::edit::tests` 守住。
 -/
@@ -34,7 +34,7 @@ impl Copied<'_> {
 
 **V2**：
 - **拒绝是一行**：`E_CODE action: subject; recovery`，其余部分各以 `; ` 接在同一行：`nearby` 非空时接 `nearby: a, b`；`retry` 为 yes 时接 `retry` 或 `retry after N ms`，unknown 时接 `it may have taken effect`；门拒时接三段式拒绝的全部三段 `rule: <rule>; <violation>; instead: <alternative>`（kernel 的 `GateRefusal`）：只给规则，模型只知道被拦，不知道为什么、还能做什么。引文里的换行换成空格，码恒在行首。谁为失败付账、哪个 provider 失败留在账本里，模型据以行动的只有上面这些。
-- **read 是一行头加正文**：头是 `<path> lines <a>-<b> of <total>`，有续读点时接 `, next <k>`；载荷里的其他键不画，包括较早账本行里的 `version`：edit 凭读戳准入，没有谁收它（`crates/runtime/spec/Tools/Edit.lean` §8-64）；文本为空时是 `<path> is empty`（总行数为 0 或未知）或 `<path> has <total> lines; offset <o> is past the end`。行号是载荷里的 0 基下标原样、闭区间：V2 写下的那些行里，调用的 `offset` 也从 0 数，所以头与标记上的数字可以原样递回去。读到末尾的答没有 `total_lines`，总数就是末行号加一。正文逐字节保留，只在 0 基行号是 10 的倍数的行与首行的行首插 `<n>|`。载荷的 `offset` 缺席即 0（§8-29-1）。
+- **read 是一行头加正文**：头是 `<path> lines <a>-<b> of <total>`，有续读点时接 `, next <k>`；载荷里的其他键不画，包括较早账本行里的 `version`：edit 凭读戳准入，没有谁收它（`Sprawling/runtime/spec/Tools/Edit.lean` §8-64）；文本为空时是 `<path> is empty`（总行数为 0 或未知）或 `<path> has <total> lines; offset <o> is past the end`。行号是载荷里的 0 基下标原样、闭区间：V2 写下的那些行里，调用的 `offset` 也从 0 数，所以头与标记上的数字可以原样递回去。读到末尾的答没有 `total_lines`，总数就是末行号加一。正文逐字节保留，只在 0 基行号是 10 的倍数的行与首行的行首插 `<n>|`。载荷的 `offset` 缺席即 0（§8-29-1）。
 - **search 按文件分组**：头一行说答了什么——content 是 `<n> matches in <f> files`，files 是 `<n> files`，count 是 `<n> files, <m> matches`（单数时写 `1 match`、`1 file`）；停走时接 `; <stopped>`，有没看过的地方时接 `; <k> not searched`。content 下每个文件一组：文件路径独占一行，接着是它的命中块，组与组之间空一行；每个命中块按 read 的语法标号，就像一个从块首行（`from`，缺席即命中行）开始的 read 答：块首行与行号为 10 的倍数的行的行首插 `<n>|`，所以从搜索答里抄进 `edit` 的段落照样能剥掉标记。上下文从命中行之上开始时命中行本身不标号，模型从块首行往下数，最多数 `CONTEXT_CAP` 行；标在命中行上会让 `edit` 认不出它（`Copied` 只剥 read 会画的标记），而让 `edit` 另认一套搜索的标号就是两套语法。files 下每行一个路径；count 下每行 `<path>:<count>`。最后，`unread` 每条一行 `<path> not searched: <why>`，与上文空一行。`truncated` 不画：`stopped` 已经说了停在哪。
 - **tool 的答就是它的正文**：`tool` 的 `list`、`find`、`detail` 答 `{"text": t}`，画成 `t` 原样（§8-60）；画成 JSON 时其中每个换行都会成为 `\n`、每个引号成为 `\"` 到达模型。
 - **其余工具**的答本版仍画成 JSON（与 V1 同字节）；某个工具有了自己的读法时在这里加一条。V2 一旦随一个发布版写进过账本，再加读法就要进位到 V3，旧行照旧按 V2 画。

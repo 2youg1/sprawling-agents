@@ -6,11 +6,11 @@
 /-!
 # runtime：会话中改运行策略，在下一个 `BeforeWave` 取用
 
-本文件是 `crates/runtime/Spec.lean` 的一个分部；下面一节保留它在 runtime 规格里的标签 §8-62，别处引作 `crates/runtime/Spec.lean §8-62`。它规定 `crates/runtime/src/mode.rs`（策略格 `PolicyCell`）、`crates/runtime/src/run/lifecycle.rs`（安全点上的取用）与 `crates/runtime/src/tools/edit.rs`、`crates/runtime/src/tools/exec.rs`（写门读格）。
+本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面一节保留它在 runtime 规格里的标签 §8-62，别处引作 `Sprawling/runtime/Spec.lean §8-62`。它规定 `Sprawling/runtime/src/mode.rs`（策略格 `PolicyCell`）、`Sprawling/runtime/src/run/lifecycle.rs`（安全点上的取用）与 `Sprawling/runtime/src/tools/edit.rs`、`Sprawling/runtime/src/tools/exec.rs`（写门读格）。
 -/
 
 /-!
-### 8-62 策略格：一个 run 在会话中换运行策略（`crates/runtime/src/mode.rs` 的 `PolicyCell`，形状 1 判定＋形状 3 状态）
+### 8-62 策略格：一个 run 在会话中换运行策略（`Sprawling/runtime/src/mode.rs` 的 `PolicyCell`，形状 1 判定＋形状 3 状态）
 
 ```rust
 // runtime::mode
@@ -31,15 +31,15 @@ pub enum Interrupt { None, Cancel, Steer { source: String, text: String },
 ```
 
 - **格由造工具的一方造**：accounting 的 workbench 在造工具之前用 `PolicyCell::new(at.policy)` 造格，把 `reader()` 交给 `EditTool::new` 与 `ExecSetup.policy`，格本身随 `RunPlan.run_policy` 交给 run；`run_started.policy` 读的是格在开头时的值。格不 `Clone`：写方只有 run 的驱动循环一个。
-- **改动从哪来**：人经 `Command::ChangeRunPolicy` 让城写一行 `run_policy_changed`（`crates/kernel/Spec.lean` D21）；记账线程把这一行投进那个房间正在跑的 run 的 `Mailslot`，与 steer 同一扇门（`crates/sprawling/Spec.lean` §8-133）。run 在任一安全点都可能读到它，但只在 `SafePoint::BeforeWave` 取用：取之前到的那几条，最后一条算数，其余被它盖过。
+- **改动从哪来**：人经 `Command::ChangeRunPolicy` 让城写一行 `run_policy_changed`（`Sprawling/kernel/Spec.lean` D21）；记账线程把这一行投进那个房间正在跑的 run 的 `Mailslot`，与 steer 同一扇门（`Sprawling/app/Spec.lean` §8-133）。run 在任一安全点都可能读到它，但只在 `SafePoint::BeforeWave` 取用：取之前到的那几条，最后一条算数，其余被它盖过。
 - **取用做三件事，次序固定**：把格里的策略换成新的；在本回合要发给模型的下一段消息（这一波的工具结果之后）末尾追加一句说明——新的 mode、写的限制、落地方式，用词取自 `kernel::RunPolicy` 的渲染；从这一波的第一次调用起，写门按新策略判。
 - **冻结的前缀一个字节不动**：`ChatRequest.tools` 从会话开始就是各 mode 常驻核心的并集（§8-60），`edit` 与 `exec` 的工具说明不带写限制的那一句（写限制只出现在追加的说明里），Resident 段的 mode 行写的是 run 开始时的 mode。所以换策略只在窗口末尾加字节，provider 的前缀缓存不失效。
 - **一波之内只有一个策略**：工具读的是格，不是信箱；格只在一波开始之前变。模型在上一回合看到的是旧说明，这一波按新策略判，是取在 `BeforeWave` 的代价，换来的是一波里的几次调用不会一半按旧、一半按新。
 - **合并时的准入读 run 结束时格里的策略**（§8-54）：那是这个 run 最后一次取用的；run 最后一个 `BeforeWave` 之后才到的改动没被它取用，落到下一个 run 的 `run_started.policy`。
 - **平台**：纯内存与账本次序上的判定，Windows、macOS、Linux 行为一致。
-- **落在哪里**：格与取用在 `crates/runtime/src/mode.rs` 与 `crates/runtime/src/run/lifecycle.rs`；格由 `accounting::worker::workbench` 造，读方在 `EditTool`（每次调用读一次，模式门与 `gate::replacing` 用同一份）与 `ExecSetup.policy`（模式门与 `Placement::opened_by`）；改动经 `RoomQueues::post_policy` 进房间的 `PolicySlot`，lane 的 `ask()` 交给 run。exec 的各臂在三个平台上只是起进程的方式不同，它们问的门读的是同一个值。
+- **落在哪里**：格与取用在 `Sprawling/runtime/src/mode.rs` 与 `Sprawling/runtime/src/run/lifecycle.rs`；格由 `accounting::worker::workbench` 造，读方在 `EditTool`（每次调用读一次，模式门与 `gate::replacing` 用同一份）与 `ExecSetup.policy`（模式门与 `Placement::opened_by`）；改动经 `RoomQueues::post_policy` 进房间的 `PolicySlot`，lane 的 `ask()` 交给 run。exec 的各臂在三个平台上只是起进程的方式不同，它们问的门读的是同一个值。
 
-- **派生检查**（Rust，`crates/runtime/src/mode.rs` 的测试 `policy_take_holds_on_every_trace`）：一个 proptest 生成器在 `{change(随机 RunPolicy), wave, call}` 上抽序列，按序列调 `arrive`、`take_at_wave` 与 `PolicyReader::now`，断言两件事——同一 `BeforeWave` 之后到下一个之前的每次读数相同且等于那一波开始时生效的策略；每个 `BeforeWave` 取的是它之前最后一条改动，没有改动就什么也不取。坏的变体：`arrive` 当场写进生效的策略，即工具读信箱里最新的那条（被否①），第一条断言在序列 `[change, call]` 与 `[call, change, call]` 上红。「每次请求的 `tools` 与已发出的字节是上一次请求的前缀」由驱动循环的测试担，见 §3。「中途换的策略管住下一波的写」由 `crates/runtime/tests/run_driver.rs` 的 `a_policy_changed_mid_run_gates_the_next_waves_edit` 担（edit 建在格的读方上，`BeforeCall` 到一条 `Create`，那一波改不动已有文件）；「改动到得了正在跑的 run」由 accounting 的 `changing_the_policy_of_a_worked_room_reaches_the_run_working_there` 担（两次改动之后槽里只剩后一条，取过即空）。
+- **派生检查**（Rust，`Sprawling/runtime/src/mode.rs` 的测试 `policy_take_holds_on_every_trace`）：一个 proptest 生成器在 `{change(随机 RunPolicy), wave, call}` 上抽序列，按序列调 `arrive`、`take_at_wave` 与 `PolicyReader::now`，断言两件事——同一 `BeforeWave` 之后到下一个之前的每次读数相同且等于那一波开始时生效的策略；每个 `BeforeWave` 取的是它之前最后一条改动，没有改动就什么也不取。坏的变体：`arrive` 当场写进生效的策略，即工具读信箱里最新的那条（被否①），第一条断言在序列 `[change, call]` 与 `[call, change, call]` 上红。「每次请求的 `tools` 与已发出的字节是上一次请求的前缀」由驱动循环的测试担，见 §3。「中途换的策略管住下一波的写」由 `Sprawling/runtime/tests/run_driver.rs` 的 `a_policy_changed_mid_run_gates_the_next_waves_edit` 担（edit 建在格的读方上，`BeforeCall` 到一条 `Create`，那一波改不动已有文件）；「改动到得了正在跑的 run」由 accounting 的 `changing_the_policy_of_a_worked_room_reaches_the_run_working_there` 担（两次改动之后槽里只剩后一条，取过即空）。
 
 下面的模型对任意一条输入序列证明：工具表与已发出的字节只增不改；一波里每次调用按这一波开始时格里的策略判；一波之中到的改动不改这一波；下一个 `BeforeWave` 取的是最后一条改动；跨过记账线程的那一跳（槽）也只交最后一条。
 -/

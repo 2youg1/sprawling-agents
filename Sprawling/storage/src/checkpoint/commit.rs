@@ -154,7 +154,7 @@ impl Checkpoint {
     /// commit at the injected time. Returns the `checkpoint_committed`
     /// payload.
     ///
-    /// **`scopes` is the run's write domain, not its room** (`crates/storage/spec/Checkpoint/Provenance.lean`
+    /// **`scopes` is the run's write domain, not its room** (`Sprawling/storage/spec/Checkpoint/Provenance.lean`
     /// §8-18). The two were allowed to differ once, and every
     /// file a resident wrote between them - a building's own documents,
     /// a second declared prefix - was staged by no checkpoint, reported by no
@@ -274,7 +274,7 @@ impl Checkpoint {
 
     /// Takes `address` back from `point` into the city's own working
     /// tree: the point's bytes in place of what is there, or no file when
-    /// the point holds none (`crates/storage/spec/Checkpoint.lean` §8-33). Returns the
+    /// the point holds none (`Sprawling/storage/spec/Checkpoint.lean` §8-33). Returns the
     /// `file_restored` record of this step, `name` empty for this tree.
     ///
     /// # Errors

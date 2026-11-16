@@ -101,7 +101,7 @@ impl Endpoint {
     /// The messages face pages its list, twenty rows to a page unless
     /// asked for more, so it is asked for a thousand and followed by
     /// `after_id` while `has_more` holds, up to [`MODEL_LIST_PAGES`]
-    /// pages (`crates/gateway/spec/Endpoint/Models.lean` §8-10). The
+    /// pages (`Sprawling/gateway/spec/Endpoint/Models.lean` §8-10). The
     /// other faces take no paging parameter.
     ///
     /// Rows come back ordered by id and without repeats, so a person

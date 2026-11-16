@@ -6,7 +6,7 @@
 //! One provider with two accounts, driven through the worker a city
 //! runs: which account each request went out on, what the ledger says
 //! about it, and which account the Session keeps
-//! (`crates/kernel/Spec.lean` §8-86, `crates/gateway/spec/Router.lean`
+//! (`Sprawling/kernel/Spec.lean` §8-86, `Sprawling/gateway/spec/Router.lean`
 //! D30).
 //!
 //! The provider answers each request by the key it carries, so what a

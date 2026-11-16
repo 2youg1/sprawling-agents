@@ -6,7 +6,7 @@
 /-!
 # kernel::event::record::CatalogDrift
 
-规定 skill、connector server 与 connector tool 的 pin 比较和 `digest_invalidated` 去重入账。Rust 类型在 `crates/kernel/src/event/record/catalog.rs`，生产去重表在 `accounting::worker::workbench`。本模型量化任意观察轨迹：相同版本不产漂移，同一 `(building, subject, pinned, found)` 至多入账一次。
+规定 skill、connector server 与 connector tool 的 pin 比较和 `digest_invalidated` 去重入账。Rust 类型在 `Sprawling/kernel/src/event/record/catalog.rs`，生产去重表在 `accounting::worker::workbench`。本模型量化任意观察轨迹：相同版本不产漂移，同一 `(building, subject, pinned, found)` 至多入账一次。
 
 D118 漂移事件只记 pin 与后来发现的 digest，不记服务器定义或工具正文。工具定义 digest 同时是其规范 JSON 的 CAS 地址，skill digest 是其 canonical manifest 的 CAS 地址，因此页面可以离线比较两个版本；服务器命令、URL、环境引用与 header 引用留在 CONFIG.toml，不进 Ledger。被否：事件携带完整定义，会把主机事实与未批准外部文本复制进历史。重开参数：某类 pin 不能用同一 digest 定位其已批准字节时，先为该域定义独立的验证边界。
 -/

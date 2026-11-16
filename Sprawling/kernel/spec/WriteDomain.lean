@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.kernel.spec.Address
+import Sprawling.kernel.spec.Address
 
 /-!
 # kernel::write_domain
 
-规定 `kernel::write_domain`（`crates/kernel/src/write_domain.rs`）：写域、只写文档的写域、写入限制与 edit war 的判定。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::write_domain`（`Sprawling/kernel/src/write_domain.rs`）：写域、只写文档的写域、写入限制与 edit war 的判定。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 -/
 
 /-!
@@ -31,7 +31,7 @@ pub fn observe_edit_war(samples: &[EditSample]) -> EditWarVerdict;
 
 - `admits`：目标 `is_reserved()` 恒 Outside（构造点已拒，判定点再拒＝fail-closed 双层）；否则 ∃prefix 使 `target.is_within(prefix)` → Within。空前缀集合法（只读角色），恒 Outside。
 - **edit war 依据**：同 addr 的样本按序去重相邻同 Run 后得 run 序列 r₁…rₙ；「夺回」＝rᵢ==rᵢ₋₂ 且 rᵢ≠rᵢ₋₁；夺回数 ≥ `EDIT_WAR_FREEZE`(2) → Freeze（A→B→A→B 即两次夺回）。逐 addr 独立计，首个达阈的 addr 入 verdict（BTreeMap 序）。
-- `#[test]` `reserved_target_is_outside_even_for_an_empty_domain` 守 reserved 目标恒不 Within（kani 不接手，理由见 `crates/kernel/Spec.lean` §2）。
+- `#[test]` `reserved_target_is_outside_even_for_an_empty_domain` 守 reserved 目标恒不 Within（kani 不接手，理由见 `Sprawling/kernel/Spec.lean` §2）。
 -/
 
 /-!
@@ -88,7 +88,7 @@ pub fn reach(domain: &WriteDomain, area: &Address, taint: &TaintSet) -> GateOutc
 ```
 
 - `gate::reach` 判声明的区域：`reaches` 为假出与 `domain` 同一段 `Outside` 三段式（同一处产出，`outside` 提为二者共用），为真 `Allow`；它永不问文件名，因为区域没有文件名。
-- `gate::domain` 判文件，一字不改；它的调用方从 bench 挪到 **`runtime::tools::edit`** 拿到路径的那一刻（`crates/runtime/Spec.lean` §8-36）——门口只判区域，所以工具这一层必须判全（`Outside` 与 `NotWritable` 都拒），它判全的方式是调同一个门。
+- `gate::domain` 判文件，一字不改；它的调用方从 bench 挪到 **`runtime::tools::edit`** 拿到路径的那一刻（`Sprawling/runtime/Spec.lean` §8-36）——门口只判区域，所以工具这一层必须判全（`Outside` 与 `NotWritable` 都拒），它判全的方式是调同一个门。
 - 被否：让 bench 读 `call.args["path"]`——那把 bench 和一个工具的参数名绑在一起，而 `exec` 同样声明 `Write` 却没有路径。
 -/
 
@@ -103,8 +103,8 @@ pub fn replacing(limit: WriteLimit, target: &Address) -> GateOutcome;   // kerne
 
 - **限制叠在写域上，不并进写域。** 写域（§8-11、§8-46）回答一个地址能不能写、写哪种文件，它来自楼的 `RULES.toml`；写入限制回答一次 run 能不能改动已经存在的文件，它来自这次派活。`Full` 表示不额外收窄；`Create` 表示只准原子地新建一个不存在的普通文件，已经存在的文件——包括这次 run 刚建成的——不能覆盖、删除或改名。两道判定都要通过，所以 `Full` 永远放不宽楼的写域，`Documents` 楼里的 `Create` 仍只能新建 Markdown 文档、仍够不到计划文件。
 - **`gate::replacing` 是「这次写会动到已有文件」时的唯一判定**：`Full` 答 `Allow`；`Create` 答 `Deny`，`E_OUTSIDE_WRITE_DOMAIN` 三段式，规则「this run creates files and changes none」，违规点出目标，替代给出「写到一个新路径」，恢复语说限制由派活时选定、换一次派活才能改。复用既有的码而不新开一个：对调用者而言这与写域外的拒绝是同一类事——这次 run 不准写那里——恢复的路也同类。
-- **「目标是否已经存在」不由本模块判。** 那是文件系统在写那一刻的事实；只有在写的那一刻原子地判，竞争的两次新建才只成一次（`crates/runtime/Spec.lean` §8-55，`crates/storage/Spec.lean` §8-32）。kernel 只持规则与拒词，判定点在每一条写路径上调它。
-- 验收：`gate::domain` 测试里 `Create` 拒、`Full` 放各一条；真实写路径上的验收在 `crates/runtime/Spec.lean` §8-55。
+- **「目标是否已经存在」不由本模块判。** 那是文件系统在写那一刻的事实；只有在写的那一刻原子地判，竞争的两次新建才只成一次（`Sprawling/runtime/Spec.lean` §8-55，`Sprawling/storage/Spec.lean` §8-32）。kernel 只持规则与拒词，判定点在每一条写路径上调它。
+- 验收：`gate::domain` 测试里 `Create` 拒、`Full` 放各一条；真实写路径上的验收在 `Sprawling/runtime/Spec.lean` §8-55。
 -/
 
 namespace Kernel.WriteDomain
@@ -217,7 +217,7 @@ theorem a_documents_domain_never_admits_the_plan (files : Files) (prefixes : Lis
     · simp
     · simp_all
 
-/-- 一次写能不能落下：写域收下目标，且目标已经存在时限制是 `Full`。「目标是否已经存在」是写的那一刻文件系统的事实，由写路径原子地判（`crates/runtime/Spec.lean` §8-55），这里是参数。 -/
+/-- 一次写能不能落下：写域收下目标，且目标已经存在时限制是 `Full`。「目标是否已经存在」是写的那一刻文件系统的事实，由写路径原子地判（`Sprawling/runtime/Spec.lean` §8-55），这里是参数。 -/
 def permits (files : Files) (domain : WriteDomain) (limit : WriteLimit) (target : Address)
     (exists_already : Bool) : Bool :=
   domain.admits files target == .Within && (!exists_already || limit == .Full)

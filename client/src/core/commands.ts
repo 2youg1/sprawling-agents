@@ -77,7 +77,7 @@ export const EFFORTS: readonly Effort[] = EffortSchema.literals;
 export const MODES: readonly Mode[] = ModeSchema.members.map((member) => member.literal);
 
 // The other three values of a run policy, each in the wire's order; the
-// first of each is the one that adds nothing (`crates/wire/Spec.lean`
+// first of each is the one that adds nothing (`Sprawling/wire/Spec.lean`
 // §8-57): the full write limit, the building's own checks, the ordinary
 // landing. A page starts on those, which is `FIRST_POLICY`, in work
 // mode: a person's first request is usually to get something done, and
@@ -387,7 +387,7 @@ export function putPrompt(at: Address, base: B3Hash, step: PromptStep): Command 
 
 // One identity card. The city rewrites the card's keys in `base`'s
 // identity area and keeps every other byte, so the page never writes
-// TOML (`crates/wire/Spec.lean` §8-59).
+// TOML (`Sprawling/wire/Spec.lean` §8-59).
 export function putIdentity(card: IdentityCard, base: string): Command {
   return { put_identity: { card, base, idem: mintIdem() } };
 }
@@ -442,7 +442,7 @@ export function configureSearch(search: SearchConfiguration): Command {
 }
 
 // The city's whole `[catalog]`: the table every building that states
-// nothing follows (`crates/wire/Spec.lean` §8-99).
+// nothing follows (`Sprawling/wire/Spec.lean` §8-99).
 export function configureCityCatalog(catalog: ExposureTable): Command {
   return { configure_city: { catalog, idem: mintIdem() } };
 }

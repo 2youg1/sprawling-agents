@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The checkpoint admission rule for one staged path: what enters, what is
-//! skipped, and what refuses the wave (`crates/storage/Spec.lean` §8-8 and §8-25).
+//! skipped, and what refuses the wave (`Sprawling/storage/Spec.lean` §8-8 and §8-25).
 
 use crate::error::StorageError;
 
@@ -19,7 +19,7 @@ pub(super) fn workdir(repo: &git2::Repository) -> Result<&std::path::Path, Stora
 /// Whether `relative` is the staging file of a write still under way:
 /// a document's (`kernel::layout`) or a replaced file's
 /// (`bundle::landing`). Its writer renames it away whenever it likes, so
-/// libgit2 must never open it (`crates/storage/spec/Checkpoint.lean` D30).
+/// libgit2 must never open it (`Sprawling/storage/spec/Checkpoint.lean` D30).
 fn is_half_a_write(relative: &std::path::Path) -> bool {
     relative.file_name().is_some_and(|name| {
         kernel::layout::is_document_staging_name(name)
@@ -28,7 +28,7 @@ fn is_half_a_write(relative: &std::path::Path) -> bool {
 }
 
 /// The checkpoint's admission rule for one staged path: what enters a
-/// checkpoint, what is skipped, and what refuses the wave (`crates/storage/spec/Checkpoint.lean` §8-8).
+/// checkpoint, what is skipped, and what refuses the wave (`Sprawling/storage/spec/Checkpoint.lean` §8-8).
 ///
 /// git asks with 1 for skip and 0 for stage, and hands over paths
 /// relative to the repository's working tree - so the alias question is
@@ -39,7 +39,7 @@ fn is_half_a_write(relative: &std::path::Path) -> bool {
 /// scope refuses the whole wave, because a name that leads into a
 /// reserved file would capture reserved bytes under a lying name, and
 /// the `file_discarded` restoration would write back through it
-/// (`crates/storage/spec/Alias.lean` §8-25).
+/// (`Sprawling/storage/spec/Alias.lean` §8-25).
 pub(super) struct StageFilter {
     root: std::path::PathBuf,
     aliases: Vec<(String, crate::alias::AliasKind)>,

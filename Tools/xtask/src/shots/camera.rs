@@ -5,7 +5,7 @@
 
 //! The engine half of `shots`: open one route in one window, and either
 //! read how far its main region scrolls or photograph one fold of it
-//! (crates/xtask/Spec.lean §8-44).
+//! (Tools/xtask/Spec.lean §8-44).
 //!
 //! **The engine is the render gate's.** Which browser, how its dump is
 //! waited for, and how a bundle opened from `file://` gets its lazily

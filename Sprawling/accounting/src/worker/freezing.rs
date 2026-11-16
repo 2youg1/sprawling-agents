@@ -78,7 +78,7 @@ pub(super) const NEWLINE: u8 = 10;
 ///
 /// The building's address opens it, not the run's room: every resident
 /// of one building carries this slot byte for byte
-/// (`crates/runtime/spec/Prefix.lean` D97), and a room's address here
+/// (`Sprawling/runtime/spec/Prefix.lean` D97), and a room's address here
 /// would split it by room. The room opens the resident slot instead.
 ///
 /// `RULES.toml` is here rather than left for the agent to open because
@@ -132,7 +132,7 @@ impl Assembled {
     /// Read by [`prompt_chain::read_convention`], the reading the layers
     /// answer gives a page: a file that is not there, a directory, and a
     /// link the read bound refuses are left out, and the page says why
-    /// (`crates/accounting/Spec.lean` §8-38). Written only when the file
+    /// (`Sprawling/accounting/Spec.lean` §8-38). Written only when the file
     /// is sent: a heading over nothing would tell a resident to follow
     /// conventions that do not exist.
     ///
@@ -169,7 +169,7 @@ impl Assembled {
 
 /// What freezing a plan reads from outside the run's own site, as
 /// values rather than as the worker that holds them, so a plan can be
-/// frozen on whichever thread prepares the run (`crates/sprawling/Spec.lean` §8-113).
+/// frozen on whichever thread prepares the run (`Sprawling/app/Spec.lean` §8-113).
 pub(super) struct Freezing<'a> {
     pub(super) city_root: &'a Path,
     /// The store the prefix and the norms are pinned in. Content
@@ -209,7 +209,7 @@ impl Freezing<'_> {
 
     /// The run slot: the task, and after it the note the person keeps
     /// for the model this run is sent to, which therefore ends the
-    /// system prompt (`crates/sprawling/Spec.lean` §8-85).
+    /// system prompt (`Sprawling/app/Spec.lean` §8-85).
     ///
     /// # Errors
     /// Propagates a run segment that will not read and a note that is
@@ -303,7 +303,7 @@ impl Freezing<'_> {
         )?;
         // The tool table rides with the prefix: the array is kept in the
         // store beside the four segments, and every `prompt_assembled`
-        // names it (`crates/runtime/Spec.lean` §8-60).
+        // names it (`Sprawling/runtime/Spec.lean` §8-60).
         let table = held(&workbench.catalog, "read the catalog")?.tool_table()?;
         self.cas
             .put(&table.array)

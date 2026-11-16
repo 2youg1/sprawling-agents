@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The device table on disk: the devices this city paired, kept across
-//! restarts at `kernel::layout::CityLayout::devices` (`crates/sprawling/spec/Outside/Conduit.lean`
+//! restarts at `kernel::layout::CityLayout::devices` (`Sprawling/app/spec/Outside/Conduit.lean`
 //! §8-139).
 //!
 //! The file is TOML, one `[[device]]` table per device, and is written

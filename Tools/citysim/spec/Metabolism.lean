@@ -6,7 +6,7 @@
 /-!
 # citysim::score 与 citysim::metabolism
 
-规定 `citysim::score`（`crates/citysim/src/score.rs`）与 `citysim::metabolism`（`crates/citysim/src/metabolism.rs`），两件只在测试构型里编译的仪器（D21）。本文件是 `crates/citysim/Spec.lean` 的一个分部；下面一节保留它在 citysim 规格里的标签 §8-8-2，别处引作 `crates/citysim/Spec.lean §8-8-2`。
+规定 `citysim::score`（`Tools/citysim/src/score.rs`）与 `citysim::metabolism`（`Tools/citysim/src/metabolism.rs`），两件只在测试构型里编译的仪器（D21）。本文件是 `Tools/citysim/Spec.lean` 的一个分部；下面一节保留它在 citysim 规格里的标签 §8-8-2，别处引作 `Tools/citysim/Spec.lean §8-8-2`。
 
 能写成定理的是处置的次序：没有任何资产在第一次被注意到的那一轮里退场（`nothing_retires_the_round_it_is_first_noticed`）；一个资产被留下，当且仅当它最近被用过、又付得起它占的地方（`an_asset_is_kept_exactly_when_it_is_used_and_pays`）。两个阈值 `ASSET_IDLE_DAYS`、`ASSET_FLOOR_PER_MILLE` 的值住 `metabolism.rs`，模型把它们当参数（§14）。分数怎样从使用次数与常驻字节算出（`score`）、`worst_first` 的排序由 `score` 的测试守着（§16）。
 -/

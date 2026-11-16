@@ -6,7 +6,7 @@
 /-!
 # devloop：改一处、看一眼、再决定，而且必有终点
 
-规定 `crates/browser/src/devloop.rs`（`browser::devloop`，`DevLoop::observe`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/browser/src/devloop.rs`（`browser::devloop`，`DevLoop::observe`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 一个回路记着看了几眼、连续几眼没变、上一眼是什么。每一眼得到四个结局之一：页面报错（`complained`）、连续 `QUIET_LOOKS` 眼没变（`settled`）、看满 `LOOKS_MAX` 眼仍在变（`gaveUp`）、再看一眼（`lookAgain`）。两个常量把「不收敛」变成一个结局，而不是一段时间。结局之后再观察是调用方的错，报 `E_LOOP_SUSPECTED`，因为调用方持着 `Step`。
 

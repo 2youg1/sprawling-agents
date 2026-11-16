@@ -53,7 +53,7 @@ pub struct EndpointAttached {
     )]
     pub tuning: Option<AttachedTuning>,
     /// The model facts read at attach or re-probe time, as one CAS blob
-    /// (`crates/kernel/spec/Event/Record.lean` §8-88, kernel D57). Absent on a line
+    /// (`Sprawling/kernel/spec/Event/Record.lean` §8-88, kernel D57). Absent on a line
     /// written before the key existed and on an attach that read no list;
     /// a replay then rebuilds from `models` alone.
     #[serde(default, skip_serializing_if = "Option::is_none")]

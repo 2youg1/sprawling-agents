@@ -9,7 +9,7 @@
 //! Inside it an edit takes the file's stamp, reads its bytes, judges the
 //! admission, replaces the one match and takes the new stamp, so two runs
 //! editing one file cannot both land on the same look and lose each
-//! other's change (`crates/runtime/spec/Tools/Edit.lean` §8-64). It
+//! other's change (`Sprawling/runtime/spec/Tools/Edit.lean` §8-64). It
 //! serialises edit with edit only: `exec` and the person's editor do not
 //! take it.
 //!

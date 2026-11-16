@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One assertion suite for every tool implementation (V3).
-//! The part `crates/kernel/spec/Tool.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Tool.lean` specifies this module with the
 //! rest of `kernel::tool`.
 
 use super::{Tool, ToolCall, ToolName};

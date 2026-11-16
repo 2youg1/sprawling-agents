@@ -27,7 +27,7 @@ impl RunWorker {
     /// The settings page sends the whole row on every pick, so re-picking
     /// an already registered model with an empty box must not overwrite
     /// its ceiling with nothing: the next call on the Anthropic wire
-    /// would be refused for a field it could not write (`crates/sprawling/Spec.lean`
+    /// would be refused for a field it could not write (`Sprawling/app/Spec.lean`
     /// §8-71). An empty box leaves the figure to the ladder in
     /// `gateway::Figures::resolve`, which this method hands the facts it
     /// holds: what the person sent, the provider's own row for this id in
@@ -95,7 +95,7 @@ impl RunWorker {
         );
         // What a model accepts is what the person said, else the
         // vendor's fact read off the catalogue or the preset table
-        // (`crates/gateway/Spec.lean` §8-37, gateway D16).
+        // (`Sprawling/gateway/Spec.lean` §8-37, gateway D16).
         let input = gateway::accepted_input(
             stated_input,
             priced.map(|row| row.input),
@@ -138,7 +138,7 @@ mod tests {
     /// A model the pinned catalogue does not know, whose vendor's page says
     /// it reads pictures, is registered as reading them, so the endpoint
     /// shows it the picture ocr hands it instead of refusing
-    /// (`crates/gateway/Spec.lean` §8-37).
+    /// (`Sprawling/gateway/Spec.lean` §8-37).
     #[test]
     fn a_preset_model_that_reads_pictures_is_registered_as_reading_them() {
         let dir = tempfile::tempdir().unwrap();
@@ -190,7 +190,7 @@ mod tests {
     /// The person's statement is the first rung: a model the pinned
     /// catalogue lists as reading text, on a server no preset row speaks
     /// for, is registered as reading pictures when the person says so
-    /// (`crates/gateway/Spec.lean` §8-37, gateway D16).
+    /// (`Sprawling/gateway/Spec.lean` §8-37, gateway D16).
     #[test]
     fn a_model_the_person_says_reads_pictures_is_registered_as_reading_them() {
         let dir = tempfile::tempdir().unwrap();

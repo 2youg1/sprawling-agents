@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Independent cleanup on parent EOF (`crates/runtime/spec/Tools/Exec/Container.lean`, D52).
+//! Independent cleanup on parent EOF (`Sprawling/runtime/spec/Tools/Exec/Container.lean`, D52).
 
 use std::io::{Read, Write};
 use std::path::Path;

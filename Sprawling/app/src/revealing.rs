@@ -42,7 +42,7 @@ pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError> {
         .with_recovery("this city holds no such file; the page may be older than the tree"));
     }
     // The file manager outlives the city, so it is handed no terminal to
-    // write on after the city has gone (`crates/sprawling/Spec.lean` D73).
+    // write on after the city has gone (`Sprawling/app/Spec.lean` D73).
     manager(&path)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())

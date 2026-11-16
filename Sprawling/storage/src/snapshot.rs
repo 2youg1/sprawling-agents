@@ -4,12 +4,12 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The chain-hash snapshot: what a fold held after one line of the
-//! Ledger, with that line's seq and chain hash (`crates/storage/spec/Snapshot.lean` §8-26).
+//! Ledger, with that line's seq and chain hash (`Sprawling/storage/spec/Snapshot.lean` §8-26).
 //!
 //! A projection, never history: a start that finds no snapshot, a
 //! damaged one, or one whose line hash does not match the line on disk
 //! folds the whole ledger, as it did before snapshots existed. That
-//! resuming is sound at all is `crates/storage/spec/Snapshot.lean`'s
+//! resuming is sound at all is `Sprawling/storage/spec/Snapshot.lean`'s
 //! `resumeIsWhole`.
 
 use std::path::Path;

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The privacy page's vocabulary (`crates/wire/spec/Privacy.lean`): the
+//! The privacy page's vocabulary (`Sprawling/wire/spec/Privacy.lean`): the
 //! closed sets every control is described by (§8-87), the answer to
 //! `Query::Privacy` (§8-88) and the operation `Command::PrivacyOperation`
 //! carries (§8-89).
@@ -312,7 +312,7 @@ listed! {
 listed! {
     /// Why a privacy operation ended without the change asked for, or
     /// with a result nobody could confirm: the closed set of stable codes
-    /// (`crates/sprawling/spec/Privacy.lean` §12).
+    /// (`Sprawling/app/spec/Privacy.lean` §12).
     pub enum PrivacyFaultCode {
         Identity,
         Clock,

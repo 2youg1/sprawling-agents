@@ -238,11 +238,11 @@ replacement = "兼容格式 (glossary: dialect)"
 
 [[entry]]
 banned = "Note::Fenced"
-replacement = "Note::Checkpointed（crates/wire/Spec.lean §8-53）"
+replacement = "Note::Checkpointed（Sprawling/wire/Spec.lean §8-53）"
 
 [[entry]]
 banned = "\"fenced\""
-replacement = "\"checkpointed\"（crates/wire/Spec.lean §8-53）"
+replacement = "\"checkpointed\"（Sprawling/wire/Spec.lean §8-53）"
 
 [[entry]]
 banned = "栅栏"
@@ -292,7 +292,7 @@ replacement = "checkpoint（glossary）"
 
 [[entry]]
 banned = "MemoryError"
-replacement = "StorageError（storage 的 SPEC：crates/storage/Spec.lean §8-14）"
+replacement = "StorageError（storage 的 SPEC：Sprawling/storage/Spec.lean §8-14）"
 
 # 外壳重做之后，左栏与底部事实条都已删除（docs/frontend-method.md §7D、§7E）：
 # 页面的常驻入口是左下三键，读数各回到读者已经在看的地方。

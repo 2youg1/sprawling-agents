@@ -58,16 +58,16 @@ fn a_roster_and_a_table_are_read_one_row_per_line() {
 fn imports_and_module_names_map_onto_files() {
     assert_eq!(
         (
-            imports("import Lean.Data.Json\n-- import Sprawling\nimport crates.kernel.Spec Std\n"),
-            module_file("crates.storage.spec.Jsonl.Barrier"),
+            imports("import Lean.Data.Json\n-- import Sprawling\nimport Sprawling.kernel.Spec Std\n"),
+            module_file("Sprawling.storage.spec.Jsonl.Barrier"),
         ),
         (
             vec![
                 (1, "Lean.Data.Json".to_owned()),
-                (3, "crates.kernel.Spec".to_owned()),
+                (3, "Sprawling.kernel.Spec".to_owned()),
                 (3, "Std".to_owned()),
             ],
-            "crates/storage/spec/Jsonl/Barrier.lean".to_owned()
+            "Sprawling/storage/spec/Jsonl/Barrier.lean".to_owned()
         )
     );
 }

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The trace-vector table derived from `crates/city/spec/Library/Audit.lean`:
+//! The trace-vector table derived from `Sprawling/city/spec/Library/Audit.lean`:
 //! each row is a trace of the model's five events and the answer the
 //! model's `shown` gives on it, and every row also replays the model's
 //! four properties against [`audit_state`].

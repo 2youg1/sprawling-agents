@@ -80,8 +80,8 @@ mod tests {
         let scratch = std::env::temp_dir().join(format!("xtask-root-{}", std::process::id()));
         let built = checkout(&scratch, "built");
         let here = checkout(&scratch, "here");
-        let verdict = judged(&built.join("crates/xtask"), &here.join("crates"));
-        let same = judged(&here.join("crates/xtask"), &here.join("crates"));
+        let verdict = judged(&built.join("Tools/xtask"), &here.join("crates"));
+        let same = judged(&here.join("Tools/xtask"), &here.join("crates"));
         std::fs::remove_dir_all(&scratch).unwrap();
         assert!(
             matches!(verdict, Err(XtaskError::StaleBuild { .. })),
@@ -96,8 +96,8 @@ mod tests {
     fn a_relocated_xtask_still_finds_its_checkout() {
         let root = super::fixture::relocated("root");
         super::fixture::write(&root, "Cargo.lock", "");
-        super::fixture::write(&root, "crates/xtask/Cargo.toml", "");
-        let verdict = judged(&root.join("crates/xtask"), &root.join("crates"));
+        super::fixture::write(&root, "Tools/xtask/Cargo.toml", "");
+        let verdict = judged(&root.join("Tools/xtask"), &root.join("crates"));
         std::fs::remove_dir_all(&root).unwrap();
         assert!(
             matches!(&verdict, Ok(found) if *found == root),

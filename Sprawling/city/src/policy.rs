@@ -28,7 +28,7 @@
 //! have fixed that and bought a worse thing — two descriptions of one
 //! building, free to disagree.
 //!
-//! Specified by `crates/city/spec/Policy.lean` §8-2.
+//! Specified by `Sprawling/city/spec/Policy.lean` §8-2.
 
 use std::path::{Path, PathBuf};
 
@@ -128,7 +128,7 @@ impl BuildingRules {
 
     /// The domains this building may reach, when its file lists them;
     /// `None` is a building that wrote no `egress` key and is held to no
-    /// domain list (`crates/city/spec/Policy.lean` D27).
+    /// domain list (`Sprawling/city/spec/Policy.lean` D27).
     ///
     /// A confidential building has the empty list, whatever its file
     /// says: "data enters and does not leave" is the meaning of the
@@ -214,7 +214,7 @@ impl BuildingRules {
     }
 
     /// How many minutes a harness run in this building may take before
-    /// the city cancels it and freezes it as limit (`crates/sprawling/Spec.lean`
+    /// the city cancels it and freezes it as limit (`Sprawling/app/Spec.lean`
     /// §8-124). Absent the line, `HARNESS_MINUTES_DEFAULT`: a harness
     /// that neither speaks nor ends would otherwise hold a lane until a
     /// person noticed (city D8 (b)).

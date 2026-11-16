@@ -62,7 +62,7 @@ impl Prepared {
     }
 
     /// The release page, which leaves this machine and only on a press
-    /// (`crates/wire/Spec.lean` §8-36), through the registry a served
+    /// (`Sprawling/wire/Spec.lean` §8-36), through the registry a served
     /// city handed the views.
     pub(super) fn release_answer(newest: Option<fn() -> wire::ReleaseAnswer>) -> wire::Answer {
         match newest {
@@ -72,7 +72,7 @@ impl Prepared {
     }
 
     /// The harness page, which walks this machine's search path, and so
-    /// is read after the views are released (`crates/sprawling/Spec.lean`
+    /// is read after the views are released (`Sprawling/app/Spec.lean`
     /// §8-100). A city nobody served was handed no reach.
     /// Does the read the views left for after the snapshot: the answer,
     /// or the refusal the views settled on.

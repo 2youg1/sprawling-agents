@@ -7,7 +7,7 @@
 //! which version it is, which characters its bytes spell, where its
 //! blocks lie, how much of it one answer carries, what one save
 //! changes, how a suggestion about it is read and decided, and how a
-//! Markdown window reads (`crates/documents/Spec.lean`).
+//! Markdown window reads (`Sprawling/documents/Spec.lean`).
 //!
 //! No I/O: the bytes arrive as slices and leave as values. Reading the
 //! disk and the content store, and recording a save, belong to the

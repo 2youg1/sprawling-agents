@@ -181,7 +181,7 @@ pub struct CityAnswer {
     pub halted: Vec<HaltScope>,
     /// The last record of a history proved whole, when the proof has
     /// found it so; absent while a served city is still proving it, or
-    /// after the proof found it broken (`crates/wire/spec/Answer.lean` §8-63).
+    /// after the proof found it broken (`Sprawling/wire/spec/Answer.lean` §8-63).
     pub proved: Option<Seq>,
 }
 
@@ -222,7 +222,7 @@ pub enum Answer {
     Endpoints(EndpointsAnswer),
     KnownHosts(KnownHostsAnswer),
     AgentCatalog(Box<AgentCatalogAnswer>),
-    /// One pasted spec read as an agent entry (`crates/wire/spec/Answer/Agents.lean` §8-90).
+    /// One pasted spec read as an agent entry (`Sprawling/wire/spec/Answer/Agents.lean` §8-90).
     AgentSpec(Box<AgentOffer>),
     Devices(Box<DevicesAnswer>),
     Building(Box<BuildingAnswer>),
@@ -247,7 +247,7 @@ pub enum Answer {
     Bytes(Box<BytesAnswer>),
     Export(Box<ExportAnswer>),
     Preview(Box<PreviewAnswer>),
-    /// A reply's text laid out (`crates/wire/spec/Answer/Preview.lean` §8-75): its closed blocks, and
+    /// A reply's text laid out (`Sprawling/wire/spec/Answer/Preview.lean` §8-75): its closed blocks, and
     /// the bytes they cover.
     Reply(Box<documents::Laid>),
     Commits(CommitsAnswer),
@@ -279,10 +279,10 @@ pub enum Answer {
     GithubLogin(GithubLoginAnswer),
     Guide(GuideProgress),
     Privacy(Box<crate::PrivacyAnswer>),
-    /// What an empty model table would register (`crates/wire/spec/Answer/ModelFigures.lean` §8-97).
+    /// What an empty model table would register (`Sprawling/wire/spec/Answer/ModelFigures.lean` §8-97).
     ModelFigures(ModelFiguresAnswer),
     /// `reason` is the text of what stopped a view that tried to look
-    /// (`crates/wire/spec/Server.lean` D47); absent when the view names
+    /// (`Sprawling/wire/spec/Server.lean` D47); absent when the view names
     /// the query alone.
     Unavailable {
         query: String,
@@ -346,7 +346,7 @@ pub struct SignalLine {
     pub from: String,
     pub at: TimeMs,
     /// The first line of the signal's `text`; `None` when its payload
-    /// carries no text (`crates/wire/spec/Reading.lean` D39).
+    /// carries no text (`Sprawling/wire/spec/Reading.lean` D39).
     #[serde(default)]
     pub first_line: Option<String>,
 }

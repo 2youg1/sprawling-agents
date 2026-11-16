@@ -73,7 +73,7 @@ const FACTS: [Fact; 21] = [
     },
     Fact {
         key: "gate_count",
-        home: "the array in crates/xtask/src/gates.rs",
+        home: "the array in Tools/xtask/src/gates.rs",
         takes: None,
         recount: |_root, _arg| Ok(gates::COUNT.to_string()),
     },
@@ -97,15 +97,15 @@ const FACTS: [Fact; 21] = [
     },
     Fact {
         key: "fuzz_targets",
-        home: "crates/fuzz/fuzz_targets",
+        home: "Tools/fuzz/fuzz_targets",
         takes: None,
         recount: |root, _arg| {
-            recount::in_directory(root, "crates/fuzz/fuzz_targets", "fuzz target")
+            recount::in_directory(root, "Tools/fuzz/fuzz_targets", "fuzz target")
         },
     },
     Fact {
         key: "citysim_scenarios",
-        home: "crates/citysim/tests/scenarios/main.rs",
+        home: "Tools/citysim/tests/scenarios/main.rs",
         takes: None,
         recount: |root, _arg| recount::citysim_scenarios(root),
     },
@@ -124,7 +124,7 @@ const FACTS: [Fact; 21] = [
     },
     Fact {
         key: "adversary_seed",
-        home: "crates/adversary/test/Main.lean",
+        home: "Tools/adversary/test/Main.lean",
         takes: None,
         recount: |root, _arg| adversary_seed(root),
     },
@@ -148,25 +148,25 @@ const FACTS: [Fact; 21] = [
     },
     Fact {
         key: "budget_bytes",
-        home: "the `budget_bytes` of that row in crates/xtask/budgets.toml",
+        home: "the `budget_bytes` of that row in Tools/xtask/budgets.toml",
         takes: Some("the register row"),
         recount: |root, arg| recount::grouped_bytes(root, arg, "budget_bytes"),
     },
     Fact {
         key: "budget_reading",
-        home: "the `best_bytes` of that row in crates/xtask/budgets.toml",
+        home: "the `best_bytes` of that row in Tools/xtask/budgets.toml",
         takes: Some("the register row"),
         recount: |root, arg| recount::grouped_bytes(root, arg, "best_bytes"),
     },
     Fact {
         key: "budget_headroom",
-        home: "the budget over the reading, both from crates/xtask/budgets.toml",
+        home: "the budget over the reading, both from Tools/xtask/budgets.toml",
         takes: Some("the register row"),
         recount: recount::headroom,
     },
     Fact {
         key: "budget_figure",
-        home: "the named integer field of that row in crates/xtask/budgets.toml",
+        home: "the named integer field of that row in Tools/xtask/budgets.toml",
         takes: Some("the register row and its field, as `row.field`"),
         recount: recount::figure,
     },
@@ -248,7 +248,7 @@ fn workspace_version(root: &Path) -> Result<String, XtaskError> {
 }
 
 /// The maturity in the spelling a span names: `word` as a sentence writes
-/// it, `titled` as a tag and a heading do (crates/xtask/Spec.lean D17).
+/// it, `titled` as a tag and a heading do (Tools/xtask/Spec.lean D17).
 /// Both come from `kernel::Maturity`, so this only carries the string.
 fn maturity(maturity: kernel::Maturity, spelling: &str) -> Result<String, XtaskError> {
     match spelling {
@@ -264,7 +264,7 @@ fn maturity(maturity: kernel::Maturity, spelling: &str) -> Result<String, XtaskE
     }
 }
 
-/// The register row a fact names, parsed from `crates/xtask/budgets.toml`.
+/// The register row a fact names, parsed from `Tools/xtask/budgets.toml`.
 fn register_row(root: &Path, row: &str) -> Result<toml::Value, XtaskError> {
     budget::register(root)?
         .get(row)
@@ -278,8 +278,8 @@ fn register_row(root: &Path, row: &str) -> Result<toml::Value, XtaskError> {
 /// The seed the adversary draws every property from, read out of the Lean
 /// definition that holds it.
 ///
-/// The figure's home is `crates/adversary/`, because that is the program that
-/// draws from it, and its specification `crates/adversary/Spec.lean` quotes it. Reading it here makes
+/// The figure's home is `Tools/adversary/`, because that is the program that
+/// draws from it, and its specification `Tools/adversary/Spec.lean` quotes it. Reading it here makes
 /// the quotation a managed span: nothing else joins a Lean definition to a
 /// number written in prose, so the two could disagree with every gate
 /// green.
@@ -289,7 +289,7 @@ fn register_row(root: &Path, row: &str) -> Result<toml::Value, XtaskError> {
 /// would leave the quoted figure as the only copy, which is the shape of
 /// defect the managed span exists to close.
 fn adversary_seed(root: &Path) -> Result<String, XtaskError> {
-    const SOURCE: &str = "crates/adversary/test/Main.lean";
+    const SOURCE: &str = "Tools/adversary/test/Main.lean";
     let text = walk::read_text(&root.join(SOURCE))?;
     let declared = text.lines().find_map(|line| {
         let value = line
@@ -369,7 +369,7 @@ mod tests {
         let root = crate::root::fixture::relocated("register-figure");
         crate::root::fixture::write(
             &root,
-            "crates/xtask/budgets.toml",
+            "Tools/xtask/budgets.toml",
             "[views_rebuild_per_mb]
 best_p50_us = 2759
 ",

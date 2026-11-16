@@ -14,12 +14,12 @@ goes through `Sprawling.Door`; what they do with the editor is written here, as
 the files say a person writes it: naming the archive's `skills/` as a shelf and
 admitting those skills in a building's reading room (`docs/getting-started.md`,
 "Tools, skills and MCP"), asking a building to review its work, and writing the
-first row of its plan (`crates/city/templates/RULES.toml`,
-`crates/city/templates/Roadmap.md`).
+first row of its plan (`Sprawling/city/templates/RULES.toml`,
+`Sprawling/city/templates/Roadmap.md`).
 
 Unlike `withGround`, the directory outlives one served process: the walk serves
 it, kills it in the middle of a run, and serves it again; the servings that
-are not the crash end in order (crates/adversary/Spec.lean D8).
+are not the crash end in order (Tools/adversary/Spec.lean D8).
 -/
 
 namespace Sprawling.Acceptance

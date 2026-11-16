@@ -6,7 +6,7 @@
 /-!
 # runtime::clock
 
-规定 `clock`（`crates/runtime/src/` 下同名的文件）。一刻的唯一拼法、结果上的戳与它的发放规则、一跑的驱动最近读到的那一刻、按 UTC 选一段时间。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `clock`（`Sprawling/runtime/src/` 下同名的文件）。一刻的唯一拼法、结果上的戳与它的发放规则、一跑的驱动最近读到的那一刻、按 UTC 选一段时间。本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `Sprawling/runtime/Spec.lean §8-n`。
 -/
 
 /-!
@@ -14,7 +14,7 @@
 
 
 ```rust
-// 关切时区的权威住 kernel::config::ClockZone（[clock] zones 属三层配置，city 仍拒写它，`crates/city/Spec.lean` §8-31）：
+// 关切时区的权威住 kernel::config::ClockZone（[clock] zones 属三层配置，city 仍拒写它，`Sprawling/city/Spec.lean` §8-31）：
 // FrozenConfig 携 clock_zones: Vec<ClockZone>；本模块只消费不定义（一个权威）。
 pub fn iso(at: TimeMs) -> String;   // ISO 8601，UTC，到秒："2026-05-14T09:31:07Z"；一刻给人或模型读时的唯一拼法
 pub fn parse_iso(raw: &str) -> Result<TimeMs, AxError>;   // iso 的逆：只收 iso 写出的那一种形状；其余 → E_INVALID_ARGS
@@ -34,7 +34,7 @@ impl StampGate {
 ```
 
 - 历法纯整数（civil-from-days，无 chrono 依赖）：全程在 `i128` 上算，`u64` 毫秒加 `i32` 分钟偏移落不出它的界，所以格式化不会失败，`iso` 与 `render` 不带 `Result`；界证明携 `#[expect]`。**精度与频率分开**：戳一律到秒，粒度只决定 `Timeless` 工具多久带一次戳——同桶里第二条 `Timeless` 结果不带戳，`Timestamped` 每条都带。A18 零字节：Off 时 observe 恒 None。
-- `iso` 是本 crate 里一刻的唯一文字形：时钟行、`status` 的 `now:` 行都经它；`parse_iso` 把同一种文字读回一刻（`view --since` 与 `--until`，`crates/sprawling/Spec.lean` §8-137），同一模块、同一精度。两者互逆：`parse_iso(&iso(t))` 是 `t` 去掉毫秒，`iso(parse_iso(s)?)` 是 `s`。`parse_iso` 只收 `YYYY-MM-DDTHH:MM:SSZ` 这 20 个字节：时区偏移、秒的小数、只有日期、小写的 `t`/`z`、历法里没有的那一天（2 月 30 日、非闰年的 2 月 29 日）、`24:00:00` 与闰秒 `:60`、1970 年之前，一律 `E_INVALID_ARGS`（action `read a UTC moment`，subject 是原文，recovery 给出正确写法）。日子在不在历法里，由把算出的日数经 `civil_from_days` 再算回来、比对年月日判定，历法只有那一份算法。
+- `iso` 是本 crate 里一刻的唯一文字形：时钟行、`status` 的 `now:` 行都经它；`parse_iso` 把同一种文字读回一刻（`view --since` 与 `--until`，`Sprawling/app/Spec.lean` §8-137），同一模块、同一精度。两者互逆：`parse_iso(&iso(t))` 是 `t` 去掉毫秒，`iso(parse_iso(s)?)` 是 `s`。`parse_iso` 只收 `YYYY-MM-DDTHH:MM:SSZ` 这 20 个字节：时区偏移、秒的小数、只有日期、小写的 `t`/`z`、历法里没有的那一天（2 月 30 日、非闰年的 2 月 29 日）、`24:00:00` 与闰秒 `:60`、1970 年之前，一律 `E_INVALID_ARGS`（action `read a UTC moment`，subject 是原文，recovery 给出正确写法）。日子在不在历法里，由把算出的日数经 `civil_from_days` 再算回来、比对年月日判定，历法只有那一份算法。
 - 时区行仍在：`FrozenConfig.clock_zones` 在真城里恒空（城配置拒 `[clock] zones`），剧本仍可冻结出非空表，所以格式化保留，偏移写成 `+HH:MM`／`-HH:MM`。
 -/
 
@@ -49,7 +49,7 @@ impl ClockReading {
     pub fn keep(&self, at: TimeMs);          // 驱动的时钟钩子每读一次就记一次
     pub fn latest(&self) -> Option<TimeMs>;  // 最近记下的读数；还没读过为 None
 }
-// crates/runtime/src/tools/status.rs
+// Sprawling/runtime/src/tools/status.rs
 impl StatusTool { pub fn clocked(self, clock: ClockReading) -> StatusTool; }   // `now:` 行从它现读
 ```
 
@@ -76,7 +76,7 @@ impl UtcSpan {
 }
 ```
 
-- **读者**：`sprawling view --since` 与 `--until`（`crates/sprawling/Spec.lean` §8-137）；playback 的时间筛选接进来时读同一个值，不另写一份区间规则。`Default` 是两端都不设界，`contains` 恒真。
+- **读者**：`sprawling view --since` 与 `--until`（`Sprawling/app/Spec.lean` §8-137）；playback 的时间筛选接进来时读同一个值，不另写一份区间规则。`Default` 是两端都不设界，`contains` 恒真。
 - **逐个时刻判断，不假定有序**：`contains` 只看给它的那一刻。账本的 `t` 不随 `seq` 单调（D5：并行只读段的开始时刻可以早于前一条的答复；墙钟也会回拨），所以按时间选行的读者每一行都问一次，不在第一条越过 `until` 的行处停下，也不二分。
 - **矛盾的区间在构造时拒绝**：`until <= since` 的区间里没有任何一刻，按它选行只会安静地答出一段空历史；拒绝时 subject 写出两端的 `iso`。合法而恰好什么都没选中的区间照常答空。
 -/
@@ -180,7 +180,7 @@ structure UtcSpan where
 
 **理由**：人从时钟行、`status` 的 `now:` 行或 `view` 的输出里抄下一刻，抄来的就是这一种形状；读回只收它，`iso` 与 `parse_iso` 互逆是一条可以逐值检验的性质，而不是两份各自宽容的规则。半开区间让相邻的两段（今天、明天）不重不漏，一行恰好落在交界那一毫秒时只属于后一段。矛盾的区间在值里拒绝，而不是让每个读者各自判一次：一个打错顺序的命令行得到一句错误，而不是一段看起来正常的空历史。
 
-**被否**：①也收时区偏移并换算成 UTC——城的配置拒绝时区（`crates/city/Spec.lean` §8-31），收偏移就有了第二条关于时区的规则；②也收只有日期、或带小数秒的写法——每多一种写法就多一条「它等于哪一刻」的规定（一天的开始还是整天、截断还是舍入），而它们都不再与 `iso` 互逆；③闭区间 `[since, until]`——相邻两段在交界那一毫秒重叠；④`until <= since` 时答空——与「这段时间里什么都没发生」分不开。
+**被否**：①也收时区偏移并换算成 UTC——城的配置拒绝时区（`Sprawling/city/Spec.lean` §8-31），收偏移就有了第二条关于时区的规则；②也收只有日期、或带小数秒的写法——每多一种写法就多一条「它等于哪一刻」的规定（一天的开始还是整天、截断还是舍入），而它们都不再与 `iso` 互逆；③闭区间 `[since, until]`——相邻两段在交界那一毫秒重叠；④`until <= since` 时答空——与「这段时间里什么都没发生」分不开。
 
 **重开参数**：页面或居民工具要按本地日期选一天时，「一天」由读者的时区展开成一个 `UtcSpan`，那时再定展开规则住哪里；本模块仍只读 UTC。
 -/

@@ -6,7 +6,7 @@
 /-!
 # accounting::views::answering::github
 
-规定 `crates/accounting/src/views/answering/github.rs`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+规定 `Sprawling/accounting/src/views/answering/github.rs`。本文件是 `Sprawling/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `Sprawling/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
 -/
 
 /-!

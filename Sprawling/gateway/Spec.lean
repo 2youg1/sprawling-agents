@@ -3,41 +3,41 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.gateway.spec.Adviser
-import crates.gateway.spec.Concurrency
-import crates.gateway.spec.Cost
-import crates.gateway.spec.Credential
-import crates.gateway.spec.Credential.Vault.File
-import crates.gateway.spec.Dialect
-import crates.gateway.spec.Dialect.Responses
-import crates.gateway.spec.Endpoint
-import crates.gateway.spec.Endpoint.Failure
-import crates.gateway.spec.Endpoint.Models
-import crates.gateway.spec.Endpoint.Stream
-import crates.gateway.spec.Endpoint.Transport
-import crates.gateway.spec.Market
-import crates.gateway.spec.Ocr
-import crates.gateway.spec.Provider
-import crates.gateway.spec.Provider.Ceiling
-import crates.gateway.spec.Provider.Generation
-import crates.gateway.spec.Provider.Identity
-import crates.gateway.spec.Provider.Input
-import crates.gateway.spec.Provider.Preset
-import crates.gateway.spec.Provider.Registry
-import crates.gateway.spec.Provider.Stability
-import crates.gateway.spec.Provider.Thinking
-import crates.gateway.spec.Reach
-import crates.gateway.spec.Reach.Resolve
-import crates.gateway.spec.Router
-import crates.gateway.spec.Router.Tuning
-import crates.gateway.spec.Transcribe
-import crates.gateway.spec.Transcribe.Recording
+import Sprawling.gateway.spec.Adviser
+import Sprawling.gateway.spec.Concurrency
+import Sprawling.gateway.spec.Cost
+import Sprawling.gateway.spec.Credential
+import Sprawling.gateway.spec.Credential.Vault.File
+import Sprawling.gateway.spec.Dialect
+import Sprawling.gateway.spec.Dialect.Responses
+import Sprawling.gateway.spec.Endpoint
+import Sprawling.gateway.spec.Endpoint.Failure
+import Sprawling.gateway.spec.Endpoint.Models
+import Sprawling.gateway.spec.Endpoint.Stream
+import Sprawling.gateway.spec.Endpoint.Transport
+import Sprawling.gateway.spec.Market
+import Sprawling.gateway.spec.Ocr
+import Sprawling.gateway.spec.Provider
+import Sprawling.gateway.spec.Provider.Ceiling
+import Sprawling.gateway.spec.Provider.Generation
+import Sprawling.gateway.spec.Provider.Identity
+import Sprawling.gateway.spec.Provider.Input
+import Sprawling.gateway.spec.Provider.Preset
+import Sprawling.gateway.spec.Provider.Registry
+import Sprawling.gateway.spec.Provider.Stability
+import Sprawling.gateway.spec.Provider.Thinking
+import Sprawling.gateway.spec.Reach
+import Sprawling.gateway.spec.Reach.Resolve
+import Sprawling.gateway.spec.Router
+import Sprawling.gateway.spec.Router.Tuning
+import Sprawling.gateway.spec.Transcribe
+import Sprawling.gateway.spec.Transcribe.Recording
 
 /-! # gateway 的规格
 
-`sprawling-gateway`（库名 `gateway`，目录 `crates/gateway`，依赖 kernel）是模型调用的一切：模型路由；provider 客户端自写，加上认证的两半；Custody；市场快照与成本；端点的并发名额与前缀等待；`kernel::model` 缝的生产适配器。模块：dialect（及 anthropic／openai／mismatch）／endpoint／credential（内缝 Vault）／market／cost／concurrency／hold／router／provider／reach／transcribe／ocr／adviser。
+`sprawling-gateway`（库名 `gateway`，目录 `Sprawling/gateway`，依赖 kernel）是模型调用的一切：模型路由；provider 客户端自写，加上认证的两半；Custody；市场快照与成本；端点的并发名额与前缀等待；`kernel::model` 缝的生产适配器。模块：dialect（及 anthropic／openai／mismatch）／endpoint／credential（内缝 Vault）／market／cost／concurrency／hold／router／provider／reach／transcribe／ocr／adviser。
 
-本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部，并写下四节不属于任何一个模块的 crate 级接口。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `gateway D<n>`；D1 到 D15 是这份规格在 Markdown 时 §12 各段按出现顺序的编号，D16 起是迁到 Lean 之后的决定，§12 末尾列出每条住在哪里。
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `Sprawling/gateway/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部，并写下四节不属于任何一个模块的 crate 级接口。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `gateway D<n>`；D1 到 D15 是这份规格在 Markdown 时 §12 各段按出现顺序的编号，D16 起是迁到 Lean 之后的决定，§12 末尾列出每条住在哪里。
 
 能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：输出上限的事实梯（`spec/Provider/Ceiling.lean`）、思考档的梯子（`spec/Provider/Thinking.lean`）、一个模型收得下什么（`spec/Provider/Input.lean`）、预置表里哪一行为一个模型 id 作答（`spec/Provider/Preset.lean`）、一次失败能不能再试（`spec/Endpoint/Failure.lean`）、一次调用的结算（`spec/Cost.lean`）、一个端点的并发名额、排队与取号之前的前缀等待（`spec/Concurrency.lean`）、Responses 流的 EOF 结算（`spec/Dialect/Responses.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
 -/
@@ -87,7 +87,7 @@ import crates.gateway.spec.Transcribe.Recording
 - **本地推理**＝指向回环地址的 OpenAI 兼容服务（llama.cpp/ollama 一类），与远端同走 `Endpoint`（§8-3）。本地引擎进程管理不属本 crate。
 - **tokio 不引入**：turn 是同步函数面，endpoint 用 `reqwest::blocking`（内部自管运行时线程，不出接口），为一个 HTTP 调用把 async 传染到全库不值。
 - 线格式 JSON 允许浮点（temperature 等 provider 字段）：dialect 是翻译面不是判定路径；判定路径（cost／market 价目）恒整数。
-- **只有 Anthropic 兼容格式在结算前交出调用。** `Endpoint` 经 `Model::call_speculating`（kernel SPEC「模型端口第三扇门」）在 `content_block_stop` 到达时交出完整调用，消费方是 `runtime::turn::speculation`（`crates/runtime/Spec.lean` §8-3），它守的性质由 `crates/runtime/spec/Turn/Speculation.lean` 证明。OpenAI 两种兼容格式在结算前不交出调用：它们的调用在哪一帧完整，线上没有一帧明说。
+- **只有 Anthropic 兼容格式在结算前交出调用。** `Endpoint` 经 `Model::call_speculating`（kernel SPEC「模型端口第三扇门」）在 `content_block_stop` 到达时交出完整调用，消费方是 `runtime::turn::speculation`（`Sprawling/runtime/Spec.lean` §8-3），它守的性质由 `Sprawling/runtime/spec/Turn/Speculation.lean` 证明。OpenAI 两种兼容格式在结算前不交出调用：它们的调用在哪一帧完整，线上没有一帧明说。
 - **加密金库文件还没有探针选它**：`Custodian::probe` 只试平台服务，何时向人要口令、口令从哪里来未定（§8-21）。
 - **上游 `/models` 说了 `image` 算不算「收得下什么」的一档，未定。** 探测把每一行的 `input_modalities` 原样记进 `ModelFacts`（§8-16），`AttachedEndpoint.models` 带着它，而 `accepted_input`（§8-37）不读它：那是供应方自己的词（`image`、`audio`），一个中转站可能为一个厂商自己拒图的 id 写上 `image`。若定为一档，它排在人之后、目录之前，与上限梯的 `Upstream` 同位；要定下它，需要一份真实中转站的 `/models` 记录，其中写着 `image` 的模型在那条线上确实收图。
 - **responses 面答 `usage: null` 时算不算「供应方没报用量」，未定。** `openai-openapi` 把 `Response.usage` 写作 `ResponseUsage` 或 `null`。`dialect::responses::reply` 在 `usage` 缺席时报 `E_WIRE_MISMATCH`，为 `null` 时经 `mismatch::tokens_or_zero` 把输入与输出都读成 0 token（缓存两数经 `mismatch::cache_count` 读成 `Unreported`，kernel D36）：两种缺法得到相反的结论，后一种让这次调用的用量从账上静默消失。规格没有说 `status` 为 `completed` 的 response 会不会带 `null`，所以读法暂不改；要定下它，需要一个真实供应方在已完成的 response 里答出 `usage: null` 的记录。
@@ -113,7 +113,7 @@ import crates.gateway.spec.Transcribe.Recording
 
 /-! ## 6 命名统一
 
-**跨 crate 类型住处**：本 crate 经 `kernel` 顶层重导出引用 kernel 的类型（如 `kernel::AxError`），类型定义在 kernel 的哪个文件是 kernel 内政，公共拼写不随它变。没有公开面基线在跑：`cargo public-api` 不在任何门或工作流里（退役的理由在 `crates/xtask/Spec.lean`），公开面由 `lib.rs` 的再导出与 `xtask depmap` 守。
+**跨 crate 类型住处**：本 crate 经 `kernel` 顶层重导出引用 kernel 的类型（如 `kernel::AxError`），类型定义在 kernel 的哪个文件是 kernel 内政，公共拼写不随它变。没有公开面基线在跑：`cargo public-api` 不在任何门或工作流里（退役的理由在 `Tools/xtask/Spec.lean`），公开面由 `lib.rs` 的再导出与 `xtask depmap` 守。
 
 Dialect／Endpoint／Custody／Vault／SecretRef／Sealed／Retries／HeaderValue／market snapshot／UsdMicros／权威计费额（authoritative billed amount）。概念名英文原词；「兑付」＝resolve+expose 的合称。
 
@@ -155,38 +155,38 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 
 | 标签 | 分部 |
 |---|---|
-| 8-1 | `crates/gateway/spec/Dialect.lean` |
-| 8-2 | `crates/gateway/spec/Endpoint.lean` |
-| 8-3 | `crates/gateway/spec/Endpoint/Transport.lean` |
-| 8-4 | `crates/gateway/spec/Credential.lean` |
+| 8-1 | `Sprawling/gateway/spec/Dialect.lean` |
+| 8-2 | `Sprawling/gateway/spec/Endpoint.lean` |
+| 8-3 | `Sprawling/gateway/spec/Endpoint/Transport.lean` |
+| 8-4 | `Sprawling/gateway/spec/Credential.lean` |
 | 8-5 | 本文件 §8 |
 | 8-6 | 本文件 §8 |
-| 8-7 | `crates/gateway/spec/Market.lean` |
-| 8-8 | `crates/gateway/spec/Cost.lean` |
-| 8-9 | `crates/gateway/spec/Router.lean` |
-| 8-10 | `crates/gateway/spec/Endpoint/Models.lean` |
-| 8-11 | `crates/gateway/spec/Router.lean` |
-| 8-12 | `crates/gateway/spec/Transcribe.lean` |
-| 8-13 | `crates/gateway/spec/Endpoint/Stream.lean` |
+| 8-7 | `Sprawling/gateway/spec/Market.lean` |
+| 8-8 | `Sprawling/gateway/spec/Cost.lean` |
+| 8-9 | `Sprawling/gateway/spec/Router.lean` |
+| 8-10 | `Sprawling/gateway/spec/Endpoint/Models.lean` |
+| 8-11 | `Sprawling/gateway/spec/Router.lean` |
+| 8-12 | `Sprawling/gateway/spec/Transcribe.lean` |
+| 8-13 | `Sprawling/gateway/spec/Endpoint/Stream.lean` |
 | 8-14 | 本文件 §8 |
-| 8-15 | `crates/gateway/spec/Reach.lean` |
-| 8-16 | `crates/gateway/spec/Router/Tuning.lean` |
-| 8-17 | `crates/gateway/spec/Provider.lean` |
-| 8-18 | `crates/gateway/spec/Provider/Registry.lean` |
-| 8-19 | `crates/gateway/spec/Provider/Stability.lean` |
-| 8-20 | `crates/gateway/spec/Dialect/Responses.lean` |
-| 8-21 | `crates/gateway/spec/Credential/Vault/File.lean` |
-| 8-23 | `crates/gateway/spec/Adviser.lean` |
+| 8-15 | `Sprawling/gateway/spec/Reach.lean` |
+| 8-16 | `Sprawling/gateway/spec/Router/Tuning.lean` |
+| 8-17 | `Sprawling/gateway/spec/Provider.lean` |
+| 8-18 | `Sprawling/gateway/spec/Provider/Registry.lean` |
+| 8-19 | `Sprawling/gateway/spec/Provider/Stability.lean` |
+| 8-20 | `Sprawling/gateway/spec/Dialect/Responses.lean` |
+| 8-21 | `Sprawling/gateway/spec/Credential/Vault/File.lean` |
+| 8-23 | `Sprawling/gateway/spec/Adviser.lean` |
 | 8-31 | 本文件 §8 |
-| 8-32 | `crates/gateway/spec/Reach/Resolve.lean` |
-| 8-33 | `crates/gateway/spec/Transcribe/Recording.lean` |
-| 8-34 | `crates/gateway/spec/Ocr.lean` |
-| 8-35 | `crates/gateway/spec/Endpoint/Transport.lean` |
-| 8-37 | `crates/gateway/spec/Provider/Input.lean` |
-| 8-38 | `crates/gateway/spec/Provider/Identity.lean` |
-| 8-39 | `crates/gateway/spec/Provider/Thinking.lean` |
-| 8-40 | `crates/gateway/spec/Concurrency.lean` |
-| 8-41 | `crates/gateway/spec/Provider/Generation.lean` |
+| 8-32 | `Sprawling/gateway/spec/Reach/Resolve.lean` |
+| 8-33 | `Sprawling/gateway/spec/Transcribe/Recording.lean` |
+| 8-34 | `Sprawling/gateway/spec/Ocr.lean` |
+| 8-35 | `Sprawling/gateway/spec/Endpoint/Transport.lean` |
+| 8-37 | `Sprawling/gateway/spec/Provider/Input.lean` |
+| 8-38 | `Sprawling/gateway/spec/Provider/Identity.lean` |
+| 8-39 | `Sprawling/gateway/spec/Provider/Thinking.lean` |
+| 8-40 | `Sprawling/gateway/spec/Concurrency.lean` |
+| 8-41 | `Sprawling/gateway/spec/Provider/Generation.lean` |
 
 §8-36 不用。下面四节不属于任何一个模块：两件本 crate 不做的事，目录化的形状，以及重试上限住在哪里。
 -/
@@ -194,7 +194,7 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 /-!
 ### 8-5 订阅额度不经本 crate
 
-本 crate 只接两种兼容格式的端点：OpenAI 兼容（chat 与 responses 两面）与 Anthropic 兼容，凭证只有人交出的 API key。**订阅额度由厂商自己的 harness 带进城**（Codex、Claude Code、Grok Build、Kimi Code、Pi 五家，人在 harness 里自己登录，见 `crates/sprawling/Spec.lean` 的 harness 一节），本 crate 不以任何厂商客户端的身份登录，不持订阅令牌，也不续期。
+本 crate 只接两种兼容格式的端点：OpenAI 兼容（chat 与 responses 两面）与 Anthropic 兼容，凭证只有人交出的 API key。**订阅额度由厂商自己的 harness 带进城**（Codex、Claude Code、Grok Build、Kimi Code、Pi 五家，人在 harness 里自己登录，见 `Sprawling/app/Spec.lean` 的 harness 一节），本 crate 不以任何厂商客户端的身份登录，不持订阅令牌，也不续期。
 
 - **理由是厂商原文，不是口味。** Anthropic 的 Claude Code 合规页（<https://code.claude.com/docs/en/legal-and-compliance>，「Authentication and credential use」一节）写明 "Anthropic does not permit third-party developers to offer Claude.ai login into their own applications"，并且 "developers may not collect, store, or intermediate Claude.ai credentials or session tokens"。Kimi Code 的会员指南（<https://www.kimi.com/en/help/kimi-code/membership-guide>）把 OAuth 留给官方客户端，第三方工具用 API key。OpenAI 没有给第三方用 ChatGPT 凭据调用订阅后端的公开契约，它给出的嵌入方式是 `codex app-server`。借用某家官方客户端的 client id 登录、把令牌存进金库，正是前两家禁止、第三家不承诺的做法。
 - **落选**：保留四家登录表并逐家标注风险。那是替人拿他的账号去赌厂商不执行条款，执行的后果落在人身上，而不是本城。
@@ -220,7 +220,7 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 
 **决定**：形状如下；§8-6 写判定之外还没接上的部分。端点的 tuning（`router/tuning.rs`）多一把 `max_in_flight: Option<MaxInFlight>`，配置里拼作 `max_in_flight`，合法域 1 到 `IN_FLIGHT_MAX`（256）；缺席时取 `vendor_in_flight(base_url)`：这台电脑上的服务器取 `IN_FLIGHT_LOCAL`（4），其余取 `IN_FLIGHT_DEFAULT`（16），因为今天没有厂商在文档里给出并发数（见下文「缺省」）。收窄与放宽是一个纯判定 `gateway::concurrency`：收到 429 或 `Retry-After` 时把当下的名额减半（至少 1），在 `Retry-After` 给出的时刻之前不再放宽；之后每连续 `WIDEN_AFTER`（8）次成功加 1，直到配置的上限。判定答两臂：名额已满（排队并计数）与等到某一刻（带时刻），不让调用方忙等（§8-6「要接时接在哪」）。状态随端点住它的 `Transport`，名额在 `kernel::Model` 的门里每次调用前取、后还（§8-6），所以 runtime 不改一行；排队数与等待时长是仪表的读数之一，页面在 provider 一处显示。
 
-**理由**：车道不设上限之后（`crates/sprawling/Spec.lean` D34），排队只该发生在 provider 一处，因为那是对方限流与计费的地方；不设闸，429 就由每条 lane 各自撞墙、各自退避。缺省取厂商的值而不是城内一个常数，是因为不同端点的上限差一两个数量级。判定与平台无关，三个平台相同。
+**理由**：车道不设上限之后（`Sprawling/app/Spec.lean` D34），排队只该发生在 provider 一处，因为那是对方限流与计费的地方；不设闸，429 就由每条 lane 各自撞墙、各自退避。缺省取厂商的值而不是城内一个常数，是因为不同端点的上限差一两个数量级。判定与平台无关，三个平台相同。
 
 **被否**：①一个城级的总车道数（V0.0.8 写死的四条）：第五个准备好的 run 等一个与任何 provider 都无关的名额；②只靠 watchdog 的退避（D2）：退避是一条 run 自己的事，挡不住其余 run 继续撞同一个端点。
 
@@ -236,7 +236,7 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 - **等待有界**：一次排队至多等 `QUEUE_WAIT_MAX`（10 分钟，从拿号时的单调读数算），超过即以 `E_BACKPRESSURE_SHED` 拒这一次调用，主体是端点名与排了多久，恢复语「这个端点的并发上限比同时想调它的 run 少：在端点设置里调大 `max_in_flight`，或少派几条」；拒后号出队，下一个顶上。排队的时间不计入 `timeout_ms`：那个期限说的是一次请求对端多久答，不是城里排了多久。
 - **取消**：门的签名没有取消信号，一个排着队的 run 在它拿到名额、调用返回之后的那个安全点才看见取消；`QUEUE_WAIT_MAX` 封住这段延迟的上限。
 
-**理由**：本 crate 的每个判定只读传给它的时刻（D17），而名额要按时刻放宽，所以时刻必须有一个来处；放在路由簿的构造参数里，生产与测试各给一个，门的签名（`kernel::Model`）一行不改，runtime 也就一行不改。守卫还名额，是因为门里有七八条提前返回的路，漏还一次就让这个端点永远少一个名额。先来后到，是因为车道不设上限之后（`crates/sprawling/Spec.lean` D34）几十条 run 可能同时排在一个端点上，没有次序时一条 run 可以一直被后来者插队。
+**理由**：本 crate 的每个判定只读传给它的时刻（D17），而名额要按时刻放宽，所以时刻必须有一个来处；放在路由簿的构造参数里，生产与测试各给一个，门的签名（`kernel::Model`）一行不改，runtime 也就一行不改。守卫还名额，是因为门里有七八条提前返回的路，漏还一次就让这个端点永远少一个名额。先来后到，是因为车道不设上限之后（`Sprawling/app/Spec.lean` D34）几十条 run 可能同时排在一个端点上，没有次序时一条 run 可以一直被后来者插队。
 
 **被否**：①门的签名里加一个 `now`：`kernel::Model` 的每个实现与每个调用方都要改，而只有这一个实现用它；②`Condvar::notify_one` 交给操作系统挑：Windows、macOS 与 Linux 的唤醒次序不同，同一个场景在三个平台上排出三种次序；③无界等待：一个被收窄到 1 的端点后面排着的 run 会停到人发现为止；④把名额放在 runtime 的 `run::drive`：每条 run 各持一份状态，正是 D17 要去掉的那件事。
 
@@ -248,10 +248,10 @@ market／cost：纯判定与数据面，被 endpoint 与 runtime 回合层消费
 /-! D21 `max_in_flight` 进端点的 tuning 与 `endpoint_attached`；排队数与等待时长是每个端点的一份读数
 
 **决定**：
-- **配置**：wire 的 `EndpointTuning` 多 `max_in_flight: Option<u32>`（`crates/wire/spec/Command/Tuning.lean` §8-29），装配层的 `tuning_of` 把零与缺席读成 `None`、把 1 到 `IN_FLIGHT_MAX` 的值经 `MaxInFlight::try_from` 收下、其余拒 `E_CONFIG_INVALID`（与同一张表单上读作凭据的请求头同一个码，一张表单的拒绝不分两种码）；gateway 的 `EndpointTuning::max_in_flight: Option<MaxInFlight>` 是 D17 那把键，住在 tuning 而不是每次调用的 `EndpointConfig`，因为门是端点的、一次建成，调用只取名额。`router/payload.rs` 的 `endpoint_attached` 载荷多同一把键，`#[serde(default, skip_serializing_if = "Option::is_none")]`：旧账本没有它的行读作 `None`，重开的城取缺省，从没被定过的端点写出的字节与今天相同。
+- **配置**：wire 的 `EndpointTuning` 多 `max_in_flight: Option<u32>`（`Sprawling/wire/spec/Command/Tuning.lean` §8-29），装配层的 `tuning_of` 把零与缺席读成 `None`、把 1 到 `IN_FLIGHT_MAX` 的值经 `MaxInFlight::try_from` 收下、其余拒 `E_CONFIG_INVALID`（与同一张表单上读作凭据的请求头同一个码，一张表单的拒绝不分两种码）；gateway 的 `EndpointTuning::max_in_flight: Option<MaxInFlight>` 是 D17 那把键，住在 tuning 而不是每次调用的 `EndpointConfig`，因为门是端点的、一次建成，调用只取名额。`router/payload.rs` 的 `endpoint_attached` 载荷多同一把键，`#[serde(default, skip_serializing_if = "Option::is_none")]`：旧账本没有它的行读作 `None`，重开的城取缺省，从没被定过的端点写出的字节与今天相同。
 - **缺省**：`None` 时取 `vendor_in_flight(base_url)`，一张住在 `gateway::concurrency` 的小表；今天没有厂商在文档里给出并发数（厂商给的是每分钟请求数与 token 数），所以表里只有一行：`reach::is_local` 认作这台电脑上的服务器取 `IN_FLIGHT_LOCAL`（4，本地推理服务器的并行槽位常见的缺省），其余取 `IN_FLIGHT_DEFAULT`（16）。
 - **读数**：排队的等待由测试台 `endpoint::permit` 的 `instrument_provider_queue`（`#[ignore]`，`just bench` 跑它）读出：16 与 64 个调用方抢四个名额，从拿号到取到的等待按注入的单调时钟计，印出 p50／p99／p999 与 max。读数是测试进程里的计数，不进账本、不进产品路径。按端点名读出此刻排队数与等待直方图的公开面（`EndpointBook` 上一个读数方法）今天没有：它在页面第一次要显示排队的那一次改动里与它的读者一起加，因为没有生产调用者的公开面不留（下文重开参数里的线上字段是同一次改动）。
-- **预算行**：`crates/xtask/budgets.toml` 的 `[provider_queue]`（测量、不设门）写「一次模型调用在端点名额前从拿号到取到的等待，注入的单调时钟，p50／p99／p999 与 max，16 与 64 个调用方对四个名额」，`measured_by` 指向 `instrument_provider_queue`；它的 `status` 写明读数欠着。
+- **预算行**：`Tools/xtask/budgets.toml` 的 `[provider_queue]`（测量、不设门）写「一次模型调用在端点名额前从拿号到取到的等待，注入的单调时钟，p50／p99／p999 与 max，16 与 64 个调用方对四个名额」，`measured_by` 指向 `instrument_provider_queue`；它的 `status` 写明读数欠着。
 
 **理由**：上限是 User 对一个端点定的规矩，与 `timeout_ms` 同属 tuning，随端点上线、随 `endpoint_attached` 进账本，重放才能说出某次调用是在什么上限下排的队。缺省写成一张表而不是一个常数，是因为本地服务器与云端的可承受并发差一个数量级；表今天几乎是空的，因为编一个厂商没写的数比给一个保守的缺省更糟。排队读数放在 gateway，是因为排队只发生在这里（D17）；不入账，是因为每次调用一行等待会让账本随调用数线性长，而它回答的是「这个进程现在堵不堵」。
 
@@ -301,7 +301,7 @@ dialect 先行（纯函数零依赖，golden 钉形）→endpoint 骨架（假 p
 
 /-! ## 12 错误处理
 
-一次失败的调用方看到的是一个 `AxError`：动作、主题、稳定的码与恢复语。provider 侧的失败经 `endpoint::failure::ProviderFailure` 一处成形（D2、D3，`crates/gateway/spec/Endpoint/Failure.lean`），本 crate 用到的码各有一条决定说明它为什么不可定义掉：
+一次失败的调用方看到的是一个 `AxError`：动作、主题、稳定的码与恢复语。provider 侧的失败经 `endpoint::failure::ProviderFailure` 一处成形（D2、D3，`Sprawling/gateway/spec/Endpoint/Failure.lean`），本 crate 用到的码各有一条决定说明它为什么不可定义掉：
 -/
 
 /-! D1 `E_PROVIDER`
@@ -332,51 +332,51 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 /-! 每一条决定住在哪里：
 
 - D1 `E_PROVIDER`：本文件 §12
-- D2 「能否再试一次」只有一个家：`endpoint::failure::ProviderFailure`：`crates/gateway/spec/Endpoint/Failure.lean`，在 `retry` 与 `refusal` 正上方
-- D3 窗口溢出是自己的一族：`Overflow`：`crates/gateway/spec/Endpoint/Failure.lean`，在 `retry` 与 `refusal` 正上方
+- D2 「能否再试一次」只有一个家：`endpoint::failure::ProviderFailure`：`Sprawling/gateway/spec/Endpoint/Failure.lean`，在 `retry` 与 `refusal` 正上方
+- D3 窗口溢出是自己的一族：`Overflow`：`Sprawling/gateway/spec/Endpoint/Failure.lean`，在 `retry` 与 `refusal` 正上方
 - D4 `E_WIRE_MISMATCH`：本文件 §12
 - D5 `E_ENDPOINT_DIALECT_UNSUPPORTED`：本文件 §12
 - D6 `E_CREDENTIAL_MISSING`／`E_CONFIG_INVALID`：本文件 §12
 - D7 `E_SECRET_EGRESS`：本文件 §12
 - D8 crate 根只再导出有别的 crate 叫得出名字的项：本文件 §7
-- D9 请求形状在主机名下白盒证明，不靠截获代理：`crates/gateway/spec/Reach/Resolve.lean`
-- D10 TLS 后端的权威是一次调用，不是一个 feature：`crates/gateway/spec/Reach.lean`
-- D11 一个端点的连接不在派活时预热（§8-35）：`crates/gateway/spec/Endpoint/Transport.lean`
-- D12 转写是一项设施，两条路用它：`crates/gateway/spec/Transcribe.lean`
-- D13 OCR 是一项设施，形状照转写：`crates/gateway/spec/Ocr.lean`
-- D14 一个模型收得下什么只在 `provider::input` 判一次（§8-37）：`crates/gateway/spec/Provider/Input.lean`，在 `accepted_input` 正上方
-- D16 人那一档是 `SelectModel` 的一个可选字段，出现即作答，缺席即「这一次没人说」（§8-37）：`crates/gateway/spec/Provider/Input.lean`，在 D14 之后
-- D15 凭证库经 `keyring-core` 与各平台 store 接入，不经 `keyring`：`crates/gateway/spec/Credential.lean`
+- D9 请求形状在主机名下白盒证明，不靠截获代理：`Sprawling/gateway/spec/Reach/Resolve.lean`
+- D10 TLS 后端的权威是一次调用，不是一个 feature：`Sprawling/gateway/spec/Reach.lean`
+- D11 一个端点的连接不在派活时预热（§8-35）：`Sprawling/gateway/spec/Endpoint/Transport.lean`
+- D12 转写是一项设施，两条路用它：`Sprawling/gateway/spec/Transcribe.lean`
+- D13 OCR 是一项设施，形状照转写：`Sprawling/gateway/spec/Ocr.lean`
+- D14 一个模型收得下什么只在 `provider::input` 判一次（§8-37）：`Sprawling/gateway/spec/Provider/Input.lean`，在 `accepted_input` 正上方
+- D16 人那一档是 `SelectModel` 的一个可选字段，出现即作答，缺席即「这一次没人说」（§8-37）：`Sprawling/gateway/spec/Provider/Input.lean`，在 D14 之后
+- D15 凭证库经 `keyring-core` 与各平台 store 接入，不经 `keyring`：`Sprawling/gateway/spec/Credential.lean`
 - D17 每个端点一个并发上限：可配置，缺省取厂商文档的值，遇 429 收窄、恢复后放宽：本文件 §8-6 之后
 - D20 名额的接线：一个注入的单调时钟，取在门里、按先来后到排队，等待有界：本文件 §8-6 之后
 - D21 `max_in_flight` 进端点的 tuning 与 `endpoint_attached`；排队数与等待时长是每个端点的一份读数：本文件 §8-6 之后
-- D22 探针落到会话内存时，编不出的 `provider_degraded` 通告并进 `custody()` 的拒词，不被丢掉：`crates/gateway/spec/Credential.lean`
-- D23 `NO_PROXY` 的读法与匹配规则跟着客户端走：域名按点为界，非 Unicode 的值读作没设：`crates/gateway/spec/Reach.lean`
-- D24 一个凭证环境变量的值不是 Unicode 时，它是一个点名变量的配置错，不是「没配过」：`crates/gateway/spec/Credential.lean`
-- D25 `prompt_cache_key` 是预置表的一列，只写给文档说收它的主机，值是会话标识：`crates/gateway/spec/Provider.lean`
-- D26 开城时为每个已登记端点预热一次连接：一次不带凭据的 `GET models_url`，失败只停这一次预热，谁也不等它（§8-35）：`crates/gateway/spec/Endpoint/Transport.lean`
-- D27 Responses stream 在 EOF 后投影出最后有效 terminal 与首个 reported error，复用最终解析器：`crates/gateway/spec/Dialect/Responses.lean`
-- D28 保持原登记事件与 Vault 格式，以完整有序列表为一次原子替换，避免逐账号命令：`crates/gateway/spec/Router.lean`
-- D29 显式账号列表生效时拒绝旧凭据字段：`crates/gateway/spec/Router.lean`
-- D30 当前 Session 成员的成功 model_returned 是唯一绑定提交点；使用原 Ledger 投影而不保存第二份：`crates/gateway/spec/Router.lean`
-- D31 隐私 owner 的只读核对在 Vault 内完成，不交出原值、不运行 probe：`crates/gateway/spec/Credential.lean`
-- D32 「这个账号还能不能接这个请求」与「能否再试」同住 `endpoint::failure`：`crates/gateway/spec/Endpoint/Failure.lean`，在 `account_disposition` 正上方
-- D33 删一把 Key 只删库里那一份，环境变量提供的 Key 拒删；端点用哪些 Key 由 `AttachedEndpoint::references` 一处回答：`crates/gateway/spec/Credential.lean`
-- D34 隐私 owner 的绑定只写一个新引用，经平台 Vault 而不经 Custodian：`crates/gateway/spec/Credential.lean`
-- D35 思考档由（Endpoint，模型）的 offer 决定，编码在发出前一处完成，dialect 不再写思考字段：`crates/gateway/spec/Provider/Thinking.lean`
-- D36 私网上的地址与这台电脑一样不走代理：`locality` 分三格，代理判定把 `Private` 当作 `Machine`：`crates/gateway/spec/Reach.lean`
-- D37 等待放在端点的门里、取号之前；冷键的第一个调用自己发 pre-warm，同键后到的调用等同一次：`crates/gateway/spec/Concurrency.lean`，在 `Holds` 正上方
-- D38 前缀键是账号与 pre-warm 请求体的摘要；共享边界由请求自己说出：`crates/gateway/spec/Concurrency.lean`，在 `HoldEvent` 正上方
-- D39 什么时候不等：`crates/gateway/spec/Concurrency.lean`，在 `arrive` 正上方
-- D41 一次等待至多 `HOLD_MAX`（30 s），pre-warm 不论怎样结束都放行等它的调用：`crates/gateway/spec/Concurrency.lean`，在 `HOLD_MAX` 正上方
-- D42 pre-warm 只带共享部分与一条最小的消息，消息上不打断点，只要一个输出 token：`crates/gateway/spec/Concurrency.lean`，§8-40 之后
-- D43 一次等待是 `prefix_held` 这一行，经模型端口交给回合层写下：`crates/gateway/spec/Concurrency.lean`，§8-40 之后
-- D44 委派出的子 run 的第一轮账号从母 run 房间的绑定开始：`crates/gateway/spec/Router.lean`，在 D30 之后
-- D45 窗口与上限的梯子是 `Figures::resolve` 一个函数，上一次登记只拿人说过的数作答，每个数记下它的来处：`crates/gateway/spec/Provider.lean`
-- D46 探测失败的再登记沿用书里已登记的行，只给新报的 id 缺省事实：`crates/gateway/spec/Endpoint/Models.lean`
-- D47 人打的 id 经 `named` 登记，读到列表时也收；勾的一个都对不上就拒：`crates/gateway/spec/Endpoint/Models.lean`
-- D48 一次再登记若去掉一个占着角色的模型，就拒绝，并点名那个角色：`crates/gateway/spec/Router.lean`
-- D64 生成参数的支持情况按 Person → Upstream → Preset 作答，输出偏好与硬上限分开，raw overrides 最后生效：`crates/gateway/spec/Provider/Generation.lean`
+- D22 探针落到会话内存时，编不出的 `provider_degraded` 通告并进 `custody()` 的拒词，不被丢掉：`Sprawling/gateway/spec/Credential.lean`
+- D23 `NO_PROXY` 的读法与匹配规则跟着客户端走：域名按点为界，非 Unicode 的值读作没设：`Sprawling/gateway/spec/Reach.lean`
+- D24 一个凭证环境变量的值不是 Unicode 时，它是一个点名变量的配置错，不是「没配过」：`Sprawling/gateway/spec/Credential.lean`
+- D25 `prompt_cache_key` 是预置表的一列，只写给文档说收它的主机，值是会话标识：`Sprawling/gateway/spec/Provider.lean`
+- D26 开城时为每个已登记端点预热一次连接：一次不带凭据的 `GET models_url`，失败只停这一次预热，谁也不等它（§8-35）：`Sprawling/gateway/spec/Endpoint/Transport.lean`
+- D27 Responses stream 在 EOF 后投影出最后有效 terminal 与首个 reported error，复用最终解析器：`Sprawling/gateway/spec/Dialect/Responses.lean`
+- D28 保持原登记事件与 Vault 格式，以完整有序列表为一次原子替换，避免逐账号命令：`Sprawling/gateway/spec/Router.lean`
+- D29 显式账号列表生效时拒绝旧凭据字段：`Sprawling/gateway/spec/Router.lean`
+- D30 当前 Session 成员的成功 model_returned 是唯一绑定提交点；使用原 Ledger 投影而不保存第二份：`Sprawling/gateway/spec/Router.lean`
+- D31 隐私 owner 的只读核对在 Vault 内完成，不交出原值、不运行 probe：`Sprawling/gateway/spec/Credential.lean`
+- D32 「这个账号还能不能接这个请求」与「能否再试」同住 `endpoint::failure`：`Sprawling/gateway/spec/Endpoint/Failure.lean`，在 `account_disposition` 正上方
+- D33 删一把 Key 只删库里那一份，环境变量提供的 Key 拒删；端点用哪些 Key 由 `AttachedEndpoint::references` 一处回答：`Sprawling/gateway/spec/Credential.lean`
+- D34 隐私 owner 的绑定只写一个新引用，经平台 Vault 而不经 Custodian：`Sprawling/gateway/spec/Credential.lean`
+- D35 思考档由（Endpoint，模型）的 offer 决定，编码在发出前一处完成，dialect 不再写思考字段：`Sprawling/gateway/spec/Provider/Thinking.lean`
+- D36 私网上的地址与这台电脑一样不走代理：`locality` 分三格，代理判定把 `Private` 当作 `Machine`：`Sprawling/gateway/spec/Reach.lean`
+- D37 等待放在端点的门里、取号之前；冷键的第一个调用自己发 pre-warm，同键后到的调用等同一次：`Sprawling/gateway/spec/Concurrency.lean`，在 `Holds` 正上方
+- D38 前缀键是账号与 pre-warm 请求体的摘要；共享边界由请求自己说出：`Sprawling/gateway/spec/Concurrency.lean`，在 `HoldEvent` 正上方
+- D39 什么时候不等：`Sprawling/gateway/spec/Concurrency.lean`，在 `arrive` 正上方
+- D41 一次等待至多 `HOLD_MAX`（30 s），pre-warm 不论怎样结束都放行等它的调用：`Sprawling/gateway/spec/Concurrency.lean`，在 `HOLD_MAX` 正上方
+- D42 pre-warm 只带共享部分与一条最小的消息，消息上不打断点，只要一个输出 token：`Sprawling/gateway/spec/Concurrency.lean`，§8-40 之后
+- D43 一次等待是 `prefix_held` 这一行，经模型端口交给回合层写下：`Sprawling/gateway/spec/Concurrency.lean`，§8-40 之后
+- D44 委派出的子 run 的第一轮账号从母 run 房间的绑定开始：`Sprawling/gateway/spec/Router.lean`，在 D30 之后
+- D45 窗口与上限的梯子是 `Figures::resolve` 一个函数，上一次登记只拿人说过的数作答，每个数记下它的来处：`Sprawling/gateway/spec/Provider.lean`
+- D46 探测失败的再登记沿用书里已登记的行，只给新报的 id 缺省事实：`Sprawling/gateway/spec/Endpoint/Models.lean`
+- D47 人打的 id 经 `named` 登记，读到列表时也收；勾的一个都对不上就拒：`Sprawling/gateway/spec/Endpoint/Models.lean`
+- D48 一次再登记若去掉一个占着角色的模型，就拒绝，并点名那个角色：`Sprawling/gateway/spec/Router.lean`
+- D64 生成参数的支持情况按 Person → Upstream → Preset 作答，输出偏好与硬上限分开，raw overrides 最后生效：`Sprawling/gateway/spec/Provider/Generation.lean`
 -/
 
 /-! ## 13 依赖选型
@@ -398,14 +398,14 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 
 /-! ## 15 影响面
 
-kernel::model 持 canonical 会话类型（`crates/kernel/Spec.lean` §8-24）；runtime 回合层消费 ChatRequest；storage::attribution 消费 model_returned 的 usage 与 billed 字段；citysim ScriptModel 收同一个 ChatRequest（同一缝）。
+kernel::model 持 canonical 会话类型（`Sprawling/kernel/Spec.lean` §8-24）；runtime 回合层消费 ChatRequest；storage::attribution 消费 model_returned 的 usage 与 billed 字段；citysim ScriptModel 收同一个 ChatRequest（同一缝）。
 -/
 
 /-! ## 16 测试与约束
 
 golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返、usage 保值、断点位保序；endpoint 对回环假服务的状态码矩阵（200/429/500/截断体）；credential：内存 Vault 全流程＋探测注入；cost 权威胜出＋溢出拒绝。约束：clippy 零告警；无 `unwrap`；`.expose(` 只在 `EXPOSE_WHITELIST` 所列文件。
 
-形式化的义务由证明清偿：`lake build crates.gateway.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
+形式化的义务由证明清偿：`lake build Sprawling.gateway.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
 
 - 输出上限的梯子：`provider::ceiling` 的 proptest `the_ceiling_ladder_keeps_the_lean_properties` 与测试（`the_higher_rung_wins_and_says_that_it_did`、`on_a_face_that_takes_no_figure_the_provider_picks_when_nobody_stated_one`、`a_relay_forwarding_a_vendors_id_is_called_at_the_vendors_ceiling`、`an_unknown_model_at_an_unknown_host_is_still_callable`）。
 - 收得下什么：`provider::input` 的 `the_first_rung_that_states_a_fact_answers` 与 `every_answer_is_a_stated_fact_or_text_on_every_combination`（27 种组合），与 accounting 的 `a_preset_model_that_reads_pictures_is_registered_as_reading_them`（选型点的生产路径）。
@@ -423,12 +423,12 @@ golden：两 Dialect 各一请求一响应（insta）；proptest：响应往返�
 
 /-! ## 17 文档关系
 
-模块登记在 ARCHITECTURE 的模块图（`xtask modmap`）；canonical 类型的改动与 `crates/kernel/Spec.lean` §8-24 同一变更集。endpoint 的生产消费者是 runtime 回合层与 `bin::assembly`；credential 的消费者是 endpoint 与 `PutSecret` 命令。
+模块登记在 ARCHITECTURE 的模块图（`xtask modmap`）；canonical 类型的改动与 `Sprawling/kernel/Spec.lean` §8-24 同一变更集。endpoint 的生产消费者是 runtime 回合层与 `bin::assembly`；credential 的消费者是 endpoint 与 `PutSecret` 命令。
 
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；它改了，分部的路径与 `architecture.toml` 里 gateway 各行的 `spec` 锚点一起重看。
 - `architecture.toml` 的模块图：gateway 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
-- kernel 的规格（`crates/kernel/Spec.lean`）：canonical 会话类型（§8-24）、`InputKinds`、`ModelFacts`、`Ceiling`、`Retries` 与码表的权威；它们改了，这里的模型与 §8 相应各节一起重看。
-- sprawling 的规格（`crates/sprawling/Spec.lean`）：选型点的窗口梯（8-71）、城的工具 `transcribe`（8-131）与 `ocr`（8-142）；它们读本规格的 §8-12、§8-17、§8-34、§8-37。
-- 引本规格的其他规格与 rustdoc 写 `crates/gateway/Spec.lean §8-n` 或 `gateway D<n>`；一节换了分部，它的标签不变，引用不必改。
+- kernel 的规格（`Sprawling/kernel/Spec.lean`）：canonical 会话类型（§8-24）、`InputKinds`、`ModelFacts`、`Ceiling`、`Retries` 与码表的权威；它们改了，这里的模型与 §8 相应各节一起重看。
+- sprawling 的规格（`Sprawling/app/Spec.lean`）：选型点的窗口梯（8-71）、城的工具 `transcribe`（8-131）与 `ocr`（8-142）；它们读本规格的 §8-12、§8-17、§8-34、§8-37。
+- 引本规格的其他规格与 rustdoc 写 `Sprawling/gateway/Spec.lean §8-n` 或 `gateway D<n>`；一节换了分部，它的标签不变，引用不必改。
 -/

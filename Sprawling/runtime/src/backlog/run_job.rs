@@ -5,7 +5,7 @@
 
 //! One Windows run's job: the shares it was given, the watch on its
 //! memory ceiling and the refusals that watch counted
-//! (`crates/runtime/spec/Tools/Exec.lean` D29, D95). [`super::jobs`]
+//! (`Sprawling/runtime/spec/Tools/Exec.lean` D29, D95). [`super::jobs`]
 //! routes each command to its run's job; this module owns what the job
 //! holds.
 

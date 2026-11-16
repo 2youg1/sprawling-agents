@@ -44,7 +44,7 @@ pub(crate) struct CommitFacts {
     /// The commit the same run announced last before this one.
     previous: Option<wire::CommitAt>,
     /// The digest of the announcing line's canonical bytes: the B3 a
-    /// person finds that line by (`crates/wire/Spec.lean` §8-78).
+    /// person finds that line by (`Sprawling/wire/Spec.lean` §8-78).
     b3: Option<kernel::B3Hash>,
 }
 
@@ -115,7 +115,7 @@ impl super::holding::Views {
     }
 
     /// The commits this city made, newest first, one page at a time
-    /// (`crates/wire/Spec.lean` §8-24).
+    /// (`Sprawling/wire/Spec.lean` §8-24).
     ///
     /// `before` is exclusive; `limit` is clamped to the same ceiling as
     /// `History`. `more` says whether a further page exists, found by
@@ -291,7 +291,7 @@ pub(crate) fn commit_facts(record: &EventRecord) -> Result<Option<(GitOid, Commi
 }
 
 /// A commit answer the views settled, and the repository its parents
-/// are read from after the snapshot is let go (`crates/sprawling/Spec.lean` §8-128).
+/// are read from after the snapshot is let go (`Sprawling/app/Spec.lean` §8-128).
 pub struct CommitsAsk {
     city_root: PathBuf,
     settled: Settled,
@@ -322,7 +322,7 @@ impl CommitsAsk {
 }
 
 /// The two facts of a commit only its object holds, read once the
-/// snapshot is let go (`crates/sprawling/Spec.lean` §8-128, `crates/wire/Spec.lean` §8-54).
+/// snapshot is let go (`Sprawling/app/Spec.lean` §8-128, `Sprawling/wire/Spec.lean` §8-54).
 fn give_git_facts(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {
     give_parents(city_root, commits);
     give_messages(city_root, commits);
@@ -458,7 +458,7 @@ mod tests {
 
     /// The B3 a commit carries is the digest of the line that announced
     /// it - what the next line of the chain holds as `prev` - and not
-    /// that line's own `prev` (`crates/wire/Spec.lean` §8-78).
+    /// that line's own `prev` (`Sprawling/wire/Spec.lean` §8-78).
     #[test]
     fn a_commit_carries_the_b3_of_the_line_that_announced_it() {
         let dir = tempfile::tempdir().unwrap();
@@ -557,7 +557,7 @@ mod tests {
         );
     }
 
-    /// `crates/wire/Spec.lean` §8-54: a commit's message is read from its object, as its
+    /// `Sprawling/wire/Spec.lean` §8-54: a commit's message is read from its object, as its
     /// parents are; one the repository does not hold has none to read.
     #[test]
     fn a_page_of_commits_carries_each_ones_message_from_git() {

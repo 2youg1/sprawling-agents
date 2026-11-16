@@ -6,7 +6,7 @@
 /-!
 # 吞吐台（TP1）
 
-规定吞吐台场景：N 个 run 同时在一座真的城里跑，读出吞吐与每一处等待。本文件是 `crates/citysim/Spec.lean` 的一个分部，节标签 §8-14。场景的执行者是 `sprawling-accounting` 的仪表 `instrument_throughput` 与它的计数对拍 `throughput_counts`（`crates/accounting/src/worker/driving/tests/throughput.rs`），理由见 D23。
+规定吞吐台场景：N 个 run 同时在一座真的城里跑，读出吞吐与每一处等待。本文件是 `Tools/citysim/Spec.lean` 的一个分部，节标签 §8-14。场景的执行者是 `sprawling-accounting` 的仪表 `instrument_throughput` 与它的计数对拍 `throughput_counts`（`Sprawling/accounting/src/worker/driving/tests/throughput.rs`），理由见 D23。
 
 能写成定理的是读数的尾部规则：p999 只在样本够多时印出，不够时印 max 并写明样本不足（`a_p999_is_printed_only_over_enough_samples`、`under_the_floor_the_max_is_printed`）；印出的尾部总是某一个真实样本（`the_printed_tail_is_a_sample`）。挂钟读数本身不是任何定理的对象。
 -/
@@ -39,9 +39,9 @@
 | `lane_pure` | 一个准备好的 run 从进队到 driving pool 为它开车道 | 纯等待 | 同上；不设车道数时恒为零或近零（`budgets.toml` 的 `[lane_wait]`） |
 | `relay_idle` | 同样的往返，城里没有 run | 工作＋屏障 | 单调时钟，测试侧，与 `relay_under_load` 同 |
 
-`lane` 一行不含车道排队：pool 不设车道数（`crates/sprawling/Spec.lean` D34），投出的 run 立刻开车，N 再大也不等前面的 run 回家。一个 run 只在 provider 的准入处等，那是 `gateway::concurrency` 按端点给的并发许可，遇 429 收窄、持续应答后放宽（`crates/gateway/Spec.lean` D17）；替身 provider 不回 429，所以本台读到的 `lane` 是准备的工作，不是排队。
+`lane` 一行不含车道排队：pool 不设车道数（`Sprawling/app/Spec.lean` D34），投出的 run 立刻开车，N 再大也不等前面的 run 回家。一个 run 只在 provider 的准入处等，那是 `gateway::concurrency` 按端点给的并发许可，遇 429 收窄、持续应答后放宽（`Sprawling/gateway/Spec.lean` D17）；替身 provider 不回 429，所以本台读到的 `lane` 是准备的工作，不是排队。
 
-**本台之外的等待**：折叠滞后与广播滞后由 `crates/sprawling` 的 `instrument_view_backlog` 读（`budgets.toml` 的 `[fold_lag]`、`[broadcast_lag]`）；私有内存节拍还没有读数的计算者（`[private_memory_beat]` 的 `measured_by` 写着缺什么）。
+**本台之外的等待**：折叠滞后与广播滞后由 `Sprawling/app` 的 `instrument_view_backlog` 读（`budgets.toml` 的 `[fold_lag]`、`[broadcast_lag]`）；私有内存节拍还没有读数的计算者（`[private_memory_beat]` 的 `measured_by` 写着缺什么）。
 
 **计数对拍**（`throughput_counts`，在 `just check` 里跑）：N = 4、`zero` 档、M = 4 时，`run_frozen` 恰 N 条，`tool_called` 恰 N·M 条，每个 `tool_called` 都有它的 `tool_result`。计数只取决于脚本，不取决于时钟，所以三个平台的 CI 都能跑它。
 
@@ -49,7 +49,7 @@
 
 D23 **吞吐台住在 `sprawling-accounting` 的仪表里，本规格只规定它。** 吞吐路径（pool、lane、relay、账本线程的一次 serve）都是 `accounting::worker` 里 `pub(in crate::worker)` 的件，驱动它们的替身 provider 与造城的夹具也只在该 crate 的测试构型里编译；本 crate 够不到，与 D18 是同一个理由。被否：给 `accounting` 开一扇公共门让 citysim 驱动一座城的 pool——那扇门没有生产调用者。**重开参数**：citysim 的替身 provider（§8-10）能当一座真城的 provider、且 `sprawling` 的二进制能被场景从外面拉起并派活时，场景搬到 citysim 的 bench，从进程外量。
 
-D24 **这一段的等待从账本与仪表外侧读。** pool 与 relay 已有各自的等待时点（`lane_waited`、`queue_waited`），但它们只在 accounting 的测试构型里可达（D23），而表要的是端到端的份额——投出到落账、负载往返减空载——所以表从外侧量，不改 worker 的任何行为；外侧读数分不出「等待」与「工作」时，表里写明它是哪几段的和。被否：为这一次测量在 pool 与 relay 上再加时点——两个时点已经在生产里，再加要改 worker 的生产代码与 `crates/sprawling/spec/Accounting/Worker.lean`。**重开参数**：`lane` 与 `relay_under_load` 两行改读那两个时点时（例如 D23 的重开条件成立），行名不变，多一个 `seg=` 字段。
+D24 **这一段的等待从账本与仪表外侧读。** pool 与 relay 已有各自的等待时点（`lane_waited`、`queue_waited`），但它们只在 accounting 的测试构型里可达（D23），而表要的是端到端的份额——投出到落账、负载往返减空载——所以表从外侧量，不改 worker 的任何行为；外侧读数分不出「等待」与「工作」时，表里写明它是哪几段的和。被否：为这一次测量在 pool 与 relay 上再加时点——两个时点已经在生产里，再加要改 worker 的生产代码与 `Sprawling/app/spec/Accounting/Worker.lean`。**重开参数**：`lane` 与 `relay_under_load` 两行改读那两个时点时（例如 D23 的重开条件成立），行名不变，多一个 `seg=` 字段。
 -/
 
 namespace Citysim.Throughput

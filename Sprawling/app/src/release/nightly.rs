@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Nightly snapshot identity (`crates/sprawling/spec/Nightly.lean` D105).
+//! Nightly snapshot identity (`Sprawling/app/spec/Nightly.lean` D105).
 
 use kernel::{AxCode, AxError};
 

@@ -5,10 +5,10 @@
 
 //! How a table is made and configured: the window its callers block for
 //! before a command is handed to the background
-//! (`crates/runtime/spec/Backlog.lean` §8-28), where a command's output
+//! (`Sprawling/runtime/spec/Backlog.lean` §8-28), where a command's output
 //! goes while it is inside that window (the same part, §8-28-3), and what
 //! shares every run it starts asks for
-//! (`crates/runtime/spec/Tools/Exec.lean` D29). The table itself, what it
+//! (`Sprawling/runtime/spec/Tools/Exec.lean` D29). The table itself, what it
 //! carries and how it ends, is the module above.
 
 use super::{Backlog, PollBudget, RunAffinity, Scratch, Shares, Sink};
@@ -45,7 +45,7 @@ impl Backlog {
     }
 
     /// The same table, handing what a command writes to `sink` while
-    /// the command is still inside its window (`crates/runtime/spec/Backlog.lean` §8-28-3).
+    /// the command is still inside its window (`Sprawling/runtime/spec/Backlog.lean` §8-28-3).
     #[must_use]
     pub fn with_sink(self, sink: Sink) -> Backlog {
         Backlog {

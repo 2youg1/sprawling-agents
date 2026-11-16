@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! CAS: content-addressed storage under BLAKE3
-//! (`crates/storage/spec/Cas.lean` §8-3).
+//! (`Sprawling/storage/spec/Cas.lean` §8-3).
 //!
 //! Three engineering facts owned here:
 //! - writes go tmp + rename: power loss leaves half-done temp files only,
@@ -183,7 +183,7 @@ impl Cas {
     /// from the object, so asking how long a two hundred megabyte version
     /// is costs nothing like two hundred megabytes. A window of a stored
     /// document version needs it to keep its request inside the object
-    /// (`crates/storage/spec/Cas.lean` §8-36). Like a range read, it trusts what `put`
+    /// (`Sprawling/storage/spec/Cas.lean` §8-36). Like a range read, it trusts what `put`
     /// verified.
     pub fn size(&self, hash: &B3Hash) -> Result<u64, StorageError> {
         let (_, path) = self.object_path(hash);

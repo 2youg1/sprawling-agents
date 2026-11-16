@@ -11,7 +11,7 @@
 //! here, so a city has one answer to "how many runs am I driving" and
 //! one crossing to serve. Two tables would be two ceilings and two
 //! crossings: a lane's append would wait on whichever thread happened
-//! to be serving the other one (`crates/sprawling/Spec.lean` §8-46-2).
+//! to be serving the other one (`Sprawling/app/Spec.lean` §8-46-2).
 //!
 //! Nothing here decides anything. Which runs to start is the caller's,
 //! and what a landed run means is `Owed`'s — this module only keeps the
@@ -88,18 +88,18 @@ pub(in crate::worker) struct Flight {
     pub(in crate::worker) backlog: runtime::Backlog,
     /// The files an edit is landing on. One table per city, and every
     /// run's `edit` holds it, so two runs cannot land on one look
-    /// (`crates/runtime/spec/Tools/Edit.lean` §8-64).
+    /// (`Sprawling/runtime/spec/Tools/Edit.lean` §8-64).
     pub(in crate::worker) edits: runtime::PathLocks,
     /// The provider requests handed off this thread, whose answers come
-    /// back over the same crossing (`crates/sprawling/Spec.lean` §8-42-9).
+    /// back over the same crossing (`Sprawling/app/Spec.lean` §8-42-9).
     pub(in crate::worker) errands: Errands,
 }
 
 impl Flight {
     /// `read_memory` is where the pool reads how much memory is free
-    /// before it starts a run (`crates/sprawling/Spec.lean` §8-46-3).
+    /// before it starts a run (`Sprawling/app/Spec.lean` §8-46-3).
     /// `monotonic` is the clock every wait the crossing records is read
-    /// off (`crates/sprawling/spec/Accounting/Worker.lean` §8-98).
+    /// off (`Sprawling/app/spec/Accounting/Worker.lean` §8-98).
     /// `seat_lane` is called at the top of every lane; `backlog` carries
     /// the shares and affinity requested for each run's commands.
     pub(in crate::worker) fn open(
@@ -250,7 +250,7 @@ impl RunWorker {
     ///
     /// **The crossing is served first**, because a run that has already
     /// been paid for must not queue behind one that has not started
-    /// (`crates/sprawling/Spec.lean` §8-42-2). Landing happens in arrival order, on
+    /// (`Sprawling/app/Spec.lean` §8-42-2). Landing happens in arrival order, on
     /// this thread, which is what makes "execute in parallel, account in
     /// series" a fact about the code.
     ///
@@ -288,7 +288,7 @@ impl RunWorker {
             return Ok(Landed::Nothing);
         };
         // A lane has just come home, so the work waiting for one starts
-        // before this run is landed (`crates/sprawling/Spec.lean` §8-46-2).
+        // before this run is landed (`Sprawling/app/Spec.lean` §8-46-2).
         for (run, err) in self.flight.pool.start_waiting() {
             self.note(
                 runtime::diagnostics::Level::Refuse,
@@ -337,7 +337,7 @@ impl RunWorker {
     /// Writes the lines that give back every node a run still had booked
     /// when its landing ended without settling its plan: the claim went
     /// on the history at call time, so only this closes it
-    /// (`crates/sprawling/Spec.lean` §8-42-8).
+    /// (`Sprawling/app/Spec.lean` §8-42-8).
     ///
     /// # Errors
     /// Propagates the first line the ledger refuses.
@@ -350,7 +350,7 @@ impl RunWorker {
 
     /// A write face issued by the same gate the lanes write through, for
     /// an instrument that times the crossing from outside a lane
-    /// (`crates/sprawling/Spec.lean` §8-84).
+    /// (`Sprawling/app/Spec.lean` §8-84).
     #[cfg(test)]
     pub(in crate::worker) fn measuring_relay(&self) -> Relay {
         self.flight.issue()
@@ -380,7 +380,7 @@ impl RunWorker {
     /// abandoned while it waits on an append loses lines the city had
     /// already told it were durable, and a renewal whose answer arrives
     /// after the close is a cost no line records
-    /// (`crates/sprawling/Spec.lean` D79).
+    /// (`Sprawling/app/Spec.lean` D79).
     ///
     /// # Errors
     /// Propagates the first landing that fails. The lanes still going

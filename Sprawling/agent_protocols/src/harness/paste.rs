@@ -5,7 +5,7 @@
 
 //! What a person pastes, read as one agent entry: a command line, a Zed
 //! or JetBrains `agent_servers` block, or a registry `agent.json`
-//! (`crates/agent_protocols/Spec.lean` §8-19).
+//! (`Sprawling/agent_protocols/Spec.lean` §8-19).
 //!
 //! The grammar lives here and nowhere else, so the WebUI and the CLI read
 //! a paste the same way (`Query::ParseAgentSpec`). Nothing is handed to a

@@ -6,7 +6,7 @@
 /-!
 # city::config_layers
 
-规定 `config_layers`、`config_layers::write`、`config_layers::settled`、`config_layers::session`、`config_layers::resident`、`config_layers::mcp`、`config_layers::search`、`config_layers::search::section`、`config_layers::catalog`、`config_layers::context`、`config_layers::cache`、`config_layers::clock`、`config_layers::refuse`（`crates/city/src/` 下同名的文件）。三层配置住哪三个文件、怎么求成一份 `FrozenConfig`、怎么写回去。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+规定 `config_layers`、`config_layers::write`、`config_layers::settled`、`config_layers::session`、`config_layers::resident`、`config_layers::mcp`、`config_layers::search`、`config_layers::search::section`、`config_layers::catalog`、`config_layers::context`、`config_layers::cache`、`config_layers::clock`、`config_layers::refuse`（`Sprawling/city/src/` 下同名的文件）。三层配置住哪三个文件、怎么求成一份 `FrozenConfig`、怎么写回去。本文件是 `Sprawling/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `Sprawling/city/Spec.lean §8-n`，决定引作 `city D<n>`。
 -/
 
 /-!
@@ -75,12 +75,12 @@ impl Ladder {
 - **梯子不在本模块重建**：下层胜上层由 `kernel::LayeredValue::resolve` 给，冻结由 `kernel::config::freeze` 给；本模块只回答「哪三份文件、怎么读」。一条规则一个权威。
 - **effort 属 `FrozenConfig` 而非 `LiveConfig`**：改它会作废 message cache breakpoints，因此改动只影响下一个 Run（理由已写在 `kernel::config`，此处不重述只遵守）。
 
-**`[[mcp]]` 一节**：`CONFIG.toml` 第三节 `[[mcp]]`（表数组）。`label` 解成 `kernel::ServerLabel`，非法即拒并报出是哪一份文件；`kernel::ReservedNamespace` 里的名字也拒（`E_CONFIG_INVALID`，读面与写面同一个 `mcp::validate`），因为 label 是这台服务器每件工具在 catalog 里的命名空间（`crates/runtime/spec/Catalog.lean` §8-60）；其余字段按这台服务器怎么够得到分两组：
+**`[[mcp]]` 一节**：`CONFIG.toml` 第三节 `[[mcp]]`（表数组）。`label` 解成 `kernel::ServerLabel`，非法即拒并报出是哪一份文件；`kernel::ReservedNamespace` 里的名字也拒（`E_CONFIG_INVALID`，读面与写面同一个 `mcp::validate`），因为 label 是这台服务器每件工具在 catalog 里的命名空间（`Sprawling/runtime/spec/Catalog.lean` §8-60）；其余字段按这台服务器怎么够得到分两组：
 
 - **`command`（非空）＋ `args`（缺省空表）＋ `env`（缺省空表，形如 `env = { API_KEY = "secret:mcp/apps" }`）**——城所在的机器上的一个程序。写成表而不是 `NAME=value` 行的列表：文件里一个名字只出现一次，也没有谁要去切一个人写的字符串。
 - **`url`（非空）＋ `headers`（缺省空表，写法同上）＋ `transport`（`"http"`｜`"sse"`，缺省 `"http"`）**——一个地址。`transport` 是闭集而不是自由文本，拼错在写它的地方就被拒，而不是变成一台没人够得到的服务器；缺省取 `http`，因为「发一条消息过去」正是一个 url 的本义。
 
-两组各自成行：`command` 与 `url` 同时出现即拒（读者要去猜），两者都不出现也拒。`command` 一行再写 `transport` 同样拒——命令走它自己的管道，再指一条流就是一行说了两种 transport。两张表的值都可以是 `secret:realm/name` 引用，兑付不在本模块（`crates/sprawling/Spec.lean` §8-4／§8-15）。同一层内标签不得重复；跨 scope 的规则见下面的 `[[mcp_ref]]`。**不在本模块的事**：进程怎么起、起不来怎么办、confidential 楼凭什么拒——那三件全在装配层（`crates/sprawling/Spec.lean` §8-4），本模块只回答「三份文件说了什么」。
+两组各自成行：`command` 与 `url` 同时出现即拒（读者要去猜），两者都不出现也拒。`command` 一行再写 `transport` 同样拒——命令走它自己的管道，再指一条流就是一行说了两种 transport。两张表的值都可以是 `secret:realm/name` 引用，兑付不在本模块（`Sprawling/app/Spec.lean` §8-4／§8-15）。同一层内标签不得重复；跨 scope 的规则见下面的 `[[mcp_ref]]`。**不在本模块的事**：进程怎么起、起不来怎么办、confidential 楼凭什么拒——那三件全在装配层（`Sprawling/app/Spec.lean` §8-4），本模块只回答「三份文件说了什么」。
 
 **`[[mcp_ref]]`：楼只引用，不复制定义**（kernel D117、city D112）：
 
@@ -99,7 +99,7 @@ tools = { docs_search = "<tool-definition-b3>" }  # 旧引用迁移前可缺席�
 
 D112 楼的连接器配置只保存引用、位置与 pin，定义默认只在城层。理由：一栋楼想多用或少用一台服务器不该重述传输与凭据引用；城层修改命令后，所有引用它的楼应在下一次 run 使用新定义，同时工具自己的 digest 仍决定哪些内容已获批准。被否：整表上梯复制 `[[mcp]]`，改一处必须逐楼重复，且近层静默遮蔽远层。重开参数：出现独立于楼的第二个定义拥有者时，先扩展 scope 类型与重复判定，不在引用行里塞第二份定义。
 
-**`[sandbox]` 一节**：`CONFIG.toml` 第二节 `[sandbox]`，字段 `shell`（bool，默认 false）、`fuel`（整数，缺省取 `SANDBOX_FUEL_DEFAULT`）、`mounts`（相对 city root 的路径表，reserved prefix 在解析点即拒）。解析仍是「本版本不读的键即拒」——被写下却什么都不发生是唯一没人能诊断的状态。整节整值上梯，语义住 `crates/kernel/Spec.lean` §8-22，此处不复述。
+**`[sandbox]` 一节**：`CONFIG.toml` 第二节 `[sandbox]`，字段 `shell`（bool，默认 false）、`fuel`（整数，缺省取 `SANDBOX_FUEL_DEFAULT`）、`mounts`（相对 city root 的路径表，reserved prefix 在解析点即拒）。解析仍是「本版本不读的键即拒」——被写下却什么都不发生是唯一没人能诊断的状态。整节整值上梯，语义住 `Sprawling/kernel/Spec.lean` §8-22，此处不复述。
 
 **`[sandbox.container]`**：可选子表由 `kernel::ContainerLimits` 的 serde 输入权威直接解析，
 不另写镜像或额度文法；字段缺席不选择 container。写面通过 `write_sandbox` 原样写回整份
@@ -109,15 +109,15 @@ D112 楼的连接器配置只保存引用、位置与 pin，定义默认只在�
 
 **`[sandbox]` 的第五个字段**：`trusted`（字符串表，缺省空表），逐项解成 `kernel::ServerLabel`。它答的是「这层楼允许哪一台 connector 服务器去做城里谁都收不回的事」（今天只有运行这座城的机器的桌面），语义与读者住 `kernel::SandboxLimits::trusts`，本节只管它在 TOML 里怎么写、在哪一层写、写错了在解析点怎么拒。与 `mounts`／`env_passthrough` 同形：一名一行、缺省为空、整节整值上梯——收不回的效果按服务器逐台放行，而不是一次放宽给所有人。
 
-**`[context]` 一节**：`CONFIG.toml` 第四节 `[context]`，一个字段 `second_threshold`（整数百分比）——上下文提醒第二道阈值响在哪一格。值的形状与合法域住 `kernel::config::SecondThreshold`（`crates/kernel/Spec.lean` §8-22），提醒怎么响住 `runtime::reminder`，本节只管它在 TOML 里怎么写、在哪一层写、写错时在哪拒。与 `mounts`／`env_passthrough`／`trusted` 逐条同形：整值上梯、Run 起点冻结、解析点拒——31–90 域外的值在解析点由 `SecondThreshold::parse` 拒（`E_INVALID_ARGS`，恢复语带合法域），不钳位、不读后丢。缺省是「没有一层说话」，而「缺席取 `CTX_REMINDER_SECOND_DEFAULT`」只在 `runtime::reminder` 一处判定。
+**`[context]` 一节**：`CONFIG.toml` 第四节 `[context]`，一个字段 `second_threshold`（整数百分比）——上下文提醒第二道阈值响在哪一格。值的形状与合法域住 `kernel::config::SecondThreshold`（`Sprawling/kernel/Spec.lean` §8-22），提醒怎么响住 `runtime::reminder`，本节只管它在 TOML 里怎么写、在哪一层写、写错时在哪拒。与 `mounts`／`env_passthrough`／`trusted` 逐条同形：整值上梯、Run 起点冻结、解析点拒——31–90 域外的值在解析点由 `SecondThreshold::parse` 拒（`E_INVALID_ARGS`，恢复语带合法域），不钳位、不读后丢。缺省是「没有一层说话」，而「缺席取 `CTX_REMINDER_SECOND_DEFAULT`」只在 `runtime::reminder` 一处判定。
 
-**`[cache]` 一节**：一个字段 `keep_warm`，取 `off` 或 `five_minute`——这一层要不要在提示缓存到期前续期。值的形状与续期判定住 `kernel::keep_warm`（`crates/kernel/spec/KeepWarm.lean` §8-74），本节只管它在 TOML 里怎么写、在哪一层写。拼写由 serde 按闭集读，拼错的词与未知键同样在解析点拒。`city::keep_warm(city_root, addr) -> Result<KeepWarm, AxError>` 爬同一张梯，下层覆盖上层；一层也没说时答 `KeepWarm::Off`——续期是人付钱的请求，默认必须是不发。与 `[context]` 不同，它不进 `FrozenConfig`：续期发生在两次 run 之间。
+**`[cache]` 一节**：一个字段 `keep_warm`，取 `off` 或 `five_minute`——这一层要不要在提示缓存到期前续期。值的形状与续期判定住 `kernel::keep_warm`（`Sprawling/kernel/spec/KeepWarm.lean` §8-74），本节只管它在 TOML 里怎么写、在哪一层写。拼写由 serde 按闭集读，拼错的词与未知键同样在解析点拒。`city::keep_warm(city_root, addr) -> Result<KeepWarm, AxError>` 爬同一张梯，下层覆盖上层；一层也没说时答 `KeepWarm::Off`——续期是人付钱的请求，默认必须是不发。与 `[context]` 不同，它不进 `FrozenConfig`：续期发生在两次 run 之间。
 
-**`[resident]` 一节**：一个字段 `harness`（字符串），点名这一层以下的房间由哪个 ACP agent 当居民：城 `CONFIG.toml` 里一行 `[[agent]]` 的 `id`（§8-4f），或一个内置条目的词。值照写下的读进来：一个词点名哪个条目，权威是 `agent_protocols::Roster::seat`，本 crate 只见 `kernel`，认不认得由派活路径判（`crates/sprawling/Spec.lean` §8-4e 第 10 条）。空串在解析点拒，与 `[model] name` 走同一条判定：空值什么也没说，写它是笔误。
+**`[resident]` 一节**：一个字段 `harness`（字符串），点名这一层以下的房间由哪个 ACP agent 当居民：城 `CONFIG.toml` 里一行 `[[agent]]` 的 `id`（§8-4f），或一个内置条目的词。值照写下的读进来：一个词点名哪个条目，权威是 `agent_protocols::Roster::seat`，本 crate 只见 `kernel`，认不认得由派活路径判（`Sprawling/app/Spec.lean` §8-4e 第 10 条）。空串在解析点拒，与 `[model] name` 走同一条判定：空值什么也没说，写它是笔误。
 
 - **一层只点名一种居民**：同一层既写 `[model] name` 又写 `[resident] harness`，解析即拒（`E_CONFIG_INVALID`），拒词带两个键和各自的值。居民是模型还是 harness，要读者去猜，就是配置写错了。`ConfigLayer` 的字段私有、`parse` 是唯一构造点，所以两键并存的值构造不出来。地址就是楼时，楼层与房间层是同一个文件；人要在这样一个带着会话记录的文件里写 harness，先 `/new` 清掉会话写下的 `[model] name`。
 - **harness 爬梯子，`[model] name` 不爬**：`settled_harness` 与 `settled_effort` 爬同一条梯子，下层胜上层，连同说出它的那一级一起答。`[model] name` 仍只是地址自己那一层的会话记录（`own_layer`，§8-14），不参与求值。
-- **会话记录压过梯子**：地址自己那一层有 `[model] name` 时，`settled_harness` 答 `None`。这段会话以模型开场，就以模型走完，理由与 `crates/sprawling/Spec.lean` §8-79「会话的形状只选一次」相同。人在楼层或城层写下的 harness，从 `/new` 开的下一段会话起生效。答案针对「一次 run 在这个地址上接着跑」；派活开新房间时，新房间自己那一层是空的，梯子的答案就是它的答案。
+- **会话记录压过梯子**：地址自己那一层有 `[model] name` 时，`settled_harness` 答 `None`。这段会话以模型开场，就以模型走完，理由与 `Sprawling/app/Spec.lean` §8-79「会话的形状只选一次」相同。人在楼层或城层写下的 harness，从 `/new` 开的下一段会话起生效。答案针对「一次 run 在这个地址上接着跑」；派活开新房间时，新房间自己那一层是空的，梯子的答案就是它的答案。
 - **城自己的写路径写不出两键并存的文件**：见 §8-4b。
 -/
 
@@ -156,8 +156,8 @@ pub fn seat_agent(city_root: &Path, room: &Address, id: &str) -> Result<(), AxEr
 - **文法照 `[[mcp]]` 的 stdio 一支**：每行 `id`、`command` 必填，`name`、`args`、`env`、`version`、`launch_digest` 可缺，`source` 必填且是三种拼写之一；不认的键拒（`deny_unknown_fields`）。`env` 是一张表，一名一次；值可以是 `secret:realm/name` 引用，明文凭据在解析时拒，判定与 `[[mcp]]` 的 `env` 是同一个 `vaulted`（§8-4b），拒词点名那一行的 `id` 与那个名字，恒不带值。
 - **只写在城那一级**（`Confined::Agents`，`spec/ConfigLayers/Ladder.lean`）：一行 agent 点名这台电脑以人的身份运行的程序，楼或房间加一行，就替它下面的每个房间起了它。楼或房间写它即拒，拒词让人把它挪进城根的 `CONFIG.toml`，与 `[remote]`、`[skills]` 同一条理由。
 - **解析时拒**（`E_CONFIG_INVALID`）：`id` 或 `command` 为空；两行同 `id`；`env` 的值是明文凭据；`source` 拼错；`launch_digest` 读不成一个 BLAKE3 摘要。`id` 合不合 agent id 的文法、`launch_digest` 与重算的摘要等不等，归 `agent_protocols`（`AgentId::parse`、`Consented::given`），派活时判：本 crate 只见 `kernel`。
-- **`launch_digest` 缺席是人亲手写的行**：那份文件就是人的同意，与 `[[mcp]]`、`[remote]` 相同；写了它的行是同意卡片写下的，之后被改过就在派活时拒（`crates/agent_protocols/Spec.lean` D16）。命令与参数是这台电脑的事实，恒不进账本（`crates/kernel/src/config.rs` 的 `McpServer` 同理）。
-- **写面**：同意卡片经 `AddAgent` 写这一行（`crates/sprawling/spec/Serving.lean` 的同意一条）。`write_agent` 只写城那一级，同 `id` 的行整行换掉、别的行原样留下，所以再加一次同一个 agent 是更新它的同意而不是第二行（第二行在解析时就拒）。`seat_agent` 在房间那一层写 `[resident] harness = <id>`，同时去掉这一层的会话记录（`[model] name`、`effort` 与 `[identity]`，与 `Forget` 去掉的相同）：一层不能同时点名模型与 harness，而「添加并在此使用」说的正是这个房间从下一段会话起换成这个 agent。两条都走 `change`，落盘前读回一遍。
+- **`launch_digest` 缺席是人亲手写的行**：那份文件就是人的同意，与 `[[mcp]]`、`[remote]` 相同；写了它的行是同意卡片写下的，之后被改过就在派活时拒（`Sprawling/agent_protocols/Spec.lean` D16）。命令与参数是这台电脑的事实，恒不进账本（`Sprawling/kernel/src/config.rs` 的 `McpServer` 同理）。
+- **写面**：同意卡片经 `AddAgent` 写这一行（`Sprawling/app/spec/Serving.lean` 的同意一条）。`write_agent` 只写城那一级，同 `id` 的行整行换掉、别的行原样留下，所以再加一次同一个 agent 是更新它的同意而不是第二行（第二行在解析时就拒）。`seat_agent` 在房间那一层写 `[resident] harness = <id>`，同时去掉这一层的会话记录（`[model] name`、`effort` 与 `[identity]`，与 `Forget` 去掉的相同）：一层不能同时点名模型与 harness，而「添加并在此使用」说的正是这个房间从下一段会话起换成这个 agent。两条都走 `change`，落盘前读回一遍。
 
 ### 8-4c `[search]`：网络搜索接哪一家（`config_layers::search`，形状 1 判定／求值）
 
@@ -188,14 +188,14 @@ reference = "secret:search/brave.main"
 header = "x-api-key"
 ```
 
-- **求值**：`search_supplier` 是「一个 run 的 `web_search` 接哪一家」的唯一答案。`Default` 答 `default_search_supplier()`，`Custom` 答 `id` 等于 `selected` 的那一家，`Off` 答 `None`（这里不提供 `web_search`）。`Custom` 的答案恒不是缺省那一家，除非人把它列进了 `suppliers` 并选了它；`selected` 在列表里找不到时以 `E_CONFIG_INVALID` 拒，不回落（D25）。冻结的值是 `FrozenConfig.search`（`crates/kernel/spec/Config.lean` §8-22），accounting 在 Run 起点对它调一次本函数（`crates/accounting/spec/Connectors.lean` §8-35）。
+- **求值**：`search_supplier` 是「一个 run 的 `web_search` 接哪一家」的唯一答案。`Default` 答 `default_search_supplier()`，`Custom` 答 `id` 等于 `selected` 的那一家，`Off` 答 `None`（这里不提供 `web_search`）。`Custom` 的答案恒不是缺省那一家，除非人把它列进了 `suppliers` 并选了它；`selected` 在列表里找不到时以 `E_CONFIG_INVALID` 拒，不回落（D25）。冻结的值是 `FrozenConfig.search`（`Sprawling/kernel/spec/Config.lean` §8-22），accounting 在 Run 起点对它调一次本函数（`Sprawling/accounting/spec/Connectors.lean` §8-35）。
 - **缺省那一家只在这里声明**：`id = "exa"`，`url = "https://mcp.exa.ai/mcp"`，`remote = "web_search_exa"`，`query = "query"`，`objective = "objective"`，`count = "numResults"`，一个匿名账号 `anonymous`。设置页显示的缺省地址由 `Query::Config` 从这个函数读回，页面与 kernel 都不写第二份。这组参数名的出处见 D25。
 - **解析时拒**（`E_CONFIG_INVALID`，梯子在 subject 前加上文件）：`choice` 不是三种拼写之一；`"default"`／`"off"` 带着 `selected` 或 `suppliers`；`"custom"` 缺 `selected`、`suppliers` 为空或 `selected` 不在其中；两家同 `id`；`url` 过不了 `[[mcp]]` 的 url 判定（§8-4b，D26）；`remote` 或 `query` 为空；写了的 `objective`／`count` 为空，或三个参数名里有两个相同；`accounts` 过不了 `ProviderAccount` 的校验（空表、重复 id 或引用、匿名账号带 header）；带引用的账号没写 `header`；任何不认的键。
 - **带引用的账号必须写 `header`**：MCP 的 header 值按整个值兑付（一个 `secret:realm/name` 换成整份密文），所以 Key 只能原样放进一个具名 header；`Authorization: Bearer` 要一个兑付者不加的前缀。缺省那一家收 `x-api-key`。重开参数：出现一家只收 Bearer 的供应方。
-- **只写在城与楼两级**：房间那一级写 `[search]` 由梯子拒（`crates/city/spec/ConfigLayers/Ladder.lean` 的 `Confined.Search`），恢复语指向楼或城的 `CONFIG.toml`。理由：设置页编辑城那一级、只读列出各楼的覆盖，房间那一级的值会治理一个 run 却不出现在页面上；房间的文件又是会话写记录的地方（§8-14）。楼一级整值覆盖城一级，同 `[[mcp]]`。
+- **只写在城与楼两级**：房间那一级写 `[search]` 由梯子拒（`Sprawling/city/spec/ConfigLayers/Ladder.lean` 的 `Confined.Search`），恢复语指向楼或城的 `CONFIG.toml`。理由：设置页编辑城那一级、只读列出各楼的覆盖，房间那一级的值会治理一个 run 却不出现在页面上；房间的文件又是会话写记录的地方（§8-14）。楼一级整值覆盖城一级，同 `[[mcp]]`。
 - **写面**：`write_search` 只写城那一级（设置页只编辑那一级），把值包成 `Change::Search`，先调读面同一个校验，过了才进 `change`，`change` 再复读整份文本（§8-4b）。`Default` 也写出 `choice = "default"`，读回的就是写下的。
-- **读回来源**：`settled_search` 与 `settled_effort` 爬同一条梯子，连同说出值的那一级答：在某栋楼（或它的房间）的地址上问，答的是这里被什么治理。没有地址指城根，所以设置页要编辑的城那一级由 `city_search` 单独读：它只读城自己那份 `CONFIG.toml`，与梯子读那一级用的是同一个 `stated`，一栋楼自己写了 `[search]` 也不会把楼的值当成城的值答出来（`crates/wire/spec/Answer/Config.lean` §8-86）。没有 `[search]` 的旧 `CONFIG.toml` 照旧读得回来，两者都答 `None`，求值为 `Default`。
-- **不在本模块的事**：机密楼不提供 `web_search`、账号怎么选、失败怎么恢复、连接怎么复用，都在 `crates/accounting/spec/Connectors.lean` §8-35。本模块只回答文件说了什么、它指哪一家。
+- **读回来源**：`settled_search` 与 `settled_effort` 爬同一条梯子，连同说出值的那一级答：在某栋楼（或它的房间）的地址上问，答的是这里被什么治理。没有地址指城根，所以设置页要编辑的城那一级由 `city_search` 单独读：它只读城自己那份 `CONFIG.toml`，与梯子读那一级用的是同一个 `stated`，一栋楼自己写了 `[search]` 也不会把楼的值当成城的值答出来（`Sprawling/wire/spec/Answer/Config.lean` §8-86）。没有 `[search]` 的旧 `CONFIG.toml` 照旧读得回来，两者都答 `None`，求值为 `Default`。
+- **不在本模块的事**：机密楼不提供 `web_search`、账号怎么选、失败怎么恢复、连接怎么复用，都在 `Sprawling/accounting/spec/Connectors.lean` §8-35。本模块只回答文件说了什么、它指哪一家。
 -/
 
 /-!
@@ -222,12 +222,12 @@ github = "off"
 how = "core"
 ```
 
-- **值的形状与读法不在本模块**：`Exposure`、`ExposureTable` 与两张表的读法（楼的工具键、楼的命名空间键、城的工具键、城的命名空间键依次）住 `kernel::config`（`crates/kernel/Spec.lean` §8-22）；哪两件工具挪不动、表不说时取什么住 `runtime::catalog::exposure`（`crates/runtime/spec/Catalog.lean` §8-60，runtime D111）。本模块只回答文件说了什么、写在哪几级、怎么写回去。
+- **值的形状与读法不在本模块**：`Exposure`、`ExposureTable` 与两张表的读法（楼的工具键、楼的命名空间键、城的工具键、城的命名空间键依次）住 `kernel::config`（`Sprawling/kernel/Spec.lean` §8-22）；哪两件工具挪不动、表不说时取什么住 `runtime::catalog::exposure`（`Sprawling/runtime/spec/Catalog.lean` §8-60，runtime D111）。本模块只回答文件说了什么、写在哪几级、怎么写回去。
 - **两张表各自冻结，不整值上梯**：楼的表没提到的工具仍落到城的表，所以 `load` 把城与楼两级各自那张交给 `freeze`，`FrozenConfig.catalog` 持两张（`CatalogExposure { city, building }`），不是 `LayeredValue::resolve` 取最近的一张。`skills` 同理按 skill 名读楼再读城，缺省 `Dormant`；skill 的 `Core` 注入 pin 版本的完整 `SKILL.md`，`Dormant` 只占一行，`Off` 不进 run（city D113）。
 - **解析时拒**（`E_CONFIG_INVALID`，梯子在 subject 前加上文件）：不认的键（`tools`、`namespaces`、`skills` 之外）；值不是三种拼写之一；`tools` 的键不合工具名的文法（`kernel::ToolName::parse`）；`namespaces` 的键不合命名空间的文法（ASCII 小写与数字，`kernel::ServerLabel::parse`，预留命名空间也合这条文法）；`skills` 的键用与书架索引相同的单段名。今天没有哪件工具或 skill 叫这个名字不拒：服务器与候选版本来去，写下的表不该因为它今天没连上就失效。
-- **只写在城与楼两级**：房间那一级写 `[catalog]` 由梯子拒（`crates/city/spec/ConfigLayers/Ladder.lean` 的 `Confined.Catalog`），恢复语指向楼或城的 `CONFIG.toml`。理由见 D34。
-- **写面整张替换**：楼页的能力节一次保存整张表（`crates/wire/Spec.lean` §8-99）。`write_catalog` 写楼那一级，城那一级经 `CitySetting::Catalog`；两者都先过读面同一个 `check`（对外名 `check_catalog`，一帧同时写别的会被拒的项时，调用方在落任何一项之前先用它判），再进 `change`，`change` 落盘前复读整份文本（§8-4b）。空表把 `catalog` 键整个拿掉，这一级回到继承：写一份与上一级相同的值，上一级以后改了这一级也不跟。
-- **属于 format 1**：`[catalog]` 与认得 `format` 的第一版同一版发布，不另登记一级 `Rung`（`crates/city/spec/Format.lean` §8-42 的加键规则从下一版起适用）。
+- **只写在城与楼两级**：房间那一级写 `[catalog]` 由梯子拒（`Sprawling/city/spec/ConfigLayers/Ladder.lean` 的 `Confined.Catalog`），恢复语指向楼或城的 `CONFIG.toml`。理由见 D34。
+- **写面整张替换**：楼页的能力节一次保存整张表（`Sprawling/wire/Spec.lean` §8-99）。`write_catalog` 写楼那一级，城那一级经 `CitySetting::Catalog`；两者都先过读面同一个 `check`（对外名 `check_catalog`，一帧同时写别的会被拒的项时，调用方在落任何一项之前先用它判），再进 `change`，`change` 落盘前复读整份文本（§8-4b）。空表把 `catalog` 键整个拿掉，这一级回到继承：写一份与上一级相同的值，上一级以后改了这一级也不跟。
+- **属于 format 1**：`[catalog]` 与认得 `format` 的第一版同一版发布，不另登记一级 `Rung`（`Sprawling/city/spec/Format.lean` §8-42 的加键规则从下一版起适用）。
 -/
 
 /-!
@@ -251,7 +251,7 @@ settings-control ModelSection.overrides client/src/views/setup/providers/generat
 
 - **旧会话没有这些键**：`generation()` 答 `None` 时保持旧比较路径，不凭当前设置补写历史；一旦当前类型化生成配置与旧的空设置不同，dispatch 拒绝并指向 `/new`。新会话总是写下有效值，`/new` 与 `Forget` 同时移除这些键，分支则从母亲 `run_started.generation` 恢复。
 - **写进那一层，而不是另存一份**：选择落到会话自己房间的 `CONFIG.toml`，由已有的 city → building → room 阶梯解析。第二个存处就是第二个答案。
-- **这份记录是会话的，不是运行时的设定**：一个 Run 用哪个模型仍由 endpoint book 选，强度仍爬同一条梯子——两者决定会话从哪里开始。房间写下来的只是它当初从哪里开始，所以登记面之后搬了家，是下次派活拒掉的分歧，而不是它默默执行的变更（`crates/sprawling/Spec.lean` §8-79`）。
+- **这份记录是会话的，不是运行时的设定**：一个 Run 用哪个模型仍由 endpoint book 选，强度仍爬同一条梯子——两者决定会话从哪里开始。房间写下来的只是它当初从哪里开始，所以登记面之后搬了家，是下次派活拒掉的分歧，而不是它默默执行的变更（`Sprawling/app/Spec.lean` §8-79`）。
 - **只改 `[model]` 表里的键**：文件里其它键是人写的，读出来、改一个值、写回去，与其余写面同走 §8-4b 的那一条写路径。文件读不动或解析不了就**拒绝**，不覆盖——一份本构建看不懂的配置不是可以随手盖掉的配置。
 - **只写 Resident 层**，层级不由调用方给：派活按钮旁边选的强度属于这一次会话的房间。需要按层写强度时，签名要多一个 `Layer` 参数，那是一次公开面变更。
 - **落点就是地址自己的 `CONFIG.toml`**，所以这个房间跑的 Run 读得到、改不了自己的档位；地址就是楼时它就是楼自己那份文件，也就是楼根上的会话（§8-4 的 `own_layer`）。
@@ -271,7 +271,7 @@ stamp = "minute"   # "off" | "minute" | "five_minute" | "hour"
 
 **拒什么**：`[clock]` 表 `deny_unknown_fields`。`zones` 与任何别的键、拼不出的值（`"minutes"`）都在解析时拒，走本模块既有的那一种拒法（`refuse::unreadable`）：主体是 serde 点名的键或值与它接受的集合，恢复语是「under `[clock]`, change the value the message names, or take that key out」。
 
-**读者**：粒度只在 `runtime::clock::StampGate` 里起作用（`crates/runtime/Spec.lean` §8-10）；生产的每一跑由装配层按冻结下来的值造一个 `StampGate`（`crates/sprawling/Spec.lean` §8-125）。
+**读者**：粒度只在 `runtime::clock::StampGate` 里起作用（`Sprawling/runtime/Spec.lean` §8-10）；生产的每一跑由装配层按冻结下来的值造一个 `StampGate`（`Sprawling/app/Spec.lean` §8-125）。
 -/
 
 /-! D115 `[model]` 同时冻结有效生成配置，仍走同一个读改写门
@@ -284,7 +284,7 @@ stamp = "minute"   # "off" | "minute" | "five_minute" | "hour"
 
 **决定**：`[resident] harness` 按城／楼／房间的梯子取最近一级（`settled_harness`），`[model] name` 仍只是地址自己那一层的会话记录。同一层两键并存在解析时拒。地址自己那一层有会话记录时，`settled_harness` 答 `None`，梯子上的 harness 从 `/new` 开的下一段会话起生效。`change` 落盘前用 `ConfigLayer::parse` 读一遍自己要写下的字节，读不回的不写。
 
-**理由**：房间在派活时才开，人事先只能把 harness 写在楼层或城层，所以它必须上梯子；`[model] name` 是城在会话第一次 run 时写下的记录，别的房间继承它就把一段会话的选择变成了别人的默认。会话记录压过梯子，一段会话就只有一个居民，provider 对这段会话缓存的前缀也不会在中途失效（`crates/sprawling/Spec.lean` §8-79）。写路径复读一次，是因为地址就是楼时楼层与房间层是同一个文件：派活路径若在别处漏了分流，把 `[model] name` 写进点名了 harness 的楼，每个读者都会拒这份文件，整栋楼派不出活；复读让这件事停在写之前，而判定仍只有 `parse` 一处。
+**理由**：房间在派活时才开，人事先只能把 harness 写在楼层或城层，所以它必须上梯子；`[model] name` 是城在会话第一次 run 时写下的记录，别的房间继承它就把一段会话的选择变成了别人的默认。会话记录压过梯子，一段会话就只有一个居民，provider 对这段会话缓存的前缀也不会在中途失效（`Sprawling/app/Spec.lean` §8-79）。写路径复读一次，是因为地址就是楼时楼层与房间层是同一个文件：派活路径若在别处漏了分流，把 `[model] name` 写进点名了 harness 的楼，每个读者都会拒这份文件，整栋楼派不出活；复读让这件事停在写之前，而判定仍只有 `parse` 一处。
 
 **被否**：①梯子上的 harness 压过会话记录：改了楼层下一次派活就换居民，一段会话前后两截的记录说的是两种居民；②把两个键收成一个枚举字段：一个是城写下的记录、只读本层，一个是人写下的设定、爬梯子，合成一个值会暗示两者按同一条规则求值，而私有字段加唯一构造点已经让两键并存的值构造不出来；③写路径只靠派活路径先分流、自己不复读：分流住在另一个 crate，一处疏漏的代价是一整栋楼。
 
@@ -345,7 +345,7 @@ stamp = "minute"   # "off" | "minute" | "five_minute" | "hour"
 /-!
 ## 模型：每一次写都先让读者读一遍
 
-所有写面（`write_session`、`forget_session`、`write_sandbox`、`write_mcp`、`write_search`、`write_second_threshold`、`write_city_setting`、`freeze_naming`）都把要说的话包成一个 `Change`，走同一个 `change`：在文档锁里读出整份文件，读不成一份 TOML 文档就拒；改它要改的键；把改好的整份文本交给 `ConfigLayer::parse`，读者拒了就拒这次写，什么都不落；读者收下才整份换上（§8-4b、D6）。锁与整份换上是 `crates/city/spec/Document.lean` 的模型，这里只说「写下的总是读者收得下的」。
+所有写面（`write_session`、`forget_session`、`write_sandbox`、`write_mcp`、`write_search`、`write_second_threshold`、`write_city_setting`、`freeze_naming`）都把要说的话包成一个 `Change`，走同一个 `change`：在文档锁里读出整份文件，读不成一份 TOML 文档就拒；改它要改的键；把改好的整份文本交给 `ConfigLayer::parse`，读者拒了就拒这次写，什么都不落；读者收下才整份换上（§8-4b、D6）。锁与整份换上是 `Sprawling/city/spec/Document.lean` 的模型，这里只说「写下的总是读者收得下的」。
 
 * `change` 交出的文本读者一定收下（`a_change_lands_only_what_the_reader_accepts`）。
 * 被拒的一次写不动文件（`a_refused_change_leaves_the_file`）。
@@ -479,7 +479,7 @@ settings-reason ConfigFile.clock 时钟行多久出一次只改结果里那一�
 settings-reason ClockSection.stamp 时钟行多久出一次只改结果里那一行的疏密，不改任何保证；缺省 minute 是 kernel 常量，需要改的人在城或楼的 CONFIG.toml 里写，拼错在解析点拒。
 settings-control ConfigFile.context client/src/views/settings/context_rung.svelte
 settings-control ContextSection.second_threshold client/src/views/settings/context_rung.svelte
-settings-reason ConfigFile.format `format` 说这份文件按哪一版的文法读，由格式阶梯在开城时写（`crates/city/Spec.lean` §8-42），不是人的设定；人改它只会让文件被拒，或被当成另一版的文件读。
+settings-reason ConfigFile.format `format` 说这份文件按哪一版的文法读，由格式阶梯在开城时写（`Sprawling/city/Spec.lean` §8-42），不是人的设定；人改它只会让文件被拒，或被当成另一版的文件读。
 settings-reason ConfigFile.identity 城在会话第一次 run 时写下命名版本，`/new` 拿掉它；这是会话的记录，不是 User 的设定，改它会让会话读到另一套名字。
 settings-reason IdentitySection.version 城在会话第一次 run 时写下命名版本，`/new` 拿掉它；这是会话的记录，不是 User 的设定，改它会让会话读到另一套名字。
 settings-control ConfigFile.mcp client/src/views/mcp.svelte

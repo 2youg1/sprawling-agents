@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.kernel.spec.Address
+import Sprawling.kernel.spec.Address
 
 /-!
 # city::building
 
-规定 `building`、`building::removal`、`building::template`（`crates/city/src/` 下同名的文件）。一栋楼怎么被建出来、收编、移走，以及一个地址归哪栋楼管；City Hall 随城立起。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+规定 `building`、`building::removal`、`building::template`（`Sprawling/city/src/` 下同名的文件）。一栋楼怎么被建出来、收编、移走，以及一个地址归哪栋楼管；City Hall 随城立起。本文件是 `Sprawling/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `Sprawling/city/Spec.lean §8-n`，决定引作 `city D<n>`。
 -/
 
 /-!
@@ -67,7 +67,7 @@ pub fn removed_payload(removed: &Removed) -> Result<Payload, AxError>;         /
 - **楼是顶层地址，房间不是楼**：`create` 拒多段地址（`lab/room1` 是 `lab` 里的一个房间）。嵌套楼会使「这个地址归谁管」多出一个答案，而 `Building::of` 取首段这件事被写域、配置与上报对象三处消费。
 - **reserved prefix 下建楼恒拒**：`.sprawling/` 是城自己的账与配置，它在一切写域之外；允许在它下面建楼，就是把一个写域开到账本上。判定用 `Address::is_reserved`，不在本模块重写前缀文法。
 - **二次出生恒拒**：已有 `RULES.toml` 即拒（同 `init` 拒第二次创世）。覆写会把一栋已在干活的楼的规则静默换掉，而那份规则可能写着 `confidential = true`。
-- **模板字节来自 `crates/city/templates/RULES.toml`（`include_str!`）**：人读的那份模板与城写出的那份必须是同一串字节，否则两份会各自漂。`Confidential` 与 `Minimal` 只差一行（`confidential` 的值），且该差异由 `policy::evaluate` 读回来断言——换行成功与否不靠阅读，靠测试。
+- **模板字节来自 `Sprawling/city/templates/RULES.toml`（`include_str!`）**：人读的那份模板与城写出的那份必须是同一串字节，否则两份会各自漂。`Confidential` 与 `Minimal` 只差一行（`confidential` 的值），且该差异由 `policy::evaluate` 读回来断言——换行成功与否不靠阅读，靠测试。
 - **先落盘再产事件**：`building_created` 记的是已经发生的事。反过来的顺序会让历史声称一栋目录不存在的楼存在，而重放会把这个谎再说一遍。
 - **只写不读的 payload**：`created_payload` 只有写面，因为没有读它的投影——楼列表读盘（`city::buildings`）。读面随第一个真正需要它的投影落地，不提前建。
 - **占位符只有一个家**：`NAME_PLACEHOLDER` 住 `building::template`，`pub(crate)`；楼的规则与它的计划、备忘、交接读同一个占位符，两份拼法会让其中一份文件永远写着 `<building name>`。
@@ -137,14 +137,14 @@ impl CityPlan { pub fn hall(&self) -> &(Address, BuildingTemplate); }   // 恒�
 /-!
 ## 模型：一个地址归哪栋楼管，哪些地址能成为楼
 
-地址的段与 `is_within`、`is_reserved` 是 kernel 的模型（`crates/kernel/spec/Address.lean`），这里只加 city 自己拥有的三件：`Building::of` 取首段并拒保留子树、`holds` 就是 `is_within`、`create` 的三道拒。受保护的名字是参数 `protected_name`，它的唯一的家是 `kernel::address`（kernel D8）。
+地址的段与 `is_within`、`is_reserved` 是 kernel 的模型（`Sprawling/kernel/spec/Address.lean`），这里只加 city 自己拥有的三件：`Building::of` 取首段并拒保留子树、`holds` 就是 `is_within`、`create` 的三道拒。受保护的名字是参数 `protected_name`，它的唯一的家是 `kernel::address`（kernel D8）。
 
 * 一个地址被它的楼管着（`a_building_holds_every_address_it_governs`），楼的楼是它自己（`a_building_is_its_own_building`）。
 * 保留子树不属于任何一栋楼（`the_reserved_subtree_belongs_to_no_building`）：账本与城自己的配置在一切写域之外，问「它归哪栋楼」只得到拒绝。
 * `create` 收下的地址恰是一栋楼的地址（`a_created_building_governs_itself`）；房间（`a_room_is_not_a_building`）与二次出生（`a_second_birth_is_refused`）各拒一次。
 * 移走的楼落在城的保留子树里（`a_removed_building_is_out_of_every_write_domain`）：它不再是楼，居民也改不动它。
 
-模型不说段的字符级文法：那是 `Address::parse` 的，判例表在 `crates/fixtures/address.jsonl`。
+模型不说段的字符级文法：那是 `Address::parse` 的，判例表在 `Tools/fixtures/address.jsonl`。
 -/
 
 namespace City.Building

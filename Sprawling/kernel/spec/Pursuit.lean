@@ -6,7 +6,7 @@
 /-!
 # kernel::pursuit
 
-规定 `kernel::pursuit`（`crates/kernel/src/pursuit.rs`）：城的常设目标与它何时停下。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::pursuit`（`Sprawling/kernel/src/pursuit.rs`）：城的常设目标与它何时停下。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 -/
 
 /-!

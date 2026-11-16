@@ -5,11 +5,11 @@
 
 //! The git pathspecs a checkpoint stages its scopes through.
 //!
-//! Specified by `crates/storage/spec/Checkpoint.lean` §8-8.
+//! Specified by `Sprawling/storage/spec/Checkpoint.lean` §8-8.
 
 /// Two git pathspecs per scope, the scope itself and everything
 /// under it, because a scope is a prefix the run may write under or,
-/// when the lane knows what a wave wrote, one file (`crates/runtime/Spec.lean` §8-45).
+/// when the lane knows what a wave wrote, one file (`Sprawling/runtime/Spec.lean` §8-45).
 ///
 /// Several, because a write domain is a set: a building's own
 /// subtree plus whatever else its `RULES.toml` declares. Staging

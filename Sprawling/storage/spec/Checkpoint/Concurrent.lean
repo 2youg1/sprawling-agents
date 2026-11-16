@@ -6,7 +6,7 @@
 /-!
 # storage::checkpoint 的并发写者
 
-规定 `crates/storage/src/checkpoint.rs`、`crates/storage/src/checkpoint/base.rs` 与 `crates/storage/src/checkpoint/commit.rs` 在多个写者同时写一座城的检查点时必须守住的性质。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（`crates/storage/Spec.lean` §8-8、§8-39）。
+规定 `Sprawling/storage/src/checkpoint.rs`、`Sprawling/storage/src/checkpoint/base.rs` 与 `Sprawling/storage/src/checkpoint/commit.rs` 在多个写者同时写一座城的检查点时必须守住的性质。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（`Sprawling/storage/Spec.lean` §8-8、§8-39）。
 
 一次检查点分三步：写者把自己的写域暂存进**自己的** index（或不经盘上 index，直接在 mempack 里写树对象），把树对象写进城共享的对象库，再把引用 `refs/sprawling/runs/<run>/<oid>` 钉到它上面。对象库按内容寻址、只增不减；检查点引用以提交自己的 oid 为名，只建不改；唯一会被改写的引用是 HEAD（`ensure_base` 在没有 HEAD 时建它，`land` 移动它），它的改写是一次比较后交换。
 
@@ -24,7 +24,7 @@
 ### 8-39 storage::checkpoint 的并发写者：每个写者一个 index，共享的只有对象库与引用（形状 4 适配器；git2）
 
 ```rust
-// crates/storage/src/checkpoint/opening.rs
+// Sprawling/storage/src/checkpoint/opening.rs
 impl Checkpoint {
     /// 城的那一份 index 上的句柄：仓库不在时建它，并把行尾钉成原样（`core.autocrlf = false`）。
     /// 配置只在值不同时写，所以城开过一次之后，再开只读不写，不与别的句柄争配置的锁。
@@ -47,8 +47,8 @@ impl Checkpoint {
 - **`wave_pre` 的引用只建不冲突。** 引用名是提交自己的 oid（§8-8），建的时候 `force = true`：名字就是值，覆盖只可能写下同一个值。`force = false` 反而会让同一刻、同一棵树、同一父提交的第二次检查点（同一个 oid）被「引用已在」拒掉。所以检查点引用之间没有冲突，`pins_only_grow` 与 `independent_steps_commute` 说的就是这一点。
 - **HEAD 的改写是比较后交换。** `land` 以 `Repository::commit(Some("HEAD"), …, parents)` 提交，libgit2 在当前 HEAD 不是第一个父提交时拒绝。基线（`ensure_base`、无 HEAD 时的 `base_checkpoint`）先以不移动引用的提交写进 mempack、落成一个 pack，再以 `Repository::reference(<HEAD 指的分支>, oid, false, …)` 建分支：分支已在即拒（libgit2 的 `Exists`），这就是从「无」出发的交换（`heldBase`，`a_held_base_moves_head_only_from_what_it_read`；pack 之前失败不动任何引用，`a_held_base_that_fails_before_the_pack_moves_no_reference`；storage D27）。`ensure_base` 被拒即重读 HEAD：HEAD 已在就返回 `None`，与赢家先做的串行次序相同（`a_lost_base_race_is_the_serial_order`）。`land` 被拒是 `StorageError::Checkpoint { op: "move HEAD" }`（→ `E_WORKTREE_BUSY`，恢复：重试这一次落地），因为它的树是对旧 HEAD 暂存的，静默重做会把别人刚落下的改动当成这次要退回的。引用的锁文件被别人占着（libgit2 的 `Locked`；Windows 上改名撞上一个开着的文件也报在这里）答的是同一个错误与同一个恢复。
 - **失败不动引用。** 暂存与写对象都不改引用（`before_the_pin_no_reference_moves`），所以在钉引用之前失败的检查点留下的引用与开始时相同；崩溃写下的对象没有引用够得着，`git gc` 收走（`a_crash_reaches_nothing_new`）。私有 index 在崩溃后留在盘上：worker 开城时 `sweep_writers` 删掉它们，与 `sweep_abandoned` 收走崩溃留下的树同一个时机。
-- **增量检查点等于整个写域的检查点。** 只暂存这一波写过的路径由 `crates/runtime/Spec.lean` §8-45 决定（lane 把各调用的 `Writes::Paths` 并起来，`Domain` 与失败的调用暂存整个写域）；它依赖的性质在这里证明：这一波在写域里只碰了这些路径时，两种暂存得到同一棵树（`staging_the_touched_paths_is_staging_the_scope`）。exec 声明 `Domain`，它的检查点暂存整个写域，libgit2 按修改时间与尺寸跳过没变的文件，是同一个定理以「stat 变了的路径」为 `touched` 的实例。
-- **验收**：从本模型导出的 Rust 检查在 `crates/storage/src/checkpoint/opening/tests.rs`——两个写者各开 `open_writer`，在同一座城里的两个线程上交错 `wave_pre`，各自的提交的树等于各自暂存的写域，两条引用都在（`others_never_touch_an_index`、`a_pin_holds_what_its_writer_staged`）；一个写者暂存并写下树对象之后、提交与钉引用之前被丢掉，城的引用集合不变（`before_the_pin_no_reference_moves`、`a_crash_reaches_nothing_new`）；两个写者在两个线程上同时 `ensure_base` 一座没有提交的城，HEAD 恰是其中一个的提交，另一个答 `None`（`a_lost_base_race_is_the_serial_order`）。从 `heldBase` 导出的检查在 `crates/storage/src/checkpoint/base/tests.rs`：一个读到「没有 HEAD」的基线在别的写者建了分支之后被拒，HEAD 仍是那个写者的提交（`a_base_that_read_no_head_is_refused_once_another_writer_made_one`，把建分支改成强制写即变红）；扫到凭证而在落包之前被拒的基线不留任何指向未落盘对象的引用（`a_refused_base_checkpoint_leaves_no_reference_to_objects_it_never_wrote`）。
+- **增量检查点等于整个写域的检查点。** 只暂存这一波写过的路径由 `Sprawling/runtime/Spec.lean` §8-45 决定（lane 把各调用的 `Writes::Paths` 并起来，`Domain` 与失败的调用暂存整个写域）；它依赖的性质在这里证明：这一波在写域里只碰了这些路径时，两种暂存得到同一棵树（`staging_the_touched_paths_is_staging_the_scope`）。exec 声明 `Domain`，它的检查点暂存整个写域，libgit2 按修改时间与尺寸跳过没变的文件，是同一个定理以「stat 变了的路径」为 `touched` 的实例。
+- **验收**：从本模型导出的 Rust 检查在 `Sprawling/storage/src/checkpoint/opening/tests.rs`——两个写者各开 `open_writer`，在同一座城里的两个线程上交错 `wave_pre`，各自的提交的树等于各自暂存的写域，两条引用都在（`others_never_touch_an_index`、`a_pin_holds_what_its_writer_staged`）；一个写者暂存并写下树对象之后、提交与钉引用之前被丢掉，城的引用集合不变（`before_the_pin_no_reference_moves`、`a_crash_reaches_nothing_new`）；两个写者在两个线程上同时 `ensure_base` 一座没有提交的城，HEAD 恰是其中一个的提交，另一个答 `None`（`a_lost_base_race_is_the_serial_order`）。从 `heldBase` 导出的检查在 `Sprawling/storage/src/checkpoint/base/tests.rs`：一个读到「没有 HEAD」的基线在别的写者建了分支之后被拒，HEAD 仍是那个写者的提交（`a_base_that_read_no_head_is_refused_once_another_writer_made_one`，把建分支改成强制写即变红）；扫到凭证而在落包之前被拒的基线不留任何指向未落盘对象的引用（`a_refused_base_checkpoint_leaves_no_reference_to_objects_it_never_wrote`）。
 -/
 
 /-! D25 一座城的检查点由多个写者同时做，每个写者一个自己的 index，共享的只有对象库与引用更新；`accounting` 那把全城的检查点锁因此拆掉。

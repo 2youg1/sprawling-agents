@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A whole-document step on one prompt document, and the line that
-//! records it (`crates/accounting/Spec.lean` §8-22,
-//! `crates/wire/Spec.lean` §8-98).
+//! records it (`Sprawling/accounting/Spec.lean` §8-22,
+//! `Sprawling/wire/Spec.lean` §8-98).
 //!
 //! Which documents take which step, and the version check, are the
 //! city's (`city::put_prompt`); this module turns the frame into that

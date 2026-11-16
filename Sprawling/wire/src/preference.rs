@@ -83,7 +83,7 @@ pub enum Face {
 }
 
 /// One of the shipped face's own OpenType features, spelled as that
-/// face's name table spells it (`crates/wire/spec/Preference.lean`
+/// face's name table spells it (`Sprawling/wire/spec/Preference.lean`
 /// D125).
 ///
 /// The six are Paper Mono's, whose `ss01`, `ss02`, `ss03`, `ss04`,
@@ -111,7 +111,7 @@ pub enum TypeFeature {
 
 /// How heavy running text stands: three postures, and the strong steps
 /// of the type ladder stand two hundred above whichever holds
-/// (`crates/wire/spec/Preference.lean` D126).
+/// (`Sprawling/wire/spec/Preference.lean` D126).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -124,7 +124,7 @@ pub enum Weight {
 /// Which face reading text is drawn in: the messages of a conversation,
 /// documents and reports. Controls, labels, figures and code keep the
 /// interface's faces whichever this says
-/// (`crates/wire/spec/Preference.lean` D52).
+/// (`Sprawling/wire/spec/Preference.lean` D52).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -215,7 +215,7 @@ pub struct Appearance {
     pub body_px: Option<BodyPx>,
     /// The families a face is followed by for the glyphs it lacks, in
     /// the order they are tried: at most two names, empty by default
-    /// (`crates/wire/spec/Preference.lean` D124).
+    /// (`Sprawling/wire/spec/Preference.lean` D124).
     ///
     /// The city stores what the person wrote and does not parse it: the
     /// page owns the name grammar and the stacks that read it, as it
@@ -223,7 +223,7 @@ pub struct Appearance {
     #[serde(default)]
     pub fallbacks: Vec<String>,
     /// The shipped face's own features the person turned on, in the
-    /// order this crate declares them (`crates/wire/spec/Preference.lean`
+    /// order this crate declares them (`Sprawling/wire/spec/Preference.lean`
     /// D125). Empty by default, and a feature no build offers is refused
     /// where it is read rather than dropped.
     #[serde(default)]
@@ -231,7 +231,7 @@ pub struct Appearance {
     /// The height of one line of running text in thousandths of the
     /// font size, at least [`LINE_HEIGHT_MIN`]. Absent means the person
     /// stated none and the stylesheet's own is drawn
-    /// (`crates/wire/spec/Preference.lean` D126).
+    /// (`Sprawling/wire/spec/Preference.lean` D126).
     #[serde(default)]
     pub line_height: Option<LineHeight>,
     /// The space between letters in thousandths of an em, at least
@@ -317,10 +317,10 @@ pub struct PreferencesAnswer {
     /// The chords this person rebound, action order.
     pub chords: Vec<Chord>,
     /// The tags this person gave sessions, in session order
-    /// (`crates/wire/spec/Preference.lean` §8-84).
+    /// (`Sprawling/wire/spec/Preference.lean` §8-84).
     pub tags: Vec<SessionTags>,
     /// The person's colours laid over the built-in theme
-    /// (`crates/wire/spec/Preference.lean` D29).
+    /// (`Sprawling/wire/spec/Preference.lean` D29).
     pub theme: ThemeOverride,
 }
 
@@ -446,15 +446,15 @@ pub enum PreferencePatch {
     /// sending an empty `spelled`.
     Chord(Chord),
     /// Whether the core's threads stand above normal. Lands in the
-    /// file's `[core]` section, not in `[ui]` (`crates/wire/spec/Command/Step.lean` §8-61).
+    /// file's `[core]` section, not in `[ui]` (`Sprawling/wire/spec/Command/Step.lean` §8-61).
     CorePriority(CorePriority),
     CorePlacement(CorePlacement),
     RunMemory(Option<std::num::NonZeroU64>),
     /// Replace one session's tags with these; an empty set removes them
-    /// (`crates/wire/spec/Preference.lean` §8-84).
+    /// (`Sprawling/wire/spec/Preference.lean` §8-84).
     Tags(SessionTags),
     /// Replace the colour override; the empty value returns to the
-    /// built-in theme (`crates/wire/spec/Preference.lean` D29).
+    /// built-in theme (`Sprawling/wire/spec/Preference.lean` D29).
     Theme(ThemeOverride),
 }
 
@@ -538,7 +538,7 @@ mod tests {
     /// The built-in face is Paper Mono, and neither a word of the face
     /// that left the bundle nor the word of the face that stayed is read
     /// as it: `maple` is Maple Mono, which still ships
-    /// (`crates/wire/spec/Preference.lean` D123).
+    /// (`Sprawling/wire/spec/Preference.lean` D123).
     #[test]
     fn the_shipped_face_is_paper_and_no_old_name_reads() {
         let held = serde_json::to_value(PreferencesAnswer::default())
@@ -567,7 +567,7 @@ mod tests {
     /// The fallback chain reads back as written, in its order, and a
     /// section written before it existed reads back as none: the city
     /// stores the names and does not parse them
-    /// (`crates/wire/spec/Preference.lean` D124).
+    /// (`Sprawling/wire/spec/Preference.lean` D124).
     #[test]
     fn the_fallback_chain_reads_back_in_its_order_and_absent_as_none() {
         let read_back = |fallbacks: Option<serde_json::Value>| {
@@ -589,7 +589,7 @@ mod tests {
     }
 
     /// The six features read back as stated and a seventh word is
-    /// refused rather than dropped (`crates/wire/spec/Preference.lean`
+    /// refused rather than dropped (`Sprawling/wire/spec/Preference.lean`
     /// D125).
     #[test]
     fn the_six_features_read_back_and_a_word_no_bundle_offers_is_refused() {
@@ -616,7 +616,7 @@ mod tests {
 
     /// A line box under the floor is refused where it is read, and any
     /// taller one reads back as the number it was
-    /// (`crates/wire/spec/Preference.lean` D126).
+    /// (`Sprawling/wire/spec/Preference.lean` D126).
     #[test]
     fn a_line_box_under_the_floor_is_refused_and_any_taller_one_reads() {
         let read_back = |height: u32| {
@@ -715,7 +715,7 @@ mod tests {
         assert_eq!(chosen.tier, Some(Tier::Panorama));
     }
 
-    /// The body size has a floor and no ceiling (`crates/wire/spec/Preference.lean`
+    /// The body size has a floor and no ceiling (`Sprawling/wire/spec/Preference.lean`
     /// D51): a size under the floor is refused where it is read, so the
     /// person's file and a frame meet the rule the page's box states,
     /// and any size above it reads back as the number it was.
@@ -734,7 +734,7 @@ mod tests {
     }
 
     /// The reading face is the person's to state and absent until they
-    /// do (`crates/wire/spec/Preference.lean` D52): a section that names
+    /// do (`Sprawling/wire/spec/Preference.lean` D52): a section that names
     /// it reads back the face it named, and one written before the
     /// field existed reads back as never stated.
     #[test]

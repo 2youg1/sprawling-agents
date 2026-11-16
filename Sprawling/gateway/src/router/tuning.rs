@@ -84,7 +84,7 @@ pub struct EndpointTuning {
     /// third state a caller has to handle.
     pub proxying: Proxying,
     /// How many calls may be in flight at once; absent means the
-    /// default for this kind of connection (`crates/gateway/Spec.lean` D21).
+    /// default for this kind of connection (`Sprawling/gateway/Spec.lean` D21).
     pub max_in_flight: Option<MaxInFlight>,
     /// How many more times one account is asked before the next account
     /// takes the request; absent means [`EndpointTuning::DEFAULTS`].

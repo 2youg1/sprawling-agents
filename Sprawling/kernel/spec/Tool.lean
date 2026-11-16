@@ -6,7 +6,7 @@
 /-!
 # kernel::tool
 
-规定 `kernel::tool`（`crates/kernel/src/tool.rs` 与 `crates/kernel/src/tool/` 下的 `writes`、`conformance`）：工具端口、效果与工具的元数据。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::tool`（`Sprawling/kernel/src/tool.rs` 与 `Sprawling/kernel/src/tool/` 下的 `writes`、`conformance`）：工具端口、效果与工具的元数据。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `kernel::tool::tests` 守住。
 -/
@@ -25,7 +25,7 @@ impl ToolName {
 }
 pub struct ServerLabel(String);     // 非空；ascii 小写/数字，恒不含下划线（见下）
 impl ServerLabel { pub fn parse(raw: &str) -> Result<ServerLabel, AxError>; pub fn as_str(&self) -> &str; }
-pub enum ReservedNamespace { Computer, Media, Record, Skill, Sprawling, Web } // ALL、as_str、named：catalog 留给城自己工具的命名空间（crates/runtime/spec/Catalog.lean §8-60）
+pub enum ReservedNamespace { Computer, Media, Record, Skill, Sprawling, Web } // ALL、as_str、named：catalog 留给城自己工具的命名空间（Sprawling/runtime/spec/Catalog.lean §8-60）
 pub struct TimeoutMs(pub u64);      // 声明即承诺可协作取消；缺席＝无截止
 pub enum Effect { Read, Write { domain: Address }, Egress,
                                     Connector { label: ServerLabel }, Spawn, Govern,
@@ -87,7 +87,7 @@ pub enum ExecArm { Program { path: String, args: Vec<String> }, Python { code: S
                                     // 三臂恒三（L0 冻结面），故穷尽不标 non_exhaustive；discard::forecast 的入参
 ```
 
-- **`invoke` 取 `&self`，trait 要求 `Send + Sync`。** 一波里开头连续的只读调用由 `Turn::execute_concurrent` 同时起跑（`crates/runtime/Spec.lean` §8-3），同一张工作台上的工具因此会被几个线程同时借用；`&self` 加 `Sync` 让「这件工具能被并行调用」由类型回答，而不是由调用方记住。有内部状态的工具把状态放在自己的锁后面（`Mutex`），锁只罩住那份状态，不罩整次调用。**被否**：①保留 `&mut self`，由工作台给每件工具套一把锁——同名的两条只读调用（两次 `read`）会在这把锁上排队，并行只剩不同名的调用；②每次调用克隆一件工具——持有子进程、连接或目录的工具克隆不出同一件东西。
+- **`invoke` 取 `&self`，trait 要求 `Send + Sync`。** 一波里开头连续的只读调用由 `Turn::execute_concurrent` 同时起跑（`Sprawling/runtime/Spec.lean` §8-3），同一张工作台上的工具因此会被几个线程同时借用；`&self` 加 `Sync` 让「这件工具能被并行调用」由类型回答，而不是由调用方记住。有内部状态的工具把状态放在自己的锁后面（`Mutex`），锁只罩住那份状态，不罩整次调用。**被否**：①保留 `&mut self`，由工作台给每件工具套一把锁——同名的两条只读调用（两次 `read`）会在这把锁上排队，并行只剩不同名的调用；②每次调用克隆一件工具——持有子进程、连接或目录的工具克隆不出同一件东西。
 - **`params` 复用 `Payload`**：键序 BTreeMap＋拒浮点白拿；schema 约定属各工具的实现。
 - **`ToolName::EXEC`**：`exec` 的唯一拼写；discard 预报、命令计数与 sieve、citysim 的执行器都读这个常量。`BROWSER` 同理。
 - **conformance 三断言**：①meta 八字段形状合法（name 文法、disclosure 非空）；②错名调用拒收（E_INVALID_ARGS）；③拒收后工具仍可用（再次正确调用不受污染）。
@@ -99,7 +99,7 @@ pub enum ExecArm { Program { path: String, args: Vec<String> }, Python { code: S
 - **`ServerLabel` 住本模块而非 agent_protocols**：它是一台 MCP server 在城里的名字，也是它每件工具名的第一段（`{label}_{tool}`），故它的文法就是 `ToolName` 的文法减下划线——写在两个 crate 里就是一条规则两个权威。**减下划线是判定而非口味**：允许它会让 `apps_foo_bar` 同时读作两种拆法，而这个名字要路由一次调用。迁入后 `city::config_layers` 在文件边界就能解析它（city 只见 kernel），于是「非法标签」在 Run 存在之前就不可表示。
 - **`ReservedNamespace` 住本模块，在 `ServerLabel` 旁边**：一台 server 的 label 就是它每件工具在 catalog 里的命名空间，所以 label 不能取城留给自己工具的那几个名字，否则 `tool list sprawling` 会把外部工具当作城自己的能力列出。拒绝在 `city::config_layers` 读 `[[mcp]]` 时发生，不在 `ServerLabel::parse`：`ServerLabel` 也是账号 id 与搜索供应方的名字，那里没有命名空间可撞。runtime 的 catalog 与 city 的配置层都只见 kernel，所以名单只能住这里。
 - **`GateSubject::None` 是一条判定而不是遗漏**：`None` 说的是「工具的 grammar 读完成参数，这条调用没有主体」。门收到它就按调用真正有的东西判：`Effect::Egress` 与 `Effect::AttachUserBrowser` 按 `EgressTarget::Loopback` 过密钥扫描（未指名去向的字节留在运行中的机器上，扫描照跑，因为跳过门曾让一条凭据静悄悄进页面），`Effect::Write` 的收窄没有更窄的区域可问（声明的 domain 已判过），`Effect::Govern` 则拒收（改规则的调用必须自己说出改哪个 scope，替它编一个等于把工具的错误说成事实）。**被否**：`None` 即跳过门——浏览器工具的非导航调用（`snapshot`、`act` 等）从此不过扫描；`None` 即拒——同一批调用全被拦下，而工具拿不出页面主机：`subject` 只读调用参数，浏览器工具不存当前页地址。文法读不出参数的调用返回 `Err`，bench 原样拒收，两种失败因此在类型上可分辨。
-- **`Area`／`Room` 今天没有生产者，`Scope` 由两件治理工具答出**：三种主体各有一个消费者（Write 的收窄用 Area／Room，Govern 用 Scope）。`rules`／`city` 答各自治理的 scope（`crates/city/Spec.lean` §8-36），Govern 的拒词因此说出那个 scope；能回答 Area／Room 的工具是 `edit`／`exec`／`archive`／`claim`／`goal`／`pr`／`signal`（各自的写入目标），它们的 `subject` 仍取 trait 默认，故收窄今天不生效。`Effect::Govern` 的 `None` 被拒收而不是回落到 run 地址。每个写工具补上自己的解析即闭合这一段（M-17）。
+- **`Area`／`Room` 今天没有生产者，`Scope` 由两件治理工具答出**：三种主体各有一个消费者（Write 的收窄用 Area／Room，Govern 用 Scope）。`rules`／`city` 答各自治理的 scope（`Sprawling/city/Spec.lean` §8-36），Govern 的拒词因此说出那个 scope；能回答 Area／Room 的工具是 `edit`／`exec`／`archive`／`claim`／`goal`／`pr`／`signal`（各自的写入目标），它们的 `subject` 仍取 trait 默认，故收窄今天不生效。`Effect::Govern` 的 `None` 被拒收而不是回落到 run 地址。每个写工具补上自己的解析即闭合这一段（M-17）。
 -/
 
 /-!
@@ -116,7 +116,7 @@ pub enum ExecArm { Program { path: String, args: Vec<String> }, Python { code: S
 
 /-! D37 发信与派活各有自己的呈现意图
 
-**决定**：`RenderIntent` 多两个单元变体 `Signal` 与 `Delegate`。`signal` 工具登记 `Signal`，`delegate` 工具登记 `Delegate`（`crates/collab/Spec.lean` D17）；`tool_called` 行照旧在调用那一刻抄下登记的 `render`，线上 `Call.render` 原样带它。变体不带字段：收信地址、正文、房间与任务都在这一次调用的 `args` 里，页面从 `Call.arguments` 读，与 `Diff` 的 meta 级空 `locations` 同一条规矩——逐调用的东西是 args 的纯函数，不进登记。三个平台上是同一份登记数据与同一种序列化，没有平台分支；写在这两个变体之前的旧账本行带的是 `generic`，页面照旧按 `effect` 画。
+**决定**：`RenderIntent` 多两个单元变体 `Signal` 与 `Delegate`。`signal` 工具登记 `Signal`，`delegate` 工具登记 `Delegate`（`Sprawling/collab/Spec.lean` D17）；`tool_called` 行照旧在调用那一刻抄下登记的 `render`，线上 `Call.render` 原样带它。变体不带字段：收信地址、正文、房间与任务都在这一次调用的 `args` 里，页面从 `Call.arguments` 读，与 `Diff` 的 meta 级空 `locations` 同一条规矩——逐调用的东西是 args 的纯函数，不进登记。三个平台上是同一份登记数据与同一种序列化，没有平台分支；写在这两个变体之前的旧账本行带的是 `generic`，页面照旧按 `effect` 画。
 
 **理由**：页面按登记选词，不按工具名（client/Spec.lean §4-26）。两件工具登记为 `Generic` 时，页面只剩 `effect` 可读：发信是 `Write`，读作「写入 send」；派活是 `Spawn`，读作「派生 <goal>」。人看不出信发给了谁、活交给了哪个房间。一个呈现意图说的就是「这一行该怎么画」，所以加在这里，而不是让页面认工具名。
 

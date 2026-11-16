@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a search answers when it is asked in Claude Code's `Grep` shape
-//! (`crates/runtime/spec/Tools/Search.lean` §8-30-2, D117, D120, D121).
+//! (`Sprawling/runtime/spec/Tools/Search.lean` §8-30-2, D117, D120, D121).
 
 use super::*;
 

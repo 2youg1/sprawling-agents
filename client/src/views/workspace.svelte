@@ -304,7 +304,7 @@ height on every desktop tier (client D113). -->
   {/if}
   <!-- Talk column: the gauge strip stands in this column above the
   conversation landmark so its run link is not a floating bar inside the
-  conversation (client D113; crates/xtask render talk). The landmark keeps
+  conversation (client D113; Tools/xtask render talk). The landmark keeps
   `-mx-wide px-wide` so thread chrome may bleed into that padding without
   crossing the region's box. -->
   <div

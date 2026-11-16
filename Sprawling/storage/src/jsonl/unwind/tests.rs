@@ -216,7 +216,7 @@ const fn wave(faults: &'static [Fault], answers_ok: bool) -> Wave {
 
 use Fault::{RefuseRestore, Tear, Unsynced};
 
-/// Trace vectors over `Step` from `crates/storage/spec/Jsonl/Barrier.lean`
+/// Trace vectors over `Step` from `Sprawling/storage/spec/Jsonl/Barrier.lean`
 /// (`unwind_sound`, `answered_survives_reopen`). A failed wave is the
 /// model's `wave tore` or `wave unsynced` followed by the restore the
 /// handle runs at once (`unwind done`, or `unwind refused` when the

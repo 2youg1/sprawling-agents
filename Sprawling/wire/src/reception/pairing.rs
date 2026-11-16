@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! This machine's door for a browser, as a state machine
-//! (`crates/wire/spec/Reception/Pairing.lean` §8-95): the pairing code the
+//! (`Sprawling/wire/spec/Reception/Pairing.lean` §8-95): the pairing code the
 //! terminal shows, one guess at a time; the open codes `/web` hands over;
 //! the nonces a session is signed over; the paired device keys; and the
 //! live session tokens, whose table and lifetime are `reception::sessions`'s.
@@ -355,7 +355,7 @@ mod tests {
     }
 
     proptest! {
-        /// `crates/wire/spec/Reception/Pairing.lean`'s three properties over
+        /// `Sprawling/wire/spec/Reception/Pairing.lean`'s three properties over
         /// random traces of guesses: judged guesses are a second apart
         /// (`judged_guesses_are_a_second_apart`), each is judged against
         /// the code the previous judgement put up (`each_code_is_judged_once`),

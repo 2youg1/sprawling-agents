@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What an attach read about each model, kept in the CAS so that a
-//! book folded again learns it back (`crates/gateway/spec/Endpoint/Models.lean`
+//! book folded again learns it back (`Sprawling/gateway/spec/Endpoint/Models.lean`
 //! §8-10, kernel D57).
 //!
 //! The endpoint book folds an `endpoint_attached` line to ids only,

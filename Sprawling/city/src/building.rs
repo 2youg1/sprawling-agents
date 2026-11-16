@@ -12,7 +12,7 @@
 //! questions a second answer.
 //!
 //! The bytes a new building starts with are the template a person reads
-//! in `crates/city/templates/RULES.toml`, not a copy of it kept here. One
+//! in `Sprawling/city/templates/RULES.toml`, not a copy of it kept here. One
 //! string, one authority; the confidential template differs from the
 //! ordinary one by the single line whose value the city refuses to
 //! assume.
@@ -20,7 +20,7 @@
 //! What a new building starts with beyond its rules — the plan, the
 //! memo, the handoff — is `crate::spine_files`'s to lay out.
 //!
-//! Specified by `crates/city/spec/Building.lean` §8-3.
+//! Specified by `Sprawling/city/spec/Building.lean` §8-3.
 
 use std::path::{Path, PathBuf};
 
@@ -474,7 +474,7 @@ fn lay_out(city_root: &Path, building: &Building, rules: &str) -> Result<(), AxE
 fn lay_out_at(root: &Path, addr: &Address, rules: &str) -> Result<(), AxError> {
     // The building's own reserved subtree, made before the file that
     // lives in it: what governs a building is not writable by what runs
-    // inside it (`crates/kernel/Spec.lean` §8-28).
+    // inside it (`Sprawling/kernel/Spec.lean` §8-28).
     let governed = root.join(kernel::RESERVED_PREFIX);
     std::fs::create_dir_all(&governed).map_err(|err| storage(&governed, &err))?;
     let file = governed.join(RULES_FILE);
@@ -539,7 +539,7 @@ pub fn adopt(city_root: &Path, addr: &Address) -> Result<Building, AxError> {
 
 /// Takes back the rules [`raise`] or [`adopt`] drew over a folder that
 /// was already there, for an adoption the city could not finish: the
-/// folder waits to be adopted again (`crates/city/Spec.lean` §8-3).
+/// folder waits to be adopted again (`Sprawling/city/Spec.lean` §8-3).
 ///
 /// Call it only for a building whose rules this adoption wrote and whose
 /// `building_created` line has not landed. Only the rules file goes: the

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `VIEWS_FOLD_RULES` moves whenever the encoding of `Views` does
-//! (`crates/sprawling/Spec.lean` §8-91).
+//! (`Sprawling/app/Spec.lean` §8-91).
 
 use kernel::{Address, EventKind, Payload, RunId};
 
@@ -16,7 +16,7 @@ mod read_back;
 /// A view folded from records that fill the inbox, the discard bin, the
 /// registry, the commits and the governed rules, so a field added,
 /// removed or reordered among them changes the bytes, and so does the
-/// encoding of either digest a snapshot holds (`crates/accounting/spec/Views/Snapshot.lean` §8-24).
+/// encoding of either digest a snapshot holds (`Sprawling/accounting/spec/Views/Snapshot.lean` §8-24).
 fn fixture(city_root: &Path) -> Views {
     let mut views = Views::new(city_root);
     let room = Address::parse("lab/room1").unwrap();
@@ -172,7 +172,7 @@ fn legacy_and_explicit_accounts_decode_from_the_actual_views_snapshot() {
 }
 
 /// The city's configuration booked as the digest of five bytes: the
-/// governed rules hold a `B3Hash` (`crates/accounting/spec/Views/Snapshot.lean` §8-24).
+/// governed rules hold a `B3Hash` (`Sprawling/accounting/spec/Views/Snapshot.lean` §8-24).
 pub(crate) fn rules_changed() -> serde_json::Value {
     let changed = kernel::event::record::RulesChanged {
         scope: kernel::event::Scope::City,
@@ -210,7 +210,7 @@ fn a_run_id_reads_back_from_the_snapshot_encoding() {
 
 /// A snapshot holds a digest as its bytes and reads the same digest
 /// back, while every format a reader sees still spells it in hex
-/// (`crates/kernel/Spec.lean` §8-84): the hex decode was most of decoding the views.
+/// (`Sprawling/kernel/Spec.lean` §8-84): the hex decode was most of decoding the views.
 #[test]
 fn a_digest_is_its_bytes_in_the_snapshot_and_its_hex_in_json() {
     let oid = kernel::GitOid::from_bytes([0xcd; 20]);

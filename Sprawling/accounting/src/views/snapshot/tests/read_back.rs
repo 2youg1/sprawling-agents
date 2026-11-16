@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A history with listed model facts reads back from the views snapshot
-//! (kernel D58, `crates/accounting/spec/Views/Snapshot.lean`).
+//! (kernel D58, `Sprawling/accounting/spec/Views/Snapshot.lean`).
 
 use kernel::{Address, B3Hash, EventKind, RunId};
 

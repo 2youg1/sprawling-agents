@@ -5,7 +5,7 @@
 
 //! The stock: one tree checked out at the trunk before any node asks for
 //! it, so that placing a node's tree is a rename rather than a checkout
-//! (`crates/storage/spec/Worktree/Trees/Stock.lean` §8-35).
+//! (`Sprawling/storage/spec/Worktree/Trees/Stock.lean` §8-35).
 //!
 //! A checkout waits on the real-time scanner once for every file it
 //! creates, so any placement that creates the tree's files while a run
@@ -97,7 +97,7 @@ impl Worktrees {
     ///
     /// The directory is renamed first, because that rename is the one
     /// step two placements cannot both make; every later step leaves a
-    /// state the next claim of `name` takes back (`crates/storage/spec/Worktree/Trees/Stock.lean` §8-35).
+    /// state the next claim of `name` takes back (`Sprawling/storage/spec/Worktree/Trees/Stock.lean` §8-35).
     pub(super) fn adopt(
         &self,
         name: &WorktreeName,
@@ -144,7 +144,7 @@ impl Worktrees {
             // behind - the tree renamed out from under it, or the write of
             // its link torn - and `Broken` is the state for it: `forget`
             // takes the registration back and the placement after it makes
-            // the stock whole (`crates/storage/spec/Worktree/Trees/Stock.lean`
+            // the stock whole (`Sprawling/storage/spec/Worktree/Trees/Stock.lean`
             // §8-35: 接管的步骤…进程可能在任何一步之后死掉，而 standing
             // 收回指向不存在目录的登记; `every_cut_is_recovered`). Where no
             // registration stands at all, the repository itself refused and
@@ -351,7 +351,7 @@ mod tests {
 
     /// A cut takeover leaves the spare's registration pointing at a tree
     /// that is gone, and the next `stock` takes that registration back and
-    /// makes the spare whole (`crates/storage/spec/Worktree/Trees/Stock.lean`
+    /// makes the spare whole (`Sprawling/storage/spec/Worktree/Trees/Stock.lean`
     /// §8-35: 接管的步骤…进程可能在任何一步之后死掉，而 `standing` 收回指向
     /// 不存在目录的登记; `every_cut_is_recovered`).
     ///
@@ -383,7 +383,7 @@ mod tests {
         );
     }
 
-    /// `crates/storage/spec/Worktree/Trees/Stock.lean` §8-35: a placement from the stock creates no file,
+    /// `Sprawling/storage/spec/Worktree/Trees/Stock.lean` §8-35: a placement from the stock creates no file,
     /// whatever the tree holds - the files were written when the stock
     /// was, where nobody waited. Judged at two sizes, so a placement
     /// whose file count grows with the tree is a failure here.

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The privacy controls: what each one writes, where, and what the
-//! sources say about it (`crates/sprawling/spec/Privacy/Controls.lean`).
+//! sources say about it (`Sprawling/app/spec/Privacy/Controls.lean`).
 //!
 //! This table is the one authority for a control's target, written value,
 //! category, edition lists and build effect; the wire carries only the
@@ -164,7 +164,7 @@ impl Written {
     /// What the target reads after this write, given what it reads now;
     /// `None` when the host has nothing this write can apply to (a task the
     /// host does not have). Mirrors `Recommendation.target` in
-    /// `crates/sprawling/spec/Privacy.lean`.
+    /// `Sprawling/app/spec/Privacy.lean`.
     pub(crate) fn target(self, current: &Snapshot) -> Option<Snapshot> {
         match self {
             Self::Dword(value) => Some(Snapshot::Registry(RawValue::dword(value))),

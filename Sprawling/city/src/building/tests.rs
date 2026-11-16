@@ -56,7 +56,7 @@ fn the_confidential_template_produces_a_building_the_city_treats_as_confidential
 
 /// The template writes no `egress` key, so a new building is held to no
 /// domain list until the person writes one; an empty list written by
-/// hand reaches no public host (`crates/city/spec/Policy.lean` D27).
+/// hand reaches no public host (`Sprawling/city/spec/Policy.lean` D27).
 #[test]
 fn a_new_building_has_no_egress_list_and_an_empty_one_reaches_nothing() {
     let dir = tempfile::tempdir().unwrap();

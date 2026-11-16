@@ -117,13 +117,19 @@ fn seams_in(declared: &[&str]) -> BTreeSet<String> {
             continue;
         }
         if let Some(path) = cells.get(2)
-            && path.starts_with("crates/")
             && path.ends_with(".rs")
+            && seam_path(path)
         {
             set.insert((*path).to_owned());
         }
     }
     set
+}
+
+/// A seam cell is a repository-relative Rust path under a product root.
+fn seam_path(path: &str) -> bool {
+    const ROOTS: [&str; 6] = ["Sprawling/", "Tools/", "Calyx/", "Mei/", "client/", "RefRain/"];
+    ROOTS.iter().any(|root| path.starts_with(root))
 }
 
 fn check_edges(
@@ -235,11 +241,11 @@ mod tests {
     fn seam_rows_are_four_cell_rows_with_paths() {
         let text = format!(
             "## {SEAM_SECTION} Seams\n\
-             | a | crates/kernel/src/ledger.rs | b | c |\n\
-             | kernel::gate | crates/kernel/src/gate.rs | x | 8.2 | S2 | 未建 |\n"
+             | a | Sprawling/kernel/src/ledger.rs | b | c |\n\
+             | kernel::gate | Sprawling/kernel/src/gate.rs | x | 8.2 | S2 | 未建 |\n"
         );
         let seams = seam_files(&text).unwrap();
-        assert!(seams.contains("crates/kernel/src/ledger.rs"));
+        assert!(seams.contains("Sprawling/kernel/src/ledger.rs"));
         assert_eq!(seams.len(), 1);
     }
 
@@ -247,9 +253,9 @@ mod tests {
     fn a_table_outside_the_seam_section_declares_no_seam() {
         let text = format!(
             "## {SEAM_SECTION} Seams\n\
-             | a | crates/kernel/src/ledger.rs | b | c |\n\
+             | a | Sprawling/kernel/src/ledger.rs | b | c |\n\
              ## 9 Shapes\n\
-             | a | crates/runtime/src/turn.rs | b | c |\n"
+             | a | Sprawling/runtime/src/turn.rs | b | c |\n"
         );
         let seams = seam_files(&text).unwrap();
         assert_eq!(seams.len(), 1, "{seams:?}");

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Where a session branched off.
-//! The part `crates/kernel/spec/Event.lean` specifies this module together
+//! The part `Sprawling/kernel/spec/Event.lean` specifies this module together
 //! with `kernel::event`.
 
 use serde::{Deserialize, Serialize};

@@ -84,7 +84,7 @@ fn steered(source: &str) -> EventRecord {
 }
 
 /// Who spoke a steer is read from the spellings the kernel defines for
-/// `steer_received.source` (`crates/wire/spec/Reading.lean` D41): the
+/// `steer_received.source` (`Sprawling/wire/spec/Reading.lean` D41): the
 /// city's own word is the city's, not a resident called `city`.
 #[test]
 fn a_steer_is_read_as_the_user_the_city_or_a_resident() {

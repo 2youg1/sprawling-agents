@@ -6,7 +6,7 @@
 //! Sampling support and the generation a session freezes. The person's
 //! corrections outrank the upstream model list, which outranks presets;
 //! no provider error is turned into a capability statement. Specified by
-//! `crates/gateway/spec/Provider/Generation.lean` §8-41, gateway D64.
+//! `Sprawling/gateway/spec/Provider/Generation.lean` §8-41, gateway D64.
 
 use kernel::{
     AxCode, AxError, Ceiling, FrozenGeneration, GenerationSettings, ModelGeneration,

@@ -10,7 +10,7 @@
 //! and the address a page opens one by is the whole of the answer this
 //! module owns.
 //!
-//! Specified by `crates/city/spec/Library.lean` §8-8.
+//! Specified by `Sprawling/city/spec/Library.lean` §8-8.
 
 use kernel::layout::CityLayout;
 use kernel::{Address, AxCode, AxError, B3Hash};

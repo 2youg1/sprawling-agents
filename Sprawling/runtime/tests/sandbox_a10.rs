@@ -272,7 +272,7 @@ fn job_for(wasm: PathBuf, memory: GuestMemory) -> SandboxJob {
     }
 }
 
-/// The compiled module outlives the call (`crates/runtime/spec/Sandbox.lean`
+/// The compiled module outlives the call (`Sprawling/runtime/spec/Sandbox.lean`
 /// D101): once a clone has run a guest, another clone runs it again
 /// without reading the file, which is shown by overwriting the file with
 /// bytes that are not WebAssembly while keeping its length and
@@ -303,7 +303,7 @@ fn a_second_guest_reuses_the_compiled_module() {
 
 /// A guest grows no further than its run's ceiling, ends as it chooses
 /// when refused, and the refusal is reported as the run's ceiling being
-/// hit (`crates/runtime/spec/Sandbox.lean` D102). Without a ceiling the
+/// hit (`Sprawling/runtime/spec/Sandbox.lean` D102). Without a ceiling the
 /// same growth succeeds and nothing is reported.
 #[test]
 fn a_guest_grows_no_further_than_the_run_ceiling() {
@@ -330,7 +330,7 @@ fn a_guest_grows_no_further_than_the_run_ceiling() {
 
 /// A guest whose initial memory alone passes the run's ceiling never
 /// starts, and says so as the ceiling it hit, not as a broken build
-/// (`crates/runtime/spec/Sandbox.lean` D102).
+/// (`Sprawling/runtime/spec/Sandbox.lean` D102).
 #[test]
 fn a_guest_that_starts_past_the_run_ceiling_reports_the_ceiling() {
     let tmp = tempfile::tempdir().unwrap();

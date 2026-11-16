@@ -47,8 +47,8 @@ Each module instantiates exactly one of the seven shapes of `docs/ARCHITECTURE.m
 the seven: given the accounts a provider has and the failures so far, it answers whether a request
 goes out again on the same account, moves to another, or stops.
 
-The three seams declared here are `kernel::ledger` in `crates/kernel/src/ledger.rs`, `kernel::tool`
-in `crates/kernel/src/tool.rs` and `kernel::model` in `crates/kernel/src/model.rs`; the seam table
+The three seams declared here are `kernel::ledger` in `Sprawling/kernel/src/ledger.rs`, `kernel::tool`
+in `Sprawling/kernel/src/tool.rs` and `kernel::model` in `Sprawling/kernel/src/model.rs`; the seam table
 in `docs/ARCHITECTURE.md` section 4 names the production adapter and the second adapter of each. A
 `pub trait` outside those files is refused by the `depmap` gate. The `Ledger` trait owns `seq` and
 `prev`, and `EventRecord::canonical_line` is the only producer of canonical ledger bytes: an adapter
@@ -80,7 +80,7 @@ Windows drive or an NTFS stream), a segment ending in a dot or whitespace, or no
 payload holding a float, or nested deeper than `PAYLOAD_DEPTH_MAX`; a `Seq` incremented past its
 maximum; a log version newer than the supported range (`E_LOG_VERSION_UNSUPPORTED`). In replay, a version below the first readable version is treated as corruption (`E_CAS_CORRUPT`). The reason
 each refusal exists is in `spec/Error.lean` and `spec/Address.lean`; the code list and each code's
-recovery are in `crates/kernel/Spec.lean` section 12.
+recovery are in `Sprawling/kernel/Spec.lean` section 12.
 
 <!-- /coderabbit-ai-generated:v1 -->
 
@@ -112,7 +112,7 @@ may be named from here.
 ## Who uses it
 
 Every crate of the product except `child`, `console_ffi` and `desktop_ffi` depends on it, and so do
-the development-only `citysim` and `xtask` and the fuzz workspace in `crates/fuzz/`. `cargo tree
+the development-only `citysim` and `xtask` and the fuzz workspace in `Tools/fuzz/`. `cargo tree
 --workspace -i sprawling-kernel -e normal --depth 1` prints the current list, which is the authority
 for this paragraph.
 
@@ -136,7 +136,7 @@ names in English, as the *Language* section of [`AGENTS.md`](../../AGENTS.md) re
 
 ```bash
 cargo nextest run -p sprawling-kernel --all-features   # the module tests, with both features on
-lake build crates.kernel.Spec                          # the SPEC's proofs
+lake build Sprawling.kernel.Spec                          # the SPEC's proofs
 cargo xtask gates spec lexicon specalign               # the SPEC, the words, and the two enum tables
 just proof                                             # Kani harnesses on Linux/macOS; skips successfully if Kani is absent
 ```
@@ -145,9 +145,9 @@ just proof                                             # Kani harnesses on Linux
 
 `cargo xtask gates specalign` is the narrow gate for this crate: it compares the `EventKind` roster
 and each `AxCode` against the tables in `spec/Event/Kind.lean` and `spec/Error.lean`, variant by
-variant. `crates/kernel/tests/refusal_matrix.rs` walks `DOORS` and requires the three parts on every
+variant. `Sprawling/kernel/tests/refusal_matrix.rs` walks `DOORS` and requires the three parts on every
 answer a door can give; it is compiled only under the `conformance` feature, which is one reason the
-command above turns both features on. `crates/kernel/tests/trybuild.rs` compiles each file under
-`crates/kernel/tests/ui/` and expects the compiler to refuse it, which is how an invalid state is
+command above turns both features on. `Sprawling/kernel/tests/trybuild.rs` compiles each file under
+`Sprawling/kernel/tests/ui/` and expects the compiler to refuse it, which is how an invalid state is
 shown to be unrepresentable rather than merely rejected. The rest of the loop, and which tier runs
 where, is in [`AGENTS.md`](../../AGENTS.md).

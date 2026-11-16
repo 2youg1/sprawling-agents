@@ -7,7 +7,7 @@
 //! digest it carries now, never a stored flag, so a change to the content
 //! makes an earlier audit stale by itself.
 //!
-//! Specified by `crates/city/spec/Library/Audit.lean` §8-28b (city D19).
+//! Specified by `Sprawling/city/spec/Library/Audit.lean` §8-28b (city D19).
 
 mod execution;
 pub use execution::{

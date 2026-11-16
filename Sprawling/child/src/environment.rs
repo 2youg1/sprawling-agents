@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which environment keys hold the city's secrets, and the rule that
-//! keeps them out of a child's environment (`crates/child/Spec.lean` D3).
+//! keeps them out of a child's environment (`Sprawling/child/Spec.lean` D3).
 
 use std::ffi::OsString;
 use std::process::Command;

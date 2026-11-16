@@ -105,7 +105,7 @@ pub(super) fn specification(root: &Path) -> Result<Vec<lean::Source>, XtaskError
 }
 
 /// The arms of `def Command.reach`, each right-hand side one of the four
-/// reaches with a leading dot (crates/xtask/Spec.lean §8-43).
+/// reaches with a leading dot (Tools/xtask/Spec.lean §8-43).
 ///
 /// # Errors
 /// When no file holds the `def`, or an arm answers something that is not

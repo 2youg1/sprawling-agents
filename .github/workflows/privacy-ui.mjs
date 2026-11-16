@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The privacy page of the served release build, on a disposable Windows
-// runner (crates/sprawling/spec/Privacy.lean section 16). `lake exe
+// runner (Sprawling/app/spec/Privacy.lean section 16). `lake exe
 // acceptance client-ui` serves the city and hands this script its port.
 //
 // The page is entered the way a person enters it: Settings, the Advanced

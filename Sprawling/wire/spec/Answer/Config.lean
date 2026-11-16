@@ -6,9 +6,9 @@
 /-!
 # wire::answer::config
 
-规定 `answer::config`（`crates/wire/src/` 下同名的文件）。一个范围的生效配置，每个值旁边是说出它的那一级。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `answer::config`（`Sprawling/wire/src/` 下同名的文件）。一个范围的生效配置，每个值旁边是说出它的那一级。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `crates/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
 -/
 
 /-!
@@ -34,7 +34,7 @@ pub struct ConfigAnswer {
 ```
 
 - **上下文环读的两级都在这一个答复上**：第二级是 `second.percent`，第一级是 `first`。页面不抄 30 这个数（docs/frontend-method.md §7J）。
-- **不带层**：第一级不可调（`crates/kernel/Spec.lean` D19），没有哪一级文件说得出它，答一个恒为 `default` 的层只是多一个读者要处理的值。
+- **不带层**：第一级不可调（`Sprawling/kernel/Spec.lean` D19），没有哪一级文件说得出它，答一个恒为 `default` 的层只是多一个读者要处理的值。
 - **`Option` 只为旧城**：这一版的城恒答 `Some`；理由与可缺的规则见 D13。
 -/
 
@@ -71,7 +71,7 @@ pub struct SettledSearch {
 pub struct SupplierAccounts { pub supplier: kernel::ServerLabel, pub accounts: Vec<AccountStatus> }   // AccountStatus 见 §8-85
 ```
 
-- **生效值与可编辑值分开答**：设置页只编辑城那一级（`crates/city/spec/ConfigLayers.lean` §8-4c），而这个地址上治理 `web_search` 的可能是这栋楼自己的 `[search]`。`configuration` 与 `from` 回答「这里实际接哪一家、谁说的」，`from = building` 时页面画一行只读的「此楼另有设置」；`city` 回答「城那一级写了什么」，编辑器从它起草。只答生效值时，一栋自己写了 `[search]` 的楼会让页面拿楼的值当城的值去改。
+- **生效值与可编辑值分开答**：设置页只编辑城那一级（`Sprawling/city/spec/ConfigLayers.lean` §8-4c），而这个地址上治理 `web_search` 的可能是这栋楼自己的 `[search]`。`configuration` 与 `from` 回答「这里实际接哪一家、谁说的」，`from = building` 时页面画一行只读的「此楼另有设置」；`city` 回答「城那一级写了什么」，编辑器从它起草。只答生效值时，一栋自己写了 `[search]` 的楼会让页面拿楼的值当城的值去改。
 - **缺省地址只有一个家**：`default_url` 是 `city::default_search_supplier()` 的 `url`，页面在「默认」一项旁边画它，不写第二份。
 - **Key 状态只答城那一级列出的账号**：页面能改的只有那些；楼一级覆盖的值只读，不需要它们的 Key 状态。`Default` 与 `Off` 列不出自定义账号，这一表为空。四态与 `EndpointSummary.account_status` 是同一个 `KeyState`（§8-85，D49）。
 - **读不动就整份 `Unavailable`**：任一级的 `[search]` 读不成时，`city::settled_search` 拒，整个 `Config` 答复与读不动 `effort` 时一样是带原因的 `Unavailable`（D47）。

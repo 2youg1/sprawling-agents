@@ -45,7 +45,7 @@ Every failure is an `AxError`: a failure line, a `recovery:` line, and a `nearby
 | 3 | `Quiet` | `call` and `dispatch` sent the frame and heard nothing inside the quiet window, or the city answered and the frame that was waited for did not come |
 | 4 | `NoCity` | nothing answered at `--at`: no connection, or no `Welcome` |
 
-The table is `bin::main::exit`, and the model proves the five codes pairwise different (`crates/sprawling/Spec.lean` §8-103). These requests are refused rather than attempted:
+The table is `bin::main::exit`, and the model proves the five codes pairwise different (`Sprawling/app/Spec.lean` §8-103). These requests are refused rather than attempted:
 
 - A command line `grammar` cannot read exits 2 and names the nearest verb.
 - `serve` on a directory that holds no history, because `up` is the verb that raises a city and `serve` serves one that exists.
@@ -67,7 +67,7 @@ The table is `bin::main::exit`, and the model proves the five codes pairwise dif
 
 **What it may name.** The `sprawling:` row of the `depmap` block in [`ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 3 is the ceiling: `kernel`, `child`, `storage`, `gateway`, `runtime`, `collab`, `city`, `browser`, `agent_protocols`, `wire`, `accounting`, `desktop`, `desktop_ffi`, `console_ffi`, `remote_access`. `documents` is not on that row and is not named here; it arrives through `wire` and `accounting`. Inside the crate, `bin::doctor` and `bin::serving` never name `crate::assembly`, which the `directions` block of the same section holds.
 
-**The allocator.** The static Linux build links `tikv-jemallocator` because musl's `malloc` serialises every thread on one lock; every other target keeps the allocator its platform ships (`crates/sprawling/spec/Serving/Memory.lean` D102).
+**The allocator.** The static Linux build links `tikv-jemallocator` because musl's `malloc` serialises every thread on one lock; every other target keeps the allocator its platform ships (`Sprawling/app/spec/Serving/Memory.lean` D102).
 
 **Undo is not a verb.** Taking a setting back means sending the command that sets it again, which is what `tests/undoing.rs` exercises.
 
@@ -81,7 +81,7 @@ cargo run -p sprawling -- --help    # the overview, built from the table in src/
 cargo run -p sprawling -- serve --help
 ```
 
-`just build-web` writes the bundle to `crates/sprawling/web-dist`, and `BUNDLE_DIR` in `build.rs` is the one declaration of that location. `build.rs` gzips whatever is there into `OUT_DIR`, at a fixed level and with a zeroed mtime, so the same source bytes embed identically on every build. Without the bundle the binary still builds and prints a warning: it carries a placeholder page, `CLIENT_COMPLETE` is false, and `sprawling status` says so. A build of this crate therefore needs no JavaScript toolchain, and `cargo xtask budget` refuses a release binary whose file table holds no client. The `.crate` archive carries `web-dist/**` through the manifest's `include`, because the directory is gitignored build output.
+`just build-web` writes the bundle to `Sprawling/app/web-dist`, and `BUNDLE_DIR` in `build.rs` is the one declaration of that location. `build.rs` gzips whatever is there into `OUT_DIR`, at a fixed level and with a zeroed mtime, so the same source bytes embed identically on every build. Without the bundle the binary still builds and prints a warning: it carries a placeholder page, `CLIENT_COMPLETE` is false, and `sprawling status` says so. A build of this crate therefore needs no JavaScript toolchain, and `cargo xtask budget` refuses a release binary whose file table holds no client. The `.crate` archive carries `web-dist/**` through the manifest's `include`, because the directory is gitignored build output.
 
 `--version` answers before any verb runs, and `--help` before any verb acts, so a verb that changes something cannot be set off by a request for its help. How a person installs and uses the binary is [`docs/getting-started.md`](../../docs/getting-started.md); how a script drives it is [`docs/wire.md`](../../docs/wire.md); how a running city is operated is [`docs/operating.md`](../../docs/operating.md).
 
@@ -99,11 +99,11 @@ A decision is a comment opening with `D<n>`, in the part of its topic, and anoth
 
 ```bash
 cargo nextest run -p sprawling --all-features   # the tests, as `just test` runs the workspace
-lake build crates.sprawling.Spec                # this SPEC and its parts; `just models` builds every crate's
+lake build Sprawling.app.Spec                # this SPEC and its parts; `just models` builds every crate's
 cargo xtask gates modmap depmap spec            # module map, dependency edges and pub traits, one specification per crate
 cargo xtask budget                              # sizes inside their budget, and the client inside the release binary
 just e2e                                        # dispatch against real endpoints; passes with a line when no key is set
 just adversary                                  # attacks this binary over the wire from outside; never a gate
 ```
 
-The integration tests are under `tests/`. Some start the real binary through `CARGO_BIN_EXE_sprawling` (`remote_door.rs`, `desktop.rs`, `privacy_disposable.rs`); others drive a dispatch against scripted ports through the door `wire::server` hands every frame to (`assembly_door.rs`, `e2e.rs`, and `tests/acceptance/`). `tests/from_adversary.rs` keeps the traces the Lean adversary found, written out as Rust tests and compared against `crates/adversary/`. `just e2e` names the environment variables it reads when it runs, so run it once to learn them.
+The integration tests are under `tests/`. Some start the real binary through `CARGO_BIN_EXE_sprawling` (`remote_door.rs`, `desktop.rs`, `privacy_disposable.rs`); others drive a dispatch against scripted ports through the door `wire::server` hands every frame to (`assembly_door.rs`, `e2e.rs`, and `tests/acceptance/`). `tests/from_adversary.rs` keeps the traces the Lean adversary found, written out as Rust tests and compared against `Tools/adversary/`. `just e2e` names the environment variables it reads when it runs, so run it once to learn them.

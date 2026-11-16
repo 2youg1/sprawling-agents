@@ -48,7 +48,7 @@ impl Placement {
     /// reaches, and nothing on this machine makes the existing ones
     /// read-only to it without administrator rights, so under `Create`
     /// only the copy is open; what a command writes there stays there
-    /// (`crates/runtime/spec/Tools.lean` §8-55, runtime D11).
+    /// (`Sprawling/runtime/spec/Tools.lean` §8-55, runtime D11).
     ///
     /// # Errors
     /// The refusal of `kernel::gate::replacing`, naming the run's

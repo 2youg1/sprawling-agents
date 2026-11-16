@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which model rows an attach registers (`crates/gateway/spec/Endpoint/Models.lean`
+//! Which model rows an attach registers (`Sprawling/gateway/spec/Endpoint/Models.lean`
 //! §8-10, D46 and D47).
 
 use kernel::event::record::Listing;

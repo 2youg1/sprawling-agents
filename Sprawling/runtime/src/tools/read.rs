@@ -36,7 +36,7 @@
 //!
 //! The arguments are Claude Code's `Read`'s, by name and by value: a
 //! `file_path`, and an `offset` that is the 1-based number of the first
-//! line (`crates/runtime/spec/Tools.lean` §8-14-1, D119). The answer
+//! line (`Sprawling/runtime/spec/Tools.lean` §8-14-1, D119). The answer
 //! keeps 0-based indexes, which the renderer draws as line numbers.
 
 use std::collections::BTreeSet;
@@ -332,10 +332,10 @@ pub struct ReadTool {
     /// Whose CAS origins pictures read by this run are stored for.
     picture_origin: Option<storage::BlockOrigin>,
     /// The root `reader` reads under, its real location anchored once
-    /// (`crates/runtime/spec/Tools/ChosenPath.lean` D112).
+    /// (`Sprawling/runtime/spec/Tools/ChosenPath.lean` D112).
     city: CityRoot,
     /// What this run has seen, written at every read of a file that
-    /// counts as a look and read by `edit` (`crates/runtime/spec/Tools/Edit.lean`
+    /// counts as a look and read by `edit` (`Sprawling/runtime/spec/Tools/Edit.lean`
     /// §8-64).
     seen: ReadStamps,
     shown: ReadShown,

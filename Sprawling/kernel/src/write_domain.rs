@@ -6,7 +6,7 @@
 //! WriteDomain prefix checking and edit-war detection. C17 is enforced twice on purpose: a reserved prefix cannot be
 //! *constructed into* a domain, and a reserved target is refused at
 //! judgment even so — fail-closed has no single point of failure.
-//! The part `crates/kernel/spec/WriteDomain.lean` specifies this module.
+//! The part `Sprawling/kernel/spec/WriteDomain.lean` specifies this module.
 
 use std::collections::BTreeMap;
 
@@ -124,7 +124,7 @@ impl WriteDomain {
 }
 
 /// What a run may do to a file that already exists inside its write
-/// domain (`crates/kernel/spec/WriteDomain.lean` §8-78).
+/// domain (`Sprawling/kernel/spec/WriteDomain.lean` §8-78).
 ///
 /// It narrows the domain and never widens it: the domain answers where
 /// a run may write and what kind of file, this answers whether a write
@@ -253,7 +253,7 @@ pub fn observe_edit_war(samples: &[EditSample]) -> EditWarVerdict {
 // No kani harness lives here. Every value this module judges is an
 // `Address`, which owns a `String`, so a symbolic harness would hand
 // CBMC loops it cannot bound, and a harness over one fixed address
-// would restate the test below at a higher price (`crates/kernel/Spec.lean`
+// would restate the test below at a higher price (`Sprawling/kernel/Spec.lean`
 // §2).
 
 #[cfg(test)]

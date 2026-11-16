@@ -5,7 +5,7 @@
 
 //! A dispatch whose resident is an official harness, on the accounting
 //! thread: what the lane is handed, and what the city does with the run
-//! once it comes home (`crates/sprawling/Spec.lean` §8-124).
+//! once it comes home (`Sprawling/app/Spec.lean` §8-124).
 //!
 //! The lane half - the tree, the harness, the turn - is
 //! `driving::harness`. What is here writes on this thread: the run's
@@ -58,7 +58,7 @@ impl RunWorker {
             .map_err(storage::StorageError::into_ax)?;
         // The run begins the room's session. What a branched session
         // carried is spent here and not handed on: ACP opens a session
-        // with no history (`crates/sprawling/Spec.lean` §8-124).
+        // with no history (`Sprawling/app/Spec.lean` §8-124).
         self.origins.started(&at.addr, run);
         let member = match at.parent {
             Some(_) => Some(
@@ -145,7 +145,7 @@ impl RunWorker {
             outcome,
         } = driven;
         // Both loans go back before either failure is propagated, for the
-        // reason a model run's landing gives (`crates/sprawling/Spec.lean` §8-46-9);
+        // reason a model run's landing gives (`Sprawling/app/Spec.lean` §8-46-9);
         // a run frozen done first offers the tree it worked in.
         let left = member.map_or(Ok(()), |id| self.flight.backlog.leave(id));
         let offered = match (&outcome, &lease) {
@@ -190,7 +190,7 @@ impl RunWorker {
 
 impl RunWorker {
     /// Opens the request a harness run cannot open itself: harness
-    /// residents reach none of the city's tools (`crates/sprawling/Spec.lean` §8-4e
+    /// residents reach none of the city's tools (`Sprawling/app/Spec.lean` §8-4e
     /// rule 7). A branch that already has a request waiting keeps it,
     /// and the verifier judges the branch as it now stands.
     ///

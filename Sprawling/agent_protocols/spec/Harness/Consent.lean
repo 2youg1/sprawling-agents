@@ -6,9 +6,9 @@
 /-!
 # Nothing an ACP agent entry names is launched before the person consents to it.
 
-Specifies `crates/agent_protocols/src/harness/entry.rs` (`Consented`) and the
-one door that starts a child, `crates/agent_protocols/src/harness/process.rs`
-(`HarnessProcess::start`), as `crates/agent_protocols/Spec.lean` section 8-19
+Specifies `Sprawling/agent_protocols/src/harness/entry.rs` (`Consented`) and the
+one door that starts a child, `Sprawling/agent_protocols/src/harness/process.rs`
+(`HarnessProcess::start`), as `Sprawling/agent_protocols/Spec.lean` section 8-19
 and D16 describe them. The Rust code is the authority on how this holds; this
 model is the authority on which property must hold.
 

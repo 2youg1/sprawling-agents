@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `sprawling gauge --at`: watch a served city's monitor over the wire
-//! and write each reading to stdout (`crates/sprawling/spec/WireClient.lean` §8-97).
+//! and write each reading to stdout (`Sprawling/app/spec/WireClient.lean` §8-97).
 
 use std::collections::VecDeque;
 use std::io::Write;

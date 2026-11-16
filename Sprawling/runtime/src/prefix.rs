@@ -268,7 +268,7 @@ impl FrozenPrefix {
     }
 
     /// This prefix, recording `tools` as the table its requests carry
-    /// (`crates/runtime/spec/Catalog.lean` §8-60). Frozen with the prefix,
+    /// (`Sprawling/runtime/spec/Catalog.lean` §8-60). Frozen with the prefix,
     /// so every turn's `prompt_assembled` names the same table.
     #[must_use]
     pub fn with_tools(self, tools: PromptTools) -> FrozenPrefix {
@@ -311,7 +311,7 @@ impl FrozenPrefix {
 
     /// How many leading system blocks every resident of this building
     /// carries: the slots [`SegmentSlot::shared_by_building`] answers
-    /// for, counted from the front (`crates/runtime/spec/Prefix.lean` D97).
+    /// for, counted from the front (`Sprawling/runtime/spec/Prefix.lean` D97).
     pub fn shared_part(&self) -> kernel::SharedPrefix {
         std::num::NonZeroUsize::new(
             self.segments()

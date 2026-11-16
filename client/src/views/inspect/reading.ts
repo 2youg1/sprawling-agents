@@ -48,7 +48,7 @@ export function regionOf(reading: Reading): Region {
 // The arguments of a call that read one file from one line, and nothing
 // else: a search also reads under a path, but it asks for a pattern, and
 // an excess key refuses the decode. A ledger holds both spellings, because
-// recorded calls are never re-spelled (crates/runtime/spec/Tools.lean
+// recorded calls are never re-spelled (Sprawling/runtime/spec/Tools.lean
 // D115): `file_path` with a line number counted from 1 (D119), and the
 // older `path` with a line counted from 0.
 const ReadOne = Schema.Union([

@@ -24,7 +24,7 @@
   const ROOM = Address.make("release/ledger");
   const RUN = RunId.make("0199c0de-5a6b-4c3d-8e4f-000000000123");
   const START = 1_790_000_000_000;
-  const PATH = "crates/city/src/document.rs";
+  const PATH = "Sprawling/city/src/document.rs";
   const OPENED = GitOid.make("7c41e09aa1b2c3d4e5f60718293a4b5c6d7e8f90");
   const CHECKED = GitOid.make("a1b2c3d4e5f60718293a4b5c6d7e8f9012345678");
   const PINNED = Locator.make(`cas:b3-${"5e".repeat(32)}`);

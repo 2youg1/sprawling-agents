@@ -75,7 +75,7 @@ fn a_session_with_a_person_opens_in_the_persons_own_words() {
     // The task and the goal are the run segment of the prefix already;
     // repeating them here would carry the person's line twice in every
     // request, and a resident's goal in a user-role message could spell
-    // a `user:` line (`crates/city/spec/SpineFiles.lean` D21).
+    // a `user:` line (`Sprawling/city/spec/SpineFiles.lean` D21).
     assert_eq!(
         text,
         "The task is in JOB.md above, handed down by the User."

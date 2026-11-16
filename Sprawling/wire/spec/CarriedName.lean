@@ -6,7 +6,7 @@
 /-!
 # wire::carried_name
 
-规定 `carried_name`（`crates/wire/src/` 下同名的文件）。本 crate 不拥有的名字：只在唯一构造点拒空与控制字符。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `carried_name`（`Sprawling/wire/src/` 下同名的文件）。本 crate 不拥有的名字：只在唯一构造点拒空与控制字符。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 -/
 
 /-!

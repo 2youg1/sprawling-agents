@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Serves a city in a process group of its own, so the acceptance walk can
-//! close it in order on Windows (crates/adversary/Spec.lean D8).
+//! close it in order on Windows (Tools/adversary/Spec.lean D8).
 //!
 //! `serve_grouped <sprawling> <argument>...` starts `<sprawling> <argument>...`
 //! and then reads its own stdin. The line `close` asks the city to close the way
@@ -120,7 +120,7 @@ mod grouped {
     /// Sends Ctrl-Break to the city's group. `GenerateConsoleCtrlEvent` is reached
     /// through the `powershell` every Windows ships, because no crate offers it
     /// behind a safe surface and this workspace forbids `unsafe`
-    /// (crates/adversary/Spec.lean D8). `powershell` shares the launcher's console
+    /// (Tools/adversary/Spec.lean D8). `powershell` shares the launcher's console
     /// and is not in the city's group, so the event reaches the city alone.
     #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
     pub(super) fn close(city: &Child) -> Result<(), Failure> {

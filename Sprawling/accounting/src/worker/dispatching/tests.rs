@@ -179,9 +179,9 @@ fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
 
 /// Work sent to a bare building is named by rule from the task, so the
 /// first call the provider sees is the run itself and a model's reply
-/// never becomes a room (`crates/sprawling/Spec.lean` §8-86). The run is known by
+/// never becomes a room (`Sprawling/app/Spec.lean` §8-86). The run is known by
 /// its assigned opening, which points at the task in JOB.md rather than
-/// repeating it (`crates/runtime/Spec.lean` §8-6).
+/// repeating it (`Sprawling/runtime/Spec.lean` §8-6).
 #[test]
 fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
     let dir = tempfile::tempdir().unwrap();
@@ -228,7 +228,7 @@ fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
 /// building, room ladder the settings page describes is the one that
 /// runs: a room whose own `CONFIG.toml` asks for it keeps its door once
 /// the run lands, though the city and the building state nothing
-/// (`crates/sprawling/Spec.lean` D80).
+/// (`Sprawling/app/Spec.lean` D80).
 #[test]
 fn a_room_that_asks_for_keep_warm_keeps_its_door_under_a_city_that_states_nothing() {
     let dir = tempfile::tempdir().unwrap();
@@ -297,7 +297,7 @@ fn two_jobs_at_one_millisecond_get_two_run_ids() {
     );
 }
 
-/// The instrument `crates/xtask/budgets.toml [prepare_dispatch]` names.
+/// The instrument `Tools/xtask/budgets.toml [prepare_dispatch]` names.
 ///
 /// It pins that the reading is taken and said out loud, not what the
 /// reading is: a wall-clock figure belongs to the machine that ran it,
@@ -323,7 +323,7 @@ fn a_dispatch_says_what_it_spent_before_the_drive() {
             }),
         ),
         // The city's clock leaps a minute at every read, so a span
-        // read off it would be a minute or more (`crates/sprawling/Spec.lean`
+        // read off it would be a minute or more (`Sprawling/app/Spec.lean`
         // §8-129-2).
         Hands {
             clock: std::sync::Arc::new(LeapingClock::from_now()),

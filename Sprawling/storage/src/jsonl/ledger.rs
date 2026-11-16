@@ -14,7 +14,7 @@ use crate::error::{StorageError, io_err};
 use crate::vfs::Vfs;
 
 /// Segment rolling threshold. Internal affair: changing it changes how
-/// files are cut, never any observable semantics (`crates/storage/Spec.lean` §14).
+/// files are cut, never any observable semantics (`Sprawling/storage/Spec.lean` §14).
 pub(crate) const SEGMENT_ROLL_BYTES: u64 = 64 * 1024 * 1024;
 
 /// How a segment's file is sized while it is written (storage D31).
@@ -22,7 +22,7 @@ pub(crate) const SEGMENT_ROLL_BYTES: u64 = 64 * 1024 * 1024;
 /// Both arms keep the same durability and the same history on disk; an
 /// arm changes only what the barrier has to flush. The preallocated
 /// segment ends in zero bytes past its last record, which the reader
-/// strips (`crates/storage/spec/Jsonl/Preallocate.lean`), so the writer's
+/// strips (`Sprawling/storage/spec/Jsonl/Preallocate.lean`), so the writer's
 /// position is the end of the records, never the end of the file.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SegmentPreallocation {
@@ -61,7 +61,7 @@ pub(crate) const SEGMENT_PREALLOCATION: SegmentPreallocation = SegmentPreallocat
 /// byte is space no write has reached yet, never a byte of a record, so
 /// `open` scans the last segment up to here and the side index stops
 /// reading at the first window whose records end before the window does
-/// (`crates/storage/spec/Jsonl/Preallocate.lean`, storage D31 and D32).
+/// (`Sprawling/storage/spec/Jsonl/Preallocate.lean`, storage D31 and D32).
 pub(crate) fn records_end(segment: &[u8]) -> usize {
     segment
         .iter()
@@ -70,7 +70,7 @@ pub(crate) fn records_end(segment: &[u8]) -> usize {
 }
 
 /// What open found and repaired, and what its tail recovery read and
-/// checked (`crates/storage/spec/Jsonl.lean` §8-34).
+/// checked (`Sprawling/storage/spec/Jsonl.lean` §8-34).
 pub struct OpenReport {
     pub recovered: Option<TailTruncation>,
     pub counted: crate::ProofCount,
@@ -106,7 +106,7 @@ pub struct JsonlLedger {
     /// directory that is not a city's ledger, and on the fault model,
     /// whose disk no other process can reach.
     pub(crate) lock: Option<WriterLock>,
-    /// The stop a failed whole-chain audit trips (`crates/storage/spec/Worktree/Back.lean` §8-27).
+    /// The stop a failed whole-chain audit trips (`Sprawling/storage/spec/Worktree/Back.lean` §8-27).
     pub(crate) halt: crate::chain_audit::ChainHalt,
     /// The segments a failed wave created, while restoring the disk to
     /// its length before that wave is still owed (`jsonl::unwind`).
@@ -114,7 +114,7 @@ pub struct JsonlLedger {
 }
 
 /// This process's exclusive hold on a city's Ledger, released when the
-/// ledger that took it is dropped (`crates/storage/spec/Jsonl.lean` §8-1).
+/// ledger that took it is dropped (`Sprawling/storage/spec/Jsonl.lean` §8-1).
 ///
 /// The operating system keeps the lock on an open handle and refuses it
 /// to every other handle on the same file, in this process or in
@@ -129,7 +129,7 @@ pub(crate) struct WriterLock {
 
 /// A ledger's writer lock, held by a step that writes nothing to the
 /// ledger but must know no city is running from its folder while it
-/// acts — moving that folder (`crates/storage/spec/Jsonl.lean` §8-1).
+/// acts — moving that folder (`Sprawling/storage/spec/Jsonl.lean` §8-1).
 /// Released on drop.
 pub struct LedgerHold {
     _lock: WriterLock,

@@ -179,7 +179,7 @@ export function callsOf(turns: readonly Turn[]): readonly Placed[] {
 
 // What the whole run came to, summed over its turns. `cached` is null
 // when no turn's provider reported a cache read: unknown, not zero
-// (crates/wire/spec/Reading.lean D35).
+// (Sprawling/wire/spec/Reading.lean D35).
 export interface Figures {
   readonly input: number;
   readonly output: number;

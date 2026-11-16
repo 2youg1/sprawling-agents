@@ -7,13 +7,13 @@
 //! `[catalog]` table and the order its statements are read in.
 //!
 //! What a table may say and on which rungs is `city`'s answer
-//! (`crates/city/spec/ConfigLayers.lean` §8-4g); which tools are fixed
+//! (`Sprawling/city/spec/ConfigLayers.lean` §8-4g); which tools are fixed
 //! and what an unstated tool falls back to is `runtime::catalog`'s
-//! (`crates/runtime/spec/Catalog.lean` §8-60). This module holds the one
+//! (`Sprawling/runtime/spec/Catalog.lean` §8-60). This module holds the one
 //! rule between them: a nearer statement covers a farther one, and a
 //! statement about a tool covers one about its namespace.
 //!
-//! Specified by `crates/kernel/spec/Config.lean` §8-22.
+//! Specified by `Sprawling/kernel/spec/Config.lean` §8-22.
 
 use std::collections::BTreeMap;
 

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The desktop connector is a tool this binary carries and starts itself
-//! (`crates/sprawling/Spec.lean` §8-4d).
+//! (`Sprawling/app/Spec.lean` §8-4d).
 //!
 //! A city starts the real `sprawling` executable as `sprawling desktop`
 //! for a building whose rules ask for the desktop, with no `[[mcp]]` row
@@ -118,7 +118,7 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
     });
 
     // The six are filed under the connector's label, one line of the
-    // dormant index that counts them (`crates/runtime/Spec.lean` §8-60).
+    // dormant index that counts them (`Sprawling/runtime/Spec.lean` §8-60).
     let names = offered.lock().unwrap().clone();
     let line = format!("desktop ({})", OFFERED.len());
     assert!(
@@ -147,7 +147,7 @@ impl Model for Listening {
                 .map(|tool| tool.name.as_str().to_owned()),
         );
         // A tool outside the mode's core is offered as a line of the
-        // dormant index (`crates/runtime/Spec.lean` §8-60).
+        // dormant index (`Sprawling/runtime/Spec.lean` §8-60).
         self.0.lock().unwrap().extend(
             req.chat
                 .system

@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The versions of one document, newest first (`crates/accounting/spec/Views/Document.lean` §8-21,
-//! `crates/wire/spec/Answer/DocumentVersions.lean` §8-83).
+//! The versions of one document, newest first (`Sprawling/accounting/spec/Views/Document.lean` §8-21,
+//! `Sprawling/wire/spec/Answer/DocumentVersions.lean` §8-83).
 //!
 //! The saves are folded from `document_written`, so a page asking about a
 //! document never walks the ledger. The version on disk is read when the
@@ -126,7 +126,7 @@ impl VersionsAsk {
 
 /// This build's default, for the three documents whose default text the
 /// binary carries, listed last and after the cut so it is always there
-/// to compare with (`crates/accounting/Spec.lean` §8-38). It is put in
+/// to compare with (`Sprawling/accounting/Spec.lean` §8-38). It is put in
 /// the store first; a store that will not take it lists it as not kept.
 fn shipped(city_root: &Path, at: &Address) -> Option<DocumentVersion> {
     let Some(city::PromptDocument::Shipped(doc)) = city::PromptDocument::of(at) else {

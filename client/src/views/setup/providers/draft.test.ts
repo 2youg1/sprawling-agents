@@ -33,7 +33,7 @@ describe("an untouched endpoint form", () => {
 // The boxes the person left empty show the figure the city would use,
 // and that figure has to be the one the city derives: an idle timeout
 // nobody set falls back to the call timeout, the typed one when the box
-// holds it (`crates/gateway/src/endpoint/stream.rs`).
+// holds it (`Sprawling/gateway/src/endpoint/stream.rs`).
 describe("the figures an empty tuning box shows", () => {
   const DEFAULTS: TuningDefaults = {
     from: "default",

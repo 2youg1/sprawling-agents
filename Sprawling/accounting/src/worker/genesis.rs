@@ -71,7 +71,7 @@ pub(super) fn standing_of(city_root: &Path, history: History) -> city::Standing 
 ///
 /// The two genesis lines are stamped with the time `hands.clock` reads,
 /// and the worker that raises City Hall is built with the same hands, so
-/// a scripted clock and vault hold from line zero (`crates/accounting/spec/Clock.lean`
+/// a scripted clock and vault hold from line zero (`Sprawling/accounting/spec/Clock.lean`
 /// §8-3, accounting D19).
 ///
 /// # Errors
@@ -102,7 +102,7 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
     })?;
     // Before line zero, so a forming refused here leaves no history and
     // the next forming finds what already landed as already shelved
-    // (`crates/city/spec/Library/Install.lean` section 8-28c).
+    // (`Sprawling/city/spec/Library/Install.lean` section 8-28c).
     let shipped = shelve_shipped(city_root)?;
     let now = crate::Clock::now(&*hands.clock)?;
     let (mut ledger, report) =
@@ -229,7 +229,7 @@ fn record_shelved(
 ///
 /// There is no built-in fallback. A run handed the binary's text while
 /// the disk held something else, or nothing, would obey bytes no person
-/// can open (`crates/city/spec/SpineFiles.lean` D29).
+/// can open (`Sprawling/city/spec/SpineFiles.lean` D29).
 ///
 /// # Errors
 /// `E_STORAGE_FATAL` naming the path, for a file that is not there and
@@ -348,7 +348,7 @@ impl RunWorker {
     /// # Errors
     /// The base checkpoint's refusal, after the rules the adoption drew
     /// are taken back so the folder waits to be adopted again
-    /// (`crates/city/Spec.lean` §8-3); and whatever the ledger says about
+    /// (`Sprawling/city/Spec.lean` §8-3); and whatever the ledger says about
     /// the record.
     fn adopted(
         &mut self,
@@ -408,7 +408,7 @@ impl RunWorker {
         let addr = building.addr();
         // The base checkpoint is paid here rather than by the first dispatch,
         // which would otherwise hash every file of the folder before its
-        // first tool call (`crates/storage/Spec.lean` §8-8). No run and no model exist
+        // first tool call (`Sprawling/storage/Spec.lean` §8-8). No run and no model exist
         // yet, and an invented model id would be worse than none.
         let of = storage::Provenance::new(
             RunId::CITY,
@@ -457,7 +457,7 @@ impl RunWorker {
     /// freezes every run that death left open, and reports what is still
     /// waiting on a person. Read-only apart from the closing `tool_result`
     /// drafts, which state E_TOOL_OUTCOME_UNKNOWN rather than guessing an
-    /// outcome, and the freezes after them (`crates/accounting/spec/Worker/Genesis/Lost.lean` §8-18-1).
+    /// outcome, and the freezes after them (`Sprawling/accounting/spec/Worker/Genesis/Lost.lean` §8-18-1).
     ///
     /// # Errors
     /// Propagates whatever the chain says about itself: a history that

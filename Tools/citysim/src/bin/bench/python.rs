@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Real CPython-WASI execution readings; WAT correctness fixtures are
-//! never performance substitutes (`crates/citysim/spec/Bench.lean` §8-6-1).
+//! never performance substitutes (`Tools/citysim/spec/Bench.lean` §8-6-1).
 
 use std::io::Write as _;
 use std::path::{Path, PathBuf};

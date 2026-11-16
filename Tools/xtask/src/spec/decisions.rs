@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The eighth assertion of the `spec` gate (crates/xtask/Spec.lean
+//! The eighth assertion of the `spec` gate (Tools/xtask/Spec.lean
 //! §8-42, D41): a decision number heads one decision in its
 //! specification.
 //!
@@ -42,7 +42,7 @@ pub(super) fn check(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskEr
                     gate: "spec",
                     location: here,
                     rule: "a decision number heads one decision in its specification \
-                           (crates/xtask/Spec.lean §8-42)"
+                           (Tools/xtask/Spec.lean §8-42)"
                         .to_owned(),
                     violation: format!("{number} also heads a decision at {earlier}"),
                     alternative: "give one of the two the specification's next free number, \

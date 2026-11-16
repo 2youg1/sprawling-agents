@@ -10,7 +10,7 @@
 //! that the nearer shelf replacing the farther one is the order of
 //! these calls rather than a reader's judgement.
 //!
-//! Specified by `crates/city/spec/Library.lean` §8-8.
+//! Specified by `Sprawling/city/spec/Library.lean` §8-8.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

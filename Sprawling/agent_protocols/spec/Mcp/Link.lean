@@ -6,11 +6,11 @@
 /-!
 # Link：请求交出之后丢了答，效果未知
 
-规定 `crates/agent_protocols/src/mcp/link.rs`（`agent_protocols::mcp::link`，一台可达的 server，不论经哪种传输）背后三种传输共同守的一条：一次失败可不可以重试，取决于请求有没有交给对侧。三种传输各自实现它：`crates/agent_protocols/src/mcp/stdio.rs`、`crates/agent_protocols/src/mcp/http.rs`、`crates/agent_protocols/src/mcp/sse.rs`，读回来的答复被拒时都经 `mcp::reading::answer_unread`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/agent_protocols/src/mcp/link.rs`（`agent_protocols::mcp::link`，一台可达的 server，不论经哪种传输）背后三种传输共同守的一条：一次失败可不可以重试，取决于请求有没有交给对侧。三种传输各自实现它：`Sprawling/agent_protocols/src/mcp/stdio.rs`、`Sprawling/agent_protocols/src/mcp/http.rs`、`Sprawling/agent_protocols/src/mcp/sse.rs`，读回来的答复被拒时都经 `mcp::reading::answer_unread`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 「交出」的刻度是传输的：stdio 是那一行写完并 flush，HTTP 与 SSE 是 POST 得到回应。交出之后期限内没有答案（`E_TIMEOUT`）、对侧在作答前关了输出或流断了（`E_TOOL_UNAVAILABLE`）、答复被读端拒（`E_WIRE_MISMATCH`），都标 `Retry::Unknown`：server 可能已经做了，再发一次可能把一次写做两遍，由看得见这次调用的人决定要不要再问。交出之前的失败（写管道失败、POST 本身失败）按对侧没收下读，`Retry::No`。HTTP 上带会话 id 的 404 是唯一的 `Retry::Yes`：按规范 server 对已结束会话的请求一律答 404，调用没有执行。
 
-剩余情形，模型不分：stdio 的行体写完、换行没写出去时管道断了，对侧可能在输入结束时把没有换行的最后一行当一条消息读；这一刻本 crate 分不出，按没收下报（`crates/agent_protocols/Spec.lean` §11）。
+剩余情形，模型不分：stdio 的行体写完、换行没写出去时管道断了，对侧可能在输入结束时把没有换行的最后一行当一条消息读；这一刻本 crate 分不出，按没收下报（`Sprawling/agent_protocols/Spec.lean` §11）。
 -/
 
 namespace AgentProtocols.Mcp.Link
@@ -70,7 +70,7 @@ theorem eagerRetry_performs_twice : performed true (retryOfEager .afterHandover)
 Mutex 或线程交错。Rust 回归从 Residents.tools 与 McpTool.invoke 进入，验证真实握手次序、
 重新 listing、原调用不重发、Unknown 不重开与克隆共享失效。
 
-`crates/accounting/src/worker/mcp.rs` 的
+`Sprawling/accounting/src/worker/mcp.rs` 的
 `failure_traces_keep_shared_lifetime_and_choose_the_next_dispatch` 从本模型派生 proptest：
 初态 live 由真实 handshake 建立，初态 ended 由带 id 的 404 前缀建立；生成器覆盖
 Failure 三个构造子、空序列及不含 sessionEnded 的序列，并在每步选择两个工具克隆之一。

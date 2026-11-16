@@ -10,7 +10,7 @@
 //! lines between the two. This module is the only reader of those tag
 //! names outside the template itself.
 //!
-//! Specified by `crates/city/spec/SpineFiles.lean` §8-5.
+//! Specified by `Sprawling/city/spec/SpineFiles.lean` §8-5.
 
 use crate::spine_files::blank::is_guidance;
 

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The space a person asked for between letters
-//! (`crates/wire/spec/Preference.lean` D126).
+//! (`Sprawling/wire/spec/Preference.lean` D126).
 //!
 //! **The floor is a type, and there is no ceiling.** Tracking is added
 //! to every advance width, so a value under [`TRACKING_MIN`] closes the

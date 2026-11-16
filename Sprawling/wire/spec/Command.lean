@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.wire.spec.Command.Kind
+import Sprawling.wire.spec.Command.Kind
 
 /-!
 # wire::command
 
-规定 `command`、`command::no_secret`、`command::wire`（`crates/wire/src/` 下同名的文件）。客户端能让城做的每一件事，与套接字拼不出的那一帧。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `command`、`command::no_secret`、`command::wire`（`Sprawling/wire/src/` 下同名的文件）。客户端能让城做的每一件事，与套接字拼不出的那一帧。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 -/
 
 /-!
@@ -33,7 +33,7 @@ WireCommand::Dispatch { addr, task, goal, policy, idem, session: Option<SessionN
 Dispatch { addr, task, goal, policy, idem, session, effort }   // 删去 budget: BudgetCap
 ```
 
-**没有人能在一件事跑之前给它定价**，所以说出「跑这件事」的那条帧不带上限。刹车只留一个：`Halt` 关掉一个范围并终止该范围里已经起来的后台成员（`runtime::backlog` 使这句话为真）。kernel 的 `BudgetCap` 类型 及其判定面随之删除（`crates/kernel/Spec.lean` §8-12），`wire` 的 kernel 再导出列表因此少一项 `BudgetCap`——**这是公开面变更**，`web` 与 `sprawling` 两份基线同变更集重生。
+**没有人能在一件事跑之前给它定价**，所以说出「跑这件事」的那条帧不带上限。刹车只留一个：`Halt` 关掉一个范围并终止该范围里已经起来的后台成员（`runtime::backlog` 使这句话为真）。kernel 的 `BudgetCap` 类型 及其判定面随之删除（`Sprawling/kernel/Spec.lean` §8-12），`wire` 的 kernel 再导出列表因此少一项 `BudgetCap`——**这是公开面变更**，`web` 与 `sprawling` 两份基线同变更集重生。
 
 - **`BudgetUse` 留在再导出列表里**：成本页读它，五路归因报它。**报告花了多少**与**事前不许花**是两件事，此处只删后者。
 - **`Dispatch` 的 reach 不变**（§19-2 仍是 `client`）：删的是一个字段，不是一个动词。
@@ -52,7 +52,7 @@ pub struct BuildingSettings { pub addr: Address, pub sandbox: Option<SandboxLimi
                               pub idem: IdemKey }
 ```
 
-- **不新起一条命令，也不给 `GovernedDocument` 加变体**。这条帧问的本来就是「这栋楼的 runs 够得到什么」——沙箱、外部服务器、运行中的机器上的哪些窗口，是同一个问题的三面；各自可缺省，缺省即不动那一面。而 `GovernedDocument` 是**城**的三份文件（`<city>/.sprawling/`），桌面白名单是**楼**的（`<building>/.sprawling/`）：把楼级路径塞进一个按 city_root 取路径的枚举里，会让那个枚举需要一个只有部分变体用得上的参数（`crates/city/Spec.lean` §8-26 已写下这条）。
+- **不新起一条命令，也不给 `GovernedDocument` 加变体**。这条帧问的本来就是「这栋楼的 runs 够得到什么」——沙箱、外部服务器、运行中的机器上的哪些窗口，是同一个问题的三面；各自可缺省，缺省即不动那一面。而 `GovernedDocument` 是**城**的三份文件（`<city>/.sprawling/`），桌面白名单是**楼**的（`<building>/.sprawling/`）：把楼级路径塞进一个按 city_root 取路径的枚举里，会让那个枚举需要一个只有部分变体用得上的参数（`Sprawling/city/Spec.lean` §8-26 已写下这条）。
 - **`desktop` 是文本而不是解析过的值**。读它的那台 server 是它语法的权威，且 fail closed——读不出来的文件关成全拒。城这一侧再抄一份解析器就是第二个权威，而两个权威里迟早有一个把某份文件读成另一种意思。城只保证「写进去的字节就是人给的字节」。
 - **`building_configured` 载荷第三个布尔位 `desktop`**：与 `sandbox`／`mcp` 同形，说的是「这一面被写过」而不是写了什么。`city::Written` 把三个布尔收成一个值——一个调用点写 `(true, false, true)` 说不出哪一位是哪一面。
 - **页面读它用 `Query::Document`**：`<building>/.sprawling/DESKTOP.toml`。那条查询本来就明说保留子树在这里可读，理由是「治理一栋楼的东西正是这个视图要给人看的」。
@@ -66,7 +66,7 @@ pub struct BuildingSettings { pub addr: Address, pub sandbox: Option<SandboxLimi
 - **它们从来没有执行者**：装配层自上线起就对这两帧以 `not_built` 作答（§19 记的那次失效的三个动词之二），而客户端按 §19-2 的门要求不画它们。一条线上拼得出、任何东西都执行不了的命令，是对客户端的假承诺；删帧之后旧页面在握手期被明确拒绝（§10），而不是拿到一个永远失败的按钮。
 - **规则的家在 kernel D2**（回滚＝分支＋git 还原），含理由、被否方案与重开参数；本节只记线的形状，不复述第二份。
 - **`control` 与 reach 表同集缩面**：`Intervention` 少两臂，只剩 Steer／Cancel／Halt 加 Release 返程（§8-4）；「中断一个活着的 Run 恒以 Handoff 收尾」的中断动词随之只剩 Steer／Cancel；§19-2 删两行。
-- **事件词同集删二**（`crates/kernel/Spec.lean` §8-4 表）：`rollback_applied`／`takeover_started` 无生产者，账本从未写下过携它们的行，故已写历史的字节与逐字节重放不受影响；携这两个词的行今天在读侧入口拒（`E_INVALID_ARGS`，kernel `parse_line` 的既有码）。
+- **事件词同集删二**（`Sprawling/kernel/Spec.lean` §8-4 表）：`rollback_applied`／`takeover_started` 无生产者，账本从未写下过携它们的行，故已写历史的字节与逐字节重放不受影响；携这两个词的行今天在读侧入口拒（`E_INVALID_ARGS`，kernel `parse_line` 的既有码）。
 - **两帧的拒因不再是 `not_built`**：`not_built` 只留给仍在文法里、等待执行者的动词；对这两帧，字节在解码处就不再是命令（§8-37 的 `E_WIRE_MISMATCH` 口径不变）。
 -/
 
@@ -101,7 +101,7 @@ Command::RestoreDiscard { restoration: Restoration, idem: IdemKey }
 Dispatch { addr, task, goal, policy, idem, session, effort, model: Option<String> }
 ```
 
-- **`model` 是城已登记的一个模型 id**，登记在哪个 tag 下都行；`None` 取房间自己那层已冻结的模型，房间尚未冻结时取 `main` tag 的模型。装配按这个 id 在簿子里找到那一条登记，连同它的端点与窗口一起用，保密楼「只用回环端点」的检查照旧由 `ModelBook::select` 做（`crates/sprawling/Spec.lean` §8-10）。
+- **`model` 是城已登记的一个模型 id**，登记在哪个 tag 下都行；`None` 取房间自己那层已冻结的模型，房间尚未冻结时取 `main` tag 的模型。装配按这个 id 在簿子里找到那一条登记，连同它的端点与窗口一起用，保密楼「只用回环端点」的检查照旧由 `ModelBook::select` 做（`Sprawling/app/Spec.lean` §8-10）。
 - **被否：借 `SelectModel` 换 tag 再派活**。`SelectModel` 改的是整座城的配置，会在同时跑着的别人的 run 底下换模型；一次派活的选择只该属于这一次派活。
 - **被否：接受任意 id，在 `main` 的端点上直接调用**。窗口与输出上限是登记时说出的，未登记的 id 没有这两个数，上下文提醒只能量一个没人给过的数。
 - **`WIRE_V` 38→39**：给既有命名帧加字段是「语法换形而名字没换」那一类，§8-1 的 golden 随之变；`client/src/wire.ts` 由 `cargo xtask wire-ts --write` 同集重生成。
@@ -116,9 +116,9 @@ Dispatch { addr, task, goal, policy: kernel::RunPolicy, idem, session, effort, m
 // 线上：{"mode":"work","write":"create","admit":"tested","landing":"experiment"}
 ```
 
-- **一个字段，四个必填的键**：`mode`（`chat｜work`）、`write`（`full｜create`）、`admit`（`standing｜tested｜contract_kept｜double_validated`）、`landing`（`ordinary｜experiment`）。值集与拼法只住 kernel（`crates/kernel/Spec.lean` §8-77、§8-78），本 crate 再导出 `RunPolicy`、`Mode`、`WriteLimit`、`AdmissionRequirement`、`LandingPolicy` 五个名字，页面按 `wire.ts` 里生成的字面量拼。缺一个键、或一个认不出的词，帧在反序列化处即拒，不落成默认值。
+- **一个字段，四个必填的键**：`mode`（`chat｜work`）、`write`（`full｜create`）、`admit`（`standing｜tested｜contract_kept｜double_validated`）、`landing`（`ordinary｜experiment`）。值集与拼法只住 kernel（`Sprawling/kernel/Spec.lean` §8-77、§8-78），本 crate 再导出 `RunPolicy`、`Mode`、`WriteLimit`、`AdmissionRequirement`、`LandingPolicy` 五个名字，页面按 `wire.ts` 里生成的字面量拼。缺一个键、或一个认不出的词，帧在反序列化处即拒，不落成默认值。
 - **页面怎么选**：写域选择给 `write` 的两项（普通 `full`、只读可新建 `create`）；`/admit tested|contract|double` 依次填 `tested`、`contract_kept`、`double_validated`，不说时填 `standing`；试验填 `landing: "experiment"`；计划经 `/plan` 进入固定的 SDD 工作流，帧上是 `mode: "work"`。这些控件归客户端的展开面（client/Spec.lean §4-41），本节只定帧。
-- **城自己派的活不经这个帧**：计划、日程、来信与编辑器经 ACP 派来的活由装配层取 `RunPolicy::of(Mode::Work)`；委派与敲门继承说话那一方的整份策略（`crates/sprawling/Spec.lean` §8-133）。
+- **城自己派的活不经这个帧**：计划、日程、来信与编辑器经 ACP 派来的活由装配层取 `RunPolicy::of(Mode::Work)`；委派与敲门继承说话那一方的整份策略（`Sprawling/app/Spec.lean` §8-133）。
 - **账上读得到**：装配层把收到的策略原样写进这次 run 的 `run_started.policy`，所以一次派活选了什么，回放与 playback 从账本读，不从线上猜。
 - **`WIRE_V` 不另进位**：`Dispatch` 的名字没变而形状变了，这正是 D1 说的改形，与本批其余改形共用 45。
 -/

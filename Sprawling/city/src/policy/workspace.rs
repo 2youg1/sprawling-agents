@@ -8,7 +8,7 @@
 //! The value owns structural validation; the endpoint book owns whether a
 //! reference is registered and whether the model offers its effort. Keeping
 //! those checks separate lets this crate remain free of provider I/O.
-//! Specified by `crates/city/spec/Policy.lean` §8-35.
+//! Specified by `Sprawling/city/spec/Policy.lean` §8-35.
 
 use serde::{Deserialize, Deserializer, Serialize};
 

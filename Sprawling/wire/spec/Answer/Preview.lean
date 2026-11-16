@@ -6,9 +6,9 @@
 /-!
 # wire::answer::preview
 
-规定 `answer::preview`（`crates/wire/src/` 下同名的文件）。一个 Markdown 版本的一个窗口读成的块，与一段回复读成的块。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `answer::preview`（`Sprawling/wire/src/` 下同名的文件）。一个 Markdown 版本的一个窗口读成的块，与一段回复读成的块。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `crates/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
 -/
 
 /-!
@@ -19,7 +19,7 @@
 Preview { version: B3Hash, viewport: documents::Span },   // → Answer::Preview(Box<PreviewAnswer>)
 pub struct PreviewAnswer { pub version: B3Hash, pub preview: documents::Preview }
 // documents::Preview::{Laid(documents::Laid), Unsupported { encoding }}；Laid { span, blocks: Vec<documents::Block> }（documents D32）
-// Block 与 Inline 的形状见 crates/documents/Spec.lean §8（documents D21）
+// Block 与 Inline 的形状见 Sprawling/documents/Spec.lean §8（documents D21）
 ```
 
 - **读的是内容库里的那一版**，与 `Range` 同一个理由（§8-70）：页面滚到第三屏时文件可能已经被改过，它要的是它打开的那一版。内容库里没有这一版，或这一版的字节不是任何一种本城读的编码的文本，答 `Unavailable { query: "Preview(<version>)" }`。
@@ -55,7 +55,7 @@ Reply { text: String, state: documents::ReplyState },   // → Answer::Reply(Box
 
 **理由**：版本在城里，页面只持有窗口，城侧一次答复带一个窗口的块，与 `Range` 同一个往返；导出本来就在 Rust 里，读的是同一个函数；页面不多一个字节的运行时依赖，反而删掉自写的 `prose.ts`。按版本问而不按地址问，理由与 D8 的 `Range` 相同。
 
-**被否**：①comrak 编成 wasm 在浏览器里读——wasm 的导出要 `unsafe`，而工作区只有 `crates/desktop/ffi` 有自己的 lint 表，多一个就要人的定规；工具链多一个目标，包体推断多 100 KB 以上（documents D20）；②`Preview { at: Address }` 读文件此刻——与 D8 的②同一个缺陷，读到一半的页面要从头重读；③答 HTML——页面要把城给的字符放进 `innerHTML`，消毒规则成为第二个权威（documents D21）。
+**被否**：①comrak 编成 wasm 在浏览器里读——wasm 的导出要 `unsafe`，而工作区只有 `Sprawling/desktop/ffi` 有自己的 lint 表，多一个就要人的定规；工具链多一个目标，包体推断多 100 KB 以上（documents D20）；②`Preview { at: Address }` 读文件此刻——与 D8 的②同一个缺陷，读到一半的页面要从头重读；③答 HTML——页面要把城给的字符放进 `innerHTML`，消毒规则成为第二个权威（documents D21）。
 
 **重开参数**：远程门上一次往返的读数超过人能察觉的界、而 D12 的做法消不掉它；或允许第二个带自己 lint 表的 crate。
 -/

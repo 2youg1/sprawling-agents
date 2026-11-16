@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The handle on this machine's door for a browser
-//! (`crates/wire/spec/Server.lean` §8-93): one lock around
+//! (`Sprawling/wire/spec/Server.lean` §8-93): one lock around
 //! [`BrowserDoor`], the clock and random source the assembly layer hands
 //! in, and the closure the device table is kept through.
 //!
@@ -13,7 +13,7 @@
 //! for them, checking a signature, telling whoever handed out an open code
 //! that it was redeemed, and telling every socket when a session token may
 //! have ended, so a forgotten browser loses the sockets it holds
-//! (`crates/wire/spec/Server/Sessions.lean` §8-93s).
+//! (`Sprawling/wire/spec/Server/Sessions.lean` §8-93s).
 
 use std::collections::BTreeMap;
 use std::sync::mpsc;

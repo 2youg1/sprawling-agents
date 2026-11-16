@@ -78,7 +78,7 @@ impl AudioType {
     }
 
     /// The container a recording's file name declares by its extension
-    /// (`crates/gateway/spec/Transcribe/Recording.lean` §8-33).
+    /// (`Sprawling/gateway/spec/Transcribe/Recording.lean` §8-33).
     ///
     /// # Errors
     /// `E_INVALID_ARGS` for a name whose extension is none of the
@@ -103,7 +103,7 @@ impl AudioType {
             })
     }
 
-    /// The container a recording's leading bytes show (`crates/gateway/spec/Ocr.lean`
+    /// The container a recording's leading bytes show (`Sprawling/gateway/spec/Ocr.lean`
     /// §8-34): a recording with no name, such as a block a
     /// connector stored, says what it is only by how it starts.
     ///
@@ -224,7 +224,7 @@ impl Recording {
         Ok(Recording { bytes, kind })
     }
 
-    /// A recording read from `reader` (`crates/gateway/spec/Transcribe/Recording.lean` §8-33).
+    /// A recording read from `reader` (`Sprawling/gateway/spec/Transcribe/Recording.lean` §8-33).
     ///
     /// # Errors
     /// `E_STORAGE_FATAL` when the reader fails, and whatever
@@ -241,7 +241,7 @@ impl Recording {
 
     /// A recording with no name to read its container from, read from
     /// `reader` as [`Recording::read_from`] reads one, its container
-    /// taken from the bytes it starts with (`crates/gateway/spec/Ocr.lean`
+    /// taken from the bytes it starts with (`Sprawling/gateway/spec/Ocr.lean`
     /// §8-34).
     ///
     /// # Errors

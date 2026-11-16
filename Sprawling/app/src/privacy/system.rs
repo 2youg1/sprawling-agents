@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The machine this process runs on, as the privacy page sees it
-//! (`crates/sprawling/spec/Privacy/Service.lean` D71): on Windows the
+//! (`Sprawling/app/spec/Privacy/Service.lean` D71): on Windows the
 //! production host (`bin::privacy::windows::host`) with the facts its
 //! version record states; anywhere else a host that has no privacy
 //! controls, refuses every operation and is never read.

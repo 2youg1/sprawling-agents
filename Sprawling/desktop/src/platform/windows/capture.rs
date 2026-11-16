@@ -12,9 +12,9 @@
 //! it. Desktop Duplication would copy an entire output, and building a
 //! per-window permission on top of a whole-screen mechanism is how the
 //! door the whole-screen refusal closed gets opened from behind
-//! (`crates/desktop/Spec.lean` section 10, designs three and five). A recording takes every frame
+//! (`Sprawling/desktop/Spec.lean` section 10, designs three and five). A recording takes every frame
 //! through [`window`] as well, so what holds for a screenshot holds for
-//! each frame of a recording (`crates/desktop/Spec.lean` D7).
+//! each frame of a recording (`Sprawling/desktop/Spec.lean` D7).
 //!
 //! `PW_RENDERFULLCONTENT` is what makes a hardware-composited window —
 //! most browsers, most editors — render into the bitmap instead of
@@ -36,7 +36,7 @@ const DOING: &str = "capture a window";
 ///
 /// The GDI half — a context for the window, a bitmap of its size, the
 /// drawing and the read back — is the Zig leaf's, which releases every
-/// object it took on every path (`crates/desktop/Spec.lean` section 8-12). What
+/// object it took on every path (`Sprawling/desktop/Spec.lean` section 8-12). What
 /// the pixels mean is decided here.
 ///
 /// # Errors
@@ -168,7 +168,7 @@ mod tests {
     /// A handle that names no window is a refusal with a next step, not
     /// a crash and not a black picture. Whether a real window captures
     /// correctly is an operator's check on a real desktop
-    /// (`crates/desktop/Spec.lean` §16.2).
+    /// (`Sprawling/desktop/Spec.lean` §16.2).
     #[test]
     fn a_handle_that_names_no_window_is_refused_rather_than_captured() {
         use winsafe::prelude::Handle;
@@ -179,7 +179,7 @@ mod tests {
         assert_eq!(refusal.as_error()["data"]["code"], "E_TOOL_UNAVAILABLE");
     }
 
-    /// The contract `crates/desktop/Spec.lean` section 8-11 holds the capture row
+    /// The contract `Sprawling/desktop/Spec.lean` section 8-11 holds the capture row
     /// to, whichever interface answers it: every GDI step runs to the
     /// end for a window this process opens — a context, a bitmap of its
     /// size, the drawing and every row read back — so what comes back is

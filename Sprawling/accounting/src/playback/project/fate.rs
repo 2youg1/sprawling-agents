@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What becomes of one line, and which lines the credential scan reads
-//! (`crates/accounting/spec/Playback/Project.lean`, last section, D47).
+//! (`Sprawling/accounting/spec/Playback/Project.lean`, last section, D47).
 //!
 //! A selected line, and a line whose fate a table reads without pairing
 //! it, is scanned as it is folded. Any other line outside the selection

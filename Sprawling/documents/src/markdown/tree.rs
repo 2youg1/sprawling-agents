@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a preview carries: a Markdown window read as blocks and inline
-//! marks (`crates/documents/Spec.lean` D21).
+//! marks (`Sprawling/documents/Spec.lean` D21).
 //!
 //! Data, never HTML. A page draws each variant as an element of its own,
 //! so no character a model or a resident wrote is handed to `innerHTML`.

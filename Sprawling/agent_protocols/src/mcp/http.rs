@@ -219,7 +219,7 @@ impl HttpServer {
         // it understood the request, and it wants an account this city
         // does not yet hold. Carried as its own code so the health view
         // can say "authenticating" where it would otherwise say "failed"
-        // (`crates/sprawling/Spec.lean` §8-61).
+        // (`Sprawling/app/Spec.lean` §8-61).
         if status == 401 || status == 403 {
             return standing(
                 status,
@@ -271,7 +271,7 @@ impl HttpServer {
 }
 
 /// What a refused status says about the account and about sending again,
-/// for HTTP and SSE alike (`crates/agent_protocols/Spec.lean` §8-17): a
+/// for HTTP and SSE alike (`Sprawling/agent_protocols/Spec.lean` §8-17): a
 /// 401 rejects this account's key, the five retriable statuses say the
 /// server did not handle the request now, and the rest stay `No`.
 pub(super) fn standing(status: u16, draft: kernel::ErrorDraft) -> kernel::ErrorDraft {

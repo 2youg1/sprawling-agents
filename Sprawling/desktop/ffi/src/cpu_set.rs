@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The CPU set records `GetSystemCpuSetInformation` writes, read in safe
-//! Rust on every platform (`crates/desktop/ffi/Spec.lean` D4 and the
+//! Rust on every platform (`Sprawling/desktop/ffi/Spec.lean` D4 and the
 //! record walk proved in its section 10). The leaf copies the records out
 //! unread; this module walks them by each record's own `Size`, so a record
 //! that claims less than a CPU set record or runs past the buffer stops

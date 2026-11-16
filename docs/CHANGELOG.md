@@ -53,7 +53,7 @@ Alpha, cut on 2026-11-15 (UTC+8) as `v0.0.17-Alpha-261115`. The workspace manife
 
 **sprawling 0.0.16 wonderer**
 
-Alpha, cut on 2026-11-10 (UTC+8) as `v0.0.16-Alpha-261110`. The workspace manifest carries 0.0.16; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.15-Alpha-261102`. The wire moves from WIRE_V 74 to 79, once for each push in which its shape changed (`crates/wire/Spec.lean` D1): 75 when model generation settings began to freeze with the session (#251), 76 when Paper Mono opened the page with a fallback chain and six switches (#255), 77 when a workspace could be imported from this computer and a skill library mounted whole (#271), 78 when the talk box was pinned across tiers and a building kept a context lock in `RULES.toml` (#290), and 79 when a stopped run began to name its error (#295). `EVENT_LOG_V` stays 2 and the configuration formats stay at format 1, so a city written by 0.0.15 opens without a new migration. Keep the backup the [update guide](getting-started.md#updating) asks for before updating.
+Alpha, cut on 2026-11-10 (UTC+8) as `v0.0.16-Alpha-261110`. The workspace manifest carries 0.0.16; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.15-Alpha-261102`. The wire moves from WIRE_V 74 to 79, once for each push in which its shape changed (`Sprawling/wire/Spec.lean` D1): 75 when model generation settings began to freeze with the session (#251), 76 when Paper Mono opened the page with a fallback chain and six switches (#255), 77 when a workspace could be imported from this computer and a skill library mounted whole (#271), 78 when the talk box was pinned across tiers and a building kept a context lock in `RULES.toml` (#290), and 79 when a stopped run began to name its error (#295). `EVENT_LOG_V` stays 2 and the configuration formats stay at format 1, so a city written by 0.0.15 opens without a new migration. Keep the backup the [update guide](getting-started.md#updating) asks for before updating.
 
 ### Behaviour changes
 
@@ -130,23 +130,23 @@ Alpha, cut on 2026-10-27 (UTC+8) as `v0.0.14-Alpha-261027`. The workspace manife
 
 **sprawling 0.0.13 odyssey**
 
-Alpha, cut on 2026-10-26 (UTC+8) as `v0.0.13-Alpha-261026`. The workspace manifest carries 0.0.13; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.12-Alpha-261017`. The wire moves three times, from WIRE_V 67 to 70, because frames changed shape in this release (`crates/wire/Spec.lean` D1): 68 when `CreateBuilding` gained `rules`, `BuildingProgress` gained `adoptable` and `Query::Template` was added (`wire` D59, #169), 69 when `Query::Layers` and the `PutPrompt` command were added (`wire` D60, #172), and 70 when `Query::Catalog` was added, `ConfigureBuilding` came to carry one `BuildingSettings` and `PrefixAnswer` gained `tools` (`wire` D61, #174). `EVENT_LOG_V` stays 2: a line written by 0.0.12 reads unchanged, and the keys this release adds to the Ledger are optional and absent from older lines — `rendered` and `shown_bytes` on `tool_result` (`kernel` D64), `hash` on each `prompt_assembled` source row (`runtime` D105), `tools` on `prompt_assembled` (#174), and `at` and `removed` on `governed_document_written` (#172). No numbered snapshot version moved, but a views snapshot is accepted only under the binary's version and the encoding of the views, and both move in this release, so the first open under 0.0.13 folds the views once from the start of the Ledger. A city written by 0.0.12 opens without conversion, but its first open under 0.0.13 can change three things on disk: an unnamed city kept beside the binary moves under the home directory, `~/.sprawling/config.toml` gains a `city` line, and an unedited `City.md`, `MAYOR.md` or `CLERK.md` is rewritten to this release's default text. Keep the backup the [update guide](getting-started.md#updating) asks for before updating.
+Alpha, cut on 2026-10-26 (UTC+8) as `v0.0.13-Alpha-261026`. The workspace manifest carries 0.0.13; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.12-Alpha-261017`. The wire moves three times, from WIRE_V 67 to 70, because frames changed shape in this release (`Sprawling/wire/Spec.lean` D1): 68 when `CreateBuilding` gained `rules`, `BuildingProgress` gained `adoptable` and `Query::Template` was added (`wire` D59, #169), 69 when `Query::Layers` and the `PutPrompt` command were added (`wire` D60, #172), and 70 when `Query::Catalog` was added, `ConfigureBuilding` came to carry one `BuildingSettings` and `PrefixAnswer` gained `tools` (`wire` D61, #174). `EVENT_LOG_V` stays 2: a line written by 0.0.12 reads unchanged, and the keys this release adds to the Ledger are optional and absent from older lines — `rendered` and `shown_bytes` on `tool_result` (`kernel` D64), `hash` on each `prompt_assembled` source row (`runtime` D105), `tools` on `prompt_assembled` (#174), and `at` and `removed` on `governed_document_written` (#172). No numbered snapshot version moved, but a views snapshot is accepted only under the binary's version and the encoding of the views, and both move in this release, so the first open under 0.0.13 folds the views once from the start of the Ledger. A city written by 0.0.12 opens without conversion, but its first open under 0.0.13 can change three things on disk: an unnamed city kept beside the binary moves under the home directory, `~/.sprawling/config.toml` gains a `city` line, and an unedited `City.md`, `MAYOR.md` or `CLERK.md` is rewritten to this release's default text. Keep the backup the [update guide](getting-started.md#updating) asks for before updating.
 
-To bring a city that 0.0.12 kept in `city/` beside its binary, start the new binary from that same folder with no path, as `sprawling` or `sprawling up`: when the person's configuration names no city, it renames the folder to `~/sprawling/city`, re-points the city's worktrees and writes the new path into the `city` line, so the move happens once. A new binary unpacked into another folder does not look for the old city, and its first screen offers to start an empty one at `~/sprawling/city`; type the old city's folder there instead, which writes it into the `city` line, or open it for one launch with `sprawling up <folder>`, which writes nothing. A city on another volume than the home directory is not moved: it opens where it is, and that folder is written into the `city` line (#167). The rewrite of `~/.sprawling/config.toml` keeps every section and key and drops its comments and layout (`crates/accounting/spec/Person.lean`). An `[[mcp]]` server labelled `computer`, `media`, `record`, `skill`, `sprawling` or `web` is now refused with `E_CONFIG_INVALID`, because those names are the city's own tool namespaces; rename the label.
+To bring a city that 0.0.12 kept in `city/` beside its binary, start the new binary from that same folder with no path, as `sprawling` or `sprawling up`: when the person's configuration names no city, it renames the folder to `~/sprawling/city`, re-points the city's worktrees and writes the new path into the `city` line, so the move happens once. A new binary unpacked into another folder does not look for the old city, and its first screen offers to start an empty one at `~/sprawling/city`; type the old city's folder there instead, which writes it into the `city` line, or open it for one launch with `sprawling up <folder>`, which writes nothing. A city on another volume than the home directory is not moved: it opens where it is, and that folder is written into the `city` line (#167). The rewrite of `~/.sprawling/config.toml` keeps every section and key and drops its comments and layout (`Sprawling/accounting/spec/Person.lean`). An `[[mcp]]` server labelled `computer`, `media`, `record`, `skill`, `sprawling` or `web` is now refused with `E_CONFIG_INVALID`, because those names are the city's own tool namespaces; rename the label.
 
 Going back to 0.0.12 is not promised, and four differences are known. A 0.0.12 binary looks for an unnamed city beside itself, so a moved city has to be named with `sprawling up <folder>`. It ignores `rendered` and draws every tool result as payload JSON, so a session resumed or forked under 0.0.12 shows the model its V2 or V3 results as JSON rather than the text it read when it acted, and the history the model sees after the downgrade differs from the one it worked from. A `CONFIG.toml` that carries `[catalog]`, which the building page's capabilities section writes, is refused by 0.0.12, which reads every key it does not know as an error. And the `MAYOR.md` and `CLERK.md` copies 0.0.13 brought forward no longer hold the `<plan>` and `<seen>` sections, which 0.0.12 reads from those files rather than from its binary, so a 0.0.12 Mayor and clerk would run without them; these last two points are inferred from the 0.0.12 source and were not run.
 
 ### Behaviour changes
 
-- **A city lives under the home directory, and its configuration files carry a format.** Without a folder on the command line, the city opened is the one the top-level `city` line of `~/.sprawling/config.toml` names, which must be an absolute path, and otherwise `~/sprawling/city`; the first screen writes the city it starts or takes over into that line (`crates/sprawling/spec/Firstrun.lean` §8-8, `crates/accounting/spec/Person.lean`). The city no longer lives beside the binary, because an update unpacks the new binary into another folder and the old city was left behind. The move of a city kept beside a 0.0.12 binary takes the Ledger's writer lock to learn that no city runs from the old folder, re-points the worktrees libgit2 recorded by absolute path, and writes `gitdir` last, so a relink cut short is picked up again (#158). Every `CONFIG.toml`, every `RULES.toml` and the person's configuration may carry a top-level `format` number: a file without one is format 1, a file newer than the binary is refused before any other key with a request to upgrade instead of an unknown-field error, and an older file is brought forward by a ladder of rungs when the city opens, its original bytes first copied into `~/.sprawling/backups/` rather than beside the file, because a building's root is often the person's own git repository (`city` D28). The ladder is empty in this release, every file kind is at format 1, and a file already at the current format is never written, because 0.0.12 refuses `format` as an unknown key.
+- **A city lives under the home directory, and its configuration files carry a format.** Without a folder on the command line, the city opened is the one the top-level `city` line of `~/.sprawling/config.toml` names, which must be an absolute path, and otherwise `~/sprawling/city`; the first screen writes the city it starts or takes over into that line (`Sprawling/app/spec/Firstrun.lean` §8-8, `Sprawling/accounting/spec/Person.lean`). The city no longer lives beside the binary, because an update unpacks the new binary into another folder and the old city was left behind. The move of a city kept beside a 0.0.12 binary takes the Ledger's writer lock to learn that no city runs from the old folder, re-points the worktrees libgit2 recorded by absolute path, and writes `gitdir` last, so a relink cut short is picked up again (#158). Every `CONFIG.toml`, every `RULES.toml` and the person's configuration may carry a top-level `format` number: a file without one is format 1, a file newer than the binary is refused before any other key with a request to upgrade instead of an unknown-field error, and an older file is brought forward by a ladder of rungs when the city opens, its original bytes first copied into `~/.sprawling/backups/` rather than beside the file, because a building's root is often the person's own git repository (`city` D28). The ladder is empty in this release, every file kind is at format 1, and a file already at the current format is never written, because 0.0.12 refuses `format` as an unknown key.
 - **Default prompt text belongs to the binary, and City.md, model notes and AGENTS.md come in layers.** The default text of `City.md`, `MAYOR.md` and `CLERK.md` is held by the binary: when the city opens, a copy byte for byte equal to any default this repository ever shipped is rewritten to the current one, a copy the person edited is kept and named in diagnostics, and a missing copy is laid down (`city` D29). The Mayor's procedure and both seats' prohibitions are binary text placed before and after the persona, and `MAYOR.md` and `CLERK.md` keep only the persona's sections, because a tool parameter that changes could never reach the copy in an old city (`city` D30). A building may keep its own `<building>/.sprawling/City.md` and its own model note at `<building>/.sprawling/models/<provider>/<model>.md`; each replaces the city's file rather than joining it, and sits in the reserved subtree because the building root belongs to the project (`city` D31). The `AGENTS.md` of every level from below the building root down to the run's room joins the resident slot, nearest the building first, so the city and building slots stay byte-shared. The building slot now opens with the building's address rather than the room's, as `runtime` D97 already required, so the prefix bytes of a building's rooms differ from 0.0.12's and the first request after the update writes a new cache entry. Every `prompt_assembled` source row carries the BLAKE3 of the bytes it kept, and a rebuild names the row that drifted (`runtime` D105). A building `City.md`, model note or `AGENTS.md` that exists and does not read refuses the run with `E_STORAGE_FATAL` naming the path, instead of being left out without a word (#157).
 - **One versioned renderer draws every tool answer the model sees.** The live turn and the rebuild a branch or a resumed session opens with both call `runtime::rendering::shown`, and each `tool_result` records the version that drew it; a line without one reads as V1, the payload JSON every earlier release showed, so a session written by 0.0.12 reopens with the history its model read (`runtime` D107, `kernel` D64). V2 draws `read`, `search`, `tool` and every refusal as text, and V3 keeps those shapes while counting every displayed line number from 1 (`runtime` D119, #194); every other tool, `exec` and connector answers included, still arrives as JSON. A `read` answer is a header, `<path> lines <a>-<b> of <total>, next <k>`, then the text with a `<n>|` mark on its first line and on every line whose displayed number is a multiple of ten. A refusal is one line, `E_CODE action: subject; recovery`, followed on the same line by nearby names, the retry advice and, for a door's refusal, the rule, the violation and the alternative. Search groups content hits by file and marks each hit block as a `read` from its first line would, so a passage copied from a hit still edits: `edit` first matches `old_string` as written, and only when that matches nothing does it remove the marks whose position the file confirms (`runtime` D108). The Ledger's numeric offsets and hit lines remain 0-based, because their recorded meaning cannot change under an older renderer; a V2 line keeps its 0-based display and a V3 line adds one only when drawn. Over the first 512 lines of six repository files, counted with o200k_base as a stand-in tokenizer, the V2 `read` text was 4.4% smaller than the payload JSON it replaced, which still carried the version string, and a refusal fell from 45 tokens to 20 (#160).
-- **`read` opens a model-chosen file once and judges the handle it reads from.** The city root is resolved once when the tool is built (`crates/runtime/spec/Tools/ChosenPath.lean` D112), instead of on every call. On Windows the engine asks the open handle where the file really lies and judges that place; on Linux it judges the resolved path, opens it and checks the handle through `/proc/self/fd`; other platforms keep the judged path. A read the handle cannot finish — an error, a directory, bytes that are not UTF-8 — is answered again by the judged path, so every refusal is the one a model saw before (`crates/runtime/spec/Tools/Read.lean` D113, #159). Since #165, `read` computes no BLAKE3 and its answer carries no `version`. Its call takes `file_path`, an optional `offset` and `limit`, and the requested `offset` is a line number counted from 1, with 0 read as the first line; a call using the retired `path` spelling is refused with the new names in the recovery (`runtime` D114, D119, #194).
+- **`read` opens a model-chosen file once and judges the handle it reads from.** The city root is resolved once when the tool is built (`Sprawling/runtime/spec/Tools/ChosenPath.lean` D112), instead of on every call. On Windows the engine asks the open handle where the file really lies and judges that place; on Linux it judges the resolved path, opens it and checks the handle through `/proc/self/fd`; other platforms keep the judged path. A read the handle cannot finish — an error, a directory, bytes that are not UTF-8 — is answered again by the judged path, so every refusal is the one a model saw before (`Sprawling/runtime/spec/Tools/Read.lean` D113, #159). Since #165, `read` computes no BLAKE3 and its answer carries no `version`. Its call takes `file_path`, an optional `offset` and `limit`, and the requested `offset` is a line number counted from 1, with 0 read as the first line; a call using the retired `path` spelling is refused with the new names in the recovery (`runtime` D114, D119, #194).
 - **`edit` is admitted by what the run has read, and `base_version` is gone.** `edit` takes `file_path`, `old_string`, `new_string` and an optional `replace_all`: the old text must match exactly once, or `replace_all` changes every occurrence, while zero matches are refused and multiple matches without it return the count (`runtime` D114, #190). Each run keeps in memory a stamp — length, last write time and file identity — of every file it has looked at, where a look is a whole answer that was not cut short or a window asked for with `offset` or `limit`. An edit of a file this run has not looked at is refused with `E_INVALID_ARGS`; an edit of a file somebody wrote after the run's last look is refused with `E_VERSION_CONFLICT`, and the refusal shows the passage around `old_string` as it now reads, which counts as a look, so the model retries against it without reading the whole file again; `old_string: ""` creates a file only where none stands. Admission, the bytes and the write happen under a city-wide lock per path, compared with case folded; `exec` and the person's editor do not take it. Stamps are not written to the Ledger, so a resumed session, a fork, a successor and a delegated child read before they edit. `plan finish` takes the path of the file that shows the work and pins it to a Locator through the same read bound as `read` (`runtime` D106, `collab` D20, `kernel` D27, #165), and the Mayor's procedure teaches this contract (#166).
 - **`exec` takes `command` or `python`, and a building without a shell reads a command as a program and its arguments.** Exactly one of the two is given, with `where: sandbox` as the default and `where: host` asking to run outside confinement; the Python arm has no host form. With `[sandbox] shell = true`, the command goes to the configured interpreter; without it, quotes group arguments and unquoted pipes, redirection, expansion and wildcards are refused instead of being passed to the program as arguments, because that would run a command the model did not write. The retired `arm` spelling is refused with the new names in the recovery (`runtime` D114, D118, #190).
 - **`search` takes a ripgrep regular expression, and a glob alone finds files by name.** `pattern` is matched one line at a time by the `regex` crate, which never backtracks; `output_mode` is `files_with_matches`, `content` or `count`, with `-i`, `-A`, `-B`, `-C` and `context` from Claude Code's Grep shape. A glob without a pattern lists matching file names, so a separate filename-only tool is unnecessary. `multiline`, `type`, a nonzero `offset` and a pattern that spells a line break are refused rather than allowed to produce a misleading answer, while `-n`, `-o` and `head_limit` go unread (`runtime` D117, D120, D121, #196).
 - **One `tool` tool reaches the catalog, and the dormant index gives each namespace one line.** `tool` with the ops `list`, `find`, `detail` and `run` replaces `describe` and `call`; `find` grades whole name, name prefix, name substring and body substring in that order, and answers at most eight hits grouped by namespace, with no corpus statistics, so a query ranks the same in every building. A namespace is given by the assembler that admits a tool rather than read off its name, and one MCP server with two hundred tools now takes one index line instead of the whole 1 KiB index (`runtime` D110, #163). Sessions written before keep `describe` and `call` calls in their history, and the gateway sends them as recorded. `collab` D21 records the decision to add no bidding, notice board, personal weight or reputation: residents reach each other directly, and contention is settled by claims.
-- **The Python guest is compiled once and held to its run's ceiling, and heavy work queues past one machine budget.** Every bench shares the process's one wasmtime engine and one slot holding the guest last compiled, recognised by path, length and modification time, instead of compiling the guest on every call (`runtime` D101). The guest's memory is held to its run's `[core] memory_bytes`, the ceiling the run's processes already had, and growth past it reports `memory_ceiling: hit` (`runtime` D102). A run with a memory ceiling reserves that many bytes from one machine budget for each foreground command and each Python call, in the order they asked, with no backfilling, so a large compile cannot wait without bound behind small commands; a reservation larger than the whole budget runs alone (`runtime` D103, D104). The budget is the top-level `memory` of `~/.sprawling/config.toml`: `"auto"`, the default, is physical memory less 2 GiB for the operating system, 400 MiB for the browser tab that shows the city and the city's own resident budget, and a whole number is bytes (`crates/sprawling/spec/Serving/Memory.lean` §8-173). A call that had to wait carries a new key in its exec result, `memory_wait`, with `ahead`, `held_bytes`, `budget_bytes` and a `detail` sentence; a call that started at once carries none (#162).
+- **The Python guest is compiled once and held to its run's ceiling, and heavy work queues past one machine budget.** Every bench shares the process's one wasmtime engine and one slot holding the guest last compiled, recognised by path, length and modification time, instead of compiling the guest on every call (`runtime` D101). The guest's memory is held to its run's `[core] memory_bytes`, the ceiling the run's processes already had, and growth past it reports `memory_ceiling: hit` (`runtime` D102). A run with a memory ceiling reserves that many bytes from one machine budget for each foreground command and each Python call, in the order they asked, with no backfilling, so a large compile cannot wait without bound behind small commands; a reservation larger than the whole budget runs alone (`runtime` D103, D104). The budget is the top-level `memory` of `~/.sprawling/config.toml`: `"auto"`, the default, is physical memory less 2 GiB for the operating system, 400 MiB for the browser tab that shows the city and the city's own resident budget, and a whole number is bytes (`Sprawling/app/spec/Serving/Memory.lean` §8-173). A call that had to wait carries a new key in its exec result, `memory_wait`, with `ahead`, `held_bytes`, `budget_bytes` and a `detail` sentence; a call that started at once carries none (#162).
 - **The conversation has no head, and its room is written once, in the box's placeholder.** In zen and blend, while the box holds no words its placeholder reads `to <building>/<room> · #<session>…`; the address in it is a button that opens the command palette, which lists this room's sessions first, five while nothing is typed, and the words around it let a press through to the box. The line goes as soon as the box holds words, input-method composition included, and comes back when the box is empty; a past session, which has no box, writes its address at its head. The workspace chip that named the room before the first send is retired, so the room is written once per screen (`client/Spec.lean` 4-10a, #161, #164, #176). A finger or pen opening focuses the palette itself, so a phone's soft keyboard does not cover the list, while keys and the mouse still land in its text box (4-64b). Who is listening moves from the chip's menu to the foot of the palette's list, drawn only while nothing is typed, and a run not yet told is left out (`client/Spec.lean` D36). A failed tool line says why it failed, with the error code's heading, and the reason stands at the end of the subject's cell so every line's time stays in one column (4-44). Switching between light and dark runs inside a view transition rather than repainting in one frame, and the settings row wraps on a narrow screen instead of cutting the model name.
 - **The panorama workbench keeps the conversation rather than a second timeline, and moments on a screen use local time.** The timeline remains on the run page, where timings are the subject; message heads and tool rows keep their moments, a turn that only calls tools is read through those rows, and the inspector's terminal and a building's commit row follow the same local-time rule. The UTC instant remains in each element's `datetime` attribute, so the visible text is not a second time standard (`client/Spec.lean` 4-44, 4-45, 4-47, 4-59, #195).
 - **A raise page builds a building or adopts a folder that is already there.** `#/raise` and `#/raise/<address>` take the address, the template (minimal or confidential) and the `RULES.toml` that template would write, and send one `CreateBuilding`; `/raise` with no words opens the page, and `/raise <address>` still raises in one step. The rules box is filled from the city's own bytes for that address and template, and starts over from them when either changes, so rules edited for the ordinary template cannot be sent under the confidential one. Before the press, the address field says whether the address will be built, adopted or refused. The city decides between building and adopting by looking at the disk, and evaluates written rules before it lays anything out, so a refused text leaves nothing behind (`city` D32, #169, #171). On the city page, a folder the city can adopt reads "not adopted" in the building table and its panel links to the raise page. `sprawling adopt` takes the same path.
@@ -154,12 +154,12 @@ Going back to 0.0.12 is not promised, and four differences are known. A 0.0.12 b
 - **`/new` and `/compact` wait for the city.** They go through the same door as a branch, so main moves only once the city has opened the new session; a refusal leaves main where it was, and the place that asked says why and what to do (`client/spec/Views/Talk/Branching.lean` D100, #171, #179).
 - **The building page shows what a room's next run is told, and takes whole-document steps on it.** A prompts section lists every prompt document of the next run in a room, in send order, with its prefix slot, its layer (city, building or room) and whether it is sent, replaced by a nearer document, absent, or withheld with a reason, and shows the bytes each slot of the room's newest run was sent, with a link to that run's prompt lens (`client/Spec.lean` 4-50, `wire` D60). Each document offers open, start a copy at this layer, remove this layer's copy, and restore the default; the last two ask first, and a step on a file that changed since the page read it is refused with `E_VERSION_CONFLICT`. The default text of `City.md`, `MAYOR.md` and `CLERK.md` is listed as one more version, so "compare with default" is RefRain's two-version comparison. Word-by-word edits stay in RefRain, which now saves the city's prompt documents and judges a save to `MAYOR.md` by its identity area (`city` D33, #172). A model note for a model id with a slash, as gateways name the models they forward, is one note under the provider's directory, which the page lists and changes (#179).
 - **A building decides how each tool reaches its runs.** `[catalog.tools]` and `[catalog.namespaces]` map a tool or a namespace to `"core"` (sent in every request), `"dormant"` (listed in the dormant index and fetched on demand) or `"off"` (not admitted). Only the city's `CONFIG.toml` and a building's may state them, because the tool array sits ahead of the system prompt in a provider's cache; each table is frozen on its own, so a building that turns one tool off follows the city for the rest. A tool reads, in order, the building's tool key, the building's namespace key, the city's tool key and the city's namespace key, and otherwise keeps its built-in default; `tool` and `read` are always `core` (`runtime` D111, `city` D34). Every run records its tool table, `off` tools included, in `prompt_assembled.tools`. The building page's capabilities section replaces the skills section: it edits the table for the building or as the city default, shows the bytes the newest run carried and what a draft would change, and how often each tool was used over the building's last 50 runs; skills are listed below it, read-only, with a link to the rules that admit them (`accounting` D55, #174). The prompt lens draws the tool table before the City segment. The dormant index now opens the skills with one line saying what a skill is, `- skill (N): the steps this building follows for a kind of work` (#188), and the `sprawling` namespace's line reads "talk to other residents, split and hand off work, see your run" whole instead of being cut at the index's 64 bytes (#179).
-- **The static Linux archive allocates on jemalloc.** The `x86_64-unknown-linux-musl` build uses jemalloc with background threads, because musl's allocator keeps one lock for every thread; glibc, macOS and Windows keep the allocator their platform ships (`crates/sprawling/spec/Serving/Memory.lean` D102, #146).
+- **The static Linux archive allocates on jemalloc.** The `x86_64-unknown-linux-musl` build uses jemalloc with background threads, because musl's allocator keeps one lock for every thread; glibc, macOS and Windows keep the allocator their platform ships (`Sprawling/app/spec/Serving/Memory.lean` D102, #146).
 
 ### Fixes
 
 - A building whose `CONFIG.toml` stated `[search]` or `[catalog]` refused every dispatch at the building's own address with `E_CONFIG_INVALID`, because the session's own file was read at the room's rung; it is now read at the rung the ladder gives it (#174).
-- A city first served with `SPRAWLING_MODEL_URL` never showed the environment's endpoint: the settings page listed no endpoint and the model picker beside the composer was missing, on that start and every later one. The Ledger was complete and only the views missed the lines written while the city opened; the views now attach before those lines are written, and the fold from the start of the Ledger that the first open under 0.0.13 makes brings such a city's views back whole (`crates/sprawling/spec/Assembly/Listening.lean` D81, #178).
+- A city first served with `SPRAWLING_MODEL_URL` never showed the environment's endpoint: the settings page listed no endpoint and the model picker beside the composer was missing, on that start and every later one. The Ledger was complete and only the views missed the lines written while the city opened; the views now attach before those lines are written, and the fold from the start of the Ledger that the first open under 0.0.13 makes brings such a city's views back whole (`Sprawling/app/spec/Assembly/Listening.lean` D81, #178).
 - Accepting a proposal card on a prompt document now passes the same check as saving it, so an accepted card can no longer leave `MAYOR.md`'s identity area unreadable (#179).
 - A room whose `AGENTS.md` is a directory refused every run in that room, on Windows with a permission error that named no cause. The room's `AGENTS.md` chain is now read through the same read bound as the `read` tool: a directory, or a link the bound refuses, is withheld with its reason and the room opens, while a file that is present and cannot be opened still stops the run (#172).
 - `/raise` on a folder that already existed recorded `adopted: false` and took no base checkpoint; it now adopts the folder (#169). An adoption whose base checkpoint is refused now removes the `RULES.toml` it wrote, so the folder waits to be adopted again instead of refusing the next press as "already has rules" (#171).
@@ -168,18 +168,18 @@ Going back to 0.0.12 is not promised, and four differences are known. A 0.0.12 b
 
 ### Security
 
-On Windows and Linux, `read` judges the place its open handle really reads from, so a link swapped between the judgement and the read can no longer move the read outside the city or into a confidential building (`crates/runtime/spec/Tools/Read.lean` D113). `edit` checks for a link before it asks the stamps and again right before the rename, because the wait for the lock and the read sit between the two, and an edit through a link is refused as a link rather than as unread (`runtime` D106). An MCP label can no longer take one of the city's reserved namespaces, so `tool list sprawling` cannot present an outside server's tools as the city's own; the configuration layer refuses it on both its read face and its write face. A model note's location is spelled as an address before it becomes a path, so a model id with a `..` segment names no note rather than a file outside the reserved subtree. A building's own `City.md` and model notes sit in the reserved subtree, which no write domain reaches, so a resident cannot rewrite what it is told. Two gates were loosened, each in a commit of its own that carried the `Verdict: user-approved` trailer on its branch: `color` skips `crates/sprawling/tests/cities/`, whose fixture city is the 0.0.12 release's output and not a client of this tree (`crates/xtask/Spec.lean` §8-8), and `render` admits the first standing control inside the conversation's `<header>`, the address line, as part of the box's group, while a second one is still a fixed bar (`crates/xtask/Spec.lean` §8-51). The squash merges of #158 and #161 folded those commits into one commit each on main, which carries the gate change beside the source it judges and no trailer.
+On Windows and Linux, `read` judges the place its open handle really reads from, so a link swapped between the judgement and the read can no longer move the read outside the city or into a confidential building (`Sprawling/runtime/spec/Tools/Read.lean` D113). `edit` checks for a link before it asks the stamps and again right before the rename, because the wait for the lock and the read sit between the two, and an edit through a link is refused as a link rather than as unread (`runtime` D106). An MCP label can no longer take one of the city's reserved namespaces, so `tool list sprawling` cannot present an outside server's tools as the city's own; the configuration layer refuses it on both its read face and its write face. A model note's location is spelled as an address before it becomes a path, so a model id with a `..` segment names no note rather than a file outside the reserved subtree. A building's own `City.md` and model notes sit in the reserved subtree, which no write domain reaches, so a resident cannot rewrite what it is told. Two gates were loosened, each in a commit of its own that carried the `Verdict: user-approved` trailer on its branch: `color` skips `Sprawling/app/tests/cities/`, whose fixture city is the 0.0.12 release's output and not a client of this tree (`Tools/xtask/Spec.lean` §8-8), and `render` admits the first standing control inside the conversation's `<header>`, the address line, as part of the box's group, while a second one is still a fixed bar (`Tools/xtask/Spec.lean` §8-51). The squash merges of #158 and #161 folded those commits into one commit each on main, which carries the gate change beside the source it judges and no trailer.
 
 `wasmtime` and `wasmtime-wasi` move together to 48.0.7 for GHSA-9pvw-hwfg-92h5 (RUSTSEC-2026-0378), and the manifest floor and the Sandbox decision move with them; the runtime compiles core modules and links wasip1 only, so as far as the code shows the advisory does not reach it, and the floor moves because it states that every fix of the line is present (#175). `ctutils` moves to 0.4.5, `rustls-webpki` to 0.103.16 and `webpki-root-certs` to 1.0.11, past RUSTSEC-2026-0385, -0382 and -0383, with only `Cargo.lock` changing (#187). Dependabot no longer ignores the major versions of `wasmtime`, `cap-std` and `cap-fs-ext`, so every release it proposes arrives as a pull request, and a major that does not compile here stays unmerged until the code moves to it; that change to `.github/` carried the `Verdict: user-approved` trailer (#175). The nightly advisories job, when it is red, opens one issue for each advisory the lockfile is exposed to, unless an issue with the same title is already open (#188).
 
 ### Measurement
 
-No release build of 0.0.13 was measured. The readings below come from the pull requests, on unoptimized builds, and are directions rather than results. On a Windows x86_64 desktop with 16 cores and other builds running, the p50 of one `read` of a warm 20 KiB file through the old judged path's resolutions was 406–479 µs, against 89–114 µs for an open plus the handle's location; a reply of one `read` call took about 0.5 ms of a 26 ms gap between requests, with the durability barrier about 4 ms, so the read is not where the end-to-end time goes; and a read right after a write waited about 51 ms on both paths alike, which is inferred to be an on-access scan and was not profiled (#159). The test `a_read_costs_within_a_bound_of_a_resolved_read` holds the handle read within 1.5 times one `canonicalize` plus a bare read, registered as `[read_handle_ratio]` in `crates/xtask/budgets.toml`, and read 1.2 against 2.7 for the old path; its wall-clock readings are owed to a release measurement. On a 16-thread probe, whose machine the pull request does not name, three allocation-heavy workloads fell from 1747 / 10338 / 3454 ms on musl's allocator to 174 / 244 / 247 ms on jemalloc (5 rounds, median), while one thread was only 22% slower on musl's allocator, which places the gap in lock contention; mimalloc was rejected because it held 212 MB against jemalloc's 4.6 MB after the same workload (#146).
+No release build of 0.0.13 was measured. The readings below come from the pull requests, on unoptimized builds, and are directions rather than results. On a Windows x86_64 desktop with 16 cores and other builds running, the p50 of one `read` of a warm 20 KiB file through the old judged path's resolutions was 406–479 µs, against 89–114 µs for an open plus the handle's location; a reply of one `read` call took about 0.5 ms of a 26 ms gap between requests, with the durability barrier about 4 ms, so the read is not where the end-to-end time goes; and a read right after a write waited about 51 ms on both paths alike, which is inferred to be an on-access scan and was not profiled (#159). The test `a_read_costs_within_a_bound_of_a_resolved_read` holds the handle read within 1.5 times one `canonicalize` plus a bare read, registered as `[read_handle_ratio]` in `Tools/xtask/budgets.toml`, and read 1.2 against 2.7 for the old path; its wall-clock readings are owed to a release measurement. On a 16-thread probe, whose machine the pull request does not name, three allocation-heavy workloads fell from 1747 / 10338 / 3454 ms on musl's allocator to 174 / 244 / 247 ms on jemalloc (5 rounds, median), while one thread was only 22% slower on musl's allocator, which places the gap in lock contention; mimalloc was rejected because it held 212 MB against jemalloc's 4.6 MB after the same workload (#146).
 
 ### Toolchain, CI and repository gates
 
-- `[read_handle_ratio]` is gated in the default test suite, so every CI run holds the read's cost at 1.5. The `lexicon` gate refuses the type name of the retired `describe` tool and points to `ToolTool`. `crates/sprawling/tests/cities/v0.0.12` holds a city the 0.0.12 release binary wrote and served once, kept byte for byte by a `.gitattributes` line, and `crates/sprawling/tests/previous_release.rs` moves it home and opens it the way `up` does; it has no conversation and no spare worktree, so the worktree half of a move is covered by the storage test alone.
-- Three runtime decisions shared a number with another: the renderer's two decisions and the search modes are now D107, D108 and D109, and the decision table in `crates/runtime/Spec.lean` lists all three. Nine more numbers each headed two decisions across the parts of one specification; each second decision moved to its specification's next free number with every comment that cites it, and the `spec` gate now refuses a number that heads two decisions in one specification (`crates/xtask/Spec.lean` §8-42, D41, #188).
+- `[read_handle_ratio]` is gated in the default test suite, so every CI run holds the read's cost at 1.5. The `lexicon` gate refuses the type name of the retired `describe` tool and points to `ToolTool`. `Sprawling/app/tests/cities/v0.0.12` holds a city the 0.0.12 release binary wrote and served once, kept byte for byte by a `.gitattributes` line, and `Sprawling/app/tests/previous_release.rs` moves it home and opens it the way `up` does; it has no conversation and no spare worktree, so the worktree half of a move is covered by the storage test alone.
+- Three runtime decisions shared a number with another: the renderer's two decisions and the search modes are now D107, D108 and D109, and the decision table in `Sprawling/runtime/Spec.lean` lists all three. Nine more numbers each headed two decisions across the parts of one specification; each second decision moved to its specification's next free number with every comment that cites it, and the `spec` gate now refuses a number that heads two decisions in one specification (`Tools/xtask/Spec.lean` §8-42, D41, #188).
 - `just walk` photographs the real screens: it raises a throwaway city under `target/walk/` that the stand-in provider answers, serves and pairs it as a person would, and keeps every page and a few pressed states as PNG files at three window sizes in both lightings, with an index. No gate runs it; a person reads the pictures (#177).
 - `client/bunfig.toml` makes `bun add` and `bun update` wait three days for a newly published package version, as Dependabot already does for every other ecosystem; `bun install --frozen-lockfile` installs what `bun.lock` pins, so CI is unaffected (#170).
 - Dependabot moved `tokio` to 1.54.1 (#182), `wat` to 1.262.0, `zip` to 9.0.5 and `find-msvc-tools` to 0.1.15, and the actions `Swatinem/rust-cache` to 2.9.3, `taiki-e/install-action` to 2.87.30, `rust-lang/crates-io-auth-action` to 1.0.6 (#181) and `cachix/install-nix-action` to 31.11.2; `tikv-jemallocator` and `tikv-jemalloc-sys` move as one group. `comrak` moves to 0.57.0, whose two new comment nodes come only from an extension the Markdown lowering leaves off and are reported as unsupported (#184), and `vt100` moves to 0.18.1, a dev-dependency only the console leaf's screen tests read (#155).
@@ -190,7 +190,7 @@ No release build of 0.0.13 was measured. The readings below come from the pull r
 - Forking a session that contains tool calls fails on an endpoint of the Anthropic dialect: the Ledger stores the provider's tool call id redacted as `secret:redacted/<hash>`, the rebuilt history sends that id, and Anthropic refuses an id outside `^[a-zA-Z0-9_-]+$` with a 400, so the run ends cancelled. 0.0.12 fails the same way; an endpoint of the OpenAI dialect accepts the redacted id, and a new session is not affected (#185).
 - A history that holds `describe` or `call` calls is sent as recorded, although neither tool is in the request's tool list any more; whether every provider accepts tool names absent from that list is not verified.
 - V2 and V3 cover `read`, `search`, `tool` and refusals, with V3 counting displayed lines from 1; `exec` and connector answers still reach the model as JSON, and an offloaded output does not yet show its path, size and tail.
-- A call waiting for a reservation does not see a halt until it starts, browsers the city starts do not reserve, and the page does not show the line; only `memory_wait` in the result says that a call waited (`crates/sprawling/spec/Serving/Memory.lean` §8-173).
+- A call waiting for a reservation does not see a halt until it starts, browsers the city starts do not reserve, and the page does not show the line; only `memory_wait` in the result says that a call waited (`Sprawling/app/spec/Serving/Memory.lean` §8-173).
 - A new binary unpacked into another folder does not find the city 0.0.12 kept beside the old binary; the first screen or `sprawling up <folder>` names it, as above.
 - Writing the `city` line rewrites `~/.sprawling/config.toml` without its comments and layout.
 
@@ -200,13 +200,13 @@ No release build of 0.0.13 was measured. The readings below come from the pull r
 
 **sprawling 0.0.12 daybreak**
 
-Alpha, cut on 2026-10-17 (UTC+8) as `v0.0.12-Alpha-261017`. The workspace manifest carries 0.0.12; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.11-Alpha-261009`. The wire moves twice, from WIRE_V 65 to 67, because frames changed shape in this release (`crates/wire/Spec.lean` D1): 66 when `CostAnswer` gained the keep-warm renewals, and 67 when `AttachEndpoint` gained `named` beside `admit` and every model row gained `listing`. `EVENT_LOG_V` stays at 2: a line written by 0.0.11 reads unchanged, and the new `prefix_held` kind is written by 0.0.12 alone. A views or standing snapshot cut by 0.0.11 is refused by version and folded again from the start of the Ledger, because the fold rules moved with the new fields; nothing has to be converted by hand ([updating](getting-started.md#updating)).
+Alpha, cut on 2026-10-17 (UTC+8) as `v0.0.12-Alpha-261017`. The workspace manifest carries 0.0.12; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.11-Alpha-261009`. The wire moves twice, from WIRE_V 65 to 67, because frames changed shape in this release (`Sprawling/wire/Spec.lean` D1): 66 when `CostAnswer` gained the keep-warm renewals, and 67 when `AttachEndpoint` gained `named` beside `admit` and every model row gained `listing`. `EVENT_LOG_V` stays at 2: a line written by 0.0.11 reads unchanged, and the new `prefix_held` kind is written by 0.0.12 alone. A views or standing snapshot cut by 0.0.11 is refused by version and folded again from the start of the Ledger, because the fold rules moved with the new fields; nothing has to be converted by hand ([updating](getting-started.md#updating)).
 
 ### Behaviour changes
 
 - **The CLI is a transcript and a live region, both drawn by a Zig leaf.** The console's CLI now writes a transcript once into the terminal's own scrollback (the banner, what was said, each run's head, its calls, its reply and its ending) and redraws a live region under it on every frame (the request waiting, the run working, the calls under way, the quit question, and a composer laid out as the WebUI's). The new `sprawling-console-ffi` package turns a scene into one frame's bytes through a Zig leaf behind one safe function, and the build holds `zig/part.zig` to the words defined once in `src/part.rs`. A record belongs to a room by its address, by its writer, or by the run working there, because a run's requests, calls, replies and freeze carry no address; replies are read through `wire::said_in`, the reader the views use. Tab opens a menu on the first fit in `wire::Slash` order and Enter takes it, instead of completing a word the city does not know; every control character from a record is drawn as U+FFFD rather than reaching the terminal as a command; and the time gutter reads the zone of the machine the city runs on. Zig is now installed by every job that builds the binary, on Linux and macOS as well as Windows, and `just fmt-check` formats the console leaf while `just check-console` runs its own Zig tests (`just check`, `just check-branch` and the `gates` job run it too). The 800- and 500-line limits on a change count added lines only, so a change that removes more than it adds is no longer split as if it were large.
-- **A keep-warm renewal runs off the accounting thread, once per real use, and it is billed.** The accounting thread is the city's one writer, and a renewal or a model listing used to wait on the provider inside it, so no relay request, landing or command was served while the provider was silent; `accounting::worker::errand` is now the one place a provider request leaves that thread, one thread per request, and its answer comes back as `Wake::Answered` on the one queue (`crates/sprawling/spec/Supervising.lean` §8-42-9, D78, D79). Keep-warm reads at the room the run works in (`kernel` D62, superseding the building-level read), sends at most one renewal per real use, due a fixed margin before the cache's lifetime ends, and plans that due time from a lead measured per endpoint from sending to the provider starting the request (`runtime` D99, D100); the settings page says "renew once after use" instead of promising a renewal every five minutes. The cost fold counts each `cache_renewed` line by what it showed — read, late, unreported or refused (`storage` D35) — and a renewal's bill joins the attribution total and the room's row, with the other four cuts taking it in one `keep_warm` bucket (`storage` D36); `CostAnswer` carries the spend and the four counts, which is WIRE_V 66. A renewal no provider priced counts as an unpriced call, and an unpriced call sums input and output rather than double-counting the cached part of the prompt.
-- **A cold wave pays one cache write.** The prefix hold sits before the ticket queue in the gateway's endpoint gate: the first call to reach a cold key sends one pre-warm of the shared system part and waits for it, the calls with the same key wait behind the hold, and all of them take tickets once it ends, so the followers read the write the first call paid for (`crates/gateway/spec/Concurrency.lean`, gateway D60/D61). The hold's key is the account plus the digest of the pre-warm request body, the release of the held calls counts as a request with that key beginning, so a refused or timed-out pre-warm starts no second one for the rest of the wave; a call the endpoint refuses locally is never pre-warmed, and a confidential building's request is never held, because its pre-warm would carry exactly the bytes that building keeps on this machine (`gateway` D39's sixth case). A delegated child opens on the provider account its mother's room is bound to, read through the worker's hand-over entry, so it shares her cache instead of rewriting the prefix under another account. Every attempt that waited writes a `prefix_held` line, the new kernel event kind, before its outcome is read.
+- **A keep-warm renewal runs off the accounting thread, once per real use, and it is billed.** The accounting thread is the city's one writer, and a renewal or a model listing used to wait on the provider inside it, so no relay request, landing or command was served while the provider was silent; `accounting::worker::errand` is now the one place a provider request leaves that thread, one thread per request, and its answer comes back as `Wake::Answered` on the one queue (`Sprawling/app/spec/Supervising.lean` §8-42-9, D78, D79). Keep-warm reads at the room the run works in (`kernel` D62, superseding the building-level read), sends at most one renewal per real use, due a fixed margin before the cache's lifetime ends, and plans that due time from a lead measured per endpoint from sending to the provider starting the request (`runtime` D99, D100); the settings page says "renew once after use" instead of promising a renewal every five minutes. The cost fold counts each `cache_renewed` line by what it showed — read, late, unreported or refused (`storage` D35) — and a renewal's bill joins the attribution total and the room's row, with the other four cuts taking it in one `keep_warm` bucket (`storage` D36); `CostAnswer` carries the spend and the four counts, which is WIRE_V 66. A renewal no provider priced counts as an unpriced call, and an unpriced call sums input and output rather than double-counting the cached part of the prompt.
+- **A cold wave pays one cache write.** The prefix hold sits before the ticket queue in the gateway's endpoint gate: the first call to reach a cold key sends one pre-warm of the shared system part and waits for it, the calls with the same key wait behind the hold, and all of them take tickets once it ends, so the followers read the write the first call paid for (`Sprawling/gateway/spec/Concurrency.lean`, gateway D60/D61). The hold's key is the account plus the digest of the pre-warm request body, the release of the held calls counts as a request with that key beginning, so a refused or timed-out pre-warm starts no second one for the rest of the wave; a call the endpoint refuses locally is never pre-warmed, and a confidential building's request is never held, because its pre-warm would carry exactly the bytes that building keeps on this machine (`gateway` D39's sixth case). A delegated child opens on the provider account its mother's room is bound to, read through the worker's hand-over entry, so it shares her cache instead of rewriting the prefix under another account. Every attempt that waited writes a `prefix_held` line, the new kernel event kind, before its outcome is read.
 - **The attach form keeps what the person typed, and a typed model id is registered on the person's word.** The form no longer writes the probed base URL into the box: it draws one line, "the city calls <recorded>", for the probe this form sent with the text and face it was sent with, and only for an answer newer than the one standing when the probe left; the box carries no `type="url"` any more, because that rule refuses `api.openai.com/v1` and `127.0.0.1:11434`, the two spellings the city accepts, and the base-URL pattern writes its hyphen as `\x2D` so it compiles under the `v` flag (`client/Spec.lean` D102). The model table asks `Query::ModelFigures` and draws, under each empty box, the figure the city would register and the rung that stated it: the person, the provider's list, an earlier registration, the catalog or a preset row, then the policy default. The whole ladder for the window and the ceiling lives in `gateway::provider::ceiling` (`gateway` D45, `Figures::resolve`), an earlier registration answers only with a figure a person stated (`gateway` D37), and a re-attach whose list cannot be read keeps the rows the book already holds instead of resetting them to default facts (`gateway` D46). `AttachEndpoint` carries the ids typed into their own box in `named`, apart from the ticked `admit` list, and a typed id the endpoint's list does not carry is registered as a `named` row on the person's word, marked by kernel D63's `ModelFacts.listing`; an attach whose ticked list matches nothing served is refused before anything is written (`gateway` D39, wire D57), and one whose rows would drop a model a role points at is refused with the role named (`gateway` D48). A form refusal is now headed by its code and drawn under the model table with its subject (`client/Spec.lean` D103, D101).
 - **A delegated child that cannot start hands its refusal back to the parent.** The delegate desk asks a `StartCheck` built from the half of admission that reads only the city's files, so a delegation is judged by the same function as a person's dispatch without a round trip to the accounting thread (`collab` D18, `accounting` D53); a child the hand-over still refuses goes back to the parent's room as a stopped handback carrying the refusal's code, subject and recovery, so the parent learns that the child never started (`collab` D19, `accounting` D54).
 - **The console confirmation reads one answer a second and locks after ten misses.** Any local client can loop `ConfirmRemoteDoor`, which is local-only, so a per-IP ban would ban the person; the guard instead judges an answer only one second after the last judged one and, after ten read misses since the last answer that did its verb, refuses every request and answer until the city restarts, closing an open remote door at that moment (`remote_access` D25, `spec/Confirm.lean`). A wall clock set back does not stall the page, and an open carried on its own thread cannot undo the lock.
@@ -215,7 +215,7 @@ Alpha, cut on 2026-10-17 (UTC+8) as `v0.0.12-Alpha-261017`. The workspace manife
 
 ### Security
 
-`ConfirmRemoteDoor` is a fixed 40-bit code with no rate limit on a local caller, and the confirmation guard above is the fix; the trace model proves that a trace which never does the verb is judged wrong at most the limit, and that a spaced answer in time still does the verb (`crates/remote_access/spec/Confirm.lean`). A building's egress list is enforced before the secret scan on both browser effects, and the host is the one the browser will connect to, not the one a hand split reads. A delegated child refused at the hand-over no longer disappears: the parent receives the refusal's code, subject and recovery as a handback in its own room. The `docnum`, `length` and `modmap` gates were narrowed, not loosened in a way that admits a defect: each removal is recorded as a decision with the reason and the condition that would bring it back (`crates/xtask/Spec.lean` D38, D39, D40), and the commits carried the `Verdict: user-approved` trailer the rule requires.
+`ConfirmRemoteDoor` is a fixed 40-bit code with no rate limit on a local caller, and the confirmation guard above is the fix; the trace model proves that a trace which never does the verb is judged wrong at most the limit, and that a spaced answer in time still does the verb (`Sprawling/remote_access/spec/Confirm.lean`). A building's egress list is enforced before the secret scan on both browser effects, and the host is the one the browser will connect to, not the one a hand split reads. A delegated child refused at the hand-over no longer disappears: the parent receives the refusal's code, subject and recovery as a handback in its own room. The `docnum`, `length` and `modmap` gates were narrowed, not loosened in a way that admits a defect: each removal is recorded as a decision with the reason and the condition that would bring it back (`Tools/xtask/Spec.lean` D38, D39, D40), and the commits carried the `Verdict: user-approved` trailer the rule requires.
 
 ### Measurement
 
@@ -226,12 +226,12 @@ Alpha, cut on 2026-10-17 (UTC+8) as `v0.0.12-Alpha-261017`. The workspace manife
 - The test build takes the client bundle from a cache entry keyed by every file under `client/`, because two builds of one tree wrote the same 77 files byte for byte, and it starts from the target directory main left: `freshen.sh` dates every input whose content matches the manifest saved with the target before any build, so cargo reuses units instead of rebuilding the workspace on every run. Replaced cache entries and closed pull requests' entries are pruned, paginated, after each main run and once a day.
 - A render pass opens as many instrumented copies and browser profiles as the machine can draw, one per three processors; the swap test moves to a runner of its own; eslint runs with `--concurrency=auto`; and the two Zig leaves rebuild when their sources or pins change rather than whenever PATH changes, so a warm target is not thrown away because setup-zig unpacked into a new directory.
 - The dev profile writes no debug information, and the two `CARGO_PROFILE_*_DEBUG` settings that would have outranked it are gone: on one windows-msvc machine the workspace's own packages compiled from warm dependencies in 136 s against 158 s on four jobs, and `target/debug` fell from 8.08 GB to 6.45 GB (1.60 GB to 1.39 GB packed with zstd -3). The nextest archive does not shrink, because windows-msvc keeps debug information in `.pdb` files the archive does not carry.
-- `docnum` no longer holds the count of `#[test]` functions, which moved with almost every change that fixed a defect and which no interface reads; `length` no longer caps a source file's length, because the file budget forced splits that removed no defect; `modmap` no longer needs a row for a test module, while production modules stay a closed list (`crates/xtask/Spec.lean` D38, D39, D40).
+- `docnum` no longer holds the count of `#[test]` functions, which moved with almost every change that fixed a defect and which no interface reads; `length` no longer caps a source file's length, because the file budget forced splits that removed no defect; `modmap` no longer needs a row for a test module, while production modules stay a closed list (`Tools/xtask/Spec.lean` D38, D39, D40).
 - `comrak` moves to 0.56.0, which drops `jetscii` and the second `phf` pair and brings `memchr-n` and `fearless_simd`; the dependency count the documents quote moves with it. The advisories RustSec published on 2026-10-16 are cleared before this release: `rustls` moves to 0.23.46, `wasmtime` and `wasmtime-wasi` to 48.0.6 — the manifest floor and the Sandbox decision move with them — and `zip` moves from the yanked 8.6.0 to 9.0.4, whose `ZipFile::name` now returns a `Result` that `xtask`'s archive reader propagates. The patch-and-minor group, `keyring-core` and the GitHub actions are bumped by dependabot, and `taiki-e/install-action` reaches 2.87.28. The ACP v1 schema is re-read at the upstream commit the adapter is built against; the stable schema added opt-in notices and compaction and rejects malformed request fields, none of which the client offers.
 
 ### Contribution rules and documentation
 
-Issues now carry the label system of `.github/labels.yml` on four axes — type, area, aspect and status — and the three issue forms plus `issue-triage.yml` mark an issue arriving around the forms as untriaged, serialized per issue and removed on close ([`docs/CONTRIBUTING.md`](CONTRIBUTING.md)); `help wanted` now carries the maintainer's endorsement, so the issue itself is the specification and a pull request meeting its acceptance criteria is welcome. [`docs/CONTRIBUTING.md`](CONTRIBUTING.md#other-projects) states when a contribution may name another project, and the [Names, aliases and pins](ARCHITECTURE.md#names-aliases-and-pins) section records the scope of the alias doors and the verification contract of each identity. Interface documentation is now required at every visibility, and a reason is written once beside the code that enforces it; no comment or specification cites a plan label the tree does not contain, and the release gate refuses the `roadmap`-anchored spelling in a published file the way it refuses a numbered sitting. `AGENTS.md` asks for an issue's related history before acting on it, names the four counts every change is judged on, and exempts code that ships nowhere from the test rule while keeping the fixture tests of the gates under `crates/xtask/`.
+Issues now carry the label system of `.github/labels.yml` on four axes — type, area, aspect and status — and the three issue forms plus `issue-triage.yml` mark an issue arriving around the forms as untriaged, serialized per issue and removed on close ([`docs/CONTRIBUTING.md`](CONTRIBUTING.md)); `help wanted` now carries the maintainer's endorsement, so the issue itself is the specification and a pull request meeting its acceptance criteria is welcome. [`docs/CONTRIBUTING.md`](CONTRIBUTING.md#other-projects) states when a contribution may name another project, and the [Names, aliases and pins](ARCHITECTURE.md#names-aliases-and-pins) section records the scope of the alias doors and the verification contract of each identity. Interface documentation is now required at every visibility, and a reason is written once beside the code that enforces it; no comment or specification cites a plan label the tree does not contain, and the release gate refuses the `roadmap`-anchored spelling in a published file the way it refuses a numbered sitting. `AGENTS.md` asks for an issue's related history before acting on it, names the four counts every change is judged on, and exempts code that ships nowhere from the test rule while keeping the fixture tests of the gates under `Tools/xtask/`.
 
 ### Known and unfixed
 
@@ -250,12 +250,12 @@ Issues now carry the label system of `.github/labels.yml` on four axes — type,
 
 **sprawling 0.0.11 interlinked**
 
-Alpha, cut on 2026-10-09 (UTC+8) as `v0.0.11-Alpha-261009`. The workspace manifest carries 0.0.11; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.10-Alpha-261008`. The wire moves once, from WIRE_V 64 to 65, because frames changed shape in this release (`crates/wire/Spec.lean` D1): four local-only commands, three queries, the thinking offer and the model identity on each model, and `AgentLine`, which replaces the `harnesses` query and its `HarnessLine`. A city written by 0.0.10 opens unchanged, and the effort it stored in the Ledger, in `CONFIG.toml` and in git trailers keeps its meaning; 0.0.10 is not promised to read a Ledger that 0.0.11 has written, so keep the backup the [update guide](getting-started.md#updating) asks for before updating.
+Alpha, cut on 2026-10-09 (UTC+8) as `v0.0.11-Alpha-261009`. The workspace manifest carries 0.0.11; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.10-Alpha-261008`. The wire moves once, from WIRE_V 64 to 65, because frames changed shape in this release (`Sprawling/wire/Spec.lean` D1): four local-only commands, three queries, the thinking offer and the model identity on each model, and `AgentLine`, which replaces the `harnesses` query and its `HarnessLine`. A city written by 0.0.10 opens unchanged, and the effort it stored in the Ledger, in `CONFIG.toml` and in git trailers keeps its meaning; 0.0.10 is not promised to read a Ledger that 0.0.11 has written, so keep the backup the [update guide](getting-started.md#updating) asks for before updating.
 
 ### Behaviour changes
 
 - **The terminal is the city's console.** `sprawling up <dir>`, and the release archive's launcher, open the page in the browser and turn the terminal into the quiet host, which shows two lines, the address and a pairing code, plus at most one transient line for a remote-door confirmation code or the progress of closing. Enter in the quiet host opens the page again, and Esc turns the terminal into the CLI: one header line with the city's folder, the room you speak to and the address, then a prompt where you write to that room or type a slash command; `/web` opens the page again and returns to the quiet host. `sprawling` with no command opens on the CLI and opens no browser until `/web`. `sprawling serve` has no console unless given `--console`, and `--no-console` leaves the terminal out on any entrance. The terminal no longer prints one line per committed record, and diagnostic lines go to stderr only when the terminal is not the console.
-- **The terminal is told what the city is doing.** In the CLI and the quiet host the city reports its state to the terminal in the Program Status Protocol (OSC 7501, revision 0.3): `blocked` with `kind=permission` while a request waits for an answer, `working` while a run is going, and otherwise `done`, `error` or `idle` after how the last run ended, as one record for the whole city with `app=sprawling`. The console reads the counts again from `Query::Metrics` when it opens, when it changes face and when a run starts or freezes or a request is asked or answered; it writes a report only when it differs from the last, carries counts in `msg` and never a word from a record, and writes `state=clear` before it hands the terminal back. It sends no support query, because the console's input reader does not parse an OSC reply and would type it into the prompt; the protocol lets a program report without one, and a terminal that does not know the sequence ignores it. On Windows the report is a crossterm command, so a console without virtual-terminal sequences writes nothing, and the system ConPTY passes the report on to the terminal unchanged. `SPRAWLING_PROGRAM_STATUS=never` turns it off; a city served without a terminal reports nothing (`crates/sprawling/spec/Console/ProgramStatus.lean` D77).
+- **The terminal is told what the city is doing.** In the CLI and the quiet host the city reports its state to the terminal in the Program Status Protocol (OSC 7501, revision 0.3): `blocked` with `kind=permission` while a request waits for an answer, `working` while a run is going, and otherwise `done`, `error` or `idle` after how the last run ended, as one record for the whole city with `app=sprawling`. The console reads the counts again from `Query::Metrics` when it opens, when it changes face and when a run starts or freezes or a request is asked or answered; it writes a report only when it differs from the last, carries counts in `msg` and never a word from a record, and writes `state=clear` before it hands the terminal back. It sends no support query, because the console's input reader does not parse an OSC reply and would type it into the prompt; the protocol lets a program report without one, and a terminal that does not know the sequence ignores it. On Windows the report is a crossterm command, so a console without virtual-terminal sequences writes nothing, and the system ConPTY passes the report on to the terminal unchanged. `SPRAWLING_PROGRAM_STATUS=never` turns it off; a city served without a terminal reports nothing (`Sprawling/app/spec/Console/ProgramStatus.lean` D77).
 - **`/quit` closes the city.** `/quit` is the one way to close it, typed in the CLI or on a page of a city served on loopback; a device paired through the remote door is refused it, and closing the browser closes nothing. With runs going it asks once, Enter to wait for them, `n` to stop them now at their next safe point, Esc to keep serving, and a second `/quit` while waiting stops them. Stopping now waits at most four seconds; a run that has not reached a safe point by then is left open, the city exits without writing its handoff, and the next `serve` freezes the runs it left open before it reads any command. A page whose city has closed says so and offers no retry: start the city again in a terminal and reload the page. A page sends the new local-only command `close_city { mode: drain | interrupt }`, which the city's own listener carries out only while it is bound to loopback.
 - **Ctrl keys belong to the terminal.** The CLI binds no Ctrl chord. Ctrl+C copies the selected text, and a Ctrl+C that reaches the city does nothing except remind you, once per session, that copying needs a selection and `/quit` closes the city; Ctrl+V pastes. Ctrl+C no longer stops an interactive city. Esc closes a menu, else clears the line, else interrupts the current room's run. A line ending in `\` followed by Enter starts a new line on every platform, as does Shift+Enter where the terminal reports it; Alt+Backspace and Alt+Left/Right edit by word, and Home, End and the arrows always work; `y` and `n` answer a waiting question on an empty line. Tab completes the argument of `/model` and `/effort` from the current offers. Signals stay for services and harnesses: SIGINT closes a city that has no console, SIGTERM and, on Windows, Ctrl+Break close any city, and losing the terminal or receiving SIGTERM stops the runs at their next safe point and closes within four seconds. One-time notices of the core priority, the CPU placement and the monitor's beat go to the log lens while the console holds the terminal.
 - **The loopback port now needs pairing or the key file.** Every caller of `127.0.0.1` presents a credential, as a caller from outside always had to. The browser `/web` or `up` opens pairs without typing; another browser types the pairing code the terminal shows; a browser that worked with 0.0.10 pairs once more. `sprawling call`, `dispatch`, `gauge` and `enrol` read the key file the city writes for its port in the per-user runtime directory when `--at` names a loopback address or `localhost`, so scripts that use them need no change; for any other host they need `--token` and exit with 2 without it, so a mistyped host never receives this machine's key. A script, an editor or a tool that opened `ws://127.0.0.1:<port>/ws` or posted to `/acp`, `/drop`, `/enroll` or `/transcribe` without a credential is now refused: it reads the key file and sends its contents as the `hello` token or as `Authorization: Bearer`, or it goes through `sprawling call`.
@@ -265,7 +265,7 @@ Alpha, cut on 2026-10-09 (UTC+8) as `v0.0.11-Alpha-261009`. The workspace manife
 
 ### Security
 
-The local listener decides each request in layers, before any credential is read: a `Host` that is not one of the listener's own names is refused, which stops DNS rebinding; a WebSocket upgrade or POST whose `Origin` is not one of the listener's own origins, port included, or is `null`, is refused with 403 before the upgrade, and a listener on every interface admits only the origin of the host the request was sent to; a `Sec-Fetch-Site` that is present and not `same-origin` is refused; a CORS preflight is refused, and no response carries `Access-Control-*`. `ListenerOrigins` is computed once from the bound address and read by these checks and by the address the terminal shows. The remote door's listener is judged by the same decision with a list of its own, computed when the door opens: the three loopback names and the public name of the route, whose `https://` address is the one origin it admits, so a page of another site is refused with 403 before the upgrade to the door's pairing and session sockets; a native client that sends no `Origin` still reaches the device-key handshake, which remains the door's authentication (`crates/wire/spec/Reception/Entry.lean` D56). A listener beyond loopback with no `SPRAWLING_PAIRING_TOKEN` mints a key for that serve instead of refusing to start.
+The local listener decides each request in layers, before any credential is read: a `Host` that is not one of the listener's own names is refused, which stops DNS rebinding; a WebSocket upgrade or POST whose `Origin` is not one of the listener's own origins, port included, or is `null`, is refused with 403 before the upgrade, and a listener on every interface admits only the origin of the host the request was sent to; a `Sec-Fetch-Site` that is present and not `same-origin` is refused; a CORS preflight is refused, and no response carries `Access-Control-*`. `ListenerOrigins` is computed once from the bound address and read by these checks and by the address the terminal shows. The remote door's listener is judged by the same decision with a list of its own, computed when the door opens: the three loopback names and the public name of the route, whose `https://` address is the one origin it admits, so a page of another site is refused with 403 before the upgrade to the door's pairing and session sockets; a native client that sends no `Origin` still reaches the device-key handshake, which remains the door's authentication (`Sprawling/wire/spec/Reception/Entry.lean` D56). A listener beyond loopback with no `SPRAWLING_PAIRING_TOKEN` mints a key for that serve instead of refusing to start.
 
 No credential is a cookie. A browser generates a non-exportable Ed25519 device key in the listener's own origin storage and signs a challenge for a session token that lives only in the page's memory (`POST /pair`, `POST /session/challenge`, `POST /session`). `/web` delivers a one-time open code through a file in the per-user runtime directory readable only by the User's account, the page removes the code from the address bar, and the city deletes the file once the code is redeemed or two minutes pass, and removes such files older than that when it starts; the terminal's address carries no secret. A session token is good while a socket holds it and for 60 seconds after the last one closes. A city served without a console prints no pairing code in its banner, which is usually kept as a log, and a key it minted is printed on a line of its own there and on the quiet host's second line, never inside an address. The pairing code has eight symbols and takes one guess, right or wrong, with at most one guess judged per second across the listener. Native clients read a per-port key file in the per-user runtime directory, written through a temporary file and a rename, readable only by the User's account, deleted when the city closes in order, and never put in the environment or the Ledger; the remote relay receives that key in process. Paired browsers keep only their public keys, in the city's `.sprawling/`, and settings lists and forgets them. Every listener answers with one header set: a Content Security Policy with `connect-src 'self'`, `frame-ancestors 'none'`, `object-src 'none'` and `base-uri 'none'`, and `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy: no-referrer`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy`; responses that are not static assets carry `Cache-Control: no-store`.
 
@@ -324,17 +324,17 @@ The Chinese README and the Chinese getting-started guide call the City 城市 th
 
 **sprawling 0.0.10 innocent**
 
-Alpha, cut on 2026-10-08 (UTC+8) as `v0.0.10-Alpha-261008`. The workspace manifest carries 0.0.10; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.9-Alpha-261004`. The wire moved from WIRE_V 56 to 64, once for each push in which its shape changed (`crates/wire/Spec.lean` D1): 57 when a doctor report's sandbox arm gained `macos_seatbelt`, 58 when a provider endpoint began to carry an ordered account list, 59 when the person's preferences gained the performance group and the release answer lost the Homebrew origin, 60 when the settings page began to read an endpoint's stored keys, tuning and the city's `[search]` back, 61 with the `ForgetSecret` command, 62 when the body size lost its upper bound, 63 with the privacy query and operation frames, and 64 when the appearance preference gained the reading face. `EVENT_LOG_V` stays at 2: a line written by 0.0.9 reads unchanged. A city written by 0.0.9 opens without conversion: its views and standing are folded again from the start of the Ledger on the first open, because the snapshot format changed; provider keys 0.0.9 stored in the vault are used as they are; and the personal configuration is read without being rewritten ([updating](getting-started.md#updating)).
+Alpha, cut on 2026-10-08 (UTC+8) as `v0.0.10-Alpha-261008`. The workspace manifest carries 0.0.10; `kernel::release::MATURITY` owns maturity, and the release workflow supplies the tag to a released binary. It records what landed after `v0.0.9-Alpha-261004`. The wire moved from WIRE_V 56 to 64, once for each push in which its shape changed (`Sprawling/wire/Spec.lean` D1): 57 when a doctor report's sandbox arm gained `macos_seatbelt`, 58 when a provider endpoint began to carry an ordered account list, 59 when the person's preferences gained the performance group and the release answer lost the Homebrew origin, 60 when the settings page began to read an endpoint's stored keys, tuning and the city's `[search]` back, 61 with the `ForgetSecret` command, 62 when the body size lost its upper bound, 63 with the privacy query and operation frames, and 64 when the appearance preference gained the reading face. `EVENT_LOG_V` stays at 2: a line written by 0.0.9 reads unchanged. A city written by 0.0.9 opens without conversion: its views and standing are folded again from the start of the Ledger on the first open, because the snapshot format changed; provider keys 0.0.9 stored in the vault are used as they are; and the personal configuration is read without being rewritten ([updating](getting-started.md#updating)).
 
 ### Behaviour changes
 
 - `/clear` is removed. `/new` is the only verb that replaces the session in a room, and `/new --carry` brings the room's `Handoff.md`; branching is a separate feature and keeps `/fork`, the fork key on each entry and the mailbox's fork entry (`client/Spec.lean` D44).
-- There is no default per-run memory ceiling. A run's commands get one only when the person enters a number of bytes under Settings → Performance and chooses `[core] placement = "soft_shares"` ("soft with memory ceiling"); an empty field means no ceiling. All commands of one run share it; Windows jobs and delegated Linux cgroups enforce it, and macOS does not. When a command reaches the ceiling, or the ceiling could not be applied or read back, the command's result and the monitor and inspector terminals say so instead of passing silently (`crates/runtime/spec/Tools/Exec.lean` D95).
+- There is no default per-run memory ceiling. A run's commands get one only when the person enters a number of bytes under Settings → Performance and chooses `[core] placement = "soft_shares"` ("soft with memory ceiling"); an empty field means no ceiling. All commands of one run share it; Windows jobs and delegated Linux cgroups enforce it, and macOS does not. When a command reaches the ceiling, or the ceiling could not be applied or read back, the command's result and the monitor and inspector terminals say so instead of passing silently (`Sprawling/runtime/spec/Tools/Exec.lean` D95).
 - Action shortcuts that were single keys now hold the accelerator (Ctrl, or ⌘ on a Mac): Ctrl+Shift+F forks from the entry under the pointer (was `f`); Ctrl+Shift+Y, Ctrl+Shift+E and Ctrl+Shift+X answer the decide card that holds the focus (were `y`, `e` and `n`; refusing moved to X because Ctrl+N opens a browser window before the page hears it); Ctrl+\ changes how much of the city the page draws (was `\`); and Ctrl+/ opens the key list (was `?`). `/` stays a single key, because it only moves the focus into the box. A letter typed while the focus is outside the box therefore changes nothing (`client/src/core/keys.ts`).
 - The read-only view of an earlier session no longer draws a "continue from its end" button. Going on from an earlier session is a branch: use the fork key on one of its entries or the mailbox's fork entry.
 - sprawling is not distributed through Homebrew: no tap is published, and the update check recognises no Homebrew install. On macOS, install through npm, Bun, crates.io, the shell installer or the release archive.
 - A plaintext credential written by hand into an `[[mcp]]` row of `CONFIG.toml` is now refused when the file is read; see Configuration below for the rule and the recovery.
-- The default body size is 15 px instead of 14 px. The smallest accepted size stays 12 px, and there is no upper bound any more (`wire::BODY_PX_MIN`, `crates/wire/spec/Preference.lean` D51).
+- The default body size is 15 px instead of 14 px. The smallest accepted size stays 12 px, and there is no upper bound any more (`wire::BODY_PX_MIN`, `Sprawling/wire/spec/Preference.lean` D51).
 
 ### Main input area and settings
 
@@ -344,15 +344,15 @@ Settings gains a Performance group: CPU placement (`none`, `soft`, `soft_shares`
 
 The client's stylesheet `client/src/theme.css` is now an entry that imports its parts from `client/src/theme/`, one part for each owner: the token tables, the light block and the person's choices, the surfaces, the motion vocabulary, the base layer, and the parts a screen owns.
 
-The appearance group offers a reading face for running text: conversation messages, documents and reports. Geist Mono stays the default face for the whole interface. The second choice is the serif face [Libron](https://github.com/nicoverbruggen/libron), shipped like Geist Mono as web font files with its SIL Open Font License beside them in `client/src/fonts/` (`docs/third-party.md` §4); controls, labels, figures, code, paths and commands stay in Geist Mono. No Chinese face is bundled: Chinese text in the reading face falls back to the machine's own `serif` face. The choice is the new `reading` field of the person's appearance preference, and a preference written by 0.0.9 reads as the default face (`crates/wire/spec/Preference.lean` D52).
+The appearance group offers a reading face for running text: conversation messages, documents and reports. Geist Mono stays the default face for the whole interface. The second choice is the serif face [Libron](https://github.com/nicoverbruggen/libron), shipped like Geist Mono as web font files with its SIL Open Font License beside them in `client/src/fonts/` (`docs/third-party.md` §4); controls, labels, figures, code, paths and commands stay in Geist Mono. No Chinese face is bundled: Chinese text in the reading face falls back to the machine's own `serif` face. The choice is the new `reading` field of the person's appearance preference, and a preference written by 0.0.9 reads as the default face (`Sprawling/wire/spec/Preference.lean` D52).
 
 The client's controls are now split into a seat and a look (`client/Spec.lean` D95). The seat is the file callers import: it owns the wiring to the city, the state, the keys and the focus, and hands each operable element to the look as a wire bag that carries its role, `aria-*` values, tab stop and handlers. The look is markup and a `<style>` block only; it reads colour and motion from the theme's tokens and imports nothing from the client's core, which eslint refuses. A person can therefore replace a look with a component of another UI library, or change its colours and motion, without losing the wiring or the alignment, which belongs to the screen that places it. `just swap` proves it: it builds the client with the replacement looks under `client/swap/` in place of the shipped ones, then runs the type check, the wiring tests and `cargo xtask render` on that build, and `ci.yml` runs it in the gates job. `cargo xtask render` also reads a roster of parts and fails when a look drops the role its contract requires. [Seats and looks](frontend-method.md#seats-and-looks) explains how to write a replacement. The split also adjusted details on the way: transitions arrive and leave on the theme's curves, one hover vocabulary is defined (rows on `wash`, controls on `raised`), copying to the clipboard has one part that reports a failed write, and the fork entry reads as a branch from a turn.
 
 ### Privacy
 
-`sprawling privacy status` prints the privacy history summary as one JSON line. It discloses a summary only after the live Windows identity matches the owner bound in the platform vault, and a missing, locked or mismatched binding is refused with its own recovery (`crates/sprawling/spec/Privacy/Cli.lean` D54).
+`sprawling privacy status` prints the privacy history summary as one JSON line. It discloses a summary only after the live Windows identity matches the owner bound in the platform vault, and a missing, locked or mismatched binding is refused with its own recovery (`Sprawling/app/spec/Privacy/Cli.lean` D54).
 
-On Windows, the settings page has a privacy group with 88 optional privacy controls in nine categories, from diagnostic data and speech input to app permissions and Windows AI features. Each control is one host setting: 74 machine registry values, 8 user registry values, 2 user environment variables and 4 scheduled tasks (`bin::privacy::controls`, `crates/sprawling/spec/Privacy/Controls.lean`). For each one the page shows its current value, the value it would write, its scope, what it changes and what stops working when it is applied, and, where Microsoft states it, which Windows editions honour it. Nothing is applied by default and there is no "apply all". A person applies or restores one control at a time, after a confirmation that binds the value the page showed; if the value on the machine changed meanwhile, the operation is refused. A machine-scope write goes through a UAC prompt. Every write is read back: when the read-back value is not the written one, the original value is written back, and when that also fails, the control stays unsettled until the person checks it (`crates/sprawling/spec/Privacy.lean`). The original value is recorded before the first write, so each control can be restored to it, and "restore all" restores the controls one by one. Of the 52 items of the original request list, 39 map to controls; the other 13 are listed with the reason they are not written (absent, obsolete, undeterminable, or needing an operation kind this version lacks). The page answers only on the machine that runs the city; a paired remote device is refused. These controls are choices about privacy, not security: many of them cost convenience, and each one shows that cost so the person can weigh it. Real writes of every operation kind were applied and restored on disposable Windows runners, never on a person's machine.
+On Windows, the settings page has a privacy group with 88 optional privacy controls in nine categories, from diagnostic data and speech input to app permissions and Windows AI features. Each control is one host setting: 74 machine registry values, 8 user registry values, 2 user environment variables and 4 scheduled tasks (`bin::privacy::controls`, `Sprawling/app/spec/Privacy/Controls.lean`). For each one the page shows its current value, the value it would write, its scope, what it changes and what stops working when it is applied, and, where Microsoft states it, which Windows editions honour it. Nothing is applied by default and there is no "apply all". A person applies or restores one control at a time, after a confirmation that binds the value the page showed; if the value on the machine changed meanwhile, the operation is refused. A machine-scope write goes through a UAC prompt. Every write is read back: when the read-back value is not the written one, the original value is written back, and when that also fails, the control stays unsettled until the person checks it (`Sprawling/app/spec/Privacy.lean`). The original value is recorded before the first write, so each control can be restored to it, and "restore all" restores the controls one by one. Of the 52 items of the original request list, 39 map to controls; the other 13 are listed with the reason they are not written (absent, obsolete, undeterminable, or needing an operation kind this version lacks). The page answers only on the machine that runs the city; a paired remote device is refused. These controls are choices about privacy, not security: many of them cost convenience, and each one shows that cost so the person can weigh it. Real writes of every operation kind were applied and restored on disposable Windows runners, never on a person's machine.
 
 ### Model providers and search
 
@@ -382,7 +382,7 @@ Windows run jobs apply the selected processor affinity. JSONL preallocation read
 
 The existing container command path preserves the configured engine, encodes a single Podman entrypoint and refuses non-UTF8 arguments instead of changing them silently. Configuration, native-platform mechanisms and lifecycle guarantees are described in [operating](operating.md#how-exec-is-confined) according to the shipped implementation.
 
-On Windows, explicitly selected native confinement (AppContainer with a Job Object) passes the six child-process regressions and the PowerShell and toolchain checks on disposable runners, and the MSVC toolchain is found outside the container. Windows still defaults to the copied working tree until `crates/runtime/spec/Tools/Exec/NativeWindows.lean` D59 is settled.
+On Windows, explicitly selected native confinement (AppContainer with a Job Object) passes the six child-process regressions and the PowerShell and toolchain checks on disposable runners, and the MSVC toolchain is found outside the container. Windows still defaults to the copied working tree until `Sprawling/runtime/spec/Tools/Exec/NativeWindows.lean` D59 is settled.
 
 ### Distribution and verification
 
@@ -390,9 +390,9 @@ Release archives keep ZIP with Deflate level 9, with archive suffixes and platfo
 
 The repository Nix flake builds the browser client before Rust and includes the shipped skills and licences. The flake is the only Nix distribution path; sprawling is not submitted to nixpkgs. Windows resource generation reads Cargo package metadata for the product and file version. Build provenance, archive checksums and OS code signing are separate facts.
 
-The static Linux archive stays linked with musl-gcc, which produces a static PIE; cargo-zigbuild produced a binary without PIE, and its release build took 9-27 s longer on GitHub's hosted Ubuntu runner (`crates/sprawling/spec/Install.lean` D57). `rust-version` stays 1.97, and a nightly `msrv` job in `platforms.yml` builds the workspace with exactly that compiler.
+The static Linux archive stays linked with musl-gcc, which produces a static PIE; cargo-zigbuild produced a binary without PIE, and its release build took 9-27 s longer on GitHub's hosted Ubuntu runner (`Sprawling/app/spec/Install.lean` D57). `rust-version` stays 1.97, and a nightly `msrv` job in `platforms.yml` builds the workspace with exactly that compiler.
 
-`ci.yml` runs the test suite in four slices balanced on measured nextest time, and checks before the slices start that every test belongs to exactly one of them; a run starts 16 jobs, 7 of them on Windows, where it started 31, 23 of them on Windows. On the Windows runners Cargo's home sits on the work drive, and the test archive links with rust-lld: on a warm cache its compile took 171 s and 194 s in two runs, against 201 s with link.exe, on GitHub's hosted Windows runner. A released binary is still linked with link.exe (`crates/xtask/Spec.lean` D27). A release is published only when every slice of its own `ci.yml` run passed, so a slice that failed, was cancelled or never started stops it.
+`ci.yml` runs the test suite in four slices balanced on measured nextest time, and checks before the slices start that every test belongs to exactly one of them; a run starts 16 jobs, 7 of them on Windows, where it started 31, 23 of them on Windows. On the Windows runners Cargo's home sits on the work drive, and the test archive links with rust-lld: on a warm cache its compile took 171 s and 194 s in two runs, against 201 s with link.exe, on GitHub's hosted Windows runner. A released binary is still linked with link.exe (`Tools/xtask/Spec.lean` D27). A release is published only when every slice of its own `ci.yml` run passed, so a slice that failed, was cancelled or never started stops it.
 
 A fault-injection run of the release workflow on a throwaway branch checked that rule: a stand-in publish step ran when every slice passed, and was skipped when one slice failed, when a test was left out of every slice (the coverage check in the test build named the unassigned tests), and when a slice was cancelled. A whole `ci.yml` run took 557 s of wall clock on GitHub's hosted runners with a warm cache, against 650 s before the cache and toolchain changes ([run 37539251320](https://github.com/2youg1/sprawling-agents/actions/runs/37539251320)).
 
@@ -431,7 +431,7 @@ means usable: a User can hand the city real work, and
 data formats, the wire and the screens may still change between versions. It
 records what landed after `v0.0.8-Pre-alpha-261002`. The wire moved from
 WIRE_V 46 to 56, once for each push in which its shape changed
-(`crates/wire/Spec.lean` D1): 47 when sessions began to carry a display name
+(`Sprawling/wire/Spec.lean` D1): 47 when sessions began to carry a display name
 and their last run, together with the harness states, registry lines, the
 doctor's scanning answer, the sandbox arm names and a colour theme; 48 when
 an endpoint's tuning gained `max_in_flight`; 49 when `RunSummary` gained
@@ -463,7 +463,7 @@ written by 0.0.8 reads unchanged.
   begin `city:`, and a fork replays a recorded steer through the same
   renderer. A property test over generated bodies, a newline followed by
   `user: …` and `</letter>` among them, failed before the change and passes after it
-  (collab D16, `crates/runtime/spec/Conversation.lean`).
+  (collab D16, `Sprawling/runtime/spec/Conversation.lean`).
 - A delegated task names who handed it down. JOB.md gains a `<from>` element
   ("the User", "the city", or "@room, run …"), the task and the goal sit
   escaped inside their own elements, and the opening line says
@@ -504,7 +504,7 @@ written by 0.0.8 reads unchanged.
   `took_us`: whole microseconds read off the turn's monotonic clock, beside
   the millisecond moments the envelope already had. A line written before
   these keys existed has none of them, and a reader falls back to the
-  difference of the two moments (`crates/kernel/spec/Event/Record.lean` D20).
+  difference of the two moments (`Sprawling/kernel/spec/Event/Record.lean` D20).
 - Seven new kinds, 96 in all: `run_policy_changed`, `session_named`,
   `skill_audited`, `signal_wait_started`, `signal_wait_ended`,
   `signal_landed` and `skill_shelved`.
@@ -545,7 +545,7 @@ written by 0.0.8 reads unchanged.
   freezes, is cancelled, or writes a carrier event. A power cut at any line
   leaves a prefix of the run with no write ahead of its intent, and the
   count and the cut are the same on Windows, macOS and Linux, where the
-  barrier is `File::sync_data` (`crates/runtime/spec/Turn/Durability.lean`
+  barrier is `File::sync_data` (`Sprawling/runtime/spec/Turn/Durability.lean`
   D36).
 - A checkpoint takes no lock across runs: each run stages into an index of
   its own, a city gets one base however many writers race, and the first base
@@ -716,7 +716,7 @@ digest and machine class. These readings are owed and not stated here:
   the PGO build run from `on-demand.yml`.
 - The spec gate counts unresolved Rust paths and stateless state-machine
   parts as ratchets, and xtask keeps no public-API baseline.
-- The shipped skills live in `crates/city/skills/`, and the city crate
+- The shipped skills live in `Sprawling/city/skills/`, and the city crate
   embeds them.
 - `on-demand.yml -f job=fresh` walks this tree's release archive from
   install to the first dispatch on Windows, macOS and Linux runners, with
@@ -732,7 +732,7 @@ digest and machine class. These readings are owed and not stated here:
   (TP3).
 - Text a User or a model reads says User for the person who owns the city.
 - `on-demand.yml -f job=mutants-modules` scores five modules against their
-  mutation rows in `crates/xtask/budgets.toml`, and the diff job takes any
+  mutation rows in `Tools/xtask/budgets.toml`, and the diff job takes any
   base. Kernel and `storage::jsonl` sit below their rows; the survivors are
   listed for the next round.
 - The page marks the User's key interactions as User Timing entries, so a
@@ -790,7 +790,7 @@ digest and machine class. These readings are owed and not stated here:
 
 - Sandbox arms are named `none`, `copied_tree`, `native`, `container` and
   `python` on every platform, and each platform's default is one column of
-  `crates/wire/spec/Answer/Doctor.lean` D26: `native` on Windows (Job Object
+  `Sprawling/wire/spec/Answer/Doctor.lean` D26: `native` on Windows (Job Object
   with AppContainer) and Linux (`bwrap`), `copied_tree` on macOS. Until that
   arm lands, every platform resolves `copied_tree`, or `native` on Linux
   where `bwrap` is present.
@@ -835,7 +835,7 @@ digest and machine class. These readings are owed and not stated here:
 
 Pre-alpha. It records what landed in the repository after
 `v0.0.7-Pre-alpha-260927`. WIRE_V 46. The version moves at most once between
-two pushes, at the first change of shape (`crates/wire/Spec.lean` D1), so in
+two pushes, at the first change of shape (`Sprawling/wire/Spec.lean` D1), so in
 this release it moved twice: to 45 when a turn and a call began to carry when
 the reply's first content arrived, and to 46 when the person's preferences
 began to keep session tags. Every other wire change below shares one of those
@@ -1294,7 +1294,7 @@ repository root, and no `-SPEC.md` file is left. Each entry file has
 seventeen sections. A decision is a `D<n>` comment above the declaration it
 governs, and the comments are in Chinese with concept names in English. The
 design models moved from the adversary into the crates they specify, and
-`crates/adversary/` now holds only the checker. The client's interaction
+`Tools/adversary/` now holds only the checker. The client's interaction
 contracts are state machines with proofs. How a screen looks is now described
 in English in `docs/frontend-method.md`, under the labels the code cites.
 
@@ -1328,17 +1328,17 @@ show this part yet.
   new. The development-only `xtask`, `citysim`, `adversary`, `fixtures`
   and `fuzz` live beside the product packages under `crates/`; `docs/` and `skills/` each
   have a README.
-- `crates/desktop` is a workspace member. The four groups of Win32 calls
+- `Sprawling/desktop` is a workspace member. The four groups of Win32 calls
   with no safe interface — enumeration, capture, the clipboard and DPI
-  awareness — go through a Zig leaf behind `crates/desktop/ffi`, the one
-  crate with a lint table of its own, and `crates/desktop/src` holds no
+  awareness — go through a Zig leaf behind `Sprawling/desktop/ffi`, the one
+  crate with a lint table of its own, and `Sprawling/desktop/src` holds no
   production `unsafe`. Zig is in the develop tier at the version
-  `crates/desktop/ffi/zig-version` pins, and `header`, `length` and `modmap`
+  `Sprawling/desktop/ffi/zig-version` pins, and `header`, `length` and `modmap`
   read `.zig` files.
 - Every product package can be published. The `packaged` gate refuses a
   package that compiles a file from outside its own directory, and `guard`
   pins every workspace package to the workspace version. `sandbox` is a
-  default feature, the client bundle is built into `crates/sprawling/web-dist`,
+  default feature, the client bundle is built into `Sprawling/app/web-dist`,
   and the templates a city writes live in the city package.
 - The maturity has one definition, `kernel::release::MATURITY`. The tag, the
   status line, both READMEs and this file render it from there.
@@ -1350,7 +1350,7 @@ show this part yet.
 - The client's runtime list adds the five CodeMirror packages, `pdfjs-dist`,
   `docx-preview`, `@noble/post-quantum`, `@lucide/svelte` and `katex`, each
   pinned exactly. The READMEs and `AGENTS.md` point to the list in
-  `crates/xtask/src/npm.rs` instead of copying it.
+  `Tools/xtask/src/npm.rs` instead of copying it.
 - `just shots` renders every page at 1440 and 1920 px, dark and light, for a
   person to look through.
 - A build with no pinned toolchain installs the stable Lean and winget's
@@ -1360,7 +1360,7 @@ show this part yet.
 
 - The city's remote key lives only as long as the process, so every device
   pairs again after the city restarts. Keeping it needs a decision about
-  where the seed lives, and `crates/remote_access/Spec.lean` §3 sets out the
+  where the seed lives, and `Sprawling/remote_access/Spec.lean` §3 sets out the
   three options. No test opens the Cloudflare route on a real tunnel.
 - A harness resident gets none of the city's tools and none of the
   building's MCP servers, and a steer sent during its turn is recorded but
@@ -1436,13 +1436,13 @@ rather than a component tree. The client speaks only the WebSocket protocol in
   chained line of a kind this build ignores is accepted by both. (crates/memory/src/chain_audit.rs:64)
 - A ledger payload may nest 126 levels. The writer refuses deeper, where it
   used to write a line that replay then refused, and depth is judged before the
-  float scan walks the value. (crates/kernel/src/event/payload.rs:22)
+  float scan walks the value. (Sprawling/kernel/src/event/payload.rs:22)
 - The whole chain is audited segment by segment in constant memory, and a
   broken chain stops the writer: every later command is refused with the
   audit's own error. (crates/memory/src/chain_audit.rs:68)
 - A served city runs that audit in the background, beside the writer rather
   than in front of it; an audit that cannot read the ledger stops the writer
-  the same way. (crates/sprawling/src/assembly/chain_watch.rs:27)
+  the same way. (Sprawling/app/src/assembly/chain_watch.rs:27)
 - The views start from a snapshot of themselves. The snapshot is written whole
   (staged, synced, renamed), fits only the line it was cut at, and a damaged or
   mismatched one falls back to a fold from the first line, so losing it costs
@@ -1451,44 +1451,44 @@ rather than a component tree. The client speaks only the WebSocket protocol in
   chain before they trust one. (crates/memory/src/snapshot/start.rs:59)
 - Startup folds stream the history one segment at a time and build the ledger
   index in the same pass, where they used to hold every raw line and every
-  record at once. (crates/sprawling/src/assembly/folds.rs:93)
+  record at once. (Sprawling/app/src/assembly/folds.rs:93)
 - The ledger index holds one 64-bit word per line, the seq implied by its
   place. (crates/memory/src/index/fold/entries.rs:12)
 - What opening a ledger cut from a torn tail reaches the person: `resume`
-  prints it and `serve` writes it to stderr. (crates/sprawling/src/assembly/lifetime.rs:56)
+  prints it and `serve` writes it to stderr. (Sprawling/app/src/assembly/lifetime.rs:56)
 
 ### A run reads and writes only where it may
 
 - The read bound has one judgement, `kernel::address::may_read`: a run's own
   building is open, another building is open unless its rules say
   confidential, and a building whose rules do not read is closed. `read`,
-  `search` and the transcripts they reach all ask it. (crates/kernel/src/address.rs:184)
+  `search` and the transcripts they reach all ask it. (Sprawling/kernel/src/address.rs:184)
 - A link or junction is judged where it lands, so a link from an open building
   into a confidential one, into `.sprawling`, or out of the city reads
   nothing. A search that meets a link it cannot resolve says so, and a search
   from the city root names a building whose rules could not be read instead of
-  passing it over as empty. (crates/runtime/src/tools/chosen_path.rs:102)
+  passing it over as empty. (Sprawling/runtime/src/tools/chosen_path.rs:102)
 - `.git` is protected metadata beside `.sprawling`, matched in any letter
-  case, and no write passes through a link. (crates/kernel/src/address.rs:40)
+  case, and no write passes through a link. (Sprawling/kernel/src/address.rs:40)
 - A run that took in outside content — a web page, an MCP answer, the
   person's own browser — carries that taint to the command door, and `exec`
   from it is refused with `E_TAINTED_ACTION`. The taint is labelled with where
-  it came from. (crates/kernel/src/error/code.rs:160)
+  it came from. (Sprawling/kernel/src/error/code.rs:160)
 - A provider key pasted into a dispatch, or written by a resident through
   `edit`, goes to the vault; the text, the request, the ledger and `JOB.md`
-  keep a `secret:pasted/...` reference. (crates/sprawling/src/assembly/dispatching/custody.rs:19)
+  keep a `secret:pasted/...` reference. (Sprawling/app/src/assembly/dispatching/custody.rs:19)
 - The same custody covers the arguments and results of every tool on the
-  bench. (crates/sprawling/src/assembly/workbench/tools/kept.rs:63)
+  bench. (Sprawling/app/src/assembly/workbench/tools/kept.rs:63)
 - A credential written into an endpoint's `base_url`, as `user:key@` or in the
-  query, is refused before it reaches the ledger. (crates/gateway/src/router/normalise.rs:191)
+  query, is refused before it reaches the ledger. (Sprawling/gateway/src/router/normalise.rs:191)
 - A pull request merge refuses with `E_VERSION_CONFLICT`, naming every path,
   when it would overwrite an uncommitted change in the city folder. It used to
   replace the person's edit without a record. (crates/memory/src/error.rs:85)
 - A background command's output returns only to the run that started it; the
   next run to call `exec` no longer receives another run's stdout. When a run
-  ends, the commands it left running are terminated. (crates/runtime/src/backlog.rs:107)
+  ends, the commands it left running are terminated. (Sprawling/runtime/src/backlog.rs:107)
 - A run's `RULES.toml` is read once while the file's stamp holds, instead of
-  once per path per call. (crates/city/src/policy/cache.rs:6)
+  once per path per call. (Sprawling/city/src/policy/cache.rs:6)
 - An export carries the city's git history as a pack, and a restore rebuilds
   the repository from it. A v0.0.6 bundle, which copied `.git` whole, restores
   as history too; a bundle whose `.git` borrows objects through `alternates` or
@@ -1503,111 +1503,111 @@ rather than a component tree. The client speaks only the WebSocket protocol in
 ### Providers fail the way they failed
 
 - 408, 429 and every 5xx are asked again; other refusals are final. The
-  recovery sentence is derived from the same classification. (crates/gateway/src/endpoint/failure.rs:153)
+  recovery sentence is derived from the same classification. (Sprawling/gateway/src/endpoint/failure.rs:153)
 - A retriable failure waits before the next try: 500 ms, doubled for each
   failure in a row, capped at 60 s, and reset by the first answered turn. A
-  halt reaches a run while it waits. (crates/runtime/src/watchdog.rs:165)
+  halt reaches a run while it waits. (Sprawling/runtime/src/watchdog.rs:165)
 - A provider that names its wait (`retry-after`) is not asked sooner, and each
   run backs off on its own jittered schedule, so runs cut by one outage do not
-  all ask again in step. (crates/gateway/src/endpoint/failure.rs:200)
+  all ask again in step. (Sprawling/gateway/src/endpoint/failure.rs:200)
 - An error has three retry answers: yes, no, and unknown — the request left
   and its answer was lost, so the provider may have run and billed it. A cut
-  stream and a silence timeout are unknown. (crates/gateway/src/endpoint/failure.rs:162)
+  stream and a silence timeout are unknown. (Sprawling/gateway/src/endpoint/failure.rs:162)
 - An error frame in the middle of an Anthropic stream, an OpenAI error chunk
   and a Responses error event are the failure they report, where they used to
-  be dropped and read as a cut. (crates/gateway/src/anthropic/stream.rs:178)
+  be dropped and read as a cut. (Sprawling/gateway/src/anthropic/stream.rs:178)
 - An MCP answer lost after the call left is marked as an effect nobody saw;
   a call that never left stays retriable. (crates/protocol/src/mcp/broker.rs:353)
 - A refusal that names the context window is `Overflow`, not retriable, with
-  `/new --carry` or a wider model as the way out. (crates/gateway/src/endpoint/failure.rs:61)
+  `/new --carry` or a wider model as the way out. (Sprawling/gateway/src/endpoint/failure.rs:61)
 - A failure reaches the page with its kind, so a Chinese page words it in
   Chinese instead of showing the city's English sentence. (client/src/core/provider_failure.ts:7)
 - A city with no model chosen answers `E_MODEL_UNCHOSEN`, whose one recovery
-  is the settings page. (crates/kernel/src/error/code.rs:168)
+  is the settings page. (Sprawling/kernel/src/error/code.rs:168)
 - A local model streams through the same endpoint as any other, where it used
   to answer in one burst at the end; a stream request answered with a whole
-  JSON body is read as that body. (crates/gateway/src/endpoint/adapter.rs:20)
-- One HTTP client per endpoint, where every call built its own. (crates/gateway/src/endpoint/transport.rs:28)
+  JSON body is read as that body. (Sprawling/gateway/src/endpoint/adapter.rs:20)
+- One HTTP client per endpoint, where every call built its own. (Sprawling/gateway/src/endpoint/transport.rs:28)
 - An MCP server's SSE stream is bounded by its opening instead of ended by it,
   so it no longer drops 15 s after connecting. (crates/protocol/src/mcp/sse.rs:18)
-- A subscription token stays a bearer token when the settings are saved again. (crates/sprawling/src/assembly/credentials/subscription.rs:51)
+- A subscription token stays a bearer token when the settings are saved again. (Sprawling/app/src/assembly/credentials/subscription.rs:51)
 - `input_tokens` means the whole prompt in every compatible format, and a
   cached token is no longer billed at the input price as well as the cache
-  price. (crates/kernel/src/model/usage.rs:28)
+  price. (Sprawling/kernel/src/model/usage.rs:28)
 - A price row with no figure leaves a call unbilled instead of billing it 0,
   and the cost answer carries how many calls no provider priced, so a city on a
   subscription or a local model reads as unpriced rather than idle. (crates/memory/src/attribution/report.rs:68)
-- The Codex login row redirects to `127.0.0.1`, following upstream. (crates/gateway/src/oauth_profiles.rs:106)
+- The Codex login row redirects to `127.0.0.1`, following upstream. (Sprawling/gateway/src/oauth_profiles.rs:106)
 
 ### What a run's conversation carries
 
 - Cancel and Steer reach a run that a lane is driving, and a steer inside a
-  tool wave is recorded. (crates/sprawling/src/assembly/driving/flight.rs:306)
+  tool wave is recorded. (Sprawling/app/src/assembly/driving/flight.rs:306)
 - A steer that arrives after a request was assembled waits for the next tool
   results instead of rewriting the message already sent, and a branch rebuilds
-  it at the same place. (crates/runtime/src/conversation.rs:56)
-- The person's words reach the request once. (crates/runtime/src/conversation.rs:15)
+  it at the same place. (Sprawling/runtime/src/conversation.rs:56)
+- The person's words reach the request once. (Sprawling/runtime/src/conversation.rs:15)
 - A cut tool result names its rest file by its address in the room, which the
-  `read` tool accepts. (crates/runtime/src/sieve.rs:25)
+  `read` tool accepts. (Sprawling/runtime/src/sieve.rs:25)
 - A branch of a branch opens with the grandmother's conversation, and a
-  carried session names the previous run's transcript. (crates/sprawling/src/assembly/freezing.rs:186)
+  carried session names the previous run's transcript. (Sprawling/app/src/assembly/freezing.rs:186)
 - A frozen handoff is the room's own `Handoff.md`, pinned; the docs now say
-  that `/new` without `--carry` discards the only copy of it. (crates/city/src/spine_files.rs:10)
-- `status` reports the token count of the call that asked. (crates/runtime/src/turn/wave.rs:133)
+  that `/new` without `--carry` discards the only copy of it. (Sprawling/city/src/spine_files.rs:10)
+- `status` reports the token count of the call that asked. (Sprawling/runtime/src/turn/wave.rs:133)
 - A turn's exchange is compacted only after the whole tool wave has landed,
-  once per turn, and `compaction::plan` alone decides whether it fits. (crates/runtime/src/compaction.rs:205)
+  once per turn, and `compaction::plan` alone decides whether it fits. (Sprawling/runtime/src/compaction.rs:205)
 - A failed stream is asked once more through the blocking door when it failed
   as a wire mismatch; each recovery step answers recovered, failed or skipped,
-  and a skip hands the same error on. (crates/runtime/src/turn/recovery.rs:33)
+  and a skip hands the same error on. (Sprawling/runtime/src/turn/recovery.rs:33)
 - A model's note, `.sprawling/models/<endpoint>/<model>.md`, ends the system
-  prompt sent to that model. (crates/sprawling/src/assembly/freezing/model_note.rs:41)
+  prompt sent to that model. (Sprawling/app/src/assembly/freezing/model_note.rs:41)
 - A room is named by rule from the task's first four ASCII words, never by a
-  model, so the first provider call of a dispatch is the run itself. (crates/sprawling/src/assembly/dispatching/session.rs:68)
+  model, so the first provider call of a dispatch is the run itself. (Sprawling/app/src/assembly/dispatching/session.rs:68)
 
 ### Tools, fences and the prompt cache
 
 - A read the model hands over while it is still generating starts during the
   generation. A Lean model (`adversary/design/Speculating.lean`) proves this
-  leaves the ledger as serial execution writes it. (crates/runtime/src/turn/speculation.rs:20)
+  leaves the ledger as serial execution writes it. (Sprawling/runtime/src/turn/speculation.rs:20)
 - The leading reads of a tool wave run at once, and the ledger holds the same
-  lines a serial wave writes. (crates/runtime/src/turn/wave.rs:39)
+  lines a serial wave writes. (Sprawling/runtime/src/turn/wave.rs:39)
 - A fence is skipped for an empty or read-only wave, stages the paths the wave
   wrote rather than the whole scope, and lists in its payload only the paths
   it changed. A failed call widens the next fence to the write domain, and a
-  building's first fence is written at adoption as one pack. (crates/runtime/src/run/fence.rs:6)
+  building's first fence is written at adoption as one pack. (Sprawling/runtime/src/run/fence.rs:6)
 - Cache breakpoints have one author: the three segment edges and the tail
   message. The Anthropic request now marks the tail message, and
-  `prompt_assembled` records the breakpoints a request really carried. (crates/runtime/src/prefix/breakpoint.rs:24)
+  `prompt_assembled` records the breakpoints a request really carried. (Sprawling/runtime/src/prefix/breakpoint.rs:24)
 - Each assembled request writes `prompt_shape_compared`: the tool table's and
   the conversation's shape, the region that changed since the request before
   it, and the most bytes the request can be billed as input. The four segment
-  hashes stay on `prompt_assembled`. (crates/kernel/src/event/record/turn.rs:197)
+  hashes stay on `prompt_assembled`. (Sprawling/kernel/src/event/record/turn.rs:197)
 - `prompt_assembled` is written once per run and again only when the payload
-  differs. (crates/runtime/src/turn.rs:98)
+  differs. (Sprawling/runtime/src/turn.rs:98)
 - Keep-warm is a setting, off by default: `[cache] keep_warm` in a layer's
   `CONFIG.toml`. When on, a prefix a real request used is renewed once, just
   before the provider's five-minute cache would expire, by resending its last
   request with one output token; each renewal's usage or refusal is a
-  `cache_renewed` line. (crates/city/src/config_layers.rs:242)
+  `cache_renewed` line. (Sprawling/city/src/config_layers.rs:242)
 - A run cannot rewrite the rules that judge it: the `rules` and `city` tools
-  keep `Effect::Govern`, which is refused on every call. (crates/city/src/city_tool.rs:18)
+  keep `Effect::Govern`, which is refused on every call. (Sprawling/city/src/city_tool.rs:18)
 - Every dispatch books the documents it stands under. The city's
   `CONFIG.toml`, and the building's `CONFIG.toml` and `RULES.toml` when the
   building exists, are hashed, and one that differs from what was last booked
   gets a `rules_changed` line with the before and after digests before the run
-  starts. (crates/sprawling/src/assembly/dispatching/agreeing.rs:184)
+  starts. (Sprawling/app/src/assembly/dispatching/agreeing.rs:184)
 - A screenshot can cover a rectangle, an element, or several elements, and
   one function reads an element's box for both `measure` and the survey. A
   capture larger than the cap is taken once more at a lower pixel density
   instead of being refused. A quality outside 0–100 is refused by the browser
   and the desktop tools alike, where the browser clamped it and the desktop
-  replaced it with 85. (crates/browser/src/shot.rs:181)
+  replaced it with 85. (Sprawling/browser/src/shot.rs:181)
 - A limit that refuses writes its own refusal in four parts, and no looser
-  limit can be built outside the kernel. (crates/kernel/src/policy_limit.rs:7)
+  limit can be built outside the kernel. (Sprawling/kernel/src/policy_limit.rs:7)
 - An MCP answer whose text passes 16 KiB reaches the model the way a long
   command output does: stored whole, with a substitute in the window. A
   document converter joins a building as one more stdio MCP server, and
-  `docs/operating.md` shows the entry. (crates/runtime/src/pipeline/connector.rs:31)
+  `docs/operating.md` shows the entry. (Sprawling/runtime/src/pipeline/connector.rs:31)
 
 ### Plans, claims and the people in a building
 
@@ -1618,39 +1618,39 @@ rather than a component tree. The client speaks only the WebSocket protocol in
 - A plan is measured in two figures: the count of leaves, which says how many
   pieces the plan turned out to have, and the weighted share, which says how
   much of the whole those pieces stand for. Shares are counted in integer
-  billionths, so no float reaches a plan. (crates/kernel/src/share.rs:35)
+  billionths, so no float reaches a plan. (Sprawling/kernel/src/share.rs:35)
 - `plan` asks whether a node must be expanded, and a split reports what is
-  left. (crates/collab/src/claim_tool/tool.rs:75)
+  left. (Sprawling/collab/src/claim_tool/tool.rs:75)
 - A run that ends holding a plan row turns it Blocked instead of leaving it In
-  progress. (crates/sprawling/src/assembly/plans/held.rs:97)
+  progress. (Sprawling/app/src/assembly/plans/held.rs:97)
 - A claim on a plan node is decided by the accounting thread when the run
   asks, first asker winning, and `roadmap_claimed` is written then. Every way a
   run comes home closes the claims it holds, node by node as each closing line
-  reaches the ledger; a split closes its parent. (crates/collab/src/claim_tool.rs:56)
+  reaches the ledger; a split closes its parent. (Sprawling/collab/src/claim_tool.rs:56)
 - A workshop hands down only the nodes that are ready, keeps its graph per
   room, and hands down the next ready set when a node comes back. A knock at an
   occupied room waits for it, a handback wakes the resident who asked, and one
   conversation stops at 64 woken runs across its branches. A pursuit moves on
-  when its runs land, without holding the desk while they drive. (crates/collab/src/workshop.rs:199)
+  when its runs land, without holding the desk while they drive. (Sprawling/collab/src/workshop.rs:199)
 - A standing goal on a building with no plan is refused with
   `E_PLAN_MISSING` and a button that puts a request for a plan in the
-  composer; a plan that cannot be read keeps its own error. (crates/sprawling/src/assembly/plans.rs:161)
+  composer; a plan that cannot be read keeps its own error. (Sprawling/app/src/assembly/plans.rs:161)
 - A verification run checks each citation against the version pinned for
   review: a quote of an earlier draft does not hold even when its words
-  match. `citysim` compares a red team's conclusions with and without that run. (crates/collab/src/citation.rs:61)
+  match. `citysim` compares a red team's conclusions with and without that run. (Sprawling/collab/src/citation.rs:61)
 - After a restart, a building the person cleared no longer pursues again, a
   rejected pull request is not offered for review again, and a taken signal
   leaves the inbox. Each came from a fold that skipped a line it could not
-  read; those folds now refuse it. (crates/sprawling/src/views/holding.rs:52)
+  read; those folds now refuse it. (Sprawling/app/src/views/holding.rs:52)
 
 ### The city answers without waiting on its writer
 
 - The views are folded on their own thread, and readers read a published
   snapshot of them without a lock; a query that reads disk, git or the network
-  does it after the snapshot is let go. (crates/sprawling/src/serving/folding.rs:6)
+  does it after the snapshot is let go. (Sprawling/app/src/serving/folding.rs:6)
 - The accounting thread sleeps on one queue and wakes for what it serves.
   A Lean model (`adversary/design/Attending.lean`) proves a waiting message
-  is served by the next wake. (crates/sprawling/src/assembly/driving/flight.rs:46)
+  is served by the next wake. (Sprawling/app/src/assembly/driving/flight.rs:46)
 - Each committed record is spelled as an event frame once, before the
   broadcast. A seq gap is owed to a socket as `Lagged`. (crates/channels/src/server/committed.rs:8)
 - The city view carries the active runs and the 32 newest frozen ones; an
@@ -1661,7 +1661,7 @@ rather than a component tree. The client speaks only the WebSocket protocol in
 - A reconnect fetches what it missed from the last seq the page folded, and a
   welcome from another ledger (a new epoch) makes the page rebuild. (client/src/core/socket.ts:165)
 - An MCP server an earlier run started is reached again rather than restarted
-  for every dispatch; a stdio server that has exited is started again. (crates/sprawling/src/assembly/workbench/servers.rs:6)
+  for every dispatch; a stdio server that has exited is started again. (Sprawling/app/src/assembly/workbench/servers.rs:6)
 - A room under review keeps one worktree across its runs, checked out to its
   scope only. (crates/memory/src/worktree/trees/kept.rs:6)
 - The view thread and the socket's workers stand one step above normal
@@ -1669,44 +1669,44 @@ rather than a component tree. The client speaks only the WebSocket protocol in
   below-normal class on Windows, `nice` on Unix, and `ionice` as well on
   Linux. `[core] priority = "normal"` in `~/.sprawling/config.toml` keeps the
   core at normal, and the doctor and the machine page say where the core
-  stands. (crates/runtime/src/tools/exec/yielding.rs:26)
+  stands. (Sprawling/runtime/src/tools/exec/yielding.rs:26)
 - A plan's next row waits while another run drives and less than a tenth of
-  physical memory is available. (crates/sprawling/src/monitor/memory.rs:15)
+  physical memory is available. (Sprawling/app/src/monitor/memory.rs:15)
 - A dispatch on a volume close to full is refused before anything is written,
-  and the refusal says how many bytes to free. (crates/sprawling/src/assembly/commanding/shedding.rs:20)
+  and the refusal says how many bytes to free. (Sprawling/app/src/assembly/commanding/shedding.rs:20)
 
 ### The terminal
 
 - One command table and a pure parser stand in front of every verb: `--help`
   no longer runs `up` or `install`, an unknown flag is refused, and a
-  misspelled verb is answered with the nearest name. (crates/sprawling/src/main/grammar.rs:62)
+  misspelled verb is answered with the nearest name. (Sprawling/app/src/main/grammar.rs:62)
 - Exit codes are one table: 0 done, 1 refused, 2 a command line (or a `call`
   frame) that cannot be read, 3 quiet before the awaited answer or event, 4
   nothing at the address answered as a city. A refusal is a failure line, a
   recovery line and the nearest names to a person, and one JSON line to a
-  program (`--json`). (crates/sprawling/src/main/exit.rs:21)
+  program (`--json`). (Sprawling/app/src/main/exit.rs:21)
 - `call` ends on its answer instead of waiting out the quiet window, and
-  `call --until <kind>` ends on the event it names. (crates/sprawling/src/wire_client.rs:24)
-- `doctor` writes its heading at once and asks every item in parallel. (crates/sprawling/src/doctor.rs:242)
+  `call --until <kind>` ends on the event it names. (Sprawling/app/src/wire_client.rs:24)
+- `doctor` writes its heading at once and asks every item in parallel. (Sprawling/app/src/doctor.rs:242)
 - `sprawling dispatch` mints its own key, runs on the model `-m` names, waits
   for its own run, and exits 3 when silence ends the wait early. A run naming
-  no model continues on its room's frozen one. (crates/sprawling/src/main/dispatch.rs:25)
+  no model continues on its room's frozen one. (Sprawling/app/src/main/dispatch.rs:25)
 - The console gives each typed line its own key and offers only the verbs the
-  wire carries. `Query::Release` is renamed `Query::NewestRelease`. (crates/sprawling/src/console/language.rs:11)
+  wire carries. `Query::Release` is renamed `Query::NewestRelease`. (Sprawling/app/src/console/language.rs:11)
 - `sprawling view` prints ledger lines filtered by kind, address and text,
-  and runs with their parents. (crates/sprawling/src/main/view.rs:12)
+  and runs with their parents. (Sprawling/app/src/main/view.rs:12)
 - A person viewing a whole city gets a raw-terminal face: it opens on the run
   waiting for the person, reads its first screen from the ledger's tail,
-  follows the ledger while open, and unfolds a run into rounds and calls. (crates/sprawling/src/main/view.rs:253)
+  follows the ledger while open, and unfolds a run into rounds and calls. (Sprawling/app/src/main/view.rs:253)
 - `sprawling check <city>` reads every city TOML file and places each refusal
-  at its line and column. (crates/city/src/check.rs:63)
+  at its line and column. (Sprawling/city/src/check.rs:63)
 - `sprawling top` watches a city's counters over the wire, one screen when the
-  output is a terminal and one JSON line per sample otherwise. (crates/sprawling/src/monitor/top.rs:6)
+  output is a terminal and one JSON line per sample otherwise. (Sprawling/app/src/monitor/top.rs:6)
 - `sprawling up --supervise` serves in a child and resumes it after a crash,
-  until three crashes in a minute. (crates/sprawling/src/supervising.rs:23)
+  until three crashes in a minute. (Sprawling/app/src/supervising.rs:23)
 - A serve that failed says so in the room's handoff, with its cause,
   instead of recording that the person closed the city.
-  (crates/sprawling/src/assembly/lifetime.rs:72)
+  (Sprawling/app/src/assembly/lifetime.rs:72)
 
 ### The screens
 
@@ -1740,11 +1740,11 @@ rather than a component tree. The client speaks only the WebSocket protocol in
   while it runs. (client/src/views/monitor/ansi.ts:30)
 - A results-only mode for a room and for the city. (client/src/core/results.ts:25)
 - A performance panel at `#/monitor`; the city samples only while somebody
-  watches. (crates/sprawling/src/monitor.rs:6)
+  watches. (Sprawling/app/src/monitor.rs:6)
 - A discarded file comes back from the recycle bin. (crates/memory/src/checkpoint/fence.rs:217)
 - A building can be removed from its page: its directory moves under
   `.sprawling/removed/` with every file kept, and a busy building says why it
-  cannot be. (crates/city/src/building/removal.rs:59)
+  cannot be. (Sprawling/city/src/building/removal.rs:59)
 - Slash verbs: `/stop` cancels, `/halt` and `/release` pair, `/clear` starts
   a new session, `/diff` opens the run; a mistyped scope halts nothing. (client/src/core/slash.ts:76)
 - The model pill names the model the session answers with; choosing another
@@ -1772,9 +1772,9 @@ rather than a component tree. The client speaks only the WebSocket protocol in
   licence; `skills/LICENSES.md` travels with them. (skills/LICENSES.md:1)
 - A skill may be a directory, and `read` opens its files by `<name>/<path>`.
   A read that misses lists the nearest existing entries and points at
-  `search`. (crates/runtime/src/tools/read/miss.rs:6)
+  `search`. (Sprawling/runtime/src/tools/read/miss.rs:6)
 - `read` opens `cas:` and `file:` locators, judged at the building the bytes
-  were stored for. (crates/runtime/src/tools/read/locator.rs:6)
+  were stored for. (Sprawling/runtime/src/tools/read/locator.rs:6)
 
 ### What the machines check
 
@@ -1796,20 +1796,20 @@ rather than a component tree. The client speaks only the WebSocket protocol in
 - The render gate measures crushed text and clipped popovers. (xtask/src/render/room.rs:9)
 - The colour gate admits the disabled ink only behind a disabled variant. (xtask/src/color.rs:37)
 - The secret gate reports a labelled hex key and no longer reads a whole
-  PascalCase identifier as one. (crates/kernel/src/secret/hex_run.rs:11)
+  PascalCase identifier as one. (Sprawling/kernel/src/secret/hex_run.rs:11)
 - The release walker does not enter nested worktrees. (xtask/src/walk.rs:14)
 - Every text file is LF in the index. (.gitattributes:1)
 - `SPRAWLING_E2E_REQUIRED=1` turns an absent end-to-end variable red. Both
   test suites judge addresses against one table. `SECURITY.md` names the one
-  channel for reporting a vulnerability. (crates/sprawling/tests/e2e.rs:18)
-- Every SPEC names section 12 Decisions. (crates/accounting/accounting-SPEC.md:372)
+  channel for reporting a vulnerability. (Sprawling/app/tests/e2e.rs:18)
+- Every SPEC names section 12 Decisions. (Sprawling/accounting/accounting-SPEC.md:372)
 - `just check-all` runs every phase to the end, and `just check-branch`
   judges one branch. (justfile:37)
 - `xtask` refuses to judge a checkout other than the one it was built from. (xtask/src/root.rs:6)
 - `just mem` reads private, peak private and working set of a named process or
   of an empty city it serves itself; every bench reading carries its floor. (xtask/src/mem.rs:6)
 - The embedded client is the bundle the workspace built, wherever
-  `CARGO_TARGET_DIR` points. (crates/sprawling/build.rs:9)
+  `CARGO_TARGET_DIR` points. (Sprawling/app/build.rs:9)
 
 ### Removed
 
@@ -1822,13 +1822,13 @@ rather than a component tree. The client speaks only the WebSocket protocol in
 - `gateway::Native`.
 - `kernel::highlight`, which nothing called.
 - Naming a room with a model.
-- `SummaryProducer`: nothing produces a summary. (crates/runtime/runtime-SPEC.md:1014)
+- `SummaryProducer`: nothing produces a summary. (Sprawling/runtime/runtime-SPEC.md:1014)
 
 ### Built, and not reachable yet
 
 - `city::install_skill` installs a skill package whole, after a static
   precheck that walks directory handles, refuses links and reparse points,
-  and bounds a package at 32 MiB. No command, tool or page calls it. (crates/city/src/lib.rs:65)
+  and bounds a package at 32 MiB. No command, tool or page calls it. (Sprawling/city/src/lib.rs:65)
 - Going back opens a new tree at an earlier point and restores one file from
   it, recorded as `went_back` and `file_restored`. No command reaches it. (crates/memory/src/worktree/back.rs:6)
 
@@ -1852,7 +1852,7 @@ with a real provider attached, and what failed there was fixed before the tag.
   copied through their binary snapshot encoding at every start, and a run id
   read back as text where sixteen bytes had been written, so `serve` stopped
   with `E_CAS_CORRUPT`. A run id now reads its bytes back from a binary
-  format and keeps its one spelling in text. (crates/kernel/src/event/identity.rs:61)
+  format and keeps its one spelling in text. (Sprawling/kernel/src/event/identity.rs:61)
 - Listing a provider's models filed the key and cleared its box, and the
   attach that followed registered the endpoint without it, so every call
   answered 401. The attach now carries the reference the form filed. (client/src/views/setup/providers/form.svelte:194)
@@ -1895,12 +1895,12 @@ with a real provider attached, and what failed there was fixed before the tag.
 
 - The page draws nothing for `log_truncated`. (client/src/core/belief/fold.ts:101)
 - A dispatched command has no memory cap: the one safe interface on Windows
-  is refused to an ordinary account. (crates/runtime/src/tools/exec/yielding.rs:26)
+  is refused to an ordinary account. (Sprawling/runtime/src/tools/exec/yielding.rs:26)
 - The memory wait holds only a plan's next row; other entrances start a run
-  without it. (crates/sprawling/src/monitor/memory.rs:15)
+  without it. (Sprawling/app/src/monitor/memory.rs:15)
 - A kept worktree of a closed room is never reclaimed. (crates/memory/src/worktree/trees/kept.rs:6)
 - On Windows and macOS the monitor reads 0 for the process's own I/O bytes.
-  (crates/sprawling/src/monitor/counters/own_process.rs:53)
+  (Sprawling/app/src/monitor/counters/own_process.rs:53)
 
 ---
 
@@ -2423,7 +2423,7 @@ ruling.
 Eleven files stood above the new 1,000-line limit; all eleven are back under it
 and the register of what predates the rule is **empty**, which is that rule's
 completed state. Every cut was taken at a seam the architecture or the crate's
-own SPEC had already named, never at a line count: `crates/sprawling/src/assembly.rs`
+own SPEC had already named, never at a line count: `Sprawling/app/src/assembly.rs`
 went from 11,461 lines to a module tree, and moving `impl RunWorker` into sixteen
 submodules changed the visibility of not one field and added not one public item.
 

@@ -6,9 +6,9 @@
 /-!
 # gateway::provider::preset
 
-规定 `provider::preset`（`crates/gateway/src/provider/preset.rs`）：一家厂商文档写下的路径、形状与上限，每行注出处；一个模型 id 由哪一行作答。本文件是 `crates/gateway/Spec.lean` 的一个分部；别处引它的决定作 `gateway D<n>`。
+规定 `provider::preset`（`Sprawling/gateway/src/provider/preset.rs`）：一家厂商文档写下的路径、形状与上限，每行注出处；一个模型 id 由哪一行作答。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；别处引它的决定作 `gateway D<n>`。
 
-§8-17（`crates/gateway/spec/Provider.lean`）写预置表的接口、行与出处；本分部是 `model_for` 选哪一行的模型：host 自己的行先答，没有自己模型行的远端 host 再借厂商的行，这台电脑上的服务一行也不借，前缀最长者胜。
+§8-17（`Sprawling/gateway/spec/Provider.lean`）写预置表的接口、行与出处；本分部是 `model_for` 选哪一行的模型：host 自己的行先答，没有自己模型行的远端 host 再借厂商的行，这台电脑上的服务一行也不借，前缀最长者胜。
 
 与 Rust 的对应：Rust 的 `model_for` 取 `base_url`，`own` 是 `host_row(base_url)` 那一行的模型行，厂商的行是 `PRESETS` 全表按序展开，`isLocal` 是 `reach::is_local(base_url)`，读的只是 URL 的 host 文字，所以三个平台相同。派生检查：`provider::preset` 的 `a_documented_model_is_matched_by_the_longest_prefix_that_fits` 与 `a_relay_forwarding_a_vendors_id_reads_the_vendors_row_and_a_local_server_does_not` 各判几个 id；选行那一步是私有的 `row_for(own, vendors, local, id)`，行表是参数，`model_for` 把 `host_row` 的模型行、`PRESETS` 全表按序展开的模型行与 `reach::is_local(base_url)` 交给它；proptest `the_row_rule_keeps_the_lean_properties` 在随机的行表、`local` 与 id 上断言三条定理，它先对一个让有自己行的远端 host 也借厂商行的 `row_for` 变红过。
 -/

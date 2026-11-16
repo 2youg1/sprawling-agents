@@ -6,7 +6,7 @@
 /-!
 # accounting::worker::genesis::lost
 
-规定 `crates/accounting/src/worker/genesis/lost.rs`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+规定 `Sprawling/accounting/src/worker/genesis/lost.rs`。本文件是 `Sprawling/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `Sprawling/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
 -/
 
 /-!
@@ -23,12 +23,12 @@ impl OpenRuns {
 pub struct ScanReport { /* …既有字段… */ pub frozen_runs: usize }
 ```
 
-- **哪些 run 死了。** `startup_scan` 在两处跑，都在这个进程拿到写者锁之后、驱动任何 run 之前：`sprawling resume` 在 `RunWorker::new` 之后；`serve` 在 `RunWorker::take_back_the_lost`（`accounting::worker::lifetime`）里，那一步先等历史证明有了结论，再在观察者接上之后、accounting 线程开始读台子之前跑它，所以冻结行经观察者进视图，页面看到那次 run 已结束，下一句话发成 `Dispatch` 而不是给死 run 的 `Steer`。这时这座城没有一次 run 在驱动：账上有 `run_started`、没有 `run_frozen` 的每一次 run，都是上一个进程死时正在跑的。harness run 与模型 run 一样开、一样冻（`crates/runtime/Spec.lean` §8-52），一并计入。
-- **次序。** 先补写悬空调用的 `E_TOOL_OUTCOME_UNKNOWN`（它们属于那次 run，要落在它的冻结之前），再为每次死掉的 run 写一行 `RunFrozen::lost()`（`crates/kernel/Spec.lean` §8-82-2），按 `run_started` 的 seq 升序。
+- **哪些 run 死了。** `startup_scan` 在两处跑，都在这个进程拿到写者锁之后、驱动任何 run 之前：`sprawling resume` 在 `RunWorker::new` 之后；`serve` 在 `RunWorker::take_back_the_lost`（`accounting::worker::lifetime`）里，那一步先等历史证明有了结论，再在观察者接上之后、accounting 线程开始读台子之前跑它，所以冻结行经观察者进视图，页面看到那次 run 已结束，下一句话发成 `Dispatch` 而不是给死 run 的 `Steer`。这时这座城没有一次 run 在驱动：账上有 `run_started`、没有 `run_frozen` 的每一次 run，都是上一个进程死时正在跑的。harness run 与模型 run 一样开、一样冻（`Sprawling/runtime/Spec.lean` §8-52），一并计入。
+- **次序。** 先补写悬空调用的 `E_TOOL_OUTCOME_UNKNOWN`（它们属于那次 run，要落在它的冻结之前），再为每次死掉的 run 写一行 `RunFrozen::lost()`（`Sprawling/kernel/Spec.lean` §8-82-2），按 `run_started` 的 seq 升序。
 - **作者。** 冻结行写成那次 run 最近一行的作者（它的居民），与补写的 `tool_result` 写成那次调用的作者同一条理由：按居民计数冻结的读者（`city::resident` 的档案）不因进程死过而少计一次。只写过 `run_started`、没写别的就死了的 run，用 `run_started` 的作者。`addr` 缺席，与 `Charter::close` 写的冻结行同形。
 - **幂等。** 第二次扫描看到的每次 run 都已冻结，什么都不写；`ScanReport.frozen_runs` 是这一次写了几行，`summary` 把它与关掉的调用数并列告诉人。
 - **不做的事。** 不写 `handoff_written`：死掉的 run 没留下交接，替它编一份是假话；不起后继：冻结的 run 是历史，接手由人或计划另派（ARCHITECTURE §13.7）。
-- 验收：`genesis::lost::tests` 的 `a_run_the_process_died_in_is_frozen_once`（冻结行的载荷、作者与次数，第二次扫描不再写）；崩溃验收（`crates/sprawling/Spec.lean` §8-127）钉住城景里那次 run 的最后一行是冻结、结局是 `cancelled`。
+- 验收：`genesis::lost::tests` 的 `a_run_the_process_died_in_is_frozen_once`（冻结行的载荷、作者与次数，第二次扫描不再写）；崩溃验收（`Sprawling/app/Spec.lean` §8-127）钉住城景里那次 run 的最后一行是冻结、结局是 `cancelled`。
 -/
 
 /-! D30 死掉的 run 由启动扫描冻结，冻结行写成它的居民，结局读 `RunFrozen::lost`

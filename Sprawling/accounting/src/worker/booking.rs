@@ -10,7 +10,7 @@
 //! dispatched, and runs dispatched beside each other read the same file.
 //! The accounting thread sees every claim in the order the lanes send
 //! them, so the first run to ask for a node takes it and the second is
-//! refused before it spends a call on the node (`crates/sprawling/Spec.lean` §8-42-8).
+//! refused before it spends a call on the node (`Sprawling/app/Spec.lean` §8-42-8).
 //! The claim's `roadmap_claimed` line is appended as the node is booked,
 //! so the history says who holds a node from the moment the model took
 //! it rather than from the moment its run lands. A booking lasts until
@@ -51,7 +51,7 @@ pub(crate) struct Claimant {
     pub room: Address,
     pub run: RunId,
     pub who: String,
-    /// The worker's own clock (`crates/accounting/spec/Clock.lean` §8-3).
+    /// The worker's own clock (`Sprawling/accounting/spec/Clock.lean` §8-3).
     pub clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
     /// The book's mark when this run's desk read the plan.
     pub read: PlanRead,

@@ -6,7 +6,7 @@
 <script lang="ts">
   // The remote group (client/Spec.lean §4-57): the device's half of the remote
   // door, and the door's own controls. Pairing and revoking stay at the
-  // city's console (`crates/remote_access/Spec.lean` D4), so this group
+  // city's console (`Sprawling/remote_access/Spec.lean` D4), so this group
   // pairs the browser it runs in when the address bar carries an
   // invitation, locks the door behind it, and forgets it; on the city's
   // own machine it says what the door is. Opening the door and

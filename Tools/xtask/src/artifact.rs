@@ -65,7 +65,7 @@ const MARKERS: [&str; 6] = [
 const TEST_FEATURES: [&str; 3] = ["conformance", "fault", "fixture"];
 
 /// The crate whose feature table becomes the shipped binary.
-const PRODUCT: &str = "crates/sprawling/Cargo.toml";
+const PRODUCT: &str = "Sprawling/app/Cargo.toml";
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();

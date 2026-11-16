@@ -5,7 +5,7 @@
 
 //! The code side of `specalign`'s roster assertion: every enum the
 //! kernel compiles, by name, with its variant names, read with `syn`
-//! from `crates/kernel/src/**`. `tables` holds every `inductive` of the
+//! from `Sprawling/kernel/src/**`. `tables` holds every `inductive` of the
 //! kernel's specification that shares a name with one of these to
 //! exactly its variants, in both directions.
 //!
@@ -22,7 +22,7 @@ use crate::report::XtaskError;
 use crate::walk;
 
 /// Where the kernel's compiled enums are read from.
-const KERNEL_SRC: &str = "crates/kernel/src";
+const KERNEL_SRC: &str = "Sprawling/kernel/src";
 
 /// The extension of the files parsed on the code side.
 const RUST: [&str; 1] = ["rs"];

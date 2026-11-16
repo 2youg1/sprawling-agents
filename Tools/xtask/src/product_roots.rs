@@ -7,7 +7,9 @@
 //!
 //! The one reader of `[[product_root]]` and `[[legacy_path]]`. Later
 //! moves derive package directories from [`ProductRoot::path`]; the
-//! residue gate refuses a legacy path once its status is `retired`.
+//! residue gate refuses a legacy path once its status is `retired`;
+//! `release` still treats every legacy path name as a citation anchor
+//! so historical CHANGELOG paths keep a home in the tree's vocabulary.
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -224,7 +226,7 @@ status = "live"
 "#;
 
     #[test]
-    fn the_checkout_table_names_every_required_root_and_keeps_legacy_live() {
+    fn the_checkout_table_names_every_required_root_and_retires_crates() {
         let table = load(this_checkout()).unwrap();
         assert_eq!(table.path_of("Sprawling"), Some("Sprawling"));
         assert_eq!(
@@ -238,13 +240,32 @@ status = "live"
         assert_eq!(table.path_of("Calyx"), Some("Calyx"));
         assert_eq!(table.path_of("RefRain"), Some("RefRain"));
         assert_eq!(table.path_of("Mei"), Some("Mei"));
+        let sprawling = table
+            .roots
+            .iter()
+            .find(|root| root.name == "Sprawling")
+            .unwrap();
+        assert_eq!(sprawling.layout, Layout::Current);
+        let tools = table
+            .roots
+            .iter()
+            .find(|root| root.name == "Tools")
+            .unwrap();
+        assert_eq!(tools.layout, Layout::Current);
         let refrain = table
             .roots
             .iter()
             .find(|root| root.name == "RefRain")
             .unwrap();
         assert_eq!(refrain.transition.as_deref(), Some("client"));
-        assert!(table.retired().is_empty());
+        assert_eq!(
+            table
+                .retired()
+                .iter()
+                .map(|row| row.path.as_str())
+                .collect::<Vec<_>>(),
+            vec!["crates"]
+        );
         assert_eq!(table.legacy.len(), 2);
     }
 

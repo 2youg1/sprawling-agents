@@ -52,7 +52,7 @@ pub enum CacheRenewed {
 /// What one renewal shows about the cache it was sent to keep.
 ///
 /// The one reading of a `cache_renewed` line that a cost view counts by
-/// (`crates/kernel/spec/KeepWarm.lean` §8-74, storage D35).
+/// (`Sprawling/kernel/spec/KeepWarm.lean` §8-74, storage D35).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RenewalOutcome {
     /// The provider reported no cache write: the renewal reached the

@@ -145,7 +145,7 @@ fn a_naming_the_store_lost_answers_no_names() {
 
 /// A delegated child's opening names the run that dispatched it, read
 /// from its `run_started.parent`, so its page can link back to the
-/// parent's session (`crates/wire/spec/Answer/Sessions.lean` D40).
+/// parent's session (`Sprawling/wire/spec/Answer/Sessions.lean` D40).
 #[test]
 fn a_delegated_childs_opening_names_its_parent_run() {
     let dir = tempfile::tempdir().unwrap();

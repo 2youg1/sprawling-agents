@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Real privacy writes on a disposable Windows runner
-//! (`crates/sprawling/spec/Privacy.lean` §16).
+//! (`Sprawling/app/spec/Privacy.lean` §16).
 //!
 //! Every test here writes the machine it runs on, so every one is
 //! ignored and starts by refusing any machine that is not a GitHub

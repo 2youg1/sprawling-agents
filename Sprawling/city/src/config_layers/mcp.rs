@@ -6,7 +6,7 @@
 //! The `[[mcp]]` table: the servers one layer reaches, each read into
 //! exactly one transport.
 //!
-//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4 and §8-4b.
+//! Specified by `Sprawling/city/spec/ConfigLayers.lean` §8-4 and §8-4b.
 
 use kernel::{
     AxCode, AxError, B3Hash, McpDefinition, McpReference, McpServer, McpTransport,

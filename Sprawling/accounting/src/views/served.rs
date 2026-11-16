@@ -65,7 +65,7 @@ impl Views {
 
     /// Takes the one way this city asks an item's publisher for its
     /// newest release, so an `UpstreamVersion` query leaves this machine
-    /// only through what the served city handed in (`crates/sprawling/Spec.lean`
+    /// only through what the served city handed in (`Sprawling/app/Spec.lean`
     /// §8-120).
     pub fn ask_upstream_through(&mut self, newest: fn(&str) -> wire::DoctorUpstream) {
         self.reach.upstream = Some(newest);
@@ -74,7 +74,7 @@ impl Views {
     /// Takes the one way this city places a vendor's set-up directory or
     /// another ACP client's file on this machine, so the ACP page's
     /// detection reads this machine only through what the served city
-    /// handed in (`crates/accounting/spec/Views.lean` D13).
+    /// handed in (`Sprawling/accounting/spec/Views.lean` D13).
     pub fn look_for_agents_through(
         &mut self,
         place: fn(&agent_protocols::SetUpDir) -> Option<std::path::PathBuf>,
@@ -84,7 +84,7 @@ impl Views {
 
     /// Takes the memory the ACP page's offers are kept in, which the served
     /// city's listener reads when a person consents to one
-    /// (`crates/accounting/spec/Views.lean`).
+    /// (`Sprawling/accounting/spec/Views.lean`).
     pub fn remember_offers_in(&mut self, offered: crate::offered::Offered) {
         self.offered = Some(offered);
     }
@@ -92,7 +92,7 @@ impl Views {
     /// Takes the one way this city asks the GitHub CLI on this machine for
     /// the login a host is signed in as, so a `GithubLogin` query starts a
     /// program only through what the served city handed in
-    /// (`crates/accounting/spec/Views/Answering/Github.lean` §8-18-3).
+    /// (`Sprawling/accounting/spec/Views/Answering/Github.lean` §8-18-3).
     pub fn ask_github_through(&mut self, login: fn(&str) -> wire::GithubReading) {
         self.reach.github = Some(login);
     }
@@ -100,7 +100,7 @@ impl Views {
     /// Takes the halt the served city's writer is held by until the proof
     /// of its history has a verdict, so the city page says whether the
     /// history is proved from the same verdict the writer obeys
-    /// (`crates/sprawling/Spec.lean` §8-134).
+    /// (`Sprawling/app/Spec.lean` §8-134).
     pub fn watch_proof(&mut self, halt: storage::ChainHalt) {
         self.proof = Some(halt);
     }

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The performance monitor's pair of frames (`crates/wire/spec/Frames/Monitor.lean` §8-47g):
+//! The performance monitor's pair of frames (`Sprawling/wire/spec/Frames/Monitor.lean` §8-47g):
 //! whether a session is watching, and one reading sent to it; and the
 //! sampling beat a page sets for the city (§8-47i).
 
@@ -25,7 +25,7 @@ pub struct BeatMs(u32);
 
 impl BeatMs {
     /// The beat a city samples at until a page sets another
-    /// (`crates/sprawling/Spec.lean` §8-173, the measurement plan).
+    /// (`Sprawling/app/Spec.lean` §8-173, the measurement plan).
     pub const DEFAULT: BeatMs = BeatMs(100);
 
     /// # Errors
@@ -88,7 +88,7 @@ pub enum Watched {
 }
 
 /// One reading of every counter the monitor shows, in integers because
-/// it travels on the wire (`crates/sprawling/Spec.lean` §8-94, §8-129-6).
+/// it travels on the wire (`Sprawling/app/Spec.lean` §8-94, §8-129-6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Sample {
@@ -106,11 +106,11 @@ pub struct Sample {
     pub event_to_screen_p50_nanos: u64,
     pub queued_runs: u64,
     /// Committed records the writer has handed the view thread that are
-    /// not yet folded and broadcast (`crates/sprawling/Spec.lean` §8-123).
+    /// not yet folded and broadcast (`Sprawling/app/Spec.lean` §8-123).
     pub view_backlog: u64,
     /// How long the beat before this one took to read the counters, by
     /// the sampler's own monotonic clock; 0 on the first beat
-    /// (`crates/sprawling/Spec.lean` §8-129-6).
+    /// (`Sprawling/app/Spec.lean` §8-129-6).
     pub read_nanos: u64,
     /// The beat this reading was sampled at, in milliseconds (§8-47i):
     /// what the page's beat control reads as the current setting.

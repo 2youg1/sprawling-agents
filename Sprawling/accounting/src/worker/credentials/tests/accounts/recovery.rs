@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How one model call's account round meets each kind of failure on
-//! the production path (`crates/kernel/Spec.lean` §8-86, runtime D89):
+//! the production path (`Sprawling/kernel/Spec.lean` §8-86, runtime D89):
 //! resend on the same account, switch to the next, or stop.
 
 use super::*;

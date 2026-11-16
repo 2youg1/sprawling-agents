@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Performance configuration grammar (`crates/wire/spec/Preference.lean` D30).
+//! Performance configuration grammar (`Sprawling/wire/spec/Preference.lean` D30).
 
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroU64;

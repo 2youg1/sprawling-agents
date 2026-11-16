@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! This machine answering (`crates/sprawling/Spec.lean` §8-40 and §8-47).
+//! This machine answering (`Sprawling/app/Spec.lean` §8-40 and §8-47).
 //!
 //! Three questions and one act live here, and nothing else does: is the
 //! program on the search path or at a place this platform installs it,
@@ -48,7 +48,7 @@ use super::{Absence, Detection, Fault, Platform, Presence, Requirement, Version}
 ///
 /// **An install goes through the parent trait.** This trait adds only
 /// `look`, so the terminal and the worker start a package manager
-/// through the one `accounting::Machine::install` (`crates/accounting/Spec.lean`
+/// through the one `accounting::Machine::install` (`Sprawling/accounting/Spec.lean`
 /// §8-4), and a script that replaces it replaces every install. `Sync`,
 /// because a report asks every item at once, one thread per item.
 pub(crate) trait Machine: accounting::Machine + Sync {
@@ -56,7 +56,7 @@ pub(crate) trait Machine: accounting::Machine + Sync {
     fn look(&self, requirement: &Requirement) -> Presence;
 
     /// Where this machine lets a core thread stand under the person's
-    /// setting (`crates/sprawling/spec/Serving/Standing.lean` §8-93).
+    /// setting (`Sprawling/app/spec/Serving/Standing.lean` §8-93).
     ///
     /// # Errors
     /// Reports a setting that does not read, and a thread that could not

@@ -6,11 +6,11 @@
 /-!
 # 放置计划：从读到的处理器拓扑到热线程的座位
 
-规定 `crates/sprawling/src/serving/placement/plan.rs`（`bin::serving::placement::plan`，形状：决定）。放置计划是一个纯函数：输入是平台读到的拓扑描述，输出是热线程可以坐的逻辑处理器，按处理器号排好；不调平台、不读钟、不看环境。`crates/sprawling/src/serving/placement/plan/tests.rs` 用 proptest 在生成的拓扑上检查下面每一条性质，并用按厂商公开核数写成的处理器家族表逐台检查计划的结果。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/app/src/serving/placement/plan.rs`（`bin::serving::placement::plan`，形状：决定）。放置计划是一个纯函数：输入是平台读到的拓扑描述，输出是热线程可以坐的逻辑处理器，按处理器号排好；不调平台、不读钟、不看环境。`Sprawling/app/src/serving/placement/plan/tests.rs` 用 proptest 在生成的拓扑上检查下面每一条性质，并用按厂商公开核数写成的处理器家族表逐台检查计划的结果。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 拓扑里每个逻辑处理器带五项：平台的处理器号 `id`；效率档 `cls`，数越大越快（Windows 的 `EfficiencyClass` 就是这个方向，Linux 由 `cpu_capacity` 或 Intel 的 `cpu_core`／`cpu_atom` 换算过来）；物理核 `core`；末级缓存组 `cache`；本进程能不能用它 `allowed`（进程的亲和、Job Object、容器的 cpuset、虚拟机给的处理器）。档的个数不限：两档（P 与 E）、三档（Meteor Lake 的 P、E 与 SoC 上的低功耗 E；ARM 的 prime、big、little）都是同一个模型。
 
-计划的规则（D45 起各条决定写在 `crates/sprawling/spec/Serving/Placement.lean`）：
+计划的规则（D45 起各条决定写在 `Sprawling/app/spec/Serving/Placement.lean`）：
 
 * 拓扑不自洽（处理器号重复，或同一个物理核报出两个档）就不放置，交给操作系统；
 * 本进程能用的处理器只有一档就不放置——不论末级缓存分几组（双 CCD 的 X3D 只有一档、两种 L3，由 AMD 自己的驱动去分，第二个意见只会与它打架）；

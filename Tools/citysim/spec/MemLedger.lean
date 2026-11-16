@@ -6,9 +6,9 @@
 /-!
 # citysim::mem_ledger 与 citysim::checker
 
-规定 `citysim::mem_ledger`（`crates/citysim/src/mem_ledger.rs`）与 `citysim::checker`（`crates/citysim/src/checker.rs`）。本文件是 `crates/citysim/Spec.lean` 的一个分部；下面一节保留它在 citysim 规格里的标签 §8-1，别处引作 `crates/citysim/Spec.lean §8-1`。
+规定 `citysim::mem_ledger`（`Tools/citysim/src/mem_ledger.rs`）与 `citysim::checker`（`Tools/citysim/src/checker.rs`）。本文件是 `Tools/citysim/Spec.lean` 的一个分部；下面一节保留它在 citysim 规格里的标签 §8-1，别处引作 `Tools/citysim/Spec.lean §8-1`。
 
-能写成定理的是内存 Ledger 的写法：一串 draft 写下去，seq 从第一号起逐条连续，每一行的 `prev` 是上一行的摘要，第一行的 `prev` 是创世值。行怎样从 draft 拼出来（`EventRecord::from_draft` 与 `canonical_line`）、摘要怎样算（`chain_hash`）是 kernel 的，模型把它们当参数，所以这里说的是「接法」而不是「字节」；字节与 `storage::JsonlLedger` 逐字节相同由 conformance 与对拍测试检查（§16）。链与 seq 的验证规则本身由 runtime 的规格陈述（`crates/runtime/spec/Replay.lean`），检查器只调用它（D16）。
+能写成定理的是内存 Ledger 的写法：一串 draft 写下去，seq 从第一号起逐条连续，每一行的 `prev` 是上一行的摘要，第一行的 `prev` 是创世值。行怎样从 draft 拼出来（`EventRecord::from_draft` 与 `canonical_line`）、摘要怎样算（`chain_hash`）是 kernel 的，模型把它们当参数，所以这里说的是「接法」而不是「字节」；字节与 `storage::JsonlLedger` 逐字节相同由 conformance 与对拍测试检查（§16）。链与 seq 的验证规则本身由 runtime 的规格陈述（`Sprawling/runtime/spec/Replay.lean`），检查器只调用它（D16）。
 -/
 
 /-!

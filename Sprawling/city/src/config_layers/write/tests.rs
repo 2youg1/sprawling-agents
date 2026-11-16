@@ -164,7 +164,7 @@ fn a_write_the_reader_would_refuse_is_not_written() {
 
 /// A building's shell interpreter survives the write face and the
 /// reader, and a spelling the reader does not know is refused there
-/// rather than read as the platform's shell (`crates/runtime/Spec.lean`
+/// rather than read as the platform's shell (`Sprawling/runtime/Spec.lean`
 /// §8-13-2 D30).
 #[test]
 fn the_shell_interpreter_is_written_and_read_back_by_name() {

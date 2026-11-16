@@ -5,8 +5,8 @@
 
 /-!
 # privacy::state 的磁盘投影接口
-规定 `crates/sprawling/src/privacy/state.rs`。这是磁盘编码与投影说明，不是形式证明：
-执行轨迹的性质由 crates.sprawling.spec.Privacy 保持，fold 是该模型 journal 与拥有栈的磁盘投影，
+规定 `Sprawling/app/src/privacy/state.rs`。这是磁盘编码与投影说明，不是形式证明：
+执行轨迹的性质由 Sprawling.app.spec.Privacy 保持，fold 是该模型 journal 与拥有栈的磁盘投影，
 不另定义执行授权。
 
 磁盘 schema 3。Line 是 schema 和 Event；Event 是三种之一：

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Secret scanning: shape-table-first, entropy-second, float-free.
-//! The part `crates/kernel/spec/Secret.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Secret.lean` specifies this module with the
 //! rest of `kernel::secret`.
 
 use crate::consts_external::{SECRET_SHAPES, SecretCharset};
@@ -150,7 +150,7 @@ fn entropy_passes(bytes: &[u8], work: &mut Work) -> bool {
 }
 
 /// What one scan did, counted rather than timed, so a test can hold how
-/// the work grows with the input (`crates/kernel/spec/Secret.lean` §8-25).
+/// the work grows with the input (`Sprawling/kernel/spec/Secret.lean` §8-25).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Work {
     /// Bytes a detector loop read, once per loop that read them.
@@ -792,7 +792,7 @@ mod verification {
     //! non-linear multiplications and returns no verdict. Totality of
     //! the whole scan is held by the proptest above; proving it here
     //! would need a per-slot function this module does not have
-    //! (`crates/kernel/Spec.lean` §2).
+    //! (`Sprawling/kernel/Spec.lean` §2).
 
     use super::*;
 

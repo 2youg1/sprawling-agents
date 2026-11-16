@@ -7,8 +7,8 @@
 # privacy 页面的服务：答复、操作与结果
 规定 `bin::privacy::service`、`bin::privacy::answer`、`bin::privacy::system` 与装配层的
 `bin::assembly::privacy`。本文件是接口说明，不是形式证明：写入次序与它的性质由
-crates.sprawling.spec.Privacy 证明，服务只把页面的一次询问或一个命令交给同一个
-`bin::privacy::coordinator`；线上的形状归 `crates/wire/spec/Privacy.lean` §8-88、§8-89。
+Sprawling.app.spec.Privacy 证明，服务只把页面的一次询问或一个命令交给同一个
+`bin::privacy::coordinator`；线上的形状归 `Sprawling/wire/spec/Privacy.lean` §8-88、§8-89。
 
 ## 装配层的拦截（`bin::assembly::privacy`）
 城的监听收到的 `Query::Privacy` 由服务作答，其余询问照旧由视图作答；`Command::PrivacyOperation`
@@ -16,7 +16,7 @@ crates.sprawling.spec.Privacy 证明，服务只把页面的一次询问或一�
 各答一句「由城的监听作答」（accounting 的 answering 与 routing），只在跳过了拦截的路径上出现。
 控制台与监听共用同一个 answering，所以终端里的 `Query::Privacy` 也由服务作答。
 远程设备的 `Ask { query: Privacy }` 与 `PrivacyOperation` 在中继按 `LocalOnly` 拒绝，不到城
-（crates/sprawling/spec/Outside/Conduit.lean）。
+（Sprawling/app/spec/Outside/Conduit.lean）。
 
 ## 答复（`Service::answer`，组装在 `bin::privacy::answer`）
 次序：结果表 → 主机事实 → 历史 → 每个控制的当前值 → 组装（D72）。

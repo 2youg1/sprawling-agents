@@ -77,7 +77,7 @@ fn fold(
 }
 
 /// The scanning reading, arm for arm as the terminal's part reads it
-/// (`crates/wire/spec/Answer/Doctor.lean` D25).
+/// (`Sprawling/wire/spec/Answer/Doctor.lean` D25).
 fn scanned(scanning: Scanning) -> wire::DoctorScanning {
     match scanning {
         Scanning::DoesNotApply => wire::DoctorScanning::DoesNotApply,

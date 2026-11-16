@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Background conformance for city D19 and `crates/sprawling/spec/Assembly.lean`.
+//! Background conformance for city D19 and `Sprawling/app/spec/Assembly.lean`.
 
 use super::*;
 use kernel::event::record::AuditVerdict;

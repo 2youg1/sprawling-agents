@@ -5,7 +5,7 @@
 
 //! The prefix hold at one endpoint's gate: which call sends the one
 //! pre-warm of a cold prefix, which calls wait for it, and when they go
-//! on toward a ticket (`crates/gateway/spec/Concurrency.lean` §8-40,
+//! on toward a ticket (`Sprawling/gateway/spec/Concurrency.lean` §8-40,
 //! D37-D41).
 //!
 //! A pure decision over the instants it is handed. `endpoint::permit`

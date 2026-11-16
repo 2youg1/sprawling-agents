@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Who reads a playback bundle, and whether one line is open to them
-//! (`crates/accounting/spec/Playback.lean` §8-12). The property is
-//! `crates/accounting/spec/Playback/Project.lean`: a line is visible only
+//! (`Sprawling/accounting/spec/Playback.lean` §8-12). The property is
+//! `Sprawling/accounting/spec/Playback/Project.lean`: a line is visible only
 //! when every building it touches is `Open`, and the two other arms of
 //! `kernel::ReadVerdict` both close.
 

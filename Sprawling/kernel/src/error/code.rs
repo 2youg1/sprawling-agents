@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Error codes: the closed AxCode set and its carrier events.
-//! The part `crates/kernel/spec/Error.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Error.lean` specifies this module with the
 //! rest of `kernel::error`.
 
 use serde::{Deserialize, Serialize};
@@ -81,7 +81,7 @@ pub enum AxCode {
     /// A served city is still proving the history it opened from, and
     /// its writer takes no line until the proof is whole. Loadtime for
     /// the same reason as `LedgerHeld`: the refused process may not write
-    /// yet (`crates/storage/Spec.lean` §8-30).
+    /// yet (`Sprawling/storage/Spec.lean` §8-30).
     HistoryUnproven,
     // Privacy and Discard (2).
     SecretEgress,
@@ -99,7 +99,7 @@ pub enum AxCode {
     // Accounts (1). Every redeemable account of a provider was tried in
     // one round and none answered; the carrier is `E_PROVIDER`'s, because
     // the fact is the same one, said by every account
-    // (`crates/kernel/spec/AccountRecovery.lean` §8-86).
+    // (`Sprawling/kernel/spec/AccountRecovery.lean` §8-86).
     ProviderAccountsExhausted,
     // Admission (2). An ACP agent answered that it needs a login first;
     // a pairing or open code was refused at this machine's door.
@@ -216,7 +216,7 @@ impl AxCode {
     /// history. Sole declaration site, exhaustive on purpose — a new code
     /// without a carrier decision is a compile error. The loadtime arm is
     /// the closed whitelist of codes that arise only while this process
-    /// cannot write the Ledger; `crates/kernel/Spec.lean` §12 gives each one's
+    /// cannot write the Ledger; `Sprawling/kernel/Spec.lean` §12 gives each one's
     /// reason.
     pub fn carrier(&self) -> Carrier {
         match self {

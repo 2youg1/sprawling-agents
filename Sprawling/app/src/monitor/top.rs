@@ -5,7 +5,7 @@
 
 //! What `sprawling top` prints: one JSON line per sample when stdout is
 //! not a terminal, and one curve per counter when it is
-//! (`crates/sprawling/spec/Monitor.lean` §8-95). Pure: the caller owns the terminal.
+//! (`Sprawling/app/spec/Monitor.lean` §8-95). Pure: the caller owns the terminal.
 
 use super::Sample;
 
@@ -75,7 +75,7 @@ struct Row {
 
 /// What a counter's integer counts, which decides how it is written.
 /// The one table of units: `gauge`'s lines for a person are written
-/// through it too (`crates/sprawling/spec/Main.lean` §8-129-4).
+/// through it too (`Sprawling/app/spec/Main.lean` §8-129-4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Unit {
     Permille,
@@ -180,7 +180,7 @@ impl Unit {
 
 /// A duration in nanoseconds as a person reads it: below 1 µs in ns,
 /// below 10 ms in whole µs, from 10 ms in ms to one decimal, truncated
-/// (`crates/sprawling/spec/Main.lean` §8-129-2, *单位*).
+/// (`Sprawling/app/spec/Main.lean` §8-129-2, *单位*).
 fn duration(nanos: u64) -> String {
     match nanos {
         0..1_000 => format!("{nanos} ns"),

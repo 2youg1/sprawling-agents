@@ -7,7 +7,7 @@
 //! Every provider call carries a `BuildingPolicy` value; the policy is
 //! *defined* here (kernel cannot name outer crates) and *evaluated* by
 //! `city::policy` — dependency inversion, same as the ledger seam.
-//! The part `crates/kernel/spec/Model.lean` specifies this module.
+//! The part `Sprawling/kernel/spec/Model.lean` specifies this module.
 
 mod generation;
 mod image;
@@ -59,12 +59,12 @@ pub type Increments<'a> = &'a mut dyn FnMut(&Increment);
 /// [`ModelReturn`] after the call settles; when the call fails, a caller
 /// discards whatever it derived from these. What a caller may start, and
 /// in which order it records the results, is fixed by
-/// `crates/runtime/spec/Turn/Speculation.lean`.
+/// `Sprawling/runtime/spec/Turn/Speculation.lean`.
 pub type EarlyCalls<'a> = &'a mut dyn FnMut(&ToolCall);
 
 /// The accounts an adapter can call as, in priority order, and the one
 /// its next request goes out on. Answered once before a round opens
-/// (`crates/kernel/spec/AccountRecovery.lean` §8-86), never per attempt.
+/// (`Sprawling/kernel/spec/AccountRecovery.lean` §8-86), never per attempt.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AccountRoster {
     pub provider: String,
@@ -107,7 +107,7 @@ pub trait Model {
     /// selecting cannot fail.
     fn select_account(&mut self, _account: &crate::ServerLabel) {}
     /// The wait the last call took at its endpoint's gate behind a
-    /// pre-warm of its shared prefix (`crates/kernel/spec/Model.lean`
+    /// pre-warm of its shared prefix (`Sprawling/kernel/spec/Model.lean`
     /// D60); `None` when it took none. Asked after every attempt, on
     /// success and on failure, by the turn that writes the
     /// `prefix_held` line; an adapter with no gate answers `None`.

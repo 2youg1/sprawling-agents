@@ -8,7 +8,7 @@
 //!
 //! Three paths put a letter in a room — a lane's send across the relay,
 //! a child's handback, and a settled landing's delivery — and each one
-//! takes this decision, so property 8 of `crates/collab/spec/Delivery.lean`
+//! takes this decision, so property 8 of `Sprawling/collab/spec/Delivery.lean`
 //! (one landing per letter, `knocked` exactly when this delivery queued a
 //! knock, `delivered` exactly when a run works in the room) holds for the
 //! whole city. The decision reads only the in-process room table and the

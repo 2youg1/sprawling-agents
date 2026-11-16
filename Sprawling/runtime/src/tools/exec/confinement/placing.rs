@@ -43,7 +43,7 @@ impl Placed {
             .ok_or_else(|| no_arm(Missing::ScratchDirectory))
     }
 
-    /// What putting the copy in place cost the filesystem (`crates/storage/Spec.lean`
+    /// What putting the copy in place cost the filesystem (`Sprawling/storage/Spec.lean`
     /// §8-31).
     pub fn work(&self) -> storage::FileWork {
         self.work

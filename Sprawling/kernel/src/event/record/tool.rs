@@ -14,7 +14,7 @@ use crate::tool::{Effect, RenderIntent, ToolName};
 /// preferred. Taken from the tool definitions rather than guessed:
 /// `file_path` is what `read` and `edit` take and `path` what most
 /// others take, the way Claude Code names them
-/// (`crates/runtime/spec/Tools.lean` §8-14-1); `addr` and `command`
+/// (`Sprawling/runtime/spec/Tools.lean` §8-14-1); `addr` and `command`
 /// name the one subject of the tools that take them.
 const SUBJECT_KEYS: [&str; 4] = ["file_path", "path", "addr", "command"];
 
@@ -47,7 +47,7 @@ pub struct ToolCalled {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject: Option<String>,
     /// The effect the tool was registered with at the moment of the
-    /// call, copied by the tool wave from its `ToolMeta` (`crates/kernel/spec/Event/Record.lean`
+    /// call, copied by the tool wave from its `ToolMeta` (`Sprawling/kernel/spec/Event/Record.lean`
     /// §8-75). Absent for a tool the bench did not know and on every line
     /// written before the key existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -95,13 +95,13 @@ pub struct ToolResult {
     pub answer: ToolAnswer,
     /// Whole microseconds from the moment the call started to the moment
     /// it answered, read off the turn's monotonic clock
-    /// (`crates/kernel/spec/Event/Record.lean` D20). Absent on every line
+    /// (`Sprawling/kernel/spec/Event/Record.lean` D20). Absent on every line
     /// written before the key existed: a reader then falls back to the
     /// difference of the two envelope moments, in milliseconds.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub took_us: Option<u64>,
     /// The renderer that drew the text the model read for this answer
-    /// (`crates/kernel/spec/Event/Record.lean` D64). Absent on every line
+    /// (`Sprawling/kernel/spec/Event/Record.lean` D64). Absent on every line
     /// written before the key existed, which reads as [`Rendering::V1`]:
     /// those lines were all shown to a model as their payload's JSON.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -115,7 +115,7 @@ pub struct ToolResult {
     /// Pictures this result carried into the model window. Kept so a
     /// fork rebuilds the same frozen conversation rather than dropping
     /// the images; empty is absent so older and picture-free lines keep
-    /// their exact bytes (`crates/kernel/spec/Event/Record.lean` D128).
+    /// their exact bytes (`Sprawling/kernel/spec/Event/Record.lean` D128).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub attachments: Vec<crate::ImageRef>,
 }
@@ -135,13 +135,13 @@ pub enum Rendering {
     /// a line could name its renderer.
     V1,
     /// One header line and a body for the tools that have one, and a
-    /// refusal as one line (`crates/runtime/spec/Rendering.lean` §8-63).
+    /// refusal as one line (`Sprawling/runtime/spec/Rendering.lean` §8-63).
     V2,
     /// V2 with its line numbers counted from 1, the way Claude Code and a
-    /// compiler count them (`crates/runtime/spec/Rendering.lean` D119).
+    /// compiler count them (`Sprawling/runtime/spec/Rendering.lean` D119).
     V3,
     /// V3 plus read-result rules and an unchanged reply
-    /// (`crates/runtime/spec/Rendering.lean` D126).
+    /// (`Sprawling/runtime/spec/Rendering.lean` D126).
     V4,
 }
 

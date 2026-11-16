@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Named daemon ownership (`crates/runtime/spec/Tools/Exec/Container.lean`, D50).
+//! Named daemon ownership (`Sprawling/runtime/spec/Tools/Exec/Container.lean`, D50).
 
 use std::path::PathBuf;
 use std::process::{Child, Command};

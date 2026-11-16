@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The conversation page's standing controls (crates/xtask/Spec.lean
+//! The conversation page's standing controls (Tools/xtask/Spec.lean
 //! §8-51, refrain P2 and P11): no fixed navigation or floating action
 //! bar over the conversation, and the persistent entries of its three
 //! clusters counted against the register.
@@ -25,7 +25,7 @@
 //! **The conversation's head holds one control.** The first standing
 //! control inside a `<header>` of the region is the address line that
 //! opens the palette (client/Spec.lean 4-10a), counted with the composer;
-//! a second control in the head is a bar again (crates/xtask/Spec.lean
+//! a second control in the head is a bar again (Tools/xtask/Spec.lean
 //! §8-51).
 
 use std::collections::BTreeMap;
@@ -172,7 +172,7 @@ pub(super) fn talk_controls_within_register(
         out.push(violation(
             at,
             "the register states how many standing controls the conversation page was accepted with",
-            format!("crates/xtask/budgets.toml has no whole `best_count` and `slack_count` in [{ROW}]"),
+            format!("Tools/xtask/budgets.toml has no whole `best_count` and `slack_count` in [{ROW}]"),
             "record the accepted fixture's reading in [talk_controls]",
         ));
         return;

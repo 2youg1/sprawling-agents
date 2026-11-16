@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The face the neighbourhood shows a model
-//! (`crates/city/spec/NeighboursTool.lean` §8-15b): this building's
+//! (`Sprawling/city/spec/NeighboursTool.lean` §8-15b): this building's
 //! addresses, or the city's buildings by name.
 //!
 //! The first line of every answer says that an address this does not

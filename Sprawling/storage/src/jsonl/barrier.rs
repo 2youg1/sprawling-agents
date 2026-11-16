@@ -4,9 +4,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The durability barrier's state: whether the ledger's in-memory
-//! position still names what the disk holds (`crates/storage/spec/Jsonl/Barrier.lean` §8-1).
+//! position still names what the disk holds (`Sprawling/storage/spec/Jsonl/Barrier.lean` §8-1).
 //!
-//! `crates/storage/spec/Jsonl/Barrier.lean` states the property this holds -
+//! `Sprawling/storage/spec/Jsonl/Barrier.lean` states the property this holds -
 //! every seq a handle answered `Ok` for survives a reopen - and proves it
 //! for any run of waves, with the counterexample for a handle that keeps
 //! writing after a failed wave.

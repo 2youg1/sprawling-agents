@@ -33,7 +33,7 @@ pub(crate) use tools::catalog_builtins;
 
 /// What laying out a run's bench reads from the city: handles that
 /// clone, and values read when the dispatch was staged, so the bench is
-/// laid out in the lane that drives the run (`crates/sprawling/Spec.lean` §8-113).
+/// laid out in the lane that drives the run (`Sprawling/app/Spec.lean` §8-113).
 ///
 /// The folds the accounting thread rewrites - who has mail waiting, who
 /// holds which goal, how far the city trusts its residents - arrive as
@@ -142,7 +142,7 @@ pub(in crate::worker) struct Laying {
     locks: Vec<String>,
     /// The endpoints and the choices made from them, which the
     /// transcription and OCR tools ask under this building's rules
-    /// (`crates/sprawling/Spec.lean` §8-131, §8-142).
+    /// (`Sprawling/app/Spec.lean` §8-131, §8-142).
     book: gateway::EndpointBook,
     proposing: tools::proposal::Proposing,
     /// Differences found while this run's catalog is assembled.
@@ -180,7 +180,7 @@ impl Laying {
 
     /// Opens the bench's checkpoint net on `writer`'s own index. The
     /// repository was made when the city opened, so no lane creates one
-    /// or writes its configuration (`crates/sprawling/spec/Accounting/Views.lean` §8-46-13).
+    /// or writes its configuration (`Sprawling/app/spec/Accounting/Views.lean` §8-46-13).
     ///
     /// # Errors
     /// Propagates a repository that will not open and an index that cannot
@@ -263,7 +263,7 @@ pub(super) struct Site {
     pub(super) routing: kernel::event::record::ModelRouting,
     /// The effective generation this session's requests carry.
     pub(super) generation: kernel::FrozenGeneration,
-    /// The endpoint the model is reached through (`crates/sprawling/Spec.lean` §8-85).
+    /// The endpoint the model is reached through (`Sprawling/app/Spec.lean` §8-85).
     pub(super) provider: String,
     pub(super) adapter: Option<super::keeping_warm::Door>,
     pub(super) identity: city::Identity,
@@ -280,10 +280,10 @@ pub(super) struct Site {
     branch: Option<String>,
     /// What survives a command's output in this run, resolved from the
     /// city's and the building's `FILTERS.toml` and frozen with the run
-    /// (`crates/sprawling/Spec.lean` §8-43).
+    /// (`Sprawling/app/Spec.lean` §8-43).
     pub(super) filters: runtime::FilterTable,
     /// The moment this run's driver read its clock last, which `status`
-    /// and a command's clock line report (`crates/sprawling/Spec.lean` §8-125).
+    /// and a command's clock line report (`Sprawling/app/Spec.lean` §8-125).
     pub(super) clock: runtime::ClockReading,
     /// Carried from the endpoint this run was given, frozen with
     /// everything else the run was set up with.
@@ -305,11 +305,11 @@ pub(super) struct Workbench {
     /// The bench, until the drive takes it. `Option` is the vehicle of
     /// that move and not a second state - the same handling `Site`
     /// gives its adapter - because a drive owns everything it runs on
-    /// and may leave this thread with it (`crates/sprawling/Spec.lean` §8-46-1).
+    /// and may leave this thread with it (`Sprawling/app/Spec.lean` §8-46-1).
     bench: Option<ToolBench>,
     /// The run's policy cell, until the plan takes it: built here,
     /// before the tools, because `edit` and `exec` hold its reader and
-    /// the run's driver is its one writer (`crates/runtime/spec/PolicyTake.lean`
+    /// the run's driver is its one writer (`Sprawling/runtime/spec/PolicyTake.lean`
     /// §8-62). `Option` for the reason `bench` is one.
     policy: Option<runtime::PolicyCell>,
     /// Whether this run asked to be replaced, read when it concludes.
@@ -342,7 +342,7 @@ pub(super) struct Reach<'a> {
 /// `panic = "abort"` a thread cannot die holding a desk, so the error
 /// arm is unreachable in the shipped binary and still written, because
 /// a test build unwinds and a desk left locked there is a fact worth a
-/// stable code rather than a second panic (`crates/sprawling/Spec.lean` §8-44).
+/// stable code rather than a second panic (`Sprawling/app/Spec.lean` §8-44).
 pub(super) fn held<'a, T>(
     desk: &'a std::sync::Mutex<T>,
     what: &'static str,
@@ -409,7 +409,7 @@ impl Site {
     ///
     /// Without a lease the checkpoint is **the run's write domain**, which is
     /// the building's own subtree plus whatever else its `RULES.toml`
-    /// declares, as `crates/storage/Spec.lean` §8-18 states. The room would be
+    /// declares, as `Sprawling/storage/Spec.lean` §8-18 states. The room would be
     /// narrower than the gate: `city::policy::write_domain` defaults to
     /// the whole building, and City Hall's residents reach every document
     /// under theirs. Anything a run wrote outside a room-sized checkpoint would

@@ -5,9 +5,9 @@
 
 //! The wait an attempt took at its endpoint's gate reaches the history
 //! as a `prefix_held` line after that attempt's `model_called`, on
-//! success and on failure (`crates/runtime/spec/Turn/Recovery.lean`
+//! success and on failure (`Sprawling/runtime/spec/Turn/Recovery.lean`
 //! D98), and the request says which part of it a building shares
-//! (`crates/runtime/spec/Prefix.lean` D97).
+//! (`Sprawling/runtime/spec/Prefix.lean` D97).
 
 #![allow(
     clippy::unwrap_used,

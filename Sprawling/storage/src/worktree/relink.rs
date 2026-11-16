@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Pointing each tree's two links at the city's new folder after the
-//! whole city moved (`crates/storage/spec/Worktree.lean` §8-9).
+//! whole city moved (`Sprawling/storage/spec/Worktree.lean` §8-9).
 //!
 //! git records a worktree by absolute path on both sides: the
 //! repository's `worktrees/<name>/gitdir` names the tree's `.git` file,

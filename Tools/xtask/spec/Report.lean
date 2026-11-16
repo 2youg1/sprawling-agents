@@ -6,8 +6,8 @@
 /-!
 # 一次 `gates` 运行的结论：按门序汇合，退出码取最重的一态
 
-规定 `crates/xtask/src/report.rs` 的 `finish_all` 与 `RunOutcome`，以及 `crates/xtask/src/gates.rs`
-把每道门的结论按门序交给它的那一步（`crates/xtask/Spec.lean` §8-31）。
+规定 `Tools/xtask/src/report.rs` 的 `finish_all` 与 `RunOutcome`，以及 `Tools/xtask/src/gates.rs`
+把每道门的结论按门序交给它的那一步（`Tools/xtask/Spec.lean` §8-31）。
 
 参照定义只陈述汇合规则：每道门交出「判过，带若干条违规」或「判不动」，一次运行走完全部结论，
 数出判不动的门与全部违规，再取一态。门怎样判、违规怎样渲染不在这里，那一半在各门自己的 Rust

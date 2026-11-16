@@ -6,7 +6,7 @@
 /-!
 # bin::browser_bidi
 
-规定 `crates/sprawling/src/browser_bidi.rs` 与 `crates/sprawling/src/browser_tool.rs`：居民经 BiDi 驱动的浏览器，与按楼的规则交给 run 的浏览器工具（`bin::browser_bidi`、`bin::browser_tool`）。本文件是 `crates/sprawling/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
+规定 `Sprawling/app/src/browser_bidi.rs` 与 `Sprawling/app/src/browser_tool.rs`：居民经 BiDi 驱动的浏览器，与按楼的规则交给 run 的浏览器工具（`bin::browser_bidi`、`bin::browser_tool`）。本文件是 `Sprawling/app/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `Sprawling/app/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `bin::browser_tool::tests`、`bin::browser_tool::tests::recordings` 守住。
 -/
@@ -38,11 +38,11 @@ impl Engine {
 
 工具住这里而不是 `browser` crate，理由是截图要落 `storage::cas`，而 `browser` 依赖图里没有 `storage`，也不该有。把 CAS 塞进 browser 会多一条本可不存在的依赖边；把工具放在装配层，`browser::verb` 的判定与 `storage::cas` 的字节各自留在自己那侧，中间只有一个 `Shot` 值。
 
-工具持有：一个 `Box<dyn BrowserPort>`、一个 `Session`、当前 `ContextId`、上一次 `PageSnapshot`（快照的 generation 由它递增）、一个 CAS 句柄。动作即 `browser::verb::Verb` 的变体（`crates/browser/Spec.lean` 的 D5），一个不多一个不少；`fetch` 的回复在这里变成 `status`、`type`、`url`、`text`、`cut`、`chars` 六个字段的结果，非文本的回复变成 `binary` 与 `bytes`，页面自己的拒绝变成 `error`。
+工具持有：一个 `Box<dyn BrowserPort>`、一个 `Session`、当前 `ContextId`、上一次 `PageSnapshot`（快照的 generation 由它递增）、一个 CAS 句柄。动作即 `browser::verb::Verb` 的变体（`Sprawling/browser/Spec.lean` 的 D5），一个不多一个不少；`fetch` 的回复在这里变成 `status`、`type`、`url`、`text`、`cut`、`chars` 六个字段的结果，非文本的回复变成 `binary` 与 `bytes`，页面自己的拒绝变成 `error`。
 
 `effect` 是 `Effect::Egress`：浏览器打开的每个 URL 都离开运行中的机器，所以它过出网门，confidential 楼因此天然拿不到它。
 
-**`act` 的结果说出它落在哪里**（`browser_tool::answering`）：`acted` 一格是快照给的 ref；指针动作没有 ref 时是 `viewport`；按键（`Action::Press`）是 `focus`，因为一次按键落在页面此刻的焦点上，不带 ref，也不碰视口（`crates/browser/Spec.lean` 的 D12）。三个词按 `Action` 的臂穷尽给出，不从「有没有 ref」反推——那样按键会被记成 `viewport`，读账本的人看到的是一次没发生过的指针动作。
+**`act` 的结果说出它落在哪里**（`browser_tool::answering`）：`acted` 一格是快照给的 ref；指针动作没有 ref 时是 `viewport`；按键（`Action::Press`）是 `focus`，因为一次按键落在页面此刻的焦点上，不带 ref，也不碰视口（`Sprawling/browser/Spec.lean` 的 D12）。三个词按 `Action` 的臂穷尽给出，不从「有没有 ref」反推——那样按键会被记成 `viewport`，读账本的人看到的是一次没发生过的指针动作。
 
 **`usersbrowser` 披露的参数表与 `Verb::read` 读的参数一一对应**（`browser_tool::person`）：`kind` 的枚举含 `press`，`key` 与 `modifiers` 各有一格；键名与修饰键名的清单不抄进描述，描述只说它们取 DOM `KeyboardEvent.key` 的名字，未知的名字由 `Key::parse`、`Modifier::parse` 拒，拒词列出能用的名字——清单的家仍是 `browser::keyboard` 一处。同一个参数名只写一格：`ref` 与 `refs` 的说明把 `act`、`measure` 与 `screenshot` 写在同一句里，因为 JSON 对象里后写的同名键会静默盖掉先写的，模型只会读到后一种用法。
 
@@ -56,7 +56,7 @@ impl RunWorker {
 }
 ```
 
-`lay_out_workbench` 调的是 `RunWorker.browsers`，不直接调 `browser_tool::for_rules`：本模块起浏览器、经 BiDi 说话，worker 搬进 `accounting` 时它留在 `sprawling`（`crates/accounting/Spec.lean` §7、accounting D10）。换掉它放不宽机密：`city::policy` 在机密楼上拒绝 `browser` 与 `usersbrowser` 两项设置，楼的规则里就没有要浏览器的那一句。钉住它的测试是 `crates/sprawling/tests/browsers.rs` 的 `a_run_is_offered_the_browser_the_worker_was_handed`。
+`lay_out_workbench` 调的是 `RunWorker.browsers`，不直接调 `browser_tool::for_rules`：本模块起浏览器、经 BiDi 说话，worker 搬进 `accounting` 时它留在 `sprawling`（`Sprawling/accounting/Spec.lean` §7、accounting D10）。换掉它放不宽机密：`city::policy` 在机密楼上拒绝 `browser` 与 `usersbrowser` 两项设置，楼的规则里就没有要浏览器的那一句。钉住它的测试是 `Sprawling/app/tests/browsers.rs` 的 `a_run_is_offered_the_browser_the_worker_was_handed`。
 
 ### 8-45-3 截图成为证据
 
@@ -102,6 +102,6 @@ pub(super) fn own() -> OwnListeners;                   // 此刻的登记；死�
 
 决定：§8-45-6 的三条判断落在 `bin::browser_tool`，对 `browser` 与 `usersbrowser` 一样，判定本身（一个地址是不是城的某个监听）在 `browser::OwnListeners`。理由：`usersbrowser` 驱动的是人自己的 profile，城的页面在那个 profile 里存着人的设备钥，一个居民把它带到城的源上，就能以人的身份操作这座城；`browser` 的 profile 是楼自己的，没有设备钥，可它照样能打开配对页。两件工具一条规则，比只守一件少一处要记住的差别。出网门不改：`kernel::gate` 的出网判定只按主机，回环一律放行（居民要看自己起的开发服务器），它不知道城监听在哪个端口，而登记只有装配层知道。被否：①让出网门长出「本城的监听」这一判定——要把端口带进 kernel 的门，而门的输入今天只有主机；②拦所有回环——居民的开发循环就是在回环上看自己造的东西。
 
-现状：页面自己发起的子资源请求与脚本里的 `fetch` 不经这条守卫。sec.md E.6 要的 BiDi `network.addIntercept` 需要 `BidiSocket` 在等答复的循环里答 `network.beforeRequestSent` 事件（`network.failRequest`），并用一段不与 `Session` 相撞的帧 id；今天的端口跳过一切事件，装上拦截而不答，被拦的请求就挂到下一次调用为止。挡住这类请求的是城在这台电脑上那个端口的入口判定：Origin 不在名单里的请求在升级之前就被拒（`crates/wire/Spec.lean` 的入口判定）。重开参数：BiDi 端口开始处理事件时，加上这一道拦截。
+现状：页面自己发起的子资源请求与脚本里的 `fetch` 不经这条守卫。sec.md E.6 要的 BiDi `network.addIntercept` 需要 `BidiSocket` 在等答复的循环里答 `network.beforeRequestSent` 事件（`network.failRequest`），并用一段不与 `Session` 相撞的帧 id；今天的端口跳过一切事件，装上拦截而不答，被拦的请求就挂到下一次调用为止。挡住这类请求的是城在这台电脑上那个端口的入口判定：Origin 不在名单里的请求在升级之前就被拒（`Sprawling/wire/Spec.lean` 的入口判定）。重开参数：BiDi 端口开始处理事件时，加上这一道拦截。
 -/
 

@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The Rust reference for the leaf's four buffer rules: the rules of
-// `crates/desktop/ffi/Spec.lean` written in safe Rust, so the equivalence test
-// in `boundary` and the fuzz target in `crates/desktop/ffi/fuzz/` compare the
+// `Sprawling/desktop/ffi/Spec.lean` written in safe Rust, so the equivalence test
+// in `boundary` and the fuzz target in `Sprawling/desktop/ffi/fuzz/` compare the
 // Zig leaf with one definition of what it must do. It is compiled into
 // those two and into nothing that ships; both reach `boundary` and
 // `step` as siblings of this module.

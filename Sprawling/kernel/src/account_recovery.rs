@@ -6,8 +6,8 @@
 //! Which account of a provider a request goes out on, and after a failure
 //! whether it goes out again on the same account, moves to another, or
 //! stops.
-//! The part `crates/kernel/spec/AccountRecovery.lean` specifies this
-//! module (`crates/kernel/Spec.lean` §8-86, kernel D54 and D55).
+//! The part `Sprawling/kernel/spec/AccountRecovery.lean` specifies this
+//! module (`Sprawling/kernel/Spec.lean` §8-86, kernel D54 and D55).
 //!
 //! **One round is one logical request**, from its first send to an
 //! answer, a stop or a `Halt`. Both drivers - the model path in the
@@ -395,7 +395,7 @@ mod tests {
         Some(AccountStep::Stop { why })
     }
 
-    /// The trace vectors `crates/kernel/spec/AccountRecovery.lean` prints
+    /// The trace vectors `Sprawling/kernel/spec/AccountRecovery.lean` prints
     /// with `#eval`, in its order, each with the answer Lean gave, and
     /// the `decide` example after them.
     #[test]
@@ -536,7 +536,7 @@ mod tests {
     const NAMES: [&str; 6] = ["a", "b", "c", "d", "e", "z"];
 
     proptest! {
-        /// The quantified theorems of `crates/kernel/spec/AccountRecovery.lean`
+        /// The quantified theorems of `Sprawling/kernel/spec/AccountRecovery.lean`
         /// on any roster of two to five accounts, any redeemable subset,
         /// any ceiling, any held account (listed or not) and any trace:
         /// `a_request_error_is_never_sent_again`,

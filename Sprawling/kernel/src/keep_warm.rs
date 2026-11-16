@@ -5,7 +5,7 @@
 
 //! Keep-warm: whether, and when, a prompt cache still in use is renewed
 //! before the provider lets it expire.
-//! The part `crates/kernel/spec/KeepWarm.lean` specifies this module.
+//! The part `Sprawling/kernel/spec/KeepWarm.lean` specifies this module.
 //!
 //! **Off unless the city enables it.** A renewal is a request the person
 //! pays for, so [`KeepWarm::Off`] is the default and plans nothing. Spend
@@ -122,7 +122,7 @@ mod tests {
         assert_eq!(renewal_due(KeepWarm::FiveMinute, renewed, LEAD_MS), None);
     }
 
-    /// What a door meets, as `Event` in `crates/kernel/spec/KeepWarm.lean`:
+    /// What a door meets, as `Event` in `Sprawling/kernel/spec/KeepWarm.lean`:
     /// a real request carrying the prefix sent at an instant, or a wake at
     /// an instant with the lead its endpoint reads then.
     #[derive(Debug, Clone, Copy)]
@@ -148,7 +148,7 @@ mod tests {
 
     proptest! {
         /// `at_most_one_renewal_per_use`, `every_renewal_leaves_the_margin`
-        /// and `off_sends_nothing` of `crates/kernel/spec/KeepWarm.lean`,
+        /// and `off_sends_nothing` of `Sprawling/kernel/spec/KeepWarm.lean`,
         /// on any trace of uses and wakes with any lead at each wake. The
         /// door is driven here as `Door.step` drives it, and the renewals
         /// are counted from the ones this driver sends.

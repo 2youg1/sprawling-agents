@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a privacy control writes, and what a read of it returns
-//! (`crates/sprawling/spec/Privacy/Controls.lean`).
+//! (`Sprawling/app/spec/Privacy/Controls.lean`).
 //!
 //! A target names a place on the host; its operation kind and its scope
 //! follow from the place and are not stored beside it (Privacy D68).

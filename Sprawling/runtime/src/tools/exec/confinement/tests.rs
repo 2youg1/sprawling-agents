@@ -138,7 +138,7 @@ fn source_tree(files: u64) -> tempfile::TempDir {
     source
 }
 
-/// `crates/runtime/spec/Tools/Exec.lean` §8-13-2 and runtime D10: the second command of a tool gets the
+/// `Sprawling/runtime/spec/Tools/Exec.lean` §8-13-2 and runtime D10: the second command of a tool gets the
 /// copy the first one used, brought back to the working directory, so
 /// what it writes is what the first command and the person changed, not
 /// the whole tree again. Judged at two sizes: a copy made afresh would

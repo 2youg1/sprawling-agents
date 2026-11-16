@@ -38,7 +38,7 @@ pub enum Command<Secret = Sealed<String>> {
         goal: String,
         /// The four values the run works under: mode, write limit,
         /// admission requirement and landing policy, all four stated
-        /// (`crates/wire/spec/Command.lean` §8-57). Written as sent into the run's
+        /// (`Sprawling/wire/spec/Command.lean` §8-57). Written as sent into the run's
         /// `run_started` line.
         policy: RunPolicy,
         idem: IdemKey,
@@ -55,7 +55,7 @@ pub enum Command<Secret = Sealed<String>> {
         /// own configuration and, failing that, the provider's default.
         /// A value is written into the session's own configuration when
         /// its room is opened, so it is chosen once and holds for every
-        /// run in that room (`crates/city/Spec.lean` §8-14).
+        /// run in that room (`Sprawling/city/Spec.lean` §8-14).
         effort: Option<Effort>,
         /// Which registered model this one dispatch calls, by its id.
         ///
@@ -63,7 +63,7 @@ pub enum Command<Secret = Sealed<String>> {
         /// model the city registered under some tag, so it arrives with
         /// the endpoint and the window it was registered with; an id the
         /// city never registered is refused before anything is written
-        /// (`crates/wire/spec/Command.lean` §8-48c).
+        /// (`Sprawling/wire/spec/Command.lean` §8-48c).
         model: Option<String>,
     },
     /// Asks a base URL what it serves, and attaches nothing.
@@ -100,12 +100,12 @@ pub enum Command<Secret = Sealed<String>> {
         /// both empty the city admits everything the endpoint serves,
         /// which is what a person who did not look at the list meant; a
         /// ticked id the endpoint does not serve is left out
-        /// (`crates/gateway/spec/Endpoint/Models.lean` D39).
+        /// (`Sprawling/gateway/spec/Endpoint/Models.lean` D39).
         admit: Vec<String>,
         /// The ids the person typed. Each is admitted whether or not the
         /// endpoint's list carries it, and one the list does not carry is
         /// registered on the person's word and marked `named`
-        /// (`crates/wire/spec/Frames.lean` D57).
+        /// (`Sprawling/wire/spec/Frames.lean` D57).
         named: Vec<String>,
         /// What this endpoint is called, how long it may take, and what
         /// every request to it carries, kept beside the registration so a
@@ -129,13 +129,13 @@ pub enum Command<Secret = Sealed<String>> {
         /// without a ceiling rather than with a zero one.
         max_output_tokens: Option<Ceiling>,
         /// What the person says the model accepts. Absent, the catalogue and
-        /// the preset table answer (`crates/gateway/Spec.lean` §8-37, D16).
+        /// the preset table answer (`Sprawling/gateway/Spec.lean` §8-37, D16).
         input: Option<InputKinds>,
         idem: IdemKey,
     },
     /// Starts a new session at an address: same room, a fresh stretch of conversation in it, so a
     /// person who changed the model starts it on purpose rather than having the room's frozen shape
-    /// move behind their back (`crates/sprawling/Spec.lean` §8-82). [`Carry`] names what crosses; the default
+    /// move behind their back (`Sprawling/app/Spec.lean` §8-82). [`Carry`] names what crosses; the default
     /// keeps nothing. Writes `session_opened`.
     OpenSession {
         addr: Address,
@@ -144,7 +144,7 @@ pub enum Command<Secret = Sealed<String>> {
         /// branch is a session whose first run begins from a line of
         /// another conversation, and everything else about it - model,
         /// effort, handoff - is what [`Carry`] and the room already say
-        /// (`crates/sprawling/Spec.lean` §8-82).
+        /// (`Sprawling/app/Spec.lean` §8-82).
         from: Option<Origin>,
         idem: IdemKey,
     },
@@ -282,7 +282,7 @@ pub enum Command<Secret = Sealed<String>> {
     },
     /// Writes one of the three documents that govern this city, whole,
     /// only if it still holds `base`: the raw editor and the identity
-    /// cards are two writers of one file (`crates/wire/spec/Answer/Identity.lean` §8-59).
+    /// cards are two writers of one file (`Sprawling/wire/spec/Answer/Identity.lean` §8-59).
     PutDocument {
         which: GovernedDocument,
         base: String,
@@ -290,32 +290,32 @@ pub enum Command<Secret = Sealed<String>> {
         idem: IdemKey,
     },
     /// One identity card: the city rewrites the card's keys in `base`'s
-    /// identity area and leaves every other byte (`crates/wire/spec/Answer/Identity.lean` §8-59).
+    /// identity area and leaves every other byte (`Sprawling/wire/spec/Answer/Identity.lean` §8-59).
     PutIdentity {
         card: IdentityCard,
         base: String,
         idem: IdemKey,
     },
-    /// Writes a building's `RULES.toml` whole (`crates/wire/spec/Command/Step.lean` §8-60).
+    /// Writes a building's `RULES.toml` whole (`Sprawling/wire/spec/Command/Step.lean` §8-60).
     PutRules(RulesWrite),
     /// Sets the provider, model and effort a new child session uses,
     /// rewriting only `[workspace_models.choice]` through the same rules
     /// door as [`Command::PutRules`].
     SetWorkspaceChoice(WorkspaceChoiceWrite),
     /// Takes one file of the city's own tree back to what a checkpoint
-    /// holds, or away when it holds none (`crates/wire/spec/Answer/Automation.lean` §8-62).
+    /// holds, or away when it holds none (`Sprawling/wire/spec/Answer/Automation.lean` §8-62).
     RestoreFile {
         at: Address,
         point: GitOid,
         idem: IdemKey,
     },
     /// Writes this city's first-run guide progress whole; the later of
-    /// two writes stays (`crates/wire/spec/Guide.lean` §8-68).
+    /// two writes stays (`Sprawling/wire/spec/Guide.lean` §8-68).
     PutGuide {
         progress: GuideProgress,
         idem: IdemKey,
     },
-    /// Writes the city's own layer (`crates/wire/spec/Command/Step.lean` §8-61).
+    /// Writes the city's own layer (`Sprawling/wire/spec/Command/Step.lean` §8-61).
     ConfigureCity(CitySettings),
     /// Writes one of a building's own spine documents.
     ///
@@ -332,9 +332,9 @@ pub enum Command<Secret = Sealed<String>> {
         body: String,
         idem: IdemKey,
     },
-    /// Saves edits on one document version (`crates/wire/spec/Command/Step.lean` §8-72).
+    /// Saves edits on one document version (`Sprawling/wire/spec/Command/Step.lean` §8-72).
     PutRange(RangeWrite),
-    /// Decides proposal cards on one document (`crates/wire/spec/Answer/Proposals.lean` §8-73).
+    /// Decides proposal cards on one document (`Sprawling/wire/spec/Answer/Proposals.lean` §8-73).
     DecideProposals(ProposalDecisions),
     /// Connects one outside application through the broker that holds its OAuth, answered with the
     /// whole shelf: the broker was asked, so every row is fresh, and the pressed one carries its
@@ -388,7 +388,7 @@ pub enum Command<Secret = Sealed<String>> {
     AgentLogin(crate::AgentLoginStart),
     ForgetDevice(crate::DeviceForgetting),
     /// One whole-document step on a prompt document the city's list names
-    /// (`crates/wire/spec/Answer/Prefix.lean` §8-98); writes
+    /// (`Sprawling/wire/spec/Answer/Prefix.lean` §8-98); writes
     /// `governed_document_written` with `at`.
     PutPrompt(PromptWrite),
     /// Presenting a pairing token. Read-only, hence no `IdemKey`; the token is plain here because a

@@ -6,7 +6,7 @@
 /-!
 # gateway::concurrency
 
-规定 `concurrency`（`crates/gateway/src/concurrency.rs`）：一个端点的并发名额，纯判定，只读注入的时刻与调用的结果；以及取号之前的前缀等待 `hold`（§8-40，住 `crates/gateway/src/` 下新开的 `hold.rs`）。本文件是 `crates/gateway/Spec.lean` 的一个分部，名额的形状与常量的理由在 D17，前缀等待的在 D37 到 D43。
+规定 `concurrency`（`Sprawling/gateway/src/concurrency.rs`）：一个端点的并发名额，纯判定，只读注入的时刻与调用的结果；以及取号之前的前缀等待 `hold`（§8-40，住 `Sprawling/gateway/src/` 下新开的 `hold.rs`）。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部，名额的形状与常量的理由在 D17，前缀等待的在 D37 到 D43。
 
 模型是一个端点的名额状态在一条事件轨迹上的演变。事件五种：取（take）、还（give back）、被限流（429，带或不带 `Retry-After`）、一次成功、时间流逝（tick）。每个带时刻的事件自带它发生的时刻，状态不持有时钟，所以三个平台相同。
 
@@ -295,7 +295,7 @@ theorem successes_stop_at_cap (s : Permits) (trace : List Event) (hv : Valid s) 
 /-!
 ## 排队：按号先来后到（D20）
 
-`Full` 时调用拿一张号排队，名额空出时只有队首那张号取到；排得太久的号被拒出队（`QUEUE_WAIT_MAX`）。模型只看号：到达、给队首一个名额、拒掉某张号。下面证明，在任意一条轨迹上，取到名额的号按拿号的次序排列——后到的调用从不先于先到的取到（`grants_follow_arrival`）。派生检查：`crates/gateway/src/endpoint/permit.rs` 的 proptest `grants_follow_arrival` 对随机的到达、任一排队者的尝试、归还与超时轨迹驱动 `Gate` 的号队列（`admit` 的每一步都是它），断言取到的号严格递增；它先对一个把名额给最新那张号的队列变红过。
+`Full` 时调用拿一张号排队，名额空出时只有队首那张号取到；排得太久的号被拒出队（`QUEUE_WAIT_MAX`）。模型只看号：到达、给队首一个名额、拒掉某张号。下面证明，在任意一条轨迹上，取到名额的号按拿号的次序排列——后到的调用从不先于先到的取到（`grants_follow_arrival`）。派生检查：`Sprawling/gateway/src/endpoint/permit.rs` 的 proptest `grants_follow_arrival` 对随机的到达、任一排队者的尝试、归还与超时轨迹驱动 `Gate` 的号队列（`admit` 的每一步都是它），断言取到的号严格递增；它先对一个把名额给最新那张号的队列变红过。
 -/
 
 /-- 一个端点的排队（`endpoint::permit` 的 `Queue`，在 `Gate` 里）。`granted` 是观察用的影子：Rust 不留已取到的号，proptest 自己记下它们。 -/
@@ -452,7 +452,7 @@ pub(super) struct Prewarming { key: PrefixKey, request: ModelRequest<'static>, b
 - `endpoint::permit` 的三例，在回环假 provider 上，经一个把名字 `provider.test` 解析到回环端口的 `Transport::detoured` 去够它：回环地址是 `reach::is_local`，D39 第 1 条在那里从不等，所以假 provider 要以一个不在这台电脑上的名字出现。`a_cold_wave_sends_one_prewarm_and_then_every_call`：三条线程带同一段冷前缀同时调同一个端点，记下的交换是一次 pre-warm（`max_tokens` 为 1、只带共享的 system 块、一条 `"."` 消息）再三次真请求；`a_prefix_just_used_is_not_held`：一次调用之后同键的一波三个调用不等、不再 pre-warm；`a_refused_prewarm_releases_every_call`：假 provider 拒 pre-warm（429），三次真调用照样发出、各自成功，每个跟随者的 `prefix_held` 都答 `refused`。
 - `runtime::turn` 的 `a_held_attempt_is_recorded_between_its_call_and_its_return`：模型端口答出一次等待时，`prefix_held` 紧跟那次尝试的 `model_called`，在 `model_returned` 之前。
 
-**现状**：issue #85 的端到端验收（替身 provider 上一波三件委派进同一栋楼，经真实的 `RunWorker`，写在 `crates/sprawling/tests/` 下）还没有。`just provider` 的替身在回环端口上听，D39 第 1 条让发往这台电脑的调用从不等，所以它在今天的替身上看不见任何 pre-warm；它要等替身能以一个不在这台电脑上的名字被够到（例如 assembly 接受一个只在测试里用的解析表）。上面 `endpoint::permit` 的三例在门这一层覆盖同样的三种结局。
+**现状**：issue #85 的端到端验收（替身 provider 上一波三件委派进同一栋楼，经真实的 `RunWorker`，写在 `Sprawling/app/tests/` 下）还没有。`just provider` 的替身在回环端口上听，D39 第 1 条让发往这台电脑的调用从不等，所以它在今天的替身上看不见任何 pre-warm；它要等替身能以一个不在这台电脑上的名字被够到（例如 assembly 接受一个只在测试里用的解析表）。上面 `endpoint::permit` 的三例在门这一层覆盖同样的三种结局。
 -/
 
 /-! D42 pre-warm 只带共享部分与一条最小的消息，消息上不打断点，只要一个输出 token
@@ -549,7 +549,7 @@ inductive Ending where
 
 **决定**：前缀键 `PrefixKey` 是 BLAKE3（作答账号的 id，接一个零字节，再接 pre-warm 请求体的 JSON 字节）；请求体是 D42 的那条 pre-warm 经 `Endpoint::wire_request` 编出的值。端点不进字节：一个 `Holds` 住在一个端点的 `Gate` 里（§8-6），键只在同一个端点上比。请求体里有端点自己的模型 id（`config.model`）、工具表、到最后一个共享边界为止的 system 块与它们的 `cache_control` 标记、按 offer 编好的思考字段与 effort（D35），以及人写下的 overrides；speed 一进请求体（#71）就进键，每个子 run 自己的 effort（#74）同理。没有命名账号的旧登记，账号那一格是空串。模型里键是一个自然数，只被比较。
 
-共享边界由请求自己说出：`ChatRequest.shared`（kernel D60）说 `system` 的前几块是同一栋楼里每个居民都逐字节带着的。runtime 组回合请求时把它定在 Building 段的边界上，因为 Resident 段由身份与目录拼成（`crates/runtime/src/prefix/segment.rs`），各个子 run 不同。
+共享边界由请求自己说出：`ChatRequest.shared`（kernel D60）说 `system` 的前几块是同一栋楼里每个居民都逐字节带着的。runtime 组回合请求时把它定在 Building 段的边界上，因为 Resident 段由身份与目录拼成（`Sprawling/runtime/src/prefix/segment.rs`），各个子 run 不同。
 
 **理由**：缓存能不能命中由发出去的字节决定，所以键直接取那些字节，而不是列一张字段表：表要与请求体保持一致，每加一个影响缓存的设置就要记得加一格，忘了的那一次，两个缓存不同的调用会共用一次 pre-warm，后一个照样按写价重写。账号进键，是因为 provider 的缓存按账号分开。
 

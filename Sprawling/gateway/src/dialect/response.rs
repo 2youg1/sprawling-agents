@@ -9,7 +9,7 @@
 //! dialect.
 //! Final parsing remains `response_from_wire` on both call paths.
 //!
-//! Spec: `crates/gateway/spec/Endpoint/Stream.lean` §8-13.
+//! Spec: `Sprawling/gateway/spec/Endpoint/Stream.lean` §8-13.
 
 use kernel::{AxError, ChatResponse, DialectKind, Increment, ToolCall};
 use serde_json::Value;
@@ -30,7 +30,7 @@ pub fn increment_of(kind: DialectKind, frame: &Value) -> Option<Increment> {
 }
 
 /// Frames retained until EOF; transport failures are decided before settlement.
-/// Spec: `crates/gateway/spec/Endpoint/Stream.lean` §8-13.
+/// Spec: `Sprawling/gateway/spec/Endpoint/Stream.lean` §8-13.
 pub(crate) struct StreamFrames {
     kind: DialectKind,
     frames: Vec<Value>,

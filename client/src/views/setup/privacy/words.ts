@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The privacy page's words for what the host's answer names. The host
-// sends names only (`crates/wire/src/privacy.rs`); every sentence about a
+// sends names only (`Sprawling/wire/src/privacy.rs`); every sentence about a
 // control, an edition or a reason is a phrase in `lang.json` keyed by
 // that name. Each key below is spelled from a closed set of the wire, so
 // a member the table has no phrase for fails the typecheck rather than

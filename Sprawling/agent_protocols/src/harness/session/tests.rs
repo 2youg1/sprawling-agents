@@ -247,7 +247,7 @@ fn quiet() -> Listener<'static> {
 
 /// A halt that arrives while the agent says nothing still becomes a
 /// cancel, once, and the cancel is booked and sent before the next
-/// report is handed on (crates/agent_protocols/spec/Harness/Session.lean,
+/// report is handed on (Sprawling/agent_protocols/spec/Harness/Session.lean,
 /// `a_halt_is_a_cancel_before_anything_else`).
 #[test]
 fn a_halt_while_the_agent_is_silent_is_a_cancel_before_the_next_report() {

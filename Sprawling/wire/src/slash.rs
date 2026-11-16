@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The slash verbs a person types, one table for the CLI and the WebUI
-//! (`crates/wire/spec/Slash.lean` §8-96).
+//! (`Sprawling/wire/spec/Slash.lean` §8-96).
 //!
 //! Every fact about a verb is one arm of a `const fn` on [`Slash`], so
 //! adding a verb makes the compiler ask for its spelling, its argument,

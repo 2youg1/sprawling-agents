@@ -75,7 +75,7 @@
 
 一个 harness 的*脚手架*（scaffolding），是它围在模型四周、让长时间的活保持连贯的结构：agent 开工前要读的文件、收工前要写的文件，以及它改不了的规则。
 
-在 sprawling 里，这套脚手架是一组 Markdown 与 TOML 表单，楼盖起来时落在楼里（模板在 [`crates/city/templates/`](../crates/city/templates/)）。表单靠形状教人：标题齐全的一张空表，连小的本地模型也能填对。
+在 sprawling 里，这套脚手架是一组 Markdown 与 TOML 表单，楼盖起来时落在楼里（模板在 [`Sprawling/city/templates/`](../Sprawling/city/templates/)）。表单靠形状教人：标题齐全的一张空表，连小的本地模型也能填对。
 
 | 文件 | 位置 | 谁写 | 用来做什么 |
 |---|---|---|---|
@@ -128,7 +128,7 @@ reading_room = ["how", "blast-radius"]
 shelves = ["~/.claude/skills"]
 ```
 
-**设置**里的**技能**一组列出每一格书架、每栋楼准入了什么、每件 skill 被多少次 run 用过。它的**主机的 skill 文件夹**一栏收一个绝对路径——`~/.claude/skills`，或 Windows 盘符——把整个文件夹只读挂载进来：里面每个带 `SKILL.md` 的文件夹都成为一件 skill，内容不复制，城答复之后上面的列表就出现它。本仓库附带 [`../crates/city/skills/`](../crates/city/skills/) 下的技能；二进制带着它们，新建的城市在自己的书架上就能找到每一件。
+**设置**里的**技能**一组列出每一格书架、每栋楼准入了什么、每件 skill 被多少次 run 用过。它的**主机的 skill 文件夹**一栏收一个绝对路径——`~/.claude/skills`，或 Windows 盘符——把整个文件夹只读挂载进来：里面每个带 `SKILL.md` 的文件夹都成为一件 skill，内容不复制，城答复之后上面的列表就出现它。本仓库附带 [`../Sprawling/city/skills/`](../Sprawling/city/skills/) 下的技能；二进制带着它们，新建的城市在自己的书架上就能找到每一件。
 
 **MCP**（Model Context Protocol）是一栋楼通往外部应用——邮件、GitHub、Figma、文档转换器——的路，经由一个工具服务。一个 server 是楼的 `CONFIG.toml` 里的一条：电脑上的程序写 `command`，托管服务写 `url`；**MCP** 页替你写同样的条目。保密楼一个也不起。
 
@@ -215,7 +215,7 @@ sprawling help
 
 [发行列表](https://github.com/2youg1/sprawling-agents/releases)里有预发布版本，GitHub 的 `releases/latest` 入口不包含它们，所以先选一个实际发布过的 tag，再照它的资产名、changelog 和校验摘要来。下文的 `<release-tag>`、`<npm-version>`、`<crate-version>`、`<archive.zip>` 都要换成真实值才能运行。
 
-Git tag、npm 版本和 crate 版本是三套不同的拼法，发布流水线通过 [kernel::Release](../crates/kernel/src/release.rs) 从同一个版本号派生出它们。
+Git tag、npm 版本和 crate 版本是三套不同的拼法，发布流水线通过 [kernel::Release](../Sprawling/kernel/src/release.rs) 从同一个版本号派生出它们。
 
 固定版本时：npm/Bun 用 `sprawling@<npm-version>`，Cargo 用 `cargo install sprawling --locked --version <crate-version>`，binstall 用 `cargo binstall sprawling --version <crate-version>`。shell 安装器只给这一次调用带上完整 tag：
 

@@ -119,7 +119,7 @@ pub enum EventKind {
     /// A subscription login an older build began. This build signs in
     /// to no subscription and writes none; the kind stays so a ledger
     /// that holds one still reads, and nothing reads its payload
-    /// (`crates/gateway/Spec.lean` §8-5).
+    /// (`Sprawling/gateway/Spec.lean` §8-5).
     LoginStarted,
     EvalRun,
     AssetArchived,
@@ -152,7 +152,7 @@ pub enum EventKind {
     ///
     /// The request is history and belongs here; **where that application
     /// stands right now is not, and is deliberately absent from the
-    /// payload** (`crates/wire/Spec.lean` §8-35b): a recorded standing
+    /// payload** (`Sprawling/wire/Spec.lean` §8-35b): a recorded standing
     /// would still read "connected" an hour after the person revoked
     /// it. The consent page's own url is absent for a second reason -
     /// it is a capability, and anybody replaying this log would be
@@ -230,7 +230,7 @@ pub enum EventKind {
 
     // Sessions and the shelf (3).
     /// The room's run policy, changed while a session is open
-    /// (`crates/kernel/spec/Event/Record.lean` D21).
+    /// (`Sprawling/kernel/spec/Event/Record.lean` D21).
     RunPolicyChanged,
     /// The name a person gave one session (D22).
     SessionNamed,
@@ -239,7 +239,7 @@ pub enum EventKind {
 
     // The reply wait (2).
     /// A run that sent with `wait` stopped at its safe point for a reply
-    /// (`crates/kernel/spec/Event/Record.lean` D32).
+    /// (`Sprawling/kernel/spec/Event/Record.lean` D32).
     SignalWaitStarted,
     /// The one line that ends a `signal_wait_started`: the reply came,
     /// the deadline passed, or the run left its room (D32).
@@ -247,19 +247,19 @@ pub enum EventKind {
 
     // Where a letter landed (1).
     /// Where the accounting thread put one `signal_enqueued`: a running
-    /// run's slot, the queue, or a knock (`crates/kernel/spec/Event/Record.lean` D38).
+    /// run's slot, the queue, or a knock (`Sprawling/kernel/spec/Event/Record.lean` D38).
     SignalLanded,
 
     // The shelf (1).
     /// One version of a skill landed on a shelf through the city's door,
-    /// and where it came from (`crates/kernel/spec/Event/Record.lean` D23).
+    /// and where it came from (`Sprawling/kernel/spec/Event/Record.lean` D23).
     SkillShelved,
 
     // The prefix hold (1).
     /// One wait a model call took at its endpoint's gate behind a
     /// pre-warm of the prefix a building shares, how the pre-warm ended,
     /// and on the call that sent it what it cost
-    /// (`crates/kernel/spec/Event/Record.lean` D61).
+    /// (`Sprawling/kernel/spec/Event/Record.lean` D61).
     PrefixHeld,
 }
 

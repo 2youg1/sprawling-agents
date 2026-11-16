@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The collaboration scenarios of TP3 (`crates/citysim/Spec.lean` §16,
+//! The collaboration scenarios of TP3 (`Tools/citysim/Spec.lean` §16,
 //! citysim D25 and D26): a coordinator that delegates three rooms, the
 //! turtle-soup game played between `hall/mayor` and `hall/clerk` under
 //! the asynchronous and the synchronous send, and the plan's
@@ -754,7 +754,7 @@ const PLAN: &str = "\
 | 1 | fire the kiln | 1 |  | Not started |  |
 ";
 
-/// Claim conflict (`crates/citysim/Spec.lean` §16, citysim D26): two
+/// Claim conflict (`Tools/citysim/Spec.lean` §16, citysim D26): two
 /// residents of one building read node 1 as ready in the same wave,
 /// because each desk holds the plan as it stood at dispatch. The potter
 /// asks first; the glazer asks while the potter still holds the node,
@@ -795,12 +795,12 @@ fn a_node_two_residents_read_as_ready_in_one_wave_is_held_by_the_first_to_claim(
     );
 }
 
-/// Re-dispatch (`crates/citysim/Spec.lean` §16, citysim D26): the lead
+/// Re-dispatch (`Tools/citysim/Spec.lean` §16, citysim D26): the lead
 /// delegates `lab/kiln`, whose child claims node 1 and then fails; the
 /// lead, still in the same run, delegates the same room again once the
 /// first child has frozen. The second child starts under the same
 /// parent. The failed child spent its claim on `FrozeWithoutEvidence`
-/// (`crates/kernel/spec/Plan.lean`), so the node is blocked, not put
+/// (`Sprawling/kernel/spec/Plan.lean`), so the node is blocked, not put
 /// back, and the second child's claim is refused at the call, even when
 /// its desk read `Roadmap.md` before the first child's landing wrote the
 /// block: the booking answers from the ledger's stop line.
@@ -849,13 +849,13 @@ fn a_room_delegated_again_after_its_child_failed_starts_under_the_same_parent() 
     );
 }
 
-/// Verification failure (`crates/citysim/Spec.lean` §16, citysim D26): in
+/// Verification failure (`Tools/citysim/Spec.lean` §16, citysim D26): in
 /// a building whose rules ask for review, the maker claims node 1,
 /// changes the kiln's notes in its own tree and offers the work; once the
 /// request is recorded, a second resident checks it and finds the done
 /// check failed. The request is rejected, nothing reaches the
 /// building, and the node is never finished: the maker froze with no
-/// evidence, so the node is blocked (`crates/kernel/spec/Plan.lean`).
+/// evidence, so the node is blocked (`Sprawling/kernel/spec/Plan.lean`).
 #[test]
 fn a_verification_that_fails_lands_nothing_and_finishes_no_node() {
     let dir = tempfile::tempdir().unwrap();

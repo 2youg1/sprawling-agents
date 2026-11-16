@@ -5,7 +5,7 @@
 
 //! The ACP page: the agent catalog, one pasted spec read as an agent
 //! entry, and the agents this city added
-//! (`crates/wire/spec/Answer/Agents.lean` §8-90).
+//! (`Sprawling/wire/spec/Answer/Agents.lean` §8-90).
 
 use kernel::{Address, B3Hash};
 use serde::{Deserialize, Serialize};

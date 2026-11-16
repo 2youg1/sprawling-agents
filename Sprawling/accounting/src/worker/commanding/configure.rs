@@ -114,7 +114,7 @@ impl RunWorker {
         // Written whole and never parsed here: the connector that reads
         // it at start-up is the authority on its syntax and fails closed,
         // so a second reading on this side would be a second authority
-        // (`crates/city/Spec.lean` §8-26).
+        // (`Sprawling/city/Spec.lean` §8-26).
         if let Some(allowlist) = desktop {
             city::write_desktop_scope(&self.city_root, building.addr(), allowlist)?;
         }
@@ -156,7 +156,7 @@ impl RunWorker {
 /// save already admitted its bytes: keeping an admitted version changes
 /// nothing, while keeping a version nobody admitted leaves a pin whose
 /// manifest no read can answer — the catalog page and the building's runs
-/// both fail on the missing object (`crates/accounting/spec/Connectors.lean`
+/// both fail on the missing object (`Sprawling/accounting/spec/Connectors.lean`
 /// D119). That save refuses instead of landing half of what the page asked.
 fn admit_external_pins(
     city_root: &std::path::Path,
@@ -247,7 +247,7 @@ fn held_pin_must_answer(
 impl RunWorker {
     /// Writes a building's `RULES.toml` whole from a page, evaluated
     /// first and only over the text the page started from, and books the
-    /// change (`crates/wire/Spec.lean` §8-60).
+    /// change (`Sprawling/wire/Spec.lean` §8-60).
     ///
     /// # Errors
     /// Propagates the evaluation's refusal, a file that is no longer
@@ -300,7 +300,7 @@ impl RunWorker {
     }
 
     /// Writes the city's own layer from the settings page, one fact at a
-    /// time, and books the change once (`crates/wire/spec/Command/Step.lean`
+    /// time, and books the change once (`Sprawling/wire/spec/Command/Step.lean`
     /// §8-61). A frame that states nothing writes nothing and books
     /// nothing.
     ///

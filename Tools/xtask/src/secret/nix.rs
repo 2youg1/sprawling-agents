@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Root Nix lock digest classification (crates/xtask/Spec.lean §8-9).
+//! Root Nix lock digest classification (Tools/xtask/Spec.lean §8-9).
 //! Round-trip equality binds a parsed property to its original bytes;
 //! unfamiliar encodings admit no exemption and remain fully scanned.
 

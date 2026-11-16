@@ -57,7 +57,7 @@ use crate::frames::{
 /// listener that demands nothing is not a state this type can hold,
 /// loopback included: the loopback port is reachable by every page in a
 /// browser on this machine, by every other account on it and by the
-/// residents' own tools (`crates/wire/spec/Reception/Entry.lean` wire
+/// residents' own tools (`Sprawling/wire/spec/Reception/Entry.lean` wire
 /// D54). [`decide_bind`] is the only producer of one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BindFace {

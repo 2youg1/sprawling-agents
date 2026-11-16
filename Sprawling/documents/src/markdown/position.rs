@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Where a node comrak read lies in the version (`crates/documents/Spec.lean`
+//! Where a node comrak read lies in the version (`Sprawling/documents/Spec.lean`
 //! D26).
 //!
 //! comrak states a position as a line and a column, both from 1, the

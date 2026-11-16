@@ -6,7 +6,7 @@
 /-!
 # bin::doctor
 
-规定 `crates/sprawling/src/doctor.rs` 与 `crates/sprawling/src/doctor/`：运行中的机器有什么、这座城要什么，以及 CLI 自己的样子（`bin::doctor`）。本文件是 `crates/sprawling/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
+规定 `Sprawling/app/src/doctor.rs` 与 `Sprawling/app/src/doctor/`：运行中的机器有什么、这座城要什么，以及 CLI 自己的样子（`bin::doctor`）。本文件是 `Sprawling/app/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `Sprawling/app/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `bin::doctor::tests`、`bin::doctor::tests::consent`、`bin::doctor::tests::faults`等 守住。
 -/
@@ -14,15 +14,15 @@
 /-!
 ## 8-146 构建这个二进制要有 Zig（`bin::doctor::table::toolchain` 的 `zig` 一行）
 
-`sprawling` 链接两片 Zig 叶子：控制台的渲染器 `Calyx/ffi`，在每个平台上编（`Calyx/ffi/Spec.lean` D1）；桌面 server 的 FFI 缝 `crates/desktop/ffi`，经 `crates/desktop/` 在 Windows 上编（`crates/desktop/Spec.lean` §8-12）。两个包的构建脚本都用 `zig build-lib`，所以在任何平台上编这个二进制、跑 `just check` 都要一个 Zig，且是 `crates/desktop/ffi/zig-version` 钉住的那一版；`Calyx/ffi/zig-version` 在仓库里必须与它相同，构建脚本比对两份。
+`sprawling` 链接两片 Zig 叶子：控制台的渲染器 `Calyx/ffi`，在每个平台上编（`Calyx/ffi/Spec.lean` D1）；桌面 server 的 FFI 缝 `Sprawling/desktop/ffi`，经 `Sprawling/desktop/` 在 Windows 上编（`Sprawling/desktop/Spec.lean` §8-12）。两个包的构建脚本都用 `zig build-lib`，所以在任何平台上编这个二进制、跑 `just check` 都要一个 Zig，且是 `Sprawling/desktop/ffi/zig-version` 钉住的那一版；`Calyx/ffi/zig-version` 在仓库里必须与它相同，构建脚本比对两份。
 
 ```rust
 // bin::doctor::table::toolchain（形状 6 数据）
 pub(super) const ZIG: Requirement;   // develop 层，Required；探测 `zig version` 以钉子开头的一行
-const ZIG_PIN: &str = crate::doctor::pin::ZIG_VERSION;   // 构建脚本读到的 crates/desktop/ffi/zig-version，去掉行尾（§8-157）
+const ZIG_PIN: &str = crate::doctor::pin::ZIG_VERSION;   // 构建脚本读到的 Sprawling/desktop/ffi/zig-version，去掉行尾（§8-157）
 ```
 
-- **钉子只在一处**：`ZIG_PIN` 是构建脚本从 `crates/desktop/ffi/zig-version` 读进来的那一行，与 `LEAN_PIN` 读 `lean-toolchain` 同一种写法（§8-58、§8-157）；探测是 `zig version` 的输出以钉子开头，Windows 的装法是 `winget install --id zig.zig -e --version <钉子> --scope user`，macOS 是 `brew install zig`，Linux 印出官方下载页。构建脚本与 CI 的安装步骤读同一个文件。
+- **钉子只在一处**：`ZIG_PIN` 是构建脚本从 `Sprawling/desktop/ffi/zig-version` 读进来的那一行，与 `LEAN_PIN` 读 `lean-toolchain` 同一种写法（§8-58、§8-157）；探测是 `zig version` 的输出以钉子开头，Windows 的装法是 `winget install --id zig.zig -e --version <钉子> --scope user`，macOS 是 `brew install zig`，Linux 印出官方下载页。构建脚本与 CI 的安装步骤读同一个文件。
 - **`Required` 而不是 `Optional`**：没有它，任何平台上的 `just check` 都编不出这个二进制。
 - **位置**：表里 `lean` 之后、`uv` 之前：它与 Rust、Lean 同属编译这份代码要的工具，装法不依赖表里更早的任何一行。
 
@@ -41,7 +41,7 @@ pub(crate) enum Need { Required, OneOf(Group), Optional }   // 一组任一即�
 pub enum Platform { Windows, MacOs, Linux }            // `bin::install` 经它进入，遵 lib.rs 的约定：二进制进入即公开
 pub(crate) struct PerPlatform<T> { windows: T, macos: T, linux: T }
 pub(crate) enum Detection { Program { program, version_arg, places }, Environment { variable } }
-pub(crate) struct Requirement { name, tier, need, enables, detect, homepage, recipe }   // recipe: PerPlatform<accounting::Recipe>（`crates/accounting/Spec.lean` §8-4）
+pub(crate) struct Requirement { name, tier, need, enables, detect, homepage, recipe }   // recipe: PerPlatform<accounting::Recipe>（`Sprawling/accounting/Spec.lean` §8-4）
 pub(crate) enum Presence { Present(String), Absent }
 pub(crate) struct Finding { requirement: &'static Requirement, presence: Presence }
 pub(crate) fn examine(machine: &dyn Machine) -> Vec<Finding>;
@@ -60,7 +60,7 @@ pub(crate) fn run<R: BufRead, W: Write>(asked: &Asked, machine: &dyn Machine, in
 pub(crate) fn verb(args: &[String]) -> ExitCode;              // Use 层必需项有缺则退 1；Develop 层只报告
 
 // bin::doctor::probe（形状 4 adapter：运行中的机器）
-pub(crate) trait Machine: accounting::Machine { fn look(&self, r: &Requirement) -> Presence; }   // 安装经父 trait 的 install（`crates/accounting/Spec.lean` §8-4）
+pub(crate) trait Machine: accounting::Machine { fn look(&self, r: &Requirement) -> Presence; }   // 安装经父 trait 的 install（`Sprawling/accounting/Spec.lean` §8-4）
 pub(crate) trait Machine { fn look(&self, r: &Requirement) -> Presence; fn install(&self, name: &str, recipe: &Recipe) -> Result<(), AxError>;
                            fn core_standing(&self) -> Result<Standing, AxError>; } // §8-93 的档位，由平台实际给出
 pub(crate) struct ThisMachine { platform: Option<Platform>, patience: Duration }
@@ -76,9 +76,9 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 - **四个文件而不是两个，理由是尺寸与形状**：`doctor.rs` 只留判定（表的形状、`finding_line`、`verdict`），表落 `table.rs`，屏幕与那一问落 `screen.rs`，跑子进程的落 `probe.rs`。判定与驱动同住一个文件时 `doctor.rs` 是 399 行——`xtask length` 的 400 之下一行，即下一次编辑必红。**这不是把文件切碎，是把「判断」与「跟人说话」分开**，两者本就不是一件事。
 - **Windows 上先找带扩展名的那个文件**：`bun` 若由 npm 装出来，同一目录下既有无扩展名的 shell 脚本 `bun`（Windows 起不动）又有 `bun.cmd`。先取无扩展名的那个，报出来的是「装了但不说版本」——一个装好的工具被报成半坏的。故 `names_of` 在 Windows 上按 `.exe`／`.cmd`／`.bat`／无扩展名的次序找，这条次序有它自己的测试。
 - **一项是环境变量而不是程序**：exec 工具 python 臂要的 CPython-WASI 组件由 `PYTHON_WASM_ENV` 指路（`accounting::worker::workbench::tools`），故它的探测是「那个变量指的文件在不在」，安装那一栏是 `Manual`——没有包管理器发它。它是 `Optional`，行尾说明它开启的是什么。
-- **终端里的词是英文，这不违反 wording 门**：AGENTS.md 的语言表把词表的管辖写在客户端上，`xtask wording` 扫的目录是 `client/src`（见 `crates/xtask/src/wording.rs` 的 `CLIENT` 常量）。控制台是操作者的，与 `install`／`console`／`firstrun` 同一口径。
+- **终端里的词是英文，这不违反 wording 门**：AGENTS.md 的语言表把词表的管辖写在客户端上，`xtask wording` 扫的目录是 `client/src`（见 `Tools/xtask/src/wording.rs` 的 `CLIENT` 常量）。控制台是操作者的，与 `install`／`console`／`firstrun` 同一口径。
 - **机器面是一条缝，而不是一个假想缝**：`Machine` 有两个实现——`ThisMachine`（真跑子进程）与测试里的 `ScriptedMachine`（一张 name→Presence 的表，外加它经 `accounting::Machine::install` 记下的安装请求）。终端与 worker 的安装走同一个 `accounting::Machine::install`，所以测试记下的就是终端真正会启动的那一次。判定因此不需要测试机上真装着什么就能被咬。
-- **核心线程实际站在哪一档（§8-93）**：报告在各层的判定之后多一段 `priority`，一行 `core threads`：`one step above normal`；`normal, as config.toml [core] priority asks`；`normal, the platform refused: <原因>`（Unix 上没有 `CAP_SYS_NICE`）；读不出设置、或问档位的那条临时线程起不来或没答话就结束时是 `unknown: <错误>`（线程 panic 时只报它没答话，不带 panic 的内容）。`ThisMachine` 读人的设置，在一条临时线程上调 `raise_this_thread` 得到这一档，线程随即结束，所以 doctor 自己的线程不换档。报的是运行 doctor 的主机此刻会给核心的档位，而不是某座正在跑的城的线程被安全阀降回之后的档位。派出的命令总是低一档（`crates/runtime/Spec.lean` §8-13-3，降档从不被拒），这一段不重复它。证据：`crates/sprawling/src/doctor/tests/reading.rs` 的 `the_doctor_says_where_the_platform_lets_the_core_stand`（平台拒绝升档的机器，报告里是那一行与平台给的原因）。页面读同一读数：`report::fold` 从同一个 `Machine::core_standing` 折出 `DoctorAnswer::core`（`crates/wire/Spec.lean` §8-25），词由页面选；证据是 `doctor::report::tests` 的 `the_page_is_told_where_the_core_stands`。
+- **核心线程实际站在哪一档（§8-93）**：报告在各层的判定之后多一段 `priority`，一行 `core threads`：`one step above normal`；`normal, as config.toml [core] priority asks`；`normal, the platform refused: <原因>`（Unix 上没有 `CAP_SYS_NICE`）；读不出设置、或问档位的那条临时线程起不来或没答话就结束时是 `unknown: <错误>`（线程 panic 时只报它没答话，不带 panic 的内容）。`ThisMachine` 读人的设置，在一条临时线程上调 `raise_this_thread` 得到这一档，线程随即结束，所以 doctor 自己的线程不换档。报的是运行 doctor 的主机此刻会给核心的档位，而不是某座正在跑的城的线程被安全阀降回之后的档位。派出的命令总是低一档（`Sprawling/runtime/Spec.lean` §8-13-3，降档从不被拒），这一段不重复它。证据：`Sprawling/app/src/doctor/tests/reading.rs` 的 `the_doctor_says_where_the_platform_lets_the_core_stand`（平台拒绝升档的机器，报告里是那一行与平台给的原因）。页面读同一读数：`report::fold` 从同一个 `Machine::core_standing` 折出 `DoctorAnswer::core`（`Sprawling/wire/Spec.lean` §8-25），词由页面选；证据是 `doctor::report::tests` 的 `the_page_is_told_where_the_core_stands`。
 - **机器面是一条缝，而不是一个假想缝**：`Machine` 有两个实现——`ThisMachine`（真跑子进程）与测试里的 `ScriptedMachine`（一张 name→Presence 的表，外加它记下的安装请求）。判定因此不需要测试机上真装着什么就能被咬。
 
 **本章测试**：表的完整性（每一项都有探测方法，且三个平台各自要么给出命令要么明说 `manual`；每一个 `Optional` 项都说出它开启什么）；`verdict` 对「全在」「缺一个必需项」「只缺一个可选项」三类输入给出正确的穷尽枚举（可选项缺失不拖垮该层）；`finding_line` 的三种写法；`--install` 在答 `n` 时**一件也不装**、答 `y` 时只装被问的那一件（由 `ScriptedMachine` 记账）。
@@ -119,7 +119,7 @@ pub(super) fn ask(command: &mut Command, knocks: u32, keep: impl FnMut(&str) -> 
 - **判断的是哪个目录**：命令行点名了城就是那座城；没点名就是 `up` 会把城放在的地方，由路由的 `default_city_location` 交进 `screen::verb`——「没点名的城放哪」只有那一个权威。只在没点名时才调它，因为它要读个人配置；它拒时（家目录找不到、个人配置读不动）doctor 印出拒词并扫一个空路径。路径先按 `monitor::volume::resolved` 规范成挂载点的写法，城还不存在时用它的绝对路径。
 - **Dev Drive 分两步读，先读不要权限的那一步**：`monitor::volume::holding` 选出挂载点是城路径最长前缀的那块盘（与 `monitor::volume::space` 同一个函数），sysinfo 给出它的文件系统名。Dev Drive 恒是 ReFS，所以不是 ReFS 就确定不是，不再起进程。是 ReFS 时才问 `fsutil devdrv query <卷>`，取以 `This is` 开头的那一句：含 `not a developer volume` 是不是；含 `trusted` 且不含 `untrusted`／`not trusted` 是受信任；其余提到 `developer volume` 的是不受信任。fsutil 在普通用户下多半拒绝打开卷，且它的话随系统语言本地化——两种都读成 `Untold`，带上那条命令，不猜。
 - **排除项只在不要管理员就能读的时候读**：Windows PowerShell 以 `-NoProfile -NonInteractive` 起动，先把输出编码设为 UTF-8、`$ErrorActionPreference='Stop'`，再取 `(Get-MpPreference).ExclusionPath`。每行一条排除路径；以 `N/A` 开头的那行读成 `Untold::AdminOnly`；空输出且退出 0 是没有排除项；退出非 0（Defender 关了或被第三方杀软替换）读成 `Failed`。一条排除路径覆盖城，当且仅当去掉末尾分隔符后不分大小写相等，或它加上 `\` 是城路径的前缀——`D:\Work` 不覆盖 `D:\Workshop\city`。含 `%` 或 `*` 的条目不展开、不算覆盖：展开要的是 Defender 自己的规则，第二份抄本会悄悄分叉。
-- **等待是计数的，有上限，且从不等人**：`asking::ask` 把 stdin 设成空、stderr 丢弃，标准输出在一条读线程上逐行读到底（Windows 的匿名管道缓冲只有几 KB，边轮询边不读会把子进程卡在写上），每行至多留 `LINE_MAX_BYTES`（4 KiB）字节、超出的部分读过即丢，再交调用者的 `keep` 判一次，只有它选中的行进 `Ended::Exited.kept`：`fsutil` 那一问只留以 `This is` 开头的句子，排除项那一问只留以 `N/A` 开头或覆盖城的条目，`gh` 那一问只留第一行。于是一次扫描在进程里至多同时持有一行与选中的几行，不把子进程的整份输出读进内存（`crates/sprawling/spec/Serving/Memory.lean` §8-173 清点表的 doctor 一行）。按 `TICK`（50 ms）敲 `try_wait`，敲满 `knocks` 下还没退出就经 `running::stop` 停掉。本节的上限是 `PATIENCE` 300 下（15 s）：冷起动的 Windows PowerShell 读 Defender 设置要几秒。`doctor::github` 问 `gh` 走同一个 `ask`，两处「问一次、读退出码」只有一份等法。
+- **等待是计数的，有上限，且从不等人**：`asking::ask` 把 stdin 设成空、stderr 丢弃，标准输出在一条读线程上逐行读到底（Windows 的匿名管道缓冲只有几 KB，边轮询边不读会把子进程卡在写上），每行至多留 `LINE_MAX_BYTES`（4 KiB）字节、超出的部分读过即丢，再交调用者的 `keep` 判一次，只有它选中的行进 `Ended::Exited.kept`：`fsutil` 那一问只留以 `This is` 开头的句子，排除项那一问只留以 `N/A` 开头或覆盖城的条目，`gh` 那一问只留第一行。于是一次扫描在进程里至多同时持有一行与选中的几行，不把子进程的整份输出读进内存（`Sprawling/app/spec/Serving/Memory.lean` §8-173 清点表的 doctor 一行）。按 `TICK`（50 ms）敲 `try_wait`，敲满 `knocks` 下还没退出就经 `running::stop` 停掉。本节的上限是 `PATIENCE` 300 下（15 s）：冷起动的 Windows PowerShell 读 Defender 设置要几秒。`doctor::github` 问 `gh` 走同一个 `ask`，两处「问一次、读退出码」只有一份等法。
 - **这一段是建议，从不是 doctor 的失败**：它不进任何一层的 verdict，不改退出码。报告在 `priority` 一段之后多一段 `scanning`：`city` 一行给出判断的路径，`dev drive` 与 `exclusion` 各一行说是、否或 `cannot tell: <原因>`；两者都不成立时给 `to speed it up`：建 Dev Drive 并把城挪上去，或在管理员 PowerShell 里跑 `Add-MpPreference -ExclusionPath '<城>'`（路径里的 `'` 写成 `''`）；是 Dev Drive 但不受信任时给 `fsutil devdrv trust <卷>`。
 - **与各项探测同时问**：`screen::run` 在一个作用域线程上问 `Machine::scanning`，同时 `examine_each` 问表里各项，整份报告仍只等最慢的那一个（§8-59）。线程没答话就结束时这一段说 `Scanning::Stopped`，其余各段照常。
 - **页面不显示这一段**：`wire::DoctorAnswer` 没有它的字段，加字段是一次 wire 变更（`WIRE_V`、`wire.ts`、`Door.lean`）。第三方杀毒软件的排除项读不到，那时 `exclusion` 说 `cannot tell`。
@@ -132,9 +132,9 @@ pub(super) fn ask(command: &mut Command, knocks: u32, keep: impl FnMut(&str) -> 
 /-!
 ## 8-47 六处探测收成一处：doctor 是「运行中的机器有什么」的唯一权威（`bin::doctor::host`、`bin::doctor::presence`）
 
-**原因**：运行中的机器被问了六次，每次一套读法——`SPRAWLING_PYTHON_WASM` 在 `accounting::worker::mcp` 与 `doctor::table` 各拼一次（§8-166 记下的债）；`host_shell()` 与 `execution_engine()` 住 `accounting::worker::workbench::engine`；Firefox 与 `chromedriver` 由 `bin::browser_bidi::lazy` 按名字盲起（Windows 上 Firefox 不在 PATH，于是 doctor 说「有」而浏览器工具说「没有」）；`ffmpeg` 在 `crates/desktop/` 里按名字起。六个答案各自漂，一个人看到的「缺什么」与 run 撞上的「缺什么」不是同一份。
+**原因**：运行中的机器被问了六次，每次一套读法——`SPRAWLING_PYTHON_WASM` 在 `accounting::worker::mcp` 与 `doctor::table` 各拼一次（§8-166 记下的债）；`host_shell()` 与 `execution_engine()` 住 `accounting::worker::workbench::engine`；Firefox 与 `chromedriver` 由 `bin::browser_bidi::lazy` 按名字盲起（Windows 上 Firefox 不在 PATH，于是 doctor 说「有」而浏览器工具说「没有」）；`ffmpeg` 在 `Sprawling/desktop/` 里按名字起。六个答案各自漂，一个人看到的「缺什么」与 run 撞上的「缺什么」不是同一份。
 
-**主机事实住机器层**（沿 `crates/kernel/Spec.lean` §8-22「主机事实不入城」）。doctor 装的东西落 `~/.sprawling/components/<item>/`，**恒不落进任何一座城**——一座城搬到另一台机器时不该带着运行中的机器的组件。城里 `CONFIG.toml` 仍只说能力位（`sandbox.shell`）与限额，不说路径。
+**主机事实住机器层**（沿 `Sprawling/kernel/Spec.lean` §8-22「主机事实不入城」）。doctor 装的东西落 `~/.sprawling/components/<item>/`，**恒不落进任何一座城**——一座城搬到另一台机器时不该带着运行中的机器的组件。城里 `CONFIG.toml` 仍只说能力位（`sandbox.shell`）与限额，不说路径。
 
 ```rust
 // lib.rs：doctor 从二进制半边搬进 lib，装配层与浏览器层才够得着它
@@ -185,15 +185,15 @@ pub(super) fn machine_half(limits: &kernel::SandboxLimits, host: &ExecHost) -> R
 pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Result<Engine, AxError>;
 ```
 
-- **谁问谁**：`workbench::engine::machine_half` 问 `doctor::host` 三次（组件、shell、引擎），它自己只留一条判定——shell 只在冻结配置说 `shell = true` 时才递给 bench，问的是 `shell` 还是 `pwsh` 由冻结配置的 `interpreter` 定（`crates/runtime/Spec.lean` §8-13-2 D30），组件缺席不拦派活（python 臂在被调用时才拒），引擎起不来则拒派活。`browser_bidi::lazy::start` 不再按名字盲起，改为 `Engine::choose(&host::firefox(), &host::chromedriver())` 后按路径起。accounting 的 mcp 模块里的 `PYTHON_WASM_ENV` 删除。
+- **谁问谁**：`workbench::engine::machine_half` 问 `doctor::host` 三次（组件、shell、引擎），它自己只留一条判定——shell 只在冻结配置说 `shell = true` 时才递给 bench，问的是 `shell` 还是 `pwsh` 由冻结配置的 `interpreter` 定（`Sprawling/runtime/Spec.lean` §8-13-2 D30），组件缺席不拦派活（python 臂在被调用时才拒），引擎起不来则拒派活。`browser_bidi::lazy::start` 不再按名字盲起，改为 `Engine::choose(&host::firefox(), &host::chromedriver())` 后按路径起。accounting 的 mcp 模块里的 `PYTHON_WASM_ENV` 删除。
 - **`SPRAWLING_PYTHON_WASM` 只拼一次，且保留为兼容读法**：拼写唯一处是 `doctor::table::PYTHON_WASM_VARIABLE`。**选的是「变量优先、组件目录次之」**：一个人显式指了一处，就该用那一处；指错了（变量设了但文件不在）报 `Absent(VariableNamesNothing)` 而**不悄悄落到组件目录**——被否决的备选是「目录优先、变量兜底」，它会让一个设错的变量永远没人发现。没设变量时看 `~/.sprawling/components/python-wasi/python.wasm`。测试遍历本 crate 的 `src/`，断言含该字面量的文件恰好一个。
-- **默认组件按内容 pin，开发覆盖明说未钉**：变量未设而组件文件在时，真实扫描与 `python_wasm` 共用 Component 探测后的同一来源判定，不经 host::look 递归；经 `PYTHON_GUEST_CHECK` 读取全文件并以 `kernel::B3Hash` 核对 `PYTHON_GUEST_B3`；相同且旁置 lib/python3.14 下的 encodings、collections、difflib、re 与 os 模块已安装才是 `Present`；stdlib 不完整报 `Broken { HalfWritten }`，不同是 `Broken { fault: DigestMismatch { expected, found } }`，读失败仍是 `Broken { Unreadable }`。`OnceLock` 缓存这次判定，进程内不为每次 exec 重读 guest。变量设为非空时跳过 pin，存在的文件报 `Present`，其 `Version::Said` 为 `unpinned override`；缺席与损坏仍按原三态回答。线上 `DigestMismatch` 映到既有 `DoctorFault::Unreadable`，其文本保留 expected 与 found，wire 的封闭 fault 集与 `WIRE_V` 不变。这个检查针对损坏与版本错配，不针对已经能写安装目录的人；`crates/runtime/spec/Sandbox.lean` 记录同一边界。
+- **默认组件按内容 pin，开发覆盖明说未钉**：变量未设而组件文件在时，真实扫描与 `python_wasm` 共用 Component 探测后的同一来源判定，不经 host::look 递归；经 `PYTHON_GUEST_CHECK` 读取全文件并以 `kernel::B3Hash` 核对 `PYTHON_GUEST_B3`；相同且旁置 lib/python3.14 下的 encodings、collections、difflib、re 与 os 模块已安装才是 `Present`；stdlib 不完整报 `Broken { HalfWritten }`，不同是 `Broken { fault: DigestMismatch { expected, found } }`，读失败仍是 `Broken { Unreadable }`。`OnceLock` 缓存这次判定，进程内不为每次 exec 重读 guest。变量设为非空时跳过 pin，存在的文件报 `Present`，其 `Version::Said` 为 `unpinned override`；缺席与损坏仍按原三态回答。线上 `DigestMismatch` 映到既有 `DoctorFault::Unreadable`，其文本保留 expected 与 found，wire 的封闭 fault 集与 `WIRE_V` 不变。这个检查针对损坏与版本错配，不针对已经能写安装目录的人；`Sprawling/runtime/spec/Sandbox.lean` 记录同一边界。
 - **手工安装仍不自动联网**：`python-wasi` 的 recipe 保持 `Manual`，文本点名 `docs/third-party.md` 登记的版本化资产、完整解包位置与 wasm 的 BLAKE3；不把 guest 或 stdlib 提交进 git。
 - **`Broken` 是第三态，不是 `Absent` 的别名**：一个在 PATH 上却起不来的二进制（权限、坏文件、架构不符）、一个存在却没有那份文件的组件目录（下载中断）、一个读不了的目录（权限），三者对 verdict 都算缺，但每一个都带着自己的原因进报告行——**绝不以「absent」一词吞掉一个可以说清的故障**。`Version` 的四态同理：说了、没说、说的不是文本、超时没说；后三者仍算 Present（§8-166 已定：不说话的工具仍是装了的工具）。
 - **本二进制起的每个子进程都由 `doctor::running::stop` 结束**：`ask_version` 读到第一行后杀掉子进程，用的是安装程序超时后走的同一段——杀不掉或收不了尸都不是可以丢掉的 `Result`，而是一句带进 `Fault::Unreadable` 的话，于是「本城起了一个它停不掉的进程」这件事排在它印出的版本号之前给人看。`Fault::Unreadable` 因此是「这台电脑不让本城把这一项做完」的那一态，它携带的那句话就是全部解释，`describe` 原样印出。
 - **`Detection::Built` 的探测是真起一次引擎**，而不是读一个 cfg：一份声称带引擎却起不来的构建，doctor 必须报 `Broken { WillNotStart }`；`ENGINE_CARRIED` 是那个 cfg 的唯一拼写，表引用它。
-- **`ffmpeg` 进表但 doctor 管不到 `crates/desktop/`**：`crates/desktop/` 跑在 `sprawling desktop` 这个子进程里，它在录制时按名字起 `ffmpeg`，与 doctor 的 `on_search_path` 走同一条 PATH，两个答案因此一致而非因此合一。doctor 报它（Optional，Use 层），`crates/desktop/` 不改——这是这里的边界，如实记。桌面 server 本身不进表：它是本二进制的一个动词（§8-4d），没有要装的东西。
-- **`browser::profile` 没有探测可搬**：读 `crates/browser/Spec.lean` 的 D4 确认 profile 是「楼的登录态住城的保留区」这条纯判定，浏览器探测住 `bin::browser_bidi::lazy`，故不改 `crates/browser`。
+- **`ffmpeg` 进表但 doctor 管不到 `Sprawling/desktop/`**：`Sprawling/desktop/` 跑在 `sprawling desktop` 这个子进程里，它在录制时按名字起 `ffmpeg`，与 doctor 的 `on_search_path` 走同一条 PATH，两个答案因此一致而非因此合一。doctor 报它（Optional，Use 层），`Sprawling/desktop/` 不改——这是这里的边界，如实记。桌面 server 本身不进表：它是本二进制的一个动词（§8-4d），没有要装的东西。
+- **`browser::profile` 没有探测可搬**：读 `Sprawling/browser/Spec.lean` 的 D4 确认 profile 是「楼的登录态住城的保留区」这条纯判定，浏览器探测住 `bin::browser_bidi::lazy`，故不改 `Sprawling/browser`。
 - **doctor 进 lib 的公开面只有 verb 与既有 guest 选择门的 re-export**：`pub use screen::verb` 供二进制半边的 `main/router.rs` 调用；`pub use host::usable_python_wasm` 供 citysim 的 CPython baseline 与生产 exec 读同一份变量优先、组件目录回退答案，不新增一个只改名的包装函数。`Machine` 仍是 `pub(crate) trait`，不上缝清单。
 
 **探测可失败的路径，逐条**（本节与 §8-48 共用，测试点名「丑的那几条」）：
@@ -242,7 +242,7 @@ pub(crate) fn explain(code: &str, findings: &[Finding], platform: Option<Platfor
 pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<String> }
 ```
 
-- **能力位 → 项目，是一张穷尽表**：`Browser → [gecko, chromedriver, msedgedriver, webkit]`（任一即可，Gecko 在前，因为它不要驱动；见 §8-57）；`Shell → [shell]`（楼要 shell 且 `sandbox.interpreter` 是 `system`）；`Pwsh → [pwsh]`（楼要 shell 且 `interpreter = "pwsh"`，报告行写 `sandbox.interpreter = "pwsh"`；`crates/runtime/Spec.lean` §8-13-2 D30）。这里只判 `pwsh` 在不在、起不起得来；版本低于 7 由 `doctor::host::usable_pwsh` 在派活时判，报告行里的版本号让人自己看得出。`browser` 读自 `RULES.toml`（`city::load`），`shell` 读自该楼冻结配置的 `sandbox.shell`（`city::load_config`）——两者合称「RULES.toml 的能力位」，实际住两份文件，这里如实记。`desktop` 不是能力位：它要的东西都在本二进制里（§8-4d）。一栋楼的一个位缺时，报告行点名**那栋楼**与它试过的每一项及各自的三态答案：`lab: browser: true, and this machine has no firefox (not on the search path) and no chromedriver (not on the search path)`。
+- **能力位 → 项目，是一张穷尽表**：`Browser → [gecko, chromedriver, msedgedriver, webkit]`（任一即可，Gecko 在前，因为它不要驱动；见 §8-57）；`Shell → [shell]`（楼要 shell 且 `sandbox.interpreter` 是 `system`）；`Pwsh → [pwsh]`（楼要 shell 且 `interpreter = "pwsh"`，报告行写 `sandbox.interpreter = "pwsh"`；`Sprawling/runtime/Spec.lean` §8-13-2 D30）。这里只判 `pwsh` 在不在、起不起得来；版本低于 7 由 `doctor::host::usable_pwsh` 在派活时判，报告行里的版本号让人自己看得出。`browser` 读自 `RULES.toml`（`city::load`），`shell` 读自该楼冻结配置的 `sandbox.shell`（`city::load_config`）——两者合称「RULES.toml 的能力位」，实际住两份文件，这里如实记。`desktop` 不是能力位：它要的东西都在本二进制里（§8-4d）。一栋楼的一个位缺时，报告行点名**那栋楼**与它试过的每一项及各自的三态答案：`lab: browser: true, and this machine has no firefox (not on the search path) and no chromedriver (not on the search path)`。
 - **读不了的楼是一行，不是沉默**：`RULES.toml` 解析失败或 `CONFIG.toml` 无效，那一栋报 `Visited::Unreadable`，屏幕上是 `lab: its rules will not read: <err>`；楼列表本身读不到（不是城）才是 `Err`。**doctor 永不静默**。
 - **`--explain <code>` 是「错误码 → 主机项目」的一张表**：`E_TOOL_UNAVAILABLE → [sandbox-engine, python-wasi, shell, ffmpeg]`，`E_BROWSER_UNAVAILABLE → [gecko, chromium, chromedriver, msedgedriver, webkit]`。其它已知码答 `NotAboutThisMachine`（它由城里的判定决定，不由运行中的机器决定）；不认识的码答 `NoSuchCode`。每一行是**那一项的三态答案加这平台上的下一步**：`python-wasi  absent: no component at ~/.sprawling/components/python-wasi/python.wasm -> manual: put a CPython wasi build there`——一个人读完那一行就能动手。
 - **边界**：doctor 不从源码构建、不 vendor、不静默。它探测一切，只安装有官方可验证来源的东西，并逐项先问。CPython-WASI 今天没有 python.org 发布的二进制，故它仍是 `Manual`，指向组件目录；这里不下载任何东西。`~/.sprawling/components/` 因此暂时只是 doctor 探测、人填入的约定——记在这里，免得下一步以为那里有个下载器。
@@ -254,14 +254,14 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 -/
 
 /-!
-## 8-54 运行中的机器有什么，页面从城那里问（`bin::doctor::report`、`accounting::views::holding`；`crates/wire/Spec.lean` §8-25）
+## 8-54 运行中的机器有什么，页面从城那里问（`bin::doctor::report`、`accounting::views::holding`；`Sprawling/wire/Spec.lean` §8-25）
 
 首跑屏的第一步原本只是一条可以复制的命令，没有任何办法知道它跑过没有、跑成了没有。本节让那一步答得出来。
 
 - **`bin::doctor::report`**：`answer(machine: &dyn Machine) -> wire::DoctorAnswer` 问一次交给它的机器并折成答案。机器是参数，所以一个测试交一台假机器，就说出机器答了什么而不必有那样一台机器；生产的调用方是 `ThisMachine` 实现的 `accounting::Machine::report`。**它不判断任何事**——哪一项在这里、一个档次缺什么，权威在 `doctor` 与 `table`；这里只换一种说法。`screen` 把同一批 findings 折成一台机器的散文，两者从同一处折出。
 - **`Views.machine: Option<wire::DoctorAnswer>`**，由 `found_on_this_machine` 从外面放进来，**不由任何记录折出**：这是本文件里唯一一个关于机器而非关于历史的答案，所以重建账本不碰它。`None` 答 `Unavailable`。
-- **`Views.registry: Option<fn() -> wire::ReleaseAnswer>`**，由 `views::served` 的 `ask_the_registry_through` 从外面放进来，与 `machine`、`vault` 同形：serve 一座城时装配根交 `bin::release::answer`，`twin` 把它带到另一份。`NewestRelease` 在快照放开之后调它（它要出网）；`None` 是一份没人 serve 的 views（重建、测试），答 `Unavailable` 而不去问注册表。views 因此不直接碰 `bin::release`，搬进 `accounting` 时 `release` 留在 `sprawling`（`crates/accounting/Spec.lean` §7）。钉住它的测试是 `a_newest_release_is_asked_of_the_registry_the_views_were_handed`。
-- **`Views.places: Option<fn(&SetUpDir) -> Option<PathBuf>>`**，由 `look_for_agents_through` 从外面放进来，与 `registry` 同形：serve 一座城时装配根交 `bin::doctor::host::place_set_up`（读这家厂商文档写的变量与家目录，`crates/agent_protocols/Spec.lean` D19）。`Query::AgentCatalog` 在快照放开之后调它找这台电脑上的 agent；`None` 答空的 `detected`（`crates/accounting/spec/Views.lean` D13）。
+- **`Views.registry: Option<fn() -> wire::ReleaseAnswer>`**，由 `views::served` 的 `ask_the_registry_through` 从外面放进来，与 `machine`、`vault` 同形：serve 一座城时装配根交 `bin::release::answer`，`twin` 把它带到另一份。`NewestRelease` 在快照放开之后调它（它要出网）；`None` 是一份没人 serve 的 views（重建、测试），答 `Unavailable` 而不去问注册表。views 因此不直接碰 `bin::release`，搬进 `accounting` 时 `release` 留在 `sprawling`（`Sprawling/accounting/Spec.lean` §7）。钉住它的测试是 `a_newest_release_is_asked_of_the_registry_the_views_were_handed`。
+- **`Views.places: Option<fn(&SetUpDir) -> Option<PathBuf>>`**，由 `look_for_agents_through` 从外面放进来，与 `registry` 同形：serve 一座城时装配根交 `bin::doctor::host::place_set_up`（读这家厂商文档写的变量与家目录，`Sprawling/agent_protocols/Spec.lean` D19）。`Query::AgentCatalog` 在快照放开之后调它找这台电脑上的 agent；`None` 答空的 `detected`（`Sprawling/accounting/spec/Views.lean` D13）。
 - **探测只由 `DoctorRefresh` 触发，服务一座城时一次也不跑**：表从 12 行长到 32 行，其中大半是起一个进程问它的版本（六件 cargo 子命令各起一次 cargo），windows-x86_64 暖缓存四核一档机器上量得 3.3–4.1 s。先前的决定把它放在开门之前，给出的参数是「12 项约 2 秒」，**两个数都已经移动**：项数翻了一倍有余，而问它的那一屏不再是第一屏（`#/` 是对话，机器那一屏在设置页的「依赖项安装」组里）。它当时否决后台探测的理由是「要多一条『还没答上来』的状态」，而那条状态今天已经存在、有夹具、也有它的动作（`MachineSkeleton` 与 `MachineUnchecked`）——那笔代价早已付过。服务因此不再为一个没人问的答案把套接字关着几秒。
 - **客户端**：`client/src/views/machine.svelte` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。**那一屏每次打开都发一次 `DoctorRefresh`**（与「重新检查」同一条命令，不是第二条路），每次打开至多一次；城里已有的答案先画出来，探完的那一份到了再换上（§8-120）。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
 - **不因事件失效**：这份答案说的是城启动时看到的那一眼，账本上没有任何记录能改变它，所以 `asking` 的 `staleBy` 对它落在 `default`（不失效）。
@@ -322,13 +322,13 @@ Detection::Listed { program, args, line }     // 程序在，且它按 args 列�
 pub(crate) fn prereqs() -> String;            // Develop 档渲染成 prereqs.tsv 的全文
 ```
 
-- **表是权威，`just prereqs` 读它的渲染**：`crates/sprawling/src/doctor/table/prereqs.tsv` 每行 `class<TAB>name<TAB>program<TAB>windows<TAB>macos<TAB>linux<TAB>purpose`，由 `table::prereqs()` 从 Develop 档渲染；测试 `the_prereqs_file_is_the_develop_tier_rendered` 要求文件逐字等于渲染结果，不等时把应有的全文印出来。`just prereqs` 在编译之前跑，只能读文件而不能问二进制，所以读的是这份渲染而不是另一张清单；`command -v <program>` 是它的探测，`program` 为 `-` 的行（浏览器家族）归 doctor 与 render 门自己去找。被否决的备选：justfile 当权威、doctor 在编译期读它——justfile 不写三平台的装法，doctor 就得再拼一遍。
+- **表是权威，`just prereqs` 读它的渲染**：`Sprawling/app/src/doctor/table/prereqs.tsv` 每行 `class<TAB>name<TAB>program<TAB>windows<TAB>macos<TAB>linux<TAB>purpose`，由 `table::prereqs()` 从 Develop 档渲染；测试 `the_prereqs_file_is_the_develop_tier_rendered` 要求文件逐字等于渲染结果，不等时把应有的全文印出来。`just prereqs` 在编译之前跑，只能读文件而不能问二进制，所以读的是这份渲染而不是另一张清单；`command -v <program>` 是它的探测，`program` 为 `-` 的行（浏览器家族）归 doctor 与 render 门自己去找。被否决的备选：justfile 当权威、doctor 在编译期读它——justfile 不写三平台的装法，doctor 就得再拼一遍。
 - **`class` 就是 `Need`**：`required` 是 `just check` 离了它跑不起来的（git、bash、rustup、rust、rustfmt、clippy、just、cargo-nextest、bun、render 用的浏览器、elan、lean、zig），`optional` 是 `just check` 缺了会跳过、或只由人主动跑的 recipe 调用的（cargo-deny、uv、python，以及 cargo-mutants、cargo-fuzz、kani）。elan 与 lean 为什么必需，见 D9「Lean 是开发这份代码必需的工具」。
 - **行序就是安装顺序**：后一行的装法用到前一行装出的程序——rustup 之后才有 `rustup component add` 与 `cargo install`，elan 之后才有 `elan toolchain install`，uv 之后才有 `uv python install`。页面的「全部安装」按表序逐项跑，所以顺序写在表里而不是写在页面上。
 - **Lean 的版本只写在 `lean-toolchain`**：`LEAN_PIN` 是构建脚本读进来的那个文件（`str::trim_ascii_end` 在 const 里去掉换行，§8-157），装法是 `elan toolchain install <pin>`，探测是 `elan toolchain list` 里有以 pin 开头的一行。换 Lean 版本只改那一个文件。
 - **Windows 上能用 winget 的都用 winget，且按用户装**：Git、just、bun、uv、ffmpeg 的 winget 清单都有用户级安装程序，配方带 `--scope user`，于是装的时候不弹 UAC——§8-166「恒不提权」在 winget 上就是这个参数。rustup 的清单没有 scope 字段，而 rustup-init 本来就只写这个人的 profile，所以不带（带了 winget 答「找不到适用的安装程序」）；Chrome 的清单只有机器级安装程序，而每台 Windows 都有 Edge，Chromium 一族在 Windows 上由 Edge 答上，Chrome 那条配方很少被走到。
 - **elan 在 Windows 上由城跑它的官方安装脚本**：winget 上没有 elan，官方装法是 `elan-init.ps1`。理由：一台新机器应当一次走完，而让人把一行 PowerShell 贴进终端正是走不完的那一步；这一条由人定下，是 §8-166「脚本只印不跑」在 Windows 的 elan 上的例外。配方是 `powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm <elan-init.ps1>))) -NoPrompt 1 -DefaultToolchain none"`：`-NoPrompt` 让它不问，`-DefaultToolchain none` 让 Lean 的版本仍只由 `lean` 一行按 `lean-toolchain` 装。它仍是 `Recipe::Command`，页面仍要人按一下才跑，所以「每一条会改动计算机的命令都先给人看过」这条不变；Linux 上的 `curl … | sh` 仍是 `Print`，例外只到 Windows 的 elan 为止。
-- **cargo 工具是一包，包里有哪些由仓库自己点名的地方决定**：`Requirement.pack == Some(Pack::RustTools)` 的行是 cargo-nextest、cargo-deny、cargo-mutants、cargo-fuzz、kani。测试 `the_rust_tools_pack_is_every_cargo_tool_this_repository_calls` 读 `justfile`、`.github/` 下的工作流、`crates/xtask/src/` 与 `docs/`，把其中调用的 cargo 子命令（`cargo <sub>` 里 `<sub>` 不是 cargo 自带的那些，也不是文档写给 person 安装 sprawling 本身的途径 `cargo binstall`——没有哪个 recipe、工作流或检查运行它，贡献者用不着）与 install-action 的 `tool:` 行收成一个集合，要求它恰好等于这一包；多一个或少一个都点名。cargo-audit 与 cargo-llvm-cov 因此不在表里：仓库里没有任何 recipe、工作流或文档调用它们。线上每一项仍是自己的一行（`just prereqs` 与判定逐项读），页面把同一包的行画成一行，一个按钮按表序装完缺的那几项，每一项一份日志。
+- **cargo 工具是一包，包里有哪些由仓库自己点名的地方决定**：`Requirement.pack == Some(Pack::RustTools)` 的行是 cargo-nextest、cargo-deny、cargo-mutants、cargo-fuzz、kani。测试 `the_rust_tools_pack_is_every_cargo_tool_this_repository_calls` 读 `justfile`、`.github/` 下的工作流、`Tools/xtask/src/` 与 `docs/`，把其中调用的 cargo 子命令（`cargo <sub>` 里 `<sub>` 不是 cargo 自带的那些，也不是文档写给 person 安装 sprawling 本身的途径 `cargo binstall`——没有哪个 recipe、工作流或检查运行它，贡献者用不着）与 install-action 的 `tool:` 行收成一个集合，要求它恰好等于这一包；多一个或少一个都点名。cargo-audit 与 cargo-llvm-cov 因此不在表里：仓库里没有任何 recipe、工作流或文档调用它们。线上每一项仍是自己的一行（`just prereqs` 与判定逐项读），页面把同一包的行画成一行，一个按钮按表序装完缺的那几项，每一项一份日志。
 - **Rust 本身是一行**：`rust` 探 `rustc --version`，配方 `rustup default stable`（rustup 装好后给出一个在 PATH 上的 rustc；进仓库后 rustup 按 `rust-toolchain.toml` 自取钉住的那一版）。它与 `lean` 两行带 `Pin`：页面把钉住的版本与装着的、上游最新的并排画出（§8-120）。
 - **探测与安装子进程看到同一条搜索路径**（`doctor::host::search_path`）：进程的 `PATH` 之后补上这个人的几个用户级 bin 目录——home 下 `.cargo`、`.elan`、`.local`、`.bun` 各自的 `bin`，Windows 上再加 `%LOCALAPPDATA%\Microsoft\WinGet\Links`——已在 `PATH` 上的不重复。安装程序改的是注册表或 shell 启动文件，本进程的 `PATH` 是启动时那一份；不补这几个目录，刚装好的 rustup 让下一行的 `cargo install` 找不到 cargo，刚装好的 elan 让 `elan toolchain install` 找不到 elan，整批装要重启城才能走完。
 - **`same_command` 一处拼写三平台**：三平台装法相同的工具只写一次，三列各抄一遍只会让其中一列悄悄落后。
@@ -389,7 +389,7 @@ pub(crate) fn reveal(city_root: &Path, at: &Address) -> Result<(), AxError>;
 reveal: fn(&Path, &Address) -> Result<(), AxError>,
 ```
 
-- **worker 经它被交到的 `fn` 指针碰这里**：生产的 `Hands`（`bin::assembly::production::hands`）装上 `revealing::reveal`，经 `Hands.reveal` 交给 worker 的构造器，`Command::Reveal` 调的是那个字段，不直接调本函数。本模块启动主机的一个程序，worker 搬进 `accounting` 时它留在 `sprawling`（`crates/accounting/Spec.lean` §7、accounting D10）；脚本场景交一个自己的 `fn`，就不会在宿主上起文件管理器。钉住它的测试是 `a_reveal_reaches_the_file_manager_the_worker_was_handed`。
+- **worker 经它被交到的 `fn` 指针碰这里**：生产的 `Hands`（`bin::assembly::production::hands`）装上 `revealing::reveal`，经 `Hands.reveal` 交给 worker 的构造器，`Command::Reveal` 调的是那个字段，不直接调本函数。本模块启动主机的一个程序，worker 搬进 `accounting` 时它留在 `sprawling`（`Sprawling/accounting/Spec.lean` §7、accounting D10）；脚本场景交一个自己的 `fn`，就不会在宿主上起文件管理器。钉住它的测试是 `a_reveal_reaches_the_file_manager_the_worker_was_handed`。
 
 - **为什么是一条命令而不是一个链接**：浏览器打不开 `file://` 之外的东西，而 `file://` 打开的是一个目录列表而不是人平时用的那个窗口。城代为执行，于是「在文件管理器里指出来」这件事在三个平台上各自用它们自己的办法完成：Windows `explorer /select,<路径>`、macOS `open -R <路径>`、其余 `xdg-open <父目录>`。
 - **文法即闸**：入参是 `Address`，它在语法上爬不出城，所以「请求城外的一个路径」这句话在线上拼不出来。此处不再加第二道路径检查——那会是同一条规则的第二个权威。
@@ -413,7 +413,7 @@ pub(crate) fn tuning_as_attached(tuning: &gateway::EndpointTuning) -> wire::Endp
 - **`attach_endpoint` 拒绝三件事**：probe 失败而人既没勾也没打任何模型，因为那样的城连一个可调用的模型 id 都没有；probe 读到列表、人勾的一个都不在列表上、又没打 id（gateway D47）；这次登记的行里少了一个占着角色的模型（gateway D48）。三种拒绝都在写 `endpoint_attached` 之前，书与账本不动。
 - **probe 按调用时的那套头与期限发出**：一个需要自定义请求头的网关，在 probe 不带那个头时答 401，人于是读到「密钥无效」，而那把密钥是好的。`request_max_retries` 在这里被兑现一次——设置页上有人正在等这一个请求；模型调用的那一份由同一个数走另一条路兑现：`dispatching::agreeing` 在选定端点处把这个 `kernel::Retries` 原样冻进 `RunPlan`，`runtime::run::drive` 据此决定一次可重试的失败之后还有没有下一次。
 - **`tuning_of` 是线上词汇与 gateway 词汇之间唯一的翻译点**：零读成缺省（清空一个数字框到达线上是 `Some(0)`，而没有请求能在 0 ms 内完成），空名字的头与不以 `/` 开头的 pointer 被丢掉（表单在人打字时留着空行），头的值读起来像凭据却不是 vault 引用时整次拒绝（`E_CONFIG_INVALID`，subject 是那个头的名字）；`stream_idle_timeout_ms` 两边同名，进 gateway 时仍是闲置界，只经同一条「零读成缺省」。
-- **`tuning_as_attached` 是同一个翻译点的反方向**（`crates/wire/spec/Answer/Endpoints.lean` §8-85，wire D49）：`EndpointView` 把挂上时的 tuning 按线上的形状读回，设置页改完账号整份重发一次挂接。两个方向住同一个模块 `accounting::tuning`，所以加一个字段时两边在同一处改；它不在 worker 里，因为读面（`accounting::views`）也要读它，而读面不点名 worker。往返一次不改变 gateway 那一份：对每一份 `tuning_of` 收下的 tuning，`tuning_of(tuning_as_attached(t)) == t`，由 `accounting::tuning::tests` 的 proptest 守住。`proxying` 读回为 `Some`，`request_max_retries` 读回为 `Retries::stated()`，头的值读回为 `HeaderValue::spelled()`。
+- **`tuning_as_attached` 是同一个翻译点的反方向**（`Sprawling/wire/spec/Answer/Endpoints.lean` §8-85，wire D49）：`EndpointView` 把挂上时的 tuning 按线上的形状读回，设置页改完账号整份重发一次挂接。两个方向住同一个模块 `accounting::tuning`，所以加一个字段时两边在同一处改；它不在 worker 里，因为读面（`accounting::views`）也要读它，而读面不点名 worker。往返一次不改变 gateway 那一份：对每一份 `tuning_of` 收下的 tuning，`tuning_of(tuning_as_attached(t)) == t`，由 `accounting::tuning::tests` 的 proptest 守住。`proxying` 读回为 `Some`，`request_max_retries` 读回为 `Retries::stated()`，头的值读回为 `HeaderValue::spelled()`。
 - **`EndpointsAnswer` 的每一行带 `label`**，取 `AttachedEndpoint::label()`，缺省即 name。
 
 ### 8-61 已经在等的那一批，合成一道屏障
@@ -421,7 +421,7 @@ pub(crate) fn tuning_as_attached(tuning: &gateway::EndpointTuning) -> wire::Endp
 `RelayGate::serve` 醒来后先把队列里等着的请求**全部取空**，再一次 `Ledger::append_all` 交下去，按位回信。
 
 - **理由是屏障的价钱与记录条数无关**：实测（`durability_barrier`，windows-x86_64 NVMe 一档机器）一条一屏障 585.2 µs／条，五十条一屏障 13.2 µs／条，而其中真正的写只有约 2.5 µs。四条车道同时在跑、每一行都要越到这一条记账线程上来，所以一次排空手里常常不止一件；一件一件交下去，交的是同样的字节，付的是四倍的屏障。
-- **等待的语义一个字没改**：回信仍然在落盘之后才发出，因为「`Ok` 即已落盘」正是 `EventRef` 之所以是一条已存在历史的引用（`crates/storage/Spec.lean` §8-1）。否决「给端口加一个显式屏障动作、`append` 只写不同步」：那会让一条已经发出的 `EventRef` 指向一条可能还不存在的历史。
+- **等待的语义一个字没改**：回信仍然在落盘之后才发出，因为「`Ok` 即已落盘」正是 `EventRef` 之所以是一条已存在历史的引用（`Sprawling/storage/Spec.lean` §8-1）。否决「给端口加一个显式屏障动作、`append` 只写不同步」：那会让一条已经发出的 `EventRef` 指向一条可能还不存在的历史。
 - **整波失败即整波拒**：`append_all` 的第一条拒绝结束整波，每个在等的调用方都收到同一条拒绝——与单条 `append` 在它后面那条失败时给出的承诺相同。
 - **计数店是证据**：`everything_already_waiting_reaches_the_store_in_one_wave` 用一家数波数的店断言四条同时到达的 draft 不花四次波，这是端口早就允许的第二实现，而不是为这条断言新开的洞。
 
@@ -450,7 +450,7 @@ impl Journal {
 `Query::Doctor` 答的是开城那一刻的快照（§8-53）。于是机器页只能把一行命令复制到终端，装完还要重启城才看得见结果。两条命令补上这段，执行点是 `accounting::worker::commanding::machine`。
 
 ```rust
-// accounting::machine（Recipe 的唯一拒绝语；Runnable 只由它造，`crates/accounting/Spec.lean` §8-4）
+// accounting::machine（Recipe 的唯一拒绝语；Runnable 只由它造，`Sprawling/accounting/Spec.lean` §8-4）
 impl Recipe {
     pub fn command(&self, item: &str) -> Result<Runnable<'_>, AxError>;
 }
@@ -469,7 +469,7 @@ impl RunWorker {
 pub(crate) fn recipe_for(item: &str) -> Result<&'static accounting::Recipe, AxError>; // InvalidArgs：表里没有；ToolUnavailable：这个平台没有配方
 ```
 
-- **查表与取平台在表旁边的 `doctor::recipe_for`，写进度行在 `doctor_install`**：worker 搬进 `accounting` 时需求表留在 `sprawling`（`crates/accounting/Spec.lean` §7），所以 worker 经打开时交给它的 `RunWorker.recipe_for` 这个 `fn` 指针拿配方，而不是自己读 `REQUIREMENTS`。它不是一层穿透：它是表的查法，与表同住 `doctor::table`，一个名字要不要被拒只在那里回答。进度行仍由 `doctor_install` 写，写的时刻因此就是安装到达的时刻。钉住这条的测试是 `an_install_takes_its_recipe_from_the_table_the_worker_was_handed`。
+- **查表与取平台在表旁边的 `doctor::recipe_for`，写进度行在 `doctor_install`**：worker 搬进 `accounting` 时需求表留在 `sprawling`（`Sprawling/accounting/Spec.lean` §7），所以 worker 经打开时交给它的 `RunWorker.recipe_for` 这个 `fn` 指针拿配方，而不是自己读 `REQUIREMENTS`。它不是一层穿透：它是表的查法，与表同住 `doctor::table`，一个名字要不要被拒只在那里回答。进度行仍由 `doctor_install` 写，写的时刻因此就是安装到达的时刻。钉住这条的测试是 `an_install_takes_its_recipe_from_the_table_the_worker_was_handed`。
 - **只跑 `Recipe::Command`，走的是终端那条 `Machine::install`**，不是第二个安装器。`Print` 与 `Manual` 各自带着「人自己去做什么」被拒：管道进 shell 的脚本是没人读过的代码，这条纪律不因请求来自页面而松一格。需求表里没有的名字在起任何进程之前就被拒，因为页面问的是这份构建不认识的东西。
 - **「这条配方这座城可不可以跑」只有 `Recipe::command` 一个家**（H-12）。它要么给出 `Runnable`，要么给出那句带恢复语的拒绝；终端（`screen`）、页面（`commanding::machine`）与机器适配器（`probe`）三处都问它，所以同一条打印配方在三扇门后读到的是同一句话。`Machine::install` 收的是 `Runnable` 而不是 `Recipe`，于是「不可跑的配方」在这一层已经不可表达，`runnable()` 与 `probe` 里那第二段措辞随之删除。
 - **`bin::doctor::running` 是本二进制起安装程序的唯一一处，等待有上限**（B-25／F-10）。三件事一起成立：`stdin` 是 `Stdio::null()`，于是要人同意源协议、要人输密码的包管理器立刻读到输入结束而不是坐在一台没有人的终端前；等待是 `try_wait` 的**计数敲门**，而不是 `Command::status()` 那种没有尽头的阻塞；敲完即杀掉子进程并带着 `E_TIMEOUT` 返回，恢复语是「自己在终端里跑这一行」。**上限用敲门次数而不是墙钟，因为本二进制读时钟的地方只有 `bin::assembly` 一处**（ARCHITECTURE §10 第 4 条）；这同时让上限可断言——测试要三次敲门就得到三次，而对着墙钟的断言问的是它跑在哪台机器上。上限由 `running::patience_for(runnable)` 一处决定：`cargo install` 从源码编译，给 `BUILD_PATIENCE = 24_000` 次 × `TICK = 50ms` = 20 分钟，因为 cargo-mutants、cargo-deny 这一类在四核机器上冷编译要 5–12 分钟，3 分钟的上限让它们每次都被杀在半路；其余的包管理器下载现成的包，仍是 `PATIENCE = 3_600` 次 = 180 秒。杀不掉或收不了尸都写进那条错误的主题——本城起的一个停不掉的进程是人必须知道的事实。
@@ -551,13 +551,13 @@ pub fn answer() -> ReleaseAnswer;
 ```
 
 `release.rs` 识别构建与安装来源，选择比较版本和手动更新命令；帧与选择契约由
-`crates/wire/spec/Answer/Release.lean` D24 定义。未带发行 tag 的 Cargo 安装按编译版本
+`Sprawling/wire/spec/Answer/Release.lean` D24 定义。未带发行 tag 的 Cargo 安装按编译版本
 比较 crates.io，开发构建保留 FromSource，不能从缺席 tag 推出安装来源。
 `SPRAWLING_RELEASE_TAG` 由构建脚本声明重跑条件，存在时必须与 Cargo 版本及成熟度一致。
-nightly 身份与发布状态由 `crates/sprawling/spec/Nightly.lean` D105 规定：`SPRAWLING_NIGHTLY_TAG`
+nightly 身份与发布状态由 `Sprawling/app/spec/Nightly.lean` D105 规定：`SPRAWLING_NIGHTLY_TAG`
 与 `SPRAWLING_SOURCE_SHA` 成对出现，完整 SHA 用于幂等与 compare，正式与 nightly 环境输入互斥。
 
-`release::registry`（`crates/sprawling/src/release/registry.rs`）拥有注册表 HTTP 读取与
+`release::registry`（`Sprawling/app/src/release/registry.rs`）拥有注册表 HTTP 读取与
 npm、crates.io 和 GitHub 发布列表的解码，沿用 gateway 的代理规则、请求耐心与
 分阶段网络拒绝；父模块拥有来源判定，适配器不切换注册表。GitHub API 和归档页面的
 repository 身份来自 Cargo 继承的根清单，不另写 owner/repo。
@@ -567,15 +567,15 @@ repository 身份来自 Cargo 继承的根清单，不另写 owner/repo。
 只有 `status --check` 或人的检查按钮调用 `answer` 才出网，成功读数与拒绝一起返回；
 查询与手动命令选择不下载、不安装、不覆写二进制。
 
-### 8-69 真端点验收闸 `just e2e`（`crates/sprawling/tests/e2e.rs`）
+### 8-69 真端点验收闸 `just e2e`（`Sprawling/app/tests/e2e.rs`）
 
 这个仓库的其余检查都在回答一个它自己写的 provider。这一条把一个人粘贴的 base URL、key 与模型名拿来，attach → 选模型 → 派活，再回头读账本——于是「key 填了，从来没跑通」是一次红，而不是一份报告。
 
 **六条口径：**
 
-1. **缺席就一行说明并通过。** 轮次是一张表：`gateway::known_hosts()`（由 `PRESETS` 算出）的每个主机的每个 face 各一轮，那个主机的 key 与模型名在 `SPRAWLING_E2E_KEY_<主机>`／`SPRAWLING_E2E_MODEL_<主机>` 里（主机名大写、非字母数字换成 `_`，如 `SPRAWLING_E2E_KEY_API_DEEPSEEK_COM`），一个 key 用于这个主机的全部 face；再加一轮「人粘贴的那个端点」，由四个环境变量 `SPRAWLING_E2E_BASE_URL`／`SPRAWLING_E2E_KEY`／`SPRAWLING_E2E_MODEL`／`SPRAWLING_E2E_DIALECT` 给出，接表外的中转或回环地址上的服务。每一轮缺什么由测试自己印出来，justfile 不抄第二份；一个主机只给了 key 与模型名中的一个是写坏的配置，同样印出。表不手写，加一行预置主机就多一组轮次（`crates/gateway/Spec.lean` §8-32 是同一张表的白盒一半）。每个测试对每一轮各立一座城，失败时点名是哪一轮。这与 `just adversary` 是同一个诚实形状：静默跳过的闸比没有闸更糟，而在每台没有 key 的机器上都红的闸没有人会跑。持有凭据的作业设 `SPRAWLING_E2E_REQUIRED=1`：此时粘贴端点那一轮的四个变量缺任何一个都判红，按主机的一轮只给了一半也判红，并印出同一行缺了什么——凭据在那里本该齐全，缺席是配置坏了，而不是所在机器正当地没有 key。只认 `1`；其他值与未设同义，免得一个拼错的开关悄悄换回跳过。
+1. **缺席就一行说明并通过。** 轮次是一张表：`gateway::known_hosts()`（由 `PRESETS` 算出）的每个主机的每个 face 各一轮，那个主机的 key 与模型名在 `SPRAWLING_E2E_KEY_<主机>`／`SPRAWLING_E2E_MODEL_<主机>` 里（主机名大写、非字母数字换成 `_`，如 `SPRAWLING_E2E_KEY_API_DEEPSEEK_COM`），一个 key 用于这个主机的全部 face；再加一轮「人粘贴的那个端点」，由四个环境变量 `SPRAWLING_E2E_BASE_URL`／`SPRAWLING_E2E_KEY`／`SPRAWLING_E2E_MODEL`／`SPRAWLING_E2E_DIALECT` 给出，接表外的中转或回环地址上的服务。每一轮缺什么由测试自己印出来，justfile 不抄第二份；一个主机只给了 key 与模型名中的一个是写坏的配置，同样印出。表不手写，加一行预置主机就多一组轮次（`Sprawling/gateway/Spec.lean` §8-32 是同一张表的白盒一半）。每个测试对每一轮各立一座城，失败时点名是哪一轮。这与 `just adversary` 是同一个诚实形状：静默跳过的闸比没有闸更糟，而在每台没有 key 的机器上都红的闸没有人会跑。持有凭据的作业设 `SPRAWLING_E2E_REQUIRED=1`：此时粘贴端点那一轮的四个变量缺任何一个都判红，按主机的一轮只给了一半也判红，并印出同一行缺了什么——凭据在那里本该齐全，缺席是配置坏了，而不是所在机器正当地没有 key。只认 `1`；其他值与未设同义，免得一个拼错的开关悄悄换回跳过。
 2. **不进 `just check`。** 它花的是别人的钱与别人的网络；有没有 key 是一台机器可以正当地没有的东西。它也不进任何定时工作流：凭据只在人自己的机器上，由持有 key 的人在自己的机器上跑 `just e2e`，仓库不存 key，也不存为它准备的变量（人的定规：需要人的 key 的定时作业删掉）。设了 `SPRAWLING_E2E_BASE_URL` 时其余三个就是欠着的，`SPRAWLING_E2E_REQUIRED=1` 让缺哪个就红哪个。
-3. **从 `RunWorker::handle` 进城，不另起进程。** 本闸要判的真端点是 provider 的那一个；`CARGO_BIN_EXE` 与套接字那一侧归 `crates/adversary/`（xtask boundary 闸：白盒 Rust、黑盒 Lean）。不经真二进制的 HTTP 面，按既有的边界规则走「经 `wire::server` 递帧的那扇门」——多起一个进程只会多付一道边界成本，而断言仍然共享产品的类型，正是那道闸判为两头不讨好的形状。
+3. **从 `RunWorker::handle` 进城，不另起进程。** 本闸要判的真端点是 provider 的那一个；`CARGO_BIN_EXE` 与套接字那一侧归 `Tools/adversary/`（xtask boundary 闸：白盒 Rust、黑盒 Lean）。不经真二进制的 HTTP 面，按既有的边界规则走「经 `wire::server` 递帧的那扇门」——多起一个进程只会多付一道边界成本，而断言仍然共享产品的类型，正是那道闸判为两头不讨好的形状。
 4. **兼容格式随它的端点走，不做命令行开关。** §24.3 写的是 `just e2e --dialect messages --relay`。兼容格式是「你指向的那个端点说哪种线」的属性，与 base URL、key 同源，故与它们并列为环境变量；旗标是这个事实的第二个家，且能与另外三个变量互相矛盾。字面拼法由 `DialectKind` 的 serde 命名给出（`anthropic`／`open_ai`），测试不另列一张表。
 5. **三个断言分三个测试，因为它们是三个事实。** ①`model_called` 出现且账本不带 `E_CONFIG_INVALID`／`E_WIRE_MISMATCH`；②`model_called` 说得出输出上限来自哪一环（`ceiling_from` 非空），与 ① 合并就成了两个事实一个判决；③ 故意断 key 必红，且 recovery 非空、错误码不是 `E_CONFIG_INVALID`——被拒的凭据是端点的答复，不是一份写坏的配置。
 6. **时长由两次 cargo 调用与两个调参守住。** 编译不占额度：`--no-run` 先付编译（一台 windows-msvc 机器上冷构建实测 2m18s），`timeout 180` 只罩测试进程。`request_max_retries = 0` 让 gateway 的退避一次都不睡，`timeout_ms = 60000` 让一次请求封顶一分钟（测试的时长上限：单次 `sleep` ≤ 10 秒、单个测试进程 `timeout` ≤ 180 秒）。三个测试各把每一轮跑一遍，所以 180 秒罩住的是「轮数 × 三次派活」：一次填进的主机多到装不下时，分几次跑，每次只导出其中几家的变量。
@@ -585,7 +585,7 @@ repository 身份来自 Cargo 继承的根清单，不另写 owner/repo。
 ### 8-71 空着的上限不是被抹掉的上限（`credentials::endpoints::select_model`）
 
 - **缺陷**：设置页每次选模型都把整行发上来，于是一个人重选自己已经登记过的模型，就把当初填的上限用一个空框覆盖掉了；下一次 messages 兼容格式的调用因为写不出 `max_tokens` 被拒（A 章 B-01 的第二段）。`None` 从此表示「这次没说」，而不是「这次要清空」。`context_tokens` 同理，`0` 是「这次没说」，因为两个数来自同一个空表单。
-- **梯子只有一架，住 gateway**（`gateway::Figures::resolve`，`crates/gateway/Spec.lean` §8-17 与 gateway D37）：窗口与上限都是人这次填的 → provider 列表里这个 id 的那一行 → 上一次登记 → 钉版目录与 `gateway::provider::preset` 的行 → 策略缺省 `OUTPUT_CEILING_DEFAULT`。窗口没有策略缺省一档，四档都沉默时窗口为 `0`，上下文提醒随之不响；上限的后两档只在 messages 面作答，chat 与 responses 两面在前三档都沉默时答 `ProviderDefault`。
+- **梯子只有一架，住 gateway**（`gateway::Figures::resolve`，`Sprawling/gateway/Spec.lean` §8-17 与 gateway D37）：窗口与上限都是人这次填的 → provider 列表里这个 id 的那一行 → 上一次登记 → 钉版目录与 `gateway::provider::preset` 的行 → 策略缺省 `OUTPUT_CEILING_DEFAULT`。窗口没有策略缺省一档，四档都沉默时窗口为 `0`，上下文提醒随之不响；上限的后两档只在 messages 面作答，chat 与 responses 两面在前三档都沉默时答 `ProviderDefault`。
 - **装配层只交上它手里的事实**：人这次填的两个数、端点簿里这个 id 的那一行（`AttachedEndpoint.models`，provider 自己说的）、`EndpointBook::registered` 读出的这个 tag 上一次登记的同一个模型、钉版目录按精确 id 的那一行，与这个端点的 base URL 和兼容格式。**上一次登记按 endpoint 与 model id 读，而不是只按 tag**：把一个 tag 指向另一个模型时，旧模型的数不得跟过去。书是「这座城登记了什么」的唯一陈述，在它旁边另存一份就是第二个权威；梯子的顺序与「上一次登记只拿人说过的数作答」都只写在 gateway，装配层不复写——一条规则两个家，漂开的总是没人看的那个。
 - **来源入账**：`model_selected` 带 `window_from: person | upstream | registered | preset`（窗口未知时缺席）与 `ceiling_from: person | upstream | registered | preset | policy | provider`，拼写取 `FigureSource::as_str` 与 `OutputCeiling::word`，载荷由 `gateway::router::payload` 一处写。`provider` 行的 `max_output_tokens` 缺席：请求里没有这个字段。账本里看得见来源，因此一次被截断的跑是读出来的，不是猜出来的；书把两个词读回 `ModelEntry`，下一次登记据此判断上一次的数该不该作答。
 
@@ -614,7 +614,7 @@ impl RunWorker { fn halted_by(&self, addr: &Address) -> Option<kernel::event::Sc
 
 **本章测试**：`an_unreadable_approval_item_stops_the_fold`（`accounting::worker::folds::tests`）、`an_appointment_this_build_cannot_read_is_refused_rather_than_defaulted`（`kernel::event::record::governance`）。
 
-### 8-76 哪些记录会动计划，是一张穷尽表（`accounting::plan_view::reach::may_move_plan`；`crates/accounting/Spec.lean` §8-6）
+### 8-76 哪些记录会动计划，是一张穷尽表（`accounting::plan_view::reach::may_move_plan`；`Sprawling/accounting/Spec.lean` §8-6）
 
 ```rust
 enum PlanReach { Untouched, Stale, NodeFreed, NodeStopped }
@@ -637,7 +637,7 @@ fn may_move_plan(kind: EventKind) -> PlanReach;
 ```
 
 - **两行而不是一行**：`mcp_tools` 是常驻连接表（F-13）唯一能省掉的那一段，混进总数就说不清省了多少。总数含协商、开房间、写简报、立 run、铺工作台与冻结计划；这一切都在会计线程上，期间没有任何车道的追加被服务。
-- **量在先，门在后**：`crates/xtask/budgets.toml [prepare_dispatch]` 只记读数与机器，不设上限——上限若写在读数之前，要么形同虚设，要么挡住正是要修它的那次改动。
+- **量在先，门在后**：`Tools/xtask/budgets.toml [prepare_dispatch]` 只记读数与机器，不设上限——上限若写在读数之前，要么形同虚设，要么挡住正是要修它的那次改动。
 - **读钟读不出不丢工具**：`mcp_tools` 无法报出 `Result`，因此钟失败时只是不报这一行；连接是工作，读数是诊断。
 - **本章测试**：`a_dispatch_says_what_it_spent_before_the_drive`（`accounting::worker::dispatching::tests`）盯住「读数被说出来」这一件事，不断言数值——墙钟数值属于跑它的那台机器，属于 `budgets.toml` 的那一行。
 
@@ -653,11 +653,11 @@ impl RunWorker {
 
 - **不变量一句话**：一个会话的调用形状选一次。房间的 `CONFIG.toml` 在它的第一个 Run 写下 `[model] name`（人选了强度就一并写下 `[model] effort`），此后每次派活读回来与自己要冻下的形状对拍，不等即拒。
 - **为什么住在派活面**：模型、输出上限与 effort 都上供应方的线，中途任何一个移动都会让会话此后每一轮为一段字节从未变过的 prompt 付全价。这道对拍在写简报之前，因此被拒的派活不落一个字节、不动会话一行记录——`stage_dispatch` 的序幕顺序（§8-166）就是这条拒绝的位置理由。
-- **对拍本身是 runtime 的**：`runtime::turn::CallShape::verified_against` 拥有比较与三句拒绝语，恢复语指向人现在就做得到的两件事——**把动过的那一项改回去，或换一个地址派这件活**（`crates/runtime/Spec.lean` §8-4-1；`/new` 上线后改的是那一个常量）。派活面只负责造出两个形状：会话记下的那个，与这次派活将要冻下的那个（模型来自 endpoint book，effort 来自梯子）。
+- **对拍本身是 runtime 的**：`runtime::turn::CallShape::verified_against` 拥有比较与三句拒绝语，恢复语指向人现在就做得到的两件事——**把动过的那一项改回去，或换一个地址派这件活**（`Sprawling/runtime/Spec.lean` §8-4-1；`/new` 上线后改的是那一个常量）。派活面只负责造出两个形状：会话记下的那个，与这次派活将要冻下的那个（模型来自 endpoint book，effort 来自梯子）。
 - **effort 比的是梯子在这里解析出的值**，不是房间那一行：`[model] effort` 一个键都没写过的会话，冻下的是「让供应方决定」，而从这一档挪到任何一档同样是形状移动。
 - **模型比的是登记面现在的答案**：`SelectModel` 改的是城级 tag→model 登记，在那里拦会把正常配置一起禁掉；被挡的是它落到一个已开会话上的那一步。会话记下的模型仍在 endpoint book 里时，上限与窗口从那一行读（它们是模型的属性，抄一份进房间的配置就是同一个事实的第二个家）；模型已不在登记面时，模型那一臂先拒。
-- **`[model] name` 不是「这个 Run 用哪个模型」的权威**：Run 的模型仍由 `EndpointBook::select` 选，会话记录只说它当初从哪个模型开始。两者不一致时这次派活被拒，而不是两个家各说各话（`crates/city/Spec.lean` §8-14、§8-4 的 `own_layer`）。
-- **地址就是楼时，地址自己就是会话**：那种地址的「自己那份 `CONFIG.toml`」就是楼的 `CONFIG.toml`（`Layer::Resident` 与 `Layer::Building` 同一文件，`crates/city/Spec.lean` §8-4）。
+- **`[model] name` 不是「这个 Run 用哪个模型」的权威**：Run 的模型仍由 `EndpointBook::select` 选，会话记录只说它当初从哪个模型开始。两者不一致时这次派活被拒，而不是两个家各说各话（`Sprawling/city/Spec.lean` §8-14、§8-4 的 `own_layer`）。
+- **地址就是楼时，地址自己就是会话**：那种地址的「自己那份 `CONFIG.toml`」就是楼的 `CONFIG.toml`（`Layer::Resident` 与 `Layer::Building` 同一文件，`Sprawling/city/Spec.lean` §8-4）。
 - **本章测试**：`accounting::worker::dispatching::session_shape::tests::a_session_keeps_the_shape_it_froze_and_refuses_a_different_effort`——同一房间连续两次派活，四条前缀逐槽位哈希相同且 CAS 里的字节相等；第三次改 effort 被拒（`E_CONFIG_INVALID`，恢复语给出两条出路），会话的 effort 一行未动、没有多出一条 `prompt_assembled`；第四次相同请求照跑并再次冻下同一批字节。`a_model_chosen_after_a_session_opened_does_not_reach_it`——已开会话之后改城级登记，往该会话的派活被拒，房间记录仍是原来的模型，而新会话拿到新模型。
 
 ### 8-80 浏览器的版本读自它旁边的文件，而不是跑它一次（`bin::doctor::version_file`）
@@ -704,7 +704,7 @@ fn kept_credential(&self, name: &str, dialect: DialectKind, header: Option<Strin
 
 **本章测试**：`credentials::tests::kept::an_empty_key_keeps_the_credential_this_city_has_archived`——带 key 接上后，再一次空框 probe 与空框 attach，三次模型表请求都带 `authorization: Bearer sk-archived`，且端点的 `auth` 仍是原引用。
 
-- **`attach_endpoint` 不以探测为准入条件（`crates/gateway/Spec.lean` §8-10 是权威，这里只记装配侧）**：鉴权头由 `AuthSpec::for_dialect`（`gateway::endpoint::auth`） 按兼容格式产出（人填的头优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`。人打的 id 走 `named`，读到列表时也照登、行上标 `named`（gateway D47）。探测失败时，若 `admit` 与 `named` 不全空则按人报的型号登记（早先已登记在这个名下的 id 留下书里那一行，`probed` 只在人报的全是这些 id 时沿用早先的值，否则为 `false`；另写一条 `effect` 级诊断，说这一次没读到列表、点名探测的错，gateway D46），两张都空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
+- **`attach_endpoint` 不以探测为准入条件（`Sprawling/gateway/Spec.lean` §8-10 是权威，这里只记装配侧）**：鉴权头由 `AuthSpec::for_dialect`（`gateway::endpoint::auth`） 按兼容格式产出（人填的头优先），于是 Anthropic 兼容端点拿到的是 `x-api-key` 而不是必然 401 的 `Authorization: Bearer`。人打的 id 走 `named`，读到列表时也照登、行上标 `named`（gateway D47）。探测失败时，若 `admit` 与 `named` 不全空则按人报的型号登记（早先已登记在这个名下的 id 留下书里那一行，`probed` 只在人报的全是这些 id 时沿用早先的值，否则为 `false`；另写一条 `effect` 级诊断，说这一次没读到列表、点名探测的错，gateway D46），两张都空才拒，恢复语是「把要用的 model id 报上来，再登记一次」。落选的是「探测失败即拒、让人先修好 `/models`」：多数兼容端点根本不服务这个接口，那条路等于让人去修一个对端从未承诺过的东西。
 - **`Credential` 是穷举枚举**：`Absent { header }`／`Key { reference, header }`。「这次没填」与「填了一把 key」是两件事，前者保留城已有的凭证，两个 `Option` 拼不出这个区别。`Credential::entered` 是线上命令的唯一入口。
 
 ### 8-82 同一个地址上的新一段：`/new`（`accounting::worker::commanding::sessions`、`Command::OpenSession`、`EventKind::SessionOpened`）
@@ -724,7 +724,7 @@ EventKind::SessionOpened                   // payload：{ carried: bool }；地�
 fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 ```
 
-- **行李里只有行李。** `carried` 在 payload 里，房间在记录自己的 `addr` 字段里（`record_at`）——一条属于某个地址的线本来就在信封上说了地址，payload 再抄一份就是同一个地址的第二个家（`crates/kernel/Spec.lean` §8-4）。
+- **行李里只有行李。** `carried` 在 payload 里，房间在记录自己的 `addr` 字段里（`record_at`）——一条属于某个地址的线本来就在信封上说了地址，payload 再抄一份就是同一个地址的第二个家（`Sprawling/kernel/Spec.lean` §8-4）。
 - **一段会话是房间上的一段，不是房间本身**：`/new` 不换地址、不换身份。市长身份按 `hall/mayor` 精确匹配（`city::spine_files::hall`），换到 `hall/mayor-2` 就把身份丢了。
 - **继承进的是 window，不是 prefix**（S2 改写了路线图早先那句话，理由记在这里）。四段 prefix 各是一份**文档**（`PrefixPlan` 的 `SourceDoc`），由人写、可编辑、逐字节哈希；而一段对话是模型说了什么、工具答了什么，`Window` 自己的文档就写着「frozen prefix 的字节永不落在这里」。把历史塞进 prefix 要有第五个槽位（而 prefix 是四段的类型），会让 `prompt_assembled` 声称历史属于它并不属于的那一段，还会让被缓存的前缀每回合都长。**所以 `RunPlan.inherited` 是 window 的材料**（`run/lifecycle.rs` 在开场任务之前推入），而它可重建的证据不是段哈希而是 `run_forked { from, at_seq }` 加上母亲自己的那些行（runtime §8-2 的 `inherited`）。
 - **一份继承只属于开这一段的那一跑。** 房间的当前一段从 `session_opened` 带上来的 `from` 落在折叠里（`accounting::worker::folds::session`），第一次派活取走它并写下 `run_forked`（这一行同时也把「用掉了」记进折叠）；同一段里的第二次派活不再继承。一个分支是一个开头，而开头的那一跑就是继承的那一跑。
@@ -733,7 +733,7 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 - **`--carry` 带摘要，也带上一跑对话的地址。** 摘要说找到了什么，只有 transcript 说是怎么找到的；接手的 run 本来就在 run 槽位里读到 `Predecessor transcript: <room>/<run>.jsonl`，带过来的一段的第一跑同样读到，指向这个房间里最后开始的那一跑。这份「欠着的前任」与 `from` 同住 `accounting::worker::folds::session`：折叠按 `run_started` 记下每个房间最后开始的 run（重建时读这一行，在世的 worker 在 `freeze_plan` 冻好一跑时自己记，因为 runtime 写的那一行它看不见），`session_opened { carried: true }` 把那一跑记为欠着的前任，`carried: false` 清掉它，这一段的第一跑开始即用掉。不往 `session_opened` 里加字段：前任是哪一跑已由历史里的 `run_started` 决定，payload 再写一份就是第二个家。被否决的备选：`/new` 时把整本账重验一遍去找最后一跑——一次人按下的命令，其代价随城的历史线性增长。
 - **分支先验再清。** `from` 指的行必须是那条 run 自己的行（`origin_is_real`），否则 `E_INVALID_ARGS` 现在就到人手里——而不是先把这个房间的形状清掉，再让一跑扑空。
 - **分支先验再清。** `from` 指的行必须是那条 run 自己的行（`origin_is_real`），否则 `E_INVALID_ARGS` 现在就到人手里——而不是先把这个房间的形状清掉，再让一跑扑空。这一验只读 `from` 指的那一行：worker 常驻一份 `storage::LedgerIndex`，验之前 `refresh`（只读上次之后追加的字节），再 `line_at(at_seq)` 取那一行、解出它属于哪条 run。不走 `runtime::replay::verify_ledger_dir`，因为那一步把整本历史读进内存、逐行验链再解析——94 MB 的账本上是一次 +67 MiB 的瞬时内存和几十毫秒，只为回答一行的归属；而 worker 是这本账唯一的写者，打开时已经验过它（`JsonlLedger::open` 的尾部恢复），整链的校验属于 replay 与 `verify`。被否决的备选：每次验前重建索引——它仍然扫全部段。两条测试（`checking_a_branch_origin_does_not_verify_the_history` 与分支重建的 `inheriting_a_branch_does_not_verify_the_history`）以一本 genesis 之后断了链的账本作证：`verify_ledger_dir` 拒它，这一验与这次重建照常作答。被否决的读数：拿一次验与一次 verify 的墙钟之比——它量的是跑测试那台机器的负载，并行跑时会翻转。
-- **`Carry::Nothing` 必须真的清掉 `Handoff.md` 的槽位**：`accounting::worker::freezing` 无条件读 `city::handoff(root, room)` 并把它折进下一个 run 的 prompt，只清配置而留着文件，新一段仍会继承上一段的摘要，于是开关不起作用（`crates/city/Spec.lean` §8-14b 拥有那一步）。
+- **`Carry::Nothing` 必须真的清掉 `Handoff.md` 的槽位**：`accounting::worker::freezing` 无条件读 `city::handoff(root, room)` 并把它折进下一个 run 的 prompt，只清配置而留着文件，新一段仍会继承上一段的摘要，于是开关不起作用（`Sprawling/city/Spec.lean` §8-14b 拥有那一步）。
 - **默认不带，理由是 `/new` 对人意味着什么** ——「在这个工作区新开一个会话」，：`/new` 对人意味着「在这个工作区新开一个会话」，带上上一段的摘要是需要说出来的例外；**没有交接时 `--carry` 不弹问、不拒绝**，事件里如实写 `carried: false`——一段新会话就是人要的那件事，没有理由因为交接槽位空着而拒他。被否决的备选：默认带、`--fresh` 不带（路线图早先的建议）——它把例外当成了常态，而且换模型后的新一段仍受旧摘要影响。
 - **拒绝只有一条**：地址上有活跃 run → `E_BUSY`，恢复语「先 `/stop`，再 `/new`」。一次派活正在写这一段的形状时把它换掉，等于让两个 run 各自以为冻的是同一份前缀。
 - **分叉是同一件事多一个起点**：S2 把它做成 `OpenSession { from: Option<Origin> }`，而不是第二个动词；`Fork` 帧的退休随 S2 一起落地。
@@ -745,15 +745,15 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 
 **本章验收**：`cargo nextest run -p sprawling -p sprawling-city -p sprawling-wire -p sprawling-kernel` 绿；`cargo xtask wire-ts`、`wiring`、`specalign` 绿。
 
-### 8-141 分支的第一个请求接着母 run 最后一个请求的字节（`accounting::worker::freezing`、`runtime::fork`；`crates/runtime/Spec.lean` §8-58）
+### 8-141 分支的第一个请求接着母 run 最后一个请求的字节（`accounting::worker::freezing`、`runtime::fork`；`Sprawling/runtime/Spec.lean` §8-58）
 
-**要什么。** provider 只为逐字节相同的前缀复用缓存：分支的第一个请求要以母 run 最后一个请求的字节开头——冻结前缀的四段，经 gateway 按兼容格式渲染之后的整份请求体，再到母 run 发过的每一条消息。消息那一半由 runtime 按 `run_started.opening` 重建（`crates/runtime/Spec.lean` §8-58）；前缀那一半由 `accounting::worker::freezing` 为分支重新组装，本节判两半合在一起、经真实渲染之后的字节。
+**要什么。** provider 只为逐字节相同的前缀复用缓存：分支的第一个请求要以母 run 最后一个请求的字节开头——冻结前缀的四段，经 gateway 按兼容格式渲染之后的整份请求体，再到母 run 发过的每一条消息。消息那一半由 runtime 按 `run_started.opening` 重建（`Sprawling/runtime/Spec.lean` §8-58）；前缀那一半由 `accounting::worker::freezing` 为分支重新组装，本节判两半合在一起、经真实渲染之后的字节。
 
 **同一间房、`Carry::Nothing`、两次都是与人交谈的派活时，字节相同。** city 段、building 段、resident 段读的是同一组文件与同一版冻下的身份；`Carry::Nothing` 清掉了房间的 `Handoff.md`，没有 `--carry` 的前任，所以 run 段只剩 `city::RunBrief::Principal` 那一句，两次相同；模型、上限与工具表也相同。
 
 **设计上就不同的三种，不改，理由在各自的规则里。**
 
-1. 母 run 以 `FromJob` 开篇：第一条消息改写，理由在 `crates/runtime/Spec.lean` §8-58。
+1. 母 run 以 `FromJob` 开篇：第一条消息改写，理由在 `Sprawling/runtime/Spec.lean` §8-58。
 2. 分支开在另一间房：building 段以房间地址开头（`freezing::building_segment`），房间换了，从这一段起就不同；分支在哪间房是人的选择。
 3. `Carry::Handoff` 或派活带了目标：run 段带上交接或分支自己的 JOB.md，run 段不同；这一段本来就不进缓存断点（`BreakpointPlan::marks_edge`），它的字节是这一次 run 自己的任务。
 
@@ -763,7 +763,7 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 
 **原因**：「客户端包在哪」有三个读者：`client/vite.config.ts` 写它，`build.rs` 嵌入它，`xtask::bundle::dist` 交给 `render`、`budget` 与 `shots` 去开。三者各自推导位置时，只要一个跟着 `CARGO_TARGET_DIR` 走、另一个不跟，`just build-web` 写出的真包就没人嵌入，二进制带着占位页通过构建，只留一条 cargo warning。而 crates.io 上的 `.crate` 只装这个包目录里的文件，包体在工作区的 `target/` 下时，从 crates.io 构建的每一份二进制都只有占位页（§8-157）。
 
-- **权威是 `build.rs` 的 `const BUNDLE_DIR: &str = "web-dist"`，值是相对本包目录、以 `/` 分段的路径。** `build.rs` 按 `CARGO_MANIFEST_DIR` 接上它，在检出里、在 `target/package/` 的验证目录里、在 registry 解开的包里都指向同一个相对位置。`xtask::bundle` 用 `syn` 读这个常量，再接上 `build.rs` 所在的目录，得出仓库相对的整条路径 `crates/sprawling/web-dist`（crates/xtask/Spec.lean §8-18）；`artifact` 门要求 `client/vite.config.ts` 与 `justfile` 拼出这条路径。
+- **权威是 `build.rs` 的 `const BUNDLE_DIR: &str = "web-dist"`，值是相对本包目录、以 `/` 分段的路径。** `build.rs` 按 `CARGO_MANIFEST_DIR` 接上它，在检出里、在 `target/package/` 的验证目录里、在 registry 解开的包里都指向同一个相对位置。`xtask::bundle` 用 `syn` 读这个常量，再接上 `build.rs` 所在的目录，得出仓库相对的整条路径 `Sprawling/app/web-dist`（Tools/xtask/Spec.lean §8-18）；`artifact` 门要求 `client/vite.config.ts` 与 `justfile` 拼出这条路径。
 - **`build.rs` 不读 `CARGO_TARGET_DIR`。** 客户端包是 bun 的产物，不是 cargo 的产物；它的位置由写它的那一步决定，与 cargo 把编译产物放在哪无关。
 - **`.gitignore` 挡着它，清单的 `include` 把它收进包。** 有 `include` 时 cargo 按这张表遍历包目录，不再问 git，所以被忽略的 `web-dist/` 照样进 `.crate`；没有 `include` 时 cargo 跳过 git 忽略的文件，包体进不了包。
 - **生成的 `client_embed.rs` 带常量 `CLIENT_BUNDLE_DIR`**，值取自 `BUNDLE_DIR`。`serve` 在只有占位页时提示 `--web-dir`，说这个目录在 `sprawling` 包里叫什么，不再手写一份。
@@ -784,7 +784,7 @@ fn checkout_root(manifest: &Path) -> Result<PathBuf, String>;
 const PINS: [(&str, &str); 3] = [
     ("RUST_TOOLCHAIN_FILE", "rust-toolchain.toml"),
     ("LEAN_TOOLCHAIN_FILE", "lean-toolchain"),
-    ("ZIG_VERSION_FILE", "crates/desktop/ffi/zig-version"),
+    ("ZIG_VERSION_FILE", "Sprawling/desktop/ffi/zig-version"),
 ];
 // OUT_DIR 下的 pins.rs（build.rs 写，bin::doctor::pin 用 include! 读）
 pub(crate) const RUST_TOOLCHAIN_FILE: &str;   // 那份文件的全文；构建没找到它时为空串
@@ -798,21 +798,21 @@ pub(crate) fn pinned(pin: Pin) -> Option<String>;   // 文件为空即 None，�
 
 - **锁按 cargo 的规则找。** cargo 把 `Cargo.lock` 写在工作区根，`cargo package` 把它放进包的根（cargo-package 文档：「Cargo.lock is always included」）。所以「往上第一个含 `Cargo.lock` 的目录」在检出里是工作区根，在 `target/package/sprawling-<版本>/` 与 registry 解开的目录里是包自己，用不着按层数往上数。整条链上都没有锁时 `build.rs` 以 `cargo::error` 失败，与此前读不到锁时一样：没有锁的构建说不出自己由哪些包组成。
 - **包体进包**：见 §8-83。`.crate` 的上限是 10 MB（cargo 的 publishing 文档），包体压缩前约 1.5 MB。
-- **城写下的文档模板归 city。** 模板与 `City.md` 住在 `crates/city/templates/`：它们是城立城、建楼、开会话时写下的第一批字节，`city::spine_files` 与 `city::building` 按包内路径 `include_str!` 它们；城里的 `City.md` 由 `city::follow_defaults` 从 `city::defaults::Shipped::City` 铺下，accounting 不伸手到别的包目录里（`crates/city/Spec.lean` §8-41）。
-- **工具链钉子由构建脚本找，找不到就不钉。** `doctor` 的 develop 层报「钉住的版本」，读的是检出根上的 `rust-toolchain.toml`、`lean-toolchain` 与 `crates/desktop/ffi/zig-version`。这三份文件不在本包里，从包里构建时它们不存在，所以 `build.rs` 在 `checkout_root` 下找它们，把全文写进 `OUT_DIR` 下的 `pins.rs`；只有「不存在」读成空串，别的读失败仍是 `cargo::error`。空串即不钉：`pinned` 答 `None`，页面不画钉住的版本，探测按空前缀接受任何一版。
-- **`packaged` 门守这条线**（crates/xtask/Spec.lean §8-49）：可发布的包的生产代码里，`include!`、`include_str!`、`include_bytes!` 只指向包目录之内或 `OUT_DIR`。
-- **清单**：`[workspace.package]` 写 `repository`、`homepage`，`publish = true`；每个包写自己的 `description`，本包另写 `readme`、`keywords`、`categories` 与 `include`；`xtask` 与 `citysim` 写 `publish = false`。工作区自己的包在 `[workspace.dependencies]` 里各钉 `version = "=<工作区版本>"`，`guard` 判它们等于 `[workspace.package] version`（crates/xtask/Spec.lean §8-49）。`sprawling-remote-access` 被二进制链接，随之可发布。`sprawling-desktop-ffi` 也可发布：`sprawling-desktop` 在 Windows 上依赖它，而 crates.io 要求依赖的每个包都在 registry 上；它的包里带着 Zig 叶子的源码与 `zig-version`，构建脚本只读包内的文件，所以从 crates.io 在 Windows 上装这个二进制要先装钉住的那一版 Zig（§8-146）。`sprawling-console-ffi` 同理可发布，包里带着渲染器的 Zig 源码与它自己的 `zig-version`，所以从 crates.io 在任何平台上装这个二进制都要先装那一版 Zig。
+- **城写下的文档模板归 city。** 模板与 `City.md` 住在 `Sprawling/city/templates/`：它们是城立城、建楼、开会话时写下的第一批字节，`city::spine_files` 与 `city::building` 按包内路径 `include_str!` 它们；城里的 `City.md` 由 `city::follow_defaults` 从 `city::defaults::Shipped::City` 铺下，accounting 不伸手到别的包目录里（`Sprawling/city/Spec.lean` §8-41）。
+- **工具链钉子由构建脚本找，找不到就不钉。** `doctor` 的 develop 层报「钉住的版本」，读的是检出根上的 `rust-toolchain.toml`、`lean-toolchain` 与 `Sprawling/desktop/ffi/zig-version`。这三份文件不在本包里，从包里构建时它们不存在，所以 `build.rs` 在 `checkout_root` 下找它们，把全文写进 `OUT_DIR` 下的 `pins.rs`；只有「不存在」读成空串，别的读失败仍是 `cargo::error`。空串即不钉：`pinned` 答 `None`，页面不画钉住的版本，探测按空前缀接受任何一版。
+- **`packaged` 门守这条线**（Tools/xtask/Spec.lean §8-49）：可发布的包的生产代码里，`include!`、`include_str!`、`include_bytes!` 只指向包目录之内或 `OUT_DIR`。
+- **清单**：`[workspace.package]` 写 `repository`、`homepage`，`publish = true`；每个包写自己的 `description`，本包另写 `readme`、`keywords`、`categories` 与 `include`；`xtask` 与 `citysim` 写 `publish = false`。工作区自己的包在 `[workspace.dependencies]` 里各钉 `version = "=<工作区版本>"`，`guard` 判它们等于 `[workspace.package] version`（Tools/xtask/Spec.lean §8-49）。`sprawling-remote-access` 被二进制链接，随之可发布。`sprawling-desktop-ffi` 也可发布：`sprawling-desktop` 在 Windows 上依赖它，而 crates.io 要求依赖的每个包都在 registry 上；它的包里带着 Zig 叶子的源码与 `zig-version`，构建脚本只读包内的文件，所以从 crates.io 在 Windows 上装这个二进制要先装钉住的那一版 Zig（§8-146）。`sprawling-console-ffi` 同理可发布，包里带着渲染器的 Zig 源码与它自己的 `zig-version`，所以从 crates.io 在任何平台上装这个二进制都要先装那一版 Zig。
 - **`sandbox` 是默认 feature。** `cargo install sprawling` 不写 `--features` 时也带执行引擎，与归档一致；不要引擎的构建写 `--no-default-features`，`just features` 编译这一份，因为别的命令都不再编它。
 - **Windows 的产品资源由 Cargo 包信息生成。** `build.rs` 是形状 4 adapter，以 `CARGO_CFG_TARGET_OS` 判断目标平台；目标为 Windows 时调用 `winresource::WindowsResource::new().compile()`，生成物留在 `OUT_DIR` 并交给链接器，其他目标不调用资源编译器。`ProductName` 读 `CARGO_PKG_NAME`，`ProductVersion` 与 `FileVersion` 读 `CARGO_PKG_VERSION`，数字版本也由 Cargo 的版本分量生成；包版本仍只有工作区清单这一处权威。`winresource` 关闭默认的 `toml` feature，不读取 `[package.metadata.winresource]` 中的覆盖项。所需工具是 MSVC 的 Windows SDK `rc.exe`，或 GNU 目标的 MinGW resource toolchain；非 Windows 主机交叉编译 MSVC 时使用 `llvm-rc` 与 `llvm-cvtres`。资源生成失败经 `cargo::error` 使构建失败，错误说明目标资源编译失败并要求检查对应工具链，不能发布一份悄悄缺失产品资源的 Windows 二进制。这些资源描述产品身份，不构成 Authenticode 签名，也不保证 Defender 的分类结果。
-- **发布次序**：`release.yml` 的 `crates` job 在 `channel`（npm）之后跑，也就排在 GitHub release 之后。它先从 `cargo metadata` 取出可发布的包，按 sparse index 挑出还没有本版号的那些，再用 `rust-lang/crates-io-auth-action` 把这次运行的 OIDC 令牌换成 crates.io 的短期令牌（Trusted Publishing），然后 `cargo publish --locked --no-verify --allow-dirty` 把挑出的包逐个点名；cargo 按依赖次序发布，desktop 与它的叶子都是工作区成员，不再单独发。仓库里不存长期令牌。crates.io 的版本不能覆盖，而 `release.yml` 允许同一个 tag 重新发版，所以 crates.io 排在最后；本包这个版本已在 sparse index 上时，job 不再发布、只留一行说明。`--no-verify`：同一棵树已经过 `verify` 调用的共享 CI 验证与 `packaged` 门（D10；调用契约见 `crates/xtask/Spec.lean` D27），验证构建只是重编一遍，还会耗掉短期令牌的时效。`--allow-dirty`：job 改写了 binstall 的下载地址（D32）。
+- **发布次序**：`release.yml` 的 `crates` job 在 `channel`（npm）之后跑，也就排在 GitHub release 之后。它先从 `cargo metadata` 取出可发布的包，按 sparse index 挑出还没有本版号的那些，再用 `rust-lang/crates-io-auth-action` 把这次运行的 OIDC 令牌换成 crates.io 的短期令牌（Trusted Publishing），然后 `cargo publish --locked --no-verify --allow-dirty` 把挑出的包逐个点名；cargo 按依赖次序发布，desktop 与它的叶子都是工作区成员，不再单独发。仓库里不存长期令牌。crates.io 的版本不能覆盖，而 `release.yml` 允许同一个 tag 重新发版，所以 crates.io 排在最后；本包这个版本已在 sparse index 上时，job 不再发布、只留一行说明。`--no-verify`：同一棵树已经过 `verify` 调用的共享 CI 验证与 `packaged` 门（D10；调用契约见 `Tools/xtask/Spec.lean` D27），验证构建只是重编一遍，还会耗掉短期令牌的时效。`--allow-dirty`：job 改写了 binstall 的下载地址（D32）。
 - **新可发布包先登记，CI 才发得出去。** 换来的令牌只覆盖登记与这次运行四项全部对上的那些包：仓库 `2youg1/sprawling-agents` 与其 owner 的 GitHub 用户名或组织名、工作流文件名 `release.yml`、environment（两边都不声明，或两边相等）。每个包在 crates.io 上各有一条自己的登记，所以没有登记的包只能由人发——登记在包名第一次由人发布之后、下一次由 CI 发布之前做，因为 crates.io 要求包名先存在才能登记。漏掉登记的包让 job 在 `publish` 步以 `403 Forbidden: The provided access token is not valid for crate <名字>` 停在第一个待发包上，其余一律不发，而此时 GitHub 发布、npm 与 system channels 已经成立。恢复是重跑同一个 run 里失败的 job：令牌按当时的登记重新换发，`pending` 一步跳过已发布的包，不需要新 tag，也不需要长期令牌。
-- **`cargo binstall sprawling` 取发行归档**：本包清单的 `[package.metadata.binstall]` 按目标三元组各写一条 `pkg-url` 与 `bin-dir`，指向 `release.yml` 打出的三份归档（`x86_64-pc-windows-msvc` → `-windows-x86_64.zip`，`aarch64-apple-darwin` → `-macos-aarch64.zip`，`x86_64-unknown-linux-musl` → `-x86_64-unknown-linux-musl.zip`，归档名的后缀表在 `crates/xtask/src/platform.rs`），`pkg-fmt = "zip"`，可执行文件在归档里的 `sprawling-<版本>-<后缀>/` 目录下。glibc 的 Linux 上 binstall 自己退到 musl 那一份；没有归档的目标，binstall 退回从 `.crate` 编译。仓库里的地址用 `v{ version }` 作 tag，`crates` job 发布前把它换成这次的 tag（D32）。
+- **`cargo binstall sprawling` 取发行归档**：本包清单的 `[package.metadata.binstall]` 按目标三元组各写一条 `pkg-url` 与 `bin-dir`，指向 `release.yml` 打出的三份归档（`x86_64-pc-windows-msvc` → `-windows-x86_64.zip`，`aarch64-apple-darwin` → `-macos-aarch64.zip`，`x86_64-unknown-linux-musl` → `-x86_64-unknown-linux-musl.zip`，归档名的后缀表在 `Tools/xtask/src/platform.rs`），`pkg-fmt = "zip"`，可执行文件在归档里的 `sprawling-<版本>-<后缀>/` 目录下。glibc 的 Linux 上 binstall 自己退到 musl 那一份；没有归档的目标，binstall 退回从 `.crate` 编译。仓库里的地址用 `v{ version }` 作 tag，`crates` job 发布前把它换成这次的 tag（D32）。
 
 **本节接口的当前状态**：从 crates.io 构建的二进制仍有两处与归档不同。`[profile.release]` 写在工作区清单里，`cargo package` 不把它带进包，`cargo install` 按 cargo 的默认 release profile 编（`opt-level = 3`，不做 fat LTO，不剥符号）；`SPRAWLING_RELEASE_TAG` 只有 `release.yml` 设，所以 `status` 如实自称 built from source，成熟度照样从 `kernel::release::MATURITY` 读（§8-162）。工具链钉子不在包里时，develop 层的 `lean` 与 `zig` 两行装不钉的版本（§8-162）。
 
 **本章验收**：Windows 上构建后，文件版本 API 读出的 `ProductName` 等于 Cargo metadata 的包名，`ProductVersion` 与 `FileVersion` 等于 Cargo metadata 的包版本，PE 的资源目录非空；这项检查读取真实链接产物，资源编译器的行为属于环境假设，不由本文件证明。非 Windows 目标的构建不要求 Windows resource toolchain。
 
-**本章测试**：`doctor::pin::tests` 读出的钉子与检出里的文件相等，空文件读成不钉；`cargo package -p sprawling --list --allow-dirty` 的列表里有包体的 `index.html`（在 `web-dist` 下）与 `Cargo.lock`；`cargo xtask gates packaged guard` 为绿；`cargo publish --workspace --dry-run --locked` 走完打包与验证构建；把清单里的 `v{ version }` 换成一个已发布的 tag 之后，`cargo binstall --dry-run --manifest-path crates/sprawling/Cargo.toml sprawling` 解析到那个 tag 下真实存在的归档地址。
+**本章测试**：`doctor::pin::tests` 读出的钉子与检出里的文件相等，空文件读成不钉；`cargo package -p sprawling --list --allow-dirty` 的列表里有包体的 `index.html`（在 `web-dist` 下）与 `Cargo.lock`；`cargo xtask gates packaged guard` 为绿；`cargo publish --workspace --dry-run --locked` 走完打包与验证构建；把清单里的 `v{ version }` 换成一个已发布的 tag 之后，`cargo binstall --dry-run --manifest-path Sprawling/app/Cargo.toml sprawling` 解析到那个 tag 下真实存在的归档地址。
 
 ### 8-162 成熟度只有一处，不钉的构建装不钉的版本（`main::version`、`bin::doctor::table::toolchain`）
 
@@ -831,7 +831,7 @@ const fn lean_install(pin: &'static str) -> &'static str;
 macro_rules! winget_zig { ($pin:expr) => { /* &'static [&'static str] */ } }
 ```
 
-- **`status` 读常量，不写字面。** 版本行是 `sprawling <CARGO_PKG_VERSION> (<MATURITY.word()>)<发布日期或 built from source>`；tag 的中缀与文档的字样是同一个常量的另外几个读者（kernel D18、crates/xtask/Spec.lean §8-16 的 `maturity` 事实）。
+- **`status` 读常量，不写字面。** 版本行是 `sprawling <CARGO_PKG_VERSION> (<MATURITY.word()>)<发布日期或 built from source>`；tag 的中缀与文档的字样是同一个常量的另外几个读者（kernel D18、Tools/xtask/Spec.lean §8-16 的 `maturity` 事实）。
 - **钉子为空时装不钉的版本。** `lean` 装 `stable`，那是 elan 认的通道名；`zig` 在 Windows 上去掉 `--version` 与它的值，winget 装它给的那一版；macOS 与 Linux 两列本来就不带版本，不变。探测不变：空前缀接受任何一版（§8-157）。
 - **winget 的参数用宏写，不用 `const fn`。** 一条装法的参数是 `&'static [&'static str]`，`const fn` 拿自己的参数造不出一段 `'static` 的切片；宏在 `const` 项里展开，钉子是常量，切片照常提升。测试用同一个宏展开空钉子，所以它判的是生产那一行的写法，而不是一份抄本。
 
@@ -871,7 +871,7 @@ pub(in crate::assembly) fn measuring_relay(&self) -> Relay;   // 与车道同一
 同一套城规、楼规与身份，交给不同的模型时常常要补一两句只对那个模型说的话（例如某个模型爱省略测试输出，某个模型需要被提醒先读再改）。这段话按 provider 与模型分文件，城一层、楼一层：
 
 ```rust
-// 位置由 city::model_note_at 拼出（`crates/city/Spec.lean` §8-44）：<city>/.sprawling/models/… 与 <building>/.sprawling/models/<provider>/<model>.md
+// 位置由 city::model_note_at 拼出（`Sprawling/city/Spec.lean` §8-44）：<city>/.sprawling/models/… 与 <building>/.sprawling/models/<provider>/<model>.md
 pub(super) struct ModelNote { pub(super) at: Address, pub(super) bytes: Vec<u8> }
 /// 这次派活选中的 endpoint 名与模型 id 下的那段话：楼的那份在就用楼的，否则城的；都不在即 None。
 pub(super) fn model_note(city_root: &Path, building: &Address, provider: &str, model: &str) -> Result<Option<ModelNote>, AxError>;
@@ -882,7 +882,7 @@ pub(super) fn model_note(city_root: &Path, building: &Address, provider: &str, m
 - **文件不在，行为逐字节与没有这个功能时相同**：run 段不多一个字节，来源表不多一行。
 - **文件在却读不出**（权限、目录占位、不是文件）是 `E_STORAGE_FATAL`，指名那条路径，派活被拒；不静默跳过，理由与 `city_segment` 相同：人写下的那段话静静躺在盘上没被读，而 run 照着缺了它的提示词干活，没有人会被告知。
 - **地址先于路径。** 位置先按地址文法拼出（`city::model_note_at`，页面的提示文档名单与 `Query::Layers` 读同一个函数），再落到盘上。模型 id 若含地址文法拒绝的字符（`:`、`\`、`.`／`..` 段），它在城里就没有可指名的那段话，按「没有文件」处理；先拼路径再读则会让一个含 `..` 的 id 读到保留区以外的文件。
-- **被否决的备选**：把它做成第五段。四段恒四是 `FrozenPrefix` 的类型（`crates/runtime/Spec.lean` §8-4），`verified_system_hashes` 与 `rebuild_prefix` 都按四段对拍；为一段随模型而变、随 run 冻结的文字加一个槽位，要改的是三个 crate 的冻结不变量，换来的只是一个本来就能从来源行读出的边界。重开条件：有读者需要按模型单独缓存这段话（例如跨 run 的缓存断点放在它之前）。
+- **被否决的备选**：把它做成第五段。四段恒四是 `FrozenPrefix` 的类型（`Sprawling/runtime/Spec.lean` §8-4），`verified_system_hashes` 与 `rebuild_prefix` 都按四段对拍；为一段随模型而变、随 run 冻结的文字加一个槽位，要改的是三个 crate 的冻结不变量，换来的只是一个本来就能从来源行读出的边界。重开条件：有读者需要按模型单独缓存这段话（例如跨 run 的缓存断点放在它之前）。
 
 **本章测试**：`freezing::tests::model_note::a_note_for_the_chosen_model_ends_the_system_prompt`——为 `house/m-local` 放一个文件，派活发出的请求里最后一条 system 消息以这段文字结尾；`freezing::tests::model_note::a_note_for_another_model_is_not_sent`——别的模型的那段话不出现；`freezing::tests::layers::a_buildings_note_for_a_model_replaces_the_citys_there_and_only_there`——楼的那份替换城的，别的楼仍得城的。
 
@@ -917,7 +917,7 @@ impl RunWorker {
 
 - **一道门，一处权威**：调用点是 `stage_dispatch` 里 `agree_to_work` 之后、`session_for` 之前。人打的派活、外面敲门的唤醒、计划推进起的活都经过这里，所以三种入口不会各有一套规矩；放在同意之后，是因为存 key 是一次写入，而城不肯接的活什么都不写；放在命名之前，是因为命名要把任务文字发给摘要模型。
 - **认什么由 `kernel::secret::scan` 定**：只换形状表命中的段（`SecretSpan::provider` 为 `Some`）。熵命中不换：提示里的提交哈希、校验和也是高熵串，换掉它们，居民就读不到它要处理的那个值，而形状表列出的前缀不会出现在这类值里。
-- **存进现有的 `gateway::Custodian`**：它按机器选后端——系统的凭据服务，或用口令派生密钥、逐条 ChaCha20-Poly1305 加密的 `encrypted-file`（`crates/gateway/Spec.lean` §8-21）。另起一把 AES-GCM 密钥就是同一件事的第二个家，也会多出一处密钥要保管。
+- **存进现有的 `gateway::Custodian`**：它按机器选后端——系统的凭据服务，或用口令派生密钥、逐条 ChaCha20-Poly1305 加密的 `encrypted-file`（`Sprawling/gateway/Spec.lean` §8-21）。另起一把 AES-GCM 密钥就是同一件事的第二个家，也会多出一处密钥要保管。
 - **引用是 `secret:pasted/<provider>-<seq>`**，`<seq>` 是存这把 key 时账本的下一个序号。每存一把 key 都追加一条 `secret_captured`（`origin: "pasted"`），所以序号不会重复：同一毫秒的两次派活也不会让后一把覆盖前一把。名字里不放时间，也不放随机数，citysim 回放时仍逐字节一致；也不放 key 的哈希或尾巴，`secret_captured` 的规矩是记录行里不带明文，也不带哈希前缀。
 - **失败**：vault 拒绝写入时整个派活失败，错误原样返回（`E_CONFIG_INVALID`，恢复语由 vault 给出）。此时房间和 `JOB.md` 都还没写；如果照原文继续派活，正是这一节要堵的泄露。
 - **被否决的备选**：① 在页面上拦下粘贴，让人先去设置页登记——人粘 key 的时候，多半就是要居民用它，拦下来只会让人换个地方再粘一次；② 在请求出门时替换——账本和 `JOB.md` 在出门之前就已写下原文。
@@ -949,7 +949,7 @@ impl kernel::Tool for Kept {
 -/
 
 /-!
-## 8-120 每一项的三个版本：装着的、钉住的、上游最新的（`bin::doctor::upstream`、`bin::doctor::pin`，形状：adapter；`crates/wire/Spec.lean` §8-50）
+## 8-120 每一项的三个版本：装着的、钉住的、上游最新的（`bin::doctor::upstream`、`bin::doctor::pin`，形状：adapter；`Sprawling/wire/Spec.lean` §8-50）
 
 一个人打开依赖页，要知道的不只是「有没有」，还有「是不是旧了」。装着的版本由探测读出（`DoctorVersion::Said`），钉住的版本写在仓库的两份文件里，上游最新的版本只有发布它的人知道。
 
@@ -978,7 +978,7 @@ pub(crate) fn newest(item: &str) -> wire::DoctorUpstream;   // 不失败、不�
 
 /-! ## 8-174 Sarasa Mono SC 与 Maple Mono NF CN 是可选的字体依赖（`bin::doctor::table`、`bin::doctor::probe`）
 
-客户端内嵌三个家族——Paper Mono、Maple Mono 与 Libron（`crates/wire/spec/Preference.lean` D123）；中文字体都不进客户端包。doctor 的 Use 层有两行可选字体行：
+客户端内嵌三个家族——Paper Mono、Maple Mono 与 Libron（`Sprawling/wire/spec/Preference.lean` D123）；中文字体都不进客户端包。doctor 的 Use 层有两行可选字体行：
 
 - `sarasa-gothic`：推荐与 Paper Mono 搭配，把 `Sarasa Mono SC` 填进外观组的回退格。
 - `maple-mono-nf-cn`：推荐作为单一字体栈：把界面与等宽字体都选为 `maple`，并在第一回退填入 `Maple Mono NF CN`——随包的 Maple Mono 家族本身没有中文字形与 Nerd Font 图标，名字不同的 NF CN 家族经回退格进入同一条栈（wire D124），Latin、中文与 Nerd Font 图标由一条路覆盖。
@@ -1009,7 +1009,7 @@ pub(super) fn font_at(platform: Platform, home: Option<PathBuf>,
 **被否**：①复用 `Detection::Component` 指到 `~/.sprawling/components`——Scoop 与 Homebrew 不写到那里，装完必报缺；②把 CJK 字体也嵌入客户端——完整 CJK 字体远超当前客户端资源预算，而回退格能让装了它的人得到同一结果；③Windows 用 winget 安装 Sarasa-Gothic——没有可靠的官方 winget 源；④只保留 Maple Mono NF CN 一种推荐——Sarasa Mono SC 与 Paper Mono 的视觉统一性更好，应作为首荐。
 -/
 
-/-! D6 doctor 的「能做什么」各面自持：终端的英文住需求表，页面的两种语言住 `lang.json`，线上只携 id（`crates/wire/Spec.lean` §8-25）
+/-! D6 doctor 的「能做什么」各面自持：终端的英文住需求表，页面的两种语言住 `lang.json`，线上只携 id（`Sprawling/wire/Spec.lean` §8-25）
 
 `Requirement::enables` 是 `sprawling doctor` 那份终端报告的措辞，终端只说英文，这句话与它描述的那一行同住 `bin::doctor::table`，改一行的人在同一处看见它；页面按 `DoctorItem::name` 从 `client/src/lang.json` 的 `machine_enables_<name>`（name 里的连字符写成 `_`，因为词表的键一律 snake_case）取 en 与 zh，与 doctor 其余每一种状态同口径——终端的 `absent` 由 `paint` 拼，页面的 `machine_absent` 由 `lang.json` 给，两面各说各的，线上只携枚举与 id。两面的集合由 `bin::doctor::tests` 的 `every_item_has_the_page_clause_in_both_languages` 钉在一起：需求表多一行而 `lang.json` 没给它词，测试红。**被否掉的**：终端也从 `lang.json` 取英文（二进制在编译期读 `client/` 的一份源文件，每次 doctor 都要解析整张词表，而终端从不说第二种语言）；线上继续携英文句子（页面的词成了服务端的选择，中文读者看到的是英文）。条件变了就重议：终端要说第二种语言时，两面合用一张词表。
 -/
@@ -1021,12 +1021,12 @@ pub(super) fn font_at(platform: Platform, home: Option<PathBuf>,
 
 /-! D10 包体与模板进拥有它们的包，不在发布时组装（§8-83、§8-157）
 
-crates.io 上的 `.crate` 只是一个包目录，所以一个构建要读的每一个文件都放进拥有它的那个包：客户端包落在 `crates/sprawling/web-dist`，城写下的模板与 `City.md` 落在 `crates/city/templates/`，构建脚本按 cargo 找锁的规则找 `Cargo.lock`，开发工具链的钉子在包外，找不到就降为不钉。理由：发布的包与仓库里的包是同一份清单、同一组文件，验证构建就是工作区里那次构建换一个目录，`packaged` 门在每一次 `just check` 里就判出包外的引用，不必等到发布。**被否**：①发布时由 xtask 在临时目录里组装一份改过的包，把包体、模板与钉子复制进去（与 `xtask channel` 组装 npm 包同一种做法）——发布出去的清单与源码对不上，`.cargo_vcs_info.json` 指向的提交编不出那份包，而组装器本身要一套自己的测试；②把各 crate 折成一个 crate 再发布——拆掉 ARCHITECTURE 的 crate 拓扑与每个 `pub(crate)` 边界。**重开参数**：一个要发布的文件不能放进任何一个包（例如两个包都要读的一大份数据），那时由一个包交出常量，另一个包读它，`City.md` 交给 accounting 就是这样做的。
+crates.io 上的 `.crate` 只是一个包目录，所以一个构建要读的每一个文件都放进拥有它的那个包：客户端包落在 `Sprawling/app/web-dist`，城写下的模板与 `City.md` 落在 `Sprawling/city/templates/`，构建脚本按 cargo 找锁的规则找 `Cargo.lock`，开发工具链的钉子在包外，找不到就降为不钉。理由：发布的包与仓库里的包是同一份清单、同一组文件，验证构建就是工作区里那次构建换一个目录，`packaged` 门在每一次 `just check` 里就判出包外的引用，不必等到发布。**被否**：①发布时由 xtask 在临时目录里组装一份改过的包，把包体、模板与钉子复制进去（与 `xtask channel` 组装 npm 包同一种做法）——发布出去的清单与源码对不上，`.cargo_vcs_info.json` 指向的提交编不出那份包，而组装器本身要一套自己的测试；②把各 crate 折成一个 crate 再发布——拆掉 ARCHITECTURE 的 crate 拓扑与每个 `pub(crate)` 边界。**重开参数**：一个要发布的文件不能放进任何一个包（例如两个包都要读的一大份数据），那时由一个包交出常量，另一个包读它，`City.md` 交给 accounting 就是这样做的。
 -/
 
 /-! D11 Zig 是开发这份代码必需的工具（§8-146）
 
-控制台的渲染器是一片 Zig 叶子（`Calyx/ffi/Spec.lean` D1），在每个平台上构建时编译；桌面 server 没有准入安全接口的四组 Win32 调用经另一片（`crates/desktop/Spec.lean` D12），在 Windows 上编译。所以没有 Zig 就编不出这个二进制。`zig` 一行因此是 `required`，版本只读 `crates/desktop/ffi/zig-version`。被否决的备选：把 Zig 叶子预编译成一个提交进树里的静态库——那是一份没人能从源码复现的二进制，`release` 的逐字节重建也就无从谈起。
+控制台的渲染器是一片 Zig 叶子（`Calyx/ffi/Spec.lean` D1），在每个平台上构建时编译；桌面 server 没有准入安全接口的四组 Win32 调用经另一片（`Sprawling/desktop/Spec.lean` D12），在 Windows 上编译。所以没有 Zig 就编不出这个二进制。`zig` 一行因此是 `required`，版本只读 `Sprawling/desktop/ffi/zig-version`。被否决的备选：把 Zig 叶子预编译成一个提交进树里的静态库——那是一份没人能从源码复现的二进制，`release` 的逐字节重建也就无从谈起。
 -/
 
 /-! D12 不钉的构建照列 `lean` 与 `zig`，装不钉的版本（§8-162、§8-157）

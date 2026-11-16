@@ -5,7 +5,7 @@
 
 //! What a page that has just opened must be able to learn from one
 //! `city_view`: which room each run works in, and whether the city is
-//! stopped (`crates/sprawling/Spec.lean` §8-52).
+//! stopped (`Sprawling/app/Spec.lean` §8-52).
 
 #![allow(
     clippy::unwrap_used,
@@ -94,7 +94,7 @@ fn a_run_in_the_city_view_says_which_room_it_works_in() {
 }
 
 /// A city that has run thousands of times puts a bounded view on the
-/// wire at each asking (`crates/sprawling/Spec.lean` §8-106): every run it ever
+/// wire at each asking (`Sprawling/app/Spec.lean` §8-106): every run it ever
 /// held would make 8,000 runs a 1.37 MB city view, fetched again after
 /// every record.
 #[test]
@@ -148,7 +148,7 @@ fn a_city_of_eight_thousand_runs_answers_in_a_bounded_view() {
 }
 
 /// A cost view names every active run and the few billed most rather
-/// than every run a city ever billed (`crates/sprawling/Spec.lean` §8-106),
+/// than every run a city ever billed (`Sprawling/app/Spec.lean` §8-106),
 /// while `total` still sums them all.
 #[test]
 fn a_cost_view_of_eight_thousand_billed_runs_names_the_top_few() {
@@ -200,7 +200,7 @@ fn a_cost_view_of_eight_thousand_billed_runs_names_the_top_few() {
     );
 }
 
-/// The hot view keeps only the recent frozen few (`crates/storage/Spec.lean` §8-5); a run pushed out of it is still a run the city holds, so its
+/// The hot view keeps only the recent frozen few (`Sprawling/storage/Spec.lean` §8-5); a run pushed out of it is still a run the city holds, so its
 /// run view is answered from the Ledger instead of reading as unknown.
 #[test]
 fn an_evicted_run_still_answers_its_run_view() {

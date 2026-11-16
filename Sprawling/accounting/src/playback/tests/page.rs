@@ -310,7 +310,7 @@ fn a_template_without_exactly_one_empty_block_or_with_a_way_out_is_not_embedded(
     );
 }
 
-/// `crates/city/skills/playback/SKILL.md`, which ships beside the binary.
+/// `Sprawling/city/skills/playback/SKILL.md`, which ships beside the binary.
 const SKILL: &str = include_str!("../../../../city/skills/playback/SKILL.md");
 
 #[test]

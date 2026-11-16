@@ -12,7 +12,7 @@
 //! move and what an unstated tool falls back to is `runtime::catalog`'s.
 //! This module answers what one file says.
 //!
-//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4g.
+//! Specified by `Sprawling/city/spec/ConfigLayers.lean` §8-4g.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -109,7 +109,7 @@ const CHANGE_THE_KEY: &str = "name a tool as its catalog lists it, or a namespac
 ///
 /// The writers call it themselves; a frame that writes another refusable
 /// fact beside the table calls it first, so neither lands when the table
-/// is refused (`crates/wire/spec/Command/Step.lean` §8-61).
+/// is refused (`Sprawling/wire/spec/Command/Step.lean` §8-61).
 ///
 /// # Errors
 /// `E_CONFIG_INVALID` naming the first key that is not a tool name or a

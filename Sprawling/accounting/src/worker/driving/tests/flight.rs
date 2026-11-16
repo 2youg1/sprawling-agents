@@ -328,7 +328,7 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
     );
 }
 
-/// **A prepared run gets a lane at once** (`crates/sprawling/Spec.lean`
+/// **A prepared run gets a lane at once** (`Sprawling/app/Spec.lean`
 /// D34). Six pieces of work sent at once all drive at once on a machine
 /// with memory to spare: none waits in the pool for a lane, because the
 /// pool holds no lane count, and all six still freeze.

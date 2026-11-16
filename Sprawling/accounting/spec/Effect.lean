@@ -6,14 +6,14 @@
 /-!
 # accounting::effect
 
-规定 `crates/accounting/src/effect.rs`：一张桌子留下的效应先成为账本行、再成为这座城，以及计划的效应怎样重放。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+规定 `Sprawling/accounting/src/effect.rs`：一张桌子留下的效应先成为账本行、再成为这座城，以及计划的效应怎样重放。本文件是 `Sprawling/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `Sprawling/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
 -/
 
 /-!
 ### 8-5 accounting::effect：一条效应先成为账本行，再成为这座城（形状 2 值类型）
 
 ```rust
-// crates/accounting/src/effect.rs —— `architecture.toml` 的 accounting::effect，形状 2（值类型）
+// Sprawling/accounting/src/effect.rs —— `architecture.toml` 的 accounting::effect，形状 2（值类型）
 pub struct Line { pub who: String, pub addr: Address, pub kind: EventKind, pub data: Payload }
 pub struct Filing { pub entry: city::ArchiveEntry, pub body: String }
 
@@ -51,14 +51,14 @@ impl RunWorker { fn settle(&mut self, at: &Assignment, run: RunId, landing: effe
 **形状**：先后是类型的性质，而不是写桌子的人的纪律。`Then` 只能从 `Landing::record` 里拿到，而 `record` 先把所有行送进去才返回它；要把顺序写反，得先拿到一个拿不到的值。
 
 - **批而不是逐条**：一张桌子的行全部落完，才轮到它的变化。signal 一支因此先落完所有 `signal_enqueued` 再投递；`deliver` 与 `knock` 都不写账，所以账本字节与逐条交错时相同。
-- **计划那一支是全有全无的**，所以它自己一个穷尽枚举 `Claims`：效应按次序重放、只有认领核盘上的状态（§8-27），任一条认领对不上，就一字不写，把那个节点报给人，并用 `released` 里的 `roadmap_released` 行关掉本跑已经落账的认领（`crates/sprawling/Spec.lean` §8-16 的形制）。效应重放到 `on_disk` 上，而不是写回派活时的副本，所以别的 run 在此期间落下的行保留。记账线程在模型认领时已经拒绝了另一个在飞 run 持有的节点（`accounting::worker::booking`，`crates/sprawling/Spec.lean` §8-42-8）；`Claims::of` 是后盾，接住从旧副本认领了已被别人落地的节点的 run。
-- **归档行不需要先写盘**：账本行要的 `kind`／`day`／`subject` 由 `city::archive_entry` 从入参算出（`crates/city/Spec.lean` §8-9）。不在装配层另算 `day_of`，因为那会是「一条归档记录长什么样」的第二个权威。
+- **计划那一支是全有全无的**，所以它自己一个穷尽枚举 `Claims`：效应按次序重放、只有认领核盘上的状态（§8-27），任一条认领对不上，就一字不写，把那个节点报给人，并用 `released` 里的 `roadmap_released` 行关掉本跑已经落账的认领（`Sprawling/app/Spec.lean` §8-16 的形制）。效应重放到 `on_disk` 上，而不是写回派活时的副本，所以别的 run 在此期间落下的行保留。记账线程在模型认领时已经拒绝了另一个在飞 run 持有的节点（`accounting::worker::booking`，`Sprawling/app/Spec.lean` §8-42-8）；`Claims::of` 是后盾，接住从旧副本认领了已被别人落地的节点的 run。
+- **归档行不需要先写盘**：账本行要的 `kind`／`day`／`subject` 由 `city::archive_entry` 从入参算出（`Sprawling/city/Spec.lean` §8-9）。不在装配层另算 `day_of`，因为那会是「一条归档记录长什么样」的第二个权威。
 - **`raised`（待批项）不进本模块**：它不是桌子交出来的效应，而是驱动期间暂存的项，本身就先落账后改状态。
 
 **pr 那两支不走 `Landing`，理由记在这里**：
 
 - `PrEffect::Opened` 里的 `storage::Checkpoint::land` 先于 `pr_opened` 落账，**但它不是「先动世界」**。它铸出的是那条账本行所指向的 commit，与 `run_started` 之前把 brief 放进 CAS 同形：没有任何记录指向的 git commit 不改变任何人读到的东西。
-- `PrEffect::Merged` 先经 `Worktrees::plan_merge` 定下这次合并会落在哪个 commit，干线已经动过的拒绝（`MergeStale`）在这一步就报出，然后才写 `pr_merged`。所以不会有一条 `pr_merged` 是替一次注定被拒的合并写的（`crates/sprawling/Spec.lean`「合并也排到它那条行后面」）。
+- `PrEffect::Merged` 先经 `Worktrees::plan_merge` 定下这次合并会落在哪个 commit，干线已经动过的拒绝（`MergeStale`）在这一步就报出，然后才写 `pr_merged`。所以不会有一条 `pr_merged` 是替一次注定被拒的合并写的（`Sprawling/app/Spec.lean`「合并也排到它那条行后面」）。
 
 **测试**：`what_a_run_changes_is_changed_after_the_line_that_announces_it`（`accounting::worker::driving::tests::ledger`）。一跑归档一条决定、又从共享计划里拿一行；`RunWorker::observe` 的 sink 在一行耐久之后才跑，所以它正是看得见「先」的位置。断言：`asset_archived` 落时书架上还没有它，`roadmap_claimed` 落时盘上那一行还没被拿走；跑完两者都在位。
 
@@ -69,7 +69,7 @@ impl RunWorker { fn settle(&mut self, at: &Assignment, run: RunId, landing: effe
 ### 8-27 accounting::effect：计划的效应按次序重放，只有认领核盘上的状态（形状 2 值类型；collab D6）
 
 ```rust
-// crates/accounting/src/effect.rs
+// Sprawling/accounting/src/effect.rs
 pub enum Claims {
     Landed(Box<Landing<Closing>>),
     Stale { node: NodeId, released: Box<Landing<Closing>> },
@@ -78,7 +78,7 @@ impl Claims { pub fn of(effects: &[ClaimEffect], on_disk: &str, path: PathBuf, r
 ```
 
 - **按次序重放，每条在前面几条留下的文本上核。** `Claims::of` 从盘上此刻的那份出发，对每条效应先问 `collab::still_true`，再用 `ClaimEffect::apply` 改文本；本 run 自己的前几条效应因此是后几条的前提，不需要「每个节点只核第一条」的例外。本 run 分了自己握着的一行、再认领其中一片叶子，那条认领核的是拆完的文本，两条都落下。
-- **只有认领会对不上。** 认领要那一行仍是 `Not started`；放下与拆分只作用于本 run 握着的那一行（collab D6），握持之前的那条认领已经在重放里核过，落地不为它们另判一个期待状态。「分一行要不要握着它」于是只有桌子那一处判定（`crates/collab/spec/Claim.lean` 的 `land` 与 `admitted_lands`）。
+- **只有认领会对不上。** 认领要那一行仍是 `Not started`；放下与拆分只作用于本 run 握着的那一行（collab D6），握持之前的那条认领已经在重放里核过，落地不为它们另判一个期待状态。「分一行要不要握着它」于是只有桌子那一处判定（`Sprawling/collab/spec/Claim.lean` 的 `land` 与 `admitted_lands`）。
 - **过时报第一条对不上的认领，重放就停在那里。** `Stale.node` 是那一行；`released` 照旧关掉本跑每一条已落账的认领。停下而不是接着核：被丢下的那条认领之后可能跟着它拆出的子行，接着核会把还不存在的子行报成「被动过」，而接着重放就得吞掉 `apply` 对一行已被别人改掉的拒绝。
 - **装配层**：`accounting::worker::settling::desks` 的 `Stale` 一臂为那一行留一条诊断（`collab::claim_tool`，Refuse 级），其余不变。
 
@@ -87,7 +87,7 @@ impl Claims { pub fn of(effects: &[ClaimEffect], on_disk: &str, path: PathBuf, r
 
 /-! ## 模型：先落行，后交出变化；计划的效应按次序重放
 
-`record` 是 `Landing::record` 的读法：按次序追加每一行，全部落下之后才交出 `Then`；第一行被拒就停下，`Then` 不交出，所以没有一种走法能在某一行落下之前拿到它之后才允许的变化。`replay` 是 `Claims::of` 的读法：效应按次序作用在前面几条留下的文本上，只有认领核状态，第一条对不上的认领让整次重放停下并点名那一行。文本、节点与「还对得上」都是参数：`collab::still_true` 与 `ClaimEffect::apply` 的文法是 collab 的（`crates/collab/spec/Claim.lean`），这里只陈述次序。本模型不是 Rust 实现的证明，对应由 `accounting::worker::driving::tests::ledger` 与 `accounting::effect::tests` 检查（§16）。
+`record` 是 `Landing::record` 的读法：按次序追加每一行，全部落下之后才交出 `Then`；第一行被拒就停下，`Then` 不交出，所以没有一种走法能在某一行落下之前拿到它之后才允许的变化。`replay` 是 `Claims::of` 的读法：效应按次序作用在前面几条留下的文本上，只有认领核状态，第一条对不上的认领让整次重放停下并点名那一行。文本、节点与「还对得上」都是参数：`collab::still_true` 与 `ClaimEffect::apply` 的文法是 collab 的（`Sprawling/collab/spec/Claim.lean`），这里只陈述次序。本模型不是 Rust 实现的证明，对应由 `accounting::worker::driving::tests::ledger` 与 `accounting::effect::tests` 检查（§16）。
 -/
 
 namespace Accounting.Effect
@@ -203,5 +203,5 @@ end Accounting.Effect
 
 /-! D39 计划的效应按次序重放、每条在前面几条留下的文本上核，只有认领核盘上的状态；过时报第一条对不上的认领（§8-27）
 
-理由：「分一行要不要握着它」只由桌子判（collab D6），落地若再为拆分、放下各判一个期待状态，就是同一条规则的第二份拼写，`crates/adversary/Spec.lean` §4 的第八个发现正是两份拼写不一致的样子。按次序重放让本 run 的前几条效应成为后几条的前提，「每个节点只核第一条效应」那条例外随之没有了，本 run 拆出又认领的子行也不再被判过时。被否决的做法：①照旧只核每个节点的第一条效应、对盘上原文判——拆出的子行在盘上还不存在，认领它的那条被判过时，工具答了成功、落地一字不写，与第八个发现同一类；②过时之后接着重放，把每一条对不上的认领都报出来——被丢下的拆分之后的子行认领会被误报，而接着重放就得吞掉 `apply` 的拒绝。重开参数：一个 run 能同时握多行时，一行过时不该挡住别的行，那时按行分组判。
+理由：「分一行要不要握着它」只由桌子判（collab D6），落地若再为拆分、放下各判一个期待状态，就是同一条规则的第二份拼写，`Tools/adversary/Spec.lean` §4 的第八个发现正是两份拼写不一致的样子。按次序重放让本 run 的前几条效应成为后几条的前提，「每个节点只核第一条效应」那条例外随之没有了，本 run 拆出又认领的子行也不再被判过时。被否决的做法：①照旧只核每个节点的第一条效应、对盘上原文判——拆出的子行在盘上还不存在，认领它的那条被判过时，工具答了成功、落地一字不写，与第八个发现同一类；②过时之后接着重放，把每一条对不上的认领都报出来——被丢下的拆分之后的子行认领会被误报，而接着重放就得吞掉 `apply` 的拒绝。重开参数：一个 run 能同时握多行时，一行过时不该挡住别的行，那时按行分组判。
 -/

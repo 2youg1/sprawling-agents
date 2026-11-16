@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The one place a child process of the city is configured
-//! (`crates/child/Spec.lean`).
+//! (`Sprawling/child/Spec.lean`).
 
 mod command;
 mod environment;

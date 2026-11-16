@@ -330,7 +330,7 @@ impl Watchdog {
 ///
 /// The one back-off table. [`Watchdog`] reads it for a model call, and
 /// the `web_search` tool reads it for a search it sends again
-/// (`crates/accounting/spec/Connectors.lean` §8-35), so the two kinds of
+/// (`Sprawling/accounting/spec/Connectors.lean` §8-35), so the two kinds of
 /// outside request wait alike.
 #[must_use]
 pub fn backoff_ms(run: RunId, failures_in_a_row: u32, failure: &AxError) -> u64 {

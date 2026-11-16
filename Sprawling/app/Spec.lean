@@ -3,50 +3,50 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.sprawling.spec.Accounting.Effect
-import crates.sprawling.spec.Accounting.PlanView
-import crates.sprawling.spec.Accounting.Views
-import crates.sprawling.spec.Accounting.Worker
-import crates.sprawling.spec.Assembly
-import crates.sprawling.spec.Assembly.ChainWatch
-import crates.sprawling.spec.Assembly.Listening
-import crates.sprawling.spec.BrowserBidi
-import crates.sprawling.spec.Console
-import crates.sprawling.spec.Console.Lifecycle
-import crates.sprawling.spec.Console.ProgramStatus
-import crates.sprawling.spec.Doctor
-import crates.sprawling.spec.Firstrun
-import crates.sprawling.spec.Install
-import crates.sprawling.spec.Keying
-import crates.sprawling.spec.Main
-import crates.sprawling.spec.Main.Exit
-import crates.sprawling.spec.Main.Grammar
-import crates.sprawling.spec.Monitor
-import crates.sprawling.spec.Nightly
-import crates.sprawling.spec.Privacy
-import crates.sprawling.spec.Privacy.State
-import crates.sprawling.spec.Privacy.Journal
-import crates.sprawling.spec.Privacy.Cli
-import crates.sprawling.spec.Privacy.Windows
-import crates.sprawling.spec.Privacy.Confirmation
-import crates.sprawling.spec.Privacy.Controls
-import crates.sprawling.spec.Privacy.Service
-import crates.sprawling.spec.Outside
-import crates.sprawling.spec.Outside.Conduit
-import crates.sprawling.spec.Serving
-import crates.sprawling.spec.Serving.OutputRing
-import crates.sprawling.spec.Serving.Memory
-import crates.sprawling.spec.Serving.Placement
-import crates.sprawling.spec.Serving.Placement.Plan
-import crates.sprawling.spec.Serving.Standing
-import crates.sprawling.spec.Supervising
-import crates.sprawling.spec.WireClient
+import Sprawling.app.spec.Accounting.Effect
+import Sprawling.app.spec.Accounting.PlanView
+import Sprawling.app.spec.Accounting.Views
+import Sprawling.app.spec.Accounting.Worker
+import Sprawling.app.spec.Assembly
+import Sprawling.app.spec.Assembly.ChainWatch
+import Sprawling.app.spec.Assembly.Listening
+import Sprawling.app.spec.BrowserBidi
+import Sprawling.app.spec.Console
+import Sprawling.app.spec.Console.Lifecycle
+import Sprawling.app.spec.Console.ProgramStatus
+import Sprawling.app.spec.Doctor
+import Sprawling.app.spec.Firstrun
+import Sprawling.app.spec.Install
+import Sprawling.app.spec.Keying
+import Sprawling.app.spec.Main
+import Sprawling.app.spec.Main.Exit
+import Sprawling.app.spec.Main.Grammar
+import Sprawling.app.spec.Monitor
+import Sprawling.app.spec.Nightly
+import Sprawling.app.spec.Privacy
+import Sprawling.app.spec.Privacy.State
+import Sprawling.app.spec.Privacy.Journal
+import Sprawling.app.spec.Privacy.Cli
+import Sprawling.app.spec.Privacy.Windows
+import Sprawling.app.spec.Privacy.Confirmation
+import Sprawling.app.spec.Privacy.Controls
+import Sprawling.app.spec.Privacy.Service
+import Sprawling.app.spec.Outside
+import Sprawling.app.spec.Outside.Conduit
+import Sprawling.app.spec.Serving
+import Sprawling.app.spec.Serving.OutputRing
+import Sprawling.app.spec.Serving.Memory
+import Sprawling.app.spec.Serving.Placement
+import Sprawling.app.spec.Serving.Placement.Plan
+import Sprawling.app.spec.Serving.Standing
+import Sprawling.app.spec.Supervising
+import Sprawling.app.spec.WireClient
 
 /-! # sprawling 的规格
 
-`sprawling`（目录 `crates/sprawling`）是这座城唯一的二进制：命令行、装配根、serve 时的服务面、机器体检，以及嵌进二进制的客户端包。
+`sprawling`（目录 `Sprawling/app`）是这座城唯一的二进制：命令行、装配根、serve 时的服务面、机器体检，以及嵌进二进制的客户端包。
 
-本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。决定写作 `D<n>`，放在它所管主题的分部里，别处引作 `sprawling D<n>`；§12 末尾列出每条住在哪里。
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `Sprawling/app/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。决定写作 `D<n>`，放在它所管主题的分部里，别处引作 `sprawling D<n>`；§12 末尾列出每条住在哪里。
 
 能写成定理的规则在分部里证明：Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威（§2 列出每个模型证明了什么）。其余各节写接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。`spec/Accounting/` 下的分部写的是 `accounting` crate 的模块，为什么暂住这里见 D30。
 -/
@@ -81,7 +81,7 @@ import crates.sprawling.spec.WireClient
 | `spec/Outside.lean` | `bin::outside` |
 | `spec/Outside/Conduit.lean` | `bin::outside::conduit` |
 | `spec/Serving.lean` | `bin::serving` |
-| `spec/Serving/Memory.lean` | 常驻内存：工作集清点、按字节计预算的缓存（`storage::resident`，`crates/storage/src/resident.rs`）、私有字节的平台读数 |
+| `spec/Serving/Memory.lean` | 常驻内存：工作集清点、按字节计预算的缓存（`storage::resident`，`Sprawling/storage/src/resident.rs`）、私有字节的平台读数 |
 | `spec/Serving/OutputRing.lean` | `bin::serving::output_ring` |
 | `spec/Serving/Placement.lean` | `bin::serving::placement` |
 | `spec/Serving/Placement/Plan.lean` | `bin::serving::placement::plan` |
@@ -118,7 +118,7 @@ import crates.sprawling.spec.WireClient
 
 /-! ## 3 假设与歧义
 
-评审楼的 worktree 按房间保留：`Site::place_tree` 以 `room-<地址 BLAKE3 摘要前 16 位十六进制>` 为名认领，同一房间的下一轮活取回上一轮留下的树（`crates/storage/Spec.lean` §8-9），不再每轮全量检出、再整目录删除；`RunWorker::over` 拿到账本写者后解开上一个写者留下的全部 worktree 锁。树按楼的 scope 领、按同一个 scope 立检查点和献出（`workbench::tree_scope` 是这一个 scope 的唯一定义）：再领一棵留着的树只检出 scope（`crates/storage/Spec.lean` §8-9），献出的 `Checkpoint::land` 只按 scope 暂存，于是合并进干线的提交只动 scope。一个房间的第一次放置先接管城的备树，只改名、不检出（`crates/storage/Spec.lean` §8-35，§8-145）；没有备树可接管时才全量检出，因为 `Worktree::add` 总做一次全量检出，git2 0.21 没有把 `git_worktree_add_options.checkout_options` 暴露成安全接口，而 `storage` 禁 `unsafe`。城的第一次放置总在这一类：那之前城没有提交，也就没有干线可备（读数在 §8-161）。上限只称一次检出、不称留着的树之和，定在 `crates/storage/Spec.lean` §8-9。树的放置与 MCP 缺表时的那次连接，连同 `lay_out_workbench`、`freeze_plan`，在驾驶这个 run 的 lane 里做（§8-113）。
+评审楼的 worktree 按房间保留：`Site::place_tree` 以 `room-<地址 BLAKE3 摘要前 16 位十六进制>` 为名认领，同一房间的下一轮活取回上一轮留下的树（`Sprawling/storage/Spec.lean` §8-9），不再每轮全量检出、再整目录删除；`RunWorker::over` 拿到账本写者后解开上一个写者留下的全部 worktree 锁。树按楼的 scope 领、按同一个 scope 立检查点和献出（`workbench::tree_scope` 是这一个 scope 的唯一定义）：再领一棵留着的树只检出 scope（`Sprawling/storage/Spec.lean` §8-9），献出的 `Checkpoint::land` 只按 scope 暂存，于是合并进干线的提交只动 scope。一个房间的第一次放置先接管城的备树，只改名、不检出（`Sprawling/storage/Spec.lean` §8-35，§8-145）；没有备树可接管时才全量检出，因为 `Worktree::add` 总做一次全量检出，git2 0.21 没有把 `git_worktree_add_options.checkout_options` 暴露成安全接口，而 `storage` 禁 `unsafe`。城的第一次放置总在这一类：那之前城没有提交，也就没有干线可备（读数在 §8-161）。上限只称一次检出、不称留着的树之和，定在 `Sprawling/storage/Spec.lean` §8-9。树的放置与 MCP 缺表时的那次连接，连同 `lay_out_workbench`、`freeze_plan`，在驾驶这个 run 的 lane 里做（§8-113）。
 
 不钉的构建（从 crates.io 的 `.crate` 构建、找不到三份工具链钉子文件）该不该在 develop 层列 `lean` 与 `zig` 两行，未定：从 crates.io 装这个二进制的人多半不开发这份代码，而 `Need` 不按构建来源分（§8-58）。今天两行照列，钉子为空时 `lean` 装 `stable`、`zig` 装 winget 给的那一版（§8-162）。判定它的证据是一次从 `.crate` 构建出的二进制在 Windows 上按页面的「安装」跑这两行。
 -/
@@ -130,18 +130,18 @@ import crates.sprawling.spec.WireClient
 
 /-! D34 车道不设上限：准备好的 run 立即得到一条 lane，放行只看内存与端点的并发名额
 
-**决定**：`accounting::worker::pool` 不持有车道数，也没有配置键给它一个；一个准备好的 run 立即得到一条 lane（一个线程）。放行只问两件事：内存（`RESERVE_SHARE`，§8-46-3 的内存闸）与这次模型调用要去的端点的并发名额（`crates/gateway/Spec.lean` D17）。排队于是只发生在 provider 一处，在那里计数并显示；lane 大多阻塞在网络上，每条只多占一个线程栈。三个平台相同：线程栈用标准库的缺省大小；内存读数经 `bin::monitor::memory`（`sysinfo`），Windows 读 `GlobalMemoryStatusEx`，Linux 读 `/proc/meminfo` 的 `MemAvailable`，macOS 读 Mach 的 `vm_statistics64`，可用量的口径在 macOS 上较宽（§8-46-3）。
+**决定**：`accounting::worker::pool` 不持有车道数，也没有配置键给它一个；一个准备好的 run 立即得到一条 lane（一个线程）。放行只问两件事：内存（`RESERVE_SHARE`，§8-46-3 的内存闸）与这次模型调用要去的端点的并发名额（`Sprawling/gateway/Spec.lean` D17）。排队于是只发生在 provider 一处，在那里计数并显示；lane 大多阻塞在网络上，每条只多占一个线程栈。三个平台相同：线程栈用标准库的缺省大小；内存读数经 `bin::monitor::memory`（`sysinfo`），Windows 读 `GlobalMemoryStatusEx`，Linux 读 `/proc/meminfo` 的 `MemAvailable`，macOS 读 Mach 的 `vm_statistics64`，可用量的口径在 macOS 上较宽（§8-46-3）。
 
 **理由**：User 定了车道不设上限。写死的四条车道说自己等于一个 provider 准入模块的上限，而那个模块已经不在，于是第五个准备好的 run 在等一个与任何 provider 都无关的名额。
 
 **被否**：①把车道数改成可配置：仍是一个与 provider 无关的闸，只是把选数的事交给人；②按 CPU 核数定车道：lane 的时间几乎都在等网络，核数不是它的约束。
 
-**重开参数**：吞吐台（`crates/citysim/spec/Throughput.lean`）在 N = 64 时量到线程栈或调度本身成了等待的来源时，重议 lane 是否改为任务而不是线程。
+**重开参数**：吞吐台（`Tools/citysim/spec/Throughput.lean`）在 N = 64 时量到线程栈或调度本身成了等待的来源时，重议 lane 是否改为任务而不是线程。
 -/
 
 /-! D73 本 crate 起的子进程从 `child::command` 起，三类例外各有它们自己的一节
 
-决定：居民浏览器的引擎（`bin::browser_bidi::engine`）、doctor 的探测、安装配方与查询（`bin::doctor::probe`、`bin::doctor::asking`、`bin::doctor::running`、`bin::doctor::github`、`bin::doctor::registry`、`bin::doctor::scanning`）、skill 审核问客户端的版本（`bin::assembly::skill_audit::clients`）、主机隐私控件与它们的 PowerShell（`bin::privacy::windows`、`bin::privacy::windows::task`、`bin::privacy::identity`、`bin::privacy::elevation`）、环境变量广播（`bin::environment_broadcast`）、安装时写 `PATH`（`bin::install::search_path_windows`）、放置读 `sysctl`（`bin::serving::placement::reading`）、在文件管理器里显示（`bin::revealing`），都由 `child::command(program)` 造出它们的 `Command`（`crates/child/Spec.lean`）：Windows 上不附着在城的控制台上，Unix 上在自己的进程组里，`SPRAWLING_SECRET_*` 与 `SPRAWLING_PAIRING_TOKEN` 不进它们的环境。文件管理器另把三路 stdio 接空：它比城活得久，继承城的终端就会在城关掉之后往一块已经不归它的屏上写。理由：这些进程都不需要城的秘密；附着在城的控制台上的进程能经 `CONOUT$` 读屏上的配对码、经 `CONIN$` 读人敲进 CLI 的键；与城同一个进程组的进程在终端挂断时随城一起收到 `SIGHUP`。三类例外不走它，各在自己那一节写明理由：守护进程起的那个子进程（它就是城，§8 的 `bin::supervising`）、CLI 交出终端完成 agent 登录的那一段（`crates/agent_protocols/Spec.lean`）、打开人的浏览器（`bin::firstrun`）。`sprawling gauge` 量的命令是人在自己终端里跑的另一个动词，不是城的子进程，也不在此列（`crates/sprawling/src/main/gauge/running.rs`）。被否：各起点自己设平台标志与 `env_remove`——十几处各写一份，下一个新起点就会漏掉；`creation_flags` 改的是全部标志，一处设了优先级就会把另一处的 `NO_WINDOW` 盖掉。重开参数：某个起点要把城的一个秘密交给它的子进程（今天没有），那时由调用点显式 `env` 递过去。
+决定：居民浏览器的引擎（`bin::browser_bidi::engine`）、doctor 的探测、安装配方与查询（`bin::doctor::probe`、`bin::doctor::asking`、`bin::doctor::running`、`bin::doctor::github`、`bin::doctor::registry`、`bin::doctor::scanning`）、skill 审核问客户端的版本（`bin::assembly::skill_audit::clients`）、主机隐私控件与它们的 PowerShell（`bin::privacy::windows`、`bin::privacy::windows::task`、`bin::privacy::identity`、`bin::privacy::elevation`）、环境变量广播（`bin::environment_broadcast`）、安装时写 `PATH`（`bin::install::search_path_windows`）、放置读 `sysctl`（`bin::serving::placement::reading`）、在文件管理器里显示（`bin::revealing`），都由 `child::command(program)` 造出它们的 `Command`（`Sprawling/child/Spec.lean`）：Windows 上不附着在城的控制台上，Unix 上在自己的进程组里，`SPRAWLING_SECRET_*` 与 `SPRAWLING_PAIRING_TOKEN` 不进它们的环境。文件管理器另把三路 stdio 接空：它比城活得久，继承城的终端就会在城关掉之后往一块已经不归它的屏上写。理由：这些进程都不需要城的秘密；附着在城的控制台上的进程能经 `CONOUT$` 读屏上的配对码、经 `CONIN$` 读人敲进 CLI 的键；与城同一个进程组的进程在终端挂断时随城一起收到 `SIGHUP`。三类例外不走它，各在自己那一节写明理由：守护进程起的那个子进程（它就是城，§8 的 `bin::supervising`）、CLI 交出终端完成 agent 登录的那一段（`Sprawling/agent_protocols/Spec.lean`）、打开人的浏览器（`bin::firstrun`）。`sprawling gauge` 量的命令是人在自己终端里跑的另一个动词，不是城的子进程，也不在此列（`Sprawling/app/src/main/gauge/running.rs`）。被否：各起点自己设平台标志与 `env_remove`——十几处各写一份，下一个新起点就会漏掉；`creation_flags` 改的是全部标志，一处设了优先级就会把另一处的 `NO_WINDOW` 盖掉。重开参数：某个起点要把城的一个秘密交给它的子进程（今天没有），那时由调用点显式 `env` 递过去。
 -/
 
 /-! ## 4 现状分析
@@ -178,205 +178,205 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 
 | 标签 | 分部 |
 |---|---|
-| 8-2 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-2b | `crates/sprawling/spec/Main.lean` |
-| 8-3 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-4 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-4b | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-4c | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-4d | `crates/sprawling/spec/Main.lean` |
-| 8-4e | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-5 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-6 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-7 | `crates/sprawling/spec/Assembly.lean` |
-| 8-8 | `crates/sprawling/spec/Firstrun.lean` |
-| 8-9 | `crates/sprawling/spec/Install.lean` |
-| 8-10 | `crates/sprawling/spec/WireClient.lean` |
-| 8-11 | `crates/sprawling/spec/Console.lean` |
-| 8-12 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-13 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-14 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-15 | `crates/sprawling/spec/Assembly.lean` |
-| 8-16 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-17 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-18 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-19 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-20 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-21 | `crates/sprawling/spec/Console.lean` |
-| 8-22 | `crates/sprawling/spec/Keying.lean` |
-| 8-24 | `crates/sprawling/spec/Accounting/Effect.lean` |
-| 8-25 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-26 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-27 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-28 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-29 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-30 | `crates/sprawling/spec/Accounting/Effect.lean` |
-| 8-31 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-32 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-33 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-34 | `crates/sprawling/spec/Accounting/PlanView.lean` |
-| 8-35 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-36 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-37 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-38 | `crates/sprawling/spec/Serving.lean` |
-| 8-39 | `crates/sprawling/spec/Assembly.lean` |
-| 8-40 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-41 | `crates/sprawling/spec/WireClient.lean` |
-| 8-42 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-42-1 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-42-2 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-42-3 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-42-4 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-42-5 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-42-6 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-42-7 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-42-8 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-42-9 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-43 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-44 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-45 | `crates/sprawling/spec/BrowserBidi.lean` |
-| 8-45-1 | `crates/sprawling/spec/BrowserBidi.lean` |
-| 8-45-2 | `crates/sprawling/spec/BrowserBidi.lean` |
-| 8-45-3 | `crates/sprawling/spec/BrowserBidi.lean` |
-| 8-45-4 | `crates/sprawling/spec/BrowserBidi.lean` |
-| 8-45-5 | `crates/sprawling/spec/BrowserBidi.lean` |
-| 8-46 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-46-1 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-46-2 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-46-3 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-46-4 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-46-5 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-46-6 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-46-7 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-46-8 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-46-9 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-46-10 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-46-11 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-46-12 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-46-13 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-47 | `crates/sprawling/spec/Doctor.lean` |
-| 8-48 | `crates/sprawling/spec/Doctor.lean` |
-| 8-49 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-50 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-50-1 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-50-2 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-50-3 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-50-4 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-51 | `crates/sprawling/spec/Assembly.lean` |
-| 8-52 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-53 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-54 | `crates/sprawling/spec/Doctor.lean` |
-| 8-55 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-56 | `crates/sprawling/spec/Assembly.lean` |
-| 8-57 | `crates/sprawling/spec/Doctor.lean` |
-| 8-58 | `crates/sprawling/spec/Doctor.lean` |
-| 8-59 | `crates/sprawling/spec/Doctor.lean` |
-| 8-60 | `crates/sprawling/spec/Doctor.lean` |
-| 8-61 | `crates/sprawling/spec/Doctor.lean` |
-| 8-62 | `crates/sprawling/spec/Doctor.lean` |
-| 8-63 | `crates/sprawling/spec/Doctor.lean` |
-| 8-64 | `crates/sprawling/spec/Doctor.lean` |
-| 8-65 | `crates/sprawling/spec/Doctor.lean` |
-| 8-66 | `crates/sprawling/spec/Doctor.lean` |
-| 8-67 | `crates/sprawling/spec/Doctor.lean` |
-| 8-68 | `crates/sprawling/spec/Doctor.lean` |
-| 8-69 | `crates/sprawling/spec/Doctor.lean` |
-| 8-71 | `crates/sprawling/spec/Doctor.lean` |
-| 8-73 | `crates/sprawling/spec/Doctor.lean` |
-| 8-74 | `crates/sprawling/spec/Doctor.lean` |
-| 8-76 | `crates/sprawling/spec/Doctor.lean` |
-| 8-78 | `crates/sprawling/spec/Doctor.lean` |
-| 8-79 | `crates/sprawling/spec/Doctor.lean` |
-| 8-80 | `crates/sprawling/spec/Doctor.lean` |
-| 8-81 | `crates/sprawling/spec/Doctor.lean` |
-| 8-82 | `crates/sprawling/spec/Doctor.lean` |
-| 8-83 | `crates/sprawling/spec/Doctor.lean` |
-| 8-84 | `crates/sprawling/spec/Doctor.lean` |
-| 8-85 | `crates/sprawling/spec/Doctor.lean` |
-| 8-86 | `crates/sprawling/spec/Doctor.lean` |
-| 8-87 | `crates/sprawling/spec/Doctor.lean` |
-| 8-88 | `crates/sprawling/spec/Assembly/Listening.lean` |
-| 8-89 | `crates/sprawling/spec/Main/Grammar.lean` |
-| 8-90 | `crates/sprawling/spec/Assembly/Listening.lean` |
-| 8-91 | `crates/sprawling/spec/Assembly/Listening.lean` |
-| 8-92 | `crates/sprawling/spec/Supervising.lean` |
-| 8-93 | `crates/sprawling/spec/Serving/Standing.lean`，放置一半在 `crates/sprawling/spec/Serving/Placement.lean` |
-| 8-94 | `crates/sprawling/spec/Monitor.lean` |
-| 8-95 | `crates/sprawling/spec/Monitor.lean` |
-| 8-96 | `crates/sprawling/spec/Monitor.lean` |
-| 8-97 | `crates/sprawling/spec/WireClient.lean` |
-| 8-98 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-99 | `crates/sprawling/spec/Assembly/Listening.lean` |
-| 8-100 | `crates/sprawling/spec/Assembly/Listening.lean` |
-| 8-101 | `crates/sprawling/spec/Assembly/Listening.lean` |
-| 8-102 | `crates/sprawling/spec/Assembly.lean` |
-| 8-103 | `crates/sprawling/spec/Main/Exit.lean` |
-| 8-104 | `crates/sprawling/spec/Main.lean` |
-| 8-105 | `crates/sprawling/spec/Main.lean` |
-| 8-106 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-107 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-108 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-109 | `crates/sprawling/spec/Supervising.lean` |
-| 8-110 | `crates/sprawling/spec/Supervising.lean` |
-| 8-111 | `crates/sprawling/spec/Supervising.lean` |
-| 8-112 | `crates/sprawling/spec/Supervising.lean` |
-| 8-113 | `crates/sprawling/spec/Supervising.lean` |
-| 8-114 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-115 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-116 | `crates/sprawling/spec/Monitor.lean` |
-| 8-117 | `crates/sprawling/spec/Main.lean` |
-| 8-118 | `crates/sprawling/spec/Install.lean` |
-| 8-119 | `crates/sprawling/spec/Assembly.lean` |
-| 8-120 | `crates/sprawling/spec/Doctor.lean` |
-| 8-121 | `crates/sprawling/spec/Assembly/Listening.lean` |
-| 8-122 | `crates/sprawling/spec/Assembly/Listening.lean` |
-| 8-123 | `crates/sprawling/spec/Serving.lean` |
-| 8-124 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-125 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-126 | `crates/sprawling/spec/Main.lean` |
-| 8-127 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-128 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-129 | `crates/sprawling/spec/Main.lean` |
-| 8-129-1 | `crates/sprawling/spec/Main.lean` |
-| 8-129-2 | `crates/sprawling/spec/Main.lean` |
-| 8-129-3 | `crates/sprawling/spec/Main.lean` |
-| 8-129-4 | `crates/sprawling/spec/Main.lean` |
-| 8-129-5 | `crates/sprawling/spec/Main.lean` |
-| 8-129-6 | `crates/sprawling/spec/Main.lean` |
-| 8-130 | `crates/sprawling/spec/Doctor.lean` |
-| 8-131 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-132 | `crates/sprawling/spec/Main.lean` |
-| 8-133 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-134 | `crates/sprawling/spec/Assembly.lean` |
-| 8-136 | `crates/sprawling/spec/Main.lean` |
-| 8-137 | `crates/sprawling/spec/Main.lean` |
-| 8-139 | `crates/sprawling/spec/Outside/Conduit.lean` |
-| 8-140 | `crates/sprawling/spec/Outside.lean` |
-| 8-141 | `crates/sprawling/spec/Doctor.lean` |
-| 8-142 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-143 | `crates/sprawling/spec/Main.lean` |
-| 8-144 | `crates/sprawling/spec/Assembly/Listening.lean` |
-| 8-145 | `crates/sprawling/spec/Supervising.lean` |
-| 8-146 | `crates/sprawling/spec/Doctor.lean` |
-| 8-151 | `crates/sprawling/spec/Assembly.lean` |
-| 8-152 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-154 | `crates/sprawling/spec/Assembly/Listening.lean` |
-| 8-155 | `crates/sprawling/spec/Supervising.lean` |
-| 8-157 | `crates/sprawling/spec/Doctor.lean` |
-| 8-161 | `crates/sprawling/spec/Supervising.lean` |
-| 8-162 | `crates/sprawling/spec/Doctor.lean` |
-| 8-163 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-164 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-165 | `crates/sprawling/spec/Assembly.lean` |
-| 8-166 | `crates/sprawling/spec/Doctor.lean` |
-| 8-167 | `crates/sprawling/spec/Accounting/Views.lean` |
-| 8-168 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-169 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-170 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-171 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-172 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| 8-173 | `crates/sprawling/spec/Serving/Memory.lean` |
-| 8-174 | `crates/sprawling/spec/Console.lean` |
+| 8-2 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-2b | `Sprawling/app/spec/Main.lean` |
+| 8-3 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-4 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-4b | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-4c | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-4d | `Sprawling/app/spec/Main.lean` |
+| 8-4e | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-5 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-6 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-7 | `Sprawling/app/spec/Assembly.lean` |
+| 8-8 | `Sprawling/app/spec/Firstrun.lean` |
+| 8-9 | `Sprawling/app/spec/Install.lean` |
+| 8-10 | `Sprawling/app/spec/WireClient.lean` |
+| 8-11 | `Sprawling/app/spec/Console.lean` |
+| 8-12 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-13 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-14 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-15 | `Sprawling/app/spec/Assembly.lean` |
+| 8-16 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-17 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-18 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-19 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-20 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-21 | `Sprawling/app/spec/Console.lean` |
+| 8-22 | `Sprawling/app/spec/Keying.lean` |
+| 8-24 | `Sprawling/app/spec/Accounting/Effect.lean` |
+| 8-25 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-26 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-27 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-28 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-29 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-30 | `Sprawling/app/spec/Accounting/Effect.lean` |
+| 8-31 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-32 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-33 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-34 | `Sprawling/app/spec/Accounting/PlanView.lean` |
+| 8-35 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-36 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-37 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-38 | `Sprawling/app/spec/Serving.lean` |
+| 8-39 | `Sprawling/app/spec/Assembly.lean` |
+| 8-40 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-41 | `Sprawling/app/spec/WireClient.lean` |
+| 8-42 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-42-1 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-42-2 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-42-3 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-42-4 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-42-5 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-42-6 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-42-7 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-42-8 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-42-9 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-43 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-44 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-45 | `Sprawling/app/spec/BrowserBidi.lean` |
+| 8-45-1 | `Sprawling/app/spec/BrowserBidi.lean` |
+| 8-45-2 | `Sprawling/app/spec/BrowserBidi.lean` |
+| 8-45-3 | `Sprawling/app/spec/BrowserBidi.lean` |
+| 8-45-4 | `Sprawling/app/spec/BrowserBidi.lean` |
+| 8-45-5 | `Sprawling/app/spec/BrowserBidi.lean` |
+| 8-46 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-46-1 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-46-2 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-46-3 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-46-4 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-46-5 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-46-6 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-46-7 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-46-8 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-46-9 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-46-10 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-46-11 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-46-12 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-46-13 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-47 | `Sprawling/app/spec/Doctor.lean` |
+| 8-48 | `Sprawling/app/spec/Doctor.lean` |
+| 8-49 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-50 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-50-1 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-50-2 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-50-3 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-50-4 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-51 | `Sprawling/app/spec/Assembly.lean` |
+| 8-52 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-53 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-54 | `Sprawling/app/spec/Doctor.lean` |
+| 8-55 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-56 | `Sprawling/app/spec/Assembly.lean` |
+| 8-57 | `Sprawling/app/spec/Doctor.lean` |
+| 8-58 | `Sprawling/app/spec/Doctor.lean` |
+| 8-59 | `Sprawling/app/spec/Doctor.lean` |
+| 8-60 | `Sprawling/app/spec/Doctor.lean` |
+| 8-61 | `Sprawling/app/spec/Doctor.lean` |
+| 8-62 | `Sprawling/app/spec/Doctor.lean` |
+| 8-63 | `Sprawling/app/spec/Doctor.lean` |
+| 8-64 | `Sprawling/app/spec/Doctor.lean` |
+| 8-65 | `Sprawling/app/spec/Doctor.lean` |
+| 8-66 | `Sprawling/app/spec/Doctor.lean` |
+| 8-67 | `Sprawling/app/spec/Doctor.lean` |
+| 8-68 | `Sprawling/app/spec/Doctor.lean` |
+| 8-69 | `Sprawling/app/spec/Doctor.lean` |
+| 8-71 | `Sprawling/app/spec/Doctor.lean` |
+| 8-73 | `Sprawling/app/spec/Doctor.lean` |
+| 8-74 | `Sprawling/app/spec/Doctor.lean` |
+| 8-76 | `Sprawling/app/spec/Doctor.lean` |
+| 8-78 | `Sprawling/app/spec/Doctor.lean` |
+| 8-79 | `Sprawling/app/spec/Doctor.lean` |
+| 8-80 | `Sprawling/app/spec/Doctor.lean` |
+| 8-81 | `Sprawling/app/spec/Doctor.lean` |
+| 8-82 | `Sprawling/app/spec/Doctor.lean` |
+| 8-83 | `Sprawling/app/spec/Doctor.lean` |
+| 8-84 | `Sprawling/app/spec/Doctor.lean` |
+| 8-85 | `Sprawling/app/spec/Doctor.lean` |
+| 8-86 | `Sprawling/app/spec/Doctor.lean` |
+| 8-87 | `Sprawling/app/spec/Doctor.lean` |
+| 8-88 | `Sprawling/app/spec/Assembly/Listening.lean` |
+| 8-89 | `Sprawling/app/spec/Main/Grammar.lean` |
+| 8-90 | `Sprawling/app/spec/Assembly/Listening.lean` |
+| 8-91 | `Sprawling/app/spec/Assembly/Listening.lean` |
+| 8-92 | `Sprawling/app/spec/Supervising.lean` |
+| 8-93 | `Sprawling/app/spec/Serving/Standing.lean`，放置一半在 `Sprawling/app/spec/Serving/Placement.lean` |
+| 8-94 | `Sprawling/app/spec/Monitor.lean` |
+| 8-95 | `Sprawling/app/spec/Monitor.lean` |
+| 8-96 | `Sprawling/app/spec/Monitor.lean` |
+| 8-97 | `Sprawling/app/spec/WireClient.lean` |
+| 8-98 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-99 | `Sprawling/app/spec/Assembly/Listening.lean` |
+| 8-100 | `Sprawling/app/spec/Assembly/Listening.lean` |
+| 8-101 | `Sprawling/app/spec/Assembly/Listening.lean` |
+| 8-102 | `Sprawling/app/spec/Assembly.lean` |
+| 8-103 | `Sprawling/app/spec/Main/Exit.lean` |
+| 8-104 | `Sprawling/app/spec/Main.lean` |
+| 8-105 | `Sprawling/app/spec/Main.lean` |
+| 8-106 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-107 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-108 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-109 | `Sprawling/app/spec/Supervising.lean` |
+| 8-110 | `Sprawling/app/spec/Supervising.lean` |
+| 8-111 | `Sprawling/app/spec/Supervising.lean` |
+| 8-112 | `Sprawling/app/spec/Supervising.lean` |
+| 8-113 | `Sprawling/app/spec/Supervising.lean` |
+| 8-114 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-115 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-116 | `Sprawling/app/spec/Monitor.lean` |
+| 8-117 | `Sprawling/app/spec/Main.lean` |
+| 8-118 | `Sprawling/app/spec/Install.lean` |
+| 8-119 | `Sprawling/app/spec/Assembly.lean` |
+| 8-120 | `Sprawling/app/spec/Doctor.lean` |
+| 8-121 | `Sprawling/app/spec/Assembly/Listening.lean` |
+| 8-122 | `Sprawling/app/spec/Assembly/Listening.lean` |
+| 8-123 | `Sprawling/app/spec/Serving.lean` |
+| 8-124 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-125 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-126 | `Sprawling/app/spec/Main.lean` |
+| 8-127 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-128 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-129 | `Sprawling/app/spec/Main.lean` |
+| 8-129-1 | `Sprawling/app/spec/Main.lean` |
+| 8-129-2 | `Sprawling/app/spec/Main.lean` |
+| 8-129-3 | `Sprawling/app/spec/Main.lean` |
+| 8-129-4 | `Sprawling/app/spec/Main.lean` |
+| 8-129-5 | `Sprawling/app/spec/Main.lean` |
+| 8-129-6 | `Sprawling/app/spec/Main.lean` |
+| 8-130 | `Sprawling/app/spec/Doctor.lean` |
+| 8-131 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-132 | `Sprawling/app/spec/Main.lean` |
+| 8-133 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-134 | `Sprawling/app/spec/Assembly.lean` |
+| 8-136 | `Sprawling/app/spec/Main.lean` |
+| 8-137 | `Sprawling/app/spec/Main.lean` |
+| 8-139 | `Sprawling/app/spec/Outside/Conduit.lean` |
+| 8-140 | `Sprawling/app/spec/Outside.lean` |
+| 8-141 | `Sprawling/app/spec/Doctor.lean` |
+| 8-142 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-143 | `Sprawling/app/spec/Main.lean` |
+| 8-144 | `Sprawling/app/spec/Assembly/Listening.lean` |
+| 8-145 | `Sprawling/app/spec/Supervising.lean` |
+| 8-146 | `Sprawling/app/spec/Doctor.lean` |
+| 8-151 | `Sprawling/app/spec/Assembly.lean` |
+| 8-152 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-154 | `Sprawling/app/spec/Assembly/Listening.lean` |
+| 8-155 | `Sprawling/app/spec/Supervising.lean` |
+| 8-157 | `Sprawling/app/spec/Doctor.lean` |
+| 8-161 | `Sprawling/app/spec/Supervising.lean` |
+| 8-162 | `Sprawling/app/spec/Doctor.lean` |
+| 8-163 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-164 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-165 | `Sprawling/app/spec/Assembly.lean` |
+| 8-166 | `Sprawling/app/spec/Doctor.lean` |
+| 8-167 | `Sprawling/app/spec/Accounting/Views.lean` |
+| 8-168 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-169 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-170 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-171 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-172 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| 8-173 | `Sprawling/app/spec/Serving/Memory.lean` |
+| 8-174 | `Sprawling/app/spec/Console.lean` |
 
 §8-163 到 §8-172 是迁移时给重号的节新编的号：这几节在 Markdown 里与另一节同号（§8-27、§8-28、§8-29、§8-40、§8-41、§8-42、§8-50、§8-60 各有两到三节），保留原号的是先出现、被引用的那一节。
 -/
@@ -408,84 +408,84 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 
 | 决定 | 住处 |
 |---|---|
-| D1 | `crates/sprawling/spec/Main.lean` |
-| D2 | `crates/sprawling/spec/Main.lean` |
-| D3 | `crates/sprawling/spec/Assembly/Listening.lean` |
-| D4 | `crates/sprawling/spec/Assembly/Listening.lean` |
-| D5 | `crates/sprawling/spec/Assembly/ChainWatch.lean` |
-| D6 | `crates/sprawling/spec/Doctor.lean` |
-| D7 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| D8 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| D9 | `crates/sprawling/spec/Doctor.lean` |
-| D10 | `crates/sprawling/spec/Doctor.lean` |
-| D11 | `crates/sprawling/spec/Doctor.lean` |
-| D12 | `crates/sprawling/spec/Doctor.lean` |
-| D13 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| D14 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| D15 | `crates/sprawling/Spec.lean` |
-| D16 | `crates/sprawling/spec/Assembly.lean` |
-| D17 | `crates/sprawling/spec/Assembly.lean` |
-| D18 | `crates/sprawling/spec/Assembly.lean` |
-| D19 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| D20 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| D21 | `crates/sprawling/spec/Supervising.lean` |
-| D22 | `crates/sprawling/spec/Supervising.lean` |
-| D23 | `crates/sprawling/spec/Main.lean` |
-| D24 | `crates/sprawling/spec/Main.lean` |
-| D25 | `crates/sprawling/spec/Main.lean` |
-| D26 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| D27 | `crates/sprawling/spec/Main.lean` |
-| D28 | `crates/sprawling/spec/Main.lean` |
-| D29 | `crates/sprawling/spec/Main.lean` |
-| D30 | `crates/sprawling/Spec.lean` |
-| D31 | `crates/sprawling/spec/Doctor.lean` |
-| D32 | `crates/sprawling/spec/Doctor.lean` |
-| D33 | `crates/sprawling/spec/Doctor.lean` |
-| D34 | `crates/sprawling/Spec.lean` |
-| D37 | `crates/sprawling/spec/Accounting/Landing.lean` |
-| D40 | `crates/sprawling/spec/Serving/Standing.lean` |
-| D41 | `crates/sprawling/spec/Serving/Placement.lean` |
-| D42 | `crates/sprawling/spec/Serving/Memory.lean` |
-| D43 | `crates/sprawling/spec/Serving/Memory.lean` |
-| D44 | `crates/sprawling/spec/Console.lean` |
-| D45 | `crates/sprawling/spec/Serving/Placement.lean` |
-| D46 | `crates/sprawling/spec/Serving/Placement.lean` |
-| D47 | `crates/sprawling/spec/Serving/Placement.lean` |
-| D48 | `crates/sprawling/spec/Monitor.lean` |
-| D49 | `crates/sprawling/spec/Doctor.lean` |
-| D50 | `crates/sprawling/spec/Install.lean` |
-| D51 | `crates/sprawling/spec/Privacy.lean` |
-| D52 | `crates/sprawling/spec/Privacy/State.lean` |
-| D53 | `crates/sprawling/spec/Install.lean` |
-| D54 | `crates/sprawling/spec/Privacy/Cli.lean` |
-| D55 | `crates/sprawling/spec/Privacy/Cli.lean` |
-| D56 | `crates/sprawling/spec/Install.lean` |
-| D57 | `crates/sprawling/spec/Install.lean` |
-| D58 | `crates/sprawling/spec/Privacy/Confirmation.lean` |
-| D59 | `crates/sprawling/spec/Privacy/Controls.lean` |
-| D60 | `crates/sprawling/spec/Privacy/Windows.lean` |
-| D61 | `crates/sprawling/spec/Privacy/State.lean` |
-| D62 | `crates/sprawling/spec/Privacy/State.lean` |
-| D63 | `crates/sprawling/spec/Privacy.lean` |
-| D64 | `crates/sprawling/spec/Privacy/Controls.lean` |
-| D65 | `crates/sprawling/spec/Privacy/Controls.lean` |
-| D66 | `crates/sprawling/spec/Privacy/Windows.lean` |
-| D67 | `crates/sprawling/spec/Privacy/Controls.lean` |
-| D68 | `crates/sprawling/spec/Privacy/Controls.lean` |
-| D69 | `crates/sprawling/spec/Privacy.lean` |
-| D70 | `crates/sprawling/spec/Privacy/Service.lean` |
-| D71 | `crates/sprawling/spec/Privacy/Service.lean` |
-| D72 | `crates/sprawling/spec/Privacy/Service.lean` |
-| D75 | `crates/sprawling/spec/Console/Lifecycle.lean` |
-| D77 | `crates/sprawling/spec/Console/ProgramStatus.lean` |
-| D78 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| D79 | `crates/sprawling/spec/Accounting/Worker.lean` |
-| D82 | `crates/sprawling/spec/Doctor.lean` |
-| D80 | `crates/sprawling/spec/Supervising.lean` |
-| D105 | `crates/sprawling/spec/Nightly.lean` |
-| D106 | `crates/sprawling/spec/Console.lean` |
-| D107 | `crates/sprawling/spec/Console.lean` |
-| D108 | `crates/sprawling/spec/Console.lean` |
+| D1 | `Sprawling/app/spec/Main.lean` |
+| D2 | `Sprawling/app/spec/Main.lean` |
+| D3 | `Sprawling/app/spec/Assembly/Listening.lean` |
+| D4 | `Sprawling/app/spec/Assembly/Listening.lean` |
+| D5 | `Sprawling/app/spec/Assembly/ChainWatch.lean` |
+| D6 | `Sprawling/app/spec/Doctor.lean` |
+| D7 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| D8 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| D9 | `Sprawling/app/spec/Doctor.lean` |
+| D10 | `Sprawling/app/spec/Doctor.lean` |
+| D11 | `Sprawling/app/spec/Doctor.lean` |
+| D12 | `Sprawling/app/spec/Doctor.lean` |
+| D13 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| D14 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| D15 | `Sprawling/app/Spec.lean` |
+| D16 | `Sprawling/app/spec/Assembly.lean` |
+| D17 | `Sprawling/app/spec/Assembly.lean` |
+| D18 | `Sprawling/app/spec/Assembly.lean` |
+| D19 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| D20 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| D21 | `Sprawling/app/spec/Supervising.lean` |
+| D22 | `Sprawling/app/spec/Supervising.lean` |
+| D23 | `Sprawling/app/spec/Main.lean` |
+| D24 | `Sprawling/app/spec/Main.lean` |
+| D25 | `Sprawling/app/spec/Main.lean` |
+| D26 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| D27 | `Sprawling/app/spec/Main.lean` |
+| D28 | `Sprawling/app/spec/Main.lean` |
+| D29 | `Sprawling/app/spec/Main.lean` |
+| D30 | `Sprawling/app/Spec.lean` |
+| D31 | `Sprawling/app/spec/Doctor.lean` |
+| D32 | `Sprawling/app/spec/Doctor.lean` |
+| D33 | `Sprawling/app/spec/Doctor.lean` |
+| D34 | `Sprawling/app/Spec.lean` |
+| D37 | `Sprawling/app/spec/Accounting/Landing.lean` |
+| D40 | `Sprawling/app/spec/Serving/Standing.lean` |
+| D41 | `Sprawling/app/spec/Serving/Placement.lean` |
+| D42 | `Sprawling/app/spec/Serving/Memory.lean` |
+| D43 | `Sprawling/app/spec/Serving/Memory.lean` |
+| D44 | `Sprawling/app/spec/Console.lean` |
+| D45 | `Sprawling/app/spec/Serving/Placement.lean` |
+| D46 | `Sprawling/app/spec/Serving/Placement.lean` |
+| D47 | `Sprawling/app/spec/Serving/Placement.lean` |
+| D48 | `Sprawling/app/spec/Monitor.lean` |
+| D49 | `Sprawling/app/spec/Doctor.lean` |
+| D50 | `Sprawling/app/spec/Install.lean` |
+| D51 | `Sprawling/app/spec/Privacy.lean` |
+| D52 | `Sprawling/app/spec/Privacy/State.lean` |
+| D53 | `Sprawling/app/spec/Install.lean` |
+| D54 | `Sprawling/app/spec/Privacy/Cli.lean` |
+| D55 | `Sprawling/app/spec/Privacy/Cli.lean` |
+| D56 | `Sprawling/app/spec/Install.lean` |
+| D57 | `Sprawling/app/spec/Install.lean` |
+| D58 | `Sprawling/app/spec/Privacy/Confirmation.lean` |
+| D59 | `Sprawling/app/spec/Privacy/Controls.lean` |
+| D60 | `Sprawling/app/spec/Privacy/Windows.lean` |
+| D61 | `Sprawling/app/spec/Privacy/State.lean` |
+| D62 | `Sprawling/app/spec/Privacy/State.lean` |
+| D63 | `Sprawling/app/spec/Privacy.lean` |
+| D64 | `Sprawling/app/spec/Privacy/Controls.lean` |
+| D65 | `Sprawling/app/spec/Privacy/Controls.lean` |
+| D66 | `Sprawling/app/spec/Privacy/Windows.lean` |
+| D67 | `Sprawling/app/spec/Privacy/Controls.lean` |
+| D68 | `Sprawling/app/spec/Privacy/Controls.lean` |
+| D69 | `Sprawling/app/spec/Privacy.lean` |
+| D70 | `Sprawling/app/spec/Privacy/Service.lean` |
+| D71 | `Sprawling/app/spec/Privacy/Service.lean` |
+| D72 | `Sprawling/app/spec/Privacy/Service.lean` |
+| D75 | `Sprawling/app/spec/Console/Lifecycle.lean` |
+| D77 | `Sprawling/app/spec/Console/ProgramStatus.lean` |
+| D78 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| D79 | `Sprawling/app/spec/Accounting/Worker.lean` |
+| D82 | `Sprawling/app/spec/Doctor.lean` |
+| D80 | `Sprawling/app/spec/Supervising.lean` |
+| D105 | `Sprawling/app/spec/Nightly.lean` |
+| D106 | `Sprawling/app/spec/Console.lean` |
+| D107 | `Sprawling/app/spec/Console.lean` |
+| D108 | `Sprawling/app/spec/Console.lean` |
 -/
 
 /-! D15 不从别的工具的配置里读 provider 表（人的决定）
@@ -494,12 +494,12 @@ sprawling 里那个已删的 `import` 模块 的五个文件读 Codex 的 `~/.co
 -/
 /-! ## 13 依赖选型
 
-依赖以 `crates/sprawling/Cargo.toml` 为准；每个依赖旁的注释写它为哪一节而在。
+依赖以 `Sprawling/app/Cargo.toml` 为准；每个依赖旁的注释写它为哪一节而在。
 -/
 
 /-! ## 14 硬编码声明
 
-客户端包的位置 `web-dist`，相对本包目录，由 `build.rs` 的 `BUNDLE_DIR` 一处声明（§8-83）。三份工具链钉子文件的位置（`rust-toolchain.toml`、`lean-toolchain`、`crates/desktop/ffi/zig-version`，相对检出的根）由 `build.rs` 的 `PINS` 一处声明（§8-157）。
+客户端包的位置 `web-dist`，相对本包目录，由 `build.rs` 的 `BUNDLE_DIR` 一处声明（§8-83）。三份工具链钉子文件的位置（`rust-toolchain.toml`、`lean-toolchain`、`Sprawling/desktop/ffi/zig-version`，相对检出的根）由 `build.rs` 的 `PINS` 一处声明（§8-157）。
 
 `bin::install` 引入四处，全部是外部世界的事实而非我们的选择，故各自注明出处：`%LOCALAPPDATA%\Programs\<app>` 是 Windows 用户级程序目录的约定；`~/.local` 下的 `bin` 是 XDG 用户级可执行目录的约定；`HKCU\Environment` 是用户级环境变量在注册表里的位置；`WM_SETTINGCHANGE=0x1A`／`HWND_BROADCAST=0xffff`／`SMTO_ABORTIFHUNG=2` 是 Win32 的常量值。这四处一旦被平台改掉，改点各只有一个。
 -/

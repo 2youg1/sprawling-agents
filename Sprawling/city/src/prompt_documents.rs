@@ -5,7 +5,7 @@
 
 //! The prompt documents a page may write at the city root or inside a
 //! reserved subtree, and the three whole-document steps a person takes
-//! on them (`crates/city/Spec.lean` §8-44, city D33).
+//! on them (`Sprawling/city/Spec.lean` §8-44, city D33).
 //!
 //! A reserved subtree is out of every write domain so that no resident
 //! rewrites what it is told; the city's own doors still let a person
@@ -204,7 +204,7 @@ pub fn model_notes(
 
 /// Every file under `dir`, each as the names of the directories on the
 /// way to it and its own: a model id with a slash keeps its note in a
-/// directory of its own (`crates/city/spec/SpineFiles.lean`).
+/// directory of its own (`Sprawling/city/spec/SpineFiles.lean`).
 ///
 /// Links are followed, because the freeze follows them when it reads a
 /// note, and a list that stopped at a link would leave out a note every

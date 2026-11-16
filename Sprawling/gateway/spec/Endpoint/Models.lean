@@ -6,7 +6,7 @@
 /-!
 # gateway::endpoint::models
 
-规定 `endpoint::models`（`crates/gateway/src/endpoint/models.rs`）：探测面：一行 `/models` 说了什么，没说什么。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+规定 `endpoint::models`（`Sprawling/gateway/src/endpoint/models.rs`）：探测面：一行 `/models` 说了什么，没说什么。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `Sprawling/gateway/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `gateway::endpoint::models` 旁的测试守住。
 -/
@@ -26,7 +26,7 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, 
 
 **「路径归兼容格式」也管凭证头**：Anthropic 的 API key 走 `x-api-key`（`Authorization: Bearer` 只发给短时联邦令牌），OpenAI 兼容格式走 `Bearer`；人显式填的头名恒优先。见 §8-9 `AuthSpec::for_dialect`。落选的是「让登记页必填头名」：那把一个兼容格式自己就知道的事推给了人，而人填错的代价是一个 401。
 
-**一行还读两件事：思考档的陈述与模型的规范 id**，读法与窗口、上限一样是「问题→键」，没有键作答即缺席（`ModelFacts.thinking`、`ModelFacts.canonical`，kernel 的 `crates/kernel/spec/Event/Record.lean`）：
+**一行还读两件事：思考档的陈述与模型的规范 id**，读法与窗口、上限一样是「问题→键」，没有键作答即缺席（`ModelFacts.thinking`、`ModelFacts.canonical`，kernel 的 `Sprawling/kernel/spec/Event/Record.lean`）：
 
 | 上游 | 键 | 读成 |
 |---|---|---|
@@ -42,7 +42,7 @@ impl Endpoint { pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, 
 - **Anthropic 的列表要翻页**：`GET /v1/models` 每页缺省 20 行（<https://platform.claude.com/docs/en/api/models/list>），所以 messages 面的探测带 `limit=1000`，并在答复的 `has_more` 为真时以 `after_id=<last_id>` 接着读，至多 `MODEL_LIST_PAGES`（16）页；第 21 个以后的模型因此也有陈述。别的两面不翻页：OpenAI 兼容的列表没有分页参数，带上一个对端不认的查询参数可能被拒。
 - **读到的事实跨过重启**：登记把这一次读到的 `Vec<ModelFacts>` 以 JSON 写进 CAS，`endpoint_attached.facts_blob` 记它的摘要（kernel D57）；编码与解码只在 `router::attached` 一处（`AttachedEndpoint::facts_bytes`、`EndpointBook::learn`），写 CAS 与读 CAS 的是持有 CAS 的 accounting。簿的折叠不做 I/O：它只记下摘要，由持有 CAS 的一方读出字节交给 `learn`，`learn` 只填进摘要相同的那一行，所以一次更晚的登记不会被较早的事实覆盖。
 
-**`adapter_for` 住 `endpoint/adapter.rs`**：装配线（每个 chosen 造一个 Endpoint，§8-3）读的只有 chosen 与赎回闭包，故它是自由函数而非 `RunWorker` 方法——挂在 worker 上等于说装配需要整座城。调用期限是 `EndpointTuning::DEFAULTS.timeout_ms`（§8-16），`adapter_for` 读 `call_timeout_ms()`——一个默认值该住在它所默认的那个设置旁边。凭据簇只出 `resolver`（赎回闭包是凭据的形状）与 `dialect_headers`（它住装配层的凭据簇 `crates/accounting/src/worker/credentials.rs`；兼容格式要的头按理是兼容格式的事，是否搬进本 crate 未定）。
+**`adapter_for` 住 `endpoint/adapter.rs`**：装配线（每个 chosen 造一个 Endpoint，§8-3）读的只有 chosen 与赎回闭包，故它是自由函数而非 `RunWorker` 方法——挂在 worker 上等于说装配需要整座城。调用期限是 `EndpointTuning::DEFAULTS.timeout_ms`（§8-16），`adapter_for` 读 `call_timeout_ms()`——一个默认值该住在它所默认的那个设置旁边。凭据簇只出 `resolver`（赎回闭包是凭据的形状）与 `dialect_headers`（它住装配层的凭据簇 `Sprawling/accounting/src/worker/credentials.rs`；兼容格式要的头按理是兼容格式的事，是否搬进本 crate 未定）。
 -/
 
 /-! D46 探测失败的再登记沿用书里已登记的行，只给新报的 id 缺省事实

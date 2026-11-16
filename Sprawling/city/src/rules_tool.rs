@@ -9,7 +9,7 @@
 //! **Why a run only reads.** `RULES.toml` lives in the building's
 //! reserved subtree, and no write domain reaches there, which is not an
 //! oversight to work around but the rule itself: a run may not change
-//! what governs it (`crates/city/spec/RulesTool.lean` §8-2b, city D1).
+//! what governs it (`Sprawling/city/spec/RulesTool.lean` §8-2b, city D1).
 //! The tool is declared `Effect::Govern`; a `read` call answers
 //! `Effect::Read`, so a run sees what it is judged by. A model that asks
 //! to `propose` new rules is answered by the effect layer's Govern
@@ -167,7 +167,7 @@ impl Tool for RulesTool {
     }
 
     /// This building's rules are what every call is about, read or asked
-    /// to be rewritten (`crates/city/spec/RulesTool.lean` §8-36).
+    /// to be rewritten (`Sprawling/city/spec/RulesTool.lean` §8-36).
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError> {
         Op::read(call.args.as_map())?;
         Ok(GateSubject::Scope(
@@ -177,7 +177,7 @@ impl Tool for RulesTool {
 
     /// Reading the rules changes nothing they govern, so a run may read
     /// them; a rewrite still meets the Govern refusal
-    /// (`crates/kernel/spec/Gate.lean` D26).
+    /// (`Sprawling/kernel/spec/Gate.lean` D26).
     fn effect_of(&self, call: &ToolCall) -> Result<Effect, AxError> {
         Ok(match Op::read(call.args.as_map())? {
             Op::Read => Effect::Read,
@@ -330,7 +330,7 @@ mod tests {
     /// Derived from `Kernel.Gate.GovernReads`: over every operation, the
     /// call's effect is `Read` exactly when the operation leaves the
     /// rules as they stand, so a run reads them and still cannot rewrite
-    /// them (`crates/kernel/spec/Gate.lean` D26).
+    /// them (`Sprawling/kernel/spec/Gate.lean` D26).
     #[test]
     fn only_the_operation_that_reads_is_a_read_and_every_rewrite_still_governs() {
         let dir = tempfile::tempdir().unwrap();

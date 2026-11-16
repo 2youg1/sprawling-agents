@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one order of a privacy operation (`crates/sprawling/spec/Privacy.lean`
+//! The one order of a privacy operation (`Sprawling/app/spec/Privacy.lean`
 //! §9): identity, the locked history, a fresh read, a durable `Prepared`,
 //! the write, the readback, a rollback when the readback is a third value,
 //! and the receipt. What to do at each step is decided by
@@ -21,7 +21,7 @@ use super::state::{Event, History, Intent, Line, Outcome, SCHEMA};
 use super::target::{Reading, Snapshot};
 
 /// How long after a command is accepted its write may still start
-/// (`crates/sprawling/spec/Privacy.lean` §14).
+/// (`Sprawling/app/spec/Privacy.lean` §14).
 const TTL_MS: u64 = 60_000;
 
 /// The machine a privacy operation runs on: its clock, the identity of
@@ -808,7 +808,7 @@ mod tests {
         #![proptest_config(ProptestConfig::with_cases(512))]
 
         /// Any sequence of commands, faults and outside changes keeps the
-        /// model's properties (`crates/sprawling/spec/Privacy.lean` §16).
+        /// model's properties (`Sprawling/app/spec/Privacy.lean` §16).
         #[test]
         fn any_fault_sequence_keeps_the_models_properties(
             turns in proptest::collection::vec(turns(), 1..24),

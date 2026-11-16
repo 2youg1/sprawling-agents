@@ -6,7 +6,7 @@
 /-!
 # profile：一栋楼的登录态住在哪里，属于谁
 
-规定 `crates/browser/src/profile.rs`（`browser::profile`，`Profile::of`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/browser/src/profile.rs`（`browser::profile`，`Profile::of`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 一栋楼的 profile 住在城的保留区下：`<reserved>/browser-profiles/<楼名>`（`PROFILES_DIR`）。`Profile::of` 只收楼的 `Address`：保留区本身不是楼，房间也不是楼（地址里带 `/` 即拒），因为登录态属于项目而不属于某个房间。confidential 楼的拒绝只有一个家：`city::policy::evaluate` 读到 `confidential = true` 与 `browser = true` 或 `usersbrowser` 并存即 `E_CONFIG_INVALID`，本 crate 没有第二个拒绝它的臂。
 

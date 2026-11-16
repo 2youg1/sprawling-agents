@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A long turn (`crates/citysim/spec/LongTurn.lean` §8-9, citysim D10):
+//! A long turn (`Tools/citysim/spec/LongTurn.lean` §8-9, citysim D10):
 //! one run of many steps, each reading a file whose bytes change and
 //! whose length does not, so the request window of every model call can
 //! be judged against the one before it.

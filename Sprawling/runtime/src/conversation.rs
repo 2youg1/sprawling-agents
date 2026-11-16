@@ -25,7 +25,7 @@
 //! have no optimization exception. The one exception is tool results after
 //! an empty reply, which extend the sent message rather than open a second
 //! adjacent user message, and leave it open again
-//! (`crates/runtime/spec/Conversation.lean` §8-47).
+//! (`Sprawling/runtime/spec/Conversation.lean` §8-47).
 
 use std::collections::BTreeSet;
 
@@ -33,7 +33,7 @@ use kernel::event::escape_markup;
 use kernel::{AxCode, AxError, ChatMessage, ContentBlock, ImageRef, Role, RunId};
 
 /// How the first user message opens: kernel's, because `run_started`
-/// records it (`crates/kernel/Spec.lean` §8-82-1).
+/// records it (`Sprawling/kernel/Spec.lean` §8-82-1).
 pub use kernel::event::record::Opening;
 
 /// The run's conversation history, owned by the executor and folded
@@ -69,11 +69,11 @@ impl Conversation {
         self.push_user_text(match opening {
             // The goal is in the job file, escaped; written here in a
             // user-role message, a resident's goal could spell a `user:`
-            // line (`crates/city/spec/SpineFiles.lean` D21).
+            // line (`Sprawling/city/spec/SpineFiles.lean` D21).
             Opening::FromJob => format!("The task is in JOB.md above, handed down by {from}."),
             // A branch's task travels in the message, so it names who
             // handed it down and holds a resident's words in sections
-            // they cannot close (`crates/runtime/spec/Conversation.lean`
+            // they cannot close (`Sprawling/runtime/spec/Conversation.lean`
             // §8-47-2).
             Opening::Inherited => format!(
                 "Handed down by {}:\n<task>{}</task>\n<goal>{}</goal>",
@@ -94,7 +94,7 @@ impl Conversation {
     ///
     /// The one place a steer is rendered: the User's as `user: <text>`, a
     /// resident's inside one `<letter>` its body cannot close
-    /// (`crates/runtime/spec/Conversation.lean` §8-47-2).
+    /// (`Sprawling/runtime/spec/Conversation.lean` §8-47-2).
     pub fn push_steer(&mut self, speaker: &Speaker, text: &str) {
         self.push_user_text(speaker.render(text));
     }
@@ -161,7 +161,7 @@ impl Conversation {
 
     /// A repeated locator in a not-yet-sent result becomes text rather than
     /// another image. Existing messages are only read: their bytes stay in
-    /// the frozen prefix (`crates/runtime/spec/Conversation.lean` §8-47-3).
+    /// the frozen prefix (`Sprawling/runtime/spec/Conversation.lean` §8-47-3).
     fn deduplicate_new_pictures(&mut self, results: &mut [ContentBlock]) {
         if !results.iter().any(|block| !pictures_in(block).is_empty()) {
             return;
@@ -252,7 +252,7 @@ fn duplicate_picture(locator: &str) -> String {
     format!("[picture already in context: {locator}]")
 }
 
-/// Who said a steer's text (`crates/runtime/spec/Conversation.lean`
+/// Who said a steer's text (`Sprawling/runtime/spec/Conversation.lean`
 /// §8-47-2). The type, not a prefix in the text, says whether the User
 /// spoke.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -551,7 +551,7 @@ mod tests {
     }
 
     proptest! {
-        /// `crates/runtime/spec/Conversation.lean` §8-47-2: a block that
+        /// `Sprawling/runtime/spec/Conversation.lean` §8-47-2: a block that
         /// opens with `user:` is the User's steer and nothing else, and a
         /// resident's words sit inside exactly one envelope its body
         /// cannot close.
@@ -579,7 +579,7 @@ mod tests {
             }
         }
 
-        /// `crates/runtime/spec/Conversation.lean` §8-47-2: a rebuilt
+        /// `Sprawling/runtime/spec/Conversation.lean` §8-47-2: a rebuilt
         /// `Inherited` opening names who handed the work down, never opens
         /// with `user:`, and holds a resident's task and goal inside
         /// sections they cannot close.

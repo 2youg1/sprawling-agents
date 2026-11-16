@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Disposable AppContainer initialization of both Windows PowerShell runtimes,
-//! specified by `crates/runtime/spec/Tools/Exec/NativeWindows.lean`.
+//! specified by `Sprawling/runtime/spec/Tools/Exec/NativeWindows.lean`.
 use super::*;
 use kernel::{Address, RunId};
 

@@ -6,7 +6,7 @@
 //! External-fact constants: values that follow the
 //! outside world. Changing one requires evidence that the world changed,
 //! never our own preference.
-//! The part `crates/kernel/spec/ConstsExternal.lean` specifies this module.
+//! The part `Sprawling/kernel/spec/ConstsExternal.lean` specifies this module.
 //!
 //! Data, plus the classifications that read that data and nothing else:
 //! [`readable_log_v`] answers a question only [`EVENT_LOG_V`] can answer
@@ -26,7 +26,7 @@ pub const PROMPT_CACHE_TTL_SECS: u64 = 300;
 /// and nowhere else, so it lives beside it. It covers the delays the lead
 /// cannot measure - a timer that wakes a little late, a renewal thread
 /// that starts a little late - and costs that many seconds of a warm
-/// window that lasts 300 (`crates/kernel/spec/KeepWarm.lean`, kernel D62).
+/// window that lasts 300 (`Sprawling/kernel/spec/KeepWarm.lean`, kernel D62).
 pub const PROMPT_CACHE_RENEWAL_MARGIN_SECS: u64 = 5;
 
 /// EventRecord `v`: one monotonic integer, no major/minor split (3.1).

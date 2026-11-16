@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Locator: the one grammar for referring to content across events and
-//! sessions. The part `crates/kernel/spec/Locator.lean` specifies this
+//! sessions. The part `Sprawling/kernel/spec/Locator.lean` specifies this
 //! module. Two schemes only:
 //!
 //! `cas:b3-<hex64>[#(L|B)<a>-<b>]` | `file:<address>@<hex40>[#(L|B)<a>-<b>]`
@@ -153,7 +153,7 @@ impl<'de> Deserialize<'de> for GitOid {
     }
 }
 
-/// A digest as its format wants it (`crates/kernel/spec/Locator.lean` §8-84): the hex spelling
+/// A digest as its format wants it (`Sprawling/kernel/spec/Locator.lean` §8-84): the hex spelling
 /// wherever a person or a frame reads it, the bytes themselves in a
 /// binary format, which only this binary reads back (a snapshot).
 fn write_digest<const N: usize, S: serde::Serializer>(

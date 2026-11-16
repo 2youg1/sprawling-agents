@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The moments the plan and the record are written.
-//! The part `crates/kernel/spec/Spine.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Spine.lean` specifies this module with the
 //! rest of `kernel::spine`.
 //!
 //! `Memo.md` itself carries no shape: it is the notepad for what needs

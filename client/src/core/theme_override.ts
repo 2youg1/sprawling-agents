@@ -12,7 +12,7 @@ import { ThemeOverride } from "../wire";
 
 // The colours the person laid over the built-in theme: CSS colours by
 // `@theme` variable, and a stylesheet of their own laid after them
-// (`crates/wire/spec/Preference.lean` D29). Whole rather than the wire's
+// (`Sprawling/wire/spec/Preference.lean` D29). Whole rather than the wire's
 // optional fields, so a reader never asks whether absent means empty.
 export interface Theme {
   readonly tokens: Readonly<Record<string, string>>;

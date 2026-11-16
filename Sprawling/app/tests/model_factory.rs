@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A dispatch driven against the models the worker was handed
-//! (`crates/accounting/Spec.lean` section 2).
+//! (`Sprawling/accounting/Spec.lean` section 2).
 //!
 //! The endpoint the city is pointed at refuses every connection, so a
 //! scripted answer can reach the history only through the factory the
@@ -216,7 +216,7 @@ fn an_unnamed_dispatch_asks_the_factory_for_the_run_model_alone() {
     let (factory, asked) = scripted(ANSWER);
     let (mut worker, ledger) = city_on(dir.path(), refusing_url(), "minimal", factory);
     // No session, so the room is named from the task's own words by
-    // rule (`crates/sprawling/Spec.lean` §8-86): the factory is asked for the run's
+    // rule (`Sprawling/app/Spec.lean` §8-86): the factory is asked for the run's
     // model and never for a digest model to name the room with.
     let dispatched = dispatch(&mut worker, None);
 

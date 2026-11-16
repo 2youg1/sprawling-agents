@@ -36,7 +36,7 @@ impl JsonlLedger {
 
     /// [`JsonlLedger::open`], with the last segment's verified-prefix
     /// record in `records` standing in for checking its prefix line by
-    /// line when the record holds (`crates/storage/spec/Jsonl.lean` §8-34). Records are read,
+    /// line when the record holds (`Sprawling/storage/spec/Jsonl.lean` §8-34). Records are read,
     /// never written: the proof that holds the writer lock writes them.
     ///
     /// # Errors
@@ -65,7 +65,7 @@ impl JsonlLedger {
     /// power-loss model, for a caller that needs one named write to fail.
     ///
     /// Takes the concrete adapter rather than the trait, so the `Vfs`
-    /// seam stays inner (`crates/storage/spec/Jsonl.lean` §8-1) and no `pub trait` leaves this
+    /// seam stays inner (`Sprawling/storage/spec/Jsonl.lean` §8-1) and no `pub trait` leaves this
     /// crate. What comes back is the same `JsonlLedger` production uses -
     /// a caller above this crate exercises its real code and loses only
     /// the write it named.
@@ -171,7 +171,7 @@ impl JsonlLedger {
     }
 
     /// Tail-truncation recovery over the last segment, taking its
-    /// verified prefix from `proof` when the record holds (`crates/storage/spec/Jsonl.lean`
+    /// verified prefix from `proof` when the record holds (`Sprawling/storage/spec/Jsonl.lean`
     /// §8-34). Returns dropped bytes and what was read and checked; on
     /// return the ledger state points at the surviving tail.
     fn recover_tail(
@@ -302,7 +302,7 @@ impl JsonlLedger {
 enum TailProof<'a> {
     /// Every line of the last segment is checked.
     Strict,
-    /// The last segment's record in these, when it holds (`crates/storage/spec/Jsonl.lean` §8-34).
+    /// The last segment's record in these, when it holds (`Sprawling/storage/spec/Jsonl.lean` §8-34).
     Records(&'a ProofRecords),
 }
 

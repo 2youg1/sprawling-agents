@@ -54,7 +54,7 @@ fn a_fitting_snapshot_resumes_at_its_tail_without_reading_earlier_segments() {
 
 /// The cut is found from its segment's end, so a line damaged before it
 /// in the same segment changes where a start begins no more than one in
-/// an earlier segment does; the proof checks both (`crates/storage/spec/Snapshot/Start.lean` §8-28).
+/// an earlier segment does; the proof checks both (`Sprawling/storage/spec/Snapshot/Start.lean` §8-28).
 #[test]
 fn damage_before_the_cut_in_its_own_segment_does_not_move_the_start() {
     let tmp = tempfile::tempdir().unwrap();
@@ -265,7 +265,7 @@ fn opening_reads(segments: usize) -> (Reads, Reads) {
 /// segment (the version probe), the last line of the segment before the
 /// last (one window from its end), and the last segment; the segments
 /// between are not read at all, so what an opening reads does not grow
-/// with the history (`crates/sprawling/Spec.lean` §8-122).
+/// with the history (`Sprawling/app/Spec.lean` §8-122).
 #[test]
 fn an_opening_reads_one_line_of_the_segment_before_the_last_and_nothing_further_back() {
     let (short, long) = (opening_reads(4), opening_reads(8));

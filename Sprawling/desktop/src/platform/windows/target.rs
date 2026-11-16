@@ -18,7 +18,7 @@
 //! differently, and the one that is not the allowlist's would be the one
 //! nobody reads.
 //!
-//! The properties this module must hold are proved in `crates/desktop/spec/Platform/Windows/Target.lean`;
+//! The properties this module must hold are proved in `Sprawling/desktop/spec/Platform/Windows/Target.lean`;
 //! this code is the authority on how it holds them.
 
 use crate::refusal::{Refusal, RefusalCode};

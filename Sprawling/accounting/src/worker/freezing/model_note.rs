@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The note a person keeps for one model, and where the city keeps it
-//! (`crates/sprawling/Spec.lean` §8-85).
+//! (`Sprawling/app/Spec.lean` §8-85).
 //!
 //! Two places, the city's reserved subtree and a building's, spelled by
 //! `city::model_note_at`: a directory at the city root would share its

@@ -5,9 +5,9 @@
 
 //! The two memory entries of an exec result: `memory_ceiling`, its keys,
 //! its states and the sentence a reader is given
-//! (`crates/runtime/spec/Tools/Exec.lean` D95), and `memory_wait`, what a
+//! (`Sprawling/runtime/spec/Tools/Exec.lean` D95), and `memory_wait`, what a
 //! call waited behind in the machine budget's line
-//! (`crates/runtime/spec/Reserve.lean` D104). Part of the one file that
+//! (`Sprawling/runtime/spec/Reserve.lean` D104). Part of the one file that
 //! owns the result's spellings.
 
 use kernel::{AxError, Payload, ToolOutcome};
@@ -62,7 +62,7 @@ pub(in crate::tools::exec) fn with_wait(
 }
 
 /// Writes how the person's memory ceiling fared into a result, under
-/// `memory_ceiling` (`crates/runtime/spec/Tools/Exec.lean` D95). Nothing
+/// `memory_ceiling` (`Sprawling/runtime/spec/Tools/Exec.lean` D95). Nothing
 /// is written for a ceiling that was not asked for or held unreached.
 pub(super) fn memory_ceiling(result: &mut Map<String, Value>, ceiling: Option<Ceiling>) {
     let Some(ceiling) = ceiling else {

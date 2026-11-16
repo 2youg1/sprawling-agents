@@ -6,7 +6,7 @@
 //! The `[[agent]]` table: the ACP agents the person added to this city,
 //! one row each, in the city's own `CONFIG.toml` only.
 //!
-//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4f. Which agent an
+//! Specified by `Sprawling/city/spec/ConfigLayers.lean` §8-4f. Which agent an
 //! id names and whether a row's command is the one consented to are
 //! `agent_protocols`'s to answer; this module owns how a row is written
 //! and what is refused where it is written.

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Backticked Rust paths and whether each names an item in the code
-//! (crates/xtask/Spec.lean §8-42, assertion 7, and D24): the module map
+//! (Tools/xtask/Spec.lean §8-42, assertion 7, and D24): the module map
 //! says which file a module is, and a lexical scan of that file says
 //! whether the next segment is declared or re-exported there.
 

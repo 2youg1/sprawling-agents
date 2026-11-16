@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The building's unified catalog answer (`crates/wire/spec/Answer/Catalog.lean`
+//! The building's unified catalog answer (`Sprawling/wire/spec/Answer/Catalog.lean`
 //! §8-99, accounting D55, D112). It joins the newest frozen tool table —
 //! or, before any run has frozen one, the built-in tools that building's
 //! vocation admits — with current selections, Ledger drift and usage, and

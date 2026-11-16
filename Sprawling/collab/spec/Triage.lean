@@ -6,7 +6,7 @@
 /-!
 # Triage：外来的东西落在哪，以及它能不能自己开工
 
-规定 `crates/collab/src/triage.rs`（`collab::triage`，`Triage::decide`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/collab/src/triage.rs`（`collab::triage`，`Triage::decide`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 一张人手写的路由表：规则自上而下，第一条命中的胜；子串、不分大小写，不是模式语言，因为这张表被读的次数远多于被写，正则会在出事那一刻多一件要 debug 的东西。命中的判法在这里是参数 `hits`，它是 Rust 的事。
 

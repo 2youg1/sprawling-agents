@@ -16,7 +16,7 @@
 //!
 //! The half that decides is [`admits`]: it says whether what a run
 //! produced may land, given the run policy it was dispatched under
-//! (`crates/runtime/spec/Mode.lean` §8-54). The evidence arrives as plain answers rather
+//! (`Sprawling/runtime/spec/Mode.lean` §8-54). The evidence arrives as plain answers rather
 //! than as an instrument's type, because the instruments live in
 //! citysim, outside this crate, and the question here is not how
 //! evidence was gathered but whether enough of it exists.
@@ -90,7 +90,7 @@ pub fn catalog_entry(mode: Mode) -> CatalogEntry {
     }
 }
 
-/// The resident tools a run in `mode` may run (`crates/runtime/Spec.lean`
+/// The resident tools a run in `mode` may run (`Sprawling/runtime/Spec.lean`
 /// §8-60). The request carries the union of every mode's core
 /// ([`in_some_core`]), and [`mode_admits`] refuses at the call a tool the
 /// mode in force does not run; every other admitted tool waits in the
@@ -154,7 +154,7 @@ pub fn mode_admits(policy: &RunPolicy, name: &str) -> Result<(), AxError> {
     .with_recovery("answer in the conversation, or ask the User to switch this run to work mode"))
 }
 
-/// The run policy in force for one run (`crates/runtime/spec/PolicyTake.lean`
+/// The run policy in force for one run (`Sprawling/runtime/spec/PolicyTake.lean`
 /// §8-62, runtime D28).
 ///
 /// One writer and many readers. A change that reaches the run at any
@@ -265,7 +265,7 @@ pub enum Admission {
 }
 
 /// Whether what a run produced may be merged, under the policy it was
-/// dispatched with (`crates/runtime/spec/Mode.lean` §8-54).
+/// dispatched with (`Sprawling/runtime/spec/Mode.lean` §8-54).
 ///
 /// The landing policy is asked first: an experiment lands nothing
 /// however well it went. Then the evidence requirement, exhaustively,
@@ -348,7 +348,7 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
 
-    /// One thing a run meets, as `crates/runtime/spec/PolicyTake.lean`
+    /// One thing a run meets, as `Sprawling/runtime/spec/PolicyTake.lean`
     /// names it: a change reaching the run, a `BeforeWave`, or one call of
     /// the wave asking a write gate.
     #[derive(Debug, Clone, Copy)]

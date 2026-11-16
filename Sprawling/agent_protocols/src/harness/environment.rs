@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The environment an ACP agent is started with: a whitelist, not the
-//! city's whole environment (`crates/agent_protocols/Spec.lean` §8-19, D17).
+//! city's whole environment (`Sprawling/agent_protocols/Spec.lean` §8-19, D17).
 
 use std::ffi::OsString;
 

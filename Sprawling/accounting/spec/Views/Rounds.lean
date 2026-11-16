@@ -6,13 +6,13 @@
 /-!
 # accounting::views::rounds：外壳读的字段
 
-规定 `crates/accounting/src/views/rounds.rs`、`crates/accounting/src/views/commits.rs` 与 `crates/accounting/src/views/lines.rs` 里外壳读的那几个字段。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+规定 `Sprawling/accounting/src/views/rounds.rs`、`Sprawling/accounting/src/views/commits.rs` 与 `Sprawling/accounting/src/views/lines.rs` 里外壳读的那几个字段。本文件是 `Sprawling/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `Sprawling/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `accounting::views::rounds::tests` 守住。
 -/
 
 /-!
-### 8-33 外壳读的字段从哪一处折出（`accounting::views::rounds`、`accounting::views::commits`、`accounting::views::lines`，形状 7 投影；`crates/wire/Spec.lean` §8-76–§8-78）
+### 8-33 外壳读的字段从哪一处折出（`accounting::views::rounds`、`accounting::views::commits`、`accounting::views::lines`，形状 7 投影；`Sprawling/wire/Spec.lean` §8-76–§8-78）
 
 ```rust
 // accounting::views::commits
@@ -28,7 +28,7 @@ pub(crate) struct CommitFacts { /* …既有字段… */ b3: Option<B3Hash> }   
 - **运行策略照录 `run_started` 的 `policy`**，与 `task`、`goal`、`dispatched_by` 同一次读；**工作树名照录这次 run 自己的 `worktree_opened`**，窗口里第一条为准。
 - **一轮的返回时刻取回复那一行自己的时刻**（`EventRecord::moment`）。版本一的行没有这个时刻，答 `None`，不拿这一轮的时间戳顶替。
 - **开场的 effort 照录 `run_started` 的 `effort`。** `runtime::run::charter` 从计划的调用形状抄下这次请求冻结的 effort，所以第一行就带着它；还没有提交的 run 也有页面能读的 effort。
-- **开场的名字按 `run_started` 的 `naming` 版本从内容库读回**（`crates/wire/Spec.lean` §8-79、D17）。内容库打不开、库里已经没有这个版本、字节读不成冻结的命名时，`names` 为 `None`：页面退回地址与角色名，绝不读今天的名字。
+- **开场的名字按 `run_started` 的 `naming` 版本从内容库读回**（`Sprawling/wire/Spec.lean` §8-79、D17）。内容库打不开、库里已经没有这个版本、字节读不成冻结的命名时，`names` 为 `None`：页面退回地址与角色名，绝不读今天的名字。
 - **缓存写照 `wire::used_in` 读**：读法在 wire，本模块不另读 `usage`。
 - 验收：`views::rounds::tests`、`views::commits::tests`、`views::snapshot::tests` 里点名这几个字段的用例；`views::rounds::carried_tests::a_turn_reports_when_its_reply_returned`；`views::rounds::opening_tests::the_opening_carries_the_effort_and_the_names_the_run_froze`、`a_naming_the_store_lost_answers_no_names`（D45）。
 -/
@@ -40,12 +40,12 @@ pub(crate) struct CommitFacts { /* …既有字段… */ b3: Option<B3Hash> }   
 
 /-! D48 跨行配对的 note 归 `accounting::views::rounds::paired`
 
-`turns` 只读一个会话自己的行；三种 note 的另一半在别处，配对放在 `turns` 之后的一遍里，`rounds_answer` 依次调用：(a) `Note::Waiting.answered`：`approval_resolved` 记在城自己的 run 下，按 approval id 配（`crates/sprawling/Spec.lean` §8-50-1）；(b) `Note::Arrived` 的 `from`、`said`、`kind`、`session` 与 `handback`：`signal_enqueued` 记在发信者的 run 下，从 `signal_consumed` 那一行往前、在整本账里按 `SignalId` 找，最多 `SENDING_REACH` 行（wire D36）；`kind` 是那条 signal 的种类，`session` 是那一行的 run（wire D43）；找到的那一条 signal 经 `collab::Handback::from_signal` 读成交接时填 `handback`（wire D38）；(c) `Note::AwaitingReply.ended`：`signal_wait_ended` 与它的开始记在同一会话里，按 `signal` 配（wire D37）；(d) `Call.landing`：一次 `send` 调用、它答复之前同一会话写下的、收信房间与参数 `to` 相同的 `signal_enqueued`、按 `SignalId` 配上的 `signal_landed`，三行都在发信会话里（wire D42，kernel D38）。配不上一律留 `None`，不猜。理由：`rounds.rs` 是一次遍历的折叠，配对要读别的 run，二者分开，各自一个改动的理由。被否决的做法：在 `turns` 里一边折一边配——`turns` 是纯函数，测试与回放直接喂它记录；让它读账本就失去了这一点。验收：`views::rounds::arrival_tests` 里 `a_signal_pulled_from_another_session_says_who_sent_it_and_what`、`a_reply_wait_says_how_it_ended`、`a_handback_says_whether_the_child_finished`（两者都点名 `kind` 与 `session`）；`views::rounds::landing_tests` 的 `a_send_call_says_where_its_letter_landed`；`views::tests::folding` 的 Inbox 用例点名 `first_line`（wire D39）。
+`turns` 只读一个会话自己的行；三种 note 的另一半在别处，配对放在 `turns` 之后的一遍里，`rounds_answer` 依次调用：(a) `Note::Waiting.answered`：`approval_resolved` 记在城自己的 run 下，按 approval id 配（`Sprawling/app/Spec.lean` §8-50-1）；(b) `Note::Arrived` 的 `from`、`said`、`kind`、`session` 与 `handback`：`signal_enqueued` 记在发信者的 run 下，从 `signal_consumed` 那一行往前、在整本账里按 `SignalId` 找，最多 `SENDING_REACH` 行（wire D36）；`kind` 是那条 signal 的种类，`session` 是那一行的 run（wire D43）；找到的那一条 signal 经 `collab::Handback::from_signal` 读成交接时填 `handback`（wire D38）；(c) `Note::AwaitingReply.ended`：`signal_wait_ended` 与它的开始记在同一会话里，按 `signal` 配（wire D37）；(d) `Call.landing`：一次 `send` 调用、它答复之前同一会话写下的、收信房间与参数 `to` 相同的 `signal_enqueued`、按 `SignalId` 配上的 `signal_landed`，三行都在发信会话里（wire D42，kernel D38）。配不上一律留 `None`，不猜。理由：`rounds.rs` 是一次遍历的折叠，配对要读别的 run，二者分开，各自一个改动的理由。被否决的做法：在 `turns` 里一边折一边配——`turns` 是纯函数，测试与回放直接喂它记录；让它读账本就失去了这一点。验收：`views::rounds::arrival_tests` 里 `a_signal_pulled_from_another_session_says_who_sent_it_and_what`、`a_reply_wait_says_how_it_ended`、`a_handback_says_whether_the_child_finished`（两者都点名 `kind` 与 `session`）；`views::rounds::landing_tests` 的 `a_send_call_says_where_its_letter_landed`；`views::tests::folding` 的 Inbox 用例点名 `first_line`（wire D39）。
 -/
 
 /-! ### 接口仍写在 sprawling 规格里的模块
 
-下面这些模块的接口与取舍今天写在 `crates/sprawling/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
+下面这些模块的接口与取舍今天写在 `Sprawling/app/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
 
 | sprawling 的标签 | 模块 |
 |---|---|

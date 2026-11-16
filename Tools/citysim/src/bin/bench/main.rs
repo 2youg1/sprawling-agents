@@ -4,14 +4,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The bench harness the performance register calls for: its wall-clock
-//! budgets and real CPython-WASI scenarios (`crates/xtask/budgets.toml`),
+//! budgets and real CPython-WASI scenarios (`Tools/xtask/budgets.toml`),
 //! measured on this machine, reported with their machine, never gated.
 //!
 //! This is a measuring Main, so it is the second sanctioned sampling
 //! point besides `bin::assembly`: every `Instant::now` here carries the
 //! same `#[expect]` the first one carries.
 //!
-//! Specified by `crates/citysim/spec/Bench.lean` §8-6.
+//! Specified by `Tools/citysim/spec/Bench.lean` §8-6.
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;

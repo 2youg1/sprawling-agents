@@ -6,7 +6,7 @@
 /-!
 # kernel::schema
 
-规定 `kernel::schema`（`crates/kernel/src/schema.rs`）：线上每个值的 JSON Schema。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::schema`（`Sprawling/kernel/src/schema.rs`）：线上每个值的 JSON Schema。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `kernel::schema` 旁的测试守住。
 -/
@@ -16,7 +16,7 @@
 
 **需求**：客户端（`client/src/wire.ts`）由 Rust 的 wire 类型生成，而 wire 携带的值大半是 kernel 的（`RunId`／`Seq`／`Address`／`EventRecord`／`AxError`／`ApprovalItem`……）。它们的 JSON 形状必须有且只有一个权威，而那个权威已经存在：类型声明上的 `#[serde(...)]`。
 
-**接口**：feature `schema`（缺省关，`schemars` 为可选依赖）。开启时，每个出现在帧里的类型带 `#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]`——派生宏读的正是 serde 读的那些属性（`rename_all`／`transparent`／`flatten`／`skip_serializing_if`／`deny_unknown_fields`／`try_from`），所以形状不可能与编码漂开。派生说不出语法的值在 `crates/kernel/src/schema.rs` 里各写一条 `impl JsonSchema`：一律是带 `pattern` 的 `string`，`AxCode` 的 `enum` 取自 `AxCode::ALL`——同一张表既产 `as_str` 也产 schema。前五个（`AxCode`／`IdemKey`／`B3Hash`／`GitOid`／`Locator`）的 serde 本就是手写的；第六个 `Address` 的 serde 是 `transparent`，派生因此只说得出「一个字符串」，而客户端要知道的恰是哪些字符串算数——`ADDRESS_PATTERN` 把 `Address::parse` 收的那套语法写成一条正则（`\p{Cc}` 即 `char::is_control`，`\p{White_Space}` 即 `char::is_whitespace`，读它的引擎一律开 Unicode 语义），`cargo xtask wire-ts` 据此发出 `Schema.pattern`，客户端不再自备一份语法。`ServerLabel` 同理：它的 serde 经 `try_from = "String"`，派生只说得出「一个字符串」，`SERVER_LABEL_PATTERN`（`^[a-z0-9]+$`）把 `ServerLabel::parse` 收的那套语法写成一条正则，MCP 页用 `Schema.is(ServerLabel)` 判标签，不自备第二份文法。判定权威仍是 `Address::parse`：它答得出**违反了哪一条**，那是一个人需要的。这些 impl 住一个文件而不是各回原文件，因为它们不是所在模块的判定，而 `locator.rs` 再收三条就越过文件行数上限；文件只装 `impl` 与它们引用的形状字符串，一处判定也没有。
+**接口**：feature `schema`（缺省关，`schemars` 为可选依赖）。开启时，每个出现在帧里的类型带 `#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]`——派生宏读的正是 serde 读的那些属性（`rename_all`／`transparent`／`flatten`／`skip_serializing_if`／`deny_unknown_fields`／`try_from`），所以形状不可能与编码漂开。派生说不出语法的值在 `Sprawling/kernel/src/schema.rs` 里各写一条 `impl JsonSchema`：一律是带 `pattern` 的 `string`，`AxCode` 的 `enum` 取自 `AxCode::ALL`——同一张表既产 `as_str` 也产 schema。前五个（`AxCode`／`IdemKey`／`B3Hash`／`GitOid`／`Locator`）的 serde 本就是手写的；第六个 `Address` 的 serde 是 `transparent`，派生因此只说得出「一个字符串」，而客户端要知道的恰是哪些字符串算数——`ADDRESS_PATTERN` 把 `Address::parse` 收的那套语法写成一条正则（`\p{Cc}` 即 `char::is_control`，`\p{White_Space}` 即 `char::is_whitespace`，读它的引擎一律开 Unicode 语义），`cargo xtask wire-ts` 据此发出 `Schema.pattern`，客户端不再自备一份语法。`ServerLabel` 同理：它的 serde 经 `try_from = "String"`，派生只说得出「一个字符串」，`SERVER_LABEL_PATTERN`（`^[a-z0-9]+$`）把 `ServerLabel::parse` 收的那套语法写成一条正则，MCP 页用 `Schema.is(ServerLabel)` 判标签，不自备第二份文法。判定权威仍是 `Address::parse`：它答得出**违反了哪一条**，那是一个人需要的。这些 impl 住一个文件而不是各回原文件，因为它们不是所在模块的判定，而 `locator.rs` 再收三条就越过文件行数上限；文件只装 `impl` 与它们引用的形状字符串，一处判定也没有。
 
 `ContainerImage` 的派生不能表达 `try_from` 的准入条件，因此其手写 schema 从构造器所属类型的前缀、digest 长度与 hex 字符表生成模式；ECMAScript 模式使用严格文本末尾检查，避免 `$` 允许终止换行。tag、短 digest、大写、尾随换行均与构造器一起拒绝，数值限额的非零要求仍由 NonZero 类型的 schema 发出。客户端回归通过实际生成的 schema 检查这些已出现的分歧。
 

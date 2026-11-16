@@ -5,7 +5,7 @@
 
 //! The route seam: what makes the remote listener on this computer's
 //! loopback reachable from outside, and nothing more
-//! (crates/remote_access/Spec.lean §8-7).
+//! (Sprawling/remote_access/Spec.lean §8-7).
 //!
 //! A route carries bytes. The handshake authenticates keys pinned at
 //! pairing rather than an address, and every frame is sealed end to end,

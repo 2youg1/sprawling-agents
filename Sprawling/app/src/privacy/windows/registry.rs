@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Exact raw registry values under HKCU and HKLM
-//! (`crates/sprawling/spec/Privacy/Windows.lean`).
+//! (`Sprawling/app/spec/Privacy/Windows.lean`).
 //!
 //! A value is read and written as its type code and its bytes, never
 //! decoded, expanded or trimmed, so what a restore writes back is what

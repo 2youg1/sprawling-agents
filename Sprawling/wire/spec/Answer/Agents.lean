@@ -6,9 +6,9 @@
 /-!
 # wire::answer::agents
 
-规定 `answer::agents`（`crates/wire/src/` 下同名的文件）：ACP 页读的 agent 目录、一段粘贴读成的一个 agent 条目，以及已添加的 agent。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `answer::agents`（`Sprawling/wire/src/` 下同名的文件）：ACP 页读的 agent 目录、一段粘贴读成的一个 agent 条目，以及已添加的 agent。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `crates/wire/tests/wire_contract.rs` 钉住的 wire schema 守住。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract.rs` 钉住的 wire schema 守住。
 -/
 
 /-!
@@ -58,11 +58,11 @@ pub enum LoginState { Unasked, Ready, Required }      // 线上 snake_case
 pub struct AuthMethod { pub id: String, pub name: String, pub kind: LoginKind }
 ```
 
-- **同意就是摘要**：`AgentOffer.spec_digest` 是城对它给出的那份启动说明算的摘要，`AddAgent` 把它带回来；城重算它此刻会给出的那一份，不相等就拒，所以人同意的那一行命令就是城写进 `[[agent]]` 的那一行（`crates/wire/spec/Command/Kind.lean` §19-2）。
-- **`launch_preview` 照原样显示**：同意卡上显示的是确切的命令行，页面不改写、不截断；路径与命令行只在答复与 `CONFIG.toml` 里，不进账本（`crates/kernel/Spec.lean` §8-87）。
+- **同意就是摘要**：`AgentOffer.spec_digest` 是城对它给出的那份启动说明算的摘要，`AddAgent` 把它带回来；城重算它此刻会给出的那一份，不相等就拒，所以人同意的那一行命令就是城写进 `[[agent]]` 的那一行（`Sprawling/wire/spec/Command/Kind.lean` §19-2）。
+- **`launch_preview` 照原样显示**：同意卡上显示的是确切的命令行，页面不改写、不截断；路径与命令行只在答复与 `CONFIG.toml` 里，不进账本（`Sprawling/kernel/Spec.lean` §8-87）。
 - **只给名字，不给值**：`env_names` 只列它设的环境变量的名字；值可能是 `secret:realm/name` 引用，也可能是 registry 写的关掉自更新的开关，页面都不需要。
 - **`PinState` 三态**：`Exact` 是启动说明钉在一个确切的版本上（`pkg@1.2.3`）；`Floating` 是交给启动程序去解析版本（`@latest` 或不写）；`Unknown` 是城所在的电脑上找到的一个程序，城没有执行它，所以不知道它是哪一版。
 - **登录只在需要时出现**：`LoginState::Unasked` 是城还没有与它开过会话；`Required` 是它以 `-32000` 答过（`E_AUTH_REQUIRED`）；`Ready` 是它接过一次会话而没有要求登录。`auth_methods` 是 agent 在 `initialize` 里声明的方法，已滤掉城不代为启动的那一种（claude.ai 订阅登录，这是人定下的）。
 - **粘贴的文法只在 Rust 里**：`ParseAgentSpec` 读一行命令（空白与双引号分词，含 `|`、`&`、`;`、`<`、`>` 的拒绝）、Zed 或 JetBrains 的 `agent_servers` 块，或 registry 的 `agent.json`，WebUI 与 CLI 都经它，页面不另写一份。
-- **现状**：城不记一家 agent 答过的 `-32000`，所以 `added` 的每一行都答 `LoginState::Unasked`，`auth_methods` 为空；登录执行器没有建成，`AgentLogin` 答 `not_built`，页面不画登录入口（`crates/agent_protocols/Spec.lean` §3）。五个官方 harness 是 `catalog` 里的内置条目，没有自己的一问。
+- **现状**：城不记一家 agent 答过的 `-32000`，所以 `added` 的每一行都答 `LoginState::Unasked`，`auth_methods` 为空；登录执行器没有建成，`AgentLogin` 答 `not_built`，页面不画登录入口（`Sprawling/agent_protocols/Spec.lean` §3）。五个官方 harness 是 `catalog` 里的内置条目，没有自己的一问。
 -/

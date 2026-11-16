@@ -104,7 +104,7 @@ pub struct RunStarted {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub dispatched_by: Option<Who>,
-    /// The run policy this run was dispatched under (`crates/kernel/spec/Model.lean` §8-77).
+    /// The run policy this run was dispatched under (`Sprawling/kernel/spec/Model.lean` §8-77).
     /// Absent in a record written before the policy was recorded; the
     /// six mode words before it never reached a typed payload, so
     /// there is no older shape to read.
@@ -112,19 +112,19 @@ pub struct RunStarted {
     pub policy: Option<RunPolicy>,
     /// The identity version this run's session froze: the key a page
     /// reads the names the request carried back by, through the content
-    /// store (`crates/kernel/spec/Event/Record.lean` §8-79). Absent in a record written before the
+    /// store (`Sprawling/kernel/spec/Event/Record.lean` §8-79). Absent in a record written before the
     /// key existed, which a page answers with the address rather than
     /// with today's names.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
     pub naming: Option<B3Hash>,
-    /// How the run's first user message was written (`crates/kernel/spec/Event/Record.lean` §8-82-1):
+    /// How the run's first user message was written (`Sprawling/kernel/spec/Event/Record.lean` §8-82-1):
     /// what a fork reads to rebuild that message the way the mother sent
     /// it. Absent in a record written before the key existed, and on a
     /// harness run, whose first words are the harness's own prompt.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub opening: Option<Opening>,
-    /// The effort the run's requests froze (`crates/kernel/spec/Event/Record.lean`
+    /// The effort the run's requests froze (`Sprawling/kernel/spec/Event/Record.lean`
     /// §8-85): the session's, which no turn may change. Absent when the
     /// dispatch stated none and the provider chooses - which is not
     /// [`Effort::None`], asking it not to think - on a harness run, and
@@ -138,7 +138,7 @@ pub struct RunStarted {
     /// The actual endpoint/model and why this run selected them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub routing: Option<ModelRouting>,
-    /// The ACP agent that took this harness run (`crates/kernel/spec/Event/Record.lean`
+    /// The ACP agent that took this harness run (`Sprawling/kernel/spec/Event/Record.lean`
     /// §8-87). Absent on a run this city's own model loop drives, and in a
     /// record written before the key existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -208,7 +208,7 @@ pub struct RunFrozen {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evidence: Option<Vec<EvidenceCite>>,
     /// Why the line was written by something other than the run's own
-    /// driver (`crates/kernel/spec/Event/Record.lean` §8-82-2). Absent on every freeze a run wrote
+    /// driver (`Sprawling/kernel/spec/Event/Record.lean` §8-82-2). Absent on every freeze a run wrote
     /// for itself, so those lines keep the bytes they always had.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cause: Option<FreezeCause>,
@@ -314,7 +314,7 @@ pub struct SessionOpened {
     /// **The room itself is the record's own `addr` field**, not a copy
     /// here: a line that belongs to an address says so in the envelope,
     /// and a payload copy would be a second place the same address is
-    /// spelled (`crates/kernel/spec/Event.lean` §8-4).
+    /// spelled (`Sprawling/kernel/spec/Event.lean` §8-4).
     pub carried: bool,
 }
 
@@ -348,7 +348,7 @@ pub struct EvalRun {
 }
 
 /// `run_policy_changed`: the room's run policy, changed while a session
-/// is open (`crates/kernel/spec/Event/Record.lean` D21).
+/// is open (`Sprawling/kernel/spec/Event/Record.lean` D21).
 ///
 /// The run under way reads it at its next safe point and passes the
 /// gate under it from that step on; the next run's `run_started.policy`
@@ -363,7 +363,7 @@ pub struct RunPolicyChanged {
 }
 
 /// `session_named`: the name a person gave one session of a room
-/// (`crates/kernel/spec/Event/Record.lean` D22).
+/// (`Sprawling/kernel/spec/Event/Record.lean` D22).
 ///
 /// The address stays the session's identity; the name is what a page
 /// shows. `began` is the seq that opened the session, the same value

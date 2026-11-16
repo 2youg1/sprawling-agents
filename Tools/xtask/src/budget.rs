@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Performance ratchet over `crates/xtask/budgets.toml` (xtask §8-25).
+//! Performance ratchet over `Tools/xtask/budgets.toml` (xtask §8-25).
 
 use std::path::Path;
 
@@ -29,7 +29,7 @@ struct Row {
     slack: u64,
 }
 
-pub(crate) const REGISTER: &str = "crates/xtask/budgets.toml";
+pub(crate) const REGISTER: &str = "Tools/xtask/budgets.toml";
 
 pub(crate) fn register(root: &Path) -> Result<toml::Value, XtaskError> {
     let path = root.join(REGISTER);

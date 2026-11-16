@@ -5,7 +5,7 @@
 
 //! The repair segment inside a call's account round: its resend is one
 //! more send on the round's current account
-//! (`crates/runtime/spec/Turn/Recovery.lean` §8-49).
+//! (`Sprawling/runtime/spec/Turn/Recovery.lean` §8-49).
 
 #![allow(
     clippy::unwrap_used,

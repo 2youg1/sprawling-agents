@@ -5,7 +5,7 @@
 
 //! The remote door as a served city keeps it, driven by a device written
 //! in Rust against a scripted route, on a counted clock and a counted
-//! random source (`crates/sprawling/Spec.lean` §8-139, §8-140).
+//! random source (`Sprawling/app/Spec.lean` §8-139, §8-140).
 
 #![allow(
     clippy::unwrap_used,
@@ -222,7 +222,7 @@ fn a_local_only_frame_is_refused_and_reaches_no_city() {
 
 /// The privacy page reads and changes the host, not the city: a device
 /// that may act is refused both the question and the operation, and
-/// neither reaches the city (`crates/wire/Spec.lean` §8-88, §8-89).
+/// neither reaches the city (`Sprawling/wire/Spec.lean` §8-88, §8-89).
 #[test]
 fn the_privacy_page_is_refused_to_a_device_that_may_act() {
     let dir = tempfile::tempdir().unwrap();

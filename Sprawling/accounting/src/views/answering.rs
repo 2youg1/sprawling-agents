@@ -45,7 +45,7 @@ use super::providers::{ProviderAsk, TableRows, endpoints_answer, figures_answer}
 
 /// How many runs a cost view names besides every active one: a bound
 /// on the size of an answer on the wire, not a machine reading, so it is
-/// a constant (`crates/sprawling/Spec.lean` §8-106).
+/// a constant (`Sprawling/app/Spec.lean` §8-106).
 pub(super) const TOP_BILLED: usize = 32;
 
 impl Views {
@@ -62,7 +62,7 @@ impl Views {
     }
 
     /// One item's newest release, asked once the snapshot is let go
-    /// because it leaves this machine (`crates/sprawling/Spec.lean` §8-120).
+    /// because it leaves this machine (`Sprawling/app/Spec.lean` §8-120).
     fn upstream_of(&self, item: &str) -> Prepared {
         Prepared::Upstream {
             ask: self.reach.upstream,
@@ -297,7 +297,7 @@ impl Views {
             wire::Query::Shells => return self.usage(Shells),
             wire::Query::NewestRelease => return Prepared::Release(self.reach.registry),
             // The host's privacy page is read by the serving binary's own listener
-            // (`crates/sprawling/spec/Privacy/Service.lean`); the views hold nothing of the host.
+            // (`Sprawling/app/spec/Privacy/Service.lean`); the views hold nothing of the host.
             wire::Query::Privacy => privacy_unavailable(),
             wire::Query::UpstreamVersion { item } => return self.upstream_of(item),
             wire::Query::BuildingView { addr } => {

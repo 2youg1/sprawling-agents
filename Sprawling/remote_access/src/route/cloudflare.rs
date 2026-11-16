@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The default route: a Cloudflare named tunnel the person made once,
-//! run for as long as the route is open (crates/remote_access/Spec.lean §8-8).
+//! run for as long as the route is open (Sprawling/remote_access/Spec.lean §8-8).
 //!
 //! The tunnel is managed locally: its credentials stay in `cloudflared`'s
 //! own directory and never enter the city, and its origin is given on

@@ -5,7 +5,7 @@
 
 //! The city page split at the view lock: the runs, the shut scopes and
 //! the pursuits copied out of the fold, and the buildings listed and
-//! their plans read once the views are released (`crates/sprawling/Spec.lean`
+//! their plans read once the views are released (`Sprawling/app/Spec.lean`
 //! §8-100).
 //!
 //! **Why the directory is listed here and not in the fold.** A building
@@ -63,7 +63,7 @@ impl Views {
                 halted: self.governance.halted.iter().map(named).collect(),
                 // A served city's verdict is the halt its writer obeys;
                 // views without one were folded from a history proved
-                // before they read it (`crates/sprawling/Spec.lean` §8-134).
+                // before they read it (`Sprawling/app/Spec.lean` §8-134).
                 proved: match &self.proof {
                     Some(halt) if !halt.proved() => None,
                     Some(_) | None => self.head,

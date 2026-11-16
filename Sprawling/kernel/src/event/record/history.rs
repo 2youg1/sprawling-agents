@@ -6,7 +6,7 @@
 //! The two steps of the unified history that write a tree: going back to
 //! a point, and taking one file back from a point.
 //!
-//! `crates/storage/spec/Worktree/Back.lean` requires that each step appends
+//! `Sprawling/storage/spec/Worktree/Back.lean` requires that each step appends
 //! exactly one record and that an undo is one of them, never a removal;
 //! these are those records. The tree is named by its worktree name, as
 //! in `worktree_opened`, and never by its path on disk, because a
@@ -28,7 +28,7 @@ pub struct WentBack {
 /// `file_restored`: `path` in the tree `name` now holds what `point`
 /// holds there, or nothing when `point` holds no such file. An empty
 /// `name` is the city's own working tree, which a person takes a file
-/// back into from a page (`crates/wire/Spec.lean` §8-62).
+/// back into from a page (`Sprawling/wire/Spec.lean` §8-62).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FileRestored {

@@ -6,7 +6,7 @@
 /-!
 # 门说了什么：接受、拒绝、静默
 
-规定检验器 `Sprawling.Door` 的 `interpret` 与 `Answer` 必须守的性质（`crates/adversary/src/Sprawling/Door.lean`）。
+规定检验器 `Sprawling.Door` 的 `interpret` 与 `Answer` 必须守的性质（`Tools/adversary/src/Sprawling/Door.lean`）。
 检验器不 import 本规格，本规格也不 import 检验器（ARCHITECTURE.md §11）：这里给出的是
 参照定义与它的定理，检验器是实现，两者的一致由 `just adversary` 的门契约那一组检查从门外问
 （`Spec.lean` §16）。

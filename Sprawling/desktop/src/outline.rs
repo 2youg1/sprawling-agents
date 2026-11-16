@@ -10,7 +10,7 @@
 //! screen, which `desktop.act` looks up by ref, and not the nesting of
 //! containers nobody named. So a tree crosses as an outline, one line
 //! per element — its ref, its role, its name — indented by depth
-//! (`crates/desktop/Spec.lean` D10 (b)).
+//! (`Sprawling/desktop/Spec.lean` D10 (b)).
 //!
 //! The role is a word from a closed vocabulary rather than whatever the
 //! platform says: a localized string names one button two ways on two
@@ -23,7 +23,7 @@
 //! it crosses: a control character would break the line it sits on, and
 //! a name as long as a page is a page rather than a name.
 //!
-//! The properties this module must hold are proved in `crates/desktop/spec/Outline.lean`;
+//! The properties this module must hold are proved in `Sprawling/desktop/spec/Outline.lean`;
 //! this code is the authority on how it holds them.
 
 // The tests run everywhere, but only the Windows arm reads a tree, so

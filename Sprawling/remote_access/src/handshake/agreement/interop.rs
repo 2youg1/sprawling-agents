@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The vectors and the one-way fixture a browser must reproduce
-//! (crates/remote_access/Spec.lean §8-12, remote_access D11), written into
-//! `crates/fixtures/remote-handshake/` by this module and read back by it.
+//! (Sprawling/remote_access/Spec.lean §8-12, remote_access D11), written into
+//! `Tools/fixtures/remote-handshake/` by this module and read back by it.
 //!
 //! Without `GOLDEN_WRITE=1` every test only reads and compares. With it,
 //! the three files with no randomness in them are written again, byte for

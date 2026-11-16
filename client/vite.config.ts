@@ -92,8 +92,8 @@ function shippedFace(): Plugin {
   };
 }
 
-// The bundle lands where `crates/sprawling/build.rs` reads it: the path
-// its `BUNDLE_DIR` states inside its own package, crates/sprawling/web-dist,
+// The bundle lands where `Sprawling/app/build.rs` reads it: the path
+// its `BUNDLE_DIR` states inside its own package, Sprawling/app/web-dist,
 // whatever `CARGO_TARGET_DIR` says, with `index.html` at its root; inside
 // the package because the crates.io archive carries nothing else.
 // `base: './'` keeps every asset reference relative, so the same bundle
@@ -112,7 +112,7 @@ export default defineConfig({
     thirdPartyNotices(declaredLicences()),
   ],
   build: {
-    outDir: "../../crates/sprawling/web-dist",
+    outDir: "../../Sprawling/app/web-dist",
     emptyOutDir: true,
     // No sourcemap ships: the map of this bundle is 4 MB against a
     // 644 KB bundle, `xtask budget` weighs everything the directory

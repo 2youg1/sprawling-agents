@@ -13,7 +13,7 @@
 
 //! The three model doors of an endpoint. They are this crate's own:
 //! a caller outside it reaches them through `permit::Gated`, which takes
-//! the endpoint's permit first (`crates/gateway/Spec.lean` §8-6).
+//! the endpoint's permit first (`Sprawling/gateway/Spec.lean` §8-6).
 
 use kernel::{AxCode, AxError, ModelRequest, ModelReturn, UsdMicros};
 use serde_json::Value;

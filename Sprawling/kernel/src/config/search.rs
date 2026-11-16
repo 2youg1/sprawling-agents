@@ -7,10 +7,10 @@
 //!
 //! What `Default` points at, how `selected` is found, what a file may not
 //! say and on which rungs it may say it are all `city`'s answers
-//! (`crates/city/spec/ConfigLayers.lean` §8-4c, city D25), so the default
+//! (`Sprawling/city/spec/ConfigLayers.lean` §8-4c, city D25), so the default
 //! supplier's address is declared there once and has no copy here.
 //!
-//! Specified by `crates/kernel/spec/Config.lean` §8-22.
+//! Specified by `Sprawling/kernel/spec/Config.lean` §8-22.
 
 use serde::{Deserialize, Serialize};
 

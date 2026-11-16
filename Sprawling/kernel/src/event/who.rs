@@ -77,7 +77,7 @@ impl Who {
     }
 
     /// Who handed a piece of work down, in the words a model reads in
-    /// its job file and its opening message (`crates/city/spec/SpineFiles.lean`
+    /// its job file and its opening message (`Sprawling/city/spec/SpineFiles.lean`
     /// D21).
     ///
     /// A resident is named with the run that handed the work down: the
@@ -115,8 +115,8 @@ impl Who {
 /// section holds no angle bracket and cannot close that section or open
 /// another. The one escaper: the job file's sections, a resident's
 /// letter and a rebuilt opening all write through it, so what one
-/// renderer refuses the others refuse too (`crates/city/spec/SpineFiles.lean`
-/// D21, `crates/runtime/spec/Conversation.lean` §8-47-2).
+/// renderer refuses the others refuse too (`Sprawling/city/spec/SpineFiles.lean`
+/// D21, `Sprawling/runtime/spec/Conversation.lean` §8-47-2).
 #[must_use]
 pub fn escape_markup(text: &str) -> String {
     text.chars()

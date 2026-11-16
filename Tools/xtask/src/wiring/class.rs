@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The class column: which class of verb each Command is when a remote
-//! device sends it (crates/wire/Spec.lean section 19-2,
-//! crates/xtask/Spec.lean §8-45).
+//! device sends it (Sprawling/wire/Spec.lean section 19-2,
+//! Tools/xtask/Spec.lean §8-45).
 //!
 //! **Two sources, one decision.** The arms of `def Command.verbClass` in
 //! the wire specification state each verb's class, and the relay decides
@@ -45,7 +45,7 @@ pub(super) enum Class {
 }
 
 impl Class {
-    /// One spelling, the Rust one, on both sides (crates/xtask/Spec.lean
+    /// One spelling, the Rust one, on both sides (Tools/xtask/Spec.lean
     /// §8-43): the relay's `VerbClass::Act` and the table's `.Act`.
     fn parse(word: &str) -> Option<Self> {
         match word {
@@ -151,7 +151,7 @@ pub(super) fn judged(
                 &stated.path,
                 "every Command states the class a remote device's frame carries",
                 format!(
-                    "`{name}` has no class in `def Command.verbClass` (crates/wire/Spec.lean \
+                    "`{name}` has no class in `def Command.verbClass` (Sprawling/wire/Spec.lean \
                      section 19-2)"
                 ),
                 "write `.LocalOnly` as its arm unless a person decided a device away from the \
@@ -186,7 +186,7 @@ mod tests {
         let root = crate::root::fixture::relocated("wiring-class");
         crate::root::fixture::write(
             &root,
-            "crates/wire/Spec.lean",
+            "Sprawling/wire/Spec.lean",
             "def Command.verbClass : Command → VerbClass\n  | .Dispatch => .Act\n  \
              | .Reveal => .LocalOnly\n  | .Gift => .localOnly\n",
         );
@@ -202,7 +202,7 @@ mod tests {
             .into_iter()
             .map(|found| (found.location, found.violation))
             .collect();
-        let at = "crates/wire/Spec.lean".to_owned();
+        let at = "Sprawling/wire/Spec.lean".to_owned();
         assert_eq!(
             named,
             [
@@ -212,7 +212,7 @@ mod tests {
                 ),
                 (
                     at,
-                    "`Gift` has no class in `def Command.verbClass` (crates/wire/Spec.lean \
+                    "`Gift` has no class in `def Command.verbClass` (Sprawling/wire/Spec.lean \
                      section 19-2)"
                         .to_owned()
                 ),

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What an agent says about itself in `initialize`, and the refusal its
-//! `-32000` becomes (`crates/agent_protocols/Spec.lean` §8-19, D14, D18).
+//! `-32000` becomes (`Sprawling/agent_protocols/Spec.lean` §8-19, D14, D18).
 
 use kernel::{AxCode, AxError};
 use serde_json::{Value, json};

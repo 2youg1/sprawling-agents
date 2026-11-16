@@ -7,7 +7,7 @@
 //! the mother sequence. Forking is not
 //! resurrection: the mother's frozen state never changes, and the new
 //! RunId arrives from the caller — this module is pure.
-//! `crates/runtime/spec/Fork.lean` proves what a fork must hold (§8-2):
+//! `Sprawling/runtime/spec/Fork.lean` proves what a fork must hold (§8-2):
 //! the prefix is the mother's first lines, and the cut never splits a wave.
 //!
 //! [`prefix`] consumes [`VerifiedLedger`], so replay and fork share one
@@ -305,7 +305,7 @@ const UNRECORDED_DISPATCHER: &str = "an unrecorded dispatcher";
 
 /// How a branch writes the first message of a run it rebuilds: the way
 /// the mother wrote it, so a provider's cached prefix holds from the
-/// first message on (`crates/runtime/spec/Fork.lean` §8-58).
+/// first message on (`Sprawling/runtime/spec/Fork.lean` §8-58).
 ///
 /// **`FromJob` is the one opening rewritten.** Its line says the task is
 /// in the JOB.md above, and the JOB.md it means is the mother's, in the

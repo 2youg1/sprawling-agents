@@ -5,7 +5,7 @@
 
 //! Strict local JSONL: a read that never creates or settles anything, and
 //! a writer that holds the file for a whole operation and returns only once
-//! a line is on disk (`crates/sprawling/spec/Privacy/Journal.lean`).
+//! a line is on disk (`Sprawling/app/spec/Privacy/Journal.lean`).
 
 use std::fs::{File, OpenOptions, TryLockError};
 use std::io::{ErrorKind, Read, Write};

@@ -17,7 +17,7 @@
   // shows the answer is the page that asks for it - once per opening,
   // whether or not the city holds an older answer, and through the same
   // command the button sends, so "look at this machine" keeps one
-  // authority (`crates/sprawling/Spec.lean` §8-120). Once an answer is here, each
+  // authority (`Sprawling/app/Spec.lean` §8-120). Once an answer is here, each
   // item's newest release is asked of its publisher, one question per
   // item, and filled in as the answers arrive.
 
@@ -127,7 +127,7 @@
   // The city answers `asking` while it reads a publisher, rather than
   // holding every other question of this page behind the network; the
   // items it is still reading are asked again after a pause, until each
-  // has its reading (`crates/sprawling/Spec.lean` §8-120).
+  // has its reading (`Sprawling/app/Spec.lean` §8-120).
   const ASK_AGAIN_MS = 1500;
   const pending = $derived(stillAsking(newest).join(" "));
   $effect(() => {

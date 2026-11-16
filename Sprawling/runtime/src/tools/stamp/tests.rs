@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The check derived from `crates/runtime/spec/Tools/Edit.lean` §8-64-2:
+//! The check derived from `Sprawling/runtime/spec/Tools/Edit.lean` §8-64-2:
 //! the model's steps replayed on [`ReadStamps`] and [`admission`], with
 //! the theorem `an_admitted_edit_follows_its_runs_last_look` asserted at
 //! every edit that lands.

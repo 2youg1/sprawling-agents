@@ -6,7 +6,7 @@
 //! One case of `shots` - one measuring or one picture - as tries: the
 //! second try a failed first one gets, the failure named for the case,
 //! and the profile directory each try removes after itself
-//! (crates/xtask/Spec.lean §8-44).
+//! (Tools/xtask/Spec.lean §8-44).
 
 use std::path::Path;
 use std::time::Duration;

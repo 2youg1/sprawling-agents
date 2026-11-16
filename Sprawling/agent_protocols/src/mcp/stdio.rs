@@ -26,7 +26,7 @@
 //! `MESSAGE_CEILING` bytes, and each message goes over a channel with no
 //! queue, so it reads the next only once a call has taken this one. Whatever the server
 //! writes beyond that waits in the pipe, which is the server's buffer
-//! rather than this city's (`crates/agent_protocols/Spec.lean` §8-15). A line past
+//! rather than this city's (`Sprawling/agent_protocols/Spec.lean` §8-15). A line past
 //! the ceiling is refused to the call that was waiting, and the child is
 //! stopped, because the rest of that line cannot be told apart from the
 //! next message.
@@ -71,7 +71,7 @@ impl StdioServer {
     /// a server still finds the search path and the home directory it
     /// needs; what it does not get is any key that holds one of the
     /// city's own secrets, which `child::command` removes
-    /// (`crates/agent_protocols/Spec.lean` D16). **A name handed to a child
+    /// (`Sprawling/agent_protocols/Spec.lean` D16). **A name handed to a child
     /// cannot be taken back**, which
     /// is why a credential arrives here already redeemed and exists as
     /// plaintext only inside this call.

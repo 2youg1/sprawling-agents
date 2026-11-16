@@ -6,7 +6,7 @@
 //! The exec tool: exactly three arms, each with its own failure story.
 //!
 //! A call names a `command` or a `python` script, the way Claude Code's
-//! `Bash` takes a `command` (`crates/runtime/spec/Tools/Exec.lean`
+//! `Bash` takes a `command` (`Sprawling/runtime/spec/Tools/Exec.lean`
 //! §8-13-4, D118). The building decides which arm a command takes: the
 //! shell when it offers one, and otherwise the program the line names,
 //! read by `program_line`, which refuses shell syntax rather than pass
@@ -272,7 +272,7 @@ impl ExecTool {
 
     /// One heavy call's reservation from the machine budget: the run's
     /// ceiling when the run asks for one, and none otherwise
-    /// (`crates/runtime/spec/Reserve.lean` D104). Blocks until the line
+    /// (`Sprawling/runtime/spec/Reserve.lean` D104). Blocks until the line
     /// starts it, holding no other lock of this tool while it waits.
     fn reservation(&self) -> Option<Reservation> {
         match self.backlog.shares() {

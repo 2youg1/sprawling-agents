@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Privacy owner verification and binding (`crates/gateway/spec/Credential.lean`
+//! Privacy owner verification and binding (`Sprawling/gateway/spec/Credential.lean`
 //! D31, D34).
 
 use super::vault::{KeyringVault, Vault};

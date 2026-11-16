@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One Markdown version written as an HTML file that stands on its own
-//! (`crates/documents/Spec.lean` D33).
+//! (`Sprawling/documents/Spec.lean` D33).
 //!
 //! The version is read by the one grammar into the tree a preview
 //! carries, so links were already judged (D23) and nesting already

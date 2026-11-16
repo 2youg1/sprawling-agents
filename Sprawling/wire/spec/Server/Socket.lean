@@ -6,7 +6,7 @@
 /-!
 # wire::server::socket：一帧一次写出
 
-规定 `server::socket::framing`（`crates/wire/src/server/socket/framing.rs`）把订阅到的记录怎样按帧写给一个会话。本文件是 `crates/wire/Spec.lean` 的一个分部；下面一节保留它在 wire 规格里的标签 §8-47h，别处引作 `crates/wire/Spec.lean §8-47h`，决定引作 `wire D45`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `server::socket::framing`（`Sprawling/wire/src/server/socket/framing.rs`）把订阅到的记录怎样按帧写给一个会话。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面一节保留它在 wire 规格里的标签 §8-47h，别处引作 `Sprawling/wire/Spec.lean §8-47h`，决定引作 `wire D45`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 ### 8-47h 视图广播按帧合并（形状 4 adapter 里的一个纯函数）
 
@@ -22,7 +22,7 @@ pub(crate) const FRAME_RECORDS_MAX: usize = 256;
 pub(crate) fn framed<R>(stream: Stream, phase: SessionState, arrivals: Vec<Arrival<R>>) -> (Vec<Said<R>>, Stream);
 ```
 
-一个会话的事件臂醒来时，订阅里往往已经排着一整批记录：折叠线程每折完一批就把这一批逐条广播（`crates/sprawling/src/serving/folding.rs`）。今天的事件臂每条记录 `send` 一次，`send` 是 `feed` 加 `flush`，于是一批 N 条就是 N 次刷到套接字。改成按帧：醒来取到第一条之后，用 `try_recv` 把已经到了的取完（至多 `FRAME_RECORDS_MAX` 条），交 `framed` 算出要说的话，逐条 `feed`，最后 `flush` 一次。线上的形状一字不变：每条记录仍是它自己的那一个 `Event` 帧（§8-47），每段跳过仍是一个 `Lagged` 帧（§8-41），合并的只是刷写。
+一个会话的事件臂醒来时，订阅里往往已经排着一整批记录：折叠线程每折完一批就把这一批逐条广播（`Sprawling/app/src/serving/folding.rs`）。今天的事件臂每条记录 `send` 一次，`send` 是 `feed` 加 `flush`，于是一批 N 条就是 N 次刷到套接字。改成按帧：醒来取到第一条之后，用 `try_recv` 把已经到了的取完（至多 `FRAME_RECORDS_MAX` 条），交 `framed` 算出要说的话，逐条 `feed`，最后 `flush` 一次。线上的形状一字不变：每条记录仍是它自己的那一个 `Event` 帧（§8-47），每段跳过仍是一个 `Lagged` 帧（§8-41），合并的只是刷写。
 
 模型证明的三条性质都对任意的到达序列成立：
 

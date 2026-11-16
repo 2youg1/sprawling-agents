@@ -28,8 +28,8 @@ use super::guard::{Stamp, Stored, stamp};
 /// The city's own port and the remote listener (`bin::outside`) serve
 /// the page through this one table, so a device that opens the remote
 /// address gets the same bytes as a browser on this machine
-/// (`crates/wire/Spec.lean` §8-2); `headers` are the listener's own,
-/// generated once per listener (`crates/wire/spec/Reception/Entry.lean`
+/// (`Sprawling/wire/Spec.lean` §8-2); `headers` are the listener's own,
+/// generated once per listener (`Sprawling/wire/spec/Reception/Entry.lean`
 /// §8-94). The routes take no credential: a browser has to load the page
 /// before it has anywhere to pair.
 ///

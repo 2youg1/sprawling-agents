@@ -6,7 +6,7 @@
 /-!
 # city::library::install
 
-规定 `library::install`、`library::install::precheck`、`library::install::precheck::walk`（`crates/city/src/` 下同名的文件）。一件技能进书架的唯一入口：静态预检、原子落位、内容哈希入 CAS。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+规定 `library::install`、`library::install::precheck`、`library::install::precheck::walk`（`Sprawling/city/src/` 下同名的文件）。一件技能进书架的唯一入口：静态预检、原子落位、内容哈希入 CAS。本文件是 `Sprawling/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `Sprawling/city/Spec.lean §8-n`，决定引作 `city D<n>`。
 -/
 
 /-!
@@ -51,7 +51,7 @@ pub fn install(city_root: &Path, slot: &Slot, package: &Path,
 - **生产调用者**：`library::shipped::shelve_shipped`（§8-28c）经这扇门把自带的 skill 放上城库，它由新城成形的那一处（`accounting::worker::genesis::form`）调用；`InstallSkill` 的执行者（D20）是第二个调用者，阅览室的城外 skill 准入是第三个，只写 CAS 而不新增书架行。
 - **外部书架没有臂**：`Slot` 只有两个构造点，城库与楼架。外部书架是别人目录的只读挂载（§8-8），往那里落东西在类型上就拼不出来。
 
-**本节测试**：`library::install::tests`——登记后的每个文件字节等于来源；manifest 逐项 digest 相符，`Installed::hash` 等于 manifest 的 BLAKE3；索引只有 `(section, name, digest)`，书架没有文件目录；扫描读回的 `Holding` 与 `Installed::holding` 整体相等；同哈希重装幂等（`AlreadyShelved`，索引不变），同名异 digest 成为新候选版本；**plan 与 apply 之间来源被换即整体拒收**（拒后索引不变、登记零调用）；链接、旧持有并存、跨 section 同名与超限各拒一次。旧书架迁移先校验旧 CAS 对象再替换为索引。CAS 绑定的端到端一例在 `crates/sprawling/tests/skill_install.rs`（`Cas::put` 兑付 `register`，可按 `Installed::hash` 取回 manifest，再逐文件取回同一份字节）。
+**本节测试**：`library::install::tests`——登记后的每个文件字节等于来源；manifest 逐项 digest 相符，`Installed::hash` 等于 manifest 的 BLAKE3；索引只有 `(section, name, digest)`，书架没有文件目录；扫描读回的 `Holding` 与 `Installed::holding` 整体相等；同哈希重装幂等（`AlreadyShelved`，索引不变），同名异 digest 成为新候选版本；**plan 与 apply 之间来源被换即整体拒收**（拒后索引不变、登记零调用）；链接、旧持有并存、跨 section 同名与超限各拒一次。旧书架迁移先校验旧 CAS 对象再替换为索引。CAS 绑定的端到端一例在 `Sprawling/app/tests/skill_install.rs`（`Cas::put` 兑付 `register`，可按 `Installed::hash` 取回 manifest，再逐文件取回同一份字节）。
 -/
 
 /-! D20 User 加 skill 只有一扇门：`InstallSkill` 的执行者把三种来源都变成一个本地目录，再交给 `library::install`；自带的 skill 编进二进制，经同一扇门放上城库
@@ -61,7 +61,7 @@ pub fn install(city_root: &Path, slot: &Slot, package: &Path,
 - **`Path`**：User 写下的路径照原样读；必须是绝对路径（Windows 上是盘符或 UNC 开头，macOS 与 Linux 上以 `/` 开头）或以 `~` 开头（`~` 指 `bin::assembly` 给出的 `Home`，与 §8-8 外部书架同一条规则）；相对路径即拒 `E_INVALID_ARGS`，恢复语说「给出绝对路径」——城的工作目录不是 User 在页面上看到的任何一个目录。随后直接 `install(city_root, slot, path, register)`。
 - **`Git`**：只收 `https://` 地址（`E_INVALID_ARGS` 拒其余：ssh 会读 User 的 ssh 配置并可能等口令，`file://` 与 `Path` 重复）。执行者在 `<city>/.sprawling/` 之下一个按 `idem` 命名、点开头的暂存目录里跑 `git clone --depth 1 [--branch <rev>] <url> <暂存目录>`，环境带 `GIT_TERMINAL_PROMPT=0`，超时 `CLONE_TIMEOUT`（120 s）；git 由 doctor 在 PATH 上找（Windows 上是 `git.exe`），不在即拒 `E_TOOL_UNAVAILABLE`，恢复语说出 doctor 给的安装行；clone 失败拒 `E_TOOL_UNAVAILABLE`，主体带 git 标准错误的最后一行，恢复语「在浏览器里打开这个地址确认它存在，再试一次」；超时拒 `E_TIMEOUT`。`subdir` 缺席时包根就是仓库根。之后 `plan_install` 读暂存目录里那一层，`apply` 落位；暂存目录无论成败都删掉，上次崩溃留下的同名暂存目录先删再 clone（与 `place_tree` 的暂存同一口径）。`.git/` 不是包的一部分：clone 之后、预检之前删掉它，因为它不是 skill 的内容，而它的对象文件会让整包超过 `PACKAGE_BYTES_LIMIT`。
 - **`SkillsSh`**：名字是 `<owner>/<repo>/<skill>` 三段（与 skills.sh 页面上的写法相同），换成 `Git { url: https://github.com/<owner>/<repo>, rev: None, subdir }`，`subdir` 是 clone 里**唯一一个**名为 `<skill>`、内含 `SKILL.md` 的目录；零个或多于一个即拒 `E_INVALID_ARGS`，拒词列出找到的候选。审核随后按 D19 去问 skills.sh 的同一个名字。
-- **`Shipped`：自带的 skill 编进二进制**。源树的 `skills/` 在构建时经 city 的构建脚本写进 `OUT_DIR` 并 `include_bytes!`（`xtask packaged` 准许的两处之一），所以四条安装渠道——发行归档、安装脚本（只复制二进制）、npm 与 `cargo binstall`（都只带二进制）、`cargo install`（crates.io 的包里只有包目录）——得到同一份自带 skill；为此源树根上的 `skills/` 搬进 city 的包目录、仍叫 `skills/`（与 city D18 把模板搬进包目录同一条理由），引用它的文档同一次改动改路径，归档的 Skills 部分（`crates/xtask/src/package/contents.rs`）改读新路径。执行者把每一件经 `install` 放进城库的 `shipped` 格（`SHIPPED_SECTION`），来源是一个从内嵌字节在暂存目录里写出的目录，于是预检、原子落位与 CAS 登记仍只有 §8-28 一处。同 digest 的那一件答 `AlreadyShelved`，不写一个字节；同名异 digest 按 §8-28 成为新候选版本，旧版本仍由各楼的 pin 引用。
+- **`Shipped`：自带的 skill 编进二进制**。源树的 `skills/` 在构建时经 city 的构建脚本写进 `OUT_DIR` 并 `include_bytes!`（`xtask packaged` 准许的两处之一），所以四条安装渠道——发行归档、安装脚本（只复制二进制）、npm 与 `cargo binstall`（都只带二进制）、`cargo install`（crates.io 的包里只有包目录）——得到同一份自带 skill；为此源树根上的 `skills/` 搬进 city 的包目录、仍叫 `skills/`（与 city D18 把模板搬进包目录同一条理由），引用它的文档同一次改动改路径，归档的 Skills 部分（`Tools/xtask/src/package/contents.rs`）改读新路径。执行者把每一件经 `install` 放进城库的 `shipped` 格（`SHIPPED_SECTION`），来源是一个从内嵌字节在暂存目录里写出的目录，于是预检、原子落位与 CAS 登记仍只有 §8-28 一处。同 digest 的那一件答 `AlreadyShelved`，不写一个字节；同名异 digest 按 §8-28 成为新候选版本，旧版本仍由各楼的 pin 引用。
 - **何时放自带的**：新城成形的那一刻放一次（`Shipped`，城库；成形只有 `accounting::worker::genesis::form` 一处，向导与 `sprawling init` 都经它，§8-28c）；已有的城不自动放——它的书架上没有某件自带 skill，可能正是 User 拿下了它——书架页给一个放自带 skill 的控件，发的是同一条 `InstallSkill { source: Shipped }`。放上书架不等于准入：阅览室仍只收 `RULES.toml` 的 `reading_room` 写下的名字（§8-8）。
 - **答复**：命令按 `idem` 回执；成功之后页面重读书架（已有的书架查询），失败经命令的拒词回到页面。审核由 D19 在落位之后另起，不进这次答复。
 
@@ -97,7 +97,7 @@ pub fn shelve_shipped(city_root: &Path,
     register: &mut dyn FnMut(&[u8]) -> Result<B3Hash, AxError>) -> Result<Vec<Installed>, AxError>;
 ```
 
-- **字节从哪来**：city 的构建脚本（`crates/city/build.rs`）走包目录里的 `skills/`，为其中每一个含 `SKILL.md` 的子目录的每个文件生成一行 `(相对路径, include_bytes!(…))`，写进 `OUT_DIR` 下的一张表，`library::shipped` 经 `include!` 读它。`skills/` 根上的 `README.md` 不是 skill，不进表，只随发行归档走（D20）；同目录的 `LICENSES.md` 也不是 skill，但作为一行没有 `/` 的条目进表，落位时写进每一件 skill 的目录（D37）。表按相对路径排序，同一棵树在三个平台上生成同一张表；路径段在表里以 `/` 分隔，落盘时逐段 `join`，于是 Windows 上不出现 `/` 与 `\` 混写。
+- **字节从哪来**：city 的构建脚本（`Sprawling/city/build.rs`）走包目录里的 `skills/`，为其中每一个含 `SKILL.md` 的子目录的每个文件生成一行 `(相对路径, include_bytes!(…))`，写进 `OUT_DIR` 下的一张表，`library::shipped` 经 `include!` 读它。`skills/` 根上的 `README.md` 不是 skill，不进表，只随发行归档走（D20）；同目录的 `LICENSES.md` 也不是 skill，但作为一行没有 `/` 的条目进表，落位时写进每一件 skill 的目录（D37）。表按相对路径排序，同一棵树在三个平台上生成同一张表；路径段在表里以 `/` 分隔，落盘时逐段 `join`，于是 Windows 上不出现 `/` 与 `\` 混写。
 - **只经 §8-28 一扇门**：`shelve_shipped` 在 `<library>/.shipped/` 这个点开头的暂存目录里按表写出每件 skill 的目录（扫描跳过点开头的项，读者看不见它），再对每件调用 `install(city_root, Slot::library(SHIPPED_SECTION), <暂存>/<name>, register)`；预检、原子落位与 CAS 登记都不在这里另写。暂存目录先删再写，成败之后都删：它从未被换入。
 - **playback 页面组装**：`skills/playback/src/skeleton.html` 按内联标记的顺序声明 CSS 与脚本片段，`skills/playback/assemble.js` 将它们逐字节组装成带生成标记的 `template.html`；脚本片段共用同一个内联脚本作用域，不增加浏览器模块加载或网络依赖。生成页仍由上述表原样内嵌，发行归档也携带同一份页；CI 用生成器的 `--check` 比对整份字节，既有 playback 验收经生产工具导出后检查 structure、source 与 offline。渲染片段持有时间线绘制，将来的 Three.js 或 WebGPU 实现也在此处维护并内联组装。
 - **字节照原样**：表里是源树里的字节，写出与登记都不改行尾——仓库的 `.gitattributes` 让它们在三个平台的检出里都是 LF，书架上的那一份就是二进制里的那一份。

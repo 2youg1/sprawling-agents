@@ -13,7 +13,7 @@
 //! (citysim D18).
 //!
 //! Each is a thin measuring loop over the product's own public faces
-//! (`crates/citysim/spec/Bench.lean` §8-6). The load every recorded reading was
+//! (`Tools/citysim/spec/Bench.lean` §8-6). The load every recorded reading was
 //! taken under is `REGISTERED`, and readings are comparable only within
 //! one fixture. This module lives in the bench Main's tree: the
 //! simulator's scenarios keep their counted clock, and every `Instant`

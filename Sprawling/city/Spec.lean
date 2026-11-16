@@ -3,40 +3,40 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.city.spec.Archive
-import crates.city.spec.Building
-import crates.city.spec.Check
-import crates.city.spec.CityTool
-import crates.city.spec.ConfigLayers
-import crates.city.spec.ConfigLayers.Ladder
-import crates.city.spec.ConfigLayers.Remote
-import crates.city.spec.Document
-import crates.city.spec.Format
-import crates.city.spec.Gitignore
-import crates.city.spec.Governed
-import crates.city.spec.History
-import crates.city.spec.Identity
-import crates.city.spec.Library
-import crates.city.spec.Library.Audit
-import crates.city.spec.Library.Install
-import crates.city.spec.Neighbourhood
-import crates.city.spec.NeighboursTool
-import crates.city.spec.Policy
-import crates.city.spec.Resident
-import crates.city.spec.Room
-import crates.city.spec.RulesTool
-import crates.city.spec.Schedule
-import crates.city.spec.Session
-import crates.city.spec.SpineFiles
-import crates.city.spec.Vocation
-import crates.city.spec.Watch
-import crates.city.spec.Wizard
+import Sprawling.city.spec.Archive
+import Sprawling.city.spec.Building
+import Sprawling.city.spec.Check
+import Sprawling.city.spec.CityTool
+import Sprawling.city.spec.ConfigLayers
+import Sprawling.city.spec.ConfigLayers.Ladder
+import Sprawling.city.spec.ConfigLayers.Remote
+import Sprawling.city.spec.Document
+import Sprawling.city.spec.Format
+import Sprawling.city.spec.Gitignore
+import Sprawling.city.spec.Governed
+import Sprawling.city.spec.History
+import Sprawling.city.spec.Identity
+import Sprawling.city.spec.Library
+import Sprawling.city.spec.Library.Audit
+import Sprawling.city.spec.Library.Install
+import Sprawling.city.spec.Neighbourhood
+import Sprawling.city.spec.NeighboursTool
+import Sprawling.city.spec.Policy
+import Sprawling.city.spec.Resident
+import Sprawling.city.spec.Room
+import Sprawling.city.spec.RulesTool
+import Sprawling.city.spec.Schedule
+import Sprawling.city.spec.Session
+import Sprawling.city.spec.SpineFiles
+import Sprawling.city.spec.Vocation
+import Sprawling.city.spec.Watch
+import Sprawling.city.spec.Wizard
 
 /-! # city 的规格
 
-`sprawling-city`（库名 `city`，目录 `crates/city`）是城的空间与身份面：楼与房间、居民的身份、楼的规则、三层配置、楼里的文档与书架，以及城写下的第一批字节。
+`sprawling-city`（库名 `city`，目录 `Sprawling/city`）是城的空间与身份面：楼与房间、居民的身份、楼的规则、三层配置、楼里的文档与书架，以及城写下的第一批字节。
 
-本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被别的规格与 rustdoc 的引用锚住，所以不重排。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `city D<n>`；D7、D12、D14、D15 是空号，§12 末尾列出其余每条住在哪里。
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `Sprawling/city/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被别的规格与 rustdoc 的引用锚住，所以不重排。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `city D<n>`；D7、D12、D14、D15 是空号，§12 末尾列出其余每条住在哪里。
 
 能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：配置梯子（`spec/ConfigLayers/Ladder.lean`）、写配置先过读者（`spec/ConfigLayers.lean`）、一个地址归哪栋楼管与建楼的三道拒（`spec/Building.lean`）、楼规的求值与写域（`spec/Policy.lean`）、读—判—换的锁（`spec/Document.lean`）、近的书架盖远的（`spec/Library.lean`）、审核绑在内容摘要上（`spec/Library/Audit.lean`）、自带 skill 只在成形时放一次（`spec/Library/Install.lean`）、治理文件在一切写域之外（`spec/Governed.lean`、`spec/Policy.lean`）、谁规划（`spec/Vocation.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
 -/
@@ -99,21 +99,21 @@ import crates.city.spec.Wizard
 
 **书架文档由页面写入（`PutShelved`）尚未实现，规则已定**：页面写的书架文档只经 `library::install`（§8-28，上架唯一的门），作为单文档包安装；写进已安装的包时生成新版本——暂存后整体替换（§8-27），不在原地改；每次写入在账本记一行 `skill_shelved`（kernel D23，`source = Page`；这个种类已在 kernel 的种类表里，今天只有新城成形放自带 skill 时写它）。wire 的 `PutShelved` 分支此刻仍答 `not_built`，客户端没有控件。
 
-**升级后的模板过期检查尚未实现，规则已定**：`init` 布置的城文件（`crates/city/templates/` 下的模板，`City.md` 在内）带上布置时所用模板的标记（模板内容哈希）；新二进制打开旧城的路径上挂一个检查，标记与二进制所带模板不符即如实说出哪份文件过期，并给出更新命令。标记与检查的挂点都还没有代码。
+**升级后的模板过期检查尚未实现，规则已定**：`init` 布置的城文件（`Sprawling/city/templates/` 下的模板，`City.md` 在内）带上布置时所用模板的标记（模板内容哈希）；新二进制打开旧城的路径上挂一个检查，标记与二进制所带模板不符即如实说出哪份文件过期，并给出更新命令。标记与检查的挂点都还没有代码。
 
-**`kernel::LayeredValue::resolve` 在这里有一份 Lean 读法**：kernel 的规格把「居民格、楼格、城格依次」写成 `crates/kernel/spec/Config.lean` 里的散文，没有它的模型，所以 `spec/ConfigLayers/Ladder.lean` 定义了 `LayeredValue.resolve` 来陈述梯子的性质。它是那句散文的读法，不是第二条规则；kernel 的 `Config` 分部长出模型的那一次改动里，这个定义搬过去，梯子的分部改为 import 它。
+**`kernel::LayeredValue::resolve` 在这里有一份 Lean 读法**：kernel 的规格把「居民格、楼格、城格依次」写成 `Sprawling/kernel/spec/Config.lean` 里的散文，没有它的模型，所以 `spec/ConfigLayers/Ladder.lean` 定义了 `LayeredValue.resolve` 来陈述梯子的性质。它是那句散文的读法，不是第二条规则；kernel 的 `Config` 分部长出模型的那一次改动里，这个定义搬过去，梯子的分部改为 import 它。
 
 模型自己的假设写在各分部的定理假设里，不写成公理：受保护的名字是参数 `protected_name`，它的唯一的家是 `kernel::address`（kernel D8）；`kept_rules_answer_what_a_read_would` 假设同一个戳读出同一份规则，这就是 D3 的重开参数；段的字符级文法、TOML 的文法与 serde 的拒词在模型之外，由 `Address::parse` 的判例表与各模块的测试守住。
 -/
 
 /-! ## 4 现状分析
 
-二十四个顶层模块（§1）。生产消费者是 `crates/sprawling` 与 `crates/accounting`：装配层在派活时读身份、规则与配置梯子，在建楼、开房间、写会话时调本 crate 的写面；`city_tool`、`rules_tool`、`neighbours_tool` 注册进 bench。
+二十四个顶层模块（§1）。生产消费者是 `Sprawling/app` 与 `Sprawling/accounting`：装配层在派活时读身份、规则与配置梯子，在建楼、开房间、写会话时调本 crate 的写面；`city_tool`、`rules_tool`、`neighbours_tool` 注册进 bench。
 -/
 
 /-! ## 5 权威信源
 
-「空间、身份、历史」的语义（Resident 是身份、活跃 Run 才是开销；一个地址决定三件事）；`crates/city/templates/URBANITE.md`（这份文件长什么样）；`architecture.toml` 里 city 那些条目。地址、保留子树与布局的模型是 kernel 的（`crates/kernel/spec/Address.lean`、`crates/kernel/spec/Layout.lean`），本 crate 的分部 import 它们而不重述。
+「空间、身份、历史」的语义（Resident 是身份、活跃 Run 才是开销；一个地址决定三件事）；`Sprawling/city/templates/URBANITE.md`（这份文件长什么样）；`architecture.toml` 里 city 那些条目。地址、保留子树与布局的模型是 kernel 的（`Sprawling/kernel/spec/Address.lean`、`Sprawling/kernel/spec/Layout.lean`），本 crate 的分部 import 它们而不重述。
 -/
 
 /-! ## 6 命名统一
@@ -149,55 +149,55 @@ workspace 内只依赖 `kernel`（ARCHITECTURE.md §3 的 `depmap`），规格�
 
 | 标签 | 分部 |
 |---|---|
-| 8-1 | `crates/city/spec/Resident.lean` |
-| 8-2 | `crates/city/spec/Policy.lean` |
-| 8-2b | `crates/city/spec/RulesTool.lean` |
-| 8-36 | `crates/city/spec/RulesTool.lean` |
-| 8-3 | `crates/city/spec/Building.lean` |
-| 8-4 | `crates/city/spec/ConfigLayers.lean` |
-| 8-4b | `crates/city/spec/ConfigLayers.lean` |
-| 8-4c | `crates/city/spec/ConfigLayers.lean` |
-| 8-4g | `crates/city/spec/ConfigLayers.lean` |
-| 8-5 | `crates/city/spec/SpineFiles.lean` |
-| 8-6 | `crates/city/spec/Schedule.lean` |
-| 8-7 | `crates/city/spec/Watch.lean` |
-| 8-8 | `crates/city/spec/Library.lean` |
-| 8-9 | `crates/city/spec/Archive.lean` |
-| 8-10 | `crates/city/spec/Wizard.lean` |
-| 8-11 | `crates/city/spec/Policy.lean` |
-| 8-12 | `crates/city/spec/Library.lean` |
-| 8-12b | `crates/city/spec/Library.lean` |
-| 8-13 | `crates/city/spec/Room.lean` |
-| 8-14 | `crates/city/spec/ConfigLayers.lean` |
-| 8-14b | `crates/city/spec/Session.lean` |
-| 8-15 | `crates/city/spec/Neighbourhood.lean` |
-| 8-15b | `crates/city/spec/NeighboursTool.lean` |
-| 8-20 | `crates/city/spec/Building.lean` |
-| 8-21 | `crates/city/spec/Gitignore.lean` |
-| 8-22 | `crates/city/spec/Vocation.lean` |
-| 8-23 | `crates/city/spec/CityTool.lean` |
-| 8-24 | `crates/city/spec/SpineFiles.lean` |
-| 8-24b | `crates/city/spec/Governed.lean` |
-| 8-25 | `crates/city/spec/Policy.lean` |
-| 8-26 | `crates/city/spec/Policy.lean` |
-| 8-27 | `crates/city/spec/Document.lean` |
-| 8-28 | `crates/city/spec/Library/Install.lean` |
-| 8-28b | `crates/city/spec/Library/Audit.lean` |
-| 8-28c | `crates/city/spec/Library/Install.lean` |
-| 8-29 | `crates/city/spec/Check.lean` |
-| 8-30 | `crates/city/spec/History.lean` |
-| 8-31 | `crates/city/spec/ConfigLayers.lean` |
-| 8-32 | `crates/city/spec/Policy.lean` |
-| 8-33 | `crates/city/spec/Identity.lean` |
-| 8-34 | `crates/city/spec/Policy.lean` |
-| 8-39 | `crates/city/spec/ConfigLayers/Remote.lean` |
-| 8-40 | `crates/city/spec/Document.lean` |
-| 8-41 | `crates/city/spec/SpineFiles.lean` |
-| 8-42 | `crates/city/spec/Format.lean` |
-| 8-43 | `crates/city/spec/SpineFiles.lean` |
-| 8-44 | `crates/city/spec/SpineFiles.lean` |
+| 8-1 | `Sprawling/city/spec/Resident.lean` |
+| 8-2 | `Sprawling/city/spec/Policy.lean` |
+| 8-2b | `Sprawling/city/spec/RulesTool.lean` |
+| 8-36 | `Sprawling/city/spec/RulesTool.lean` |
+| 8-3 | `Sprawling/city/spec/Building.lean` |
+| 8-4 | `Sprawling/city/spec/ConfigLayers.lean` |
+| 8-4b | `Sprawling/city/spec/ConfigLayers.lean` |
+| 8-4c | `Sprawling/city/spec/ConfigLayers.lean` |
+| 8-4g | `Sprawling/city/spec/ConfigLayers.lean` |
+| 8-5 | `Sprawling/city/spec/SpineFiles.lean` |
+| 8-6 | `Sprawling/city/spec/Schedule.lean` |
+| 8-7 | `Sprawling/city/spec/Watch.lean` |
+| 8-8 | `Sprawling/city/spec/Library.lean` |
+| 8-9 | `Sprawling/city/spec/Archive.lean` |
+| 8-10 | `Sprawling/city/spec/Wizard.lean` |
+| 8-11 | `Sprawling/city/spec/Policy.lean` |
+| 8-12 | `Sprawling/city/spec/Library.lean` |
+| 8-12b | `Sprawling/city/spec/Library.lean` |
+| 8-13 | `Sprawling/city/spec/Room.lean` |
+| 8-14 | `Sprawling/city/spec/ConfigLayers.lean` |
+| 8-14b | `Sprawling/city/spec/Session.lean` |
+| 8-15 | `Sprawling/city/spec/Neighbourhood.lean` |
+| 8-15b | `Sprawling/city/spec/NeighboursTool.lean` |
+| 8-20 | `Sprawling/city/spec/Building.lean` |
+| 8-21 | `Sprawling/city/spec/Gitignore.lean` |
+| 8-22 | `Sprawling/city/spec/Vocation.lean` |
+| 8-23 | `Sprawling/city/spec/CityTool.lean` |
+| 8-24 | `Sprawling/city/spec/SpineFiles.lean` |
+| 8-24b | `Sprawling/city/spec/Governed.lean` |
+| 8-25 | `Sprawling/city/spec/Policy.lean` |
+| 8-26 | `Sprawling/city/spec/Policy.lean` |
+| 8-27 | `Sprawling/city/spec/Document.lean` |
+| 8-28 | `Sprawling/city/spec/Library/Install.lean` |
+| 8-28b | `Sprawling/city/spec/Library/Audit.lean` |
+| 8-28c | `Sprawling/city/spec/Library/Install.lean` |
+| 8-29 | `Sprawling/city/spec/Check.lean` |
+| 8-30 | `Sprawling/city/spec/History.lean` |
+| 8-31 | `Sprawling/city/spec/ConfigLayers.lean` |
+| 8-32 | `Sprawling/city/spec/Policy.lean` |
+| 8-33 | `Sprawling/city/spec/Identity.lean` |
+| 8-34 | `Sprawling/city/spec/Policy.lean` |
+| 8-39 | `Sprawling/city/spec/ConfigLayers/Remote.lean` |
+| 8-40 | `Sprawling/city/spec/Document.lean` |
+| 8-41 | `Sprawling/city/spec/SpineFiles.lean` |
+| 8-42 | `Sprawling/city/spec/Format.lean` |
+| 8-43 | `Sprawling/city/spec/SpineFiles.lean` |
+| 8-44 | `Sprawling/city/spec/SpineFiles.lean` |
 
-`spec/ConfigLayers/Ladder.lean` 没有标签：它是 §8-4 那条梯子的模型。`spec/SpineFiles.lean` 末尾的「模板的写法」一节讲 `crates/city/templates/` 下每份模板的格式，同样没有标签。
+`spec/ConfigLayers/Ladder.lean` 没有标签：它是 §8-4 那条梯子的模型。`spec/SpineFiles.lean` 末尾的「模板的写法」一节讲 `Sprawling/city/templates/` 下每份模板的格式，同样没有标签。
 
 **门面上换名**：`lib.rs` 按能力组织，不按文件组织，所以一个函数对外的名字可能与它所在模块里的名字不同（`config_layers::load` 对外是 `city::load_config`，`room::open` 对外是 `city::open_room`）；每一处换名写在规定它的那一节里。
 -/
@@ -227,12 +227,12 @@ workspace 内只依赖 `kernel`（ARCHITECTURE.md §3 的 `depmap`），规格�
 **A（选中）：`Identity` 两态枚举**。调用方拿到的东西自己会说自己是谁，段字节由它给出。
 **B（落选）：`Option<Resident>`**。少一个类型，但每个调用方都要自己决定「None 时该给 prefix 什么」——那是一条散落在每个调用点的策略，且第一个忘记写的人会得到一个空的 resident 段。翻案条件：出现第三种身份（例如代表某人的临时身份），届时枚举照常扩，Option 则无法扩。
 
-**安装的决定与动作（`library::install`，`crates/city/spec/Library/Install.lean` §8-28）**
+**安装的决定与动作（`library::install`，`Sprawling/city/spec/Library/Install.lean` §8-28）**
 
 **A（选中）：`plan_install` → `PlannedInstall::apply` 拆两步，`install` 是两者的合成。** 全部拒绝发生在决定里，动作只能从决定里拿到（`storage::worktree` 的 `plan_merge` 同形）。TOCTOU 复查问的正是「决定之后、落位之前，世界动了没有」——这道缝不打开，复查就无处可查；批准面也在这道缝上：人按 `PlannedInstall::hash()` 批准一个具体哈希再让它落地。
 **B（落选）：单一同步 `install` 四步全吞。** 入口最窄，但「安装中途目录被换」在单扇门内无法被测试模拟，除非往产品代码塞一个测试钩子；而钩子进产品代码正是本仓库明拒的东西。翻案条件：落位改由携带代际计数的文件系统原语完成（复查不再需要人为制造的间隙），届时合成回单扇门。
 
-**配置文件名（`crates/city/spec/ConfigLayers.lean` §8-4）**
+**配置文件名（`Sprawling/city/spec/ConfigLayers.lean` §8-4）**
 
 **A（选中）：三层同名 `CONFIG.toml`，层级由位置决定**。读者记一个名字；把一份配置放错层是一个**位置**错误，而位置在目录树里看得见。
 **B（落选）：每层各起一名**（`CITY.toml`／`BUILDING.toml`／`RESIDENT.toml`）。文件名自带层级信息，代价是三个名字要同时被记住，且放错层变成一个**拼写**错误——拼写错误要靠逐字比对才看得出。翻案条件：出现同一目录下共存两级配置的需求（例如一栋楼的默认与它自己作为房间的默认同处），届时位置不再能区分层级。
@@ -263,37 +263,37 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 
 | 决定 | 标题 | 住处 |
 |---|---|---|
-| D1 | 定规：一个 run 不改写审判它自己的规则 | `crates/city/spec/RulesTool.lean` |
-| D2 | 定规：读界在调用时按目标所在楼现读规则 | `crates/city/spec/Policy.lean` |
-| D3 | 定规：一个 run 内按 (mtime, len) 留住他楼的规则 | `crates/city/spec/Policy.lean` |
-| D4 | 没有生产调用者的公开面不留 | `crates/city/Spec.lean` |
-| D5 | 定规：项目文件夹里的工作文档与对话记录恒不进 git | `crates/city/spec/Gitignore.lean` |
-| D6 | 定规：`[resident] harness` 上梯子，会话记录压过它 | `crates/city/spec/ConfigLayers.lean` |
-| D8 | 定规：拒词的恢复语归写拒词的那一处 | `crates/city/Spec.lean` |
-| D9 | 城外书架上的持有带着扫描读到的正文 | `crates/city/spec/Library.lean` |
-| D10 | 写入限制随派活走，不进 `RULES.toml` | `crates/city/spec/Policy.lean` |
-| D11 | 身份住在两份治理文档的身份区里，一个 session 在房间那一层冻一版 | `crates/city/spec/Identity.lean` |
-| D13 | 治理工具的 scope 用账本上的 scope 文字 | `crates/city/spec/RulesTool.lean` |
-| D16 | `[remote]` 只在城那一层，值照写下的读，判在开门时 | `crates/city/spec/ConfigLayers/Remote.lean` |
-| D17 | 读-判-换的门把此刻的字节交给判定，判定留在调用方 | `crates/city/spec/Document.lean` |
-| D18 | 模板与 `City.md` 住进 city 的包目录，不留在 `docs/` | `crates/city/spec/SpineFiles.lean` |
-| D19 | 审核状态从账本与书架摘要读出；审核在落位之后发起，不拦上架 | `crates/city/spec/Library/Audit.lean` |
-| D20 | User 加 skill 只经 `InstallSkill` 一扇门，自带的 skill 编进二进制 | `crates/city/spec/Library/Install.lean` |
-| D21 | JOB.md 用 `<from>` 写明交活的人，任务与目标转义后放进各自的节 | `crates/city/spec/SpineFiles.lean` |
-| D22 | `City.md` 写明哪种形状是 User 的话，信与居民交下的活只带那个居民的身份 | `crates/city/spec/SpineFiles.lean` |
-| D23 | `rules` 工具只读：说明不提供它恒拒的操作，也不留写面 | `crates/city/spec/RulesTool.lean` |
-| D24 | 房间的封条整张出现：暂存再改名，不用 `create_new` 加写入 | `crates/city/spec/Gitignore.lean` |
-| D25 | `[search]` 是三臂的值，`Custom` 不回落到缺省那一家，缺省那一家只在 `config_layers::search` 声明 | `crates/city/spec/ConfigLayers.lean` |
-| D26 | MCP url 用 `url::Url` 解析，凭据的名字与值仍由 `kernel::secret` 判 | `crates/city/spec/ConfigLayers.lean` |
-| D27 | `egress` 不写是不限主机，写了才判 | `crates/city/spec/Policy.lean` |
-| D28 | 配置的版本是文件里的一个数，缺省为 1，阶梯只在需要时改写 | `crates/city/spec/Format.lean` |
-| D29 | 默认文本归二进制，与某个已发布版本逐字节相同的副本开城时前移到本构建的默认 | `crates/city/spec/SpineFiles.lean` |
-| D30 | City Hall 的纪律分人设之前与人设之后两段，操作说明不留在人设文件里 | `crates/city/spec/SpineFiles.lean` |
-| D31 | 楼级 `City.md` 放在楼的保留区，近者替换远者 | `crates/city/spec/SpineFiles.lean` |
-| D32 | 人从页面立楼时，目录在不在由城看：在就收编，不在就新建 | `crates/city/spec/Building.lean` |
-| D33 | 页面能写的提示文档是 city 的一张名单，整份动作也在 city | `crates/city/spec/SpineFiles.lean` |
-| D34 | `[catalog]` 只写在城与楼两级，两级的表各自冻结 | `crates/city/spec/ConfigLayers.lean` |
-| D35 | 主机导入跳过名为 `.git` 的真实目录，同名的文件与链接不跳过 | `crates/city/spec/Building.lean` |
+| D1 | 定规：一个 run 不改写审判它自己的规则 | `Sprawling/city/spec/RulesTool.lean` |
+| D2 | 定规：读界在调用时按目标所在楼现读规则 | `Sprawling/city/spec/Policy.lean` |
+| D3 | 定规：一个 run 内按 (mtime, len) 留住他楼的规则 | `Sprawling/city/spec/Policy.lean` |
+| D4 | 没有生产调用者的公开面不留 | `Sprawling/city/Spec.lean` |
+| D5 | 定规：项目文件夹里的工作文档与对话记录恒不进 git | `Sprawling/city/spec/Gitignore.lean` |
+| D6 | 定规：`[resident] harness` 上梯子，会话记录压过它 | `Sprawling/city/spec/ConfigLayers.lean` |
+| D8 | 定规：拒词的恢复语归写拒词的那一处 | `Sprawling/city/Spec.lean` |
+| D9 | 城外书架上的持有带着扫描读到的正文 | `Sprawling/city/spec/Library.lean` |
+| D10 | 写入限制随派活走，不进 `RULES.toml` | `Sprawling/city/spec/Policy.lean` |
+| D11 | 身份住在两份治理文档的身份区里，一个 session 在房间那一层冻一版 | `Sprawling/city/spec/Identity.lean` |
+| D13 | 治理工具的 scope 用账本上的 scope 文字 | `Sprawling/city/spec/RulesTool.lean` |
+| D16 | `[remote]` 只在城那一层，值照写下的读，判在开门时 | `Sprawling/city/spec/ConfigLayers/Remote.lean` |
+| D17 | 读-判-换的门把此刻的字节交给判定，判定留在调用方 | `Sprawling/city/spec/Document.lean` |
+| D18 | 模板与 `City.md` 住进 city 的包目录，不留在 `docs/` | `Sprawling/city/spec/SpineFiles.lean` |
+| D19 | 审核状态从账本与书架摘要读出；审核在落位之后发起，不拦上架 | `Sprawling/city/spec/Library/Audit.lean` |
+| D20 | User 加 skill 只经 `InstallSkill` 一扇门，自带的 skill 编进二进制 | `Sprawling/city/spec/Library/Install.lean` |
+| D21 | JOB.md 用 `<from>` 写明交活的人，任务与目标转义后放进各自的节 | `Sprawling/city/spec/SpineFiles.lean` |
+| D22 | `City.md` 写明哪种形状是 User 的话，信与居民交下的活只带那个居民的身份 | `Sprawling/city/spec/SpineFiles.lean` |
+| D23 | `rules` 工具只读：说明不提供它恒拒的操作，也不留写面 | `Sprawling/city/spec/RulesTool.lean` |
+| D24 | 房间的封条整张出现：暂存再改名，不用 `create_new` 加写入 | `Sprawling/city/spec/Gitignore.lean` |
+| D25 | `[search]` 是三臂的值，`Custom` 不回落到缺省那一家，缺省那一家只在 `config_layers::search` 声明 | `Sprawling/city/spec/ConfigLayers.lean` |
+| D26 | MCP url 用 `url::Url` 解析，凭据的名字与值仍由 `kernel::secret` 判 | `Sprawling/city/spec/ConfigLayers.lean` |
+| D27 | `egress` 不写是不限主机，写了才判 | `Sprawling/city/spec/Policy.lean` |
+| D28 | 配置的版本是文件里的一个数，缺省为 1，阶梯只在需要时改写 | `Sprawling/city/spec/Format.lean` |
+| D29 | 默认文本归二进制，与某个已发布版本逐字节相同的副本开城时前移到本构建的默认 | `Sprawling/city/spec/SpineFiles.lean` |
+| D30 | City Hall 的纪律分人设之前与人设之后两段，操作说明不留在人设文件里 | `Sprawling/city/spec/SpineFiles.lean` |
+| D31 | 楼级 `City.md` 放在楼的保留区，近者替换远者 | `Sprawling/city/spec/SpineFiles.lean` |
+| D32 | 人从页面立楼时，目录在不在由城看：在就收编，不在就新建 | `Sprawling/city/spec/Building.lean` |
+| D33 | 页面能写的提示文档是 city 的一张名单，整份动作也在 city | `Sprawling/city/spec/SpineFiles.lean` |
+| D34 | `[catalog]` 只写在城与楼两级，两级的表各自冻结 | `Sprawling/city/spec/ConfigLayers.lean` |
+| D35 | 主机导入跳过名为 `.git` 的真实目录，同名的文件与链接不跳过 | `Sprawling/city/spec/Building.lean` |
 -/
 
 /-! D8 定规：拒词的恢复语归写拒词的那一处
@@ -312,11 +312,11 @@ resident 段是模型每回合都读到的四段之一。`URBANITE.md` 建议 30
 
 **决定**：`RULES.toml` 的 `harness_minutes` 给一栋楼里每次 harness run 的墙钟上限，缺省 `HARNESS_MINUTES_DEFAULT = 60`，`0` 在解析时拒。
 
-**理由**：上限回答的是「这栋楼肯让一个外来居民占一条 lane 和它的进程吃掉的内存多久」（pool 不设车道数，`crates/sprawling/Spec.lean` D34；新 run 的放行只看可用内存，§8-46-3 的内存闸），与 `review`、`confidential` 同是楼对它的居民立的规矩，而楼规由人写、run 改不了（D1）。放在 `CONFIG.toml` 的 `[resident]` 表里，它会爬城／楼／房间的梯子，一间房自己的那一层就能把上限写大，而那一层是会话写记录的地方。缺省给一个值而不是「不限」：不限时一个卡住的 harness 一直吃着别的 run 放行要看的那份可用内存，直到人发现，60 分钟够一次大的改动做完。
+**理由**：上限回答的是「这栋楼肯让一个外来居民占一条 lane 和它的进程吃掉的内存多久」（pool 不设车道数，`Sprawling/app/Spec.lean` D34；新 run 的放行只看可用内存，§8-46-3 的内存闸），与 `review`、`confidential` 同是楼对它的居民立的规矩，而楼规由人写、run 改不了（D1）。放在 `CONFIG.toml` 的 `[resident]` 表里，它会爬城／楼／房间的梯子，一间房自己的那一层就能把上限写大，而那一层是会话写记录的地方。缺省给一个值而不是「不限」：不限时一个卡住的 harness 一直吃着别的 run 放行要看的那份可用内存，直到人发现，60 分钟够一次大的改动做完。
 
 **被否**：①`[resident] minutes` 与 `harness` 并列：见上，房间一层能改楼的上限；②缺省不限、只靠停摆：卡住的 harness 要人来发现。
 
-**重开参数**：放行不再看可用内存（`crates/sprawling/Spec.lean` §8-46-3 的内存闸），于是一个卡住的 harness 挡不住别的 run，或 harness 能在回合中间报告进度、城能分辨「在做事」与「卡住了」时。
+**重开参数**：放行不再看可用内存（`Sprawling/app/Spec.lean` §8-46-3 的内存闸），于是一个卡住的 harness 挡不住别的 run，或 harness 能在回合中间报告进度、城能分辨「在做事」与「卡住了」时。
 -/
 
 /-! ## 13 依赖选型
@@ -329,7 +329,7 @@ workspace 内只依赖 `kernel`（拓扑硬约束）。dev 依赖 `tempfile`。�
 
 `cap-std` 与 `cap-fs-ext`（workspace 钉版）：技能包预检要按打开的目录句柄相对地列举与打开（§8-28），标准库只按路径打开。它们是安全 Rust 里的那一层 `openat`；其下的 `cap-primitives` 已在锁文件里（`wasmtime-wasi` 之下），许可相同。落选的另一条路是只收城自己控制的暂存区里的来源：它把「来源是谁的目录」变成一条安装方要遵守的约定，而不是由读法成立。
 
-规格本身只 import 工具链的库、本 crate 的分部与 kernel 的分部（`crates/kernel/spec/Address.lean`、`crates/kernel/spec/Layout.lean`），ARCHITECTURE.md §3 的 `depmap` 允许 city 依赖 kernel。
+规格本身只 import 工具链的库、本 crate 的分部与 kernel 的分部（`Sprawling/kernel/spec/Address.lean`、`Sprawling/kernel/spec/Layout.lean`），ARCHITECTURE.md §3 的 `depmap` 允许 city 依赖 kernel。
 -/
 
 /-! ## 14 硬编码声明
@@ -345,7 +345,7 @@ Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第�
 
 /-! ## 15 影响面
 
-改身份、规则、配置梯子或书架的公开面，波及 `crates/sprawling` 的装配层（派活、建楼、开房间、写会话）与视图；改 `crates/city/templates/` 下被 `include_str!` 的模板即改新楼与新城的第一批字节；加一件工具即 `ChatRequest.tools` 每回合多一条 disclosure 与一份 schema。
+改身份、规则、配置梯子或书架的公开面，波及 `Sprawling/app` 的装配层（派活、建楼、开房间、写会话）与视图；改 `Sprawling/city/templates/` 下被 `include_str!` 的模板即改新楼与新城的第一批字节；加一件工具即 `ChatRequest.tools` 每回合多一条 disclosure 与一份 schema。
 -/
 
 /-! ## 16 测试与约束
@@ -354,7 +354,7 @@ Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第�
 
 建楼与配置九条：新建的楼被 `policy::load` 读回且 confidential 模板真的锁本地模型池｜二次出生恒拒｜reserved prefix 下建楼恒拒｜房间地址建楼恒拒且拒词指出该建哪栋｜下层配置盖上层｜**同一层写模型又写 harness 即拒，城自己的写路径也写不出这样的文件；房间有会话记录时梯子上的 harness 不生效，`/new` 之后生效**｜不认的键即拒｜**写在 `CONFIG.toml` 里的 effort 出现在真实出线请求体里**（bin 侧端到端，假 provider 录下请求体）｜**`usersbrowser` 的三种值各读回各的形状，`browser` 与它互不影响，confidential 楼写它即拒**。
 
-技能安装六条（`library::install::tests`，CAS 绑定一例在 `crates/sprawling/tests/skill_install.rs`）：装上架的字节与来源一致且扫描读回的 `Holding` 整体相等｜同哈希重装幂等且盘上字节不变｜**plan 与 apply 之间来源目录被换即整体拒收**（盘上无文件、登记零调用）｜经符号链接的包（包目录本身或 `SKILL.md`）恒拒｜同格异哈希占名拒｜跨 section 同名拒。
+技能安装六条（`library::install::tests`，CAS 绑定一例在 `Sprawling/app/tests/skill_install.rs`）：装上架的字节与来源一致且扫描读回的 `Holding` 整体相等｜同哈希重装幂等且盘上字节不变｜**plan 与 apply 之间来源目录被换即整体拒收**（盘上无文件、登记零调用）｜经符号链接的包（包目录本身或 `SKILL.md`）恒拒｜同格异哈希占名拒｜跨 section 同名拒。
 
 自带 skill 一条（`accounting::worker::genesis::tests`）：新城成形之后城库的 `shipped` 格恰是包目录 `skills/` 下的每件 skill，二次成形被拒后书架不变（§8-28c）。
 
@@ -362,9 +362,9 @@ Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第�
 
 读界两条：`kernel::address::tests` 的三类读者矩阵（本楼读本楼、他楼读非机密楼、楼外读机密楼，外加机密楼读自己、规则读不出）逐格判出 `ReadVerdict`，且本楼的读从不调用规则闭包｜bin 侧 `a_run_in_another_building_reads_nothing_of_a_confidential_one`：普通楼里的 run 按路径 `read`、再不带路径 `search` 机密楼里的文件，假 provider 录下的每一份请求体里都没有那份文件的字节，且最后一份带着 `E_GATE_DENIED`。
 
-邻里名册六条：扫到的名册**不含我自己**且有人的与空的各自落在对的臂上｜`## Bring them` 在场时取它、缺席时退回第一段正文且跳过标题与引文｜同一座城扫两次字节相同（`read_dir` 序不得泄漏到答案里）｜`scope=city` 只交出楼名、不交出任何住户｜`.sprawling` 与 archive 目录都不是房间｜**模板仍然带着 `## Bring them` 这一节**（对 `crates/city/templates/URBANITE.md` 的 `include_str!` 断言；模板改名而代码不改，就是一份永远退回正文的名册）。
+邻里名册六条：扫到的名册**不含我自己**且有人的与空的各自落在对的臂上｜`## Bring them` 在场时取它、缺席时退回第一段正文且跳过标题与引文｜同一座城扫两次字节相同（`read_dir` 序不得泄漏到答案里）｜`scope=city` 只交出楼名、不交出任何住户｜`.sprawling` 与 archive 目录都不是房间｜**模板仍然带着 `## Bring them` 这一节**（对 `Sprawling/city/templates/URBANITE.md` 的 `include_str!` 断言；模板改名而代码不改，就是一份永远退回正文的名册）。
 
-形式化的义务由证明清偿：`lake build crates.city.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
+形式化的义务由证明清偿：`lake build Sprawling.city.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
 
 - 梯子：`config_layers::tests`（下层盖上层、不认的键即拒、写回往返）、`config_layers::ladder::tests`（解析拒词在梯子上带着文件、恢复语照旧）、`config_layers::resident::tests`（同一层两种居民即拒，会话记录压过梯子，`/new` 之后最近的 harness 生效）、`config_layers::remote::tests` 与 `config_layers::shelves` 的测试（城独占的表在楼层即拒）。
 - 写配置：`config_layers::write::tests`（写面写出的字节读得回，读者不收的写不落）、`config_layers::session::tests`。
@@ -382,8 +382,8 @@ Ephemeral 段文本（私有常量，改它即改一个 Ephemeral 读到的第�
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；它改了，分部的路径与 `architecture.toml` 里 city 各行的 `spec` 锚点一起重看。ARCHITECTURE.md 模块表的 city 各行讲的是同一组模块。
 - `architecture.toml` 的模块图：city 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词（Resident、Neighbourhood 等），`cargo xtask gates lexicon` 检查。
-- `crates/city/templates/` 下被实例化的模板：它们与 §8-3、§8-5、§8-41 同期改，因为模板的字节就是新楼与新城的第一批字节。
-- kernel 的规格（`crates/kernel/Spec.lean`）：地址与保留子树（§8-2，`crates/kernel/spec/Address.lean`）、布局（`crates/kernel/spec/Layout.lean`）、配置梯子的胜负与冻结（§8-22）、效果层对 `Govern` 的拒（§8-27）。它们改了，这里的 `Building`、`Policy`、`ConfigLayers/Ladder` 三个模型与 §8-2、§8-4 一起重看。
-- runtime 的规格（`crates/runtime/Spec.lean` §8-29、§8-30-1）：阅览室怎样把书架上的一件交给 run、模型选的路径怎样过读界；accounting 的规格（`crates/accounting/Spec.lean`）与 sprawling 的规格（`crates/sprawling/Spec.lean`）：装配层怎样调本 crate 的写面。
-- 引本规格的其他规格与 rustdoc 写 `crates/city/Spec.lean §8-n` 或 `city D<n>`；本 crate 的 rustdoc 写规定它的分部。一节换了分部，它的标签不变，引用不必改。
+- `Sprawling/city/templates/` 下被实例化的模板：它们与 §8-3、§8-5、§8-41 同期改，因为模板的字节就是新楼与新城的第一批字节。
+- kernel 的规格（`Sprawling/kernel/Spec.lean`）：地址与保留子树（§8-2，`Sprawling/kernel/spec/Address.lean`）、布局（`Sprawling/kernel/spec/Layout.lean`）、配置梯子的胜负与冻结（§8-22）、效果层对 `Govern` 的拒（§8-27）。它们改了，这里的 `Building`、`Policy`、`ConfigLayers/Ladder` 三个模型与 §8-2、§8-4 一起重看。
+- runtime 的规格（`Sprawling/runtime/Spec.lean` §8-29、§8-30-1）：阅览室怎样把书架上的一件交给 run、模型选的路径怎样过读界；accounting 的规格（`Sprawling/accounting/Spec.lean`）与 sprawling 的规格（`Sprawling/app/Spec.lean`）：装配层怎样调本 crate 的写面。
+- 引本规格的其他规格与 rustdoc 写 `Sprawling/city/Spec.lean §8-n` 或 `city D<n>`；本 crate 的 rustdoc 写规定它的分部。一节换了分部，它的标签不变，引用不必改。
 -/

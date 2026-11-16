@@ -6,9 +6,9 @@
 /-!
 # Acp：外部编辑器的请求，怎样变成一次普通的 Dispatch
 
-规定 `crates/agent_protocols/src/acp.rs`（`agent_protocols::acp`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/agent_protocols/src/acp.rs`（`agent_protocols::acp`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
-配对在本模块之前判定：令牌住 `wire`，判定住入站中间件，未配对的请求到不了这里（`crates/agent_protocols/Spec.lean` §9）。本模块只守三条：
+配对在本模块之前判定：令牌住 `wire`，判定住入站中间件，未配对的请求到不了这里（`Sprawling/agent_protocols/Spec.lean` §9）。本模块只守三条：
 
 1. **入站文法只有一个入口**：`Incoming` 只能由 `parse` 造出，它造出的值三个字段都在、task 与 goal 不空（`a_parsed_request_has_every_field`）。令牌不是 `Incoming` 的字段，所以一个能被打印的请求值不可能带着令牌。
 2. **持有效令牌也够不到 reserved prefix**（`an_admitted_request_never_names_the_citys_own_subtree`）。

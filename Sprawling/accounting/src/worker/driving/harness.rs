@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The second drive: a run whose turn an official harness takes, in the
-//! room's own tree (`crates/sprawling/Spec.lean` §8-4e, §8-124).
+//! room's own tree (`Sprawling/app/Spec.lean` §8-4e, §8-124).
 //!
 //! It stands beside [`drive_run`](super::lane::drive_run) rather than
 //! inside it, because everything that drive is handed - the adapter,
@@ -12,7 +12,7 @@
 //! they run in, the ledger they write through, the checkpoint gate and
 //! the rule that a stopping scope stops the run. The order of the lines
 //! is `runtime::run::harness`'s, and the properties it keeps are proved
-//! in `crates/agent_protocols/spec/Harness/Session.lean`.
+//! in `Sprawling/agent_protocols/spec/Harness/Session.lean`.
 
 use std::path::{Path, PathBuf};
 use std::process::ChildStdin;
@@ -111,11 +111,11 @@ impl Chartered {
             skills: &[],
             policy: self.policy,
             // A harness run is handed no prefix of this city's, so it
-            // froze no names (`crates/runtime/Spec.lean` §8-56).
+            // froze no names (`Sprawling/runtime/Spec.lean` §8-56).
             naming: None,
             // Its first words are the prompt handed to the harness's own
             // session; the city writes it no first message to record
-            // (`crates/kernel/Spec.lean` §8-82-1).
+            // (`Sprawling/kernel/Spec.lean` §8-82-1).
             opening: None,
             // Nor does it send this city's requests, so no effort or
             // generation froze.
@@ -145,12 +145,12 @@ pub(in crate::worker) struct HarnessHalf {
     /// The city's genesis line, which signs the tree's commits.
     pub(in crate::worker) city: kernel::B3Hash,
     /// The key of the command this dispatch answers, stamped on the
-    /// `worktree_opened` line (`crates/sprawling/Spec.lean` §8-41).
+    /// `worktree_opened` line (`Sprawling/app/Spec.lean` §8-41).
     pub(in crate::worker) command: Option<kernel::IdemKey>,
     /// This run's place in the backlog, when somebody handed it down.
     pub(in crate::worker) member: Option<runtime::BacklogId>,
     /// How long the turn may take, from the moment the run starts: the
-    /// building's `harness_minutes` (`crates/sprawling/Spec.lean` §8-124).
+    /// building's `harness_minutes` (`Sprawling/app/Spec.lean` §8-124).
     pub(in crate::worker) ceiling_ms: u64,
     pub(in crate::worker) notes: Notes,
     /// Where the ledger stood when the dispatch was staged, which a
@@ -334,7 +334,7 @@ fn drive_turn<L: Ledger>(
 }
 
 /// Commits the tree as the harness left it, on this run's own index
-/// (`crates/sprawling/spec/Accounting/Views.lean` §8-46-13).
+/// (`Sprawling/app/spec/Accounting/Views.lean` §8-46-13).
 struct HarnessCheckpoint<'a> {
     root: &'a Path,
     scope: &'a [String],

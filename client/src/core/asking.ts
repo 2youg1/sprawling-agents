@@ -82,7 +82,7 @@ export const QUERIES = {
 // own memory, with the patience that read needs. The privacy answer
 // reads every control, four of them scheduled tasks read through
 // Windows PowerShell, and one such call took more than fifteen seconds
-// on a busy workstation (`crates/sprawling/src/privacy/windows.rs`
+// on a busy workstation (`Sprawling/app/src/privacy/windows.rs`
 // `PATIENCE`); held to the common patience, the page would report the
 // city late and ask the whole read again on every visit.
 const SLOW_MS: Readonly<Partial<Record<string, number>>> = { [QUERIES.privacy]: 120_000 };
@@ -105,7 +105,7 @@ export function commitsQuery(building: Address | null, before: Seq | null): Quer
 // The one spelling of the GitHub import question: the login the GitHub
 // CLI on the city's machine is signed in as for `host`, the city's
 // default host when `null`. Asked only when the person presses import
-// (`crates/wire/Spec.lean` §8-67).
+// (`Sprawling/wire/Spec.lean` §8-67).
 export function githubLoginQuery(host: string | null): Query {
   return { github_login: host };
 }

@@ -838,7 +838,7 @@ fold、fresh read（计划任务经 Windows PowerShell 读取，冷启动要几�
 （装配层为页面服务，Privacy.Service）走同一个 coordinator。Home 只给 journal 路径。
 
 ## 16 测试与约束
-模型由 `lake build crates.sprawling.spec.Privacy` 验收，无 sorry/admit/axiom。
+模型由 `lake build Sprawling.app.spec.Privacy` 验收，无 sorry/admit/axiom。
 派生检查：`bin::privacy::plan` 的测试逐条回放 applyVectors、restoreVectors、readbackVectors；
 `bin::privacy::coordinator` 的 proptest 用 FaultHost 与内存 journal 生成任意命令与故障序列
 （写失败、写入第三值、读回失败、Prepared 持久失败、Finished 持久失败、回滚失败、外部改值、期限已过），
@@ -847,7 +847,7 @@ fold、fresh read（计划任务经 Windows PowerShell 读取，冷启动要几�
 step_rollback_ends（RolledBack 只在目标真实值等于原值时记录）与 trace_unknown（unknown 之后、
 核对之前没有系统写入）对应的性质；另有一条经真实 LockedJournal 的 apply 与 restore。证明只覆盖模型，不证明 IO 适配器。
 真实 Windows 行为只在一次性 GitHub Actions runner 上验收（`.github/workflows/privacy-windows-acceptance.yml`，
-windows-2022 与 windows-2025）：`crates/sprawling/tests/privacy_disposable.rs` 的测试全部 #[ignore]，
+windows-2022 与 windows-2025）：`Sprawling/app/tests/privacy_disposable.rs` 的测试全部 #[ignore]，
 开头要求 GITHUB_ACTIONS=true、RUNNER_OS=Windows 与 SPRAWLING_DISPOSABLE_PRIVACY=1 同时成立，
 否则失败而不写任何东西，所以默认测试与人的主机都不会运行它们。测试经构建出的二进制的 privacy CLI
 进入生产路径（提升子进程就是这个可执行文件），每个用例一个临时 home，读回另用 reg.exe 与

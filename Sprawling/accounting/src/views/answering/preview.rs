@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One window of a stored Markdown version, laid out as blocks
-//! (`crates/accounting/spec/Views/Document.lean` §8-23, `crates/wire/Spec.lean` §8-74).
+//! (`Sprawling/accounting/spec/Views/Document.lean` §8-23, `Sprawling/wire/Spec.lean` §8-74).
 //!
 //! Reads the content store and nothing else, the way a range does: the
 //! version is the object's address, so a page previewing a file a

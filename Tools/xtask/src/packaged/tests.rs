@@ -60,7 +60,7 @@ const FILES: [(&str, &str); 10] = [
     ),
     (
         "crates/p/src/tests.rs",
-        "const FIXTURE: &str = include_str!(\"../../../crates/fixtures/a.jsonl\");\n",
+        "const FIXTURE: &str = include_str!(\"../../../Tools/fixtures/a.jsonl\");\n",
     ),
     (
         "crates/p/q/Cargo.toml",

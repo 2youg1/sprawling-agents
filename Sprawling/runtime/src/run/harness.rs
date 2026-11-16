@@ -5,13 +5,13 @@
 
 //! A run whose turn an official harness takes: every line the city
 //! writes for it, and the completion its answer freezes as
-//! (`crates/runtime/spec/Run.lean` §8-52).
+//! (`Sprawling/runtime/spec/Run.lean` §8-52).
 //!
 //! The harness runs its own tools, so the city writes what it decided -
 //! the opening, the cancel, the tree it committed, the answer to its own
 //! prompt, the freeze - and books what the harness reported as it went.
 //! The order of those lines and the ending are proved in
-//! `crates/agent_protocols/spec/Harness/Session.lean`; the types here
+//! `Sprawling/agent_protocols/spec/Harness/Session.lean`; the types here
 //! hold the order, because `conclude` and `abandon` take the run by value
 //! and a frozen run has nothing left to write with.
 

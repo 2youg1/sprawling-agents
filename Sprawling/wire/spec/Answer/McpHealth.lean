@@ -6,9 +6,9 @@
 /-!
 # wire::answer::mcp_health
 
-规定 `answer::mcp_health`（`crates/wire/src/` 下同名的文件）。一个地址够得到的每台工具服务器站在哪、供什么。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `answer::mcp_health`（`Sprawling/wire/src/` 下同名的文件）。一个地址够得到的每台工具服务器站在哪、供什么。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `crates/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
 -/
 
 /-!
@@ -40,7 +40,7 @@ pub struct McpToolLine { pub remote: String, pub name: String,
 
 **五条口径：**
 
-1. **名与值成对而不是一行 `"Name: value"`**。旧写法把「怎么切这一行」留给了读者，而一个值里合法地含冒号；成对之后拆分这件事不存在，写的人与读的人也不必约定同一条切法。值可以是 `secret:realm/name` 引用，兑付点在离线最近的那一格（`crates/sprawling/Spec.lean` §8-4／§8-15）。
+1. **名与值成对而不是一行 `"Name: value"`**。旧写法把「怎么切这一行」留给了读者，而一个值里合法地含冒号；成对之后拆分这件事不存在，写的人与读的人也不必约定同一条切法。值可以是 `secret:realm/name` 引用，兑付点在离线最近的那一格（`Sprawling/app/Spec.lean` §8-4／§8-15）。
 2. **`Sse` 是自己的一支而不是 `Http` 的一个开关**。两者开法不同、败法也不同：http 服务器拒绝一次请求，而流式服务器可以接下每一次请求却一次也不答。
 3. **三种状态穷尽，而不是一个标志加一句可选的理由**。「在答」「要登录」「失败了，原因在此」是人接下来要做的三件不同的事；理由可选的形状会让一次失败不带理由地上线。`Authenticating` 的判断只有一个来源——传输层对 401／403 抬的 `E_CREDENTIAL_MISSING`，故这里没有什么要猜。
 4. **失败携整条三段式拒绝**，界面逐字画出：措辞的权威在城里，页面再写一遍就是第二个权威。

@@ -6,7 +6,7 @@
 //! An endpoint's tuning as the wire carries it and as the endpoint book
 //! keeps it, translated in both directions in one place: the worker
 //! reads a form's tuning in, and the views read the book's back out for
-//! the settings page (`crates/wire/spec/Answer/Endpoints.lean` §8-85).
+//! the settings page (`Sprawling/wire/spec/Answer/Endpoints.lean` §8-85).
 //!
 //! Apart from the worker because both of them read it, and the views
 //! never name the worker.
@@ -22,7 +22,7 @@ use kernel::AxError;
 /// a deadline for the whole streamed request**, which is what this
 /// city's blocking transport can enforce; the wire keeps the name the
 /// person's own `config.toml` uses, and `gateway` states what it does
-/// with it (`crates/gateway/Spec.lean` §8-16).
+/// with it (`Sprawling/gateway/Spec.lean` §8-16).
 ///
 /// A row with no name and a pointer with no path are dropped: a form
 /// that keeps an empty row open while somebody types is a form whose
@@ -75,7 +75,7 @@ pub(crate) fn tuning_of(wire: wire::EndpointTuning) -> Result<gateway::EndpointT
 
 /// The book's tuning in the frame's shape: [`tuning_of`] read backwards,
 /// so the settings page can send an endpoint back whole with only its
-/// account list changed (`crates/wire/spec/Answer/Endpoints.lean` §8-85).
+/// account list changed (`Sprawling/wire/spec/Answer/Endpoints.lean` §8-85).
 ///
 /// Beside [`tuning_of`] so a field added to one direction meets the other
 /// in the same file. Every tuning [`tuning_of`] accepts comes back from

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The privacy page on a served city's listener
-//! (`crates/sprawling/spec/Privacy/Service.lean`): `Query::Privacy` is
+//! (`Sprawling/app/spec/Privacy/Service.lean`): `Query::Privacy` is
 //! answered from the host and `Command::PrivacyOperation` carried out on
 //! it, ahead of the views and the run worker, which hold nothing of the
 //! host.

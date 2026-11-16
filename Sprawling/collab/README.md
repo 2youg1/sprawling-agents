@@ -56,11 +56,11 @@ Three places treat a refusal as a result rather than a fault: `Handback::of` fol
 - A send takes effect at the call: the `signal_enqueued` line is written before the signal is delivered, because a projection may only change as a consequence of a record that already exists (`collab D7`). A signal taken out of the queue is held until a recorded model answer has read it, and a run that leaves first gives it back (`collab D8`).
 - A `plan` action that splits a row requires holding it; the refusal arrives at the call rather than at landing (`collab D6`). Only `hall/mayor` may `add` the first line of an empty plan (`collab D12`).
 - A parent run cancelled or failed closes the graph it laid out: no new node is handed down, and the nodes already running still report back (`collab D14`).
-- Of this workspace it may name `kernel` and `storage`, and nothing else — `crates/collab/Cargo.toml` takes no other edge.
+- Of this workspace it may name `kernel` and `storage`, and nothing else — `Sprawling/collab/Cargo.toml` takes no other edge.
 
 ## Who uses it
 
-Three workspace packages depend on it, as `cargo tree --workspace -i sprawling-collab -e normal --depth 1` prints: `sprawling`, the assembly root; `sprawling-accounting`, whose assembly layer builds one desk per round; and `citysim`, the scenario runner in `crates/citysim`. What it may name is its line in the `depmap` block of [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 3.
+Three workspace packages depend on it, as `cargo tree --workspace -i sprawling-collab -e normal --depth 1` prints: `sprawling`, the assembly root; `sprawling-accounting`, whose assembly layer builds one desk per round; and `citysim`, the scenario runner in `Tools/citysim`. What it may name is its line in the `depmap` block of [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 3.
 
 ## The specification
 
@@ -76,8 +76,8 @@ A property that spans modules is named after the module that holds it, and the o
 
 ```bash
 cargo nextest run -p sprawling-collab   # module tests, the compile-fail cases and the pull request walk
-lake build crates.collab.Spec           # this crate's Lean specification
+lake build Sprawling.collab.Spec           # this crate's Lean specification
 cargo xtask gates spec lexicon specalign # the SPEC, its vocabulary and its anchors
 ```
 
-`crates/collab/tests/ui/` holds two programs that must fail to compile — an `Artifact` has no public constructor, and an open pull request cannot name its verifier — and `crates/collab/tests/trybuild.rs` asserts that they fail. `crates/collab/tests/pr_flow.rs` opens a pull request, has it refused, and merges it from outside.
+`Sprawling/collab/tests/ui/` holds two programs that must fail to compile — an `Artifact` has no public constructor, and an open pull request cannot name its verifier — and `Sprawling/collab/tests/trybuild.rs` asserts that they fail. `Sprawling/collab/tests/pr_flow.rs` opens a pull request, has it refused, and merges it from outside.

@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Assertions 6 and 7 of the `spec` gate (crates/xtask/Spec.lean §8-42):
-//! two counts that may only fall, each pinned in `crates/xtask/budgets.toml`.
+//! Assertions 6 and 7 of the `spec` gate (Tools/xtask/Spec.lean §8-42):
+//! two counts that may only fall, each pinned in `Tools/xtask/budgets.toml`.
 //! A count above its pin lists the offenders; a count below it asks for
 //! the pin to be lowered in the same change, so the room it freed cannot
 //! be spent again later.
@@ -200,7 +200,7 @@ fn compare(register: &toml::Value, ratchet: Ratchet, found: &[String], out: &mut
         .and_then(toml::Value::as_integer)
         .and_then(|pin| usize::try_from(pin).ok());
     let location = format!("{}: [{row}]", budget::REGISTER);
-    let rule = "a count the spec gate ratchets may only fall (crates/xtask/Spec.lean §8-42)";
+    let rule = "a count the spec gate ratchets may only fall (Tools/xtask/Spec.lean §8-42)";
     match pinned {
         None => out.push(finding(
             location,

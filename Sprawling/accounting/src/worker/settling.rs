@@ -19,7 +19,7 @@ use kernel::Locator;
 /// rather than during the drive.
 pub(super) struct Sweep<'a> {
     /// Read on the lane before the run came home
-    /// (`crates/sprawling/spec/Accounting/Landing.lean` D37).
+    /// (`Sprawling/app/spec/Accounting/Landing.lean` D37).
     pub(super) swept: Option<super::dispatching::heavy_landing::Swept>,
     pub(super) raised: &'a mut Vec<kernel::ApprovalItem>,
     pub(super) job_locator: &'a Locator,
@@ -31,13 +31,13 @@ pub(super) struct Sweep<'a> {
 /// this run travel together: both are read by the same settling pass, one
 /// to report what the drive deleted and one to keep a knock chain
 /// finite, and a caller that passed them side by side had to keep two
-/// arguments in step (`crates/sprawling/Spec.lean` §8-46-12).
+/// arguments in step (`Sprawling/app/Spec.lean` §8-46-12).
 pub(super) struct Settling<'a> {
     pub(super) sweep: Sweep<'a>,
     pub(super) chain: super::KnockChain,
     /// The claims booked at call time that this landing has yet to
     /// close; the plan step closes each as its closing line reaches the
-    /// ledger (`crates/sprawling/Spec.lean` §8-42-8).
+    /// ledger (`Sprawling/app/Spec.lean` §8-42-8).
     pub(super) open_claims: &'a mut crate::worker::booking::OpenClaims,
 }
 

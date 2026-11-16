@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The face the city itself shows a model (`crates/city/spec/CityTool.lean` §8-23).
+//! The face the city itself shows a model (`Sprawling/city/spec/CityTool.lean` §8-23).
 //!
 //! Three actions on one catalogue line: `list` says what is already
 //! here, `raise` lays out a building that is not, and `adopt` draws the
@@ -16,14 +16,14 @@
 //! directory of the city, and no write domain reaches there. That is
 //! not an obstacle to route around: the shape of the city is the
 //! person's decision, and `Effect::Govern` is refused at the effect
-//! layer (`crates/city/spec/RulesTool.lean` §8-2b) exactly as `crate::rules_tool` is —
+//! layer (`Sprawling/city/spec/RulesTool.lean` §8-2b) exactly as `crate::rules_tool` is —
 //! a run raises nothing; a person does, outside a run. `list` changes
 //! nothing, so its call answers `Effect::Read` and a run may list.
 //!
 //! Only City Hall's residents are given this tool
 //! ([`crate::vocation`]); whatever the address asking, a building is
 //! raised through the `CreateBuilding` command and adopted through the
-//! `sprawling adopt` CLI (`crates/city/spec/Building.lean` §8-3).
+//! `sprawling adopt` CLI (`Sprawling/city/spec/Building.lean` §8-3).
 
 use std::path::{Path, PathBuf};
 
@@ -219,7 +219,7 @@ impl Tool for CityTool {
 
     /// Every action reads or changes the shape of the city, so every
     /// call is about the city; a building being raised does not exist
-    /// yet to be the scope (`crates/city/spec/RulesTool.lean` §8-36).
+    /// yet to be the scope (`Sprawling/city/spec/RulesTool.lean` §8-36).
     fn subject(&self, call: &ToolCall) -> Result<GateSubject, AxError> {
         Request::read(call.args.as_map())?;
         Ok(GateSubject::Scope(Scope::City.to_string()))
@@ -227,7 +227,7 @@ impl Tool for CityTool {
 
     /// Listing the city changes nothing about its shape, so a run may
     /// list it; raising and adopting still meet the Govern refusal
-    /// (`crates/kernel/spec/Gate.lean` D26).
+    /// (`Sprawling/kernel/spec/Gate.lean` D26).
     fn effect_of(&self, call: &ToolCall) -> Result<Effect, AxError> {
         Ok(match Request::read(call.args.as_map())? {
             Request::List => Effect::Read,
@@ -382,7 +382,7 @@ mod tests {
 
     /// Derived from `Kernel.Gate.GovernReads`: over every action, the
     /// call's effect is `Read` exactly when it leaves the city's shape as
-    /// it stands (`crates/kernel/spec/Gate.lean` D26).
+    /// it stands (`Sprawling/kernel/spec/Gate.lean` D26).
     #[test]
     fn only_the_list_is_a_read_and_raising_or_adopting_still_governs() {
         let dir = tempfile::tempdir().unwrap();

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // What the machine page says about scanning in front of the city's
-// directory (`crates/wire/spec/Answer/Doctor.lean` D25): one line per
+// directory (`Sprawling/wire/spec/Answer/Doctor.lean` D25): one line per
 // fact the city read, each a subject and what was found.
 //
 // Windows is the only platform with an answer: Defender's real-time

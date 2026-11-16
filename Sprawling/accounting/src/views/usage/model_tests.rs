@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The three properties `crates/accounting/spec/Views/Usage.lean` proves
+//! The three properties `Sprawling/accounting/spec/Views/Usage.lean` proves
 //! of its model, checked of the fold on traces drawn from the model's
 //! input space: pins and reads by three runs of three skills.
 

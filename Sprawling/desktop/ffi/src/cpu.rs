@@ -5,7 +5,7 @@
 
 //! This machine's CPU sets, the calling thread's processor group, this
 //! process at full speed, a job's CPU weight and memory limit, and the
-//! completion port that reads when the job refused memory, through the leaf (`crates/desktop/ffi/Spec.lean` D4). Nothing here
+//! completion port that reads when the job refused memory, through the leaf (`Sprawling/desktop/ffi/Spec.lean` D4). Nothing here
 //! decides what to do with them: the placement plan and the job policy
 //! live with their callers.
 
@@ -149,7 +149,7 @@ pub fn job_share(job: isize, weight: u32, memory: usize) -> Result<(), Failure> 
 
 /// A completion port attached to one job, read for the times a process
 /// of the job was refused memory at the job's limit
-/// (`crates/desktop/ffi/Spec.lean` D6). The port lives as long as this
+/// (`Sprawling/desktop/ffi/Spec.lean` D6). The port lives as long as this
 /// value; dropping it closes the port.
 #[derive(Debug)]
 pub struct JobWatch {

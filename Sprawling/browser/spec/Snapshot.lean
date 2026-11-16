@@ -6,7 +6,7 @@
 /-!
 # snapshot：模型看得见一页的什么
 
-规定 `crates/browser/src/snapshot.rs`（`browser::snapshot`，`PageSnapshot::read` 与 `truncate_label`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/browser/src/snapshot.rs`（`browser::snapshot`，`PageSnapshot::read` 与 `truncate_label`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 一次快照把驱动的无障碍树压平成 `ref role "name"` 的行：三个字段一行，因为模型下一件要做的事是把 ref 抄回来。原始 DOM 恒不入窗；角色取自一张封闭的白名单（入口 §10 第 3 条）。
 

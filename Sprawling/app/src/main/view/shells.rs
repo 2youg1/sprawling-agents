@@ -3,11 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The `--shells` lens of `sprawling view` (`crates/sprawling/spec/Main.lean`
+//! The `--shells` lens of `sprawling view` (`Sprawling/app/spec/Main.lean`
 //! §8-105): each shell interpreter's calls and failures by class.
 //!
 //! The fold and its rules are `runtime::ShellTally`'s
-//! (`crates/runtime/Spec.lean` §8-13-2 D30); this file reads the ledger,
+//! (`Sprawling/runtime/Spec.lean` §8-13-2 D30); this file reads the ledger,
 //! hands it every tool result, and writes what it counted.
 
 use std::io::Write;

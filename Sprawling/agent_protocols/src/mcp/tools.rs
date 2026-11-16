@@ -8,7 +8,7 @@
 //! Two servers offering one verb stay two tools, a constructed tool is
 //! outside a confidential building and has a deadline, and a reply's
 //! `isError` and `_meta` decide how it is read: the properties are proved
-//! in `crates/agent_protocols/spec/Mcp/Tools.lean`.
+//! in `Sprawling/agent_protocols/spec/Mcp/Tools.lean`.
 
 use std::sync::Mutex;
 
@@ -21,14 +21,14 @@ use kernel::{
 use serde_json::{Map, Value};
 
 /// The `_meta` key a server sets on an `isError` result when part of the
-/// call may already have taken effect (`crates/agent_protocols/Spec.lean` §8-1c).
+/// call may already have taken effect (`Sprawling/agent_protocols/Spec.lean` §8-1c).
 /// The desktop server sets it by reading it from here
-/// (`crates/desktop/Spec.lean` D14).
+/// (`Sprawling/desktop/Spec.lean` D14).
 pub const EFFECT_META_KEY: &str = "sprawling/effect-unknown";
 
 /// How much of a server's own failure text reaches the subject: a refusal
 /// and its recovery fit, a stack trace or a whole page does not
-/// (`crates/agent_protocols/Spec.lean` §8-1c).
+/// (`Sprawling/agent_protocols/Spec.lean` §8-1c).
 pub(crate) const ERROR_TEXT_CAP_BYTES: usize = 4_096;
 
 /// What a caller does after a tool reported its own failure.

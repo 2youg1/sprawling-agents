@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which characters a document version's bytes spell
-//! (`crates/documents/spec/Encoding.lean`, D4).
+//! (`Sprawling/documents/spec/Encoding.lean`, D4).
 //!
 //! A byte-order mark decides first, so a UTF-16 file - which holds a NUL
 //! beside every ASCII character - is text. Without a mark the bytes are

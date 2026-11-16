@@ -6,7 +6,7 @@
 /-!
 # kernel::version
 
-规定 `kernel::version`（`crates/kernel/src/version.rs`）：一个主体的版本，从 `FIRST` 起只向前走。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::version`（`Sprawling/kernel/src/version.rs`）：一个主体的版本，从 `FIRST` 起只向前走。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 
 这一分部是说明文档，不是形式规格：`Version` 是一个带溢出检查的计数，没有判定与状态机。
 -/
@@ -20,5 +20,5 @@ impl Version { pub const FIRST: Version;               // 1；首个可见版本
                pub fn next(self) -> Result<Version, AxError>; }   // 溢出时 E_INVALID_ARGS
 ```
 
-信号记下它发往的房间的版本（`room_version`，`crates/kernel/src/event/record/collaboration.rs`）。被改的文件不靠版本守：edit 由这个 run 自己读到的戳准入（`crates/runtime/Spec.lean` §8-64），所以这里没有新鲜度判定。
+信号记下它发往的房间的版本（`room_version`，`Sprawling/kernel/src/event/record/collaboration.rs`）。被改的文件不靠版本守：edit 由这个 run 自己读到的戳准入（`Sprawling/runtime/Spec.lean` §8-64），所以这里没有新鲜度判定。
 -/

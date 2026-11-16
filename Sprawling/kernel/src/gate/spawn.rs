@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The spawn admission: who may hand work down, and how far.
-//! The part `crates/kernel/spec/Gate.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Gate.lean` specifies this module with the
 //! rest of `kernel::gate`.
 //!
 //! Handing work to a second agent needs no person's answer: the depth

@@ -10,7 +10,7 @@ include!("src/part.rs");
 
 const PIN: &str = "zig-version";
 
-const SIBLING_PIN: &str = "../../crates/desktop/ffi/zig-version";
+const SIBLING_PIN: &str = "../../Sprawling/desktop/ffi/zig-version";
 
 const LIBRARY: &str = "sprawling_console_leaf";
 

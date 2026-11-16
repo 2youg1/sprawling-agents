@@ -5,9 +5,9 @@
 
 /-!
 # Windows native execution
-规定 `crates/runtime/src/tools/exec/native_windows.rs`、
-`crates/runtime/src/tools/exec/native_windows/msvc.rs` 与
-`crates/desktop/ffi/src/confinement.rs`、`crates/desktop/ffi/zig/confinement.zig`。
+规定 `Sprawling/runtime/src/tools/exec/native_windows.rs`、
+`Sprawling/runtime/src/tools/exec/native_windows/msvc.rs` 与
+`Sprawling/desktop/ffi/src/confinement.rs`、`Sprawling/desktop/ffi/zig/confinement.zig`。
 
 D53：Windows native 使用无 capability 的 AppContainer 与匿名 Job Object；
 CreateProcessW 以 CREATE_SUSPENDED 创建，设置 command Job 的 CPU hard cap 与 kill-on-close
@@ -17,7 +17,7 @@ CreateProcess 面没有 SECURITY_CAPABILITIES / STARTUPINFOEX，不能承担此�
 
 D54：native 的 CPU hard cap 默认 50% 整机份额，未设置 run memory 时不设置内存上限；仅配置的 Shares::CpuAndMemory 请求
 aggregate committed-memory 上限，且只设在 run job 上。CPU 默认数只在 native_windows.rs 定义。run job 在 table lock 内先创建、
-设上限并挂上撞限的 watch（`crates/runtime/spec/Tools/Exec.lean` D95），native command 同时加入 command job 与 run job，再恢复；
+设上限并挂上撞限的 watch（`Sprawling/runtime/spec/Tools/Exec.lean` D95），native command 同时加入 command job 与 run job，再恢复；
 command job 嵌在 run job 里，run job 的上限管住整棵树，多个命令的 aggregate 内存不能通过每条命令分别领限额来扩大。
 command job 不另设同值上限：两只同值 job 嵌套时撞限消息落到内层 command job，run job 的 watch 读不到（实测见 Exec.lean D95），一个读处才说得清撞没撞。
 拒绝设置限额或 watch 时停止启动。
@@ -279,7 +279,7 @@ theorem revoke_preserves_other_owner (sid other : Nat) (grants : List Nat)
 
 /-! ## argv 保全（D55）
 
-D55：`crates/desktop/ffi/src/confinement/packet.rs` 的 `quoted` 是唯一生产编码器；
+D55：`Sprawling/desktop/ffi/src/confinement/packet.rs` 的 `quoted` 是唯一生产编码器；
 这里规定保全性质，runtime 与 Zig 不再编码 argv。微软 CRT 对普通参数的
 反斜杠／引号规则规定 `CrtTail`，程序名的独立规则规定 `CrtProgram`；
 Microsoft [Parsing C command-line arguments](https://learn.microsoft.com/en-us/cpp/c-language/parsing-c-command-line-arguments)

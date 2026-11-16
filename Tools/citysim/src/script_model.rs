@@ -14,7 +14,7 @@
 //! HTTP face: a network call is not deterministic, and its evidence
 //! lives in gateway's own loopback tests.
 //!
-//! Specified by `crates/citysim/spec/Executor.lean` §8-2.
+//! Specified by `Tools/citysim/spec/Executor.lean` §8-2.
 
 use std::collections::VecDeque;
 

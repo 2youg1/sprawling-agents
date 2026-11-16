@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One vault held behind a lock, as the parts that read it reach it
-//! (`crates/accounting/spec/HeldVault.lean` §8-9).
+//! (`Sprawling/accounting/spec/HeldVault.lean` §8-9).
 //!
 //! The assembly point, the served worker and the MCP health view each
 //! need a resolver over the city's vault, and each must refuse the same

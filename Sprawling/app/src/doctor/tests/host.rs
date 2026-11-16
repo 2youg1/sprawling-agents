@@ -36,7 +36,7 @@ fn a_build_with_the_engine_feature_carries_one() {
 }
 
 /// Every bench this process hands an engine to shares one compiled guest
-/// (`crates/runtime/spec/Sandbox.lean` D101): after one bench has run a
+/// (`Sprawling/runtime/spec/Sandbox.lean` D101): after one bench has run a
 /// guest, a second bench runs it again although the file now holds bytes
 /// that are not WebAssembly under the same length and modification time.
 #[cfg(feature = "sandbox")]
@@ -80,7 +80,7 @@ fn every_bench_shares_one_compiled_guest() {
 }
 
 /// A building that asks for PowerShell 7 is handed a `pwsh` only when
-/// its version line reads 7 or later (`crates/runtime/Spec.lean`
+/// its version line reads 7 or later (`Sprawling/runtime/Spec.lean`
 /// §8-13-2 D30): a pwsh 6, or one that would not say, is refused at the
 /// call instead.
 #[test]

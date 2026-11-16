@@ -33,7 +33,7 @@ fn event() -> impl Strategy<Value = Event> {
 }
 
 proptest! {
-    /// The three properties of `crates/runtime/spec/Reserve.lean`, after
+    /// The three properties of `Sprawling/runtime/spec/Reserve.lean`, after
     /// every step of any trace of asks and give-backs: held bytes within
     /// the budget or one holder alone (`held_within_budget`), tickets
     /// started in the order they asked (`started_in_ask_order`), and a

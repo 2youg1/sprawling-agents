@@ -12,7 +12,7 @@
 //! record alone: does the plan as it stands still leave the row a claim
 //! took free to take. `ClaimDesk` decides; this describes and checks.
 //! The properties both halves hold are proved in
-//! `crates/collab/spec/Claim.lean`.
+//! `Sprawling/collab/spec/Claim.lean`.
 //! Two shapes, so two files (ARCHITECTURE.md section 9).
 
 use kernel::event::record::{RoadmapMoved, RoadmapStep};

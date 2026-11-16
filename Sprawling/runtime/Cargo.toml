@@ -18,7 +18,7 @@ name = "runtime"
 base64.workspace = true
 # Every process exec starts is configured by `child::command`: off the
 # city's console, in a process group of its own, without the city's
-# secrets (`crates/runtime/spec/Tools/Exec.lean` D96).
+# secrets (`Sprawling/runtime/spec/Tools/Exec.lean` D96).
 child = { workspace = true }
 kernel = { workspace = true }
 storage = { workspace = true }
@@ -29,13 +29,13 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 png.workspace = true
 # search's `glob`: ripgrep's own glob matcher, so `*.{ts,tsx}` and
 # `src/**/*.rs` mean what they mean to Claude Code's Grep
-# (`crates/runtime/spec/Tools/Search.lean` D117).
+# (`Sprawling/runtime/spec/Tools/Search.lean` D117).
 globset = { version = "0.4", default-features = false }
 # search's `pattern`: the engine ripgrep uses by default, which matches
-# with finite automata and never backtracks (`crates/runtime/spec/Tools/Search.lean` D120).
+# with finite automata and never backtracks (`Sprawling/runtime/spec/Tools/Search.lean` D120).
 regex = "1"
 # search's `pattern` parsed into the syntax tree `regex` itself builds,
-# to refuse a pattern that spells a line break (`crates/runtime/spec/Tools/Search.lean` D121).
+# to refuse a pattern that spells a line break (`Sprawling/runtime/spec/Tools/Search.lean` D121).
 regex-syntax = "0.8"
 # File identity (volume and file index on Windows, device and inode
 # elsewhere): `read` compares the handle it opened with the file now at
@@ -47,7 +47,7 @@ serde_json.workspace = true
 # subtree, and its shape has one reader.
 toml.workspace = true
 # Execution boundary. The two crates move as one family: upgrading only
-# one mixes two Wasmtime `Linker` types (`crates/runtime/spec/Sandbox.lean`
+# one mixes two Wasmtime `Linker` types (`Sprawling/runtime/spec/Sandbox.lean`
 # §8-13). wasip1 only; there is no way for a guest to acquire a socket.
 # Selecting p1 without the defaults removes p3. Upstream's p1 still
 # implies p2, whose removal belongs to the frozen host-surface stage.
@@ -55,7 +55,7 @@ wasmtime = { version = "50.0.1", optional = true, default-features = false, feat
 wasmtime-wasi = { version = "50.0.1", optional = true, default-features = false, features = ["p1"] }
 
 # One Job Object per run, so a run's whole process tree can be read
-# (`crates/runtime/Spec.lean` §8-13-3); the crate's public surface is safe.
+# (`Sprawling/runtime/Spec.lean` §8-13-3); the crate's public surface is safe.
 [target.'cfg(target_os = "macos")'.dependencies]
 # F_GETPATH queries the opened descriptor, independent of replaceable names.
 rustix = { version = "1.1.5", features = ["fs"] }
@@ -64,18 +64,18 @@ rustix = { version = "1.1.5", features = ["fs"] }
 win32job = { workspace = true }
 # A file's identity for an edit's read stamp (volume serial number and
 # file index), which std exposes only on an unstable API
-# (`crates/runtime/spec/Tools/Edit.lean` §8-64).
+# (`Sprawling/runtime/spec/Tools/Edit.lean` §8-64).
 winapi-util = { workspace = true }
 # Each run's job takes a weighted CPU share through the one FFI seam
-# (`crates/runtime/spec/Tools/Exec.lean` D29).
+# (`Sprawling/runtime/spec/Tools/Exec.lean` D29).
 desktop_ffi = { workspace = true }
 # The MSVC discovery rustc and cc use, run outside the AppContainer that
 # cannot read Visual Studio's instance state; already in the lock beneath
-# cc (`crates/runtime/spec/Tools/Exec/NativeWindows.lean` D60).
+# cc (`Sprawling/runtime/spec/Tools/Exec/NativeWindows.lean` D60).
 find-msvc-tools = "0.1.14"
 # Where an open handle really lies (`GetFinalPathNameByHandleW`), which
 # std answers only through `canonicalize`, an open of its own: `read`
-# judges the handle it reads from (`crates/runtime/spec/Tools/Read.lean`
+# judges the handle it reads from (`Sprawling/runtime/spec/Tools/Read.lean`
 # D113). Already in the lock beneath wasmtime's cap-primitives, with the
 # windows-sys it calls through; the unsafe call is inside the crate.
 winx = "0.36.4"

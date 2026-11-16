@@ -5,10 +5,10 @@
 
 //! The read-only faces for replay, folds and fixtures: they never open
 //! the ledger, never repair, never write — replay must not mutate what it
-//! verifies (`crates/runtime/Spec.lean` §8-1). Complete lines only; a torn tail
+//! verifies (`Sprawling/runtime/Spec.lean` §8-1). Complete lines only; a torn tail
 //! byte-run is not a line and is left for `open` to judge.
 //!
-//! Specified by `crates/storage/spec/Jsonl.lean` §8-1.
+//! Specified by `Sprawling/storage/spec/Jsonl.lean` §8-1.
 
 use std::path::{Path, PathBuf};
 

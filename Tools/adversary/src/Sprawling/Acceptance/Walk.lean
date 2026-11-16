@@ -42,7 +42,7 @@ open Lean (Json)
 /-- What the walk was handed: the binary, the stand-in's URL, the archive's
 shelf with the skills on it, the script the stand-in plays, which the walk
 appends a run to once the city has named what that run needs
-(`crates/adversary/Spec.lean` D7), and the file the stand-in records into. -/
+(`Tools/adversary/Spec.lean` D7), and the file the stand-in records into. -/
 structure Setting where
   door : Door
   url : String

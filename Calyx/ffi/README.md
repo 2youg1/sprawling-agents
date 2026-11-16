@@ -1,6 +1,6 @@
 # sprawling-console-ffi
 
-The console's renderer. Rust writes a scene — the lines of the transcript, the live area, the composer and where its cursor stands — and a Zig leaf, `Calyx/ffi/zig/leaf.zig`, turns it into the bytes of one terminal frame. What the console shows is decided in `crates/sprawling`, whose `crates/sprawling/spec/Console.lean` section 8-11 says so; this package decides how it looks. Rendering is a pure function: the same scene gives the same bytes, and the leaf reads no clock, opens no file and keeps no state between calls.
+The console's renderer. Rust writes a scene — the lines of the transcript, the live area, the composer and where its cursor stands — and a Zig leaf, `Calyx/ffi/zig/leaf.zig`, turns it into the bytes of one terminal frame. What the console shows is decided in `Sprawling/app`, whose `Sprawling/app/spec/Console.lean` section 8-11 says so; this package decides how it looks. Rendering is a pure function: the same scene gives the same bytes, and the leaf reads no clock, opens no file and keeps no state between calls.
 
 It does not write to a terminal, hold a screen, or decide which frame comes next. `draw` fills a buffer the caller lends and answers where the cursor ended up, so the caller owns the device and this package owns the bytes.
 
@@ -45,7 +45,7 @@ Two refusals happen instead of a partial drawing. A frame past the longest buffe
 
 Rust lends the leaf the scene's bytes and an output buffer, and reads back the frame's length and the row the cursor ended on. That is this package's only `unsafe`: one `unsafe extern "C"` declaration in `Calyx/ffi/src/leaf.rs` and one `unsafe` block inside the safe function `console_ffi::draw`. The block carries a `SAFETY:` line stating the precondition it rests on — both slices are live and their lengths travel beside their pointers, the buffer the leaf writes into is one it was lent, and the leaf keeps none of the pointers past the call — and the declaration and the call each relax the lint at that one item with an `#[expect]` that gives its reason.
 
-Because of that, the package writes out a lint table of its own: the workspace's table with `unsafe_code` at `deny` instead of `forbid`. `cargo xtask gates guard` holds it to the workspace's key by key, and names this package and `crates/desktop/ffi` as the only two allowed to have one. `Calyx/ffi/Spec.lean` D1 records the decision and the alternatives it beat.
+Because of that, the package writes out a lint table of its own: the workspace's table with `unsafe_code` at `deny` instead of `forbid`. `cargo xtask gates guard` holds it to the workspace's key by key, and names this package and `Sprawling/desktop/ffi` as the only two allowed to have one. `Calyx/ffi/Spec.lean` D1 records the decision and the alternatives it beat.
 
 ## Constraints a reader acts on
 
@@ -54,7 +54,7 @@ Because of that, the package writes out a lint table of its own: the workspace's
 <!-- coderabbit-ai-generated-section:v1:e7d8a91cbf2b6929ef3778dfb310830bfa55abaf5591115bc78bb4fbe0e5021f -->
 
 - The package declares no features and names no workspace package. `vt100` is a development dependency, so the tests can read a frame the way a person does.
-- The leaf is built on Windows, Linux and macOS, so Zig at the version `Calyx/ffi/zig-version` pins is needed to build the workspace on all three; `sprawling doctor` lists it with the other tools. `build.rs` refuses a `zig` that answers another version, and inside this repository it also refuses a pin that differs from the one in `crates/desktop/ffi/zig-version`, because both leaves are built with one Zig. A package built from crates.io has no sibling and skips that second check. When `DOCS_RS` is set, `build.rs` returns without Zig, because docs.rs has none and rustdoc does not link the leaf (D10).
+- The leaf is built on Windows, Linux and macOS, so Zig at the version `Calyx/ffi/zig-version` pins is needed to build the workspace on all three; `sprawling doctor` lists it with the other tools. `build.rs` refuses a `zig` that answers another version, and inside this repository it also refuses a pin that differs from the one in `Sprawling/desktop/ffi/zig-version`, because both leaves are built with one Zig. A package built from crates.io has no sibling and skips that second check. When `DOCS_RS` is set, `build.rs` returns without Zig, because docs.rs has none and rustdoc does not link the leaf (D10).
 - `zig/part.zig` must spell the enums `src/part.rs` defines. `build.rs` refuses to build when it does not, and prints the text it should hold.
 - The leaf is compiled with `-O ReleaseSafe`, so every bounds and overflow check stays in the shipped binary and a failed one traps; `-fPIC` is added for every non-Windows target. The build refuses a target other than x86_64 or aarch64, and one that is not Windows, Linux or macOS.
 - `build.rs` reruns only when `zig/`, `src/part.rs` or one of the pins changes, never when `PATH` does: the leaf is built by the pinned compiler, and an editor whose `PATH` differs from CI's would otherwise rebuild it on every call.

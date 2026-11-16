@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The last three assertions of the `spec` gate (crates/xtask/Spec.lean
+//! The last three assertions of the `spec` gate (Tools/xtask/Spec.lean
 //! §8-42), read off every `.lean` in the tree as text: the imports each
 //! side may make, no proof obligation left undischarged, and every
 //! repository path a specification cites on disk.
@@ -43,7 +43,7 @@ enum Owner<'a> {
 
 /// Who answers for the file at `rel`. Under the checker's directory, its
 /// entry and the parts beside it are its specification and everything else
-/// is the checker (crates/xtask/Spec.lean §8-47).
+/// is the checker (Tools/xtask/Spec.lean §8-47).
 fn owner_of<'a>(found: &'a [Member], rel: &str) -> Option<Owner<'a>> {
     let Some(inside) = rel
         .strip_prefix(super::CHECKER)
@@ -86,7 +86,7 @@ pub(super) fn check(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskEr
                 out.push(finding(
                     format!("{rel}:{line}"),
                     "the checker and the specifications import along the crate graph and \
-                     never each other (crates/xtask/Spec.lean §8-42)",
+                     never each other (Tools/xtask/Spec.lean §8-42)",
                     why,
                     "import the toolchain's libraries, this crate's parts, or the parts of a \
                      crate the depmap block lets this one depend on",
@@ -126,7 +126,7 @@ fn undischarged(rel: &str, code: &str, out: &mut Vec<Violation>) {
         out.push(finding(
             format!("{rel}:{}", index.saturating_add(1)),
             "a specification proves what it states: no `sorry`, `admit` or `axiom` \
-             (crates/xtask/Spec.lean §8-42)",
+             (Tools/xtask/Spec.lean §8-42)",
             why.to_owned(),
             "prove it as a theorem; an assumption the proof needs is a hypothesis of the \
              theorem, where a reader sees it",
@@ -236,7 +236,7 @@ fn cited_paths(root: &Path, rel: &str, text: &str, top: &BTreeSet<String>) -> Ve
             }
             out.push(finding(
                 format!("{rel}:{}", index.saturating_add(1)),
-                "a specification cites only files on disk (crates/xtask/Spec.lean §8-42)",
+                "a specification cites only files on disk (Tools/xtask/Spec.lean §8-42)",
                 format!("cites `{path}`, which is not there"),
                 "follow the file to where it moved, or say what replaced it",
             ));

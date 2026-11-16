@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Port bind then one writer (`crates/sprawling/spec/Assembly/Listening.lean` §8-88);
+//! Port bind then one writer (`Sprawling/app/spec/Assembly/Listening.lean` §8-88);
 //! a refused serve leaves the Ledger as found.
 
 use std::sync::Arc;

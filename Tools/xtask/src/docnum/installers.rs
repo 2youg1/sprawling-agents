@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Standalone repository defaults generated from workspace metadata
-//! (crates/xtask/Spec.lean §8-16 D30).
+//! (Tools/xtask/Spec.lean §8-16 D30).
 
 use std::path::Path;
 

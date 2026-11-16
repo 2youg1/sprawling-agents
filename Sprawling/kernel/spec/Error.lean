@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.kernel.spec.Event.Kind
+import Sprawling.kernel.spec.Event.Kind
 
 /-!
 # kernel::error
 
-规定 `kernel::error`（`crates/kernel/src/error.rs` 与 `crates/kernel/src/error/` 下的 `code`、`shape`、`refusal`、`provider`）：码、恢复语必填的错误与它的构造路径、carrier 声明。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::error`（`Sprawling/kernel/src/error.rs` 与 `Sprawling/kernel/src/error/` 下的 `code`、`shape`、`refusal`、`provider`）：码、恢复语必填的错误与它的构造路径、carrier 声明。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 -/
 
 /-!
@@ -102,7 +102,7 @@ impl ErrorDraft {
 -/
 
 /-!
-装载期七码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED` `E_LEDGER_HELD` `E_HISTORY_UNPROVEN`）＝C9 唯一例外白名单；`Carrier::Loadtime` 即其类型面。白名单封闭，进表的条件只有一条：**这个码只在本进程此刻写不了账本时出现**，因为它若有账本可写，就必须有 carrier。每一码进表的理由逐条记在 `crates/kernel/Spec.lean` §12。
+装载期七码（`E_CONFIG_INVALID` `E_CAS_CORRUPT` `E_STORAGE_FATAL` `E_WIRE_MISMATCH` `E_LOG_VERSION_UNSUPPORTED` `E_LEDGER_HELD` `E_HISTORY_UNPROVEN`）＝C9 唯一例外白名单；`Carrier::Loadtime` 即其类型面。白名单封闭，进表的条件只有一条：**这个码只在本进程此刻写不了账本时出现**，因为它若有账本可写，就必须有 carrier。每一码进表的理由逐条记在 `Sprawling/kernel/Spec.lean` §12。
 `E_BUSY` 的 carrier 与 `E_WORKTREE_BUSY` 一样是 `tool_result`，而两者的区别在名字里：那一个说的是工作树这个机制，这一个说的是**同一个地址上有 run 正在工作**，拒绝里点名那条 run，调用方据此先停它再动手。
 两条呈现约束：`E_SECRET_EGRESS` 的 subject 只写 SecretRef 与位置、恒不回显命中字节；`E_DISCARD_IRREVERSIBLE` 的 alternative 必须可执行。执行点在各生产模块，此处记为 carrier 表随附契约。
 
@@ -178,7 +178,7 @@ inductive AxCode where
 
 /-- carrier 的唯一声明位（`AxCode::carrier`，C9）：穷尽，没有通配臂，所以新增一个码而不给它 carrier 是编译错误。每一臂一行，`specalign` 逐臂与 kernel 编译出来的 `carrier()` 对账。
 
-装载期那几臂是封闭的白名单，进表的条件只有一条：这个码只在本进程此刻写不了账本时出现；它若有账本可写，就必须有 carrier。每一码进表的理由在 `crates/kernel/Spec.lean` §12。 -/
+装载期那几臂是封闭的白名单，进表的条件只有一条：这个码只在本进程此刻写不了账本时出现；它若有账本可写，就必须有 carrier。每一码进表的理由在 `Sprawling/kernel/Spec.lean` §12。 -/
 def AxCode.carrier : AxCode → Carrier
   -- 基表
   | .PathNotFound => .Event .ToolResult

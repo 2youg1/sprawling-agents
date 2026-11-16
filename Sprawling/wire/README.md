@@ -83,7 +83,7 @@ refusal, and the connection stays open.
 - **Features.** `server` carries the listener and its TCP stack. It is a default
   feature of this package and switched off on the workspace dependency, so
   `sprawling-accounting` and `xtask` take the frames without a socket and
-  `crates/fuzz` takes them with default features off, while `sprawling` and
+  `Tools/fuzz` takes them with default features off, while `sprawling` and
   `citysim` name `server` by hand. `schema` derives the JSON Schema of the whole
   envelope, which `cargo xtask wire-ts` renders into `client/src/wire.ts`; `xtask`
   asks for it and the product binary is built without it.
@@ -117,7 +117,7 @@ refusal, and the connection stays open.
 `sprawling-accounting`, `sprawling` and `xtask`: the product binary and the
 simulator serve through this crate, `sprawling-accounting` names its frames in
 the writer, and `xtask` reads the schema to generate the client's types.
-`crates/fuzz` is outside that workspace and decodes the frames without a socket.
+`Tools/fuzz` is outside that workspace and decodes the frames without a socket.
 
 ## Specification
 
@@ -137,8 +137,8 @@ in `spec/Command/Kind.lean`: it says from which side each verb is reached and
 which class it belongs to, and the `wiring` gate reads it there.
 
 When the wire moves, `cargo xtask wire-ts --write` rewrites `client/src/wire.ts`,
-which is never edited by hand, and `crates/adversary/src/Sprawling/Door.lean` and
-`crates/adversary/src/Sprawling/Regression.lean` change in the same commit,
+which is never edited by hand, and `Tools/adversary/src/Sprawling/Door.lean` and
+`Tools/adversary/src/Sprawling/Regression.lean` change in the same commit,
 because the adversary reads the wire the way a stranger does.
 
 ## Checking it
@@ -146,7 +146,7 @@ because the adversary reads the wire the way a stranger does.
 ```bash
 cargo nextest run -p sprawling-wire --all-features   # the tests, as `just test` runs them
 cargo check -p sprawling-wire --no-default-features  # the frames without the listener, as `just features` checks it
-lake build crates.wire.Spec                          # the proofs; `just models` builds every crate's
+lake build Sprawling.wire.Spec                          # the proofs; `just models` builds every crate's
 cargo xtask gates wire-ts wiring                     # the client types are current, every verb is reachable
 ```
 

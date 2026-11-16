@@ -5,7 +5,7 @@
 
 //! The canonical conversation vocabulary: what a request and a response
 //! are made of, in the city dialect every adapter translates from.
-//! The part `crates/kernel/spec/Model.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Model.lean` specifies this module with the
 //! rest of `kernel::model`.
 
 use std::borrow::Cow;
@@ -161,7 +161,7 @@ pub enum ModelTag {
     /// The model that reads text out of a picture: one a person
     /// registered as able to read images. The city's OCR tool asks for
     /// it, and with none chosen that tool says so rather than handing a
-    /// picture to a model that only reads text (`crates/kernel/spec/Model.lean` §8-80).
+    /// picture to a model that only reads text (`Sprawling/kernel/spec/Model.lean` §8-80).
     Ocr,
 }
 
@@ -193,7 +193,7 @@ impl std::fmt::Display for ModelTag {
 
 /// How hard the provider should think, least to most, in the upstreams' words. Which levels one
 /// (Endpoint, model) offers is the upstream's statement, answered by the gateway's thinking
-/// ladder and never by a table here (`crates/kernel/spec/Model.lean` D56); a level outside the
+/// ladder and never by a table here (`Sprawling/kernel/spec/Model.lean` D56); a level outside the
 /// offer is refused, never moved to a neighbour. Check the vendors before changing the ladder:
 /// <https://platform.claude.com/docs/en/build-with-claude/effort>,
 /// <https://developers.openai.com/api/docs/guides/reasoning>.
@@ -334,7 +334,7 @@ pub enum MessageBreakpoint {
 }
 
 /// How many of a request's leading system blocks every resident of one
-/// building carries byte for byte (`crates/kernel/spec/Model.lean` D60).
+/// building carries byte for byte (`Sprawling/kernel/spec/Model.lean` D60).
 ///
 /// A request-side annotation like [`MessageBreakpoint`]: `runtime` sets
 /// it from the frozen prefix, and the gateway's prefix hold reads it

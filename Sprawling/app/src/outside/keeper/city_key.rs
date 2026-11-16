@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The city's remote signing key as the vault keeps it
-//! (`crates/sprawling/spec/Outside/Conduit.lean` §8-139,
-//! crates/remote_access/Spec.lean D23): read back at every start, written
+//! (`Sprawling/app/spec/Outside/Conduit.lean` §8-139,
+//! Sprawling/remote_access/Spec.lean D23): read back at every start, written
 //! the first time, replaced when the User asks.
 //!
 //! The seed never becomes bytes here. A fresh seed is drawn into a buffer,

@@ -8,7 +8,7 @@
 //! official harnesses as built-in entries (`roster`), a pasted agent
 //! (`paste`), the environment a child sees (`environment`), and one
 //! session with an agent (`process`, `session`)
-//! (`crates/agent_protocols/Spec.lean` §8-19).
+//! (`Sprawling/agent_protocols/Spec.lean` §8-19).
 
 mod catalog;
 mod detect;

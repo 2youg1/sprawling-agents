@@ -9,20 +9,20 @@
 //! A lane holds one thing, a drive, and the only `kernel::Ledger` it is
 //! given is a [`Relay`](super::relay::Relay) — so "a city has one
 //! writer" is held by the types rather than by discipline: a lane
-//! cannot reach the segments at all (`crates/sprawling/Spec.lean` §8-46-3).
+//! cannot reach the segments at all (`Sprawling/app/Spec.lean` §8-46-3).
 //!
 //! **A lane is a thread that lives as long as the run it drives and
 //! the stock it puts back once that run is home.** A resident pool of
 //! threads would need an entrance channel and a closing protocol to hold
 //! nothing between runs; here a `JoinHandle` in `running` *is* the
 //! evidence that a run is still going, and one in `trailing` that its
-//! lane is still finishing after the run came home (`crates/sprawling/Spec.lean`
+//! lane is still finishing after the run came home (`Sprawling/app/Spec.lean`
 //! §8-161).
 //!
-//! **The pool holds no lane count** (`crates/sprawling/Spec.lean` D34): a
+//! **The pool holds no lane count** (`Sprawling/app/Spec.lean` D34): a
 //! prepared run gets a lane at once, and only memory holds it back. The
 //! concurrency wall is the endpoint's, where the provider rate-limits and
-//! bills (`crates/gateway/Spec.lean` D17).
+//! bills (`Sprawling/gateway/Spec.lean` D17).
 
 use std::collections::VecDeque;
 use std::sync::mpsc;
@@ -46,7 +46,7 @@ pub struct Memory {
 
 /// The share of physical memory a new run leaves free: one part in
 /// this many. A share rather than a byte count, because a byte count
-/// suits one class of machine (`crates/sprawling/Spec.lean` §8-46-3).
+/// suits one class of machine (`Sprawling/app/Spec.lean` §8-46-3).
 const RESERVE_SHARE: u64 = 10;
 
 /// One run, home from its lane: which run it was, and what its drive
@@ -75,7 +75,7 @@ pub(crate) struct DrivingPool {
     /// city's stock back. Joined once they have finished, and all of
     /// them when the pool is dropped. Not counted in `in_flight`: one
     /// lane per city stocks at a time, and counting it would make a new
-    /// run wait on a checkout (`crates/sprawling/Spec.lean` §8-161).
+    /// run wait on a checkout (`Sprawling/app/Spec.lean` §8-161).
     trailing: Vec<(RunId, std::thread::JoinHandle<()>)>,
     /// Drives prepared while memory was tight, oldest first. A waiting
     /// drive holds no thread: the queue is here, where it can be
@@ -83,10 +83,10 @@ pub(crate) struct DrivingPool {
     waiting: VecDeque<Waiting>,
     /// Where `full` reads how much memory this machine has free. Handed
     /// in rather than read here, because reading it reaches the host
-    /// (`crates/sprawling/Spec.lean` §8-46-3).
+    /// (`Sprawling/app/Spec.lean` §8-46-3).
     read_memory: fn() -> Memory,
     /// The clock a run's wait in `waiting` is read off, and where the
-    /// wait is kept (`crates/sprawling/Spec.lean` §8-46-3, the pure lane
+    /// wait is kept (`Sprawling/app/Spec.lean` §8-46-3, the pure lane
     /// wait).
     monotonic: fn() -> Instant,
     /// Called at the top of every lane, on the lane's thread.
@@ -95,9 +95,9 @@ pub(crate) struct DrivingPool {
 }
 
 /// What the pool takes from this machine, as one value: where it reads
-/// free memory (`crates/sprawling/Spec.lean` §8-46-3), the clock a
+/// free memory (`Sprawling/app/Spec.lean` §8-46-3), the clock a
 /// run's wait is read off, and the hook each lane takes its seat through
-/// (`crates/sprawling/spec/Serving/Placement.lean` D46).
+/// (`Sprawling/app/spec/Serving/Placement.lean` D46).
 pub(crate) struct LaneHands {
     pub(crate) read_memory: fn() -> Memory,
     pub(crate) monotonic: fn() -> Instant,
@@ -144,7 +144,7 @@ impl DrivingPool {
     }
 
     /// Whether a new run waits: memory is tight while another run is
-    /// driving (`crates/sprawling/Spec.lean` §8-46-3).
+    /// driving (`Sprawling/app/Spec.lean` §8-46-3).
     pub fn full(&self) -> bool {
         !admits(self.in_flight(), (self.read_memory)())
     }
@@ -294,12 +294,12 @@ impl Drop for DrivingPool {
     /// Waits for every lane still putting the stock back. A city opened
     /// again in this process lifts every tree's lock first, and a stock
     /// half checked out would then read as ready for the next placement
-    /// (`crates/sprawling/Spec.lean` §8-155, §8-161).
+    /// (`Sprawling/app/Spec.lean` §8-155, §8-161).
     fn drop(&mut self) {
         for (_, lane) in self.trailing.drain(..) {
             // A lane that ended abnormally has nobody left to tell: the
             // city is closing, and the next open takes back a stock left
-            // half made (`crates/sprawling/Spec.lean` §8-155).
+            // half made (`Sprawling/app/Spec.lean` §8-155).
             drop(lane.join());
         }
     }

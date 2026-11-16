@@ -6,9 +6,9 @@
 /-!
 # wire::answer::prefix
 
-规定 `answer::prefix`、`answer::layers`、`answer::skills`、`answer::git_status`（`crates/wire/src/` 下同名的文件）。一个 run 冻下的 system prompt、下一个 run 将被告知什么、一栋楼会做什么、它那里还有什么没提交。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `answer::prefix`、`answer::layers`、`answer::skills`、`answer::git_status`（`Sprawling/wire/src/` 下同名的文件）。一个 run 冻下的 system prompt、下一个 run 将被告知什么、一栋楼会做什么、它那里还有什么没提交。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `crates/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
 -/
 
 /-!
@@ -60,7 +60,7 @@ pub struct GitStatusAnswer { pub building: Address, pub branch: Option<String>,
 1. **`stored` 与空文本是两件事。** 仓库被清理过与这一段本来就没有内容，读者下一步做的事不同；用空串同时表示两者，会让一次数据丢失看起来像一次正常的装配。
 2. **`Content` 只答 `cas:` 一种方案。** `file:` 指的是树上的一条路径，那是 `Query::Document` 的问题；在这里再答一次就是同一条规则的第二个权威。**被否**：让 `Content` 按方案分流兼收两种——它会把「读一个对象」和「读一个文件」的失败面合成一个，而两者恢复动作不同。
 3. **`PrefixSource.dropped` 恒上线，即使是零。** 「一个字节都没裁」是一次测量，缺省的字段不是。
-4. **技能一行而三类架子，`shelf` 说它来自哪一格**：按架子各造一张表会让「近的架子压过远的架子」这条既有规则在客户端被重写一遍。城内书架是 CAS 索引：`Library` 只指城库这一作用域，`Building(Address)` 指那栋楼的索引，都不再伪装成 `Query::Document` 的地址；城外臂仍携第几条挂载与相对该架根的路径（布局与优先级见 `crates/city/Spec.lean` §8-8）。`SkillLine.hash` 是 canonical manifest digest，`pinned_by` 按**名字加 manifest digest**成对匹配——两次 run 之间出现新候选版本时，只按名字匹配会宣称早先那次 run 读到了后来才批准的字。`external_shelves` 另带城自己那份 `[skills] shelves` 的原始有序表，供导入表单读回与整表保存；它不是从当前扫描结果反推的，因为空目录与暂时不在的挂载也仍是人写下的设置。`#[serde(default)]` 让旧答面读作尚未告知，页面按空表画，不把旧城的沉默说成一张新配置。
+4. **技能一行而三类架子，`shelf` 说它来自哪一格**：按架子各造一张表会让「近的架子压过远的架子」这条既有规则在客户端被重写一遍。城内书架是 CAS 索引：`Library` 只指城库这一作用域，`Building(Address)` 指那栋楼的索引，都不再伪装成 `Query::Document` 的地址；城外臂仍携第几条挂载与相对该架根的路径（布局与优先级见 `Sprawling/city/Spec.lean` §8-8）。`SkillLine.hash` 是 canonical manifest digest，`pinned_by` 按**名字加 manifest digest**成对匹配——两次 run 之间出现新候选版本时，只按名字匹配会宣称早先那次 run 读到了后来才批准的字。`external_shelves` 另带城自己那份 `[skills] shelves` 的原始有序表，供导入表单读回与整表保存；它不是从当前扫描结果反推的，因为空目录与暂时不在的挂载也仍是人写下的设置。`#[serde(default)]` 让旧答面读作尚未告知，页面按空表画，不把旧城的沉默说成一张新配置。
 5. **`Drift` 整个可缺席，而不是两个零。** 没有上游的分支与和上游齐平的分支不是一回事，读成 `0/0` 的页面会告诉人「你的工作已经推上去了」。
 6. **`GitStatusAnswer.checkpoint` 携整条 `CommitAnswer`。** 变更栏旁边那一行要说出 run、房间、模型与花费，而这四样已经有了唯一形状；另造一个摘要类型就是第二个「一次提交是什么」。
 

@@ -15,7 +15,7 @@
 //! Kernel D38 on the two paths that do not cross the relay: a child's
 //! handback and a settled landing's delivery each write one
 //! `signal_landed`, paired to its letter by `SignalId`
-//! (`crates/collab/spec/Delivery.lean` property 8).
+//! (`Sprawling/collab/spec/Delivery.lean` property 8).
 
 use super::super::*;
 use super::tests::move_in;

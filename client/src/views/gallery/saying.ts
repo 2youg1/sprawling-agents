@@ -12,7 +12,7 @@ export const SAYING = [
   "on it — reading the city",
   "on it — reading the city, then writing the plan it asks for",
   [
-    "- `crates/kernel`",
+    "- `Sprawling/kernel`",
     "- **Ledger**",
     "",
     "| step | what |",

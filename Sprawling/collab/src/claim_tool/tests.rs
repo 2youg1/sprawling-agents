@@ -150,7 +150,7 @@ fn a_run_holds_one_node_at_a_time() {
 
 /// A path given as evidence is pinned through the tool's `Pinner`, and a
 /// string spelled as a Locator is judged as one even when a `Pinner`
-/// stands by (`crates/collab/Spec.lean` D20).
+/// stands by (`Sprawling/collab/Spec.lean` D20).
 #[test]
 fn a_path_given_as_evidence_is_pinned_and_a_broken_locator_is_not() {
     let shared = desk();

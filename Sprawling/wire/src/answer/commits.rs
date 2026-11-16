@@ -68,13 +68,13 @@ pub struct CommitAnswer {
     pub parents: Option<Vec<GitOid>>,
     /// The commit object's own message, trailers included, read when
     /// the parents are and absent for the same reasons, or when it is
-    /// not UTF-8 (`crates/wire/spec/Answer/Commits.lean` §8-54).
+    /// not UTF-8 (`Sprawling/wire/spec/Answer/Commits.lean` §8-54).
     pub message: Option<String>,
     /// The BLAKE3 of the canonical bytes of the line that announced this
     /// commit - the digest the next line of the chain carries as `prev`,
     /// not this line's own `prev`. A person finds the line by it and
     /// checks it was not altered. `None` only in a frame from a city
-    /// written before it was answered (`crates/wire/Spec.lean` §8-78).
+    /// written before it was answered (`Sprawling/wire/Spec.lean` §8-78).
     #[serde(default)]
     pub b3: Option<B3Hash>,
 }

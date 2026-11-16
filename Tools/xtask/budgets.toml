@@ -17,7 +17,7 @@
 # microsecond): a millisecond field cannot tell 0.4 ms from 0 ms, and a
 # reading taken in microseconds is never rounded twice. A page or a
 # terminal shows a duration below 10 ms in µs and one of 10 ms or more in
-# ms (`crates/sprawling/spec/Main.lean` §8-129-2, *单位*).
+# ms (`Sprawling/app/spec/Main.lean` §8-129-2, *单位*).
 #
 # The User ruled to skip measurement in this version. A row whose reading
 # was never taken says `owed` in its status and names the recipe that
@@ -146,7 +146,7 @@ budget_bytes = 134217728
 # the sandbox's file capabilities arrived: crossterm, sysinfo, cap-std
 # and memory-stats, with about 28,000 lines of Rust around them.
 # It rose by 243,712 B more when the desktop connector moved into this
-# binary as the `desktop` verb (`crates/sprawling/Spec.lean` §8-4d): 12,916,224 B on
+# binary as the `desktop` verb (`Sprawling/app/Spec.lean` §8-4d): 12,916,224 B on
 # the tree before, 13,159,936 B after, linked the same way. That buys no
 # second executable to install and no hand-written [[mcp]] row. The
 # separate executable weighed 670,720 B, most of it std, serde_json, toml
@@ -162,7 +162,7 @@ measured_by = "just build-web, just dist, then cargo xtask budget, on windows-x8
 status = "reported, not gated: the person's ruling that runtime speed comes before size. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just build-web, just dist, then cargo xtask budget retakes it"
 
 # The unit here is a production function; the separate 500-line file
-# budget lives in length::FILE_LINE_LIMIT (crates/xtask/Spec.lean D39).
+# budget lives in length::FILE_LINE_LIMIT (Tools/xtask/Spec.lean D39).
 # Across 1,800 production
 # functions the median is 9 lines, p90 is 39 and p99 is 145, so 200 sits
 # well above where the repository actually writes; what it catches is a
@@ -218,41 +218,41 @@ status = "gated, with a register of the signatures that predate the rule"
 # in. Fifteen of them were spent splitting that file.
 [argument_count.predating]
 names = [
-  "crates/collab/src/workshop.rs::new",            # 9
-  "crates/collab/src/inbox/signal.rs::new",        # 7
-  "crates/collab/src/signal_desk.rs::new",          # 6
-  "crates/runtime/src/turn.rs::assemble",          # 6
-  "crates/accounting/src/effect.rs::of",            # 6
-  "crates/accounting/src/effect.rs::shelf",         # 6
-  "crates/browser/src/act.rs::frame_for",          # 5
-  "crates/city/src/archive.rs::entry",             # 5
-  "crates/collab/src/pr_tool.rs::new",             # 5
-  "crates/runtime/src/digest.rs::digest_once",     # 5
-  "crates/runtime/src/fork/lineage.rs::fork_draft",        # 5
-  "crates/runtime/src/handoff.rs::new",            # 5
-  "crates/runtime/src/run.rs::drive",              # 5
-  "crates/runtime/src/turn.rs::call",              # 5
+  "Sprawling/collab/src/workshop.rs::new",            # 9
+  "Sprawling/collab/src/inbox/signal.rs::new",        # 7
+  "Sprawling/collab/src/signal_desk.rs::new",          # 6
+  "Sprawling/runtime/src/turn.rs::assemble",          # 6
+  "Sprawling/accounting/src/effect.rs::of",            # 6
+  "Sprawling/accounting/src/effect.rs::shelf",         # 6
+  "Sprawling/browser/src/act.rs::frame_for",          # 5
+  "Sprawling/city/src/archive.rs::entry",             # 5
+  "Sprawling/collab/src/pr_tool.rs::new",             # 5
+  "Sprawling/runtime/src/digest.rs::digest_once",     # 5
+  "Sprawling/runtime/src/fork/lineage.rs::fork_draft",        # 5
+  "Sprawling/runtime/src/handoff.rs::new",            # 5
+  "Sprawling/runtime/src/run.rs::drive",              # 5
+  "Sprawling/runtime/src/turn.rs::call",              # 5
 ]
 
 # White box is Rust, black box is Lean (the person's ruling).
 # `cargo xtask boundary` refuses a Rust check that reaches this product
-# across a process boundary; `crates/adversary/` is where such a check belongs,
+# across a process boundary; `Tools/adversary/` is where such a check belongs,
 # in a language with none of this repository's vocabulary, so it can
 # testify about a client that shares none of its assumptions.
 #
-# Nothing predates the rule any longer. `crates/wire/tests/enrolment.rs`
+# Nothing predates the rule any longer. `Sprawling/wire/tests/enrolment.rs`
 # used to stand up the enrolment endpoint on a loopback port and write
 # the HTTP request out by hand; what it checks - three fates of one
 # credential, told apart by a worker the test stands in for - is a
 # white-box question, so it now drives the router in process
 # (`tower::ServiceExt::oneshot` with axum's `MockConnectInfo`) and
 # crosses nothing. The black-box half it could not honestly carry - a
-# real vault on a real machine - stays out of `crates/adversary/` too, because
+# real vault on a real machine - stays out of `Tools/adversary/` too, because
 # a served city writes to the platform credential service and the wire
 # has no verb that takes a credential back. A file this list does not
 # name is refused outright, so the register stays empty by construction.
 #
-# `crates/sprawling/src/assembly/driving.rs` is deliberately absent. Its
+# `Sprawling/app/src/assembly/driving.rs` is deliberately absent. Its
 # sockets reach a fake model provider the test stood up, never this
 # product, and its three lines carry `boundary-ok:` with that reason. A
 # waiver is right there and a register row would be wrong: the debt is
@@ -266,7 +266,7 @@ status = "gated, with a register of the files that predate the rule"
 files = []
 
 # Which platforms a release publishes for, and what each archive is
-# called, is stated once in `crates/xtask/src/platform.rs`. The workflow matrix,
+# called, is stated once in `Tools/xtask/src/platform.rs`. The workflow matrix,
 # the two install scripts and the npm shim each restate it in another
 # language, and `cargo xtask artifact` holds all four to that table:
 # `install.sh` had come to offer a suffix the matrix never produces, and
@@ -282,7 +282,7 @@ files = []
 # suffix, and it goes when nobody spells it any more.
 [archive_naming]
 what = "the suffix every archive a release publishes ends with"
-measured_by = "cargo xtask artifact (the table in crates/xtask/src/platform.rs)"
+measured_by = "cargo xtask artifact (the table in Tools/xtask/src/platform.rs)"
 status = "gated, with a register of the names spelled before the rule"
 
 [archive_naming.predating]
@@ -299,7 +299,7 @@ slack_bytes = 2097152
 measured_by = "just mem"
 status = "measured, not gated: private 2,469,888 B, peak private 2,469,888 B, working set 8,331,264 B on windows-x86_64, 16 cores, NVMe (release). The counter differs per platform, so one number cannot mean the same thing on three of them. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just mem retakes it"
 
-# The memory beat (crates/sprawling/spec/Serving/Memory.lean, measuring
+# The memory beat (Sprawling/app/spec/Serving/Memory.lean, measuring
 # plan): the sampler reads private bytes every 100 ms while somebody
 # watches and each one-second monitor sample carries the highest of its
 # second. The statistics are taken on the reading side, from the samples.
@@ -336,35 +336,35 @@ status = "measured, not gated: 500 steps peak private 7,487,488 B (7.1 MiB), 100
 # (`on-demand.yml`, `-f job=mutants-modules`) and gated there.
 [kernel_mutation]
 what = "the share of kernel mutants the tests kill"
-mutation_files = ["crates/kernel/src/**"]
+mutation_files = ["Sprawling/kernel/src/**"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
 status = "gated by just mutants-score, not by just check; on-demand run 37120210843 (mutants-modules on wave/W11, eight shards on windows-latest; no job scores macOS or Linux) read 640 caught, 251 missed, 0 timed out, 391 unviable: 71.8%, under the minimum; the 251 survivors are listed by that run's mutants-modules-score job and are killed with tests, not by lowering the row"
 
 [storage_jsonl_mutation]
 what = "the share of storage::jsonl mutants the tests kill"
-mutation_files = ["crates/storage/src/jsonl.rs", "crates/storage/src/jsonl/**"]
+mutation_files = ["Sprawling/storage/src/jsonl.rs", "Sprawling/storage/src/jsonl/**"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
 status = "gated by just mutants-score, not by just check; on-demand run 37120210843 (mutants-modules on wave/W11, eight shards on windows-latest; no job scores macOS or Linux) read 115 caught, 28 missed, 0 timed out, 79 unviable: 80.4%, under the minimum; the 28 survivors are listed by that run's mutants-modules-score job and are killed with tests, not by lowering the row"
 
 [accounting_relay_mutation]
 what = "the share of accounting::worker::relay mutants the tests kill"
-mutation_files = ["crates/accounting/src/worker/relay.rs"]
+mutation_files = ["Sprawling/accounting/src/worker/relay.rs"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
 status = "gated by just mutants-score, not by just check; on-demand run 37120210843 (mutants-modules on wave/W11, eight shards on windows-latest; no job scores macOS or Linux) read 3 caught, 0 missed, 0 timed out, 12 unviable: 100.0%"
 
 [collab_signal_tool_mutation]
 what = "the share of collab::signal_tool mutants the tests kill"
-mutation_files = ["crates/collab/src/signal_tool.rs"]
+mutation_files = ["Sprawling/collab/src/signal_tool.rs"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
 status = "gated by just mutants-score, not by just check; on-demand run 37120210843 (mutants-modules on wave/W11, eight shards on windows-latest; no job scores macOS or Linux) read 1 caught, 0 missed, 0 timed out, 3 unviable: 100.0%"
 
 [kernel_share_mutation]
 what = "the share of kernel::share mutants the tests kill"
-mutation_files = ["crates/kernel/src/share.rs"]
+mutation_files = ["Sprawling/kernel/src/share.rs"]
 minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
 status = "gated by just mutants-score, not by just check; on-demand run 37120210843 (mutants-modules on wave/W11, eight shards on windows-latest; no job scores macOS or Linux) read 6 caught, 0 missed, 0 timed out, 3 unviable: 100.0%"
@@ -552,7 +552,7 @@ status = "measured, not gated: 5 rebuilds of the registered fixture (`bench::sce
 # person will find it.
 [prepare_dispatch]
 what = "one dispatch, from the command arriving to the lane taking the drive, on the accounting thread"
-measured_by = "the instrument is two reads of the monotonic clock `Hands.monotonic` around `stage_dispatch` (crates/accounting/src/worker/dispatching/running.rs) and two more around `Laying::mcp_tools` (crates/accounting/src/worker/workbench/servers.rs), which runs in the lane that drives the run (`crates/sprawling/Spec.lean` §8-93), written out at `Level::Trace`; the assembly hands the worker that clock beside the city's own (`crates/accounting/Spec.lean` §8-11), so a span never reads a city clock that a test or a correction can move. Read it off `a_dispatch_says_what_it_spent_before_the_drive` (cargo nextest run -p sprawling-accounting --release -E 'test(a_dispatch_says_what_it_spent_before_the_drive)' --no-capture), or off any served city running at that floor"
+measured_by = "the instrument is two reads of the monotonic clock `Hands.monotonic` around `stage_dispatch` (Sprawling/accounting/src/worker/dispatching/running.rs) and two more around `Laying::mcp_tools` (Sprawling/accounting/src/worker/workbench/servers.rs), which runs in the lane that drives the run (`Sprawling/app/Spec.lean` §8-93), written out at `Level::Trace`; the assembly hands the worker that clock beside the city's own (`Sprawling/accounting/Spec.lean` §8-11), so a span never reads a city clock that a test or a correction can move. Read it off `a_dispatch_says_what_it_spent_before_the_drive` (cargo nextest run -p sprawling-accounting --release -E 'test(a_dispatch_says_what_it_spent_before_the_drive)' --no-capture), or off any served city running at that floor"
 status = "measured, not gated: 58 ms median on windows-x86_64, 16 cores, NVMe (2026-09-21, release, four runs: 50, 50, 51, 66; ~70 ms unoptimized when idle), for a dispatch into a fresh city with **no MCP server declared** - so this figure is the floor, and the `mcp_tools` line beside it read 0 ms over 0 servers in every run. The two lines are reported apart because a resident connection table (K-05) removes only the second, and the reading is K-05's own verdict: at 0 ms the table saves nothing, so it stays unbuilt until a served building declares servers and the second line shows them dominating. Not gated - a wall-clock reading is the machine's, and this one also depends on how many MCP servers a building declares. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and the nextest command in measured_by retakes it"
 
 # T14's four-action pressure reading (deepening plan section 3 T14): the
@@ -611,7 +611,7 @@ status = "measured, not gated: p50 1.540 ms, p95 1.735, p99 1.984; floor 1.358, 
 [first_byte]
 what = "`serve` spawned to the first byte of GET /, over the three fixture cities, with the product's own split of the opening"
 measured_by = "just web-bundle, cargo build --release -p sprawling --locked, then cargo run --release -p citysim --bin bench_startup --locked -- first-byte (the `bench-startup` recipe takes no argument, so it reads the four actions and not this one)"
-status = "measured, not gated: p50 in ms over three bench runs - the empty city 45-47 (city fixture 7e6fda8b5653dd7f), l100k 110-112 (6615c4052f604f8c), l400k 210-212 (99909ec1f02d58fc) (windows-x86_64, 16 cores, NVMe, release at opt-level 3; the same runs read 47-48, 121-125 and 257-263 at opt-level \"z\"). The l400k serve says fold 0 lines from the snapshots 101 ms, open the ledger 42, copy the views 20. The history is proved behind the first byte, its segments hashed in parallel waves of eight (storage PROOF_WAVE): l400k proof 138 ms, commands taken 310 ms after opening began; l100k proof 84 ms, bounded by one 64 MiB segment; commands wait for the proof (E_HISTORY_UNPROVEN). The remaining snapshot fold is the dominant phase (`crates/sprawling/Spec.lean` §8-154). This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and the bench_startup first-byte command in measured_by retakes it"
+status = "measured, not gated: p50 in ms over three bench runs - the empty city 45-47 (city fixture 7e6fda8b5653dd7f), l100k 110-112 (6615c4052f604f8c), l400k 210-212 (99909ec1f02d58fc) (windows-x86_64, 16 cores, NVMe, release at opt-level 3; the same runs read 47-48, 121-125 and 257-263 at opt-level \"z\"). The l400k serve says fold 0 lines from the snapshots 101 ms, open the ledger 42, copy the views 20. The history is proved behind the first byte, its segments hashed in parallel waves of eight (storage PROOF_WAVE): l400k proof 138 ms, commands taken 310 ms after opening began; l100k proof 84 ms, bounded by one 64 MiB segment; commands wait for the proof (E_HISTORY_UNPROVEN). The remaining snapshot fold is the dominant phase (`Sprawling/app/Spec.lean` §8-154). This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and the bench_startup first-byte command in measured_by retakes it"
 
 # How large this tree's dependency graph is, counted off the resolved
 # lockfile rather than off any manifest: a manifest states what was
@@ -627,11 +627,11 @@ status = "measured, not gated: p50 in ms over three bench runs - the empty city 
 # **Reported, never gated (the person's ruling).** Dependencies are
 # welcome; they are worth cutting where a cut makes the project less of
 # a black box, and a ceiling on the count cannot tell which cut that is.
-# crates/xtask/Spec.lean section 8-25 holds the reasoning and what would reopen it.
+# Tools/xtask/Spec.lean section 8-25 holds the reasoning and what would reopen it.
 [dependency_count]
 what = "packages in Cargo.lock once every transitive dependency is resolved, workspace members included"
 measured_by = "cargo xtask budget (budget::lockfile_packages, counting [[package]] in Cargo.lock)"
-status = "reported, not gated: the dependency count is read and printed, and no count is refused (crates/xtask/Spec.lean section 8-25)"
+status = "reported, not gated: the dependency count is read and printed, and no count is refused (Tools/xtask/Spec.lean section 8-25)"
 
 # T13: where the two latency tiers are stated. One latency metric in two
 # stages: the first is p95 inside one frame's budget (a person sees no
@@ -642,7 +642,7 @@ status = "reported, not gated: the dependency count is read and printed, and no 
 # construction. The second stage is reached after the first one is.
 #
 # The sub-metric split is what keeps a disk's floor from masking harness
-# overhead (crates/citysim/Spec.lean section 8-6): `harness` carries no durability
+# overhead (Tools/citysim/Spec.lean section 8-6): `harness` carries no durability
 # commit and is the only sub-metric these tiers price; `whole` is disk
 # work whose seam does not split and gets no tier. Multi-run parallel is
 # read by `[relay_round_trip]`, where the `store=memory` line is the
@@ -657,7 +657,7 @@ status = "reported, not gated: the dependency count is read and printed, and no 
 # every summary so an interleaved candidate comparison can be reproduced.
 [python_execution]
 what = "real CPython-WASI cold no-prewarm and warm calls, concurrent call latency and throughput, and virtual memory (Windows: private commit) plus resident memory before, during and after a separate concurrent burst"
-measured_by = "just bench, or cargo run --release -p citysim --bin bench -- python [baseline|candidate]; bench::python and bench::python::cold in crates/citysim/src/bin/bench/; executable, guest and script BLAKE3 digests on every CSV reading"
+measured_by = "just bench, or cargo run --release -p citysim --bin bench -- python [baseline|candidate]; bench::python and bench::python::cold in Tools/citysim/src/bin/bench/; executable, guest and script BLAKE3 digests on every CSV reading"
 guest_initialization_target_p50_us = 250000
 guest_initialization_target_p95_us = 500000
 minimum_worthwhile_relative_permille = 50
@@ -684,61 +684,61 @@ status = "declared before any candidate run, not gated. Adopt only when both the
 what = "the harness's own processing latency over the four load scenarios, one metric in two stages"
 stage_one_p95_us = 16000
 stage_two_p99_us = 1000
-scope = "sub-metric `harness` only, and the `store=memory` line of `[relay_round_trip]` for multi-run parallel; `whole` carries no tier (crates/citysim/Spec.lean section 8-6)"
+scope = "sub-metric `harness` only, and the `store=memory` line of `[relay_round_trip]` for multi-run parallel; `whole` carries no tier (Tools/citysim/Spec.lean section 8-6)"
 measured_by = "just bench, release: the citysim bench bin gives one reading line per scenario and sub-metric for three scenarios, and `instrument_relay_round_trip` gives multi-run parallel; each line carries its machine class"
 status = "staged targets, not gated: a wall-clock figure is the machine's. Baselines sit in the ARCHITECTURE.md performance book. Under the registered fixture a reading only goes down; relaxing a tier or fattening the fixture lands in a commit of its own. This version's reading is owed, because the User ruled to skip measurement in this version: the baselines in the performance book were taken on an earlier tree, and just bench retakes them"
 
 [relay_round_trip]
 what = "one relay append from a lane to the accounting thread and back, while a run is in flight, with `attend` as the city runs it"
-measured_by = "cargo nextest run -p sprawling-accounting --run-ignored only -E 'test(/::instrument_relay/)' --no-capture (crates/accounting/src/worker/driving/tests/instruments.rs, `crates/sprawling/Spec.lean` §8-84), 200 samples per store"
+measured_by = "cargo nextest run -p sprawling-accounting --run-ignored only -E 'test(/::instrument_relay/)' --no-capture (Sprawling/accounting/src/worker/driving/tests/instruments.rs, `Sprawling/app/Spec.lean` §8-84), 200 samples per store"
 status = "measured, gated at p50 <= 1 ms on the memory store only: unoptimized build, windows-x86_64, 16 cores, three other builds running beside it. Polling loop before the one queue: store=disk p50 31198 us, store=memory p50 31313 us, both the two timed waits. The one queue: store=memory p50 45 us against 29 us for the store's own append with no crossing; store=disk p50 2351 us, floor 1458 us, which is the device's fsync, a physical floor. The release reading and the 10 us memory target are not yet taken. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench (instrument_relay_round_trip), for the release reading the figures above lack retakes it"
 
 [throughput]
 what = "N runs dispatched at once (N in 1, 4, 16, 64), three model-latency arms, 4 tool calls per run alternating status and edit: runs/s, records/s, tool calls/s, the waits lane, first_call, relay_under_load, relay_queue (a relay request queued to taken, on the worker's monotonic clock), lane_pure (the [lane_wait] row), relay_idle at p50/p99/p999 (p999 only at n >= 1000) and max, and the accounting thread's busy share in permille"
-measured_by = "cargo nextest run -p sprawling-accounting --run-ignored only -E 'test(instrument_throughput)' --no-capture (crates/accounting/src/worker/driving/tests/throughput.rs, crates/citysim/spec/Throughput.lean section 8-14); SPRAWLING_TP1_RUNS and SPRAWLING_TP1_LATENCY narrow the arms"
+measured_by = "cargo nextest run -p sprawling-accounting --run-ignored only -E 'test(instrument_throughput)' --no-capture (Sprawling/accounting/src/worker/driving/tests/throughput.rs, Tools/citysim/spec/Throughput.lean section 8-14); SPRAWLING_TP1_RUNS and SPRAWLING_TP1_LATENCY narrow the arms"
 status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it (instrument_throughput), and a target waits for that first reading and the User's confirmation of one"
 
 [view_backlog]
 what = "how far the view fold falls behind a burst of 2,000 records while readers keep asking"
-measured_by = "just bench (instrument_view_backlog, crates/sprawling/src/serving/folding/tests/instruments.rs)"
+measured_by = "just bench (instrument_view_backlog, Sprawling/app/src/serving/folding/tests/instruments.rs)"
 status = "measured, not gated: 2,003 records in a 12.255 ms burst, 60 reader questions; a record waits floor 184 us, p50 7118 us, p99 8312 us, max 8350 us for its broadcast, and at most 1,945 records wait at once; the median of three runs whose p50 read 5861-8340 us (windows-x86_64, 16 cores, NVMe, release at opt-level 3; 7853-11347 us at opt-level \"z\"). This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench retakes it"
 
 [provider_queue]
 what = "one model call's wait at its endpoint's permit gate, from taking a ticket to holding a permit, on the injected monotonic clock, p50/p99/p999 and max, at 16 and 64 callers against four permits"
-measured_by = "just bench (instrument_provider_queue, crates/gateway/src/endpoint/permit.rs, `crates/gateway/Spec.lean` D21)"
+measured_by = "just bench (instrument_provider_queue, Sprawling/gateway/src/endpoint/permit.rs, `Sprawling/gateway/Spec.lean` D21)"
 status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it (instrument_provider_queue)"
 
 [lane_wait]
 what = "the pure lane wait: a staged run's time in the driving pool's queue before its lane opens, zero for a run that waited for nothing, p50/p99/p999 and max"
-measured_by = "just bench (instrument_throughput, wait=lane_pure, crates/accounting/src/worker/driving/tests/throughput.rs)"
+measured_by = "just bench (instrument_throughput, wait=lane_pure, Sprawling/accounting/src/worker/driving/tests/throughput.rs)"
 status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it (instrument_throughput, wait=lane_pure)"
 
 [fold_lag]
 what = "a record's wait from the writer's send to the first reader answer that has folded it, during the 2,000-record burst of view_backlog, p50/p99/p999 and max"
-measured_by = "just bench (instrument_view_backlog, line instrument_fold_lag, crates/sprawling/src/serving/folding/tests/instruments.rs)"
+measured_by = "just bench (instrument_view_backlog, line instrument_fold_lag, Sprawling/app/src/serving/folding/tests/instruments.rs)"
 status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it (instrument_view_backlog, line instrument_fold_lag)"
 
 [broadcast_lag]
 what = "a record's wait from the first reader answer that has folded it to its arrival on a client's channel, during the burst of view_backlog, p50/p99/p999 and max"
-measured_by = "just bench (instrument_view_backlog, line instrument_broadcast_lag, crates/sprawling/src/serving/folding/tests/instruments.rs)"
+measured_by = "just bench (instrument_view_backlog, line instrument_broadcast_lag, Sprawling/app/src/serving/folding/tests/instruments.rs)"
 status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it (instrument_view_backlog, line instrument_broadcast_lag)"
 
-# Each tool's phases (`crates/runtime/Spec.lean` §10): the call through
+# Each tool's phases (`Sprawling/runtime/Spec.lean` §10): the call through
 # the tool's own face, then the secret scan of its result, which every
 # tool shares, so the remaining cost of each tool has a reading.
 [tool_phases]
 what = "one call of read, write, edit, exec and search in two phases, in microseconds: the call through the tool's face (path resolution, IO and the envelope together) and the secret scan of its result"
-measured_by = "just bench (instrument_read_phases, instrument_write_and_edit_phases, instrument_exec_phases, instrument_search_phases in crates/runtime/src/redact.rs)"
+measured_by = "just bench (instrument_read_phases, instrument_write_and_edit_phases, instrument_exec_phases, instrument_search_phases in Sprawling/runtime/src/redact.rs)"
 status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it, and a target waits for that first reading and the User's confirmation of one"
 
 # What a read of a model-chosen file costs against what its design
 # claims, one judgement of the real location and one open
-# (`crates/runtime/spec/Tools/Read.lean` D113). The wall clock is the
+# (`Sprawling/runtime/spec/Tools/Read.lean` D113). The wall clock is the
 # machine's; the ratio between two reads taken in the same process is
 # not, and a return to four resolutions per read crosses it.
 [read_handle_ratio]
 what = "p50 of one handle read of a 20 KiB file (open, the handle's real location judged, read, BLAKE3, the line cut) over p50 of one canonicalize followed by a bare buffered read of the same file, interleaved 200 rounds; windows and linux only, because elsewhere the judged path is the read"
-measured_by = "cargo nextest run -p sprawling-runtime -E 'test(a_read_costs_within_a_bound_of_a_resolved_read)', which fails above 1.5 (crates/runtime/src/tools/read/tests/instruments.rs); the wall-clock readings come from just bench (instrument_read_ab, instrument_read_after_write_ab, instrument_read_round_trip)"
+measured_by = "cargo nextest run -p sprawling-runtime -E 'test(a_read_costs_within_a_bound_of_a_resolved_read)', which fails above 1.5 (Sprawling/runtime/src/tools/read/tests/instruments.rs); the wall-clock readings come from just bench (instrument_read_ab, instrument_read_after_write_ab, instrument_read_round_trip)"
 status = "gated by that test at 1.5, in the default suite, so every CI run holds it; the wall-clock readings are owed to the version's final measurement"
 
 # What a playback export costs in wall-clock time over histories of
@@ -746,28 +746,28 @@ status = "gated by that test at 1.5, in the default suite, so every CI run holds
 # every machine agrees on.
 [playback_export_time]
 what = "milliseconds one playback export takes over histories of growing length"
-measured_by = "just bench (instrument_evidence_cost, crates/accounting/src/playback/tests/tracing.rs, crates/accounting/spec/Playback/Traced.lean section 8-25)"
+measured_by = "just bench (instrument_evidence_cost, Sprawling/accounting/src/playback/tests/tracing.rs, Sprawling/accounting/spec/Playback/Traced.lean section 8-25)"
 status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it"
 
 # Production placement of a room and the stock put back after it, over a
-# trunk of 512 files of 16 KB (`crates/sprawling/Spec.lean` §8-155).
+# trunk of 512 files of 16 KB (`Sprawling/app/Spec.lean` §8-155).
 [production_placement]
 what = "milliseconds to place the first and the second room in production and to put the stock back, over 512 files of 16 KB"
-measured_by = "just bench (instrument_production_placement, crates/accounting/src/worker/dispatching/preparing/tests.rs)"
+measured_by = "just bench (instrument_production_placement, Sprawling/accounting/src/worker/dispatching/preparing/tests.rs)"
 status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it"
 
 # The gap a second dispatch leaves in a run already driving
-# (`crates/sprawling/Spec.lean` §8-84).
+# (`Sprawling/app/Spec.lean` §8-84).
 [dispatch_gap]
 what = "the gap a second dispatch leaves in a running one"
-measured_by = "just bench (instrument_dispatch_gap, crates/accounting/src/worker/driving/tests/instruments.rs)"
+measured_by = "just bench (instrument_dispatch_gap, Sprawling/accounting/src/worker/driving/tests/instruments.rs)"
 status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it"
 
 # What an endpoint's first request pays to resolve, connect and shake
-# hands, against its second (`crates/gateway/spec/Endpoint/Transport.lean` §8-35).
+# hands, against its second (`Sprawling/gateway/spec/Endpoint/Transport.lean` §8-35).
 [first_call_connect]
 what = "an endpoint's first request against its second through one client, over fresh clients"
-measured_by = "just bench (instrument_first_call_connect, crates/gateway/src/endpoint/transport.rs)"
+measured_by = "just bench (instrument_first_call_connect, Sprawling/gateway/src/endpoint/transport.rs)"
 status = "owed, not gated: no reading exists yet, because the User ruled to skip measurement in this version; `just bench` takes it"
 
 # What one beat of the monitor costs the process it watches, per kind of
@@ -777,7 +777,7 @@ status = "owed, not gated: no reading exists yet, because the User ruled to skip
 # recorded here and never gated, for the reason `[local_latency]` gives.
 [monitor_beat]
 what = "one platform reading of the monitor's beat: the summary counters, the whole page, or one process tree"
-measured_by = "just bench (instrument_monitor_beat, crates/sprawling/src/monitor/counters/tests.rs), 200 samples per reading, nearest rank through `bin::monitor::spread::Spread`"
+measured_by = "just bench (instrument_monitor_beat, Sprawling/app/src/monitor/counters/tests.rs), 200 samples per reading, nearest rank through `bin::monitor::spread::Spread`"
 status = "measured, not gated: summary floor 2 us, p50 2 us, p99 3 us; page floor 95 us, p50 121 us, p99 440 us; tree floor 5019 us, p50 5738 us, p99 9441 us (features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01). This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench retakes it"
 
 # The wall time of a tool wave whose leading calls only read. The
@@ -786,7 +786,7 @@ status = "measured, not gated: summary floor 2 us, p50 2 us, p99 3 us; page floo
 # takes is the machine's, so it is recorded here and never asserted.
 [tool_wave_reads]
 what = "one wave of three read calls of 50 ms each, from the first call started to the last result accounted"
-measured_by = "not instrumented: taken with a wall-clock bound before that bound became the rendezvous check, which now lives in crates/runtime/tests/run_driver.rs"
+measured_by = "not instrumented: taken with a wall-clock bound before that bound became the rendezvous check, which now lives in Sprawling/runtime/tests/run_driver.rs"
 status = "measured, not gated: serial 153.0 ms; concurrent 51-60 ms on an idle machine and 82.8 ms under a merge-train build (debug build, windows-x86_64, 16 cores). A wall-clock figure is the machine's, so it is recorded, never gated. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and no recipe retakes it yet (measured_by names what is missing)"
 
 # What the client pays to fold one animation frame of stream into the
@@ -834,7 +834,7 @@ status = "measured, not gated here: 45-124 us per city across three runs (x86_64
 # How many controls stand on the conversation page at once (refrain P11,
 # docs/frontend-method.md §4-43): the edge keys, the composer's row and the inspect
 # side's handle, counted on every shell fixture of the gallery by
-# `cargo xtask render` (crates/xtask/Spec.lean §8-51). A control inside a
+# `cargo xtask render` (Tools/xtask/Spec.lean §8-51). A control inside a
 # message, a fact's detail or an opened panel is not standing and is not
 # counted. The design aims at 8; the number held here is the reading of
 # the fixtures as accepted, and it is a ratchet like every other row: it
@@ -866,7 +866,7 @@ what = "ledger lines a narrow playback export scans, on a 1004-line fixture of 2
 measured_by = "cargo nextest run -p sprawling-accounting -E 'test(a_narrow_export_scans_only_what_its_tables_read)'"
 status = "measured, held by that test rather than weighed by budget: 208 lines lazy against 1004 full; the same on windows, macos and linux, because the count depends on the fixture alone. The wall clock of a narrow export of a long city is not recorded yet. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench (instrument_evidence_cost), for the wall clock of an export, which this row's count does not carry retakes it"
 
-# Text-only spec parts under the anchors of `state machine` and `typestate` modules; may only fall (crates/xtask/Spec.lean §8-42, assertion 6).
+# Text-only spec parts under the anchors of `state machine` and `typestate` modules; may only fall (Tools/xtask/Spec.lean §8-42, assertion 6).
 [spec_parts_without_theorem]
 what = "text-only specification parts under the anchors of `state machine` and `typestate` modules"
 measured_by = "cargo xtask gates spec (spec::ratchet, assertion 6)"

@@ -6,11 +6,11 @@
 /-!
 # The remote door: who may reach a city from outside its machine, and closesAt when.
 
-Specifies `crates/remote_access/src/door.rs`, the state a city keeps about its remote
+Specifies `Sprawling/remote_access/src/door.rs`, the state a city keeps about its remote
 door: whether it is open and in which epoch, the pairing codes that are still
 live, the devices that were paired, and the sessions those devices hold. The
 Rust code is the authority on how these properties hold; this model is the
-authority on which properties must hold (crates/remote_access/Spec.lean §8-1).
+authority on which properties must hold (Sprawling/remote_access/Spec.lean §8-1).
 
 The door is independent of the route that makes it reachable (a Cloudflare
 named tunnel, or a command the person wrote). A route carries bytes and
@@ -18,7 +18,7 @@ nothing else, so nothing here mentions one: every decision below is taken on
 the city's machine, and a route that changes the frames it carries can only
 make the door unreachable. A device's first connection, the pairing
 handshake that carries its code sealed, is modelled in
-`crates/remote_access/spec/Handshake.lean`; this model begins where that one
+`Sprawling/remote_access/spec/Handshake.lean`; this model begins where that one
 hands a code to the door.
 
 Time is a number passed in by the caller, as everywhere in the city. The door

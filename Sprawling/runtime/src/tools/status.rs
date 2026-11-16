@@ -20,7 +20,7 @@
 //! Nothing here samples. The snapshot is frozen at dispatch, and what
 //! moves while the run goes on - its children, its backlog, its context
 //! used, the time - is read from the one place that records it. The
-//! time is the driver's latest reading (`crates/runtime/spec/Clock.lean` §8-53): a tool that
+//! time is the driver's latest reading (`Sprawling/runtime/spec/Clock.lean` §8-53): a tool that
 //! read a clock of its own would be a second sampling point in the run,
 //! and its "now" could name a moment no line of the ledger records.
 //! The worktree's size is the one reading taken at the call, from the
@@ -192,7 +192,7 @@ impl StatusTool {
     }
 
     /// The reading the run records the provider's count into, which the
-    /// `ctx` line reports (`crates/runtime/spec/Tools.lean` §8-14, `status`).
+    /// `ctx` line reports (`Sprawling/runtime/spec/Tools.lean` §8-14, `status`).
     #[must_use]
     pub fn metering(mut self, context: ContextReading) -> StatusTool {
         self.context = context;
@@ -200,7 +200,7 @@ impl StatusTool {
     }
 
     /// The reading the run's clock hook keeps, which the `now` line
-    /// reports (`crates/runtime/spec/Clock.lean` §8-53). It reports the time whatever the
+    /// reports (`Sprawling/runtime/spec/Clock.lean` §8-53). It reports the time whatever the
     /// run's stamp granularity: `now` is a field of this tool's answer,
     /// not an envelope attachment, and a city that turned stamps off
     /// has not asked its model to stop knowing the time.
@@ -222,7 +222,7 @@ impl StatusTool {
     }
 
     /// The table whose members at this run's address the thirteenth
-    /// line reports (`crates/runtime/spec/Backlog.lean` §8-28-2).
+    /// line reports (`Sprawling/runtime/spec/Backlog.lean` §8-28-2).
     #[must_use]
     pub fn reporting(mut self, backlog: Backlog) -> StatusTool {
         self.backlog = Some(backlog);

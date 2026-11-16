@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One schema in, one Effect 4 expression out
-//! (`crates/xtask/Spec.lean` section 8-52).
+//! (`Tools/xtask/Spec.lean` section 8-52).
 //!
 //! The half of the emitter that reads a schema rather than a document:
 //! which keywords the subset allows, and what each one becomes. Naming,

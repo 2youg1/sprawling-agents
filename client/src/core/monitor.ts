@@ -6,7 +6,7 @@
 // The performance panel's reading of the monitor history: a row per
 // counter with its latest reading, its window's p50 and p99, and its
 // bars. The readings are written by the unit rule `sprawling top` uses
-// (`crates/sprawling/spec/Monitor.lean` §8-95), so a User at the page
+// (`Sprawling/app/spec/Monitor.lean` §8-95), so a User at the page
 // and an agent at the terminal read one sample as the same figure;
 // `monitor.test.ts` holds this to the fixture `bin::monitor::top`'s own
 // screen test uses. The bars are the page's own drawing (D82 in
@@ -135,7 +135,7 @@ function reading(unit: Unit, value: number): string {
 
 // A duration in nanoseconds as a person reads it: below 1 µs in ns,
 // below 10 ms in whole µs, from 10 ms in ms with one decimal, truncated
-// (`crates/sprawling/spec/Main.lean` §8-129-2, the unit rule).
+// (`Sprawling/app/spec/Main.lean` §8-129-2, the unit rule).
 function duration(nanos: number): string {
   if (nanos < 1_000) {
     return `${String(nanos)} ns`;

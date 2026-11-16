@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The whole client speaking through the remote door (client/Spec.lean §4-64,
-// `crates/remote_access/Spec.lean` §8-10): a page opened from the remote
+// `Sprawling/remote_access/Spec.lean` §8-10): a page opened from the remote
 // address, in an origin that kept a paired device, speaks the wire as
 // sealed payloads on `/remote/session`; any other page speaks to this
 // origin's `/ws`. Which line a connection takes is judged each time the

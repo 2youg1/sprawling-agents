@@ -6,7 +6,7 @@
 /-!
 # runtime::pipeline
 
-规定 `pipeline`、`pipeline::adviser`、`pipeline::connector`、`pipeline::exec`（`crates/runtime/src/` 下同名的文件）。工具结果的信封、缩短的次序、窗口顾问与连接器结果。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `pipeline`、`pipeline::adviser`、`pipeline::connector`、`pipeline::exec`（`Sprawling/runtime/src/` 下同名的文件）。工具结果的信封、缩短的次序、窗口顾问与连接器结果。本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `Sprawling/runtime/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::pipeline::adviser::tests`、`runtime::pipeline::connector::tests`、`runtime::pipeline::tests` 守住。
 -/
@@ -86,7 +86,7 @@ pub fn package_connector(outcome: ToolOutcome, offload: OffloadSite<'_>) -> Resu
 
 **决定**：MCP 答复里的 `audio` 块与图片块走同一步：容器认得、base64 解得开、不为空时存进 CAS，块换成一行带 locator 的字（§8-27-10）。它不进 `ToolOutcome.attachments`。
 
-**理由**：桌面 server 录下的声音落在它自己机器的临时目录里，城里没有工具读得到；答复是它交回城里的唯一一条路（`crates/desktop/Spec.lean` D13）。base64 留在窗口里会把一段两分钟的录音变成五百万个字符，账本也跟着记下它们，所以它与图片一样在这一步离开答复。附件是模型要看的东西，`ImageRef` 带宽高，provider 的线把它画成图片；声音没有一个模型能读的形状，要读它的是一件工具，工具要的是 locator。连接器不判容器：哪些容器送得出去，由读这段录音的那一方判（`gateway::AudioType` 是那张表），连接器只认 `audio/` 这个前缀，于是容器的认法仍只有一处，而 runtime 也不为一张表多一条到 gateway 的依赖边。
+**理由**：桌面 server 录下的声音落在它自己机器的临时目录里，城里没有工具读得到；答复是它交回城里的唯一一条路（`Sprawling/desktop/Spec.lean` D13）。base64 留在窗口里会把一段两分钟的录音变成五百万个字符，账本也跟着记下它们，所以它与图片一样在这一步离开答复。附件是模型要看的东西，`ImageRef` 带宽高，provider 的线把它画成图片；声音没有一个模型能读的形状，要读它的是一件工具，工具要的是 locator。连接器不判容器：哪些容器送得出去，由读这段录音的那一方判（`gateway::AudioType` 是那张表），连接器只认 `audio/` 这个前缀，于是容器的认法仍只有一处，而 runtime 也不为一张表多一条到 gateway 的依赖边。
 
 **被否**：①给 `ToolOutcome` 加一个声音附件的槽（kernel 的类型多一臂，provider 的两条线都要为一种它们画不出的东西写一条拒绝）；②原样留在窗口里（见上）；③存进 CAS 并照着落盘一个 rest 文件给 `read`（`read` 读的是文本，一段 wav 的字节对模型没有用）。
 

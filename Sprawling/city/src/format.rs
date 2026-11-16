@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The `format` number a configuration file may carry, and the ladder
-//! that brings an older file forward (`crates/city/spec/Format.lean`
+//! that brings an older file forward (`Sprawling/city/spec/Format.lean`
 //! §8-42).
 //!
 //! A file without `format` is format 1, so a file nobody migrated is

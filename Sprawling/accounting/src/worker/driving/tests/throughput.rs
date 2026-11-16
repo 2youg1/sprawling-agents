@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The throughput bench (`crates/citysim/spec/Throughput.lean` §8-14): N
+//! The throughput bench (`Tools/citysim/spec/Throughput.lean` §8-14): N
 //! runs dispatched at once into N rooms of one building, each taking M
 //! tool calls that alternate a read and a write, against a loopback
 //! provider that holds every model call for the latency arm's time.
@@ -91,7 +91,7 @@ struct Taken {
     /// Relay queue waits and the accounting thread's sleep, µs (§8-98).
     relay_queue: Vec<u64>,
     /// Pure lane waits: a staged run's wait for its lane, µs
-    /// (`crates/sprawling/Spec.lean` §8-46-3).
+    /// (`Sprawling/app/Spec.lean` §8-46-3).
     lane_wait: Vec<u64>,
     idle_us: u64,
     posted_ms: u64,

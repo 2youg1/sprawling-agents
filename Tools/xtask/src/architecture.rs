@@ -59,11 +59,11 @@ mod tests {
 ## 3 Units
 | a | b |
 ## 4 Seams
-| seam | crates/kernel/src/ledger.rs |
+| seam | Sprawling/kernel/src/ledger.rs |
 ### An aside that belongs to section 4
-| seam | crates/browser/src/port.rs |
+| seam | Sprawling/browser/src/port.rs |
 ## 5 Next
-| seam | crates/kernel/src/nowhere.rs |
+| seam | Sprawling/kernel/src/nowhere.rs |
 ";
 
     #[test]

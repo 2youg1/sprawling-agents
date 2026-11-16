@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The fields one thinking level, or thinking on, is written in on each
-//! face (`crates/gateway/spec/Dialect.lean` §8-1, gateway D35).
+//! face (`Sprawling/gateway/spec/Dialect.lean` §8-1, gateway D35).
 //!
 //! The one place a level becomes request bytes. The word for a level is
 //! `Effort::as_str`; which field carries it is the face's and, on the

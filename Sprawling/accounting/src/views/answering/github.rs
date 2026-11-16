@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which host a GitHub import asks, whether it names a host at all, and
-//! the reader the served city handed in (`crates/accounting/spec/Views/Answering/Github.lean` §8-18-3,
-//! `crates/wire/Spec.lean` §8-67).
+//! the reader the served city handed in (`Sprawling/accounting/spec/Views/Answering/Github.lean` §8-18-3,
+//! `Sprawling/wire/Spec.lean` §8-67).
 //!
 //! Starting `gh` reaches this machine and the network, so the reader is
 //! the binary's (`bin::doctor::github`) and arrives as a `fn` pointer;

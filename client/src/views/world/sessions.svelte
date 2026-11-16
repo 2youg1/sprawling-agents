@@ -15,7 +15,7 @@
   // A row is titled by the session's name, or its room when it has none,
   // and says the model, effort and workspace of its last run and the
   // start of its last reply, cut to the width the row has
-  // (`crates/wire/spec/Answer/Sessions.lean` D27).
+  // (`Sprawling/wire/spec/Answer/Sessions.lean` D27).
   // A session a resident handed down says which resident did, under its
   // title, read off the session line (client D83).
   //

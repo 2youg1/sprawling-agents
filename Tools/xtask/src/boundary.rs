@@ -42,7 +42,7 @@ const CROSSINGS: [(&str, &str); 5] = [
     ),
 ];
 
-const FUZZ: &str = "crates/fuzz/";
+const FUZZ: &str = "Tools/fuzz/";
 const GATES: &str = env!("CARGO_PKG_NAME");
 
 /// Test-code extent by address (xtask Spec §8-39).
@@ -129,7 +129,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
     for file in walk::files_with_ext(root, &["rs"])? {
         let rel = walk::rel(root, &file);
-        if walk::in_isolation_zone(&rel) || rel == "crates/xtask/src/boundary.rs" {
+        if walk::in_isolation_zone(&rel) || rel == "Tools/xtask/src/boundary.rs" {
             continue;
         }
         let whole = match reading(&rel, &found) {
@@ -168,7 +168,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             location: format!("{REGISTER} [{ROW}.{PREDATING}]"),
             rule: "an exception that is no longer needed is struck from the register".to_owned(),
             violation: format!("{spent} no longer crosses the process boundary"),
-            alternative: "delete its row: the check has moved to crates/adversary/ or come back \
+            alternative: "delete its row: the check has moved to Tools/adversary/ or come back \
                           in-process, and the debt it recorded is paid"
                 .to_owned(),
         });
@@ -238,10 +238,10 @@ fn crossed(rel: &str, line: usize, token: &str, what: &str) -> Violation {
         gate: "boundary",
         location: format!("{rel}:{line}"),
         rule: "a check that crosses the process boundary is written in Lean under \
-               crates/adversary/; Rust checks link the crates and enter by their public faces"
+               Tools/adversary/; Rust checks link the crates and enter by their public faces"
             .to_owned(),
         violation: format!("`{token}` in test code: {what}"),
-        alternative: "move it to crates/adversary/ as a property over traces, or drive the same \
+        alternative: "move it to Tools/adversary/ as a property over traces, or drive the same \
                       thing in-process through the door wire::server uses; if this is not \
                       this product's boundary, narrow CROSSINGS to the exact external surface"
             .to_owned(),
@@ -293,7 +293,7 @@ mod tests {
                     drop(std::net::TcpStream::connect(&url).unwrap());\n\
                 }\n\
             }\n";
-        assert!(found("crates/accounting/src/worker/driving.rs", source).is_empty());
+        assert!(found("Sprawling/accounting/src/worker/driving.rs", source).is_empty());
     }
 
     #[test]
@@ -307,7 +307,7 @@ mod tests {
                     let _ = std::process::Command::new(env!(\"CARGO_BIN_EXE_sprawling\"));\n\
                 }\n\
             }\n";
-        let out = found("crates/sprawling/src/main.rs", source);
+        let out = found("Sprawling/app/src/main.rs", source);
         assert_eq!(out.len(), 1, "{out:#?}");
         assert!(out[0].location.ends_with(":6"), "{:?}", out[0].location);
     }
@@ -315,8 +315,8 @@ mod tests {
     #[test]
     fn a_file_under_tests_is_test_code_by_where_it_lives() {
         let source = "fn helper() {\n    let _ = axum::serve(listener, app);\n}\n";
-        assert_eq!(found("crates/wire/tests/enrolment.rs", source).len(), 1);
-        assert!(found("crates/wire/src/server.rs", source).is_empty());
+        assert_eq!(found("Sprawling/wire/tests/enrolment.rs", source).len(), 1);
+        assert!(found("Sprawling/wire/src/server.rs", source).is_empty());
     }
 
     #[test]
@@ -332,6 +332,6 @@ mod tests {
                     let _ = env!(\"CARGO_BIN_EXE_sprawling\"); // boundary-ok: same\n\
                 }\n\
             }\n";
-        assert!(found("crates/runtime/src/x.rs", source).is_empty());
+        assert!(found("Sprawling/runtime/src/x.rs", source).is_empty());
     }
 }

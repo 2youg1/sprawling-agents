@@ -253,7 +253,7 @@ impl LedgerIndex {
     ///
     /// The walk starts at `from` rather than skipping the seqs before it,
     /// so reading a stretch costs the stretch, however long the ledger
-    /// before it is (`crates/storage/Spec.lean` §8-38). `from` need not be
+    /// before it is (`Sprawling/storage/Spec.lean` §8-38). `from` need not be
     /// a seq anybody wrote; nothing at or after it yields nothing.
     pub fn seqs_from(&self, from: Seq) -> impl DoubleEndedIterator<Item = Seq> + '_ {
         self.folded.seqs_from(from)
@@ -378,7 +378,7 @@ fn walk<E>(
 
 /// Only the folded maps are written: the seam is this process's own, and
 /// an index read back reaches disk through a new one. A views snapshot
-/// carries the index this way (`crates/storage/spec/Index.lean` §8-4).
+/// carries the index this way (`Sprawling/storage/spec/Index.lean` §8-4).
 impl serde::Serialize for LedgerIndex {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.folded.serialize(serializer)

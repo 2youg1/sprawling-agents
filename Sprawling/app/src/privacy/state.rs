@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Exact history values and their fold (`crates/sprawling/spec/Privacy/State.lean`).
+//! Exact history values and their fold (`Sprawling/app/spec/Privacy/State.lean`).
 
 use std::collections::BTreeMap;
 use std::num::NonZeroU64;
@@ -84,7 +84,7 @@ pub(super) struct Status {
 
 /// The operations of one history and the owner reference every one of
 /// them was prepared under, held together so that a summary without an
-/// owner cannot be built (`crates/sprawling/spec/Privacy/State.lean`).
+/// owner cannot be built (`Sprawling/app/spec/Privacy/State.lean`).
 #[derive(Debug)]
 struct Summary {
     owner: SecretRef,

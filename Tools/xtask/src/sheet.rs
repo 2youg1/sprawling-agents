@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which lines of a client file are a stylesheet (crates/xtask/Spec.lean
+//! Which lines of a client file are a stylesheet (Tools/xtask/Spec.lean
 //! §8-8 D35).
 //!
 //! A `.css` or `.html` file is a stylesheet from its first line to its

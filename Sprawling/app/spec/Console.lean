@@ -6,9 +6,9 @@
 /-!
 # calyx::console
 
-规定 `Calyx/src/console.rs` 与 `Calyx/src/console/`：服务中的那个终端（`calyx::console`）。本文件是 `crates/sprawling/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
+规定 `Calyx/src/console.rs` 与 `Calyx/src/console/`：服务中的那个终端（`calyx::console`）。本文件是 `Sprawling/app/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `Sprawling/app/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格。生命周期的状态机与它的性质在 `crates/sprawling/spec/Console/Lifecycle.lean`，那里的转移向量由 `calyx::console::lifecycle` 的测试逐行回放；报告给终端的程序状态（OSC 7501）的模型在 `crates/sprawling/spec/Console/ProgramStatus.lean`，由 `calyx::console::program_status` 的测试回放；其余接口形状与取舍由 Rust 的类型与 `calyx::console::tests::helpers`、`calyx::console::tests::parsing`、`calyx::console::tests::terminal` 守住。
+这一分部只有文字：它是说明文档，不是形式规格。生命周期的状态机与它的性质在 `Sprawling/app/spec/Console/Lifecycle.lean`，那里的转移向量由 `calyx::console::lifecycle` 的测试逐行回放；报告给终端的程序状态（OSC 7501）的模型在 `Sprawling/app/spec/Console/ProgramStatus.lean`，由 `calyx::console::program_status` 的测试回放；其余接口形状与取舍由 Rust 的类型与 `calyx::console::tests::helpers`、`calyx::console::tests::parsing`、`calyx::console::tests::terminal` 守住。
 -/
 
 /-!
@@ -43,12 +43,12 @@ pub(crate) fn step(face: Face, event: Event) -> (Face, Option<Cause>);
 
 - 只有停城请求进入 `Stopping`：CLI 的 `/quit`、同一台电脑上的页面发来的 `CloseCity`、信号、终端没了、`wire::serve` 失败。进入的那一步给出缘由，`CommandDesk::close` 记下它；先到的缘由作数。
 - **键与信号是两件事**。CLI 与安静宿主在 raw 模式里读键，敲出来的 Ctrl+C 是一个键，不是信号，城只在每个会话里第一次收到它时印一行「复制请先选中文字；关闭城市用 /quit」，此外什么都不做；Ctrl+C 与 Ctrl+V 归终端（有选区时复制、粘贴）。信号形式的 `SIGINT`（Windows 的 `CTRL_C_EVENT`）在交互面上面不变，在 `Opening` 与 `Headless` 里是 `Stopping(Drain)`，工装与服务管理器靠它。Windows 的 Ctrl+Break 始终是信号，处处是 `Stopping(Drain)`；`SIGTERM` 处处是 `Stopping(Interrupt)`，与其他 interrupt 一样带时限。
-- **每一次 interrupt 都有时限**（`Console/Lifecycle.lean` D75）：面进入 `Stopping(Interrupt)` 的那一步，外壳装上 `INTERRUPT_GRACE`（4 s），不论这次 interrupt 来自 `/quit` 后的 n、页面的「立刻停下并关闭」、`SIGTERM`、收口中的第二次请求还是终端没了。进行中的 provider 调用不是安全点，没有时限的 interrupt 要等到调用超时；时限到了，进程不写交接退出，留下的 run 由下一次 `serve` 的启动扫描冻结（`crates/accounting/Spec.lean` §8-18-1）。
+- **每一次 interrupt 都有时限**（`Console/Lifecycle.lean` D75）：面进入 `Stopping(Interrupt)` 的那一步，外壳装上 `INTERRUPT_GRACE`（4 s），不论这次 interrupt 来自 `/quit` 后的 n、页面的「立刻停下并关闭」、`SIGTERM`、收口中的第二次请求还是终端没了。进行中的 provider 调用不是安全点，没有时限的 interrupt 要等到调用超时；时限到了，进程不写交接退出，留下的 run 由下一次 `serve` 的启动扫描冻结（`Sprawling/accounting/Spec.lean` §8-18-1）。
 - **终端没了**（Windows 的 `CTRL_CLOSE_EVENT`，Unix 的 `SIGHUP`，raw 模式下读键出错）：切断所有终端出口（`Sinks::Cut`），进入 `Stopping(Interrupt)`，于是带着同一个时限。Windows 在关窗 5 s 后结束进程，4 s 给交接留出余量；Unix 取同一个数，三个平台行为相同。
 - **升档**：收口中再来一次显式停止（`/quit`、页面的 `CloseCity`、`SIGINT`、Ctrl+Break）从 `Drain` 升到 `Interrupt`，时限从这一步起算；`Interrupt` 中再来一次，或第二个 `SIGTERM`，或时限到了，进程不写交接立刻退出，并说一行「the city exits without a handoff; `sprawling resume` will close what was open」。终端没了不算一次升档，只切断出口。
 - `Interrupt` 怎样停：台子记下 `interrupting`，每条 lane 在下一个安全点从 `CommandDesk::interrupt_for` 读到 `Cancel`，后台命令经 `Backlog::halt(None)` 停下，不写 `city_halted`（否则下次开城这座城仍冻着）；然后照常 `land_the_rest` 并写交接；时限到时还没落地的 run，进程不等它。
 
-**`/quit` 是一条线上命令**：`CloseCity { mode, idem }`（`crates/wire/spec/Command/Kind.lean`，`LocalOnly`）。执行者在 `bin::assembly`：`Listening::serve` 的 `select!` 里与信号同一条事件通道，`Front::commands` 在命令到达台子之前截下它，变成 `Event::Quit(Asker::Page, mode)`；worker 那一臂答「城在别处关闭」。只在监听绑在回环上时接受，绑在别的地址上一律以 `E_GATE_DENIED` 拒，因为 `/ws` 的命令出口不带对端地址，而回环绑定是「对端是回环」唯一不必另取对端地址就成立的条件；会话已认证由本地门的入场判定负责（`crates/wire/spec/Reception.lean`）。**推翻的记录**：此前「收口不是一条 Command，能被拼出来的线上帧就是陌生人停掉别人城市的一条路」。本地门要求每个调用者都带凭据之后，回环上不再有陌生人；剩下的本地调用者（居民的 `exec`、浏览器工具）本来就能发 `PutRules`、`RemoveBuilding` 这类更重的命令，停城对它们不是新增的能力。远程设备由 class 列的 `LocalOnly` 挡在中继上。
+**`/quit` 是一条线上命令**：`CloseCity { mode, idem }`（`Sprawling/wire/spec/Command/Kind.lean`，`LocalOnly`）。执行者在 `bin::assembly`：`Listening::serve` 的 `select!` 里与信号同一条事件通道，`Front::commands` 在命令到达台子之前截下它，变成 `Event::Quit(Asker::Page, mode)`；worker 那一臂答「城在别处关闭」。只在监听绑在回环上时接受，绑在别的地址上一律以 `E_GATE_DENIED` 拒，因为 `/ws` 的命令出口不带对端地址，而回环绑定是「对端是回环」唯一不必另取对端地址就成立的条件；会话已认证由本地门的入场判定负责（`Sprawling/wire/spec/Reception.lean`）。**推翻的记录**：此前「收口不是一条 Command，能被拼出来的线上帧就是陌生人停掉别人城市的一条路」。本地门要求每个调用者都带凭据之后，回环上不再有陌生人；剩下的本地调用者（居民的 `exec`、浏览器工具）本来就能发 `PutRules`、`RemoveBuilding` 这类更重的命令，停城对它们不是新增的能力。远程设备由 class 列的 `LocalOnly` 挡在中继上。
 
 **CLI（`Cli`）**：主屏、raw 模式、内联，终端自己的回滚、搜索、复制照常可用。屏上分两块：**转写**写一次就进回滚；**活动区**在转写下面，每一帧重画。两块都由控制台的渲染器画（`console_ffi`，`Calyx/ffi/Spec.lean`）：控制台说屏上有什么，渲染器决定它长什么样，颜色只取终端自己的调色板，所以跟着人选的主题走。
 
@@ -109,7 +109,7 @@ pub(crate) fn serving(terminal: &Terminal, vitals: Option<&wire::MetricsAnswer>,
 - **`/serving` 是渲染，不是来源**。城侧的数全部来自一次 `Query::Metrics`；`/wire metrics` 仍印它的 JSONL 原样，与 `sprawling call` 同形。两个动词，两个问题：`/serving` 答「这个进程开在哪、门朝谁开」，`metrics` 答「这座城里有多少什么」。
 - **动词名不与既有概念撞车**：`status` 在 `docs/glossary.md` 里是工具的名字，故控制台这个动词叫 `serving`。
 - **常驻内存不进这一屏**：「resident 在本平台叫什么」的唯一权威是 `xtask::mem`；`/serving` 印出 pid，`cargo xtask mem <pid>` 只差一次粘贴。**翻案条件**：新增一个 unit 承载这一个计数器，届时两个调用方共用一份定义。
-- **斜杠词表一张**（`wire::slash`，`crates/wire/spec/Slash.lean`）：`/help`、`/room <addr>`、`/new`、`/stop`、`/halt [--all]`、`/release [--all]`、`/model [<id>]`、`/effort [<level>]`、`/approve [<id>]`、`/deny [<id>]`、`/web`、`/quit`、`/serving`、`/remote <verb>`、`/acp [<text>]`、`/wire <verb> [<json>]`，每行写明在 CLI、WebUI 还是两处都提供。CLI 读它，客户端经 `cargo xtask wire-ts` 生成的 `SLASH` 读它；`/at` 不再存在，选房间是 `/room`。
+- **斜杠词表一张**（`wire::slash`，`Sprawling/wire/spec/Slash.lean`）：`/help`、`/room <addr>`、`/new`、`/stop`、`/halt [--all]`、`/release [--all]`、`/model [<id>]`、`/effort [<level>]`、`/approve [<id>]`、`/deny [<id>]`、`/web`、`/quit`、`/serving`、`/remote <verb>`、`/acp [<text>]`、`/wire <verb> [<json>]`，每行写明在 CLI、WebUI 还是两处都提供。CLI 读它，客户端经 `cargo xtask wire-ts` 生成的 `SLASH` 读它；`/at` 不再存在，选房间是 `/room`。
 -/
 
 /-!

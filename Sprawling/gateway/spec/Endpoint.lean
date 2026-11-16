@@ -6,7 +6,7 @@
 /-!
 # gateway::endpoint
 
-规定 `endpoint`（`crates/gateway/src/endpoint.rs`）：自写线格式的 provider 客户端；包着它的 `permit::Gated` 是 `kernel::Model` 的生产适配器。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+规定 `endpoint`（`Sprawling/gateway/src/endpoint.rs`）：自写线格式的 provider 客户端；包着它的 `permit::Gated` 是 `kernel::Model` 的生产适配器。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `Sprawling/gateway/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `gateway::endpoint::config`、`gateway::endpoint::auth`、`gateway::endpoint::call`等 旁的测试守住。
 -/
@@ -41,8 +41,8 @@ impl Endpoint { pub(crate) fn call(&mut self, req: &ModelRequest) -> Result<Mode
 - **组请求五步**：canonical→`request_wire`→逐条应用 overrides（JSON Pointer，后者胜）→认证头兑付（`resolver` 取 `Sealed`，`expose()` 只在写头那一格，写完即 drop 零化）→POST。响应四步：状态码判定（非 2xx 一律 `E_PROVIDER`，408／429／5xx 标可重试，其余 4xx 不标，400／413 带窗口拒词是 `Overflow`；分类的唯一一处是 `ProviderFailure`，见 `Endpoint/Failure.lean`；对端正文不回显）→`response_from_wire`→usage 抽取→`ModelReturn`。
 - **半流中断**：SSE 流截断（连接断／不完整事件）＝`E_PROVIDER`，retry 为 `Unknown`（请求已发出，回答丢了），恒不产部分 ModelReturn；流式读法见 §8-13。
 - **无暗重试**：重试是 watchdog 的决策（上限的唯一表示是 `Retries`，§8-16），endpoint 一次调用恰一次 HTTP 往返；幂等由调用方 IdemKey dedup 看守。
-- base_url＝完整端点 URL（逐字段哲学，不拼路径）；`EndpointConfig.pricing` 让结算在适配器内完成，`ModelReturn` 因此携 usage／stop／billed 入账（`crates/kernel/Spec.lean` §8-24；权威额线上无标准槽位，现行恒 PriceSheet 源）；TLS 取 rustls，加密后端由 `reach::tls` 在造客户端前装好（§8-15）。
-- `.expose(` 白名单（`crates/xtask/src/secret.rs` 的 `EXPOSE_WHITELIST`，全表以它为准）：gateway 侧的合法出现点只有 `endpoint/call.rs`（端点调用）。**两种凭证在同一句里写上线**：`authorize` 既写注册带的那条，也写人在自定义头里放的 `HeaderValue::Redeemed`；三个请求写入点（`call`、`stream`、`list_models`）都只调它，谁都不自己遍历 `extra_headers`。
+- base_url＝完整端点 URL（逐字段哲学，不拼路径）；`EndpointConfig.pricing` 让结算在适配器内完成，`ModelReturn` 因此携 usage／stop／billed 入账（`Sprawling/kernel/Spec.lean` §8-24；权威额线上无标准槽位，现行恒 PriceSheet 源）；TLS 取 rustls，加密后端由 `reach::tls` 在造客户端前装好（§8-15）。
+- `.expose(` 白名单（`Tools/xtask/src/secret.rs` 的 `EXPOSE_WHITELIST`，全表以它为准）：gateway 侧的合法出现点只有 `endpoint/call.rs`（端点调用）。**两种凭证在同一句里写上线**：`authorize` 既写注册带的那条，也写人在自定义头里放的 `HeaderValue::Redeemed`；三个请求写入点（`call`、`stream`、`list_models`）都只调它，谁都不自己遍历 `extra_headers`。
 - **`Endpoint` 的字段不出 `endpoint/`**：`config`／`client`／`redemption` 是 `pub(super)`；`transcribe` 走 `post_bytes` 与 `model()`。于是「一次 POST 如何发出、非 2xx 如何变成 `AxError`、对侧正文如何不被回显」在本 crate 里只有一份答案。转写面仍保留它自己那句恢复语（`rewrite_recovery`）：线上出了什么事是端点的事，人接下来能做什么是设施的事。
 
 **图的兑付面与两句拒绝**

@@ -240,7 +240,7 @@ fn reach(residents: &Residents, server: &kernel::McpServer, root: &Path) -> (usi
 
 /// Two lanes reaching two servers share one table: a handshake that
 /// has not been answered yet holds up the lanes asking for its own
-/// server and nobody else (`crates/sprawling/Spec.lean` §8-4).
+/// server and nobody else (`Sprawling/app/Spec.lean` §8-4).
 #[test]
 #[allow(
     clippy::disallowed_methods,
@@ -314,7 +314,7 @@ fn a_second_dispatch_reaches_the_server_the_first_one_started() {
 /// A dispatch whose server has not answered its handshake yet leaves
 /// the desk free: the command is answered on the accounting thread,
 /// and the lane that will drive the run is the one that waits for
-/// the server (`crates/sprawling/Spec.lean` §8-113).
+/// the server (`Sprawling/app/Spec.lean` §8-113).
 #[test]
 fn a_dispatch_whose_server_still_shakes_hands_leaves_the_desk_free() {
     let dir = tempfile::tempdir().unwrap();

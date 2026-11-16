@@ -6,7 +6,7 @@
 /-!
 # kernel::budget
 
-规定 `kernel::budget`（`crates/kernel/src/budget.rs`）：钱与量的整数化。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::budget`（`Sprawling/kernel/src/budget.rs`）：钱与量的整数化。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状由 Rust 的类型守住，`kernel::budget` 旁还没有测试。
 -/
@@ -27,7 +27,7 @@ pub struct BudgetUse { pub usd: UsdMicros, pub tokens: Tokens }    // serde（Pr
 
 - **理由是刹车只留一个**：`Halt` 停一个范围并终止该范围内的后台成员（`runtime::backlog::halt` 是承兑点）。一座必须停下的城由人说停，而不是由一个没人能在事前算准的上限替他说停。
 - **留下的是记账而不是闸**：`BudgetUse` 与 `storage::attribution` 的五路归因、成本页原样保留。**报告花了多少**与**事前不许花**是两件事，kernel 只做前者。
-- **不在此列**：`crates/xtask/budgets.toml`（门的价目册，同名异物）与 `Fuel`（wasm 客的停机保证）。
+- **不在此列**：`Tools/xtask/budgets.toml`（门的价目册，同名异物）与 `Fuel`（wasm 客的停机保证）。
 - `BudgetUse` 保留 serde，因为它是 `Progress::Unplanned` 与 `Completion::Evidence` 的载荷字段，账本里已有历史行读得回去。
 - 本模块没有 kani harness：三个新型只有构造、取值与 `checked_add`，没有判定可证；树上有几条 harness、CI 证哪几条，以 `cargo xtask proof --list` 为准。
 -/

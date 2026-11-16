@@ -6,7 +6,7 @@
 /-!
 # 开城的次序：先占端口，再写第一行，最后才说 running
 
-规定 `crates/sprawling/src/assembly/listening.rs` 的 `listen` 与 `main::city` 的横幅之间的次序（`bin::assembly::listening`、`main::city`；§8-88）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/app/src/assembly/listening.rs` 的 `listen` 与 `main::city` 的横幅之间的次序（`bin::assembly::listening`、`main::city`；§8-88）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 `listen` 依次做四步，每一步都可能拒绝：判定绑定面并 bind；建 CAS 目录、开账本读起视图；开写者线程，`JsonlLedger::open` 先取写者锁、再做断尾恢复、再 `open_for_service`；返回 `Listening`。账本的第一次写在取到写者锁之后。横幅只在拿到 `Listening` 之后印，这是类型排的：`serve_city` 没有 `Listening` 就走不到印横幅的那一段。
 
@@ -91,9 +91,9 @@ end Sprawling.Assembly.Listening
 **原因**：一座城曾经可以同时有两个写者。第二个进程对同一座城执行 `serve` 时，写者线程在 bind 之前就已经打开；bind 失败后它照常收口，往账本里写了一行「人主动关城」的 handoff。那是没有人做过的事，而且是一次分叉：两个进程各自用同一个 `prev` 写了同一个 seq。`sprawling is running.` 这行横幅则在这一切之前就印了出来。
 
 **次序**，`assembly::listen` 是它唯一的定义：
-1. 判定绑定面，然后 bind（`wire::bind`，`crates/wire/Spec.lean` §8-46）。端口被占、或者暴露的地址没有令牌，都在这里拒绝，账本一字未动。
+1. 判定绑定面，然后 bind（`wire::bind`，`Sprawling/wire/Spec.lean` §8-46）。端口被占、或者暴露的地址没有令牌，都在这里拒绝，账本一字未动。
 2. 建 CAS 目录，开账本、从两份快照一遍读起视图与 Standing（§8-122）。
-3. 开写者线程：`RunWorker::new` → `JsonlLedger::open` 先取写者锁（`crates/storage/Spec.lean` §8-1），再做断尾恢复，再接上视图的观察者，再 `open_for_service`（D81）。锁被别的进程持着，就是 `E_LEDGER_HELD`；已经绑定的监听器随之放掉，账本一字未动。
+3. 开写者线程：`RunWorker::new` → `JsonlLedger::open` 先取写者锁（`Sprawling/storage/Spec.lean` §8-1），再做断尾恢复，再接上视图的观察者，再 `open_for_service`（D81）。锁被别的进程持着，就是 `E_LEDGER_HELD`；已经绑定的监听器随之放掉，账本一字未动。
 4. 返回 `Listening`。到这一步，一次 serve 能做的拒绝都已经做完。
 
 然后调用方印横幅、打开浏览器，再调用 `Listening::serve` 开始应答。
@@ -233,7 +233,7 @@ impl PrefixAsk { pub(super) fn read(self) -> wire::Answer; } // 读不到那一�
 
 ### 8-90 服务中的城在后台证明整条链，证明之前与链断之后写者都不写（`bin::assembly::chain_watch`）
 
-证明线程的四种结局（完好、断链、读不了、恐慌）怎样落到停机值上的权威是 `crates/sprawling/spec/Assembly/ChainWatch.lean`：每种结局都给出判定，只有完好才放行；停机值本身的权威是 `crates/storage/spec/ChainAudit.lean`。本节是接口、线程与理由。
+证明线程的四种结局（完好、断链、读不了、恐慌）怎样落到停机值上的权威是 `Sprawling/app/spec/Assembly/ChainWatch.lean`：每种结局都给出判定，只有完好才放行；停机值本身的权威是 `Sprawling/storage/spec/ChainAudit.lean`。本节是接口、线程与理由。
 
 ```rust
 // accounting::worker::chain_halt —— shape: adapter，随 worker 住（它读写者的私有字段）
@@ -256,9 +256,9 @@ pub(super) fn audit_in_background(
 ) -> Result<std::thread::JoinHandle<()>, AxError>; // StorageFatal「start the chain audit」：线程起不来
 ```
 
-**两步，先接上停机再起线程。** `chain_under_audit` 新建一个 `storage::ChainHalt::awaiting_proof()`，经 `JsonlLedger::halt_on` 接到这个 worker 的写者上，交回停机值、账本目录、写者此刻的位置与能写的记录（`JsonlLedger::proof_records`，记录目录由 `accounting::views::snapshot::start::proof_dir` 给出）；`audit_in_background` 再在名为 `sprawling-chain-audit` 的线程上跑 `storage::prove_chain`（`crates/storage/Spec.lean` §8-30）。前一步读写者的私有字段，所以随 worker 住；后一步起线程，所以留在装配根（accounting D17）。线程只持有账本目录、停机值、记录和自己的 `Diagnostics`，不碰写者，所以写线程从不等证明。`serve` 的写线程在 `open_for_service` 之后依次调用这两步；起不来的线程与起不来的写线程一样，让 `serve` 失败。citysim 与测试不走这条路，所以它们的时序里没有第二个线程。
+**两步，先接上停机再起线程。** `chain_under_audit` 新建一个 `storage::ChainHalt::awaiting_proof()`，经 `JsonlLedger::halt_on` 接到这个 worker 的写者上，交回停机值、账本目录、写者此刻的位置与能写的记录（`JsonlLedger::proof_records`，记录目录由 `accounting::views::snapshot::start::proof_dir` 给出）；`audit_in_background` 再在名为 `sprawling-chain-audit` 的线程上跑 `storage::prove_chain`（`Sprawling/storage/Spec.lean` §8-30）。前一步读写者的私有字段，所以随 worker 住；后一步起线程，所以留在装配根（accounting D17）。线程只持有账本目录、停机值、记录和自己的 `Diagnostics`，不碰写者，所以写线程从不等证明。`serve` 的写线程在 `open_for_service` 之后依次调用这两步；起不来的线程与起不来的写线程一样，让 `serve` 失败。citysim 与测试不走这条路，所以它们的时序里没有第二个线程。
 
-**证明之前写者不写。** 停机值在判定之前拒绝每一次追加，答 `E_HISTORY_UNPROVEN`：页面上发来的命令照样被服务，人收到的是这个码与它的恢复办法，账本一行不多（`crates/accounting/spec/Worker/Attend.lean` 的 `nothing_is_written_before_the_proof`）。`open_for_service` 写的开城那几行在停机值接上之前写下，它们是城自己的开门，不是按历史作出的判断。关城时写者先 `await_proof`，交接那一行在证明有了结局之后写：完好就照常写下，断链就被拒并说出断链的原因。证明线程若没有给出判定就结束（恐慌），它持有的守卫在退栈时以「证明没有走完」跳闸，关城不会永远等下去。
+**证明之前写者不写。** 停机值在判定之前拒绝每一次追加，答 `E_HISTORY_UNPROVEN`：页面上发来的命令照样被服务，人收到的是这个码与它的恢复办法，账本一行不多（`Sprawling/accounting/spec/Worker/Attend.lean` 的 `nothing_is_written_before_the_proof`）。`open_for_service` 写的开城那几行在停机值接上之前写下，它们是城自己的开门，不是按历史作出的判断。关城时写者先 `await_proof`，交接那一行在证明有了结局之后写：完好就照常写下，断链就被拒并说出断链的原因。证明线程若没有给出判定就结束（恐慌），它持有的守卫在退栈时以「证明没有走完」跳闸，关城不会永远等下去。
 
 **结果作为诊断推给页面。** 证明线程的 `Diagnostics` 与写者的那一份同一个落点（`serving::Journal` 的 sink）、同一个级别下限，所以页面在日志里读到这一行：`Whole` 先 `prove`，再写一条 `Effect`：
 
@@ -315,7 +315,7 @@ pub(crate) fn start_served_views(ledger_dir: &Path, log: &mut Diagnostics, cost:
 
 **两个折叠，一条起步路径。** 视图与 `Standing`（§8-101）各有一份快照，放在 `<city>/.sprawling/snapshot/` 下各自的目录（`views/`、`standing/`）里，各有自己的 `fold_version`，因为两者的编码各自改变；核对快照、折尾部、退回全量折叠、切快照只在 `snapshot::start` 写一次，由 `SnapshotFold` 接两种折叠。**被否：两个折叠共用一份快照。** 那让只改了一边编码的构建丢掉两边的快照，而且 `Standing` 在每个 worker 打开时就切，视图在 `serve` 起步时和服务中的折叠线程上切，两者的最后一行并不总相同。
 
-**起步只折尾部。** `start::<Views>` 调 `storage::start_from_snapshot(ledger_dir, <city>/.sprawling/snapshot/views/, views_fold_version())`（`crates/storage/Spec.lean` §8-28）。`Resume`：解码快照里的 views，再用 `ChainSnapshot::resume()` 给出的 `LineCheck` 逐行核对并折尾部——尾部仍然过同一个逐行检查，行号从 `seq + 1` 数起。`Whole`：与没有快照时完全相同，`runtime::replay::fold_ledger_dir` 从创世一段一段地核对并折叠；`Whole` 只带原因，不带行（`crates/storage/Spec.lean` §8-28）。快照之前的行在起步时不再逐行核对：切快照时它们已经过一次完整的核对（从创世或从上一份快照起），`fit` 用一行的链哈希证明它们还是那些行；之后被改坏的行在服务中的城里由后台的证明（§8-90）抓住；一次性的查询（`views::ask` 经 `Views::rebuild`）旁边没有后台证明，所以 `Views::rebuild` 经 `start_audited::<Views>` 起步：先同步跑一次 `storage::prove_chain`，带着只读的已验证前缀记录（`crates/storage/Spec.lean` §8-30：记录命中的段只读、只哈希，其余逐行核对，从不写记录），只有它返回 `Whole` 才从快照起步作答，`Broken(reason)` 与读不了账本都原样拒绝。**被否：一次性查询从创世全量折叠。** 证明逐行核对的只是没有记录覆盖的行，内存是一段字节；全量折叠要解析并折叠每一行，建出整份视图。**快照校验失败绝不信任它**：任何一种 `WholeFold` 都走全量折叠，原因放在 `from` 里；`serve` 把两份折叠各自的 `from` 写成一条 `Effect` 诊断（`the views <起步>; the standing <起步>`），说明这次从哪里起步、为什么。
+**起步只折尾部。** `start::<Views>` 调 `storage::start_from_snapshot(ledger_dir, <city>/.sprawling/snapshot/views/, views_fold_version())`（`Sprawling/storage/Spec.lean` §8-28）。`Resume`：解码快照里的 views，再用 `ChainSnapshot::resume()` 给出的 `LineCheck` 逐行核对并折尾部——尾部仍然过同一个逐行检查，行号从 `seq + 1` 数起。`Whole`：与没有快照时完全相同，`runtime::replay::fold_ledger_dir` 从创世一段一段地核对并折叠；`Whole` 只带原因，不带行（`Sprawling/storage/Spec.lean` §8-28）。快照之前的行在起步时不再逐行核对：切快照时它们已经过一次完整的核对（从创世或从上一份快照起），`fit` 用一行的链哈希证明它们还是那些行；之后被改坏的行在服务中的城里由后台的证明（§8-90）抓住；一次性的查询（`views::ask` 经 `Views::rebuild`）旁边没有后台证明，所以 `Views::rebuild` 经 `start_audited::<Views>` 起步：先同步跑一次 `storage::prove_chain`，带着只读的已验证前缀记录（`Sprawling/storage/Spec.lean` §8-30：记录命中的段只读、只哈希，其余逐行核对，从不写记录），只有它返回 `Whole` 才从快照起步作答，`Broken(reason)` 与读不了账本都原样拒绝。**被否：一次性查询从创世全量折叠。** 证明逐行核对的只是没有记录覆盖的行，内存是一段字节；全量折叠要解析并折叠每一行，建出整份视图。**快照校验失败绝不信任它**：任何一种 `WholeFold` 都走全量折叠，原因放在 `from` 里；`serve` 把两份折叠各自的 `from` 写成一条 `Effect` 诊断（`the views <起步>; the standing <起步>`），说明这次从哪里起步、为什么。
 
 **切快照：服务起步时，折叠越过快照就切一次。** `serve` 调 `start_served_views`：它先经 `fold_city` 让视图与 worker 的 `Standing` 从各自的快照一遍读起（§8-122），再在视图折过的最后一行切一份视图快照（`snapshot::start::cut_at`），最后交出视图；这一遍没有折到任何新行时什么也不写。这个频率不含常数：切一次的代价是一次编码加一次 `sync`，与视图大小成正比；它省下的是下一次起步重折这段尾部的时间，与尾部长度成正比，而尾部只在上次起步之后增长。一次性的查询（`views::ask`）经 `Views::rebuild` 只读快照，不切：读命令不写盘。**写不下快照不让 `serve` 失败**：失败写成一条 `Refuse` 诊断，内容是失败原因与恢复办法，视图照常交出。快照只是下一次起步的捷径：没切成，下一次起步从旧快照或从创世多折一段，结果逐字节相同，只慢一些；而账本写不下时历史本身就缺了，两者不能同样对待。**被否：写不下快照就让 `serve` 失败。** 那让一个只影响下次起步速度的故障（快照目录满、权限错）挡住整座城。
 
@@ -339,7 +339,7 @@ pub(in crate::assembly) fn from_json_text<'de, T: DeserializeOwned, D: Deseriali
 
 **postcard 装不下的字段写成 JSON 文本。** `Entrance.refused` 里的 `AxError` 用 `#[serde(flatten)]`，postcard 不支持；`CollaborationFold.enqueued` 里的信号带 `Payload`（JSON 值），postcard 读不回来。前者整张表经 `as_json_text` 写成一段 JSON 文本；后者先经写者自己的 `Signal::enqueued_payload` 变回入队记录的载荷，读回时经它的逆 `Signal::from_payload`，所以信号的形状只有一处定义。`Entrance.carrying` 是本进程正在执行的命令，不是从历史折出来的，不进快照。**被否：给 `AxError` 另写一份不带 flatten 的编码。** 那是这个类型的第二份拼写，线上的 JSON 形状与快照的形状会各自漂移。
 
-**起步之前先证明整条链。** `Standing::fold` 经 `start_audited::<StandingFolds>` 起步：先同步跑一次 `storage::prove_chain`，带着只读的已验证前缀记录（`crates/storage/Spec.lean` §8-30），只有它返回 `Whole` 才调 `start`；证明后起步只在 `start_audited` 写一次，一次性查询（§8-91）与它共用。`Broken(reason)` 原样返回，worker 打不开，读不了账本同样拒绝。起步本身看不到快照之前的行：`fit` 只核对快照那一行，`JsonlLedger::open` 的尾部扫描只读最后一段；`resume`、`fork`、`adopt` 与一次性命令打开的 worker 旁边没有后台证明（§8-90）。于是某个封好的段里一行被改写成另一行，仍然规范、仍接得上前一行，只断了下一行的 `prev`，除了这次证明谁都看不到；有了它，从快照起步绝不接受一条全量折叠会拒绝的链。记录命中的段只读、只哈希，所以每次打开 worker 仍要读一遍整条链的字节，逐行核对的只是记录之后长出的行。服务中的城不走这里：它的 `Standing` 在 `fold_city` 里与视图一遍起步，证明在后台，证明完成之前写者不写（§8-90、§8-122）。**被否：服务中的 worker 在后台证明完成之前就按历史接受命令。** `Standing` 决定 worker 接不接一条命令，按一段没证明过的历史接受命令，写下的行接在一条可能断了的链后面。
+**起步之前先证明整条链。** `Standing::fold` 经 `start_audited::<StandingFolds>` 起步：先同步跑一次 `storage::prove_chain`，带着只读的已验证前缀记录（`Sprawling/storage/Spec.lean` §8-30），只有它返回 `Whole` 才调 `start`；证明后起步只在 `start_audited` 写一次，一次性查询（§8-91）与它共用。`Broken(reason)` 原样返回，worker 打不开，读不了账本同样拒绝。起步本身看不到快照之前的行：`fit` 只核对快照那一行，`JsonlLedger::open` 的尾部扫描只读最后一段；`resume`、`fork`、`adopt` 与一次性命令打开的 worker 旁边没有后台证明（§8-90）。于是某个封好的段里一行被改写成另一行，仍然规范、仍接得上前一行，只断了下一行的 `prev`，除了这次证明谁都看不到；有了它，从快照起步绝不接受一条全量折叠会拒绝的链。记录命中的段只读、只哈希，所以每次打开 worker 仍要读一遍整条链的字节，逐行核对的只是记录之后长出的行。服务中的城不走这里：它的 `Standing` 在 `fold_city` 里与视图一遍起步，证明在后台，证明完成之前写者不写（§8-90、§8-122）。**被否：服务中的 worker 在后台证明完成之前就按历史接受命令。** `Standing` 决定 worker 接不接一条命令，按一段没证明过的历史接受命令，写下的行接在一条可能断了的链后面。
 
 **每次打开 worker 都切。** `Standing::fold` 先 `start::<StandingFolds>`，折过了快照之后的行就切一份新快照，再 settle。切不成不是折叠的错：结果放在 `Standing.cut` 里，`RunWorker::over` 把它写成一条 `Refuse` 诊断，worker 照常打开，理由与 §8-91 相同。账本目录不存在时什么也不读、不切。
 
@@ -388,7 +388,7 @@ pub(crate) fn start_served_views(ledger_dir: &Path, log: &mut Diagnostics, cost:
 **决定。**
 1. 一行，不是七行。七段是同一次开城的七个部分，读的人要看的是它们之间的比例。被否：每段一条 `Trace`——默认下限看不见它们，打开 `trace` 又会被别的行淹没。
 2. 读数是诊断，不是账本记录。开城用了多久是运行这座城的主机在那一刻的事实，不属于城的历史（`docs/logging.md` §2）。被否：写一条账本事件——同一段历史在两台机器上就不再逐字节相同。
-3. `line()` 是唯一的渲染，没有读者解析它。要逐段比较的人读 `bench_startup` 留在夹具城旁边的日志（`crates/citysim/Spec.lean` §8-5-1），那一行与首字节读数出自同一次开城。
+3. `line()` 是唯一的渲染，没有读者解析它。要逐段比较的人读 `bench_startup` 留在夹具城旁边的日志（`Tools/citysim/Spec.lean` §8-5-1），那一行与首字节读数出自同一次开城。
 4. 派活不在这里拆段。派活的两次读数已在 `prepare_dispatch` 那一行（`[prepare_dispatch]`），它走城钟、按毫秒；把 `stage_dispatch` 内部拆成微秒级的段，要一个能在 accounting 里取单调时间的端口，那是记账线程长任务那一项自己的工作。
 
 **测试。** `assembly::listening::tests::a_listening_city_says_what_opening_it_cost`：在一座刚 `init` 的城上 `listen`，`log` 取 `Effect` 下限、sink 是同一个 `Journal`，事先订阅 `Journal::lines()`；收到恰好一条以 `opened the city in ` 开头的 `Effect`，七个段名按上面的次序出现，并含 `fold <n> lines from genesis`，`n` 是 `init` 写下的账本行数（三行，加上每件自带 skill 一行 `skill_shelved`，kernel D23）。
@@ -414,11 +414,11 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 
 **要什么。** 开一座城到首字节从 40 万行城的 8.2 s 落到毫秒级（D41）：首字节之前只做与尾部长度、快照大小同阶的工作，整条链的证明不挡首字节，接受命令等证明完成。
 
-**两份快照，一遍读。** 视图与 Standing 各有一份快照（§8-91、§8-101），切点各不相同。`start_both` 先读两份快照，各自核对 `fold_version` 并解码；两份都能用时，从较早的切点起经 `storage::start_from_snapshot` 取那一段尾部，每一行过同一个逐行检查（`ChainSnapshot::resume` 给出的 `LineCheck`），再只交给切点在它之前的那一份折叠。较晚的那份快照在这一遍里核对自己那一行（它的 `seq` 上那一行的链哈希），核对不上就在这一遍之后从创世再折它一次（`FoldStart::Whole(Stale)`，罕见的一支）。一份快照不能用（没有、坏了、版本不对、账本比它短），这一遍就从创世走，另一份也在同一遍里从创世折（`FoldStart::Alongside`），所以任何情形下首字节之前至多一遍逐行核对。性质是 `crates/storage/spec/Snapshot.lean` 的 `twoCutsOnePass`。**被否：两份各自经 `start` 起步。** 较晚切点之后的那段尾部被读、被核对两次。
+**两份快照，一遍读。** 视图与 Standing 各有一份快照（§8-91、§8-101），切点各不相同。`start_both` 先读两份快照，各自核对 `fold_version` 并解码；两份都能用时，从较早的切点起经 `storage::start_from_snapshot` 取那一段尾部，每一行过同一个逐行检查（`ChainSnapshot::resume` 给出的 `LineCheck`），再只交给切点在它之前的那一份折叠。较晚的那份快照在这一遍里核对自己那一行（它的 `seq` 上那一行的链哈希），核对不上就在这一遍之后从创世再折它一次（`FoldStart::Whole(Stale)`，罕见的一支）。一份快照不能用（没有、坏了、版本不对、账本比它短），这一遍就从创世走，另一份也在同一遍里从创世折（`FoldStart::Alongside`），所以任何情形下首字节之前至多一遍逐行核对。性质是 `Sprawling/storage/spec/Snapshot.lean` 的 `twoCutsOnePass`。**被否：两份各自经 `start` 起步。** 较晚切点之后的那段尾部被读、被核对两次。
 
-**账本索引随视图快照恢复**（`crates/storage/Spec.lean` §8-4）：从快照起步的视图带着切快照时的索引，第一次历史查询只 `refresh` 之后长出来的字节。从创世走的那一遍照旧顺手建索引。
+**账本索引随视图快照恢复**（`Sprawling/storage/Spec.lean` §8-4）：从快照起步的视图带着切快照时的索引，第一次历史查询只 `refresh` 之后长出来的字节。从创世走的那一遍照旧顺手建索引。
 
-**历史在后台证明。** 快照之前的行在首字节之前一个字节也不核对；写者起好之后，`bin::assembly::chain_watch` 的线程用 `storage::prove_chain` 带着已验证前缀记录走整条链（§8-90、`crates/storage/Spec.lean` §8-30）：记录命中的段只读、只哈希，不解析；记录之后长出的行与没有记录的段逐行核对，然后写新记录。所以一次开城至多一遍逐行核对全量——升级之后第一次开城、或记录被删之后——其余开城只核对上次证明之后长出的行。证明完成之前写者拒绝每一次追加（`E_HISTORY_UNPROVEN`，§8-90）；查询不等证明，按从快照起步的视图作答。
+**历史在后台证明。** 快照之前的行在首字节之前一个字节也不核对；写者起好之后，`bin::assembly::chain_watch` 的线程用 `storage::prove_chain` 带着已验证前缀记录走整条链（§8-90、`Sprawling/storage/Spec.lean` §8-30）：记录命中的段只读、只哈希，不解析；记录之后长出的行与没有记录的段逐行核对，然后写新记录。所以一次开城至多一遍逐行核对全量——升级之后第一次开城、或记录被删之后——其余开城只核对上次证明之后长出的行。证明完成之前写者拒绝每一次追加（`E_HISTORY_UNPROVEN`，§8-90）；查询不等证明，按从快照起步的视图作答。
 
 **四个就绪时刻。**
 
@@ -433,9 +433,9 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 
 **计时。** `OpeningCost`（§8-121）的阶段改为 `fold <n> lines from the snapshots` 或 `from genesis`，读的人从同一行看出这次开城有没有从快照起步；`OpeningCost::began` 把开城起点交给证明线程，M3 从同一个起点量起。
 
-**本节接口的当前状态。** M1 与 M2 是同一刻：`wire::serve` 在 `listen` 返回之后才开始应答，把静态页面的应答提前到折叠之前要改 `wire` 的服务入口，归 W 车道。尾部恢复从末段的已验证前缀起只逐行核对之后的字节（§8-144，`crates/storage/Spec.lean` §8-34）。`SnapshotStart::Resume.tail` 仍把尾部整段读进内存；正常关闭的城尾部为空，崩溃后的尾部是上次切视图快照之后写下的记录。Standing 的快照只在开城时切（§8-101），所以 Standing 的切点落后于视图，这一遍从 Standing 的切点读起：按与视图相同的节奏在服务中切 Standing，要先核对写者对 Standing 的增量更新与 `StandingFolds::absorb` 是同一条规则。页面从 `CityAnswer.proved` 读到历史已证明到哪一条（§8-134）。
+**本节接口的当前状态。** M1 与 M2 是同一刻：`wire::serve` 在 `listen` 返回之后才开始应答，把静态页面的应答提前到折叠之前要改 `wire` 的服务入口，归 W 车道。尾部恢复从末段的已验证前缀起只逐行核对之后的字节（§8-144，`Sprawling/storage/Spec.lean` §8-34）。`SnapshotStart::Resume.tail` 仍把尾部整段读进内存；正常关闭的城尾部为空，崩溃后的尾部是上次切视图快照之后写下的记录。Standing 的快照只在开城时切（§8-101），所以 Standing 的切点落后于视图，这一遍从 Standing 的切点读起：按与视图相同的节奏在服务中切 Standing，要先核对写者对 Standing 的增量更新与 `StandingFolds::absorb` 是同一条规则。页面从 `CityAnswer.proved` 读到历史已证明到哪一条（§8-134）。
 
-### 8-144 开城的两段与一次性重建：末段按记录证明、第二份视图按值克隆、重建每行只核对一遍（`accounting::worker::folds`、`accounting::views::snapshot`、`accounting::views::snapshot::start`，形状 7 投影；`crates/storage/Spec.lean` §8-34，`crates/accounting/Spec.lean` §8-19）
+### 8-144 开城的两段与一次性重建：末段按记录证明、第二份视图按值克隆、重建每行只核对一遍（`accounting::worker::folds`、`accounting::views::snapshot`、`accounting::views::snapshot::start`，形状 7 投影；`Sprawling/storage/Spec.lean` §8-34，`Sprawling/accounting/Spec.lean` §8-19）
 
 **原因是一组拆开的读数。** 40 万行夹具城（`bench_startup first-byte` 的 `l400k`，§8-122 之后，windows-x86_64、16 核、NVMe、release）开城 1220 ms，其中 `open the ledger` 576 ms、`fold 0 lines from the snapshots` 279 ms、`copy the views` 357 ms。逐段拆开量：
 - `open the ledger` 几乎全是尾部恢复逐行核对末段（40,843,081 B）；同一段读一遍 15 ms、BLAKE3 一遍 23 ms。
@@ -445,38 +445,38 @@ pub(crate) fn fold_city(ledger_dir: &Path, now: TimeMs, cost: &mut OpeningCost)
 整城重建（`just bench` 的 `large_ledger_fold`，5 万行、没有快照也没有记录）p50 1286 ms：`Views::rebuild` 先经 `prove_chain` 逐行核对整条链，从创世全量折叠时又逐行核对一遍。
 
 **四处改动，保证不变。**
-1. `fold_city` 经 `JsonlLedger::open_reusing` 开账本，记录取自 `proof_dir` 的只读一份（`crates/storage/Spec.lean` §8-34）：末段的前缀按摘要证明，逐行核对的只有上一次后台证明（§8-90）之后写下的行。正常关闭的城，那几行就是关城时写的交接。
-2. `Views::twin` 是派生的 `Clone`（`crates/accounting/Spec.lean` §8-19(a)）：共享的句柄在 `Arc` 里，克隆后仍共享，结果与编码再解码相同。
-3. `start_audited` 从创世折叠时不先证明，从快照起步时才先证明（`crates/accounting/Spec.lean` §8-19(b)）。
-4. `storage::tail_after` 从含快照那一行的段尾往回找它，不再从段首把整段切成行（`crates/storage/Spec.lean` §8-28）。
+1. `fold_city` 经 `JsonlLedger::open_reusing` 开账本，记录取自 `proof_dir` 的只读一份（`Sprawling/storage/Spec.lean` §8-34）：末段的前缀按摘要证明，逐行核对的只有上一次后台证明（§8-90）之后写下的行。正常关闭的城，那几行就是关城时写的交接。
+2. `Views::twin` 是派生的 `Clone`（`Sprawling/accounting/Spec.lean` §8-19(a)）：共享的句柄在 `Arc` 里，克隆后仍共享，结果与编码再解码相同。
+3. `start_audited` 从创世折叠时不先证明，从快照起步时才先证明（`Sprawling/accounting/Spec.lean` §8-19(b)）。
+4. `storage::tail_after` 从含快照那一行的段尾往回找它，不再从段首把整段切成行（`Sprawling/storage/Spec.lean` §8-28）。
 
-**回退门是计数，墙钟只登记。** storage 的 `jsonl::open::tests` 在 N 与 2N 行上断言：记录覆盖末段之后再写 2 行，开账本逐行核对 2 行、按摘要复用 1 段。accounting 的 `worker::folds::views_start::tests` 在两种规模上断言：没有快照与记录时重建逐行核对的行数等于账本行数；快照与记录都在时等于之后长出的行数的两倍（证明一遍、折尾部一遍），与历史长度无关。开城各段与首字节的毫秒数由 `bench_startup first-byte` 与 `opened the city in` 那一行（§8-121）读出，进 `crates/xtask/budgets.toml` 的 `[first_byte]` 与 `[views_rebuild_per_mb]`。
+**回退门是计数，墙钟只登记。** storage 的 `jsonl::open::tests` 在 N 与 2N 行上断言：记录覆盖末段之后再写 2 行，开账本逐行核对 2 行、按摘要复用 1 段。accounting 的 `worker::folds::views_start::tests` 在两种规模上断言：没有快照与记录时重建逐行核对的行数等于账本行数；快照与记录都在时等于之后长出的行数的两倍（证明一遍、折尾部一遍），与历史长度无关。开城各段与首字节的毫秒数由 `bench_startup first-byte` 与 `opened the city in` 那一行（§8-121）读出，进 `Tools/xtask/budgets.toml` 的 `[first_byte]` 与 `[views_rebuild_per_mb]`。
 
 **本节接口的当前状态。**
 - `copy the views` 仍在开城那一行里（§8-121 的 `Phase::Twin`），`twin` 仍答 `Result`：它不再会失败，去掉 `Result` 与这一段要同时改 `bin::assembly::listening` 的调用点。
 
-### 8-154 开城与证明再降一档：快照里的摘要是字节，证明按波读段（`accounting::views::snapshot`、`accounting::worker::folds::standing_start`，形状 7 投影；`bin::assembly::chain_watch`，形状：状态机；`crates/kernel/Spec.lean` §8-84，`crates/storage/Spec.lean` §8-37，`crates/accounting/Spec.lean` §8-24）
+### 8-154 开城与证明再降一档：快照里的摘要是字节，证明按波读段（`accounting::views::snapshot`、`accounting::worker::folds::standing_start`，形状 7 投影；`bin::assembly::chain_watch`，形状：状态机；`Sprawling/kernel/Spec.lean` §8-84，`Sprawling/storage/Spec.lean` §8-37，`Sprawling/accounting/Spec.lean` §8-24）
 
 **原因是 §8-144 留下的两处读数。** 40 万行夹具城（`bench_startup first-byte` 的 `l400k`，windows-x86_64、16 核、NVMe、release，三轮各 3 个样本）首字节 p50 296–298 ms；`opened the city in` 约 261 ms，其中 `fold 0 lines from the snapshots` 189–190 ms、`open the ledger` 41–42 ms、`copy the views` 22 ms；`the history is proved` 那一行：6 段全按记录命中、0 行逐行核对、读与哈希各 376,383,853 B，证明 390–395 ms，开城起点之后 651–656 ms 接受命令（M3）。10 万行城（`l100k`）：首字节 p50 127–130 ms，折叠 53 ms，证明 98–99 ms，M3 192–193 ms。
 
 **两处改动。**
-1. 视图与 Standing 的快照里，`GitOid` 与 `B3Hash` 写成字节本身（`crates/kernel/Spec.lean` §8-84）。两份快照的夹具里都有这两种摘要，`fold_version` 随之进位，升级之后第一次开城从创世折一次、切新快照（`crates/accounting/Spec.lean` §8-24）。
-2. 后台证明按波读段：一波至多 8 段，各段的读与记录前缀的哈希同时做，链仍按段序判（`crates/storage/Spec.lean` §8-37）。`chain_watch` 的那一行不变。
+1. 视图与 Standing 的快照里，`GitOid` 与 `B3Hash` 写成字节本身（`Sprawling/kernel/Spec.lean` §8-84）。两份快照的夹具里都有这两种摘要，`fold_version` 随之进位，升级之后第一次开城从创世折一次、切新快照（`Sprawling/accounting/Spec.lean` §8-24）。
+2. 后台证明按波读段：一波至多 8 段，各段的读与记录前缀的哈希同时做，链仍按段序判（`Sprawling/storage/Spec.lean` §8-37）。`chain_watch` 的那一行不变。
 
-**保证不变。** 账本行、线上帧、`golden-p0`／`golden-s1`、wire 的两份 golden 都不变；证明的判定与逐行核对相同（`crates/storage/spec/Snapshot.lean` 的 `wavesAreStrict`）。回退门仍是计数：storage 的 `chain_audit::tests` 在 N 与 2N 段上断言五个计数（逐行核对的行数、按摘要的段数、读与哈希的字节、波数），accounting 的两个 fold-rules 测试钉住快照格式。
+**保证不变。** 账本行、线上帧、`golden-p0`／`golden-s1`、wire 的两份 golden 都不变；证明的判定与逐行核对相同（`Sprawling/storage/spec/Snapshot.lean` 的 `wavesAreStrict`）。回退门仍是计数：storage 的 `chain_audit::tests` 在 N 与 2N 段上断言五个计数（逐行核对的行数、按摘要的段数、读与哈希的字节、波数），accounting 的两个 fold-rules 测试钉住快照格式。
 
-**改后的读数**（同一台机器、同一组夹具、同样三轮）。`l400k`：首字节 p50 249–259 ms；`opened the city in` 216–222 ms，其中 `fold 0 lines from the snapshots` 145–149 ms；证明 119–121 ms，开城起点之后 335–343 ms 接受命令。`l100k`：首字节 p50 116–119 ms，折叠 42 ms，证明 77–78 ms，M3 159–161 ms。一波 4 段（两波读完 6 段）时 `l400k` 的证明是 200 ms、M3 420 ms，所以一波取 8 段（`crates/storage/Spec.lean` §8-37）。
+**改后的读数**（同一台机器、同一组夹具、同样三轮）。`l400k`：首字节 p50 249–259 ms；`opened the city in` 216–222 ms，其中 `fold 0 lines from the snapshots` 145–149 ms；证明 119–121 ms，开城起点之后 335–343 ms 接受命令。`l100k`：首字节 p50 116–119 ms，折叠 42 ms，证明 77–78 ms，M3 159–161 ms。一波 4 段（两波读完 6 段）时 `l400k` 的证明是 200 ms、M3 420 ms，所以一波取 8 段（`Sprawling/storage/Spec.lean` §8-37）。
 
 **本节接口的当前状态。**
 - 视图快照解码去掉十六进制只省下约 44 ms，不是 §8-144 估的 105 ms；`fold … from the snapshots` 余下的 145 ms 还没有拆开量过。下一步是在这一段里分开读快照、postcard 解码各字段与尾部，按读数找下一处。
-- 证明的墙钟由最长的一段定：`l100k` 只有两段，一段 64 MiB 读与哈希约 60 ms，所以证明 77 ms；在一段之内并行哈希（`crates/storage/Spec.lean` §8-37 的第二条被否）是段少的城的下一处余量。M3 在 40 万行城上仍是开城加证明，两者都在毫秒级。
+- 证明的墙钟由最长的一段定：`l100k` 只有两段，一段 64 MiB 读与哈希约 60 ms，所以证明 77 ms；在一段之内并行哈希（`Sprawling/storage/Spec.lean` §8-37 的第二条被否）是段少的城的下一处余量。M3 在 40 万行城上仍是开城加证明，两者都在毫秒级。
 - `copy the views`（22 ms）与 `open the ledger`（41 ms，读末段并按记录证明它）没有动。
 - 升级之后第一次开城从创世折一次（`l400k` 约 7 s），因为两份快照的 `fold_version` 都进了位；之后的开城照上面的读数。
 -/
 
 /-! D3 开城不等整条链的证明，接受命令等（§8-122）
 
-首字节之前只读尾部与两份快照，整条链在写者起好之后由后台证明，证明完成之前写者拒绝每一次追加（`E_HISTORY_UNPROVEN`），查询按从快照起步的视图作答。**被否：轻量审计，封好的段只取 `prev`、`seq` 并哈希整行。** 它不再证明每一行都能被这个构建逐字节规范地写出来，与 `LineCheck` 不等价，而开城之后读这些行的正是按 `LineCheck` 解析它们的视图与索引；已验证前缀记录让「只哈希」只用在已经逐行核对过、字节没有变的段上（`crates/storage/Spec.lean` §8-30）。**被否：证明完成之前接受命令、断链再停写。** 那是 §8-101 已被否的做法：写下的行接在一条可能断了的链后面，收不回来。
+首字节之前只读尾部与两份快照，整条链在写者起好之后由后台证明，证明完成之前写者拒绝每一次追加（`E_HISTORY_UNPROVEN`），查询按从快照起步的视图作答。**被否：轻量审计，封好的段只取 `prev`、`seq` 并哈希整行。** 它不再证明每一行都能被这个构建逐字节规范地写出来，与 `LineCheck` 不等价，而开城之后读这些行的正是按 `LineCheck` 解析它们的视图与索引；已验证前缀记录让「只哈希」只用在已经逐行核对过、字节没有变的段上（`Sprawling/storage/Spec.lean` §8-30）。**被否：证明完成之前接受命令、断链再停写。** 那是 §8-101 已被否的做法：写下的行接在一条可能断了的链后面，收不回来。
 -/
 
 /-! D4 开城变快靠少做重复的事，不靠放松保证（§8-144）

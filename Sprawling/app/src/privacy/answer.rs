@@ -5,7 +5,7 @@
 
 //! The privacy page's answer, put together from the controls table, the
 //! original items, what the host read and what the history released
-//! (`crates/sprawling/spec/Privacy/Service.lean`). No IO: the reads and the
+//! (`Sprawling/app/spec/Privacy/Service.lean`). No IO: the reads and the
 //! identity check happen in [`super::service`] before anything here runs.
 
 use wire::{

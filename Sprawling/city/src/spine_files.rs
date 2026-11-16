@@ -22,7 +22,7 @@
 //! ones — and the record of past ones is in the ledger, where a rewrite
 //! cannot reach it.
 //!
-//! Specified by `crates/city/spec/SpineFiles.lean` §8-5.
+//! Specified by `Sprawling/city/spec/SpineFiles.lean` §8-5.
 
 use std::path::{Path, PathBuf};
 
@@ -57,7 +57,7 @@ pub const SPEC_FILE: &str = "SPEC.md";
 pub const CITY_FILE: &str = "City.md";
 /// The bytes this build's default [`CITY_FILE`] holds, handed out only
 /// through `defaults::Shipped::City` so the one writer of the city's
-/// copy is `defaults::follow_defaults` (`crates/city/spec/SpineFiles.lean`
+/// copy is `defaults::follow_defaults` (`Sprawling/city/spec/SpineFiles.lean`
 /// §8-41).
 pub(crate) const CITY_TEMPLATE: &str = include_str!("../templates/City.md");
 /// The conventions a project brings with it. **The city neither writes
@@ -86,7 +86,7 @@ const PROJECT_PLACEHOLDER: &str = "<project name>";
 /// What a dispatch knows about the work when the job file is written.
 pub struct JobBrief<'a> {
     /// Who handed this work down, as `kernel::event::Who::handed_down_by`
-    /// renders it (`crates/city/spec/SpineFiles.lean` D21).
+    /// renders it (`Sprawling/city/spec/SpineFiles.lean` D21).
     pub from: &'a str,
     /// One line: what to produce.
     pub task: &'a str,
@@ -181,7 +181,7 @@ pub fn handoff_path(city_root: &Path, room: &Address) -> PathBuf {
 ///
 /// **A slot that is already empty is not a failure.** The caller asked
 /// for a new session, which is a thing that can be done whatever the
-/// previous one left behind (`crates/sprawling/Spec.lean` §8-82).
+/// previous one left behind (`Sprawling/app/Spec.lean` §8-82).
 ///
 /// # Errors
 /// `E_STORAGE_FATAL` naming the path, for every failure except a file
@@ -322,7 +322,7 @@ pub fn roadmap(city_root: &Path, building_addr: &Address) -> Result<String, AxEr
 /// The job form with the brief written into it.
 ///
 /// The task and the goal are escaped, whoever wrote them, so neither can
-/// close its element (`crates/city/spec/SpineFiles.lean` D21); holding no
+/// close its element (`Sprawling/city/spec/SpineFiles.lean` D21); holding no
 /// `<`, neither can spell a marker, so the markers fill one after another.
 fn filled(brief: &JobBrief<'_>) -> String {
     JOB_TEMPLATE

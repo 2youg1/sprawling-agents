@@ -6,7 +6,7 @@
 /-!
 # session：握手完成之前，工具不出手
 
-规定 `crates/desktop/src/session.rs`（`desktop::session`，`Server::answer` 与 `Phase`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/desktop/src/session.rs`（`desktop::session`，`Server::answer` 与 `Phase`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 MCP 的生命周期是 `initialize` → `notifications/initialized` → 其余。一台不强制这个次序的 server 会让客户端的次序错误在别处以别的形状爆出来（§10 第 2 条）。`Phase` 是 typestate 在运行期的投影：`Fresh`、`Initializing`、`Ready`。
 

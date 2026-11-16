@@ -6,9 +6,9 @@
 /-!
 # citysim::executor
 
-规定 `citysim::executor`（`crates/citysim/src/executor.rs`），以及它交给 `runtime::run::drive` 的两个剧本适配器 `citysim::script_model`、`citysim::script_tools` 与筛子的世界 `citysim::sieving`。本文件是 `crates/citysim/Spec.lean` 的一个分部；下面每一节保留它在 citysim 规格里的标签 §8-n，别处引作 `crates/citysim/Spec.lean §8-n`。
+规定 `citysim::executor`（`Tools/citysim/src/executor.rs`），以及它交给 `runtime::run::drive` 的两个剧本适配器 `citysim::script_model`、`citysim::script_tools` 与筛子的世界 `citysim::sieving`。本文件是 `Tools/citysim/Spec.lean` 的一个分部；下面每一节保留它在 citysim 规格里的标签 §8-n，别处引作 `Tools/citysim/Spec.lean §8-n`。
 
-确定性是这里的事（D1）：一次剧本执行重放时逐字节相同，因为剧本是写死的、时钟是一个按问询计数的计数器、执行是单线程，三者都不读外界。能写成定理的是其中三件：计数时钟交出的读数只取决于被问了几次（`the_clock_hands_out_its_count`）；场景只在回合边界说话，取消压过 steer（D7）；一次工具调用的键取每 run 一个的位次，所以同一 run 里两次调用的键永远不同（D20）。剧本模型按序作答、用尽之后恒以空调用作结（`the_script_is_answered_in_order`）。回合本身怎样走是 runtime 的模型（`crates/runtime/spec/Turn.lean`、`crates/runtime/spec/Run.lean`），本文件不重述。
+确定性是这里的事（D1）：一次剧本执行重放时逐字节相同，因为剧本是写死的、时钟是一个按问询计数的计数器、执行是单线程，三者都不读外界。能写成定理的是其中三件：计数时钟交出的读数只取决于被问了几次（`the_clock_hands_out_its_count`）；场景只在回合边界说话，取消压过 steer（D7）；一次工具调用的键取每 run 一个的位次，所以同一 run 里两次调用的键永远不同（D20）。剧本模型按序作答、用尽之后恒以空调用作结（`the_script_is_answered_in_order`）。回合本身怎样走是 runtime 的模型（`Sprawling/runtime/spec/Turn.lean`、`Sprawling/runtime/spec/Run.lean`），本文件不重述。
 -/
 
 /-!
@@ -44,7 +44,7 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError>;
 pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<ScenarioReport, AxError>;
 ```
 
-- 事件序（无取消正常收束）：`checkpoint_committed`（JOB.md 先落）→ `run_started` → `prompt_assembled`（每 run 一条，`crates/runtime/Spec.lean` §8-39 第 5 条）→ 每回合 `prompt_shape_compared→model_called→model_returned[→tool_called→tool_result]*` → 空 calls 回合后 `handoff_written` → `run_frozen{completion:done, evidence:[末 model_returned]}`。
+- 事件序（无取消正常收束）：`checkpoint_committed`（JOB.md 先落）→ `run_started` → `prompt_assembled`（每 run 一条，`Sprawling/runtime/Spec.lean` §8-39 第 5 条）→ 每回合 `prompt_shape_compared→model_called→model_returned[→tool_called→tool_result]*` → 空 calls 回合后 `handoff_written` → `run_frozen{completion:done, evidence:[末 model_returned]}`。
 - 取消在指定边界注入 `Interrupt::Cancel`（D7）：事件序断言是 `cancel_received` 后无新 `model_called`／`tool_called`，且 `handoff_written` 恒先于 `run_frozen`，三个边界各一条剧本。
 - `steer` 在给定回合的波边界递一句人话（`Interrupt::Steer`，说话者是 `Speaker::Person`）：它追加到下一个结果里，不打断正在进行的动作，故剧本断言循环照常继续。同一边界上取消压过 steer（`every_cancel_point_is_reached` 对任意 steer 成立）。
 - 回合数没有上限：驱动器跑到模型回空 calls 或被取消为止（`runtime::run::drive`）。
@@ -67,7 +67,7 @@ pub fn run_scenario_on(ledger: &mut MemLedger, scenario: Scenario) -> Result<Sce
 
 门路由归 `ToolBench`，写域住 bench 内，executor 不手写 domain 门。`ScriptTool` 是 `kernel::Tool` 缝的第二适配器，**注册进真 ToolBench**，于是脚本工具与真 L0 工具走同一条门路由。波前的检查点是**每波一次**而非只在 exec forecast 命中时：`ToolBench` 内的 forecast 检查点是它在 exec 臂上的加强，两者不互相替代。空波仍提交（同树 oid），因为链可重建优于省一次提交。tool_result 的信封由 executor 挂（`pipeline::package` 加 `StampGate`），与 serve 同位；场景把 `exec` 的结果交给筛子时（`sieve` 为 `Some`），信封由 `sieving::package_exec` 经城自己的筛子挂。
 
-事件序断言：edit 成功的波携 `checkpoint_committed`（波前，断言形：每个 `tool_called` 之前最近的 `checkpoint_committed` 晚于最近的 `model_returned`）；tool_result 信封可携 ClockStamp（非 Off 时）；越域写被 domain 门拒且 refusal 以 tool_result 回流；链恒可验；双跑字节对拍。gateway 进 sim 的只有 dialect 翻译面（纯函数，确定性保持）；endpoint 的 HTTP 面不入 sim（网络即非确定），其验证住 gateway 自身的回环假服务测试（`crates/gateway/Spec.lean` §2）。
+事件序断言：edit 成功的波携 `checkpoint_committed`（波前，断言形：每个 `tool_called` 之前最近的 `checkpoint_committed` 晚于最近的 `model_returned`）；tool_result 信封可携 ClockStamp（非 Off 时）；越域写被 domain 门拒且 refusal 以 tool_result 回流；链恒可验；双跑字节对拍。gateway 进 sim 的只有 dialect 翻译面（纯函数，确定性保持）；endpoint 的 HTTP 面不入 sim（网络即非确定），其验证住 gateway 自身的回环假服务测试（`Sprawling/gateway/Spec.lean` §2）。
 -/
 
 /-!
@@ -82,7 +82,7 @@ fn next_place(placed: &Cell<Option<u64>>) -> Result<Seq, AxError>;   // 交出 u
 
 模型的位次是 `Nat`，没有顶；Rust 的位次交出 `u64::MAX` 之后拒绝下一次调用，而不是饱和在顶上——饱和会让两次调用共用一把键，第二次被 bench 当作重复（`the_call_after_the_last_place_is_refused`）。
 
-**动作字节取 `ToolCall::action`**（`crates/kernel/Spec.lean` §8-23，全库唯一一份），**位次取每跑一个的计数器**，与 `accounting::worker` 同形，故两个驱动器对「一次工具调用的键怎么算」只有一份读法（D20）。
+**动作字节取 `ToolCall::action`**（`Sprawling/kernel/Spec.lean` §8-23，全库唯一一份），**位次取每跑一个的计数器**，与 `accounting::worker` 同形，故两个驱动器对「一次工具调用的键怎么算」只有一份读法（D20）。
 
 `two_reads_in_one_wave_are_two_calls` 钉住这一条：一个回合携两次同名、参数不同的调用，两条 `tool_result` 都带结果、都不带 `error`。`IdemKey` 不进任何 payload，故账本字节与 `golden-p0` 不受它影响。
 -/
@@ -225,7 +225,7 @@ theorem keyed_places_from (run next : Nat) (actions : List String) :
     · exact Nat.le_refl _
     · exact Nat.le_of_succ_le (ih (next + 1) key later)
 
-/-- D20 **一次工具调用的键：每跑一个的位次，加上整个动作的字节。** 动作字节取 `ToolCall::action`（`crates/kernel/Spec.lean` §8-23，全库唯一一份），位次取每跑一个的计数器，与 `accounting::worker` 同形，故两个驱动器对「一次工具调用的键怎么算」只有一份读法。被击败的读法：位次取回合时钟 `t`、动作字节只取工具名。`runtime::run` 给一波里的每次调用同一个 `t`（一波是一个瞬间），于是一波之内两次同名调用拿到相同的 `IdemKey`，`ToolBench::invoke` 的去重把第二次判成重复，参数不同也不救；而且那个 `Seq` 是钟读数换了个类型，违反确定性规则「位次不从时钟来」（ARCHITECTURE.md §10 第 7 条）。
+/-- D20 **一次工具调用的键：每跑一个的位次，加上整个动作的字节。** 动作字节取 `ToolCall::action`（`Sprawling/kernel/Spec.lean` §8-23，全库唯一一份），位次取每跑一个的计数器，与 `accounting::worker` 同形，故两个驱动器对「一次工具调用的键怎么算」只有一份读法。被击败的读法：位次取回合时钟 `t`、动作字节只取工具名。`runtime::run` 给一波里的每次调用同一个 `t`（一波是一个瞬间），于是一波之内两次同名调用拿到相同的 `IdemKey`，`ToolBench::invoke` 的去重把第二次判成重复，参数不同也不救；而且那个 `Seq` 是钟读数换了个类型，违反确定性规则「位次不从时钟来」（ARCHITECTURE.md §10 第 7 条）。
 
 同一个 run 里，没有两次调用的键输入相同，无论它们的动作是什么、落在哪一波。 -/
 theorem no_two_calls_of_a_run_share_a_key (run next : Nat) (actions : List String) :

@@ -5,7 +5,7 @@
 
 //! Fresh-process CPython calls and their completion protocol. The timing ends
 //! when the reader receives the flushed line, not on a later poll or process
-//! teardown (`crates/citysim/spec/Bench.lean` §8-6-1).
+//! teardown (`Tools/citysim/spec/Bench.lean` §8-6-1).
 
 use std::io::BufRead as _;
 use std::path::Path;

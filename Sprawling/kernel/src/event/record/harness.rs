@@ -103,7 +103,7 @@ pub enum HarnessPermitKind {
 ///
 /// Written when the stop reason arrives, before the run freezes, for
 /// every stop reason. An `end_turn` answer with text is evidence of
-/// `Completion::Done` (`crates/kernel/spec/Completion.lean` §8-20).
+/// `Completion::Done` (`Sprawling/kernel/spec/Completion.lean` §8-20).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HarnessAnswered {

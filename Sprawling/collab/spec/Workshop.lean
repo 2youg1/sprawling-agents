@@ -6,7 +6,7 @@
 /-!
 # Workshop：只派就绪的节点，一个节点只派一次
 
-规定 `crates/collab/src/workshop.rs`（`collab::workshop`，`Workshop::ready`）与 `crates/collab/src/workshop/underway.rs`（`collab::workshop::underway`，`Underway::hand_next`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/collab/src/workshop.rs`（`collab::workshop`，`Workshop::ready`）与 `Sprawling/collab/src/workshop/underway.rs`（`collab::workshop::underway`，`Underway::hand_next`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 一张图是一组节点，每个节点点名它依赖的节点。`done` 是这个房间的 join 已收下 `Artifact` 的节点；`handed` 是这个房间此前已派出的节点。一个节点在「就绪」与「已汇合」之间是「在飞」，只看 `done` 分不出它与「未派」，所以 `Underway` 带着已派集。
 
@@ -18,7 +18,7 @@
 
 性质 4–7 管一张图在父房间里的整段 trace：图在派活那一刻登记，子节点与父 run 谁先落地都行，父 run 被取消或失败时关图（见「图在派活那一刻登记」一节与 collab D14）。
 
-构造时拒重名、悬空依赖与环（`Workshop::new`），故一张存在的图是一张跑得完的图；调度确定（有序集合、按 id 破平），这是判负与重放的前提。这两条由 `crates/collab/src/workshop/tests.rs` 经生产入口断言，本模型不重述。
+构造时拒重名、悬空依赖与环（`Workshop::new`），故一张存在的图是一张跑得完的图；调度确定（有序集合、按 id 破平），这是判负与重放的前提。这两条由 `Sprawling/collab/src/workshop/tests.rs` 经生产入口断言，本模型不重述。
 -/
 
 namespace Collab.Workshop
@@ -76,7 +76,7 @@ theorem withoutHanded_hands_twice :
 /-!
 ## 图在派活那一刻登记（collab D7、D14）
 
-上面三条只看一次 `hand_next`。下面的模型看父房间的一张图从摆出到关掉的整段 trace，规定 `crates/accounting/src/worker/waking/handing.rs`（调用时登记与派出，`end_hand_over` 按父 run 的结局关图）与 `crates/accounting/src/worker/dispatching/handback.rs`（`hand_down_what_is_ready`）。
+上面三条只看一次 `hand_next`。下面的模型看父房间的一张图从摆出到关掉的整段 trace，规定 `Sprawling/accounting/src/worker/waking/handing.rs`（调用时登记与派出，`end_hand_over` 按父 run 的结局关图）与 `Sprawling/accounting/src/worker/dispatching/handback.rs`（`hand_down_what_is_ready`）。
 
 - `layOut`：父 run 调 `workshop lay_out` 的那一刻。图就在这时登记给父房间（状态 `live`），就绪的节点当场派出，不等父 run 落地（D7）。图还开着时这个房间后来的 run 再摆一次，新图取代旧图，已派集照带；同一个 run 的第二次摆出在 Rust 里当场被拒（`WorkshopDesk::lay_out`），模型不分 run，所以不写这道拒。构造时重名的图被拒（`Workshop::new`），模型里是一个空操作。
 - `land x back`：在飞的子节点 `x` 落地。它的 handback 投进父房间（`backs`）；`Finished` 才汇入 join（`done`），`Stopped` 只投信不汇合。图还开着，就按新的 `done` 再派一次就绪集；全部汇合就关图。子节点落地与父 run 落地的先后不受约束。
@@ -441,14 +441,14 @@ theorem withoutCallRegistration_strands :
 /-!
 ## 导出检查：轨迹向量与两个故意改坏的实现
 
-Rust 测试经生产入口（`RunWorker::hand_over_at_call`、子 run 的落地与 handback、`end_hand_over`）重放下面的动作序列，断言派活记录（`handed`，按 `run_started` 次序）、汇合集与关图与否等于这里的值：`crates/accounting/src/worker/waking/vector_tests.rs` 重放全部四条向量。`vectorFailed` 的父 run 是一次失败的驱动，经 `GraphAfter::of` 读成 `GraphAfter::Closed`，与 `vectorCancelled` 同一臂；节点 3 的模型调用被扣到父 run 结束之后，所以落地次序是向量的次序，不是 lane 谁快。`vectorStopped` 的节点 2 以空回复落成 `Limit`，即 `Handback::Stopped`；它的末一步（节点 2 第二次落地）在生产里没有入口，一个 run 只落地一次，所以 Rust 重放前五步。节点 id 是子房间地址的序号；`Back.finished` 是子 run 以 Done 落地并通过 done check，`Back.stopped` 是它停下；`Ending` 是父 run 的落地结局。每条向量由 `lake build` 经 `#guard` 判定，模型改了而向量没跟上，构建就红。
+Rust 测试经生产入口（`RunWorker::hand_over_at_call`、子 run 的落地与 handback、`end_hand_over`）重放下面的动作序列，断言派活记录（`handed`，按 `run_started` 次序）、汇合集与关图与否等于这里的值：`Sprawling/accounting/src/worker/waking/vector_tests.rs` 重放全部四条向量。`vectorFailed` 的父 run 是一次失败的驱动，经 `GraphAfter::of` 读成 `GraphAfter::Closed`，与 `vectorCancelled` 同一臂；节点 3 的模型调用被扣到父 run 结束之后，所以落地次序是向量的次序，不是 lane 谁快。`vectorStopped` 的节点 2 以空回复落成 `Limit`，即 `Handback::Stopped`；它的末一步（节点 2 第二次落地）在生产里没有入口，一个 run 只落地一次，所以 Rust 重放前五步。节点 id 是子房间地址的序号；`Back.finished` 是子 run 以 Done 落地并通过 done check，`Back.stopped` 是它停下；`Ending` 是父 run 的落地结局。每条向量由 `lake build` 经 `#guard` 判定，模型改了而向量没跟上，构建就红。
 
 两个故意改坏的实现必须各让至少一条向量变红，在模型里由下面的 `#guard` 判，在 Rust 里由同名测试判：Rust 测试服务到汇合数够了或已无 run 在驱动为止，所以一个什么也不派的实现让断言变红，而不是让测试挂住。
 
 - **落地才登记**（`stepRegisteringAtLanding`，即被否决的半步）：`vectorEarly`、`vectorCancelled`、`vectorFailed` 都变红，三条下都只派出节点 1，节点 2 与 3 不派（紧跟四条向量之后的那条 `#guard` 判这件事）。
 - **关图不挡**（`stepIgnoringEnding`）：`hand_down_what_is_ready` 不看父 run 的结局（`holds`），`vectorCancelled` 与 `vectorFailed` 变红，节点 4 被派出。
 
-`vectorStopped` 记下 `crates/collab/Spec.lean` §3 那个未定的问题：停下的子节点投了 handback 却不汇合，图永远开着、节点 4 永远不派；要改这条，先改模型。
+`vectorStopped` 记下 `Sprawling/collab/Spec.lean` §3 那个未定的问题：停下的子节点投了 handback 却不汇合，图永远开着、节点 4 永远不派；要改这条，先改模型。
 -/
 
 /-- 菱形：1 在前，2、3 依赖 1，4 依赖 2 与 3。 -/

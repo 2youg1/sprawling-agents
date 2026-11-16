@@ -5,9 +5,9 @@
 
 //! What this crate's twelve modules say when persistence refuses, and
 //! the one door that turns it into an `AxError`
-//! (`crates/storage/spec/Error.lean` §8-14).
+//! (`Sprawling/storage/spec/Error.lean` §8-14).
 //!
-//! **Why this is a module of its own.** `crates/storage/Spec.lean` §7 recorded
+//! **Why this is a module of its own.** `Sprawling/storage/Spec.lean` §7 recorded
 //! the condition when the type was born: it lived beside the ledger
 //! while fewer than three modules aggregated here, and moved out at
 //! three. Most of the crate's modules import it today, and most of its
@@ -87,7 +87,7 @@ pub enum StorageError {
     /// changed in the city folder and has not committed.
     #[error("merging would discard uncommitted changes to {}", paths.join(", "))]
     MergeWouldDiscard { paths: Vec<String> },
-    /// A name that is an alias. The family is refused whole (`crates/storage/spec/Alias.lean`
+    /// A name that is an alias. The family is refused whole (`Sprawling/storage/spec/Alias.lean`
     /// §8-25): a write through one lands where the name does not say.
     #[error("{op} refused at {path}: that name is a {kind}")]
     Alias {
@@ -97,16 +97,16 @@ pub enum StorageError {
     },
     /// Something already stands at the name a create asked for: the
     /// file system answered at the moment of the write, so a second of
-    /// two racing creates meets this (`crates/storage/spec/Alias.lean` §8-32).
+    /// two racing creates meets this (`Sprawling/storage/spec/Alias.lean` §8-32).
     #[error("{} already exists", path.display())]
     NameTaken { path: PathBuf },
     /// Another handle holds this city's writer lock: a second process,
-    /// or a second ledger in this one (`crates/storage/spec/Jsonl.lean` §8-1).
+    /// or a second ledger in this one (`Sprawling/storage/spec/Jsonl.lean` §8-1).
     #[error("the ledger at {dir} is held by another writer")]
     LedgerHeld { dir: PathBuf },
     /// A wave's write or barrier failed, so what the disk holds past
     /// `at` is unknown to this handle; only a reopen can judge it
-    /// (`crates/storage/spec/Jsonl.lean` §8-1).
+    /// (`Sprawling/storage/spec/Jsonl.lean` §8-1).
     #[error("the ledger at {} lost its barrier at seq {}", dir.display(), at.value())]
     LedgerBroken { dir: PathBuf, at: kernel::Seq },
     /// A whole-chain audit found a broken line, so this writer stopped

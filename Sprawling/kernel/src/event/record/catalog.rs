@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The pin and found versions of one catalog drift, carried by
-//! `digest_invalidated` (`crates/kernel/spec/CatalogDrift.lean` D118).
+//! `digest_invalidated` (`Sprawling/kernel/spec/CatalogDrift.lean` D118).
 
 use serde::{Deserialize, Serialize};
 

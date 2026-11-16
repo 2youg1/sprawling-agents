@@ -61,13 +61,13 @@ pub(crate) fn with_suffix(suffix: &str) -> Option<&'static Platform> {
 
 pub(crate) const WORKFLOW: &str = ".github/workflows/release.yml";
 
-const SHIM: &str = "crates/xtask/src/channel/shim.js";
+const SHIM: &str = "Tools/xtask/src/channel/shim.js";
 
 const SPELLERS: [&str; 4] = [
     WORKFLOW,
     "install.sh",
     "install.ps1",
-    "crates/sprawling/Cargo.toml",
+    "Sprawling/app/Cargo.toml",
 ];
 
 const REGISTER_ROW: &str = "archive_naming";
@@ -407,7 +407,7 @@ fn disagrees(location: &str, violation: String) -> Violation {
             .to_owned(),
         violation,
         alternative:
-            "bring this file to the table in `crates/xtask/src/platform.rs`, or change that \
+            "bring this file to the table in `Tools/xtask/src/platform.rs`, or change that \
                       table and every file that restates it in one change-set"
                 .to_owned(),
     }

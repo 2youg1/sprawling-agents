@@ -6,7 +6,7 @@
 /-!
 # runtime::prefix
 
-规定 `prefix`、`prefix::breakpoint`、`prefix::segment`、`prefix::shape`、`prefix::warmth`（`crates/runtime/src/` 下同名的文件）。冻结前缀的四段、分段哈希、断点与保温。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `prefix`、`prefix::breakpoint`、`prefix::segment`、`prefix::shape`、`prefix::warmth`（`Sprawling/runtime/src/` 下同名的文件）。冻结前缀的四段、分段哈希、断点与保温。本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `Sprawling/runtime/Spec.lean §8-n`。
 -/
 
 /-!
@@ -99,7 +99,7 @@ impl Lead {
 - **Off 时不记、不发**：`sent` 在 `KeepWarm::Off` 下不克隆请求，所以默认配置下每个 session 不为保温多占一字节，也不会有续期可发。默认配置下城不为保温多发一条请求，本模块的测试钉住这一点。
 - 续期请求是该前缀最近一次真实请求原样重发，只把 `max_tokens` 压到 1：缓存按前缀字节命中，与输出上限无关，所以 1 个输出 token 是续期能付的最低价。
 - 一个前缀只留最近一条请求：同一前缀后来的请求覆盖前一条，内存随前缀数而非请求数增长。
-- 何时续、续几次全由 `kernel::keep_warm::renewal_due` 判定（`crates/kernel/Spec.lean` §8-74，kernel D62），本模块不另写第二个 TTL 或余量；续期发出后前缀的 `CacheUse` 记成 `renewed`，于是它不再欠续期。
+- 何时续、续几次全由 `kernel::keep_warm::renewal_due` 判定（`Sprawling/kernel/Spec.lean` §8-74，kernel D62），本模块不另写第二个 TTL 或余量；续期发出后前缀的 `CacheUse` 记成 `renewed`，于是它不再欠续期。
 - 真实请求进账的门是 `Warmed`：它拥有一次 run 调用的 adapter，本身也是 `kernel::Model`，所以 turn loop 照旧只见 `&mut dyn Model`，每一次成功的调用（阻塞门、流式门或推测门）都在返回后按发出时刻记进 `Warmth`。失败的调用不记：provider 没有读到的前缀没有可续的缓存。
 
 ```rust
@@ -116,13 +116,13 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call
 
 - **提前量量的是它被用来做的事**（D100）：从发出到 provider 开始处理请求。`Warmed` 只在两处读它：一次续期的往返（续期只要 1 个 token，回答紧跟 prefill），与一次真实调用从发出到第一个正文或推理增量的时间。后者还含 prefill 与第一个 token，所以只会偏长、让续期偏早，不会让它晚于寿命。真实调用的整段时长从不当提前量：它含整段生成，一次 200 秒的调用会把续期排到落地之前。阻塞门没有增量，它的调用不改读数。
 - 读数按 endpoint 存，不按门存：网络路径与名额门属于 endpoint，而一扇门每次真实使用只见到一次续期，单扇门攒不出读数。门由调用方给它所连 endpoint 的那一个 `Lead`；`next_due` 每次按当时的读数算，所以别的门量出的新读数也挪动这扇门的到期时刻。
-- 谁调 `renew_due`：run 落地后 `Warmed` 按房间留在 accounting 的 worker 上，记账线程按 `next_due` 醒来，把到期的门整扇交给一条自己的线程，那条线程调 `renew_due`，门连同回执回到记账线程，续期的 usage 记成 `cache_renewed`（`crates/sprawling/Spec.lean` §8-112、§8-42-9）。所以 `Warmed` 要能整扇移到另一条线程上：它的 adapter 是 `Box<dyn Model + Send>`，时钟由调用方给，accounting 交的是 `Send` 的那一种；`Lead` 的读数是原子的，lane 上的门与续期线程上的门可以同时写它。
+- 谁调 `renew_due`：run 落地后 `Warmed` 按房间留在 accounting 的 worker 上，记账线程按 `next_due` 醒来，把到期的门整扇交给一条自己的线程，那条线程调 `renew_due`，门连同回执回到记账线程，续期的 usage 记成 `cache_renewed`（`Sprawling/app/Spec.lean` §8-112、§8-42-9）。所以 `Warmed` 要能整扇移到另一条线程上：它的 adapter 是 `Box<dyn Model + Send>`，时钟由调用方给，accounting 交的是 `Send` 的那一种；`Lead` 的读数是原子的，lane 上的门与续期线程上的门可以同时写它。
 - **验收**：本模块旁的 `a_long_call_leaves_its_renewal_due_a_lifetime_after_it_was_sent`——provider 的真实调用耗时 200 秒，落地时不发续期，续期排在「发出 + TTL − 续期往返 − 余量」；`a_streamed_call_reads_the_lead_at_its_first_word`——流式调用的提前量是到第一个增量的时间；`doors_to_one_endpoint_share_its_lead`——一扇门续期量出的往返挪动同一 endpoint 另一扇门的到期时刻。
 -/
 
 /-! D100 提前量是「发出到 provider 开始处理」的时间，按 endpoint 存一个读数
 
-**决定**：`Lead` 是一个 endpoint 的读数，clone 的句柄共享它；`Warmed` 在续期往返与真实调用的第一个增量两处写它，整段调用不写；accounting 按 endpoint 名给每扇门同一个 `Lead`（`crates/sprawling/Spec.lean` §8-112）。最近一次读数直接覆盖上一次，不留样本窗口。
+**决定**：`Lead` 是一个 endpoint 的读数，clone 的句柄共享它；`Warmed` 在续期往返与真实调用的第一个增量两处写它，整段调用不写；accounting 按 endpoint 名给每扇门同一个 `Lead`（`Sprawling/app/Spec.lean` §8-112）。最近一次读数直接覆盖上一次，不留样本窗口。
 
 **理由**：provider 的寿命从它开始处理请求时起算，提前量要盖住的正是续期从城到 provider 开始处理的这一段。先前门把每次调用的整段时长记作提前量，真实调用之后起作用的续期几乎总是带着上一次调用的时长出发：保温窗口缩短这次调用的时长，调用超过半个寿命时到期时刻早于落地。两处读数都含排队与 prefill，只会偏长；偏长的代价是续期早发几秒，偏短的代价是一次重写前缀，所以宁长勿短。
 
@@ -135,7 +135,7 @@ impl<C: FnMut() -> Result<TimeMs, AxError>> Model for Warmed<C> { /* call、call
 
 **决定**：`Warmed` 自己实现 `call`、`call_streaming`、`call_speculating`，每一扇都经同一个 `recorded` 转发给它拥有的 adapter，并照同一口径记账；`provider_account`、`account_roster`、`select_account` 也照样转发。turn loop 走哪扇门由 `turn::speculation::Generating` 决定，门只管把那扇门原样交给 adapter。
 
-**理由**：`kernel::Model` 的缺省方法对「没有流」「说不出调用何时完整」的 adapter 是诚实的，所以一扇门漏转发时什么都不失败，只是变慢：缺省的 `call_speculating` 丢掉提前调用的接收端、改调 `call_streaming`，生产路径上的只读工具于是全等整段回答写完才开始。漏掉的覆盖没有 lint 或 `#[deny]` 能抓，守住它的是 `crates/runtime/tests/run_driver.rs` 里经 `Warmed` 驱动替身模型、看只读调用在模型返回之前开始的那条测试。
+**理由**：`kernel::Model` 的缺省方法对「没有流」「说不出调用何时完整」的 adapter 是诚实的，所以一扇门漏转发时什么都不失败，只是变慢：缺省的 `call_speculating` 丢掉提前调用的接收端、改调 `call_streaming`，生产路径上的只读工具于是全等整段回答写完才开始。漏掉的覆盖没有 lint 或 `#[deny]` 能抓，守住它的是 `Sprawling/runtime/tests/run_driver.rs` 里经 `Warmed` 驱动替身模型、看只读调用在模型返回之前开始的那条测试。
 
 **被否**：只转发阻塞门与流式门、推测门交给缺省——那正是让提前读在城里失效的形状；另造一个包装 trait 列出「必须转发」的方法——它在 `Model` 之外又写一份方法清单，两份会各自漂，而 `Model` 只有这一个包装者。
 
@@ -177,7 +177,7 @@ impl FrozenSegment {
 3. **不出自文档的字节不记来源行，来源表照写。** 装配层二进制自带或派生的字节（楼地址、房间地址、名字行、身份与 hall 纪律、目录渲染、`run_segment` 的输出）今天没有来源行；`AGENTS.md` 前的标题句今天与文件的字节同记在文件那一行里，那一行的 `kept` 与 `hash` 量的是标题加文件，所以按文件地址取回的字节对不上它；一段全是这种字节就写空表，空表说的是「它不来自文档」，缺席的键说的是「不知道」。所以今天只有全部出自文档的段能经 `rebuild_prefix` 重建，Building、Resident、Run 三段重建不出。未决的是这些字节怎样成为来源行：按 D105 的哈希从对象库取回是一种答法，要定的是行怎样标明它不是文档（`PromptSource` 加一个缺省为文档的字段，旧行读宽容），以及 `rebuild_prefix` 怎样拿到这些字节；能定下它的证据是一条经派发入口冻结、四段都重建一致的测试。
 4. **`breakpoints` 记本次请求实际发出的断点，而不是四个 slot 名。** 行由 `BreakpointPlan::breakpoints()` 拼出，值是段界的 slot 名与 `tail`。类型仍是 `Vec<String>`、键名不变、`#[serde(default)]`，所以写着 `["city","building","resident","run"]` 的记录照读：那是 slot 清单，其中 `run` 段界从未在请求里出现过。**被否**：保留 slot 清单另加一个 `plan` 键——那样账上仍有一行名为断点却不是断点的数据，读者要自己知道该信哪一个。
 
-5. **`prompt_assembled` 每个 run 只写一条。** `turn::prompt::PromptRecord` 记着本 run 最后写下的载荷；`assemble` 照常算出本回合的载荷，与之相等就不写，不等才写并记住。prefix 在 run 内冻结，断点计划只随「对话是否为空」变，所以此后各回合的行是第一条的逐字拷贝；回合间真正会动的请求区域由 `prompt_shape_compared` 逐回合记，尾锚恒落在最后一条消息上，无须逐回合重述。比较的是载荷本身而不是「是不是第一回合」：哪天某个回合的载荷真的变了，账上就多一条，账本不会替一个请求声称它没带的断点。读者据此按 run 取段：`storage::attribution` 以 run 为键保存段权重（`crates/storage/Spec.lean` §8-7），`sprawling::views::prefix` 读一跑的第一条。旧账每回合一条，照读，因为同一 run 的各条相同。**被否**：之后的回合写一条引用首条的短记录——它不携任何读者需要的事实，只多一行链。
+5. **`prompt_assembled` 每个 run 只写一条。** `turn::prompt::PromptRecord` 记着本 run 最后写下的载荷；`assemble` 照常算出本回合的载荷，与之相等就不写，不等才写并记住。prefix 在 run 内冻结，断点计划只随「对话是否为空」变，所以此后各回合的行是第一条的逐字拷贝；回合间真正会动的请求区域由 `prompt_shape_compared` 逐回合记，尾锚恒落在最后一条消息上，无须逐回合重述。比较的是载荷本身而不是「是不是第一回合」：哪天某个回合的载荷真的变了，账上就多一条，账本不会替一个请求声称它没带的断点。读者据此按 run 取段：`storage::attribution` 以 run 为键保存段权重（`Sprawling/storage/Spec.lean` §8-7），`sprawling::views::prefix` 读一跑的第一条。旧账每回合一条，照读，因为同一 run 的各条相同。**被否**：之后的回合写一条引用首条的短记录——它不携任何读者需要的事实，只多一行链。
 
 **被否**：让页面在被问的那一刻重新装配一次 prefix 去拿来源。此刻的文件不是当时的文件，那样画出来的是一份没有任何人收到过的提示。
 -/
@@ -197,7 +197,7 @@ impl FrozenSegment {
 
 **决定**：`SegmentSource` 与 `PromptSource` 各带一个 `hash`：这一行留进段里的字节（文档的前 `kept` 个字节，不含截断标记）的 BLAKE3。`SegmentSource::whole(addr, bytes)` 从同一串字节算出 `kept` 与 `hash`，`build_segment` 对截断的文档用所留的那一段算。`replay::rebuild_prefix` 先逐行核对：一行写了 `hash`，而解析器给的文档前 `kept` 个字节算出的哈希与它不同，就以 `E_CAS_CORRUPT` 拒绝并点名这一行的地址与段；行都对上之后再核对整段哈希。`PromptSource::hash` 是 `Option`：旧行没有这个键，读作 `None`，那一行只由整段哈希核对。
 
-**理由**：整段哈希只能说「这一段的某处变了」，人要找的是哪一份文件变了；每行的哈希把答案落到一个人能打开的地址上。哈希的是所留的字节而不是整份文档，因为模型读到的只是这一段：文档在截断点之后改了，模型收到的字节没变，重建也不该报它。二进制自带、不出自任何文档的字节，下一步也用同一个字段在对象库里找回（`crates/runtime/spec/Prefix.lean` §8-39 第 3 条的空表届时改写）。
+**理由**：整段哈希只能说「这一段的某处变了」，人要找的是哪一份文件变了；每行的哈希把答案落到一个人能打开的地址上。哈希的是所留的字节而不是整份文档，因为模型读到的只是这一段：文档在截断点之后改了，模型收到的字节没变，重建也不该报它。二进制自带、不出自任何文档的字节，下一步也用同一个字段在对象库里找回（`Sprawling/runtime/spec/Prefix.lean` §8-39 第 3 条的空表届时改写）。
 
 **被否**：①只记整份文档的哈希——截断的文档在截断点之后被改，重建会误报；②只在重建失败时再逐份比对长度——长度相同、字节不同的改动查不出来（A15 的漂移用例正是这种）。
 

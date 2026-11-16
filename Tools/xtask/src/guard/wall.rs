@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use super::{diverged, shown};
 use crate::report::Violation;
 
-const LEAVES: [&str; 2] = ["crates/desktop/ffi", "Calyx/ffi"];
+const LEAVES: [&str; 2] = ["Sprawling/desktop/ffi", "Calyx/ffi"];
 
 struct Recorded {
     table: &'static str,
@@ -20,7 +20,7 @@ const RECORDED: [Recorded; 1] = [Recorded {
     table: "rust",
     key: "unsafe_code",
     because: "each call into a Zig leaf relaxes it at that one statement with a written \
-              reason, which `forbid` makes impossible (`crates/desktop/Spec.lean` section 12.14, \
+              reason, which `forbid` makes impossible (`Sprawling/desktop/Spec.lean` section 12.14, \
               `Calyx/ffi/Spec.lean` D1)",
 }];
 
@@ -31,7 +31,7 @@ pub(super) fn tables(workspace: &toml::Value, members: &[(String, toml::Value)])
         match members.iter().find(|(dir, _)| dir == leaf) {
             Some((_, manifest)) => compared(wall, (leaf, manifest.get("lints")), &mut out),
             None => out.push(diverged(
-                format!("crates/xtask/src/guard/wall.rs LEAVES {leaf}"),
+                format!("Tools/xtask/src/guard/wall.rs LEAVES {leaf}"),
                 "a lint table of its own belongs to a workspace member",
                 format!("no workspace member lives at {leaf}"),
                 format!(
@@ -108,7 +108,7 @@ fn judge(compared: Compared<'_>, out: &mut Vec<Violation>) {
         // the way a register entry is struck when its file comes back
         // under budget.
         (Some(row), true) => out.push(diverged(
-            format!("crates/xtask/src/guard/wall.rs RECORDED {table}.{key}"),
+            format!("Tools/xtask/src/guard/wall.rs RECORDED {table}.{key}"),
             "a recorded difference between the two tables is struck once the two sides agree",
             format!("`{key}` now reads the same on both sides"),
             format!(
@@ -122,7 +122,7 @@ fn judge(compared: Compared<'_>, out: &mut Vec<Violation>) {
             format!("{} against the workspace's {}", shown(copy), shown(wall)),
             format!(
                 "copy the workspace's line into {leaf}/Cargo.toml, or record the difference \
-                 and its reason in `RECORDED` (crates/xtask/src/guard/wall.rs) — a difference \
+                 and its reason in `RECORDED` (Tools/xtask/src/guard/wall.rs) — a difference \
                  nobody wrote down is a wall that fell over quietly"
             ),
         )),

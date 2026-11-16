@@ -5,10 +5,10 @@
 
 /-!
 # privacy::cli 的本地入口
-规定 `crates/sprawling/src/privacy/cli.rs`、它读取真实身份的
-`crates/sprawling/src/privacy/identity.rs`，以及写入动词交给 coordinator 的生产 Host
+规定 `Sprawling/app/src/privacy/cli.rs`、它读取真实身份的
+`Sprawling/app/src/privacy/identity.rs`，以及写入动词交给 coordinator 的生产 Host
 `bin::privacy::windows::host`。本文件是接口说明，不是形式证明：写入动词的次序与性质由
-crates.sprawling.spec.Privacy 证明，CLI 只把参数交给同一个 `bin::privacy::coordinator`；
+Sprawling.app.spec.Privacy 证明，CLI 只把参数交给同一个 `bin::privacy::coordinator`；
 status 与 inspect 是无状态查询，披露性质由类型持有（见 D54）。
 
 动词（main::verbs 各登记一次，main::router 直接调用；时钟由 router 交入 assembly 的 SystemClock，

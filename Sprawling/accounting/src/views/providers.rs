@@ -12,7 +12,7 @@
 //! Both answers ask the vault, and asking the vault asks the platform's
 //! credential service, so both finish after the snapshot is let go. The
 //! one reading of an account into a [`wire::KeyState`] lives here, for
-//! both (`crates/accounting/spec/Views.lean` §8-36).
+//! both (`Sprawling/accounting/spec/Views.lean` §8-36).
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -163,7 +163,7 @@ pub(super) struct TableRows<'q> {
 }
 
 /// The window and the ceiling a pick with empty boxes would register for
-/// each row, with the rung that answered (`crates/wire/spec/Answer/ModelFigures.lean`
+/// each row, with the rung that answered (`Sprawling/wire/spec/Answer/ModelFigures.lean`
 /// §8-97). Answered while the snapshot is held: it reads the endpoint
 /// book and tables pinned in this build, and never the vault.
 ///
@@ -458,7 +458,7 @@ mod tests {
     }
 
     /// Both rungs the context ring draws travel on the one answer it
-    /// reads; the page keeps no copy of the first (`crates/wire/Spec.lean`
+    /// reads; the page keeps no copy of the first (`Sprawling/wire/Spec.lean`
     /// §8-77).
     #[test]
     fn the_first_rung_is_answered_beside_the_second() {

@@ -6,9 +6,9 @@
 /-!
 # storage::checkpoint::provenance
 
-规定 `checkpoint::provenance`（`crates/storage/src/` 下同名的文件）。一次提交出自哪个 session：五条 git trailer，与它在账本一侧的形状。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
+规定 `checkpoint::provenance`（`Sprawling/storage/src/` 下同名的文件）。一次提交出自哪个 session：五条 git trailer，与它在账本一侧的形状。本文件是 `Sprawling/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `Sprawling/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与模块旁的测试守住（`crates/storage/Spec.lean` §16）。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与模块旁的测试守住（`Sprawling/storage/Spec.lean` §16）。
 -/
 
 /-!
@@ -79,7 +79,7 @@ pub fn recorded_effort(effort: Option<kernel::Effort>) -> Effort;
   两个 crate 各手写一次同一个键，就是两个会各说各话的权威。
 - **`checkpoint_committed` 与 `pr_merged` 携同一份归属。** 8-17 写着「trailers 是投影，
   账本是权威」，而这两个事实否则只存在于 git 提交上；带上它们，`sprawling whose`
-  才能只读账本作答（`accounting::views`，`crates/sprawling/Spec.lean` §8-167）。两条记录 flatten 同一个结构，
+  才能只读账本作答（`accounting::views`，`Sprawling/app/Spec.lean` §8-167）。两条记录 flatten 同一个结构，
   于是「一次提交出自谁」不会在两个 kind 上长成两种说法。
 - **缺键的记录读得回**：不带这两项的 `checkpoint_committed` 没有这两个键，
   `CommitAttribution` 的 `#[serde(default)]` 对它答空 id 与 `None`——

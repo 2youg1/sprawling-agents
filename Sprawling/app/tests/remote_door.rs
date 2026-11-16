@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The remote door end to end, over real sockets (`crates/sprawling/Spec.lean`
+//! The remote door end to end, over real sockets (`Sprawling/app/Spec.lean`
 //! §8-151).
 //!
 //! A served city, a person typing `/remote` on its console, a route the
@@ -20,13 +20,13 @@
 //!
 //! **The console is typed at once the history is proved.** A served city
 //! refuses every append with `E_HISTORY_UNPROVEN` until the proof of the
-//! history it opened from ends (`crates/sprawling/spec/Assembly/Listening.lean`
+//! history it opened from ends (`Sprawling/app/spec/Assembly/Listening.lean`
 //! §8-90), and that proof runs on its own thread, so on a loaded machine
 //! a line typed straight after the start is refused. The harness reads
 //! the city's log and types nothing before the log says the history is
 //! proved.
 //!
-//! **Why Rust and not the Lean checker** (`crates/sprawling/Spec.lean` section 12):
+//! **Why Rust and not the Lean checker** (`Sprawling/app/Spec.lean` section 12):
 //! the device's half of the pairing and session handshakes and of the
 //! seal exists only in `remote_access`. The lines that start the binary
 //! and open WebSockets carry the boundary waiver for that reason.
@@ -53,7 +53,7 @@ use remote_access::keys::{SigningKey, VerifyingKey};
 use remote_access::route::command::LOCAL_ENV;
 use remote_access::seal::Payload;
 use tokio::net::TcpStream;
-// boundary-ok: the device's half of the remote door exists only in remote_access, so this check speaks it from Rust (`crates/sprawling/Spec.lean` §8-151)
+// boundary-ok: the device's half of the remote door exists only in remote_access, so this check speaks it from Rust (`Sprawling/app/Spec.lean` §8-151)
 use tokio_tungstenite::tungstenite::Message;
 // boundary-ok: the same device, on the remote listener this city opened
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
@@ -66,7 +66,7 @@ type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 const PATIENCE: Duration = Duration::from_secs(60);
 
 /// The log line a served city writes once its history is proved and it
-/// takes commands (`crates/sprawling/src/assembly/chain_watch.rs`).
+/// takes commands (`Sprawling/app/src/assembly/chain_watch.rs`).
 const PROVED: &str = "the history is proved";
 
 /// The log line a served city writes when the proof found the history
@@ -157,7 +157,7 @@ fn a_device_reaches_the_city_through_the_door_over_real_sockets() {
 const SPACED: Duration = Duration::from_millis(remote_access::confirm::CONFIRM_SPACING_MS + 50);
 
 /// The door's wire verbs from a page on the city's own port
-/// (`crates/sprawling/spec/Outside.lean` §8-140, remote_access D4): a
+/// (`Sprawling/app/spec/Outside.lean` §8-140, remote_access D4): a
 /// request answers `E_APPROVAL_PENDING` and prints a code only on the
 /// console; a wrong code is refused and ends the request, so the right
 /// code after it is refused too; a fresh request confirmed with its own
@@ -362,7 +362,7 @@ async fn refused(page: &mut Socket, text: &str) -> Option<AxCode> {
 /// that only speaks WebSocket closes the connection - reads as what came,
 /// with no headers and no body.
 fn fetched(at: &str, path: &str) -> (String, Vec<String>, Vec<u8>) {
-    // boundary-ok: the page is fetched from the remote listener the way a device's browser fetches it (`crates/sprawling/Spec.lean` §8-151)
+    // boundary-ok: the page is fetched from the remote listener the way a device's browser fetches it (`Sprawling/app/Spec.lean` §8-151)
     let mut stream = match std::net::TcpStream::connect(at) {
         Ok(stream) => stream,
         Err(refused) => return (format!("{at}: {refused}"), Vec::new(), Vec::new()),
@@ -622,8 +622,8 @@ impl Served {
     fn start(city_root: &Path) -> Served {
         // `:0`, so the relay reaches the city only at the port its
         // listener was given, never at the one `serve` was asked for
-        // (`crates/wire/Spec.lean` §8-46, wire D16).
-        // boundary-ok: the remote door is opened from the served city's console, so the check starts the city it reaches (`crates/sprawling/Spec.lean` §8-151)
+        // (`Sprawling/wire/Spec.lean` §8-46, wire D16).
+        // boundary-ok: the remote door is opened from the served city's console, so the check starts the city it reaches (`Sprawling/app/Spec.lean` §8-151)
         let mut child = Command::new(env!("CARGO_BIN_EXE_sprawling"))
             .arg("serve")
             .arg(city_root)

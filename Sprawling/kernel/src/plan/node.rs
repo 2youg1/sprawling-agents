@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Plan nodes: the types a plan is made of, without the tree that hangs them.
-//! The part `crates/kernel/spec/Plan.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Plan.lean` specifies this module with the
 //! rest of `kernel::plan`.
 
 use serde::{Deserialize, Serialize};

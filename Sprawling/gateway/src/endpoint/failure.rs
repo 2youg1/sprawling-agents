@@ -6,7 +6,7 @@
 //! What failed about one provider call, and the one place that decides
 //! whether it may be asked again, whether the account that met it can
 //! still take it, and what the person does next
-//! (`crates/gateway/spec/Endpoint/Failure.lean`, gateway D2, D3 and D32).
+//! (`Sprawling/gateway/spec/Endpoint/Failure.lean`, gateway D2, D3 and D32).
 
 use kernel::{AccountDisposition, AxError, ProviderFailureKind, Retry};
 
@@ -468,7 +468,7 @@ mod tests {
         );
     }
 
-    /// Derived from `crates/gateway/spec/Endpoint/Failure.lean`: every
+    /// Derived from `Sprawling/gateway/spec/Endpoint/Failure.lean`: every
     /// status a provider refuses with, crossed with whether the body names
     /// the window and whether it says the quota is used up, lands on the
     /// kind, the retry and the account disposition the model gives

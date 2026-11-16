@@ -18,12 +18,12 @@ save reaches the disk through `city::document`, which holds the lock and replace
 and the city's writer records it in `accounting`. `sprawling-wire` carries this
 package's `Span`, `Format`, `Encoding`, `Window`, `Preview`, `Slice` and `TextEdit` as they are, so
 the page receives these values directly rather than a rendering of them.
-`crates/documents/Spec.lean` section 7 states these boundaries as the shape of the interface.
+`Sprawling/documents/Spec.lean` section 7 states these boundaries as the shape of the interface.
 
 ## How it is shaped
 
 `src/lib.rs` is an index and the modules are the library. Each module is one file named for what it
-owns, and nine of them are separately acceptable units, exactly as `crates/documents/Spec.lean`
+owns, and nine of them are separately acceptable units, exactly as `Sprawling/documents/Spec.lean`
 section 1 counts them:
 
 - **`span`** — a stretch of one version, a half-open byte interval with one constructor and a wire
@@ -146,7 +146,7 @@ beside what it governs.
 
 ```bash
 cargo nextest run -p sprawling-documents   # the module tests beside the code
-lake build crates.documents.Spec           # this package's Lean proofs
+lake build Sprawling.documents.Spec           # this package's Lean proofs
 cargo xtask gates spec lexicon             # the SPEC and the words it uses
 ```
 
@@ -157,7 +157,7 @@ cargo xtask gates spec lexicon             # the SPEC and the words it uses
 The two Markdown corpora live in the tests rather than in the model: the `markdown::lowering` tests
 carry the CommonMark cases migrated from the client's former TypeScript prose reader, and the
 `layout` tests carry the block spans of RefRain's regression corpus, whose bytes were checked
-against that corpus's own SHA-256 list. `crates/documents/Spec.lean` section 2 names every
+against that corpus's own SHA-256 list. `Sprawling/documents/Spec.lean` section 2 names every
 acceptance with the test that settles it. `just check` runs every check of the workspace.
 
 

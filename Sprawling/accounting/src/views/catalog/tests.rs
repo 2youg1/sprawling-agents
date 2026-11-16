@@ -86,7 +86,7 @@ fn save_pins_result(
 
 /// The pins face alone, without the reading-room face: the half one
 /// save leaves when its second door never runs
-/// (`crates/accounting/spec/Connectors.lean` D121).
+/// (`Sprawling/accounting/spec/Connectors.lean` D121).
 fn pin_only_result(
     city_root: &Path,
     lab: &Address,
@@ -274,7 +274,7 @@ fn an_accepted_skill_removal_leaves_no_historical_ghost_row() {
 /// save. The pinned version was never admitted to the store, so the save
 /// refuses before anything lands: a pin that names bytes no read can
 /// answer would take the catalog panel and the building's runs down
-/// (`crates/accounting/spec/Connectors.lean` D119).
+/// (`Sprawling/accounting/spec/Connectors.lean` D119).
 #[test]
 fn a_pin_for_a_rewritten_external_skill_is_refused_before_anything_lands() {
     let (dir, lab) = city_with_lab();
@@ -316,7 +316,7 @@ fn a_pin_for_a_rewritten_external_skill_is_refused_before_anything_lands() {
 /// One save lands its CONFIG.toml face and then its RULES.toml face; the
 /// half where pins landed and the admission did not must still read —
 /// the skill shows pinned and withheld — and the next save converges
-/// (`crates/accounting/spec/Connectors.lean` D121).
+/// (`Sprawling/accounting/spec/Connectors.lean` D121).
 #[test]
 fn pins_without_a_reading_room_entry_read_as_pinned_and_withheld() {
     let (dir, lab) = city_with_lab();

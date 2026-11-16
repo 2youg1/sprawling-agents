@@ -59,7 +59,7 @@ impl Laying {
     /// It reads the city through [`Laying`] rather than the worker, so it
     /// runs in the lane that drives the run: an MCP server that still
     /// shakes hands holds up that lane and nothing else
-    /// (`crates/sprawling/Spec.lean` §8-113).
+    /// (`Sprawling/app/Spec.lean` §8-113).
     ///
     /// The catalogue and the bench come from one registration, so a
     /// name is on both lists or on neither. The delegate desk comes back with
@@ -94,16 +94,16 @@ impl Laying {
         held(&catalog, "lay out the catalog")?.set_mode(at.policy.mode);
         // The run's policy cell opens with the dispatch's policy, and the
         // write gates read it at each write, so a change the run takes
-        // mid-way reaches them (`crates/runtime/spec/PolicyTake.lean` §8-62).
+        // mid-way reaches them (`Sprawling/runtime/spec/PolicyTake.lean` §8-62).
         let policy = runtime::PolicyCell::new(at.policy);
         // What this run has seen: `read` writes it and `edit` is admitted
         // by it. A new table per run, so a fork, a successor or a child
-        // starts having seen nothing (`crates/runtime/spec/Tools/Edit.lean` §8-64).
+        // starts having seen nothing (`Sprawling/runtime/spec/Tools/Edit.lean` §8-64).
         let stamps = runtime::ReadStamps::default();
         let shown = runtime::ReadShown::default();
         let edit = self.edit_tool(site, addr, policy.reader(), stamps.clone())?;
         // Every tool shares one keeper, so no two of them keep two keys
-        // under one name (`crates/sprawling/Spec.lean` §8-87).
+        // under one name (`Sprawling/app/Spec.lean` §8-87).
         let keeper = std::sync::Arc::new(kept::Keeper::new(
             Arc::clone(&self.vault),
             self.staged_at.value(),
@@ -137,7 +137,7 @@ impl Laying {
         // The refusal face of the building's own governance. It reaches
         // for the reserved subtree, which no write domain does, and
         // `Effect::Govern` is refused at the effect layer: a run does
-        // not change what governs it (`crates/city/Spec.lean` §8-2b).
+        // not change what governs it (`Sprawling/city/Spec.lean` §8-2b).
         let rules_tool = city::RulesTool::new(&self.city_root, site.building.addr().clone())?;
         // The one door onto the rest of the city. It is registered
         // beside `signal` rather than behind it because the two answer
@@ -187,7 +187,7 @@ impl Laying {
         // when the building asks for review.
         // One reading of the write domain feeds both: what the bench
         // admits and what its checkpoint stages are the same set by
-        // definition (`crates/storage/Spec.lean` §8-18), and taking them from
+        // definition (`Sprawling/storage/Spec.lean` §8-18), and taking them from
         // one call is what keeps them that way.
         let domain = site.rules.write_domain()?;
         let scope: Vec<String> = domain.prefixes().map(|p| p.as_str().to_owned()).collect();
@@ -214,7 +214,7 @@ impl Laying {
         // leaves nothing to agree by hand.
         // Both key by name, so this order reaches no model. Each tool is
         // filed here under the namespace the catalog lists it in
-        // (`crates/runtime/Spec.lean` §8-60): this is the one place that
+        // (`Sprawling/runtime/Spec.lean` §8-60): this is the one place that
         // knows which tools are the city's own.
         let own =
             |tool: Box<dyn kernel::Tool>| (Namespace::Own(ReservedNamespace::Sprawling), tool);
@@ -260,7 +260,7 @@ impl Laying {
         })
     }
 
-    /// City Hall plans; every other building builds (`crates/city/Spec.lean` §8-22).
+    /// City Hall plans; every other building builds (`Sprawling/city/Spec.lean` §8-22).
     ///
     /// # Errors
     /// Propagates a tool that refuses to be built.
@@ -295,7 +295,7 @@ impl Laying {
 
     /// The run's `edit`: the building's domain is the ceiling and the
     /// run's write limit narrows it, both asked at every write
-    /// (`crates/city/Spec.lean` §8-32); `stamps` is the table the run's
+    /// (`Sprawling/city/Spec.lean` §8-32); `stamps` is the table the run's
     /// `read` writes, and the path locks are the city's one table.
     ///
     /// # Errors
@@ -321,7 +321,7 @@ impl Laying {
 
     /// The run's `plan`, whose `finish` takes the path of the file that
     /// shows the work, pinned at that moment through the judgement
-    /// `read` gives it (`crates/collab/Spec.lean` D20).
+    /// `read` gives it (`Sprawling/collab/Spec.lean` D20).
     ///
     /// # Errors
     /// Propagates a desk left locked by a thread that died.
@@ -359,7 +359,7 @@ struct VocationParts<'a> {
 /// `[catalog]` tables give it, and routes on the bench every one the
 /// catalog admitted. A tool a table turned off gets no route: the catalog
 /// keeps its row for the record, and a call by its name reaches nothing
-/// (`crates/runtime/Spec.lean` §8-60).
+/// (`Sprawling/runtime/Spec.lean` §8-60).
 ///
 /// # Errors
 /// Propagates a catalog left locked by a thread that died, and a
@@ -381,7 +381,7 @@ fn register(
 
 impl Laying {
     /// The admitted tools the city files under a namespace other than
-    /// `sprawling` (`crates/runtime/Spec.lean` §8-60): reading pictures
+    /// `sprawling` (`Sprawling/runtime/Spec.lean` §8-60): reading pictures
     /// and recordings, the look back and the proposal, the web, and what
     /// reaches outside the city.
     ///
@@ -395,7 +395,7 @@ impl Laying {
     ) -> Result<Vec<Filed>, AxError> {
         let mut filed: Vec<Filed> = Vec::new();
         // Present only where the book names an endpoint this building
-        // may send a recording or a picture to (`crates/sprawling/Spec.lean` §8-131,
+        // may send a recording or a picture to (`Sprawling/app/Spec.lean` §8-131,
         // §8-142).
         let media = Namespace::Own(ReservedNamespace::Media);
         filed.extend(
@@ -404,12 +404,12 @@ impl Laying {
                 .map(|tool| (media.clone(), tool)),
         );
         // A look back at the history this building may read, written
-        // into the city's playback exports (`crates/sprawling/Spec.lean` §8-132).
+        // into the city's playback exports (`Sprawling/app/Spec.lean` §8-132).
         let record = Namespace::Own(ReservedNamespace::Record);
         filed.push((record.clone(), Box::new(self.playback_tool(site, addr)?)));
         filed.push((record, Box::new(self.proposal_tool(site, addr, bound)?)));
         // The city's own way onto the web, to the supplier `[search]`
-        // names (`crates/accounting/spec/Connectors.lean` §8-35).
+        // names (`Sprawling/accounting/spec/Connectors.lean` §8-35).
         if let Some(search) = self.search_tool(site)? {
             filed.push((Namespace::Own(ReservedNamespace::Web), Box::new(search)));
         }

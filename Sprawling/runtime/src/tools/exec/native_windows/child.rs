@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Child protocol fixture specified by `crates/runtime/spec/Tools/Exec/NativeWindows.lean`.
+//! Child protocol fixture specified by `Sprawling/runtime/spec/Tools/Exec/NativeWindows.lean`.
 
 pub(super) const SOURCE: &str = r#"
 use std::os::windows::ffi::OsStrExt;

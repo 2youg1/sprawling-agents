@@ -19,17 +19,17 @@ fn one_machine_stays_behind_and_everything_that_explains_the_code_goes_out() {
         "LICENSE",
         "docs/glossary.md",
         "docs/third-party.md",
-        "crates/city/templates/JOB.md",
-        "crates/kernel/kernel-SPEC.md",
-        "crates/kernel/src/lib.rs",
-        "crates/xtask/lexicon.toml",
-        "crates/fixtures/golden.jsonl",
+        "Sprawling/city/templates/JOB.md",
+        "Sprawling/kernel/kernel-SPEC.md",
+        "Sprawling/kernel/src/lib.rs",
+        "Tools/xtask/lexicon.toml",
+        "Tools/fixtures/golden.jsonl",
     ] {
         assert!(!is_scaffolding(out), "{out} is published");
     }
     // `localise.rs` is not the isolation zone, and a prefix rule
     // written without care would say it is.
-    assert!(!is_scaffolding("crates/city/src/building.rs"));
+    assert!(!is_scaffolding("Sprawling/city/src/building.rs"));
 }
 
 #[test]
@@ -38,7 +38,7 @@ fn anything_the_rule_does_not_name_is_published() {
     // shows up in the artefact, where somebody sees it; the other
     // way round it disappears, where nobody does.
     assert!(!is_scaffolding("docs/some-new-page.md"));
-    assert!(!is_scaffolding("crates/kernel/src/brand_new.rs"));
+    assert!(!is_scaffolding("Sprawling/kernel/src/brand_new.rs"));
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn a_link_that_differs_only_in_case_is_caught_here_and_nowhere_else() {
         "docs/glossary.md",
         "docs/getting-started.md",
         "AGENTS.md",
-        "crates/kernel/kernel-SPEC.md",
+        "Sprawling/kernel/kernel-SPEC.md",
     ]
     .into_iter()
     .map(str::to_owned)
@@ -83,8 +83,8 @@ fn a_link_that_differs_only_in_case_is_caught_here_and_nowhere_else() {
     );
     // A name that is already mixed case is judged the same way round.
     assert_eq!(
-        spellings.miscased("crates/kernel/kernel-spec.md"),
-        Some("crates/kernel/kernel-SPEC.md")
+        spellings.miscased("Sprawling/kernel/kernel-spec.md"),
+        Some("Sprawling/kernel/kernel-SPEC.md")
     );
 
     // Right as written.
@@ -148,7 +148,7 @@ fn a_document_anchored_outside_the_repository_is_caught_and_shorthand_is_not() {
     // never wrong.
     assert!(outside_the_tree("// tools/exec.rs", &dirs).is_none());
     assert!(outside_the_tree("`read src/lex.rs` differs by", &dirs).is_none());
-    assert!(outside_the_tree("crates/city/src/building.rs", &dirs).is_none());
+    assert!(outside_the_tree("Sprawling/city/src/building.rs", &dirs).is_none());
     assert!(outside_the_tree("see local/Handoff.md", &dirs).is_none());
 
     // A URL is somebody else's tree. The colon ends the token, so
@@ -171,16 +171,16 @@ fn only_prose_is_read_for_citations() {
     // A city address in a fixture is not a path in this repository,
     // and there are seventy-nine of them.
     assert!(!is_prose(
-        "crates/city/src/building.rs",
+        "Sprawling/city/src/building.rs",
         "    assert!(a(\"lab/x.md\"));"
     ));
     assert!(is_prose(
-        "crates/city/src/building.rs",
+        "Sprawling/city/src/building.rs",
         "//! see docs/glossary.md"
     ));
-    assert!(is_prose("crates/city/city-SPEC.md", "anything at all"));
+    assert!(is_prose("Sprawling/city/city-SPEC.md", "anything at all"));
     assert!(is_prose(
-        "crates/city/templates/SPEC.md",
+        "Sprawling/city/templates/SPEC.md",
         "<!-- a comment -->"
     ));
 }
@@ -188,7 +188,7 @@ fn only_prose_is_read_for_citations() {
 #[test]
 fn directory_names_carry_no_depth() {
     let names = directory_names(&[
-        "crates/runtime/src/tools/exec.rs".to_owned(),
+        "Sprawling/runtime/src/tools/exec.rs".to_owned(),
         "README.md".to_owned(),
     ]);
     for present in ["crates", "runtime", "src", "tools", "local"] {

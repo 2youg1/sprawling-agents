@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One window of a Markdown version, laid out by the city's one Markdown
-//! grammar (`crates/documents/spec/Markdown.lean`, D20-D26).
+//! grammar (`Sprawling/documents/spec/Markdown.lean`, D20-D26).
 //!
 //! The window is cut the way a range is cut, then, when the version runs
 //! on past it, ended where its second-to-last block ends: the last block

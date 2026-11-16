@@ -9,7 +9,7 @@
 //! endpoint/model reference and exact effort before a child run starts, and
 //! validates the same policy when a person saves it. Existing sessions and
 //! new sessions in buildings without a policy retain the tag-based path.
-//! Specified by `crates/sprawling/spec/Accounting/Worker.lean` §8-173.
+//! Specified by `Sprawling/app/spec/Accounting/Worker.lean` §8-173.
 
 use kernel::event::record::{ModelRouting, ModelSelectionSource};
 use kernel::{AxCode, AxError, Difficulty, Effort, ModelRef};

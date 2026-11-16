@@ -18,7 +18,7 @@ import { lookOf, type PatchHands, type PatchRow } from "./patch";
 const PATCH: HunksAnswer = {
   oid_a: GitOid.make("7c41e09aa1b2c3d4e5f60718293a4b5c6d7e8f90"),
   oid_b: GitOid.make("a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"),
-  path: "crates/city/src/document.rs",
+  path: "Sprawling/city/src/document.rs",
   lines: ["@@ -38,2 +38,2 @@", " keep", "-gone", "+came"].map((text, at) => ({
     number: at + 1,
     text,

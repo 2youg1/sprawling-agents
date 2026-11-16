@@ -6,7 +6,7 @@
 /-!
 # citysim::wire_script
 
-规定 `citysim::wire_script`（`crates/citysim/src/wire_script.rs`）：替身 provider 回放的那份脚本，`parse` 收下哪些脚本，以及 `Replay` 把一个请求放进哪个 run 的哪一条。套接字、记录文件与把脚本文件再读一遍在 `wire_script::exchange`，由 `spec/WireScript/Exchange.lean` 规定。本文件是 `crates/citysim/Spec.lean` 的一个分部；下面每一节保留它在 citysim 规格里的标签 §8-n，别处引作 `crates/citysim/Spec.lean §8-n`。
+规定 `citysim::wire_script`（`Tools/citysim/src/wire_script.rs`）：替身 provider 回放的那份脚本，`parse` 收下哪些脚本，以及 `Replay` 把一个请求放进哪个 run 的哪一条。套接字、记录文件与把脚本文件再读一遍在 `wire_script::exchange`，由 `spec/WireScript/Exchange.lean` 规定。本文件是 `Tools/citysim/Spec.lean` 的一个分部；下面每一节保留它在 citysim 规格里的标签 §8-n，别处引作 `Tools/citysim/Spec.lean §8-n`。
 
 能写成定理的是放置规则：一个续轮的位置只取决于它带回来的调用 id，与此前开启过几个 run、别的 run 怎么交错无关；一个合法脚本里每个 id 认出写下它的那一条回复；带回两个 run 的 id、用尽的 run、没有剩下的 run 都被拒，而不是重复最后一条；第一轮按次序开启下一个 run；接上的脚本不改动已经握着的 run。替身的每一种拒绝都不在城会重发的状态码里，这是 `Refusal.status` 那张常数表的事实，不写成定理（见 §8-10）。回复本身的线上 JSON 怎样读是 gateway 的事（`gateway::response_from_wire`），模型只留下放置要用的那一样：一条回复调用了哪些 id。正文里哪些字符串是 id、怎样从 JSON 里收集它们，是 Rust 的 `Replay::collect`，由 `wire_script::tests` 守着。
 -/
@@ -43,7 +43,7 @@ impl ScriptedProvider {
 | `POST` | 按 run 作答，见 §8-13；回复以 200 送出，`content-type: application/json`——城要的是流时也照读（gateway 按媒体类型认出整段回复） |
 | 其他方法 | 405，码 `method_unanswered` |
 
-拒绝的正文是 `{"error":{"type":"<码>","message":"<一句话>"}}`，OpenAI 与 Anthropic 两种兼容格式的错误都是这个形状。替身的每一种拒绝都不在 gateway 的「可重试」之列：状态码只有 400、404、405、409、410，而 gateway 重发的是 408、429 与 5xx（那一集合的权威是 `crates/gateway/src/endpoint/failure.rs` 的 `ProviderFailure::retry`），所以城把用尽读成一次不会自己好的拒绝，而不是一直重发。`no_refusal_of_the_stand_in_is_retried_by_the_city` 把每一种拒绝照替身的写法在回环上答给 `gateway::Endpoint::list_models`，断言错误的 `retry()` 是 `Retry::No`：读的是 gateway 自己的 `ProviderFailure::retry`，不抄它的状态码集合。**用尽要拒，不重复最后一条**：黑盒检查要看得见城比脚本多调了一次（`an_exhausted_run_is_refused`）。
+拒绝的正文是 `{"error":{"type":"<码>","message":"<一句话>"}}`，OpenAI 与 Anthropic 两种兼容格式的错误都是这个形状。替身的每一种拒绝都不在 gateway 的「可重试」之列：状态码只有 400、404、405、409、410，而 gateway 重发的是 408、429 与 5xx（那一集合的权威是 `Sprawling/gateway/src/endpoint/failure.rs` 的 `ProviderFailure::retry`），所以城把用尽读成一次不会自己好的拒绝，而不是一直重发。`no_refusal_of_the_stand_in_is_retried_by_the_city` 把每一种拒绝照替身的写法在回环上答给 `gateway::Endpoint::list_models`，断言错误的 `retry()` 是 `Retry::No`：读的是 gateway 自己的 `ProviderFailure::retry`，不抄它的状态码集合。**用尽要拒，不重复最后一条**：黑盒检查要看得见城比脚本多调了一次（`an_exhausted_run_is_refused`）。
 
 **什么算一个请求、记录写什么、凭据头怎样落盘**，是 `wire_script::exchange` 的事，见 `spec/WireScript/Exchange.lean` 的 §8-10 续。
 
@@ -204,7 +204,7 @@ def carriedOf : List Turn → Carried
 
 /-- D11 **进程外的替身 provider 是 citysim 的一个二进制，脚本就是 `ScriptModel` 的那种线上 JSON，按 run 分开作答。**
 
-黑盒验收要让发行件去调一个会应答的 provider，而三条已有的规则各挡住一个位置：黑盒检查写在 Lean 里（`xtask boundary`），`crates/adversary/` 不自带 HTTP 服务端（`crates/adversary/Spec.lean` §13：一个假 provider 会让那个目录变成第二个 gateway 实现），为测试写的东西不进人下载的二进制（`xtask artifact`）。剩下的位置是这里：`bin/provider` 是测试工具，由 justfile 拉起，URL 经环境变量 `SPRAWLING_PROVIDER` 交给调用它的检查，与对抗器经 `SPRAWLING_BIN` 接收二进制是同一个形状。
+黑盒验收要让发行件去调一个会应答的 provider，而三条已有的规则各挡住一个位置：黑盒检查写在 Lean 里（`xtask boundary`），`Tools/adversary/` 不自带 HTTP 服务端（`Tools/adversary/Spec.lean` §13：一个假 provider 会让那个目录变成第二个 gateway 实现），为测试写的东西不进人下载的二进制（`xtask artifact`）。剩下的位置是这里：`bin/provider` 是测试工具，由 justfile 拉起，URL 经环境变量 `SPRAWLING_PROVIDER` 交给调用它的检查，与对抗器经 `SPRAWLING_BIN` 接收二进制是同一个形状。
 
 脚本的格式只有一种：一份 JSON 写明兼容格式（`face`，拼法取 `kernel::DialectKind` 的 serde 形）、`/models` 列出的模型 id，以及一串 run，每个 run 是它按序拿到的回复，每条回复就是那个兼容格式的 provider 会发的线上 JSON。`WireScript::parse` 把每条回复经 `gateway::response_from_wire` 与 `ModelReturn::from_response` 读一遍，与城读真 provider 的回复是同一个函数，也是 `ScriptModel::from_wire` 走的那一条，所以一份替身能回放的脚本也是 `ScriptModel` 能回放的脚本，写错一个键在解析时就被拒，而不是在城里变成一条 `E_WIRE_MISMATCH`。
 

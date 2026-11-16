@@ -147,7 +147,7 @@ pub struct ServeConfig {
     /// a ledger keeps its epoch for its whole life.
     pub epoch: Option<B3Hash>,
     /// This machine's door for a browser: its pairing code, open codes,
-    /// paired device keys and live session tokens (`crates/wire/spec/Server.lean` §8-93).
+    /// paired device keys and live session tokens (`Sprawling/wire/spec/Server.lean` §8-93).
     pub door: LocalDoor,
 }
 
@@ -208,7 +208,7 @@ pub(crate) struct ShellState {
     pub(crate) epoch: Option<B3Hash>,
 }
 
-/// The performance monitor as a session sees it (`crates/wire/spec/Frames/Monitor.lean` §8-47g).
+/// The performance monitor as a session sees it (`Sprawling/wire/spec/Frames/Monitor.lean` §8-47g).
 ///
 /// Whether anybody watches is decided where the history is kept; a
 /// session holds what `watch` returned for as long as it watches, and
@@ -220,7 +220,7 @@ pub struct MonitorFeed {
     /// session missed is not stated: the next one is a second away.
     pub samples: broadcast::Sender<crate::frames::Sample>,
     /// Sets the beat the monitor samples at and remembers it for the
-    /// city (`crates/wire/spec/Frames/Monitor.lean` §8-47i).
+    /// city (`Sprawling/wire/spec/Frames/Monitor.lean` §8-47i).
     pub beat: Arc<dyn Fn(crate::frames::BeatMs) + Send + Sync>,
 }
 
@@ -243,7 +243,7 @@ pub type AcpSink =
 pub type TranscribeSink = Arc<dyn Fn(Vec<u8>, String) -> Result<String, AxError> + Send + Sync>;
 
 /// Where a file dropped onto the composer goes: its name and its bytes
-/// in, the absolute path the city kept it at out (`crates/wire/spec/Server.lean` §8-49).
+/// in, the absolute path the city kept it at out (`Sprawling/wire/spec/Server.lean` §8-49).
 pub type DropSink = Arc<dyn Fn(&str, &[u8]) -> Result<String, AxError> + Send + Sync>;
 
 /// The largest file `/drop` takes. axum's own default of 2 MiB refuses an
@@ -272,7 +272,7 @@ pub struct EnrollBody {
 /// `face` is the binding verdict's, so the key every door judges against
 /// is decided once, before the socket exists; `origins` are the names the
 /// same address answers to, read by the entry decision in front of every
-/// route (`crates/wire/spec/Reception/Entry.lean` §8-94).
+/// route (`Sprawling/wire/spec/Reception/Entry.lean` §8-94).
 ///
 /// # Errors
 /// The listener's own headers cannot be spelled as HTTP headers.
@@ -324,7 +324,7 @@ pub fn router(
         // editor offers it as a body key, and an unpaired editor is
         // answered by `agent_protocols::admit` rather than at the door.
         .route("/acp", entered(Arrival::Door(Door::Acp), post(accept_acp)))
-        // This machine's door for a browser (`crates/wire/spec/Server.lean` §8-93):
+        // This machine's door for a browser (`Sprawling/wire/spec/Server.lean` §8-93):
         // the routes a browser reaches before it holds a credential.
         .route("/pair", entered(Arrival::Pairing, post(accept_pairing)))
         .route(

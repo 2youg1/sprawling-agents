@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The machine budget heavy work reserves its memory from, and the queue
-//! it waits in past that budget (`crates/runtime/spec/Reserve.lean`, D103
+//! it waits in past that budget (`Sprawling/runtime/spec/Reserve.lean`, D103
 //! and D104). The model there is the authority on what must hold: held
 //! bytes within the budget unless one reservation holds alone, starts in
 //! exactly the order of asking, and a queue that waits only behind a

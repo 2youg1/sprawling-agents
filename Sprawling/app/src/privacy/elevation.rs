@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Machine-scope writes through a short-lived UAC-elevated child that
-//! writes and never judges (`crates/sprawling/spec/Privacy/Windows.lean` D60).
+//! writes and never judges (`Sprawling/app/spec/Privacy/Windows.lean` D60).
 //!
 //! The parent starts this same executable as `privacy elevated-write
 //! <write>` under the `runas` verb and waits for it; the child checks the

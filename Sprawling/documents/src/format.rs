@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which grammar a document is written in, read from its name
-//! (`crates/documents/Spec.lean` D6).
+//! (`Sprawling/documents/Spec.lean` D6).
 
 use serde::{Deserialize, Serialize};
 

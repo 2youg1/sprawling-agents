@@ -6,7 +6,7 @@
 /-!
 # 命令行的优先规则
 
-规定 `crates/sprawling/src/main/grammar.rs` 的 `parse` 在读任何动词的参数之前做的那几个决定（§8-89）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。命令表 `VERBS`（`main/verbs.rs`）是数据，按名找行（`find`）与读一行的参数（`arguments`）在模型里是参数，因为这里要钉的只是次序：
+规定 `Sprawling/app/src/main/grammar.rs` 的 `parse` 在读任何动词的参数之前做的那几个决定（§8-89）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。命令表 `VERBS`（`main/verbs.rs`）是数据，按名找行（`find`）与读一行的参数（`arguments`）在模型里是参数，因为这里要钉的只是次序：
 
 * `--version`／`-V` 出现在 `--` 之前的任何位置都得 `Version`；
 * 其次 `--help`／`-h` 出现在 `--` 之前的任何位置都得那个动词的帮助，没有动词时得总览；

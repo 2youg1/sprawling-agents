@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The three properties of `crates/storage/spec/Jsonl/Preallocate.lean`,
+//! The three properties of `Sprawling/storage/spec/Jsonl/Preallocate.lean`,
 //! checked on real segments: trailing zeros change no scan, a tear
 //! before zeros is still truncated, and zeros before a line are not the
 //! end of the segment.

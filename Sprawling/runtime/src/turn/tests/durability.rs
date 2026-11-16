@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The checks derived from `crates/runtime/spec/Turn/Durability.lean`
+//! The checks derived from `Sprawling/runtime/spec/Turn/Durability.lean`
 //! (runtime D24): how many barriers a turn pays, that a write's intent
 //! is durable before the write runs, and what a power cut at any line of
 //! the ledger's write sequence leaves on disk.

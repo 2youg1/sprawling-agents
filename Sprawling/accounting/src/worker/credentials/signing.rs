@@ -7,7 +7,7 @@
 //! redeems a reference.
 //!
 //! No login lives here. Subscription quota enters the city through the
-//! vendor's own harness, where the person signs in (`crates/gateway/Spec.lean`
+//! vendor's own harness, where the person signs in (`Sprawling/gateway/Spec.lean`
 //! §8-5), so the only credential this city takes is a key a person
 //! hands it.
 
@@ -28,7 +28,7 @@ pub(in crate::worker) enum Arrival {
     /// A person enrolled it on the host, under a name they chose.
     Enrolment,
     /// It was pasted into a dispatch and taken into custody there
-    /// (`crates/sprawling/Spec.lean` §8-87).
+    /// (`Sprawling/app/Spec.lean` §8-87).
     Pasted,
 }
 
@@ -64,7 +64,7 @@ impl RunWorker {
         }
         // Before the record, so a refused append still leaves no
         // connection sending the value this one replaced
-        // (`crates/accounting/spec/Connectors.lean` §8-2).
+        // (`Sprawling/accounting/spec/Connectors.lean` §8-2).
         self.connectors.invalidate(reference);
         let captured = SecretCaptured {
             reference: reference.clone(),
@@ -74,7 +74,7 @@ impl RunWorker {
     }
 
     /// Deletes one reference's key from the vault, once nothing the city
-    /// reads names it (`crates/accounting/spec/Worker.lean` §8-37).
+    /// reads names it (`Sprawling/accounting/spec/Worker.lean` §8-37).
     ///
     /// Nothing is recorded: no fold reads that a reference once held a
     /// value, and the book and the configuration, which say who uses

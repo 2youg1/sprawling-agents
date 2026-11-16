@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The second client of `wire::frames` (`crates/sprawling/Spec.lean` section
+//! The second client of `wire::frames` (`Sprawling/app/Spec.lean` section
 //! 8-10).
 //!
 //! ARCHITECTURE section 8 says the wire is the whole API and that a
@@ -61,7 +61,7 @@ pub(crate) enum Unheard {
 }
 
 /// Where `--at` points, as far as this machine's key file is concerned
-/// (`crates/sprawling/spec/WireClient.lean`).
+/// (`Sprawling/app/spec/WireClient.lean`).
 #[derive(Debug, PartialEq, Eq)]
 enum Reach {
     /// A loopback literal or `localhost`, on this port: the key file of
@@ -92,7 +92,7 @@ fn reach(at: &str) -> Reach {
 
 /// The credential a call presents: the token given with `--token`, or
 /// else, for a city on this machine, the key it keeps in its key file
-/// (`crates/sprawling/spec/Keying.lean` §8-22). A key file that cannot be
+/// (`Sprawling/app/spec/Keying.lean` §8-22). A key file that cannot be
 /// read is said once and the greeting goes without; the city's refusal
 /// then says how to get in.
 ///
@@ -429,7 +429,7 @@ mod tests {
     /// promised 1 means "the city refused". An agent branching on the
     /// exit code read a refusal it never received as a success - which
     /// the out-of-tree checker measured against a real city
-    /// (`crates/adversary/Spec.lean` section 4).
+    /// (`Tools/adversary/Spec.lean` section 4).
     /// The key file answers only for a host on this machine: a loopback
     /// literal, with or without brackets, or `localhost` in any case. A
     /// name that only starts like one is another machine, and so is a

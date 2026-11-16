@@ -14,7 +14,7 @@
 //! nodes' trees all live under [`kernel::PROTECTED_METADATA`] and count
 //! as neither.
 //!
-//! Specified by `crates/storage/spec/Worktree.lean` §8-9.
+//! Specified by `Sprawling/storage/spec/Worktree.lean` §8-9.
 
 use std::path::Path;
 
@@ -56,7 +56,7 @@ mod tests {
         assert!(!outside_reserved(Path::new(".sprawling/ledger/a.jsonl")));
         assert!(!outside_reserved(Path::new("lab/.sprawling/CONFIG.toml")));
         // Git's own metadata is nobody's work either: writing it is
-        // privilege escalation (`crates/kernel/spec/Address.lean` §8-73).
+        // privilege escalation (`Sprawling/kernel/spec/Address.lean` §8-73).
         assert!(!outside_reserved(Path::new(".git/hooks/pre-run")));
         assert!(!outside_reserved(Path::new("lab/.git/config")));
         // Windows resolves the reserved directory case-insensitively,

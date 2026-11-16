@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The lazy credential scan against the full scan it replaces
-//! (`crates/accounting/spec/Playback/Project.lean`, last section, D47).
+//! (`Sprawling/accounting/spec/Playback/Project.lean`, last section, D47).
 //!
 //! The model proves that the lazy scan hands every table the fate the
 //! full scan does; these cases hold the Rust to it on random histories

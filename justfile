@@ -8,13 +8,13 @@ default: check
 # `main` (AGENTS.md, Verification tier 3).
 #
 # `build-web` sits before `gates` because two of the gates - render and
-# npm - judge artifacts rather than sources: they need `crates/sprawling/web-dist`
+# npm - judge artifacts rather than sources: they need `Sprawling/app/web-dist`
 # and `client/node_modules` to exist, and they refuse rather than skip
 # when those are absent, so a check that never built them would be red,
 # not silently green. CI says the same thing through
 # `.github/actions/client-artifacts`, which runs `build-web` for the jobs
 # that run those gates. It sits before `clippy` as well, because
-# `crates/sprawling/build.rs` embeds the bundle: built after the compile,
+# `Sprawling/app/build.rs` embeds the bundle: built after the compile,
 # a stale bundle is what clippy and the tests would see.
 #
 # Formatting runs right after `prereqs`, because it answers in seconds
@@ -84,7 +84,7 @@ check-branch base="main":
     if [ -n "$clean" ] && [ -f "$mark" ]; then echo "check-branch: tree $tree vs $mb is already green"; exit 0; fi
     mapfile -d '' -t changed < <(git diff --name-only -z "$mb" HEAD) || exit 2
     touched() { printf '%s\0' "${changed[@]}" | grep -qz "^$1/"; }
-    # Which package holds a path is cargo metadata's answer (crates/xtask/Spec.lean
+    # Which package holds a path is cargo metadata's answer (Tools/xtask/Spec.lean
     # §8-39); the paths go through stdin, since a rename branch
     # lists more of them than one command line holds.
     packages=$(printf '%s\0' "${changed[@]}" | tr '\0' '\n' | cargo xtask members --owning | tr -d '\r') || exit 2
@@ -103,11 +103,11 @@ check-branch base="main":
     step file-gates cargo xtask gates length comments --files "${changed[@]}"
     step deny just deny
     touched client && step client just client-checks && step artifacts cargo xtask gates render budget npm
-    touched crates/desktop/ffi && step desktop just check-desktop
+    touched Sprawling/desktop/ffi && step desktop just check-desktop
     touched Calyx/ffi && step console just check-console
     # A Lean specification is proved by `models`, which no other step runs;
     # the Lean package's own three files change what it proves
-    # (crates/xtask/Spec.lean §8-43).
+    # (Tools/xtask/Spec.lean §8-43).
     printf '%s\0' "${changed[@]}" | tr '\0' '\n' | grep -qE '\.lean$|^(lakefile\.toml|lean-toolchain|lake-manifest\.json)$' \
         && step models just models
     [ "$rc" = 0 ] && [ -n "$clean" ] && mkdir -p "$(dirname "$mark")" && touch "$mark"
@@ -157,10 +157,10 @@ branch-tests base +packages:
 # What this repository's loop needs installed, read from the doctor's
 # develop tier.
 #
-# `crates/sprawling/src/doctor/table.rs` is the one list: `sprawling
+# `Sprawling/app/src/doctor/table.rs` is the one list: `sprawling
 # doctor` and the settings page install from it, and a test there holds
 # `prereqs.tsv` beside it to exactly what the table renders
-# (`crates/sprawling/Spec.lean` §8-58). This recipe reads that file rather
+# (`Sprawling/app/Spec.lean` §8-58). This recipe reads that file rather
 # than keeping a list of its own, because two lists of one fact is how a
 # person installed everything one of them named and still met a red
 # gate. Each row is one probe, so the whole recipe costs milliseconds and
@@ -209,7 +209,7 @@ prereqs mode="check":
         if [ "$class" = required ]; then
             missing=$((missing + 1))
         fi
-    done < '{{justfile_directory()}}/crates/sprawling/src/doctor/table/prereqs.tsv'
+    done < '{{justfile_directory()}}/Sprawling/app/src/doctor/table/prereqs.tsv'
     if [ "$mode" = list ]; then
         exit 0
     fi
@@ -226,20 +226,20 @@ prereqs mode="check":
 fmt:
     cargo fmt --all
     zig fmt Calyx/ffi/zig
-    {{ if os() == "windows" { "zig fmt crates/desktop/ffi/zig" } else { "echo 'zig fmt: the desktop leaf is built on Windows only'" } }}
+    {{ if os() == "windows" { "zig fmt Sprawling/desktop/ffi/zig" } else { "echo 'zig fmt: the desktop leaf is built on Windows only'" } }}
     bun fmt
 
 # Both Zig leaves are formatted by `zig fmt`: the console's renderer on
 # every platform, where it is built (`Calyx/ffi/Spec.lean` D1),
 # and the desktop server's leaf on Windows, the one platform it is built
-# on (`crates/desktop/Spec.lean` section 8-12).
+# on (`Sprawling/desktop/Spec.lean` section 8-12).
 #
 # The client's half answers in under a second, which is why `check` runs
 # this phase first.
 fmt-check:
     cargo fmt --all --check
     zig fmt --check Calyx/ffi/zig
-    {{ if os() == "windows" { "zig fmt --check crates/desktop/ffi/zig" } else { "echo 'zig fmt: the desktop leaf is built on Windows only'" } }}
+    {{ if os() == "windows" { "zig fmt --check Sprawling/desktop/ffi/zig" } else { "echo 'zig fmt: the desktop leaf is built on Windows only'" } }}
     bun fmt --check
 
 # --all-features is load-bearing: code behind a feature (runtime/wasm, */conformance)
@@ -251,7 +251,7 @@ clippy:
 # default features, test targets included; `sprawling` without its
 # default features, which is the binary with no execution engine -
 # `sandbox` is a default feature, so nothing else compiles that build
-# (`crates/sprawling/Spec.lean` §8-157); and `wire` with `server` off - which is the
+# (`Sprawling/app/Spec.lean` §8-157); and `wire` with `server` off - which is the
 # reason that feature exists, since it keeps the TCP stack out of a
 # wasm32 build. Code behind a feature is compiled the day somebody turns
 # that feature on, and a combination that does not build is what the
@@ -494,7 +494,7 @@ check-core:
     cargo nextest run {{core_packages}} --locked --all-features --no-fail-fast
 
 # The three gates that judge a built artifact rather than a source:
-# `render` opens `crates/sprawling/web-dist`, `npm` reads `client/node_modules`,
+# `render` opens `Sprawling/app/web-dist`, `npm` reads `client/node_modules`,
 # `budget` weighs both. The one list of them; `gates-sources` runs every
 # other gate on the roster.
 artifact_gates := "render npm budget"
@@ -530,13 +530,13 @@ gates-sources mode="" *paths:
 gates-artifacts: build-web
     cargo xtask gates {{artifact_gates}}
 
-# The Lean specifications: every module under `crates/`, each a part of a
-# crate's specification (ARCHITECTURE.md section 11, "Specifications in
-# Lean"). `lakefile.toml` sets `warningAsError`, so a `sorry` or an `admit`,
+# The Lean specifications: every module under `Sprawling/` and `Tools/`,
+# each a part of a crate's specification (ARCHITECTURE.md section 11,
+# "Specifications in Lean"). `lakefile.toml` sets `warningAsError`, so a `sorry` or an `admit`,
 # which Lean reports as a warning, fails the build; an `axiom` raises no
 # warning at all, so the `spec` gate refuses it by its shape, where Lean is
-# not needed to see it (crates/xtask/Spec.lean §8-42). The checker under
-# `crates/adversary/` is not built here: it attacks the binary and stays out
+# not needed to see it (Tools/xtask/Spec.lean §8-42). The checker under
+# `Tools/adversary/` is not built here: it attacks the binary and stays out
 # of every required check.
 #
 # Lean is a required tool (`just prereqs`). Where `lake` is absent this
@@ -552,7 +552,7 @@ models:
     lake build Spec
 
 # Every commit subject and ruling trailer in a range of history
-# (crates/xtask/Spec.lean §8-35), and on a pull request its title, which
+# (Tools/xtask/Spec.lean §8-35), and on a pull request its title, which
 # a squash merge of two or more commits turns into the subject main
 # receives. Not in `check`, because a tree has no
 # range: CI names it, and at a desk it is `just commits main..HEAD`.
@@ -584,14 +584,14 @@ deny:
     fi
     cargo deny check bans licenses sources
 
-# What no cargo command runs for `crates/desktop`: the Zig leaf's own
+# What no cargo command runs for `Sprawling/desktop`: the Zig leaf's own
 # tests - its unit tests, its seeded property tests and one input of its
 # fuzz test - on Windows, the one platform the leaf is built on
-# (`crates/desktop/Spec.lean` section 8-12). The server and its seam are workspace
+# (`Sprawling/desktop/Spec.lean` section 8-12). The server and its seam are workspace
 # members, so clippy, the suite and the licence read judge them with
 # everything else.
 check-desktop:
-    {{ if os() == "windows" { "zig test -O ReleaseSafe crates/desktop/ffi/zig/leaf.zig --cache-dir target/zig-test" } else { "echo 'zig test: the Zig leaf is built on Windows only'" } }}
+    {{ if os() == "windows" { "zig test -O ReleaseSafe Sprawling/desktop/ffi/zig/leaf.zig --cache-dir target/zig-test" } else { "echo 'zig test: the Zig leaf is built on Windows only'" } }}
 
 # The console renderer's own Zig tests, which no cargo command runs; the
 # frames it draws are judged by `console_ffi`'s Rust tests through a
@@ -599,23 +599,23 @@ check-desktop:
 check-console:
     zig test -O ReleaseSafe Calyx/ffi/zig/leaf.zig --cache-dir target/zig-test
 
-# The Rust side's fuzz of crates/desktop/ffi's Zig leaf: its four buffer rules
+# The Rust side's fuzz of Sprawling/desktop/ffi's Zig leaf: its four buffer rules
 # against their Rust reference, for `rounds` drawn inputs from `seed`
 # (hexadecimal), on Windows, the one platform the leaf is built on. A
 # disagreement prints the seed and the round it replays from. Drawn
 # rather than coverage-guided: libFuzzer has no platform for this leaf
-# today (`crates/desktop/Spec.lean` D12).
+# today (`Sprawling/desktop/Spec.lean` D12).
 fuzz-desktop rounds="1000000" seed="5eedf022":
     DESKTOP_FFI_FUZZ_ROUNDS={{rounds}} DESKTOP_FFI_FUZZ_SEED={{seed}} cargo nextest run -p sprawling-desktop-ffi --locked --run-ignored only -E 'test(/for_as_long_as_asked/)'
 
 # The browser client (client/Spec.lean): Svelte + Effect, built by
-# Vite under bun, bundled into crates/sprawling/web-dist where
-# crates/sprawling/build.rs reads it and where `cargo package` archives it. `just prereqs` names bun. `--frozen-lockfile` makes bun.lock
+# Vite under bun, bundled into Sprawling/app/web-dist where
+# Sprawling/app/build.rs reads it and where `cargo package` archives it. `just prereqs` names bun. `--frozen-lockfile` makes bun.lock
 # the authority, so a build cannot resolve a version nobody committed.
 build-web:
     cd client && bun install --frozen-lockfile && bun run build
 
-# The bundle in crates/sprawling/web-dist, built only when it is absent or
+# The bundle in Sprawling/app/web-dist, built only when it is absent or
 # some file under client/ (its sources, its lockfile, its configuration)
 # is newer than the bundle's index.html, which Vite writes on every
 # build after emptying the directory. A recipe that measures the binary
@@ -624,7 +624,7 @@ build-web:
 # always builds. `find -newer`, `-prune` and `-quit` behave the same in
 # Git Bash on Windows and in the find of macOS and Linux.
 web-bundle:
-    if [ -f crates/sprawling/web-dist/index.html ] && [ -z "$(find client -path client/node_modules -prune -o -type f -newer crates/sprawling/web-dist/index.html -print -quit)" ]; then echo "web-bundle: crates/sprawling/web-dist is newer than every file under client/, kept"; else '{{just_executable()}}' --justfile '{{justfile()}}' build-web; fi
+    if [ -f Sprawling/app/web-dist/index.html ] && [ -z "$(find client -path client/node_modules -prune -o -type f -newer Sprawling/app/web-dist/index.html -print -quit)" ]; then echo "web-bundle: Sprawling/app/web-dist is newer than every file under client/, kept"; else '{{just_executable()}}' --justfile '{{justfile()}}' build-web; fi
 
 # The client's own gates: lint (no `any`, no `as`, no throw, no try, no
 # non-exhaustive switch), typecheck, and its tests.
@@ -642,7 +642,7 @@ check-client: build-web client-checks
 # `svelte-check` stays the type lane and this one only catches a `.ts`
 # error sooner.
 client-checks:
-    bun crates/city/skills/playback/assemble.js --check
+    bun Sprawling/city/skills/playback/assemble.js --check
     cd client && bun run lint && bun check && bun run typecheck && bun run test
 
 # The gate that opens the gallery in a real engine, on its own: roles,
@@ -651,14 +651,14 @@ client-checks:
 render:
     cargo xtask render
 
-# The swap test (crates/xtask/Spec.lean section 8-13): every look under
+# The swap test (Tools/xtask/Spec.lean section 8-13): every look under
 # client/swap/ drawn in place of the look at the same path under
 # client/src/, and the client still holds. The replacement satisfies the
 # look's props type (typecheck), the wiring tests of each replaced part
 # pass untouched (a test imports no look, by the client's lint), the
 # swap build replaces every look it holds, and render, its parts roster
 # among it, judges the result. The bundle lands in target/swap-web, never
-# in crates/sprawling/web-dist, so a stopped run leaves nothing for the
+# in Sprawling/app/web-dist, so a stopped run leaves nothing for the
 # binary to embed. Needs the client's dependencies, which `build-web`
 # installs.
 swap:
@@ -700,7 +700,7 @@ proof:
 sim:
     cargo test --package citysim --locked
 
-# The stand-in provider (crates/citysim/Spec.lean section 8-10):
+# The stand-in provider (Tools/citysim/Spec.lean section 8-10):
 # plays a wire script on a loopback port, appends every exchange to the
 # record, and prints `SPRAWLING_PROVIDER=<url>` before it answers, so the
 # check started beside it reads the URL from that line. `listen` is a
@@ -709,7 +709,7 @@ provider script record *listen:
     cargo run --package citysim --bin provider --locked -- {{script}} {{record}} {{listen}}
 
 # Every page of the client at 1440 and 1920, dark and light, as PNG files
-# and an index under target/shots (crates/xtask/Spec.lean
+# and an index under target/shots (Tools/xtask/Spec.lean
 # §8-44). Not a gate: a person reads the pictures. `--origin <url>`
 # photographs a served city instead of the bundle.
 shots *args: build-web
@@ -726,23 +726,23 @@ walk *args: build-web
 
 # The half of the shots camera's check that needs an engine that draws
 # frames: a page whose state is written by the frame after the scroll
-# (crates/xtask/Spec.lean §8-44, D25). It is `#[ignore]`d for `just check`,
+# (Tools/xtask/Spec.lean §8-44, D25). It is `#[ignore]`d for `just check`,
 # because a hosted runner's engine draws no frame at all inside a dump
 # run and the check was red on every CI run for it.
 shots-frames:
     cargo nextest run -p xtask --locked --run-ignored only -E 'test(a_frame_after_the_scroll)'
 
-# Create a crate's Spec.lean skeleton (crates/xtask/Spec.lean §8-41).
+# Create a crate's Spec.lean skeleton (Tools/xtask/Spec.lean §8-41).
 spec crate:
     cargo xtask spec {{crate}}
 
 # Requires cargo-fuzz + nightly; `nightly.yml` runs the smoke batch.
 fuzz target:
-    cargo fuzz run {{target}} --fuzz-dir crates/fuzz
+    cargo fuzz run {{target}} --fuzz-dir Tools/fuzz
 
 # Requires cargo-mutants. Every module held to a mutation score, run in one
 # shard and scored. The modules, their file globs and their thresholds are the
-# rows of crates/xtask/budgets.toml that carry `mutation_files`; they are
+# rows of Tools/xtask/budgets.toml that carry `mutation_files`; they are
 # enforced here rather than in `just check` because a full mutation run is
 # hours, and a gate nobody waits for is a gate nobody runs. `on-demand.yml`
 # runs the same two recipes in eight shards (`-f job=mutants-modules`).
@@ -762,9 +762,9 @@ mutants-modules shard:
     #!/usr/bin/env bash
     set -euo pipefail
     py="$(command -v python || command -v python3)"
-    mapfile -t globs < <("$py" -c 'import tomllib; rows = tomllib.load(open("crates/xtask/budgets.toml", "rb")); [print(glob) for row in rows.values() if isinstance(row, dict) for glob in row.get("mutation_files", [])]' | tr -d '\r')
+    mapfile -t globs < <("$py" -c 'import tomllib; rows = tomllib.load(open("Tools/xtask/budgets.toml", "rb")); [print(glob) for row in rows.values() if isinstance(row, dict) for glob in row.get("mutation_files", [])]' | tr -d '\r')
     if [ "${#globs[@]}" -eq 0 ]; then
-        echo "mutants-modules: no row of crates/xtask/budgets.toml carries mutation_files; add the module's file globs to its row" >&2
+        echo "mutants-modules: no row of Tools/xtask/budgets.toml carries mutation_files; add the module's file globs to its row" >&2
         exit 2
     fi
     files=()
@@ -788,7 +788,7 @@ mutants-score dir="mutants.out":
     py="$(command -v python || command -v python3)"
     "$py" - '{{dir}}' <<'PY'
     import fnmatch, json, pathlib, sys, tomllib
-    register = tomllib.loads(pathlib.Path("crates/xtask/budgets.toml").read_text(encoding="utf-8"))
+    register = tomllib.loads(pathlib.Path("Tools/xtask/budgets.toml").read_text(encoding="utf-8"))
     rows = {name: row for name, row in register.items() if isinstance(row, dict) and "mutation_files" in row}
     reports = sorted(pathlib.Path(sys.argv[1]).rglob("outcomes.json"))
     if not reports:
@@ -866,8 +866,8 @@ budget:
 # CPython-WASI baseline, then the two instruments that drive the city's own
 # accounting loop - a relay
 # round trip and the gap a second dispatch leaves in a running one
-# (`crates/sprawling/Spec.lean` §8-84) - and the phases of each tool,
-# its call and the secret scan of its result (`crates/runtime/Spec.lean`).
+# (`Sprawling/app/Spec.lean` §8-84) - and the phases of each tool,
+# its call and the secret scan of its result (`Sprawling/runtime/Spec.lean`).
 #
 # The instruments are library tests, so `--lib` builds only the three
 # library test binaries: an integration test would also link the
@@ -882,14 +882,14 @@ bench:
     cargo nextest run -p sprawling -p sprawling-accounting -p sprawling-gateway -p sprawling-runtime --release --lib --profile bench --run-ignored only -E 'test(/::instrument_/)' --no-capture || status=$?; \
     exit "$status"
 
-# The four-action pressure reading (crates/citysim/Spec.lean 8-5) - install,
+# The four-action pressure reading (Tools/citysim/Spec.lean 8-5) - install,
 # startup, raise a city, open a session - measured, never gated.
 #
 # `web-bundle` first: without the bundle the binary embeds a placeholder
 # page, and a placeholder is not the artifact a person installs - its
 # weight is what the install action unpacks and the startup action loads.
 # It is `web-bundle` rather than `build-web` because Vite rewrites every
-# file of the bundle on each build, `crates/sprawling/build.rs` reruns on
+# file of the bundle on each build, `Sprawling/app/build.rs` reruns on
 # any bundle file whose mtime moved, and the release profile then relinks
 # the whole binary; a second round on an unchanged client must measure
 # the same binary rather than rebuild it.
@@ -954,7 +954,7 @@ replay log:
     cargo run -p sprawling --locked -- replay {{log}}
 
 # Private, peak private and working set, in this platform's own counters
-# (crates/xtask/Spec.lean §8-30). A pid reads that process. `long-turn
+# (Tools/xtask/Spec.lean §8-30). A pid reads that process. `long-turn
 # [steps] [every]` reads the long-turn instrument at each of its pauses
 # (citysim D10). Anything else serves a city - a fresh
 # empty one, or `--city <dir>` - so the release binary is built first: a
@@ -978,9 +978,9 @@ mem-long-turn steps="500" every="100":
         esac
     done
 
-# The adversarial property checker in `crates/adversary/`, which lives outside the
+# The adversarial property checker in `Tools/adversary/`, which lives outside the
 # workspace, outside the release, and outside `just check`
-# (crates/adversary/Spec.lean section 2). It is never a gate: on a machine with
+# (Tools/adversary/Spec.lean section 2). It is never a gate: on a machine with
 # no Lean toolchain this prints one line and succeeds, so `just check` behaves
 # exactly as it does where the directory is absent.
 #
@@ -1011,7 +1011,7 @@ adversary *args:
     SPRAWLING_BIN="$binary" lake exe adversary {{args}}
 
 # The usability walk a stranger takes with a release archive
-# (crates/adversary/Spec.lean section 9, step 6). The archive is
+# (Tools/adversary/Spec.lean section 9, step 6). The archive is
 # unpacked into target/acceptance, the stand-in provider is started on the
 # script the acceptance world writes for the archive's skills, and the
 # archive's own binary is walked through a first day, a process killed in
@@ -1019,7 +1019,7 @@ adversary *args:
 # collaboration. The walk is handed the script as well as the record,
 # because one run of it names a branch only the city knows, and the walk
 # appends that run to the script once it has read the branch from the
-# history (crates/adversary/Spec.lean D7). The servings that are not the
+# history (Tools/adversary/Spec.lean D7). The servings that are not the
 # crash end with SIGINT on macOS and Linux; on Windows each city is started
 # through the launcher `serve_grouped` in a process group of its own, which
 # the walk asks to send it Ctrl-Break. A city that does not exit within ten
@@ -1035,7 +1035,7 @@ adversary *args:
 # names an archive has asked for this walk.
 #
 # This recipe is the only place that starts the stand-in: the checker under
-# crates/adversary/ hosts no server (crates/adversary/Spec.lean section 13) and is
+# Tools/adversary/ hosts no server (Tools/adversary/Spec.lean section 13) and is
 # told the stand-in's URL, as it is told the binary's path.
 acceptance archive:
     #!/usr/bin/env bash
@@ -1068,7 +1068,7 @@ acceptance archive:
     [ -f "$provider" ] || provider="$provider.exe"
     # The launcher is named only on Windows, where a city closes in order
     # only on a Ctrl-Break to a process group of its own; macOS and Linux
-    # send SIGINT to the city itself (crates/adversary/Spec.lean D8).
+    # send SIGINT to the city itself (Tools/adversary/Spec.lean D8).
     launcher=""
     # The paths are handed to programs that are not a shell; under Git Bash
     # they are `/c/...`, which only that shell resolves (see `adversary`).
@@ -1111,7 +1111,7 @@ acceptance archive:
 # servings in order, with SIGINT on macOS and Linux and through the
 # launcher's Ctrl-Break on Windows, so they write theirs; a serving that
 # had to be terminated instead is named by a `note` line of the walk
-# (crates/adversary/Spec.lean D8). The city of its own is closed in order
+# (Tools/adversary/Spec.lean D8). The city of its own is closed in order
 # the same way, and the one-shot verbs exit normally. The held-out load below shares no
 # step with this one, so a gain it shows is not a gain on the training
 # script alone.
@@ -1145,7 +1145,7 @@ pgo-train archive:
     # walk's launcher `serve_grouped` (built by `acceptance` above) in a
     # process group of its own, and the line `close` on the launcher's stdin
     # has it send Ctrl-Break to that group; elsewhere SIGINT is the orderly
-    # close (crates/adversary/Spec.lean D8).
+    # close (Tools/adversary/Spec.lean D8).
     at="127.0.0.1:{{pgo_port}}"
     taken() { grep -q 'commands are taken' "$city/../serve.err" 2>/dev/null; }
     if command -v cygpath >/dev/null 2>&1; then

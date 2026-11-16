@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.kernel.spec.Address
+import Sprawling.kernel.spec.Address
 
 /-!
 # city::vocation
 
-规定 `vocation`（`crates/city/src/` 下同名的文件）。一个地址上的居民是来建造的还是来规划的。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+规定 `vocation`（`Sprawling/city/src/` 下同名的文件）。一个地址上的居民是来建造的还是来规划的。本文件是 `Sprawling/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `Sprawling/city/Spec.lean §8-n`，决定引作 `city D<n>`。
 -/
 
 /-!

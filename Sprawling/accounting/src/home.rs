@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! This person's home directory, and what this product keeps under it
-//! (`crates/accounting/spec/Home.lean` §8-7).
+//! (`Sprawling/accounting/spec/Home.lean` §8-7).
 //!
 //! Three callers derived the same directory before this module: the
 //! doctor looking for downloaded components, the installer looking for
@@ -46,7 +46,7 @@ const CITIES_DIR: &str = "sprawling";
 pub const CITY_DIR: &str = "city";
 
 /// Where the original bytes of a file the format ladder rewrote are
-/// kept (`crates/city/spec/Format.lean` §8-42).
+/// kept (`Sprawling/city/spec/Format.lean` §8-42).
 const BACKUPS_DIR: &str = "backups";
 
 /// What this machine looks like when neither variable is set.

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The npm gate: the dependency face of `client/` (crates/xtask/Spec.lean
+//! The npm gate: the dependency face of `client/` (Tools/xtask/Spec.lean
 //! §8-12).
 //!
 //! The workspace side of the tree has `cargo-deny` and `depmap` watching
@@ -69,7 +69,7 @@ const PERMITTED: &str = "deny.toml";
 /// RefRain, each its own lazy chunk (client/Spec.lean §4-54, client D32).
 /// `@noble/post-quantum` is the remote device's ML-KEM and ML-DSA,
 /// loaded only when the remote group pairs or locks (client/Spec.lean §4-57,
-/// `crates/remote_access/Spec.lean` D21). `katex` lays out a formula as
+/// `Sprawling/remote_access/Spec.lean` D21). `katex` lays out a formula as
 /// MathML, loaded only when a page first draws one (client/Spec.lean
 /// §4-64a).
 const RUNTIME: [&str; 22] = [

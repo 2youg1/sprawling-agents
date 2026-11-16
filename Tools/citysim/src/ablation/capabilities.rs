@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The corpus: each thing a resident of this city must be able to do,
-//! and the phrase in `crates/city/templates/City.md` that grants it.
+//! and the phrase in `Sprawling/city/templates/City.md` that grants it.
 //!
 //! **Data, not behaviour.** Editing this list is editing what the
 //! ablation measures, and the run refuses outright when a `cue` here is
@@ -21,7 +21,7 @@
 //! descriptions grant what they grant; a row for one of them would
 //! grade a phrase the document no longer says.
 //!
-//! Specified by `crates/citysim/spec/Ablation.lean` §8-8-4.
+//! Specified by `Tools/citysim/spec/Ablation.lean` §8-8-4.
 
 use super::Capability;
 

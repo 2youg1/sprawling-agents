@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The `[search]` table read, resolved, refused and written back
-//! (`crates/city/spec/ConfigLayers.lean` §8-4c and its model
+//! (`Sprawling/city/spec/ConfigLayers.lean` §8-4c and its model
 //! `City.ConfigLayers.Search`).
 
 use super::*;

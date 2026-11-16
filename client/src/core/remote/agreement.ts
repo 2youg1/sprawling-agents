@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The key exchange both handshakes share (`crates/remote_access/
+// The key exchange both handshakes share (`Sprawling/remote_access/
 // Spec.lean` §8-4): an ephemeral X25519 key from WebCrypto and an
 // ephemeral ML-KEM-768 key from `@noble/post-quantum`, the transcript
 // both sides sign, and the two session keys HKDF expands from both

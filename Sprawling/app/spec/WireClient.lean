@@ -6,7 +6,7 @@
 /-!
 # bin::wire_client
 
-规定 `crates/sprawling/src/wire_client.rs` 与 `crates/sprawling/src/wire_client/`：CLI 经它对一座在服务的城说话的第二个 wire 客户端（`bin::wire_client`）。本文件是 `crates/sprawling/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
+规定 `Sprawling/app/src/wire_client.rs` 与 `Sprawling/app/src/wire_client/`：CLI 经它对一座在服务的城说话的第二个 wire 客户端（`bin::wire_client`）。本文件是 `Sprawling/app/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `Sprawling/app/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `bin::wire_client::watching::tests` 守住。
 -/
@@ -30,7 +30,7 @@ pub(crate) fn enrol(at: &str, realm: &str, name: &str, value: &str) -> Result<St
 pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)>;   // "realm/name"
 ```
 
-- **没给 `--token` 时，只为这台电脑上的城读钥匙文件**：`call`、`send`、`top` 与 `enrol` 都经 `credential(at, given)` 取凭据：给了 `--token` 就用它；否则由 `reach(at)` 判 `at` 的主机，主机是回环字面量（`127.0.0.0/8`、`::1`，带不带方括号都算）或 `localhost` 时（`Reach::ThisMachine(port)`），按端口读这台电脑这座城的钥匙文件（`crates/sprawling/spec/Keying.lean` §8-22）；别的主机（`Reach::Elsewhere`）一律拒绝，`E_CREDENTIAL_MISSING`，恢复语要人给 `--token`，什么都不发。主机的判定取 `kernel::gate::target_of`，它把 `localhost`、`127.x.y.z` 与 `::1` 判为 `Loopback`，与出网门同一处权威，不解析名字。**原因**：钥匙文件给的是这台电脑上的程序；按端口找文件而不看主机，`--at other-host:8787` 就会经明文 `ws://` 在问候里把这台电脑上那座城的钥匙交给别的机器和链路上的任何人。被否：别的主机也读钥匙文件、只在连上之后再判（钥匙已经发出去了）；按名字解析后判回环（解析结果由 DNS 说了算，`localhost.example.com` 之类的名字可以指向任何地方）。主机在这台电脑上却没有读得出的端口（`Reach::Portless`）时不读文件，问候不带凭据，连接自己会失败。读不到钥匙文件也不是错：问候照常发出，城以握手拒绝作答，拒词说怎样拿到钥匙。`enrol` 把它放进 `Authorization: Bearer`，因为 `/enroll` 与别的门一样要凭据。
+- **没给 `--token` 时，只为这台电脑上的城读钥匙文件**：`call`、`send`、`top` 与 `enrol` 都经 `credential(at, given)` 取凭据：给了 `--token` 就用它；否则由 `reach(at)` 判 `at` 的主机，主机是回环字面量（`127.0.0.0/8`、`::1`，带不带方括号都算）或 `localhost` 时（`Reach::ThisMachine(port)`），按端口读这台电脑这座城的钥匙文件（`Sprawling/app/spec/Keying.lean` §8-22）；别的主机（`Reach::Elsewhere`）一律拒绝，`E_CREDENTIAL_MISSING`，恢复语要人给 `--token`，什么都不发。主机的判定取 `kernel::gate::target_of`，它把 `localhost`、`127.x.y.z` 与 `::1` 判为 `Loopback`，与出网门同一处权威，不解析名字。**原因**：钥匙文件给的是这台电脑上的程序；按端口找文件而不看主机，`--at other-host:8787` 就会经明文 `ws://` 在问候里把这台电脑上那座城的钥匙交给别的机器和链路上的任何人。被否：别的主机也读钥匙文件、只在连上之后再判（钥匙已经发出去了）；按名字解析后判回环（解析结果由 DNS 说了算，`localhost.example.com` 之类的名字可以指向任何地方）。主机在这台电脑上却没有读得出的端口（`Reach::Portless`）时不读文件，问候不带凭据，连接自己会失败。读不到钥匙文件也不是错：问候照常发出，城以握手拒绝作答，拒词说怎样拿到钥匙。`enrol` 把它放进 `Authorization: Bearer`，因为 `/enroll` 与别的门一样要凭据。
 
   ```rust
   enum Reach { ThisMachine(u16), Portless, Elsewhere }   // 穷尽；`reach(at)` 是唯一判定
@@ -45,12 +45,12 @@ pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)>;   // "realm/na
 - **一条命令收到城安静为止，或收到调用方点名的那种事件为止**。发出的是 `Command` 时，“安静”是一段无帧的时长（`--quiet-ms`，默认 2000），而不是帧数：一条 Dispatch 会产生多少事件是城的事，客户端猜不到。调用方知道自己在等哪件事时，写 `--until <kind>`（`kind` 取 `EventKind` 的 snake_case 拼写，由 serde 读，不另立名表）：`call` 在打印第一条该种类的 `Event` 或一条 `Refusal`（被拒的命令不会再产生事件）后退出，不再白等一整段安静窗口。窗口此时仍是两帧之间的上限；窗口先到而点名的事件没来，`Heard.awaited` 为 `Missing`，`spoken()` 给 `Unfinished`，退出码是 3 而不是 0——在等的事没发生，读成成功就是把失败读成成功。查询只有一个答复，`--until` 对查询不起作用。
 - **何时结束由 `wire_client::Ending` 一处决定**。`Ending::of` 按发出帧的种类与 `Until` 穷尽匹配，得 `Reply`（查询与握手）、`Quiet`、`Event(kind)`、`Run { under, milestone, run }` 四者之一；每一帧由 `Reply::of` 经 `wire::ServerFrame` 读一次，`Reply::Event { kind, run, addr }` 同时供 `--until` 比种类、供 dispatch 认出自己的 run。在等的帧到没到只记在 `Heard.awaited` 一处，`call` 与 `dispatch` 读的是同一个 `spoken()`。被否决的备选：把「收到答复就走」做成一个布尔参数——它会让 `call(…, false)` 这样的调用点说不出自己在等什么；以及让 dispatch 另记一份「里程碑到没到」——它与 `Awaited` 答的是同一个问题，两份记录迟早说两样话。
 - **`sprawling dispatch <addr> <task> [--detach] [-m|--model <id>] [--at] [--token]`（`bin::main::dispatch`，形状 adapter）是一次派活的整条路**：进程内铸幂等键（`IdemKey::derive(RunId::CITY, Seq::FIRST, 16 字节 OS 熵)`，与控制台每行一把键同一个构造；键从命令行拿进来就等于让人或 agent 再抄一遍 wire 的键格式），模式取 `Mode::PlanGoal`、强度与目标留空、`session` 为 `None`（地址是楼时城向模型要房间名，是房间时续写那个会话）。它等的是 `Until::Run { under, milestone }`，`Ending::of` 把它变成 `Ending::Run { under, milestone, run }`：`under` 是派去的地址，第一条 `addr` 等于它或在它之下的 `run_started` 认定这次的 run，`milestone = Milestone::Frozen` 时等到**那个** run 的 `run_frozen`（别的 run 冻结不算），`milestone = Milestone::Started`（`--detach`）时收到 `run_started` 就走；两者收到 `Refusal` 都立即结束，安静窗口（默认 120000 ms：一次模型调用返回前不出帧，派到楼时城先调一次模型给房间起名，run 才开始；每来一帧都重新计时）只作上限，窗口在里程碑之前关上时 `Heard.awaited` 为 `Missing`，城说过话则 `spoken()` 给 `Spoken::Unfinished`，一帧没回则给 `Quiet`，都退 3 而不是 0。`--detach` 的 stdout 只有 run id 一行，逐帧 JSONL 改走 stderr，于是 `id=$(sprawling dispatch --detach …)` 可直接用；不带 `--detach` 时逐帧 JSONL 走 stdout，与 `call` 一致。退出码表与 `call` 同一张，映射只写在 `main::calling` 的 `exit_of`（`Spoken` → `Exit`）与 `tell_unheard`（`Unheard` → `Exit`）两处，两个动词都调它们：0 答复（里程碑已到）、1 拒绝、2 命令行、3 安静或未到里程碑、4 `--at` 没有城。被否决的备选：让 `dispatch` 拼一段 JSON 再交给 `call`——`call --until run_frozen` 等的是任何一个 run 的冻结，认不出这一次派出的那个 run，而不带 `--until` 只能等安静；一次 run 的长短是模型的事，安静窗口要么截断它要么让每次派活白等。
-- **`-m|--model <id>` 点名这一次的模型**：它原样进 `WireCommand::Dispatch.model`（`crates/wire/Spec.lean` §8-48），不带时为 `None`：房间自己那层已冻结的模型仍有 tag 登记时取那个 tag，否则取 `main` tag 的模型——冻结的模型已无 tag 登记时，`main` 的模型由 `choose_shape` 以换模型拒掉（§8-79），拒绝语点名动过的那一项，恢复语给出人现在做得到的出路；在这里以「无 tag 登记」拒，两者都说不出。继任交接、唤醒敲门和不带 `-m` 的后续派活都带 `None`，若 `None` 一律取 `main`，在用 `-m` 开的房间里它们会被 `choose_shape` 以换模型拒掉，接力就断在半路。装配在 `agree_to_work` 里按这个 id 在 `ModelBook::choices()` 找到登记它的 tag，同一个 id 登记在几个 tag 下时取 `ModelTag` 次序里最前的那个，`main` 最前——`choices()` 按 `BTreeMap<ModelTag, _>` 的键序给出，所以这个取法不随登记先后变，再经 `ModelBook::select` 取端点与登记行，所以保密楼只用回环端点的检查、端点是否仍挂着、订阅凭证续期都与 `main` 同一条路；找不到时以 `E_CONFIG_INVALID` 拒，恢复语是「在设置页把它登记到一个 tag 下再派」，拒在写任何东西之前。选中的 id 由 `choose_shape` 冻进房间自己那层 `CONFIG.toml`，与 tag 解析出的模型同一扇门，所以一个已冻结的会话照旧拒绝换模型。被否决的备选：用 `SelectModel` 先改 tag 再派——那是整座城的配置，会在同时跑着的别人的 run 底下换模型。
+- **`-m|--model <id>` 点名这一次的模型**：它原样进 `WireCommand::Dispatch.model`（`Sprawling/wire/Spec.lean` §8-48），不带时为 `None`：房间自己那层已冻结的模型仍有 tag 登记时取那个 tag，否则取 `main` tag 的模型——冻结的模型已无 tag 登记时，`main` 的模型由 `choose_shape` 以换模型拒掉（§8-79），拒绝语点名动过的那一项，恢复语给出人现在做得到的出路；在这里以「无 tag 登记」拒，两者都说不出。继任交接、唤醒敲门和不带 `-m` 的后续派活都带 `None`，若 `None` 一律取 `main`，在用 `-m` 开的房间里它们会被 `choose_shape` 以换模型拒掉，接力就断在半路。装配在 `agree_to_work` 里按这个 id 在 `ModelBook::choices()` 找到登记它的 tag，同一个 id 登记在几个 tag 下时取 `ModelTag` 次序里最前的那个，`main` 最前——`choices()` 按 `BTreeMap<ModelTag, _>` 的键序给出，所以这个取法不随登记先后变，再经 `ModelBook::select` 取端点与登记行，所以保密楼只用回环端点的检查、端点是否仍挂着、订阅凭证续期都与 `main` 同一条路；找不到时以 `E_CONFIG_INVALID` 拒，恢复语是「在设置页把它登记到一个 tag 下再派」，拒在写任何东西之前。选中的 id 由 `choose_shape` 冻进房间自己那层 `CONFIG.toml`，与 tag 解析出的模型同一扇门，所以一个已冻结的会话照旧拒绝换模型。被否决的备选：用 `SelectModel` 先改 tag 再派——那是整座城的配置，会在同时跑着的别人的 run 底下换模型。
 - **输出是 JSONL，一行一帧**。发明一种人看的排版就是为 wire 里的每一个类型再写一遍它长什么样，而那份渲染一定会漂。
 - **退出码带信息**：收到过 `Refusal` 退 1；命令之后一帧都没回来（`Quiet`），或回来了帧而在等的那一帧没来（`Unfinished`），退 3；否则退 0。`Quiet` 与 `Unfinished` 分成两支，是因为前者连城是否收到这一帧都无从断言，后者城在说话、只是事情还没做到。一个驱动它的 agent 不应当为了知道「成不成」去解析 JSON。
 - **`enrol` 只从 stdin 读，恒不从 argv 读**。argv 进进程表、进 shell 历史、进父进程的日志；这比浏览器路径更好的地方就在这里，因为页面那条路要先把明文拿进一个标签页的内存。**输出只有引用**，恒不回显值。
 - **依赖不新增包**：`tokio-tungstenite` 正是 axum 的 `ws` 特性已经携带的那一份，直接依赖它在 `Cargo.lock` 里**增加零个包**（实测 496 → 496）；换一个别的 WebSocket 库就是把同一个协议的两份实现放进同一个二进制。不开 TLS：控制面走 `ws://`，而一座要经 TLS 到达的城是一座前面站着终结器的城。
-- **未做且已知**：`/enroll` 仍在工人取走凭据之前就答 201（详 `crates/wire/Spec.lean` §8）。`enrol` 因此报的是「已受理」而不是「已入库」，这句话写在输出里而不是留给人去撞。
+- **未做且已知**：`/enroll` 仍在工人取走凭据之前就答 201（详 `Sprawling/wire/Spec.lean` §8）。`enrol` 因此报的是「已受理」而不是「已入库」，这句话写在输出里而不是留给人去撞。
 
 **本章测试**：`split_reference` 对 `realm/name`、缺斜杠、空段、多斜杠四类输入给出正确答案；握手帧的 `wire_v` 与 `schema` 逐字节等于 `wire` 自己的值（这条断言就是「不存在第二份握手权威」的可执行形式）。`wire_client::tests` 用一个替身城证明：查询在窗口到期之前随答复返回；带 `--until` 的命令在窗口到期之前随点名的事件返回，之前的事件照样打印；点名的事件没来而别的事件来了，结果是 `Unfinished` 而不是已答复。`wire_client::ending::tests` 证明：派到楼的等待认出在它房间里开始的 run，别的 run 冻结不结束它；`--detach` 在 run 开始时结束并带回 run id；窗口在里程碑之前关上是 `Unfinished`。真城验收：`call` 一条必被拒的命令，收到 `refusal` 且退 1。
 -/
@@ -58,13 +58,13 @@ pub(crate) fn split_reference(raw: &str) -> Option<(&str, &str)>;   // "realm/na
 /-!
 ## 8-41 门说的话与门做的事：静默有自己的退出码，重放的命令只做一次（`bin::wire_client`、`accounting::worker::commanding::entrance`）
 
-仓外的对抗性检验器（`crates/adversary/Spec.lean` §4）留了两条未修的发现。两条都只在**门外**可观测，
+仓外的对抗性检验器（`Tools/adversary/Spec.lean` §4）留了两条未修的发现。两条都只在**门外**可观测，
 两条都伤同一类调用方——一个拿退出码分支、拿重试兜底的 agent。本节一次答完，因为它们是同一个承诺的两半：
 **门说出口的话必须等于门做的事**。
 
 ### 发现一：静默不是接受，故它不是 0
 
-**原因**：窗口内没收到拒绝，不等于城照办了。`AttachEndpoint` 指向一个连不上的 base URL 时，产品侧探测 15 s，客户端默认窗口 2 s（`crates/adversary/Spec.lean` §4 第一个发现）；把没有拒绝读成 0，「拒绝没赶上静默窗口」与「城照办了」就是同一个码。
+**原因**：窗口内没收到拒绝，不等于城照办了。`AttachEndpoint` 指向一个连不上的 base URL 时，产品侧探测 15 s，客户端默认窗口 2 s（`Tools/adversary/Spec.lean` §4 第一个发现）；把没有拒绝读成 0，「拒绝没赶上静默窗口」与「城照办了」就是同一个码。
 
 **依据**：`call` 与 `dispatch` 有四种结局。
 
@@ -103,7 +103,7 @@ impl Heard { pub(crate) fn spoken(&self) -> Spoken; }
 `accounting::worker::desk` 只合并**还在队列上或正在被执行**的同键命令（`clockwork.rs` 那条测试钉的就是它），
 一旦第一条跑完，重放就是第二次副作用。
 
-**依据：判在命令入口，判在任何副作用之前**（`crates/kernel/Spec.lean` §8-6 的原话）。
+**依据：判在命令入口，判在任何副作用之前**（`Sprawling/kernel/Spec.lean` §8-6 的原话）。
 
 ```rust
 // accounting::worker::commanding::entrance（形状 1 decision：状态是集合，判定借 kernel::gate::dedup）
@@ -166,7 +166,7 @@ socket 上的一次对话与 HTTP 上的一次托管是两件事，同处一个�
 ### 文档同步
 
 本节；`ARCHITECTURE.md` §12 增 `accounting::worker::commanding::entrance` 与两个测试文件的行；
-kernel D1 记下 `gate::dedup` 由 `idem::claim` 与 `IdemGuard` 接替；`crates/adversary/Spec.lean` §4 两条发现标注已修。
+kernel D1 记下 `gate::dedup` 由 `idem::claim` 与 `IdemGuard` 接替；`Tools/adversary/Spec.lean` §4 两条发现标注已修。
 `docs/operating.md` 增退出码表。公开面：`bin::wire_client` 与 `bin::assembly` 都是二进制内部（`pub(crate)`
 以下），`RunWorker::handle` 的签名不变。
 -/

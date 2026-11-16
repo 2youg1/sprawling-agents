@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Motion gate: a transition's curve and duration are named once, in the
-//! client's theme (crates/xtask/Spec.lean §8-51, docs/frontend-method.md §4-43).
+//! client's theme (Tools/xtask/Spec.lean §8-51, docs/frontend-method.md §4-43).
 //!
 //! The same shape as the colour scan: one production point, the theme's
 //! entry and the parts it imports (`crate::theme`), and every

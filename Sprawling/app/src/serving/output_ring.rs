@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What running commands already wrote, kept per run so a page that
-//! opens mid-command sees it (`crates/sprawling/spec/Accounting/Worker.lean` §8-115; the bound and the
-//! order it keeps are proved in `crates/sprawling/spec/Serving/OutputRing.lean`).
+//! opens mid-command sees it (`Sprawling/app/spec/Accounting/Worker.lean` §8-115; the bound and the
+//! order it keeps are proved in `Sprawling/app/spec/Serving/OutputRing.lean`).
 
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::{Mutex, MutexGuard, PoisonError};

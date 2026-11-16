@@ -54,7 +54,7 @@ pub(super) fn unavailable(query: String) -> wire::Answer {
 }
 
 /// The answer to a question this city tried to look up and could not,
-/// with what stopped it (`crates/wire/spec/Server.lean` D47).
+/// with what stopped it (`Sprawling/wire/spec/Server.lean` D47).
 pub(super) fn unavailable_because(query: String, stopped: &kernel::AxError) -> wire::Answer {
     wire::Answer::Unavailable {
         query,
@@ -228,7 +228,7 @@ pub enum Prepared {
 
 /// The ledger as a history reader carries it out of the snapshot: where
 /// it lives, and its index, which has a lock of its own that only
-/// readers wait on (`crates/sprawling/Spec.lean` §8-100).
+/// readers wait on (`Sprawling/app/Spec.lean` §8-100).
 pub struct LedgerAsk {
     pub(super) city_root: PathBuf,
     pub(super) index: Arc<Mutex<storage::LedgerIndex>>,
@@ -242,7 +242,7 @@ impl LedgerAsk {
     /// offset pointing at another line, so the index is replaced by an
     /// empty one and the poison cleared: the refresh that follows scans
     /// the whole ledger once, and later reads refresh incrementally again
-    /// (`crates/sprawling/Spec.lean` §8-100).
+    /// (`Sprawling/app/Spec.lean` §8-100).
     pub(super) fn indexed(
         &self,
     ) -> Result<(MutexGuard<'_, storage::LedgerIndex>, PathBuf), storage::StorageError> {
@@ -315,7 +315,7 @@ impl Prepared {
             }
             Self::Find(root, under, text) => wire::Answer::Find(find_answer(&root, under, text)),
             // Missing, unreadable and empty are answers of their own
-            // (`crates/wire/Spec.lean` §8-69), so this read always answers a document.
+            // (`Sprawling/wire/Spec.lean` §8-69), so this read always answers a document.
             Self::Document { city_root, at } => {
                 wire::Answer::Document(Box::new(document_answer(&city_root, at)))
             }

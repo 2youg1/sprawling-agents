@@ -10,12 +10,12 @@
 //! than more of `crate::policy`: that module reads a building's rules
 //! and this one only decides where a document it never opens is kept.
 //! The authority on this file's syntax is the server that reads it at
-//! startup (`crates/desktop/src/scope.rs`), and that server fails closed — a
+//! startup (`Sprawling/desktop/src/scope.rs`), and that server fails closed — a
 //! file it cannot read permits nothing. A second parser on this side
 //! would be a second authority, and one of two authorities eventually
 //! reads a file as meaning something the other does not.
 //!
-//! Specified by `crates/city/spec/Policy.lean` §8-26.
+//! Specified by `Sprawling/city/spec/Policy.lean` §8-26.
 
 use std::path::{Path, PathBuf};
 

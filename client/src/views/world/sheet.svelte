@@ -74,7 +74,7 @@
   // every prompt token of each call, cached or not, so the share of it
   // the cache served is the hit rate. Only turns whose provider reported
   // a cache read count toward the rate (`hitInput`); when none did, the
-  // rate is unknown rather than 0% (crates/wire/spec/Reading.lean D35).
+  // rate is unknown rather than 0% (Sprawling/wire/spec/Reading.lean D35).
   const used = $derived(
     turns.reduce(
       (sum, turn) => ({

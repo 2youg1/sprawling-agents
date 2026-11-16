@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The properties of `crates/sprawling/spec/Serving/Placement/Plan.lean`
+//! The properties of `Sprawling/app/spec/Serving/Placement/Plan.lean`
 //! checked on generated topologies, then the plan for described processor
 //! families. Each family is built from the vendor's published core,
 //! thread and cache counts, numbered the way Windows numbers a hybrid

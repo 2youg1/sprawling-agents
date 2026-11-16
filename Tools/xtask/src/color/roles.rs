@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The role layer: what a surface is *for*, judged against a closed
-//! vocabulary (crates/xtask/Spec.lean §8-8).
+//! vocabulary (Tools/xtask/Spec.lean §8-8).
 //!
 //! The rungs are the authority on values and the six assertions beside
 //! this file judge them. They do not answer the question a view asks -
@@ -290,7 +290,7 @@ fn views_outside_the_theme(root: &Path, source: &str) -> Result<Vec<Violation>, 
                     violation: format!("`{spelling}` names a rung of the ramp"),
                     alternative: format!(
                         "spell the role whose job this is; the vocabulary is the ROLES table in \
-                         crates/xtask/src/color/roles.rs, and the theme ({}) maps each one to \
+                         Tools/xtask/src/color/roles.rs, and the theme ({}) maps each one to \
                          a rung",
                         theme::ENTRY
                     ),
@@ -308,7 +308,7 @@ fn views_outside_the_theme(root: &Path, source: &str) -> Result<Vec<Violation>, 
                          engine draws nothing in its place and says nothing"
                     ),
                     alternative: "spell a role from the ROLES table in \
-                                  crates/xtask/src/color/roles.rs or a token the theme declares"
+                                  Tools/xtask/src/color/roles.rs or a token the theme declares"
                         .to_owned(),
                 });
             }

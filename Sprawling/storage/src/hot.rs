@@ -58,7 +58,7 @@ pub struct RunHot {
     /// The room this run stopped on a synchronous `send` to hear from,
     /// and until when: present from a `signal_wait_started` until a
     /// `signal_wait_ended` or the freeze, so a frozen run never waits
-    /// (`crates/storage/spec/Hot.lean` D29, `frozen_run_never_waits`).
+    /// (`Sprawling/storage/spec/Hot.lean` D29, `frozen_run_never_waits`).
     /// Defaulted, because a hot view stored before the field existed
     /// had no waits to remember.
     #[serde(default)]
@@ -155,7 +155,7 @@ impl RunHot {
 /// How many frozen runs the hot view holds besides every active one,
 /// and so how many a city view carries. A bound on the size of an
 /// answer on the wire, not a machine reading, so it is a constant
-/// (`crates/storage/spec/Hot.lean` §8-5).
+/// (`Sprawling/storage/spec/Hot.lean` §8-5).
 pub const RECENT_FROZEN: usize = 32;
 
 #[derive(Clone, Default, serde::Serialize, serde::Deserialize)]

@@ -5,14 +5,14 @@
 
 //! `playback`: a resident exports a stretch of the history its building
 //! may read, as a bundle or a playback page, and checks an export of its
-//! building against the city (`crates/sprawling/Spec.lean` §8-132).
+//! building against the city (`Sprawling/app/Spec.lean` §8-132).
 //!
 //! The reader is bound when the bench is laid out: the building the run
 //! stands in. No argument names a reader, and an argument this tool does
 //! not know is refused, so a resident cannot widen what it reads.
 //! Exports land under the city's playback exports, in the building's own
 //! directory, through the one landing every export takes
-//! (`crates/accounting/spec/Playback/Check.lean` §8-13).
+//! (`Sprawling/accounting/spec/Playback/Check.lean` §8-13).
 
 use std::path::{Path, PathBuf};
 

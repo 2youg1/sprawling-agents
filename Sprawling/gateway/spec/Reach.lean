@@ -6,7 +6,7 @@
 /-!
 # gateway::reach
 
-规定 `reach`（`crates/gateway/src/reach.rs`）：一次分段读数；哪些调用走这台电脑的代理；进程唯一的 TLS 后端。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+规定 `reach`（`Sprawling/gateway/src/reach.rs`）：一次分段读数；哪些调用走这台电脑的代理；进程唯一的 TLS 后端。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `Sprawling/gateway/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `gateway::reach`、`gateway::reach::proxy` 旁的测试守住。
 -/
@@ -27,7 +27,7 @@ pub fn is_local(base_url: &str) -> bool;                                        
 - **`socks` 不花钱**：reqwest 0.13 的 `socks = []` 是空 feature，实现就在它自己的 `connect.rs` 里，锁文件不多一个包。`system-proxy` 只在 Windows 与 macOS 各拉一个读系统设置的包。
 - **全城的 HTTP 客户端都在 `reach::proxy` 里造**（`client_for`）。同一条规则写在五处就是五条规则，它们一直一致到其中一处被改为止；更要紧的是，分段读数若自己再判一次，它报出的就是一条请求不会走的路——而那正是看报告的人唯一无法自己核实的东西：客户端已经 `no_proxy` 了，读数却按环境变量报 `Environment`，就是这种分叉。
 - **全进程只有一个 TLS 加密后端：aws-lc-rs，由 `reach::tls` 装一次。** reqwest 取 `rustls-no-provider`，rustls 作为工作区依赖只开 `std`、`tls12`、`aws_lc_rs`；`reach::tls::install_provider()` 用 `std::sync::Once` 把 `rustls::crypto::aws_lc_rs::default_provider()` 装成 rustls 的进程默认，`client_for` 在交出 builder 之前调它。于是用哪一个后端是一次显式的调用，不是 reqwest 某个 feature 的副作用；远程门（`remote_access`）的握手与封装原语走工作区里同一行 `aws-lc-rs`、同一组 feature，编出来是同一份 AWS-LC；进程里任何别的 rustls 使用者读 `CryptoProvider::get_default()`，得到的也是它。**绕开 `client_for` 造客户端被机械地挡住**：`clippy.toml` 的 `disallowed-methods` 列出 reqwest 的构造入口与 `CryptoProvider::install_default`，唯一的例外是 `client_for` 与 `install_provider` 各自那一处 `#[expect]`。挡的理由是具体的：`rustls-no-provider` 下，一个没经过 `client_for` 的 builder 在 `build()` 时找不到进程默认，reqwest 会 panic，而发行 profile 是 `panic = "abort"`。
-- **默认把打到这台电脑的调用摘出代理，但那是默认而不是定理**（`Proxying::ExceptLocal`）：开了 system-proxy 之后，一台配了代理的机器会把回环也送进代理，本地推理服务器由别人的网关代答 502。但把它写死就是替所有人做了一个只对大多数人成立的决定，而这一类决定失效时没有任何一屏能告诉人到底发生了什么。它是 `EndpointTuning.proxying` 的默认值，另两个值各自对应一类真实的机器（`crates/kernel/Spec.lean` §8-50），而无论哪一个，读数都会把结论写在 `through` 那一格里。
+- **默认把打到这台电脑的调用摘出代理，但那是默认而不是定理**（`Proxying::ExceptLocal`）：开了 system-proxy 之后，一台配了代理的机器会把回环也送进代理，本地推理服务器由别人的网关代答 502。但把它写死就是替所有人做了一个只对大多数人成立的决定，而这一类决定失效时没有任何一屏能告诉人到底发生了什么。它是 `EndpointTuning.proxying` 的默认值，另两个值各自对应一类真实的机器（`Sprawling/kernel/Spec.lean` §8-50），而无论哪一个，读数都会把结论写在 `through` 那一格里。
 - **工具服务器用默认值，且是显式地用**（`agent_protocols::mcp::http`、`agent_protocols::mcp::sse`）：它没有一份属于自己的设置可携。**会重新打开这一条的参数**：出现一个必须经代理才能够到的回环 MCP 服务器——到那时 `McpServer` 也要长出这一字段，而不是在这里改常量。
 - **`locality` 是全城唯一的那一条判断**（D36）：一个地址落在这台电脑（`Machine`）、它所在的私网（`Private`）还是公网（`Public`），只在 `reach::proxy::locality` 判一次。`client_for` 的代理豁免（`Through::LocalAddress`）读 `Machine` 与 `Private` 两格；地址规整时缺省的 scheme 与兼容格式提示、设置页上那个 `local` 标记、并发与机密楼的判断读 `is_local`，它就是 `locality == Machine`，因为它们问的是「在不在这台电脑上」，不是「出不出这个网」。`Machine`：回环（`IpAddr::is_loopback`，先经 `to_canonical` 把 `::ffff:127.0.0.1` 读成 IPv4），外加 `localhost` 与 `*.localhost`，所以 `127.0.0.2` 在每一处都算这台电脑。`Private`：IPv4 的私网段（`10/8`、`172.16/12`、`192.168/16`）与链路本地段（`169.254/16`），IPv6 的唯一本地段（`fc00::/7`）与链路本地段（`fe80::/10`），名字以 `.local`（mDNS，RFC 6762）或 `.home.arpa`（RFC 8375）结尾。其余都是 `Public`；名字不解析，因为一次 DNS 查询会让判定依赖网络，并把每一个端点的名字送给解析器。两份判断只会在某一处先被改掉时各说各的。
 - **每个出站请求报出这座城的名字**：`client_for` 给 builder 设 user agent `sprawling/<CARGO_PKG_VERSION>`，一处写给全城。服务端会拒绝不报名字的请求：有的 provider 要求客户端报自己的名字而不是 HTTP 库的名字，CDN 后面的 MCP 服务器对没有 user agent 的请求答 403。

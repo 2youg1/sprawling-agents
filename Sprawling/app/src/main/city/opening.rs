@@ -26,7 +26,7 @@
 //! unless `--console`.
 
 /// Which door a city was started through, which decides the face its
-/// terminal opens on (`crates/sprawling/spec/Console.lean` §8-11).
+/// terminal opens on (`Sprawling/app/spec/Console.lean` §8-11).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Entrance {
     /// `sprawling` with no command: the CLI, and no browser until `/web`.

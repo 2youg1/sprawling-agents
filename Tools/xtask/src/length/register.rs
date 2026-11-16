@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What `crates/xtask/budgets.toml` states about length, read once and handed
+//! What `Tools/xtask/budgets.toml` states about length, read once and handed
 //! to the gate as values.
 //!
 //! The two limits and the register of exceptions all arrive from one

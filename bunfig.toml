@@ -4,7 +4,7 @@
 #
 # `printWidth` is rustfmt's 100, so the TypeScript, CSS and Svelte next to
 # the Rust wrap where the Rust wraps. The default 80 re-wraps a third of the
-# client a second time and puts every line of `crates/xtask/src/channel/shim.js`
+# client a second time and puts every line of `Tools/xtask/src/channel/shim.js`
 # on three.
 #
 # Markdown and TOML are written, not formatted: prose is line-broken where a
@@ -21,7 +21,7 @@ ignorePatterns = [
   # producer's next `--write` run a diff, and `wire-ts` would then judge code
   # against a shape it cannot emit.
   "client/src/wire.ts", # `cargo xtask wire-ts`
-  "crates/agent_protocols/catalog/registry.json", # `cargo xtask acp-catalog`
+  "Sprawling/agent_protocols/catalog/registry.json", # `cargo xtask acp-catalog`
   "lake-manifest.json", # lake
   # The offline playback page: `assemble.js` builds `template.html` out of
   # these fragments byte for byte, and `client-checks` compares the result.
@@ -29,8 +29,9 @@ ignorePatterns = [
   # A record is evidence, not code: a response an endpoint answered, a
   # registry index, a city as one version wrote it, a reading taken once.
   # Re-wrapping one rewrites what was recorded without saying so.
-  "crates/*/tests/**/*.json",
-  "crates/agent_protocols/src/harness/catalog/recorded-index.json",
-  "crates/sprawling/tests/cities/**",
+  "Sprawling/*/tests/**/*.json",
+  "Tools/*/tests/**/*.json",
+  "Sprawling/agent_protocols/src/harness/catalog/recorded-index.json",
+  "Sprawling/app/tests/cities/**",
   "docs/benchmarks/**",
 ]

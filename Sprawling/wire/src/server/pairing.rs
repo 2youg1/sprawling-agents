@@ -4,10 +4,10 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! This machine's door for a browser: pairing, and the challenge and
-//! signature that open a session (`crates/wire/spec/Server.lean` §8-93).
+//! signature that open a session (`Sprawling/wire/spec/Server.lean` §8-93).
 //!
 //! The entry decision has already let only a browser of this listener's
-//! own origin through (`crates/wire/spec/Reception/Entry.lean` §8-94);
+//! own origin through (`Sprawling/wire/spec/Reception/Entry.lean` §8-94);
 //! the rules of what each route then decides are the door's
 //! (`server::door`, `reception::pairing`).
 

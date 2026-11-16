@@ -9,7 +9,7 @@
 //! that a client which lost its socket may send the frame again without
 //! doing the work twice. `kernel::idem::claim` judges membership and
 //! says the seen set is the caller's state; this is that caller
-//! (`crates/sprawling/Spec.lean` §8-41).
+//! (`Sprawling/app/Spec.lean` §8-41).
 //!
 //! Two things are held here, and they answer two different questions.
 //! The set answers "has this city already done this"; the map answers

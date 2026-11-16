@@ -150,7 +150,7 @@ impl Missing {
 ///
 /// On Windows the native arm is an AppContainer with no capabilities and a
 /// Job tree admitted while the child is suspended. Limits and resource
-/// ownership are specified by `Tools/Exec/NativeWindows.lean`.
+/// ownership are specified by `Sprawling/runtime/spec/Tools/Exec/NativeWindows.lean`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Confinement {
     /// Namespaces of its own — mount, network, process, user — made by a
@@ -179,7 +179,7 @@ impl Confinement {
     /// The arm a machine with these capabilities gives when no arm is named.
     ///
     /// A Windows build resolves [`Confinement::CopiedTree`] until the native
-    /// arm passes the conformance that `Tools/Exec.lean` SB1 item 3 lists;
+    /// arm passes the conformance that `Sprawling/runtime/spec/Tools/Exec.lean` SB1 item 3 lists;
     /// a building that names `native` still gets [`Confinement::WindowsJobObject`].
     pub fn choose(offered: &Offerings) -> Confinement {
         if offered.scratch.is_none() {

@@ -6,7 +6,7 @@
 //! The subject line and the ruling trailer of every commit in a range,
 //! and on a pull request the title, which a squash merge of two or more
 //! commits turns into the subject main receives
-//! (crates/xtask/Spec.lean §8-35). Not a gate: gates judge the tree, and this judges
+//! (Tools/xtask/Spec.lean §8-35). Not a gate: gates judge the tree, and this judges
 //! history, so it runs only where a caller names the range.
 
 use std::path::Path;

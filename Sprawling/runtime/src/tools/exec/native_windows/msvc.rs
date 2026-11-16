@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The MSVC search directories an AppContainer child cannot discover for
-//! itself, specified by `crates/runtime/spec/Tools/Exec/NativeWindows.lean` D60.
+//! itself, specified by `Sprawling/runtime/spec/Tools/Exec/NativeWindows.lean` D60.
 
 use std::ffi::{OsStr, OsString};
 use std::process::Command;

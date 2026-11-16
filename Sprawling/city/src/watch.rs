@@ -21,7 +21,7 @@
 //! its subscriptions go with it rather than needing a second list
 //! somebody has to remember to prune.
 //!
-//! Specified by `crates/city/spec/Watch.lean` §8-7.
+//! Specified by `Sprawling/city/spec/Watch.lean` §8-7.
 
 use std::path::{Path, PathBuf};
 

@@ -6,7 +6,7 @@
 /-!
 # gateway::transcribe
 
-规定 `transcribe`（`crates/gateway/src/transcribe.rs`）：把一段录音变成一行字的可选设施。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+规定 `transcribe`（`Sprawling/gateway/src/transcribe.rs`）：把一段录音变成一行字的可选设施。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `Sprawling/gateway/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `gateway::transcribe::wire`、`gateway::transcribe::transcriber` 旁的测试守住。
 -/
@@ -58,7 +58,7 @@ impl Transcriber {
 }
 ```
 
-**没配就是一句具名的拒绝，不是一个空串。** `Transcriber::absent()` 上的 `transcribe` 恒返回三段式 `E_TOOL_UNAVAILABLE`：action ＝ `transcribe a recording`，subject ＝ `this city has no transcription endpoint attached`，recovery 指出两条人能立刻做的路（登记一个服务 `audio/transcriptions` 的 endpoint，或者改用打字）。**为何复用 `E_TOOL_UNAVAILABLE` 而不新增一码**：基表里这一码的语义正是「这次部署里没有这项设施」，而 `E_CONFIG_INVALID` 会说成人填错了什么——什么都没填错，这项设施本就是可选的。这项设施有两条路用它：界面的 `/transcribe`（composer 的麦克风），与城给 run 的工具 `transcribe`（`crates/sprawling/Spec.lean` §8-131）；两条路缺的是同一项设施，故同一个码，`E_BROWSER_UNAVAILABLE` 那样只属于一件工具的专码在这里会给同一个事实第二个名字。码表是 kernel 全城权威且按「能否定义掉」逐码守着，为一件已有码能如实表达的事把它撑大，就是给同一个事实立第二个名字。
+**没配就是一句具名的拒绝，不是一个空串。** `Transcriber::absent()` 上的 `transcribe` 恒返回三段式 `E_TOOL_UNAVAILABLE`：action ＝ `transcribe a recording`，subject ＝ `this city has no transcription endpoint attached`，recovery 指出两条人能立刻做的路（登记一个服务 `audio/transcriptions` 的 endpoint，或者改用打字）。**为何复用 `E_TOOL_UNAVAILABLE` 而不新增一码**：基表里这一码的语义正是「这次部署里没有这项设施」，而 `E_CONFIG_INVALID` 会说成人填错了什么——什么都没填错，这项设施本就是可选的。这项设施有两条路用它：界面的 `/transcribe`（composer 的麦克风），与城给 run 的工具 `transcribe`（`Sprawling/app/Spec.lean` §8-131）；两条路缺的是同一项设施，故同一个码，`E_BROWSER_UNAVAILABLE` 那样只属于一件工具的专码在这里会给同一个事实第二个名字。码表是 kernel 全城权威且按「能否定义掉」逐码守着，为一件已有码能如实表达的事把它撑大，就是给同一个事实立第二个名字。
 
 **凭据只有一条路，请求也只有一条。** `Transcriber` 内部持一个真的 `Endpoint`（`DialectKind::OpenAi`、`Redemption::without_images`、`pricing: None`），整次 POST 由 `Endpoint::post_bytes` 发（§8-2），认证头由 `Endpoint::authorize` 写——与聊天调用、与 `list_models` 探测是同一格兑付。头名由 `AuthSpec::for_dialect` 定（§8-9），登记面不自己在 Bearer 与具名头之间选。**恒不为转写开第二个持凭据的地方**：两处持凭据就是两处会漏。
 
@@ -82,10 +82,10 @@ pub(crate) fn transcription_of(wire: &serde_json::Value) -> Result<String, AxErr
 
 **为何 `Recording` 是值而不是一对参数**：字节与它的格式永远同行，且两条不变量（非空、不超 `RECORDING_MAX_BYTES`）只在 `new` 一处守；无 setter。**为何 `wire` 与 `transcriber` 分家**：「这段多部分请求体长什么样」是纯数据的判定、可逐字节断言，「怎么把它发出去并兑付凭据」要一个 socket——两件事变化的理由不同。
 
-**线上的入口是 `wire` 的 `POST /transcribe`**（`crates/wire/src/reception/admission.rs`），经 `TranscribeSink` 交到这里；它不是 `Command` 的变体。
+**线上的入口是 `wire` 的 `POST /transcribe`**（`Sprawling/wire/src/reception/admission.rs`），经 `TranscribeSink` 交到这里；它不是 `Command` 的变体。
 -/
 
 /-! D12 转写是一项设施，两条路用它
 
-决定：`transcribe` 既是 composer 麦克风背后的设施，也是城给 run 的一件工具（`crates/sprawling/Spec.lean` §8-131）；两条路读端点账本里 `ModelTag::Transcribe` 的同一个选择，经同一个 `transcriber_for` 造设施；工具只在那个选择成立时上 run 的工具表。理由：computer use 要能把声音变成字，而二进制里不内置任何模型（定规），于是模型要转写只能经人接入的这个端点；`Transcriber::absent()` 的码仍是 `E_TOOL_UNAVAILABLE`，语义不变，仍是「这次部署里没有这项设施」。被否的备选：给工具另立一个专码（同一个事实两个名字）；让转写只做界面设施（模型拿不到任何转写能力）。
+决定：`transcribe` 既是 composer 麦克风背后的设施，也是城给 run 的一件工具（`Sprawling/app/Spec.lean` §8-131）；两条路读端点账本里 `ModelTag::Transcribe` 的同一个选择，经同一个 `transcriber_for` 造设施；工具只在那个选择成立时上 run 的工具表。理由：computer use 要能把声音变成字，而二进制里不内置任何模型（定规），于是模型要转写只能经人接入的这个端点；`Transcriber::absent()` 的码仍是 `E_TOOL_UNAVAILABLE`，语义不变，仍是「这次部署里没有这项设施」。被否的备选：给工具另立一个专码（同一个事实两个名字）；让转写只做界面设施（模型拿不到任何转写能力）。
 -/

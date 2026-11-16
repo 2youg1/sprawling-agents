@@ -6,7 +6,7 @@
 //! Every skill this repository ships, on a shelf the city mounts from
 //! outside itself and admitted by a building's reading room, is pinned
 //! when a run starts and read by name as the bytes the pin names
-//! (`crates/runtime/Spec.lean` §8-29-6; `docs/getting-started.md`, "Tools, skills
+//! (`Sprawling/runtime/Spec.lean` §8-29-6; `docs/getting-started.md`, "Tools, skills
 //! and MCP").
 //!
 //! A shipped skill's pinned bytes are the staged ones, the licence list

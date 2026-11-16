@@ -65,7 +65,7 @@ pub(super) fn enrol(read: &Arguments) -> ExitCode {
         Ok(reference) => {
             println!("{reference}");
             // Accepted, not yet stored: the route answers before the
-            // worker has taken it (`crates/wire/Spec.lean` §8).
+            // worker has taken it (`Sprawling/wire/Spec.lean` §8).
             eprintln!("accepted; the city stores it as soon as its worker is free");
             ExitCode::SUCCESS
         }
@@ -266,7 +266,7 @@ pub(super) fn replay(dir: Option<&String>) -> ExitCode {
 /// integrity check would otherwise score a mistyped argument as a pass.
 /// An empty ledger is a different fact and still verifies, which is why
 /// the question asked is whether a segment exists rather than whether a
-/// line does (`crates/sprawling/Spec.lean` section 12).
+/// line does (`Sprawling/app/Spec.lean` section 12).
 ///
 /// # Errors
 /// `E_PATH_NOT_FOUND` when the directory holds no ledger segment, and

@@ -7,7 +7,7 @@
 //! (version direction, chain, seq), the kind split (typed or ignorable),
 //! and the writer-canonical echo. `JsonlLedger::open`'s tail scan and
 //! `runtime::replay` both walk a ledger through a `LineCheck`, so a line
-//! one of them accepts the other cannot refuse (`crates/storage/spec/Jsonl/Verify.lean` §8-1).
+//! one of them accepts the other cannot refuse (`Sprawling/storage/spec/Jsonl/Verify.lean` §8-1).
 //!
 //! The check holds the chain state only - the previous line's hash and
 //! the seq expected next - never a line, so a reader that feeds it one
@@ -95,7 +95,7 @@ impl LineCheck {
     /// does, so a line that does is history, whatever else is wrong with it.
     /// A run of zero bytes is preallocated space a write had not reached,
     /// not part of a line, so the bytes after the last zero are judged on
-    /// their own (`crates/storage/spec/Jsonl/Preallocate.lean`,
+    /// their own (`Sprawling/storage/spec/Jsonl/Preallocate.lean`,
     /// `zeros_before_a_line_are_not_the_end`).
     pub(crate) fn carries_envelope(raw: &[u8]) -> bool {
         raw.rsplit(|byte| *byte == 0)

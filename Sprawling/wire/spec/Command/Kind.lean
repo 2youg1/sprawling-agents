@@ -6,7 +6,7 @@
 /-!
 # wire::command::kind
 
-规定 `command::kind`（`crates/wire/src/` 下同名的文件）。`enum Command` 的变体，与每个动词从哪里够得到、远程设备发来时属哪一类（§19，`xtask wiring` 的数据面）。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `command::kind`（`Sprawling/wire/src/` 下同名的文件）。`enum Command` 的变体，与每个动词从哪里够得到、远程设备发来时属哪一类（§19，`xtask wiring` 的数据面）。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 -/
 
 /-!
@@ -51,19 +51,19 @@
 | `LocalOnly` | 放宽访问、够到凭证或城所在的宿主机、改变治理这座城的东西：接端点、选模型、建楼拆楼、写规则与配置、装东西、开文件管理器 | 恒不带进来，不论权限 |
 
 - **新加的 Command 一律 `LocalOnly`**，除非人决定一台不在电脑旁的设备可以做它。`Act` 与 `Read` 是一次决定，不是默认值；表里一行缺 `class` 格，`xtask wiring` 点名那一行。
-- `class` 只判 Command。`Ask` 与 `Monitor` 两种帧属 `Read`，只有 `Ask { query: Privacy }` 属 `LocalOnly`：它答的是城所在主机的设置与本应用改过它们的记录，不是城的状态（crates/wire/spec/Privacy.lean §8-88）；设备发来的 `Hello` 由中继换成城自己的令牌再发（§8-66）；远程门的配对与撤销不在线上，开门、关门、更换城钥匙与它们的确认在线上的方式见下面四行（remote_access D4）。
+- `class` 只判 Command。`Ask` 与 `Monitor` 两种帧属 `Read`，只有 `Ask { query: Privacy }` 属 `LocalOnly`：它答的是城所在主机的设置与本应用改过它们的记录，不是城的状态（Sprawling/wire/spec/Privacy.lean §8-88）；设备发来的 `Hello` 由中继换成城自己的令牌再发（§8-66）；远程门的配对与撤销不在线上，开门、关门、更换城钥匙与它们的确认在线上的方式见下面四行（remote_access D4）。
 - 这一列是权威，中继按它判，`xtask wiring` 把表与中继的穷尽匹配（`bin::outside::verbs::command_class`）逐行对照（§8-65）。
 
-**远程门的四个动词**：设置页开关远程门、更换城钥匙（Roadmap 的 A7），上线的方式由 remote_access D4 定下；四行在下方 `inductive Command`、`reach` 与 `verbClass` 里各有一臂，等控制台确认的那一次请求是 `remote_access::confirm`（crates/remote_access/Spec.lean §8-13）。四个命令都带 `idem`，与其余改东西的命令同一条类型不变量，Rust 一侧的载荷是 `wire::DoorOpening`、`wire::DoorStep`（换钥匙与关门共用）与 `wire::DoorAnswer`；执行者不在 worker 的队列上，而在装配层 `bin::outside::asking`，因为远程门由它持有（`crates/sprawling/spec/Outside.lean` §8-140）。
+**远程门的四个动词**：设置页开关远程门、更换城钥匙（Roadmap 的 A7），上线的方式由 remote_access D4 定下；四行在下方 `inductive Command`、`reach` 与 `verbClass` 里各有一臂，等控制台确认的那一次请求是 `remote_access::confirm`（Sprawling/remote_access/Spec.lean §8-13）。四个命令都带 `idem`，与其余改东西的命令同一条类型不变量，Rust 一侧的载荷是 `wire::DoorOpening`、`wire::DoorStep`（换钥匙与关门共用）与 `wire::DoorAnswer`；执行者不在 worker 的队列上，而在装配层 `bin::outside::asking`，因为远程门由它持有（`Sprawling/app/spec/Outside.lean` §8-140）。
 
 | Command | 载荷 | reach | class | 守卫 | 执行者做的事 |
 |---|---|---|---|---|---|
 | `OpenRemoteDoor` | `lasting_ms: u64`、`idem`（一分钟到七天，与控制台 `--for` 同一条界） | `client` | `LocalOnly` | 控制台确认 | `Confirm::request`，在控制台印出确认码，答 `E_APPROVAL_PENDING` |
 | `ReplaceCityKey` | `idem` | `client` | `LocalOnly` | 控制台确认 | 同上 |
-| `ConfirmRemoteDoor` | `code: String`（控制台印出的确认码，大小写、空白与连字符不论）、`idem` | `client` | `LocalOnly` | 它自己就是确认 | `Confirm::confirm` 取回动词：开门走 `Doorway::open` 与远程监听，同 `/remote open`；换钥匙走 `Doorway::replace_key`，同 `/remote replace-key`，门开着时以 `E_BUSY` 拒（`crates/sprawling/spec/Outside.lean` §8-140） |
+| `ConfirmRemoteDoor` | `code: String`（控制台印出的确认码，大小写、空白与连字符不论）、`idem` | `client` | `LocalOnly` | 它自己就是确认 | `Confirm::confirm` 取回动词：开门走 `Doorway::open` 与远程监听，同 `/remote open`；换钥匙走 `Doorway::replace_key`，同 `/remote replace-key`，门开着时以 `E_BUSY` 拒（`Sprawling/app/spec/Outside.lean` §8-140） |
 | `CloseRemoteDoor` | `idem` | `client` | `LocalOnly` | 无 | `Doorway::close(Console)`，同 `/remote close` |
 
-- **守卫一列说一帧到了执行者之后还要什么**：「控制台确认」的请求本身什么也不做，城取一个确认码、只印在城的控制台上，紧接着的一帧 `ConfirmRemoteDoor` 带回它、且在它到期之前（期限写在 crates/remote_access/Spec.lean §3），城才做那个动词（crates/remote_access/spec/Confirm.lean）。理由：城的回环端口上任何本地客户端都发得出这几帧，包括驱动页面的浏览器工具，而控制台的输出不进任何一帧，所以只有读得到控制台的那一位能确认。关门不要守卫，因为它只减少访问（remote_access D5）。改一个动词的守卫是这一格与执行者里的一臂。
+- **守卫一列说一帧到了执行者之后还要什么**：「控制台确认」的请求本身什么也不做，城取一个确认码、只印在城的控制台上，紧接着的一帧 `ConfirmRemoteDoor` 带回它、且在它到期之前（期限写在 Sprawling/remote_access/Spec.lean §3），城才做那个动词（Sprawling/remote_access/spec/Confirm.lean）。理由：城的回环端口上任何本地客户端都发得出这几帧，包括驱动页面的浏览器工具，而控制台的输出不进任何一帧，所以只有读得到控制台的那一位能确认。关门不要守卫，因为它只减少访问（remote_access D5）。改一个动词的守卫是这一格与执行者里的一臂。
 - **四行都是 `LocalOnly`**：一台远程设备开不了门、换不了钥匙，不论它的权限，因为门要保护的正是从城外来的那一端；远程设备锁门走封装的锁门字节（remote_access D13），不走 `CloseRemoteDoor`。
 - **配对不在这张表里**：邀请是持有即用的秘密，显示在页面上就会被驱动页面的工具读到（remote_access D4），所以配对留在控制台，页面给分步说明与可复制的一行。
 
@@ -77,7 +77,7 @@
 | `ForgetDevice` | `device: DeviceId`、`idem` | `client` | `LocalOnly` | 无 | 删掉那台浏览器的公钥，它下次只能重新配对（§8-91） |
 
 - **四行都是 `LocalOnly`**：关闭城市、让一个程序以人的账户权限跑进城里、替人启动一个登录、撤销一台设备，都是治理这座城的动作，一台远程设备不论权限都做不了。
-- **现状**：`CloseCity`、`AddAgent` 与 `ForgetDevice` 由服务中的城的监听器执行（`bin::assembly::listening`），worker 那一臂以「这一条只在城的监听器上执行」拒绝。`AgentLogin` 仍由 `not_built` 作答：登录执行器没有建成（`crates/agent_protocols/Spec.lean` §3），客户端不画它。
+- **现状**：`CloseCity`、`AddAgent` 与 `ForgetDevice` 由服务中的城的监听器执行（`bin::assembly::listening`），worker 那一臂以「这一条只在城的监听器上执行」拒绝。`AgentLogin` 仍由 `not_built` 作答：登录执行器没有建成（`Sprawling/agent_protocols/Spec.lean` §3），客户端不画它。
 
 **`client` 而尚未落地的三个**（`HandOff`／`PutShelved`／`BatchByBuilding`）今天由 `not_built` 作答，
 所以门对它们要求的是**客户端不画**——`not_built` 的 rustdoc 说的就是这件事，现在有机器看着了。
@@ -92,15 +92,15 @@
 pub(super) fn command_class(command: &wire::WireCommand) -> remote_access::door::VerbClass;   // 穷尽匹配，无通配臂
 ```
 
-- **`class` 是 §19-2 的一列，不是 wire 的一个方法。** 它说的是远程门放不放一帧进来，而远程门的权限与 `VerbClass` 归 `remote_access`（crates/remote_access/Spec.lean §8-1）；本 crate 不依赖它，也不为它另立一个同值的枚举。中继在 `sprawling`，那里同时看得见两者（crates/remote_access/Spec.lean §7）。
-- **表与匹配由门机器对照**：`xtask wiring` 读表的第三格与 `command_class` 的每一臂，表里缺格、读不成三个取值之一、或与匹配说法不一，都点名那一个动词（crates/xtask/Spec.lean §8-45）。匹配是穷尽的，所以一个新 Command 在有人定下它的类之前编译不过。
+- **`class` 是 §19-2 的一列，不是 wire 的一个方法。** 它说的是远程门放不放一帧进来，而远程门的权限与 `VerbClass` 归 `remote_access`（Sprawling/remote_access/Spec.lean §8-1）；本 crate 不依赖它，也不为它另立一个同值的枚举。中继在 `sprawling`，那里同时看得见两者（Sprawling/remote_access/Spec.lean §7）。
+- **表与匹配由门机器对照**：`xtask wiring` 读表的第三格与 `command_class` 的每一臂，表里缺格、读不成三个取值之一、或与匹配说法不一，都点名那一个动词（Tools/xtask/Spec.lean §8-45）。匹配是穷尽的，所以一个新 Command 在有人定下它的类之前编译不过。
 - 不改任何帧，不动 `WIRE_V`。
 -/
 
 /-!
 ### 8-66 远程中继怎样用这条线
 
-- **设备说的是同一条线。** 远程会话里封装的每一帧文本（crates/remote_access/Spec.lean §8-5 的 `Payload::Frame`）就是一帧 `ClientFrame` 或 `ServerFrame`；中继打开封装、按 §19-2 判类，放行的帧**原样**发给城自己在回环上的 `/ws`，不解析后再序列化。
+- **设备说的是同一条线。** 远程会话里封装的每一帧文本（Sprawling/remote_access/Spec.lean §8-5 的 `Payload::Frame`）就是一帧 `ClientFrame` 或 `ServerFrame`；中继打开封装、按 §19-2 判类，放行的帧**原样**发给城自己在回环上的 `/ws`，不解析后再序列化。
 - **`Hello` 换成城自己的**：设备不知道、也不该知道城的配对令牌（§8-41）。中继把设备的 `Hello` 里的 `token` 换成城的令牌（没有就是空），`wire_v` 与 `schema` 照设备说的发，所以设备上的页面与城说不说同一版线，仍由 `server::decide_handshake` 判。
 - **拒绝是一帧 `Refusal`**：被门拒的帧不到城，中继封一帧 `ServerFrame::Refusal` 回给设备，码是 `E_GATE_DENIED`，恢复语说该在城自己的机器上做，或该重新配对为 `act`。读不成 `ClientFrame` 的文本同样封一帧 `E_WIRE_MISMATCH` 回去。
 - 城发来的每一帧都封好送回设备，事件、答复、增量一视同仁：一台 `Watch` 设备能读的就是这座城的整条线，这正是「看」的意思。
@@ -108,7 +108,7 @@ pub(super) fn command_class(command: &wire::WireCommand) -> remote_access::door:
 
 namespace Wire.Command.Kind
 
-/-- 线上的每一个动词：`command::kind` 里 `enum Command` 的变体，一行一个，拼写与 Rust 相同（crates/xtask/Spec.lean §8-43）。次序照 §19-2 的表。 -/
+/-- 线上的每一个动词：`command::kind` 里 `enum Command` 的变体，一行一个，拼写与 Rust 相同（Tools/xtask/Spec.lean §8-43）。次序照 §19-2 的表。 -/
 inductive Command where
   | Dispatch
   | ProbeEndpoint
@@ -177,7 +177,7 @@ inductive VerbClass where
   | LocalOnly
   deriving DecidableEq, Repr
 
-/-- §19-2 的 reach 列：一行一臂，每臂上方的注释是那一行的说明。`xtask wiring` 读这些臂（crates/xtask/Spec.lean §8-43），把它与 `enum Command`、`run_command` 的臂和 `client/src` 的发出点对照。 -/
+/-- §19-2 的 reach 列：一行一臂，每臂上方的注释是那一行的说明。`xtask wiring` 读这些臂（Tools/xtask/Spec.lean §8-43），把它与 `enum Command`、`run_command` 的臂和 `client/src` 的发出点对照。 -/
 def Command.reach : Command → Reach
   -- 派活，产品的正面
   | .Dispatch => .client
@@ -209,7 +209,7 @@ def Command.reach : Command → Reach
   | .DecideProposals => .client
   -- 起一栋楼
   | .CreateBuilding => .client
-  -- 把一栋楼移出城：文件搬进 reserved subtree（`crates/city/Spec.lean` §8-3），历史留在 Ledger，写 `building_removed`；有 run 正在其中某个房间里跑时拒 `E_BUSY`，点名房间与 run
+  -- 把一栋楼移出城：文件搬进 reserved subtree（`Sprawling/city/Spec.lean` §8-3），历史留在 Ledger，写 `building_removed`；有 run 正在其中某个房间里跑时拒 `E_BUSY`，点名房间与 run
   | .RemoveBuilding => .client
   -- 中途换方向
   | .Steer => .client
@@ -265,7 +265,7 @@ def Command.reach : Command → Reach
   | .ConfirmRemoteDoor => .client
   -- 立刻关远程门，结束每一个远程会话；不要守卫，因为关门只减少访问（remote_access D5）
   | .CloseRemoteDoor => .client
-  -- 改主机的一个隐私控制，或核对没有结论的那一次操作；执行者是城的监听（crates/wire/spec/Privacy.lean §8-89）
+  -- 改主机的一个隐私控制，或核对没有结论的那一次操作；执行者是城的监听（Sprawling/wire/spec/Privacy.lean §8-89）
   | .PrivacyOperation => .client
   -- 从 vault 删掉一个引用的 Key：载荷 `wire::SecretForgetting` 带 `reference: String`（`secret:realm/name`）与 `idem`。还有端点或配置在用它就拒，环境变量提供的拒并说要 unset 哪个（gateway D33）；不写账本。控件是账号编辑器移除账号之后的「同时删除 Key」（client D93）
   | .ForgetSecret => .client
@@ -288,10 +288,10 @@ def Command.reach : Command → Reach
 
 **被否**：①给 `wire::Command` 加一个 `class()` 方法：要么本 crate 依赖 `remote_access`，要么另立一个同值的枚举，两处定义同一组值；②在表里写类、中继在启动时解析 SPEC：二进制读一份 Markdown 做授权，文档的排版错误就成了门的漏洞；③不写表、只留匹配：一个动词能不能从城外做，是人要读到、要决定的事，藏在代码里没人看。
 
-**写法**：`class` 是下方 `def Command.verbClass` 的一臂一行，`xtask wiring` 按 crates/xtask/Spec.lean §8-45 读它。**重开参数**：`command_class` 的一臂按帧的参数再分两类时，一行一臂写不下，表改由 Lean 侧导出（xtask D8、D11）。
+**写法**：`class` 是下方 `def Command.verbClass` 的一臂一行，`xtask wiring` 按 Tools/xtask/Spec.lean §8-45 读它。**重开参数**：`command_class` 的一臂按帧的参数再分两类时，一行一臂写不下，表改由 Lean 侧导出（xtask D8、D11）。
 -/
 
-/-- §19-2 的 class 列：一行一臂。`xtask wiring` 读这些臂，与 `bin::outside::verbs::command_class` 的穷尽匹配逐个动词对照（crates/xtask/Spec.lean §8-45）。 -/
+/-- §19-2 的 class 列：一行一臂。`xtask wiring` 读这些臂，与 `bin::outside::verbs::command_class` 的穷尽匹配逐个动词对照（Tools/xtask/Spec.lean §8-45）。 -/
 def Command.verbClass : Command → VerbClass
   | .Dispatch => .Act
   | .ProbeEndpoint => .LocalOnly

@@ -40,7 +40,7 @@ impl JsonlLedger {
     }
 
     /// Group commit: one durability barrier for the whole wave
-    /// (`crates/storage/Spec.lean` §3, item 1: the batch is what the wave delivered).
+    /// (`Sprawling/storage/Spec.lean` §3, item 1: the batch is what the wave delivered).
     pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, StorageError> {
         // A restore a failed wave left owed runs first: it is what mends
         // the barrier, and it may remove the segment this wave would
@@ -105,7 +105,7 @@ impl JsonlLedger {
         // is durable: the bytes it copies exist before it runs. A
         // refusal is reported and skipped rather than returned - the
         // history already has the record, and a disposable artifact
-        // must never fail history's caller (`crates/storage/spec/Sessions.lean` §8-24).
+        // must never fail history's caller (`Sprawling/storage/spec/Sessions.lean` §8-24).
         if let Some(sessions) = self.sessions.as_mut() {
             for record in &records {
                 if let Err(error) = sessions.absorb(record) {
@@ -128,7 +128,7 @@ impl JsonlLedger {
     /// Hands this ledger's session slices to whoever will file them from
     /// now on; this writer files none after it. `None` for a ledger that
     /// is not a city's, and for one that already handed them off
-    /// (`crates/storage/spec/Sessions.lean` §8-24).
+    /// (`Sprawling/storage/spec/Sessions.lean` §8-24).
     pub fn hand_off_session_slices(&mut self) -> Option<crate::sessions::Sessions> {
         self.sessions.take()
     }
@@ -441,7 +441,7 @@ mod tests {
             torn_tail: crate::fault_fs::TornTail::None,
         });
         // The opening reads the tail and keeps the empty segment where
-        // it is (`crates/storage/Spec.lean` §8-1 step 5: nothing is cut).
+        // it is (`Sprawling/storage/Spec.lean` §8-1 step 5: nothing is cut).
         let mut seeded = fs.clone();
         crate::vfs::Vfs::create_dir_all(&mut seeded, dir.path()).unwrap();
         crate::vfs::Vfs::append(

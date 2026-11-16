@@ -28,7 +28,7 @@ use kernel::event::record::{AssetArchived, DiscardRestored, FileDiscarded};
 use kernel::{Address, AxError, EventRecord, RunId};
 
 /// The vendors this city knows by host, copied row for row from the
-/// preset table (`crates/wire/Spec.lean` §8-51). A row the normaliser refuses
+/// preset table (`Sprawling/wire/Spec.lean` §8-51). A row the normaliser refuses
 /// is a defect of the table, and the answer names itself unavailable
 /// with the row's refusal rather than listing the rest as if whole.
 pub(crate) fn known_hosts_answer() -> wire::Answer {

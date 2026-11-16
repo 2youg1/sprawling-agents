@@ -30,7 +30,7 @@ pub(super) enum Body {
         claim: Claim,
         tail: Tail,
         /// How the run's memory ceiling held as the command entered
-        /// (`crates/runtime/spec/Tools/Exec.lean` D95).
+        /// (`Sprawling/runtime/spec/Tools/Exec.lean` D95).
         ceiling: Mark,
     },
     Run(RunState),
@@ -74,7 +74,7 @@ impl Body {
 /// rather than with an error: the command's exit code is the fact the
 /// caller is owed, and a temporary file that vanished must not turn a run
 /// that finished into a run that failed, nor read as a command that
-/// printed nothing (`crates/runtime/spec/Tools/Exec.lean` D95).
+/// printed nothing (`Sprawling/runtime/spec/Tools/Exec.lean` D95).
 /// A directory that will not go costs disk, never the result.
 pub(super) fn collect(dir: &std::path::Path) -> (String, String) {
     let read = |name: &str, stream: &str| match std::fs::read(dir.join(name)) {

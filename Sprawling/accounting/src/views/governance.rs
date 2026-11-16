@@ -22,7 +22,7 @@ use kernel::{Address, AxError, EventKind, Payload, RunId};
 /// and the run that was working there. What that run was sent to do is
 /// read back from its `run_started` when the item is answered, so no
 /// run's task stays in this process after it froze
-/// (`crates/sprawling/spec/Accounting/Worker.lean` §8-25).
+/// (`Sprawling/app/spec/Accounting/Worker.lean` §8-25).
 #[derive(Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 pub struct BlockedJob {
     pub addr: Address,
@@ -54,7 +54,7 @@ pub struct Governance {
     /// the item is answered, because an answered item holds nothing up.
     pub origins: std::collections::BTreeMap<String, BlockedJob>,
     /// The proposal cards waiting on a person, and the ones handled
-    /// (`crates/accounting/spec/Worker/Commanding/Saving.lean` §8-22, accounting D34).
+    /// (`Sprawling/accounting/spec/Worker/Commanding/Saving.lean` §8-22, accounting D34).
     pub proposals: super::proposals::Proposals,
 }
 
@@ -86,7 +86,7 @@ impl Governance {
     /// would open a history written by another build as a city with work
     /// missing from its account, approvals nobody would ever be asked,
     /// and an allowance narrower than the person gave
-    /// (`crates/sprawling/Spec.lean` §8-74).
+    /// (`Sprawling/app/Spec.lean` §8-74).
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "a few kinds move this fold; the rest of the event vocabulary does not"

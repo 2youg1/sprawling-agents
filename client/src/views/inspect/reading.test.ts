@@ -67,7 +67,7 @@ const SHOT = call(5, {
 const UNPLACED = call(6, { tool: "mcp/github" });
 
 describe("where a read call opens the file", () => {
-  // A ledger keeps both spellings of a read (crates/runtime/spec/Tools.lean
+  // A ledger keeps both spellings of a read (Sprawling/runtime/spec/Tools.lean
   // D115): `file_path` numbers its offset from 1 (D119), the older `path`
   // from 0, and both open on the line an editor counts from 1.
   test("from the line either spelling of the call names", () => {

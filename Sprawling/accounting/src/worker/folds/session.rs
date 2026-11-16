@@ -33,7 +33,7 @@
 //! starts under it rather than under the policy its frame carries,
 //! because the ledger's line is what the session menu shows as the
 //! room's state and the page's copy is a second one
-//! (`crates/sprawling/spec/Accounting/Worker.lean` §8-133).
+//! (`Sprawling/app/spec/Accounting/Worker.lean` §8-133).
 //!
 //! **The map is not a second authority for the lineage.** What run
 //! continues what is in the ledger, and stays there; this holds only

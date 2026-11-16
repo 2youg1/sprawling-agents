@@ -7,7 +7,7 @@
 //! amount always wins over price-sheet arithmetic; the sheet is the
 //! fallback, not a second opinion. Checked integer math end to end —
 //! an overflowing settlement is an error, never a wrapped number
-//! (`crates/gateway/spec/Cost.lean` §8-8).
+//! (`Sprawling/gateway/spec/Cost.lean` §8-8).
 
 use kernel::{AxCode, AxError, ModelUsage, UsdMicros};
 

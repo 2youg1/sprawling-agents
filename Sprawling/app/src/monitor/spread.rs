@@ -5,7 +5,7 @@
 
 //! The one reading of a set of durations: its floor, its nearest-rank
 //! shares, its peak, and how many samples sit far above the middle
-//! (`crates/sprawling/spec/Main.lean` §8-129-2).
+//! (`Sprawling/app/spec/Main.lean` §8-129-2).
 //!
 //! Every percentile the repository prints - `sprawling gauge`'s spread
 //! line, citysim's `bench` and `bench_startup` readings - is read here,
@@ -101,7 +101,7 @@ impl Spread {
 }
 
 /// A duration as the whole number of microseconds every reading line
-/// and register field carries (`crates/sprawling/spec/Main.lean`
+/// and register field carries (`Sprawling/app/spec/Main.lean`
 /// §8-129-2, *单位*); a span too long for `u64` reads as `u64::MAX`.
 #[must_use]
 pub fn micros(span: Duration) -> u64 {

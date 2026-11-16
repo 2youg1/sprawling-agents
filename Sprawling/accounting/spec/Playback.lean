@@ -6,9 +6,9 @@
 /-!
 # accounting::playback
 
-规定 `crates/accounting/src/playback.rs` 与它的 bundle：`playback::select`、`playback::reader`、`playback::walk`、`playback::project`、`playback::links`、`playback::document`、`playback::encode`、`playback::consistency`。必须守住的性质在 `crates/accounting/spec/Playback/Select.lean` 与 `crates/accounting/spec/Playback/Project.lean`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+规定 `Sprawling/accounting/src/playback.rs` 与它的 bundle：`playback::select`、`playback::reader`、`playback::walk`、`playback::project`、`playback::links`、`playback::document`、`playback::encode`、`playback::consistency`。必须守住的性质在 `Sprawling/accounting/spec/Playback/Select.lean` 与 `Sprawling/accounting/spec/Playback/Project.lean`。本文件是 `Sprawling/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `Sprawling/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；必须守住的性质证在上面两个分部，其余由 Rust 的类型与 `accounting::playback::tests` 守住（`crates/accounting/Spec.lean` §16）。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；必须守住的性质证在上面两个分部，其余由 Rust 的类型与 `accounting::playback::tests` 守住（`Sprawling/accounting/Spec.lean` §16）。
 
 **平台**：导出只读账本、楼的规则文件与检查点仓库，不读墙钟，不写盘（落盘见 §8-13）；下面每一句在 Windows、macOS 与 Linux 上相同。
 -/
@@ -16,7 +16,7 @@
 /-!
 ### 8-12 accounting::playback：一段历史成为一份可以重算的 playback bundle（形状 7 投影）
 
-`playback` 把一座城 Ledger 的一段折成一份 **playback bundle**：带来源的、字节确定的 JSON，人或 agent 拿它回看一段工作流。它是账务读面上的一个共享投影，CLI（`sprawling playback export/check`，`crates/sprawling/Spec.lean` §8-126）与以后的居民工具都是它的薄适配器。必须守住的性质的权威是 `crates/accounting/spec/Playback/Select.lean`（选择、次序与去重、cutoff 不读未来）与 `crates/accounting/spec/Playback/Project.lean`（读不到的行不流进派生表、真实关闭的单调性）；本节是接口与做法。
+`playback` 把一座城 Ledger 的一段折成一份 **playback bundle**：带来源的、字节确定的 JSON，人或 agent 拿它回看一段工作流。它是账务读面上的一个共享投影，CLI（`sprawling playback export/check`，`Sprawling/app/Spec.lean` §8-126）与以后的居民工具都是它的薄适配器。必须守住的性质的权威是 `Sprawling/accounting/spec/Playback/Select.lean`（选择、次序与去重、cutoff 不读未来）与 `Sprawling/accounting/spec/Playback/Project.lean`（读不到的行不流进派生表、真实关闭的单调性）；本节是接口与做法。
 
 ```rust
 // accounting::playback
@@ -94,7 +94,7 @@ pub enum Reader { Person(Confidential), Resident(Address) }
 
 **失败。** 全部是 `AxError`：`Selection::new` 的矛盾区间、bundle 读不懂或不规范是 `E_INVALID_ARGS`（action `select a playback range` / `read a playback bundle`）；链上的行按 `LineFault::into_ax` 报（`E_CAS_CORRUPT`、`E_LOG_VERSION_UNSUPPORTED`），recovery 指向 `sprawling replay`；序列化写到 `BUNDLE_MAX_BYTES` 还没写完是 `E_INVALID_ARGS`（subject 说超过了这个上限，不说整份有多大，因为写者在上限处就停了），recovery 是用 `--from`/`--through`、`--run` 或 `--building` 收窄；规则、payload 读不了按各自的 `AxError` 原样上抛。任何失败都不交回部分的 bundle。错误文字不回显被隐去的内容。
 
-**资源。** 一遍读，一个段的字节常驻；另外常驻的是 `Lineage`（每个 run 一行）、关键时刻与消息的两端（每个键一项）、可能成为上下文的范围外可见行（run 的首行与各对的两端），范围内的投影，以及折到当前行的视图（§8-25）。`BUNDLE_MAX_BYTES` 只限最终字节，不限这些常驻量。编码时进程里多出的只有 bundle 的那一份缓冲（至多 `BUNDLE_MAX_BYTES`），没有整份紧凑 JSON 与它的转义副本这两份中间串（`crates/sprawling/spec/Serving/Memory.lean` §8-173 清点表的 playback 一行）。整份 `Document` 仍在内存里：`finish` 给提交找证据时按 seq 查 `events`（`playback::traced`），边走边编码要先把那次查找改成经账本旁索引读回，`crates/accounting/Spec.lean` §3 记着这件事。32 MiB 是待测的初值：多日夹具上的导出峰值与读取成本量出来之前，不把它当作内存上界。
+**资源。** 一遍读，一个段的字节常驻；另外常驻的是 `Lineage`（每个 run 一行）、关键时刻与消息的两端（每个键一项）、可能成为上下文的范围外可见行（run 的首行与各对的两端），范围内的投影，以及折到当前行的视图（§8-25）。`BUNDLE_MAX_BYTES` 只限最终字节，不限这些常驻量。编码时进程里多出的只有 bundle 的那一份缓冲（至多 `BUNDLE_MAX_BYTES`），没有整份紧凑 JSON 与它的转义副本这两份中间串（`Sprawling/app/spec/Serving/Memory.lean` §8-173 清点表的 playback 一行）。整份 `Document` 仍在内存里：`finish` 给提交找证据时按 seq 查 `events`（`playback::traced`），边走边编码要先把那次查找改成经账本旁索引读回，`Sprawling/accounting/Spec.lean` §3 记着这件事。32 MiB 是待测的初值：多日夹具上的导出峰值与读取成本量出来之前，不把它当作内存上界。
 
 **版本。** bundle 的内容或某张表的求法每变一次，`PROJECTION_RULES` 进一位，于是旧构建导出、本构建读得开的 bundle 复核时报「复核不了」，而不是报「不同」。字段增减是形状的变化，`SCHEMA` 随之进一位：读回时先只读 `schema` 一个键，不是本构建的 `SCHEMA` 就在结构一项报出两个版本、要求用写它的那个版本复核，而不报一条字段缺失。
 

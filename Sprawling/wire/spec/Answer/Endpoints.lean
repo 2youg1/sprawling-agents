@@ -6,9 +6,9 @@
 /-!
 # wire::answer::endpoints
 
-规定 `answer::endpoints`（`crates/wire/src/` 下同名的文件）。设置页读回的已挂端点，与一次探测的读数。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `answer::endpoints`（`Sprawling/wire/src/` 下同名的文件）。设置页读回的已挂端点，与一次探测的读数。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `crates/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
 -/
 
 /-!
@@ -50,7 +50,7 @@ pub enum KeyState {                            // 线上拼作 snake_case
 
 - **`tuning` 是挂上时的原样，不是生效值**：没人定过的数字仍是缺席，页面照旧用 `Query::Config` 的 `tuning` 画占位符（§8-47e）。读回的写法是 accounting 把 `AttachEndpoint` 的 tuning 变成 gateway 那份的同一个模块的逆向（`accounting::tuning`），两个方向放在一起，往返一次得到同一份 gateway tuning；`proxying` 读回为 `Some`，因为 gateway 一侧已经把缺席定成城的规则。请求头的值读回为 `spelled()`，即金库引用或一个过了密钥扫描的字面量，与账本里那一行相同，所以这里没有账本之外的东西。
 - **`account_status` 按账号 id 对上，不按位置**：每一行带 `id`，页面不必假定两张表一样长、一样排。它只说 Key 在不在、页面能不能改，不带值，也不带环境变量的名字。四态由 `gateway::Custodian::describe` 的 `configured` 与 `writable` 读出：`writable` 为假就是环境变量给的（`describe` 只在那里答假），再按 `configured` 分出 `Environment` 与 `EnvironmentUnusable`；`writable` 为真时按 `configured` 分出 `Stored` 与 `Missing`。
-- **看金库在快照放开之后**：`describe` 要问平台的凭据服务，这一问不能占着每个读者共用的那条折叠线程，所以 `EndpointView` 与 `Config` 一样走 `Prepared`（`crates/accounting/spec/Views.lean` §8-36）。金库的锁中毒时整份答复是 `Unavailable` 并带原因（D47），而不是把每个账号都说成 `Missing`。
+- **看金库在快照放开之后**：`describe` 要问平台的凭据服务，这一问不能占着每个读者共用的那条折叠线程，所以 `EndpointView` 与 `Config` 一样走 `Prepared`（`Sprawling/accounting/spec/Views.lean` §8-36）。金库的锁中毒时整份答复是 `Unavailable` 并带原因（D47），而不是把每个账号都说成 `Missing`。
 - `WIRE_V` 随本组改形进一位（D1、D49）。
 -/
 

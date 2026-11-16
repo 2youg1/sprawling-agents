@@ -6,7 +6,7 @@
 /-!
 # kernel::release
 
-规定 `kernel::release`（`crates/kernel/src/release.rs`）：一次发布的两种拼法与谁更新。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::release`（`Sprawling/kernel/src/release.rs`）：一次发布的两种拼法与谁更新。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 -/
 
 /-!
@@ -42,12 +42,12 @@ pub const MATURITY: Maturity;                   // 这棵树切出的每一次�
 2. **排序是 semver 自己的。** 日期落在 pre-release 段，于是 `0.0.5-pre.260912` 高于 `0.0.5-pre.260911` 而低于裸的 `0.0.5`——semver 对点分数字标识符按数值比。`Ord` 按字段声明顺序派生即复现该规则，本 crate 与注册表因而对同一对发布给出同一个次序。**这正是本类型存在的理由**：二进制拿自己的裸 `0.0.5` 去比注册表的 `0.0.5-pre.260912`，会把最新的那一版读成更旧的那一版，且无声。
 3. **日期必须随版本一起走，不能摆在旁边。** 一个 0.0.x 的版本号几乎说不出树有多旧，而树有多旧正是它的读者最需要知道的（CHANGELOG.md 开篇）。故 `released()` 是给人读的那一个渲染，`npm_version()` 是给注册表的那一个。
 4. **无钟无套接字。** 注册表此刻给的是什么，归调用方去取；本模块只判它被递到的东西（ARCHITECTURE.md 第 1 段）。
-5. **成熟度只写在 `MATURITY` 一处。** tag 的中缀、`sprawling status` 版本行里的说法（`crates/sprawling/Spec.lean` §8-162）、文档里由 `cargo xtask docnum` 的 `maturity` 事实渲染的字样（crates/xtask/Spec.lean §8-16），都从这个常量读；npm 那一种拼法的 `-pre.` 不随它变（D18）。
+5. **成熟度只写在 `MATURITY` 一处。** tag 的中缀、`sprawling status` 版本行里的说法（`Sprawling/app/Spec.lean` §8-162）、文档里由 `cargo xtask docnum` 的 `maturity` 事实渲染的字样（Tools/xtask/Spec.lean §8-16），都从这个常量读；npm 那一种拼法的 `-pre.` 不随它变（D18）。
 -/
 
 namespace Kernel.Release
 
-/-! D18 **成熟度是 kernel 的一个枚举常量，每一个读者从它渲染。** `MATURITY` 是这棵树切出的发布处在哪一级；tag 的中缀、`status` 的说法、README 两份与 CHANGELOG 里的字样都由它渲染，于是进 alpha 只改这一个常量，下面的定理说明每一处渲染都随之变。它是枚举而不是一段字符串：tag 写 `Pre-alpha`、句子写 `pre-alpha`，两种写法由 `Maturity` 的两个方法各给一次，读者不自己改大小写。值住 Rust（`crates/kernel/src/release.rs`），模型对任一取值成立，所以这里是参数而不是定义。
+/-! D18 **成熟度是 kernel 的一个枚举常量，每一个读者从它渲染。** `MATURITY` 是这棵树切出的发布处在哪一级；tag 的中缀、`status` 的说法、README 两份与 CHANGELOG 里的字样都由它渲染，于是进 alpha 只改这一个常量，下面的定理说明每一处渲染都随之变。它是枚举而不是一段字符串：tag 写 `Pre-alpha`、句子写 `pre-alpha`，两种写法由 `Maturity` 的两个方法各给一次，读者不自己改大小写。值住 Rust（`Sprawling/kernel/src/release.rs`），模型对任一取值成立，所以这里是参数而不是定义。
 被否：①写成 `Cargo.toml` 版本号的 pre-release 段（`0.0.8-alpha`）——它改的是 semver 次序与 crates.io 上的每一处 `=` 钉子，而成熟度不是版本号的一部分；②npm 那一种拼法也带成熟度——semver 按字典序比 pre-release 标识，`alpha` 排在 `pre` 之前，一个 alpha 的发布在注册表上会被读成比最后一个 pre-alpha 更旧，所以 `-pre.` 留到定 V0.1.0 的那一次改动再定。
 重开参数：成熟度要进 npm 的版本串，或一棵树要同时切出两级成熟度的发布。 -/
 
@@ -111,7 +111,7 @@ pub fn stands_on_crates(mine: &Release, newest: &Version) -> ReleaseVerdict;
 - **预发布的「更新」**：在 npm 上，版本号相同、日期更晚的那一次更新，因为日期落在 pre-release 段、按数值比；在 crates.io 上，同一版本号只能发一次，日期更晚的重切发不上去，所以 crates.io 对同一版本号恒答 `Current`。这对用 cargo 装的人是真话：`cargo install sprawling --locked` 本来就取不到一次只改了日期的重切。
 - **拼回去**：crates.io 的拼法就是 `Release::version()`（`0.0.9`），不另设一个返回同值的函数；`Version` 不在 kernel 根上导出，因为根上的 `kernel::Version` 是另一个概念，调用方写 `kernel::release::Version`。
 - **平台**：只读字符串，Windows、macOS、Linux 一致；向 crates.io 的那一次 HTTPS GET（带 User-Agent）归调用方（口径 4），与问 npm 用同一个 reqwest 客户端。打印的更新命令随安装方式（npm、cargo、压缩包、源码）而变，不随平台变。
-- **派生检查**（`crates/kernel/src/release.rs` 的测试）：proptest 在 `0..=9` 的三个版本数与合法日期上抽两次发布 `a`、`b`，断言：版本号不同时 `stands_on_crates(a, &b_version)` 与 `stands(a, b)` 相等；版本号相同时前者是 `Current`；把两次发布的 `npm_version()` 按 semver 第 11 条（测试里手写的标识比较）排出的次序与 `Release` 的 `Ord` 相同。坏的变体：`stands_on_crates` 把 `newest` 补成日期为零的 `Release` 再交给 `stands`，版本号相同的每一对都红成 `Ahead`。
+- **派生检查**（`Sprawling/kernel/src/release.rs` 的测试）：proptest 在 `0..=9` 的三个版本数与合法日期上抽两次发布 `a`、`b`，断言：版本号不同时 `stands_on_crates(a, &b_version)` 与 `stands(a, b)` 相等；版本号相同时前者是 `Current`；把两次发布的 `npm_version()` 按 semver 第 11 条（测试里手写的标识比较）排出的次序与 `Release` 的 `Ord` 相同。坏的变体：`stands_on_crates` 把 `newest` 补成日期为零的 `Release` 再交给 `stands`，版本号相同的每一对都红成 `Ahead`。
 -/
 
 /-- 一个版本号：三个点分数字。 -/

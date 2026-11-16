@@ -117,7 +117,7 @@ pub struct SignalConsumed {
 
 /// `signal_wait_started`: a run that sent `signal` with `wait` stopped
 /// at its safe point until a reply from `on` or the deadline
-/// (`crates/kernel/spec/Event/Record.lean` D32). `deadline_ms` is a
+/// (`Sprawling/kernel/spec/Event/Record.lean` D32). `deadline_ms` is a
 /// reading of the injected clock, not the wall: replay orders by seq,
 /// and the wire turns it into a wall-clock instant (wire D34).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -151,7 +151,7 @@ pub enum WaitEnd {
 
 /// `signal_landed`: where the accounting thread put the signal
 /// `signal` at the moment it delivered it, written right after its
-/// `signal_enqueued` (`crates/kernel/spec/Event/Record.lean` D38).
+/// `signal_enqueued` (`Sprawling/kernel/spec/Event/Record.lean` D38).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignalLanded {
     pub signal: SignalId,

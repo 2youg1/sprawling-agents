@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The privacy command verbs (`crates/sprawling/spec/Privacy/Cli.lean`):
+//! The privacy command verbs (`Sprawling/app/spec/Privacy/Cli.lean`):
 //! status and inspect read; apply, restore, restore-all and reconcile run
 //! through the one coordinator; elevated-write is the elevated child's.
 
@@ -125,7 +125,7 @@ pub fn restore_all(clock: impl accounting::Clock, emit: impl FnMut(String)) -> R
 }
 
 /// Carries out one machine-scope write as the elevated child the privacy
-/// page starts (`crates/sprawling/spec/Privacy/Windows.lean` D60): checks
+/// page starts (`Sprawling/app/spec/Privacy/Windows.lean` D60): checks
 /// it against the control table and writes, reading nothing back and
 /// recording nothing.
 ///

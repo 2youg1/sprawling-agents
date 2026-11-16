@@ -64,7 +64,7 @@ pub enum Query {
         to: Seq,
         limit: u32,
     },
-    /// The stretches of one room, newest first (`crates/wire/spec/Answer/Sessions.lean` §8-71).
+    /// The stretches of one room, newest first (`Sprawling/wire/spec/Answer/Sessions.lean` §8-71).
     Sessions {
         room: Address,
     },
@@ -139,12 +139,12 @@ pub enum Query {
     /// pasting its address.
     KnownHosts,
     /// The ACP page's catalog, detected agents and added agents
-    /// (`crates/wire/spec/Answer/Agents.lean` §8-90).
+    /// (`Sprawling/wire/spec/Answer/Agents.lean` §8-90).
     AgentCatalog,
     /// One pasted launch spec read as an agent entry, or refused; the paste
     /// grammar lives in the city alone (§8-90).
     ParseAgentSpec { text: String },
-    /// The browsers paired at this machine's door (`crates/wire/spec/Answer/Devices.lean` §8-91).
+    /// The browsers paired at this machine's door (`Sprawling/wire/spec/Answer/Devices.lean` §8-91).
     Devices,
     /// One building's own files and its archive - the pages an agent
     /// writes for the next agent, which are also the pages a person
@@ -153,14 +153,14 @@ pub enum Query {
         addr: Address,
     },
     /// What the city calls the person and the Mayor, read from the two
-    /// identity areas at the moment of asking (`crates/wire/spec/Answer/Identity.lean` §8-59).
+    /// identity areas at the moment of asking (`Sprawling/wire/spec/Answer/Identity.lean` §8-59).
     Identity,
     /// The schedule and the watch table, read at the moment of asking:
-    /// shown on the page, written by hand (`crates/wire/spec/Answer/Automation.lean` §8-62).
+    /// shown on the page, written by hand (`Sprawling/wire/spec/Answer/Automation.lean` §8-62).
     Automation,
-    /// A candidate user id: gh's login for a host (`crates/wire/spec/Answer/Github.lean` §8-67).
+    /// A candidate user id: gh's login for a host (`Sprawling/wire/spec/Answer/Github.lean` §8-67).
     GithubLogin(Option<String>),
-    /// The first-run guide's progress (`crates/wire/spec/Guide.lean` §8-68).
+    /// The first-run guide's progress (`Sprawling/wire/spec/Guide.lean` §8-68).
     Guide,
     /// Who answers for this city, and what has been answered on the
     /// person's behalf.
@@ -209,31 +209,31 @@ pub enum Query {
     Listing {
         at: Option<Address>,
     },
-    /// Files under `under` whose name holds `text` (`crates/wire/spec/Answer/Find.lean` §8-82).
+    /// Files under `under` whose name holds `text` (`Sprawling/wire/spec/Answer/Find.lean` §8-82).
     Find { under: Address, text: String },
     /// One file of the city as a version, with its first window
-    /// (`crates/wire/spec/Answer/Document.lean` §8-69). The path is an `Address`, so it cannot leave the
+    /// (`Sprawling/wire/spec/Answer/Document.lean` §8-69). The path is an `Address`, so it cannot leave the
     /// city root; the reserved subtree is readable on purpose, because
     /// this door answers the person and not a resident.
     Document {
         at: Address,
     },
-    /// The proposal cards still open on one document (`crates/wire/spec/Answer/Proposals.lean` §8-73).
+    /// The proposal cards still open on one document (`Sprawling/wire/spec/Answer/Proposals.lean` §8-73).
     Proposals(Address),
     /// Every proposal card still open in the city, by document and
-    /// offer time (`crates/wire/spec/Answer/Proposals.lean` §8-73).
+    /// offer time (`Sprawling/wire/spec/Answer/Proposals.lean` §8-73).
     OpenProposals,
-    /// One window of a stored version, by its version (`crates/wire/spec/Answer/Range.lean` §8-70).
+    /// One window of a stored version, by its version (`Sprawling/wire/spec/Answer/Range.lean` §8-70).
     Range { version: B3Hash, range: documents::Span },
-    /// One document's versions, newest first (`crates/wire/spec/Answer/DocumentVersions.lean` §8-83).
+    /// One document's versions, newest first (`Sprawling/wire/spec/Answer/DocumentVersions.lean` §8-83).
     Versions { at: Address },
-    /// One window of a stored object's bytes (`crates/wire/spec/Answer/DocumentBytes.lean` §8-80).
+    /// One window of a stored object's bytes (`Sprawling/wire/spec/Answer/DocumentBytes.lean` §8-80).
     Bytes { version: B3Hash, range: documents::Span },
-    /// A stored Markdown version as one HTML file (`crates/wire/spec/Answer/DocumentBytes.lean` §8-81).
+    /// A stored Markdown version as one HTML file (`Sprawling/wire/spec/Answer/DocumentBytes.lean` §8-81).
     Export { at: Address, version: B3Hash },
-    /// One window of a stored Markdown version, laid out (`crates/wire/spec/Answer/Preview.lean` §8-74).
+    /// One window of a stored Markdown version, laid out (`Sprawling/wire/spec/Answer/Preview.lean` §8-74).
     Preview { version: B3Hash, viewport: documents::Span },
-    /// A reply's text, laid out by the preview's grammar (`crates/wire/spec/Answer/Preview.lean` §8-75).
+    /// A reply's text, laid out by the preview's grammar (`Sprawling/wire/spec/Answer/Preview.lean` §8-75).
     Reply {
         text: String,
         state: documents::ReplyState,
@@ -324,19 +324,19 @@ pub enum Query {
     /// from the history, for the reason [`Query::Commit`] gives.
     GitStatus { building: Address },
     /// Whether each tool server one address reaches is answering, and what it offers, handshaken
-    /// once at the moment of asking (`crates/wire/spec/Answer/McpHealth.lean` §8-34).
+    /// once at the moment of asking (`Sprawling/wire/spec/Answer/McpHealth.lean` §8-34).
     McpHealth {
         addr: Address,
     },
     /// Which outside applications the broker offers, and where each one stands for this city
-    /// (`crates/wire/spec/Answer/Toolkits.lean` §8-35b).
+    /// (`Sprawling/wire/spec/Answer/Toolkits.lean` §8-35b).
     Toolkits,
     /// Which release this city is running, and which ones npm and crates.io offer
-    /// (`crates/wire/spec/Answer/Release.lean` §8-36).
+    /// (`Sprawling/wire/spec/Answer/Release.lean` §8-36).
     NewestRelease,
     /// The host's privacy controls, their current values and what this
     /// app's history discloses to the account asking
-    /// (`crates/wire/spec/Privacy.lean` §8-88). Answered by the city's
+    /// (`Sprawling/wire/spec/Privacy.lean` §8-88). Answered by the city's
     /// listener, never through a remote device.
     Privacy,
     /// Everything this person settled about their own reading of the
@@ -370,7 +370,7 @@ pub enum Query {
         runs: Vec<RunId>,
     },
     /// The newest release of one requirement-table item, asked of its
-    /// publisher (`crates/sprawling/Spec.lean` §8-120).
+    /// publisher (`Sprawling/app/Spec.lean` §8-120).
     ///
     /// Asked by the dependency page for each item once the page is open,
     /// which is the person asking whether their tools are behind; the
@@ -382,19 +382,19 @@ pub enum Query {
         item: String,
     },
     /// Every skill's contents, audit and uses by day, folded from the whole ledger when the
-    /// skill page opens (`crates/wire/spec/Reading.lean` D28, D33); `skill` narrows it to one.
+    /// skill page opens (`Sprawling/wire/spec/Reading.lean` D28, D33); `skill` narrows it to one.
     SkillUsage { skill: Option<String> },
     /// The same table per tool server and tool; `server` narrows it to one.
     McpUsage { server: Option<String> },
     /// Every use as one JSONL or CSV row for the User to download; the city writes no file.
     UsageExport { what: crate::UsageKind, format: crate::ExportFormat },
     /// Every shell interpreter's calls and failures by class, folded from the whole ledger in
-    /// the same pass as the usage tables (`crates/wire/spec/Reading.lean` D48).
+    /// the same pass as the usage tables (`Sprawling/wire/spec/Reading.lean` D48).
     Shells,
     /// The window and the ceiling the city would register for each row
     /// of one endpoint's model table, were the person to leave both
     /// boxes empty, each with the rung that answered
-    /// (`crates/wire/spec/Answer/ModelFigures.lean` §8-97). `base_url`
+    /// (`Sprawling/wire/spec/Answer/ModelFigures.lean` §8-97). `base_url`
     /// is the text in the box, which the city normalises the way an
     /// attach does.
     ModelFigures {
@@ -405,11 +405,11 @@ pub enum Query {
     },
     /// The prompt documents the next run at `addr` is frozen with, in
     /// send order, each with its layer and whether it is sent
-    /// (`crates/wire/spec/Answer/Prefix.lean` §8-98).
+    /// (`Sprawling/wire/spec/Answer/Prefix.lean` §8-98).
     Layers { addr: Address },
     /// How each tool this building admits reaches its runs: the newest
     /// run's frozen table, read against the `[catalog]` tables on disk,
-    /// with the evidence of use (`crates/wire/spec/Answer/Catalog.lean` §8-99).
+    /// with the evidence of use (`Sprawling/wire/spec/Answer/Catalog.lean` §8-99).
     Catalog { building: Address },
 }
 

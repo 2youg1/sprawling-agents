@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Progressive disclosure and the truncation lock
-//! (`crates/runtime/Spec.lean` §8-60, §8-61). Only what this session can
+//! (`Sprawling/runtime/Spec.lean` §8-60, §8-61). Only what this session can
 //! actually reach is listed — admission is the caller's evidence: the
 //! assembler registers the tools a building's vocation, rules and book
 //! allow, and reads each building's reading room off its `city::policy`
@@ -290,7 +290,7 @@ impl Catalog {
     /// Every admitted capability a session does not carry as a tool, in
     /// the index's order: one entry per namespace of the tools outside
     /// the core, then the skills under one line that says what a skill
-    /// is, one entry each (`crates/runtime/spec/Catalog.lean` §8-60).
+    /// is, one entry each (`Sprawling/runtime/spec/Catalog.lean` §8-60).
     ///
     /// The `skill` namespace's tools are counted in that line rather than
     /// given one of their own, so the sentence is said once.
@@ -357,7 +357,7 @@ impl Catalog {
 
     /// The call a `tool` `run` stands for, with the id the model gave it,
     /// so its result pairs with the `tool` call in the conversation and
-    /// its tool passes its own doors (`crates/runtime/Spec.lean` §8-61).
+    /// its tool passes its own doors (`Sprawling/runtime/Spec.lean` §8-61).
     ///
     /// # Errors
     /// `E_INVALID_ARGS` when the call is not a `run`, when the arguments

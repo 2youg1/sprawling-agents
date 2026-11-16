@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The port a city takes before it opens, and serving on it
-//! (`crates/wire/spec/Server/Listener.lean` §8-46).
+//! (`Sprawling/wire/spec/Server/Listener.lean` §8-46).
 //!
 //! Two steps, because the assembly layer needs a gap between them: a
 //! city takes its port first, then opens its one writer, and only then
@@ -47,7 +47,7 @@ impl Bound {
     }
 
     /// The names and origins this listener answers to, computed once from
-    /// the address it holds (`crates/wire/spec/Reception/Entry.lean`
+    /// the address it holds (`Sprawling/wire/spec/Reception/Entry.lean`
     /// §8-94): the URL a person opens, and what the residents' browser
     /// guard keeps them away from.
     #[must_use]

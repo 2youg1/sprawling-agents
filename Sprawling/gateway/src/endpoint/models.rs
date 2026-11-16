@@ -126,7 +126,7 @@ fn price(row: &Value, keys: [&str; 2]) -> Option<String> {
 }
 
 /// What the row says about thinking, from the first vendor's keys that
-/// carry it (`crates/gateway/spec/Endpoint/Models.lean` §8-10).
+/// carry it (`Sprawling/gateway/spec/Endpoint/Models.lean` §8-10).
 fn thinking(row: &Value) -> Option<ThinkingStatement> {
     openrouter(row)
         .or_else(|| xai(row))

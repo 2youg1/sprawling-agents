@@ -84,7 +84,7 @@ fn a_serve_of_a_held_city_is_refused_and_lets_its_port_go() {
 }
 
 /// The phases of opening a served city, in the order `listen` does them
-/// (`crates/sprawling/spec/Assembly/Listening.lean` §8-121). The fold
+/// (`Sprawling/app/spec/Assembly/Listening.lean` §8-121). The fold
 /// names how many lines the city holds, which the test reads off the
 /// ledger `init` wrote: one `skill_shelved` per shipped skill moves it.
 const OPENING_PHASES: [&str; 7] = [
@@ -171,7 +171,7 @@ fn a_listening_city_says_what_opening_it_cost() {
 /// views, as every later line does: a vault that fell back to session
 /// memory is disclosed by a `provider_degraded` line `open_for_service`
 /// writes, and the views' answers come to stand after it
-/// (`crates/sprawling/spec/Assembly/Listening.lean` D81).
+/// (`Sprawling/app/spec/Assembly/Listening.lean` D81).
 #[test]
 fn every_line_written_while_opening_reaches_the_views() {
     let city = tempfile::tempdir().expect("a temporary directory");

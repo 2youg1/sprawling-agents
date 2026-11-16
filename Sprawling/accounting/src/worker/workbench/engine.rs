@@ -6,7 +6,7 @@
 //! The machine half of the exec tool: the three things about `exec`
 //! that are this machine's rather than the city's, asked of the host
 //! the worker was handed and shaped by what the frozen configuration
-//! allows (`crates/sprawling/Spec.lean` §8-47, `crates/accounting/spec/Worker.lean` §8-11).
+//! allows (`Sprawling/app/Spec.lean` §8-47, `Sprawling/accounting/spec/Worker.lean` §8-11).
 //!
 //! Nothing here reads the search path, a variable or a feature flag.
 //! What it holds is the judgement between the host's answer and the
@@ -30,7 +30,7 @@ pub(super) struct MachineHalf {
 
 /// Asks the host for the component, the shell and the engine; the
 /// shell only where a layer asked for one, and then the interpreter
-/// that layer named (`crates/runtime/Spec.lean` §8-13-2 D30).
+/// that layer named (`Sprawling/runtime/Spec.lean` §8-13-2 D30).
 ///
 /// A broken component or shell arrives here as `None`: the exec tool's
 /// own refusal names the arm, and `sprawling doctor --explain

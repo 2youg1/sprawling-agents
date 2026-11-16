@@ -9,7 +9,7 @@
 //! The first two adapters own a medium — `storage::jsonl` owns segments on disk, citysim's
 //! owns a `Vec`. This one owns neither. It owns a crossing: the driving pool holds `Relay`
 //! and nothing else that can write, so "a city has one writer" is held by the types rather
-//! than by discipline (ARCHITECTURE section 10, `crates/sprawling/Spec.lean` §8-42).
+//! than by discipline (ARCHITECTURE section 10, `Sprawling/app/Spec.lean` §8-42).
 
 use std::collections::VecDeque;
 use std::sync::mpsc;
@@ -37,7 +37,7 @@ pub(crate) struct RelayRequest {
     back: mpsc::SyncSender<Result<Vec<EventRef>, AxError>>,
     /// When the lane queued it, on the gate's monotonic clock: the
     /// accounting thread reads its queue wait off it
-    /// (`crates/sprawling/spec/Accounting/Worker.lean` §8-98).
+    /// (`Sprawling/app/spec/Accounting/Worker.lean` §8-98).
     queued: Instant,
 }
 
@@ -46,7 +46,7 @@ pub(crate) struct RelayRequest {
 ///
 /// One queue, because a thread blocks on one thing at a time: a queue
 /// per mouth is polled with timeouts that every request waits out
-/// (`crates/sprawling/Spec.lean` §8-42-4, `crates/accounting/spec/Worker/Attend.lean`).
+/// (`Sprawling/app/Spec.lean` §8-42-4, `Sprawling/accounting/spec/Worker/Attend.lean`).
 pub(crate) enum Wake {
     /// A lane's append, waiting for its answer.
     Relay(RelayRequest),
@@ -70,14 +70,14 @@ pub(crate) enum Wake {
 pub(crate) struct Drained {
     /// Every line the ledger took, in ledger order: a line a lane wrote
     /// is history as much as one the accounting thread wrote, so the
-    /// same folds are shown it (`crates/sprawling/Spec.lean` §8-110).
+    /// same folds are shown it (`Sprawling/app/Spec.lean` §8-110).
     pub written: Vec<EventDraft>,
     /// Registrations in arrival order, left to the thread that holds the
     /// goal register: a copy of the register here would be a second
-    /// answer to who holds the ground (`crates/sprawling/Spec.lean` §8-42-8).
+    /// answer to who holds the ground (`Sprawling/app/Spec.lean` §8-42-8).
     pub goals: Vec<GoalAsk>,
     /// Answers to provider requests handed off, in arrival order, left
-    /// to the thread that records them (`crates/sprawling/Spec.lean` §8-42-9).
+    /// to the thread that records them (`Sprawling/app/Spec.lean` §8-42-9).
     pub answers: Vec<Answer>,
 }
 
@@ -95,7 +95,7 @@ pub(crate) enum Patience {
 /// `kernel::Ledger` it is given.
 ///
 /// Cloned per driving thread, and once for the remote door, whose five
-/// lines the assembly writes from outside any run (`crates/sprawling/Spec.lean`
+/// lines the assembly writes from outside any run (`Sprawling/app/Spec.lean`
 /// §8-139). Nothing here decides anything: seq, prev and the bytes stay
 /// with the adapter on the accounting side, which is what keeps one city
 /// to one writer.
@@ -167,7 +167,7 @@ pub(crate) struct RelayGate {
     issuing: mpsc::Sender<Wake>,
     pub booked: ClaimBook,
     /// How many appends wait and how many are not yet durable
-    /// (`crates/sprawling/Spec.lean` §8-98).
+    /// (`Sprawling/app/Spec.lean` §8-98).
     health: Health,
     /// The worker's monotonic clock (`Hands.monotonic`), which every
     /// wait this gate records is read off.
@@ -207,7 +207,7 @@ impl RelayGate {
 
     /// Waits as `patience` allows for the first wake, then takes every
     /// wake already queued: relay requests are written before anything
-    /// lands (`crates/sprawling/Spec.lean` §8-42-2), claims are answered in queue
+    /// lands (`Sprawling/app/Spec.lean` §8-42-2), claims are answered in queue
     /// order, runs home go on `homes`, goal registrations and provider
     /// answers into the returned [`Drained`] in arrival order, and a
     /// command or a close only ends the wait.
@@ -427,7 +427,7 @@ mod tests {
 
     /// A lane's append counts as queued until the accounting thread takes
     /// it, then as not yet durable until its batch is written, then as
-    /// neither (`crates/sprawling/Spec.lean` §8-98).
+    /// neither (`Sprawling/app/Spec.lean` §8-98).
     #[test]
     fn the_accounting_queue_counts_what_waits_and_what_is_not_yet_durable() {
         use crate::worker::health::Health;
@@ -502,7 +502,7 @@ mod tests {
     }
 
     /// A relay request's queue wait is read off the gate's clock at both
-    /// ends (`crates/sprawling/spec/Accounting/Worker.lean` §8-98). The
+    /// ends (`Sprawling/app/spec/Accounting/Worker.lean` §8-98). The
     /// clock steps one microsecond per reading: the lane reads it once
     /// as it queues, the gate once before and once after its sleep and
     /// once as it takes the request, so the wait is three steps on every

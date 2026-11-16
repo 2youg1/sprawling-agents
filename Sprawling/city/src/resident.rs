@@ -12,7 +12,7 @@
 //! done is already in the ledger, and a stored summary beside it would be
 //! a second account of the same past.
 //!
-//! Specified by `crates/city/spec/Resident.lean` §8-1.
+//! Specified by `Sprawling/city/spec/Resident.lean` §8-1.
 
 use std::path::{Path, PathBuf};
 
@@ -102,7 +102,7 @@ fn described(addr: &Address, written: Vec<u8>) -> Vec<u8> {
     let mut out = Vec::new();
     paragraph(&mut out, discipline.opening.as_bytes());
     // The identity area is not who the seat is: the name it holds opens
-    // the resident slot on its own line (`crates/city/spec/Identity.lean` §8-33), and one
+    // the resident slot on its own line (`Sprawling/city/spec/Identity.lean` §8-33), and one
     // name said twice in one request is two answers to one question.
     paragraph(&mut out, &crate::identity::persona(written));
     paragraph(&mut out, discipline.closing.as_bytes());

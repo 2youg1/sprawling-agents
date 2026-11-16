@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which link and image targets a preview lets a page follow
-//! (`crates/documents/spec/Markdown.lean` `admitted`, D23).
+//! (`Sprawling/documents/spec/Markdown.lean` `admitted`, D23).
 //!
 //! The rule is here once so a page and an export never judge a target
 //! twice. It reads a target the way a browser parses an `href` - tabs

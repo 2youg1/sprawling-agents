@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The time the worker reads, handed to it rather than sampled by it
-//! (`crates/accounting/spec/Clock.lean` §8-3).
+//! (`Sprawling/accounting/spec/Clock.lean` §8-3).
 
 use kernel::{AxError, TimeMs};
 

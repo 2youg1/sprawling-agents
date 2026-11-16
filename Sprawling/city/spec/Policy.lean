@@ -3,13 +3,13 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.kernel.spec.Delegation
-import crates.kernel.spec.Layout
+import Sprawling.kernel.spec.Delegation
+import Sprawling.kernel.spec.Layout
 
 /-!
 # city::policy
 
-规定 `policy`、`policy::cache`、`policy::evaluate`、`policy::reach`、`policy::user_browser`、`policy::desktop`、`config_layers::city_layer`（`crates/city/src/` 下同名的文件）。这栋楼里允许什么：`RULES.toml` 求值成规则、读界、写域、楼的治理文件落在哪、页面写楼规的那扇门。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+规定 `policy`、`policy::cache`、`policy::evaluate`、`policy::reach`、`policy::user_browser`、`policy::desktop`、`config_layers::city_layer`（`Sprawling/city/src/` 下同名的文件）。这栋楼里允许什么：`RULES.toml` 求值成规则、读界、写域、楼的治理文件落在哪、页面写楼规的那扇门。本文件是 `Sprawling/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `Sprawling/city/Spec.lean §8-n`，决定引作 `city D<n>`。
 -/
 
 /-!
@@ -63,20 +63,20 @@ impl RulesCache {
 }
 ```
 
-**`harness_minutes`**：一次 harness run 在这栋楼里最多跑多少分钟（`crates/sprawling/Spec.lean` §8-124），正整数；缺这一行读作 `HARNESS_MINUTES_DEFAULT`（60）。`0` 由 serde 在解析时拒（`NonZeroU32`）：一个到点即停的上限是笔误。它只管 harness：模型 run 的每一回合都经城自己的安全点，停一件事是 `cancel`、停一片是 `halt`，而 harness 的回合在城之外走完，一个既不说话也不结束的 harness 没有别的路让出车道（D8 (b)）。
+**`harness_minutes`**：一次 harness run 在这栋楼里最多跑多少分钟（`Sprawling/app/Spec.lean` §8-124），正整数；缺这一行读作 `HARNESS_MINUTES_DEFAULT`（60）。`0` 由 serde 在解析时拒（`NonZeroU32`）：一个到点即停的上限是笔误。它只管 harness：模型 run 的每一回合都经城自己的安全点，停一件事是 `cancel`、停一片是 `halt`，而 harness 的回合在城之外走完，一个既不说话也不结束的 harness 没有别的路让出车道（D8 (b)）。
 
 `RulesCache`（`policy/cache.rs`，形状 1 判定）：一个 run 一份，读界的闭包持有它。`load` 先对 `RULES.toml` 做一次 stat，(mtime, len) 与上次读到的相同就交回留着的规则，不同或第一次就走 `load` 读盘求值并按这次 stat 的戳留下。文件不存在或 stat 失败时不留任何东西、每次都走 `load`，于是「没有 RULES.toml」与「被替代的旧文档」两条的答案与不缓存时逐字相同。锁中毒时同样退回 `load`。失败与 `load` 相同，失败不留。决定见 D3。
 
 - **规则是一份 TOML，散文没有另起一份文件**：若是 Markdown，读者就得在**任意一行**上匹配 `confidential:`／`write:`／`review:`／`browser:`／`usersbrowser:`／`desktop:`，于是「How work is done here」里一句以 `desktop = true` 开头的话就授予了宿主机的桌面，而一栋没写 `write:` 的楼落到 `Everything`。两处都朝宽松的一侧失败，那是权限读者唯一不许失败的方向。改成 TOML 之后键只在文法给出键的位置成立，`deny_unknown_fields` 让拼错成为一条消息而不是一次静默缺席，`confidential` 与 `write` 都不再有缺省。**散文留在同一份文件里**，作 `does` 与 `conventions` 两个键：拆成两份文档同样能关掉撞键，代价是一栋楼有两种说法且可以互相矛盾。居民拿到的就是这份文件本身的字节，所以城判定的与 agent 读到的是同一串。
 
 - **confidential 四条各有其守处**：模型池锁本地由 `gateway::endpoint` **在会泄漏的那一端**拒（`req.policy.confidential` 即拒，携三段式）；写域止于本楼子树由 `write_domain()` 在构造点拒；数据可入不可出归出网门；**楼里的字节楼外读不到**，归读界（下一条）。**把兜底放在会出事的那一层**，路由错了仍然拦得住。
-- **读界：本楼全开，他楼非机密可读，机密楼对楼外全关**。判定只有一处：`kernel::address::may_read(reader_building, target, rules) -> ReadVerdict`（`crates/kernel/Spec.lean` §8-2），三臂 `Open`／`Confidential`／`RulesUnreadable(AxError)`。问它的是模型选路的唯一判定处 `runtime::tools::chosen_path`（`crates/runtime/Spec.lean` §8-30-1）：`read` 的路径、`search` 的起点、`search` 不带路径时在城根下走进的每一栋楼，以及经这两件工具读到的 transcript（`crates/runtime/Spec.lean` §8-32），都先过它。`rules` 是目标所在楼此刻的规则：装配层把 `city::Building::of(target)` 与 `policy::load` 接成一个闭包交给 `may_read`，**只在目标出了本楼时才调用**——本楼的读不读盘，他楼的读每次现读规则。规则读不出＝`RulesUnreadable`，一样关：读不出的那份规则可能写着 `confidential = true`，而隐私设置不得朝宽松的一侧失败（本节「没有 RULES.toml」那条同理）。**读界只管模型选的路径**：catalog 名是人在阅览室里准入的（`crates/runtime/Spec.lean` §8-29 起首），不经它；`exec` 在宿主机上跑的命令读得到盘上任何文件，那道墙要 OS sandbox，与「出网」那条的缺口是同一个缺口。
+- **读界：本楼全开，他楼非机密可读，机密楼对楼外全关**。判定只有一处：`kernel::address::may_read(reader_building, target, rules) -> ReadVerdict`（`Sprawling/kernel/Spec.lean` §8-2），三臂 `Open`／`Confidential`／`RulesUnreadable(AxError)`。问它的是模型选路的唯一判定处 `runtime::tools::chosen_path`（`Sprawling/runtime/Spec.lean` §8-30-1）：`read` 的路径、`search` 的起点、`search` 不带路径时在城根下走进的每一栋楼，以及经这两件工具读到的 transcript（`Sprawling/runtime/Spec.lean` §8-32），都先过它。`rules` 是目标所在楼此刻的规则：装配层把 `city::Building::of(target)` 与 `policy::load` 接成一个闭包交给 `may_read`，**只在目标出了本楼时才调用**——本楼的读不读盘，他楼的读每次现读规则。规则读不出＝`RulesUnreadable`，一样关：读不出的那份规则可能写着 `confidential = true`，而隐私设置不得朝宽松的一侧失败（本节「没有 RULES.toml」那条同理）。**读界只管模型选的路径**：catalog 名是人在阅览室里准入的（`Sprawling/runtime/Spec.lean` §8-29 起首），不经它；`exec` 在宿主机上跑的命令读得到盘上任何文件，那道墙要 OS sandbox，与「出网」那条的缺口是同一个缺口。
 - **没有 RULES.toml 是普通楼；有而不声明是错误**：把隐私设置的默认值悄悄取成宽松的那一边，正是这整个面存在的理由。拼写不是 `true`／`false` 同样拒——读起来像笔误的隐私设置不得解析成许可。
 - **confidential 楼声明越界前缀＝拒而不裁剪**：静默裁剪会让文件说一套、城做另一套；拒绝会指出该改哪一行。
 - **无声明写域时默认只写本楼**：一栋楼至少能写自己，且不多。`prefixes` 里一条读不出的地址**传播而不跳过**——在读它的地方丢掉，一栋楼就写得比人授予的少，而这件事没有任何一处说出来。
 - **`review = true` 是楼级开关**：开则每个 Run 得一棵自己的 worktree，写的东西在别人检查并 merge 之前对楼不可见。**默认关**，与 confidential 的「不声明即错」相反——隐私的默认值不得惄悄取宽，而审查纪律的默认值不得惄悄取严：一个人派一个 Agent 去改一行字并盯着看，应当看得到文件变化。拼写不是 `true`／`false` 同样拒。
 - **`egress` 是可选的域名表**：不写这一键，楼不限主机；写了表，城的浏览器与人的浏览器只导航到表中域名及其子域；空表是不到任何公网主机（D27）。表随 run 冻结，经 `limit_egress` 交给 `runtime::bench::ToolBench`，由它在每次调用前以 `kernel::gate::egress::egress_target` 判定。类型经 `kernel::EgressAllowlist` 重导出，住哪一簇文件是 kernel 内政（`gate::egress`，公共拼写不变）。**confidential 楼同时列域名＝矛盾，拒**——「数据可入不可出」是那个设置的含义，域名表写在它下面会逼读者自己去调和两句话。
-- **`checkpoint_entropy_allow` 是 User 给低置信度扫描留的出路**：值是仓库相对文件路径的数组，每项先过 `Address::parse`，匹配整项而不是前缀或 glob。它只豁免这些文件里的熵命中，已知厂商形状照样拒绝；不含命中正文，也不写摘要。文件住在楼自己的保留子树，agent 只能读不能改（D1）；装配层把同一份 `EntropyAllowlist` 交给 model lane、bench 的预测网、harness、adoption 与 landing 的 checkpoint。缺省为空，旧城行为不需要迁移。处置与验收的权威是 `crates/storage/spec/Checkpoint.lean` D95，这里只规定配置从哪里来、谁能改。
+- **`checkpoint_entropy_allow` 是 User 给低置信度扫描留的出路**：值是仓库相对文件路径的数组，每项先过 `Address::parse`，匹配整项而不是前缀或 glob。它只豁免这些文件里的熵命中，已知厂商形状照样拒绝；不含命中正文，也不写摘要。文件住在楼自己的保留子树，agent 只能读不能改（D1）；装配层把同一份 `EntropyAllowlist` 交给 model lane、bench 的预测网、harness、adoption 与 landing 的 checkpoint。缺省为空，旧城行为不需要迁移。处置与验收的权威是 `Sprawling/storage/spec/Checkpoint.lean` D95，这里只规定配置从哪里来、谁能改。
 - **执行点与缺口要分清**：provider 路径由 `endpoint` 的 confidential 拒守住；Agent 自己发起的出网是否被拦，取决于 exec 所在的那一臂 `runtime::tools::exec::Confinement` 是否承诺关网（`Guarantee::Network`，每一臂在工具描述里说出自己不承诺什么），浏览器工具一次调用点名的页面由 bench 按表判，页面里的子资源、重定向与 `exec` 发起的连接不经这张表。判定在这里，拦截只到调用点名的那个主机——不承诺关网的地方不要说「出网已管住」。
 - **`usersbrowser` 一键同时是开关与地址**：值 `"ws://127.0.0.1:<port>/session"` 启用并声明地址，`true` 启用而地址未定（工具每次调用都得到门的问题），absent／`false` 即无此工具。**confidential 楼写这一键即拒**（`E_CONFIG_INVALID`）——附着读的是那个人浏览器里全部登录态，本楼的隔离在那一刻失效。地址的**语法**（`ws://`、主机形状）在此读一次并把 `url`／`host` 一起交出；**loopback 与否是 `kernel::gate::attach` 的政策**，语法不替政策作答。
 - **`browser` 与 `usersbrowser` 是两个键**：前者是城自己拉起的浏览器（profile 按楼隔离），后者是人已经开着的那个（人的真 profile）。`browser` 不是 `usersbrowser` 的前缀截断——TOML 的键是文法给出的整体，两个设置因此互不误读。
@@ -114,7 +114,7 @@ impl BuildingRules {
 
 - **缺省是关，与 `browser` 同、与 `confidential` 反**。分野是两者各自往哪一侧失手：把隐私设置读成宽松那一侧是一次事故，而少给一件工具只是少一件工具。桌面比浏览器更该守这一条——`desktop.act` 会在这个人自己的机器上按下按键，而按下去的东西没有 restoration。
 - **机密楼恒不给桌面**，理由与 `browser` 那条同构而更强：一台桌面上有别的程序、别的窗口、一整块剪贴板，`desktop.screenshot` 读到的东西没有一样是这栋楼的。「数据可入不可出」与「这栋楼可以截屏运行中的机器」是同一句话的两半，不能同时为真，故在 `evaluate` 里即拒，`E_CONFIG_INVALID`，拒词指出删哪一行。
-- **它开的是「准不准接」，不是「准不准做」。**准不准做归 `DESKTOP.toml`，那是 server 那一侧、按窗口逐条写的 allowlist（`crates/desktop/Spec.lean` §8-4）。两道门叠着，且**次序固定**：楼说不，连进程都不起；楼说是，仍要那份 allowlist 逐窗口点头。一道门管「这栋楼是干这个的吗」，另一道管「运行中的机器上的哪几个窗口」，把它们合成一道都会让其中一个问题没人问。
+- **它开的是「准不准接」，不是「准不准做」。**准不准做归 `DESKTOP.toml`，那是 server 那一侧、按窗口逐条写的 allowlist（`Sprawling/desktop/Spec.lean` §8-4）。两道门叠着，且**次序固定**：楼说不，连进程都不起；楼说是，仍要那份 allowlist 逐窗口点头。一道门管「这栋楼是干这个的吗」，另一道管「运行中的机器上的哪几个窗口」，把它们合成一道都会让其中一个问题没人问。
 -/
 
 /-!
@@ -132,17 +132,17 @@ pub fn write_desktop_scope(city_root: &Path, addr: &Address, text: &str) -> Resu
 
 **写它的是一扇门，不是一个能拼路径的调用方**（`city::governed` §8-24b 同一条理由，此处第二次适用而不是第二个权威）：设置页递「哪一栋楼」与「整份文本」，路径由本模块算。能自己拼路径的调用方就能拼出一条走出保留子树的路径。
 
-**整份覆写，且恒不在此校验内容**：`DESKTOP.toml` 的语法权威在 server 那一侧（`crates/desktop/src/scope.rs`），且它 fail closed——读不出来的文件关成全拒。城里再抄一份解析器就是第二个权威，而两个权威里迟早有一个会把某份文件读成另一种意思。城这一侧只保证「写进去的字节就是人给的字节」，剩下的由那台 server 在启动时读，读不动就什么都不做。
+**整份覆写，且恒不在此校验内容**：`DESKTOP.toml` 的语法权威在 server 那一侧（`Sprawling/desktop/src/scope.rs`），且它 fail closed——读不出来的文件关成全拒。城里再抄一份解析器就是第二个权威，而两个权威里迟早有一个会把某份文件读成另一种意思。城这一侧只保证「写进去的字节就是人给的字节」，剩下的由那台 server 在启动时读，读不动就什么都不做。
 
 **恒不复用 `Governed`**：那三份是**城**的文件（`<city>/.sprawling/`），这一份是**楼**的。把楼级路径塞进一个按 city_root 取路径的枚举里，会让那个枚举需要一个只有部分变体用得上的参数。
 
-**线上它走 `ConfigureBuilding` 的第四个可选字段**（`crates/wire/Spec.lean` §8-40）：那条帧问的就是「这栋楼的 runs 按什么规矩来」，沙箱、外部服务器、运行中的机器上的窗口与第二级提醒落哪一层是同一个问题的四面。`configured_payload` 因此收一个 `Written { sandbox, mcp, desktop, context }` 而不是四个裸布尔——一个调用点写 `(true, false, true, false)` 说不出哪一位是哪一面。
+**线上它走 `ConfigureBuilding` 的第四个可选字段**（`Sprawling/wire/Spec.lean` §8-40）：那条帧问的就是「这栋楼的 runs 按什么规矩来」，沙箱、外部服务器、运行中的机器上的窗口与第二级提醒落哪一层是同一个问题的四面。`configured_payload` 因此收一个 `Written { sandbox, mcp, desktop, context }` 而不是四个裸布尔——一个调用点写 `(true, false, true, false)` 说不出哪一位是哪一面。
 -/
 
 /-!
 ### 8-32 楼的写域是上限，一次派活的写入限制只收窄它（`city::policy`，形状 1 判定）
 
-**接口**：不新增。`BuildingRules::write_domain()` 照旧从 `RULES.toml` 的 `prefixes` 与 `write` 两键给出 `kernel::WriteDomain`；一次 run 的写入限制 `kernel::WriteLimit` 由派活给出（`crates/kernel/Spec.lean` §8-78），在写门上与写域各判一次。
+**接口**：不新增。`BuildingRules::write_domain()` 照旧从 `RULES.toml` 的 `prefixes` 与 `write` 两键给出 `kernel::WriteDomain`；一次 run 的写入限制 `kernel::WriteLimit` 由派活给出（`Sprawling/kernel/Spec.lean` §8-78），在写门上与写域各判一次。
 
 - **两道判定都要过**：写域回答能不能写这个地址、写哪种文件；写入限制回答能不能改动已经存在的文件。`full` 不额外收窄，所以普通档永远放不宽楼的 `RULES.toml`；`create` 在 `write = "documents"` 的楼里仍只能新建 Markdown 文档、仍够不到计划文件；保留子树对两者都在写域之外。
 - **`RULES.toml` 没有写入限制的键。** 一栋楼的规则说它允许什么，一次派活的限制说这一次要多小心；两者分在两处，「哪一处说了算」就不用规则来回答（D10）。
@@ -195,7 +195,7 @@ effort = "high"
 - **策略只管城市原生模型居民**：harness 自己选模型，`agree_to_work` 的 harness 臂不读这张表。confidential 的本地边界仍由 `EndpointBook::select` 在选型时判，策略不能放宽它。
 - **只在新 Session 的委派路径上推荐**：已有房间记录时忽略本次难度与直接选择，继续走冻结形状；新子 Session 在 `Dispatch.model` 缺席时，有 `[workspace_models.choice]` 就用它（provider、model、effort 三栏），否则有难度取对应推荐，没难度取 `medium`。人显式给出的 `Dispatch.model`／`effort` 仍优先，并受 allowed／max effort 与 provider offer 约束。推荐或直接选择的端点被摘除、模型不再登记、effort offer 改变或 confidential 不允许时拒绝，不降档、不另换模型。
 - **版本随子 run 入账**：策略的规范 JSON 字节摘要进入 `run_started.routing.policy`；实际 `ModelRef`、请求难度与选择来源同在这条记录，实际 effort 沿用已有的 `run_started.effort`，不写第二份。重放只读这些行，不重新评估任务。
-- **新楼的模板带一段注释占位**：`crates/city/templates/RULES.toml` 末尾把 `allowed`、`max_effort` 与三档推荐写成注释，每档给 `endpoint`（provider 名）、`model`、`effort` 三栏。注释即不启用，人揭开并改掉示例值就生效；占位符本身由 `the_template_hands_a_building_a_working_routing_placeholder` 钉住——模板照读是 `None`，揭开后是本读者接受的策略。
+- **新楼的模板带一段注释占位**：`Sprawling/city/templates/RULES.toml` 末尾把 `allowed`、`max_effort` 与三档推荐写成注释，每档给 `endpoint`（provider 名）、`model`、`effort` 三栏。注释即不启用，人揭开并改掉示例值就生效；占位符本身由 `the_template_hands_a_building_a_working_routing_placeholder` 钉住——模板照读是 `None`，揭开后是本读者接受的策略。
 - **直接选择是一帧，仍走楼规这一扇门**：`SetWorkspaceChoice` 只改 `[workspace_models.choice]`（没有这一节时补上一节，三档与选择相同，以便读者接受），经 `write_rules_against` 求值并守 `base`。三档推荐留在文件里，页面可以把某一档填进选择器，但它们不是唯一的写法。页面不另拼一份 TOML。
 
 验收：city 的解析与结构拒绝测试、Lean 的 `route_existing_session`／`route_without_policy`／`route_recommendation_allowed`／`route_recommendation_within_max`；accounting 经真实 `delegate` 覆盖三档、无难度缺省、已有 Session 不换模型、无策略旧行为与开始前拒绝。

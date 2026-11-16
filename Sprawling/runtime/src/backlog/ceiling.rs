@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a command's result says about the person's memory ceiling
-//! (`crates/runtime/spec/Tools/Exec.lean` D95): the mark a command gets
+//! (`Sprawling/runtime/spec/Tools/Exec.lean` D95): the mark a command gets
 //! as it enters the table, and the verdict read when it is collected.
 //! The platforms only count refusals ([`super::jobs`] on Windows,
 //! [`super::cgroup`] on Linux); which case is reported is decided here

@@ -13,8 +13,8 @@
 //! may still delegate. No person is asked: nothing outside the run's
 //! own room changes, and no depth is added. What bounds a chain of
 //! successions is the hop counter its landing is checked against, in
-//! `crates/accounting/src/worker/driving/owing.rs`, whose ceilings are
-//! recorded in `crates/sprawling/Spec.lean` §8-46-12. `Halt` answers a different
+//! `Sprawling/accounting/src/worker/driving/owing.rs`, whose ceilings are
+//! recorded in `Sprawling/app/Spec.lean` §8-46-12. `Halt` answers a different
 //! question: it shuts a scope to new work.
 //!
 //! **A request is not a run.** The tool answers with where the successor

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How often each skill and each tool server was used, by whom and on
-//! which day (`crates/wire/spec/Reading.lean` D28, D33).
+//! which day (`Sprawling/wire/spec/Reading.lean` D28, D33).
 //!
 //! Folded from the ledger by `accounting::views::usage`; nothing here
 //! decides what counts as a use, which D33 states once.
@@ -83,7 +83,7 @@ pub struct SkillVersion {
 }
 
 /// Who put one content of a skill on its shelf, read off the ledger in
-/// ledger order (`crates/wire/spec/Reading.lean` D33).
+/// ledger order (`Sprawling/wire/spec/Reading.lean` D33).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "by", rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -210,7 +210,7 @@ pub struct UsageExportAnswer {
 }
 
 /// Every shell interpreter the ledger saw, with how its shell lines
-/// ended (`crates/wire/spec/Reading.lean` D48). The fold is
+/// ended (`Sprawling/wire/spec/Reading.lean` D48). The fold is
 /// `runtime::ShellTally`'s; this is its reading on the wire.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]

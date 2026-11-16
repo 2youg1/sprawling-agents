@@ -5,7 +5,7 @@
 
 //! This process's own counters, read through its own handle rather than
 //! the whole process table, so one reading costs about a microsecond
-//! (`crates/sprawling/spec/Monitor.lean` §8-96).
+//! (`Sprawling/app/spec/Monitor.lean` §8-96).
 
 use std::time::Duration;
 
@@ -38,7 +38,7 @@ impl OwnProcess {
     }
 
     /// Reads private bytes alone, between two readings, so the next
-    /// reading reports the highest of them (`crates/sprawling/spec/Monitor.lean` §8-96).
+    /// reading reports the highest of them (`Sprawling/app/spec/Monitor.lean` §8-96).
     pub(crate) fn note_private(&mut self) {
         let now = private_bytes(memory_stats::memory_stats().as_ref());
         self.peak_private = self.peak_private.max(now);
@@ -73,7 +73,7 @@ impl OwnProcess {
 
 /// Windows reads `PagefileUsage`, the committed private bytes; macOS
 /// reads the virtual size, which overstates them, until a safe interface
-/// reaches `phys_footprint` (`crates/sprawling/spec/Serving/Memory.lean` D43).
+/// reaches `phys_footprint` (`Sprawling/app/spec/Serving/Memory.lean` D43).
 #[cfg(not(target_os = "linux"))]
 fn private_bytes(memory: Option<&memory_stats::MemoryStats>) -> u64 {
     memory.map_or(0, |stats| widen(stats.virtual_mem))
@@ -135,7 +135,7 @@ fn storage_bytes() -> StorageBytes {
 }
 
 /// Elsewhere the counter is reachable only through `unsafe`, which this
-/// workspace forbids, so both read 0 (`crates/sprawling/spec/Monitor.lean` §8-96, decision 1).
+/// workspace forbids, so both read 0 (`Sprawling/app/spec/Monitor.lean` §8-96, decision 1).
 #[cfg(not(target_os = "linux"))]
 fn storage_bytes() -> StorageBytes {
     StorageBytes::default()

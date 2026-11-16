@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Whether real-time scanning stands in front of the city directory's
-//! writes, as the doctor page reads it (`crates/wire/spec/Answer/Doctor.lean`
+//! writes, as the doctor page reads it (`Sprawling/wire/spec/Answer/Doctor.lean`
 //! D25).
 //!
 //! Arm for arm the shape of `bin::doctor::scanning::Scanning`, because

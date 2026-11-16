@@ -5,13 +5,13 @@
 
 //! What a strict walk of the chain proved, one record per segment, so the
 //! next proof reads and hashes those bytes instead of checking them line
-//! by line again (`crates/storage/spec/ChainAudit.lean` §8-30).
+//! by line again (`Sprawling/storage/spec/ChainAudit.lean` §8-30).
 //!
 //! A projection: a record that is missing, damaged, of another rule
 //! version, or out of step with the chain state entering its segment is
 //! not used, and that segment is checked line by line. That reusing a
 //! record gives the strict verdict is `cachedVerifyIsStrict` in
-//! `crates/storage/spec/Snapshot.lean`.
+//! `Sprawling/storage/spec/Snapshot.lean`.
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -50,7 +50,7 @@ pub struct ProofRecords {
 }
 
 /// Only a handle that holds the writer lock writes records, so a
-/// read-only command never touches the disk (`crates/storage/spec/ChainAudit.lean` §8-30).
+/// read-only command never touches the disk (`Sprawling/storage/spec/ChainAudit.lean` §8-30).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum May {
     Read,
@@ -118,7 +118,7 @@ impl ProofRecords {
 
 /// Where checking a ledger's last segment begins when the ledger is
 /// opened: the byte, the lines before it, the chain state there, and what
-/// was read and hashed to get there (`crates/storage/spec/Jsonl.lean` §8-34).
+/// was read and hashed to get there (`Sprawling/storage/spec/Jsonl.lean` §8-34).
 pub(crate) struct TailStart {
     pub(crate) from: usize,
     pub(crate) lines: u64,
@@ -270,8 +270,8 @@ impl SegmentRecord {
 /// The judgement of one record, in two halves a proof can take apart:
 /// what the segment's own bytes decide, which a wave hashes before the
 /// walk reaches the segment, and what the chain entering it decides
-/// (`crates/storage/Spec.lean` §8-30, §8-34, §8-37). Together they are `reuses` in
-/// `crates/storage/spec/Snapshot.lean`, whose `cachedVerifyIsStrict`
+/// (`Sprawling/storage/Spec.lean` §8-30, §8-34, §8-37). Together they are `reuses` in
+/// `Sprawling/storage/spec/Snapshot.lean`, whose `cachedVerifyIsStrict`
 /// says a record that stands gives the strict verdict.
 impl SegmentRecord {
     /// The recorded prefix length when its rule version and the

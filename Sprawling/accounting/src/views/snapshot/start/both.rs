@@ -4,9 +4,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Two folds started together on one pass over the ledger, from the
-//! earlier of their two snapshots (`crates/sprawling/Spec.lean` §8-122). That the pass
+//! earlier of their two snapshots (`Sprawling/app/Spec.lean` §8-122). That the pass
 //! gives each fold what its own whole fold gives is `twoCutsOnePass` in
-//! `crates/storage/spec/Snapshot.lean`.
+//! `Sprawling/storage/spec/Snapshot.lean`.
 
 use std::path::Path;
 

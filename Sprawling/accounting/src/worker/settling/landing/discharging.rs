@@ -51,7 +51,7 @@ impl RunWorker {
                 // The asker is woken by the decision every signal takes,
                 // once its graph has joined or been closed: each node that
                 // is still out comes back on its own (collab §8
-                // `collab::handback`, `crates/collab/spec/Workshop.lean`).
+                // `collab::handback`, `Sprawling/collab/spec/Workshop.lean`).
                 if handed.is_ok() && !self.collaborating.workshops.contains_key(&parent) {
                     self.knock(
                         handback.signal(),

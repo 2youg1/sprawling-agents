@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The user persistent environment as raw `HKCU\Environment` values,
-//! announced after each write (`crates/sprawling/spec/Privacy/Windows.lean`).
+//! announced after each write (`Sprawling/app/spec/Privacy/Windows.lean`).
 //!
 //! The persistent value and a process environment are different things:
 //! a program already running, and the cleaned environment sprawling's

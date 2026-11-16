@@ -3,43 +3,43 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.storage.spec.Alias
-import crates.storage.spec.Attribution
-import crates.storage.spec.Blob
-import crates.storage.spec.Bundle
-import crates.storage.spec.Cas
-import crates.storage.spec.Cas.Ranges
-import crates.storage.spec.ChainAudit
-import crates.storage.spec.Changes
-import crates.storage.spec.Checkpoint
-import crates.storage.spec.Checkpoint.Provenance
-import crates.storage.spec.DigestCache
-import crates.storage.spec.Error
-import crates.storage.spec.FaultFs
-import crates.storage.spec.Hot
-import crates.storage.spec.Hunks
-import crates.storage.spec.Index
-import crates.storage.spec.Jsonl
-import crates.storage.spec.Jsonl.Barrier
-import crates.storage.spec.Jsonl.Preallocate
-import crates.storage.spec.Jsonl.Verify
-import crates.storage.spec.Queue
-import crates.storage.spec.RealFs
-import crates.storage.spec.Resident
-import crates.storage.spec.Sessions
-import crates.storage.spec.Snapshot
-import crates.storage.spec.Snapshot.Start
-import crates.storage.spec.Status
-import crates.storage.spec.Vfs
-import crates.storage.spec.Worktree
-import crates.storage.spec.Worktree.Back
-import crates.storage.spec.Worktree.Trees.Stock
+import Sprawling.storage.spec.Alias
+import Sprawling.storage.spec.Attribution
+import Sprawling.storage.spec.Blob
+import Sprawling.storage.spec.Bundle
+import Sprawling.storage.spec.Cas
+import Sprawling.storage.spec.Cas.Ranges
+import Sprawling.storage.spec.ChainAudit
+import Sprawling.storage.spec.Changes
+import Sprawling.storage.spec.Checkpoint
+import Sprawling.storage.spec.Checkpoint.Provenance
+import Sprawling.storage.spec.DigestCache
+import Sprawling.storage.spec.Error
+import Sprawling.storage.spec.FaultFs
+import Sprawling.storage.spec.Hot
+import Sprawling.storage.spec.Hunks
+import Sprawling.storage.spec.Index
+import Sprawling.storage.spec.Jsonl
+import Sprawling.storage.spec.Jsonl.Barrier
+import Sprawling.storage.spec.Jsonl.Preallocate
+import Sprawling.storage.spec.Jsonl.Verify
+import Sprawling.storage.spec.Queue
+import Sprawling.storage.spec.RealFs
+import Sprawling.storage.spec.Resident
+import Sprawling.storage.spec.Sessions
+import Sprawling.storage.spec.Snapshot
+import Sprawling.storage.spec.Snapshot.Start
+import Sprawling.storage.spec.Status
+import Sprawling.storage.spec.Vfs
+import Sprawling.storage.spec.Worktree
+import Sprawling.storage.spec.Worktree.Back
+import Sprawling.storage.spec.Worktree.Trees.Stock
 
 /-! # storage 的规格
 
-`sprawling-storage`（库名 `storage`，目录 `crates/storage`）是城的持久化：kernel Ledger 的落盘实现与它的逐行检查、内容库、旁挂索引与热视图、git 检查点与工作树、导出与恢复、链的证明与快照。
+`sprawling-storage`（库名 `storage`，目录 `Sprawling/storage`）是城的持久化：kernel Ledger 的落盘实现与它的逐行检查、内容库、旁挂索引与热视图、git 检查点与工作树、导出与恢复、链的证明与快照。
 
-本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被 `architecture.toml` 模块图的旧锚点与别的规格里的引用锚住，所以不重排：8-6 是空号。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部的末尾，别处引作 `storage D<n>`；§12 末尾列出每条住在哪里。
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `Sprawling/storage/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被 `architecture.toml` 模块图的旧锚点与别的规格里的引用锚住，所以不重排：8-6 是空号。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部的末尾，别处引作 `storage D<n>`；§12 末尾列出每条住在哪里。
 
 能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：逐行检查与链（`spec/Jsonl/Verify.lean`）、屏障与重开（`spec/Jsonl/Barrier.lean`）、预分配段的段尾零（`spec/Jsonl/Preallocate.lean`）、已命名对象恒不腐蚀（`spec/Cas.lean`）与范围读（`spec/Cas/Ranges.lean`）、快照与已验证前缀（`spec/Snapshot.lean`）、停机值与证明的波（`spec/ChainAudit.lean`）、工作树的租约（`spec/Worktree.lean`）、接管备树的断点（`spec/Worktree/Trees/Stock.lean`）、回到过去（`spec/Worktree/Back.lean`）、每个错误答哪个码（`spec/Error.lean`）、按 seq 往后读索引（`spec/Index.lean` §8-38）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
 -/
@@ -71,7 +71,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 | `changes` | 4 适配器 | 两个 checkpoint 之间动了什么：路径与计数，不含补丁文本 |
 | `hunks` | 4 适配器 | 两个 checkpoint 之间一个文件的补丁文本，凭证形状的行被扣下并点名 |
 | `status` | 4 适配器 | 还没被检查点收走的改动：分支、它与上游的差距、与某次提交不同的文件 |
-| `resident` | 7 projection | 进程里只放工作集：按字节计预算、能从盘上读回的缓存；性质归 `crates/sprawling/spec/Serving/Memory.lean` |
+| `resident` | 7 projection | 进程里只放工作集：按字节计预算、能从盘上读回的缓存；性质归 `Sprawling/app/spec/Serving/Memory.lean` |
 
 每一行的模块由 `spec/` 下规定它的分部写明（§8 的表）；`reserved` 由 `spec/Worktree.lean` 规定，它是工作树与检查点共用的谓词。
 -/
@@ -80,7 +80,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 
 - `JsonlLedger` 过 kernel conformance 六断言（含确定性双灌对拍）。
 - proptest：任意 draft 序列落盘后，尾部任意字节级破坏（截断/追加垃圾）→ 重开＝最长合法前缀＋一条 `log_truncated`，链续可验，续写不断链。
-- 读 `crates/fixtures/ledger-ahead/` 高版本夹具 → 方向感知拒绝（报「由更新版本写成」＋原始路径），恒不部分解读。
+- 读 `Tools/fixtures/ledger-ahead/` 高版本夹具 → 方向感知拒绝（报「由更新版本写成」＋原始路径），恒不部分解读。
 - 断电于 EventRecord 落账与断电于 CAS rename 各恢复一次（FaultFs 点阵驱动）。
 - CAS：put→get 往返；范围取回（L/B 两式）；去重（同内容二次 put 不二次物化）；断电只留 `tmp/` 半成品，已命名对象恒完好。
 - 形状 7 的 proptest 骨架一次两实例化：index 损坏即重建且查询结果不变；hot 折同一条流两次得同一份读数。
@@ -119,7 +119,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 9. **`checkpoint::commit` 的 family 1 只做了一部分。** `file_discarded` 的载荷仍由 checkpoint 手工拼成 `Map`，`taint_promoted`、`cross_building_transfer`、`secret_egress_blocked` 三种还没有各自的结构体。未定的是这些结构体住在 kernel 的事件表旁边还是 storage 里；判定它的证据是它们的第二个写者出现在哪个 crate。
 10. **`digest_cache` 没有生产读者。** `DigestCache` 由 `lib.rs` 公开，但城里没有一个生产调用方，只有它旁边的测试在调（8-11）；它守着的「同内容哈希终生一次」今天不护任何路径。未定的是接上一个读者还是删掉本模块；判定它的证据是一个按内容哈希复用摘要的生产读者出现，或者下一次 storage 公开面的清点仍找不到它。
 
-模型自己的假设写在各分部的定理假设里，不写成公理：摘要函数是参数，单射性归 `crates/kernel/spec/Ledger.lean`；临时件名对写者单射是 `named_objects_never_corrupt` 的前提（D1 的命名给出它）；已验证前缀的记录只由逐行核对写下是 `cachedVerifyIsStrict` 的前提（§8-30 的「只有持写者锁的进程写记录」给出它）。
+模型自己的假设写在各分部的定理假设里，不写成公理：摘要函数是参数，单射性归 `Sprawling/kernel/spec/Ledger.lean`；临时件名对写者单射是 `named_objects_never_corrupt` 的前提（D1 的命名给出它）；已验证前缀的记录只由逐行核对写下是 `cachedVerifyIsStrict` 的前提（§8-30 的「只有持写者锁的进程写记录」给出它）。
 -/
 
 /-! ## 4 现状分析
@@ -129,7 +129,7 @@ import crates.storage.spec.Worktree.Trees.Stock
 
 /-! ## 5 权威信源
 
-落盘形态/断尾/版本方向/组提交/分段；CAS 三工程事实；FaultFs 三故障与断电四注入点；确定性；断电与存储边界；ARCHITECTURE.md §4（内缝 Vfs 不升真缝）与 §12 的 storage 段；`crates/kernel/Spec.lean` §8-4/§8-9。
+落盘形态/断尾/版本方向/组提交/分段；CAS 三工程事实；FaultFs 三故障与断电四注入点；确定性；断电与存储边界；ARCHITECTURE.md §4（内缝 Vfs 不升真缝）与 §12 的 storage 段；`Sprawling/kernel/Spec.lean` §8-4/§8-9。
 -/
 
 /-! ## 6 命名统一
@@ -169,8 +169,8 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
   - **句柄命名的是文件，不是路径**，所以 `rename`／`remove_file`／`truncate` 之前必须松手：不松手的话，重命名之后向旧路径的追写会写进**已经改了名的那个文件**，删除之后的追写会写进**一个已不存在的文件**，两者都静默。CAS 正是靠「写 tmp 再重命名」给对象命名的，断尾修复正是靠截断与删除修段的。**Windows 不会拦住你**（Rust 开文件带共享删除与重命名），所以看着的断言问的不是「这个操作能不能做」而是「之后字节落在哪个文件里」；去掉 `release` 它当场报错。
   - **剩下的是 fsync 本身**，要再压就必须跨记录合屏障，而那是契约问题不是实现问题（下两段）。
   - 否决「跨会话组提交：一个序列化写入者收集同一时间窗内各会话的 drafts」，它针对的是多个线程争一把账本锁时的车队延迟。**这座城没有那个形状可优化**：
-  - 账本只在记账线程里打开且从不离开；驱动线程手里能写账本的只有 `accounting::worker::relay` 的 `Relay`，它把 draft 送到记账线程并等回执，所以「一座城一个写者」由类型持有（`crates/sprawling/Spec.lean` §8-42，ARCHITECTURE §10）。探针量的是许多线程共享一个 `Mutex<JsonlLedger>`，那是本仓刻意不采用的形状。
-  - 屏障的代价与骑在它上面的记录条数无关，所以一波一屏障：`kernel::Ledger` 端口有 `append_all`（`crates/kernel/Spec.lean` §8-51），`JsonlLedger` 覆写它为整波一次写一道屏障，`relay` 按波交付。
+  - 账本只在记账线程里打开且从不离开；驱动线程手里能写账本的只有 `accounting::worker::relay` 的 `Relay`，它把 draft 送到记账线程并等回执，所以「一座城一个写者」由类型持有（`Sprawling/app/Spec.lean` §8-42，ARCHITECTURE §10）。探针量的是许多线程共享一个 `Mutex<JsonlLedger>`，那是本仓刻意不采用的形状。
+  - 屏障的代价与骑在它上面的记录条数无关，所以一波一屏障：`kernel::Ledger` 端口有 `append_all`（`Sprawling/kernel/Spec.lean` §8-51），`JsonlLedger` 覆写它为整波一次写一道屏障，`relay` 按波交付。
   - 否决的是给端口加一个显式屏障动作、让 `append` 只写不同步。**它会改掉本模块的一条必要前提**：`Ok` 即已落盘，观察者也只在落盘后才听到一条——「架上不会有历史里没有的东西」靠的就是这个，而 `EventRef` 一旦在同步前发出去，它就不再指向一条已存在的历史。
 - 不判定任何语义——kind 二分、载荷校验、规范字节全部来自 kernel；jsonl 只定 seq/prev 与介质。
 - 不采样时钟（clippy disallowed 已看守）——`log_truncated` 的 `t` 由 open 的调用方注入；checkpoint 的提交时间同规入参。
@@ -185,45 +185,45 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 
 | 标签 | 分部 |
 |---|---|
-| 8-1 | `crates/storage/spec/Jsonl.lean`、`crates/storage/spec/Jsonl/Verify.lean`、`crates/storage/spec/Jsonl/Barrier.lean`、`crates/storage/spec/Jsonl/Preallocate.lean` |
-| 8-2 | `crates/storage/spec/FaultFs.lean` |
-| 8-3 | `crates/storage/spec/Cas.lean` |
-| 8-36 | `crates/storage/spec/Cas.lean` |
-| 8-4 | `crates/storage/spec/Index.lean` |
-| 8-5 | `crates/storage/spec/Hot.lean` |
-| 8-7 | `crates/storage/spec/Attribution.lean` |
-| 8-17 | `crates/storage/spec/Checkpoint/Provenance.lean` |
-| 8-18 | `crates/storage/spec/Checkpoint/Provenance.lean` |
-| 8-8 | `crates/storage/spec/Checkpoint.lean` |
-| 8-13 | `crates/storage/spec/Changes.lean` |
-| 8-9 | `crates/storage/spec/Worktree.lean` |
-| 8-10 | `crates/storage/spec/Queue.lean` |
-| 8-11 | `crates/storage/spec/DigestCache.lean` |
-| 8-12 | `crates/storage/spec/Bundle.lean` |
-| 8-14 | `crates/storage/spec/Error.lean` |
-| 8-15 | `crates/storage/spec/Vfs.lean` |
-| 8-16 | `crates/storage/spec/RealFs.lean` |
-| 8-19 | `crates/storage/spec/Hunks.lean` |
-| 8-20 | `crates/storage/spec/Checkpoint.lean` |
-| 8-21 | `crates/storage/spec/Bundle.lean` |
-| 8-22 | `crates/storage/spec/Status.lean` |
-| 8-23 | `crates/storage/spec/Cas/Ranges.lean` |
-| 8-24 | `crates/storage/spec/Sessions.lean` |
-| 8-25 | `crates/storage/spec/Alias.lean` |
-| 8-26 | `crates/storage/spec/Snapshot.lean` |
-| 8-30 | `crates/storage/spec/ChainAudit.lean` |
-| 8-28 | `crates/storage/spec/Snapshot/Start.lean` |
-| 8-27 | `crates/storage/spec/Worktree/Back.lean` |
-| 8-31 | `crates/storage/spec/Worktree.lean` |
-| 8-35 | `crates/storage/spec/Worktree/Trees/Stock.lean` |
-| 8-32 | `crates/storage/spec/Alias.lean` |
-| 8-29 | `crates/storage/spec/Blob.lean` |
-| 8-33 | `crates/storage/spec/Checkpoint.lean` |
-| 8-34 | `crates/storage/spec/Jsonl.lean` |
-| 8-37 | `crates/storage/spec/ChainAudit.lean` |
-| 8-38 | `crates/storage/spec/Index.lean` |
-| 8-39 | `crates/storage/spec/Checkpoint/Concurrent.lean` |
-| 8-40 | `crates/storage/spec/Resident.lean` |
+| 8-1 | `Sprawling/storage/spec/Jsonl.lean`、`Sprawling/storage/spec/Jsonl/Verify.lean`、`Sprawling/storage/spec/Jsonl/Barrier.lean`、`Sprawling/storage/spec/Jsonl/Preallocate.lean` |
+| 8-2 | `Sprawling/storage/spec/FaultFs.lean` |
+| 8-3 | `Sprawling/storage/spec/Cas.lean` |
+| 8-36 | `Sprawling/storage/spec/Cas.lean` |
+| 8-4 | `Sprawling/storage/spec/Index.lean` |
+| 8-5 | `Sprawling/storage/spec/Hot.lean` |
+| 8-7 | `Sprawling/storage/spec/Attribution.lean` |
+| 8-17 | `Sprawling/storage/spec/Checkpoint/Provenance.lean` |
+| 8-18 | `Sprawling/storage/spec/Checkpoint/Provenance.lean` |
+| 8-8 | `Sprawling/storage/spec/Checkpoint.lean` |
+| 8-13 | `Sprawling/storage/spec/Changes.lean` |
+| 8-9 | `Sprawling/storage/spec/Worktree.lean` |
+| 8-10 | `Sprawling/storage/spec/Queue.lean` |
+| 8-11 | `Sprawling/storage/spec/DigestCache.lean` |
+| 8-12 | `Sprawling/storage/spec/Bundle.lean` |
+| 8-14 | `Sprawling/storage/spec/Error.lean` |
+| 8-15 | `Sprawling/storage/spec/Vfs.lean` |
+| 8-16 | `Sprawling/storage/spec/RealFs.lean` |
+| 8-19 | `Sprawling/storage/spec/Hunks.lean` |
+| 8-20 | `Sprawling/storage/spec/Checkpoint.lean` |
+| 8-21 | `Sprawling/storage/spec/Bundle.lean` |
+| 8-22 | `Sprawling/storage/spec/Status.lean` |
+| 8-23 | `Sprawling/storage/spec/Cas/Ranges.lean` |
+| 8-24 | `Sprawling/storage/spec/Sessions.lean` |
+| 8-25 | `Sprawling/storage/spec/Alias.lean` |
+| 8-26 | `Sprawling/storage/spec/Snapshot.lean` |
+| 8-30 | `Sprawling/storage/spec/ChainAudit.lean` |
+| 8-28 | `Sprawling/storage/spec/Snapshot/Start.lean` |
+| 8-27 | `Sprawling/storage/spec/Worktree/Back.lean` |
+| 8-31 | `Sprawling/storage/spec/Worktree.lean` |
+| 8-35 | `Sprawling/storage/spec/Worktree/Trees/Stock.lean` |
+| 8-32 | `Sprawling/storage/spec/Alias.lean` |
+| 8-29 | `Sprawling/storage/spec/Blob.lean` |
+| 8-33 | `Sprawling/storage/spec/Checkpoint.lean` |
+| 8-34 | `Sprawling/storage/spec/Jsonl.lean` |
+| 8-37 | `Sprawling/storage/spec/ChainAudit.lean` |
+| 8-38 | `Sprawling/storage/spec/Index.lean` |
+| 8-39 | `Sprawling/storage/spec/Checkpoint/Concurrent.lean` |
+| 8-40 | `Sprawling/storage/spec/Resident.lean` |
 -/
 
 /-! ## 9 工作流程
@@ -233,7 +233,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 
 /-! ## 10 实现逻辑
 
-1. 行终止符恒 `\n`（含末行）；chain_hash 对不含 `\n` 的行字节计算（`crates/kernel/Spec.lean` §8-9）。`.gitattributes` 的 `* text=auto eol=lf` 令索引与每个平台的检出都是 LF，夹具字节因此跨平台一致。
+1. 行终止符恒 `\n`（含末行）；chain_hash 对不含 `\n` 的行字节计算（`Sprawling/kernel/Spec.lean` §8-9）。`.gitattributes` 的 `* text=auto eol=lf` 令索引与每个平台的检出都是 LF，夹具字节因此跨平台一致。
 2. open 的段校验用 `EventRecord::parse_line`＋`chain_hash` 复算，无独立解析器（一个权威）。
 3. 段内偏移不建索引（storage::index 的事）；`read_raw_lines` 全量读，消费者只有 replay/夹具/conformance。
 4. `list` 排序返回＋段名零填宽度 20：字典序＝数值序，跨平台遍历确定。
@@ -263,43 +263,43 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 
 | 决定 | 标题 | 分部 |
 |---|---|---|
-| D1 | 临时件按「内容哈希＋写者进程＋本进程的 put 序号」命名，开句柄只清别的进程写的临时件 | `crates/storage/spec/Cas.lean` |
-| D2 | 文档的版本不另设存放处，进的就是内容库 | `crates/storage/spec/Cas.lean` |
-| D3 | `VersionAhead`→`E_LOG_VERSION_UNSUPPORTED` | `crates/storage/spec/Error.lean` |
-| D4 | `CasCorrupt`→`E_CAS_CORRUPT` | `crates/storage/spec/Error.lean` |
-| D5 | `CasMissing`→`E_PATH_NOT_FOUND` | `crates/storage/spec/Error.lean` |
-| D6 | `RangeOutOfBounds`→`E_INVALID_ARGS` | `crates/storage/spec/Error.lean` |
-| D7 | `Io`→`E_STORAGE_FATAL` | `crates/storage/spec/Error.lean` |
-| D8 | `WorktreeBusy`→`E_WORKTREE_BUSY` | `crates/storage/spec/Error.lean` |
-| D9 | `MergeStale`→`E_VERSION_CONFLICT` | `crates/storage/spec/Error.lean` |
-| D10 | `MergeWouldDiscard`→`E_VERSION_CONFLICT` | `crates/storage/spec/Error.lean` |
-| D11 | `Worktree`→`E_STORAGE_FATAL` | `crates/storage/spec/Error.lean` |
-| D12 | `Alias`→`E_OUTSIDE_WRITE_DOMAIN` | `crates/storage/spec/Error.lean` |
-| D13 | Windows 上硬链接按链接计数字面拒绝，计数经 `winapi-util` 的句柄读取 | `crates/storage/spec/Alias.lean` |
-| D14 | 放置接管一棵事先检出好的备树，备树在没人等的时候检出（8-35） | `crates/storage/spec/Worktree/Trees/Stock.lean` |
-| D15 | runtime 的 edit 经本 crate 落盘，新建由文件系统原子地占名（8-32） | `crates/storage/spec/Alias.lean` |
-| D16 | `LedgerBroken`→`E_STORAGE_FATAL` | `crates/storage/spec/Jsonl/Barrier.lean` |
-| D17 | `Envelope`→`E_LOG_VERSION_UNSUPPORTED` 同族拒读 | `crates/storage/spec/Error.lean` |
-| D18 | `LedgerHeld`→`E_LEDGER_HELD` | `crates/storage/spec/Jsonl.lean` |
-| D19 | `Unproven`→`E_HISTORY_UNPROVEN` | `crates/storage/spec/ChainAudit.lean` |
-| D20 | 已验证前缀的记录不带密钥 | `crates/storage/spec/ChainAudit.lean` |
-| D21 | 证明并行的只是各段前缀的摘要，链仍按段序判 | `crates/storage/spec/ChainAudit.lean` |
-| D22 | 开账本借用证明写下的记录，不另起一种记录 | `crates/storage/spec/Jsonl.lean` |
-| D23 | 从某个 seq 往后读由索引给，而不由调用方跳过前面的（8-38） | `crates/storage/spec/Index.lean` |
-| D24 | 屏障本身按平台各有一臂，每一臂守同一条持久语义 | `crates/storage/spec/Jsonl/Barrier.lean` |
-| D25 | 一座城的检查点由多个写者同时做，每个写者一个自己的 index，共享的只有对象库与引用更新 | `crates/storage/spec/Checkpoint/Concurrent.lean` |
-| D26 | 移动 HEAD 的两步在每一座城上都经同一进程里一把只护 HEAD 的锁，不按盘的种类分路 | `crates/storage/spec/Checkpoint/Concurrent.lean` |
-| D27 | 城的第一个提交与收楼的基线同一种写法：对象进 mempack、一个 pack 落盘，之后才写 index、以比较后交换建分支 | `crates/storage/spec/Checkpoint.lean` |
-| D28 | 备树还在检出时来的第二个新房间自己全量检出一次，不等那棵备树，也不多备一棵 | `crates/storage/spec/Worktree/Trees/Stock.lean` |
-| D29 | 热视图的 `waiting` 是这次跑最后一个还没结束的等待 | `crates/storage/spec/Hot.lean` |
-| D30 | 检查点的暂存过滤在 libgit2 打开之前跳过文件写者与落盘门的暂存名 | `crates/storage/spec/Checkpoint.lean` |
-| D31 | 段的预分配是一个可选的臂，默认仍是生长；选它就是改 `SEGMENT_PREALLOCATION` 一个值 | `crates/storage/spec/Jsonl/Preallocate.lean` |
-| D32 | 索引的刷新逐窗向前读，在预分配段的零尾那一窗停 | `crates/storage/spec/Index.lean` |
-| D33 | 建表的那一遍扫描与刷新共用同一支窗读，在预分配段的零尾那一窗停 | `crates/storage/spec/Index.lean` |
-| D34 | JSONL 的三条整段读路径使用有界内存的流式扫描 | `crates/storage/spec/Jsonl.lean` |
-| D35 | 保温续期在归因里单独报数，按 kernel 的一条读法分四格 | `crates/storage/spec/Attribution.lean` |
-| D36 | 续期花费进总额与每一个维度，在每一维都有带名字的去处 | `crates/storage/spec/Attribution.lean` |
-| D95 | checkpoint 只对已知密钥形状硬拒绝，熵命中提交并留下不含正文的 finding | `crates/storage/spec/Checkpoint.lean` |
+| D1 | 临时件按「内容哈希＋写者进程＋本进程的 put 序号」命名，开句柄只清别的进程写的临时件 | `Sprawling/storage/spec/Cas.lean` |
+| D2 | 文档的版本不另设存放处，进的就是内容库 | `Sprawling/storage/spec/Cas.lean` |
+| D3 | `VersionAhead`→`E_LOG_VERSION_UNSUPPORTED` | `Sprawling/storage/spec/Error.lean` |
+| D4 | `CasCorrupt`→`E_CAS_CORRUPT` | `Sprawling/storage/spec/Error.lean` |
+| D5 | `CasMissing`→`E_PATH_NOT_FOUND` | `Sprawling/storage/spec/Error.lean` |
+| D6 | `RangeOutOfBounds`→`E_INVALID_ARGS` | `Sprawling/storage/spec/Error.lean` |
+| D7 | `Io`→`E_STORAGE_FATAL` | `Sprawling/storage/spec/Error.lean` |
+| D8 | `WorktreeBusy`→`E_WORKTREE_BUSY` | `Sprawling/storage/spec/Error.lean` |
+| D9 | `MergeStale`→`E_VERSION_CONFLICT` | `Sprawling/storage/spec/Error.lean` |
+| D10 | `MergeWouldDiscard`→`E_VERSION_CONFLICT` | `Sprawling/storage/spec/Error.lean` |
+| D11 | `Worktree`→`E_STORAGE_FATAL` | `Sprawling/storage/spec/Error.lean` |
+| D12 | `Alias`→`E_OUTSIDE_WRITE_DOMAIN` | `Sprawling/storage/spec/Error.lean` |
+| D13 | Windows 上硬链接按链接计数字面拒绝，计数经 `winapi-util` 的句柄读取 | `Sprawling/storage/spec/Alias.lean` |
+| D14 | 放置接管一棵事先检出好的备树，备树在没人等的时候检出（8-35） | `Sprawling/storage/spec/Worktree/Trees/Stock.lean` |
+| D15 | runtime 的 edit 经本 crate 落盘，新建由文件系统原子地占名（8-32） | `Sprawling/storage/spec/Alias.lean` |
+| D16 | `LedgerBroken`→`E_STORAGE_FATAL` | `Sprawling/storage/spec/Jsonl/Barrier.lean` |
+| D17 | `Envelope`→`E_LOG_VERSION_UNSUPPORTED` 同族拒读 | `Sprawling/storage/spec/Error.lean` |
+| D18 | `LedgerHeld`→`E_LEDGER_HELD` | `Sprawling/storage/spec/Jsonl.lean` |
+| D19 | `Unproven`→`E_HISTORY_UNPROVEN` | `Sprawling/storage/spec/ChainAudit.lean` |
+| D20 | 已验证前缀的记录不带密钥 | `Sprawling/storage/spec/ChainAudit.lean` |
+| D21 | 证明并行的只是各段前缀的摘要，链仍按段序判 | `Sprawling/storage/spec/ChainAudit.lean` |
+| D22 | 开账本借用证明写下的记录，不另起一种记录 | `Sprawling/storage/spec/Jsonl.lean` |
+| D23 | 从某个 seq 往后读由索引给，而不由调用方跳过前面的（8-38） | `Sprawling/storage/spec/Index.lean` |
+| D24 | 屏障本身按平台各有一臂，每一臂守同一条持久语义 | `Sprawling/storage/spec/Jsonl/Barrier.lean` |
+| D25 | 一座城的检查点由多个写者同时做，每个写者一个自己的 index，共享的只有对象库与引用更新 | `Sprawling/storage/spec/Checkpoint/Concurrent.lean` |
+| D26 | 移动 HEAD 的两步在每一座城上都经同一进程里一把只护 HEAD 的锁，不按盘的种类分路 | `Sprawling/storage/spec/Checkpoint/Concurrent.lean` |
+| D27 | 城的第一个提交与收楼的基线同一种写法：对象进 mempack、一个 pack 落盘，之后才写 index、以比较后交换建分支 | `Sprawling/storage/spec/Checkpoint.lean` |
+| D28 | 备树还在检出时来的第二个新房间自己全量检出一次，不等那棵备树，也不多备一棵 | `Sprawling/storage/spec/Worktree/Trees/Stock.lean` |
+| D29 | 热视图的 `waiting` 是这次跑最后一个还没结束的等待 | `Sprawling/storage/spec/Hot.lean` |
+| D30 | 检查点的暂存过滤在 libgit2 打开之前跳过文件写者与落盘门的暂存名 | `Sprawling/storage/spec/Checkpoint.lean` |
+| D31 | 段的预分配是一个可选的臂，默认仍是生长；选它就是改 `SEGMENT_PREALLOCATION` 一个值 | `Sprawling/storage/spec/Jsonl/Preallocate.lean` |
+| D32 | 索引的刷新逐窗向前读，在预分配段的零尾那一窗停 | `Sprawling/storage/spec/Index.lean` |
+| D33 | 建表的那一遍扫描与刷新共用同一支窗读，在预分配段的零尾那一窗停 | `Sprawling/storage/spec/Index.lean` |
+| D34 | JSONL 的三条整段读路径使用有界内存的流式扫描 | `Sprawling/storage/spec/Jsonl.lean` |
+| D35 | 保温续期在归因里单独报数，按 kernel 的一条读法分四格 | `Sprawling/storage/spec/Attribution.lean` |
+| D36 | 续期花费进总额与每一个维度，在每一维都有带名字的去处 | `Sprawling/storage/spec/Attribution.lean` |
+| D95 | checkpoint 只对已知密钥形状硬拒绝，熵命中提交并留下不含正文的 finding | `Sprawling/storage/spec/Checkpoint.lean` |
 -/
 
 /-! ## 13 依赖选型
@@ -308,7 +308,7 @@ kernel（workspace 内层）；`thiserror`；`blake3`（经 kernel 的 chain_has
 形状 7 的重建骨架住 `tests/derived_views.rs`（`tests/` 不受 modmap 辖，与 kernel/runtime 既有集成测试同例），一次定义两次实例化（index／hot）。
 `git2`（checkpoint、worktree 与读仓库的各模块；libgit2 vendored，链接例外在 `deny.toml` 登记；版本由根 `Cargo.toml` 与 `Cargo.lock` 给出）。git2 不入缝：崩溃安全委托它的事务，只测重建与孤儿清扫。
 
-规格本身只 import 工具链的库、本 crate 的分部与 kernel 的分部（`spec/Jsonl/Verify.lean` import `crates/kernel/spec/Ledger.lean`，ARCHITECTURE.md §3 的 `depmap` 允许 storage 依赖 kernel）。
+规格本身只 import 工具链的库、本 crate 的分部与 kernel 的分部（`spec/Jsonl/Verify.lean` import `Sprawling/kernel/spec/Ledger.lean`，ARCHITECTURE.md §3 的 `depmap` 允许 storage 依赖 kernel）。
 -/
 
 /-! ## 14 硬编码声明
@@ -325,7 +325,7 @@ runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费
 
 单测：open 六步各分支；滚动边界；append_all 原子性（注入 Io 后内存态不前进）；cas put/get/get_range/dedup。proptest：链续与断尾（任意截断点/垃圾尾）；FaultFs 点阵（cut_at_op 扫描）。夹具：A16 高版本拒读。conformance：JsonlLedger 在本 crate 的每一次测试构建里过 kernel 六断言（dev-dependency 打开 kernel 的 `conformance`，所以不必打开本 crate 的同名特性）。约束：clippy 零告警；fault_fs 在非 test/fault 构建中零字节。
 
-形式化的义务由证明清偿：`lake build crates.storage.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
+形式化的义务由证明清偿：`lake build Sprawling.storage.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
 
 - 逐行检查与尾部恢复：`jsonl::append::tests` 的 `any_tail_damage_recovers_to_a_valid_chain`、`jsonl/open/tests.rs`、`jsonl/boundary/tests.rs` 的 `a_prior_segment_ending_in_an_ignorable_line_opens`、`jsonl/tail/tests.rs`。
 - 屏障：`jsonl/barrier.rs` 的 `no_append_after_a_failed_barrier_claims_a_record_the_disk_loses`、`jsonl/unwind/tests.rs`。
@@ -342,8 +342,8 @@ runtime::replay 读 `read_raw_lines`；citysim 夹具对拍与断电点阵消费
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；它改了，分部的路径与 `architecture.toml` 里 storage 各行的 `spec` 锚点一起重看。ARCHITECTURE.md §4（内缝 Vfs 不升真缝）与 §10 第 3 条（库 crate 起线程的地方是点名的，§8-37 是其中一处）约束本 crate 的形状。
 - `architecture.toml` 的模块图：storage 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
-- kernel 的规格（`crates/kernel/Spec.lean`）：事件表、错误码、`Ledger` 端口与 `chain_hash` 的权威；`crates/kernel/spec/Ledger.lean`：链规则与摘要单射的假设，`spec/Jsonl/Verify.lean` import 它。它们改了，这里的逐行检查与 §8-1、§8-14 一起重看。
-- sprawling 的规格（`crates/sprawling/Spec.lean`）8-91、8-101、8-122、8-144、8-145、8-154：服务中的城怎样开账本、起证明、调 `stock`，以及证明与开城的读数；`crates/xtask/budgets.toml`：本 crate 的读数与预算。
-- runtime 的规格（`crates/runtime/Spec.lean` §8-1、§8-13-2）：`replay` 与本 crate 共用 `LineCheck`，沙箱副本与本 crate 共用 `FileWork`。
-- 引本规格的其他规格与 rustdoc 写 `crates/storage/Spec.lean §8-n` 或 `storage D<n>`；一节换了分部，它的标签不变，引用不必改。
+- kernel 的规格（`Sprawling/kernel/Spec.lean`）：事件表、错误码、`Ledger` 端口与 `chain_hash` 的权威；`Sprawling/kernel/spec/Ledger.lean`：链规则与摘要单射的假设，`spec/Jsonl/Verify.lean` import 它。它们改了，这里的逐行检查与 §8-1、§8-14 一起重看。
+- sprawling 的规格（`Sprawling/app/Spec.lean`）8-91、8-101、8-122、8-144、8-145、8-154：服务中的城怎样开账本、起证明、调 `stock`，以及证明与开城的读数；`Tools/xtask/budgets.toml`：本 crate 的读数与预算。
+- runtime 的规格（`Sprawling/runtime/Spec.lean` §8-1、§8-13-2）：`replay` 与本 crate 共用 `LineCheck`，沙箱副本与本 crate 共用 `FileWork`。
+- 引本规格的其他规格与 rustdoc 写 `Sprawling/storage/Spec.lean §8-n` 或 `storage D<n>`；一节换了分部，它的标签不变，引用不必改。
 -/

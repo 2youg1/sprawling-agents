@@ -37,7 +37,7 @@ pub(super) enum Packaged {
     /// The CycloneDX bill of materials, so a person who wants to know
     /// what is inside the binary does not have to build it.
     Sbom,
-    /// The skills a release ships: `crates/city/skills/`, walked as it
+    /// The skills a release ships: `Sprawling/city/skills/`, walked as it
     /// stands and carried as `skills/`. One
     /// part rather than one row per skill, because the list of skills is
     /// the directory's business and a closed per-file list here would be
@@ -71,7 +71,7 @@ const READABLE_MODE: u32 = 0o644;
 /// Where the tree of skills lives in the repository: the city crate
 /// owns it, because its build script embeds the same files a new city
 /// shelves.
-const SKILLS_DIR: &str = "crates/city/skills";
+const SKILLS_DIR: &str = "Sprawling/city/skills";
 
 /// The name the archive carries the tree of skills under, so the person
 /// who unpacks a release finds `skills/` beside the binary.
@@ -151,14 +151,14 @@ impl Packaged {
             }
             Self::Sbom => "run `just sbom`, or `just dist`, which ends with it",
             Self::Skills => {
-                "restore `crates/city/skills/` from the tree, or change this table and the archive in \
+                "restore `Sprawling/city/skills/` from the tree, or change this table and the archive in \
                  one change-set"
             }
         }
     }
 }
 
-/// Every file under `crates/city/skills/`, one entry each, named
+/// Every file under `Sprawling/city/skills/`, one entry each, named
 /// `skills/<path>`.
 ///
 /// Walked rather than listed: which skills a release carries is the
@@ -168,7 +168,7 @@ impl Packaged {
 /// text travels with the files it covers.
 ///
 /// # Errors
-/// Refuses a tree with no `crates/city/skills/` directory - the part is required
+/// Refuses a tree with no `Sprawling/city/skills/` directory - the part is required
 /// like every other, and an archive that silently ships without the
 /// skills is the defect this table exists to prevent.
 fn skills(root: &Path) -> Result<Vec<Entry>, XtaskError> {
@@ -202,7 +202,7 @@ fn sbom_name() -> Result<String, XtaskError> {
         .and_then(std::ffi::OsStr::to_str)
         .map(str::to_owned)
         .ok_or_else(|| XtaskError::Doc {
-            file: "crates/xtask/src/sbom.rs".to_owned(),
+            file: "Tools/xtask/src/sbom.rs".to_owned(),
             msg: format!("`{}` names no file to put in the archive", sbom::SBOM),
         })
 }

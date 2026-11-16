@@ -17,7 +17,7 @@ use kernel::{Address, B3Hash, Effort, IdemKey, KeepWarm};
 use serde::{Deserialize, Serialize};
 
 /// A page's save of one document: edits made on the version `baseline`,
-/// refused once that version has moved (`crates/wire/spec/Command/Step.lean` §8-72).
+/// refused once that version has moved (`Sprawling/wire/spec/Command/Step.lean` §8-72).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RangeWrite {
@@ -28,7 +28,7 @@ pub struct RangeWrite {
 }
 
 /// A display name for the session of `room` that began at `began`; an
-/// empty name takes it back (`crates/wire/spec/Answer/Sessions.lean` D27).
+/// empty name takes it back (`Sprawling/wire/spec/Answer/Sessions.lean` D27).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SessionNaming {
@@ -39,7 +39,7 @@ pub struct SessionNaming {
 }
 
 /// A room's new run policy, which the run under way takes at its next
-/// safe point (`crates/wire/spec/Answer/Sessions.lean` D27).
+/// safe point (`Sprawling/wire/spec/Answer/Sessions.lean` D27).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PolicyChange {
@@ -50,7 +50,7 @@ pub struct PolicyChange {
 
 /// What `OpenRemoteDoor` asks for: the remote door open for `lasting_ms`, one minute to seven
 /// days. The request does nothing by itself; the city prints a code at its own console and
-/// refuses the frame with `E_APPROVAL_PENDING` (`crates/wire/spec/Command/Kind.lean`,
+/// refuses the frame with `E_APPROVAL_PENDING` (`Sprawling/wire/spec/Command/Kind.lean`,
 /// remote_access D4).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -79,7 +79,7 @@ pub struct DoorStep {
 /// What `ForgetSecret` carries: the vault reference whose key is deleted, spelled
 /// `secret:realm/name`. Refused while an attached endpoint or a configuration still names the
 /// reference, and for a key the environment supplies (gateway D33); writes nothing to the ledger
-/// (`crates/accounting/spec/Worker.lean` §8-37).
+/// (`Sprawling/accounting/spec/Worker.lean` §8-37).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SecretForgetting {
@@ -88,7 +88,7 @@ pub struct SecretForgetting {
 }
 
 /// A person's decision on proposal cards of one document, landed as one
-/// save (`crates/wire/spec/Answer/Proposals.lean` §8-73).
+/// save (`Sprawling/wire/spec/Answer/Proposals.lean` §8-73).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ProposalDecisions {
@@ -108,7 +108,7 @@ pub struct ProposalDecision {
 
 /// A building's whole `RULES.toml` from a page, and the text the page
 /// read: the city evaluates `body` before it lands, and only over `base`
-/// (`crates/wire/spec/Command/Step.lean` §8-60).
+/// (`Sprawling/wire/spec/Command/Step.lean` §8-60).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RulesWrite {
@@ -119,7 +119,7 @@ pub struct RulesWrite {
 }
 
 /// The provider, model and effort a new child session uses, written
-/// through the same rules door as [`RulesWrite`] (`crates/wire/spec/Command/Step.lean` §8-60b).
+/// through the same rules door as [`RulesWrite`] (`Sprawling/wire/spec/Command/Step.lean` §8-60b).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WorkspaceChoiceWrite {
@@ -145,7 +145,7 @@ pub struct WorkspaceChoiceWrite {
 /// `desktop` is the allowlist's text and not a parsed value: the connector
 /// that reads that file at start-up is the authority on its syntax and
 /// fails closed, and a second parser here would be a second authority
-/// (`crates/city/Spec.lean` §8-26).
+/// (`Sprawling/city/Spec.lean` §8-26).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BuildingSettings {
@@ -161,7 +161,7 @@ pub struct BuildingSettings {
     pub context_second_threshold: Option<u64>,
     /// The building's whole `[catalog]` table, which replaces what the
     /// building stated before; an empty table takes the key out, so the
-    /// building follows the city's again (`crates/wire/spec/Answer/Catalog.lean` §8-99).
+    /// building follows the city's again (`Sprawling/wire/spec/Answer/Catalog.lean` §8-99).
     pub catalog: Option<kernel::config::ExposureTable>,
     /// The building's whole connector references and approved versions.
     /// An empty list explicitly selects none rather than inheriting.
@@ -174,7 +174,7 @@ pub struct BuildingSettings {
 }
 
 /// The city's own layer from the settings page: `None` leaves a key as
-/// it is (`crates/wire/spec/Command/Step.lean` §8-61).
+/// it is (`Sprawling/wire/spec/Command/Step.lean` §8-61).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CitySettings {
@@ -184,7 +184,7 @@ pub struct CitySettings {
     /// so a value the city refuses lands nothing.
     pub search: Option<kernel::config::SearchConfiguration>,
     /// The city's whole `[catalog]` table, the default every building
-    /// that states nothing follows (`crates/wire/spec/Answer/Catalog.lean` §8-99).
+    /// that states nothing follows (`Sprawling/wire/spec/Answer/Catalog.lean` §8-99).
     pub catalog: Option<kernel::config::ExposureTable>,
     /// The city's whole ordered `[skills] shelves` table. `None` leaves
     /// it alone; an empty list explicitly mounts no outside shelf.
@@ -199,7 +199,7 @@ pub struct CitySettings {
 /// different results on disk, and `carry: true` at a call site says
 /// neither of them. `Nothing` is the first variant and the default,
 /// because that is what a person means by starting a new session — a
-/// new one, here, not a continuation (`crates/sprawling/Spec.lean` §8-82). The
+/// new one, here, not a continuation (`Sprawling/app/Spec.lean` §8-82). The
 /// handoff is the exception a person states.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -249,7 +249,7 @@ pub enum GovernedDocument {
     Preferences,
 }
 
-/// One identity card's values (`crates/wire/spec/Answer/Identity.lean` §8-59).
+/// One identity card's values (`Sprawling/wire/spec/Answer/Identity.lean` §8-59).
 ///
 /// Each key is the card's own: `None` removes it, which puts the default
 /// name back. What a name may be is the city's answer (`city::Naming`),
@@ -315,7 +315,7 @@ pub enum PursuitStep {
 /// One whole-document step on the prompt document at `at`, taken only
 /// while the file is still `base`: the hash of the version the page read,
 /// or of no bytes when the file is absent
-/// (`crates/wire/spec/Answer/Prefix.lean` §8-98).
+/// (`Sprawling/wire/spec/Answer/Prefix.lean` §8-98).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PromptWrite {
@@ -326,7 +326,7 @@ pub struct PromptWrite {
 }
 
 /// A whole-document step on one prompt document
-/// (`crates/wire/spec/Answer/Prefix.lean` §8-98); editing it word by word
+/// (`Sprawling/wire/spec/Answer/Prefix.lean` §8-98); editing it word by word
 /// is `PutRange`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -342,7 +342,7 @@ pub enum PromptStep {
 }
 
 /// What `CloseCity` carries: how the runs under way end
-/// (`crates/wire/spec/Command/Kind.lean` §19-2).
+/// (`Sprawling/wire/spec/Command/Kind.lean` §19-2).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CityClosing {
@@ -364,7 +364,7 @@ pub enum CloseMode {
 /// What `AddAgent` carries: the consent to one agent entry the city
 /// offered, named by the digest of its launch spec. The city recomputes
 /// the digest of the spec it would offer now and refuses on a mismatch,
-/// so what is written is what the person saw (`crates/wire/spec/Answer/Agents.lean` §8-90).
+/// so what is written is what the person saw (`Sprawling/wire/spec/Answer/Agents.lean` §8-90).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AgentAdding {
@@ -387,7 +387,7 @@ pub struct AgentLoginStart {
 }
 
 /// What `ForgetDevice` carries: the paired browser whose key the city
-/// deletes (`crates/wire/spec/Answer/Devices.lean` §8-91).
+/// deletes (`Sprawling/wire/spec/Answer/Devices.lean` §8-91).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DeviceForgetting {

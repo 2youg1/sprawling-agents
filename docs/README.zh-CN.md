@@ -127,10 +127,10 @@ sprawling 不会在后台自动更新。需要升级时，可在设置里检查�
 
 在 sprawling 里搭建一套多 Agent 协作流，不需要写一行 Python 或 TypeScript 编排代码：
 
-- **表单脚手架即工作流（Scaffolding Forms）**：每栋楼建起时自带一套结构化 Markdown 与 TOML 表单（模板见 [`crates/city/templates/`](../crates/city/templates/)）——`SPEC.md` 记录项目规格与架构决定，`Roadmap.md` 是唯一的分层任务表与进度分母，`Memo.md` 留存决策备忘，`Handoff.md` 负责跨会话交接，`URBANITE.md` 定义居民的角色与做事方式。表单靠自身的结构引导模型，哪怕是轻量本地模型也能按表头把事情填对。
+- **表单脚手架即工作流（Scaffolding Forms）**：每栋楼建起时自带一套结构化 Markdown 与 TOML 表单（模板见 [`Sprawling/city/templates/`](../Sprawling/city/templates/)）——`SPEC.md` 记录项目规格与架构决定，`Roadmap.md` 是唯一的分层任务表与进度分母，`Memo.md` 留存决策备忘，`Handoff.md` 负责跨会话交接，`URBANITE.md` 定义居民的角色与做事方式。表单靠自身的结构引导模型，哪怕是轻量本地模型也能按表头把事情填对。
 - **Mayor 分层规划与常设目标（Standing Goal）**：市政厅里的 Mayor（`hall/mayor`）专门负责将你的想法拆解为路线图，并通过 `plan` 工具把各部分的活分派给对应的楼。Mayor 被刻意限制为只写 Markdown 而不跑代码，防止规划者自己下场改代码而不再审视各栋楼交回的证据。为楼开启**常设目标**后，城市会持续把就绪的计划节点派发出去，并等待在途 run 完成（[日常操作](operating.md)）。
-- **声明式规则与万物皆可入住**：楼的权限边界写在 `<building>/.sprawling/RULES.toml` 里：可写的前缀与方式（`everything` / `documents`）、合并前是否审查、准入哪些 skill、能访问的域名（`egress`）、能不能用城市自带的浏览器或你正在用的浏览器、能否操作桌面（白名单在 `DESKTOP.toml`）、是否保密（`confidential` 会把楼的模型池收成只走本地推理，也不起 MCP）。拼错的键会被拒绝而不是忽略（[`policy.rs`](../crates/city/src/policy.rs)）。`.sprawling/` 在保留区，Agent 读得到、改不了。
-- **能力与权限继续往下分**：工具和 skill 的三档、MCP 定义与楼里的引用、沙箱、思考档位写在 `CONFIG.toml`，按城市、楼、房间三层覆盖。工具表止于楼这一层，因为它在系统提示词之前被 provider 缓存，房间各不相同会把一整栋楼的缓存拆碎（[`config/exposure.rs`](../crates/kernel/src/config/exposure.rs)）。每次派活再定一次运行策略：对话还是干活、能不能改写已有文件、合并前要不要测试证据、走普通落地还是实验工作树（[`mode.rs`](../crates/kernel/src/model/mode.rs)）。
+- **声明式规则与万物皆可入住**：楼的权限边界写在 `<building>/.sprawling/RULES.toml` 里：可写的前缀与方式（`everything` / `documents`）、合并前是否审查、准入哪些 skill、能访问的域名（`egress`）、能不能用城市自带的浏览器或你正在用的浏览器、能否操作桌面（白名单在 `DESKTOP.toml`）、是否保密（`confidential` 会把楼的模型池收成只走本地推理，也不起 MCP）。拼错的键会被拒绝而不是忽略（[`policy.rs`](../Sprawling/city/src/policy.rs)）。`.sprawling/` 在保留区，Agent 读得到、改不了。
+- **能力与权限继续往下分**：工具和 skill 的三档、MCP 定义与楼里的引用、沙箱、思考档位写在 `CONFIG.toml`，按城市、楼、房间三层覆盖。工具表止于楼这一层，因为它在系统提示词之前被 provider 缓存，房间各不相同会把一整栋楼的缓存拆碎（[`config/exposure.rs`](../Sprawling/kernel/src/config/exposure.rs)）。每次派活再定一次运行策略：对话还是干活、能不能改写已有文件、合并前要不要测试证据、走普通落地还是实验工作树（[`mode.rs`](../Sprawling/kernel/src/model/mode.rs)）。
 - **外部能力**：既可按楼挂载 MCP 工具服务（同一个 Provider 可登记多个账号，密钥失效或额度用尽时按你定的顺序换到下一个），也能直接把任何支持 **ACP 协议**的外部 Agent（如 Claude Code、Codex 等）作为居民请进房间干活（[接入文档](integrations.md)）。
 
 ### 2. 上下文先看清，再让它跑
@@ -138,7 +138,7 @@ sprawling 不会在后台自动更新。需要升级时，可在设置里检查�
 模型跑偏的时候，常见的难点是搞不清它被哪段系统提示词带偏了，还是被几十个工具的 Schema 撑满了上下文。sprawling 把上下文做成一份可以当场看的账：
 
 - **发车前预检每一层提示词**：楼页的 **提示（Prompts）** 视图按实际发送顺序列出下次 run 将读到的全城、本楼、房间三层文档（`City.md`、`AGENTS.md`、`SPEC.md` 等），标明每份文档的来源、是否缺席或被近层覆盖，以及最近一次 run 各层的精确字节数。你可以直接在页面上打开文档、在当前层新建覆盖副本，或一键恢复默认。
-- **三档能力暴露与 1 KiB 索引上限**：在楼页的 **能力（Capabilities）** 视图中，工具与 Skill 分为 `core`（常驻请求）、`dormant`（按需休眠）和 `off`（关闭）三档。哪怕一栋楼准入了数十个 MCP 工具与 Skill，所有 `dormant` 项也会按命名空间自动折叠进一份**严格不超过 1 KiB 的休眠索引**（由 [Catalog.lean](../crates/runtime/spec/Catalog.lean) 形式化证明不超预算），run 在需要时通过 `tool` 工具去检索、看说明并调用。页面将三档开关与最近一次 run 的字节开销、30 天未使用筛选项并排展示，支持一键关掉闲置能力。
+- **三档能力暴露与 1 KiB 索引上限**：在楼页的 **能力（Capabilities）** 视图中，工具与 Skill 分为 `core`（常驻请求）、`dormant`（按需休眠）和 `off`（关闭）三档。哪怕一栋楼准入了数十个 MCP 工具与 Skill，所有 `dormant` 项也会按命名空间自动折叠进一份**严格不超过 1 KiB 的休眠索引**（由 [Catalog.lean](../Sprawling/runtime/spec/Catalog.lean) 形式化证明不超预算），run 在需要时通过 `tool` 工具去检索、看说明并调用。页面将三档开关与最近一次 run 的字节开销、30 天未使用筛选项并排展示，支持一键关掉闲置能力。
 - **Pin 与漂移提示**：工具或 Skill 的定义自钉住（pin）以来若发生变动，会立即标为 `Added`、`Changed` 或 `Removed` 并并排展示新旧文本对比，防止外部工具静默改变行为。每次 run 都有独立的 **时间、回合、监视器、提示（Prompt 原文）、上下文、改动、证据** 七个视图，发给模型的每一个字节都有据可查。
 
 ### 3. 针对 Agent（AX）与人（UX）的体验细节
@@ -146,7 +146,7 @@ sprawling 不会在后台自动更新。需要升级时，可在设置里检查�
 sprawling 在底层做了大量针对 Agent 行为特征（AX）与人类注意力保护（UX）的专门设计：
 
 - **三段式可行动拒绝（`AxError`）**：Agent 的每个动作都要过规则门禁（gate）。一旦被拒，系统绝不只回一句报错或道歉，而是强制返回三项结构化信息：**违反了哪条规则（rule）、具体哪里越界（violation）、换成什么做法可以继续（alternative / recovery）**（在 Rust 类型层，不带恢复建议的错误甚至无法通过编译）。Agent 读完拒绝理由就能自己改道继续干，无需停下来向你求救。
-- **命令感知的无损可逆压缩器（`sieve`）**：不用另一个小模型去总结命令输出（既费钱、增加延迟，又破坏重放的确定性）。`exec` 命令产生长输出时，系统先将完整原文钉入 BLAKE3 内容寻址库（CAS）并落盘 `.rest/` 文件，随后经过 7 级无正则线性扫描流水线：去除 ANSI 控制符、折叠连续空行、**模板级去重**（把交错刷屏的 `Compiling a / b` 折成一行加计数）、**同命令跨调用差分**（同一 run 内反复跑 `cargo check` 时，只输出新增或变化的报错，其余一行带过）、按诊断优先级保留关键报错行（[Sieve.lean](../crates/runtime/spec/Sieve.lean)）。模型既省下大量上下文，需要看细节时又能随时按附带路径读回原文。
+- **命令感知的无损可逆压缩器（`sieve`）**：不用另一个小模型去总结命令输出（既费钱、增加延迟，又破坏重放的确定性）。`exec` 命令产生长输出时，系统先将完整原文钉入 BLAKE3 内容寻址库（CAS）并落盘 `.rest/` 文件，随后经过 7 级无正则线性扫描流水线：去除 ANSI 控制符、折叠连续空行、**模板级去重**（把交错刷屏的 `Compiling a / b` 折成一行加计数）、**同命令跨调用差分**（同一 run 内反复跑 `cargo check` 时，只输出新增或变化的报错，其余一行带过）、按诊断优先级保留关键报错行（[Sieve.lean](../Sprawling/runtime/spec/Sieve.lean)）。模型既省下大量上下文，需要看细节时又能随时按附带路径读回原文。
 - **无损旁路干预（Steer & Carry）**：发现正在跑的 run 方向偏了，不必强行中断重来。输入 `/steer <文字>`，指令会在下一个工具安全点追加进结果末尾。在 run 的实时 **监视器** 里看代码改动时，可以对任意 diff 块直接点撤回，或者写一句批注（自动作为 steer 送达）。在命令面板里选 **带着这段对话去…**，就能把当前上下文直接分叉带到另一个房间。
 - **合并同类提问与 Clerk 代答**：送到 **等你的事** 页面上的设计问题，相同的会自动合并为一张卡片，点一次允许或拒绝即可成批放行。你还可以把日常审批委托给市政厅的 `hall/clerk` 代答，它的每次决定与理由都会如实记入账本。
 
@@ -166,17 +166,17 @@ sprawling 在底层做了大量针对 Agent 行为特征（AX）与人类注意�
 - **只读工具流式推测与智能缓存保温**：模型还在流式生成回复时，打头的只读工具（`read`、`search`）已经提前并发起跑。上下文严格锁定 `City → Building → Resident → Run` 四段静态前缀，编译期禁止混入时间戳等易变字段；已发送的消息也加入这个冻结前缀，后续回合只追加而不改写历史，需要改变较早内容时停止并从那里分叉。系统支持根据实测首包提前量以 1 token 的最低代价自动续期保温，最大化命中服务商的 Prompt Cache。
 - **主核优先与子进程降级礼让**：在“设置 → 性能”中可配置 CPU 放置策略（`soft` / `pinned` / `soft_shares`）与核心线程优先级。Agent 派出的所有构建、测试等子命令都默认以低于城市的系统优先级启动（Windows 下为 Below Normal，Unix 下为 `nice -n 10`），哪怕后台几个 Agent 同时跑全量编译，页面也照常响应。
 - **OS 级内存硬上限与整机预算排队**：支持为单次 run 设置内存上限（通过 Windows Job Object 或 Linux cgroups 强制执行），并配合整机内存预算队列（`memory = "auto"`）先预订后执行，超限任务自动排队而非把机器撑爆（[城市怎样使用你的硬件](performance.md#choose-how-the-city-uses-the-machine)）。
-- **内建性能监视与棘轮门禁**：网页监视器与命令行 `sprawling gauge`（别名 `top`）可在你自己的硬件上实时测量耗时分位数（floor / p50 / p95 / p99）、模型调用、token、精确到微美元的成本与进程树资源占用。项目的各项预算与历史基线均公示在 [性能登记表](../crates/xtask/budgets.toml) 中（[性能文档](performance.md)）。
-- **性能是持续的工作**：每个读数都记进性能登记表（`crates/xtask/budgets.toml`），带机器类别和复现命令。哪条被门禁挡住、哪条只登记，表里逐行写明。下一步优化从火焰图里挑，改完用同一套 harness 复测。规模上去时先看账本和端点闸门：run 并行驱动，记账串行落到一个线程，并发上限只有每个端点自己的 `max_in_flight`，为的是让 Agent 数量增加时开销不以乘方式增长。
+- **内建性能监视与棘轮门禁**：网页监视器与命令行 `sprawling gauge`（别名 `top`）可在你自己的硬件上实时测量耗时分位数（floor / p50 / p95 / p99）、模型调用、token、精确到微美元的成本与进程树资源占用。项目的各项预算与历史基线均公示在 [性能登记表](../Tools/xtask/budgets.toml) 中（[性能文档](performance.md)）。
+- **性能是持续的工作**：每个读数都记进性能登记表（`Tools/xtask/budgets.toml`），带机器类别和复现命令。哪条被门禁挡住、哪条只登记，表里逐行写明。下一步优化从火焰图里挑，改完用同一套 harness 复测。规模上去时先看账本和端点闸门：run 并行驱动，记账串行落到一个线程，并发上限只有每个端点自己的 `max_in_flight`，为的是让 Agent 数量增加时开销不以乘方式增长。
 
 ### 6. 多 Agent 社会模拟与二次开发
 
-- **原生群体通信**：居民之间可以发现可达地址、通过信件（`letter`）互相发消息、敲门让空着的房间开一次 run、分工协作或等待回信，不需要你居中当传话筒。主 Agent 向你汇报进展，而底层所有的群体互动通信都被完整记录，可通过 [playback](../crates/city/skills/playback/SKILL.md) 导出并与 Ledger 对照核验，适合用于多 Agent 协作效率、组织行为与社会模拟实验。
+- **原生群体通信**：居民之间可以发现可达地址、通过信件（`letter`）互相发消息、敲门让空着的房间开一次 run、分工协作或等待回信，不需要你居中当传话筒。主 Agent 向你汇报进展，而底层所有的群体互动通信都被完整记录，可通过 [playback](../Sprawling/city/skills/playback/SKILL.md) 导出并与 Ledger 对照核验，适合用于多 Agent 协作效率、组织行为与社会模拟实验。
 - **开放线协议与架构接缝（Seams）**：前后端通过公开的 [wire 线协议](wire.md) 通信，`sprawling call` 与 `sprawling dispatch` 可以直接用退出码在脚本中编排城市。你也可以沿着 [架构文档](ARCHITECTURE.md#8-where-to-change-what) 标明的接缝（seams）替换组件或构建自己的客户端。
 
 ### 7. 本地优先的隐私保护与代码签名政策
 
-- **凭据隔离与落盘前脱敏**：你在消息里随手粘贴的 API Key 会先被拦截送入系统凭证库（Vault），模型看到的只是 `secret:realm/name` 引用（[custody](../crates/accounting/src/worker/dispatching/custody.rs)）。模型回复与工具结果里长得像密钥的内容，在写入永久历史前会被自动替换成脱敏标记（[redact](../crates/runtime/src/redact.rs)）。
+- **凭据隔离与落盘前脱敏**：你在消息里随手粘贴的 API Key 会先被拦截送入系统凭证库（Vault），模型看到的只是 `secret:realm/name` 引用（[custody](../Sprawling/accounting/src/worker/dispatching/custody.rs)）。模型回复与工具结果里长得像密钥的内容，在写入永久历史前会被自动替换成脱敏标记（[redact](../Sprawling/runtime/src/redact.rs)）。
 - **默认本地留存与保密楼**：除了你主动接入的模型服务、MCP 工具以及默认开启的网页搜索（关闭前会将搜索词发往 Exa）之外，没有任何数据离开你的电脑。**保密楼（`confidential`）** 在发出任何远程模型调用前就会硬性拦截，也不启动任何 MCP 服务，配合本地模型可安全处理高度敏感数据。
 - **回环端口防劫持与环境净化**：本地监听端口对所有调用方强制要求凭据（`/web` 打开的首个浏览器自动完成免输配对，第二个浏览器需输入终端一次性配对码，本地脚本读取仅当前系统账户可读的密钥文件），浏览器其他标签页里的恶意网页无法跨站驱动城市（[SECURITY.md](SECURITY.md)）。城市启动的子进程（ACP Agent、MCP 服务、浏览器等）会自动剥离城市的敏感环境变量。
 - **Windows 88 项透明隐私控制**：在 Windows 上，设置页提供 88 项可选的系统隐私控制（涵盖诊断遥测、语音输入、应用权限与 Windows AI 功能），每一项都清楚列出当前值、改动内容与可能牺牲的便利，支持逐项应用或恢复，且每次写入后都会重新读回核验（[Windows 隐私控制](operating.md#windows-privacy-controls)）。
@@ -240,9 +240,9 @@ Agent 的能力和规模越强，人的注意力就越昂贵。我拒绝让 spra
 | [`AGENTS.md`](../AGENTS.md) | 每次改动都要守的规则与检查命令，人和 Agent 动手前都先读它 |
 | [`docs/CONTRIBUTING.md`](CONTRIBUTING.md) | 贡献前的准备、功能准入五项测试与提交流程 |
 | [`docs/frontend-method.md`](frontend-method.md) | 界面屏幕怎么搭、怎么验收，以及已经批准的视觉设计规范 |
-| [`crates/README.md`](../crates/README.md) | 每个 crate 管什么、规格在哪；规格 `crates/<dir>/Spec.lean` 记录该 crate 的接口、决定和形式化证明，注释为中文 |
-| [`crates/city/templates/`](../crates/city/templates/) | 城市写进每栋楼的脚手架表单模板，Agent 会读，你也可以直接读 |
-| [`crates/city/skills/`](../crates/city/skills/) | 随发行版一起内置分发的 Skills |
+| [`Sprawling/README.md`](../Sprawling/README.md) | 每个 crate 管什么、规格在哪；规格 `crates/<dir>/Spec.lean` 记录该 crate 的接口、决定和形式化证明，注释为中文 |
+| [`Sprawling/city/templates/`](../Sprawling/city/templates/) | 城市写进每栋楼的脚手架表单模板，Agent 会读，你也可以直接读 |
+| [`Sprawling/city/skills/`](../Sprawling/city/skills/) | 随发行版一起内置分发的 Skills |
 | [`docs/logging.md`](logging.md) | 什么进诊断日志、什么进 Ledger，以及两者为什么要严格分开 |
 | [`docs/third-party.md`](third-party.md) | 本仓库跟随的上游事实、致谢与开源许可义务 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 每一版改了什么，以及哪些已知问题仍在跟进 |
@@ -259,7 +259,7 @@ Agent 的能力和规模越强，人的注意力就越昂贵。我拒绝让 spra
   - `sdd` 和 `translation` 是作者中文 Skills 的英文改编版。备选的 `tutor` 归档在 [docs/ArchiveSKILL](ArchiveSKILL/)，不再内置。
   - `why`、`how` 和 `blast-radius` 改编自 Lauren Tan（poteto）的 [pstack](https://github.com/cursor/plugins/tree/main/pstack)，`authority-review` 改编自同一仓库的 Thermos。这四项均保留 MIT 许可。
   - `ub-mode` 改编自 Robert C. Martin 的 [ub-mode](https://github.com/unclebob/ub-mode) 和 pstack，保留 MIT 许可；交付方式由各仓库自己的规则决定。
-  - 每个 Skill 的署名和许可见 [skills/LICENSES.md](../crates/city/skills/LICENSES.md)。
+  - 每个 Skill 的署名和许可见 [skills/LICENSES.md](../Sprawling/city/skills/LICENSES.md)。
 - **贡献与许可**
   - 报告缺陷或提出功能建议，请使用 [Issue 表单](https://github.com/2youg1/sprawling-agents/issues/new/choose)。
   - 提交代码改动请遵循 [AGENTS.md](../AGENTS.md) 和 [CONTRIBUTING](CONTRIBUTING.md)。

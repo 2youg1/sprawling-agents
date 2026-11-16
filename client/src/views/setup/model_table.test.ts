@@ -252,9 +252,9 @@ describe("the columns", () => {
 // The two hosts the city's ladder tells apart for one catalogue-known
 // id: a relay off this machine, where the preset table states the
 // vendor's window, and a server on this machine such as
-// http://127.0.0.1:8811/v1, where no rung does (crates/gateway/Spec.lean
+// http://127.0.0.1:8811/v1, where no rung does (Sprawling/gateway/Spec.lean
 // §8-17; the city's side is `a_relay_forwarding_a_vendors_id_answers_the_vendors_window`
-// in crates/accounting/src/views/providers.rs).
+// in Sprawling/accounting/src/views/providers.rs).
 const RELAY = "https://relay.example.test/v1";
 const SONNET = "claude-sonnet-4-5";
 

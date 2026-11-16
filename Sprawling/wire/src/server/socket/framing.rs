@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How one session's event arm writes in frames
-//! (`crates/wire/spec/Server/Socket.lean` §8-47h): every record already
+//! (`Sprawling/wire/spec/Server/Socket.lean` §8-47h): every record already
 //! queued when it wakes becomes its own `Event` frame, and the socket is
 //! flushed once. The model there proves that where the frames are cut
 //! changes nothing the page is told, that records are told in seq order
@@ -164,7 +164,7 @@ mod tests {
     }
 
     proptest! {
-        /// `crates/wire/spec/Server/Socket.lean`: cutting the arrivals
+        /// `Sprawling/wire/spec/Server/Socket.lean`: cutting the arrivals
         /// into frames anywhere tells what one frame tells
         /// (`framing_is_invisible`); a live session tells exactly the
         /// records it was handed, in seq order (`records_said`,

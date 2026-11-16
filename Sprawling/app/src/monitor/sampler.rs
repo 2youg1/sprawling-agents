@@ -6,7 +6,7 @@
 //! The thread that ticks the monitor once every ten memory beats and
 //! sends each fresh reading to the watching sessions, and notes this
 //! process's private bytes on every memory beat in between
-//! (`crates/sprawling/spec/Monitor.lean` §8-96). The memory beat is the
+//! (`Sprawling/app/spec/Monitor.lean` §8-96). The memory beat is the
 //! one a page sets (`super::beat`), 100 ms until it does.
 
 use std::sync::{Arc, Mutex, PoisonError, Weak};
@@ -24,7 +24,7 @@ use accounting::worker::health::Health;
 const MEMORY_BEATS_PER_BEAT: u32 = 10;
 
 /// What a beat adds to the counters it read: the accounting queue's two
-/// counts (`crates/sprawling/spec/Accounting/Worker.lean` §8-98), the view fold's backlog (8-123), and
+/// counts (`Sprawling/app/spec/Accounting/Worker.lean` §8-98), the view fold's backlog (8-123), and
 /// how long the beat before this one took to read (8-129-6).
 pub(crate) struct Gauges<B> {
     health: Health,

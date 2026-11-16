@@ -6,7 +6,7 @@
 /-!
 # kernel::delegation
 
-规定 `kernel::delegation`（`crates/kernel/src/delegation.rs`）：委派一层深的两层守卫。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::delegation`（`Sprawling/kernel/src/delegation.rs`）：委派一层深的两层守卫。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 -/
 
 /-!

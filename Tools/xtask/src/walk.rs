@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Deterministic file walker: sorted output, fixed skip set, forward-slash
-//! relative paths (crates/xtask/Spec.lean §10-1).
+//! relative paths (Tools/xtask/Spec.lean §10-1).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -196,7 +196,7 @@ mod tests {
         assert!(in_isolation_zone("local/Handoff.md"));
         assert!(in_isolation_zone("local"));
         assert!(!in_isolation_zone("localx/notes.md"));
-        assert!(!in_isolation_zone("crates/kernel/src/lib.rs"));
+        assert!(!in_isolation_zone("Sprawling/kernel/src/lib.rs"));
     }
 
     #[test]

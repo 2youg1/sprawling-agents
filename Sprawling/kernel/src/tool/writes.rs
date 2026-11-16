@@ -4,14 +4,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a call that ran may have written to the city's tree, as its tool
-//! can tell (`crates/kernel/spec/Tool.lean` §8-23).
+//! can tell (`Sprawling/kernel/spec/Tool.lean` §8-23).
 
 use super::Effect;
 use crate::Address;
 
 /// What one call, or every call since the last checkpoint, may have written.
 ///
-/// A checkpoint stages what this names (`crates/runtime/Spec.lean` §8-45), so an
+/// A checkpoint stages what this names (`Sprawling/runtime/Spec.lean` §8-45), so an
 /// answer narrower than the truth leaves a write no commit carries. Only
 /// a tool that knows every file it wrote answers `Paths`.
 #[derive(Debug, Clone, PartialEq, Eq)]

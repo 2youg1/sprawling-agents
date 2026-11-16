@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The banner a city with no face of its own prints once it listens
-//! (`crates/sprawling/spec/Firstrun.lean` §8-8): a harness reads the URL
+//! (`Sprawling/app/spec/Firstrun.lean` §8-8): a harness reads the URL
 //! from it, so it stays plain lines on standard output.
 
 use sprawling::serving;
@@ -34,7 +34,7 @@ pub(super) fn print_banner(
         // account alone reads holds it for programs on this machine.
         // Never inside an address: an address goes into the browser's
         // history, its bookmarks and screenshots, and the page reads no
-        // key from it (`crates/sprawling/spec/Keying.lean` §8-22).
+        // key from it (`Sprawling/app/spec/Keying.lean` §8-22).
         serving::Keyed::Minted(code) => {
             println!("    key      {code}");
             println!();
@@ -60,7 +60,7 @@ pub(super) enum Reader {
 /// How a browser is paired with a city that has no face of its own. The
 /// pairing code is not printed: this output is usually a log, a code in
 /// it stays good until its first guess, and it is never printed again
-/// when a guess replaces it (`crates/sprawling/spec/Firstrun.lean` §8-8).
+/// when a guess replaces it (`Sprawling/app/spec/Firstrun.lean` §8-8).
 pub(super) fn print_pairing(reader: Reader) {
     match reader {
         Reader::LineConsole => {

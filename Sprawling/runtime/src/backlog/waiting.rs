@@ -10,7 +10,7 @@
 //! whether a command comes back as `Settled` or as `Backgrounded`, and
 //! those two answers carry different payloads; the ending decides what
 //! the `exec` result says happened. Neither may be spelled twice, so
-//! both live here (`crates/runtime/spec/Backlog.lean` §8-28-1).
+//! both live here (`Sprawling/runtime/spec/Backlog.lean` §8-28-1).
 
 use std::process::ExitStatus;
 use std::time::Duration;
@@ -23,7 +23,7 @@ use super::{BacklogId, Body, Claim, Member, Table};
 
 /// The rate a watched command's output is read at, 64 KiB a second:
 /// several times what a person reads on a page, and small enough that a
-/// flooding child costs each poll a bounded copy (`crates/runtime/spec/Backlog.lean` §8-28-3).
+/// flooding child costs each poll a bounded copy (`Sprawling/runtime/spec/Backlog.lean` §8-28-3).
 const READ_BYTES_PER_MS: u64 = 64;
 
 /// The short window a caller blocks for, counted in polls.

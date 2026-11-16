@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The processor and job calls of the leaf (`crates/desktop/ffi/Spec.lean`
+// The processor and job calls of the leaf (`Sprawling/desktop/ffi/Spec.lean`
 // D4): each export one whole call, answering a `Step` the way the
 // exports of `leaf.zig` do. Nothing here reads a record: the CPU set
 // records are copied out unread and walked in Rust.
@@ -26,7 +26,7 @@ extern "kernel32" fn GetQueuedCompletionStatus(port: HANDLE, bytes: *u32, key: *
 extern "kernel32" fn CloseHandle(handle: HANDLE) callconv(.winapi) BOOL;
 
 // The SDK's values for the processor and job calls, each written once,
-// here (`crates/desktop/ffi/Spec.lean` D4).
+// here (`Sprawling/desktop/ffi/Spec.lean` D4).
 const ERROR_INSUFFICIENT_BUFFER: u32 = 122;
 const PROCESS_POWER_THROTTLING: u32 = 4;
 const PROCESS_POWER_THROTTLING_CURRENT_VERSION: u32 = 1;
@@ -122,7 +122,7 @@ export fn sprawling_desktop_thread_group(group: *u16, mask: *u64, code: *u32) u3
 }
 
 /// This process's execution speed is never throttled: the control bit set
-/// and the state bit clear (`crates/sprawling/spec/Serving/Standing.lean` D40).
+/// and the state bit clear (`Sprawling/app/spec/Serving/Standing.lean` D40).
 export fn sprawling_desktop_full_speed(code: *u32) u32 {
     const state: PROCESS_POWER_THROTTLING_STATE = .{
         .Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION,

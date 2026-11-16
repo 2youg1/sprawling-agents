@@ -34,9 +34,9 @@ A gate that cannot judge is a type of its own, never a violation: `Io`, `Doc` an
 
 <!-- coderabbit-ai-generated-section:v1:bf1c34d5059c64287cac26c7e1a7fed6f1857cb013fb382992e092eaf69e08c8 -->
 
-- Source comparison gates read without rewriting their managed files. `docnum` and `wire-ts` write those files only with `--write`; `spec` creates a skeleton where none exists. This is not a rule for all commands: `package` writes `target/package/sprawling-<version>-<target-label>.zip`, and `shots` writes `target/shots/<route>-<fold>-<width>-<lighting>.png`, `target/shots/index.md` and browser logs under `target/shots/engine/`, without `--write`. The target label is `<os>-<arch>` for a host build or the explicit target triple. In bundle mode, `shots` also writes `crates/sprawling/web-dist/sprawling-shots.html`; browser profiles are temporary and removed after use. Every gate run rescans its inputs.
+- Source comparison gates read without rewriting their managed files. `docnum` and `wire-ts` write those files only with `--write`; `spec` creates a skeleton where none exists. This is not a rule for all commands: `package` writes `target/package/sprawling-<version>-<target-label>.zip`, and `shots` writes `target/shots/<route>-<fold>-<width>-<lighting>.png`, `target/shots/index.md` and browser logs under `target/shots/engine/`, without `--write`. The target label is `<os>-<arch>` for a host build or the explicit target triple. In bundle mode, `shots` also writes `Sprawling/app/web-dist/sprawling-shots.html`; browser profiles are temporary and removed after use. Every gate run rescans its inputs.
 - The scan surface is the tree, not its build output: `walk` skips `target`, `node_modules`, `.lake`, `.svelte-check`, `.zig-cache` and `web-dist`, and never enters a directory below the root that holds its own `.git` entry, because a second checkout is not this tree.
-- Three gates need artifacts rather than sources. `render` reads the client in `crates/sprawling/web-dist`, which `just build-web` produces, and a Chromium-family engine, which `SPRAWLING_BROWSER` may name. `npm` reads `client/node_modules` and refuses when it is absent. `budget` weighs what exists and stays silent when nothing has been built, because `just check` builds no release binary.
+- Three gates need artifacts rather than sources. `render` reads the client in `Sprawling/app/web-dist`, which `just build-web` produces, and a Chromium-family engine, which `SPRAWLING_BROWSER` may name. `npm` reads `client/node_modules` and refuses when it is absent. `budget` weighs what exists and stays silent when nothing has been built, because `just check` builds no release binary.
 - Lean is read as text, never run (`xtask D8`): the shapes a gate knows are a one-constructor-per-line `inductive`, a one-arm-per-line `def` and the `import` lines. `just models` is what builds a proof.
 - `modmap` judges every package except this one, whose modules the SPEC describes instead (`xtask D9`); a test module needs no row of its own (`xtask D40`).
 - It may name `kernel`, whose secret scanner the `secret` gate reuses, `browser`, which holds the verdicts the `render` gate reaches, and `wire` with its `schema` feature, from which `wire-ts` writes the client's types.
@@ -56,7 +56,7 @@ The SPEC is [`Spec.lean`](Spec.lean), with its parts under [`spec/`](spec/); sec
 
 ```bash
 cargo nextest run -p xtask       # every gate tested on fixtures its tests build
-lake build crates.xtask.Spec     # the SPEC's proofs; `just models` builds every specification
+lake build Tools.xtask.Spec     # the SPEC's proofs; `just models` builds every specification
 cargo xtask gates                # every gate, on this tree
 cargo xtask gates <name>...      # one or a few, in roster order
 just gates                       # every gate, then the supply-chain read

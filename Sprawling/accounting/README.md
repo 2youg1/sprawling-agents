@@ -4,7 +4,7 @@ The city's one writer, the views every page is answered from, and the four ports
 
 `worker::RunWorker` is the writer [`docs/glossary.md`](../../docs/glossary.md) calls the *accounting thread*: it alone holds the Ledger, the endpoint book, the plans, the pursuits, the governance fold and the desks, and it settles what each run left behind in the order the results arrive. The read side lives beside it: the fold every query is answered from (`views`), every run folded into one line with its parent pointers (`lineage`), and a stretch of history exported as a playback bundle (`playback`).
 
-What it deliberately does not do: choose the model a run talks to, renew a credential, or decide how an adapter is built. A port receives an already chosen model and an already redeemed credential, and `gateway::adapter_for` builds the adapter. Reaching this machine, a network or a terminal stays in `crates/sprawling` behind a port or a `fn` pointer (`accounting D9`).
+What it deliberately does not do: choose the model a run talks to, renew a credential, or decide how an adapter is built. A port receives an already chosen model and an already redeemed credential, and `gateway::adapter_for` builds the adapter. Reaching this machine, a network or a terminal stays in `Sprawling/app` behind a port or a `fn` pointer (`accounting D9`).
 
 ## How it is shaped
 
@@ -32,11 +32,11 @@ Each module instantiates one of the seven shapes in [`docs/ARCHITECTURE.md`](../
 
 Four of these are the seam declarations [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 4 lists: `models`, `clock`, `connectors` and `machine` are declared here and implemented outside. The table's fifth row for this crate is `views::snapshot::start`'s `SnapshotFold`, which a fold implements so that a snapshot can be resumed: `views::Views` is one implementation and the worker's standing fold the other.
 
-The production adapters are wired in `crates/sprawling`. `Hands.clock` carries the wall clock from `crates/sprawling/src/assembly/production.rs`, `Hands.machine` the doctor's machine from `crates/sprawling/src/doctor/probe.rs`, and the endpoint book's model factory and the buildings' MCP links are installed by the worker's own constructor (`accounting D18`).
+The production adapters are wired in `Sprawling/app`. `Hands.clock` carries the wall clock from `Sprawling/app/src/assembly/production.rs`, `Hands.machine` the doctor's machine from `Sprawling/app/src/doctor/probe.rs`, and the endpoint book's model factory and the buildings' MCP links are installed by the worker's own constructor (`accounting D18`).
 
 ## When a call fails
 
-Every refusal is a `kernel::AxError`: the action that failed, the subject, and a recovery sentence a caller can act on. This crate defines no error type and adds no code to `AxCode` (`crates/accounting/Spec.lean` §12).
+Every refusal is a `kernel::AxError`: the action that failed, the subject, and a recovery sentence a caller can act on. This crate defines no error type and adds no code to `AxCode` (`Sprawling/accounting/Spec.lean` §12).
 
 - A port's refusal passes through unchanged, so what a caller reads is `gateway`'s, `agent_protocols`' or the doctor's own three parts.
 - A name the requirement table does not carry is refused rather than looked for, and a printed or manual recipe is refused with `E_TOOL_UNAVAILABLE` before anything starts.
@@ -49,16 +49,16 @@ Every refusal is a `kernel::AxError`: the action that failed, the subject, and a
 ## Constraints
 
 - No features: the crate compiles the same code for every consumer.
-- Time is a parameter. Every moment the writer reads comes through `Hands.clock`, including the one a `log_truncated` line and a `form` genesis line are stamped with (`crates/accounting/spec/Clock.lean` §8-3).
-- The writer is handed this machine as one `Hands` value (`accounting D20`), made in one place, `crates/sprawling/src/assembly/production.rs`. The worker's own tests build theirs from a fixture confined to test builds, in `worker::fixture`.
+- Time is a parameter. Every moment the writer reads comes through `Hands.clock`, including the one a `log_truncated` line and a `form` genesis line are stamped with (`Sprawling/accounting/spec/Clock.lean` §8-3).
+- The writer is handed this machine as one `Hands` value (`accounting D20`), made in one place, `Sprawling/app/src/assembly/production.rs`. The worker's own tests build theirs from a fixture confined to test builds, in `worker::fixture`.
 - It starts two kinds of thread, both of them named in [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 10 rule 3: one lane per run in flight in `worker::pool`, and one thread per provider request handed off in `worker::errand`. The accounting thread and the view fold are started by the assembly root.
 - `unsafe_code` is forbidden by the workspace lint table, and no Zig leaf sits below this crate.
 - Of this workspace it may name only what the `depmap` block allows: `agent_protocols`, `city`, `collab`, `documents`, `gateway`, `kernel`, `runtime`, `storage`, `wire`.
-- The interface sections of the modules that moved here from the assembly root still live in `crates/sprawling/Spec.lean`; `accounting D15` records how and when they move (`crates/accounting/Spec.lean` §3).
+- The interface sections of the modules that moved here from the assembly root still live in `Sprawling/app/Spec.lean`; `accounting D15` records how and when they move (`Sprawling/accounting/Spec.lean` §3).
 
 ## Who uses it
 
-Two workspace packages depend on it, as `cargo tree --workspace -i sprawling-accounting -e normal --depth 1` prints: `sprawling`, the assembly root, and `citysim`, the scenario runner in `crates/citysim`. What it may name is its line in the `depmap` block of [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 3.
+Two workspace packages depend on it, as `cargo tree --workspace -i sprawling-accounting -e normal --depth 1` prints: `sprawling`, the assembly root, and `citysim`, the scenario runner in `Tools/citysim`. What it may name is its line in the `depmap` block of [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 3.
 
 ## The specification
 
@@ -76,8 +76,8 @@ Effects are proved in [`spec/Effect.lean`](spec/Effect.lean), the plan projectio
 ```bash
 cargo nextest run -p sprawling-accounting              # the module tests beside the code
 cargo nextest run -p sprawling -E 'binary(acceptance)' # the three acceptance assertions
-lake build crates.accounting.Spec                      # this crate's Lean specification
+lake build Sprawling.accounting.Spec                      # this crate's Lean specification
 cargo xtask gates spec lexicon specalign               # the SPEC, its vocabulary and its anchors
 ```
 
-The four ports' second implementations are the scripted factory, connectors, clock and machine in `crates/sprawling/tests/model_factory.rs`, `connectors.rs`, `clock.rs` and `machine.rs`; `cargo nextest run -p sprawling` runs them, and [`Spec.lean`](Spec.lean) §2 says what each one pins.
+The four ports' second implementations are the scripted factory, connectors, clock and machine in `Sprawling/app/tests/model_factory.rs`, `connectors.rs`, `clock.rs` and `machine.rs`; `cargo nextest run -p sprawling` runs them, and [`Spec.lean`](Spec.lean) §2 says what each one pins.

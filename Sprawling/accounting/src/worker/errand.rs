@@ -5,7 +5,7 @@
 
 //! The provider requests the accounting thread hands off: each one on a
 //! thread of its own, its answer brought back on the one queue and
-//! recorded there (`crates/sprawling/Spec.lean` §8-42-9).
+//! recorded there (`Sprawling/app/Spec.lean` §8-42-9).
 //!
 //! **The accounting thread never waits on a provider.** It is the
 //! city's one writer, so every relay request, landing and command waits
@@ -15,7 +15,7 @@
 //!
 //! One thread per request rather than the driving pool or one resident
 //! thread, so a renewal of one door never waits for another door or for
-//! a probe (`crates/sprawling/Spec.lean` D78).
+//! a probe (`Sprawling/app/Spec.lean` D78).
 
 use std::sync::mpsc;
 

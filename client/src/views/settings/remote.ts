@@ -69,7 +69,7 @@ export const VERBS: readonly (readonly [string, Key])[] = [
 // What a pairing looks like from start to end, one numbered step each:
 // what the User does at the city's console, what the other device
 // opens, and what it shows. Pairing stays at the console
-// (`crates/remote_access/Spec.lean` D4: an invitation shown on a page is
+// (`Sprawling/remote_access/Spec.lean` D4: an invitation shown on a page is
 // read by whatever drives the page), so a step that happens at the
 // console carries its spelling and a copy key, never a button.
 export interface Step {

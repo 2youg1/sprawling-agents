@@ -6,7 +6,7 @@
 /-!
 # 一个回合要几道落盘屏障：只读工具不在执行前等落盘
 
-规定 `crates/runtime/src/turn/wave.rs` 与 `crates/runtime/src/turn/ledger.rs` 把一个回合的记录交给 `kernel::Ledger` 的时机，以及 `crates/accounting/src/worker/relay.rs` 为这些记录付的屏障（`crates/runtime/Spec.lean` §8-3，`crates/sprawling/Spec.lean` §8-42-2）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/runtime/src/turn/wave.rs` 与 `Sprawling/runtime/src/turn/ledger.rs` 把一个回合的记录交给 `kernel::Ledger` 的时机，以及 `Sprawling/accounting/src/worker/relay.rs` 为这些记录付的屏障（`Sprawling/runtime/Spec.lean` §8-3，`Sprawling/app/Spec.lean` §8-42-2）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 一次屏障的价钱与它带几条记录几乎无关（`kernel::Ledger::append_all` 的文档：一条一屏障约 585 µs，五十条一屏障每条约 13 µs）。所以要省的是屏障的次数，而不是记录的条数。
 
@@ -519,9 +519,9 @@ D36：攒下的记录（`turn::ledger::HeldLines`）归 `Run<Active>`、活整�
 * **run 结束时每条记录都有 ref**（`tf1_run_refs_complete`）；
 * **任一崩溃点，盘上的历史是收尾付屏障的形状（`closedTurn`）在某个崩溃点也会留下的历史**（`held_cut_is_closed_cut`）。`resume` 与重放只读盘上的记录，所以它们在新形状的任一崩溃点得出的结论，就是 `closedTurn` 在那个对应崩溃点得出的结论；缺的只是收尾屏障之前那段记录，而那是 `closedTurn` 在收尾屏障之前掉电也会缺的。
 
-落选：每回合收尾付一道（`closedTurn`）——安全，但只读回合要付 2 道而不是 1 道，而它不换来任何可恢复性，因为下一道屏障在任何对外效果之前；把 ref 在追加时就交出（`eagerStep`）——`EventRef` 会指向可能不存在的历史，违反 `kernel::ledger` 的「`Ok(ref)` 即已落盘」，见 `eager_ref_is_not_durable`。重新打开的参数：一个回合的 ref 必须在回合内被对外读到（例如 `TurnReport` 的 ref 在下一道屏障之前就被发上 wire），或者一次屏障的价钱与它带的记录数变得成正比。三个平台相同：本模型只决定屏障的次数与位置，屏障本身是 `File::sync_data`（Windows 上 `FlushFileBuffers`，Linux 上 `fdatasync`，macOS 上走哪一个由 `crates/storage/spec/Jsonl/Barrier.lean` 与 storage §8-1 决定），计数上界 `1 + 写调用数` 在三个平台上都成立，崩溃点的等价也一样，因为它只依赖屏障的位置。
+落选：每回合收尾付一道（`closedTurn`）——安全，但只读回合要付 2 道而不是 1 道，而它不换来任何可恢复性，因为下一道屏障在任何对外效果之前；把 ref 在追加时就交出（`eagerStep`）——`EventRef` 会指向可能不存在的历史，违反 `kernel::ledger` 的「`Ok(ref)` 即已落盘」，见 `eager_ref_is_not_durable`。重新打开的参数：一个回合的 ref 必须在回合内被对外读到（例如 `TurnReport` 的 ref 在下一道屏障之前就被发上 wire），或者一次屏障的价钱与它带的记录数变得成正比。三个平台相同：本模型只决定屏障的次数与位置，屏障本身是 `File::sync_data`（Windows 上 `FlushFileBuffers`，Linux 上 `fdatasync`，macOS 上走哪一个由 `Sprawling/storage/spec/Jsonl/Barrier.lean` 与 storage §8-1 决定），计数上界 `1 + 写调用数` 在三个平台上都成立，崩溃点的等价也一样，因为它只依赖屏障的位置。
 
-**storage 一侧**：跨回合攒下的记录在两回合之间只在进程内存里，这不改变 storage 的任何契约（`append_all` 仍是一批一屏障、成功即落盘）。两次 `append_all` 之间隔着一次模型调用、段轮换落在其间，都不需要 storage 多守什么：`crates/storage/spec/Jsonl/Barrier.lean` 的 `answered_survives_a_pause`。 -/
+**storage 一侧**：跨回合攒下的记录在两回合之间只在进程内存里，这不改变 storage 的任何契约（`append_all` 仍是一批一屏障、成功即落盘）。两次 `append_all` 之间隔着一次模型调用、段轮换落在其间，都不需要 storage 多守什么：`Sprawling/storage/spec/Jsonl/Barrier.lean` 的 `answered_survives_a_pause`。 -/
 
 /-- 一道屏障之后的状态。 -/
 def flush (s : State) : State := s.step .barrier

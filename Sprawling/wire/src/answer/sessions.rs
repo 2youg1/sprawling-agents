@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The stretches of one room, newest first: where each began, how, its
-//! runs and its last line (`crates/wire/spec/Answer/Sessions.lean` §8-71).
+//! runs and its last line (`Sprawling/wire/spec/Answer/Sessions.lean` §8-71).
 
 use kernel::{Address, Effort, Origin, Seq, TimeMs};
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ pub const SESSIONS_MAX: usize = 64;
 
 /// How many characters of a stretch's last reply [`SessionLine::preview`]
 /// carries. A bound on the answer, not on what a page shows: the page cuts
-/// again to the width it has (`crates/wire/spec/Answer/Sessions.lean` D27).
+/// again to the width it has (`Sprawling/wire/spec/Answer/Sessions.lean` D27).
 pub const SESSION_PREVIEW_MAX: usize = 240;
 
 /// One room's stretches, newest first, and how many older ones the answer
@@ -53,7 +53,7 @@ pub struct SessionLine {
     /// The runs started in this stretch.
     pub runs: u64,
     /// The last line of this stretch filed under the room's address, and
-    /// its time: the room's slice ends there (`crates/storage/Spec.lean` §8-24).
+    /// its time: the room's slice ends there (`Sprawling/storage/Spec.lean` §8-24).
     pub last: Seq,
     pub at: TimeMs,
     /// The name the last `session_named` for this stretch gave it; `None`

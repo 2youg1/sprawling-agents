@@ -5,7 +5,7 @@
 
 //! Hybrid signing keys: ML-DSA-44 and Ed25519, both derived from one
 //! 32-byte seed, and a signature that holds only when both halves hold
-//! (crates/remote_access/Spec.lean §8-3).
+//! (Sprawling/remote_access/Spec.lean §8-3).
 //!
 //! The city's own key and every device's key have this shape. A device
 //! generates its key where it lives and sends the public half at pairing;
@@ -60,7 +60,7 @@ impl SigningKey {
     }
 
     /// Derives the city's key from the seed the vault keeps, in the form
-    /// [`written`] gives it (crates/remote_access/Spec.lean D23).
+    /// [`written`] gives it (Sprawling/remote_access/Spec.lean D23).
     ///
     /// # Errors
     /// `E_CONFIG_INVALID` for text [`written`] cannot produce: a wrong
@@ -204,7 +204,7 @@ impl Signature {
 
 /// The two sub-seeds a seed derives, Ed25519's first and ML-DSA-44's
 /// second. A browser derives the same two from the seed in
-/// `crates/fixtures/remote-handshake/keys.txt` (crates/remote_access/Spec.lean
+/// `Tools/fixtures/remote-handshake/keys.txt` (Sprawling/remote_access/Spec.lean
 /// §8-12), which is why the pair is readable inside the crate.
 pub(crate) fn halves(
     seed: &[u8; SEED_BYTES],

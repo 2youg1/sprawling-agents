@@ -6,7 +6,7 @@
 /-!
 # runtime::tools::edit 的准入
 
-规定 `tools::edit`、`tools::stamp`、`tools::path_lock`（`crates/runtime/src/` 下同名的文件）。一次 edit 什么时候可以落盘：每个 run 记下它读到的每个文件的戳，edit 只在「这个 run 最后一次看到的就是文件现在的样子」时落盘；对不存在的路径 `old_string: ""` 新建。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面的节保留它在 runtime 规格里的标签 §8-64，别处引作 `crates/runtime/Spec.lean §8-64`。
+规定 `tools::edit`、`tools::stamp`、`tools::path_lock`（`Sprawling/runtime/src/` 下同名的文件）。一次 edit 什么时候可以落盘：每个 run 记下它读到的每个文件的戳，edit 只在「这个 run 最后一次看到的就是文件现在的样子」时落盘；对不存在的路径 `old_string: ""` 新建。本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面的节保留它在 runtime 规格里的标签 §8-64，别处引作 `Sprawling/runtime/Spec.lean §8-64`。
 
 这一分部是形式规格：§8-64-2 的模型对它容许的每一条迹成立，Rust 的派生检查是 `runtime::tools::stamp::tests` 里的 proptest，它在随机的多 run 迹上驱动 `ReadStamps` 与 `admission`，断言与本模型相同的结论。
 -/
@@ -15,7 +15,7 @@
 ### 8-64 runtime::tools::edit 的准入（形状 1 判定＋形状 4 适配器）
 
 ```rust
-// crates/runtime/src/tools/stamp.rs
+// Sprawling/runtime/src/tools/stamp.rs
 pub struct Stamp { /* len、modified、identity —— 私有 */ }
 pub struct FileFacts { /* stamp、is_file —— 私有；长度从 stamp 读 */ }
 impl Stamp {
@@ -29,12 +29,12 @@ pub(crate) enum Intent { Replace, Create }                                      
 pub(crate) enum Admission { Lands, Unread, Moved, Absent, Present }
 pub(crate) fn admission(seen: Option<&Stamp>, current: Option<&Stamp>, intent: Intent) -> Admission;
 
-// crates/runtime/src/tools/path_lock.rs
+// Sprawling/runtime/src/tools/path_lock.rs
 #[derive(Clone, Default)]
 pub struct PathLocks { /* 城级：进程里所有 run 共用一张 —— 私有 */ }
 impl PathLocks { pub(crate) fn hold(&self, path: &Path) -> PathGuard; }        // 等到没人持有再持有；PathGuard 落下即放
 
-// crates/runtime/src/tools/edit.rs
+// Sprawling/runtime/src/tools/edit.rs
 pub struct EditDesk { pub policy: PolicyReader, pub seen: ReadStamps, pub locks: PathLocks }
 impl EditTool {
     pub fn new(city_root: &Path, domain: Address, writable: WriteDomain, desk: EditDesk)
@@ -45,10 +45,10 @@ impl EditTool {
 
 - **匹配**：`old_string` 先原样匹配（零命中时再剥抄进来的行号标记，D108）。`replace_all` 缺省为假，这时恰好一处命中才落盘，零处与多处都拒，拒词带计数，多处时恢复语说出两条路：加长 `old_string` 直到只命中一处，或设 `replace_all: true`；为真时每一处都换，一处也没有照样拒。新建时给 `replace_all: true` 拒：没有可换的东西。参数名与合法值取 Claude Code 的 `Edit`（D114）。
 
-- **戳是（长度、修改时间、文件身份）**，不是内容哈希：read 不再为一份可能永远不改的文件算 BLAKE3。身份在 Unix 是 `(dev, ino)`，在 Windows 是（卷序列号、文件索引）。edit 自己的写经暂存文件改名（`crates/storage/Spec.lean` §8-32），每次写都换一个身份，所以同一 run 的连续 edit 靠写后记下的新戳，而粗粒度时钟下同长度、同修改时间的外来改写只会漏过身份不变的原地改写——那一条由锁内的唯一匹配兜住，严格拒绝只是提示，替换是否正确由唯一匹配决定。
+- **戳是（长度、修改时间、文件身份）**，不是内容哈希：read 不再为一份可能永远不改的文件算 BLAKE3。身份在 Unix 是 `(dev, ino)`，在 Windows 是（卷序列号、文件索引）。edit 自己的写经暂存文件改名（`Sprawling/storage/Spec.lean` §8-32），每次写都换一个身份，所以同一 run 的连续 edit 靠写后记下的新戳，而粗粒度时钟下同长度、同修改时间的外来改写只会漏过身份不变的原地改写——那一条由锁内的唯一匹配兜住，严格拒绝只是提示，替换是否正确由唯一匹配决定。
 - **什么算看过**：read 一个文件，答复是整份（没被截断），或者调用显式给了 `offset`／`limit`（窗口读）；读前读后各取一次戳，两次不等就不记。被截断的整读不算，因为模型以为自己看到了整份。catalog、`cas:` 定位符、包内文档不记戳：edit 改不到它们。edit 落盘后记下新戳；被「读后被改」拒绝时，拒绝里带着 `old_string` 附近的当前片段，这个片段算一次窗口读，记下当前戳，所以模型照片段改好 `old_string` 直接重试，不必整份重读。正因为拒绝算一次观察，它总要给出一段：`old_string` 的首行已不在文件里时，片段取文件开头，免得这个 run 凭一次什么也没看到的「观察」被准入。
 - **读戳只在内存里，每个 run 一张，不进账本。** 能从账本起出来的 run——重启后续接会话（新 run 经 `origin` 继承母 run 的对话）、fork、`succeed` 的继任、`delegate` 的子 run——起点都没有读戳，第一次 edit 前要读，所以没有要从账本重建的读戳；运行时也没有同一个 run 跨进程续跑。
-- **按路径的锁**：键是这个 run 写入的树里的位置（`write_root` 加地址），所以两个工作树里的同一地址是两把锁；键按大小写折叠后比较，因为 Windows 与 macOS 的卷上 `Notes.md` 与 `notes.md` 是同一个文件，不折叠就是同一文件上的两把锁，在区分大小写的卷上折叠只让只差大小写的两个文件互相等待。锁内依次是取戳、读字节、判准入、唯一匹配、写、取新戳；在模型里这就是一步 `edit`。它只串行化 edit 与 edit：exec 与人的编辑器不拿这把锁，对它们只剩判定与改名之间的窗口。链接检查（`crates/storage/Spec.lean` §8-25）在取锁之前做一次，好让经链接的 edit 答「经链接」而不是「没读过」；改名之前再做一次，因为等锁与读字节之间可能有人放了链接。
+- **按路径的锁**：键是这个 run 写入的树里的位置（`write_root` 加地址），所以两个工作树里的同一地址是两把锁；键按大小写折叠后比较，因为 Windows 与 macOS 的卷上 `Notes.md` 与 `notes.md` 是同一个文件，不折叠就是同一文件上的两把锁，在区分大小写的卷上折叠只让只差大小写的两个文件互相等待。锁内依次是取戳、读字节、判准入、唯一匹配、写、取新戳；在模型里这就是一步 `edit`。它只串行化 edit 与 edit：exec 与人的编辑器不拿这把锁，对它们只剩判定与改名之间的窗口。链接检查（`Sprawling/storage/Spec.lean` §8-25）在取锁之前做一次，好让经链接的 edit 答「经链接」而不是「没读过」；改名之前再做一次，因为等锁与读字节之间可能有人放了链接。
 - **错误**：读后被改答 `E_VERSION_CONFLICT`，why 里是片段；没读过答 `E_INVALID_ARGS`，恢复语「先 read，窗口读即可」；路径已存在却 `old_string: ""` 答 `E_VERSION_CONFLICT`；路径不存在而 `old_string` 非空答 `E_INVALID_ARGS`，恢复语指向 `old_string: ""`。
 -/
 

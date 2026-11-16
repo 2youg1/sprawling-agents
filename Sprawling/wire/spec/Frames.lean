@@ -6,7 +6,7 @@
 /-!
 # wire::frames
 
-规定 `frames`、`frames::query`、`frames::tests`、`answer::building`（`crates/wire/src/` 下同名的文件）。线上的信封：五种帧、`WIRE_V` 与 schema 哈希，线的另一端由这一端生成，以及只在线上活着的三类帧（增量、日志、命令输出）。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `frames`、`frames::query`、`frames::tests`、`answer::building`（`Sprawling/wire/src/` 下同名的文件）。线上的信封：五种帧、`WIRE_V` 与 schema 哈希，线的另一端由这一端生成，以及只在线上活着的三类帧（增量、日志、命令输出）。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 -/
 
 /-!
@@ -81,7 +81,7 @@ impl From<WireCommand> for Command                     // 总函数；PutSecret 
 
 4. **`Auth`／`Hello` 的令牌是明文 `String`，而 `PutSecret` 的值是 `Sealed`**。不对称是故意的：配对令牌**必须跨线**才能完成配对，在传输中密封它只是自欺；它在**落地一刻**被封（`decide_handshake` 只接受 `&Sealed<String>` 作为已配置值）。凭证则相反：它本就不应跨线。
 
-5. **wire 携 git 的 oid 时携 `kernel::GitOid` 本体**（`Query::Commit`／`Query::Hunks` 的 oid，与紧邻的 `B3Hash` 同形：40 位小写 hex，长度不对即拒），故 `GitOid` 带 serde。**被否**：在 wire 里自建 `CheckpointRef(String)` 并自校 40 hex——那是 git oid 形状的第二个权威。该变更属 kernel 公开面，已与 `crates/kernel/Spec.lean` §8-2 同集提交。
+5. **wire 携 git 的 oid 时携 `kernel::GitOid` 本体**（`Query::Commit`／`Query::Hunks` 的 oid，与紧邻的 `B3Hash` 同形：40 位小写 hex，长度不对即拒），故 `GitOid` 带 serde。**被否**：在 wire 里自建 `CheckpointRef(String)` 并自校 40 hex——那是 git oid 形状的第二个权威。该变更属 kernel 公开面，已与 `Sprawling/kernel/Spec.lean` §8-2 同集提交。
 -/
 
 /-!
@@ -106,13 +106,13 @@ pub struct Delta { pub run: RunId, pub increment: kernel::Increment }
 
 **一条增量说清自己来自哪一路**（`kernel::Increment`，WIRE_V 28→29）。推理与散文是两路而不是一路：一个把八成以上输出花在推理上的模型几乎不往散文那一路发东西，而把两路并进一个缓冲区的页面，要么把模型的草稿当答案给人看，要么让人对着空线程等三分钟。**败给的方案**：帧上加一个布尔——那要求每一个读者自己记住 true 是哪一路。
 
-**服务端半边在 `gateway`：** `kernel::Model` 多一个 `call_streaming(req, onto)`，默认实现就是 `call` 并且不报告任何增量——一个没有流的适配器因此是诚实的而不是坏的。`gateway::endpoint` 覆盖它：请求带 `stream: true`，逐行读 SSE，`dialect::increment_of` 认两路——助手散文与推理各自的那个字段，工具参数一律不报（半个工具参数不是短一点的工具参数），帧保留与 EOF 后结算遵循 `crates/gateway/spec/Endpoint/Stream.lean` §8-13 的 `StreamFrames` 契约，结算结果交给同一个 `response_from_wire`。**结算答案因此只有一个解析器**：流式调用与阻塞调用不可能对同一个回复得出两个结论。流被切断仍然表现为读取错误，永不表现为一个变短的回答。
+**服务端半边在 `gateway`：** `kernel::Model` 多一个 `call_streaming(req, onto)`，默认实现就是 `call` 并且不报告任何增量——一个没有流的适配器因此是诚实的而不是坏的。`gateway::endpoint` 覆盖它：请求带 `stream: true`，逐行读 SSE，`dialect::increment_of` 认两路——助手散文与推理各自的那个字段，工具参数一律不报（半个工具参数不是短一点的工具参数），帧保留与 EOF 后结算遵循 `Sprawling/gateway/spec/Endpoint/Stream.lean` §8-13 的 `StreamFrames` 契约，结算结果交给同一个 `response_from_wire`。**结算答案因此只有一个解析器**：流式调用与阻塞调用不可能对同一个回复得出两个结论。流被切断仍然表现为读取错误，永不表现为一个变短的回答。
 -/
 
 /-!
 ### 8-16 线的另一端由这一端生成（`wire_schema`，feature `schema`）
 
-**需求**：`client/`（TypeScript）要与 `crates/wire` 说同一门语言，而 §8 从头到尾只承认一个权威——Rust 的类型声明。手写一份 TS 类型就是第二个权威，它会在握手通过之后才被发现漂了。故 TS 面由这一端**生成**：`cargo xtask wire-ts` 读本 crate 的 JSON Schema，写出 `client/src/wire.ts`（每个类型一条 TS `type` 加一条 Effect `Schema` 值，外加 `WIRE_V` 与 `WIRE_HASH`）；不带 `--write` 时只比对盘上文件，第一处不同的行即门红。
+**需求**：`client/`（TypeScript）要与 `Sprawling/wire` 说同一门语言，而 §8 从头到尾只承认一个权威——Rust 的类型声明。手写一份 TS 类型就是第二个权威，它会在握手通过之后才被发现漂了。故 TS 面由这一端**生成**：`cargo xtask wire-ts` 读本 crate 的 JSON Schema，写出 `client/src/wire.ts`（每个类型一条 TS `type` 加一条 Effect `Schema` 值，外加 `WIRE_V` 与 `WIRE_HASH`）；不带 `--write` 时只比对盘上文件，第一处不同的行即门红。
 
 **接口**（feature `schema`，缺省关；`web` 以 `default-features = false` 依赖本 crate，产品二进制不开它）：
 
@@ -123,13 +123,13 @@ pub fn wire_schema() -> serde_json::Value;   // 一份文档：`$defs` 里是信
 ```
 
 - **哈希的素材是整个线上名字面**：`schema_hash()` 吃 `WIRE_V`、命令名表、查询名表，以及 `kernel::EventKind::ALL` 按表序的每个种类名——事件种类随每个事件帧到达页面，改名、增删一个种类与改名一个帧一样会让旧页面误读，所以它移动握手哈希，不靠有人记得去升 `WIRE_V`。生成的 `WIRE_HASH` 常量就是这个函数的输出，客户端在握手处送回它，服务端按原样校验——两端校验的是同一个值，而不是一个「schema 文档的摘要」；后者会把每一条 doc 注释的改动都变成一次拒配。
-- **每个入帧的类型都派生 `schemars::JsonSchema`**（`#[cfg_attr(feature = "schema", derive(...))]`），派生宏读的是 serde 已经在读的属性，故形状与编码同源。kernel 侧的值经 kernel 自己的 `schema` feature 派生（`crates/kernel/Spec.lean` §8-45）；`NoSecret` 手写 `impl JsonSchema` 为 `false`（任何值都不满足），于是 `PutSecret` 臂在 TS 里是 `value: never`——线上拼不出它，这一句在两端各说一次、意思相同。`Command<Secret>` 以 `schemars(rename = "Command")` 命名，因为线上只有 `Command<NoSecret>` 一种实例。
+- **每个入帧的类型都派生 `schemars::JsonSchema`**（`#[cfg_attr(feature = "schema", derive(...))]`），派生宏读的是 serde 已经在读的属性，故形状与编码同源。kernel 侧的值经 kernel 自己的 `schema` feature 派生（`Sprawling/kernel/Spec.lean` §8-45）；`NoSecret` 手写 `impl JsonSchema` 为 `false`（任何值都不满足），于是 `PutSecret` 臂在 TS 里是 `value: never`——线上拼不出它，这一句在两端各说一次、意思相同。`Command<Secret>` 以 `schemars(rename = "Command")` 命名，因为线上只有 `Command<NoSecret>` 一种实例。
 - **生成器只认 serde 会产出的那个子集**：对象（`properties`／`required`／`additionalProperties`）、`string`／`integer`／`number`／`boolean`／`null`、`array`（`items`）与元组（`prefixItems`）、`enum` 字符串表、`const`、`oneOf`／`anyOf`、`$ref` 指向 `#/$defs/…`、`type: [T, "null"]`、`true`／`false` 两种布尔 schema。其余一律拒绝并点名关键字与所在类型——一个会猜的生成器就是一个会静默产出错类型的生成器。具名的裸 `string`／`integer` 即 newtype，TS 侧打上 `Schema.brand(名)`。
 - **文件确定**：`$defs` 按名排序后按依赖拓扑输出（Effect 的 `Schema` 值必须先定义后引用；环即拒绝），对象键排序，LF 行尾，生成头注明来源。
 
 **被否**：（a）在 wire 用 schemars 的 remote derive 镜像 kernel 的四十个类型——每个镜像是同一形状的第二个权威，而 §8-1 第 5 条早已为 `GitOid` 拒过同一形状的提案；（b）把 schema 文档的摘要作为握手哈希——doc 注释入哈希，改一句注释即旧页面全拒；（c）手写 `wire.ts`——正是本节要关掉的那扇门。
 
-**`answer.rs` 随之切出 `answer/building.rs`**：二十六条 `cfg_attr` 派生行把 381 行推到 407 行，越过 400 行预算，故一栋楼说自己的七个读形状（`BuildingProgress`／`BlockedLine`／`PlanRow`／`PursuitLine`／`BuildingDoc`／`ArchiveLine`／`BuildingAnswer`）迁入 `crates/wire/src/answer/building.rs`，`answer.rs` 以 `pub use` 引回，公开拼写不变；文字逐字节照搬，无字段开放。定义模块从 `wire::answer` 变为 `wire::answer::building`，那是住处，不是接口变更。
+**`answer.rs` 随之切出 `answer/building.rs`**：二十六条 `cfg_attr` 派生行把 381 行推到 407 行，越过 400 行预算，故一栋楼说自己的七个读形状（`BuildingProgress`／`BlockedLine`／`PlanRow`／`PursuitLine`／`BuildingDoc`／`ArchiveLine`／`BuildingAnswer`）迁入 `Sprawling/wire/src/answer/building.rs`，`answer.rs` 以 `pub use` 引回，公开拼写不变；文字逐字节照搬，无字段开放。定义模块从 `wire::answer` 变为 `wire::answer::building`，那是住处，不是接口变更。
 
 **本节的公开面变更**：wire 多出 `wire_schema`（仅 feature `schema`，缺省 feature 下不存在）；kernel 在 `--all-features` 下多出四十余条 `JsonSchema` 实现（缺省 feature 下不存在）。
 -/
@@ -174,7 +174,7 @@ pub struct LiveOutput { pub run: RunId, pub stream: OutputStream, pub text: Stri
 - **与 `Delta` 同一条规则**：可丢弃，不带账本序号，不进账本；调用的结果以 `tool_returned` 落账时页面扔掉它画的这段，两者不一致时账本赢。
 - **第四条广播通道 `ServeConfig::outputs`**：一条刷屏的命令不该把模型的增量或日志行挤出慢读者的窗口；`RecvError::Lagged` 一言不发地略过，理由与增量相同——漏掉的字节在调用落账时整段到达。
 - **`text` 是 UTF-8 有损解码**，因为一块在字节上界处切开，可能切在一个多字节字符中间；切口处画成替换字符只影响预览，结果以账本为准。**被否**：线上带字节数组——JSON 里一个字节要三四个字符，而页面最终画的是文本。
-- **`ServeConfig::outputs_so_far: Arc<dyn Fn() -> Vec<LiveOutput> + Send + Sync>`**：一个会话在送出 `Welcome` 之后、接实时帧之前调它一次，把还在跑的命令已经写出的字节按原来的次序作为 `Output` 帧送出，所以在命令跑到一半时打开页面的人先看到已经写出的部分。会话先订阅第四条通道再调它，所以一块可能送两遍而不会漏；预览里重复一块无害，漏一块则要等调用落账才补上。缓冲住在装配层（`crates/sprawling/Spec.lean` §8-90），因为清空它要看账本里的 `tool_result`，而本 crate 不折叠账本。
+- **`ServeConfig::outputs_so_far: Arc<dyn Fn() -> Vec<LiveOutput> + Send + Sync>`**：一个会话在送出 `Welcome` 之后、接实时帧之前调它一次，把还在跑的命令已经写出的字节按原来的次序作为 `Output` 帧送出，所以在命令跑到一半时打开页面的人先看到已经写出的部分。会话先订阅第四条通道再调它，所以一块可能送两遍而不会漏；预览里重复一块无害，漏一块则要等调用落账才补上。缓冲住在装配层（`Sprawling/app/Spec.lean` §8-90），因为清空它要看账本里的 `tool_result`，而本 crate 不折叠账本。
 - **`OutputStream` 是 `runtime::Stream` 的第二处拼写而不是第二处权威**：本 crate 的依赖图够不到 `runtime`，映射住在装配层（`sprawling::assembly` 的 `serve`），与 `LogLevel`（§8-32）同一个安排。
 -/
 
@@ -294,7 +294,7 @@ end Wire.Frames
 
 /-! D22 V0.0.9 的线上改形一次进位，由一个变更集落地
 
-**决定**：V0.0.9 的全部线上改形——`Call`／`Used` 的微秒耗时（D28）、`SessionLine` 的五件与 `NameSession`、`ChangeRunPolicy` 两帧（D27）、`ReleaseAnswer` 的注册表与更新命令（D24）、`DoctorAnswer.scanning`（D25）、沙箱臂名（D26）、skill 与 MCP 的三个查询（D28）、`theme` 偏好（D29）——在同一个变更集里落地，`WIRE_V` 按 D1 只进一位；同一个变更集重生 schema golden、`client/src/wire.ts`（`cargo xtask wire-ts`）、docnum，并改 `crates/adversary/` 的 Door 与 Regression。之后的车道不再改线；确有一处必须改时，由整合者在合并时重生上面这几样，`WIRE_V` 在两次推送之间仍至多进一位。
+**决定**：V0.0.9 的全部线上改形——`Call`／`Used` 的微秒耗时（D28）、`SessionLine` 的五件与 `NameSession`、`ChangeRunPolicy` 两帧（D27）、`ReleaseAnswer` 的注册表与更新命令（D24）、`DoctorAnswer.scanning`（D25）、沙箱臂名（D26）、skill 与 MCP 的三个查询（D28）、`theme` 偏好（D29）——在同一个变更集里落地，`WIRE_V` 按 D1 只进一位；同一个变更集重生 schema golden、`client/src/wire.ts`（`cargo xtask wire-ts`）、docnum，并改 `Tools/adversary/` 的 Door 与 Regression。之后的车道不再改线；确有一处必须改时，由整合者在合并时重生上面这几样，`WIRE_V` 在两次推送之间仍至多进一位。
 
 **理由**：升版的代价是 `wire.ts` 重生与客户端同改，与改动的数量无关（§8-39），分十次就付十次，而且十条车道同时改帧表会在合并时十次冲突。先把形状写定、再一次实现，是 V0.0.9 的执行规则（接口先定）。
 
@@ -353,7 +353,7 @@ wire shape golden 与客户端协议。-/
 
 /-! D57 人打的 id 走 `AttachEndpoint.named`，模型行带 `listing`
 
-**决定**：`AttachEndpoint` 多一个必填的 `named: Vec<String>`，装人在「端点没有列出的模型 id」框里打的 id，与 `admit`（人在端点列出的模型里勾的）分开；城读到列表时也收下它们（gateway D47）。`ModelFactsSummary` 多一个必填的 `listing: Listing`（`listed`｜`named`，kernel D63），页面据此标出人点名、端点没列出的行。`WIRE_V` 从 66 进到 67，同一个变更集重生 schema golden、wire shape golden、`client/src/wire.ts`（`cargo xtask wire-ts`），并改 `crates/adversary/src/Sprawling/Door.lean` 的帧与 `crates/adversary/src/Sprawling/Regression.lean` 的渲染。
+**决定**：`AttachEndpoint` 多一个必填的 `named: Vec<String>`，装人在「端点没有列出的模型 id」框里打的 id，与 `admit`（人在端点列出的模型里勾的）分开；城读到列表时也收下它们（gateway D47）。`ModelFactsSummary` 多一个必填的 `listing: Listing`（`listed`｜`named`，kernel D63），页面据此标出人点名、端点没列出的行。`WIRE_V` 从 66 进到 67，同一个变更集重生 schema golden、wire shape golden、`client/src/wire.ts`（`cargo xtask wire-ts`），并改 `Tools/adversary/src/Sprawling/Door.lean` 的帧与 `Tools/adversary/src/Sprawling/Regression.lean` 的渲染。
 
 **理由**：`admit` 的定义是「这个端点供应的模型里城收哪些」；人打的 id 也塞进这一张，城就分不出哪个该从列表里挑、哪个该照人的话登记，读到列表时人打的 id 被当作列表外的勾选略去，一次登记登记出零个模型。收下人打的 id 是人定下的规矩：中转站常常服务列表里没有的 id，人打一个 id 就是要它被用上。标记由城写在行上，不让页面拿自己手里的列表去比：页面的列表是上一次探测读到的，登记时城读的可能是另一份。
 

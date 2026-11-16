@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Serving the privacy page (`crates/sprawling/spec/Privacy/Service.lean`):
+//! Serving the privacy page (`Sprawling/app/spec/Privacy/Service.lean`):
 //! the answer to `Query::Privacy`, read off the host with the history
 //! disclosed only to the account it belongs to, and the operations
 //! `Command::PrivacyOperation` asks for, carried out one at a time with

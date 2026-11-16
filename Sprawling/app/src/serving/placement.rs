@@ -7,13 +7,13 @@
 //! free one, or none when every seat is taken, kept until the thread
 //! exits, and handed to the platform as a soft ideal processor so the
 //! scheduler stays in charge and moves the thread on at once when that
-//! core is busy (`crates/sprawling/spec/Serving/Placement.lean`, D41 and
+//! core is busy (`Sprawling/app/spec/Serving/Placement.lean`, D41 and
 //! D45-D47). The seats are the plan `plan` makes of the topology
 //! `reading` reports; `tests` checks this table against the seat model.
 //! This module is also the one place that decides what each arm of the
 //! person's `[core] placement` turns on (D47), the runs' shares included,
 //! and how large the machine budget those shares reserve from is
-//! (`crates/runtime/spec/Reserve.lean` D104).
+//! (`Sprawling/runtime/spec/Reserve.lean` D104).
 
 mod pinned;
 pub(crate) mod plan;
@@ -122,7 +122,7 @@ pub(crate) fn run_shares() -> Shares {
 
 /// What the operating system keeps for itself under `memory = "auto"`:
 /// the 2 to 2.5 GiB a desktop system takes before any application, at
-/// its lower end (`crates/sprawling/spec/Serving/Memory.lean` §8-173).
+/// its lower end (`Sprawling/app/spec/Serving/Memory.lean` §8-173).
 const SYSTEM_KEEPS_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
 /// What the browser tab showing the city is estimated to take under
@@ -130,7 +130,7 @@ const SYSTEM_KEEPS_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const VIEW_KEEPS_BYTES: u64 = 400 * 1024 * 1024;
 
 /// The machine budget every run's heavy work reserves its ceiling from,
-/// one book for the process (`crates/runtime/spec/Reserve.lean` D104). A
+/// one book for the process (`Sprawling/runtime/spec/Reserve.lean` D104). A
 /// `memory` that does not read is told as a process notice once, here,
 /// and the city sizes the budget as if it said `"auto"`.
 pub(crate) fn machine_budget() -> runtime::MachineBudget {

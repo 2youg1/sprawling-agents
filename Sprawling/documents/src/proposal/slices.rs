@@ -5,7 +5,7 @@
 // Portions copyright (c) 2026 2youg1 and the RefRain contributors
 
 //! The sentences of a text with the whitespace around them, and the
-//! alignment of two such lists (`crates/documents/Spec.lean` D14, D15).
+//! alignment of two such lists (`Sprawling/documents/Spec.lean` D14, D15).
 //!
 //! Migrated from RefRain's `manuscript::review` (the sentence cut) and
 //! `manuscript::align` (the common-subsequence table). Two things moved:

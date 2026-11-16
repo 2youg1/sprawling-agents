@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The `[remote]` table: the route the city's own layer chooses for the
-//! remote door (`crates/city/spec/ConfigLayers/Remote.lean` §8-39).
+//! remote door (`Sprawling/city/spec/ConfigLayers/Remote.lean` §8-39).
 //!
 //! The door opens onto the whole city, so only the city's own file may
 //! choose how the outside reaches it; a building or a room that writes

@@ -6,7 +6,7 @@
 /-!
 # citysim::nesting
 
-规定 `citysim::nesting`（`crates/citysim/src/nesting.rs`）与它的读法 `citysim::nesting::reading`（`crates/citysim/src/nesting/reading.rs`），一件只在测试构型里编译的仪器（D21）。本文件是 `crates/citysim/Spec.lean` 的一个分部；下面一节保留它在 citysim 规格里的标签 §8-8-3，别处引作 `crates/citysim/Spec.lean §8-8-3`。
+规定 `citysim::nesting`（`Tools/citysim/src/nesting.rs`）与它的读法 `citysim::nesting::reading`（`Tools/citysim/src/nesting/reading.rs`），一件只在测试构型里编译的仪器（D21）。本文件是 `Tools/citysim/Spec.lean` 的一个分部；下面一节保留它在 citysim 规格里的标签 §8-8-3，别处引作 `Tools/citysim/Spec.lean §8-8-3`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；`Fault` 的排序与 `grade`、`recommended` 的判法由 Rust 的穷尽枚举与 `nesting::tests` 守着（§16），三种格式的文法是 TOML、JSON 与 Markdown 各自的，模型若重写它们就成了第二份读法。
 -/

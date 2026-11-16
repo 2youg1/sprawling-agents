@@ -7,7 +7,7 @@
 //!
 //! Whatever the transport, a call lost after its request was handed over
 //! leaves the effect unknown and is never sent again by itself; that rule
-//! is proved in `crates/agent_protocols/spec/Mcp/Link.lean`.
+//! is proved in `Sprawling/agent_protocols/spec/Mcp/Link.lean`.
 
 use kernel::{AxError, McpTransport, TimeoutMs};
 

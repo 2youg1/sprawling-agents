@@ -4,14 +4,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The plan's seats in the model's two pools
-//! (`crates/sprawling/spec/Serving/Placement.lean`, the two-pool section):
+//! (`Sprawling/app/spec/Serving/Placement.lean`, the two-pool section):
 //! the plan's last [`SERIAL_SEATS`] seats belong to the city's serial
 //! threads, the rest to the runs' lanes, so a lane cannot take the seat a
 //! serial thread needs and no seat holds two threads. This part is the
 //! table alone, with no platform call and no setting: the module above
 //! builds it and hands a seat to the platform.
 //!
-//! `crates/sprawling/src/serving/placement/tests.rs` checks these
+//! `Sprawling/app/src/serving/placement/tests.rs` checks these
 //! properties on the table over every plan of up to five seats and every
 //! sequence of six starts and exits of four threads.
 

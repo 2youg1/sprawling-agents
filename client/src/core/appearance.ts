@@ -89,11 +89,11 @@ export const STACK_SHAPE = /^[\p{L}\p{N} ,'"_-]{1,120}$/u;
 // `.` a name is made of, and nothing that could close the declaration it
 // lands in. No quote and no comma: the page adds the quotes itself, and a
 // comma would splice a second family into a slot that holds one
-// (`crates/wire/spec/Preference.lean` D124 states the same grammar).
+// (`Sprawling/wire/spec/Preference.lean` D124 states the same grammar).
 export const FAMILY_SHAPE = /^[\p{L}\p{N} _.-]{1,64}$/u;
 
 // The features a bundled face declares for itself
-// (`crates/wire/spec/Preference.lean` D125). Paper Mono's name table
+// (`Sprawling/wire/spec/Preference.lean` D125). Paper Mono's name table
 // carries all six; Maple Mono carries three of the same intents, under
 // its own tags (`calt`, `cv02`, `zero`), and declares nothing for the
 // other three. A face this build does not bundle declares nothing here:

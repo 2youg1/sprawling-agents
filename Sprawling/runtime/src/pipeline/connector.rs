@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One MCP server's answer as the model reads it (`crates/runtime/spec/Pipeline.lean`
+//! One MCP server's answer as the model reads it (`Sprawling/runtime/spec/Pipeline.lean`
 //! §8-27-10): text that fits passes untouched, text that does not is
 //! stored whole and replaced by a window the model pages with `read`,
 //! a PNG picture is stored in the content store and travels as an
@@ -200,7 +200,7 @@ fn measured(block: &Value) -> Result<(Vec<u8>, ImageRef), String> {
 
 /// The picture `bytes` are, as this city carries one: a PNG inside
 /// [`IMAGE_MAX_BYTES`] whose header gives its two sides, referred to by
-/// the `cas:` locator its bytes hash to (`crates/runtime/spec/Tools/BoundReader.lean` §8-59).
+/// the `cas:` locator its bytes hash to (`Sprawling/runtime/spec/Tools/BoundReader.lean` §8-59).
 ///
 /// The one recognition a picture gets, whether it arrived in a
 /// connector's answer or was named to a tool. Only PNG is measured, for

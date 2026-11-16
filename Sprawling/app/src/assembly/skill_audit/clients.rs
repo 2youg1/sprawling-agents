@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Production audit effects (`crates/sprawling/spec/Assembly.lean`, city D19).
+//! Production audit effects (`Sprawling/app/spec/Assembly.lean`, city D19).
 //! HTTP construction stays with gateway; program discovery stays with doctor.
 
 use std::path::Path;

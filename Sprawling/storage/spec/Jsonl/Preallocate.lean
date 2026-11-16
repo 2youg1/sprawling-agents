@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.storage.spec.Jsonl.Verify
+import Sprawling.storage.spec.Jsonl.Verify
 
 /-!
 # 预分配的段：段尾的零字节不是撕裂
 
-规定段文件预分配（`File::set_len` 把段先撑到一个容量）之后，`open` 的尾段扫描（`crates/storage/src/jsonl/open.rs`）怎样读段尾（`crates/storage/Spec.lean` §8-1，屏障的各平台臂见 `crates/storage/spec/Jsonl/Barrier.lean` storage D24）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。默认的臂不预分配，但 `open` 的读者已经守着这三条性质（`crates/storage/src/jsonl/open/preallocated.rs` 在真实的段上逐条检查），所以预分配那一臂被选中时读路径不必再改。
+规定段文件预分配（`File::set_len` 把段先撑到一个容量）之后，`open` 的尾段扫描（`Sprawling/storage/src/jsonl/open.rs`）怎样读段尾（`Sprawling/storage/Spec.lean` §8-1，屏障的各平台臂见 `Sprawling/storage/spec/Jsonl/Barrier.lean` storage D24）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。默认的臂不预分配，但 `open` 的读者已经守着这三条性质（`Sprawling/storage/src/jsonl/open/preallocated.rs` 在真实的段上逐条检查），所以预分配那一臂被选中时读路径不必再改。
 
 预分配之后，最后一条记录之后不再是文件末尾，而是一串零字节。一段于是是一列槽：一个槽要么是今天的一项 `Raw`（一行，或读不出信封的字节），要么是零。读者先剥掉段尾连续的零，再把剩下的交给今天的 `scan`；剥不掉的零（后面还跟着非零字节）读作 `notALine`，与撕裂同一种处置。
 
@@ -21,7 +21,7 @@ import crates.storage.spec.Jsonl.Verify
 * **在剥零之后的位置写下，接续成立**：写者把位置取成剥零之后的长度（`writer_position_is_the_stripped_end`），在那里写下一条（覆盖段尾的零，或零已用完时接在末尾），读者扫出的结局与「这一段加这一条、没有零」逐字相同（`a_record_written_at_the_stripped_end_resumes_the_segment`）；
 * **在文件长度处写下，记录落在零之后**：读者看到的是这一段、一串读不出信封的字节、再这一条，与把零读作撕裂相同（`a_record_written_at_the_file_length_sits_behind_the_zeros`），于是 `open` 拒开而不是接续。
 
-这两条与上面三条合起来，就是预分配那一臂（storage D31）的读与接续的结论；`crates/storage/src/jsonl/open/preallocated.rs` 的 proptest `a_preallocated_writer_resumes_after_every_reopen_and_every_cut` 从它们导出：任意几波、任意容量，开了预分配的写者写、重开、再写，读回的恰是全部记录、链完整，段文件仍不短于容量。
+这两条与上面三条合起来，就是预分配那一臂（storage D31）的读与接续的结论；`Sprawling/storage/src/jsonl/open/preallocated.rs` 的 proptest `a_preallocated_writer_resumes_after_every_reopen_and_every_cut` 从它们导出：任意几波、任意容量，开了预分配的写者写、重开、再写，读回的恰是全部记录、链完整，段文件仍不短于容量。
 -/
 
 /-! D31 段的预分配是一个可选的臂：`SegmentPreallocation { Grow, ToRollSize }`，每一个本构建打开的账本都用常量 `jsonl::ledger::SEGMENT_PREALLOCATION` 给的那一臂，今天是 `Grow`，即预分配之前的行为。

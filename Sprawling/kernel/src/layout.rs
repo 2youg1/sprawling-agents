@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Where a city keeps each kind of file on disk: one derivation from
-//! the city root and an address (`crates/kernel/spec/Layout.lean` §8-56).
+//! the city root and an address (`Sprawling/kernel/spec/Layout.lean` §8-56).
 //!
 //! Every directory name and file name the city writes is declared here
 //! once, and every path it writes them to is spelled here once, so a
@@ -84,12 +84,12 @@ pub const BROWSERS_FILE: &str = "browsers.toml";
 /// subtree, one directory per building.
 pub const PLAYBACK_DIR: &str = "playback";
 /// The beat the performance monitor samples at, under the city's
-/// reserved subtree (`crates/sprawling/spec/Monitor.lean` D48).
+/// reserved subtree (`Sprawling/app/spec/Monitor.lean` D48).
 pub const MONITOR_FILE: &str = "MONITOR.toml";
 
 /// What the staging file of a document named `name` is called: the
 /// name hidden by a dot and suffixed `.staging`, in the document's own
-/// directory (`crates/kernel/spec/Layout.lean` §8-56).
+/// directory (`Sprawling/kernel/spec/Layout.lean` §8-56).
 ///
 /// The whole-or-nothing document writer stages here and renames over
 /// the document; the checkpoint scan refuses this name before git opens
@@ -251,7 +251,7 @@ impl CityLayout {
     }
 
     /// How far the person has got through this city's first-run guide
-    /// (`crates/wire/Spec.lean` §8-68).
+    /// (`Sprawling/wire/Spec.lean` §8-68).
     ///
     /// Under the city's reserved subtree, because it decides what this
     /// city shows a person when it opens, and no write domain reaches it.
@@ -264,14 +264,14 @@ impl CityLayout {
     ///
     /// Under the city's reserved subtree, because the table decides who
     /// may reach the city and no write domain may change that
-    /// (`crates/kernel/spec/Layout.lean` §8-76).
+    /// (`Sprawling/kernel/spec/Layout.lean` §8-76).
     #[must_use]
     pub fn devices(&self) -> PathBuf {
         self.governed_root().join(REMOTE_DIR).join(DEVICES_FILE)
     }
 
     /// The browsers paired at this machine's own door, kept as public
-    /// keys (`crates/wire/spec/Server.lean` §8-93).
+    /// keys (`Sprawling/wire/spec/Server.lean` §8-93).
     ///
     /// Under the city's reserved subtree for the reason [`Self::devices`]
     /// is: the table decides who may reach the city.
@@ -281,7 +281,7 @@ impl CityLayout {
     }
 
     /// Where residents' playback exports land, one directory per
-    /// building (`crates/accounting/Spec.lean` §8-13, `crates/sprawling/Spec.lean` §8-132).
+    /// building (`Sprawling/accounting/Spec.lean` §8-13, `Sprawling/app/Spec.lean` §8-132).
     ///
     /// Under the city's reserved subtree, because no write domain reaches
     /// it, so a written report is changed only by exporting another; the

@@ -6,7 +6,7 @@
 /-!
 # Nightly 快照身份与发布推进
 
-规定 `crates/sprawling/src/release/nightly.rs` 的快照身份，以及
+规定 `Sprawling/app/src/release/nightly.rs` 的快照身份，以及
 `.github/workflows/nightly-release.yml` 的发布推进。模型只描述判定与保留规则；
 GitHub、编译器、网络和文件系统的效果由回环安装验收与 workflow 检查。
 

@@ -79,7 +79,7 @@ impl Booking {
 }
 
 /// Where `finish` turns a path the model wrote into the Locator of the
-/// file's bytes at that moment (`crates/collab/Spec.lean` D20).
+/// file's bytes at that moment (`Sprawling/collab/Spec.lean` D20).
 ///
 /// The assembly layer hands it in because judging a path for reading
 /// takes the read bound, which this crate cannot see; a desk that judged

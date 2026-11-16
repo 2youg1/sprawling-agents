@@ -5,7 +5,7 @@
 
 // What a person's answer to one proposal card sends, and where the
 // answer stands until the card is gone (client/Spec.lean §4-55,
-// `crates/wire/Spec.lean` §8-73).
+// `Sprawling/wire/Spec.lean` §8-73).
 //
 // **The verdicts are spelled here and nowhere else.** The city refuses
 // a verdict on a sentence that did not change, a verdict on a place the
@@ -135,7 +135,7 @@ export function advance(deciding: Deciding, happened: Happened): Deciding {
 
 // The city's spellings of the actions a decision is refused at: the
 // decision as a whole, and one sentence of it
-// (`crates/documents/src/proposal.rs`). A refusal carries no key (§8-2),
+// (`Sprawling/documents/src/proposal.rs`). A refusal carries no key (§8-2),
 // so these and the subject are how one is told to be this card's.
 const DECIDING_ACTIONS: ReadonlySet<string> = new Set(["decide proposals", "decide a proposal"]);
 

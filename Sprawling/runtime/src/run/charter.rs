@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A run's opening pair and its closing pair, written once for every
-//! kind of run (`crates/runtime/spec/Run.lean` §8-52, runtime D7).
+//! kind of run (`Sprawling/runtime/spec/Run.lean` §8-52, runtime D7).
 //!
 //! A model run and a harness run open and close alike: the job pin, then
 //! `run_started`; `handoff_written`, then `run_frozen` a millisecond
@@ -50,15 +50,15 @@ pub struct Charter<'a> {
     pub predecessor: Option<RunId>,
     pub dispatched_by: &'a Who,
     pub skills: &'a [SkillPin],
-    /// The run policy `run_started` records (`crates/kernel/Spec.lean` §8-77).
+    /// The run policy `run_started` records (`Sprawling/kernel/Spec.lean` §8-77).
     pub policy: kernel::RunPolicy,
-    /// The identity version `run_started` records (`crates/kernel/Spec.lean` §8-79).
+    /// The identity version `run_started` records (`Sprawling/kernel/Spec.lean` §8-79).
     pub naming: Option<kernel::B3Hash>,
     /// How the run's first user message was written, which a fork reads
-    /// back (`crates/kernel/Spec.lean` §8-82-1); `None` for a run the city writes no
+    /// back (`Sprawling/kernel/Spec.lean` §8-82-1); `None` for a run the city writes no
     /// first message for.
     pub opening: Option<Opening>,
-    /// The effort `run_started` records (`crates/kernel/Spec.lean` §8-85):
+    /// The effort `run_started` records (`Sprawling/kernel/Spec.lean` §8-85):
     /// the one the run's requests froze; `None` when none was stated, and
     /// for a run that sends this city no requests.
     pub effort: Option<kernel::Effort>,
@@ -67,7 +67,7 @@ pub struct Charter<'a> {
     /// The native model routing this run recorded; `None` for a harness.
     pub routing: Option<&'a kernel::event::record::ModelRouting>,
     /// The ACP agent `run_started` records for a harness run
-    /// (`crates/kernel/spec/Event/Record.lean` §8-87); `None` for a run this
+    /// (`Sprawling/kernel/spec/Event/Record.lean` §8-87); `None` for a run this
     /// city's own model loop drives.
     pub agent: Option<&'a kernel::event::record::AgentRunIdentity>,
 }

@@ -13,7 +13,7 @@
 //! machine with no desktop can check it; `super::act` only turns each
 //! stroke into the event Win32 wants and sends the batch.
 //!
-//! The properties this module must hold are proved in `crates/desktop/spec/Platform/Windows/Strokes.lean`;
+//! The properties this module must hold are proved in `Sprawling/desktop/spec/Platform/Windows/Strokes.lean`;
 //! this code is the authority on how it holds them.
 
 use windows::Win32::UI::WindowsAndMessaging::WHEEL_DELTA;
@@ -266,7 +266,7 @@ enum Held {
 ///
 /// Nothing taken is a plain refusal: nothing reached the window. Any
 /// part taken is marked as an effect nobody can see, because that part
-/// may already have clicked or typed (`crates/desktop/Spec.lean` D4).
+/// may already have clicked or typed (`Sprawling/desktop/Spec.lean` D4).
 pub(crate) fn cut_short(accepted: usize, sent: usize, released: Released) -> Refusal {
     if accepted == 0 {
         return Refusal::new(
@@ -334,7 +334,7 @@ mod tests {
     /// Nothing here presses a key on the machine running the tests: the
     /// strokes are built and counted, never sent. Whether a click landed
     /// is what an operator checks on a real desktop
-    /// (`crates/desktop/Spec.lean` §16.2).
+    /// (`Sprawling/desktop/Spec.lean` §16.2).
     #[test]
     fn each_action_is_the_events_it_says_it_is_and_no_more() {
         let at = Point { x: 10, y: 20 };

@@ -6,7 +6,7 @@
 /-!
 # 欠哪一种拒绝：守序
 
-规定检验器 `Sprawling.Model` 的 `refusal` 必须守的性质（`crates/adversary/src/Sprawling/Model.lean`）：
+规定检验器 `Sprawling.Model` 的 `refusal` 必须守的性质（`Tools/adversary/src/Sprawling/Model.lean`）：
 一个没挂 provider、或挂了 provider 的城，在停摆、地址保留、楼已立这几个事实上，对立楼与派活
 各欠哪一种失败。这里只谈**哪一种失败**，从不谈任何被计算出来的值：错误码是门对调用方的承诺
 （`AGENTS.md`），钉住它钉的是承诺，而不是对某条规则的重算。

@@ -6,7 +6,7 @@
 /-!
 # gateway::router
 
-规定 `router`（`crates/gateway/src/router.rs`）：已登记端点的簿与每个标签的选择；一次取模型只答一问。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+规定 `router`（`Sprawling/gateway/src/router.rs`）：已登记端点的簿与每个标签的选择；一次取模型只答一问。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `Sprawling/gateway/Spec.lean §8-n`。
 
 本分部的 Accounts 模型证明显式账号在提交轨迹上保持存在，其他接口由 Rust 类型与 router 旁的回归检查守住。
 -/
@@ -56,7 +56,7 @@ pub fn selected_payload(ModelTag, &str, &ModelEntry) -> Result<Payload, AxError>
 - **两个入口一个读者**：`apply`（重建路径，手里是 record）与 `absorb`（写入路径，手里是刚要写的 kind、run、addr 与 payload）共用同一套载荷读取，于是「写者以为的」与「重建得到的」不可能分岔。
 - **confidential 在选型点再守一次**：非回环 endpoint 对 confidential 楼恒拒（`E_GATE_DENIED`）。`gateway::endpoint` 的兜底拒同期改为**按本地性判定**（而非一律拒）：规则是「字节不出运行中的机器」，不是「不准用这个类型」；否则一个回环的 Anthropic 服务器会被误拒。
 - **路径归兼容格式**：人输入 base URL（provider 文档就是那么印的），`messages`／`chat/completions`／`models` 由兼容格式拼。这与 `EndpointConfig.base_url`「完整端点 URL、不拼路径」并不矛盾：适配器保持字面，拼路径的是上层登记面。
-- **`probed` 是这份 models 的来源，不是端点的健康度**：`true` ＝ `GET .../models` 答了，登记的每一行都是对端自己列出的；`false` ＝ 至少有一行是人点名、城照登的（探测失败时人报的型号，或读到列表时人打的、列表里没有的 id）。哪几行是人点名的，由每一行的 `listing` 说（kernel D63、`crates/gateway/spec/Endpoint/Models.lean` D47）。载荷里缺 `probed` 键读作 `true`，于是没有这个键的 `endpoint_attached` 重放不变。
+- **`probed` 是这份 models 的来源，不是端点的健康度**：`true` ＝ `GET .../models` 答了，登记的每一行都是对端自己列出的；`false` ＝ 至少有一行是人点名、城照登的（探测失败时人报的型号，或读到列表时人打的、列表里没有的 id）。哪几行是人点名的，由每一行的 `listing` 说（kernel D63、`Sprawling/gateway/spec/Endpoint/Models.lean` D47）。载荷里缺 `probed` 键读作 `true`，于是没有这个键的 `endpoint_attached` 重放不变。
 - **`AuthSpec::for_dialect` 是凭证头的唯一产地**：`AuthSpec::for_dialect(dialect: DialectKind, reference: SecretRef, header: Option<String>) -> AuthSpec`，纯函数，住 `endpoint/auth.rs`。人显式填的头名恒胜（`Header`）；否则 Anthropic → `Header{name:"x-api-key"}`，OpenAI 及其余 → `Bearer`。**它不住 `endpoint/config.rs`**：「凭证头归兼容格式」是一个可以自己站着的概念；`AuthSpec` 类型本体留在 config.rs，因为搬它会让同一个名字在 crate 内多出一条 `pub(crate) use` 路径。登记面（`accounting::worker::credentials::endpoints::endpoint_of`）不自己在 Bearer 与具名头之间选，否则「Anthropic 用哪个头」在城里有两个权威，而漂开的总是没人看的那个。
 -/
 
@@ -85,7 +85,7 @@ Session 选择，snapshot 保留同一账号列表，
 显式列表不回退原 auth。成功回答将非秘密账号 ID 绑定到房间的 Session，
 重排与重启不改变仍在列表中的绑定；新 Session 清除绑定，被移除的绑定回到名册里第一个可兑付的账号（`AccountRound::start`，kernel D54）。
 旧单账号登记继续使用原 AuthSpec，不构造虚拟账号或重新选择认证头。
-失败之后原号再发、换号还是停下由 kernel 的 `AccountRound` 决定（`crates/kernel/spec/AccountRecovery.lean`，kernel D54），哪些失败说「换号」由 `endpoint::failure` 决定（D32）；本接口只供名册与按名选号（`crates/kernel/spec/Model.lean`）。
+失败之后原号再发、换号还是停下由 kernel 的 `AccountRound` 决定（`Sprawling/kernel/spec/AccountRecovery.lean`，kernel D54），哪些失败说「换号」由 `endpoint::failure` 决定（D32）；本接口只供名册与按名选号（`Sprawling/kernel/spec/Model.lean`）。
 Accounts 模型以通过账号校验的提交为输入；
 空表、重复引用和非法 header 由 Rust 账户校验回归判断。
 -/
@@ -142,7 +142,7 @@ AttachEndpoint 共用这个判定，拒绝发生在 probe、诊断成功和 Ledg
 PutSecret 独立完成；此判定只决定登记命令是否有明确目标，不回滚先前的 Vault 操作。
 
 下面 submit 对应 endpoint_of 的准入；trace 以原状态继续处理被拒的提交。
-派生回归在 `crates/accounting/src/worker/credentials/endpoints.rs`：从 RunWorker.handle
+派生回归在 `Sprawling/accounting/src/worker/credentials/endpoints.rs`：从 RunWorker.handle
 登记 legacy、迁移 A/B、提交 C，检查错误、无外发、账本不变、实际 probe header，
 并检查重启后的完整账号列表；提交轨迹的投影检查在 router::book 旁。
 -/
@@ -204,7 +204,7 @@ Session 边界；SessionOpened 撤销旧 Run 的成员资格，使后续调用�
 资格只由唯一 RunId 的 RunStarted 建立，按房间撤销不影响其它房间，因此不另存 epoch。
 分支是带 `from` 的 `OpenSession`，与 `/new` 一样写 `session_opened`，所以两者都从首个可兑付账号重新选起，
 不继承来源 Session 的绑定。删除 snapshot 后重启、分支与 `/new` 三种情形由
-`crates/accounting/src/worker/credentials/tests/accounts/affinity.rs` 经真实 `RunWorker` 检查。
+`Sprawling/accounting/src/worker/credentials/tests/accounts/affinity.rs` 经真实 `RunWorker` 检查。
 换号的分类在 D32，换号的预算与步进在 kernel D54；搜索设置与账号登记界面不在本接口内。 -/
 
 /-! D44 委派出的子 run 的第一轮账号从母 run 房间的绑定开始
@@ -215,11 +215,11 @@ Session 边界；SessionOpened 撤销旧 Run 的成员资格，使后续调用�
 
 **被否**：①照 D30 让子 run 从名册的第一个账号起：母 run 不在第一个账号上时（她换过号，或名单重排过），每个子 run 都错过她的缓存；②派活时直接给子房间写一条绑定：`model_returned` 之外多了一个绑定提交点，D30 的唯一提交点不再成立，重放要多读一种行；③分支也继承：分支开的是一个新 Session，人用它重新开始，人定下的只是委派；④从 `EndpointBook` 的 `session_rooms` 读母 run 的房间：`run_frozen` 一到就删掉她那一项，而 `end_hand_over` 在这之后还会派出她最后交下的活，这些子 run 就读不到；⑤在 `Assignment` 上再带一份母 run 的房间：她在哪里工作就多了一处记法，每个 `Assignment` 字面量都要填它。
 
-**重开参数**：人定下把继承扩到分支；母 run 与子 run 常用不同的 Provider，使「同一 Provider 上的绑定」很少答出账号。派生检查：`crates/accounting/src/worker/credentials/tests/accounts/affinity.rs` 的 `a_delegated_child_opens_on_its_mothers_account` 经真实 `RunWorker` 驱动一次委派，母 run 绑在名册的第二个账号上时，子 run 的 `model_called` 记的是那个账号。 -/
+**重开参数**：人定下把继承扩到分支；母 run 与子 run 常用不同的 Provider，使「同一 Provider 上的绑定」很少答出账号。派生检查：`Sprawling/accounting/src/worker/credentials/tests/accounts/affinity.rs` 的 `a_delegated_child_opens_on_its_mothers_account` 经真实 `RunWorker` 驱动一次委派，母 run 绑在名册的第二个账号上时，子 run 的 `model_called` 记的是那个账号。 -/
 
 namespace Gateway.Router.Affinity
 
-/-- `crates/gateway/src/router/book.rs`：单个房间可有多个 Run，成员资格属于当前 Session。 -/
+/-- `Sprawling/gateway/src/router/book.rs`：单个房间可有多个 Run，成员资格属于当前 Session。 -/
 structure State (Run Account : Type) where
   eligible : Run → Bool := fun _ => false
   pending : Run → Option Account := fun _ => none
@@ -268,7 +268,7 @@ def retired (run : Run) : RetiredStep Account → Step Run Account
   | .frozen => .frozen run
 
 /-- 任意旧 Run 的后续调用、答复和冻结轨迹都不能改变当前绑定，包括另一 Run 已成功的绑定。
-`crates/accounting/src/views/snapshot/tests.rs` 生成该轨迹并在实时、重放与任意快照切点检验。 -/
+`Sprawling/accounting/src/views/snapshot/tests.rs` 生成该轨迹并在实时、重放与任意快照切点检验。 -/
 theorem retired_trace_preserves_binding [DecidableEq Run] (state : State Run Account)
     (run : Run) (steps : List (RetiredStep Account)) (h : state.eligible run = false) :
     (steps.foldl (fun current step => apply current (retired run step)) state).bound = state.bound := by

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One refusal per door, produced by the door itself.
-//! The part `crates/kernel/spec/Gate.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Gate.lean` specifies this module with the
 //! rest of `kernel::gate`.
 
 use std::collections::BTreeMap;

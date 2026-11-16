@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How much of a version one answer carries, and where it is cut
-//! (`crates/documents/spec/Window.lean`, D7).
+//! (`Sprawling/documents/spec/Window.lean`, D7).
 //!
 //! A window never splits a character, never runs past the version, and
 //! never carries more than [`WINDOW_BYTES_MAX`] bytes past the offset it

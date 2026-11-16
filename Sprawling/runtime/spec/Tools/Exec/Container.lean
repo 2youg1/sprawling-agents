@@ -6,8 +6,8 @@
 /-!
 # runtime::tools::exec::container
 
-规定 `crates/runtime/src/tools/exec/container.rs`，kernel 的输入值住
-`crates/kernel/src/config/container.rs`，既有放置与副本契约仍由父分部 §8-13-2 规定。
+规定 `Sprawling/runtime/src/tools/exec/container.rs`，kernel 的输入值住
+`Sprawling/kernel/src/config/container.rs`，既有放置与副本契约仍由父分部 §8-13-2 规定。
 
 ## 1 需求分解
 
@@ -174,7 +174,7 @@ spawn/enrol 失败必须走同一清理权威。容器收下限额之前不得�
 
 ## 16 测试与约束
 
-`lake build crates.runtime.spec.Tools.Exec.Container` 证明任意能力列表中缺一项即拒。
+`lake build Sprawling.runtime.spec.Tools.Exec.Container` 证明任意能力列表中缺一项即拒。
 Rust 的公开 admission／argv 测试检查实际实现，entrypoint 回归覆盖两个后端、JSON 数组形状、
 空 JSON 数组、null、引号与普通路径，以及 Unix 下不可编码的 OsStr program；
 非 UTF-8 输入直接经公开 create_command 检查 typed refusal，不经过有损字符串转换。

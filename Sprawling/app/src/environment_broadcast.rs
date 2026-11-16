@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The one announcement that the user environment changed
-//! (`crates/sprawling/spec/Install.lean` §8-9, `crates/sprawling/spec/Privacy/Windows.lean`).
+//! (`Sprawling/app/spec/Install.lean` §8-9, `Sprawling/app/spec/Privacy/Windows.lean`).
 //!
 //! Explorer caches the environment block, and a console started from it
 //! inherits the cache, so a registry write alone reaches no new window.

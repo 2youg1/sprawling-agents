@@ -8,7 +8,7 @@ use crate::worker::*;
 /// Adopting a folder checkpoints it at once, as one pack: the first dispatch
 /// into a building of thousands of files would otherwise hash every one
 /// of them and write each as a loose object before its first tool call
-/// (`crates/storage/Spec.lean` §8-8, the base checkpoint).
+/// (`Sprawling/storage/Spec.lean` §8-8, the base checkpoint).
 #[test]
 fn adopting_a_folder_checkpoints_it_as_one_pack_before_any_dispatch() {
     let dir = tempfile::tempdir().unwrap();
@@ -52,7 +52,7 @@ fn adopting_a_folder_checkpoints_it_as_one_pack_before_any_dispatch() {
 /// the project's files, and the project's git would list the ledger and
 /// the object store as untracked work. Genesis adds one anchored line
 /// for the city's reserved subtree to the root's `.gitignore`, keeping
-/// every line the project already had (`crates/city/Spec.lean` §8-21).
+/// every line the project already had (`Sprawling/city/Spec.lean` §8-21).
 #[test]
 fn forming_a_city_keeps_its_own_subtree_out_of_the_workspaces_git() {
     let dir = tempfile::tempdir().unwrap();

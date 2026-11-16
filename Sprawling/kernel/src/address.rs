@@ -5,7 +5,7 @@
 
 //! Address: canonical relative path inside a city, and
 //! the WriteDomain primitive `is_within`.
-//! The part `crates/kernel/spec/Address.lean` specifies this module.
+//! The part `Sprawling/kernel/spec/Address.lean` specifies this module.
 //!
 //! Invariants owned here:
 //! - one constructor: [`Address::parse`]; whatever it accepts is already
@@ -19,7 +19,7 @@
 //!   ([`PROTECTED_METADATA`]) can never enter a WriteDomain, at whatever
 //!   depth it sits, and every WriteDomain constructor must ask first.
 //! - [`may_read`] answers the read bound: what a resident of one
-//!   building may read by a path it chose (`crates/city/Spec.lean` §8-2).
+//!   building may read by a path it chose (`Sprawling/city/Spec.lean` §8-2).
 
 use serde::{Deserialize, Serialize};
 
@@ -33,7 +33,7 @@ use crate::error::{AxCode, AxError};
 /// never writable by what runs inside it.
 pub const RESERVED_PREFIX: &str = ".sprawling";
 
-/// git's own metadata directory (`crates/kernel/spec/Address.lean` §8-73). Writing it is
+/// git's own metadata directory (`Sprawling/kernel/spec/Address.lean` §8-73). Writing it is
 /// privilege escalation: a hook is code that runs at the next git
 /// operation, a config key can start a program, and the checkpoint
 /// references and the restoration objects a `file_discarded` names all
@@ -123,7 +123,7 @@ impl Address {
     /// `<building>/.sprawling/`, and a run whose write domain is its
     /// building must not reach them. Widening this predicate can only
     /// refuse more, which is the direction a fail-closed check may move
-    /// in without a second authority to check it against (`crates/kernel/spec/Address.lean`
+    /// in without a second authority to check it against (`Sprawling/kernel/spec/Address.lean`
     /// §8-73).
     pub fn is_reserved(&self) -> bool {
         self.0.split('/').any(|segment| {

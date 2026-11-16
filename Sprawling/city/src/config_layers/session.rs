@@ -19,7 +19,7 @@
 //! a session writes the shape it froze; every later run reads it back
 //! and refuses to move it, because a provider caches a conversation's
 //! prefix for as long as the model and the effort behind it stay put
-//! (`crates/sprawling/Spec.lean` §8-79 does the refusing). An address that is its
+//! (`Sprawling/app/Spec.lean` §8-79 does the refusing). An address that is its
 //! own building has one file for both rungs, so that address is its own
 //! session.
 //!
@@ -27,7 +27,7 @@
 //! `CONFIG.toml`: a second path would be a second answer to what "whole
 //! or not at all" means.
 //!
-//! Specified by `crates/city/spec/ConfigLayers.lean` §8-14.
+//! Specified by `Sprawling/city/spec/ConfigLayers.lean` §8-14.
 
 use std::path::Path;
 
@@ -116,7 +116,7 @@ pub fn write_session(
 }
 
 /// Records the identity version a session froze at its own address
-/// (`crates/city/spec/Identity.lean` §8-33).
+/// (`Sprawling/city/spec/Identity.lean` §8-33).
 ///
 /// Written by the session's first run, beside the shape it froze, and
 /// taken out with that shape by [`forget`].
@@ -134,7 +134,7 @@ pub fn freeze_naming(city_root: &Path, addr: &Address, version: B3Hash) -> Resul
 /// the model and the effort are one choice, and forgetting one of them
 /// would leave a later run reading half a shape it cannot move. Only the
 /// keys this module wrote are removed, because the file is a person's as
-/// well as a session's (`crates/city/spec/Session.lean` §8-14b).
+/// well as a session's (`Sprawling/city/spec/Session.lean` §8-14b).
 ///
 /// # Errors
 /// Propagates a file that exists and cannot be read or parsed, and a

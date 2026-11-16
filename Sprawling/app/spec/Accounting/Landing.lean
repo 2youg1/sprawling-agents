@@ -6,7 +6,7 @@
 /-!
 # 记账线程只做账：落 run 的重活不在记账线程上
 
-规定 `crates/accounting/src/worker/driving/flight.rs`（`serve_flight`）、`crates/accounting/src/worker/dispatching/running.rs`（`land`）与 `crates/sprawling/src/serving/folding.rs`（`spawn_folding`）在落 run 的重活（transcript、检查点、合并）移出记账线程之后必须守住的性质。它是 `crates/sprawling/spec/Accounting/Worker.lean` §8-42-4 的模型：那一节说记账线程有三张嘴、按什么次序服务；这里说一张嘴上能做什么。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/accounting/src/worker/driving/flight.rs`（`serve_flight`）、`Sprawling/accounting/src/worker/dispatching/running.rs`（`land`）与 `Sprawling/app/src/serving/folding.rs`（`spawn_folding`）在落 run 的重活（transcript、检查点、合并）移出记账线程之后必须守住的性质。它是 `Sprawling/app/spec/Accounting/Worker.lean` §8-42-4 的模型：那一节说记账线程有三张嘴、按什么次序服务；这里说一张嘴上能做什么。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 落 run 分两半。重活在这个 run 的 lane 上做完：写 transcript、立最后一道检查点、把节点的工作合进干线，结果是一组已经算好的记录草稿。账的一半在记账线程上做：追加这组草稿，然后把 run 记成已冻结。于是记账线程上的每一步都只是追加，一次落 run 与一次 relay 请求的区别只在追加几条。
 
@@ -15,7 +15,7 @@
 * **只有一个追加者，记录只有一个全局次序**——账本恰是开始时的账本接上每条消息的记录，按服务次序，只增不减（`the_ledger_is_the_served_records_in_order`、`the_ledger_only_grows`）；
 * **冻结之前落 run 的记录已在账上**——一个 run 一旦被看见已冻结，它落 run 的每一条记录都已在账本里（`a_frozen_run_has_its_landing_on_the_ledger`）。
 
-视图广播按帧合并不在记账线程上，它的模型在 `crates/wire/spec/Server/Socket.lean` §8-47h。
+视图广播按帧合并不在记账线程上，它的模型在 `Sprawling/wire/spec/Server/Socket.lean` §8-47h。
 -/
 
 namespace Sprawling.Accounting.Landing
@@ -56,7 +56,7 @@ structure Accounts where
 
 **被否**：①整个 `land` 搬进 lane：房间队列、认领簿与派活表就有了第二个写者；②把清扫留在记账线程、只搬 transcript：清扫的 diff 随 run 写过的文件数增长，是两步里更重的那一步。
 
-**重开参数**：吞吐台（`crates/citysim/spec/Throughput.lean`）在 relay 排队的 p99 里仍量到落 run 的一段时，逐步给留下的步骤计时，再议哪一步搬走。
+**重开参数**：吞吐台（`Tools/citysim/spec/Throughput.lean`）在 relay 排队的 p99 里仍量到落 run 的一段时，逐步给留下的步骤计时，再议哪一步搬走。
 -/
 
 /-- 服务一条消息：追加它的记录；回家的 run 在它的记录追加之后才记成已冻结，两者是同一步。 -/

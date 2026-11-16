@@ -20,7 +20,7 @@ A new core feature must clear all five tests before any implementation: the need
 
 ## 2 One change
 
-Before designing or changing code, load [ub-mode](../crates/city/skills/ub-mode/SKILL.md) and follow its loop for scope, specification, regression evidence, implementation and closure. [The view layer](../AGENTS.md#the-view-layer) defines the client exemptions; [SPECs and Markdown](../AGENTS.md#specs-and-markdown) defines where an unfinished interface is recorded.
+Before designing or changing code, load [ub-mode](../Sprawling/city/skills/ub-mode/SKILL.md) and follow its loop for scope, specification, regression evidence, implementation and closure. [The view layer](../AGENTS.md#the-view-layer) defines the client exemptions; [SPECs and Markdown](../AGENTS.md#specs-and-markdown) defines where an unfinished interface is recorded.
 
 Choose the smallest complete change that removes the cause; never preserve a defective structure to keep the diff small. Split a migration only at independently verifiable boundaries, not by file or line counts.
 
@@ -81,7 +81,7 @@ Name another project only when the issue or the pull request cannot be understoo
 A change that borrows from another project states which of the two cases holds:
 
 - **A borrowed fact** — an interface shape, a protocol, a value read from upstream — is cited, and [`third-party.md`](third-party.md) is updated in the same change: its [§1 table](third-party.md#1-where-the-intelligence-comes-from), with the path followed and the commit read, because `upstream-watch.yml` reads that table and the tracked commit is written nowhere else. Keep a quotation to the short excerpt the citation needs.
-- **Borrowed code** is not pasted in. This repository vendors no upstream code, because every `.rs` file carries the MPL-2.0 notice and a file from another project cannot wear it ([`third-party.md`](third-party.md) §7). Re-implement from the documented facts, or bring the work in as a dependency through the gates: `cargo deny` against the licence allowlist in `deny.toml`, or the client's `RUNTIME` list in `crates/xtask/src/npm.rs`. Copyleft work, GPL-family code among it, is not copied in at all.
+- **Borrowed code** is not pasted in. This repository vendors no upstream code, because every `.rs` file carries the MPL-2.0 notice and a file from another project cannot wear it ([`third-party.md`](third-party.md) §7). Re-implement from the documented facts, or bring the work in as a dependency through the gates: `cargo deny` against the licence allowlist in `deny.toml`, or the client's `RUNTIME` list in `Tools/xtask/src/npm.rs`. Copyleft work, GPL-family code among it, is not copied in at all.
 
 If neither case holds, the project is not mentioned. If which case holds is unclear, ask in the issue before opening the pull request.
 
@@ -97,7 +97,7 @@ When adding a gate, build a fixture that violates the rule and assert that the g
 
 ## 8 Environment
 
-The repository pins the Rust toolchain in `rust-toolchain.toml`, Lean in `lean-toolchain` and Zig in `crates/desktop/ffi/zig-version`, and names every other tool in the develop tier of the doctor's table (`crates/sprawling/src/doctor/table.rs`), which is the only list: `sprawling doctor` and the settings page's dependency group install from it, and `just prereqs` reads it through the `prereqs.tsv` the table renders, printing what is absent, what needs it, and the line that installs it. Rows marked *required* are what `just check` cannot run without; rows marked *optional* are skipped by `just check` when absent, or belong to a recipe that says so itself. `nix develop` enters a shell holding those tools, and `nix flake check` refuses a shell that stops short of the list.
+The repository pins the Rust toolchain in `rust-toolchain.toml`, Lean in `lean-toolchain` and Zig in `Sprawling/desktop/ffi/zig-version`, and names every other tool in the develop tier of the doctor's table (`Sprawling/app/src/doctor/table.rs`), which is the only list: `sprawling doctor` and the settings page's dependency group install from it, and `just prereqs` reads it through the `prereqs.tsv` the table renders, printing what is absent, what needs it, and the line that installs it. Rows marked *required* are what `just check` cannot run without; rows marked *optional* are skipped by `just check` when absent, or belong to a recipe that says so itself. `nix develop` enters a shell holding those tools, and `nix flake check` refuses a shell that stops short of the list.
 
 **Zig is checked to the exact version.** The desktop leaf's build script runs `zig version` and refuses any version other than the pin, so a machine that builds the workspace on Windows needs that Zig on PATH, and so does anyone who installs `sprawling` from crates.io there; `sprawling doctor` lists it with its install line. The client's `.ts` type check is `bun check`, the TypeScript 7 checker built into the runtime; `.svelte` files are checked by `svelte-check`, whose classic lane reads the `typescript` 6 package - kept also for typescript-eslint, whose peer range does not admit 7 yet (`client/README.md`).
 
@@ -116,7 +116,7 @@ Use [The loop](verification.md#the-loop) for build-lock and slow-build handling.
 Every label — its name, colour and description — has one authority, [`.github/labels.yml`](../.github/labels.yml), and the live set is synchronized from that file; the command is at the end of this section. The labels divide along four axes:
 
 - `type:` — what the issue is, exactly one: `bug`, `enhancement` or `feature`. The forms apply it: [Bug report](../.github/ISSUE_TEMPLATE/bug_report.yml), [Enhancement](../.github/ISSUE_TEMPLATE/enhancement_request.yml), [Feature request](../.github/ISSUE_TEMPLATE/feature_request.yml). An issue about documentation is still one of the three, with `area: docs` naming where it lands.
-- `area:` — where the work lands, one or more: `frontend` (`client/`), `backend` (the Rust binary and `crates/`), `docs`.
+- `area:` — where the work lands, one or more: `frontend` (`client/`), `backend` (the Rust binary under `Sprawling/` and `Tools/`), `docs`.
 - `aspect:` — a cross-cutting concern, zero or more: `performance`, `security`, `accessibility`. A security bug is `type: bug` plus `aspect: security`, reported through [SECURITY.md](SECURITY.md) rather than a public issue.
 - `status:` — the triage state, below.
 - `help wanted` and `good first issue` — the contribution labels, below.

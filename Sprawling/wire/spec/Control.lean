@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.wire.spec.Command.Kind
+import Sprawling.wire.spec.Command.Kind
 
 /-!
 # wire::control
 
-规定 `control`（`crates/wire/src/` 下同名的文件）。人的干预动词，与其中哪些欠一份 Handoff。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `control`（`Sprawling/wire/src/` 下同名的文件）。人的干预动词，与其中哪些欠一份 Handoff。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 -/
 
 /-!

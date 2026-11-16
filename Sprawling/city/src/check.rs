@@ -5,7 +5,7 @@
 
 //! Every TOML file a city holds, read by the parser that reads it at run
 //! time, with the first refusal of each placed at a line and a column
-//! (`crates/city/spec/Check.lean` §8-29).
+//! (`Sprawling/city/spec/Check.lean` §8-29).
 //!
 //! The parser's verdict is the verdict. Only when it refuses is the file
 //! read a second time with the same shape, to take the span `toml`
@@ -100,7 +100,7 @@ pub(crate) fn files(city_root: &Path) -> Result<Vec<(PathBuf, Kind)>, AxError> {
 
 impl Kind {
     /// The `format` ladder this kind of file climbs, if it carries one
-    /// (`crates/city/spec/Format.lean` §8-42).
+    /// (`Sprawling/city/spec/Format.lean` §8-42).
     pub(crate) fn versioned(&self) -> Option<FormatFile> {
         match self {
             Kind::Config => Some(FormatFile::LayerConfig),

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The original items: each line of the privacy request list as the person
-//! wrote it, and what became of it (`crates/sprawling/spec/Privacy/Controls.lean`).
+//! wrote it, and what became of it (`Sprawling/app/spec/Privacy/Controls.lean`).
 //!
 //! A line either writes a control, shared with any line that names the
 //! same target, or is not written for a reason the research settled; a

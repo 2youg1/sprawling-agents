@@ -301,7 +301,7 @@ impl EndpointBook {
 
     /// One warm-up for every attached endpoint, each sharing that
     /// endpoint's client slot, so the connection it opens is the one the
-    /// endpoint's first call takes (`crates/gateway/spec/Endpoint/Transport.lean` D26).
+    /// endpoint's first call takes (`Sprawling/gateway/spec/Endpoint/Transport.lean` D26).
     pub fn warm_ups(&self) -> impl Iterator<Item = WarmUp> + '_ {
         self.endpoints.values().map(|held| {
             WarmUp::new(
@@ -314,7 +314,7 @@ impl EndpointBook {
 
     /// Resolves one attachment's account list before effects or replay folding.
     /// An omitted list preserves the existing declaration; an explicit list
-    /// replaces it atomically. See `crates/gateway/spec/Router.lean` Accounts.
+    /// replaces it atomically. See `Sprawling/gateway/spec/Router.lean` Accounts.
     #[must_use]
     pub fn accounts_for_attachment(
         &self,
@@ -371,7 +371,7 @@ impl EndpointBook {
     ///
     /// Read by endpoint and model id rather than by tag alone: pointing
     /// a tag at another model must not carry the old model's figures
-    /// onto the new one (`crates/sprawling/Spec.lean` §8-71).
+    /// onto the new one (`Sprawling/app/Spec.lean` §8-71).
     #[must_use]
     pub fn registered(&self, tag: ModelTag, endpoint: &str, model: &str) -> Option<&ModelEntry> {
         self.chosen
@@ -381,7 +381,7 @@ impl EndpointBook {
     }
 
     /// Refuses an attachment whose rows leave out a model a tag points
-    /// at on this endpoint (`crates/gateway/spec/Router.lean` D40). The
+    /// at on this endpoint (`Sprawling/gateway/spec/Router.lean` D40). The
     /// fold never clears a choice when an endpoint is attached again, so
     /// this is where a role stays on a model the endpoint still holds.
     ///

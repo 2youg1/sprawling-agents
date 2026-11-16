@@ -5,7 +5,7 @@
 
 //! Wiring gate: every verb on the wire is reachable from the side that is
 //! supposed to reach it, and no other side pretends it is
-//! (crates/wire/Spec.lean section 19).
+//! (Sprawling/wire/Spec.lean section 19).
 //!
 //! **Both directions have failed here, and they fail differently.**
 //!
@@ -38,7 +38,7 @@
 //!
 //! The same table carries a second fact, the class of verb a frame is
 //! when a remote device sends it, as the arms of `def Command.verbClass`;
-//! `class` reads it beside the relay's own match (crates/wire/Spec.lean
+//! `class` reads it beside the relay's own match (Sprawling/wire/Spec.lean
 //! section 19-2).
 
 use std::collections::BTreeSet;
@@ -48,11 +48,11 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 /// The wire crate's directory, whose Lean specification holds the reach
-/// and class tables (crates/xtask/Spec.lean §8-43).
-const WIRE_CRATE: &str = "crates/wire";
+/// and class tables (Tools/xtask/Spec.lean §8-43).
+const WIRE_CRATE: &str = "Sprawling/wire";
 /// Where a reader is sent to change a row.
-const TABLE: &str = "`def Command.reach` (crates/wire/Spec.lean section 19-2)";
-const WIRE_DIR: &str = "crates/wire/src";
+const TABLE: &str = "`def Command.reach` (Sprawling/wire/Spec.lean section 19-2)";
+const WIRE_DIR: &str = "Sprawling/wire/src";
 /// The package the city's one writer lives in, whose `src` is searched.
 /// A package rather than a file: the gate wants the declaration of
 /// `run_command`, not its address, and pinning the address meant that
@@ -351,13 +351,13 @@ mod tests {
 
     /// The reach of each verb is an arm of `def Command.reach`, and a
     /// finding about one is located at the file that holds the arms
-    /// (crates/xtask/Spec.lean §8-43).
+    /// (Tools/xtask/Spec.lean §8-43).
     #[test]
     fn a_migrated_wire_specification_answers_the_reach_of_each_verb() {
         let root = crate::root::fixture::relocated("wiring-lean");
         crate::root::fixture::write(
             &root,
-            "crates/wire/Spec.lean",
+            "Sprawling/wire/Spec.lean",
             "/-! the reach -/\ndef Command.reach : Command → Reach\n  -- a person's verb\n  \
              | .Pursue => .client\n  | .Hello => .handshake\n\ndef other := 1\n",
         );
@@ -367,7 +367,7 @@ mod tests {
             read.map(|table| (table.path, table.rows))
                 .map_err(|err| err.to_string()),
             Ok((
-                "crates/wire/Spec.lean".to_owned(),
+                "Sprawling/wire/Spec.lean".to_owned(),
                 std::collections::BTreeMap::from([
                     ("Hello".to_owned(), Reach::Handshake),
                     ("Pursue".to_owned(), Reach::Client),

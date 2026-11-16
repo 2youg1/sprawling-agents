@@ -3,11 +3,11 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.benchstat.spec.Estimators
+import Tools.benchstat.spec.Estimators
 
 /-! # sprawling-benchstat 的规格
 
-`crates/benchstat/` 是可发布、无产品 crate 依赖的基准分析器，Cargo 包名为
+`Tools/benchstat/` 是可发布、无产品 crate 依赖的基准分析器，Cargo 包名为
 `sprawling-benchstat`，库名与命令名仍为 `benchstat`。它把一轮的 `manifest.json`
 与 `results.csv` 变成确定性的 `exports.json` 和权威 Markdown 报告；同一实现负责生成与验证，
 读者不需要产品二进制或另一套统计代码。
@@ -38,7 +38,7 @@ import crates.benchstat.spec.Estimators
 - `cargo nextest run -p sprawling-benchstat`、
   `cargo clippy -p sprawling-benchstat --all-targets --all-features -- -D warnings`、
   `cargo publish -p sprawling-benchstat --dry-run --locked` 与
-  `lake build crates.benchstat.Spec` 通过；历史 `docs/benchmarks/v0.0.11/` 不变。
+  `lake build Tools.benchstat.Spec` 通过；历史 `docs/benchmarks/v0.0.11/` 不变。
 -/
 
 /-! ## 3 假设与歧义
@@ -179,7 +179,7 @@ statrs：正态和二项分布；rustfft（关闭默认 SIMD features）：KDE �
 /-! ## 17 文档关系
 
 `docs/benchmarks/methodology.md` 是方法绑定；本规格拥有命令和实现边界；`architecture.toml` 登记模块；
-`lakefile.toml` 的两个 `crates.benchstat` glob 收进本规格；`docs/third-party.md` 记录新增 crate。
+`lakefile.toml` 的两个 `Tools.benchstat` glob 收进本规格；`docs/third-party.md` 记录新增 crate。
 修改任一命令、字段、估计量或发布政策时，四处按各自权威范围同步审查。
 -/
 

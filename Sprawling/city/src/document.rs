@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Putting a document on disk whole, or leaving the old one there
-//! (`crates/city/spec/Document.lean` §8-27).
+//! (`Sprawling/city/spec/Document.lean` §8-27).
 //!
 //! Every file the city writes is read back by something that parses it:
 //! a configuration layer, a building's rules, a job brief. A write that
@@ -126,7 +126,7 @@ pub(crate) fn moved(path: &Path) -> AxError {
 }
 
 /// Runs `act` on the bytes `path` holds now, with `path` held against
-/// every other writer of it in this process (`crates/city/spec/Document.lean` §8-40).
+/// every other writer of it in this process (`Sprawling/city/spec/Document.lean` §8-40).
 ///
 /// The door for a writer whose rule reads the whole document: read here,
 /// judged by `act`, replaced through [`Held::replace`] before `act`

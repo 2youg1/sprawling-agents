@@ -22,7 +22,7 @@
 //! the reason `scan_staged` gives about its own hits — printing the bytes
 //! to prove a leak is the leak.
 //!
-//! Specified by `crates/storage/spec/Hunks.lean` §8-19.
+//! Specified by `Sprawling/storage/spec/Hunks.lean` §8-19.
 
 use std::path::Path;
 

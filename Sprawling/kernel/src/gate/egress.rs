@@ -5,7 +5,7 @@
 
 //! The egress doors: whether bytes may leave and whether a host may be
 //! reached.
-//! The part `crates/kernel/spec/Gate.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Gate.lean` specifies this module with the
 //! rest of `kernel::gate`.
 
 use crate::error::{AxCode, AxError, GateRefusal};

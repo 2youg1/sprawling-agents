@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The browsers paired at this machine's door
-//! (`crates/wire/spec/Answer/Devices.lean` §8-91).
+//! (`Sprawling/wire/spec/Answer/Devices.lean` §8-91).
 
 use kernel::TimeMs;
 use serde::{Deserialize, Serialize};

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Where each package lives, what it is called, and whether it ships
-//! (crates/xtask/Spec.lean §8-39).
+//! (Tools/xtask/Spec.lean §8-39).
 //!
 //! The one reader of `cargo metadata`. A gate that derives a directory
 //! for itself assumes that the directory, the package name and the lib
@@ -59,7 +59,7 @@ pub(crate) struct Member {
 }
 
 /// Whether a package can be published, as its manifest's `publish`
-/// field says (crates/xtask/Spec.lean §8-49).
+/// field says (Tools/xtask/Spec.lean §8-49).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Publish {
     /// No `publish` field, `publish = true`, or a list of registries.
@@ -178,8 +178,8 @@ pub(crate) fn find<'a>(found: &'a [Member], name: &str) -> Result<&'a Member, Xt
 
 /// The package that owns `rel`, a repo-relative `/`-separated path: of
 /// the packages whose directory holds it, the one whose directory is
-/// longest. A package nested in another's directory (`crates/desktop/ffi`
-/// in `crates/desktop`) owns its own paths.
+/// longest. A package nested in another's directory (`Sprawling/desktop/ffi`
+/// in `Sprawling/desktop`) owns its own paths.
 pub(crate) fn owner<'a>(found: &'a [Member], rel: &str) -> Option<&'a Member> {
     found
         .iter()

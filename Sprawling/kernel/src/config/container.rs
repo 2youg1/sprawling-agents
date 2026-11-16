@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Explicit container limits and a local immutable image identity
-//! (`crates/kernel/spec/Config.lean`, container input contract).
+//! (`Sprawling/kernel/spec/Config.lean`, container input contract).
 
 use std::num::{NonZeroU32, NonZeroU64};
 

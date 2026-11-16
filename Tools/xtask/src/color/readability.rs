@@ -5,7 +5,7 @@
 
 //! Readability: the seventh token assertion, which pairs every text token
 //! with the brightest surface text may sit on and every type step with the
-//! tier its size and weight demand (crates/xtask/Spec.lean §8-8).
+//! tier its size and weight demand (Tools/xtask/Spec.lean §8-8).
 
 use super::contrast::{apca_lc, bronze_tier};
 use super::tables::{parse_text_tokens, parse_type_scale, text_surface_ceiling, tier_slack};

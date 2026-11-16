@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A page's save and a person's decision on proposal cards, through the
-//! worker's own doors (`crates/wire/Spec.lean` §8-72, 8-73; `crates/accounting/spec/Worker/Commanding/Saving.lean` §8-22).
+//! worker's own doors (`Sprawling/wire/Spec.lean` §8-72, 8-73; `Sprawling/accounting/spec/Worker/Commanding/Saving.lean` §8-22).
 
 #![allow(
     clippy::unwrap_used,

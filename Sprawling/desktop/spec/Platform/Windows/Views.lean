@@ -6,7 +6,7 @@
 /-!
 # views：一个动作只落在它看过的那一代上
 
-规定 `crates/desktop/src/platform/windows/views.rs`（`desktop::platform::windows::views`，`Views::mint` 与 `Views::resolve`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（D5，§10 设计六）。
+规定 `Sprawling/desktop/src/platform/windows/views.rs`（`desktop::platform::windows::views`，`Views::mint` 与 `Views::resolve`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（D5，§10 设计六）。
 
 一次 `desktop.snapshot` 为一扇窗口（按句柄，不按标题）铸一代 ref，记下这扇窗口当时的外框；`desktop.act` 带着它看过的那一代来。代与外框都对得上、ref 是这一代铸过的，动作才被接受。
 

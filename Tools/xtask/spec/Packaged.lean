@@ -6,7 +6,7 @@
 /-!
 # `packaged`：哪些项进不了任何一次生产编译
 
-规定 `crates/xtask/src/packaged.rs` 的 `excludes_production`（`crates/xtask/Spec.lean` §8-49）：
+规定 `Tools/xtask/src/packaged.rs` 的 `excludes_production`（`Tools/xtask/Spec.lean` §8-49）：
 一个 `cfg` 谓词在 `test` 为假时不可能成立，它标着的项连同它声明的文件就不进 `packaged` 的判定。
 
 参照定义把谓词读成一棵树，按 Rust 参考的 `cfg` 语义求值；`excludes_production` 是门的读法。
@@ -62,14 +62,14 @@ D16 **`packaged` 沿 cargo 的 target 走模块树，不按文件名猜哪些是
 `include_str!` 会不会在包外落空」只对生产编译单元里的调用成立。门从 `cargo metadata` 交出的
 target 源文件起，按 Rust 参考的模块路径规则跟 `mod` 声明走，凡 cfg 谓词在 `test` 为假时不可能
 成立的项（`test`，或含 `test` 的 `all(…)`，或每一支都如此的 `any(…)`）连同它声明的文件一并
-不进（`crates/xtask/Spec.lean` §8-49）。理由：本仓用 `#[path = "…/tests.rs"]`、
+不进（`Tools/xtask/Spec.lean` §8-49）。理由：本仓用 `#[path = "…/tests.rs"]`、
 `#[path = "grammar_tests.rs"]`、`#[cfg(test)] mod tests;` 几种写法放测试，文件名说不准；而模块树
 就是编译器自己的答案，没有第二种读法。被击败的备选：①像 `boundary`、`depmap` 那样按 `tests`、
 `tests.rs`、`_tests.rs` 认测试文件——一个生产文件叫 `fixture.rs`、一个测试文件叫
 `grammar_tests.rs` 之外的名字时，前者放过、后者误报，且失败无声；②在门里跑 `cargo package`
 加验证构建——要编译整个包，分钟级，而门在 `gates` 里毫秒级并行（§8-31），这份证据由人发布前的
 `cargo publish --dry-run` 给；③判每个文件里的每个 `include_str!`，测试也算——测试读
-`crates/fixtures/` 是本仓的惯例，而打包之后它们根本不编译，拒它们是错的。**重开参数**：一个可发布
+`Tools/fixtures/` 是本仓的惯例，而打包之后它们根本不编译，拒它们是错的。**重开参数**：一个可发布
 的包开始用宏生成 `mod` 声明，或用 `cfg_attr` 给 `mod` 换路径，那时门改为读
 `cargo rustc -- -Zunpretty` 一类编译器给出的模块表。
 -/

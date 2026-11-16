@@ -11,7 +11,7 @@ disallowed-methods = [
     { path = "std::time::Instant::now", reason = "inject time from assembly" },
     { path = "std::time::SystemTime::now", reason = "inject time from assembly" },
     # Every HTTP client is built by `gateway::client_for`, which installs the
-    # process's one TLS backend first (`crates/gateway/Spec.lean` §8-15); a client built
+    # process's one TLS backend first (`Sprawling/gateway/Spec.lean` §8-15); a client built
     # anywhere else panics at `build()` under `rustls-no-provider`.
     # `allow-invalid`, because a crate that depends on neither reqwest nor
     # rustls cannot resolve these paths, and that is not a finding.
@@ -23,7 +23,7 @@ disallowed-methods = [
     { path = "reqwest::ClientBuilder::new", reason = "build clients through gateway::client_for", allow-invalid = true },
     { path = "rustls::crypto::CryptoProvider::install_default", reason = "the one provider is installed by gateway::reach::tls", allow-invalid = true },
     # Every child process of the city starts from `child::command`
-    # (`crates/child/Spec.lean` D4); a spawn point that is not the city's
+    # (`Sprawling/child/Spec.lean` D4); a spawn point that is not the city's
     # child says which kind it is in its own `#[expect(..., reason = "...")]`.
     { path = "std::process::Command::new", reason = "start a child process through child::command, which detaches it from the city's console and removes the city's secrets from its environment" },
 ]

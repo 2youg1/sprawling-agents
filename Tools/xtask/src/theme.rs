@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Where the browser client's theme lives, and in which order it is read
-//! (crates/xtask/Spec.lean §8-8, §8-51).
+//! (Tools/xtask/Spec.lean §8-8, §8-51).
 //!
 //! The theme is one entry stylesheet and the parts it imports. The entry
 //! is the file `main.ts` imports; each part is a contiguous piece of the

@@ -7,7 +7,7 @@
 //! real guest, the one compiled guest every clone of it shares, the
 //! ceiling a guest's memory grows under, and the rules by which its
 //! ending becomes a [`SandboxExit`](super::SandboxExit)
-//! (`crates/runtime/spec/Sandbox.lean` §8-13, D101, D102).
+//! (`Sprawling/runtime/spec/Sandbox.lean` §8-13, D101, D102).
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};

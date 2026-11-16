@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A stored object as bytes, window by window, and a Markdown version
-//! exported as one HTML file (`crates/wire/spec/Answer/DocumentBytes.lean`
+//! exported as one HTML file (`Sprawling/wire/spec/Answer/DocumentBytes.lean`
 //! §8-80, §8-81).
 //!
 //! Bytes travel on the same socket as every other answer, so a device on

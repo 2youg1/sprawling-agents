@@ -6,7 +6,7 @@
 //! What `web_search` asks of the model and hands to one supplier: the
 //! parameters it offers, derived from the supplier frozen with the run,
 //! and the judgement of that supplier's mapping against the remote
-//! tool's `inputSchema` (`crates/accounting/spec/Connectors.lean` §8-35).
+//! tool's `inputSchema` (`Sprawling/accounting/spec/Connectors.lean` §8-35).
 
 use kernel::config::SearchSupplier;
 use kernel::{AxCode, AxError, Payload};

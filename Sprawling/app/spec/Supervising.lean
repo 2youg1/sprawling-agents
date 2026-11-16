@@ -6,7 +6,7 @@
 /-!
 # 守护的崩溃预算：崩溃 → `resume` → `serve`，一分钟三次就停下等人
 
-规定 `crates/sprawling/src/supervising.rs` 的 `CrashBudget::after`（`bin::supervising`，形状 1 decision；§8-109）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。起子进程、读退出状态、等人按 Enter 归 `bin::supervising::children`，这里不建模。
+规定 `Sprawling/app/src/supervising.rs` 的 `CrashBudget::after`（`bin::supervising`，形状 1 decision；§8-109）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。起子进程、读退出状态、等人按 Enter 归 `bin::supervising::children`，这里不建模。
 
 时刻是守护起步以来的毫秒数，取自单调时钟，所以在模型里是自然数；「距今」是自然数的截断减法，与 Rust 的 `saturating_sub` 相同。
 
@@ -212,7 +212,7 @@ pub(in crate::assembly) struct Flight {
 
 ### 8-92 装配根与 serving、doctor 之间的依赖只朝一个方向
 
-`bin::assembly` 是 `sprawling` 里唯一知道所有具体类型的地方，别的模块不应当反过来知道它（ARCHITECTURE.md §3）。一条从 serving 或 doctor 指回装配根的边，意味着改装配根的内部可能改坏一个读面，而读面本来只该依赖它读的那份事实的权威。城的唯一写者与读面都住 `accounting` 之后，装配根只剩自由函数与直接碰主机的生产适配器（`crates/accounting/Spec.lean` §8-11、accounting D12）：`production`（`SystemClock`、`hands`、`init_city`、`form_city`）、`listening`（占端口、开写者）、`attending`（起写者线程）、`chain_watch`（起审计线程）与 `dropping`（拖进对话框的文件）。
+`bin::assembly` 是 `sprawling` 里唯一知道所有具体类型的地方，别的模块不应当反过来知道它（ARCHITECTURE.md §3）。一条从 serving 或 doctor 指回装配根的边，意味着改装配根的内部可能改坏一个读面，而读面本来只该依赖它读的那份事实的权威。城的唯一写者与读面都住 `accounting` 之后，装配根只剩自由函数与直接碰主机的生产适配器（`Sprawling/accounting/Spec.lean` §8-11、accounting D12）：`production`（`SystemClock`、`hands`、`init_city`、`form_city`）、`listening`（占端口、开写者）、`attending`（起写者线程）、`chain_watch`（起审计线程）与 `dropping`（拖进对话框的文件）。
 
 **账本在哪，由 `kernel::layout::CityLayout::ledger` 一处回答。** 每个读账本的地方直接调用 `CityLayout::new(city_root).ledger()`，装配点不另设转发函数：转发只给同一件事换了名字，却会让读面与 serving 为了一个路径去依赖装配点。
 
@@ -222,21 +222,21 @@ pub(in crate::assembly) struct Flight {
 
 **serving 不往命令台投命令，所以不需要句柄。** 投命令的是 `listen` 交给 socket 的那几个闭包、控制台与 ACP 入站；前一个随 `listen` 住在装配根，后两个本来就在 serving 之外。另一种做法是把 `listen` 拆成传输的一半（留在 serving，持一个 serving 自己定义的命令发送端）与写者的一半（进装配根）；它多出一个类型和一条通道，换来的只是 `listen` 住在 serving 里，而 `listen` 的次序（§8-88）恰好是「先占端口，再开写者」这一件事，拆开后这个次序要由两边共同守。
 
-**日志行的时间由构造者交进来。** `Journal::new` 收一个 `serving::journal::Clock`，即 `Arc<dyn accounting::Clock + Send + Sync>`；`main::city` 交的是 `assembly::SystemClock`，墙钟只在 `bin::assembly::production` 采样（§8-63，`crates/accounting/Spec.lean` §8-3）。
+**日志行的时间由构造者交进来。** `Journal::new` 收一个 `serving::journal::Clock`，即 `Arc<dyn accounting::Clock + Send + Sync>`；`main::city` 交的是 `assembly::SystemClock`，墙钟只在 `bin::assembly::production` 采样（§8-63，`Sprawling/accounting/Spec.lean` §8-3）。
 
 反方向是组装点应有的方向，保留：装配根用 serving 的 `open_vault`、`Serving`、`folding`、`output_ring::OutputRing`、`standing::monotonic_now`，用 doctor 的 `ThisMachine`、`Platform`、`PATIENCE`、`host`、`recipe_for`，用 `accounting::worker` 的 `RunWorker`、`CommandDesk`、`Hands`、`genesis::form` 与 `folds::start_served_views`。
 
-**方向由门守。** ARCHITECTURE.md 的 `directions` 块逐个模块写下它的产品代码永不写出的路径，`cargo xtask depmap` 读它（crates/xtask/Spec.lean §8-33）。块里有三行：`accounting` 的 views 不写出 `crate::worker`；doctor 与 serving 不写出 `crate::assembly` 与 `accounting::worker`。读面与写者同住 `accounting` 之后，「写者知道读面、读面不知道写者」由第一行守；`accounting` 不依赖 `sprawling`，读面与写者指回装配根由编译器拒绝。城有没有历史由 `city::has_history` 回答（`crates/city/Spec.lean` §8-30），doctor 与写者都从那里取用。
+**方向由门守。** ARCHITECTURE.md 的 `directions` 块逐个模块写下它的产品代码永不写出的路径，`cargo xtask depmap` 读它（Tools/xtask/Spec.lean §8-33）。块里有三行：`accounting` 的 views 不写出 `crate::worker`；doctor 与 serving 不写出 `crate::assembly` 与 `accounting::worker`。读面与写者同住 `accounting` 之后，「写者知道读面、读面不知道写者」由第一行守；`accounting` 不依赖 `sprawling`，读面与写者指回装配根由编译器拒绝。城有没有历史由 `city::has_history` 回答（`Sprawling/city/Spec.lean` §8-30），doctor 与写者都从那里取用。
 
 读面用到的五样东西各归其主，worker 从那里取用：
 
 | 事实 | 住处 | 理由 |
 |---|---|---|
-| 一个居民或房间叫什么 | `kernel::Address::name`（`crates/kernel/Spec.lean` §8-2 的 `Address`） | 地址的最后一段是地址自己的事实；城的名册与楼的页面都从这里读 |
+| 一个居民或房间叫什么 | `kernel::Address::name`（`Sprawling/kernel/Spec.lean` §8-2 的 `Address`） | 地址的最后一段是地址自己的事实；城的名册与楼的页面都从这里读 |
 | 一栋楼的页面、`documents::WINDOW_BYTES_MAX` | `accounting::views::building_page` | 页面是一个读面：按问的那一刻读盘，不持有第二份 |
 | 一台 MCP server 经哪种传输到达（`McpLink`） | `agent_protocols::mcp::link` | 三种传输（`agent_protocols::mcp` 下的 `stdio`、`http`、`sse`）与把它们合成 `agent_protocols::Outbound` 的那个枚举同住 `agent_protocols`；读面与装配点都经 `agent_protocols` 的握手与列工具说话 |
-| broker 的钥匙登记在哪、这座城对 broker 是谁（`broker_for`） | `accounting::toolkit_broker`（`crates/accounting/Spec.lean` §8-9） | 页面与命令读同一组事实；连接动作 `connect_toolkit` 仍是 worker 的 |
-| 一个锁着的 vault 的解析器与锁中毒时的拒绝（`resolving`、`poisoned_vault`） | `accounting::held_vault`（`crates/accounting/Spec.lean` §8-9） | worker、读面与 serving 都要一次性的解析器；拒绝的措辞只有一处 |
+| broker 的钥匙登记在哪、这座城对 broker 是谁（`broker_for`） | `accounting::toolkit_broker`（`Sprawling/accounting/Spec.lean` §8-9） | 页面与命令读同一组事实；连接动作 `connect_toolkit` 仍是 worker 的 |
+| 一个锁着的 vault 的解析器与锁中毒时的拒绝（`resolving`、`poisoned_vault`） | `accounting::held_vault`（`Sprawling/accounting/Spec.lean` §8-9） | worker、读面与 serving 都要一次性的解析器；拒绝的措辞只有一处 |
 
 
 ### 8-112 保温的门：run 的模型调用经 `Warmed` 走，落地后留在 `RunWorker` 上（`accounting::worker::keeping_warm`，形状 1 数据）
@@ -263,33 +263,33 @@ impl RunWorker {
 }
 ```
 
-`dispatching::agreeing` 选定适配器后，用 `city::keep_warm(city_root, judged)` 读到的设置——`judged` 是判 harness 的同一个地址：派进已开的房间时是房间地址，城→楼→房间三层都读到；开房间的派活是楼（D80）——、worker 的 `clock`（`accounting::Clock`）与 `Kept::lead_of` 按所选 endpoint 名给出的提前量，把它包成 `Door`；连同一 endpoint 的门共用一个提前量，因为网络路径与名额门属于 endpoint，而一扇门每次真实使用只见到一次续期（runtime D100）；`Agreed`、`Site`、`Driving`、`Driven` 与 `driving::lane` 带的都是这扇门，所以 run 发出的每个请求都进了保温账（`crates/runtime/Spec.lean` §8-4-2），转向循环不知道保温存在。`settling::landing` 在 run 结束时把门交给 `Kept`，按房间地址存：同一房间后来的 run 换掉前一扇门，因为后一个前缀才是下一次会用到的。`next_due` 为 `None` 的门（设置为 `Off`，或已续过一次）不留，所以默认设置下 `Kept` 一直是空的，worker 不多占一个字节，也不多发一个请求。
+`dispatching::agreeing` 选定适配器后，用 `city::keep_warm(city_root, judged)` 读到的设置——`judged` 是判 harness 的同一个地址：派进已开的房间时是房间地址，城→楼→房间三层都读到；开房间的派活是楼（D80）——、worker 的 `clock`（`accounting::Clock`）与 `Kept::lead_of` 按所选 endpoint 名给出的提前量，把它包成 `Door`；连同一 endpoint 的门共用一个提前量，因为网络路径与名额门属于 endpoint，而一扇门每次真实使用只见到一次续期（runtime D100）；`Agreed`、`Site`、`Driving`、`Driven` 与 `driving::lane` 带的都是这扇门，所以 run 发出的每个请求都进了保温账（`Sprawling/runtime/Spec.lean` §8-4-2），转向循环不知道保温存在。`settling::landing` 在 run 结束时把门交给 `Kept`，按房间地址存：同一房间后来的 run 换掉前一扇门，因为后一个前缀才是下一次会用到的。`next_due` 为 `None` 的门（设置为 `Off`，或已续过一次）不留，所以默认设置下 `Kept` 一直是空的，worker 不多占一个字节，也不多发一个请求。
 
-`accounting::worker::attend` 的空闲分支先读日程，再调用 `renew_warm(now)`，下一次睡眠取「距下次读日程」与「距 `warm_due`」中较短者，所以一次续期不会等到日程的整点之后。续期不在记账线程上发（D78）：`renew_warm` 经 `take_due` 取出每扇到期的门，各交给 `accounting::worker::errand` 的一条线程，那条线程调门的 `renew_due`，把门连同回执作为 `Answer::Renewed` 送回记账线程的队列；该不该续、续哪个前缀仍由门里的 `kernel::keep_warm::renewal_due` 判。门在外面时不在 `next_due` 里，所以同一扇门不会被交出去两次，记账线程也不为它空醒。回答回来时 `record_renewal` 在房间地址下为每次续期写一条 `cache_renewed`（`crates/kernel/Spec.lean` §8-4）：成功时是 provider 自报的用量与账单额，失败时是它的拒绝原样，所以人从账本上读得出保温花了多少、哪个 provider 拒了续期；成本视图的总额含这笔花费，并把它单列一行（`crates/storage/Spec.lean` D36）。门续完还欠续期就回家；它在外面时同一房间落地了一个新 run，新门已经换掉它，回来的这扇被丢弃。续期失败不停城；只有这条记录本身写不进账本时才写进诊断日志，与日程读取失败同样处理。
+`accounting::worker::attend` 的空闲分支先读日程，再调用 `renew_warm(now)`，下一次睡眠取「距下次读日程」与「距 `warm_due`」中较短者，所以一次续期不会等到日程的整点之后。续期不在记账线程上发（D78）：`renew_warm` 经 `take_due` 取出每扇到期的门，各交给 `accounting::worker::errand` 的一条线程，那条线程调门的 `renew_due`，把门连同回执作为 `Answer::Renewed` 送回记账线程的队列；该不该续、续哪个前缀仍由门里的 `kernel::keep_warm::renewal_due` 判。门在外面时不在 `next_due` 里，所以同一扇门不会被交出去两次，记账线程也不为它空醒。回答回来时 `record_renewal` 在房间地址下为每次续期写一条 `cache_renewed`（`Sprawling/kernel/Spec.lean` §8-4）：成功时是 provider 自报的用量与账单额，失败时是它的拒绝原样，所以人从账本上读得出保温花了多少、哪个 provider 拒了续期；成本视图的总额含这笔花费，并把它单列一行（`Sprawling/storage/Spec.lean` D36）。门续完还欠续期就回家；它在外面时同一房间落地了一个新 run，新门已经换掉它，回来的这扇被丢弃。续期失败不停城；只有这条记录本身写不进账本时才写进诊断日志，与日程读取失败同样处理。
 
 失败：续期不传回 `Err`，每扇交出去的门各得一巡结果；一巡里第一次拒绝之前的已答续期照常逐条入账，拒绝本身原样放进 `CacheRenewed::Refused`，拒绝之后不再发。一扇门失败不妨碍其他门续期，失败的门被丢弃，所以拒绝续期的 provider 不会在每次醒来时再被问一遍。起不了线程时同样写一条 `Refused`，那扇门被丢弃。门出门时带一个递增的记号：它在外面时房间迎来了新门、新门也出去续期，旧门回来时记号对不上，既不摘掉新门的在途标记，也不顶掉新门（旧门按「被换掉」丢弃）。
 
-当前状态：保温已完整：设置默认关、默认下不发任何额外请求，打开后每次真实使用在到期前续期一次，每次续期在自己的线程上发，用量或拒绝都记在账本上；提前量按 endpoint 存，取续期的往返或真实调用到第一个增量的时间（`crates/runtime/Spec.lean` §8-4-2）。
+当前状态：保温已完整：设置默认关、默认下不发任何额外请求，打开后每次真实使用在到期前续期一次，每次续期在自己的线程上发，用量或拒绝都记在账本上；提前量按 endpoint 存，取续期的往返或真实调用到第一个增量的时间（`Sprawling/runtime/Spec.lean` §8-4-2）。
 
-决定：门按房间存，而不是按 run 存。按 run 存时，一个房间连续跑十次会留下十扇门，其中九扇续的是已经被下一个前缀覆盖的缓存，花的钱没有用处；按房间存时门的数目以房间数为上限。重新考虑的条件：同一房间里并行的会话各有自己的前缀。续期一扇门一条线程，所以不同房间的续期互不等待（`crates/sprawling/spec/Accounting/Worker.lean` D78）。
+决定：门按房间存，而不是按 run 存。按 run 存时，一个房间连续跑十次会留下十扇门，其中九扇续的是已经被下一个前缀覆盖的缓存，花的钱没有用处；按房间存时门的数目以房间数为上限。重新考虑的条件：同一房间里并行的会话各有自己的前缀。续期一扇门一条线程，所以不同房间的续期互不等待（`Sprawling/app/spec/Accounting/Worker.lean` D78）。
 
 ### 8-145 备树：lane 在 run 驾驶完之后补一棵，下一次放置接管它（`accounting::worker::dispatching::preparing`）
 
 ```rust
-// storage —— `crates/storage/Spec.lean` §8-35
+// storage —— `Sprawling/storage/Spec.lean` §8-35
 impl storage::Worktrees { pub fn stock(&self) -> Result<storage::FileWork, storage::StorageError>; }
 // accounting::worker::dispatching::preparing —— Staged::fly 的两臂
 // 两臂：驾驶返回之后先 home(flown)，交回 Flown；再 restock.put_back()（次序与池的一半见 §8-161）
 // Restock::owed_by：借了树（lease 为 Some）才欠一次补树，补的是 Worktrees::open(city_root)?.stock()（界与失败见 §8-155）
 ```
 
-- **为什么在这里。** 一次放置等的是实时扫描对每个新建文件的放行，512 个 16 KB 文件的树以秒计（`crates/storage/Spec.lean` §8-31、§8-35）。人等的是 run 的第一次模型调用，备树把检出挪出这一段，放置只改名。补树放在 lane 驾驶完、交回 `Flown` 之后：这时 run 的模型调用都已做完，它写的行都已经由 relay 写下，它的落地也不再等这条 lane（§8-161）。记账线程不行（§8-113：记账线程不等盘）；`land` 在记账线程上；开城时补一棵会把一次全量检出加进首字节（§8-122）；一条专门补树的后台线程不在 ARCHITECTURE §10 第 3 条点名的起线程处之列。`fly` 只有一个调用者，`accounting::worker::pool` 起的那条 lane，所以补树在 `fly` 里就是在 lane 上。
+- **为什么在这里。** 一次放置等的是实时扫描对每个新建文件的放行，512 个 16 KB 文件的树以秒计（`Sprawling/storage/Spec.lean` §8-31、§8-35）。人等的是 run 的第一次模型调用，备树把检出挪出这一段，放置只改名。补树放在 lane 驾驶完、交回 `Flown` 之后：这时 run 的模型调用都已做完，它写的行都已经由 relay 写下，它的落地也不再等这条 lane（§8-161）。记账线程不行（§8-113：记账线程不等盘）；`land` 在记账线程上；开城时补一棵会把一次全量检出加进首字节（§8-122）；一条专门补树的后台线程不在 ARCHITECTURE §10 第 3 条点名的起线程处之列。`fly` 只有一个调用者，`accounting::worker::pool` 起的那条 lane，所以补树在 `fly` 里就是在 lane 上。
 - **只在借了树的 run 之后补。** 没有评审、也不是试验的楼从不借树，它的 run 补一棵只会白占一棵树的盘。harness 的 run 与模型的 run 经同一个 `lend_tree` 借树（§8-124），也同样可能接管备树，所以两臂都补。`stock` 在备树已在干线上时只写干线改过的文件，所以房间取回自己留着的树之后补树的代价是一次差量（读数见 §8-155）。
-- **代价落在谁身上。** run 的落地不等补树：lane 先把 `Flown` 交回记账线程，再补树，`DrivingPool::landed` 不在记账线程上 `join` 还在补树的 lane（§8-161）。房间队列与树的归还、待人处理事项的登记、对派活者的答复、交下去的活与继任 run 的派出照常在 `land` 里做。补树占着这条 lane 的线程直到补完；只有备树刚被接管过（一个房间第一次放置）时它是一次全量检出，其余时候是差量。紧接着派到一个新房间的 run 若在补完之前放置，见到的备树正被补（`Busy`），这次放置退回全量检出（`crates/storage/Spec.lean` §8-35）。关城时丢掉 `DrivingPool` 要 `join` 还在补的 lane，所以关城等正在补的那一棵。
+- **代价落在谁身上。** run 的落地不等补树：lane 先把 `Flown` 交回记账线程，再补树，`DrivingPool::landed` 不在记账线程上 `join` 还在补树的 lane（§8-161）。房间队列与树的归还、待人处理事项的登记、对派活者的答复、交下去的活与继任 run 的派出照常在 `land` 里做。补树占着这条 lane 的线程直到补完；只有备树刚被接管过（一个房间第一次放置）时它是一次全量检出，其余时候是差量。紧接着派到一个新房间的 run 若在补完之前放置，见到的备树正被补（`Busy`），这次放置退回全量检出（`Sprawling/storage/Spec.lean` §8-35）。关城时丢掉 `DrivingPool` 要 `join` 还在补的 lane，所以关城等正在补的那一棵。
 - **失败。** `stock` 的失败不改变 run 的结局：run 已经结束，补不上备树只让下一次放置退回全量检出。失败写一条 `Refuse` 诊断行，锚在 lane 的账本位置快照上，与 §8-113 lane 半段的诊断行同一个写端。
 - **试验借树（§8-133）的重开参数读的是这里。** D20「试验借一棵自己的树」以放置读数是否以秒计为重开条件：接管备树之后放置以毫秒计，那条决定的前提回到它被定下时的样子。
 
-当前状态：两半都已落地。storage 一半是 `crates/storage/Spec.lean` §8-35（`stock`，放置先接管备树）；citysim 的 `large_worktree_placement` 在每轮之前调 `stock`（citysim D13、`crates/citysim/Spec.lean` §8-12）；lane 一半在 `dispatching::preparing`，界、崩溃后的收回与读数在 §8-155。检验是 `preparing::tests` 的两条：`a_lane_puts_the_stock_back_after_its_run_comes_home`（`fly` 交回 `Flown` 时还没有备树，`fly` 返回、`land` 还没跑时备树已经登记、没锁、目录在），`the_next_room_takes_the_stock_and_creates_no_file`（第一个房间经真 lane 派活并落地，第二个房间的放置整值比较 `FileWork`，三个计数都是 0，接管之后 lane 又补回一棵）。
+当前状态：两半都已落地。storage 一半是 `Sprawling/storage/Spec.lean` §8-35（`stock`，放置先接管备树）；citysim 的 `large_worktree_placement` 在每轮之前调 `stock`（citysim D13、`Tools/citysim/Spec.lean` §8-12）；lane 一半在 `dispatching::preparing`，界、崩溃后的收回与读数在 §8-155。检验是 `preparing::tests` 的两条：`a_lane_puts_the_stock_back_after_its_run_comes_home`（`fly` 交回 `Flown` 时还没有备树，`fly` 返回、`land` 还没跑时备树已经登记、没锁、目录在），`the_next_room_takes_the_stock_and_creates_no_file`（第一个房间经真 lane 派活并落地，第二个房间的放置整值比较 `FileWork`，三个计数都是 0，接管之后 lane 又补回一棵）。
 ### 8-155 补树的界：一座城一次一条 lane 在补，补到一半进程死了由盘上的状态收回（`accounting::worker::dispatching::preparing`）
 
 ```rust
@@ -305,10 +305,10 @@ impl Restock {
 static STOCKING: Mutex<BTreeSet<PathBuf>>;
 ```
 
-- **一座城同一时刻至多一条 lane 在补，后来的跳过，不等。** `crates/storage/Spec.lean` §8-35 保证了两种并发（两次放置争一棵备树；一次刷新与一次接管），没有保证两次 `stock` 同时见到「没有备树」：两条都去新备，后一条的 `worktree add` 撞上前一条刚登记的 `+spare` 而失败，它的 `take_back` 收回的是前一条的登记；这时一次正在接管的放置在改名登记目录那一步失败，那次派活带着存储错误回到人那里。lane 在调 `stock` 之前先在表里占这座城的位置，占不到就不补：正在补的那一条补完，城里就有备树。不等，是因为正在补的那一条补完城里就有备树，等它只让这条 lane 的线程多活一次全量检出，之后的那次 `stock` 也只剩一次空的差量。表被一条 lane 崩掉而中毒时照样读写，因为表里每一步都在锁内做完。
+- **一座城同一时刻至多一条 lane 在补，后来的跳过，不等。** `Sprawling/storage/Spec.lean` §8-35 保证了两种并发（两次放置争一棵备树；一次刷新与一次接管），没有保证两次 `stock` 同时见到「没有备树」：两条都去新备，后一条的 `worktree add` 撞上前一条刚登记的 `+spare` 而失败，它的 `take_back` 收回的是前一条的登记；这时一次正在接管的放置在改名登记目录那一步失败，那次派活带着存储错误回到人那里。lane 在调 `stock` 之前先在表里占这座城的位置，占不到就不补：正在补的那一条补完，城里就有备树。不等，是因为正在补的那一条补完城里就有备树，等它只让这条 lane 的线程多活一次全量检出，之后的那次 `stock` 也只剩一次空的差量。表被一条 lane 崩掉而中毒时照样读写，因为表里每一步都在锁内做完。
 - **表在进程里，按城根分键。** 一座城只有一个写者进程（账本的写锁），所以「这个进程里谁在补这座城」就是「谁在补这座城」。
 - **成功与失败。** 成功写一条 `Trace` 诊断行，带 `stock` 答回的三个计数，人从日志读得出这次补树是全量检出还是差量。失败写一条 `Refuse` 诊断行，说下一次放置会退回全量检出；不返回错误，run 的结局不因它改变（§8-145）。两行都锚在派活被决定时的账本位置（`Laying` 与 `HarnessHalf` 里的 `staged_at`），与 §8-113 lane 半段的诊断行同一个写端。
-- **补到一半进程死了。** 账本里没有补树的记录，重放与恢复都不读它；备树的全部状态在盘上与城的 git 登记里，进程里的表随进程消失。下一个写者开城时 `RunWorker::over` 先拿账本写锁，再由 `Worktrees::lift_abandoned_leases` 解开每一棵树的锁，`+spare` 也在其中，否则一棵锁着的备树会被读成「正在补」，本次服务里再也没有备树可接管；`sweep_abandoned` 不清它，因为 `live` 不列它（`crates/storage/Spec.lean` §8-35）。之后按盘上的样子收回：登记与两份链接文件都认得出时，下一次放置接管它，检出到一半的文件由接管第⑥步的 `restore` 补全；登记在而链接文件认不出时，下一次 `stock` 收回登记重备；目录在而没有登记时，下一次 `stock` 先清掉目录再备。所以 G5（崩溃与恢复）不需要为补树加任何恢复步骤；它要守住的只有一条次序：开城解锁先于第一次放置。
+- **补到一半进程死了。** 账本里没有补树的记录，重放与恢复都不读它；备树的全部状态在盘上与城的 git 登记里，进程里的表随进程消失。下一个写者开城时 `RunWorker::over` 先拿账本写锁，再由 `Worktrees::lift_abandoned_leases` 解开每一棵树的锁，`+spare` 也在其中，否则一棵锁着的备树会被读成「正在补」，本次服务里再也没有备树可接管；`sweep_abandoned` 不清它，因为 `live` 不列它（`Sprawling/storage/Spec.lean` §8-35）。之后按盘上的样子收回：登记与两份链接文件都认得出时，下一次放置接管它，检出到一半的文件由接管第⑥步的 `restore` 补全；登记在而链接文件认不出时，下一次 `stock` 收回登记重备；目录在而没有登记时，下一次 `stock` 先清掉目录再备。所以 G5（崩溃与恢复）不需要为补树加任何恢复步骤；它要守住的只有一条次序：开城解锁先于第一次放置。
 - **补树不在落地这一段。** 一个房间第一次放置接管了备树之后，这条 lane 补回的是一次全量检出；lane 在交回 `Flown` 之后才补，`DrivingPool::landed` 不 `join` 还在补的 lane，所以这个 run 的落地不等它（§8-161）。
 - **读数。** 由 `preparing::tests::instrument_production_placement`（`#[ignore]`）给出：一座评审楼的 `lab/room1/bulk` 里 512 个 16 KB 文件，第一个房间经 `fly` 放置（全量检出）、驾驶、补备树；第二个房间经 `fly` 接管备树、驾驶、补回一棵。仪表用一个包住城账本的计时 `Ledger` 与交给 `fly` 的 `home` 量四段：`fly` 开始到 `worktree_opened` 入账（放置），最后一行入账到交回 `Flown`（落地等的，`landing_wait_ms`），交回 `Flown` 到 `fly` 返回（补树），以及整个 `fly`。下面两段读数在 lane 先补树、后交回 `Flown` 时量得，那时补树这一段整段落在落地之前（§8-161 前后对照）。
 
@@ -316,7 +316,7 @@ static STOCKING: Mutex<BTreeSet<PathBuf>>;
 
 读数（发行构建，windows-x86_64、16 核，同一仪表两轮）：第二个房间接管备树的放置 47–48 ms，`created` 为 0；它的 lane 补回备树 1.35–1.54 s。第一个房间的放置 4.29–4.72 s，`created` 513；它之后补备树 1.24–1.42 s。发行构建省下的是计算，省不下实时扫描对每个新建文件的放行，所以补树与城的第一次放置在发行构建里仍以秒计。`just bench` 的 `large_worktree_placement`（bench 自己备树）p50 36.0 ms。
 
-当前状态：上面各条都已落地。还以秒计的有两段，都不在 run 的落地之前：一是补备树本身，在 lane 交回 `Flown` 之后，占着这条 lane 的线程与盘（§8-161）；二是一座城的第一次放置，它先提交一次城（`crates/storage/Spec.lean` §8-8 的 `ensure_base`），每座城只有一次，那次之前没有干线可备，所以备树帮不上它，这一段仍在那座城第一个 run 的第一次模型调用之前（拆分与读数在 §8-161）。发行构建的读数由同一个仪表测试给出：`cargo nextest run --release -p sprawling-accounting --run-ignored only --no-capture -E 'test(instrument_production_placement)'`。
+当前状态：上面各条都已落地。还以秒计的有两段，都不在 run 的落地之前：一是补备树本身，在 lane 交回 `Flown` 之后，占着这条 lane 的线程与盘（§8-161）；二是一座城的第一次放置，它先提交一次城（`Sprawling/storage/Spec.lean` §8-8 的 `ensure_base`），每座城只有一次，那次之前没有干线可备，所以备树帮不上它，这一段仍在那座城第一个 run 的第一次模型调用之前（拆分与读数在 §8-161）。发行构建的读数由同一个仪表测试给出：`cargo nextest run --release -p sprawling-accounting --run-ignored only --no-capture -E 'test(instrument_production_placement)'`。
 
 ### 8-161 run 先落地，lane 再补备树（`accounting::worker::dispatching::preparing`、`accounting::worker::pool`）
 
@@ -358,7 +358,7 @@ impl Drop for DrivingPool { /* join 每条 trailing 里的 lane */ }
 - **lane：`Staged::fly<L: Ledger>(self, ledger: &mut L, context: DriveContext) -> Flown`**（`dispatching::preparing`），先准备、再 `drive_run`，这是 lane 的全部工作；准备这一段依次做：`Site::place_tree`，`Stamping` 包着这条 lane 的 relay，于是 `worktree_opened` 经 relay 写；`lay_out_workbench`，MCP 缺表时的连接在这里；`Freezing::freeze_plan`，CAS 用 lane 共用的句柄；`probe_after`、`Sieving::for_run`、`checkpoint_scope`。`ensure_base` 与检查点之间的次序由 §8-46-13 定。`claim` 只动本房间的树与分支。`Site` 与 `Assignment` 无论准备成败都装在 `Flown` 里、随 `Arrival` 回家，因为 `land` 要还 `Site` 借到的树；`Workbench` 经 `Driving` 进驾驶、随 `Driven` 回家，`land` 读它的 `delegates` 与 `succession`。准备失败时 `Flown.driven` 就是那个错误，`land` 照常先还房间队列与树，再把错误交给问的人，和驾驶失败走同一条路（§8-46-9）。
 - **`DrivingPool` 排队与起 lane 的单位是 `Staged`**：满了的时候等着的是一份还没准备的派活，它不占线程，也还没有占树、没有连 server。`Staged` 带着 `site.run_id`，池按它认重复。
 
-**lane 借什么。** §8-110、§8-111 拆出的对象里，lane 只借本来就是共享句柄的那几样，每样是一个 `Arc` 的克隆或一个值，收在 `Staged` 的 `Laying` 里：`Flight.backlog`（`exec` 与 `status` 用）、`Credentials.vault`（工具解析密钥用）、`city_root`、lane 共用的 CAS 句柄、MCP 常驻表、诊断的写端、时钟。房间的六张桌子（信、目标、计划、书架、PR、作坊）本来就是 `Arc<Mutex<_>>`，`Desks::for_bench` 把它们的克隆与 `waiting` 作为 `BenchDesks` 交给 lane，`Desks` 本身（连同队列的 `tenure`）留在 `Continuation` 里，只有它还队列。常驻表：`accounting::Connectors::connect` 取 `&self`（`crates/accounting/Spec.lean` §8-2），`RunWorker.connectors` 是 `Arc<dyn Connectors + Send + Sync>`，lane 借一个克隆；表的寿命仍是 worker 的寿命，最后一个 `Arc` 落地时 `Drop` 杀子进程（§8-4）。CAS 是 lane 共用的一个句柄 `RunWorker::lane_store`（`Arc<Mutex<Cas>>`），随 worker 打开，冻结与筛子的 offload 都经它写，每次在锁里做完：`storage::Cas::open` 会清扫 `tmp/` 里的半成品，而一次写的半成品名只由对象哈希决定，一条 lane 自己开句柄就会扫掉另一条 lane 正在写的对象，两条 lane 写同一个对象也会共用同一个半成品文件。记账线程仍用自己的 `RunWorker::cas`，它写 brief 与 job，不写冻结的四段。检查点仓库由谁建、lane 怎样打开它，由 §8-46-13 定。`Collaborating`、`Planning`、`Doorstep`、`Governance`、账本与 `LedgerIndex` 不借：记账线程的折叠改写它们，lane 读到的只能是 `Laying` 里的快照——`collaborating.rooms` 里挂着信的房间集合、这个居民持有的目标、治理的自治级别、`ledger.position`、`city_hash`。快照在 `stage_dispatch` 里取，lane 看到的是这个 run 被决定那一刻的城。`origins.started`（房间的会话从这个 run 起算）也在 `stage_dispatch` 里、紧跟在读 `carried_from` 之后：它改的是记账线程的折叠；准备在 lane 里失败的 run 与驾驶失败的 run 一样，都已开始了房间的会话。
+**lane 借什么。** §8-110、§8-111 拆出的对象里，lane 只借本来就是共享句柄的那几样，每样是一个 `Arc` 的克隆或一个值，收在 `Staged` 的 `Laying` 里：`Flight.backlog`（`exec` 与 `status` 用）、`Credentials.vault`（工具解析密钥用）、`city_root`、lane 共用的 CAS 句柄、MCP 常驻表、诊断的写端、时钟。房间的六张桌子（信、目标、计划、书架、PR、作坊）本来就是 `Arc<Mutex<_>>`，`Desks::for_bench` 把它们的克隆与 `waiting` 作为 `BenchDesks` 交给 lane，`Desks` 本身（连同队列的 `tenure`）留在 `Continuation` 里，只有它还队列。常驻表：`accounting::Connectors::connect` 取 `&self`（`Sprawling/accounting/Spec.lean` §8-2），`RunWorker.connectors` 是 `Arc<dyn Connectors + Send + Sync>`，lane 借一个克隆；表的寿命仍是 worker 的寿命，最后一个 `Arc` 落地时 `Drop` 杀子进程（§8-4）。CAS 是 lane 共用的一个句柄 `RunWorker::lane_store`（`Arc<Mutex<Cas>>`），随 worker 打开，冻结与筛子的 offload 都经它写，每次在锁里做完：`storage::Cas::open` 会清扫 `tmp/` 里的半成品，而一次写的半成品名只由对象哈希决定，一条 lane 自己开句柄就会扫掉另一条 lane 正在写的对象，两条 lane 写同一个对象也会共用同一个半成品文件。记账线程仍用自己的 `RunWorker::cas`，它写 brief 与 job，不写冻结的四段。检查点仓库由谁建、lane 怎样打开它，由 §8-46-13 定。`Collaborating`、`Planning`、`Doorstep`、`Governance`、账本与 `LedgerIndex` 不借：记账线程的折叠改写它们，lane 读到的只能是 `Laying` 里的快照——`collaborating.rooms` 里挂着信的房间集合、这个居民持有的目标、治理的自治级别、`ledger.position`、`city_hash`。快照在 `stage_dispatch` 里取，lane 看到的是这个 run 被决定那一刻的城。`origins.started`（房间的会话从这个 run 起算）也在 `stage_dispatch` 里、紧跟在读 `carried_from` 之后：它改的是记账线程的折叠；准备在 lane 里失败的 run 与驾驶失败的 run 一样，都已开始了房间的会话。
 
 **lane 半段的诊断行。** `mcp_tools` 为每台 server 写一行（连上、已连着、拒绝）并写它自己的计时，`admit_reading_room` 为阅览室点名却不在架上的名字写一行。诊断的写端是可共享的句柄 `recording::Notes`（一个 `Arc<Mutex<Diagnostics>>`），`RunWorker.log` 就是它，lane 借一份克隆，行锚在 `Laying` 里的账本位置快照上。锚取快照是因为诊断只写不读：`runtime::diagnostics` 没有读回一行的方法，决定与恢复的代码因此不可能依赖锚；读者是人，人用 `seq` 把一行对到历史上的位置，准备阶段的行锚在准备开始的位置，正是它说的事发生的地方。锁中毒时照样取出写端：每次写在锁内一步做完，中毒只说明别的线程在锁外崩了。被否：`Prepared` 把行带回家、由 `land` 写——锚落在整个 run 之后，一台拒绝握手的 server 要等 run 落地才被人看见，而 `Refuse` 这一档写给正在看的人。
 
@@ -371,15 +371,15 @@ impl Drop for DrivingPool { /* join 每条 trailing 里的 lane */ }
 
 /-! D21 补备树放在 lane 里，在 run 交回 `Flown` 之后；`DrivingPool` 落地时不 `join` 还在补的 lane（§8-145、§8-161）
 
-放置的秒数是一次全量检出等实时扫描逐个放行新建文件（`crates/storage/Spec.lean` §8-35）；把检出挪进备树，放置只剩改名，而补备树本身仍是一次全量检出，它必须落在人等的两段之外：run 的第一次模型调用之前，和 run 的落地之前，因为落地写审批、答复派活者、往下派活。lane 驾驶完、交回 `Flown` 之后，两段都已过去。**被否**：在 `land` 里补——`land` 在记账线程上，记账线程等一次检出，每条 lane 的 append 都排在它后面（§8-113）；开城时补——一次全量检出加进首字节（§8-122）；为补树另起一条后台线程——库 crate 与 `sprawling` 起线程的地方都是 ARCHITECTURE §10 第 3 条点名的，补树不值一条新线程，lane 已经在那里；lane 在交回 `Flown` 之前补——一个新房间的 run 落地晚一次全量检出，发行构建 1.2–1.5 s（§8-161 的读数）。**重开参数**：同一座城的派活密到下一次放置常赶在补完之前（放置见备树 `Busy` 而全量检出），那时补树的时机要往前挪，或者一座城备不止一棵。
+放置的秒数是一次全量检出等实时扫描逐个放行新建文件（`Sprawling/storage/Spec.lean` §8-35）；把检出挪进备树，放置只剩改名，而补备树本身仍是一次全量检出，它必须落在人等的两段之外：run 的第一次模型调用之前，和 run 的落地之前，因为落地写审批、答复派活者、往下派活。lane 驾驶完、交回 `Flown` 之后，两段都已过去。**被否**：在 `land` 里补——`land` 在记账线程上，记账线程等一次检出，每条 lane 的 append 都排在它后面（§8-113）；开城时补——一次全量检出加进首字节（§8-122）；为补树另起一条后台线程——库 crate 与 `sprawling` 起线程的地方都是 ARCHITECTURE §10 第 3 条点名的，补树不值一条新线程，lane 已经在那里；lane 在交回 `Flown` 之前补——一个新房间的 run 落地晚一次全量检出，发行构建 1.2–1.5 s（§8-161 的读数）。**重开参数**：同一座城的派活密到下一次放置常赶在补完之前（放置见备树 `Busy` 而全量检出），那时补树的时机要往前挪，或者一座城备不止一棵。
 -/
 
 /-! D22 一座城一次只有一条 lane 补备树，后来的跳过，表放在进程里按城根分键（§8-155）
 
-两次 `stock` 同时见到「没有备树」时，后一次的失败会收回前一次的登记，正在接管的一次放置因此失败，那次派活带着存储错误回到人那里；`crates/storage/Spec.lean` §8-35 只保证了放置与放置、刷新与接管这两种并发。跳过而不等，因为等另一条 lane 的全量检出就是让自己的落地再晚一次全量检出，而正在补的那一条补完城里就有备树。表在进程里，因为一座城只有一个写者进程，「这个进程里谁在补这座城」就是「谁在补这座城」；与 `city::document` 按路径分键的写锁表是同一种做法。**被否**：在 storage 的 `stock` 里补上这个窗口——storage 的公开契约本轮不改（`crates/storage/Spec.lean` §8-35 已定）；`Flight` 持一把补树的锁、经 `DriveContext` 交给 lane——与进程表判的是同一件事，却要多一条从 `RunWorker` 穿过 `drive_context` 到两条 `fly` 臂的传递路径；跳过换成等——理由见上。**重开参数**：一个进程同时为同一座城开两个 worker，或 storage 的 `stock` 自己在「没有备树」时先占住 `+spare`。
+两次 `stock` 同时见到「没有备树」时，后一次的失败会收回前一次的登记，正在接管的一次放置因此失败，那次派活带着存储错误回到人那里；`Sprawling/storage/Spec.lean` §8-35 只保证了放置与放置、刷新与接管这两种并发。跳过而不等，因为等另一条 lane 的全量检出就是让自己的落地再晚一次全量检出，而正在补的那一条补完城里就有备树。表在进程里，因为一座城只有一个写者进程，「这个进程里谁在补这座城」就是「谁在补这座城」；与 `city::document` 按路径分键的写锁表是同一种做法。**被否**：在 storage 的 `stock` 里补上这个窗口——storage 的公开契约本轮不改（`Sprawling/storage/Spec.lean` §8-35 已定）；`Flight` 持一把补树的锁、经 `DriveContext` 交给 lane——与进程表判的是同一件事，却要多一条从 `RunWorker` 穿过 `drive_context` 到两条 `fly` 臂的传递路径；跳过换成等——理由见上。**重开参数**：一个进程同时为同一座城开两个 worker，或 storage 的 `stock` 自己在「没有备树」时先占住 `+spare`。
 -/
 
 /-! D80 保温设置在 run 所在房间的地址上读，开房间的派活读楼（§8-112）
 
-`agree_to_work` 用判 harness 的同一个地址 `judged` 读 `city::keep_warm`。派进一个已开的房间时它是房间地址，所以城、楼、房间三层梯都被读到，房间自己 `CONFIG.toml` 的 `[cache]` 压过楼与城，这正是 `crates/kernel/spec/KeepWarm.lean` §8-74 与设置页说的梯子；开房间的派活（发给一栋楼，或点名一个会话）读楼，因为新房间自己那层此刻是空的，而派活地址若是另一个房间，它那层属于那个房间。理由：只读楼时，写在房间那一层的值不起作用，按房间开关保温也就无处可写。**被否**：在 `room_for` 开出房间之后再造门——门要从 `agree_to_work` 挪进 `stage_dispatch` 模型一臂，而新房间那一层在它第一次 run 之前没有人写过 `[cache]`，读到的与读楼相同；为保温另写一条「在哪一层判」——那是 `session::opens_a_room` 的第二份定义。**重开参数**：开房间的派活能同时给新房间写一层设置（例如派活帧带上保温）时，改在开出的房间上读。
+`agree_to_work` 用判 harness 的同一个地址 `judged` 读 `city::keep_warm`。派进一个已开的房间时它是房间地址，所以城、楼、房间三层梯都被读到，房间自己 `CONFIG.toml` 的 `[cache]` 压过楼与城，这正是 `Sprawling/kernel/spec/KeepWarm.lean` §8-74 与设置页说的梯子；开房间的派活（发给一栋楼，或点名一个会话）读楼，因为新房间自己那层此刻是空的，而派活地址若是另一个房间，它那层属于那个房间。理由：只读楼时，写在房间那一层的值不起作用，按房间开关保温也就无处可写。**被否**：在 `room_for` 开出房间之后再造门——门要从 `agree_to_work` 挪进 `stage_dispatch` 模型一臂，而新房间那一层在它第一次 run 之前没有人写过 `[cache]`，读到的与读楼相同；为保温另写一条「在哪一层判」——那是 `session::opens_a_room` 的第二份定义。**重开参数**：开房间的派活能同时给新房间写一层设置（例如派活帧带上保温）时，改在开出的房间上读。
 -/

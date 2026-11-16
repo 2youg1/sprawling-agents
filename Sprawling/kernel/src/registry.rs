@@ -9,7 +9,7 @@
 //! door between the two (player–referee in the type). The registry is a
 //! value, not a store: state lives with the caller and is rebuilt from
 //! the Ledger.
-//! The part `crates/kernel/spec/Registry.lean` specifies this module.
+//! The part `Sprawling/kernel/spec/Registry.lean` specifies this module.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -151,7 +151,7 @@ impl Registry {
 
     /// Whether this locator was promoted. The Discard door does not ask:
     /// a planned discard of an asset is as reversible as any other
-    /// (`crates/kernel/spec/Discard.lean` §8-26).
+    /// (`Sprawling/kernel/spec/Discard.lean` §8-26).
     pub fn is_asset(&self, locator: &Locator) -> bool {
         self.assets.contains(&locator.to_string())
     }

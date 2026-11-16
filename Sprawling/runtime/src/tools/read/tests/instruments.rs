@@ -5,7 +5,7 @@
 
 //! What a read of a file costs, the handle read against the judged path
 //! it replaced, interleaved in one process so both sides see the same
-//! machine (`crates/runtime/spec/Tools/Read.lean` D113).
+//! machine (`Sprawling/runtime/spec/Tools/Read.lean` D113).
 //!
 //! The judged side re-resolves the city root on every call, as the
 //! judged path did before the root was anchored, and cuts with the cut
@@ -209,7 +209,7 @@ fn instrument_read_after_write_ab() {
     );
 }
 
-/// The ceiling CI holds (`crates/xtask/budgets.toml` `[read_handle_ratio]`):
+/// The ceiling CI holds (`Tools/xtask/budgets.toml` `[read_handle_ratio]`):
 /// the handle read of a 20 KiB file, where the fixed cost of resolving
 /// and opening dominates, stays within this many resolved reads of it.
 #[cfg(any(windows, target_os = "linux", target_os = "macos"))]

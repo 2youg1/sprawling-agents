@@ -6,7 +6,7 @@
 //! Single embed point of the shipped skills: walks this package's
 //! `skills/` and writes `shipped_skills.rs` into `OUT_DIR`, one
 //! `(path, include_bytes!(..))` entry per file of every skill, which
-//! `library::shipped` includes (`crates/city/spec/Library/Install.lean`
+//! `library::shipped` includes (`Sprawling/city/spec/Library/Install.lean`
 //! §8-28c).
 //!
 //! The directory is inside this package because a crates.io archive

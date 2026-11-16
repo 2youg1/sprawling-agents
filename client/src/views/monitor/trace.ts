@@ -11,7 +11,7 @@
 // command's exit code is the call's own (`Call.exit_code`, which the city
 // reads off the whole result even where the line here was cut). The
 // runtime writes an exec result as `{stdout, stderr, exit_code}` and an
-// edit result as `{path, diff}` (crates/runtime/src/tools/
+// edit result as `{path, diff}` (Sprawling/runtime/src/tools/
 // exec/outcome.rs and edit.rs), and the channel hands each over as
 // compact JSON on one line, so the line cut never falls inside one.
 // A result that does not read as that shape is still drawn, as its raw
@@ -20,7 +20,7 @@
 // the moment the call was made and the moment it was answered, and a
 // call still running has none yet. A result whose run hit the person's
 // memory ceiling, or ran outside the ceiling the person asked for,
-// carries `memory_ceiling` (crates/runtime/spec/Tools/Exec.lean D95), on
+// carries `memory_ceiling` (Sprawling/runtime/spec/Tools/Exec.lean D95), on
 // itself and on each background row it brings; every one is read, so
 // the terminal can say it in the alert ink under the command.
 
@@ -104,10 +104,10 @@ export interface Trace {
   readonly latest: Target | null;
 }
 
-// `crates/runtime/src/tools/edit.rs` writes this as the base of a file
+// `Sprawling/runtime/src/tools/edit.rs` writes this as the base of a file
 // the call created.
 // A creation's diff is written from `/dev/null` (`unified_diff` in
-// crates/runtime/src/tools/edit.rs). Results recorded while edits still
+// Sprawling/runtime/src/tools/edit.rs). Results recorded while edits still
 // carried `base_version` mark a creation with the base "new" instead.
 const CREATED_FROM = "--- /dev/null\n";
 const CREATED_BASE = "new";
@@ -115,7 +115,7 @@ const CREATED_BASE = "new";
 // What an exec call asked to run, in both spellings a ledger holds: the
 // `command` or `python` a call takes now, and the `arm` an older build
 // wrote, which history keeps as it was recorded
-// (crates/runtime/spec/Tools.lean D115).
+// (Sprawling/runtime/spec/Tools.lean D115).
 const Asked = Schema.Union([
   Schema.Struct({ command: Schema.String }),
   Schema.Struct({ python: Schema.String }),

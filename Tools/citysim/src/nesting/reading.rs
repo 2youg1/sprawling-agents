@@ -8,7 +8,7 @@
 //! Split out of the grading rules so that the syntax each shape is
 //! written in, and the rules that judge an edit, are read separately.
 //!
-//! Specified by `crates/citysim/spec/Nesting.lean` §8-8-3.
+//! Specified by `Tools/citysim/spec/Nesting.lean` §8-8-3.
 
 use std::collections::BTreeMap;
 

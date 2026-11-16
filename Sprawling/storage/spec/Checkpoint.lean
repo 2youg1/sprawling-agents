@@ -3,14 +3,14 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.storage.spec.Checkpoint.Concurrent
+import Sprawling.storage.spec.Checkpoint.Concurrent
 
 /-!
 # storage::checkpoint
 
-规定 `checkpoint`、`checkpoint::base`、`checkpoint::commit`、`checkpoint::scan`、`checkpoint::scan::pathspec`、`checkpoint::scan::stage_filter`（`crates/storage/src/` 下同名的文件）；`checkpoint::opening` 的写者 index 住 `crates/storage/spec/Checkpoint/Concurrent.lean` §8-39，`checkpoint::provenance` 住 `crates/storage/spec/Checkpoint/Provenance.lean` §8-17、§8-18。git2 波前 add -A、波后补记、staged diff 的凭证扫描、重启后的比较基准，以及从检查点取回一个文件。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
+规定 `checkpoint`、`checkpoint::base`、`checkpoint::commit`、`checkpoint::scan`、`checkpoint::scan::pathspec`、`checkpoint::scan::stage_filter`（`Sprawling/storage/src/` 下同名的文件）；`checkpoint::opening` 的写者 index 住 `Sprawling/storage/spec/Checkpoint/Concurrent.lean` §8-39，`checkpoint::provenance` 住 `Sprawling/storage/spec/Checkpoint/Provenance.lean` §8-17、§8-18。git2 波前 add -A、波后补记、staged diff 的凭证扫描、重启后的比较基准，以及从检查点取回一个文件。本文件是 `Sprawling/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `Sprawling/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
 
-本部分开头的接口文字由 Rust 的类型与模块旁的测试守住（`crates/storage/Spec.lean` §16）；扫描证据到处置的映射由本文件末尾的 Lean 定义与定理证明，检查点的并发性质住 `crates/storage/spec/Checkpoint/Concurrent.lean`。
+本部分开头的接口文字由 Rust 的类型与模块旁的测试守住（`Sprawling/storage/Spec.lean` §16）；扫描证据到处置的映射由本文件末尾的 Lean 定义与定理证明，检查点的并发性质住 `Sprawling/storage/spec/Checkpoint/Concurrent.lean`。
 -/
 
 /-!
@@ -36,7 +36,7 @@ impl Checkpoint {
     /// 这一波碰过什么。首个 checkpoint 与 `ensure_base`
     /// 面对空 index，所以照旧列出它们提交的每一个文件。
     /// `scopes` 的每一项可以是目录前缀，也可以是一个文件：lane 在只知道
-    /// 这一波写了哪些文件时只把它们交进来（`crates/runtime/Spec.lean` §8-45）。工作区里是
+    /// 这一波写了哪些文件时只把它们交进来（`Sprawling/runtime/Spec.lean` §8-45）。工作区里是
     /// 文件、或工作区没有而 index 记为文件的项，按字面路径 `add_path`／
     /// `remove_path`，过同一道 `StageFilter` 与同一条 ignore 规则；其余的项
     /// 生成两条 pathspec，它本身与 `<它>/*`，交给一次 `add_all`。只拿 pathspec
@@ -129,7 +129,7 @@ impl Checkpoint {
   - 树里一个不是 UTF-8 的名字拒掉整次 sweep（`Checkpoint { op: "sweep the working tree" }`）：地址是 UTF-8 的，这样的路径拼不成 `file:` 地址，而把它读成所在目录会让一次删除不被报出。
 - `open` 只在**没有仓库**（libgit2 的 `NotFound`）时 `init`；仓库在而打不开（`.git` 损坏、权限被拒）是 `Checkpoint { op: "open the city repository" }`，因为在它上面 init 会把它的历史藏起来。`open` 无仓即 `init` 但**不造创世提交**（空仓是合法态；在此臆造历史会使首个 checkpoint 无法归属）。暂存只用一次 `add_all`：libgit2 把 index 与工作区比一遍（按 stat 跳过没变的文件），新增、修改、删除都在这一遍里暂存；再跑一遍 `update_all` 是把同一个写域重走一次，5,000 个文件的写域上稳态 checkpoint 的中位数因此从 104 ms 降到 71–78 ms（未优化构建，16 核、SSD，同一仪表交错测三次）。暂存规则只写在 `wave_pre` 的文档里（点名文件的 scope 走字面 `add_path`/`remove_path`，点名前缀的 scope 走字面 glob 加 `<glob>/*`）；**session 切片永不进 add**（`sessions::is_session_projection`）：它是账务线程在波中持续追加的可弃投影，一旦被暂存，git 下一次就会去读一个自己以为已经知道的文件，而一个还在长的工作区文件会让那一次读把整波拒掉（`E_WORKTREE_BUSY`）。`wave_post` 走 pre 提交树的 `TreeWalk` 比对工作区存在性，输出按路径排序（确定性）。secret 扫描在**提交之前**扫 index blob；已知形状命中即拒，熵命中按 D95 提交并记账，两者都只报位置与原因——回显字节本身即泄漏。`StorageError::Checkpoint{op,detail}` 映到 `E_WORKTREE_BUSY`，`SecretEgress(SecretEgressBlocked)` 映到 `E_SECRET_EGRESS`。
 - **index 锁的等待有界。** 同一栋楼的两个 run 同时暂存时，`.git/index.lock` 只在一次写的时间里被持有，`checkpoint::scan::write_index` 因此遇到这把锁就隔一小段再试，有上限；上限与间隔只写在那个函数里。到了上限仍被拒，就是一个真卡住的锁（例如持锁的进程已经死了），照常报 `Checkpoint { op: "write index" }`——那才是人能处理的事实。
-- **检查点的持久性弱于账本，三个平台相同。** 检查点的对象、index 与引用经 libgit2 写入，本 crate 不打开它的 fsync 选项，所以「落盘」在这里的意思是交给了操作系统，不是掉电之后仍在：Windows、Linux、macOS 上都不调 `FlushFileBuffers`／`fdatasync`／`F_FULLFSYNC`。掉电可能丢掉最近一道检查点；账本里那一行的 oid 于是指向一个不在的提交，`restore` 答「找不到提交」，而账本本身不受影响（它的屏障见 `crates/storage/spec/Jsonl/Barrier.lean`）。（推断：这依据 libgit2 默认不 fsync 对象目录；本 crate 没有设置它的地方，`rg fsync crates/storage/src` 只命中 jsonl。）
+- **检查点的持久性弱于账本，三个平台相同。** 检查点的对象、index 与引用经 libgit2 写入，本 crate 不打开它的 fsync 选项，所以「落盘」在这里的意思是交给了操作系统，不是掉电之后仍在：Windows、Linux、macOS 上都不调 `FlushFileBuffers`／`fdatasync`／`F_FULLFSYNC`。掉电可能丢掉最近一道检查点；账本里那一行的 oid 于是指向一个不在的提交，`restore` 答「找不到提交」，而账本本身不受影响（它的屏障见 `Sprawling/storage/spec/Jsonl/Barrier.lean`）。（推断：这依据 libgit2 默认不 fsync 对象目录；本 crate 没有设置它的地方，`rg fsync Sprawling/storage/src` 只命中 jsonl。）
 - `open` 逐次钉仓库局部 `core.autocrlf=false`。城里的文件必须逐字节往返，而运行中的机器的 git 有可能被配成在检出时重写行尾；被重写的文件与 Ledger 里它的哈希不符，而那看起来像损坏不像设置。
 - 提交身份见 8-17（而不是一个固定的 `sprawling <sprawling@local>`）；时间恒入参（git 签名时间＝t，确定性 2）；scope 外文件恒不入 add（WriteDomain 即边界，全树扫描被明拒）。**`scopes` 是一组前缀而非一个**，因为写域是一个集合：楼自己的子树，加上 `RULES.toml` 另外声明的每一条。调用方传房间而门判整栋楼时，两者之间的文件进不了任何检查点——`Changes` 因此恒空，`file_discarded` 也无处恢复；权威在本节。无变化波：wave_pre 产空提交（同树 oid，仍记 payload——链可重建优于省一次提交）。
 - **写域拒绝链接穿透（junction／symlink 字面拒；硬链接臂见 8-25 与 §3.5）。** 暂存回调对每个命中路径问 `storage::alias`：任一链接使**整波拒绝**（`StorageError::Alias`），绝不跳过继续——跳过即部分捕获，`file_discarded` 的恢复地址会指向一份与自己不符的树。git 交回调的是相对仓根的路径，判别名前必须先拼上工作树根（否则问的是进程自己的目录）。保护元数据在检查点侧是**跳过**而非拒绝（`storage::reserved::outside_reserved`）：那些字节另有家（城或楼的治理、git 的对象库），与 `stage_tree` 跳过保留子树同口径；被拒的 run 拿到的 recovery 是「把链接换成普通文件后重试」，故不会卡死在自己的目录上。
@@ -143,9 +143,9 @@ impl Checkpoint {
 **重开参数。** pack 落盘之后的检出（约 1.2 s）成了第一次放置的主成本，或 libgit2 给出可卸下的 odb 后端。
 -/
 
-/-! D30 检查点的暂存过滤（`StageFilter::admit`）在 libgit2 打开一个文件之前跳过两种暂存名：文件写者的 `.<name>.staging`（`kernel::layout::is_document_staging_name`，写者是 `crates/city/src/document.rs`）与落盘门的 `.<name>.part`（`bundle::landing::is_staging_name`，写者是 `WriteTarget::replace`，runtime 的 edit 经它落盘，storage D15）。
+/-! D30 检查点的暂存过滤（`StageFilter::admit`）在 libgit2 打开一个文件之前跳过两种暂存名：文件写者的 `.<name>.staging`（`kernel::layout::is_document_staging_name`，写者是 `Sprawling/city/src/document.rs`）与落盘门的 `.<name>.part`（`bundle::landing::is_staging_name`，写者是 `WriteTarget::replace`，runtime 的 edit 经它落盘，storage D15）。
 **为什么。** 这两种文件是一次写的一半：写者写完、flush、再改名到目标上，它们从不是城里的一个文件，账本也不认它们。可它们落在写域里，而同一座城里别的 run 的检查点在同一刻 `add_all` 这一片目录：libgit2 先枚举、再 stat、再读进对象库，三步之间暂存文件可能被改名拿走，或者还在长。Windows 上 libgit2 打开着它时写者的改名被拒（`MoveFileExW` 撞上一个开着的文件），写者那一次写失败；macOS 与 Linux 上改名照常，libgit2 的 stat 报 `failed to stat`，或者读到的字节数与 stat 给的尺寸不符、报 `failed to read file into stream`，整波检查点被拒成 `E_WORKTREE_BUSY`。所以过滤必须在打开之前按名字认出它们；三个平台同一条规则，区别只在不认时坏在哪一边。跳过而不是拒波：它们不是任何人的作品，与 session 切片、受保护元数据同属「别有归宿的字节」。
-**被否：重试那一次失败的暂存。** 竞态窗口仍在，重试只把失败的概率压低，并且 Windows 上坏的是写者，不是检查点。**被否：给暂存文件起一个唯一名或放进保留子树。** 前者让崩溃留下的碎片无从归属（`crates/city/spec/Document.lean`），后者让改名跨目录、在某些平台上跨卷，失去原子性。
+**被否：重试那一次失败的暂存。** 竞态窗口仍在，重试只把失败的概率压低，并且 Windows 上坏的是写者，不是检查点。**被否：给暂存文件起一个唯一名或放进保留子树。** 前者让崩溃留下的碎片无从归属（`Sprawling/city/spec/Document.lean`），后者让改名跨目录、在某些平台上跨卷，失去原子性。
 **没有挡住的。** exec 在写域里就地改写或删掉的任意文件也能在 stat 与读之间变化；它们没有可认的名字，按名字的过滤够不着，那一类仍以 `E_WORKTREE_BUSY` 拒波、由重试那一波恢复。
 **重开参数。** 写者改用不在写域里的暂存位置，或 libgit2 给出在读失败时跳过一个路径的选项。
 -/

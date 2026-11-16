@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The keep-warm door a run's model calls go through, and the doors a
-//! worker keeps once the run has landed (`crates/sprawling/Spec.lean` §8-112).
+//! worker keeps once the run has landed (`Sprawling/app/Spec.lean` §8-112).
 //!
 //! Which prefix is due is decided inside each door by
 //! `kernel::keep_warm`, and the `cache_renewed` lines are written on the
@@ -20,8 +20,8 @@ use runtime::prefix::warmth::Lead;
 use std::collections::BTreeMap;
 
 /// The chosen adapter, wrapped so every request a run sends enters the
-/// keep-warm account (`crates/runtime/Spec.lean` §8-4-2), timed on the worker's own
-/// clock (`crates/accounting/spec/Clock.lean` §8-3).
+/// keep-warm account (`Sprawling/runtime/Spec.lean` §8-4-2), timed on the worker's own
+/// clock (`Sprawling/accounting/spec/Clock.lean` §8-3).
 pub(crate) type Door = runtime::prefix::warmth::Warmed<DoorClock>;
 
 /// What a door reads the time through: the worker's clock, carried into
@@ -39,7 +39,7 @@ pub(in crate::worker) struct Kept {
     doors: BTreeMap<Address, Door>,
     /// One reading per endpoint name, shared by every door that reaches
     /// it, so a renewal's round trip times every room on that endpoint
-    /// (`crates/runtime/spec/Prefix.lean` D100).
+    /// (`Sprawling/runtime/spec/Prefix.lean` D100).
     leads: BTreeMap<String, Lead>,
     /// The rooms whose door is out on a renewal, each with the token the
     /// door left with: a door that comes back with a token its room no
@@ -164,7 +164,7 @@ impl RunWorker {
 
     /// Hands every door due at `now` to a thread of its own, which sends
     /// its renewals; the answers are recorded by [`Self::record_renewal`]
-    /// when they come back (`crates/sprawling/Spec.lean` §8-112, D78).
+    /// when they come back (`Sprawling/app/Spec.lean` §8-112, D78).
     ///
     /// A door whose thread will not start is recorded as refused and let
     /// go, as a door the provider refused is.

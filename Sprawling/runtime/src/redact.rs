@@ -383,7 +383,7 @@ mod tests {
 /// The phase instruments of the tools whose results pass this module:
 /// each times one call through the tool's own face (path resolution, IO
 /// and the envelope as one phase), then the secret scan of its result,
-/// and prints one line per tool in microseconds (`crates/runtime/Spec.lean`
+/// and prints one line per tool in microseconds (`Sprawling/runtime/Spec.lean`
 /// §10, the per-tool phases). They live here because the scan is the
 /// phase every tool shares.
 #[cfg(test)]

@@ -130,18 +130,18 @@ pub struct ConfigAnswer {
     /// of the window: `kernel::consts_policy::CTX_REMINDER_FIRST_PERCENT`.
     /// No layer moves it, so no layer travels with it. Always answered by
     /// this build; absent only in a frame from a city written before it
-    /// was (`crates/wire/Spec.lean` D13).
+    /// was (`Sprawling/wire/Spec.lean` D13).
     #[serde(default)]
     pub first: Option<u64>,
     /// Absolute building context lock in input tokens, when `RULES.toml`
     /// states one: the ring and the city's reminders both measure against
-    /// `min(model window, lock)` (`crates/wire/spec/Answer/Config.lean`
+    /// `min(model window, lock)` (`Sprawling/wire/spec/Answer/Config.lean`
     /// §8-87). Absent is reminder-only behaviour against the model window.
     #[serde(default)]
     pub context_lock_tokens: Option<u64>,
     pub tuning: TuningDefaults,
     /// Which outside service `web_search` reaches here, and what the
-    /// settings page edits (`crates/wire/spec/Answer/Config.lean` §8-86).
+    /// settings page edits (`Sprawling/wire/spec/Answer/Config.lean` §8-86).
     pub search: SettledSearch,
 }
 

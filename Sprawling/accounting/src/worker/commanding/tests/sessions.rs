@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A session's name and a room's run policy, through the worker's own
-//! door (`crates/wire/spec/Answer/Sessions.lean` D27).
+//! door (`Sprawling/wire/spec/Answer/Sessions.lean` D27).
 
 #![allow(
     clippy::unwrap_used,
@@ -117,7 +117,7 @@ fn changing_a_run_policy_records_the_policy_the_person_chose() {
 
 /// A new run policy for a room a run is working in reaches that run: it
 /// waits in the slot the run's safe points read, and only the last
-/// change waits (`crates/runtime/spec/PolicyTake.lean` §8-62).
+/// change waits (`Sprawling/runtime/spec/PolicyTake.lean` §8-62).
 #[test]
 fn changing_the_policy_of_a_worked_room_reaches_the_run_working_there() {
     let (_dir, mut worker) = city();
@@ -193,7 +193,7 @@ fn to_chat() -> wire::Command {
 
 /// The defect: a policy the User changed while nobody worked in the room
 /// stayed on the ledger alone, and the next dispatch started under the
-/// policy the page sent with it (`crates/sprawling/spec/Accounting/Worker.lean`
+/// policy the page sent with it (`Sprawling/app/spec/Accounting/Worker.lean`
 /// §8-133).
 #[test]
 fn a_policy_changed_while_the_room_is_idle_rules_the_next_dispatch() {

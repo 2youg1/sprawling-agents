@@ -72,7 +72,7 @@ Two directories travel inside the package, because a crates.io archive carries a
 and nothing else (`city D18`, `city D20`). [`templates/`](templates/) holds the default text of the
 files a city and its buildings start with — `URBANITE.md`, `JOB.md`, `RULES.toml`, `Roadmap.md`,
 `City.md` — and the code reads them with `include_str!`, so a template's bytes are the first bytes
-of a new city. [`skills/`](skills/) holds the skills shipped with the binary: `crates/city/build.rs`
+of a new city. [`skills/`](skills/) holds the skills shipped with the binary: `Sprawling/city/build.rs`
 walks every directory there that holds a `SKILL.md`, writes one `include_bytes!` entry per file into
 `OUT_DIR`, and `library::shipped` shelves them when a city forms. A file directly under `skills/` is
 not a skill and rides in the release archive instead.
@@ -86,7 +86,7 @@ an address the action cannot use, `E_STORAGE_FATAL` for a disk this package cann
 `E_VERSION_CONFLICT` for a document or an identity area that moved under a save, `E_PATH_NOT_FOUND`
 for a shelf item or package file that is not there, `E_CAS_CORRUPT` for content on a shelf that does
 not match its digest, `E_GATE_DENIED` for a read or write the building's rules refuse, and
-`E_TOOL_UNAVAILABLE` or `E_TIMEOUT` for an audit fetch that could not run. `crates/city/Spec.lean`
+`E_TOOL_UNAVAILABLE` or `E_TIMEOUT` for an audit fetch that could not run. `Sprawling/city/Spec.lean`
 section 12 answers whether each code can be defined away by a type, and each module's SPEC section
 names the recovery it writes.
 
@@ -124,7 +124,7 @@ inside one process. This lock coordinates only in-process edits; it does not pro
 
 Two external dependencies need a reason a reader can check. `cap-std` and `cap-fs-ext` walk a skill
 package by directory handle, following no link, because the standard library opens only by path and
-a source directory's owner can swap one (`crates/city/Spec.lean` section 13). `toml` parses the
+a source directory's owner can swap one (`Sprawling/city/Spec.lean` section 13). `toml` parses the
 three layers with `deny_unknown_fields`, so a misspelled key fails at the field.
 
 Five decisions change how a caller must use the package. `city D1`: a run never rewrites the rules
@@ -160,15 +160,15 @@ each `D<n>` decision lives.
 
 ```bash
 cargo nextest run -p sprawling-city   # the module tests beside the code
-lake build crates.city.Spec           # this package's Lean proofs
+lake build Sprawling.city.Spec           # this package's Lean proofs
 cargo xtask gates spec lexicon        # the SPEC and the words it uses
 ```
 
 One acceptance check needs a crate this package may not name:
-`crates/sprawling/tests/skill_install.rs` installs a skill with `city::install_skill` and hands it
+`Sprawling/app/tests/skill_install.rs` installs a skill with `city::install_skill` and hands it
 the production content store of `sprawling-storage` as the registration, so the shelf index and
 every package file resolve through verified reads. Several bin-side checks read what a model was
 actually sent — the same resident segment across two runs, and a confidential building's bytes
-reaching no request — and those live beside the writer that sends it. `crates/city/Spec.lean`
+reaching no request — and those live beside the writer that sends it. `Sprawling/city/Spec.lean`
 section 16 says which test checks what and where it lives, and `just test` and `just models` run the
 whole workspace.

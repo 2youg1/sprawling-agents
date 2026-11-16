@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Why the city is closing, and the line that records it: the UNLOADING
-//! end of one worker's lifetime (`crates/accounting/spec/Worker.lean` §8-11).
+//! end of one worker's lifetime (`Sprawling/accounting/spec/Worker.lean` §8-11).
 //!
 //! It sits beside [`super`], which holds the LOADING end, because a
 //! reader asking "what does a restart find" and "what does a close
@@ -21,7 +21,7 @@ use kernel::{AxError, EventKind, Locator};
 /// are different facts for the next session, and a record that spelled
 /// both as the first would claim a choice nobody made. Which event
 /// becomes which closing is decided by the console's lifecycle
-/// (`crates/sprawling/spec/Console/Lifecycle.lean`); this type only
+/// (`Sprawling/app/spec/Console/Lifecycle.lean`); this type only
 /// carries the answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Closing {

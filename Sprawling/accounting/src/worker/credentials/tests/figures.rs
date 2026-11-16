@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What the model table's placeholders say, against what a pick with
-//! empty boxes registers (`crates/wire/spec/Answer/ModelFigures.lean`
+//! empty boxes registers (`Sprawling/wire/spec/Answer/ModelFigures.lean`
 //! §8-97, wire D58).
 
 use super::endpoints::selected_lines;

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Where the catalog files an admitted tool (`crates/runtime/spec/Catalog.lean`
+//! Where the catalog files an admitted tool (`Sprawling/runtime/spec/Catalog.lean`
 //! §8-60): under a namespace the city keeps for its own tools, or under
 //! the label of the server that offers it. The dormant index gives each
 //! namespace one line, and `tool list` opens one.

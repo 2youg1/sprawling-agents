@@ -14,7 +14,7 @@ fn a_relocated_package_gets_its_spec_skeleton_in_its_own_directory() {
 }
 
 /// The skeleton is Lean: the notice as Lean comments, then the seventeen
-/// section comments `crates/city/skills/sdd` lists, numbered in order.
+/// section comments `Sprawling/city/skills/sdd` lists, numbered in order.
 #[test]
 fn the_skeleton_opens_with_the_notice_and_numbers_the_seventeen_sections_in_order() {
     let text = super::skeleton("k");
@@ -39,7 +39,7 @@ fn judged(root: &std::path::Path) -> Result<Vec<String>, String> {
     for (path, text) in [
         ("architecture.toml", "module = []\n"),
         (
-            "crates/xtask/budgets.toml",
+            "Tools/xtask/budgets.toml",
             "[spec_parts_without_theorem]\npinned = 0\n\n[rust_paths_unresolved]\npinned = 0\n",
         ),
     ] {
@@ -118,13 +118,13 @@ fn lean_imports_along_the_crate_graph_and_proves_what_it_states() {
     crate::root::fixture::write(&root, "tools/k/spec/A.lean", "import crates.j.Spec\n");
     crate::root::fixture::write(
         &root,
-        "crates/adversary/src/X.lean",
+        "Tools/adversary/src/X.lean",
         "import Lean.Data.Json\nimport crates.j.Spec\n",
     );
     assert_eq!(
         judged(&root),
         Ok(vec![
-            "crates/adversary/src/X.lean:2: the checker imports `crates.j.Spec`, and it imports \
+            "Tools/adversary/src/X.lean:2: the checker imports `crates.j.Spec`, and it imports \
              only `Sprawling` and the toolchain's libraries"
                 .to_owned(),
             "crates/j/Spec.lean:10: leaves an `admit`".to_owned(),
@@ -148,38 +148,38 @@ fn lean_imports_along_the_crate_graph_and_proves_what_it_states() {
 fn the_checker_has_one_specification_that_imports_its_parts_and_never_the_checker() {
     let root = crate::root::fixture::relocated("spec-checker");
     crate::root::fixture::write(&root, "tools/k/k-SPEC.md", "# k\n");
-    crate::root::fixture::write(&root, "crates/adversary/adversary-SPEC.md", "# adversary\n");
+    crate::root::fixture::write(&root, "Tools/adversary/adversary-SPEC.md", "# adversary\n");
     crate::root::fixture::write(
         &root,
-        "crates/adversary/Spec.lean",
-        "import crates.adversary.spec.Answer\n/-! Specifies crates/j/src/gone.rs. -/\n",
+        "Tools/adversary/Spec.lean",
+        "import Tools.adversary.spec.Answer\n/-! Specifies crates/j/src/gone.rs. -/\n",
     );
     crate::root::fixture::write(
         &root,
-        "crates/adversary/spec/Answer.lean",
+        "Tools/adversary/spec/Answer.lean",
         "import Lean.Data.Json\nimport Sprawling.Door\nimport crates.j.Spec\n",
     );
     crate::root::fixture::write(
         &root,
-        "crates/adversary/src/Sprawling/X.lean",
-        "import Sprawling.Frame\nimport crates.adversary.Spec\n",
+        "Tools/adversary/src/Sprawling/X.lean",
+        "import Sprawling.Frame\nimport Tools.adversary.Spec\n",
     );
     assert_eq!(
         judged(&root),
         Ok(vec![
-            "crates/adversary/Spec.lean:2: cites `crates/j/src/gone.rs`, which is not there"
+            "Tools/adversary/Spec.lean:2: cites `crates/j/src/gone.rs`, which is not there"
                 .to_owned(),
-            "crates/adversary/spec/Answer.lean:2: the checker's specification imports \
+            "Tools/adversary/spec/Answer.lean:2: the checker's specification imports \
              `Sprawling.Door`, and it imports only its own parts and the toolchain's libraries"
                 .to_owned(),
-            "crates/adversary/spec/Answer.lean:3: the checker's specification imports \
+            "Tools/adversary/spec/Answer.lean:3: the checker's specification imports \
              `crates.j.Spec`, and it imports only its own parts and the toolchain's libraries"
                 .to_owned(),
-            "crates/adversary/src/Sprawling/X.lean:2: the checker imports `crates.adversary.Spec`, \
+            "Tools/adversary/src/Sprawling/X.lean:2: the checker imports `Tools.adversary.Spec`, \
              and it imports only `Sprawling` and the toolchain's libraries"
                 .to_owned(),
-            "crates/adversary: crates/adversary holds crates/adversary/adversary-SPEC.md and \
-             crates/adversary/Spec.lean"
+            "Tools/adversary: Tools/adversary holds Tools/adversary/adversary-SPEC.md and \
+             Tools/adversary/Spec.lean"
                 .to_owned(),
             "crates/j: crates/j holds neither a `*-SPEC.md` nor a Spec.lean".to_owned(),
         ])
@@ -214,8 +214,8 @@ fn a_part_is_text_closed_quantified_or_checked() {
                 "a/spec/D.lean",
                 "@[simp] private theorem grows {s : S}\n    (h : s.ok) : P s := by\n  simp\n",
             ),
-            ("crates/adversary/src/X.lean", ""),
-            ("crates/adversary/spec/Y.lean", ""),
+            ("Tools/adversary/src/X.lean", ""),
+            ("Tools/adversary/spec/Y.lean", ""),
         ]),
         rust: files(&[
             ("a/tests.rs", "#[test]\nfn f() {} // a/spec/D.lean grows\n"),
@@ -231,7 +231,7 @@ fn a_part_is_text_closed_quantified_or_checked() {
             ("a/spec/D.lean".to_owned(), Class::QuantifiedChecked),
             ("a/spec/Q.lean".to_owned(), Class::QuantifiedUnchecked),
             ("a/spec/T.lean".to_owned(), Class::TextOnly),
-            ("crates/adversary/spec/Y.lean".to_owned(), Class::TextOnly),
+            ("Tools/adversary/spec/Y.lean".to_owned(), Class::TextOnly),
         ]
     );
 }
@@ -257,7 +257,7 @@ fn the_two_counts_are_held_to_their_pins() {
          ]\n",
     );
     write(
-        "crates/xtask/budgets.toml",
+        "Tools/xtask/budgets.toml",
         "[spec_parts_without_theorem]\npinned = 1\n\n[rust_paths_unresolved]\npinned = 5\n",
     );
     write("crates/j/src/lib.rs", "pub use machine::Phase;\n");
@@ -286,7 +286,7 @@ fn the_two_counts_are_held_to_their_pins() {
             "crates/j/spec/Machine/Step.lean: [spec_parts_without_theorem] counts 2 against a \
              pin of 1; this is one of them"
                 .to_owned(),
-            "crates/xtask/budgets.toml: [rust_paths_unresolved]: [rust_paths_unresolved] counts \
+            "Tools/xtask/budgets.toml: [rust_paths_unresolved]: [rust_paths_unresolved] counts \
              3, below its pin of 5"
                 .to_owned(),
         ])

@@ -5,7 +5,7 @@
 
 //! The browsers paired at this machine's door, kept in the city's
 //! reserved subtree (`kernel::layout::CityLayout::browsers`,
-//! `crates/sprawling/spec/Serving.lean`): public keys, labels and times,
+//! `Sprawling/app/spec/Serving.lean`): public keys, labels and times,
 //! never a secret.
 //!
 //! The rules of pairing are `wire::reception::pairing`'s; this reads the

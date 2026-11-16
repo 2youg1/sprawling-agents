@@ -44,7 +44,7 @@ const PATIENCE: Duration = Duration::from_secs(120);
 /// with the program a shell resolves and where each platform installs
 /// it. Rendered by the doctor's own test from its family table, so the
 /// gate and the doctor look in the same places (section 8-13).
-const CHROMIUM: &str = include_str!("../../../../crates/sprawling/src/doctor/family/chromium.tsv");
+const CHROMIUM: &str = include_str!("../../../../Sprawling/app/src/doctor/family/chromium.tsv");
 
 /// The engine to render with, in the three tiers section 8-13 fixes.
 ///
@@ -91,7 +91,7 @@ fn chromium_members() -> impl Iterator<Item = (&'static str, std::str::Split<'st
 }
 
 /// What `doctor` installed, read as the filesystem convention it is
-/// (`crates/kernel/Spec.lean` §8-22) rather than as a second probe for
+/// (`Sprawling/kernel/Spec.lean` §8-22) rather than as a second probe for
 /// where a browser lives on this machine.
 fn in_components() -> Option<PathBuf> {
     let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))?;

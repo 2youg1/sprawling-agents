@@ -4,11 +4,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The commands about who and what reaches the city, each a LocalOnly
-// verb (`crates/wire/spec/Command/Kind.lean` §19-2): closing it,
+// verb (`Sprawling/wire/spec/Command/Kind.lean` §19-2): closing it,
 // forgetting a paired browser and adding an ACP agent. Each carries its
 // own idempotency key, as every command does. Starting an agent's
 // sign-in has no sender until the city can run one
-// (`crates/agent_protocols/Spec.lean` §3).
+// (`Sprawling/agent_protocols/Spec.lean` §3).
 
 import type { Address, AgentOffer, CloseMode, Command, DeviceId } from "../wire";
 import { mintIdem } from "./idem";

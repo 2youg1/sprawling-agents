@@ -6,7 +6,7 @@
 //! What the settings page reads back about the two accounts and a third
 //! whose key was never filed: the tuning the endpoint was attached with,
 //! and each account's key, read through the vault the worker lends the
-//! views (`crates/wire/spec/Answer/Endpoints.lean` §8-85).
+//! views (`Sprawling/wire/spec/Answer/Endpoints.lean` §8-85).
 
 use super::*;
 

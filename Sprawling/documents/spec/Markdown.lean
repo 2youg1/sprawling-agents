@@ -6,7 +6,7 @@
 /-!
 # markdown：一个文法把一个版本的窗口读成块
 
-规定 `crates/documents/src/markdown.rs`（`documents::preview`）与它的两个部分 `markdown/tree.rs`、`markdown/lowering.rs`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。CommonMark 与 GFM 的文法本身归 comrak（D20、D22），不在这里重写：模型只管本 crate 在 comrak 的树之外加的三条判定和一条答复的形状。
+规定 `Sprawling/documents/src/markdown.rs`（`documents::preview`）与它的两个部分 `markdown/tree.rs`、`markdown/lowering.rs`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。CommonMark 与 GFM 的文法本身归 comrak（D20、D22），不在这里重写：模型只管本 crate 在 comrak 的树之外加的三条判定和一条答复的形状。
 
 证明的性质：
 

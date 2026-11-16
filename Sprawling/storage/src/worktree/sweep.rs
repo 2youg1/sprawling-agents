@@ -11,7 +11,7 @@
 //! earlier serving, a crashed one included. What each leaves is three
 //! things: git's registration, the directory under the reserved subtree,
 //! and the branch git made for it. This module takes back each of them,
-//! and only what the city made (`crates/storage/spec/Worktree.lean` §8-9).
+//! and only what the city made (`Sprawling/storage/spec/Worktree.lean` §8-9).
 
 use std::path::{Path, PathBuf};
 
@@ -139,7 +139,7 @@ impl Worktrees {
             // only what it can open, so the directory goes by hand: that is
             // what `git worktree prune` removes for a tree whose directory
             // is gone, and the tree it pointed at is not one to keep
-            // (`crates/storage/spec/Worktree/Trees/Stock.lean` §8-35, the
+            // (`Sprawling/storage/spec/Worktree/Trees/Stock.lean` §8-35, the
             // same state `Stock::Broken` names).
             Err(_) if admin.is_dir() => {
                 return std::fs::remove_dir_all(&admin).map_err(|source| StorageError::Worktree {
@@ -171,7 +171,7 @@ impl Worktrees {
     /// machinery, so nothing in it is the person's.
     ///
     /// A name that is a link is refused rather than removed, because the
-    /// placement it precedes would refuse it too (`crates/storage/spec/Alias.lean` §8-25).
+    /// placement it precedes would refuse it too (`Sprawling/storage/spec/Alias.lean` §8-25).
     ///
     /// # Errors
     /// Refuses a name that is a link, and propagates a directory that

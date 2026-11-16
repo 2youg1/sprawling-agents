@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The parts roster: every gallery region that draws a part carries the
-//! roles that part's contract names (crates/xtask/Spec.lean §8-13,
+//! roles that part's contract names (Tools/xtask/Spec.lean §8-13,
 //! client/spec/Views/Parts.lean §7-10).
 //!
 //! **A look that forgets to spread a wire bag drops the role with it.**

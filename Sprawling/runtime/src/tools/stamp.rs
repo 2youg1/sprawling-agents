@@ -6,7 +6,7 @@
 //! A file's stamp, the stamps one run has seen, and the admission an
 //! edit gets from them.
 //!
-//! `crates/runtime/spec/Tools/Edit.lean` §8-64 models the admission and
+//! `Sprawling/runtime/spec/Tools/Edit.lean` §8-64 models the admission and
 //! proves what it must hold over every interleaving of runs: a run whose
 //! last look at a file was followed by anybody else's write lands nothing
 //! there. [`admission`] is that model's decision, arm for arm, and the
@@ -15,7 +15,7 @@
 //! A stamp is the file's length, its modification time and its identity
 //! on the volume, read in one query of an open handle. The stamp itself
 //! carries no content hash; a read hashes only a racy claim
-//! (`crates/runtime/spec/Tools/Read.lean` D127). An edit's own write
+//! (`Sprawling/runtime/spec/Tools/Read.lean` D127). An edit's own write
 //! lands through a staging file renamed over the name, so its identity
 //! changes on every write the tool makes.
 
@@ -256,7 +256,7 @@ pub(crate) enum Admission {
     Present,
 }
 
-/// The decision `crates/runtime/spec/Tools/Edit.lean` names `admission`.
+/// The decision `Sprawling/runtime/spec/Tools/Edit.lean` names `admission`.
 pub(crate) fn admission(
     seen: Option<&Stamp>,
     current: Option<&Stamp>,

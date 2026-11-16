@@ -6,7 +6,7 @@
 /-!
 # accounting::views 与 accounting::lineage
 
-规定 `crates/accounting/src/views.rs` 的公开面与 `crates/accounting/src/lineage.rs`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+规定 `Sprawling/accounting/src/views.rs` 的公开面与 `Sprawling/accounting/src/lineage.rs`。本文件是 `Sprawling/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `Sprawling/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `accounting::views::answering::stored::tests`、`accounting::views::versions::tests`、`accounting::views::tests`等 守住。
 -/
@@ -20,10 +20,10 @@ pub struct Views { /* 折叠状态，私有 */ }
 impl Views {
     pub fn new(city_root: &Path) -> Views;
     pub fn over(ledger_dir: &Path) -> Views;
-    /// 先审计整条链，再从合适的快照起步、只折尾部（`crates/sprawling/Spec.lean` §8-91）。
+    /// 先审计整条链，再从合适的快照起步、只折尾部（`Sprawling/app/Spec.lean` §8-91）。
     pub fn rebuild(ledger_dir: &Path) -> Result<Views, AxError>;
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError>;
-    /// 锁内只取小数据；读盘、读库、出网在 `Prepared::finish` 里做（`crates/sprawling/Spec.lean` §8-100）。
+    /// 锁内只取小数据；读盘、读库、出网在 `Prepared::finish` 里做（`Sprawling/app/Spec.lean` §8-100）。
     pub fn prepare(&self, query: &wire::Query) -> Prepared;
     pub fn twin(&self) -> Result<Views, AxError>;
 
@@ -73,17 +73,17 @@ pub(crate) fn config_answer(city_root: &Path, addr: &Address, vault: Option<&Arc
     -> Result<wire::ConfigAnswer, AxError>;
 ```
 
-- **答两问的一个模块**：`Query::EndpointView` 与 `Query::Config` 都要问金库每个账号的 Key 在不在（`crates/wire/spec/Answer/Endpoints.lean` §8-85，`crates/wire/spec/Answer/Config.lean` §8-86），而 `gateway::Custodian::describe` 会问平台的凭据服务，所以两问都在快照放开之后答，经 `Prepared::Provider`。账号到 `KeyState` 的映射只住这里，两问共用。
+- **答两问的一个模块**：`Query::EndpointView` 与 `Query::Config` 都要问金库每个账号的 Key 在不在（`Sprawling/wire/spec/Answer/Endpoints.lean` §8-85，`Sprawling/wire/spec/Answer/Config.lean` §8-86），而 `gateway::Custodian::describe` 会问平台的凭据服务，所以两问都在快照放开之后答，经 `Prepared::Provider`。账号到 `KeyState` 的映射只住这里，两问共用。
 - **端点一问分两半**：快照握着时 `endpoints_answer` 从 endpoint book 写出每一行，`tuning` 由 `accounting::tuning` 的 `tuning_as_attached` 读回，`account_status` 留空；放开之后按每行 `tuning.accounts` 的次序填上。一个不指引用的账号是 `Anonymous`，不去碰金库；没有开着的金库（重建、`ask`、测试里没人 serve 的 `Views`）时每个带引用的账号是 `Unread`，不说成 `Missing`。
 - **配置一问**：梯子照旧由 `city` 爬一次；`search` 的生效值与来源取 `city::settled_search`，城那一级的值取 `city::city_search`，缺省地址取 `city::default_search_supplier`，Key 状态只答城那一级 `Custom` 列出的供应方。
-- **模型表的占位一问**（`Query::ModelFigures`，`crates/wire/spec/Answer/ModelFigures.lean` §8-97、wire D58）：先把框里的文字与兼容格式经 `gateway::normalise_entered` 与 `Normalised::face` 归一化，再建一次 `MarketSnapshot::builtin()`，对每一行调 `gateway::Figures::resolve`：人的两格为空，provider 列表一级是这一行带来的两个数，此前登记一级是 `EndpointBook::registered(tag, endpoint, id)`，目录一级是 `lookup(id)`。`FigureSource` 到 `wire::FigureFrom` 的映射是穷尽的 `match`，住这里，与思考档的 `OfferSource` 同形。它只读端点账本与钉在二进制里的表，所以在快照握着时作答，不走 `Prepared::Provider`。归一化拒绝时整问是带原因的 `Unavailable`。
+- **模型表的占位一问**（`Query::ModelFigures`，`Sprawling/wire/spec/Answer/ModelFigures.lean` §8-97、wire D58）：先把框里的文字与兼容格式经 `gateway::normalise_entered` 与 `Normalised::face` 归一化，再建一次 `MarketSnapshot::builtin()`，对每一行调 `gateway::Figures::resolve`：人的两格为空，provider 列表一级是这一行带来的两个数，此前登记一级是 `EndpointBook::registered(tag, endpoint, id)`，目录一级是 `lookup(id)`。`FigureSource` 到 `wire::FigureFrom` 的映射是穷尽的 `match`，住这里，与思考档的 `OfferSource` 同形。它只读端点账本与钉在二进制里的表，所以在快照握着时作答，不走 `Prepared::Provider`。归一化拒绝时整问是带原因的 `Unavailable`。
 - **读不动就说读不动**：梯子、`[search]` 或金库的锁任一处失败，答复是带原因的 `Unavailable`（wire D47），不是一份缺了几项的答复。
 - 验收：`accounting::views::providers::tests` 的 `every_key_state_is_read_from_what_the_vault_describes`、`the_search_answer_names_the_city_value_apart_from_a_building_override`；`accounting::worker::credentials::tests::accounts::readback` 的 `each_account_reads_its_key_state_and_the_tuning_reads_back_as_attached`（真实 worker 挂上三个账号，金库借出前全是 `Unread`，借出后按次序读出）；`accounting::tuning::tests` 的 `a_tuning_read_back_attaches_to_the_same_tuning`；`accounting::worker::credentials::tests::endpoints` 的 `the_placeholder_answers_what_a_pick_with_empty_boxes_registers`（真实 worker：问到的窗口、上限与来源，等于随后一次不带数字的 `SelectModel` 登记下的）；`accounting::worker::commanding::tests::configuring` 的两条（城一级 `[search]` 写下并读回、被拒的一帧什么都不落）。
 -/
 
 /-! D13 ACP 页的检测找厂商目录经 `Views.places` 这个 `fn` 指针，不经 `Machine`，也不在开城时算好
 
-理由：这一问读的是此刻这台电脑上的目录与文件，与 `registry`、`upstream` 同形——没有状态、服务中的城交一次（生产交 `bin::doctor::host::place_set_up`，读厂商文档写的变量与家目录，`crates/agent_protocols/Spec.lean` D19）、`None` 就答空的 `detected`（D10）；它不启动任何程序，所以不必等 `DoctorRefresh`。被否决的做法：给 `Machine` 加一个方法——`Machine` 属于 worker，读面拿不到它，而且 doctor 的逐项查法已经在 `bin::doctor::Machine::look` 里，再加一个方法就是第二条查法；在开城时把检测的结果算进 `DoctorAnswer`——那是一个线上的形状改动，而且人装完一个 agent，要等到下一次 `DoctorRefresh` 才看得到它。
+理由：这一问读的是此刻这台电脑上的目录与文件，与 `registry`、`upstream` 同形——没有状态、服务中的城交一次（生产交 `bin::doctor::host::place_set_up`，读厂商文档写的变量与家目录，`Sprawling/agent_protocols/Spec.lean` D19）、`None` 就答空的 `detected`（D10）；它不启动任何程序，所以不必等 `DoctorRefresh`。被否决的做法：给 `Machine` 加一个方法——`Machine` 属于 worker，读面拿不到它，而且 doctor 的逐项查法已经在 `bin::doctor::Machine::look` 里，再加一个方法就是第二条查法；在开城时把检测的结果算进 `DoctorAnswer`——那是一个线上的形状改动，而且人装完一个 agent，要等到下一次 `DoctorRefresh` 才看得到它。
 -/
 
 /-! D14 `views` 搬进来时，本 crate 加 `storage` 与 `runtime` 两条边
@@ -113,7 +113,7 @@ impl Evidence { pub(super) fn of(kind: EventKind) -> Evidence; }    // evidence_
 
 /-! ### 接口仍写在 sprawling 规格里的模块
 
-下面这些模块的接口与取舍今天写在 `crates/sprawling/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
+下面这些模块的接口与取舍今天写在 `Sprawling/app/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
 
 | sprawling 的标签 | 模块 |
 |---|---|

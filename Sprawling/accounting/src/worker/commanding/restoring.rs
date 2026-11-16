@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Putting one recycle-bin row back by the way back it carries
-//! (`crates/sprawling/Spec.lean` §8-107).
+//! (`Sprawling/app/Spec.lean` §8-107).
 
 use crate::worker::RunWorker;
 use kernel::{AxCode, AxError, EventKind, Locator, Payload, Restoration};
@@ -77,7 +77,7 @@ impl RunWorker {
 
 impl RunWorker {
     /// Takes one file of the city's own tree back to what a checkpoint
-    /// holds, then records the step (`crates/wire/Spec.lean` §8-62).
+    /// holds, then records the step (`Sprawling/wire/Spec.lean` §8-62).
     ///
     /// # Errors
     /// Refuses `E_BUSY` while a run works in that building, naming the

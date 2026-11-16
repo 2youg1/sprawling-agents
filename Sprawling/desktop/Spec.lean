@@ -3,17 +3,17 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.desktop.spec.Outline
-import crates.desktop.spec.Platform.Windows.Strokes
-import crates.desktop.spec.Platform.Windows.Target
-import crates.desktop.spec.Platform.Windows.Views
-import crates.desktop.spec.Scope
-import crates.desktop.spec.Scope.Pattern
-import crates.desktop.spec.Session
+import Sprawling.desktop.spec.Outline
+import Sprawling.desktop.spec.Platform.Windows.Strokes
+import Sprawling.desktop.spec.Platform.Windows.Target
+import Sprawling.desktop.spec.Platform.Windows.Views
+import Sprawling.desktop.spec.Scope
+import Sprawling.desktop.spec.Scope.Pattern
+import Sprawling.desktop.spec.Session
 
 /-! # desktop 的规格
 
-`sprawling-desktop`（库名 `desktop`，目录 `crates/desktop`）是一台按行说话的 MCP server：它给 agent 一双眼睛和一双手，落在这台 Windows 桌面上，并且这双手从第一天起就受一份 allowlist 约束。它是根工作区的成员，继承工作区的 lint 表，作为库链进 `sprawling`，由 `sprawling desktop` 这个动词起成子进程；它唯一的 FFI 缝 `sprawling-desktop-ffi`（`crates/desktop/ffi`）是另一个成员，规格是 `crates/desktop/ffi/Spec.lean`。
+`sprawling-desktop`（库名 `desktop`，目录 `Sprawling/desktop`）是一台按行说话的 MCP server：它给 agent 一双眼睛和一双手，落在这台 Windows 桌面上，并且这双手从第一天起就受一份 allowlist 约束。它是根工作区的成员，继承工作区的 lint 表，作为库链进 `sprawling`，由 `sprawling desktop` 这个动词起成子进程；它唯一的 FFI 缝 `sprawling-desktop-ffi`（`Sprawling/desktop/ffi`）是另一个成员，规格是 `Sprawling/desktop/ffi/Spec.lean`。
 
 本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。能写成定理的性质在分部里证明；本文件的十七节记录其余的要求、理由与决定，决定写作 `D<n>`，别处引作 `desktop D<n>`。D1 到 D14 沿用这份规格在 Markdown 时 §12 的条目号，§10 的设计一到设计十是它原来 §8.5 的四对与 §8.6 的六对。
 -/
@@ -24,7 +24,7 @@ import crates.desktop.spec.Session
 
 拆成三件可独立验收的事：
 
-- **协议壳（`rpc` ＋ `session`）**：一台按行说话的 MCP server，握手与 `tools/call` 的形状与 `crates/agent_protocols/src/mcp/*` 所写的客户端逐字对齐，于是城把它当一台普通的 stdio MCP server 连：一栋楼的 `RULES.toml` 写 `desktop = true`，城就以 `sprawling desktop <DESKTOP.toml>` 起自己这个二进制（`crates/sprawling/Spec.lean` §8-4d），之后走的是与任何 `[[mcp]]` 相同的那条路。
+- **协议壳（`rpc` ＋ `session`）**：一台按行说话的 MCP server，握手与 `tools/call` 的形状与 `Sprawling/agent_protocols/src/mcp/*` 所写的客户端逐字对齐，于是城把它当一台普通的 stdio MCP server 连：一栋楼的 `RULES.toml` 写 `desktop = true`，城就以 `sprawling desktop <DESKTOP.toml>` 起自己这个二进制（`Sprawling/app/Spec.lean` §8-4d），之后走的是与任何 `[[mcp]]` 相同的那条路。
 - **工具表（`tools`）**：六件工具的名字、说明与入参 schema **定死**。每条说明都写明这件工具**不做**什么。
 - **拒绝故事（`scope` ＋ `platform`）**：工具名认出之后的拒绝——越界、未实现、平台做不到——都以 MCP `CallToolResult` 的 `isError` 结果回答，文字里是带稳定错误码的三段拒词；握手未完、方法或工具名不认识、行读不出，这几类协议层的错误才回 JSON-RPC error。没有 scope 文件＝全拒。
 
@@ -55,7 +55,7 @@ import crates.desktop.spec.Session
 | windows::dpi | 连接器答第一次调用之前，本进程恒已按显示器感知 DPI；做不到时每一次调用恒被拒，恒不在两种坐标之间混算 |
 | windows::clipboard | 读恒以 `GlobalSize` 为上界；锁不住恒是拒绝而不是「没有文本」；写恒先备好整块内存再清空剪贴板，交不出时恒释放那块内存，拒词恒说明剪贴板已被清空 |
 | windows::record | 同一窗口重复 start 恒被拒；未 start 就 stop 恒被拒；每一帧恒取自 `capture::window`；抓帧失败恒让录制停下，`stop` 恒交出落盘路径并说出写了多少帧、为什么提前停；`audio: true` 恒只录 scope 文件点名的那一个设备；`stop` 恒把不超过 `SOUND_CARRIED_MOST` 的声音作为一块 audio content 放在文字之前交回，更长的只交路径并说出为什么 |
-| unsafe | 生产代码的 `unsafe` 恒只在 `crates/desktop/ffi/src/` 之下，恒是一次对 Zig 叶子的调用或那一处声明（§8-12 的表）；每一个 `unsafe` 块恒带一行 `SAFETY:`，写的是**使它成立、并且可能为假的前提**，而不是把这次调用换句话再说一遍 |
+| unsafe | 生产代码的 `unsafe` 恒只在 `Sprawling/desktop/ffi/src/` 之下，恒是一次对 Zig 叶子的调用或那一处声明（§8-12 的表）；每一个 `unsafe` 块恒带一行 `SAFETY:`，写的是**使它成立、并且可能为假的前提**，而不是把这次调用换句话再说一遍 |
 
 分部里的定理是模型对性质的证明：scope 缺与坏都关成全拒、两个标识都要中、空 allowlist 不准任何窗口、没写 `sound` 不录声音；`*` 匹配任何名字、不带 `*` 的 pattern 只匹配等长的名字；握手完成之前不出工具；名字无控制字符且有上界；部分输入只补发前缀里按下过的东西的抬起；旧的一代与挪动过的窗口都被拒；两扇以上中了恒不挑。每个分部各有一条「拿掉守卫即反例」的定理。表里其余的行由各模块旁的测试经生产入口断言（§16）。
 -/
@@ -68,9 +68,9 @@ import crates.desktop.spec.Session
 
 /-! ## 4 现状分析
 
-`crates/agent_protocols` 已经是这套协议的**客户端**权威：`Rpc::initialize`／`initialized`／`list_tools`／`call_tool`／`read` 定死了城里说出去的每一行，`agent_protocols::mcp::stdio` 定死了字节怎么走（子进程、按行、消息内无换行、超时即回收子进程）。本 package 是那一端的**对侧**，因此它的形状不是设计出来的，是**读出来的**。
+`Sprawling/agent_protocols` 已经是这套协议的**客户端**权威：`Rpc::initialize`／`initialized`／`list_tools`／`call_tool`／`read` 定死了城里说出去的每一行，`agent_protocols::mcp::stdio` 定死了字节怎么走（子进程、按行、消息内无换行、超时即回收子进程）。本 package 是那一端的**对侧**，因此它的形状不是设计出来的，是**读出来的**。
 
-城这一侧读 `tools/call` 答复的是 `agent_protocols::McpTool`：`isError: true` 的结果是一次失败，拒词全文进它的 subject；`_meta` 带 `sprawling/effect-unknown` 时它标 `Retry::Unknown`（`crates/agent_protocols/Spec.lean` §8-1c）。
+城这一侧读 `tools/call` 答复的是 `agent_protocols::McpTool`：`isError: true` 的结果是一次失败，拒词全文进它的 subject；`_meta` 带 `sprawling/effect-unknown` 时它标 `Retry::Unknown`（`Sprawling/agent_protocols/Spec.lean` §8-1c）。
 -/
 
 /-! ## 5 权威信源
@@ -81,9 +81,9 @@ import crates.desktop.spec.Session
 | stdio 传输：子进程、按行、消息内无换行 | <https://modelcontextprotocol.io/specification/2025-06-18/basic/transports> |
 | `tools/list`／`tools/call` 的 `name`／`description`／`inputSchema` 三字段 | <https://modelcontextprotocol.io/specification/2025-06-18/server/tools> |
 | JSON-RPC 2.0 的保留错误码区间与 `-32000` 起的实现自定义区 | <https://www.jsonrpc.org/specification#error_object> |
-| 城里客户端实际发出的行 | `crates/agent_protocols/src/mcp/handshake.rs`、`crates/agent_protocols/src/mcp/tools.rs` |
-| 城里字节怎么走、超时怎么算 | `crates/agent_protocols/src/mcp/stdio.rs` |
-| `CONFIG.toml` 的 `[[mcp]]` 与 `McpTransport::Stdio { command, args }` | `crates/kernel/src/config.rs` |
+| 城里客户端实际发出的行 | `Sprawling/agent_protocols/src/mcp/handshake.rs`、`Sprawling/agent_protocols/src/mcp/tools.rs` |
+| 城里字节怎么走、超时怎么算 | `Sprawling/agent_protocols/src/mcp/stdio.rs` |
+| `CONFIG.toml` 的 `[[mcp]]` 与 `McpTransport::Stdio { command, args }` | `Sprawling/kernel/src/config.rs` |
 | `CallToolResult`、`isError`、内容块；「工具自己的错误放进结果、置 `isError`，不回协议层错误」 | <https://modelcontextprotocol.io/specification/2025-06-18/server/tools>，`schema/2025-06-18/schema.ts` 的 `CallToolResult` |
 | `_meta` 键名的格式与保留前缀 | <https://modelcontextprotocol.io/specification/2025-06-18/basic> 的 `_meta` 一节 |
 | `GetDIBits`、`ReleaseDC`、`OpenClipboard`、`GetClipboardData`、`SendInput` 的调用前提 | learn.microsoft.com 上各自的函数页（`wingdi/nf-wingdi-getdibits`、`winuser/nf-winuser-releasedc`、`winuser/nf-winuser-openclipboard`、`winuser/nf-winuser-getclipboarddata`、`winuser/nf-winuser-sendinput`） |
@@ -115,7 +115,7 @@ Lean 里的名字与 Rust 的对应：`Desktop.Scope.Tool` ↔ `tools::ToolName`
 
 D14 并回 workspace：本 package 继承 `forbid`，FFI 叶子自带一张只差一行的 lint 表。
 
-- **决定**：server 与它的 FFI 缝住在 `crates/desktop` 与 `crates/desktop/ffi`，两个都是根工作区的成员；它们不再自成一个工作区，没有第二份锁，根 `Cargo.toml` 不 exclude 任何包。本 package 以 `[lints] workspace = true` 继承工作区的 lint 表（`unsafe_code = "forbid"`），包元数据与共享依赖都经 `workspace = true` 继承；lib 名改为 `desktop`，与 depmap 的行名、与其余 crate 的「lib 名即目录名」一致。`desktop_ffi` 写一张自己的 `[lints]`：与根 `[workspace.lints]` 逐键相同，只有 `unsafe_code` 是 `deny`。`xtask guard` 判这一张表（逐键等于根表，例外只有记下理由的 `unsafe_code`），并判其余每个成员的 `[lints]` 恰是 `workspace = true`。本 package 依赖 `kernel` 与 `agent_protocols`：错误码的拼写取 `kernel::AxCode::as_str`，质量的域取 `kernel::consts_policy::IMAGE_QUALITY`，协议修订取 `agent_protocols::PROTOCOL_VERSION`，效果未知的键取 `agent_protocols::EFFECT_META_KEY`；`refusal.rs`、`rpc.rs`、`encode.rs` 里的抄件、`xtask guard` 的 `quoted` 比对与 `kernel::error::code` 里读 `refusal.rs` 的那条测试一起删去。测试自己建窗口要写的 `unsafe` 搬进 `desktop_ffi::fixture`，只在 `fixture` feature 下编译；本 package 只在 Windows 的 dev 依赖里打开它，`xtask artifact` 把 `fixture` 列为测试 feature。
+- **决定**：server 与它的 FFI 缝住在 `Sprawling/desktop` 与 `Sprawling/desktop/ffi`，两个都是根工作区的成员；它们不再自成一个工作区，没有第二份锁，根 `Cargo.toml` 不 exclude 任何包。本 package 以 `[lints] workspace = true` 继承工作区的 lint 表（`unsafe_code = "forbid"`），包元数据与共享依赖都经 `workspace = true` 继承；lib 名改为 `desktop`，与 depmap 的行名、与其余 crate 的「lib 名即目录名」一致。`desktop_ffi` 写一张自己的 `[lints]`：与根 `[workspace.lints]` 逐键相同，只有 `unsafe_code` 是 `deny`。`xtask guard` 判这一张表（逐键等于根表，例外只有记下理由的 `unsafe_code`），并判其余每个成员的 `[lints]` 恰是 `workspace = true`。本 package 依赖 `kernel` 与 `agent_protocols`：错误码的拼写取 `kernel::AxCode::as_str`，质量的域取 `kernel::consts_policy::IMAGE_QUALITY`，协议修订取 `agent_protocols::PROTOCOL_VERSION`，效果未知的键取 `agent_protocols::EFFECT_META_KEY`；`refusal.rs`、`rpc.rs`、`encode.rs` 里的抄件、`xtask guard` 的 `quoted` 比对与 `kernel::error::code` 里读 `refusal.rs` 的那条测试一起删去。测试自己建窗口要写的 `unsafe` 搬进 `desktop_ffi::fixture`，只在 `fixture` feature 下编译；本 package 只在 Windows 的 dev 依赖里打开它，`xtask artifact` 把 `fixture` 列为测试 feature。
 - **理由**：本 package 坐在墙外的理由只有一条（Win32 边界要放开 `unsafe_code`，§10 设计二）。X3 把那些调用收进 Zig 叶子之后（D12），本 package 的生产代码已不写 `unsafe`，这条理由只剩叶子那一层。墙外的代价却都还在：一份抄来的 lint 表、包元数据与依赖版本，第二份锁，六个错误码、质量域、协议修订与 `_meta` 键各一份第二拼写，`depmap` 只能陈述那一行而守不住，`cargo clippy --workspace` 判不到它。并回之后这些抄件都换成引用，剩下的唯一一处差异是叶子那张表的 `unsafe_code` 一行，guard 判的正是它。叶子留在工作区里，而不是另起一个工作区：放在外面它就要自己的锁与 `[workspace.package]`，guard 又要比对一整堵墙；在里面，它与别的成员共享锁、元数据与依赖版本，只有一张表是自己的。依赖 `agent_protocols` 只为两个常量，代价是本 package 单独编译时要先编 `agent_protocols` 与 `gateway`；二进制不变，因为 `sprawling` 本来就链接它们，而这是两个常量各只剩一个定义的唯一做法。
 - **击败的备选**：①叶子也继承 `forbid`，把 `extern` 声明交给一个生成的或第三方的安全绑定——今天没有合格的绑定（D9），而 Rust 2024 的 `unsafe extern` 块在 `forbid` 下编不过；②叶子留在一个墙外工作区，只把本 package 并回——墙还在，只是变小，第二份锁与抄写核对都留着；③测试建窗口的 `unsafe` 留在本 package，给它另开一张 lint 表——cargo 的 lint 表不分 profile，给测试开就是给生产代码开；④不依赖 `agent_protocols`，两个常量留着由 guard 比对——一个事实两个定义，再加一道只为它们存在的门；⑤lib 名保持 `sprawling_desktop`——`depmap` 按 lib 名判边，那一行就要改名，而其余每个 crate 的 lib 名都是它的目录名。
 - **重开的参数**：一个合格的安全绑定覆盖了叶子的四组调用，叶子离开，那张自己的表与 guard 一起删去；或 cargo 允许一个成员继承工作区 lint 表而只改一行，那时叶子写 `workspace = true` 加一行覆盖，guard 的比对随之删去。
@@ -245,7 +245,7 @@ pub(crate) fn perform(tool: ToolName, arguments: &Value, admitted: &Admitted<'_>
 
 `desktop.act` 携 generation 是照抄 `browser::act` 的那一条：**对着一份快照做的决定，恒不落到另一份快照上**——过期就拒，而不是打到那时挪过去的东西上。
 
-**`drag`／`scroll` 的形状只有一份**：桌面侧与浏览器侧读同一组字段——起点是 `ref` 或 `point`，拖拽终点与滚动增量都用 `to`，`steps` 是中间移动次数。浏览器侧由 `browser::input` 实现（`crates/browser/Spec.lean` 的 D9），桌面侧由这张表实现；两侧的 `Action`／动词名逐字对齐，不会各自演化出一套。
+**`drag`／`scroll` 的形状只有一份**：桌面侧与浏览器侧读同一组字段——起点是 `ref` 或 `point`，拖拽终点与滚动增量都用 `to`，`steps` 是中间移动次数。浏览器侧由 `browser::input` 实现（`Sprawling/browser/Spec.lean` 的 D9），桌面侧由这张表实现；两侧的 `Action`／动词名逐字对齐，不会各自演化出一套。
 
 ### 8-8 Windows 这条胳膊的内部
 
@@ -295,16 +295,16 @@ impl Desk {
 
 **每一个 `unsafe` 块恒带一行 `SAFETY:`，写的是使这次调用成立的前提。**「我们调用 `EnumWindows`」不是前提，那只是把调用换句话再说一遍；「`into` 有 `into.len()` 个已初始化的槽、只借给这一次调用，叶子按同一个长度写」才是前提。审这一条的办法是逐个 `SAFETY:` 问一句：它说的东西**能不能是假的**？不能为假的句子不是前提，是复述。
 
-生产代码的 `unsafe` 恒只在 `crates/desktop/ffi/src/` 之下，且恒只包住一次对 Zig 叶子的调用——不包住随后的判断，因为把安全代码收进 `unsafe` 块只会让下一个读者多审几行。本 package 自己的 `src/` 一行 `unsafe` 也不写；测试为了建自己的窗口要写的 `unsafe` 在 `desktop_ffi::fixture` 里，各带 `SAFETY:`，只在 `fixture` feature 下编译（§8-11）。哪些生产调用写 `unsafe`，只看 §8-12 那张表；本节不另列一份。
+生产代码的 `unsafe` 恒只在 `Sprawling/desktop/ffi/src/` 之下，且恒只包住一次对 Zig 叶子的调用——不包住随后的判断，因为把安全代码收进 `unsafe` 块只会让下一个读者多审几行。本 package 自己的 `src/` 一行 `unsafe` 也不写；测试为了建自己的窗口要写的 `unsafe` 在 `desktop_ffi::fixture` 里，各带 `SAFETY:`，只在 `fixture` feature 下编译（§8-11）。哪些生产调用写 `unsafe`，只看 §8-12 那张表；本节不另列一份。
 
-几条最容易写成复述的前提，在这里点名。剪贴板的两次调用要求本进程没有别的线程正处在一次打开与关闭之间：`desktop_ffi::clipboard` 的进程内轮次锁就是这条前提，所以 SAFETY 行写的是「锁在手里」这件可能为假的事。句柄写进 `winsafe::HWND` 的槽里，前提是槽数与交给叶子的容量是同一个数。叶子里那几条前提——位图解除选择之后才读回、`ReleaseDC` 传取得 DC 时的那扇窗口、剪贴板的块以 `GlobalSize` 为界——不再是 Rust 的 `SAFETY:`，而是 `crates/desktop/ffi/Spec.lean` 证明的模型性质与 `leaf.zig` 里写在取得旁边的 `defer`。
+几条最容易写成复述的前提，在这里点名。剪贴板的两次调用要求本进程没有别的线程正处在一次打开与关闭之间：`desktop_ffi::clipboard` 的进程内轮次锁就是这条前提，所以 SAFETY 行写的是「锁在手里」这件可能为假的事。句柄写进 `winsafe::HWND` 的槽里，前提是槽数与交给叶子的容量是同一个数。叶子里那几条前提——位图解除选择之后才读回、`ReleaseDC` 传取得 DC 时的那扇窗口、剪贴板的块以 `GlobalSize` 为界——不再是 Rust 的 `SAFETY:`，而是 `Sprawling/desktop/ffi/Spec.lean` 证明的模型性质与 `leaf.zig` 里写在取得旁边的 `defer`。
 
 ### 8-10 进程的两端住城里
 
 本 package 没有自己的可执行文件，公开面只有 `serve_stdio` 一个函数。
 
-- **进程从哪里起**：`sprawling desktop [scope]`（`crates/sprawling/src/main/desktop.rs`，`crates/sprawling/Spec.lean` §8-4d）。一个位置参数是 `DESKTOP.toml` 的路径，缺席即 `Scope::Closed`。它不判定任何事：作用域归 `scope`，应答归 `session`。
-- **唯一真的把进程拉起来的测试**也住城里（`crates/sprawling/tests/desktop.rs`）：城按一栋楼的规则起 `sprawling desktop`，握手、list，模型收到六件工具。其余测试只证明库里的判断。
+- **进程从哪里起**：`sprawling desktop [scope]`（`Sprawling/app/src/main/desktop.rs`，`Sprawling/app/Spec.lean` §8-4d）。一个位置参数是 `DESKTOP.toml` 的路径，缺席即 `Scope::Closed`。它不判定任何事：作用域归 `scope`，应答归 `session`。
+- **唯一真的把进程拉起来的测试**也住城里（`Sprawling/app/tests/desktop.rs`）：城按一栋楼的规则起 `sprawling desktop`，握手、list，模型收到六件工具。其余测试只证明库里的判断。
 
 ### 8-11 按操作准入的安全接口
 
@@ -325,14 +325,14 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 
 **契约测试在真窗口上跑，只碰测试自己建的窗口。** 枚举、落点、树与捕获这几行的契约，由测试在本进程里建一扇不抢焦点的窗口（`desktop_ffi::fixture`，只在 `fixture` feature 下编译，本 package 只在 Windows 的 dev 依赖里打开它；`platform/windows/fixture.rs` 只把它的外框换成本 package 的 `Bounds`）再读回它来判；它们不读、不点、不改人桌面上别的窗口。输入这一行的旧实现把事件写进 `INPUT` 联合体，不写 `unsafe` 读不回来，所以它的契约测试随替换一起写，判的是每个 stroke 变成了哪个 `HwKbMouse` 值；真的把事件送到窗口上仍是 §16.2 的操作者检查。
 
-### 8-12 Zig 缝：`crates/desktop/ffi`
+### 8-12 Zig 缝：`Sprawling/desktop/ffi`
 
 没有准入安全接口的四组调用（§8-11 里「实现」写 `desktop_ffi` 的四行）由一个包做完：
 
-- **位置**：`crates/desktop/ffi/`，包名 `sprawling-desktop-ffi`，库名 `desktop_ffi`，规格是 `crates/desktop/ffi/Spec.lean`（边界规则与资源配对的定理在那里）。Zig 源码在 `crates/desktop/ffi/zig/`：`leaf.zig`（四组操作与 export）、`boundary.zig`（叶子往借来的缓冲里写什么）、`step.zig`（step 的 Zig 拼写）。
-- **一张自己的表**：两个包都是根工作区的成员，包元数据与 `winsafe` 的版本行都以 `workspace = true` 继承。本 package 的 `[lints]` 是 `workspace = true`；`desktop_ffi` 的 `[lints]` 是它自己的一张，与根 `[workspace.lints]` 逐键相同，只有 `unsafe_code` 是 `deny`，`xtask guard` 判这一张表，例外只有那一行（crates/xtask/Spec.lean §8-46、D14）。
-- **构建**：`crates/desktop/ffi/build.rs` 只用标准库起 `zig build-lib`（`ReleaseSafe`，目标取自 cargo 的目标），只在 Windows 目标上；别的目标上本包只剩 `step`，本 package 也只在 Windows 上依赖它。Zig 的版本只写在 `crates/desktop/ffi/zig-version`：构建脚本、doctor 的 `zig` 一行（`crates/sprawling/Spec.lean` §8-146）与 CI 的安装步骤都读它。
-- **对拍与 fuzz 的配方**：`desktop_ffi::boundary` 的测试以种子化输入比对叶子与 Rust 参考（`crates/desktop/ffi/src/reference.rs`），每条规则两万个；`just fuzz-desktop <rounds> <seed>` 把同一比对按给定的轮数与种子跑下去（Rust 一侧的 fuzz）；`just check-desktop` 里的 `zig test crates/desktop/ffi/zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试（Zig 一侧的 fuzz）。
+- **位置**：`Sprawling/desktop/ffi/`，包名 `sprawling-desktop-ffi`，库名 `desktop_ffi`，规格是 `Sprawling/desktop/ffi/Spec.lean`（边界规则与资源配对的定理在那里）。Zig 源码在 `Sprawling/desktop/ffi/zig/`：`leaf.zig`（四组操作与 export）、`boundary.zig`（叶子往借来的缓冲里写什么）、`step.zig`（step 的 Zig 拼写）。
+- **一张自己的表**：两个包都是根工作区的成员，包元数据与 `winsafe` 的版本行都以 `workspace = true` 继承。本 package 的 `[lints]` 是 `workspace = true`；`desktop_ffi` 的 `[lints]` 是它自己的一张，与根 `[workspace.lints]` 逐键相同，只有 `unsafe_code` 是 `deny`，`xtask guard` 判这一张表，例外只有那一行（Tools/xtask/Spec.lean §8-46、D14）。
+- **构建**：`Sprawling/desktop/ffi/build.rs` 只用标准库起 `zig build-lib`（`ReleaseSafe`，目标取自 cargo 的目标），只在 Windows 目标上；别的目标上本包只剩 `step`，本 package 也只在 Windows 上依赖它。Zig 的版本只写在 `Sprawling/desktop/ffi/zig-version`：构建脚本、doctor 的 `zig` 一行（`Sprawling/app/Spec.lean` §8-146）与 CI 的安装步骤都读它。
+- **对拍与 fuzz 的配方**：`desktop_ffi::boundary` 的测试以种子化输入比对叶子与 Rust 参考（`Sprawling/desktop/ffi/src/reference.rs`），每条规则两万个；`just fuzz-desktop <rounds> <seed>` 把同一比对按给定的轮数与种子跑下去（Rust 一侧的 fuzz）；`just check-desktop` 里的 `zig test Sprawling/desktop/ffi/zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试（Zig 一侧的 fuzz）。
 
 生产代码的每一个 `unsafe` 都在这张表里，各是一次叶子调用，`SAFETY:` 写在调用旁：
 
@@ -361,7 +361,7 @@ D1 定规：`visible` 只在 Windows 与测试里编译。
 
 D12 没有准入安全接口的四组调用经一片 Zig 叶子，Rust 面零业务 `unsafe`。
 
-- **决定**：枚举、捕获、剪贴板、DPI 四组调用由 `crates/desktop/ffi` 的 Zig 叶子整段做完（§8-12）：一个 export 一个完整操作，Rust 借出缓冲、读回 step 与错误码，句柄、DC 与全局块恒不跨边界。Rust 面每次调用一个 `unsafe` 块，加那一处 `unsafe extern` 声明，全部在 §8-12 的表里；本 package 的 `src/` 生产代码不写 `unsafe`。两个包都是根工作区的成员，共享锁、包元数据与 `winsafe` 的一条版本行；lint 表只有 `desktop_ffi` 那一张与工作区差一行（D14）。叶子往缓冲里写什么、资源怎么配对，由 `crates/desktop/ffi/Spec.lean` 证明模型性质，由对拍、fuzz 与真窗口上的契约测试检查实现。
+- **决定**：枚举、捕获、剪贴板、DPI 四组调用由 `Sprawling/desktop/ffi` 的 Zig 叶子整段做完（§8-12）：一个 export 一个完整操作，Rust 借出缓冲、读回 step 与错误码，句柄、DC 与全局块恒不跨边界。Rust 面每次调用一个 `unsafe` 块，加那一处 `unsafe extern` 声明，全部在 §8-12 的表里；本 package 的 `src/` 生产代码不写 `unsafe`。两个包都是根工作区的成员，共享锁、包元数据与 `winsafe` 的一条版本行；lint 表只有 `desktop_ffi` 那一张与工作区差一行（D14）。叶子往缓冲里写什么、资源怎么配对，由 `Sprawling/desktop/ffi/Spec.lean` 证明模型性质，由对拍、fuzz 与真窗口上的契约测试检查实现。
 - **理由**：AGENTS.md「Rust」一节给平台调用定了次序：先找安全接口，没有合格的就用 Zig 叶子，`unsafe` Rust 只在测量表明它整体最好时才准入。这四组在 X2 的审查里没有合格的安全接口（D9），口径 ① 要的正是业务代码零 `unsafe`、只留一个经审的 FFI 缝。整段操作放进叶子，是因为这四组的风险不在某一次调用，而在调用之间：位图选进之后要选回、DC 要随取得它的窗口还回去、全局块要么交出要么释放。这些次序在叶子里写成取得旁边的 `defer`，在 Lean 里写成可穷举的模型；若每个 Win32 调用各包一个 export，次序就又回到 Rust 的 `Drop` 与 `unsafe` 里（`desktop_ffi` D1）。
 - **剩余限制**（写明，不当作已解决）：两侧的 fuzz 都是抽样而不是覆盖引导。Zig 的覆盖引导 fuzz（`--fuzz`）今天不在 Windows 上实现；cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时，而叶子只在 Windows 上编，所以 libFuzzer 没有一个能跑它的平台。叶子以 `ReleaseSafe` 编，抽样到的越界即 trap。Lean 证明的是叶子对操作系统回答的处理，操作系统本身是假设。
 - **击败的备选**：①留在 `windows` 绑定上继续手写 `unsafe`（33 个块，与口径 ① 相反）；②一个独立的 Zig 可执行程序、经进程边界说话（多一个交付物与它的监管，而本 server 本来就是一个子进程，多一层隔离买不到新东西）；③每个 Win32 调用一个 export（见上）；④把叶子的调用留在本 package 里、本 package 整个用 `deny`（`unsafe` 的许可就落到了协议壳与平台臂上，那里一行也不需要它）。
@@ -370,7 +370,7 @@ D12 没有准入安全接口的四组调用经一片 Zig 叶子，Rust 面零业
 D13 录下的声音作为一块 audio content 交回城里。
 
 - **决定**：`desktop.record` 的 `stop` 在这份录制录了声音时，答复的第一块是 MCP 的 audio content（`type: "audio"`、`data` 是 base64、`mimeType: "audio/wav"`），第二块是照旧的那段文字，多写 `sound`（wav 的路径）。wav 超过 `SOUND_CARRIED_MOST` 时不带 audio 块，文字里写 `sound_left_out` 说明多长、在哪里；声音那个 ffmpeg 提前退出时写 `sound_ended_early`，有多少交多少。
-- **理由**：wav 落在临时目录（§14），城里没有一件工具读得到那里；交回城里的唯一一条不新增依赖、不新增写权限的路，是 MCP 答复本身。连接器已经把答复里的图片存进 CAS（`crates/runtime/Spec.lean` §8-27-10），声音走同一条路，模型读到的是一行带 locator 的字，base64 恒不进窗口也恒不进账本。截图恒是一块 image 在前（§8-2b），声音照同一个形状，模型读这两种答复用的是同一种读法。
+- **理由**：wav 落在临时目录（§14），城里没有一件工具读得到那里；交回城里的唯一一条不新增依赖、不新增写权限的路，是 MCP 答复本身。连接器已经把答复里的图片存进 CAS（`Sprawling/runtime/Spec.lean` §8-27-10），声音走同一条路，模型读到的是一行带 locator 的字，base64 恒不进窗口也恒不进账本。截图恒是一块 image 在前（§8-2b），声音照同一个形状，模型读这两种答复用的是同一种读法。
 - **击败的备选**：①把录音写进这座楼（scope 文件说的是能碰哪些窗口，没说能往城里哪里写，§14；而且本 server 不知道城根在哪）；②只交路径（城里没有工具读得到临时目录）；③把整段声音不论多长都塞进答复（十分钟的 wav 是 19 MB，base64 之后超过城的 MCP 单行上限，整个答复会被拒，连画面的路径都到不了）。
 - **重开的参数**：城的 MCP 客户端改了单行上限；或者 `transcribe` 能直接读运行中的机器上的一个文件。
 -/
@@ -391,7 +391,7 @@ D13 录下的声音作为一块 audio content 交回城里。
 5. **越界判定在平台之前**：`admits` 是纯判定，无 I/O、无时钟，于是它可以被逐条测，而 Win32 一行都还没跑。
 6. **glob 一定终止**：回溯时文本下标只增不减，且到达文本末尾即失败，故循环恒有界；`scope::pattern` 里有一条专门打这一点的测试（一个「几乎匹配很多次」的名字）。
 7. **`deny_unknown_fields`**：拼错的键若被默默忽略，写它的人会把它读成一个生效了的键。故坏键＝坏文件＝全拒。
-8. **GDI 的三条前提写在取得旁边**：叶子的 `draw` 把位图选进 memory DC，`defer` 在它返回之前选回旧对象，`readBack` 在 `draw` 返回之后才调 `GetDIBits`；`ReleaseDC` 的 `defer` 传的是 `GetDC` 时的那扇窗口；`GetDIBits` 读回的行数不等于高就答 `ShortRows`，不交出半张图。空句柄在 `GetDC` 之前就答 `NoWindow`，因为 `GetDC(NULL)` 取的是整屏。三条的模型性质在 `crates/desktop/ffi/Spec.lean`（`every_gdi_object_is_given_back_once`、`read_back_follows_unselect`）。
+8. **GDI 的三条前提写在取得旁边**：叶子的 `draw` 把位图选进 memory DC，`defer` 在它返回之前选回旧对象，`readBack` 在 `draw` 返回之后才调 `GetDIBits`；`ReleaseDC` 的 `defer` 传的是 `GetDC` 时的那扇窗口；`GetDIBits` 读回的行数不等于高就答 `ShortRows`，不交出半张图。空句柄在 `GetDC` 之前就答 `NoWindow`，因为 `GetDC(NULL)` 取的是整屏。三条的模型性质在 `Sprawling/desktop/ffi/Spec.lean`（`every_gdi_object_is_given_back_once`、`read_back_follows_unselect`）。
 9. **每个常量只写一处**：滚轮一格的 `WHEEL_DELTA` 用 `windows` 绑定里的定义；`PW_RENDERFULLCONTENT`、`CF_UNICODETEXT`、`GMEM_MOVEABLE`、`HWND_MESSAGE` 只写在 `leaf.zig`，Rust 一侧不再拼写它们；DPI 感知值由本 package 从 `windows` 绑定的 `PROCESS_PER_MONITOR_DPI_AWARE` 读出、传给叶子。
 
 下面十个设计各记一个被选中的做法与它击败的备选。
@@ -455,7 +455,7 @@ D8 剪贴板：自己的 owner，有界的读，先备好再清空。
 D11 声音：ffmpeg 的 `dshow` 录 scope 文件点名的那一个设备。
 
 - **决定**：`desktop.record` 的 `audio: true` 录的是人写在 scope 文件里的那一个 DirectShow 音频设备，键为 `sound = "<设备名>"`，与 `record`、`clipboard` 同样缺省不写。设备名只从 scope 文件来：调用方的参数里没有它，本 server 也不枚举设备。scope 文件写了 `record = true` 而没写 `sound` 时，`audio: true` 以 `E_GATE_DENIED` 拒，恢复语说出去哪里查设备名（`ffmpeg -hide_banner -list_devices true -f dshow -i dummy`）与写进哪一键。声音由第二个 ffmpeg 进程录，`-f dshow -i audio=<设备名>`，写成录制目录里的一个 16 kHz 单声道 wav，与画面各成一个文件；没有 ffmpeg 时，有声音的录制以 `E_TOOL_UNAVAILABLE` 拒，因为帧序列那一支录不了声音。
-- **理由**：主线 ffmpeg 在 Windows 上的音频输入是 `dshow`（`ffmpeg -devices` 列得出），不加依赖、不加 `unsafe`。dshow 设备的名字是驱动起的，随机器而变，城里没有一处知道；替人挑一个，就是替人授权录下一个他没点名的声音源，而麦克风是比一扇窗口更重的授权。人写下名字，就是人授权了这一个设备，与 `windows` 列表授权窗口是同一种读法。画面与声音分成两个进程、两个文件：画面从 stdin 进（D7），声音是 ffmpeg 自己的输入，放进一个进程就要对齐两条时钟；wav 是 `gateway::AudioType` 认得、城的 `transcribe` 工具直接收得下的容器（`crates/sprawling/Spec.lean` §8-131），16 kHz 单声道一分钟约 1.9 MB。
+- **理由**：主线 ffmpeg 在 Windows 上的音频输入是 `dshow`（`ffmpeg -devices` 列得出），不加依赖、不加 `unsafe`。dshow 设备的名字是驱动起的，随机器而变，城里没有一处知道；替人挑一个，就是替人授权录下一个他没点名的声音源，而麦克风是比一扇窗口更重的授权。人写下名字，就是人授权了这一个设备，与 `windows` 列表授权窗口是同一种读法。画面与声音分成两个进程、两个文件：画面从 stdin 进（D7），声音是 ffmpeg 自己的输入，放进一个进程就要对齐两条时钟；wav 是 `gateway::AudioType` 认得、城的 `transcribe` 工具直接收得下的容器（`Sprawling/app/Spec.lean` §8-131），16 kHz 单声道一分钟约 1.9 MB。
 - **击败的备选**：WASAPI 回环（能录机器正在放的任何声音，但要新依赖或新 `unsafe`）；枚举设备取第一个（替人选了授权对象）；由调用方在参数里给设备名（模型给出授权对象，scope 文件就不再是授权的唯一处）；把声音混进 mp4（两条时钟，而没有 ffmpeg 的那一支本来就没有声音可混）。
 - **重开的参数**：主线 ffmpeg 在 Windows 上有了 WASAPI 输入；或者 scope 文件要按窗口给不同的设备。
 
@@ -567,15 +567,15 @@ D10 树经 `uiautomation` 读、按文档序铸 ref、折成文字；COM 公寓�
 | 效果未知的 `_meta` 键 | `sprawling/effect-unknown`，值 `true` | 我们的约定；唯一定义在 `agent_protocols::mcp::tools::EFFECT_META_KEY`，本 package 引用它 |
 | 工具层拒词的文字 | 第一行 `E_…: cannot <action> — <subject>`，第二行 `instead: <recovery>` | 我们的选择：第一行与 JSON-RPC error 的 `message` 同一句，第二行让恢复句在模型读到的文字里有自己的位置 |
 | DPI 感知 | 按显示器感知（`PROCESS_PER_MONITOR_DPI_AWARE`，取自 `windows` 绑定，交给叶子） | 外面的事实：Windows 8.1 起的 shcore 接口；理由见 D6 |
-| Zig 的版本 | `crates/desktop/ffi/zig-version` 里的那一行 | 我们的选择：叶子只对一个 Zig 版本编过、测过；换版本只改那一个文件（`crates/desktop/ffi/Spec.lean` D3） |
+| Zig 的版本 | `Sprawling/desktop/ffi/zig-version` 里的那一行 | 我们的选择：叶子只对一个 Zig 版本编过、测过；换版本只改那一个文件（`Sprawling/desktop/ffi/Spec.lean` D3） |
 
 模型里的 `LABEL_MOST` 与 Rust 的 `outline::LABEL_MOST` 取同一个值，由 `outline` 模块旁的测试守着。
 
 D16 截图 schema 的 `quality` 上限经 `IMAGE_QUALITY.admit` 读出。
 
-D17 录制起的两个 ffmpeg（`windows::record::sink` 编码画面、`windows::record::hearing` 录声音）从 `child::command` 起（`crates/child/Spec.lean`）：不附着在城的控制台上，`SPRAWLING_SECRET_*` 与 `SPRAWLING_PAIRING_TOKEN` 不进它们的环境。理由：ffmpeg 只读 stdin 与一个设备，用不着城的秘密；附着在城的控制台上的进程能读屏上的配对码与人敲进 CLI 的键。被否：本 package 自己设 `CREATE_NO_WINDOW`——那是第二份定义，`child` 是唯一的一份。
+D17 录制起的两个 ffmpeg（`windows::record::sink` 编码画面、`windows::record::hearing` 录声音）从 `child::command` 起（`Sprawling/child/Spec.lean`）：不附着在城的控制台上，`SPRAWLING_SECRET_*` 与 `SPRAWLING_PAIRING_TOKEN` 不进它们的环境。理由：ffmpeg 只读 stdin 与一个设备，用不着城的秘密；附着在城的控制台上的进程能读屏上的配对码与人敲进 CLI 的键。被否：本 package 自己设 `CREATE_NO_WINDOW`——那是第二份定义，`child` 是唯一的一份。
 
-- **决定**：`desktop.screenshot` 的 `inputSchema` 里 `quality.maximum` 是 `kernel::consts_policy::IMAGE_QUALITY` 收下的最大值，由 `tools::largest_quality` 在 `admit` 上二分找出：`admit` 的域是 `0..=max`（`crates/kernel/spec/PolicyLimit.lean` §8-73），所以「收下」对质量单调，三十二次判定之内找到边界。一次调用的质量仍在解析点经 `admit` 判（`platform::windows::reading`）。
+- **决定**：`desktop.screenshot` 的 `inputSchema` 里 `quality.maximum` 是 `kernel::consts_policy::IMAGE_QUALITY` 收下的最大值，由 `tools::largest_quality` 在 `admit` 上二分找出：`admit` 的域是 `0..=max`（`Sprawling/kernel/spec/PolicyLimit.lean` §8-73），所以「收下」对质量单调，三十二次判定之内找到边界。一次调用的质量仍在解析点经 `admit` 判（`platform::windows::reading`）。
 - **理由**：schema 是模型读到的域，`admit` 是本 server 执行的域。schema 里写死的 100 是同一个事实的第二份定义：城里的域一挪，模型照旧按旧域发，server 按新域拒。kernel 的 `ImageQuality` 没有 getter，那是 kernel D3 的定规（拒因只由类型说出，调用方读不出裸数去拼自己的句子）；schema 的上界不是一句拒因，经类型唯一的门读出它，定规不动。
 - **击败的备选**：①在 `consts_policy` 加一个公开常量 `IMAGE_QUALITY_MAX`，`IMAGE_QUALITY` 由它构造——一个数一个家，代码最短，但它正是 12.3 这条定规关上的那扇门；②留 100、由评审盯着；③由 `xtask guard` 比对两处（设计九已否：抄件加比对只让漂移看得见）。
 - **重开的参数**：kernel D3 改为准许读出上限类政策值的数；那时 schema 直接读那个数，`largest_quality` 删去。
@@ -583,7 +583,7 @@ D17 录制起的两个 ffmpeg（`windows::record::sink` 编码画面、`windows:
 
 /-! ## 15 影响面
 
-工作区成员，唯一的调用方是 `sprawling`：`crates/sprawling/Cargo.toml` 以 `desktop = { workspace = true }` 依赖它，`ARCHITECTURE.md` §3 的 depmap 块有它与 `desktop_ffi` 各一行。改 `kernel::AxCode` 那六个变体、`IMAGE_QUALITY`、`agent_protocols::PROTOCOL_VERSION` 或 `EFFECT_META_KEY` 波及本 package。它在 Windows 上按路径依赖 `desktop_ffi`，所以 Windows 上构建 `sprawling` 要有 `zig-version` 钉住的 Zig。改 `serve_stdio` 的签名波及 `bin::main::desktop`；改工具名或 `tools/list` 的形状波及 `kernel::gate::undoable`（按远端名前缀 `desktop.` 判）与 `crates/sprawling/tests/desktop.rs`。
+工作区成员，唯一的调用方是 `sprawling`：`Sprawling/app/Cargo.toml` 以 `desktop = { workspace = true }` 依赖它，`ARCHITECTURE.md` §3 的 depmap 块有它与 `desktop_ffi` 各一行。改 `kernel::AxCode` 那六个变体、`IMAGE_QUALITY`、`agent_protocols::PROTOCOL_VERSION` 或 `EFFECT_META_KEY` 波及本 package。它在 Windows 上按路径依赖 `desktop_ffi`，所以 Windows 上构建 `sprawling` 要有 `zig-version` 钉住的 Zig。改 `serve_stdio` 的签名波及 `bin::main::desktop`；改工具名或 `tools/list` 的形状波及 `kernel::gate::undoable`（按远端名前缀 `desktop.` 判）与 `Sprawling/app/tests/desktop.rs`。
 
 ### 15.2 城里那一侧
 
@@ -593,29 +593,29 @@ D17 录制起的两个 ffmpeg（`windows::record::sink` 编码画面、`windows:
 2. **`desktop.` 前缀的 MCP 工具归到「撤不回」那道门**：一次点击没有 restoration，`kernel::discard` 那套「拿得回来才准删」在这里无从谈起，故它该走的是**升给人**（Escalate），不是 Deny。落点是 `runtime::bench::admit` 里 `Effect::Connector` 那一支。
 3. **设置页写 `DESKTOP.toml`**：它是**治理文件**，不是产物——它说的是这栋楼的 runs 能碰什么。故它落在这栋楼的 reserved subtree（`<building>/.sprawling/DESKTOP.toml`），与 `RULES.toml`／`CONFIG.toml` 同处，**任何 write domain 都够不着**；写它的那一点照 `city::governed` 的形状办（一道门、整份写、不拼路径），而不是让设置页自己拼一个路径出来。这就是 `DomainReach` 立下的那条读法：一份决定「residents 能写什么」的文件，恒不由 resident 写。
 
-4. **城自己起这台 server**：`RULES.toml` 写 `desktop = true` 的楼，城以 `sprawling desktop <DESKTOP.toml>` 起它，不要人手写 `[[mcp]]`（`crates/sprawling/Spec.lean` §8-4d）。
+4. **城自己起这台 server**：`RULES.toml` 写 `desktop = true` 的楼，城以 `sprawling desktop <DESKTOP.toml>` 起它，不要人手写 `[[mcp]]`（`Sprawling/app/Spec.lean` §8-4d）。
 
 #### 落到哪一步，还欠什么
 
-四件都已落地并各自有测试：`city::policy` 读 `desktop:`（缺省关、机密楼即拒、打字错误即拒）；`kernel::gate::undoable` 判「远端名前缀 `desktop.`」并升给人，`runtime::bench::admit` 在出网门之后叫它；设置页的框经 `ConfigureBuilding` 的 `desktop` 字段整份写 `DESKTOP.toml`，写之前先落账本一行（`crates/sprawling/Spec.lean` 里桌面 allowlist 那一节）；城按规则起 `sprawling desktop`。
+四件都已落地并各自有测试：`city::policy` 读 `desktop:`（缺省关、机密楼即拒、打字错误即拒）；`kernel::gate::undoable` 判「远端名前缀 `desktop.`」并升给人，`runtime::bench::admit` 在出网门之后叫它；设置页的框经 `ConfigureBuilding` 的 `desktop` 字段整份写 `DESKTOP.toml`，写之前先落账本一行（`Sprawling/app/Spec.lean` 里桌面 allowlist 那一节）；城按规则起 `sprawling desktop`。
 
 **不内置任何模型（定规）**：本二进制不带 OCR、ASR 或任何视觉模型的权重，这些都经人接入的端点。模型拿到的桌面文字先是 accessibility tree；OCR 端点与本地 ASR 端点都是人接进来的。
 
-**录音到 `transcribe`**：`desktop.record` 停下时把声音作为一块 audio content 交回（D13），连接器把它存进 CAS，模型读到的是一行带 `cas:` locator 的字（`crates/runtime/Spec.lean` §8-27-10、runtime D15）；`transcribe` 经 `runtime::BoundReader` 按这个 locator 读这一块，容器从开头的字节认（`crates/sprawling/Spec.lean` §8-131，`crates/runtime/Spec.lean` §8-59，`crates/gateway/Spec.lean` §8-34）。
+**录音到 `transcribe`**：`desktop.record` 停下时把声音作为一块 audio content 交回（D13），连接器把它存进 CAS，模型读到的是一行带 `cas:` locator 的字（`Sprawling/runtime/Spec.lean` §8-27-10、runtime D15）；`transcribe` 经 `runtime::BoundReader` 按这个 locator 读这一块，容器从开头的字节认（`Sprawling/app/Spec.lean` §8-131，`Sprawling/runtime/Spec.lean` §8-59，`Sprawling/gateway/Spec.lean` §8-34）。
 
 **还欠的**，都是这条接口的当前状态：
 
-1. **OCR**：一张截图变成文字由城工具 `ocr` 承担（`crates/sprawling/Spec.lean` §8-142），它读连接器存进 CAS 的截图，经人为 `ModelTag::Ocr` 选的端点；本 package 不做 OCR。
+1. **OCR**：一张截图变成文字由城工具 `ocr` 承担（`Sprawling/app/Spec.lean` §8-142），它读连接器存进 CAS 的截图，经人为 `ModelTag::Ocr` 选的端点；本 package 不做 OCR。
 2. **macOS 这条胳膊**：`platform/elsewhere.rs` 对 macOS 答 `E_TOOL_UNAVAILABLE`。它要在一台 Mac 或夜间的 `platforms.yml` 上验，Windows 上验不了。
 -/
 
 /-! ## 16 测试与约束
 
-逐模块 `#[cfg(test)]`。真的把进程拉起来的那一条住城里（`crates/sprawling/tests/desktop.rs`，§8-10）：它是唯一一处证明「城起的 `sprawling desktop` 真的接得上」的测试，其余测试都只证明库里的判断。
+逐模块 `#[cfg(test)]`。真的把进程拉起来的那一条住城里（`Sprawling/app/tests/desktop.rs`，§8-10）：它是唯一一处证明「城起的 `sprawling desktop` 真的接得上」的测试，其余测试都只证明库里的判断。
 
 **约束**：`unsafe` 只在 `platform/windows/` 之下且每块携一行 `SAFETY:`（§8-9）；其余处恒不出现 `unsafe`、`unwrap`、`expect`、`panic!`、`todo!`、裸下标、`as`；算术走 `checked_*`／`saturating_*`；每个文件 ≤400 行、每个函数 ≤200 行且 ≤4 参数。`scope.rs` 因这条尺子而在 446 行处切出 `scope/pattern.rs`——切口落在「一行 allowlist 匹配什么」与「这份文件许可什么」之间，是语义的，不是为了凑行数；`Admitted` 落地时它再次抵线，这一次切出的是 `scope/tests.rs`（形状同 `session/tests.rs`），判定与对判定的断言各占一个文件。
 
-验收命令：本 package 与 `desktop_ffi` 是工作区成员，`just clippy`、`just test` 与 `just fmt-check` 判它们，与判其余 crate 是同一条命令；Windows 上 `just check-desktop` 另跑 `zig test` 判叶子自己的测试（`zig fmt --check` 在 `just fmt-check` 里）。`xtask guard` 判 `desktop_ffi` 那一张自己的 lint 表，例外只有记下理由的 `unsafe_code` 一行（D14）。叶子的三份 `.zig` 与 `.rs` 受同样的 `xtask header`、`length`、`modmap`：MPL 头、函数 200 行与文件 400 行、模块表里各一行（crates/xtask/Spec.lean §8-48，ARCHITECTURE §2 条件 5）。`record.rs` 因 `xtask length` 的 400 行文件尺子在 443 行处切出 `record/sink.rs`——切口落在「可不可以开始录」与「由谁写、写到哪」之间。
+验收命令：本 package 与 `desktop_ffi` 是工作区成员，`just clippy`、`just test` 与 `just fmt-check` 判它们，与判其余 crate 是同一条命令；Windows 上 `just check-desktop` 另跑 `zig test` 判叶子自己的测试（`zig fmt --check` 在 `just fmt-check` 里）。`xtask guard` 判 `desktop_ffi` 那一张自己的 lint 表，例外只有记下理由的 `unsafe_code` 一行（D14）。叶子的三份 `.zig` 与 `.rs` 受同样的 `xtask header`、`length`、`modmap`：MPL 头、函数 200 行与文件 400 行、模块表里各一行（Tools/xtask/Spec.lean §8-48，ARCHITECTURE §2 条件 5）。`record.rs` 因 `xtask length` 的 400 行文件尺子在 443 行处切出 `record/sink.rs`——切口落在「可不可以开始录」与「由谁写、写到哪」之间。
 
 `platforms.yml` 的 macOS job 跑工作区的 clippy 与 nextest，所以非 Windows 臂与只在非 Windows 上编译的测试（`session/tests.rs` 里 `#[cfg(not(windows))]` 的那一条）每晚在 macOS 上过一次。
 
@@ -637,7 +637,7 @@ D17 录制起的两个 ffmpeg（`windows::record::sink` 编码画面、`windows:
 
 /-! ## 17 文档关系
 
-`ARCHITECTURE.md` §3 depmap 块的 `desktop` 与 `desktop_ffi` 两行｜`crates/desktop/README.md`（英文，讲清城怎么起它、叶子为什么有自己的一张 lint 表）｜crates/xtask/Spec.lean §8-46（guard 判叶子那张表）｜`crates/sprawling/Spec.lean` §8-4d｜同步本 SPEC §13 与 §8-7 的实现状态｜`crates/desktop/README.md` 的 The honest-refusal rule 一节｜`crates/agent_protocols/Spec.lean` §8-1c（城怎么读 `isError` 与 `_meta`）。
+`ARCHITECTURE.md` §3 depmap 块的 `desktop` 与 `desktop_ffi` 两行｜`Sprawling/desktop/README.md`（英文，讲清城怎么起它、叶子为什么有自己的一张 lint 表）｜Tools/xtask/Spec.lean §8-46（guard 判叶子那张表）｜`Sprawling/app/Spec.lean` §8-4d｜同步本 SPEC §13 与 §8-7 的实现状态｜`Sprawling/desktop/README.md` 的 The honest-refusal rule 一节｜`Sprawling/agent_protocols/Spec.lean` §8-1c（城怎么读 `isError` 与 `_meta`）。
 
-`docs/glossary.md` 的 **desktop connector** 一行；`crates/browser/Spec.lean` D9（拖拽与滚动的同一份词汇，§8-7）；`crates/agent_protocols/Spec.lean` §8-1c（城怎么读 `isError` 与 `_meta`，`EFFECT_META_KEY` 与 `PROTOCOL_VERSION` 的唯一定义）；`crates/desktop/ffi/Spec.lean`（缝本身的规格）；`crates/sprawling/Spec.lean` §8-4d 与 §8-146；`architecture.toml` 里 desktop 各行的锚点指向本文件与分部。这些改了，重读本文件对应的节与决定。
+`docs/glossary.md` 的 **desktop connector** 一行；`Sprawling/browser/Spec.lean` D9（拖拽与滚动的同一份词汇，§8-7）；`Sprawling/agent_protocols/Spec.lean` §8-1c（城怎么读 `isError` 与 `_meta`，`EFFECT_META_KEY` 与 `PROTOCOL_VERSION` 的唯一定义）；`Sprawling/desktop/ffi/Spec.lean`（缝本身的规格）；`Sprawling/app/Spec.lean` §8-4d 与 §8-146；`architecture.toml` 里 desktop 各行的锚点指向本文件与分部。这些改了，重读本文件对应的节与决定。
 -/

@@ -6,7 +6,7 @@
 /-!
 # gateway::provider::thinking
 
-规定 `provider::thinking`（`crates/gateway/src/provider/thinking.rs`）与它的编码分部 `provider::thinking::encoding`（`crates/gateway/src/provider/thinking/encoding.rs`）：一个（Endpoint，模型）提供哪些思考档、一次请求实际发哪一档、明说的档不在提供之列时怎样拒，以及一档在这一面上写成哪个字段。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面一节保留它的标签 §8-39，别处引作 `crates/gateway/Spec.lean §8-39`，决定引作 `gateway D<n>`。
+规定 `provider::thinking`（`Sprawling/gateway/src/provider/thinking.rs`）与它的编码分部 `provider::thinking::encoding`（`Sprawling/gateway/src/provider/thinking/encoding.rs`）：一个（Endpoint，模型）提供哪些思考档、一次请求实际发哪一档、明说的档不在提供之列时怎样拒，以及一档在这一面上写成哪个字段。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；下面一节保留它的标签 §8-39，别处引作 `Sprawling/gateway/Spec.lean §8-39`，决定引作 `gateway D<n>`。
 
 模型证明五条跨过所有输入的性质：发出的档一定在提供之列（`the_sent_level_is_offered`）；什么都不提供的 offer 什么都不发（`an_offer_of_nothing_sends_nothing`）；存下的档被提供时原样发出、恒不夹到邻档（`an_offered_level_is_sent_as_stored`）；明说的档恰在不被提供时被拒（`admit_refuses_exactly_what_is_not_offered`）；「开启思考」只发给没有档位的模型（`thinking_on_is_sent_only_where_no_level_is_offered`）。
 
@@ -48,13 +48,13 @@ pub(crate) fn fields(ask: Ask, dialect: DialectKind, field: EffortField) -> Vec<
 - **`levels` 在类型上不含 `none`**：关闭思考不是一档（IF-0 2.2）；`Effort::None` 只为读回旧账保留，它恒不被提供，于是一个存成 `none` 的旧值按默认规则处理。
 - **实发的档（`ask`）**：存下的或继承来的档被提供时原样发出；否则 `high` 被提供时发 `high`（`kernel::consts_policy::DEFAULT_EFFORT`）；否则上游或文档说的默认档被提供时发它；否则一个没有档位、开关为 `Allowed` 的模型收到「开启思考」；否则什么都不写。恒不夹到邻档：不被提供的档不变成离它最近的那一档，而是走默认规则，因为「最近」在两家厂商那里深浅不同。
 - **派活前的拒（`admit`）**：只有这一次请求明说的档（`/effort <level>` 或 `Dispatch.effort`）会被拒：不在 `levels` 里时答 `E_CONFIG_INVALID`，主题写这个模型，恢复语列出提供的档（没有时说这个模型没有思考档，去掉这一项再派）。存下的偏好恒不被拒（M-14）：换了模型，偏好留着，这一次按默认规则发。
-- **编码归 `encoding` 一处**：一个 `Ask` 在三面上写成什么，见 `crates/gateway/spec/Dialect.lean` §8-1 的表与 §8-17 的 `EffortField`。dialect 自己不再写任何思考字段，于是「一档写成哪个字」只有这一处。
-- **学到的拒绝推迟**（IF-0 §11）：今天不从 400 里学某一档被拒；所以没有「只让集合变小」这条性质的对象。旧的六个词读回原义由 kernel 的拼写测试守住（`crates/kernel/tests/spellings.rs`），不是这架梯子的性质。
+- **编码归 `encoding` 一处**：一个 `Ask` 在三面上写成什么，见 `Sprawling/gateway/spec/Dialect.lean` §8-1 的表与 §8-17 的 `EffortField`。dialect 自己不再写任何思考字段，于是「一档写成哪个字」只有这一处。
+- **学到的拒绝推迟**（IF-0 §11）：今天不从 400 里学某一档被拒；所以没有「只让集合变小」这条性质的对象。旧的六个词读回原义由 kernel 的拼写测试守住（`Sprawling/kernel/tests/spellings.rs`），不是这架梯子的性质。
 -/
 
 /-! D35 思考档由（Endpoint，模型）的 offer 决定，编码在发出前一处完成，dialect 不再写思考字段
 
-**决定**：`Endpoint` 带着 `adapter_for` 按这一行登记算出的 `ThinkingOffer`；`Endpoint::wire_request` 先由 `ThinkingOffer::ask` 从请求的 `effort` 算出实发的 `Ask`，再由 `encoding::fields` 按这一面与主机的 `EffortField` 写进正文的顶层，然后才套会话缓存键与人的 `overrides`（人写了同一路径时人胜）。派活前的 `admit` 由 accounting 的选形状一步调用（`crates/accounting/src/worker/dispatching/session_shape.rs`），在写下任何文件或记录之前。
+**决定**：`Endpoint` 带着 `adapter_for` 按这一行登记算出的 `ThinkingOffer`；`Endpoint::wire_request` 先由 `ThinkingOffer::ask` 从请求的 `effort` 算出实发的 `Ask`，再由 `encoding::fields` 按这一面与主机的 `EffortField` 写进正文的顶层，然后才套会话缓存键与人的 `overrides`（人写了同一路径时人胜）。派活前的 `admit` 由 accounting 的选形状一步调用（`Sprawling/accounting/src/worker/dispatching/session_shape.rs`），在写下任何文件或记录之前。
 
 **理由**：编码要读 offer（没有档位的模型把默认写成「开启思考」，而这要知道它没有档位），而 offer 是登记与模型的事实，不是一次请求的形状；放在 dialect 里就要把 offer 塞进纯函数的参数，三面各写一份「这一档怎么拼」。原来三份「词→字符串」的映射（`Effort::as_str`、openai 与 responses 各一份）因此只剩 `Effort::as_str` 一份。
 

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The Rust check derived from the prefix hold's Lean model
-//! (`crates/gateway/spec/Concurrency.lean` §8-40): random traces of
+//! (`Sprawling/gateway/spec/Concurrency.lean` §8-40): random traces of
 //! arrivals, ends and clock readings drive [`Holds`], and a shadow of
 //! the model's state checks properties 7 to 10 after every step.
 
@@ -92,7 +92,7 @@ impl Shadow {
 }
 
 proptest! {
-    /// Properties 7 to 10 of `crates/gateway/spec/Concurrency.lean`
+    /// Properties 7 to 10 of `Sprawling/gateway/spec/Concurrency.lean`
     /// after every step of a random trace over four keys.
     #[test]
     fn holds_keep_the_lean_properties(

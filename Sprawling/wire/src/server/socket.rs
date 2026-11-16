@@ -12,7 +12,7 @@
 //!
 //! A welcomed session holds a [`Seat`] at the door: the session token its
 //! hello showed stays good while the socket lives, and the session ends
-//! once the door has ended that token (`crates/wire/spec/Server/Sessions.lean`
+//! once the door has ended that token (`Sprawling/wire/spec/Server/Sessions.lean`
 //! §8-93s). The event arm writes in frames, as `framing` says.
 
 mod framing;

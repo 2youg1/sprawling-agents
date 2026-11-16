@@ -7,7 +7,7 @@
 //! A thin veneer over `runtime::replay` on purpose: one verification
 //! authority, never a second one (citysim D16).
 //!
-//! Specified by `crates/citysim/spec/MemLedger.lean` §8-1.
+//! Specified by `Tools/citysim/spec/MemLedger.lean` §8-1.
 
 use kernel::AxError;
 

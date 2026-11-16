@@ -23,8 +23,8 @@
 //! answers the ceiling ladder's question about one model id. Host
 //! defaults and model facts are one table because they are one
 //! statement by one vendor. Which row answers for an id is modelled in
-//! `crates/gateway/spec/Provider/Preset.lean`; the table's interface is
-//! `crates/gateway/spec/Provider.lean` §8-17.
+//! `Sprawling/gateway/spec/Provider/Preset.lean`; the table's interface is
+//! `Sprawling/gateway/spec/Provider.lean` §8-17.
 
 mod rows;
 
@@ -347,7 +347,7 @@ fn host_row(base_url: &str) -> Option<&'static HostPreset> {
 /// is answered from the rows of the vendor that published the id:
 /// relays rarely state a ceiling in their model list, and the vendor's
 /// documented figure is closer to the relay's fact than a policy figure
-/// that belongs to neither (`crates/gateway/spec/Provider.lean` §8-17). A server on this
+/// that belongs to neither (`Sprawling/gateway/spec/Provider.lean` §8-17). A server on this
 /// machine borrows nothing, because the window of a model it serves is
 /// its own configuration.
 ///
@@ -536,7 +536,7 @@ mod tests {
 
     /// A host that hangs its Anthropic-compatible face under another
     /// path than its OpenAI one is reached on the path of the face the
-    /// person chose (`crates/gateway/spec/Provider.lean` §8-17).
+    /// person chose (`Sprawling/gateway/spec/Provider.lean` §8-17).
     #[test]
     fn a_bare_host_reaches_the_path_of_the_face_the_person_chose() {
         use crate::router::{DialectHint, normalise_entered};
@@ -828,7 +828,7 @@ mod tests {
     }
 
     proptest::proptest! {
-        /// The three theorems of `crates/gateway/spec/Provider/Preset.lean`
+        /// The three theorems of `Sprawling/gateway/spec/Provider/Preset.lean`
         /// over random row tables and ids, rather than over the shipped
         /// table alone.
         #[test]

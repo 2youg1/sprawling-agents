@@ -29,7 +29,7 @@ use kernel::{Seq, TimeMs};
 use runtime::diagnostics::{Diagnostics, Entry, Level, Sink, Site};
 
 /// Where a line's time comes from: the assembly point's clock
-/// (`crates/accounting/Spec.lean` §8-3), shared with every sink this journal makes.
+/// (`Sprawling/accounting/Spec.lean` §8-3), shared with every sink this journal makes.
 pub type Clock = std::sync::Arc<dyn accounting::Clock + Send + Sync>;
 
 /// How many lines a page that stopped reading may fall behind before it
@@ -56,7 +56,7 @@ static PROCESS: Mutex<Option<(Diagnostics, Seq)>> = Mutex::new(None);
 ///
 /// Once [`Journal::hears_the_process`] has run, the notice leaves the way
 /// every diagnostic does, so it reaches only the log lens while the
-/// console owns the terminal (`crates/sprawling/spec/Console.lean`
+/// console owns the terminal (`Sprawling/app/spec/Console.lean`
 /// §8-11). Before that it goes to standard error, because no console
 /// owns the terminal until serving has begun.
 pub(crate) fn notice(module: &'static str, message: &str) {
@@ -86,7 +86,7 @@ pub struct Journal {
 ///
 /// A console that owns the terminal draws the CLI or the quiet host
 /// there, and a diagnostic written over either is a line nobody asked
-/// for (`crates/sprawling/spec/Console.lean` §8-11); a city with no
+/// for (`Sprawling/app/spec/Console.lean` §8-11); a city with no
 /// terminal of its own keeps standard error, which harnesses read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mouth {
@@ -150,7 +150,7 @@ impl Journal {
     /// from now on, placed at `at`, the position serving starts from.
     /// Called by `assembly::listen` before any console exists, so a
     /// console that takes the terminal later never has a notice written
-    /// over it (`crates/sprawling/spec/Console.lean` §8-11).
+    /// over it (`Sprawling/app/spec/Console.lean` §8-11).
     pub(crate) fn hears_the_process(&self, log: &Diagnostics, at: Seq) {
         let writer = self.beside(log);
         *PROCESS.lock().unwrap_or_else(PoisonError::into_inner) = Some((writer, at));

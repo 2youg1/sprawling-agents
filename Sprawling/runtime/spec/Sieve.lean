@@ -6,7 +6,7 @@
 /-!
 # runtime::sieve
 
-规定 `sieve`、`sieve::key`、`sieve::record`、`sieve::filter`、`sieve::scan`、`sieve::stages`、`sieve::diff`（`crates/runtime/src/` 下同名的文件）。命令输出的确定性压缩器。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `sieve`、`sieve::key`、`sieve::record`、`sieve::filter`、`sieve::scan`、`sieve::stages`、`sieve::diff`（`Sprawling/runtime/src/` 下同名的文件）。命令输出的确定性压缩器。本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `Sprawling/runtime/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::sieve::tests` 守住。
 -/
@@ -80,7 +80,7 @@ error  >  panicked / fatal / failure / failed  >  assertion  >  warning  >  note
 
 **原样保留、任何阶段不得触碰**：URL、设备码形状的字符串、`secret:realm/name` 引用、带行列的文件路径、退出码。
 
-过滤表住 `<city>/.sprawling/FILTERS.toml`，楼级可覆盖 `<building>/.sprawling/FILTERS.toml`，走既有三层阶梯且**整值解析而非逐字段合并**（直接沿用 `crates/kernel/Spec.lean` §8-22 给 `[sandbox]` 定的口径①，一条规则一个权威）。**信任问题不存在**：过滤表住保留区，没有任何写域够得着它。
+过滤表住 `<city>/.sprawling/FILTERS.toml`，楼级可覆盖 `<building>/.sprawling/FILTERS.toml`，走既有三层阶梯且**整值解析而非逐字段合并**（直接沿用 `Sprawling/kernel/Spec.lean` §8-22 给 `[sandbox]` 定的口径①，一条规则一个权威）。**信任问题不存在**：过滤表住保留区，没有任何写域够得着它。
 
 形状（谓词只有 prefix / contains / suffix，无正则）：
 
@@ -201,5 +201,5 @@ pub struct PackContext<'a> { /* 既有五字段 */ pub sieve: Option<SieveReques
 
 **三个 reducer 与表的关系**：cargo 与 git 是两个以代码构造的 `Filter` 值，rustc 诊断分组是 cargo 那张的 `keep_contains` 命中行向后扩到空行为止（同一诊断块整体进中段候选）；generic 是空谓词的 `Filter`。表内条目与内建同形，故楼级表可以整张换掉 cargo 的裁法而不动代码。
 
-**citysim 侧**：`Scenario` 增 `sieve: Option<SieveWorld>`（CAS＋environment＋过滤表＋本 run 的 history）；有它时执行器把名为 `exec` 的工具结果经 `package_exec` 走带 `SieveRequest` 的 `package`，模型看到 `{content, exit_code, sieve:[载荷]}`。`crates/citysim/tests/scenarios/sieve.rs`：同一目录同一表跑两遍账本逐字节相同；第二次同命令只出新错误与 `[unchanged: N lines…]`。
+**citysim 侧**：`Scenario` 增 `sieve: Option<SieveWorld>`（CAS＋environment＋过滤表＋本 run 的 history）；有它时执行器把名为 `exec` 的工具结果经 `package_exec` 走带 `SieveRequest` 的 `package`，模型看到 `{content, exit_code, sieve:[载荷]}`。`Tools/citysim/tests/scenarios/sieve.rs`：同一目录同一表跑两遍账本逐字节相同；第二次同命令只出新错误与 `[unchanged: N lines…]`。
 -/

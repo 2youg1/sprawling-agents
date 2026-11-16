@@ -118,7 +118,7 @@ pub(crate) fn tokens_or_zero(usage: &Value, key: &str, path: &str) -> Result<Tok
 
 /// A cache count, which a provider may not report at all: an absent
 /// object, an absent key and `null` are each `Unreported`, never a zero
-/// hit (`crates/kernel/spec/Model.lean` D36).
+/// hit (`Sprawling/kernel/spec/Model.lean` D36).
 pub(crate) fn cache_count(
     usage: Option<&Value>,
     key: &str,

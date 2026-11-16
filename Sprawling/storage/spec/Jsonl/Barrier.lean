@@ -6,7 +6,7 @@
 /-!
 # 账本的回答与重开后磁盘上的内容
 
-规定 `crates/storage/src/jsonl/barrier.rs`：`append_all` 在一波之前查询、在该波最后一次 sync 之后修补的状态 `Barrier`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪条性质」的权威（§8-1）。
+规定 `Sprawling/storage/src/jsonl/barrier.rs`：`append_all` 在一波之前查询、在该波最后一次 sync 之后修补的状态 `Barrier`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪条性质」的权威（§8-1）。
 
 磁盘是一列格子：一格要么是一条带 seq 的完整记录，要么是一波写到一半中断时留下的字节。开账本时保留到第一个不是完整记录的格子为止，这就是尾部恢复。一个 handle 记着一个位置，以及它答过 `Ok` 的那些 seq。
 
@@ -31,7 +31,7 @@ impl Barrier {
 - 一波在写出第一个字节之前把屏障置为 `Broken`，在它触及的每一段都 sync 完（以及新段的 `sync_dir`）之后才置回 `Whole`；`append_all` 进门先完成上一波留下的退回，再 `admit`，空波也一样。
 - 置回 `Whole` 的另一条路是退回（`jsonl::unwind`）：删掉失败那一波新建的段、把当前段截回 `seg_len`，于是段又恰好结束在内存位置上。模型里这是 `Step.unwind`：成功时磁盘变成位置之下的那些记录，失败时什么都不变。
 - 原因：写到一半死掉的波会在段尾留下位置不认识的字节——撕裂的半行，或 sync 失败的整行。在它后面再写的一波，会接在下次 open 要截掉的那段字节之后，它的 `Ok` 就说了一条盘上没有的记录（`barrier.rs` 的 `no_append_after_a_failed_barrier_claims_a_record_the_disk_loses`）。句柄不知道段尾有什么，所以它不去猜：要么把段截回自己知道的位置（退回），要么拒绝之后的每一波，留给 open 判段尾。
-- 性质「句柄答过 `Ok` 的每个 seq 重开后都在」由 `crates/storage/spec/Jsonl/Barrier.lean` 对任意一串波证明（`answered_survives_reopen`），并给出不守屏障时的反例（`withoutBarrier`）；`just models` 证明它。
+- 性质「句柄答过 `Ok` 的每个 seq 重开后都在」由 `Sprawling/storage/spec/Jsonl/Barrier.lean` 对任意一串波证明（`answered_survives_reopen`），并给出不守屏障时的反例（`withoutBarrier`）；`just models` 证明它。
 - 被否：失败后把位置退回或前推到盘上真实的末尾。写失败时句柄不知道落下了多少字节，sync 失败后页缓存里的字节是否还会落盘也不知道；猜一个位置，就是用猜测替 open 的断尾恢复作答。
 - 重开参数：出现后台组提交（记账线程发布「已持久到 seq N」的水位线）之后，sync 失败不再发生在 `append_all` 里，屏障状态随水位线一起搬到记账线程。
 -/
@@ -268,9 +268,9 @@ end Storage.Jsonl.Barrier
 
 /-! D24 屏障本身按平台各有一臂，每一臂守同一条持久语义
 
-**每一臂必须守的不变式**：`append_all` 答 `Ok` 时，这一波的每个字节在掉电之后仍在介质上，与今天 `Vfs::sync_data` 之后的保证相同；一臂若只保证「离开了进程」或「进了磁盘的易失缓存」，它就是一道更弱的屏障，不能入选（D94）。屏障之后才把 `Barrier` 置回 `whole`、才答 `Ok`，这一点对每一臂都不变，所以上面的 `answered_survives_reopen` 对每一臂成立；预分配的那一臂另须守 `crates/storage/spec/Jsonl/Preallocate.lean` 的三条性质（段尾零不改变扫描结论、撕裂照样被截、中间的零读作撕裂），并且写者的位置取剥零之后的长度。
+**每一臂必须守的不变式**：`append_all` 答 `Ok` 时，这一波的每个字节在掉电之后仍在介质上，与今天 `Vfs::sync_data` 之后的保证相同；一臂若只保证「离开了进程」或「进了磁盘的易失缓存」，它就是一道更弱的屏障，不能入选（D94）。屏障之后才把 `Barrier` 置回 `whole`、才答 `Ok`，这一点对每一臂都不变，所以上面的 `answered_survives_reopen` 对每一臂成立；预分配的那一臂另须守 `Sprawling/storage/spec/Jsonl/Preallocate.lean` 的三条性质（段尾零不改变扫描结论、撕裂照样被截、中间的零读作撕裂），并且写者的位置取剥零之后的长度。
 
-**今天的臂**：三个平台都走 `std::fs::File::sync_data`（`crates/storage/src/real_fs.rs` 的 `Vfs::sync_data`）。标准库在三个平台上把它落到（读自 Rust 1.97.1 的 `library/std/src/sys/fs/unix.rs` 与 `library/std/src/sys/fs/windows.rs`，`File::datasync`）：
+**今天的臂**：三个平台都走 `std::fs::File::sync_data`（`Sprawling/storage/src/real_fs.rs` 的 `Vfs::sync_data`）。标准库在三个平台上把它落到（读自 Rust 1.97.1 的 `library/std/src/sys/fs/unix.rs` 与 `library/std/src/sys/fs/windows.rs`，`File::datasync`）：
 * Windows：`datasync` 调 `fsync`，即 `FlushFileBuffers`；
 * Linux：`fdatasync`；
 * macOS（`target_vendor = "apple"`）：`fcntl(fd, F_FULLFSYNC)`，不是普通的 `fsync`——所以今天在 macOS 上 `sync_data` 已经要求磁盘清空它的写缓存，不是一道更弱的屏障。
@@ -280,7 +280,7 @@ end Storage.Jsonl.Barrier
 * Linux：`fdatasync`（今天）；`O_DSYNC`，经 `std::os::unix::fs::OpenOptionsExt::custom_flags`，每次写带数据同步；两者都可加预分配，预分配让 `fdatasync` 不必再写文件长度这条元数据。
 * macOS：`F_FULLFSYNC`（今天）；`F_BARRIERFSYNC` 只给次序不给持久，是更弱的屏障，不入选；预分配可选。
 
-**实现**：写直达两臂是 `crates/storage/src/real_fs.rs` 的 `SegmentDurability::WriteThrough`，每个平台的选择是一个常量 `SEGMENT_DURABILITY`，今天三处都是 `SyncData`；写直达之后屏障照发，所以上面的不变式不随臂变。读源码的结论在 1.97.1 上成立；`rust-toolchain.toml` 现在钉的是 1.99.0，那一版的 `library/std/src/sys/fs/unix.rs` 与 `windows.rs` 的 `File::datasync` 还要重读一遍，读法同上。预分配那一臂要求写者按位置写（`Vfs` 今天只有写在文件末尾的 `append`），所以还没有实现；读者一侧已经守着 `crates/storage/spec/Jsonl/Preallocate.lean` 的三条性质。
+**实现**：写直达两臂是 `Sprawling/storage/src/real_fs.rs` 的 `SegmentDurability::WriteThrough`，每个平台的选择是一个常量 `SEGMENT_DURABILITY`，今天三处都是 `SyncData`；写直达之后屏障照发，所以上面的不变式不随臂变。读源码的结论在 1.97.1 上成立；`rust-toolchain.toml` 现在钉的是 1.99.0，那一版的 `library/std/src/sys/fs/unix.rs` 与 `windows.rs` 的 `File::datasync` 还要重读一遍，读法同上。预分配那一臂要求写者按位置写（`Vfs` 今天只有写在文件末尾的 `append`），所以还没有实现；读者一侧已经守着 `Sprawling/storage/spec/Jsonl/Preallocate.lean` 的三条性质。
 
 **落选**：一个平台用一臂、其余平台跟着它——三个平台的系统调用与它们的持久语义各不相同，同一个名字在三处是三件事。重新打开它的参数：标准库改变 `File::sync_data` 在某个平台上落到的系统调用（实现者先在 `rust-toolchain.toml` 钉住的版本上重读上面两个源文件），或某一臂的测量在 p99 上不再胜出。
 -/

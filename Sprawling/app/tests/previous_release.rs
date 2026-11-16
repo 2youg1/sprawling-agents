@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A city the previous release wrote, opened by this build after the
-//! move home (`crates/sprawling/spec/Firstrun.lean` §8-8).
+//! move home (`Sprawling/app/spec/Firstrun.lean` §8-8).
 //!
 //! `tests/cities/v0.0.12` is what the 0.0.12 release binary wrote with
 //! `sprawling init city` beside itself and then served once, kept byte

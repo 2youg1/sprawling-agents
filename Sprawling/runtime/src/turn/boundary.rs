@@ -14,7 +14,7 @@ use crate::conversation::Speaker;
 /// `Cancel` ends the turn at the boundary; `Steer` records and advances
 /// (the executor folds the text into its `Conversation`); `Policy`
 /// advances too, and the executor holds it in its `PolicyCell` until the
-/// next `SafePoint::BeforeWave` (`crates/runtime/spec/PolicyTake.lean`
+/// next `SafePoint::BeforeWave` (`Sprawling/runtime/spec/PolicyTake.lean`
 /// §8-62). `Policy` writes nothing: its `run_policy_changed` line is
 /// already on the ledger, which is how it reached this run.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -6,9 +6,9 @@
 /-!
 # Console confirmation: a page asks, the console shows a code, the User types it.
 
-Specifies `remote_access::confirm` (crates/remote_access/src/confirm.rs,
-crates/remote_access/Spec.lean §8-13), and the two wire commands that
-reach it (crates/wire/spec/Command/Kind.lean, the rows for the remote door).
+Specifies `remote_access::confirm` (Sprawling/remote_access/src/confirm.rs,
+Sprawling/remote_access/Spec.lean §8-13), and the two wire commands that
+reach it (Sprawling/wire/spec/Command/Kind.lean, the rows for the remote door).
 The model is the authority on which properties must hold; the Rust module
 is the authority on how they hold (remote_access D4).
 

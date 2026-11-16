@@ -9,8 +9,8 @@ import Lean.Data.Json
 # What the stand-in provider says, written before the city asks.
 
 The acceptance world walks a city that calls a provider which answers. That
-provider is not in this directory: it is the stand-in `crates/citysim` builds
-(`crates/citysim/Spec.lean` sections 8-10 and 8-13), started by `just acceptance` and
+provider is not in this directory: it is the stand-in `Tools/citysim` builds
+(`Tools/citysim/Spec.lean` sections 8-10 and 8-13), started by `just acceptance` and
 handed over as the URL in `SPRAWLING_PROVIDER`. What this module owns is the
 script it plays — each run's replies, in the order the walk opens the runs —
 because the script is the world's expectation stated as data: the walk asserts
@@ -27,7 +27,7 @@ script for a request carrying none (citysim D11). So every
 call id here is `callId run turn`, unique in the script, and the runs are listed
 in the order the walk opens them: the walk waits for each run to freeze before
 it sends the next, except for the two claimants, which it sends at once and
-which are therefore written alike (`crates/adversary/Spec.lean` D6).
+which are therefore written alike (`Tools/adversary/Spec.lean` D6).
 -/
 
 namespace Sprawling.Acceptance
@@ -84,7 +84,7 @@ def right : String := s!"{reviewed}/right"
 def planItem : String := "glaze the kiln"
 
 /-- What the planner divides that row into. The plan numbers the children of
-row `1` as `1.1` and `1.2` (`crates/city/templates/Roadmap.md`), which is what a person
+row `1` as `1.1` and `1.2` (`Sprawling/city/templates/Roadmap.md`), which is what a person
 reading the plan sees and what the claims below name. -/
 def leaves : List String := ["wire the kiln", "glaze tests"]
 
@@ -165,7 +165,7 @@ def morningRun : Run := fun _ => [saying "the city came back"]
 /-- Takes the person's row and divides it into the two leaves.
 
 The row is claimed first because the plan desk splits only the row the run
-holds and refuses any other at the call (collab D6; `crates/adversary/Spec.lean`
+holds and refuses any other at the call (collab D6; `Tools/adversary/Spec.lean`
 section 4, the eighth finding). -/
 def plannerRun : Run := fun run =>
   [ calling run 0 "plan" (Json.mkObj [("action", .str "claim"), ("node", .str "1")])
@@ -195,7 +195,7 @@ def offeringRun : Run := fun run =>
   , saying "offered for review" ]
 
 /-- Checks the offer on `branch` and says it does not pass. Written only once
-the walk has read the branch from the history (`crates/adversary/Spec.lean` D7). -/
+the walk has read the branch from the history (`Tools/adversary/Spec.lean` D7). -/
 def checkerRun (branch : String) : Run := fun run =>
   [ calling run 0 "pr"
       (Json.mkObj

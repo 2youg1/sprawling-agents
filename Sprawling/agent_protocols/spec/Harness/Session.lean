@@ -8,17 +8,17 @@
 
 Specifies the harness run the dispatch path starts for a room whose resident
 is an ACP agent the person consented to, the five official harnesses among
-them as built-in entries (`crates/sprawling/Spec.lean` §8-4e and 8-124). Three Rust modules hold it between them, and the Rust code is the
+them as built-in entries (`Sprawling/app/Spec.lean` §8-4e and 8-124). Three Rust modules hold it between them, and the Rust code is the
 authority on how these properties hold; this model is the authority on which
 properties must hold:
 
-* `crates/agent_protocols/src/harness/session.rs` - the ACP session: a halt
+* `Sprawling/agent_protocols/src/harness/session.rs` - the ACP session: a halt
   becomes `session/cancel`, a report is handed on, a stop reason ends the turn
-  (`crates/agent_protocols/Spec.lean` section 8-19);
-* `crates/runtime/src/run/harness.rs` - the lines the run writes: its opening,
+  (`Sprawling/agent_protocols/Spec.lean` section 8-19);
+* `Sprawling/runtime/src/run/harness.rs` - the lines the run writes: its opening,
   each report, the cancel, the checkpoint, the answer and the freeze, and which
-  `kernel::Completion` the answer freezes as (`crates/runtime/Spec.lean` §8-52);
-* `crates/accounting/src/worker/driving/harness.rs` - the drive that joins the
+  `kernel::Completion` the answer freezes as (`Sprawling/runtime/Spec.lean` §8-52);
+* `Sprawling/accounting/src/worker/driving/harness.rs` - the drive that joins the
   two in a lane: what counts as a cut, and the tree the checkpoint commits.
 
 A harness runs its own tools. The city cannot admit or refuse what it does; it
@@ -114,7 +114,7 @@ structure State where
 /-- A run that has just started: nothing cut, nothing frozen. -/
 def State.fresh : State := ⟨none, false⟩
 
-/-- How an answer ends the run (`crates/sprawling/Spec.lean` §8-4e rules 3 and 8, 8-124).
+/-- How an answer ends the run (`Sprawling/app/Spec.lean` §8-4e rules 3 and 8, 8-124).
 An end of turn that said something is done; one that said nothing is limit,
 the reading `runtime::run::lifecycle::concluded` gives an empty model reply. A
 turn the ceiling cancelled ended against something, so it is limit; a turn a
@@ -292,7 +292,7 @@ theorem a_deadline_never_freezes_cancelled (why : Stop) (spoke : Bool) :
 
 /-! ## Only an admitted record is cited as evidence -/
 
-/-- The records a claim that the run is done may cite (`crates/kernel/Spec.lean` §8-20, `kernel::completion::CITABLE`): the answer to the city's prompt. A report
+/-- The records a claim that the run is done may cite (`Sprawling/kernel/Spec.lean` §8-20, `kernel::completion::CITABLE`): the answer to the city's prompt. A report
 is what the harness said, and the city never decided it. -/
 def Record.citable : Record → Bool
   | .answered _ => true

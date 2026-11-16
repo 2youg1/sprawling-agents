@@ -8,7 +8,7 @@
 // with (client/spec/Views/Door.lean is the model; `step` is it, event for
 // event). A press asks the city; the city prints a one-time code on its
 // own console and answers `E_APPROVAL_PENDING`; the code typed here
-// goes back in `ConfirmRemoteDoor` (`crates/remote_access/Spec.lean` D4).
+// goes back in `ConfirmRemoteDoor` (`Sprawling/remote_access/Spec.lean` D4).
 // Closing needs no code and does not pass through this machine.
 
 import {

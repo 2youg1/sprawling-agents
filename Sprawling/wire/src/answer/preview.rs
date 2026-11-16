@@ -4,12 +4,12 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One window of a stored Markdown version, laid out as blocks
-//! (`crates/wire/spec/Answer/Preview.lean` §8-74).
+//! (`Sprawling/wire/spec/Answer/Preview.lean` §8-74).
 //!
 //! Read by the version, for the reason a range is: a page previewing a
 //! file a resident is rewriting goes on reading the version it opened.
 //! The blocks are the `documents` crate's grammar, carried as it spells
-//! them (`crates/documents/Spec.lean` D1, D21); `Laid.span` says which
+//! them (`Sprawling/documents/Spec.lean` D1, D21); `Laid.span` says which
 //! stretch was read, which is where the next request starts from.
 
 use documents::Preview;

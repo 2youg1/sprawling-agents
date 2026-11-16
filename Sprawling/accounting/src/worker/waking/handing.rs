@@ -7,7 +7,7 @@
 //! the graph it lays out, registered with its room at the call and
 //! closed when the run is cancelled or fails (collab D14).
 //!
-//! The model is `crates/collab/spec/Workshop.lean`: a graph is laid out
+//! The model is `Sprawling/collab/spec/Workshop.lean`: a graph is laid out
 //! (`layOut`), its nodes land in any order against their parent
 //! (`land`), and the parent's ending closes it or leaves it open
 //! (`parentEnds`, decided once, by [`GraphAfter::of`]). Order is ledger

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The location and sensors controls, one row each, in page order
-//! (`crates/sprawling/spec/Privacy/Controls.lean`).
+//! (`Sprawling/app/spec/Privacy/Controls.lean`).
 
 use wire::{PrivacyBuildEffect as Effect, PrivacyCategory, PrivacyEdition as Edition};
 

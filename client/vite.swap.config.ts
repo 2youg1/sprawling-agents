@@ -11,7 +11,7 @@ import type { Plugin, UserConfig } from "vite";
 
 import shipped from "./vite.config";
 
-// The swap build (crates/xtask/Spec.lean §8-13, `just swap`): the shipped
+// The swap build (Tools/xtask/Spec.lean §8-13, `just swap`): the shipped
 // client with every look under `swap/` drawn in place of the look at the
 // same path under `src/`. A seat imports its look as `./x.look.svelte`,
 // so the replacement is matched on the path the import resolves to, not
@@ -20,7 +20,7 @@ const SOURCE = normalizePath(join(import.meta.dirname, "src"));
 const SWAP = normalizePath(join(import.meta.dirname, "swap"));
 const LOOK = ".look.svelte";
 
-// Outside `crates/sprawling/web-dist`, which the binary embeds: a swap
+// Outside `Sprawling/app/web-dist`, which the binary embeds: a swap
 // build stopped half-way must not leave a replaced bundle for the next
 // `cargo build` to ship. Under the repository's own `target/` rather
 // than `CARGO_TARGET_DIR`, which worktrees may share.

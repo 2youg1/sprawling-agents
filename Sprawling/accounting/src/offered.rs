@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The agent offers the ACP page was answered, and the consent that
-//! writes one of them into the city (`crates/accounting/spec/Views.lean`,
-//! `crates/sprawling/spec/Serving.lean`).
+//! writes one of them into the city (`Sprawling/accounting/spec/Views.lean`,
+//! `Sprawling/app/spec/Serving.lean`).
 //!
 //! `AddAgent` carries only the digest of the launch the card showed. A
 //! registry entry is taken again from the shipped snapshot, but a pasted

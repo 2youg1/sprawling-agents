@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The prefix hold at the gate, end to end through `Gated`
-//! (`crates/gateway/spec/Concurrency.lean` §8-40): threads that call one
+//! (`Sprawling/gateway/spec/Concurrency.lean` §8-40): threads that call one
 //! endpoint at once with one cold shared prefix, against a loopback
 //! provider reached under a name that is not this machine's, because
 //! D39 never holds a call to this machine.

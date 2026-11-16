@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The apply, restore, readback and reconciliation decisions
-//! (`crates/sprawling/spec/Privacy.lean` §8–9): `planApply`, `planRestore`,
+//! (`Sprawling/app/spec/Privacy.lean` §8–9): `planApply`, `planRestore`,
 //! `judgeReadback`, `settle` and `reconciled`, over a history whose owner
 //! was already checked and a fresh read the coordinator took. No IO and no
 //! clock; the coordinator carries out what these return.
@@ -194,7 +194,7 @@ fn reconciled(intent: &Intent, value: &Snapshot) -> PrivacySettlement {
     }
 }
 
-/// Replays the vectors `crates/sprawling/spec/Privacy.lean` §11 prints with
+/// Replays the vectors `Sprawling/app/spec/Privacy.lean` §11 prints with
 /// `#eval`. The model's control 1 writes the DWORD 1, here
 /// `feedback_notifications`; its control 3 disables a task, here
 /// `ceip_consolidator_task`; its owner 7 is the fixture owner and 8 another.

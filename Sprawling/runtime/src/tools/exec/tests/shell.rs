@@ -4,13 +4,13 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The shell arm's interpreter and its failure tally
-//! (`crates/runtime/Spec.lean` §8-13-2 D30).
+//! (`Sprawling/runtime/Spec.lean` §8-13-2 D30).
 
 use super::*;
 
 /// A building that asked for PowerShell 7 on a machine without it is
 /// refused by name, and the refusal says how to get either interpreter
-/// back (`crates/runtime/Spec.lean` §8-13-2 D30).
+/// back (`Sprawling/runtime/Spec.lean` §8-13-2 D30).
 #[test]
 fn a_shell_line_under_a_missing_pwsh_is_refused_by_name_not_run_by_cmd() {
     let chamber = tempfile::tempdir().unwrap();

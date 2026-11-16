@@ -23,7 +23,7 @@
 //! that owned a provider could not run offline, could not be replayed,
 //! and would be measuring the network as much as the model.
 //!
-//! Specified by `crates/citysim/spec/Nesting.lean` §8-8-3.
+//! Specified by `Tools/citysim/spec/Nesting.lean` §8-8-3.
 
 use std::collections::BTreeMap;
 

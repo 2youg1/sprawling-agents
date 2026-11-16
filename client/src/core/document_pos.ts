@@ -8,7 +8,7 @@
 //
 // **The wire counts bytes, the editor counts UTF-16 code units of a
 // folded text.** A version's bytes are its identity
-// (`crates/documents/Spec.lean` D2), so every span the city answers or
+// (`Sprawling/documents/Spec.lean` D2), so every span the city answers or
 // accepts is a byte span. The editor holds the version's text with its
 // byte-order mark dropped and every line break - `\r\n`, `\r`, `\n` -
 // read as one `\n`, because that is how CodeMirror splits lines, and an
@@ -162,7 +162,7 @@ export function positionsOf(version: B3Hash, encoding: Encoding, text: string): 
 // Each change written as the baseline's bytes and the text that takes
 // their place, its line breaks written the way the version writes them.
 // The changes are the editor's own, in document order and apart, so
-// the edits are too (`crates/documents/Spec.lean` D8).
+// the edits are too (`Sprawling/documents/Spec.lean` D8).
 export function textEdits(positions: Positions, changes: readonly EditorChange[]): TextEdit[] {
   return changes.map((change) => ({
     span: { start: positions.bytes(change.from), end: positions.bytes(change.to) },

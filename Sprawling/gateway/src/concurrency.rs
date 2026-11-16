@@ -5,12 +5,12 @@
 
 //! One endpoint's concurrency permits: how many calls may be in flight
 //! to it now, narrowed when the provider answers 429 and widened again
-//! once it keeps answering (`crates/gateway/Spec.lean` D17).
+//! once it keeps answering (`Sprawling/gateway/Spec.lean` D17).
 //!
 //! A pure judgement: it reads only the instant it is handed and the
 //! outcome of each call, so it behaves the same on Windows, macOS and
 //! Linux. The properties it keeps are proved in
-//! `crates/gateway/spec/Concurrency.lean`; the proptest below checks
+//! `Sprawling/gateway/spec/Concurrency.lean`; the proptest below checks
 //! this implementation against them over random traces.
 
 use std::num::NonZeroU32;
@@ -27,7 +27,7 @@ pub(crate) const IN_FLIGHT_DEFAULT: MaxInFlight = MaxInFlight(NonZeroU32::MIN.sa
 
 /// The concurrency a server on this machine gets when nobody settled
 /// one: the parallel slots a local inference server commonly starts
-/// with (`crates/gateway/Spec.lean` D21).
+/// with (`Sprawling/gateway/Spec.lean` D21).
 pub(crate) const IN_FLIGHT_LOCAL: MaxInFlight = MaxInFlight(NonZeroU32::MIN.saturating_add(3));
 
 /// The concurrency an endpoint at `base_url` gets when its tuning
@@ -212,7 +212,7 @@ mod tests {
     }
 
     proptest! {
-        /// The five properties of `crates/gateway/spec/Concurrency.lean`,
+        /// The five properties of `Sprawling/gateway/spec/Concurrency.lean`,
         /// checked after every step of a random trace.
         #[test]
         fn permits_keep_the_lean_properties(
@@ -253,7 +253,7 @@ mod tests {
     }
 
     proptest! {
-        /// `run_keeps_within` of `crates/gateway/spec/Concurrency.lean`:
+        /// `run_keeps_within` of `Sprawling/gateway/spec/Concurrency.lean`:
         /// from any state a trace can reach with no more permits in use
         /// than the limit, a trace with no narrowing in it keeps it so
         /// after every step. The prefix may narrow, so the suffix starts

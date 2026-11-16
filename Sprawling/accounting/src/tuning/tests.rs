@@ -6,7 +6,7 @@
 //! The settings page reads an endpoint's tuning back and attaches it
 //! again with only the account list changed, so reading back and
 //! attaching must land the tuning the book already held
-//! (`crates/wire/spec/Answer/Endpoints.lean` §8-85).
+//! (`Sprawling/wire/spec/Answer/Endpoints.lean` §8-85).
 
 use kernel::account_recovery::AccountRetries;
 use kernel::event::record::ProviderAccount;

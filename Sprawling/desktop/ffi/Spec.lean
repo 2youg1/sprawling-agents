@@ -5,9 +5,9 @@
 
 /-! # desktop_ffi 的规格
 
-`sprawling-desktop-ffi`（库名 `desktop_ffi`，目录 `crates/desktop/ffi`）是桌面 server 唯一的 FFI 缝：没有准入安全接口的四组 Win32 调用——枚举顶层窗口、按窗口捕获、剪贴板文本、DPI 感知——由一片 Zig 叶子（`crates/desktop/ffi/zig/leaf.zig`）整段做完，Rust 一侧只借出缓冲、读回一个 step 与一个错误码。本文件是这个包的规格入口；能写成定理的性质在下面证明，其余要求、理由与决定写在十七节的注释里，决定写作 `D<n>`，别处引作 `desktop_ffi D<n>`。
+`sprawling-desktop-ffi`（库名 `desktop_ffi`，目录 `Sprawling/desktop/ffi`）是桌面 server 唯一的 FFI 缝：没有准入安全接口的四组 Win32 调用——枚举顶层窗口、按窗口捕获、剪贴板文本、DPI 感知——由一片 Zig 叶子（`Sprawling/desktop/ffi/zig/leaf.zig`）整段做完，Rust 一侧只借出缓冲、读回一个 step 与一个错误码。本文件是这个包的规格入口；能写成定理的性质在下面证明，其余要求、理由与决定写在十七节的注释里，决定写作 `D<n>`，别处引作 `desktop_ffi D<n>`。
 
-桌面 server 那一侧怎么用这条缝（哪些调用经过它、`unsafe` 恒只在哪里）写在 `crates/desktop/Spec.lean` §8-12 与 D12；那里是 server 的规格，这里是缝本身的规格。
+桌面 server 那一侧怎么用这条缝（哪些调用经过它、`unsafe` 恒只在哪里）写在 `Sprawling/desktop/Spec.lean` §8-12 与 D12；那里是 server 的规格，这里是缝本身的规格。
 -/
 
 namespace DesktopFfi
@@ -26,7 +26,7 @@ namespace DesktopFfi
 
 下面的定理是模型对性质的证明：保留的恰是前缀、计数是全长；复制恒不越过块、写下的恒放得进缓冲、恒不含零、缓冲够长时恒成功；填写恰好一个终止符且与复制互逆；块恒不留在进程手里；GDI 对象恒成对释放。每一组各有一条「拿掉守卫即反例」的定理。
 
-生产实现与模型的一致性由三处检查，均不需要桌面：`desktop_ffi::boundary` 的测试 `the_leaf_and_the_rust_reference_agree_on_every_drawn_input` 用种子化的输入比对 Zig 叶子与 Rust 参考（`src/reference.rs`），每条规则两万个；同一比对的 `the_leaf_and_the_rust_reference_agree_for_as_long_as_asked` 按 `just fuzz-desktop` 给的轮数与种子跑（Rust 一侧的 fuzz）；`zig test zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试（Zig 一侧的 fuzz；覆盖引导的 `--fuzz` 今天不在 Windows 上实现，这里跑的是种子化那一半与 fuzz 测试的单次输入）。资源配对在真窗口上由桌面 server 的契约测试判（`crates/desktop/Spec.lean` §8-11）。
+生产实现与模型的一致性由三处检查，均不需要桌面：`desktop_ffi::boundary` 的测试 `the_leaf_and_the_rust_reference_agree_on_every_drawn_input` 用种子化的输入比对 Zig 叶子与 Rust 参考（`src/reference.rs`），每条规则两万个；同一比对的 `the_leaf_and_the_rust_reference_agree_for_as_long_as_asked` 按 `just fuzz-desktop` 给的轮数与种子跑（Rust 一侧的 fuzz）；`zig test zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试（Zig 一侧的 fuzz；覆盖引导的 `--fuzz` 今天不在 Windows 上实现，这里跑的是种子化那一半与 fuzz 测试的单次输入）。资源配对在真窗口上由桌面 server 的契约测试判（`Sprawling/desktop/Spec.lean` §8-11）。
 -/
 
 /-! ## 3 假设与歧义
@@ -38,25 +38,25 @@ namespace DesktopFfi
 
 /-! ## 4 现状分析
 
-四组调用此前在 `platform::windows` 的 `enumerate`、`capture`、`clipboard`、`dpi` 四个模块里经 `windows` 绑定手写 `unsafe`（`crates/desktop/Spec.lean` §8-11 的表）；本包落地后，那四个模块只调这里的安全函数。叶子从 `crates/desktop/ffi/build.rs` 以 `zig build-lib` 编译成静态库，只在 Windows 目标上编；别的目标上本包只剩 `step`。
+四组调用此前在 `platform::windows` 的 `enumerate`、`capture`、`clipboard`、`dpi` 四个模块里经 `windows` 绑定手写 `unsafe`（`Sprawling/desktop/Spec.lean` §8-11 的表）；本包落地后，那四个模块只调这里的安全函数。叶子从 `Sprawling/desktop/ffi/build.rs` 以 `zig build-lib` 编译成静态库，只在 Windows 目标上编；别的目标上本包只剩 `step`。
 -/
 
 /-! ## 5 权威信源
 
-- Step 的名字与编号：`crates/desktop/ffi/src/step.rs`；`zig/step.zig` 是它的 Zig 拼写，`build.rs` 每次构建比对两者（D2）。
-- Zig 的版本：`crates/desktop/ffi/zig-version`（D3）。
+- Step 的名字与编号：`Sprawling/desktop/ffi/src/step.rs`；`zig/step.zig` 是它的 Zig 拼写，`build.rs` 每次构建比对两者（D2）。
+- Zig 的版本：`Sprawling/desktop/ffi/zig-version`（D3）。
 - 各 Win32 调用的前提：learn.microsoft.com 上 `EnumWindows`、`GetDC`、`ReleaseDC`、`PrintWindow`、`GetDIBits`、`OpenClipboard`、`GetClipboardData`、`GlobalSize`、`SetClipboardData`、`SetProcessDpiAwareness` 各自的函数页。
 - 常量（`PW_RENDERFULLCONTENT`、`CF_UNICODETEXT`、`GMEM_MOVEABLE`、`HWND_MESSAGE`）只写在 `leaf.zig` 一处；DPI 感知值由 Rust 从 `windows` 绑定的定义传入。
 -/
 
 /-! ## 6 命名统一
 
-沿用 `crates/desktop/Spec.lean` 的词：three-part refusal、scope、generation。**step**：叶子的一次调用停在哪里（`Finished` 或停下的那一步）；**leaf**：Zig 的那一片；**boundary rule**：叶子往借来的缓冲里写什么的规则。Lean 里的名字与 Zig／Rust 的对应：`kept` ↔ `Kept.keep`／`boundary::keep`，`textEnd` ↔ `textEnd`，`textCopy` ↔ `textCopy`／`boundary::text_copy`，`textFill` ↔ `textFill`／`boundary::text_fill`，`bitmapBytes` ↔ `bitmapBytes`／`boundary::bitmap_bytes`。
+沿用 `Sprawling/desktop/Spec.lean` 的词：three-part refusal、scope、generation。**step**：叶子的一次调用停在哪里（`Finished` 或停下的那一步）；**leaf**：Zig 的那一片；**boundary rule**：叶子往借来的缓冲里写什么的规则。Lean 里的名字与 Zig／Rust 的对应：`kept` ↔ `Kept.keep`／`boundary::keep`，`textEnd` ↔ `textEnd`，`textCopy` ↔ `textCopy`／`boundary::text_copy`，`textFill` ↔ `textFill`／`boundary::text_fill`，`bitmapBytes` ↔ `bitmapBytes`／`boundary::bitmap_bytes`。
 -/
 
 /-! ## 7 模块边界
 
-叶子不拥有任何措辞、scope、generation 或工具名；它只做调用、只写借来的缓冲、只答 step 与码。把 step 与码变成三段式拒词归桌面 server 的 `platform::windows::fault`。Rust 面每个调用组一个文件，`leaf.rs` 是 export 的唯一声明处，`ended.rs` 是把跨边界的数读成 `Step` 的唯一处。`fixture`（只在 `fixture` feature 下编译）是测试自己开一扇窗口、建一个编出来的句柄的那几处 `unsafe`：桌面 server 继承工作区的 `forbid`，连测试也写不出 `unsafe`，本包是唯一能放开它的一层，所以 server 的契约测试经这里开窗口（`crates/desktop/Spec.lean` D14）。
+叶子不拥有任何措辞、scope、generation 或工具名；它只做调用、只写借来的缓冲、只答 step 与码。把 step 与码变成三段式拒词归桌面 server 的 `platform::windows::fault`。Rust 面每个调用组一个文件，`leaf.rs` 是 export 的唯一声明处，`ended.rs` 是把跨边界的数读成 `Step` 的唯一处。`fixture`（只在 `fixture` feature 下编译）是测试自己开一扇窗口、建一个编出来的句柄的那几处 `unsafe`：桌面 server 继承工作区的 `forbid`，连测试也写不出 `unsafe`，本包是唯一能放开它的一层，所以 server 的契约测试经这里开窗口（`Sprawling/desktop/Spec.lean` D14）。
 -/
 
 /-! ## 8 接口先行
@@ -427,7 +427,7 @@ theorem cleared_and_unwritten_is_handing (a : Answers)
   cases a.allocated <;> cases a.filled <;> cases a.owned <;> cases a.opened <;>
     cases a.emptied <;> cases a.handed <;> simp
 
-/-- 先备好再清空：剪贴板只在块已分配并填好之后才被清空（`crates/desktop/Spec.lean` D8）。 -/
+/-- 先备好再清空：剪贴板只在块已分配并填好之后才被清空（`Sprawling/desktop/Spec.lean` D8）。 -/
 theorem cleared_only_after_the_block_is_ready (a : Answers) (h : (write a).cleared = true) :
     a.allocated = true ∧ a.filled = true := by
   revert h
@@ -558,14 +558,14 @@ example : walk (fun _ => 0) 64 3 0 = none := by decide
 
 叶子恒以 step 答：`Finished`、`Absent`（剪贴板没有文本，是成功）、`NoRoom`（附长度，Rust 重试），其余是停下的那一步，附调用线程当时的 `GetLastError`。Rust 面把 step 读成 `Failure::At { step, code }`；一个不是任何 step 的数读成 `Failure::Unspelled`，而不是假定它有效。DPI 两个调用直接答 HRESULT。失败之后叶子不留任何资源（§10 的两组资源定理），剪贴板写在 `Handing` 之后是空的，这一件由拒词说出。
 
-**D4 处理器拓扑、节能限流与 run 的 job 份额也在这片叶子里，叶子只做调用，记录由安全的 Rust 解析。** `sprawling` 的放置（`crates/sprawling/spec/Serving/Placement.lean` D41、D45）要 `GetSystemCpuSetInformation` 与 `GetThreadGroupAffinity`，D40 要 `SetProcessInformation(ProcessPowerThrottling)`，`crates/runtime/spec/Tools/Exec.lean` D29 要 job 的 CPU 权重与作业级内存上限；`std`、`thread-priority` 3.1.1、`win32job` 2.0.3、`winsafe` 0.0.29 都不给这几项，而 `unsafe` 只许在本包（`xtask guard`），所以它们是本叶子的新 export，各做一次完整的调用：CPU set 的记录原样写进 Rust 借出的字节缓冲（`NoRoom` 附需要的长度，Rust 加大重试），组亲和与限流各写一个小结构。解析不进叶子：记录的走法（上面 `walk` 的两条定理）在 `cpu_set::parse` 里，是纯的安全 Rust，在每个平台上都编译，于是一台 i5-1340P 实读的记录作为夹具在 Linux 与 macOS 的 runner 上也被解析；它的 fuzz 是 proptest 在任意字节上跑（不 panic、只报 `Malformed`），叶子一侧没有可对拍的纯函数，所以这一组没有 Zig 侧的对拍。被否：①叶子解析好再交结构——解析是最可能出错的一段，放在 Zig 里就只能在 Windows 上测，也离开了 Rust 的类型；②为它们另开一个 FFI crate——要动门的机器（guard 的 lint 表名单），换来的只是名字更贴切。重开参数：一个对外安全的 crate 给出这些调用，那一组离开叶子。
+**D4 处理器拓扑、节能限流与 run 的 job 份额也在这片叶子里，叶子只做调用，记录由安全的 Rust 解析。** `sprawling` 的放置（`Sprawling/app/spec/Serving/Placement.lean` D41、D45）要 `GetSystemCpuSetInformation` 与 `GetThreadGroupAffinity`，D40 要 `SetProcessInformation(ProcessPowerThrottling)`，`Sprawling/runtime/spec/Tools/Exec.lean` D29 要 job 的 CPU 权重与作业级内存上限；`std`、`thread-priority` 3.1.1、`win32job` 2.0.3、`winsafe` 0.0.29 都不给这几项，而 `unsafe` 只许在本包（`xtask guard`），所以它们是本叶子的新 export，各做一次完整的调用：CPU set 的记录原样写进 Rust 借出的字节缓冲（`NoRoom` 附需要的长度，Rust 加大重试），组亲和与限流各写一个小结构。解析不进叶子：记录的走法（上面 `walk` 的两条定理）在 `cpu_set::parse` 里，是纯的安全 Rust，在每个平台上都编译，于是一台 i5-1340P 实读的记录作为夹具在 Linux 与 macOS 的 runner 上也被解析；它的 fuzz 是 proptest 在任意字节上跑（不 panic、只报 `Malformed`），叶子一侧没有可对拍的纯函数，所以这一组没有 Zig 侧的对拍。被否：①叶子解析好再交结构——解析是最可能出错的一段，放在 Zig 里就只能在 Windows 上测，也离开了 Rust 的类型；②为它们另开一个 FFI crate——要动门的机器（guard 的 lint 表名单），换来的只是名字更贴切。重开参数：一个对外安全的 crate 给出这些调用，那一组离开叶子。
 
 **D5 native confinement 的资源跨越 backlog 多次轮询，由安全 Rust owner 持有句柄。**
 `src/confinement.rs` 的 `OwnedProcess` 持有叶子产生的 command Job/process 句柄、
 唯一 AppContainer profile 名和 ACL 授权记录，`zig/confinement.zig` 通过完整
 launch、poll、terminate、cleanup 操作管理它们；授权路径在叶子内复制，
 没有调用借出缓冲的地址留下。生产 caller 是
-`crates/runtime/src/tools/exec/native_windows.rs` 与 backlog 的 native process arm，
+`Sprawling/runtime/src/tools/exec/native_windows.rs` 与 backlog 的 native process arm，
 launch 以 capability-free AppContainer 挂起创建、给 command job 配置 CPU cap（内存上限只在
 run job 上，由 D6 的 watch 读撞限），装进 command job 与 run job 后恢复。scratch ACL 与 profile storage 都只属于这次执行；
 harness 网络不进入 AppContainer。声明的 toolchain home 只授予 read/execute，
@@ -576,7 +576,7 @@ Rust 负责 argv/env/限额与 typed failures，叶子不选择策略。
 `win32job` 不提供 AppContainer 起动，所以采用既有 FFI seam，而非再建 unsafe crate；
 Microsoft `UpdateProcThreadAttribute`、`CreateAppContainerProfile` 与 Job Objects 文档
 规定平台前提。生命周期与 packet 定理的 authority 在
-`crates/runtime/spec/Tools/Exec/NativeWindows.lean`；其中 `Argv` 规定 `packet::quoted`
+`Sprawling/runtime/spec/Tools/Exec/NativeWindows.lean`；其中 `Argv` 规定 `packet::quoted`
 的普通参数保全、程序名支持域、NUL 内容拒绝与 cmd 脚本边界，本文件不复制
 该编码或 parser 定义，也不沿逆向 crate dependency 导入 runtime 的规格。
 `confinement::tests` 从 packet 的生产入口检验 `Argv` 量化的输入空间；
@@ -588,7 +588,7 @@ D1 的重开条件已满足：后台命令跨越多次工具调用。cleanup 的
 Drop 是 caller 放弃所有权时的 emergency teardown，仍尝试每项资源并报告失败。
 
 **D6 run job 的撞限读处是一个 completion port，由安全 Rust owner `cpu::JobWatch` 持有。**
-`crates/runtime/spec/Tools/Exec.lean` D95 要知道一个 run 的分配有没有在 job 的内存上限处被拒；
+`Sprawling/runtime/spec/Tools/Exec.lean` D95 要知道一个 run 的分配有没有在 job 的内存上限处被拒；
 Windows 只用 job 的 completion port 投递 `JOB_OBJECT_MSG_JOB_MEMORY_LIMIT` 说这件事，
 `win32job` 2.0.3 与 `winsafe` 0.0.29 都不挂 port，所以是本叶子的三个 export：
 `sprawling_desktop_job_watch` 建 port 并以 `JobObjectAssociateCompletionPortInformation`
@@ -614,7 +614,7 @@ owner 持有：`JobWatch` 只持 port 的句柄值，`Drop` 关它。被否：�
 
 **D5 native Record 的字段、顺序和类型由 `src/confinement.rs` 的 `#[repr(C)] Record` 定义。** `build.rs` 在每个平台上读取该声明，逐字段渲染对应的 Zig `extern struct` 并检查 `zig/confinement_api.zig`；只接受 `usize` 与 `[u8; N]`，未知类型、缺失声明或不同拼写都拒绝构建。两侧面向同一目标，C 布局与同宽基础类型决定偏移及对齐。检查不以总字节数代替字段顺序，因此两个同宽句柄互换仍被拒绝；回归夹具确认这一拒绝。被否：只比较结构大小会漏掉 `job` 和 `process` 互换；在 `OUT_DIR` 生成 Zig 声明会让不经 Cargo 的 `zig test` 失去入口。
 
-**D3 Zig 的版本只写在 `crates/desktop/ffi/zig-version`。** `build.rs` 要求 `zig version` 与它相等；doctor 的 `zig` 一行以 `include_str!` 读它；CI 的安装步骤读它。被否：`build.zig.zon` 的 `minimum_zig_version`（这里没有 `build.zig`，而且它说的是下限不是钉子）。`build.rs` 只在 `zig/`、两份 Rust 记录文件或这份钉变了时重跑，不随 `PATH` 重跑，理由与被否的做法同 `Calyx/ffi/Spec.lean` D1：叶子由钉住的版本编出，Zig 换目录不改变它，随 `PATH` 重跑则 CI 的每个作业与桌面上每次换 shell 都重编叶子和依赖它的 `runtime`、`desktop`、`sprawling`。
+**D3 Zig 的版本只写在 `Sprawling/desktop/ffi/zig-version`。** `build.rs` 要求 `zig version` 与它相等；doctor 的 `zig` 一行以 `include_str!` 读它；CI 的安装步骤读它。被否：`build.zig.zon` 的 `minimum_zig_version`（这里没有 `build.zig`，而且它说的是下限不是钉子）。`build.rs` 只在 `zig/`、两份 Rust 记录文件或这份钉变了时重跑，不随 `PATH` 重跑，理由与被否的做法同 `Calyx/ffi/Spec.lean` D1：叶子由钉住的版本编出，Zig 换目录不改变它，随 `PATH` 重跑则 CI 的每个作业与桌面上每次换 shell 都重编叶子和依赖它的 `runtime`、`desktop`、`sprawling`。
 
 **D7 docs.rs 构建不编译 Zig 叶子。** `build.rs` 在环境变量 `DOCS_RS` 已设时直接成功返回，不读钉、不起 `zig`、不发出链接指令，并以 `cargo::rerun-if-env-changed=DOCS_RS` 登记该变量（同 console_ffi D10）。理由与被否同 `Calyx/ffi/Spec.lean` D10：docs.rs 沙箱无 Zig，而 `cargo rustdoc` 不链接原生叶子；安全包装的文档不依赖那片静态库。非 Windows 目标本就不编叶子；本决定让 Windows 目标上的文档构建同样不依赖 Zig。重开参数同 console_ffi D10。
 
@@ -628,14 +628,14 @@ owner 持有：`JobWatch` 只持 port 的句柄值，`Drop` 关它。被否：�
 
 /-! ## 16 测试与约束
 
-已证：§10 的定理。测试：`desktop_ffi` 的 `ended` 与 `boundary` 单测（对拍）；`zig test crates/desktop/ffi/zig/leaf.zig`（Zig 侧单测、种子化性质、fuzz 测试的单次输入）；`just fuzz-desktop`（按给定轮数与种子的长时对拍）。libFuzzer 在这里没有平台：叶子只在 Windows 上编，而 cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时；所以 Rust 一侧以抽样而不是以覆盖来 fuzz。重开参数：cargo-fuzz 在 windows-msvc 上链接得出。环境假设：§3。约束：`unsafe` 恒只在本包、恒是一次 export 调用、恒带一行 `SAFETY:`；lint 表是 `crates/desktop/Cargo.toml` 的 `[workspace.lints]`，与根工作区逐键比对（`xtask guard`）。
+已证：§10 的定理。测试：`desktop_ffi` 的 `ended` 与 `boundary` 单测（对拍）；`zig test Sprawling/desktop/ffi/zig/leaf.zig`（Zig 侧单测、种子化性质、fuzz 测试的单次输入）；`just fuzz-desktop`（按给定轮数与种子的长时对拍）。libFuzzer 在这里没有平台：叶子只在 Windows 上编，而 cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时；所以 Rust 一侧以抽样而不是以覆盖来 fuzz。重开参数：cargo-fuzz 在 windows-msvc 上链接得出。环境假设：§3。约束：`unsafe` 恒只在本包、恒是一次 export 调用、恒带一行 `SAFETY:`；lint 表是 `Sprawling/desktop/Cargo.toml` 的 `[workspace.lints]`，与根工作区逐键比对（`xtask guard`）。
 -/
 
 /-! ## 17 文档关系
 
-- `crates/desktop/Spec.lean` §8-11、§8-12、D12、D14：server 一侧的调用组表、缝的位置，以及本包那一张只差 `unsafe_code` 一行的 lint 表；那里的表变了，§1 的四组随之变。
-- `crates/xtask/Spec.lean` §8-46：guard 怎么读这堵墙。
-- `crates/sprawling/Spec.lean` §8-146：doctor 的 `zig` 一行。
+- `Sprawling/desktop/Spec.lean` §8-11、§8-12、D12、D14：server 一侧的调用组表、缝的位置，以及本包那一张只差 `unsafe_code` 一行的 lint 表；那里的表变了，§1 的四组随之变。
+- `Tools/xtask/Spec.lean` §8-46：guard 怎么读这堵墙。
+- `Sprawling/app/Spec.lean` §8-146：doctor 的 `zig` 一行。
 - `AGENTS.md`「Rust」一节：平台调用的次序与 `SAFETY:` 行的写法；那里的规则变了，D1 重议。
 -/
 

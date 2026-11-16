@@ -21,7 +21,7 @@
 //! says, a refusal included, is a `CallToolResult`, and a refusal sets
 //! its `isError`.
 //!
-//! The properties this module must hold are proved in `crates/desktop/spec/Session.lean`;
+//! The properties this module must hold are proved in `Sprawling/desktop/spec/Session.lean`;
 //! this code is the authority on how it holds them.
 
 use crate::answer::Answer;
@@ -47,7 +47,7 @@ pub(crate) enum Phase {
 impl Phase {
     /// The phase `notifications/initialized` leaves a connection in:
     /// only one that has answered `initialize` opens
-    /// (`crates/desktop/Spec.lean` D15).
+    /// (`Sprawling/desktop/Spec.lean` D15).
     ///
     /// # Errors
     /// Refuses the notification on a fresh connection, which stays fresh:
@@ -190,7 +190,7 @@ impl Server {
     /// a protocol fault and answers with a JSON-RPC error. Once the tool
     /// is named, every refusal is the tool's own and answers as a result
     /// with `isError` set, so the model reads all three parts
-    /// (`crates/desktop/Spec.lean` D2).
+    /// (`Sprawling/desktop/Spec.lean` D2).
     fn call(&mut self, params: &Value) -> Result<Value, Refusal> {
         let name = params.get("name").and_then(Value::as_str).ok_or_else(|| {
             Refusal::new(

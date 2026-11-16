@@ -6,7 +6,7 @@
 /-!
 # outline：一扇窗口读给模型的名字
 
-规定 `crates/desktop/src/outline.rs`（`desktop::outline`，`label` 与 `LABEL_MOST`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（D10 (b)）。
+规定 `Sprawling/desktop/src/outline.rs`（`desktop::outline`，`label` 与 `LABEL_MOST`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（D10 (b)）。
 
 一扇窗口的树折成一段大纲，一行一个元素：`e<n> <role> "<name>"`。name 是应用给控件起的名字，应用是别人写的。这里证明它进窗之前的两件事：
 

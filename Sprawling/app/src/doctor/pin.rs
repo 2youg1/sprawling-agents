@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The versions this repository pins, read from the files that pin
-//! them (`crates/sprawling/spec/Doctor.lean` §8-120 and §8-157).
+//! them (`Sprawling/app/spec/Doctor.lean` §8-120 and §8-157).
 //!
 //! The build script reads the files from the checkout this binary is
 //! built in, so changing a pinned version is an edit to that one file
@@ -32,9 +32,9 @@ include!(concat!(env!("OUT_DIR"), "/pins.rs"));
 /// installs and detects by it. Empty in a build that found no pin.
 pub(crate) const LEAN_TOOLCHAIN: &str = LEAN_TOOLCHAIN_FILE.trim_ascii_end();
 
-/// The Zig version `crates/desktop/ffi/zig-version` pins, the one file
+/// The Zig version `Sprawling/desktop/ffi/zig-version` pins, the one file
 /// the leaf's build script and CI's install step read too
-/// (`crates/sprawling/spec/Doctor.lean` §8-146). Empty in a build that found no pin.
+/// (`Sprawling/app/spec/Doctor.lean` §8-146). Empty in a build that found no pin.
 pub(crate) const ZIG_VERSION: &str = ZIG_VERSION_FILE.trim_ascii_end();
 
 /// The version `pin` names, as a dotted number; `None` for an unpinned

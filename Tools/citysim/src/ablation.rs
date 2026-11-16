@@ -6,7 +6,7 @@
 //! What a resident stops being able to do when one passage of the city
 //! document is taken away.
 //!
-//! **`crates/city/templates/City.md` is compiled into the binary and read by every
+//! **`Sprawling/city/templates/City.md` is compiled into the binary and read by every
 //! resident before anything else, so each passage of it charges rent on
 //! every prefix the city assembles.** This module is the instrument that
 //! prices that rent: it cuts the document into passages, removes one at
@@ -25,7 +25,7 @@
 //! one capability. The capability survives the removal of a passage when
 //! its cue does.
 //!
-//! Specified by `crates/citysim/spec/Ablation.lean` §8-8-4.
+//! Specified by `Tools/citysim/spec/Ablation.lean` §8-8-4.
 
 use kernel::{AxCode, AxError, ByteLen};
 

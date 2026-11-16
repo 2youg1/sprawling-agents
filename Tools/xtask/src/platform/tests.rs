@@ -76,7 +76,7 @@ fn a_mismatched_mei_shim_package_is_reported() {
     if root.exists() {
         std::fs::remove_dir_all(&root).unwrap();
     }
-    let dir = root.join("crates/xtask/src/channel");
+    let dir = root.join("Tools/xtask/src/channel");
     std::fs::create_dir_all(&dir).unwrap();
     let shim = dir.join("shim.js");
     let valid = include_str!("../channel/shim.js");

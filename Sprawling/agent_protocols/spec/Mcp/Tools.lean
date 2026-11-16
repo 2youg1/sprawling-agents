@@ -6,11 +6,11 @@
 /-!
 # Tools：外部工具的名字、构造与它的答复
 
-规定 `crates/agent_protocols/src/mcp/tools.rs`（`agent_protocols::mcp::tools`）与 `crates/agent_protocols/src/mcp/handshake.rs` 里 `Rpc::call_tool` 的浮点检查。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/agent_protocols/src/mcp/tools.rs`（`agent_protocols::mcp::tools`）与 `Sprawling/agent_protocols/src/mcp/handshake.rs` 里 `Rpc::call_tool` 的浮点检查。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 四件事：
 
-1. **两台 server 的同名工具恒是两个工具**（`two_servers_offering_one_verb_stay_two_tools`）：本城的工具名是 `{label}_{sanitised}`，而 `ServerLabel` 只由小写字母与数字组成（`kernel::tool`，`crates/kernel/Spec.lean` §8-23），所以第一个下划线之前就是标签。
+1. **两台 server 的同名工具恒是两个工具**（`two_servers_offering_one_verb_stay_two_tools`）：本城的工具名是 `{label}_{sanitised}`，而 `ServerLabel` 只由小写字母与数字组成（`kernel::tool`，`Sprawling/kernel/Spec.lean` §8-23），所以第一个下划线之前就是标签。
 2. **浮点入参按调用拒，并报出它的位置**（`floatAt_names_a_fractional_leaf`、`floatAt_none_iff`）：拒词里的路径指向一个真是小数的叶子，没有小数的入参恒不被拒。
 3. **一件出站工具在 confidential 楼里不存在，也不能没有期限**（`a_constructed_tool_is_outside_confidential_and_bounded`）。
 4. **工具自己报的错是一次失败；`_meta` 说效果未知、或说得读不懂，都按「不知道」读**（`read_unknown_iff`、`a_reading_safe_to_repeat_is_one_the_server_never_doubted`）。

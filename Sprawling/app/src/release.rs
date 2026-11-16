@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 //! Manual checks: install origin selects the registry, comparison operand and updater.
-//! Specified by `crates/wire/spec/Answer/Release.lean` and `crates/sprawling/spec/Install.lean`.
+//! Specified by `Sprawling/wire/spec/Answer/Release.lean` and `Sprawling/app/spec/Install.lean`.
 use kernel::release::Version;
 use kernel::{AxCode, AxError, Release};
 use wire::{InstallChannel, Registry, RegistryNewest, RegistryReading};

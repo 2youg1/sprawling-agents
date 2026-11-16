@@ -121,7 +121,7 @@ pub(super) fn in_directory(root: &Path, dir: &str, what: &str) -> Result<String,
 /// The harness's `mod` list is the authority: a helper file under
 /// `scenarios/` is not a scenario, and `main.rs` itself is not one either.
 pub(super) fn citysim_scenarios(root: &Path) -> Result<String, XtaskError> {
-    let harness = "crates/citysim/tests/scenarios/main.rs";
+    let harness = "Tools/citysim/tests/scenarios/main.rs";
     let text = walk::read_text(&root.join(harness))?;
     let found = text
         .lines()

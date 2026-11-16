@@ -4,12 +4,12 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One file of the city, read once from disk and answered as a version
-//! (`crates/accounting/spec/Views/Document.lean` §8-21, `crates/wire/Spec.lean` §8-69).
+//! (`Sprawling/accounting/spec/Views/Document.lean` §8-21, `Sprawling/wire/Spec.lean` §8-69).
 //!
 //! Every judgement - which version, whether the bytes are text, where
 //! the first window ends - is the `documents` crate's; this module reads
 //! the disk, keeps every version it reads in the content store, where
-//! any later question reads it by its version (`crates/wire/spec/Answer/Document.lean`
+//! any later question reads it by its version (`Sprawling/wire/spec/Answer/Document.lean`
 //! §8-69), and spells the answer. The same text judgement
 //! answers `Content` and `Prefix`, which read bytes out of the store
 //! rather than off the tree: what makes bytes readable does not depend on
@@ -38,7 +38,7 @@ impl Views {
 /// One file of the tree as it stands at the moment of asking.
 ///
 /// Takes the city root rather than the views: it reads the disk, and
-/// runs after the view lock is released (`crates/sprawling/Spec.lean` §8-100).
+/// runs after the view lock is released (`Sprawling/app/Spec.lean` §8-100).
 pub(super) fn document_answer(city_root: &Path, at: Address) -> wire::DocumentAnswer {
     let state = match std::fs::read(resolve(city_root, Some(&at))) {
         Ok(bytes) => state_of(city_root, &at, &bytes),
@@ -87,7 +87,7 @@ fn state_of(city_root: &Path, at: &Address, bytes: &[u8]) -> DocumentState {
 }
 
 /// The first window of a text version, and whether it covers the whole
-/// of it (`crates/accounting/spec/Views/Document.lean` §8-21).
+/// of it (`Sprawling/accounting/spec/Views/Document.lean` §8-21).
 fn text_body(
     format: Format,
     encoding: documents::Encoding,

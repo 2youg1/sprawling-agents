@@ -6,7 +6,7 @@
 /-!
 # target：一个名字恰好指一扇窗口，否则拒绝
 
-规定 `crates/desktop/src/platform/windows/target.rs`（`desktop::platform::windows::target`，`choose`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/desktop/src/platform/windows/target.rs`（`desktop::platform::windows::target`，`choose`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 一次调用以 `title`、`process` 或两者指名一扇窗口；两者合起来是一个判定 `fits`（给了的每一个都要中，`spec/Scope.lean` 的读法）。桌面上中了的窗口恰好一扇才交出它；零扇拒并指向 `desktop.windows`，两扇以上拒并列出各自的 title，**恒不**在其中挑一个——挑中的那一扇是对人想要哪份文档的猜测。
 

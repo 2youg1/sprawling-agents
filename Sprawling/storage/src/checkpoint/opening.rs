@@ -12,7 +12,7 @@
 //! is the one file two writers would disagree about, so each writer stages
 //! into its own, under the reserved subtree where no checkpoint stages it.
 //!
-//! Specified by `crates/storage/spec/Checkpoint/Concurrent.lean` §8-39.
+//! Specified by `Sprawling/storage/spec/Checkpoint/Concurrent.lean` §8-39.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The Mei backend: display-local identity, one JSONL converter, replay,
-//! and the child process group (`crates/sprawling/spec/Console.lean` §8-174).
+//! and the child process group (`Sprawling/app/spec/Console.lean` §8-174).
 
 use crate::part::{Ending, Outcome};
 use crate::scene::Entry;

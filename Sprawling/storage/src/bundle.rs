@@ -20,7 +20,7 @@
 //! compression dependency to carry; a directory needs neither, and any
 //! backup tool can wrap one.
 //!
-//! Specified by `crates/storage/spec/Bundle.lean` §8-12.
+//! Specified by `Sprawling/storage/spec/Bundle.lean` §8-12.
 
 mod export;
 mod files;

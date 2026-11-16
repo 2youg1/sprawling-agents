@@ -6,7 +6,7 @@
 /-!
 # city::spine_files
 
-规定 `spine_files`、`spine_files::blank`、`spine_files::hall`、`handoff_form`、`defaults`（`crates/city/src/` 下同名的文件）。一栋楼开局有哪几份文档、一件活的 JOB.md 落在哪、交接表单怎么读，城写下的模板，以及哪几份文档的默认文本归二进制。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+规定 `spine_files`、`spine_files::blank`、`spine_files::hall`、`handoff_form`、`defaults`（`Sprawling/city/src/` 下同名的文件）。一栋楼开局有哪几份文档、一件活的 JOB.md 落在哪、交接表单怎么读，城写下的模板，以及哪几份文档的默认文本归二进制。本文件是 `Sprawling/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `Sprawling/city/Spec.lean §8-n`，决定引作 `city D<n>`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `city::spine_files::tests` 守住。
 -/
@@ -41,7 +41,7 @@ pub fn city_prompt_path(city_root: &Path, building: &Address) -> Result<PathBuf,
 
 - **楼级三份由 `lay_out` 写，交接住房间**：`lay_out` 写 Roadmap／Memo／`SPEC.md`；`Handoff.md` 由 `room::open` 经 `lay_out_handoff` 铺在房间里（§8-24）；`RULES.toml` 归 `building::create`（它的含义归 `policy`）——同一份文件有两个写入者就是两个权威。
 - **已存在的文档恒不覆写**：一栋已在干活的楼的计划不得因为又跑了一次建楼而回到空白。
-- **模板的占位行不进新楼的 Roadmap**：`crates/city/templates/Roadmap.md` 里的两行 `Not started` 是给人看的例子；照抄进去，一栋新楼开局就有两件不存在的待办，而它们会进分母。实例化时删掉 Item 列为空的数据行，断言是「新楼的分母是 0」。
+- **模板的占位行不进新楼的 Roadmap**：`Sprawling/city/templates/Roadmap.md` 里的两行 `Not started` 是给人看的例子；照抄进去，一栋新楼开局就有两件不存在的待办，而它们会进分母。实例化时删掉 Item 列为空的数据行，断言是「新楼的分母是 0」。
 - **JOB.md 先落盘，再产 `run_started`**（模板第一行就这么写）；内容同时进 CAS，于是盘上那份是现场、CAS 那份是历史——Agent 改了 JOB.md 也不会使「当时派的是什么活」不可考。同一个房间再派一件活即覆写它（JOB.md 是本次会话的任务，不是档案）。**人那句话在表单里只出现一次**：标题只写 `# JOB.md`，任务正文只进 `<task>` 节——标题再插一遍，一段粘贴每次请求就多付一遍。
 - **JOB.md 写明是谁交下的这件活**（D21）：`<from>` 一节写 `JobBrief.from`，即 `kernel::event::Who::handed_down_by` 给的 "the User"、"the city" 或 "@room, run …"；`<task>` 与 `<goal>` 的正文里 `&`、`<`、`>` 一律转义成 `&amp;`、`&lt;`、`&gt;`，于是正文关不掉它所在的节。转义之后正文里不可能再出现 `<fill-…>` 占位符，三个占位符依次 `replace` 即可，不必再防「正文被二次扫描」。
 - **机器只填它知道的段**：Task／Goal 两段有事实就写；Background／Delivery 无事实则不写——写一个 `(未知)` 占位，只是让模型每回合读一遍没信息的行。
@@ -56,7 +56,7 @@ pub fn city_prompt_path(city_root: &Path, building: &Address) -> Result<PathBuf,
 -/
 
 /-!
-### 8-41 城写下的模板住在 city 自己的包里（`crates/city/templates/`、`city::defaults::Shipped`，形状 6 数据面）
+### 8-41 城写下的模板住在 city 自己的包里（`Sprawling/city/templates/`、`city::defaults::Shipped`，形状 6 数据面）
 
 ```rust
 // city::spine_files
@@ -64,8 +64,8 @@ pub(crate) const CITY_TEMPLATE: &str = include_str!("../templates/City.md");   /
 // 其余模板仍是本模块与 building::template 的私有常量，各自 include_str!("../templates/<文件>") 或 ("../../templates/<文件>")
 ```
 
-- **一个目录装城写下的全部第一批字节**：`crates/city/templates/` 下是 `RULES.toml`、`RULES-hall.toml`、`Roadmap.md`、`Memo.md`、`Handoff.md`、`SPEC.md`、`JOB.md`、`MAYOR.md`、`CLERK.md`、`URBANITE.md`、`City.md`，以及说明每份文件谁写、谁读的 `README.md`。人读的那份与城写出的那份仍是同一串字节（§8-3、§8-5），只是这串字节现在住在把它编进去的包里。
-- **为什么在包里**：crates.io 上的 `.crate` 只装包目录里的文件，验证构建与 `cargo install` 都在解开的包里编译；`include_str!` 指向包外的 `docs/` 时，那里没有这些文件，city 编不出来（`crates/sprawling/Spec.lean` §8-157）。`packaged` 门判这一条（crates/xtask/Spec.lean §8-49）。
+- **一个目录装城写下的全部第一批字节**：`Sprawling/city/templates/` 下是 `RULES.toml`、`RULES-hall.toml`、`Roadmap.md`、`Memo.md`、`Handoff.md`、`SPEC.md`、`JOB.md`、`MAYOR.md`、`CLERK.md`、`URBANITE.md`、`City.md`，以及说明每份文件谁写、谁读的 `README.md`。人读的那份与城写出的那份仍是同一串字节（§8-3、§8-5），只是这串字节现在住在把它编进去的包里。
+- **为什么在包里**：crates.io 上的 `.crate` 只装包目录里的文件，验证构建与 `cargo install` 都在解开的包里编译；`include_str!` 指向包外的 `docs/` 时，那里没有这些文件，city 编不出来（`Sprawling/app/Spec.lean` §8-157）。`packaged` 门判这一条（Tools/xtask/Spec.lean §8-49）。
 - **`City.md` 由 city 交出，accounting 只读城里那份**：城里的 `City.md`、`MAYOR.md`、`CLERK.md` 由 `defaults::follow_defaults` 铺下与前移（§8-43），这份文件的名字（`CITY_FILE`）与它同目录的模板都归本模块。accounting 不持有默认文本，只读 `city_prompt_path` 答的那份；那份不在时冻结以 `E_STORAGE_FATAL` 拒绝，恢复语请人重开城，开城时 `follow_defaults` 再铺下。所以 `CITY_TEMPLATE` 是 `pub(crate)`，唯一的读者是 `defaults::Shipped::City`：冻结时若临时换上内置文本，模型读到的就不是人能打开的那份文件（D29）。
 - **失败**：没有运行期失败。模板改名或挪走，`include_str!` 在编译期就红。
 
@@ -88,8 +88,8 @@ pub struct Edited { pub doc: Shipped, pub path: PathBuf }    // 人改过、保�
 pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError>;
 ```
 
-- **判定只有一处**：`standing` 按字节判。等于本构建的默认是 `Current`；BLAKE3 落在这份文档的历史摘要表里是 `Earlier`；文件不在是 `Absent`；其余是 `Edited`。摘要表收这几份模板在仓库历史里出现过的每一版（`crates/city/templates/`，以及更早住在仓库 docs 目录下的 City.md 与模板），开发构建立过的城也认得出来。
-- **`follow_defaults` 是这三份文档唯一的写者**：`Absent` 与 `Earlier` 写成本构建的默认（经 `document::edit_against`，以判定时读到的字节为底，整份落盘；读与写之间人的编辑器存过这份文件时以 `E_VERSION_CONFLICT` 不写，这份副本照 `Edited` 留下并列进返回值，因为那次保存是人的），`Current` 不动，`Edited` 不动并列进返回值。立城与开城都调它：开城在 `RunWorker::holding`（`crates/accounting/src/worker/lifetime.rs`）里、拿着城的写锁、紧挨 `keep_records_out_of_git`；立城经同一个 `holding`，所以创世不再自己写这三份。
+- **判定只有一处**：`standing` 按字节判。等于本构建的默认是 `Current`；BLAKE3 落在这份文档的历史摘要表里是 `Earlier`；文件不在是 `Absent`；其余是 `Edited`。摘要表收这几份模板在仓库历史里出现过的每一版（`Sprawling/city/templates/`，以及更早住在仓库 docs 目录下的 City.md 与模板），开发构建立过的城也认得出来。
+- **`follow_defaults` 是这三份文档唯一的写者**：`Absent` 与 `Earlier` 写成本构建的默认（经 `document::edit_against`，以判定时读到的字节为底，整份落盘；读与写之间人的编辑器存过这份文件时以 `E_VERSION_CONFLICT` 不写，这份副本照 `Edited` 留下并列进返回值，因为那次保存是人的），`Current` 不动，`Edited` 不动并列进返回值。立城与开城都调它：开城在 `RunWorker::holding`（`Sprawling/accounting/src/worker/lifetime.rs`）里、拿着城的写锁、紧挨 `keep_records_out_of_git`；立城经同一个 `holding`，所以创世不再自己写这三份。
 - **改默认文本的那个改动，把改之前那版的 BLAKE3 加进摘要表**：否则未改的旧副本被判成 `Edited`，旧城会一直读旧文字。测试 `no_default_lists_itself_as_earlier` 断言本构建的默认不在自己的摘要表里（在就说明改动忘了换默认）。
 - **失败**：`E_STORAGE_FATAL` 带路径，读不了或写不了任何一份时；改过的副本不是失败。
 
@@ -122,7 +122,7 @@ pub fn restore(city_root: &Path, doc: Shipped, base: B3Hash) -> Result<usize, Ax
 ```
 
 - **名单只有一处**：`PromptDocument::of` 判一个地址是不是页面能写的提示文档。`PutRange` 读它放行保留子树里的这几份，`PutPrompt` 读它决定每一步对哪一份成立；两处若各写一张表，就会有一份只能逐字改、不能恢复的文档。`PREFERENCES.md` 不在名单上：它不进任何前缀，设置页的那扇门照旧管它。房间的 `URBANITE.md` 与各级 `AGENTS.md` 不在保留子树里，本来就经 `PutRange` 写，也不在名单上。
-- **模型提示的拼法只有一处**：`model_note_at` 先拼地址再变路径，地址文法拒的 provider 或 model 不对应任何一份（与冻结时 `model_note` 的读法同一个函数，`crates/sprawling/Spec.lean` §8-85），所以一个带 `..` 的模型 id 拼不出保留子树之外的路径。`model_notes` 列出一层盘上的每一份，供 `Query::Layers` 用。**模型 id 可以带 `/`**（`vendor/model` 这样经网关转发的 id 很常见），这时提示落在 provider 目录下的子目录里；`model_notes` 走进 provider 目录下的每一层子目录，`PromptDocument::of` 把 provider 之后的各段连起来读成同一个 id，所以冻结时读到的每一份，页面都列得出、改得了。验收：`prompt_documents::tests::a_model_id_with_a_slash_is_one_note_the_list_reads_back`。**链接照冻结的读法跟随**：冻结经 `std::fs::read` 读提示，跟随 provider 目录、子目录与文件上的链接，所以 `model_notes` 也跟随它们；只跟一边的话，页面会漏掉一份每个 run 都收到的提示。保留子树是人与城写的地方，模型写不进去，链接是人放的；列出它指向的提示不比冻结多读任何字节。指回本次下行途中某个目录的链接不再走第二遍（按解析后的路径判），所以环不会让列举不停；指向不存在之处的链接不列，冻结读它也是「不在」。验收（链接只在 unix 上能由测试建出）：`prompt_documents::tests::linked_notes_are_listed_as_the_freeze_reads_them`。
+- **模型提示的拼法只有一处**：`model_note_at` 先拼地址再变路径，地址文法拒的 provider 或 model 不对应任何一份（与冻结时 `model_note` 的读法同一个函数，`Sprawling/app/Spec.lean` §8-85），所以一个带 `..` 的模型 id 拼不出保留子树之外的路径。`model_notes` 列出一层盘上的每一份，供 `Query::Layers` 用。**模型 id 可以带 `/`**（`vendor/model` 这样经网关转发的 id 很常见），这时提示落在 provider 目录下的子目录里；`model_notes` 走进 provider 目录下的每一层子目录，`PromptDocument::of` 把 provider 之后的各段连起来读成同一个 id，所以冻结时读到的每一份，页面都列得出、改得了。验收：`prompt_documents::tests::a_model_id_with_a_slash_is_one_note_the_list_reads_back`。**链接照冻结的读法跟随**：冻结经 `std::fs::read` 读提示，跟随 provider 目录、子目录与文件上的链接，所以 `model_notes` 也跟随它们；只跟一边的话，页面会漏掉一份每个 run 都收到的提示。保留子树是人与城写的地方，模型写不进去，链接是人放的；列出它指向的提示不比冻结多读任何字节。指回本次下行途中某个目录的链接不再走第二遍（按解析后的路径判），所以环不会让列举不停；指向不存在之处的链接不列，冻结读它也是「不在」。验收（链接只在 unix 上能由测试建出）：`prompt_documents::tests::linked_notes_are_listed_as_the_freeze_reads_them`。
 - **三步各对哪几份成立**：`Own` 对 `BuildingCity` 与 `ModelNote` 成立，文件已在就拒；起手的字节是远一层那份（楼的 `City.md` 抄城根的，楼的模型提示抄城的那份，城没有就是空的）。`Inherit` 对 `BuildingCity` 与 `ModelNote` 成立，删掉文件，远的一层重新管。`Restore` 只对 `Shipped` 成立，经 `defaults::restore` 写回本版默认、保留 `MAYOR.md` 的身份区，所以默认文本仍只由 `defaults` 一个模块写（§8-43）。其余组合以 `E_INVALID_ARGS` 拒，恢复里说出这一份能做哪几步。
 - **以 `base` 为底**：三步都在 `document` 的锁里先读文件，哈希不等于 `base`（不在读作空字节）时以 `E_VERSION_CONFLICT` 拒、什么都不改，因为人在页面上确认的是他看到的那一版。
 - **失败**：读不了、写不了、删不掉是 `E_STORAGE_FATAL` 带路径。
@@ -153,7 +153,7 @@ pub fn restore(city_root: &Path, doc: Shipped, base: B3Hash) -> Result<usize, Ax
 
 /-! D30 City Hall 的纪律分人设之前与人设之后两段，操作说明不留在人设文件里
 
-**决定**：`spine_files::hall` 给每个 hall 席位两段二进制文本：`opening` 放在人设之前（Mayor 是它怎么工作与怎么写计划），`closing` 放在人设之后（绝不做什么、谁读得到什么）。`MAYOR.md`、`CLERK.md` 的模板只留人设各节（`<who>`、`<voice>`、`<stops>`、`<bring>`）；`<seen>` 与 `<plan>` 都在二进制文本里。Mayor 的 `<plan>` 说计划怎么写，并按 `edit` 与 `plan` 现行的参数教这两个工具；参数的权威在工具（`crates/runtime/spec/Tools.lean` §8-14 的 `edit`，`crates/collab/Spec.lean` 的 `collab::claim_tool`），改参数的那个改动同时改这一段，因为二进制之外没有别的写者会替它改。
+**决定**：`spine_files::hall` 给每个 hall 席位两段二进制文本：`opening` 放在人设之前（Mayor 是它怎么工作与怎么写计划），`closing` 放在人设之后（绝不做什么、谁读得到什么）。`MAYOR.md`、`CLERK.md` 的模板只留人设各节（`<who>`、`<voice>`、`<stops>`、`<bring>`）；`<seen>` 与 `<plan>` 都在二进制文本里。Mayor 的 `<plan>` 说计划怎么写，并按 `edit` 与 `plan` 现行的参数教这两个工具；参数的权威在工具（`Sprawling/runtime/spec/Tools.lean` §8-14 的 `edit`，`Sprawling/collab/Spec.lean` 的 `collab::claim_tool`），改参数的那个改动同时改这一段，因为二进制之外没有别的写者会替它改。
 
 **理由**：操作说明会随工具改名、参数增删而变，住在人改的文件里，二进制就改不到它（D29 只能前移没改过的副本）。程序放在人设之前，人设给它上色；禁令放在最后，模型最后读到它，人设压不住它。
 
@@ -176,13 +176,13 @@ pub fn restore(city_root: &Path, doc: Shipped, base: B3Hash) -> Result<usize, Ax
 /-!
 ### 8-24 Handoff 住房间
 
-> 权威在 `crates/runtime/Spec.lean` §8-33；本节只记 city 这一侧。
+> 权威在 `Sprawling/runtime/Spec.lean` §8-33；本节只记 city 这一侧。
 
-`handoff_path(city_root, room)`、`handoff(city_root, room)` 与 `clear_handoff(city_root, room)` 的第二个参数是**房间地址**：`<city>/<room>/Handoff.md`，装配层的 `run_segment` 递本跑的地址。模板由 `room::open` 在打开房间时经 `spine_files::lay_out_handoff` 铺下；楼级 `lay_out` 不铺 `Handoff.md`。理由是同楼并发：两个房间同时冻结，一份楼级文件就是两份内容抢一个名字。没有房间的地址（直接派到楼根的跑）读到 `None`，与空白表单的读法一致。`clear_handoff` 删掉文件而不是写回空白表单：空白表单与没有文件都读成 `None`，写一份只会让两种盘上状态说同一件事（`crates/sprawling/Spec.lean` §8-82 的新会话）。
+`handoff_path(city_root, room)`、`handoff(city_root, room)` 与 `clear_handoff(city_root, room)` 的第二个参数是**房间地址**：`<city>/<room>/Handoff.md`，装配层的 `run_segment` 递本跑的地址。模板由 `room::open` 在打开房间时经 `spine_files::lay_out_handoff` 铺下；楼级 `lay_out` 不铺 `Handoff.md`。理由是同楼并发：两个房间同时冻结，一份楼级文件就是两份内容抢一个名字。没有房间的地址（直接派到楼根的跑）读到 `None`，与空白表单的读法一致。`clear_handoff` 删掉文件而不是写回空白表单：空白表单与没有文件都读成 `None`，写一份只会让两种盘上状态说同一件事（`Sprawling/app/Spec.lean` §8-82 的新会话）。
 -/
 
 /-!
-### 模板的写法：格式标注的是「该多小心」（`crates/city/templates/`）
+### 模板的写法：格式标注的是「该多小心」（`Sprawling/city/templates/`）
 
 **格式不是允许与否的门禁，是谨慎程度的标记**，而且不设门禁把它变红：想清楚了照样改。据此三类：
 
@@ -199,9 +199,9 @@ pub fn restore(city_root: &Path, doc: Shipped, base: B3Hash) -> Result<usize, Ax
 
 /-! D18 模板与 `City.md` 住进 city 的包目录，不留在 `docs/`
 
-**决定**：城写下的模板与 `City.md` 住在 `crates/city/templates/`（§8-41）；`City.md` 的默认文本由 `city::defaults::Shipped::City` 交出，写到城里的只有 `follow_defaults`。
+**决定**：城写下的模板与 `City.md` 住在 `Sprawling/city/templates/`（§8-41）；`City.md` 的默认文本由 `city::defaults::Shipped::City` 交出，写到城里的只有 `follow_defaults`。
 
-**理由**：模板的字节是 city 的产品：`building::create`、`spine_files::lay_out`、`write_job` 与创世都按它们写盘，编译期 `include_str!` 它们。一个包要发布，它编译时读的每个文件都得在它自己的目录里（`crates/sprawling/Spec.lean` §8-157），而 `docs/` 这样的仓库目录不属于任何包。放进 city 而不是 accounting，因为这些文件的名字、读法与「谁写哪一份」本来就在本模块。
+**理由**：模板的字节是 city 的产品：`building::create`、`spine_files::lay_out`、`write_job` 与创世都按它们写盘，编译期 `include_str!` 它们。一个包要发布，它编译时读的每个文件都得在它自己的目录里（`Sprawling/app/Spec.lean` §8-157），而 `docs/` 这样的仓库目录不属于任何包。放进 city 而不是 accounting，因为这些文件的名字、读法与「谁写哪一份」本来就在本模块。
 
 **被否**：①模板放在 `docs/` 下给人读，发布前由脚本复制进包——仓库里的包与发布出去的包不再是同一组文件，复制那一步要自己的检查；②模板放在 `docs/` 下，city 里放一个指向它的符号链接——Windows 上建符号链接要开发者模式或管理员权限，git 在那里默认把链接检出成一个写着路径的普通文件；③`City.md` 搬进 accounting——它的文件名与同族模板都在 city，搬过去就把一族文件拆进两个包。
 

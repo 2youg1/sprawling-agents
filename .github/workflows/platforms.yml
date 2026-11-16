@@ -50,7 +50,7 @@ jobs:
   # runner". The commit date comes from git rather than from an API, so
   # this job needs nothing but a checkout, so it was legal on ubuntu even
   # while Linux was kept out of the builds. That has since been
-  # re-argued (`crates/sprawling/Spec.lean` §8-9): a native Linux runner never
+  # re-argued (`Sprawling/app/Spec.lean` §8-9): a native Linux runner never
   # touches a cross toolchain, which was the whole of the original reason.
   moved:
     runs-on: ubuntu-latest
@@ -103,7 +103,7 @@ jobs:
           tool: cargo-nextest,just
       # macOS's `sh` is what `install.sh` runs under for a person on a Mac,
       # and it accepts less than the shells the other platforms run
-      # (`crates/sprawling/spec/Install.lean` section 8-118).
+      # (`Sprawling/app/spec/Install.lean` section 8-118).
       - name: the shell scripts parse under the sh macOS ships
         if: ${{ !cancelled() }}
         run: git ls-files -z '*.sh' | xargs -0 -n 1 sh -n
@@ -128,7 +128,7 @@ jobs:
         id: trybuild-scratch
         with:
           path: target/tests
-          key: trybuild-${{ runner.os }}-core-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+          key: trybuild-${{ runner.os }}-core-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'Sprawling/*/tests/**', 'Tools/*/tests/**') }}
           restore-keys: trybuild-${{ runner.os }}-core-
       - name: clippy and the suite of the core packages
         if: ${{ !cancelled() }}
@@ -137,7 +137,7 @@ jobs:
         if: ${{ !cancelled() && github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
         with:
           path: target/tests
-          key: trybuild-${{ runner.os }}-core-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'crates/*/tests/**') }}
+          key: trybuild-${{ runner.os }}-core-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml', 'Sprawling/*/tests/**', 'Tools/*/tests/**') }}
       - name: clear the trybuild scratch before later steps
         if: always()
         shell: bash
@@ -179,7 +179,7 @@ jobs:
   # stabilised after it, or a dependency whose own `rust-version` is
   # newer, passes every pinned job and breaks the install. Linux, because
   # this compiles every package but the Windows-only code and a Windows
-  # runner is the scarce one (`crates/sprawling/spec/Doctor.lean` D31).
+  # runner is the scarce one (`Sprawling/app/spec/Doctor.lean` D31).
   # The version is read from the root manifest, its one authority.
   msrv:
     needs: moved
@@ -237,7 +237,7 @@ jobs:
       - name: install pinned toolchain
         run: rustup show
       # The Zig the desktop's leaf is built with; every Windows build of
-      # `sprawling` compiles it (`crates/desktop/Spec.lean` section 8-12).
+      # `sprawling` compiles it (`Sprawling/desktop/Spec.lean` section 8-12).
       - uses: ./.github/actions/zig
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2

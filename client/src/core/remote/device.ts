@@ -7,7 +7,7 @@
 // the city's key it pinned, the id the door gave it, and its own key.
 // IndexedDB rather than the preferences' rows because it stores a
 // `CryptoKey` as it is, so the Ed25519 half stays a key no script can
-// export (`crates/remote_access/Spec.lean` D1, D21). The seed is never
+// export (`Sprawling/remote_access/Spec.lean` D1, D21). The seed is never
 // kept: it was shown once, at pairing.
 //
 // One record per origin, because a device's key belongs to the host

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The native key's file (`crates/sprawling/spec/Keying.lean` §8-22):
+//! The native key's file (`Sprawling/app/spec/Keying.lean` §8-22):
 //! `<per-user runtime directory>/sprawling/<port>.key`, readable by the
 //! User alone, written when a city starts serving and removed when it
 //! closes.
@@ -134,7 +134,7 @@ fn make_private(dir: &Path) -> Result<(), AxError> {
 
 /// Removes the inherited entries and grants the current User alone full
 /// control, through `icacls`: a direct DACL call needs `unsafe`, which
-/// this crate forbids (`crates/sprawling/spec/Keying.lean` §8-22). The
+/// this crate forbids (`Sprawling/app/spec/Keying.lean` §8-22). The
 /// program is `System32`'s, never one the search order finds first in
 /// this binary's folder (Keying D76).
 #[cfg(windows)]

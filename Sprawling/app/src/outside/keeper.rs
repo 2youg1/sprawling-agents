@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The remote door as this process keeps it (`crates/sprawling/spec/Outside/Conduit.lean` §8-139):
+//! The remote door as this process keeps it (`Sprawling/app/spec/Outside/Conduit.lean` §8-139):
 //! the one `remote_access::door::Door`, the city's signing key, the
 //! route, the device table and the ledger lines, behind one lock.
 //!
@@ -11,7 +11,7 @@
 //! and each connection the remote listener answers - so a state change
 //! and the line that records it happen under the same lock and in the
 //! same order. The door decides; this module carries out what it
-//! decided: it writes the five lines (`crates/kernel/Spec.lean` §8-81),
+//! decided: it writes the five lines (`Sprawling/kernel/Spec.lean` §8-81),
 //! keeps the device table on disk, and opens and closes the route.
 //!
 //! Time and randomness come in as [`Senses`], made in `bin::assembly`,
@@ -50,7 +50,7 @@ pub(crate) type Clock = Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>;
 /// This machine's random source, filling the slice it is given.
 pub(crate) type Entropy = Arc<dyn Fn(&mut [u8]) -> Result<(), AxError> + Send + Sync>;
 /// Builds the route one opening of the door goes out through, closed
-/// (`crates/sprawling/spec/Assembly.lean` §8-151): asked once per `open`, so the route is the
+/// (`Sprawling/app/spec/Assembly.lean` §8-151): asked once per `open`, so the route is the
 /// one the city's configuration names at that moment.
 pub(crate) type Choosing = Box<dyn FnMut() -> Result<Box<dyn Route + Send>, AxError> + Send>;
 

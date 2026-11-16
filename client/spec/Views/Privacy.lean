@@ -6,7 +6,7 @@
 /-!
 # privacy：隐私页上一项从按下到结果
 
-规定 `client/src/views/setup/privacy/entry.ts` 的 `step`：隐私组（`#/setup/privacy`，§7L）里每一个控制各有一台这样的状态机，页面没有「全部应用」，也不预选任何一项。主机一侧的确认绑定（命令带页面显示的当前值作 `expected`，主机 fresh read 不符即拒绝）在 `crates/sprawling/spec/Privacy/Confirmation.lean`；机器作用域另经 Windows 的 UAC。
+规定 `client/src/views/setup/privacy/entry.ts` 的 `step`：隐私组（`#/setup/privacy`，§7L）里每一个控制各有一台这样的状态机，页面没有「全部应用」，也不预选任何一项。主机一侧的确认绑定（命令带页面显示的当前值作 `expected`，主机 fresh read 不符即拒绝）在 `Sprawling/app/spec/Privacy/Confirmation.lean`；机器作用域另经 Windows 的 UAC。
 
 一项的走法：按下「应用」「恢复」或「核对」（只有页面算出可用的那个动作按得动）进入确认；确认框写出当前值 → 写入值、作用域、是否需要管理员、这一项容易被忽略的事与怎样撤销；取消回到原处，什么也不发；确认时铸一个 idem 并发送命令，进入发送中；链路没送出时回到可重试的「未发出」；主机按 idem 保留结果，页面只认自己铸的那个 idem：仍在进行就留在发送中，结束时进入已结束或被拒绝，任何别的 idem 的结果都不改这一项。结束或被拒绝之后可以再按。
 

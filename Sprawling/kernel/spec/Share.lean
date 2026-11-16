@@ -6,7 +6,7 @@
 /-!
 # kernel::share
 
-规定 `kernel::share`（`crates/kernel/src/share.rs`）：守恒的份额。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::share`（`Sprawling/kernel/src/share.rs`）：守恒的份额。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 -/
 
 /-!

@@ -4,9 +4,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The scenes the Lean model of selection states, run through the
-//! production export (`crates/accounting/spec/Playback.lean` §8-12, accounting D25 (i)).
+//! production export (`Sprawling/accounting/spec/Playback.lean` §8-12, accounting D25 (i)).
 //!
-//! `crates/accounting/spec/Playback/Select.lean` proves that its model
+//! `Sprawling/accounting/spec/Playback/Select.lean` proves that its model
 //! selects each scene's seqs from its ledger. This test reads the same
 //! ledger and the same scenes out of that file, line by line, writes the
 //! ledger, and asks the export for each scene. A behaviour comparison,

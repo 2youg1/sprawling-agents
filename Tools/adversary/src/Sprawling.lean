@@ -20,10 +20,10 @@ import Sprawling.Acceptance.Servings
 import Sprawling.Acceptance.Checklist
 
 /-! The library index. It holds no logic; every rule lives in the module that
-owns it, and the dependency order is the one `crates/adversary/Spec.lean` section 7
+owns it, and the dependency order is the one `Tools/adversary/Spec.lean` section 7
 draws: `Model` → `Door` → `Frame`, `Model` → `Ground` → `Door`, `Provider` →
 `Ground` for the second world, `Layer` → `Ground` with `Check` for the third,
 `Person` on `Layer` for the fourth, and the acceptance world under
 `Sprawling.Acceptance` on `Provider` and `Layer`. The checker imports no
 specification: the chain and snapshot theorems it cites in comments live in
-`crates/kernel/spec/Ledger.lean` and `crates/storage/spec/Snapshot.lean`. -/
+`Sprawling/kernel/spec/Ledger.lean` and `Sprawling/storage/spec/Snapshot.lean`. -/

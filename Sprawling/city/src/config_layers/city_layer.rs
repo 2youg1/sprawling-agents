@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The facts a person writes into the city's own layer from the settings
-//! page (`crates/city/spec/Policy.lean` §8-34).
+//! page (`Sprawling/city/spec/Policy.lean` §8-34).
 //!
 //! The city's layer is the far end of the ladder: what it states holds
 //! wherever a building or a room states nothing. It is written through
@@ -25,7 +25,7 @@ pub enum CitySetting<'a> {
     KeepWarm(KeepWarm),
     Effort(Effort),
     /// The city's whole `[catalog]` table, the default every building
-    /// that states nothing reads (`crates/city/spec/ConfigLayers.lean`
+    /// that states nothing reads (`Sprawling/city/spec/ConfigLayers.lean`
     /// §8-4g); an empty table takes the key out.
     Catalog(&'a ExposureTable),
     /// The city's whole ordered external skill shelf table.

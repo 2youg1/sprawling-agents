@@ -6,7 +6,7 @@
 //! One refusal shape for every way a layer can fail to be read, so the
 //! recovery line is written once and cannot drift between callers.
 //!
-//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4.
+//! Specified by `Sprawling/city/spec/ConfigLayers.lean` §8-4.
 
 use std::path::Path;
 
@@ -66,23 +66,23 @@ pub(super) fn unreadable(text: &str, err: &toml::de::Error) -> AxError {
 pub(super) enum Confined {
     /// A shelf is mounted for every building at once, so a building or
     /// a room that names one would admit a directory nobody who keeps
-    /// this city chose (`crates/city/spec/Library.lean` §8-8).
+    /// this city chose (`Sprawling/city/spec/Library.lean` §8-8).
     Shelves,
     /// The remote door opens onto the whole city, so a building or a
     /// room that chose its route would decide for every other one how
-    /// the outside comes in (`crates/city/spec/ConfigLayers/Remote.lean` §8-39).
+    /// the outside comes in (`Sprawling/city/spec/ConfigLayers/Remote.lean` §8-39).
     Remote,
     /// The settings page edits the city's choice and lists each
     /// building's, so a room's choice would govern runs without
-    /// appearing anywhere a person looks (`crates/city/spec/ConfigLayers.lean` §8-4c).
+    /// appearing anywhere a person looks (`Sprawling/city/spec/ConfigLayers.lean` §8-4c).
     Search,
     /// An agent row names a program this machine runs as the person, so a
     /// building or a room that added one would start it for every room
-    /// below (`crates/city/spec/ConfigLayers.lean` §8-4f).
+    /// below (`Sprawling/city/spec/ConfigLayers.lean` §8-4f).
     Agents,
     /// The tool array sits ahead of the system prompt in a provider's
     /// cache, so rooms of one building that exposed different tools would
-    /// split that building's cache (`crates/city/spec/ConfigLayers.lean` §8-4g).
+    /// split that building's cache (`Sprawling/city/spec/ConfigLayers.lean` §8-4g).
     Catalog,
     /// A building references a definition instead of copying it; rooms
     /// receive their selection through their frozen CATALOG.toml.

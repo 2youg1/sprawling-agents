@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The one layer that is the person's rather than a city's
-//! (`crates/accounting/spec/Person.lean` §8-8).
+//! (`Sprawling/accounting/spec/Person.lean` §8-8).
 //!
 //! What somebody settled about how they read their cities — the
 //! language, the appearance, the chords they rebound — lives in
@@ -39,13 +39,13 @@ use crate::home::Home;
 /// spelling and read under another is a setting that never takes
 /// effect.
 const UI: &str = "ui";
-/// Performance settings adopted at serving startup (`crates/sprawling/Spec.lean` §8-93).
+/// Performance settings adopted at serving startup (`Sprawling/app/Spec.lean` §8-93).
 const CORE: &str = "core";
 /// The top-level key naming the city a launch with none named opens
-/// (`crates/accounting/spec/Person.lean` §8-8).
+/// (`Sprawling/accounting/spec/Person.lean` §8-8).
 const CITY: &str = "city";
 /// The top-level key giving the machine budget heavy work reserves from
-/// (`crates/accounting/spec/Person.lean` §8-8, `crates/runtime/spec/Reserve.lean` D104).
+/// (`Sprawling/accounting/spec/Person.lean` §8-8, `Sprawling/runtime/spec/Reserve.lean` D104).
 const MEMORY: &str = "memory";
 /// The spelling of `memory` that leaves the budget to the city.
 const AUTO: &str = "auto";
@@ -143,7 +143,7 @@ fn stated_city(file: &Path) -> Result<Option<PathBuf>, AxError> {
 /// section and key of the person's file keeps its value, but the file is
 /// written back from its parsed form, so comments are dropped and the
 /// order and layout of keys may change
-/// (`crates/accounting/spec/Person.lean` §8-8).
+/// (`Sprawling/accounting/spec/Person.lean` §8-8).
 ///
 /// # Errors
 /// Everything [`read`] returns; `E_CONFIG_INVALID` for a path that is
@@ -597,7 +597,7 @@ priority = \"normal\"
     }
 
     /// The body size floor holds at the file, the door a person writes
-    /// by hand (`crates/wire/spec/Preference.lean` D51): 11 is refused
+    /// by hand (`Sprawling/wire/spec/Preference.lean` D51): 11 is refused
     /// where it is read, and a size far above the page's old ceiling is
     /// read as written.
     #[test]

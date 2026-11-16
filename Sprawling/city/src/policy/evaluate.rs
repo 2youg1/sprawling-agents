@@ -19,7 +19,7 @@
 //! bytes, so the prose a resident reads and the settings the city
 //! enforces cannot describe two different buildings.
 //!
-//! Specified by `crates/city/spec/Policy.lean` §8-2.
+//! Specified by `Sprawling/city/spec/Policy.lean` §8-2.
 
 use std::path::Path;
 
@@ -35,7 +35,7 @@ use super::{
 /// Replaces a building's rules with a page's whole text, evaluated
 /// first, and only if the file still holds `base`: a page left open
 /// while the file was edited elsewhere must not write over that edit
-/// (`crates/city/spec/Policy.lean` §8-34).
+/// (`Sprawling/city/spec/Policy.lean` §8-34).
 ///
 /// The evaluation comes before the write, so the file on disk is always
 /// one this build can read: a governance document that stopped parsing
@@ -192,7 +192,7 @@ pub(crate) struct Written {
     desktop: bool,
     /// Absent is a building with no domain list, which reaches any host
     /// its browser keys allow; a list, empty included, is the only hosts
-    /// it reaches (`crates/city/spec/Policy.lean` D27).
+    /// it reaches (`Sprawling/city/spec/Policy.lean` D27).
     #[serde(default)]
     egress: Option<Vec<String>>,
     #[serde(default)]

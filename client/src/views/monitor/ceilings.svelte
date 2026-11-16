@@ -5,7 +5,7 @@
   // Copyright (c) 2026 2youg1 and the sprawling contributors
 
   // What a command's result said about the person's memory ceiling
-  // (crates/runtime/spec/Tools/Exec.lean D95), one line each, in the
+  // (Sprawling/runtime/spec/Tools/Exec.lean D95), one line each, in the
   // alert ink under the command: a run that reached the ceiling, a ceiling
   // that did not apply to the command, and a ceiling whose reaching cannot
   // be read are all failures the person asked to be told about. Both

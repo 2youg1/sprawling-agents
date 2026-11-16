@@ -4,19 +4,19 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One endpoint's permit gate, and the model face that passes it before
-//! a request leaves (`crates/gateway/Spec.lean` §8-6, D20).
+//! a request leaves (`Sprawling/gateway/Spec.lean` §8-6, D20).
 //!
 //! Every call takes a ticket and waits in arrival order; only the ticket
 //! at the head of the queue asks [`Permits`] for a permit, so who gets
 //! the next permit is decided by the ticket and not by which thread the
 //! operating system wakes. The order is proved in
-//! `crates/gateway/spec/Concurrency.lean` (`grants_follow_arrival`); the
+//! `Sprawling/gateway/spec/Concurrency.lean` (`grants_follow_arrival`); the
 //! proptest below checks this queue against it. The clock is the
 //! injected `fn() -> Instant`, so the gate behaves the same on Windows,
 //! macOS and Linux.
 //!
 //! Before a call takes its ticket it passes the prefix hold
-//! (`crates/gateway/spec/Concurrency.lean` §8-40): the first call to
+//! (`Sprawling/gateway/spec/Concurrency.lean` §8-40): the first call to
 //! reach a cold shared prefix sends one pre-warm of it, the calls with
 //! the same key wait for that one, and all of them then take tickets
 //! like any other call. The hold lives under the queue's lock and wakes
@@ -383,7 +383,7 @@ impl Gated {
     }
 
     /// Passes the prefix hold, takes a permit, and calls through `door`
-    /// (`crates/gateway/spec/Concurrency.lean` §8-40, steps one to five).
+    /// (`Sprawling/gateway/spec/Concurrency.lean` §8-40, steps one to five).
     fn through(
         &mut self,
         req: &ModelRequest,

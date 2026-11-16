@@ -5,7 +5,7 @@
 
 //! The address a person's own browser answers on.
 //!
-//! Specified by `crates/city/spec/Policy.lean` §8-2.
+//! Specified by `Sprawling/city/spec/Policy.lean` §8-2.
 
 use kernel::{AxCode, AxError};
 

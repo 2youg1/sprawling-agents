@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which directory entries a search walk descends into (`crates/runtime/spec/Tools/Search.lean`
+//! Which directory entries a search walk descends into (`Sprawling/runtime/spec/Tools/Search.lean`
 //! §8-30).
 
 use std::path::PathBuf;
@@ -41,7 +41,7 @@ pub(super) enum Step {
 /// character — is named among the unread with the reason the parse gave,
 /// because the walk could not look at it, and a silent pass would answer
 /// "nothing here" where the answer is "not looked at".
-/// Git's own metadata is inside that predicate too (`crates/kernel/spec/Address.lean` §8-73),
+/// Git's own metadata is inside that predicate too (`Sprawling/kernel/spec/Address.lean` §8-73),
 /// and scanning an object store yields hits nobody can act on.
 ///
 /// The read bound is asked only at the city root: it answers for a

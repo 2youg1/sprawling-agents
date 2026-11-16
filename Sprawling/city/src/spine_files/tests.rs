@@ -95,7 +95,7 @@ fn the_job_file_lands_in_the_room_and_says_what_the_run_was_asked_for() {
 
 /// A delegate's job file names the resident that handed it down, and a
 /// task or goal cannot close the element it sits in, whoever wrote it
-/// (`crates/city/spec/SpineFiles.lean` D21).
+/// (`Sprawling/city/spec/SpineFiles.lean` D21).
 #[test]
 fn the_job_file_names_who_handed_it_down_and_its_text_stays_in_its_element() {
     let dir = tempfile::tempdir().unwrap();

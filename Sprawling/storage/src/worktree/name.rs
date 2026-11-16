@@ -5,7 +5,7 @@
 
 //! Worktree names: one segment, no escape.
 //!
-//! Specified by `crates/storage/spec/Worktree.lean` §8-9.
+//! Specified by `Sprawling/storage/spec/Worktree.lean` §8-9.
 
 use crate::error::StorageError;
 

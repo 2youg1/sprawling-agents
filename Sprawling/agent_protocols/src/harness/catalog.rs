@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The ACP registry's index read as agent entries, and the snapshot of it
-//! this build ships (`crates/agent_protocols/Spec.lean` §8-19, D12, D13).
+//! this build ships (`Sprawling/agent_protocols/Spec.lean` §8-19, D12, D13).
 //!
 //! One reader for both: the snapshot `cargo xtask acp-catalog` commits is
 //! the CDN index with the fields this city does not read taken out, so a

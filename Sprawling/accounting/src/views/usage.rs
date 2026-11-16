@@ -5,7 +5,7 @@
 
 //! The usage table of every skill and every tool server, folded from the
 //! whole ledger after the view lock is released
-//! (`crates/accounting/spec/Views/Usage.lean` §8-34, accounting D49).
+//! (`Sprawling/accounting/spec/Views/Usage.lean` §8-34, accounting D49).
 //!
 //! What counts as a use is wire D33's: a skill read by a run whose
 //! `run_started` pinned it, and a call whose recorded effect names a tool
@@ -73,7 +73,7 @@ const EARLIER_DESCRIBE: &str = "describe";
 const EARLIER_CALL: &str = "call";
 /// The argument a ledger written before `read` took Claude Code's names
 /// named the file with; its lines keep it, because recorded calls are
-/// never re-spelled (`crates/runtime/spec/Tools.lean` D115).
+/// never re-spelled (`Sprawling/runtime/spec/Tools.lean` D115).
 const EARLIER_READ_PATH: &str = "path";
 
 /// Which of the three usage questions a page asked.

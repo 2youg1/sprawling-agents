@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The face of `tool` (`crates/runtime/Spec.lean` §8-60, §8-61): what an
+//! The face of `tool` (`Sprawling/runtime/Spec.lean` §8-60, §8-61): what an
 //! admitted capability is, read from the run's catalog, and the one way
 //! to run a tool that is not in the request's tool list. Its answers are
 //! ordinary tool results appended at the end of the conversation, so the
@@ -188,7 +188,7 @@ fn op(call: &ToolCall) -> Result<Op<'_>, AxError> {
 }
 
 /// The catalog's lock was left by a thread that died; the same answer
-/// `read` gives (`crates/runtime/spec/Tools/Read.lean`).
+/// `read` gives (`Sprawling/runtime/spec/Tools/Read.lean`).
 fn poisoned() -> AxError {
     AxError::failure(
         AxCode::StorageFatal,

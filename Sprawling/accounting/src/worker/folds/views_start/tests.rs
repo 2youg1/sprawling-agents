@@ -192,7 +192,7 @@ fn a_snapshot_that_cannot_be_cut_is_reported_and_the_views_still_serve() {
 
 /// A served city whose last opening cut both snapshots opens again from
 /// them: before the first byte it checks and folds only the lines written
-/// since, not the history before them (`crates/sprawling/Spec.lean` §8-122).
+/// since, not the history before them (`Sprawling/app/Spec.lean` §8-122).
 #[test]
 fn a_served_city_reopens_from_its_snapshots_and_folds_only_what_grew() {
     let dir = tempfile::tempdir().unwrap();
@@ -240,7 +240,7 @@ fn a_served_city_reopens_from_its_snapshots_and_folds_only_what_grew() {
 /// A one-shot rebuild checks each line once: from genesis the fold's own
 /// check is the proof, and from a snapshot with the proof records full it
 /// checks only what was written since - twice, once proving and once
-/// folding - at any length of history (`crates/accounting/spec/Views/Snapshot.lean` §8-19).
+/// folding - at any length of history (`Sprawling/accounting/spec/Views/Snapshot.lean` §8-19).
 #[test]
 fn a_rebuild_checks_each_line_once_whatever_the_length_of_history() {
     let hands = crate::worker::fixture::hands;

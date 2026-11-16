@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A city an earlier release kept beside the binary, and its one move
-//! to where this release keeps cities (`crates/sprawling/spec/Firstrun.lean`
+//! to where this release keeps cities (`Sprawling/app/spec/Firstrun.lean`
 //! §8-8).
 //!
 //! Releases up to 0.0.12 put a city nobody named in `<binary's
@@ -25,7 +25,7 @@ pub enum Homing {
     /// worktrees were pointed at it, or why their links could not be
     /// rewritten: the move stands either way, because a tree whose links
     /// git cannot follow is taken back and checked out again the next
-    /// time the city places one (`crates/sprawling/spec/Supervising.lean`).
+    /// time the city places one (`Sprawling/app/spec/Supervising.lean`).
     Moved {
         from: PathBuf,
         to: PathBuf,

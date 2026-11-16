@@ -6,7 +6,7 @@
 //! The post-wave sweep: what a checkpoint's tree holds and the working
 //! tree no longer does, as `file_discarded` payloads.
 //!
-//! Specified by `crates/storage/spec/Checkpoint.lean` §8-8.
+//! Specified by `Sprawling/storage/spec/Checkpoint.lean` §8-8.
 
 use kernel::Payload;
 use serde_json::{Map, Value};

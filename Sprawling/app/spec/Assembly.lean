@@ -6,9 +6,9 @@
 /-!
 # bin::assembly
 
-规定 `crates/sprawling/src/assembly.rs` 与 `crates/sprawling/src/assembly/`：装配根，造生产的手、接上端口、起线程、开城（`bin::assembly`）；开城的次序在 `spec/Assembly/Listening.lean`，审计线程的结局在 `spec/Assembly/ChainWatch.lean`。本文件是 `crates/sprawling/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
+规定 `Sprawling/app/src/assembly.rs` 与 `Sprawling/app/src/assembly/`：装配根，造生产的手、接上端口、起线程、开城（`bin::assembly`）；开城的次序在 `spec/Assembly/Listening.lean`，审计线程的结局在 `spec/Assembly/ChainWatch.lean`。本文件是 `Sprawling/app/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `Sprawling/app/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
 
-本文件是描述，不是被证明的规格：它不含 Lean 定义与定理，它说的每一条由各节点名的测试判。城的唯一写者 `RunWorker` 住 `accounting` crate（`crates/accounting/src/worker/`），§8-7、§8-39、§8-51、§8-102、§8-165 与 D16 说的是那个写者被装配层用到的那一面；`accounting::worker::…` 这样的路径指的就是那个 crate。
+本文件是描述，不是被证明的规格：它不含 Lean 定义与定理，它说的每一条由各节点名的测试判。城的唯一写者 `RunWorker` 住 `accounting` crate（`Sprawling/accounting/src/worker/`），§8-7、§8-39、§8-51、§8-102、§8-165 与 D16 说的是那个写者被装配层用到的那一面；`accounting::worker::…` 这样的路径指的就是那个 crate。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `bin::assembly::dropping`、`bin::assembly::remote_door` 旁的测试守住。
 -/
@@ -27,10 +27,10 @@ pub fn acp_dispatch(desk: &CommandDesk, body: &serde_json::Value, pairing: wire:
 -/
 
 /-!
-## 8-15 装配层的公开面（`crates/sprawling/src/lib.rs`、`assembly.rs`）
+## 8-15 装配层的公开面（`Sprawling/app/src/lib.rs`、`assembly.rs`）
 
 ```rust
-// crates/sprawling/src/lib.rs —— 索引文件，只准声明（modmap 看守）
+// Sprawling/app/src/lib.rs —— 索引文件，只准声明（modmap 看守）
 pub mod assembly; pub mod audience; pub mod console; pub mod doctor; pub mod firstrun;
 pub mod monitor; pub mod release; pub mod serving; pub mod supervising;
 mod browser_bidi; mod browser_tool; mod keying; mod outside; mod revealing;
@@ -49,18 +49,18 @@ impl Listening {
 
 `InitReport`、`Adopt` 住 `accounting::worker::genesis`，`RunWorker`、`ScanReport` 住 `accounting::worker`，`History`／`has_history` 住 `city::history`，`open_vault` 与 `Serving` 住 `bin::serving`；装配层只把它们接起来。
 
-- **为什么有 lib target**：只有 `src/main.rs` 时，工作区里没有任何东西能依赖装配层，citysim 与 `tests/` 都够不到它。`crates/sprawling/tests/assembly_door.rs` 走的正是这扇门：`init_city` 造城，再读 `InitReport.ledger_dir` 下的账本。
+- **为什么有 lib target**：只有 `src/main.rs` 时，工作区里没有任何东西能依赖装配层，citysim 与 `tests/` 都够不到它。`Sprawling/app/tests/assembly_door.rs` 走的正是这扇门：`init_city` 造城，再读 `InitReport.ledger_dir` 下的账本。
 - **`pub mod` 而非扁平 facade**：模块表以 `bin::assembly`／`bin::console`／`bin::firstrun` 命名模块，模块名本身是已记录的架构事实；本 crate `publish = false`，C-REEXPORT 要替第三方省的那段路径没有受益人。**取窄的地方在项，不在模块**：只有跨出 crate 的项是 `pub`，其余留 `pub(crate)` 或 `pub(super)`。
 - **`install` 与 `wire_client` 留在 bin**：前者把二进制放上 PATH，后者从终端连一座已服务的城并从 stdin 读 enrolment——两者都是关于命令行的，不是关于城的。
 - **`Cargo.toml` 不分 target 配置**：Cargo 对同一 package 自动发现 `src/lib.rs` 与 `src/main.rs` 两个 target，OUT_DIR 对两者相同，`include!(client_embed.rs)` 与 `DEPENDENCIES` 因此留在 `main.rs`。
 - **门禁**：`header` 要求 `lib.rs` 带 MPL 通告；`modmap` 对 `*/lib.rs` 按索引文件判定，只准 `mod`／`use`／`pub use`／注释／属性。
-- **citysim 不是第二个装配层**：`crates/citysim/Cargo.toml` 不依赖 sprawling，`run_scenario` 手工构造 `RunPlan`，够到的最高层是 `runtime::run::drive`；装配层可被依赖，但 citysim 不依赖它。
+- **citysim 不是第二个装配层**：`Tools/citysim/Cargo.toml` 不依赖 sprawling，`run_scenario` 手工构造 `RunPlan`，够到的最高层是 `runtime::run::drive`；装配层可被依赖，但 citysim 不依赖它。
 -/
 
 /-!
 ## 8-39 写者是一棵模块树（`accounting::worker::*`）
 
-`RunWorker` 的定义在 `crates/accounting/src/worker.rs`，它的方法按字段簇散进 `worker/` 下的子模块（`credentials`、`workbench`、`settling`、`reviewing`、`commanding`、`driving`、`dispatching`、`waking`、`genesis`、`lifetime` 等），每个文件守 `xtask length` 的上限。下面说的是它的切法，不是一份文件清单；文件清单是 ARCHITECTURE 的模块表。
+`RunWorker` 的定义在 `Sprawling/accounting/src/worker.rs`，它的方法按字段簇散进 `worker/` 下的子模块（`credentials`、`workbench`、`settling`、`reviewing`、`commanding`、`driving`、`dispatching`、`waking`、`genesis`、`lifetime` 等），每个文件守 `xtask length` 的上限。下面说的是它的切法，不是一份文件清单；文件清单是 ARCHITECTURE 的模块表。
 
 - **子模块，不是兄弟模块**：子模块看得见父模块的私有项（Rust Reference，*Visibility and Privacy*："If an item is private, it may be accessed by the current module and its descendants"），所以 `RunWorker` 的字段保持私有，跨文件调用收成 `pub(in crate::worker)`，`worker` 之外看到的仍是同一张脸。
 - **缝取自字段簇，不取行数**：`city_root`、`ledger`、`governance` 被多数方法碰；其余字段成簇不交叉——凭据（`vault`）落 `credentials`，工作台与收尾（`inboxes`／`joins`／`requests`／`goals`）落 `workbench` 与 `settling`，追求（`pursuits`／`delegator`）落 `plans`，打断与观察落 `driving`，敲门（`knocks`）落 `waking`。`settle_requests` 回答「一个不能直接写的楼怎么收下这次改动」，所以住 `reviewing`；`create_building`／`adopt_building`／`startup_scan` 回答一座城怎么长出楼、重启后看见什么，所以住 `genesis`；`configure_building` 是人发的一个动词，住 `commanding::configure`。
@@ -92,7 +92,7 @@ pub(crate) fn handoff_probe() -> Result<Probe, AxError>;   // 名 handoff、版�
 /-!
 ## 8-165 Assembly 显式化：接线是一处，判定住折叠，搬运是值
 
-- **接线是一处**：把一个选择变成一个模型适配器只在 `gateway::adapter_for`（`crates/gateway/src/endpoint/adapter.rs`，与 `Endpoint::new` 同簇）发生，凭据由调用方以 `resolver` 递入；`accounting::worker::credentials` 只出 `resolver`（赎回闭包是凭据的形状），不在 `RunWorker` 上挂装配线。值参而非方法，因为 `adapter_for` 读的只有选择与 `resolver`，挂在 `RunWorker` 上等于说「装配需要整座城」。
+- **接线是一处**：把一个选择变成一个模型适配器只在 `gateway::adapter_for`（`Sprawling/gateway/src/endpoint/adapter.rs`，与 `Endpoint::new` 同簇）发生，凭据由调用方以 `resolver` 递入；`accounting::worker::credentials` 只出 `resolver`（赎回闭包是凭据的形状），不在 `RunWorker` 上挂装配线。值参而非方法，因为 `adapter_for` 读的只有选择与 `resolver`，挂在 `RunWorker` 上等于说「装配需要整座城」。
 - **停摆判定只有一处**：`halted_by`（`accounting::worker::commanding::governing`，`pub(in crate::worker)`）读本进程的 `governance` 折叠（`HALTED`／`RELEASED`），每个调用点走它。它不进 kernel：它答的是折叠状态，不是纯函数能回答的问题，搬进 kernel 等于把 `Governance` 一起搬过去。
 - **适配器随值来去**：`Driving` 拥有它的适配器（`accounting::worker::keeping_warm::Door`），drive 结束时经 `Driven.adapter` 交回，调用方拆开归位；`&mut` 出借会把「谁拥有适配器」悬在一次调用上。`Site` 一侧的 `adapter` 是 `Option<Door>`，只是这次搬运的载具，跨过调用时两端皆为 `Some`；`None` 分支以 `E_CONFIG_INVALID` 拒绝而不 panic（§8-40 的先例）。
 - **定时只有一个 `last_*`**：`last_tick` 的读写只在 `commanding::routing` 的 `tick`（读表→判断到期→推进）；它是写者状态而不是散装轮询，删它等于删掉「开机不补跑昨日」这条产品语义（§8-6）。
@@ -114,7 +114,7 @@ pub(crate) fn handoff_probe() -> Result<Probe, AxError>;   // 名 handoff、版�
 -/
 
 /-!
-## 8-134 页面读到历史证明到哪里（`accounting::views::city`、`bin::assembly::listening`、`bin::assembly::attending`；`crates/wire/Spec.lean` §8-63）
+## 8-134 页面读到历史证明到哪里（`accounting::views::city`、`bin::assembly::listening`、`bin::assembly::attending`；`Sprawling/wire/Spec.lean` §8-63）
 
 服务中的城在后台证明整条链（§8-90、§8-122），证明完成之前写者拒绝每一次追加。页面需要在同一刻知道这件事，否则一次被拒的命令看起来是坏了。`CityAnswer.proved` 回答它。
 
@@ -125,7 +125,7 @@ pub(crate) fn handoff_probe() -> Result<Probe, AxError>;   // 名 handoff、版�
 -/
 
 /-!
-## 8-56 说出来的那句话：录音进城，一行字出来（`accounting::views::hearing`、`bin::assembly::listening::hearing`；`crates/wire/Spec.lean` §8-27）
+## 8-56 说出来的那句话：录音进城，一行字出来（`accounting::views::hearing`、`bin::assembly::listening::hearing`；`Sprawling/wire/Spec.lean` §8-27）
 
 `gateway::transcribe` 是转写的适配器；本节是从 `/transcribe` 走到它的那条路。
 
@@ -141,7 +141,7 @@ pub(crate) fn handoff_probe() -> Result<Probe, AxError>;   // 名 handoff、版�
 /-!
 ## 8-102 开城时修过什么，要说给人（`accounting::worker::lifetime`、`accounting::worker::genesis`、`bin::assembly::attending`）
 
-**原因**：`JsonlLedger::open` 在断尾恢复时截掉撑裂的尾行，并返回 `OpenReport`（`crates/storage/Spec.lean` §8-1）。账上虽然多了一行 `log_truncated`，但页面不画它，CLI 也不读它；报告若被丢掉，人就不知道上一次进程死时丢了几个字节。
+**原因**：`JsonlLedger::open` 在断尾恢复时截掉撑裂的尾行，并返回 `OpenReport`（`Sprawling/storage/Spec.lean` §8-1）。账上虽然多了一行 `log_truncated`，但页面不画它，CLI 也不读它；报告若被丢掉，人就不知道上一次进程死时丢了几个字节。
 
 **形状**：值（形状 2）。`RunWorker` 持有 `LedgerOpening`，它是 `OpenReport` 在本 crate 的类型化状态，只由 `LedgerOpening::from(OpenReport)` 生成：
 
@@ -172,7 +172,7 @@ impl RunWorker {
 /-!
 ## 8-119 拖进对话框的文件存进城里（`bin::assembly::dropping`，形状：adapter）
 
-浏览器不把被拖进页面的文件的绝对路径告诉页面。拖放携带 `file://` URI（`text/uri-list`）时页面直接用那条本地路径，不经过城；否则页面把字节经本页同源的 `POST /drop`（`crates/wire/Spec.lean` §8-49）交给城，城存下它，答出它的绝对路径，页面把这条路径插进对话框。本节是城这一半。
+浏览器不把被拖进页面的文件的绝对路径告诉页面。拖放携带 `file://` URI（`text/uri-list`）时页面直接用那条本地路径，不经过城；否则页面把字节经本页同源的 `POST /drop`（`Sprawling/wire/Spec.lean` §8-49）交给城，城存下它，答出它的绝对路径，页面把这条路径插进对话框。本节是城这一半。
 
 **接口。**
 
@@ -190,7 +190,7 @@ pub(super) fn dropping(city_root: PathBuf) -> wire::DropSink;   // listening 把
 
 **决定。**
 
-1. **存在 hall 的 `dropped/` 下，而不是保留子树 `.sprawling/` 或城根下自己的目录。** 居民的 `read` 只收城内相对地址，并且不进保留子树（`crates/runtime/Spec.lean` `tools::chosen_path`）；放进 `.sprawling/` 的文件人能看见，市长却读不到。城根下每个顶层目录都是一栋楼（`city::buildings`），放在城根下的 `dropped/` 会作为一栋楼出现在城里和工作区的菜单里。hall 是每座城都有的楼（`kernel::consts_policy::HALL_BUILDING`），市长在自己的楼里读它，其他楼按 `kernel::address::may_read` 读它（除非 hall 的规则把它标为机密），而绝对路径的末尾就是那条相对地址。
+1. **存在 hall 的 `dropped/` 下，而不是保留子树 `.sprawling/` 或城根下自己的目录。** 居民的 `read` 只收城内相对地址，并且不进保留子树（`Sprawling/runtime/Spec.lean` `tools::chosen_path`）；放进 `.sprawling/` 的文件人能看见，市长却读不到。城根下每个顶层目录都是一栋楼（`city::buildings`），放在城根下的 `dropped/` 会作为一栋楼出现在城里和工作区的菜单里。hall 是每座城都有的楼（`kernel::consts_policy::HALL_BUILDING`），市长在自己的楼里读它，其他楼按 `kernel::address::may_read` 读它（除非 hall 的规则把它标为机密），而绝对路径的末尾就是那条相对地址。
 2. **目录按内容命名。** 用时间或序号命名，同一个文件拖两次就是两份；用名字命名，两个同名的文件互相覆盖。内容哈希让两件事都不发生，也不需要任何状态。
 3. **名字交给地址文法判，不另写一份清洗规则。** 一条存得下却不能被读成地址的路径，居民拿到了也打不开；地址文法已经是「城里什么路径合法」的唯一回答。
 
@@ -198,7 +198,7 @@ pub(super) fn dropping(city_root: PathBuf) -> wire::DropSink;   // listening 把
 -/
 
 /-!
-## 8-151 `/remote open` 按城的 `[remote]` 选通路（`bin::assembly::remote_door`，形状：adapter；`crates/city/Spec.lean` §8-39，crates/remote_access/Spec.lean §8-7 到 §8-9、D22）
+## 8-151 `/remote open` 按城的 `[remote]` 选通路（`bin::assembly::remote_door`，形状：adapter；`Sprawling/city/Spec.lean` §8-39，Sprawling/remote_access/Spec.lean §8-7 到 §8-9、D22）
 
 §8-139 的门有了看守、监听与中继，但没有一条通路能把它从这台电脑之外够到。这一节把城的 `[remote]` 表接到 `remote_access::route` 这条缝上。
 
@@ -211,16 +211,16 @@ const ROUTE_PATIENCE: TimeoutMs = TimeoutMs(30_000);     // 一次 open 最长�
 fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError>;
 ```
 
-- **一处选择**：`chosen` 读 `city::remote_route`（`crates/city/Spec.lean` §8-39），对 `RemoteRoute` 穷尽匹配：`Cloudflare` 造 `NamedTunnel`，`tunnel` 经 `TunnelName::parse`、`url` 经 `PublicUrl::parse`，程序是 `command`，不写时是 `cloudflared`；`Command` 造 `CommandRoute`，`command` 是程序，`args` 照写，`HostPermanence` 一对一换成 `Permanence`。生产里造通路的只有这一处；`Outdoors::keep` 把一个读城根的闭包交给 `Keeping.choose`，门在每次 `open` 时调它（§8-139）。
+- **一处选择**：`chosen` 读 `city::remote_route`（`Sprawling/city/Spec.lean` §8-39），对 `RemoteRoute` 穷尽匹配：`Cloudflare` 造 `NamedTunnel`，`tunnel` 经 `TunnelName::parse`、`url` 经 `PublicUrl::parse`，程序是 `command`，不写时是 `cloudflared`；`Command` 造 `CommandRoute`，`command` 是程序，`args` 照写，`HostPermanence` 一对一换成 `Permanence`。生产里造通路的只有这一处；`Outdoors::keep` 把一个读城根的闭包交给 `Keeping.choose`，门在每次 `open` 时调它（§8-139）。
 - **拒绝原样交出**：没配 `[remote]` → city 的那句拒绝（`E_CONFIG_INVALID`，主体是城那一层的文件，恢复语写出两种通路必需的键）；隧道名、地址写错 → `remote_access` 的拒绝（`E_CONFIG_INVALID`）；程序起不来 → `E_TOOL_UNAVAILABLE`，主体带程序名；到时没就绪 → `E_TIMEOUT`。每一种都发生在门打开之前：门关着，通路没开，账上没有一行。
-- **耐心 30 秒**：`cloudflared` 连上边缘通常要一到数秒（crates/remote_access/Spec.lean §14），一条包着 `tailscale serve` 的命令更快。`open` 在控制台的线程上等，门的锁这段时间握着，所以等太久的代价是控制台看起来像停了。30 秒够一次慢网络；改它就是改人敲下 `/remote open` 之后最长等多久。
-- **绑定之后的地址**：`Outdoors` 与另外三个读者——`bin::main::city` 印的横幅、控制台 `/serving` 印的地址、打开浏览器探的地址——读的都是绑定之后的地址：`wire::Bound::local_addr`（`crates/wire/Spec.lean` §8-46，wire D16）在绑定时读一次，`assembly::listening` 经 `Listening::local_addr` 把它交给 `Outdoors::new` 与这三个读者。城在 `:0` 上服务时，中继连的是系统分到的那个端口，端到端测试因此在 `127.0.0.1:0` 上起城。**被否**：`listening` 先在 `:0` 上试绑一次拿到端口、放掉，再把具体端口交给 `wire::bind`（试绑与真绑之间别的进程可以把端口拿走，`crates/wire/Spec.lean` §8-46 已否这一做法）。
+- **耐心 30 秒**：`cloudflared` 连上边缘通常要一到数秒（Sprawling/remote_access/Spec.lean §14），一条包着 `tailscale serve` 的命令更快。`open` 在控制台的线程上等，门的锁这段时间握着，所以等太久的代价是控制台看起来像停了。30 秒够一次慢网络；改它就是改人敲下 `/remote open` 之后最长等多久。
+- **绑定之后的地址**：`Outdoors` 与另外三个读者——`bin::main::city` 印的横幅、控制台 `/serving` 印的地址、打开浏览器探的地址——读的都是绑定之后的地址：`wire::Bound::local_addr`（`Sprawling/wire/Spec.lean` §8-46，wire D16）在绑定时读一次，`assembly::listening` 经 `Listening::local_addr` 把它交给 `Outdoors::new` 与这三个读者。城在 `:0` 上服务时，中继连的是系统分到的那个端口，端到端测试因此在 `127.0.0.1:0` 上起城。**被否**：`listening` 先在 `:0` 上试绑一次拿到端口、放掉，再把具体端口交给 `wire::bind`（试绑与真绑之间别的进程可以把端口拿走，`Sprawling/wire/Spec.lean` §8-46 已否这一做法）。
 
 **测试**：
 
 - `assembly::remote_door::tests::a_city_with_no_remote_table_is_refused_naming_the_table`：城那一层没有 `[remote]`，`chosen` 答 `E_CONFIG_INVALID`，恢复语里有 `route`、`tunnel`、`url`、`command`、`permanence`。
 - `assembly::remote_door::tests::the_route_the_table_names_is_the_one_that_opens`：`command` 一臂写一个不存在的程序，打开时的拒绝是 `E_TOOL_UNAVAILABLE` 且主体带那个程序名；`cloudflare` 一臂写同样不存在的程序，拒绝的恢复语说装上 `cloudflared`；`cloudflare` 一臂的 `url` 写成 `http://`，造的那一刻就以 `E_CONFIG_INVALID` 拒。
-- `crates/sprawling/tests/remote_door.rs::a_device_reaches_the_city_through_the_door_over_real_sockets`：`assembly::init_city` 造城，城那一层写 `[remote] route = "command"`，命令是这个测试程序自己（`route_stand_in`，一个只在被当作通路时做事的被忽略的测试：它从 `SPRAWLING_REMOTE_LOCAL` 读到回环地址，印出 `{"url": "https://<那个地址>"}` 后等着被结束），于是「外面」就是回环本身。起 `sprawling serve <城> 127.0.0.1:0 --console`，在它的标准输入上打 `/remote open`、`/remote pair phone`，从印出的链接读出配对码与指纹；设备一侧用 `remote_access` 在 `/remote/pair` 上配对、在 `/remote/session` 上建会话；会话里发线协议的 `Hello`、一个 `Read` 帧（`Ask` `Metrics`，答回 `Answered`）、一个 `Act` 帧（`Halt` 全城，设备收到 `city_halted` 的事件帧）与一个 `LocalOnly` 帧（`Reveal`，答回 `E_GATE_DENIED` 的 `Refusal`）；再打 `/remote close`。结束城之后读账：远程门的四行与 `city_halted` 依次是 `remote_opened`、`device_paired`、`remote_session_started`、`city_halted`、`remote_closed`。
+- `Sprawling/app/tests/remote_door.rs::a_device_reaches_the_city_through_the_door_over_real_sockets`：`assembly::init_city` 造城，城那一层写 `[remote] route = "command"`，命令是这个测试程序自己（`route_stand_in`，一个只在被当作通路时做事的被忽略的测试：它从 `SPRAWLING_REMOTE_LOCAL` 读到回环地址，印出 `{"url": "https://<那个地址>"}` 后等着被结束），于是「外面」就是回环本身。起 `sprawling serve <城> 127.0.0.1:0 --console`，在它的标准输入上打 `/remote open`、`/remote pair phone`，从印出的链接读出配对码与指纹；设备一侧用 `remote_access` 在 `/remote/pair` 上配对、在 `/remote/session` 上建会话；会话里发线协议的 `Hello`、一个 `Read` 帧（`Ask` `Metrics`，答回 `Answered`）、一个 `Act` 帧（`Halt` 全城，设备收到 `city_halted` 的事件帧）与一个 `LocalOnly` 帧（`Reveal`，答回 `E_GATE_DENIED` 的 `Refusal`）；再打 `/remote close`。结束城之后读账：远程门的四行与 `city_halted` 依次是 `remote_opened`、`device_paired`、`remote_session_started`、`city_halted`、`remote_closed`。
 -/
 
 /-! D16 远程门的五行经 worker 的 relay 写，不经命令桌
@@ -230,12 +230,12 @@ fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError>;
 
 /-! D17 通路在每次 `/remote open` 时按 `[remote]` 造出，随门开、随门关（§8-151）
 
-人改了城的 `[remote]`，下一次 `/remote open` 就用新的通路，不必重启城：城的签名密钥只活在这个进程里（crates/remote_access/Spec.lean §3），重启一次，每台设备都要重新配对。选择只有 `remote_door::chosen` 一处，它对 `city::RemoteRoute` 穷尽匹配，`Doorway` 只认 `Route` 这条缝。**被否**：开城时读一次、把造好的通路放进 `Keeping`（改了配置要重启城，代价是全部设备重新配对；配错的 `[remote]` 还会让 `/remote devices`、`/remote revoke` 这些与通路无关的动词一起失效）；让 `remote_access` 的通路类型自己从 TOML 读出（第二个配置读者，梯子与拒法要再写一遍，remote_access D22）。**重开参数**：通路的打开变得昂贵到要在开城时预热，或一座城要同时开着几条通路。
+人改了城的 `[remote]`，下一次 `/remote open` 就用新的通路，不必重启城：城的签名密钥只活在这个进程里（Sprawling/remote_access/Spec.lean §3），重启一次，每台设备都要重新配对。选择只有 `remote_door::chosen` 一处，它对 `city::RemoteRoute` 穷尽匹配，`Doorway` 只认 `Route` 这条缝。**被否**：开城时读一次、把造好的通路放进 `Keeping`（改了配置要重启城，代价是全部设备重新配对；配错的 `[remote]` 还会让 `/remote devices`、`/remote revoke` 这些与通路无关的动词一起失效）；让 `remote_access` 的通路类型自己从 TOML 读出（第二个配置读者，梯子与拒法要再写一遍，remote_access D22）。**重开参数**：通路的打开变得昂贵到要在开城时预热，或一座城要同时开着几条通路。
 -/
 
 /-! D18 远程门的端到端测试用 Rust 写，起真二进制（§8-151）
 
-黑盒检查按 `xtask boundary` 归 `crates/adversary/` 的 Lean，可设备那一半的配对握手、会话握手与封装（ML-KEM、ML-DSA、AES-GCM）只在 `remote_access` 里有实现，Lean 那一侧今天说不了远程门的话；在 Lean 里再实现一遍，就是第二份密码学。所以 `crates/sprawling/tests/remote_door.rs` 起 `sprawling serve`，以 `remote_access` 的设备一侧走真套接字，起二进制与开 WebSocket 的几行各带 `boundary-ok`。**被否**：在进程内驱动 `bin::outside`（`outside` 不是库的公开面，而且那样测不到控制台读 `/remote open`、装配层读 `[remote]`、命令通路起子进程这三段生产路径）。**重开参数**：`crates/adversary/` 有了一个能做混合签名与封装的设备，这条测试就搬过去，`boundary-ok` 随之删掉。
+黑盒检查按 `xtask boundary` 归 `Tools/adversary/` 的 Lean，可设备那一半的配对握手、会话握手与封装（ML-KEM、ML-DSA、AES-GCM）只在 `remote_access` 里有实现，Lean 那一侧今天说不了远程门的话；在 Lean 里再实现一遍，就是第二份密码学。所以 `Sprawling/app/tests/remote_door.rs` 起 `sprawling serve`，以 `remote_access` 的设备一侧走真套接字，起二进制与开 WebSocket 的几行各带 `boundary-ok`。**被否**：在进程内驱动 `bin::outside`（`outside` 不是库的公开面，而且那样测不到控制台读 `/remote open`、装配层读 `[remote]`、命令通路起子进程这三段生产路径）。**重开参数**：`Tools/adversary/` 有了一个能做混合签名与封装的设备，这条测试就搬过去，`boundary-ok` 随之删掉。
 -/
 
 /-!

@@ -23,7 +23,7 @@
   // thing glass has to keep apart from what it carries.
   const BEHIND = Array.from(
     { length: 9 },
-    (_, n) => `crates/city/src/document.rs:${String(40 + n * 7)} reads the version the person saw`,
+    (_, n) => `Sprawling/city/src/document.rs:${String(40 + n * 7)} reads the version the person saw`,
   );
 
   const CORNERS: readonly { readonly box: string; readonly size: string }[] = [

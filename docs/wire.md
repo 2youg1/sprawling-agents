@@ -128,8 +128,8 @@ The ones whose arguments need saying:
 
 `select_model` also accepts `input`, an optional statement of the model's
 accepted input kinds. Omit it to use the catalogue and preset fallback;
-[the command definition](../crates/wire/src/command/kind.rs) and
-[InputKinds](../crates/kernel/src/event/record/endpoint.rs) define the field
+[the command definition](../Sprawling/wire/src/command/kind.rs) and
+[InputKinds](../Sprawling/kernel/src/event/record/endpoint.rs) define the field
 and its values.
 
 An `idem` is `idem1-` followed by 32 lowercase hexadecimal characters. Mint
@@ -166,9 +166,9 @@ name the active runs and a recent or top-billed few; `run_view` and
 `{"monitor":"watch"}` watches the city's counters;
 `{"monitor":"watch_summary"}` watches the summary alone. Readings follow the
 city's current sampling beat, as defined by
-[the sampler](../crates/sprawling/src/monitor/sampler.rs).
+[the sampler](../Sprawling/app/src/monitor/sampler.rs).
 `{"monitor":{"beat":250}}` sets and remembers the city's sampling interval
-in milliseconds; [BeatMs](../crates/wire/src/frames/monitor.rs) defines its
+in milliseconds; [BeatMs](../Sprawling/wire/src/frames/monitor.rs) defines its
 valid range and initial default. `{"monitor":"release"}` or closing the
 connection stops that connection's watch.
 

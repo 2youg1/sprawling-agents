@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One model's identity across providers (`crates/gateway/spec/Provider/Identity.lean`
+//! One model's identity across providers (`Sprawling/gateway/spec/Provider/Identity.lean`
 //! §8-38).
 
 use crate::endpoint::ModelFacts;

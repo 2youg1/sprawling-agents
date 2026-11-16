@@ -6,10 +6,10 @@
 //! The version of one subject: a counter that starts at
 //! [`Version::FIRST`] and only moves forward, checked. A signal records
 //! the version of the room it was sent to (`room_version`).
-//! The part `crates/kernel/spec/Version.lean` specifies this module.
+//! The part `Sprawling/kernel/spec/Version.lean` specifies this module.
 //!
 //! A file a run edits is guarded by the run's own read, not by a
-//! version (`crates/runtime/Spec.lean` §8-64), so no write
+//! version (`Sprawling/runtime/Spec.lean` §8-64), so no write
 //! judges freshness here.
 
 use serde::{Deserialize, Serialize};

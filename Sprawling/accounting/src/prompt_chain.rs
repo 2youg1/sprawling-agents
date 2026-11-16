@@ -5,7 +5,7 @@
 
 //! The conventions a run at an address is sent, and how each one is
 //! read: through the read bound its building gives, the judgement the
-//! `read` tool gives a path (`crates/accounting/Spec.lean` §8-38).
+//! `read` tool gives a path (`Sprawling/accounting/Spec.lean` §8-38).
 //!
 //! The freeze and the layers answer both read here, so what a page says
 //! the next run receives is what the next run receives. A prefix is sent
@@ -219,7 +219,7 @@ fn read_nested(
 }
 
 /// What a run of `home` may read by a path: the read bound, closed over
-/// the building and this city's rules (`crates/city/Spec.lean` §8-2).
+/// the building and this city's rules (`Sprawling/city/Spec.lean` §8-2).
 ///
 /// Another building's rules are read each time a path lands in it, not
 /// here, so a run that stays in its own building never pays for them,

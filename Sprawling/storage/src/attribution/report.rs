@@ -20,7 +20,7 @@
 //! and nowhere else. This module never prices a call — that authority is
 //! `gateway::cost`, and a second one would be a second answer.
 //!
-//! Specified by `crates/storage/spec/Attribution.lean` §8-7.
+//! Specified by `Sprawling/storage/spec/Attribution.lean` §8-7.
 
 //! Attribution reports: what each wave billed.
 
@@ -305,7 +305,7 @@ impl Attribution {
 /// The tokens of one call's `usage`: input and output, the only two
 /// disjoint counts — the dialect layer normalizes `input_tokens` to
 /// the whole prompt, cache reads and writes included
-/// (`crates/gateway/spec/Dialect.lean` §8-1), so adding the cache counts
+/// (`Sprawling/gateway/spec/Dialect.lean` §8-1), so adding the cache counts
 /// again would count the cached part twice. A call that reported no
 /// usage used no tokens anyone measured.
 fn usage_tokens(data: &serde_json::Map<String, Value>) -> u64 {

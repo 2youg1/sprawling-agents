@@ -5,7 +5,7 @@
 
 //! What a `tool` `run` stands for, and whether its arguments fit the top
 //! level of the named tool's input schema
-//! (`crates/runtime/spec/Catalog.lean` `resolveCall`, §8-61).
+//! (`Sprawling/runtime/spec/Catalog.lean` `resolveCall`, §8-61).
 //!
 //! Only the top level is checked: the arguments are an object, every
 //! `required` key is present, every declared `type` matches, and no key

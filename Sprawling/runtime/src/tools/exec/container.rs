@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Container daemon admission and direct create argv
-//! (`crates/runtime/spec/Tools/Exec/Container.lean`). A successful admission
+//! (`Sprawling/runtime/spec/Tools/Exec/Container.lean`). A successful admission
 //! is a daemon capability statement; it is not an isolation measurement.
 //! The caller must inspect the image and created container before start,
 //! and hand daemon cancellation to the existing backlog with the CLI child.

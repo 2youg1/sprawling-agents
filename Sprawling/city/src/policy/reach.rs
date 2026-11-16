@@ -6,7 +6,7 @@
 //! What a building's residents may write inside their prefixes, as one
 //! line of `RULES.toml` decides it (`DomainReach`).
 //!
-//! Specified by `crates/city/spec/Policy.lean` §8-20.
+//! Specified by `Sprawling/city/spec/Policy.lean` §8-20.
 
 use kernel::{AxCode, AxError};
 

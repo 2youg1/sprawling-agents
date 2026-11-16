@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Public exec/Backlog daemon regressions (`crates/runtime/spec/Tools/Exec/Container.lean`).
+//! Public exec/Backlog daemon regressions (`Sprawling/runtime/spec/Tools/Exec/Container.lean`).
 
 use super::*;
 use serde_json::json;

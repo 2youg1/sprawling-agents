@@ -6,7 +6,7 @@
 /-!
 # gateway::dialect::responses
 
-规定 `dialect::responses`（`crates/gateway/src/dialect/responses.rs`）：第三支笔：OpenAI responses 面。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+规定 `dialect::responses`（`Sprawling/gateway/src/dialect/responses.rs`）：第三支笔：OpenAI responses 面。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `Sprawling/gateway/Spec.lean §8-n`。
 
 请求与最终 reply 的接口由文字描述；stream 的保留性质由下方模型证明，Rust 实现由 `gateway::dialect::responses::reply`、`gateway::dialect::responses::request`、`gateway::dialect::responses::stream` 旁的测试守住。
 -/
@@ -43,7 +43,7 @@
 `response_from` 决定；缺字段的 terminal 不覆盖已有答案，存在的 null 仍交给原解析器拒绝。
 端点保留全部帧到 EOF，error 不阻断后续 delta；读失败或 silence 先于结算的 error 与 terminal。
 两槽在线保留方案虽减少长流存储与耗时，却在匹配测量中出现小流回退，因此采用帧缓冲；
-性能接受条件与读数由 `crates/xtask/budgets.toml` 的 `[responses_stream]` 持有。
+性能接受条件与读数由 `Tools/xtask/budgets.toml` 的 `[responses_stream]` 持有。
 落选：提前返回 error 会改变 EOF 与错误优先级；在线 projection 尚不满足性能接受条件。
 模型只描述 EOF 结算的语义 projection，不描述读取期间的帧数或字节数；Nat 是不透明
 response、error、delta 身份，解析器不是模型的第二份。

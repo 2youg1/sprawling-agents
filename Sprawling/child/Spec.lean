@@ -5,7 +5,7 @@
 
 /-! # child 的规格
 
-`sprawling-child`（库名 `child`，目录 `crates/child`，不依赖任何 crate）是城起一个子进程时唯一的构造点：`child::command(program)` 交回一个 `std::process::Command`，它已经脱离城的控制台、放进自己的进程组，并去掉了城的秘密所在的环境变量。本文件是 crate 的规格入口；它没有状态机，十七节都是说明，不是证明，接口由 Rust 的类型与 `child::environment::tests` 守住。决定写作 `D<n>`，别处引作 `child D<n>`。
+`sprawling-child`（库名 `child`，目录 `Sprawling/child`，不依赖任何 crate）是城起一个子进程时唯一的构造点：`child::command(program)` 交回一个 `std::process::Command`，它已经脱离城的控制台、放进自己的进程组，并去掉了城的秘密所在的环境变量。本文件是 crate 的规格入口；它没有状态机，十七节都是说明，不是证明，接口由 Rust 的类型与 `child::environment::tests` 守住。决定写作 `D<n>`，别处引作 `child D<n>`。
 -/
 
 /-! ## 1 需求分解
@@ -29,7 +29,7 @@
 /-! ## 3 假设与歧义
 
 - **假设**：城的秘密只经这两种环境变量进到城的进程里。别的路（文件、命令行参数）不归本 crate。
-- **例外**：城的子进程里只有一类不走 `command`：守护进程起的那个子进程（它就是城，有意留在同一个控制台上），理由写在 `crates/sprawling/spec/Supervising.lean` 的「子进程的那一行」：子进程继承这个终端，终端的面属于它。CLI 交出终端给某个 agent 的登录流程还没有建成（`crates/agent_protocols/Spec.lean` §3）；建成时它是第二类，因为登录期间那个程序占着终端。浏览器与文件管理器不是例外：它们比城活得久，正因为如此才要去掉城的秘密，所以打开器与文件管理器都经 `command` 起，调用点再把三路 stdio 设成 null（`crates/sprawling/spec/Firstrun.lean` §8-8）。
+- **例外**：城的子进程里只有一类不走 `command`：守护进程起的那个子进程（它就是城，有意留在同一个控制台上），理由写在 `Sprawling/app/spec/Supervising.lean` 的「子进程的那一行」：子进程继承这个终端，终端的面属于它。CLI 交出终端给某个 agent 的登录流程还没有建成（`Sprawling/agent_protocols/Spec.lean` §3）；建成时它是第二类，因为登录期间那个程序占着终端。浏览器与文件管理器不是例外：它们比城活得久，正因为如此才要去掉城的秘密，所以打开器与文件管理器都经 `command` 起，调用点再把三路 stdio 设成 null（`Sprawling/app/spec/Firstrun.lean` §8-8）。
 - **不是城的子进程的起点**：本二进制的 `gauge` 动词、开发工具包、构建脚本与测试代码起的进程都不是城的子进程，D4 说它们为什么不走 `command`。`clippy.toml` 的禁令对它们同样生效，所以每一个这样的起点都在调用处看得见。
 -/
 
@@ -82,7 +82,7 @@ D4 `clippy.toml` 的 `disallowed-methods` 拒绝 `std::process::Command::new`，
 - 守护进程的子进程（§3 的例外）：`bin::supervising::children`。
 - `gauge` 量的命令：它在人的终端前台跑人给的命令，像 shell 那样。`command` 会把它放进自己的进程组、给它一个没有窗口的控制台，于是人按的 Ctrl+C 到不了它，`gauge` 退出后它成了孤儿。它不在城里跑，环境是人自己的。
 - 开发工具包（xtask、citysim、benchstat）：它们起的 cargo、git、浏览器与被测的二进制属于开发者，不属于城，不持有城的秘密；开发工具要能用终端的 Ctrl+C 结束它们，要按进程树杀掉浏览器。这些包不依赖本 crate。
-- 构建脚本（`crates/desktop/ffi/build.rs` 起 `zig`）：它在 cargo 里跑，不在城里。
+- 构建脚本（`Sprawling/desktop/ffi/build.rs` 起 `zig`）：它在 cargo 里跑，不在城里。
 - 测试代码：测试起的是它自己的夹具进程。经生产入口（如 `runtime::Backlog`）交进去的 `Command` 也是夹具，生产调用点交进去的由 `command` 造。
 - 独立 Archetype 进程：`Mei` 不依赖城市，也不持有城市的秘密；它直接启动自己的 Python，
   让解释器与 Mei 留在同一进程组，外层 killpg 才能覆盖它。Sprawling TUI 启动 Mei 时仍走
@@ -134,6 +134,6 @@ D4 `clippy.toml` 的 `disallowed-methods` 拒绝 `std::process::Command::new`，
 /-! ## 17 文档关系
 
 - ARCHITECTURE.md §3 的 `depmap`（`child:` 一行），`architecture.toml` 的 `[family.child]` 与两个模块行。
-- `crates/gateway/spec/Credential.lean`（环境变量是 vault 的只读来源，键形 `SPRAWLING_SECRET_<REALM>_<NAME>`，前缀读自本 crate）。
+- `Sprawling/gateway/spec/Credential.lean`（环境变量是 vault 的只读来源，键形 `SPRAWLING_SECRET_<REALM>_<NAME>`，前缀读自本 crate）。
 - `clippy.toml` 的 `disallowed-methods`（D4）。
 -/

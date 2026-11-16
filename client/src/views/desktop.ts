@@ -12,7 +12,7 @@
 // One box holding the whole file, because that is what the file is: the
 // connector reads it whole at start-up and permits nothing it cannot
 // read, so a form with a field per window would be a second reading of
-// a syntax this side does not own (`crates/city/Spec.lean` §8-26).
+// a syntax this side does not own (`Sprawling/city/Spec.lean` §8-26).
 
 import { fill, say } from "../core/lang";
 import type { Lang } from "../core/lang";

@@ -22,7 +22,7 @@
 //! produced 268 findings and zero credentials. The
 //! alternative was a table of 268 byte offsets, which the next
 //! `bun install` invalidates in full - a category question written down as
-//! coordinates. The known limit is recorded in crates/xtask/Spec.lean §8-9:
+//! coordinates. The known limit is recorded in Tools/xtask/Spec.lean §8-9:
 //! a test that read a live credential from the environment and recorded it
 //! into a snapshot would pass here, and the defect in that case is the
 //! test.
@@ -41,8 +41,8 @@ mod nix_tests;
 /// The only files allowed to say `.expose(` under crates/*/src: the
 /// defining module and each redemption point, with its reason beside it.
 const EXPOSE_WHITELIST: [&str; 5] = [
-    "crates/kernel/src/secret/sealed.rs",
-    "crates/gateway/src/endpoint/call.rs",
+    "Sprawling/kernel/src/secret/sealed.rs",
+    "Sprawling/gateway/src/endpoint/call.rs",
     // An MCP server's configured header or environment variable may
     // name a credential instead of carrying one. This is the one place
     // the reference is redeemed for all three transports; what travels
@@ -51,20 +51,20 @@ const EXPOSE_WHITELIST: [&str; 5] = [
     // Listed rather than redeemed one layer up, because the
     // alternative put plaintext in the composition root, which is what this
     // list exists to prevent.
-    "crates/agent_protocols/src/mcp/redeeming.rs",
+    "Sprawling/agent_protocols/src/mcp/redeeming.rs",
     // The broker that holds an outside application's OAuth is reached
     // with a project key in an `x-api-key` header, which is the same
     // last slot before the wire as the redemption points above. The
     // alternative was handing the broker a plaintext key from the
     // assembly, which is the thing this list exists to prevent.
-    "crates/agent_protocols/src/mcp/broker.rs",
+    "Sprawling/agent_protocols/src/mcp/broker.rs",
     // The city's remote signing key is derived from a seed the vault
     // keeps. The seed is read back to bytes inside the one function that
     // derives the key from it, and nowhere else. The alternative put the
     // plaintext seed in the composition root (`bin::outside::keeper`),
     // which is what this list exists to prevent
-    // (crates/remote_access/Spec.lean D23).
-    "crates/remote_access/src/keys.rs",
+    // (Sprawling/remote_access/Spec.lean D23).
+    "Sprawling/remote_access/src/keys.rs",
 ];
 
 /// Exact literals the detector flags that are not credentials.
@@ -82,7 +82,7 @@ const EXPOSE_WHITELIST: [&str; 5] = [
 /// since this path is inside the guard's protected face.
 ///
 /// - `CC_x86_64_unknown_linux_musl` — Cargo's per-target C compiler
-///   variable, quoted in `crates/sprawling/Spec.lean` where the static Linux
+///   variable, quoted in `Sprawling/app/Spec.lean` where the static Linux
 ///   archive is argued. No workflow sets it: that archive is held back
 ///   until it is settled where a Linux install keeps a credential, and
 ///   `release.yml` says so. The entry stays because the name is not a
@@ -90,7 +90,7 @@ const EXPOSE_WHITELIST: [&str; 5] = [
 ///   never itself hold a value; the target triple's digits and
 ///   underscores are what trip the mixed-alphabet rule.
 /// - The six `Win32_*` names — Cargo features of the `windows` crate,
-///   listed in `crates/desktop/Cargo.toml` to select the API surfaces the
+///   listed in `Sprawling/desktop/Cargo.toml` to select the API surfaces the
 ///   Windows arm calls: data exchange for the clipboard, threading and
 ///   variant for COM, accessibility for the UI Automation tree, HiDPI
 ///   for per-monitor scaling, keyboard and mouse for `SendInput`, and
@@ -331,8 +331,8 @@ resolver = \"3\"
         let body = key_shaped();
         for rel in [
             "client/bun.lock",
-            "crates/gateway/src/dialect/snapshots/pinned.snap",
-            "crates/gateway/src/dialect/request.rs",
+            "Sprawling/gateway/src/dialect/snapshots/pinned.snap",
+            "Sprawling/gateway/src/dialect/request.rs",
         ] {
             let path = root.join(rel);
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -343,7 +343,7 @@ resolver = \"3\"
         let places: Vec<&str> = found.iter().map(|v| v.location.as_str()).collect();
         assert_eq!(
             places,
-            ["crates/gateway/src/dialect/request.rs:byte 0"],
+            ["Sprawling/gateway/src/dialect/request.rs:byte 0"],
             "only the authored file is a place a credential can enter"
         );
         std::fs::remove_dir_all(&root).unwrap();

@@ -6,7 +6,7 @@
 /-!
 # wire::server
 
-规定 `server`、`server::config`、`server::config::enrolment`、`server::socket`、`server::bundle`、`server::uploads`、`assets`、`answer::cost`（`crates/wire/src/` 下同名的文件）。监听的一端：判定是纯函数，套接字一个也不做；客户端资产、几扇 HTTP 门与 Query 的答面。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `server`、`server::config`、`server::config::enrolment`、`server::socket`、`server::bundle`、`server::uploads`、`assets`、`answer::cost`（`Sprawling/wire/src/` 下同名的文件）。监听的一端：判定是纯函数，套接字一个也不做；客户端资产、几扇 HTTP 门与 Query 的答面。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `wire::assets` 旁的测试守住。会话令牌的寿命是一个状态机，它的模型在 `spec/Server/Sessions.lean`。
 -/
@@ -88,7 +88,7 @@ pub fn bundle_routes<S: Clone + Send + Sync + 'static>(client: Arc<ClientAssets>
 
 **客户端是一张资产表，不是一个文件**：`ServeConfig` 携 `client: Arc<ClientAssets>`，因为 `client/` 的构建产物是 `index.html` 加它引用的脚本、样式与字体，只携一个文件的形状会让页面壳引用一条服务端没有的路由。资产表是封闭清单：路径穿越（`..`、空段、盘符、点头文件）在判定层拒，miss 报文件名并给出重建口令。`Disk` 臂逐请求读盘，专供开发回路（改前端刷新即见），发布路径恒不构造它。
 
-**送页面的路由只有一张表**（D20）：城自己的端口把 `bundle_routes` 并进 `router`，远程监听（`crates/remote_access/Spec.lean` §8-10）也并进它自己的那张表，所以设备打开远程地址拿到的字节与这台电脑上的浏览器拿到的相同；响应头按监听器生成、作为参数交进来（§8-94 末节）。
+**送页面的路由只有一张表**（D20）：城自己的端口把 `bundle_routes` 并进 `router`，远程监听（`Sprawling/remote_access/Spec.lean` §8-10）也并进它自己的那张表，所以设备打开远程地址拿到的字节与这台电脑上的浏览器拿到的相同；响应头按监听器生成、作为参数交进来（§8-94 末节）。
 
 **公开签名不携传输层的类型**：sink 收 `Vec<u8>` 而不是 `axum::body::Bytes`。**一个泄露自己传输层的公开签名，会把「换掉 HTTP 库」变成对每一个从未选过它的调用方的破坏性变更**。
 
@@ -96,11 +96,11 @@ pub fn bundle_routes<S: Clone + Send + Sync + 'static>(client: Arc<ClientAssets>
 
 `decide_bind` 的四格真值表是全部行为：回环×有钥匙＝`Serve(Loopback)`；非回环×有钥匙＝`Serve(Exposed)`；**两面×无钥匙＝`Refuse(E_CONFIG_INVALID)`**。拒绝发生在**启动时**，不是启动后拒连——它是配置判定。
 
-**三个平台上同一条规则**：「回环」由 `IpAddr::is_loopback` 判（IPv4 的 `127.0.0.0/8` 与 IPv6 的 `::1`），标准库在 Windows、macOS、Linux 上给同一个答案，所以 `decide_bind` 与 `decide_enroll` 不分平台。一个 IPv4 映射地址（`::ffff:127.0.0.1`）不算回环：绑定在这样的地址上按暴露面判，比需要的更严而不更松。对端地址不同：监听在 `[::]` 上时，Linux 与 macOS 缺省接收 IPv4 连接并把对端报成映射地址，Windows 缺省不接收（三者 `IPV6_V6ONLY` 的系统缺省值不同，本 crate 不设它）；于是在 Linux 与 macOS 上，同机经 IPv4 连到 `[::]` 监听器的 `/enroll` 报来的对端是 `::ffff:127.0.0.1`。规则的本意是「只认同一台机器」，所以 `decide_enroll` 先取 `IpAddr::to_canonical` 再判 `is_loopback`（`crates/wire/src/reception.rs` 的 `decide_enroll`）：映射回环被接受，映射的外部地址（`::ffff:203.0.113.7`）仍被拒，三个平台给同一个答案。**被否掉的做法**：在监听器上设 `IPV6_V6ONLY`——那改的是哪些连接进得来，不是谁算同一台机器，且要在每个平台上各设一次。
+**三个平台上同一条规则**：「回环」由 `IpAddr::is_loopback` 判（IPv4 的 `127.0.0.0/8` 与 IPv6 的 `::1`），标准库在 Windows、macOS、Linux 上给同一个答案，所以 `decide_bind` 与 `decide_enroll` 不分平台。一个 IPv4 映射地址（`::ffff:127.0.0.1`）不算回环：绑定在这样的地址上按暴露面判，比需要的更严而不更松。对端地址不同：监听在 `[::]` 上时，Linux 与 macOS 缺省接收 IPv4 连接并把对端报成映射地址，Windows 缺省不接收（三者 `IPV6_V6ONLY` 的系统缺省值不同，本 crate 不设它）；于是在 Linux 与 macOS 上，同机经 IPv4 连到 `[::]` 监听器的 `/enroll` 报来的对端是 `::ffff:127.0.0.1`。规则的本意是「只认同一台机器」，所以 `decide_enroll` 先取 `IpAddr::to_canonical` 再判 `is_loopback`（`Sprawling/wire/src/reception.rs` 的 `decide_enroll`）：映射回环被接受，映射的外部地址（`::ffff:203.0.113.7`）仍被拒，三个平台给同一个答案。**被否掉的做法**：在监听器上设 `IPV6_V6ONLY`——那改的是哪些连接进得来，不是谁算同一台机器，且要在每个平台上各设一次。
 
 薄壳的职责恒为三件：静态资源（前端产物，`bundle_routes`）｜WS 升级（`/ws`）｜四条 HTTP 路由（`/enroll`、`/transcribe`、`/drop`、`/acp`）。它不持业务状态，不做策略判断：`/enroll`、`/transcribe`、`/drop` 由 `decide_admission` 在门前判配对，`/acp` 在处理器里经同一个函数判，因为编辑器把令牌放在正文的一个键里而不是请求头里；送页面的两条路由不设配对，因为还没拿到配对码的浏览器也得先载入输入配对码的那张表单。
 
-**WS 路由与两条沿途缝**。升级后的会话只做三件事：先收 `Hello` 并交 `decide_handshake` 判（拒即关，不降级）；收到 `ClientFrame::Command` 交给 sink；把订阅到的 `EventRecord` 以 `ServerFrame::Event` 推给客户端，醒来时已经到了的记录作为一帧写出、刷写一次（`crates/wire/spec/Server/Socket.lean` §8-47h）。
+**WS 路由与两条沿途缝**。升级后的会话只做三件事：先收 `Hello` 并交 `decide_handshake` 判（拒即关，不降级）；收到 `ClientFrame::Command` 交给 sink；把订阅到的 `EventRecord` 以 `ServerFrame::Event` 推给客户端，醒来时已经到了的记录作为一帧写出、刷写一次（`Sprawling/wire/spec/Server/Socket.lean` §8-47h）。
 
 ```rust
 // ServeConfig 的两项（全表见上）：
@@ -151,7 +151,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 - **为什么是强类型答面而不是一团 `Payload`**：客户端读帧的词汇是 `client/src/wire.ts`，由 `cargo xtask wire-ts` 从本 crate 的 schema 生成，故发帧的边界 crate 欠对方一套有类型的读帧词汇（同 kernel 再导出的理由）。一个无类型载荷会把解析责任推给每一个视图模块，每一个都得自己猜一遍形状。
 - **`Answer::Unavailable { query, reason }` 是一个真答案**：不求值的视图报自己的名字，而不是返回空结果——空城与未实现在界面上必须长得不一样。看了却没看成的视图在 `reason` 里说出没看成的原因（D47）；`reason` 缺席时视图只报名字：这份构建不求值这个查询，或这个读面还没有说出原因。
 - **`CityAnswer.buildings: Vec<BuildingProgress>`**：每栋楼一行，携 `Progress` 与 `problems`。解析不出的行进 `problems` 并照显——悄悄丢掉读不懂的行，等于按一个没人选过的分母报进度。
-- **五维成本携权威总额**：`CostAnswer.total` 与 actor、segment、tool、skill 四个维度各自求和相等；`by_run` 只带活跃的跑与花得最多的前几个（`crates/sprawling/Spec.lean` §8-90），和可以小于 `total`。界面按 `total` 算占比而不自己归一，未归因余额与列表之外的跑因此都看得见。
+- **五维成本携权威总额**：`CostAnswer.total` 与 actor、segment、tool、skill 四个维度各自求和相等；`by_run` 只带活跃的跑与花得最多的前几个（`Sprawling/app/Spec.lean` §8-90），和可以小于 `total`。界面按 `total` 算占比而不自己归一，未归因余额与列表之外的跑因此都看得见。
 - **无报价的调用单独报数**：`CostAnswer.unpriced: UnpricedCalls { calls, tokens }` 是账本上没有权威计费额的模型调用次数与它们的 token 总数（`storage::Attribution` 的 `unpriced` 原样上线）。它们不进 `total`，所以缺了这一项，一座只用订阅登录或本地模型的城跑了多少次都读作「没花钱」；界面据 `calls > 0` 说「有调用没有报价」并给出 token 数，而不是把 `$0.00` 当作量出来的数。
 - **保温续期在总额里单列一行**：`CostAnswer.renewals: Renewals { billed, read, late, unreported, refused }` 是 `storage::Attribution` 的 `renewals` 原样上线（storage D35、D36）。`billed` 已在 `total` 与各维度里（维度里记在房间与 `keep_warm` 桶下），界面把它画成总额之内带标签的一行，而不是再加一次；四格的和是续期的次数，`late` 是到得太晚、按写价重建了前缀的次数。
 
@@ -165,15 +165,15 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 - 壳里零策略：判定在 `decide_enroll`，壳只搬字节——同 `decide_bind`／`decide_frame` 的切法，故无需跑服务即可穷尽测。
 - 应答返回那条 `secret_captured` 记录写下的 `ref`——金库键的那句文本，不是路由再拼一次的一句；值不回声、不入事件载荷。入金库由 `Sealed::into_vault_value`（住 kernel::secret，即 expose 白名单三文件之一）完成，开封因此**不发生在装配层**。
 
-**线上没有登录命令**：订阅额度由厂商自己的 harness 带进城，人在 harness 里自己登录，本城不以任何厂商客户端的身份登录（`crates/gateway/Spec.lean` §8-5）。`WireCommand` 没有登录命令，`COMMAND_NAMES` 里也没有。
+**线上没有登录命令**：订阅额度由厂商自己的 harness 带进城，人在 harness 里自己登录，本城不以任何厂商客户端的身份登录（`Sprawling/gateway/Spec.lean` §8-5）。`WireCommand` 没有登录命令，`COMMAND_NAMES` 里也没有。
 
 **五个查询各有自己的答**（`InboxView`／`DiscardView`／`RegistryView`／`ArchiveSearch`／`Metrics`）。三条口径：①**队列折叠着看不消费着看**（`Inbox::pull` 要拿走才给内容，看一眼就取走的视图会改变它所报告的对象）；②归档在被问的那一刻读盘（同 `BuildingView`，文件是权威）；③**`Metrics` 恒不携钱**——钱是 `CostView` 的，一个数字两个主人就是两个数字开始互相矛盾的起点。
 
 **`DiscardLine.restoration` 携 `Option<Restoration>` 而非一个句子**。回收站那一行的「怎么拿回来」的唯一措辞处在客户端（`client/src/views/record/bin.svelte` 按 `tracked`／`interred`／`rebuildable` 三臂措辞）；服务端若把它拼成一句话，就是**一件事两个渲染权威**，而服务端那句还拼不出可执行的那句话。所以计划以它自己的形状上线（载荷本来就是 `Restoration` 序列化出来的，故读得回去）；`None` 的意思是**这一条记录用了本构建读不懂的方案**，界面据此画一行而不给动作——行恒不隐藏，因为藏起一件被删的东西比承认读不懂它的方案更糟。这类「语法换形而名字没换」的改动不动 `QUERY_NAMES` 与 `COMMAND_NAMES`，故只能由 `WIRE_V` 进位让旧页面在握手期被拒。
 
-**`POST /acp` 与 `AcpSink`**。外来编辑器的请求走自己的路由，不挤 Command 面：它自带鉴权、要一个当场的回答，而 Command 面的回答是事件流。三条口径：①**令牌在本 crate 判**（配对令牌住这里，常数时间比对也就住这里），只把 `authentic` 一位传进去——拒词由 `agent_protocols::admit` 措辞，「未配对者只学到一位」因此只有一个权威；②回给编辑器的只有 `AcpProgress` 三字段，run id 是工人接单时才铸的，故受理那一刻诚实的答案是「已受理、未完成」；③编辑器出示native key（读钥匙文件，`crates/sprawling/spec/Keying.lean` §8-22）或一个会话令牌，与 control surface 同一条规矩。
+**`POST /acp` 与 `AcpSink`**。外来编辑器的请求走自己的路由，不挤 Command 面：它自带鉴权、要一个当场的回答，而 Command 面的回答是事件流。三条口径：①**令牌在本 crate 判**（配对令牌住这里，常数时间比对也就住这里），只把 `authentic` 一位传进去——拒词由 `agent_protocols::admit` 措辞，「未配对者只学到一位」因此只有一个权威；②回给编辑器的只有 `AcpProgress` 三字段，run id 是工人接单时才铸的，故受理那一刻诚实的答案是「已受理、未完成」；③编辑器出示native key（读钥匙文件，`Sprawling/app/spec/Keying.lean` §8-22）或一个会话令牌，与 control surface 同一条规矩。
 
-**三帧登记面**（§8-1 golden 同集更新）——`AttachEndpoint`（人刚输入的 URL＋兼容格式＋`secret:` 引用；**引用有字节形，凭证没有**）、`SelectModel`（标签→模型＋两个探不到的 token 数＋人说的「收得下什么」；输出上限是 `Option<Ceiling>`，缺席即「没人登记过」，零在类型上不存在；`input: Option<kernel::InputKinds>` 紧接在 `max_output_tokens` 之后，出现时是 `gateway::accepted_input` 的第一档，缺席时梯子从目录开始，`crates/gateway/Spec.lean` §8-37、gateway D16）、`EndpointView`（设置页的读；`EndpointsAnswer` 里 `has_credential` 是关于凭证能回答的全部）。
+**三帧登记面**（§8-1 golden 同集更新）——`AttachEndpoint`（人刚输入的 URL＋兼容格式＋`secret:` 引用；**引用有字节形，凭证没有**）、`SelectModel`（标签→模型＋两个探不到的 token 数＋人说的「收得下什么」；输出上限是 `Option<Ceiling>`，缺席即「没人登记过」，零在类型上不存在；`input: Option<kernel::InputKinds>` 紧接在 `max_output_tokens` 之后，出现时是 `gateway::accepted_input` 的第一档，缺席时梯子从目录开始，`Sprawling/gateway/Spec.lean` §8-37、gateway D16）、`EndpointView`（设置页的读；`EndpointsAnswer` 里 `has_credential` 是关于凭证能回答的全部）。
 
 **三个 kernel 类型的再导出**（`DialectKind`／`Effort`／`ModelTag`）。客户端只读 `wire` 的 schema，而设置页要拼写这三个词；再导出而非镜像定义，因为镜像就是同一规则的第二个权威——同 §8-0 对 `Mode` 的口径。
 -/
@@ -203,7 +203,7 @@ Unavailable {
 
 **决定**：`/` 与 `/{*asset}` 两条路由连同它们的响应头由 `bundle_routes` 造出，对路由表的状态类型泛型，自带 `Arc<ClientAssets>` 作状态；`router` 把它并进来，装配层的远程监听也把它并进来。
 
-**理由**：设备从二维码打开的是远程监听的地址，那里要答出与城的端口同一份页面（`crates/remote_access/Spec.lean` §8-10）。哪个路径答哪些字节已经只在 `ClientAssets::lookup` 一处判；路由的拼写与「gzip 的字节要带 `Content-Encoding`」这两件事若在装配层再写一份，两个端口送页面的方式就有两个家，一边加了一个响应头，另一边不会知道。
+**理由**：设备从二维码打开的是远程监听的地址，那里要答出与城的端口同一份页面（`Sprawling/remote_access/Spec.lean` §8-10）。哪个路径答哪些字节已经只在 `ClientAssets::lookup` 一处判；路由的拼写与「gzip 的字节要带 `Content-Encoding`」这两件事若在装配层再写一份，两个端口送页面的方式就有两个家，一边加了一个响应头，另一边不会知道。
 
 **被否**：①远程监听把非升级的 `GET` 反向代理到城的端口——多一跳 HTTP 客户端，且城的端口在局域网面上要配对令牌，中继还得替设备出示它；②`wire` 只公开 `asset_response`，装配层自己拼两条路由——路径的拼写成了两份。
 
@@ -219,7 +219,7 @@ Unavailable {
 /-!
 ### 8-22 没有监听器的那份构建，测试也不许提它（`tests/enrolment.rs`、`tests/wire_contract.rs`）
 
-`cargo clippy -p sprawling-wire --no-default-features --all-targets` 要绿：`tests/enrolment.rs` 整份都在驱动 `wire::router`，`tests/wire_contract.rs` 有三条断言在问 `decide_bind`／`decide_handshake`，而这三样连同 `axum`、`tokio` 都由 feature `server` 带进来。**这份构建正是 `accounting` 用的那一份**（`crates/accounting/Cargo.toml` 依赖本 crate 而不开 `server`，D2）——它需要本 crate 的词汇而不要 TCP 栈；一个在这里名词都拼不出来的测试文件，把它自己的红判在了产品的一条真路径上。
+`cargo clippy -p sprawling-wire --no-default-features --all-targets` 要绿：`tests/enrolment.rs` 整份都在驱动 `wire::router`，`tests/wire_contract.rs` 有三条断言在问 `decide_bind`／`decide_handshake`，而这三样连同 `axum`、`tokio` 都由 feature `server` 带进来。**这份构建正是 `accounting` 用的那一份**（`Sprawling/accounting/Cargo.toml` 依赖本 crate 而不开 `server`，D2）——它需要本 crate 的词汇而不要 TCP 栈；一个在这里名词都拼不出来的测试文件，把它自己的红判在了产品的一条真路径上。
 
 **按测试真正需要的东西设门，而不是把 feature 打开**：`tests/enrolment.rs` 首行 `#![cfg(feature = "server")]`（整份文件都是路由的事）；`tests/wire_contract.rs` 只给那三条断言与它们的两个辅助函数、以及 `Hello`／`Welcome`／`AxCode`／`SocketAddr` 这几个只被它们用到的名字加 `#[cfg(feature = "server")]`——命令表、查询表、schema 哈希与那两个不可拼写的形状**在两份构建里都被判**，因为它们在两份构建里都成立。
 -/
@@ -234,7 +234,7 @@ pub type TranscribeSink = Arc<dyn Fn(Vec<u8>, String) -> Result<String, AxError>
 
 - **是一条路由，不是一条 Command，也不是一条 Query**。Command 被接下之后经事件流作答，而「我刚说的那句话是什么」必须回到录它的那个标签页；Query 是另一种会作答的形状，而一条在供应方那里花掉数秒的查询就是一条装成读的命令。`/enroll` 与 `/drop` 是同一类旁门：帧的文法装不下的那几件事各有一扇 HTTP 门。
 - **容器从请求头读，不从字节猜**：浏览器录进它手上有的容器，而只有它知道是哪一个。没有 content-type 即按名拒绝——一个没人声明的容器发不出去。`; codecs=opus` 这类参数说的是容器里的编解码器，而音频线路由的是容器，故取分号前那一段；那一段修剪后为空（头里只有参数）同样是没声明容器，与缺头同一句拒绝。
-- **`ModelTag` 增第三个 `Transcribe`**（`crates/kernel/Spec.lean` §8-24 的枚举同步）：**「哪个 endpoint、哪个 model 答这一类活」本来就有机制**——人登记一个 endpoint，再为一个 tag 选一个 model。第二张表单加第二份存储会是同一个问题的第二个答案，而那把 key 还要有第二条进金库的路。人填 URL 与 key 因而走的是既有的 attach 表单。
+- **`ModelTag` 增第三个 `Transcribe`**（`Sprawling/kernel/Spec.lean` §8-24 的枚举同步）：**「哪个 endpoint、哪个 model 答这一类活」本来就有机制**——人登记一个 endpoint，再为一个 tag 选一个 model。第二张表单加第二份存储会是同一个问题的第二个答案，而那把 key 还要有第二条进金库的路。人填 URL 与 key 因而走的是既有的 attach 表单。
 - **服务端**：`gateway::transcriber_for(chosen, secrets)` 与 `adapter_for` 同形——把一个选择变成一件可调用的东西这件事只在一处发生。`Views::transcriber` 在锁内读出选择、锁外发请求。
 -/
 
@@ -252,7 +252,7 @@ pub enum Door { Transcribe, Enroll, Acp, Drop }
 - **文件名走查询参数，不走请求头**：请求头的值只能可靠地携带 ASCII，而人的文件名常常不是。缺 `name` 即 422。
 - **`Door::Drop` 未配对即拒**：它往城的磁盘上写字节，与另外两扇会动作的门同一个判定（8-40）。
 - **正文上限 `DROP_BYTES_MAX`（64 MiB），只加在这一条路由上**：axum 的缺省上限是 2 MiB，一张截图或一份 PDF 就会超过；更大的正文答 413。上限不放宽到其余路由，因为它们收的是一行文字或一份录音。
-- 城怎么存、存在哪里、答出哪条路径是 `crates/sprawling/Spec.lean` §8-119 的事；这里只把名字与字节交进去，把答案或拒绝原样交回来（拒绝是 422 加 `refusal_text`）。
+- 城怎么存、存在哪里、答出哪条路径是 `Sprawling/app/Spec.lean` §8-119 的事；这里只把名字与字节交进去，把答案或拒绝原样交回来（拒绝是 422 加 `refusal_text`）。
 -/
 
 /-!

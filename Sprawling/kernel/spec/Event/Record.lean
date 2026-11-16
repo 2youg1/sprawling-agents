@@ -6,7 +6,7 @@
 /-!
 # kernel::event::record
 
-规定 `kernel::event::record`（`crates/kernel/src/event/record.rs` 与 `crates/kernel/src/event/record/` 下按族分的文件）：每个有载荷结构的 `EventKind` 一个 serde 结构，以及它们与账本之间仅有的两扇门。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::event::record`（`Sprawling/kernel/src/event/record.rs` 与 `Sprawling/kernel/src/event/record/` 下按族分的文件）：每个有载荷结构的 `EventKind` 一个 serde 结构，以及它们与账本之间仅有的两扇门。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `kernel::event::record::tool::tests`、`kernel::event::record::turn::tests`、`kernel::event::record::run::tests`等 守住。
 -/
@@ -206,7 +206,7 @@ pub struct VaultFellBack { pub component: String,     // 探针写 vault
                            pub reason: String }
 // wire::note_of 只把 Refused 记成回合上的 Note::Refused；VaultFellBack 没改变任何回合，不出 note。
 
-// record::harness：官方 harness 居民一次 run 写的两种行（`crates/sprawling/Spec.lean` §8-4e）。
+// record::harness：官方 harness 居民一次 run 写的两种行（`Sprawling/app/Spec.lean` §8-4e）。
 // 词是本城的，不是 ACP 的：账本写下的拼写不能再改，ACP 的词跟着上游走（D9）。
 #[serde(tag = "report", rename_all = "snake_case")]
 pub enum HarnessReported {
@@ -239,7 +239,7 @@ pub struct ToolResult { pub tool_use_id: String, pub name: ToolName,
 #[serde(untagged)]
 pub enum ToolAnswer { Answered { result: Payload }, Failed { error: Payload } }
 #[serde(rename_all = "lowercase")]
-pub enum Rendering { V1, V2, V3 }   // 画出模型所见文本的渲染器（crates/runtime/spec/Rendering.lean §8-63）
+pub enum Rendering { V1, V2, V3 }   // 画出模型所见文本的渲染器（Sprawling/runtime/spec/Rendering.lean §8-63）
 
 pub struct CityInitialized {}           // 城名在信封的 addr
 pub struct BuildingCreated { pub addr: Address, pub template: String,
@@ -269,7 +269,7 @@ impl CacheRenewed { pub fn outcome(&self) -> RenewalOutcome; }
 pub enum RenewalOutcome { Read, Late, Unreported, Refused }
 ```
 
-结构按族住 `crates/kernel/src/event/record/` 下；哪个 kind 有结构，以那里的类型为准。
+结构按族住 `Sprawling/kernel/src/event/record/` 下；哪个 kind 有结构，以那里的类型为准。
 `gate_denied`、`budget_limit` 的载荷是平铺的 `AxError`，`approval_requested` 的是 `ApprovalItem`，
 `result_offloaded` 的是 `runtime::sieve::ResultOffloaded`（它平铺筛子的账，筛子在 runtime），不另立结构；
 `watchdog_fired` 的读方 `wire::note_of` 把 `BackOff` 读成它等待的那次拒绝（码与主语照录），
@@ -303,7 +303,7 @@ pub enum RenewalOutcome { Read, Late, Unreported, Refused }
 1. **字节不动。** 字段名即旧写方用的键；旧写方省略的键写 `skip_serializing_if`，
    旧写方无条件写出的键（含空数组）无条件写出。键序由 `serde_json` 的 BTreeMap 定，
    与此处声明序无关。每族一组逐字节对拍测试守住这条。
-2. **读宽写严。** 旧构建可能不写的字段一律 `#[serde(default)]`——`crates/fixtures/golden-s1`
+2. **读宽写严。** 旧构建可能不写的字段一律 `#[serde(default)]`——`Tools/fixtures/golden-s1`
    里就有一条 `data` 为 `{}` 的 `run_started`；未知键忽略而不拒。
 3. **值保留 kernel 类型。** run 是 `RunId` 而非 `String`，job 是 `Locator`；
    手写 `Serialize` 的类型挂 `schemars(with = "String")` 说明其 wire 形状。
@@ -336,7 +336,7 @@ pub struct ModelReturned {
 ```
 
 - **它是一个时刻，不是一个时长。** 首字耗时（TTFT）由读者拿它减去开这个回合的 `model_called` 的 `t`；账本不记派生值，记下的两个时刻已经够算。
-- **读数来自回合的钟**：`runtime::turn` 在它包住的增量汇点里读第一段非空内容到达的那一刻（`crates/runtime/Spec.lean` §8-50）。kernel 不采样，gateway 也不采样：`kernel::Model` 的实现从不读钟。
+- **读数来自回合的钟**：`runtime::turn` 在它包住的增量汇点里读第一段非空内容到达的那一刻（`Sprawling/runtime/Spec.lean` §8-50）。kernel 不采样，gateway 也不采样：`kernel::Model` 的实现从不读钟。
 - **缺席有三种情形，都不是零**：回复从一扇到齐之前什么也不报的门回来（阻塞门、没有流的适配器、流式解析失败之后换阻塞门重发修好的那一次）；回复在流上只带工具调用，没有一段文字或推理（首个内容的定义与理由见 runtime D6）；这把键出现之前写下的每一行。三种都读作「没有量到」，页面不画首字耗时，不猜。
 - **字节不动**：缺席即省略（`skip_serializing_if`），旧行与今天没量到的行字节相同；读宽（`default`）。账本版本不为此进位：`v` 为 2 的行里这一格可以缺席，读者不从版本推断它在不在。
 
@@ -350,10 +350,10 @@ pub struct ToolCalled {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub render: Option<RenderIntent>,    // 调用那一刻这件工具登记的呈现
 }
-// Effect 与 RenderIntent 在 feature `schema` 下派生 JsonSchema：线上 Call 直接携它们（`crates/wire/Spec.lean` §8-55）
+// Effect 与 RenderIntent 在 feature `schema` 下派生 JsonSchema：线上 Call 直接携它们（`Sprawling/wire/Spec.lean` §8-55）
 ```
 
-- **写方只有回合的工具波**：`runtime::turn::wave` 写 `tool_called` 时，从工具面的 `ConcurrentInvoke::meta_of` 取这件工具的 `ToolMeta`，照录其中两项（`crates/runtime/Spec.lean` §8-51）。工具面不认识这个名字时两者缺席——一次调用了没登记的工具，是一个真实状态。
+- **写方只有回合的工具波**：`runtime::turn::wave` 写 `tool_called` 时，从工具面的 `ConcurrentInvoke::meta_of` 取这件工具的 `ToolMeta`，照录其中两项（`Sprawling/runtime/Spec.lean` §8-51）。工具面不认识这个名字时两者缺席——一次调用了没登记的工具，是一个真实状态。
 - **记的是调用那一刻的登记**：一件工具以后换了效果或呈现，旧行仍说它当时是什么；折叠不去问今天的登记。新加一件内置工具不需要改任何读者：它的登记随它第一次被调用写进账本。
 - **`Diff.locations` 照录登记**：登记层面的声明是空表（§8-23），每次调用的位置是工具一侧由参数算出的纯函数，今天还没有这个函数，所以账上的 `locations` 恒为空；一次编辑调用改的是哪个文件，读者读 `subject`。
 - **不进模型的字节**：`tool_called` 是入窗种类，但窗口从 `model_returned` 的消息重建工具调用，从不读 `tool_called` 的载荷（`runtime::fork` 的逐种类表把它列在「不是对话」一侧），所以这两个键不改变任何请求。
@@ -375,11 +375,11 @@ pub struct RunStarted {
 ```
 
 - **它说什么。** 一次 run 的第一条 user 消息有三种写法：`FromJob` 是一句指向前缀 run 段里 JOB.md 的话加目标，`Inherited` 是 `Task: …\nGoal: …`，`WithPerson` 是人的原话。写法在派活时由城定一次（`accounting::worker::freezing` 按 `city::RunBrief` 选），`runtime::conversation::Conversation::push_task_lines` 按它写出字节。
-- **为什么记进账本。** 分叉从账本重建母 run 的对话（`runtime::fork::fold_run`），第一条消息要照母 run 发出的写法重建，provider 的前缀缓存才从第一条消息起命中（`crates/runtime/Spec.lean` §8-58）。不记，重建只能猜；而按 `goal` 是否为空去猜，等于在分叉里再写一遍 `city::write_brief` 的「有目标才是一份 job」那条规则。
+- **为什么记进账本。** 分叉从账本重建母 run 的对话（`runtime::fork::fold_run`），第一条消息要照母 run 发出的写法重建，provider 的前缀缓存才从第一条消息起命中（`Sprawling/runtime/Spec.lean` §8-58）。不记，重建只能猜；而按 `goal` 是否为空去猜，等于在分叉里再写一遍 `city::write_brief` 的「有目标才是一份 job」那条规则。
 - **一个枚举，一个家。** 这个值以前只住在 `runtime::conversation`；现在账本载荷要带它，而 runtime 依赖 kernel、kernel 不依赖 runtime，所以枚举住在本模块，`runtime::Opening` 与 `runtime::conversation::Opening` 是它的再导出，调用方的路径不变（runtime D14）。
 - **写者**：`runtime::run::Charter::open` 从 `Charter.opening` 照录。模型 run 的 charter 填 `Some(RunPlan.opening)`；harness run 的第一句话是交给 harness 自己会话的 prompt，城不为它写 user 消息，填 `None`。
-- **缺席读作「不知道」。** 加这个键之前写下的行没有它，`fold_run` 对它沿用加键之前的读法（`crates/runtime/Spec.lean` §8-58 的表）。按 `default` 加、缺席不写，所以旧账本照读，`golden-s1` 里载荷为 `{}` 的那行 `run_started` 照旧读成 `RunStarted::default()`。
-- 验收：`runtime::fork::request_tests` 的 `a_branch_first_request_opens_with_the_same_bytes_pictures_included`，与 `accounting::worker::freezing::tests::lineage` 的 `a_branch_first_request_carries_the_bytes_of_the_mothers_last`（`crates/sprawling/Spec.lean` §8-141）：写出的键经真实的派活与分叉读回。
+- **缺席读作「不知道」。** 加这个键之前写下的行没有它，`fold_run` 对它沿用加键之前的读法（`Sprawling/runtime/Spec.lean` §8-58 的表）。按 `default` 加、缺席不写，所以旧账本照读，`golden-s1` 里载荷为 `{}` 的那行 `run_started` 照旧读成 `RunStarted::default()`。
+- 验收：`runtime::fork::request_tests` 的 `a_branch_first_request_opens_with_the_same_bytes_pictures_included`，与 `accounting::worker::freezing::tests::lineage` 的 `a_branch_first_request_carries_the_bytes_of_the_mothers_last`（`Sprawling/app/Spec.lean` §8-141）：写出的键经真实的派活与分叉读回。
 
 #### 8-82-2 进程死后冻结的那一行：`run_frozen.cause`
 
@@ -400,13 +400,13 @@ impl RunFrozen {
 }
 ```
 
-- **它说什么。** ARCHITECTURE §13.7 画的是 `Lost --> Frozen`：进程死在一次 run 的半途，那次 run 再也不会被驱动，重开的城要把它冻结。冻结的那一行由重开时的启动扫描写（`crates/accounting/Spec.lean` §8-18），不由 run 自己写，所以载荷多一个键说明原因。
+- **它说什么。** ARCHITECTURE §13.7 画的是 `Lost --> Frozen`：进程死在一次 run 的半途，那次 run 再也不会被驱动，重开的城要把它冻结。冻结的那一行由重开时的启动扫描写（`Sprawling/accounting/Spec.lean` §8-18），不由 run 自己写，所以载荷多一个键说明原因。
 - **结局仍是三种之一。** `Completion` 的三种结局不变（§8-20），死掉的 run 冻成 `cancelled`：它没做完，`Done` 需要城自己记下的证据而它没有；也没有被上限截断，`Limit` 说的是那件事。`cancelled` 说的是「停下了，不是做完」，`cause: process_died` 把「人或 halt 叫停的」与「进程死了」分开（D14）。
 - **一处构造。** `RunFrozen::lost` 是写这一行的唯一入口，「死掉的 run 冻成哪一种结局」只在这里回答。
 - **因错误停下的 `cancelled` 还引用错误本身。** 只要这次冻结属于一次失败，负载带可选的 `failure: AxError`：一条带 carrier 的事件不一定有可配对的调用（`tool_result` 在 round 折里按 `tool_use_id` 找调用），loadtime 码更没有任何 carrier，而一次停下的 run 不该靠页面猜。主动取消与正常完成不发明原因；旧行没有这个键，读它的 `completion` 的人不受影响。
 - 被否：给每个 carrier 事件另立一条「找不到调用也画」的读法——每种 carrier 各有各的形状，读者得逐个认，而 `run_frozen` 是每条终止路径都经过的共同出口；在 `Closing` 里另存一份错误——一个事实两个家。
 - **缺席即 run 自己的冻结。** `RunFrozen::of` 写的行没有这个键，字节与加键之前相同；旧行照读。读结局的读者（`views` 的 `completion`、`city::resident` 的计数）照旧只读 `completion`。
-- 验收：`sprawling` 的崩溃验收 `a_city_killed_while_writing_an_answer_reopens_with_the_torn_line_cut_and_the_call_unknown`（`crates/sprawling/Spec.lean` §8-127）钉住死 run 的最后一行是这一行。
+- 验收：`sprawling` 的崩溃验收 `a_city_killed_while_writing_an_answer_reopens_with_the_torn_line_cut_and_the_call_unknown`（`Sprawling/app/Spec.lean` §8-127）钉住死 run 的最后一行是这一行。
 
 ### 8-79 身份的两处入账：保存的回执与一次 run 冻下的那一版（`kernel::event::record`，形状 2 值类型）
 
@@ -424,14 +424,14 @@ pub struct GovernedDocumentWritten {
 pub struct RunStarted {
     // …既有字段…
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub naming: Option<B3Hash>,     // 这次 run 的 session 冻下的身份版本（`crates/city/Spec.lean` §8-33）
+    pub naming: Option<B3Hash>,     // 这次 run 的 session 冻下的身份版本（`Sprawling/city/Spec.lean` §8-33）
 }
 ```
 
 - **两个键都只是摘要。** 身份本身——名字与「关于你」——在两份治理文档里，冻下的那一版在内容库里，摘要是读回它的钥匙（`cas:<naming>`）。账本不抄名字：名字是人改的字，抄进不可删的历史就有了第二个家，而人删掉的一段「关于你」会永远留在那里。
-- **提示文档的整份动作也记在这一行**（`Command::PutPrompt`，`crates/wire/Spec.lean` §8-98）：`which` 是文件名，`at` 是地址——楼的 `City.md` 与模型提示不在城保留子树里那三份的位置，只有文件名就读不出是哪一份；`removed` 说这一次删掉了它，而不是写成空的，两者对下一个 run 不同（删掉之后远的一层重新管，空文件什么也不送）。`removed` 是一位而不是第三种行，因为读者要的是同一件事——管这里的提示变了——只是变成了什么不同。
-- **回执。** 写 `MAYOR.md` 或 `PREFERENCES.md`（`PutDocument`、`PutIdentity`）之后的那一行带上新的身份版本，页面见到它才把卡片标为已保存（`crates/wire/Spec.lean` §8-59）。写 `CLERK.md` 不动身份，键缺席。
-- **一次 run 用的是哪一版。** `run_started.naming` 由 `runtime::run::Charter::open` 从 `RunPlan.naming` 照录（`crates/runtime/Spec.lean` §8-56）。旧行没有这个键，读作「这一行早于身份入账」，页面回退到地址或角色名，不用今天的名字。
+- **提示文档的整份动作也记在这一行**（`Command::PutPrompt`，`Sprawling/wire/Spec.lean` §8-98）：`which` 是文件名，`at` 是地址——楼的 `City.md` 与模型提示不在城保留子树里那三份的位置，只有文件名就读不出是哪一份；`removed` 说这一次删掉了它，而不是写成空的，两者对下一个 run 不同（删掉之后远的一层重新管，空文件什么也不送）。`removed` 是一位而不是第三种行，因为读者要的是同一件事——管这里的提示变了——只是变成了什么不同。
+- **回执。** 写 `MAYOR.md` 或 `PREFERENCES.md`（`PutDocument`、`PutIdentity`）之后的那一行带上新的身份版本，页面见到它才把卡片标为已保存（`Sprawling/wire/Spec.lean` §8-59）。写 `CLERK.md` 不动身份，键缺席。
+- **一次 run 用的是哪一版。** `run_started.naming` 由 `runtime::run::Charter::open` 从 `RunPlan.naming` 照录（`Sprawling/runtime/Spec.lean` §8-56）。旧行没有这个键，读作「这一行早于身份入账」，页面回退到地址或角色名，不用今天的名字。
 - 这些键都按 `default` 加、缺席不写，所以旧账本照读，旧构建读新行时把它们当未知键拒（§8-40 的方向门照旧）。
 - 验收：`record::run` 的 `a_run_started_line_records_the_naming_it_froze`（写出、读回、缺席不写）。
 -/
@@ -449,7 +449,7 @@ pub struct RunStarted {
 }
 ```
 
-- **照录冻下的那一个值。** 强度随模型一起在 session 冻结（`runtime::turn::report` 拒绝 run 中途改它），所以 run 开头记一次就是整次 run 的事实。`runtime::run::Charter::open` 从 `RunPlan.shape.effort` 抄进来，与 `policy`、`naming` 同一处写（`crates/runtime/Spec.lean` §8-56）。
+- **照录冻下的那一个值。** 强度随模型一起在 session 冻结（`runtime::turn::report` 拒绝 run 中途改它），所以 run 开头记一次就是整次 run 的事实。`runtime::run::Charter::open` 从 `RunPlan.shape.effort` 抄进来，与 `policy`、`naming` 同一处写（`Sprawling/runtime/Spec.lean` §8-56）。
 - **缺席有两种来历，读法相同。** 一是这次派活没有说强度，提供方自定——这与 `Effort::None`（请它不思考）是两件事，所以不写成 `none`；二是这一行早于这个键。页面两种都不画强度，不猜。harness run 没有本城的请求，恒缺席。
 - **被否：读这次 run 的第一个提交的 `effort`**（`CommitAttribution`）。还没提交过的 run 说不出强度，而提交上的那个值写的是 `Effort::None` 兼指「没说」，读回来分不清。**被否：读 `model_selected`**：那是房间的选择，后来的派活可以在帧上另带强度，房间的选择不等于这次 run 用的那一个。
 - 验收：`record::run` 的 `a_run_started_line_records_the_effort_it_froze`（写出、读回、缺席不写）。
@@ -481,7 +481,7 @@ pub struct AgentRunIdentity {
 }
 ```
 
-- **只记身份，不记命令行**：命令行与路径是一台机器的事实，可能带着用户名与目录（`crates/kernel/src/config.rs` 对 `[[mcp]]` 的同一条规矩），账本可以被任何人重放与导出。`id` 说是哪一个条目，`version` 说 agent 自己报的版本，`launch_digest` 说人同意的是哪一份启动说明；三者合起来足以回答「这次 run 是谁跑的、跑的是不是人同意的那一份」，而不带出任何路径。
+- **只记身份，不记命令行**：命令行与路径是一台机器的事实，可能带着用户名与目录（`Sprawling/kernel/src/config.rs` 对 `[[mcp]]` 的同一条规矩），账本可以被任何人重放与导出。`id` 说是哪一个条目，`version` 说 agent 自己报的版本，`launch_digest` 说人同意的是哪一份启动说明；三者合起来足以回答「这次 run 是谁跑的、跑的是不是人同意的那一份」，而不带出任何路径。
 - **摘要的来源只有一个**：人同意时（`AddAgent` 的 `spec_digest`）城重算的那一份，同意之后启动说明改了，摘要就不同，读账的人能看出这次 run 用的不是当初同意的那一份。
 - **缺席读作「不是 ACP agent 接手的 run」**：本城自己调模型的 run 与早于这个键的行都没有它，按 `default` 加、缺席不写，旧账本照读；0.0.10 读到带这个键的行按未知键拒（§8-40 的方向门照旧）。
 -/
@@ -547,10 +547,10 @@ pub struct DeviceRevoked { pub device: String, pub name: String }
 pub struct RemoteSessionStarted { pub device: String, pub expires: TimeMs }
 ```
 
-- **五种都是 record-only，都写在城自己名下**（`run` 为 `RunId::CITY`，无 `addr`）：谁能从外面够到这座城不决定任何一次模型请求的字节。写它们的是装配层的远程门（`crates/sprawling/Spec.lean` §8-139），经 worker 的 relay 进同一个写者。`who` 是 `person`，只有门到时自己关上那一条是 `city`。
+- **五种都是 record-only，都写在城自己名下**（`run` 为 `RunId::CITY`，无 `addr`）：谁能从外面够到这座城不决定任何一次模型请求的字节。写它们的是装配层的远程门（`Sprawling/app/Spec.lean` §8-139），经 worker 的 relay 进同一个写者。`who` 是 `person`，只有门到时自己关上那一条是 `city`。
 - **追加在 `ALL` 末尾，次序就是一扇门一生的次序**：开、关、配对、撤销、会话开始（表按种类排，入账的次序是开、配对、会话开始、撤销、关）。不写 `ig`：0.0.7 的读者不认识这五个种类，按 D10 的规矩报 `E_LOG_VERSION_UNSUPPORTED` 而不是跳过它们。
 - **没有一行携带密钥、配对码或会话 id**：账本可以被任何人重放，带上它们等于把冒充一台设备的材料交给每一个读者。设备的公钥只在设备表里（`CityLayout::devices`）。
-- **设备与权限用正文写**：`device` 是设备 id 的 base32 正文，`authority` 是 `watch` 或 `act`。两者的类型与拼写归 `remote_access::door`（crates/remote_access/Spec.lean §8-11），kernel 不依赖它，所以这里存它给出的字。
+- **设备与权限用正文写**：`device` 是设备 id 的 base32 正文，`authority` 是 `watch` 或 `act`。两者的类型与拼写归 `remote_access::door`（Sprawling/remote_access/Spec.lean §8-11），kernel 不依赖它，所以这里存它给出的字。
 
 ### 8-83 一份文档的一次写与一处修改提案的一生（`kernel::event::record::document`，形状 2 值类型）
 
@@ -571,7 +571,7 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 ```
 
 - **四种都是 record-only，追加在 `ALL` 末尾**，次序是 `document_written`、`proposal_offered`、`proposal_decided`、`proposal_withdrawn`（D15）。不写 `ig`：0.0.7 的读者不认识它们，按 D10 报 `E_LOG_VERSION_UNSUPPORTED`。
-- **`document_written` 是保存的回执**：写在城名下，载荷不携正文；同一条命令写下的每一行都带那条命令的 `idem`（accounting 的 `commanding::entrance`），页面凭它认出「这是我那一次」，并从 `version` 读到下一次保存的基线（`crates/wire/Spec.lean` §8-72）。`bytes` 是新版本的长度，不是改了多少。
+- **`document_written` 是保存的回执**：写在城名下，载荷不携正文；同一条命令写下的每一行都带那条命令的 `idem`（accounting 的 `commanding::entrance`），页面凭它认出「这是我那一次」，并从 `version` 读到下一次保存的基线（`Sprawling/wire/Spec.lean` §8-72）。`bytes` 是新版本的长度，不是改了多少。
 - **区间是两个整数，不是 `documents::Span`**：kernel 不依赖 `documents`，读者经 `documents::Span::new(start, end)` 把它读回来，起点在终点之后的一行在那里被拒。
 - **`before` 与 `after` 各至多 `documents::WINDOW_BYTES_MAX` 字节**：一张卡是一个窗口读得下的一段（documents D18）。判定在提出提案的那一处，kernel 只携带。
 - **提案的身份不在载荷里**：它是提出它的 run 与上面六个值的摘要，由 `documents::Offer::id` 一处算出（documents D13）；`proposal_decided` 与 `proposal_withdrawn` 的 `proposal` 就是这个摘要。同一个 run 对同一版同一段提同一句话是同一个提案。
@@ -593,7 +593,7 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 
 **理由**：一件工具是什么，权威是它的 `ToolMeta`；这份登记只在一次 run 的工具台上存在，折叠账本的读面够不到它，而楼的 MCP 工具与内置工具的登记每次 run 都可能不同。写在调用那一行上，读面读到的就是那一刻的事实，一件新工具进来不需要任何读者多写一臂。
 
-**被否**：①读面按工具名穷尽匹配出呈现：每加一件工具都要改这个匹配，MCP 工具的名字读面根本不知道；②读面持一份工具登记，在折叠时查：登记随楼与 run 变，旧行会被今天的登记重新解释；③线上自定一个不含地址的投影枚举：同一规则的第二个权威（`crates/wire/Spec.lean` §8-0）。
+**被否**：①读面按工具名穷尽匹配出呈现：每加一件工具都要改这个匹配，MCP 工具的名字读面根本不知道；②读面持一份工具登记，在折叠时查：登记随楼与 run 变，旧行会被今天的登记重新解释；③线上自定一个不含地址的投影枚举：同一规则的第二个权威（`Sprawling/wire/Spec.lean` §8-0）。
 
 **代价**：经工具台写下的每条 `tool_called` 多二三十个字节。
 
@@ -643,12 +643,12 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 
 **重开参数**：出现一个读者需要工具内部分段（门、路径解析、IO、秘密扫描、检查点）的入账读数时，重议是否在 `tool_result` 里记分段，或只在仪表里记（今天只在仪表里记）。
 
-写方：`runtime::turn` 从 `RunHooks.monotonic_us` 读三次单调读数（工具开始与答复、尝试发出、首个内容、回复收齐），差即这三把键；它与线上的 `Call`、`Used` 帧同一次 `WIRE_V` 进位（`crates/wire/Spec.lean` D22）。
+写方：`runtime::turn` 从 `RunHooks.monotonic_us` 读三次单调读数（工具开始与答复、尝试发出、首个内容、回复收齐），差即这三把键；它与线上的 `Call`、`Used` 帧同一次 `WIRE_V` 进位（`Sprawling/wire/Spec.lean` D22）。
 -/
 
 /-! D64 `tool_result` 记下画出模型所见文本的渲染器，缺席读作 V1
 
-**决定**：`tool_result` 多两把可缺席的键：`rendered: Option<Rendering>` 说出模型读到的那段文本由哪一版渲染器从这一行画出，`shown_bytes: Option<u64>` 是那段文本的字节数。`Rendering` 是 `V1`、`V2`、`V3`、`V4`，serde 小写串。缺席的 `rendered` 读作 `V1`（`Rendering::of`），也就是载荷的紧凑 JSON：这把键出现之前的每一行都是这样给模型看的。渲染器本身住 `runtime::rendering`（`crates/runtime/spec/Rendering.lean` §8-63），因为它要知道每个工具的结果形状；kernel 只持有「这一行由哪一版画出」这个事实。只认 V1–V3 的旧构建读到 `"v4"` 时仍按未知的 serde 枚举值拒绝，`Payload::read` 报 `E_WIRE_MISMATCH`；这是新行不能被旧构建重建的已知兼容边界，未知版本不会被猜成旧版本。
+**决定**：`tool_result` 多两把可缺席的键：`rendered: Option<Rendering>` 说出模型读到的那段文本由哪一版渲染器从这一行画出，`shown_bytes: Option<u64>` 是那段文本的字节数。`Rendering` 是 `V1`、`V2`、`V3`、`V4`，serde 小写串。缺席的 `rendered` 读作 `V1`（`Rendering::of`），也就是载荷的紧凑 JSON：这把键出现之前的每一行都是这样给模型看的。渲染器本身住 `runtime::rendering`（`Sprawling/runtime/spec/Rendering.lean` §8-63），因为它要知道每个工具的结果形状；kernel 只持有「这一行由哪一版画出」这个事实。只认 V1–V3 的旧构建读到 `"v4"` 时仍按未知的 serde 枚举值拒绝，`Payload::read` 报 `E_WIRE_MISMATCH`；这是新行不能被旧构建重建的已知兼容边界，未知版本不会被猜成旧版本。
 
 **理由**：账本存结构化的答，模型读的是文本，文本是行与渲染器的函数。从账本重建一段对话（分支、恢复）时，模型要看到它当时看到的字节，否则一个已缓存的前缀从第一条工具结果起就失效，而且模型读到的历史不是它当时据以行动的那一份。版本随行而不随 run：一个 run 可能跨过一次二进制升级，前后两行由不同的渲染器画出。`shown_bytes` 让「模型可见的字节」按工具分账，不必在读者那边重渲染一遍。
 
@@ -659,20 +659,20 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 
 /-! D21 会话中改运行策略是一个入窗的种类 `run_policy_changed`，在下一个 `SafePoint::BeforeWave` 生效
 
-**决定**：加一个种类 `run_policy_changed`（`EventKind::RunPolicyChanged`，追加在 `ALL` 末尾，不写 `ig`），载荷 `RunPolicyChanged { policy: RunPolicy, by: Who }`，`addr` 是房间，`run` 恒为 `RunId::CITY`：这一行是人经城做的事，由 accounting 的 `record_at` 这一扇城自己的门写下；正在跑的 run 按 `addr` 认出它，不按 `run`。写方是城：收到线上的 `Command::ChangeRunPolicy { room, policy, idem }` 时写这一行；正在跑的 run 经 `Interrupt::Policy` 在任一安全点收到它（与 Steer 同一扇门），在下一个 `SafePoint::BeforeWave` 生效（runtime D28，`crates/runtime/spec/PolicyTake.lean`）：从那一波起按新策略过门，并在那一波工具结果之后追加一句说明，冻结的前缀不动。此后人派进这个房间的 run，`run_started.policy` 取房间这一 session 里最后一次改过的策略，帧里带的策略只管没有改过的 session；新的 `session_opened` 让房间回到帧里的策略，因为会话菜单只把 session 开始之后的改动当作房间的状态（`crates/sprawling/spec/Accounting/Worker.lean` §8-133）。窗类：入窗，因为那一句说明决定下一次模型请求的字节。模型与思考强度在会话中不变。
+**决定**：加一个种类 `run_policy_changed`（`EventKind::RunPolicyChanged`，追加在 `ALL` 末尾，不写 `ig`），载荷 `RunPolicyChanged { policy: RunPolicy, by: Who }`，`addr` 是房间，`run` 恒为 `RunId::CITY`：这一行是人经城做的事，由 accounting 的 `record_at` 这一扇城自己的门写下；正在跑的 run 按 `addr` 认出它，不按 `run`。写方是城：收到线上的 `Command::ChangeRunPolicy { room, policy, idem }` 时写这一行；正在跑的 run 经 `Interrupt::Policy` 在任一安全点收到它（与 Steer 同一扇门），在下一个 `SafePoint::BeforeWave` 生效（runtime D28，`Sprawling/runtime/spec/PolicyTake.lean`）：从那一波起按新策略过门，并在那一波工具结果之后追加一句说明，冻结的前缀不动。此后人派进这个房间的 run，`run_started.policy` 取房间这一 session 里最后一次改过的策略，帧里带的策略只管没有改过的 session；新的 `session_opened` 让房间回到帧里的策略，因为会话菜单只把 session 开始之后的改动当作房间的状态（`Sprawling/app/spec/Accounting/Worker.lean` §8-133）。窗类：入窗，因为那一句说明决定下一次模型请求的字节。模型与思考强度在会话中不变。
 
-**理由**：改策略是城里发生过的事，重放要能说出某一步是在哪个策略下过的门；把它记在 `run_started` 里只够说一次 run 开头的策略。生效点放在安全点而不是立即，是因为一个工具波已经按旧策略过了门，半途换门会让同一波的两次调用被不同的规则判。工具定义不随策略变：会话开始时工具清单定成各模式的并集（`crates/runtime/spec/Catalog.lean` D25），所以改策略只动门与那一句说明，提示缓存不失效。
+**理由**：改策略是城里发生过的事，重放要能说出某一步是在哪个策略下过的门；把它记在 `run_started` 里只够说一次 run 开头的策略。生效点放在安全点而不是立即，是因为一个工具波已经按旧策略过了门，半途换门会让同一波的两次调用被不同的规则判。工具定义不随策略变：会话开始时工具清单定成各模式的并集（`Sprawling/runtime/spec/Catalog.lean` D25），所以改策略只动门与那一句说明，提示缓存不失效。
 
 **被否**：①复用 `autonomy_changed`：它回答的是「谁答设计问题」，作用域是城或楼，与一次 run 的纪律是两件事；②只改偏好文件、不入账：重放读不到，门的判决就没有来历；③立即生效：同一波工具被两套规则判。
 
 **重开参数**：出现会话中改模型或思考强度的需求时，重议是否把它们并进同一个种类（今天它们在会话中固定，因为换模型使缓存整段失效）。
 
-载荷在 `kernel::event::record::run`（`RunPolicyChanged`，`by` 经 `Who` 的拼写）；窗类在 `spec/Event/Kind.lean` 记作 `InWindow`。门一侧的取用（`Interrupt::Policy`、`runtime::PolicyCell` 在 `BeforeWave` 取用、追加那一句）在 `crates/runtime/src/run/lifecycle.rs`；尚未落地的是把这一行投进正在跑的 run 的信箱，以及 `edit` 与 `exec` 改读 `PolicyReader`，所以今天的写门仍按 `run_started.policy` 判。
+载荷在 `kernel::event::record::run`（`RunPolicyChanged`，`by` 经 `Who` 的拼写）；窗类在 `spec/Event/Kind.lean` 记作 `InWindow`。门一侧的取用（`Interrupt::Policy`、`runtime::PolicyCell` 在 `BeforeWave` 取用、追加那一句）在 `Sprawling/runtime/src/run/lifecycle.rs`；尚未落地的是把这一行投进正在跑的 run 的信箱，以及 `edit` 与 `exec` 改读 `PolicyReader`，所以今天的写门仍按 `run_started.policy` 判。
 -/
 
 /-! D22 会话的显示名是一个 record-only 种类 `session_named`；地址仍是身份，标签仍在偏好文件里
 
-**决定**：加一个种类 `session_named`（`EventKind::SessionNamed`，record-only，追加在 `ALL` 末尾），载荷 `SessionNamed { began: Seq, name: String }`：`addr` 是房间，`began` 指认这段 session（与 `wire::SessionLine.began` 同一个值），`name` 是人给的显示名，空串即撤回显示名、退回地址。写方是城，收到 `Command::NameSession { room, began, name, idem }` 时写，名字经 `crates/wire/spec/CarriedName.lean` 的规则拒空白与控制字符。同一段 session 以最后一行为准。标签不入账：它们仍是偏好文件里的 `tags`（`crates/wire/spec/Preference.lean` D21）；没有标签时读者按工作区给一个默认标签，这是读法，不是记录。
+**决定**：加一个种类 `session_named`（`EventKind::SessionNamed`，record-only，追加在 `ALL` 末尾），载荷 `SessionNamed { began: Seq, name: String }`：`addr` 是房间，`began` 指认这段 session（与 `wire::SessionLine.began` 同一个值），`name` 是人给的显示名，空串即撤回显示名、退回地址。写方是城，收到 `Command::NameSession { room, began, name, idem }` 时写，名字经 `Sprawling/wire/spec/CarriedName.lean` 的规则拒空白与控制字符。同一段 session 以最后一行为准。标签不入账：它们仍是偏好文件里的 `tags`（`Sprawling/wire/spec/Preference.lean` D21）；没有标签时读者按工作区给一个默认标签，这是读法，不是记录。
 
 **理由**：显示名是这段 session 在城里叫什么，换一台设备、导出这座城、让居民在对话里提到它，读到的都该是同一个名字，所以它属于城的历史；标签是人怎么归类自己的工作，D21 已经给了它一个家。显示名不改地址：地址决定读写域与账本身份，改它等于搬家。
 
@@ -683,7 +683,7 @@ pub struct ProposalWithdrawn { pub proposal: B3Hash }
 
 /-! D23 skill 上架时的审核是一个 record-only 种类 `skill_audited`；调用记录不加种类，从已有的行折出
 
-**决定**：加一个种类 `skill_audited`（`EventKind::SkillAudited`，record-only，追加在 `ALL` 末尾），由城在一个 skill 落位之后、以及扫架时看见它此刻的整包摘要没有审核时写（每个 `(skill, digest)` 在一个城进程里只发起一次；何时发起、问谁、怎样读回答由 `crates/city/spec/Library/Audit.lean` city D19 规定），`run` 为 `RunId::CITY`，`addr` 是书架所在的 scope。载荷：
+**决定**：加一个种类 `skill_audited`（`EventKind::SkillAudited`，record-only，追加在 `ALL` 末尾），由城在一个 skill 落位之后、以及扫架时看见它此刻的整包摘要没有审核时写（每个 `(skill, digest)` 在一个城进程里只发起一次；何时发起、问谁、怎样读回答由 `Sprawling/city/spec/Library/Audit.lean` city D19 规定），`run` 为 `RunId::CITY`，`addr` 是书架所在的 scope。载荷：
 
 ```rust
 pub struct SkillAudited {
@@ -727,9 +727,9 @@ pub enum WaitEnd { Reply { reply: SignalId }, Timeout, Left }   // 回信到了�
 - `deadline_ms` 是注入时钟上的读数，不是墙钟：重放按 seq 读次序，不按时刻；线上把它换成墙钟时刻（wire D34）。
 - 等待期间 run 不调模型、不写 `model_returned`，watchdog 读到一个未配对的 `started` 就知道这个 run 是停着而不是卡住，不对它退避或报警。
 
-**现状**：两个种类已在 `crates/kernel/spec/Event/Kind.lean` 的表里与 `EventKind` 里（`ALL` 末尾，入窗），上面三个载荷类型在 `kernel::event::record`（`crates/kernel/src/event/record/collaboration.rs`；`WaitEnd` 线上以 `end` 键区分三臂），还没有写方；写方是 collab 的发信门（collab D9），读者在那之前把两个种类当作没有内容的行跳过。
+**现状**：两个种类已在 `Sprawling/kernel/spec/Event/Kind.lean` 的表里与 `EventKind` 里（`ALL` 末尾，入窗），上面三个载荷类型在 `kernel::event::record`（`Sprawling/kernel/src/event/record/collaboration.rs`；`WaitEnd` 线上以 `end` 键区分三臂），还没有写方；写方是 collab 的发信门（collab D9），读者在那之前把两个种类当作没有内容的行跳过。
 
-**理由**：一个停着的 run 必须在账本里看得出来，否则 `status`、页面、watchdog 与重放都分不清它在等还是卡住（`crates/collab/spec/Delivery.lean` 的 `wait_bounded`、`waits_end` 说的是模型，账本要能把同一件事说给读者）。开始与结束分两行，是因为等待跨越安全点、可能跨越进程死亡；只记一行「等过多久」要等结束才写，中间那段时间什么都看不见。入窗，是因为下一次模型调用要知道它是被回信还是被超时叫醒的。
+**理由**：一个停着的 run 必须在账本里看得出来，否则 `status`、页面、watchdog 与重放都分不清它在等还是卡住（`Sprawling/collab/spec/Delivery.lean` 的 `wait_bounded`、`waits_end` 说的是模型，账本要能把同一件事说给读者）。开始与结束分两行，是因为等待跨越安全点、可能跨越进程死亡；只记一行「等过多久」要等结束才写，中间那段时间什么都看不见。入窗，是因为下一次模型调用要知道它是被回信还是被超时叫醒的。
 
 **被否**：①不入账、只在内存里停：重放与重开的页面看不到一个正在等的 run；②在 `signal_enqueued` 的载荷上加 `wait` 字段：说得出开始，说不出结束；③用 `run_policy_changed` 之类的已有种类表示停住：一个种类两种意思。
 
@@ -738,7 +738,7 @@ pub enum WaitEnd { Reply { reply: SignalId }, Timeout, Left }   // 回信到了�
 
 /-! D61 一次端点门前的等待是一行 record-only 的 `prefix_held`，种类表的行与实现同一次改动落地
 
-**决定**：一个种类（追加在 `ALL` 末尾，只入账），写方是 runtime 的回合层：一次尝试返回之后（成功与失败两臂），它问模型端口的 `prefix_held`（`crates/kernel/spec/Model.lean` D60），有就写这一行，`run` 是那次尝试的 run，`addr` 缺席（与 `model_called` 相同：回合层的行由 run 说明是谁的），位置紧跟那次尝试的 `model_called`、在 `model_returned` 或那次失败之前：
+**决定**：一个种类（追加在 `ALL` 末尾，只入账），写方是 runtime 的回合层：一次尝试返回之后（成功与失败两臂），它问模型端口的 `prefix_held`（`Sprawling/kernel/spec/Model.lean` D60），有就写这一行，`run` 是那次尝试的 run，`addr` 缺席（与 `model_called` 相同：回合层的行由 run 说明是谁的），位置紧跟那次尝试的 `model_called`、在 `model_returned` 或那次失败之前：
 
 ```rust
 pub struct PrefixHeld {
@@ -756,7 +756,7 @@ pub enum PrewarmSent {               // 先试 Refused，同 CacheRenewed：Answ
 }
 ```
 
-载荷住 `crates/kernel/src/event/record/prefix_held.rs`，在 `renewal.rs` 旁，与 `CacheRenewed` 同族；窗类是 `RecordOnly`，因为等待不改任何一次请求的字节。`model_returned.took_us` 从尝试发出算起，包含这段等待。
+载荷住 `Sprawling/kernel/src/event/record/prefix_held.rs`，在 `renewal.rs` 旁，与 `CacheRenewed` 同族；窗类是 `RecordOnly`，因为等待不改任何一次请求的字节。`model_returned.took_us` 从尝试发出算起，包含这段等待。
 
 **理由**：人看见一个子 run 晚出发几秒，要能在它自己的历史里读到为什么；pre-warm 是一次真请求，它的写价要进城的历史。花费只在发它的那一行，一笔钱只入一次账。
 
@@ -778,7 +778,7 @@ pub enum Landing { Delivered, Queued, Knocked }   // 进了正在跑的 run 的�
 - 敲门之后被推迟或被链长拒绝，落点仍是 `Knocked`：这一行记的是投递那一刻的判定，敲门的去向由 `run_started` 或那一条拒绝说。
 - 这一行之前写下的账本没有它；页面配不上就画工具自己答的东西，不猜。
 - 每条路径上的发信 run，就是那一行 `signal_enqueued` 的 `run`：relay 路径是正在跑、调用了 `send` 的那个 run；交接路径是落地的子 run（交接信以它的名义写）；落定路径是正在落定的那个 run（阻塞通知以放下红节点的 run 的名义写）。
-- 三条路径都写这一行，所以性质 8 的「每封信恰一行」在整座城成立（`crates/collab/spec/Delivery.lean` 的 `send` 不分路径）。一次落定投递到一半被房间拒绝时，已写下的落点行留在账本上，敲门按 `settling::landing` 的口径退回标记：那几行记的仍是投递那一刻的判定，与被推迟的敲门同一口径。
+- 三条路径都写这一行，所以性质 8 的「每封信恰一行」在整座城成立（`Sprawling/collab/spec/Delivery.lean` 的 `send` 不分路径）。一次落定投递到一半被房间拒绝时，已写下的落点行留在账本上，敲门按 `settling::landing` 的口径退回标记：那几行记的仍是投递那一刻的判定，与被推迟的敲门同一口径。
 - 判定只读进程里的房间表与敲门队列，Windows、macOS、Linux 上同一段 trace 得同一行。
 
 **理由**：工具答复时还不知道信落在哪里（collab D17），页面要把三种结果画在发信那一行上，就要一行在判定的那一刻把它记下来；只入账，因为发信的模型已经读过工具的答复，落点不改变它下一次请求的字节。
@@ -803,7 +803,7 @@ pub enum Landing { Delivered, Queued, Knocked }   // 进了正在跑的 run 的�
 为可缺席 SecretRef，header 为可缺席字符串；引用缺席代表匿名账号。
 `validate_provider_accounts` 是非空、id/reference 唯一及 header 合法性的唯一判定。
 AttachedTuning.accounts 缺席保留旧登记；显式列表解析失败必须拒绝，不能抹掉整张
-tuning 后回退 auth。顺序与准入模型见 `crates/gateway/spec/Router.lean`。
+tuning 后回退 auth。顺序与准入模型见 `Sprawling/gateway/spec/Router.lean`。
 -/
 
 /-! ModelCalled.provider_account 是可缺席的 ProviderAccountBinding，含 provider 与

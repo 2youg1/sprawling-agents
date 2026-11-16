@@ -7,7 +7,7 @@
 //!
 //! The reads a turn started while the model was still generating
 //! (`super::speculation`) are accounted here like every other call, each
-//! taking its cached result; `crates/runtime/spec/Turn/Speculation.lean` is the
+//! taking its cached result; `Sprawling/runtime/spec/Turn/Speculation.lean` is the
 //! authority on why that leaves the lines, in the order and with the
 //! payloads, that serial execution writes.
 //!
@@ -21,7 +21,7 @@
 //! and everything held before it to be durable before its tool runs, and
 //! its `tool_result` rides the next barrier (runtime D24). Which
 //! properties that order keeps on every crash point is
-//! `crates/runtime/spec/Turn/Durability.lean`.
+//! `Sprawling/runtime/spec/Turn/Durability.lean`.
 
 use kernel::event::record::{ToolAnswer, ToolCalled, ToolResult};
 use kernel::{
@@ -60,11 +60,11 @@ pub(super) use reorder::lost_answer;
 pub trait ConcurrentInvoke {
     /// The registration of the call's tool: its effect decides whether
     /// the call is read-only, and `tool_called` copies its effect and
-    /// render (`crates/runtime/spec/Turn.lean` §8-51). `None` is a tool the bench does not
+    /// render (`Sprawling/runtime/spec/Turn.lean` §8-51). `None` is a tool the bench does not
     /// know, which is not read-only.
     fn meta_of(&self, call: &ToolCall) -> Option<&ToolMeta>;
     /// The call behind a `tool` `run`, resolved before anything
-    /// reads a registration (`crates/runtime/Spec.lean` §8-61).
+    /// reads a registration (`Sprawling/runtime/Spec.lean` §8-61).
     fn resolve_call(&self, call: ToolCall) -> ToolCall {
         call
     }

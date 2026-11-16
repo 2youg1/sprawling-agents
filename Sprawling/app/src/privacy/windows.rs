@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The Windows privacy adapters and the host facts read from the
-//! protected installation record (`crates/sprawling/spec/Privacy/Windows.lean`).
+//! protected installation record (`Sprawling/app/spec/Privacy/Windows.lean`).
 //!
 //! Everything here reads `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion`
 //! through the 64-bit view, which only an administrator can change, so
@@ -46,7 +46,7 @@ pub(crate) fn powershell() -> Result<std::path::PathBuf, AxError> {
 /// current directory or this binary's own folder would find it: any
 /// process of this user can change the first three, and the binary's
 /// folder is often writable by this user (Privacy.Cli D55; `cmd.exe` and
-/// `icacls.exe`, `crates/sprawling/spec/Keying.lean` D76).
+/// `icacls.exe`, `Sprawling/app/spec/Keying.lean` D76).
 ///
 /// # Errors
 /// `ToolUnavailable` when the record is unreadable or names a relative

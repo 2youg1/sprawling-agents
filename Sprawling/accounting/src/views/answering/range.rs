@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One window of a stored document version (`crates/accounting/spec/Views/Document.lean` §8-21,
-//! `crates/wire/Spec.lean` §8-70).
+//! One window of a stored document version (`Sprawling/accounting/spec/Views/Document.lean` §8-21,
+//! `Sprawling/wire/Spec.lean` §8-70).
 //!
 //! Reads the content store and nothing else: the version is the
 //! object's address, so a page reading on through a file a resident is
@@ -56,7 +56,7 @@ fn window_of(city_root: &Path, version: &B3Hash, wanted: Span) -> Result<Window,
 
 /// The bytes of one stored version a window needs, and the encoding its
 /// mark names: the one read of the store a range and a preview both make
-/// (`crates/accounting/spec/Views/Document.lean` §8-21, accounting D41).
+/// (`Sprawling/accounting/spec/Views/Document.lean` §8-21, accounting D41).
 pub(super) struct Stored {
     pub(super) encoding: Encoding,
     at: u64,

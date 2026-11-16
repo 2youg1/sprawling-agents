@@ -26,9 +26,9 @@ use serde::{Deserialize, Serialize};
 ///
 /// The remaining fields are the city's own, each from its one
 /// authority: `thinking` names the rung it came from, `canonical` is
-/// `gateway::provider::identity`'s (`crates/wire/spec/Answer/Endpoints.lean` §8-92),
+/// `gateway::provider::identity`'s (`Sprawling/wire/spec/Answer/Endpoints.lean` §8-92),
 /// and `listing` is what the attach recorded about where the row came
-/// from (`crates/wire/spec/Frames.lean` D57).
+/// from (`Sprawling/wire/spec/Frames.lean` D57).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ModelFactsSummary {

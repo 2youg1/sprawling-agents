@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a picture is on the canonical conversation.
-//! The part `crates/kernel/spec/Model.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Model.lean` specifies this module with the
 //! rest of `kernel::model`.
 //!
 //! The ledger holds a reference and four integers, never bytes: the

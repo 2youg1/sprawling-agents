@@ -5,7 +5,7 @@
 
 // The device's own key: a hybrid of Ed25519 and ML-DSA-44, both halves
 // derived from one 32-byte seed exactly as the city derives its own
-// (`crates/remote_access/Spec.lean` §8-3), so a signature holds only
+// (`Sprawling/remote_access/Spec.lean` §8-3), so a signature holds only
 // when both halves hold. The Ed25519 half is a WebCrypto key this page
 // can sign with and no script can export (D1); the ML-DSA half has no
 // WebCrypto form, so its private bytes are held as bytes (D21).

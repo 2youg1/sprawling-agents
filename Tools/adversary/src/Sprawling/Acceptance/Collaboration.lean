@@ -22,7 +22,7 @@ walk. The one thing the walk learns from the city before it can go on is the
 branch the offer was made on: it is named after a digest of the room, which
 this directory does not predict, so the walk reads it from the history and
 appends the run that checks it to the stand-in's script
-(`crates/adversary/Spec.lean` D7).
+(`Tools/adversary/Spec.lean` D7).
 -/
 
 namespace Sprawling.Acceptance

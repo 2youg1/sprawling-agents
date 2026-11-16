@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How each tool a building admits reaches its runs
-//! (`crates/wire/spec/Answer/Catalog.lean` §8-99).
+//! (`Sprawling/wire/spec/Answer/Catalog.lean` §8-99).
 //!
 //! Once a run has frozen a tool table, the rows are that table, because
 //! assembling a workbench to answer a page would shake hands with every

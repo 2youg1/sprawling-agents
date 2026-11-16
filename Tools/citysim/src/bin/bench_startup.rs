@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The four-action pressure reading (`crates/citysim/spec/BenchStartup.lean`
+//! The four-action pressure reading (`Tools/citysim/spec/BenchStartup.lean`
 //! §8-5): install, startup, raise a city, open a session - and
 //! the first byte a served city answers with, over three lengths of
 //! history (section 8-5-1). `bench_startup first-byte` takes that last
@@ -12,7 +12,7 @@
 //! This is a measuring Main, the third sanctioned sampling point besides
 //! `bin::assembly` and `citysim::bench`: every `Instant::now` here carries
 //! the same `#[expect]` the first two carry. It measures and gates
-//! nothing; `crates/xtask/budgets.toml` is where a reading is recorded.
+//! nothing; `Tools/xtask/budgets.toml` is where a reading is recorded.
 //!
 //! The shipped binary is the one beside this executable - the build
 //! profile directory is the one place `cargo build` puts both - and
@@ -83,7 +83,7 @@ fn main() -> ExitCode {
 /// suffix.
 ///
 /// The fact has one authority, the per-platform `binary` field of
-/// `crates/xtask/src/platform.rs`, and this crate cannot reach it: the bin's
+/// `Tools/xtask/src/platform.rs`, and this crate cannot reach it: the bin's
 /// `install` module is not importable and `xtask` is tooling. The
 /// restatement, its reason, and what would retire it are recorded as
 /// citysim D5.
@@ -112,7 +112,7 @@ fn run() -> Result<(), AxError> {
 }
 
 /// The first byte of `GET /` over the three fixture cities, which are
-/// kept beside the build directory and reused (`crates/citysim/spec/BenchStartup.lean`
+/// kept beside the build directory and reused (`Tools/citysim/spec/BenchStartup.lean`
 /// §8-5-1).
 fn first_bytes(binary: &Path) -> Result<(), AxError> {
     let Some(cities) = binary
@@ -143,7 +143,7 @@ first byte: `serve` spawned to the first byte of GET /, fixture cities in {}",
     println!(
         "two readings compare only when their fixture digests are equal; each serve's \
          standard error is kept beside its city, and its `opened the city in` line is the \
-         product's own split of the same opening (`crates/sprawling/Spec.lean` §8-121)"
+         product's own split of the same opening (`Sprawling/app/Spec.lean` §8-121)"
     );
     println!(
         "{:<8} {:>8} {:>10} {:>10} {:>10}   {:<16}   serve log",

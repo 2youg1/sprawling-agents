@@ -5,7 +5,7 @@
 
 //! The window and the ceiling the city would register for each row of a
 //! model table the person left empty, each with the rung that answered
-//! (`crates/wire/spec/Answer/ModelFigures.lean` §8-97, wire D58).
+//! (`Sprawling/wire/spec/Answer/ModelFigures.lean` §8-97, wire D58).
 //!
 //! Read shapes only: the ladder is `gateway::Figures::resolve`, the one
 //! the pick point calls, so a page that draws these draws what a pick

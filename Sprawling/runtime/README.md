@@ -158,7 +158,7 @@ comment opening with `D<n>` above what it governs.
 
 ```bash
 cargo nextest run -p sprawling-runtime --all-features   # the tests, with the engine, as `just test` runs them
-lake build crates.runtime.Spec                          # the proofs; `just models` builds every crate's
+lake build Sprawling.runtime.Spec                          # the proofs; `just models` builds every crate's
 cargo xtask gates spec specalign modmap depmap          # no sorry, every anchor on disk, every edge allowed
 just sim                                                # the citysim scenarios, which drive this turn loop
 ```

@@ -39,7 +39,7 @@ pub(crate) const LAB: Setup = Setup {
     neighbour: "lab/other",
 };
 
-/// City Hall, which plans (`crates/city/Spec.lean` §8-22).
+/// City Hall, which plans (`Sprawling/city/Spec.lean` §8-22).
 pub(crate) const HALL: Setup = Setup {
     building: "hall",
     room: "hall/mayor",
@@ -375,7 +375,7 @@ pub(crate) fn lay_draft(city: &Path, setup: &Setup) {
 }
 
 /// An offer is a card the person is shown and nothing more: the
-/// document keeps its bytes (`crates/accounting/Spec.lean` §8-30).
+/// document keeps its bytes (`Sprawling/accounting/Spec.lean` §8-30).
 fn proposal(setup: &Setup) -> Episode {
     Episode {
         step: Step {
@@ -412,7 +412,7 @@ fn proposal(setup: &Setup) -> Episode {
 }
 
 /// Refused at the effect layer: a run does not change what governs it
-/// (`crates/city/Spec.lean` §8-2b). Judged by the file staying as it was.
+/// (`Sprawling/city/Spec.lean` §8-2b). Judged by the file staying as it was.
 fn rules() -> Episode {
     Episode {
         step: Step {
@@ -434,7 +434,7 @@ fn rules() -> Episode {
 /// A shell is off unless a building turns it on, so a command is one
 /// program and its arguments, and a line that needs a shell is refused
 /// rather than run as some other command
-/// (`crates/runtime/spec/Tools/Exec.lean` D118).
+/// (`Sprawling/runtime/spec/Tools/Exec.lean` D118).
 fn exec() -> Episode {
     Episode {
         step: Step {
@@ -511,7 +511,7 @@ fn succeed() -> Episode {
 }
 
 /// The guide of a dormant tool: its whole disclosure, its schema, and
-/// how it is run (`crates/runtime/Spec.lean` §8-60).
+/// how it is run (`Sprawling/runtime/Spec.lean` §8-60).
 fn detail() -> Episode {
     Episode {
         step: Step {
@@ -567,7 +567,7 @@ fn run_itself() -> Episode {
 }
 
 /// Refused at the effect layer: a run does not raise a building
-/// (`crates/city/Spec.lean` §8-23). Judged by the building not existing.
+/// (`Sprawling/city/Spec.lean` §8-23). Judged by the building not existing.
 fn city() -> Episode {
     Episode {
         step: Step {
@@ -627,7 +627,7 @@ pub(crate) fn answered_text(answer: &ToolAnswer) -> Result<&str, String> {
         .ok_or_else(|| "the result carries no text".to_owned())
 }
 
-// The transcription tool (`crates/sprawling/Spec.lean` §8-131). It is offered only to
+// The transcription tool (`Sprawling/app/Spec.lean` §8-131). It is offered only to
 // a city that chose an endpoint to transcribe, and the two catalogue
 // tests choose none, so the tool is covered here by cities of its own.
 
@@ -729,7 +729,7 @@ fn a_confidential_building_is_not_offered_a_transcription_endpoint_off_this_mach
 const STORED: &[u8] = b"RIFF\x24\x00\x00\x00WAVEfmt a stored recording";
 
 /// The transcription tool reads a block a connector stored, by the
-/// locator the window showed for it (`crates/sprawling/Spec.lean` §8-131): no name,
+/// locator the window showed for it (`Sprawling/app/Spec.lean` §8-131): no name,
 /// so the container is read from its leading bytes.
 #[test]
 fn a_run_hears_a_recording_a_connector_stored_by_its_locator() {

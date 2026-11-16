@@ -6,7 +6,7 @@
 /-!
 # act：对一页动手，只用刚看过的那一页
 
-规定 `crates/browser/src/act.rs`（`browser::act`，`frame_for`、`ensure_fresh`、`selector_of`）与 `crates/browser/src/verb.rs` 里 `act` 一臂的判定。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/browser/src/act.rs`（`browser::act`，`frame_for`、`ensure_fresh`、`selector_of`）与 `Sprawling/browser/src/verb.rs` 里 `act` 一臂的判定。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 一个动作带着它被决定时的 generation。ref 是本次快照里的位置，不是页面里的稳定标识（D3）：页面是别人写的，不配合 `id` 或 `data-testid`；把 ref 定成位置，「页面动过了」就成了一个可判定的事实。代价是每次动手前必须先看一眼，这正是要的顺序。
 

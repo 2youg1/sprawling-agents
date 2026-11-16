@@ -20,7 +20,7 @@
 //! out, answering nothing however fast it was.
 //!
 //! **It is read a line at a time and only the lines the caller asked for
-//! are kept** (`crates/sprawling/spec/Doctor.lean` §8-166): a line is
+//! are kept** (`Sprawling/app/spec/Doctor.lean` §8-166): a line is
 //! held to [`LINE_MAX_BYTES`] and offered to the caller's `keep`, so one
 //! question never holds a program's whole output in this process.
 

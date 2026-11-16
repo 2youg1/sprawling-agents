@@ -5,7 +5,7 @@
 
 //! CLI entry. Subcommands land with their stages and are refused honestly
 //! until then — a refusal that names what is missing beats a stub that
-//! pretends (`crates/sprawling/Spec.lean`). Live now: status, replay, init, serve,
+//! pretends (`Sprawling/app/Spec.lean`). Live now: status, replay, init, serve,
 //! export, restore, resume, fork.
 
 // The city harness is the library half of this package (`src/lib.rs`);
@@ -19,7 +19,7 @@ use std::process::ExitCode;
 
 /// The static Linux build's allocator, because musl's `malloc` serialises
 /// every thread on one lock while this binary allocates on all of them
-/// (`crates/sprawling/spec/Serving/Memory.lean` D102). Every other target
+/// (`Sprawling/app/spec/Serving/Memory.lean` D102). Every other target
 /// keeps the allocator its platform ships.
 #[cfg(target_env = "musl")]
 #[global_allocator]

@@ -5,7 +5,7 @@
 
 //! The files under one address whose name holds a text, found by one
 //! bounded walk of the tree `Query::Listing` reads
-//! (`crates/wire/spec/Answer/Find.lean` §8-82).
+//! (`Sprawling/wire/spec/Answer/Find.lean` §8-82).
 //!
 //! The disk is the authority, as it is for `listing`: an index kept
 //! beside the tree would be a second copy of what the tree says (wire

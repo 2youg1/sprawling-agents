@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Who a run can reach, and who stands there (`crates/city/spec/Neighbourhood.lean` §8-15).
+//! Who a run can reach, and who stands there (`Sprawling/city/spec/Neighbourhood.lean` §8-15).
 //!
 //! This building has speech and had no address book. `signal` takes the
 //! address of whoever you are talking to, the refusal names the boundary
@@ -24,7 +24,7 @@ use kernel::{Address, AxError};
 
 use crate::resident::Identity;
 
-/// The heading `crates/city/templates/URBANITE.md` asks a resident to write the
+/// The heading `Sprawling/city/templates/URBANITE.md` asks a resident to write the
 /// kind of work that belongs with them under. A roster's one line is
 /// taken from there when it exists, because "why would I go to them" is
 /// exactly what that section answers.
@@ -370,7 +370,7 @@ mod tests {
         let template = include_str!("../templates/URBANITE.md");
         assert!(
             template.contains(BRING_HEADING),
-            "crates/city/templates/URBANITE.md no longer has {BRING_HEADING}"
+            "Sprawling/city/templates/URBANITE.md no longer has {BRING_HEADING}"
         );
     }
 }

@@ -18,7 +18,7 @@
 //! minus consumed — the Ledger is already the history, and a second
 //! durable copy would be a second answer.
 //!
-//! Specified by `crates/storage/spec/Queue.lean` §8-10.
+//! Specified by `Sprawling/storage/spec/Queue.lean` §8-10.
 
 use std::collections::BTreeMap;
 

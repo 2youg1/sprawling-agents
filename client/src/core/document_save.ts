@@ -5,7 +5,7 @@
 
 // What became of a person's unsaved work on one document: the draft the
 // browser keeps, the save the page sent, and the city's receipt for it
-// (client/Spec.lean §4-46, `crates/wire/Spec.lean` §8-72).
+// (client/Spec.lean §4-46, `Sprawling/wire/Spec.lean` §8-72).
 //
 // **Only the city says "saved".** A save is a `PutRange` on the version
 // it was made on; the city answers a refusal or nothing, and records a
@@ -134,7 +134,7 @@ export type Happened =
   | { readonly kind: "moved"; readonly version: B3Hash };
 
 // The city's spelling of the action a refused save failed at
-// (`crates/documents/src/edit.rs`, `accounting::worker::commanding::saving`).
+// (`Sprawling/documents/src/edit.rs`, `accounting::worker::commanding::saving`).
 // A refusal carries no key (§8-2), so this is how one is told to be a
 // save's.
 const SAVE_ACTION = "save a document";

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A city whose process died while it was writing its history opens
-//! again by the rules (`crates/sprawling/Spec.lean` §8-127): the half-written line is
+//! again by the rules (`Sprawling/app/Spec.lean` §8-127): the half-written line is
 //! cut and said, the chain verifies, a call whose answer was lost is
 //! closed as unknown rather than as failed, and the views answer from
 //! what survived, where the run that died is frozen.
@@ -211,7 +211,7 @@ struct ReopenedWhole {
 
 /// A city killed after the dispatch's job was put in the content store
 /// and before the `checkpoint_committed` line that cites it reached the
-/// history (`crates/storage/spec/Checkpoint.lean`). The blob is on disk
+/// history (`Sprawling/storage/spec/Checkpoint.lean`). The blob is on disk
 /// and nothing in the history names it, so no run had started: the city
 /// opens with no line to cut and no run to freeze, the history
 /// verifies, and the room takes the same task again. The kill is made on the disk, so it is the same
@@ -392,7 +392,7 @@ struct ReopenedAfterTheSwap {
 
 /// A city killed after a checkpoint's commit and reference reached the
 /// repository and before its `checkpoint_committed` line reached the
-/// history (`crates/storage/spec/Checkpoint/Concurrent.lean`, storage
+/// history (`Sprawling/storage/spec/Checkpoint/Concurrent.lean`, storage
 /// D25: a crashed writer leaves only garbage). The reference names a
 /// commit no line cites; the history the city reopens is the history up
 /// to the death, the run that died is frozen, and nothing is written
@@ -478,7 +478,7 @@ struct ReopenedMidBarrier {
 
 /// A city killed while the barrier of a wave of several lines was under
 /// way: the wave's first line reached the disk whole, half of its second
-/// did, and nothing after (`crates/storage/spec/Jsonl/Barrier.lean`). The
+/// did, and nothing after (`Sprawling/storage/spec/Jsonl/Barrier.lean`). The
 /// wave never answered `Ok`, so nobody was told of it; the reopened city
 /// cuts the torn half and says so, keeps the whole line once, freezes the
 /// run that died, and takes the task again. The wave is the one between

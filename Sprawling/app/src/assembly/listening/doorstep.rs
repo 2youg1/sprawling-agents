@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What a served city keeps at its own door on this machine
-//! (`crates/sprawling/spec/Serving.lean`): the browser door, with the
+//! (`Sprawling/app/spec/Serving.lean`): the browser door, with the
 //! clock and random source it is handed here, the paired browsers' table
 //! behind it, and the key file native clients read.
 //!
@@ -59,7 +59,7 @@ impl super::Listening {
     }
 
     /// The names the listener answers to; its `url` is the one a person
-    /// opens (`crates/wire/spec/Reception/Entry.lean` §8-94).
+    /// opens (`Sprawling/wire/spec/Reception/Entry.lean` §8-94).
     #[must_use]
     pub fn origins(&self) -> &wire::ListenerOrigins {
         self.bound.origins()

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A reader's place in a document, carried across a save
-//! (`crates/documents/Spec.lean` D10).
+//! (`Sprawling/documents/Spec.lean` D10).
 
 use crate::edit::Transaction;
 use crate::span::Span;

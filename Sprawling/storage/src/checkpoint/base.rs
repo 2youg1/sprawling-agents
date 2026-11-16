@@ -52,7 +52,7 @@ impl Checkpoint {
     /// Takes the handle by value: the in-memory store is installed on
     /// this handle's object database and cannot be taken off again, so
     /// the handle goes with it, and no later checkpoint can write an object
-    /// into a store nobody dumps (`crates/storage/spec/Checkpoint.lean` §8-8).
+    /// into a store nobody dumps (`Sprawling/storage/spec/Checkpoint.lean` §8-8).
     ///
     /// The commit moves HEAD when the city has none, under `HEAD_MOVES` and
     /// by compare-and-swap (storage D27), and is otherwise filed under

@@ -4,14 +4,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The interpreter a building names for its shell lines; the part
-//! `crates/kernel/spec/Config.lean` §8-22 specifies.
+//! `Sprawling/kernel/spec/Config.lean` §8-22 specifies.
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AxCode, AxError};
 
 /// Which interpreter a building's shell lines run under
-/// (`crates/kernel/spec/Config.lean` §8-22, `crates/runtime/Spec.lean`
+/// (`Sprawling/kernel/spec/Config.lean` §8-22, `Sprawling/runtime/Spec.lean`
 /// §8-13-2 D30).
 ///
 /// `System` is the platform's own shell, `%COMSPEC%` on Windows and

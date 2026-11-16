@@ -59,7 +59,7 @@ impl RunWorker {
         // checkpoint of this drive, so everything the whole drive deleted is
         // reported once rather than once per wave.
         // The diff itself was read on the lane before the run came home
-        // (`crates/sprawling/spec/Accounting/Landing.lean` D37); only its
+        // (`Sprawling/app/spec/Accounting/Landing.lean` D37); only its
         // lines are written here.
         if let Some(swept) = sweep.swept {
             let base = swept.base;
@@ -76,7 +76,7 @@ impl RunWorker {
                 let item = kernel::ApprovalItem {
                     // The sweep's own slot in this run: one escalation
                     // per run, at a position the run's call counter
-                    // never reaches (`crates/kernel/Spec.lean` §8-21).
+                    // never reaches (`Sprawling/kernel/Spec.lean` §8-21).
                     id: kernel::ApprovalId::of_sweep(&run_id),
                     actor: who.to_owned(),
                     artifact: sweep.job_locator.clone(),
@@ -113,7 +113,7 @@ impl RunWorker {
             // A node's claim is closed the moment its closing line is on
             // the ledger, not when `Roadmap.md` is rewritten or the whole
             // landing is: a refusal part-way leaves owed only the nodes
-            // whose last line still reads them as held (`crates/sprawling/Spec.lean`
+            // whose last line still reads them as held (`Sprawling/app/Spec.lean`
             // §8-42-8).
             let mut close =
                 |closing: effect::Closing| self.record_closing(run_id, closing, open_claims);

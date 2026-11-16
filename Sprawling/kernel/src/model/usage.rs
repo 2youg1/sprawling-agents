@@ -5,7 +5,7 @@
 
 //! What a provider reports a call cost in tokens, and how a stored row
 //! of it reads under each meaning `input_tokens` has had.
-//! The part `crates/kernel/spec/Model.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Model.lean` specifies this module with the
 //! rest of `kernel::model`.
 
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,7 @@ use crate::model::wire::DialectKind;
 ///
 /// A provider that never reports its cache and one that reports a zero
 /// hit are different facts to the User, so the two do not share a value
-/// (`crates/kernel/spec/Model.lean` D36). A stored row spells
+/// (`Sprawling/kernel/spec/Model.lean` D36). A stored row spells
 /// `Unreported` by leaving the key out; an absent key or `null` reads
 /// back as `Unreported`, a present `0` as `Reported(0)`.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

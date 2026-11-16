@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Whether an address is one of the city's own listeners, and which
-//! address a tab is on (`crates/browser/Spec.lean` D13).
+//! address a tab is on (`Sprawling/browser/Spec.lean` D13).
 //!
 //! A resident's browser that reached the city's own page would act there
 //! with whatever the profile holds for it; in the person's own browser

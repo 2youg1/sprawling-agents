@@ -11,7 +11,7 @@
 //! `env`, `interpreter`, `memory_ceiling` — so an arm cannot spell a result differently
 //! from its neighbour, and the tally that reads shell results back out
 //! of the ledger reads them under the same spellings
-//! (`crates/runtime/Spec.lean` §8-13-2 D30).
+//! (`Sprawling/runtime/Spec.lean` §8-13-2 D30).
 
 use std::collections::BTreeMap;
 

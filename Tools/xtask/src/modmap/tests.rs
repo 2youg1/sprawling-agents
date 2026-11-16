@@ -8,7 +8,7 @@ use super::*;
 /// One well-formed entry. TOML gives an inline table one line, so these are
 /// assembled at compile time rather than wrapped.
 const REGISTERED: &str = concat!(
-    r#"{ name = "kernel::gate", file = "crates/kernel/src/gate.rs", "#,
+    r#"{ name = "kernel::gate", file = "Sprawling/kernel/src/gate.rs", "#,
     r#"owns = "five gates", shape = "decision", since = "S2", "#,
     r#"status = "planned", spec = "kernel-SPEC.md#8-27" }"#,
 );
@@ -21,13 +21,13 @@ const TOOL: &str = concat!(
 );
 
 const BAD_STATUS: &str = concat!(
-    r#"{ name = "kernel::a", file = "crates/kernel/src/a.rs", "#,
+    r#"{ name = "kernel::a", file = "Sprawling/kernel/src/a.rs", "#,
     r#"owns = "x", shape = "decision", since = "S2", "#,
     r#"status = "done", spec = "s.md#8-1" }"#,
 );
 
 const EMPTY_DUTY: &str = concat!(
-    r#"{ name = "kernel::b", file = "crates/kernel/src/b.rs", "#,
+    r#"{ name = "kernel::b", file = "Sprawling/kernel/src/b.rs", "#,
     r#"owns = "   ", shape = "decision", since = "S2", "#,
     r#"status = "built", spec = "s.md#8-1" }"#,
 );
@@ -42,7 +42,7 @@ fn product() -> [Member; 1] {
     [Member {
         package: "kernel".to_owned(),
         lib: Some("kernel".to_owned()),
-        dir: "crates/kernel".to_owned(),
+        dir: "Sprawling/kernel".to_owned(),
         role: members::Role::Product,
         depends_on: BTreeSet::new(),
         publish: members::Publish::Registry,
@@ -58,7 +58,7 @@ fn an_entry_outside_the_product_is_carried_but_not_judged() {
     let mut violations = Vec::new();
     let found = rows(&map_of(&[REGISTERED, TOOL]), &product(), &mut violations);
     assert_eq!(found.len(), 1);
-    assert_eq!(found[0].path, "crates/kernel/src/gate.rs");
+    assert_eq!(found[0].path, "Sprawling/kernel/src/gate.rs");
     assert!(violations.is_empty());
 }
 
@@ -85,10 +85,10 @@ fn a_bad_status_a_duplicate_and_an_empty_duty_are_each_refused() {
 
 #[test]
 fn index_name_requires_registered_children() {
-    let dirs: BTreeSet<String> = ["crates/runtime/src/tools".to_owned()].into();
-    assert!(is_index_name("crates/runtime/src/tools.rs", &dirs));
-    assert!(is_index_name("crates/kernel/src/lib.rs", &dirs));
-    assert!(!is_index_name("crates/kernel/src/util.rs", &dirs));
+    let dirs: BTreeSet<String> = ["Sprawling/runtime/src/tools".to_owned()].into();
+    assert!(is_index_name("Sprawling/runtime/src/tools.rs", &dirs));
+    assert!(is_index_name("Sprawling/kernel/src/lib.rs", &dirs));
+    assert!(!is_index_name("Sprawling/kernel/src/util.rs", &dirs));
 }
 
 /// A tool package other than the gates' own is judged as a product is:

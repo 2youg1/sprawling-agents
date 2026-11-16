@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The state of the person's face of `sprawling view` and the frame it
-//! draws (`crates/sprawling/spec/Main.lean` §8-117). Both lenses share one selected
+//! draws (`Sprawling/app/spec/Main.lean` §8-117). Both lenses share one selected
 //! thing; nothing here touches the terminal or the disk.
 
 use std::collections::BTreeSet;

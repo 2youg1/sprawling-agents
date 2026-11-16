@@ -7,7 +7,7 @@
 // door shows: the pairing code, the city's fingerprint and the device's
 // seed. RFC 4648 base32 in lower case without padding, the alphabet of
 // `remote_access::pairing`, so a code the console printed and a code
-// this page reads are the same characters (`crates/remote_access/
+// this page reads are the same characters (`Sprawling/remote_access/
 // Spec.lean` §8-2, D18).
 
 const ALPHABET = "abcdefghijklmnopqrstuvwxyz234567";

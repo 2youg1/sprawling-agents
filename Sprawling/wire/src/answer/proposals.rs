@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The proposal cards still open on one document, and every document of
-//! the city that has one (`crates/wire/spec/Answer/Proposals.lean` §8-73).
+//! the city that has one (`Sprawling/wire/spec/Answer/Proposals.lean` §8-73).
 //!
 //! The document's version now is answered once, and each card carries
 //! the version it was made on: a page compares the two to say which
@@ -38,7 +38,7 @@ pub struct ProposalCard {
     pub span: Span,
     pub slices: Vec<Slice>,
     /// The `proposal_offered` line that offered this card, in `run`'s
-    /// session (`crates/wire/spec/Answer/Proposals.lean` D44). `None`
+    /// session (`Sprawling/wire/spec/Answer/Proposals.lean` D44). `None`
     /// when the line is outside that session's window or does not read
     /// back; a letter then draws the whole conversation.
     #[serde(default)]

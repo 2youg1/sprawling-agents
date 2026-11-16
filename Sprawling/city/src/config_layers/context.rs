@@ -12,14 +12,14 @@
 //! out-of-domain percent is refused where the file is parsed rather than
 //! read into a value nobody can diagnose.
 //!
-//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4.
+//! Specified by `Sprawling/city/spec/ConfigLayers.lean` §8-4.
 
 use serde::Deserialize;
 
 /// What one layer's `[context]` table states, read as written rather
 /// than as a parsed type: the domain is `SecondThreshold`'s answer, and
 /// a deserializer that enforced it here would be the second place that
-/// rule lives (the `McpSection` rule, `crates/city/spec/ConfigLayers.lean` §8-4).
+/// rule lives (the `McpSection` rule, `Sprawling/city/spec/ConfigLayers.lean` §8-4).
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct ContextSection {
@@ -40,7 +40,7 @@ mod tests {
     use crate::config_layers::ConfigLayer;
 
     /// The refusal is the only sentence a person editing this file
-    /// gets, so it carries the legal domain (`crates/kernel/Spec.lean` §8-22). No
+    /// gets, so it carries the legal domain (`Sprawling/kernel/Spec.lean` §8-22). No
     /// clamping: a file that states 30 means something its writer has
     /// to be told is not accepted.
     #[test]

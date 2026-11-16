@@ -12,7 +12,7 @@
 //! here is what a parent learns, not what a child did.
 //!
 //! What a graph hands down when a node lands, and when it stops, is
-//! specified by `crates/collab/spec/Workshop.lean`; the parent's ending
+//! specified by `Sprawling/collab/spec/Workshop.lean`; the parent's ending
 //! closes the graph in `crate::worker::waking::handing`.
 
 use std::collections::BTreeSet;
@@ -121,7 +121,7 @@ recovery: {}
     /// so the locator the parent is handed names bytes rather than a
     /// sentence this process happened to build. The account's one origin
     /// is the child's run and room, so the parent reads it only through
-    /// a read bound that covers the child's room (`crates/runtime/Spec.lean`
+    /// a read bound that covers the child's room (`Sprawling/runtime/Spec.lean`
     /// §8-29-5), and is refused it otherwise. The city verifies:
     /// `Completion::Done` is something the city observed, and a producer
     /// verifying itself is what `Claim::verified` refuses.

@@ -6,7 +6,7 @@
 /-!
 # runtime::tools
 
-规定 `tools`、`tools::edit`、`tools::status`（`crates/runtime/src/` 下同名的文件）。工具面：四件工具的共同约定、写域的两道闸与「只新建」；edit 的准入在 `spec/Tools/Edit.lean`（§8-64）。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `tools`、`tools::edit`、`tools::status`（`Sprawling/runtime/src/` 下同名的文件）。工具面：四件工具的共同约定、写域的两道闸与「只新建」；edit 的准入在 `spec/Tools/Edit.lean`（§8-64）。本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `Sprawling/runtime/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::tools::edit::tests`、`runtime::tools::status::tests` 守住。
 -/
@@ -40,11 +40,11 @@ impl EditTool {
 pub struct ExecSetup { /* …既有字段… */ pub policy: crate::mode::PolicyReader }
 ```
 
-- **edit 的两条臂各走 storage 的一种落盘。** 改写一个已有文件：先过写域（§8-36），再问 `kernel::gate::replacing(policy.now().write, &target)`，`Create` 下在读文件之前就拒，盘面不动；放行后经 `storage::WriteTarget::replace`（暂存文件再 `rename`，取被替换文件的权限，`crates/storage/Spec.lean` §8-32）。新建（对不存在的路径 `old_string: ""`）：经 `storage::WriteTarget::create`，名字由文件系统的「仅当不存在才建」原子地占下，已有文件（包括别的调用刚建成的）答 `E_VERSION_CONFLICT`，请先读它。新建在两种限制下都这样走，所以竞争的两次新建只成一次，不论限制是什么。
+- **edit 的两条臂各走 storage 的一种落盘。** 改写一个已有文件：先过写域（§8-36），再问 `kernel::gate::replacing(policy.now().write, &target)`，`Create` 下在读文件之前就拒，盘面不动；放行后经 `storage::WriteTarget::replace`（暂存文件再 `rename`，取被替换文件的权限，`Sprawling/storage/Spec.lean` §8-32）。新建（对不存在的路径 `old_string: ""`）：经 `storage::WriteTarget::create`，名字由文件系统的「仅当不存在才建」原子地占下，已有文件（包括别的调用刚建成的）答 `E_VERSION_CONFLICT`，请先读它。新建在两种限制下都这样走，所以竞争的两次新建只成一次，不论限制是什么。
 - **限制在每次写时读，不写进工具说明**：edit 与 exec 持 run 的策略格的读方（§8-62），每次写时问 `now().write`，所以 run 在中途取用的改动从下一波起就到了写门。工具说明不带写限制：说明随工具表冻结在前缀里，而写限制在一个 run 里会变；模型在 run 中途换策略后从追加的那句说明里读到它（§8-62）；一个开头就在 `Create` 下的 run，在第一次被拒时从拒词里读到，拒词说出限制与可走的路。
-- **exec 在 `Create` 下只在副本里跑。** `where: host` 的 program 与 shell 直接落在人的树上，没有任何东西能让已有文件只读，所以在起进程之前就由 `gate::replacing` 拒，主语是工作目录；`sandbox` 放置照常：写入落在同步来的副本上，副本里的东西不回到树上，所以已有文件不变、命令也新建不了任何东西。python 臂的挂载恒只读，不受影响。确认不了隔离的工具不开放写入（`crates/kernel/Spec.lean` §8-78）。`where: host` 的判在 `Placement::opened_by` 里，读的是同一个策略格。
-- **链接**：写目标与它到城根之间的每一级若是链接（符号链接、junction、硬链接），`WriteTarget::within` 字面拒（`crates/storage/Spec.lean` §8-25），两种限制下一样，所以经链接改旧文件这条路在 `Create` 下同样不通。
-- 验收：集成测试 `crates/runtime/tests/create_limit.rs` 的 `an_existing_file_is_unchanged_under_create_by_edit_exec_and_link`：`Create` 下对一个已有文件的 edit 改写、host 上一条改它的 shell 命令、在指向它的链接名上新建，三者都拒，文件字节不变；storage 的 `two_racing_creates_admit_one`。
+- **exec 在 `Create` 下只在副本里跑。** `where: host` 的 program 与 shell 直接落在人的树上，没有任何东西能让已有文件只读，所以在起进程之前就由 `gate::replacing` 拒，主语是工作目录；`sandbox` 放置照常：写入落在同步来的副本上，副本里的东西不回到树上，所以已有文件不变、命令也新建不了任何东西。python 臂的挂载恒只读，不受影响。确认不了隔离的工具不开放写入（`Sprawling/kernel/Spec.lean` §8-78）。`where: host` 的判在 `Placement::opened_by` 里，读的是同一个策略格。
+- **链接**：写目标与它到城根之间的每一级若是链接（符号链接、junction、硬链接），`WriteTarget::within` 字面拒（`Sprawling/storage/Spec.lean` §8-25），两种限制下一样，所以经链接改旧文件这条路在 `Create` 下同样不通。
+- 验收：集成测试 `Sprawling/runtime/tests/create_limit.rs` 的 `an_existing_file_is_unchanged_under_create_by_edit_exec_and_link`：`Create` 下对一个已有文件的 edit 改写、host 上一条改它的 shell 命令、在指向它的链接名上新建，三者都拒，文件字节不变；storage 的 `two_racing_creates_admit_one`。
 -/
 
 /-!
@@ -52,7 +52,7 @@ pub struct ExecSetup { /* …既有字段… */ pub policy: crate::mode::PolicyR
 
 
 ```rust
-// crates/runtime/src/tools/exec.rs —— 三臂（ExecArm 住 kernel::tool）
+// Sprawling/runtime/src/tools/exec.rs —— 三臂（ExecArm 住 kernel::tool）
 pub struct ExecTool { /* workdir、mounts、python_wasm: Option<PythonGuest>、sandbox: Box<dyn Sandbox>、
                         shell: Shell（§8-13-2 D30）、fuel —— 私有；全由装配／执行器注入 */ }
 impl ExecTool { pub fn new(…) -> ExecTool; }
@@ -62,7 +62,7 @@ impl Tool for ExecTool { /* meta：name=exec、effect=Write{domain}、temporal=T
 // Python 臂：sandbox.run(python_wasm.wasm, argv=["python","-c",code], mounts＋一个只读 stdlib mount)；组件缺失→E_TOOL_UNAVAILABLE＋alternative＝Program 臂
 // Shell 臂：探测缺失即拒（E_TOOL_UNAVAILABLE，不是降级；楼要了 pwsh 而没有时点名 pwsh 7）；存在则 sh -c／cmd /C／pwsh -NoLogo -NoProfile -NonInteractive -Command（D30）；placement 与 Program 臂同一权威（§8-13-2）
 
-// crates/runtime/src/tools/edit.rs —— 读戳准入（§8-64）＋写域双闸＋创建臂
+// Sprawling/runtime/src/tools/edit.rs —— 读戳准入（§8-64）＋写域双闸＋创建臂
 pub struct EditTool { /* city_root、writable: WriteDomain、policy、desk: EditDesk —— 私有 */ }
 impl Tool for EditTool { /* meta：name=edit、effect=Write{domain}、render=Diff、temporal=Timeless */ }
 // new(city_root, addr, writable: WriteDomain)：writable＝该 Run 的写域（rules.write_domain()）。
@@ -74,7 +74,7 @@ impl Tool for EditTool { /* meta：name=edit、effect=Write{domain}、render=Dif
 // args：{file_path, old_string, new_string, replace_all?}；准入按本 run 的读戳（§8-64，D106）：没读过＝E_INVALID_ARGS，读后被改＝E_VERSION_CONFLICT 带当前片段；
 // old_string 必唯一命中，replace_all 为真时换掉每一处（零命中＝E_INVALID_ARGS；不带 replace_all 而多命中＝E_INVALID_ARGS 携计数）；回显＝unified diff（逐次 diff 即回档粒度）
 
-// crates/runtime/src/tools/read.rs —— 一个参数，两条路
+// Sprawling/runtime/src/tools/read.rs —— 一个参数，两条路
 pub struct ReadTool { /* city_root、catalog: Arc<Mutex<Catalog>>、bound、block_store —— 私有 */ }
 impl ReadTool { pub fn new(city_root: &Path, catalog: Arc<Mutex<Catalog>>, bound: ReadBound, block_store: &Path)
     -> Result<ReadTool, AxError>; }   // bound 见 §8-29-1，block_store 见 §8-29-5
@@ -84,7 +84,7 @@ impl Tool for ReadTool { /* meta：name=read、effect=Read、cost=Light、render
 // 路径不存在而 old_string 非空的拒词指向创建形；缺参拒词报三字段契约。理由：没有创建能力的城里，Agent 在空房间里无法开始任何工作；
 // 创建住 edit 而非新工具，因为「文件变更＋准入」已是本工具拥有的唯一权威，「不存在」只是准入的一个取值。
 
-// crates/runtime/src/tools/status.rs —— 十四字段
+// Sprawling/runtime/src/tools/status.rs —— 十四字段
 pub struct StatusSnapshot { pub who: String, pub addr: Address, pub policy: RunPolicy,
     pub ctx_limit: Tokens, pub trust: String,
     pub write_domain: String, pub locks: Vec<String>, pub worktree: PathBuf,
@@ -107,7 +107,7 @@ impl Tool for StatusTool { /* meta：name=status、effect=Read、temporal=Timest
 - **`children` 只携地址与代理类别**：子 Run 在父嚽结之后才开，故父自己那一跑里 **子既无 run id 也无上下文读数**——四个字段里三个只能填零，而零与未知是两件事。现形状只携得出口的两件：派到哪个房间、哪一类代理。
 - **`worktree` 的大小为何现读**：快照里只有树的路径，大小在每次调用时走一遍树算出：每个普通文件的长度相加，`.sprawling`（`kernel::RESERVED_PREFIX`）下城自己的状态不算，链接既不跟也不计，所以一条指回上层的链接走不成环。冻结在派发时的大小在本跑第一次写之后就错了，而派发时一律填零（测试城里 `status` 答 `0 bytes`）正是这个形状留下的缺陷。读不出来时这一行答 `size unreadable` 与原因，而不是一个看起来像真的零。目录名按字节比较，三个平台一样：Windows 与 macOS 的默认卷不分大小写，一个拼成 `.SPRAWLING` 的目录在那里与 `.sprawling` 是同一个，会被计入，这一偏差只多算、不少算。
 - **`ctx` 的用量为何现读**：快照在派发时冻结，那时还没有任何一次调用，冻结的用量只能是零，而且整跑都是零——一个照 City.md 去问 `status` 的模型会被告知窗口是空的。用量住 `ContextReading`：Run 每回合把 provider 报的 `input_tokens` 写进去，`status` 被调用时读出，所以报的是本跑最近一次已完成调用的计数。上限 `ctx_limit` 仍在快照里，因为它整跑不变。
-- **`neighbours` 追加在末尾而不插入到 `signals_pending` 旁边**：冻结序存在的理由是字段表增长时居民的习惯仍可迁移，而一次插入会把前十二行里的一半挪位。它只报**人数**不报名单：名单长度随人口增长，而 `status` 是一份定长文本（`render_children` 已为同一条理由被压成一行）；详情归 `neighbours` 工具，`crates/city/Spec.lean` §8-15b。
+- **`neighbours` 追加在末尾而不插入到 `signals_pending` 旁边**：冻结序存在的理由是字段表增长时居民的习惯仍可迁移，而一次插入会把前十二行里的一半挪位。它只报**人数**不报名单：名单长度随人口增长，而 `status` 是一份定长文本（`render_children` 已为同一条理由被压成一行）；详情归 `neighbours` 工具，`Sprawling/city/Spec.lean` §8-15b。
 - **数的是人，不是地址**：一间没人站着的房间没有读者，把它计入会让 `neighbours: 3` 读起来像「有三个人可以说话」而实际上一个都没有。空房间仍然在工具的答案里，因为它对 delegate 与搬入是真信息。
 - **`catalog` 是最后一个字段**：`always`、`dormant`、`skills`、`core_bytes`、`index_bytes` 与 `reading_bytes` 全部取装配时同一个 `Catalog::tool_table().record`，`Query::Catalog` 也读这份 `PromptTools`；页面与 status 不各算一张表。闭包在调用时读已冻好的记录，工具在冻结前构造时答 `catalog: not frozen`，不伪造零。
 - **`children` 是闭包而不是快照字段**：派活发生在 `status` 工具造好之后，一份开跑前拍的快照永远是空的。派生台住 `collab`，而 depmap 不允许 runtime 依赖 collab，故本模块只收一个答「现在派了哪些」的闭包，装配层把台接上去——与 `RunHooks` 四个闭包同一纪律：第二实现不存在时不引 trait。
@@ -203,7 +203,7 @@ impl ToolBench {
     /// 检查点的三件东西恒同行：仓、它盖住的范围、写它的人。
     pub struct CheckpointNet { pub checkpoint: Checkpoint, pub scope: Vec<String>, pub of: Provenance }
     // `scope` 是这次 run 的**写域全部前缀**，不是它的房间：检查点窄于写域，
-    // 两者之间写下的文件就进不了任何检查点（`crates/storage/Spec.lean` §8-18）。
+    // 两者之间写下的文件就进不了任何检查点（`Sprawling/storage/Spec.lean` §8-18）。
     /// 本 bench 服务的那份活。Spawn 门要铸一个人答得出的条目，
     /// 条目要有 actor（问谁）与 artifact（看什么）；两者都不在一次工具调用里。
     /// 未给即拒（fail-closed）——一个人问不到的派生就是没人批准的派生。
@@ -232,18 +232,18 @@ impl ToolBench {
 
 | 文件 | 管什么 |
 |---|---|
-| `crates/runtime/src/tools/edit.rs` | `EditTool` 与 `EditDesk`：`new` 的参数模式声明、`Tool::invoke` 的判定次序（工具身份→地址→写域→锁内准入（§8-64）→匹配数→落盘→记新戳），创建臂 `create`，以及 `unified_diff`／`common_prefix`／`common_suffix` |
-| `crates/runtime/src/tools/edit/passage.rs` | 「读后被改」拒绝里的当前片段：`old_string` 首行附近的几行，带 1 基行号（D119） |
-| `crates/runtime/src/tools/edit/tests.rs` | edit 拒绝什么、回显什么：读过之后的落盘与 diff、没读过、读后被改带片段、两个 run 争一个文件、创建臂两种冲突、写域外、城外的本平台绝对路径（`E_GATE_DENIED`，盘上不留文件）与非法地址、缺文件的恢复话术、零次与多次匹配、错路由 |
+| `Sprawling/runtime/src/tools/edit.rs` | `EditTool` 与 `EditDesk`：`new` 的参数模式声明、`Tool::invoke` 的判定次序（工具身份→地址→写域→锁内准入（§8-64）→匹配数→落盘→记新戳），创建臂 `create`，以及 `unified_diff`／`common_prefix`／`common_suffix` |
+| `Sprawling/runtime/src/tools/edit/passage.rs` | 「读后被改」拒绝里的当前片段：`old_string` 首行附近的几行，带 1 基行号（D119） |
+| `Sprawling/runtime/src/tools/edit/tests.rs` | edit 拒绝什么、回显什么：读过之后的落盘与 diff、没读过、读后被改带片段、两个 run 争一个文件、创建臂两种冲突、写域外、城外的本平台绝对路径（`E_GATE_DENIED`，盘上不留文件）与非法地址、缺文件的恢复话术、零次与多次匹配、错路由 |
 -/
 
 /-!
-### 8-36 写域的两道闸各问一个问题（`crates/kernel/Spec.lean` §8-46 末段）
+### 8-36 写域的两道闸各问一个问题（`Sprawling/kernel/Spec.lean` §8-46 末段）
 
 
 - **`bench::admit`** 对 `Effect::Write { domain: area }` 改调 `kernel::reach(&self.domain, area, &self.taint)`：工具声明的是一块区域，门口只问这块区域够不够得到。
 - **`tools::edit::invoke`** 解析出 `target` 后调 `kernel::domain(&self.writable, &target, &TaintSet::empty())`：`Allow` 继续，`Deny { refusal }` 原样作 `Err`（三段式因此由 kernel 一处产出，工具不自拼 `Outside` 的话术），`Escalate` 在写域门上不可能出现——`GateOutcome` 刻意穷尽，这一臂如实答一条 `E_INVALID_ARGS` 说明该不变量，而不是 `unreachable!`。空 `TaintSet`：taint 是 bench 的事实，工具这一层没有它，拒词因此少一句「派生自 N 个外部来源」——那句话仍由门口那道 `reach` 说。
-- **验收**：`crates/runtime/src/tools/edit/tests.rs` 钉住「Documents 域的工具创建 `<city>/hall/note.md` 成功、创建 `<city>/hall/note.rs` 被拒（`E_OUTSIDE_WRITE_DOMAIN`，主语是文件）」；`bench/tests.rs` 钉住「Documents 域、声明区域为 `hall/mayor` 的 `Write` 效果在门口放行」。
+- **验收**：`Sprawling/runtime/src/tools/edit/tests.rs` 钉住「Documents 域的工具创建 `<city>/hall/note.md` 成功、创建 `<city>/hall/note.rs` 被拒（`E_OUTSIDE_WRITE_DOMAIN`，主语是文件）」；`bench/tests.rs` 钉住「Documents 域、声明区域为 `hall/mayor` 的 `Write` 效果在门口放行」。
 -/
 
 /-! D114 常驻工具的参数名与合法值取 Claude Code 的拼写，出入只留本城的特性
@@ -270,7 +270,7 @@ impl ToolBench {
 
 /-! D116 参数改名不改变任何已派生的 `IdemKey`，不做迁移
 
-**决定**：外向动作的键只在一次活的调用被准入时派生：`accounting::worker::driving::placing` 的 `Placing::admit` 从模型这次送来的调用取 `ToolCall::action`，与 run 和这次调用在 run 里的位置一起交给 `IdemKey::derive`（`crates/kernel/spec/Idem.lean` §8-6）。键只进这个 run 的 `ToolBench.seen`，在内存里，不进账本。恢复不重新准入记下的调用：启动扫描对没有结局的调用写一行 `E_TOOL_OUTCOME_UNKNOWN`（`runtime::replay::outcome_unknown_draft`），分叉与续接开一个新的 RunId，新调用的键从新 run 起算。所以新版里没有一处为旧调用重新派生键；改名改的只是新调用的规范化字节，不需要迁移。
+**决定**：外向动作的键只在一次活的调用被准入时派生：`accounting::worker::driving::placing` 的 `Placing::admit` 从模型这次送来的调用取 `ToolCall::action`，与 run 和这次调用在 run 里的位置一起交给 `IdemKey::derive`（`Sprawling/kernel/spec/Idem.lean` §8-6）。键只进这个 run 的 `ToolBench.seen`，在内存里，不进账本。恢复不重新准入记下的调用：启动扫描对没有结局的调用写一行 `E_TOOL_OUTCOME_UNKNOWN`（`runtime::replay::outcome_unknown_draft`），分叉与续接开一个新的 RunId，新调用的键从新 run 起算。所以新版里没有一处为旧调用重新派生键；改名改的只是新调用的规范化字节，不需要迁移。
 
 **证据**：`accounting::worker::genesis::tests` 的 `an_old_shaped_dangling_call_is_closed_and_never_run`：账本末尾一条旧形状、没有结局的 edit 调用，启动扫描把它关成 `E_TOOL_OUTCOME_UNKNOWN`，文件一个字节不动。
 

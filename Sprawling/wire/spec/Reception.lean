@@ -6,7 +6,7 @@
 /-!
 # wire::reception
 
-规定 `reception`、`reception::tests`、`answer::history`（`crates/wire/src/` 下同名的文件）。能不能绑、这个对端能不能录凭证、能不能欢迎它、它的帧此刻是什么意思，以及丢帧之后的区间。一个请求进不进得了门住在 `spec/Reception/Entry.lean`，浏览器的配对与会话住在 `spec/Reception/Pairing.lean`。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `reception`、`reception::tests`、`answer::history`（`Sprawling/wire/src/` 下同名的文件）。能不能绑、这个对端能不能录凭证、能不能欢迎它、它的帧此刻是什么意思，以及丢帧之后的区间。一个请求进不进得了门住在 `spec/Reception/Entry.lean`，浏览器的配对与会话住在 `spec/Reception/Pairing.lean`。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 -/
 
 /-!
@@ -71,7 +71,7 @@ impl BindFace { pub fn key(&self) -> &B3Hash; }
 **强制点：`decide_bind` 是 `BindFace` 的唯一生产者，`bind` 是它的唯一调用者，`serve` 把 `Bound` 里的面经 `router` 交给壳。** 壳（`ShellState.face`）此后是「这一面要求什么」的唯一读者：`decide_frame` 与各扇门都经 `reception::Keys` 读它。
 
 - **两个臂里的钥匙都不是 `Option`**：「回环而什么都不要」与「暴露着却不要求任何东西」都是类型上不存在的状态。回环面也要凭据，理由是 wire D54：同一台机器上的另一个用户、另一个端口上的页面、居民的工具都能到达回环端口，回环本身不是凭据。
-- **钥匙是 `bind` 的入参**：它是这次服务的native key（`crates/sprawling/spec/Keying.lean` §8-22：配置过就采纳，否则当场铸）。判决只在 `bind` 里产生一次，面随 `Bound` 走到壳里，故这不是同一个事实的两个家。
+- **钥匙是 `bind` 的入参**：它是这次服务的native key（`Sprawling/app/spec/Keying.lean` §8-22：配置过就采纳，否则当场铸）。判决只在 `bind` 里产生一次，面随 `Bound` 走到壳里，故这不是同一个事实的两个家。
 - **拒绝只剩一格**：调用方没给钥匙。产品二进制总会给一把；拒绝臂留给第三方 embedder，回 `E_CONFIG_INVALID` 与恢复办法，在套接字存在之前。
 - **面之外还认会话令牌**：浏览器配对之后经挑战签名换来的会话令牌（§8-93）是动态的，住在本地门的状态里；`Keys { face, sessions, now }` 把两者合成一次判定（令牌认不认看此刻，§8-93），`Keys::pairing` 是 hello 与每个 POST 共用的那一问。
 

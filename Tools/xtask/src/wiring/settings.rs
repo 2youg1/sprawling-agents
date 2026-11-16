@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Coverage decisions for settable fields (`crates/xtask/Spec.lean`).
+//! Coverage decisions for settable fields (`Tools/xtask/Spec.lean`).
 
 use crate::report::{Violation, XtaskError};
 use crate::walk;
@@ -13,9 +13,9 @@ use std::path::Path;
 pub(super) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut found = Vec::new();
     for (source, spec) in [
-        ("crates/wire/src/preference", "crates/wire"),
-        ("crates/city/src/config_layers", "crates/city"),
-        ("crates/kernel/src/config/container", "crates/kernel"),
+        ("Sprawling/wire/src/preference", "Sprawling/wire"),
+        ("Sprawling/city/src/config_layers", "Sprawling/city"),
+        ("Sprawling/kernel/src/config/container", "Sprawling/kernel"),
     ] {
         let mut files = vec![root.join(format!("{source}.rs"))];
         if root.join(source).is_dir() {

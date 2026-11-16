@@ -6,7 +6,7 @@
 //! The Ledger port: the only write entrance to history (seam list,
 //! ARCHITECTURE section 3), plus the chain rule both adapters and replay
 //! share.
-//! The part `crates/kernel/spec/Ledger.lean` specifies this module.
+//! The part `Sprawling/kernel/spec/Ledger.lean` specifies this module.
 //!
 //! Contract owned here:
 //! - implementations own seq/prev assignment and byte production; callers
@@ -162,7 +162,7 @@ pub mod conformance {
         lines
     }
 
-    /// The suite (`crates/kernel/spec/Ledger.lean` §8-9, six assertions). `fresh` must yield an
+    /// The suite (`Sprawling/kernel/spec/Ledger.lean` §8-9, six assertions). `fresh` must yield an
     /// empty ledger each call.
     pub fn assert_ledger_conformance<L, F>(mut fresh: F)
     where

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One action's timed samples, and what they answer (`crates/citysim/spec/BenchStartup.lean`
+//! One action's timed samples, and what they answer (`Tools/citysim/spec/BenchStartup.lean`
 //! §8-5).
 //!
 //! Shape: decision. Every reading arrives as a `Duration` a caller
@@ -36,7 +36,7 @@ pub enum Tier {
     Outside,
 }
 
-/// The second tier's line: p99 within one millisecond (`crates/citysim/spec/BenchStartup.lean`
+/// The second tier's line: p99 within one millisecond (`Tools/citysim/spec/BenchStartup.lean`
 /// §8-5).
 const SECOND_TIER: Duration = Duration::from_millis(1);
 
@@ -44,7 +44,7 @@ const SECOND_TIER: Duration = Duration::from_millis(1);
 /// recorded.
 ///
 /// The shares, floor and peak are the product's one reading of a set,
-/// `Spread` (`crates/sprawling/Spec.lean` §8-129-2); what this set adds is the
+/// `Spread` (`Sprawling/app/Spec.lean` §8-129-2); what this set adds is the
 /// arrival order. A suspicious stretch is a question about *when* in the
 /// run something happened, so each sample keeps its mark in the order it
 /// arrived.

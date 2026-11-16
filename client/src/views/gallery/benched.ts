@@ -160,7 +160,7 @@ interface Shape {
 const SHAPES: readonly Shape[] = [
   {
     calls: [
-      call(11, "read", "crates/city/city-SPEC.md", 31),
+      call(11, "read", "Sprawling/city/city-SPEC.md", 31),
       call(12, "exec", "cargo nextest -p city", 3_412),
     ],
     notes: [],
@@ -168,14 +168,14 @@ const SHAPES: readonly Shape[] = [
     used: [380_000, 900, 61_000, 22_400],
   },
   {
-    calls: [call(21, "edit", "crates/city/src/document.rs", 87)],
+    calls: [call(21, "edit", "Sprawling/city/src/document.rs", 87)],
     notes: [{ checkpointed: { at: Seq.make(22), oid: oid("d") } }],
     first: 412,
     used: [402_000, 1_100, 88_000, 9_800],
   },
   {
     calls: [
-      call(31, "edit", "crates/city/city-SPEC.md", 64),
+      call(31, "edit", "Sprawling/city/city-SPEC.md", 64),
       call(33, "exec", "just check-client", null),
     ],
     notes: [{ checkpointed: { at: Seq.make(32), oid: oid("e") } }],
@@ -332,12 +332,12 @@ export function answering(query: Query): Answer | undefined {
         head: query.changes.head ?? null,
         files: [
           {
-            path: "crates/city/src/document.rs",
+            path: "Sprawling/city/src/document.rs",
             how: "modified",
             lines: { counted: { added: 12, removed: 3 } },
           },
           {
-            path: "crates/city/city-SPEC.md",
+            path: "Sprawling/city/city-SPEC.md",
             how: "modified",
             lines: { counted: { added: 4, removed: 1 } },
           },

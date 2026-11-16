@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The schedule and the watch table as a page reads them
-//! (`crates/wire/spec/Answer/Automation.lean` §8-62).
+//! (`Sprawling/wire/spec/Answer/Automation.lean` §8-62).
 
 use kernel::Address;
 use serde::{Deserialize, Serialize};

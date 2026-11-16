@@ -6,7 +6,7 @@
 /-!
 # window：一次答复带多少、在哪里切
 
-规定 `crates/documents/src/window.rs`（`documents::cut`、`lift`、`head`，`WINDOW_BYTES_MAX`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/documents/src/window.rs`（`documents::cut`、`lift`、`head`，`WINDOW_BYTES_MAX`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 一个窗口是一个版本里的一段半开字节区间。哪些偏移是字符边界是参数 `boundary`：它由编码决定（UTF-8 的非续字节、UTF-16 的偶数偏移且不是低代理），版本的两端恒是边界。Rust 的切法是：起点取 `min(wanted.start, size)` 往回退到边界，终点取 `boundedEnd` 往回退到边界，再不小于起点。往回退不低于抬起的第一个字节 `floor`（`Lifted.at`）。
 

@@ -5,7 +5,7 @@
 
 //! Every key moment, message and call written with its two ends, once
 //! the fold has paired them and settled every deferred end
-//! (`crates/accounting/spec/Playback.lean` §8-12).
+//! (`Sprawling/accounting/spec/Playback.lean` §8-12).
 
 use std::collections::BTreeSet;
 

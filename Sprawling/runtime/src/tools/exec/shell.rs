@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which interpreter a shell line runs under, and the command line each
-//! one takes (`crates/runtime/Spec.lean` §8-13-2 D30).
+//! one takes (`Sprawling/runtime/Spec.lean` §8-13-2 D30).
 //!
 //! The configuration names an interpreter and the machine says whether
 //! it has it; this file only holds the answer the two arrive at. A
@@ -84,7 +84,7 @@ impl Shell {
     /// The sentence the tool's description ends with: which interpreter
     /// a command runs under, in the spelling the result records; that a
     /// command is one program with its arguments where there is no
-    /// shell (`crates/runtime/spec/Tools/Exec.lean` D118); or nothing
+    /// shell (`Sprawling/runtime/spec/Tools/Exec.lean` D118); or nothing
     /// when the building asked for a shell this machine lacks, whose
     /// refusal says why at the call. A model writes a different language
     /// for each.

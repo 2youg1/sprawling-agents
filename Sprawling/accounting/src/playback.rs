@@ -5,15 +5,15 @@
 
 //! A stretch of one city's history, exported as a playback bundle, and a
 //! bundle checked against another or recomputed from its city
-//! (`crates/accounting/spec/Playback.lean` §8-12).
+//! (`Sprawling/accounting/spec/Playback.lean` §8-12).
 //!
 //! The properties the export holds are proved in
-//! `crates/accounting/spec/Playback/Select.lean` and
-//! `crates/accounting/spec/Playback/Project.lean`; this module is how
+//! `Sprawling/accounting/spec/Playback/Select.lean` and
+//! `Sprawling/accounting/spec/Playback/Project.lean`; this module is how
 //! they hold. The command line (`bin::main::playback`) and the
 //! resident's tool (`worker::workbench::tools::playback`) are thin doors
 //! onto [`export`], [`embed`], [`check`] and [`land`]
-//! (`crates/accounting/spec/Playback/Check.lean` §8-13).
+//! (`Sprawling/accounting/spec/Playback/Check.lean` §8-13).
 
 use std::path::Path;
 

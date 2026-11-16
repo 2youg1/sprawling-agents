@@ -7,7 +7,7 @@
 //! generates `client_embed.rs`, the file table main.rs includes; writes
 //! the dependency list the lockfile names, and the toolchain pins the
 //! doctor reports, beside it. Windows targets also link product resources
-//! derived from Cargo's package metadata (`crates/sprawling/Spec.lean` §8-157).
+//! derived from Cargo's package metadata (`Sprawling/app/Spec.lean` §8-157).
 //!
 //! The bundle is whatever `just build-web` left at [`BUNDLE_DIR`] in this
 //! package's directory: the client's own `index.html` and the hashed
@@ -17,7 +17,7 @@
 //!
 //! **Every path here works in three trees**: this checkout, the
 //! directory `cargo package` verifies its archive in, and the registry
-//! directory `cargo install` unpacks it into (`crates/sprawling/Spec.lean` §8-157).
+//! directory `cargo install` unpacks it into (`Sprawling/app/Spec.lean` §8-157).
 //! So nothing is found by counting parent directories: the bundle is
 //! inside this package, the lockfile is found by cargo's own rule, and
 //! a pin file outside the package is read when it is there and left
@@ -47,7 +47,7 @@ use std::path::{Path, PathBuf};
 /// stays here whatever `CARGO_TARGET_DIR` says. It is inside this package
 /// because a crates.io archive carries this package's directory and
 /// nothing else, and this is the only reader that has to work there and
-/// in the published tree, neither of which carries `crates/xtask/`; `xtask`
+/// in the published tree, neither of which carries `Tools/xtask/`; `xtask`
 /// reads this constant out of this file, and its artifact gate refuses a
 /// client build script or a justfile that spells the path differently.
 const BUNDLE_DIR: &str = "web-dist";
@@ -56,11 +56,11 @@ const BUNDLE_DIR: &str = "web-dist";
 /// relative to the checkout's root and named by the constant `pins.rs`
 /// gives it. None is in this package, so a build from the crates.io
 /// archive finds none of them, and the doctor reports those tools as
-/// unpinned (`crates/sprawling/Spec.lean` §8-157).
+/// unpinned (`Sprawling/app/Spec.lean` §8-157).
 const PINS: [(&str, &str); 3] = [
     ("RUST_TOOLCHAIN_FILE", "rust-toolchain.toml"),
     ("LEAN_TOOLCHAIN_FILE", "lean-toolchain"),
-    ("ZIG_VERSION_FILE", "crates/desktop/ffi/zig-version"),
+    ("ZIG_VERSION_FILE", "Sprawling/desktop/ffi/zig-version"),
 ];
 
 /// What a binary built without the client serves.

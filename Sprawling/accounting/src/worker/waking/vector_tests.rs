@@ -12,7 +12,7 @@
     reason = "test code"
 )]
 
-//! The derived check of `crates/collab/spec/Workshop.lean`: its four
+//! The derived check of `Sprawling/collab/spec/Workshop.lean`: its four
 //! trace vectors replayed through the production hand-over, with the
 //! parent standing in as a desk pair and its ending given as
 //! `GraphAfter`, and the children as real runs that land and hand back.
@@ -304,7 +304,7 @@ fn vector_failed_hands_nothing_after_the_parent_fails() {
 /// but the stopped node does not join, so 4 never becomes ready and
 /// the graph stays registered for a join that cannot come. This is
 /// the behaviour the model states while the open question of
-/// `crates/collab/Spec.lean` §3, what a stopped node does to its
+/// `Sprawling/collab/Spec.lean` §3, what a stopped node does to its
 /// graph, stands; settling it changes the model first and this test
 /// with it. The model's last act, a second landing of 2, has no
 /// production door: a run lands once.

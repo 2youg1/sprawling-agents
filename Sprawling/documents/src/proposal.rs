@@ -6,7 +6,7 @@
 
 //! One suggestion a run makes about one stretch of a document version,
 //! read as a card of sentences and decided sentence by sentence
-//! (`crates/documents/spec/Proposal.lean`, D13-D19).
+//! (`Sprawling/documents/spec/Proposal.lean`, D13-D19).
 //!
 //! Migrated from RefRain's `manuscript::review` (a proposal frozen on a
 //! baseline, cut into review slices) and `manuscript::decision` (verdicts

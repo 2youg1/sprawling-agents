@@ -155,7 +155,7 @@ fn says(text: &str) -> Result<ModelReturn, AxError> {
 
 /// The namespaces the request's dormant index names, each as
 /// `<namespace> (<members>)`: their tools are offered too, through
-/// `tool` (`crates/runtime/Spec.lean` §8-60). Skills are opened rather
+/// `tool` (`Sprawling/runtime/Spec.lean` §8-60). Skills are opened rather
 /// than called, so they are left out.
 pub(crate) fn dormant_tools(req: &ModelRequest) -> Vec<String> {
     req.chat

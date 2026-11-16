@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The one entrance outside content takes into a run (`crates/runtime/spec/Bench.lean`
+//! The one entrance outside content takes into a run (`Sprawling/runtime/spec/Bench.lean`
 //! §8-46): every answer a tool gave passes here before the model reads
 //! it, and whatever an answer brought in from outside this city grows
 //! the taint every later door of the run reads.

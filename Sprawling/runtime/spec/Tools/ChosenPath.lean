@@ -6,7 +6,7 @@
 /-!
 # runtime::tools::chosen_path
 
-规定 `tools::chosen_path`（`crates/runtime/src/` 下同名的文件）。模型选路的唯一判定：文法、保留区、读界，以及判的是盘打开的那个地址。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `tools::chosen_path`（`Sprawling/runtime/src/` 下同名的文件）。模型选路的唯一判定：文法、保留区、读界，以及判的是盘打开的那个地址。本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `Sprawling/runtime/Spec.lean §8-n`。
 -/
 
 /-!
@@ -14,7 +14,7 @@
 
 
 ```rust
-// 本 run 能读什么：装配层把 kernel::address::may_read 闭合在读者的楼与城的规则上（`crates/city/Spec.lean` §8-2）。
+// 本 run 能读什么：装配层把 kernel::address::may_read 闭合在读者的楼与城的规则上（`Sprawling/city/Spec.lean` §8-2）。
 pub type ReadBound = Arc<dyn Fn(&Address) -> ReadVerdict + Send + Sync>;
 // 入一个字符串，出一个地址或一个三段式拒绝。本身无 I/O；bound 可能为他楼读一次规则。
 pub(crate) fn admit(asked: &str, action: &'static str, bound: &dyn Fn(&Address) -> ReadVerdict)
@@ -67,7 +67,7 @@ pub(crate) enum Walked { Directory(PathBuf), File(PathBuf), Passed }
 
 **判的是盘打开的那个地址，不只是模型写下的那个。** 文法准入的地址仍可能穿过一个链接：开放楼里一条指向机密楼、保留区或城外的链接，打开的是链接的目标，只判字面地址就等于把 admit 拒掉的东西从侧门交出去。所以 `read` 与 `search` 的起点都走 `land`，`search` 遍历中遇到的每一个链接也走 `land`——链接的判定只有这一处。
 
-它是 `read` 原有那段判定的搬家，不是它的第二份。三道判定次序固定：文法、保留区、读界——前两道不碰盘，读界为他楼可能读一次规则，所以排最后。`ReadTool::new` 与 `SearchTool::new` 各持同一个 `ReadBound` 的一份 `Arc`；装配层建一次，交给两件工具，两件工具立起时各自锚定一次 `CityRoot`（D112）。`BoundReader::open` 不在热路径上，每次调用锚定一次，花费与逐次重解析相同。`search` 遍历时对每一个候选文件同样只问 `Address::is_reserved()`——kernel 的那个原语——所以「什么是保留区」自始至终一个权威；读界则只在城根那一层问，一栋楼整栋开或整栋关（`crates/city/Spec.lean` §8-3「楼是顶层地址」），楼里的条目继承楼的答案，不为每个文件再读一次规则。
+它是 `read` 原有那段判定的搬家，不是它的第二份。三道判定次序固定：文法、保留区、读界——前两道不碰盘，读界为他楼可能读一次规则，所以排最后。`ReadTool::new` 与 `SearchTool::new` 各持同一个 `ReadBound` 的一份 `Arc`；装配层建一次，交给两件工具，两件工具立起时各自锚定一次 `CityRoot`（D112）。`BoundReader::open` 不在热路径上，每次调用锚定一次，花费与逐次重解析相同。`search` 遍历时对每一个候选文件同样只问 `Address::is_reserved()`——kernel 的那个原语——所以「什么是保留区」自始至终一个权威；读界则只在城根那一层问，一栋楼整栋开或整栋关（`Sprawling/city/Spec.lean` §8-3「楼是顶层地址」），楼里的条目继承楼的答案，不为每个文件再读一次规则。
 -/
 
 namespace Runtime.Tools.ChosenPath
@@ -86,7 +86,7 @@ inductive Code where
   | StorageFatal
   deriving DecidableEq, Repr
 
-/-- 判一条模型选的路径要的三个事实。它们各有权威，都不在本 crate：文法是 `kernel::Address::parse`，保留区是 `Address::is_reserved`，读界是装配层把 `kernel::address::may_read` 闭合在读者的楼与城的规则上得到的 `ReadBound`（`crates/city/Spec.lean` §8-2）。模型不重述它们，只把它们当参数，所以地址也是一个任意类型。 -/
+/-- 判一条模型选的路径要的三个事实。它们各有权威，都不在本 crate：文法是 `kernel::Address::parse`，保留区是 `Address::is_reserved`，读界是装配层把 `kernel::address::may_read` 闭合在读者的楼与城的规则上得到的 `ReadBound`（`Sprawling/city/Spec.lean` §8-2）。模型不重述它们，只把它们当参数，所以地址也是一个任意类型。 -/
 structure Rules (Address : Type) where
   parse : String → Option Address
   is_reserved : Address → Bool

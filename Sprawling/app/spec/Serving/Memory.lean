@@ -6,7 +6,7 @@
 /-!
 # 进程里只放工作集：按字节计预算的缓存
 
-规定城的常驻内存（§8-173）：哪些工作集住在进程里、每一个由谁拥有、什么给它设上界；一个按字节计预算、能从盘上读回的缓存必须守住的性质；私有字节在三个平台上怎样读；从盘上读回时用的定位读；分配器对照与一小时斜率的测量计划。缓存的 Rust 模块是 `storage::resident`（`crates/storage/src/resident.rs`，接口在 `crates/storage/spec/Resident.lean` §8-40），它的 doc comment 链回本分部。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定城的常驻内存（§8-173）：哪些工作集住在进程里、每一个由谁拥有、什么给它设上界；一个按字节计预算、能从盘上读回的缓存必须守住的性质；私有字节在三个平台上怎样读；从盘上读回时用的定位读；分配器对照与一小时斜率的测量计划。缓存的 Rust 模块是 `storage::resident`（`Sprawling/storage/src/resident.rs`，接口在 `Sprawling/storage/spec/Resident.lean` §8-40），它的 doc comment 链回本分部。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 ## 8-173 常驻内存（形状：状态机）
 
@@ -19,24 +19,24 @@
 | 视图折叠（`Governance`、各房间与 run 的视图） | `accounting::views` | 无；随账本折叠，每个 run 留一份摘要 | run 数、记录数 |
 | 对话窗口（`Conversation` 的 `messages` 与 `held`） | `runtime::conversation` | 模型的上下文窗口经 `runtime::compaction` 与 `runtime::offload` 压住；进程里没有按字节计的上界 | 回合数、工具结果的字节 |
 | 冻结 run 的热视图墓碑（`HotView::evicted`） | `storage::hot` | 无；每个冻结的 run 一个 `RunId` | run 数 |
-| 待批项阻着的活 | `accounting::views::governance` | 只记每项待批的房间与 run，答过即删；那一跑被派去做什么在答复时从账本读回（`crates/sprawling/spec/Accounting/Worker.lean` §8-25） | 待批项数 |
+| 待批项阻着的活 | `accounting::views::governance` | 只记每项待批的房间与 run，答过即删；那一跑被派去做什么在答复时从账本读回（`Sprawling/app/spec/Accounting/Worker.lean` §8-25） | 待批项数 |
 | 账本旁索引（seq → 段与偏移） | `storage::index::ledger` | 无；每条记录一项 | 记录数 |
 | 楼规缓存（`RulesCache`） | `city::policy::cache` | 每栋读过的楼一份，按文件戳失效 | 楼数 |
 | sieve 历史（`SieveHistory`） | `runtime::sieve` | 每个 run 内每种命令一个 `Locator` | 命令种数 |
 | 还在跑的命令的输出环（`OutputRing`） | `bin::serving::output_ring` | 每个 run 64 KiB 或最新的一块（§8-115） | 活的 run 数 |
 | 监视页历史 | `bin::monitor` | 300 个点，没人看时释放（§8-94） | 无 |
 | 摘要缓存（`DigestCache`） | `storage::digest_cache` | 在盘上，进程里不留 | 无 |
-| playback 导出 | `accounting::playback` | 走账本是流式的，编码直接写进 bundle 的那一份缓冲、到 `BUNDLE_MAX_BYTES`（32 MiB）即停；整份 `Document` 在编码之前仍在内存里（`crates/accounting/Spec.lean` §3） | 选中的记录数 |
-| doctor 扫描 | `bin::doctor` | 子进程的输出逐行读，每行至多 4 KiB，只留调用者选中的行（`doctor::asking`，`crates/sprawling/spec/Doctor.lean` §8-166 之一） | 选中的行数 |
+| playback 导出 | `accounting::playback` | 走账本是流式的，编码直接写进 bundle 的那一份缓冲、到 `BUNDLE_MAX_BYTES`（32 MiB）即停；整份 `Document` 在编码之前仍在内存里（`Sprawling/accounting/Spec.lean` §3） | 选中的记录数 |
+| doctor 扫描 | `bin::doctor` | 子进程的输出逐行读，每行至多 4 KiB，只留调用者选中的行（`doctor::asking`，`Sprawling/app/spec/Doctor.lean` §8-166 之一） | 选中的行数 |
 | guest 的内容 pin | `bin::doctor::host` | 默认组件每进程首次选择时读入完整 wasm、算完 BLAKE3 即释放；`OnceLock` 只留判定，不留字节 | 无 |
-| 已编译的 guest 模块（`Compiled`） | `runtime::sandbox::engine` | 一格：同一进程里所有 `WasmtimeSandbox` 的克隆共用一份编译产物，换 guest 时替换（`crates/runtime/spec/Sandbox.lean` D101） | 无 |
-| guest 的线性内存 | `runtime::sandbox::engine` | run 的 `[core] memory_bytes`（`soft_shares` 臂时，与这个 run 的子进程同一个数，`crates/runtime/spec/Sandbox.lean` D102）；没填时 wasm32 的 4 GiB；调用结束即释放 | 同时在跑的 python 调用数 |
+| 已编译的 guest 模块（`Compiled`） | `runtime::sandbox::engine` | 一格：同一进程里所有 `WasmtimeSandbox` 的克隆共用一份编译产物，换 guest 时替换（`Sprawling/runtime/spec/Sandbox.lean` D101） | 无 |
+| guest 的线性内存 | `runtime::sandbox::engine` | run 的 `[core] memory_bytes`（`soft_shares` 臂时，与这个 run 的子进程同一个数，`Sprawling/runtime/spec/Sandbox.lean` D102）；没填时 wasm32 的 4 GiB；调用结束即释放 | 同时在跑的 python 调用数 |
 
 账本与 CAS 已经在盘上，所以上表里随城增长的几项（视图、墓碑、旁索引）都可以改成「在盘上，按需读回」；它们读回时走下面的缓存模型。
 
 ### 整台机器
 
-上表是城的进程。在一台小内存的机器上，进程之外还有三类重活各自吃内存：exec 的子进程（编译器、测试、解释器），每个 run 的进程树已经可以由 `[core] memory_bytes` 设上限（`crates/runtime/spec/Tools/Exec.lean` D29、D95）；python 臂的 guest，在城的进程里，由同一个数设上限（上表）；城起动的浏览器。每一项的上限都有了，缺的是「求和」：两次编译同时起就会让机器换页，而一旦换页，模型流、界面与编译一起卡住。求和由一份机器预算做：run 设了内存上限时，它的每条前台命令与每次 python 调用在开始前从这份预算里预约那个数，放不下就按号排队，结果里的 `memory_wait` 说出拿号时前面有几份、持有多少、预算多少（判定与性质在 `crates/runtime/spec/Reserve.lean`，什么预约、持有多久见那里的 D104）。预算的字节由 `bin::serving::placement::machine_budget` 定，每个进程一本账：人层 `config.toml` 顶层的 `memory` 写了字节数就用它；`"auto"` 或不写时，是物理内存减去操作系统的保留（`SYSTEM_KEEPS_BYTES`，2 GiB，桌面系统在任何应用之前就占 2 到 2.5 GiB，取低端）、看城的那个浏览器标签页的估计（`VIEW_KEEPS_BYTES`，400 MiB，一个标签页 150 到 400 MiB，取高端）与城的进程的驻留预算（`storage::resident` 的 `RESIDENT_TOTAL_BYTES`），减不够时为 0，即一次只放行一件重活。文件字节不在此列：它们归操作系统的文件缓存，不在进程里留副本，派生数据经 `storage::resident`。
+上表是城的进程。在一台小内存的机器上，进程之外还有三类重活各自吃内存：exec 的子进程（编译器、测试、解释器），每个 run 的进程树已经可以由 `[core] memory_bytes` 设上限（`Sprawling/runtime/spec/Tools/Exec.lean` D29、D95）；python 臂的 guest，在城的进程里，由同一个数设上限（上表）；城起动的浏览器。每一项的上限都有了，缺的是「求和」：两次编译同时起就会让机器换页，而一旦换页，模型流、界面与编译一起卡住。求和由一份机器预算做：run 设了内存上限时，它的每条前台命令与每次 python 调用在开始前从这份预算里预约那个数，放不下就按号排队，结果里的 `memory_wait` 说出拿号时前面有几份、持有多少、预算多少（判定与性质在 `Sprawling/runtime/spec/Reserve.lean`，什么预约、持有多久见那里的 D104）。预算的字节由 `bin::serving::placement::machine_budget` 定，每个进程一本账：人层 `config.toml` 顶层的 `memory` 写了字节数就用它；`"auto"` 或不写时，是物理内存减去操作系统的保留（`SYSTEM_KEEPS_BYTES`，2 GiB，桌面系统在任何应用之前就占 2 到 2.5 GiB，取低端）、看城的那个浏览器标签页的估计（`VIEW_KEEPS_BYTES`，400 MiB，一个标签页 150 到 400 MiB，取高端）与城的进程的驻留预算（`storage::resident` 的 `RESIDENT_TOTAL_BYTES`），减不够时为 0，即一次只放行一件重活。文件字节不在此列：它们归操作系统的文件缓存，不在进程里留副本，派生数据经 `storage::resident`。
 
 ### 模型：一份按字节计预算的缓存
 
@@ -54,7 +54,7 @@
 
 ### 从模型导出的 Rust 检查
 
-`crates/storage/src/resident/tests.rs` 是一个 `proptest`：生成器产生 `insert`／`read`／`evict`／`freeze` 的任意序列（run 取 0..4，地址取 0..16，值的长度取 0..2×预算，让「一项超过预算」那条分支被走到），盘是一个按地址给字节的 `BTreeMap`。每一步之后断言：常驻字节不超过预算；每个冻结的 run 名下没有项；每次读答出的字节等于盘上的字节。按项数修剪（只留最近的 N 项）的那一版在这个 proptest 上变红，提交次序里先是它的红，再是按字节修剪的绿。
+`Sprawling/storage/src/resident/tests.rs` 是一个 `proptest`：生成器产生 `insert`／`read`／`evict`／`freeze` 的任意序列（run 取 0..4，地址取 0..16，值的长度取 0..2×预算，让「一项超过预算」那条分支被走到），盘是一个按地址给字节的 `BTreeMap`。每一步之后断言：常驻字节不超过预算；每个冻结的 run 名下没有项；每次读答出的字节等于盘上的字节。按项数修剪（只留最近的 N 项）的那一版在这个 proptest 上变红，提交次序里先是它的红，再是按字节修剪的绿。
 
 ### 私有字节：三个平台各读什么
 
@@ -62,7 +62,7 @@
 
 ### 定位读：从盘上读回一项
 
-不用 `mmap`：`memmap2::Mmap::map` 是 `unsafe fn`，本工作区禁 `unsafe`。读回一项用定位读，不移动文件游标，所以多个读者可以共用一个打开的句柄：Windows 上 `std::os::windows::fs::FileExt::seek_read`，Linux 与 macOS 上 `std::os::unix::fs::FileExt::read_exact_at`，都是 std 的安全接口。Windows 的 `seek_read` 会移动游标且可能读不满，所以 Windows 臂循环到读满或读到文件尾。读回的页留在操作系统的文件缓存里，那部分是可回收的，不计入私有字节。今天从账本读回一行走的是 `storage` 的 `Vfs::read_at`：`RealFs` 每次打开文件、`seek` 到偏移、只读那一段（`crates/storage/src/real_fs.rs`），没有共用的句柄，所以游标移动不碍事，三个平台走同一段 std 代码；等到一个读者要在多个线程间共用一个打开的句柄时，再换成上面两个 `FileExt` 接口。
+不用 `mmap`：`memmap2::Mmap::map` 是 `unsafe fn`，本工作区禁 `unsafe`。读回一项用定位读，不移动文件游标，所以多个读者可以共用一个打开的句柄：Windows 上 `std::os::windows::fs::FileExt::seek_read`，Linux 与 macOS 上 `std::os::unix::fs::FileExt::read_exact_at`，都是 std 的安全接口。Windows 的 `seek_read` 会移动游标且可能读不满，所以 Windows 臂循环到读满或读到文件尾。读回的页留在操作系统的文件缓存里，那部分是可回收的，不计入私有字节。今天从账本读回一行走的是 `storage` 的 `Vfs::read_at`：`RealFs` 每次打开文件、`seek` 到偏移、只读那一段（`Sprawling/storage/src/real_fs.rs`），没有共用的句柄，所以游标移动不碍事，三个平台走同一段 std 代码；等到一个读者要在多个线程间共用一个打开的句柄时，再换成上面两个 `FileExt` 接口。
 
 ### 预算：每份缓存一个命名的常量
 
@@ -78,19 +78,19 @@
 ### 测量计划
 
 * 内存节拍：默认每 100 ms 采一次私有字节（上面每个平台的那个数），报 p50、p99、max、高于 p50 的累计时长与每小时斜率，n 与读数绑定的条件随读数写下。
-* 一小时斜率：吞吐台（`crates/citysim/spec/Throughput.lean`）的负载（N 个并发 run，各自做读写与 exec）跑一小时，斜率按最小二乘对时间求；验收标准是斜率在两次空负载一小时读数的差以内。
+* 一小时斜率：吞吐台（`Tools/citysim/spec/Throughput.lean`）的负载（N 个并发 run，各自做读写与 exec）跑一小时，斜率按最小二乘对时间求；验收标准是斜率在两次空负载一小时读数的差以内。
 * 盘读的延迟峰：在交互路径上（切换 session、打开信箱、滚动）读回被逐出的项时，那个交互的 p99 不超过 16 ms。
 * 分配器（已由 D102 决定）：musl 的发行件用 jemalloc，其余平台用各自的堆。D102 的吞吐读数来自一次临时探针，条件写在那节：16 线程、churn／json／map、5 轮中位数、一次没有真实 Linux 内核的兼容层上的运行。复核方式是在 Linux runner 上按同一负载重跑，并读私有字节的 p99 与一小时斜率。
 
 ### 待做
 
-1. 内存节拍的统计：`bin::monitor::sampler` 已按 100 ms 的 `MEMORY_BEAT` 读私有字节，每秒的读数报这一秒的峰（`crates/sprawling/spec/Monitor.lean` §8-96）；p50／p99／max／高于 p50 的时长／每小时斜率还没有人算，它们由读监视帧的测量（`sprawling gauge` 或 TP1 台）在那一侧算，不在城的进程里攒一小时的点。
+1. 内存节拍的统计：`bin::monitor::sampler` 已按 100 ms 的 `MEMORY_BEAT` 读私有字节，每秒的读数报这一秒的峰（`Sprawling/app/spec/Monitor.lean` §8-96）；p50／p99／max／高于 p50 的时长／每小时斜率还没有人算，它们由读监视帧的测量（`sprawling gauge` 或 TP1 台）在那一侧算，不在城的进程里攒一小时的点。
 2. 清点表里随城增长的三项（视图、墓碑、旁索引）逐一改成经 `storage::resident` 读回，每一项一个上表的常量，读回用上面的定位读。今天没有一项经过它：旁索引已是按列存的紧凑表（`storage::index::fold`），视图是许多小的按 run 摘要；把它们挪到盘上要一份盘上的索引格式与视图快照之外的按需读回，能定下先挪哪一项的是 TP1 负载下一小时私有字节里各项的占比。
-3. playback 导出的 `Document` 改成边走边编码：编码本身已经直接写进 bundle 的那一份缓冲（`crates/accounting/spec/Playback.lean` §8-12），剩下的是 `finish` 给提交找证据时按 seq 查整份 `events`（`crates/accounting/Spec.lean` §3）。
-4. `crates/xtask/budgets.toml` 加内存节拍与一小时斜率的两行（由那一波拥有 budgets.toml 的车道提交）。
+3. playback 导出的 `Document` 改成边走边编码：编码本身已经直接写进 bundle 的那一份缓冲（`Sprawling/accounting/spec/Playback.lean` §8-12），剩下的是 `finish` 给提交找证据时按 seq 查整份 `events`（`Sprawling/accounting/Spec.lean` §3）。
+4. `Tools/xtask/budgets.toml` 加内存节拍与一小时斜率的两行（由那一波拥有 budgets.toml 的车道提交）。
 5. D102 的读数在 Linux runner 上复核：同一负载，读私有字节 p99 与一小时斜率，确认换分配器之后斜率仍在上限之内。
-6. 机器级预约还没有覆盖的部分：城起动的浏览器实例不预约；没有内存上限的 run 什么都不预约（D104 的理由与重开参数）；界面还不显示排队，只有结果里的 `memory_wait`；在等的调用不响应 halt，要等到被放行才看见 run 已停（等待的上界见 D104）。为什么不复用 gateway 的并发名额见 `crates/runtime/spec/Reserve.lean` D103。未定的是没填 `[core] memory_bytes` 的子进程预约多少字节：它是一个估计而不是上限，决定了小内存机器上能同时跑几条命令。
-7. 峰值堆的棘轮：citysim 场景的峰值堆字节，以 `dhat` 作测试构建的全局分配器读出，写成 `crates/xtask/budgets.toml` 的一行；`xtask artifact` 保证它不进发行件。
+6. 机器级预约还没有覆盖的部分：城起动的浏览器实例不预约；没有内存上限的 run 什么都不预约（D104 的理由与重开参数）；界面还不显示排队，只有结果里的 `memory_wait`；在等的调用不响应 halt，要等到被放行才看见 run 已停（等待的上界见 D104）。为什么不复用 gateway 的并发名额见 `Sprawling/runtime/spec/Reserve.lean` D103。未定的是没填 `[core] memory_bytes` 的子进程预约多少字节：它是一个估计而不是上限，决定了小内存机器上能同时跑几条命令。
+7. 峰值堆的棘轮：citysim 场景的峰值堆字节，以 `dhat` 作测试构建的全局分配器读出，写成 `Tools/xtask/budgets.toml` 的一行；`xtask artifact` 保证它不进发行件。
 8. 4 GB 剖面：TP1 的负载加两个并发编译，在内存上限 4 GB 的 Linux 容器（cgroup `memory.max`）里跑一小时，读有没有进程被杀（`memory.events` 的 `oom_kill`）、换页次数与工具调用 p99；Windows 上的 segment heap（应用清单的 `heapType`）与默认堆按私有字节与斜率对照。
 -/
 
@@ -102,7 +102,7 @@
 * Linux：std 读 `/proc/self/smaps_rollup`，取 `Private_Clean` 与 `Private_Dirty` 之和（内核 4.14 起有，容器里也有）；没有这个文件或它不给这两行时，读 `/proc/self/status` 的 `RssAnon`（匿名驻留页，不含换出的私有页，所以偏低）；两个都读不到时读作 0。都是普通文件，std 读它们不需要 `unsafe`，与 §8-96 读 `/proc/self/io` 同一种做法。
 * macOS：`phys_footprint` 只能经 `task_info(TASK_VM_INFO)` 取得，那是一次 FFI 调用。按 AGENTS.md 平台调用的次序先找对外只给安全接口的 crate；没有找到之前，macOS 上报 `memory-stats` 的 `task_basic_info.virtual_size`，它是虚拟大小，比私有字节大得多，不为它写 `unsafe`。
 
-读数用的是哪一种，由平台决定（Linux 的 `RssAnon` 退路在运行时决定）；`wire::frames::monitor::Sample` 没有携带来源的字段，所以这一点写在这里与 `crates/sprawling/spec/Monitor.lean` §8-96，屏幕上不标。给 `Sample` 加来源字段是一次线上协议的改动，等下一次改监视帧时一起做。
+读数用的是哪一种，由平台决定（Linux 的 `RssAnon` 退路在运行时决定）；`wire::frames::monitor::Sample` 没有携带来源的字段，所以这一点写在这里与 `Sprawling/app/spec/Monitor.lean` §8-96，屏幕上不标。给 `Sample` 加来源字段是一次线上协议的改动，等下一次改监视帧时一起做。
 
 理由：Linux 的两个文件 std 就能读，代价是一次小文件读（smaps_rollup 在内核里按段求和，段多时比 status 慢）；macOS 的 `phys_footprint` 是活动监视器报的那个数，但它要 FFI。被否的做法：三个平台都报 RSS（工作集）：RSS 包括可回收的文件页，缓存交给操作系统的文件缓存之后 RSS 会随读盘上升，而这正是本设计要鼓励的。重开的条件：出现以安全接口读 `phys_footprint` 的 crate。
 -/
@@ -119,7 +119,7 @@
 
 单线程跑同一负载，musl 的 `malloc` 只慢 22%（46.2 对 38.0 ms），所以差距几乎全部是锁争用，不是分配的常数开销；纯计算的对照负载两臂相同（1.7–1.9 ms），排除了机器漂移。
 
-决定：`crates/sprawling/Cargo.toml` 只在 `cfg(target_env = "musl")` 上依赖 `tikv-jemallocator` 0.7（vendor 的 jemalloc 5.3.1），并开 `background_threads`，让未用页的归还由 decay 定时器推进，而不是等下一次分配；`crates/sprawling/src/main.rs` 在同一条 cfg 下声明 `#[global_allocator]`。
+决定：`Sprawling/app/Cargo.toml` 只在 `cfg(target_env = "musl")` 上依赖 `tikv-jemallocator` 0.7（vendor 的 jemalloc 5.3.1），并开 `background_threads`，让未用页的归还由 decay 定时器推进，而不是等下一次分配；`Sprawling/app/src/main.rs` 在同一条 cfg 下声明 `#[global_allocator]`。
 
 为什么其余三个平台不换：
 

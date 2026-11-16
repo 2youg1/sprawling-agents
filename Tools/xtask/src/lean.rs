@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A Lean file read as text, in the few restricted shapes a gate reads
-//! (crates/xtask/Spec.lean §8-42 and §8-43).
+//! (Tools/xtask/Spec.lean §8-42 and §8-43).
 //!
 //! **No gate runs Lean** (section 12-8). A gate judges in milliseconds
 //! beside twenty others, and proving belongs to `just models`; what a
@@ -255,14 +255,14 @@ pub(crate) fn imports(code: &str) -> Vec<(usize, String)> {
 }
 
 /// The repo-relative file a module name is read from:
-/// `crates.storage.spec.Snapshot` is `crates/storage/spec/Snapshot.lean`.
+/// `Sprawling.storage.spec.Snapshot` is `Sprawling/storage/spec/Snapshot.lean`.
 #[must_use]
 pub(crate) fn module_file(module: &str) -> String {
     format!("{}.lean", module.replace('.', "/"))
 }
 
 /// A package directory in the dotted form a module name starts with:
-/// `crates/agent_protocols` is `crates.agent_protocols`.
+/// `Sprawling/agent_protocols` is `Sprawling.agent_protocols`.
 #[must_use]
 pub(crate) fn dotted(dir: &str) -> String {
     dir.replace('/', ".")

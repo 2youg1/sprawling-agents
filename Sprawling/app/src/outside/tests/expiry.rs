@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The door closes itself when its time is up, through the listener's
-//! own tick (`crates/sprawling/spec/Outside/Conduit.lean` §8-139).
+//! own tick (`Sprawling/app/spec/Outside/Conduit.lean` §8-139).
 //!
 //! Everything from `listener::open` on is the production path; the
 //! clock is one the test turns, and the route is a stand-in that

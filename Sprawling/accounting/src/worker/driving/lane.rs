@@ -8,7 +8,7 @@
 //! interrupt it.
 //!
 //! It is a free function rather than a method because a lane is a
-//! thread that holds no worker (`crates/sprawling/Spec.lean` §8-46-1): everything a
+//! thread that holds no worker (`Sprawling/app/Spec.lean` §8-46-1): everything a
 //! drive needs from the city arrives in [`DriveContext`], which is five
 //! handles that clone, and the ledger arrives as a parameter — the
 //! accounting thread hands its own, and a lane hands a
@@ -39,13 +39,13 @@ pub(crate) struct DriveContext {
     /// What the person asked of this run, read at its safe points. One
     /// handle per drive, all of them reading the same desk by run id:
     /// a steer and a cancel reach the run they name and no other
-    /// (`crates/sprawling/Spec.lean` §8-42-1).
+    /// (`Sprawling/app/Spec.lean` §8-42-1).
     pub person: Option<std::sync::Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>>,
     /// What is still running while the runs go on, so a halt on a scope
     /// reaches a run inside it.
     pub backlog: runtime::Backlog,
     /// The worker's own clock, so a run's lines and the worker's are
-    /// read from one time (`crates/accounting/spec/Clock.lean` §8-3).
+    /// read from one time (`Sprawling/accounting/spec/Clock.lean` §8-3).
     pub clock: std::sync::Arc<dyn crate::Clock + Send + Sync>,
     /// The monotonic clock a run's durations are read off
     /// (`Hands.monotonic`, kernel D20).
@@ -58,11 +58,11 @@ pub(crate) struct DriveContext {
 const HALT_SLICE_MS: u64 = 50;
 
 /// Whether the scope a run's backlog member sits in is being stopped,
-/// for a model run and a harness run alike (`crates/sprawling/Spec.lean` §8-124).
+/// for a model run and a harness run alike (`Sprawling/app/Spec.lean` §8-124).
 ///
 /// A backlog that cannot answer counts as stopped: it cannot promise the
 /// scope is still open, and a run that carried on would be running
-/// inside a scope a person may already have shut (`crates/sprawling/Spec.lean`
+/// inside a scope a person may already have shut (`Sprawling/app/Spec.lean`
 /// §8-73).
 pub(super) fn scope_stopping(
     backlog: &runtime::Backlog,
@@ -136,7 +136,7 @@ pub(crate) fn drive_run<L: Ledger>(
     let declared = bench.declared_writes();
     // This run's own index: two nodes of one ready set drive at once by
     // design, and on one shared index libgit2's `.git/index.lock` refused
-    // the second checkpoint (`crates/sprawling/spec/Accounting/Views.lean` §8-46-13).
+    // the second checkpoint (`Sprawling/app/spec/Accounting/Views.lean` §8-46-13).
     let mut checkpoint_handle = storage::Checkpoint::open_writer(&write_root, run_id)
         .map_err(storage::StorageError::into_ax)?
         .with_entropy_allowlist(checkpoint_entropy_allow);

@@ -6,7 +6,7 @@
 /-!
 # wire::frames::ask
 
-规定 `frames::ask`（`crates/wire/src/` 下同名的文件）。问与答按问的一方铸造的编号配对，答带它反映到哪一条。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `frames::ask`（`Sprawling/wire/src/` 下同名的文件）。问与答按问的一方铸造的编号配对，答带它反映到哪一条。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 -/
 
 /-!

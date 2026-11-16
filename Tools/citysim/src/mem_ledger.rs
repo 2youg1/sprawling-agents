@@ -7,7 +7,7 @@
 //! adapter, so simulation histories and real histories are comparable
 //! byte for byte.
 //!
-//! Specified by `crates/citysim/spec/MemLedger.lean` §8-1.
+//! Specified by `Tools/citysim/spec/MemLedger.lean` §8-1.
 
 use kernel::ledger::chain_hash;
 use kernel::ledger::conformance::LedgerInspect;
@@ -28,7 +28,7 @@ impl MemLedger {
         }
     }
 
-    /// The inherent read face (`crates/citysim/spec/MemLedger.lean` §8-1):
+    /// The inherent read face (`Tools/citysim/spec/MemLedger.lean` §8-1):
     /// the executor's report and byte comparisons read here; the
     /// `LedgerInspect` impl below stays the conformance suite's door.
     pub fn raw_lines(&self) -> &[Vec<u8>] {

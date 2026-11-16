@@ -58,7 +58,7 @@ The SPEC is [`Spec.lean`](Spec.lean), with its part under [`spec/Estimators.lean
 cargo nextest run -p sprawling-benchstat              # the tests; `just test` runs them too
 cargo clippy -p sprawling-benchstat --all-targets --all-features -- -D warnings
 cargo publish -p sprawling-benchstat --dry-run --locked  # the packaging and build a crates.io publish makes, without uploading
-lake build crates.benchstat.Spec                       # the SPEC's proofs; `just models` builds every specification
+lake build Tools.benchstat.Spec                       # the SPEC's proofs; `just models` builds every specification
 ```
 
 `tests/round.rs` writes a round into a temporary directory, exports it, publishes it, verifies it, and then hand-edits the generated section: `verify` fails with `E_VERIFY_MISMATCH`. The two examples are a one-off cross-check of the historical v0.0.11 subset, not part of reproducing a published round: `examples/convert_v0011.rs` writes the long-form round from a historical directory into a local one, and `examples/check_v0011.rs` compares those exports with the historical observations. Neither changes a published round.

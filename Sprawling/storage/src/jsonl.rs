@@ -25,7 +25,7 @@
 //! it never enters a public signature — `JsonlLedger` hides it behind
 //! `Box<dyn Vfs>`.
 //!
-//! Specified by `crates/storage/spec/Jsonl.lean` §8-1.
+//! Specified by `Sprawling/storage/spec/Jsonl.lean` §8-1.
 
 mod append;
 mod barrier;

@@ -209,7 +209,7 @@ fn a_loopback_endpoint_with_a_credential_sends_it_on_every_call() {
 }
 
 /// The content store is opened once, when the adapter is built, rather
-/// than once per picture (`crates/sprawling/Spec.lean` §8-171). What that moves is
+/// than once per picture (`Sprawling/app/Spec.lean` §8-171). What that moves is
 /// where the failure lands: a city whose store cannot be opened says so
 /// while the adapter is being assembled, instead of half way through a
 /// conversation the model has already started.
@@ -380,7 +380,7 @@ fn a_line_a_run_writes_reaches_the_book_the_worker_holds() {
 /// The provider's own list is the rung below the person: a pick that
 /// states nothing, for a model whose list row states a window and a
 /// ceiling, registers both and names the provider as the rung that
-/// answered (`crates/gateway/Spec.lean` §8-17, gateway D45). The form
+/// answered (`Sprawling/gateway/Spec.lean` §8-17, gateway D45). The form
 /// no longer has to copy the list's figures into the person's boxes
 /// for the city to use them.
 #[test]

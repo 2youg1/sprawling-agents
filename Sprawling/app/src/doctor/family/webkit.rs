@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Safari, through the driver macOS ships beside it (`crates/sprawling/spec/Doctor.lean`
+//! Safari, through the driver macOS ships beside it (`Sprawling/app/spec/Doctor.lean`
 //! §8-57).
 //!
 //! Data, with no branch in it. The member this family looks for is the

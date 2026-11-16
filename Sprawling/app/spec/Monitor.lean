@@ -6,9 +6,9 @@
 /-!
 # 性能监视器的历史：有人看才采样，每项 300 点
 
-规定 `crates/sprawling/src/monitor.rs` 的 `Monitor::tick`（`bin::monitor`，形状：状态机；§8-94）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/app/src/monitor.rs` 的 `Monitor::tick`（`bin::monitor`，形状：状态机；§8-94）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
-一拍之内只发生一件事：看最多的那个人要什么，就读什么一次，放进历史；没人看就不读，并把历史释放。读数 `Sample` 的类型是参数（它定义在 `wire::frames::monitor`，`crates/wire/Spec.lean` §8-47），读取函数也是参数，所以「没人看不读」在模型里是「读取函数没有被调用」：`tick` 返回它调用读取函数时传的那一类，没调用就是 `none`。
+一拍之内只发生一件事：看最多的那个人要什么，就读什么一次，放进历史；没人看就不读，并把历史释放。读数 `Sample` 的类型是参数（它定义在 `wire::frames::monitor`，`Sprawling/wire/Spec.lean` §8-47），读取函数也是参数，所以「没人看不读」在模型里是「读取函数没有被调用」：`tick` 返回它调用读取函数时传的那一类，没调用就是 `none`。
 
 四条性质：没人看时不读、历史为空（§8-94 决定 1）；历史不超过 `capacity`；满了丢最旧的、从旧到新；有人看整页就读整页，只有看摘要的人才只读摘要。
 -/
@@ -102,7 +102,7 @@ WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge
 
 **接口。**
 
-- `Sample`：一次读数，全部是 `u64` 的整数计数，没有浮点（它会上线协议，定义在 `wire::frames::monitor`，见 `crates/wire/Spec.lean` §8-47，本模块用的就是那一个类型）。字段：`core_cpu_permille`、`core_private_bytes`、`core_working_set_bytes`、`core_read_bytes`、`core_written_bytes`、`machine_cpu_permille`、`machine_available_bytes`、`volume_free_bytes`、`ledger_queue_depth`、`durable_lag`、`relay_p50_nanos`、`event_to_screen_p50_nanos`、`queued_runs`。
+- `Sample`：一次读数，全部是 `u64` 的整数计数，没有浮点（它会上线协议，定义在 `wire::frames::monitor`，见 `Sprawling/wire/Spec.lean` §8-47，本模块用的就是那一个类型）。字段：`core_cpu_permille`、`core_private_bytes`、`core_working_set_bytes`、`core_read_bytes`、`core_written_bytes`、`machine_cpu_permille`、`machine_available_bytes`、`volume_free_bytes`、`ledger_queue_depth`、`durable_lag`、`relay_p50_nanos`、`event_to_screen_p50_nanos`、`queued_runs`。
 - `Monitor::new()`：不分配。
 - `Monitor::watch(&self, watched: Watched) -> Watch`：一个在看的人，看整页（`Watched::Everything`）或只看设置树「性能」条目旁那一行摘要摘要（`Watched::Summary`，`Watched` 定义在 `wire::frames::monitor`）。两类分开计数。`Watch` 被丢弃时这个人就不再算数；它可以跨线程持有（socket 线程持有，采样线程计数）。
 - `Monitor::tick(&mut self, read: impl FnOnce(Watched) -> Sample)`：每秒调用一次。有人看整页时以 `Watched::Everything` 调用 `read` 一次；只有看摘要的人时以 `Watched::Summary` 调用，读的一方只读本进程；把结果放进历史，满 300 个时丢掉最旧的。没人在看时不调用 `read`，并释放历史占的内存。
@@ -120,7 +120,7 @@ WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge
 
 **测试。** `monitor::tests`：没人看时 `read` 一次也不被调用、历史为空，人走了以后历史被释放；放入 301 个点后只剩最后 300 个、从旧到新；只有看摘要的人时 `read` 收到 `Summary`，再来一个看整页的人时收到 `Everything`，他走了以后回到 `Summary`。
 
-**本节接口的当前状态。** 计数器读取与每秒一拍的采样线程见 §8-96；线上的一对监视帧见 `crates/wire/Spec.lean` §8-47：会话发 `Watch` 时经 `assembly::listening` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计。WebUI 监视页 `client/src/views/monitor.svelte` 在 `#/monitor`，经这对帧打开时计一个看的人、关闭时释放，读数与曲线由 `client/src/core/monitor.ts` 按 §8-95 的规则算出。`sprawling gauge --at <地址>` 经这对帧看监视器，见 §8-97。性能摘要（设置树「性能」条目旁，`watching.ts` 的 `watchSummary`）经 `WatchSummary` 看监视器，只显示本进程的 CPU 与工作集；只有它在看时采样线程只读 `OwnProcess`，不打开 `sysinfo`。其余尚未落地：采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
+**本节接口的当前状态。** 计数器读取与每秒一拍的采样线程见 §8-96；线上的一对监视帧见 `Sprawling/wire/Spec.lean` §8-47：会话发 `Watch` 时经 `assembly::listening` 交给它的 `watch` 在这里的 `Monitor` 上计一个看的人，发 `Release` 或断开时不再计。WebUI 监视页 `client/src/views/monitor.svelte` 在 `#/monitor`，经这对帧打开时计一个看的人、关闭时释放，读数与曲线由 `client/src/core/monitor.ts` 按 §8-95 的规则算出。`sprawling gauge --at <地址>` 经这对帧看监视器，见 §8-97。性能摘要（设置树「性能」条目旁，`watching.ts` 的 `watchSummary`）经 `WatchSummary` 看监视器，只显示本进程的 CPU 与工作集；只有它在看时采样线程只读 `OwnProcess`，不打开 `sysinfo`。其余尚未落地：采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表。
 
 **内存的读数**（`bin::monitor::memory`）：整机物理内存与可用内存经 `sysinfo`（只开 `system` 特性，只刷新 RAM）一次读出成 `Memory { physical, available }`，这是城里读内存的唯一一处；`read` 刷新本线程留着的一个 `System`，不每次新建：同一台 Windows x86-64 桌面级机器、测试档构建上，新建句柄时一次读数 2.2–2.3 µs，留着句柄时 1.6–1.7 µs，余下的是平台调用本身；按线程留而不是全局一把锁，读数的线程之间不互等；计划推进按它决定下一行是否排队（§8-46-3，只管计划行；其他入口的现状见那里）。平台不报时两项都是零，此时不算紧。取 `sysinfo`，因为它是对外只给安全接口的现成路，本 crate 不写 `unsafe`。
 -/
@@ -137,7 +137,7 @@ WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge
 - 失败：`sparkline` 没有失败路径。`json_line` 只转交 `serde_json` 的错误；整数字段没有可被拒绝的内容，所以它实际上不会出现，调用方把它当作写 stdout 失败处理，而不是在这里用一个隐藏的 `unwrap` 吞掉。
 - `screen(samples: &[Sample], curve_width: usize) -> String`：终端画面的一屏（不含清屏与光标控制，那是调用方的事）。每个计数器一行，共 13 行，以 `
 ` 分隔，顺序与 `Sample` 的字段相同：左对齐 24 列的英文标签，右对齐 10 列的最新读数，两个空格，再是这一项最近 `curve_width` 个点的曲线。没有样本时返回空串，调用方在第一秒什么也不画。
-- `Unit::{Permille, Bytes, Nanos, Count}` 与 `Unit::reading(&self, value: u64) -> String`：一个读数按单位写成文字，是城里单位换算的唯一一处；`gauge::lines` 写给人的行也调它（§8-129-4）。读数的写法按单位定：千分比写成一位小数的百分数（`123` → `12.3%`）；字节按 1024 进位取最大的、读数不小于 1 的单位，写一位小数（`B` 只写整数，其后是 `KiB`、`MiB`、`GiB`、`TiB`）；纳秒按时长的显示规则写：不到 1 µs 写整数 `ns`，不到 10 ms 写整数 `µs`，10 ms 及以上写一位小数的 `ms`，没有更大的单位（`crates/sprawling/spec/Main.lean` §8-129-2 *单位*）；计数原样写。小数一律截断而不是四舍五入，整数运算，没有浮点。
+- `Unit::{Permille, Bytes, Nanos, Count}` 与 `Unit::reading(&self, value: u64) -> String`：一个读数按单位写成文字，是城里单位换算的唯一一处；`gauge::lines` 写给人的行也调它（§8-129-4）。读数的写法按单位定：千分比写成一位小数的百分数（`123` → `12.3%`）；字节按 1024 进位取最大的、读数不小于 1 的单位，写一位小数（`B` 只写整数，其后是 `KiB`、`MiB`、`GiB`、`TiB`）；纳秒按时长的显示规则写：不到 1 µs 写整数 `ns`，不到 10 ms 写整数 `µs`，10 ms 及以上写一位小数的 `ms`，没有更大的单位（`Sprawling/app/spec/Main.lean` §8-129-2 *单位*）；计数原样写。小数一律截断而不是四舍五入，整数运算，没有浮点。
 
 **定下的值。** 8 级字符 `▁▂▃▄▅▆▇█`（U+2581–U+2588），与常见终端字体都有的块元素一致。标签列宽 24、读数列宽 10：最长的标签 `event to screen p50` 与最长的读数 `1023.9 GiB` 都放得下。
 
@@ -162,9 +162,9 @@ WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge
 - `sampler::beat(monitor: &Mutex<Monitor>, samples: &broadcast::Sender<Sample>, read: impl FnOnce(Watched) -> Sample)`：一拍。调用 `Monitor::tick(read)`，`read` 收到这一拍看的人要的范围（`Watched`）；这一拍读了计数器，就把这一个读数发到 `samples`（即 `wire::MonitorFeed::samples`）。没人在看时 `read` 不被调用，什么也不发。发送时一个订阅者也没有不是失败：看的会话在两拍之间走了，它没有错过自己要的东西。锁中毒时照常取用：计数是原子的，历史是完整的 `VecDeque`，中毒不留下写了一半的状态。
 - `sampler::spawn_sampler(monitor: Weak<Mutex<Monitor>>, samples: broadcast::Sender<Sample>, volume: PathBuf, gauges: Gauges<impl Fn() -> u64 + Send + 'static>) -> Result<(), AxError>`：`volume` 是城的路径，交给 `Counters::open`；`gauges`（`sampler::Gauges`）给每个读数补上计数器读不到的几项：记账队列的两个计数、视图折叠的积压与上一拍读数用的时间。起名为 `sprawling-monitor` 的线程，每秒一拍，读数来自 `counters::Counters`。一拍之内线程按内存节拍醒十次：有人在看（`Counters` 开着）时，每次醒来经 `Counters::note_private` 读一次本进程的私有字节，这一秒的 `Sample.core_private_bytes` 报这十次与拍上那一次里最高的一个，所以几毫秒的峰不会落在两次每秒读数之间（D83 第 4 条要看的就是峰）；没人看时醒来什么也不读。线程只持 `Weak`：`ServeConfig` 连同 `MonitorFeed::watch` 被丢弃后 `upgrade` 失败，线程在下一拍结束。起不了线程时返回 `StorageFatal`，recovery 是检查进程的线程上限（与 `serving::folding` 相同）。
 - `counters::Counters::open(volume: PathBuf) -> Counters` 与 `Counters::read(&mut self, watched: Watched, elapsed: Duration) -> Sample`：核心进程的五项取自 `OwnProcess`；`Watched::Everything` 时再读整机 CPU（千分比）、可用内存与城所在卷的剩余空间。城的路径在 `open` 时经 §8-116 的 `volume::resolved` 解析一次，之后每拍用解析过的路径找盘：城以相对路径或 verbatim 拼写起来时，没有一个挂载点是原样路径的前缀，卷的剩余空间就一直读作 0。解析不出时退回原样路径。`sysinfo` 的句柄在第一次 `Everything` 读数时才打开，一次 `Summary` 读数把它们丢掉，所以只有摘要在看时它们不常驻。第一次读数没有上一次可比，两项 CPU 为 0。
-- `counters::own_process::OwnProcess::new() -> OwnProcess` 与 `OwnProcess::read(&mut self, elapsed: Duration) -> OwnReading`：只问本进程、不遍历进程表的读数，`elapsed` 是距上一次读数的墙钟时间。`OwnReading { cpu_permille, private_bytes, working_set_bytes, read_bytes, written_bytes }`：CPU 是两次读数之间本进程累计 CPU 时间的增量除以墙钟增量与核数（千分比，整数运算，截到 `0..=1000`），第一次为 0；private 是私有字节，每个平台读什么见 `crates/sprawling/spec/Serving/Memory.lean` D43：Windows 是 PagefileUsage（即 PrivateUsage），Linux 是 `/proc/self/smaps_rollup` 的 `Private_Clean` 加 `Private_Dirty`（没有它时是 `/proc/self/status` 的 `RssAnon`），macOS 是虚拟大小；工作集是驻留内存；读写字节是本进程累计经存储读写的字节数，Linux 上取自 `/proc/self/io` 的 `read_bytes` 与 `write_bytes`（std 读文件，不需要 unsafe），其他平台读作 0（决定 1）。平台拒绝某一项时这一项读作 0，与尚未接入的项同样处理：`Sample` 是给人看的读数，没有携带失败的位置，而一秒后下一拍会再读一次。`Counters` 只在有人看时存在：`beat` 之后历史为空（没人看）时采样线程丢掉它，平台句柄与进程表不常驻。
+- `counters::own_process::OwnProcess::new() -> OwnProcess` 与 `OwnProcess::read(&mut self, elapsed: Duration) -> OwnReading`：只问本进程、不遍历进程表的读数，`elapsed` 是距上一次读数的墙钟时间。`OwnReading { cpu_permille, private_bytes, working_set_bytes, read_bytes, written_bytes }`：CPU 是两次读数之间本进程累计 CPU 时间的增量除以墙钟增量与核数（千分比，整数运算，截到 `0..=1000`），第一次为 0；private 是私有字节，每个平台读什么见 `Sprawling/app/spec/Serving/Memory.lean` D43：Windows 是 PagefileUsage（即 PrivateUsage），Linux 是 `/proc/self/smaps_rollup` 的 `Private_Clean` 加 `Private_Dirty`（没有它时是 `/proc/self/status` 的 `RssAnon`），macOS 是虚拟大小；工作集是驻留内存；读写字节是本进程累计经存储读写的字节数，Linux 上取自 `/proc/self/io` 的 `read_bytes` 与 `write_bytes`（std 读文件，不需要 unsafe），其他平台读作 0（决定 1）。平台拒绝某一项时这一项读作 0，与尚未接入的项同样处理：`Sample` 是给人看的读数，没有携带失败的位置，而一秒后下一拍会再读一次。`Counters` 只在有人看时存在：`beat` 之后历史为空（没人看）时采样线程丢掉它，平台句柄与进程表不常驻。
 
-**定下的值。** 内存节拍默认 `wire::BeatMs::DEFAULT` 100 ms（Memory.lean 的测量计划），可在 `BEAT_MIN_MS`–`BEAT_MAX_MS` 之内由页面调（`crates/wire/spec/Frames/Monitor.lean` §8-47i）；一拍是 `MEMORY_BEATS_PER_BEAT` 个内存节拍，默认即 1 s（§8-94 的「每秒一点」）；线程名 `sprawling-monitor`。
+**定下的值。** 内存节拍默认 `wire::BeatMs::DEFAULT` 100 ms（Memory.lean 的测量计划），可在 `BEAT_MIN_MS`–`BEAT_MAX_MS` 之内由页面调（`Sprawling/wire/spec/Frames/Monitor.lean` §8-47i）；一拍是 `MEMORY_BEATS_PER_BEAT` 个内存节拍，默认即 1 s（§8-94 的「每秒一点」）；线程名 `sprawling-monitor`。
 
 **节拍按城记住**（D48）：`monitor::beat::Beat` 持有当前节拍（一个原子数，采样线程每次醒来读它）与城里记它的文件 `kernel::layout::CityLayout::monitor()`（`.sprawling/MONITOR.toml`，一行 `beat_ms = <n>`）。`Beat::open(city_root)` 在 serve 时读这个文件，文件不在时是默认，读不懂或越界时也是默认并记一条 warn 日志；`Beat::set(b)` 先改原子数、再整份重写文件（`city::document::replace` 之外的保留子树文件照 `GUIDE.toml` 的做法写），写不成记 warn 日志，此刻的节拍仍生效。三个平台上的读写都只经标准库的文件接口。
 
@@ -178,13 +178,13 @@ WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge
 
 **测试。** `monitor::sampler::tests`：有人看时一拍把读到的那一个读数发给订阅者；没人看时不读、不发。`monitor::counters::tests`：读本进程得到非零的工作集、整机可用内存与卷剩余空间；以相对路径 `.` 打开的 `Counters` 读到的卷剩余空间非零。`monitor::counters::own_process::tests`：第一次读数的 CPU 为 0，本进程忙过一段之后第二次读数的 CPU 大于 0，工作集与 private 非零。
 
-**本节接口的当前状态。** 整机可用内存经 §8-94 的 `bin::monitor::memory` 读出，与计划推进的内存闸（§8-46-3）读同一处。核心健康里记账队列深度与持久水位线的两项经 §8-98 的 `Health` 读出；其余几项现为 0，缺的是来源而不是采样，§8-98 的当前状态逐项写明。派出的命令按 run 装进各自的 Job Object，`Backlog::processes`（`runtime::backlog::jobs`） 给出每个 run 此刻的进程（`crates/runtime/Spec.lean` §8-13-3）；按这些 pid 读每个进程的内存与 CPU、并把逐 run 的明细送上线，还没有做：`Sample` 是一行固定的 13 个数，逐 run 的明细要一种新的帧（WIRE_V 加一）。磁盘延迟没有字段。本进程的累计读写字节在 Linux 以外读作 0（决定 1）。一拍里剩下的大头是 `sysinfo` 的整机 CPU（0.7–8 ms）与磁盘（0.2–0.8 ms），离「采样一次 ≤ 50 µs」还差这两项；采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表尚未落地。
+**本节接口的当前状态。** 整机可用内存经 §8-94 的 `bin::monitor::memory` 读出，与计划推进的内存闸（§8-46-3）读同一处。核心健康里记账队列深度与持久水位线的两项经 §8-98 的 `Health` 读出；其余几项现为 0，缺的是来源而不是采样，§8-98 的当前状态逐项写明。派出的命令按 run 装进各自的 Job Object，`Backlog::processes`（`runtime::backlog::jobs`） 给出每个 run 此刻的进程（`Sprawling/runtime/Spec.lean` §8-13-3）；按这些 pid 读每个进程的内存与 CPU、并把逐 run 的明细送上线，还没有做：`Sample` 是一行固定的 13 个数，逐 run 的明细要一种新的帧（WIRE_V 加一）。磁盘延迟没有字段。本进程的累计读写字节在 Linux 以外读作 0（决定 1）。一拍里剩下的大头是 `sysinfo` 的整机 CPU（0.7–8 ms）与磁盘（0.2–0.8 ms），离「采样一次 ≤ 50 µs」还差这两项；采样一次 ≤ 50 µs、占 CPU ≤ 0.1% 的仪表尚未落地。
 -/
 
 /-!
 ## 8-116 城所在卷快满时不接新活（`bin::monitor::volume`，形状：adapter；`accounting::worker::commanding::shedding`，形状：decision）
 
-`crates/kernel/spec/Degradation.lean` §8-74 的 `degradation::admit_work` 判定卷低于地板时不接新活；本节给它生产的读数和生产的入口。读数不取监视器的 `Sample`：监视器只在有人看时采样（§8-94 决定 1），而不接新活不能取决于此刻有没有人开着监视页。
+`Sprawling/kernel/spec/Degradation.lean` §8-74 的 `degradation::admit_work` 判定卷低于地板时不接新活；本节给它生产的读数和生产的入口。读数不取监视器的 `Sample`：监视器只在有人看时采样（§8-94 决定 1），而不接新活不能取决于此刻有没有人开着监视页。
 
 **接口。**
 
@@ -200,7 +200,7 @@ WebUI 的监视页、设置树「性能」条目旁的摘要与 `sprawling gauge
 
 **测试。** `accounting::worker::commanding::tests::shedding`：读卷函数报告卷低于地板时，`Dispatch` 被拒为 `BackpressureShed`，recovery 说出要腾出的字节数，房间没有被建起来。`monitor::volume::tests`：以相对路径 `.` 读卷、以 `canonicalize` 给出的 verbatim 拼写读卷，都与以工作目录的绝对路径读到同一块盘。
 
-**本节接口的当前状态。** `Wake` 等不经人的入口尚未接入；性能摘要与 doctor 尚不显示降级；盘慢、内存紧、CPU 被占满三种状态还没有生产的读数（`crates/kernel/spec/Degradation.lean` §8-74）。
+**本节接口的当前状态。** `Wake` 等不经人的入口尚未接入；性能摘要与 doctor 尚不显示降级；盘慢、内存紧、CPU 被占满三种状态还没有生产的读数（`Sprawling/kernel/spec/Degradation.lean` §8-74）。
 -/
 
 /-! D48 采样节拍按城记在保留子树的一个文件里，由持有监视器的外壳读写

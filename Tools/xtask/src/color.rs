@@ -28,7 +28,7 @@
 //! the share of the gamut a token takes, the APCA tier it claims, the
 //! brightest surface text may sit on - and none of the three is a colour
 //! component. They are declared beside the values they govern, as
-//! properties the cascade ignores (crates/xtask/Spec.lean §8-8).
+//! properties the cascade ignores (Tools/xtask/Spec.lean §8-8).
 
 use std::path::Path;
 
@@ -55,7 +55,7 @@ const GRAY_CHROMA: u16 = 14;
 
 /// The two coloured tokens that may leave the axis, each with the one hue
 /// it may take: the context ring's first reminder and its handoff
-/// reminder (crates/xtask/Spec.lean §8-8b). Named rather than counted, so a
+/// reminder (Tools/xtask/Spec.lean §8-8b). Named rather than counted, so a
 /// third token cannot borrow either hue.
 const CHECKPOINTS: [(&str, u16); 2] = [("REMINDER_FIRST", 150), ("REMINDER_SECOND", 25)];
 
@@ -351,7 +351,7 @@ fn token_violation(rule: &str, violation: String) -> Violation {
         rule: rule.to_owned(),
         violation,
         alternative: "adjust the client's theme, and record the reason in \
-                      crates/xtask/Spec.lean §8-8; colour rules are mechanical by design"
+                      Tools/xtask/Spec.lean §8-8; colour rules are mechanical by design"
             .to_owned(),
     }
 }

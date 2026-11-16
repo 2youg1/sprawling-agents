@@ -10,7 +10,7 @@
 # compiler that produced it, which only a version the tree names records.
 # A contributor still gets this release without a step of their own,
 # because rustup installs whatever this file names on first use. The
-# decision is `crates/sprawling/spec/Doctor.lean` D31; the oldest release
+# decision is `Sprawling/app/spec/Doctor.lean` D31; the oldest release
 # that may build the published packages is `rust-version` in the root
 # `Cargo.toml`, a separate fact.
 #

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The seat model of `crates/sprawling/spec/Serving/Placement.lean`,
+//! The seat model of `Sprawling/app/spec/Serving/Placement.lean`,
 //! checked on the Rust seat table over every plan of up to five seats and
 //! every sequence of six starts and exits of four threads, the two
 //! serial ones and the two lanes. Bounded and exhaustive rather than

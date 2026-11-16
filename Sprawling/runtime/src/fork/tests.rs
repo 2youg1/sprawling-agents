@@ -572,7 +572,7 @@ fn a_cut_the_history_does_not_hold_is_refused() {
     assert!(err.recovery().contains("ends at seq 3"), "{err}");
 }
 
-/// D115 (`crates/runtime/spec/Tools.lean`): a call an older build
+/// D115 (`Sprawling/runtime/spec/Tools.lean`): a call an older build
 /// recorded under the argument names it took then reaches the branch as
 /// it was recorded, beside the answer it got; nothing maps it to the
 /// names this build's tools take.

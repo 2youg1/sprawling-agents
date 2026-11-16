@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Whether real-time scanning stands in front of the city directory's
-//! writes (`crates/sprawling/Spec.lean` §8-166).
+//! writes (`Sprawling/app/Spec.lean` §8-166).
 //!
 //! A city writes many small files: the Ledger, the buildings' worktrees,
 //! their builds. On Windows, Defender checks each write before it

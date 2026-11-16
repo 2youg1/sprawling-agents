@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The city's `[[agent]]` rows and the shipped catalog, read as the one
-//! roster a word is seated from (`crates/agent_protocols/Spec.lean` §8-19,
-//! `crates/city/spec/ConfigLayers.lean` §8-4f).
+//! roster a word is seated from (`Sprawling/agent_protocols/Spec.lean` §8-19,
+//! `Sprawling/city/spec/ConfigLayers.lean` §8-4f).
 //!
 //! It lives here because `city` sees only `kernel` and `agent_protocols`
 //! sees no configuration: this crate is the first that sees both, and the

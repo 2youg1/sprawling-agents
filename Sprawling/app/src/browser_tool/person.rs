@@ -80,7 +80,7 @@ pub(crate) fn for_user_browser(
 /// model needs the shape before it calls, and a tool whose schema is
 /// empty leaves it guessing. The parser stays the authority on what is
 /// accepted; this is what is disclosed, and section 2 of
-/// `crates/browser/Spec.lean` holds the two in one change-set.
+/// `Sprawling/browser/Spec.lean` holds the two in one change-set.
 ///
 /// # Errors
 /// Propagates a schema that does not build, which is a build-time defect.

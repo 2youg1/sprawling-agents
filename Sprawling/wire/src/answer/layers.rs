@@ -5,7 +5,7 @@
 
 //! The prompt documents the next run at an address is frozen with, in
 //! the order they are sent, and the layer each one comes from
-//! (`crates/wire/spec/Answer/Prefix.lean` §8-98).
+//! (`Sprawling/wire/spec/Answer/Prefix.lean` §8-98).
 //!
 //! Which document is sent and which a nearer one replaces is decided
 //! where the prefix is frozen; this answer carries that decision so a

@@ -5,7 +5,7 @@
 
 //! `cargo xtask acp-catalog`: the ACP registry's index, read once from its
 //! CDN and written as the catalog snapshot this build ships
-//! (`crates/agent_protocols/Spec.lean` §8-19, D13).
+//! (`Sprawling/agent_protocols/Spec.lean` §8-19, D13).
 //!
 //! Only the fields the city reads are kept - `id`, `name`, `version`,
 //! `license`, `distribution`, and of a binary target its `cmd`, `args` and
@@ -26,7 +26,7 @@ use crate::report::XtaskError;
 const INDEX: &str = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";
 
 /// The snapshot `agent_protocols::Catalog::bundled` reads.
-const SNAPSHOT: &str = "crates/agent_protocols/catalog/registry.json";
+const SNAPSHOT: &str = "Sprawling/agent_protocols/catalog/registry.json";
 
 /// The fields of one agent the city reads.
 const KEPT: [&str; 5] = ["distribution", "id", "license", "name", "version"];

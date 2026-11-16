@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One file of crates/remote_access/Spec.lean §8-12: its spelling, one named
+//! One file of Sprawling/remote_access/Spec.lean §8-12: its spelling, one named
 //! field of lowercase hex per line, and the two ways a test holds it,
 //! byte for byte or by what it still proves.
 
@@ -52,7 +52,7 @@ fn writing() -> bool {
 }
 
 pub(super) fn dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../crates/fixtures/remote-handshake")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../Tools/fixtures/remote-handshake")
 }
 
 fn write(name: &str, fields: &Fields) {

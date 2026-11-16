@@ -86,7 +86,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
     assert_eq!(
         schema_hash().to_string(),
         WIRE_SCHEMA_GOLDEN,
-        "schema hash changed - update `crates/wire/spec/Frames.lean` §8-1 in the same commit"
+        "schema hash changed - update `Sprawling/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
         WIRE_V, 79,
@@ -348,7 +348,7 @@ fn every_state_changing_command_carries_an_idempotency_key() {
 // ----------------------------------------------------------- retired frames
 
 /// The two frames that left the wire rather than staying on it answered
-/// with `not_built` for ever (`crates/wire/spec/Command.lean` §8-44,
+/// with `not_built` for ever (`Sprawling/wire/spec/Command.lean` §8-44,
 /// kernel D2). Their bytes still spell what they
 /// spelled, and that is no longer a command: what a client gets for them
 /// is the grammar's own unknown-variant refusal, not a verb it may offer

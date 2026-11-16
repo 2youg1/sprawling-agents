@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which agent a word names: the rows the person added, and the five
-//! official harnesses as built-in entries (`crates/agent_protocols/Spec.lean`
+//! official harnesses as built-in entries (`Sprawling/agent_protocols/Spec.lean`
 //! §8-19, D12).
 //!
 //! A built-in entry records what the registry does not: the word it has
@@ -25,7 +25,7 @@ pub struct Official {
     /// Its id in the ACP registry, whose row says how it starts.
     pub registry_id: &'static str,
     /// The directories whose presence says it is installed or signed in
-    /// (`crates/agent_protocols/Spec.lean` D19). Each row cites its
+    /// (`Sprawling/agent_protocols/Spec.lean` D19). Each row cites its
     /// vendor page; an empty table reads as "not looked for".
     pub set_up: &'static [SetUpDir],
     /// Where its vendor says how a person signs in.

@@ -12,7 +12,7 @@
 
 //! What a run reads back from a cgroup root: nothing where the root may
 //! not be written, and the weight and the limit the arm asked for where
-//! it may (`crates/runtime/spec/Tools/Exec.lean` D29, D33).
+//! it may (`Sprawling/runtime/spec/Tools/Exec.lean` D29, D33).
 //!
 //! Every test builds a fake `/sys/fs/cgroup` under the temp directory,
 //! so the same checks run on the machine the code is written on and on

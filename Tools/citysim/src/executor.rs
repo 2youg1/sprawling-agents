@@ -10,11 +10,11 @@
 //!
 //! Event order (no cancel, natural conclusion):
 //! checkpoint_committed, run_started, prompt_assembled once per run
-//! (`crates/runtime/Spec.lean` §8-39 item 5), then per turn prompt_shape_compared,
+//! (`Sprawling/runtime/Spec.lean` §8-39 item 5), then per turn prompt_shape_compared,
 //! model_called, model_returned, (tool_called, tool_result)*, and finally
 //! handoff_written, run_frozen.
 //!
-//! Specified by `crates/citysim/spec/Executor.lean` §8-2 to §8-4.
+//! Specified by `Tools/citysim/spec/Executor.lean` §8-2 to §8-4.
 
 use std::cell::Cell;
 
@@ -169,7 +169,7 @@ pub fn run_scenario(scenario: Scenario) -> Result<ScenarioReport, AxError> {
 /// This is what makes two runs on one ledger expressible: the second
 /// run continues the first one's chain, so the report carries both
 /// runs' lines and `seq` orders them the way one city would have
-/// written them (`crates/sprawling/Spec.lean` §8-46-5).
+/// written them (`Sprawling/app/Spec.lean` §8-46-5).
 ///
 /// # Errors
 /// Propagates whatever the drive refuses.
@@ -273,7 +273,7 @@ pub fn run_scenario_on(
             .map_or(Temporal::Timeless, |meta| meta.temporal);
         match bench.invoke(call, &key, t)? {
             // A replay carries the first call's own result, and is
-            // packaged exactly as that result was (`crates/runtime/Spec.lean` §8-35).
+            // packaged exactly as that result was (`Sprawling/runtime/Spec.lean` §8-35).
             BenchOutcome::Ran { outcome, .. } | BenchOutcome::Duplicate { outcome } => {
                 // The envelope is the caller's to hang: a clock line when
                 // one is due, inside this result's byte budget.

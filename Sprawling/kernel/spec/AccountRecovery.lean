@@ -3,14 +3,14 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.kernel.spec.Error
+import Sprawling.kernel.spec.Error
 
 /-!
 # kernel::account_recovery
 
-规定 `kernel::account_recovery`（`crates/kernel/src/account_recovery.rs`）：一次逻辑请求面对一个 Provider 的有序账号时，先用哪个账号、失败后在原号上再发还是换号、何时停下。本文件是 `crates/kernel/Spec.lean` 的一个分部，节标签 §8-86，别处引作 `crates/kernel/Spec.lean §8-86` 或它的决定 `kernel D54`、`kernel D55`。
+规定 `kernel::account_recovery`（`Sprawling/kernel/src/account_recovery.rs`）：一次逻辑请求面对一个 Provider 的有序账号时，先用哪个账号、失败后在原号上再发还是换号、何时停下。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部，节标签 §8-86，别处引作 `Sprawling/kernel/Spec.lean §8-86` 或它的决定 `kernel D54`、`kernel D55`。
 
-模块图把它登记为 `state machine`。模型路径的驱动方已经接上它：`runtime::watchdog` 持有每一次模型调用的一轮，`runtime::run::drive` 执行它的处置（`crates/runtime/spec/Watchdog.lean` §8-9，runtime D89）；`web_search` 工具还不存在。`Watchdog` 原来的 `Retry` 三态规则就是下面单账号名册（`Roster.Single`）的处置，所以单账号端点的行为不因接上本模块而变（`a_single_account_ignores_the_disposition`），`runtime::watchdog` 旁原有的测试一字不改照样通过。
+模块图把它登记为 `state machine`。模型路径的驱动方已经接上它：`runtime::watchdog` 持有每一次模型调用的一轮，`runtime::run::drive` 执行它的处置（`Sprawling/runtime/spec/Watchdog.lean` §8-9，runtime D89）；`web_search` 工具还不存在。`Watchdog` 原来的 `Retry` 三态规则就是下面单账号名册（`Roster.Single`）的处置，所以单账号端点的行为不因接上本模块而变（`a_single_account_ignores_the_disposition`），`runtime::watchdog` 旁原有的测试一字不改照样通过。
 
 模型证明，对任意名册、任意人设上限、任意失败与修复的轨迹：请求错误不再发送；说「换号」的失败不在原号上重发；一个账号一轮里的发送不超过 1＋k；一轮里每个账号至多到一次，总发送不超过 n·(1＋k)，且不超过 `AtMost` 上限＋1；效果不明的请求不换号；Session 的绑定只在回答时移动。
 
@@ -37,9 +37,9 @@ impl AccountRound {
 }
 ```
 
-`next` 只返回信息、`apply` 只推进状态（命令与查询分离），两个驱动方——模型路径的 `runtime::watchdog` 与 `runtime::run::drive`（`crates/runtime/spec/Watchdog.lean` §8-9），以及 accounting 的 `web_search` 工具——都只执行 `AccountStep`，各自不另写一个重试循环、不另判一次选哪个账号。下面的 Lean 定义就是这些方法的参考语义：`next` 一臂对一臂，`apply`、`admits_repair`、`repaired` 逐字段相同；`tried` 在 Rust 是集合，在模型是到过的顺序（最新的在前），因为证明要数它的长度。模型的 `held` 与 `answered` 只为陈述绑定的性质而在，Rust 的轮不存 `held`：只有 `start` 读它一次。计数在 Rust 里饱和而不回绕：单账号的轮在 `UntilHalted` 之下一直再发到 `Halt`，回绕的计数会读成一个新账号的余额。
+`next` 只返回信息、`apply` 只推进状态（命令与查询分离），两个驱动方——模型路径的 `runtime::watchdog` 与 `runtime::run::drive`（`Sprawling/runtime/spec/Watchdog.lean` §8-9），以及 accounting 的 `web_search` 工具——都只执行 `AccountStep`，各自不另写一个重试循环、不另判一次选哪个账号。下面的 Lean 定义就是这些方法的参考语义：`next` 一臂对一臂，`apply`、`admits_repair`、`repaired` 逐字段相同；`tried` 在 Rust 是集合，在模型是到过的顺序（最新的在前），因为证明要数它的长度。模型的 `held` 与 `answered` 只为陈述绑定的性质而在，Rust 的轮不存 `held`：只有 `start` 读它一次。计数在 Rust 里饱和而不回绕：单账号的轮在 `UntilHalted` 之下一直再发到 `Halt`，回绕的计数会读成一个新账号的余额。
 
-**本轮**（round）是一次逻辑请求：从第一次发送起，到回答、停下或 `Halt` 为止。模型调用每一次 `Model::call` 开一轮，`web_search` 每一次工具调用开一轮。恢复轮次与已用的余额不入账、不持久化：进程重启后的下一次请求从绑定的账号开新的一轮（绑定本身由 Ledger 重建，`crates/gateway/spec/Router.lean` D30）。
+**本轮**（round）是一次逻辑请求：从第一次发送起，到回答、停下或 `Halt` 为止。模型调用每一次 `Model::call` 开一轮，`web_search` 每一次工具调用开一轮。恢复轮次与已用的余额不入账、不持久化：进程重启后的下一次请求从绑定的账号开新的一轮（绑定本身由 Ledger 重建，`Sprawling/gateway/spec/Router.lean` D30）。
 
 **驱动方怎样执行每一种处置**（实现约束，由各驱动方旁的测试守住，不由本模型证明）：
 
@@ -51,9 +51,9 @@ impl AccountRound {
 | `Stop { Unknown }` | 原错误原样，带着 `effect_unknown`，冻结原因 `ProviderRefused` | 同上 |
 | `Stop { Exhausted }` | 一条 `E_PROVIDER_ACCOUNTS_EXHAUSTED`，carrier 与 `E_PROVIDER` 相同，run 以 `Cancelled` 冻结；subject 列出 Provider 与每个账号 id 及其最后一种失败，不含 Key 与引用；恢复语：补录凭据或额度、或新增账号，然后再派活 | 同一个码作为失败的工具结果 |
 
-模型路径的生产回归在 `crates/accounting/src/worker/credentials/tests/accounts/recovery.rs`：一个 Provider 的两个账号经真实 `RunWorker` 与按 Key 作答的回环 Provider，逐一检查忙碌时原号再发到余额用完后换号、401 与额度用完只发一次就换号、400 只发一次且不换号、答复丢失只在原号再发且停下时仍是 `effect_unknown`、全部失败只记一条 `E_PROVIDER_ACCOUNTS_EXHAUSTED`、等待中停下 run，以及每个请求只带 `model_called` 记下的那个账号的 Key、Ledger 里没有 Key 的明文。根 run 由人的 `Cancel` 停下，交下去的 run 由 `Halt` 经它的 backlog 成员停下，两者在等待里由同一处（`Interrupting::halted`）询问；回归驱动的是前者。
+模型路径的生产回归在 `Sprawling/accounting/src/worker/credentials/tests/accounts/recovery.rs`：一个 Provider 的两个账号经真实 `RunWorker` 与按 Key 作答的回环 Provider，逐一检查忙碌时原号再发到余额用完后换号、401 与额度用完只发一次就换号、400 只发一次且不换号、答复丢失只在原号再发且停下时仍是 `effect_unknown`、全部失败只记一条 `E_PROVIDER_ACCOUNTS_EXHAUSTED`、等待中停下 run，以及每个请求只带 `model_called` 记下的那个账号的 Key、Ledger 里没有 Key 的明文。根 run 由人的 `Cancel` 停下，交下去的 run 由 `Halt` 经它的 backlog 成员停下，两者在等待里由同一处（`Interrupting::halted`）询问；回归驱动的是前者。
 
-**谁看见 `held`**：模型路径的 `held` 是 Session 的绑定（`gateway::router` 的 `EndpointBook` 从 Ledger 折出，`crates/gateway/spec/Router.lean` D30），派活时取它开第一轮，此后每一轮取适配器当前的账号；回答之后 `model_returned` 提交绑定，下一轮从新绑定开始。`web_search` 不记 Session 绑定（D54），每一轮的 `held` 恒缺席，所以总从名册里第一个可兑付的账号开始。
+**谁看见 `held`**：模型路径的 `held` 是 Session 的绑定（`gateway::router` 的 `EndpointBook` 从 Ledger 折出，`Sprawling/gateway/spec/Router.lean` D30），派活时取它开第一轮，此后每一轮取适配器当前的账号；回答之后 `model_returned` 提交绑定，下一轮从新绑定开始。`web_search` 不记 Session 绑定（D54），每一轮的 `held` 恒缺席，所以总从名册里第一个可兑付的账号开始。
 -/
 
 namespace Kernel.AccountRecovery
@@ -216,7 +216,7 @@ def AccountRound.apply (round : AccountRound Account) : AccountStep Account → 
     { round with current := some to, tried := to :: round.tried, here := 1, total := round.total + 1 }
   | .Stop _ => round
 
-/-- `AccountRound::admits_repair`：修复段（`crates/runtime/spec/Turn/Recovery.lean` 的 `BlockingResend`）换阻塞门重发之前问这一句。多账号时那次重发是原号上的一次发送，要原号还有余额、人设的上限还许；单账号照旧放行（D54 第 8 条）。 -/
+/-- `AccountRound::admits_repair`：修复段（`Sprawling/runtime/spec/Turn/Recovery.lean` 的 `BlockingResend`）换阻塞门重发之前问这一句。多账号时那次重发是原号上的一次发送，要原号还有余额、人设的上限还许；单账号照旧放行（D54 第 8 条）。 -/
 def AccountRound.admits_repair (round : AccountRound Account) : Bool :=
   match round.roster with
   | .Single => true

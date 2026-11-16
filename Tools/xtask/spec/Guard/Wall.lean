@@ -6,8 +6,8 @@
 /-!
 # `guard::wall`：唯一一张自己的 lint 表，与它记下的差异
 
-规定 `crates/xtask/src/guard/wall.rs` 的 `judge`（`crates/xtask/Spec.lean` §8-46）：叶子
-`crates/desktop/ffi` 的 `[lints]` 与根 `[workspace.lints]` 逐键比对，例外只在 `RECORDED`。
+规定 `Tools/xtask/src/guard/wall.rs` 的 `judge`（`Tools/xtask/Spec.lean` §8-46）：叶子
+`Sprawling/desktop/ffi` 的 `[lints]` 与根 `[workspace.lints]` 逐键比对，例外只在 `RECORDED`。
 
 参照定义只陈述一个键的结论；两张表怎样读成键、成员怎样列出、别的成员怎样判 `workspace = true`
 不在这里，那一半在 `guard` 的 Rust 里，由它自己的测试守着。
@@ -28,13 +28,13 @@ deriving DecidableEq, Repr
 
 /-
 D14 **guard 只判一张自己的 lint 表；`members` 只列工作区成员。**desktop 并回工作区之后
-（`crates/desktop/Spec.lean` D14），本仓没有一个在工作区之外构建的包，唯一的抄件是 FFI 叶子
-`crates/desktop/ffi` 那张 `[lints]`，它与根表只差 `unsafe_code` 一行。guard 因此判这一张表，再判
+（`Sprawling/desktop/Spec.lean` D14），本仓没有一个在工作区之外构建的包，唯一的抄件是 FFI 叶子
+`Sprawling/desktop/ffi` 那张 `[lints]`，它与根表只差 `unsafe_code` 一行。guard 因此判这一张表，再判
 其余每个成员都写 `lints.workspace = true`；墙的元数据、依赖版本与四处抄过去的常量（协议修订、
 `_meta` 键、错误码、质量域）不再有第二份，比对随之删去。成员名单取自 `members`（`cargo metadata`），
 不从根清单的 `members` 数组读，因为 cargo 会把工作区目录里的 path 依赖自动收为成员，数组里没写的
 成员照样存在。`members` 的 `Reach` 与「经 path 依赖进来的墙外包」那一支一起删去：没有那样的包，
-一个永远不出现的变体只会让每个读者多判一臂。嵌套的包（`crates/desktop/ffi` 在 `crates/desktop`
+一个永远不出现的变体只会让每个读者多判一臂。嵌套的包（`Sprawling/desktop/ffi` 在 `Sprawling/desktop`
 之下）由 `members::owner` 判归属：持有一个路径的包里目录最长的那一个。被击败的备选：①叶子也抄包
 元数据与依赖版本、guard 照旧比对一整堵墙——这些在工作区里都能继承，抄了就是第二个家；②guard 从
 根清单的 `members` 数组读成员——漏掉 cargo 自动收进来的成员；③留着 `Reach::PathDependency` 等

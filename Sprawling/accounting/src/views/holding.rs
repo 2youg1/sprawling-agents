@@ -34,7 +34,7 @@ use super::snapshot::start::city_root_of;
 /// startup and folded forward by the write observer, so deleting them
 /// costs nothing but the rebuild — the ledger remains the only history.
 ///
-/// The encoding a snapshot holds (`crates/sprawling/Spec.lean` §8-91) leaves out the
+/// The encoding a snapshot holds (`Sprawling/app/Spec.lean` §8-91) leaves out the
 /// four fields that are not folded from the ledger; `Views::decode`
 /// takes them from `Views::new`.
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -61,7 +61,7 @@ pub struct Views {
     /// where the served ledger head starts before the fold moves it.
     pub(super) head: Option<kernel::Seq>,
     /// The chain hash of the ledger's first line, which names this
-    /// history for its whole life (`crates/wire/Spec.lean` §3, `Welcome.epoch`).
+    /// history for its whole life (`Sprawling/wire/Spec.lean` §3, `Welcome.epoch`).
     pub(super) epoch: Option<kernel::B3Hash>,
     /// What waits in each room, folded from the signal records. Held
     /// here rather than read off a queue: a queue answers by being
@@ -90,7 +90,7 @@ pub struct Views {
     pub(super) predecessors: std::collections::BTreeMap<kernel::RunId, kernel::RunId>,
     /// The commit each run announced last, so the next one it announces
     /// names its previous commit without a walk past every other run's
-    /// (`crates/sprawling/Spec.lean` §8-128).
+    /// (`Sprawling/app/Spec.lean` §8-128).
     pub(super) last_commit: std::collections::BTreeMap<kernel::RunId, wire::CommitAt>,
     /// Which runs were frozen with each skill pinned, by name and hash
     /// together: a skill edited between two runs is two documents under
@@ -111,12 +111,12 @@ pub struct Views {
     )]
     /// seq to byte offset, held rather than rebuilt, and carried by the
     /// views snapshot so a start from it does not rebuild it either
-    /// (`crates/storage/Spec.lean` §8-4): rebuilt, it cost every history question 14.4
+    /// (`Sprawling/storage/Spec.lean` §8-4): rebuilt, it cost every history question 14.4
     /// ms on a fifty thousand record ledger.
     ///
     /// Behind a lock of its own because the fold never touches it: a
     /// query carries the `Arc` out of its snapshot of the views and
-    /// reads the ledger with only readers waiting on it (`crates/sprawling/Spec.lean` §8-100).
+    /// reads the ledger with only readers waiting on it (`Sprawling/app/Spec.lean` §8-100).
     pub(super) index: std::sync::Arc<std::sync::Mutex<storage::LedgerIndex>>,
     /// Where each run's first `prompt_assembled` record sits, so the
     /// prompt a page asks for is one ledger line rather than a walk
@@ -127,16 +127,16 @@ pub struct Views {
     pub(super) latest_shapes: std::collections::BTreeMap<kernel::RunId, kernel::Seq>,
     /// Where each building's newest run's first `prompt_assembled` sits,
     /// so the capabilities a page asks for are one ledger line
-    /// (`crates/wire/spec/Answer/Catalog.lean` §8-99).
+    /// (`Sprawling/wire/spec/Answer/Catalog.lean` §8-99).
     pub(super) building_prompts: std::collections::BTreeMap<Address, RunPrompt>,
     /// The room each started run opened in, until its first prompt is
     /// folded: the prompt line carries no address, its run's start does.
     pub(super) unprompted: std::collections::BTreeMap<kernel::RunId, Started>,
     /// Each address's stretches, so a room's sessions are answered without
-    /// reading the ledger back (`crates/wire/Spec.lean` §8-71).
+    /// reading the ledger back (`Sprawling/wire/Spec.lean` §8-71).
     pub(super) sessions: super::sessions::RoomSessions,
     /// Each document's saves through a page, so its versions are
-    /// answered without reading the ledger back (`crates/wire/Spec.lean` §8-83).
+    /// answered without reading the ledger back (`Sprawling/wire/Spec.lean` §8-83).
     pub(super) saves: super::versions::DocumentSaves,
     /// Every building's plan, parsed once and re-parsed only when a
     /// record says it may have moved.
@@ -144,7 +144,7 @@ pub struct Views {
     /// Behind a lock of its own so a reader reads a plan off the disk
     /// with the views released and puts it back afterwards; the fold
     /// holds it only to forget what a record may have moved
-    /// (`crates/sprawling/Spec.lean` §8-100).
+    /// (`Sprawling/app/Spec.lean` §8-100).
     #[serde(
         serialize_with = "super::snapshot::encode_plans",
         deserialize_with = "super::snapshot::decode_plans"
@@ -192,7 +192,7 @@ pub struct Views {
     #[serde(skip)]
     pub(super) offered: Option<crate::offered::Offered>,
     /// The halt a served city's writer refuses lines by until the proof
-    /// of its history has a verdict (`crates/wire/Spec.lean` §8-63); `None` for views
+    /// of its history has a verdict (`Sprawling/wire/Spec.lean` §8-63); `None` for views
     /// that started from a history proved before they folded it.
     #[serde(skip)]
     pub(super) proof: Option<storage::ChainHalt>,
@@ -332,7 +332,7 @@ impl Views {
             .map_err(storage::StorageError::into_ax)?;
         // A freeze may evict a run and a late record may land on one;
         // either way its money is folded back from the Ledger on demand
-        // (`crates/sprawling/Spec.lean` §8-106), so the row goes with it.
+        // (`Sprawling/app/Spec.lean` §8-106), so the row goes with it.
         if record.kind() == EventKind::RunFrozen || self.hot.was_evicted(&record.run()) {
             let hot = &self.hot;
             self.attribution.retain_runs(|run| !hot.was_evicted(run));
@@ -468,7 +468,7 @@ mod tests {
     use super::Views;
     use crate::views::tests::{Place, view_record};
 
-    /// `crates/wire/spec/Frames/Ask.lean`,
+    /// `Sprawling/wire/spec/Frames/Ask.lean`,
     /// `an_answer_contains_genesis_exactly_when_something_was_folded`: an
     /// answer's `as_of` is the first seq the view has not folded, so a
     /// view that folded nothing answers `Seq::FIRST` and its answer does

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `AddAgent` taken at the served city's listener
-//! (`crates/sprawling/spec/Serving.lean`): the offers the views answered
+//! (`Sprawling/app/spec/Serving.lean`): the offers the views answered
 //! and this machine's search path are both here, and neither is in the
 //! run worker.
 

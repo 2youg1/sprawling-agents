@@ -6,7 +6,7 @@
 /-!
 # runtime::run
 
-规定 `run`、`run::lifecycle`、`run::charter`、`run::harness`（`crates/runtime/src/` 下同名的文件）。run 的驱动：派发、回合、冻结，run 事件序与 harness run 事件序的唯一权威。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `run`、`run::lifecycle`、`run::charter`、`run::harness`（`Sprawling/runtime/src/` 下同名的文件）。run 的驱动：派发、回合、冻结，run 事件序与 harness run 事件序的唯一权威。本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `Sprawling/runtime/Spec.lean §8-n`。
 -/
 
 /-!
@@ -17,10 +17,10 @@
 pub struct RunPlan { /* …既有字段… */ pub naming: Option<B3Hash> }
 ```
 
-- **照录，不读。** 身份由 accounting 在冻结前缀时按 session 取定（`crates/accounting/Spec.lean` §8-15、`crates/city/Spec.lean` §8-33），名字已经在 city 段与 resident 段的字节里；本 crate 只把那一版的摘要从 `RunPlan.naming` 抄进 `run_started.naming`（`crates/kernel/Spec.lean` §8-79），由 `Charter::open` 与运行策略同一处写。`None` 是这座城的这次 run 没有冻任何身份（测试替身、早于身份入账的构造方）。
+- **照录，不读。** 身份由 accounting 在冻结前缀时按 session 取定（`Sprawling/accounting/Spec.lean` §8-15、`Sprawling/city/Spec.lean` §8-33），名字已经在 city 段与 resident 段的字节里；本 crate 只把那一版的摘要从 `RunPlan.naming` 抄进 `run_started.naming`（`Sprawling/kernel/Spec.lean` §8-79），由 `Charter::open` 与运行策略同一处写。`None` 是这座城的这次 run 没有冻任何身份（测试替身、早于身份入账的构造方）。
 - 被否：让 runtime 读两份治理文档自己算摘要——run 开始的那一刻读到的未必是前缀冻下的那一版，账上的摘要会与请求里的名字不符。
-- **强度同一处照录。** `Charter` 另带 `effort: Option<Effort>`：模型 run 的 `RunPlan::charter` 取 `shape.effort`（请求冻下的那一个，`turn::report` 拒绝中途改它），`Charter::open` 把它写进 `run_started.effort`（`crates/kernel/Spec.lean` §8-85）；harness run 不经本城的请求，填 `None`。验收：`run::lifecycle` 的 `the_charter_carries_the_effort_the_request_froze`。
-- **接手的 agent 同一处照录。** `Charter` 另带 `agent: Option<&AgentRunIdentity>`：harness run 的驱动在会话打开之后、`HarnessRun::open` 之前填它（id、agent 在 `initialize` 里报的版本、同意的摘要），`Charter::open` 把它写进 `run_started.agent`（`crates/kernel/spec/Event/Record.lean` §8-87）；模型 run 填 `None`。命令与路径不进这一格。
+- **强度同一处照录。** `Charter` 另带 `effort: Option<Effort>`：模型 run 的 `RunPlan::charter` 取 `shape.effort`（请求冻下的那一个，`turn::report` 拒绝中途改它），`Charter::open` 把它写进 `run_started.effort`（`Sprawling/kernel/Spec.lean` §8-85）；harness run 不经本城的请求，填 `None`。验收：`run::lifecycle` 的 `the_charter_carries_the_effort_the_request_froze`。
+- **接手的 agent 同一处照录。** `Charter` 另带 `agent: Option<&AgentRunIdentity>`：harness run 的驱动在会话打开之后、`HarnessRun::open` 之前填它（id、agent 在 `initialize` 里报的版本、同意的摘要），`Charter::open` 把它写进 `run_started.agent`（`Sprawling/kernel/spec/Event/Record.lean` §8-87）；模型 run 填 `None`。命令与路径不进这一格。
 -/
 
 /-!
@@ -87,7 +87,7 @@ pub fn drive(plan: RunPlan, ledger: &mut dyn Ledger, model: &mut dyn Model,
 
 - **为什么要这个模块**：「Dispatch → N 回合 → 冻结」的事件序只有这一处。citysim 与真城各写一遍就是两个权威，而两者一旦漂开，**仿真继续绿而真城错**——仿真的全部价值恰好建立在它跑的是同一份代码上。故 citysim 是本模块的调用方，每个剧本直接验证生产回路。
 - **`run_started.parent`**：只在派生开的 Run 上出现。「两行相邻」不是一个可查询的事实；写进载荷之后，前端折得出树，离线重放也折得出同一棵树。
-- **时间纪律**：时钟只经 `RunHooks::now` 进来，只由驱动在自己的线程上、在串行阶段调用；工具面（`ConcurrentInvoke` 的实现、装配层的 bench、citysim 的闭包）恒不采样，只收读数，`admit` 收的仍是回合时间戳。采样点：dispatch 两次（checkpoint、run_started）；每回合开头一次，得回合时间戳；每次模型尝试发出之前一次（`model_called`），回复到齐之后一次（`model_returned`）；每条工具调用放行之后、工具起跑之前一次（`tool_called`），它的答复交给工具面的 `account` 之前一次（`tool_result`），所以工具面打戳时读到的最新读数就是答复时刻；provider 失败而冻结时一次；结束时 freeze 一次，handoff 用它、run_frozen 用它＋1；取消时 freeze 沿用被打断那个回合的时间戳，因为这次冻结属于那个回合。回合里其余的行（`prompt_assembled`、`prompt_shape_compared`、`steer_received`、`cancel_received`、波前的 `checkpoint_committed`）带回合时间戳。哪几种行记自己的时刻，只由 `turn::ledger` 的 `Authored`／`Carried` 变体定一次：那四个变体不带读数就造不出来。计数器闭包（citysim）下采样的次数与次序是剧本的函数，所以字节照样可重放。这四种行的 `t` 怎么读，以 `crates/kernel/Spec.lean` §8-4「信封 `t` 记的是什么」为准。
+- **时间纪律**：时钟只经 `RunHooks::now` 进来，只由驱动在自己的线程上、在串行阶段调用；工具面（`ConcurrentInvoke` 的实现、装配层的 bench、citysim 的闭包）恒不采样，只收读数，`admit` 收的仍是回合时间戳。采样点：dispatch 两次（checkpoint、run_started）；每回合开头一次，得回合时间戳；每次模型尝试发出之前一次（`model_called`），回复到齐之后一次（`model_returned`）；每条工具调用放行之后、工具起跑之前一次（`tool_called`），它的答复交给工具面的 `account` 之前一次（`tool_result`），所以工具面打戳时读到的最新读数就是答复时刻；provider 失败而冻结时一次；结束时 freeze 一次，handoff 用它、run_frozen 用它＋1；取消时 freeze 沿用被打断那个回合的时间戳，因为这次冻结属于那个回合。回合里其余的行（`prompt_assembled`、`prompt_shape_compared`、`steer_received`、`cancel_received`、波前的 `checkpoint_committed`）带回合时间戳。哪几种行记自己的时刻，只由 `turn::ledger` 的 `Authored`／`Carried` 变体定一次：那四个变体不带读数就造不出来。计数器闭包（citysim）下采样的次数与次序是剧本的函数，所以字节照样可重放。这四种行的 `t` 怎么读，以 `Sprawling/kernel/Spec.lean` §8-4「信封 `t` 记的是什么」为准。
 - **开头只读段的时刻**：各条在放行之后逐条采开始；全部 join 之后按调用序逐条入账，入账前、工具面的 `account` 之前采答复，所以一条的答复时刻是「这一波在调用序上轮到它入账的时刻」，不早于它真正答完，不晚于最慢那条答完。生成中提前起跑的读，开始时刻记成它被放行的那一刻：这两行量的是这一波为它花了多久。重开参数：出现声明 `Effect::Read` 而常超过 1 s 的工具时，改在工作线程上采样，那要一个 `Sync` 的时钟。
 - **结束判定**：`calls_made == 0` 且这一答**说了话**，即 `Completion::Done(Evidence[model_returned])`；`calls_made == 0` 而内容为空、或 `stop == MaxTokens`，即 `Completion::Limit`（§8-37）；任一安全点命中 Cancel 即 `Completion::Cancelled`。三条均经 `freeze` 出口，故 **handoff_written＋run_frozen 是唯一出口**，无第二条退路。第四点 `BeforeSpawn` 与前三点同权：命中即 `Cancelled`，那个回合的 assistant 与 tool results **不入窗**，因为窗口前推是「回合成立」的后果而不是它的一部分。
 - **checkpoint 的拒绝先留下可查询事实**：`CheckpointFailure` 包含交给调用方的 `AxError`，以及可选的 `SecretEgressBlocked`。转换只有一条（`From<storage::StorageError>`）：只有它认得出 `SecretEgress` 并留下报告，调用方自己 `map_err` 就会把报告丢掉。`advance` 在传播错误之前把后者作为本 run 的 `secret_egress_blocked` 行放入 held lines；载荷的 `code`、`scope` 与每处 `withheld` 由 storage 的同一报告给出，runtime 不解析错误文本，也不接触命中字节。随后仍走原有的 carrier 与冻结路径；`gate_denied` 记这次动作被拒，`secret_egress_blocked` 记扫描证据，两者不是同一份载荷的两个拼写。
@@ -182,7 +182,7 @@ impl<'a> HarnessRun<'a> {
 ```
 
 - **为什么要这两个模块**：`Run::dispatch` 收整份 `RunPlan`，而 `CallShape` 与 `FrozenPrefix` 是模型的事实：harness 自己选模型、自己拼上下文，给它填一份就是写下一件城不知道的事，窗口与上下文提醒还会读它。所以一个 run 的开篇两行（`checkpoint_committed` 的 `JobPinned` 与 `run_started`）与收尾两行（`handoff_written` 与 `run_frozen`）由 `Charter` 写：`Run::dispatch` 与 `Run::freeze` 经 `RunPlan::charter` 写它们，字节不变；`HarnessRun` 经同一个 `Charter` 写。run 生命周期的行仍只有本 crate 一个作者，JobPinned 在前、`run_frozen` 比 `handoff_written` 晚 1 ms 这两条也只写在一处。
-- **次序是 `crates/agent_protocols/spec/Harness/Session.lean` 定的，类型守住它**：`open` → 任意条 `report` → 至多一次生效的 `cancel` → `conclude` 或 `abandon`。`conclude` 依次写 `checkpoint_committed`、`harness_answered`、`handoff_written`、`run_frozen`（`nothing_follows_the_stop_reason`：树先提交，再记回答，再冻结）；`abandon` 只写收尾两行，冻成 `Cancelled`，不记 harness 没给过的回答（`a_lost_session_freezes_cancelled_with_no_answer`）。两者都消费 `self`，冻结之后没有值能再写一行；第二次 `cancel` 什么也不写，记住的是头一次的 `Cut`（`a_second_halt_sends_nothing`）。
+- **次序是 `Sprawling/agent_protocols/spec/Harness/Session.lean` 定的，类型守住它**：`open` → 任意条 `report` → 至多一次生效的 `cancel` → `conclude` 或 `abandon`。`conclude` 依次写 `checkpoint_committed`、`harness_answered`、`handoff_written`、`run_frozen`（`nothing_follows_the_stop_reason`：树先提交，再记回答，再冻结）；`abandon` 只写收尾两行，冻成 `Cancelled`，不记 harness 没给过的回答（`a_lost_session_freezes_cancelled_with_no_answer`）。两者都消费 `self`，冻结之后没有值能再写一行；第二次 `cancel` 什么也不写，记住的是头一次的 `Cut`（`a_second_halt_sends_nothing`）。
 - **回答冻成哪一种 `Completion`，只在 `harness::ending` 一处判**（`Session.lean` 的 `ending`）：
 
   | 停止原因 | 头一次的截断 | 结局 |
@@ -196,7 +196,7 @@ impl<'a> HarnessRun<'a> {
   空回答冻成 `Limit`，与 `lifecycle::concluded` 对空模型回复的判法相同。撞上墙钟上限的 run 是撞上了什么而停，所以是 `Limit`；人或停摆取消的才是 `Cancelled`（`a_deadline_never_freezes_cancelled`）。截断之后 harness 仍答出 `end_turn` 并说了话，活已做完，照 `Done` 记：账本上 `cancel_received` 在前、`harness_answered` 在后，两件事都在。
 - **时间**：`open` 与 `Run::dispatch` 一样采两次 `now`（JobPinned 一次、`run_started` 一次）；其余每一行的 `t` 由调用方给，调用方在自己的线程上读同一只钟。收尾两行用给的 `t` 与 `t + 1`，`t` 已到 `u64` 顶时答 `E_INVALID_ARGS`，与 `Run::freeze` 同一句。
 - **每一行的 `who` 与 `addr`**：`who` 恒为 `Charter::who`（房间的居民）；开篇、汇报、取消、检查点与回答带 `Charter::addr`；收尾两行不带地址，与 `Run::freeze` 相同。
-- **载荷**：`report` 写 kernel 的 `HarnessReported`，`conclude` 写 `HarnessAnswered`（`crates/kernel/Spec.lean` §8-4，两者都是 record-only）；`cancel_received` 的载荷是空对象，与回合里的那一条相同，截断的缘由不进账本（kernel 事件表不为它加键），由冻结的 `Limit` 与 `Cancelled` 分开。检查点的载荷由调用方从 `storage::Checkpoint::wave_pre` 取来，本 crate 不开仓库，理由与 `RunHooks::checkpoint` 相同。
+- **载荷**：`report` 写 kernel 的 `HarnessReported`，`conclude` 写 `HarnessAnswered`（`Sprawling/kernel/Spec.lean` §8-4，两者都是 record-only）；`cancel_received` 的载荷是空对象，与回合里的那一条相同，截断的缘由不进账本（kernel 事件表不为它加键），由冻结的 `Limit` 与 `Cancelled` 分开。检查点的载荷由调用方从 `storage::Checkpoint::wave_pre` 取来，本 crate 不开仓库，理由与 `RunHooks::checkpoint` 相同。
 - **失败**：任何一行写不进账本，原错误向上抛，run 停在它写到的那一行；这与 `Run::freeze` 自己的 append 失败时相同：账本自身就是受害者时没有真实的东西可写。
 -/
 

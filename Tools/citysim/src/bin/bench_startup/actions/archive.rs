@@ -5,7 +5,7 @@
 
 //! The release archive as the install action meets it: the digest
 //! published with it, the unpack, and the executable that comes out
-//! (citysim D3, `crates/citysim/spec/BenchStartup.lean` §8-5).
+//! (citysim D3, `Tools/citysim/spec/BenchStartup.lean` §8-5).
 //!
 //! Shape: adapter. `sha2` and `zip` are the release's own spelling of
 //! "the digest" and "the archive format", and each is named once in the

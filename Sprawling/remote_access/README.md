@@ -4,9 +4,9 @@ The remote door, and the routes that carry its bytes and decide nothing. A perso
 
 The crate is two layers, and only the second one can be replaced. The security core decides who gets in: `door` holds whether the door is open and in which epoch, the pairings still waiting, the paired devices and the sessions they hold; `pairing` mints the one-time pairing code; `keys` holds hybrid signing keys, ML-DSA-44 with Ed25519, derived from one 32-byte seed; `handshake` runs the key exchange of every connection, X25519 with ML-KEM-768, and its `pairing` half runs a device's first one; `seal` wraps every frame of a session in AES-256-GCM with a counter against replay; `confirm` holds the one request that waits for the code the city prints on its console. The second layer is `route`, which makes the remote listener on loopback reachable from outside and does nothing else: a Cloudflare named tunnel by default, a command the person wrote, or a scripted route for tests.
 
-The door's decisions never name a route, and a route sees handshake messages and ciphertext only. The handshake authenticates the keys pinned at pairing rather than an address, and every frame is sealed end to end, so a route cannot pose as either side. What a route still delivers is the page itself, and a route that rewrote the page would read what the page reads: the person who chooses the route carries that trust, and cryptography cannot take it from them (`crates/remote_access/Spec.lean` D10).
+The door's decisions never name a route, and a route sees handshake messages and ciphertext only. The handshake authenticates the keys pinned at pairing rather than an address, and every frame is sealed end to end, so a route cannot pose as either side. What a route still delivers is the page itself, and a route that rewrote the page would read what the page reads: the person who chooses the route carries that trust, and cryptography cannot take it from them (`Sprawling/remote_access/Spec.lean` D10).
 
-This crate owns no socket, no listener, no WebSocket, no device table on disk, no clock and no entropy source. The remote listener, the relay that hands each opened frame to the city's `/ws`, the device table, the console itself and the `[remote]` configuration table all belong to the assembly layer in `crates/sprawling` (`bin::outside`, `bin::assembly::remote_door`).
+This crate owns no socket, no listener, no WebSocket, no device table on disk, no clock and no entropy source. The remote listener, the relay that hands each opened frame to the city's `/ws`, the device table, the console itself and the `[remote]` configuration table all belong to the assembly layer in `Sprawling/app` (`bin::outside`, `bin::assembly::remote_door`).
 
 ## How it is shaped
 
@@ -25,7 +25,7 @@ Each module holds one decision:
 
 ## When a call fails
 
-A refusal is an `AxError` in three parts: the failed action, the subject, and a recovery. The codes below are the whole set this crate answers with; `crates/remote_access/Spec.lean` section 12 holds the table with the state each one leaves behind.
+A refusal is an `AxError` in three parts: the failed action, the subject, and a recovery. The codes below are the whole set this crate answers with; `Sprawling/remote_access/Spec.lean` section 12 holds the table with the state each one leaves behind.
 
 | Code | When | What a caller does |
 |---|---|---|
@@ -44,12 +44,12 @@ Three refusals happen before anything is attempted. `PublicUrl::parse` refuses a
 
 - The crate declares no features; nothing here can be compiled out.
 - The security core does no I/O, and time and entropy arrive as parameters, so every decision replays. The one exception is the ephemeral keys of both handshakes: the cryptography library draws them, because ML-KEM encapsulation takes no external entropy.
-- `Route`'s two methods are synchronous and block until the route is ready or the patience runs out (`crates/remote_access/Spec.lean` D15). A caller runs them on a thread of its own; this crate depends on no executor.
+- `Route`'s two methods are synchronous and block until the route is ready or the patience runs out (`Sprawling/remote_access/Spec.lean` D15). A caller runs them on a thread of its own; this crate depends on no executor.
 - The two production routes start a child process through `child::command`, so a route never inherits the city's console or its secrets (D24).
 - This crate reads no configuration. The caller parses the `[remote]` table and constructs `Tunnel`, `RouteCommand` and `Permanence` (D22).
 - Opening the door, replacing the city key and confirming a request wait for the code the console prints; closing the door and locking it from a device do not (D4, D5). The code never enters a frame or a page.
 - The city key's seed lives in the city's vault, not in the city directory, and `keys::from_sealed` is this crate's only exposure of a seed (D23).
-- There is no `unsafe` in this crate. The vectors under `crates/fixtures/remote-handshake` are written by its tests: run the tests whose names contain `vector` or `fixture` with `GOLDEN_WRITE=1` to write them again rather than editing the files, since the deterministic files are rewritten byte for byte and the two carrying randomness only when the committed copy no longer verifies.
+- There is no `unsafe` in this crate. The vectors under `Tools/fixtures/remote-handshake` are written by its tests: run the tests whose names contain `vector` or `fixture` with `GOLDEN_WRITE=1` to write them again rather than editing the files, since the deterministic files are rewritten byte for byte and the two carrying randomness only when the committed copy no longer verifies.
 
 ## Who uses it
 
@@ -67,7 +67,7 @@ A decision is a comment opening with `D<n>` directly above what it governs, cite
 
 ```bash
 cargo nextest run -p sprawling-remote-access                    # the crate's tests
-lake build crates.remote_access.Spec                            # this crate's Lean specification
+lake build Sprawling.remote_access.Spec                            # this crate's Lean specification
 cargo nextest run -p sprawling -E 'binary(remote_door)'          # the remote door end to end, over real sockets
 cargo xtask gates spec depmap                                   # its specification and its dependency edges
 ```

@@ -3,55 +3,55 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.runtime.spec.Backlog
-import crates.runtime.spec.Bench
-import crates.runtime.spec.Catalog
-import crates.runtime.spec.Clock
-import crates.runtime.spec.Compaction
-import crates.runtime.spec.Conversation
-import crates.runtime.spec.Diagnostics
-import crates.runtime.spec.Digest
-import crates.runtime.spec.Elision
-import crates.runtime.spec.Fork
-import crates.runtime.spec.Handoff
-import crates.runtime.spec.Mode
-import crates.runtime.spec.Offload
-import crates.runtime.spec.Pipeline
-import crates.runtime.spec.PolicyTake
-import crates.runtime.spec.Prefix
-import crates.runtime.spec.Reminder
-import crates.runtime.spec.Rendering
-import crates.runtime.spec.Replay
-import crates.runtime.spec.Reserve
-import crates.runtime.spec.Run
-import crates.runtime.spec.Run.Checkpoint
-import crates.runtime.spec.Sandbox
-import crates.runtime.spec.Sieve
-import crates.runtime.spec.Tools
-import crates.runtime.spec.Tools.BoundReader
-import crates.runtime.spec.Tools.ChosenPath
-import crates.runtime.spec.Tools.Edit
-import crates.runtime.spec.Tools.Exec
-import crates.runtime.spec.Tools.Exec.Container
-import crates.runtime.spec.Tools.Exec.NativeMacos
-import crates.runtime.spec.Tools.Exec.NativeWindows
-import crates.runtime.spec.Tools.Read
-import crates.runtime.spec.Tools.Search
-import crates.runtime.spec.Tools.Succeed
-import crates.runtime.spec.Transcript
-import crates.runtime.spec.Turn
-import crates.runtime.spec.Turn.Durability
-import crates.runtime.spec.Turn.Recovery
-import crates.runtime.spec.Turn.Speculation
-import crates.runtime.spec.Watchdog
+import Sprawling.runtime.spec.Backlog
+import Sprawling.runtime.spec.Bench
+import Sprawling.runtime.spec.Catalog
+import Sprawling.runtime.spec.Clock
+import Sprawling.runtime.spec.Compaction
+import Sprawling.runtime.spec.Conversation
+import Sprawling.runtime.spec.Diagnostics
+import Sprawling.runtime.spec.Digest
+import Sprawling.runtime.spec.Elision
+import Sprawling.runtime.spec.Fork
+import Sprawling.runtime.spec.Handoff
+import Sprawling.runtime.spec.Mode
+import Sprawling.runtime.spec.Offload
+import Sprawling.runtime.spec.Pipeline
+import Sprawling.runtime.spec.PolicyTake
+import Sprawling.runtime.spec.Prefix
+import Sprawling.runtime.spec.Reminder
+import Sprawling.runtime.spec.Rendering
+import Sprawling.runtime.spec.Replay
+import Sprawling.runtime.spec.Reserve
+import Sprawling.runtime.spec.Run
+import Sprawling.runtime.spec.Run.Checkpoint
+import Sprawling.runtime.spec.Sandbox
+import Sprawling.runtime.spec.Sieve
+import Sprawling.runtime.spec.Tools
+import Sprawling.runtime.spec.Tools.BoundReader
+import Sprawling.runtime.spec.Tools.ChosenPath
+import Sprawling.runtime.spec.Tools.Edit
+import Sprawling.runtime.spec.Tools.Exec
+import Sprawling.runtime.spec.Tools.Exec.Container
+import Sprawling.runtime.spec.Tools.Exec.NativeMacos
+import Sprawling.runtime.spec.Tools.Exec.NativeWindows
+import Sprawling.runtime.spec.Tools.Read
+import Sprawling.runtime.spec.Tools.Search
+import Sprawling.runtime.spec.Tools.Succeed
+import Sprawling.runtime.spec.Transcript
+import Sprawling.runtime.spec.Turn
+import Sprawling.runtime.spec.Turn.Durability
+import Sprawling.runtime.spec.Turn.Recovery
+import Sprawling.runtime.spec.Turn.Speculation
+import Sprawling.runtime.spec.Watchdog
 
 /-! # runtime 的规格
 
-`sprawling-runtime`（库名 `runtime`，目录 `crates/runtime`）是一次 run 从派发到冻结的全部：回合的四相与取消边界、冻结前缀、工具面与它们的读界、工具结果的打包与压缩、分叉与离线重演、时钟与打戳。
+`sprawling-runtime`（库名 `runtime`，目录 `Sprawling/runtime`）是一次 run 从派发到冻结的全部：回合的四相与取消边界、冻结前缀、工具面与它们的读界、工具结果的打包与压缩、分叉与离线重演、时钟与打戳。
 
-本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部的末尾，别处引作 `runtime D<n>`；D1 到 D16 沿用这份规格在 Markdown 时 §12 的条目号，D12 空着，§12 末尾列出每条住在哪里。
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `Sprawling/runtime/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部的末尾，别处引作 `runtime D<n>`；D1 到 D16 沿用这份规格在 Markdown 时 §12 的条目号，D12 空着，§12 末尾列出每条住在哪里。
 
-能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：回合的边界（`spec/Turn.lean`）、开头只读段的提前起跑（`spec/Turn/Speculation.lean`）、一个回合付几道落盘屏障（`spec/Turn/Durability.lean`）、run 的唯一出口与结局判定（`spec/Run.lean`）、一波之前立不立 checkpoint（`spec/Run/Checkpoint.lean`）、分叉的前缀、切点与开篇写法（`spec/Fork.lean`）、打戳与按 UTC 选一段时间（`spec/Clock.lean`）、合并时的准入（`spec/Mode.lean`）、模型选路的判定（`spec/Tools/ChosenPath.lean`）与按字节读的门（`spec/Tools/BoundReader.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例与各模块旁的测试守住（§16）。
+能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：回合的边界（`spec/Turn.lean`）、开头只读段的提前起跑（`spec/Turn/Speculation.lean`）、一个回合付几道落盘屏障（`spec/Turn/Durability.lean`）、run 的唯一出口与结局判定（`spec/Run.lean`）、一波之前立不立 checkpoint（`spec/Run/Checkpoint.lean`）、分叉的前缀、切点与开篇写法（`spec/Fork.lean`）、打戳与按 UTC 选一段时间（`spec/Clock.lean`）、合并时的准入（`spec/Mode.lean`）、模型选路的判定（`spec/Sprawling/runtime/spec/Tools/ChosenPath.lean`）与按字节读的门（`spec/Tools/BoundReader.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例与各模块旁的测试守住（§16）。
 -/
 
 /-! ## 1 需求分解
@@ -102,7 +102,7 @@ import crates.runtime.spec.Watchdog
 - `spec/Fork.lean`：分叉点过了尾就拒绝，前缀恰是母序列的头 `at_seq + 1` 行（A19）；切点不晚于要求的那一行、能切、并且只退到必须退的地方（`the_cut_never_splits_a_wave`、`retreat_goes_back_no_further_than_needed`）；只有 `FromJob` 被改写（`only_from_job_is_rewritten`）。
 - `spec/Clock.lean`：`Off` 什么都不带（A18）；第一条结果与每一条 `Timestamped` 结果都带戳；`Timeless` 的结果一个桶里至多一次（`a_timeless_result_is_stamped_at_most_once_per_bucket`）；矛盾的区间被拒，相邻的两段不重不漏。
 - `spec/Mode.lean`：合并当且仅当常规落地且证据在场（`lands_exactly_with_its_evidence`）。
-- `spec/Tools/ChosenPath.lean`：准入的地址读得通、不在保留区里、读界开着；保留区在读界被问之前拒绝；`land` 交回的真实位置同样被判过；只判字面地址有反例（`judging_only_the_written_address_lets_a_link_out`）。
+- `spec/Sprawling/runtime/spec/Tools/ChosenPath.lean`：准入的地址读得通、不在保留区里、读界开着；保留区在读界被问之前拒绝；`land` 交回的真实位置同样被判过；只判字面地址有反例（`judging_only_the_written_address_lets_a_link_out`）。
 - `spec/Tools/BoundReader.lean`：一个块只在为它存过、读界开着的楼里读得到；没有来源的块被拒；门对路径的拒绝与 `read` 同码；按路径打开的文件是在它落下的地方被判过、判定时在场的那一个。
 
 每个模型都带一个可实现的正常路径（第一条结果带戳、没有人喊停的一波、`a_fork_is_the_mothers_first_lines`、Lean 里的 `example`），所以这些保证不是从一个无法满足的前提推出来的。生产实现与模型的对应由 §16 列出的 Rust 测试检查；一条 Lean 定理证明的是模型，不是 Rust。
@@ -117,7 +117,7 @@ import crates.runtime.spec.Watchdog
 6. **`contract_kept` 的证据今天没人量。** 城读不出一次翻新有没有动到可观察的契约，装配层把 `Produced.contract_moved` 恒填 `false`，所以选了 `contract_kept` 的 run 在合并时恒放行（§8-54）。要让这一要求真的拒，得有一个读得出契约的量具（例如 run 前后同一组对外测试的结果对照）把它填进 `Produced`；判定它的证据是一次动了对外行为、测试仍绿的翻新在 citysim 里被放行。
 7. **`Create` 管不到楼的 MCP 工具。** 一个 MCP server 是楼自己声明的外部进程，它写不写文件、写在哪里，城看不见（§8-55 只覆盖城自己的写路径：edit、exec 与链接）。候选是 `Create` 下不挂载声明了写效果的连接器，或只挂载声明只读的；判定它的证据是一个会写文件的连接器在 `Create` 的 run 里改动了已有文件。
 
-模型自己的假设写在各分部的定理假设里，不写成公理：路径判定把 kernel 的文法、保留区与装配层的读界当参数（`spec/Tools/ChosenPath.lean` 的 `Rules`），不重述它们；`within_city` 对绝对路径的换算（D4）与打开之后的 `still_judged` 复核不在模型里，前者是平台的事实，后者防的是判定与打开之间换进来的链接，由 `tools::read::tests::doors` 在真实文件系统上检查。打戳的模型不带时区行，`iso` 与 `parse_iso` 互逆由 `clock` 的测试逐值检查，历法本身没有在 Lean 里证明。
+模型自己的假设写在各分部的定理假设里，不写成公理：路径判定把 kernel 的文法、保留区与装配层的读界当参数（`spec/Sprawling/runtime/spec/Tools/ChosenPath.lean` 的 `Rules`），不重述它们；`within_city` 对绝对路径的换算（D4）与打开之后的 `still_judged` 复核不在模型里，前者是平台的事实，后者防的是判定与打开之间换进来的链接，由 `tools::read::tests::doors` 在真实文件系统上检查。打戳的模型不带时区行，`iso` 与 `parse_iso` 互逆由 `clock` 的测试逐值检查，历法本身没有在 Lean 里证明。
 -/
 
 /-! ## 4 现状分析
@@ -127,7 +127,7 @@ verify 为 O(n) 全量；消费面（测试/夹具/citysim）规模千行级，�
 
 /-! ## 5 权威信源
 
-Fork 三规则；重放/分叉/幂等；at_seq 越界、未知 kind、崩溃恢复行；`crates/kernel/Spec.lean` §8-4/§8-9；`crates/storage/Spec.lean` §8-1。
+Fork 三规则；重放/分叉/幂等；at_seq 越界、未知 kind、崩溃恢复行；`Sprawling/kernel/Spec.lean` §8-4/§8-9；`Sprawling/storage/Spec.lean` §8-1。
 -/
 
 /-! ## 6 命名统一
@@ -180,84 +180,84 @@ tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、storage(cas 经 p
 
 | 标签 | 分部 |
 |---|---|
-| 8-1 | `crates/runtime/spec/Replay.lean` |
-| 8-2 | `crates/runtime/spec/Fork.lean` |
-| 8-3 | `crates/runtime/spec/Turn.lean` |
-| 8-4 | `crates/runtime/spec/Prefix.lean` |
-| 8-4-1 | `crates/runtime/spec/Prefix.lean` |
-| 8-4-2 | `crates/runtime/spec/Prefix.lean` |
-| 8-5 | `crates/runtime/spec/Handoff.lean` |
-| 8-6 | `crates/runtime/spec/Turn.lean` |
-| 8-7 | `crates/runtime/spec/Pipeline.lean` |
-| 8-8 | `crates/runtime/spec/Offload.lean` |
-| 8-9 | `crates/runtime/spec/Watchdog.lean` |
-| 8-10 | `crates/runtime/spec/Clock.lean` |
-| 8-53 | `crates/runtime/spec/Clock.lean` |
-| 8-57 | `crates/runtime/spec/Clock.lean` |
-| 8-58 | `crates/runtime/spec/Fork.lean` |
-| 8-11 | `crates/runtime/spec/Catalog.lean` |
-| 8-60 | `crates/runtime/spec/Catalog.lean` |
-| 8-61 | `crates/runtime/spec/Catalog.lean` |
-| 8-62 | `crates/runtime/spec/PolicyTake.lean` |
-| 8-12 | `crates/runtime/spec/Mode.lean` |
-| 8-12b | `crates/runtime/spec/Mode.lean` |
-| 8-54 | `crates/runtime/spec/Mode.lean` |
-| 8-55 | `crates/runtime/spec/Tools.lean` |
-| 8-56 | `crates/runtime/spec/Run.lean` |
-| 8-13 | `crates/runtime/spec/Sandbox.lean` |
-| 8-13-2 | `crates/runtime/spec/Tools/Exec.lean` |
-| 8-13-3 | `crates/runtime/spec/Tools/Exec.lean` |
-| 8-13-4 | `crates/runtime/spec/Tools/Exec.lean` |
-| 8-14 | `crates/runtime/spec/Tools.lean` |
-| 8-14-1 | `crates/runtime/spec/Tools.lean` |
-| 8-15 | `crates/runtime/spec/Run.lean` |
-| 8-16 | `crates/runtime/spec/Digest.lean` |
-| 8-17 | `crates/runtime/spec/Diagnostics.lean` |
-| 8-15-1 | `crates/runtime/spec/Run.lean` |
-| 8-18 | `crates/runtime/spec/Turn.lean` |
-| 8-19 | `crates/runtime/spec/Bench.lean` |
-| 8-20 | `crates/runtime/spec/Replay.lean` |
-| 8-21 | `crates/runtime/spec/Prefix.lean` |
-| 8-22 | `crates/runtime/spec/Tools.lean` |
-| 8-23 | `crates/runtime/spec/Run.lean` |
-| 8-24 | `crates/runtime/spec/Digest.lean` |
-| 8-25 | `crates/runtime/spec/Sandbox.lean` |
-| 8-26 | `crates/runtime/spec/Tools/Exec.lean` |
-| 8-27 | `crates/runtime/spec/Sieve.lean` |
-| 8-27-10 | `crates/runtime/spec/Pipeline.lean` |
-| 8-28 | `crates/runtime/spec/Backlog.lean` |
-| 8-29 | `crates/runtime/spec/Tools/Read.lean` |
-| 8-30 | `crates/runtime/spec/Tools/Search.lean` |
-| 8-30-1 | `crates/runtime/spec/Tools/ChosenPath.lean` |
-| 8-30-2 | `crates/runtime/spec/Tools/Search.lean` |
-| 8-59 | `crates/runtime/spec/Tools/BoundReader.lean` |
-| 8-31 | `crates/runtime/spec/Tools/Exec.lean` |
-| 8-32 | `crates/runtime/spec/Transcript.lean` |
-| 8-33 | `crates/runtime/spec/Tools/Succeed.lean` |
-| 8-34 | `crates/runtime/spec/Reminder.lean` |
-| 8-64 | `crates/runtime/spec/Tools/Edit.lean` |
-| 8-48 | `crates/runtime/spec/Run.lean` |
-| 8-37 | `crates/runtime/spec/Run.lean` |
-| 8-36 | `crates/runtime/spec/Tools.lean` |
-| 8-35 | `crates/runtime/spec/Bench.lean` |
-| 8-38 | `crates/runtime/spec/Diagnostics.lean` |
-| 8-39 | `crates/runtime/spec/Prefix.lean` |
-| 8-40 | `crates/runtime/spec/Backlog.lean` |
-| 8-41 | `crates/runtime/spec/Turn.lean` |
-| 8-42 | `crates/runtime/spec/Elision.lean` |
-| 8-49 | `crates/runtime/spec/Turn/Recovery.lean` |
-| 8-50 | `crates/runtime/spec/Turn/Recovery.lean` |
-| 8-51 | `crates/runtime/spec/Turn.lean` |
-| 8-43 | `crates/runtime/spec/Watchdog.lean` |
-| 8-44 | `crates/runtime/spec/Compaction.lean` |
-| 8-45 | `crates/runtime/spec/Run/Checkpoint.lean` |
-| 8-46 | `crates/runtime/spec/Bench.lean` |
-| 8-47 | `crates/runtime/spec/Conversation.lean` |
-| 8-47-1 | `crates/runtime/spec/Conversation.lean` |
-| 8-47-2 | `crates/runtime/spec/Conversation.lean` |
-| 8-47-3 | `crates/runtime/spec/Conversation.lean` |
-| 8-52 | `crates/runtime/spec/Run.lean` |
-| 8-63 | `crates/runtime/spec/Rendering.lean` |
+| 8-1 | `Sprawling/runtime/spec/Replay.lean` |
+| 8-2 | `Sprawling/runtime/spec/Fork.lean` |
+| 8-3 | `Sprawling/runtime/spec/Turn.lean` |
+| 8-4 | `Sprawling/runtime/spec/Prefix.lean` |
+| 8-4-1 | `Sprawling/runtime/spec/Prefix.lean` |
+| 8-4-2 | `Sprawling/runtime/spec/Prefix.lean` |
+| 8-5 | `Sprawling/runtime/spec/Handoff.lean` |
+| 8-6 | `Sprawling/runtime/spec/Turn.lean` |
+| 8-7 | `Sprawling/runtime/spec/Pipeline.lean` |
+| 8-8 | `Sprawling/runtime/spec/Offload.lean` |
+| 8-9 | `Sprawling/runtime/spec/Watchdog.lean` |
+| 8-10 | `Sprawling/runtime/spec/Clock.lean` |
+| 8-53 | `Sprawling/runtime/spec/Clock.lean` |
+| 8-57 | `Sprawling/runtime/spec/Clock.lean` |
+| 8-58 | `Sprawling/runtime/spec/Fork.lean` |
+| 8-11 | `Sprawling/runtime/spec/Catalog.lean` |
+| 8-60 | `Sprawling/runtime/spec/Catalog.lean` |
+| 8-61 | `Sprawling/runtime/spec/Catalog.lean` |
+| 8-62 | `Sprawling/runtime/spec/PolicyTake.lean` |
+| 8-12 | `Sprawling/runtime/spec/Mode.lean` |
+| 8-12b | `Sprawling/runtime/spec/Mode.lean` |
+| 8-54 | `Sprawling/runtime/spec/Mode.lean` |
+| 8-55 | `Sprawling/runtime/spec/Tools.lean` |
+| 8-56 | `Sprawling/runtime/spec/Run.lean` |
+| 8-13 | `Sprawling/runtime/spec/Sandbox.lean` |
+| 8-13-2 | `Sprawling/runtime/spec/Tools/Exec.lean` |
+| 8-13-3 | `Sprawling/runtime/spec/Tools/Exec.lean` |
+| 8-13-4 | `Sprawling/runtime/spec/Tools/Exec.lean` |
+| 8-14 | `Sprawling/runtime/spec/Tools.lean` |
+| 8-14-1 | `Sprawling/runtime/spec/Tools.lean` |
+| 8-15 | `Sprawling/runtime/spec/Run.lean` |
+| 8-16 | `Sprawling/runtime/spec/Digest.lean` |
+| 8-17 | `Sprawling/runtime/spec/Diagnostics.lean` |
+| 8-15-1 | `Sprawling/runtime/spec/Run.lean` |
+| 8-18 | `Sprawling/runtime/spec/Turn.lean` |
+| 8-19 | `Sprawling/runtime/spec/Bench.lean` |
+| 8-20 | `Sprawling/runtime/spec/Replay.lean` |
+| 8-21 | `Sprawling/runtime/spec/Prefix.lean` |
+| 8-22 | `Sprawling/runtime/spec/Tools.lean` |
+| 8-23 | `Sprawling/runtime/spec/Run.lean` |
+| 8-24 | `Sprawling/runtime/spec/Digest.lean` |
+| 8-25 | `Sprawling/runtime/spec/Sandbox.lean` |
+| 8-26 | `Sprawling/runtime/spec/Tools/Exec.lean` |
+| 8-27 | `Sprawling/runtime/spec/Sieve.lean` |
+| 8-27-10 | `Sprawling/runtime/spec/Pipeline.lean` |
+| 8-28 | `Sprawling/runtime/spec/Backlog.lean` |
+| 8-29 | `Sprawling/runtime/spec/Tools/Read.lean` |
+| 8-30 | `Sprawling/runtime/spec/Tools/Search.lean` |
+| 8-30-1 | `Sprawling/runtime/spec/Tools/ChosenPath.lean` |
+| 8-30-2 | `Sprawling/runtime/spec/Tools/Search.lean` |
+| 8-59 | `Sprawling/runtime/spec/Tools/BoundReader.lean` |
+| 8-31 | `Sprawling/runtime/spec/Tools/Exec.lean` |
+| 8-32 | `Sprawling/runtime/spec/Transcript.lean` |
+| 8-33 | `Sprawling/runtime/spec/Tools/Succeed.lean` |
+| 8-34 | `Sprawling/runtime/spec/Reminder.lean` |
+| 8-64 | `Sprawling/runtime/spec/Tools/Edit.lean` |
+| 8-48 | `Sprawling/runtime/spec/Run.lean` |
+| 8-37 | `Sprawling/runtime/spec/Run.lean` |
+| 8-36 | `Sprawling/runtime/spec/Tools.lean` |
+| 8-35 | `Sprawling/runtime/spec/Bench.lean` |
+| 8-38 | `Sprawling/runtime/spec/Diagnostics.lean` |
+| 8-39 | `Sprawling/runtime/spec/Prefix.lean` |
+| 8-40 | `Sprawling/runtime/spec/Backlog.lean` |
+| 8-41 | `Sprawling/runtime/spec/Turn.lean` |
+| 8-42 | `Sprawling/runtime/spec/Elision.lean` |
+| 8-49 | `Sprawling/runtime/spec/Turn/Recovery.lean` |
+| 8-50 | `Sprawling/runtime/spec/Turn/Recovery.lean` |
+| 8-51 | `Sprawling/runtime/spec/Turn.lean` |
+| 8-43 | `Sprawling/runtime/spec/Watchdog.lean` |
+| 8-44 | `Sprawling/runtime/spec/Compaction.lean` |
+| 8-45 | `Sprawling/runtime/spec/Run/Checkpoint.lean` |
+| 8-46 | `Sprawling/runtime/spec/Bench.lean` |
+| 8-47 | `Sprawling/runtime/spec/Conversation.lean` |
+| 8-47-1 | `Sprawling/runtime/spec/Conversation.lean` |
+| 8-47-2 | `Sprawling/runtime/spec/Conversation.lean` |
+| 8-47-3 | `Sprawling/runtime/spec/Conversation.lean` |
+| 8-52 | `Sprawling/runtime/spec/Run.lean` |
+| 8-63 | `Sprawling/runtime/spec/Rendering.lean` |
 -/
 
 /-! ## 9 工作流程
@@ -287,13 +287,13 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 每个工具在本 crate 里可测的有两段：经工具自己的面完成一次调用（路径判定、IO 与信封合为一段），以及结果入账前经 `redact` 的秘密扫描。仪表是 `redact::phases` 里的 `instrument_read_phases`、`instrument_write_and_edit_phases`、`instrument_exec_phases`、`instrument_search_phases`——放在 `redact` 旁，因为扫描是每个工具共有的那一段——由 `just bench` 以 `--lib` 跑，读数一行一工具、以微秒计；夹具约 64 KiB，形同城里工具结果的文本（哈希、oid、带凭据名的 hex 键、混合字母 token）。M2 的 gate、checkpoint 与屏障三段不在本 crate：它们在 accounting 的工具面与账本线程里，本 crate 的仪表读不到，那三段的仪表属于 accounting。三个平台上两段的含义相同；exec 在 Windows 上经 `cmd`，在 macOS 与 Linux 上经 `sh`。读数由版本中段的统一测量给出，下面每段只写剩余成本的来源、下界与下一步。
 
 - **read**：剩余成本是读出所请求的字节与对这些字节的一次扫描。下界是两者各一遍：结果整段进账本，扫描必须看到结果的每个字节，不能按选区跳过。`redact` 接收载荷的所有权并原地改写（D37），零命中时扫描之外不再分配，剩下的就是这两遍。
-  read 另有两个仪表，也由 `just bench` 跑。`tools::read` 的 `instrument_read_ab` 在同一进程里逐轮交替四条路：§8-29-4 的判定路径（每次重求城根）、按句柄读（`spec/Tools/Read.lean` D113）、一次 canonicalize 加裸读、裸读，文件 20 KiB 到 8 MiB；`instrument_read_after_write_ab` 在每次读之前写一个字节，读的是刚写过的文件。`turn` 的 `instrument_read_round_trip` 量端到端：从模型回复里拿到一个 `read` 调用，到下一次请求交给模型，经真实的 `ReadTool` 与落在盘上的 `JsonlLedger`，包括准入、读、秘密扫描、`settle`、使本回合可持久的屏障（`append_all` 与它的 sync，D36）和下一次组装；同时单列读本身与每道屏障，看各占多少。墙钟读数属于机器，不当门；CI 守一个比值：`a_read_costs_within_a_bound_of_a_resolved_read` 要求 20 KiB 文件按句柄读的 p50 不超过「一次 canonicalize 加裸读」p50 的 1.5 倍。按句柄读的设计正是一次判定加一次 open，所以这个比值在各台机器上都接近 1；退回 4 次 canonicalize 加再开核验的判定路径就越过它。只在 Windows、Linux 与 macOS 上守，因为其他平台上判定路径就是读法。
+  read 另有两个仪表，也由 `just bench` 跑。`tools::read` 的 `instrument_read_ab` 在同一进程里逐轮交替四条路：§8-29-4 的判定路径（每次重求城根）、按句柄读（`spec/Sprawling/runtime/spec/Tools/Read.lean` D113）、一次 canonicalize 加裸读、裸读，文件 20 KiB 到 8 MiB；`instrument_read_after_write_ab` 在每次读之前写一个字节，读的是刚写过的文件。`turn` 的 `instrument_read_round_trip` 量端到端：从模型回复里拿到一个 `read` 调用，到下一次请求交给模型，经真实的 `ReadTool` 与落在盘上的 `JsonlLedger`，包括准入、读、秘密扫描、`settle`、使本回合可持久的屏障（`append_all` 与它的 sync，D36）和下一次组装；同时单列读本身与每道屏障，看各占多少。墙钟读数属于机器，不当门；CI 守一个比值：`a_read_costs_within_a_bound_of_a_resolved_read` 要求 20 KiB 文件按句柄读的 p50 不超过「一次 canonicalize 加裸读」p50 的 1.5 倍。按句柄读的设计正是一次判定加一次 open，所以这个比值在各台机器上都接近 1；退回 4 次 canonicalize 加再开核验的判定路径就越过它。只在 Windows、Linux 与 macOS 上守，因为其他平台上判定路径就是读法。
 - **write**（`edit` 对不存在的路径以 `old_string: ""` 新建文件）：剩余成本是写盘，加上结果回显的整份 diff 的扫描——新文件的 diff 就是全文，所以扫描量与文件同长。下界是写一遍、扫一遍回显。回显全文不能省：逐次的 diff 是还原一次改动的粒度（`tools::edit` 的模块说明），只回显长度与版本会让扫描量变成常数，却丢掉这次新建的还原依据。下一步因此在扫描器一侧，即 read 那一段说的不复制未命中的字符串。
 - **edit**：剩余成本在调用一段：在按路径的锁里取两次戳、读整个文件做唯一匹配，再整份写回；不再计算哈希（D106）。回显只含改动的行，扫描几乎为零。下界是读一遍、写一遍文件；局部改写不改变「整份写回」的下界，因为落盘经暂存文件改名。
-- **exec**：剩余成本是起一个进程与沙箱臂的准备，扫描只覆盖 stdout 与 stderr。下界是一次进程创建。下一步属于沙箱臂（`spec/Tools/Exec.lean`），不属于扫描。
+- **exec**：剩余成本是起一个进程与沙箱臂的准备，扫描只覆盖 stdout 与 stderr。下界是一次进程创建。下一步属于沙箱臂（`spec/Sprawling/runtime/spec/Tools/Exec.lean`），不属于扫描。
 - **search**：剩余成本是在读界内遍历楼的目录并逐文件匹配，扫描只覆盖命中行。下界是读界内每个文件读一遍。下一步是在多次搜索之间复用遍历结果；它需要一个随写入失效的索引，失效规则要先写进 `spec/Tools/Search.lean`。
 
-扫描器本身是 kernel 的 `secret::scan`（`crates/kernel/spec/Secret.lean` §8-25）：形状表对字节只走一遍，hex 段先判标签再读熵，工作量随输入线性增长，由 kernel 的确定性计数测试把守。
+扫描器本身是 kernel 的 `secret::scan`（`Sprawling/kernel/spec/Secret.lean` §8-25）：形状表对字节只走一遍，hex 段先判标签再读熵，工作量随输入线性增长，由 kernel 的确定性计数测试把守。
 -/
 
 /-! ## 11 边界枚举
@@ -313,61 +313,61 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 
 | 决定 | 标题 | 分部 |
 |---|---|---|
-| D1 | 定规：来源行不带摘要生产者指纹 | `crates/runtime/spec/Prefix.lean` |
-| D2 | 定规：回合边界的压缩只在收尾边界换快照 | `crates/runtime/spec/Compaction.lean` |
-| D3 | 定规：run 结束即终止它留下的后台命令 | `crates/runtime/spec/Backlog.lean` |
-| D4 | 定规：一条路径算不算绝对路径，由本平台判定 | `crates/runtime/spec/Tools/ChosenPath.lean` |
-| D5 | 一回合里等来的四个时刻各采各的，钟交给回合的账本门 | `crates/runtime/spec/Turn.lean` |
-| D6 | 首个内容只数文字与推理，钟在回合里读 | `crates/runtime/spec/Turn/Recovery.lean` |
-| D7 | 定规：run 的开篇与收尾归 `Charter`，harness run 不借 `RunPlan` | `crates/runtime/spec/Run.lean` |
-| D8 | 戳从驱动最近的读数渲染，到秒，默认每分钟；回合在工具面打包之前读答复时刻 | `crates/runtime/spec/Clock.lean` |
-| D9 | 城外书架上的 skill 由 catalog 携着正文交给 run | `crates/runtime/spec/Tools/Read.lean` |
-| D10 | 沙箱副本按工具一份、每条命令前同步，而不是每条命令新建一份 | `crates/runtime/spec/Tools/Exec.lean` |
-| D11 | 「只新建」下 exec 只在副本里跑，不开放 host | `crates/runtime/spec/Tools/Exec.lean` |
-| D13 | 时刻只有 `iso` 写出的那一种拼法可以读回，时间段是半开的、两端在构造时核对 | `crates/runtime/spec/Clock.lean` |
-| D14 | 开篇的写法记在 `run_started` 上，`FromJob` 的分支仍改写第一条消息 | `crates/runtime/spec/Fork.lean` |
-| D15 | 连接器把声音块存进 CAS，交出的是 locator 而不是附件 | `crates/runtime/spec/Pipeline.lean` |
-| D16 | 按字节读的门在 runtime，交出一个 `Read` 与字节的来处 | `crates/runtime/spec/Tools/BoundReader.lean` |
-| D19 | 休眠索引整份封顶 1 KiB，按字节、不按件 | `crates/runtime/spec/Catalog.lean` |
-| D20 | 索引按稳定序贪心装填，先带提示、再只有名字、最后 `+N more` | `crates/runtime/spec/Catalog.lean` |
-| D21 | 工具表在 session 里恒不变，第三档经 `tool` 走会话 | `crates/runtime/spec/Catalog.lean` |
-| D22 | 找是确定的等级匹配，skill 正文仍只经 `read` | `crates/runtime/spec/Catalog.lean` |
-| D23 | 命令行程序不另立目录 | `crates/runtime/spec/Catalog.lean` |
-| D24 | 只读工具不在执行前等落盘，写调用的意图先落盘，一波一道屏障 | `crates/runtime/spec/Turn.lean`（§8-3），性质在 `crates/runtime/spec/Turn/Durability.lean` |
-| D25 | 会话中可改运行策略之后，常驻核心是各 mode 核心的并集 | `crates/runtime/spec/Catalog.lean` |
-| D28 | 会话中换运行策略只由驱动循环在 `BeforeWave` 写进策略格，工具只读格 | `crates/runtime/spec/PolicyTake.lean` |
-| D29 | 每个 run 的 job 按权重分 CPU、设作业级内存上限；子进程在 macOS 降到 utility，在 Linux 用 cgroup v2 或只用 nice | `crates/runtime/spec/Tools/Exec.lean` |
-| D30 | shell 默认仍是平台的 shell，一栋楼可以换成 pwsh 7，exec 的失败按 shell 从账本折出 | `crates/runtime/spec/Tools/Exec.lean` |
-| D32 | 沙箱臂的调研表（SB0）与按平台的缺省臂、可选臂 | `crates/runtime/spec/Tools/Exec.lean` |
-| D34 | 对话窗口每个 run 有字节预算，已发出的消息超出时移出进程、按 `Locator` 从 CAS 读回 | `crates/runtime/spec/Conversation.lean`（§8-47-1） |
-| D36 | 攒下的记录跨过回合：`HeldLines` 归 `Run<Active>`、每回合的 `Journal` 借它，回合收尾不付屏障，`TurnReport` 的 `model_returned` 是 `Entry`、ref 在下一道屏障换出，一回合 `1 + 写调用数`、run 末尾一道，三个平台相同 | `crates/runtime/spec/Turn/Durability.lean` |
-| D37 | `redact` 接收并交回载荷的所有权：零命中原样交回同一块分配，有命中只换命中的字符串，三个平台相同 | `crates/runtime/spec/Tools.lean`（runtime::redact） |
-| D89 | `Watchdog` 执行 `AccountRound` 的处置，不持有模型、不另写换号循环 | `crates/runtime/spec/Watchdog.lean` |
-| D97 | 一栋楼共享前缀的哪几块，由段格说出 | `crates/runtime/spec/Prefix.lean` |
-| D98 | 每次尝试之后问一次端点门前的等待，有就记一行 `prefix_held` | `crates/runtime/spec/Turn/Recovery.lean` |
-| D99 | 保温门转发 `Model` 的每一扇调用门，不让任何一扇落到 trait 的缺省实现 | `crates/runtime/spec/Prefix.lean`（§8-4-2） |
-| D100 | 提前量是「发出到 provider 开始处理」的时间，按 endpoint 存一个读数 | `crates/runtime/spec/Prefix.lean`（§8-4-2） |
-| D101 | guest 模块每个进程只读、只编译一次，`WasmtimeSandbox` 的克隆共用一个 Engine 与一格已编译模块 | `crates/runtime/spec/Sandbox.lean` |
-| D102 | guest 的内存上限就是它的 run 的内存上限，撞到时结果带 `memory_ceiling` | `crates/runtime/spec/Sandbox.lean` |
-| D103 | 机器级预约按号先来后到、不回填，比整份预算大的预约在没有别人持有时单独放行 | `crates/runtime/spec/Reserve.lean` |
-| D104 | 只有人填过的上限才预约，run 的前台命令与 python 调用各预约那个数，只持有到前台窗口结束 | `crates/runtime/spec/Reserve.lean` |
-| D105 | 来源行带它所留字节的哈希，重建时逐行核对 | `crates/runtime/spec/Prefix.lean` |
-| D106 | edit 以每个 run 的读戳准入，读后被改则拒绝并给出当前片段 | `crates/runtime/spec/Tools/Edit.lean` |
-| D107 | 工具结果的文本由带版本的渲染器画出，每一行记下自己的版本，V1 永久保留 | `crates/runtime/spec/Rendering.lean` |
-| D108 | read 每 10 行标一个行号，edit 原样匹配不到时剥掉抄进来的标记再匹配 | `crates/runtime/spec/Rendering.lean` |
-| D109 | search 的 `output_mode` 取 Claude Code 的三个值，缺省 files_with_matches | `crates/runtime/spec/Tools/Search.lean` |
-| D110 | 一个 `tool` 工具、四个 op 取代 `describe` 与 `call`；休眠索引一个命名空间一行 | `crates/runtime/spec/Catalog.lean` |
-| D111 | 一件工具的档位由楼与城的 `[catalog]` 表定，`tool` 与 `read` 固定常驻，表在 run 起点冻结 | `crates/runtime/spec/Catalog.lean` |
-| D114 | 常驻工具的参数名与合法值取 Claude Code 的拼写，出入只留本城的特性 | `crates/runtime/spec/Tools.lean` |
-| D115 | 旧账本里的调用原样进入重建的对话，旧参数名不映射成新名 | `crates/runtime/spec/Tools.lean` |
-| D116 | 参数改名不改变任何已派生的 `IdemKey`，不做迁移 | `crates/runtime/spec/Tools.lean` |
-| D117 | 按文件名找住在 search 里：给 `glob` 而不给 `pattern` 时，答名字合 `glob` 的文件 | `crates/runtime/spec/Tools/Search.lean` |
-| D118 | `command` 在没有 shell 的楼里读作一个程序与它的参数 | `crates/runtime/spec/Tools/Exec.lean` |
-| D119 | 模型读到的行号从 1 数起（渲染器 V3），账本里的下标仍从 0 数起 | `crates/runtime/spec/Rendering.lean` |
-| D120 | `pattern` 是 ripgrep 语法的正则，由 `regex` crate 逐行判 | `crates/runtime/spec/Tools/Search.lean` |
-| D121 | 本城答不了的 Grep 参数：会让答案误导的拒，只改篇幅的不读 | `crates/runtime/spec/Tools/Search.lean` |
-| D123 | 生成配置是 CallShape 的一部分，与模型和 effort 同时比较 | `crates/runtime/spec/Turn.lean` |
-| D129 | 已发送 Conversation 与 FrozenPrefix 一样不为优化改写；重复新图在首次入窗前只留文本 | `crates/runtime/spec/Conversation.lean`（§8-47-3） |
+| D1 | 定规：来源行不带摘要生产者指纹 | `Sprawling/runtime/spec/Prefix.lean` |
+| D2 | 定规：回合边界的压缩只在收尾边界换快照 | `Sprawling/runtime/spec/Compaction.lean` |
+| D3 | 定规：run 结束即终止它留下的后台命令 | `Sprawling/runtime/spec/Backlog.lean` |
+| D4 | 定规：一条路径算不算绝对路径，由本平台判定 | `Sprawling/runtime/spec/Tools/ChosenPath.lean` |
+| D5 | 一回合里等来的四个时刻各采各的，钟交给回合的账本门 | `Sprawling/runtime/spec/Turn.lean` |
+| D6 | 首个内容只数文字与推理，钟在回合里读 | `Sprawling/runtime/spec/Turn/Recovery.lean` |
+| D7 | 定规：run 的开篇与收尾归 `Charter`，harness run 不借 `RunPlan` | `Sprawling/runtime/spec/Run.lean` |
+| D8 | 戳从驱动最近的读数渲染，到秒，默认每分钟；回合在工具面打包之前读答复时刻 | `Sprawling/runtime/spec/Clock.lean` |
+| D9 | 城外书架上的 skill 由 catalog 携着正文交给 run | `Sprawling/runtime/spec/Tools/Read.lean` |
+| D10 | 沙箱副本按工具一份、每条命令前同步，而不是每条命令新建一份 | `Sprawling/runtime/spec/Tools/Exec.lean` |
+| D11 | 「只新建」下 exec 只在副本里跑，不开放 host | `Sprawling/runtime/spec/Tools/Exec.lean` |
+| D13 | 时刻只有 `iso` 写出的那一种拼法可以读回，时间段是半开的、两端在构造时核对 | `Sprawling/runtime/spec/Clock.lean` |
+| D14 | 开篇的写法记在 `run_started` 上，`FromJob` 的分支仍改写第一条消息 | `Sprawling/runtime/spec/Fork.lean` |
+| D15 | 连接器把声音块存进 CAS，交出的是 locator 而不是附件 | `Sprawling/runtime/spec/Pipeline.lean` |
+| D16 | 按字节读的门在 runtime，交出一个 `Read` 与字节的来处 | `Sprawling/runtime/spec/Tools/BoundReader.lean` |
+| D19 | 休眠索引整份封顶 1 KiB，按字节、不按件 | `Sprawling/runtime/spec/Catalog.lean` |
+| D20 | 索引按稳定序贪心装填，先带提示、再只有名字、最后 `+N more` | `Sprawling/runtime/spec/Catalog.lean` |
+| D21 | 工具表在 session 里恒不变，第三档经 `tool` 走会话 | `Sprawling/runtime/spec/Catalog.lean` |
+| D22 | 找是确定的等级匹配，skill 正文仍只经 `read` | `Sprawling/runtime/spec/Catalog.lean` |
+| D23 | 命令行程序不另立目录 | `Sprawling/runtime/spec/Catalog.lean` |
+| D24 | 只读工具不在执行前等落盘，写调用的意图先落盘，一波一道屏障 | `Sprawling/runtime/spec/Turn.lean`（§8-3），性质在 `Sprawling/runtime/spec/Turn/Durability.lean` |
+| D25 | 会话中可改运行策略之后，常驻核心是各 mode 核心的并集 | `Sprawling/runtime/spec/Catalog.lean` |
+| D28 | 会话中换运行策略只由驱动循环在 `BeforeWave` 写进策略格，工具只读格 | `Sprawling/runtime/spec/PolicyTake.lean` |
+| D29 | 每个 run 的 job 按权重分 CPU、设作业级内存上限；子进程在 macOS 降到 utility，在 Linux 用 cgroup v2 或只用 nice | `Sprawling/runtime/spec/Tools/Exec.lean` |
+| D30 | shell 默认仍是平台的 shell，一栋楼可以换成 pwsh 7，exec 的失败按 shell 从账本折出 | `Sprawling/runtime/spec/Tools/Exec.lean` |
+| D32 | 沙箱臂的调研表（SB0）与按平台的缺省臂、可选臂 | `Sprawling/runtime/spec/Tools/Exec.lean` |
+| D34 | 对话窗口每个 run 有字节预算，已发出的消息超出时移出进程、按 `Locator` 从 CAS 读回 | `Sprawling/runtime/spec/Conversation.lean`（§8-47-1） |
+| D36 | 攒下的记录跨过回合：`HeldLines` 归 `Run<Active>`、每回合的 `Journal` 借它，回合收尾不付屏障，`TurnReport` 的 `model_returned` 是 `Entry`、ref 在下一道屏障换出，一回合 `1 + 写调用数`、run 末尾一道，三个平台相同 | `Sprawling/runtime/spec/Turn/Durability.lean` |
+| D37 | `redact` 接收并交回载荷的所有权：零命中原样交回同一块分配，有命中只换命中的字符串，三个平台相同 | `Sprawling/runtime/spec/Tools.lean`（runtime::redact） |
+| D89 | `Watchdog` 执行 `AccountRound` 的处置，不持有模型、不另写换号循环 | `Sprawling/runtime/spec/Watchdog.lean` |
+| D97 | 一栋楼共享前缀的哪几块，由段格说出 | `Sprawling/runtime/spec/Prefix.lean` |
+| D98 | 每次尝试之后问一次端点门前的等待，有就记一行 `prefix_held` | `Sprawling/runtime/spec/Turn/Recovery.lean` |
+| D99 | 保温门转发 `Model` 的每一扇调用门，不让任何一扇落到 trait 的缺省实现 | `Sprawling/runtime/spec/Prefix.lean`（§8-4-2） |
+| D100 | 提前量是「发出到 provider 开始处理」的时间，按 endpoint 存一个读数 | `Sprawling/runtime/spec/Prefix.lean`（§8-4-2） |
+| D101 | guest 模块每个进程只读、只编译一次，`WasmtimeSandbox` 的克隆共用一个 Engine 与一格已编译模块 | `Sprawling/runtime/spec/Sandbox.lean` |
+| D102 | guest 的内存上限就是它的 run 的内存上限，撞到时结果带 `memory_ceiling` | `Sprawling/runtime/spec/Sandbox.lean` |
+| D103 | 机器级预约按号先来后到、不回填，比整份预算大的预约在没有别人持有时单独放行 | `Sprawling/runtime/spec/Reserve.lean` |
+| D104 | 只有人填过的上限才预约，run 的前台命令与 python 调用各预约那个数，只持有到前台窗口结束 | `Sprawling/runtime/spec/Reserve.lean` |
+| D105 | 来源行带它所留字节的哈希，重建时逐行核对 | `Sprawling/runtime/spec/Prefix.lean` |
+| D106 | edit 以每个 run 的读戳准入，读后被改则拒绝并给出当前片段 | `Sprawling/runtime/spec/Tools/Edit.lean` |
+| D107 | 工具结果的文本由带版本的渲染器画出，每一行记下自己的版本，V1 永久保留 | `Sprawling/runtime/spec/Rendering.lean` |
+| D108 | read 每 10 行标一个行号，edit 原样匹配不到时剥掉抄进来的标记再匹配 | `Sprawling/runtime/spec/Rendering.lean` |
+| D109 | search 的 `output_mode` 取 Claude Code 的三个值，缺省 files_with_matches | `Sprawling/runtime/spec/Tools/Search.lean` |
+| D110 | 一个 `tool` 工具、四个 op 取代 `describe` 与 `call`；休眠索引一个命名空间一行 | `Sprawling/runtime/spec/Catalog.lean` |
+| D111 | 一件工具的档位由楼与城的 `[catalog]` 表定，`tool` 与 `read` 固定常驻，表在 run 起点冻结 | `Sprawling/runtime/spec/Catalog.lean` |
+| D114 | 常驻工具的参数名与合法值取 Claude Code 的拼写，出入只留本城的特性 | `Sprawling/runtime/spec/Tools.lean` |
+| D115 | 旧账本里的调用原样进入重建的对话，旧参数名不映射成新名 | `Sprawling/runtime/spec/Tools.lean` |
+| D116 | 参数改名不改变任何已派生的 `IdemKey`，不做迁移 | `Sprawling/runtime/spec/Tools.lean` |
+| D117 | 按文件名找住在 search 里：给 `glob` 而不给 `pattern` 时，答名字合 `glob` 的文件 | `Sprawling/runtime/spec/Tools/Search.lean` |
+| D118 | `command` 在没有 shell 的楼里读作一个程序与它的参数 | `Sprawling/runtime/spec/Tools/Exec.lean` |
+| D119 | 模型读到的行号从 1 数起（渲染器 V3），账本里的下标仍从 0 数起 | `Sprawling/runtime/spec/Rendering.lean` |
+| D120 | `pattern` 是 ripgrep 语法的正则，由 `regex` crate 逐行判 | `Sprawling/runtime/spec/Tools/Search.lean` |
+| D121 | 本城答不了的 Grep 参数：会让答案误导的拒，只改篇幅的不读 | `Sprawling/runtime/spec/Tools/Search.lean` |
+| D123 | 生成配置是 CallShape 的一部分，与模型和 effort 同时比较 | `Sprawling/runtime/spec/Turn.lean` |
+| D129 | 已发送 Conversation 与 FrozenPrefix 一样不为优化改写；重复新图在首次入窗前只留文本 | `Sprawling/runtime/spec/Conversation.lean`（§8-47-3） |
 -/
 
 /-! ## 13 依赖选型
@@ -395,32 +395,32 @@ citysim 是 `run::drive` 的调用方（§8-15），assemble 的签名变动波�
 
 /-! ## 16 测试与约束
 
-单测：五步各拒绝分支＋ig 跳过；fork 越界；fork_draft 载荷形。proptest：对任意合法 draft 序列（经内存 Ledger 物化）verify 恒过；任意单字节翻转恒拒。A2/A19 演示测试入 crates/runtime/tests/。约束：clippy 零告警。
+单测：五步各拒绝分支＋ig 跳过；fork 越界；fork_draft 载荷形。proptest：对任意合法 draft 序列（经内存 Ledger 物化）verify 恒过；任意单字节翻转恒拒。A2/A19 演示测试入 Sprawling/runtime/tests/。约束：clippy 零告警。
 A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）；A7 往返四断言；A18 零字节；watchdog 分级序；A10 三断言（feature `wasm` 下真 wasmtime＋WAT）；L0×失败注入矩阵（三臂×（正常／工具错／拒收））；ToolBench 门路由（Deny 回流／门的提问回流／dedup 先于副作用）。
 回合边界的压缩（§8-44）：`compaction::exchange::tests` 三例（预算内全保留；超预算回复按 `plan` 裁、结构化结果整块保留；份额随 exchange 大小走）；`turn/tests/compaction` 两例（收尾边界才换快照、波中达阈值按全波分组一次压）；`fork/tests` 一例（分支继承的是压缩后的 exchange）；citysim `compaction` 两例（波中达阈值账本全字节保留、同剧本逐字节重放）。
 
-形式化的义务由证明清偿：`lake build crates.runtime.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
+形式化的义务由证明清偿：`lake build Sprawling.runtime.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
 
 - 回合的边界：`turn::tests::phases`（`cancel_at_the_call_boundary_stops_before_any_model_bytes`、`steer_at_a_boundary_records_and_advances`、`a_wave_halted_between_two_calls_does_not_make_the_second`）。
-- run 的出口与 checkpoint：`crates/runtime/tests/run_driver.rs`（`a_checkpoint_runs_before_the_wave_and_carries_the_turns_stamp`、`a_run_that_calls_nothing_puts_up_no_checkpoint`、`a_read_only_wave_puts_up_no_checkpoint`）与 `run::lifecycle::tests`。
-- 分叉：`fork::tests`（`a_cut_inside_a_wave_moves_back_to_the_safe_point`、`a_cut_the_history_does_not_hold_is_refused`）、`fork::request_tests` 与 `crates/runtime/tests/replay_fork.rs`。
+- run 的出口与 checkpoint：`Sprawling/runtime/tests/run_driver.rs`（`a_checkpoint_runs_before_the_wave_and_carries_the_turns_stamp`、`a_run_that_calls_nothing_puts_up_no_checkpoint`、`a_read_only_wave_puts_up_no_checkpoint`）与 `run::lifecycle::tests`。
+- 分叉：`fork::tests`（`a_cut_inside_a_wave_moves_back_to_the_safe_point`、`a_cut_the_history_does_not_hold_is_refused`）、`fork::request_tests` 与 `Sprawling/runtime/tests/replay_fork.rs`。
 - 打戳与时间段：`clock` 的测试（`off_emits_never_even_for_timestamped_tools`、`first_result_emits_once_then_timeless_deduplicates_within_a_bucket`、`timestamped_emits_every_result_with_its_own_reading`、`a_span_keeps_its_start_and_leaves_out_its_end`、`a_span_with_no_moment_in_it_is_refused`）。
 - 准入：`mode` 的测试，每种要求、每种落地各自的拒与放。
 - 截断锁：`catalog::tests`（休眠索引不超过上限、一个命名空间一行、两百件工具的 MCP 服务器只占一行且典型问话在 `FIND_HITS` 件内找到、截断只在放不下时发生、没准入的件零字节、常驻核心以外的工具不进工具表、`resolve_run` 的三种拒绝与换出的调用沿用原 `id`），以及工具面换调用的 `turn::tests::resolving`。
 - 路径与按字节读：`tools::chosen_path` 的测试、`tools::read::tests::doors` 与 `tools::bound_reader` 的测试（`the_door_refuses_what_read_refuses_with_the_same_code`）。
 
-只有节注释的分部，其要求由类型、trybuild 反例（`crates/runtime/tests/trybuild.rs`）与 `cargo nextest run -p sprawling-runtime` 的各模块测试守住。
+只有节注释的分部，其要求由类型、trybuild 反例（`Sprawling/runtime/tests/trybuild.rs`）与 `cargo nextest run -p sprawling-runtime` 的各模块测试守住。
 -/
 
 /-! ## 17 文档关系
 
-模块登记在 ARCHITECTURE 的模块图（`xtask modmap`）；canonical 类型的改动与 `crates/kernel/Spec.lean` §8-23/§8-24 同一变更集；runtime 的公开面即 `lib.rs` 的 `pub mod` 与根重导出。
+模块登记在 ARCHITECTURE 的模块图（`xtask modmap`）；canonical 类型的改动与 `Sprawling/kernel/Spec.lean` §8-23/§8-24 同一变更集；runtime 的公开面即 `lib.rs` 的 `pub mod` 与根重导出。
 
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；它改了，分部的路径与 `architecture.toml` 里 runtime 各行的 `spec` 锚点一起重看。
 - `architecture.toml` 的模块图：runtime 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
-- kernel 的规格（`crates/kernel/Spec.lean`）：事件表、`Effect`、`Opening`、`RunPolicy` 与 `ReadVerdict` 的权威；它们改了，这里的模型与 §8 相应各节一起重看。
-- storage 的规格（`crates/storage/Spec.lean`）：逐行检查 `LineCheck`、块的来源 `Cas::origins` 与写目标；gateway 的规格（`crates/gateway/Spec.lean`）：模型口、`AudioType` 与 `Recording`。
-- `crates/agent_protocols/spec/Harness/Session.lean`：harness run 的次序与结局表（§8-52 引它），runtime 不 import 它，因为 `depmap` 不让 runtime 依赖 agent_protocols。
-- 引本规格的其他规格与 rustdoc 写 `crates/runtime/Spec.lean §8-n` 或 `runtime D<n>`；一节换了分部，它的标签不变，引用不必改。
+- kernel 的规格（`Sprawling/kernel/Spec.lean`）：事件表、`Effect`、`Opening`、`RunPolicy` 与 `ReadVerdict` 的权威；它们改了，这里的模型与 §8 相应各节一起重看。
+- storage 的规格（`Sprawling/storage/Spec.lean`）：逐行检查 `LineCheck`、块的来源 `Cas::origins` 与写目标；gateway 的规格（`Sprawling/gateway/Spec.lean`）：模型口、`AudioType` 与 `Recording`。
+- `Sprawling/agent_protocols/spec/Harness/Session.lean`：harness run 的次序与结局表（§8-52 引它），runtime 不 import 它，因为 `depmap` 不让 runtime 依赖 agent_protocols。
+- 引本规格的其他规格与 rustdoc 写 `Sprawling/runtime/Spec.lean §8-n` 或 `runtime D<n>`；一节换了分部，它的标签不变，引用不必改。
 -/

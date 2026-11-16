@@ -5,7 +5,7 @@
 
 //! How a session opened: its `run_started` line as the rounds answer it,
 //! with the names its session froze read back from the content store
-//! (`crates/wire/Spec.lean` §8-79, D17).
+//! (`Sprawling/wire/Spec.lean` §8-79, D17).
 
 use std::path::Path;
 
@@ -43,7 +43,7 @@ pub(super) fn opening(records: &[EventRecord], city_root: &Path) -> Option<wire:
 }
 
 /// The names a session froze under `version`, as the content store holds
-/// them (`crates/wire/Spec.lean` D17). A store that will not open, a
+/// them (`Sprawling/wire/Spec.lean` D17). A store that will not open, a
 /// version it no longer holds and bytes that are not a frozen naming
 /// answer no names: the page then falls back to the address and the
 /// role's name, never to the names as they are today.

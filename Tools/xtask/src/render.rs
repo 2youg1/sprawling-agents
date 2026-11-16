@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Render gate: the client's own gallery is opened in a real engine, and
-//! what it drew is measured (crates/xtask/Spec.lean §8-13 and §8-14).
+//! what it drew is measured (Tools/xtask/Spec.lean §8-13 and §8-14).
 //!
 //! **This is the step the method never had.** A stylesheet's rules do not
 //! collide in either source file — they collide in the cascade. Two rules
@@ -112,7 +112,7 @@ enum Errand {
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     // Where the bundle lands is the build script's statement, read
     // rather than repeated: this gate and the binary must open one
-    // directory (crates/xtask/Spec.lean §8-18). `--bundle` names another
+    // directory (Tools/xtask/Spec.lean §8-18). `--bundle` names another
     // one for the swap build alone (§8-13), which never ships.
     let bundle = match asked_for(BUNDLE) {
         Some(dir) => root.join(dir),
@@ -157,7 +157,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     // page five times.
     let sources = sources::index(root)?;
     // The conversation page is judged where the gallery draws it; another
-    // route is a page that may not hold one (crates/xtask/Spec.lean §8-51).
+    // route is a page that may not hold one (Tools/xtask/Spec.lean §8-51).
     let talk = if route == GALLERY {
         Some((talk::Words::read(root)?, crate::budget::register(root)?))
     } else {

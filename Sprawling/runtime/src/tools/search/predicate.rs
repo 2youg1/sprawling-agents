@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What one search call asks, read from the arguments of Claude Code's
-//! `Grep` (`crates/runtime/spec/Tools/Search.lean` §8-30-2).
+//! `Grep` (`Sprawling/runtime/spec/Tools/Search.lean` §8-30-2).
 //!
 //! **A regular expression that never backtracks** (D120). The pattern
 //! is compiled by the `regex` crate, the engine ripgrep uses by default,
@@ -57,7 +57,7 @@ pub(super) struct Context {
 }
 
 /// What a call hands back for the files it matched
-/// (`crates/runtime/spec/Tools/Search.lean` D109).
+/// (`Sprawling/runtime/spec/Tools/Search.lean` D109).
 #[derive(Clone, Copy)]
 pub(super) enum Mode {
     /// Only the files that hold a match.
@@ -141,7 +141,7 @@ impl Mode {
     ];
 
     /// The payload key the entries travel under; the ledger keeps these
-    /// names whatever the call spelled (`crates/runtime/spec/Rendering.lean`
+    /// names whatever the call spelled (`Sprawling/runtime/spec/Rendering.lean`
     /// §8-63 draws them).
     fn key(self) -> &'static str {
         match self {

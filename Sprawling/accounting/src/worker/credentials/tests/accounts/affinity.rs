@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which account a Session keeps across a restart, which one a new or
-//! branched Session starts on (`crates/gateway/spec/Router.lean` D30),
+//! branched Session starts on (`Sprawling/gateway/spec/Router.lean` D30),
 //! and which one a delegated child starts on (D44).
 
 use super::*;

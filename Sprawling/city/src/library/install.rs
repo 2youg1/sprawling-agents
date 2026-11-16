@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Installing one skill into the city's CAS and a shelf's index
-//! (`crates/city/spec/Library/Install.lean` §8-28). The source precheck,
+//! (`Sprawling/city/spec/Library/Install.lean` §8-28). The source precheck,
 //! recheck and refusal paths are unchanged; the landed form is now one
 //! CAS object per file, a canonical manifest, and an index row rather
 //! than a second directory of bytes.

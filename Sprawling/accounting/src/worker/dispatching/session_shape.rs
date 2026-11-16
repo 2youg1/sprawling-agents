@@ -64,7 +64,7 @@ impl RunWorker {
     /// what the (Endpoint, model) offers, so a level the model does not
     /// offer is refused rather than sent or moved to a neighbour; a
     /// stored level is never refused, the gateway sends the default rule's
-    /// level instead (`crates/gateway/spec/Provider/Thinking.lean` §8-39).
+    /// level instead (`Sprawling/gateway/spec/Provider/Thinking.lean` §8-39).
     ///
     /// # Errors
     /// Propagates the room's own configuration failing to read or

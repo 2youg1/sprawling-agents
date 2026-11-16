@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The size of a line of body text a person asked for
-//! (`crates/wire/spec/Preference.lean` D51).
+//! (`Sprawling/wire/spec/Preference.lean` D51).
 //!
 //! **The floor is a type, and there is no ceiling.** A number under
 //! [`BODY_PX_MIN`] is refused where it is read — from the person's `[ui]`

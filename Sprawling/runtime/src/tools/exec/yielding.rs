@@ -10,7 +10,7 @@
 //! harness has to win that contest, so every host command the exec tool
 //! dispatches starts one level down instead of inheriting the core's
 //! level. Both platforms are reached through a safe interface, so this
-//! file needs no foreign call (`crates/runtime/spec/Tools/Exec.lean` §8-13-3).
+//! file needs no foreign call (`Sprawling/runtime/spec/Tools/Exec.lean` §8-13-3).
 
 use std::process::Command;
 
@@ -114,7 +114,7 @@ fn start_below_the_core(_shares: Shares) -> Command {
 
 /// Where macOS keeps `taskpolicy`, which starts a program with its QoS
 /// clamped: utility work is placed on the efficiency cores first, on
-/// Apple silicon and Intel Macs alike (`crates/runtime/spec/Tools/Exec.lean` D29).
+/// Apple silicon and Intel Macs alike (`Sprawling/runtime/spec/Tools/Exec.lean` D29).
 #[cfg(target_os = "macos")]
 const TASKPOLICY: &str = "/usr/sbin/taskpolicy";
 

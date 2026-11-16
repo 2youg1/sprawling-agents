@@ -48,13 +48,13 @@ There is no random source here and no seed (`citysim D1`), so a red scenario rep
 - The package has no features; a caller turns none on. `kernel` arrives with `conformance`, `wire` with `server`, and `sprawling` is named for its bench binaries only.
 - A scenario is single-threaded and reads a counter instead of the system clock, and it cancels only at a turn boundary (`citysim D7`), which is why a cancel written at the same boundary beats a steer. `MemLedger` never touches a disk, and no fault filesystem is built here: that one lives in `storage`.
 - Instruments live here rather than in a crate of their own, because none has a production caller (`citysim D6`).
-- A bench reading is registered in `crates/xtask/budgets.toml` and never gated (`citysim D17`); the measured feature set is `sprawling`'s default features (`citysim D9`); the long turn gates on the growth of the request window, with RSS only a reading (`citysim D10`); the Python family publishes nothing without a real CPython-WASI guest (`citysim D27`); the stand-in re-reads its script only when every run it holds is used up (`citysim D15`).
+- A bench reading is registered in `Tools/xtask/budgets.toml` and never gated (`citysim D17`); the measured feature set is `sprawling`'s default features (`citysim D9`); the long turn gates on the growth of the request window, with RSS only a reading (`citysim D10`); the Python family publishes nothing without a real CPython-WASI guest (`citysim D27`); the stand-in re-reads its script only when every run it holds is used up (`citysim D15`).
 - `serve_grouped` is the one Windows-only piece, with `win32job` under a `cfg(windows)` dependency.
 - It may name `kernel`, `storage`, `runtime`, `gateway`, `collab`, `wire`, `sprawling` and `accounting`. The `depmap` block does not list it.
 
 ## Who uses it
 
-No package depends on it: `cargo tree --workspace -i citysim -e normal --depth 1` prints the package alone. Its callers are the recipes `just sim`, `just bench`, `just bench-startup`, `just provider` and `just mem long-turn`, and the acceptance walk in `crates/adversary`, whose recipe starts `provider` and, on Windows, `serve_grouped`.
+No package depends on it: `cargo tree --workspace -i citysim -e normal --depth 1` prints the package alone. Its callers are the recipes `just sim`, `just bench`, `just bench-startup`, `just provider` and `just mem long-turn`, and the acceptance walk in `Tools/adversary`, whose recipe starts `provider` and, on Windows, `serve_grouped`.
 
 ## Specification
 
@@ -65,11 +65,11 @@ The SPEC is [`Spec.lean`](Spec.lean), with a part per module under [`spec/`](spe
 ```bash
 cargo nextest run -p citysim      # the scenarios and the instruments' tests, as `just test` runs them
 just sim                          # the same tests under `cargo test --package citysim`
-lake build crates.citysim.Spec    # the SPEC's proofs; `just models` builds every specification
+lake build Tools.citysim.Spec    # the SPEC's proofs; `just models` builds every specification
 cargo xtask gates modmap specalign  # this crate's module rows and their SPEC anchors
 ```
 
-Two golden Ledgers under `crates/fixtures/` are rebuilt byte for byte by these tests: `golden-s1` by `tests/scenarios/ledger_conformance.rs` from a fixed script, and `golden-p0` by `tests/scenarios/interventions.rs` from a whole run with an intervention, driven through the real turn machine. To write one again after a change that is meant to alter it, run its test with `GOLDEN_WRITE=1`, and do not edit the file by hand. The scenario files share one integration binary (`tests/scenarios/`) so the CI test archive links that graph once.
+Two golden Ledgers under `Tools/fixtures/` are rebuilt byte for byte by these tests: `golden-s1` by `tests/scenarios/ledger_conformance.rs` from a fixed script, and `golden-p0` by `tests/scenarios/interventions.rs` from a whole run with an intervention, driven through the real turn machine. To write one again after a change that is meant to alter it, run its test with `GOLDEN_WRITE=1`, and do not edit the file by hand. The scenario files share one integration binary (`tests/scenarios/`) so the CI test archive links that graph once.
 
 `just provider <script> <record>` starts the stand-in: it binds a loopback port, prints `SPRAWLING_PROVIDER=<url>` before it answers anything, and appends every exchange to the record.
 

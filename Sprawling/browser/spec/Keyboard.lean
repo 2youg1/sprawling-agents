@@ -6,7 +6,7 @@
 /-!
 # keyboard：一次按键里，键是嵌套着按下又放开的
 
-规定 `crates/browser/src/keyboard.rs`（`browser::keyboard`，`key_frame`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。决定见入口的 D12。
+规定 `Sprawling/browser/src/keyboard.rs`（`browser::keyboard`，`key_frame`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。决定见入口的 D12。
 
 一次按键是一帧 `input.performActions` 的 `key` 源：修饰键按枚举次序逐个按下，这个键按下又放开，修饰键按相反次序放开。修饰键是集合，按下的次序由枚举给出，所以同一次按键恒是同一串字节。
 

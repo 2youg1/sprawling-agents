@@ -6,11 +6,11 @@
 /-!
 # accounting::worker::workbench::tools
 
-规定工作台里本 crate 写的三件工具：`crates/accounting/src/worker/workbench/tools/ocr.rs`、`crates/accounting/src/worker/workbench/tools/transcribe.rs` 与 `crates/accounting/src/worker/workbench/tools/proposal.rs`。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+规定工作台里本 crate 写的三件工具：`Sprawling/accounting/src/worker/workbench/tools/ocr.rs`、`Sprawling/accounting/src/worker/workbench/tools/transcribe.rs` 与 `Sprawling/accounting/src/worker/workbench/tools/proposal.rs`。本文件是 `Sprawling/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `Sprawling/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
 -/
 
 /-!
-### 8-20 工作台的两件读外来字节的工具：`ocr` 与 `transcribe`（`accounting::worker::workbench::tools::ocr`、`…::tools::transcribe`，形状 4 适配器；`crates/sprawling/Spec.lean` §8-131、§8-142）
+### 8-20 工作台的两件读外来字节的工具：`ocr` 与 `transcribe`（`accounting::worker::workbench::tools::ocr`、`…::tools::transcribe`，形状 4 适配器；`Sprawling/app/Spec.lean` §8-131、§8-142）
 
 ```rust
 // accounting::worker::workbench::tools::endpoints（登记里的一段）
@@ -31,12 +31,12 @@ pub(super) struct OcrTool { /* reader、policy、recogniser: Mutex<Recogniser>�
 // 两件都是 kernel::Tool；参数 `{ path }`；答 `{ path, text }`
 ```
 
-- **两件工具读字节只经 `runtime::BoundReader`**（`crates/runtime/Spec.lean` §8-59）。`endpoint_tools` 用交给 `read` 与 `search` 的同一个 `ReadBound`、同一个 run 的树根与城的块仓造一个 `BoundReader`，克隆给两件工具；它是工作台登记里自成一段的一步，因为这两件工具共用这一扇门，而 `lay_out_workbench` 已在函数与文件的长度上限边上。本 crate 不判路径：`Address::is_within`、`Address::is_reserved` 与 `storage::WriteTarget::within` 曾在 `transcribe` 里替这扇门判，门落地后删去。
+- **两件工具读字节只经 `runtime::BoundReader`**（`Sprawling/runtime/Spec.lean` §8-59）。`endpoint_tools` 用交给 `read` 与 `search` 的同一个 `ReadBound`、同一个 run 的树根与城的块仓造一个 `BoundReader`，克隆给两件工具；它是工作台登记里自成一段的一步，因为这两件工具共用这一扇门，而 `lay_out_workbench` 已在函数与文件的长度上限边上。本 crate 不判路径：`Address::is_within`、`Address::is_reserved` 与 `storage::WriteTarget::within` 曾在 `transcribe` 里替这扇门判，门落地后删去。
 - **有没有这件工具，是一次 `select`。** `transcribe` 读 `ModelTag::Transcribe`，`ocr` 读 `ModelTag::Ocr`，都按 run 所在那座楼的楼规（`site.rules.policy()`）问端点账本；拒了，工具不上表。设施由 gateway 造：`gateway::transcriber_for` 与 `gateway::recogniser_for`，后者带上 `credentials::dialect_headers` 给这个 face 的头，与主模型的适配器同一张。
 - **容器的认法：** 图按 `runtime::pipeline::connector::png_picture` 认（读界判过的字节整份读进来，再交它），录音按 `Named` 分：文件看扩展名（`gateway::AudioType::of_file_name`，`file:` Locator 也是文件），块看开头的字节（`gateway::Recording::read_unlabelled`）。
 - **`ocr` 的设施在一把锁后面**，理由同 `transcribe`：凭据解析器是 `Send` 而不是 `Sync`，`recognise` 又要 `&mut`；同一个 run 的两次 OCR 轮流进行。
-- **在表上的位置**：`transcribe` 之后、`playback` 之前，两件都在内置那一段（`crates/sprawling/Spec.lean` §8-142）。
-- 验收：两件工具各自模块的测试经一个没有设施的工具判拒绝（别楼的机密路径、reserved subtree、认不得的容器、不在的文件、没有任何楼的 `cas:`），设施的拒绝原样交回；接上设施的那一半由 `crates/sprawling/tests/acceptance/` 的 `ocr` 与 `transcribe` 测试经回环端点证明。
+- **在表上的位置**：`transcribe` 之后、`playback` 之前，两件都在内置那一段（`Sprawling/app/Spec.lean` §8-142）。
+- 验收：两件工具各自模块的测试经一个没有设施的工具判拒绝（别楼的机密路径、reserved subtree、认不得的容器、不在的文件、没有任何楼的 `cas:`），设施的拒绝原样交回；接上设施的那一半由 `Sprawling/app/tests/acceptance/` 的 `ocr` 与 `transcribe` 测试经回环端点证明。
 -/
 
 /-!
@@ -63,8 +63,8 @@ pub(super) fn offered(reader: &runtime::BoundReader, asked: &Offering) -> Result
 - **`offer`：读城里那一版，找出原文，判长度，写一行。** `path` 经一个建在城根上的 `runtime::BoundReader` 打开（交给 `read` 的同一个读界，D32）：保留子树、读界关着的楼由那扇门拒；Locator 与块被拒，因为提案是关于城里那份文件此刻的字节（documents D35）。读出的字节不是文本（`Reading::Opaque`）时拒；是文本就整份解码，`old` 必须恰好出现一次，零次与多次各一句拒词，带次数；区间按那一版的编码换成字节：UTF-8 的两种，解码出的文字就是版本的字节（documents D5），UTF-16 的两种，每个码元两个字节。`old` 为空或与 `new` 相同时拒。然后 `documents::Offer::of` 判长度（documents D18），工具写一行 `proposal_offered`，记在这次 run、这个居民、这个房间名下，回答卡的身份（documents D13）。同一张卡再 `offer` 一次不再写行，答同一个身份；收回过的卡再 `offer` 被拒（documents D19）。
 - **行经 lane 的 relay 写下。** relay 是 lane 唯一能写账本的门（D11）；记账线程写下这一行之后把它交给 `Governance` 的折叠（§8-22），`Query::Proposals` 从此答出这张卡，人的决定也从同一个折叠找它。
 - **`withdraw` 只收这次 run 自己提出、还开着的卡。** 判它的是工具自己的一本小账（身份 ↦ 开着／收回过）：run 的身份每次派活新铸（`run_id_for` 读时刻），所以这次 run 提出的卡只出自这件工具的这一个实例。别的 run 的卡、没提出过的身份、收回过的卡都拒 `E_INVALID_ARGS`，不写行。
-- **当前状态：人在 run 还在跑时决定了它的一张卡，run 随后收回同一张卡，会多写一行 `proposal_withdrawn`。** 工具看不见那次决定；`views::proposals::Proposals::close` 照最后写下的一行把卡记成收回过。卡上的字节已经由人的决定落下，`open_on` 对两种处理都拒，所以没有字节写错，错的是折叠记下的「怎样处理的」，与 documents D19「处理过的卡不再动」不合。补法是折叠对已经处理过的卡不再改（`close` 保留第一次处理，`views/proposals.rs` 里一行），它也让任何一条迟到的收回成为被拒的一步；另一条路是收回改走记账线程的问询，像 `goal` 的登记那样由 `Governance` 当场判（`crates/sprawling/Spec.lean` §8-42-8），那要在 `relay::Wake` 加一臂。
-- 验收：`worker::workbench::tools::proposal::tests`（一次 `offer` 恰写一行、文档字节不动；收回别人的卡、收回两次、重提收回过的卡都被拒；UTF-16 文档上引出的原文经 `documents::decide` 落得下）；`crates/sprawling/tests/acceptance/` 的 catalogue 里 `proposal` 一段（`views::ask` 的 `Query::Proposals` 答出这张卡，属于这次 run，文档字节不动）；citysim 的 `tests/proposal_baseline.rs`（citysim D22：文档被城外的写者挪动之后，人接受这张卡以 `E_VERSION_CONFLICT` 被拒，文档留着挪动之后的字节，卡仍开着）。
+- **当前状态：人在 run 还在跑时决定了它的一张卡，run 随后收回同一张卡，会多写一行 `proposal_withdrawn`。** 工具看不见那次决定；`views::proposals::Proposals::close` 照最后写下的一行把卡记成收回过。卡上的字节已经由人的决定落下，`open_on` 对两种处理都拒，所以没有字节写错，错的是折叠记下的「怎样处理的」，与 documents D19「处理过的卡不再动」不合。补法是折叠对已经处理过的卡不再改（`close` 保留第一次处理，`views/proposals.rs` 里一行），它也让任何一条迟到的收回成为被拒的一步；另一条路是收回改走记账线程的问询，像 `goal` 的登记那样由 `Governance` 当场判（`Sprawling/app/Spec.lean` §8-42-8），那要在 `relay::Wake` 加一臂。
+- 验收：`worker::workbench::tools::proposal::tests`（一次 `offer` 恰写一行、文档字节不动；收回别人的卡、收回两次、重提收回过的卡都被拒；UTF-16 文档上引出的原文经 `documents::decide` 落得下）；`Sprawling/app/tests/acceptance/` 的 catalogue 里 `proposal` 一段（`views::ask` 的 `Query::Proposals` 答出这张卡，属于这次 run，文档字节不动）；citysim 的 `tests/proposal_baseline.rs`（citysim D22：文档被城外的写者挪动之后，人接受这张卡以 `E_VERSION_CONFLICT` 被拒，文档留着挪动之后的字节，卡仍开着）。
 -/
 
 /-! D32 城的工具读别楼的文件与 `cas:` 块，只经 runtime 的 `BoundReader`
@@ -83,7 +83,7 @@ pub(super) fn offered(reader: &runtime::BoundReader, asked: &Offering) -> Result
 
 /-! ### 接口仍写在 sprawling 规格里的模块
 
-下面这些模块的接口与取舍今天写在 `crates/sprawling/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
+下面这些模块的接口与取舍今天写在 `Sprawling/app/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。
 
 | sprawling 的标签 | 模块 |
 |---|---|

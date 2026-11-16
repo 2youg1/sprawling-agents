@@ -6,7 +6,7 @@
 //! Which version this city runs, and what each installation registry offers.
 //!
 //! **A reading of right now, never folded from the Ledger**, on the
-//! same grounds as `McpHealth` and `Toolkits` (`crates/wire/spec/Answer/McpHealth.lean`
+//! same grounds as `McpHealth` and `Toolkits` (`Sprawling/wire/spec/Answer/McpHealth.lean`
 //! §8-34): which release is newest is a fact about this minute, and a
 //! recorded copy would still name last month's release as the newest
 //! one. It is also the reason this answer is never sent unasked - the
@@ -69,7 +69,7 @@ pub enum ReleaseAnswer {
 }
 
 /// What one registry said about the newest release
-/// (`crates/wire/spec/Answer/Release.lean` D24).
+/// (`Sprawling/wire/spec/Answer/Release.lean` D24).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RegistryNewest {

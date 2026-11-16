@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The processor topology as each platform reports it, never assumed
-//! (`crates/sprawling/spec/Serving/Placement.lean` D45): CPU sets and the
+//! (`Sprawling/app/spec/Serving/Placement.lean` D45): CPU sets and the
 //! reading thread's group on Windows, `/proc` and sysfs on Linux, `sysctl`
 //! on macOS. The translation from each platform's words to a [`Topology`]
 //! is a pure function beside its reader, so a reading captured on one

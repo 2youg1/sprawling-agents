@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The ordered stack of configuration layers a run is governed by, as
-//! one value (`crates/city/spec/ConfigLayers.lean` §8-4).
+//! one value (`Sprawling/city/spec/ConfigLayers.lean` §8-4).
 //!
 //! A rung is a scope that may state a value, and the ladder is every
 //! rung that exists for one address, read once, in order from the
@@ -25,7 +25,7 @@
 //! answers that, and this module only says which rungs there are and
 //! what each of them states.
 //!
-//! Specified by `crates/city/spec/ConfigLayers/Ladder.lean`.
+//! Specified by `Sprawling/city/spec/ConfigLayers/Ladder.lean`.
 
 use std::path::{Path, PathBuf};
 
@@ -38,7 +38,7 @@ use crate::building::Building;
 
 /// Declares [`Layer`] and `Layer::ALL` from one list, so the order the
 /// ladder is read in names every variant and nothing else
-/// (`crates/city/spec/ConfigLayers/Ladder.lean`, `Layer.ALL_complete`).
+/// (`Sprawling/city/spec/ConfigLayers/Ladder.lean`, `Layer.ALL_complete`).
 macro_rules! rungs {
     ($($rung:ident),+ $(,)?) => {
         /// One rung of the City -> Building -> Resident ladder, from the
@@ -166,7 +166,7 @@ impl Ladder {
 /// A rung nearer than a confined table may be stated on is refused here
 /// rather than read and dropped: `[skills]` and `[remote]` only on the
 /// city's own rung, `[search]` on the city's or a building's
-/// (`crates/city/spec/ConfigLayers/Ladder.lean`, `Confined`).
+/// (`Sprawling/city/spec/ConfigLayers/Ladder.lean`, `Confined`).
 ///
 /// Crate-internal because the city's own rung is read without an address
 /// by [`super::city_shelves`]: the missing-file rule is stated once here

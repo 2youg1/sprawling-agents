@@ -80,7 +80,7 @@ impl AttachedEndpoint {
     /// Account retention is settled by the caller before this check. Only
     /// submitted fields count: archived legacy auth remains readable during
     /// replay. Presence includes empty text and does not parse a reference.
-    /// See `crates/gateway/spec/Router.lean` D29.
+    /// See `Sprawling/gateway/spec/Router.lean` D29.
     ///
     /// # Errors
     /// Returns `E_CONFIG_INVALID` when an explicit list has no account target

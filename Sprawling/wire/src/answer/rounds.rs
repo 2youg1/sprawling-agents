@@ -94,13 +94,13 @@ pub struct Used {
     /// The part of `input` read from the provider's cache
     /// (`kernel::ModelUsage::cache_read_tokens`); `None` when the provider
     /// did not report it, which a page shows as unknown rather than zero
-    /// (`crates/wire/spec/Reading.lean` D35).
+    /// (`Sprawling/wire/spec/Reading.lean` D35).
     #[serde(default)]
     pub cached: Option<Tokens>,
     /// The part of `input` written into the provider's cache
     /// (`kernel::ModelUsage::cache_write_tokens`), priced apart from a
     /// read. `None` when the provider did not report it, and in a frame
-    /// from a city written before it was answered (`crates/wire/Spec.lean`
+    /// from a city written before it was answered (`Sprawling/wire/Spec.lean`
     /// D13, D35).
     #[serde(default)]
     pub cache_write: Option<Tokens>,
@@ -113,7 +113,7 @@ pub struct Used {
     /// Whole microseconds from the attempt going out to the reply being
     /// whole, as `model_returned.took_us` recorded it. `None` on a line
     /// written before the key existed: a page then shows the difference
-    /// of the moments, in milliseconds (`crates/wire/spec/Reading.lean` D28).
+    /// of the moments, in milliseconds (`Sprawling/wire/spec/Reading.lean` D28).
     #[serde(default)]
     pub took_us: Option<u64>,
 }
@@ -178,12 +178,12 @@ pub struct Call {
     /// Whole microseconds the call took, as its paired `tool_result.took_us`
     /// recorded it (kernel D20). `None` for a call not yet answered and for
     /// a line written before the key existed: a page then shows
-    /// `answered - called` in milliseconds (`crates/wire/spec/Reading.lean` D28).
+    /// `answered - called` in milliseconds (`Sprawling/wire/spec/Reading.lean` D28).
     #[serde(default)]
     pub took_us: Option<u64>,
     /// Where the letter a `send` call sent landed, paired by `SignalId`
     /// from the `signal_landed` its delivery wrote under the sending run
-    /// (`crates/wire/spec/Reading.lean` D42, kernel D38). `None` for every
+    /// (`Sprawling/wire/spec/Reading.lean` D42, kernel D38). `None` for every
     /// other tool, for a call whose letter is not yet delivered, and for
     /// a Ledger written before the line existed: a page then draws what
     /// the tool itself answered.
@@ -278,7 +278,7 @@ pub struct Opening {
     #[serde(default)]
     pub policy: Option<kernel::RunPolicy>,
     /// The effort the run's requests froze, as its `run_started`
-    /// records it (`crates/kernel/Spec.lean` §8-85); `None` when the
+    /// records it (`Sprawling/kernel/Spec.lean` §8-85); `None` when the
     /// dispatch stated none, and for a line written before the key
     /// existed.
     #[serde(default)]
@@ -287,14 +287,14 @@ pub struct Opening {
     #[serde(default)]
     pub generation: Option<kernel::FrozenGeneration>,
     /// The names the run's session froze, read back from the version its
-    /// `run_started` names (`crates/wire/Spec.lean` D17). `None` for a
+    /// `run_started` names (`Sprawling/wire/Spec.lean` D17). `None` for a
     /// line written before the city recorded names, and for a version
     /// the store no longer holds or cannot read: the page then falls
     /// back to the address and the role's name, never to today's names.
     #[serde(default)]
     pub names: Option<FrozenNames>,
     /// The run that dispatched this one, as its `run_started` records it
-    /// (`crates/wire/spec/Answer/Sessions.lean` D40); `None` for a run
+    /// (`Sprawling/wire/spec/Answer/Sessions.lean` D40); `None` for a run
     /// the User or the city dispatched, and for a line written before
     /// the key existed.
     #[serde(default)]

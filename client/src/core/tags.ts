@@ -6,7 +6,7 @@
 // The tags a person gives sessions, and the one reserved tag that pins.
 //
 // **The tags are the person's, kept by the city** in the person's own
-// `config.toml` beside the chords they rebound (`crates/wire/Spec.lean`
+// `config.toml` beside the chords they rebound (`Sprawling/wire/Spec.lean`
 // §8-84), so a phone reaching the same city reads the same tags. This
 // page draws its own copy at once and sends the change; every answer the
 // city gives replaces the copy whole, as every other preference does.
@@ -15,7 +15,7 @@
 // and the line its stretch began at (`SessionLine::began`).
 //
 // **A session the person never tagged carries its workspace as a tag**
-// (`crates/wire/spec/Answer/Sessions.lean` D27): the default is derived
+// (`Sprawling/wire/spec/Answer/Sessions.lean` D27): the default is derived
 // here and stored nowhere, so the first change the person makes to the
 // set writes it down with the rest, and from then on the stored set is
 // the whole truth.

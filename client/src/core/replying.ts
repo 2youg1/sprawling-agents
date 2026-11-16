@@ -31,7 +31,7 @@ export const UNLAID: Laying = { blocks: [], reached: 0, judged: null, refused: f
 // The text the next question carries, or `null` when no question is due.
 // A streaming question carries only the complete lines of the rest,
 // because a closure point falls after a complete line and nowhere else
-// (`crates/documents/Spec.lean` D31): a token that brings no line break
+// (`Sprawling/documents/Spec.lean` D31): a token that brings no line break
 // cannot move it.
 export function question(text: string, laying: Laying, state: ReplyState): string | null {
   if (laying.refused) return null;

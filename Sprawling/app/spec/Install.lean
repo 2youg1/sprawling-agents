@@ -6,7 +6,7 @@
 /-!
 # 让二进制成为一个词：搜索路径的两个判定
 
-规定 `crates/sprawling/src/install.rs` 里的 `plan_append` 与 `plan_remove`（`bin::install`，形状 4 adapter：决定纯，落地薄）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（§8-9）。拷贝、可执行文件删除、注册表读写与广播是适配器的事，这里不建模；Windows 自卸载的环境契约与实际检查见 D53。
+规定 `Sprawling/app/src/install.rs` 里的 `plan_append` 与 `plan_remove`（`bin::install`，形状 4 adapter：决定纯，落地薄）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（§8-9）。拷贝、可执行文件删除、注册表读写与广播是适配器的事，这里不建模；Windows 自卸载的环境契约与实际检查见 D53。
 
 一条搜索路径在模型里是它按分隔符切开的各段，按原来的次序。段的类型 `α` 是参数，因为判定只需要两件事：两段是不是同一个目录（`same`，Rust 里是 `same_directory`：去掉首尾空白与尾随的斜杠，Windows 上再不分大小写），以及一段是不是空段（`blank`）。空白的整串在模型里是空表，于是「空串变成那一个目录」不是一个特例。
 
@@ -169,7 +169,7 @@ pub(crate) fn install(direction: Direction) -> Result<Report, AxError>;
 - **改完必须广播 `WM_SETTINGCHANGE`，否则新窗口也读不到**：Explorer 缓存环境块，从它启动的新控制台继承的是缓存。`#![forbid(unsafe_code)]` 关掉了在 Rust 里调 `SendMessageTimeout` 这条路，故广播由 PowerShell 的 `Add-Type` P/Invoke 完成（`HWND_BROADCAST=0xffff`、`WM_SETTINGCHANGE=0x1A`、`SMTO_ABORTIFHUNG=2`、5 秒上限）。实测一次约 1.1 秒。广播只在库 crate 的 `bin::environment_broadcast` 一处实现，privacy 的用户环境适配器共用它（Privacy.Windows）；它经受保护安装目录下的 Windows PowerShell 运行（Privacy.Cli D54），不从 PATH 选。**广播失败不致命**：路径已经写下了，报一行提示说「注销后生效」，而不是把已经成功的一半说成失败。
 - **非 Windows 拷贝照做，改 shell rc 不做**：装进 `~/.local` 下的 `bin`（该目录在现代发行版上默认已在 PATH 上）。**不写 shell rc**，理由记在这里而不是留一个静默的空分支：rc 文件有 bash／zsh／fish 三套语法与 `.profile`／`.bashrc`／`.zshrc` 多个候选，选错就是往人的登录脚本里写一行没有作用却要人自己删的东西；而从 Windows 交叉编译到 Linux 已知走不通（`aws-lc-sys` 需 C 交叉工具链），故这一支只能由 CI 编译与 lint，不能由我运行验收——**该 job 是 `platforms.yml` 的 macOS job，不再是 ubuntu**（ubuntu 已被裁出流水线）。**没有跑过的写入动作不写**。目录不在 PATH 上时，报告里给出该加的那一行，人自己贴。
 
-  **Linux 进流水线**：上段论证的是「从无 Linux 的开发机器**交叉编译**走不通（`aws-lc-sys` 需 C 交叉工具链）」，不是「Linux 构建不成立」；GitHub 的原生 runner 在 Linux 上原生构建，根本不碰交叉工具链。落法两件，分开决策：①`release.yml` 矩阵加 `x86_64-unknown-linux-musl` **静态**一行——NixOS 没有 `/lib64/ld-linux-x86-64.so.2`，一份动态链接的 ubuntu 产物在 NixOS 上起不来，而静态一份同时覆盖 NixOS／Alpine／老发行版／容器。**待探项已探明，后端不换**：`aws-lc-sys` 由 `reqwest → hyper-rustls → rustls → aws-lc-rs` 引入（`cargo tree -i aws-lc-sys`，实测），而 aws-lc-sys 0.44.0 的 crate 源码内自带 `src/x86_64_unknown_linux_musl_crypto.rs` 且 README 的 Pregenerated Bindings 表列出该三元组——**该目标在预生成绑定名单上**，故不需要 bindgen，rustls 后端保持 `aws-lc-rs`，不切 `ring`（少一个 crypto 后端就少一处与 Windows／macOS 产物不同的实现）。它仍需一套 musl 的 C 工具链编译 AWS-LC 源码，故该 job 装 `musl-tools` 并令 `CC_x86_64_unknown_linux_musl=musl-gcc`；cmake 已在 runner 镜像上。**这一条只在 CI 上成立**（Windows 开发机上没有 Linux，也没有 musl 工具链），证据是依赖树与 crate 自带文件，不是一次绿色构建。**那次构建已经发生，两半各自有了答案。** aws-lc 那一半站住：`aws-lc-sys 0.44.0` 与 `aws-lc-rs 1.18.0` 在 musl 上开编且未报错，预生成绑定与 `musl-tools` 这套安排没有被证伪。构建停在另一处，而这一处上段根本没有论到：`keyring` 的 Linux 后端是 secret-service，树因此另到 `libdbus-sys`，它的 build script 跨目标边界问 pkg-config，而 pkg-config 默认拒答跨编译查询。**装 `libdbus-1-dev` 不是解法**：那会把宿主的 glibc D-Bus 递给一次静态 musl 链接，那是一个矛盾而不是一项配置——**一份静态 Linux 二进制与一个 D-Bus 凭据库不能同时为真**。故**那个先于构建的问题已经有答案，该行随之进矩阵。** 问题是：**Linux 装上之后，一把 API key 存在哪里**。答：内核自带的 keyring——凭证库的 Linux store 取 keyutils（`linux-keyutils-keyring-store`，`crates/gateway/Spec.lean` §8-4），那是一组 syscall，不需要会话总线、不需要动态库，静态 musl 与容器里同样成立，`libdbus-sys` 随之离树（实测：`Cargo.lock` 删 `dbus`／`dbus-secret-service`／`libdbus-sys`，增 `linux-keyutils`）。代价写在类型上：`KeyringVault::PERSISTENCE` 在 Linux 上恒为 `Persistence::ThisBoot`，`Persistence::consequence()` 是那句话的唯一权威，`resolve` 未命中时把它接在 recovery 后面，故重启吃掉的 key 自己会说话而不是静默失败（`crates/gateway/Spec.lean` §8-4）。仍欠的只剩一项：**真机验收必须在 Linux 上跑**，开发机器是 Windows，故 keyutils 的写—读—删探针只能到 CI 或一台 Linux 上才算数。该行除此之外所需的都已建成并保留：`just package` 收三元组、归档名带三元组、`install.sh` 认得那个名字。**那一处债已清**：`binary_path` 认了三元组并迁进 `xtask::package`，`just package <triple>` 一条配方打三行矩阵，`release.yml` 里重抄的步骤随之删除，musl 归档的名字带三元组（crates/xtask/Spec.lean §8-11）；②`flake.nix` 提供 devshell 与完整应用，Rust 从 `rust-toolchain.toml` 派生，应用版本读工作区 Cargo 清单；Nix 构建不接管 Windows／macOS 发布路径，验证由 `platforms.yml` 持有。Nix 打包接口与验收见本文件 D50。
+  **Linux 进流水线**：上段论证的是「从无 Linux 的开发机器**交叉编译**走不通（`aws-lc-sys` 需 C 交叉工具链）」，不是「Linux 构建不成立」；GitHub 的原生 runner 在 Linux 上原生构建，根本不碰交叉工具链。落法两件，分开决策：①`release.yml` 矩阵加 `x86_64-unknown-linux-musl` **静态**一行——NixOS 没有 `/lib64/ld-linux-x86-64.so.2`，一份动态链接的 ubuntu 产物在 NixOS 上起不来，而静态一份同时覆盖 NixOS／Alpine／老发行版／容器。**待探项已探明，后端不换**：`aws-lc-sys` 由 `reqwest → hyper-rustls → rustls → aws-lc-rs` 引入（`cargo tree -i aws-lc-sys`，实测），而 aws-lc-sys 0.44.0 的 crate 源码内自带 `src/x86_64_unknown_linux_musl_crypto.rs` 且 README 的 Pregenerated Bindings 表列出该三元组——**该目标在预生成绑定名单上**，故不需要 bindgen，rustls 后端保持 `aws-lc-rs`，不切 `ring`（少一个 crypto 后端就少一处与 Windows／macOS 产物不同的实现）。它仍需一套 musl 的 C 工具链编译 AWS-LC 源码，故该 job 装 `musl-tools` 并令 `CC_x86_64_unknown_linux_musl=musl-gcc`；cmake 已在 runner 镜像上。**这一条只在 CI 上成立**（Windows 开发机上没有 Linux，也没有 musl 工具链），证据是依赖树与 crate 自带文件，不是一次绿色构建。**那次构建已经发生，两半各自有了答案。** aws-lc 那一半站住：`aws-lc-sys 0.44.0` 与 `aws-lc-rs 1.18.0` 在 musl 上开编且未报错，预生成绑定与 `musl-tools` 这套安排没有被证伪。构建停在另一处，而这一处上段根本没有论到：`keyring` 的 Linux 后端是 secret-service，树因此另到 `libdbus-sys`，它的 build script 跨目标边界问 pkg-config，而 pkg-config 默认拒答跨编译查询。**装 `libdbus-1-dev` 不是解法**：那会把宿主的 glibc D-Bus 递给一次静态 musl 链接，那是一个矛盾而不是一项配置——**一份静态 Linux 二进制与一个 D-Bus 凭据库不能同时为真**。故**那个先于构建的问题已经有答案，该行随之进矩阵。** 问题是：**Linux 装上之后，一把 API key 存在哪里**。答：内核自带的 keyring——凭证库的 Linux store 取 keyutils（`linux-keyutils-keyring-store`，`Sprawling/gateway/Spec.lean` §8-4），那是一组 syscall，不需要会话总线、不需要动态库，静态 musl 与容器里同样成立，`libdbus-sys` 随之离树（实测：`Cargo.lock` 删 `dbus`／`dbus-secret-service`／`libdbus-sys`，增 `linux-keyutils`）。代价写在类型上：`KeyringVault::PERSISTENCE` 在 Linux 上恒为 `Persistence::ThisBoot`，`Persistence::consequence()` 是那句话的唯一权威，`resolve` 未命中时把它接在 recovery 后面，故重启吃掉的 key 自己会说话而不是静默失败（`Sprawling/gateway/Spec.lean` §8-4）。仍欠的只剩一项：**真机验收必须在 Linux 上跑**，开发机器是 Windows，故 keyutils 的写—读—删探针只能到 CI 或一台 Linux 上才算数。该行除此之外所需的都已建成并保留：`just package` 收三元组、归档名带三元组、`install.sh` 认得那个名字。**那一处债已清**：`binary_path` 认了三元组并迁进 `xtask::package`，`just package <triple>` 一条配方打三行矩阵，`release.yml` 里重抄的步骤随之删除，musl 归档的名字带三元组（Tools/xtask/Spec.lean §8-11）；②`flake.nix` 提供 devshell 与完整应用，Rust 从 `rust-toolchain.toml` 派生，应用版本读工作区 Cargo 清单；Nix 构建不接管 Windows／macOS 发布路径，验证由 `platforms.yml` 持有。Nix 打包接口与验收见本文件 D50。
 - **`Report` 说的是已经发生的事**：拷到哪、搜索路径改没改（`AlreadyPresent` 与 `Append` 是两句不同的话）、广播成不成、以及「PATH 变更不会进已经开着的窗口」。**恒不说「安装成功」四个字**——人要知道的是下一步该开一个新窗口。
 
 **本章测试**：`program_dir` 在两个平台各取本平台约定；`plan_append` 对空串、已含该目录（含大小写不同与带尾分隔符两形）、含其它目录三类输入分别给出正确的穷尽枚举；`plan_remove` 删得干净且保住其余段（含空段）；`plan_append` 之后 `plan_remove` 回到原值——**幂等与可逆是一对性质测试，不是一次手工观察**。判定既然只在 Windows 编译，这组测试也只在 Windows 编译：**测一个在本平台不存在的函数，测的是空**；推送门跑的正是 Windows，故这组测试每次推送都跑。
@@ -226,7 +226,7 @@ pub(crate) fn install(direction: Direction) -> Result<Report, AxError>;
 安装资源与许可文档的相对目录在包定义各声明一次，由 passthru 暴露给验收归档组装；
 Nix 许可由工作区 Cargo 的 SPDX 声明解析，未知标识或复合表达式必须拒绝求值。
 安装后的 skills 与许可证在包的 share 目录，skills 来源与目录名读既有归档权威
-`crates/xtask/src/package/contents.rs`，首次起城的模板与 skills 仍由 city 的构建脚本嵌入。
+`Tools/xtask/src/package/contents.rs`，首次起城的模板与 skills 仍由 city 的构建脚本嵌入。
 下载 integrity 不符、锁解析失败、客户端构建失败或 Rust 编译失败均让 derivation 失败，不能交出
 占位页作为完整包；修复原锁、源文件或构建依赖后重建，不改变依赖版本来掩盖失败。
 
@@ -250,8 +250,8 @@ Nix 用户的唯一渠道是本仓库的 flake（人的决定）：项目不向 
 
 /-! D104 npm/Bun 包入口选择已安装的运行时
 
-根包入口与内部运行时入口的打包契约只由 `crates/xtask/Spec.lean` D31 规定，
-`crates/xtask/src/channel.rs` 生成它们；本节规定安装与启动之间的边界。
+根包入口与内部运行时入口的打包契约只由 `Tools/xtask/Spec.lean` D31 规定，
+`Tools/xtask/src/channel.rs` 生成它们；本节规定安装与启动之间的边界。
 入口将原参数、标准流与退出状态交给已安装的真实二进制，不改变 PATH、不安装运行时
 或下载更新；Unix 的 SIGINT/SIGTERM/SIGHUP 交给子进程，子进程信号退出仍以同一信号结束。
 包来源只从明确的 npm/Bun 元数据或缓存目录辨认，路径组件接受 Windows 与 Unix 分隔符，
@@ -274,7 +274,7 @@ Windows 上先以 `symlink_metadata` 读取安装目录 entry；文件 symlink�
 目标缺席由 entry 的 NotFound 决定，不能用 canonicalize 的 NotFound 遗留 dangling link。
 这些读取与删除之间未锁定目录项，不承诺并发替换路径的事务隔离。
 
-依赖取 `crates/sprawling/Cargo.toml` 的 Windows 专用 `self-replace`，使用其公开安全接口，
+依赖取 `Sprawling/app/Cargo.toml` 的 Windows 专用 `self-replace`，使用其公开安全接口，
 选择依据是 ARCHITECTURE.md §2 的平台调用次序；本 crate 不引入 unsafe 或自己的 helper 协议。
 官方接口与算法见 https://docs.rs/self-replace/1.5.0/self_replace/fn.self_delete_outside_path.html
 和 https://docs.rs/self-replace/1.5.0/src/self_replace/windows.rs.html 。
@@ -333,7 +333,7 @@ musl-gcc 为 499–513 s；③链接器每次多出一条 `ignoring deprecated l
 `musl-tools` 与 `CC_<triple>` 换来 Zig 与 cargo-zigbuild 两步安装，要维护的部件没有变少。体积小 3%
 （33.5 MB 对 34.6 MB）抵不过 ASLR。其余构建处也不用它：Windows 一行是 MSVC 目标，cargo-zigbuild 不支持 `*-windows-msvc`；
 macOS 一行与 `ci.yml` 都是宿主构建，系统 C 工具链已对准目标；Nix 构建由 `buildRustPackage` 与 nixpkgs 的工具链负责
-（D50）；本地开发只建宿主目标。Zig 只编译 `crates/desktop/ffi` 的叶子，由那个包的 build script 调用，与链接器无关。
+（D50）；本地开发只建宿主目标。Zig 只编译 `Sprawling/desktop/ffi` 的叶子，由那个包的 build script 调用，与链接器无关。
 
 重开参数：发布矩阵加入一个 runner 不能原生构建、Ubuntu 也没有现成交叉 C 工具链的目标（例如要求 glibc 版本下限的
 `*-linux-gnu` 产物），或 cargo-zigbuild 能交出 `static-pie` 且不比 musl-gcc 慢。

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The entry decision in front of every route, and the headers every
-//! answer carries (`crates/wire/spec/Reception/Entry.lean` §8-94).
+//! answer carries (`Sprawling/wire/spec/Reception/Entry.lean` §8-94).
 //!
 //! The judgement is `reception::decide_entry`'s; this reads the three
 //! headers it asks about, answers a refusal with 403 before the route

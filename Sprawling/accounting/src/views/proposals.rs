@@ -5,8 +5,8 @@
 
 //! The proposal cards a city's history holds, open or handled, and the
 //! two answers that list them: one document's open cards, and every
-//! open card of the city by document and offer time (`crates/accounting/spec/Worker/Commanding/Saving.lean`
-//! §8-22, `crates/wire/Spec.lean` §8-73).
+//! open card of the city by document and offer time (`Sprawling/accounting/spec/Worker/Commanding/Saving.lean`
+//! §8-22, `Sprawling/wire/Spec.lean` §8-73).
 //!
 //! Held inside [`super::Governance`], so the worker that judges a
 //! decision and the page that draws a card read one fold: a card is a
@@ -190,7 +190,7 @@ impl super::Views {
 
 /// One document's open cards with the version its file holds now,
 /// read after the view lock is let go: the version is a digest of the
-/// whole file (`crates/sprawling/Spec.lean` §8-100). Each card names
+/// whole file (`Sprawling/app/Spec.lean` §8-100). Each card names
 /// the line that offered it, found in its run's session window
 /// (wire D44).
 pub(super) fn proposals_answer(
@@ -199,7 +199,7 @@ pub(super) fn proposals_answer(
     open: Vec<Offer>,
 ) -> wire::Answer {
     // Missing and unreadable are both "no version now"; the document
-    // answer is where a page learns which, and why (`crates/wire/Spec.lean` §8-69).
+    // answer is where a page learns which, and why (`Sprawling/wire/Spec.lean` §8-69).
     let version = match std::fs::read(super::listing::resolve(&ledger.city_root, Some(&doc))) {
         Ok(bytes) => Some(B3Hash::digest(&bytes)),
         Err(_no_version_now) => None,

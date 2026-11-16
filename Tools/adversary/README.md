@@ -47,7 +47,7 @@ One failed check does not stop the tree. The whole tree runs serially (`adversar
 <!-- coderabbit-ai-generated-section:v1:2593e3bf2352ac8c14c07d3143d9f4affebbeb02cfb52819837b876f1defd3ed -->
 
 - No external Lean dependency (`adversary D2`): `mkStdGen` draws the traces, `Lean.Data.Json` reads the wire, `IO.Process` runs the door and `IO.FS` holds the ground. The price is that sampling, shrinking and the check tree are written here rather than imported.
-- No provider is started here (`adversary D3`). `just adversary` builds `sprawling` and hands in its path as `SPRAWLING_BIN`; `just acceptance` starts `crates/citysim`'s `provider` and hands in its URL as `SPRAWLING_PROVIDER`. The justfile is the only place that knows where either is, so a run cannot be driven by a stale binary.
+- No provider is started here (`adversary D3`). `just adversary` builds `sprawling` and hands in its path as `SPRAWLING_BIN`; `just acceptance` starts `Tools/citysim`'s `provider` and hands in its URL as `SPRAWLING_PROVIDER`. The justfile is the only place that knows where either is, so a run cannot be driven by a stale binary.
 - Ordinary `just adversary` checks use `withGround`, which ends each city with `.killed`; they do not cover ordered shutdown or handoff. The acceptance walk closes its first and third servings in order: `SIGINT` on macOS and Linux, and on Windows through citysim's `serve_grouped` launcher, which sends Ctrl-Break to the group (`adversary D8`). Only the second serving of the acceptance walk is killed; a walk that falls back to terminating a city prints a `note` line saying so.
 
 <!-- /coderabbit-ai-generated:v1 -->
@@ -81,7 +81,7 @@ Nothing in the workspace depends on it: it is not a Cargo package, so it appears
 
 1. For a `forAll` counterexample, rerun with the reported sample seed until the trace is the same twice. For an execution exception, use the run’s opening seed and the check path as described above. For a fixed check, rerun its named check with `just adversary --select "<check path text>"`.
 2. Read the error and, for `.broke` counterexamples, the minimized trace and broken promise.
-3. Fixed checks also compare the deliverable. If the renderer changed without regenerating `from_adversary.rs`, inspect the renderer change first, then follow the error and regenerate with `SPRAWLING_ACCEPT=1 just adversary`. This mismatch is not a new product counterexample and needs no new regression test or product-code change. For a new product counterexample, save it as a Rust regression test under `crates/sprawling/tests/`. `SPRAWLING_ACCEPT=1` only rewrites `from_adversary.rs` from the fixed `remembered` trace and the renderer's other fixed cases; it does not save a newly discovered trace. For a different counterexample, write a separate test file beside `from_adversary.rs` so regeneration preserves it. The byte comparison checks only that the fixed generated cases match the renderer.
+3. Fixed checks also compare the deliverable. If the renderer changed without regenerating `from_adversary.rs`, inspect the renderer change first, then follow the error and regenerate with `SPRAWLING_ACCEPT=1 just adversary`. This mismatch is not a new product counterexample and needs no new regression test or product-code change. For a new product counterexample, save it as a Rust regression test under `Sprawling/app/tests/`. `SPRAWLING_ACCEPT=1` only rewrites `from_adversary.rs` from the fixed `remembered` trace and the renderer's other fixed cases; it does not save a newly discovered trace. For a different counterexample, write a separate test file beside `from_adversary.rs` so regeneration preserves it. The byte comparison checks only that the fixed generated cases match the renderer.
 4. Fix the defect in Rust. This directory keeps no copy of the case.
 5. When the wire changes, update [`src/Sprawling/Door.lean`](src/Sprawling/Door.lean) and the renderer in [`src/Sprawling/Regression.lean`](src/Sprawling/Regression.lean) in the same change, as the *Tests* section of [`AGENTS.md`](../../AGENTS.md) requires.
 
@@ -102,7 +102,7 @@ just adversary                          # build the binary, then run every check
 just adversary --select "<text>"        # only the checks whose path in the tree contains the text; --reject leaves them out
 SPRAWLING_SEED=<n> just adversary       # repeat a run with the seed a failure printed
 just acceptance <archive>               # the walk a stranger takes with a release archive, beside the stand-in provider
-lake build crates.adversary.Spec         # the checker's SPEC; `just models` builds every specification
+lake build Tools.adversary.Spec         # the checker's SPEC; `just models` builds every specification
 ```
 
 The checks run one after another, and the order is the one that fails cheapest first: the rendered file compared byte for byte, then the door's contract, then the drawn traces, then the directed attack, then the history and the hostile disk, and last the groups named after the defects they were found from. `just acceptance` needs an archive from `just package`, because that is a release build; it unpacks into `target/acceptance/`, writes the stand-in's script from the archive's `skills/`, and records the checklist a person works through by hand as `target/acceptance/checklist.md`.

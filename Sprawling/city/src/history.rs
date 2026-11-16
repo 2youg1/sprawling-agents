@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Whether a directory already carries a city's history (`crates/city/spec/History.lean`
+//! Whether a directory already carries a city's history (`Sprawling/city/spec/History.lean`
 //! §8-30).
 //!
 //! A fact about the ledger directory on disk, so it lives beside the

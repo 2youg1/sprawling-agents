@@ -6,7 +6,7 @@
 /-!
 # gateway::provider::input
 
-规定 `provider::input`（`crates/gateway/src/provider/input.rs`）：一个模型收得下什么：人说的、目录、预置表、`Text`，先说者胜。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+规定 `provider::input`（`Sprawling/gateway/src/provider/input.rs`）：一个模型收得下什么：人说的、目录、预置表、`Text`，先说者胜。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `Sprawling/gateway/Spec.lean §8-n`。
 -/
 
 /-!
@@ -33,7 +33,7 @@ pub(crate) fn input_for(base_url: &str, id: &str) -> Option<InputKinds>;
 
 namespace Gateway.Provider.Input
 
-/-- 一个模型收得下什么（`kernel::event::record::InputKinds`，`gateway::InputKinds` 是它的再导出）。kernel 的 Lean 规格（`crates/kernel/Spec.lean`）不定义这个类型，所以这里照它的两个变体写一份模型里的类型，拼写与 Rust 相同。 -/
+/-- 一个模型收得下什么（`kernel::event::record::InputKinds`，`gateway::InputKinds` 是它的再导出）。kernel 的 Lean 规格（`Sprawling/kernel/Spec.lean`）不定义这个类型，所以这里照它的两个变体写一份模型里的类型，拼写与 Rust 相同。 -/
 inductive InputKinds where
   | Text
   | TextImage
@@ -49,7 +49,7 @@ inductive InputKinds where
 决定：`Command::SelectModel` 带 `input: Option<InputKinds>`，`accepted_input` 的第一个参数就是它；出现时它作答，可以比目录宽，也可以比目录窄；缺席时梯子从目录开始，不读这个模型以前登记的 `input`。理由：人知道而两张表不知道的事有两个方向——一个目录之外、厂商文档也没写的模型能读图，或一条中转线会把图剥掉；只许放宽就说不出后一种。字段放在 `SelectModel` 里，是因为设置页每次选型都把整行送来（`choosing` 的 `select_model`），收得下什么与窗口、上限同是「探不到、由人说」的一格。缺席时不读回以前的登记，理由同 D14 的第三条：`model_selected` 不记 `input` 是哪一档答的，读回它就把梯子的一次答案当成了人说的话。代价：一次不带这一格的选型（例如对话框里的 `/model`）让 `input` 回到梯子的答案，人说过的要在设置页再说一次。被否的备选：①只许放宽（`stated` 只能是 `TextImage`）——说不出「这条线不收图」；②另开一条命令只改 `input`——两条命令写同一行登记，后到的一条要先读回前一条写下的整行；③缺席时读回以前登记的 `input`——见上。重开参数：一个不经设置页选型的入口要保住人说过的 `input` 时，`model_selected` 记下 `input` 的来处，缺席时只读回人说的那一档。
 -/
 
-/-- `provider::input::accepted_input`。`stated` 是人在 `SelectModel.input` 里说的（D16）；`pinned` 是钉版目录按精确 id 的那一行的 `input`；`preset` 是 `preset::input_for(base_url, id)` 的答案，模型把预置表按 host 与 id 前缀查的那一步（`crates/gateway/spec/Provider/Preset.lean`）当作一个已经给出的值。 -/
+/-- `provider::input::accepted_input`。`stated` 是人在 `SelectModel.input` 里说的（D16）；`pinned` 是钉版目录按精确 id 的那一行的 `input`；`preset` 是 `preset::input_for(base_url, id)` 的答案，模型把预置表按 host 与 id 前缀查的那一步（`Sprawling/gateway/spec/Provider/Preset.lean`）当作一个已经给出的值。 -/
 def accepted_input (stated pinned preset : Option InputKinds) : InputKinds :=
   ((stated.or pinned).or preset).getD .Text
 

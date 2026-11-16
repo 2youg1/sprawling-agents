@@ -6,7 +6,7 @@
 /-!
 # runtime::turn::recovery
 
-规定 `turn::recovery`（`crates/runtime/src/` 下同名的文件）。模型调用的恢复管线，以及回合怎样记下回复的首个内容几时到。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `turn::recovery`（`Sprawling/runtime/src/` 下同名的文件）。模型调用的恢复管线，以及回合怎样记下回复的首个内容几时到。本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `Sprawling/runtime/Spec.lean §8-n`。
 -/
 
 /-!
@@ -50,14 +50,14 @@ pub(super) struct BlockingResend<'w> { round: &'w mut Watchdog }   // 今天唯�
 
 **失败码**：本层不造码。`Failed` 携带的是修复重发拿到的原错误（生产段即阻塞门自己的失败，码由 gateway 一处给出，通常是 `E_WIRE_MISMATCH`）；全段转手即首个失败的原码，逐字段不变。`E_WIRE_MISMATCH` 的"能否定义掉"随 §12 走：恢复段只是把「同样的请求再发一次」换成「换一扇门再问一次」，没有改变该码的可定义性。
 
-**生产段 `BlockingResend` 的触发点，一个都不多**：失败那次走的是**流式门**且失败码是 `E_WIRE_MISMATCH`，并且这次调用的账号轮放行一次修复（`AccountRound::admits_repair`，`crates/kernel/spec/AccountRecovery.lean` §8-86）。多账号时那次换门重发是原号上的一次发送：放行才发，发了就记 `AccountRound::repaired`（段问的是 `Watchdog::admits_repair` 与 `Watchdog::repaired`，它们转问 `Watchdog` 持有的那一轮；没有开着的轮时放行、不计，与单账号相同），不放行即 `Skipped`，原错误交给下一段与 `Watchdog`，于是一个账号一轮里的发送不超过 1＋k（`sends_on_one_account_stay_within_the_budget`）；单账号的轮总是放行、不计数，与这一条出现之前相同。理由：两扇门是同一条缝的两个口（`kernel::model` 保证同答同败），但**流式装配与整身解析是两条解析路径**——流式工具调用拼接出的半句话在阻塞门是一份完整 body。其余失败一律 `Skipped`：可重试族归 watchdog，门拒与配置族换门重发只会把同一个拒词买回来。
+**生产段 `BlockingResend` 的触发点，一个都不多**：失败那次走的是**流式门**且失败码是 `E_WIRE_MISMATCH`，并且这次调用的账号轮放行一次修复（`AccountRound::admits_repair`，`Sprawling/kernel/spec/AccountRecovery.lean` §8-86）。多账号时那次换门重发是原号上的一次发送：放行才发，发了就记 `AccountRound::repaired`（段问的是 `Watchdog::admits_repair` 与 `Watchdog::repaired`，它们转问 `Watchdog` 持有的那一轮；没有开着的轮时放行、不计，与单账号相同），不放行即 `Skipped`，原错误交给下一段与 `Watchdog`，于是一个账号一轮里的发送不超过 1＋k（`sends_on_one_account_stay_within_the_budget`）；单账号的轮总是放行、不计数，与这一条出现之前相同。理由：两扇门是同一条缝的两个口（`kernel::model` 保证同答同败），但**流式装配与整身解析是两条解析路径**——流式工具调用拼接出的半句话在阻塞门是一份完整 body。其余失败一律 `Skipped`：可重试族归 watchdog，门拒与配置族换门重发只会把同一个拒词买回来。
 
 **被否（各记理由与会重开它的参数）：**
 
 - **空响应后追问一句的段**：「一条什么都没说的回复」意味着什么，§8-37 的 `concluded` 是唯一判定处（`Completion::Limit`），调用层再判一次就是第二个家，而 nudge 重发还会改写那条以供应方真实报文钉住的剧本。参数：有"空响应是瞬态"的实测数据时，与 §8-37 一同重开。
 - **「剔除被拒工具后重发」段**：本仓的 provider 拒绝从不回引 body（`ProviderFailure::Refused`），没有类型化触发点可依，靠错误文本嗅探即造脆弱权威；无声砍工具是能力的静默降级，与"拒答即声明"相悖。参数：gateway 的拒绝族带上类型化的拒绝面之后重开。
 - **「补悬空 tool_result 后重发」段**：回合窗口按构造无悬空调用（被取消的回合不入窗；`fold_run` 遇开波回退到上一安全点），触发点不存在；账本侧关帐的权威在 `replay::resume`，不写第二份。参数：出现能把悬空对话推进窗口的新入口时重开。
-- **盲重试段（对可重试失败原样重发）**：该判定属于 watchdog 与端点的并发名额 `gateway::concurrency`（§8-9：watchdog 只判断还有没有下一次；`crates/gateway/Spec.lean` D17），段越权即第二个重试权威。
+- **盲重试段（对可重试失败原样重发）**：该判定属于 watchdog 与端点的并发名额 `gateway::concurrency`（§8-9：watchdog 只判断还有没有下一次；`Sprawling/gateway/Spec.lean` D17），段越权即第二个重试权威。
 - **`Skipped` 无载荷（unit 变体）**：结构上确实吞不掉错误，但"这一段转手的是哪个错误"也在答案里读不出来了，而谁把什么交给谁正是段契约要陈述的事实。
 - **段＝闭枚举（形状 6）**：多段场景只能靠触发点拼装，契约测不直接，且新修复进来即改枚举与全部 match。trait 的第二实现是测试里的记账段（本仓缝规则认可的替身一族：测试时钟、计数店）。
 -/
@@ -70,7 +70,7 @@ pub(super) struct BlockingResend<'w> { round: &'w mut Watchdog }   // 今天唯�
 pub(super) struct Settled {
     pub(super) returned: ModelReturn,
     pub(super) speculated: Speculated,
-    pub(super) first_at: Option<TimeMs>,   // 落账的那一次尝试的首个内容；写进 model_returned（`crates/kernel/Spec.lean` §8-75）
+    pub(super) first_at: Option<TimeMs>,   // 落账的那一次尝试的首个内容；写进 model_returned（`Sprawling/kernel/Spec.lean` §8-75）
 }
 ```
 

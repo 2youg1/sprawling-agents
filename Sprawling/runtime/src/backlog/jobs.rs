@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Which processes belong to which run (`crates/runtime/spec/Tools/Exec.lean` §8-13-3).
+//! Which processes belong to which run (`Sprawling/runtime/spec/Tools/Exec.lean` §8-13-3).
 //!
 //! A dispatched `cargo test` spends its memory in the `rustc` and test
 //! processes it starts, not in `cargo`. On Windows every run therefore
@@ -65,7 +65,7 @@ pub enum RunAffinity {
 /// How a run's processes share this machine with the other runs'
 /// processes (D29). The backlog is given the shares to ask for by the
 /// assembly, which takes them from the person's `[core] placement`
-/// (`crates/sprawling/spec/Serving/Placement.lean` D47); this crate reads
+/// (`Sprawling/app/spec/Serving/Placement.lean` D47); this crate reads
 /// no setting.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Shares {

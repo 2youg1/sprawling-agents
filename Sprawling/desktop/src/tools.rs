@@ -98,7 +98,7 @@ fn properties(own: Value) -> Value {
 }
 
 /// The largest quality the city admits, which the screenshot schema
-/// states as its `maximum` (`crates/desktop/Spec.lean` D16).
+/// states as its `maximum` (`Sprawling/desktop/Spec.lean` D16).
 ///
 /// `IMAGE_QUALITY` is the one definition of the domain, and by ruling it
 /// has no getter (kernel D3): a refusal is said by the type

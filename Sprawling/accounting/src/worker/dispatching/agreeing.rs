@@ -25,7 +25,7 @@ use super::{Agreed, Assignment, HarnessSeat, Seat};
 /// hash itself rather than from its printed form: the round trip
 /// through hexadecimal had two failure points that both answered zero,
 /// so a digest this build could not print became run `00000…`
-/// (`crates/sprawling/Spec.lean` §8-73).
+/// (`Sprawling/app/Spec.lean` §8-73).
 pub(in crate::worker) fn run_id_for(job: &Locator, addr: &Address, now: TimeMs) -> RunId {
     let seed = format!("{job}|{}|{}", addr.as_str(), now.value());
     let digest = kernel::B3Hash::digest(seed.as_bytes());
@@ -51,7 +51,7 @@ pub fn acp_dispatch(
     if matches!(pairing, wire::Pairing::Absent) {
         // The refusal says nothing about whether the address exists, the
         // building is real, or the token was close: an unpaired caller
-        // learns one bit. `crates/agent_protocols/Spec.lean` section 9 gives this
+        // learns one bit. `Sprawling/agent_protocols/Spec.lean` section 9 gives this
         // judgement to the inbound middleware in `wire`; until that
         // middleware refuses on the route, the door the request already
         // reached is the one place that can.
@@ -151,7 +151,7 @@ impl RunWorker {
         let adapter = self.models.build(&chosen, self.redemption()?)?;
         let retries = chosen.endpoint.tuning.request_max_retries;
         // Every request the run sends goes through the keep-warm door,
-        // so a landed run can have its prefix renewed (`crates/sprawling/Spec.lean`
+        // so a landed run can have its prefix renewed (`Sprawling/app/Spec.lean`
         // §8-112); under the default setting the door only forwards.
         let clock = std::sync::Arc::clone(&self.clock);
         let adapter = crate::worker::keeping_warm::Door::new(
@@ -182,7 +182,7 @@ impl RunWorker {
     /// booked as zero bytes, the same reading `city::load` gives it. A
     /// building that does not exist opens no account: a mistyped name
     /// would otherwise leave the history holding a building the city
-    /// never had (`crates/sprawling/Spec.lean` §8-40).
+    /// never had (`Sprawling/app/Spec.lean` §8-40).
     ///
     /// # Errors
     /// `E_STORAGE_FATAL` for a document or a building root that cannot
@@ -257,7 +257,7 @@ impl RunWorker {
     /// follow-up without `-m` - continues on the model its room froze
     /// while a tag still registers it, and otherwise runs on `main`:
     /// the session's shape check then refuses the moved model with the
-    /// way out a person can take (`crates/sprawling/Spec.lean` §8-79), which a
+    /// way out a person can take (`Sprawling/app/Spec.lean` §8-79), which a
     /// refusal here could not name.
     ///
     /// # Errors
@@ -398,7 +398,7 @@ struct Named<'a> {
 /// The agent a room's configuration names, or the refusal a dispatch to
 /// it is owed before anything is written: a word that names no agent, a
 /// row changed after its consent, a confidential building, and a dispatch
-/// that named a model (`crates/sprawling/Spec.lean` §8-124).
+/// that named a model (`Sprawling/app/Spec.lean` §8-124).
 fn seated_harness(
     asked: &Asked<'_>,
     named: Named<'_>,

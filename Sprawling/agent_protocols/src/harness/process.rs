@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One consented ACP agent started as a child that speaks ACP on its pipes
-//! (`crates/agent_protocols/Spec.lean` §8-19, D16, D17).
+//! (`Sprawling/agent_protocols/Spec.lean` §8-19, D16, D17).
 //!
 //! The process is reclaimed when its handle is dropped, so whoever holds
 //! the handle is the one list of what to kill. Its stderr is discarded

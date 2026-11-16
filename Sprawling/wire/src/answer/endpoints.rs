@@ -52,7 +52,7 @@ pub struct EndpointSummary {
     /// shape `AttachEndpoint` carries it: a page that changes the account
     /// list sends this back whole with only `accounts` replaced, so the
     /// figures, headers and overrides nobody touched stay as they were
-    /// (`crates/wire/spec/Answer/Endpoints.lean` §8-85, wire D49).
+    /// (`Sprawling/wire/spec/Answer/Endpoints.lean` §8-85, wire D49).
     pub tuning: crate::EndpointTuning,
     /// Whether each listed account's key is there, one row per id in the
     /// order of `tuning.accounts`; empty for an endpoint registered

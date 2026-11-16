@@ -3,24 +3,24 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.kernel.spec.Layout
-import crates.city.spec.Building
+import Sprawling.kernel.spec.Layout
+import Sprawling.city.spec.Building
 
 /-!
 # city::config_layers::ladder
 
-规定 `config_layers::ladder` 与 `config_layers::ladder::tests`（`crates/city/src/` 下同名的文件）。一个地址被哪几级配置治理、每一级说了什么、哪一级说的算，以及一张只许写在较远几级的表写得太近时怎样被拒。接口与取舍写在 `crates/city/spec/ConfigLayers.lean` 的 §8-4，本文件只放它们的模型与证明；本文件是 `crates/city/Spec.lean` 的一个分部，决定引作 `city D<n>`。
+规定 `config_layers::ladder` 与 `config_layers::ladder::tests`（`Sprawling/city/src/` 下同名的文件）。一个地址被哪几级配置治理、每一级说了什么、哪一级说的算，以及一张只许写在较远几级的表写得太近时怎样被拒。接口与取舍写在 `Sprawling/city/spec/ConfigLayers.lean` 的 §8-4，本文件只放它们的模型与证明；本文件是 `Sprawling/city/Spec.lean` 的一个分部，决定引作 `city D<n>`。
 -/
 
 /-!
 ## 模型：一条梯子是一个值，最近的那一级说了算
 
-`Ladder::read` 按 `Layer::ALL` 由远及近读每一级的文件，落点与更远一级相同的那一级丢掉；`tagged` 把每一级说的话放进 `kernel::LayeredValue` 它那一格，`resolve` 是 `tagged` 去掉那一级。哪一格压过哪一格是 `kernel::LayeredValue::resolve` 的答案（`crates/kernel/Spec.lean` §8-22）：居民格、楼格、城格依次。kernel 的规格把这条写成散文、没有它的 Lean 模型，所以下面的 `LayeredValue.resolve` 是那句散文的 Lean 读法，不是第二条规则；kernel 的 `Config` 分部长出模型时，这个定义搬过去，本文件改为 import 它（§3）。
+`Ladder::read` 按 `Layer::ALL` 由远及近读每一级的文件，落点与更远一级相同的那一级丢掉；`tagged` 把每一级说的话放进 `kernel::LayeredValue` 它那一格，`resolve` 是 `tagged` 去掉那一级。哪一格压过哪一格是 `kernel::LayeredValue::resolve` 的答案（`Sprawling/kernel/Spec.lean` §8-22）：居民格、楼格、城格依次。kernel 的规格把这条写成散文、没有它的 Lean 模型，所以下面的 `LayeredValue.resolve` 是那句散文的 Lean 读法，不是第二条规则；kernel 的 `Config` 分部长出模型时，这个定义搬过去，本文件改为 import 它（§3）。
 
 * 设置页答的值就是 run 被治理的值（`the_setting_page_and_the_run_read_one_value`）：`settled_effort` 与 `load` 爬的是同一条梯子，`resolve` 只是 `tagged` 丢掉那一级。
 * 最近的那一级说了算，且说出它是哪一级（`the_nearest_rung_that_speaks_wins`）；一级都没说就是 `none`，城有意把这件事交给缺省或供应方。
-* 地址就是楼时只有两级、同一份文件只读一次（`an_address_that_is_its_building_reads_two_rungs`）；房间的地址读三级（`a_room_reads_three_rungs`）。文件的位置是 kernel 布局的模型（`crates/kernel/spec/Layout.lean` 的 `config`），楼取地址首段是 `crates/city/spec/Building.lean` 的 `head`。
-* 有的表只许写在较远的几级：`[skills] shelves` 与 `[remote]` 只在城那一级，`[search]` 与 `[catalog]` 在城与楼两级（`crates/city/spec/ConfigLayers.lean` §8-4c、§8-4g）。一级写了一张比它够得到的那一级更近的表，读文件时即拒（`a_table_written_too_near_is_refused`）；一级写的表它全都够得到就照读（`a_rung_reads_the_tables_it_reaches`），城那一级够得到每一张（`the_city_states_its_own_tables`）。
+* 地址就是楼时只有两级、同一份文件只读一次（`an_address_that_is_its_building_reads_two_rungs`）；房间的地址读三级（`a_room_reads_three_rungs`）。文件的位置是 kernel 布局的模型（`Sprawling/kernel/spec/Layout.lean` 的 `config`），楼取地址首段是 `Sprawling/city/spec/Building.lean` 的 `head`。
+* 有的表只许写在较远的几级：`[skills] shelves` 与 `[remote]` 只在城那一级，`[search]` 与 `[catalog]` 在城与楼两级（`Sprawling/city/spec/ConfigLayers.lean` §8-4c、§8-4g）。一级写了一张比它够得到的那一级更近的表，读文件时即拒（`a_table_written_too_near_is_refused`）；一级写的表它全都够得到就照读（`a_rung_reads_the_tables_it_reaches`），城那一级够得到每一张（`the_city_states_its_own_tables`）。
 * 梯子给一个解析拒词只加上文件，码与恢复语照解析器给的（`the_ladder_keeps_the_parsers_recovery`，D8 (a)）。
 * 一层只点名一种居民，地址自己那一层有会话记录时梯子上的 harness 不生效（`a_session_that_opened_on_a_model_keeps_it`），没有记录时最近的那一级点名的 harness 生效（`without_a_record_the_nearest_harness_runs`，D6）。
 -/
@@ -222,7 +222,7 @@ structure Seat where
   harness : Option String
   one : model = none ∨ harness = none
 
-/-! 这里落实 D6：`settled_harness` 先看地址自己那一层有没有会话写下的 `[model] name`，有就答 `none`；没有才爬梯子取最近一级点名的 harness。决定、理由与被否的备选写在 `crates/city/spec/ConfigLayers.lean` 的 D6。 -/
+/-! 这里落实 D6：`settled_harness` 先看地址自己那一层有没有会话写下的 `[model] name`，有就答 `none`；没有才爬梯子取最近一级点名的 harness。决定、理由与被否的备选写在 `Sprawling/city/spec/ConfigLayers.lean` 的 D6。 -/
 def settledHarness (own : Seat) (rungs : List (Rung Seat)) : Option (String × Layer) :=
   match own.model with
   | some _ => none

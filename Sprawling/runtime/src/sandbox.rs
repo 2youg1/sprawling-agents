@@ -48,11 +48,11 @@ pub struct Mount {
 }
 
 /// How far a guest's linear memory may grow
-/// (`crates/runtime/spec/Sandbox.lean` D102).
+/// (`Sprawling/runtime/spec/Sandbox.lean` D102).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GuestMemory {
     /// No ceiling of the run's: only wasm32's 4 GiB address space bounds
-    /// the guest, as the ruling behind `Tools/Exec.lean` D95 leaves a run
+    /// the guest, as the ruling behind `Sprawling/runtime/spec/Tools/Exec.lean` D95 leaves a run
     /// with no default ceiling.
     Wasm32,
     /// The run's own ceiling, the same bytes its processes may commit
@@ -108,7 +108,7 @@ pub enum SandboxExit {
 
 /// The seam. One method: hand it a job, get back what the guest did.
 /// `Send`, because the `exec` tool that holds one is `Send`
-/// (`crates/sprawling/Spec.lean` §8-44); every adapter here already was.
+/// (`Sprawling/app/Spec.lean` §8-44); every adapter here already was.
 pub trait Sandbox: Send {
     fn run(&mut self, job: &SandboxJob) -> Result<SandboxOutcome, AxError>;
 }

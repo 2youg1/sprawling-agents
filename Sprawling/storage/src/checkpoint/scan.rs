@@ -205,7 +205,7 @@ impl Checkpoint {
     /// # Errors
     /// A blob the object database will not hand back: a byte that enters
     /// the tree unread breaks "every byte that entered the tree was scanned
-    /// once" (`crates/storage/spec/Checkpoint.lean` §8-8), so the checkpoint
+    /// once" (`Sprawling/storage/spec/Checkpoint.lean` §8-8), so the checkpoint
     /// is refused rather than the blob skipped.
     fn scan_blob(
         &self,
@@ -285,7 +285,7 @@ impl Checkpoint {
     /// Only an unborn branch and a missing reference mean "none yet";
     /// anything else that stops HEAD being read is an error, because
     /// reading it as "none" would turn the next checkpoint into a parentless
-    /// root commit cut off from the history before it (`crates/storage/spec/Checkpoint.lean` §8-8).
+    /// root commit cut off from the history before it (`Sprawling/storage/spec/Checkpoint.lean` §8-8).
     pub(super) fn head_commit(
         repo: &git2::Repository,
     ) -> Result<Option<git2::Commit<'_>>, StorageError> {
@@ -319,7 +319,7 @@ impl Checkpoint {
     /// wave runs, and a checkpoint that staged it would ask git to read a
     /// workdir file it believes it already knows; a file still growing
     /// under an open handle makes that read refuse the whole wave
-    /// (`crates/storage/Spec.lean` §8-8, §8-24). Nor does one ever stage protected
+    /// (`Sprawling/storage/Spec.lean` §8-8, §8-24). Nor does one ever stage protected
     /// metadata or an alias - [`StageFilter`] owns that rule.
     ///
     /// Returns the paths whose staged blob this call added, changed or
@@ -518,7 +518,7 @@ impl Checkpoint {
     /// Only `scopes` is staged, as a checkpoint stages it: a kept tree is
     /// checked out again over its scope alone, so its files outside the
     /// scope may trail the branch, and staging them would take back
-    /// what the trunk changed there (`crates/storage/spec/Worktree.lean` §8-9). Entries outside
+    /// what the trunk changed there (`Sprawling/storage/spec/Worktree.lean` §8-9). Entries outside
     /// the scope go into the commit as the index holds them. No scope
     /// stages the whole tree except the reserved subtree, whose rule
     /// [`StageFilter`] owns.

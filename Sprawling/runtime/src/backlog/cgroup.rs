@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Each Linux run's child cgroup: the weight every run holds, and the
-//! memory limit when the arm asked for one (`crates/runtime/spec/Tools/Exec.lean` D29, D33).
+//! memory limit when the arm asked for one (`Sprawling/runtime/spec/Tools/Exec.lean` D29, D33).
 //!
 //! cgroup v2 is a filesystem, so this module is plain file reads and
 //! writes: the harness moves itself into `core` under its own cgroup —
@@ -39,7 +39,7 @@ use super::ceiling::{Mark, Unapplied};
 
 /// The weight every run's child cgroup holds, from 1 to 10000: the same
 /// for every run, so the runs share the processors evenly among
-/// themselves (`crates/runtime/spec/Tools/Exec.lean` D29).
+/// themselves (`Sprawling/runtime/spec/Tools/Exec.lean` D29).
 #[cfg(any(not(windows), test))]
 const RUN_CPU_WEIGHT: u64 = 100;
 

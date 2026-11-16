@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `specalign`'s reading of the kernel's Lean specification
-//! (crates/xtask/Spec.lean §8-43): the carrier of every `AxCode`, the
+//! (Tools/xtask/Spec.lean §8-43): the carrier of every `AxCode`, the
 //! window class of every `EventKind`, and every `inductive` that shares a
 //! name with a kernel enum, each against what the kernel compiles.
 //!
@@ -87,7 +87,7 @@ fn located(sources: &[Source], def: &str) -> Result<Located, XtaskError> {
         .ok_or_else(|| XtaskError::Doc {
             file: "the kernel's Lean specification".to_owned(),
             msg: format!(
-                "no `def {def}` written one arm per line (crates/xtask/Spec.lean §8-43); write it \
+                "no `def {def}` written one arm per line (Tools/xtask/Spec.lean §8-43); write it \
                  there, so the gate has a table to hold the enum to"
             ),
         })
@@ -160,7 +160,7 @@ fn finding(location: String, violation: String, alternative: &str) -> Violation 
         gate: "specalign",
         location,
         rule: "the kernel's Lean specification names exactly the variants the kernel compiles, \
-               with the carrier and window class each one has (crates/xtask/Spec.lean §8-43)"
+               with the carrier and window class each one has (Tools/xtask/Spec.lean §8-43)"
             .to_owned(),
         violation,
         alternative: alternative.to_owned(),
@@ -201,10 +201,10 @@ mod tests {
             carriers.join("\n"),
             windows.join("\n")
         );
-        fixture::write(&root, "crates/kernel/Spec.lean", &spec);
+        fixture::write(&root, "Sprawling/kernel/Spec.lean", &spec);
         fixture::write(
             &root,
-            "crates/kernel/src/lib.rs",
+            "Sprawling/kernel/src/lib.rs",
             "pub enum Colour { Red, Blue }\n",
         );
         let found = super::super::check(&root);
@@ -212,7 +212,7 @@ mod tests {
         let texts = found
             .map(|all| {
                 all.into_iter()
-                    .filter(|v| v.location.starts_with("crates/kernel"))
+                    .filter(|v| v.location.starts_with("Sprawling/kernel"))
                     .map(|v| v.violation)
                     .collect::<Vec<_>>()
             })
@@ -260,10 +260,10 @@ mod tests {
             carriers.join("\n"),
             windows.join("\n")
         );
-        fixture::write(&root, "crates/kernel/Spec.lean", &spec);
+        fixture::write(&root, "Sprawling/kernel/Spec.lean", &spec);
         fixture::write(
             &root,
-            "crates/kernel/src/lib.rs",
+            "Sprawling/kernel/src/lib.rs",
             "pub enum Carrier { Event(EventKind), Loadtime }\n\
              pub enum WindowClass { InWindow, RecordOnly }\n",
         );
@@ -272,7 +272,7 @@ mod tests {
         let texts = found
             .map(|all| {
                 all.into_iter()
-                    .filter(|v| v.location.starts_with("crates/kernel"))
+                    .filter(|v| v.location.starts_with("Sprawling/kernel"))
                     .map(|v| v.violation)
                     .collect::<Vec<_>>()
             })

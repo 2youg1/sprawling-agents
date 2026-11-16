@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The `web_search` tool (`crates/accounting/spec/Connectors.lean` §8-35): its
+//! The `web_search` tool (`Sprawling/accounting/spec/Connectors.lean` §8-35): its
 //! catalogue episode, against a search supplier on a loopback port that
 //! the city's `[search]` table selects, so the catalogue never reaches a
 //! service off this machine.

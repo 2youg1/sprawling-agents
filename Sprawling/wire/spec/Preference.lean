@@ -6,7 +6,7 @@
 /-!
 # wire::preference
 
-规定 `preference`、`command::shelf`、`answer::model_facts`（`crates/wire/src/` 下同名的文件）。人能编辑的两份文件各得一扇门，以及同一次升版里的几件小事。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `preference`、`command::shelf`、`answer::model_facts`（`Sprawling/wire/src/` 下同名的文件）。人能编辑的两份文件各得一扇门，以及同一次升版里的几件小事。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `wire::preference::tag::tests` 守住。
 -/
@@ -38,7 +38,7 @@
 | `Query::Config { addr }` → `ConfigAnswer` | `effort: Option<SettledEffort>` ＋ `second: SettledSecond` ＋ `TuningDefaults`；`SettledEffort` 携 `ConfigLayer`（`default｜city｜building｜resident`，后三个与 `city::Layer` 同拼写，`default` 是没有任何一级文件说过、城的内建值在生效）；`SettledSecond` 同携 `ConfigLayer`，`percent` 为已过 `SecondThreshold` 构造点的整百分数，没有一级说过时是 `kernel::consts_policy::CTX_REMINDER_SECOND_DEFAULT` 且 `from = default`，`domain: SecondDomain { min, max }` 是 `SecondThreshold` 构造点的合法域（`CTX_REMINDER_SECOND_MIN`／`_MAX`）（§8-47）；`effort` 缺席仍是一句陈述：没有一级说过时回答的是提供方自己的缺省，城说不出那个值；`TuningDefaults` 为 `from: ConfigLayer`（今天恒为 `default`：梯上没有一级文件说得出这几个数，它们是 `gateway::EndpointTuning::DEFAULTS` 的读出；层随值一起答，页面才不必自己断定「这是内建的」）＋ `timeout_ms` ＋ `request_max_retries: Option<u32>`（`Retries::stated`，缺席即 `UntilHalted`）＋ `stream_idle_timeout_ms: Option<u64>`（缺席即与整通调用同界）＋ `proxying` ＋ `account_retries: AccountRetries`（同一账号上再发几次，kernel §8-86；表单在两个以上账号时用它作占位）；`search: SettledSearch`（生效值、来源层、城自己写的值、缺省地址与城列出账号的 Key 状态，`spec/Answer/Config.lean` §8-86） | **层是答案的一半。** 只给解析值的页面说不出这是本层写的还是继承来的，于是要把三层再读一遍自己爬一次梯子——**一把梯子爬两次就是一个问题两个答案**。层名随 `city::Layer`：线上把楼的文件叫 `resident`、把房的文件叫 `room`，而梯子把房的文件叫 `resident`——读者与被治的那次 run 会对“这是哪一份文件”给出不同的答案；一处穷尽匹配（`accounting::views::providers::rung_of`）把两份拼写钉在一起。`TuningDefaults` 是 `gateway::EndpointTuning::DEFAULTS` 的读出，字段形状也随它：重试上限是 `Retries` 而不是一个数（“直到有人按停”没有数字拼得出来），流的那个界是**闲置界而非整答案的截止**，且可缺席 |
 | `Command::PutShelved { shelf, name, text, idem }` | `Shelf { Library, Building(addr) }`；写 `skill_shelved`（kernel D23） | 与 `GovernedDocument` 同一条理由：两处货架都在保留子树里，任何写域都够不着，所以帧里没有路径可拼。`name` 允许子路径，脚本因此留得住自己的文件夹 |
 
-**八、`DialectKind::OpenAiResponses`。** kernel 的兼容格式集由二变三，`gateway::dialect` 的五个入口各多一条臂。登记与调用从此说同一句话：人粘贴 responses URL，`ConnectionKind::Responses` 记住了，而 `wire()` 从前仍答 `OpenAi`——**记对了、调错了**。形状的出处归 `crates/gateway/Spec.lean` §8-20。
+**八、`DialectKind::OpenAiResponses`。** kernel 的兼容格式集由二变三，`gateway::dialect` 的五个入口各多一条臂。登记与调用从此说同一句话：人粘贴 responses URL，`ConnectionKind::Responses` 记住了，而 `wire()` 从前仍答 `OpenAi`——**记对了、调错了**。形状的出处归 `Sprawling/gateway/Spec.lean` §8-20。
 -/
 
 /-! D14 档位、玻璃与混合档透明度随偏好进城，三者都可缺
@@ -54,7 +54,7 @@
 
 /-! D51 正文字号的下限是类型 `BodyPx`，没有上限
 
-**决定**：`Appearance.body_px` 是 `Option<BodyPx>`（`crates/wire/src/preference/body.rs`）。`BodyPx(u32)` 的唯一构造点是 `BodyPx::new`，`TryFrom<u32>` 经它；小于 `BODY_PX_MIN`（12）的数拒为 `E_INVALID_ARGS`，恢复语句写出下限。serde 经 `try_from = "u32"` 读、经 `into = "u32"` 写，所以人的文件 `[ui]` 里写 `body_px = 11` 在读入处即被拒（`accounting::person` 报 `ConfigInvalid` 并点名 `[ui]`，不改写那份文件），一帧 `PutPreferences` 带 11 在解码处即被拒；12 以上的任何整数照收。schema 内联为 `{"type": "integer", "minimum": 12}`，生成的 `client/src/wire.ts` 因此按同一个下限判页面读到的答案；`cargo xtask wire-ts` 另发 `BODY_PX = { min }`（`crates/xtask/Spec.lean` §8-36），外观组的字号框与 `client/src/core/sizing.ts` 读它。`body_px` 缺席时画样式表自己的字号，缺省是 15px（`client/src/theme/tokens-type.css` 的 `--text-body`）。schema 多了 `minimum` 而名字没变，按 D1 `WIRE_V` 进一位。
+**决定**：`Appearance.body_px` 是 `Option<BodyPx>`（`Sprawling/wire/src/preference/body.rs`）。`BodyPx(u32)` 的唯一构造点是 `BodyPx::new`，`TryFrom<u32>` 经它；小于 `BODY_PX_MIN`（12）的数拒为 `E_INVALID_ARGS`，恢复语句写出下限。serde 经 `try_from = "u32"` 读、经 `into = "u32"` 写，所以人的文件 `[ui]` 里写 `body_px = 11` 在读入处即被拒（`accounting::person` 报 `ConfigInvalid` 并点名 `[ui]`，不改写那份文件），一帧 `PutPreferences` 带 11 在解码处即被拒；12 以上的任何整数照收。schema 内联为 `{"type": "integer", "minimum": 12}`，生成的 `client/src/wire.ts` 因此按同一个下限判页面读到的答案；`cargo xtask wire-ts` 另发 `BODY_PX = { min }`（`Tools/xtask/Spec.lean` §8-36），外观组的字号框与 `client/src/core/sizing.ts` 读它。`body_px` 缺席时画样式表自己的字号，缺省是 15px（`client/src/theme/tokens-type.css` 的 `--text-body`）。schema 多了 `minimum` 而名字没变，按 D1 `WIRE_V` 进一位。
 
 **理由**：区间原先只有页面在查，Rust 里没有一个读者：`[ui]` 写 11 照读，页面再把同一个数读成拒绝，两个家对一个数各说一句。下限做成类型之后，文件、帧与页面都由这一条规则判。上限由人的决定去掉：12px 已是给少数人的极端选项，往上没有一个尺寸是本 build 有理由替人拒绝的。12px 不另算对比度，颜色门读 `@theme` 里缺省的那一行字号并保持绿即可（人的决定）。
 
@@ -111,8 +111,8 @@
 
 **决定**：`Appearance` 加三件可缺的字段，三者缺席都是「这个人没说过」，页面画样式表自己的姿态。
 
-1. `line_height: Option<LineHeight>`（`crates/wire/src/preference/leading.rs`）：行盒相对字号的千分数，下限 `LINE_HEIGHT_MIN` = 1200（1.2 倍），无上限。页面把 `--leading-read` 写在根元素上，读正文的元素用 `leading-read`（缺省 1.625，与今天的 `leading-relaxed` 同值，所以没说过的人看不出变化）。
-2. `letter_spacing: Option<Tracking>`（`crates/wire/src/preference/tracking.rs`）：字距的千分之一 em，下限 `TRACKING_MIN` = -50，无上限。页面写 `--tracking`，`client/src/theme/base.css` 的 `:root` 与 `:root:lang(zh)` 两条规则都读它，中文缺省仍是 0。
+1. `line_height: Option<LineHeight>`（`Sprawling/wire/src/preference/leading.rs`）：行盒相对字号的千分数，下限 `LINE_HEIGHT_MIN` = 1200（1.2 倍），无上限。页面把 `--leading-read` 写在根元素上，读正文的元素用 `leading-read`（缺省 1.625，与今天的 `leading-relaxed` 同值，所以没说过的人看不出变化）。
+2. `letter_spacing: Option<Tracking>`（`Sprawling/wire/src/preference/tracking.rs`）：字距的千分之一 em，下限 `TRACKING_MIN` = -50，无上限。页面写 `--tracking`，`client/src/theme/base.css` 的 `:root` 与 `:root:lang(zh)` 两条规则都读它，中文缺省仍是 0。
 3. `weight: Option<Weight>`：闭集 `light｜regular｜medium`，页面写 `data-weight`，`client/src/theme/preference.css` 把它换成 `--font-weight-body` 的 300／400／500，四个强档随它升高 200。
 
 三件都与 `BodyPx`（D51）同一条理由走类型：行高低于 1.2 倍时相邻两行的字开始相碰，字距收到 -0.05em 以下时相邻字母相碰，这是画得出来与画不出来之分，不是口味，所以在文件、帧与页面三处由一条规则拒；往上任何值只是更松，与人去掉字号上限的理由相同。
@@ -152,7 +152,7 @@ pub enum PreferencePatch { /* … */ Tags(SessionTags) }
 
 **决定**：标签是 `PreferencesAnswer::tags`，经 `PutPreferences` 写入 `config.toml` 的 `[ui]`，一段 session 以 `(city, room, began)` 命名（§8-84）。
 
-**理由**：标签是人怎么归类自己的工作，不是城里发生过的事；放进账本就要一个事件、一次折叠与一份视图，而它改变不了任何 run 的行为。偏好文件已经是「人的那一层」（`crates/accounting/spec/Person.lean` §8-8），浏览器与手机都从同一个答案读它。`began` 是 `Query::Sessions` 已经答出的稳定序号，不必为 session 另造一个 id。
+**理由**：标签是人怎么归类自己的工作，不是城里发生过的事；放进账本就要一个事件、一次折叠与一份视图，而它改变不了任何 run 的行为。偏好文件已经是「人的那一层」（`Sprawling/accounting/spec/Person.lean` §8-8），浏览器与手机都从同一个答案读它。`began` 是 `Query::Sessions` 已经答出的稳定序号，不必为 session 另造一个 id。
 
 **被否**：①账本事件 `session_tagged`——让人的分类变成城的历史，导出一座城会把人的标签带给下一个人；②存在浏览器里——手机看不到；③以 `(room, began)` 为键——人的文件在多座城之间共用，各城 `hall/mayor` 的第一段序号相近，会相撞。
 

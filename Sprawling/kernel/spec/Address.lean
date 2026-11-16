@@ -6,7 +6,7 @@
 /-!
 # kernel::address
 
-规定 `kernel::address`（`crates/kernel/src/address.rs`）：地址文法、段边界、受保护元数据与保留谓词、读界、`SessionName`。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::address`（`Sprawling/kernel/src/address.rs`）：地址文法、段边界、受保护元数据与保留谓词、读界、`SessionName`。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 -/
 
 /-!
@@ -37,9 +37,9 @@ impl Address {
 - 同一性按字节：`Eq`、`Ord` 与 `is_within` 在所有平台上逐字节比较，大小写不同的两个地址因而是两个地址；`is_within` 自反（`a.is_within(a)`）。**只有 `is_reserved` 折叠 ASCII 大小写**，因为它是一道只允许多拒的门，而它守的目录名在文件系统那边是大小写不敏感的（8-55）。
 - 符号链接 canonicalize 属效果面（write_domain 的适配层）；本原语只对已规范化相对路径作证。
 - 解析拒绝的 AxError：`action="parse address"`、`subject=原串`、recovery 指出违规成分与合法形态。
-- 判例表只有一份：`crates/fixtures/address.jsonl`，每行一个拼写与它的判决（`accepted`／`refused`，拒绝行附所违规则）。`Address::parse` 的测试、`schema` 给客户端的 `ADDRESS_PATTERN`、客户端 `address.test.ts` 对生成出的 schema，三个读者读同一个文件；表放在两种语言之外，是因为放在任何一边都会让另一边抄一份，而抄本的条数会各自漂移。
+- 判例表只有一份：`Tools/fixtures/address.jsonl`，每行一个拼写与它的判决（`accepted`／`refused`，拒绝行附所违规则）。`Address::parse` 的测试、`schema` 给客户端的 `ADDRESS_PATTERN`、客户端 `address.test.ts` 对生成出的 schema，三个读者读同一个文件；表放在两种语言之外，是因为放在任何一边都会让另一边抄一份，而抄本的条数会各自漂移。
 
-**读界**（`crates/city/Spec.lean` §8-2 confidential 的第四条；形状 1 判定）：
+**读界**（`Sprawling/city/Spec.lean` §8-2 confidential 的第四条；形状 1 判定）：
 
 ```rust
 pub enum ReadVerdict { Open, Confidential, RulesUnreadable(AxError) }   // 穷尽；不是 bool
@@ -52,7 +52,7 @@ pub fn may_read(
 
 - 规则一句话：`target.is_within(reader_building)` 即 `Open`，且**不调用 `rules`**；否则问 `rules`——`Ok(false)`＝`Open`，`Ok(true)`＝`Confidential`，`Err(e)`＝`RulesUnreadable(e)`。后两臂都是「关」，分成两臂是因为恢复语不同：前者请去问那栋楼里的人，后者要一个人去修那份规则。
 - `rules` 是闭包而不是值：本楼的读是绝大多数，它们不该为一次读盘付账；「哪栋楼持有 target」与「读它的规则」是 city 的权威（`city::Building::of`、`city::policy::load`），由装配层接成这个闭包，kernel 不复述「楼是地址的首段」。它交出的是 `BuildingPolicy::confidential` 那一个事实，形状因此是 `bool`：本模块不引 `model`，`address` 保持叶子模块。
-- 拒绝的措辞不在这里：`ReadVerdict` 是判定，拒词由问它的人写（`crates/runtime/Spec.lean` §8-30-1 `chosen_path::admit`，那是模型选路唯一的拒绝处）。
+- 拒绝的措辞不在这里：`ReadVerdict` 是判定，拒词由问它的人写（`Sprawling/runtime/Spec.lean` §8-30-1 `chosen_path::admit`，那是模型选路唯一的拒绝处）。
 -/
 
 /-!
@@ -81,7 +81,7 @@ impl SessionName {
 pub fn is_reserved(&self) -> bool;   // 任一段命中名单之一即真（ASCII 折叠，见 8-55）
 ```
 
-**理由是写域默认覆盖整栋楼。** 一次派活的写域由 `city::policy::write_domain()` 给出，`crates/city/templates/RULES.toml` 的 `prefixes` 出厂是空表，于是写域回落到 `[self.addr]`——整栋楼；`runtime::tools::edit` 对路径只有 `WriteDomain::admits` 一道依据，`city::load` 又在每次派活时重读 `RULES.toml`。楼的 `RULES.toml` 与 `CONFIG.toml` 住在 `<building>/.sprawling/` 下（`kernel::layout`，8-56），所以只看首段的判定挡不住一个 agent 改自己楼的写域、`confidential`、思考强度与 MCP server；任一段命中才挡得住，词汇表「一个 agent 改不了自己的账与自己的配置」由此得到执行。
+**理由是写域默认覆盖整栋楼。** 一次派活的写域由 `city::policy::write_domain()` 给出，`Sprawling/city/templates/RULES.toml` 的 `prefixes` 出厂是空表，于是写域回落到 `[self.addr]`——整栋楼；`runtime::tools::edit` 对路径只有 `WriteDomain::admits` 一道依据，`city::load` 又在每次派活时重读 `RULES.toml`。楼的 `RULES.toml` 与 `CONFIG.toml` 住在 `<building>/.sprawling/` 下（`kernel::layout`，8-56），所以只看首段的判定挡不住一个 agent 改自己楼的写域、`confidential`、思考强度与 MCP server；任一段命中才挡得住，词汇表「一个 agent 改不了自己的账与自己的配置」由此得到执行。
 
 - **一条规则，三处实例**：一个 scope 的治理字节住在它自己的 `.sprawling/` 里。城是 `<city>/.sprawling/`，楼是 `<building>/.sprawling/`，房间是 `<building>/<room>/.sprawling/`。城的布局因此不是特例，而是同一条规则在根 scope 上的实例。
 - **失效关闭，只会拒绝得更多**：`is_reserved` 对任何含 `.sprawling` 段的地址答真，`WriteDomain::new` 与 `admits` 两处因此同时收紧。
@@ -127,7 +127,7 @@ namespace Kernel.Address
 
 /-! ### 模型
 
-一个地址就是它的段：`Address::parse` 收下的串按 `/` 切开。段的文法——不空、不是 `.`／`..`、不含反斜杠、`:` 与控制字符、不以点或空白结尾，以及至少一段——由 `Address::parse` 在唯一的构造点判，判例表是 `crates/fixtures/address.jsonl`；本模型不重述字符级的规则，只说段一级的两条关系：`is_within` 与 `is_reserved`。
+一个地址就是它的段：`Address::parse` 收下的串按 `/` 切开。段的文法——不空、不是 `.`／`..`、不含反斜杠、`:` 与控制字符、不以点或空白结尾，以及至少一段——由 `Address::parse` 在唯一的构造点判，判例表是 `Tools/fixtures/address.jsonl`；本模型不重述字符级的规则，只说段一级的两条关系：`is_within` 与 `is_reserved`。
 
 `is_within` 在 Rust 里是「字节前缀，且剩下的部分为空或以 `/` 开头」；对已经过了文法的地址，它与「段序列的前缀」是同一件事，因为段里没有 `/`。这条对应由 `address::tests` 的 proptest（自反、传递、反对称）与 `".sprawlingx/a"` 这类段边界判例检查，不在这里证明。 -/
 
@@ -162,7 +162,7 @@ theorem is_within_antisymm {a b : Address} (ab : is_within a b = true) (ba : is_
 
 /-- D8 定规：受保护元数据名单只有 kernel::address 一个家
 
-`PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`storage::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是storage 侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 storage 的别名族规则承担（`crates/storage/Spec.lean` §8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
+`PROTECTED_METADATA` 是 `.sprawling` 与 `.git` 两个名字的唯一住处，`is_reserved`、`SessionName`、`storage::reserved::outside_reserved` 与 bundle 的 `travels` 全部引用它，任何调用点不得重拼这两个字符串。这条定规的理由是「写某路径即提权」（8-73）；被击败的备选是storage 侧另立一份写目标名单——同一问题两个家，且两个家会各自演化。经链接写受保护元数据的恒拒由 storage 的别名族规则承担（`Sprawling/storage/Spec.lean` §8-25），两半合起来才是「写 `.git/hooks` 即提权」这一个洞的完整封堵。
 -/
 def is_reserved (protected_name : String → Bool) (a : Address) : Bool :=
   a.segments.any protected_name

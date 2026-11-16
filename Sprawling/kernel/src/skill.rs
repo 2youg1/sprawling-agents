@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The canonical manifest of one skill package
-//! (`crates/kernel/spec/Skill.lean`). A manifest names every package item
+//! (`Sprawling/kernel/spec/Skill.lean`). A manifest names every package item
 //! and each file's CAS digest; the package digest is the digest of these
 //! bytes. It carries no file bytes itself and performs no I/O.
 

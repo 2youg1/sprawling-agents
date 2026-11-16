@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The constructor every child process of the city starts from
-//! (`crates/child/Spec.lean` §8, D1 and D2).
+//! (`Sprawling/child/Spec.lean` §8, D1 and D2).
 
 use std::ffi::OsStr;
 use std::process::Command;

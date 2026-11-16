@@ -10,7 +10,7 @@
 //! events is the binary's work. That split is what lets "one instruction
 //! builds a city" be tested without building one.
 //!
-//! Specified by `crates/city/spec/Wizard.lean` §8-10.
+//! Specified by `Sprawling/city/spec/Wizard.lean` §8-10.
 
 use kernel::{Address, AxCode, AxError, RESERVED_PREFIX};
 

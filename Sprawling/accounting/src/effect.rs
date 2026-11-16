@@ -243,7 +243,7 @@ impl Claims {
     /// against the plan the earlier ones left, so a leaf this run split
     /// off and then claimed is there to be claimed; the replay stops at
     /// the first claim that no longer holds, because what follows it may
-    /// stand on rows that claim's split would have made (`crates/accounting/spec/Effect.lean`
+    /// stand on rows that claim's split would have made (`Sprawling/accounting/spec/Effect.lean`
     /// §8-27).
     ///
     /// # Errors
@@ -328,7 +328,7 @@ fn released(
 /// The `roadmap_released` line that hands a claimed node back, saying
 /// why in `note`, or `None` for an effect that is not a claim. The one
 /// shape both a stale landing and a run that came home without landing
-/// close a claim with (`crates/sprawling/Spec.lean` §8-42-8).
+/// close a claim with (`Sprawling/app/Spec.lean` §8-42-8).
 ///
 /// # Errors
 /// Propagates a payload that will not build.
@@ -420,7 +420,7 @@ mod tests {
     /// leaves lands both, and the plan reads as the run's desk left it:
     /// the leaf's claim is checked against the plan the split left rather
     /// than the file on disk, where the leaf does not exist yet
-    /// (`crates/accounting/spec/Effect.lean` §8-27).
+    /// (`Sprawling/accounting/spec/Effect.lean` §8-27).
     #[test]
     fn a_run_that_splits_its_row_and_claims_a_leaf_lands_both() {
         let run = desk(1);

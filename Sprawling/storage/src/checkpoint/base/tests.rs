@@ -164,7 +164,7 @@ fn a_first_base_writes_one_pack_and_no_loose_object_at_any_file_count() {
 }
 
 /// Derived from `a_held_base_moves_head_only_from_what_it_read`
-/// (`crates/storage/spec/Checkpoint/Concurrent.lean`): a base that read
+/// (`Sprawling/storage/spec/Checkpoint/Concurrent.lean`): a base that read
 /// "no HEAD" and finds a branch another writer created since is refused,
 /// and HEAD stays the other writer's commit.
 #[test]

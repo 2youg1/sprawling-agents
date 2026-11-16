@@ -28,8 +28,8 @@ version = "0.0.8"
 
 [workspace.dependencies]
 serde = "1"
-kernel = { package = "sprawling-kernel", path = "crates/kernel", version = "=0.0.8" }
-wire = { package = "sprawling-wire", path = "crates/wire", version = "=0.0.8", default-features = false }
+kernel = { package = "sprawling-kernel", path = "Sprawling/kernel", version = "=0.0.8" }
+wire = { package = "sprawling-wire", path = "Sprawling/wire", version = "=0.0.8", default-features = false }
 "#;
 
 /// A member taking both through the workspace table.
@@ -74,8 +74,8 @@ fn a_pin_left_behind_by_a_version_bump_is_named() {
 #[test]
 fn a_path_dependency_without_a_version_is_named() {
     let unpinned = WORKSPACE.replace(
-        "path = \"crates/kernel\", version = \"=0.0.8\"",
-        "path = \"crates/kernel\"",
+        "path = \"Sprawling/kernel\", version = \"=0.0.8\"",
+        "path = \"Sprawling/kernel\"",
     );
     let found = judged(&unpinned, MEMBER);
     assert_eq!(found.len(), 1, "{found:#?}");

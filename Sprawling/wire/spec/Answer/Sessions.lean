@@ -6,9 +6,9 @@
 /-!
 # wire::answer::sessions
 
-规定 `answer::sessions`（`crates/wire/src/` 下同名的文件）。一个房间的各段 session，新的在前。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `answer::sessions`（`Sprawling/wire/src/` 下同名的文件）。一个房间的各段 session，新的在前。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `crates/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
 -/
 
 /-!
@@ -38,8 +38,8 @@ pub enum SessionStart {
 ```
 
 - **为什么。** 页面对一个房间的历史只知道热视图里的 run（最近冻结的 32 个加上在跑的）和本次打开以后收到的记录，所以重载之后看不到更早一段的边界，房间信箱的「最近」段（refrain 路线图 S7.5）没有东西可列。session 是房间的一段（`docs/glossary.md` 的 Session），它的边界与起法都在账本里：`session_opened` 带着 `carried` 与 `from`，房间第一次被派活打开时没有这一行，第一行是那个 `run_started`。
-- **字段读自账本的哪一行。** `began` 是那一段的第一行；`start` 是 `Opened` 时，`carry` 由 `session_opened.carried` 读出（`true` 即 `Carry::Handoff`：上一段的交接真的带过去了），`from` 原样是它的 `from`；`runs` 数这一段里地址是这个房间的 `run_started`；`last` 与 `at` 是这一段里地址是这个房间的最后一行与它的 `t`，与 `storage::sessions` 为这个房间切的那份切片是同一组行（`crates/storage/Spec.lean` §8-24）。地址不是房间的记录（模型调用、工具调用）不挪 `last`：它们属于 run，run 的进度由 `Query::RunView` 回答。
-- **作答在锁内，不读盘。** 视图折叠一张按地址的表（`crates/accounting/Spec.lean` §8-19(c)），`Query::Sessions` 只从这张表里拷出这个房间最新的至多 `SESSIONS_MAX` 段，没有一行账本被读；一个房间从没有过 session 时答空表、`earlier` 为 0，与「这个地址不存在」不作区分，因为房间是目录，答它在不在是 `Query::Listing` 的事。
+- **字段读自账本的哪一行。** `began` 是那一段的第一行；`start` 是 `Opened` 时，`carry` 由 `session_opened.carried` 读出（`true` 即 `Carry::Handoff`：上一段的交接真的带过去了），`from` 原样是它的 `from`；`runs` 数这一段里地址是这个房间的 `run_started`；`last` 与 `at` 是这一段里地址是这个房间的最后一行与它的 `t`，与 `storage::sessions` 为这个房间切的那份切片是同一组行（`Sprawling/storage/Spec.lean` §8-24）。地址不是房间的记录（模型调用、工具调用）不挪 `last`：它们属于 run，run 的进度由 `Query::RunView` 回答。
+- **作答在锁内，不读盘。** 视图折叠一张按地址的表（`Sprawling/accounting/Spec.lean` §8-19(c)），`Query::Sessions` 只从这张表里拷出这个房间最新的至多 `SESSIONS_MAX` 段，没有一行账本被读；一个房间从没有过 session 时答空表、`earlier` 为 0，与「这个地址不存在」不作区分，因为房间是目录，答它在不在是 `Query::Listing` 的事。
 - **新的在前，一次至多 64 段，没有翻页。** 读它的是「最近」段，要的是最近几段；`earlier` 说出更早的还有多少，页面据此说「更早的 n 段不在此处」而不是假装没有。
 - **只动名字表，不进 `WIRE_V`。** 新加一个查询与一个答复，旧帧一个也没改形；名字表多一项，schema 哈希随之变（D1、§4）。
 -/

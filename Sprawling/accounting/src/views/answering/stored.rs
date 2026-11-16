@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A stored object as bytes, and a stored Markdown version exported
-//! (`crates/accounting/spec/Views/Document.lean` §8-21, `crates/wire/spec/Answer/DocumentBytes.lean`
+//! (`Sprawling/accounting/spec/Views/Document.lean` §8-21, `Sprawling/wire/spec/Answer/DocumentBytes.lean`
 //! §8-80, §8-81).
 //!
 //! Both read the content store and nothing else, after the view lock is

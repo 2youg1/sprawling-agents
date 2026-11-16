@@ -108,7 +108,7 @@ impl RunWorker {
     /// model list are asked from a thread of their own, and the record
     /// is written by [`Self::record_probe`] when they answer, so a slow
     /// endpoint holds up nothing but this probe
-    /// (`crates/sprawling/Spec.lean` §8-42-9).
+    /// (`Sprawling/app/Spec.lean` §8-42-9).
     ///
     /// # Errors
     /// A base URL whose credential reference cannot be parsed, and a
@@ -209,7 +209,7 @@ impl RunWorker {
     /// name, as it should travel now.
     ///
     /// **An empty key box means "leave the key alone", never "remove
-    /// it"** (`crates/sprawling/Spec.lean` §8-81). The form answers the vault once
+    /// it"** (`Sprawling/app/Spec.lean` §8-81). The form answers the vault once
     /// and holds the reference only while it is mounted, so every
     /// later visit says nothing about the credential; reading that as
     /// `AuthSpec::None` probed without a key and wrote the endpoint
@@ -245,7 +245,7 @@ impl RunWorker {
     /// serves first.
     ///
     /// `admission` holds the rows the person ticked on the endpoint's
-    /// list and the ids they typed (`crates/gateway/spec/Endpoint/Models.lean`
+    /// list and the ids they typed (`Sprawling/gateway/spec/Endpoint/Models.lean`
     /// D47). Asking for nothing admits everything the endpoint serves,
     /// which is what somebody who never asked for the list meant; a
     /// ticked id the endpoint does not serve is left out rather than
@@ -264,7 +264,7 @@ impl RunWorker {
     ///
     /// The probe is asked from a thread of its own, and the endpoint is
     /// registered by [`Self::finish_attach`] when it answers
-    /// (`crates/sprawling/Spec.lean` §8-42-9). An attachment that
+    /// (`Sprawling/app/Spec.lean` §8-42-9). An attachment that
     /// changes nothing the city keeps asks nothing and is registered at
     /// once.
     ///
@@ -408,7 +408,7 @@ impl RunWorker {
 
     /// Writes what the attach read into the CAS, the line that names it,
     /// and hands the facts back to the worker's own book, which folded
-    /// the line to ids only (`crates/gateway/spec/Endpoint/Models.lean` §8-10).
+    /// the line to ids only (`Sprawling/gateway/spec/Endpoint/Models.lean` §8-10).
     fn record_attached(&mut self, mut endpoint: gateway::AttachedEndpoint) -> Result<(), AxError> {
         let (blob, bytes) = crate::listed_facts::keep(&mut self.cas, &mut endpoint)?;
         self.record(
@@ -428,7 +428,7 @@ impl RunWorker {
     /// belongs to a chat request, and a model list takes no body.
     ///
     /// `request_max_retries` is honoured here, and here only: a model
-    /// call's retries are the watchdog's decision (`crates/gateway/Spec.lean`
+    /// call's retries are the watchdog's decision (`Sprawling/gateway/Spec.lean`
     /// §8-16), while a person watching a settings page is waiting on this
     /// one request and a network that dropped it once is worth asking
     /// again.
@@ -465,7 +465,7 @@ impl RunWorker {
     ///
     /// The store is opened once here rather than once per picture, so a
     /// conversation carrying four pictures holds one handle on one
-    /// immutable directory rather than four (`crates/sprawling/Spec.lean` §8-171). The handle is
+    /// immutable directory rather than four (`Sprawling/app/Spec.lean` §8-171). The handle is
     /// this adapter's own rather than the worker's, because the worker's
     /// is needed elsewhere while a call is out.
     ///
@@ -747,7 +747,7 @@ mod tests {
 
     /// On the chat face a model nobody stated a ceiling for is called
     /// with none, so the provider's own default for that model applies
-    /// (`crates/gateway/Spec.lean` §8-17), and the account says who picked it.
+    /// (`Sprawling/gateway/Spec.lean` §8-17), and the account says who picked it.
     #[test]
     fn a_chat_face_model_nobody_stated_a_ceiling_for_is_left_to_the_provider() {
         let dir = tempfile::tempdir().unwrap();

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The exposure one admitted tool takes in a run
-//! (`crates/runtime/spec/Catalog.lean` §8-60, D111): the two tools no
+//! (`Sprawling/runtime/spec/Catalog.lean` §8-60, D111): the two tools no
 //! table moves, what the building's and the city's `[catalog]` tables
 //! state, and the default an unstated tool falls back to.
 //!

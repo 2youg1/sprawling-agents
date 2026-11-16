@@ -13,7 +13,7 @@ order: `script` writes what the stand-in provider will play, the recipe starts
 the stand-in on it, and `walk` drives the archive's binary through the city a
 stranger raises. The recipe holds the order because it holds the processes:
 the stand-in is started outside this directory, which hosts no server of its
-own (`crates/adversary/Spec.lean` section 13).
+own (`Tools/adversary/Spec.lean` section 13).
 
 Unlike `adversary`, nothing here is skipped. The person asked for this run by
 naming an archive, so a binary or a provider that is missing is a failure that
@@ -53,7 +53,7 @@ private def required (name : String) : IO String := do
 where
   absent := throw <| IO.userError s!"{name} is not set; run this through `just acceptance <archive>`"
 
-/-- The launcher the recipe names on Windows, or none (crates/adversary/Spec.lean D8). -/
+/-- The launcher the recipe names on Windows, or none (Tools/adversary/Spec.lean D8). -/
 private def launcher : IO (Option System.FilePath) := do
   match (← IO.getEnv "SPRAWLING_LAUNCHER").map (·.trimAscii.toString) with
   | some named => if named.isEmpty then return none else return some named

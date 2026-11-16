@@ -9,7 +9,7 @@
 //! uses, so the window a scenario replays is the window the product
 //! showed.
 //!
-//! Specified by `crates/citysim/spec/Executor.lean` §8-3.
+//! Specified by `Tools/citysim/spec/Executor.lean` §8-3.
 
 use std::path::PathBuf;
 

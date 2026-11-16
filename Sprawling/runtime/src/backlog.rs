@@ -28,7 +28,7 @@
 //! The table has two kinds of member: a background command, which a
 //! halt kills, and a run a resident handed down, which a halt marks and
 //! which stops itself at its next safe point by asking [`Backlog::stopping`]
-//! (`crates/runtime/spec/Backlog.lean` §8-28-2). One table, one `halt`, so a stopped scope has
+//! (`Sprawling/runtime/spec/Backlog.lean` §8-28-2). One table, one `halt`, so a stopped scope has
 //! nothing left going in it under either name.
 
 use std::collections::BTreeMap;
@@ -75,7 +75,7 @@ struct Table {
 
 impl Backlog {
     /// The same table, asking these shares for every run whose command
-    /// it starts (`crates/runtime/spec/Tools/Exec.lean` D29).
+    /// it starts (`Sprawling/runtime/spec/Tools/Exec.lean` D29).
     #[must_use]
     pub fn with_shares(self, shares: Shares) -> Backlog {
         Backlog { shares, ..self }
@@ -95,7 +95,7 @@ impl Backlog {
     }
 
     /// The machine budget a run's heavy work reserves its ceiling from
-    /// (`crates/runtime/spec/Reserve.lean` D104).
+    /// (`Sprawling/runtime/spec/Reserve.lean` D104).
     #[must_use]
     pub fn budget(&self) -> &crate::reserve::MachineBudget {
         &self.budget

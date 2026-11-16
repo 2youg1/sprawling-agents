@@ -85,7 +85,7 @@ fn a_signal_is_on_the_history_before_the_sender_freezes() {
 /// second run there would read a spare inbox that nothing is delivered
 /// into, while the signal waits for the holder. When the holder gives
 /// the queue back the same knock goes out, and the run it starts finds
-/// the signal at home (`crates/sprawling/Spec.lean` §8-46-12).
+/// the signal at home (`Sprawling/app/Spec.lean` §8-46-12).
 #[test]
 fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
     let dir = tempfile::tempdir().unwrap();

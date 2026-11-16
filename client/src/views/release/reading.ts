@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // What the release group reads out of the city's answer
-// (`crates/wire/spec/Answer/Release.lean` D24): one line per registry the
+// (`Sprawling/wire/spec/Answer/Release.lean` D24): one line per registry the
 // city asked, and the command that updates this binary through the
 // channel that installed it.
 //

@@ -6,7 +6,7 @@
 /-!
 # runtime::tools::search
 
-规定 `tools::search`、`tools::search::predicate`、`tools::search::descent`（`crates/runtime/src/` 下同名的文件）。search：一个正则或一个 glob，在读界打开的城里走一遍。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `tools::search`、`tools::search::predicate`、`tools::search::descent`（`Sprawling/runtime/src/` 下同名的文件）。search：一个正则或一个 glob，在读界打开的城里走一遍。本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `Sprawling/runtime/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::tools::search::tests`、`runtime::tools::search::tests::limits` 守住。
 -/
@@ -71,11 +71,11 @@ const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 
 /-! D120 `pattern` 是 ripgrep 语法的正则，由 `regex` crate 逐行判
 
-**决定**：search 的 `pattern` 是正则，由 `regex` crate 编译与匹配，语法就是 ripgrep 缺省引擎的语法（ripgrep 的缺省引擎正是这个 crate）；`-i` 为真时不分大小写。一行一行地匹配：`.` 不匹配换行，`^` 与 `$` 是行首行尾。依赖与它的被否写在 `crates/runtime/Spec.lean` §13。
+**决定**：search 的 `pattern` 是正则，由 `regex` crate 编译与匹配，语法就是 ripgrep 缺省引擎的语法（ripgrep 的缺省引擎正是这个 crate）；`-i` 为真时不分大小写。一行一行地匹配：`.` 不匹配换行，`^` 与 `$` 是行首行尾。依赖与它的被否写在 `Sprawling/runtime/Spec.lean` §13。
 
 **理由**：Claude Code 的 `Grep` 是 ripgrep，模型写给它的 `fn\s+main`、`impl.*Tool`、`interface\{\}` 照 ripgrep 的语法写；子串搜索把这些字面地找一遍，答「没有」，而文件里明明有，这正是「找不到与看不了是两个答案」要防的那种错答。以前不用正则，理由是模式引擎会把回溯放在模型和它的下一个回合之间；`regex` crate 不回溯，以有限自动机匹配，时间与输入长度成线性，编译有大小上限，这个理由对它不成立。逐行匹配让行号、上下文与 content 的窗口照旧按行算（§8-63），也与 ripgrep 的缺省一致。
 
-**被否**：①保留子串——上面的理由；②`fancy-regex` 或 PCRE2——多了环视与反向引用，代价是回溯，恰是原来那条理由要挡的；③在 `exec` 里跑 `rg`——不是每台主机都有 `rg`，City Hall 的工具集没有 `exec`（`crates/city/Spec.lean` §8-22），而经 `exec` 的答没有读界与续读的行号；④整份文件一次匹配、支持跨行——见 D121。
+**被否**：①保留子串——上面的理由；②`fancy-regex` 或 PCRE2——多了环视与反向引用，代价是回溯，恰是原来那条理由要挡的；③在 `exec` 里跑 `rg`——不是每台主机都有 `rg`，City Hall 的工具集没有 `exec`（`Sprawling/city/Spec.lean` §8-22），而经 `exec` 的答没有读界与续读的行号；④整份文件一次匹配、支持跨行——见 D121。
 
 **重开参数**：读数显示模型常写环视或反向引用而被拒；或 ripgrep 换了缺省引擎。
 -/
@@ -98,7 +98,7 @@ const UNREAD_SHOWN: usize = 16;     // unread 列出的条数上限
 | 跳过 | 理由 | 权威 |
 |---|---|---|
 | 保留区子树 | 一跑不读治理自己的东西 | `Address::is_reserved`（kernel） |
-| 读界关上的楼 | 机密楼对楼外全关；规则读不出的楼同样关 | `kernel::address::may_read`（`crates/city/Spec.lean` §8-2） |
+| 读界关上的楼 | 机密楼对楼外全关；规则读不出的楼同样关 | `kernel::address::may_read`（`Sprawling/city/Spec.lean` §8-2） |
 | `.git` 目录（任何深度，不分 ASCII 大小写） | 它是对象库不是文本，扫它只产出乱码命中；它与保留区同属受保护的元数据 | `kernel::address::PROTECTED_METADATA`，经 `Address::is_reserved` |
 | 非 UTF-8 文件 | 二进制里没有可读的行 | 本节 |
 | `land` 以 `E_GATE_DENIED` 拒绝的链接 | 链接的目标落在城外、保留区或关上的楼 | `chosen_path::land` |

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The bytes a model named, read after the one judgement `read` gives a
-//! path (`crates/runtime/spec/Tools/BoundReader.lean` §8-59).
+//! path (`Sprawling/runtime/spec/Tools/BoundReader.lean` §8-59).
 //!
 //! `read` hands back text or a picture attachment. A tool that sends
 //! bytes to an endpoint needs the bytes themselves, and they may sit in another building the
@@ -77,7 +77,7 @@ impl BoundReader {
         let addr = chosen_path::admit(&spelled, action, &*self.bound)?;
         // Not a hot path: anchoring here costs what re-resolving the
         // root inside `land` used to cost on every call
-        // (`crates/runtime/spec/Tools/ChosenPath.lean` D112).
+        // (`Sprawling/runtime/spec/Tools/ChosenPath.lean` D112).
         let city = chosen_path::CityRoot::anchor(&self.city_root, action)?;
         let real = match chosen_path::land(&city, &addr, action, &*self.bound)?.location {
             Located::Present(real) if real.is_file() => real,
@@ -104,7 +104,7 @@ impl BoundReader {
     /// The Locator of the whole bytes `asked` names at this moment,
     /// judged exactly as [`Self::open`] judges it: what `plan finish`
     /// records when a model names the file that shows its work
-    /// (`crates/collab/Spec.lean` D20, kernel `spec/Locator.lean` D27).
+    /// (`Sprawling/collab/Spec.lean` D20, kernel `spec/Locator.lean` D27).
     ///
     /// # Errors
     /// Every refusal of [`Self::open`], and `E_STORAGE_FATAL` when the

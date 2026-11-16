@@ -75,7 +75,7 @@ export function tpsOf(turn: Turn): number | null {
 // A landed duration in the finest unit the Ledger recorded it in: whole
 // microseconds where the line carries a monotonic `took_us`/`first_us`
 // (kernel D20), whole milliseconds where only the two moments exist (a
-// line written before the key did, `crates/wire/spec/Reading.lean` D28).
+// line written before the key did, `Sprawling/wire/spec/Reading.lean` D28).
 // The unit travels with the number because a 0 from two millisecond
 // moments means "under a millisecond", never "0 µs".
 export type Took =

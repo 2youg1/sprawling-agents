@@ -5,7 +5,7 @@
 
 //! The catalog selection one session froze at its own address. It is a
 //! session record beside CONFIG.toml, never a third hand-edited layer
-//! (`crates/city/spec/ConfigLayers.lean` D114).
+//! (`Sprawling/city/spec/ConfigLayers.lean` D114).
 
 use std::collections::BTreeMap;
 use std::path::Path;

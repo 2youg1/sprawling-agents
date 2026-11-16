@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Discard verdicts: the decision table.
-//! The part `crates/kernel/spec/Discard.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Discard.lean` specifies this module with the
 //! rest of `kernel::discard`.
 
 use super::request::{DenyReason, DiscardRequest};
@@ -115,4 +115,4 @@ mod tests {
 // those loops: one run burned six hours and a second ran forty-five
 // minutes under `--default-unwind 32`, both on `tainted_never_allows`,
 // and neither returned. The fail-closed propositions are held by the
-// tests above (`crates/kernel/Spec.lean` §2).
+// tests above (`Sprawling/kernel/Spec.lean` §2).

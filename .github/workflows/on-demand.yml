@@ -7,7 +7,7 @@
 #             branch on origin, a tag or a commit, in sixteen shards
 #             (`just mutants-diff`)
 #   mutants-modules
-#             the mutants of every module `crates/xtask/budgets.toml`
+#             the mutants of every module `Tools/xtask/budgets.toml`
 #             holds to a mutation score (the rows with `mutation_files`),
 #             in eight shards (`just mutants-modules`), then one job
 #             that adds the shards up per module and fails a module under
@@ -34,7 +34,7 @@
 #             logs are the artifact `fresh-<os>-<tree>`.
 #   keychain  on macOS: whether the Keychain asks again for the city key
 #             once the binary is replaced; the reading is the artifact
-#             `keychain-<tree>` (crates/remote_access/Spec.lean §3)
+#             `keychain-<tree>` (Sprawling/remote_access/Spec.lean §3)
 #
 # Ask with `gh workflow run on-demand.yml --ref <branch> -f job=<name>`;
 # `mutants` also takes `-f base=<ref>` (default `main`).
@@ -399,7 +399,7 @@ jobs:
   # additionally has just, lake, cargo and, on Windows, Git Bash's
   # /usr/bin and zig on its PATH, because those run the checker and the
   # stand-in provider, which are built before the environment narrows:
-  # the narrower PATH reruns the build script of crates/desktop/ffi,
+  # the narrower PATH reruns the build script of Sprawling/desktop/ffi,
   # which watches PATH and on Windows compiles its Zig leaf; the city it
   # serves is the archive's binary and nothing from the checkout.
   #
@@ -561,13 +561,13 @@ jobs:
           ARCHIVE_TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
-          bundle="$PWD/crates/sprawling/web-dist"
+          bundle="$PWD/Sprawling/app/web-dist"
           backup="$RUNNER_TEMP/client-regression-bundle"
           cp -R "$bundle" "$backup"
           trap 'result=$?; cp -R "$backup/." "$bundle/"; exit "$result"' EXIT
           python3 - <<'PYTHON'
           from pathlib import Path
-          bundle = Path("crates/sprawling/web-dist")
+          bundle = Path("Sprawling/app/web-dist")
           scripts = list(bundle.rglob("*.js"))
           if not scripts:
               raise SystemExit("the production bundle has no script to corrupt")
@@ -649,9 +649,9 @@ jobs:
 
   # Whether the city key survives a binary update on macOS, where the
   # Keychain may ask again before it lets a newly signed binary read an
-  # item an older one wrote (crates/remote_access/Spec.lean §3). The city
+  # item an older one wrote (Sprawling/remote_access/Spec.lean §3). The city
   # key is kept by the remote door, and a serve keeps the door only when it
-  # has a console (crates/sprawling/spec/Outside.lean, "没有控制台"), so
+  # has a console (Sprawling/app/spec/Outside.lean, "没有控制台"), so
   # each serve here runs with `--console` and an empty stdin: the door and
   # its key are kept at start-up, then the console reads end of input and
   # stops while the city serves on. Without `--console` no serve ever

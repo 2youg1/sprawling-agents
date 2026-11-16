@@ -6,7 +6,7 @@
 /-!
 # proposal：一张修改提案卡怎样切成句子、怎样按逐句的决定合成、一张卡能被处理几次
 
-规定 `crates/documents/src/proposal.rs`（`documents::Review`、`Slice`、`Offer`、`decide`）与 `crates/documents/src/proposal/slices.rs`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/documents/src/proposal.rs`（`documents::Review`、`Slice`、`Offer`、`decide`）与 `Sprawling/documents/src/proposal/slices.rs`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 Rust 的 `Review::of(before, after)` 把两段文本各切成句子（每一句连着它前面的空白与最后一句之后的空白，接起来恰是原文），再对齐成一串 `Slice`：`Same` 两边都有，`Delete` 只在原文里，`Insert` 只在提议里。本模型把一句写成它的全部字节 `piece`（Rust 的 `lead ++ text ++ trail`），把对齐的结果当作给定的一串句子；「对齐出的句子按种类过滤之后恰是两边的句子」由 Rust 的测试断言，不在这里证明。Rust 的决定是一组「序号 ↦ 判词」，本模型把它写成与句子一一对应的 `Option Verdict` 列表，没被点名的句子是 `none`；`amend` 在 Rust 里换掉的是句子的 `text`、留着它的空白，这里换掉整句，两者对性质没有区别。
 

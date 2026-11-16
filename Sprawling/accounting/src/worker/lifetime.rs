@@ -29,7 +29,7 @@ use kernel::{AxError, B3Hash, EventDraft, EventKind, EventRecord, Ledger, Payloa
 use storage::{Cas, JsonlLedger, OpenReport};
 
 /// What opening the ledger repaired before this worker read a line of
-/// it (`crates/sprawling/Spec.lean` §8-102). The ledger records the cut as
+/// it (`Sprawling/app/Spec.lean` §8-102). The ledger records the cut as
 /// `log_truncated`, but no page draws that line, so the worker keeps
 /// this value to tell the person at the two doors a city opens through.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -94,7 +94,7 @@ fn old_skill_bindings(
 
 impl RunWorker {
     /// Opens the city's ledger at the time `hands.clock` reads, and
-    /// builds the worker over it with `hands` (`crates/accounting/spec/Worker.lean` §8-11).
+    /// builds the worker over it with `hands` (`Sprawling/accounting/spec/Worker.lean` §8-11).
     ///
     /// # Errors
     /// Propagates whatever opening the ledger or the store reports, and
@@ -166,7 +166,7 @@ impl RunWorker {
         } = hands;
         let now = crate::Clock::now(&*clock)?;
         // Holding the one writer is what makes every worktree lock a
-        // lock nobody alive holds (`crates/storage/Spec.lean` §8-9).
+        // lock nobody alive holds (`Sprawling/storage/Spec.lean` §8-9).
         storage::Worktrees::lift_abandoned_leases(city_root, &ledger)
             .map_err(storage::StorageError::into_ax)?;
         // A rule the ignore table gained since a building was raised
@@ -366,7 +366,7 @@ impl RunWorker {
         Ok(())
     }
 
-    /// Takes back the trees a crash left behind (`crates/sprawling/Spec.lean` §8-108).
+    /// Takes back the trees a crash left behind (`Sprawling/app/Spec.lean` §8-108).
     ///
     /// Nothing is held yet: the ledger this worker holds is locked to
     /// this process, and no run has been dispatched. A tree that will
@@ -397,7 +397,7 @@ impl RunWorker {
 
     /// Brings every configuration file the city holds to this build's
     /// format, its original bytes kept under `~/.sprawling/backups`
-    /// (`crates/sprawling/spec/Accounting/Worker.lean` §8-108).
+    /// (`Sprawling/app/spec/Accounting/Worker.lean` §8-108).
     ///
     /// Under the ledger's writer lock no run reads these files yet. Each
     /// file rewritten or refused is told; nothing here keeps the person
@@ -441,7 +441,7 @@ impl RunWorker {
     }
 
     /// Makes the checkpoint repository before a lane asks for a writer's index, and takes back
-    /// the indexes a crash left: no run is live yet (`crates/sprawling/spec/Accounting/Views.lean` §8-46-13).
+    /// the indexes a crash left: no run is live yet (`Sprawling/app/spec/Accounting/Views.lean` §8-46-13).
     fn open_checkpoints(&mut self) {
         let opened = storage::Checkpoint::open(&self.city_root)
             .and_then(|_| storage::Checkpoint::sweep_writers(&self.city_root));
@@ -458,7 +458,7 @@ impl RunWorker {
 
     /// Freezes the runs the last process left open, and closes the calls
     /// whose outcome it left unknown, through the scan `sprawling resume`
-    /// runs (`crates/accounting/spec/Worker/Genesis/Lost.lean` §8-18-1,
+    /// runs (`Sprawling/accounting/spec/Worker/Genesis/Lost.lean` §8-18-1,
     /// D30).
     ///
     /// For a served city: call it after the observer is attached and
@@ -497,7 +497,7 @@ impl RunWorker {
     }
 
     /// The same worker, reading every time through `clock` instead of
-    /// the wall clock (`crates/accounting/spec/Clock.lean` §8-3).
+    /// the wall clock (`Sprawling/accounting/spec/Clock.lean` §8-3).
     ///
     /// The door citysim and the tests drive a worker through: when
     /// things happen is theirs to script, while what the worker writes
@@ -510,7 +510,7 @@ impl RunWorker {
 
     /// The same worker, taking the browser tools a building's rules ask
     /// for from `browsers` instead of starting a browser on this host
-    /// (`crates/sprawling/Spec.lean` §8-45-2).
+    /// (`Sprawling/app/Spec.lean` §8-45-2).
     #[must_use]
     pub fn with_browsers(self, browsers: super::Browsers) -> RunWorker {
         RunWorker { browsers, ..self }
@@ -518,7 +518,7 @@ impl RunWorker {
 
     /// The same worker, starting the desktop server a building's rules
     /// ask for from `program` instead of from this executable
-    /// (`crates/sprawling/Spec.lean` §8-4d).
+    /// (`Sprawling/app/Spec.lean` §8-4d).
     #[must_use]
     pub fn with_desktop_program(self, program: super::DesktopProgram) -> RunWorker {
         RunWorker {
@@ -528,7 +528,7 @@ impl RunWorker {
     }
 
     /// The same worker, starting the harness a room's resident names
-    /// through `start` instead of on this host (`crates/sprawling/Spec.lean` §8-124).
+    /// through `start` instead of on this host (`Sprawling/app/Spec.lean` §8-124).
     /// Only a test plays a harness; production starts the vendor's own.
     #[cfg(test)]
     #[must_use]

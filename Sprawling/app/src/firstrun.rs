@@ -11,7 +11,7 @@
 //! person typing `sprawling` in a shell needs `GetConsoleProcessList`,
 //! which needs `unsafe`, which the workspace forbids. So nothing here
 //! guesses how it was started: the three ways in are each named, and they
-//! meet at `up` (`crates/sprawling/spec/Firstrun.lean` §8-8).
+//! meet at `up` (`Sprawling/app/spec/Firstrun.lean` §8-8).
 
 use std::io::{BufRead, Write};
 use std::net::SocketAddr;
@@ -40,7 +40,7 @@ pub enum FirstScreen {
 }
 
 /// Draws the first two lines of the CLI when no city is there yet, and
-/// reads the one answer they ask for (`crates/sprawling/spec/Firstrun.lean` §8-8).
+/// reads the one answer they ask for (`Sprawling/app/spec/Firstrun.lean` §8-8).
 ///
 /// The path is on the screen before the question, so nobody consents to a
 /// location they were not shown. End of input is `Quit`: a piped or
@@ -139,7 +139,7 @@ pub fn open_when_ready(bind: SocketAddr, url: String, door: wire::LocalDoor) {
 /// Opens `url` in this desktop's browser already paired: an open code
 /// from `door` goes into a page only this account can read, and the
 /// browser is handed that file's path, never the code
-/// (`crates/sprawling/spec/Firstrun.lean` §8-8). The file is removed once
+/// (`Sprawling/app/spec/Firstrun.lean` §8-8). The file is removed once
 /// the page redeems the code, or once the code expires.
 ///
 /// Under WSL a `file:` page cannot reach the Windows browser, so the bare
@@ -273,7 +273,7 @@ fn open_in_browser(
 }
 
 /// `cmd.exe` from `System32`, never one the search order finds first in
-/// this binary's folder (`crates/sprawling/spec/Firstrun.lean` §8-8).
+/// this binary's folder (`Sprawling/app/spec/Firstrun.lean` §8-8).
 #[cfg(target_os = "windows")]
 fn handler(target: &str) -> Result<std::process::Command, kernel::AxError> {
     let mut command = child::command(crate::privacy::windows::system32("cmd.exe")?);

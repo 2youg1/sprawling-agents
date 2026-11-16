@@ -4,17 +4,17 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The fold that turns verified lines into a playback bundle's tables
-//! (`crates/accounting/spec/Playback.lean` §8-12).
+//! (`Sprawling/accounting/spec/Playback.lean` §8-12).
 //!
 //! Every line up to the cutoff is folded into the run lineage and the
 //! key-moment ends, because a run's state and a moment's closing are
 //! facts as of the cutoff, not as of the window. Every table the bundle
 //! carries is then built from the lines the reader may see alone: a
 //! withheld line adds to a count and to nothing else
-//! (`crates/accounting/spec/Playback/Project.lean`). A committed
+//! (`Sprawling/accounting/spec/Playback/Project.lean`). A committed
 //! checkpoint's evidence is asked of the history folded up to its line,
 //! and its diff and calls are read last, from the repository and through
-//! the walk's index (`crates/accounting/spec/Playback/Traced.lean` §8-17, §8-25).
+//! the walk's index (`Sprawling/accounting/spec/Playback/Traced.lean` §8-17, §8-25).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;

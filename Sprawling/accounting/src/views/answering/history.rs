@@ -251,7 +251,7 @@ impl LedgerAsk {
     /// The summary of a run the hot view evicted, folded from that run's
     /// own records in the Ledger through a `storage::HotView` holding it
     /// alone, so the cold side maps a record to a row by the same rule
-    /// as the hot one (`crates/sprawling/Spec.lean` §8-106).
+    /// as the hot one (`Sprawling/app/Spec.lean` §8-106).
     ///
     /// An error when the records cannot be read, or when they fold to no
     /// run at all: an evicted run always has some, so the caller answers

@@ -244,7 +244,7 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
         );
     }
     // Both wait in the dormant index under the city's own namespace, and
-    // the hall reaches them through `tool` (`crates/runtime/Spec.lean` §8-60).
+    // the hall reaches them through `tool` (`Sprawling/runtime/Spec.lean` §8-60).
     let listed = |name: &str| {
         offered.contains(&format!("- {name}:")) || offered.contains(&format!("- {name}\\n"))
     };
@@ -303,7 +303,7 @@ fn a_checkpoint_carries_what_the_run_may_write_and_not_only_its_room() {
 /// The checkpoint after a wave stages the paths that wave's calls said they
 /// wrote, not the whole write domain: `edit` knows its one file, so the
 /// closing checkpoint has no reason to walk the building for it
-/// (`crates/runtime/Spec.lean` §8-45). The first checkpoint of the run still takes
+/// (`Sprawling/runtime/Spec.lean` §8-45). The first checkpoint of the run still takes
 /// the whole domain, because no commit of this run vouches for the tree
 /// before it.
 #[test]
@@ -360,7 +360,7 @@ fn a_note_beside_the_hall(city: &std::path::Path) -> git2::Repository {
 /// The city's genesis hash is read from the ledger once and remembered:
 /// it is the one fact about a city that cannot change without the city
 /// being a different one, so no checkpoint, landing or merge re-reads the
-/// front of the history to learn it (`crates/sprawling/Spec.lean` §8-51).
+/// front of the history to learn it (`Sprawling/app/Spec.lean` §8-51).
 #[test]
 fn the_citys_genesis_hash_is_read_once_and_survives_the_ledger_going_away() {
     let dir = tempfile::tempdir().unwrap();

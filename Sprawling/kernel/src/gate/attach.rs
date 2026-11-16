@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The one door that asks a person.
-//! The part `crates/kernel/spec/Gate.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Gate.lean` specifies this module with the
 //! rest of `kernel::gate`.
 //!
 //! Every other door answers from the rules it was handed. This one

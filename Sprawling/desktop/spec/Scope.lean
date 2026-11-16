@@ -6,7 +6,7 @@
 /-!
 # scope：没有写下的就是没有准许
 
-规定 `crates/desktop/src/scope.rs`（`desktop::scope`，`Scope::read`、`Scope::parse`、`Scope::admits`、`Admitted::sound`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/desktop/src/scope.rs`（`desktop::scope`，`Scope::read`、`Scope::parse`、`Scope::admits`、`Admitted::sound`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 `DESKTOP.toml` 只表达一份 allowlist（窗口标题的 pattern、进程名的 pattern）、`record`／`clipboard` 两位开关与 `sound` 一个设备名。一行 pattern 匹配什么归 `spec/Scope/Pattern.lean`；这里把「哪些名字被某一行匹配」当作两个判定 `windows`、`processes`。一次 `tools/call` 在碰到平台之前先过这里（§7），所以「越界」在任何 Win32 调用之前就已判完。
 

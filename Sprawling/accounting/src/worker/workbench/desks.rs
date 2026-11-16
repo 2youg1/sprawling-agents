@@ -25,7 +25,7 @@ impl RunWorker {
     /// A second run in the same room is given a queue of its own and
     /// told so in [`Desks::holding`]: the room table lends its queue to
     /// one reader, and what arrives meanwhile waits there for that
-    /// reader to land (`crates/sprawling/Spec.lean` §8-46-9).
+    /// reader to land (`Sprawling/app/Spec.lean` §8-46-9).
     ///
     /// # Errors
     /// Propagates a plan that cannot be read and a shelf that cannot be
@@ -328,7 +328,7 @@ pub(in crate::worker) struct Desks {
     /// to the desk, so it is counted here or not at all.
     pub(in crate::worker) waiting: u32,
     /// This run's tenure over its room's queue, shown when it lands:
-    /// only the holder gives a queue back (`crates/sprawling/Spec.lean` §8-46-9).
+    /// only the holder gives a queue back (`Sprawling/app/Spec.lean` §8-46-9).
     pub(in crate::worker) tenure: crate::worker::QueueTenure,
     /// Where a change of the room's run policy waits for this run.
     pub(in crate::worker) policy: crate::worker::rooms::PolicySlot,

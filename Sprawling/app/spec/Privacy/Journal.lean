@@ -5,8 +5,8 @@
 
 /-!
 # privacy::journal 的 history 读写接口
-规定 `crates/sprawling/src/privacy/journal.rs`。本节是 IO 契约说明，不是 fsync 证明。
-History 的行为性质引用 crates.sprawling.spec.Privacy 的任意轨迹契约；writer 满足该模型
+规定 `Sprawling/app/src/privacy/journal.rs`。本节是 IO 契约说明，不是 fsync 证明。
+History 的行为性质引用 Sprawling.app.spec.Privacy 的任意轨迹契约；writer 满足该模型
 durablePrepared 的环境假设（成功返回即已持久）。
 
 读取：read(path: &Path) -> Result<History, HistoryFault> 只以 File::open 打开既有文件，

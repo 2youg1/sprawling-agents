@@ -29,7 +29,7 @@ open Sprawling
 Fixed rather than drawn from the clock. A counterexample is only worth rendering
 into a Rust test if the run that found it can be repeated, and a checker that
 answers differently on two runs of the same tree cannot tell a fix from a lucky
-draw. `crates/adversary/Spec.lean` section 14 records the figure; the nightly job states
+draw. `Tools/adversary/Spec.lean` section 14 records the figure; the nightly job states
 `SPRAWLING_SEED` instead, so exploring new traces and reproducing a local red
 are each served without arguing with the other. -/
 def defaultSeed : Nat := 20260912
@@ -120,7 +120,7 @@ private def sealed (door : Door) : IO Unit :=
 /-- What the door's own documentation promises: a refusal is distinguishable
 from an acceptance, from outside, without reading the frames.
 
-`crates/adversary/Spec.lean` section 4 records the measurement that made this worth asserting:
+`Tools/adversary/Spec.lean` section 4 records the measurement that made this worth asserting:
 the exit code means "no refusal arrived inside the quiet window", which is not
 the same statement. -/
 private def exitCodeMeansWhatItSays (door : Door) : IO Unit :=
@@ -384,9 +384,9 @@ after both have written into it.
 product rather than in this check.** An approval item is named
 `ap-<run>-<seq>`, so it is distinct as soon as the runs are; but an item is
 raised only by a gate during a tool wave, which needs a provider that answers,
-and this directory may not host one (crates/adversary/Spec.lean section 13). The
+and this directory may not host one (Tools/adversary/Spec.lean section 13). The
 identity two lanes would have collided on is asserted here; that two questions
-reach two rows of an inbox is owed by `crates/sprawling/tests/e2e.rs`, which
+reach two rows of an inbox is owed by `Sprawling/app/tests/e2e.rs`, which
 has a real endpoint to ask. -/
 private def twoDispatchesAreTwoRuns (door : Door) : IO Unit :=
   withGround door fun ground => do
@@ -468,7 +468,7 @@ suite had been changing.
 
 `tampering` flips a byte in the oldest record and is right to: that is the one
 position no city process races. But the chain covers every record a later record
-has hashed — `crates/kernel/spec/Ledger.lean`'s `aCoveredLineCannotChangeUnnoticed` — so
+has hashed — `Sprawling/kernel/spec/Ledger.lean`'s `aCoveredLineCannotChangeUnnoticed` — so
 detection at one position is detection at one position and no more. This walks
 them all, oldest first, and puts the city's own bytes back before each attempt: a
 file still carrying the previous attempt's damage would refuse for that reason,

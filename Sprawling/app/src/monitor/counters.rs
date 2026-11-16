@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The platform counters one [`Sample`] is read from: this process, the
-//! machine, and the volume the city lives on (`crates/sprawling/spec/Monitor.lean` §8-96).
+//! machine, and the volume the city lives on (`Sprawling/app/spec/Monitor.lean` §8-96).
 //!
 //! A `Counters` exists only while somebody watches; the sampler drops it
 //! when the last watcher leaves, so its handles and process table are
@@ -31,7 +31,7 @@ pub(crate) struct Counters {
 
 /// How many platform readings were taken, by kind: this process through
 /// its own handle, the machine through `sysinfo`, and the whole process
-/// table (`crates/sprawling/spec/Main.lean` §8-129-3). A count rather than a time, so a
+/// table (`Sprawling/app/spec/Main.lean` §8-129-3). A count rather than a time, so a
 /// test can hold the sampling cost exactly on any machine.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct Reads {
@@ -103,7 +103,7 @@ impl Counters {
         not(test),
         expect(
             dead_code,
-            reason = "the count gate's tests read it (`crates/sprawling/spec/Main.lean` §8-129-3); a production reading only counts"
+            reason = "the count gate's tests read it (`Sprawling/app/spec/Main.lean` §8-129-3); a production reading only counts"
         )
     )]
     pub(crate) fn reads(&self) -> Reads {

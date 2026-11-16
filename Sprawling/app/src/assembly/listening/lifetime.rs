@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Lifecycle carry-out for a served city
-//! (`crates/sprawling/spec/Console/Lifecycle.lean`, `crates/sprawling/spec/Console.lean` §8-11).
+//! (`Sprawling/app/spec/Console/Lifecycle.lean`, `Sprawling/app/spec/Console.lean` §8-11).
 
 use std::future::Future;
 use std::pin::Pin;
@@ -101,7 +101,7 @@ pub(crate) async fn live(
 }
 
 /// `CloseCity` from a page reaches the lifecycle only on loopback
-/// (`crates/sprawling/spec/Console.lean` §8-11); the sink has no peer address.
+/// (`Sprawling/app/spec/Console.lean` §8-11); the sink has no peer address.
 pub(super) fn closing_from_a_page(
     at: std::net::SocketAddr,
     lifecycle: tokio::sync::mpsc::Sender<Event>,

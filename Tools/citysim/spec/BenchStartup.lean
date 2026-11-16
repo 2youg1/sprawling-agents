@@ -6,19 +6,19 @@
 /-!
 # citysim::bench_startup
 
-规定 `just bench-startup` 的测量 Main `bin/bench_startup`（`crates/citysim/src/bin/bench_startup.rs`）与它的模块：`samples`、`actions`，以及 `actions` 下的 `archive`、`first_byte`、`footprint`、`history`（都在 `crates/citysim/src/bin/bench_startup/` 下）。本文件是 `crates/citysim/Spec.lean` 的一个分部；下面各节保留它们在 citysim 规格里的标签 §8-5、§8-5-1，别处引作 `crates/citysim/Spec.lean §8-5`。
+规定 `just bench-startup` 的测量 Main `bin/bench_startup`（`Tools/citysim/src/bin/bench_startup.rs`）与它的模块：`samples`、`actions`，以及 `actions` 下的 `archive`、`first_byte`、`footprint`、`history`（都在 `Tools/citysim/src/bin/bench_startup/` 下）。本文件是 `Tools/citysim/Spec.lean` 的一个分部；下面各节保留它们在 citysim 规格里的标签 §8-5、§8-5-1，别处引作 `Tools/citysim/Spec.lean §8-5`。
 
-能写成定理的是读数本身不说假话的两件：可疑样本只标注不剔除，每个样本都留在读数里，标注只看它是否超过中位的倍数（`every_sample_is_kept_and_marked_by_the_cut`）；主导子步是中位最大的那一个（`the_dominant_step_has_the_largest_middle`）；没有子步切分时答 `None` 是 `dominant` 的空表一臂，不另写定理。分位怎样取是 sprawling 的 `Spread`（`crates/sprawling/Spec.lean` §8-129-2），倍数 `SUSPICIOUS_TIMES` 也住那里，模型把中位与倍数之积当参数；计时与文件计数由 `samples`、`footprint`、`actions` 的测试守着（§16）。
+能写成定理的是读数本身不说假话的两件：可疑样本只标注不剔除，每个样本都留在读数里，标注只看它是否超过中位的倍数（`every_sample_is_kept_and_marked_by_the_cut`）；主导子步是中位最大的那一个（`the_dominant_step_has_the_largest_middle`）；没有子步切分时答 `None` 是 `dominant` 的空表一臂，不另写定理。分位怎样取是 sprawling 的 `Spread`（`Sprawling/app/Spec.lean` §8-129-2），倍数 `SUSPICIOUS_TIMES` 也住那里，模型把中位与倍数之积当参数；计时与文件计数由 `samples`、`footprint`、`actions` 的测试守着（§16）。
 -/
 
 /-!
 ### 8-5 bench_startup 族：四动作压档的测量面（只实测，不优化）
 
-四动作各给三件套（能否进 p99≤1ms／极限读数／主导成本件），本族只测不优化。本族是 `just bench` 的同族仪表：同一 citysim bin 面、同一 wall-clock 口径（测而不门，读数标注机器类属）。四行读数落在 `crates/xtask/budgets.toml` 的 `[install]`／`[startup]`／`[raise_city]`／`[open_session]`，无预算键故不门；机器类属、样本数与四个动作的子指标数字都写在行内，本规格不重抄它们。
+四动作各给三件套（能否进 p99≤1ms／极限读数／主导成本件），本族只测不优化。本族是 `just bench` 的同族仪表：同一 citysim bin 面、同一 wall-clock 口径（测而不门，读数标注机器类属）。四行读数落在 `Tools/xtask/budgets.toml` 的 `[install]`／`[startup]`／`[raise_city]`／`[open_session]`，无预算键故不门；机器类属、样本数与四个动作的子指标数字都写在行内，本规格不重抄它们。
 
 ```rust
-// crates/citysim/src/bin/bench_startup.rs —— measuring Main：本族唯一计时采样点（`stamp()`，同 bin::bench 先例）；`SAMPLES` 是每动作次数的唯一之家，循环、预分配与报告同读它
-// crates/citysim/src/bin/bench_startup/samples.rs —— shape: decision（时间以 Duration 入参；无时钟、无 I/O）
+// Tools/citysim/src/bin/bench_startup.rs —— measuring Main：本族唯一计时采样点（`stamp()`，同 bin::bench 先例）；`SAMPLES` 是每动作次数的唯一之家，循环、预分配与报告同读它
+// Tools/citysim/src/bin/bench_startup/samples.rs —— shape: decision（时间以 Duration 入参；无时钟、无 I/O）
 pub struct Samples { /* 一次构造点持有 ≥1 个 Duration；invalid state 不可拼写 */ }
 pub use sprawling::monitor::spread::Share;   // P50, P95, P99：产品自己的那一个
 pub enum SampleKind { Plain, Suspicious }   // > SUSPICIOUS_TIMES × p50 标可疑：Defender 实时扫描等外扰的标注位
@@ -31,7 +31,7 @@ impl Samples {
     pub fn suspicious(&self) -> usize;
     pub fn tier(&self) -> Tier;
 }
-// crates/citysim/src/bin/bench_startup/actions.rs —— shape: adapter（薄驱动产品公面，口径即边界；两处跨进程动作走的都是产品自己的路径）
+// Tools/citysim/src/bin/bench_startup/actions.rs —— shape: adapter（薄驱动产品公面，口径即边界；两处跨进程动作走的都是产品自己的路径）
 pub(crate) const SAMPLES: usize;   // 200
 pub struct PerSample { pub processes: u64, pub files: u64, pub barriers: u64 }
 pub struct Action { pub total: Samples, pub steps: Vec<(&'static str, Samples)>, pub per_sample: PerSample }
@@ -40,8 +40,8 @@ pub fn startup(binary: &Path) -> Result<Action, AxError>;
 pub fn raise_city(scratch: &Path) -> Result<Action, AxError>;
 pub fn open_session(city: &Path) -> Result<Action, AxError>;
 pub fn dominant(steps: &[(&'static str, Samples)]) -> Option<&'static str>;
-// crates/citysim/src/bin/bench_startup/actions/archive.rs —— shape: adapter（发行档的格式读写都在这里：摘要、解包、写出 fixture 条目；`sha2`／`zip` 各在 workspace 清单里一个名字，打包步与本次读数不会对它们生出第二种拼法）
-// crates/citysim/src/bin/bench_startup/actions/footprint.rs —— shape: adapter（一次 walk 供所有读者：一个样本在一棵树下写了多少文件、多少账行、某个名字在哪、以及样本之间如何把目录清平）
+// Tools/citysim/src/bin/bench_startup/actions/archive.rs —— shape: adapter（发行档的格式读写都在这里：摘要、解包、写出 fixture 条目；`sha2`／`zip` 各在 workspace 清单里一个名字，打包步与本次读数不会对它们生出第二种拼法）
+// Tools/citysim/src/bin/bench_startup/actions/footprint.rs —— shape: adapter（一次 walk 供所有读者：一个样本在一棵树下写了多少文件、多少账行、某个名字在哪、以及样本之间如何把目录清平）
 ```
 
 **四个计时边界**（起止、子步、决定见 D2／D3）。样本 200／动作（≥100）；p50/p95/p99 取 nearest-rank；读数全样本给出（基线永不减除），可疑样本只标注不剔除。
@@ -57,7 +57,7 @@ pub fn dominant(steps: &[(&'static str, Samples)]) -> Option<&'static str>;
 
 **命令行**：`bench_startup` 不带参数量四个动作与首字节；`bench_startup first-byte` 只量首字节；别的参数以 `E_INVALID_ARGS` 拒。
 
-**平台**：计时口径在三个平台上相同，被量的东西不同。「`CreateProcess` 发出」在 macOS、Linux 上是 `std::process::Command::spawn` 发出（fork/exec），子步「进程创建」量的是 `spawn` 返回所花的时间，这在三个平台上代价不同；可执行文件名带本平台后缀（`std::env::consts::EXE_SUFFIX`，Windows 上是 `.exe`）；Defender 实时扫描只在 Windows 上有，其余平台的可疑样本标的是别的外扰；耐久屏障是 storage 在各平台上的那一个（`crates/storage/Spec.lean`）。所以读数按 `std::env::consts::OS` 与机器类属登记，两个平台的读数不互相比较。
+**平台**：计时口径在三个平台上相同，被量的东西不同。「`CreateProcess` 发出」在 macOS、Linux 上是 `std::process::Command::spawn` 发出（fork/exec），子步「进程创建」量的是 `spawn` 返回所花的时间，这在三个平台上代价不同；可执行文件名带本平台后缀（`std::env::consts::EXE_SUFFIX`，Windows 上是 `.exe`）；Defender 实时扫描只在 Windows 上有，其余平台的可疑样本标的是别的外扰；耐久屏障是 storage 在各平台上的那一个（`Sprawling/storage/Spec.lean`）。所以读数按 `std::env::consts::OS` 与机器类属登记，两个平台的读数不互相比较。
 
 **失败**：产品公面的失败原样抛 `AxError`，不新增码；测量自体的失败（被测二进制不在构建档目录等）用既有码走三段式（动作/主体/`AxCode`/recovery）。
 
@@ -65,13 +65,13 @@ Rust 检查：`samples.rs` 的三个测试判 nearest-rank 分位、可疑标注
 
 D2 **计时边界取「动作的可观察端点」，进程动作以退出为端点。** 四动作里两个跨进程（安装的落位确认、启动）：端点是被拉起进程**退出被观察到**，因为「可接受命令」在产品外部可观察的最短证据就是一条轻命令被应答完毕。落盘动作（建城、开 session）以公面调用**返回**为端点，因为返回即账本已带自身屏障落盘（落账先于效果）。被击败的备选：以进程内部时点（参数解析完成、监听就绪）为端点——那要在产品里插桩，为测量加一条不发货的分支，改写被测路径。
 
-D3 **安装边界含归档摘要校验、不含 PATH 写入。** 摘要校验（sha256）是 `install.sh`／`install.ps1` 从归档就位到解包之间必经的一步，删掉它测的就是不验摘要的安装，故计为安装的子步并单列读数。签名验签不在这次测量里：发行件签名的验签侧有设计而签名动作未接（`crates/xtask/Spec.lean` §8-29），读数里这一子步记 **0** 并注明；签名动作接上之后，此子步只增不删。PATH 写入（`sprawling install` 的注册表写与桌面广播）在边界外：它是一次性的桌面状态写入，第二次运行幂等（`PathEdit::AlreadyPresent`），计进每样本会把桌面状态写入误报成安装成本。被击败的备选：整段 `install.sh` 全测——含网络下载与 shell 启动，而网络不在本族的计时口径内。
+D3 **安装边界含归档摘要校验、不含 PATH 写入。** 摘要校验（sha256）是 `install.sh`／`install.ps1` 从归档就位到解包之间必经的一步，删掉它测的就是不验摘要的安装，故计为安装的子步并单列读数。签名验签不在这次测量里：发行件签名的验签侧有设计而签名动作未接（`Tools/xtask/Spec.lean` §8-29），读数里这一子步记 **0** 并注明；签名动作接上之后，此子步只增不删。PATH 写入（`sprawling install` 的注册表写与桌面广播）在边界外：它是一次性的桌面状态写入，第二次运行幂等（`PathEdit::AlreadyPresent`），计进每样本会把桌面状态写入误报成安装成本。被击败的备选：整段 `install.sh` 全测——含网络下载与 shell 启动，而网络不在本族的计时口径内。
 
-D4 **计量主语是 Rust measuring Main，不是 crates/adversary/ 也不是 criterion。** 四动作零行为断言，只计时；`crates/adversary/` 量化行为轨迹，Lean 侧不为墙钟定价。criterion 会是第二套仪表：本族挂 `just bench` 族，同一 wall-clock 口径（测而不门）。它拉起产品二进制——被测动作本身即进程边界；boundary 门判的是**检查**站哪一侧，其越过面 token（`CARGO_BIN_EXE`／`SPRAWLING_BIN` 等）本族一个不写，被测二进制取自构建档目录（`cargo build` 同时放置两个产物的地方），`just bench-startup` 先构建后测量，故不接手工路径也不会测到旧产物。被击败的备选：把四动作写进 `crates/adversary/`——那里没有秒表也没有本仓词汇，量出来的东西无法与 `just bench` 对表。
+D4 **计量主语是 Rust measuring Main，不是 Tools/adversary/ 也不是 criterion。** 四动作零行为断言，只计时；`Tools/adversary/` 量化行为轨迹，Lean 侧不为墙钟定价。criterion 会是第二套仪表：本族挂 `just bench` 族，同一 wall-clock 口径（测而不门）。它拉起产品二进制——被测动作本身即进程边界；boundary 门判的是**检查**站哪一侧，其越过面 token（`CARGO_BIN_EXE`／`SPRAWLING_BIN` 等）本族一个不写，被测二进制取自构建档目录（`cargo build` 同时放置两个产物的地方），`just bench-startup` 先构建后测量，故不接手工路径也不会测到旧产物。被击败的备选：把四动作写进 `Tools/adversary/`——那里没有秒表也没有本仓词汇，量出来的东西无法与 `just bench` 对表。
 
-D6 **安装的落位确认拆成「系统」与「产品」两步，读数不在本条里。** 旧的一步 `launch` 把首次拉起的整段算作一件，读出来它占了安装的九成（`crates/xtask/budgets.toml` 的 `[install]` 行），可是这九成里多少是本产品自己在跑、多少是操作系统在新映像第一次被执行时扫描它，从一件里分不出来，而两者的对策完全不同：前者改产品，后者只能改发布方式（签名、信誉）或交给 User 的机器设置。拆法沿用 ② startup 已有的分界：`spawn_version` 早就分别量出 spawn 调用的时长与此后到退出的时长，安装只是把这两段分别记下，不再相加。三个平台上的含义（推断，读数时核对）：Windows 上按需扫描在 `CreateProcess` 里阻塞，落在 `system`；macOS 上 Rust 的 spawn 在 exec 成功之后才返回，内核与 `syspolicyd` 对首次执行的评估若在 exec 之内就落在 `system`，若推迟到第一条指令之后就落在 `product`；Linux 上默认没有扫描器，`system` 只是 fork／exec 本身。被否决的做法：在产品里加计时点（`sprawling version` 打印自己的启动时刻）——那是为了测量往发给 User 的二进制里写东西，`xtask artifact` 不收；用 ETW 或 `fs_usage` 读扫描器——一份只在一个平台上存在的第二仪表。本条只加计时点，不取读数：读数由 `just bench-startup` 在测量那一轮取（`[install]` 行的 status）。
+D6 **安装的落位确认拆成「系统」与「产品」两步，读数不在本条里。** 旧的一步 `launch` 把首次拉起的整段算作一件，读出来它占了安装的九成（`Tools/xtask/budgets.toml` 的 `[install]` 行），可是这九成里多少是本产品自己在跑、多少是操作系统在新映像第一次被执行时扫描它，从一件里分不出来，而两者的对策完全不同：前者改产品，后者只能改发布方式（签名、信誉）或交给 User 的机器设置。拆法沿用 ② startup 已有的分界：`spawn_version` 早就分别量出 spawn 调用的时长与此后到退出的时长，安装只是把这两段分别记下，不再相加。三个平台上的含义（推断，读数时核对）：Windows 上按需扫描在 `CreateProcess` 里阻塞，落在 `system`；macOS 上 Rust 的 spawn 在 exec 成功之后才返回，内核与 `syspolicyd` 对首次执行的评估若在 exec 之内就落在 `system`，若推迟到第一条指令之后就落在 `product`；Linux 上默认没有扫描器，`system` 只是 fork／exec 本身。被否决的做法：在产品里加计时点（`sprawling version` 打印自己的启动时刻）——那是为了测量往发给 User 的二进制里写东西，`xtask artifact` 不收；用 ETW 或 `fs_usage` 读扫描器——一份只在一个平台上存在的第二仪表。本条只加计时点，不取读数：读数由 `just bench-startup` 在测量那一轮取（`[install]` 行的 status）。
 
-D5 **被测可执行文件的名字在本 crate 只重述一处，注释点名它的权威。** `executable_name()` 拼的是 `install.rs` 装出来的那个名字：`INSTALLED_STEM` 的值 `sprawling` 加本平台后缀。该事实的权威是 `crates/xtask/src/platform.rs` 每平台的 `binary` 字段，`cargo xtask artifact` 把发行侧的四种拼法（工作流矩阵、两个安装脚本、npm shim）钉在它上面；citysim 这一处不在那四种之内，它是唯一需要这个名字的**测量**读者。够不到权威的原因是位置而非取舍：`install` 模块（`crates/sprawling/src/install.rs`）由 `crates/sprawling/src/main.rs` 声明，是二进制的模块，不可 import，而 `xtask` 是工具不是依赖。本 crate 内只留这一处拼写——`shipped_binary` 找的路径名与 `archive_of` 写出的 zip 成员名都读它。**重开参数**：这个名字若移进 `sprawling` lib 成为公共面，本函数改为读它，重述随之删除。
+D5 **被测可执行文件的名字在本 crate 只重述一处，注释点名它的权威。** `executable_name()` 拼的是 `install.rs` 装出来的那个名字：`INSTALLED_STEM` 的值 `sprawling` 加本平台后缀。该事实的权威是 `Tools/xtask/src/platform.rs` 每平台的 `binary` 字段，`cargo xtask artifact` 把发行侧的四种拼法（工作流矩阵、两个安装脚本、npm shim）钉在它上面；citysim 这一处不在那四种之内，它是唯一需要这个名字的**测量**读者。够不到权威的原因是位置而非取舍：`install` 模块（`Sprawling/app/src/install.rs`）由 `Sprawling/app/src/main.rs` 声明，是二进制的模块，不可 import，而 `xtask` 是工具不是依赖。本 crate 内只留这一处拼写——`shipped_binary` 找的路径名与 `archive_of` 写出的 zip 成员名都读它。**重开参数**：这个名字若移进 `sprawling` lib 成为公共面，本函数改为读它，重述随之删除。
 -/
 
 /-!
@@ -87,17 +87,17 @@ D5 **被测可执行文件的名字在本 crate 只重述一处，注释点名�
 | `l100k` | 2,000 个 run × 50 条 | 5 |
 | `l400k` | 8,000 个 run × 50 条 | 3 |
 
-一个 run 是 `run_started`、八个回合（`prompt_assembled`、`model_called`、`model_returned`、`tool_called`、`tool_result`、`checkpoint_committed`）与 `run_frozen`，正文长度与实测城市的记录相近。这是每回合一条 `prompt_assembled` 的账本形状：产品写的是每 run 一条 `prompt_assembled` 加每回合一条 `prompt_shape_compared`（`crates/runtime/Spec.lean` §8-39 第 5 条），而每回合一条的账本仍被读入，故夹具是合法输入，其折叠代价与一座真正工作过的城同量级，但不逐条同形。账本经 `storage::jsonl::append` 的 `JsonlLedger::append_all` 按每批 10,000 条写入：分段、链与字节规范都是产品自己的，本族不拼一行账。
+一个 run 是 `run_started`、八个回合（`prompt_assembled`、`model_called`、`model_returned`、`tool_called`、`tool_result`、`checkpoint_committed`）与 `run_frozen`，正文长度与实测城市的记录相近。这是每回合一条 `prompt_assembled` 的账本形状：产品写的是每 run 一条 `prompt_assembled` 加每回合一条 `prompt_shape_compared`（`Sprawling/runtime/Spec.lean` §8-39 第 5 条），而每回合一条的账本仍被读入，故夹具是合法输入，其折叠代价与一座真正工作过的城同量级，但不逐条同形。账本经 `storage::jsonl::append` 的 `JsonlLedger::append_all` 按每批 10,000 条写入：分段、链与字节规范都是产品自己的，本族不拼一行账。
 
-**夹具城留在 `<构建档目录>/../bench-cities/<名>`**，下次复用：40 万条是 376 MB，每次重写要付的时间比量它还多。复用只看那座城的目录在不在；生成先写进 `<名>.partial`，写完才改名成 `<名>`，所以一次中断的生成留下的是下次先清掉的 `.partial`，不是一座半截的城；`xtask mem --city` 读的就是同一座城（`crates/xtask/Spec.lean` §8-30），于是首字节与启动峰值出自同一份历史。
+**夹具城留在 `<构建档目录>/../bench-cities/<名>`**，下次复用：40 万条是 376 MB，每次重写要付的时间比量它还多。复用只看那座城的目录在不在；生成先写进 `<名>.partial`，写完才改名成 `<名>`，所以一次中断的生成留下的是下次先清掉的 `.partial`，不是一座半截的城；`xtask mem --city` 读的就是同一座城（`Tools/xtask/Spec.lean` §8-30），于是首字节与启动峰值出自同一份历史。
 
-**每座夹具城的读数旁打印它账本的摘要**（`citysim::ledger_digest`，D8），两条首字节读数只在摘要相等时可比。每个样本那次 `serve` 的标准错误写进 `<构建档目录>/../bench-cities/<名>.serve.log`（后一个样本覆盖前一个），报告里打印这个路径。其中以 `opened the city in` 开头的那一行是产品自己拆出的开城各段耗时（`crates/sprawling/Spec.lean` §8-121），以 `the history is proved` 开头的那一行是后台证明走完、写者开始接受命令的时刻（就绪时刻 M3，`crates/sprawling/Spec.lean` §8-122）：本族不解析它们，只把它们和首字节读数放在同一次开城旁边给人读。所以一个样本量完首字节之后并不立刻停掉 `serve`，而是等日志里出现证明的结局（`the history is proved` 或 `the ledger stopped taking writes`），至多 300 s；首字节读数在这之前已经取下，不受这段等待影响。
+**每座夹具城的读数旁打印它账本的摘要**（`citysim::ledger_digest`，D8），两条首字节读数只在摘要相等时可比。每个样本那次 `serve` 的标准错误写进 `<构建档目录>/../bench-cities/<名>.serve.log`（后一个样本覆盖前一个），报告里打印这个路径。其中以 `opened the city in` 开头的那一行是产品自己拆出的开城各段耗时（`Sprawling/app/Spec.lean` §8-121），以 `the history is proved` 开头的那一行是后台证明走完、写者开始接受命令的时刻（就绪时刻 M3，`Sprawling/app/Spec.lean` §8-122）：本族不解析它们，只把它们和首字节读数放在同一次开城旁边给人读。所以一个样本量完首字节之后并不立刻停掉 `serve`，而是等日志里出现证明的结局（`the history is proved` 或 `the ledger stopped taking writes`），至多 300 s；首字节读数在这之前已经取下，不受这段等待影响。
 
 ```rust
-// crates/citysim/src/bin/bench_startup/actions/history.rs —— shape: adapter（一座有历史的夹具城：init 之后经产品的 Ledger 写入）
+// Tools/citysim/src/bin/bench_startup/actions/history.rs —— shape: adapter（一座有历史的夹具城：init 之后经产品的 Ledger 写入）
 pub enum History { Empty, Runs(u32) }
 pub fn fixture_city(cities: &Path, name: &str, history: History) -> Result<PathBuf, AxError>;
-// crates/citysim/src/bin/bench_startup/actions/first_byte.rs —— shape: adapter
+// Tools/citysim/src/bin/bench_startup/actions/first_byte.rs —— shape: adapter
 pub fn first_byte(binary: &Path, city: &Path, samples: usize, log: &Path) -> Result<Samples, AxError>;
 ```
 -/

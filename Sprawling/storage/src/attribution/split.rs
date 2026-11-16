@@ -20,7 +20,7 @@
 //! and nowhere else. This module never prices a call — that authority is
 //! `gateway::cost`, and a second one would be a second answer.
 //!
-//! Specified by `crates/storage/spec/Attribution.lean` §8-7.
+//! Specified by `Sprawling/storage/spec/Attribution.lean` §8-7.
 
 //! Attribution splits: dividing a bill by weight.
 

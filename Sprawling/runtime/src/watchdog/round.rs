@@ -5,7 +5,7 @@
 
 //! One model call's account round as the watchdog holds it: opened from
 //! the adapter's roster, with what each account met, which is what the
-//! exhausted refusal names (`crates/runtime/spec/Watchdog.lean` §8-9).
+//! exhausted refusal names (`Sprawling/runtime/spec/Watchdog.lean` §8-9).
 
 use std::collections::BTreeMap;
 

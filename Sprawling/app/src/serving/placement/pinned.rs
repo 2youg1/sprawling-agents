@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The fourth comparison arm: the plan's processors held by hard
-//! affinity (`crates/sprawling/spec/Serving/Placement.lean`, D41 and
+//! affinity (`Sprawling/app/spec/Serving/Placement.lean`, D41 and
 //! D103). It is built to be measured later, and it is honest about what
 //! each platform can do: a Windows Job Object holds this process to the
 //! plan's mask, Linux has the call but not through a safe Rust interface

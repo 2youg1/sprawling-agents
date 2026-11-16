@@ -36,13 +36,13 @@ pub struct ModelFacts {
     /// The provider's own output price, verbatim.
     pub output_price: Option<String>,
     /// What the row said about thinking levels, read by the gateway's
-    /// thinking ladder (`crates/gateway/spec/Provider/Thinking.lean`).
+    /// thinking ladder (`Sprawling/gateway/spec/Provider/Thinking.lean`).
     /// Absent on a row that said nothing and on a line written before
     /// the key existed.
     #[serde(default)]
     pub thinking: Option<ThinkingStatement>,
     /// The upstream's own identity for this model across providers,
-    /// where it states one (`crates/gateway/spec/Provider/Identity.lean`).
+    /// where it states one (`Sprawling/gateway/spec/Provider/Identity.lean`).
     /// Machine-readable sampling support stated by the provider.
     #[serde(default)]
     pub generation: Option<crate::GenerationSupport>,

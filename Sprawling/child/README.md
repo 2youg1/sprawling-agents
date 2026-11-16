@@ -51,7 +51,7 @@ A process that will not start is `spawn`'s own `io::Error`, and it belongs to th
 
 ## The specification
 
-`crates/child/Spec.lean` is the whole SPEC and has no parts under a `spec/` directory. §1 splits the two units, §2 states the two acceptance criteria, §3 records the one process that is not started through it and the things that are not city children at all, §8 gives the four public items and the flags rule, §11 enumerates the boundary cases of the key rule, and §16 names the test. D1 to D3 are the three decisions on the platform flag, the process group and the key rule; D4 is the ban and its classes.
+`Sprawling/child/Spec.lean` is the whole SPEC and has no parts under a `spec/` directory. §1 splits the two units, §2 states the two acceptance criteria, §3 records the one process that is not started through it and the things that are not city children at all, §8 gives the four public items and the flags rule, §11 enumerates the boundary cases of the key rule, and §16 names the test. D1 to D3 are the three decisions on the platform flag, the process group and the key rule; D4 is the ban and its classes.
 
 The package has no state machine, so the SPEC proves nothing and holds no theorem: the Rust types and `child::environment::tests` hold it. `ARCHITECTURE.md` §11, *Specifications in Lean*, says how a SPEC is laid out.
 
@@ -59,7 +59,7 @@ The package has no state machine, so the SPEC proves nothing and holds no theore
 
 ```bash
 cargo nextest run -p sprawling-child   # the environment rule's tests
-lake build crates.child.Spec           # this package's specification
+lake build Sprawling.child.Spec           # this package's specification
 ```
 
 `environment::tests::every_secret_key_is_removed_and_nothing_else` is the one test: it hands `scrubbed` a set of inherited keys and checks that each secret key is gone, that nothing else moved, and that a differently cased spelling of a secret key is gone on Windows.

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A run offered the browser the worker was handed
-//! (`crates/sprawling/Spec.lean` §8-45-2).
+//! (`Sprawling/app/Spec.lean` §8-45-2).
 //!
 //! The building's rules ask for a browser, and the worker was handed a
 //! source of browser tools that answers with one scripted tool. A worker
@@ -47,7 +47,7 @@ impl Model for Listening {
                 .map(|tool| tool.name.as_str().to_owned()),
         );
         // A tool outside the mode's core is offered as a line of the
-        // dormant index (`crates/runtime/Spec.lean` §8-60).
+        // dormant index (`Sprawling/runtime/Spec.lean` §8-60).
         self.0.lock().unwrap().extend(
             req.chat
                 .system
@@ -207,7 +207,7 @@ fn a_run_is_offered_the_browser_the_worker_was_handed() {
     });
 
     // A browser is filed under `computer`, one line of the dormant
-    // index (`crates/runtime/Spec.lean` §8-60).
+    // index (`Sprawling/runtime/Spec.lean` §8-60).
     let names = offered.lock().unwrap().clone();
     assert!(
         names.iter().any(|name| name == "computer (1)"),

@@ -44,7 +44,7 @@ impl Unanswered {
 }
 
 /// The serving binary holds the remote door and answers its four verbs
-/// before they reach the desk (`crates/sprawling/spec/Outside.lean`
+/// before they reach the desk (`Sprawling/app/spec/Outside.lean`
 /// §8-140), so one arriving here came by a path that skipped it.
 fn the_door_is_held_elsewhere() -> AxError {
     AxError::failure(
@@ -56,7 +56,7 @@ fn the_door_is_held_elsewhere() -> AxError {
 }
 
 /// A verb the serving binary carries out on its own listener, ahead of
-/// the desk (`crates/sprawling/spec/Serving.lean`), so one arriving here
+/// the desk (`Sprawling/app/spec/Serving.lean`), so one arriving here
 /// came by a path that skipped it.
 #[derive(Clone, Copy)]
 enum OnTheListener {
@@ -86,7 +86,7 @@ impl OnTheListener {
 }
 
 /// The serving binary answers host privacy operations on its own listener
-/// (`crates/sprawling/spec/Privacy/Service.lean`), so one arriving here came
+/// (`Sprawling/app/spec/Privacy/Service.lean`), so one arriving here came
 /// by a path that skipped it.
 fn privacy_is_served_elsewhere() -> AxError {
     AxError::failure(
@@ -137,7 +137,7 @@ impl RunWorker {
     /// The reply is a parameter rather than something the caller holds
     /// onto, because one verb outlives this call: a `Dispatch` starts a
     /// run in a lane and returns, so a refusal that arrives after the
-    /// drive has to know where to go (`crates/sprawling/Spec.lean` §8-46-2).
+    /// drive has to know where to go (`Sprawling/app/Spec.lean` §8-46-2).
     pub(in crate::worker) fn run_command(
         &mut self,
         command: wire::Command,
@@ -159,7 +159,7 @@ impl RunWorker {
                     // that branched off another said so once, at the moment it began.
                     origin: self.origins.get(&addr),
                     // The session's last change, on the ledger, outranks
-                    // the copy the page sent (`crates/sprawling/spec/Accounting/Worker.lean` §8-133).
+                    // the copy the page sent (`Sprawling/app/spec/Accounting/Worker.lean` §8-133).
                     policy: self.origins.policy(&addr).unwrap_or(policy),
                     addr,
                     session,
@@ -345,7 +345,7 @@ impl RunWorker {
     /// is noted rather than swallowing the rest.** Returning on the first
     /// refusal after the window had closed would let one mistyped
     /// building address make every other job due that minute disappear
-    /// with nothing recorded (`crates/sprawling/Spec.lean` §8-46-2).
+    /// with nothing recorded (`Sprawling/app/Spec.lean` §8-46-2).
     ///
     /// # Errors
     /// Propagates the schedule's own refusal to parse. A job that cannot

@@ -12,7 +12,7 @@
 )]
 
 //! What a turn and a call carry beside their pairing, each read from
-//! the one record that states it (`crates/wire/Spec.lean` §8-53 onward).
+//! the one record that states it (`Sprawling/wire/Spec.lean` §8-53 onward).
 
 use super::turns;
 use wire::{AxCode, AxError, B3Hash, EventDraft, EventKind, EventRecord, Payload, RunId, Seq};
@@ -208,7 +208,7 @@ fn a_cut_output_points_at_its_original() {
 
 /// An `exec` result names the code its command ended with; a command a
 /// signal stopped has none, and the row then draws none
-/// (`crates/wire/Spec.lean` §8-76).
+/// (`Sprawling/wire/Spec.lean` §8-76).
 #[test]
 fn an_exec_call_carries_the_code_its_command_ended_with_and_no_code_when_it_had_none() {
     let exec = |seq: u64, id: &str| {
@@ -241,7 +241,7 @@ fn an_exec_call_carries_the_code_its_command_ended_with_and_no_code_when_it_had_
 }
 
 /// What the provider read from its cache and what it wrote into it are
-/// priced apart, so a turn answers both (`crates/wire/Spec.lean` §8-76).
+/// priced apart, so a turn answers both (`Sprawling/wire/Spec.lean` §8-76).
 #[test]
 fn a_turn_carries_cache_reads_and_cache_writes_apart() {
     let returned = record(
@@ -262,7 +262,7 @@ fn a_turn_carries_cache_reads_and_cache_writes_apart() {
 
 /// A provider that reports no cache counts leaves the line without
 /// them; the turn says the counts are unknown, so a page cannot show a
-/// 0% hit for a cache nobody measured (`crates/wire/spec/Reading.lean` D35).
+/// 0% hit for a cache nobody measured (`Sprawling/wire/spec/Reading.lean` D35).
 #[test]
 fn a_turn_whose_provider_reported_no_cache_counts_leaves_them_unknown() {
     let returned = record(

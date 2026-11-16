@@ -6,7 +6,7 @@
 /-!
 # runtime::tools::read
 
-规定 `tools::read`、`tools::read::engine`、`tools::read::miss`、`tools::read::package`、`tools::read::locator`（`crates/runtime/src/` 下同名的文件）。read 的区间读、包、没命中时的 nearby、打开 Locator，以及城外书架上的 skill。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `tools::read`、`tools::read::engine`、`tools::read::miss`、`tools::read::package`、`tools::read::locator`（`Sprawling/runtime/src/` 下同名的文件）。read 的区间读、包、没命中时的 nearby、打开 Locator，以及城外书架上的 skill。本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `Sprawling/runtime/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::tools::read::tests`、`runtime::tools::read::tests::locators`、`runtime::tools::read::tests::looks` 守住。
 -/
@@ -19,11 +19,11 @@
 
 **字节上限切在行边界上，且落在 `Interval::cut` 内部而不在下游。** 理由只有一条：`next_offset` 是调用方续读的唯一凭据，若字节在本函数报出 `next_offset` 之后才被裁掉，那个数就会指过一批没人交付的行，而这个缺口是无声的。首行恒交付，无论它多长——一次返回空的作答会把收到的 offset 原样递回去，调用方于是永远问同一个问题。
 
-`search` 共用同一个上限，接在它已有的 `truncated` 上：`MATCH_CAP = 64` 界定**几条**答案上路，不界定它们**多大**。**首个命中同样受它约束**：每行先被切到 `LINE_CAP`（`crates/runtime/spec/Tools/Search.lean`），所以一条命中的上下文块已远小于上限；块仍超过上限时，由 `elision::splice` 从尾部切进上限、带 `[truncated: N bytes]`，然后停走并报 `truncated`。`read` 的首行恒交付而 `search` 不，是因为 `search` 报的是行号、续读走 `read`，不存在一次空答让调用方原地打转的那个缺口；一整行压缩产物原样塞进一条命中，就是这道上限要拦的那种输入。
+`search` 共用同一个上限，接在它已有的 `truncated` 上：`MATCH_CAP = 64` 界定**几条**答案上路，不界定它们**多大**。**首个命中同样受它约束**：每行先被切到 `LINE_CAP`（`Sprawling/runtime/spec/Tools/Search.lean`），所以一条命中的上下文块已远小于上限；块仍超过上限时，由 `elision::splice` 从尾部切进上限、带 `[truncated: N bytes]`，然后停走并报 `truncated`。`read` 的首行恒交付而 `search` 不，是因为 `search` 报的是行号、续读走 `read`，不存在一次空答让调用方原地打转的那个缺口；一整行压缩产物原样塞进一条命中，就是这道上限要拦的那种输入。
 
-**取 64 KiB 的推导与实测见 `crates/kernel/Spec.lean` §8-8 该常量的 doc**；一句话是：上下文提醒按 30%／65% 排成梯子，没有哪一步可以整级跨过，故单条结果 < 35% 窗口，而 64 KiB 在最坏字节-token 比率下是 128K 窗口的 20.5%。
+**取 64 KiB 的推导与实测见 `Sprawling/kernel/Spec.lean` §8-8 该常量的 doc**；一句话是：上下文提醒按 30%／65% 排成梯子，没有哪一步可以整级跨过，故单条结果 < 35% 窗口，而 64 KiB 在最坏字节-token 比率下是 128K 窗口的 20.5%。
 
-`ReadTool` 增 `offset`（1 基行号，缺省 1，§8-29-1）与 `limit`（缺省与上限**均为 512 行**）。被截断时结果携 `total_lines` 与 `next_offset`，所以「我拿到的是不是全部」不需要猜。`bytes` 字段的语义不变，仍是本次返回文本的长度。结果不携版本，读也不对内容算哈希：读到盘上的一个文件时，读之前与读之后从同一个句柄各取一次戳（长度、修改时间、文件身份），两次相等且这次读算作「看过」（整份未截断，或调用显式给了 `offset`/`limit`）就记进本 run 的读戳表，`edit` 凭它准入（`crates/runtime/spec/Tools/Edit.lean` §8-64）。catalog 条目、包内文档与 Locator 读出的字节不记戳，因为 `edit` 改不到它们。
+`ReadTool` 增 `offset`（1 基行号，缺省 1，§8-29-1）与 `limit`（缺省与上限**均为 512 行**）。被截断时结果携 `total_lines` 与 `next_offset`，所以「我拿到的是不是全部」不需要猜。`bytes` 字段的语义不变，仍是本次返回文本的长度。结果不携版本，读也不对内容算哈希：读到盘上的一个文件时，读之前与读之后从同一个句柄各取一次戳（长度、修改时间、文件身份），两次相等且这次读算作「看过」（整份未截断，或调用显式给了 `offset`/`limit`）就记进本 run 的读戳表，`edit` 凭它准入（`Sprawling/runtime/spec/Tools/Edit.lean` §8-64）。catalog 条目、包内文档与 Locator 读出的字节不记戳，因为 `edit` 改不到它们。
 
 理由：整读一份千行级的 SPEC 或数十 KB 的 ARCHITECTURE，要么吃掉整个窗口，要么被管线从中间剪掉，而剪掉的往往正是要改的那一段。512 是选定值。
 
@@ -87,7 +87,7 @@ const NEARBY_CAP: usize = 16;
 - **文件在而打不开＝`E_STORAGE_FATAL`，不给 `nearby`**：名字是对的，候选只会误导。
 - **打开之后再核一次，不符＝`E_GATE_DENIED`**：包与单文档的路径，以及 §8-29-4-1 退回的路径，经 `text_at` 打开判过的真实路径，然后核两件事：这条路径此刻的真实位置仍是它自己（路上没有换进来的链接），此刻这条路径上的文件与打开的句柄是同一个文件（`same-file` 的 `Handle`，比的是卷与文件号）；任一不符即拒，拒因不说出链接指向哪里。之后只从已打开的句柄读。两道核验各挡一种换法：判定之后换进来并一直留着的链接，打开与再开都穿过它而相等，只有重求真实位置看得见；打开时是链接、重求前又换回的，只有句柄比对看得见。剩下的窗口要在打开、重求、再开之间来回换三次。打开放在判定之后而不是之前，因为先打开就会在判定前打开链接背后未经判定的东西，Unix 上一个 FIFO 会让这次打开一直阻塞。catalog 里的单份文档也先经 `real_location`（§8-30-1）求真实位置，所以 `text_at` 的每个调用方交来的都是真实路径，核验对它们一视同仁。
 - **列目录是尽力而为**：目录列不出或名字不是 Unicode 时 `nearby` 为空，调用方要的拒因是「没命中」本身。
-- **恢复语指向 `search`，不指向 `exec`**：每栋楼的工具集都有 `search`，而 City Hall 的工具集里没有 `exec`（`crates/city/Spec.lean` §8-22）；一句指向一件不存在的工具的恢复语会让规划者空转一个回合。
+- **恢复语指向 `search`，不指向 `exec`**：每栋楼的工具集都有 `search`，而 City Hall 的工具集里没有 `exec`（`Sprawling/city/Spec.lean` §8-22）；一句指向一件不存在的工具的恢复语会让规划者空转一个回合。
 
 #### 8-29-4-1 模型选的路径按句柄判定（`runtime::tools::read::engine`）
 
@@ -104,7 +104,7 @@ pub(super) fn text_of(request: Request<'_>) -> Result<Looked, AxError>;
 - **macOS：同 Linux 的顺序，换一种核法。** macOS 没有命名打开描述符的 procfs，所以打开之后把句柄的卷号与文件号对判定路径此刻指向的文件再求一次，保留身份比较，并用 `rustix::fs::getpath`（`F_GETPATH`）取得已打开句柄的位置，重新交给 `judged_location` 授权后才读；位置无法确认或不获授权即 `E_GATE_DENIED`，不使用可替换的路径查询证明句柄位置。
 - **其他平台走 §8-29-4 的判定路径**，不变。
 - **除 macOS 句柄位置无法确认或不获授权外，失败都退回判定路径重答一遍**：open、元数据、取真实位置、读出错，句柄是目录，字节不是 UTF-8——这些调用本来就答错误或目录，退回由 `land` + `text_at` 给出与 main 相同的那一句，`nearby` 也在那里算。`Floor` 因此只在退回时求。
-- **整读一次，不缓存**：容量按句柄报的长度预留，一次读入，整份校验 UTF-8 不复制；文件字节归操作系统的文件缓存（`crates/sprawling/spec/Serving/Memory.lean` §8-173）。
+- **整读一次，不缓存**：容量按句柄报的长度预留，一次读入，整份校验 UTF-8 不复制；文件字节归操作系统的文件缓存（`Sprawling/app/spec/Serving/Memory.lean` §8-173）。
 
 #### 8-29-5 打开一个 Locator：`cas:` 与 `file:`（`runtime::tools::read::locator`）
 
@@ -120,8 +120,8 @@ fn judged_at(hash: &B3Hash, origins: &[storage::BlockOrigin],
 ```
 
 - **以 `cas:` 或 `file:` 开头的参数是 Locator**，按 `Locator::parse` 判形，判不过即 `E_INVALID_ARGS`；其余参数走 catalog 与普通路径，不受影响（一个城内地址不含冒号，两者不相交）。
-- **`cas:` 块按存块时记下的楼判读取界，只在 `judged_at` 一处决定**，判本身仍是 `chosen_path::admit`（§8-30-1）那一个。来源是 `Cas::put_for` 在存块时写下的（`crates/storage/Spec.lean` §8-3）：一个块为几栋楼存过就有几条来源，取读者能读的第一栋；一栋都读不了就取第一条来源，让 `admit` 按那栋楼的理由拒绝；没有来源的块（上架的技能包、从未存过的哈希）＝`E_GATE_DENIED`，恢复语让它改读块所出自的 `file:`。只按楼判、不按 run 判：读得了那栋楼的文件就读得了为那栋楼存下的字节，而 run 只记作出处。另一条路是按账本里哪一行写了这个哈希来判，落选：模型写的文字（例如委派的 `goal`）会落进带 `addr` 的行，那样的归属可以伪造。`file:<addr>@<oid>` 按 `<addr>` 判。
-- **`file:` 在该 oid 上做 git 读**（`storage::blob_at`，`crates/storage/Spec.lean` §8-29），读的是那一次提交里的字节而不是工作区此刻的文件；地址在该提交里不是一个文件（目录、不存在）＝`E_INVALID_ARGS`。
+- **`cas:` 块按存块时记下的楼判读取界，只在 `judged_at` 一处决定**，判本身仍是 `chosen_path::admit`（§8-30-1）那一个。来源是 `Cas::put_for` 在存块时写下的（`Sprawling/storage/Spec.lean` §8-3）：一个块为几栋楼存过就有几条来源，取读者能读的第一栋；一栋都读不了就取第一条来源，让 `admit` 按那栋楼的理由拒绝；没有来源的块（上架的技能包、从未存过的哈希）＝`E_GATE_DENIED`，恢复语让它改读块所出自的 `file:`。只按楼判、不按 run 判：读得了那栋楼的文件就读得了为那栋楼存下的字节，而 run 只记作出处。另一条路是按账本里哪一行写了这个哈希来判，落选：模型写的文字（例如委派的 `goal`）会落进带 `addr` 的行，那样的归属可以伪造。`file:<addr>@<oid>` 按 `<addr>` 判。
+- **`file:` 在该 oid 上做 git 读**（`storage::blob_at`，`Sprawling/storage/Spec.lean` §8-29），读的是那一次提交里的字节而不是工作区此刻的文件；地址在该提交里不是一个文件（目录、不存在）＝`E_INVALID_ARGS`。
 - **范围**：`cas:` 带的范围照 Locator 本身只交回那一段（`Cas::get_range`）；`file:` 带范围＝`E_INVALID_ARGS`，恢复语让它去掉范围改用 `offset`／`limit`——提交里的文件没有一份按范围读的实现，而 `offset`／`limit` 已答同一个问题。之后都按 `offset`／`limit` 切（§8-29-1）。字节不是 UTF-8＝`E_INVALID_ARGS`，read 只交文本。
 - **为 run 存块的调用方都走 `put_for`**：转录（`Transcript::materialise`，记房间）、卸载的原件（`offload::tee`，记命令所在的房间，来源随 `OffloadSite` 传入）、截图（`bin::browser_tool`，记这栋楼）、交接单 must-read 里的规范文档（`accounting::worker::freezing`，记 run 所在的房间）、run 的任务书（`accounting::worker::dispatching::running`，记房间；run id 由任务书的定位符派生，所以先 `put` 取得哈希，run 立起后再 `put_for` 补记来源）、子 run 的交回说明（`accounting::worker::dispatching::handback`，记子 run 与它的房间）。仍走 `put` 的有两类：上架的技能包不是为某个 run 存的，读不到它的 `cas:`，它按 catalog 名读；冻结前缀的各段（`intern_prefix`）只为让账本里的前缀可审计，一个段为同一栋楼的所有 run 共用，不作为定位符交给任何 run。
 
@@ -136,7 +136,7 @@ pub fn admit_external(package: &Path,
 
 - **按名读到的是钉住的整包**：城外书架是别的程序的目录，扫描为候选构造完整 manifest；准入时经 `admit_external` 把每个文件与 canonical manifest 复制进城 CAS。之后 catalog 只携 manifest digest，`read <名>` 与 `<名>/<相对路径>` 都走 §8-29-3 的完整校验读取，城外路径不再被打开。
 - **外部变化是 drift，不是静默换版**：扫描的候选 digest 与准入时复制得到的 digest 不一致即 `E_VERSION_CONFLICT`；复制完成后外部再改，不影响本 run 或之后仍持旧 pin 的 run。新候选经接受动作更新 pin 后才进入新会话。
-- **一件 skill 在 catalog 里只有一个名字**：书架扫描按「近架盖远架」留下一个候选（`crates/city/Spec.lean` §8-8），catalog 的 `admit_skill` 对重名仍拒。所有来源共用同一个 manifest 读取与包内文件路径，不再有只能读 `SKILL.md` 的外部特例。
+- **一件 skill 在 catalog 里只有一个名字**：书架扫描按「近架盖远架」留下一个候选（`Sprawling/city/Spec.lean` §8-8），catalog 的 `admit_skill` 对重名仍拒。所有来源共用同一个 manifest 读取与包内文件路径，不再有只能读 `SKILL.md` 的外部特例。
 -/
 
 /-!

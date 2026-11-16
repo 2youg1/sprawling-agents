@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The prompt layers of one address, read off the disk when a page asks
-//! (`crates/accounting/Spec.lean` §8-38, `crates/wire/Spec.lean` §8-98).
+//! (`Sprawling/accounting/Spec.lean` §8-38, `Sprawling/wire/Spec.lean` §8-98).
 //!
 //! Every judgement here is one the freeze already makes: which `City.md`
 //! governs a building is `city::city_prompt_path`, a convention file is

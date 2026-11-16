@@ -5,7 +5,7 @@
 
 //! Which thinking levels one (Endpoint, model) offers, the level one
 //! request is sent, and the refusal of an explicit level outside the
-//! offer (`crates/gateway/spec/Provider/Thinking.lean` §8-39, gateway D35).
+//! offer (`Sprawling/gateway/spec/Provider/Thinking.lean` §8-39, gateway D35).
 //!
 //! The ladder is climbed once per (Endpoint, model): the upstream's own
 //! model list first, then the preset table's documented levels, then
@@ -248,7 +248,7 @@ mod tests {
     }
 
     proptest! {
-        /// The five properties `crates/gateway/spec/Provider/Thinking.lean`
+        /// The five properties `Sprawling/gateway/spec/Provider/Thinking.lean`
         /// proves, over every subset of the seven words, every switch,
         /// every default and every stored and explicit level.
         #[test]

@@ -5,10 +5,10 @@
 
 //! The remote listener: a loopback port of its own, opened with the door
 //! and closed with it, that the route makes reachable from outside
-//! (`crates/sprawling/spec/Outside/Conduit.lean` §8-139).
+//! (`Sprawling/app/spec/Outside/Conduit.lean` §8-139).
 //!
 //! It answers two WebSocket paths and the page. [`PAIR_PATH`] carries one
-//! pairing handshake and ends (crates/remote_access/Spec.lean §8-6).
+//! pairing handshake and ends (Sprawling/remote_access/Spec.lean §8-6).
 //! [`SESSION_PATH`] carries a session handshake, then relays: each sealed
 //! frame from the device is judged by the conduit and, when the door
 //! permits it, sent to the city's own `/ws` on this machine as a client
@@ -16,7 +16,7 @@
 //! message on either path is binary. Every other `GET` is answered with
 //! the client bundle through `wire::bundle_routes`, the same table the
 //! city's own port serves it with, so the address in the pairing code
-//! opens the page that pairs (crates/remote_access/Spec.lean §8-10).
+//! opens the page that pairs (Sprawling/remote_access/Spec.lean §8-10).
 //!
 //! The listener is its own port rather than a route on the city's port
 //! because the route makes it reachable from outside while the city's

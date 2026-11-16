@@ -4,10 +4,10 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The proof of the whole history a served city runs beside its writer
-//! (`crates/sprawling/spec/Assembly/Listening.lean` §8-90, §8-122). The halt it sets the verdict on is
+//! (`Sprawling/app/spec/Assembly/Listening.lean` §8-90, §8-122). The halt it sets the verdict on is
 //! attached by the worker (`chain_halt`); this file starts the thread
 //! and says what it found. Which outcome settles the halt how is
-//! proved in `crates/sprawling/spec/Assembly/ChainWatch.lean`.
+//! proved in `Sprawling/app/spec/Assembly/ChainWatch.lean`.
 
 use std::time::Instant;
 

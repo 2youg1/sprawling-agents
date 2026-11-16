@@ -6,7 +6,7 @@
 /-!
 # kernel::consts_external
 
-规定 `kernel::consts_external`（`crates/kernel/src/consts_external.rs`）：外部事实常量与「哪些账本版本读得开」。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::consts_external`（`Sprawling/kernel/src/consts_external.rs`）：外部事实常量与「哪些账本版本读得开」。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 -/
 
 /-!
@@ -25,7 +25,7 @@ pub const L0_TOOLS: [&str; 3] = ["exec", "edit", "status"];
 pub struct SecretShape { pub provider: &'static str, pub prefix: &'static str,
                          pub charset: SecretCharset, pub len: (u16, u16) }   // 闭区间
 pub enum SecretCharset { Base62, Base64Url, HexLower, UpperBase36 }
-pub const SECRET_SHAPES: [SecretShape; N] = [ /* 公开 provider 令牌形状，见 `crates/kernel/Spec.lean` §14 */ ];
+pub const SECRET_SHAPES: [SecretShape; N] = [ /* 公开 provider 令牌形状，见 `Sprawling/kernel/Spec.lean` §14 */ ];
 ```
 
 `SECRET_SHAPES` 是数据不是代码（零分支）；消费者是 `kernel::secret::scan` 与 `xtask secret`。

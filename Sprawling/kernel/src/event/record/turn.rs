@@ -35,7 +35,7 @@ pub struct PromptAssembled {
     #[serde(default)]
     pub breakpoints: Vec<String>,
     /// The tool table the request carried and every tool the building
-    /// admitted beside it (`crates/runtime/spec/Catalog.lean` §8-60).
+    /// admitted beside it (`Sprawling/runtime/spec/Catalog.lean` §8-60).
     /// Absent on a line written before the table was recorded, and on
     /// a prefix assembled without a catalog.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -122,7 +122,7 @@ pub struct PromptSegment {
 /// cut off; `marker` says a truncation marker follows the kept bytes,
 /// which the byte counts alone cannot say. `hash` is the BLAKE3 of the
 /// kept bytes, so a rebuild names the one document that changed
-/// (`crates/runtime/spec/Prefix.lean` D105); a row written before rows
+/// (`Sprawling/runtime/spec/Prefix.lean` D105); a row written before rows
 /// carried it reads as `None` and is checked by its segment's hash
 /// alone.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -210,7 +210,7 @@ pub struct ModelReturned {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub billed_usd_micros: Option<UsdMicros>,
     /// When the reply's first non-empty prose or reasoning reached the
-    /// city, read from the turn's clock (`crates/kernel/spec/Event/Record.lean` §8-75). A moment,
+    /// city, read from the turn's clock (`Sprawling/kernel/spec/Event/Record.lean` §8-75). A moment,
     /// not a duration: the time to first content is this minus the
     /// `model_called` line's `t`. Absent when the reply came through a
     /// door that reports nothing before it settles, when it streamed
@@ -220,7 +220,7 @@ pub struct ModelReturned {
     pub first_at: Option<TimeMs>,
     /// Whole microseconds from the moment the attempt that returned went
     /// out to its first non-empty prose or reasoning, on the turn's
-    /// monotonic clock (`crates/kernel/spec/Event/Record.lean` D20).
+    /// monotonic clock (`Sprawling/kernel/spec/Event/Record.lean` D20).
     /// Absent exactly where `first_at` is.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub first_us: Option<u64>,
@@ -246,7 +246,7 @@ impl SteerReceived {
     /// The `source` of a steer the person spoke. `runtime::conversation`
     /// writes it and `wire::note_of` reads it; the spelling lives here
     /// because both depend on this crate and neither on the other
-    /// (`crates/wire/spec/Reading.lean` D41).
+    /// (`Sprawling/wire/spec/Reading.lean` D41).
     pub const PERSON_SOURCE: &'static str = "user";
     /// The `source` of the city's own word to a run: a policy change, a
     /// sync wait that ran out.

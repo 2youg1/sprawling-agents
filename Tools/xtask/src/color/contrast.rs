@@ -77,7 +77,7 @@ pub(super) fn apca_lc(text: u16, surface: u16) -> f64 {
 
 /// APCA lightness contrast between an on-axis text token and a fill laid
 /// at `percent` opacity over an on-axis backdrop: the glass role over the
-/// surface behind it (crates/xtask/Spec.lean §8-51).
+/// surface behind it (Tools/xtask/Spec.lean §8-51).
 ///
 /// The two are mixed channel by channel in the encoded space, which is
 /// how an engine composites a translucent fill over what it already drew;

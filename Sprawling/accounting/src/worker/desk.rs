@@ -127,7 +127,7 @@ impl CommandDesk {
     /// Says the city is stopping, and wakes the worker so it hears.
     ///
     /// Called by the process's own lifecycle, which alone decides that
-    /// the city closes (`crates/sprawling/spec/Console/Lifecycle.lean`);
+    /// the city closes (`Sprawling/app/spec/Console/Lifecycle.lean`);
     /// a page's `CloseCity` reaches it only through that lifecycle. The
     /// worker reads it where it reads the queue, so whatever is running
     /// finishes first, or stops at its next safe point when the close
@@ -216,7 +216,7 @@ impl CommandDesk {
     /// [`Self::interrupt_for`]. The thread asking here wakes on every
     /// post and a lane reads only at its safe points, so handing it out
     /// here would refuse it as though no run answered
-    /// (`crates/sprawling/Spec.lean` §8-42-1).
+    /// (`Sprawling/app/Spec.lean` §8-42-1).
     pub fn next(&self, driving: impl Fn(RunId) -> bool) -> DeskWait<'_> {
         let Ok(mut waiting) = self.waiting.lock() else {
             return DeskWait::Gone;

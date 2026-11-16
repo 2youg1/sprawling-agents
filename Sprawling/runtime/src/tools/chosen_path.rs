@@ -24,7 +24,7 @@
 //! why a skill inside reserved space is still handed over: `read`
 //! resolves the catalog first and only unresolved names reach this.
 //!
-//! `crates/runtime/spec/Tools/ChosenPath.lean` proves what the judgement
+//! `Sprawling/runtime/spec/Tools/ChosenPath.lean` proves what the judgement
 //! must hold: an admitted path is open and outside every reserved
 //! subtree, and `land` judges where the disk really lands (§8-30-1).
 
@@ -158,7 +158,7 @@ fn spelled_under(root: &Path, real: &Path) -> Option<String> {
 
 /// The root a tool reads under: the spelling the assembly handed it,
 /// and the real location that spelling resolved to once, when the tool
-/// was built (`crates/runtime/spec/Tools/ChosenPath.lean` D112). A run's
+/// was built (`Sprawling/runtime/spec/Tools/ChosenPath.lean` D112). A run's
 /// root does not move while the run lives, and comparing against the
 /// anchored location is fail-closed: a root swapped for a link fails
 /// the comparison instead of leading reads out of the city.

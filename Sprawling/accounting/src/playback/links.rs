@@ -4,13 +4,13 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The two ends of every key moment, every message and every call, a tool
-//! call or a model attempt (`crates/accounting/spec/Playback.lean` §8-12, `crates/accounting/spec/Playback/Traced.lean` §8-17 and §8-25).
+//! call or a model attempt (`Sprawling/accounting/spec/Playback.lean` §8-12, `Sprawling/accounting/spec/Playback/Traced.lean` §8-17 and §8-25).
 //!
 //! A key moment is a set of lines grouped under a stable key: a run, an
 //! approval, a pull request. It closes only on its real closing line,
 //! never at the edge of the selected window, so a moment closed at one
 //! cutoff stays closed at every later one
-//! (`crates/accounting/spec/Playback/Project.lean`). A closing line also
+//! (`Sprawling/accounting/spec/Playback/Project.lean`). A closing line also
 //! inherits the buildings its opening line touched, which is how an
 //! answer written on the city run stays behind the confidential
 //! building that asked the question, and a call's answer behind the
@@ -75,7 +75,7 @@ pub(super) enum Visibility {
     /// Its buildings all read `Open`, and its credential scan waits until
     /// a table reads its fate: until then it gives what a visible line
     /// gives, and [`Links::resolve`] takes that back if the scan matches
-    /// (`crates/accounting/spec/Playback/Project.lean`, D47).
+    /// (`Sprawling/accounting/spec/Playback/Project.lean`, D47).
     Deferred,
 }
 

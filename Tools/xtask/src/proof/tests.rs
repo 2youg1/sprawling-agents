@@ -29,13 +29,13 @@ mod verification {
     let found = in_file(
         text,
         "kernel",
-        "crates/kernel/src/backpressure.rs",
+        "Sprawling/kernel/src/backpressure.rs",
         "backpressure",
     );
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].name, "backpressure::verification::admit_is_total");
     assert_eq!(found[0].package, "kernel");
-    assert_eq!(found[0].location, "crates/kernel/src/backpressure.rs:7");
+    assert_eq!(found[0].location, "Sprawling/kernel/src/backpressure.rs:7");
 }
 
 #[test]
@@ -53,7 +53,7 @@ mod verification {
     let found = in_file(
         text,
         "kernel",
-        "crates/kernel/src/discard/verdict.rs",
+        "Sprawling/kernel/src/discard/verdict.rs",
         "discard::verdict",
     );
     let names: Vec<&str> = found.iter().map(|h| h.name.as_str()).collect();
@@ -78,7 +78,7 @@ mod verification {
     fn helper() {}
 }
 ";
-    let found = in_file(text, "kernel", "crates/kernel/src/taint.rs", "taint");
+    let found = in_file(text, "kernel", "Sprawling/kernel/src/taint.rs", "taint");
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].name, "taint::verification::proved");
 }
@@ -96,7 +96,7 @@ mod verification {
     fn total() {}
 }
 ";
-    let found = in_file(text, "kernel", "crates/kernel/src/secret.rs", "secret");
+    let found = in_file(text, "kernel", "Sprawling/kernel/src/secret.rs", "secret");
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].name, "secret::verification::total");
 }
@@ -115,7 +115,7 @@ mod verification {
     let found = in_file(
         text,
         "kernel",
-        "crates/kernel/src/write_domain.rs",
+        "Sprawling/kernel/src/write_domain.rs",
         "write_domain",
     );
     assert_eq!(found.len(), 1);
@@ -142,7 +142,7 @@ mod verification {
     fn rooted() {}
 }
 ";
-    let found = in_file(text, "kernel", "crates/kernel/src/lib.rs", "");
+    let found = in_file(text, "kernel", "Sprawling/kernel/src/lib.rs", "");
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].name, "verification::rooted");
 }
@@ -220,7 +220,7 @@ fn an_excuse_may_cite_a_lean_specification() {
     let mut out = Vec::new();
     super::every_excuse_cites_where_it_was_decided(
         &[
-            harness("out of reach, crates/kernel/Spec.lean D3"),
+            harness("out of reach, Sprawling/kernel/Spec.lean D3"),
             harness("out of reach, kernel-SPEC.md 8-13"),
             harness("out of reach"),
         ],

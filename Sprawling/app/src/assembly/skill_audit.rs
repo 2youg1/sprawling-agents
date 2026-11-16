@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Background skill audits (`crates/sprawling/spec/Assembly.lean`, city D19).
+//! Background skill audits (`Sprawling/app/spec/Assembly.lean`, city D19).
 //! The observer only queues notices; this thread writes through Relay.
 
 use std::collections::{BTreeMap, BTreeSet};

@@ -6,7 +6,7 @@
 /-!
 # playback 的投影：读者读不到的行不流进任何派生表，关键时刻只在真实结束事件上闭合
 
-规定 `crates/accounting/src/playback/project.rs`、`crates/accounting/src/playback/project/fate.rs`、`crates/accounting/src/playback/reader.rs`、`crates/accounting/src/playback/links.rs`、`crates/accounting/src/playback/links/ends.rs`、`crates/accounting/src/playback/traced.rs` 与 `crates/accounting/src/trace.rs`（`crates/accounting/Spec.lean` §8-12、§8-25）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/accounting/src/playback/project.rs`、`Sprawling/accounting/src/playback/project/fate.rs`、`Sprawling/accounting/src/playback/reader.rs`、`Sprawling/accounting/src/playback/links.rs`、`Sprawling/accounting/src/playback/links/ends.rs`、`Sprawling/accounting/src/playback/traced.rs` 与 `Sprawling/accounting/src/trace.rs`（`Sprawling/accounting/Spec.lean` §8-12、§8-25）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 **读界。** 一行碰到的每一栋楼都由读者判一次，答案复用 `kernel::ReadVerdict` 的三臂：`Open`、`Confidential`、`RulesUnreadable`。只有碰到的楼全是 `Open` 的行可见；另外两臂一律关闭，所以规则读不了不会朝宽的一侧失败。一行「碰到」哪些楼，Rust 从信封地址、它所在 run 的房间、它关闭的那一对的打开行、以及载荷里以已知楼开头的地址求出；本模型把这个集合当作行的一个字段。
 
@@ -208,7 +208,7 @@ theorem evidence_ignores_lines_after_the_cutoff {α : Type} (fold : List Line �
 
 /-! ## 导出的懒扫描：范围外的行只在有人要它的命运时才扫（D47）
 
-全扫描对每一条碰到的楼全是 `Open` 的行跑 `kernel::secret::scan`，范围内外都扫，因为一行的命运（`Fate`：`Shown`、`Closed`、`Credential`）不止决定它自己进不进 bundle，还流进三处：`remember()`（可见的 `run_started` 给出 run 的 policy；不可见的 `tool_called` 记进 `hidden_calls`，一个提交的 trace 可能点它的名），`links.note` 的配对（一对的另一端是否可见，决定 bundle 写 `Withheld` 还是 `Outside`，以及调用的名字与耗时），以及范围外但配了对的行进 `context`。40 万行的城上，全扫描的导出于是不论选几行都付约 25 s 的全史扫描（`crates/accounting/Spec.lean` §8-25 的读数）。
+全扫描对每一条碰到的楼全是 `Open` 的行跑 `kernel::secret::scan`，范围内外都扫，因为一行的命运（`Fate`：`Shown`、`Closed`、`Credential`）不止决定它自己进不进 bundle，还流进三处：`remember()`（可见的 `run_started` 给出 run 的 policy；不可见的 `tool_called` 记进 `hidden_calls`，一个提交的 trace 可能点它的名），`links.note` 的配对（一对的另一端是否可见，决定 bundle 写 `Withheld` 还是 `Outside`，以及调用的名字与耗时），以及范围外但配了对的行进 `context`。40 万行的城上，全扫描的导出于是不论选几行都付约 25 s 的全史扫描（`Sprawling/accounting/Spec.lean` §8-25 的读数）。
 
 **D47：懒扫描。** 范围外、楼全 `Open` 的行先不扫，它的命运记作待定（`links::Visibility::Deferred`）；只有三种情况才扫它的字节：它在范围内；它的种类有一张表不经配对就读它的命运（`remember()` 读的 `run_started`、`tool_called`，以及 `Links::related` 读的 run 的打开行 `run_started`、`run_forked`——一个 run 指向的父 run 或前任 run 可能在范围内没有一行，它的打开行仍要判可见性），这三种在 `apply` 里当场扫；有一条范围内的行与它同属一个配对键（同一次调用、同一个关键时刻、同一封信），不论那条范围内的行在它之前还是之后。楼不全 `Open` 的行不必扫：它的命运已是 `Closed`。本节证明，对任意历史、任意扫描函数，懒扫描交出的三样东西——范围内每行的命运（也就是 bundle 的 events、withheld 的楼与 credential 计数）、`remember()` 读到的命运、配对两端的命运——与全扫描逐条相同（`lazy_scan_equals_full_scan`），而且懒扫描从不读一条它没选去扫的行（`lazy_scan_reads_only_scanned`），扫的行数不多于全扫描（`lazy_scans_no_more`）。
 

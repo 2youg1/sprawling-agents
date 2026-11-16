@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The four actions this binary prices, driven over the product's public faces
-//! (`crates/citysim/spec/BenchStartup.lean` §8-5).
+//! (`Tools/citysim/spec/BenchStartup.lean` §8-5).
 //!
 //! Shape: adapter. Each driver is the timing boundary of its action and
 //! nothing else: it stamps the boundary's ends and its sub-steps, counts
@@ -42,7 +42,7 @@ use super::stamp;
 use archive::{digest_mismatch, digest_of, unpack};
 use footprint::{clear, files_under, ledger_lines};
 
-/// How many times each action runs (`crates/citysim/spec/BenchStartup.lean` §8-5: the
+/// How many times each action runs (`Tools/citysim/spec/BenchStartup.lean` §8-5: the
 /// floor is one hundred; two hundred is what puts p99 two samples below
 /// the top rather than on it).
 ///

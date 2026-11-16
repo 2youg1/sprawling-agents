@@ -6,7 +6,7 @@
 /-!
 # wire::command::step
 
-规定 `command::step`（`crates/wire/src/` 下同名的文件）。命令在标量之外携的值与它的闭集：保存、提案的决定、楼规、城的配置、会话的起法、关停范围、治理文档与设置页上的卡片。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `command::step`（`Sprawling/wire/src/` 下同名的文件）。命令在标量之外携的值与它的闭集：保存、提案的决定、楼规、城的配置、会话的起法、关停范围、治理文档与设置页上的卡片。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 -/
 
 /-!
@@ -50,11 +50,11 @@ Command::OpenSession { addr: Address, carry: Carry, from: Option<Origin>, idem: 
 
 **`from` 把「分叉」收进了同一个动词**。从某句分出去与从此处重开是同一件事的两个起点：都是「在这个房间开新的一段」，只差新的一段要不要继承某条线的对话。所以线上没有第二个动词，没有 `Fork` 帧（它写下血统却没有任何 dispatch 路径消费它，`routing.rs` 的注释与 runtime §8-2 的 §186 早把这件事记成缺陷），`OpenSession { from: Some(..) }` 是它该在的地方。**血统仍然写在 `run_forked` 里**，由真正开始的那个 run 写：一个分支在「开」的时刻还没有 run，先写一条血统就得先编一个 run id，而那个 run 永远不会存在。
 
-**它答的是一个死路。** 房间的第一个 run 把模型与强度冻进它自己的 `CONFIG.toml`（`crates/city/Spec.lean` §8-14），此后形状不同的派活全被 `E_CONFIG_INVALID` 拒——这条规则本身是对的，前缀缓存不能中途换模型；错在被拒之后没有任何出口，换过主模型的人再也派不出去。新的一段会话就是那个出口，而它只能在城里发生（清掉房间自己写下的两行、清掉交接槽位、在账本写 `session_opened`），所以它是一个 Command 而不是页面自己做的几件事。
+**它答的是一个死路。** 房间的第一个 run 把模型与强度冻进它自己的 `CONFIG.toml`（`Sprawling/city/Spec.lean` §8-14），此后形状不同的派活全被 `E_CONFIG_INVALID` 拒——这条规则本身是对的，前缀缓存不能中途换模型；错在被拒之后没有任何出口，换过主模型的人再也派不出去。新的一段会话就是那个出口，而它只能在城里发生（清掉房间自己写下的两行、清掉交接槽位、在账本写 `session_opened`），所以它是一个 Command 而不是页面自己做的几件事。
 
 **`Carry` 是枚举而不是 `bool`。** 两个状态都是有名字的行为，而且落到磁盘上的结果不同：`Nothing` 连 `Handoff.md` 的槽位一起清空，`Handoff` 留着它。`carry: true` 在调用点读不出是哪一个，`Nothing` 也不是「没有值」而是一个答案——它是第一个变体，`Default` 因此不需要人再写一遍。
 
-**本章测试**：`crates/wire/tests/wire_contract.rs` 的命令样本（表长、名表去重、golden 哈希）；`Carry` 的默认值在 `wire` 侧有一条断言，因为它是这份规格里唯一被写成「第一个变体」的默认。
+**本章测试**：`Sprawling/wire/tests/wire_contract.rs` 的命令样本（表长、名表去重、golden 哈希）；`Carry` 的默认值在 `wire` 侧有一条断言，因为它是这份规格里唯一被写成「第一个变体」的默认。
 -/
 
 /-!
@@ -67,8 +67,8 @@ pub struct RulesWrite { pub building: Address, pub base: String, pub body: Strin
 ```
 
 - **整份文本，一道基线。** `body` 是新的整份 `RULES.toml`，`base` 是页面起手时读到的那份（文件还不存在时为空串）。楼规有两个写者——人在页面上，以及住在楼里的市长经 `rules` 工具提案——所以与 `PutSpine` 同一条守卫：文件已经不是 `base` 就拒 `E_VERSION_CONFLICT`，什么都不写。
-- **先求值，后落盘。** 城先用读楼规的同一个求值器（`city::evaluate`）读 `body`，读不出——不合 TOML、缺 `confidential`、机密楼列了出网域名——就拒，盘上不动；求值通过才经基线守卫整份换上去（`crates/city/Spec.lean` §8-34）。所以盘上的楼规永远是这个构建读得懂的那一份，下一次派活不会因为一次保存而打不开这栋楼。
-- **账上一行 `rules_changed`。** 写成之后城记一行 `rules_changed { scope: building, which: "RULES.toml", before, after, bytes }`，与派活前核对楼规的那一行同形（`crates/kernel/Spec.lean` §8-4）；所以下一次派活看到的摘要与账上一致，不会把这次保存读成「有人绕过了门改了文件」。
+- **先求值，后落盘。** 城先用读楼规的同一个求值器（`city::evaluate`）读 `body`，读不出——不合 TOML、缺 `confidential`、机密楼列了出网域名——就拒，盘上不动；求值通过才经基线守卫整份换上去（`Sprawling/city/Spec.lean` §8-34）。所以盘上的楼规永远是这个构建读得懂的那一份，下一次派活不会因为一次保存而打不开这栋楼。
+- **账上一行 `rules_changed`。** 写成之后城记一行 `rules_changed { scope: building, which: "RULES.toml", before, after, bytes }`，与派活前核对楼规的那一行同形（`Sprawling/kernel/Spec.lean` §8-4）；所以下一次派活看到的摘要与账上一致，不会把这次保存读成「有人绕过了门改了文件」。
 - **载荷是一个值。** `PutRules` 与 `ConfigureCity` 各带一个结构体而不是平铺的字段，线上形状与平铺时相同（`{"put_rules":{…}}`）；理由是 `Command` 住的文件与 `From<WireCommand>` 那个函数都已经贴着长度上限，一个值占一行。
 
 ### 8-60b `SetWorkspaceChoice`：页面写子代理的直接选择
@@ -106,9 +106,9 @@ CorePriority(CorePriority)                 // {"core_priority":"raised"} | {"cor
 pub enum CorePriority { Raised, Normal }   // 值集与拼法住这里，accounting::person 读写 `[core] priority` 用的就是它
 ```
 
-- **城那一层，五项。** `ConfigureCity` 写城自己那份 `CONFIG.toml`（`<city>/.sprawling/CONFIG.toml`）：`keep_warm` 写 `[cache] keep_warm`，`effort` 写 `[model] effort`，`search` 整值写 `[search]`（`city::write_search`，`crates/city/spec/ConfigLayers.lean` §8-4c），`catalog` 整张写 `[catalog]`（§8-4g，空表拿掉这个键），`skill_shelves` 整表写 `[skills] shelves`（`city::CitySetting::SkillShelves`，`crates/city/spec/Library.lean` §8-8）；`None` 不动那一项。`skill_shelves` 是外部书架路径的完整有序表，空表明确表示不挂载；每项沿用读面的绝对路径或 `~/...` 文法，写前用同一个 `shelf_path` 判定，拒绝时不动任何字段。`search` 与 `catalog` 同样在落盘之前判过：先用 `city::check_catalog` 判 `catalog`，再写 `search`（写面自己先判），再写其余项。拒词是城的 `E_CONFIG_INVALID`，页面留着草稿。城那一层从梯子的最远一端说话，楼与房间各自的一层照旧压过它（`crates/city/Spec.lean` §8-4）。`ConfigureCity` 已是 `LocalOnly`，所以远程设备不能借这个字段点名主机目录。`ConfigureBuilding` 不改：它的地址就是它写的楼，城那一层没有地址可写，所以是另一条帧，而不是 `ConfigureBuilding` 收一个特殊地址。
+- **城那一层，五项。** `ConfigureCity` 写城自己那份 `CONFIG.toml`（`<city>/.sprawling/CONFIG.toml`）：`keep_warm` 写 `[cache] keep_warm`，`effort` 写 `[model] effort`，`search` 整值写 `[search]`（`city::write_search`，`Sprawling/city/spec/ConfigLayers.lean` §8-4c），`catalog` 整张写 `[catalog]`（§8-4g，空表拿掉这个键），`skill_shelves` 整表写 `[skills] shelves`（`city::CitySetting::SkillShelves`，`Sprawling/city/spec/Library.lean` §8-8）；`None` 不动那一项。`skill_shelves` 是外部书架路径的完整有序表，空表明确表示不挂载；每项沿用读面的绝对路径或 `~/...` 文法，写前用同一个 `shelf_path` 判定，拒绝时不动任何字段。`search` 与 `catalog` 同样在落盘之前判过：先用 `city::check_catalog` 判 `catalog`，再写 `search`（写面自己先判），再写其余项。拒词是城的 `E_CONFIG_INVALID`，页面留着草稿。城那一层从梯子的最远一端说话，楼与房间各自的一层照旧压过它（`Sprawling/city/Spec.lean` §8-4）。`ConfigureCity` 已是 `LocalOnly`，所以远程设备不能借这个字段点名主机目录。`ConfigureBuilding` 不改：它的地址就是它写的楼，城那一层没有地址可写，所以是另一条帧，而不是 `ConfigureBuilding` 收一个特殊地址。
 - **账上一行。** 写成之后城记一行 `rules_changed { scope: city, which: "CONFIG.toml", … }`，与派活前核对城配置的那一行同形。
-- **核心优先级是这个人自己那一层。** `CorePriority` 进 `PreferencePatch`，所以经已有的 `PutPreferences` 写，落在 `~/.sprawling/config.toml` 的 `[core] priority`——那是它一直住的地方（`crates/sprawling/Spec.lean` §8-93），不在 `[ui]` 里，所以 `PreferencesAnswer` 不带它；页面从 `Query::Doctor` 的核心一项读到它此刻的效果。写下之后，下一次 `serve` 起线程时读它。
+- **核心优先级是这个人自己那一层。** `CorePriority` 进 `PreferencePatch`，所以经已有的 `PutPreferences` 写，落在 `~/.sprawling/config.toml` 的 `[core] priority`——那是它一直住的地方（`Sprawling/app/Spec.lean` §8-93），不在 `[ui]` 里，所以 `PreferencesAnswer` 不带它；页面从 `Query::Doctor` 的核心一项读到它此刻的效果。写下之后，下一次 `serve` 起线程时读它。
 - **改形共用一次进位**：`CitySettings` 名字不变而增加字段时按 D1 进 `WIRE_V`；本批与 `CreateBuilding.source`、`SkillsAnswer.external_shelves` 共用一次。
 - 验收：city 的 `a_city_setting_lands_in_the_city_layer_and_the_rooms_read_it`（城层写 `keep_warm` 之后，一间没有说话的房间读到 `FiveMinute`；写 `effort` 之后梯子答它来自城那一层）；accounting 的 `the_core_priority_lands_in_its_own_section_and_reads_back`；accounting 的 `a_city_search_setting_lands_in_the_city_layer_and_reads_back`（`ConfigureCity` 带 `search` 写下城一级，`Query::Config` 读回生效值与城的值）、`a_local_skill_library_is_mounted_and_read_back`（整库路径写下后 `Query::Skills` 带回挂载表并列出其中的 skill）与 `a_refused_skill_shelf_writes_nothing`（相对路径被拒，旁边的 `keep_warm` 也不落）；另有 `a_refused_search_setting_writes_nothing` 与 `a_refused_catalog_writes_nothing_beside_an_accepted_search`。
 -/
@@ -126,12 +126,12 @@ pub struct RangeWrite {
     pub idem: IdemKey,
 }
 pub struct TextEdit { pub span: documents::Span, pub text: String }   // documents 定义，线上直接携带（documents D1）
-// 回执：账本行 document_written { at, baseline, version, bytes }，带这条命令的 idem（`crates/kernel/Spec.lean` §8-83）
+// 回执：账本行 document_written { at, baseline, version, bytes }，带这条命令的 idem（`Sprawling/kernel/Spec.lean` §8-83）
 ```
 
 - **基线是一个版本，编辑是那一版的字节区间加一段文本。** 页面把它的光标与选区换算成字节（refrain 路线图 §4-8 的 `core/document_pos.ts`），替换的内容以文本送来，城按那一版的编码把它写成字节（documents D11）：页面不必知道一份 UTF-16 文件怎样拼一个字符，城里也只有一处会写这几种编码。
 - **判定在落盘之前，次序固定。** 地址在保留子树里（`Address::is_reserved`：城与楼的规则、配置、治理文档、`.git`）拒 `E_OUTSIDE_WRITE_DOMAIN`——那些文件各有自己的门（§8-59、§8-60、§8-61），它们要先求值或先改写身份区，这扇门不做；文件此刻的摘要不是 `baseline` 拒 `E_VERSION_CONFLICT`；那一版不是文本（§8-69 的 `Opaque`）、编辑乱序或重叠或越过末尾、改完之后不再是同一种编码的文本（劈开了一个字符、在没有标记的 UTF-8 里写进 NUL）都拒 `E_INVALID_ARGS`（documents D8、D11、D12）。任何一种拒绝之后盘上都没有动，页面的草稿留着，重读再改。
-- **两个同基线的保存只落先到的那个。** 读、判、整份换上在城的文档锁里一次做完（`crates/city/Spec.lean` §8-40），所以第二个保存读到的已经是第一个落下的版本，摘要不再是它的基线。城外的写者（人的编辑器、居民的 `edit`）不受这把锁约束，挡住它们的是同一个基线：它们一改，摘要就变了。
+- **两个同基线的保存只落先到的那个。** 读、判、整份换上在城的文档锁里一次做完（`Sprawling/city/Spec.lean` §8-40），所以第二个保存读到的已经是第一个落下的版本，摘要不再是它的基线。城外的写者（人的编辑器、居民的 `edit`）不受这把锁约束，挡住它们的是同一个基线：它们一改，摘要就变了。
 - **没有文件读作空字节。** 基线是空字节的摘要时（§8-69 的 `Empty`，或页面要新建一份文件），一次保存把文件建起来；上面的目录随之建起。
 - **回执是账本行，不是命令的答复。** 命令的答复只送拒绝（§8-2）；成功时城写一行 `document_written`，带这条命令的 `idem`。页面见到带着自己那个 `idem` 的一行才显示「已保存」，并从 `version` 读到下一次保存的基线；在那之前只显示「保存中」。丢了答复的页面用同一个 `idem` 再发，城答它第一次的结果，不再写第二次（accounting 的 `commanding::entrance`）。
 - **`WIRE_V` 不另进位**：`PutRange` 是新名字，哈希自己会变（D1）。
@@ -165,7 +165,7 @@ structure Save (Version : Type) where
   valid : Bool
   next : Version
 
-/-- 判定与落下：拒绝时答拒因，文件仍是 `current`；落下时文件换成 `next`。读、判、整份换上在城的文档锁里一次做完（`crates/city/Spec.lean` §8-40），所以在模型里是一步。 -/
+/-- 判定与落下：拒绝时答拒因，文件仍是 `current`；落下时文件换成 `next`。读、判、整份换上在城的文档锁里一次做完（`Sprawling/city/Spec.lean` §8-40），所以在模型里是一步。 -/
 def putRange {Version : Type} [DecidableEq Version] (current : Version) (save : Save Version) :
     Except Refusal Version :=
   if save.reserved then .error .OutsideWriteDomain

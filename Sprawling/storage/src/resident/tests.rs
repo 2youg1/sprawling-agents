@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The three properties of `crates/sprawling/spec/Serving/Memory.lean`
+//! The three properties of `Sprawling/app/spec/Serving/Memory.lean`
 //! §8-173, checked after every step of an arbitrary sequence of inserts,
 //! reads, evictions and freezes: the resident bytes never exceed the
 //! budget, a frozen run holds nothing, and every read answers the bytes

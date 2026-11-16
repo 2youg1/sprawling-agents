@@ -7,7 +7,7 @@
 
 <script lang="ts" module>
   // A formula the city read between dollar signs and left undrawn
-  // (`crates/documents/Spec.lean` D22), drawn by KaTeX as MathML
+  // (`Sprawling/documents/Spec.lean` D22), drawn by KaTeX as MathML
   // (client/Spec.lean §4-64a). The source comes with its delimiters: two
   // dollar signs on each side is a display formula, one is inline.
   export interface Formula {

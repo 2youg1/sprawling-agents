@@ -205,7 +205,7 @@ fn renderer_version_four_round_trips_and_an_unknown_version_is_refused() {
     assert!(serde_json::from_str::<Rendering>("\"v5\"").is_err());
 }
 
-/// The names Claude Code's tools take (`crates/runtime/spec/Tools.lean`
+/// The names Claude Code's tools take (`Sprawling/runtime/spec/Tools.lean`
 /// §8-14-1) are what a call acted on, ahead of whatever string sorts
 /// first.
 #[test]

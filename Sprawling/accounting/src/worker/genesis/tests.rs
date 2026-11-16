@@ -620,7 +620,7 @@ fn the_startup_scan_closes_dangling_calls_once_and_reports_the_rest() {
     assert!(closed, "the closing result states the unknown outcome");
 }
 
-/// `crates/runtime/spec/Tools.lean` D116: recovery never admits a call
+/// `Sprawling/runtime/spec/Tools.lean` D116: recovery never admits a call
 /// it finds in the history again, so a call an older build recorded
 /// under the argument names it took then derives no key and runs
 /// nothing here; it is closed as an unknown outcome and the file it

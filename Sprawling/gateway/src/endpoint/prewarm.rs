@@ -5,7 +5,7 @@
 
 //! The pre-warm one call would send for the prefix its building shares,
 //! the key that prefix is cached under, and the calls that wait for
-//! none (`crates/gateway/spec/Concurrency.lean` §8-40, D38, D39, D42).
+//! none (`Sprawling/gateway/spec/Concurrency.lean` §8-40, D38, D39, D42).
 //!
 //! The request is the call's own, cut to its shared part: the same
 //! model, tools and effort, the system blocks `ChatRequest::shared_system`

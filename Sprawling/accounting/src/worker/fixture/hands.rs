@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The hands a worker under test is built with, the clocks they read, and
-//! a city formed with them (`crates/accounting/spec/Worker.lean` §8-11, accounting D19).
+//! a city formed with them (`Sprawling/accounting/spec/Worker.lean` §8-11, accounting D19).
 
 use std::path::{Path, PathBuf};
 
@@ -15,7 +15,7 @@ use crate::worker::genesis::{Adopt, InitReport, form};
 use crate::worker::hands::{ExecHost, Hands};
 
 /// The hands a worker under test is built with: none of them reaches
-/// this machine (`crates/accounting/spec/Worker.lean` §8-11).
+/// this machine (`Sprawling/accounting/spec/Worker.lean` §8-11).
 ///
 /// An in-memory vault, a clock that reads the wall, a machine with
 /// nothing on it, roomy memory and volume, a file manager and a desktop

@@ -5,7 +5,7 @@
 
 //! Writing the index while another run of this city holds its lock.
 //!
-//! Specified by `crates/storage/spec/Checkpoint.lean` §8-8.
+//! Specified by `Sprawling/storage/spec/Checkpoint.lean` §8-8.
 
 use crate::error::StorageError;
 

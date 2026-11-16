@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One remote session's frames, judged one at a time
-//! (`crates/sprawling/spec/Outside/Conduit.lean` §8-139; crates/remote_access/Spec.lean §8-5, §8-10;
-//! what reaches the city is proved in `crates/sprawling/spec/Outside/Conduit.lean`).
+//! (`Sprawling/app/spec/Outside/Conduit.lean` §8-139; Sprawling/remote_access/Spec.lean §8-5, §8-10;
+//! what reaches the city is proved in `Sprawling/app/spec/Outside/Conduit.lean`).
 //!
 //! A sealed payload from the device is opened, read by its first byte,
 //! and, when it is a wire frame, classed (`outside::verbs`) and judged by
@@ -47,7 +47,7 @@ pub(super) struct Conduit {
     opener: Opener,
     sealer: Sealer,
     /// The city's own key, which the greeting carries in: every face of
-    /// the city demands one (`crates/wire/Spec.lean` §8-41).
+    /// the city demands one (`Sprawling/wire/Spec.lean` §8-41).
     token: String,
 }
 

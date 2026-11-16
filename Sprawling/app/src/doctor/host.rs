@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The one door the rest of this binary asks what this machine has
-//! through (`crates/sprawling/spec/Doctor.lean` §8-47).
+//! through (`Sprawling/app/spec/Doctor.lean` §8-47).
 //!
 //! The exec tool wants the python component, the shell and the engine;
 //! the browser tool wants Firefox or a driver. Before this file each of
@@ -56,7 +56,7 @@ pub(crate) fn components_dir() -> Option<PathBuf> {
 const USER_BINS: [&str; 4] = [".cargo/bin", ".elan/bin", ".local/bin", ".bun/bin"];
 
 /// The search path every probe reads and every install program is
-/// started with (`crates/sprawling/spec/Doctor.lean` §8-58): this process's `PATH`,
+/// started with (`Sprawling/app/spec/Doctor.lean` §8-58): this process's `PATH`,
 /// then each per-user bin directory it does not already name, and on
 /// Windows the directory winget links a user-scope package into.
 ///
@@ -100,7 +100,7 @@ pub(crate) fn find_program(program: &str) -> Option<PathBuf> {
 
 /// Where one vendor's set-up directory, or another ACP client's file, is
 /// on this machine: the variable its vendor documents when that is set,
-/// else the path under the User's home (`crates/agent_protocols/Spec.lean`
+/// else the path under the User's home (`Sprawling/agent_protocols/Spec.lean`
 /// D19).
 pub(crate) fn place_set_up(dir: &agent_protocols::SetUpDir) -> Option<PathBuf> {
     // A machine with no home directory can still name a directory a
@@ -114,7 +114,7 @@ pub(crate) fn place_set_up(dir: &agent_protocols::SetUpDir) -> Option<PathBuf> {
 }
 
 /// The file one item's install writes its output to, fresh for every
-/// install (`crates/sprawling/spec/Doctor.lean` §8-64).
+/// install (`Sprawling/app/spec/Doctor.lean` §8-64).
 ///
 /// Under the system's temporary directory rather than the component
 /// directory, because a directory named for an item there is what
@@ -250,7 +250,7 @@ pub(crate) fn pwsh() -> Presence {
 }
 
 /// The PowerShell 7 a run may be handed: a present `pwsh` whose version
-/// line reads major 7 or later (`crates/runtime/Spec.lean` §8-13-2 D30).
+/// line reads major 7 or later (`Sprawling/runtime/Spec.lean` §8-13-2 D30).
 /// A pwsh 6, and one whose version this machine could not read, is
 /// `None`, because the flags and error ids the exec tool relies on are
 /// PowerShell 7's.
@@ -272,13 +272,13 @@ pub(super) fn seven_or_later(presence: &Presence) -> Option<PathBuf> {
 }
 
 /// The CPython-WASI component a run may be handed: a present one, and
-/// never a broken one (`crates/accounting/Spec.lean` §8-11).
+/// never a broken one (`Sprawling/accounting/Spec.lean` §8-11).
 pub fn usable_python_wasm() -> Option<PathBuf> {
     usable_path(&python_wasm())
 }
 
 /// The shell a run may be handed: a present one, and never a broken one
-/// (`crates/accounting/Spec.lean` §8-11).
+/// (`Sprawling/accounting/Spec.lean` §8-11).
 pub(crate) fn usable_shell() -> Option<PathBuf> {
     usable_path(&shell())
 }
@@ -312,7 +312,7 @@ pub(super) fn built(carried: bool) -> Presence {
 
 /// The sandbox this build carries, if it carries one: a clone of the
 /// one engine this process starts at the first ask, so every bench shares
-/// one compiled guest (`crates/runtime/spec/Sandbox.lean` D101). An engine
+/// one compiled guest (`Sprawling/runtime/spec/Sandbox.lean` D101). An engine
 /// that will not start is not kept, and the next ask starts it again.
 ///
 /// # Errors

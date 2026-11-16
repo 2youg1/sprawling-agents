@@ -6,7 +6,7 @@
 /-!
 # city::library::audit
 
-规定 `library::audit`（`crates/city/src/library/audit.rs`）：书架上一件 skill 的审核状态怎么从账本读出来。本文件是 `crates/city/Spec.lean` 的一个分部，标签 §8-28b，决定引作 `city D19`。
+规定 `library::audit`（`Sprawling/city/src/library/audit.rs`）：书架上一件 skill 的审核状态怎么从账本读出来。本文件是 `Sprawling/city/Spec.lean` 的一个分部，标签 §8-28b，决定引作 `city D19`。
 
 模型放在 city 而不放在 accounting：「这件 skill 此刻的候选版本是什么」是书架索引的事实（§8-8 的 `Holding::hash`、§8-28 的 canonical manifest digest），审核绑定的正是这个摘要；accounting 的折叠（wire D32）只读本模块给出的判定，不另写一份「过期」的规则。
 -/

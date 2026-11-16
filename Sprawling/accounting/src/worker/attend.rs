@@ -8,13 +8,13 @@
 //!
 //! The loop looks at three things in this order: every relay request a
 //! lane is blocked on, then at most one run home from a lane, then the
-//! desk (`crates/sprawling/Spec.lean` §8-42-4).
+//! desk (`Sprawling/app/Spec.lean` §8-42-4).
 //!
 //! Which properties the loop must hold - every message served in
 //! finitely many steps, append order equal to seq order, no wake
 //! without work - is decided by the Lean model
-//! `crates/accounting/spec/Worker/Attend.lean`; this loop polls and so does not
-//! yet hold the third (`crates/sprawling/Spec.lean` §8-42-4).
+//! `Sprawling/accounting/spec/Worker/Attend.lean`; this loop polls and so does not
+//! yet hold the third (`Sprawling/app/Spec.lean` §8-42-4).
 
 use std::time::Duration;
 
@@ -25,7 +25,7 @@ use super::relay::Patience;
 
 impl RunWorker {
     /// The accounting queue's counts, readable from another thread: the
-    /// monitor samples them (`crates/sprawling/Spec.lean` §8-98).
+    /// monitor samples them (`Sprawling/app/Spec.lean` §8-98).
     pub fn health(&self) -> Health {
         self.flight.gate.health()
     }
@@ -33,13 +33,13 @@ impl RunWorker {
     /// A relay onto this worker's ledger, for a writer that is not a run:
     /// the remote door's lines are written from the assembly, and reach
     /// the history through the same crossing a driving thread uses, so
-    /// the city still has one writer (`crates/sprawling/Spec.lean` §8-139).
+    /// the city still has one writer (`Sprawling/app/Spec.lean` §8-139).
     pub fn relay(&self) -> super::Relay {
         self.flight.gate.issue()
     }
 
     /// Hands this worker's session slices to the thread that will file
-    /// them from now on, so this thread files none (`crates/sprawling/Spec.lean`
+    /// them from now on, so this thread files none (`Sprawling/app/Spec.lean`
     /// §8-123). `None` when they were handed off already, or the ledger
     /// is not a city's.
     pub fn hand_off_session_slices(&mut self) -> Option<storage::Sessions> {
@@ -49,17 +49,17 @@ impl RunWorker {
 
 /// The accounting thread's loop: every relay request the one queue
 /// holds, then at most one run home, then the desk, in that order
-/// (`crates/sprawling/Spec.lean` §8-42-4), until the desk closes.
+/// (`Sprawling/app/Spec.lean` §8-42-4), until the desk closes.
 ///
 /// The thread sleeps on the one queue and on nothing else, so a relay
 /// request, a run home, a posted command and a close each wake it the
 /// moment they are queued; an idle city wakes only at the schedule's
-/// deadline (`crates/accounting/spec/Worker/Attend.lean`).
+/// deadline (`Sprawling/accounting/spec/Worker/Attend.lean`).
 ///
 /// A function of its own rather than the body of the thread's closure,
 /// because the instruments that time a relay round trip and the gap two
 /// dispatches leave in a run drive this loop and not a copy of it
-/// (`crates/sprawling/Spec.lean` §8-84): a copy that waited differently would be
+/// (`Sprawling/app/Spec.lean` §8-84): a copy that waited differently would be
 /// measured instead of the city.
 pub fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
     desk.ring_through(worker.bell());
@@ -67,7 +67,7 @@ pub fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
     // than measured from it, because a city with lanes driving comes
     // back here on every relay request, and one that opened its
     // schedule file that often would spend its time opening a file
-    // (`crates/sprawling/Spec.lean` §8-46-2).
+    // (`Sprawling/app/Spec.lean` §8-46-2).
     let mut read_schedule_at = kernel::TimeMs::new(0);
     // The desk is read before the first wait, because what was posted
     // before this thread attended rang nobody.
@@ -111,7 +111,7 @@ pub fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
                 };
                 // A kept keep-warm door that falls due before the next
                 // schedule read wakes the loop for itself
-                // (`crates/sprawling/Spec.lean` §8-112); none is kept by default.
+                // (`Sprawling/app/Spec.lean` §8-112); none is kept by default.
                 let until_warm = match (worker.warm_due(), worker.clock.now()) {
                     (Some(_), Ok(now)) => {
                         worker.renew_warm(now);
@@ -128,7 +128,7 @@ pub fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
             DeskWait::Close(why) => {
                 // A city closed before the proof of its history finished
                 // writes its handoff once the proof has a verdict, rather
-                // than having it refused (`crates/sprawling/Spec.lean` §8-90).
+                // than having it refused (`Sprawling/app/Spec.lean` §8-90).
                 worker.await_proof();
                 // A close that interrupts stops the background commands
                 // too, without writing `city_halted`: the next serve opens

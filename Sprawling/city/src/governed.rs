@@ -15,7 +15,7 @@
 //! and then "a resident cannot edit its own governance" would hold by
 //! habit rather than by construction.
 //!
-//! Specified by `crates/city/spec/Governed.lean` §8-24b.
+//! Specified by `Sprawling/city/spec/Governed.lean` §8-24b.
 
 use std::path::{Path, PathBuf};
 
@@ -63,7 +63,7 @@ impl Governed {
 /// box and saves once, and a partial write would leave the city governed
 /// by half a sentence. Against a base, because the raw editor and the
 /// identity cards are two writers of `MAYOR.md` and `PREFERENCES.md`
-/// (`crates/city/spec/Identity.lean` §8-33), and a page left open in a second tab is a third.
+/// (`Sprawling/city/spec/Identity.lean` §8-33), and a page left open in a second tab is a third.
 /// The identity area of those two is read before anything lands, by the
 /// same reader the cards use. The previous content is not kept here —
 /// the Ledger line that announces the write is what a reader goes back

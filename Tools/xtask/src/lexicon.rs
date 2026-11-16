@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! One concept, one name. Data face is `crates/xtask/lexicon.toml`; exempt
+//! One concept, one name. Data face is `Tools/xtask/lexicon.toml`; exempt
 //! with `lexicon-ok: <reason>` on the line or the line above (redline C6).
 
 use std::path::Path;
@@ -12,7 +12,7 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 /// Retired words; `vocabulary` reads the same path.
-pub(crate) const PATH: &str = "crates/xtask/lexicon.toml";
+pub(crate) const PATH: &str = "Tools/xtask/lexicon.toml";
 
 const EXEMPT_MARK: &str = "lexicon-ok:";
 const LANG: &str = concat!(crate::walk::client_src!(), "/lang.json");

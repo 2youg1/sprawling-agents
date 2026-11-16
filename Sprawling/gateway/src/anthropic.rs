@@ -275,7 +275,7 @@ pub(crate) fn response_from(wire: &Value) -> Result<ChatResponse, AxError> {
         "response.usage",
     )?;
     // This wire's `input_tokens` counts only what missed the cache; the
-    // city's count is the whole prompt (`crates/kernel/Spec.lean` §8-24, `ModelUsage`).
+    // city's count is the whole prompt (`Sprawling/kernel/Spec.lean` §8-24, `ModelUsage`).
     let input_tokens = [cache_read_tokens, cache_write_tokens]
         .into_iter()
         .map(CacheCount::or_zero)

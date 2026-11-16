@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 // Portions copyright (c) 2026 2youg1 and the RefRain contributors
 
-//! Where a document's blocks lie in its bytes (`crates/documents/Spec.lean`
+//! Where a document's blocks lie in its bytes (`Sprawling/documents/Spec.lean`
 //! D6), migrated from RefRain's `source_layout`.
 //!
 //! The source stays bytes. A layout only records which byte intervals are
@@ -31,7 +31,7 @@ pub(crate) fn blocks(format: Format, source: &[u8]) -> Vec<Span> {
 }
 
 /// Where the blocks that can no longer change end, in Markdown still
-/// being written (`crates/documents/Spec.lean` D31, `closedUpTo`).
+/// being written (`Sprawling/documents/Spec.lean` D31, `closedUpTo`).
 ///
 /// Just past the last complete line that is blank outside a code block,
 /// is an ATX heading at the margin, or closes a code block opened at the

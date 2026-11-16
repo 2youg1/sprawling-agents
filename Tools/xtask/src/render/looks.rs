@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Every look is measured, and every look sizes itself from tokens
-//! (crates/xtask/Spec.lean §8-13).
+//! (Tools/xtask/Spec.lean §8-13).
 //!
 //! **A look the gallery never draws is a look this gate never reads.**
 //! The roles, the names and the geometry are taken from `#/gallery`, so

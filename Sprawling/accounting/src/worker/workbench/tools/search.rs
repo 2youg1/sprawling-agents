@@ -5,7 +5,7 @@
 
 //! `web_search`: the city's web search tool, sent to the one supplier
 //! the run's frozen `[search]` names, over MCP streamable HTTP, through
-//! the ordinary connector gate (`crates/accounting/spec/Connectors.lean`
+//! the ordinary connector gate (`Sprawling/accounting/spec/Connectors.lean`
 //! §8-35, accounting D52).
 //!
 //! Which account a call goes out on, whether a failed call goes again,

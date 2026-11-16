@@ -4,12 +4,12 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A release named by its version number alone, the spelling crates.io
-//! carries (`crates/kernel/spec/Release.lean` §8-54-1).
+//! carries (`Sprawling/kernel/spec/Release.lean` §8-54-1).
 
 use crate::error::{AxCode, AxError};
 
 /// A release named by its version number alone, as crates.io names it
-/// (`crates/kernel/spec/Release.lean` §8-54-1, kernel D35).
+/// (`Sprawling/kernel/spec/Release.lean` §8-54-1, kernel D35).
 ///
 /// Its own type rather than a [`Release`] with a date made up, because
 /// crates.io states no date, and a date filled in for it is a value the

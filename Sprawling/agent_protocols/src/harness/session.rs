@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One ACP session with an official harness, this city as the client
-//! (`crates/agent_protocols/Spec.lean` §8-19).
+//! (`Sprawling/agent_protocols/Spec.lean` §8-19).
 //!
 //! JSON-RPC 2.0, one message per line, over whatever reader and writer
 //! the caller hands in: a child's stdio in production, a pipe an agent
@@ -21,7 +21,7 @@
 //!
 //! What a run over this session must keep - a report is never admitted
 //! history, a halt is a cancel before anything else, a frozen run emits
-//! nothing - is proved in `crates/agent_protocols/spec/Harness/Session.lean`.
+//! nothing - is proved in `Sprawling/agent_protocols/spec/Harness/Session.lean`.
 
 use std::io::Write;
 use std::path::Path;
@@ -44,7 +44,7 @@ use report::{ask_of, update_of};
 const METHOD_NOT_FOUND: i64 = -32_601;
 
 /// The longest a halt waits for the harness to say something before the
-/// session asks about it anyway (`crates/agent_protocols/Spec.lean` section 14).
+/// session asks about it anyway (`Sprawling/agent_protocols/Spec.lean` section 14).
 const HALT_TICK_MS: u64 = 200;
 
 /// The caller's answer to a permission ask.
@@ -216,7 +216,7 @@ impl<W: Write> AcpSession<W> {
             let heard = self.lines.next(Duration::from_millis(HALT_TICK_MS))?;
             // Before anything the agent said is handled, and after every
             // silent wait: a halt becomes a cancel ahead of the next
-            // report (crates/agent_protocols/spec/Harness/Session.lean).
+            // report (Sprawling/agent_protocols/spec/Harness/Session.lean).
             self.heed_halt(listener)?;
             let line = match heard {
                 Heard::Message(line) => line,

@@ -6,7 +6,7 @@
 /-!
 # kernel::skill
 
-规定 `skill`（`crates/kernel/src/skill.rs`）：一件 skill 包的 canonical manifest。city 在准入时写它，runtime 在读取时凭它找到每个文件的 CAS digest；包 digest 是 manifest 字节的 BLAKE3，不再是整包规范串的 digest。
+规定 `skill`（`Sprawling/kernel/src/skill.rs`）：一件 skill 包的 canonical manifest。city 在准入时写它，runtime 在读取时凭它找到每个文件的 CAS digest；包 digest 是 manifest 字节的 BLAKE3，不再是整包规范串的 digest。
 -/
 
 /-!
@@ -154,11 +154,11 @@ city 的安装与书架索引、runtime 的 `read`、usage 的版本 digest 与�
 /-!
 ## 16 测试与约束
 
-Rust 测 canonical roundtrip、全部拒绝形状、查找和 UTF-8；Lean 证明查找不返回别项。`cargo nextest run -p sprawling-kernel skill` 与 `lake build crates.kernel.spec.Skill` 验收；没有声称 Lean 证明 Rust 实现等价。
+Rust 测 canonical roundtrip、全部拒绝形状、查找和 UTF-8；Lean 证明查找不返回别项。`cargo nextest run -p sprawling-kernel skill` 与 `lake build Sprawling.kernel.spec.Skill` 验收；没有声称 Lean 证明 Rust 实现等价。
 -/
 
 /-!
 ## 17 文档关系
 
-`crates/city/spec/Library/Install.lean` 决定写入顺序，`crates/city/spec/Library.lean` 决定索引，`crates/runtime/spec/Tools/Read.lean` 决定完整校验读取，`crates/storage/spec/Cas.lean` 决定 digest 与 `E_CAS_CORRUPT`。
+`Sprawling/city/spec/Library/Install.lean` 决定写入顺序，`Sprawling/city/spec/Library.lean` 决定索引，`Sprawling/runtime/spec/Tools/Read.lean` 决定完整校验读取，`Sprawling/storage/spec/Cas.lean` 决定 digest 与 `E_CAS_CORRUPT`。
 -/

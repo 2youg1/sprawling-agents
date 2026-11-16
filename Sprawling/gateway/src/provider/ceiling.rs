@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which statement about one model's context window and output ceiling
-//! wins, and who made it (shape 1 decision; `crates/gateway/spec/Provider/Ceiling.lean`,
-//! interface in `crates/gateway/spec/Provider.lean` §8-17, gateway D45).
+//! wins, and who made it (shape 1 decision; `Sprawling/gateway/spec/Provider/Ceiling.lean`,
+//! interface in `Sprawling/gateway/spec/Provider.lean` §8-17, gateway D45).
 //!
 //! **A model with no registered ceiling could not be called at all.**
 //! The Anthropic wire requires `max_tokens` in every request and refuses
@@ -639,7 +639,7 @@ mod tests {
     }
 
     proptest::proptest! {
-        /// The three properties of `crates/gateway/spec/Provider/Ceiling.lean`
+        /// The three properties of `Sprawling/gateway/spec/Provider/Ceiling.lean`
         /// over the model's whole input space: each of the person, the
         /// provider's list, an earlier registration from each of the five
         /// sources and the pinned catalogue silent or stating a figure,

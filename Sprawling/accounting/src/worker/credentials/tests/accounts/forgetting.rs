@@ -5,7 +5,7 @@
 
 //! Forgetting a key through `ForgetSecret`: kept while anything the
 //! city reads still names the reference, deleted once nothing does
-//! (`crates/accounting/spec/Worker.lean` §8-37).
+//! (`Sprawling/accounting/spec/Worker.lean` §8-37).
 
 use kernel::{AxCode, AxError};
 

@@ -5,7 +5,7 @@
 
 //! Builds the Zig leaf with the standard library alone: `zig build-lib`
 //! into this package's `OUT_DIR`, linked as a static library, on a
-//! Windows target and nowhere else (`crates/desktop/Spec.lean` D12).
+//! Windows target and nowhere else (`Sprawling/desktop/Spec.lean` D12).
 //! When `DOCS_RS` is set, the script returns without Zig: docs.rs has
 //! none, and rustdoc does not link the leaf (`desktop_ffi` D7).
 //!
@@ -106,7 +106,7 @@ fn rendered() -> String {
 fn pinned_zig(pinned: &str) -> Result<(), String> {
     let install = format!(
         "install Zig {pinned} (`winget install --id zig.zig -e --version {pinned}`), which \
-         builds crates/desktop/ffi's leaf; `sprawling doctor` lists it with the other tools"
+         builds Sprawling/desktop/ffi's leaf; `sprawling doctor` lists it with the other tools"
     );
     let asked = Command::new("zig")
         .arg("version")

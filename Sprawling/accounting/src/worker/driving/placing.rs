@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A run's bench as the tool face a wave drives in three stages
-//! (`crates/runtime/Spec.lean` §8-3): each call's key is placed by its position when
+//! (`Sprawling/runtime/Spec.lean` §8-3): each call's key is placed by its position when
 //! it is admitted, and the commits it was checkpointed against, what it says
 //! it wrote and the commands that ran are counted when it is accounted.
 //! Both happen in call order, so a wave whose reads ran at once leaves
@@ -34,7 +34,7 @@ pub(super) struct Checkpointing {
     /// from.
     pub(super) checkpointed: RefCell<Vec<String>>,
     /// What the calls since the last checkpoint said they wrote, which is
-    /// what the next checkpoint stages (`crates/runtime/Spec.lean` §8-45).
+    /// what the next checkpoint stages (`Sprawling/runtime/Spec.lean` §8-45).
     wrote: RefCell<Writes>,
 }
 
@@ -69,7 +69,7 @@ impl Checkpointing {
 
     /// A call that failed may have failed partway through its writes, and
     /// its own account of them no longer holds, so the next checkpoint walks
-    /// the whole domain (`crates/runtime/Spec.lean` §8-45).
+    /// the whole domain (`Sprawling/runtime/Spec.lean` §8-45).
     fn widen(&self) {
         self.add(Writes::Domain);
     }
@@ -93,7 +93,7 @@ pub(super) struct Placing<'f> {
     ran: (u32, u32),
     checkpointing: &'f Checkpointing,
     /// What the run was told it can reach: the one authority on what a
-    /// `tool` `run` stands for (`crates/runtime/Spec.lean` §8-61).
+    /// `tool` `run` stands for (`Sprawling/runtime/Spec.lean` §8-61).
     catalog: Arc<Mutex<Catalog>>,
     shown: ReadShown,
     rules: RuleDelivery,
@@ -166,7 +166,7 @@ impl<'f> Placing<'f> {
 
     /// What the model reads of a result no command produced: a
     /// connector's answer is packaged for the window
-    /// (`crates/runtime/Spec.lean` §8-27-10); every other tool shapes its own.
+    /// (`Sprawling/runtime/Spec.lean` §8-27-10); every other tool shapes its own.
     fn unsieved(&mut self, call: &ToolCall, outcome: ToolOutcome) -> Result<ToolOutcome, AxError> {
         match self.bench.meta_of(&call.name).map(|meta| &meta.effect) {
             Some(Effect::Connector { .. }) => self.sieving.package_connector(outcome),
@@ -270,7 +270,7 @@ impl<'f> Placing<'f> {
             BenchOutcome::Refused { refusal } => Err(*refusal),
             // A replay is answered with what the first call answered,
             // sieved the same way. An error here would tell the model its
-            // call failed when it succeeded (`crates/runtime/Spec.lean` §8-35). The
+            // call failed when it succeeded (`Sprawling/runtime/Spec.lean` §8-35). The
             // command counters are not touched: nothing ran this time.
             BenchOutcome::Duplicate { outcome } => {
                 if call.name.as_str() == runtime::ReadTool::NAME {
@@ -308,7 +308,7 @@ impl ConcurrentInvoke for Placing<'_> {
     fn admit(&mut self, call: &ToolCall, t: TimeMs) -> Admitted {
         let at = self.next;
         self.next = at.saturating_add(1);
-        // What the action is, is the tool face's to say (`crates/kernel/Spec.lean`
+        // What the action is, is the tool face's to say (`Sprawling/kernel/Spec.lean`
         // §8-23). Two identical calls at two positions are two keys and
         // both run; the same position replayed is one key, which is what
         // deduplication is for.

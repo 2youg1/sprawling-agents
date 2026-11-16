@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The device's half of the remote door's two handshakes
-// (`crates/remote_access/Spec.lean` §8-4, §8-6), byte for byte the
+// (`Sprawling/remote_access/Spec.lean` §8-4, §8-6), byte for byte the
 // layout `remote_access::handshake` reads.
 //
 // **Pairing**: the device's first visit, authenticated by the city

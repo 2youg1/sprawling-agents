@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What one search hit carries, and what a walk that stopped says
-//! (`crates/runtime/spec/Tools/Search.lean` §8-30).
+//! (`Sprawling/runtime/spec/Tools/Search.lean` §8-30).
 
 use crate::elision::{self, Elided};
 

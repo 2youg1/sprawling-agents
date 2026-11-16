@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The processes a supervised city runs as: `serve` in a child, and
-//! `resume` in a child after each crash (`crates/sprawling/spec/Supervising.lean` §8-109).
+//! `resume` in a child after each crash (`Sprawling/app/spec/Supervising.lean` §8-109).
 //!
 //! Thin on purpose. The exit a child leaves is read as served or failed
 //! and judged by `CrashBudget::after`; this file only spawns, waits,

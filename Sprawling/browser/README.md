@@ -2,9 +2,9 @@
 
 What a resident may see of a web page and do to it, decided for a browser the city drives over WebDriver BiDi. A run looks at a page as a snapshot, clicks, fills a field, presses keys, takes a screenshot, compares two images, looks again after changing code, and finds the same signed-in account the next time through the building's own browser profile.
 
-The package holds the decisions and the value types, and no I/O. It starts no browser process, holds no socket, downloads no driver, opens no file, and has no `async`. In `crates/sprawling`, `browser_bidi` starts or attaches to the browser, holds the socket and implements this package's `BrowserPort`, while `browser_tool` turns the actions into the `browser` and `usersbrowser` tools. It does not decide whether a building may use a browser at all: `city::policy` does, and it is also where a confidential building is refused. Page text becomes tainted like any other tool result, in `kernel::taint`.
+The package holds the decisions and the value types, and no I/O. It starts no browser process, holds no socket, downloads no driver, opens no file, and has no `async`. In `Sprawling/app`, `browser_bidi` starts or attaches to the browser, holds the socket and implements this package's `BrowserPort`, while `browser_tool` turns the actions into the `browser` and `usersbrowser` tools. It does not decide whether a building may use a browser at all: `city::policy` does, and it is also where a confidential building is refused. Page text becomes tainted like any other tool result, in `kernel::taint`.
 
-Who reads a survey is the caller's question too. `survey` answers where a drawn page's boxes went wrong; whether that turns a gate red is decided by the `render` gate in `crates/xtask`, and whether a resident's own page is worth surveying is decided by the tool that asked.
+Who reads a survey is the caller's question too. `survey` answers where a drawn page's boxes went wrong; whether that turns a gate red is decided by the `render` gate in `Tools/xtask`, and whether a resident's own page is worth surveying is decided by the tool that asked.
 
 ## How it is shaped
 
@@ -24,7 +24,7 @@ Each module holds one decision:
 - `own` — whether an address is one of the city's own listeners, and the address a tab is on. A name is judged by its spelling and never resolved, because a lookup would make the answer depend on the network.
 - `survey` — what a page turns out to be once it has been laid out: alignment, text that outgrew its container, legibility, a word outside the declared vocabulary. It measures only what layout brings into existence, and reports boxes; mapping a box back to the line that drew it happens where a source tree exists.
 
-`BrowserPort` is the seam list row `browser::port` in [`ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 4. Its production adapters are `BidiSocket`, `LazyEngine` and `AttachedBrowser` in `crates/sprawling/src/browser_bidi`, and its second adapter is `Recording`; section 8 of the SPEC, decision D1, says why there is no conformance suite beside the trait.
+`BrowserPort` is the seam list row `browser::port` in [`ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 4. Its production adapters are `BidiSocket`, `LazyEngine` and `AttachedBrowser` in `Sprawling/app/src/browser_bidi`, and its second adapter is `Recording`; section 8 of the SPEC, decision D1, says why there is no conformance suite beside the trait.
 
 ## When a call fails
 
@@ -66,7 +66,7 @@ A decision is a comment opening with `D<n>` directly above what it governs, cite
 
 ```bash
 cargo nextest run -p sprawling-browser    # the module tests, which need no browser
-lake build crates.browser.Spec            # this package's Lean specification
+lake build Sprawling.browser.Spec            # this package's Lean specification
 cargo xtask gates spec depmap             # its specification and its dependency edges
 ```
 

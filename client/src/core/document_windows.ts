@@ -7,7 +7,7 @@
 // city answers (client/Spec.lean §4-46). `Query::Document` answers the first
 // window; a version longer than one is in the city's content store and
 // the rest is read by version through `Query::Range`, each window
-// starting where the last one ended (`crates/wire/Spec.lean` §8-69,
+// starting where the last one ended (`Sprawling/wire/Spec.lean` §8-69,
 // §8-70). The windows are bytes of the version, so the text is complete
 // exactly when the windows reach the version's length.
 

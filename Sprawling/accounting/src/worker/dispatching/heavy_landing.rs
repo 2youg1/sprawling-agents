@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The heavy half of a run's landing, which the run's lane does before
-//! it hands the run home (`crates/sprawling/spec/Accounting/Landing.lean`
+//! it hands the run home (`Sprawling/app/spec/Accounting/Landing.lean`
 //! D37): the transcript beside the room and the checkpoint sweep's
 //! diff. Both read only the drive and the disk, so the accounting
 //! thread, which every relay request waits on, never waits on them.
@@ -19,7 +19,7 @@ use super::super::workbench::held;
 use super::super::{Assignment, Driven, Site};
 
 /// The checkpoint sweep of one drive, read on its lane before the run
-/// came home (`crates/sprawling/spec/Accounting/Landing.lean` D37): the
+/// came home (`Sprawling/app/spec/Accounting/Landing.lean` D37): the
 /// diff grows with every file the run wrote, and on the accounting
 /// thread every relay request would wait it out.
 pub(in crate::worker) struct Swept {
@@ -32,7 +32,7 @@ pub(in crate::worker) struct Swept {
 }
 
 /// What a lane needs to do the heavy half of its run's landing before
-/// it hands the run home (`crates/sprawling/spec/Accounting/Landing.lean`
+/// it hands the run home (`Sprawling/app/spec/Accounting/Landing.lean`
 /// D37): the steps that read only the drive and the disk.
 pub(super) struct HeavyLanding {
     pub(super) city_root: PathBuf,

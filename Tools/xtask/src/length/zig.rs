@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! How long a Zig function is, read from Zig's tokens (crates/xtask/Spec.lean §8-48 and
+//! How long a Zig function is, read from Zig's tokens (Tools/xtask/Spec.lean §8-48 and
 //! xtask D15).
 //!
 //! **Counting braces is exact in Zig once four kinds of token are

@@ -51,7 +51,7 @@ private def quoted (line : String) : Option String :=
 table's order.
 
 The same reading `cargo xtask shots` takes of the same table
-(`crates/xtask/Spec.lean` §8-44), because it is the table the address
+(`Tools/xtask/Spec.lean` §8-44), because it is the table the address
 bar writes and reads; a comment line is skipped, since its words can hold a
 colon. -/
 def pagesIn (routes : String) : List String :=

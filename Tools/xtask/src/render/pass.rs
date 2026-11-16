@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One opening of the gallery: how wide the window is, how the page is
-//! lit, and whether the engine is in a forced-colour mode (crates/xtask/Spec.lean
+//! lit, and whether the engine is in a forced-colour mode (Tools/xtask/Spec.lean
 //! §8-17).
 //!
 //! **A property that holds at one width is not a property.** The three

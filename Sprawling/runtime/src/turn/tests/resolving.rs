@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A `tool` `run` accounted as the tool it names
-//! (`crates/runtime/Spec.lean` §8-61).
+//! (`Sprawling/runtime/Spec.lean` §8-61).
 
 use super::super::*;
 use super::concurrent::{Placed, waved};

@@ -11,7 +11,7 @@
 //! the history back — so "the key is filled in and nothing ever worked"
 //! becomes a red test rather than a report.
 //!
-//! **The rounds are a table, not a list kept here** (`crates/sprawling/Spec.lean`
+//! **The rounds are a table, not a list kept here** (`Sprawling/app/Spec.lean`
 //! §8-69): every face of every host `gateway::known_hosts` names, called
 //! with the key and the model a person exported for that host, and then
 //! the one endpoint a person pasted - a relay, a server on this machine.
@@ -27,8 +27,8 @@
 //! **It enters by `RunWorker::handle`, the door `wire::server` hands
 //! every frame to**, rather than by spawning the binary and opening a
 //! socket. The endpoint under test is the provider's, and the process
-//! boundary this repository judges from outside belongs to `crates/adversary/`
-//! (xtask boundary gate; `crates/sprawling/Spec.lean` §8-69).
+//! boundary this repository judges from outside belongs to `Tools/adversary/`
+//! (xtask boundary gate; `Sprawling/app/Spec.lean` §8-69).
 
 #![allow(
     clippy::unwrap_used,

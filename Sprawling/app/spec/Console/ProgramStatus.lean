@@ -6,7 +6,7 @@
 /-!
 # calyx::console::program_status
 
-规定 `Calyx/src/console/program_status/mod.rs`：城用 Program Status Protocol（OSC 7501）告诉它所在的终端，这座城此刻在做什么。本文件是 `crates/sprawling/Spec.lean` 的一个分部，控制台的其余接口在 `crates/sprawling/spec/Console.lean` §8-11。Lean 模型是「必须守住哪些性质」的权威，Rust 是「怎样守住」的权威。
+规定 `Calyx/src/console/program_status/mod.rs`：城用 Program Status Protocol（OSC 7501）告诉它所在的终端，这座城此刻在做什么。本文件是 `Sprawling/app/Spec.lean` 的一个分部，控制台的其余接口在 `Sprawling/app/spec/Console.lean` §8-11。Lean 模型是「必须守住哪些性质」的权威，Rust 是「怎样守住」的权威。
 
 协议本身的权威是它的规范页（Program Status Protocol，rev 0.3）：一条报告是 `ESC ] 7501 ; <pairs> ESC \`，`pairs` 是以 `:` 分隔的 `key=value`，`state` 必有，`msg` 是 UTF-8 文本的标准 base64；每条报告整条替换终端为这个程序存的那条记录；`state=clear` 不带 `id` 时删掉这个终端上的所有记录。模型里没有字节：编码只在 Rust 里，由 `calyx::console::program_status` 的测试按规范的文法与上限逐条检查。
 

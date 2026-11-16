@@ -30,7 +30,7 @@ unwrap_used = "deny"
 as_conversions = "deny"
 "#;
 
-/// The leaf as `crates/desktop/ffi/Cargo.toml` writes it: the
+/// The leaf as `Sprawling/desktop/ffi/Cargo.toml` writes it: the
 /// workspace's table, with the one recorded line changed.
 const LEAF_MANIFEST: &str = r#"
 [package]
@@ -82,7 +82,7 @@ fn a_lint_the_leaf_no_longer_carries_is_refused_and_named() {
     assert_eq!(found.len(), 1, "{found:#?}");
     assert_eq!(
         found[0].location,
-        "crates/desktop/ffi/Cargo.toml [lints.clippy] as_conversions"
+        "Sprawling/desktop/ffi/Cargo.toml [lints.clippy] as_conversions"
     );
     assert!(found[0].violation.contains("absent"), "{found:#?}");
     assert!(found[0].alternative.contains("RECORDED"), "{found:#?}");
@@ -149,7 +149,7 @@ fn a_leaf_that_is_no_longer_a_member_strikes_its_exception() {
     );
     assert_eq!(found.len(), 1, "{found:#?}");
     assert!(
-        found[0].location.contains("LEAVES crates/desktop/ffi"),
+        found[0].location.contains("LEAVES Sprawling/desktop/ffi"),
         "{found:#?}"
     );
     assert!(found[0].alternative.contains("RECORDED"), "{found:#?}");

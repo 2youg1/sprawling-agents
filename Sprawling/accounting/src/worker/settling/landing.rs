@@ -199,7 +199,7 @@ impl RunWorker {
         // and whoever asked hears why. The refusal is noted as well as
         // handed back, because an obligation with nobody behind it
         // reaches the diagnostics log and nothing else
-        // (`crates/sprawling/Spec.lean` §8-46-12). The run itself still lands below,
+        // (`Sprawling/app/Spec.lean` §8-46-12). The run itself still lands below,
         // so refusing a successor does not also take this run's ending
         // off the ledger.
         let onward = match replaced {
@@ -265,7 +265,7 @@ impl RunWorker {
             return Ok(Landed::Elsewhere);
         }
         // What this run sent stays warm for the room's next run
-        // (`crates/sprawling/Spec.lean` §8-112).
+        // (`Sprawling/app/Spec.lean` §8-112).
         if let Some(door) = adapter {
             self.warm.keep(addr.clone(), door);
         }

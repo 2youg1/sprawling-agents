@@ -4,13 +4,13 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One ACP agent entry, and the consent that lets it start
-//! (`crates/agent_protocols/Spec.lean` §8-19, D16).
+//! (`Sprawling/agent_protocols/Spec.lean` §8-19, D16).
 //!
 //! An entry is only an offer: the catalog, the paste parser and the
 //! detection produce entries, and nothing here starts a process. The one
 //! door that does, `HarnessProcess::start`, takes a [`Consented`], whose
 //! field is private and whose two constructors are the two ways a person
-//! consents (`crates/agent_protocols/spec/Harness/Consent.lean`).
+//! consents (`Sprawling/agent_protocols/spec/Harness/Consent.lean`).
 
 use kernel::{AxCode, AxError, B3Hash};
 
@@ -216,7 +216,7 @@ fn launcher(program: &str) -> Option<Launcher> {
 }
 
 /// An entry the person consented to: the only thing a child is started
-/// from (`crates/agent_protocols/spec/Harness/Consent.lean`).
+/// from (`Sprawling/agent_protocols/spec/Harness/Consent.lean`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Consented {
     entry: AgentEntry,

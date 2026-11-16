@@ -5,7 +5,7 @@
 
 //! The one request that waits for the city's console: a page asks for a
 //! verb, the console shows a code, the User types it back
-//! (`crates/remote_access/spec/Confirm.lean`, remote_access D4).
+//! (`Sprawling/remote_access/spec/Confirm.lean`, remote_access D4).
 //!
 //! At most one request waits. A new request replaces the one before it,
 //! and every answer the guard reads, right or wrong, ends the request it
@@ -29,7 +29,7 @@ pub const CONFIRM_BYTES: usize = 5;
 const GROUP_LEN: usize = 4;
 
 /// The least time between two answers the guard reads
-/// (`crates/remote_access/Spec.lean` D25): one a second, the rate the
+/// (`Sprawling/remote_access/Spec.lean` D25): one a second, the rate the
 /// pairing code is guessed at.
 pub const CONFIRM_SPACING_MS: u64 = 1_000;
 

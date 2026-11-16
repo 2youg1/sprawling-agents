@@ -23,7 +23,7 @@ const MARK_EVERY: u64 = 10;
 
 /// How a renderer numbers the lines it draws. The ledger keeps 0-based
 /// indexes under every version; the number a model reads is the index
-/// plus the base (`crates/runtime/spec/Rendering.lean` D119).
+/// plus the base (`Sprawling/runtime/spec/Rendering.lean` D119).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Numbering {
     /// The line at index 0 is line 0 (V1 and V2).

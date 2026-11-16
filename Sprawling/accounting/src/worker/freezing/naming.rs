@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The names one session is frozen with (`crates/accounting/spec/Worker/Freezing/Naming.lean` §8-15): what
+//! The names one session is frozen with (`Sprawling/accounting/spec/Worker/Freezing/Naming.lean` §8-15): what
 //! the city calls the person and the Mayor, in the city slot and at the
 //! head of the resident slot.
 
@@ -64,7 +64,7 @@ impl Frozen {
     /// here. Without a `City.md` of the building's own, that is the same
     /// for every resident of the city and so stays in the one slot cached
     /// across all of them; with one, it is still the same for every
-    /// resident of that building (`crates/runtime/spec/Prefix.lean` D97).
+    /// resident of that building (`Sprawling/runtime/spec/Prefix.lean` D97).
     ///
     /// # Errors
     /// As `prompt_segment` and `city::city_prompt_path`, and a path the

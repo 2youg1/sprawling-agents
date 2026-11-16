@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Seatbelt command placement; specified by
-//! `crates/runtime/spec/Tools/Exec/NativeMacos.lean`.
+//! `Sprawling/runtime/spec/Tools/Exec/NativeMacos.lean`.
 
 use std::path::Path;
 use std::process::Command;

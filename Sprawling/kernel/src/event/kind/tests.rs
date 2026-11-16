@@ -49,7 +49,7 @@ fn every_kind_spells_itself_once_and_exactly_twelve_reach_the_window() {
 }
 
 /// The remote door's five kinds, in the order a door's life writes them
-/// (`crates/kernel/spec/Event/Record.lean` §8-81), and then the four document kinds
+/// (`Sprawling/kernel/spec/Event/Record.lean` §8-81), and then the four document kinds
 /// (section 8-83), and then the three V0.0.9 kinds (D21-D23) and the
 /// reply wait's two (D32) and where a letter landed (D38) close the table, so the SPEC table and `ALL`
 /// keep one order; who shelved a skill (D23) and the prefix hold (D61)

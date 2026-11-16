@@ -20,7 +20,7 @@
 //! does not have one yet. Concern time zones are a rendering matter and
 //! live with the clock stamp.
 //!
-//! Specified by `crates/city/spec/Schedule.lean` §8-6.
+//! Specified by `Sprawling/city/spec/Schedule.lean` §8-6.
 
 use std::path::{Path, PathBuf};
 

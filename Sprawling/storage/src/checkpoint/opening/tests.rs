@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The checks derived from `crates/storage/spec/Checkpoint/Concurrent.lean`
+//! The checks derived from `Sprawling/storage/spec/Checkpoint/Concurrent.lean`
 //! §8-39 "验收": real threads, one city, no lock around a checkpoint.
 
 use std::collections::BTreeSet;

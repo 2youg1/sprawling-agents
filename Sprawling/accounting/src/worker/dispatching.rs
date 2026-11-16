@@ -47,9 +47,9 @@ pub(super) struct Assignment {
     pub(super) difficulty: Option<kernel::Difficulty>,
     /// The registered model this dispatch named by id, when it named
     /// one; `None` runs on the `main` tag's model. Spent by agreeing,
-    /// which finds the tag that registered it (`crates/sprawling/Spec.lean` §8-10).
+    /// which finds the tag that registered it (`Sprawling/app/Spec.lean` §8-10).
     pub(super) model: Option<String>,
-    /// The run policy the dispatch chose (`crates/kernel/Spec.lean` §8-77): written
+    /// The run policy the dispatch chose (`Sprawling/kernel/Spec.lean` §8-77): written
     /// into `run_started`, asked by the merge, and inherited whole by
     /// every run this one hands work to or knocks for.
     pub(super) policy: kernel::RunPolicy,
@@ -180,7 +180,7 @@ pub(super) struct Agreed {
     /// Why this run selected the model, recorded in `run_started`.
     pub(super) routing: kernel::event::record::ModelRouting,
     /// The name of the endpoint the model is reached through, which is
-    /// the provider a model's note is filed under (`crates/sprawling/Spec.lean` §8-85).
+    /// the provider a model's note is filed under (`Sprawling/app/Spec.lean` §8-85).
     pub(super) provider: String,
     pub(super) adapter: super::keeping_warm::Door,
     /// How many times this run may make a failed call again, as the
@@ -190,7 +190,7 @@ pub(super) struct Agreed {
 }
 
 /// Who the city agreed to seat in the room: decided once, in
-/// `agree_to_work`, before anything is written (`crates/sprawling/Spec.lean` §8-124).
+/// `agree_to_work`, before anything is written (`Sprawling/app/Spec.lean` §8-124).
 ///
 /// Every later phase that differs between the two residents matches
 /// this, and nothing downstream asks the configuration again.
@@ -229,7 +229,7 @@ pub(super) struct Knock {
     pub(super) policy: kernel::RunPolicy,
     /// Where the run that spoke stood in its conversation. The woken run
     /// is one hop further on, and both ceilings are read there
-    /// (`crates/sprawling/Spec.lean` §8-46-12).
+    /// (`Sprawling/app/Spec.lean` §8-46-12).
     pub(super) chain: super::KnockChain,
 }
 

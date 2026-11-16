@@ -6,7 +6,7 @@
 /-!
 # gateway::endpoint::stream
 
-规定 `endpoint::stream`（`crates/gateway/src/endpoint/stream.rs`）：逐字读一次调用，结算答案只有一个解析器。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+规定 `endpoint::stream`（`Sprawling/gateway/src/endpoint/stream.rs`）：逐字读一次调用，结算答案只有一个解析器。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `Sprawling/gateway/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `gateway::endpoint::stream` 旁的测试守住。
 -/
@@ -30,7 +30,7 @@
 
 **一个工具调用在它的 `content_block_stop` 到达时就是完整的，解码器在那一刻交出它。** `anthropic::stream::completed_call(frames, at) -> Result<Option<ToolCall>, AxError>`：`frames` 是迄今收到的帧，`at` 是刚收到 `content_block_stop` 的那个 index。块是 `tool_use` 则答 `Some(ToolCall)`，别的块答 `None`；参数停在一个值的中间照旧是 `E_PROVIDER`（同 `settled_tool_arguments`）。**重装只有一处**：`settled` 与 `completed_call` 都经 `rebuilt` 把帧按 index 拼回块，再由 `block_from` 读成 `ContentBlock`——提前交出的调用与结算后 `ModelReturn` 里那一条逐字段相等，这由测试钉住。**交出的不是 `Increment`**：`Increment` 在线协议上、只供人看、不许任何下游据以决策（kernel `Increments` 的约定），而一次提前交出的调用恰恰是要据以执行的；把它塞进 `Increment` 既要动 `WIRE_V`，又会让「看的东西」变成「决定的东西」。`Endpoint::stream` 每收到一帧就交给 `StreamFrames::retain_and_complete`：Anthropic 兼容格式在最后一帧是 `content_block_stop` 时经 `completed_call` 作答，别的兼容格式恒答 `None`；三种兼容格式都保留帧到 EOF，再按各自文法结算；Responses 的结算投影见 D27；答出的调用交给 `call_speculating` 的 `early`。
 
-**提前交出的调用不是历史**：账本仍只从结算后的 `ModelReturn` 记 `tool_called`；回答被截断或取消，提前交出的调用与据它得出的结果一并丢弃。这两句与「只提前启动第一个写调用之前的只读调用」由 `crates/runtime/spec/Turn/Speculation.lean` 证明：`speculation_is_not_an_event`、`speculation_keeps_serial_order`、`a_cut_answer_discards_its_cache`；`speculating_past_a_write_changes_the_ledger` 给出落选设计（写调用之后的读也提前启动）的反例——提前启动的读看到的是写之前的世界。
+**提前交出的调用不是历史**：账本仍只从结算后的 `ModelReturn` 记 `tool_called`；回答被截断或取消，提前交出的调用与据它得出的结果一并丢弃。这两句与「只提前启动第一个写调用之前的只读调用」由 `Sprawling/runtime/spec/Turn/Speculation.lean` 证明：`speculation_is_not_an_event`、`speculation_keeps_serial_order`、`a_cut_answer_discards_its_cache`；`speculating_past_a_write_changes_the_ledger` 给出落选设计（写调用之后的读也提前启动）的反例——提前启动的读看到的是写之前的世界。
 
 **认不出的帧跳过，缺失的结算帧不跳过。** provider 会加新的事件类型，一个人不该因为其中一个是新的就丢掉整次调用；但流在说明「为什么停」的那一帧之前结束，是 `Provider` 失败并且可重试——它和一个被截断的 body 是同一种失败，刻意不允许「保留已收到的增量」来补救：把不完整的回复当成完整的呈现出去，是这里唯一不能有的结局。
 

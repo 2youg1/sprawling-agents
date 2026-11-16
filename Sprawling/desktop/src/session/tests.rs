@@ -81,7 +81,7 @@ fn work_asked_for_before_the_handshake_is_refused() {
 /// The notification alone opens nothing: a client that never sent
 /// `initialize` negotiated no revision and read no capabilities, so the
 /// connection stays where it was and the tools stay closed
-/// (`crates/desktop/Spec.lean` D15).
+/// (`Sprawling/desktop/Spec.lean` D15).
 #[test]
 fn the_notification_before_initialize_opens_nothing() {
     let mut server = Server::new(Scope::parse("windows = [\"*\"]\n"));

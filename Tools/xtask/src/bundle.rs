@@ -7,7 +7,7 @@
 //!
 //! The build script states the location relative to its own package,
 //! because a package archived for crates.io carries its own directory
-//! and nothing else (crates/xtask/Spec.lean §8-18); this joins it onto that
+//! and nothing else (Tools/xtask/Spec.lean §8-18); this joins it onto that
 //! package's directory and hands every reader the whole repo-relative
 //! path: a name with one home and a parent directory spelled once per
 //! reader still let the bundler write where the build script did not look.
@@ -19,10 +19,10 @@
 //! placeholder with one warning, `render` and `budget` skipped, and the
 //! defect reached a person as a blank page.
 //!
-//! **The path lives in `crates/sprawling/build.rs`, and this reads it
+//! **The path lives in `Sprawling/app/build.rs`, and this reads it
 //! from there.** That file is the only reader that must work in the
 //! published tree and in the crates.io archive, neither of which carries
-//! `crates/xtask/`, and it is the first reader in any build; a copy kept
+//! `Tools/xtask/`, and it is the first reader in any build; a copy kept
 //! here would be the second home again. The
 //! two files that restate the path in another language are held to it by
 //! `restated`, which reports rather than rewrites — a gate does not edit
@@ -34,7 +34,7 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 /// The package whose build script embeds the bundle, repo-relative.
-const PACKAGE: &str = "crates/sprawling";
+const PACKAGE: &str = "Sprawling/app";
 
 /// The file in it that owns the bundle's path.
 const EMBEDDER: &str = "build.rs";

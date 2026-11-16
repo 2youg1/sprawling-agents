@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The agents this machine shows evidence of, found without running
-//! anything (`crates/agent_protocols/Spec.lean` §8-19).
+//! anything (`Sprawling/agent_protocols/Spec.lean` §8-19).
 //!
 //! Two kinds of evidence, both read from files: an agent the person
 //! configured in another ACP client, and a built-in entry whose vendor

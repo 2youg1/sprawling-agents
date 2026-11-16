@@ -8,7 +8,7 @@
 //! `fault` feature; never in a production build.
 //!
 //! The model is stricter than any real platform so the write discipline
-//! it enforces holds on every platform (`crates/storage/spec/FaultFs.lean` §8-2):
+//! it enforces holds on every platform (`Sprawling/storage/spec/FaultFs.lean` §8-2):
 //! - every file has two planes: `durable` (survives power loss) and
 //!   `live` (what the running process observes). `sync_data` promotes
 //!   live to durable; a power cut drops the unsynced delta, except a
@@ -38,7 +38,7 @@ use super::plan::{FaultPlan, FileState, State, TornTail};
 /// Shared-state handle: clone it, hand one clone to the ledger, keep one
 /// to cut power and to reopen after the crash. `Arc<Mutex<_>>` rather
 /// than `Rc<RefCell<_>>` because the inner seam it implements is `Send`
-/// (`crates/sprawling/Spec.lean` §8-44): a store that holds one has to cross a thread.
+/// (`Sprawling/app/Spec.lean` §8-44): a store that holds one has to cross a thread.
 #[derive(Clone)]
 pub struct FaultFs(Arc<Mutex<State>>);
 
@@ -287,7 +287,7 @@ impl Vfs for FaultFs {
             // The target's dir entry is new: it survives only after a
             // sync_dir. Stricter than reality — a cut here loses the
             // object entirely, but its put never returned Ok, so no
-            // acknowledged effect is lost (`crates/storage/spec/Cas.lean` §8-3).
+            // acknowledged effect is lost (`Sprawling/storage/spec/Cas.lean` §8-3).
             file.durable_entry = false;
             state.files.insert(to.to_path_buf(), file);
         }

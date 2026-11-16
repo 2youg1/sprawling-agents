@@ -6,12 +6,12 @@
 //! The regression the local door was rebuilt for: a page on another
 //! site, or a request naming another host, reached the city's socket and
 //! its acting doors on loopback without presenting anything
-//! (`crates/wire/spec/Reception/Entry.lean` §8-94).
+//! (`Sprawling/wire/spec/Reception/Entry.lean` §8-94).
 //!
 //! Driven in process through `tower::ServiceExt::oneshot`, as the other
 //! route tests are: this judges the router's own table, and a test that
 //! raised the product's server and spoke HTTP from outside would be
-//! `crates/adversary/`'s ground (`xtask boundary`).
+//! `Tools/adversary/`'s ground (`xtask boundary`).
 
 #![cfg(feature = "server")]
 #![allow(

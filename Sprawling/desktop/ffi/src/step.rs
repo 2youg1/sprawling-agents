@@ -7,7 +7,7 @@
 // library declares it as a module, and `build.rs` includes it to hold
 // `zig/step.zig` to the same names and numbers on every build, so the
 // Zig spelling cannot drift without the build refusing
-// (`crates/desktop/Spec.lean` D12).
+// (`Sprawling/desktop/Spec.lean` D12).
 
 /// Where one call into the Zig leaf ended: finished, or the part of the
 /// operation that stopped it.

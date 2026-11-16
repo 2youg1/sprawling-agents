@@ -23,13 +23,13 @@
 //! process, through `tower::ServiceExt::oneshot`, with the peer address
 //! supplied the way axum supplies it for tests. Nothing here raises the
 //! product's server or writes an HTTP request by hand - a check that did
-//! would be standing outside, and outside is `crates/adversary/`'s ground
+//! would be standing outside, and outside is `Tools/adversary/`'s ground
 //! (`xtask boundary`).
 
 // The route this file drives exists only in a build with the listener.
 // Without it there is no router, no axum and no tokio, and a test file
 // that named them anyway turned `--no-default-features` red for the one
-// build that has no business carrying them (`crates/wire/spec/Server.lean`
+// build that has no business carrying them (`Sprawling/wire/spec/Server.lean`
 // §8-22).
 #![cfg(feature = "server")]
 #![allow(

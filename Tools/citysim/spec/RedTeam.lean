@@ -6,7 +6,7 @@
 /-!
 # citysim::red_team
 
-规定 `citysim::red_team`（`crates/citysim/src/red_team.rs`）。本文件是 `crates/citysim/Spec.lean` 的一个分部；下面一节保留它在 citysim 规格里的标签 §8-7，别处引作 `crates/citysim/Spec.lean §8-7`。
+规定 `citysim::red_team`（`Tools/citysim/src/red_team.rs`）。本文件是 `Tools/citysim/Spec.lean` 的一个分部；下面一节保留它在 citysim 规格里的标签 §8-7，别处引作 `Tools/citysim/Spec.lean §8-7`。
 
 能写成定理的是两臂的差别（D19）：未验证臂留下每一条结论；验证臂只留下引文成立的那些，所以当判定把每一种埋下的缺陷读成它自己那种不成立、把忠实的结论读成成立时，验证臂放行的缺陷为 0、误删的忠实结论为 0。判定本身是 `collab::Citation::against`，它怎样读出这些结果是 collab 的事，模型把「判定忠实」写成定理的假设，`every_planted_defect_is_dropped_by_its_own_reading` 在真实的判定上检查它。
 -/

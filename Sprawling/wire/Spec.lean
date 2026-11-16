@@ -3,66 +3,66 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.wire.spec.Aggregate
-import crates.wire.spec.Answer
-import crates.wire.spec.Answer.Agents
-import crates.wire.spec.Answer.Automation
-import crates.wire.spec.Answer.Catalog
-import crates.wire.spec.Answer.Commits
-import crates.wire.spec.Answer.Config
-import crates.wire.spec.Answer.Devices
-import crates.wire.spec.Answer.Doctor
-import crates.wire.spec.Answer.Document
-import crates.wire.spec.Answer.DocumentBytes
-import crates.wire.spec.Answer.DocumentVersions
-import crates.wire.spec.Answer.Endpoints
-import crates.wire.spec.Answer.Find
-import crates.wire.spec.Answer.Github
-import crates.wire.spec.Answer.Hunks
-import crates.wire.spec.Answer.Identity
-import crates.wire.spec.Answer.KnownHosts
-import crates.wire.spec.Answer.McpHealth
-import crates.wire.spec.Answer.ModelFigures
-import crates.wire.spec.Answer.Prefix
-import crates.wire.spec.Answer.Preview
-import crates.wire.spec.Answer.Proposals
-import crates.wire.spec.Answer.Range
-import crates.wire.spec.Answer.Release
-import crates.wire.spec.Answer.Sessions
-import crates.wire.spec.Answer.Toolkits
-import crates.wire.spec.Auth
-import crates.wire.spec.CarriedName
-import crates.wire.spec.Command
-import crates.wire.spec.Command.Kind
-import crates.wire.spec.Command.Step
-import crates.wire.spec.Command.Tuning
-import crates.wire.spec.Control
-import crates.wire.spec.Frames
-import crates.wire.spec.Frames.Ask
-import crates.wire.spec.Frames.Monitor
-import crates.wire.spec.Guide
-import crates.wire.spec.NamedFrames
-import crates.wire.spec.Preference
-import crates.wire.spec.Privacy
-import crates.wire.spec.Reading
-import crates.wire.spec.Reception
-import crates.wire.spec.Reception.Admission
-import crates.wire.spec.Reception.Entry
-import crates.wire.spec.Reception.Inbound
-import crates.wire.spec.Reception.Pairing
-import crates.wire.spec.Reply
-import crates.wire.spec.Server
-import crates.wire.spec.Server.Committed
-import crates.wire.spec.Server.Listener
-import crates.wire.spec.Server.Sessions
-import crates.wire.spec.Server.Socket
-import crates.wire.spec.Slash
+import Sprawling.wire.spec.Aggregate
+import Sprawling.wire.spec.Answer
+import Sprawling.wire.spec.Answer.Agents
+import Sprawling.wire.spec.Answer.Automation
+import Sprawling.wire.spec.Answer.Catalog
+import Sprawling.wire.spec.Answer.Commits
+import Sprawling.wire.spec.Answer.Config
+import Sprawling.wire.spec.Answer.Devices
+import Sprawling.wire.spec.Answer.Doctor
+import Sprawling.wire.spec.Answer.Document
+import Sprawling.wire.spec.Answer.DocumentBytes
+import Sprawling.wire.spec.Answer.DocumentVersions
+import Sprawling.wire.spec.Answer.Endpoints
+import Sprawling.wire.spec.Answer.Find
+import Sprawling.wire.spec.Answer.Github
+import Sprawling.wire.spec.Answer.Hunks
+import Sprawling.wire.spec.Answer.Identity
+import Sprawling.wire.spec.Answer.KnownHosts
+import Sprawling.wire.spec.Answer.McpHealth
+import Sprawling.wire.spec.Answer.ModelFigures
+import Sprawling.wire.spec.Answer.Prefix
+import Sprawling.wire.spec.Answer.Preview
+import Sprawling.wire.spec.Answer.Proposals
+import Sprawling.wire.spec.Answer.Range
+import Sprawling.wire.spec.Answer.Release
+import Sprawling.wire.spec.Answer.Sessions
+import Sprawling.wire.spec.Answer.Toolkits
+import Sprawling.wire.spec.Auth
+import Sprawling.wire.spec.CarriedName
+import Sprawling.wire.spec.Command
+import Sprawling.wire.spec.Command.Kind
+import Sprawling.wire.spec.Command.Step
+import Sprawling.wire.spec.Command.Tuning
+import Sprawling.wire.spec.Control
+import Sprawling.wire.spec.Frames
+import Sprawling.wire.spec.Frames.Ask
+import Sprawling.wire.spec.Frames.Monitor
+import Sprawling.wire.spec.Guide
+import Sprawling.wire.spec.NamedFrames
+import Sprawling.wire.spec.Preference
+import Sprawling.wire.spec.Privacy
+import Sprawling.wire.spec.Reading
+import Sprawling.wire.spec.Reception
+import Sprawling.wire.spec.Reception.Admission
+import Sprawling.wire.spec.Reception.Entry
+import Sprawling.wire.spec.Reception.Inbound
+import Sprawling.wire.spec.Reception.Pairing
+import Sprawling.wire.spec.Reply
+import Sprawling.wire.spec.Server
+import Sprawling.wire.spec.Server.Committed
+import Sprawling.wire.spec.Server.Listener
+import Sprawling.wire.spec.Server.Sessions
+import Sprawling.wire.spec.Server.Socket
+import Sprawling.wire.spec.Slash
 
 /-! # wire 的规格
 
-`sprawling-wire`（库名 `wire`，目录 `crates/wire`，依赖 kernel）是人与城之间的那条线：Command／Query／Event 三分的帧与它们的编码、版本与 schema 哈希的握手、绑定面、干预动词、多座城一个界面，以及 Autonomy 应答者与三队列在线上的形状。本规格先于代码存在；实现不多不少地遵守本文。模块：`frames`（含 `command`／`answer`／`carried_name`／`named_frames`）、`server`（含 `reception`／`assets`）、`control`、`auth`、`aggregate`、`preference`、`privacy`、`reading`。
+`sprawling-wire`（库名 `wire`，目录 `Sprawling/wire`，依赖 kernel）是人与城之间的那条线：Command／Query／Event 三分的帧与它们的编码、版本与 schema 哈希的握手、绑定面、干预动词、多座城一个界面，以及 Autonomy 应答者与三队列在线上的形状。本规格先于代码存在；实现不多不少地遵守本文。模块：`frames`（含 `command`／`answer`／`carried_name`／`named_frames`）、`server`（含 `reception`／`assets`）、`control`、`auth`、`aggregate`、`preference`、`privacy`、`reading`。
 
-本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被模块图的旧锚点与别的规格里的引用锚住，所以不重排，也不补空号。「每个动词从哪里够得到」那一节保留它的标签 §19 与 §19-1 到 §19-3，住在 `spec/Command/Kind.lean`，`xtask wiring` 读它。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `wire D<n>`；D1 到 D12 沿用这份规格在 Markdown 时 §12 的条目号，§12 末尾列出每条住在哪里。
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。标签被模块图的旧锚点与别的规格里的引用锚住，所以不重排，也不补空号。「每个动词从哪里够得到」那一节保留它的标签 §19 与 §19-1 到 §19-3，住在 `spec/Command/Kind.lean`，`xtask wiring` 读它。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部里，别处引作 `wire D<n>`；D1 到 D12 沿用这份规格在 Markdown 时 §12 的条目号，§12 末尾列出每条住在哪里。
 
 能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：握手与 `WIRE_V` 的进位（`spec/Frames.lean`）、绑定面与丢帧之后的区间（`spec/Reception.lean`）、HTTP 门的配对判定（`spec/Reception/Admission.lean`）、套接字拼不出 `PutSecret`（`spec/Command.lean`）、reach 与 class 两张表的性质（`spec/Command/Kind.lean`）、带基线的保存（`spec/Command/Step.lean`）、干预欠不欠 Handoff（`spec/Control.lean`）、携带的名字只拒空与控制字符（`spec/CarriedName.lean`）、答复反映到哪一条（`spec/Frames/Ask.lean`）、事件按帧写出时每条记录按 seq 次序到达且不重复、没说到的都被 `Lagged` 点名（`spec/Server/Socket.lean`）、撤销设备与会话令牌的寿命（`spec/Server/Sessions.lean`）。其余分部只有节注释：它们写的是线上的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例、`tests/wire_contract.rs` 的 golden 与各模块旁的测试守住（§16）。
 -/
@@ -99,7 +99,7 @@ import crates.wire.spec.Slash
 
 **`earlier` 的含义**：「从这条之前接着问」，`None` 即「到头了」；「答是空的而 `earlier` 是 `Some`」这一态**不存在**——服务端不需要把「我这一段没扫到」告诉客户端。
 
-**建 run→seq 的索引**：不建索引，一次 `RunHistory` 要扫整本账，扫描量与账本长度同阶，而这是「打开一个较早的会话」这个动作的全部延迟。那份要随账本同步的派生状态已经存在：`storage::LedgerIndex` 常驻于 `Views` 并每次查询 `refresh`，run 表只是它多一个字段，搭同一趟刷新、同一份 cache、同一条「存疑即重建」的反射，不新增同步义务。至于「第二个权威」：索引回答的是「在哪」，从不回答「是什么」，它可弃且存疑即重建；账本仍是唯一权威。接面与内存代价见 `crates/storage/Spec.lean` §8-4。
+**建 run→seq 的索引**：不建索引，一次 `RunHistory` 要扫整本账，扫描量与账本长度同阶，而这是「打开一个较早的会话」这个动作的全部延迟。那份要随账本同步的派生状态已经存在：`storage::LedgerIndex` 常驻于 `Views` 并每次查询 `refresh`，run 表只是它多一个字段，搭同一趟刷新、同一份 cache、同一条「存疑即重建」的反射，不新增同步义务。至于「第二个权威」：索引回答的是「在哪」，从不回答「是什么」，它可弃且存疑即重建；账本仍是唯一权威。接面与内存代价见 `Sprawling/storage/Spec.lean` §8-4。
 - **server**：默认绑定回环；没有给钥匙时**拒绝启动**并回 `E_CONFIG_INVALID`（不是启动后再拒连——这是绑定面判定，不是请求面判定）。**每一面都有凭据是一条不变量，不是一句注释**：绑定判定把钥匙装进 `BindFace` 的两个臂，壳只持有这个面，于是「回环而什么都不要」与「暴露着却不要求任何东西」都是类型上不存在的状态（§8-41）。每个请求先过入口判定（Host、Origin、`Sec-Fetch-Site`，§8-94），跨站的 Origin 与不在名单的 Host 在升级之前就回 403。
 - **auth**：令牌比较恒为常数时间（不早退）；比较函数以「逐字节差异位置不影响耗时」的性质测试看守。地基是 `server::constant_time_eq` 与 `decide_handshake`；`auth` 模块接令牌的生成、展示与持久化。
 - **aggregate**：**类型化保证**——聚合上游连接的发送面在类型上只接受 `Query`，没有一个能塞进 `Command` 的方法（不是运行时 `if`，是类型上不存在该入口）；以 trybuild 反例钉死。
@@ -124,7 +124,7 @@ import crates.wire.spec.Slash
 
 /-! ## 3 假设与歧义
 
-- **本 crate 是 tokio 的异步消费者**：套接字服务跑在 tokio＋axum 上；gateway 与 endpoint 用 `reqwest::blocking`，不引 tokio（`crates/gateway/Spec.lean` §3／§13）。
+- **本 crate 是 tokio 的异步消费者**：套接字服务跑在 tokio＋axum 上；gateway 与 endpoint 用 `reqwest::blocking`，不引 tokio（`Sprawling/gateway/Spec.lean` §3／§13）。
 - **没有第二条传输路径**：即使浏览器与服务在同一台机器上也是网络连接，故不存在「同进程内存通道」这条优惠。唯一例外是 `PutSecret`——它不是靠运行时判断走内存通道，而是**类型上不可序列化**，因此远程连接根本编不出这条帧。
 - **编码是 JSON，且编码本身不进冻结面**。选 JSON 的理由是不对称：浏览器原生支持，且开发者能在网络面板直接读帧。
 - **`control` 自持鉴权与幂等，独立成模块**。ARCHITECTURE §6 预留了「做不到则并入 server」的退路，这里不需要它：`control` 持有一条 `server` 不知道也不该知道的策略——**哪些 Command 是干预，以及一次干预必须留下什么**（「任何中断都以 Handoff 收尾，下一位拿得到完整现场」）。那是判定，不是转调。
@@ -139,19 +139,19 @@ import crates.wire.spec.Slash
 
 /-! ## 4 现状分析
 
-装配消费者是 `crates/sprawling`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
+装配消费者是 `Sprawling/app`（`serve` 把处理器注入 `ServeConfig`）；客户端 `client/` 读的 `client/src/wire.ts` 由 `cargo xtask wire-ts` 从本 crate 的 schema 生成（§8-16）。
 -/
 
 /-! ## 5 权威信源
 
-wire 面全节（Command 表、Query 表、编码与握手、绑定面三段）；聚合层硬约束「聚合层只转发 Query 与 Event，恒不转发 Command」；干预动词语义表；`Sealed<T>` 的不可序列化性质；`kernel::error` 的装载期六码白名单（`crates/kernel/Spec.lean` §8-1，封闭）。外部：axum（内含 tokio-tungstenite）与 tokio，版本钉在根 `Cargo.toml`。
+wire 面全节（Command 表、Query 表、编码与握手、绑定面三段）；聚合层硬约束「聚合层只转发 Query 与 Event，恒不转发 Command」；干预动词语义表；`Sealed<T>` 的不可序列化性质；`kernel::error` 的装载期六码白名单（`Sprawling/kernel/Spec.lean` §8-1，封闭）。外部：axum（内含 tokio-tungstenite）与 tokio，版本钉在根 `Cargo.toml`。
 -/
 
 /-! ## 6 命名统一
 
 Command／Query／Event（三分的原名，不译）；命令与查询的原名逐字取 `COMMAND_NAMES`／`QUERY_NAMES`，两张表由 `named_frames!` 从变体表生成（§8-38），本文不另列；control surface（不译）；配对令牌＝pairing token；握手＝handshake。
 
-Lean 里的名字与 Rust 的对应（门比的是同一个拼写，crates/xtask/Spec.lean §8-43）：
+Lean 里的名字与 Rust 的对应（门比的是同一个拼写，Tools/xtask/Spec.lean §8-43）：
 
 - `Wire.Command.Kind.Command` 的构造子 ↔ `command::kind` 里 `enum Command` 的变体，逐字相同；`Reach` 的四个取值 ↔ §19-1 的 `client`／`push`／`handshake`／`sealed`；`VerbClass` ↔ `remote_access::door::VerbClass`；`Command.reach`、`Command.verbClass` ↔ §19-2 的两列。
 - `Wire.Command.Carrying` ↔ `Command<Secret>`，`WireCommand` ↔ `Command<NoSecret>`（`NoSecret` 在模型里是 `Empty`），`fromWire` ↔ `impl From<WireCommand> for Command`。
@@ -186,122 +186,122 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 三条不可动摇的形状约定，它们决定接口而非被接口决定：
 
 1. **`Command` 是穷尽枚举，每个改状态臂携 `IdemKey`**——「双击两下不开两个 Run」由类型保证，不由服务端去重表保证（去重表是第二道，`kernel::idem::claim` 已有）。
-2. **`PutSecret::value: Sealed<String>`**——`Sealed<T>` 无 `Serialize`（`crates/kernel/Spec.lean` §8-25），故含它的枚举也无法整体派生 `Serialize`。这迫使 `Command` 的序列化实现**手写并对该臂显式拒绝**，而不是让宏悄悄地把它序列化出去。手写点即唯一权威，`E_WIRE_MISMATCH` 在此产出。
+2. **`PutSecret::value: Sealed<String>`**——`Sealed<T>` 无 `Serialize`（`Sprawling/kernel/Spec.lean` §8-25），故含它的枚举也无法整体派生 `Serialize`。这迫使 `Command` 的序列化实现**手写并对该臂显式拒绝**，而不是让宏悄悄地把它序列化出去。手写点即唯一权威，`E_WIRE_MISMATCH` 在此产出。
 3. **`aggregate` 的上游发送面签名只接受 `Query`**——不是 `fn send(&self, frame: Frame)` 再运行时判断，是 `fn query(&self, q: Query)` 且没有第二个发送方法。
 
 每一节的接口写在规定它的模块的分部里。标签照旧，按标签找分部：
 
 | 标签 | 分部 |
 |---|---|
-| 8-0 | `crates/wire/spec/CarriedName.lean` |
-| 8-1 | `crates/wire/spec/Frames.lean` |
-| 8-2 | `crates/wire/spec/Server.lean` |
-| 8-3 | `crates/wire/spec/Auth.lean` |
-| 8-4 | `crates/wire/spec/Control.lean` |
-| 8-5 | `crates/wire/spec/Aggregate.lean` |
-| 8-6 | `crates/wire/Spec.lean（本文件）` |
-| 8-7 | `crates/wire/spec/Command.lean` |
-| 8-8 | `crates/wire/spec/Frames.lean` |
-| 8-15 | `crates/wire/spec/Server.lean` |
-| 8-16 | `crates/wire/spec/Frames.lean` |
-| 8-17 | `crates/wire/spec/Answer/Commits.lean` |
-| 8-18 | `crates/wire/spec/Answer/Commits.lean` |
-| 8-18b | `crates/wire/spec/Command.lean` |
-| 8-19 | `crates/wire/spec/Command/Step.lean` |
-| 8-20 | `crates/wire/spec/Answer/Hunks.lean` |
-| 8-21 | `crates/wire/spec/Reading.lean` |
-| 8-22 | `crates/wire/spec/Server.lean` |
-| 8-23 | `crates/wire/spec/Answer.lean` |
-| 8-24 | `crates/wire/spec/Answer/Commits.lean` |
-| 8-25 | `crates/wire/spec/Answer/Doctor.lean` |
-| 8-26 | `crates/wire/spec/Command.lean` |
-| 8-27 | `crates/wire/spec/Server.lean` |
-| 8-28 | `crates/wire/spec/Answer/Endpoints.lean` |
-| 8-29 | `crates/wire/spec/Command/Tuning.lean` |
-| 8-32 | `crates/wire/spec/Frames.lean` |
-| 8-33 | `crates/wire/spec/Answer/Doctor.lean` |
-| 8-34 | `crates/wire/spec/Answer/McpHealth.lean` |
-| 8-35 | `crates/wire/spec/Answer/Prefix.lean` |
-| 8-35b | `crates/wire/spec/Answer/Toolkits.lean` |
-| 8-36 | `crates/wire/spec/Answer/Release.lean` |
-| 8-37 | `crates/wire/spec/Reception/Inbound.lean` |
-| 8-38 | `crates/wire/spec/NamedFrames.lean` |
-| 8-39 | `crates/wire/spec/Preference.lean` |
-| 8-40 | `crates/wire/spec/Reception/Admission.lean` |
-| 8-41 | `crates/wire/spec/Reception.lean` |
-| 8-42 | `crates/wire/spec/Answer.lean` |
-| 8-43 | `crates/wire/spec/Command/Step.lean` |
-| 8-44 | `crates/wire/spec/Command.lean` |
-| 8-45 | `crates/wire/spec/Command.lean` |
-| 8-46 | `crates/wire/spec/Server/Listener.lean` |
-| 8-47 | `crates/wire/spec/Server/Committed.lean` |
-| 8-47b | `crates/wire/spec/Reading.lean` |
-| 8-47c | `crates/wire/spec/Command.lean` |
-| 8-47d | `crates/wire/spec/Frames/Ask.lean` |
-| 8-47e | `crates/wire/spec/Answer/Config.lean` |
-| 8-47f | `crates/wire/spec/Answer/Release.lean` |
-| 8-47g | `crates/wire/spec/Frames/Monitor.lean` |
-| 8-47h | `crates/wire/spec/Server/Socket.lean` |
-| 8-47i | `crates/wire/spec/Frames/Monitor.lean` |
-| 8-48 | `crates/wire/spec/Reading.lean` |
-| 8-48b | `crates/wire/spec/Answer.lean` |
-| 8-48c | `crates/wire/spec/Command.lean` |
-| 8-48d | `crates/wire/spec/Frames.lean` |
-| 8-48e | `crates/wire/spec/Answer.lean` |
-| 8-49 | `crates/wire/spec/Server.lean` |
-| 8-50 | `crates/wire/spec/Answer/Doctor.lean` |
-| 8-51 | `crates/wire/spec/Answer/KnownHosts.lean` |
-| 8-53 | `crates/wire/spec/Reading.lean` |
-| 8-54 | `crates/wire/spec/Answer/Commits.lean` |
-| 8-55 | `crates/wire/spec/Reading.lean` |
-| 8-56 | `crates/wire/spec/Reading.lean` |
-| 8-57 | `crates/wire/spec/Command.lean` |
-| 8-59 | `crates/wire/spec/Answer/Identity.lean` |
-| 8-60 | `crates/wire/spec/Command/Step.lean` |
-| 8-61 | `crates/wire/spec/Command/Step.lean` |
-| 8-62 | `crates/wire/spec/Answer/Automation.lean` |
-| 8-63 | `crates/wire/spec/Answer.lean` |
-| 8-64 | `crates/wire/spec/Frames/Monitor.lean` |
-| 8-65 | `crates/wire/spec/Command/Kind.lean` |
-| 8-66 | `crates/wire/spec/Command/Kind.lean` |
-| 8-67 | `crates/wire/spec/Answer/Github.lean` |
-| 8-68 | `crates/wire/spec/Guide.lean` |
-| 8-69 | `crates/wire/spec/Answer/Document.lean` |
-| 8-70 | `crates/wire/spec/Answer/Range.lean` |
-| 8-71 | `crates/wire/spec/Answer/Sessions.lean` |
-| 8-72 | `crates/wire/spec/Command/Step.lean` |
-| 8-73 | `crates/wire/spec/Answer/Proposals.lean` |
-| 8-74 | `crates/wire/spec/Answer/Preview.lean` |
-| 8-75 | `crates/wire/spec/Answer/Preview.lean` |
-| 8-76 | `crates/wire/spec/Reading.lean` |
-| 8-77 | `crates/wire/spec/Answer/Config.lean` |
-| 8-78 | `crates/wire/spec/Answer/Commits.lean` |
-| 8-79 | `crates/wire/spec/Reading.lean` |
-| 8-83 | `crates/wire/spec/Answer/DocumentVersions.lean` |
-| 8-80 | `crates/wire/spec/Answer/DocumentBytes.lean` |
-| 8-81 | `crates/wire/spec/Answer/DocumentBytes.lean` |
-| 8-82 | `crates/wire/spec/Answer/Find.lean` |
-| 8-84 | `crates/wire/spec/Preference.lean` |
-| 8-85 | `crates/wire/spec/Answer/Endpoints.lean` |
-| 8-86 | `crates/wire/spec/Answer/Config.lean` |
-| 8-87 | `crates/wire/spec/Privacy.lean` |
-| 8-88 | `crates/wire/spec/Privacy.lean` |
-| 8-89 | `crates/wire/spec/Privacy.lean` |
-| 8-90 | `crates/wire/spec/Answer/Agents.lean` |
-| 8-91 | `crates/wire/spec/Answer/Devices.lean` |
-| 8-92 | `crates/wire/spec/Answer/Endpoints.lean` |
-| 8-93 | `crates/wire/spec/Server.lean` |
-| 8-93s | `crates/wire/spec/Server/Sessions.lean` |
-| 8-94 | `crates/wire/spec/Reception/Entry.lean` |
-| 8-95 | `crates/wire/spec/Reception/Pairing.lean` |
-| 8-96 | `crates/wire/spec/Slash.lean` |
-| 8-97 | `crates/wire/spec/Answer/ModelFigures.lean` |
-| 8-98 | `crates/wire/spec/Answer/Prefix.lean` |
-| 8-99 | `crates/wire/spec/Answer/Catalog.lean` |
-| 19 | `crates/wire/spec/Command/Kind.lean` |
-| 19-1 | `crates/wire/spec/Command/Kind.lean` |
-| 19-2 | `crates/wire/spec/Command/Kind.lean` |
-| 19-3 | `crates/wire/spec/Command/Kind.lean` |
+| 8-0 | `Sprawling/wire/spec/CarriedName.lean` |
+| 8-1 | `Sprawling/wire/spec/Frames.lean` |
+| 8-2 | `Sprawling/wire/spec/Server.lean` |
+| 8-3 | `Sprawling/wire/spec/Auth.lean` |
+| 8-4 | `Sprawling/wire/spec/Control.lean` |
+| 8-5 | `Sprawling/wire/spec/Aggregate.lean` |
+| 8-6 | `Sprawling/wire/Spec.lean（本文件）` |
+| 8-7 | `Sprawling/wire/spec/Command.lean` |
+| 8-8 | `Sprawling/wire/spec/Frames.lean` |
+| 8-15 | `Sprawling/wire/spec/Server.lean` |
+| 8-16 | `Sprawling/wire/spec/Frames.lean` |
+| 8-17 | `Sprawling/wire/spec/Answer/Commits.lean` |
+| 8-18 | `Sprawling/wire/spec/Answer/Commits.lean` |
+| 8-18b | `Sprawling/wire/spec/Command.lean` |
+| 8-19 | `Sprawling/wire/spec/Command/Step.lean` |
+| 8-20 | `Sprawling/wire/spec/Answer/Hunks.lean` |
+| 8-21 | `Sprawling/wire/spec/Reading.lean` |
+| 8-22 | `Sprawling/wire/spec/Server.lean` |
+| 8-23 | `Sprawling/wire/spec/Answer.lean` |
+| 8-24 | `Sprawling/wire/spec/Answer/Commits.lean` |
+| 8-25 | `Sprawling/wire/spec/Answer/Doctor.lean` |
+| 8-26 | `Sprawling/wire/spec/Command.lean` |
+| 8-27 | `Sprawling/wire/spec/Server.lean` |
+| 8-28 | `Sprawling/wire/spec/Answer/Endpoints.lean` |
+| 8-29 | `Sprawling/wire/spec/Command/Tuning.lean` |
+| 8-32 | `Sprawling/wire/spec/Frames.lean` |
+| 8-33 | `Sprawling/wire/spec/Answer/Doctor.lean` |
+| 8-34 | `Sprawling/wire/spec/Answer/McpHealth.lean` |
+| 8-35 | `Sprawling/wire/spec/Answer/Prefix.lean` |
+| 8-35b | `Sprawling/wire/spec/Answer/Toolkits.lean` |
+| 8-36 | `Sprawling/wire/spec/Answer/Release.lean` |
+| 8-37 | `Sprawling/wire/spec/Reception/Inbound.lean` |
+| 8-38 | `Sprawling/wire/spec/NamedFrames.lean` |
+| 8-39 | `Sprawling/wire/spec/Preference.lean` |
+| 8-40 | `Sprawling/wire/spec/Reception/Admission.lean` |
+| 8-41 | `Sprawling/wire/spec/Reception.lean` |
+| 8-42 | `Sprawling/wire/spec/Answer.lean` |
+| 8-43 | `Sprawling/wire/spec/Command/Step.lean` |
+| 8-44 | `Sprawling/wire/spec/Command.lean` |
+| 8-45 | `Sprawling/wire/spec/Command.lean` |
+| 8-46 | `Sprawling/wire/spec/Server/Listener.lean` |
+| 8-47 | `Sprawling/wire/spec/Server/Committed.lean` |
+| 8-47b | `Sprawling/wire/spec/Reading.lean` |
+| 8-47c | `Sprawling/wire/spec/Command.lean` |
+| 8-47d | `Sprawling/wire/spec/Frames/Ask.lean` |
+| 8-47e | `Sprawling/wire/spec/Answer/Config.lean` |
+| 8-47f | `Sprawling/wire/spec/Answer/Release.lean` |
+| 8-47g | `Sprawling/wire/spec/Frames/Monitor.lean` |
+| 8-47h | `Sprawling/wire/spec/Server/Socket.lean` |
+| 8-47i | `Sprawling/wire/spec/Frames/Monitor.lean` |
+| 8-48 | `Sprawling/wire/spec/Reading.lean` |
+| 8-48b | `Sprawling/wire/spec/Answer.lean` |
+| 8-48c | `Sprawling/wire/spec/Command.lean` |
+| 8-48d | `Sprawling/wire/spec/Frames.lean` |
+| 8-48e | `Sprawling/wire/spec/Answer.lean` |
+| 8-49 | `Sprawling/wire/spec/Server.lean` |
+| 8-50 | `Sprawling/wire/spec/Answer/Doctor.lean` |
+| 8-51 | `Sprawling/wire/spec/Answer/KnownHosts.lean` |
+| 8-53 | `Sprawling/wire/spec/Reading.lean` |
+| 8-54 | `Sprawling/wire/spec/Answer/Commits.lean` |
+| 8-55 | `Sprawling/wire/spec/Reading.lean` |
+| 8-56 | `Sprawling/wire/spec/Reading.lean` |
+| 8-57 | `Sprawling/wire/spec/Command.lean` |
+| 8-59 | `Sprawling/wire/spec/Answer/Identity.lean` |
+| 8-60 | `Sprawling/wire/spec/Command/Step.lean` |
+| 8-61 | `Sprawling/wire/spec/Command/Step.lean` |
+| 8-62 | `Sprawling/wire/spec/Answer/Automation.lean` |
+| 8-63 | `Sprawling/wire/spec/Answer.lean` |
+| 8-64 | `Sprawling/wire/spec/Frames/Monitor.lean` |
+| 8-65 | `Sprawling/wire/spec/Command/Kind.lean` |
+| 8-66 | `Sprawling/wire/spec/Command/Kind.lean` |
+| 8-67 | `Sprawling/wire/spec/Answer/Github.lean` |
+| 8-68 | `Sprawling/wire/spec/Guide.lean` |
+| 8-69 | `Sprawling/wire/spec/Answer/Document.lean` |
+| 8-70 | `Sprawling/wire/spec/Answer/Range.lean` |
+| 8-71 | `Sprawling/wire/spec/Answer/Sessions.lean` |
+| 8-72 | `Sprawling/wire/spec/Command/Step.lean` |
+| 8-73 | `Sprawling/wire/spec/Answer/Proposals.lean` |
+| 8-74 | `Sprawling/wire/spec/Answer/Preview.lean` |
+| 8-75 | `Sprawling/wire/spec/Answer/Preview.lean` |
+| 8-76 | `Sprawling/wire/spec/Reading.lean` |
+| 8-77 | `Sprawling/wire/spec/Answer/Config.lean` |
+| 8-78 | `Sprawling/wire/spec/Answer/Commits.lean` |
+| 8-79 | `Sprawling/wire/spec/Reading.lean` |
+| 8-83 | `Sprawling/wire/spec/Answer/DocumentVersions.lean` |
+| 8-80 | `Sprawling/wire/spec/Answer/DocumentBytes.lean` |
+| 8-81 | `Sprawling/wire/spec/Answer/DocumentBytes.lean` |
+| 8-82 | `Sprawling/wire/spec/Answer/Find.lean` |
+| 8-84 | `Sprawling/wire/spec/Preference.lean` |
+| 8-85 | `Sprawling/wire/spec/Answer/Endpoints.lean` |
+| 8-86 | `Sprawling/wire/spec/Answer/Config.lean` |
+| 8-87 | `Sprawling/wire/spec/Privacy.lean` |
+| 8-88 | `Sprawling/wire/spec/Privacy.lean` |
+| 8-89 | `Sprawling/wire/spec/Privacy.lean` |
+| 8-90 | `Sprawling/wire/spec/Answer/Agents.lean` |
+| 8-91 | `Sprawling/wire/spec/Answer/Devices.lean` |
+| 8-92 | `Sprawling/wire/spec/Answer/Endpoints.lean` |
+| 8-93 | `Sprawling/wire/spec/Server.lean` |
+| 8-93s | `Sprawling/wire/spec/Server/Sessions.lean` |
+| 8-94 | `Sprawling/wire/spec/Reception/Entry.lean` |
+| 8-95 | `Sprawling/wire/spec/Reception/Pairing.lean` |
+| 8-96 | `Sprawling/wire/spec/Slash.lean` |
+| 8-97 | `Sprawling/wire/spec/Answer/ModelFigures.lean` |
+| 8-98 | `Sprawling/wire/spec/Answer/Prefix.lean` |
+| 8-99 | `Sprawling/wire/spec/Answer/Catalog.lean` |
+| 19 | `Sprawling/wire/spec/Command/Kind.lean` |
+| 19-1 | `Sprawling/wire/spec/Command/Kind.lean` |
+| 19-2 | `Sprawling/wire/spec/Command/Kind.lean` |
+| 19-3 | `Sprawling/wire/spec/Command/Kind.lean` |
 
 ### 8-6 crate 面的两项
 
@@ -344,7 +344,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 - **`E_WIRE_MISMATCH`**：不可——它是装载期六码之一（封闭白名单），且它的存在理由就是「浏览器缓存旧前端」这一 WebUI 特有错配。类型无法定义掉跨版本的字节。握手之后解不出的帧同归此码、两侧的处置见 §8-37。
 - **`E_CONFIG_INVALID`**：不可——没有钥匙的绑定必须在**启动时**拒绝，这是配置判定不是请求判定。
 - **`E_PAIRING_REFUSED`**（kernel 的码）：配对码或开页码不对、用过或太早，§8-95。
-- **没有 signal-unknown 码**：握手的 schema 哈希保证同一连接的两端共享同一份词汇，一个本版本不认的 Signal 种类只能来自更新的二进制写的 Ledger，而那已由版本方向门拒在外面（`crates/collab/Spec.lean` §8 的 `collab::inbox` 一条）。
+- **没有 signal-unknown 码**：握手的 schema 哈希保证同一连接的两端共享同一份词汇，一个本版本不认的 Signal 种类只能来自更新的二进制写的 Ledger，而那已由版本方向门拒在外面（`Sprawling/collab/Spec.lean` §8 的 `collab::inbox` 一条）。
 
 失败之后什么保持不变是各接口的一部分：绑定判定在套接字存在之前拒绝（§8-2、§8-46）；握手失败即断连（§10「两个设计」），握手之后读不出的帧答一次带计数的拒绝而不关连接（§8-37）；一次保存或一次提案的决定被拒时盘上不动（§8-72、§8-73，`spec/Command/Step.lean`）；`Committed::new` 拼不出帧时那条记录不推，下一条到达时会话发出 `Lagged`（§8-47）。
 
@@ -352,60 +352,60 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 | 决定 | 标题 | 分部 |
 |---|---|---|
-| D1 | `WIRE_V` 在两次推送之间最多进一位，进在第一个改形的提交 | `crates/wire/spec/Frames.lean` |
-| D2 | 写者点名的四个类型不在 `server` feature 之后 | `crates/wire/spec/Reply.lean` |
-| D3 | 本批上线的字段各读自一个权威，缺席即没有 | `crates/wire/spec/Reading.lean` |
-| D4 | `Dispatch` 带一个 `policy`，而不是四个平铺的字段 | `crates/wire/spec/Command.lean` |
-| D5 | 设置页上的卡片的改写在城里做，页面只交值 | `crates/wire/spec/Answer/Identity.lean` |
-| D6 | 动词类是 §19-2 的一列，由中继的穷尽匹配实现、门机器对照 | `crates/wire/spec/Command/Kind.lean` |
-| D7 | GitHub 导入是一条只读查询，由二进制跑 gh；指南进度是一个按城的文件，整份写 | `crates/wire/spec/Answer/Github.lean` |
-| D8 | 文档答复带版本，三种「没有文本」各是一种答复，范围按版本读 | `crates/wire/spec/Answer/Document.lean` |
-| D9 | 一个房间的 session 列表从视图折叠作答，不从按地址的索引读账本 | `crates/wire/spec/Answer/Sessions.lean` |
-| D10 | 保存带基线版本与文本编辑，回执是账本行；提案按文档成批决定 | `crates/wire/spec/Command/Step.lean` |
-| D11 | Markdown 在城里读，页面按版本与窗口问它的块 | `crates/wire/spec/Answer/Preview.lean` |
-| D12 | 对话流按文字问块，不按版本，不随增量带块 | `crates/wire/spec/Answer/Preview.lean` |
-| D13 | 外壳读的字段在本版之内增加，各自可缺，各读自账本上写下它的那一行 | `crates/wire/spec/Reading.lean` |
-| D14 | 档位、玻璃与混合档透明度随偏好进城，三者都可缺 | `crates/wire/spec/Preference.lean` |
-| D15 | 全城开着的提案是一问，答文档与提出时刻，不答正文 | `crates/wire/spec/Answer/Proposals.lean` |
-| D16 | `Bound` 在绑定时读下监听器的地址，`local_addr` 只是读出它 | `crates/wire/spec/Server/Listener.lean` |
-| D17 | 冻下的名字在城里读成类型，线上不带摘要 | `crates/wire/spec/Reading.lean` |
-| D18 | 文件的字节经一个 `Query` 回答逐窗送到页面，不开第二扇 HTTP 门 | `crates/wire/spec/Answer/DocumentBytes.lean` |
-| D19 | 找文件是城里的一次有界走树，不是页面一层一层地问 `Listing` | `crates/wire/spec/Answer/Find.lean` |
-| D20 | 送页面的两条路由是一个公开函数，城的端口与远程监听各把它并进自己的路由表 | `crates/wire/spec/Server.lean` |
-| D21 | session 的标签住在人的偏好文件里，按 `(city, room, began)` 存 | `crates/wire/spec/Preference.lean` |
-| D22 | V0.0.9 的线上改形一次进位，由一个变更集落地 | `crates/wire/spec/Frames.lean` |
-| D24 | 更新检查同时问 npm 与 crates.io，按这份二进制的安装方式给出更新命令 | `crates/wire/spec/Answer/Release.lean` |
-| D25 | 依赖项页逐行已够；城目录前的扫描上页面，是 `DoctorAnswer` 的一件 | `crates/wire/spec/Answer/Doctor.lean` |
-| D26 | 沙箱臂按机制族命名，每个名字在三个平台上都有可填的臂 | `crates/wire/spec/Answer/Doctor.lean` |
-| D27 | 一段 session 带出显示名、模型、思考强度、工作区与最后一条回复；改名与改运行策略各是一帧命令 | `crates/wire/spec/Answer/Sessions.lean` |
-| D28 | `Call` 带出整数微秒的耗时；skill 与 MCP 的使用各是一个查询 | `crates/wire/spec/Reading.lean` |
-| D29 | 配色的覆盖是人的偏好，经 `PutPreferences` 写进偏好文件的 `[ui]` | `crates/wire/spec/Preference.lean` |
-| D32 | `InstallSkill` 是往书架上加 skill 的命令，来源是一个四臂的值 | `crates/wire/spec/Command.lean` |
-| D33 | skill 与 MCP 的使用各从哪一行折出、按天怎么数、怎样导出 | `crates/wire/spec/Reading.lean` |
-| D34 | 停在同步 `send` 上的 run 在 `RunSummary` 上多一个 `waiting`；`wait` 是工具参数 | `crates/wire/spec/Reading.lean` |
-| D35 | `Used` 的两个缓存数在 provider 没报时缺席，页面写「未知」 | `crates/wire/spec/Reading.lean` |
-| D45 | 视图广播按帧合并只合并刷写，不改帧的形状，也不按 session 重排 | `crates/wire/spec/Server/Socket.lean` |
-| D46 | 采样节拍是 `Monitoring` 的第四个变体，按城记住 | `crates/wire/spec/Frames/Monitor.lean` |
-| D47 | `Answer::Unavailable` 带上没看成的原因 | `crates/wire/spec/Server.lean` |
-| D48 | 每个 shell 解释器的读数是一个查询，与 skill、MCP 的使用同一遍折叠 | `crates/wire/spec/Reading.lean` |
-| D49 | 设置页靠读回的 tuning 整份重发一次挂接，Key 状态按账号 id 答 | `crates/wire/spec/Answer/Endpoints.lean` |
-| D50 | 线上的值是主机读到的原样，页面原样送回作 expected | `crates/wire/spec/Privacy.lean` |
-| D51 | 正文字号的下限是类型 `BodyPx`，没有上限 | `crates/wire/spec/Preference.lean` |
-| D62 | 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore | `crates/wire/spec/Privacy.lean` |
-| D123 | 内置字体是 Paper Mono，`maple` 指仍随包的 Maple Mono，`geist` 不留别名 | `crates/wire/spec/Preference.lean` |
-| D124 | 缺字的回退链是 `Appearance.fallbacks`：至多两个家族名，按顺序试 | `crates/wire/spec/Preference.lean` |
-| D125 | 随包字体的六项特性是 `Appearance.features`，闭集 `TypeFeature` | `crates/wire/spec/Preference.lean` |
-| D126 | 排布的三件：行高、字距、字重，各有下限与域 | `crates/wire/spec/Preference.lean` |
-| D53 | V0.0.11 的线上改形一次进位，由第一条车道落地 | `crates/wire/spec/Frames.lean` |
-| D54 | 每个调用方都要非环境凭据，入口先判 Host 与 Origin | `crates/wire/spec/Reception/Entry.lean` |
-| D55 | 会话令牌在最后一条 socket 结束后空闲 60 s 失效 | `crates/wire/spec/Server/Sessions.lean` |
-| D56 | 远程监听有自己的 Host 与 Origin 名单，由同一个 `decide_entry` 判 | `crates/wire/spec/Reception/Entry.lean` |
-| D57 | 人打的 id 走 `AttachEndpoint.named`，模型行带 `listing` | `crates/wire/spec/Frames.lean` |
-| D58 | 模型表的占位由城的梯子按行作答，来源是一个闭集的枚举 | `crates/wire/spec/Answer/ModelFigures.lean` |
-| D59 | 建楼页：`CreateBuilding` 带人写的规则与可缺的主机导入源，楼行标出可收编的文件夹，模板字节可先问 | `crates/wire/spec/Frames.lean` |
-| D60 | 提示层：一问答下一个 run 的每份提示文档从哪一层来，一条命令做整份动作，默认文本是一版 | `crates/wire/spec/Frames.lean` |
-| D61 | 能力：一问答一栋楼每件工具的档位、来源与使用证据，两张 `[catalog]` 表各走已有的配置帧 | `crates/wire/spec/Frames.lean` |
-| D65 | 模型高级设置复用 AttachEndpoint 的 tuning，不新增模型设置命令 | `crates/wire/spec/Command/Tuning.lean` |
+| D1 | `WIRE_V` 在两次推送之间最多进一位，进在第一个改形的提交 | `Sprawling/wire/spec/Frames.lean` |
+| D2 | 写者点名的四个类型不在 `server` feature 之后 | `Sprawling/wire/spec/Reply.lean` |
+| D3 | 本批上线的字段各读自一个权威，缺席即没有 | `Sprawling/wire/spec/Reading.lean` |
+| D4 | `Dispatch` 带一个 `policy`，而不是四个平铺的字段 | `Sprawling/wire/spec/Command.lean` |
+| D5 | 设置页上的卡片的改写在城里做，页面只交值 | `Sprawling/wire/spec/Answer/Identity.lean` |
+| D6 | 动词类是 §19-2 的一列，由中继的穷尽匹配实现、门机器对照 | `Sprawling/wire/spec/Command/Kind.lean` |
+| D7 | GitHub 导入是一条只读查询，由二进制跑 gh；指南进度是一个按城的文件，整份写 | `Sprawling/wire/spec/Answer/Github.lean` |
+| D8 | 文档答复带版本，三种「没有文本」各是一种答复，范围按版本读 | `Sprawling/wire/spec/Answer/Document.lean` |
+| D9 | 一个房间的 session 列表从视图折叠作答，不从按地址的索引读账本 | `Sprawling/wire/spec/Answer/Sessions.lean` |
+| D10 | 保存带基线版本与文本编辑，回执是账本行；提案按文档成批决定 | `Sprawling/wire/spec/Command/Step.lean` |
+| D11 | Markdown 在城里读，页面按版本与窗口问它的块 | `Sprawling/wire/spec/Answer/Preview.lean` |
+| D12 | 对话流按文字问块，不按版本，不随增量带块 | `Sprawling/wire/spec/Answer/Preview.lean` |
+| D13 | 外壳读的字段在本版之内增加，各自可缺，各读自账本上写下它的那一行 | `Sprawling/wire/spec/Reading.lean` |
+| D14 | 档位、玻璃与混合档透明度随偏好进城，三者都可缺 | `Sprawling/wire/spec/Preference.lean` |
+| D15 | 全城开着的提案是一问，答文档与提出时刻，不答正文 | `Sprawling/wire/spec/Answer/Proposals.lean` |
+| D16 | `Bound` 在绑定时读下监听器的地址，`local_addr` 只是读出它 | `Sprawling/wire/spec/Server/Listener.lean` |
+| D17 | 冻下的名字在城里读成类型，线上不带摘要 | `Sprawling/wire/spec/Reading.lean` |
+| D18 | 文件的字节经一个 `Query` 回答逐窗送到页面，不开第二扇 HTTP 门 | `Sprawling/wire/spec/Answer/DocumentBytes.lean` |
+| D19 | 找文件是城里的一次有界走树，不是页面一层一层地问 `Listing` | `Sprawling/wire/spec/Answer/Find.lean` |
+| D20 | 送页面的两条路由是一个公开函数，城的端口与远程监听各把它并进自己的路由表 | `Sprawling/wire/spec/Server.lean` |
+| D21 | session 的标签住在人的偏好文件里，按 `(city, room, began)` 存 | `Sprawling/wire/spec/Preference.lean` |
+| D22 | V0.0.9 的线上改形一次进位，由一个变更集落地 | `Sprawling/wire/spec/Frames.lean` |
+| D24 | 更新检查同时问 npm 与 crates.io，按这份二进制的安装方式给出更新命令 | `Sprawling/wire/spec/Answer/Release.lean` |
+| D25 | 依赖项页逐行已够；城目录前的扫描上页面，是 `DoctorAnswer` 的一件 | `Sprawling/wire/spec/Answer/Doctor.lean` |
+| D26 | 沙箱臂按机制族命名，每个名字在三个平台上都有可填的臂 | `Sprawling/wire/spec/Answer/Doctor.lean` |
+| D27 | 一段 session 带出显示名、模型、思考强度、工作区与最后一条回复；改名与改运行策略各是一帧命令 | `Sprawling/wire/spec/Answer/Sessions.lean` |
+| D28 | `Call` 带出整数微秒的耗时；skill 与 MCP 的使用各是一个查询 | `Sprawling/wire/spec/Reading.lean` |
+| D29 | 配色的覆盖是人的偏好，经 `PutPreferences` 写进偏好文件的 `[ui]` | `Sprawling/wire/spec/Preference.lean` |
+| D32 | `InstallSkill` 是往书架上加 skill 的命令，来源是一个四臂的值 | `Sprawling/wire/spec/Command.lean` |
+| D33 | skill 与 MCP 的使用各从哪一行折出、按天怎么数、怎样导出 | `Sprawling/wire/spec/Reading.lean` |
+| D34 | 停在同步 `send` 上的 run 在 `RunSummary` 上多一个 `waiting`；`wait` 是工具参数 | `Sprawling/wire/spec/Reading.lean` |
+| D35 | `Used` 的两个缓存数在 provider 没报时缺席，页面写「未知」 | `Sprawling/wire/spec/Reading.lean` |
+| D45 | 视图广播按帧合并只合并刷写，不改帧的形状，也不按 session 重排 | `Sprawling/wire/spec/Server/Socket.lean` |
+| D46 | 采样节拍是 `Monitoring` 的第四个变体，按城记住 | `Sprawling/wire/spec/Frames/Monitor.lean` |
+| D47 | `Answer::Unavailable` 带上没看成的原因 | `Sprawling/wire/spec/Server.lean` |
+| D48 | 每个 shell 解释器的读数是一个查询，与 skill、MCP 的使用同一遍折叠 | `Sprawling/wire/spec/Reading.lean` |
+| D49 | 设置页靠读回的 tuning 整份重发一次挂接，Key 状态按账号 id 答 | `Sprawling/wire/spec/Answer/Endpoints.lean` |
+| D50 | 线上的值是主机读到的原样，页面原样送回作 expected | `Sprawling/wire/spec/Privacy.lean` |
+| D51 | 正文字号的下限是类型 `BodyPx`，没有上限 | `Sprawling/wire/spec/Preference.lean` |
+| D62 | 没有「全部恢复」的帧：页面为每个仍拥有的控制各发一次 Restore | `Sprawling/wire/spec/Privacy.lean` |
+| D123 | 内置字体是 Paper Mono，`maple` 指仍随包的 Maple Mono，`geist` 不留别名 | `Sprawling/wire/spec/Preference.lean` |
+| D124 | 缺字的回退链是 `Appearance.fallbacks`：至多两个家族名，按顺序试 | `Sprawling/wire/spec/Preference.lean` |
+| D125 | 随包字体的六项特性是 `Appearance.features`，闭集 `TypeFeature` | `Sprawling/wire/spec/Preference.lean` |
+| D126 | 排布的三件：行高、字距、字重，各有下限与域 | `Sprawling/wire/spec/Preference.lean` |
+| D53 | V0.0.11 的线上改形一次进位，由第一条车道落地 | `Sprawling/wire/spec/Frames.lean` |
+| D54 | 每个调用方都要非环境凭据，入口先判 Host 与 Origin | `Sprawling/wire/spec/Reception/Entry.lean` |
+| D55 | 会话令牌在最后一条 socket 结束后空闲 60 s 失效 | `Sprawling/wire/spec/Server/Sessions.lean` |
+| D56 | 远程监听有自己的 Host 与 Origin 名单，由同一个 `decide_entry` 判 | `Sprawling/wire/spec/Reception/Entry.lean` |
+| D57 | 人打的 id 走 `AttachEndpoint.named`，模型行带 `listing` | `Sprawling/wire/spec/Frames.lean` |
+| D58 | 模型表的占位由城的梯子按行作答，来源是一个闭集的枚举 | `Sprawling/wire/spec/Answer/ModelFigures.lean` |
+| D59 | 建楼页：`CreateBuilding` 带人写的规则与可缺的主机导入源，楼行标出可收编的文件夹，模板字节可先问 | `Sprawling/wire/spec/Frames.lean` |
+| D60 | 提示层：一问答下一个 run 的每份提示文档从哪一层来，一条命令做整份动作，默认文本是一版 | `Sprawling/wire/spec/Frames.lean` |
+| D61 | 能力：一问答一栋楼每件工具的档位、来源与使用证据，两张 `[catalog]` 表各走已有的配置帧 | `Sprawling/wire/spec/Frames.lean` |
+| D65 | 模型高级设置复用 AttachEndpoint 的 tuning，不新增模型设置命令 | `Sprawling/wire/spec/Command/Tuning.lean` |
 -/
 
 /-! ## 13 依赖选型
@@ -432,8 +432,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 /-! ## 15 影响面
 
-- 改 `Command`／`Query`／帧：名字变了，schema golden 随之变；名字不变而形状变了，按 D1 进 `WIRE_V`；`client/src/wire.ts` 重新生成（`cargo xtask wire-ts`），`crates/sprawling` 的处理器穷尽匹配随之改，§19-2 的 reach 表增删一行（`xtask wiring`）。
-- 改 `ServeConfig`：波及 `crates/sprawling` 的 `serve` 装配点。
+- 改 `Command`／`Query`／帧：名字变了，schema golden 随之变；名字不变而形状变了，按 D1 进 `WIRE_V`；`client/src/wire.ts` 重新生成（`cargo xtask wire-ts`），`Sprawling/app` 的处理器穷尽匹配随之改，§19-2 的 reach 表增删一行（`xtask wiring`）。
+- 改 `ServeConfig`：波及 `Sprawling/app` 的 `serve` 装配点。
 -/
 
 /-! ## 16 测试与约束
@@ -446,7 +446,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 - 入口判定的回归测试：`tests/entry.rs` 在进程内对路由表发请求，跨站的 Origin 与外来的 Host 在升级之前就得到 403。
 - 约束：非测试代码遵守 C3 硬化全条；全库禁裸 spawn（确定性第 3 条）——**本 crate 的并发必须是结构化的，带取消令牌**，这是引入 tokio 后第一条要守住的线。
 
-形式化的义务由证明清偿：`lake build crates.wire.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些检查守住，它们是行为比对，不是精化证明：
+形式化的义务由证明清偿：`lake build Sprawling.wire.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些检查守住，它们是行为比对，不是精化证明：
 
 - 握手与 `WIRE_V`：`tests/wire_contract.rs` 的 schema 哈希 golden 与 `the_wire_shape_is_pinned_so_a_change_meets_the_version_rule`。
 - 绑定面与丢帧区间：`tests/wire_contract.rs` 的 `the_binding_face_has_exactly_one_refusing_cell`；`reception::tests` 里 `decide_lag` 与 `Stream` 的测试。
@@ -468,13 +468,13 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 - ARCHITECTURE 模块表的 wire 各行。
 - `client/Spec.lean`：线上形状变了的那一侧。
-- `crates/sprawling/Spec.lean`：`serve` 子命令的装配面。
+- `Sprawling/app/Spec.lean`：`serve` 子命令的装配面。
 
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；它改了，分部的路径与 `architecture.toml` 里 wire 各行的 `spec` 锚点一起重看。ARCHITECTURE.md §7「The wire」与 §8 的「a new `Command` or `Query` frame」一行引 D1。
 - `architecture.toml` 的模块图：wire 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
-- crates/xtask/Spec.lean §8-43、§8-45：`xtask wiring` 读 `spec/Command/Kind.lean` 里 `Command.reach` 与 `Command.verbClass` 的受限形状；改那两个 `def` 的写法就是改门读到的东西。
+- Tools/xtask/Spec.lean §8-43、§8-45：`xtask wiring` 读 `spec/Command/Kind.lean` 里 `Command.reach` 与 `Command.verbClass` 的受限形状；改那两个 `def` 的写法就是改门读到的东西。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
-- kernel 的规格（`crates/kernel/Spec.lean`）：线上携带的 kernel 类型、事件种类、错误码与装载期白名单的权威；remote_access 的规格（`crates/remote_access/Spec.lean`）：`VerbClass` 与远程门的权限；documents 的规格（`crates/documents/Spec.lean`）：线上直接携带的 `Span`、`Window`、`Preview`、`Laid` 等的权威。
-- `crates/adversary/src/Sprawling/Door.lean` 与 `Regression.lean`：从外面说这条线的检查器，线上改形时同一个变更集改它们（AGENTS.md）。
-- 引本规格的其他规格与 rustdoc 写 `crates/wire/Spec.lean §8-n` 或 `wire D<n>`，本 crate 的源码引它自己的分部；一节换了分部，它的标签不变，引用不必改。
+- kernel 的规格（`Sprawling/kernel/Spec.lean`）：线上携带的 kernel 类型、事件种类、错误码与装载期白名单的权威；remote_access 的规格（`Sprawling/remote_access/Spec.lean`）：`VerbClass` 与远程门的权限；documents 的规格（`Sprawling/documents/Spec.lean`）：线上直接携带的 `Span`、`Window`、`Preview`、`Laid` 等的权威。
+- `Tools/adversary/src/Sprawling/Door.lean` 与 `Regression.lean`：从外面说这条线的检查器，线上改形时同一个变更集改它们（AGENTS.md）。
+- 引本规格的其他规格与 rustdoc 写 `Sprawling/wire/Spec.lean §8-n` 或 `wire D<n>`，本 crate 的源码引它自己的分部；一节换了分部，它的标签不变，引用不必改。
 -/

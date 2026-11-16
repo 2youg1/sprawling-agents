@@ -6,7 +6,7 @@
 /-!
 # encoding：一个版本的字节拼出哪些字符
 
-规定 `crates/documents/src/encoding.rs`（`documents::Encoding`、`Reading::of`、`Encoding::of_mark`、`Encoding::decode`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/documents/src/encoding.rs`（`documents::Encoding`、`Reading::of`、`Encoding::of_mark`、`Encoding::decode`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 字节顺序标记先判：有标记就照标记读，没有就是 UTF-8 或什么都不是（D4）。某串字节在 UTF-8、UTF-16LE、UTF-16BE 下是否合法是参数 `Validity`：那是 Unicode 的事实，Rust 用标准库的 `str::from_utf8` 与 `char::decode_utf16` 判它，模型不重述。
 

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A dispatched command starts below the core, on every platform
-//! (`crates/runtime/spec/Tools/Exec.lean` §8-13-3).
+//! (`Sprawling/runtime/spec/Tools/Exec.lean` §8-13-3).
 
 #![allow(clippy::arithmetic_side_effects, reason = "test code")]
 

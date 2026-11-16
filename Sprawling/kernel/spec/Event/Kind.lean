@@ -6,18 +6,18 @@
 /-!
 # kernel::event::kind
 
-规定 `kernel::event::kind`（`crates/kernel/src/event/kind.rs` 与 `crates/kernel/src/event/kind/window.rs`）：事件种类的闭集与它们的窗类。本分部是 §8-4 那张表的家。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::event::kind`（`Sprawling/kernel/src/event/kind.rs` 与 `Sprawling/kernel/src/event/kind/window.rs`）：事件种类的闭集与它们的窗类。本分部是 §8-4 那张表的家。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 -/
 
 /-!
 ### 8-4 EventKind 全集与二分（specalign 数据面）
 
-`kernel::event` 的接口在 `crates/kernel/spec/Event.lean` §8-4；本分部是那一节的表。`inductive EventKind` 是全集，`EventKind.windowClass` 是二分，每一臂上方的注释说这一种行携带什么、为什么落在这一类。二分依据唯一：该事件载荷是否决定模型请求字节；不存在第三类。
+`kernel::event` 的接口在 `Sprawling/kernel/spec/Event.lean` §8-4；本分部是那一节的表。`inductive EventKind` 是全集，`EventKind.windowClass` 是二分，每一臂上方的注释说这一种行携带什么、为什么落在这一类。二分依据唯一：该事件载荷是否决定模型请求字节；不存在第三类。
 -/
 
 namespace Kernel.Event.Kind
 
-/-- 事件种类的闭集，与 `kernel::EventKind` 逐变体同名，`cargo xtask gates specalign` 双向对账；线上拼写是变体名的蛇形小写（serde 的 `rename_all = "snake_case"`）。注释行是 Rust 里的分组。新种类追加在 `ALL` 末尾；本 crate 不标 `#[non_exhaustive]`（`crates/kernel/Spec.lean` §8），新增一个种类在每个没处理它的读者那里是编译错误。 -/
+/-- 事件种类的闭集，与 `kernel::EventKind` 逐变体同名，`cargo xtask gates specalign` 双向对账；线上拼写是变体名的蛇形小写（serde 的 `rename_all = "snake_case"`）。注释行是 Rust 里的分组。新种类追加在 `ALL` 末尾；本 crate 不标 `#[non_exhaustive]`（`Sprawling/kernel/Spec.lean` §8），新增一个种类在每个没处理它的读者那里是编译错误。 -/
 inductive EventKind where
   -- 创世与空间
   | CityInitialized
@@ -233,7 +233,7 @@ def EventKind.windowClass : EventKind → WindowClass
   | .SpineDocumentWritten => .RecordOnly
   /- 一次派发所站的规则文档之一换了内容（城的 `CONFIG.toml`，楼的 `CONFIG.toml` 与 `RULES.toml`）：载荷携 scope、which（`RULES.toml`／`CONFIG.toml`，枚举 `GoverningDocument`）、前后两枚摘要与字节数，恒不携正文。在准入（`agree_to_work`）之后、第一次读规则之前落账——先落账再生效；准入拒绝的派发与不存在的楼不记。`before` 缺席即开账行；本行的 `after` 等于同一文档下一行的 `before`，断链本身说明有人绕过一切门改了文件 -/
   | .RulesChanged => .RecordOnly
-  /- 人请求接入一个外部应用，载荷只携 slug。**恒不携站位**——那是关于此刻的事实（`crates/wire/Spec.lean` §8-35b）；**恒不携 consent URL**——那是一张能力凭证，记进可重放的账本等于发给每一个重放的人 -/
+  /- 人请求接入一个外部应用，载荷只携 slug。**恒不携站位**——那是关于此刻的事实（`Sprawling/wire/Spec.lean` §8-35b）；**恒不携 consent URL**——那是一张能力凭证，记进可重放的账本等于发给每一个重放的人 -/
   | .ToolkitLinkOpened => .RecordOnly
   -- 供应商与模态
   /- 一次嵌入调用入账：模型、请求多少条、回来多少个向量、调用方要的维度与 provider 自报的 token。向量本身不在此处——与 `model_called` 不携请求体同理，它是可从记录的输入重算的派生值，存两份就是同一件事有两个家 -/

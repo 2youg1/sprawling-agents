@@ -4,14 +4,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A page's save of one document, and a person's decision on the
-//! proposal cards of one (`crates/accounting/spec/Worker/Commanding/Saving.lean` §8-22, `crates/wire/Spec.lean` §8-72,
+//! proposal cards of one (`Sprawling/accounting/spec/Worker/Commanding/Saving.lean` §8-22, `Sprawling/wire/Spec.lean` §8-72,
 //! 8-73).
 //!
 //! Both read the document's bytes inside its lock, hand them to the
 //! `documents` rule that decides, keep the version that lands in the
 //! content store, replace the file whole, and then record what landed:
 //! a version the page lists can always be read back by its version
-//! (`crates/wire/spec/Answer/DocumentVersions.lean` §8-83). The rules are the `documents` crate's and the lock is
+//! (`Sprawling/wire/spec/Answer/DocumentVersions.lean` §8-83). The rules are the `documents` crate's and the lock is
 //! `city::document`'s; this module only puts them in order and writes
 //! the lines.
 
@@ -100,7 +100,7 @@ impl RunWorker {
 
     /// Where a document a page names lives, refused inside the reserved
     /// subtree: the files there have doors of their own that judge what
-    /// they are given before it lands (`crates/wire/Spec.lean` §8-72).
+    /// they are given before it lands (`Sprawling/wire/Spec.lean` §8-72).
     /// The prompt documents on the city's list are the exception, judged
     /// by that list (`city::PromptDocument`).
     fn destination(&self, doc: &Address) -> Result<Destination, AxError> {

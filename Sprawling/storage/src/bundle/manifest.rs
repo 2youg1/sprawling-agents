@@ -5,7 +5,7 @@
 
 //! Bundle manifests: what an export carries.
 //!
-//! Specified by `crates/storage/spec/Bundle.lean` §8-12.
+//! Specified by `Sprawling/storage/spec/Bundle.lean` §8-12.
 
 use std::path::Path;
 

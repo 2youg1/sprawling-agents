@@ -38,7 +38,7 @@ fn fold_steer(conversation: &mut Conversation, interrupt: &Interrupt) {
 }
 
 /// A policy change may reach the run at any safe point; it waits in the
-/// cell until the next `BeforeWave` (`crates/runtime/spec/PolicyTake.lean`
+/// cell until the next `BeforeWave` (`Sprawling/runtime/spec/PolicyTake.lean`
 /// §8-62).
 fn hold_policy(cell: &mut PolicyCell, interrupt: &Interrupt) {
     if let Interrupt::Policy { policy } = interrupt {
@@ -125,7 +125,7 @@ impl Run<Active> {
     /// The dispatch pair: the job pin lands first, then the run exists.
     /// Two ledger lines, two clock samples — the pin is a fact about the
     /// city and the start is a fact about the run. Written by the plan's
-    /// charter, the one author of every run's opening (`crates/runtime/spec/Run.lean`
+    /// charter, the one author of every run's opening (`Sprawling/runtime/spec/Run.lean`
     /// §8-52).
     ///
     /// # Errors

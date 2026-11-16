@@ -6,11 +6,11 @@
 //! Policy constants: our choices. Changing one
 //! changes behavior and therefore requires EVAL evidence or an
 //! explicit ruling. Data only — zero branches by charter.
-//! The part `crates/kernel/spec/ConstsPolicy.lean` specifies this module.
+//! The part `Sprawling/kernel/spec/ConstsPolicy.lean` specifies this module.
 //!
-//! Six entries carry a type rather than a plain number (`crates/kernel/spec/ConstsPolicy.lean`
+//! Six entries carry a type rather than a plain number (`Sprawling/kernel/spec/ConstsPolicy.lean`
 //! §8-8): AUTONOMY_DEFAULT, CLOCK_STAMP_DEFAULT, DEFAULT_EFFORT, and the three limits
-//! whose refusal derives from their type (`crates/kernel/spec/PolicyLimit.lean` §8-73).
+//! whose refusal derives from their type (`Sprawling/kernel/spec/PolicyLimit.lean` §8-73).
 
 /// Exact ratio as an integer pair: kernel decision paths never touch
 /// floats (determinism rule 6). Kept unreduced so the spelling mirrors the
@@ -48,7 +48,7 @@ pub const PREFIX_SLOTS: std::num::NonZeroU64 = match std::num::NonZeroU64::new(4
 ///
 /// The domain starts one point above the first rung, derived rather than
 /// written: two rungs on one percent would always sound as one, and the
-/// first would never be heard (`crates/kernel/Spec.lean` D19).
+/// first would never be heard (`Sprawling/kernel/Spec.lean` D19).
 pub const CTX_REMINDER_FIRST_PERCENT: u64 = 30;
 pub const CTX_REMINDER_SECOND_DEFAULT: u64 = 65;
 pub const CTX_REMINDER_SECOND_MIN: u64 = match CTX_REMINDER_FIRST_PERCENT.checked_add(1) {
@@ -194,7 +194,7 @@ pub const IMAGE_QUALITY: crate::policy_limit::ImageQuality =
 /// has no row for the model. The three rungs above it carry real
 /// statements, so this number is never a figure that outranks one
 /// somebody made. The chat and responses faces never reach it: there a
-/// ceiling nobody stated is left to the provider (`crates/gateway/Spec.lean` §8-17).
+/// ceiling nobody stated is left to the provider (`Sprawling/gateway/Spec.lean` §8-17).
 ///
 /// Chosen at the width every provider this city calls accepts for every
 /// model it serves, which is what a number used in place of knowledge
@@ -220,7 +220,7 @@ pub const AUTONOMY_DEFAULT: crate::approval::Autonomy = crate::approval::Autonom
 /// (Endpoint, model) offers it: a balanced level for a person who never
 /// opened the setting. Whether it is used is the answer of the gateway's
 /// thinking ladder, which falls back to the upstream's own default when
-/// this level is not offered (`crates/kernel/spec/Model.lean` D56).
+/// this level is not offered (`Sprawling/kernel/spec/Model.lean` D56).
 pub const DEFAULT_EFFORT: crate::model::Effort = crate::model::Effort::High;
 
 /// Where a city listens when nobody says otherwise: the loopback

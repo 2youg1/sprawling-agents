@@ -6,7 +6,7 @@
 /-!
 # edit：一次保存改了什么、留下什么、怎样收回
 
-规定 `crates/documents/src/edit.rs`（`documents::Transaction`、`Edit`、`Applied`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/documents/src/edit.rs`（`documents::Transaction`、`Edit`、`Applied`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 Rust 的 `Transaction` 是一串按文档序排好、互不重叠的半开字节区间加各自的替换字节。本模型把同一件事写成从头到尾的一串 `Piece`：两段编辑之间的空隙是 `keep n`，一段编辑是 `replace old new`（换掉源文接下来的 `old` 个字节）。两种写法一一对应：按序走 Rust 的编辑，空隙长 `start - cursor` 记一个 `keep`，编辑本身记一个 `replace (end - start) bytes`；末尾没被点名的字节在两边都原样留下。字节在模型里是 `Nat`，因为性质与字节的取值范围无关。
 

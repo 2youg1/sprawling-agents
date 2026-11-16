@@ -6,7 +6,7 @@
 /-!
 # storage::error
 
-规定 `error`（`crates/storage/src/` 下同名的文件）。`StorageError` 与 `into_ax`：本 crate 失败词汇的唯一定义点，以及每个变体答哪个码。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
+规定 `error`（`Sprawling/storage/src/` 下同名的文件）。`StorageError` 与 `into_ax`：本 crate 失败词汇的唯一定义点，以及每个变体答哪个码。本文件是 `Sprawling/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `Sprawling/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
 -/
 
 /-!
@@ -43,7 +43,7 @@ pub(crate) fn io_err(op: &'static str, path: &Path) -> impl FnOnce(io::Error) ->
 /-!
 ## 每个变体答哪个码
 
-`StorageError::into_ax` 是本 crate 失败越过 crate 边界的唯一出口。下面的 `code` 列出每个变体答的 `AxCode`；`Draft` 与 `ChainHalted` 不造码，原样交出它们带着的那个 `AxError`（`carried`）。码本身（拼写、语义、装载期白名单）的权威是 kernel 的错误码表（`crates/kernel/Spec.lean` §8-4），这里只说 storage 的哪个失败落在哪个码上，以及为什么它不能被定义掉。
+`StorageError::into_ax` 是本 crate 失败越过 crate 边界的唯一出口。下面的 `code` 列出每个变体答的 `AxCode`；`Draft` 与 `ChainHalted` 不造码，原样交出它们带着的那个 `AxError`（`carried`）。码本身（拼写、语义、装载期白名单）的权威是 kernel 的错误码表（`Sprawling/kernel/Spec.lean` §8-4），这里只说 storage 的哪个失败落在哪个码上，以及为什么它不能被定义掉。
 
 账本介质的失败（`Io`、`LedgerBroken`）与快照的盘拒绝都答 `E_STORAGE_FATAL`，宁停不脏：这是 `code` 的三个分支本身，单独立一条只核对这三格的定理只会重述定义；`only_two_variants_carry` 陈述只有 `Draft` 与 `ChainHalted` 不造码，所以别的变体的码都在这张表里写死。
 -/

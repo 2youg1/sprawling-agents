@@ -115,7 +115,7 @@ fn every_flag_a_body_reads_passes_the_table() {
 }
 
 /// A row named by two words is read from two words, its flags after
-/// them; the first word alone names both rows under it (`crates/sprawling/spec/Main.lean`
+/// them; the first word alone names both rows under it (`Sprawling/app/spec/Main.lean`
 /// §8-126).
 #[test]
 fn a_verb_of_two_words_is_read_from_two_words() {
@@ -161,7 +161,7 @@ fn a_verb_of_two_words_is_read_from_two_words() {
 
 /// The first `--` ends sprawling's own words: what follows is the
 /// measured command's, `--version` and `--help` included, so
-/// `gauge -- cargo --version` measures cargo (`crates/sprawling/spec/Main.lean` §8-129-4).
+/// `gauge -- cargo --version` measures cargo (`Sprawling/app/spec/Main.lean` §8-129-4).
 #[test]
 fn the_words_after_two_dashes_are_not_read_as_sprawlings_own() {
     let parsed = parse(&words(&["top", "--", "cargo", "--version", "--help"]));

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Daemon policy verification (`crates/runtime/spec/Tools/Exec/Container.lean`).
+//! Daemon policy verification (`Sprawling/runtime/spec/Tools/Exec/Container.lean`).
 
 use kernel::{AxError, ContainerLimits};
 use serde_json::{Value, json};

@@ -6,7 +6,7 @@
 /-!
 # gateway::cost
 
-规定 `cost`（`crates/gateway/src/cost.rs`）：一次调用的结算：权威计费额优先，价目推算全程 checked 整数。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+规定 `cost`（`Sprawling/gateway/src/cost.rs`）：一次调用的结算：权威计费额优先，价目推算全程 checked 整数。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `Sprawling/gateway/Spec.lean §8-n`。
 
 下面的模型证明结算的两条性质：权威计费额在场恒胜；价目推算答出的数就是精确的和、装得进 `u64`，装不下就没有答案。
 -/

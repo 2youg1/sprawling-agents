@@ -45,7 +45,7 @@ Refused rather than attempted: opening a Ledger a newer version wrote, truncatin
 
 ## Constraints
 
-- Two features, both off by default. `fault` compiles the second `vfs` adapter, so a caller can cut the power under a Ledger: `crates/accounting`'s dev-dependency turns it on for its own tests, and this crate's tests have the adapter without the feature. `conformance` forwards to `kernel/conformance`; this crate's dev-dependency turns that on directly, so its own tests run the port suite either way.
+- Two features, both off by default. `fault` compiles the second `vfs` adapter, so a caller can cut the power under a Ledger: `Sprawling/accounting`'s dev-dependency turns it on for its own tests, and this crate's tests have the adapter without the feature. `conformance` forwards to `kernel/conformance`; this crate's dev-dependency turns that on directly, so its own tests run the port suite either way.
 - One writer per city. The Ledger takes an exclusive lock when it opens, so a second process, or a second handle in this process, is refused with `E_LEDGER_HELD` rather than queued behind.
 - `Ok` from `append_all` means every line of the wave is written and synced. After a wave fails, the handle refuses every later wave until the Ledger is opened again, and that open is what repairs the tail (`storage D16`).
 - Time arrives as a parameter. The crate never reads a wall clock, and the roll threshold and the preallocation arm of a segment are internal: `SEGMENT_ROLL_BYTES` and `SEGMENT_PREALLOCATION` change how the file is cut, never what the history reads as (`storage D31`).
@@ -56,7 +56,7 @@ Refused rather than attempted: opening a Ledger a newer version wrote, truncatin
 
 ## Who uses it
 
-`cargo tree --workspace -i sprawling-storage -e normal --depth 1` prints five dependents: the product's `sprawling-accounting`, `sprawling-collab`, `sprawling-runtime` and assembly root `sprawling`, and `citysim`, the scenario runner that sits outside the product graph. The fuzz package under `crates/fuzz` names it too, and is a workspace of its own. What each may name is the `depmap` block of [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 3.
+`cargo tree --workspace -i sprawling-storage -e normal --depth 1` prints five dependents: the product's `sprawling-accounting`, `sprawling-collab`, `sprawling-runtime` and assembly root `sprawling`, and `citysim`, the scenario runner that sits outside the product graph. The fuzz package under `Tools/fuzz` names it too, and is a workspace of its own. What each may name is the `depmap` block of [`docs/ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 3.
 
 ## Specification
 
@@ -72,9 +72,9 @@ What a city keeps on disk, and where, is [`docs/ARCHITECTURE.md`](../../docs/ARC
 
 ```bash
 cargo nextest run -p sprawling-storage --all-features   # the tests, as `just test` runs them
-lake build crates.storage.Spec                          # the SPEC's proofs; `just models` builds every crate's
+lake build Sprawling.storage.Spec                          # the SPEC's proofs; `just models` builds every crate's
 just replay <ledger-dir>                                # the whole-chain audit, run by the binary, read-only
 cargo xtask gates spec lexicon specalign                # the SPEC, its vocabulary and its anchors
 ```
 
-`tests/derived_views.rs` throws away the index and the hot view, rebuilds each from the same Ledger and requires the same answers; `tests/ui/write_target.rs` must fail to compile, because a `WriteTarget` is cleared at one constructor; and the opening of a Ledger is tested against `crates/fixtures/ledger-ahead`, a Ledger written by a newer version, which this crate must refuse rather than read.
+`tests/derived_views.rs` throws away the index and the hot view, rebuilds each from the same Ledger and requires the same answers; `tests/ui/write_target.rs` must fail to compile, because a `WriteTarget` is cleared at one constructor; and the opening of a Ledger is tested against `Tools/fixtures/ledger-ahead`, a Ledger written by a newer version, which this crate must refuse rather than read.

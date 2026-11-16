@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The words a person files sessions under (`crates/wire/spec/Preference.lean`
+//! The words a person files sessions under (`Sprawling/wire/spec/Preference.lean`
 //! §8-84, wire D21).
 //!
 //! **A tag is the person's classification, not the city's history.** It

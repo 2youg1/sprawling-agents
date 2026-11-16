@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One save of a document: edits against the version they were made on
-//! (`crates/documents/spec/Edit.lean`, D8 and D9).
+//! (`Sprawling/documents/spec/Edit.lean`, D8 and D9).
 //!
 //! A transaction names the version it was made on, so a second writer
 //! that started from the same version learns that the document moved

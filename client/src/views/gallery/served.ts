@@ -220,7 +220,7 @@ export interface NoticeDay {
 // span three rooms and two runs, so the rows have something to merge
 // on - a code that repeats under one subject - and something not to.
 // The frozen-model refusal carries the sentence the runtime writes as
-// its subject (`crates/runtime/src/turn/report.rs`), because a subject
+// its subject (`Sprawling/runtime/src/turn/report.rs`), because a subject
 // that is not a room is the case the notice's ways out must survive.
 export const NOTICE_DAYS: readonly NoticeDay[] = [
   {

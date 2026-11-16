@@ -6,7 +6,7 @@
 //! Why a privacy operation did not make the change asked for, or its
 //! history could not be read or extended, and the one map from each to the
 //! error a person reads
-//! (`crates/sprawling/spec/Privacy.lean` §12).
+//! (`Sprawling/app/spec/Privacy.lean` §12).
 
 use std::num::NonZeroU64;
 
@@ -96,7 +96,7 @@ pub(crate) enum WriteFault {
 }
 
 /// Why a privacy operation ended without the change asked for: the closed
-/// set of stable codes in `crates/sprawling/spec/Privacy.lean` §12.
+/// set of stable codes in `Sprawling/app/spec/Privacy.lean` §12.
 #[derive(Debug)]
 pub(super) enum PrivacyFault {
     Identity(AxError),

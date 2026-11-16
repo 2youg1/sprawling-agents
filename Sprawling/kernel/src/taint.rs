@@ -8,7 +8,7 @@
 //! bytes; reads hand out borrows, derivation unions provenance, and no
 //! method ever returns the bare value — "washing it clean" is a compile
 //! error, not a review finding.
-//! The part `crates/kernel/spec/Taint.lean` specifies this module.
+//! The part `Sprawling/kernel/spec/Taint.lean` specifies this module.
 //!
 //! Deliberately absent: serde on `Tainted` (deserialization would be a
 //! second entrance and a forged-empty-taint hole) and any `into_inner`.
@@ -135,7 +135,7 @@ impl<T> Tainted<T> {
 // No kani harness lives here. Union monotonicity is a proposition about
 // a `BTreeSet` of `String`s, which gives CBMC loops it cannot bound, and
 // a harness over two fixed labels would only restate the proptest below
-// over a narrower domain (`crates/kernel/Spec.lean` §2).
+// over a narrower domain (`Sprawling/kernel/Spec.lean` §2).
 
 #[cfg(test)]
 #[allow(

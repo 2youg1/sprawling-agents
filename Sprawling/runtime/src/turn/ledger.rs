@@ -28,7 +28,7 @@
 //! gate, its reply whole, a tool call started, its answer - carry their
 //! own reading and cannot be built without one; every other line carries the turn's stamp. The clock
 //! those readings come from is read in this module and nowhere else in
-//! the turn (`crates/kernel/Spec.lean` §8-4, "what the envelope `t` records").
+//! the turn (`Sprawling/kernel/Spec.lean` §8-4, "what the envelope `t` records").
 
 use kernel::{
     Address, AxCode, AxError, EventDraft, EventKind, EventRef, Ledger, Payload, RunId, TimeMs,
@@ -50,7 +50,7 @@ pub(super) enum Authored {
 /// through the turn's journal so that it takes its place among the
 /// turn's held lines rather than ahead of them, which is what lets those
 /// lines wait for the next barrier instead of going down first
-/// (`crates/runtime/spec/Turn/Durability.lean`, `tf1Turn`).
+/// (`Sprawling/runtime/spec/Turn/Durability.lean`, `tf1Turn`).
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum RunLine {
     /// What the assembled request looks like to a prompt cache.
@@ -155,7 +155,7 @@ impl Moment {
 /// out names a durable record. A turn calls it before each outside
 /// effect - a model call, a write - and the run calls it once more before
 /// it freezes, and nowhere else (runtime D24, D36,
-/// `crates/runtime/spec/Turn/Durability.lean`).
+/// `Sprawling/runtime/spec/Turn/Durability.lean`).
 #[derive(Debug, Clone, PartialEq)]
 pub struct HeldLines {
     run: RunId,

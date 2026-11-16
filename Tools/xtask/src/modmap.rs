@@ -22,7 +22,7 @@
 //! checked** rather than trusted: an index file may hold declarations and
 //! nothing else, so exempting it costs no coverage.
 //!
-//! **A test module needs no entry** (crates/xtask/Spec.lean D40). It
+//! **A test module needs no entry** (Tools/xtask/Spec.lean D40). It
 //! compiles only under `cfg(test)`, holds no production policy, and is
 //! found from the module it tests; requiring a row for it made every
 //! regression test a registration edit. A test module that has a row is
@@ -43,7 +43,7 @@ mod index;
 use index::{check_index_content, is_index_name};
 
 /// The module map. This gate is its only reader, so a field change breaks
-/// one place (crates/xtask/Spec.lean §8-10); `specalign` names the file when
+/// one place (Tools/xtask/Spec.lean §8-10); `specalign` names the file when
 /// reporting an anchor it could not resolve.
 pub(crate) const MAP: &str = "architecture.toml";
 /// The status column, in the language the table is written in. It moved
@@ -99,7 +99,7 @@ struct Row {
 /// One module's claim about where its interface is specified.
 ///
 /// Handed to `specalign`, which is the gate that owns "a SPEC says what
-/// the code says". This gate stays the map's only reader (crates/xtask/Spec.lean
+/// the code says". This gate stays the map's only reader (Tools/xtask/Spec.lean
 /// §8-10), so a field change breaks one place. The module names
 /// itself rather than carrying a line number: an entry is found by name in
 /// a structured file, and a name does not move when the file is reordered.
@@ -291,7 +291,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 }
 
 /// The package these gates are compiled into. Its modules are described
-/// by crates/xtask/Spec.lean §7 rather than by the map, and it is the one
+/// by Tools/xtask/Spec.lean §7 rather than by the map, and it is the one
 /// package the map does not cover (section 12-9).
 const GATES: &str = env!("CARGO_PKG_NAME");
 

@@ -6,7 +6,7 @@
 //! What a person reads off the report: four status words, two sections,
 //! the level the core's threads get, what scanning does to the city's
 //! writes, colour a terminal may refuse, and a version column no vendor
-//! banner can push off the screen (`crates/sprawling/Spec.lean` §8-59 and
+//! banner can push off the screen (`Sprawling/app/Spec.lean` §8-59 and
 //! §8-166).
 
 use super::{ScriptedMachine, finding_for};

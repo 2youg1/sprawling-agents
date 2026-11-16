@@ -99,14 +99,14 @@
   // work that did not happen contributes no clause - so this one
   // produces three.
   const A_WAVE: readonly Call[] = [
-    call(1, "read", "crates/kernel/src/gate/door.rs", null),
-    call(2, "read", "crates/kernel/src/gate/item.rs", null),
-    call(3, "read", "crates/kernel/src/gate/dedup.rs", null),
+    call(1, "read", "Sprawling/kernel/src/gate/door.rs", null),
+    call(2, "read", "Sprawling/kernel/src/gate/item.rs", null),
+    call(3, "read", "Sprawling/kernel/src/gate/dedup.rs", null),
     call(4, "search", "GateOutcome", null),
-    call(5, "read", "crates/kernel/src/approval.rs", null),
-    call(6, "read", "crates/kernel/Spec.lean", null),
+    call(5, "read", "Sprawling/kernel/src/approval.rs", null),
+    call(6, "read", "Sprawling/kernel/Spec.lean", null),
     call(7, "search", "may_answer", null),
-    call(8, "edit", "crates/kernel/src/gate/door.rs", null),
+    call(8, "edit", "Sprawling/kernel/src/gate/door.rs", null),
     call(9, "exec", "cargo fmt --all", null),
     call(10, "exec", "cargo clippy -p sprawling-kernel --all-targets", null),
     call(11, "exec", "cargo test -p sprawling-kernel --lib gate", null),
@@ -126,7 +126,7 @@
   const A_FILE: Call = call(
     1,
     "read",
-    "crates/kernel/src/gate/door.rs",
+    "Sprawling/kernel/src/gate/door.rs",
     said(
       `pub fn answer(door: Door, asked: &Asked) -> GateOutcome {
     // A door answers Allow or Deny and never asks a third thing.
@@ -142,7 +142,7 @@
 
   // A file with a trail long enough to wrap, so the crumbs are
   // measured as a row that has to fold rather than as three words.
-  const TRAILED = "crates/sprawling/src/assembly/dispatch/lanes/admission.rs";
+  const TRAILED = "Sprawling/app/src/assembly/dispatch/lanes/admission.rs";
 
   const BLOCK_COMMENT = `/* Two lines of one comment, so the colouring has to
    carry state from the end of one line to the start of the next. */
@@ -222,7 +222,7 @@ const HIDDEN: usize = 0;
 
 <Case label="code · a comment crossing lines, and one that never closes">
   <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
-  {@render framed("crates/kernel/src/limit.rs", BLOCK_COMMENT)}
+  {@render framed("Sprawling/kernel/src/limit.rs", BLOCK_COMMENT)}
 </Case>
 
 <Case label="code · no file was named, so no trail and no colour">

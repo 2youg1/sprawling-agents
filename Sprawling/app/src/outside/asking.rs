@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The remote door's verbs on the wire (`crates/sprawling/spec/Outside.lean`
+//! The remote door's verbs on the wire (`Sprawling/app/spec/Outside.lean`
 //! §8-140, remote_access D4): `CloseRemoteDoor` is carried at once;
 //! `OpenRemoteDoor` and `ReplaceCityKey` only print a code at the city's
 //! console and answer `E_APPROVAL_PENDING`; `ConfirmRemoteDoor` with that
@@ -27,7 +27,7 @@ use wire::{Command, Delivered, Reply, WireCommand};
 
 use super::console::{Lasting, Remote, RemoteLine, perform};
 
-/// How long a printed code answers (`crates/remote_access/Spec.lean` §8-13).
+/// How long a printed code answers (`Sprawling/remote_access/Spec.lean` §8-13).
 const CONFIRM_MS: u64 = 2 * 60 * 1000;
 
 /// What the city's listener hands each Command to.

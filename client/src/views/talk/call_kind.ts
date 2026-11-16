@@ -117,7 +117,7 @@ const LANDED: Readonly<Record<Landing, Key>> = {
   knocked: "talk_landed_knocked",
 };
 
-// The signal tool's own argument grammar (crates/collab/src/signal_tool.rs).
+// The signal tool's own argument grammar (Sprawling/collab/src/signal_tool.rs).
 // wording-ok: an argument value the tool reads, never shown to a reader
 const Pull = Schema.Struct({ action: Schema.Literal("pull") });
 // wording-ok: an argument value the tool reads, never shown to a reader

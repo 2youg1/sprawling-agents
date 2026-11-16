@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Where the first-run guide stands, read from two different sources
-// that never stand in for each other (refrain §3-15, `crates/wire/
+// that never stand in for each other (refrain §3-15, `Sprawling/wire/
 // Spec.lean` §8-68). **Whether a step is done** is the city's own
 // configuration: a `main` model chosen, nothing missing on the doctor's
 // use tier, a name written into the identity block. **What the person

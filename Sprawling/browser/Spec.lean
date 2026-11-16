@@ -3,11 +3,11 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.browser.spec.Act
-import crates.browser.spec.Devloop
-import crates.browser.spec.Keyboard
-import crates.browser.spec.Profile
-import crates.browser.spec.Snapshot
+import Sprawling.browser.spec.Act
+import Sprawling.browser.spec.Devloop
+import Sprawling.browser.spec.Keyboard
+import Sprawling.browser.spec.Profile
+import Sprawling.browser.spec.Snapshot
 
 /-! # browser 的规格
 
@@ -41,7 +41,7 @@ import crates.browser.spec.Snapshot
 | usersbrowser | 工具名取 `ToolName::USER_BROWSER` 一个权威；未声明地址的楼每次调用都得到门的问题；声明了地址的楼其 effect 带该主机；`usersbrowser` 与 `browser` 是两个设置；confidential 楼在 `city::policy` 即拒 |
 | profile | 两栋楼的 profile 互不包含；路径住保留区；confidential 楼的拒绝只有一个家（`spec/Profile.lean`） |
 
-usersbrowser 披露给模型的参数表（`crates/sprawling/src/browser_tool/person.rs`）与 `Verb::read` 同一个变更集改：解析器是接受什么的权威，参数表是披露什么。
+usersbrowser 披露给模型的参数表（`Sprawling/app/src/browser_tool/person.rs`）与 `Verb::read` 同一个变更集改：解析器是接受什么的权威，参数表是披露什么。
 -/
 
 /-! ## 3 假设与歧义
@@ -55,7 +55,7 @@ usersbrowser 披露给模型的参数表（`crates/sprawling/src/browser_tool/pe
 
 /-! ## 4 现状分析
 
-纯判定与值类型：`session`、`snapshot`、`act`、`verb`、`input`、`keyboard`、`shot`、`diff`、`devloop`、`profile`、`geometry`、`survey` 与缝 `port`。生产消费者是 `crates/sprawling`：`browser_bidi` 持套接字并实现 `BrowserPort`，`browser_tool` 把动作面接成 `browser` 与 `usersbrowser` 两件工具；`xtask render` 读 `survey`。
+纯判定与值类型：`session`、`snapshot`、`act`、`verb`、`input`、`keyboard`、`shot`、`diff`、`devloop`、`profile`、`geometry`、`survey` 与缝 `port`。生产消费者是 `Sprawling/app`：`browser_bidi` 持套接字并实现 `BrowserPort`，`browser_tool` 把动作面接成 `browser` 与 `usersbrowser` 两件工具；`xtask render` 读 `survey`。
 
 **对真浏览器核过的部分。** 对 Gecko 的一次真会话核过了 §3 的协议形状：`session.new` 接受空能力集；`script.evaluate` 的回复是 `result.result = { type, handle, sharedId, value }`，`sharedId` 就在这一层；`browsingContext.captureScreenshot` 的 `format.type` 收 `image/png`。元素裁剪随之落地：`clip.type = "element"` 收由 `script.evaluate` 回复里取出的 `sharedId`，回来的图正好是该元素的框。同一次会话量到驱动原样忽略 `imageSize`：2000×1500 的视口带 `maxWidth:1920` 仍回 2000×1500，400×300 的 clip 带 `maxWidth:200` 仍回 400×300，所以上界靠重拍生效（D7）。
 
@@ -126,7 +126,7 @@ usersbrowser 披露给模型的参数表（`crates/sprawling/src/browser_tool/pe
 4. **动作里页面文本恒是数据**：`quote` 是页面内容成为代码的唯一位置（`spec/Act.lean`）。
 5. **回路必有终点**：`LOOKS_MAX` 与 `QUIET_LOOKS` 把「不收敛」变成一个结局（`spec/Devloop.lean`）。
 
-D1 缝上有 trait，没有 conformance 套件。`BrowserPort` 是 trait，因为缝上有多个生产实现：`crates/sprawling/src/browser_bidi` 的 `BidiSocket`（直连）、`LazyEngine`（按需起引擎、首帧才连）与 `AttachedBrowser`（连人自己的浏览器），加上本 crate 的 `Recording`；撤 trait 会让这几条路合成一个类型。不设套件，因为它的证据为零：被测者 `Recording` 按构造就回 `frame.id()` 且回答不消费条目，断言恒真；生产适配器跑不了它，CI 没有浏览器驱动（ARCHITECTURE.md §11 具名的缺口之一）。这样的套件会让读者把「过了 conformance」读成「传输层被验过」。录制回放是重放证据，不是传输层的证据。重开参数：回复路由规则（读过无 id 的事件、按 id 认领答案）从 `socket.rs` 的 async 循环搬进本 crate 成为纯函数，且 `crates/sprawling` 的测试能用一对本地 socket 驱动它；那时套件与它的调用方在同一次改动里出现。
+D1 缝上有 trait，没有 conformance 套件。`BrowserPort` 是 trait，因为缝上有多个生产实现：`Sprawling/app/src/browser_bidi` 的 `BidiSocket`（直连）、`LazyEngine`（按需起引擎、首帧才连）与 `AttachedBrowser`（连人自己的浏览器），加上本 crate 的 `Recording`；撤 trait 会让这几条路合成一个类型。不设套件，因为它的证据为零：被测者 `Recording` 按构造就回 `frame.id()` 且回答不消费条目，断言恒真；生产适配器跑不了它，CI 没有浏览器驱动（ARCHITECTURE.md §11 具名的缺口之一）。这样的套件会让读者把「过了 conformance」读成「传输层被验过」。录制回放是重放证据，不是传输层的证据。重开参数：回复路由规则（读过无 id 的事件、按 id 认领答案）从 `socket.rs` 的 async 循环搬进本 crate 成为纯函数，且 `Sprawling/app` 的测试能用一对本地 socket 驱动它；那时套件与它的调用方在同一次改动里出现。
 
 D2 缝只运帧，套接字归装配层。被否决的是把 WebSocket 会话整体放进本 crate：读起来更像「一个浏览器客户端」，但它把异步运行时拖进一个本可纯的 crate，所有断言都要一个 runtime，第二适配器只能是一个假服务器。选中的做法让整段会话在无浏览器、无异步的条件下逐帧断言，录制回放能在一台没有 WebDriver 的机器上重放一次真实会话；它替代不了传输层的证据（D1）。代价：装配层多一段连接管理，帧的 id 必须由 `Session` 铸。
 
@@ -142,7 +142,7 @@ D7 截图的区域三臂互斥，框只有一个来源，上界由两端说住�
 
 D8 `diff` 的百分比是万分比整数（`changed_ppm`、`ratio_q4`），框是像素坐标的整数矩形，因为两者会进账本载荷。尺寸不同的两张图不比较，回 `E_INVALID_ARGS`：缩放后再比，比出来的是缩放算法的差异。解码后的字节短于头部声明的尺寸时回 `E_WIRE_MISMATCH` 并说出是哪一张短了（先拍的、后拍的、两张都短），因为三种情况的下一步不同；判定对前后两个像素取值穷尽匹配。全 crate 只有一个矩形类型 `shot::Rect`（`covers` 与 `covering` 是它的方法），`diff` 从 `shot` 读它。`png` 依赖：产品路径只解码，测试用它的编码器造夹具，断言比的是真 PNG 字节。
 
-D9 拖拽与滚动与 `desktop.act` 同一份词汇：`drag` 从 ref 或 point 到 point，`scroll` 用 `to` 表示滚多远，`steps` 为中间移动次数，两侧字段名与含义逐字相同（`crates/desktop/Spec.lean` §8-7 指向这里）。BiDi 的元素 origin 用页面自己的 shared id 而不是选择器，所以元素起点的拖拽在线上是两帧：`act::resolve_frame` 让页面报出元素，`input::shared_id_of` 读出 id，`input::pointer_frame` 发 `input.performActions`；`Verb::frames` 只发第一帧，工具在 `invoke` 里补第二帧，判定仍在纯代码里，`Recording` 能逐帧重放。`Scroll` 与 point 起点的 `Drag` 没有元素，所以 `Action::reference()` 是 `Option`。
+D9 拖拽与滚动与 `desktop.act` 同一份词汇：`drag` 从 ref 或 point 到 point，`scroll` 用 `to` 表示滚多远，`steps` 为中间移动次数，两侧字段名与含义逐字相同（`Sprawling/desktop/Spec.lean` §8-7 指向这里）。BiDi 的元素 origin 用页面自己的 shared id 而不是选择器，所以元素起点的拖拽在线上是两帧：`act::resolve_frame` 让页面报出元素，`input::shared_id_of` 读出 id，`input::pointer_frame` 发 `input.performActions`；`Verb::frames` 只发第一帧，工具在 `invoke` 里补第二帧，判定仍在纯代码里，`Recording` 能逐帧重放。`Scroll` 与 point 起点的 `Drag` 没有元素，所以 `Action::reference()` 是 `Option`。
 
 D10 `usersbrowser` 驱动人已经开着的那个浏览器，用的是那个人的真 profile；与 `browser` 的差别是安全模型而不是动作集合。地址是人的声明：`RULES.toml` 的 `usersbrowser` 一键，值为 `ws://127.0.0.1:<port>/session` 时启用该工具并把地址交给 attach 门；值为 `true` 时启用而地址未定，每次调用都得到门的问题（`E_APPROVAL_PENDING`）；absent 或 `false` 即无此工具；confidential 楼写这一键即在规则读取处被拒。恒不关人的浏览器：`AttachedBrowser` 只连、不启动、不结束进程，`Verb::Close` 结束的是一次会话；附着是会话级、绑一个 run。入账：附着是工具的第一次调用，与之后每个动作一样写 `tool_called` 与 `tool_result`；`disclosure` 写明它需要人先批准并引导先用 `browser`。平台的门就是授权：Firefox 走 `--remote-debugging-port`、Chromium 走驱动，两者都要求人的动作；地址是否 loopback 由 `gate::attach` 判，非 loopback 的声明被拒，因为那会把登录态读过一个网络。
 
@@ -150,7 +150,7 @@ D11 一页哪里画错了，由一份测量、一套判决回答，门（`xtask 
 
 D12 一个 run 能按键：`Action::Press { key, modifiers }`，一帧 `input.performActions` 的 `key` 源（`spec/Keyboard.lean`）。客户端的键表（`client/Spec.lean` §9）因此有了机器读者，验收可以由本产品驱动本产品。键名与修饰键名取 DOM `KeyboardEvent.key` 的值，一个字符键就写那个字符；名字、WebDriver 码位与枚举在 `keyboard` 的一处对应，`Key::parse`、`Modifier::parse` 与 `key_frame` 都读它，`verb::read` 经这两个 `parse` 取值。按键落在焦点上：`Press` 不带 ref，不需要第二帧；要先让某个元素得到焦点，是先做一次 `click`。没有快照即拒，没有 ref 所以不核 generation。不换算大小写：`K` 送出的就是 `K`，`Shift` 另是一个修饰键。读参：`kind` 为 `press`，`key` 必填，`modifiers` 可选、是字符串数组；未知的名字各以 `E_INVALID_ARGS` 拒绝，恢复语列出能用的名字。被否决的备选：在 `Type` 的文字里夹转义（同一个字符串既是文字又是键）；`"Ctrl+K"` 形式的小语言（键名之外的第二套文法）。
 
-D13 「这个地址是不是城自己的一个监听」是本 crate 的一个纯判定：`OwnListeners::new(listeners)` 收城此刻监听的 `SocketAddr`，`OwnListeners::holds(url)` 答一个 `http`、`https`、`ws` 或 `wss` 地址是否落在其中之一上：端口相同（不写端口时取 scheme 的默认端口），并且主机是回环（`localhost`、`*.localhost`、回环地址，`::ffff:127.0.0.1` 也算），或者等于那个监听绑定的地址，或者那个监听绑定在未指定地址（`0.0.0.0`、`::`）上而主机是一个 IP 字面量。`page_address(tree, context)` 从 `browsingContext.getTree` 的答复里读出一个 tab 此刻的地址。装配层持登记、按它拒（`crates/sprawling/spec/BrowserBidi.lean` §8-45-6，sprawling D74）。不解析名字：一次 DNS 查询会让判定依赖网络。被否：按主机名单判（`127.0.0.1`、`localhost`）不看端口——居民在回环上起的开发服务器也会被拒。
+D13 「这个地址是不是城自己的一个监听」是本 crate 的一个纯判定：`OwnListeners::new(listeners)` 收城此刻监听的 `SocketAddr`，`OwnListeners::holds(url)` 答一个 `http`、`https`、`ws` 或 `wss` 地址是否落在其中之一上：端口相同（不写端口时取 scheme 的默认端口），并且主机是回环（`localhost`、`*.localhost`、回环地址，`::ffff:127.0.0.1` 也算），或者等于那个监听绑定的地址，或者那个监听绑定在未指定地址（`0.0.0.0`、`::`）上而主机是一个 IP 字面量。`page_address(tree, context)` 从 `browsingContext.getTree` 的答复里读出一个 tab 此刻的地址。装配层持登记、按它拒（`Sprawling/app/spec/BrowserBidi.lean` §8-45-6，sprawling D74）。不解析名字：一次 DNS 查询会让判定依赖网络。被否：按主机名单判（`127.0.0.1`、`localhost`）不看端口——居民在回环上起的开发服务器也会被拒。
 
 成本：`to_text` 一行三个字段，因为模型下一件事是把 ref 抄回来；拒词报出可用 ref 的数量与起点。
 -/
@@ -185,7 +185,7 @@ D13 「这个地址是不是城自己的一个监听」是本 crate 的一个纯
 
 /-! ## 15 影响面
 
-改 `BrowserPort` 或 `Verb` 波及 `crates/sprawling` 的 `browser_bidi` 与 `browser_tool`；改 `survey` 波及 `xtask render`；`city::policy` 的 confidential 读取决定一栋楼有没有这两件工具；改键名或修饰键名波及客户端键表的读者与 `browser_tool` 披露的参数表。
+改 `BrowserPort` 或 `Verb` 波及 `Sprawling/app` 的 `browser_bidi` 与 `browser_tool`；改 `survey` 波及 `xtask render`；`city::policy` 的 confidential 读取决定一栋楼有没有这两件工具；改键名或修饰键名波及客户端键表的读者与 `browser_tool` 披露的参数表。
 -/
 
 /-! ## 16 测试与约束
@@ -199,6 +199,6 @@ D13 「这个地址是不是城自己的一个监听」是本 crate 的一个纯
 
 - `architecture.toml` 里 browser 各行（锚点指向本文件与分部）与 ARCHITECTURE.md §4 缝清单（`BrowserPort`）；ARCHITECTURE.md §11 的 V3 一行引 D1。
 - `docs/glossary.md` 的 **browser** 行（D4）与新增词汇。
-- `crates/desktop/Spec.lean` §8-7（拖拽与滚动的同一份词汇，D9）；client/Spec.lean §9（键表，D12）；`crates/city/Spec.lean` §8-2 的 policy（confidential 与 `usersbrowser`，D10）；`crates/xtask/Spec.lean` 的 `render` 一节与 §8-26 `survey`（D11）；`crates/sprawling/Spec.lean` 的 `browser_tool` 一节。这些节改了，重读本文件对应的决定。
+- `Sprawling/desktop/Spec.lean` §8-7（拖拽与滚动的同一份词汇，D9）；client/Spec.lean §9（键表，D12）；`Sprawling/city/Spec.lean` §8-2 的 policy（confidential 与 `usersbrowser`，D10）；`Tools/xtask/Spec.lean` 的 `render` 一节与 §8-26 `survey`（D11）；`Sprawling/app/Spec.lean` 的 `browser_tool` 一节。这些节改了，重读本文件对应的决定。
 - 本 crate 没有 `conformance` feature（D1）。
 -/

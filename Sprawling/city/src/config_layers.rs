@@ -18,7 +18,7 @@
 //! are and what each states is [`ladder`]'s. This module answers what
 //! one file says.
 //!
-//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4.
+//! Specified by `Sprawling/city/spec/ConfigLayers.lean` §8-4.
 
 use std::path::{Path, PathBuf};
 
@@ -113,10 +113,10 @@ pub struct ConfigLayer {
     /// Reading Room names to admitted canonical manifests, building scope only.
     skill_pins: std::collections::BTreeMap<String, B3Hash>,
     /// The identity version a session froze at this address
-    /// (`crates/city/spec/Identity.lean` §8-33): read at the room's own layer only.
+    /// (`Sprawling/city/spec/Identity.lean` §8-33): read at the room's own layer only.
     naming: Option<B3Hash>,
     /// The route the city's own layer chooses for the remote door
-    /// (`crates/city/spec/ConfigLayers/Remote.lean` §8-39); refused on every other rung.
+    /// (`Sprawling/city/spec/ConfigLayers/Remote.lean` §8-39); refused on every other rung.
     remote: Option<RemoteRoute>,
     /// The ACP agents the person added (§8-4f); refused on every other rung.
     agents: Option<Vec<AgentRow>>,
@@ -279,7 +279,7 @@ impl ConfigLayer {
         self.second_threshold
     }
 
-    /// How often this layer asks for the clock line (`crates/city/spec/ConfigLayers.lean` §8-31).
+    /// How often this layer asks for the clock line (`Sprawling/city/spec/ConfigLayers.lean` §8-31).
     #[must_use]
     pub fn clock_stamp(&self) -> Option<ClockStampGranularity> {
         self.clock_stamp
@@ -395,7 +395,7 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
     kernel::config::freeze(&StatedConfig {
         clock_stamp: ladder.resolve(ConfigLayer::clock_stamp),
         // No layer states zones: a stamp is written in UTC, and the key
-        // is refused where it is written (`crates/city/spec/ConfigLayers.lean` §8-31).
+        // is refused where it is written (`Sprawling/city/spec/ConfigLayers.lean` §8-31).
         clock_zones: kernel::LayeredValue::default(),
         effort: ladder.resolve(ConfigLayer::effort),
         sandbox: ladder.resolve(|layer| layer.sandbox().cloned()),

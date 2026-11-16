@@ -26,7 +26,7 @@
 //! wants compared against; the head is the fallback for a city that has
 //! checkpointed nothing.
 //!
-//! Specified by `crates/storage/spec/Status.lean` §8-22.
+//! Specified by `Sprawling/storage/spec/Status.lean` §8-22.
 
 use std::path::Path;
 

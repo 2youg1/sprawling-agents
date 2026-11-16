@@ -4,14 +4,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `cargo xtask spec <lib>`: create a crate's `Spec.lean` with the MPL
-//! notice and the seventeen numbered section comments `crates/city/skills/sdd` lists
-//! (crates/xtask/Spec.lean §8-41), in the directory of the package whose lib
+//! notice and the seventeen numbered section comments `Sprawling/city/skills/sdd` lists
+//! (Tools/xtask/Spec.lean §8-41), in the directory of the package whose lib
 //! (or, for a tool without one, whose package) goes by that name.
 //! Creation only: an existing `Spec.lean` is never overwritten, because
 //! everything past the skeleton is a specification somebody wrote.
 //!
 //! The gate of the same name judges what the tree holds and never
-//! writes (crates/xtask/Spec.lean §8-42): the command makes a
+//! writes (Tools/xtask/Spec.lean §8-42): the command makes a
 //! specification, the gate holds every specification to its rules, and
 //! neither does the other's job.
 
@@ -29,11 +29,11 @@ mod source;
 mod theorems;
 
 /// The checker's directory. Its own specification sits in it, beside the
-/// checker, and is held to the rules a crate's is (crates/xtask/Spec.lean
+/// checker, and is held to the rules a crate's is (Tools/xtask/Spec.lean
 /// §8-47): the checker is a Lean program, so no cargo package stands for it.
-const CHECKER: &str = "crates/adversary";
+const CHECKER: &str = "Tools/adversary";
 
-/// The seventeen responsibilities of `crates/city/skills/sdd`, in its order. What each
+/// The seventeen responsibilities of `Sprawling/city/skills/sdd`, in its order. What each
 /// section holds is that skill's to say, so the skeleton carries titles only.
 const SECTIONS: [&str; 17] = [
     "需求分解",

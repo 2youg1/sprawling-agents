@@ -12,7 +12,7 @@
 //! caller decides what a clock is: a counter in the simulator, the one
 //! sanctioned wall-clock sample in `bin::assembly`.
 //!
-//! `crates/runtime/spec/Run.lean` proves what the event sequence must
+//! `Sprawling/runtime/spec/Run.lean` proves what the event sequence must
 //! hold (§8-15): `handoff_written` and `run_frozen` close every run, once.
 
 use kernel::{
@@ -70,7 +70,7 @@ pub struct RunPlan {
     /// recorded verbatim by `run_started`; harness runs have none.
     pub routing: Option<kernel::event::record::ModelRouting>,
     /// The run policy this run was dispatched under, written into
-    /// `run_started` as it was chosen (`crates/kernel/Spec.lean` §8-77), and
+    /// `run_started` as it was chosen (`Sprawling/kernel/Spec.lean` §8-77), and
     /// the cell that holds it while the run goes: the one value here
     /// that changes, and only at `SafePoint::BeforeWave` (§8-62). Whoever
     /// builds the tools builds the cell first and hands each write gate
@@ -119,7 +119,7 @@ pub struct RunPlan {
     /// when somebody looked at a form.
     pub retries: kernel::Retries,
     /// The identity version this run's session froze, which
-    /// `run_started` records as it is (`crates/runtime/spec/Run.lean` §8-56).
+    /// `run_started` records as it is (`Sprawling/runtime/spec/Run.lean` §8-56).
     pub naming: Option<kernel::B3Hash>,
 }
 
@@ -279,7 +279,7 @@ pub struct Active {
     /// request, and that absence is the `FirstRequest` a record states.
     prior_shape: Option<crate::prefix::shape::PromptShape>,
     /// The `prompt_assembled` payload this run wrote last, which a turn
-    /// does not write again (`crates/runtime/spec/Prefix.lean` §8-39, item 5).
+    /// does not write again (`Sprawling/runtime/spec/Prefix.lean` §8-39, item 5).
     prompt: crate::turn::PromptRecord,
     /// Whether the next wave needs a checkpoint (§8-45).
     checkpoint: checkpoint::CheckpointPolicy,
@@ -288,7 +288,7 @@ pub struct Active {
     lines: crate::turn::HeldLines,
     /// The run's watchdog, here rather than on `drive`'s stack because a
     /// turn's repair segment asks the same account round whether one more
-    /// send is allowed (`crates/runtime/spec/Watchdog.lean` §8-9).
+    /// send is allowed (`Sprawling/runtime/spec/Watchdog.lean` §8-9).
     watchdog: crate::Watchdog,
 }
 

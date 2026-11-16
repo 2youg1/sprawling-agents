@@ -6,18 +6,18 @@
 /-!
 # Claim：分一行要先握着它，落地只核认领
 
-规定 `crates/collab/src/claim_tool.rs`（`collab::claim_tool`，`ClaimDesk` 的 `claim`、`finish`、`block`、`release`、`split`）、`crates/collab/src/claim_effect.rs`（`collab::claim_effect`，`still_true`）与 `crates/accounting/src/effect.rs`（`accounting::effect`，`Claims::of`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/collab/src/claim_tool.rs`（`collab::claim_tool`，`ClaimDesk` 的 `claim`、`finish`、`block`、`release`、`split`）、`Sprawling/collab/src/claim_effect.rs`（`collab::claim_effect`，`still_true`）与 `Sprawling/accounting/src/effect.rs`（`accounting::effect`，`Claims::of`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 一个 run 的桌子拿着派活那一刻的计划副本，模型每调一次 `plan`，桌子判一次、改副本、排一条效应；run 落地时，工人把同一组效应按次序重放到盘上此刻的那份计划上（`land`）。「分一行要不要握着它」只在桌子判（`Desk.act` 的 `split` 一支，collab D6）；落地不再为拆分另判状态，只核认领（`stillTrue`）——认领是唯一从共享计划里拿走一行的效应，也就是唯一会因为别的写者动过计划而失真的效应。
 
 四条性质：
 
 1. **桌子拒绝分一行没握着的计划**（`split_needs_hold`）：模型当场拿到拒词，桌子不排效应、不改副本。
-2. **桌子答应的，落在派活那份计划上全部落下**（`admitted_lands`）：工具答成功而落地一字不写，在没有别的写者的时候不可达。第八个发现（`crates/adversary/Spec.lean` §4）正是这条的反例：旧的落地对拆分另判 `In progress`，而旧的桌子不要求握着。
+2. **桌子答应的，落在派活那份计划上全部落下**（`admitted_lands`）：工具答成功而落地一字不写，在没有别的写者的时候不可达。第八个发现（`Tools/adversary/Spec.lean` §4）正是这条的反例：旧的落地对拆分另判 `In progress`，而旧的桌子不要求握着。
 3. **一行被别人动过，这个 run 对它的拆分落不下**（`split_of_moved_row_is_stale`）：每条拆分之前都有本 run 对同一行的认领，而且那条认领是这一行的第一条效应（`first_touch_is_claim`），所以盘上那一行已不是 `Not started` 时，整次落地判过时。
 4. **拿掉握持守卫，两个 run 把同一行各分一次**（`withoutHold_splits_twice`）：本模型咬得动的演示。从同一份计划派出的两个 run 都不认领就分第 1 行，两次落地都核不出什么，第二次在第一次的子行之后再长一组。
 
-模型的简化：计划的一行只有状态，依赖与叶子判定（`kernel::plan::tree::claim` 的就绪集）收成「`Not started`」一条；拆分只记「这一行被分过一次」（`divided`），子行怎样编号是 `kernel::spine::insert_children` 的事，本模型不重述。`add`（collab D12）不在本模型里：它只在根下写一个新编号的行，不碰已有的行，落地时 `still_true` 对它答真，所以它不改变这里任何一条关于认领与拆分的性质；守恒由 `crates/kernel/spec/Share.lean` 的 `Kernel.Share.Root` 证明。拆分在 Rust 里还要求新表能解析、能建树，那是一次与握持无关的拒绝，`ClaimDesk::split` 在改副本之前判它（`crates/collab/src/claim_tool.rs`）；握持的拒绝由 `crates/collab/src/claim_tool/split_tests.rs` 经生产入口断言。
+模型的简化：计划的一行只有状态，依赖与叶子判定（`kernel::plan::tree::claim` 的就绪集）收成「`Not started`」一条；拆分只记「这一行被分过一次」（`divided`），子行怎样编号是 `kernel::spine::insert_children` 的事，本模型不重述。`add`（collab D12）不在本模型里：它只在根下写一个新编号的行，不碰已有的行，落地时 `still_true` 对它答真，所以它不改变这里任何一条关于认领与拆分的性质；守恒由 `Sprawling/kernel/spec/Share.lean` 的 `Kernel.Share.Root` 证明。拆分在 Rust 里还要求新表能解析、能建树，那是一次与握持无关的拒绝，`ClaimDesk::split` 在改副本之前判它（`Sprawling/collab/src/claim_tool.rs`）；握持的拒绝由 `Sprawling/collab/src/claim_tool/split_tests.rs` 经生产入口断言。
 -/
 
 namespace Collab.Claim

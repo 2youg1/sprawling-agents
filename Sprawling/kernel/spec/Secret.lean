@@ -6,7 +6,7 @@
 /-!
 # kernel::secret
 
-规定 `kernel::secret`（`crates/kernel/src/secret.rs` 与 `crates/kernel/src/secret/` 下的 `span`、`scan`、`hex_run`、`sealed`）：密钥引用、扫描与封存。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::secret`（`Sprawling/kernel/src/secret.rs` 与 `Sprawling/kernel/src/secret/` 下的 `span`、`scan`、`hex_run`、`sealed`）：密钥引用、扫描与封存。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `kernel::secret::span`、`kernel::secret::scan`、`kernel::secret::hex_run` 等模块旁的测试守住。
 -/
@@ -62,5 +62,5 @@ impl Sealed<String> {
 - **明文离开 `Sealed` 只有两条路**：`expose`（调用处受 `xtask secret` 白名单约束）与 `into_vault_value`（消耗本值，交出的仍是 drop 即零化的 `Zeroizing<String>`）。后者定义在本模块而不在录入处，录入处因此不必上白名单。
 - **命中原因只有一处拼写**：`SecretSpan::reason` 把形状命中答成 provider 名、熵命中答成 `high entropy`；checkpoint 的位置记录与 hunks 的 withheld 行都调它，不在两个出口各写一次 `unwrap_or`。
 - **`EntropyAllowlist` 只装仓库相对路径**，构造元素是已经通过 `Address::parse` 的值；匹配是整条路径相等，不是前缀或 glob。它不改变 `scan` 的答案，只给 checkpoint 的熵处置一个由 User 写下的豁免；形状命中从不询问它（storage D95）。
-- 误报是既知常态（入口无损可逆，出口才拒）；`E_SECRET_EGRESS` 的 subject 恒不回显命中字节（塑形在 gate::egress）。checkpoint 的硬拒绝只保留给已知形状，低置信度熵命中的提交与记账规则见 `crates/storage/spec/Checkpoint.lean` D95。
+- 误报是既知常态（入口无损可逆，出口才拒）；`E_SECRET_EGRESS` 的 subject 恒不回显命中字节（塑形在 gate::egress）。checkpoint 的硬拒绝只保留给已知形状，低置信度熵命中的提交与记账规则见 `Sprawling/storage/spec/Checkpoint.lean` D95。
 -/

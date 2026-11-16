@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The production privacy host (`crates/sprawling/spec/Privacy/Cli.lean`):
+//! The production privacy host (`Sprawling/app/spec/Privacy/Cli.lean`):
 //! the account's identity and its owner binding, and each control's read
 //! and write routed to its adapter, machine scope through elevation.
 //!

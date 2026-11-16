@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The accounting thread's health as counts other threads can read
-//! (`crates/sprawling/Spec.lean` §8-98).
+//! (`Sprawling/app/Spec.lean` §8-98).
 //!
 //! `relay` owns both counts: only it knows when a lane's append enters
 //! the accounting thread's queue, when the accounting thread takes it
@@ -45,7 +45,7 @@ struct Counts {
     relay_queue: Mutex<VecDeque<u64>>,
     /// Microseconds each staged run waited in the driving pool's queue
     /// before its lane opened, zero for a run that waited for nothing,
-    /// oldest first (`crates/sprawling/Spec.lean` §8-46-3, the pure lane
+    /// oldest first (`Sprawling/app/Spec.lean` §8-46-3, the pure lane
     /// wait).
     lane_wait: Mutex<VecDeque<u64>>,
 }

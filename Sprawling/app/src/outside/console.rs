@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! `/remote` on the city's console: open, pair, close, devices, revoke,
-//! replace-key (`crates/sprawling/spec/Outside.lean` §8-140).
+//! replace-key (`Sprawling/app/spec/Outside.lean` §8-140).
 //!
 //! `/remote` is not on the wire, so no frame - from a browser, a remote
 //! device or a tool a resident holds - can pair or revoke a device; the
@@ -231,7 +231,7 @@ fn opening(opened: &Opened, lasting: Lasting, keeps: Persistence) -> String {
 }
 
 /// How long a paired device stays paired, which is how long this
-/// machine's vault keeps the city key (`crates/gateway/spec/Credential.lean`
+/// machine's vault keeps the city key (`Sprawling/gateway/spec/Credential.lean`
 /// §8-4). Where the key lives is the doctor's report; this says only what
 /// it costs a device.
 fn kept_for(keeps: Persistence) -> &'static str {

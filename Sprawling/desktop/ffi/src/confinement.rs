@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Owned Windows native execution. The launch ordering and boundary contract
-//! are specified by `crates/runtime/spec/Tools/Exec/NativeWindows.lean`.
+//! are specified by `Sprawling/runtime/spec/Tools/Exec/NativeWindows.lean`.
 
 use std::collections::BTreeMap;
 use std::ffi::OsString;

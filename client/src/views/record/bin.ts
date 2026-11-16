@@ -8,7 +8,7 @@
 // is back, and its own way back in words; a row whose way back the
 // browser can carry out also offers the press that does it. A row
 // without a way back cannot be constructed upstream
-// (crates/wire/spec/Server.lean), so every row carries one and the page
+// (Sprawling/wire/spec/Server.lean), so every row carries one and the page
 // draws it rather than a guess.
 
 import type { Lang } from "../../core/lang";

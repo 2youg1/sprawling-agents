@@ -6,7 +6,7 @@
 /-!
 # kernel::consts_policy
 
-规定 `kernel::consts_policy`（`crates/kernel/src/consts_policy.rs`）：政策常量。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::consts_policy`（`Sprawling/kernel/src/consts_policy.rs`）：政策常量。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `kernel::consts_policy` 旁的测试守住。
 -/
@@ -26,7 +26,7 @@ pub const CTX_REMINDER_SECOND_MAX: u64 = 90;                         // 第二�
 pub const LOOP_REPEAT_THRESHOLD: u32 = 3;
 pub const OFFLOAD_MIN_BYTES: u64 = 16_384;
 pub const INTERVAL_CAP_BYTES: usize = 65_536;                        // 一次区间读／检索的窗口预算
-pub const EXCHANGE_BUDGET_BYTES: u64 = OUTPUT_CEILING_DEFAULT * BYTES_PER_TOKEN;  // 一回合 exchange 的窗口预算（`crates/runtime/Spec.lean` §8-44）
+pub const EXCHANGE_BUDGET_BYTES: u64 = OUTPUT_CEILING_DEFAULT * BYTES_PER_TOKEN;  // 一回合 exchange 的窗口预算（`Sprawling/runtime/Spec.lean` §8-44）
 pub const DRAFT_HELD_ESCALATE: u32 = 3;
 pub const EDIT_WAR_FREEZE: u32 = 2;
 pub const SECRET_ENTROPY_MIN: Ratio = Ratio { num: 7, den: 2 };      // 3.5 bits/char
@@ -43,7 +43,7 @@ pub const BYTES_PER_TOKEN: u64 = 4;                                  // 字节�
 pub const PREFIX_SLOTS: NonZeroU64 = 4;                              // 整份 prefix 预算均分的槽数
 pub const SANDBOX_FUEL_DEFAULT: u64 = 200_000_000;                   // §8-22 沙箱限额的缺省燃料
 pub const CREDENTIAL_NAME_MARKERS: [&str; 11];                       // §8-22 凭据形状名字的标记词
-pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;                       // messages 面输出上限梯的最后一档（token；`crates/gateway/Spec.lean` §8-17）
+pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;                       // messages 面输出上限梯的最后一档（token；`Sprawling/gateway/Spec.lean` §8-17）
 pub const CLOCK_STAMP_DEFAULT: ClockStampGranularity = ClockStampGranularity::Minute;   // runtime D8
 pub const AUTONOMY_DEFAULT: Autonomy = Autonomy::Owner;
 pub const DEFAULT_EFFORT: Effort = Effort::High;                    // 没有人说过强度时内置的默认档（§8-24 D56）；用不用它由 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块） 按 offer 解出

@@ -11,7 +11,7 @@
 //! enum is one the control surface can ask for and one the refusal
 //! lists, without a second table to keep in step.
 //!
-//! Specified by `crates/city/spec/Building.lean` §8-3 and §8-20.
+//! Specified by `Sprawling/city/spec/Building.lean` §8-3 and §8-20.
 
 use kernel::{Address, AxCode, AxError};
 
@@ -119,7 +119,7 @@ impl BuildingTemplate {
                         format!("the template no longer carries `{ORDINARY_LINE}`"),
                     )
                     .with_recovery(
-                        "restore that line in crates/city/templates/RULES.toml; the confidential \
+                        "restore that line in Sprawling/city/templates/RULES.toml; the confidential \
                          template is the ordinary one with that value flipped",
                     ));
                 }

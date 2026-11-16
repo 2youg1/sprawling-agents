@@ -75,7 +75,7 @@ Every city is raised with one building already standing: `hall`, City Hall, wher
 
 A harness's *scaffolding* is the structure it puts around a model so that long work stays coherent: the files an agent reads before it starts, the files it writes before it stops, and the rules it cannot change.
 
-In sprawling that scaffolding is a set of Markdown and TOML forms that land in a building when it is raised (the templates are in [`crates/city/templates/`](../crates/city/templates/)). A form teaches by its shape: a blank form with the right headings is one even a small local model fills in correctly.
+In sprawling that scaffolding is a set of Markdown and TOML forms that land in a building when it is raised (the templates are in [`Sprawling/city/templates/`](../Sprawling/city/templates/)). A form teaches by its shape: a blank form with the right headings is one even a small local model fills in correctly.
 
 | File | Where | Written by | What it is for |
 |---|---|---|---|
@@ -128,7 +128,7 @@ A name on that list that no shelf holds is reported rather than promised. This k
 shelves = ["~/.claude/skills"]
 ```
 
-The **skills** group under **settings** lists every shelf, what each building admits, and how many runs used each skill. Its **folders from this computer** box takes an absolute path — `~/.claude/skills`, or a Windows drive — and mounts the whole folder read-only: every folder inside it holding a `SKILL.md` becomes a skill, nothing is copied, and the list above shows it once the city answers. This repository ships the skills under [`../crates/city/skills/`](../crates/city/skills/); the binary carries them, and a new city finds every one on its library shelf.
+The **skills** group under **settings** lists every shelf, what each building admits, and how many runs used each skill. Its **folders from this computer** box takes an absolute path — `~/.claude/skills`, or a Windows drive — and mounts the whole folder read-only: every folder inside it holding a `SKILL.md` becomes a skill, nothing is copied, and the list above shows it once the city answers. This repository ships the skills under [`../Sprawling/city/skills/`](../Sprawling/city/skills/); the binary carries them, and a new city finds every one on its library shelf.
 
 **MCP** (Model Context Protocol) is how a building reaches outside applications — mail, GitHub, Figma, a document converter — through a tool server. A server is one entry in the building's `CONFIG.toml`: a `command` for a program on this computer, or a `url` for a hosted one; the **MCP** page writes the same entries for you. A confidential building starts none.
 
@@ -215,7 +215,7 @@ sprawling help
 
 The [release list](https://github.com/2youg1/sprawling-agents/releases) includes prereleases, and GitHub's `releases/latest` endpoint excludes them, so pick a tag that was actually published and use its asset names, changelog and checksums. The `<release-tag>`, `<npm-version>`, `<crate-version>` and `<archive.zip>` below all have to be replaced with real values before a command runs.
 
-A Git tag, an npm version and a crate version are three different spellings, and the release workflow derives them from one version number through [kernel::Release](../crates/kernel/src/release.rs).
+A Git tag, an npm version and a crate version are three different spellings, and the release workflow derives them from one version number through [kernel::Release](../Sprawling/kernel/src/release.rs).
 
 To pin a version: `sprawling@<npm-version>` for npm/Bun, `cargo install sprawling --locked --version <crate-version>` for Cargo, and `cargo binstall sprawling --version <crate-version>` for binstall. The shell installer takes the full tag for this one invocation only:
 

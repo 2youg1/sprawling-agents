@@ -6,7 +6,7 @@
 /-!
 # gateway::dialect
 
-规定 `dialect`（`crates/gateway/src/dialect.rs`）：canonical 会话类型与各兼容格式之间的纯函数翻译，及 anthropic、openai、mismatch、images 四个同层模块。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+规定 `dialect`（`Sprawling/gateway/src/dialect.rs`）：canonical 会话类型与各兼容格式之间的纯函数翻译，及 anthropic、openai、mismatch、images 四个同层模块。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `Sprawling/gateway/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `gateway::dialect::request`、`gateway::dialect::response`、`gateway::anthropic::stream`等 旁的测试守住。
 -/
@@ -14,7 +14,7 @@
 /-!
 ### 8-1 gateway::dialect（形状 1 判定函数族）＋anthropic／openai／mismatch
 
-城内规范会话类型住 `kernel::model`（缝上类型）；canonical↔wire 翻译入口是纯函数，无 I/O。crate 内的 `StreamFrames` 持有流帧，保留与 EOF 结算契约由 `crates/gateway/spec/Endpoint/Stream.lean` §8-13 规定。
+城内规范会话类型住 `kernel::model`（缝上类型）；canonical↔wire 翻译入口是纯函数，无 I/O。crate 内的 `StreamFrames` 持有流帧，保留与 EOF 结算契约由 `Sprawling/gateway/spec/Endpoint/Stream.lean` §8-13 规定。
 
 **两家 provider 的字段知识各住各家。** 切缝是**变化的理由**：一家 provider 改了它的形状，只有它那一个文件动；而本模块顶上那句「改之前先读 provider 自己的文档」只有跟它指的那堆字段同居一处才真的被读到，所以两张文档链接表各自跟着它的 dialect 走。
 - `dialect` 的每个入口是一条 `match kind`，对 `DialectKind` 穷尽；不认得的 dialect 恒拒而不拿较近的那一家近似。跨 dialect 的断言（两向往返、float 拒收）留在这里，因为它们测的就是路由的契约。
@@ -39,18 +39,18 @@ pub(crate) fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<se
                                     // 响应侧的反方向只供测试：造 provider 回复、证往返（wire→canonical→wire 等值）；生产里没有调用者，所以不编进发行的二进制
 ```
 
-- **保三样**：①断点位——canonical 的 `cache: true` 标记翻到 Anthropic 侧＝`cache_control{type:"ephemeral"}`，system 块逐块原位，被标记的消息落在它的最后一块上（缓存区到这一块结束为止）；断点放在哪由 `runtime::prefix::BreakpointPlan` 决定，兼容格式只拼写；OpenAI 侧无显式断点（供应商缓存是隐式前缀匹配），翻译**记录性丢弃**（文档声明，不静默）；②工具形状——`ToolDef{name, description, input_schema}`↔Anthropic `tools[]`／OpenAI `tools[{type:"function",function:{…}}]`，逐字段；tool_use↔tool_calls（id/name/args 无失）；③usage——Anthropic `usage{input_tokens,output_tokens,cache_read_input_tokens,cache_creation_input_tokens}`／OpenAI `usage{prompt_tokens,completion_tokens,prompt_tokens_details.cached_tokens}`→`ModelUsage` 四整数字段加 `dialect`，缺失字段取 0。`input_tokens` 在每个兼容格式下都是整个 prompt（`crates/kernel/Spec.lean` 的 `ModelUsage`）：OpenAI 两面的 `prompt_tokens`／`input_tokens` 本就含缓存部分，照抄；Anthropic 的 `input_tokens` 只数未命中缓存的部分，解析时加上 `cache_read_input_tokens` 与 `cache_creation_input_tokens`，写回线上时减回去。`cost::settle` 按输入价计的是 `input_tokens` 减去两个缓存数。
+- **保三样**：①断点位——canonical 的 `cache: true` 标记翻到 Anthropic 侧＝`cache_control{type:"ephemeral"}`，system 块逐块原位，被标记的消息落在它的最后一块上（缓存区到这一块结束为止）；断点放在哪由 `runtime::prefix::BreakpointPlan` 决定，兼容格式只拼写；OpenAI 侧无显式断点（供应商缓存是隐式前缀匹配），翻译**记录性丢弃**（文档声明，不静默）；②工具形状——`ToolDef{name, description, input_schema}`↔Anthropic `tools[]`／OpenAI `tools[{type:"function",function:{…}}]`，逐字段；tool_use↔tool_calls（id/name/args 无失）；③usage——Anthropic `usage{input_tokens,output_tokens,cache_read_input_tokens,cache_creation_input_tokens}`／OpenAI `usage{prompt_tokens,completion_tokens,prompt_tokens_details.cached_tokens}`→`ModelUsage` 四整数字段加 `dialect`，缺失字段取 0。`input_tokens` 在每个兼容格式下都是整个 prompt（`Sprawling/kernel/Spec.lean` 的 `ModelUsage`）：OpenAI 两面的 `prompt_tokens`／`input_tokens` 本就含缓存部分，照抄；Anthropic 的 `input_tokens` 只数未命中缓存的部分，解析时加上 `cache_read_input_tokens` 与 `cache_creation_input_tokens`，写回线上时减回去。`cost::settle` 按输入价计的是 `input_tokens` 减去两个缓存数。
 - 未知 wire 字段：请求侧不产（我们只写自己声明的字段＋overrides）；响应侧忽略未知键、缺必需键报 `E_WIRE_MISMATCH`（subject 写键路径）。
 - canonical 枚举（Role／StopReason／ContentBlock）是闭的，本模块对每一支写出真实的臂；新增一支即在两种兼容格式里同时编译失败，这正是要的，所以没有 fail-closed 通配臂；wire JSON 键序＝serde_json BTreeMap 字典序（确定性，对端语义无关）。
 - `E_ENDPOINT_DIALECT_UNSUPPORTED`：DialectKind 之外的兼容格式请求（wire 探查失败）；本模块两码之外不新增。
 
 **思考块与思考强度的两侧翻译**
 
-保的第四样：**思考块。**Anthropic 侧两向逐字，`thinking`（携 `signature`）与 `redacted_thinking`（携 `data`）各自原位往返；canonical→wire→canonical 与 wire→canonical→wire 两条往返均逐字节相等。理由是 provider 官方规定而非我们的偏好：改动即 400，报文指名这两个块 cannot be modified（`crates/kernel/Spec.lean` §8-24 引原文）。
+保的第四样：**思考块。**Anthropic 侧两向逐字，`thinking`（携 `signature`）与 `redacted_thinking`（携 `data`）各自原位往返；canonical→wire→canonical 与 wire→canonical→wire 两条往返均逐字节相等。理由是 provider 官方规定而非我们的偏好：改动即 400，报文指名这两个块 cannot be modified（`Sprawling/kernel/Spec.lean` §8-24 引原文）。
 
 Chat 面的思考块由主机的拼法决定（`ChatSpelling.reasoning`，§8-17）。OpenAI 自己的规格里 assistant 消息没有推理字段，未登记的主机因此**记录性丢弃**思考块（与断点位同一规则：文档声明，不静默）。DeepSeek、Moonshot／Kimi、智谱与 OpenRouter 的文档则要求或接受把上一轮的推理原样放回 assistant 消息的 `reasoning_content`：DeepSeek 的思考模式默认开启，文档写明带 `tools` 的请求必须回传全部历史 `reasoning_content`，否则答 400——本城的每一次派活都带工具，所以在这几家主机上丢弃思考块就是第二轮必然失败。回传的只有思考文本，`signature` 恒不上这条线。canonical 记录不受影响，重放仍能从 canonical 重推出当时实发字节（dialect 是纯函数，拼法是它的参数）。入向：`reasoning` 与 `reasoning_content` 两种拼法都读成签名为空的 `Thinking`。
 
-思考字段不由 dialect 写。`ChatRequest.effort` 是城存下或这一次明说的档，实发什么由思考档的梯子（`crates/gateway/spec/Provider/Thinking.lean` §8-39）按这个（Endpoint，模型）的 offer 算出一个 `Ask`（一档，或「开启思考」，或缺席），再由 `provider::thinking::encoding` 按这一面与主机的 `EffortField`（§8-17）写进正文顶层（gateway D35）：
+思考字段不由 dialect 写。`ChatRequest.effort` 是城存下或这一次明说的档，实发什么由思考档的梯子（`Sprawling/gateway/spec/Provider/Thinking.lean` §8-39）按这个（Endpoint，模型）的 offer 算出一个 `Ask`（一档，或「开启思考」，或缺席），再由 `provider::thinking::encoding` 按这一面与主机的 `EffortField`（§8-17）写进正文顶层（gateway D35）：
 
 | 这一面（`EffortField`） | `Ask::Level(l)` | `Ask::On` | 主机 |
 |---|---|---|---|
@@ -66,7 +66,7 @@ Chat 面的思考块由主机的拼法决定（`ChatSpelling.reasoning`，§8-17
 - **一档写成哪个词只有 `Effort::as_str` 一处**：七个词与 serde 拼写相同，`minimal` 照原词写；发不发某一档给某个模型归 offer，不归兼容格式。
 - Messages API 参考页里 `effort` 只挂在 `output_config` 之下，顶层写 `effort` 是一个对侧不认的字段。Chat 面的 `reasoning_effort` 是 OpenAI 规格（`openai-openapi` 的 `CreateChatCompletionRequest`）的拼法；`reasoning:{effort}` 与 `reasoning:{enabled}` 是 OpenRouter 自己的统一参数（<https://openrouter.ai/docs/guides/best-practices/reasoning-tokens>）。
 
-**缓存后果写在这里，因为它是选型理由**：官方排错文档记明「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」。故强度住 `FrozenConfig`（`crates/kernel/Spec.lean` §8-22），Run 内不可变；实发的档由 §8-39 从已冻结的值与登记的 offer 算出，两者在 Run 内都不变。
+**缓存后果写在这里，因为它是选型理由**：官方排错文档记明「switching thinking modes, changing the effort value, and changing `budget_tokens` all invalidate message cache breakpoints」。故强度住 `FrozenConfig`（`Sprawling/kernel/Spec.lean` §8-22），Run 内不可变；实发的档由 §8-39 从已冻结的值与登记的 offer 算出，两者在 Run 内都不变。
 
 **两种缓存失效是两件事，不要合成一件。** ① **供应商侧的 message cache breakpoints**：同一个前缀字节不变，仅因请求形状变了（思考模式、effort、思考预算），对方就把已缓存的**消息**断点作废——本模块与 §8-19 守的是这一条，故强度与模型在 Run 内不得改；② **本城冻结的 system 前缀本身**：四段字节任一段变了，后续请求读到的就是另一份前缀，缓存自然落空——守它的是 runtime 侧的重算对拍（`FrozenPrefix::verified_segment_hashes`，本 crate 不参与）。一句区分：**effort 变了前缀没变，缓存仍会失效；前缀变了哪怕形状一字未改，缓存也已不同。** 顾问之所以可以动窗口而不能动模型与 effort，正是因为窗口属易变半，而这两件属①。
 

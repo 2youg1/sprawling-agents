@@ -6,9 +6,9 @@
 /-!
 # Reading：一条消息的上限，以及读端在拒绝之后停下
 
-规定 `crates/agent_protocols/src/mcp/reading.rs`（`agent_protocols::mcp::reading`）：`read_one_message`、`read_whole_message` 与 `Lines`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/agent_protocols/src/mcp/reading.rs`（`agent_protocols::mcp::reading`）：`read_one_message`、`read_whole_message` 与 `Lines`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
-一台 MCP server 或一家 harness 是外部方，它写的每个字节都是不受信任的输入，而读它的进程同时是这座城唯一的写者：内存耗尽等于历史中断（`crates/agent_protocols/Spec.lean` §8 的消息上限一条）。所以：
+一台 MCP server 或一家 harness 是外部方，它写的每个字节都是不受信任的输入，而读它的进程同时是这座城唯一的写者：内存耗尽等于历史中断（`Sprawling/agent_protocols/Spec.lean` §8 的消息上限一条）。所以：
 
 1. **上限之内的消息照常读**（`reads_a_message_within_the_ceiling`）：上限是能通过的最大消息，不是最小的被拒消息。
 2. **读出的消息不超过上限**（`a_message_read_is_within_the_ceiling`），**一条消息的前「上限 + 1」个字节里没有换行就被拒**（`refuses_past_the_ceiling`）：拒绝在对侧还在写时就到，本城不会握住一条无界的消息。
@@ -17,7 +17,7 @@
 
 模型逐字节读；Rust 按块读（`BufRead::fill_buf` 给的块，`read_whole_message` 每次 8 KiB），每读进一块就比一次上限。两者对同一份输入的判决相同：一条消息被拒，当且仅当它在换行之前已经超过上限；差别只在拒绝那一刻本城多握了至多一块，这是内存的上界，不是判决。不是 UTF-8 的消息与读不出的底层错误由 Rust 拒（`E_WIRE_MISMATCH`、`E_TOOL_UNAVAILABLE`），不在本模型里：它们不改变上面四条的任何一条。
 
-读端与调用方之间的交接是 `sync_channel(0)`：读端等调用方取走这一条才读下一条，一条连接在内存里至多握着一条读完待取的消息与一条正在读的。这是并发的事实，模型不表示线程；它由 `Lines::over` 的构造与 `mcp::stdio`、`mcp::sse` 的测试守住（`crates/agent_protocols/Spec.lean` §16）。
+读端与调用方之间的交接是 `sync_channel(0)`：读端等调用方取走这一条才读下一条，一条连接在内存里至多握着一条读完待取的消息与一条正在读的。这是并发的事实，模型不表示线程；它由 `Lines::over` 的构造与 `mcp::stdio`、`mcp::sse` 的测试守住（`Sprawling/agent_protocols/Spec.lean` §16）。
 -/
 
 namespace AgentProtocols.Mcp.Reading
@@ -39,7 +39,7 @@ inductive Outcome where
 
 /- D6 消息上限的四条决定。
 (a) 上限不是参数：签名是 `read_one_message(source, server)`，上限取自 `MESSAGE_CEILING`，不由调用方传入。一个可以由调用方选的上限，就是每个传输各选一个的上限，而拒词必须对每一台 server 报出同一个数字。测试用真实大小的输入压两边边界，不靠注入一个小上限；本模型把上限写成参数只为陈述对每一个上限都成立的性质。
-(b) 数值的推导随单图上限更新：`IMAGE_MAX_BYTES` 是 4 MiB，带 padding 的 base64 后 5,592,408 B；8 MiB 仍让一次工具答案装得下这样一张图、它的文字与 JSON-RPC 信封，但余量不再是旧值所说的 3 倍。读数与推导记在 `crates/xtask/budgets.toml` 的 `[mcp_message_ceiling]`。
+(b) 数值的推导随单图上限更新：`IMAGE_MAX_BYTES` 是 4 MiB，带 padding 的 base64 后 5,592,408 B；8 MiB 仍让一次工具答案装得下这样一张图、它的文字与 JSON-RPC 信封，但余量不再是旧值所说的 3 倍。读数与推导记在 `Tools/xtask/budgets.toml` 的 `[mcp_message_ceiling]`。
 (c) 拒绝是终止性的，不是跳过一条：超限消息未读完的尾巴与下一条消息在字节上无从分辨，所以拒绝之后调用方恒不再从同一个 source 读，传输回收子进程（`the_reader_stops_at_its_first_refusal`；被否的「跳过一条接着读」见文末 `withoutStopping_reads_a_tail_as_a_message`）。`Received` 是穷尽枚举而非 `Option<String>`：「对侧关了输出」是调用方要据以停读的状态，用缺席表示它就等于让每个调用点各自重推一遍。
 (d) 读端不排队：读端每读一条都调 `read_one_message`，读到的交给 `sync_channel(0)`，等调用方取走这一条才读下一条，于是一条连接在内存里至多握着一条读完待取的消息与一条正在读的，上界是两倍 `MESSAGE_CEILING`；再往后的字节留在子进程的管道或 TCP 的接收窗口里，那是对侧的缓冲，不是本城的。被否：`sync_channel(N)`（N > 0）多买到的只是 reader 能先读 N 条，而一次调用只取一条答案，多读的那几条只会多占 N 倍上限的内存；无界的 `channel()` 在读端慢时把内存吃光，而「慢」正是一个被工具卡住的 Run 的常态。 -/
 /-- `read_one_message`：`held` 是这条消息已读的字节，返回读出的结果与 source 里剩下的字节。

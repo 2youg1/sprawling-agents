@@ -9,7 +9,7 @@
 //! thread and keeps its own connection pool. A client built per call
 //! therefore held one thread per concurrent run and handshook again on
 //! every call, so the book keeps one [`Transport`] per endpoint and every
-//! call to that endpoint clones its client (`crates/gateway/spec/Endpoint/Transport.lean` §8-3).
+//! call to that endpoint clones its client (`Sprawling/gateway/spec/Endpoint/Transport.lean` §8-3).
 
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
@@ -31,10 +31,10 @@ use crate::concurrency::MaxInFlight;
 pub(crate) struct Transport {
     slot: Arc<OnceLock<reqwest::blocking::Client>>,
     /// The permits every model call to this endpoint waits on
-    /// (`crates/gateway/Spec.lean` §8-6).
+    /// (`Sprawling/gateway/Spec.lean` §8-6).
     gate: Arc<Gate>,
     /// The step a test takes after the client is configured and before
-    /// it is built (`crates/gateway/spec/Reach/Resolve.lean` §8-32).
+    /// it is built (`Sprawling/gateway/spec/Reach/Resolve.lean` §8-32).
     #[cfg(test)]
     detour: Option<Detour>,
 }
@@ -123,7 +123,7 @@ impl ClientShape {
 
 /// One endpoint's connection, opened before its first call so that call
 /// does not pay to resolve, connect and shake hands
-/// (`crates/gateway/spec/Endpoint/Transport.lean` D26).
+/// (`Sprawling/gateway/spec/Endpoint/Transport.lean` D26).
 ///
 /// It holds no credential, no redemption and no header a person
 /// entered, so the one request it sends cannot carry a key.
@@ -230,7 +230,7 @@ mod tests {
     const BASE: &str = "https://api.anthropic.com/v1/messages";
     const MODELS: &str = "https://api.anthropic.com/v1/models";
 
-    /// `crates/gateway/spec/Endpoint/Transport.lean` §8-35: every call to one endpoint goes out
+    /// `Sprawling/gateway/spec/Endpoint/Transport.lean` §8-35: every call to one endpoint goes out
     /// over the connection the endpoint's first call opened, so resolving,
     /// connecting and the handshake are paid once per endpoint rather than
     /// once per call. A call through another transport opens a connection
@@ -254,7 +254,7 @@ mod tests {
         );
     }
 
-    /// `crates/gateway/spec/Endpoint/Transport.lean` D26: a warm-up opens the connection the
+    /// `Sprawling/gateway/spec/Endpoint/Transport.lean` D26: a warm-up opens the connection the
     /// endpoint's first call goes out over. The stand-in has heard one
     /// request once the warm-up returns, and the call that follows comes
     /// on the same connection.
@@ -275,7 +275,7 @@ mod tests {
         );
     }
 
-    /// The reading behind `crates/gateway/spec/Endpoint/Transport.lean` §8-35: an endpoint's
+    /// The reading behind `Sprawling/gateway/spec/Endpoint/Transport.lean` §8-35: an endpoint's
     /// first and second request through one client, timed apart, over
     /// `ROUNDS` fresh clients. The difference is what the first request
     /// pays to resolve, connect and shake hands. By default it reads the

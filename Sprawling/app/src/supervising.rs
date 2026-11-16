@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Whether a served city that just ended is left down, raised again, or
-//! handed to the person (`crates/sprawling/spec/Supervising.lean` §8-109; the budget's
-//! properties are proved in `crates/sprawling/spec/Supervising.lean`).
+//! handed to the person (`Sprawling/app/spec/Supervising.lean` §8-109; the budget's
+//! properties are proved in `Sprawling/app/spec/Supervising.lean`).
 //!
 //! The decision alone: no process, no clock. `children` runs the
 //! processes, samples the time and reads a child's exit code as served

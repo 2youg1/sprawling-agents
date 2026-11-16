@@ -5,7 +5,7 @@
 
 //! Which connector tools reach effects nothing here can take back, and
 //! the rule that answers for them.
-//! The part `crates/kernel/spec/Gate.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Gate.lean` specifies this module with the
 //! rest of `kernel::gate`.
 //!
 //! Every consequential path in this city ships with a way back. A
@@ -31,7 +31,7 @@ use crate::tool::{ServerLabel, ToolName};
 use super::GateOutcome;
 
 /// The remote-name prefix this server's tools carry. It is the desktop
-/// connector's own vocabulary (`crates/desktop/Spec.lean` §8-7), quoted
+/// connector's own vocabulary (`Sprawling/desktop/Spec.lean` §8-7), quoted
 /// here because this is the side that has to recognise it.
 const REACHES_THIS_MACHINE: &str = "desktop.";
 

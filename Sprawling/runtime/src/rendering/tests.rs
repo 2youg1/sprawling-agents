@@ -55,7 +55,7 @@ fn version_one_draws_the_payload_json_the_model_read_before() {
 
 /// A `version` an earlier ledger row carries is not drawn: edit is
 /// admitted by read stamps and takes none
-/// (`crates/runtime/spec/Tools/Edit.lean` §8-64).
+/// (`Sprawling/runtime/spec/Tools/Edit.lean` §8-64).
 #[test]
 fn a_read_is_a_header_and_its_text_marked_every_ten_lines() {
     let text: String = (0..23).map(|n| format!("line {n}\n")).collect();

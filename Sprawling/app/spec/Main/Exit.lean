@@ -6,7 +6,7 @@
 /-!
 # 退出码是一张表
 
-规定 `crates/sprawling/src/main/exit.rs` 的 `Exit`，与 `crates/sprawling/src/main/calling.rs` 把 `wire_client::Unheard` 读成退出码的那一处（§8-103）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/app/src/main/exit.rs` 的 `Exit`，与 `Sprawling/app/src/main/calling.rs` 把 `wire_client::Unheard` 读成退出码的那一处（§8-103）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 退出码是给调用方（人或 agent）的一个事实，所以五个码各说一件事，任何两件不共用一个数。`Unheard` 的三种原因各落到它真正断言的那一件上：帧读不懂是命令行的错，地址上没有城与城拒绝不是一回事，握手之后断开是一次对话失败而不是没有城。
 
@@ -95,11 +95,11 @@ pub(super) fn written(err: &AxError, form: Form) -> String;
 | 3 | `Quiet` | `call` 与 `dispatch`：帧发出去了，安静窗口内什么都没回来（`Spoken::Quiet`），或城回了话而等的那一帧没来（`Spoken::Unfinished`） |
 | 4 | `NoCity` | `--at` 那里没有城在答：连不上，或连上了却没有回握手 |
 
-`Exit` 是退出码的唯一定义；数字只在 `From<Exit> for ExitCode` 里出现一次。`wire_client::call` 用 `Unheard` 说清没听到回答的原因：帧解析失败是 `Unreadable`（映射到 2），`--at` 指向别的机器又没给 `--token` 是 `Unkeyed`（映射到 2，`crates/sprawling/spec/WireClient.lean` 的钥匙文件一条），连接、发送问候或等 `Welcome` 失败是 `NoCity`（映射到 4），握手之后连接断了或本进程起不了 runtime 是 `Broken`（映射到 1）。三者都照常在 stderr 上印 `AxError` 的失败行与 recovery 行。
+`Exit` 是退出码的唯一定义；数字只在 `From<Exit> for ExitCode` 里出现一次。`wire_client::call` 用 `Unheard` 说清没听到回答的原因：帧解析失败是 `Unreadable`（映射到 2），`--at` 指向别的机器又没给 `--token` 是 `Unkeyed`（映射到 2，`Sprawling/app/spec/WireClient.lean` 的钥匙文件一条），连接、发送问候或等 `Welcome` 失败是 `NoCity`（映射到 4），握手之后连接断了或本进程起不了 runtime 是 `Broken`（映射到 1）。三者都照常在 stderr 上印 `AxError` 的失败行与 recovery 行。
 
 拒绝怎么写由 `refusal::written` 一处决定，它只管文字，不管写到哪里；调用方把结果写到 stderr。`Form::Human` 是失败行、`recovery:` 行，`AxError` 带 `nearby` 时再加一行 `nearby: a, b`，给人读的拒绝也指出附近能用的名字。`Form::Json` 是一行 `AxError` 的 serde（与 wire 上 `Refusal` 同形），反序列化回来与原值相等。`call` 带 `--json` 时用 `Form::Json`，其余调用方用 `Form::Human`。
 
-**本节接口的当前状态。** `call` 与 `dispatch` 经 `Exit` 退出；其余动词返回 `ExitCode`，经 `bin::main::city::report` 得 1。`--json` 目前只有 `call` 接受。还没做的是：其余动词的 `--json`、kernel 的命令行错误码（先改 `crates/kernel/spec/Error.lean` 的 `AxCode` 表）、以及「动词 × 模式（终端、管道、`--json`）→ 退出码与输出流」的整张表。`doctor` 已经只在 stdout 是终端且没有 `NO_COLOR` 时着色（§8-59）。
+**本节接口的当前状态。** `call` 与 `dispatch` 经 `Exit` 退出；其余动词返回 `ExitCode`，经 `bin::main::city::report` 得 1。`--json` 目前只有 `call` 接受。还没做的是：其余动词的 `--json`、kernel 的命令行错误码（先改 `Sprawling/kernel/spec/Error.lean` 的 `AxCode` 表）、以及「动词 × 模式（终端、管道、`--json`）→ 退出码与输出流」的整张表。`doctor` 已经只在 stdout 是终端且没有 `NO_COLOR` 时着色（§8-59）。
 
 **决定。**
 

@@ -46,23 +46,23 @@ fn item(source: &str, needle: &str, check: Check, blocks: Vec<Block>) -> ListIte
 /// paragraph still being said.
 #[test]
 fn a_list_a_table_and_a_code_block_read_as_their_own_blocks() {
-    let source = "- `crates/kernel`\n- **Ledger**\n\n| 步骤 | 做什么 |\n|---|---|\n| 1 | 读 |\n\n```rust\nfn main() {}\n\n```\nThen the next par";
+    let source = "- `Sprawling/kernel`\n- **Ledger**\n\n| 步骤 | 做什么 |\n|---|---|\n| 1 | 读 |\n\n```rust\nfn main() {}\n\n```\nThen the next par";
     assert_eq!(
         laid(source),
         vec![
             Block::List {
-                span: at(source, "- `crates/kernel`\n- **Ledger**"),
+                span: at(source, "- `Sprawling/kernel`\n- **Ledger**"),
                 order: Order::Bullet,
                 spacing: Spacing::Tight,
                 items: vec![
                     item(
                         source,
-                        "- `crates/kernel`",
+                        "- `Sprawling/kernel`",
                         Check::NotATask,
                         vec![paragraph(
                             source,
-                            "`crates/kernel`",
-                            vec![Inline::Code("crates/kernel".to_owned())]
+                            "`Sprawling/kernel`",
+                            vec![Inline::Code("Sprawling/kernel".to_owned())]
                         )]
                     ),
                     item(

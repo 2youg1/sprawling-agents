@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! F8: a reply one run took and never answered reaches the next run of
-//! that room (collab D8, `crates/collab/spec/Delivery.lean`
+//! that room (collab D8, `Sprawling/collab/spec/Delivery.lean`
 //! `leave_requeues`).
 //!
 //! The shape of the run that lost a reply in a test city: a resident

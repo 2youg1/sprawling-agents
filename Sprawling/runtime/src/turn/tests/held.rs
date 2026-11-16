@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The checks derived from the held-run half of
-//! `crates/runtime/spec/Turn/Durability.lean` (runtime D36), driven
+//! `Sprawling/runtime/spec/Turn/Durability.lean` (runtime D36), driven
 //! through a whole run: the lines a turn holds cross into the next
 //! turn, so each turn pays `1 + writes` barriers and the run one more at
 //! its end, a power cut at any line still leaves a prefix of the

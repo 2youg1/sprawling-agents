@@ -5,8 +5,8 @@
 
 //! The placement plan: a pure function from the processor topology the
 //! platform reported to the CPUs the hot threads may prefer
-//! (`crates/sprawling/spec/Serving/Placement/Plan.lean`, decision D45 in
-//! `crates/sprawling/spec/Serving/Placement.lean`). It calls no platform,
+//! (`Sprawling/app/spec/Serving/Placement/Plan.lean`, decision D45 in
+//! `Sprawling/app/spec/Serving/Placement.lean`). It calls no platform,
 //! so every rule is checked here on described topologies of processors
 //! this machine is not.
 

@@ -6,7 +6,7 @@
 /-!
 # calyx::console::lifecycle
 
-规定 `Calyx/src/console/lifecycle.rs`：一个服务中的进程从开城到退出走过的面，以及每一个事件在每一个面上做什么。本文件是 `crates/sprawling/Spec.lean` 的一个分部，接口与取舍写在 `crates/sprawling/spec/Console.lean` §8-11。Lean 模型是「必须守住哪些性质」的权威，Rust 是「怎样守住」的权威。
+规定 `Calyx/src/console/lifecycle.rs`：一个服务中的进程从开城到退出走过的面，以及每一个事件在每一个面上做什么。本文件是 `Sprawling/app/Spec.lean` 的一个分部，接口与取舍写在 `Sprawling/app/spec/Console.lean` §8-11。Lean 模型是「必须守住哪些性质」的权威，Rust 是「怎样守住」的权威。
 
 模型只有面与事件，没有 I/O：台子上的 `OnceLock<Closing>` 在这里是 `State.cause`，worker 写交接在这里是事件 `landed`，4 s 的时限到了是事件 `deadline`。
 
@@ -117,7 +117,7 @@ def Face.isGone : Face → Bool
 
 /-! D75 每一次 interrupt 都有时限，时限由档位决定，不是面上的一个独立字段
 
-决定：收口处在 `interrupt` 就有时限（`INTERRUPT_GRACE`，4 s），不论这次 interrupt 来自 `/quit` 后的 n、页面的「立刻停下并关闭」、`SIGTERM`、收口中的第二次请求还是终端没了；时限到了，进程不写交接退出，下一次 `serve` 的启动扫描冻结留下的 run（`crates/accounting/Spec.lean` §8-18-1）。理由：进行中的 provider 调用不是安全点，只等安全点的 interrupt 要等到调用超时（默认 120 s）才结束，人按下「立刻停下」却等了近两分钟；时限从档位得出，「interrupt 却没有时限」就写不出来。被否：①只给终端没了装时限——就是上面那两分钟；②在 interrupt 时取消进行中的 provider 调用——要改 lane 与 gateway 的取消路径，不在这一层；③给 `SIGTERM` 留给发信号的一方去限时——服务管理器的时限通常是几十秒，城卡在一次调用里时它照样等满，而 4 s 内落地的 run 照常写交接。重开参数：lane 在 interrupt 时能取消进行中的 provider 调用之后，时限只剩兜底，那时再看 4 s 是否该放长。
+决定：收口处在 `interrupt` 就有时限（`INTERRUPT_GRACE`，4 s），不论这次 interrupt 来自 `/quit` 后的 n、页面的「立刻停下并关闭」、`SIGTERM`、收口中的第二次请求还是终端没了；时限到了，进程不写交接退出，下一次 `serve` 的启动扫描冻结留下的 run（`Sprawling/accounting/Spec.lean` §8-18-1）。理由：进行中的 provider 调用不是安全点，只等安全点的 interrupt 要等到调用超时（默认 120 s）才结束，人按下「立刻停下」却等了近两分钟；时限从档位得出，「interrupt 却没有时限」就写不出来。被否：①只给终端没了装时限——就是上面那两分钟；②在 interrupt 时取消进行中的 provider 调用——要改 lane 与 gateway 的取消路径，不在这一层；③给 `SIGTERM` 留给发信号的一方去限时——服务管理器的时限通常是几十秒，城卡在一次调用里时它照样等满，而 4 s 内落地的 run 照常写交接。重开参数：lane 在 interrupt 时能取消进行中的 provider 调用之后，时限只剩兜底，那时再看 4 s 是否该放长。
 -/
 
 /-- 收口有没有时限：每一次 interrupt 都有，drain 没有（D75）。 -/

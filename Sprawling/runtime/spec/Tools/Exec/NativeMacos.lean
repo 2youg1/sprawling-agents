@@ -7,7 +7,7 @@
 # runtime::tools::exec::native_macos
 
 ## 1 需求分解
-规定 `crates/runtime/src/tools/exec/native_macos.rs`：Seatbelt 只允许副本路径写入，
+规定 `Sprawling/runtime/src/tools/exec/native_macos.rs`：Seatbelt 只允许副本路径写入，
 禁止网络，显式选择失败时拒绝。聚合内存、树级终止与独立身份不由 Seatbelt 提供。
 
 ## 2 验收标准

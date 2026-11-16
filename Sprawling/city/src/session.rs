@@ -10,7 +10,7 @@
 //! calls and the effort it thinks with into the room's own
 //! `CONFIG.toml`, and every later run in that room refuses to move them,
 //! because a provider caches a conversation's prefix only for as long as
-//! the shape of the calls behind it stays put (`crates/city/spec/ConfigLayers.lean` §8-14).
+//! the shape of the calls behind it stays put (`Sprawling/city/spec/ConfigLayers.lean` §8-14).
 //! That refusal is right, and it needs a counterweight, or a person who
 //! changed the model could never dispatch into that room again. Starting
 //! a new session is that counterweight.
@@ -37,7 +37,7 @@
 //! is `None` — stays the only authority on that; this module only clears
 //! the slot.
 //!
-//! Specified by `crates/city/spec/Session.lean` §8-14b.
+//! Specified by `Sprawling/city/spec/Session.lean` §8-14b.
 
 use std::path::Path;
 
@@ -52,7 +52,7 @@ use crate::spine_files;
 /// The two halves are [`forget_shape`] and
 /// [`crate::spine_files::clear_handoff`], and this is the call that keeps
 /// them together: it is what `Command::OpenSession` with
-/// `Carry::Nothing` performs (`crates/sprawling/Spec.lean` §8-82).
+/// `Carry::Nothing` performs (`Sprawling/app/Spec.lean` §8-82).
 ///
 /// # Errors
 /// Propagates a room configuration that exists and cannot be read or

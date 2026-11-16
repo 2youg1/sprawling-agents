@@ -114,7 +114,7 @@ private def waits (door : Door) (port : Port) (serving : Serving) : Nat → IO B
       | _ => waits door port serving tries
 
 /-- How a served city leaves once the action against it is done
-(crates/adversary/Spec.lean D8). -/
+(Tools/adversary/Spec.lean D8). -/
 inductive Leaving where
   /-- Terminated, with no handoff: the crash the acceptance walk takes, and
   every ground of the tree, which reads nothing a handoff would write. -/
@@ -345,7 +345,7 @@ second answer would be believed about a line nothing had tested.
 
 The file names are the ones `Ground.stored` read, which is the same assumption
 `corrupt`, `tear` and `duplicate` already make about the layout:
-`crates/adversary/Spec.lean` section 14 records it. -/
+`Tools/adversary/Spec.lean` section 14 records it. -/
 def Ground.putBack (ground : Ground) (saved : List (String × ByteArray)) : IO Unit := do
   for (name, bytes) in saved do
     IO.FS.writeBinFile (ground.ledger / name) bytes

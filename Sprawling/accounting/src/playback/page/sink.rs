@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The sink html5ever's tree builder builds a playback page into
-//! (`crates/accounting/spec/Playback/Check.lean` §8-13): one table of nodes in the order the parser
+//! (`Sprawling/accounting/spec/Playback/Check.lean` §8-13): one table of nodes in the order the parser
 //! made them, each element with its parent and the text appended into it.
 
 use std::borrow::Cow;

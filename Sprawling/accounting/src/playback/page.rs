@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A playback page read the way a browser's parser builds it, the bundle
-//! it carries, and the references it makes (`crates/accounting/spec/Playback/Check.lean` §8-13).
+//! it carries, and the references it makes (`Sprawling/accounting/spec/Playback/Check.lean` §8-13).
 //!
 //! The page goes through html5ever's tree builder, so an element inside
 //! `<svg>`, a `<noscript>` or a `<template>` is the element a browser
@@ -44,7 +44,7 @@ pub fn embed(template: &[u8], bundle: &Bundle) -> Result<Vec<u8>, AxError> {
         AxError::failure(AxCode::InvalidArgs, "embed a playback bundle", subject).with_recovery(
             "write the template as UTF-8 HTML with one empty playback-bundle block, a \
              Content-Security-Policy first in its head, and nothing it loads from outside \
-             (crates/city/skills/playback/SKILL.md)",
+             (Sprawling/city/skills/playback/SKILL.md)",
         )
     };
     let text = std::str::from_utf8(template)

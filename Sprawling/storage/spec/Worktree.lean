@@ -6,7 +6,7 @@
 /-!
 # storage::worktree
 
-规定 `worktree`、`worktree::name`、`worktree::lease`、`worktree::sweep`、`worktree::trees`、`worktree::trees::kept`、`worktree::landing`、`worktree::weight`、`reserved`（`crates/storage/src/` 下同名的文件）。一个节点一棵工作树，对象共享而文件不共享：领、还、再领、开城清扫、合并，以及领树的文件操作计数；`reserved` 是这里与 checkpoint 共用的「哪些字节属于人」的唯一谓词。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
+规定 `worktree`、`worktree::name`、`worktree::lease`、`worktree::sweep`、`worktree::trees`、`worktree::trees::kept`、`worktree::landing`、`worktree::weight`、`reserved`（`Sprawling/storage/src/` 下同名的文件）。一个节点一棵工作树，对象共享而文件不共享：领、还、再领、开城清扫、合并，以及领树的文件操作计数；`reserved` 是这里与 checkpoint 共用的「哪些字节属于人」的唯一谓词。本文件是 `Sprawling/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `Sprawling/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
 -/
 
 /-!
@@ -134,11 +134,11 @@ pub struct FileWork { pub created: u64, pub rewritten: u64, pub removed: u64, pu
 impl WorktreeLease { pub fn work(&self) -> FileWork; }   // 领这棵树花了文件系统什么
 ```
 
-- **四个数各数一件事。** `created`：在没有文件的名字上写下的文件；`rewritten`：因为与该有的内容不同而改写的文件；`removed`：删掉的目录项，一个目录连同里面的东西算一项；`walked`：读过的目录项。新建目录不计，因为实时扫描等的是文件。`FileWork` 也是 runtime 沙箱副本的计数（`crates/runtime/Spec.lean` §8-13-2），一个值、一处定义。
+- **四个数各数一件事。** `created`：在没有文件的名字上写下的文件；`rewritten`：因为与该有的内容不同而改写的文件；`removed`：删掉的目录项，一个目录连同里面的东西算一项；`walked`：读过的目录项。新建目录不计，因为实时扫描等的是文件。`FileWork` 也是 runtime 沙箱副本的计数（`Sprawling/runtime/Spec.lean` §8-13-2），一个值、一处定义。
 - **门是计数，墙钟只是读数。** 放置一棵 512 个 16 KB 文件的树 p50 约 0.9 s，等的是实时扫描对新建文件的放行，不是磁盘，也不是本 crate 的计算；墙钟随扫描器与机器变，计数不变。`trees::kept::tests` 的 `claiming_a_tree_costs_what_it_places_and_restores` 在 N 与 2N 个文件的城上各领一次、再领一次，断言四个数；墙钟与 RSS 以毫秒、MiB 记进 `budgets.toml`，不设门。
 - **放置（新建一棵）。** 称城的工作树一遍（`walked` 是城的目录项数，`.git` 与 reserved 两个不下探的目录各算一项），全量检出（`created` 是树里的文件数，子模块不算），`rewritten` 与 `removed` 为 0。树的 `disk` 取检出刚写下的索引：libgit2 每写一个文件就 lstat 它，把大小记进索引项，所以各项大小之和就是量出来的字节，不必再走一遍新树。被否：检出后再 `measure` 新树——多读一遍 N 个目录项，而新树里只有检出写下的文件。索引项的大小是 32 位（git 索引格式），4 GiB 及以上的单个文件记成取模后的值，`disk` 随之偏小；`disk` 只进 `worktree_opened` 的读数，不参与任何判定。
 - **再领（留着的树）。** `created`、`rewritten`、`removed` 取 scope 内检出的通知（`CheckoutNotificationType::UPDATED` 与 `UNTRACKED`，libgit2 在改盘之前逐项告知）：目标没有的已跟踪文件算 `removed`，盘上没有的算 `created`，其余算 `rewritten`，被删的未跟踪项算 `removed`。所以一次什么都没变的再领这三个数都是 0，一个 run 在 scope 里改了一个文件、多留了一个文件，下一次再领就是 1、0、1。`walked` 是 `disk` 那一遍全树称重，随树的大小长：树里可能有 scope 之外、上一次 run 留下的未跟踪文件（构建产物），只有走一遍才量得到。取消这一遍要么让 `disk` 只报已跟踪的字节，要么把它改成估计值，两者都改了 `worktree_opened` 的含义。**重开参数**：`disk` 不再需要是量出来的值时。
-- **首次放置的树是整棵的。** git2 不把 `checkout_options` 暴露成安全接口（8-9）；而且 run 会读 scope 之外的文件，`exec` 里的编译器经真实文件系统读依赖，按需放置必须覆盖这些读取，缩到 scope 会让它们读不到。整棵树的文件在备树时写下（8-35），放置接管备树时只写干线自备树以来改过的文件；没有备树可接管时放置全量检出，`created` 是树里的文件数。沙箱副本的缩减另见 `crates/runtime/Spec.lean` §8-13-2、runtime D10。不用硬链接把树「放」成共享文件：共享可写文件的两棵树不是彼此隔离的两棵树，一边的写入会出现在另一边，而且链接计数大于 1 的文件在 `alias` 那里一律拒写（8-25）。
+- **首次放置的树是整棵的。** git2 不把 `checkout_options` 暴露成安全接口（8-9）；而且 run 会读 scope 之外的文件，`exec` 里的编译器经真实文件系统读依赖，按需放置必须覆盖这些读取，缩到 scope 会让它们读不到。整棵树的文件在备树时写下（8-35），放置接管备树时只写干线自备树以来改过的文件；没有备树可接管时放置全量检出，`created` 是树里的文件数。沙箱副本的缩减另见 `Sprawling/runtime/Spec.lean` §8-13-2、runtime D10。不用硬链接把树「放」成共享文件：共享可写文件的两棵树不是彼此隔离的两棵树，一边的写入会出现在另一边，而且链接计数大于 1 的文件在 `alias` 那里一律拒写（8-25）。
 -/
 
 /-!

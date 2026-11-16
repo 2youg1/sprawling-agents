@@ -16,7 +16,7 @@
 // blocks are the stretches between its blank lines - it has no blank
 // line inside a code block - so a block closes where the blank line
 // after it arrives, which is the city's closure point for this reply
-// (`crates/documents/Spec.lean` D31) but for its heading, which the
+// (`Sprawling/documents/Spec.lean` D31) but for its heading, which the
 // city closes one line earlier. Each block is drawn with the element
 // `refrain/laid.svelte` gives its kind. The two shapes run interleaved,
 // so a slow moment lands on both.
@@ -27,9 +27,9 @@ const ROUNDS = 7;
 const SECTION = [
   "Reading the city first, then the plan it asks for.",
   "",
-  "- `crates/kernel` holds the **Ledger** and every rule on it",
-  "- `crates/runtime` drives a turn",
-  "- `crates/sprawling` wires the two together",
+  "- `Sprawling/kernel` holds the **Ledger** and every rule on it",
+  "- `Sprawling/runtime` drives a turn",
+  "- `Sprawling/app` wires the two together",
   "",
   "| step | what | where |",
   "|---|---|---|",

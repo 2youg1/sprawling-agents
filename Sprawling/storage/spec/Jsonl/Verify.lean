@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.kernel.spec.Ledger
+import Sprawling.kernel.spec.Ledger
 
 /-!
 # storage::jsonl::verify
 
-规定 `jsonl::verify`（`crates/storage/src/` 下同名的文件）。账本的每个读者走一行的同一份检查 `LineCheck`，以及 `open` 对一行故障的处置。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
+规定 `jsonl::verify`（`Sprawling/storage/src/` 下同名的文件）。账本的每个读者走一行的同一份检查 `LineCheck`，以及 `open` 对一行故障的处置。本文件是 `Sprawling/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `Sprawling/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
 -/
 
 /-!
@@ -37,7 +37,7 @@ impl LineFault { pub fn into_ax(self, line_no: u64) -> AxError; }  // 整本读�
 ```
 
 - 判定顺序：信封（`v` 经 `readable_log_v`）→ `prev` → `seq` → kind 二分（借用判定，不 clone）→ 已知 kind 的类型解析与规范回写比对；`ig:true` 的未知 kind 不解析但照样入链。
-- `open` 对故障的处置：`VersionAhead`／`NotAVersion` 按版本拒；`NotALine` 且其后无带信封的行＝撕裂，截断（`carries_envelope` 把一串零当作预分配的空间而不是行的一部分，只判最后一个零之后的字节，所以零之后的记录算作「其后带信封的行」，见 `crates/storage/spec/Jsonl/Preallocate.lean`）；其余一律拒而不截——撕裂不会留下带信封的行，截掉它等于删掉合法历史。
+- `open` 对故障的处置：`VersionAhead`／`NotAVersion` 按版本拒；`NotALine` 且其后无带信封的行＝撕裂，截断（`carries_envelope` 把一串零当作预分配的空间而不是行的一部分，只判最后一个零之后的字节，所以零之后的记录算作「其后带信封的行」，见 `Sprawling/storage/spec/Jsonl/Preallocate.lean`）；其余一律拒而不截——撕裂不会留下带信封的行，截掉它等于删掉合法历史。
 - 被否：两个读者各持一份检查。只做类型解析的 `open` 会把一条链续正确的 `ig:true` 行在尾段当撕裂截掉，而 `replay` 收下同一行。
 - 被否：前段末行只做类型解析。`EventRecord` 的 kind 没有「未知」这一臂，一条 `ig:true` 的新 kind 行若恰是前段的最后一行，类型解析拒它，城就打不开，而尾段扫描与 `replay` 都收下同一行（`jsonl/boundary/tests.rs` 的 `a_prior_segment_ending_in_an_ignorable_line_opens`）。代价：前段末行若不是写者规范的字节，`open` 现在也拒；那样的行 `replay` 本来就拒。
 -/
@@ -45,7 +45,7 @@ impl LineFault { pub fn into_ax(self, line_no: u64) -> AxError; }  // 整本读�
 /-!
 ## 模型：一行的判定、一串行的链，与 `open` 对一行故障的处置
 
-一行在判定里露出的只有信封的几个字段与它自己的字节：`v` 经 `readable_log_v` 的回答、`seq`、`prev`、kind 落在哪一类，以及这一行的文字（它的 `chain_hash` 由 `hash` 给出，`hash` 就是 `kernel::ledger::chain_hash`，与 `crates/kernel/spec/Ledger.lean` 一样留作参数，这里不计算任何摘要）。JSON 能不能解析、规范回显是不是逐字节相同，模型各缩成一位：`Raw.notALine` 与 `Kind.known false`。
+一行在判定里露出的只有信封的几个字段与它自己的字节：`v` 经 `readable_log_v` 的回答、`seq`、`prev`、kind 落在哪一类，以及这一行的文字（它的 `chain_hash` 由 `hash` 给出，`hash` 就是 `kernel::ledger::chain_hash`，与 `Sprawling/kernel/spec/Ledger.lean` 一样留作参数，这里不计算任何摘要）。JSON 能不能解析、规范回显是不是逐字节相同，模型各缩成一位：`Raw.notALine` 与 `Kind.known false`。
 
 四条性质：
 

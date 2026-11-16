@@ -6,7 +6,7 @@
 /-!
 # fan-in：写的人不验自己的活
 
-规定 `crates/collab/src/fanin.rs`（`collab::fanin`）与 `crates/collab/src/pr.rs`（`collab::pr`）的判定。Rust 代码是「怎样守住」的权威：`Artifact` 没有公开构造子，`Pr<Open>` 拿不到验证者的名字，两条都由 `crates/collab/tests/ui/` 的编译失败反例钉住。本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/collab/src/fanin.rs`（`collab::fanin`）与 `Sprawling/collab/src/pr.rs`（`collab::pr`）的判定。Rust 代码是「怎样守住」的权威：`Artifact` 没有公开构造子，`Pr<Open>` 拿不到验证者的名字，两条都由 `Sprawling/collab/tests/ui/` 的编译失败反例钉住。本模型是「必须守住哪些性质」的权威。
 
 未验证的产出是 `Claim`；`Claim.verified` 是造出 `Artifact` 的唯一一处。汇合（`FanIn`）只收 `Artifact`，于是「Claim 进汇合」在 Rust 的类型层拼不出来。这里把那条唯一的路写成函数，性质都说它的输出：
 

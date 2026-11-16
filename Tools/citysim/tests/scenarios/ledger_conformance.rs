@@ -33,7 +33,7 @@ fn draft(kind: EventKind, t: u64, who: &str) -> EventDraft {
     }
 }
 
-/// The fixed script behind crates/fixtures/golden-s1: breadth over addr, ig and
+/// The fixed script behind Tools/fixtures/golden-s1: breadth over addr, ig and
 /// payload shapes. Never edit without regenerating the fixture (see
 /// golden_fixture below).
 fn fixture_script() -> Vec<EventDraft> {

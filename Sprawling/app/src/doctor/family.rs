@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A browser is an engine, and an engine has many brands
-//! (`crates/sprawling/spec/Doctor.lean` §8-57).
+//! (`Sprawling/app/spec/Doctor.lean` §8-57).
 //!
 //! One row per engine family, not one row per vendor: a machine with
 //! Zen on it has a Gecko browser, and a doctor that asks for `firefox`

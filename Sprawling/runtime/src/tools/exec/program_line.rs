@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A command line read without a shell: one program and its arguments
-//! (`crates/runtime/spec/Tools/Exec.lean` §8-13-4, D118).
+//! (`Sprawling/runtime/spec/Tools/Exec.lean` §8-13-4, D118).
 //!
 //! A building that offers no shell still runs `command`, as the program
 //! its first word names. The grammar is the part of a shell's that

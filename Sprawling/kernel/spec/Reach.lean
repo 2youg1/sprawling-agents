@@ -6,7 +6,7 @@
 /-!
 # kernel::reach
 
-规定 `kernel::reach`（`crates/kernel/src/reach.rs`）：一次调用停在哪一段。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::reach`（`Sprawling/kernel/src/reach.rs`）：一次调用停在哪一段。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状由 Rust 的类型与 `kernel::reach` 旁的测试守住。
 -/

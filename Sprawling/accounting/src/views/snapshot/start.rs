@@ -4,13 +4,13 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Where a fold a snapshot holds starts: after the snapshot, or from
-//! genesis and why, and the snapshot a start cuts (`crates/sprawling/Spec.lean` §8-91);
+//! genesis and why, and the snapshot a start cuts (`Sprawling/app/Spec.lean` §8-91);
 //! and where two such folds start together, on one pass (8-122).
 //!
 //! Held beside the views rather than in the assembly point, which also
 //! starts the worker's standing from it: a one-shot read starts the views
 //! here through `Views::rebuild`, and the read side never names the
-//! assembly point (`crates/sprawling/Spec.lean` §8-92).
+//! assembly point (`Sprawling/app/Spec.lean` §8-92).
 
 use std::path::{Path, PathBuf};
 
@@ -62,7 +62,7 @@ pub fn snapshot_dir<F: SnapshotFold>(city_root: &Path) -> PathBuf {
 }
 
 /// Where the city at `city_root` keeps its verified prefix records
-/// (`crates/storage/Spec.lean` §8-30): the one spelling of that path.
+/// (`Sprawling/storage/Spec.lean` §8-30): the one spelling of that path.
 pub fn proof_dir(city_root: &Path) -> PathBuf {
     CityLayout::new(city_root).snapshot().join("verified")
 }
@@ -92,7 +92,7 @@ pub enum FoldStart {
     /// From genesis, and why the snapshot was not used.
     Whole(WholeFold),
     /// From genesis on the pass another fold needed from genesis; this
-    /// fold's own snapshot was not used (`crates/sprawling/Spec.lean` §8-122).
+    /// fold's own snapshot was not used (`Sprawling/app/Spec.lean` §8-122).
     Alongside,
 }
 
@@ -120,7 +120,7 @@ enum Resuming {
 /// The one start behind [`start`] and [`start_audited`]: from the
 /// snapshot when one fits, proving the chain first when `resuming` says
 /// so; from genesis otherwise, where the whole fold checks every line and
-/// a proof would check each a second time (`crates/accounting/spec/Views/Snapshot.lean` §8-19).
+/// a proof would check each a second time (`Sprawling/accounting/spec/Views/Snapshot.lean` §8-19).
 fn begin<F: SnapshotFold>(ledger_dir: &Path, resuming: Resuming) -> Result<Audited<F>, AxError> {
     let city_root = city_root_of(ledger_dir);
     let (started, proved) = match storage::start_from_snapshot(
@@ -152,7 +152,7 @@ fn begin<F: SnapshotFold>(ledger_dir: &Path, resuming: Resuming) -> Result<Audit
 
 /// A start from a proved history, and how many lines were checked one by
 /// one on the way there: the proof's and the fold's together
-/// (`crates/accounting/spec/Views/Snapshot.lean` §8-19).
+/// (`Sprawling/accounting/spec/Views/Snapshot.lean` §8-19).
 pub struct Audited<F> {
     pub started: Started<F>,
     pub lines_checked: u64,
@@ -161,11 +161,11 @@ pub struct Audited<F> {
 /// [`start`] from a proved history, so a start from the snapshot never
 /// accepts a chain a whole fold would refuse: the snapshot's fit checks
 /// only the line at its seq, and the ledger open scans only the last
-/// segment (`crates/sprawling/Spec.lean` §8-101). Before resuming, the whole chain is
+/// segment (`Sprawling/app/Spec.lean` §8-101). Before resuming, the whole chain is
 /// proved with the city's verified prefix records, read and never
 /// written: a one-shot read does not write to the disk. From genesis the
 /// whole fold checks every line through the same `LineCheck`, which is
-/// the proof's verdict, so no separate proof runs (`crates/accounting/spec/Views/Snapshot.lean`
+/// the proof's verdict, so no separate proof runs (`Sprawling/accounting/spec/Views/Snapshot.lean`
 /// §8-19).
 ///
 /// # Errors

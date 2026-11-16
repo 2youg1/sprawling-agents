@@ -42,7 +42,7 @@ fn shelved(city_root: &std::path::Path) -> Vec<(String, String)> {
 
 /// A new city has every built-in skill on its library shelf, under the
 /// `shipped` section, and a second forming - refused, because history
-/// starts once - leaves that shelf as it was (`crates/city/spec/Library/Install.lean`
+/// starts once - leaves that shelf as it was (`Sprawling/city/spec/Library/Install.lean`
 /// §8-28c, city D20).
 #[test]
 fn a_formed_city_has_every_shipped_skill_on_its_shelf() {
@@ -60,7 +60,7 @@ fn a_formed_city_has_every_shipped_skill_on_its_shelf() {
 
 /// Forming writes one `skill_shelved` per shipped skill, after line zero,
 /// whose digest is the whole-package hash the shelf holds and whose
-/// source is `Shipped` (kernel D23, `crates/city/spec/Library/Install.lean` §8-28c).
+/// source is `Shipped` (kernel D23, `Sprawling/city/spec/Library/Install.lean` §8-28c).
 #[test]
 fn a_formed_city_records_each_shipped_skill_it_shelved() {
     use kernel::event::record::{ShelvedFrom, SkillShelved};

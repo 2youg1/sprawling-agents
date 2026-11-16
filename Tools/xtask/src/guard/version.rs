@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The version every one of the workspace's own packages is pinned to
-//! (crates/xtask/Spec.lean §8-49).
+//! (Tools/xtask/Spec.lean §8-49).
 //!
 //! `[workspace.package] version` is the one authority for which release
 //! this tree is. A path dependency cannot be published without a

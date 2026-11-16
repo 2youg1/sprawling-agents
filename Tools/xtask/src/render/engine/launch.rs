@@ -5,7 +5,7 @@
 
 //! One engine process from start to finish: what it wrote to stdout,
 //! where its stderr went, how long it may take, and what happens to the
-//! helper processes it leaves behind (crates/xtask/Spec.lean §8-44).
+//! helper processes it leaves behind (Tools/xtask/Spec.lean §8-44).
 //!
 //! A Chromium-family engine starts helper processes that inherit its
 //! stdout and may outlive it. Reading stdout to its end, as

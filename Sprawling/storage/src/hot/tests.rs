@@ -278,7 +278,7 @@ fn iteration_is_runid_ordered_not_insertion_ordered() {
     assert_eq!(seen, ids);
 }
 
-/// One record of the `waiting` fold, as `crates/storage/spec/Hot.lean`'s
+/// One record of the `waiting` fold, as `Sprawling/storage/spec/Hot.lean`'s
 /// `Line` names it: which of two rooms a start waits on, and its deadline.
 #[derive(Debug, Clone, Copy)]
 enum Line {

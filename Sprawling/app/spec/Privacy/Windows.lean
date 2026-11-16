@@ -8,7 +8,7 @@
 规定 `bin::privacy::windows` 及其三个适配器 `bin::privacy::windows::registry`、
 `bin::privacy::windows::environment`、`bin::privacy::windows::task`，以及
 `bin::privacy::elevation`。本节是平台接口说明，不是形式证明：适配器只读写控制表给出的目标，
-是否写、写什么、写后怎样判定由 crates.sprawling.spec.Privacy 的 plan 与 Step 决定。
+是否写、写什么、写后怎样判定由 Sprawling.app.spec.Privacy 的 plan 与 Step 决定。
 
 四种 operation kind：
 - registry_value_hklm 与 registry_value_hkcu：winreg 的安全原始值接口，64 位视图

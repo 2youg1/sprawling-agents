@@ -7,7 +7,7 @@
 //! `ToolMeta` is the eight-field registration: a tool without a complete
 //! meta is invisible to the model. `effect` decides which gate a call
 //! passes; `temporal` decides whether its envelope carries a clock stamp.
-//! The part `crates/kernel/spec/Tool.lean` specifies this module.
+//! The part `Sprawling/kernel/spec/Tool.lean` specifies this module.
 
 use serde::{Deserialize, Serialize};
 
@@ -63,7 +63,7 @@ impl std::fmt::Display for ToolName {
 }
 
 /// A namespace the catalog files the city's own tools under
-/// (`crates/runtime/spec/Catalog.lean` §8-60).
+/// (`Sprawling/runtime/spec/Catalog.lean` §8-60).
 ///
 /// An external server's label is the namespace of every tool it offers,
 /// so a server labelled with one of these would have its tools listed
@@ -244,7 +244,7 @@ pub enum Effect {
     },
     /// Moves money. No tool in this build declares it; the bench refuses
     /// it with `E_TOOL_UNAVAILABLE`, so the first tool that does meets a
-    /// door rather than a gap (`crates/runtime/spec/Tools.lean`).
+    /// door rather than a gap (`Sprawling/runtime/spec/Tools.lean`).
     Spend,
 }
 
@@ -270,7 +270,7 @@ pub enum CostTier {
 ///
 /// `Signal` and `Delegate` carry nothing for the same reason: who a
 /// letter goes to and which room takes the work are per call, so a page
-/// reads them from the call's arguments (`crates/kernel/spec/Tool.lean`
+/// reads them from the call's arguments (`Sprawling/kernel/spec/Tool.lean`
 /// D37).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -379,11 +379,11 @@ pub enum GateSubject {
 /// second adapter: citysim scripted tools.
 ///
 /// `Send`, because a bench of tools is driven on a pool thread rather
-/// than on the thread that built it (`crates/sprawling/Spec.lean` §8-44). A tool that
+/// than on the thread that built it (`Sprawling/app/Spec.lean` §8-44). A tool that
 /// holds something a thread cannot give up has no place on a bench.
 ///
 /// `Sync`, and `invoke` takes `&self`, because the read-only calls at
-/// the head of a wave run at the same time (`crates/runtime/Spec.lean` §8-3), so one
+/// the head of a wave run at the same time (`Sprawling/runtime/Spec.lean` §8-3), so one
 /// tool can be inside `invoke` on several threads at once. A tool with
 /// state of its own keeps that state behind its own lock.
 pub trait Tool: Send + Sync {
@@ -415,7 +415,7 @@ pub trait Tool: Send + Sync {
     /// [`Effect::Read`] for an operation that only reads the rules, so a
     /// run can see what it is judged by while every operation that
     /// rewrites them still meets the Govern refusal
-    /// (`crates/kernel/spec/Gate.lean` D26).
+    /// (`Sprawling/kernel/spec/Gate.lean` D26).
     ///
     /// # Errors
     /// Refuses arguments this tool cannot read - the same refusal its

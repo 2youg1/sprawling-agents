@@ -6,7 +6,7 @@
 //! The `[search]` table as a file spells it, in `SearchSection`; what a
 //! value may say is [`super::check`]'s answer.
 //!
-//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4c.
+//! Specified by `Sprawling/city/spec/ConfigLayers.lean` §8-4c.
 
 use std::path::Path;
 

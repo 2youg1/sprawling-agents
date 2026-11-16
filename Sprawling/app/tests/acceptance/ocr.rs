@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The OCR tool (`crates/sprawling/Spec.lean` §8-142). It is offered only to a city
+//! The OCR tool (`Sprawling/app/Spec.lean` §8-142). It is offered only to a city
 //! that chose a model for `ocr`, and the two catalogue tests choose
 //! none, so the tool is covered here by cities of its own.
 
@@ -17,7 +17,7 @@ use crate::script::Step;
 const READ: &str = "KILN 1280";
 
 /// The model the person chose for `ocr`: the row of the built-in
-/// catalogue that is registered as reading pictures (`crates/sprawling/Spec.lean`
+/// catalogue that is registered as reading pictures (`Sprawling/app/Spec.lean`
 /// §8-142 says why it has to be that row).
 const EYES: &str = "claude-sonnet";
 

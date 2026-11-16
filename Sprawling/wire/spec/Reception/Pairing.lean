@@ -6,7 +6,7 @@
 /-!
 # wire::reception::pairing
 
-规定 `reception::pairing`（`crates/wire/src/` 下同名的文件）。这台电脑上的这扇门对浏览器的状态：终端上的配对码、`/web` 交出的开页码、挑战用的 nonce、配过对的设备钥与活着的会话令牌。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `reception::pairing`（`Sprawling/wire/src/` 下同名的文件）。这台电脑上的这扇门对浏览器的状态：终端上的配对码、`/web` 交出的开页码、挑战用的 nonce、配过对的设备钥与活着的会话令牌。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 -/
 
 /-!

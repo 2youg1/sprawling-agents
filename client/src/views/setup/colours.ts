@@ -5,7 +5,7 @@
 
 // The colour page's logic: the tokens it offers, how the person's
 // override is worn and taken off, and the legibility it warns about
-// (roadmap CT, `crates/wire/spec/Preference.lean` D29).
+// (roadmap CT, `Sprawling/wire/spec/Preference.lean` D29).
 //
 // **The theme is read off the page, never copied.** The theme is
 // compiled into the bundle, so the running page has no file to open;

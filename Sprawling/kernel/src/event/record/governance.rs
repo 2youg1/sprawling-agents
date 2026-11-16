@@ -144,7 +144,7 @@ fn city_wide() -> Scope {
 /// The two words a `city_halted` record carries are spelled here and
 /// nowhere else, so every fold reads an unrecognised word the same way;
 /// constants compared by hand at each fold let one read it as a release
-/// while another ignored the line (`crates/sprawling/Spec.lean` §8-74).
+/// while another ignored the line (`Sprawling/app/Spec.lean` §8-74).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -182,7 +182,7 @@ pub struct GovernedDocumentWritten {
     pub bytes: usize,
     /// The identity version the city has once this write landed: the
     /// receipt a page waits for before it calls a save saved
-    /// (`crates/kernel/spec/Event/Record.lean` §8-79). Absent for `CLERK.md`, which names nobody,
+    /// (`Sprawling/kernel/spec/Event/Record.lean` §8-79). Absent for `CLERK.md`, which names nobody,
     /// and in lines written before the key existed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]

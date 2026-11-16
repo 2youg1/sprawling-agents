@@ -7,7 +7,7 @@
 // length budget that file sits at. Opening and replacing the key only
 // ask: the city prints a code on its own console and answers
 // `E_APPROVAL_PENDING`, and the code comes back in `confirmRemoteDoor`
-// (`crates/remote_access/Spec.lean` D4). Closing needs no code.
+// (`Sprawling/remote_access/Spec.lean` D4). Closing needs no code.
 
 import { mintIdem } from "../idem";
 import type { Command } from "../../wire";

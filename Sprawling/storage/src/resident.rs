@@ -5,10 +5,10 @@
 
 //! The working set read back from disk: a cache with a byte budget,
 //! trimmed from its oldest entry, that holds nothing for a frozen run
-//! (`crates/storage/Spec.lean` §8-40).
+//! (`Sprawling/storage/Spec.lean` §8-40).
 //!
 //! The properties it keeps are proved in
-//! `crates/sprawling/spec/Serving/Memory.lean` §8-173: the resident bytes
+//! `Sprawling/app/spec/Serving/Memory.lean` §8-173: the resident bytes
 //! never exceed the budget, a frozen run holds nothing, and every read
 //! answers the bytes on disk, an evicted entry's included. The budget
 //! counts bytes rather than entries because entries differ in size by

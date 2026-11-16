@@ -3,40 +3,40 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.accounting.spec.Clock
-import crates.accounting.spec.Connectors
-import crates.accounting.spec.Effect
-import crates.accounting.spec.Guide
-import crates.accounting.spec.HeldVault
-import crates.accounting.spec.Home
-import crates.accounting.spec.Machine
-import crates.accounting.spec.Models
-import crates.accounting.spec.Person
-import crates.accounting.spec.PlanView
-import crates.accounting.spec.Playback
-import crates.accounting.spec.Playback.Check
-import crates.accounting.spec.Playback.Project
-import crates.accounting.spec.Playback.Select
-import crates.accounting.spec.Playback.Traced
-import crates.accounting.spec.Trace
-import crates.accounting.spec.Views
-import crates.accounting.spec.Views.Answering.Github
-import crates.accounting.spec.Views.Document
-import crates.accounting.spec.Views.Rounds
-import crates.accounting.spec.Views.Snapshot
-import crates.accounting.spec.Views.Usage
-import crates.accounting.spec.Worker
-import crates.accounting.spec.Worker.Attend
-import crates.accounting.spec.Worker.Commanding.Saving
-import crates.accounting.spec.Worker.Freezing.Naming
-import crates.accounting.spec.Worker.Genesis.Lost
-import crates.accounting.spec.Worker.Workbench.Tools
+import Sprawling.accounting.spec.Clock
+import Sprawling.accounting.spec.Connectors
+import Sprawling.accounting.spec.Effect
+import Sprawling.accounting.spec.Guide
+import Sprawling.accounting.spec.HeldVault
+import Sprawling.accounting.spec.Home
+import Sprawling.accounting.spec.Machine
+import Sprawling.accounting.spec.Models
+import Sprawling.accounting.spec.Person
+import Sprawling.accounting.spec.PlanView
+import Sprawling.accounting.spec.Playback
+import Sprawling.accounting.spec.Playback.Check
+import Sprawling.accounting.spec.Playback.Project
+import Sprawling.accounting.spec.Playback.Select
+import Sprawling.accounting.spec.Playback.Traced
+import Sprawling.accounting.spec.Trace
+import Sprawling.accounting.spec.Views
+import Sprawling.accounting.spec.Views.Answering.Github
+import Sprawling.accounting.spec.Views.Document
+import Sprawling.accounting.spec.Views.Rounds
+import Sprawling.accounting.spec.Views.Snapshot
+import Sprawling.accounting.spec.Views.Usage
+import Sprawling.accounting.spec.Worker
+import Sprawling.accounting.spec.Worker.Attend
+import Sprawling.accounting.spec.Worker.Commanding.Saving
+import Sprawling.accounting.spec.Worker.Freezing.Naming
+import Sprawling.accounting.spec.Worker.Genesis.Lost
+import Sprawling.accounting.spec.Worker.Workbench.Tools
 
 /-! # accounting 的规格
 
-`sprawling-accounting`（库名 `accounting`，目录 `crates/accounting`）是 accounting thread 的家：城的唯一写者，它向外伸手时经过的端口，以及页面问的每个问题从折叠里怎样答。
+`sprawling-accounting`（库名 `accounting`，目录 `Sprawling/accounting`）是 accounting thread 的家：城的唯一写者，它向外伸手时经过的端口，以及页面问的每个问题从折叠里怎样答。
 
-本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。决定写作 `D<n>`，放在它所管主题的分部里，别处引作 `accounting D<n>`；D26、D38、D40、D43、D44 是空号，§12 末尾列出其余每条住在哪里。
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `Sprawling/accounting/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。决定写作 `D<n>`，放在它所管主题的分部里，别处引作 `accounting D<n>`；D26、D38、D40、D43、D44 是空号，§12 末尾列出其余每条住在哪里。
 
 能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：效应先成为账本行、计划的效应按次序重放（`spec/Effect.lean`）、计划的投影与盘上一致（`spec/PlanView.lean`）、只有表里的命令配方问得到端口（`spec/Machine.lean`）、导入 GitHub 身份时视图只判主机（`spec/Views/Answering/Github.lean`）、记账线程的循环（`spec/Worker/Attend.lean`）、playback 的选择与投影（`spec/Playback/Select.lean`、`spec/Playback/Project.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型与各模块旁的测试守住（§16）。
 -/
@@ -67,27 +67,27 @@ import crates.accounting.spec.Worker.Workbench.Tools
 
 /-! ## 2 验收标准
 
-九条断言。前三条在 `crates/sprawling/tests/model_factory.rs`，都驱动一个由 `bin::assembly::hands` 造出、再接收脚本 `ModelFactory` 的 `accounting::worker::RunWorker`：
+九条断言。前三条在 `Sprawling/app/tests/model_factory.rs`，都驱动一个由 `bin::assembly::hands` 造出、再接收脚本 `ModelFactory` 的 `accounting::worker::RunWorker`：
 
 | 测试 | 它钉住的事 |
 |---|---|
 | `a_dispatch_reaches_the_model_the_worker_was_handed` | run 的模型走端口。端点指向一个拒绝连接的 loopback 端口，所以一个绕过端口、自己造适配器的 worker 碰不到脚本模型，历史里也就没有脚本写下的那句回答。 |
-| `an_unnamed_dispatch_asks_the_factory_for_the_run_model_alone` | 没有 session 的 dispatch 按规则从任务的词里取房间名（`crates/sprawling/Spec.lean` §8-86），不做命名调用：工厂只被问到 run 的主模型，run 在规则给出的房间里开始。 |
+| `an_unnamed_dispatch_asks_the_factory_for_the_run_model_alone` | 没有 session 的 dispatch 按规则从任务的词里取房间名（`Sprawling/app/Spec.lean` §8-86），不做命名调用：工厂只被问到 run 的主模型，run 在规则给出的房间里开始。 |
 | `a_confidential_building_refuses_before_the_factory_is_asked` | 机密楼的拒绝在 worker 的选择里，不在工厂里：端点不是 loopback 地址时 dispatch 以 `GateDenied` 被拒，脚本工厂一次也没被问到。换掉工厂不能绕开机密。 |
 
-第四条在 `crates/sprawling/tests/connectors.rs`：`a_run_is_offered_the_tools_the_worker_was_handed`。楼的配置写了一个 MCP server，它的命令在任何主机上都不存在；worker 接收了一个脚本 `Connectors`，它给出一个工具。一个绕过端口、自己启动 server 的 worker 起不来这个 server，模型收到的工具表与休眠索引里也就都没有那个工具。
+第四条在 `Sprawling/app/tests/connectors.rs`：`a_run_is_offered_the_tools_the_worker_was_handed`。楼的配置写了一个 MCP server，它的命令在任何主机上都不存在；worker 接收了一个脚本 `Connectors`，它给出一个工具。一个绕过端口、自己启动 server 的 worker 起不来这个 server，模型收到的工具表与休眠索引里也就都没有那个工具。
 
-第五条在 `crates/sprawling/tests/clock.rs`：`a_worker_stamps_its_lines_with_the_clock_it_was_handed`。worker 接收一个停在固定时刻的脚本 `Clock` 之后写下的每一行，`t` 都是那个时刻；一个自己读墙钟的写点写下的 `t` 是现在的时间。
+第五条在 `Sprawling/app/tests/clock.rs`：`a_worker_stamps_its_lines_with_the_clock_it_was_handed`。worker 接收一个停在固定时刻的脚本 `Clock` 之后写下的每一行，`t` 都是那个时刻；一个自己读墙钟的写点写下的 `t` 是现在的时间。
 
-第六条在 `crates/sprawling/tests/machine.rs`：`a_refresh_counts_the_items_the_machine_it_was_handed_answered`。worker 接收一个脚本 `Machine`，它的回答只有一个条目；`DoctorRefresh` 之后 worker 在诊断里报的条目数是 1。一个自己去问主机的 worker 报的是需求表的全部条目数。测试从 `DoctorRefresh` 进而不从 `DoctorInstall` 进：对着一个绕过端口自己动手的 worker，后者会在宿主上真的启动包管理器。
+第六条在 `Sprawling/app/tests/machine.rs`：`a_refresh_counts_the_items_the_machine_it_was_handed_answered`。worker 接收一个脚本 `Machine`，它的回答只有一个条目；`DoctorRefresh` 之后 worker 在诊断里报的条目数是 1。一个自己去问主机的 worker 报的是需求表的全部条目数。测试从 `DoctorRefresh` 进而不从 `DoctorInstall` 进：对着一个绕过端口自己动手的 worker，后者会在宿主上真的启动包管理器。
 
-第七至第九条是验收覆盖，在 `crates/sprawling/tests/acceptance/`，一个测试二进制（nextest 过滤器 `binary(acceptance)`）。它们同样驱动一个由 `bin::assembly::hands` 造出、再接收脚本 `ModelFactory` 的 `accounting::worker::RunWorker`；脚本只替模型说话，工作台、效果层、检查点、账本与书架都是生产件。
+第七至第九条是验收覆盖，在 `Sprawling/app/tests/acceptance/`，一个测试二进制（nextest 过滤器 `binary(acceptance)`）。它们同样驱动一个由 `bin::assembly::hands` 造出、再接收脚本 `ModelFactory` 的 `accounting::worker::RunWorker`；脚本只替模型说话，工作台、效果层、检查点、账本与书架都是生产件。
 
 | 测试 | 它钉住的事 |
 |---|---|
-| `every_tool_a_builder_is_offered_is_called_and_answered` | 一栋 `Builds` 楼里的 run，第一次请求收到的每一件工具都被脚本调用一次；每条 `tool_called` 恰有一条同 id 的 `tool_result`；每件工具的回答与它自己的 SPEC 一致，逐件的判定在 `episodes.rs`。该调用哪些工具不写名单，取模型收到的工具表，再把休眠索引的每个命名空间行换成脚本以 `tool` 的 `list` 列出的成员，列出的件数要等于行上的计数（`crates/runtime/Spec.lean` §8-60）；`tool` 本身也在表里，由脚本以 `detail`、`list`、`run` 调用：工作台多登记一件工具而脚本里没有它的一段，这条测试点名那件工具变红。 |
-| `every_tool_city_hall_is_offered_is_called_and_answered` | 同一条验收标准，对 `Plans` 楼（市政厅）。多出的 `city` 和 `rules` 一样在效果层被拒（`crates/city/Spec.lean` §8-2b、§8-23）；判定看的是调用之后城根下的目录与楼的 `RULES.toml` 一字未变，不钉拒绝码。 |
-| `every_shipped_skill_a_building_admits_is_read_by_name_and_pinned` | 仓库 `crates/city/skills/` 下每个技能包经 `city::install_skill` 装进城库、由楼的阅览室按名准入之后：`run_started.skills` 按目录顺序列出每一件，哈希等于装入时 `Installed::holding` 报告的 `SKILL.md` 哈希（整包哈希是 CAS 的键，答的是另一个问题，`crates/city/Spec.lean` §8-28）；`read <名>` 交给模型的就是那份 `SKILL.md`；包内附属文件按 `<名>/<相对路径>` 读得到。技能集合取 `skills/` 目录本身，不另写名单。 |
+| `every_tool_a_builder_is_offered_is_called_and_answered` | 一栋 `Builds` 楼里的 run，第一次请求收到的每一件工具都被脚本调用一次；每条 `tool_called` 恰有一条同 id 的 `tool_result`；每件工具的回答与它自己的 SPEC 一致，逐件的判定在 `episodes.rs`。该调用哪些工具不写名单，取模型收到的工具表，再把休眠索引的每个命名空间行换成脚本以 `tool` 的 `list` 列出的成员，列出的件数要等于行上的计数（`Sprawling/runtime/Spec.lean` §8-60）；`tool` 本身也在表里，由脚本以 `detail`、`list`、`run` 调用：工作台多登记一件工具而脚本里没有它的一段，这条测试点名那件工具变红。 |
+| `every_tool_city_hall_is_offered_is_called_and_answered` | 同一条验收标准，对 `Plans` 楼（市政厅）。多出的 `city` 和 `rules` 一样在效果层被拒（`Sprawling/city/Spec.lean` §8-2b、§8-23）；判定看的是调用之后城根下的目录与楼的 `RULES.toml` 一字未变，不钉拒绝码。 |
+| `every_shipped_skill_a_building_admits_is_read_by_name_and_pinned` | 仓库 `Sprawling/city/skills/` 下每个技能包经 `city::install_skill` 装进城库、由楼的阅览室按名准入之后：`run_started.skills` 按目录顺序列出每一件，哈希等于装入时 `Installed::holding` 报告的 `SKILL.md` 哈希（整包哈希是 CAS 的键，答的是另一个问题，`Sprawling/city/Spec.lean` §8-28）；`read <名>` 交给模型的就是那份 `SKILL.md`；包内附属文件按 `<名>/<相对路径>` 读得到。技能集合取 `skills/` 目录本身，不另写名单。 |
 
 城外工具（浏览器、MCP、桌面）不在这张覆盖表里：它们经端口交进来的路由各有一条测试（`browsers.rs`、`connectors.rs`、`desktop.rs`），在真实浏览器与真实 MCP server 上的行为不由白盒判定。
 
@@ -105,26 +105,26 @@ import crates.accounting.spec.Worker.Workbench.Tools
 
 /-! D23 验收覆盖从模型收到的工具表与休眠索引各命名空间行经 `tool list` 列出的成员算出应当调用的集合；城外工具不进这张表；效果层拒绝的工具按「没有东西变」判定；技能经城库装入
 
-理由：哪些工具存在，唯一的权威是工作台的那一次登记（`crates/sprawling/Spec.lean` §8-27），模型第一次请求里的工具表，加上休眠索引每个命名空间行经 `tool list` 列出的成员，就是它的输出（不常驻的工具按命名空间在索引里合成一行，`crates/runtime/Spec.lean` §8-60）。测试若照抄一份名单，下一次加工具时名单会悄悄漏掉那一件；从工具表算，漏掉的那件会被点名。城外工具的集合随楼的配置与主机而变，放进来就要在测试里配一台浏览器或一台 MCP server，而它们的路由已经各有一条端口测试。`rules` 与 `city` 声明 `Effect::Govern`，拒绝码取决于工具是否给出自己的 `subject`（`crates/city/Spec.lean` §8-2b 写了两种拒词）；钉住拒绝码，补上 `subject` 的那次改动就会打红验收，而验收要守的规矩——run 不改写审判它的规则、不立楼——在那次改动前后都成立。技能经 `city::install_skill` 装进城库：那条路把一个包的每个文件落在城内，所以验收连包里附属文件的按名读取一起判；城外书架上的一件由 catalog 携着正文交给 run（`crates/runtime/Spec.lean` §8-29-6），它的验收是另一条测试，判的是同一条阅览室、catalog、`read` 与 `SkillPin` 的链。被否决的做法：手写工具名单再逐件断言（第二个权威）；把城外工具一并覆盖（重复端口测试，并让验收依赖主机）；按拒绝码断言效果层的拒绝（钉死一个 SPEC 已说明会变的细节）。
+理由：哪些工具存在，唯一的权威是工作台的那一次登记（`Sprawling/app/Spec.lean` §8-27），模型第一次请求里的工具表，加上休眠索引每个命名空间行经 `tool list` 列出的成员，就是它的输出（不常驻的工具按命名空间在索引里合成一行，`Sprawling/runtime/Spec.lean` §8-60）。测试若照抄一份名单，下一次加工具时名单会悄悄漏掉那一件；从工具表算，漏掉的那件会被点名。城外工具的集合随楼的配置与主机而变，放进来就要在测试里配一台浏览器或一台 MCP server，而它们的路由已经各有一条端口测试。`rules` 与 `city` 声明 `Effect::Govern`，拒绝码取决于工具是否给出自己的 `subject`（`Sprawling/city/Spec.lean` §8-2b 写了两种拒词）；钉住拒绝码，补上 `subject` 的那次改动就会打红验收，而验收要守的规矩——run 不改写审判它的规则、不立楼——在那次改动前后都成立。技能经 `city::install_skill` 装进城库：那条路把一个包的每个文件落在城内，所以验收连包里附属文件的按名读取一起判；城外书架上的一件由 catalog 携着正文交给 run（`Sprawling/runtime/Spec.lean` §8-29-6），它的验收是另一条测试，判的是同一条阅览室、catalog、`read` 与 `SkillPin` 的链。被否决的做法：手写工具名单再逐件断言（第二个权威）；把城外工具一并覆盖（重复端口测试，并让验收依赖主机）；按拒绝码断言效果层的拒绝（钉死一个 SPEC 已说明会变的细节）。
 -/
 
 /-! ## 3 假设与歧义
 
 - citysim 有一个场景经脚本的 `Hands`（计数时钟、内存里的 vault）与 `ModelFactory` 驱动一次 dispatch：`tests/proposal_baseline.rs`（citysim D22）。它判的是结局，不判同一场景跑两遍账本逐字节相同，所以 ARCHITECTURE.md §11 的 V6 缺口还差这一步；能定下它的证据是那个场景在 citysim 里逐字节重放。
 - `views::mcp_health` 自己用 `agent_protocols::McpLink` 启动一个 MCP server 去问它的健康，不经 `Connectors`。未定的是这次读要不要也经端口：`views` 搬进本 crate 时它照原样搬（`agent_protocols` 本来就是本 crate 的依赖）；能定下它的证据是一个脚本场景需不需要回答 MCP 健康查询。
-- `playback` 的导出在 40 万行的城上要 27 s，分段计时里约七成是投影做的 credential 扫描（`kernel::secret::scan`，每行约 60 µs，在 `opt-level = "z"` 下量；读数见 §8-25）。D47 定下投影只扫命运会被某张表读到的行——范围内的、`remember()` 要的、与范围内的行同一个配对键的——并证明它交出的命运与全扫描逐条相同（`crates/accounting/spec/Playback/Project.lean` 末节）；一行的命运仍只在 `playback::project` 一处判定，`scanned` 只决定要不要读回它的字节。Rust 照它实现：范围外的行的命运先记作待定，`finish` 在任何一张表读之前只扫被配对读到的那些，字节取自已留着的副本或经 `storage::LineReader` 按段内偏移读回；派生检查（`accounting::playback::tests::lazy`）在随机历史上比较懒扫描与全扫描的整份 bundle 与扫描次数。三个平台相同：只用 seq 与段内偏移，读回走 `storage` 的同一个接口。`kernel::secret::scan` 本身变快是另一件事，每个扫描者都受益。
+- `playback` 的导出在 40 万行的城上要 27 s，分段计时里约七成是投影做的 credential 扫描（`kernel::secret::scan`，每行约 60 µs，在 `opt-level = "z"` 下量；读数见 §8-25）。D47 定下投影只扫命运会被某张表读到的行——范围内的、`remember()` 要的、与范围内的行同一个配对键的——并证明它交出的命运与全扫描逐条相同（`Sprawling/accounting/spec/Playback/Project.lean` 末节）；一行的命运仍只在 `playback::project` 一处判定，`scanned` 只决定要不要读回它的字节。Rust 照它实现：范围外的行的命运先记作待定，`finish` 在任何一张表读之前只扫被配对读到的那些，字节取自已留着的副本或经 `storage::LineReader` 按段内偏移读回；派生检查（`accounting::playback::tests::lazy`）在随机历史上比较懒扫描与全扫描的整份 bundle 与扫描次数。三个平台相同：只用 seq 与段内偏移，读回走 `storage` 的同一个接口。`kernel::secret::scan` 本身变快是另一件事，每个扫描者都受益。
 - `playback`（§8-12、§8-13）的两个上限是待测初值：`BUNDLE_MAX_BYTES` 与 `PAGE_MAX_BYTES` 要在多日夹具上量过导出峰值、页面解析与首屏成本才定值，定值的证据是 citysim 的多日场景读数。居民导出位置（§8-13）里崩溃留下的暂存文件 `<名>.partial-<pid>` 没有人收走：它不会被当成导出件读（`check` 只认 `.json`/`.html` 的名字），能定下要不要收的是这类文件在真实城里出现的频率。
 - `playback::export` 还不是边走边编码：`finish` 给提交找证据时按 seq 在整份 `events` 里查（`playback::traced`），所以 `Document` 在编码之前整份留在内存里；编码本身已经直接写进 bundle 的那一份缓冲（§8-12）。能让 `events` 在 walk 里一边投影一边编码掉的，是证据查找改成经账本旁索引读回那几行；能定下值不值得改的是多日夹具上导出的私有字节峰值里 `Document` 占多少。
-- **本 crate 有一百九十五个模块的接口仍写在 sprawling 的规格里。** 模块从 `sprawling` 搬过来时，它在 `crates/sprawling/Spec.lean` 里的那一节留在原处，只把模块路径改成新的拼写（原先在 sprawling 的 views 目录下的模块改写到 `accounting::views` 之下，`bin::assembly` 下的模块改写到 `accounting::worker` 之下）。`architecture.toml` 里这些行指向本 crate 的分部（`spec/Views.lean`、`spec/Views/Snapshot.lean`、`spec/Views/Rounds.lean`、`spec/PlanView.lean`、`spec/Worker.lean`、`spec/Worker/Attend.lean`、`spec/Worker/Workbench/Tools.lean`），每个分部末尾一张表按 sprawling 的标签列出它们；搬法见 D15。
+- **本 crate 有一百九十五个模块的接口仍写在 sprawling 的规格里。** 模块从 `sprawling` 搬过来时，它在 `Sprawling/app/Spec.lean` 里的那一节留在原处，只把模块路径改成新的拼写（原先在 sprawling 的 views 目录下的模块改写到 `accounting::views` 之下，`bin::assembly` 下的模块改写到 `accounting::worker` 之下）。`architecture.toml` 里这些行指向本 crate 的分部（`spec/Views.lean`、`spec/Views/Snapshot.lean`、`spec/Views/Rounds.lean`、`spec/PlanView.lean`、`spec/Worker.lean`、`spec/Worker/Attend.lean`、`spec/Worker/Workbench/Tools.lean`），每个分部末尾一张表按 sprawling 的标签列出它们；搬法见 D15。
 -/
 
 /-! ## 4 现状分析
 
-本 crate 有四个端口。`ModelFactory` 的生产适配器是 `accounting::worker::models::GatewayModels`，`Connectors` 的是 `accounting::worker::mcp::Residents`，两者都由 `RunWorker` 的构造器装上（D18）；`Clock` 的生产适配器是 `bin::assembly::production::SystemClock`，经 `Hands.clock` 交进来；`Machine` 的是 `bin::doctor::ThisMachine`，经 `Hands.machine` 交进来。生产的 `Hands` 只由 `bin::assembly::production::hands` 一处造出（§8-11）。四个端口的第二实现依次在 `crates/sprawling/tests/model_factory.rs`、`connectors.rs`、`clock.rs`、`machine.rs`。
+本 crate 有四个端口。`ModelFactory` 的生产适配器是 `accounting::worker::models::GatewayModels`，`Connectors` 的是 `accounting::worker::mcp::Residents`，两者都由 `RunWorker` 的构造器装上（D18）；`Clock` 的生产适配器是 `bin::assembly::production::SystemClock`，经 `Hands.clock` 交进来；`Machine` 的是 `bin::doctor::ThisMachine`，经 `Hands.machine` 交进来。生产的 `Hands` 只由 `bin::assembly::production::hands` 一处造出（§8-11）。四个端口的第二实现依次在 `Sprawling/app/tests/model_factory.rs`、`connectors.rs`、`clock.rs`、`machine.rs`。
 
-生产消费者是 `crates/sprawling`：装配根造 `Hands`、起写者线程与视图折叠线程，服务面与 CLI 经 §8-10、§8-11 列出的 `pub` 面读本 crate；citysim 经同一组端口驱动一次 dispatch（§3）。
+生产消费者是 `Sprawling/app`：装配根造 `Hands`、起写者线程与视图折叠线程，服务面与 CLI 经 §8-10、§8-11 列出的 `pub` 面读本 crate；citysim 经同一组端口驱动一次 dispatch（§3）。
 
-**常驻内存。** 本 crate 在进程里留两份今天没有上界的工作集：视图折叠（`views`，每个 run 一份摘要，随记录数与 run 数增长）与 playback 导出（`playback::export` 走账本是流式的，编码直接写进 bundle 的那一份缓冲、到 `BUNDLE_MAX_BYTES` 即停，但整份 `Document` 在编码之前留在内存里，§3）。冻结的 run 的记录在账本里，视图只该留它的摘要，不留它的消息与工具结果。它们的字节预算（视图 `VIEWS_RESIDENT_BYTES`）、按字节计的缓存与读回规则都写在 `crates/sprawling/spec/Serving/Memory.lean` §8-173，本 crate 照它改：视图经那份缓存读回（一项待批阻着的活已经在答复时从账本读回，`crates/sprawling/spec/Accounting/Worker.lean` §8-25），playback 的 `Document` 改成边走边编码（§3）。三个平台上做法相同，读回走 std 的定位读。
+**常驻内存。** 本 crate 在进程里留两份今天没有上界的工作集：视图折叠（`views`，每个 run 一份摘要，随记录数与 run 数增长）与 playback 导出（`playback::export` 走账本是流式的，编码直接写进 bundle 的那一份缓冲、到 `BUNDLE_MAX_BYTES` 即停，但整份 `Document` 在编码之前留在内存里，§3）。冻结的 run 的记录在账本里，视图只该留它的摘要，不留它的消息与工具结果。它们的字节预算（视图 `VIEWS_RESIDENT_BYTES`）、按字节计的缓存与读回规则都写在 `Sprawling/app/spec/Serving/Memory.lean` §8-173，本 crate 照它改：视图经那份缓存读回（一项待批阻着的活已经在答复时从账本读回，`Sprawling/app/spec/Accounting/Worker.lean` §8-25），playback 的 `Document` 改成边走边编码（§3）。三个平台上做法相同，读回走 std 的定位读。
 -/
 
 /-! ## 5 权威信源
@@ -157,18 +157,18 @@ Lean 里的名字与 Rust 的对应：
 
 | `bin` 里的东西 | 归属 | worker 或 `views` 用它做什么 | 依据 |
 |---|---|---|---|
-| `views` | 搬进本 crate | `Views`、`Published`、`Governance`、`pursued`、`snapshot::start` | worker 的读面；`Governance` 由读侧拥有，写侧从那里取用（`crates/sprawling/Spec.lean` §8-92） |
+| `views` | 搬进本 crate | `Views`、`Published`、`Governance`、`pursued`、`snapshot::start` | worker 的读面；`Governance` 由读侧拥有，写侧从那里取用（`Sprawling/app/Spec.lean` §8-92） |
 | `lineage` | 搬进本 crate | `sprawling view` 的 run 列表，以及 playback 的共享投影 | 它只折记录，与 `views` 同形（形状 7）；二进制的 `main::view` 与本 crate 的读面都够得到它 |
 | `home` | 搬进本 crate | 阅览室与 `views::skills` 取这个人的家目录 | 只读一个环境变量、拼路径，不启动任何东西；`person` 与 `views` 都从它取路径 |
 | `person` | 搬进本 crate | `PutPreferences` 写、`Preferences` 查询读 | 人的那一层是一份文件，读写它和读写城的文件同类，不是主机的能力 |
 | `serving::standing::CorePriority` | 随 `person` 搬进本 crate | 偏好里核心线程抬不抬高的那个值 | 它是 `person` 读出来的值；真去抬高线程的 `raise_this_thread` 留在 `serving` |
 | `held_vault` | 搬进本 crate | 把一个锁着的 vault 变成解析器，锁中毒时的拒绝 | 纯函数，只碰已经打开的 vault |
 | `toolkit_broker` | 搬进本 crate | 一个外部应用的 broker 钥匙登记在哪 | 纯函数，`views::toolkits` 与连接动作读同一组事实 |
-| `doctor`（`REQUIREMENTS`、`Platform`、`host`、`Presence`、`PATIENCE`、`ThisMachine`） | 经端口：看与装经 `Machine`，需求表的查法经 `RunWorker.recipe_for`（`crates/sprawling/Spec.lean` 中 `doctor_install` 那一节） | 需求表查找、执行引擎的路径 | 主机上有什么，`bin::doctor` 是唯一权威（本节上文）；`views::agents` 找厂商目录经 `Views.places`，生产交的是 `bin::doctor::host::place_set_up`（`crates/accounting/spec/Views.lean` D13）；exec 的主机半经 `Hands.exec_host`（§8-11） |
-| `monitor::memory::read`、`monitor::volume::read` | 经 `Hands`：`read_memory` 与 `read_volume`，都是 `fn` 指针（`crates/sprawling/Spec.lean` §8-46-3、§8-94；§8-11） | 新工作进门时读内存与卷的余量 | 读主机的计数器；读数的类型 `Memory` 与记账线程的计数 `Health` 随 worker 搬进本 crate，读数的做法留在 `bin::monitor` |
-| `revealing` | 经端口：`RunWorker` 的 `reveal` 字段，一个 `fn` 指针（`crates/sprawling/Spec.lean` §8-60） | `Reveal` 在主机的文件管理器里打开一个地址 | 启动主机的一个程序 |
-| `browser_tool` | 经端口：`RunWorker::with_browsers` 交进来的 `fn` 指针（`crates/sprawling/Spec.lean` §8-45-2） | 按楼的规则给 run 的浏览器工具 | 启动浏览器，经 BiDi 说话 |
-| `release` | 经端口：`Views.registry`，一个由 `views::served` 放进来的 `fn` 指针（`crates/sprawling/Spec.lean` 中 `Views.machine` 旁的那一条） | `views` 回答 `NewestRelease` 查询 | 向 npm 注册表发请求 |
+| `doctor`（`REQUIREMENTS`、`Platform`、`host`、`Presence`、`PATIENCE`、`ThisMachine`） | 经端口：看与装经 `Machine`，需求表的查法经 `RunWorker.recipe_for`（`Sprawling/app/Spec.lean` 中 `doctor_install` 那一节） | 需求表查找、执行引擎的路径 | 主机上有什么，`bin::doctor` 是唯一权威（本节上文）；`views::agents` 找厂商目录经 `Views.places`，生产交的是 `bin::doctor::host::place_set_up`（`Sprawling/accounting/spec/Views.lean` D13）；exec 的主机半经 `Hands.exec_host`（§8-11） |
+| `monitor::memory::read`、`monitor::volume::read` | 经 `Hands`：`read_memory` 与 `read_volume`，都是 `fn` 指针（`Sprawling/app/Spec.lean` §8-46-3、§8-94；§8-11） | 新工作进门时读内存与卷的余量 | 读主机的计数器；读数的类型 `Memory` 与记账线程的计数 `Health` 随 worker 搬进本 crate，读数的做法留在 `bin::monitor` |
+| `revealing` | 经端口：`RunWorker` 的 `reveal` 字段，一个 `fn` 指针（`Sprawling/app/Spec.lean` §8-60） | `Reveal` 在主机的文件管理器里打开一个地址 | 启动主机的一个程序 |
+| `browser_tool` | 经端口：`RunWorker::with_browsers` 交进来的 `fn` 指针（`Sprawling/app/Spec.lean` §8-45-2） | 按楼的规则给 run 的浏览器工具 | 启动浏览器，经 BiDi 说话 |
+| `release` | 经端口：`Views.registry`，一个由 `views::served` 放进来的 `fn` 指针（`Sprawling/app/Spec.lean` 中 `Views.machine` 旁的那一条） | `views` 回答 `NewestRelease` 查询 | 向 npm 注册表发请求 |
 | `console` | 留在装配根 | — | 只有 `listening` 用它；它是终端，不是 worker |
 | `serving` 的其余部分（`folding`、`output_ring`、`Serving`、`open_vault`） | 留在装配根 | — | 只有 `attending`、`listening` 与 `production` 用它们 |
 | `assembly` 的 `production`（`SystemClock`、`hands`、`init_city`、`form_city`）、`listening`、`attending` 的起线程那一半（`spawn_worker`）、`chain_watch` 的起审计线程那一半、`dropping` | 留在装配根 | — | 起线程、绑端口、造生产的手：D17、D18 |
@@ -179,7 +179,7 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定；规格只 impor
 
 /-! D9 worker 的决定与读面搬进本 crate，通往主机、网络或终端的做法留在 `sprawling`、经端口交进来（§7 归属表）
 
-理由：端口正是 citysim 插第二实现的地方；把一个适配器搬进来，它碰主机的那一步就跟着进了 citysim 驱动的 crate，脚本场景会真的起浏览器、读内存、打开文件管理器。被否决的做法：全部搬进来——本 crate 就要依赖 `thread-priority`、`sysinfo`、浏览器与终端，citysim 换不掉其中任何一个；把 `views` 留在 `sprawling`、经端口交给 worker——`Governance` 由读侧拥有，写侧在写下记录之前就要同步地从它作决定（`crates/sprawling/Spec.lean` §8-92），端口会把一个 trait 放到决定路径上，并把一份折叠的权威分到两个 crate。
+理由：端口正是 citysim 插第二实现的地方；把一个适配器搬进来，它碰主机的那一步就跟着进了 citysim 驱动的 crate，脚本场景会真的起浏览器、读内存、打开文件管理器。被否决的做法：全部搬进来——本 crate 就要依赖 `thread-priority`、`sysinfo`、浏览器与终端，citysim 换不掉其中任何一个；把 `views` 留在 `sprawling`、经端口交给 worker——`Governance` 由读侧拥有，写侧在写下记录之前就要同步地从它作决定（`Sprawling/app/Spec.lean` §8-92），端口会把一个 trait 放到决定路径上，并把一份折叠的权威分到两个 crate。
 -/
 
 /-! D8 `effect` 与 `plan_view` 先于 `RunWorker` 搬进本 crate
@@ -193,41 +193,41 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定；规格只 impor
 
 | 标签 | 分部 |
 |---|---|
-| 8-1 | `crates/accounting/spec/Models.lean` |
-| 8-2 | `crates/accounting/spec/Connectors.lean` |
-| 8-3 | `crates/accounting/spec/Clock.lean` |
-| 8-4 | `crates/accounting/spec/Machine.lean` |
-| 8-5 | `crates/accounting/spec/Effect.lean` |
-| 8-6 | `crates/accounting/spec/PlanView.lean` |
-| 8-7 | `crates/accounting/spec/Home.lean` |
-| 8-8 | `crates/accounting/spec/Person.lean` |
-| 8-9 | `crates/accounting/spec/HeldVault.lean` |
-| 8-10 | `crates/accounting/spec/Views.lean` |
-| 8-11 | `crates/accounting/spec/Worker.lean` |
-| 8-12 | `crates/accounting/spec/Playback.lean` |
-| 8-13 | `crates/accounting/spec/Playback/Check.lean` |
-| 8-15 | `crates/accounting/spec/Worker/Freezing/Naming.lean` |
-| 8-16 | `crates/accounting/spec/Trace.lean` |
-| 8-17 | `crates/accounting/spec/Playback/Traced.lean` |
-| 8-18-1 | `crates/accounting/spec/Worker/Genesis/Lost.lean` |
-| 8-18-2 | `crates/accounting/spec/Guide.lean` |
-| 8-18-3 | `crates/accounting/spec/Views/Answering/Github.lean` |
-| 8-19 | `crates/accounting/spec/Views/Snapshot.lean` |
-| 8-20 | `crates/accounting/spec/Worker/Workbench/Tools.lean` |
-| 8-21 | `crates/accounting/spec/Views/Document.lean` |
-| 8-22 | `crates/accounting/spec/Worker/Commanding/Saving.lean` |
-| 8-23 | `crates/accounting/spec/Views/Document.lean` |
-| 8-24 | `crates/accounting/spec/Views/Snapshot.lean` |
-| 8-25 | `crates/accounting/spec/Playback/Traced.lean` |
-| 8-27 | `crates/accounting/spec/Effect.lean` |
-| 8-29 | `crates/accounting/spec/Views/Document.lean` |
-| 8-30 | `crates/accounting/spec/Worker/Workbench/Tools.lean` |
-| 8-33 | `crates/accounting/spec/Views/Rounds.lean` |
-| 8-34 | `crates/accounting/spec/Views/Usage.lean` |
-| 8-35 | `crates/accounting/spec/Connectors.lean` |
-| 8-36 | `crates/accounting/spec/Views.lean` |
-| 8-37 | `crates/accounting/spec/Worker.lean` |
-| 8-38 | `crates/accounting/spec/Views/Document.lean` |
+| 8-1 | `Sprawling/accounting/spec/Models.lean` |
+| 8-2 | `Sprawling/accounting/spec/Connectors.lean` |
+| 8-3 | `Sprawling/accounting/spec/Clock.lean` |
+| 8-4 | `Sprawling/accounting/spec/Machine.lean` |
+| 8-5 | `Sprawling/accounting/spec/Effect.lean` |
+| 8-6 | `Sprawling/accounting/spec/PlanView.lean` |
+| 8-7 | `Sprawling/accounting/spec/Home.lean` |
+| 8-8 | `Sprawling/accounting/spec/Person.lean` |
+| 8-9 | `Sprawling/accounting/spec/HeldVault.lean` |
+| 8-10 | `Sprawling/accounting/spec/Views.lean` |
+| 8-11 | `Sprawling/accounting/spec/Worker.lean` |
+| 8-12 | `Sprawling/accounting/spec/Playback.lean` |
+| 8-13 | `Sprawling/accounting/spec/Playback/Check.lean` |
+| 8-15 | `Sprawling/accounting/spec/Worker/Freezing/Naming.lean` |
+| 8-16 | `Sprawling/accounting/spec/Trace.lean` |
+| 8-17 | `Sprawling/accounting/spec/Playback/Traced.lean` |
+| 8-18-1 | `Sprawling/accounting/spec/Worker/Genesis/Lost.lean` |
+| 8-18-2 | `Sprawling/accounting/spec/Guide.lean` |
+| 8-18-3 | `Sprawling/accounting/spec/Views/Answering/Github.lean` |
+| 8-19 | `Sprawling/accounting/spec/Views/Snapshot.lean` |
+| 8-20 | `Sprawling/accounting/spec/Worker/Workbench/Tools.lean` |
+| 8-21 | `Sprawling/accounting/spec/Views/Document.lean` |
+| 8-22 | `Sprawling/accounting/spec/Worker/Commanding/Saving.lean` |
+| 8-23 | `Sprawling/accounting/spec/Views/Document.lean` |
+| 8-24 | `Sprawling/accounting/spec/Views/Snapshot.lean` |
+| 8-25 | `Sprawling/accounting/spec/Playback/Traced.lean` |
+| 8-27 | `Sprawling/accounting/spec/Effect.lean` |
+| 8-29 | `Sprawling/accounting/spec/Views/Document.lean` |
+| 8-30 | `Sprawling/accounting/spec/Worker/Workbench/Tools.lean` |
+| 8-33 | `Sprawling/accounting/spec/Views/Rounds.lean` |
+| 8-34 | `Sprawling/accounting/spec/Views/Usage.lean` |
+| 8-35 | `Sprawling/accounting/spec/Connectors.lean` |
+| 8-36 | `Sprawling/accounting/spec/Views.lean` |
+| 8-37 | `Sprawling/accounting/spec/Worker.lean` |
+| 8-38 | `Sprawling/accounting/spec/Views/Document.lean` |
 
 §8-18 分成三小节，各住规定它的那个模块的分部：§8-18-1、§8-18-2、§8-18-3。`spec/Playback/Select.lean`、`spec/Playback/Project.lean` 与 `spec/Worker/Attend.lean` 没有标签：前两个是 §8-12、§8-17、§8-25 的性质，后一个是记账线程循环的模型。
 -/
@@ -245,14 +245,14 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定；规格只 impor
 
 /-! ## 9 工作流程
 
-一次 dispatch 从装配根走到账本：服务面把 `wire::Command` 交给 `accounting::worker::attend` 的收件队列；记账线程判定、写下 `run_started` 之前的每一步不写账本（`crates/sprawling/Spec.lean` §8-40「先判定后动手」）；lane 线程在 `accounting::worker::pool` 里驾驶 run，经 `relay` 写回；run 结束后桌子的效应经 `effect::Landing::record` 先成为账本行，再成为这座城（§8-5）。读的一侧：视图折叠线程把每一行交给 `Views::apply`，查询在锁内取小数据、在锁外读盘（§8-10）。
+一次 dispatch 从装配根走到账本：服务面把 `wire::Command` 交给 `accounting::worker::attend` 的收件队列；记账线程判定、写下 `run_started` 之前的每一步不写账本（`Sprawling/app/Spec.lean` §8-40「先判定后动手」）；lane 线程在 `accounting::worker::pool` 里驾驶 run，经 `relay` 写回；run 结束后桌子的效应经 `effect::Landing::record` 先成为账本行，再成为这座城（§8-5）。读的一侧：视图折叠线程把每一行交给 `Views::apply`，查询在锁内取小数据、在锁外读盘（§8-10）。
 -/
 
 /-! ## 10 实现逻辑
 
 每个模块的参照定义与取舍写在它的分部里：端口为什么交整页、交整条连接（D4–D7）；`Hands` 为什么是一个值（D20）；效应的先后为什么是类型的性质（§8-5）；playback 为什么逐字节携带账本行、复核靠重算（D24、D25）。
 
-代价的读数随它所在的节：快照的克隆与编码（§8-19，40 万行夹具城上克隆 22 ms、编码再解码 350 ms）；playback 在 40 万行的城上的导出（§8-25，约 27 s，其中约七成是 credential 扫描，§3）；提交证据随提交数线性增长（§8-25 的 `instrument_evidence_cost`）。复杂度的计量都按账本行数与区间长度，不按墙钟；墙钟只进 `crates/xtask/budgets.toml`。
+代价的读数随它所在的节：快照的克隆与编码（§8-19，40 万行夹具城上克隆 22 ms、编码再解码 350 ms）；playback 在 40 万行的城上的导出（§8-25，约 27 s，其中约七成是 credential 扫描，§3）；提交证据随提交数线性增长（§8-25 的 `instrument_evidence_cost`）。复杂度的计量都按账本行数与区间长度，不按墙钟；墙钟只进 `Tools/xtask/budgets.toml`。
 -/
 
 /-! ## 11 边界枚举
@@ -268,54 +268,54 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定；规格只 impor
 
 | 决定 | 住处 |
 |---|---|
-| D1 | `crates/accounting/spec/Models.lean` |
-| D2 | `crates/accounting/spec/Models.lean` |
-| D3 | `crates/accounting/spec/Models.lean` |
-| D4 | `crates/accounting/spec/Connectors.lean` |
-| D5 | `crates/accounting/spec/Connectors.lean` |
-| D6 | `crates/accounting/spec/Machine.lean` |
-| D7 | `crates/accounting/spec/Machine.lean` |
-| D8 | `crates/accounting/Spec.lean` |
-| D9 | `crates/accounting/Spec.lean` |
-| D10 | `crates/accounting/spec/Worker.lean` |
-| D11 | `crates/accounting/spec/Worker.lean` |
-| D12 | `crates/accounting/spec/Worker.lean` |
-| D13 | `crates/accounting/spec/Views.lean` |
-| D14 | `crates/accounting/spec/Views.lean` |
-| D15 | `crates/accounting/Spec.lean` |
-| D16 | `crates/accounting/spec/Views.lean` |
-| D17 | `crates/accounting/spec/Worker.lean` |
-| D18 | `crates/accounting/spec/Worker.lean` |
-| D19 | `crates/accounting/spec/Worker.lean` |
-| D20 | `crates/accounting/spec/Worker.lean` |
-| D21 | `crates/accounting/spec/Worker.lean` |
-| D22 | `crates/accounting/spec/Worker.lean` |
-| D23 | `crates/accounting/Spec.lean` |
-| D24 | `crates/accounting/spec/Playback.lean` |
-| D25 | `crates/accounting/spec/Playback/Check.lean` |
-| D27 | `crates/accounting/spec/Worker/Freezing/Naming.lean` |
-| D28 | `crates/accounting/spec/Trace.lean` |
-| D29 | `crates/accounting/spec/Playback/Traced.lean` |
-| D30 | `crates/accounting/spec/Worker/Genesis/Lost.lean` |
-| D31 | `crates/accounting/spec/Views/Snapshot.lean` |
-| D32 | `crates/accounting/spec/Worker/Workbench/Tools.lean` |
-| D33 | `crates/accounting/spec/Views/Document.lean` |
-| D34 | `crates/accounting/spec/Worker/Commanding/Saving.lean` |
-| D35 | `crates/accounting/spec/Views/Document.lean` |
-| D36 | `crates/accounting/spec/Views/Snapshot.lean` |
-| D37 | `crates/accounting/spec/Playback/Traced.lean` |
-| D39 | `crates/accounting/spec/Effect.lean` |
-| D41 | `crates/accounting/spec/Views/Document.lean` |
-| D42 | `crates/accounting/spec/Worker/Workbench/Tools.lean` |
-| D45 | `crates/accounting/spec/Views/Rounds.lean` |
-| D47 | `crates/accounting/spec/Playback/Project.lean` |
-| D48 | `crates/accounting/spec/Views/Rounds.lean` |
-| D49 | `crates/accounting/spec/Views/Usage.lean` |
-| D50 | `crates/accounting/spec/Views.lean` |
-| D52 | `crates/accounting/spec/Connectors.lean` |
-| D53 | `crates/accounting/spec/Worker.lean` |
-| D54 | `crates/accounting/spec/Worker.lean` |
-| D55 | `crates/accounting/spec/Views/Usage.lean` |
+| D1 | `Sprawling/accounting/spec/Models.lean` |
+| D2 | `Sprawling/accounting/spec/Models.lean` |
+| D3 | `Sprawling/accounting/spec/Models.lean` |
+| D4 | `Sprawling/accounting/spec/Connectors.lean` |
+| D5 | `Sprawling/accounting/spec/Connectors.lean` |
+| D6 | `Sprawling/accounting/spec/Machine.lean` |
+| D7 | `Sprawling/accounting/spec/Machine.lean` |
+| D8 | `Sprawling/accounting/Spec.lean` |
+| D9 | `Sprawling/accounting/Spec.lean` |
+| D10 | `Sprawling/accounting/spec/Worker.lean` |
+| D11 | `Sprawling/accounting/spec/Worker.lean` |
+| D12 | `Sprawling/accounting/spec/Worker.lean` |
+| D13 | `Sprawling/accounting/spec/Views.lean` |
+| D14 | `Sprawling/accounting/spec/Views.lean` |
+| D15 | `Sprawling/accounting/Spec.lean` |
+| D16 | `Sprawling/accounting/spec/Views.lean` |
+| D17 | `Sprawling/accounting/spec/Worker.lean` |
+| D18 | `Sprawling/accounting/spec/Worker.lean` |
+| D19 | `Sprawling/accounting/spec/Worker.lean` |
+| D20 | `Sprawling/accounting/spec/Worker.lean` |
+| D21 | `Sprawling/accounting/spec/Worker.lean` |
+| D22 | `Sprawling/accounting/spec/Worker.lean` |
+| D23 | `Sprawling/accounting/Spec.lean` |
+| D24 | `Sprawling/accounting/spec/Playback.lean` |
+| D25 | `Sprawling/accounting/spec/Playback/Check.lean` |
+| D27 | `Sprawling/accounting/spec/Worker/Freezing/Naming.lean` |
+| D28 | `Sprawling/accounting/spec/Trace.lean` |
+| D29 | `Sprawling/accounting/spec/Playback/Traced.lean` |
+| D30 | `Sprawling/accounting/spec/Worker/Genesis/Lost.lean` |
+| D31 | `Sprawling/accounting/spec/Views/Snapshot.lean` |
+| D32 | `Sprawling/accounting/spec/Worker/Workbench/Tools.lean` |
+| D33 | `Sprawling/accounting/spec/Views/Document.lean` |
+| D34 | `Sprawling/accounting/spec/Worker/Commanding/Saving.lean` |
+| D35 | `Sprawling/accounting/spec/Views/Document.lean` |
+| D36 | `Sprawling/accounting/spec/Views/Snapshot.lean` |
+| D37 | `Sprawling/accounting/spec/Playback/Traced.lean` |
+| D39 | `Sprawling/accounting/spec/Effect.lean` |
+| D41 | `Sprawling/accounting/spec/Views/Document.lean` |
+| D42 | `Sprawling/accounting/spec/Worker/Workbench/Tools.lean` |
+| D45 | `Sprawling/accounting/spec/Views/Rounds.lean` |
+| D47 | `Sprawling/accounting/spec/Playback/Project.lean` |
+| D48 | `Sprawling/accounting/spec/Views/Rounds.lean` |
+| D49 | `Sprawling/accounting/spec/Views/Usage.lean` |
+| D50 | `Sprawling/accounting/spec/Views.lean` |
+| D52 | `Sprawling/accounting/spec/Connectors.lean` |
+| D53 | `Sprawling/accounting/spec/Worker.lean` |
+| D54 | `Sprawling/accounting/spec/Worker.lean` |
+| D55 | `Sprawling/accounting/spec/Views/Usage.lean` |
 -/
 
 /-! ## 13 依赖选型
@@ -332,7 +332,7 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定，每一条边的
 
 /-! ## 15 影响面
 
-改端口的签名，波及 `crates/sprawling` 的装配根（`bin::assembly::production`）与四个端口测试（§4）；改 `views` 的公开面，波及服务面、CLI 与视图折叠线程；改 bundle 的形状，`SCHEMA` 与 `PROJECTION_RULES` 一起进位（D29 (f)），波及 `skills/playback/` 的参考页面；改快照里出现的类型，`VIEWS_FOLD_RULES` 由夹具摘要进位（§8-24）。
+改端口的签名，波及 `Sprawling/app` 的装配根（`bin::assembly::production`）与四个端口测试（§4）；改 `views` 的公开面，波及服务面、CLI 与视图折叠线程；改 bundle 的形状，`SCHEMA` 与 `PROJECTION_RULES` 一起进位（D29 (f)），波及 `skills/playback/` 的参考页面；改快照里出现的类型，`VIEWS_FOLD_RULES` 由夹具摘要进位（§8-24）。
 -/
 
 /-! ## 16 测试与约束
@@ -341,11 +341,11 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定，每一条边的
 
 - 效应：`accounting::worker::driving::tests::ledger` 的 `what_a_run_changes_is_changed_after_the_line_that_announces_it`、`accounting::effect::tests` 的 `a_run_that_splits_its_row_and_claims_a_leaf_lands_both`。
 - 计划的投影：`accounting::plan_view::tests`。
-- 主机与安装：`crates/sprawling/tests/machine.rs`、`accounting::worker::commanding` 的安装测试。
+- 主机与安装：`Sprawling/app/tests/machine.rs`、`accounting::worker::commanding` 的安装测试。
 - GitHub：`views::answering::github` 的 `a_github_login_is_asked_of_the_reader_the_views_were_handed`。
 - playback：`accounting::playback::tests::model` 从 `spec/Playback/Select.lean` 逐行读出场景表，跑生产的 `export`（D25 (i)）。
 
-形式化的义务由证明清偿：`lake build crates.accounting.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。没有 Lean 模型的分部，其要求由类型与 `cargo nextest run -p sprawling-accounting` 的各模块测试守住。
+形式化的义务由证明清偿：`lake build Sprawling.accounting.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。没有 Lean 模型的分部，其要求由类型与 `cargo nextest run -p sprawling-accounting` 的各模块测试守住。
 -/
 
 /-! ## 17 文档关系
@@ -353,8 +353,8 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定，每一条边的
 - ARCHITECTURE.md §11「Specifications in Lean」：本规格的布局；§3 的 `depmap` 与 §4 的端口表：本 crate 的依赖与端口。它们改了，分部的路径、`architecture.toml` 里 accounting 各行的 `spec` 锚点与 §7 一起重看。
 - `architecture.toml` 的模块图：accounting 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词（accounting thread、Ledger、playback bundle 等），`cargo xtask gates lexicon` 检查。
-- sprawling 的规格（`crates/sprawling/Spec.lean`）：装配根、CLI 与服务面怎样调本 crate，以及 §3 那一百九十五个模块的接口；D15 说那些节怎样搬进来。
-- 别的 crate 的规格：`crates/kernel/Spec.lean`（事件、地址、读界）、`crates/wire/Spec.lean`（查询与命令的答）、`crates/city/Spec.lean`（文档、楼规、归档）、`crates/collab/Spec.lean`（认领）、`crates/documents/Spec.lean`（窗口、预览、提案）、`crates/storage/Spec.lean`（账本索引与内容库）、`crates/runtime/Spec.lean`（读界与回合）。它们改了，引用它们的那一节一起重看。
-- `crates/city/skills/playback/SKILL.md`：playback page 的数据契约与验证要求，与 §8-12、§8-13 同期改。
-- 引本规格的其他规格与 rustdoc 写 `crates/accounting/Spec.lean §8-n` 或 `accounting D<n>`；本 crate 的 rustdoc 写规定它的分部。一节换了分部，它的标签不变，引用不必改。
+- sprawling 的规格（`Sprawling/app/Spec.lean`）：装配根、CLI 与服务面怎样调本 crate，以及 §3 那一百九十五个模块的接口；D15 说那些节怎样搬进来。
+- 别的 crate 的规格：`Sprawling/kernel/Spec.lean`（事件、地址、读界）、`Sprawling/wire/Spec.lean`（查询与命令的答）、`Sprawling/city/Spec.lean`（文档、楼规、归档）、`Sprawling/collab/Spec.lean`（认领）、`Sprawling/documents/Spec.lean`（窗口、预览、提案）、`Sprawling/storage/Spec.lean`（账本索引与内容库）、`Sprawling/runtime/Spec.lean`（读界与回合）。它们改了，引用它们的那一节一起重看。
+- `Sprawling/city/skills/playback/SKILL.md`：playback page 的数据契约与验证要求，与 §8-12、§8-13 同期改。
+- 引本规格的其他规格与 rustdoc 写 `Sprawling/accounting/Spec.lean §8-n` 或 `accounting D<n>`；本 crate 的 rustdoc 写规定它的分部。一节换了分部，它的标签不变，引用不必改。
 -/

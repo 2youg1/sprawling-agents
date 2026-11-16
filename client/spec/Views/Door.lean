@@ -6,7 +6,7 @@
 /-!
 # door：设置 → 远程里的门开关、「更换城钥匙」与确认码输入框
 
-规定 `client/src/views/settings/remote_door.ts` 的 `step`，以及 `client/src/views/settings/remote_state.svelte` 据它放焦点的方式（`client/Spec.lean` §4-57，`crates/remote_access/Spec.lean` D4）。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`remote.test.ts` 判 `step` 与这里的定义读出同样的答案。
+规定 `client/src/views/settings/remote_door.ts` 的 `step`，以及 `client/src/views/settings/remote_state.svelte` 据它放焦点的方式（`client/Spec.lean` §4-57，`Sprawling/remote_access/Spec.lean` D4）。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`remote.test.ts` 判 `step` 与这里的定义读出同样的答案。
 
 按下「开门」发 `OpenRemoteDoor{lasting_ms}`，按下「更换城钥匙」发 `ReplaceCityKey`。城答 `E_APPROVAL_PENDING` 时页面显示一个确认码输入框，焦点进框，说明码印在城的控制台上；Escape 取消，焦点回到按下的那个控件；提交发 `ConfirmRemoteDoor{code}`；城答一个拒绝（`E_GATE_DENIED` 或别的码）时清空输入框，焦点回到那个控件，状态行说再按一次。关门发 `CloseRemoteDoor`，不要码，不经这台状态机（D4：关门在线上不设防）。
 

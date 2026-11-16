@@ -5,7 +5,7 @@
 
 //! The addresses this city listens on, registered by its listeners and
 //! read by both browser tools before they act
-//! (`crates/sprawling/spec/BrowserBidi.lean` §8-45-6, sprawling D74).
+//! (`Sprawling/app/spec/BrowserBidi.lean` §8-45-6, sprawling D74).
 //!
 //! The tools are built per run through a function pointer that carries no
 //! state of the assembly, and the remote listener opens and closes while

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The files under one address whose name holds a text
-//! (`crates/wire/spec/Answer/Find.lean` §8-82).
+//! (`Sprawling/wire/spec/Answer/Find.lean` §8-82).
 //!
 //! A page that wants one name cannot ask `Listing` level by level: a
 //! deep tree is dozens of round trips before it can say "none", and a

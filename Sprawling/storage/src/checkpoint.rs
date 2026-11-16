@@ -31,7 +31,7 @@
 //! `land` move HEAD, because a worktree branches from a commit and offered
 //! work has to be on a branch.
 //!
-//! Specified by `crates/storage/spec/Checkpoint.lean` §8-8.
+//! Specified by `Sprawling/storage/spec/Checkpoint.lean` §8-8.
 
 mod base;
 pub(crate) mod commit;

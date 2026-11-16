@@ -21,7 +21,7 @@ fn small() -> Fixture {
     }
 }
 
-/// The key sequence of the grammar in `crates/citysim/spec/Bench.lean` §8-6. The
+/// The key sequence of the grammar in `Tools/citysim/spec/Bench.lean` §8-6. The
 /// format's authority is `Reading::line`; this is the acceptance contract
 /// a render must keep meeting.
 const KEYS: [&str; 10] = [

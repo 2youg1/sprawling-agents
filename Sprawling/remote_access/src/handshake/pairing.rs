@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The handshake an unpaired device makes to pair (crates/remote_access/Spec.lean
-//! §8-6). Its properties are stated by `crates/remote_access/spec/Handshake.lean`.
+//! The handshake an unpaired device makes to pair (Sprawling/remote_access/Spec.lean
+//! §8-6). Its properties are stated by `Sprawling/remote_access/spec/Handshake.lean`.
 //!
 //! The city has no key for the device yet, so only the city signs. The
 //! device checks the key the city presents against the fingerprint its

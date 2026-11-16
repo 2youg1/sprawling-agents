@@ -6,7 +6,7 @@
 /-!
 # gateway::provider
 
-规定 `provider`（`crates/gateway/src/provider/mod.rs`）：本城在问一个 provider 之前就知道的事：厂商文档写下来一次，与输出上限的事实梯。本文件是 `crates/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `crates/gateway/Spec.lean §8-n`。
+规定 `provider`（`Sprawling/gateway/src/provider/mod.rs`）：本城在问一个 provider 之前就知道的事：厂商文档写下来一次，与输出上限的事实梯。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；下面每一节保留它在 gateway 规格里的标签 §8-n，别处引作 `Sprawling/gateway/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状由 Rust 的类型守住，`gateway::provider` 旁还没有测试。
 -/
@@ -43,7 +43,7 @@ pub struct ChatSpelling { pub ceiling: CeilingField, pub effort: EffortField,
 impl ChatSpelling { pub const DOCUMENTED: ChatSpelling; }       // 未登记的主机：max_tokens、reasoning_effort、丢弃思考、两面的图都跟在其后的 user
 pub enum CeilingField { MaxTokens, MaxCompletionTokens }
 pub enum EffortField { ReasoningEffort, ReasoningObject, ThinkingToggle, EnableThinking }
-                                    // 一档与「开启思考」在 chat 面写成哪几个字段，表在 `crates/gateway/spec/Dialect.lean` §8-1
+                                    // 一档与「开启思考」在 chat 面写成哪几个字段，表在 `Sprawling/gateway/spec/Dialect.lean` §8-1
 pub enum ReasoningReturn { Dropped, AsReasoningContent }
 pub enum ToolPictureCarry { FollowingUser, InToolContent }   // 工具产出的图在某一接口面写在哪；表在 Dialect §8-1 与 D66
 // HostPreset 另有三列：chat: ChatSpelling、session_header: Option<&'static str>、cache_key_field: Option<&'static str>
@@ -90,7 +90,7 @@ impl Figures {
 - **事实梯只有一架，权威从高到低：人填 → provider 的列表 → 上一次登记 → 钉版目录与预设表 → 策略缺省**，窗口与上限各爬一次。人填不是推断，故压过其余各档；provider 的 `/v1/models` 说过的话压过本城钉下的任何数字（Anthropic 自己的 Models API 逐模型给出 `max_tokens` 与 `max_input_tokens`，`endpoint::models` 读这两个键），这一档读的是端点簿里这个 id 的那一行（`AttachedEndpoint.models`，§8-10），不是表单抄进人那一格的数。上一次登记是这个 tag 上一次选同一个端点的同一个模型时登记的那一行（`ModelEntry`），按 endpoint 与 model id 读，把 tag 指向另一个模型时旧模型的数不跟过去；它只拿人说过的数作答（D45）。**上限的后两档只在这一面要求这个字段时作答**：messages 兼容格式的每个请求都必须带 `max_tokens`，于是那里梯子恒有答案，`kernel::consts_policy::OUTPUT_CEILING_DEFAULT = 8_192` 只在前四档全数沉默时作答；chat 与 responses 两面的上限字段是可选的，人、provider 与上一次登记都没说时答 `ProviderDefault`，请求里不写这个字段，由供应方按模型取它自己的缺省。**窗口没有策略缺省一档，也不看是哪一面**：窗口不上线，只用于上下文提醒与会话冻下的形状；四档都沉默时窗口未知（登记为 `0`），上下文提醒随之不响。
 - **每个数记下说出它的那一档**：`ModelEntry` 带 `window_from` 与 `ceiling_from`（`Option<FigureSource>`，数缺席时为 `None`），`model_selected` 带同名的两个词，`router::payload` 一处写、`read_choice` 一处读。只拿到数字的读者说不出一次跑为什么停在那里，也说不出下一次登记时这个数该不该在「上一次登记」那一档作答。
 - **为什么 OpenAI 兼容两面不写本城的数字**：本城写下的任何数字，要么低于厂商按模型给的缺省（把一个思考模型截在它还在想的时候，跑以 `limit` 结束，人读到的是体验问题而不是设置问题），要么在对话变长后被拒——Kimi 的文档写明「input plus max_completion_tokens exceeds the model context window」时答 `invalid_request_error`，vLLM 对 `max_tokens` 加输入超过 `max_model_len` 的请求同样答 400。厂商的缺省总被厂商自己接受，并且随模型走：DeepSeek 不写 `max_tokens` 时思考模式缺省 64K（<https://api-docs.deepseek.com/api/create-chat-completion>），Kimi K3 缺省 131072（<https://platform.moonshot.ai/docs/api/chat>）。落选的是「抬高策略缺省」：一个对所有模型都更大的数字正是上面第二种失败，而且它仍是本城替厂商猜的数字。**重开参数**：当某个登记过的主机的文档缺省低到截断一次普通的派活（今天没有一家），在本表给它的模型写行，并让这一面的预设档作答。
-- **`resolve` 的返回值带着是谁答的**（`FigureSource`），因为只拿到数字的调用方说不出一次跑为什么停在那里。这是对 `anthropic.rs` 那句自我反对的回答——「a ceiling invented at the call site truncates runs for a reason that appears nowhere in the account」：它出现在账里（`model_selected.ceiling_from`，见 `crates/sprawling/Spec.lean` §8-52）。
+- **`resolve` 的返回值带着是谁答的**（`FigureSource`），因为只拿到数字的调用方说不出一次跑为什么停在那里。这是对 `anthropic.rs` 那句自我反对的回答——「a ceiling invented at the call site truncates runs for a reason that appears nowhere in the account」：它出现在账里（`model_selected.ceiling_from`，见 `Sprawling/app/Spec.lean` §8-52）。
 - **预设表的上下文窗口也是一档**：`window_for` 与 `ceiling_for` 读同一行，窗口梯在钉版目录之后读它，所以它在三个兼容格式上一样作答。今天登记模型行的是 `api.anthropic.com`（当前四个家族与更早的四行，读自厂商的 models overview）与 `api.deepseek.com`（`deepseek-flash` 与 `deepseek-v4-pro` 两个当前家族，加上旧名 `deepseek-v4-flash`：1M 窗口，上限 393216——API 参考写作「between 1 and 384K (393216)」）。Flash 与旧 Flash 名的 `input` 是 `TextImage`，Pro 是 `Text`，与厂商 Vision 表一致。厂商页上写作 `1M`、`128K` 的数按一千进位读：它恒不高于厂商所指的那个数。
 - **钉版目录与预设表是同一档的两个索引**：目录按精确 id 查，预设表按 host ＋ id 前缀查，一条测试钉住两个索引不为同一个 id 作答。`MarketSnapshot::lookup` 因此保持精确匹配，前缀匹配只发生在预设表内。
 - **预设表逐行注出处**，每行带厂商文档地址；查不到的行不发明数字，而是让梯子落到下一档——这就是「不补零、不补默认、不补猜测」在登记面上的样子。`image_max_side` 同样只收文档明确陈述的数；`None` 让请求保持原字节，而不是猜一个上限。DeepSeek Flash 与其旧名的这一列是 8192，实际请求达到十五个图片部件时取 4096（重复 locator 同样计数），Pro 不读图所以是 `None`。价目列不在本表：厂商价目随时在动，一个没有复核日期的价目行就是第二个会漂的权威，价目继续住钉版目录（§8-7）。
@@ -110,7 +110,7 @@ impl Figures {
 
 决定：人填 → provider 的列表 → 上一次登记 → 钉版目录与预设表 → 策略缺省这架梯子只写在 `provider::ceiling::Figures::resolve`，选型点 `select_model` 与设置页要问的查询都调它，装配层只交上人这次填的两个数、端点簿里这个 id 的那一行与上一次登记的那一行。`ModelEntry` 带 `window_from` 与 `ceiling_from`，`model_selected` 带同名的两个词。上一次登记只在它记下的来处是 `Person` 或 `Registered` 时作答（`FigureSource::carried`），那时这一次记作 `registered`；来处是 `Upstream`、`Preset` 或 `Policy` 的数，下一次登记时回到那一档再问一次。账本里没有来处的数——`ceiling_from` 出现之前写的行，与 `window_from` 出现之前写的每一行——读作 `Registered`；读不出的词也读作 `Registered`，因为这个数确实是这个 tag 上一次登记的，而它是谁说的这个 build 说不出来。
 
-理由：`ModelEntry` 原来只存数，不存来处，于是一次早先选模型时落到的策略缺省 8 192，下一次以「上一次登记」的身份压过 provider 后来说的数，在 `model_selected.ceiling_from` 里还记成 `upstream`，而 glossary 对那一档的定义是 provider 的列表；provider 列表里的数又只在表单把它抄进人那一格时才进城，于是被记成 `person`。上一次登记这一档存在的理由是人重选同一个模型时空着的框不抹掉他当初填的数（`crates/sprawling/Spec.lean` §8-71）；provider 与本城的表随时可以再问，再问一次答的是它们现在说的，所以只有人说的数需要沿下来。
+理由：`ModelEntry` 原来只存数，不存来处，于是一次早先选模型时落到的策略缺省 8 192，下一次以「上一次登记」的身份压过 provider 后来说的数，在 `model_selected.ceiling_from` 里还记成 `upstream`，而 glossary 对那一档的定义是 provider 的列表；provider 列表里的数又只在表单把它抄进人那一格时才进城，于是被记成 `person`。上一次登记这一档存在的理由是人重选同一个模型时空着的框不抹掉他当初填的数（`Sprawling/app/Spec.lean` §8-71）；provider 与本城的表随时可以再问，再问一次答的是它们现在说的，所以只有人说的数需要沿下来。
 
 被否：①上一次登记的数一律作答，来处只记账——一个旧的策略缺省压过下一个 build 新加的预设行，messages 面上落到的预设数在端点换到 chat 面后变成一个照发的上限，而那一面本该交给供应方；②来处是 `Upstream` 的数也沿下来——provider 的列表已在它自己那一档读过，沿下来的只会是它已经撤回的数，而且旧 build 写下的 `upstream` 装的正是上一次登记沿下来的数，其中有策略缺省；③梯子留在 `select_model`，查询另抄一份——同一条规则两个家，漂开的总是没人看的那个；④价目也走这个函数——provider 的价目是它原样的文字，单位各家不同（§8-16），换算成 `UsdMicros` 是一个新的读法，不在这一次的范围，见 §3。
 

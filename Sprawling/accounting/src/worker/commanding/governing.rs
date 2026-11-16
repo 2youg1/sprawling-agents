@@ -22,7 +22,7 @@ impl RunWorker {
     ///
     /// It still does not end a run: stopping a run in flight is
     /// `Cancel`, and one verb that did both would leave a person unable
-    /// to ask for either alone. What changed (`crates/runtime/Spec.lean` §8-28) is that
+    /// to ask for either alone. What changed (`Sprawling/runtime/Spec.lean` §8-28) is that
     /// a background command is not a run. It is a child process nobody
     /// could reach, because a run waiting on one is inside a system call
     /// rather than at a phase boundary; leaving it going would make
@@ -167,7 +167,7 @@ impl RunWorker {
             // Into a lane, so that answering one item does not hold the
             // desk for the length of the run it releases; a person
             // answering a queue of approvals would otherwise wait minutes
-            // between two clicks (`crates/sprawling/Spec.lean` §8-46-2). The
+            // between two clicks (`Sprawling/app/Spec.lean` §8-46-2). The
             // room it was interrupted in already exists, so no session
             // is opened.
             // The start reports its own refusal; there is no run id to
@@ -183,7 +183,7 @@ impl RunWorker {
     ///
     /// The read is positional and its pages stay in the operating
     /// system's file cache, so this process keeps no copy of any run's
-    /// task (`crates/sprawling/spec/Accounting/Worker.lean` §8-25).
+    /// task (`Sprawling/app/spec/Accounting/Worker.lean` §8-25).
     ///
     /// # Errors
     /// A ledger that cannot be listed or read, and a line of the run that
@@ -257,7 +257,7 @@ impl RunWorker {
 
     /// Writes one identity card into its document, only if the document
     /// still holds `base`, and records that it happened with the identity
-    /// version it leaves: the receipt a page waits for (`crates/wire/Spec.lean`
+    /// version it leaves: the receipt a page waits for (`Sprawling/wire/Spec.lean`
     /// §8-59).
     ///
     /// # Errors

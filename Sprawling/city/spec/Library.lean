@@ -6,7 +6,7 @@
 /-!
 # city::library
 
-规定 `library`、`library::reading`、`library::shelf`、`config_layers::shelves`（`crates/city/src/` 下同名的文件）。书架上有什么：城库、楼架与城外书架，阅览室准入哪几件。本文件是 `crates/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `crates/city/Spec.lean §8-n`，决定引作 `city D<n>`。
+规定 `library`、`library::reading`、`library::shelf`、`config_layers::shelves`（`Sprawling/city/src/` 下同名的文件）。书架上有什么：城库、楼架与城外书架，阅览室准入哪几件。本文件是 `Sprawling/city/Spec.lean` 的一个分部；下面每一节保留它在 city 规格里的标签 §8-n，别处引作 `Sprawling/city/Spec.lean §8-n`，决定引作 `city D<n>`。
 -/
 
 /-!
@@ -51,7 +51,7 @@ pub fn check_skill_shelves(shelves: &[String], home: &Path) -> Result<(), AxErro
 - **外部路径里的 `~` 指这个人自己的 home，home 以参数传入**：读环境不是本 crate 的活（`bin::assembly` 给出 `Home`），因此测试扫的是测试自己造的目录。committed 的城配置里不放一台机器的绝对路径，这正是 `~` 存在的理由。不是 `~` 开头也不是绝对路径的条目在解释处即拒，恢复语说出这条规则。
 - **同一名的优先级是 building > library > external（外部按数组序）**：按最远的架先上、近的盖上去，于是城自己的存货盖过别的程序的目录——城留下一个名字时，那个名字指城的 skill；楼的自己一份又盖过城的。外部条目排到最后，因为它是别人写的：一份目录不是一个权威。
 - **目录的架次由 `Shelf` 的臂序给出**：`Library::all` 先按 `Shelf::catalog_position`——城库、楼架、外部架按 `[skills] shelves` 的数组序——再按 `(section, name)`。位置是对三条臂的穷尽 match，不另立一张次序表；加一条臂而不在这里安置它，本 crate 编译不过。外部持有者没有 section，若把全部持有者按 `(section, name)` 排，别人的目录会排到城自己的存货之前，那正是上一条优先级的反面。
-- **一件藏品总是由 manifest 描述**：单文档也是只有 `SKILL.md` 一项的 manifest，包则列出每个目录与文件。catalog 只列 `SKILL.md` 的第一行；`read` 按 `<名>/<相对路径>` 在 manifest 中查文件 digest 并做完整 CAS 读取（`crates/runtime/Spec.lean` §8-29-3），所以不会把同名单文档的别的文件一并交出。
+- **一件藏品总是由 manifest 描述**：单文档也是只有 `SKILL.md` 一项的 manifest，包则列出每个目录与文件。catalog 只列 `SKILL.md` 的第一行；`read` 按 `<名>/<相对路径>` 在 manifest 中查文件 digest 并做完整 CAS 读取（`Sprawling/runtime/Spec.lean` §8-29-3），所以不会把同名单文档的别的文件一并交出。
 - **`Holding` 不携 `path` 或 `package`**：来源由 `Shelf` 说出，版本由 `hash` 说出；再存一个目录或文件地址就是第二个权威，也会在 CAS 迁移后指向不存在的副本。
 -/
 
@@ -79,7 +79,7 @@ pub struct Holding { …, pub hash: B3Hash }   // canonical manifest 的 BLAKE3�
 ```
 
 - **manifest digest 覆盖整包**：`shelve` 取 disclosure 的同时构造每份文件的 digest 与 canonical manifest，包版本不再只是 `SKILL.md` 的哈希。
-- **为什么存在 `Holding` 而不是让读者自己算**：读者要的答案是「它变了没有」，需要两个时刻各一次读取；早一次由 `run_started` 携走存进账本（`crates/runtime/Spec.lean` §8-11）。比对对的是这座城自己的历史，不是一份签名：它只能说「这变了」，永远不说「这安全」。
+- **为什么存在 `Holding` 而不是让读者自己算**：读者要的答案是「它变了没有」，需要两个时刻各一次读取；早一次由 `run_started` 携走存进账本（`Sprawling/runtime/Spec.lean` §8-11）。比对对的是这座城自己的历史，不是一份签名：它只能说「这变了」，永远不说「这安全」。
 - **名字不变而任何包文件变了，正是注入的样子**，只按名字或只按 `SKILL.md` 核对的读者发现不了它。
 -/
 

@@ -10,7 +10,7 @@
   // option, Enter opens it in the right side through `openDocument` at
   // the worktree's text. The page never claims that a directory it was
   // not told about holds no such name, so an answer the city cut short
-  // says so under the list (`Query::Find`, `crates/wire/Spec.lean`
+  // says so under the list (`Query::Find`, `Sprawling/wire/Spec.lean`
   // §8-82). The modal around it is `views/finder.svelte`'s, and opening
   // it puts the focus in the box, the first control the dialog holds.
   //

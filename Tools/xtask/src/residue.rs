@@ -278,11 +278,11 @@ status = "live"
     }
 
     #[test]
-    fn the_current_layout_is_green_while_legacy_paths_stay_live() {
+    fn the_checkout_layout_is_green_after_crates_retire() {
         let violations = check(this_checkout()).unwrap();
         assert!(
             violations.is_empty(),
-            "residue must stay green on the unmoved tree: {violations:?}"
+            "residue must stay green on the post-F2 layout: {violations:?}"
         );
     }
 

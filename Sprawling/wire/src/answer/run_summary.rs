@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! One run as a reader who never saw its stream needs it
-//! (`crates/wire/spec/Reading.lean` D34 for `waiting`).
+//! (`Sprawling/wire/spec/Reading.lean` D34 for `waiting`).
 
 use kernel::{Address, EventKind, RunId, Seq, TimeMs};
 use serde::{Deserialize, Serialize};
@@ -42,7 +42,7 @@ pub struct RunSummary {
     pub goal: Option<String>,
     /// The room the run stopped on a synchronous `send` to hear from,
     /// and until when; absent while it waits for nobody, and always
-    /// absent once it froze (`crates/wire/spec/Reading.lean` D34).
+    /// absent once it froze (`Sprawling/wire/spec/Reading.lean` D34).
     /// Defaulted, so an answer from a build without the field still
     /// reads.
     #[serde(default)]

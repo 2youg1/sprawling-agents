@@ -8,7 +8,7 @@
 //! The version probe and the city's identity both need line 1 alone,
 //! and a segment grows to tens of megabytes: lifting it whole to split
 //! off one line made a single-segment ledger cost two full reads on
-//! every open (`crates/storage/spec/Jsonl.lean` §8-1). The window starts at one page and
+//! every open (`Sprawling/storage/spec/Jsonl.lean` §8-1). The window starts at one page and
 //! doubles, so a line of any length costs at most twice its own bytes.
 
 use std::io;
@@ -25,7 +25,7 @@ use super::open::unversioned;
 
 /// The first window a reader of a line of unknown length asks for; each
 /// next window is twice the last. `jsonl::tail` reads backwards by the
-/// same rule (`crates/storage/spec/Jsonl.lean` §8-1), and the side
+/// same rule (`Sprawling/storage/spec/Jsonl.lean` §8-1), and the side
 /// index reads a segment's new records forward by it (storage D32).
 pub(crate) const FIRST_WINDOW_BYTES: u64 = 4096;
 
@@ -72,7 +72,7 @@ impl JsonlLedger {
         // A mangled first line in a single-segment ledger is tail damage:
         // it carries no version information, and tail recovery owns it.
         // With more segments behind it the same damage is non-tail and
-        // must refuse instead (`crates/storage/spec/Jsonl.lean` §8-1).
+        // must refuse instead (`Sprawling/storage/spec/Jsonl.lean` §8-1).
         let probed = serde_json::from_slice::<serde_json::Value>(&first_line)
             .ok()
             .and_then(|value| value.get("v").and_then(serde_json::Value::as_u64));
@@ -140,7 +140,7 @@ mod tests {
 
     /// With more segments behind it, a first line that carries no version is
     /// damage inside the history, not a torn tail: open refuses at line 1
-    /// rather than reading past it (`crates/storage/spec/Jsonl.lean` §8-1).
+    /// rather than reading past it (`Sprawling/storage/spec/Jsonl.lean` §8-1).
     #[test]
     fn a_mangled_first_line_with_segments_behind_it_is_refused() {
         let dir = tempfile::tempdir().unwrap();

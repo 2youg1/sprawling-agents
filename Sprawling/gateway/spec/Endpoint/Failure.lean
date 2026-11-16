@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.kernel.spec.Error
+import Sprawling.kernel.spec.Error
 
 /-!
 # gateway::endpoint::failure
 
-规定 `endpoint::failure`（`crates/gateway/src/endpoint/failure.rs`）：一次 provider 调用哪里失败了、同一请求能不能再发，与恢复语。本文件是 `crates/gateway/Spec.lean` 的一个分部；别处引它的决定作 `gateway D<n>`。
+规定 `endpoint::failure`（`Sprawling/gateway/src/endpoint/failure.rs`）：一次 provider 调用哪里失败了、同一请求能不能再发，与恢复语。本文件是 `Sprawling/gateway/Spec.lean` 的一个分部；别处引它的决定作 `gateway D<n>`。
 
 本分部没有 §8 的节：「能否再试一次」「窗口溢出」与「换不换账号」是三条决定（D2、D3、D32），各自站在它所管的定义正上方。模型证明：没发出去的请求再发、发出去丢了回答的效果不明、普通的拒绝恰在 408／429／5xx 时再问、溢出从不再试、额度用尽不再问；换账号恰在 401、结构化的额度用尽与流内的 `insufficient_quota` 时成立，效果不明的失败从不换账号，换账号的失败都不再发。
 -/
@@ -101,11 +101,11 @@ theorem an_overflow_is_never_asked_again (status : Nat) : retry (.Overflow statu
 
 /-! D32 「这个账号还能不能接这个请求」与「能否再试」同住 `endpoint::failure`：`ProviderFailure::account_disposition`
 
-**决定**：每一种失败除了 `retry` 还答一格 `AccountDisposition`（`crates/kernel/spec/Error.lean` D53），也只在这里答一次，`ProviderFailure` 造 `AxError` 时经 `ErrorDraft::account_unusable` 写进去。答 `Advance` 的恰是三种：对端以 401 拒绝（这个 Key 不被认）；对端以 429 拒绝且拒绝体的结构化 `error.code`（缺席或为 null 时取 `error.type`）恰为 `insufficient_quota`，判为 `AccountUnavailable`；已答 200 的流里报错帧的 `kind` 恰为 `insufficient_quota`。其余一律 `Keep`：408、限流的 429、5xx 与列明的流内错误是对端忙，原号稍后再问（`Retry::Yes`）；400、403、404、422 是请求、地域、权限或模型的问题，没有证据说换一个账号就能修好，所以不再发也不换号；`Overflow`、`Unreadable`、`Unbuilt` 与账号无关；往返未完成的 `Exchange`、`Cut`、`Silence` 不换号，其中效果不明的那几种由 `unknown_keeps_account` 守住。
+**决定**：每一种失败除了 `retry` 还答一格 `AccountDisposition`（`Sprawling/kernel/spec/Error.lean` D53），也只在这里答一次，`ProviderFailure` 造 `AxError` 时经 `ErrorDraft::account_unusable` 写进去。答 `Advance` 的恰是三种：对端以 401 拒绝（这个 Key 不被认）；对端以 429 拒绝且拒绝体的结构化 `error.code`（缺席或为 null 时取 `error.type`）恰为 `insufficient_quota`，判为 `AccountUnavailable`；已答 200 的流里报错帧的 `kind` 恰为 `insufficient_quota`。其余一律 `Keep`：408、限流的 429、5xx 与列明的流内错误是对端忙，原号稍后再问（`Retry::Yes`）；400、403、404、422 是请求、地域、权限或模型的问题，没有证据说换一个账号就能修好，所以不再发也不换号；`Overflow`、`Unreadable`、`Unbuilt` 与账号无关；往返未完成的 `Exchange`、`Cut`、`Silence` 不换号，其中效果不明的那几种由 `unknown_keeps_account` 守住。
 
 `AccountUnavailable` 是 D3 之外的又一族：429 本来说「忙」，而额度用尽不是忙，等多久再问都一样，所以它的 `retry` 是 `No`。落选的是保留 `Yes` 只加 `Advance`：单账号端点会对一个用尽的额度退避重试到 `Halt`，多账号时还要让选号模块推翻 `retry`，那是同一事实的第二个权威。它上线时的种类是 `ProviderFailureKind::Quota { status }`，恢复语说出真有的出路：给这个账号补额度，或在 Provider 页再加一个账号；`Refused` 的恢复语（查模型名、密钥与兼容格式）对它是错的出路。分类只读拒绝体里结构化的 `error` 对象，不读 message 文本，subject 仍只写 URL 与状态码；读体失败、坏 JSON、403 都不授换号。判 `Overflow` 先于判额度，与 D3 的次序一致。
 
-端点兑付凭据（`endpoint::redemption`）造的 `E_CREDENTIAL_MISSING`——这个账号的引用在 vault 里不在、环境变量也没给——同样标 `Advance`：缺的是这个账号的凭据，下一个账号可能有。vault 锁住或不可用的错误不标，换号修不好共用的存储（`crates/kernel/spec/AccountRecovery.lean` D55）。
+端点兑付凭据（`endpoint::redemption`）造的 `E_CREDENTIAL_MISSING`——这个账号的引用在 vault 里不在、环境变量也没给——同样标 `Advance`：缺的是这个账号的凭据，下一个账号可能有。vault 锁住或不可用的错误不标，换号修不好共用的存储（`Sprawling/kernel/spec/AccountRecovery.lean` D55）。
 
 **信源**：OpenAI 的错误码文档把 429「You exceeded your current quota」与 429「Rate limit reached for requests」分成两条，前者的出路是充值或换计划（<https://platform.openai.com/docs/guides/error-codes>）；`insufficient_quota` 是 OpenAI 兼容格式拒绝体里 `error.code`／`error.type` 的取值。Anthropic 兼容格式以别的类型报计费问题，今天不判为 `Advance`。只凭 429 的状态码不证明额度用尽。
 

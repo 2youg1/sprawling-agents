@@ -119,7 +119,7 @@ pub(crate) fn write(root: &Path) -> Result<String, XtaskError> {
 
 /// Every document a reader can receive: the Markdown ones, and the Lean
 /// specifications, whose block comments hold a span as well as a Markdown
-/// paragraph does (crates/xtask/Spec.lean §8-43). The isolation zone holds
+/// paragraph does (Tools/xtask/Spec.lean §8-43). The isolation zone holds
 /// one machine's working notes and is never published, so a marker there
 /// is nobody's authority.
 fn documents(root: &Path) -> Result<Vec<std::path::PathBuf>, XtaskError> {
@@ -182,7 +182,7 @@ fn judge(rel: &str, span: &Span, values: &Readings, out: &mut Vec<Violation>) {
             rule: "a managed span names a fact the generator array defines".to_owned(),
             violation: format!("`{}` is not a fact xtask can recount", span.key),
             alternative: format!(
-                "add it to `FACTS` in crates/xtask/src/docnum/facts.rs, or name one of: {}",
+                "add it to `FACTS` in Tools/xtask/src/docnum/facts.rs, or name one of: {}",
                 facts::keys()
             ),
         });

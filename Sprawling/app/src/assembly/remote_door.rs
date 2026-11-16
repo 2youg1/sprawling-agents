@@ -3,11 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the remote door of a served city is made of (`crates/sprawling/spec/Outside/Conduit.lean`
+//! What the remote door of a served city is made of (`Sprawling/app/spec/Outside/Conduit.lean`
 //! §8-139): the device table's path, the writer's relay for its five
 //! lines, this machine's clock and random source, where the city's own
 //! listener answers on this machine and the page it serves, and the
-//! route the city's `[remote]` table names (`crates/sprawling/spec/Assembly.lean`
+//! route the city's `[remote]` table names (`Sprawling/app/spec/Assembly.lean`
 //! §8-151).
 //!
 //! Assembled here because the clock is sampled in `bin::assembly` only,
@@ -40,7 +40,7 @@ const CLOUDFLARED: &str = "cloudflared";
 /// The longest one `/remote open` waits for its route to be reachable.
 /// The console's thread waits, and the door's lock is held, for as long
 /// as this; `cloudflared` reaches its edge in one to a few seconds
-/// (`crates/sprawling/spec/Assembly.lean` §8-151).
+/// (`Sprawling/app/spec/Assembly.lean` §8-151).
 const ROUTE_PATIENCE: TimeoutMs = TimeoutMs(30_000);
 
 /// The parts a remote door is kept with, gathered while the city opens.
@@ -81,7 +81,7 @@ impl Outdoors {
     /// Keeps the door on a thread of its own and hands it to `then`
     /// there: the city key it reads can wait on a Keychain dialog nobody
     /// answers, and the serve that called this listens for Ctrl-C at
-    /// once (`crates/sprawling/spec/Console.lean`).
+    /// once (`Sprawling/app/spec/Console.lean`).
     pub(super) fn keep_aside(self, then: impl FnOnce(Result<Remote, AxError>) + Send + 'static) {
         let runtime = tokio::runtime::Handle::try_current();
         std::thread::spawn(move || {

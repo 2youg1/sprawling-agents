@@ -6,13 +6,13 @@
 /-!
 # accounting::views：写在 sprawling 规格里的那些节
 
-本分部收着写 accounting crate 里 `accounting::views` 的节。模块从 `sprawling` 搬进 `accounting` 时，写它的那一节留在本 crate 的规格里（accounting D15），标签不变；为什么暂住这里、何时搬走，见 sprawling D30。本文件是 `crates/sprawling/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `crates/sprawling/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
+本分部收着写 accounting crate 里 `accounting::views` 的节。模块从 `sprawling` 搬进 `accounting` 时，写它的那一节留在本 crate 的规格里（accounting D15），标签不变；为什么暂住这里、何时搬走，见 sprawling D30。本文件是 `Sprawling/app/Spec.lean` 的一个分部；下面每一节保留它的标签 §8-n，别处引作 `Sprawling/app/Spec.lean §8-n`，决定引作 `sprawling D<n>`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `accounting::views` 旁的测试守住。
 
 **平台**：视图只折账本、读城里的文件与检查点仓库，不取时钟（时刻都来自记录自己的 `t`）；除 §8-52 列目录时文件名的读法外，下面每一句在 Windows、macOS 与 Linux 上相同。
 
-§8-46-9 到 §8-46-13 写的是 `accounting::worker`，不是 `accounting::views`；`crates/sprawling/Spec.lean` 的标签表把它们放在这里，所以它们的权威就在本文件，直到它们随 accounting D15 那一步搬走。
+§8-46-9 到 §8-46-13 写的是 `accounting::worker`，不是 `accounting::views`；`Sprawling/app/Spec.lean` 的标签表把它们放在这里，所以它们的权威就在本文件，直到它们随 accounting D15 那一步搬走。
 -/
 
 /-!
@@ -27,9 +27,9 @@ impl CityAsk { fn read(self) -> wire::Answer; }                     // 放下快
 ```
 
 - **视图冷重建与热折叠共用 `apply`**：启动时把 Ledger 逐行喂进去，其后由 `JsonlLedger::observe` 喂。测试断言两条路径答案逐字段相等——这就是「projection 可弃」的可执行形式。
-- **计划的投影是 `Roadmap.md` 的缓存**：那份文件就是计划，Agent 用 edit 工具改它。`Views` 持 `Arc<Mutex<accounting::plan_view::PlanView>>`，`roadmap_*` 记录经 `apply` 让缓存失效，查询在锁外读盘回填（§8-100，`crates/accounting/Spec.lean` §8-6）。
+- **计划的投影是 `Roadmap.md` 的缓存**：那份文件就是计划，Agent 用 edit 工具改它。`Views` 持 `Arc<Mutex<accounting::plan_view::PlanView>>`，`roadmap_*` 记录经 `apply` 让缓存失效，查询在锁外读盘回填（§8-100，`Sprawling/accounting/Spec.lean` §8-6）。
 - **读不懂的行照显**：`problems` 随答案回到界面；没有 Roadmap 的楼答 `Progress::Unplanned`（它没有 ratio 方法，故界面画不出百分比不是守规矩，是无从下手）。
-- **保留前缀不是楼**：列楼经 `city::buildings`（`crates/city/src/building.rs`），`.` 开头的目录跳过，`.sprawling/` 因此恒不被当成一栋楼。
+- **保留前缀不是楼**：列楼经 `city::buildings`（`Sprawling/city/src/building.rs`），`.` 开头的目录跳过，`.sprawling/` 因此恒不被当成一栋楼。
 - **`Views` 是 `pub`**：它经 `accounting::views::Views` 重导出给 `sprawling` 的 `bin::assembly` 与 `bin::serving`，字段一律 `pub(super)`，只有 `views` 自己的模块看得见折叠的内部。
 -/
 
@@ -83,7 +83,7 @@ impl CommitFacts { pub(super) fn answer(&self, oid: GitOid, lineage: Vec<RunId>,
   而不是「是不是这个 kind」。`pr_merged` 的 `commit` 键还是手写的键名，载荷旁的归因读成 `CommitAttribution`。
 - **读不出的载荷是错误，不是「这一行没宣告提交」**：`checkpoint_committed` 读不成那个枚举、或 `pr_merged` 的归因读不成 `CommitAttribution`，`commit_facts` 返回错误，`Views::apply` 与 playback 的 `absorb`／`checkpoint_of` 把它往上交；跳过它，城造过的一个提交就无声地从 Commit／Commits 视图与回放的证据里消失。`pr_merged` 的 `commit` 键缺席或解析不成 oid、记录不带地址时答 `None`：前者是这一行没说出提交，后者是没有可归属的人。
 - **`run`、`seq`、`at` 与 `actor` 取自记录自己的身份**（`EventRecord::run`／`seq`／`t`／`addr`），
-  `b3` 是宣告它的那一行规范字节的摘要，`model` 与 `effort` 取自载荷（`crates/storage/Spec.lean` §8-18）。**没有一个字段是从 git 读的**：
+  `b3` 是宣告它的那一行规范字节的摘要，`model` 与 `effort` 取自载荷（`Sprawling/storage/Spec.lean` §8-18）。**没有一个字段是从 git 读的**：
   投影读权威，不读另一份投影。
 - **重复的 oid 后写覆盖前写**：同一个 oid 只可能由同一次提交产生，两条记录说同一件事时
   它们说的是同一件事。
@@ -128,7 +128,7 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 1. 追加一条 `autonomy_changed`，值 `delegate:hall/clerk`。**不改 `AUTONOMY_DEFAULT`**：缺省值说的是「没人说过话时怎么办」，而这里是这座城市作出的一个决定，人可以改它，改它要有一行历史可改。`folds` 读回这条线，重启后 clerk 依旧是代答者，无需第二处记忆。
 2. 用 `city::CityPlan::new(None).hall()` 拿到那栋楼，走 `create_building` 落 `RULES.toml` 与脊柱文档，并记 `building_created`。走这扇门而不是另写一段，是为了让市政厅与任何一栋楼在历史里长得一样。
 
-`MAYOR.md` 与 `CLERK.md`（以及城根的 `City.md`）由 worker 开城时经 `city::follow_defaults` 铺下（`crates/city/spec/SpineFiles.lean` §8-43）：立城也经过同一个 `RunWorker::holding`，所以创世不再自己写它们。
+`MAYOR.md` 与 `CLERK.md`（以及城根的 `City.md`）由 worker 开城时经 `city::follow_defaults` 铺下（`Sprawling/city/spec/SpineFiles.lean` §8-43）：立城也经过同一个 `RunWorker::holding`，所以创世不再自己写它们。
 
 **每座城市至少有两栋楼**：`views::tests` 按地址找楼，不按 `buildings[0]` 取楼。
 
@@ -137,13 +137,13 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 /-!
 ## 8-50 三种读法的答：回合、证据、一个节点的花费（`accounting::views::rounds`、`views::evidence`、`views::cost_of`）
 
-`wire` 定形状（`crates/wire/Spec.lean` §8-21），这里折出答。三个新模块都是形状 7 投影：把记录折成页要的读法，删掉重折逐字节相同。
+`wire` 定形状（`Sprawling/wire/Spec.lean` §8-21），这里折出答。三个新模块都是形状 7 投影：把记录折成页要的读法，删掉重折逐字节相同。
 
 ### 8-50-1 `accounting::views::rounds`——一次会话折成回合
 
 `records_of(run)` 用 `LedgerIndex::run_seqs_before` 取这次跑最新的 `HISTORY_MAX` 条 seq，逐条读行、逐条解析，旧在前。**上界与客户端问 `RunHistory { limit: HISTORY_MAX }` 的那一段等宽**，所以折叠看到的会话与读历史的客户端看到的一样多。读不回来的一行**截断而不清空**：读到的那些仍然是真的（同 `Views::history`）。
 
-折叠（`views::rounds::turns`）：`model_called` 开一个回合；`tool_called` 挂进当前回合并按 runtime 给的 id 记下等答；`model_returned` 落到最近一个回合上；`tool_result` 按 id 找回它自己的那次调用——**恒不按位置配对**，因为两个调用可以先后发出而后发的先答；其余记录按 `wire::reading::note_of` 判是否成为一条 `Note`（`Checkpointed`、`Refused`、`Waiting`、`Arrived`、`AwaitingReply`、`Discarded`、`Unreadable` 七种；跨行配对见 `crates/accounting/spec/Views/Rounds.lean` D48）；第一条 `model_called` 之前的记录不属于任何回合，窗口里找不到调用的 `tool_result` 丢掉，因为窗口有界，它的头几行可以是没人在这里见过的调用的答复。答复另带 `worktree`：窗口里第一条 `worktree_opened` 的名字，读不回时为 `None`。`opened_at` 是本会话第一条 `Checkpointed` 的 oid：那是这份活开始时的树，取最新的一个检查点答的是另一个问题（「上一波动了什么」）。
+折叠（`views::rounds::turns`）：`model_called` 开一个回合；`tool_called` 挂进当前回合并按 runtime 给的 id 记下等答；`model_returned` 落到最近一个回合上；`tool_result` 按 id 找回它自己的那次调用——**恒不按位置配对**，因为两个调用可以先后发出而后发的先答；其余记录按 `wire::reading::note_of` 判是否成为一条 `Note`（`Checkpointed`、`Refused`、`Waiting`、`Arrived`、`AwaitingReply`、`Discarded`、`Unreadable` 七种；跨行配对见 `Sprawling/accounting/spec/Views/Rounds.lean` D48）；第一条 `model_called` 之前的记录不属于任何回合，窗口里找不到调用的 `tool_result` 丢掉，因为窗口有界，它的头几行可以是没人在这里见过的调用的答复。答复另带 `worktree`：窗口里第一条 `worktree_opened` 的名字，读不回时为 `None`。`opened_at` 是本会话第一条 `Checkpointed` 的 oid：那是这份活开始时的树，取最新的一个检查点答的是另一个问题（「上一波动了什么」）。
 
 **等人的终点从城自己的 run 里配回来**：`approval_resolved` 记在 `RunId::CITY` 下，不在这次会话的记录里，所以折完回合之后 `answer_waits` 按 approval id 把答复的 `t` 写回 `Note::Waiting.answered`。只有这次会话的窗口里有 `approval_requested` 时才读城的那一段（同样最新的 `HISTORY_MAX` 条）——没等过人的会话不多付一次读。请求或答复落在各自窗口外、或载荷读不回来时，`answered` 为 `None`，页面把请求之后整段画给人，而不是猜一个终点。备选是让治理折叠常驻一张 id→答复时刻的表：它随城一生里答过的每一件批准只增不减，而这里的读只在打开一个等过人的会话时才付。
 
@@ -163,7 +163,7 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 
 ### 8-46-13 检查点不排队：每条 lane 一个自己的 index（`accounting::worker::driving::lane`、`accounting::worker::driving::harness`、`accounting::worker::workbench`、`accounting::worker::workbench::standing`）
 
-**这一节是 sprawling 一侧关于检查点并发的唯一一处规则**；它依赖的性质由 `crates/storage/spec/Checkpoint/Concurrent.lean`（`crates/storage/Spec.lean` §8-39，storage D25、D26）证明，§8-113 与 §8-110 只引用这里。
+**这一节是 sprawling 一侧关于检查点并发的唯一一处规则**；它依赖的性质由 `Sprawling/storage/spec/Checkpoint/Concurrent.lean`（`Sprawling/storage/Spec.lean` §8-39，storage D25、D26）证明，§8-113 与 §8-110 只引用这里。
 
 **一轮检查点是一个动作，不是一个 run 的一部分，而它不必与别的 run 的检查点排队。** 一个 ready set 里的每个节点各占一条 lane 同时跑（§8-46-4），它们都落在**同一个仓库**里。两条 lane 共用仓库的那一份 index 时，libgit2 为暂存取 `.git/index.lock`，后到的一条拿到「the index is locked; this might be due to a concurrent or crashed process」，以 `cancelled` 冻结，它的节点被当作「自己的 done check 没过」交回——所以检查点之间必须有一个次序。这个次序不需要一把全城的锁给：每条 lane 用 `Checkpoint::open_writer(city_root, run)` 开一个自己 index 的句柄，暂存、写树、建提交只碰它自己的 index，共享的对象库与以 oid 为名的引用在任何交错下都等于某个串行次序（storage D25）。于是：
 
@@ -179,7 +179,7 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 
 ### 8-46-9 一个房间一个队列：`accounting::worker::rooms`
 
-形状：**深模块**（ARCH §9 第 1 种）。文件 `crates/accounting/src/worker/rooms.rs`。
+形状：**深模块**（ARCH §9 第 1 种）。文件 `Sprawling/accounting/src/worker/rooms.rs`。
 
 **一个房间恰好一个队列，由类型执行**：`RoomQueues` 是房间队列唯一的持有者。多条车道同时驾驶时，`pursue` 可以把同一栋楼的多行派到同一个房间地址；若两轮活各借一份队列再各自整份还回，后还的一份会盖掉先还的一份，账本上写着 `signal_enqueued`，内存里那条信号却不在，而只增账本分不出「本来就没有」与「被覆盖了」。
 
@@ -248,11 +248,11 @@ impl RunWorker { pub fn serve(&mut self, serving: Serving); }
 
 **入账落在诊断日志而不是账本**：账本里没有 `schedule_dispatch_failed` 这一种记录；同一处境下 `answer_knocks` 用诊断行记
 「敲不开的门」，此处复用同一机制而不是造第二种。`city::Schedule::due_after` 返回 `(地址, task, goal)` 三元组，不带 `fired_at`，
-所以窗口只能整段推进而不能逐条推进；逐条推进要 `crates/city` 给出每条作业的触发时刻。
+所以窗口只能整段推进而不能逐条推进；逐条推进要 `Sprawling/city` 给出每条作业的触发时刻。
 
 **撤销不是一个动词**：`attach` / `select_model` / `set_autonomy` 之后的一键回退，做法是**发同一条命令、带旧值**，
 账本两条线都留着。后端这一侧因此只欠一条性质：设置类命令重复发送与发送一次等价。
-`set_autonomy` 与 `select_model` 折叠取最后一条，故成立（`crates/sprawling/tests/undoing.rs`）。
+`set_autonomy` 与 `select_model` 折叠取最后一条，故成立（`Sprawling/app/tests/undoing.rs`）。
 **两处不成立，都需要它们各自的卡**：
 
 1. `attach` 没有反向动词——`Command` 里没有 detach，`EndpointLost` 只由 `E_ENDPOINT_DIALECT_UNSUPPORTED` 的
@@ -339,18 +339,18 @@ fn knock(&mut self, signal: &collab::Signal, speaker: &Address, policy: kernel::
 -/
 
 /-!
-## 8-52 新客户端要问的四件事，服务端怎么答（`accounting::views::listing`、`accounting::views::document`、`views::rounds`、`views::holding`；`crates/wire/Spec.lean` §8-23）
+## 8-52 新客户端要问的四件事，服务端怎么答（`accounting::views::listing`、`accounting::views::document`、`views::rounds`、`views::holding`；`Sprawling/wire/Spec.lean` §8-23）
 
 - **`Views.governance: views::Governance`**（原 `Views.halted`／`Views.approvals`／`Views.autonomy` 三个散字段）。停摆作用域、待答项与自治档由 `city_halted`／`approval_requested`／`approval_resolved`／`autonomy_changed` 折出，**折法只有 `Governance::absorb` 一处**：工作线程持一份判定面，`Views` 持一份读面，同一个类型、同一遍折，重建即相等（`accounting::worker::folds::tests::standing`、`what_a_worker_holds_is_what_a_restart_rebuilds`）；两份拼法会对「读不懂的决定算什么」答得不一样，所以只有一份。`CityAnswer.halted` 是 `governance.halted` 的 `Vec` 形。
-- **`summarize`（`views::lines`）把 `RunHot.who`／`addr`／`started`／`completion`／`pr`／`ask`／`task`／`goal` 与阶段、`last_seq`／`last_kind` 抄进 `RunSummary`**，不读账本（`crates/wire/Spec.lean` §8-48）。
+- **`summarize`（`views::lines`）把 `RunHot.who`／`addr`／`started`／`completion`／`pr`／`ask`／`task`／`goal` 与阶段、`last_seq`／`last_kind` 抄进 `RunSummary`**，不读账本（`Sprawling/wire/Spec.lean` §8-48）。
 - **`rounds_answer` 多读两条记录**：窗口里第一条 `run_started` 成 `Opening { task, goal, at: record.t(), dispatched_by, policy, effort, names }`（`views::rounds::opening`；`names` 是会话冻结时的名字，从 CAS 读回，读不回时为 `None`，页面退回地址与角色名，而不是今天的名字），第一条 `run_frozen` 成 `Closing { completion, at }`；`turns()` 不读这两条。
 - **`accounting::views::listing`**（新文件）：`at` 为 `None` 读城根，否则读 `city_root/<at>`；`read_dir` 一层，目录在前、文件在后、各按名字 UTF-8 序；读不了的目录答空表而不是拒绝——一个读不了的目录在页面上是一个空目录。符号链接按 `metadata` 判：指向目录的算目录；`read_dir` 本身读不出的一项、`metadata` 读不出的一项（例如断开的符号链接）都不出行。文件大小 `u64`。名字经 `to_string_lossy` 成 UTF-8：Linux 与 macOS 上不是 UTF-8 的字节、Windows 上落单的 UTF-16 代理项各成 U+FFFD，排序按这个转换后的名字，三个平台只在这一处不同。
-- **`accounting::views::document`**：路径同上（与 listing 共用 `listing::resolve`）；答什么、读到的哪些版本进内容库、怎样判文本、在哪里切，见 `crates/accounting/Spec.lean` §8-21 与 `crates/wire/Spec.lean` §8-69。**不经密钥扫描**：这是城内的文件给城的主人看，而 `Hunks` 的扫描针对的是把补丁文本挂上线的那条路——但 `.sprawling/CONFIG.toml` 里只有 `secret:` 引用，明文本来就不落盘（`xtask secret` 门保证），所以这里没有可泄露的东西。
-- **验收**：`views::listing::tests`——`init_city` 铺出的城根列出 `.sprawling` 与 `hall` 两个目录；`hall` 下列出 `Roadmap.md` 等文件且目录先于文件；不存在的路径答空表。`views::document::tests`——读城里 `hall` 楼自己的 `RULES.toml` 得到原文，第一个窗口盖住整份；其余见 `crates/accounting/Spec.lean` §8-21。`views::rounds::tests`——三条记录的会话答出 `opening.task`；冻结后答出 `closing.completion == "done"`。`views::tests`——`city_halted` 后 `city_view.halted == ["city"]`，`released` 后为空。
+- **`accounting::views::document`**：路径同上（与 listing 共用 `listing::resolve`）；答什么、读到的哪些版本进内容库、怎样判文本、在哪里切，见 `Sprawling/accounting/Spec.lean` §8-21 与 `Sprawling/wire/Spec.lean` §8-69。**不经密钥扫描**：这是城内的文件给城的主人看，而 `Hunks` 的扫描针对的是把补丁文本挂上线的那条路——但 `.sprawling/CONFIG.toml` 里只有 `secret:` 引用，明文本来就不落盘（`xtask secret` 门保证），所以这里没有可泄露的东西。
+- **验收**：`views::listing::tests`——`init_city` 铺出的城根列出 `.sprawling` 与 `hall` 两个目录；`hall` 下列出 `Roadmap.md` 等文件且目录先于文件；不存在的路径答空表。`views::document::tests`——读城里 `hall` 楼自己的 `RULES.toml` 得到原文，第一个窗口盖住整份；其余见 `Sprawling/accounting/Spec.lean` §8-21。`views::rounds::tests`——三条记录的会话答出 `opening.task`；冻结后答出 `closing.completion == "done"`。`views::tests`——`city_halted` 后 `city_view.halted == ["city"]`，`released` 后为空。
 -/
 
 /-!
-## 8-53 一座楼做过的提交，倒序分页（`accounting::views::commits`、`views::holding`；`crates/wire/Spec.lean` §8-24）
+## 8-53 一座楼做过的提交，倒序分页（`accounting::views::commits`、`views::holding`；`Sprawling/wire/Spec.lean` §8-24）
 
 - **`Views.commit_seqs: BTreeMap<Seq, GitOid>`**，与按 oid 键的 `commits` 表由 `fold_commit` 同一处写入：一条记录若宣告了提交，两张表各得一行。按 oid 的表答 `Commit`，按 seq 的表答 `Commits`；两表从同一条流折出，重建即相等。
 - **`commits_answer(building, before, limit)`**：在 `commit_seqs` 上从 `before` 的独占上界（`None` 即尾）向前走，按 `actor` 地址前缀过滤（`actor == building` 或以 `<building>/` 起头；`None` 不过滤），取 `limit.clamp(1, HISTORY_MAX)` 条；再多走一步得 `more`。每条经 `CommitFacts::answer` 与 `lineage_of` 成 `CommitAnswer`，故列举与反查答同一形状；`spent` 经 `Views::billed_to`，有一行的花费读不出（它的跑已被逐出、账本读不回）时整页答 `Unavailable`。
@@ -358,7 +358,7 @@ fn knock(&mut self, signal: &collab::Signal, speaker: &Address, policy: kernel::
 -/
 
 /-!
-## 8-128 一次提交带出同一次 run 的上一个提交，与它的父提交（`accounting::views::commits`；`crates/wire/Spec.lean` §8-54）
+## 8-128 一次提交带出同一次 run 的上一个提交，与它的父提交（`accounting::views::commits`；`Sprawling/wire/Spec.lean` §8-54）
 
 - **`CommitFacts.previous: Option<wire::CommitAt>`**，`fold_commit` 写入：`Views.last_commit: BTreeMap<RunId, CommitAt>` 记每次 run 最近宣告的那个提交，一条记录宣告提交时，先把这张表里同一 run 的那一项取作 `previous`，再换成本提交。同一个 oid 被宣告第二次时不拿自己当 `previous`，沿用第一次折出的那个。折叠从快照起步也一样：`last_commit` 随视图进快照，`VIEWS_FOLD_RULES` 随编码变。
 - **`parents` 不进视图。** `Query::Commit` 与 `Query::Commits` 在锁内由视图答出其余各字段，交给 `Prepared::Commits(CommitsAsk)`；锁放开之后 `CommitsAsk::read` 经 `storage::parents_of` 一次开仓库读这一页每个 oid 的父提交，再开一次仓库读每个提交的 `message`（`give_messages` 暂住 `views::commits`，accounting D34 (b)）。读不到仓库时 `parents` 全为 `None`；仓库打不开、对象不在、消息不是 UTF-8 时 `message` 为 `None`；答复照样发出：这两格是这一行多出的事实，不是它成立的条件。§8-167 说的「没有一个字段是从 git 读的」指 trailer 能答的那几项；父提交 trailer 答不出，它的权威是提交对象本身。
@@ -366,9 +366,9 @@ fn knock(&mut self, signal: &collab::Signal, speaker: &Address, policy: kernel::
 -/
 
 /-!
-## 8-106 城景有界（`accounting::views::answering`、`storage::hot`；`crates/storage/Spec.lean` §8-5、`crates/wire/Spec.lean` 的 `CityAnswer`）
+## 8-106 城景有界（`accounting::views::answering`、`storage::hot`；`Sprawling/storage/Spec.lean` §8-5、`Sprawling/wire/Spec.lean` 的 `CityAnswer`）
 
-- **`CityView` 的 `runs` 取自 `HotView::runs`**：热视图只留活跃的全部，加 `last_seq` 最近的 `storage::RECENT_FROZEN` 个冻结跑（`crates/storage/Spec.lean` §8-5），按 RunId 序。`active`／`frozen` 两个数仍是全城的数，页面拿 `frozen` 减去列表里冻结的行数，就知道还有多少在列表之外；那些跑经分页的 `History`／`RunHistory` 读。理由：城景是页面最常问的答复，它的大小原先与城的全部历史同阶（8,000 次跑的城约 1.37 MB），有界之后只与活跃数同阶。答复的语义变了，`WIRE_V` 加一。
+- **`CityView` 的 `runs` 取自 `HotView::runs`**：热视图只留活跃的全部，加 `last_seq` 最近的 `storage::RECENT_FROZEN` 个冻结跑（`Sprawling/storage/Spec.lean` §8-5），按 RunId 序。`active`／`frozen` 两个数仍是全城的数，页面拿 `frozen` 减去列表里冻结的行数，就知道还有多少在列表之外；那些跑经分页的 `History`／`RunHistory` 读。理由：城景是页面最常问的答复，它的大小原先与城的全部历史同阶（8,000 次跑的城约 1.37 MB），有界之后只与活跃数同阶。答复的语义变了，`WIRE_V` 加一。
 - **客户端的 `staleBy` 只在城景真会变的记录上作废它**：`run_started`、`run_frozen`（列表的成员变了），楼与 pursuit 的那组记录（`buildings`／`pursuits`），`city_halted`（`halted`）。一次跑中途的记录只推进 `last_seq`／`last_kind`，页面自己的折叠（`core/belief`）已经从同一条记录读到了，重拉城景只是把同一件事再运一遍。
 - **`CostView` 的 `by_run` 同样有界**：活跃的跑一个不少（顶栏「这次跑花了多少」读的正是正在动的那次），其余从 `Attribution` 仍持有行的跑（即热视图没逐出的冻结跑，见下）里只取花得最多的 `views::answering::TOP_BILLED`（32）个，同额按名字，按名字序输出。选法是对非活跃行做一次 `select_nth_unstable_by`，O(runs)。`total` 仍是全城的权威总额，`by_run` 的和因此可以小于它；界面本就按 `total` 算占比，列表之外的钱留作看得见的余额，而不是被摊掉。另外四个维度（actor、segment、tool、skill）的桶数不随跑数增长，不截。`TOP_BILLED` 与 `RECENT_FROZEN` 一样是线上答复的大小上界，不随机器变。
 - **`RunView` 问到一次被逐出的跑时读冷的一侧**：`hot.get` 答不出而 `hot.was_evicted` 认得它，就从账本索引取这次跑的全部序号，按序号从旧到新把它的记录折进一个只装这一次跑的新 `HotView`，答那一行。折法仍是 `HotView::apply`，冷热两侧没有第二份「一条记录怎么变成一行」。代价是这次跑的记录数，只在有人打开一次旧跑时付。既不在热视图里、也没有墓碑的跑答 `None`；账本读不出、或读出的记录折不出这次跑时答 `Unavailable`，`reason` 是读面遇到的错误（`LedgerAsk::recalled` 返回 `Result<RunSummary, AxError>`，wire D47），因为被逐出的跑必有记录，读不到是「没能看」而不是「没有这次跑」。

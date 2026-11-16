@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The versions of one document, newest first
-//! (`crates/wire/spec/Answer/DocumentVersions.lean` §8-83).
+//! (`Sprawling/wire/spec/Answer/DocumentVersions.lean` §8-83).
 //!
 //! The history knows the versions a page wrote; a resident's `edit`, a
 //! command or the person's own editor writes past the city's document
@@ -55,6 +55,6 @@ pub enum VersionSource {
     /// recorded save wrote: written outside the page before it.
     Before { seq: Seq },
     /// This build's default text, for the three documents the binary
-    /// carries (`crates/wire/spec/Answer/Prefix.lean` §8-98).
+    /// carries (`Sprawling/wire/spec/Answer/Prefix.lean` §8-98).
     Shipped,
 }

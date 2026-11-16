@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! comrak's tree read into the preview tree (`crates/documents/Spec.lean`
+//! comrak's tree read into the preview tree (`Sprawling/documents/Spec.lean`
 //! D22-D24, D26).
 //!
 //! comrak owns CommonMark and GFM; this module owns which extensions the

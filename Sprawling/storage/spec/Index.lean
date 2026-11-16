@@ -6,7 +6,7 @@
 /-!
 # storage::index
 
-规定 `index`、`index::ledger`、`index::reader`、`index::fold`、`index::fold::entries`（`crates/storage/src/` 下同名的文件）。Ledger 旁挂索引 seq→（段，偏移）与 run 表；可弃，存疑即重建。本文件是 `crates/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `crates/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
+规定 `index`、`index::ledger`、`index::reader`、`index::fold`、`index::fold::entries`（`Sprawling/storage/src/` 下同名的文件）。Ledger 旁挂索引 seq→（段，偏移）与 run 表；可弃，存疑即重建。本文件是 `Sprawling/storage/Spec.lean` 的一个分部；下面每一节保留它在 storage 规格里的标签 §8-n，别处引作 `Sprawling/storage/Spec.lean §8-n`，决定引作 `storage D<n>`。
 -/
 
 /-!
@@ -47,7 +47,7 @@ impl LineReader<'_> {
 }
 ```
 
-- **索引随视图快照落盘，只作为投影**：建表只有一遍扫描（`index/ledger.rs` 的 `walk`），两个入口共用它：`rebuild` 自己定位每一行，`folding` 让折叠交回它已读出的位置；这一遍与 `refresh` 读同一段用同一条窗读、在零尾那一窗停（`read_records`，storage D33），所以预分配的段（storage D31）在建表时也不读记录末尾到段尾的零；`Views` 持有它并在每次查询前 `refresh`。`LedgerIndex` 实现 `serde::Serialize`／`Deserialize`，只写 `folded`（列、列外行、段名字典、run 表与 `scanned`），读回时配一条新的 `RealFs` 缝；视图快照（`crates/sprawling/Spec.lean` §8-91）连同它一起编码，所以从快照起步的城，第一次历史查询只 `refresh` 快照之后长出来的字节，而不是整本扫描一遍。它仍是投影：`scanned` 记着切快照那一刻每段已折入的长度，段变短或消失就整份重建（下文 `refresh` 的规则），快照删掉就从段重建。**被否：单独一个索引文件。** 那是第二个可失效的家，要自己的版本、自己的切点与自己的损坏判定；放进视图快照，它与视图共用 `fold_version`、体摘要与原子写。**被否：从快照起步后不带索引。** 第一次历史查询会整本扫描、逐行解析（40 万行的城是秒级），把开城省下的读取挪到第一个问历史的人身上。
+- **索引随视图快照落盘，只作为投影**：建表只有一遍扫描（`index/ledger.rs` 的 `walk`），两个入口共用它：`rebuild` 自己定位每一行，`folding` 让折叠交回它已读出的位置；这一遍与 `refresh` 读同一段用同一条窗读、在零尾那一窗停（`read_records`，storage D33），所以预分配的段（storage D31）在建表时也不读记录末尾到段尾的零；`Views` 持有它并在每次查询前 `refresh`。`LedgerIndex` 实现 `serde::Serialize`／`Deserialize`，只写 `folded`（列、列外行、段名字典、run 表与 `scanned`），读回时配一条新的 `RealFs` 缝；视图快照（`Sprawling/app/Spec.lean` §8-91）连同它一起编码，所以从快照起步的城，第一次历史查询只 `refresh` 快照之后长出来的字节，而不是整本扫描一遍。它仍是投影：`scanned` 记着切快照那一刻每段已折入的长度，段变短或消失就整份重建（下文 `refresh` 的规则），快照删掉就从段重建。**被否：单独一个索引文件。** 那是第二个可失效的家，要自己的版本、自己的切点与自己的损坏判定；放进视图快照，它与视图共用 `fold_version`、体摘要与原子写。**被否：从快照起步后不带索引。** 第一次历史查询会整本扫描、逐行解析（40 万行的城是秒级），把开城省下的读取挪到第一个问历史的人身上。
 - **seq 是隐式的，每行只存一个 `u64`**：内核给行连续编号，所以一行的 seq 就是它在列里的位置加 `base`，列里只存段名字典 id 与偏移拼成的一个字。五万行的账本在索引里占 400 KB，显式 seq 列加 (id, 偏移) 对的布局要 1.2 MB（每行 24 B，`a_contiguous_ledger_costs_eight_bytes_per_record` 钉住 8 B）。损坏的账本仍要能索引，因为修复路径靠它：低于 `base` 的 seq、远到要让空洞多于行数才够得着的 seq（拉长后列里的空洞数超过 `max(列里的行数, 64)`；界按行数而不按列长算，因为按列长算时每个被接受的 seq 都能让列翻倍）、段 id 超过 16 位或偏移超过 48 位的位置，都进 `outliers`；一个 seq 只在两处之一，重复写保留最后的位置，`seqs()` 把两处按序归并。**被否：只留列、把列外行丢掉**——被丢的行对每个读者都不可见；**被否：空洞无上限地拉长列**——一个被写坏成 2^60 的 seq 会让索引去分配 2^63 字节。`doubling_seqs_leave_the_column_bounded_by_its_lines` 钉住这条界；`fold/tests.rs` 的 map 形 oracle 对全部查询（含 `seqs()` 正反两向与两端交替）判等。
 - **`base` 由第一条插入的行定下，之后不再移动。** 这第一条行的 seq 若已损坏且很大，其后每一条健康的行都低于 `base`，全部落进 `outliers`：答案仍然正确，每行 8 B 的布局却失去了，一行按 `BTreeMap` 的节点计价。接受这笔代价，因为它只出现在首行损坏的账本上，而那样的账本本来走修复路径；列外行多于列内行时重定 `base` 是候选的改法，判定它的证据是一个首行 seq 损坏的真实账本在索引里的常驻字节。
 - **取行走游标，而不是每行一次 open ＋逐字节 read**：一次 `History`／`RunHistory` 查询要取一段连续的 seq，而每一行重开段文件、再一次一个字节 `read` 到换行的读法，系统调用数与行长同阶。句柄因此住进 `LineReader`：段名不变即不重开，读用 `BufReader::read_until(b'\n')`，一次填充服务多行。
@@ -60,14 +60,14 @@ impl LineReader<'_> {
   - 索引因此多记一张 `scanned: BTreeMap<段名, 已折入字节数>`。`refresh` 逐段比对：**变大就只读新那一段字节，读到预分配段的零尾为止**；**变小或消失就全重建**（断尾修复截过段，旧偏移不再可信）；一字未动就什么也不做。「消失」按计数判：本次列出的段名逐个在 `scanned` 里查，命中的个数少于 `scanned` 的条数，就是有已折入的段不见了。每段一次有序表查找，不按段数的平方比对名字（`index/ledger/tests.rs` 的 `a_segment_that_vanished_rebuilds_the_index`）。
   - **「上次读到哪」只有这一个家，而且它恒落在整行边界上**：`fold_segment` 只把带终止符的行计入，所以 `scanned` 记的永远是某条记录的结尾，下一次 refresh 从一条记录的开头起读，**取不到半条**。
   - **定位读，而不是整读再切尾**：从 `scanned` 起逐窗 `Vfs::read_at`，第一窗 `jsonl::FIRST_WINDOW_BYTES`（4 KiB），之后每窗加倍，读进来的缓冲只装增量。长度以本次 `Vfs::size` 读到的值封顶——stat 与 read 之间落的那条账留给下一次 refresh，而不是折在一个本次没有确认过的偏移上。
-  - **读到零尾那一窗即停**：一窗读回来，`jsonl::records_end`（`open` 剥段尾零的同一条规则，`crates/storage/spec/Jsonl/Preallocate.lean`）答的记录末尾短于这一窗，记录就止于此，其后的零不再读（storage D32）。预分配的段（storage D31）从建起就是滚动尺寸，段长于是不再说明有没有新记录：没有新记录的一次刷新读一窗的零，有新记录的一次读新记录加至多一窗。生长的段没有零尾，读到 `size` 为止，读量与整读增量相同（`a_refresh_reads_the_appended_tail_rather_than_the_segment`、`a_refresh_stops_at_the_zero_tail_of_a_preallocated_segment`）。
+  - **读到零尾那一窗即停**：一窗读回来，`jsonl::records_end`（`open` 剥段尾零的同一条规则，`Sprawling/storage/spec/Jsonl/Preallocate.lean`）答的记录末尾短于这一窗，记录就止于此，其后的零不再读（storage D32）。预分配的段（storage D31）从建起就是滚动尺寸，段长于是不再说明有没有新记录：没有新记录的一次刷新读一窗的零，有新记录的一次读新记录加至多一窗。生长的段没有零尾，读到 `size` 为止，读量与整读增量相同（`a_refresh_reads_the_appended_tail_rather_than_the_segment`、`a_refresh_stops_at_the_zero_tail_of_a_preallocated_segment`）。
   - **`scanned` 不落盘，所以「偏移写坏」不是一个状态**：它是常驻状态，建表时取当下段大小，故「已折入」与「盘上长度」在那一刻是同一个数。进程内若出现 `scanned > 段长`，走的是「变小」那一支，同样整份重建。任何一条可疑路径的答案都是重建，没有一条会读到半条记录。
   - **`refresh` 报出它读了多少字节**（`Refreshed`）：整读与定位读折出的索引逐条相同，唯一的区别就是抬起的字节数，所以那个数必须能被断言，也正是 `index_refresh_read` 这条预算的读数来源。
   - 消费者：`accounting::views` 的 `Views` 持一份，每次查询先 `refresh`。刷新代价是一次 `read_dir` 加逐段 `metadata`，预分配的末段再加一窗的读，与账本大小无关。
 - **run 索引与 seq 索引同住一张旁挂物**：不建 run 表时，`run_history` 只能从账本尾部逐行往回读、读完再过滤，不属于这个 run 的行也要完整取出再丢掉。索引因此多记一张 run 表（`RunTable`，按区间记每个 run 写过的 seq），查询只取属于它的 seq，代价与**答的条数**同阶而不与账本长度同阶。
   - **为什么不放进一份落盘冷投影**：要让 `run_history` 读一份落盘投影，就得在事件路径上开一个写事务，每条事件多一道磁盘屏障。为一个不需要持久化的答案给每一条落账加一道屏障，方向是反的；本 crate 因此不持有落盘投影。
   - **为什么可以放进 `index`**：这张旁挂物**已经常驻**（`Views` 持有并每查询 `refresh`），**已经逐行解析过每一条新行**（`locate` 一次 `serde_json` 解析读两个字段），**已经带着「存疑即重建」的可弃性**。run 表搭的是同一趟 refresh、同一条重建反射，不新增任何同步义务。
-  - **内存代价**：run 表每 run 一段或几段区间，不是每条 seq 一个节点；seq 列不为每条带一个段名 `String`，段名进字典一行一个。计入 `resident_empty_idle` 预算（`crates/xtask/budgets.toml` 该行记录读数与上限）。
+  - **内存代价**：run 表每 run 一段或几段区间，不是每条 seq 一个节点；seq 列不为每条带一个段名 `String`，段名进字典一行一个。计入 `resident_empty_idle` 预算（`Tools/xtask/budgets.toml` 该行记录读数与上限）。
   - **run 表是区间，不是 id 集**：run 是连续突发，写入即尾部并段；真交错的 run 就是几段区间。只有值域首尾相接才并段，而并段时缺口里的值必然都写过（两端点各自由一次写入造出），故区间从不声称没写过的 seq。成员查询＝区间定位后按值下探，答的顺序仍由新到旧。它是惰性的：按区间由新到旧逐值产出，调用方 `take(n)` 取多少才走多少，所以代价与取出的条数同阶，不先把整个 run 的 seq 展开成一张表。等价仍由 `index/fold/tests.rs` 的 oracle 判定，oracle 那一侧照旧是展开的表。**被否**：`BTreeSet<Seq>` 每条一个 id，长 run 不塌缩。
   - **等价锁在 `index/fold/tests.rs`**：oracle 是 map 形实现，proptest 喂随机行流（乱序与重复 seq、不可解析的 run 名、非文档行）断言全部公开查询恒同解。
   - **`before` 取开区间**，与线格式 `HistoryAnswer.earlier` 的含义（「从这条之前接着问」）同字同义，调用方不做 `before - 1` 这条减法，也就碰不到它的 `Seq::FIRST` 边界。
@@ -93,7 +93,7 @@ impl LedgerIndex {
 
 - **答什么**：`seqs()` 里不小于 `from` 的那一段，次序不变（`seqs_from_answers_the_held_seqs_at_or_after`）；也就是调用方原来写的 `seqs().skip_while(|seq| *seq < from)` 交出的那一串（`seqs_from_is_the_walk_past_the_smaller`）。`from` 之后没有行时答空，`from` 不必是写过的 seq。
 - **不看 `from` 之前的格**：seq 是隐式的（8-4），`from` 所在那一格就是 `from - base`，读者从那一格起走；列外行是有序表，从 `BTreeMap::range(from..)` 起走。起步的代价是一次减法与一次 O(log 列外行数) 的查找，之后每交出一个值走一格（空洞不交出，但要走过）。答案不取决于 `from` 之前的任何一格（`seqs_from_reads_no_slot_before_its_start`），所以从某个 seq 往后读一段的代价只与那一段同阶，而与它前面的账本长度无关。
-- **消费者**：`accounting::trace` 判同楼的别人时，从区间的下界读到上界（`crates/accounting/Spec.lean` §8-25）；每个提交一次，有了这个读者，一次导出在这一项上的代价是各区间长度之和，而不是提交数乘行数。
+- **消费者**：`accounting::trace` 判同楼的别人时，从区间的下界读到上界（`Sprawling/accounting/Spec.lean` §8-25）；每个提交一次，有了这个读者，一次导出在这一项上的代价是各区间长度之和，而不是提交数乘行数。
 - **列外行与归并**：与 `seqs()` 同一个归并，列与列外行各从 `from` 起；`index/fold/tests.rs` 的 map 形 oracle 对每个探测的 `from` 判等（正反两向）。本模型只写列，列外行是有序表的区间查询，没有自己的算术。
 
 D23 从某个 seq 往后读由索引给，而不由调用方跳过前面的。理由：列里一行的位置就是它的 seq 减 `base`，索引知道 `from` 在哪一格，调用方只能从第一格数过去；`skip_while` 在每个提交上都把区间之前的全部 seq 走一遍，一次导出就是提交数乘行数。被否决的做法：①给一个闭开区间的读者 `seqs_in(Range<Seq>)`——上界是调用方的条件（`take_while` 在第一个越界的值上停），放进索引不省一格，只多一个参数；②在 playback 里留一份 walk 走过的 seq 表，按下界二分——那是同一批行的第二份索引，要与 `LedgerIndex` 各自维护；③按 run 读（`run_seqs_before`）再合并——同楼的别人是全部 run，按 run 读要先知道有哪些 run。重开参数：有调用方要从某个 seq 往前读（例如 `view --follow` 从尾部倒着取新长出来的行）时，再看要不要一个从上界往前的读者；今天的 `seqs().rev().take_while(..)` 只走新长出来的那几行，不随账本长度增长。

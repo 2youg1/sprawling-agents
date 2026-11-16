@@ -7,7 +7,7 @@
 //! mode is injectable — an outcome script may hold typed errors, and an
 //! exhausted script is itself a failure (E_TOOL_UNAVAILABLE).
 //!
-//! Specified by `crates/citysim/spec/Executor.lean` §8-2.
+//! Specified by `Tools/citysim/spec/Executor.lean` §8-2.
 
 use std::collections::VecDeque;
 use std::sync::Mutex;

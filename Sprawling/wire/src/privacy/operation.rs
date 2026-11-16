@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What `Command::PrivacyOperation` asks for, and the result the host
-//! keeps for it under its `idem` (`crates/wire/spec/Privacy.lean` §8-89).
+//! keeps for it under its `idem` (`Sprawling/wire/spec/Privacy.lean` §8-89).
 
 use kernel::{AxError, IdemKey};
 use serde::{Deserialize, Serialize};
@@ -25,7 +25,7 @@ pub struct PrivacyRequest {
 
 /// One change the person confirmed on the page. `expected` is the value
 /// the page showed when the person confirmed; the host writes nothing when
-/// its fresh read differs (`crates/sprawling/spec/Privacy/Confirmation.lean`
+/// its fresh read differs (`Sprawling/app/spec/Privacy/Confirmation.lean`
 /// D58).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

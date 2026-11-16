@@ -233,7 +233,7 @@ pub(super) fn serve_city(
     };
     // After the refusals a restart could not cure, so a mistyped line
     // is refused once here rather than spending the crash budget
-    // (`crates/sprawling/spec/Supervising.lean` §8-109).
+    // (`Sprawling/app/spec/Supervising.lean` §8-109).
     // The face the terminal opens on is the entrance's; `--no-console`
     // is the way out for a supervisor that wants the old blocking shape.
     let surface = entrance.surface(args, Interactive::here());
@@ -282,7 +282,7 @@ pub(super) fn serve_city(
     };
     let token = keyed.code().to_owned();
     // The socket's workers stand above the commands the city dispatches
-    // (`crates/sprawling/spec/Serving/Standing.lean` §8-93).
+    // (`Sprawling/app/spec/Serving/Standing.lean` §8-93).
     let core = serving::setting_telling_a_refusal();
     let runtime = match serving::serving_runtime(core) {
         Ok(runtime) => runtime,
@@ -321,7 +321,7 @@ pub(super) fn serve_city(
     let (vault, vault_notice) = serving::open_vault();
     // The port and the writer are both taken before a word is printed:
     // a banner saying "running" over a port another process holds was a
-    // claim the city could not keep (`crates/sprawling/spec/Assembly/Listening.lean` §8-88).
+    // claim the city could not keep (`Sprawling/app/spec/Assembly/Listening.lean` §8-88).
     let listening = match runtime.block_on(assembly::listen(serving::Serving {
         city_root: city.to_path_buf(),
         addr: bind,
@@ -350,7 +350,7 @@ pub(super) fn serve_city(
     });
     // The banner is for a city with no face of its own: a harness reads
     // the URL from it. The CLI prints one header line, the quiet host
-    // its two lines (`crates/sprawling/spec/Firstrun.lean` §8-8).
+    // its two lines (`Sprawling/app/spec/Firstrun.lean` §8-8).
     if !owns_the_terminal {
         print_banner(city, &url, &client_line, &keyed);
         if let Some(level) = floor {

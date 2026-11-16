@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A skill and its package files, read only through a pinned manifest
-//! (`crates/kernel/spec/Skill.lean`). Both the manifest and every file
+//! (`Sprawling/kernel/spec/Skill.lean`). Both the manifest and every file
 //! are full, verified CAS reads; no filesystem path is followed.
 
 use std::path::Path;

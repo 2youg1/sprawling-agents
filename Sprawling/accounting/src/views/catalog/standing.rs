@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The built-in tools a building's catalog page lists before any run has
-//! frozen a table (`crates/accounting/spec/Views/Usage.lean` D55).
+//! frozen a table (`Sprawling/accounting/spec/Views/Usage.lean` D55).
 //!
 //! Each row's definition is that tool's `definition`, the same value its
 //! constructor writes into `ToolMeta`. Connectors, browsers, and the

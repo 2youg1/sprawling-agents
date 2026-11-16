@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A stretch of one document version, counted in bytes from its first
-//! byte (`crates/documents/Spec.lean` D2).
+//! byte (`Sprawling/documents/Spec.lean` D2).
 
 use kernel::{AxCode, AxError};
 use serde::{Deserialize, Serialize};

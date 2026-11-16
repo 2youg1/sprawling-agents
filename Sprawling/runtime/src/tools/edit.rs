@@ -13,11 +13,11 @@
 //! carries the passage as it now reads, which counts as a look. And an
 //! `old_string` that matches zero times, or many times without
 //! `replace_all`, is refused with the count, because "replace the first
-//! one" is a guess about which occurrence was meant. `crates/runtime/spec/Tools/Edit.lean` §8-64
+//! one" is a guess about which occurrence was meant. `Sprawling/runtime/spec/Tools/Edit.lean` §8-64
 //! models the admission and proves it loses no run's update.
 //!
 //! The arguments are Claude Code's `Edit`'s, by name and by value
-//! (`crates/runtime/spec/Tools.lean` §8-14-1, D114).
+//! (`Sprawling/runtime/spec/Tools.lean` §8-14-1, D114).
 //!
 //! The echo is a unified diff. Per-edit diffs are the restoration
 //! granularity: a checkpoint restores a wave, but a diff restores one
@@ -51,8 +51,8 @@ pub struct EditTool {
 #[derive(Clone)]
 pub struct EditDesk {
     /// The run's policy cell, asked at each write for what the run may do
-    /// to a file that already exists (`crates/runtime/spec/Tools.lean`
-    /// §8-55, `crates/runtime/spec/PolicyTake.lean` §8-62).
+    /// to a file that already exists (`Sprawling/runtime/spec/Tools.lean`
+    /// §8-55, `Sprawling/runtime/spec/PolicyTake.lean` §8-62).
     pub policy: crate::mode::PolicyReader,
     /// What this run has seen; the same table its `read` writes.
     pub seen: ReadStamps,
@@ -135,7 +135,7 @@ impl EditTool {
 
 /// One string argument. A call spelled the way an older build's
 /// history spells it lands here too, and the recovery names the
-/// arguments this build takes (`crates/runtime/spec/Tools.lean` D115).
+/// arguments this build takes (`Sprawling/runtime/spec/Tools.lean` D115).
 fn arg<'a>(args: &'a Map<String, Value>, key: &str) -> Result<&'a str, AxError> {
     args.get(key).and_then(Value::as_str).ok_or_else(|| {
         AxError::failure(
@@ -256,7 +256,7 @@ impl Tool for EditTool {
         let path = self.city_root.join(rel);
         // A name that is a link lands a write somewhere the gate never
         // judged - `.git/hooks` through a junction is privilege
-        // escalation (`crates/storage/Spec.lean` §8-25) - so it is
+        // escalation (`Sprawling/storage/Spec.lean` §8-25) - so it is
         // refused before the stamps are asked, and before the creating
         // arm makes a parent directory through it.
         storage::WriteTarget::within("edit file", &self.city_root, &path)
@@ -355,7 +355,7 @@ impl Tool for EditTool {
         // The replacement lands the way every city write does: a staging
         // file renamed over the name, so a failed write leaves the old
         // file and a hard link's other names keep their bytes
-        // (`crates/storage/Spec.lean` §8-32). The name is cleared of links
+        // (`Sprawling/storage/Spec.lean` §8-32). The name is cleared of links
         // again here, because the clearing above came before the wait for
         // the lock and the read, and a link placed since would carry the
         // write past the gate.
@@ -376,7 +376,7 @@ impl EditTool {
     /// filesystem still claims the name at the write, judged again once
     /// the parents exist, so a writer outside the lock
     /// that took it since is refused too, under either write limit
-    /// (`crates/storage/Spec.lean` §8-32).
+    /// (`Sprawling/storage/Spec.lean` §8-32).
     fn create(
         &self,
         target: &kernel::Address,

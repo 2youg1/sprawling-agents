@@ -2,7 +2,7 @@
 
 Everything between a decision to call a model and the bytes on the wire. A caller gets the endpoint client and the `kernel::model` adapter behind it, the custody of the API keys a person hands over, the per-call settlement that says what a call cost, and the pure judgements that fix a request's shape: which dialect translates it, what its context window and output ceiling are, which thinking level it carries. `dialect` turns the city's canonical conversation into a provider's format and back, and the request that leaves is explainable byte for byte.
 
-A subscription does not pass through this crate. A person signs in inside one of the five official harnesses, and that ACP agent carries the subscription into the city (`crates/gateway/Spec.lean` §8-5); this crate logs in as no vendor's client, holds no subscription token and renews none. It holds no Ledger handle, so every event payload it produces is a value the caller records. Whether a call may leave this machine is `kernel::gate`'s judgement, and what a provider's answer means for the Ledger is `runtime::redact`'s. Rust code names the crate `gateway`; `cargo -p` takes `sprawling-gateway`.
+A subscription does not pass through this crate. A person signs in inside one of the five official harnesses, and that ACP agent carries the subscription into the city (`Sprawling/gateway/Spec.lean` §8-5); this crate logs in as no vendor's client, holds no subscription token and renews none. It holds no Ledger handle, so every event payload it produces is a value the caller records. Whether a call may leave this machine is `kernel::gate`'s judgement, and what a provider's answer means for the Ledger is `runtime::redact`'s. Rust code names the crate `gateway`; `cargo -p` takes `sprawling-gateway`.
 
 ## How it is shaped
 
@@ -37,7 +37,7 @@ A failure reaches the caller as one `kernel::AxError`: the action that failed, t
 - `E_MODEL_UNCHOSEN` — no model is chosen for the tag a call asks for. The recovery says to attach a provider on the settings page and pick a model for that tag.
 - `E_INVALID_ARGS`, `E_TOOL_UNAVAILABLE`, `E_STORAGE_FATAL` — the optional facilities' refusals: a recording this build cannot send, and a reader a `Recording` was handed that failed.
 
-Four requests are refused rather than attempted. A base URL carrying a key before the host or in its query is refused when it is entered, because a secret in a URL reaches logs and error text (`router::normalise_entered`). A conversation that outgrew the model's window is refused and never retried, and its recovery names `/new --carry` and a model with a larger window. An explicit thinking level the (Endpoint, model) does not offer is refused before dispatch (`crates/gateway/spec/Provider/Thinking.lean`). A key the environment supplies is refused on delete, because removing the stored copy while the variable still answers would read as done and change nothing (D33).
+Four requests are refused rather than attempted. A base URL carrying a key before the host or in its query is refused when it is entered, because a secret in a URL reaches logs and error text (`router::normalise_entered`). A conversation that outgrew the model's window is refused and never retried, and its recovery names `/new --carry` and a model with a larger window. An explicit thinking level the (Endpoint, model) does not offer is refused before dispatch (`Sprawling/gateway/spec/Provider/Thinking.lean`). A key the environment supplies is refused on delete, because removing the stored copy while the variable still answers would read as done and change nothing (D33).
 
 §12 also lists `E_ENDPOINT_DIALECT_UNSUPPORTED` for a compatible format this build cannot speak (D5); no call site in the crate produces it today.
 
@@ -46,7 +46,7 @@ Four requests are refused rather than attempted. A base URL carrying a key befor
 - The crate has no features. `cargo nextest run -p sprawling-gateway` is its whole test surface.
 - It is blocking end to end: `reqwest::blocking`, no `async` and no tokio, because the turn loop is a synchronous function and one HTTP call must not asyncify the library (§3).
 - Time is a parameter. `adapter_for(chosen, redemption, dialect_headers, monotonic)` takes `fn() -> Instant`, and this crate never calls `Instant::now`; `clippy.toml` refuses it. `bin::assembly` hands in the production clock, a test hands in one that counts (D20).
-- Every HTTP client is built by `gateway::client_for`, which installs the process's one crypto backend first; `clippy.toml` refuses `reqwest`'s own constructors, so a second build point is a red build (`crates/gateway/spec/Reach.lean`, D10).
+- Every HTTP client is built by `gateway::client_for`, which installs the process's one crypto backend first; `clippy.toml` refuses `reqwest`'s own constructors, so a second build point is a red build (`Sprawling/gateway/spec/Reach.lean`, D10).
 - No credential is cached. `Custodian::resolve` redeems once per operation, and plaintext exists only in the vault and in the last register before the wire (§7). `Custodian::describe` answers a reference's standing — configured or not, from which store, writable or not, how long that store keeps it — without the value, and `Persistence` is a fact about the target rather than about the probe: `AcrossReboots` where the platform service writes to disk, `ThisBoot` where the Linux build talks to the kernel keyring, `ThisProcess` in session memory. `Custodian::probe` tries the platform service and falls back to session memory with a `provider_degraded` payload it may not drop (D22); the encrypted-file backend is built and no probe selects it yet (§3).
 - `EndpointBook` is a value and not a store: deleting it and replaying the Ledger produces the same book (§7). The crate still holds no Ledger handle, and the assembly layer writes what it produces.
 - D21: `max_in_flight` is a field of `EndpointTuning`, settled once per endpoint, never an argument of a single call. D8: the crate root re-exports only items another crate names, and a test-only item stays behind `#[cfg(test)]`.
@@ -68,7 +68,7 @@ The SPEC is written in Chinese with concept names in English; [`docs/glossary.md
 
 ```bash
 cargo nextest run -p sprawling-gateway   # every test beside the code
-lake build crates.gateway.Spec           # the SPEC's proofs; `just models` builds every crate's
+lake build Sprawling.gateway.Spec           # the SPEC's proofs; `just models` builds every crate's
 just bench                               # the timing instruments, this crate's among them; measured, never gated
 ```
 

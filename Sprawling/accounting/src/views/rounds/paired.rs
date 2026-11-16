@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The notes and calls whose other half sits on another line
-//! (`crates/accounting/spec/Views/Rounds.lean` D48): an answer to a
+//! (`Sprawling/accounting/spec/Views/Rounds.lean` D48): an answer to a
 //! wait, a pulled signal and its sending, a reply wait and its end, a
 //! `send` call and where its letter landed.
 //!

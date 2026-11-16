@@ -5,7 +5,7 @@
 
 //! Reaching the MCP servers a building's configuration names: the
 //! production `crate::Connectors`, and the one door that swaps it
-//! for another (`crates/accounting/spec/Connectors.lean` §8-2).
+//! for another (`Sprawling/accounting/spec/Connectors.lean` §8-2).
 
 use crate::Reached;
 use agent_protocols::Outbound as _;
@@ -15,7 +15,7 @@ use super::RunWorker;
 
 /// Every MCP server this worker has reached, kept connected between
 /// runs, so a dispatch pays for a child and a handshake only when its
-/// server was not already running (`crates/sprawling/Spec.lean` §8-4).
+/// server was not already running (`Sprawling/app/Spec.lean` §8-4).
 ///
 /// Keyed by the whole declaration and the run root the child started
 /// in: a changed field is another server, and a child cannot move to

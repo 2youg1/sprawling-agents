@@ -11,7 +11,7 @@
 //! page reads its address back through a query, and `kernel` holds only
 //! the shape (city D25).
 //!
-//! Specified by `crates/city/spec/ConfigLayers.lean` §8-4c.
+//! Specified by `Sprawling/city/spec/ConfigLayers.lean` §8-4c.
 
 use std::collections::BTreeSet;
 use std::path::Path;

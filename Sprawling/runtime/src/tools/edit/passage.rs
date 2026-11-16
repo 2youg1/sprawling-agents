@@ -7,7 +7,7 @@
 //! moved after the run's last look.
 //!
 //! The passage is a window read: the refusal records the current stamp
-//! (`crates/runtime/spec/Tools/Edit.lean` §8-64), so a model that fixes
+//! (`Sprawling/runtime/spec/Tools/Edit.lean` §8-64), so a model that fixes
 //! `old_string` from these lines retries at once instead of reading the whole
 //! file again. Because the refusal counts as a look, it always shows a
 //! window: where the first line of `old_string` is gone, the window is the head
@@ -35,7 +35,7 @@ pub(super) enum Opened {
 /// The window around where `old_string` begins in `text`, or at the head of
 /// `text` when the first line of `old_string` is gone, with a header naming its
 /// lines the way the current renderer numbers them
-/// (`crates/runtime/spec/Rendering.lean` D119).
+/// (`Sprawling/runtime/spec/Rendering.lean` D119).
 pub(super) fn around(text: &str, old: &str) -> (Opened, String) {
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
     let found = old

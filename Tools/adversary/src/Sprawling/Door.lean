@@ -30,7 +30,7 @@ structure Door where
   binary : System.FilePath
   /-- The launcher that serves the city in a process group of its own, named
   only where the acceptance walk closes cities in order on Windows
-  (crates/adversary/Spec.lean D8). -/
+  (Tools/adversary/Spec.lean D8). -/
   launcher : Option System.FilePath := none
 deriving Inhabited
 
@@ -175,7 +175,7 @@ inductive Verb where
 door prints what arrives before the city has been silent for a window, so a
 command still being served looks exactly like a command that produced nothing.
 Collapsing the two is how a refused action gets read as a successful one;
-`crates/adversary/Spec.lean` section 4 records the measurement that found this. -/
+`Tools/adversary/Spec.lean` section 4 records the measurement that found this. -/
 inductive Answer where
   | accepted (frames : List Frame)
   | denied (complaint : Complaint)
@@ -209,7 +209,7 @@ def quietMillis : Nat := 250
 
 Paid in full only by a city that says nothing at all, so its length costs a
 passing run nothing; it is twenty times the 250 ms that answers on a machine
-busy compiling were measured to overrun (`crates/adversary/Spec.lean` D9). -/
+busy compiling were measured to overrun (`Tools/adversary/Spec.lean` D9). -/
 def answerMillis : Nat := 5000
 
 /-- What ends one call: the reply to a query, the one record a command's
@@ -218,7 +218,7 @@ acceptance writes, or the city going silent.
 Each verb says which, in `Verb.ending`, because only the asker knows what it is
 waiting for: a call that ends on silence reads a slow answer as no answer, and
 on a busy machine that turned an answering city into a finding
-(`crates/adversary/Spec.lean` D9). -/
+(`Tools/adversary/Spec.lean` D9). -/
 inductive Ending where
   | reply
   /-- The record's kind, spelled as `EventKind` serialises it, which is the
@@ -480,7 +480,7 @@ private def drained (stream : IO.FS.Handle) : IO (IO String) := do
 def servedStdio : IO.Process.StdioConfig :=
   { stdin := .piped, stdout := .piped, stderr := .piped }
 
-/-- How a served process is asked to close in order (crates/adversary/Spec.lean D8). -/
+/-- How a served process is asked to close in order (Tools/adversary/Spec.lean D8). -/
 inductive Closing where
   /-- `kill -s INT` to the city itself, which only macOS and Linux can send. -/
   | interrupt

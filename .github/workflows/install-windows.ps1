@@ -83,7 +83,7 @@ try {
     if ($pathAfterUninstall -cne ($kept -join ';') -or $key.GetValueKind('Path') -ne $pathKindBeforeUninstall) {
         throw 'Uninstall must remove only its PATH entry and preserve the value type.'
     }
-    $originDefinition = [regex]::Match((Get-Content -LiteralPath 'crates/sprawling/src/release.rs' -Raw), 'pub const ARCHIVE_ORIGIN_FILE: &str = "([^"]+)";')
+    $originDefinition = [regex]::Match((Get-Content -LiteralPath 'Sprawling/app/src/release.rs' -Raw), 'pub const ARCHIVE_ORIGIN_FILE: &str = "([^"]+)";')
     if (-not $originDefinition.Success) { throw 'Archive origin authority was not found.' }
     $origin = Join-Path $installedDir $originDefinition.Groups[1].Value
     if (Test-Path -LiteralPath $origin) { throw 'Uninstall left the archive origin marker.' }

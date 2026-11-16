@@ -371,7 +371,7 @@ fn the_prereqs_file_is_the_develop_tier_rendered() {
 /// names, so that program is a required row of the develop tier. The
 /// shell is read out of the `justfile` rather than written here, so a
 /// recipe file that moves to another shell turns this red until the
-/// table follows it (`crates/sprawling/spec/Doctor.lean` §8-130).
+/// table follows it (`Sprawling/app/spec/Doctor.lean` §8-130).
 #[test]
 fn the_shell_every_recipe_runs_in_is_a_required_develop_row() {
     let justfile = std::fs::read_to_string(

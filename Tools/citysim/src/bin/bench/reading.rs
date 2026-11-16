@@ -9,7 +9,7 @@
 //! renderer, and the tests compare it byte for byte. A reading carries
 //! its machine class as a field rather than inheriting it from a header,
 //! so a reading that arrived from another machine cannot silently share
-//! a table with the reference class (`crates/citysim/spec/Bench.lean` §8-6). It
+//! a table with the reference class (`Tools/citysim/spec/Bench.lean` §8-6). It
 //! carries the digest of the bytes it was taken over the same way, so a
 //! reading of a changed fixture cannot share a table with the register's
 //! (section 3-8).
@@ -81,7 +81,7 @@ impl Load {
 /// Which part of a scenario's path a reading prices.
 ///
 /// The split is what keeps a disk floor from masking harness overhead and
-/// keeps harness speed from standing in for the disk (`crates/citysim/spec/Bench.lean`
+/// keeps harness speed from standing in for the disk (`Tools/citysim/spec/Bench.lean`
 /// §8-6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SubMetric {
@@ -116,7 +116,7 @@ pub(crate) struct Reading {
 impl Reading {
     /// The one construction point: the shares are read by the product's
     /// one percentile reading, `Spread`, nearest rank
-    /// (`crates/sprawling/Spec.lean` §8-129-2).
+    /// (`Sprawling/app/Spec.lean` §8-129-2).
     ///
     /// # Errors
     /// Refuses a scenario that sampled nothing, because a reading with no
@@ -166,7 +166,7 @@ pub(crate) fn spread_of(samples: Vec<Duration>) -> Result<Spread, String> {
 
 /// A register row's reading line: the row, its spread in integer
 /// microseconds, then the counts the row needs beside it, each written
-/// ` key=value` by the caller (`crates/citysim/spec/Bench.lean` §8-6).
+/// ` key=value` by the caller (`Tools/citysim/spec/Bench.lean` §8-6).
 pub(crate) fn row_line(row: &str, spread: &Spread, beside: &str) -> String {
     format!(
         "budget row={row} samples={} floor_us={} p50_us={} p95_us={} p99_us={} peak_us={}{beside}",
@@ -180,7 +180,7 @@ pub(crate) fn row_line(row: &str, spread: &Spread, beside: &str) -> String {
 }
 
 /// The failure a scenario with no samples deserves: one error shape,
-/// three mandatory parts, no new code (`crates/citysim/spec/Bench.lean` §8-6).
+/// three mandatory parts, no new code (`Tools/citysim/spec/Bench.lean` §8-6).
 fn sampled_nothing() -> String {
     format!(
         "{}",

@@ -57,7 +57,7 @@
     code: "E_PATH_NOT_FOUND",
     action: "read",
     subject: "crates/nowhere/src/lib.rs",
-    nearby: ["crates/city/src/lib.rs"],
+    nearby: ["Sprawling/city/src/lib.rs"],
     recovery: "list the parent directory first",
     retry: "no",
   });
@@ -85,7 +85,7 @@
   ];
 
   const CALLS: readonly Call[] = [
-    call(41, "read", "crates/city/src/document.rs", 31),
+    call(41, "read", "Sprawling/city/src/document.rs", 31),
     call(42, "search", "edit_against", 140),
     call(43, "exec", "cargo nextest -p city", 3_412),
   ];

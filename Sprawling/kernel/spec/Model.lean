@@ -6,7 +6,7 @@
 /-!
 # kernel::model
 
-规定 `kernel::model`（`crates/kernel/src/model.rs` 与 `crates/kernel/src/model/` 下的 `seam`、`wire`、`usage`、`image`、`mode`、`window`、`conformance`）：模型端口、canonical 会话类型、增量与提前交出的调用、运行策略。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::model`（`Sprawling/kernel/src/model.rs` 与 `Sprawling/kernel/src/model/` 下的 `seam`、`wire`、`usage`、`image`、`mode`、`window`、`conformance`）：模型端口、canonical 会话类型、增量与提前交出的调用、运行策略。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `kernel::model::tests` 守住。
 -/
@@ -162,7 +162,7 @@ fn call_speculating(&mut self, req: &ModelRequest, onto: Increments<'_>, early: 
 
 **它与 `Increments` 分开，因为它是要据以执行的。** 增量只供人看，谁都不得据它分支；提前交出的调用恰恰要据以启动工具。并进同一个 sink 就是让「看的东西」变成「决定的东西」。
 
-**提前交出的调用不是历史。** 账本仍只从结算后的 `ModelReturn` 记 `tool_called`；回答被截断或取消，这扇门返回失败，调用方把据提前交出的调用得出的结果一并丢弃。调用方能据它做什么由 `crates/runtime/spec/Turn/Speculation.lean` 定：只提前启动排在第一个写调用之前的只读调用，结果按调用位置缓存，结算后按发出顺序记账。
+**提前交出的调用不是历史。** 账本仍只从结算后的 `ModelReturn` 记 `tool_called`；回答被截断或取消，这扇门返回失败，调用方把据提前交出的调用得出的结果一并丢弃。调用方能据它做什么由 `Sprawling/runtime/spec/Turn/Speculation.lean` 定：只提前启动排在第一个写调用之前的只读调用，结果按调用位置缓存，结算后按发出顺序记账。
 
 **默认实现落回 `call_streaming`、什么也不提前交出。** 这对没有流、或其兼容格式在结算前说不出一个调用何时完整的适配器是诚实的：调用方只是没有提前量，拿到的 `ModelReturn` 不变。落选的是给 `call_streaming` 加第三个参数：那会让每个适配器与每个调用点都改签名，而只有一个兼容格式说得出块何时结束。
 -/
@@ -222,7 +222,7 @@ impl LandingPolicy { pub const ALL: [LandingPolicy; 2]; pub const fn as_str(self
 
 - **四件事，四个值。** `Mode` 回答这次 run 是在交谈还是在干活；`WriteLimit` 回答它能改什么；`AdmissionRequirement` 回答它的产出要带什么证据才准合并；`LandingPolicy` 回答产出走常规的路，还是留在一棵试验的树里不落地。四者独立取值、可以任意组合：只读可新建的试验、要测试的交谈都拼得出来，而且都有确定的意思。它们总是一起走（线上的 `Dispatch`、账本的 `run_started`、装配层的派活），所以是一个值 `RunPolicy`。
 - **`Standing` 是一个有名字的值，不是「没有要求」。** 它说的是「楼自己的规矩已经要的检查，不多加一项」：楼要评审，评审照旧；楼不要，就只有这次 run 自己的检查点。它不取消任何既有的强制校验。把它写成 `Option<AdmissionRequirement>` 的 `None`，读者会把缺席读成免检。
-- **选了要求不等于拿到了证据。** `RunPolicy` 只记要求；证据由 `runtime::mode::admits` 在合并那一刻对照（`crates/runtime/Spec.lean` §8-54）。
+- **选了要求不等于拿到了证据。** `RunPolicy` 只记要求；证据由 `runtime::mode::admits` 在合并那一刻对照（`Sprawling/runtime/Spec.lean` §8-54）。
 - **`RunPolicy::of(mode)` 是「只选了 mode」的策略**：写入不额外收窄、准入按楼的规矩、常规落地。派活的入口里只有人能选另外三项；城自己派的活（计划、排程、来信、编辑器经 ACP 派来的活）都走 `of(Mode::Work)`，一次委派或敲门继承说话那一方的整份策略。
 - **拼法只有一处**：每个枚举的 `as_str` 写出的词就是 serde 读的词，各有一条遍历式断言钉住往返同词；未知词在反序列化处即拒（§8-40）。
 - **入账**：`RunStarted.policy: Option<RunPolicy>`（§8-4 记录围栏），由 `runtime::run::Charter::open` 写，`#[serde(default, skip_serializing_if = "Option::is_none")]`。旧账本里没有这个键，读作「这一行早于策略入账」；旧的六个 mode 词从未以类型化载荷进过账本，所以没有要映射的历史读法（D12）。
@@ -236,8 +236,8 @@ impl LandingPolicy { pub const ALL: [LandingPolicy; 2]; pub const fn as_str(self
 pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest" | "transcribe" | "ocr"
 ```
 
-- **一个标签，不是一个模型。** 二进制里不带任何模型（D18）：人接一个端点、为 `Ocr` 选一个能读图的模型，城的 OCR 工具（X6）按这一次选择调用它，与转写读 `Transcribe` 是同一个机制（`crates/wire/Spec.lean` §8-27）。没有选时（或选中的端点已经摘下、机密楼的端点不在运行这座城的机器上），这栋楼的 run 的工具表里没有 `ocr`，模型看不到一件用不了的工具；`gateway::Recogniser::absent()` 是这种城里的识别器，每次识别都答 `E_TOOL_UNAVAILABLE`。两条路都不回落到 `Main`——一个只会读字的模型被递上一张图，答的是它猜的东西。
-- **先有登记位，调用方随 X6 来。** 这条与本枚举「有人问才长」的规矩相违，理由是线上形状：`ModelTag` 在线上，加一个值要进位，本批（`WIRE_V` 45）一次带上，X6 落地时不再为它另进一位（`crates/wire/Spec.lean` D1）。在 X6 落地之前，页面不画这一行（client/Spec.lean 的模型表照旧三行）。
+- **一个标签，不是一个模型。** 二进制里不带任何模型（D18）：人接一个端点、为 `Ocr` 选一个能读图的模型，城的 OCR 工具（X6）按这一次选择调用它，与转写读 `Transcribe` 是同一个机制（`Sprawling/wire/Spec.lean` §8-27）。没有选时（或选中的端点已经摘下、机密楼的端点不在运行这座城的机器上），这栋楼的 run 的工具表里没有 `ocr`，模型看不到一件用不了的工具；`gateway::Recogniser::absent()` 是这种城里的识别器，每次识别都答 `E_TOOL_UNAVAILABLE`。两条路都不回落到 `Main`——一个只会读字的模型被递上一张图，答的是它猜的东西。
+- **先有登记位，调用方随 X6 来。** 这条与本枚举「有人问才长」的规矩相违，理由是线上形状：`ModelTag` 在线上，加一个值要进位，本批（`WIRE_V` 45）一次带上，X6 落地时不再为它另进一位（`Sprawling/wire/Spec.lean` D1）。在 X6 落地之前，页面不画这一行（client/Spec.lean 的模型表照旧三行）。
 - `ALL` 的顺序就是设置页给出它们的顺序，`Ocr` 在最后。
 -/
 
@@ -267,7 +267,7 @@ pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest
 
 **决定**：
 - `ChatRequest` 多一个请求侧注记 `shared: SharedPrefix`，与 `breakpoint` 一样 `#[serde(skip)]`，缺省 `Unshared`，`shared_system` 是它唯一的读法，与 `carries_breakpoint` 之于 `breakpoint` 相同：`Leading(n)` 说 `system` 的前 n 块（连同排在它们前面的工具表）是同一栋楼里每个居民都逐字节带着的。runtime 组回合请求时由冻结前缀给出：`SegmentSlot` 的 City 与 Building 两格，因为 Resident 段由身份与目录拼成，各居民不同；顾问、OCR、探测与 `ChatRequest::empty` 写 `Unshared`。读者是 gateway 的前缀等待（gateway D38、D39）。
-- `Model` 多一扇只读的门 `fn prefix_held(&self) -> Option<PrefixHeld> { None }`：最近一次调用在端点门前等过的那一次 pre-warm（gateway D43），没等过时 `None`。gateway 的 `Gated`（`endpoint::permit`）是唯一答 `Some` 的实现，每次调用开始时清掉上一次的记录；runtime 的 `Warmed` 转交给它包着的模型；回合层在每次尝试返回之后问一次，有就写一行 `prefix_held`（`crates/kernel/spec/Event/Record.lean` D61）。
+- `Model` 多一扇只读的门 `fn prefix_held(&self) -> Option<PrefixHeld> { None }`：最近一次调用在端点门前等过的那一次 pre-warm（gateway D43），没等过时 `None`。gateway 的 `Gated`（`endpoint::permit`）是唯一答 `Some` 的实现，每次调用开始时清掉上一次的记录；runtime 的 `Warmed` 转交给它包着的模型；回合层在每次尝试返回之后问一次，有就写一行 `prefix_held`（`Sprawling/kernel/spec/Event/Record.lean` D61）。
 
 **理由**：哪几段是共享的，是 runtime 组前缀时的事实，它决定段的次序与内容，gateway 只该读它；让 gateway 自己数 `system` 里第几个带断点的块，就是把 runtime 的布局在 gateway 里再拼一遍。等待发生在模型端口里面，而写账的是回合层（gateway 不持 Ledger 句柄），所以要一扇门把它交出来；它与 `provider_account` 一样是缺省 `None` 的只读方法，脚本模型与测试替身不用改。
 
@@ -298,9 +298,9 @@ pub enum ModelTag { Main, Digest, Transcribe, Ocr }   // 线上 "main" | "digest
 **重开参数**：某个上游的档位越出这七个词且有人要选它（今天只有 Ollama 由模型自定义的名字与 ACP agent 的任意值，后者走 agent 自己的 config option，不进 `Effort`）；或人要在选择器里提供「关闭思考」。
 -/
 
-/-! Model 的账号面：适配器答出它当前的账号与它的账号名册，并按名选号。选择只换后续请求所用的凭据引用，不发请求、不兑现 Vault，因此不返回错误；没有具名账号的适配器答 `None`，行为不变。`ModelCalled` 记录每一次尝试用的账号，`ModelReturned` 才提交 Session 的绑定（`crates/gateway/spec/Router.lean` D30）。
+/-! Model 的账号面：适配器答出它当前的账号与它的账号名册，并按名选号。选择只换后续请求所用的凭据引用，不发请求、不兑现 Vault，因此不返回错误；没有具名账号的适配器答 `None`，行为不变。`ModelCalled` 记录每一次尝试用的账号，`ModelReturned` 才提交 Session 的绑定（`Sprawling/gateway/spec/Router.lean` D30）。
 
-先用哪个账号、失败后原号再发、换号还是停下，由 `AccountRound`（`crates/kernel/spec/AccountRecovery.lean` §8-86）决定；端口不自己判「绑定的账号不在名册里就选首账号」，那是 `AccountRound::start` 的事：
+先用哪个账号、失败后原号再发、换号还是停下，由 `AccountRound`（`Sprawling/kernel/spec/AccountRecovery.lean` §8-86）决定；端口不自己判「绑定的账号不在名册里就选首账号」，那是 `AccountRound::start` 的事：
 
 ```rust
 pub struct AccountRoster {

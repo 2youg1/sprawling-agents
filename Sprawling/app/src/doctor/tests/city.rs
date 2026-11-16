@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A building named for what it asks and this machine lacks, rules that
-//! will not read, and a code explained (`crates/sprawling/spec/Doctor.lean` §8-48).
+//! will not read, and a code explained (`Sprawling/app/spec/Doctor.lean` §8-48).
 
 use kernel::Address;
 
@@ -313,7 +313,7 @@ fn explain_on_the_screen_is_one_line_per_item_and_never_a_failure() {
 
 /// The page's answer carries the scanning reading the terminal prints:
 /// `DoctorRefresh` reaches `accounting::Machine::report`, and that is
-/// the fold the page reads (`crates/wire/spec/Answer/Doctor.lean` D25).
+/// the fold the page reads (`Sprawling/wire/spec/Answer/Doctor.lean` D25).
 #[test]
 fn the_page_carries_the_scanning_reading_the_doctor_took() {
     let city = std::env::temp_dir().join("one");

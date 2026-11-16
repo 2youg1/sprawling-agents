@@ -15,7 +15,7 @@
 //! **Every renderer a ledger line names stays drawable.** A line records
 //! the [`Rendering`] it was drawn with, and a rebuild draws it again
 //! with that one, so a session written by an older build reopens with
-//! the history its model actually read. `crates/runtime/spec/Rendering.lean`
+//! the history its model actually read. `Sprawling/runtime/spec/Rendering.lean`
 //! §8-63 is the authority on each version's shape.
 
 use kernel::event::record::{Rendering, ToolAnswer};

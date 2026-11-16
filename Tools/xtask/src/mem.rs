@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! How heavy a served city is, in this platform's own counters
-//! (crates/xtask/Spec.lean §8-30).
+//! (Tools/xtask/Spec.lean §8-30).
 //!
 //! **Three counters, because they answer three questions.** Private is
 //! what the process holds that nobody shares, which is what one more
@@ -20,7 +20,7 @@
 //! register once recorded xtask's own working set as a city's.
 //!
 //! The report states no verdict. The budget and each scenario's reading
-//! live in `crates/xtask/budgets.toml`, one row per scenario.
+//! live in `Tools/xtask/budgets.toml`, one row per scenario.
 
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};

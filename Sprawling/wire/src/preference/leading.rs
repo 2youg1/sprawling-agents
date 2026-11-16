@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The height of one line of running text
-//! (`crates/wire/spec/Preference.lean` D126).
+//! (`Sprawling/wire/spec/Preference.lean` D126).
 //!
 //! **The floor is a type, and there is no ceiling.** A line box under
 //! [`LINE_HEIGHT_MIN`] shares its edges with the lines beside it, so the

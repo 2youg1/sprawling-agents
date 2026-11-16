@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The ACP page's two questions: the agent catalog with the agents this
-//! city added, and one pasted agent (`crates/accounting/spec/Views.lean`,
-//! `crates/wire/spec/Answer/Agents.lean` §8-90).
+//! city added, and one pasted agent (`Sprawling/accounting/spec/Views.lean`,
+//! `Sprawling/wire/spec/Answer/Agents.lean` §8-90).
 
 use std::path::PathBuf;
 

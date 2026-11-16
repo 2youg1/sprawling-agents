@@ -15,7 +15,7 @@
 //! names where the module is specified (`anchors`).
 //!
 //! The tables and rosters are the Lean shapes `tables` reads out of
-//! `crates/kernel/Spec.lean` and its parts (crates/xtask/Spec.lean §8-43);
+//! `Sprawling/kernel/Spec.lean` and its parts (Tools/xtask/Spec.lean §8-43);
 //! the compiled side is `enums`.
 
 use std::path::Path;
@@ -29,15 +29,15 @@ mod tables;
 
 /// The kernel's package directory, whose `Spec.lean` and parts hold the
 /// tables this gate reads.
-const KERNEL_DIR: &str = "crates/kernel";
+const KERNEL_DIR: &str = "Sprawling/kernel";
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
     let sources = lean::specification(root, KERNEL_DIR)?.ok_or_else(|| XtaskError::Doc {
         file: format!("{KERNEL_DIR}/{}", lean::ENTRY),
         msg: "the kernel has no Lean specification, so there is no table to hold its enums \
-              to; the kernel's specification is crates/kernel/Spec.lean and its parts \
-              (crates/xtask/Spec.lean section 8-43)"
+              to; the kernel's specification is Sprawling/kernel/Spec.lean and its parts \
+              (Tools/xtask/Spec.lean section 8-43)"
             .to_owned(),
     })?;
     tables::check(root, &sources, &mut violations)?;

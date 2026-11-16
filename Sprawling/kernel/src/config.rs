@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Three-layer config resolution, specified by `crates/kernel/spec/Config.lean`.
+//! Three-layer config resolution, specified by `Sprawling/kernel/spec/Config.lean`.
 //! `FrozenConfig` and `LiveConfig` share no field; tests check this property.
 
 use serde::{Deserialize, Serialize};
@@ -174,7 +174,7 @@ impl From<SecondThreshold> for u64 {
 ///
 /// Lives in the building's `RULES.toml` as `context_lock_tokens`, not in
 /// `CONFIG.toml`: a hard lock is a building capability, not a run-reminder
-/// rung (`crates/city/spec/Policy.lean`).
+/// rung (`Sprawling/city/spec/Policy.lean`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(try_from = "u64", into = "u64")]
 pub struct ContextLock(u64);

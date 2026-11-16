@@ -48,7 +48,7 @@ fn edit(path: &str, old: &str, new: &str) -> ToolCall {
 
 /// A read answers no version and hashes nothing; what it leaves behind
 /// is the run's stamp, and that is what admits the edit
-/// (`crates/runtime/spec/Tools/Edit.lean` §8-64).
+/// (`Sprawling/runtime/spec/Tools/Edit.lean` §8-64).
 #[test]
 fn a_whole_read_admits_the_runs_edit_and_answers_no_version() {
     let dir = tempfile::tempdir().unwrap();

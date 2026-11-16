@@ -8,11 +8,11 @@
 //!
 //! Which agent a word names is `agent_protocols::Roster::seat`'s to
 //! answer, and this crate sees only `kernel`, so a name is read as written
-//! and judged where a dispatch is agreed (`crates/sprawling/Spec.lean` §8-4e, rule 10).
+//! and judged where a dispatch is agreed (`Sprawling/app/Spec.lean` §8-4e, rule 10).
 //! This module owns how one layer states it, the rule that a layer
 //! names a model or a harness and never both, and the rule that a
 //! session which opened on a model keeps it until `/new`
-//! (`crates/city/spec/ConfigLayers.lean` §8-4, city D6).
+//! (`Sprawling/city/spec/ConfigLayers.lean` §8-4, city D6).
 
 use std::path::Path;
 
@@ -63,7 +63,7 @@ pub(super) fn one_resident(model: Option<&str>, harness: Option<&str>) -> Result
 ///
 /// `None` when no rung names one, and when the address's own file holds
 /// a session's `[model] name`: that session opened on a model and keeps
-/// it until `/new` forgets the record (`crates/city/spec/ConfigLayers.lean`
+/// it until `/new` forgets the record (`Sprawling/city/spec/ConfigLayers.lean`
 /// §8-4, city D6). The ladder is read first, so a rung that cannot be
 /// read is reported before the record is consulted, as [`super::load`]
 /// would report it.

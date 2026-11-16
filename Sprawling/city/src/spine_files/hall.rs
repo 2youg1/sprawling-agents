@@ -11,7 +11,7 @@
 //! sits where that resident works, which is right for a resident that a
 //! person dispatched and wrong for two that serve the whole city.
 //!
-//! Specified by `crates/city/spec/SpineFiles.lean` §8-5.
+//! Specified by `Sprawling/city/spec/SpineFiles.lean` §8-5.
 
 use std::path::{Path, PathBuf};
 
@@ -120,7 +120,7 @@ pub fn hall_identity_path(city_root: &Path, addr: &Address) -> Option<PathBuf> {
 /// cannot remove what keeps the city running. A persona that turns the
 /// planner into a character of its own leaves the procedure, the tool
 /// list and the prohibitions untouched. Same shape as
-/// `resident::EPHEMERAL_SEGMENT` (`crates/city/spec/SpineFiles.lean`
+/// `resident::EPHEMERAL_SEGMENT` (`Sprawling/city/spec/SpineFiles.lean`
 /// D30).
 #[must_use]
 pub fn hall_discipline(addr: &Address) -> Option<Discipline> {

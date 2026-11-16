@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! First byte: `sprawling serve` spawned to the first byte of `GET /`
-//! (`crates/citysim/spec/BenchStartup.lean` §8-5-1).
+//! (`Tools/citysim/spec/BenchStartup.lean` §8-5-1).
 //!
 //! Shape: adapter. The end of the boundary is a byte of the page rather
 //! than the port opening, because a person sees the page, and a server
@@ -14,7 +14,7 @@
 //! whether it proved the history it opened from. What that serve wrote
 //! to standard error is kept in the log file the caller names, so the
 //! phases the product timed for itself - the opening line and the proof
-//! line, the moment commands are taken (`crates/sprawling/Spec.lean` §8-122) - sit
+//! line, the moment commands are taken (`Sprawling/app/Spec.lean` §8-122) - sit
 //! beside the reading.
 
 use std::io::{Read as _, Write as _};
@@ -97,7 +97,7 @@ fn one(binary: &Path, city: &Path, log: &Path) -> Result<Duration, AxError> {
 }
 
 /// The lines a served city writes when the proof of its history ends:
-/// whole, or the ledger stopped (`crates/sprawling/Spec.lean` §8-90).
+/// whole, or the ledger stopped (`Sprawling/app/Spec.lean` §8-90).
 const PROOF_ENDS: [&str; 2] = ["the history is proved", "the ledger stopped taking writes"];
 
 /// Waits until the serve's log says how the proof of its history ended,
@@ -137,7 +137,7 @@ fn first_answer(child: &mut Child, at: SocketAddr) -> Result<(), AxError> {
             let mut byte = [0u8; 1];
             // The Host names the listener with its port, as a browser
             // writes it: any other is refused at the entry
-            // (`crates/wire/spec/Reception/Entry.lean` §8-94).
+            // (`Sprawling/wire/spec/Reception/Entry.lean` §8-94).
             let request = format!("GET / HTTP/1.1\r\nHost: {at}\r\nConnection: close\r\n\r\n");
             let asked = stream
                 .write_all(request.as_bytes())

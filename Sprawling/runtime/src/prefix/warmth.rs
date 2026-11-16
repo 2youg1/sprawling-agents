@@ -5,7 +5,7 @@
 
 //! One session's keep-warm account: the last real request each prefix
 //! carried, and the renewal sent for it when `kernel::keep_warm` says it
-//! is due (`crates/runtime/spec/Prefix.lean` §8-4-2).
+//! is due (`Sprawling/runtime/spec/Prefix.lean` §8-4-2).
 //!
 //! **Off keeps nothing.** Under [`KeepWarm::Off`] a request is not even
 //! cloned, so the default setting costs no memory per session and has no
@@ -128,7 +128,7 @@ fn renewal_of(request: &ModelRequest<'static>) -> ModelRequest<'static> {
 /// A clone shares the reading, so every door that reaches the endpoint
 /// renews by the same lead: the network path and the permit gate belong
 /// to the endpoint, and one door sees one renewal per real use, too few
-/// to keep a reading of its own (`crates/runtime/spec/Prefix.lean` D100).
+/// to keep a reading of its own (`Sprawling/runtime/spec/Prefix.lean` D100).
 #[derive(Debug, Clone, Default)]
 pub struct Lead(Arc<AtomicU64>);
 
@@ -151,7 +151,7 @@ impl Lead {
 /// It forwards every call method of [`Model`] rather than inheriting a
 /// default, because a default is correct and only slower: an inherited
 /// `call_speculating` drops the early calls, and no read then starts
-/// while the model writes (`crates/runtime/spec/Prefix.lean` D97).
+/// while the model writes (`Sprawling/runtime/spec/Prefix.lean` D97).
 ///
 /// The clock is the caller's, injected from the one sampling point. The
 /// door measures its endpoint's [`Lead`] from a renewal's round trip and

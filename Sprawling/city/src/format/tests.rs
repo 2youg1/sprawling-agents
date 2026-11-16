@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The three outcomes `crates/city/spec/Format.lean` §8-42 names, each
+//! The three outcomes `Sprawling/city/spec/Format.lean` §8-42 names, each
 //! met through the door production uses.
 
 use super::*;

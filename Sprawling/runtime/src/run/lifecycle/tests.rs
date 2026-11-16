@@ -121,7 +121,7 @@ fn plan() -> RunPlan {
 }
 
 /// The effort a run's requests froze is the one its first line records
-/// (`crates/kernel/Spec.lean` §8-85), so a page can say it before the run
+/// (`Sprawling/kernel/Spec.lean` §8-85), so a page can say it before the run
 /// commits anything.
 #[test]
 fn the_charter_carries_the_effort_the_request_froze() {

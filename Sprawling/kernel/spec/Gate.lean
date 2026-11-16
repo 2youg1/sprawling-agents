@@ -6,7 +6,7 @@
 /-!
 # kernel::gate
 
-规定 `kernel::gate`（`crates/kernel/src/gate.rs` 与 `crates/kernel/src/gate/` 下的每一道门）：门、门册与拒绝矩阵。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::gate`（`Sprawling/kernel/src/gate.rs` 与 `Sprawling/kernel/src/gate/` 下的每一道门）：门、门册与拒绝矩阵。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 -/
 
 /-!
@@ -93,7 +93,7 @@ pub fn undoable(call: &ConnectorCall<'_>, sandbox: &SandboxLimits, taint: &Taint
 
 **信任按 label 记，不按工具名记**：楼层回答的是「这个连接器可以碰运行中的机器吗」，一个连接器一行。
 
-**这道门与 `RULES.toml` 的 `desktop` 是两回事，次序也固定**（`crates/city/Spec.lean` §8-25）：楼那一位开关决定这台 server **接不接得上**，这道门决定接上之后**每一次调用放不放行**。
+**这道门与 `RULES.toml` 的 `desktop` 是两回事，次序也固定**（`Sprawling/city/Spec.lean` §8-25）：楼那一位开关决定这台 server **接不接得上**，这道门决定接上之后**每一次调用放不放行**。
 
 **恒不为它新增 `Effect` 变体**：`Effect` 是路由字段，`Connector` 已经把这一类调用路由到出网门了；再加一格会让每一处 `match Effect` 都要回答一个与它无关的问题。这道门叠在出网门之后，两道各答各的——出网门答「这些字节能出去吗」，本门答「这个后果收得回来吗」。
 -/

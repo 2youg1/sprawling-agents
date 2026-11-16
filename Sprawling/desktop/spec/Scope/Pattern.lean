@@ -6,7 +6,7 @@
 /-!
 # scope::pattern：一行 allowlist 匹配什么
 
-规定 `crates/desktop/src/scope/pattern.rs`（`desktop::scope::pattern`，`Pattern::new` 与 `Pattern::matches`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
+规定 `Sprawling/desktop/src/scope/pattern.rs`（`desktop::scope::pattern`，`Pattern::new` 与 `Pattern::matches`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。
 
 pattern 是给人写的：只认 `*`（任意一段字符，含空），其余每个字符代表它自己，按 ASCII 大小写不敏感比较，因为 Windows 的进程名就是这样比的（§10 第 4 条）。一整套正则会让「我到底放开了什么」变成一个需要推演的问题。
 

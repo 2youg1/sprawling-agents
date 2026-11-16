@@ -7,7 +7,7 @@
 //! stands for this city.
 //!
 //! This is a reading of right now and it is never folded from the
-//! Ledger, on the same grounds as `McpHealth` (`crates/wire/spec/Answer/McpHealth.lean`
+//! Ledger, on the same grounds as `McpHealth` (`Sprawling/wire/spec/Answer/McpHealth.lean`
 //! §8-34): whether an account is connected this minute is a fact about
 //! this minute, and a recorded copy would still call it connected an
 //! hour after the person revoked it.

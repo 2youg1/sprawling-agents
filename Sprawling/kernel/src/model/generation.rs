@@ -6,7 +6,7 @@
 //! Generation values shared by settings, the Ledger and canonical calls.
 //! Sampling numbers stay as text until the provider request boundary, so
 //! no Ledger payload or configuration file acquires a float. Specified by
-//! `crates/kernel/spec/Model.lean` §8-24, kernel D124.
+//! `Sprawling/kernel/spec/Model.lean` §8-24, kernel D124.
 
 use serde::{Deserialize, Serialize};
 

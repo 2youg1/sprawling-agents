@@ -33,12 +33,12 @@ pub struct DoctorAnswer {
     /// Where this machine lets the core's threads stand.
     pub core: DoctorCore,
     /// Whether real-time scanning stands in front of the city
-    /// directory's writes (`crates/wire/spec/Answer/Doctor.lean` D25).
+    /// directory's writes (`Sprawling/wire/spec/Answer/Doctor.lean` D25).
     pub scanning: super::scanning::DoctorScanning,
 }
 
 /// The level this machine gives the core's threads under the person's
-/// setting (`crates/sprawling/Spec.lean` §8-93). The dispatched commands are not here:
+/// setting (`Sprawling/app/Spec.lean` §8-93). The dispatched commands are not here:
 /// they always start one level below, and lowering is never refused.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -267,7 +267,7 @@ pub struct DoctorVerdict {
 pub struct DoctorSandbox {
     pub arm: DoctorSandboxArm,
     /// The arm's name in the closed set a setting chooses from
-    /// (`crates/wire/spec/Answer/Doctor.lean` D26).
+    /// (`Sprawling/wire/spec/Answer/Doctor.lean` D26).
     pub named: SandboxArm,
     /// One row per axis, in the order the axes are declared. The rows
     /// are stated rather than left to the page to infer: an arm that

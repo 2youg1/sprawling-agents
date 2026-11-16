@@ -6,7 +6,7 @@
 /-!
 # kernel::locator
 
-规定 `kernel::locator`（`crates/kernel/src/locator.rs`）：`cas:`／`file:` 文法、`B3Hash` 与 `GitOid`、它们的 serde。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::locator`（`Sprawling/kernel/src/locator.rs`）：`cas:`／`file:` 文法、`B3Hash` 与 `GitOid`、它们的 serde。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `kernel::locator::tests` 守住。
 -/
@@ -62,8 +62,8 @@ impl<'de> Deserialize<'de> for GitOid { /* 同上，20 个字节 */ }
 ```
 
 - **一条规则，两种摘要。** 两种摘要的 serde 问同一个问题 `is_human_readable()`，写与读各经一个私有函数（`write_digest`、`read_digest`），两个类型只交出各自的字节与拼写。账本行、线上帧、`serde_json::Value` 都是人读的格式，拼写照旧是小写十六进制，读回只收 `decode_hex_fixed` 认的那一种拼写；视图与 Standing 的快照经 postcard 编码，是二进制格式，写 N 个字节、读回 N 个字节，不分配字符串、不解十六进制。`RunId` 早已这样做（`kernel::event::identity` 的 `read_run_id`：uuid 在二进制格式里写 16 个字节）。
-- **什么不变。** 账本的规范字节（`canonical_line`）、线上的拼写、`golden-p0`／`golden-s1`、wire 的两份 golden 都不变：它们全经 `serde_json` 写。变的只有快照格式；快照格式由 `VIEWS_FOLD_RULES` 与 `STANDING_FOLD_RULES` 的夹具摘要钉住（`crates/accounting/Spec.lean` §8-24），所以旧快照按「版本不符」从创世折一次，没有第二种读法。
-- **为什么。** 40 万行夹具城开城时视图快照解码约 135 ms，其中约 105 ms 是提交折叠里 64,000 个 oid 的十六进制：每个 oid 在 `commits`、`commit_seqs`、`last_commit` 里各解一次（`crates/sprawling/Spec.lean` §8-144）。改后的读数在 `crates/sprawling/Spec.lean` §8-154。
+- **什么不变。** 账本的规范字节（`canonical_line`）、线上的拼写、`golden-p0`／`golden-s1`、wire 的两份 golden 都不变：它们全经 `serde_json` 写。变的只有快照格式；快照格式由 `VIEWS_FOLD_RULES` 与 `STANDING_FOLD_RULES` 的夹具摘要钉住（`Sprawling/accounting/Spec.lean` §8-24），所以旧快照按「版本不符」从创世折一次，没有第二种读法。
+- **为什么。** 40 万行夹具城开城时视图快照解码约 135 ms，其中约 105 ms 是提交折叠里 64,000 个 oid 的十六进制：每个 oid 在 `commits`、`commit_seqs`、`last_commit` 里各解一次（`Sprawling/app/Spec.lean` §8-144）。改后的读数在 `Sprawling/app/Spec.lean` §8-154。
 - **被否：快照里每个摘要字段各标一个 `#[serde(with = …)]`。** 摘要散在视图的十几个字段与 wire 的类型里（例如 `wire::CommitAt`），逐个标注就是同一条规则的十几份拼写；漏标一处既不报错，也看不出慢，只是悄悄留着十六进制。serde 的 `is_human_readable` 正是为这种区分设的。**被否：给快照另起一个 `GitOidBytes` 新类型。** 视图里存的 `GitOid` 也是线上答复里的那个值，换类型就要在折叠与作答之间来回转换。
 -/
 
@@ -80,7 +80,7 @@ impl<'de> Deserialize<'de> for GitOid { /* 同上，20 个字节 */ }
 
 /-! D27 `plan finish` 收一个路径，运行时在完成那一刻把它折成这份内容的 Locator
 
-**决定**：`plan finish` 的 `evidence` 是本节文法的两种完整形式之一，或者一个路径（与 `read` 同一个判定：`runtime::BoundReader::pin`）。是路径时，运行时在完成那一刻读这个文件，记下 `Locator::cas(B3Hash::digest(bytes))` 的规范拼写，计划里存的永远是 Locator。`read` 与 `edit` 都不答版本：edit 的准入靠每个 run 的读戳（`crates/runtime/spec/Tools/Edit.lean` D106），模型没有要抄的哈希。工作树里的文件不答 git oid：`file:<address>@<oid>` 的 oid 是一次提交（`storage::blob_at` 按提交取文件），一份尚未落进检查点的文件没有这样一个提交。
+**决定**：`plan finish` 的 `evidence` 是本节文法的两种完整形式之一，或者一个路径（与 `read` 同一个判定：`runtime::BoundReader::pin`）。是路径时，运行时在完成那一刻读这个文件，记下 `Locator::cas(B3Hash::digest(bytes))` 的规范拼写，计划里存的永远是 Locator。`read` 与 `edit` 都不答版本：edit 的准入靠每个 run 的读戳（`Sprawling/runtime/spec/Tools/Edit.lean` D106），模型没有要抄的哈希。工作树里的文件不答 git oid：`file:<address>@<oid>` 的 oid 是一次提交（`storage::blob_at` 按提交取文件），一份尚未落进检查点的文件没有这样一个提交。
 
 **理由**：版本串在 read 的每次答复里约 62 个 token，模型要把它原样抄进 `plan finish`，没有 `exec` 的 run 又拿不到 40 位 oid。让运行时在完成那一刻算，文法仍只有这一个家，计划里的证据仍是这份内容的 Locator，可以拿去与文件核对（字节不进块存储，所以 `read` 这个 `cas:` 取不回它们），模型只说它指的是哪个文件。
 

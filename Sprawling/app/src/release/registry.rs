@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
-//! Registry HTTP reads and decoding (`crates/sprawling/spec/Doctor.lean` §8-68).
+//! Registry HTTP reads and decoding (`Sprawling/app/spec/Doctor.lean` §8-68).
 
 use kernel::release::Version;
 use kernel::{AxCode, AxError, Proxying, Reach, Release};

@@ -6,7 +6,7 @@
 /-!
 # wire::reception::sessions：会话令牌的寿命
 
-规定 `reception::sessions`，以及 `server::door`、`server::seat`、`server::socket` 里让会话结束的那几行（`crates/wire/src/` 下同名的文件）。本文件是 `crates/wire/Spec.lean` 的一个分部；下面一节保留它在 wire 规格里的标签 §8-93s，是 §8-93（`spec/Server.lean`）本地门的一部分，别处引作 `crates/wire/Spec.lean §8-93s`，决定引作 `wire D55`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。三条性质对每一条序列成立，由 `reception::sessions` 旁的 proptest `forgotten_and_lapsed_tokens_stay_ended_and_seated_ones_stay_good` 在随机序列上对照 Rust。
+规定 `reception::sessions`，以及 `server::door`、`server::seat`、`server::socket` 里让会话结束的那几行（`Sprawling/wire/src/` 下同名的文件）。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面一节保留它在 wire 规格里的标签 §8-93s，是 §8-93（`spec/Server.lean`）本地门的一部分，别处引作 `Sprawling/wire/Spec.lean §8-93s`，决定引作 `wire D55`。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威。三条性质对每一条序列成立，由 `reception::sessions` 旁的 proptest `forgotten_and_lapsed_tokens_stay_ended_and_seated_ones_stay_good` 在随机序列上对照 Rust。
 
 ### 8-93s 会话的寿命：撤销即断开，空闲即失效
 

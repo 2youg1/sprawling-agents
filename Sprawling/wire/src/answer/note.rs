@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a turn came to besides its calls (`crates/wire/spec/Reading.lean`
+//! What a turn came to besides its calls (`Sprawling/wire/spec/Reading.lean`
 //! §8-21, D36-D38).
 
 use kernel::event::record::SignalKind;

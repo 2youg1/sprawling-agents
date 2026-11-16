@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Whether one request may knock at this city's door at all, before any
-//! credential is read (`crates/wire/spec/Reception/Entry.lean` §8-94,
+//! credential is read (`Sprawling/wire/spec/Reception/Entry.lean` §8-94,
 //! wire D54).
 //!
 //! The names and origins a listener answers to are computed once, from
@@ -326,7 +326,7 @@ impl EntryRefusal {
 }
 
 /// Decides whether one request may knock at all, in the order of
-/// `crates/wire/spec/Reception/Entry.lean` §8-94: Host, page, preflight,
+/// `Sprawling/wire/spec/Reception/Entry.lean` §8-94: Host, page, preflight,
 /// Origin, `Sec-Fetch-Site`, then the pairing routes for browsers only.
 /// Pure; the credential is judged after this, by [`super::Keys`].
 #[must_use]
@@ -393,7 +393,7 @@ mod tests {
         Arrival::Pairing,
     ];
 
-    /// The five properties of `crates/wire/spec/Reception/Entry.lean`,
+    /// The five properties of `Sprawling/wire/spec/Reception/Entry.lean`,
     /// checked cell by cell over every input the model admits: each host,
     /// origin and fetch-site class a request can present, at every route.
     #[test]

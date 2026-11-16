@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Scheduled task presence, enabled state and definition digest, and
-//! enabling or disabling one task (`crates/sprawling/spec/Privacy/Windows.lean`).
+//! enabling or disabling one task (`Sprawling/app/spec/Privacy/Windows.lean`).
 //!
 //! The `ScheduledTasks` module has no safe Rust binding, so Windows
 //! PowerShell under the protected installation path asks it. A task is

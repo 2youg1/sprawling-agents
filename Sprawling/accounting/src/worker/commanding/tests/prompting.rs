@@ -5,7 +5,7 @@
 
 //! A person's steps on the prompt documents of one building, through
 //! the worker's own doors, read back through the layers answer
-//! (`crates/wire/Spec.lean` §8-98; `crates/accounting/spec/Worker/Commanding/Saving.lean` §8-22).
+//! (`Sprawling/wire/Spec.lean` §8-98; `Sprawling/accounting/spec/Worker/Commanding/Saving.lean` §8-22).
 
 #![allow(
     clippy::unwrap_used,

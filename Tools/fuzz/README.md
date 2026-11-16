@@ -33,7 +33,7 @@ An input the parser rejects is the ordinary outcome: every target returns early 
 
 - It is a separate workspace, so it resolves its own lockfile and its own versions. It takes `sprawling-kernel`, `sprawling-storage`, `sprawling-wire` without its listener (`default-features = false`, because a frame is decoded before any socket code sees it), `sprawling-city` and `sprawling-agent-protocols` by path. No product crate names this one.
 - [`rust-toolchain.toml`](../../rust-toolchain.toml) pins a stable release, and cargo-fuzz needs the nightly-only sanitizer flags, so every command names `+nightly`; `RUSTUP_TOOLCHAIN=nightly` is the same override for the recipe.
-- The manifest is not a member of the product workspace, so every command run from the repository root names `--fuzz-dir crates/fuzz`.
+- The manifest is not a member of the product workspace, so every command run from the repository root names `--fuzz-dir Tools/fuzz`.
 - Each target is a binary of its own with `test`, `doc` and `bench` turned off and `#![no_main]`, which is the shape libFuzzer's entry point needs.
 - A target that needs a hook in a parser asks the crate that owns the parser for it; no rule moves in here for a fuzz target's convenience.
 
@@ -48,8 +48,8 @@ There is none. Each property lives beside the target that checks it, in the comm
 ## Checking it
 
 ```bash
-cargo +nightly fuzz list --fuzz-dir crates/fuzz                                        # the targets
-cargo +nightly fuzz run <target> --fuzz-dir crates/fuzz                               # one target, until stopped
+cargo +nightly fuzz list --fuzz-dir Tools/fuzz                                        # the targets
+cargo +nightly fuzz run <target> --fuzz-dir Tools/fuzz                               # one target, until stopped
 RUSTUP_TOOLCHAIN=nightly just fuzz <target>                                           # the same through the recipe, which names no toolchain itself
-cargo +nightly fuzz run <target> --fuzz-dir crates/fuzz -- -max_total_time=60          # sixty seconds, the length of the nightly run
+cargo +nightly fuzz run <target> --fuzz-dir Tools/fuzz -- -max_total_time=60          # sixty seconds, the length of the nightly run
 ```

@@ -14,7 +14,7 @@
 //! changed is left as it is and named, so the person learns that their
 //! version no longer tracks the binary.
 //!
-//! Specified by `crates/city/spec/SpineFiles.lean` §8-43 (city D29).
+//! Specified by `Sprawling/city/spec/SpineFiles.lean` §8-43 (city D29).
 
 use std::path::{Path, PathBuf};
 
@@ -60,7 +60,7 @@ impl Shipped {
 
     /// The BLAKE3 of every earlier default of this document, as lowercase
     /// hex: each version the repository's history holds under
-    /// `crates/city/templates/` and, before the templates moved there,
+    /// `Sprawling/city/templates/` and, before the templates moved there,
     /// under the repository's docs directory.
     ///
     /// A change to a default adds the digest of the text it replaces
@@ -127,7 +127,7 @@ pub enum CopyStanding {
 ///
 /// The body is judged and an identity area above it is not: the
 /// identity cards write the names a person gives into the top of
-/// `MAYOR.md` (`crates/city/spec/Identity.lean` §8-33), and naming the
+/// `MAYOR.md` (`Sprawling/city/spec/Identity.lean` §8-33), and naming the
 /// Mayor is not editing who the Mayor is.
 #[must_use]
 pub fn standing(doc: Shipped, copy: Option<&[u8]>) -> CopyStanding {
@@ -202,7 +202,7 @@ pub fn follow_defaults(city_root: &Path) -> Result<Vec<Edited>, AxError> {
 /// keeping an identity area above it, only while the copy still holds
 /// the version `base` names (a copy that is not there reads as no
 /// bytes). The copy is then `Current`, and follows the binary's default
-/// from here on (`crates/city/Spec.lean` §8-44). Answers how long the copy
+/// from here on (`Sprawling/city/Spec.lean` §8-44). Answers how long the copy
 /// now is.
 ///
 /// # Errors

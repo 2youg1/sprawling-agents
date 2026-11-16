@@ -13,7 +13,7 @@
 //! person writes to say what they are handing over, and a permission
 //! nobody can read at a glance is a permission nobody checked.
 //!
-//! The properties this module must hold are proved in `crates/desktop/spec/Scope/Pattern.lean`;
+//! The properties this module must hold are proved in `Sprawling/desktop/spec/Scope/Pattern.lean`;
 //! this code is the authority on how it holds them.
 
 /// One allowlist line, held as characters so that matching never slices

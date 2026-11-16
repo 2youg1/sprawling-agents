@@ -3,11 +3,11 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.documents.spec.Edit
-import crates.documents.spec.Encoding
-import crates.documents.spec.Proposal
-import crates.documents.spec.Markdown
-import crates.documents.spec.Window
+import Sprawling.documents.spec.Edit
+import Sprawling.documents.spec.Encoding
+import Sprawling.documents.spec.Proposal
+import Sprawling.documents.spec.Markdown
+import Sprawling.documents.spec.Window
 
 /-! # documents 的规格
 
@@ -40,9 +40,9 @@ refrain 路线图 §4-8、§4-10 的验收在 Rust 测试里成立，测试走�
 | 验收 | 完成的定义 |
 |---|---|
 | A1 字节不变 | `edit::tests::every_byte_outside_the_edits_is_copied_through`：带 BOM、混合换行、尾随空格、非 UTF-8 的四份样本，编辑之外的每个字节原样留下；`window::tests::windows_read_end_to_end_give_back_every_byte`：逐窗读完一个版本，窗口首尾相接就是这个版本，逐字节；`layout::tests` 的 RefRain 回归语料：块与空隙首尾相接就是源文 |
-| A3 后到者被拒 | `edit::tests::a_second_save_from_the_same_version_is_refused`：两个写者从同一版本出发，先到的落下，后到的得到 `E_VERSION_CONFLICT`，先到者的字节不动；线上那一半是 accounting 的 `a_second_save_from_the_same_version_is_refused_and_the_first_stands`（`crates/wire/Spec.lean` §8-72） |
+| A3 后到者被拒 | `edit::tests::a_second_save_from_the_same_version_is_refused`：两个写者从同一版本出发，先到的落下，后到的得到 `E_VERSION_CONFLICT`，先到者的字节不动；线上那一半是 accounting 的 `a_second_save_from_the_same_version_is_refused_and_the_first_stands`（`Sprawling/wire/Spec.lean` §8-72） |
 | 文本编辑写回字节 | `edit::tests::a_text_save_writes_the_version_s_own_encoding`：UTF-16 与带标记的 UTF-8 文档上的文本编辑按那一版的编码写回；`edit::tests::a_save_that_splits_a_character_is_refused` |
-| A10 修改提案 | `proposal::tests`：整张接受得到提议、改后接受得到人改过的句子、整张拒绝不写；过期的提案被拒、拒绝它却可以；两张重叠的卡不能一起接受；切出的句子接起来是两边的原文；accounting 的 `worker::commanding::tests::saving` 走线上那一半（收回、重复请求、重开之后从账本折回）；run 经 `proposal` 工具提出与收回由 accounting 的 `worker::workbench::tools::proposal::tests` 判，过期基线被人决定时被拒由 citysim 的 `tests/proposal_baseline.rs` 判（`crates/accounting/Spec.lean` §8-30） |
+| A10 修改提案 | `proposal::tests`：整张接受得到提议、改后接受得到人改过的句子、整张拒绝不写；过期的提案被拒、拒绝它却可以；两张重叠的卡不能一起接受；切出的句子接起来是两边的原文；accounting 的 `worker::commanding::tests::saving` 走线上那一半（收回、重复请求、重开之后从账本折回）；run 经 `proposal` 工具提出与收回由 accounting 的 `worker::workbench::tools::proposal::tests` 判，过期基线被人决定时被拒由 citysim 的 `tests/proposal_baseline.rs` 判（`Sprawling/accounting/Spec.lean` §8-30） |
 
 refrain 路线图 §4-9 的 A4 在 Rust 一侧的一半（「不支持」与「内容为空」可区分）由 `spec/Markdown.lean` 的 `empty_is_not_unsupported` 与下表的测试判；真实浏览器截图那一半归页面。
 
@@ -67,7 +67,7 @@ refrain 路线图 §4-9 的 A4 在 Rust 一侧的一半（「不支持」与「�
 
 /-! ## 4 现状分析
 
-本 crate 之前，`Query::Document` 只给文件头 64 KiB、`from_utf8_lossy` 有损解码、头 8 KiB 里有 NUL 就判二进制（refrain 路线图附录 C）：UTF-16 文件被判成二进制，非 UTF-8 的字节被替换字符盖掉，而答复里没有版本，页面无法说「我改的是哪一版」。现在 `accounting::views::document` 用本 crate 的 `Reading::of`、`head` 作答，`accounting::views::answering::range` 用 `lift`、`cut` 按版本答范围（`crates/accounting/Spec.lean` §8-21，`crates/wire/Spec.lean` §8-69、§8-70）；`Content` 与 `Prefix` 的文本判定经同一个 `Reading::of`。
+本 crate 之前，`Query::Document` 只给文件头 64 KiB、`from_utf8_lossy` 有损解码、头 8 KiB 里有 NUL 就判二进制（refrain 路线图附录 C）：UTF-16 文件被判成二进制，非 UTF-8 的字节被替换字符盖掉，而答复里没有版本，页面无法说「我改的是哪一版」。现在 `accounting::views::document` 用本 crate 的 `Reading::of`、`head` 作答，`accounting::views::answering::range` 用 `lift`、`cut` 按版本答范围（`Sprawling/accounting/Spec.lean` §8-21，`Sprawling/wire/Spec.lean` §8-69、§8-70）；`Content` 与 `Prefix` 的文本判定经同一个 `Reading::of`。
 
 **迁入的部分。** RefRain（另一个仓库，`refrain-core` crate 的 `source_layout` 模块）的两条分块规则（Markdown 与纯文本）与它的回归语料：二十份文本按 RefRain 生成语料的脚本逐字搬进 `layout::tests`，每一份的字节与 RefRain 语料清单记的 SHA-256 核过，块区间与它冻结的块表逐项相同。RefRain 的 `DocumentSurface`（`refrain-app` crate 的 `native_document` 模块）里与平台无关的部分迁的是有界投影的做法：按块取一屏、取不下一块时退到字符边界（`window::head`）。没有迁的：`DocumentSurface` 的输入法组合、光标移动与撤销栈——草稿只在浏览器（refrain 路线图 §4-8），服务端没有一个正在编辑的文档；迁入时去掉了直接索引、`expect`、`as` 与内部随机 ID。
 
@@ -96,15 +96,15 @@ refrain 路线图 §4-9 的 A4 在 Rust 一侧的一半（「不支持」与「�
 
 **preview** 取自 `docs/glossary.md`：一个 Markdown 版本的一个窗口由本 crate 的文法读成的块，是数据而不是 HTML。Rust 里是 `documents::Preview`，线上是 `Query::Preview` 与 `Answer::Preview`；读出的块是 `Block`，行内的是 `Inline`，读得出而不画的是 `Unsupported`；读出的一段与它的块是 `Laid`，预览与回复共用。模型里是 `Documents.Markdown.settle`、`lower`、`admitted`。
 
-**reply**（回复）是模型在一次调用里说的话：结算了的在 `model_returned` 的载荷里，还在说的经流式增量到页面（`crates/wire/Spec.lean` §8-8）。Rust 里是 `documents::reply` 与 `ReplyState::{Streaming, Settled}`，线上是 `Query::Reply` 与 `Answer::Reply`；「已经不会再变」的那一段止于 **收束点**（closure point），Rust 里是 `layout::closed`，模型里是 `Documents.Markdown.closedUpTo` 与 `reach`。
+**reply**（回复）是模型在一次调用里说的话：结算了的在 `model_returned` 的载荷里，还在说的经流式增量到页面（`Sprawling/wire/Spec.lean` §8-8）。Rust 里是 `documents::reply` 与 `ReplyState::{Streaming, Settled}`，线上是 `Query::Reply` 与 `Answer::Reply`；「已经不会再变」的那一段止于 **收束点**（closure point），Rust 里是 `layout::closed`，模型里是 `Documents.Markdown.closedUpTo` 与 `reach`。
 -/
 
 /-! ## 7 模块边界
 
 - **字节从哪里来**归调用方：`accounting::views` 读盘与内容库，把切片交进来；本 crate 恒不持文件句柄。
-- **一版字节存到哪**归 `storage::cas`：版本身份就是内容库的地址（D3），所以按版本取范围就是按地址读对象（`crates/storage/Spec.lean` §8-36）。
-- **一次保存怎样落盘、怎样记账**归 `city::document`（锁、读当前字节、整份换上，`crates/city/Spec.lean` §8-40）与写者 `accounting::worker::commanding::saving`（`crates/wire/Spec.lean` §8-72、§8-73）。
-- **一张卡开着、决定过还是收回过**归读账本的折叠（`crates/accounting/Spec.lean` §8-22）：本 crate 给出每一步的判定，不持有任何一张卡。
+- **一版字节存到哪**归 `storage::cas`：版本身份就是内容库的地址（D3），所以按版本取范围就是按地址读对象（`Sprawling/storage/Spec.lean` §8-36）。
+- **一次保存怎样落盘、怎样记账**归 `city::document`（锁、读当前字节、整份换上，`Sprawling/city/Spec.lean` §8-40）与写者 `accounting::worker::commanding::saving`（`Sprawling/wire/Spec.lean` §8-72、§8-73）。
+- **一张卡开着、决定过还是收回过**归读账本的折叠（`Sprawling/accounting/Spec.lean` §8-22）：本 crate 给出每一步的判定，不持有任何一张卡。
 - **线上的拼写**归 `wire`：它直接携带本 crate 的 `Span`、`Format`、`Encoding`、`Window`，以及预览的 `Preview` 与它的块（D1、D21）。
 - **把块画成元素**归页面（client/Spec.lean §4-26）：本 crate 给页面数据，不给 HTML，也不决定一个 `Unsupported` 怎样显示原文。导出是例外，也只有这一处：`markdown::export` 把同一棵树写成一份离开城与页面之后独立成立的 HTML（D33）。
 - **CommonMark 与 GFM 的文法**归 comrak（D20、D22）：本 crate 只选扩展、把它的树读成本 crate 的树、判链接的协议与嵌套的深度。
@@ -122,18 +122,18 @@ refrain 路线图 §4-9 的 A4 在 Rust 一侧的一半（「不支持」与「�
 - **`layout`**（形状 1 判定，crate 内）：`blocks(Format, &[u8]) -> Vec<Span>`；`closed(&[u8]) -> u64`，还在写的 Markdown 里已经不会再变的块止于第几个字节（D31）。
 - **`window`**（形状 1 判定）：`WINDOW_BYTES_MAX`、`Window { span, text }`、`Lifted { at, bytes, size }`、`head(Format, Encoding, &[u8])`、`lift(Span, size) -> Span`、`cut(Encoding, Lifted, Span) -> Result<Window, AxError>`（`spec/Window.lean`）。
 - **`edit`**（形状 2 值类型 ＋ 形状 1 判定）：`Edit { span, bytes }`、`Transaction::new(baseline, edits)`、`Transaction::{baseline, edits}`、`Transaction::apply(&[u8]) -> Result<Applied, AxError>`、`Applied::{baseline, bytes, version, undo}`（`spec/Edit.lean`）；`TextEdit { span, text }`（线上携带）与 `save(source, baseline, &[TextEdit]) -> Result<Applied, AxError>`（D11、D12）。
-- **`proposal`**（形状 2 值类型 ＋ 形状 1 判定）：`Offer::of(RunId, &ProposalOffered) -> Result<Offer, AxError>`、`Offer::{id, run, doc, baseline, span, before, after, review}`；`Review::of(before, after)`、`Review::{slices, into_slices, merged(&[SliceVerdict]) -> Result<String, AxError>}`；`Slice { kind, text, lead, trail }`、`SliceKind::{Same, Delete, Insert}`（线上携带）；`decide(source, &[(&Offer, &[SliceVerdict])]) -> Result<Option<Applied>, AxError>`（`spec/Proposal.lean`）；常量 `PROPOSAL_ID_TAG`（D13）与 `ALIGN_CELLS_MAX`（D15）也是公开的。判词的类型 `SliceVerdict`、`Verdict` 住 kernel（`crates/kernel/Spec.lean` §8-83），因为账本记的就是它。
+- **`proposal`**（形状 2 值类型 ＋ 形状 1 判定）：`Offer::of(RunId, &ProposalOffered) -> Result<Offer, AxError>`、`Offer::{id, run, doc, baseline, span, before, after, review}`；`Review::of(before, after)`、`Review::{slices, into_slices, merged(&[SliceVerdict]) -> Result<String, AxError>}`；`Slice { kind, text, lead, trail }`、`SliceKind::{Same, Delete, Insert}`（线上携带）；`decide(source, &[(&Offer, &[SliceVerdict])]) -> Result<Option<Applied>, AxError>`（`spec/Proposal.lean`）；常量 `PROPOSAL_ID_TAG`（D13）与 `ALIGN_CELLS_MAX`（D15）也是公开的。判词的类型 `SliceVerdict`、`Verdict` 住 kernel（`Sprawling/kernel/Spec.lean` §8-83），因为账本记的就是它。
 - **`selection`**（形状 2 值类型）：`Selection { anchor, focus }`、`collapsed`、`span`、`mapped(&Transaction)`。
 - **`markdown`**（形状 1 判定，`spec/Markdown.lean`）：`preview(Encoding, Lifted, Span) -> Result<Preview, AxError>`；`Preview::{Laid(Laid), Unsupported { encoding }}`；`Laid { span, blocks }`（D32）；`reply(&str, ReplyState) -> Result<Laid, AxError>`、`ReplyState::{Streaming, Settled}`（D30）；`export(title: &str, Encoding, &[u8]) -> Result<String, AxError>` 与 `EXPORT_BYTES_MAX`（D33，`markdown::export`）。树在 `markdown::tree`（形状 2 值类型）：`Block::{Heading, Paragraph, List, Quote, Code, Table, Rule, Footnote, Unsupported}`、`ListItem { span, check, blocks }`、`Row { cells }`、`Inline::{Text, Code, Emphasis, Strong, Strikethrough, Link, Image, FootnoteReference, SoftBreak, LineBreak, Unsupported}`、`Order`、`Spacing`、`Check`、`Align`、`Construct::{Html, Math, FrontMatter, Nesting, Extension}`。comrak 的树到本 crate 的树在 `markdown::lowering`（crate 内）。一切都带 `serde` 与可选的 `schemars` 派生，线上直接携带（D1）。
 -/
 
 /-! ## 9 工作流程
 
-读：调用方读一份文件的全部字节 → `B3Hash::digest` 得版本 → `Format::of_name` → `Reading::of`；是文本就 `head` 取第一个窗口；调用方把读到的每一版都存进内容库（`crates/wire/Spec.lean` §8-69）。之后每一次按版本取范围：调用方从内容库读这一版的长度与前三个字节（`Encoding::of_mark`），`lift` 说要抬起哪几个字节，`cut` 切出窗口。
+读：调用方读一份文件的全部字节 → `B3Hash::digest` 得版本 → `Format::of_name` → `Reading::of`；是文本就 `head` 取第一个窗口；调用方把读到的每一版都存进内容库（`Sprawling/wire/Spec.lean` §8-69）。之后每一次按版本取范围：调用方从内容库读这一版的长度与前三个字节（`Encoding::of_mark`），`lift` 说要抬起哪几个字节，`cut` 切出窗口。
 
-写（`crates/wire/Spec.lean` §8-72）：调用方在文档锁里读当前字节 → `save` 判基线、判编码、把文本编辑写成那一版编码的字节、经 `Transaction` 落下、判结果仍是同一种编码的文本 → 调用方整份替换 → 记账，回执带 `Applied::version`。
+写（`Sprawling/wire/Spec.lean` §8-72）：调用方在文档锁里读当前字节 → `save` 判基线、判编码、把文本编辑写成那一版编码的字节、经 `Transaction` 落下、判结果仍是同一种编码的文本 → 调用方整份替换 → 记账，回执带 `Applied::version`。
 
-提案（`crates/wire/Spec.lean` §8-73）：run 经工作台的 `proposal` 工具提出（`crates/accounting/Spec.lean` §8-30）：工具读城里那份文件此刻的字节（D35），从 run 引出的原话找出区间，调 `Offer::of` 判长度，再写一行 `proposal_offered`；收回时写 `proposal_withdrawn`。读账本的折叠对每一行 `proposal_offered` 调 `Offer::of`，得到身份与卡；页面要卡时 `Offer::review` 切句、对齐；人决定时调用方在文档锁里读当前字节，`decide` 对每张卡 `merged` 出替换文本，接受了什么的卡判基线与原文，几段合成一次 `save`。
+提案（`Sprawling/wire/Spec.lean` §8-73）：run 经工作台的 `proposal` 工具提出（`Sprawling/accounting/Spec.lean` §8-30）：工具读城里那份文件此刻的字节（D35），从 run 引出的原话找出区间，调 `Offer::of` 判长度，再写一行 `proposal_offered`；收回时写 `proposal_withdrawn`。读账本的折叠对每一行 `proposal_offered` 调 `Offer::of`，得到身份与卡；页面要卡时 `Offer::review` 切句、对齐；人决定时调用方在文档锁里读当前字节，`decide` 对每张卡 `merged` 出替换文本，接受了什么的卡判基线与原文，几段合成一次 `save`。
 
 预览：调用方从内容库读这一版的长度与前三个字节（`Encoding::of_mark`），`lift(viewport, size)` 说要抬起哪几个字节 → `preview`：UTF-16 答 `Unsupported`；否则 `cut` 切出窗口，没到末尾时退到倒数第二块的末尾（D25），comrak 读窗口的文字，`lowering` 把它的树读成 `Block`，区间加上窗口的起点。页面从 `span.end` 接着要下一窗。
 
@@ -180,13 +180,13 @@ D17 几张卡可以一起决定，接受了什么的卡合成一次保存（`dec
 
 D18 一处提案的原文与提议各至多 `WINDOW_BYTES_MAX` 字节，`Offer::of` 拒绝更长的（`E_INVALID_ARGS`）。一张卡是一屏读得完的一段，这个上限让一张卡的答复与一个窗口同阶，也让对齐表有界（D15）；更大的改动是一次保存，或者几处提案。重开参数：refrain 路线图 S7.10 的验收要求整章重写成一张卡时。
 
-D19 一张卡只被处理一次：开着的卡可以被人决定或被提出它的 run 收回，决定过或收回过的卡再被决定或收回都被拒（`E_INVALID_ARGS`），状态不变（`spec/Proposal.lean` 的 `decided_is_final`、`withdrawn_is_final`）。状态由读账本的折叠持有（`crates/accounting/Spec.lean` §8-22），本 crate 只给出判定所需的身份与合成。被否决的是「决定之后可以换一个决定」：一次决定落下的字节已经成了文档的一版，再换一个决定就是一次新的保存，它该带新的基线。
+D19 一张卡只被处理一次：开着的卡可以被人决定或被提出它的 run 收回，决定过或收回过的卡再被决定或收回都被拒（`E_INVALID_ARGS`），状态不变（`spec/Proposal.lean` 的 `decided_is_final`、`withdrawn_is_final`）。状态由读账本的折叠持有（`Sprawling/accounting/Spec.lean` §8-22），本 crate 只给出判定所需的身份与合成。被否决的是「决定之后可以换一个决定」：一次决定落下的字节已经成了文档的一版，再换一个决定就是一次新的保存，它该带新的基线。
 
-D35 一处提案提在城里那份文件此刻的那一版上。`proposal` 工具（`crates/accounting/Spec.lean` §8-30）在调用时经 run 的读界读出城根下这份文档的全部字节，基线就是这些字节的摘要（D3），原文从这些字节里切出；人决定时 `decide` 读的也是城里那份（`crates/accounting/Spec.lean` §8-22），所以一张刚提出的卡与人看到的文档是同一版。原文由 run 引出：它给出要改的那段原话，原话必须在这一版里恰好出现一次，区间由它的位置算出（accounting D42）；在城里那份里找不到时被拒，拒词说它要引的是城里那份。被否决的：①run 读到的那一版——那一版没有记在任何地方，工具要它就得让模型抄一个版本串，抄错时得到的是一张在任何一版上都不成立的卡；②run 候选工作树里那份文件的基线——审阅中的 run 写在自己的树里，树里的文件可能已经是它自己改过的，那一版不在城里，卡一提出就过期。重开参数：页面要让人「在我看到的那一版上」请 run 提案时，版本成为请求的一部分。
+D35 一处提案提在城里那份文件此刻的那一版上。`proposal` 工具（`Sprawling/accounting/Spec.lean` §8-30）在调用时经 run 的读界读出城根下这份文档的全部字节，基线就是这些字节的摘要（D3），原文从这些字节里切出；人决定时 `decide` 读的也是城里那份（`Sprawling/accounting/Spec.lean` §8-22），所以一张刚提出的卡与人看到的文档是同一版。原文由 run 引出：它给出要改的那段原话，原话必须在这一版里恰好出现一次，区间由它的位置算出（accounting D42）；在城里那份里找不到时被拒，拒词说它要引的是城里那份。被否决的：①run 读到的那一版——那一版没有记在任何地方，工具要它就得让模型抄一个版本串，抄错时得到的是一张在任何一版上都不成立的卡；②run 候选工作树里那份文件的基线——审阅中的 run 写在自己的树里，树里的文件可能已经是它自己改过的，那一版不在城里，卡一提出就过期。重开参数：页面要让人「在我看到的那一版上」请 run 提案时，版本成为请求的一部分。
 
 D36 run 一边对一份文档提案、一边直接改它时，不由 runtime 的写门判；守边界的是版本（D17）。提案只是账本上的一行，run 不写那份文档；它直接写下的每一次——与人的编辑器、别的居民的 `edit` 一样——都是一个新版本，此后人接受那张卡时 `decide` 判出卡的基线不是源文这一版，整次以 `E_VERSION_CONFLICT` 拒，什么都不落，直接写下的字节留着。所以一张提案永远盖不掉一次直接的写，这就是 refrain 路线图 §4-10「受同一边界约束」要守的事。被否决的：runtime 的写门在每次 `edit`、`exec` 写之前查「这份文档有没有开着的提案」——runtime 不读账本，门要么持一份提案折叠的拷贝（`views::Governance` 之外的第二个权威），要么每次写都回记账线程问一次；而 `exec` 写哪些文件在它跑完之前不知道，门判不全。代价：run 直接改了一份它开着卡的文档之后，那张卡过期，只能被人拒绝或由 run 重提，而不是在写之前被拦下。重开参数：过期的卡在真实的城里成为常见的情形。
 
-D20 Markdown 在城里读，不在浏览器里读。比的是四个读者：文档预览（版本在城里，页面只持有窗口，城侧一次答复带一个窗口的块，与 `Range` 同一个往返）；导出（U12 与 playback 本来就在 Rust 里，读的是同一个函数）；对话流（页面手里已经有文字，城侧要多一次往返，D30）；经远程门的设备（城侧每窗一次网络往返，浏览器侧零次）。被否决的是把 comrak 编成 wasm 在浏览器里读（refrain 路线图 §4-9 的另一臂），理由有四：(a) wasm 导出一个函数要 `#[unsafe(no_mangle)]` 或 wasm-bindgen 生成的 `unsafe`，工作区的 `unsafe_code` 是 `forbid`，只有 `crates/desktop/ffi` 有自己的 lint 表（`xtask guard`），所以要第二个带自己 lint 表的 crate，那是放宽一道门，要人的定规；(b) 工具链多一个 `wasm32-unknown-unknown` 目标，用 wasm-bindgen 时还多一个版本必须与 crate 逐位相同的命令行工具；(c) 包体推断多 100 KB 以上（gzip，没有构建过），`frontend_artifact` 的棘轮余量只有几 KB，城侧反而删掉 `prose.ts`；(d) 同一个 comrak 编两份——二进制给导出，wasm 给页面——两条构建路。城侧的代价：二进制多 comrak 一族；每窗一次往返，页面与城在同一台机器上时是一次回环上的 WebSocket 往返，远程门上是一次网络往返，都还没有读数。运行速度先于体积（人的定规）在这里不偏向 wasm：差别在往返，不在读一窗的微秒级计算。重开参数：远程门上量出的往返超过人能察觉的界（refrain 路线图 §5 的 `client_send_feedback`，100 ms）而 D30 的做法消不掉它；或者出现允许第二个带自己 lint 表的 crate 的定规。
+D20 Markdown 在城里读，不在浏览器里读。比的是四个读者：文档预览（版本在城里，页面只持有窗口，城侧一次答复带一个窗口的块，与 `Range` 同一个往返）；导出（U12 与 playback 本来就在 Rust 里，读的是同一个函数）；对话流（页面手里已经有文字，城侧要多一次往返，D30）；经远程门的设备（城侧每窗一次网络往返，浏览器侧零次）。被否决的是把 comrak 编成 wasm 在浏览器里读（refrain 路线图 §4-9 的另一臂），理由有四：(a) wasm 导出一个函数要 `#[unsafe(no_mangle)]` 或 wasm-bindgen 生成的 `unsafe`，工作区的 `unsafe_code` 是 `forbid`，只有 `Sprawling/desktop/ffi` 有自己的 lint 表（`xtask guard`），所以要第二个带自己 lint 表的 crate，那是放宽一道门，要人的定规；(b) 工具链多一个 `wasm32-unknown-unknown` 目标，用 wasm-bindgen 时还多一个版本必须与 crate 逐位相同的命令行工具；(c) 包体推断多 100 KB 以上（gzip，没有构建过），`frontend_artifact` 的棘轮余量只有几 KB，城侧反而删掉 `prose.ts`；(d) 同一个 comrak 编两份——二进制给导出，wasm 给页面——两条构建路。城侧的代价：二进制多 comrak 一族；每窗一次往返，页面与城在同一台机器上时是一次回环上的 WebSocket 往返，远程门上是一次网络往返，都还没有读数。运行速度先于体积（人的定规）在这里不偏向 wasm：差别在往返，不在读一窗的微秒级计算。重开参数：远程门上量出的往返超过人能察觉的界（refrain 路线图 §5 的 `client_send_feedback`，100 ms）而 D30 的做法消不掉它；或者出现允许第二个带自己 lint 表的 crate 的定规。
 
 D21 读出的是数据树，不是 HTML。块是标题、段落、列表（列表项各带自己的块）、引用、代码、表、分隔线、脚注定义与「不支持」，行内是文字、代码、强调、加粗、删除线、链接、图片、脚注引用、软换行、硬换行与「不支持」；线上直接携带（D1）。页面按树画元素，模型或居民写下的任何字符都不进 `innerHTML`——今天 `prose.ts` 守的就是这一条。被否决的：(a) comrak 的 HTML 输出加页面里的消毒器——消毒规则成了第二个权威，页面还要放开 `innerHTML`；(b) comrak 的 CommonMark XML——页面要再解析一遍。
 
@@ -200,7 +200,7 @@ D25 预览按版本读一个窗口：窗口照 `Range` 的切法（`cut`，D7）
 
 D26 源位置：comrak 的 `sourcepos`（行与按字节数的列，都从 1 起，终点含在内）换算成版本里的半开字节区间。行按 comrak 的切法（`\r\n`、`\r`、`\n`）数，终点列换成不含的末尾，落到文字之外的夹到文字末尾。区间只用来定位（预览与源码的对应），不用来编辑：编辑仍走 `Span` 与 `Transaction`（D8），refrain 路线图附录 F 说的正是 source position 不保证可视编辑无损。行内节点不带区间，因为今天的读者只要块一级的对应。
 
-D30 对话流读同一个文法，入口是一条带文字的查询：页面把它手里的回复文字与「还在说／已结算」送给 `reply`（线上 `Query::Reply`，`crates/wire/Spec.lean` §8-75），答复是 `Laid`。结算了的回复按「一个只装着这段文字的版本」读，所以它读出的树与预览同一段字节的树相等（`a_settled_reply_is_laid_out_as_a_preview_of_its_text`）；还在说的回复只读收束点之前的字节（D31），开着的末尾页面照旧画原文。一次至多读一个窗口（D7），页面从答复的 `span.end` 接着送其余的文字，所以一次答复的代价与一次预览同阶，而不随回复多长变。选这一条，是因为它是唯一一个同时盖住流式与历史的入口：页面手里本来就有文字（流式时来自增量，重开页面时来自 `model_returned` 的载荷），一个入口两处都用。被否的：(a) 写 `model_returned` 的一方把回复的文字另存进内容库、记录带上地址，页面按版本问 `Preview`——回复的文字就有了第二个家（`ModelCalled` 不带请求体也是这条理由），每一次回复多一次内容库写入，`model_returned` 的形状要变，变之前写下的行没有地址，页面为它们仍要第二个读法；而且它只盖结算之后，还在说的那一段只能画原文，块随闭合画出的那一半（`[stream_relayout]` 量出的 0 px 跳动）就丢了。(b) 城在流式增量旁边按同一个文法给出已经闭合的块——增量按构造可丢（`crates/wire/Spec.lean` §8-8：漏了一帧的页面什么也没丢），块放进去之后漏一帧就是少一块；它也只盖流式，从历史打开的回复没有增量，于是还要 (a) 或 (c) 在旁边，入口成了两个。代价：文字随每一问回到城里一次，每次闭合多一次往返——同一台机器上是回环上的一次 WebSocket 往返，远程门上是一次网络往返，都还没有读数；页面只在手里的文字长了时再问，同时只有一问在途（client/Spec.lean §4-26）。重开参数：远程门上量出的往返超过人能察觉的界（refrain 路线图 §5 的 `client_send_feedback`，100 ms），那时流式这一半另加 (b)，历史仍走这一个入口。
+D30 对话流读同一个文法，入口是一条带文字的查询：页面把它手里的回复文字与「还在说／已结算」送给 `reply`（线上 `Query::Reply`，`Sprawling/wire/Spec.lean` §8-75），答复是 `Laid`。结算了的回复按「一个只装着这段文字的版本」读，所以它读出的树与预览同一段字节的树相等（`a_settled_reply_is_laid_out_as_a_preview_of_its_text`）；还在说的回复只读收束点之前的字节（D31），开着的末尾页面照旧画原文。一次至多读一个窗口（D7），页面从答复的 `span.end` 接着送其余的文字，所以一次答复的代价与一次预览同阶，而不随回复多长变。选这一条，是因为它是唯一一个同时盖住流式与历史的入口：页面手里本来就有文字（流式时来自增量，重开页面时来自 `model_returned` 的载荷），一个入口两处都用。被否的：(a) 写 `model_returned` 的一方把回复的文字另存进内容库、记录带上地址，页面按版本问 `Preview`——回复的文字就有了第二个家（`ModelCalled` 不带请求体也是这条理由），每一次回复多一次内容库写入，`model_returned` 的形状要变，变之前写下的行没有地址，页面为它们仍要第二个读法；而且它只盖结算之后，还在说的那一段只能画原文，块随闭合画出的那一半（`[stream_relayout]` 量出的 0 px 跳动）就丢了。(b) 城在流式增量旁边按同一个文法给出已经闭合的块——增量按构造可丢（`Sprawling/wire/Spec.lean` §8-8：漏了一帧的页面什么也没丢），块放进去之后漏一帧就是少一块；它也只盖流式，从历史打开的回复没有增量，于是还要 (a) 或 (c) 在旁边，入口成了两个。代价：文字随每一问回到城里一次，每次闭合多一次往返——同一台机器上是回环上的一次 WebSocket 往返，远程门上是一次网络往返，都还没有读数；页面只在手里的文字长了时再问，同时只有一问在途（client/Spec.lean §4-26）。重开参数：远程门上量出的往返超过人能察觉的界（refrain 路线图 §5 的 `client_send_feedback`，100 ms），那时流式这一半另加 (b)，历史仍走这一个入口。
 
 D31 收束点：一段还在写的 Markdown 里，已经不会再变的块止于最后一个这样的完整行之后——代码块之外的空行；顶格（第一列）的 ATX 标题行；从顶格开启的代码块的闭合行（`layout::closed`，`spec/Markdown.lean` 的 `closedUpTo`）。没有换行的最后一行什么也不收束，因为接下来的字可能接上它。围栏用 `layout` 分块的同一条认法（D6：三个以上同一个 `` ` `` 或 `~`，缩进少于四列，闭合行同字符且不短于开启行），代码块里的空行与标题不收束。只认顶格的标题与顶格开启的代码块，是因为缩进的那些可能在一个列表项或引用里，它之后的行还可能接回那个容器。这是 `prose.ts` 的 `closedUpTo` 的规则，围栏换成了本 crate 的认法。收束点只进不退（`closed_stays`），不过回复的长度（`closed_le_length`）。已知的两处会变：块之间隔着空行的列表在流式期间一段一段读，结算之后读成一个松散列表；定义晚于引用到达的链接与脚注在流式期间读成文字。两处都在结算的那一问里读对，页面画结算的答复。被否的：①预览的止法（止于倒数第二块，D25）——它为了保证有进展，一块都没闭合时也读出整个窗口，还在说的段落就被读成了一块；②读整段文字，留下 comrak 的树里末尾之前的块——一段没写完的文字读出的树不说明哪些会变（`Title` 之下来一行 `===` 就从段落变成标题，列表项的下一行可能接回它）；③沿用 `prose.ts` 只认行首三个反引号的围栏——同一个 crate 里两条围栏规则，`~~~` 与缩进的围栏在分块与收束里各判一次。
 
@@ -264,9 +264,9 @@ comrak（BSD-2-Clause）关掉默认 feature 取用：默认的是它的命令�
 
 - `architecture.toml` 里 documents 各行（锚点指向本文件与分部），ARCHITECTURE.md §3 的 `depmap`（`documents: kernel`，`wire` 与 `accounting` 两行各有它）。
 - `docs/glossary.md` 的 **document version**、**document window**、**draft**、**preview**、**proposal**、**review slice**。
-- `crates/wire/Spec.lean` §8-74、§12.11（`Query::Preview`）；`crates/accounting/Spec.lean` §8-23、accounting D35（谁从内容库读、谁作答）；client/Spec.lean §4-26、client D14（页面怎样画这棵树，为什么在城里读）。
-- `crates/accounting/Spec.lean` §8-30、accounting D42（`proposal` 工具：在哪一版上提、怎样找出原文、怎样写行，D35、D36）。
-- `crates/wire/Spec.lean` §8-75、§12.12（`Query::Reply`）；`crates/accounting/Spec.lean` §8-29、accounting D41（回复在视图锁外读）；client/Spec.lean §4-26、client D15（页面什么时候问、删 `prose.ts`）；`crates/wire/Spec.lean` §8-8（增量为什么不带块）。
-- `crates/wire/Spec.lean` §8-69、§8-70（文档读取契约）、§8-72、§8-73（保存与提案）、§12.8、§12.10；`crates/kernel/Spec.lean` §8-83（`document_written` 与提案的三种事件，`SliceVerdict`）；`crates/accounting/Spec.lean` §8-21（谁读盘、谁存版本、谁作答）、§12 第 33 条；`crates/storage/Spec.lean` §8-36（版本进内容库）；`crates/city/Spec.lean` §8-27、§8-40（`city::document`：锁、读当前字节、整份换上）；`crates/accounting/Spec.lean` §8-22（保存与提案的写者、提案的折叠）。这些节改了，重读本文件对应的决定。
+- `Sprawling/wire/Spec.lean` §8-74、§12.11（`Query::Preview`）；`Sprawling/accounting/Spec.lean` §8-23、accounting D35（谁从内容库读、谁作答）；client/Spec.lean §4-26、client D14（页面怎样画这棵树，为什么在城里读）。
+- `Sprawling/accounting/Spec.lean` §8-30、accounting D42（`proposal` 工具：在哪一版上提、怎样找出原文、怎样写行，D35、D36）。
+- `Sprawling/wire/Spec.lean` §8-75、§12.12（`Query::Reply`）；`Sprawling/accounting/Spec.lean` §8-29、accounting D41（回复在视图锁外读）；client/Spec.lean §4-26、client D15（页面什么时候问、删 `prose.ts`）；`Sprawling/wire/Spec.lean` §8-8（增量为什么不带块）。
+- `Sprawling/wire/Spec.lean` §8-69、§8-70（文档读取契约）、§8-72、§8-73（保存与提案）、§12.8、§12.10；`Sprawling/kernel/Spec.lean` §8-83（`document_written` 与提案的三种事件，`SliceVerdict`）；`Sprawling/accounting/Spec.lean` §8-21（谁读盘、谁存版本、谁作答）、§12 第 33 条；`Sprawling/storage/Spec.lean` §8-36（版本进内容库）；`Sprawling/city/Spec.lean` §8-27、§8-40（`city::document`：锁、读当前字节、整份换上）；`Sprawling/accounting/Spec.lean` §8-22（保存与提案的写者、提案的折叠）。这些节改了，重读本文件对应的决定。
 - refrain 路线图 §4-8、§4-9、§4-10、附录 B–G 是本 crate 的需求来源；RefRain 的 `source_layout`、`native_document`、`manuscript::review` 与 `manuscript::decision` 四个模块是迁入的出处（§4）。
 -/

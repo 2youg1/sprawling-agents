@@ -9,7 +9,7 @@ import Sprawling.Ground
 # The second world: a city that has been given a provider.
 
 `Sprawling.Model` remembers a city nobody ever attached an endpoint to, and
-`crates/adversary/Spec.lean` section 3 records why: with no provider, every dispatch
+`Tools/adversary/Spec.lean` section 3 records why: with no provider, every dispatch
 stops at configuration and the model knows which refusal is owed. Attaching one
 makes a different world, so it is written here rather than smuggled into that
 one.
@@ -176,7 +176,7 @@ def Door.send (door : Door) (ground : Ground) (verb : Verb) : IO Unit := do
 An id no catalogue knows and no preset covers, which is the case the ladder's
 bottom rung exists for: a person pasting a relay's own name for a model. Fixed
 rather than drawn, so a counterexample names something a reader recognises
-(`crates/adversary/Spec.lean` section 14). -/
+(`Tools/adversary/Spec.lean` section 14). -/
 def relayName : String := "relay"
 
 def unlistedModel : String := "opus-nine"

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which disk holds the city, and how much room it has left
-//! (`crates/sprawling/spec/Monitor.lean` §8-116).
+//! (`Sprawling/app/spec/Monitor.lean` §8-116).
 
 use std::path::{Component, Path, PathBuf, Prefix};
 

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The remote listener's two paths, spoken from the browser
-// (`crates/remote_access/Spec.lean` §8-10): `/remote/pair` carries one
+// (`Sprawling/remote_access/Spec.lean` §8-10): `/remote/pair` carries one
 // pairing and ends; `/remote/session` carries a session handshake and
 // then sealed payloads. Every message is binary. The city ends a
 // connection with a close frame whose reason is one stable code and

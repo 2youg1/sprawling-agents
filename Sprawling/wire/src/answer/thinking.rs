@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Which thinking levels one (Endpoint, model) offers, and where that
-//! answer came from (`crates/wire/spec/Answer/Endpoints.lean` §8-92).
+//! answer came from (`Sprawling/wire/spec/Answer/Endpoints.lean` §8-92).
 
 use kernel::Effort;
 use serde::{Deserialize, Serialize};

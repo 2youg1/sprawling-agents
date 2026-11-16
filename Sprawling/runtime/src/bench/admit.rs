@@ -10,7 +10,7 @@ use super::*;
 
 impl ToolBench {
     /// Hands the bench the egress list the building wrote, frozen with
-    /// the run (`crates/city/spec/Policy.lean` D27). A browser call to a
+    /// the run (`Sprawling/city/spec/Policy.lean` D27). A browser call to a
     /// public host outside it is refused before any byte leaves; the
     /// judgement compares against this short list, so it adds no read,
     /// no lookup and no round trip to the call.
@@ -215,7 +215,7 @@ impl ToolBench {
     }
 
     /// The building's egress list, asked about the host one call names
-    /// when the building wrote a list (`crates/city/spec/Policy.lean`
+    /// when the building wrote a list (`Sprawling/city/spec/Policy.lean`
     /// D27). It stands before the secret scan: a host the building does
     /// not reach owes no answer about which bytes may go there.
     fn listed(&self, target: &EgressTarget) -> Option<BenchOutcome> {
@@ -399,7 +399,7 @@ mod tests {
 
     /// The bench routes on the call's effect, not the tool's: a read of
     /// the rules runs inside a run, a rewrite is still refused
-    /// (`crates/kernel/spec/Gate.lean` D26).
+    /// (`Sprawling/kernel/spec/Gate.lean` D26).
     #[test]
     fn a_govern_tool_read_runs_in_a_run_and_its_rewrite_is_still_refused() {
         let meta = stub("ruler", Effect::Govern, GateSubject::None)
@@ -472,7 +472,7 @@ mod tests {
 
     /// The building's list decides which public hosts a browser call
     /// reaches, its subdomains included; a building that wrote no list
-    /// keeps every host (`crates/city/spec/Policy.lean` D27).
+    /// keeps every host (`Sprawling/city/spec/Policy.lean` D27).
     #[test]
     fn a_browser_call_reaches_only_the_hosts_the_building_lists() {
         let outcomes = [

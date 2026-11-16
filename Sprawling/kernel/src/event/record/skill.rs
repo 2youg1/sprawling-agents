@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! What shelving a skill and auditing it record
-//! (`crates/kernel/spec/Event/Record.lean` D23).
+//! (`Sprawling/kernel/spec/Event/Record.lean` D23).
 //!
 //! The line is record-only: what an auditor said about a skill decides
 //! no byte of a model request. A skill's use is not recorded here; the

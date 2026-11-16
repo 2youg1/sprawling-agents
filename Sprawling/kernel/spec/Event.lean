@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.kernel.spec.Event.Kind
+import Sprawling.kernel.spec.Event.Kind
 
 /-!
 # kernel::event
 
-规定 `kernel::event`（`crates/kernel/src/event.rs` 与 `crates/kernel/src/event/` 下的 `identity`、`payload`、`scope`、`who`、`moment`）以及 `kernel::origin`（`crates/kernel/src/origin.rs`）：信封、规范字节、`EventRef` 的铸造、信封 `t` 的语义与可忽略性。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::event`（`Sprawling/kernel/src/event.rs` 与 `Sprawling/kernel/src/event/` 下的 `identity`、`payload`、`scope`、`who`、`moment`）以及 `kernel::origin`（`Sprawling/kernel/src/origin.rs`）：信封、规范字节、`EventRef` 的铸造、信封 `t` 的语义与可忽略性。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 -/
 
 /-!
@@ -95,7 +95,7 @@ pub fn escape_markup(text: &str) -> String;  // `<` `>` `&` 写成实体：标�
 - `t` 是写方经注入的时钟采到的 UTC 整数毫秒，kernel 从不采样。
 - `v` 为 2 起，`model_called`、`model_returned`、`tool_called`、`tool_result` 四种行记这一行自己那件事的时刻：一次模型尝试发出、一次回复到齐、一次工具调用开始（放行之后、工具起跑之前）、一次调用答复。`EventKind::records_a_moment` 是这四种的名册，`moment` 对这样的行答 `Some(t)`。
 - `v` 为 1 的行里，这四种带的是它所在回合的时间戳，同一回合的行同值。`moment` 答 `None`，意思是「这一刻没有量过」，不是零耗时。
-- 其余种类的 `t` 是写方为这一行采的一次读数；一个回合里的其余行沿用回合时间戳（`crates/runtime/Spec.lean` §8-15）。
+- 其余种类的 `t` 是写方为这一行采的一次读数；一个回合里的其余行沿用回合时间戳（`Sprawling/runtime/Spec.lean` §8-15）。
 - `t` 不随 `seq` 单调：并行只读调用的开始可以早于前一条调用的答复，壁钟也会回拨。次序以 `seq` 为准。
 - 重启之后由 `runtime::replay::outcome_unknown_draft` 补上的 `tool_result`（错误码 `E_TOOL_OUTCOME_UNKNOWN`）记的是城补上它的时刻，不是工具答复的时刻；量工具用时的读者跳过这样的行。
 
@@ -109,7 +109,7 @@ open Kernel.Event.Kind
 
 /-! ### 可忽略性：`ig` 授的是跳过权，只在种类未知时有用
 
-读者在一行的 `kind` 里读到的，要么是本构建认得的种类，要么是一个更新的构建写下的词。本构建认得的照常全解，`ig` 不改变什么；不认得的，写方标了 `ig: true` 就跳过它的类型化解读，没有标就拒读整本账本（`E_LOG_VERSION_UNSUPPORTED`，说出方向）。跳过的行照样在链上：它的字节被它的后继取过摘要（`crates/kernel/spec/Ledger.lean`），跳过的只是解读。这条规则的生产实现是 `storage::jsonl::verify` 的 `classify`（以及 `runtime::replay`），本节是它的权威。 -/
+读者在一行的 `kind` 里读到的，要么是本构建认得的种类，要么是一个更新的构建写下的词。本构建认得的照常全解，`ig` 不改变什么；不认得的，写方标了 `ig: true` 就跳过它的类型化解读，没有标就拒读整本账本（`E_LOG_VERSION_UNSUPPORTED`，说出方向）。跳过的行照样在链上：它的字节被它的后继取过摘要（`Sprawling/kernel/spec/Ledger.lean`），跳过的只是解读。这条规则的生产实现是 `storage::jsonl::verify` 的 `classify`（以及 `runtime::replay`），本节是它的权威。 -/
 
 /-- 读者在一行的 `kind` 里读到的东西。 -/
 inductive Spelled where

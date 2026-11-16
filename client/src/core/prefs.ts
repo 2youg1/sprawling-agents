@@ -99,7 +99,7 @@ const ROWS = {
   glass: "sprawling.appearance.glass",
   blend: "sprawling.appearance.blend",
   // The colours laid over the built-in theme, as the wire spells them
-  // (`crates/wire/spec/Preference.lean` D29), so the cache and the
+  // (`Sprawling/wire/spec/Preference.lean` D29), so the cache and the
   // city's record read through one grammar.
   theme: "sprawling.appearance.theme",
   // Which rule a provider attached from now on starts with. A person

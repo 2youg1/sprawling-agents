@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The four classes of a specification part (crates/xtask/Spec.lean §8-42,
+//! The four classes of a specification part (Tools/xtask/Spec.lean §8-42,
 //! assertion 6, and D22), read off the part's code with comments and
 //! strings blanked (`lean::code`).
 

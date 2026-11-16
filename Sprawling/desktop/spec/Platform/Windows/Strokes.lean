@@ -6,7 +6,7 @@
 /-!
 # strokes：一批输入只被收下一部分时，还按着什么
 
-规定 `crates/desktop/src/platform/windows/strokes.rs`（`desktop::platform::windows::strokes`，`left_held` 与 `cut_short`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（D4）。
+规定 `Sprawling/desktop/src/platform/windows/strokes.rs`（`desktop::platform::windows::strokes`，`left_held` 与 `cut_short`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（D4）。
 
 `SendInput` 只承诺按序插入、返回插入了几个，不承诺回滚。一批事件只被收下前 k 个时，前缀可能已经落在窗口上，修饰键可能停在按下。本 server 按收下的前缀算出仍按着的东西，按按下的相反次序补发它们的抬起；从不补发按下，从不重发整批。
 

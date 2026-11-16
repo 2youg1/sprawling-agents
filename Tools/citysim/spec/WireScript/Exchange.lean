@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.citysim.spec.WireScript
+import Tools.citysim.spec.WireScript
 
 /-!
 # citysim::wire_script::exchange
 
-规定 `citysim::wire_script::exchange`（`crates/citysim/src/wire_script/exchange.rs`）：从一条回环连接上读一个请求、把脚本给它的回答写回去、把这次交换追加进记录，以及第一轮找不到还没开启的 run 时把脚本文件再读一遍。哪一个请求得到哪一个回答由 `spec/WireScript.lean` 的 `Replay` 判；本文件是 `crates/citysim/Spec.lean` 的一个分部，接着那里的 §8-10 写这一半。
+规定 `citysim::wire_script::exchange`（`Tools/citysim/src/wire_script/exchange.rs`）：从一条回环连接上读一个请求、把脚本给它的回答写回去、把这次交换追加进记录，以及第一轮找不到还没开启的 run 时把脚本文件再读一遍。哪一个请求得到哪一个回答由 `spec/WireScript.lean` 的 `Replay` 判；本文件是 `Tools/citysim/Spec.lean` 的一个分部，接着那里的 §8-10 写这一半。
 
 能写成定理的是重读：脚本文件只在一个第一轮被 `no_run_left` 拒时再读，再读读不成或接不上时那次拒绝照旧、回放的状态不变，接得上时那个第一轮开启追加的 run。凭据头的值不落盘是一个判断的两臂，不写成定理，由 `the_same_request_twice_is_recorded_byte_for_byte_alike` 判记录里没有那个 key；请求怎样从字节里读出来（`read_request`）同样由 Rust 守着，见 §16。
 -/
@@ -39,7 +39,7 @@ def wants_more_runs : Answer → Bool
   | .Refused .NoRunLeft => true
   | _ => false
 
-/-- D15 **脚本的 run 用完时，替身先把脚本文件再读一遍，再拒一个新开的 run。** 有的回复要写进城才知道的东西：一个要评审的房间的分支名由城按地址的摘要取（`room-<摘要前 16 位>`），而黑盒检查不预测任何摘要（`crates/adversary/Spec.lean` §2 第 3 条）。所以检查先从历史里读出它，再把要用它的那个 run 追加进脚本文件；替身在一个新开的 run 找不到还没开启的 run 时把文件再读一遍，读到的脚本若以它已经握着的那些 run 开头（`face`、`models` 与这些 run 逐值相等），多出来的 run 接在后面（`a_run_appended_after_the_script_ran_out_is_opened`）；否则这次重读被拒（`E_CONFIG_INVALID`，写到标准错误），这个新开的 run 照样得到 `no_run_left`（`a_reread_that_is_not_taken_changes_nothing`）。已经开启的 run 永远按它开启时的回复作答，追加改不动它们（`a_grown_replay_answers_every_held_run_alike`）。
+/-- D15 **脚本的 run 用完时，替身先把脚本文件再读一遍，再拒一个新开的 run。** 有的回复要写进城才知道的东西：一个要评审的房间的分支名由城按地址的摘要取（`room-<摘要前 16 位>`），而黑盒检查不预测任何摘要（`Tools/adversary/Spec.lean` §2 第 3 条）。所以检查先从历史里读出它，再把要用它的那个 run 追加进脚本文件；替身在一个新开的 run 找不到还没开启的 run 时把文件再读一遍，读到的脚本若以它已经握着的那些 run 开头（`face`、`models` 与这些 run 逐值相等），多出来的 run 接在后面（`a_run_appended_after_the_script_ran_out_is_opened`）；否则这次重读被拒（`E_CONFIG_INVALID`，写到标准错误），这个新开的 run 照样得到 `no_run_left`（`a_reread_that_is_not_taken_changes_nothing`）。已经开启的 run 永远按它开启时的回复作答，追加改不动它们（`a_grown_replay_answers_every_held_run_alike`）。
 
 被否：①按请求里的内容拼回复（把分支名从上一次工具结果里抄过来）——替身就在写自己的文字了，D11 的那条线就没了；②走到半路再起第二个替身——城要改挂第二个 URL，而起进程的是配方，不是检查；③每个请求都重读文件——每次交换都多付一次读盘，而且一个已经开启的 run 会在它脚下被换掉（`the_file_is_read_again_only_for_a_run_none_is_left_for`）。**重开参数**：要在一个已经开启的 run 里插进城才知道的东西时，这条不够用，要重新判断替身能不能答一个它看不见的值。
 

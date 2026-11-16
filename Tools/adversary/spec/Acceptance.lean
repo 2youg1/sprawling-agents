@@ -6,10 +6,10 @@
 /-!
 # 验收世界：替身把一个请求放进哪个 run，与按序走、停在第一处失败
 
-规定验收世界 `Sprawling.Acceptance`（`crates/adversary/src/Sprawling/Acceptance/Script.lean`、
-`crates/adversary/src/Sprawling/Acceptance/Walk.lean`）依赖的性质。
+规定验收世界 `Sprawling.Acceptance`（`Tools/adversary/src/Sprawling/Acceptance/Script.lean`、
+`Tools/adversary/src/Sprawling/Acceptance/Walk.lean`）依赖的性质。
 
-**替身按 run 分开作答**（citysim D11、`crates/citysim/Spec.lean` §8-13）。一个请求带回它这个
+**替身按 run 分开作答**（citysim D11、`Tools/citysim/Spec.lean` §8-13）。一个请求带回它这个
 run 至今拿到过的调用 id；替身由其中最靠后的那一个认出它是哪个 run 的第几条之后，答那个 run 的
 下一条。一个 id 都没带的请求开启下一个还没开启的 run。下面的参照定义只陈述这条放置规则，不陈述
 id 怎样从正文里读出来——那一半在 citysim 的 Rust 里，由它自己的测试守着。

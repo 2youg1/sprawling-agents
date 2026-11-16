@@ -17,7 +17,7 @@
 //! anything by itself** — deciding is `metabolism`'s, and adopting is a
 //! mode's.
 //!
-//! Specified by `crates/citysim/spec/Metabolism.lean` §8-8-2.
+//! Specified by `Tools/citysim/spec/Metabolism.lean` §8-8-2.
 
 use kernel::ByteLen;
 

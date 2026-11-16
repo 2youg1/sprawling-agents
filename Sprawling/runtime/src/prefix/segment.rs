@@ -40,7 +40,7 @@ impl SegmentSlot {
     ];
 
     /// Whether every resident of one building carries this slot byte
-    /// for byte (`crates/runtime/spec/Prefix.lean` D97): the Resident
+    /// for byte (`Sprawling/runtime/spec/Prefix.lean` D97): the Resident
     /// slot is built from an identity and a catalog, and the Run slot
     /// belongs to one run.
     pub fn shared_by_building(self) -> bool {
@@ -150,7 +150,7 @@ impl FrozenSegment {
 /// that fitted whole reports `dropped: 0`, which is a measurement
 /// rather than an absence. `hash` is the BLAKE3 of the kept bytes,
 /// computed from the same bytes as `kept`, so the two cannot describe
-/// different spans (`crates/runtime/spec/Prefix.lean` D105).
+/// different spans (`Sprawling/runtime/spec/Prefix.lean` D105).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SegmentSource {
     pub addr: Address,
@@ -198,7 +198,7 @@ impl SegmentSource {
 /// Every refusal meaning "this session cannot take this turn" ends
 /// here, so no refusal promises a verb the wire does not carry: every
 /// client can send a task to another address, and this sentence is
-/// where that way out is spelled, once (`crates/runtime/spec/Prefix.lean` §8-4-1).
+/// where that way out is spelled, once (`Sprawling/runtime/spec/Prefix.lean` §8-4-1).
 pub(crate) const ANOTHER_ADDRESS: &str =
     "send this task to another address, which opens a session of its own";
 

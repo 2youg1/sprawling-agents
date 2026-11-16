@@ -10,7 +10,7 @@ use kernel::{Address, EventKind, RunId, Seq};
 
 /// A building's capabilities come from the run it started last, even
 /// when a run started earlier in another room freezes its prompt after
-/// it (`crates/accounting/spec/Views/Usage.lean`, the capabilities
+/// it (`Sprawling/accounting/spec/Views/Usage.lean`, the capabilities
 /// question).
 #[test]
 fn a_building_keeps_the_prompt_of_the_run_it_started_last() {

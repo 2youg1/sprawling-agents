@@ -6,7 +6,7 @@
 /-!
 # runtime::offload
 
-规定 `offload`（`crates/runtime/src/` 下同名的文件）。共用的缩短原语：有损而可还原，四条不变量。本文件是 `crates/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `crates/runtime/Spec.lean §8-n`。
+规定 `offload`（`Sprawling/runtime/src/` 下同名的文件）。共用的缩短原语：有损而可还原，四条不变量。本文件是 `Sprawling/runtime/Spec.lean` 的一个分部；下面每一节保留它在 runtime 规格里的标签 §8-n，别处引作 `Sprawling/runtime/Spec.lean §8-n`。
 
 这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的接口形状与取舍由 Rust 的类型与 `runtime::offload` 旁的测试守住。
 -/
@@ -18,7 +18,7 @@
 ```rust
 pub const REST_DIR: &str = ".rest";
 pub struct OffloadSite<'a> { pub cas: &'a mut storage::Cas, pub city_root: &'a std::path::Path,
-                             pub room: &'a kernel::Address, pub origin: storage::BlockOrigin }   // origin：这块字节替哪个 run、哪栋楼写下（`crates/storage/Spec.lean` §8-3）
+                             pub room: &'a kernel::Address, pub origin: storage::BlockOrigin }   // origin：这块字节替哪个 run、哪栋楼写下（`Sprawling/storage/Spec.lean` §8-3）
 pub struct OffloadRecord { pub substitute: Vec<u8>, pub original: Locator, pub rest_path: String,
                            pub original_len: u64 }
 pub fn offload(bytes: &[u8], cap_bytes: u64, site: &mut OffloadSite<'_>) -> Result<OffloadRecord, AxError>;

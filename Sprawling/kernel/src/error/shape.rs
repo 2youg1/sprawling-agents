@@ -5,7 +5,7 @@
 
 //! AxError: the one error shape of the whole city, and ErrorDraft, the
 //! only way to reach it.
-//! The part `crates/kernel/spec/Error.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Error.lean` specifies this module with the
 //! rest of `kernel::error`.
 
 use serde::{Deserialize, Serialize};
@@ -339,7 +339,7 @@ mod tests {
     /// A switch is never said beside a resend: whatever order the
     /// builders run in, `Advance` comes with `Retry::No` and no wait, and
     /// a wait comes with `Retry::Yes` alone. Derived from
-    /// `crates/kernel/spec/Error.lean`
+    /// `Sprawling/kernel/spec/Error.lean`
     /// (`no_order_of_calls_advances_a_resendable_failure`,
     /// `no_order_of_calls_waits_without_retrying`).
     #[derive(Debug, Clone)]

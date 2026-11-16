@@ -95,12 +95,12 @@
         head: null,
         files: [
           {
-            path: "crates/kernel/src/ledger.rs",
+            path: "Sprawling/kernel/src/ledger.rs",
             how: "modified",
             lines: { counted: { added: 90, removed: 36 } },
           },
           {
-            path: "crates/kernel/src/ledger/tests.rs",
+            path: "Sprawling/kernel/src/ledger/tests.rs",
             how: "added",
             lines: { counted: { added: 37, removed: 0 } },
           },

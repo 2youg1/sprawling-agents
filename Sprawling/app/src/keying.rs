@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Where the key one serve demands comes from (`crates/sprawling/spec/Keying.lean`
+//! Where the key one serve demands comes from (`Sprawling/app/spec/Keying.lean`
 //! section 8-22).
 //!
 //! Pure, and pure on purpose: the entropy a minted key is made of is

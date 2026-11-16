@@ -44,7 +44,7 @@ impl Laying {
                 domain: addr.clone(),
                 run: site.run_id,
                 // The run's write limit, read at each command: under
-                // `Create` a command runs only in the copy (`crates/runtime/Spec.lean` §8-55).
+                // `Create` a command runs only in the copy (`Sprawling/runtime/Spec.lean` §8-55).
                 policy,
             },
             machine.engine,

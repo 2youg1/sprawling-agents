@@ -13,4 +13,4 @@
 
 # A city an earlier release wrote, kept byte for byte: its ledger and its
 # content store are judged by digest, so no conversion may touch them.
-crates/sprawling/tests/cities/** -text
+Sprawling/app/tests/cities/** -text

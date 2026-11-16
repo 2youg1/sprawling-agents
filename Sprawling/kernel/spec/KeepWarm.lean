@@ -6,7 +6,7 @@
 /-!
 # kernel::keep_warm
 
-规定 `kernel::keep_warm`（`crates/kernel/src/keep_warm.rs`）：缓存保温的设置与判定。本文件是 `crates/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`。
+规定 `kernel::keep_warm`（`Sprawling/kernel/src/keep_warm.rs`）：缓存保温的设置与判定。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 
 判定是一台小状态机：一扇门见到真实使用与唤醒，按 `renewal_due` 决定此刻发不发续期。下面的模型对门可能见到的每一条轨迹证明两条性质，`kernel::keep_warm` 旁的 proptest `every_trace_keeps_the_lean_properties` 从它们派生。
 -/
@@ -33,11 +33,11 @@ pub fn renewal_due(setting: KeepWarm, cache: CacheUse, lead_ms: u64) -> Option<u
 
 - 判定：`FiveMinute` 且这次使用还欠续期时，续期时刻＝`used_ms + PROMPT_CACHE_TTL_SECS·1000 − PROMPT_CACHE_RENEWAL_MARGIN_SECS·1000 − lead_ms`（饱和减；`used_ms + TTL` 溢出 `u64` 即不续期）。续期发出后 `CacheUse` 记为 `Spent`，`renewal_due` 对它答 `None`，直到下一次真实使用。所以「一次真实使用至多一次续期」是 `CacheUse` 里记下的事实，而不是从时刻推出来的（D62）。
 - 「最近用过」与缓存寿命是同一个常数 `consts_external::PROMPT_CACHE_TTL_SECS`，余量是它旁边的 `PROMPT_CACHE_RENEWAL_MARGIN_SECS`；两者只在这里相减，不另立第二个 300。
-- `lead_ms` 的含义：从城发出请求到 provider 开始处理它的时间，按 endpoint 实测，由调用方给（`crates/runtime/Spec.lean` §8-4-2，runtime D98）。provider 的寿命从它开始处理请求时起算，`used_ms` 是城发出的时刻，早于那一刻；所以续期提前 `lead_ms` 发出，只要它自己到达 provider 不比 `lead_ms` 慢，就在保证寿命之内开始。不在这里写死一个网络余量：慢链路与快链路要的提前量不同。
+- `lead_ms` 的含义：从城发出请求到 provider 开始处理它的时间，按 endpoint 实测，由调用方给（`Sprawling/runtime/Spec.lean` §8-4-2，runtime D98）。provider 的寿命从它开始处理请求时起算，`used_ms` 是城发出的时刻，早于那一刻；所以续期提前 `lead_ms` 发出，只要它自己到达 provider 不比 `lead_ms` 慢，就在保证寿命之内开始。不在这里写死一个网络余量：慢链路与快链路要的提前量不同。
 - 余量防的是 `lead_ms` 量不到的延迟：到期那一刻定时器醒得晚一点、交出续期的线程起得晚一点。
-- 花费只观察、不设门限：续期请求照常记 usage，本模块不读余额也不拦。一次续期的 usage 报出非零的 `cache_write_tokens`，就是它到得太晚、provider 重写了前缀；这条读法住 `kernel::event::record::CacheRenewed` 的 `outcome`，成本视图从 `storage::Attribution` 的 `renewals` 读到次数（`crates/storage/Spec.lean` §8-7）。
-- 设置按城→楼→居民三层梯解析，下层覆盖上层，一层也没说＝`Off`（`crates/city/Spec.lean` §8-4 `[cache]` 一节）。它不进 `FrozenConfig`：续期发生在两次 run 之间，不属于任何一次 run 的冻结面。
-- 记账并经 `kernel::Model` 发出续期的是 `runtime::prefix::warmth`（`crates/runtime/Spec.lean` §8-4-2）。续期由 `accounting::worker::keeping_warm` 在房间落地后按 `renewal_due` 发出，每次续期写一行 `cache_renewed`（`crates/sprawling/Spec.lean` §8-93、§8-112）；它报出的账单额进成本总额，并在总额里单列一行（`crates/storage/Spec.lean` D36）。
+- 花费只观察、不设门限：续期请求照常记 usage，本模块不读余额也不拦。一次续期的 usage 报出非零的 `cache_write_tokens`，就是它到得太晚、provider 重写了前缀；这条读法住 `kernel::event::record::CacheRenewed` 的 `outcome`，成本视图从 `storage::Attribution` 的 `renewals` 读到次数（`Sprawling/storage/Spec.lean` §8-7）。
+- 设置按城→楼→居民三层梯解析，下层覆盖上层，一层也没说＝`Off`（`Sprawling/city/Spec.lean` §8-4 `[cache]` 一节）。它不进 `FrozenConfig`：续期发生在两次 run 之间，不属于任何一次 run 的冻结面。
+- 记账并经 `kernel::Model` 发出续期的是 `runtime::prefix::warmth`（`Sprawling/runtime/Spec.lean` §8-4-2）。续期由 `accounting::worker::keeping_warm` 在房间落地后按 `renewal_due` 发出，每次续期写一行 `cache_renewed`（`Sprawling/app/Spec.lean` §8-93、§8-112）；它报出的账单额进成本总额，并在总额里单列一行（`Sprawling/storage/Spec.lean` D36）。
 -/
 
 namespace Kernel.KeepWarm

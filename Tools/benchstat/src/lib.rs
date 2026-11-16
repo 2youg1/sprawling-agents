@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Reproducible benchmark analysis (crates/benchstat/Spec.lean).
+//! Reproducible benchmark analysis (Tools/benchstat/Spec.lean).
 
 pub mod analysis;
 pub mod error;

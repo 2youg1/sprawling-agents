@@ -57,7 +57,7 @@ impl ReleaseTarget {
             cmd: "package".to_owned(),
             msg: format!(
                 "no platform this release publishes for ends an archive with `{suffix}`; \
-                 add the row to crates/xtask/src/platform.rs, and the matrix and install scripts \
+                 add the row to Tools/xtask/src/platform.rs, and the matrix and install scripts \
                  that restate it, in one change-set"
             ),
         })

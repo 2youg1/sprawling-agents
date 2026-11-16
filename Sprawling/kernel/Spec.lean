@@ -3,58 +3,58 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import crates.kernel.spec.AccountRecovery
-import crates.kernel.spec.Address
-import crates.kernel.spec.Approval
-import crates.kernel.spec.Backpressure
-import crates.kernel.spec.Blockage
-import crates.kernel.spec.Budget
-import crates.kernel.spec.CatalogDrift
-import crates.kernel.spec.Change
-import crates.kernel.spec.Completion
-import crates.kernel.spec.Config
-import crates.kernel.spec.ConstsExternal
-import crates.kernel.spec.ConstsPolicy
-import crates.kernel.spec.Degradation
-import crates.kernel.spec.Delegation
-import crates.kernel.spec.Discard
-import crates.kernel.spec.Error
-import crates.kernel.spec.Event
-import crates.kernel.spec.Event.Kind
-import crates.kernel.spec.Event.Record
-import crates.kernel.spec.Gate
-import crates.kernel.spec.Goal
-import crates.kernel.spec.Idem
-import crates.kernel.spec.KeepWarm
-import crates.kernel.spec.Layout
-import crates.kernel.spec.Ledger
-import crates.kernel.spec.Locator
-import crates.kernel.spec.Model
-import crates.kernel.spec.NodeId
-import crates.kernel.spec.Plan
-import crates.kernel.spec.PolicyLimit
-import crates.kernel.spec.Pursuit
-import crates.kernel.spec.Reach
-import crates.kernel.spec.Registry
-import crates.kernel.spec.Release
-import crates.kernel.spec.Repair
-import crates.kernel.spec.Retries
-import crates.kernel.spec.Schema
-import crates.kernel.spec.Secret
-import crates.kernel.spec.Share
-import crates.kernel.spec.Skill
-import crates.kernel.spec.Spine
-import crates.kernel.spec.Stall
-import crates.kernel.spec.Taint
-import crates.kernel.spec.Tool
-import crates.kernel.spec.Version
-import crates.kernel.spec.WriteDomain
+import Sprawling.kernel.spec.AccountRecovery
+import Sprawling.kernel.spec.Address
+import Sprawling.kernel.spec.Approval
+import Sprawling.kernel.spec.Backpressure
+import Sprawling.kernel.spec.Blockage
+import Sprawling.kernel.spec.Budget
+import Sprawling.kernel.spec.CatalogDrift
+import Sprawling.kernel.spec.Change
+import Sprawling.kernel.spec.Completion
+import Sprawling.kernel.spec.Config
+import Sprawling.kernel.spec.ConstsExternal
+import Sprawling.kernel.spec.ConstsPolicy
+import Sprawling.kernel.spec.Degradation
+import Sprawling.kernel.spec.Delegation
+import Sprawling.kernel.spec.Discard
+import Sprawling.kernel.spec.Error
+import Sprawling.kernel.spec.Event
+import Sprawling.kernel.spec.Event.Kind
+import Sprawling.kernel.spec.Event.Record
+import Sprawling.kernel.spec.Gate
+import Sprawling.kernel.spec.Goal
+import Sprawling.kernel.spec.Idem
+import Sprawling.kernel.spec.KeepWarm
+import Sprawling.kernel.spec.Layout
+import Sprawling.kernel.spec.Ledger
+import Sprawling.kernel.spec.Locator
+import Sprawling.kernel.spec.Model
+import Sprawling.kernel.spec.NodeId
+import Sprawling.kernel.spec.Plan
+import Sprawling.kernel.spec.PolicyLimit
+import Sprawling.kernel.spec.Pursuit
+import Sprawling.kernel.spec.Reach
+import Sprawling.kernel.spec.Registry
+import Sprawling.kernel.spec.Release
+import Sprawling.kernel.spec.Repair
+import Sprawling.kernel.spec.Retries
+import Sprawling.kernel.spec.Schema
+import Sprawling.kernel.spec.Secret
+import Sprawling.kernel.spec.Share
+import Sprawling.kernel.spec.Skill
+import Sprawling.kernel.spec.Spine
+import Sprawling.kernel.spec.Stall
+import Sprawling.kernel.spec.Taint
+import Sprawling.kernel.spec.Tool
+import Sprawling.kernel.spec.Version
+import Sprawling.kernel.spec.WriteDomain
 
 /-! # kernel 的规格
 
-`sprawling-kernel`（库名 `kernel`，目录 `crates/kernel`）是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖，不持有任何落盘物。城里的每一个决定都建在它上面：地址与保留子树、事件信封与链、事件种类与它们的窗类、错误码与它们的 carrier、门、计划、政策常量与磁盘布局。
+`sprawling-kernel`（库名 `kernel`，目录 `Sprawling/kernel`）是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖，不持有任何落盘物。城里的每一个决定都建在它上面：地址与保留子树、事件信封与链、事件种类与它们的窗类、错误码与它们的 carrier、门、计划、政策常量与磁盘布局。
 
-本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `crates/kernel/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。两个标签各被用过两次（8-73、8-74），表里分开写出各自的分部，引用它们的地方写分部的路径。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部的末尾，别处引作 `kernel D<n>`；D1 到 D16 沿用这份规格在 Markdown 时 §12 的条目号，§12 末尾列出每条住在哪里。
+本文件是 crate 的规格入口，分部在 `spec/` 下，布局见 ARCHITECTURE.md §11「Specifications in Lean」。接口一节一节写在规定它的那个模块的分部里，每一节保留它的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`；本文件 §8 列出每个标签住在哪个分部。两个标签各被用过两次（8-73、8-74），表里分开写出各自的分部，引用它们的地方写分部的路径。决定写作 `D<n>`，放在它所管的声明正上方，或它所管主题的那个分部的末尾，别处引作 `kernel D<n>`；D1 到 D16 沿用这份规格在 Markdown 时 §12 的条目号，§12 末尾列出每条住在哪里。
 
 能写成定理的规则在分部里证明，Lean 模型是「必须守住哪些性质」的权威，Rust 代码是「怎样守住」的权威：地址、段边界与保留子树（`spec/Address.lean`）、城内磁盘布局（`spec/Layout.lean`）、写域与写入限制（`spec/WriteDomain.lean`）、事件种类与窗类（`spec/Event/Kind.lean`）、可忽略性、时刻与 `seq`（`spec/Event.lean`）、链（`spec/Ledger.lean`）、错误码的 carrier、拼写与重试三态（`spec/Error.lean`）、账本版本的读法（`spec/ConstsExternal.lean`），以及几张判定表（`spec/Discard.lean`、`spec/Approval.lean`、`spec/Delegation.lean`、`spec/Backpressure.lean`、`spec/Idem.lean`、`spec/Pursuit.lean`）。其余分部只有节注释：它们写的是接口的形状、取舍与被否的备选，由 Rust 的类型、trybuild 反例、kani 与各模块旁的测试守住（§16）。
 -/
@@ -88,7 +88,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 - proptest：Address 解析拒绝面、is_within 前缀性质、Locator 往返、IdemKey 重算不变。
 - conformance 套件对任意 `impl Ledger` 可跑（由 citysim 内存 Ledger 第二实现证明）。
 
-- 类型加固十项全部有型可指；`crates/kernel/tests/ui` 的 trybuild 反例全部编译失败。
+- 类型加固十项全部有型可指；`Sprawling/kernel/tests/ui` 的 trybuild 反例全部编译失败。
 - kani 三 harness 入库（`#[cfg(kani)]`）：kani 没有 Windows 宿主，每条性质配 proptest 镜像本地可跑，kani 本体入 CI Linux job。
 - **三条全被 CI 证，理由不是成本而是信息**：`backpressure::verification::admit_is_total_and_monotone_in_depth`、`backpressure::verification::an_overflowing_sum_never_admits`、`secret::scan::verification::log2_q10_is_total`——任意 u64 上的全函数性、单调性、溢出时的 fail-closed 与定点 log2 的终止性，都是抽样到不了的地方。**不传全局 unwind**：三条的循环界要么没有循环，要么是常数（`log2_q10` 十次），CBMC 自己推得出来。
 - **入库的 harness 恒被证，这是本节的收口条件**：写了不证的 harness 让「本仓有 kani 覆盖」这句话比事实强，故一条性质要么以求解器解得动的形状入库，要么按下一条记为已关闭的决定并从源码删除。
@@ -124,7 +124,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 7. **存储写失败码**：装载期码 `E_STORAGE_FATAL` 承载 Ledger append 等存储写失败；与 `E_CAS_CORRUPT`（读到的对象不可信）分立，recovery 相反。
 8. **深度上限在构造点**：读侧 `parse_line` 走 serde_json，递归上限 128 在第 128 层容器处拒绝，故一行最多 127 层，其中信封（`EventRecord` 这个对象）占 1 层；于是 `Payload::new` 与其 `Deserialize` 双侧拒绝嵌套超过 `PAYLOAD_DEPTH_MAX`＝126 层的载荷（载荷自身的对象算第 1 层），码 `E_INVALID_ARGS`，recovery 是把正文存进 CAS、载荷只带它的 locator。模型给的工具参数（`ToolCalled.args`）与工具结果（`ToolAnswer`）原样进 `data`，所以写得进却读不回的一行会让整条链重放失败；拒在写侧，读侧永远读得动自己写下的东西。浮点与深度在同一趟迭代遍历里判，只用一个 `(值, 层数)` 栈：不递归，所以敌意载荷耗不掉写方的栈；一个载荷只分配这一次，落选的是两趟分开的遍历（深度一趟、浮点一趟递归），它每层、每个节点各分配一个 `Vec`，在 dev 构建上对同一份两百来个节点的载荷交错计时，慢三倍多（每次约 58 µs 对 17 µs）。
 9. **没有写方的 kind 不定型**：`credential_lent`、`backpressure_shed`、`digest_invalidated` 在 `EventKind` 里有名字，但本树没有任何写方。结构体要以写方的字节为准（record 模块规则 1），没有写方就没有可对齐的字节，故它们留在 `record` 之外；哪天出现写方，它的第一版就经 `Payload::of` 写，结构体随之落在 `record` 下。
-10. **V0.0.9 留着位置的四项**：信号与派活发出即生效（含同步发信的等待回信动作）、只读工具不在执行前等落盘（`crates/runtime/spec/Turn/Durability.lean` 的 TF1 次序）、检查点不再全城排队、账本线程只做账；它们若要新种类或新键，写成 `spec/Event/Record.lean` 的下一条决定。`run_policy_changed` 有两个读者：正在跑的 run 在安全点读它、追加那一句说明、按新策略过门，下一次人派的活从 accounting 的 session fold 取它（D21）；`skill_audited` 已入枚举而没有写方，写方是 skill 上架时的审核（D23）；`skill_shelved` 的写方今天只有新城成形放自带 skill 的那一处，`InstallSkill` 与 `PutShelved` 的执行者落地时是另两处（D23）。`signal_wait_started`／`signal_wait_ended` 已入枚举而没有写方，写方是带 `wait` 的 `send`（D32，collab D9）。`signal_landed` 的写方是记账线程的投递处（D38）。
+10. **V0.0.9 留着位置的四项**：信号与派活发出即生效（含同步发信的等待回信动作）、只读工具不在执行前等落盘（`Sprawling/runtime/spec/Turn/Durability.lean` 的 TF1 次序）、检查点不再全城排队、账本线程只做账；它们若要新种类或新键，写成 `spec/Event/Record.lean` 的下一条决定。`run_policy_changed` 有两个读者：正在跑的 run 在安全点读它、追加那一句说明、按新策略过门，下一次人派的活从 accounting 的 session fold 取它（D21）；`skill_audited` 已入枚举而没有写方，写方是 skill 上架时的审核（D23）；`skill_shelved` 的写方今天只有新城成形放自带 skill 的那一处，`InstallSkill` 与 `PutShelved` 的执行者落地时是另两处（D23）。`signal_wait_started`／`signal_wait_ended` 已入枚举而没有写方，写方是带 `wait` 的 `send`（D32，collab D9）。`signal_landed` 的写方是记账线程的投递处（D38）。
 
 模型自己的假设写在各分部的定理假设里，不写成公理：拼写函数（`spec/Error.lean`）、受保护的段名与 ASCII 折叠（`spec/Address.lean`）、布局的目录名与文件名（`spec/Layout.lean`）、`EVENT_LOG_V` 与首版本（`spec/ConstsExternal.lean`）、`u64` 的上界（`spec/Event.lean`、`spec/Backpressure.lean`）都是参数，它们的值只住 Rust；摘要函数是单射这一条写在 `spec/Ledger.lean` 的定理假设里。
 -/
@@ -136,7 +136,7 @@ kernel 是纯判定函数层：只吃入参吐 verdict，零内部 crate 依赖�
 
 /-! ## 5 权威信源
 
-**改这些类型前先读 provider 官方文档**（链接也写在 `crates/gateway/src/anthropic.rs` 与 `crates/gateway/src/openai.rs` 的模块注释里，以便下一位先看权威再动手）：
+**改这些类型前先读 provider 官方文档**（链接也写在 `Sprawling/gateway/src/anthropic.rs` 与 `Sprawling/gateway/src/openai.rs` 的模块注释里，以便下一位先看权威再动手）：
 
 | 主题 | 出处 |
 |---|---|
@@ -215,7 +215,7 @@ gate ──▶ 上述全部（组合面）＋idem
 
 **本 crate 无 `#[non_exhaustive]`：每个枚举都是闭的，穷尽性交给编译器。** 给 `AxCode`、`EventKind`、`Effect`、`DialectKind`、`DelegateKind` 这类面标开放，下游就得写永远打不到的 `_ =>`，而新增一个变体本该在每个没处理它的读者那里成为编译错误。
 
-这条判定成立的前提是工作区之外没有下游，`#[non_exhaustive]` 在这里买不到任何兼容性。ARCHITECTURE.md §3 写明：每个包都发布到 crates.io，只因为 `cargo install sprawling` 从 registry 构建二进制，而 crates.io 要求它的每个依赖都在那里（`crates/sprawling/spec/Doctor.lean` §8-157）；这些包是一个二进制的部件，不是给别的项目用的库。发布之后这条判定照旧成立：发布只为 `cargo install`，没有对任何外部读者承诺兼容性，所以开放枚举仍买不到东西，却要每个工作区读者写打不到的通配臂（AGENTS.md 要求 match 不带通配臂）。**重开参数**：任一 kernel 类型作为库提供给别的项目、并为它承诺 semver 兼容的那天；单是发布到 crates.io 不算。
+这条判定成立的前提是工作区之外没有下游，`#[non_exhaustive]` 在这里买不到任何兼容性。ARCHITECTURE.md §3 写明：每个包都发布到 crates.io，只因为 `cargo install sprawling` 从 registry 构建二进制，而 crates.io 要求它的每个依赖都在那里（`Sprawling/app/spec/Doctor.lean` §8-157）；这些包是一个二进制的部件，不是给别的项目用的库。发布之后这条判定照旧成立：发布只为 `cargo install`，没有对任何外部读者承诺兼容性，所以开放枚举仍买不到东西，却要每个工作区读者写打不到的通配臂（AGENTS.md 要求 match 不带通配臂）。**重开参数**：任一 kernel 类型作为库提供给别的项目、并为它承诺 semver 兼容的那天；单是发布到 crates.io 不算。
 
 外部开放枚举（`serde_json::Value`、`std::io::ErrorKind`、`git2::Delta`、tungstenite 的帧类型）与 `EventKind` 这样的词汇表仍会逼出通配臂：前者不归我们关，后者穷举一遍就是 `EventKind` 的第二份拷贝。这两类各带 `#[expect(clippy::wildcard_enum_match_arm, reason = …)]`，理由写在当处；除此之外通配臂即红。
 
@@ -223,77 +223,77 @@ gate ──▶ 上述全部（组合面）＋idem
 
 | 标签 | 分部 |
 |---|---|
-| 8-1 | `crates/kernel/spec/Error.lean` |
-| 8-2 | `crates/kernel/spec/Address.lean` |
-| 8-29 | `crates/kernel/spec/Address.lean` |
-| 8-28 | `crates/kernel/spec/Address.lean` |
-| 8-73（受保护元数据） | `crates/kernel/spec/Address.lean` |
-| 8-55 | `crates/kernel/spec/Address.lean` |
-| 8-3 | `crates/kernel/spec/Locator.lean` |
-| 8-84 | `crates/kernel/spec/Locator.lean` |
-| 8-4 | `crates/kernel/spec/Event.lean` |
-| 8-75 | `crates/kernel/spec/Event/Record.lean` |
-| 8-82 | `crates/kernel/spec/Event/Record.lean` |
-| 8-82-1 | `crates/kernel/spec/Event/Record.lean` |
-| 8-82-2 | `crates/kernel/spec/Event/Record.lean` |
-| 8-79 | `crates/kernel/spec/Event/Record.lean` |
-| 8-81 | `crates/kernel/spec/Event/Record.lean` |
-| 8-83 | `crates/kernel/spec/Event/Record.lean` |
-| 8-85 | `crates/kernel/spec/Event/Record.lean` |
-| 8-87 | `crates/kernel/spec/Event/Record.lean` |
-| 8-88 | `crates/kernel/spec/Event/Record.lean` |
-| 8-89 | `crates/kernel/spec/Event/Record.lean` |
-| 8-5 | `crates/kernel/spec/Version.lean` |
-| 8-6 | `crates/kernel/spec/Idem.lean` |
-| 8-7 | `crates/kernel/spec/ConstsExternal.lean` |
-| 8-8 | `crates/kernel/spec/ConstsPolicy.lean` |
-| 8-10 | `crates/kernel/spec/Taint.lean` |
-| 8-11 | `crates/kernel/spec/WriteDomain.lean` |
-| 8-46 | `crates/kernel/spec/WriteDomain.lean` |
-| 8-78 | `crates/kernel/spec/WriteDomain.lean` |
-| 8-12 | `crates/kernel/spec/Budget.lean` |
-| 8-13 | `crates/kernel/spec/Backpressure.lean` |
-| 8-74（降级） | `crates/kernel/spec/Degradation.lean` |
-| 8-14 | `crates/kernel/spec/Stall.lean` |
-| 8-15 | `crates/kernel/spec/Goal.lean` |
-| 8-16 | `crates/kernel/spec/Repair.lean` |
-| 8-17 | `crates/kernel/spec/Delegation.lean` |
-| 8-18 | `crates/kernel/spec/Registry.lean` |
-| 8-19 | `crates/kernel/spec/Spine.lean` |
-| 8-32 | `crates/kernel/spec/Share.lean` |
-| 8-33 | `crates/kernel/spec/Plan.lean` |
-| 8-48 | `crates/kernel/spec/NodeId.lean` |
-| 8-34 | `crates/kernel/spec/Blockage.lean` |
-| 8-35 | `crates/kernel/spec/Pursuit.lean` |
-| 8-20 | `crates/kernel/spec/Completion.lean` |
-| 8-21 | `crates/kernel/spec/Approval.lean` |
-| 8-47 | `crates/kernel/spec/Approval.lean` |
-| 8-22 | `crates/kernel/spec/Config.lean` |
-| 8-23 | `crates/kernel/spec/Tool.lean` |
-| 8-52 | `crates/kernel/spec/Tool.lean` |
-| 8-24 | `crates/kernel/spec/Model.lean` |
-| 8-53 | `crates/kernel/spec/Model.lean` |
-| 8-40 | `crates/kernel/spec/Model.lean` |
-| 8-77 | `crates/kernel/spec/Model.lean` |
-| 8-80 | `crates/kernel/spec/Model.lean` |
-| 8-25 | `crates/kernel/spec/Secret.lean` |
-| 8-26 | `crates/kernel/spec/Discard.lean` |
-| 8-27 | `crates/kernel/spec/Gate.lean` |
-| 8-49 | `crates/kernel/spec/Gate.lean` |
-| 8-30 | `crates/kernel/spec/Change.lean` |
-| 8-45 | `crates/kernel/spec/Schema.lean` |
-| 8-50 | `crates/kernel/spec/Reach.lean` |
-| 8-54 | `crates/kernel/spec/Release.lean` |
-| 8-54-1 | `crates/kernel/spec/Release.lean` |
-| 8-56 | `crates/kernel/spec/Layout.lean` |
-| 8-76 | `crates/kernel/spec/Layout.lean` |
-| 8-72 | `crates/kernel/spec/Retries.lean` |
-| 8-86 | `crates/kernel/spec/AccountRecovery.lean` |
-| 8-73（上限类政策值） | `crates/kernel/spec/PolicyLimit.lean` |
-| 8-74（缓存保温） | `crates/kernel/spec/KeepWarm.lean` |
-| 8-4（种类与窗类的表） | `crates/kernel/spec/Event/Kind.lean` |
-| 8-9 | `crates/kernel/spec/Ledger.lean` |
-| 8-51 | `crates/kernel/spec/Ledger.lean` |
+| 8-1 | `Sprawling/kernel/spec/Error.lean` |
+| 8-2 | `Sprawling/kernel/spec/Address.lean` |
+| 8-29 | `Sprawling/kernel/spec/Address.lean` |
+| 8-28 | `Sprawling/kernel/spec/Address.lean` |
+| 8-73（受保护元数据） | `Sprawling/kernel/spec/Address.lean` |
+| 8-55 | `Sprawling/kernel/spec/Address.lean` |
+| 8-3 | `Sprawling/kernel/spec/Locator.lean` |
+| 8-84 | `Sprawling/kernel/spec/Locator.lean` |
+| 8-4 | `Sprawling/kernel/spec/Event.lean` |
+| 8-75 | `Sprawling/kernel/spec/Event/Record.lean` |
+| 8-82 | `Sprawling/kernel/spec/Event/Record.lean` |
+| 8-82-1 | `Sprawling/kernel/spec/Event/Record.lean` |
+| 8-82-2 | `Sprawling/kernel/spec/Event/Record.lean` |
+| 8-79 | `Sprawling/kernel/spec/Event/Record.lean` |
+| 8-81 | `Sprawling/kernel/spec/Event/Record.lean` |
+| 8-83 | `Sprawling/kernel/spec/Event/Record.lean` |
+| 8-85 | `Sprawling/kernel/spec/Event/Record.lean` |
+| 8-87 | `Sprawling/kernel/spec/Event/Record.lean` |
+| 8-88 | `Sprawling/kernel/spec/Event/Record.lean` |
+| 8-89 | `Sprawling/kernel/spec/Event/Record.lean` |
+| 8-5 | `Sprawling/kernel/spec/Version.lean` |
+| 8-6 | `Sprawling/kernel/spec/Idem.lean` |
+| 8-7 | `Sprawling/kernel/spec/ConstsExternal.lean` |
+| 8-8 | `Sprawling/kernel/spec/ConstsPolicy.lean` |
+| 8-10 | `Sprawling/kernel/spec/Taint.lean` |
+| 8-11 | `Sprawling/kernel/spec/WriteDomain.lean` |
+| 8-46 | `Sprawling/kernel/spec/WriteDomain.lean` |
+| 8-78 | `Sprawling/kernel/spec/WriteDomain.lean` |
+| 8-12 | `Sprawling/kernel/spec/Budget.lean` |
+| 8-13 | `Sprawling/kernel/spec/Backpressure.lean` |
+| 8-74（降级） | `Sprawling/kernel/spec/Degradation.lean` |
+| 8-14 | `Sprawling/kernel/spec/Stall.lean` |
+| 8-15 | `Sprawling/kernel/spec/Goal.lean` |
+| 8-16 | `Sprawling/kernel/spec/Repair.lean` |
+| 8-17 | `Sprawling/kernel/spec/Delegation.lean` |
+| 8-18 | `Sprawling/kernel/spec/Registry.lean` |
+| 8-19 | `Sprawling/kernel/spec/Spine.lean` |
+| 8-32 | `Sprawling/kernel/spec/Share.lean` |
+| 8-33 | `Sprawling/kernel/spec/Plan.lean` |
+| 8-48 | `Sprawling/kernel/spec/NodeId.lean` |
+| 8-34 | `Sprawling/kernel/spec/Blockage.lean` |
+| 8-35 | `Sprawling/kernel/spec/Pursuit.lean` |
+| 8-20 | `Sprawling/kernel/spec/Completion.lean` |
+| 8-21 | `Sprawling/kernel/spec/Approval.lean` |
+| 8-47 | `Sprawling/kernel/spec/Approval.lean` |
+| 8-22 | `Sprawling/kernel/spec/Config.lean` |
+| 8-23 | `Sprawling/kernel/spec/Tool.lean` |
+| 8-52 | `Sprawling/kernel/spec/Tool.lean` |
+| 8-24 | `Sprawling/kernel/spec/Model.lean` |
+| 8-53 | `Sprawling/kernel/spec/Model.lean` |
+| 8-40 | `Sprawling/kernel/spec/Model.lean` |
+| 8-77 | `Sprawling/kernel/spec/Model.lean` |
+| 8-80 | `Sprawling/kernel/spec/Model.lean` |
+| 8-25 | `Sprawling/kernel/spec/Secret.lean` |
+| 8-26 | `Sprawling/kernel/spec/Discard.lean` |
+| 8-27 | `Sprawling/kernel/spec/Gate.lean` |
+| 8-49 | `Sprawling/kernel/spec/Gate.lean` |
+| 8-30 | `Sprawling/kernel/spec/Change.lean` |
+| 8-45 | `Sprawling/kernel/spec/Schema.lean` |
+| 8-50 | `Sprawling/kernel/spec/Reach.lean` |
+| 8-54 | `Sprawling/kernel/spec/Release.lean` |
+| 8-54-1 | `Sprawling/kernel/spec/Release.lean` |
+| 8-56 | `Sprawling/kernel/spec/Layout.lean` |
+| 8-76 | `Sprawling/kernel/spec/Layout.lean` |
+| 8-72 | `Sprawling/kernel/spec/Retries.lean` |
+| 8-86 | `Sprawling/kernel/spec/AccountRecovery.lean` |
+| 8-73（上限类政策值） | `Sprawling/kernel/spec/PolicyLimit.lean` |
+| 8-74（缓存保温） | `Sprawling/kernel/spec/KeepWarm.lean` |
+| 8-4（种类与窗类的表） | `Sprawling/kernel/spec/Event/Kind.lean` |
+| 8-9 | `Sprawling/kernel/spec/Ledger.lean` |
+| 8-51 | `Sprawling/kernel/spec/Ledger.lean` |
 -/
 
 /-! ## 9 工作流程
@@ -355,8 +355,8 @@ gate ──▶ 上述全部（组合面）＋idem
 - `E_VERSION_CONFLICT`（verdict 映射在 `runtime::tools::edit`）：不可定义掉——乐观并发的存在理由就是冲突可发生。
 - `E_LOG_VERSION_UNSUPPORTED`／`E_CAS_CORRUPT`：住装载期白名单，产生地在 memory/runtime（见各自 SPEC）。
 - `E_STORAGE_FATAL`（存储写失败，装载期）：不可定义掉——磁盘满与介质 Io 失败在设计边界外；宁停不脏要求它直达进程级 fatal，不得伪装成可重试。S2 期初增设；storage 的 Io 映射已改正（storage D7）。
-- `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 storage 的写者锁先于一切读写定义掉（`crates/storage/Spec.lean` §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
-- `E_HISTORY_UNPROVEN`（服务中的城还在证明它开城时的历史，装载期）：不可定义掉——城从快照起步，快照之前的历史由后台证明走一遍（`crates/storage/Spec.lean` §8-30、`crates/sprawling/Spec.lean` §8-122），而开城不等它。它只能住装载期白名单：证明完成之前，写者拒绝每一次追加，被拒的一方此刻恰恰写不了账本。它不能借 `E_LEDGER_HELD`：那一码的 recovery 是停下另一个进程，这一码的 recovery 是等几秒再发一次（「the city is still proving the history it opened from; send it again once the log says the history is proved」）。它也不能借 `E_BUSY`：那一码点名一条正在工作的 run，这里没有 run。
+- `E_LEDGER_HELD`（另一个进程持着这座城的账本，装载期）：不可定义掉——两个进程打开同一座城，是人的两个普通动作（双击两次、两个终端各开一次）。它只能住装载期白名单：被拒的一方恰恰是写不了账本的那一方，给它一个 carrier，就等于让第二个写者把「我被拒了」写进别人的账本。能定义掉的那部分（被拒的一方先写了东西）已由 storage 的写者锁先于一切读写定义掉（`Sprawling/storage/Spec.lean` §8-1）。它也不能借 `E_BUSY`：那一码的 carrier 是 `tool_result`，而一个码只有一个 carrier。
+- `E_HISTORY_UNPROVEN`（服务中的城还在证明它开城时的历史，装载期）：不可定义掉——城从快照起步，快照之前的历史由后台证明走一遍（`Sprawling/storage/Spec.lean` §8-30、`Sprawling/app/Spec.lean` §8-122），而开城不等它。它只能住装载期白名单：证明完成之前，写者拒绝每一次追加，被拒的一方此刻恰恰写不了账本。它不能借 `E_LEDGER_HELD`：那一码的 recovery 是停下另一个进程，这一码的 recovery 是等几秒再发一次（「the city is still proving the history it opened from; send it again once the log says the history is proved」）。它也不能借 `E_BUSY`：那一码点名一条正在工作的 run，这里没有 run。
 
 其余的码（逐码答「能否定义掉」）：
 
@@ -371,9 +371,9 @@ gate ──▶ 上述全部（组合面）＋idem
 - `E_EVIDENCE_MISSING`：部分定义掉——无证据 Done 已不可构造（类型半）；构造时拒绝仍需此码（运行时半，A6 双守）。
 - `E_PLAN_MISSING`：不可——没有计划的楼上设常设目标，pursuit 找不到一步可做就当场「完成」，人看到的是一句 `finished` 而什么也没发生。这一码只在计划缺席或为空时于设目标处拒绝：`Roadmap.md` 读不出来保留它自己的码（`E_STORAGE_FATAL`），表格不成形是 `E_INVALID_ARGS` 并列出坏行——那份计划是人写的，恢复动作不该请市长另写一份盖掉它。`subject` 恒为 `<楼地址>: <常设目标>`，客户端据此给出「让市长写计划」的预填表单（client/Spec.lean §4-35a），由人提交。人定的是拒绝加按钮，胜过「先让市长自动写计划」：后者替人派出一次有成本的 run，而人只是想设一个目标。
 - `E_PROVIDER_ACCOUNTS_EXHAUSTED`：不可——一个 Provider 登记了两个以上账号，一次逻辑请求把每个可兑付的账号都试过而无一作答（`spec/AccountRecovery.lean` §8-86，D54 第 7 条），或开轮时名册里一个可兑付的都没有。只报最后一个账号的 401 会让人去修一个账号，而出路是补录凭据、补额度或新增账号。carrier 与 `E_PROVIDER` 相同（`provider_degraded`）：说的是同一件事，只是每个账号都说了；run 以 `Cancelled` 冻住，所以外层不会再开一轮。`subject` 写 Provider 与每个到过的账号 id 及它最后一次失败的码与种类，不写 Key，也不写引用；生产者只有模型路径的 `runtime::run::drive`，`web_search` 把同一个码作为失败的工具结果交给模型。单账号的端点不产生它：那里只有原来的 `E_PROVIDER`。
-- `E_AUTH_REQUIRED`（一个 ACP agent 以 `-32000` 答复，要先登录）：不可——登录在 agent 自己那里，城收到这一答复之前不知道它要不要登录。`subject` 写 agent 的 id；`recovery` 列出 agent 在 `initialize` 里声明的认证方法的 id，页面据此给出登录入口，城登录后重新 `initialize` 并重发原请求（`crates/agent_protocols/Spec.lean`）。它不借 `E_CREDENTIAL_MISSING`：那一码的出路是在本城的 vault 里补一个 Key，而这里本城不持有任何凭据，出路是 agent 自己的登录流程。
+- `E_AUTH_REQUIRED`（一个 ACP agent 以 `-32000` 答复，要先登录）：不可——登录在 agent 自己那里，城收到这一答复之前不知道它要不要登录。`subject` 写 agent 的 id；`recovery` 列出 agent 在 `initialize` 里声明的认证方法的 id，页面据此给出登录入口，城登录后重新 `initialize` 并重发原请求（`Sprawling/agent_protocols/Spec.lean`）。它不借 `E_CREDENTIAL_MISSING`：那一码的出路是在本城的 vault 里补一个 Key，而这里本城不持有任何凭据，出路是 agent 自己的登录流程。
 - `E_PAIRING_REFUSED`（本地门上一次配对或开页码被拒：码不对、已用过，或全局限速已到）：不可——配对码与开页码由人从终端或跳转文件抄到浏览器，抄错是人可达的状态。三种原因用同一码、同一句恢复语，不告诉对方是哪一种，因为区分「码不对」与「已用过」就是告诉猜码的一方它离对的码有多近；`recovery` 说去终端读当前的配对码再试一次。它不借 `E_GATE_DENIED`：那一码说的是一个门按规矩拦下了一个已认证的请求，这里请求者还没有任何身份。
-- 远程设备发来的 `LocalOnly` 动词不另设码：`E_GATE_DENIED` 已经是远程中继拒它们时用的码（`crates/wire/spec/Command/Kind.lean` §8-66），恢复语说在城自己的机器上做。
+- 远程设备发来的 `LocalOnly` 动词不另设码：`E_GATE_DENIED` 已经是远程中继拒它们时用的码（`Sprawling/wire/spec/Command/Kind.lean` §8-66），恢复语说在城自己的机器上做。
 - `E_SECRET_EGRESS`／`E_DISCARD_IRREVERSIBLE`：不可——两门存在的理由即这两类越界可发生；类型已把「无 Restoration 的 Discard 值」定义掉，Unplanned 请求（exec 预判路）是剩余不可消部分。
 - `E_CONFIG_INVALID`：不可——SecretRef 形状非法与明文入配置必须在反序列化即拒。
 - `E_MODEL_UNCHOSEN`（这一类模型还没有人选定）：不可——城在没接供应方、没选模型时也要能开，所以「这一类没有模型」是人可达的状态。它不并进 `E_CONFIG_INVALID`：那一码还答「会话中途换了模型」「端点已不在」等情形，出路各不相同（去设置 对 开新对话），而客户端只能按码给出路。生产者只有 `gateway::router` 的 `EndpointBook::select`；账本此刻可写，所以 carrier 是 `tool_result`，不进装载期白名单。
@@ -384,47 +384,47 @@ gate ──▶ 上述全部（组合面）＋idem
 
 | 决定 | 标题 | 住处 |
 |---|---|---|
-| D1 | 定规：默认 YOLO，门只答放行或拦住 | `crates/kernel/spec/Gate.lean` |
+| D1 | 定规：默认 YOLO，门只答放行或拦住 | `Sprawling/kernel/spec/Gate.lean` |
 | D2 | 定规：回滚＝分支＋git 还原 | 本文件 |
-| D3 | 定规：上限类政策值的拒因句式从类型给出，调用方拼不出第二种拒因 | `crates/kernel/spec/PolicyLimit.lean` |
+| D3 | 定规：上限类政策值的拒因句式从类型给出，调用方拼不出第二种拒因 | `Sprawling/kernel/spec/PolicyLimit.lean` |
 | D4 | 定规：kernel 不拆 crate | 本文件 |
-| D5 | 定规：降级的线相对于设备，停止接新活的拒绝带着读数 | `crates/kernel/spec/Degradation.lean` |
-| D6 | 定规：请求借用会话与工具表，断点是请求的注记 | `crates/kernel/spec/Model.lean` |
-| D7 | 定规：上下文提醒第二道阈值的缺省与合法域只有一个家，可选覆盖走既有配置梯子 | `crates/kernel/spec/Config.lean` |
-| D8 | 定规：受保护元数据名单只有 kernel::address 一个家 | `crates/kernel/spec/Address.lean` |
-| D9 | harness 的汇报与回答按本城的词入账 | `crates/kernel/spec/Event/Record.lean` |
-| D10 | 信封 `t` 记这一行等来的时刻，`EVENT_LOG_V` 因此为 2 | `crates/kernel/spec/Event.lean` |
-| D11 | 一次调用的效果与呈现，在调用那一刻从登记读出、记进 `tool_called` | `crates/kernel/spec/Event/Record.lean` |
-| D12 | 运行策略是四个值，一次以新形状入账 | `crates/kernel/spec/Model.lean` |
-| D13 | 远程门的五种事件全是 record-only，载荷里不带钥匙 | `crates/kernel/spec/Event/Record.lean` |
-| D14 | 进程死后的 run 冻成 `cancelled`，载荷记下原因，不加第四种结局 | `crates/kernel/spec/Event/Record.lean` |
-| D15 | 一份文档的一次写是一个种类，修改提案的一生是三个种类，都是 record-only | `crates/kernel/spec/Event/Record.lean` |
-| D16 | 摘要在二进制格式里写字节，在人读的格式里写十六进制 | `crates/kernel/spec/Locator.lean` |
-| D18 | 成熟度是 kernel 的一个枚举常量，每一个读者从它渲染 | `crates/kernel/spec/Release.lean` |
-| D19 | 定规：第一道上下文提醒在窗口的 30%，第二道的合法域从 31% 起 | `crates/kernel/spec/Config.lean` |
-| D20 | 耗时记整数微秒，作为可缺席的键挂在既有的行上，账本版本不进位 | `crates/kernel/spec/Event/Record.lean` |
-| D21 | 会话中改运行策略是一个入窗的种类 `run_policy_changed`，在下一个安全点生效 | `crates/kernel/spec/Event/Record.lean` |
-| D22 | 会话的显示名是一个 record-only 种类 `session_named` | `crates/kernel/spec/Event/Record.lean` |
-| D23 | skill 上架时的审核是一个 record-only 种类 `skill_audited`；调用记录从已有的行折出 | `crates/kernel/spec/Event/Record.lean` |
-| D24 | `asset_archived` 在 `archive record` 被调用时写 | `crates/kernel/spec/Event/Record.lean` |
-| D25 | 一份空计划的根份额归这栋楼的 Mayor，`plan` 因此有 `add` | `crates/kernel/spec/Share.lean` |
-| D26 | Govern 类工具的只读操作在 run 里放行：效果按一次调用定 | `crates/kernel/spec/Gate.lean` |
-| D27 | `plan finish` 收一个路径，运行时在完成那一刻把它折成这份内容的 Locator | `crates/kernel/spec/Locator.lean` |
-| D32 | 同步 `send` 的一次等待是一对种类 `signal_wait_started`／`signal_wait_ended` | `crates/kernel/spec/Event/Record.lean` |
-| D35 | crates.io 的答案只按版本号判，与 npm 的答案在每一对版本号不同的发布上相同 | `crates/kernel/spec/Release.lean` |
-| D36 | 没报的缓存数是「没报」，不是 0 | `crates/kernel/spec/Model.lean` |
-| D37 | 发信与派活各有自己的呈现意图 | `crates/kernel/spec/Tool.lean` |
-| D38 | 一封信落在哪里是一行 record-only 的 `signal_landed` | `crates/kernel/spec/Event/Record.lean` |
-| D53 | 「这个账号还能不能接这个请求」是 `AxError` 上与 `retry` 并列的第二格 | `crates/kernel/spec/Error.lean` |
-| D54 | 选号与恢复只有一个家：`AccountRound` | `crates/kernel/spec/AccountRecovery.lean` |
-| D55 | 凭据能否兑付在开轮时读一次；一个账号的凭据缺失只让这个账号出局，vault 本身的故障让整轮停下 | `crates/kernel/spec/AccountRecovery.lean` |
-| D56 | `Effort` 是七级的闭枚举；每个（Endpoint，模型）提供哪几级是上游的陈述，由 gateway 回答 | `crates/kernel/spec/Model.lean` |
-| D57 | 登记时的模型事实进 CAS，账本行只记摘要 | `crates/kernel/spec/Event/Record.lean` |
-| D59 | url 里的主机按 WHATWG URL 标准读 | `crates/kernel/spec/Gate.lean` |
-| D60 | 请求说出自己哪一段是一栋楼共享的；端点门前的等待经模型端口交回 | `crates/kernel/spec/Model.lean` |
-| D61 | 一次端点门前的等待是一行 record-only 的 `prefix_held`，种类表的行与实现同一次改动落地 | `crates/kernel/spec/Event/Record.lean` |
-| D62 | 一次真实使用至多一次续期，记在 `CacheUse` 里；续期时刻扣一个固定余量 | `crates/kernel/spec/KeepWarm.lean` |
-| D63 | 模型行记下它是端点列出的，还是人点名而端点没列出的 | `crates/kernel/spec/Event/Record.lean` |
+| D5 | 定规：降级的线相对于设备，停止接新活的拒绝带着读数 | `Sprawling/kernel/spec/Degradation.lean` |
+| D6 | 定规：请求借用会话与工具表，断点是请求的注记 | `Sprawling/kernel/spec/Model.lean` |
+| D7 | 定规：上下文提醒第二道阈值的缺省与合法域只有一个家，可选覆盖走既有配置梯子 | `Sprawling/kernel/spec/Config.lean` |
+| D8 | 定规：受保护元数据名单只有 kernel::address 一个家 | `Sprawling/kernel/spec/Address.lean` |
+| D9 | harness 的汇报与回答按本城的词入账 | `Sprawling/kernel/spec/Event/Record.lean` |
+| D10 | 信封 `t` 记这一行等来的时刻，`EVENT_LOG_V` 因此为 2 | `Sprawling/kernel/spec/Event.lean` |
+| D11 | 一次调用的效果与呈现，在调用那一刻从登记读出、记进 `tool_called` | `Sprawling/kernel/spec/Event/Record.lean` |
+| D12 | 运行策略是四个值，一次以新形状入账 | `Sprawling/kernel/spec/Model.lean` |
+| D13 | 远程门的五种事件全是 record-only，载荷里不带钥匙 | `Sprawling/kernel/spec/Event/Record.lean` |
+| D14 | 进程死后的 run 冻成 `cancelled`，载荷记下原因，不加第四种结局 | `Sprawling/kernel/spec/Event/Record.lean` |
+| D15 | 一份文档的一次写是一个种类，修改提案的一生是三个种类，都是 record-only | `Sprawling/kernel/spec/Event/Record.lean` |
+| D16 | 摘要在二进制格式里写字节，在人读的格式里写十六进制 | `Sprawling/kernel/spec/Locator.lean` |
+| D18 | 成熟度是 kernel 的一个枚举常量，每一个读者从它渲染 | `Sprawling/kernel/spec/Release.lean` |
+| D19 | 定规：第一道上下文提醒在窗口的 30%，第二道的合法域从 31% 起 | `Sprawling/kernel/spec/Config.lean` |
+| D20 | 耗时记整数微秒，作为可缺席的键挂在既有的行上，账本版本不进位 | `Sprawling/kernel/spec/Event/Record.lean` |
+| D21 | 会话中改运行策略是一个入窗的种类 `run_policy_changed`，在下一个安全点生效 | `Sprawling/kernel/spec/Event/Record.lean` |
+| D22 | 会话的显示名是一个 record-only 种类 `session_named` | `Sprawling/kernel/spec/Event/Record.lean` |
+| D23 | skill 上架时的审核是一个 record-only 种类 `skill_audited`；调用记录从已有的行折出 | `Sprawling/kernel/spec/Event/Record.lean` |
+| D24 | `asset_archived` 在 `archive record` 被调用时写 | `Sprawling/kernel/spec/Event/Record.lean` |
+| D25 | 一份空计划的根份额归这栋楼的 Mayor，`plan` 因此有 `add` | `Sprawling/kernel/spec/Share.lean` |
+| D26 | Govern 类工具的只读操作在 run 里放行：效果按一次调用定 | `Sprawling/kernel/spec/Gate.lean` |
+| D27 | `plan finish` 收一个路径，运行时在完成那一刻把它折成这份内容的 Locator | `Sprawling/kernel/spec/Locator.lean` |
+| D32 | 同步 `send` 的一次等待是一对种类 `signal_wait_started`／`signal_wait_ended` | `Sprawling/kernel/spec/Event/Record.lean` |
+| D35 | crates.io 的答案只按版本号判，与 npm 的答案在每一对版本号不同的发布上相同 | `Sprawling/kernel/spec/Release.lean` |
+| D36 | 没报的缓存数是「没报」，不是 0 | `Sprawling/kernel/spec/Model.lean` |
+| D37 | 发信与派活各有自己的呈现意图 | `Sprawling/kernel/spec/Tool.lean` |
+| D38 | 一封信落在哪里是一行 record-only 的 `signal_landed` | `Sprawling/kernel/spec/Event/Record.lean` |
+| D53 | 「这个账号还能不能接这个请求」是 `AxError` 上与 `retry` 并列的第二格 | `Sprawling/kernel/spec/Error.lean` |
+| D54 | 选号与恢复只有一个家：`AccountRound` | `Sprawling/kernel/spec/AccountRecovery.lean` |
+| D55 | 凭据能否兑付在开轮时读一次；一个账号的凭据缺失只让这个账号出局，vault 本身的故障让整轮停下 | `Sprawling/kernel/spec/AccountRecovery.lean` |
+| D56 | `Effort` 是七级的闭枚举；每个（Endpoint，模型）提供哪几级是上游的陈述，由 gateway 回答 | `Sprawling/kernel/spec/Model.lean` |
+| D57 | 登记时的模型事实进 CAS，账本行只记摘要 | `Sprawling/kernel/spec/Event/Record.lean` |
+| D59 | url 里的主机按 WHATWG URL 标准读 | `Sprawling/kernel/spec/Gate.lean` |
+| D60 | 请求说出自己哪一段是一栋楼共享的；端点门前的等待经模型端口交回 | `Sprawling/kernel/spec/Model.lean` |
+| D61 | 一次端点门前的等待是一行 record-only 的 `prefix_held`，种类表的行与实现同一次改动落地 | `Sprawling/kernel/spec/Event/Record.lean` |
+| D62 | 一次真实使用至多一次续期，记在 `CacheUse` 里；续期时刻扣一个固定余量 | `Sprawling/kernel/spec/KeepWarm.lean` |
+| D63 | 模型行记下它是端点列出的，还是人点名而端点没列出的 | `Sprawling/kernel/spec/Event/Record.lean` |
 -/
 
 /-! ## 13 依赖选型
@@ -453,9 +453,9 @@ gate ──▶ 上述全部（组合面）＋idem
 
 /-! ## 15 影响面
 
-storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部消费本 crate 的公开面；全部 kernel 决断模块建立在 error/event 之上。公开面变更须与本规格同一变更集；守它的是编译器（下游 crate 不编译）与 `crates/wire/tests/wire_contract.rs` 的 schema golden，xtask 不存公开面基线（`crates/xtask/Spec.lean` §8-32）。
+storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部消费本 crate 的公开面；全部 kernel 决断模块建立在 error/event 之上。公开面变更须与本规格同一变更集；守它的是编译器（下游 crate 不编译）与 `Sprawling/wire/tests/wire_contract.rs` 的 schema golden，xtask 不存公开面基线（`Tools/xtask/Spec.lean` §8-32）。
 
-改 `AccountRound` 的一种处置（`spec/AccountRecovery.lean`），同一个变更集改它的两个驱动方：模型路径的 `Watchdog` 与 `drive`（`crates/runtime/spec/Watchdog.lean` §8-9）与 accounting 的 `web_search` 工具；改 `AccountDisposition` 的一臂，同一个变更集改 gateway 的分类（`crates/gateway/spec/Endpoint/Failure.lean` D32）。
+改 `AccountRound` 的一种处置（`spec/AccountRecovery.lean`），同一个变更集改它的两个驱动方：模型路径的 `Watchdog` 与 `drive`（`Sprawling/runtime/spec/Watchdog.lean` §8-9）与 accounting 的 `web_search` 工具；改 `AccountDisposition` 的一臂，同一个变更集改 gateway 的分类（`Sprawling/gateway/spec/Endpoint/Failure.lean` D32）。
 
 改 `EventKind` 或 `AxCode` 的一个变体，同一个变更集改 `spec/Event/Kind.lean` 或 `spec/Error.lean` 里的那一臂（`specalign` 判）；改了与某个 `inductive` 同名的枚举，同一个变更集改那个 `inductive`；改了被模型化的判定（§2 列出的那几个），同一个变更集改模型与它的证明。
 -/
@@ -470,10 +470,10 @@ storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部
 - 约束：`cargo clippy --workspace --all-targets -- -D warnings` 零告警；无 `unsafe`；文件前三行 MPL 头。
 - 各模块测试面（逐模块文件内 `#[cfg(test)]`，kani harness 另配 proptest 镜像）：taint 并集单调／map 保集；write_domain reserved 恒拒／夺回计数；budget `checked_add` 溢出；backpressure 单调；stall 尾部连续语义；goal/repair 重叠矩阵；delegation 静动双层；registry verify 拒非证据 kind；spine 表解析正反例；completion 空证据／错 kind 拒；approval 应答真值表十二行遍历＋自审拒；config 字段交集空断言；tool/model conformance 自证；secret 双语料＋熵边界；discard 决策表全分支＋forecast 三臂正反；gate 门册遍历（`DOORS` 每行一条 `conformance::sample`，refusal 三段非空）＋taint 有真判决＋`claim` 认领一次。
 
-形式化的义务由证明清偿：`lake build crates.kernel.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
+形式化的义务由证明清偿：`lake build Sprawling.kernel.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：
 
 - 种类与窗类、码与 carrier：`cargo xtask gates specalign` 把 `spec/Event/Kind.lean` 与 `spec/Error.lean` 的两张表、以及每一个同名的 `inductive`，与 kernel 编译出来的枚举逐项对账；`event::kind::tests` 与 `error::code` 的测试检查计数、拼写的往返与单射。
-- 地址与保留子树：`address::tests`（判例表 `crates/fixtures/address.jsonl`、`is_within` 的 proptest、任一段与 Windows 别名的保留判例、三类读者的读界矩阵）。
+- 地址与保留子树：`address::tests`（判例表 `Tools/fixtures/address.jsonl`、`is_within` 的 proptest、任一段与 Windows 别名的保留判例、三类读者的读界矩阵）。
 - 布局：`layout::tests`（保留子树在每个写域之外、`of_ledger` 的往返与拒绝）。
 - 写域：`write_domain` 的测试（`reserved_target_is_outside_even_for_an_empty_domain`、`Documents` 的两种 `NotWritable`）与 `gate::tests` 里 `Create` 的拒与 `Full` 的放。
 - 可忽略性与版本：`storage::jsonl` 的 `an_ignorable_line_from_a_newer_vocabulary_is_kept_and_chained`、`consts_external` 的 `readable_log_v` 测试、`event::moment::tests`。
@@ -482,9 +482,9 @@ storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部
 - 账号轮：`spec/AccountRecovery.lean` 用 `#eval` 打印的轨迹向量由 `account_recovery::tests::the_lean_trace_vectors_replay_one_by_one` 逐条重放；`every_round_keeps_the_lean_properties` 与 `a_single_account_round_reads_retry_alone` 用 proptest 覆盖任意失败序列、名册长度、可兑付子集与人设上限，检查该分部的量化定理。
 - 换号与重试同行：`error::shape::tests::no_order_of_calls_advances_a_resendable_failure` 用 proptest 走任意次序的四个构造器，对拍 `spec/Error.lean` 的同名定理与 `no_order_of_calls_waits_without_retrying`；`only_a_switch_is_written_and_an_old_record_reads_as_keep` 守住 `Keep` 不上线、旧行读作 `Keep`。
 
-生成设置的文本值、能力词汇与冻结记录由 kernel D124（`crates/kernel/spec/Model.lean`）规定；gateway D64 的模型证明支持来源与输出偏好的判定，Rust 行为检查守住对应关系。
+生成设置的文本值、能力词汇与冻结记录由 kernel D124（`Sprawling/kernel/spec/Model.lean`）规定；gateway D64 的模型证明支持来源与输出偏好的判定，Rust 行为检查守住对应关系。
 
-没有 Lean 模型、由 Rust 守住的：Payload 的浮点与深度、规范字节与 golden、Locator 文法、密钥扫描与熵、计划树与份额守恒、门的拒词与 `DOORS` 矩阵、降级读数、保温续期、模型端口的三扇门。它们的分部只有节注释，要求由类型、trybuild 反例（`crates/kernel/tests/ui`）、kani 与 `cargo nextest run -p sprawling-kernel` 的各模块测试守住；把其中一条写成定理，是下一次改它时的事。
+没有 Lean 模型、由 Rust 守住的：Payload 的浮点与深度、规范字节与 golden、Locator 文法、密钥扫描与熵、计划树与份额守恒、门的拒词与 `DOORS` 矩阵、降级读数、保温续期、模型端口的三扇门。它们的分部只有节注释，要求由类型、trybuild 反例（`Sprawling/kernel/tests/ui`）、kani 与 `cargo nextest run -p sprawling-kernel` 的各模块测试守住；把其中一条写成定理，是下一次改它时的事。
 -/
 
 /-! ## 17 文档关系
@@ -495,6 +495,6 @@ storage::jsonl／storage::cas／runtime::replay／runtime::fork／citysim 全部
 - `architecture.toml` 的模块图：kernel 每一行的 `spec` 指向规定它的分部，`cargo xtask gates specalign` 检查锚点在盘上。
 - `docs/glossary.md`：本规格用的词，`cargo xtask gates lexicon` 检查。
 - xtask 的规格 §8-43（门读 Lean 的受限形状）：`specalign` 读本规格的哪几种形状；它改了，§8-1 与 §8-4 的两张表与同名的 `inductive` 一起重看。
-- `crates/adversary/Spec.lean` 第 5 节：检验器从门外判账本的链与错误码，不 import 本规格；`spec/Ledger.lean` 的单射假设在那里被记为一条环境假设。
-- 引本规格的其他规格与 rustdoc 写 `crates/kernel/Spec.lean §8-n` 或 `kernel D<n>`；一节换了分部，它的标签不变，引用不必改。kernel 的模块文档指向规定它的分部。
+- `Tools/adversary/Spec.lean` 第 5 节：检验器从门外判账本的链与错误码，不 import 本规格；`spec/Ledger.lean` 的单射假设在那里被记为一条环境假设。
+- 引本规格的其他规格与 rustdoc 写 `Sprawling/kernel/Spec.lean §8-n` 或 `kernel D<n>`；一节换了分部，它的标签不变，引用不必改。kernel 的模块文档指向规定它的分部。
 -/

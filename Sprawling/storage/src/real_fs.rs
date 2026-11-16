@@ -11,7 +11,7 @@
 //! call rather than per byte, and a ledger appends to one segment over
 //! and over.
 //!
-//! Specified by `crates/storage/spec/RealFs.lean` §8-16.
+//! Specified by `Sprawling/storage/spec/RealFs.lean` §8-16.
 
 use std::io;
 use std::io::{Read as _, Seek as _, SeekFrom};
@@ -231,7 +231,7 @@ impl Vfs for RealFs {
 /// How the bytes of the file `RealFs` appends to travel to the device.
 /// Every arm still issues `sync_data` at the barrier, so the durability
 /// `append_all` answers `Ok` for is the same in each and an arm changes
-/// only the cost (`crates/storage/spec/Jsonl/Barrier.lean`, storage D24).
+/// only the cost (`Sprawling/storage/spec/Jsonl/Barrier.lean`, storage D24).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SegmentDurability {
     /// Buffered writes, then `File::sync_data`: `FlushFileBuffers` on

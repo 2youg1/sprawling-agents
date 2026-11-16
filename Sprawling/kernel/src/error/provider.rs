@@ -5,7 +5,7 @@
 
 //! What kind of provider failure an `E_PROVIDER` error reports, and
 //! whether the account that met a failure can still take the request.
-//! The part `crates/kernel/spec/Error.lean` specifies this module with the
+//! The part `Sprawling/kernel/spec/Error.lean` specifies this module with the
 //! rest of `kernel::error`.
 
 use serde::{Deserialize, Serialize};
@@ -46,7 +46,7 @@ pub enum ProviderFailureKind {
 }
 
 /// Whether the account a request went out on can still take it
-/// (`crates/kernel/spec/Error.lean` D53).
+/// (`Sprawling/kernel/spec/Error.lean` D53).
 ///
 /// A second answer beside `Retry` rather than a reading of it:
 /// a rejected key and a request the provider calls malformed are both

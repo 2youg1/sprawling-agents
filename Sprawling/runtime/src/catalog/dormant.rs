@@ -7,7 +7,7 @@
 //! session does not carry, and one per admitted skill, packed greedily
 //! under
 //! [`DORMANT_INDEX_CEILING`](super::DORMANT_INDEX_CEILING)
-//! (`crates/runtime/spec/Catalog.lean` `pack`, `index_within_ceiling`).
+//! (`Sprawling/runtime/spec/Catalog.lean` `pack`, `index_within_ceiling`).
 //!
 //! Each entry is tried with its hint, then with its name alone, and the
 //! first entry that fits neither way ends the list with `+N more`. The

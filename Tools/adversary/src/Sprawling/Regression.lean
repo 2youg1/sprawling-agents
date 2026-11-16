@@ -241,7 +241,7 @@ private def preamble (name : String) (trace : Trace) : List String :=
   , ""
   , "//! The traces the adversary found, kept here so this repository remembers them."
   , "//!"
-  , "//! Written by `crates/adversary/src/Sprawling/Regression.lean` and compared against it"
+  , "//! Written by `Tools/adversary/src/Sprawling/Regression.lean` and compared against it"
   , "//! byte for byte. Change the trace there; changing it here turns the adversary"
   , "//! red, which is exactly what should happen when the two disagree."
   , "//!"
@@ -267,13 +267,13 @@ private def preamble (name : String) (trace : Trace) : List String :=
 The line is written whole rather than wrapped, which holds while the longest
 spelling keeps it inside the width rustfmt is configured for; a longer
 authority than this one would be reformatted, and the comparison in
-`crates/adversary/test/Main.lean` would report that as a drift. -/
+`Tools/adversary/test/Main.lean` would report that as a drift. -/
 private def attaching (spelling : String) (index : Nat) : String :=
   s!"    attach(&mut worker, {quoted s!"{relayName}-{index}"}, {quoted spelling}).unwrap();"
 
 /-- Every spelling of one endpoint reaches one registration.
 
-The defect this remembers is recorded in `crates/adversary/Spec.lean` section 4, fourth
+The defect this remembers is recorded in `Tools/adversary/Spec.lean` section 4, fourth
 finding: the normalisation existed, had its own tests, and had no caller, so the
 city wrote down five different URLs for one endpoint and the first call to four
 of them answered 404. -/

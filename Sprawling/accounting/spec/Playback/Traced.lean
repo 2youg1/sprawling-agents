@@ -6,9 +6,9 @@
 /-!
 # accounting::playback::traced
 
-规定 playback 的时间选择、调用的耗时、运行策略与提交的证据：`playback::traced`、`playback::diff`，以及它们在 `playback::select`、`playback::links`、`playback::project` 与 `views::rounds::Attempts` 里的那一部分。本文件是 `crates/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `crates/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
+规定 playback 的时间选择、调用的耗时、运行策略与提交的证据：`playback::traced`、`playback::diff`，以及它们在 `playback::select`、`playback::links`、`playback::project` 与 `views::rounds::Attempts` 里的那一部分。本文件是 `Sprawling/accounting/Spec.lean` 的一个分部；下面每一节保留它在 accounting 规格里的标签 §8-n，别处引作 `Sprawling/accounting/Spec.lean §8-n`，决定引作 `accounting D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它要守住的性质证在 `crates/accounting/spec/Playback/Select.lean` 与 `crates/accounting/spec/Playback/Project.lean`，其余由 Rust 的类型与 `accounting::playback::tests` 守住（`crates/accounting/Spec.lean` §16）。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它要守住的性质证在 `Sprawling/accounting/spec/Playback/Select.lean` 与 `Sprawling/accounting/spec/Playback/Project.lean`，其余由 Rust 的类型与 `accounting::playback::tests` 守住（`Sprawling/accounting/Spec.lean` §16）。
 
 **平台**：时间条件只读每行信封的 `t`，不读墙钟；提交的证据只读 git 对象。下面每一句在 Windows、macOS 与 Linux 上相同。
 -/
@@ -16,7 +16,7 @@
 /-!
 ### 8-17 accounting::playback 的时间选择、调用的耗时、运行策略与提交的证据（形状 7 投影；`diff`、`traced` 为形状 4 适配器）
 
-回看一段工作流的人还要四样东西：按 UTC 时间选一段；每次工具调用花了多久，以及这个数什么时候是量出来的；一次 run 要求了什么准入证据；一个提交改了什么、出自哪几次调用。本节定这四样在 bundle 里的形状与求法；泳道与播放怎样画是页面的事（`crates/city/skills/playback/SKILL.md`）。CLI 与城工具读同一组条件（`crates/sprawling/Spec.lean` §8-143）。时间条件的性质在 `crates/accounting/spec/Playback/Select.lean`。
+回看一段工作流的人还要四样东西：按 UTC 时间选一段；每次工具调用花了多久，以及这个数什么时候是量出来的；一次 run 要求了什么准入证据；一个提交改了什么、出自哪几次调用。本节定这四样在 bundle 里的形状与求法；泳道与播放怎样画是页面的事（`Sprawling/city/skills/playback/SKILL.md`）。CLI 与城工具读同一组条件（`Sprawling/app/Spec.lean` §8-143）。时间条件的性质在 `Sprawling/accounting/spec/Playback/Select.lean`。
 
 ```rust
 // accounting::playback
@@ -49,7 +49,7 @@ impl Window<'_> {
 - `took` 是 `{"measured":"<毫秒>"}`，当且仅当两端都可见、`views::rounds::answered_timing` 判这一对的时刻是量出来的（两行都有 `EventRecord::moment`，答复不是城在重启后补写的 `E_TOOL_OUTCOME_UNKNOWN`），并且答复的 `t` 不早于调用的 `t`；其余一律是 `"unknown"`。所以版本早于逐行时刻的账本、混合区间里旧版本的那几次调用、补写的答复、还没答、有一端被隐去，都不给耗时，页面也就不会画出零耗时。判定量没量的规则只在 `views::rounds` 一处；逐行的精度仍是每条 `events` 的 `moment`，混合的区间逐行、逐调用各自保留。
 - 一条两端都落在范围外、范围内又没有成员的调用，在它关闭时就从「可能成为上下文的范围外行」里删掉：调用占账本行数的大头，留着它们会让一次窄选择的常驻量与整本账同阶；删掉以后常驻的只有还没关闭的调用。
 
-**运行策略（`runs[].policy`）。** 每个 run 行带这个 run 的 `run_started.policy`（`crates/kernel/Spec.lean` §8-77：`mode`、`write`、`admit`、`landing`），早于策略入账的行写 `null`。`admit` 是这次派活要求的准入证据；它的结果是这个 run 打开的 PR 怎样关闭：合并时准入不过写成 `pr_rejected`，`by` 与 `why` 是拒绝它的一方与理由（`crates/runtime/Spec.lean` §8-54），合并写成 `pr_merged`，带 `reviewed_commit` 与 `verified_by`。这些行在 `events` 里，关键时刻 `pr` 一项指向它们。要求与结局各是记下的事实，playback 不从一次合并推断测试跑过没有。
+**运行策略（`runs[].policy`）。** 每个 run 行带这个 run 的 `run_started.policy`（`Sprawling/kernel/Spec.lean` §8-77：`mode`、`write`、`admit`、`landing`），早于策略入账的行写 `null`。`admit` 是这次派活要求的准入证据；它的结果是这个 run 打开的 PR 怎样关闭：合并时准入不过写成 `pr_rejected`，`by` 与 `why` 是拒绝它的一方与理由（`Sprawling/runtime/Spec.lean` §8-54），合并写成 `pr_merged`，带 `reviewed_commit` 与 `verified_by`。这些行在 `events` 里，关键时刻 `pr` 一项指向它们。要求与结局各是记下的事实，playback 不从一次合并推断测试跑过没有。
 
 **提交的证据。** 范围内可见的每个 `Committed` checkpoint 多三项；读这三项要读账本之外的输入（git 对象与 `accounting::trace` 对整本账的折叠），确定性的条件是这些输入相同，而 git 对象按 oid 不可变：
 
@@ -74,7 +74,7 @@ impl Window<'_> {
 /-!
 ### 8-25 accounting::playback 的模型调用耗时，与只读到 cutoff 的提交证据（形状 7 投影；`views::rounds::Attempts` 为形状 1 决策）
 
-§8-17 给工具调用配了耗时，给提交配了调用归属。这一节补两样：模型调用（一条 `model_called` 到答它的 `model_returned`）的耗时；提交的证据只读到 cutoff——cutoff 之后的行写了什么、审不审得过，都改变不了 bundle，所以 `check --city` 在一段 cutoff 之后才坏掉的历史上照样逐字节重现。必须守住的性质在 `crates/accounting/spec/Playback/Project.lean`：`took_is_measured`、`an_unmeasured_end_is_unknown`、`evidence_ignores_lines_after_the_cutoff`。
+§8-17 给工具调用配了耗时，给提交配了调用归属。这一节补两样：模型调用（一条 `model_called` 到答它的 `model_returned`）的耗时；提交的证据只读到 cutoff——cutoff 之后的行写了什么、审不审得过，都改变不了 bundle，所以 `check --city` 在一段 cutoff 之后才坏掉的历史上照样逐字节重现。必须守住的性质在 `Sprawling/accounting/spec/Playback/Project.lean`：`took_is_measured`、`an_unmeasured_end_is_unknown`、`evidence_ignores_lines_after_the_cutoff`。
 
 ```rust
 // accounting::views::rounds（形状 1 决策）
@@ -102,7 +102,7 @@ pub(crate) fn trace_through(index: &LedgerIndex, ledger_dir: &Path, commit: wire
 
 **模型调用（`calls`）。**
 
-- 一次模型调用是 links 里调用的第二种对：键是 run 与那条 `model_called` 的 seq；关闭它的是同一 run 的 `model_returned`，它答哪一条由 `views::rounds::Attempts` 判：这个 run 在它之前最近的那条 `model_called`。rounds 的 `turns` 把答复放进回合时也经 `Attempts`，所以页面的回合与 bundle 的调用用同一条配对规则。每次尝试都入账，修复后的重发是第二条 `model_called`（`crates/runtime/spec/Turn/Recovery.lean` §8-50），被它替下的那次尝试不会有答复，写 `"pending"`，`took` 为 `"unknown"`。
+- 一次模型调用是 links 里调用的第二种对：键是 run 与那条 `model_called` 的 seq；关闭它的是同一 run 的 `model_returned`，它答哪一条由 `views::rounds::Attempts` 判：这个 run 在它之前最近的那条 `model_called`。rounds 的 `turns` 把答复放进回合时也经 `Attempts`，所以页面的回合与 bundle 的调用用同一条配对规则。每次尝试都入账，修复后的重发是第二条 `model_called`（`Sprawling/runtime/spec/Turn/Recovery.lean` §8-50），被它替下的那次尝试不会有答复，写 `"pending"`，`took` 为 `"unknown"`。
 - 行：`run`、`callee`、`called`、`answered`、`took`。`callee` 是两种之一：`{"tool":{"id","name"}}`（工具调用，§8-17）或 `{"model":{"name"}}`（模型调用：打开行可见时是 `ModelCalled.model`，请求里写的端点自己的模型 id，否则 `null`）。
 - `took` 与工具调用同一条规则（§8-17）：两端都可见，`views::rounds::answered_timing` 判两端量过（两行都有 `EventRecord::moment`），答复的 `t` 不早于调用的 `t`，才写 `{"measured":"<毫秒>"}`，其余一律 `"unknown"`。模型的答复不带 `error`，所以「城在重启后补写的答复」这一条对它不成立；规则仍只在 rounds 一处。`ModelReturned.first_at` 是首个内容到达的时刻，不进 `took`：它答的是另一个问题（首字延迟），那一行在 `events` 里，页面要时自己读。
 - 两端都在范围外、范围内没有成员的模型调用，与工具调用一样在关闭时从候选里删掉（§8-17）。
@@ -113,9 +113,9 @@ pub(crate) fn trace_through(index: &LedgerIndex, ledger_dir: &Path, commit: wire
 - `playback::traced::Evidence` 在 walk 里收下每一条核对过的行（`Walked::Known`）：先折进 `trace::History`，再记下这一行是不是第一次宣告它点名的提交（`views::commits::commit_facts`）。范围内可见的 `Committed` checkpoint 是第一次宣告时，在折完这一行的那一刻问 `History::commit(oid)`：此刻的视图恰好折到这一行，`previous` 是这个 run 在它之前宣告的最近一个提交，run、`actor`、`seq` 就是这一行自己的，`parents` 与 `message` 由 git 按 oid 给出。答只取决于这一行与它之前的历史，以后的宣告与 cutoff 之后的行都改变不了它（`evidence_ignores_lines_after_the_cutoff`）。
 - walk 结束后，每个这样的答交给 `trace::trace_through`，经 walk 的索引读这个 run 在这一行之前的行与区间里的行，区间规则是 §8-16 那一条；读到的 seq 全都小于这一行，所以不越过 cutoff。
 - `History::absorb` 遇到视图拒绝折的第一行时停下，记住那条拒绝；之后每次 `commit` 都答它，这些提交写 `{"unread":"<错误码>"}`，导出不因此失败（§8-17）。视图折的是 walk 已核对过的同一批记录，被拒绝的行在 cutoff 以内，所以一份 bundle 里的 `unread` 只取决于 cutoff 以内的历史，复核时照样重现。
-- `whose --trace`（`crates/sprawling/Spec.lean` §8-136）不变：`trace(city_root, oid)` 照旧经 `views::ask` 求这个 oid 最近一次的宣告、重建一次索引，再经 `trace_through` 按同一条区间规则读。
+- `whose --trace`（`Sprawling/app/Spec.lean` §8-136）不变：`trace(city_root, oid)` 照旧经 `views::ask` 求这个 oid 最近一次的宣告、重建一次索引，再经 `trace_through` 按同一条区间规则读。
 
-**代价。** 一份 bundle 只折一遍视图，与 walk 同一遍、同一批记录；它从不调用 `views::ask`，也不重建索引。每个范围内第一次宣告的提交另有一次视图查询（在内存里），它经 `Prepared::finish` 两次打开仓库：读父提交（`storage::parents_of`）与提交消息（`views::commits`，`crates/sprawling/Spec.lean` §8-128），再按索引读它的 run 的行（倒着读到下界前最近的 `model_called`）与区间里的行。判同楼的别人时从区间的下界起读索引（`LedgerIndex::seqs_from`，`crates/storage/Spec.lean` §8-38），读到区间之后的第一行为止：一个提交读过的索引项是它的区间长度加一，与它之前的账本有多长无关，一次导出在这一项上的代价是各区间长度之和，不是提交数乘行数。确定性计数：`accounting::playback::tests::tracing` 在 N 与 2N 个提交的历史上各导出一次，数这次导出开始了几次视图折叠，两种规模下都是 1；再数一个提交判同楼的别人时最多读过几条索引项，两种规模下都是 6（第一个提交的区间从它的 run 的第一行起，五行，加上区间之后那一行）。两个数都只在测试里编译（`trace::counted`），理由与 D37 (c) 相同：要挡住的是按 N 增长的代价，墙钟在小夹具上看不出它。毫秒读数由同一文件的仪表 `instrument_evidence_cost` 给出（`cargo nextest run -p sprawling-accounting --release --run-ignored only -E 'test(instrument_evidence_cost)' --no-capture`）：50、100、200 个提交（1,003、2,003、4,003 行）的一次导出依次约 100–115、160–170、365–430 ms，随提交数线性增长。
+**代价。** 一份 bundle 只折一遍视图，与 walk 同一遍、同一批记录；它从不调用 `views::ask`，也不重建索引。每个范围内第一次宣告的提交另有一次视图查询（在内存里），它经 `Prepared::finish` 两次打开仓库：读父提交（`storage::parents_of`）与提交消息（`views::commits`，`Sprawling/app/Spec.lean` §8-128），再按索引读它的 run 的行（倒着读到下界前最近的 `model_called`）与区间里的行。判同楼的别人时从区间的下界起读索引（`LedgerIndex::seqs_from`，`Sprawling/storage/Spec.lean` §8-38），读到区间之后的第一行为止：一个提交读过的索引项是它的区间长度加一，与它之前的账本有多长无关，一次导出在这一项上的代价是各区间长度之和，不是提交数乘行数。确定性计数：`accounting::playback::tests::tracing` 在 N 与 2N 个提交的历史上各导出一次，数这次导出开始了几次视图折叠，两种规模下都是 1；再数一个提交判同楼的别人时最多读过几条索引项，两种规模下都是 6（第一个提交的区间从它的 run 的第一行起，五行，加上区间之后那一行）。两个数都只在测试里编译（`trace::counted`），理由与 D37 (c) 相同：要挡住的是按 N 增长的代价，墙钟在小夹具上看不出它。毫秒读数由同一文件的仪表 `instrument_evidence_cost` 给出（`cargo nextest run -p sprawling-accounting --release --run-ignored only -E 'test(instrument_evidence_cost)' --no-capture`）：50、100、200 个提交（1,003、2,003、4,003 行）的一次导出依次约 100–115、160–170、365–430 ms，随提交数线性增长。
 
 **在 40 万行的城上。** 读数取自 40 万行夹具城（`bench_startup first-byte` 的 `l400k`：400,003 行、64,000 个提交；windows-x86_64、16 线程的笔记本处理器、release，`opt-level = 3`）：`sprawling playback export` 选 `--from 2 --through 8`（范围里没有提交）26.8–27.2 s，选 `--from 399000`（1,003 行、约 160 个提交）26.9–27.0 s，选 `--from 380000`（20,003 行、约 3,200 个提交）31.2 s，各三次。同一座城上分段计时（在 `opt-level = "z"` 下量，那时同一次导出是 34 s）：只走 walk（逐行核对）5.5 s；walk 加视图折叠 6.6–7.3 s，所以视图折叠约 1.1–1.8 s，是一次导出的 4% 上下；walk 加整个投影 33–37 s，其中 credential 扫描约 25 s、`named_in_payload` 2.3 s、视图折叠 1.4 s、`links` 0.9 s。导出的秒数因此不在视图折叠里，而在投影对每一行的扫描（§3），范围里没有提交时不折视图最多省下这 4%（D37 (b)）。范围里每多一个提交，另付约 1.3 ms（读父提交、区间里的行与同楼的别人）。
 
@@ -126,7 +126,7 @@ pub(crate) fn trace_through(index: &LedgerIndex, ledger_dir: &Path, commit: wire
 
 /-! D29 playback 的时间条件比信封 `t`、逐行判断，`--day` 展开成同一个区间；调用的耗时只在 rounds 判为量出来时给出；提交的证据经 `trace` 与 `storage::hunks` 读，读不到就写明读不到
 
-(a) 时间条件读每一行信封的 `t`，与 `view --since` 与 `--until`（`crates/sprawling/Spec.lean` §8-137）同一个 `UtcSpan`，不按种类去载荷里挑时间字段，也不靠 `t` 有序提前停或二分。理由：`t` 就是这一行记下的那一刻，任何种类都有；它不随 seq 单调，在第一条越过 `until` 的行处停下会漏掉回退的行。被否决的做法：只对四种记时刻的行判时间、其余行跟着它所在的回合走（同一件事两个家，且旧账本里根本分不出回合的边界）；在索引里存时间列再二分（要 `t` 有序）。
+(a) 时间条件读每一行信封的 `t`，与 `view --since` 与 `--until`（`Sprawling/app/Spec.lean` §8-137）同一个 `UtcSpan`，不按种类去载荷里挑时间字段，也不靠 `t` 有序提前停或二分。理由：`t` 就是这一行记下的那一刻，任何种类都有；它不随 seq 单调，在第一条越过 `until` 的行处停下会漏掉回退的行。被否决的做法：只对四种记时刻的行判时间、其余行跟着它所在的回合走（同一件事两个家，且旧账本里根本分不出回合的边界）；在索引里存时间列再二分（要 `t` 有序）。
 
 (b) `day` 拼成 `<day>T00:00:00Z` 交给 `parse_iso`，加一个 UTC 日的毫秒数作上界；与 `since`/`until` 同给时取交集。理由：历法与校验只有 `runtime::clock` 那一份，日期另写一个解析器就是第二份；一天在 UTC 里总是 86 400 秒（Unix 时间不计闰秒）。交集而不拒绝同给，是因为「这一天里九点以后」本来就是一个合法的问题。被否决的做法：`day` 与 `since`/`until` 互斥（把一个合法的问题拒掉）；在本模块写一个 `YYYY-MM-DD` 解析器。
 

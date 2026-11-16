@@ -6,7 +6,7 @@
 /-!
 # 回到过去，与并行 run 的写域
 
-规定 `crates/storage/src/worktree/back.rs`：一个人回到城历史中某个 point 时 run 打开的那棵树，以及与它共用写域的两步——run 在自己的树里写一个文件（`crates/storage/src/worktree/trees.rs`），和从某个 point 把一个文件取回到那棵树里（`crates/storage/src/worktree/back.rs`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（§8-27）。
+规定 `Sprawling/storage/src/worktree/back.rs`：一个人回到城历史中某个 point 时 run 打开的那棵树，以及与它共用写域的两步——run 在自己的树里写一个文件（`Sprawling/storage/src/worktree/trees.rs`），和从某个 point 把一个文件取回到那棵树里（`Sprawling/storage/src/worktree/back.rs`）。Rust 代码是「怎样守住」的权威；本模型是「必须守住哪些性质」的权威（§8-27）。
 
 城的历史只由两样已有的东西构成：只增不减的那一本 Ledger，以及城仓库里写下后就不再改变的 git 对象。一个 point 就是一次提交。回到某个 point，是开一个新 run，给它一棵自己的树，树的分支从那次提交起；城所在的干线不动，因为此刻可能有别的 run 正在写，干线是它的工作落地的地方。撤销不是删除：它从更早的 point 取回一个文件，Ledger 把这次取回记成又一条记录。
 
@@ -35,7 +35,7 @@ impl Worktrees {
 
 **统一历史不另建存储。** 城的历史只有两份已有的东西：只追加的账本，与城仓库里写下就不再变的 git 对象。log 是血缘树，diff 是两点之间对话与文件一起的差别，blame 是 `whose`，合并走已有的 PR 流（8-9）；本节只管其中两个会写盘的动作。
 
-**性质由 Lean 模型定。** `crates/storage/spec/Worktree/Back.lean`（`just models`）规定的性质分两处守。本模块守树的四条：回到过去得到的树恰是那一点的文件（`goBack_opens_at_the_point`）；名字已被一棵活树占着即拒，调用者自己的树也不被替换（`goBack_refuses_a_live_tree`）；回到过去、写、取回都只动发起它的那个 run 的树，从不动干线，于是一个 run 写下的内容在任何只含别的 run 的步骤序列之后原样还在（`others_never_touch_a_tree`、`a_write_survives_other_runs`）。账本的两条——每一步给账本追加恰好一条记录，撤销即取回、也是追加（`the_ledger_only_grows`、`undo_is_an_appended_restore`）——归调用者：本模块不写账本，但 `restore_file` 把它那一步的记录作为返回值交出（kernel 的 `FileRestored`，path 取 git 树的写法，所以同一次取回在任何机器上记成同样的字节），调用者追加它即是 `restored` 那一条；`claim_at` 那一步的记录是 kernel 的 `WentBack`（名字加 point）。
+**性质由 Lean 模型定。** `Sprawling/storage/spec/Worktree/Back.lean`（`just models`）规定的性质分两处守。本模块守树的四条：回到过去得到的树恰是那一点的文件（`goBack_opens_at_the_point`）；名字已被一棵活树占着即拒，调用者自己的树也不被替换（`goBack_refuses_a_live_tree`）；回到过去、写、取回都只动发起它的那个 run 的树，从不动干线，于是一个 run 写下的内容在任何只含别的 run 的步骤序列之后原样还在（`others_never_touch_a_tree`、`a_write_survives_other_runs`）。账本的两条——每一步给账本追加恰好一条记录，撤销即取回、也是追加（`the_ledger_only_grows`、`undo_is_an_appended_restore`）——归调用者：本模块不写账本，但 `restore_file` 把它那一步的记录作为返回值交出（kernel 的 `FileRestored`，path 取 git 树的写法，所以同一次取回在任何机器上记成同样的字节），调用者追加它即是 `restored` 那一条；`claim_at` 那一步的记录是 kernel 的 `WentBack`（名字加 point）。
 
 **回到过去不移动 HEAD。** 选「新 session ＋ 一棵停在那一点提交上的独立工作区」，否决「把城的 HEAD 检出到那一点」：后者会在别的 run 正写着的时候改掉它们落地的基线，而 Lean 模型里干线恒不被任何一步改动，正是这条的形式化。分支在那一点上新建，名字就是 `WorktreeName`，与 `claim` 同一套名字。
 

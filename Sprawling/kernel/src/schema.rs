@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! The JSON Schema of the values a derive cannot state.
-//! The part `crates/kernel/spec/Schema.lean` specifies this module.
+//! The part `Sprawling/kernel/spec/Schema.lean` specifies this module.
 //!
 //! Every other value on the wire derives its schema from the declaration
 //! serde reads, so the two cannot drift. These are the strings a grammar
@@ -12,7 +12,7 @@
 //! through their own constructor, so a derive would
 //! say a field is a string and nothing about what it must say. Each
 //! schema states that grammar as a pattern, which `cargo xtask wire-ts`
-//! turns into the client's own check (`crates/kernel/spec/Schema.lean` §8-45).
+//! turns into the client's own check (`Sprawling/kernel/spec/Schema.lean` §8-45).
 //!
 //! **The pattern is not the authority.** `Address::parse` answers which
 //! rule a string broke, which is what a person can act on; two

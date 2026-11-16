@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The run policy: the four values one run works under (`crates/kernel/spec/Model.lean`
+//! The run policy: the four values one run works under (`Sprawling/kernel/spec/Model.lean`
 //! §8-77).
 //!
 //! Defined here rather than in `runtime` for the reason

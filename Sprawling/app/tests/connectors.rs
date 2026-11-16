@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! A run offered the MCP tools the worker was handed
-//! (`crates/accounting/Spec.lean` section 2), and found through `tool`
-//! however many a server lists (`crates/runtime/Spec.lean` §8-60).
+//! (`Sprawling/accounting/Spec.lean` section 2), and found through `tool`
+//! however many a server lists (`Sprawling/runtime/Spec.lean` §8-60).
 //!
 //! The building names a server whose command does not exist on any
 //! machine, so its tool can reach the model only through the connectors
@@ -115,7 +115,7 @@ impl Model for Listening {
                 .map(|tool| tool.name.as_str().to_owned()),
         );
         // A tool outside the mode's core is offered under its namespace,
-        // one line of the dormant index (`crates/runtime/Spec.lean` §8-60).
+        // one line of the dormant index (`Sprawling/runtime/Spec.lean` §8-60).
         self.0.lock().unwrap().extend(dormant_names(req));
         Ok(ModelReturn::bare(
             kernel::model::message_payload(&[ContentBlock::Text {
@@ -391,7 +391,7 @@ fn a_run_is_offered_the_tools_the_worker_was_handed() {
 
 /// A server of two hundred tools takes one line of the dormant index,
 /// and `tool` `find` names the one a few words describe among its first
-/// eight hits (`crates/runtime/Spec.lean` §8-60, D110).
+/// eight hits (`Sprawling/runtime/Spec.lean` §8-60, D110).
 #[test]
 fn two_hundred_tools_of_one_server_take_one_index_line_and_are_found() {
     let seen = Arc::new(Mutex::new(Seen::default()));
@@ -453,7 +453,7 @@ fn apps_rows(city_root: &std::path::Path) -> Vec<wire::CatalogTool> {
 /// the newest run was frozen with, and a namespace the building turns off
 /// is gone from the next run's index and tool list while the answer
 /// still lists it, off, so a person can turn it back on
-/// (`crates/wire/spec/Answer/Catalog.lean` §8-99, runtime D111).
+/// (`Sprawling/wire/spec/Answer/Catalog.lean` §8-99, runtime D111).
 #[test]
 fn a_namespace_a_building_turns_off_leaves_the_next_run_and_stays_listed() {
     use kernel::config::{Exposure, ExposureFrom, ExposureTable};
@@ -950,7 +950,7 @@ impl accounting::ModelFactory for Callers {
 }
 
 /// A converted document longer than the window reaches the model as
-/// the pipeline's window over it, not whole (`crates/runtime/Spec.lean` §8-27-10).
+/// the pipeline's window over it, not whole (`Sprawling/runtime/Spec.lean` §8-27-10).
 #[test]
 fn a_long_connector_answer_reaches_the_model_packaged() {
     let document = "The quarter closed with every account reconciled. ".repeat(1_000);

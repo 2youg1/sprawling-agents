@@ -172,7 +172,7 @@ fn a_door_that_refused_lands_in_the_turn_whole() {
     let refusal = AxError::failure(
         AxCode::OutsideWriteDomain,
         "write",
-        "crates/kernel/src/gate.rs",
+        "Sprawling/kernel/src/gate.rs",
     )
     .with_recovery("write under lab/ instead");
     let payload = serde_json::to_value(&refusal).expect("an error serialises");

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Register before create (`crates/runtime/spec/Tools/Exec/Container.lean`, D50).
+//! Register before create (`Sprawling/runtime/spec/Tools/Exec/Container.lean`, D50).
 
 use std::process::Command;
 

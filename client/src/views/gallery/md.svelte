@@ -193,7 +193,7 @@
 
   // wording-ok: fixture text is a model's reply, not a page's words
   const CLOSED = [
-    "- `crates/kernel`",
+    "- `Sprawling/kernel`",
     "- **Ledger**",
     "",
     "| step | what |",
@@ -218,7 +218,7 @@
           {
             span: by("- `crates"),
             check: "not_a_task",
-            blocks: [{ paragraph: { span: by("`crates"), inline: [{ code: "crates/kernel" }] } }],
+            blocks: [{ paragraph: { span: by("`crates"), inline: [{ code: "Sprawling/kernel" }] } }],
           },
           {
             span: by("- **"),

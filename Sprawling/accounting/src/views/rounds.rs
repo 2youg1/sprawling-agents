@@ -351,7 +351,7 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
 /// run recorded before it. Every attempt lands on the ledger, so a resend
 /// after a repair is a second `model_called`, and the attempt it replaced
 /// is never answered. The one rule a page's rounds and a playback
-/// bundle's calls pair a reply by (`crates/accounting/spec/Playback/Traced.lean` §8-25).
+/// bundle's calls pair a reply by (`Sprawling/accounting/spec/Playback/Traced.lean` §8-25).
 #[derive(Debug, Default)]
 pub(crate) struct Attempts {
     latest: BTreeMap<RunId, kernel::Seq>,
@@ -379,7 +379,7 @@ impl Attempts {
 }
 
 /// Whether this line's `t` is the moment its own event happened
-/// (`crates/kernel/Spec.lean` §8-4, "what the envelope `t` records").
+/// (`Sprawling/kernel/Spec.lean` §8-4, "what the envelope `t` records").
 pub(crate) fn timing_of(record: &EventRecord) -> wire::Timing {
     match record.moment() {
         Some(_) => wire::Timing::Measured,
@@ -390,7 +390,7 @@ pub(crate) fn timing_of(record: &EventRecord) -> wire::Timing {
 /// Whether a call's two times are measured once `answer` is paired with
 /// it, given how the call's own line read (`asked`): the one rule a page's
 /// rounds and a playback bundle's calls both time a call by, a tool call
-/// or a model attempt (`crates/accounting/spec/Playback/Traced.lean` §8-17, §8-25). An answer the city wrote itself after a
+/// or a model attempt (`Sprawling/accounting/spec/Playback/Traced.lean` §8-17, §8-25). An answer the city wrote itself after a
 /// restart makes the span unmeasured either way.
 pub(crate) fn answered_timing(asked: wire::Timing, answer: &EventRecord) -> wire::Timing {
     if supplied_by_the_city(answer.data().as_map().get("error")) {

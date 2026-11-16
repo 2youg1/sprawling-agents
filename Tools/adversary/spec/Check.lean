@@ -7,7 +7,7 @@
 # 收缩，以及一次只借出一个的端口
 
 规定检验器 `Sprawling.Check` 的收缩与 `Sprawling.Ground` 的端口池必须守的性质
-（`crates/adversary/src/Sprawling/Check.lean`、`crates/adversary/src/Sprawling/Ground.lean`）。
+（`Tools/adversary/src/Sprawling/Check.lean`、`Tools/adversary/src/Sprawling/Ground.lean`）。
 
 **收缩的每一个候选都更短。** 候选是从一条失败的轨迹里删掉一段相邻的元素（先整块、减半，
 再逐个）；元素本身从不变小，因为每个值都是固定演员表里的一个词（`Spec.lean` §14）。删掉

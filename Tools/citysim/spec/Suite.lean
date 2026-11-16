@@ -6,7 +6,7 @@
 /-!
 # citysim::suite
 
-规定 `citysim::suite`（`crates/citysim/src/suite.rs`），以及 §8-8 五件仪器共有的规矩。`score`、`metabolism` 在 `spec/Metabolism.lean`，`nesting` 在 `spec/Nesting.lean`，`ablation` 在 `spec/Ablation.lean`。本文件是 `crates/citysim/Spec.lean` 的一个分部；下面各节保留它们在 citysim 规格里的标签 §8-8、§8-8-1，别处引作 `crates/citysim/Spec.lean §8-8`。
+规定 `citysim::suite`（`Tools/citysim/src/suite.rs`），以及 §8-8 五件仪器共有的规矩。`score`、`metabolism` 在 `spec/Metabolism.lean`，`nesting` 在 `spec/Nesting.lean`，`ablation` 在 `spec/Ablation.lean`。本文件是 `Tools/citysim/Spec.lean` 的一个分部；下面各节保留它们在 citysim 规格里的标签 §8-8、§8-8-1，别处引作 `Tools/citysim/Spec.lean §8-8`。
 
 能写成定理的是一份报告的计数：每个 outcome 恰好记一次，记进它那一半的 `tried`，或记进 `unknown`（`every_outcome_is_counted_once`）；不认识的 outcome 不进任何一半的分母，那是 `Report.record` 的 `none` 一臂，不另写定理。模型的计数是 `Nat`，Rust 的是 `u32` 且饱和相加：一份 suite 的 outcome 不到 2³² 条，所以模型不写饱和那一档。「同一个 id 两次即拒」由 Rust 的 `Suite::new` 持有，模型把建好的 suite 当作 id 到一半的函数，于是一个 id 在模型里只能属于一半。
 -/

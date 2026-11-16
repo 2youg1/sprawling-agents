@@ -9,7 +9,7 @@ use kernel::{Address, EventKind, Payload, RunId};
 
 /// A room's stretches come from the fold: where each began, how, its runs
 /// and its last line, newest first, with nothing of another room in them,
-/// answered without leaving the lock (`crates/wire/Spec.lean` §8-71).
+/// answered without leaving the lock (`Sprawling/wire/Spec.lean` §8-71).
 #[test]
 fn a_room_s_sessions_are_answered_from_the_fold() {
     let dir = tempfile::tempdir().unwrap();
@@ -185,7 +185,7 @@ fn a_room_s_sessions_are_answered_from_the_fold() {
 /// A stretch carries the name its last `session_named` gave it, the model
 /// and effort of its last run, and the start of its last reply cut to
 /// `SESSION_PREVIEW_MAX` characters; an empty name takes the name back
-/// (`crates/wire/spec/Answer/Sessions.lean` D27).
+/// (`Sprawling/wire/spec/Answer/Sessions.lean` D27).
 #[test]
 fn a_session_line_carries_its_name_model_effort_and_last_reply() {
     let dir = tempfile::tempdir().unwrap();

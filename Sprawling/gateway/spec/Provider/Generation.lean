@@ -6,9 +6,9 @@
 /-!
 # gateway::provider::generation
 
-规定 `provider::generation`（`crates/gateway/src/provider/generation.rs`）：一个
+规定 `provider::generation`（`Sprawling/gateway/src/provider/generation.rs`）：一个
 `(Endpoint, model, dialect)` 的采样参数支持情况、人在模型编辑器里保存的默认值，以及新
-Session 冻下的有效生成配置。本文件是 `crates/gateway/Spec.lean` 的分部 §8-41。
+Session 冻下的有效生成配置。本文件是 `Sprawling/gateway/Spec.lean` 的分部 §8-41。
 
 模型只含纯判定；文本到 JSON 数字的转换、账本与文件 I/O 不在模型里。Rust 对应检查在
 `provider::generation::tests`，请求体检查在 `gateway::endpoint::call` 与

@@ -6,9 +6,9 @@
 /-!
 # wire::reading
 
-规定 `reading`、`answer::rounds`、`answer::evidence`、`answer::cost_of`（`crates/wire/src/` 下同名的文件）。一条账本载荷读成线上的值，给两端共用：回合、证据与一个计划节点的花费。本文件是 `crates/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `crates/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
+规定 `reading`、`answer::rounds`、`answer::evidence`、`answer::cost_of`（`Sprawling/wire/src/` 下同名的文件）。一条账本载荷读成线上的值，给两端共用：回合、证据与一个计划节点的花费。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 
-这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `crates/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
+这一分部只有文字：它是说明文档，不是形式规格，这里没有一句是被证明的；它写下的帧形状由 Rust 的类型与 `Sprawling/wire/tests/wire_contract.rs` 钉住的 wire schema（`wire::schema_hash`）守住。
 -/
 
 /-!
@@ -50,16 +50,16 @@ pub struct CostOfAnswer { pub node: NodeId, pub spent: UsdMicros,
                           pub runs: Vec<(RunId, UsdMicros)> }
 ```
 
-**这里搬的是读法而不是接口。** 一个会话被读成回合、一次跑留下什么证据、一个计划节点花了多少钱——这三件事此前只有 `crates/web` 会算，于是「线就是全部 API」（ARCHITECTURE §8）在这三处是假的：另写一个客户端就得把折叠逻辑照抄一遍，而照抄出来的那一份迟早与这一份不一致。现在三者各是一次查询，答由 `accounting::views` 折出（`crates/sprawling/Spec.lean` §8-47）。
+**这里搬的是读法而不是接口。** 一个会话被读成回合、一次跑留下什么证据、一个计划节点花了多少钱——这三件事此前只有 `crates/web` 会算，于是「线就是全部 API」（ARCHITECTURE §8）在这三处是假的：另写一个客户端就得把折叠逻辑照抄一遍，而照抄出来的那一份迟早与这一份不一致。现在三者各是一次查询，答由 `accounting::views` 折出（`Sprawling/app/Spec.lean` §8-47）。
 
 - **`Rounds` 的值类型住 `wire`，折叠住 `accounting::views`。** 值要上线，故必须可序列化；折叠要读账本，故必须在能读账本的那一层。两者切分开来，正是 ARCHITECTURE §9 的形状 2 与形状 7 的分界。
-- **`wire::reading` 是第三块**：把一条账本载荷读成上面这些值的那些纯函数（`said_in`／`used_in`／`output_in`／`note_of`）。它住在线这一层而不是服务端，因为**两端都要读**：服务端答 `Rounds` 要它，客户端把推来的 `model_returned` 折进自己的快照也要它（ARCHITECTURE §5 第 12 步：同一个折叠，线的两边）。一份权威，两个调用者。**`Call.subject` 不由这里算**：写方在写 `tool_called` 时把它定下（`crates/kernel/Spec.lean` §8-4：`ToolCalled::subject_of`），折叠读记录里的 `subject` 键；两个读方各按自己的 map 序推一次，同一次调用已经出现过两个名字。
+- **`wire::reading` 是第三块**：把一条账本载荷读成上面这些值的那些纯函数（`said_in`／`used_in`／`output_in`／`note_of`）。它住在线这一层而不是服务端，因为**两端都要读**：服务端答 `Rounds` 要它，客户端把推来的 `model_returned` 折进自己的快照也要它（ARCHITECTURE §5 第 12 步：同一个折叠，线的两边）。一份权威，两个调用者。**`Call.subject` 不由这里算**：写方在写 `tool_called` 时把它定下（`Sprawling/kernel/Spec.lean` §8-4：`ToolCalled::subject_of`），折叠读记录里的 `subject` 键；两个读方各按自己的 map 序推一次，同一次调用已经出现过两个名字。
 - **读不出的载荷是一条 `Note::Unreadable { cause, at }`，不是没有 note**：`note_of` 认下的种类（被拒、检查点）若载荷读不回它该有的形状，答里留一行，`cause` 说哪一种事件、读到哪一步失败，`at` 指向账本里那条记录。被否：返回 `None`——那样一次被拒在人眼里就是「什么都没发生」，而失败本身被这一层抹掉了。`CheckpointCommitted` 的 `JobPinned` 是一个真答案（派发钉住的是作业不是提交），仍然没有 note。
 - **`Changes` 早已在线上**（§8-20），`storage::changes` 一直是它唯一的权威；查过之后不动它——把一件已经做完的事再做一遍就是造第二个权威。
 - **`Evidence` 只认写下来的东西**：截图是 `tool_result` 载荷里的 `image` 定位符（`bin::browser_tool::storing::stored` 写的那三项：定位符、两条边、media type），完成证据是 `roadmap_finished` 载荷里的 `evidence` 定位符。**答里恒不携字节**：一张图是一个 `cas:` 定位符，取它是资产端点的事，把 base64 塞进查询答会让「看一眼这次跑干了什么」付上整批像素的代价——与 §8-20 拒绝整批补丁同一条理由。
 - **`CostOf` 的分母不在这里**：答只报这个节点上归到的绝对金额与逐跑明细，不报占比。占比需要一个这一端没有的分母（整城总额是 `CostView` 的），而没有分母的百分比正是 `UnplannedProgress` 拒绝拼出来的那种东西。节点到跑的映射由 `roadmap_claimed` 折出（载荷里的 `node` 与记录的 `addr`），钱由 `storage::attribution` 的 `by_run` 给——**不新增任何计价处**。
 - **一个本城没认领过的节点答 `CostOf { spent: 0, runs: [] }` 而不是 `Unavailable`**：与 `Changes` 那一条相反，因为这里「没人认领过它」是一个真答案而不是「我读不了」；节点地址本身经 `NodeId` 的手写 `Deserialize` 把过关，读不了的形状根本上不了线。
-- **`RunCosts { runs: Vec<RunId> }` → `Answer::RunCosts(RunCostsAnswer { runs: Vec<(RunId, UsdMicros)> })`**：`CostView.by_run` 之外的跑逐个按名字问，一次最多 `RUN_COSTS_MAX`（64）个，按问的顺序答；读不出的跑不出行，零是「没花钱」。钱仍只由 `storage::attribution` 折，冷的一侧从账本折（`crates/sprawling/Spec.lean` §8-90）。
+- **`RunCosts { runs: Vec<RunId> }` → `Answer::RunCosts(RunCostsAnswer { runs: Vec<(RunId, UsdMicros)> })`**：`CostView.by_run` 之外的跑逐个按名字问，一次最多 `RUN_COSTS_MAX`（64）个，按问的顺序答；读不出的跑不出行，零是「没花钱」。钱仍只由 `storage::attribution` 折，冷的一侧从账本折（`Sprawling/app/Spec.lean` §8-90）。
 - **`WIRE_V` 15→16，一次进位管三条查询**：名字表长了三项（17→20），故 schema 哈希无论如何都要变。旧页面在握手期被明确拒绝，这正是该机制存在的理由。
 - **被否**：（a）把 `Rounds` 并进 `RunHistory` 的答——前者是折叠后的读法，后者是原始记录页，一个答两副形状会让翻页与折叠互相牵制；（b）让 `Evidence` 直接回字节——见上一条；（c）把折叠留在 `wire` 里由客户端调用——那样新客户端仍要自己跑一遍折叠，而这一节整件事就是不要它这么做。
 -/
@@ -89,7 +89,7 @@ pub enum Note {
 - **被否：只带一个时长**。时长丢了起点，页面画不出调用在时间轴上的位置，也就排不出并发的两次调用。
 - **模型名挂在回合上，不挂在答案上**：`model_called` 每问一次记一次 `model`，一次 run 中途换模型（降级、换端点）时，逐回合的名字才是账本写下的事实；run 页统计栏的「模型」格取最后一个回合的名字，前后不同时列出各个名字。读法与 `Call.subject` 同：取那一键的文本，读不出为 `None`，页面不画名字而不猜。
 - **被否：`RoundsAnswer.model` 一个字段**。那得在折叠里挑一个回合的名字当整次 run 的名字，换过模型的 run 上它说错一半。
-- **等人从哪一刻开始，读自请求记录**：`Note::Waiting.t` 是 `approval_requested` 那条记录的 `t`，与 `Call.called` 同理不是 `Option`。等到哪一刻结束是 `answered`：`approval_resolved` 记在城自己的 run 下，服务端按 approval id 把它配回请求（`crates/sprawling/Spec.lean` §8-50-1），配不上为 `None`，不猜。
+- **等人从哪一刻开始，读自请求记录**：`Note::Waiting.t` 是 `approval_requested` 那条记录的 `t`，与 `Call.called` 同理不是 `Option`。等到哪一刻结束是 `answered`：`approval_resolved` 记在城自己的 run 下，服务端按 approval id 把它配回请求（`Sprawling/app/Spec.lean` §8-50-1），配不上为 `None`，不猜。
 -/
 
 /-!
@@ -113,7 +113,7 @@ pub struct Opening {
 ```rust
 pub struct Turn {
     // …既有字段…
-    pub first_at: Option<TimeMs>,   // 开这个回合的回复记下的 first_at（`crates/kernel/Spec.lean` §8-75）；缺席即没量到
+    pub first_at: Option<TimeMs>,   // 开这个回合的回复记下的 first_at（`Sprawling/kernel/Spec.lean` §8-75）；缺席即没量到
     pub timing: Timing,             // `t` 是不是 model_called 自己那一刻
 }
 pub struct Call {
@@ -129,7 +129,7 @@ pub enum Note {
 ```
 
 - **`first_at` 照录那一行的键。** 回合里最后一条 `model_returned` 写下的 `first_at`，读不出或缺席即 `None`。首字耗时是 `first_at − t`，线上不另带一个时长：页面手里已有这两个数。
-- **`Timing` 答一个问题：两个时刻之差是不是一次测量。** `Measured`：这一行上的每个时刻都是它自己那条记录量下的那一刻（`EventRecord::moment` 答 `Some`）。`Unmeasured`：至少一个不是——账本版本 1 写下的行带的是回合时间戳，同一回合的行同值；或者答复是重启之后城补上的 `E_TOOL_OUTCOME_UNKNOWN`，它记的是城补上它的那一刻（`crates/kernel/Spec.lean` §8-4「信封 `t` 记的是什么」）。时刻本身照旧带出，它仍给出次序；页面不从 `Unmeasured` 的行画用时。
+- **`Timing` 答一个问题：两个时刻之差是不是一次测量。** `Measured`：这一行上的每个时刻都是它自己那条记录量下的那一刻（`EventRecord::moment` 答 `Some`）。`Unmeasured`：至少一个不是——账本版本 1 写下的行带的是回合时间戳，同一回合的行同值；或者答复是重启之后城补上的 `E_TOOL_OUTCOME_UNKNOWN`，它记的是城补上它的那一刻（`Sprawling/kernel/Spec.lean` §8-4「信封 `t` 记的是什么」）。时刻本身照旧带出，它仍给出次序；页面不从 `Unmeasured` 的行画用时。
 - **`Turn.timing` 只说 `t`**：回合在线上只有这一个时刻；`first_at` 在场即量过，缺席即没有。`Call.timing` 说 `called` 与 `answered` 两个：一次调用的两条记录由同一个构建写下时两者同为量过或同为未量，城补上的答复例外，所以一个值够用。
 - **`Checkpointed`**：fence 与 checkpoint 曾是一个概念的两个名字，checkpoint 留下（glossary）。`Note` 不进名字表，改它的标签不动 schema 哈希，所以它随本节的进位落地。
 - **进位**：本节的提交是 D1 意义上上一次推送之后第一个名字不变而改形的提交，`WIRE_V` 44 → 45；§8-53 至 §8-58 共用 45。
@@ -141,7 +141,7 @@ pub enum Note {
 ```rust
 pub struct Call {
     // …既有字段…
-    pub effect: Option<kernel::Effect>,        // tool_called 记下的登记（`crates/kernel/Spec.lean` §8-75(b)）
+    pub effect: Option<kernel::Effect>,        // tool_called 记下的登记（`Sprawling/kernel/Spec.lean` §8-75(b)）
     pub render: Option<kernel::RenderIntent>,  // 同上：Generic、Terminal、Diff、Signal 或 Delegate（kernel D37）
 }
 ```
@@ -161,7 +161,7 @@ pub struct Output {
 }
 ```
 
-- **只在调用的输出上有值**：`Call.output` 的 `pinned` 读自配对上的 `tool_result` 结果里第一笔离窗账目（`runtime::pipeline::pinned_original`，`crates/runtime/Spec.lean` §8-51(b)）；`Call.arguments` 也是 `Output`，它的 `pinned` 恒为 `None`——参数从不离窗。
+- **只在调用的输出上有值**：`Call.output` 的 `pinned` 读自配对上的 `tool_result` 结果里第一笔离窗账目（`runtime::pipeline::pinned_original`，`Sprawling/runtime/Spec.lean` §8-51(b)）；`Call.arguments` 也是 `Output`，它的 `pinned` 恒为 `None`——参数从不离窗。
 - **原文是命令原本写出的字节**：结果先被 sieve 裁、再被普通搬运存一次时，指的是第一笔账目的原文，不是 sieve 留下的替身。页面拿它经 `Query::Content` 读全文，`cut` 仍只说这个视图裁了几行。
 - **旧行明确缺席**：结果里没有账目（没离窗、或写在账目进结果之前）即 `None`，不按相邻的行去猜。
 -/
@@ -170,7 +170,7 @@ pub struct Output {
 
 **决定**：(a) `Turn.first_at` 照录 `model_returned` 的键；`Timing` 由 `EventRecord::moment` 与答复的错误码判出。线上不带首字耗时，也不从相邻行推断一个时刻量没量过。
 
-**理由**：一个事实一个家。时刻语义的权威是 `crates/kernel/Spec.lean` §8-4 与 `EventRecord::moment`；首字耗时是两个时刻之差，页面手里已有这两个数。
+**理由**：一个事实一个家。时刻语义的权威是 `Sprawling/kernel/Spec.lean` §8-4 与 `EventRecord::moment`；首字耗时是两个时刻之差，页面手里已有这两个数。
 
 **被否**：①线上带一个 `ttft` 时长：派生值在线上有了第二个家，而且 `t` 未量时它要答一个答不了的数；②`Timing` 三值（量过、回合时间戳、城补的）：页面对后两种做同一件事——不画用时——第三个值只会逼每个读者多写一臂；要分辨时，`Call.outcome` 与答复内容已经说明那是城补的。
 
@@ -242,7 +242,7 @@ pub struct Turn {
 }
 pub struct Opening {
     // …既有字段…
-    #[serde(default)] pub effort: Option<kernel::Effort>,   // `run_started.effort`（`crates/kernel/Spec.lean` §8-85）
+    #[serde(default)] pub effort: Option<kernel::Effort>,   // `run_started.effort`（`Sprawling/kernel/Spec.lean` §8-85）
     #[serde(default)] pub names: Option<FrozenNames>,       // `run_started.naming` 那一版，从内容库读回
 }
 pub struct FrozenNames {
@@ -306,7 +306,7 @@ pub struct UsageExportAnswer { what: UsageKind, format: ExportFormat, body: Stri
 
 - **内容版本**是账上第一次以某个摘要说出这件 skill 的那一行：一行 `skill_shelved`（kernel D23，城经上架的门落下这一版），或一个钉住它的 `run_started`；`seq`、时刻与 run 是那一行的。`author` 说谁放上去的：有一行 `skill_shelved` 带这个摘要时是 `Shelved`，携那一行的 `seq` 与它的 `source`；没有而这个名字在钉住它的那一刻之前已有过 `skill_shelved` 时是 `OutsideShelf`——内容在城的门之外被改过，页面写「在架外」；这个名字在那一刻之前从没有过 `skill_shelved` 时是 `Unrecorded`——这一版在城开始记上架之前就在架上。判法只看账本次序，所以重放答同一张表。
 - **审核**按每格书架此刻的摘要，由 `city::library::audit_state` 读账上这个名字的每一行 `skill_audited` 判出；`Stale` 就是「内容改过，请再审一次」。
-- **一次 skill 使用**是一行 `tool_called`，它所在的 run 的 `run_started` 钉住了一件 skill（名字与哈希，`crates/runtime/Spec.lean` §8-11），而这一行是：`describe`，问的就是那个名字（部分记作 `guide`）；或 `read`，路径是那个名字（部分记作 `SKILL.md`）或 `<名字>/<相对路径>`（部分记作那个相对路径）。认的是「这个 run 钉住了这个名字」，不从路径的写法猜：一个恰好与某件 skill 同名的普通文件，在没钉住它的 run 里不是一次使用。使用的内容版本是钉住时的哈希，所以 skill 改过之后，旧的使用仍指向它当时读到的那一版。
+- **一次 skill 使用**是一行 `tool_called`，它所在的 run 的 `run_started` 钉住了一件 skill（名字与哈希，`Sprawling/runtime/Spec.lean` §8-11），而这一行是：`describe`，问的就是那个名字（部分记作 `guide`）；或 `read`，路径是那个名字（部分记作 `SKILL.md`）或 `<名字>/<相对路径>`（部分记作那个相对路径）。认的是「这个 run 钉住了这个名字」，不从路径的写法猜：一个恰好与某件 skill 同名的普通文件，在没钉住它的 run 里不是一次使用。使用的内容版本是钉住时的哈希，所以 skill 改过之后，旧的使用仍指向它当时读到的那一版。
 - **一次 MCP 使用**是一行 `tool_called`，它记下的 `effect` 是 `Connector { label }`：服务器就是那个 `label`，工具是行上的名字去掉 `<label>_` 前缀。这个 `effect` 是 `agent_protocols::mcp::tools` 注册工具时写下、随行进账本的，所以它说的是调用那一刻的服务器，配置改过、服务器删掉之后仍然对，答问也不必握手。`call` 一行指名的工具按第一个 `_` 拆：`kernel::ServerLabel` 只收小写字母与数字，服务器名里没有 `_`；拆出的头是已知的服务器名（账上见过的与此刻配置的）才归属，因为城自己的工具名里也有 `_`。头不是已知服务器名的，归在 `server: None` 下，页面写作「已移除」并给出完整工具名（accounting D49）。
 - **结果**也算：每次使用带上配对的 `tool_result` 是否成功；没有配对行（run 被杀）记作未知。
 - **按天数**：按信封时刻的 UTC 日历日分桶，`day` 写作 `YYYY-MM-DD`；导出带每一行的毫秒时刻，要按本地时区重新分桶的分析自己做。
@@ -518,7 +518,7 @@ pub struct ShellCalls {
 }
 ```
 
-**决定**：`Query::Shells` 答整本账本上每个 shell 解释器的读数。折叠是 `runtime::ShellTally`（`crates/runtime/spec/Tools/Exec.lean` D30），线上的答面与 `sprawling view --shells` 的每一行同形：同一份折叠，两种写法。读面是 accounting 的使用折叠（`views::usage::Usage`）：它本来就在快照放开之后从头读一遍账本、看每一条 `tool_result`，多交一份给 `ShellTally`，不另读一遍。账本读不了时答 `Unavailable` 并带原因（D47）。页面把这张表画在工具（MCP）页的使用表旁边，类名按 `lang.json` 措辞，认不得的类原样写出。
+**决定**：`Query::Shells` 答整本账本上每个 shell 解释器的读数。折叠是 `runtime::ShellTally`（`Sprawling/runtime/spec/Tools/Exec.lean` D30），线上的答面与 `sprawling view --shells` 的每一行同形：同一份折叠，两种写法。读面是 accounting 的使用折叠（`views::usage::Usage`）：它本来就在快照放开之后从头读一遍账本、看每一条 `tool_result`，多交一份给 `ShellTally`，不另读一遍。账本读不了时答 `Unavailable` 并带原因（D47）。页面把这张表画在工具（MCP）页的使用表旁边，类名按 `lang.json` 措辞，认不得的类原样写出。
 
 **理由**：pwsh 7 是否该成为默认（runtime D30）要看这份读数；只有命令行能读时，用浏览器的 User 看不到它。
 
