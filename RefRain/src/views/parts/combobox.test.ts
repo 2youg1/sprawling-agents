@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The combobox's wiring, without a look: the key table checked against
-// the properties `client/spec/Views/Parts/Combobox.lean` proves, over
+// the properties `RefRain/spec/Views/Parts/Combobox.lean` proves, over
 // every cursor and row count in a small range, and the value a look is
 // given checked for what a screen reader is told - which row is the
 // value, which is the cursor, what the search box names. The model

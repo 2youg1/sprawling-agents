@@ -6,7 +6,7 @@
 /-!
 # link：人关掉的城，链路停下
 
-规定 `client/src/core/link.ts` 的 `advance` 在关闭这件事上的那一部分（`client/Spec.lean` §4-57c、D98）：`closing { mode }` 记下人用 `/quit` 要过的关闭，此后 socket 一断，链路进 `closed`，不走阶梯；只有人的 `retry` 让它重新打开，并忘掉这次关闭。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`link.test.ts` 的「a city the person closed」一组对每一种关闭方式、把每一种事件喂给 `closed` 的链路，判它与这里读出同样的答案。
+规定 `RefRain/src/core/link.ts` 的 `advance` 在关闭这件事上的那一部分（`RefRain/Spec.lean` §4-57c、D98）：`closing { mode }` 记下人用 `/quit` 要过的关闭，此后 socket 一断，链路进 `closed`，不走阶梯；只有人的 `retry` 让它重新打开，并忘掉这次关闭。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`link.test.ts` 的「a city the person closed」一组对每一种关闭方式、把每一种事件喂给 `closed` 的链路，判它与这里读出同样的答案。
 
 模型只留判定关闭要用的东西：链路的七个阶段、链路记没记着关闭，与它收到的事件里的七类（`received` 拆成问候与其余的帧两类，`closed` 记作 `dropped`；读不出的帧与关闭无关，不在模型里）。
 

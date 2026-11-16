@@ -1,19 +1,5 @@
-<!-- This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0. If a copy of the MPL was not distributed with this
-file, You can obtain one at https://mozilla.org/MPL/2.0/.
-Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- How one tool call's line is drawn: `kind  subject  time  result` on a
-four-column grid (client/Spec.lean §4-44), the whole line one button. The
-line the right side holds is raised and carries the accent bar on its
-left; any other line takes the row's wash under the pointer. The time
-cell is at least nine characters and grows past that rather than spilling
-over the subject, which truncates. A failure's reason stands at the end
-of the subject's cell, against the time, rather than in the result cell:
-each line is a grid of its own, so a reason in the last column would
-widen it on that line alone and push its time out of the column the
-other lines keep. The reason gives way before the subject's first eight
-characters do, and the whole of it is in the hint. -->
+
 <script lang="ts">
   import { Kbd } from "../parts/kbd.svelte";
   import Tip from "../parts/tip.svelte";

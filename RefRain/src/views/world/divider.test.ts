@@ -5,7 +5,7 @@
 
 // A workbench divider and the head of the world's sheet as their looks
 // receive them: the APG Window Splitter and Tabs key tables of
-// client/spec/Views/Workspace.lean §7-11, and the `aria-*` values their
+// RefRain/spec/Views/Workspace.lean §7-11, and the `aria-*` values their
 // bags carry. The clamping of a width is `core/workbench.ts`'s, judged
 // by its own test.
 

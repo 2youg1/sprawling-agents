@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The card's chords against client/spec/Views/Parts/Decide.lean: a
+// The card's chords against RefRain/spec/Views/Parts/Decide.lean: a
 // chord answers only what the card offers and only while it can be
 // given (property 4), over every card a caller can hand in - each of the
 // three answers absent, offered, or offered with a reason it cannot be

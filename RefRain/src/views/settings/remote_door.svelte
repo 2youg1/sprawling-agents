@@ -4,8 +4,8 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The door controls of the remote group (client/Spec.lean §4-57, the
-  // model in client/spec/Views/Door.lean): open the door for a chosen
+  // The door controls of the remote group (RefRain/Spec.lean §4-57, the
+  // model in RefRain/spec/Views/Door.lean): open the door for a chosen
   // time, close it, replace the city key, and the code input the city's
   // answer opens. `step` in `remote_door.ts` decides every move; this
   // component sends what it says to send, feeds it the city's answers

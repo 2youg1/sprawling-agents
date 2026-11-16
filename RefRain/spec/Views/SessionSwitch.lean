@@ -6,9 +6,9 @@
 /-!
 # session switcher：一棵会话树上的键盘契约
 
-规定 `client/src/views/world/switcher.ts` 的 `answer`：zen 切换器的上下键只在可见行内移动，左右键只折叠或展开，Enter 才打开行，输入法组字中的键不改变状态。树的父子关系、默认折叠与环防护由 `core/session_tree.ts` 的判定与 `session_tree.test.ts` 承担；本模型只证明收键状态机。
+规定 `RefRain/src/views/world/switcher.ts` 的 `answer`：zen 切换器的上下键只在可见行内移动，左右键只折叠或展开，Enter 才打开行，输入法组字中的键不改变状态。树的父子关系、默认折叠与环防护由 `core/session_tree.ts` 的判定与 `session_tree.test.ts` 承担；本模型只证明收键状态机。
 
-打开之后仍是 `client/spec/Views/Talk/Branching.lean` 的「先分支、再前往」，这里不复制那条规则。
+打开之后仍是 `RefRain/spec/Views/Talk/Branching.lean` 的「先分支、再前往」，这里不复制那条规则。
 -/
 
 namespace Client.Views.SessionSwitch

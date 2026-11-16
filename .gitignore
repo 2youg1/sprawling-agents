@@ -18,7 +18,7 @@
 **/zig-out/
 # svelte-check's generated transpiled project (editor tooling writes it);
 # it is build output, and ESLint's flat config lints
-# dot directories unless they are ignored (client/eslint.config.ts).
+# dot directories unless they are ignored (RefRain/eslint.config.ts).
 .svelte-check/
 
 # Working records never ship. To a contributor and to a model they are

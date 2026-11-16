@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The two geometry rules of a layer, checked against the properties
-// `client/spec/Views/Parts/Popover.lean` proves for them, over every
+// `RefRain/spec/Views/Parts/Popover.lean` proves for them, over every
 // input in a small grid rather than over a few picked cases: the proofs
 // quantify over all inputs, and an implementation that drifted on one
 // corner would pass any short list of examples that missed it.

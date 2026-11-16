@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The properties this module must hold are proved in `client/spec/Views/Workspace.lean`
-// (`stepMail`, client D60).
-//
-// The mailbox is an ordinary layer under the three edge keys rather than
-// a popover, so the platform no longer decides what closes it and where
-// the focus goes: this step does. `mailbox.svelte` feeds it the key and
-// The mailbox key (`toggle`), Escape, a press outside the column (the other two
-// edge keys are outside), the focus entering the column, and a followed
-// row; it reads back whether the column is shown and whether the focus
-// belongs on the key.
 
 export type MailFocus = "key" | "inside" | "elsewhere";
 
@@ -23,8 +13,7 @@ export interface Mail {
 
 export type MailInput = "toggle" | "escape" | "outside" | "enter" | "follow";
 
-// Putting the column away: a focus inside it goes back to the key, and a
-// focus anywhere else stays where it is.
+
 function stow(mail: Mail): Mail {
   return { shown: false, focus: mail.focus === "inside" ? "key" : mail.focus };
 }
@@ -43,12 +32,7 @@ export function stepMail(mail: Mail, input: MailInput): Mail {
   }
 }
 
-// A letter open on the right side (client/spec/Views/Workspace.lean
-// `stepLetter`, client D73). The right side is outside the column, so the
-// mailbox stows while a letter is open; closing the letter brings the
-// mailbox back with the focus on the row that opened it. A row is named
-// by its card's id, because the column mounts new elements when it
-// comes back.
+
 export interface LetterSide<Row> {
   readonly mail: Mail;
   readonly opener: Row | null;

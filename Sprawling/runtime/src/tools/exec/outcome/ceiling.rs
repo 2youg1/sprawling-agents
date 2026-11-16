@@ -135,7 +135,7 @@ mod tests {
     use crate::backlog::{Exit, Finished};
 
     /// The client reads `memory_ceiling` under these spellings
-    /// (`client/src/views/monitor/trace.ts`), from a settled result and
+    /// (`RefRain/src/views/monitor/trace.ts`), from a settled result and
     /// from each background row alike.
     #[test]
     fn a_ceiling_is_written_under_one_spelling_in_both_places() {

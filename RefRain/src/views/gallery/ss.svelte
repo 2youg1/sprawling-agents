@@ -5,7 +5,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // The sessions pane with a row per session (client/Spec.lean §7K), in a
+  // The sessions pane with a row per session (RefRain/Spec.lean §7K), in a
   // made-up city of three buildings: the Mayor's current session pinned
   // by being current, an earlier session of `lab/room1` pinned by its tag,
   // tags on four sessions, and the pane filtered by one of them; the row

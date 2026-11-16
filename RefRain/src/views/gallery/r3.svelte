@@ -1,26 +1,13 @@
-<!-- This Source Code Form is subject to the terms of the Mozilla Public
-     License, v. 2.0. If a copy of the MPL was not distributed with this
-     file, You can obtain one at https://mozilla.org/MPL/2.0/.
-     Copyright (c) 2026 2youg1 and the sprawling contributors -->
+
 
 <script lang="ts" module>
-  // The remote group in each standing it can take (client/Spec.lean §4-57):
-  // the door explained on the city's own machine, an invitation that
-  // does not read, a browser lacking a curve, an invitation the city
-  // answered with someone else's key, the seed shown once, and a paired
-  // device whose door was just locked. Each standing is drawn with one
-  // of the vault's lifetimes, so the restart step shows every wording:
-  // before the doctor answered, across restarts, until reboot, and in
-  // the city's memory only. Drawn through the group's own
-  // body, with the presses going nowhere; the dialog that confirms a
-  // forget is `parts/dialog.svelte`'s, drawn in the parts section. The
-  // door controls are drawn once at each width, at rest.
-
+  
+  
   import type { Device } from "../../core/remote/device";
   import type { Standing } from "../settings/remote";
   import type { DoctorCustodyLifetime } from "../../wire";
 
-  // The lifetime each standing is drawn with, in the order of `standings`.
+  
   const KEEPS: readonly (DoctorCustodyLifetime | null)[] = [
     null,
     "until_reboot",

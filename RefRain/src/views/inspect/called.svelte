@@ -6,10 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // One call in full, drawn by the view its reading names (client/Spec.lean
-  // §4-45): the patch it made, the terminal it printed to, the file it read
-  // from, or the picture it took. `reading.ts` decides which; this file
-  // only routes.
+  
+  
 </script>
 
 <script lang="ts">

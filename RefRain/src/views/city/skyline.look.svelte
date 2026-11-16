@@ -1,47 +1,17 @@
-<!-- This Source Code Form is subject to the terms of the Mozilla Public
-     License, v. 2.0. If a copy of the MPL was not distributed with this
-     file, You can obtain one at https://mozilla.org/MPL/2.0/.
-     Copyright (c) 2026 2youg1 and the sprawling contributors -->
+
 
 <script lang="ts">
-  // How the city is drawn as a skyline at night, and nothing else: one
-  // tower per building along one avenue, City Hall at its centre under
-  // a dome, a window per run that lights while the run is going, a
-  // figure at the door for each run still moving, a flag on the roof
-  // where a pursuit stands, a lamp by the door where something is
-  // blocked. Every tower carries its name and how far its plan has got;
-  // what the glyphs mean is the legend's job, beside the drawing. Every
-  // place, word and tower link arrives in `SkylineLook` (`./skyline.ts`),
-  // and each tower's wire bag is spread unchanged on its group.
-  //
-  // **This file is the outermost drawing component, so every id a
-  // gradient needs is declared once in the `defs` below and referenced
-  // by name** (client/Spec.lean §4-12). Nothing else in the drawing
-  // spells `glow` or `ground` a second time.
-  //
-  // What changes under the hand or with a run arrives and leaves on the
-  // theme's two curves (docs/frontend-method.md §4-43): a tower lights
-  // under the pointer or the focus on `arrive` and settles back on
-  // `leave`, a window lights on `arrive` and goes dark on `leave`, and a
-  // glow fades in behind a tower whose runs start and out when they
-  // stop, instead of appearing whole.
-  //
-  // The drawing is a fixed box with a fixed ratio: a width read from
-  // the content and a height read from that width let the scrollbar
-  // appear, take width away, shorten the drawing, remove the scrollbar
-  // and start again. Nothing here says the city is stopped: the shell's
-  // banner says it once, in words.
+  
+  
   import Mark from "./marks.svelte";
   import type { Pane, SkylineLook } from "./skyline";
 
   const look: SkylineLook = $props();
 
-  // The depth of the plinth a tower stands on, under the ground line.
+  
   const PLINTH = 14;
 
-  // Each window's paint, spelled for Tailwind to read out of this file
-  // as text. A window lights on the arrival curve and goes out on the
-  // leaving one, because CSS takes the curve from the state it moves to.
+  
   const PANE: Record<Pane, string> = {
     dark: "fill-drawn-hollow ease-leave",
     ended: "fill-drawn-line ease-leave",

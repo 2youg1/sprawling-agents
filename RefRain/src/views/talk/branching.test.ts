@@ -7,7 +7,7 @@
 // holds the room's new session and not when the frame leaves the page,
 // a refusal stays with the branch that met it, and a second press while
 // one is opening sends nothing. The trace vectors are the ones `#eval`
-// prints in client/spec/Views/Talk/Branching.lean, replayed through
+// prints in RefRain/spec/Views/Talk/Branching.lean, replayed through
 // `keepBranches`; a difference between the model and the code turns
 // the last test red.
 

@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What a skeleton tells a screen reader and how many bars it stands up,
-// against the skeleton row of `client/spec/Views/Parts.lean` §7-1.
 
 import { describe, expect, test } from "bun:test";
 

@@ -6,15 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // The way from one line of the inspector to the person's own editor
-  // (client/Spec.lean §4-39): a link when the line belongs to the worktree's
-  // current text and an editor is chosen, and otherwise the location
-  // written out to copy, so the page never claims an editor opened
-  // something (`core/editor.ts`'s `reachOf`). It is drawn by the
-  // inspector's worded key, `./text_key.look.svelte`.
-
-  // How long the copy receipt holds: long enough to see, short enough
-  // that it never becomes the control's face.
+  
+  
   const RECEIPT_MS = 1200;
 </script>
 
@@ -27,9 +20,9 @@
   import Look from "./text_key.look.svelte";
 
   interface Props {
-    // Relative to the city, as the ledger records it.
+    
     readonly path: string;
-    // One-based.
+    
     readonly line: number;
     readonly shown: Shown;
   }
@@ -43,8 +36,7 @@
 
   let copied = $state(false);
 
-  // The receipt appears only after the write landed, so a press that
-  // quietly failed shows no receipt rather than a lying one.
+  
   function copy(text: string): void {
     void navigator.clipboard.writeText(text).then(() => {
       copied = true;

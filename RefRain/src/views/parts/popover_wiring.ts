@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What a popover decides before anything is drawn - where each key
-// moves the cursor, which ids name its lists and rows - and the whole
-// value its look is given (`PopoverLook`). The key table is
-// `client/spec/Views/Parts.lean` §7-5, modelled as `press` in
-// `client/spec/Views/Parts/Popover.lean`.
-//
-// It sits apart from `./popover`, which keeps the shapes callers hand a
-// popover and re-exports the component beside them: this file is what
-// the component itself reads, and a module the component read could
-// not re-export the component without a cycle.
 
 import type { Snippet } from "svelte";
 import { createAttachmentKey } from "svelte/attachments";
@@ -22,26 +12,23 @@ import type { Key } from "../../core/lang";
 import type { Side } from "./layer";
 import type { PopoverColumn, PopoverRow } from "./popover";
 
-// `content` sizes each list to its rows and `equal` gives every list
-// the same width, both laid side by side: the arrows walk one list and
-// Tab changes it. A caller drawing its own look (`look`) lays the same
-// lists out as it likes and keeps this key table.
+
 export type Layout = "content" | "equal";
 
-// The list the cursor is in and the row it is on.
+
 export interface Place {
   readonly column: number;
   readonly cursor: number;
 }
 
-// What one key does.
+
 export type Pressed =
   | { readonly kind: "move"; readonly to: Place }
   | { readonly kind: "apply" }
   | { readonly kind: "close" }
   | { readonly kind: "pass" };
 
-// A key as the wiring reads it; a `KeyboardEvent` is one.
+
 export interface Keyed {
   readonly key: string;
   readonly shiftKey: boolean;
@@ -50,9 +37,7 @@ export interface Keyed {
 
 const PASS: Pressed = { kind: "pass" };
 
-// The key table. `place` is already clamped to the lists, `rows` is
-// how many rows each list holds. Left and right are left to a caller's
-// caret.
+
 export function pressed(place: Place, key: Keyed, rows: readonly number[]): Pressed {
   const here = rows.at(place.column) ?? 0;
   const walk = (by: number): Pressed =>
@@ -62,8 +47,8 @@ export function pressed(place: Place, key: Keyed, rows: readonly number[]): Pres
           kind: "move",
           to: { column: place.column, cursor: Math.min(here - 1, Math.max(0, place.cursor + by)) },
         };
-  // A turn starts the next list at its top even when there is only one
-  // list to turn to, as the model's `wrap` does.
+  
+  
   const turn = (by: number): Pressed =>
     rows.length === 0
       ? { kind: "move", to: place }
@@ -91,38 +76,35 @@ export function pressed(place: Place, key: Keyed, rows: readonly number[]): Pres
   }
 }
 
-// The ids of one popover's lists and rows, unique within the document
-// so `aria-activedescendant` names one row and not one in every popover
-// that ever opened.
+
 export const listId = (seat: string, column: number): string => `${seat}-c${String(column)}`;
 export const rowId = (seat: string, column: number, index: number): string =>
   `${seat}-r${String(column)}-${String(index)}`;
 
-// The state the seat holds, as the wiring reads it.
+
 export interface PopoverView {
   readonly seat: string;
   readonly layout: Layout;
   readonly columns: readonly PopoverColumn[];
   readonly place: Place;
-  // A caller's text box holds the focus and forwards its keys (bind
-  // mode), so no list takes the focus or names the cursor.
+  
+  
   readonly holder: "list" | "caller";
   readonly side: Side;
-  // The room on that side, in pixels, measured when the layer was first
-  // drawn; `null` before then. A look that can grow past it caps its
-  // height there.
+  
+  
   readonly room: number | null;
-  // The accessible name of the dialog, a lang.json key, as each
-  // column's label is.
+  
+  
   readonly title: Key;
-  // Puts a lang.json key in the person's language.
+  
   readonly say: (key: Key) => string;
 }
 
-// What the seat lends the wiring.
+
 export interface Hands {
-  // Every key the table claimed moves the cursor, even to where it was:
-  // a clamped key still reveals a cursor scrolled out by the wheel.
+  
+  
   readonly place: (to: Place) => void;
   readonly apply: (column: PopoverColumn, row: PopoverRow) => void;
   readonly close: () => void;
@@ -130,9 +112,7 @@ export interface Hands {
   readonly holdList: (column: number) => Attachment<HTMLUListElement>;
 }
 
-// The handler a list and a forwarding text box share: it answers whether
-// the popover used the key, so a text box knows whether to let the
-// character through.
+
 export function keysOf(view: PopoverView, hands: Hands): (key: Keyed) => boolean {
   return (key) => {
     const answer = pressed(
@@ -187,7 +167,7 @@ export interface OptionWire {
 
 export interface RowLook {
   readonly key: string;
-  // The row as the caller gave it, for a caller's own `row` snippet.
+  
   readonly row: PopoverRow;
   readonly chosen: boolean;
   readonly cursor: boolean;
@@ -212,13 +192,13 @@ export interface PopoverLook {
   readonly row: Snippet<[PopoverRow]> | undefined;
 }
 
-// What the caller draws inside the popover's own frame.
+
 export interface Slots {
   readonly header: Snippet | undefined;
   readonly row: Snippet<[PopoverRow]> | undefined;
 }
 
-// The whole value a look draws, wired to `hands`.
+
 export function lookOf(view: PopoverView, hands: Hands, slots: Slots): PopoverLook {
   const keys = keysOf(view, hands);
   const { seat, place } = view;

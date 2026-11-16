@@ -6,9 +6,8 @@
 -->
 
 <script lang="ts">
-  // The building page's looks, each drawn from a value of its own type
-  // with the states its seat hands it, so the roles and boxes each look
-  // draws are read here rather than only inside a whole building page.
+  
+  
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import ArmSelect from "../building/arm_select.look.svelte";
@@ -37,16 +36,16 @@
   import { Address, B3Hash, RunId, ServerLabel } from "../../wire";
   import type { CatalogAnswer, LayerDocument } from "../../wire";
   import Catalog from "../building/catalog.look.svelte";
-  import { catalogLook, draftOf, pressGroup, rowsOf, selectionOf } from "../building/catalog";
+  import { draftOf, pressGroup, rowsOf, selectionOf } from "../building/catalog";
+  import { catalogLook } from "../building/catalog_look";
   import Case from "./case.svelte";
 
   const { lang } = ui();
   const still = (): void => undefined;
   const SHOP = Address.make("shop");
   const VERSION = B3Hash.make("af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262");
-  // One room's prompt documents: the city's City.md replaced by the
-  // building's, a project file withheld, an identity absent, and a note
-  // the building has no place of its own for yet.
+  
+  
   const LAYERS: readonly LayerDocument[] = [
     {
       at: Address.make("City.md"),
@@ -127,10 +126,8 @@
     actionName: (card, action) => actionName(card, action, $lang),
     onAction: still,
   }));
-  // One building's tools after its newest run: the city's own namespace
-  // with a fixed row and an edited one, and a server the building turned
-  // off; the draft moves `plan` into the core and the server back on, so
-  // the meter shows what the save would add.
+  
+  
   function digest(tag: string): B3Hash {
     return B3Hash.make(tag.padStart(64, "0"));
   }

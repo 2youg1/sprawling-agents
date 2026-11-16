@@ -85,7 +85,7 @@ refusal, and the connection stays open.
   `sprawling-accounting` and `xtask` take the frames without a socket and
   `Tools/fuzz` takes them with default features off, while `sprawling` and
   `citysim` name `server` by hand. `schema` derives the JSON Schema of the whole
-  envelope, which `cargo xtask wire-ts` renders into `client/src/wire.ts`; `xtask`
+  envelope, which `cargo xtask wire-ts` renders into `RefRain/src/wire.ts`; `xtask`
   asks for it and the product binary is built without it.
 - **Concurrency.** One task drives one socket, as a `tokio::select!` over the
   peer's frames and the pushes it owes, and a view read that blocks runs on the
@@ -136,7 +136,7 @@ section 16 names the tests that hold what the proofs leave open. Section 19 live
 in `spec/Command/Kind.lean`: it says from which side each verb is reached and
 which class it belongs to, and the `wiring` gate reads it there.
 
-When the wire moves, `cargo xtask wire-ts --write` rewrites `client/src/wire.ts`,
+When the wire moves, `cargo xtask wire-ts --write` rewrites `RefRain/src/wire.ts`,
 which is never edited by hand, and `Tools/adversary/src/Sprawling/Door.lean` and
 `Tools/adversary/src/Sprawling/Regression.lean` change in the same commit,
 because the adversary reads the wire the way a stranger does.

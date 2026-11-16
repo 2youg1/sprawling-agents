@@ -35,13 +35,13 @@
 # before the catch-all `patch-and-minor`, because an update joins the
 # first group it matches.
 #
-# The JavaScript side of the tree is `client/`, whose dependencies bun
-# resolves into `client/bun.lock`. No entry covers it yet: Dependabot's bun
+# The JavaScript side of the tree is `RefRain/`, whose dependencies bun
+# resolves into `RefRain/bun.lock`. No entry covers it yet: Dependabot's bun
 # updater reads lockfile version 1, while bun writes version 2 from 1.4
 # onward, so an entry would fail on every run instead of opening pull
 # requests. It goes in once the updater reads version 2. Until then the
 # runtime dependencies `RUNTIME` in `Tools/xtask/src/npm.rs` lists are
-# held on caret ranges in `client/package.json`, and the npm gate checks
+# held on caret ranges in `RefRain/package.json`, and the npm gate checks
 # that the lockfile agrees with them.
 version: 2
 

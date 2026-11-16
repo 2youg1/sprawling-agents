@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // How the prompts section is drawn, and nothing else (`./prompts.ts`,
-  // client/Spec.lean 4-50, its ninth part): the room it is about, the
+  // RefRain/Spec.lean 4-50, its ninth part): the room it is about, the
   // bytes each slot of the newest run here was sent, when a change takes
   // effect, and one card per document in the order they are sent. A
   // document the next run does not receive is drawn in the faint ink.

@@ -6,10 +6,8 @@
 -->
 
 <script lang="ts">
-  // How the mailbox column is drawn (client/Spec.lean §4-49): a head
-  // one bar tall with the name, the link's word and its recovery, and
-  // under it one scroller holding every section. Beside each of the
-  // first nine entries stands the digit that reaches it.
+  
+  
   import Button from "../parts/button.svelte";
   import type { ColumnLook } from "./column";
 
@@ -39,11 +37,7 @@
 </div>
 
 <style>
-  /* The digit beside each of the first nine entries (client/Spec.lean
-   * §7-11): the column counts every `data-entry` mark in document order,
-   * which is the order `./entries.ts` walks, so the number drawn is the
-   * number a digit reaches. Past nine the slot is empty; a slot outside
-   * the column is never counted and draws nothing. */
+  
   @counter-style mailbox-blank {
     system: cyclic;
     symbols: "";

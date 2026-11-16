@@ -3,17 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The settings panel's groups: what each is called, the line under its
-// heading, and how wide its body grows. One table per fact, read by
-// `setup.svelte`; the order a person meets them in is the settings
-// tree's (`views/settings/tree.ts`), and the set is the address bar's
-// (`core/route.ts`), so a group added there leaves these tables
-// refusing to compile until it has a name.
 
 import type { Key } from "../../core/lang";
 import type { SetupGroup } from "../../core/route";
 
-// What each group is called (client/Spec.lean §4-36).
+
 export const HEADING: Record<SetupGroup, Key> = {
   you: "setup_group_you",
   performance: "setup_group_performance",
@@ -35,8 +29,7 @@ export const HEADING: Record<SetupGroup, Key> = {
   about: "release_title",
 };
 
-// The line under the heading, saying what the group governs - the one
-// kind of sentence this panel is allowed (client/Spec.lean §4-10).
+
 export const HINT: Record<SetupGroup, Key | null> = {
   you: "setup_group_hint_you",
   performance: "setup_group_hint_performance",
@@ -58,10 +51,7 @@ export const HINT: Record<SetupGroup, Key | null> = {
   about: null,
 };
 
-// The one width table. A group of cards takes the whole body and lays
-// its cards in as many measure-wide columns as it holds (`grid-fit`);
-// a group that is one list, one form or one text reads badly stretched
-// and stops at the conversation's width.
+
 export const WIDTH: Record<SetupGroup, string> = {
   you: "",
   performance: "max-w-talk",
@@ -83,5 +73,5 @@ export const WIDTH: Record<SetupGroup, string> = {
   about: "max-w-talk",
 };
 
-// The groups whose answers `core/prefs.ts` keeps (client/Spec.lean §4-29).
+
 export const PREFERRED: readonly SetupGroup[] = ["network", "appearance", "colours", "keys"];

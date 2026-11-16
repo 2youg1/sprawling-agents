@@ -6,13 +6,13 @@
 /-!
 # decide：请决定卡的三个键
 
-规定 `client/src/views/parts/decide.svelte` 的键（`role="group"`，Accel-Shift-Y／E／X），键表在 `client/spec/Views/Workspace.lean` §7-11，卡的种类与答复见 `client/Spec.lean` §7C 与 §4-55。一张卡至多三个答复，各在一个键上；卡上没有的答复、说明了为什么按不动的答复，按键落空；三个答复键都带 accel（`client/Spec.lean` D92），不带 accel 的一下按键——焦点在文本框里也好、停在卡上也好——不是答复，所以误打的一个字母不会替人作决定。
+规定 `RefRain/src/views/parts/decide.svelte` 的键（`role="group"`，Accel-Shift-Y／E／X），键表在 `RefRain/spec/Views/Workspace.lean` §7-11，卡的种类与答复见 `RefRain/Spec.lean` §7C 与 §4-55。一张卡至多三个答复，各在一个键上；卡上没有的答复、说明了为什么按不动的答复，按键落空；三个答复键都带 accel（`RefRain/Spec.lean` D92），不带 accel 的一下按键——焦点在文本框里也好、停在卡上也好——不是答复，所以误打的一个字母不会替人作决定。
 
 性质：
 
 1. **一个门在等人亲自动手时只有「知道了」**（`a_gate_only_takes_no`）：城那边没有可替人发的帧。
 2. **基线过期的提案只能拒绝**（`a_stale_proposal_only_refuses`）。
-3. **不带 accel 的一下按键不是答复**（`a_press_without_the_accelerator_is_no_answer`）；`client/src/core/keys.test.ts` 的「every action but focusing the message box holds the accelerator」判默认表确实如此。
+3. **不带 accel 的一下按键不是答复**（`a_press_without_the_accelerator_is_no_answer`）；`RefRain/src/core/keys.test.ts` 的「every action but focusing the message box holds the accelerator」判默认表确实如此。
 4. **按键落下的答复一定是卡上给出、且按得动的那一个**（`a_key_answers_only_what_the_card_offers`）。
 -/
 

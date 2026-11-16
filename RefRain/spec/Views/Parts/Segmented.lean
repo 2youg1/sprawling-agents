@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import client.spec.Views.Parts
+import RefRain.spec.Views.Parts
 
 /-!
 # segmented：一个 Tab 站，选择跟随焦点
 
-规定 `client/src/views/parts/segmented.ts` 的 `nextStop` 与 `tabStop`（APG Radio Group，roving tabindex），键表在 `client/spec/Views/Parts.lean` §7-4。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`segmented.test.ts` 判实现与这里的定义读出同样的格。
+规定 `RefRain/src/views/parts/segmented.ts` 的 `nextStop` 与 `tabStop`（APG Radio Group，roving tabindex），键表在 `RefRain/spec/Views/Parts.lean` §7-4。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`segmented.test.ts` 判实现与这里的定义读出同样的格。
 
 一格能不能选是一个布尔值：`why` 缺席即能选。选择跟随焦点，所以方向键落在哪一格就选中哪一格，不能选的格必须被跳过。
 

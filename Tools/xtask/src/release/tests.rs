@@ -113,7 +113,7 @@ fn a_document_anchored_outside_the_repository_is_caught_and_shorthand_is_not() {
         "Tools",
         "docs",
         "src",
-        "client",
+        "RefRain",
         "local",
         "target",
     ]

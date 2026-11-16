@@ -292,7 +292,7 @@ nix run .#default --no-update-lock-file -- status
 nix run .#default --no-update-lock-file -- up ./cities/first
 ```
 
-[The flake](../flake.nix) reads the pinned compiler from `rust-toolchain.toml`, Rust dependencies from `Cargo.lock`, client dependencies from `client/bun.lock`, and `flake.lock` fixes the Nix-side builders. Nix fetches the locked dependencies first and then builds inside its network sandbox; the build runs the existing client command and embeds the output, so the result carries the page, the shipped skills, templates and licences. A first build may compile a pile of dependencies first.
+[The flake](../flake.nix) reads the pinned compiler from `rust-toolchain.toml`, Rust dependencies from `Cargo.lock`, client dependencies from `RefRain/bun.lock`, and `flake.lock` fixes the Nix-side builders. Nix fetches the locked dependencies first and then builds inside its network sandbox; the build runs the existing client command and embeds the output, so the result carries the page, the shipped skills, templates and licences. A first build may compile a pile of dependencies first.
 
 The version line comes from the binary. A checkout built without release provenance shows `built from source` — a version number alone identifies no published tag. To update, move to another actual tag or commit and run the commands again. `nix develop` opens a development environment and does not start a city.
 

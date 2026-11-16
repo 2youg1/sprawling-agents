@@ -6,7 +6,7 @@
 // What the control decides before anything is drawn: where a track
 // begins and ends, where an arrow key lands, which cell a keyboard
 // arrives at, and the wire bags a look spreads - the key table and the
-// `aria-*` values of client/Spec.lean §7-4, read off the value the seat
+// `aria-*` values of RefRain/Spec.lean §7-4, read off the value the seat
 // hands any look (client D95). No look is imported here, so a look
 // swapped for another leaves every one of these cases standing. The
 // drawing itself is measured in a real engine by `cargo xtask render`

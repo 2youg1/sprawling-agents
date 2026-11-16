@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The line between the editor and the terminal: the APG Window Splitter
-// row of client/Spec.lean §7-11, read off the value the seat hands any
+// row of RefRain/Spec.lean §7-11, read off the value the seat hands any
 // look (client D95). No look is imported here.
 
 import { describe, expect, test } from "bun:test";

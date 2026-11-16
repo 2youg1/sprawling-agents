@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts">
-  // How RefRain's editor is dressed (client/Spec.lean §7N, D23): the box
+  // How RefRain's editor is dressed (RefRain/Spec.lean §7N, D23): the box
   // a CodeMirror view is mounted into, filling the column it stands in,
   // and the rules that overrule CodeMirror's own base theme so every
   // colour on it is a role of the theme. CodeMirror builds its DOM

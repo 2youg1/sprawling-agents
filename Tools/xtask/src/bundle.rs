@@ -14,7 +14,7 @@ const EMBEDDER: &str = "build.rs";
 
 const DECLARATION: &str = "BUNDLE_DIR";
 
-const RESTATEMENTS: [&str; 2] = ["client/vite.config.ts", "justfile"];
+const RESTATEMENTS: [&str; 2] = ["RefRain/vite.config.ts", "justfile"];
 
 pub(crate) fn stated_path(root: &Path) -> Result<String, XtaskError> {
     let embedder = format!("{PACKAGE}/{EMBEDDER}");

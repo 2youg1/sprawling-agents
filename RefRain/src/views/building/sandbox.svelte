@@ -6,23 +6,8 @@
 -->
 
 <script lang="ts">
-  // What a run in this building may touch: the building's own sandbox,
-  // as one card (client/Spec.lean §4-50, UG; `ConfigureBuilding.sandbox`).
-  //
-  // **Whole, because the city reads it whole.** A layer that speaks
-  // about the sandbox speaks about all of it (`kernel::config::
-  // SandboxLimits`), so the card shows every face and sends every face.
-  // A building with no sandbox of its own runs under the city's; the
-  // card says so and leaves the fuel box empty, because the default fuel
-  // is a kernel constant the wire does not carry and the page will not
-  // copy.
-  //
-  // **The grammar of each line is the wire's.** A mount is an `Address`,
-  // a trusted connector a `ServerLabel`, both decoded through the
-  // generated schemas; what those cannot see - a reserved subtree, a
-  // name the city will not pass through - the city refuses, and the
-  // refusal is a toast. The card calls itself saved only once the
-  // city's answer holds what it sent.
+  
+  
   import { Option, Schema } from "effect";
   import { untrack } from "svelte";
 
@@ -42,10 +27,10 @@
 
   interface Props {
     readonly address: Address;
-    // The building's own sandbox, or `null` when it has none.
+    
     readonly held: SandboxLimits | null;
-    // Whether the city has answered at all; before it has, nothing on
-    // the card is anybody's value yet.
+    
+    
     readonly known: boolean;
   }
 
@@ -60,13 +45,13 @@
   const CONTAINER_FIELDS = ["image", "user", "cpu_millis", "memory_bytes", "pids"] as const;
   type ContainerField = (typeof CONTAINER_FIELDS)[number];
 
-  // The three faces written one entry per line.
+  
   type ListKey = "mounts" | "env" | "trusted";
 
   interface Draft {
     readonly shell: (typeof SHELL)[number];
-    // Carried, not shown: a building chooses pwsh in its CONFIG.toml
-    // (runtime D30), and saving the card must not undo that choice.
+    
+    
     readonly interpreter: Interpreter;
     readonly arm: ArmChoice;
     readonly containerFields: Readonly<Record<ContainerField, string>>;
@@ -97,11 +82,10 @@
 
   let draft = $state<Draft>(draftOf(null));
   let edited = $state(false);
-  // What the last save sent, until the city's answer holds it.
+  
   let sent = $state<string | null>(null);
 
-  // The card follows the city's answer until somebody edits it, and
-  // follows it again once their edit has landed.
+  
   $effect(() => {
     const now = held;
     if (!untrack(() => edited)) draft = draftOf(now);
@@ -114,8 +98,7 @@
       .filter((line) => line !== "");
   }
 
-  // Each list decoded line by line; the first line its schema refuses
-  // is named, so the person knows which one to fix.
+  
   function decoded<T>(
     text: string,
     schema: Schema.Codec<T, string>,
@@ -185,8 +168,7 @@
     edit({ lists: { ...draft.lists, [key]: value } });
   }
 
-  // The three lists in the order the card draws them, each with the
-  // line its schema refused, if any.
+  
   const LISTS = $derived([
     {
       key: "mounts",

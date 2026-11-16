@@ -1,22 +1,8 @@
-<!-- This Source Code Form is subject to the terms of the Mozilla Public
-     License, v. 2.0. If a copy of the MPL was not distributed with this
-     file, You can obtain one at https://mozilla.org/MPL/2.0/.
-     Copyright (c) 2026 2youg1 and the sprawling contributors -->
+
 
 <script lang="ts">
-  // The city page, on the shell's column lines (client/Spec.lean §4-50): the
-  // page header names the city and carries the one control that stops
-  // or releases it; under it one row of figures; then the building
-  // table or the drawing in columns 1-8 of the page, the picked
-  // building beside it in 9-11, and under both the runs board - every
-  // run in the city on the lineage tree, the runs waiting for the person
-  // first. The table opens first because it reads at any width, where
-  // the drawing at a phone's width is a band too thin to read. In
-  // results mode all of it gives way to the runs' outcomes alone.
-  //
-  // The legend is folded behind one control under the drawing
-  // (`city/legend.ts`).
-
+  
+  
   import { QUERIES } from "../core/asking";
   import { readAnswer } from "../core/answered";
   import { say } from "../core/lang";
@@ -43,13 +29,12 @@
   import Showing from "./shared/showing.svelte";
   import WorkspaceNav from "./shared/workspace.svelte";
 
-  // The two ways the page draws the city's buildings, the first the one
-  // it opens on.
+  
   const VIEWS = ["table", "drawing"] as const;
 
   interface Props {
-    // Whether this is the page or a fixture inside one: a document may
-    // have exactly one heading of the page's own rank.
+    
+    
     readonly rank?: "page" | "section" | undefined;
   }
 
@@ -67,8 +52,7 @@
   const read = $derived(readAnswer($answer, (held) => ("city" in held ? held.city : undefined)));
   const city = $derived(read.kind === "held" ? read.value : undefined);
 
-  // The time is sampled when the run table changes shape or a run
-  // changes phase, which is when a bar's right-hand end moves.
+  
   const board = $derived({ runs: boardRuns($belief.runs), now: u.now() });
 
   const halted = $derived(cityIsShut($belief.halted));

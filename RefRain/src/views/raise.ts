@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the raise page decides without the page (client/Spec.lean 4-50b):
-// what a typed address would become, and which templates a person is
-// offered. Whether the address names a folder already there is the
-// city's answer (`BuildingProgress.adoptable`), read here and never
-// worked out again from a listing of the disk.
 
 import { Option, Schema } from "effect";
 
@@ -17,8 +12,7 @@ import type { Template } from "../core/commands";
 import { Address } from "../wire";
 import type { BuildingProgress } from "../wire";
 
-// What raising the typed address would do: nothing yet, nothing at all
-// with the reason, or a building laid out empty or drawn over a folder.
+
 export type Raising =
   | { readonly kind: "blank" }
   | { readonly kind: "refused"; readonly why: Key }
@@ -41,27 +35,21 @@ export function raisingOf(typed: string, buildings: readonly BuildingProgress[])
   }
 }
 
-// The templates a person raises a building from. City Hall's is the
-// city's own and is raised with the city, so it is not offered.
+
 export const OFFERED: readonly Exclude<Template, "hall">[] = ["minimal", "confidential"];
 
-// The folders waiting to be adopted.
+
 export function waiting(buildings: readonly BuildingProgress[]): readonly Address[] {
   return buildings.filter((each) => each.adoptable).map((each) => each.addr);
 }
 
-// The path the import box offers the city, or nothing when it is empty.
-// The city reads it with its own rule; this only decides whether a frame
-// carries a source at all.
+
 export function sourceOf(written: string): string | null {
   const text = written.trim();
   return text === "" ? null : text;
 }
 
-// What the import box holds that no machine could read as a folder.
-// Only the shapes the frame's own reader refuses: whether the folder is
-// there, inside the city, or linked is the city's to see, because only it
-// can look.
+
 export function sourceRefusal(written: string): Key | null {
   const text = written.trim();
   if (text === "") return null;
@@ -69,8 +57,7 @@ export function sourceRefusal(written: string): Key | null {
   return absolute ? null : "raise_source_relative";
 }
 
-// The waiting folders the page offers to fill in: the one already in the
-// box is not offered again, since the box says it.
+
 export function fillable(
   buildings: readonly BuildingProgress[],
   typed: string,

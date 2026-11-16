@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The person's preferences as the city keeps them, in the person's own
-// `~/.sprawling/config.toml`: the one place this client's record and
-// the wire's record meet, and the one join between the door in
-// `core/prefs.ts` and the connection.
-//
-// **The city wins, and only a live link tells it.** Every answer the
-// city gives replaces what this browser held; a change made while the
-// link is down stays in this browser, which `keeper` already says, and
-// the next answer after the link returns is the one that counts.
 
 import { get } from "svelte/store";
 
@@ -23,19 +14,13 @@ import { themeOf } from "./theme_override";
 import type { Connection } from "./socket";
 import type { Appearance as WireAppearance, PreferencesAnswer } from "../wire";
 
-// Who keeps these preferences between one visit and the next.
-//
-// Two answers, and a person is entitled to both of them: somebody who
-// picks a face for the page needs to know whether the choice follows
-// them to their next browser or dies with this profile's data.
+
 export type Keeper =
-  // This browser and nothing else. Clearing its data loses them, and
-  // another browser reaching the same city starts from the postures
-  // this client ships with.
+  
+  
   | "browser"
-  // The city, in the person's own `~/.sprawling/config.toml`. This
-  // browser still caches the record, and the cache never outranks the
-  // answer: every answer that arrives replaces it whole.
+  
+  
   | "city";
 
 export function keepWithCity(door: PreferenceDoor, conn: Connection): void {
@@ -48,11 +33,7 @@ export function keepWithCity(door: PreferenceDoor, conn: Connection): void {
   });
 }
 
-// The city's answer taken over what this browser held. A field the
-// answer leaves out, or states as never chosen, is one the person never
-// settled with the city, so the browser's value stands for it. The
-// tier is this tab's alone (client/Spec.lean D47), so the answer's is
-// not read.
+
 export function adopted(held: Preferences, answer: PreferencesAnswer): Preferences {
   return {
     ...held,
@@ -90,11 +71,7 @@ export function appearanceOnWire(next: Appearance): WireAppearance {
   };
 }
 
-// The reading face, glass and the opacity are absent from an answer by
-// a city that keeps none of them, and this browser's values stand. The
-// city keeps the opacity as a bare percent and the slider's domain is
-// this client's (`BLEND_PERCENT`), so a stated figure outside it - a
-// file edited by hand - reads as no opacity, as a stored row would.
+
 function appearanceOfCity(stated: WireAppearance, held: Appearance): Appearance {
   return {
     lighting: stated.lighting,
@@ -103,10 +80,8 @@ function appearanceOfCity(stated: WireAppearance, held: Appearance): Appearance 
     sansStack: stated.sans_stack,
     monoStack: stated.mono_stack,
     reading: stated.reading ?? held.reading,
-    // The chain and the features are the person's, and an answer that
-    // does not carry them is an older city rather than a new blank: the
-    // browser's stand, as they do for glass and the opacity. A name the
-    // page cannot write is dropped here, and one past the two slots too.
+    
+    
     fallbacks:
       stated.fallbacks === undefined
         ? held.fallbacks

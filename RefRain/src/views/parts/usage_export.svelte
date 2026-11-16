@@ -6,18 +6,15 @@
 -->
 
 <script lang="ts">
-  // The seat of the export buttons (`./usage_export`): it asks the city
-  // on each press, hands a fresh answer to the browser's download, and
-  // draws whatever `./usage_export.look.svelte` is. A wait still open
-  // when the panel goes away is dropped, so no download starts from a
-  // page the person already left.
+  
+  
   import { onDestroy } from "svelte";
   import { get } from "svelte/store";
 
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { ExportFormat, Query, UsageKind } from "../../wire";
-  import { saveFile } from "../refrain/saved_file";
+  import { saveFile } from "../editor/saved_file";
   import { exportedOf, FORMATS, TYPES } from "./usage_export";
   import type { Exported } from "./usage_export";
   import Look from "./usage_export.look.svelte";
@@ -31,7 +28,7 @@
   const lang = u.lang;
   let waiting = $state<ExportFormat | null>(null);
   let missed = $state<Exported | null>(null);
-  // The open wait of each format; the button's busy state allows one.
+  
   const waits: Record<ExportFormat, (() => void) | undefined> = {
     jsonl: undefined,
     csv: undefined,
@@ -45,8 +42,8 @@
     waiting = format;
     missed = null;
     const held = u.conn.asking.ask(query);
-    // The answer a press before this one left: the press is answered by
-    // the next one to arrive, never by that.
+    
+    
     const before = get(held);
     u.conn.asking.refresh(query);
     const off = held.subscribe((answer) => {

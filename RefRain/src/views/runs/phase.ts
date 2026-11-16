@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// How a run's phase looks wherever a time bar draws it - the runs
-// board and the city's building table - so the two bars are read with
-// one legend.
 
 import type { Doing } from "../../core/doing";
 import { fill, say } from "../../core/lang";
@@ -26,8 +23,7 @@ export const PHASES: readonly Phase[] = [
   "capped",
 ];
 
-// The mark a run's row carries: each ending its own drawing, because a
-// forced-colours mode repaints the ink and leaves only the shape.
+
 export const PHASE_MARK: Record<Phase, { readonly glyph: GlyphName; readonly weight: Weight }> = {
   model: { glyph: "pulse", weight: "live" },
   tool: { glyph: "tool", weight: "live" },
@@ -61,10 +57,7 @@ export const PHASE_WORD: Record<Phase, Key> = {
   capped: "runs_phase_capped",
 };
 
-// A run's phase in words where a row has room for one phrase: the
-// legend's word, except for a run waiting for a reply, which names the
-// room it waits on and the time left before its deadline on the
-// caller's clock (client/Spec.lean D88).
+
 export function phaseSaid(lang: Lang, doing: Doing, now: number): string {
   if (doing.kind !== "awaiting_reply") return say(lang, PHASE_WORD[phaseOf(doing)]);
   const left = doing.wait.until - now;

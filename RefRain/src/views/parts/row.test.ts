@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The walk a list of rows takes, replayed against the properties of
-// `client/spec/Views/Parts/Row.lean`, and the two bags a row's look is
+// `RefRain/spec/Views/Parts/Row.lean`, and the two bags a row's look is
 // handed. Where a row landed on the page is measured by
 // `cargo xtask render` on the gallery fixtures.
 

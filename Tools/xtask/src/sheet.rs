@@ -86,7 +86,7 @@ mod tests {
 <p></p>
 <style>.b {}</style>
 ";
-        let read: Vec<(usize, Reading)> = lines("client/src/views/a.svelte", text)
+        let read: Vec<(usize, Reading)> = lines("RefRain/src/views/a.svelte", text)
             .map(|line| (line.number, line.reading))
             .collect();
         assert_eq!(
@@ -103,8 +103,8 @@ mod tests {
                 (9, Reading::Sheet),
             ]
         );
-        assert!(lines("client/src/x.css", "a\nb").all(|line| line.reading == Reading::Sheet));
-        assert!(lines("client/src/x.ts", "<style>\na").all(|line| line.reading == Reading::Code));
+        assert!(lines("RefRain/src/x.css", "a\nb").all(|line| line.reading == Reading::Sheet));
+        assert!(lines("RefRain/src/x.ts", "<style>\na").all(|line| line.reading == Reading::Code));
     }
 
     #[test]

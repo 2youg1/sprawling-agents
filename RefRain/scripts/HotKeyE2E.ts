@@ -4,30 +4,26 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // Keyboard-only acceptance of the client's main flows, on the same
-// throwaway city and stand-in provider as client/scripts/walk.ts.
+// throwaway city and stand-in provider as RefRain/scripts/walk.ts.
 //
 //   just build-web
 //   cargo build --package sprawling --bin sprawling --package citysim --bin provider --locked
-//   cd client && bun scripts/HotKeyE2E.ts
+//   cd RefRain && bun scripts/HotKeyE2E.ts
 //
 // No product action below calls `focus()` or `click()`: pairing, forms,
 // disclosures, comboboxes, navigation and commands all arrive through
 // DevTools key events. JavaScript only reads the resulting DOM, navigates
 // to visual fixtures, freezes animation frames and takes screenshots.
-
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-
 import { ORIGIN, phrase, prepareCity } from "./walk";
 import { FIGURED } from "../src/views/gallery/served";
 import type { DevTools } from "./walk_devtools";
-
 const ROOT = join(import.meta.dir, "..", "..");
 const OUT = join(ROOT, "target", "hotkey-e2e");
 const TASK = "Keyboard acceptance: describe the first ledger round.";
 const FRAME = { name: "1440x1000", width: 1440, height: 1000, dpr: 1, touch: false };
 const MODIFIER = { ctrl: 2, shift: 8 };
-
 interface Active {
   readonly tag: string;
   readonly text: string;
@@ -36,37 +32,29 @@ interface Active {
   readonly labels: string;
   readonly type: string;
 }
-
 interface Check {
   readonly name: string;
   readonly evidence: string;
 }
-
 const checks: Check[] = [];
-
 function fail(why: string): never {
   console.error(`HotKeyE2E: ${why}`);
   process.exit(1);
 }
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
-
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
-
 function record(name: string, evidence: string): void {
   checks.push({ name, evidence });
   console.log(`HotKeyE2E: ${name} — ${evidence}`);
 }
-
 async function evaluate(tools: DevTools, expression: string): Promise<unknown> {
   const answer = await tools.run(expression);
   return answer.ok ? answer.value : fail(answer.why);
 }
-
 async function active(tools: DevTools): Promise<Active | null> {
   const value = await evaluate(
     tools,
@@ -93,16 +81,13 @@ async function active(tools: DevTools): Promise<Active | null> {
     type: text(value.type),
   };
 }
-
 function said(node: Active): string {
   if (node.tag === "BODY") return "";
   return [node.aria, node.placeholder, node.labels, node.text].join(" ").toLocaleLowerCase();
 }
-
 async function key(tools: DevTools, name: string, code: string, virtual: number): Promise<void> {
   await tools.raw(name, code, virtual);
 }
-
 async function tabUntil(
   tools: DevTools,
   wanted: string | ((node: Active) => boolean),
@@ -120,7 +105,6 @@ async function tabUntil(
     `Tab never reached ${typeof wanted === "string" ? wanted : "the requested control"}; last focus: ${JSON.stringify(last)}`,
   );
 }
-
 async function downUntil(tools: DevTools, wanted: string, limit = 30): Promise<Active> {
   for (let at = 0; at < limit; at += 1) {
     const node = await active(tools);
@@ -129,12 +113,10 @@ async function downUntil(tools: DevTools, wanted: string, limit = 30): Promise<A
   }
   return fail(`ArrowDown never reached ${wanted}`);
 }
-
 async function replace(tools: DevTools, words: string): Promise<void> {
   await tools.raw("a", "KeyA", 65, MODIFIER.ctrl);
   await tools.type(words);
 }
-
 async function waitFor(
   tools: DevTools,
   expression: string,
@@ -148,7 +130,6 @@ async function waitFor(
   const body = await evaluate(tools, "document.body.innerText.slice(0, 1200)");
   return fail(`timed out waiting for ${description}; page begins: ${JSON.stringify(body)}`);
 }
-
 async function waitText(tools: DevTools, words: string, present = true): Promise<void> {
   await waitFor(
     tools,
@@ -156,18 +137,15 @@ async function waitText(tools: DevTools, words: string, present = true): Promise
     `${present ? "present" : "absent"}: ${words}`,
   );
 }
-
 async function waitHash(tools: DevTools, wanted: string): Promise<void> {
   await waitFor(tools, `location.hash.includes(${JSON.stringify(wanted)})`, `hash ${wanted}`);
 }
-
 async function shot(tools: DevTools, name: string): Promise<void> {
   await tools.settle(350);
   const kept = await tools.keep(join(OUT, name));
   if (!kept.ok) return fail(`screenshot ${name}: ${kept.why}`);
   await tools.settle(50);
 }
-
 async function hotkey(
   tools: DevTools,
   name: string,
@@ -177,7 +155,6 @@ async function hotkey(
 ): Promise<void> {
   await tools.raw(name, code, virtual, MODIFIER.ctrl + (shift ? MODIFIER.shift : 0));
 }
-
 async function pairByKeyboard(tools: DevTools, code: string): Promise<void> {
   await tools.frame(FRAME, "dark");
   await tools.load(`${ORIGIN}/`, 500);
@@ -195,14 +172,12 @@ async function pairByKeyboard(tools: DevTools, code: string): Promise<void> {
   await key(tools, " ", "Space", 32);
   await waitText(tools, phrase("pair_title"), false);
 }
-
 async function focusComposer(tools: DevTools): Promise<void> {
   const node = await active(tools);
   if (node?.tag === "TEXTAREA") return;
   await key(tools, "/", "Slash", 191);
   await tabUntil(tools, (current) => current.tag === "TEXTAREA", 10);
 }
-
 async function firstHours(): Promise<void> {
   const prepared = await prepareCity(undefined, false, pairByKeyboard);
   const { tools } = prepared;
@@ -224,7 +199,6 @@ async function firstHours(): Promise<void> {
   );
   record("#229 disclosure", "the required model editor is open after pairing");
   await shot(tools, "01-guide-model-editor.png");
-
   await tabUntil(tools, "models ·");
   await tabUntil(tools, phrase("setup_models_save"));
   record("#229 save tab stop", "Tab reaches save models from the model summary");
@@ -250,7 +224,6 @@ async function firstHours(): Promise<void> {
     "the guide unlocks start the conversation",
   );
   record("#229 role and save", "the keyboard chooses main · thinks and saves it");
-
   await tabUntil(tools, phrase("guide_start"));
   await key(tools, " ", "Space", 32);
   await waitFor(tools, `document.querySelector("textarea") !== null`, "the conversation composer");
@@ -259,7 +232,6 @@ async function firstHours(): Promise<void> {
   await key(tools, "Enter", "Enter", 13);
   await waitText(tools, "I created");
   record("dispatch", "the first task is sent and its reply is drawn");
-
   await focusComposer(tools);
   await tools.type("/new");
   await key(tools, "Enter", "Enter", 13);
@@ -271,7 +243,6 @@ async function firstHours(): Promise<void> {
   );
   record("/new empty scene", "the old thread and its fold are unmounted after the city accepts");
   await shot(tools, "02-new-empty-session.png");
-
   await hotkey(tools, "U", "KeyU", 85, true);
   await waitFor(
     tools,
@@ -287,11 +258,9 @@ async function firstHours(): Promise<void> {
   await shot(tools, "03-session-reopened.png");
   await prepared.close();
 }
-
 async function settledFlows(): Promise<DevTools> {
   const prepared = await prepareCity(undefined, true, pairByKeyboard);
   const { tools } = prepared;
-
   await hotkey(tools, "/", "Slash", 191);
   await waitFor(tools, `document.querySelector("dialog[open]") !== null`, "the command palette");
   await tabUntil(tools, (node) => node.tag === "INPUT");
@@ -310,7 +279,6 @@ async function settledFlows(): Promise<DevTools> {
   await waitHash(tools, "atlas/review");
   await waitText(tools, "Review the building");
   record("palette navigation", "Accel-/ and /cd open the requested room");
-
   await hotkey(tools, "/", "Slash", 191);
   await tabUntil(tools, (node) => node.tag === "INPUT");
   await tools.type("/diff");
@@ -318,7 +286,6 @@ async function settledFlows(): Promise<DevTools> {
   await waitHash(tools, "#/run/");
   await waitText(tools, phrase("run_changes"));
   record("run page", "the keyboard opens the current run's changes lens");
-
   await tabUntil(tools, "settings");
   await evaluate(tools, "window.settingsOpener = document.activeElement; undefined");
   await key(tools, "Enter", "Enter", 13);
@@ -341,7 +308,6 @@ async function settledFlows(): Promise<DevTools> {
     "settings closes and restores opener focus",
   );
   record("settings keyboard", "tree keys work, settings stays folded, Escape returns focus");
-
   await hotkey(tools, "\\", "Backslash", 220);
   await waitFor(
     tools,
@@ -361,7 +327,6 @@ async function settledFlows(): Promise<DevTools> {
     "zen tier",
   );
   record("tier cycling", "Accel-\\ visits blend, panorama and returns to zen");
-
   await tabUntil(tools, "mailbox");
   await key(tools, " ", "Space", 32);
   await waitFor(
@@ -376,10 +341,8 @@ async function settledFlows(): Promise<DevTools> {
     "Escape closes the mailbox",
   );
   record("mailbox keyboard", "the mailbox opens and Escape closes it");
-
   return tools;
 }
-
 async function showCase(tools: DevTools, label: string): Promise<void> {
   await waitFor(
     tools,
@@ -402,7 +365,6 @@ async function showCase(tools: DevTools, label: string): Promise<void> {
   );
   await tools.settle(100);
 }
-
 async function thinkingFrame(tools: DevTools, at: number, name: string): Promise<void> {
   const found = await evaluate(
     tools,
@@ -420,7 +382,6 @@ async function thinkingFrame(tools: DevTools, at: number, name: string): Promise
   await tools.settle(50);
   await shot(tools, name);
 }
-
 async function visuals(tools: DevTools): Promise<void> {
   await evaluate(tools, "location.hash = '/gallery'; undefined");
   await waitText(tools, "gallery");
@@ -474,7 +435,6 @@ async function visuals(tools: DevTools): Promise<void> {
     return fail(`model figure sources overlap: ${JSON.stringify(overlaps)}`);
   record("#230 figure cells", "context and output source text rectangles do not intersect");
   await shot(tools, "04-model-figure-placeholders.png");
-
   await showCase(tools, "conversation · the thinking mark at rest and gathered");
   await thinkingFrame(tools, 0, "05-thinking-rest.png");
   await thinkingFrame(tools, 1600, "06-thinking-gathered.png");
@@ -483,11 +443,9 @@ async function visuals(tools: DevTools): Promise<void> {
   await shot(tools, "07-thinking-reduced-motion.png");
   await evaluate(tools, "document.documentElement.removeAttribute('data-motion'); undefined");
   record("thinking motion", "rest, gathered and reduced-motion frames are captured");
-
   await showCase(tools, "conversation · an empty new session after one round");
   await shot(tools, "08-new-session-gallery.png");
 }
-
 async function main(): Promise<void> {
   mkdirSync(OUT, { recursive: true });
   await firstHours();
@@ -499,5 +457,4 @@ async function main(): Promise<void> {
   );
   process.exit(0);
 }
-
 await main();

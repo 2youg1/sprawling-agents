@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The model picker checked against `client/spec/Views/Picker.lean`: the
+// The model picker checked against `RefRain/spec/Views/Picker.lean`: the
 // window of every list of up to nine entries with every entry pinned,
 // and the room each section keeps over every state an open picker
 // reaches without typing, on cities generated across both orders.

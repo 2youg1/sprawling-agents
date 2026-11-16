@@ -6,21 +6,8 @@
 -->
 
 <script lang="ts">
-  // The plan as rows: what the building set out to do, how deep each
-  // item sits, what it waits for, and where it stands. What the city
-  // could not read is stated above the plan rather than swallowed, and
-  // what is stuck is stated below it with the line that said so.
-  //
-  // A row is a disclosure rather than a table row: it opens into what
-  // that node has cost and which runs spent it (`Query::CostOf`,
-  // client/Spec.lean §4-50), which a sortable table has no place for.
-  //
-  // The state on the right is `parts/badge.svelte`. It was five
-  // hand-drawn paints here, which is the same thing that component is
-  // for, and the nested conditional that chose between them had no arm
-  // for a row awaiting approval - that row was drawn as one nobody had
-  // started.
-
+  
+  
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
   import { percent } from "../../core/share";
@@ -41,7 +28,7 @@
 
   const lang = ui().lang;
 
-  // The row a hand opened: one node's cost question at a time.
+  
   let open = $state<string | null>(null);
 
   const STATUS_WORD: Record<RoadmapStatus, Key> = {
@@ -59,13 +46,7 @@
     );
   }
 
-  // How loudly one row's state is drawn. Exhaustive over the five
-  // states the wire carries, so a sixth is a compile error rather than
-  // a row that quietly looks like an idle one. The colour only repeats
-  // the word beside it, which is why two states may share a weight:
-  // `ready` and `in_progress` are both the city working, and `blocked`
-  // and `awaiting_approval` are both the city stopped until somebody
-  // acts (client/Spec.lean §4-32).
+  
   function weightOf(row: PlanRow): Weight {
     switch (row.status) {
       case "in_progress":
@@ -80,9 +61,7 @@
     }
   }
 
-  // One pane of indent per level of the node number, so the plan
-  // tightens with the rest of the page instead of holding a width of
-  // its own.
+  
   function indentOf(node: string): string {
     return `calc(var(--spacing-pane) * ${String(node.split(".").length - 1)})`;
   }
@@ -90,13 +69,8 @@
 
 <div>
   <h2 class="sr-only">{say($lang, "bld_plan")}</h2>
-  <!-- Two figures, because either alone misleads (kernel::completion).
-       The bar is the leaves, which say how many pieces the plan turned
-       out to have; the figure beside it is the weighted share, which
-       moves when a branch is divided generously. A reader seeing both
-       can tell work finished from work redistributed. -->
-  <!-- A plan with no leaves has no progress to show: a bar at zero
-       reads as work stalled rather than work not yet planned. -->
+  
+  
   {#if "planned" in answer.progress && answer.progress.planned.total > 0}
     <div class="mb-base flex items-center gap-base">
       <Progress

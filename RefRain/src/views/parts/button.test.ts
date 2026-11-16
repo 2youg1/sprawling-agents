@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The button's wiring as client/spec/Views/Parts.lean §7-2 states it:
+// The button's wiring as RefRain/spec/Views/Parts.lean §7-2 states it:
 // `aria-disabled` while loading or refused, `aria-busy` only while
 // loading, `aria-describedby` pointing at the hint that carries the
 // reason, and one guard that keeps a press from landing unless the

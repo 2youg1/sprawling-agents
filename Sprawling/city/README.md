@@ -13,7 +13,7 @@ It reads and writes the files of the directory it is handed — a room's `URBANI
 wall clock: what needs a time receives one. Three things are not here. History is not here: an
 action hands back the `kernel::Payload` a caller appends, and `sprawling-storage` owns the Ledger,
 so no call in this package writes a line. The look of an identity is not here: a `Dossier` is
-numbers, and `client/` decides how to draw them. And writing a shelved skill from a page is not
+numbers, and `RefRain/` decides how to draw them. And writing a shelved skill from a page is not
 built yet — `wire::Command::PutShelved` is answered `not_built` by the city's writer, and the
 way to put a document on a shelf today is to edit it there.
 

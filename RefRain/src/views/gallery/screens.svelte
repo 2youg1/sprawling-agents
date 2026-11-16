@@ -6,22 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // Whole screens, in the states the roadmap asks each of them for.
-  // Every one mounts the component the page mounts and hands it the
-  // props the page hands it; nothing here is a drawing of a screen.
-  //
-  // The sheet of keys covers the window it is opened over, so the box
-  // below it carries a transform, which is what makes a fixed box
-  // treat that box as its window.
-  //
-  // **The three notice seats live here because one refusal has three
-  // homes on screen and no seat of its own file** (client/Spec.lean §4-35):
-  // the drawer that keeps a day of them, the corner a toast rises
-  // into, and the line under a field that a person is still typing in.
-  // Each draws the same `parts/notice.svelte`, so the three cases read
-  // as three placements of one thing rather than three notice
-  // drawings.
-
+  
+  
   import type { DoctorAnswer } from "../../wire";
   import type { Lang } from "../../core/lang";
   import { RELEASE_ALL } from "../../core/slash";
@@ -31,11 +17,7 @@
   import { Address, NodeId, Tokens, UsdMicros } from "../../wire";
   import Plan from "../building/plan.svelte";
 
-  // One plan in the state the two figures exist for: a branch that was
-  // divided generously, so the share says more than the count does.
-  // Three leaves, one finished, one running, one held up - and 50%
-  // behind the reader while only a third of the leaves are done, which
-  // is the difference the second figure is drawn to let somebody see.
+  
   const PLANNED: BuildingAnswer = {
     addr: Address.make("lab"),
     archive: [],
@@ -82,9 +64,7 @@
     sandbox: null,
   };
 
-  // The other face. A plan the city could not read has no denominator,
-  // and the interface says so rather than painting a fraction it does
-  // not have (kernel::completion, A17's type half).
+  
   const UNPLANNED: BuildingAnswer = {
     ...PLANNED,
     plan: [],
@@ -97,9 +77,7 @@
     },
   };
 
-  // Two buildings side by side, one named by a whole sentence: the
-  // label under the long one has to stop at its own slot instead of
-  // running into its neighbour's name.
+  
   const idle = {
     unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 },
   };
@@ -129,18 +107,7 @@
     ],
   };
 
-  // One machine, with an item in each of the three states a person
-  // acts differently on: here, missing and required, missing and
-  // optional.
-  //
-  // The confinement it reports is the Windows arm on purpose. It is
-  // the one that keeps some axes and not others - a job object ends a
-  // process tree and caps what it may spend, and does nothing at all
-  // about the network - so it is the arm that proves the page draws a
-  // guarantee list rather than a yes or a no. "Windows has no
-  // sandbox" would have been easier to draw and would have been false;
-  // a machine that says it is boxed in while the box has no lid is
-  // worse than one that says it has no box.
+  
   const MACHINE: DoctorAnswer = {
     core: "raised",
     scanning: "does_not_apply",
@@ -190,10 +157,7 @@
     ],
   };
 
-  // The label of one recovery action. A command is spelled as itself
-  // in both languages; a link action has no spelling and takes the
-  // word its own row carries, and so does a form (client/Spec.lean §4-10,
-  // 4-35a, `core/recovering.ts`).
+  
   function wordOf(lang: Lang, recovery: Recovery): string {
     switch (recovery.kind) {
       case "command":
@@ -280,9 +244,7 @@
   <ModelTable served={PROBED} about={null} onChosen={() => undefined} />
 </Case>
 
-<!-- One state, because this section holds no answer: where the level
-is decided is the same sentence whatever the city has been told, and
-the choosing happens over the composer. -->
+
 <Case label="settings · how hard the city thinks">
   <EffortSection />
 </Case>
@@ -308,11 +270,7 @@ the choosing happens over the composer. -->
   </Stand>
 </Case>
 
-<!-- The notice drawer: a day of refusals kept where a person can come
-back to them, grouped by day under a sticky heading, each entry
-carrying the count of the refusals that arrived the same way and the
-actions `core/recovering.ts` maps from its code. The waiting questions
-sit above these in the shipped drawer and keep their own fixture. -->
+
 <Case label="notices · the drawer, twelve entries across three days" width={440}>
   <div class="flex flex-col bg-chrome shadow-sheet">
     <div class="flex items-baseline justify-between gap-base px-base py-snug">
@@ -350,9 +308,7 @@ sit above these in the shipped drawer and keep their own fixture. -->
   </div>
 </Case>
 
-<!-- Three toasts in the corner they land in. The stack is capped at
-three by whoever keeps the list: a fourth refusal goes to the drawer
-rather than into a taller corner. -->
+
 <Case label="notices · three toasts, stacked at the corner">
   <div
     class="flex min-h-output w-full flex-col items-end justify-end gap-snug rounded-card border border-dashed border-edge-input p-snug"
@@ -386,9 +342,7 @@ rather than into a taller corner. -->
   </div>
 </Case>
 
-<!-- One refusal with a home: it sits under the field it was refused
-at, and the field carries no error of its own - the notice is the
-error, and both red markings at once would say it twice. -->
+
 <Case label="notices · inline under the field it belongs to">
   <div class="max-w-measure">
     <Field
@@ -410,10 +364,7 @@ error, and both red markings at once would say it twice. -->
   </div>
 </Case>
 
-<!-- The two figures the plan carries, and the face that has neither.
-     One case each, because a renderer is told to handle both and a
-     fixture that only ever drew the happy face would leave the other
-     unpainted and unjudged. -->
+
 <Case label="building · plan showing a share and a leaf count">
   <Plan answer={PLANNED} />
 </Case>

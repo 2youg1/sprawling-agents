@@ -11,31 +11,31 @@ describe("third-party notices", () => {
   test("each installed package is named once, scoped and nested ones by their own name", () => {
     expect(
       packagesIn([
-        "/w/client/node_modules/svelte/src/internal/client/index.js",
-        "/w/client/node_modules/@lezer/rust/dist/index.js",
-        "/w/client/node_modules/@lezer/rust/dist/other.js",
-        "/w/client/node_modules/a/node_modules/b/x.js",
-        "C:\\w\\client\\node_modules\\effect\\dist\\esm\\Schema.js",
-        "\0/w/client/node_modules/svelte/src/index-client.js",
-        "/w/client/src/main.ts",
+        "/w/RefRain/node_modules/svelte/src/internal/client/index.js",
+        "/w/RefRain/node_modules/@lezer/rust/dist/index.js",
+        "/w/RefRain/node_modules/@lezer/rust/dist/other.js",
+        "/w/RefRain/node_modules/a/node_modules/b/x.js",
+        "C:\\w\\RefRain\\node_modules\\effect\\dist\\esm\\Schema.js",
+        "\0" + "/w/RefRain/node_modules/svelte/src/index-client.js",
+        "/w/RefRain/src/main.ts",
       ]),
     ).toEqual([
-      { name: "@lezer/rust", dir: "/w/client/node_modules/@lezer/rust" },
-      { name: "b", dir: "/w/client/node_modules/a/node_modules/b" },
-      { name: "effect", dir: "C:/w/client/node_modules/effect" },
-      { name: "svelte", dir: "/w/client/node_modules/svelte" },
+      { name: "@lezer/rust", dir: "/w/RefRain/node_modules/@lezer/rust" },
+      { name: "b", dir: "/w/RefRain/node_modules/a/node_modules/b" },
+      { name: "effect", dir: "C:/w/RefRain/node_modules/effect" },
+      { name: "svelte", dir: "/w/RefRain/node_modules/svelte" },
     ]);
   });
 
   test("an asset copied from a package's subfolder brings that folder's licence files along", () => {
     expect(
-      foldersOf({ name: "pdfjs-dist", dir: "C:/w/client/node_modules/pdfjs-dist" }, [
-        "C:/w/client/node_modules/pdfjs-dist/cmaps/GBK-EUC-H.bcmap",
-        "C:/w/client/node_modules/pdfjs-dist/cmaps/Identity-H.bcmap",
-        "C:/w/client/node_modules/pdfjs-dist/wasm/openjpeg.wasm",
-        "C:/w/client/node_modules/pdfjs-dist/README.md",
-        "C:/w/client/node_modules/pdfjs-distant/x/y.js",
-        "C:/w/client/src/fonts/MapleMono-Regular.woff2",
+      foldersOf({ name: "pdfjs-dist", dir: "C:/w/RefRain/node_modules/pdfjs-dist" }, [
+        "C:/w/RefRain/node_modules/pdfjs-dist/cmaps/GBK-EUC-H.bcmap",
+        "C:/w/RefRain/node_modules/pdfjs-dist/cmaps/Identity-H.bcmap",
+        "C:/w/RefRain/node_modules/pdfjs-dist/wasm/openjpeg.wasm",
+        "C:/w/RefRain/node_modules/pdfjs-dist/README.md",
+        "C:/w/RefRain/node_modules/pdfjs-distant/x/y.js",
+        "C:/w/RefRain/src/fonts/MapleMono-Regular.woff2",
       ]),
     ).toEqual(["cmaps", "wasm"]);
   });

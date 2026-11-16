@@ -27,7 +27,7 @@
 One process serves one page, and the page is inside the binary rather than
 beside it: `Sprawling/app/build.rs` compresses `Sprawling/app/web-dist` and emits
 an `include_bytes!` entry per file, so a server that started has no asset
-directory left to lose. The page is `client/`: Svelte and Effect, bundled by
+directory left to lose. The page is `RefRain/`: Svelte and Effect, bundled by
 Vite and driven by bun (§2).
 
 **The wire is the seam, not the language.** A second client written against
@@ -95,7 +95,7 @@ every week.
 | Inbound WebSocket | `axum` with its `ws` feature (`Sprawling/wire/Cargo.toml`; `Sprawling/app/Cargo.toml` for the remote listener) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
 | Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (`Sprawling/wire/Spec.lean` §8-41). |
 | HTTP client | `reqwest`, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. The TLS backend is aws-lc-rs, installed once by `gateway::reach::tls`. |
-| Client | Svelte and Effect, bundled by Vite, driven by bun | Its runtime dependencies are exactly the list `RUNTIME` in `Tools/xtask/src/npm.rs`, each admitted under `client/Spec.lean` §7-9, and no framework runtime beyond Svelte. Svelte compiles its templates away; Effect decodes the wire with `Schema` and carries the client's few effectful steps. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
+| Client | Svelte and Effect, bundled by Vite, driven by bun | Its runtime dependencies are exactly the list `RUNTIME` in `Tools/xtask/src/npm.rs`, each admitted under `RefRain/Spec.lean` §7-9, and no framework runtime beyond Svelte. Svelte compiles its templates away; Effect decodes the wire with `Schema` and carries the client's few effectful steps. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
 | Content store | BLAKE3 | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
 | Restoration | `git2`, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
@@ -716,8 +716,8 @@ the part worth knowing before starting, not after.
 | a new seam | §4, and the trait's file | `depmap` refuses a `pub trait` outside the files §4 names |
 | a new module, or a deleted one | `architecture.toml` | `modmap` refuses a production file with no entry, and an entry whose file is gone; a test module needs no entry |
 | a platform the release ships | `xtask::platform`'s `PLATFORMS` | one row per platform; the npm scope and the bare root name are asserted there |
-| the page | `client/` + `client/Spec.lean` | its own lint, typecheck and tests; the bundle is measured against a byte budget |
-| the page's colours, motion or words | `client/src/theme.css` and the parts it imports from `client/src/theme/`, `client/src/lang.json` + `docs/frontend-method.md` | `xtask color`, `xtask motion` and `xtask wording` refuse a colour, curve, duration or word spelled anywhere else |
+| the page | `RefRain/` + `RefRain/Spec.lean` | its own lint, typecheck and tests; the bundle is measured against a byte budget |
+| the page's colours, motion or words | `RefRain/src/theme.css` and the parts it imports from `RefRain/src/theme/`, `RefRain/src/lang.json` + `docs/frontend-method.md` | `xtask color`, `xtask motion` and `xtask wording` refuse a colour, curve, duration or word spelled anywhere else |
 | what a module must hold on every input | the part under the crate's `spec/` that names the module (§11, *Specifications in Lean*) | `just models` proves it with no `sorry`, `admit` or `axiom`; the module's rustdoc names the part |
 | a gate itself | `Tools/xtask/` + `Tools/xtask/Spec.lean` | a red gate is resolved by fixing the code, narrowing its precise scope, or deleting it; never by adding an exception |
 | how a door handles a filesystem alias or pins content and evidence | [§10, Names, aliases and pins](#names-aliases-and-pins) | review against each door's stated scope and owning SPEC |
@@ -1096,9 +1096,9 @@ when the specification has parts, with `<dir>` its path in dotted form.
 There is no glob over a whole `crates` or `client` tree: a `.+` glob walks
 every directory below it, so one over `crates` would also build the
 checker's implementation and any generated Lean file below it. The client's parts are named after its
-TypeScript modules below `client/src/` the way a crate's are named after
+TypeScript modules below `RefRain/src/` the way a crate's are named after
 its Rust modules: `views/parts/segmented.ts` is specified by
-`client/spec/Views/Parts/Segmented.lean`. The client's specification holds
+`RefRain/spec/Views/Parts/Segmented.lean`. The client's specification holds
 interfaces, decisions and interaction contracts; how a screen looks is
 described in English in `docs/frontend-method.md`, under the labels the
 code cites.
@@ -1288,8 +1288,8 @@ yet.
   top-level product directories (`Sprawling/`, `Tools/`, `Calyx/`,
   `RefRain/`, `Mei/`); later moves derive paths from it, and
   `cargo xtask residue` refuses a legacy path once marked `retired`.
-  After the crates split, `Sprawling/` and `Tools/` are current and
-  `crates/` is retired; `client/` remains live until RefRain R0.
+  After the crates split and RefRain R0, `Sprawling/`, `Tools/` and
+  `RefRain/` are current; `crates/` and `client/` are retired.
 - **Adding an entry is the registration step**: it lands in the same change
   as the file, before the file is written.
 - **Removing an entry requires a ruling**, recorded as a `Verdict:` trailer
@@ -1428,7 +1428,7 @@ sequenceDiagram
 `Sprawling/accounting/src/worker/driving/harness.rs` (`drive_harness`),
 `Sprawling/runtime/src/run/harness.rs`,
 `Sprawling/storage/src/jsonl/append.rs` (`append_all`),
-`Sprawling/app/src/serving/folding.rs`, `client/src/core/socket.ts`.
+`Sprawling/app/src/serving/folding.rs`, `RefRain/src/core/socket.ts`.
 
 ### 13.3 A turn, and where a cancel is heard
 
@@ -1614,7 +1614,7 @@ flowchart TD
     link -->|"saying"| say[the text of one run, in place]
 ```
 
-`client/src/core/socket.ts` (`drain`, `deliver`, `lagged`),
-`client/src/core/frames.ts`, `client/src/core/link.ts` (`advance`),
-`client/src/core/gap_walk.ts`, `client/src/core/belief.ts`,
-`client/src/core/asking.ts` (`invalidate`).
+`RefRain/src/core/socket.ts` (`drain`, `deliver`, `lagged`),
+`RefRain/src/core/frames.ts`, `RefRain/src/core/link.ts` (`advance`),
+`RefRain/src/core/gap_walk.ts`, `RefRain/src/core/belief.ts`,
+`RefRain/src/core/asking.ts` (`invalidate`).

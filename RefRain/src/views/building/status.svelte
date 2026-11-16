@@ -6,17 +6,8 @@
 -->
 
 <script lang="ts">
-  // What this building has written since its last checkpoint, and where
-  // its branch stands (client/Spec.lean §4-50). Every changed file is a way
-  // out: pressing the row opens the file's working-tree text on the
-  // right side, and "take back" returns it to what that checkpoint
-  // holds. The checkpoint itself names the run, the room and the model,
-  // and links into the run page - the way back from a line of code to
-  // the session that wrote it.
-  //
-  // The three states of the question are three states of the screen: a
-  // city that has not answered yet says nothing rather than guessing,
-  // one without git says so, and one with git gets the whole reading.
+  
+  
   import { fill, say } from "../../core/lang";
   import { roomOf, toFragment } from "../../core/route";
   import { usd } from "../../core/time";
@@ -46,8 +37,7 @@
     return "git_status" in held ? held.git_status : null;
   });
 
-  // The row whose file is in front on the right side, marked the way a
-  // chosen row is marked everywhere (docs/frontend-method.md §7B).
+  
   function isOpen(path: string): boolean {
     const item = rightItem();
     return (

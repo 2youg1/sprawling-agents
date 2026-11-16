@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The chord sheet's wiring as client/Spec.lean §7-3 states it for every
-// dialog: the heading names it, the line that says where chords are
-// rebound describes it, and Escape is answered by the caller rather than
-// by the element. A specimen on #/gallery is open in the page's flow; the
-// modal seat is opened by `showModal()`, never by the attribute, because
-// an `open` attribute makes a dialog that is not modal.
 
 import { describe, expect, test } from "bun:test";
 

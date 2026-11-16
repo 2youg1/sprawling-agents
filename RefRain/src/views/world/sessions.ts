@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the sessions pane's look is given (`sessions.look.svelte`), and
-// how the seat (`sessions.svelte`) reads one session into a row of it
-// (client/Spec.lean §7K): its state, its title, the time beside it and
-// the lines under it, all in the person's language. The pane decides
-// which rows there are and in what order (`core/stretches.ts`); this
-// file decides what one row says.
 
 import type { RunBelief } from "../../core/belief";
 import { fill, say } from "../../core/lang";
@@ -27,9 +21,7 @@ import type { BranchNote } from "../talk/branch_note";
 import { phaseSaid } from "../runs/phase";
 import { called, dispatcherOf } from "../talk/naming";
 
-// A row's state dot: running, waiting for the person, or done. A past
-// session is done whatever its last run says: the city goes on only
-// with the current one.
+
 export type Dot = "run" | "ask" | "done";
 
 export function dotOf(stretch: Stretch): Dot {
@@ -48,7 +40,7 @@ export function dotOf(stretch: Stretch): Dot {
   }
 }
 
-// The bag spread on the tag filter's group, and on each of its toggles.
+
 export interface FilterWire {
   readonly role: "group";
   readonly "aria-label": string;
@@ -61,13 +53,12 @@ export interface ToggleWire {
 
 export interface ToggleLook {
   readonly key: string;
-  // The tag, or "all"; already in the person's language.
+  
   readonly word: string;
   readonly wire: ToggleWire;
 }
 
-// The bag spread on a row's link: where it goes, and whether its
-// session is the one in main.
+
 export interface LinkWire {
   readonly href: string;
   readonly "aria-current": "page" | undefined;
@@ -82,81 +73,71 @@ export interface DisclosureWire {
   readonly onclick: () => void;
 }
 
-// The pin a pinned row carries: a mark with a name, and the hint that
-// says who pinned it.
+
 export interface PinLook {
   readonly hint: string;
   readonly wire: { readonly role: "img"; readonly "aria-label": string };
 }
 
-// What a row's menu seat (`session_menu.svelte`) is handed.
+
 export interface MenuProps {
   readonly named: Named | null;
   readonly label: string;
   readonly tags: readonly Tag[];
   readonly pinning: Pinning;
   readonly session: { readonly name: string; readonly run: RunId | null };
-  // The read-only bypass; null for the room's current session.
+  
   readonly read: View | null;
 }
 
-// The row of the session in main names it and says nothing else about it
-// that the screen already says once (client/Spec.lean §7K, "one place on
-// a screen"): the thread under it shows the session's state - the live
-// reply, the card that waits for the person, the line that closes a
-// finished run - its last words, its task and who handed it down; the
-// chosen session's gauge, or the first message head beside the blend
-// tier's panel, says what it ran on; and the context ring says how full
-// its window is. What stays is what nothing else on the screen says:
-// its title, its pin, its tags, and how long a running one has run.
+
 export interface RowLook {
   readonly key: string;
   readonly depth: number;
   readonly disclosure: DisclosureWire | undefined;
   readonly link: LinkWire;
-  // Whether this row's session is the one in main.
+  
   readonly chosen: boolean;
-  // Absent on the chosen row.
+  
   readonly dot: Dot | undefined;
   readonly title: string;
-  // The room's address, which the title stands for when it is a name.
+  
   readonly room: string;
-  // Whether this is its room's current session; a past one is quieter.
+  
   readonly current: boolean;
   readonly pin: PinLook | undefined;
-  // How long it has run, that it waits, or how long ago it ended; on the
-  // chosen row only how long it has run.
+  
+  
   readonly when: string | undefined;
-  // The lines under the title, each absent when it has nothing to say
-  // and on the chosen row: the phase of a run waiting on a reply, who
-  // handed the work down, what the session is about, and what it ran on.
+  
+  
   readonly phase: string | undefined;
   readonly delegated: string | undefined;
   readonly about: string | undefined;
   readonly ranOn: string | undefined;
   readonly tags: readonly Tag[];
-  // The run whose context the row's bar reads (`context_bar.svelte`),
-  // for a current session that holds one and is not the chosen row.
+  
+  
   readonly context: { readonly room: Address; readonly run: RunId } | undefined;
   readonly menu: MenuProps;
-  // Opening or refusal beside this row, never a toast that moves main.
+  
   readonly note: BranchNote | null;
 }
 
 export interface SessionsLook {
-  // Absent while no row carries a tag.
+  
   readonly filter:
     { readonly wire: FilterWire; readonly toggles: readonly ToggleLook[] } | undefined;
-  // Whether the pane is as narrow as the right pane leaves it, which
-  // drops the second line and the time.
+  
+  
   readonly narrow: boolean;
   readonly rows: readonly RowLook[];
 }
 
-// What a row is read from beyond its session.
+
 export interface RowContext {
   readonly lang: Lang;
-  // The page's clock, which a running row's time reads.
+  
   readonly now: number;
   readonly chosen: boolean;
   readonly tags: readonly Tag[];
@@ -229,7 +210,7 @@ export function rowOf(stretch: Stretch, at: RowContext): RowLook {
   };
 }
 
-// The lines a row that is not the chosen one says under its title.
+
 type Told = Pick<RowLook, "phase" | "delegated" | "about" | "ranOn" | "context">;
 
 function toldOf(stretch: Stretch, dot: Dot, at: RowContext): Told {
@@ -250,8 +231,7 @@ function toldOf(stretch: Stretch, dot: Dot, at: RowContext): Told {
   };
 }
 
-// Who pinned it, said both ways: the Mayor's current session is pinned
-// by being current, any other by the person's tag.
+
 function pinOf(pinning: Exclude<Pinning, "none">, lang: Lang): PinLook {
   const hint = say(lang, pinning === "mayor" ? "world_pinned_mayor" : "world_pinned_tagged");
   return { hint, wire: { role: "img", "aria-label": hint } };
@@ -278,9 +258,7 @@ function whenOf(stretch: Stretch, dot: Dot, lang: Lang, now: number): string {
   }
 }
 
-// What the second line says: the start of the session's last reply,
-// else the task of its last run, else how the session began when this
-// page holds none of its runs.
+
 function aboutOf(stretch: Stretch, last: RunBelief | undefined, lang: Lang): string {
   return stretch.line.preview ?? last?.task ?? say(lang, startOf(stretch));
 }
@@ -290,8 +268,7 @@ export function titleOf(stretch: Stretch): string {
   return name === "" ? roomOf(stretch.room) : name;
 }
 
-// What the session ran on: model, effort and workspace, each left out
-// when the city does not say it.
+
 function ranOnOf(stretch: Stretch, lang: Lang): string {
   const { model, effort, workspace } = stretch.line;
   return [
@@ -310,10 +287,7 @@ function startOf(stretch: Stretch): Key {
   return start.opened.carry === "handoff" ? "mailbox_start_carried" : "mailbox_start_new";
 }
 
-// The resident a session's work was handed down by, as the session
-// line spells it (`SessionStart::Dispatched { by }`), in the words the
-// thread's own opening uses; empty for a session the User or the city
-// began, which the second line already says.
+
 function delegatedBy(stretch: Stretch, lang: Lang): string {
   const start = stretch.line.start;
   const by = "dispatched" in start ? dispatcherOf(start.dispatched.by) : null;
@@ -322,8 +296,7 @@ function delegatedBy(stretch: Stretch, lang: Lang): string {
     : "";
 }
 
-// The tag filter: "all" first, then each tag a listed row carries; one
-// is held at a time, and pressing the held one again goes back to all.
+
 export function filterOf(
   offered: readonly Tag[],
   by: Tag | null,

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "sprawling-client",
+      "name": "refrain",
       "dependencies": {
         "@codemirror/commands": "^6.11.1",
         "@codemirror/merge": "^6.12.2",

@@ -282,7 +282,7 @@ pub enum Unapplied { Platform, NotDelegated, Refused, Unjoined }
 
 命令入表时记下一个 `ceiling::Mark`（下面 `CeilingMark` 的 Rust 面），收走时由 `ceiling::verdict` 用那一刻读到的计数给出 `Option<Ceiling>`；这两者与「哪种情形算没落地」只在 `runtime::backlog::ceiling` 一处，`jobs` 与 `cgroup` 只读平台的计数。
 
-exec 结果多一个键 `memory_ceiling`，形如 `{"state": "hit" | "unapplied" | "unread", "limit_bytes": N, "detail": "…"}`；`unapplied` 另带 `"why": "platform" | "not_delegated" | "refused" | "unjoined"`。后台命令在 `background` 行里带同一个键。键名与拼写只在 `tools::exec::outcome` 一处；客户端从结果读它（`client/src/views/monitor/trace.ts` 的 `commandOf`），在终端行下面画出错误。
+exec 结果多一个键 `memory_ceiling`，形如 `{"state": "hit" | "unapplied" | "unread", "limit_bytes": N, "detail": "…"}`；`unapplied` 另带 `"why": "platform" | "not_delegated" | "refused" | "unjoined"`。后台命令在 `background` 行里带同一个键。键名与拼写只在 `tools::exec::outcome` 一处；客户端从结果读它（`RefRain/src/views/monitor/trace.ts` 的 `commandOf`），在终端行下面画出错误。
 
 **证据**：撞到上限按命令运行期间这个 run 的撞限计数有没有增加来判，计数在命令入表时记一次、在命令被收走时再读一次（`settle` 与 `harvest` 是收走命令的两处）。入表时就读不出计数，记下的是 `unread`，收走时报 `Unread`。同一 run 的上限是所有命令共用的，所以计数增加时，这期间还在跑的每条命令都报 `Hit`：上限说的是这个 run，而不是哪一个进程超了。
 

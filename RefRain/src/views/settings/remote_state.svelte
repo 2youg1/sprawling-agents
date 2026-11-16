@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The remote group drawn from one standing (client/Spec.lean §4-57): what
+  // The remote group drawn from one standing (RefRain/Spec.lean §4-57): what
   // the door is, the numbered steps of a pairing with the console verbs
   // each step types (`STEPS`), and what a restart of the city's computer
   // does to a pairing (`restartOf`), an invitation to

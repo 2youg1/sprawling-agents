@@ -6,14 +6,8 @@
 -->
 
 <script lang="ts">
-  // How RefRain's head line is drawn (client/Spec.lean §7N): the line
-  // docs/frontend-method.md §7F seats above the editor. Two groups -
-  // where the document is and what became of the last save, then the
-  // readings and the save - on one line that is a control high, so the
-  // controls on it set its height and nothing pads it past 32 px; a
-  // container too narrow for one line puts the second group under the
-  // first. The receipt that asks for the person carries an alert dot as
-  // well as its colour, so it is told apart without colour.
+  
+  
   import type { HeadLook } from "./head";
 
   const look: HeadLook = $props();

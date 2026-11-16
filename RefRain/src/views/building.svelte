@@ -6,32 +6,12 @@
 -->
 
 <script lang="ts" module>
-  // One building, on the shell's column lines (client/Spec.lean §4-50): the
-  // page frame's header names it and carries the verbs that act on the
-  // whole building; under it the standing goal; then three columns of
-  // the shell's grid - the index and the directory tree on the left,
-  // the chosen section or file in the middle, and, when anything is open
-  // on the right side, the right side itself: the same inspector the
-  // conversation draws, its tabs and keys included (4-50, client D27).
-  //
-  // What a person can ask of this building - stop it, set it a standing
-  // goal, take it away - is spelled as commands (client/Spec.lean §4-10): the
-  // verbs a person reads are the commands they would type, so the
-  // screen teaches the command line rather than a private vocabulary.
-  //
-  // What the tree hands back crosses a component file boundary as a
-  // type. typescript-eslint resolves no named export of a `.svelte`
-  // module in its type program, so the type-aware rules below see
-  // `Picked` as an error type; `svelte-check` is the type gate and
-  // resolves it (client/Spec.lean §4-1). Each suppression names that gap and
-  // nothing else.
+  
+  
   import type { Key } from "../core/lang";
   import type { Picked } from "./building/tree.svelte";
 
-  // The sections of the index, in the order a person reads a building
-  // by: what it set out to do, what it committed, what it has changed
-  // since, what its runs are told, what they can reach, and what they
-  // are allowed to touch.
+  
   const SECTIONS = ["plan", "commits", "changes", "prompts", "catalog", "sandbox"] as const;
   type Section = (typeof SECTIONS)[number];
 
@@ -77,14 +57,13 @@
 
   interface Props {
     readonly address: Address;
-    // Whether this is the page or a fixture inside one: a document may
-    // have exactly one heading of the page's own rank.
+    
+    
     readonly rank?: "page" | "section" | undefined;
-    // What a specimen on `#/gallery` shows on its right side while
-    // nobody opened anything; the page itself shows only what somebody
-    // opened, having no run in front of it to follow.
+    
+    
     readonly beside?: readonly RightItem[] | undefined;
-    // A direct link to the unified catalog, used by the composer chip.
+    
     readonly initialSection?: "catalog" | undefined;
   }
 
@@ -94,8 +73,7 @@
   const lang = u.lang;
   const belief = u.conn.belief;
 
-  // What the middle column shows: a section of the index, or - when
-  // `section` is `null` - what the tree picked.
+  
   let section = $state<Section | null>("plan");
   $effect(() => {
     if (initialSection !== undefined) section = initialSection;
@@ -118,8 +96,8 @@
 
   const halted = $derived(buildingIsShut($belief.halted, address));
   const removal = $derived(removalOf(address, livingIn(address)));
-  // Removing moves the building's files out of the city, so it is asked
-  // through `parts/dialog` before the command leaves.
+  
+  
   let removing = $state(false);
   const done = $derived.by(() => {
     const held = building;
@@ -129,8 +107,7 @@
     return held.progress.planned;
   });
 
-  // What the middle column is called: the address it shows, or the
-  // section's word.
+  
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- typescript-eslint resolves no named export of a `.svelte` module; `svelte-check` resolves it and is the type gate
   const shownAddress: string = $derived(picked?.at ?? "");
   const shownLabel: string = $derived(
@@ -162,8 +139,7 @@
     ),
   );
 
-  // How many runs are working at or below a room, which is what the
-  // rooms list lights its dots for.
+  
   function livingIn(room: Address): number {
     return $belief.live.filter((run) => within(run, room)).length;
   }
@@ -175,9 +151,7 @@
       {fill(say($lang, "bld_progress"), { done: String(done.done), total: String(done.total) })}
     </span>
   {/if}
-  <!-- Halt still shuts an idle building to new work and ends its backlog
-       (glossary: Halt), so the control stays live and only says that
-       nothing runs here now. -->
+  
   {#if !halted && livingIn(address) === 0}
     <span class="text-note text-text-faint">{say($lang, "bld_halt_idle")}</span>
   {/if}
@@ -203,10 +177,7 @@
 <Page title={address} {rank} {aside}>
   <WorkspaceNav current={address} />
   <Goal {address} />
-  <!-- In source order the index, the section and the tree: one column
-       under 768 px reads them in that order, so a phone reaches the
-       section, and a file open on the right, before the whole tree; from 768 px the index and the tree
-       share the first three columns and the section spans both rows. -->
+  
   <div
     class="grid grid-cols-11 grid-rows-[auto_1fr] items-start gap-x-gutter gap-y-wide narrow:grid-cols-1 narrow:grid-rows-none"
   >

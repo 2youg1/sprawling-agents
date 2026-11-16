@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The popover's wiring, without a look: the key table checked against
-// `press` in `client/spec/Views/Parts/Popover.lean` over
+// `press` in `RefRain/spec/Views/Parts/Popover.lean` over
 // every place in every shape of up to three lists of up to four rows,
 // and the value a look is given checked for what a screen reader is
 // told - which list holds the Tab stop, which row is applied, which

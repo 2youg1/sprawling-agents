@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The world layer's menu buttons as their looks receive them: the key
-// table of client/spec/Views/Workspace.lean §7-11 (pane label, session
+// table of RefRain/spec/Views/Workspace.lean §7-11 (pane label, session
 // row menu), and the `aria-*` values and items the wire bags carry.
 
 import { describe, expect, test } from "bun:test";

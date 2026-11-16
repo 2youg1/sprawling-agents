@@ -6,11 +6,8 @@
 -->
 
 <script lang="ts">
-  // The paired browsers group (client/Spec.lean §4-57b): asks the city
-  // for every browser that paired at this machine's door and hands the
-  // answer to the list (`devices_list.svelte`), which the gallery draws
-  // from a fixture. Forgetting one is `ForgetDevice`, a verb only this
-  // machine's own browser may send.
+  
+  
   import { onMount } from "svelte";
 
   import { QUERIES } from "../../core/asking";
@@ -27,7 +24,7 @@
   const read = $derived(
     readAnswer($asked, (held) => ("devices" in held ? held.devices.devices : undefined)),
   );
-  // This browser's own id, so its row can say so.
+  
   let here = $state<string | null>(null);
   onMount(() => {
     void kept().then((device) => (here = device?.id ?? null));

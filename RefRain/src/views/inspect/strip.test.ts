@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The inspector strip's key table and `aria-*` values (client/Spec.lean
+// The inspector strip's key table and `aria-*` values (RefRain/Spec.lean
 // §7-11, the APG Tabs rows), read off the value the seat hands any look
 // (client D95). No look is imported here, so a look swapped for another
 // leaves every case standing.

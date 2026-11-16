@@ -7,12 +7,7 @@ import type { Belief, RunBelief } from "./belief";
 import { newestWorking } from "./belief/live";
 import type { View } from "./route";
 
-// The run in front of the person: the one a stop, a steer and `/diff`
-// reach from wherever they are pressed (client/Spec.lean §4-41, client D16). A
-// talk page answers with its room's newest working run, a run page
-// with its own run while that run still works, and every other page
-// with none: a city, a building or the monitor shows many runs, and a
-// stop that chose one of them would choose for the person.
+
 export function runInFront(belief: Belief, view: View): RunBelief | undefined {
   switch (view.kind) {
     case "talk":

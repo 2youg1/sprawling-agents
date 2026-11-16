@@ -9,7 +9,7 @@
   import type { AgentCatalogAnswer, AgentOffer } from "../../wire";
   import type { BoxReading } from "./agents";
 
-  // The ACP agents page as drawn (client/Spec.lean §4-67, design H2):
+  // The ACP agents page as drawn (RefRain/Spec.lean §4-67, design H2):
   // the agents already added as one line that opens, then one box that
   // searches the bundled catalog as one types and turns into a parsed
   // consent card on a paste, the agents found on this computer as

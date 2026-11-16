@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The one translation between a View and the address bar, both ways.
-// One spelling is written; every spelling an older build wrote is read.
-// The old table (`crates/web/src/route/fragments.rs`) is folded in at
-// the bottom, so a bookmark from the Dioxus client still opens.
 
 import { Option, Schema } from "effect";
 
@@ -15,21 +11,15 @@ import type { BuildingProgress, RunId } from "../wire";
 import { isInvitation } from "./remote/invitation";
 import { readRunId } from "./run_id";
 
-// The address grammar is the server's, carried in the schema `cargo
-// xtask wire-ts` generates from `kernel::Address`. A fragment a person
-// edited by hand is read through it and nowhere else.
+
 const readAddress = Schema.decodeOption(Address);
 
-// Which lens the record is read through: the whole history, then what was
-// kept, then what was thrown away.
+
 export type Lens = "ledger" | "archive" | "bin" | "log";
 
 export const LENSES: readonly Lens[] = ["ledger", "archive", "bin", "log"];
 
-// The groups the settings panel draws in its body, as the address bar
-// spells them: `#/setup/<group>` opens the panel at one (client/Spec.lean §7L).
-// The order the settings tree offers them in is the tree's own
-// (`views/settings/tree.ts`); this is only the set the address bar reads.
+
 export const SETUP_GROUPS = [
   "you",
   "accounts",
@@ -53,8 +43,7 @@ export const SETUP_GROUPS = [
 
 export type SetupGroup = (typeof SETUP_GROUPS)[number];
 
-// The lenses of the run page, in the order its tabs offer them; a
-// `#/run/<id>/<lens>` link opens the page at one (client D28).
+
 export const RUN_LENSES = [
   "time",
   "turns",
@@ -67,10 +56,7 @@ export const RUN_LENSES = [
 
 export type RunLens = (typeof RUN_LENSES)[number];
 
-// An item of the right side, as a link names it (client/Spec.lean §4-63): a
-// call, or a version of a building's document - the worktree's current
-// text when `version` is `null`. The same two shapes the inspector holds
-// (`views/inspect/open.svelte.ts`), so opening one hands it over whole.
+
 export type ItemLink =
   | { readonly kind: "call"; readonly run: RunId; readonly at: Seq }
   | {
@@ -80,20 +66,16 @@ export type ItemLink =
       readonly version: B3Hash | null;
     };
 
-// The room a person talks to when they have named none: the Mayor.
+
 export const MAYOR: Address = Address.make("hall/mayor");
 
-// What parts a room from the stretch the address bar names in it. The
-// address grammar refuses `:`, and every segment is written escaped, so
-// the last one in the fragment is always this one.
+
 const STRETCH = ":";
 
-// Which page the content region shows.
+
 export type View =
-  // A conversation, and the item a link asks the right side to open
-  // beside it on arrival; the right side's state itself is not here
-  // (client/Spec.lean §4-27). With `session`, the stretch that began at
-  // that line (`SessionLine::began`) rather than the room's current one.
+  
+  
   | {
       readonly kind: "talk";
       readonly address: Address;
@@ -102,35 +84,31 @@ export type View =
     }
   | { readonly kind: "city" }
   | { readonly kind: "building"; readonly address: Address; readonly section?: "catalog" }
-  // The page a building is raised on; with an address, that address is
-  // filled in, which is how a folder waiting to be adopted is opened.
+  
+  
   | { readonly kind: "raise"; readonly address?: Address }
-  // A run, and the lens a link opened it at; without one the page picks
-  // its lens from the run's state.
+  
+  
   | { readonly kind: "run"; readonly run: RunId; readonly lens?: RunLens }
-  // The settings panel, open over the page beneath it. Without a group
-  // the panel opens at the one it drew last: the address bar names a
-  // group only when somebody chose one.
+  
+  
   | { readonly kind: "setup"; readonly group?: SetupGroup }
   | { readonly kind: "mcp" }
   | { readonly kind: "record"; readonly lens: Lens }
   | { readonly kind: "cost" }
   | { readonly kind: "registry" }
-  // The guide, and the step a link opened; without one the guide opens
-  // at the step it judges current.
+  
+  
   | { readonly kind: "welcome"; readonly step?: GuideStep }
   | { readonly kind: "monitor" }
-  // Every screen at once, on fixtures, reachable without a city. It is
-  // a route rather than a build flag so the gate that measures it opens
-  // the same bundle a person runs.
+  
+  
   | { readonly kind: "gallery" };
 
-// The conversation with the Mayor: the page a person arrives to.
+
 export const DEFAULT_VIEW: View = { kind: "talk", address: MAYOR };
 
-// The address-bar form of a view, fragment marker included. Always begins
-// `#/`, so a fragment written by hand and one written here are the same
-// string. Each view has exactly one spelling.
+
 export function toFragment(view: View): string {
   switch (view.kind) {
     case "talk":
@@ -167,9 +145,7 @@ export function toFragment(view: View): string {
   }
 }
 
-// An item as the query after a conversation's address: every value
-// percent-encoded by the browser's own writer, a worktree's text with no
-// `version` key at all.
+
 function itemQuery(item: ItemLink): string {
   switch (item.kind) {
     case "call":
@@ -183,8 +159,7 @@ function itemQuery(item: ItemLink): string {
   }
 }
 
-// The item a conversation's query names: exactly the keys one of the two
-// shapes writes, each read through the wire's own schema, or `None`.
+
 function readItem(query: string): Option.Option<ItemLink> {
   const asked = new URLSearchParams(query);
   const keys = [...asked.keys()].sort().join(" ");
@@ -233,7 +208,7 @@ function recordFragment(lens: Lens): string {
   }
 }
 
-// A head with nothing after it, in the spelling this build writes.
+
 const BARE: Readonly<Record<string, View>> = {
   "": DEFAULT_VIEW,
   talk: DEFAULT_VIEW,
@@ -249,8 +224,7 @@ const BARE: Readonly<Record<string, View>> = {
   gallery: { kind: "gallery" },
 };
 
-// Every spelling an older build wrote: each lands on the page that
-// inherited its question. Read, never written, and never offered.
+
 const OLD: Readonly<Record<string, View>> = {
   overview: { kind: "city" },
   live: DEFAULT_VIEW,
@@ -264,29 +238,20 @@ const OLD: Readonly<Record<string, View>> = {
   settings: { kind: "setup" },
 };
 
-// The pages a person may name, for the menus that offer them: every
-// head this build writes, less the empty fragment, which the address
-// bar writes and nobody types. Derived from the table above, so a page
-// somebody can type is a page the address bar can write back.
+
 export const PAGES: readonly string[] = Object.keys(BARE).filter((head) => head !== "");
 
-// The page one bare name reaches, `None` when this build has no page
-// by that name. A menu that offers a page resolves it through here
-// rather than spelling a fragment of its own.
+
 export function page(name: string): Option.Option<View> {
   return Option.fromNullishOr(BARE[name] ?? OLD[name]);
 }
 
-// An address as the address bar carries it: each segment percent-encoded,
-// the slashes between them kept, so a room named in any script is written
-// the way a browser would write it and read back through `unescaped`.
+
 function escaped(address: Address): string {
   return address.split("/").map(encodeURIComponent).join("/");
 }
 
-// The segments a browser percent-encoded, decoded one by one so an encoded
-// slash stays inside its segment. `None` for a malformed escape, which
-// names nothing rather than a room spelled with a stray `%`.
+
 const decodeSegment = Option.liftThrowable(decodeURIComponent);
 
 function unescaped(tail: string): Option.Option<string> {
@@ -314,13 +279,10 @@ function named(raw: string): string {
   return raw.replace(/^#*/, "").replace(/^\/*/, "");
 }
 
-// The view a fragment names, or `None` when it names nothing. `None`
-// rather than a silent fall back to the first page: a router that quietly
-// lands somewhere else teaches people their bookmarks are unreliable
-// without ever admitting it.
+
 export function fromFragment(raw: string): Option.Option<View> {
-  // The link `/remote pair` prints carries its invitation in a fragment
-  // of its own shape; it opens the group that pairs (client/Spec.lean §3-2).
+  
+  
   if (isInvitation(raw)) return Option.some({ kind: "setup", group: "remote" });
   const whole = named(raw);
   const mark = whole.indexOf("?");
@@ -379,9 +341,7 @@ export function fromFragment(raw: string): Option.Option<View> {
   }
 }
 
-// A conversation, or one of its earlier stretches, with an item to open
-// beside it: the only view a query follows. The address is escaped, so its own question marks are `%3F`
-// and the first bare one starts the query.
+
 function talkWith(path: string, query: string): Option.Option<View> {
   const head = ["talk/", "s/"].find((prefix) => path.startsWith(prefix));
   if (head === undefined) return Option.none();
@@ -392,9 +352,7 @@ function talkWith(path: string, query: string): Option.Option<View> {
   );
 }
 
-// What the address bar says, when this build cannot resolve it. `None`
-// for an empty fragment, which is the first page rather than a broken
-// link.
+
 export function unresolved(hash: string): Option.Option<string> {
   const name = named(hash);
   if (name === "" || Option.isSome(fromFragment(hash))) {
@@ -403,8 +361,7 @@ export function unresolved(hash: string): Option.Option<string> {
   return Option.some(`#/${name}`);
 }
 
-// The address bar, as the one thing this module reads and writes on it.
-// `window.location` is one; a test hands in a plain object.
+
 export interface AddressBar {
   hash: string;
 }
@@ -413,18 +370,14 @@ export function current(bar: Readonly<AddressBar>): Option.Option<View> {
   return fromFragment(bar.hash);
 }
 
-// Puts a view in the address bar. Assigning the hash pushes a history
-// entry and fires `hashchange`, and that listener is what moves the
-// signal: a click, an `<a href>` and the back button take one path.
+
 export function go(bar: AddressBar, view: View): void {
   bar.hash = toFragment(view);
 }
 
 export type WorkspaceView = Extract<View, { kind: "talk" }>;
 
-// The one reader for a workspace typed into `/room`, `/cd` or the
-// palette. Bare text is an address; a fragment or URL must name a talk
-// view, never another page that happens to share the address grammar.
+
 export function readWorkspace(raw: string): WorkspaceView | null {
   const text = raw.trim();
   if (text === "") return null;
@@ -443,9 +396,7 @@ export function readWorkspace(raw: string): WorkspaceView | null {
   );
 }
 
-// Where a parsed workspace goes against the buildings the city knows.
-// A top-level name follows the raise/building classification; a room is
-// direct only below an established building.
+
 export function workspaceDestination(
   view: WorkspaceView,
   buildings: readonly BuildingProgress[],
@@ -455,7 +406,7 @@ export function workspaceDestination(
   return buildings.some((held) => held.addr === building && !held.adoptable) ? view : null;
 }
 
-// The building an address belongs to: its first segment.
+
 export function buildingOf(address: Address): Address {
   const slash = address.indexOf("/");
   return slash < 0 ? address : Address.make(address.slice(0, slash));
@@ -471,10 +422,7 @@ export type BuildingDestination =
       readonly view: { readonly kind: "raise"; readonly address: Address };
     };
 
-// Where a top-level address goes, read against the city's own building
-// list. Navigation and the raise form share this classification (client
-// D104): an established building has a page, while an adoptable folder or
-// an unknown name is confirmed on the prefilled raise page.
+
 export function buildingDestination(
   addr: Address,
   buildings: readonly BuildingProgress[],
@@ -485,15 +433,13 @@ export function buildingDestination(
   return { kind: "building", view: { kind: "building", address: addr } };
 }
 
-// The last segment: what a person called the room.
+
 export function roomOf(address: Address): string {
   const slash = address.lastIndexOf("/");
   return slash < 0 ? address : address.slice(slash + 1);
 }
 
-// The room a person names inside a building: `<building>/<name>`, which
-// a dispatch opens by itself, so naming a room needs no digest model to
-// name it. None when the name is one the city would refuse as a session.
+
 export function roomIn(building: Address, name: string): Option.Option<Address> {
   const named = name.trim();
   return Schema.is(SessionName)(named)

@@ -26,10 +26,10 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
-import words from "../../client/src/lang.json";
-import { DEFAULT_VIEW, toFragment } from "../../client/src/core/route.ts";
-import { TREE } from "../../client/src/views/settings/tree.ts";
-import { HEADING } from "../../client/src/views/setup/groups.ts";
+import words from "../../RefRain/src/lang.json";
+import { DEFAULT_VIEW, toFragment } from "../../RefRain/src/core/route.ts";
+import { TREE } from "../../RefRain/src/views/settings/tree.ts";
+import { HEADING } from "../../RefRain/src/views/setup/groups.ts";
 import { observeModalFocus } from "./acceptance-focus.mjs";
 
 const [port, output] = process.argv.slice(2);

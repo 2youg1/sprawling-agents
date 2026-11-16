@@ -1,7 +1,7 @@
 # What the npm and render gates judge, prepared the one way this
 # repository states it.
 #
-# `npm` reads `client/node_modules` to judge every licence and `render`
+# `npm` reads `RefRain/node_modules` to judge every licence and `render`
 # opens `Sprawling/app/web-dist/index.html` to measure the page. Neither skips
 # when what it judges is absent: a gate that silently judged nothing let
 # one run report green on twelve gates while claiming fourteen, so both
@@ -15,7 +15,7 @@
 # that had never installed the tree it judged.
 #
 # A job that only embeds the bundle asks for `bundle`: the bundle is a
-# function of `client/`, so a cache entry keyed by every file there
+# function of `RefRain/`, so a cache entry keyed by every file there
 # stands in for `bun install` and the Vite build, which cost the test
 # build 27 s before its compile could start. Only main writes the entry.
 name: client artefacts
@@ -37,11 +37,11 @@ runs:
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
       with:
         path: Sprawling/app/web-dist
-        key: web-dist-${{ runner.os }}-${{ hashFiles('client/**', '!client/node_modules/**') }}
+        key: web-dist-${{ runner.os }}-${{ hashFiles('RefRain/**', '!RefRain/node_modules/**') }}
     - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
       if: steps.bundle.outputs.cache-hit != 'true'
       with:
-        bun-version-file: client/package.json
+        bun-version-file: RefRain/package.json
     # On Windows bun downloads into the work drive that holds the checkout
     # and restores no cache. Unpacking the 88 MB cache entry into the user
     # profile on the system drive took 30 s; on the work drive it took
@@ -57,7 +57,7 @@ runs:
       if: runner.os != 'Windows' && steps.bundle.outputs.cache-hit != 'true'
       with:
         path: ~/.bun/install/cache
-        key: bun-${{ runner.os }}-${{ hashFiles('client/bun.lock') }}
+        key: bun-${{ runner.os }}-${{ hashFiles('RefRain/bun.lock') }}
         restore-keys: bun-${{ runner.os }}-
     # The recipe runner, because the command below is a recipe. Jobs that
     # already install it pay nothing: the action is a no-op on a hit.
@@ -73,4 +73,4 @@ runs:
       if: inputs.want == 'bundle' && steps.bundle.outputs.cache-hit != 'true' && github.ref == 'refs/heads/main'
       with:
         path: Sprawling/app/web-dist
-        key: web-dist-${{ runner.os }}-${{ hashFiles('client/**', '!client/node_modules/**') }}
+        key: web-dist-${{ runner.os }}-${{ hashFiles('RefRain/**', '!RefRain/node_modules/**') }}

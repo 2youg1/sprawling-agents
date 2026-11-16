@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Trace vectors for the letter properties `client/spec/Views/Workspace.lean`
+// Trace vectors for the letter properties `RefRain/spec/Views/Workspace.lean`
 // proves (client D73): every trace of mailbox inputs between opening a
 // letter and closing it, up to a length, from every state the shell
 // can start in.

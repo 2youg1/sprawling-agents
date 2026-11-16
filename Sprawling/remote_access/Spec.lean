@@ -368,8 +368,8 @@ D22 本 crate 不读配置。通路的三个参数（选哪一个实现、隧道
 / 与其下的路径    不是 WebSocket 升级的 GET：客户端的 bundle，与城自己的端口同一份（`wire::bundle_routes`，`Sprawling/wire/Spec.lean` §8-2、wire D20）
 ```
 
-- **页面经同一个端口到达设备**：设备打开二维码里的 `https://<外面的地址>/#pair=…`，远程监听答出客户端的 bundle，页面在这个源上配对、存下设备密钥（`client/Spec.lean` §4-57）。页面这一半不经过门：没配对的浏览器得先拿到页面，才有地方兑配对码，这与城的端口上 `/` 不要令牌是同一个理由（`Sprawling/wire/spec/Reception/Admission.lean`）。页面之外的 HTTP 门（`/transcribe`、`/drop`、`/enroll`、`/acp`）不在远程监听上：它们不是线协议帧，中继判不了它们的动词类，所以在远程源上答 404。
-- **配对之后整个客户端经 `/remote/session` 说线协议**：页面在 `https:` 源上、这个源的 IndexedDB 存着一台配对过的设备时，链路的每一次连接都是一次会话握手，此后每一帧线协议文本封成 `Payload::Frame` 发出，城发回的每一帧打开后交给链路；没有配对过的源照旧连 `/ws`（`client/Spec.lean` §4-64）。中继把设备的 `Hello` 帧连同城的配对令牌一起交给城的 `/ws`，所以设备不持有令牌。端到端的证据是 `Sprawling/app/tests/remote_door/main.rs`：从远程地址取到的 `/` 与城的端口上的 `/` 逐字节相同，设备经 `/remote/session` 收到城的 `Welcome`。
+- **页面经同一个端口到达设备**：设备打开二维码里的 `https://<外面的地址>/#pair=…`，远程监听答出客户端的 bundle，页面在这个源上配对、存下设备密钥（`RefRain/Spec.lean` §4-57）。页面这一半不经过门：没配对的浏览器得先拿到页面，才有地方兑配对码，这与城的端口上 `/` 不要令牌是同一个理由（`Sprawling/wire/spec/Reception/Admission.lean`）。页面之外的 HTTP 门（`/transcribe`、`/drop`、`/enroll`、`/acp`）不在远程监听上：它们不是线协议帧，中继判不了它们的动词类，所以在远程源上答 404。
+- **配对之后整个客户端经 `/remote/session` 说线协议**：页面在 `https:` 源上、这个源的 IndexedDB 存着一台配对过的设备时，链路的每一次连接都是一次会话握手，此后每一帧线协议文本封成 `Payload::Frame` 发出，城发回的每一帧打开后交给链路；没有配对过的源照旧连 `/ws`（`RefRain/Spec.lean` §4-64）。中继把设备的 `Hello` 帧连同城的配对令牌一起交给城的 `/ws`，所以设备不持有令牌。端到端的证据是 `Sprawling/app/tests/remote_door/main.rs`：从远程地址取到的 `/` 与城的端口上的 `/` 逐字节相同，设备经 `/remote/session` 收到城的 `Welcome`。
 
 - **监听在回环上，随门开关**：`/remote open` 在 `127.0.0.1` 上绑一个系统给的端口，通路把外面引到它（§8-7）；门关上（控制台、设备锁门或到时）监听随之停止。城自己的端口不经通路，仍由它的配对令牌守着。
 - **每条消息都是二进制 WebSocket 消息**，正文就是 §8-4、§8-6、§8-5 的定长消息或封装；文本消息被拒（`E_WIRE_MISMATCH`），连接结束。
@@ -408,7 +408,7 @@ fixture.txt           city_public, hello, x25519_private, ml_kem_private, reply,
 - **`seal.txt`**：§8-5 的封装。同一把城到设备的密钥 `key` 依次封两个负载：`frame` 是 `Payload::Frame` 的字节（首字节 `00`，后接 UTF-8 文字），计数 0；`lock` 是 `Payload::Lock`（一个字节 `01`），计数 1。nonce 是方向标签 `c->d` 的四个 ASCII 字节接 8 字节大端计数，计数不上线；AAD 为空；`*_sealed` 是密文接 16 字节的 GCM 标签。
 - **`signature-*.txt`**：一把混合公钥、一条消息与它的混合签名（§8-3）。`signature-rust.txt` 由 Rust 用 `keys.txt` 的那把密钥签；aws-lc-rs 的 ML-DSA-44 签名带随机（hedged），所以只有 Ed25519 一半能逐字节复现，浏览器验整份。浏览器一侧签的那一份由客户端提交为 `signature-browser.txt`，字段相同；Rust 的测试验目录里每一个 `signature-*.txt`，所以它落地时 Rust 一侧不改代码。
 - **`fixture.txt`**：单向夹具（D11）。`hello` 是设备的 `Hello`（设备 id、X25519 公钥、ML-KEM-768 封装密钥、nonce），`x25519_private` 与 `ml_kem_private`（FIPS 203 的 2400 字节解封装密钥）是它的两把临时私钥；`reply` 是 Rust 城对它的回答，`city_public` 是签回答的城公钥；`first_frame` 是握手之后城封给设备的第一帧（城到设备，计数 0），`plaintext` 是它打开后的负载字节（`Payload::Frame`，约定的文字）。设备走 §8-4 的设备一半：从 `hello` 与不含签名的 `reply` 算握手记录，用 `city_public` 验回答的签名，派生会话密钥，打开 `first_frame`，得出 `plaintext`。
-- **浏览器一侧**：`client/src/core/remote/interop.test.ts` 读同一组文件，以页面的实现（WebCrypto 加 `@noble/post-quantum`，D21）重算确定的三份、验 `signature-rust.txt`、用固定的临时私钥打开 `fixture.txt` 的第一帧；它还用 `keys.txt` 的种子签 `signature-rust.txt` 的那条消息，写成 `signature-browser.txt`，Rust 一侧的 `every_signature_vector_verifies` 验它。这一份只在树上那一份在浏览器一侧验不过时由 `GOLDEN_WRITE=1 bun test --conditions=browser src/core/remote/interop.test.ts`（在 `client/` 里跑）重写。
+- **浏览器一侧**：`RefRain/src/core/remote/interop.test.ts` 读同一组文件，以页面的实现（WebCrypto 加 `@noble/post-quantum`，D21）重算确定的三份、验 `signature-rust.txt`、用固定的临时私钥打开 `fixture.txt` 的第一帧；它还用 `keys.txt` 的种子签 `signature-rust.txt` 的那条消息，写成 `signature-browser.txt`，Rust 一侧的 `every_signature_vector_verifies` 验它。这一份只在树上那一份在浏览器一侧验不过时由 `GOLDEN_WRITE=1 bun test --conditions=browser src/core/remote/interop.test.ts`（在 `RefRain/` 里跑）重写。
 - **重生成**：`GOLDEN_WRITE=1 cargo nextest run -p sprawling-remote-access -E 'test(/vector|fixture/)'`。确定的三份（`keys.txt`、`session-keys.txt`、`seal.txt`）每次重写，字节不变；`signature-rust.txt` 与 `fixture.txt` 带着随机（ML-DSA 的签名、城的临时密钥、新抽的 ML-KEM 密钥），只在提交入库的那一份在 Rust 一侧验不过或打不开时重写，所以协议没变时重跑一次不改一个字节，而标签、握手记录、派生或封装的任何改动都让它们打不开、随之重写。不带这个变量时，测试只读、只比，不写。
 - **固定的临时密钥只经测试的缝进来**：读写这些文件的是 `#[cfg(test)]` 的 `remote_access::handshake::agreement::interop`，它从两把私钥造出设备的临时密钥；发行二进制里设备的临时密钥只有 `generate` 一个来处，`handshake` 没有可注入随机源的接口（D20）。
 
@@ -502,7 +502,7 @@ D7 每个错误码能否不可能发生：`E_GATE_DENIED` 不能——它报的�
 - 1b 选 **aws-lc-rs**（已在依赖图里，经 rustls 引入）：它在稳定接口上提供 ML-KEM-768、ML-DSA-44、X25519、Ed25519、HKDF 与 AES-GCM，是一个带 FIPS 验证历史的库，比拼接几个各自维护的 RustCrypto crate 少一个信任面。浏览器侧：X25519、Ed25519、HKDF、AES-GCM 用 WebCrypto；ML-KEM 与 ML-DSA 需要一个纯 JS 实现，用 `@noble/post-quantum`（MIT），信任口径见 D21；加入它要改 `Tools/xtask/src/npm.rs` 的 `RUNTIME` 表，是一次门的改动，按 AGENTS.md 单独提交。
 - 互通向量（§8-12）不加依赖：十六进制的读写在测试里，不引入 JSON 解析器（D20）。
 
-D21 浏览器一侧的 ML-KEM 与 ML-DSA 用 `@noble/post-quantum`，精确钉版本，只由远程页面懒加载；种子只在配对时显示一次（定规）。它是一个自审、未经独立审计的 0.x 库，而 Rust 一侧选 aws-lc-rs 的理由之一是它的 FIPS 验证历史，两侧的信任口径因此不同；接受它的条件是它的 ML-KEM-768 与 ML-DSA-44 过 §8-12 的向量与夹具。版本号只写在 `client/package.json`，`Tools/xtask/src/npm.rs` 的 `RUNTIME` 表收它一项，两处都归客户端的那次改动。懒加载让没有打开远程页面的人不为它付字节。种子：页面在配对时把 52 个字符的种子给人看一次，不保存；两半密钥分开保存，Ed25519 那一半是 WebCrypto 的不可导出密钥（D1）。代价是重装 PWA 就要重新配对。落选的三种：把 aws-lc 或 RustCrypto 编成 wasm（两端同源，体积推断大一个数量级，aws-lc 编 wasm 未验证）；等浏览器原生支持 ML-KEM 与 ML-DSA（远程门推迟到不定的时候）；种子加密后存进 IndexedDB（页面持有种子，D1 的不可导出就不成立）。出现独立审计，或主流引擎的 WebCrypto 原生提供这两种算法时，重新考虑这一条。
+D21 浏览器一侧的 ML-KEM 与 ML-DSA 用 `@noble/post-quantum`，精确钉版本，只由远程页面懒加载；种子只在配对时显示一次（定规）。它是一个自审、未经独立审计的 0.x 库，而 Rust 一侧选 aws-lc-rs 的理由之一是它的 FIPS 验证历史，两侧的信任口径因此不同；接受它的条件是它的 ML-KEM-768 与 ML-DSA-44 过 §8-12 的向量与夹具。版本号只写在 `RefRain/package.json`，`Tools/xtask/src/npm.rs` 的 `RUNTIME` 表收它一项，两处都归客户端的那次改动。懒加载让没有打开远程页面的人不为它付字节。种子：页面在配对时把 52 个字符的种子给人看一次，不保存；两半密钥分开保存，Ed25519 那一半是 WebCrypto 的不可导出密钥（D1）。代价是重装 PWA 就要重新配对。落选的三种：把 aws-lc 或 RustCrypto 编成 wasm（两端同源，体积推断大一个数量级，aws-lc 编 wasm 未验证）；等浏览器原生支持 ML-KEM 与 ML-DSA（远程门推迟到不定的时候）；种子加密后存进 IndexedDB（页面持有种子，D1 的不可导出就不成立）。出现独立审计，或主流引擎的 WebCrypto 原生提供这两种算法时，重新考虑这一条。
 -/
 
 /-! ## 14 硬编码声明
@@ -534,7 +534,7 @@ D21 浏览器一侧的 ML-KEM 与 ML-DSA 用 `@noble/post-quantum`，精确钉�
 - `Sprawling/remote_access/src/door/spelling.rs` 内的测试：设备 id、公钥与权限的正文各读回原值；短了的 id 与不认识的权限字以 `E_INVALID_ARGS` 拒（§8-11）。
 - `Sprawling/remote_access/src/keys.rs`、`Sprawling/remote_access/src/seal.rs` 内的测试与 `Sprawling/remote_access/src/handshake/tests.rs`：§2 对 keys、handshake、seal 的各条；每条验证步骤被故意拿掉时，对应测试转红。
 - `Sprawling/remote_access/src/handshake/pairing/tests.rs`：§2 对配对握手的各条，每条对应 `Handshake.lean` 的一组定理；`Sprawling/remote_access/src/route/tests.rs`：§2 对通路的各条，`command` 通路对一个脚本化子进程（Windows 上是 `cmd`，其余平台是 `sh`）答出的 `Opened` 与脚本化通路答出的相同。
-- `Sprawling/remote_access/src/handshake/agreement/interop.rs`：§8-12 的五份文件各有一条读回测试，名字里带 `vector` 或 `fixture`；带 `GOLDEN_WRITE=1` 时按 §8-12 重写。浏览器一侧的同一组检查在 `client/src/core/remote/interop.test.ts`，由 `just check-client` 跑。
+- `Sprawling/remote_access/src/handshake/agreement/interop.rs`：§8-12 的五份文件各有一条读回测试，名字里带 `vector` 或 `fixture`；带 `GOLDEN_WRITE=1` 时按 §8-12 重写。浏览器一侧的同一组检查在 `RefRain/src/core/remote/interop.test.ts`，由 `just check-client` 跑。
 - 约束：零 `unsafe`；门、配对码、密钥、握手与封装零 I/O，时间与熵从参数来，唯一例外是两种握手的临时密钥（§8-4、§8-6）；通路的 I/O 只经标准库（D14）。
 - `Sprawling/remote_access/spec/Handshake.lean`：配对握手的三条性质，由 `just models` 证明。它不驱动 Rust 代码；Rust 一侧与它对应的是 §2 里配对的各条。
 
@@ -546,7 +546,7 @@ D11 与浏览器的互通只做组件级已知答案向量，加一条从 Rust �
 - `ARCHITECTURE.md`：§3 的 `depmap` 块（`remote_access: kernel`，`sprawling` 一行带着本 crate）、§4 的缝表（`remote_access::route` 一行）、§10 规则 3（`route::command` 的读线程与 `bin::outside::listener` 的任务）。这些改了，重读本文件 §7 与 §8-7。
 - `architecture.toml`：本 crate 各行与 `[family.remote_access]`，锚点指向本文件或它的分部。新模块先在那里登记。
 - `docs/glossary.md`：远程门、纪元、配对码、邀请、设备、通路、远程会话，并写明远程门与 Gate 的 door、远程会话与房间的 Session 不是一物（§6）。§6 的词改了，两处一起改。
-- `Sprawling/kernel/Spec.lean` §8-76（设备表的路径）与 §8-81（远程门的五个事件）、`Sprawling/wire/Spec.lean` §19-2 的 `class` 列与 §8-66（中继与 `Refusal`）、`Sprawling/app/Spec.lean` §8-139 与 §8-140（门的看守、远程监听、控制台的 `/remote`）、`client/Spec.lean` §9（配对页的交互契约落地时写在那里，§3）。§8-1 的动词类、§8-5 的负载、§8-6 的邀请写法或 §8-10 的两条路径改了，重读这几节。
+- `Sprawling/kernel/Spec.lean` §8-76（设备表的路径）与 §8-81（远程门的五个事件）、`Sprawling/wire/Spec.lean` §19-2 的 `class` 列与 §8-66（中继与 `Refusal`）、`Sprawling/app/Spec.lean` §8-139 与 §8-140（门的看守、远程监听、控制台的 `/remote`）、`RefRain/Spec.lean` §9（配对页的交互契约落地时写在那里，§3）。§8-1 的动词类、§8-5 的负载、§8-6 的邀请写法或 §8-10 的两条路径改了，重读这几节。
 - `Tools/fixtures/remote-handshake/` 与 `Tools/README.md` 的 fixtures 一行（§8-12）：客户端的互通测试读这些文件；§8-3 到 §8-5 的任何字节改了，文件重生成，客户端的测试须仍过。
 - `docs/operating.md` 里控制台 `/remote` 的那一段与 `[remote]` 的写法（两种通路、`tailscale serve` 的示例）：控制台的动词以 `Sprawling/app/Spec.lean` §8-140 为准，表的键以 `Sprawling/city/Spec.lean` §8-39 为准，§8-8、§8-9 改了参数时三处一起改。
 - `README.md` 与 `README.zh-CN.md` 的「它在哪里监听」一节照 D3 与 D10 写远程门与通路上剩下的那一件信任，`docs/getting-started.md` 与中文版的「另一台机器」一节指向 `docs/operating.md`；D3、D10 改了，这四处一起改，中英两份在同一个提交里。

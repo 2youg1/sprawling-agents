@@ -48,7 +48,7 @@ refrain 路线图 §4-9 的 A4 在 Rust 一侧的一半（「不支持」与「�
 
 | 验收 | 完成的定义 |
 |---|---|
-| CommonMark 语料 | `markdown::lowering::tests` 里迁自 `client/src/core/prose.test.ts` 的三组（列表、表与代码块相继闭合；没闭合的代码块留着它的空行；段落由空行而不由换行结束），逐块比较整棵树，块的区间切回源文就是那一块 |
+| CommonMark 语料 | `markdown::lowering::tests` 里迁自 `RefRain/src/core/prose.test.ts` 的三组（列表、表与代码块相继闭合；没闭合的代码块留着它的空行；段落由空行而不由换行结束），逐块比较整棵树，块的区间切回源文就是那一块 |
 | 项目扩展语料 | `markdown::lowering::tests`：删除线、任务列表、脚注、自动链接、CJK 友好的强调、公式、前置元数据、HTML 块，各读成 D22 说的那一种节点 |
 | A4 的 Rust 一半 | `markdown::tests::an_empty_window_an_empty_block_and_an_unread_encoding_are_three_shapes`：空窗口答零个块，内容为空的代码块读成 `Code { text: "" }`，UTF-16 的版本答 `Preview::Unsupported`；`markdown::lowering::tests::what_the_grammar_reads_but_does_not_draw_keeps_its_source`：HTML、公式与前置元数据读成带原文的 `Unsupported`；几者各不同形 |
 | 预览逐窗读完 | `markdown::tests::reading_on_from_each_preview_lays_out_every_paragraph_once`：超过一窗的版本从 0 起按答复的 `span.end` 逐窗读，每一段恰好读出一次 |
@@ -73,7 +73,7 @@ refrain 路线图 §4-9 的 A4 在 Rust 一侧的一半（「不支持」与「�
 
 **修改提案迁自 RefRain `refrain-core` 的 `manuscript::review` 与 `manuscript::decision`**：提案冻在一个基线上、句子切片（终止符与紧随的闭合符号）、逐句的判词（接受、改后接受，改后接受只对插入的句子）、批量决定的过期与重叠拒绝。改动的：身份由内容摘要算出而不是随机 `Id`（D13）；对齐的键是整句的字节而不只是去掉空白的句子（D14）；只迁对齐表的那一半，不迁锚点分段（D15）；作用域是一段字节而不是一串块 id（D17）；`CommentOnly` 与「格式改动」的分类没有迁，卡上没有它们的读者。
 
-**Markdown 的读法。** 本 crate 之前，页面上的 Markdown 只由 `client/src/core/prose.ts` 读：标题、列表、围栏代码、表、引用与三种行内标记，按正则一行一行认，链接只认 `http(s)`；嵌套列表、引用里的块、HTML、脚注、引用式链接与公式都读成段落文字。它产出数据而不是 HTML，这一条迁过来了（D21）；其余由 comrak 的 CommonMark 与 GFM 取代（D20、D22）。它的 `closedUpTo`（流式的回复里哪一段已经不会再变）的规则迁成 `layout::closed`（D31），围栏的认法换成 `layout` 分块用的同一条（`~~~` 与缩进三列以内的围栏也认）；对话流由城读（D30），`prose.ts` 在页面接上 `Query::Reply` 时删去（client/Spec.lean §4-26）。
+**Markdown 的读法。** 本 crate 之前，页面上的 Markdown 只由 `RefRain/src/core/prose.ts` 读：标题、列表、围栏代码、表、引用与三种行内标记，按正则一行一行认，链接只认 `http(s)`；嵌套列表、引用里的块、HTML、脚注、引用式链接与公式都读成段落文字。它产出数据而不是 HTML，这一条迁过来了（D21）；其余由 comrak 的 CommonMark 与 GFM 取代（D20、D22）。它的 `closedUpTo`（流式的回复里哪一段已经不会再变）的规则迁成 `layout::closed`（D31），围栏的认法换成 `layout` 分块用的同一条（`~~~` 与缩进三列以内的围栏也认）；对话流由城读（D30），`prose.ts` 在页面接上 `Query::Reply` 时删去（RefRain/Spec.lean §4-26）。
 -/
 
 /-! ## 5 权威信源
@@ -106,7 +106,7 @@ refrain 路线图 §4-9 的 A4 在 Rust 一侧的一半（「不支持」与「�
 - **一次保存怎样落盘、怎样记账**归 `city::document`（锁、读当前字节、整份换上，`Sprawling/city/Spec.lean` §8-40）与写者 `accounting::worker::commanding::saving`（`Sprawling/wire/Spec.lean` §8-72、§8-73）。
 - **一张卡开着、决定过还是收回过**归读账本的折叠（`Sprawling/accounting/Spec.lean` §8-22）：本 crate 给出每一步的判定，不持有任何一张卡。
 - **线上的拼写**归 `wire`：它直接携带本 crate 的 `Span`、`Format`、`Encoding`、`Window`，以及预览的 `Preview` 与它的块（D1、D21）。
-- **把块画成元素**归页面（client/Spec.lean §4-26）：本 crate 给页面数据，不给 HTML，也不决定一个 `Unsupported` 怎样显示原文。导出是例外，也只有这一处：`markdown::export` 把同一棵树写成一份离开城与页面之后独立成立的 HTML（D33）。
+- **把块画成元素**归页面（RefRain/Spec.lean §4-26）：本 crate 给页面数据，不给 HTML，也不决定一个 `Unsupported` 怎样显示原文。导出是例外，也只有这一处：`markdown::export` 把同一棵树写成一份离开城与页面之后独立成立的 HTML（D33）。
 - **CommonMark 与 GFM 的文法**归 comrak（D20、D22）：本 crate 只选扩展、把它的树读成本 crate 的树、判链接的协议与嵌套的深度。
 
 约束：本 crate 只依赖 `kernel`、`serde`、`comrak` 与可选的 `schemars`；恒不出现 I/O、时钟与全局状态。
@@ -200,7 +200,7 @@ D25 预览按版本读一个窗口：窗口照 `Range` 的切法（`cut`，D7）
 
 D26 源位置：comrak 的 `sourcepos`（行与按字节数的列，都从 1 起，终点含在内）换算成版本里的半开字节区间。行按 comrak 的切法（`\r\n`、`\r`、`\n`）数，终点列换成不含的末尾，落到文字之外的夹到文字末尾。区间只用来定位（预览与源码的对应），不用来编辑：编辑仍走 `Span` 与 `Transaction`（D8），refrain 路线图附录 F 说的正是 source position 不保证可视编辑无损。行内节点不带区间，因为今天的读者只要块一级的对应。
 
-D30 对话流读同一个文法，入口是一条带文字的查询：页面把它手里的回复文字与「还在说／已结算」送给 `reply`（线上 `Query::Reply`，`Sprawling/wire/Spec.lean` §8-75），答复是 `Laid`。结算了的回复按「一个只装着这段文字的版本」读，所以它读出的树与预览同一段字节的树相等（`a_settled_reply_is_laid_out_as_a_preview_of_its_text`）；还在说的回复只读收束点之前的字节（D31），开着的末尾页面照旧画原文。一次至多读一个窗口（D7），页面从答复的 `span.end` 接着送其余的文字，所以一次答复的代价与一次预览同阶，而不随回复多长变。选这一条，是因为它是唯一一个同时盖住流式与历史的入口：页面手里本来就有文字（流式时来自增量，重开页面时来自 `model_returned` 的载荷），一个入口两处都用。被否的：(a) 写 `model_returned` 的一方把回复的文字另存进内容库、记录带上地址，页面按版本问 `Preview`——回复的文字就有了第二个家（`ModelCalled` 不带请求体也是这条理由），每一次回复多一次内容库写入，`model_returned` 的形状要变，变之前写下的行没有地址，页面为它们仍要第二个读法；而且它只盖结算之后，还在说的那一段只能画原文，块随闭合画出的那一半（`[stream_relayout]` 量出的 0 px 跳动）就丢了。(b) 城在流式增量旁边按同一个文法给出已经闭合的块——增量按构造可丢（`Sprawling/wire/Spec.lean` §8-8：漏了一帧的页面什么也没丢），块放进去之后漏一帧就是少一块；它也只盖流式，从历史打开的回复没有增量，于是还要 (a) 或 (c) 在旁边，入口成了两个。代价：文字随每一问回到城里一次，每次闭合多一次往返——同一台机器上是回环上的一次 WebSocket 往返，远程门上是一次网络往返，都还没有读数；页面只在手里的文字长了时再问，同时只有一问在途（client/Spec.lean §4-26）。重开参数：远程门上量出的往返超过人能察觉的界（refrain 路线图 §5 的 `client_send_feedback`，100 ms），那时流式这一半另加 (b)，历史仍走这一个入口。
+D30 对话流读同一个文法，入口是一条带文字的查询：页面把它手里的回复文字与「还在说／已结算」送给 `reply`（线上 `Query::Reply`，`Sprawling/wire/Spec.lean` §8-75），答复是 `Laid`。结算了的回复按「一个只装着这段文字的版本」读，所以它读出的树与预览同一段字节的树相等（`a_settled_reply_is_laid_out_as_a_preview_of_its_text`）；还在说的回复只读收束点之前的字节（D31），开着的末尾页面照旧画原文。一次至多读一个窗口（D7），页面从答复的 `span.end` 接着送其余的文字，所以一次答复的代价与一次预览同阶，而不随回复多长变。选这一条，是因为它是唯一一个同时盖住流式与历史的入口：页面手里本来就有文字（流式时来自增量，重开页面时来自 `model_returned` 的载荷），一个入口两处都用。被否的：(a) 写 `model_returned` 的一方把回复的文字另存进内容库、记录带上地址，页面按版本问 `Preview`——回复的文字就有了第二个家（`ModelCalled` 不带请求体也是这条理由），每一次回复多一次内容库写入，`model_returned` 的形状要变，变之前写下的行没有地址，页面为它们仍要第二个读法；而且它只盖结算之后，还在说的那一段只能画原文，块随闭合画出的那一半（`[stream_relayout]` 量出的 0 px 跳动）就丢了。(b) 城在流式增量旁边按同一个文法给出已经闭合的块——增量按构造可丢（`Sprawling/wire/Spec.lean` §8-8：漏了一帧的页面什么也没丢），块放进去之后漏一帧就是少一块；它也只盖流式，从历史打开的回复没有增量，于是还要 (a) 或 (c) 在旁边，入口成了两个。代价：文字随每一问回到城里一次，每次闭合多一次往返——同一台机器上是回环上的一次 WebSocket 往返，远程门上是一次网络往返，都还没有读数；页面只在手里的文字长了时再问，同时只有一问在途（RefRain/Spec.lean §4-26）。重开参数：远程门上量出的往返超过人能察觉的界（refrain 路线图 §5 的 `client_send_feedback`，100 ms），那时流式这一半另加 (b)，历史仍走这一个入口。
 
 D31 收束点：一段还在写的 Markdown 里，已经不会再变的块止于最后一个这样的完整行之后——代码块之外的空行；顶格（第一列）的 ATX 标题行；从顶格开启的代码块的闭合行（`layout::closed`，`spec/Markdown.lean` 的 `closedUpTo`）。没有换行的最后一行什么也不收束，因为接下来的字可能接上它。围栏用 `layout` 分块的同一条认法（D6：三个以上同一个 `` ` `` 或 `~`，缩进少于四列，闭合行同字符且不短于开启行），代码块里的空行与标题不收束。只认顶格的标题与顶格开启的代码块，是因为缩进的那些可能在一个列表项或引用里，它之后的行还可能接回那个容器。这是 `prose.ts` 的 `closedUpTo` 的规则，围栏换成了本 crate 的认法。收束点只进不退（`closed_stays`），不过回复的长度（`closed_le_length`）。已知的两处会变：块之间隔着空行的列表在流式期间一段一段读，结算之后读成一个松散列表；定义晚于引用到达的链接与脚注在流式期间读成文字。两处都在结算的那一问里读对，页面画结算的答复。被否的：①预览的止法（止于倒数第二块，D25）——它为了保证有进展，一块都没闭合时也读出整个窗口，还在说的段落就被读成了一块；②读整段文字，留下 comrak 的树里末尾之前的块——一段没写完的文字读出的树不说明哪些会变（`Title` 之下来一行 `===` 就从段落变成标题，列表项的下一行可能接回它）；③沿用 `prose.ts` 只认行首三个反引号的围栏——同一个 crate 里两条围栏规则，`~~~` 与缩进的围栏在分块与收束里各判一次。
 
@@ -234,7 +234,7 @@ Markdown（`markdown::lowering::tests`、`markdown::target::tests`、`markdown::
 
 `kernel`（`AxError`、`B3Hash` 与它的 BLAKE3）、`serde`（线上携带的类型，D1）、可选的 `schemars`（`schema` feature，只由 `wire` 的 `schema` 打开）、`comrak`（Markdown 的文法，D20、D22）。不引入编码探测库：它会猜（D4）。
 
-comrak（BSD-2-Clause）关掉默认 feature 取用：默认的是它的命令行与 syntect 高亮器，而代码的颜色归页面的 lezer（client/Spec.lean §4-26）。它把 CommonMark 规范的全部例子当作自己的测试，GFM 的扩展同样；它的树是一个 arena，读完即丢，不比一次调用活得久。被比较过的：pulldown-cmark——事件流而不是树，源位置是字节区间而不是行列，但它的扩展里没有前置元数据与 CJK 友好的强调；markdown-rs——mdast 树更完整，但传递依赖更多、更新更慢。版本在根 `Cargo.toml`，锁在 `Cargo.lock`。comrak 经 `finl_unicode` 读 Unicode 的字符类别，它的许可声明是 `(MIT OR Apache-2.0) AND Unicode-DFS-2016`；`deny.toml` 收下 Unicode-DFS-2016 是人的定规：它是清单里已有的 Unicode-3.0 的 2016 年文本，同样宽松，只要求声明随数据同行，而图里只有 `finl_unicode` 带来它。块的两条规则（D6）仍是本 crate 自己的：它们给 `head` 与预览的窗口找块末，只要字节，不要一棵 CommonMark 树。规格的分部不 import 任何别的 crate 的规格。
+comrak（BSD-2-Clause）关掉默认 feature 取用：默认的是它的命令行与 syntect 高亮器，而代码的颜色归页面的 lezer（RefRain/Spec.lean §4-26）。它把 CommonMark 规范的全部例子当作自己的测试，GFM 的扩展同样；它的树是一个 arena，读完即丢，不比一次调用活得久。被比较过的：pulldown-cmark——事件流而不是树，源位置是字节区间而不是行列，但它的扩展里没有前置元数据与 CJK 友好的强调；markdown-rs——mdast 树更完整，但传递依赖更多、更新更慢。版本在根 `Cargo.toml`，锁在 `Cargo.lock`。comrak 经 `finl_unicode` 读 Unicode 的字符类别，它的许可声明是 `(MIT OR Apache-2.0) AND Unicode-DFS-2016`；`deny.toml` 收下 Unicode-DFS-2016 是人的定规：它是清单里已有的 Unicode-3.0 的 2016 年文本，同样宽松，只要求声明随数据同行，而图里只有 `finl_unicode` 带来它。块的两条规则（D6）仍是本 crate 自己的：它们给 `head` 与预览的窗口找块末，只要字节，不要一棵 CommonMark 树。规格的分部不 import 任何别的 crate 的规格。
 -/
 
 /-! ## 14 硬编码声明
@@ -248,7 +248,7 @@ comrak（BSD-2-Clause）关掉默认 feature 取用：默认的是它的命令�
 
 /-! ## 15 影响面
 
-改 `Span`、`Format`、`Encoding` 或 `Window` 的形状就改了线上的文档答复：`wire` 的 schema 摘要变、`client/src/wire.ts` 重生成、读文档的三处页面（`client/src/core/document.ts` 的读者）跟着改。改 `Reading::of` 改的是 `Document`、`Range`、`Content` 与 `Prefix` 四条查询对「是不是文本」的同一个判断。改 `WINDOW_BYTES_MAX` 改的是每个窗口答复的大小上限。`edit` 的生产调用方是 `save`，经它是 `accounting::worker::commanding::saving`；`selection` 仍只有测试调用：页面自己把光标带过一次保存，城里没有一个读者的位置。改 `Slice`、`SliceKind`、`TextEdit` 的形状就改了线上的提案答复与保存帧；改句子的切法或对齐会改变已经入账的提案在页面上的样子，但不改变它们的身份（身份只读原文与提议，D13），也不改变任何已经落下的字节。
+改 `Span`、`Format`、`Encoding` 或 `Window` 的形状就改了线上的文档答复：`wire` 的 schema 摘要变、`RefRain/src/wire.ts` 重生成、读文档的三处页面（`RefRain/src/core/document.ts` 的读者）跟着改。改 `Reading::of` 改的是 `Document`、`Range`、`Content` 与 `Prefix` 四条查询对「是不是文本」的同一个判断。改 `WINDOW_BYTES_MAX` 改的是每个窗口答复的大小上限。`edit` 的生产调用方是 `save`，经它是 `accounting::worker::commanding::saving`；`selection` 仍只有测试调用：页面自己把光标带过一次保存，城里没有一个读者的位置。改 `Slice`、`SliceKind`、`TextEdit` 的形状就改了线上的提案答复与保存帧；改句子的切法或对齐会改变已经入账的提案在页面上的样子，但不改变它们的身份（身份只读原文与提议，D13），也不改变任何已经落下的字节。
 
 改 `markdown` 的树（加一种块、一种行内、一种 `Construct`）就改了 `Answer::Preview`：`wire` 的 schema 摘要变、`wire.ts` 重生成、页面的画法多一臂。改文法的扩展清单（D22）改的是每一份 Markdown 读出的块，预览、对话流与导出一起变。改 `NESTING_MAX` 改的是答复在 JSON 里最深多少层（D24）。改收束点的规则（D31）改的是流式期间哪些块提前画出，不改结算之后的树；改 `Laid` 的形状同时改 `Answer::Preview` 与 `Answer::Reply`。
 -/
@@ -264,9 +264,9 @@ comrak（BSD-2-Clause）关掉默认 feature 取用：默认的是它的命令�
 
 - `architecture.toml` 里 documents 各行（锚点指向本文件与分部），ARCHITECTURE.md §3 的 `depmap`（`documents: kernel`，`wire` 与 `accounting` 两行各有它）。
 - `docs/glossary.md` 的 **document version**、**document window**、**draft**、**preview**、**proposal**、**review slice**。
-- `Sprawling/wire/Spec.lean` §8-74、§12.11（`Query::Preview`）；`Sprawling/accounting/Spec.lean` §8-23、accounting D35（谁从内容库读、谁作答）；client/Spec.lean §4-26、client D14（页面怎样画这棵树，为什么在城里读）。
+- `Sprawling/wire/Spec.lean` §8-74、§12.11（`Query::Preview`）；`Sprawling/accounting/Spec.lean` §8-23、accounting D35（谁从内容库读、谁作答）；RefRain/Spec.lean §4-26、client D14（页面怎样画这棵树，为什么在城里读）。
 - `Sprawling/accounting/Spec.lean` §8-30、accounting D42（`proposal` 工具：在哪一版上提、怎样找出原文、怎样写行，D35、D36）。
-- `Sprawling/wire/Spec.lean` §8-75、§12.12（`Query::Reply`）；`Sprawling/accounting/Spec.lean` §8-29、accounting D41（回复在视图锁外读）；client/Spec.lean §4-26、client D15（页面什么时候问、删 `prose.ts`）；`Sprawling/wire/Spec.lean` §8-8（增量为什么不带块）。
+- `Sprawling/wire/Spec.lean` §8-75、§12.12（`Query::Reply`）；`Sprawling/accounting/Spec.lean` §8-29、accounting D41（回复在视图锁外读）；RefRain/Spec.lean §4-26、client D15（页面什么时候问、删 `prose.ts`）；`Sprawling/wire/Spec.lean` §8-8（增量为什么不带块）。
 - `Sprawling/wire/Spec.lean` §8-69、§8-70（文档读取契约）、§8-72、§8-73（保存与提案）、§12.8、§12.10；`Sprawling/kernel/Spec.lean` §8-83（`document_written` 与提案的三种事件，`SliceVerdict`）；`Sprawling/accounting/Spec.lean` §8-21（谁读盘、谁存版本、谁作答）、§12 第 33 条；`Sprawling/storage/Spec.lean` §8-36（版本进内容库）；`Sprawling/city/Spec.lean` §8-27、§8-40（`city::document`：锁、读当前字节、整份换上）；`Sprawling/accounting/Spec.lean` §8-22（保存与提案的写者、提案的折叠）。这些节改了，重读本文件对应的决定。
 - refrain 路线图 §4-8、§4-9、§4-10、附录 B–G 是本 crate 的需求来源；RefRain 的 `source_layout`、`native_document`、`manuscript::review` 与 `manuscript::decision` 四个模块是迁入的出处（§4）。
 -/

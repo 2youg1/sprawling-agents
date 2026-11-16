@@ -1,18 +1,8 @@
-<!-- This Source Code Form is subject to the terms of the Mozilla Public
-     License, v. 2.0. If a copy of the MPL was not distributed with this
-     file, You can obtain one at https://mozilla.org/MPL/2.0/.
-     Copyright (c) 2026 2youg1 and the sprawling contributors -->
+
 
 <script lang="ts">
-  // The shell: one twelve-column grid (docs/frontend-method.md §4-33), the page on its
-  // columns, the three edge keys at the foot of the first column, and what
-  // may float over them - the settings panel, a refusal, the palette, the
-  // sheet of keys. Which page shows is the address bar's decision, read on
-  // every `hashchange`; the conversation page lays itself out by the tier
-  // (`views/workspace.svelte`). The keys are spelled in `core/keys`; this
-  // file asks which action a press was and does that one thing. A stopped
-  // city is said once, here, as a banner over every page.
-
+  
+  
   import { Option } from "effect";
   import { onMount, tick } from "svelte";
 
@@ -64,8 +54,7 @@
   import { launchOf, opensGuide } from "./views/welcome/guide";
   import { keepSheets, leaveSheet, openSheet, sheetsOpen } from "./views/sheets.svelte";
 
-  // The Opening `main.ts` read off the page, captured once and whole: the
-  // shell never follows its fields, which the suppression below says.
+  
   const props: { opening: Opening } = $props();
   // svelte-ignore state_referenced_locally (the shell captures this value once at mount and never follows the prop)
   setUi(props.opening);
@@ -78,11 +67,10 @@
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const bindings = keymap();
 
-  // The actions that move the address bar, derived from `Action` so a
-  // new `go.*` action has to land somewhere here before this compiles.
+  
   type GoAction = Extract<Action, `go.${string}`>;
 
-  // Where each of them lands; every other action is answered by `act`.
+  
   const GOES: Readonly<Record<GoAction, View>> = {
     "go.talk": { kind: "talk", address: MAYOR },
     "go.waiting": { kind: "talk", address: MAYOR },
@@ -97,33 +85,29 @@
   let view = $state.raw<View>(DEFAULT_VIEW);
   let sheetOpen = $state(false);
   let sessionSwitcherOpen = $state(false);
-  // How many times the stop key found no run in front; each is answered.
+  
   let stopsWithoutRun = $state(0);
-  // What opened the sheet, which takes the focus back when it closes.
+  
   let opener: HTMLElement | null = null;
-  // Whether a page was drawn yet: the first paint is not a navigation.
+  
   let arrived = false;
 
   const waiting = $derived($approvals?.length ?? 0);
   const working = $derived($belief.live.length > 0);
-  // What a launch reads to decide whether it opens the guide (client D54).
+  
   const launch = $derived(
     $endpoints !== undefined && "endpoints" in $endpoints
       ? launchOf($endpoints.endpoints, $held.welcomed)
       : undefined,
   );
 
-  // The box a person writes in, wherever the page put it. Reached by the
-  // element it is rather than by a name this file would have to keep in
-  // step with the composer.
+  
   function focusComposer(): void {
     const box = document.querySelector("main textarea");
     if (box instanceof HTMLTextAreaElement) box.focus();
   }
 
-  // After a navigation the new page's own heading takes the focus, so a
-  // keyboard or a screen-reader user lands in the page that just opened
-  // (ux-upgrades A12); the heading stands outside the Tab order.
+  
   function focusTitle(): void {
     const heading = document.querySelector("main h1");
     if (heading instanceof HTMLElement) {
@@ -132,11 +116,7 @@
     }
   }
 
-  // The settings panel takes the focus itself, inside the top layer;
-  // closing it gives the focus back to the control that opened it. A
-  // move to another session of the conversation is timed to the frame
-  // that draws it, and lands in the composer so the next keystroke is
-  // not swallowed by the invisible page title (client D112).
+  
   function settle(): void {
     const was = view;
     view = Option.getOrElse(current(u.bar), () => DEFAULT_VIEW);
@@ -155,9 +135,8 @@
       markEndAtFrame("layer_drawn");
       void tick().then(focusComposer);
     } else if (arrived && view.kind !== "setup") {
-      // Live talk keeps the box; a read-only past view has none, so its
-      // heading is still the landing. Captured now: the tick callback
-      // would otherwise lose the talk narrowing on `view`.
+      
+      
       const intoComposer = switchedSession && view.kind === "talk" && view.session === undefined;
       void tick().then(() => {
         if (back !== null) {
@@ -171,18 +150,11 @@
     arrived = true;
   }
 
-  // One page replaces another through a view transition that carries the
-  // page's title across. It wraps the read of the address bar, not the
-  // write, because `hashchange` arrives in a later task - which also
-  // covers the back button and every `<a href="#/…">`. Firefox lacks the
-  // API, and motion turned off asks for no travel: both take a plain swap.
-  // Talk-to-talk session switches skip the document transition: the
-  // cross-fade costs a panel of latency on every row click while the
-  // title is the only named element that moves (client D112).
+  
   function follow(): void {
     const next = Option.getOrElse(current(u.bar), () => DEFAULT_VIEW);
-    // The panel has its own CSS arrival; a document transition would
-    // delay its close and can overlap the next group navigation.
+    
+    
     if (
       view.kind === "setup" ||
       next.kind === "setup" ||
@@ -205,9 +177,7 @@
     opener = null;
   }
 
-  // Leaves any full page for the Mayor's room in the zen tier: the
-  // settings panel's home key, and a click on either blank side of a
-  // page that offers them.
+  
   function homeZen(): void {
     tierOnLanding = null;
     u.prefs.setTier("zen");
@@ -218,10 +188,7 @@
     u.go(DEFAULT_VIEW);
   }
 
-  // The tier is this tab's (`core/prefs.ts`, client/Spec.lean D47), cycled in `TIERS` order;
-  // holding the layers key shows blend and changes nothing (docs/frontend-method.md §7E), and
-  // one column opens the world as a sheet instead (4-52). A tier is the conversation's layout,
-  // so a press elsewhere returns there first and the tier lands as it settles (D48).
+  
   let columns = $state<Columns>("twelve");
   let tierOnLanding: Tier | null = null;
   function cycleTier(): void {
@@ -256,7 +223,7 @@
         : $held.tier,
   );
 
-  // How many times the mailbox chord asked; the mailbox answers each one.
+  
   let mailboxAsked = $state(0);
 
   let tierHeld: ReturnType<typeof setTimeout> | null = null;
@@ -276,8 +243,7 @@
     }, HOLD_MS);
   }
 
-  // The layers chord acts when it is let go: a tap changes the tier, and
-  // a hold that already showed the blend tier only ends the look.
+  
   function releaseTier(): void {
     if (tierHeld === null) return;
     clearTimeout(tierHeld);
@@ -286,9 +252,7 @@
     else cycleTier();
   }
 
-  // The chord is let go when its own key comes up, or when the
-  // accelerator does: a Mac sends no key-up for a key pressed while
-  // Command is held.
+  
   function letGo(event: KeyboardEvent): void {
     if (event.key === "Control" || event.key === "Meta") expose(false);
     const tierKey = folded(event.key) === folded(bindings.chord("tier.cycle")?.key ?? "");
@@ -304,7 +268,7 @@
 
   function act(action: Action): void {
     switch (action) {
-      // These arms are `GoAction`, so the lookup is checked at compile time.
+      
       case "go.talk":
       case "go.city":
       case "go.mcp":
@@ -331,7 +295,7 @@
         mailboxAsked += 1;
         return;
       case "inspect":
-        // An open item holds the inspector open, so the key shuts both.
+        
         u.prefs.setPanel(rightItem() === null && !$held.panel);
         closeRight();
         return;
@@ -355,18 +319,16 @@
       case "decide.yes":
       case "decide.edit":
       case "decide.no":
-        // Each is answered where its subject is - the entry under the hand
-        // by the thread (`talk/thread.svelte`), an answer by the decide
-        // card holding the focus (`parts/decide.svelte`) - and the shell
-        // holds neither.
+        
+        
         return;
     }
   }
 
   function keys(event: KeyboardEvent): void {
     const accel = event.ctrlKey || event.metaKey;
-    // The accelerator alone, held, draws every key's name; any other key
-    // with it, or an input method's composition, is a chord and not a look.
+    
+    
     expose(
       (event.key === "Control" || event.key === "Meta") && !event.isComposing && !event.repeat,
     );
@@ -377,9 +339,8 @@
       return;
     }
     if (event.repeat && tierHeld !== null) return;
-    // With the palette open, only a chord that holds the accelerator is
-    // the shell's; everything else is being typed into its filter. The
-    // text-field half of this rule lives in `core/keys`' `matches`.
+    
+    
     if (paletteShown() && !accel) return;
     const action = bindings.acting(pressedOf(event));
     if (action !== null) {
@@ -388,12 +349,10 @@
     }
   }
 
-  // The run list is the ground every page stands on: asked and watched
-  // here for the life of the shell, whatever page is open.
+  
   $effect(() => u.conn.asking.ask(QUERIES.city).subscribe(() => undefined));
 
-  // Decided once per launch, so the conversation a skip lands in is not
-  // sent back by the next answer (`client/spec/Views/Guide.lean`).
+  
   let launched = false;
   $effect(() => {
     if (launch === undefined || launched) return;
@@ -401,11 +360,9 @@
     if (opensGuide(launch) && view.kind === "talk") u.go({ kind: "welcome" });
   });
 
-  // The document title and the tab's icon carry what a hidden tab most
-  // needs to say: how many things wait for the person, and whether the
-  // city is working at all.
+  
   $effect(() => {
-    // A city nobody has named is called what the city page calls it.
+    
     const name = $belief.city ?? say($lang, "nav_city");
     document.title = waiting > 0 ? `(${String(waiting)}) ${name}` : name;
     document.documentElement.lang = $lang;

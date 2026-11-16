@@ -6,10 +6,8 @@
 -->
 
 <script lang="ts">
-  // The seat of the copy key (client/Spec.lean §4-65): it holds the
-  // key's state and the receipt's clock, lends the wiring (`./copy`)
-  // the browser's clipboard and the language, and draws whatever
-  // `./copy.look.svelte` is.
+  
+  
   import { onDestroy } from "svelte";
 
   import { ui } from "../../ui";
@@ -21,8 +19,8 @@
   const { lang } = ui();
 
   let copied: Copied = $state(REST);
-  // The wiring keeps at most one receipt waiting, so one handle is all
-  // a key that goes away has to cancel.
+  
+  
   let waiting: ReturnType<typeof setTimeout> | undefined = undefined;
   onDestroy(() => {
     clearTimeout(waiting);

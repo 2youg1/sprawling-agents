@@ -1,40 +1,13 @@
 <script lang="ts" module>
-  // This Source Code Form is subject to the terms of the Mozilla Public
-  // License, v. 2.0. If a copy of the MPL was not distributed with this
-  // file, You can obtain one at https://mozilla.org/MPL/2.0/.
-  // Copyright (c) 2026 2youg1 and the sprawling contributors
-
-  // Cost in five cuts of one authoritative total. Shares are drawn
-  // against `total`, never against the sum of the rows, so an
-  // unattributed remainder stays visible. A provider that reported no
-  // price leaves the total at zero; the server counts those calls and
-  // their tokens, and the page states that count rather than printing
-  // $0.00 as if it were a measurement or calling the city idle.
-  //
-  // **The total and the by-run cut are two questions and stay apart**
-  // (docs/frontend-method.md §7D): one is what this city has spent, the other is who
-  // spent it. The figure beside the title is the total and never a sum of
-  // the rows below it.
-  //
-  // Keep-warm renewals are spend the total already holds, under their
-  // room and the `keep_warm` bucket of the cuts; the line under the header
-  // names that share of the total and how many renewals came too late, and
-  // never adds it to the total again (storage D36).
-  //
-  // The bar under a row is that row's summary: it restates the figure
-  // beside the name, so a compact page draws the name and the figure and
-  // stops there. Which pages are compact is `theme/preference.css`'s one density
-  // attribute, not a switch of this page's own.
-
+  
+  
   import type { Key } from "../core/lang";
   import type { Renewals, UnpricedCalls, UsdMicros } from "../wire";
 
   type Cut = "by_run" | "by_actor" | "by_segment" | "by_tool" | "by_skill";
   const CUTS: readonly Cut[] = ["by_run", "by_actor", "by_segment", "by_tool", "by_skill"];
 
-  // Each cut's heading, one phrase-table key per cut. A table rather than
-  // a spelled-out name so a key that `lang.json` drops fails to compile
-  // instead of failing to render.
+  
   const TITLES: Record<Cut, Key> = {
     by_run: "cost_by_run",
     by_actor: "cost_by_actor",
@@ -57,8 +30,8 @@
   import { costReading, renewalsSent } from "./pricing";
 
   interface Props {
-    // Whether this is the page or a fixture inside one: a document may
-    // have exactly one heading of the page's own rank.
+    
+    
     readonly rank?: "page" | "section" | undefined;
   }
 
@@ -112,9 +85,7 @@
 {/snippet}
 
 {#snippet total()}
-  <!-- An idle city states no figure at all: the empty state under the
-  header already says nothing was spent, and a total of zero beside it
-  would read as a measurement. -->
+  
   {#if answer !== undefined && reading !== undefined && reading.kind !== "idle"}
     <span class="flex items-baseline gap-snug">
       <span class="text-note text-text-faint">{say($lang, "cost_total")}</span>
@@ -125,9 +96,7 @@
   {/if}
 {/snippet}
 
-<!-- The total stands at the right end of the header line, the one place
-a figure about the whole page goes; the cuts under it take the page's
-width in as many columns as it holds. -->
+
 <Page title={say($lang, "cost_title")} {rank} aside={total}>
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={QUERIES.cost} />
@@ -137,9 +106,7 @@ width in as many columns as it holds. -->
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
     {@render unpriced(answer.unpriced)}
   {:else if reading.kind === "idle"}
-    <!-- Nothing has been spent, which reads exactly like a page that
-    failed to load unless the page says which one it is. Spending starts
-    with a run, and a run starts in the conversation with the Mayor. -->
+    
     <EmptyState missing="cost_empty" seat="region">
       {#snippet action()}
         <AskMayor />
@@ -154,8 +121,7 @@ width in as many columns as it holds. -->
       <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
       {@render renewed(answer.renewals)}
     {/if}
-    <!-- The cuts are columns of the page itself, parted by a rule rather
-    than lifted onto cards (docs/frontend-method.md §7A-4, client/Spec.lean §4-50). -->
+    
     <div class="grid grid-fit gap-x-gutter gap-y-wide">
       {#each CUTS as each (each)}
         <section

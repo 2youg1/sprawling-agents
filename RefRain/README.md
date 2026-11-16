@@ -8,7 +8,7 @@ Copyright (c) 2026 2youg1 and the sprawling contributors
 
 The city's face: a Svelte 5 single-page client, served by the same
 binary that runs the city. It talks exactly one protocol
-(`client/src/wire.ts`, generated — never edited by hand) and holds no
+(`RefRain/src/wire.ts`, generated — never edited by hand) and holds no
 state of its own beyond the browser cache behind `core/prefs.ts`.
 
 ## Toolchain
@@ -45,7 +45,7 @@ See `docs/frontend-method.md` for how a screen is built and accepted.
 | `src/core/` | plain `.ts`: the socket, the belief folds, the keymap, the phrase table's reader, preferences. Store-shaped values from `svelte/store`; `bun test` runs against these directly. |
 | `src/ui.ts` | the one gate out of `core/` to components: `setUi` at startup, `ui()` everywhere else. |
 | `src/views/` | one route or region per file, runes. |
-| `src/views/parts/` | the controls this repository draws itself — the only home for a button, a field, a badge, a dialog, a tooltip. Adding one means `client/Spec.lean` §9 first. |
+| `src/views/parts/` | the controls this repository draws itself — the only home for a button, a field, a badge, a dialog, a tooltip. Adding one means `RefRain/Spec.lean` §9 first. |
 | `src/views/gallery/` | the fixtures `#/gallery` serves and `cargo xtask render` measures. |
 | `src/theme.css` | the theme's entry: it imports the parts in `src/theme/` in cascade order, and the theme is the only place allowed a colour literal. |
 | `src/lang.json` | every word a reader is given, both languages. |
@@ -53,4 +53,4 @@ See `docs/frontend-method.md` for how a screen is built and accepted.
 | `scripts/` | Browser-driven repository checks: `walk.ts` photographs the running client, and `HotKeyE2E.ts` checks its main flows using keyboard events alone. |
 
 The interfaces, the keyboard table and the accessibility contracts are
-in [`client/Spec.lean`](../client/Spec.lean).
+in [`RefRain/Spec.lean`](../RefRain/Spec.lean).

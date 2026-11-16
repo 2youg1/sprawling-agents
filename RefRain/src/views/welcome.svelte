@@ -1,35 +1,8 @@
-<!-- This Source Code Form is subject to the terms of the Mozilla Public
-     License, v. 2.0. If a copy of the MPL was not distributed with this
-     file, You can obtain one at https://mozilla.org/MPL/2.0/.
-     Copyright (c) 2026 2youg1 and the sprawling contributors -->
+
 
 <script lang="ts">
-  // The first-run guide (refrain §3-15, client/Spec.lean §7G): five steps in
-  // one column, only the first required. Each step is the city's real
-  // door for that job - the provider form and the `main` model choice,
-  // the doctor's report with its installs, the governing documents, the
-  // shelves, the MCP page - so finishing a step here and finishing it in
-  // the settings are one act with one receipt.
-  //
-  // **Done is the city's answer; put off is the person's.** `guide.ts`
-  // keeps the two apart: a step is drawn done only when the city's
-  // configuration says so, and the progress the city keeps for this
-  // guide (`Query::Guide`, `Command::PutGuide`) records only what the
-  // person looked at, put off, and where the guide reopens. The progress
-  // writes no ledger record, so after each write the page asks for it
-  // again, and until that answer lands it draws the write it sent.
-  //
-  // **Leaving is one choice, made two ways.** "Start the conversation"
-  // and "skip all optional" both open the Mayor's room with nothing sent
-  // and nothing written into the box, and the guide is then left; the
-  // shell still opens it at launch while the city has no provider
-  // endpoint (client D54).
-  //
-  // **A step done moves the guide on.** When the open step turns done in
-  // the city's answer, the next step nobody has done or put off opens and
-  // the done one folds (client D55); a body arrives with `drop` and goes
-  // at once.
-
+  
+  
   import { tick, untrack, type Snippet } from "svelte";
 
   import { QUERIES } from "../core/asking";
@@ -59,14 +32,13 @@
   import Step from "./welcome/step.look.svelte";
 
   interface Props {
-    // Whether this layout is the page or a region inside one: a
-    // document may have exactly one heading of the page's own rank.
+    
+    
     readonly rank?: "page" | "section" | undefined;
-    // The step a `#/welcome/<step>` link opens (client/Spec.lean §4-63).
+    
     readonly step?: GuideStep | undefined;
-    // The shell's back key, which `pages.svelte` draws and hands over so
-    // it stands on this page's one column rather than at the frame's
-    // left edge, far from the column it leads away from.
+    
+    
     readonly back?: Snippet | undefined;
   }
 
@@ -104,7 +76,7 @@
   }
 
   const read = $derived(readAnswer($guide, (held) => ("guide" in held ? held.guide : undefined)));
-  // The write this page sent and the city has not answered yet.
+  
   let sent = $state<GuideProgress | null>(null);
   $effect(() => {
     if ($guide === undefined) return;
@@ -114,10 +86,10 @@
   });
   const progress = $derived(sent ?? (read.kind === "held" ? read.value : {}));
   const current = $derived(currentOf(progress, configured));
-  // The one step drawn open: the current one, unless the person folded it.
+  
   let folded = $state(false);
-  // A step a link named is drawn open without telling the city the guide
-  // moved there: a link opens, it does not write. Choosing a step clears it.
+  
+  
   let linked = $state<GuideStep | null>(null);
   $effect(() => {
     const asked = step ?? null;
@@ -130,8 +102,7 @@
   const open = $derived(folded ? null : (linked ?? current));
   const ready = $derived(configured.provider === true);
 
-  // The city's previous reading, to tell a step the person just did from
-  // an answer that only now arrived.
+  
   let before: Configured | null = null;
   $effect(() => {
     const after = configured;
@@ -165,8 +136,7 @@
     write(opened(progress, step));
   }
 
-  // Putting a step off closes its body, so the focus moves to the step
-  // the guide moved on to rather than to the top of the document.
+  
   function later(step: Exclude<GuideStep, "provider">): void {
     folded = false;
     linked = null;
@@ -188,10 +158,7 @@
   }
 </script>
 
-<!-- One column, standing in the middle part of the shell's silver cut
-(client D24), where the conversation stands: the steps, their rules and the
-fields inside them share its two edges, so the page has one right edge
-rather than one per kind of row. -->
+
 <div class="flex min-w-0 flex-1 flex-col @min-[64rem]:silver-columns">
   <div class="flex min-w-0 flex-1 flex-col @min-[64rem]:col-start-2">
     {@render back?.()}

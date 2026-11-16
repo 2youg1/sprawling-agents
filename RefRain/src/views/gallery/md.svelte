@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // A model's reply as the thread draws it (client/Spec.lean §4-26, §4-53), on
+  // A model's reply as the thread draws it (RefRain/Spec.lean §4-26, §4-53), on
   // a made-up city that answers `Query::Reply` with the blocks the
   // city's grammar lays out for each text below, written out by hand:
   // a settled reply with every kind of block, a streaming one whose
@@ -43,7 +43,7 @@
     "| step | where |",
     "| :--- | ---: |",
     "| ask | `core/replying.ts` |",
-    "| draw | `refrain/laid.svelte` |",
+    "| draw | `editor/laid.svelte` |",
     "",
     "> A block the city has closed is never taken back.",
     "",
@@ -149,7 +149,7 @@
         head: { cells: [[words("step")], [words("where")]] },
         body: [
           { cells: [[words("ask")], [{ code: "core/replying.ts" }]] },
-          { cells: [[words("draw")], [{ code: "refrain/laid.svelte" }]] },
+          { cells: [[words("draw")], [{ code: "editor/laid.svelte" }]] },
         ],
       },
     },

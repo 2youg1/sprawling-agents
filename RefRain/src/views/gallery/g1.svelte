@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // The conversation's frozen facts (client/Spec.lean §4-44, §4-59): the Mayor's
+  // The conversation's frozen facts (RefRain/Spec.lean §4-44, §4-59): the Mayor's
   // session heads its first message with the model, the effort and the
   // mode it froze, under the name it froze - Cat - while the city has
   // since renamed the Mayor to Ada, which the box below already says,

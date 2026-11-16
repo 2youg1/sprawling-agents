@@ -3,25 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The browser half of the link: one line, three listeners, and no
-// judgements about the wire. Every judgement is `link.ts`'s; this turns
-// browser callbacks into link events, carries out the actions the machine
-// answers with, and hands what arrives to the belief and the asking.
-//
-// The one conversation the link holds of its own, the walk over a gap,
-// is `gap_walk.ts`'s; this hands it the frames and answers it names.
-//
-// The browser's own facilities are reached here and nowhere below: the
-// frame callback, the timers, and the clock the asking measures its
-// patience by. A module that read the clock itself would be a module a
-// test cannot put in a hurry. The line the link speaks through is handed
-// in (`core/line.ts`), because a page opened from the remote door speaks
-// through a sealed session instead of this origin's `/ws` (client/Spec.lean
-// §4-64).
-//
-// Frames are folded once per animation frame rather than as they land:
-// a burst of records becomes one store update and one paint, which is
-// what keeps a busy city under the 16 ms the person asked for.
 
 import { writable } from "svelte/store";
 import type { Readable } from "svelte/store";
@@ -58,37 +39,28 @@ export interface Connection {
   readonly state: Readable<LinkState>;
   readonly belief: Readable<Belief>;
   readonly asking: Asking;
-  // Each run's running command, as far as it has written, until the
-  // call's result lands (core/live_output.ts).
+  
+  
   readonly live: Readable<Readonly<Partial<Record<RunId, Tail>>>>;
-  // Words said while the link is down, waiting for the next welcome.
+  
   readonly unsent: Readable<number>;
-  // Sends one command, or holds it in `unsent` when it is words and the
-  // link is down; false when neither happened, and the person should be
-  // told rather than left to wonder.
+  
+  
   readonly command: (command: Command) => boolean;
   readonly retry: () => void;
-  // Asks the city to close (`/quit`), and stops this link from
-  // reconnecting once the city ends the socket; false when the command
-  // could not be sent, because the link is not live.
+  
+  
   readonly closeCity: (mode: CloseMode) => boolean;
-  // How the person asked the city to close, from the moment the command
-  // went out; null until then, and again after a retry.
+  
+  
   readonly closing: Readable<CloseMode | null>;
   readonly dismissRefusal: () => void;
-  // Everything in the bell has now been looked at.
+  
   readonly markNoticesSeen: () => void;
   readonly monitor: Pick<Watching, "samples" | "watch" | "watchSummary" | "setBeat">;
 }
 
-// How a POST offers this page's credential - the session token
-// (`core/local/entering.ts`).
-//
-// The socket offers it inside the hello frame, where the frame type
-// names the field; a POST has no frame, so it carries the standard
-// bearer header, which `wire::reception::offered_pairing` reads.
-// A page that holds no token sends no header at all, and the city
-// judges the request as one that showed nothing.
+
 export function bearing(token: string | null): Readonly<Record<string, string>> {
   return token === null ? {} : { authorization: `Bearer ${token}` };
 }
@@ -100,9 +72,8 @@ function hidden(): boolean {
 export function openConnection(dial: Dial, lang: Lang): Connection {
   let link: Link = newLink(lang);
   let line: Line | null = null;
-  // One clock for this connection: the asking measures its patience by
-  // it and the belief stamps each refusal with it, so a question and its
-  // refusal can never disagree about when they happened.
+  
+  
   const now = () => Date.now();
   const state = writable<LinkState>(link.state);
   const store = createBelief(now);
@@ -112,16 +83,14 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
 
   const queue: ServerFrame[] = [];
   let scheduled = false;
-  // The last id this connection's page minted. One counter for every
-  // question, so the gap walk and the views never share an id.
+  
+  
   let lastAsk = 0;
-  // The attempt the ladder scheduled, held so a link that turns out to
-  // be refused can cancel it. A refused link that left this running
-  // would reopen the socket behind a message telling the person the
-  // opposite.
+  
+  
   let reconnect: ReturnType<typeof setTimeout> | null = null;
 
-  // Sends one question under a fresh id; null when the line is not open.
+  
   function sendAsk(query: Query): AskId | null {
     lastAsk = lastAsk >= 0xffff_ffff ? 1 : lastAsk + 1;
     const askId = AskId.make(lastAsk);
@@ -136,12 +105,8 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
   const asking = createAsking(
     (query: Query) => (isLive(link) ? sendAsk(query) : null),
     now,
-    // A question that never came back lands where every other refusal
-    // lands: the corner once, and the bell until the person has read
-    // it. The recovery is the one part written for a person, so it is
-    // said here, in the language `<html lang>` states - which `app.tsx`
-    // keeps equal to the person's choice, and which a screen reader
-    // reads the page by.
+    
+    
     (phrase, error) => {
       const lang = langOf(document.documentElement.lang);
       store.refused({ ...error, recovery: say(lang, phrase) });
@@ -167,10 +132,8 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
         watching.reconnected();
         return;
       case "deliver": {
-        // The field this build could not read, if any, is reported here
-        // rather than swallowed: the frame decoded and the socket is
-        // still speaking this wire, so it goes where every other refusal
-        // goes, and the rest of the record has already been folded.
+        
+        
         const bad = walk.fold(action.event);
         if (action.event.kind === "tool_result") {
           live.update(({ [action.event.run]: _settled, ...rest }) => rest);
@@ -182,8 +145,8 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
       case "answered": {
         const { ask_id, as_of, outcome } = action.answered;
         if ("refusal" in outcome) store.refused(outcome.refusal);
-        // The walk's own question settles no held question, so its
-        // answer never reaches the asking.
+        
+        
         if (walk.answered(ask_id, outcome)) return;
         if ("answer" in outcome && "city" in outcome.answer) {
           store.adoptCity(outcome.answer.city);
@@ -235,10 +198,8 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
     }
     perform(action);
     if (isStopped(link)) {
-      // The machine has stopped this link. Nothing here decides that:
-      // the socket half only carries it out, by cancelling the attempt
-      // the ladder booked and dropping the line the refusal came in
-      // on. The person's retry is what starts it again.
+      
+      
       if (reconnect !== null) {
         clearTimeout(reconnect);
         reconnect = null;
@@ -249,7 +210,7 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
     }
   }
 
-  // Drains what arrived since the last paint, in order, as one update.
+  
   function drain(): void {
     scheduled = false;
     store.batch(() => {
@@ -260,8 +221,8 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
   }
 
   function open(): void {
-    // Every callback asks whether its line is still the link's line: a
-    // line the link has dropped may still be closing.
+    
+    
     const mine = () => line === opened;
     const opened: Line = dial({
       opened: (credential) => {
@@ -282,14 +243,13 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
   function heard(text: string): void {
     const frame = decodeFrame(text);
     if (frame === null) {
-      // The two ends disagree about the wire. Reported as what it is,
-      // never as a close: a page told the socket dropped reconnects,
-      // and it would meet this same frame every time.
+      
+      
       step({ kind: "undecodable" });
       return;
     }
-    // A welcome is folded at once, so the questions the page has been
-    // holding go out on the same tick the link comes up.
+    
+    
     if ("welcome" in frame || "refusal" in frame) {
       store.batch(() => {
         drain();
@@ -300,25 +260,21 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
     queue.push(frame);
     if (!scheduled) {
       scheduled = true;
-      // A hidden tab is never painted, so it drains on a timer instead;
-      // otherwise an approval request waits for the person to come back.
+      
+      
       if (hidden()) setTimeout(drain, 0);
       else requestAnimationFrame(drain);
     }
   }
 
-  // Either way the queue drains now: going hidden, the paint it waits
-  // for will not come, and shown again, the person is looking. Shown, the
-  // ladder's wait is spent too - `wait_elapsed` is the machine's own door
-  // back to `opening`, and it opens only from backoff.
+  
   function visibilityChanged(): void {
     if (queue.length > 0) drain();
     if (hidden() || reconnect === null) return;
     step(unbook({ kind: "wait_elapsed" }));
   }
 
-  // Cancels the attempt the ladder booked, for an event that opens the
-  // link now instead.
+  
   function unbook(event: LinkEvent): LinkEvent {
     if (reconnect !== null) clearTimeout(reconnect);
     reconnect = null;
@@ -342,9 +298,8 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
       switch (link.state.kind) {
         case "live":
           return sendText(encodeFrame({ command }));
-        // Words are held only while the link is on its way back by
-        // itself (client/Spec.lean, socket.ts); a refused link waits for the
-        // person, and an idle one has not been started.
+        
+        
         case "idle":
         case "refused":
         case "closed":

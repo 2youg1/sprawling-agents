@@ -197,7 +197,7 @@ gate ──▶ 上述全部（组合面）＋idem
 - 不做 I/O、不采样时钟、不生成随机数——RunId／时间戳／种子全部由调用方注入；`uuid` 依赖仅用于解析与格式化，恒不启用生成特性。
 - 不实现任何端口——`Ledger` 的实现住 storage 与 citysim；kernel 只声明 trait 与链语义纯函数。
 - 不认识文件系统、明文凭证与颜色——canonicalize、Vault、OKLCH 各归其效果面模块。
-- 不持 Markdown 词法器——界面读文档时由客户端 `client/src/core/prose.ts` 分词，Rust 侧没有调用者；在 kernel 再放一份只会与客户端那份悄悄分叉。服务端真要分词的那一天，词法器随它的第一个调用者一起进来。
+- 不持 Markdown 词法器——界面读文档时由客户端 `RefRain/src/core/prose.ts` 分词，Rust 侧没有调用者；在 kernel 再放一份只会与客户端那份悄悄分叉。服务端真要分词的那一天，词法器随它的第一个调用者一起进来。
 -/
 
 /-! D4 定规：kernel 不拆 crate
@@ -369,7 +369,7 @@ gate ──▶ 上述全部（组合面）＋idem
 - `E_DELEGATION_DEPTH`：不消解（明裁：边界反馈优于沉默缺席）。
 - `E_APPROVAL_PENDING`／`E_APPROVAL_DENIED`：不可——一个设计问题停住提问的那个 run，而人可以答「不」；两者都是用户可达状态。`E_APPROVAL_PENDING` 有一个门的生产者：`gate::attach` 的 Ask（§8-27），它请求的是人的动作而不是 Approval Inbox 里的一条答案，所以不产生 `ApprovalItem`；`E_APPROVAL_DENIED` 仍只由人答题面对产生。
 - `E_EVIDENCE_MISSING`：部分定义掉——无证据 Done 已不可构造（类型半）；构造时拒绝仍需此码（运行时半，A6 双守）。
-- `E_PLAN_MISSING`：不可——没有计划的楼上设常设目标，pursuit 找不到一步可做就当场「完成」，人看到的是一句 `finished` 而什么也没发生。这一码只在计划缺席或为空时于设目标处拒绝：`Roadmap.md` 读不出来保留它自己的码（`E_STORAGE_FATAL`），表格不成形是 `E_INVALID_ARGS` 并列出坏行——那份计划是人写的，恢复动作不该请市长另写一份盖掉它。`subject` 恒为 `<楼地址>: <常设目标>`，客户端据此给出「让市长写计划」的预填表单（client/Spec.lean §4-35a），由人提交。人定的是拒绝加按钮，胜过「先让市长自动写计划」：后者替人派出一次有成本的 run，而人只是想设一个目标。
+- `E_PLAN_MISSING`：不可——没有计划的楼上设常设目标，pursuit 找不到一步可做就当场「完成」，人看到的是一句 `finished` 而什么也没发生。这一码只在计划缺席或为空时于设目标处拒绝：`Roadmap.md` 读不出来保留它自己的码（`E_STORAGE_FATAL`），表格不成形是 `E_INVALID_ARGS` 并列出坏行——那份计划是人写的，恢复动作不该请市长另写一份盖掉它。`subject` 恒为 `<楼地址>: <常设目标>`，客户端据此给出「让市长写计划」的预填表单（RefRain/Spec.lean §4-35a），由人提交。人定的是拒绝加按钮，胜过「先让市长自动写计划」：后者替人派出一次有成本的 run，而人只是想设一个目标。
 - `E_PROVIDER_ACCOUNTS_EXHAUSTED`：不可——一个 Provider 登记了两个以上账号，一次逻辑请求把每个可兑付的账号都试过而无一作答（`spec/AccountRecovery.lean` §8-86，D54 第 7 条），或开轮时名册里一个可兑付的都没有。只报最后一个账号的 401 会让人去修一个账号，而出路是补录凭据、补额度或新增账号。carrier 与 `E_PROVIDER` 相同（`provider_degraded`）：说的是同一件事，只是每个账号都说了；run 以 `Cancelled` 冻住，所以外层不会再开一轮。`subject` 写 Provider 与每个到过的账号 id 及它最后一次失败的码与种类，不写 Key，也不写引用；生产者只有模型路径的 `runtime::run::drive`，`web_search` 把同一个码作为失败的工具结果交给模型。单账号的端点不产生它：那里只有原来的 `E_PROVIDER`。
 - `E_AUTH_REQUIRED`（一个 ACP agent 以 `-32000` 答复，要先登录）：不可——登录在 agent 自己那里，城收到这一答复之前不知道它要不要登录。`subject` 写 agent 的 id；`recovery` 列出 agent 在 `initialize` 里声明的认证方法的 id，页面据此给出登录入口，城登录后重新 `initialize` 并重发原请求（`Sprawling/agent_protocols/Spec.lean`）。它不借 `E_CREDENTIAL_MISSING`：那一码的出路是在本城的 vault 里补一个 Key，而这里本城不持有任何凭据，出路是 agent 自己的登录流程。
 - `E_PAIRING_REFUSED`（本地门上一次配对或开页码被拒：码不对、已用过，或全局限速已到）：不可——配对码与开页码由人从终端或跳转文件抄到浏览器，抄错是人可达的状态。三种原因用同一码、同一句恢复语，不告诉对方是哪一种，因为区分「码不对」与「已用过」就是告诉猜码的一方它离对的码有多近；`recovery` 说去终端读当前的配对码再试一次。它不借 `E_GATE_DENIED`：那一码说的是一个门按规矩拦下了一个已认证的请求，这里请求者还没有任何身份。

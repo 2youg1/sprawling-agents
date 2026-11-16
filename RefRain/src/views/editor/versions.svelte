@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // Every version the city knows of this document, newest first, and the
-  // diff between any two (client/Spec.lean §4-46, §4-61): the list is the
+  // diff between any two (RefRain/Spec.lean §4-46, §4-61): the list is the
   // city's `Versions` answer, with the draft as one more side. A version
   // whose text this page already held is compared from that text; any
   // other is gathered window by window by its version. The comparison is

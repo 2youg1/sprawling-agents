@@ -6,9 +6,9 @@
 // The tabs' wiring, driven the way its seat drives it and with no look
 // at all: whichever look draws the tabs, these are the keys it hands on,
 // the one Tab stop, and the ids that tie each tab to its panel
-// (client/spec/Views/Parts.lean §7-4). The key walk is checked over
+// (RefRain/spec/Views/Parts.lean §7-4). The key walk is checked over
 // every position of every set up to eight tabs, the space the model in
-// client/spec/Views/Parts/Tabs.lean quantifies over.
+// RefRain/spec/Views/Parts/Tabs.lean quantifies over.
 
 import { describe, expect, test } from "bun:test";
 import { createRawSnippet } from "svelte";

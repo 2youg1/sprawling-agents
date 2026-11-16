@@ -5,7 +5,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // The right side keeping its place (client/Spec.lean §4-63), in a made-up
+  // The right side keeping its place (RefRain/Spec.lean §4-63), in a made-up
   // city: a document tab whose RefRain session holds a draft beside a
   // commit's changes, the changes a commit picked in the workbench
   // opens on the right, and the line that says a draft the browser

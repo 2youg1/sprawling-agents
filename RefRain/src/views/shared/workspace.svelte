@@ -6,11 +6,8 @@
 -->
 
 <script lang="ts">
-  // The shared workspace entries on the city and building pages
-  // (client/Spec.lean §4-50a): one link to the existing raise page, and,
-  // on a building page, a native select for the buildings and adoptable
-  // folders the city already answered with. Selection only navigates;
-  // creation and adoption still wait for confirmation on the raise page.
+  
+  
   import { QUERIES } from "../../core/asking";
   import { say } from "../../core/lang";
   import { buildingDestination, toFragment } from "../../core/route";
@@ -19,8 +16,8 @@
   import { buildingsOf } from "./buildings";
 
   interface Props {
-    // The building page's current address. The city page omits it and
-    // keeps its existing building table as the way to switch.
+    
+    
     readonly current?: Address | undefined;
   }
 

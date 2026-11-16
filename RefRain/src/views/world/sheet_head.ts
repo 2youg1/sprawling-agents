@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the head of the world's sheet is given (`sheet_head.look.svelte`),
-// and the wiring its seat (`sheet_head.svelte`) builds: the back key, and
-// APG Tabs with automatic activation over the workbench's panes, one
-// stop on the way in and the arrows, Home and End once inside
-// (client/spec/Views/Workspace.lean §7-11).
 
 import type { Attachment } from "svelte/attachments";
 
@@ -15,9 +10,7 @@ import type { Pane } from "../../core/workbench";
 import { HOLD } from "./drawn";
 import type { KeyPress } from "./drawn";
 
-// Where a key on the tab at `at` of `count` lands: the arrows wrap at
-// both ends, Home and End go to the first and the last; undefined for
-// any other key.
+
 export function landing(count: number, at: number, key: string): number | undefined {
   const last = count - 1;
   if (last < 0) return undefined;
@@ -35,20 +28,20 @@ export function landing(count: number, at: number, key: string): number | undefi
   }
 }
 
-// The bag spread on the back key.
+
 export interface BackWire {
   readonly type: "button";
   readonly "aria-label": string;
   readonly onclick: () => void;
 }
 
-// The bag spread on the strip of tabs.
+
 export interface StripWire {
   readonly role: "tablist";
   readonly "aria-label": string;
 }
 
-// The bag spread on one tab. Only the shown tab is a stop.
+
 export interface TabWire {
   readonly type: "button";
   readonly role: "tab";
@@ -63,7 +56,7 @@ export interface TabWire {
 
 export interface TabLook {
   readonly key: Pane;
-  // The pane's name, already in the person's language.
+  
   readonly label: string;
   readonly shown: boolean;
   readonly wire: TabWire;
@@ -78,8 +71,8 @@ export interface SheetHeadLook {
 export interface SheetHeadInput {
   readonly tabs: readonly { readonly pane: Pane; readonly label: string }[];
   readonly shown: Pane;
-  // The prefix of the ids the panes carry, `<prefix>-<pane>`; a tab is
-  // `<prefix>-tab-<pane>`, which its pane is labelled by.
+  
+  
   readonly prefix: string;
   readonly words: { readonly back: string; readonly strip: string };
 }

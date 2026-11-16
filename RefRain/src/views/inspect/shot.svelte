@@ -6,19 +6,15 @@
 -->
 
 <script lang="ts" module>
-  // A call that took a screenshot (client/Spec.lean §4-45, §4-61). The browser
-  // tool records the picture's place in the content store and its two
-  // sides; the picture's bytes are fetched by that place, window by
-  // window, and drawn at the picture's own proportions. Until they
-  // arrive, and when they cannot, the frame is drawn empty and says
-  // which - a blank reads as a picture of nothing.
+  
+  
 </script>
 
 <script lang="ts">
   import { storedObject } from "../../core/document_bytes";
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
-  import { StoredBytes } from "../refrain/fetched.svelte";
+  import { StoredBytes } from "../editor/fetched.svelte";
   import type { Picture } from "./reading";
 
   interface Props {
@@ -37,8 +33,7 @@
     fetched.start(object);
   });
 
-  // The picture as an address the image element reads, made once its
-  // bytes are whole and let go when they change or the view goes.
+  
   let source = $state<string | null>(null);
   $effect(() => {
     const value = fetched.value;
@@ -66,8 +61,7 @@
       media: picture.media_type,
     })}
   </p>
-  <!-- The frame keeps the picture's proportions inside whatever room the
-  region has, the way an image that is contained would. -->
+  
   <div class="flex min-h-0 flex-1 items-center justify-center [container-type:size]">
     {#if source !== null}
       <img

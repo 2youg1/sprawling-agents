@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The hint's wiring as client/Spec.lean §7-3 states it: a `role="tooltip"`
+// The hint's wiring as RefRain/Spec.lean §7-3 states it: a `role="tooltip"`
 // node whose id the control is handed, Escape as its one key, and
 // hold-to-reveal reaching only a hint that asked for it and was not
 // dismissed. Where the box lands is measured by `cargo xtask render`

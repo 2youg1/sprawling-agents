@@ -1,23 +1,8 @@
-<!-- This Source Code Form is subject to the terms of the Mozilla Public
-     License, v. 2.0. If a copy of the MPL was not distributed with this
-     file, You can obtain one at https://mozilla.org/MPL/2.0/.
-     Copyright (c) 2026 2youg1 and the sprawling contributors
--->
+
 
 <script lang="ts">
-  // The conversation: one room, the Mayor's unless the address says
-  // otherwise, as the column the shell's grid gives it (docs/frontend-method.md §4-33)
-  // - words flowing down it, the box at its foot. Every run in the room
-  // is a stretch of the same thread; what waits for the person is a card
-  // in it; and the box either steers the run that is going or opens the
-  // next one. On the panorama tier the gauge strip sits in this column
-  // above the conversation landmark (workspace.svelte, client D113 / §7K);
-  // only on one column, under the world layer's sheet, is it a band: the
-  // last thing said, and the same box (docs/frontend-method.md §7I).
-  //
-  // A session is a stretch of the room, not the room: runs
-  // before it fold behind one line, and how it began is drawn where the
-  // two meet.
+  
+  
   import { cancel, dispatch, steer } from "../core/commands";
   import { sendingInto } from "../core/doing";
   import { newestWorking } from "../core/belief/live";
@@ -65,12 +50,11 @@
 
   interface Props {
     readonly address: Address;
-    // The band under the world layer's sheet on one column: the thread
-    // steps aside and the last thing said stands above the box.
+    
+    
     readonly band: boolean;
-    // Where the column stands (`talk/seat.ts`): it decides whether the
-    // box's placeholder carries the address line (client/Spec.lean 4-10a)
-    // and whether the first message head states the frozen facts.
+    
+    
     readonly seat: Seat;
   }
 
@@ -83,13 +67,11 @@
   const policy = u.policy;
   const held = u.prefs.held;
 
-  // The runs of this room, oldest first. A run whose room is not yet
-  // known is not shown here rather than shown in the wrong room.
+  
   const runs = $derived(heldIn($belief, address));
   const live = $derived(newestWorking($belief, address));
-  // A branch from this room while the city has not opened it: said
-  // above the box, which still speaks to the session that is running,
-  // with `/stop` for that run beside a refusal (client D100).
+  
+  
   const branching = u.branches.held;
   const branchNote = $derived.by(() => {
     const going = live;
@@ -102,9 +84,8 @@
     return noteOf(branchInto($branching, address), address, $lang, stop);
   });
   const isMayor = $derived(address === MAYOR);
-  // Whom the next session here will speak with: the name a new session
-  // would freeze, which is today's (refrain §3-13). A session already
-  // going is drawn under the name it froze, which its thread reads.
+  
+  
   const identity = u.conn.asking.ask(QUERIES.identity);
   const stated = $derived(
     $identity !== undefined && "identity" in $identity && "stated" in $identity.identity
@@ -113,10 +94,7 @@
   );
   const who = $derived(called(address, stated, $lang));
 
-  // Where the newest session in this room began. Runs the fold places at
-  // or before it are the earlier stretch, folded away;
-  // nothing before a boundary is ever a run of this stretch because a
-  // session cannot open underneath a run working in the room.
+  
   const began = $derived($belief.sessions[address] ?? null);
   const sessionAnswer = $derived(u.conn.asking.ask({ sessions: { room: address } }));
   const currentLine = $derived(
@@ -142,9 +120,7 @@
   );
   const shown = $derived(began === null ? runs : runs.filter((run) => run.lastSeq > began));
 
-  // The room's newest run policy change inside the open session, drawn
-  // as one short line before the first run that started after it
-  // (`policyAt`, or after every run when none did).
+  
   const changed = $derived.by(() => {
     const change = $belief.policies[address] ?? null;
     return change === null || (began !== null && change.seq <= began) ? null : change;
@@ -161,17 +137,12 @@
         }),
   );
 
-  // The run the band and the fork picker speak for: the one still going,
-  // or the last one this room finished. The same question `Thread` asks, merged with it
-  // by `asking` because the two ask it in the same words.
+  
   const current = $derived(
     live ?? shown.at(-1) ?? (origin === null ? undefined : $belief.runs[origin.run]),
   );
 
-  // The rounds of that run, asked here for the band's last line and the
-  // fork picker. Subscribed by hand because the run it follows changes:
-  // `$store` binds one store at initialisation, and this question moves
-  // to a new run the moment one starts.
+  
   let rawAnswer = $state<RoundsAnswer | undefined>(undefined);
   const answer = $derived(
     rawAnswer === undefined
@@ -190,19 +161,13 @@
     });
   });
 
-  // The last thing said in this room, which the band shows above the
-  // box: the newest run's reply as the rounds have it.
+  
   const said = $derived(answer?.turns.filter((turn) => typeof turn.said === "string").at(-1));
 
-  // How this stretch began, in the words the divider draws. A branch
-  // that went out from this screen knows its turn and its mother the
-  // moment it is sent; a session somebody opened elsewhere is learned
-  // from the record landing, and after a reload only the boundary's
-  // existence survives - which is the part every case shares.
+  
   let story = $state<Boundary | null>(null);
-  // The next boundary change is ours when a branch just went out from
-  // here: its record lands a round trip later, and that arrival must not
-  // draw a second divider for somebody else's `/new`.
+  
+  
   let ours = false;
   let watching = false;
   let seen: Seq | null = null;
@@ -236,10 +201,7 @@
     story = { kind: "opened", at: u.now() };
   });
 
-  // The last dispatch sent from this room, and where its run started:
-  // a bare building's work opens a room of its own (client D6).
-  // The line saying so is about the dispatch, so a steer sent after it
-  // or the run it started ending takes the line away.
+  
   let sent = $state<Sent | null>(null);
   const landing = $derived.by((): Landing => {
     if (sent?.from !== address) return { kind: "pending" };
@@ -249,17 +211,14 @@
       : found;
   });
 
-  // Where the words last sent stand (`talk/delivery.ts`): read off the
-  // link and the belief while there is something to settle, and drawn at
-  // the foot of the thread until the run's own thread holds them.
+  
   const link = u.conn.state;
   function hear(): Heard {
     return { live: $link.kind === "live", newest: newestSeq($belief), refusal: $belief.refusal };
   }
   let delivery = $state<Delivery>(NONE);
-  // Accepted words leave the foot once the run they started is on screen
-  // (or went to another room, which `Landed` says); a steer is heard by a
-  // run already on screen.
+  
+  
   $effect(() => {
     const kind = delivery.kind;
     if (kind === "none") return;
@@ -274,12 +233,10 @@
   });
   const echo = $derived(delivery.kind === "none" ? null : delivery);
 
-  // An empty room: nothing to read and nothing just sent, so the box
-  // stands in the middle. The first send lets it sink at once, before
-  // the city has answered, because the words it shows are already there.
+  
   const blank = $derived(shown.length === 0 && origin === null && echo === null);
-  // The address line stands in the box, as the address its placeholder
-  // names, so the page names the room once (client/Spec.lean 4-10a).
+  
+  
   const addressed = $derived(!band && drawsAddress(seat));
 
   function send(text: string): boolean {
@@ -310,18 +267,14 @@
     return went;
   }
 
-  // Words handed to the city wait for its answer here, a steer's as much
-  // as a dispatch's: a steer the city refuses - the run it named is gone -
-  // is otherwise words that vanish from the box and from the thread.
+  
   function awaitAnswer(text: string): void {
     refused = null;
     handing = hand(text, $belief);
     u.conversing.set({ kind: "waiting", handing });
   }
 
-  // A refused dispatch never becomes a run, and a refused steer never
-  // reaches one: its card stands where the reply would have been
-  // (`handing.ts` pairs a refusal with its send), and the corner is told the card is ours.
+  
   let handing: Handing = IDLE;
   let refused = $state<{ readonly words: string; readonly error: AxError } | null>(null);
   $effect(() => {
@@ -338,14 +291,7 @@
     u.conversing.set(NOT_CONVERSING);
   });
 
-  // One branch, from wherever a person pointed, through the page's one
-  // branch door (`talk/branching.ts`, client D100): the line it cut at
-  // travels in the one frame `/fork` sends, and only once
-  // the city has opened the branch do the words a message carries go
-  // back to the box through the draft door - the composer reads that
-  // door when it mounts and this page remounts it below. Before then
-  // the box still speaks to the session that is running, and a refused
-  // branch must leave it so.
+  
   function doFork(plan: ForkPlan): void {
     picking = false;
     u.branches.open(address, { kind: "branch", origin: plan.origin }, () => {
@@ -360,14 +306,12 @@
         mother: plan.mother,
         origin: plan.origin,
       };
-      // The branch is where the person just went.
+      
       rejoined += 1;
     });
   }
 
-  // `/fork` with no argument cannot name a line from inside the verb
-  // table, so it asks this screen for the picker (`core/slash`'s one
-  // outward request).
+  
   let picking = $state(false);
   let asked = 0;
   $effect(() => {
@@ -378,26 +322,17 @@
     }
   });
 
-  // Where the view stands while words arrive is the scroller's
-  // (`talk/scroller.svelte`); this page only sends it to the foot when a
-  // branch it made opens there.
+  
   let rejoined = $state(0);
 
-  // One composer, drawn in the middle of an empty room and in the bar
-  // once the room has a thread. Two call sites, one instance at a time:
-  // a second Composer would carry a second draft and a second selection.
-  // It remounts when this stretch begins - which is how the words a
-  // fork returned to the box arrive there, since the box reads its
-  // draft once, when it mounts.
+  
   const placeholder = $derived(
     isMayor && stated === null
       ? say($lang, "talk_placeholder_mayor")
       : fill(say($lang, "talk_placeholder_room"), { room: who }),
   );
 
-  // The checker types a `{#snippet}` name as a void call, which the
-  // lint lane rejects inside a render tag. The name is taken again as
-  // its `Snippet` type, and the template renders that.
+  
   const composer: Snippet = drawComposer;
 </script>
 
@@ -451,11 +386,7 @@
   />
 {/snippet}
 
-<!-- One column, one box. The box is the same element in an empty room and
-in a full one: in an empty room it is lifted to the middle of the column,
-and the first send lets it sink to its seat
-(docs/frontend-method.md §7I), so neither the words being typed nor an input method's
-composition is rebuilt on the way. -->
+
 <div
   class={["flex min-h-0 flex-col", band ? "" : "h-full"]}
   style:container-type={band ? undefined : "size"}
@@ -489,9 +420,7 @@ composition is rebuilt on the way. -->
       {#if echo !== null}
         <Delivered delivery={echo} />
       {/if}
-      <!-- The queue is drawn in an empty room too: "N waiting" links to
-      the mayor's room, which a person who only worked in a building has
-      never spoken in. -->
+      
       <Waiting />
       <Inbox addr={address} />
     </Scroller>

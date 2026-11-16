@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// One stored object's bytes as they arrive: the page asks the next
-// window (`core/document_bytes.ts`) until the bytes meet the object's
-// end, or the city says it no longer holds the object (client/Spec.lean
-// §4-61). Made while a component initialises, so the asking stops with
-// the component.
 
 import { untrack } from "svelte";
 
@@ -18,7 +13,7 @@ import type { Fetched, Fetching } from "../../core/document_bytes";
 import type { B3Hash } from "../../wire";
 
 export class StoredBytes {
-  // The question the city could not answer, when it could not.
+  
   lost = $state<string | null>(null);
   private at = $state.raw<Fetching | null>(null);
 

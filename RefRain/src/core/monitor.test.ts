@@ -5,7 +5,7 @@
 
 // The panel reads what `sprawling top` reads: the same fixture as
 // `bin::monitor::top`'s screen test gives the same readings. The bars
-// are the page's own (D82 in `client/Spec.lean`).
+// are the page's own (D82 in `RefRain/Spec.lean`).
 
 import { describe, expect, test } from "bun:test";
 

@@ -6,7 +6,7 @@
 /-!
 # guide：启动时进不进快速开始，与跳过之后落在哪
 
-规定 `client/src/views/welcome/guide.ts` 的 `opensGuide` 与 `skipAll`，以及 `client/src/app.svelte` 在启动时据它做的那一次换页（`client/Spec.lean` §7G、D54）。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`guide.test.ts` 判 `opensGuide` 与这里的定义读出同样的答案。
+规定 `RefRain/src/views/welcome/guide.ts` 的 `opensGuide` 与 `skipAll`，以及 `RefRain/src/app.svelte` 在启动时据它做的那一次换页（`RefRain/Spec.lean` §7G、D54）。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`guide.test.ts` 判 `opensGuide` 与这里的定义读出同样的答案。
 
 启动的判定只做一次：城第一次答出端点表时，外壳若停在对话页而 `opensGuide` 为真，就换到上手指南；此后的回答不再换页。只做一次，是为了让「跳过全部可选项」之后进的对话页不被下一个回答又送回指南。
 

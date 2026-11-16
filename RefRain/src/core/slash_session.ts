@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the session verbs of the slash table do: `/new`, `/compact`,
-// `/tag` and `/untag`. Apart from `slash.ts` because these open
-// sessions and change tags through the hands, while the table only
-// spells and routes; `slash.ts` stays the one list of verbs.
 
 import type { Address, Carry } from "../wire";
 import { cancel } from "./commands";
@@ -16,28 +12,19 @@ import type { SlashCall, SlashHands } from "./slash_hands";
 
 const CARRY = "--carry";
 
-// `/new`: a new session here, with nothing from the last one unless
-// `--carry` says so. It is the only verb that replaces a session
-// (client/Spec.lean D44). A room with no handoff
-// answers `carried: false` rather than refusing, so the word passes on.
+
 export function fresh(hands: SlashHands, call: SlashCall): void {
   if (hands.here === null) return;
   opened(hands, hands.here, call.words.includes(CARRY) ? "handoff" : "nothing");
 }
 
-// A new session at `room`, and main brought to it once the city has
-// opened it: sent from a past session in main, the new one is where the
-// person is going, and a refusal leaves main where it was (#120).
+
 function opened(hands: SlashHands, room: Address, carry: Carry): void {
   if (!hands.openSession(room, carry)) return;
   hands.write("");
 }
 
-// `/compact` is `/new --carry`. A run still going is stopped first and
-// the session opens once the belief holds it frozen: a frozen run has
-// written the handoff, and no session opens under a working run. While
-// another session is opening the door would take no second one, so
-// nothing is stopped and the line stays to send again (client D100).
+
 export function compact(hands: SlashHands): void {
   const room = hands.here;
   if (room === null || hands.opening()) return;
@@ -53,8 +40,7 @@ export function compact(hands: SlashHands): void {
   });
 }
 
-// `/tag` and `/untag`: one word on or off the session in main. A word
-// that is not a tag sends nothing and leaves the line to correct.
+
 export function retag(hands: SlashHands, call: SlashCall, change: typeof given): void {
   const tag = readTag(call.rest);
   const session = hands.tagged;

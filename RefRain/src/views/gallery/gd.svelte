@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts" module>
-  // Keys and search (client/Spec.lean §4-62): the file finder's content with a
+  // Keys and search (RefRain/Spec.lean §4-62): the file finder's content with a
   // building's files found shallow first, the same with a walk the city
   // cut short, and tool lines drawing their keys at the row's end. The
   // finder's `<dialog>` is not mounted here: a modal covers every other

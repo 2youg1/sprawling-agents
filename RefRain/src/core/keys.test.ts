@@ -51,7 +51,7 @@ describe("the shell's own keys", () => {
     expect(ACTIONS.filter((action) => reserved(DEFAULTS[action]))).toEqual([]);
   });
 
-  // The audit of the four browsers' shortcut lists (client/Spec.lean D-keys):
+  // The audit of the four browsers' shortcut lists (RefRain/Spec.lean D-keys):
   // a default that a browser gives a function of its own is moved or dropped.
   test("no action ships on a chord a browser gives a function of its own", () => {
     expect(ACTIONS.filter((action) => browserKeeps(DEFAULTS[action]))).toEqual([]);

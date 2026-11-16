@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // The card that stops and asks, in each shape its three kinds give it
-  // (client/spec/Views/Parts/Decide.lean): a resident's question with
+  // (RefRain/spec/Views/Parts/Decide.lean): a resident's question with
   // yes and no, a door waiting on the person's own hand with only a way
   // to acknowledge it, and a proposal on a moved base, whose accepting
   // answers stay reachable and say why they cannot be given.

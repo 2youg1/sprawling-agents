@@ -38,7 +38,7 @@ pub struct CommitAnswer {
   「我看不了」是两个答案，而读的人对它们的下一步不同。
 - **答案从账本来，不从 git 来**（`Sprawling/storage/Spec.lean` §8-18）。一座导出后在别处恢复、
   `.git` 不在身边的城，照样答得出自己的历史。
-- **客户端欠的（前端冻结，此处不画界面）**：`client/src/wire.ts` 需重新生成
+- **客户端欠的（前端冻结，此处不画界面）**：`RefRain/src/wire.ts` 需重新生成
   （`cargo xtask wire-ts --write`）；只把新变体接进
   `mount::frame` 那条「有答案而暂无页面问它」的臂，使其仍能编译。
 -/

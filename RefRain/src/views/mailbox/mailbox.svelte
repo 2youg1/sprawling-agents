@@ -6,21 +6,8 @@
 -->
 
 <script lang="ts">
-  // The mailbox: the edge key at the foot of the first column and the
-  // transient column it opens from the left (client/Spec.lean §4-49,
-  // docs/frontend-method.md §7E). One column, ordered by what needs the
-  // person: deciding, working, recent, and under them the notices the
-  // drawer used to hold (4-35). What the key says and which marks it
-  // carries is `./key.ts`'s; it is drawn by the edge key look.
-  //
-  // **The column is a layer under the keys, not a popover** (client
-  // D60): it pushes in from the left edge and the three edge keys stay
-  // above it, which a top-layer popover would forbid. So what the
-  // platform used to decide - Escape, a press outside, the focus back on
-  // this key - is decided by `layer.ts`, the step the Lean model proves,
-  // and this file only feeds it what happened and where the focus is.
-  // What it holds is `column.svelte`, mounted only while it is open, so
-  // a closed mailbox asks the city nothing.
+  
+  
   import { tick } from "svelte";
   import { createAttachmentKey } from "svelte/attachments";
 
@@ -37,12 +24,11 @@
   import { takeRow, wantedRow } from "./returning.svelte";
 
   interface Props {
-    // How many times the mailbox chord asked for the column: a count
-    // rather than a flag, so a second press while it is open is heard
-    // and closes it.
+    
+    
     readonly asked: number;
-    // The key's hint, given its name: the edge writes the chord beside
-    // it, from the one key table.
+    
+    
     readonly hint: (words: string) => string;
   }
 
@@ -66,7 +52,7 @@
     };
   };
 
-  // The chord answers here, where the column is: each new ask toggles it.
+  
   let heard = 0;
   $effect(() => {
     const now = asked;
@@ -75,8 +61,7 @@
     feed("toggle");
   });
 
-  // Where the focus is now, read from the page rather than remembered,
-  // so a Tab out of the column is seen without a listener of its own.
+  
   function focusNow(): MailFocus {
     const at = document.activeElement;
     if (at !== null && column?.contains(at) === true) return "inside";
@@ -96,10 +81,7 @@
     if (next.focus === "key" && focus !== "key") key?.focus();
   }
 
-  // A press anywhere but the column and its own key puts it away; the
-  // key's press is its click, which toggles.
-  // A letter closed on the right side: the column comes back with the
-  // focus on the row that opened it (client D73).
+  
   $effect(() => {
     const row = wantedRow();
     if (row === null) return;
@@ -123,8 +105,7 @@
     feed("outside");
   }
 
-  // Escape is the column's while it is open, unless something inside it
-  // that has its own Escape - a menu, a popover - is open and takes it.
+  
   function escaped(event: KeyboardEvent): void {
     if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
     if (column !== undefined && column.querySelector(":popover-open") !== null) return;
@@ -142,13 +123,13 @@
     };
   });
 
-  // What needs the person, and what is merely new.
+  
   const blocking = $derived(
     $belief.notices.filter((notice) => !notice.seen && urgencyOf(notice.error) === "needs_you")
       .length,
   );
-  // The cards open on the documents this page saw proposals for: the
-  // only questions a closed mailbox asks (4-49, 4-55).
+  
+  
   const proposed = openCards(u.conn.asking);
   const needs = $derived(($approvals?.length ?? 0) + blocking + $proposed.length);
   const fresh = $derived(
@@ -169,10 +150,7 @@
 
 <Look {...look} />
 
-<!-- The column stands from the left edge of the frame, under the keys:
-it is a fixed child of the edge keys' nav, whose stacking it shares, and
-`z-(--layer-mailbox)` keeps it under the keys inside that nav. Its padding keeps every
-row clear of the key column, so the keys never cover what it says. -->
+
 {#if open}
   <aside
     bind:this={column}

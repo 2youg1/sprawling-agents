@@ -193,7 +193,7 @@ fn a_supervised_child_is_forwarded_the_served_flags_with_their_values() {
         "--log",
         "debug",
         "--web-dir",
-        "client/dist",
+        "RefRain/dist",
         "--supervise",
         "--no-open",
         "--console",
@@ -201,7 +201,7 @@ fn a_supervised_child_is_forwarded_the_served_flags_with_their_values() {
     .map(str::to_owned);
     assert_eq!(
         super::verbs::forwarded(&line),
-        ["--log", "debug", "--web-dir", "client/dist"].map(str::to_owned)
+        ["--log", "debug", "--web-dir", "RefRain/dist"].map(str::to_owned)
     );
 }
 

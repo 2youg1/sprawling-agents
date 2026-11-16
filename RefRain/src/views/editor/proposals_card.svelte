@@ -6,18 +6,8 @@
 -->
 
 <script lang="ts">
-  // One proposal card, the decide card's third kind (client/Spec.lean §7C,
-  // 4-55): its body is the city's sentence-by-sentence diff, and its
-  // answers are accept (y), edit then accept (e) and reject (n). The same
-  // card stands in the mailbox and above the document in RefRain; the
-  // seat hands in a line of its own (`lead`) and nothing else differs.
-  // This file holds the card's state and its effects; `proposals_card.ts`
-  // turns them into the value `proposals_card.look.svelte` draws.
-  //
-  // **The card going away is the receipt.** A decision the city lands
-  // closes the card, the answer for the document is asked again, and
-  // this card is no longer drawn. Until then the card says where the
-  // decision stands, and a refusal the city returns is written on it.
+  
+  
   import { untrack } from "svelte";
   import type { Snippet } from "svelte";
   import { get } from "svelte/store";
@@ -43,14 +33,14 @@
   import { short } from "./reading";
 
   interface Props {
-    // The document the card is on.
+    
     readonly doc: Address;
     readonly card: ProposalCard;
-    // The version the document holds now, from the same answer as the
-    // card; `null` when it holds none.
+    
+    
     readonly version: B3Hash | null;
-    // A line of the seat's own above the diff: in the mailbox the path
-    // and the way to the document, in RefRain the way to the stretch.
+    
+    
     readonly lead?: Snippet;
   }
 
@@ -61,13 +51,13 @@
   const belief = u.conn.belief;
 
   let deciding = $state<Deciding>({ kind: "idle" });
-  // The person's edit, kept while they go back to the diff and return.
+  
   let edit = $state<Edit | null>(null);
   let editing = $state(false);
 
   const standing = $derived(standingOf(card, version));
-  // The card as its look and its refusals read it: the edit only while
-  // the card is open for editing.
+  
+  
   const held = $derived({ standing, deciding, edit: editing ? edit : null, lead });
   const asker = $derived(
     fill(say($lang, "proposal_from"), {
@@ -126,9 +116,7 @@
 
   const look = $derived(cardLookOf(card, held, $lang, { retake }));
 
-  // The city's refusal of this card's decision, written on the card. A
-  // version conflict means the document moved under the card: the
-  // answer is asked again, and the card comes back stale.
+  
   $effect(() => {
     let last: AxError | null = get(belief).refusal;
     return belief.subscribe((believed) => {
@@ -143,8 +131,7 @@
     });
   });
 
-  // A decision in flight when the link drops is sent again, key and
-  // all, when the link is back.
+  
   $effect(() => {
     let live = get(u.conn.state).kind === "live";
     return u.conn.state.subscribe((state) => {

@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The highlighter itself, and the only file that knows a grammar exists.
-// It is a lazy chunk: `code.ts` imports it on the first piece of code a
-// screen shows, and each grammar below is a chunk of its own, so a page
-// that only ever shows Rust downloads the Rust grammar and no other
-// (client/Spec.lean §4-26).
 
 import { highlightCode, tagHighlighter, tags } from "@lezer/highlight";
 
@@ -19,8 +14,7 @@ interface Grammar {
   parse(text: string): Tree;
 }
 
-// The grammars this build carries. The tsx and jsx variants share the
-// JavaScript grammar with TypeScript and differ in the flags it takes.
+
 type Family =
   | "cpp"
   | "css"
@@ -53,10 +47,7 @@ const LOAD: Record<Family, () => Promise<Grammar>> = {
   yaml: () => import("@lezer/yaml").then((grammar) => grammar.parser),
 };
 
-// Which grammar a name asks for. A file's extension and a Markdown
-// fence's word are looked up in the same table, so `rs` and `rust` can
-// never name two different grammars. A name the table does not hold is
-// drawn in one ink rather than guessed at.
+
 const FAMILY = new Map<string, Family>([
   ["c", "cpp"],
   ["cc", "cpp"],
@@ -83,10 +74,7 @@ const FAMILY = new Map<string, Family>([
   ["yml", "yaml"],
 ]);
 
-// The four inks the theme can hold apart at note size, each claiming
-// every tag below its parent: `lineComment` is a comment, `character`
-// and `regexp` are strings, `integer` is a number, `controlKeyword` is
-// a word.
+
 const HIGHLIGHT = tagHighlighter([
   { tag: tags.comment, class: "comment" },
   { tag: tags.string, class: "string" },
@@ -101,8 +89,7 @@ const INK = new Map<string, Ink>([
   ["word", "word"],
 ]);
 
-// A grammar is built once per page: the TypeScript variant is a new
-// parser each time it is configured, and a screen repaints often.
+
 const loaded = new Map<Family, Promise<Grammar>>();
 
 function grammarOf(family: Family): Promise<Grammar> {
@@ -113,9 +100,7 @@ function grammarOf(family: Family): Promise<Grammar> {
   return asked;
 }
 
-// The word that picks the grammar: what follows the last dot of the
-// file's name, or the whole name when it has none, which is how a fence
-// word such as `rust` arrives.
+
 function nameOf(source: string): string {
   const name = source.slice(source.lastIndexOf("/") + 1);
   return name.slice(name.lastIndexOf(".") + 1).toLowerCase();

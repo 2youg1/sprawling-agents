@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // What a table decides and hands its look, against the table paragraph
-// of `client/spec/Views/Parts.lean` §7-6: `aria-sort` only on a column
+// of `RefRain/spec/Views/Parts.lean` §7-6: `aria-sort` only on a column
 // that can be ordered by, the names of the boxes and the corrected
 // cells, and the header box's third state while some rows are ticked.
 

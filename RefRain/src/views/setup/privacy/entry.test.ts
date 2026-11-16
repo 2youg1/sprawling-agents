@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 
 import { IDLE, step, type Action, type Event, type Send, type Stage } from "./entry";
 
-// The trace vectors `#eval` prints in client/spec/Views/Privacy.lean,
+// The trace vectors `#eval` prints in RefRain/spec/Views/Privacy.lean,
 // transcribed: the start, the events, and the final stage and sends
 // `run vectorOffered` gives. A difference between the model and `step`
 // turns one of these red.

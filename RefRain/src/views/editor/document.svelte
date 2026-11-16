@@ -6,12 +6,8 @@
 -->
 
 <script lang="ts">
-  // One document in RefRain: the head line, the reason the text is read
-  // only when it is, the conflict bar, and the four readings. The editor
-  // is mounted once and hidden rather than unmounted while the preview
-  // or the versions are drawn, so the cursor, the selection, the undo
-  // history and an input method's composition all survive a change of
-  // reading (client/Spec.lean §7N).
+  
+  
   import { draftPlace } from "../../core/document_save";
   import { fill, say } from "../../core/lang";
   import { kib } from "../../core/time";
@@ -38,7 +34,7 @@
     readonly at: Address;
     readonly building: Address;
     readonly version: B3Hash | null;
-    // The reading it opens in; a person starts in the source.
+    
     readonly reading?: Reading;
   }
 
@@ -48,14 +44,14 @@
   const lang = u.lang;
   // svelte-ignore state_referenced_locally (a session belongs to one document and version; refrain.svelte keys this component on both)
   const session = new Session(u, at, version);
-  // Whether the browser refused to keep this document's draft (4-63).
+  
   // svelte-ignore state_referenced_locally (one document per component, as above)
   const unkept = u.prefs.draftUnkept(draftPlace(at));
   const drafted = $derived(session.receipt.kind !== "clean" && session.receipt.kind !== "saved");
 
   // svelte-ignore state_referenced_locally (the first reading only; the person picks the rest)
   let reading = $state<Reading>(first);
-  // The byte the next reading should open at, carried across a switch.
+  
   let anchor = $state<number | null>(null);
   let top = 0;
 
@@ -63,17 +59,13 @@
   const markdown = $derived(
     session.file?.kind === "text" && session.file.gathering.format === "markdown",
   );
-  // An HTML text is previewed by this browser rather than by the city
-  // (client/Spec.lean §4-54).
+  
+  
   const html = $derived(session.file?.kind === "text" && drawnAs(at) === "html");
 
   const phrases = $derived(phrasesIn($lang));
 
-  // Switching reading keeps the place: the line at the top of the
-  // editor becomes the preview's first block, and the preview's first
-  // block the editor's top line. The caret stays where it was, and the
-  // editor scrolls only once it is shown, because a hidden editor has no
-  // height to scroll in.
+  
   function pick(next: Reading): void {
     const editing = session.editing;
     const base = session.positions;
@@ -124,8 +116,7 @@
 
   const editorShown = $derived(reading === "source" || reading === "diff");
 
-  // A proposal card's stretch is a byte span of its version, so the
-  // editor can be taken there only while it holds that version.
+  
   function unshowable(card: ProposalCard): string | undefined {
     return session.editing !== null && session.positions?.version === card.baseline
       ? undefined

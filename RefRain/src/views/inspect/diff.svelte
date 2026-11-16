@@ -6,16 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // A call that changed a file, as the patch of that file between the two
-  // checkpoints around it (client/Spec.lean §4-45, docs/frontend-method.md §7F). The checkpoint after the
-  // call is the tree the patch reads into, so the patch covers the whole
-  // wave the call was part of, and the line above it names both trees.
-  //
-  // **A line number of a past tree is not offered to an editor.** The
-  // page asks what moved between the later checkpoint and the worktree;
-  // when this file is among it, the worktree no longer holds the text the
-  // numbers belong to, and the line is offered as `path:line` to copy
-  // rather than as a link that would open on a different line (4-39).
+  
+  
 </script>
 
 <script lang="ts">
@@ -46,8 +38,7 @@
 
   const NOTHING: Readable<Answer | undefined> = readable(undefined);
 
-  // The file the call changed: where its registration located the change,
-  // or the path it was called on.
+  
   const path = $derived.by((): string => {
     const render = call.render;
     const located =
@@ -67,8 +58,7 @@
   const asked = $derived(question === null ? NOTHING : u.conn.asking.ask(question));
   const read = $derived(readAnswer($asked, (held) => ("hunks" in held ? held.hunks : undefined)));
 
-  // What has moved since the later checkpoint, the worktree being the
-  // other end.
+  
   const sinceQuestion = $derived.by((): Query | null =>
     bracket.head === null ? null : { changes: { base: bracket.head, head: null } },
   );

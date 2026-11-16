@@ -1,17 +1,5 @@
-<!-- This Source Code Form is subject to the terms of the Mozilla Public
-     License, v. 2.0. If a copy of the MPL was not distributed with this
-     file, You can obtain one at https://mozilla.org/MPL/2.0/.
-     Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- The settings row under the composer's line (docs/frontend-method.md
-§7I, client/Spec.lean §4-60): before a session starts, the sandbox on
-the left while one restricts the room's building, the model picker's token
-and the permissions entry on the right; once one has, nothing but the
-notice that a sentence the link did not take was kept in the box.
-This file is the seat (client D95): it holds which menu is open, what
-the open picker has chosen, typed and opened in full, and the drawn
-elements, and moves the focus. `picker_look.ts` and `policy.ts` build
-the value `settings_row.look.svelte` draws. It writes no class. -->
+
 <script lang="ts">
   import { untrack } from "svelte";
   import type { Attachment } from "svelte/attachments";
@@ -38,8 +26,8 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
     readonly room: Address | null;
     readonly draws: RowDraws;
     readonly kept: boolean;
-    // The menu a fixture draws open; it takes no focus until somebody
-    // opens a menu themselves.
+    
+    
     readonly menu?: RowStarts;
   }
 
@@ -62,8 +50,8 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
 
   let menu = $state<RowMenu>(menuOf(untrack(() => starts)));
   let preview = untrack(() => starts) !== "closed";
-  // A picker a fixture drew open stays open under presses elsewhere on
-  // the gallery page, until somebody opens one themselves.
+  
+  
   let drawnOpen = untrack(() => starts) !== "closed";
   let segment = $state<Segment | null>(startSegment(untrack(() => starts)));
   let pick = $state<PickerHeld["pick"]>(null);
@@ -73,8 +61,7 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
   let binding = $state<PopoverBinding | null>(null);
   let active = $state<string | null>(null);
 
-  // The entries in force when the picker opens, kept inside the first
-  // five rows of their lists for as long as it stays open.
+  
   const pinnedNow = (): PickerHeld["pinned"] => {
     const offers = offersOf(picker.endpoints);
     const order = orderOf(offers);
@@ -87,13 +74,11 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
   };
   let pinned = $state<PickerHeld["pinned"]>(untrack(pinnedNow));
   let opened = $state<Combination | null>(untrack(() => inForce(picker)));
-  // The combination this opening ended on, written to the tab's recent
-  // list once the picker has closed: a row added while it is open would
-  // grow it under the pointer.
+  
+  
   let ended: Combination | null = null;
 
-  // The elements no draw reads: a plain record, so the attachments that
-  // fill it never write during a derivation.
+  
   const drawn: Record<"token" | "frame" | "permission" | "policyFrame", HTMLElement | undefined> = {
     token: undefined,
     frame: undefined,
@@ -114,9 +99,8 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
     permission: keep("permission"),
     policyFrame: keep("policyFrame"),
   };
-  // The two elements an opened panel gives the focus to, held as state,
-  // because the panel's content is drawn after it opens and the focus
-  // waits for it.
+  
+  
   let filter = $state<HTMLElement | undefined>(undefined);
   let first = $state<HTMLElement | undefined>(undefined);
   const holdFilter: Attachment<HTMLElement> = (node) => {
@@ -132,9 +116,7 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
     };
   };
 
-  // An opened panel takes the focus: the permissions panel on its first
-  // switch, the picker in its filter box. A panel a fixture drew open
-  // does not, once.
+  
   $effect(() => {
     if (menu !== "policy" || first === undefined) return;
     if (preview) {
@@ -250,8 +232,7 @@ the value `settings_row.look.svelte` draws. It writes no class. -->
         : undefined,
   });
 
-  // A press anywhere outside the token and the open picker closes it,
-  // and the press goes on to whatever it landed on.
+  
   const outside = (event: PointerEvent): void => {
     if (menu !== "model" || drawnOpen) return;
     if (event.target instanceof Node && drawn.frame?.contains(event.target) === true) return;

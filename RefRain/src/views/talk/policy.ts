@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The permissions entry of the settings row (client/Spec.lean §4-60).
-// The admission and landing rows are read from the wire's lists; its two
-// switches change mode and write in Ui.policy. The entry is a seat and a
-// look like the rest of the row (client D95): `permissionsOf` builds the
-// value `settings_row.look.svelte` draws, every role, key and focus rule
-// inside a wire bag, and the seat (`settings_row.svelte`) holds whether
-// the panel is open and where focus goes.
 
 import type { Attachment } from "svelte/attachments";
 
@@ -31,8 +24,7 @@ export const POLICY_SWITCHES = {
 
 type Chosen = "write" | "admit" | "landing";
 
-// The menu: one column per value, each row a value the wire offers, the
-// one the page holds marked.
+
 export function policyColumns(lang: Lang, policy: RunPolicy): readonly PopoverColumn[] {
   const column = <K extends Chosen>(
     field: K,
@@ -54,8 +46,7 @@ export function policyColumns(lang: Lang, policy: RunPolicy): readonly PopoverCo
   ];
 }
 
-// The policy after one row of the menu is applied; a row no column
-// offers changes nothing.
+
 export function picked(policy: RunPolicy, column: string, row: string): RunPolicy {
   const write = WRITE_LIMITS.find((each) => column === "write" && each === row);
   const admit = ADMISSIONS.find((each) => column === "admit" && each === row);
@@ -68,9 +59,7 @@ export function picked(policy: RunPolicy, column: string, row: string): RunPolic
   };
 }
 
-// What the closed control says: the write limit, then whichever of the
-// other two is not its first value, so a create-only experiment is
-// never hidden behind a closed menu.
+
 export function policyFace(lang: Lang, policy: RunPolicy): string {
   return [
     say(lang, `admission_value_${policy.write}`),
@@ -81,8 +70,7 @@ export function policyFace(lang: Lang, policy: RunPolicy): string {
     .join(" · ");
 }
 
-// The bag spread on one switch, a native checkbox that says it is a
-// switch: Space turns it, and it changes its own field alone.
+
 export interface SwitchWire {
   readonly type: "checkbox";
   readonly role: "switch";
@@ -97,7 +85,7 @@ export interface SwitchLook {
   readonly wire: SwitchWire;
 }
 
-// The bag spread on one native select; the platform owns its keys.
+
 export interface SelectWire {
   readonly value: string | undefined;
   readonly onchange: (event: { readonly currentTarget: { readonly value: string } }) => void;
@@ -110,8 +98,7 @@ export interface SelectLook {
   readonly wire: SelectWire;
 }
 
-// The bag spread on the open panel: a dialog that Escape closes,
-// giving focus back to the entry.
+
 export interface PanelWire {
   readonly role: "dialog";
   readonly tabindex: -1;
@@ -125,16 +112,16 @@ export interface PanelLook {
   readonly selects: readonly SelectLook[];
 }
 
-// Everything the look is given for the permissions entry.
+
 export interface PermissionsLook {
   readonly frame: FrameWire;
   readonly trigger: TriggerWire;
-  // The mode, then what the closed control says (`policyFace`).
+  
   readonly face: string;
   readonly panel: PanelLook | undefined;
 }
 
-// What only the seat can do.
+
 export interface PermissionsHands {
   readonly choose: (policy: RunPolicy) => void;
   readonly toggle: () => void;
@@ -143,7 +130,7 @@ export interface PermissionsHands {
   readonly hold: {
     readonly frame: Attachment<HTMLElement>;
     readonly trigger: Attachment<HTMLElement>;
-    // The first switch, which takes the focus when the panel opens.
+    
     readonly first: Attachment<HTMLElement>;
   };
 }
@@ -192,7 +179,7 @@ function panelOf(lang: Lang, policy: RunPolicy, hands: PermissionsHands): PanelL
       },
     },
   });
-  // The work switch comes first and takes the focus when the panel opens.
+  
   const work = switchOf("mode", "talk_work_switch");
   return {
     wire: {

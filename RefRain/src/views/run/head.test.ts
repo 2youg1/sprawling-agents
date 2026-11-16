@@ -5,7 +5,7 @@
 
 // The run page's sheet as decided, with no look: which facts stand on
 // it for what the page knows, and where its two links lead
-// (client/Spec.lean §4-42).
+// (RefRain/Spec.lean §4-42).
 
 import { describe, expect, test } from "bun:test";
 

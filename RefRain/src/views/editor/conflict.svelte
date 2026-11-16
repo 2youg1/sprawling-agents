@@ -6,12 +6,8 @@
 -->
 
 <script lang="ts">
-  // The conflict bar's seat (client D95): the draft stands on a version
-  // the city no longer holds, drawn by `./conflict.look.svelte`. Nothing is
-  // decided for the person (client/Spec.lean §4-46): they compare the draft
-  // with the city's version, carry it over onto that version as a draft
-  // still to be saved, or drop it - the last after a question, because
-  // a dropped draft is gone (client D1).
+  
+  
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
@@ -33,7 +29,7 @@
   let asking = $state(false);
 
   const theirs = $derived(session.theirs);
-  // A version to compare with or move onto is needed first.
+  
   const waiting = $derived(theirs === null ? { why: say($lang, "refrain_conflict_unknown") } : {});
 </script>
 

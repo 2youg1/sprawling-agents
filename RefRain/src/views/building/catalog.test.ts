@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The draft of the capabilities section: a row is written only when it
-// departs from what it inherits, a group press moves every member, a
-// fixed row never moves, and the meter is what moves into the core less
-// what moves out. The vectors are the ones `#eval` prints in
-// client/spec/Views/Catalog.lean, replayed through `pressRow` and
-// `pressGroup`; a difference between the model and the code turns the
-// last test red.
 
 import { describe, expect, test } from "bun:test";
 
@@ -18,7 +11,6 @@ import { Address, B3Hash, ServerLabel } from "../../wire";
 import {
   acceptSkill,
   acceptTool,
-  catalogLook,
   draftOf,
   effectiveOf,
   keepSkill,
@@ -28,13 +20,12 @@ import {
   pressSkill,
   rowsOf,
   sameTable,
-  settleSave,
   skillMeterOf,
 } from "./catalog";
+import { catalogLook } from "./catalog_look";
 import type { Row, Selection, Table } from "./catalog";
 
-// The model's fixture, tool `n` spelled `t<n>` and namespace `n` spelled
-// `n<n>`.
+
 function row(
   name: number,
   ns: number,
@@ -77,18 +68,6 @@ const ROWS: readonly Row[] = [
 ];
 
 const EMPTY: Table = { tools: {}, namespaces: {}, skills: {} };
-
-function selection(
-  reading: readonly string[],
-  skills: Readonly<Record<string, Exposure>> = {},
-): Selection {
-  return {
-    catalog: { tools: {}, namespaces: {}, skills },
-    references: [],
-    skillPins: {},
-    readingRoom: reading,
-  };
-}
 
 type Edit =
   { readonly row: readonly [number, Exposure] } | { readonly group: readonly [number, Exposure] };
@@ -149,9 +128,7 @@ describe("the capabilities draft", () => {
     ).toBe(true);
   });
 
-  // Each vector: the edits, the table they leave (keys and values, in no
-  // order), every row's exposure, and the meter against the empty table,
-  // as `#eval vectors.map …` printed them.
+  
   const VECTORS: readonly {
     readonly edits: readonly Edit[];
     readonly tools: Readonly<Record<string, Exposure>>;
@@ -367,8 +344,8 @@ describe("the capabilities draft", () => {
       unused: () => undefined,
       copy: () => undefined,
     };
-    // The removed tool sits under an MCP reference label, so the MCP
-    // pane is the one that draws it.
+    
+    
     const removedTools = catalogLook(
       {
         answer,
@@ -479,118 +456,3 @@ describe("the capabilities draft", () => {
   });
 });
 
-describe("a building with no run yet", () => {
-  const hands = {
-    scope: () => undefined,
-    pane: () => undefined,
-    edit: () => undefined,
-    save: () => undefined,
-    unused: () => undefined,
-    copy: () => undefined,
-  };
-  const answer: CatalogAnswer = {
-    building: Address.make("lab"),
-    run: null,
-    core_bytes: 0,
-    index_bytes: 0,
-    reading_bytes: 0,
-    always: 1,
-    dormant: 1,
-    skills: 0,
-    changed: 0,
-    open_sessions: 0,
-    runs_seen: 0,
-    tools: [row(0, 0, 10, false, "core").tool, row(1, 0, 8, false, "dormant").tool],
-    skill_rows: [],
-    references: [],
-    skill_pins: {},
-    reading_room: [],
-    city: {},
-    stated: {},
-  };
-
-  test("lists the standing tools and says a save reaches the first run", () => {
-    const look = catalogLook(
-      {
-        answer,
-        scope: "building",
-        draft: selectionOfStanding(),
-        edited: false,
-        now: 0,
-        unusedOnly: false,
-        buildings: [],
-        pane: "tools",
-      },
-      "en",
-      hands,
-    );
-    expect(look.empty).toBeUndefined();
-    expect(look.beforeRun).toContain("No run yet");
-    expect(look.groups.length).toBeGreaterThan(0);
-  });
-
-  test("an empty tools pane still says there is nothing to edit", () => {
-    const look = catalogLook(
-      {
-        answer: { ...answer, tools: [] },
-        scope: "building",
-        draft: selectionOfStanding(),
-        edited: false,
-        now: 0,
-        unusedOnly: false,
-        buildings: [],
-        pane: "tools",
-      },
-      "en",
-      hands,
-    );
-    expect(look.beforeRun).toBeUndefined();
-    expect(look.empty).toContain("No run yet");
-  });
-});
-
-function selectionOfStanding(): Selection {
-  return {
-    catalog: { tools: {}, namespaces: {}, skills: {} },
-    references: [],
-    skillPins: {},
-    readingRoom: [],
-  };
-}
-
-describe("settleSave", () => {
-  test("a landed save acknowledges only a draft the person has not moved on from", () => {
-    const sent = selection([]);
-    expect(settleSave(sent, sent, sent, "building")).toEqual({
-      landed: true,
-      edited: false,
-      saved: true,
-    });
-    // The person edited again inside the round trip: the acknowledgement
-    // must not clobber those edits.
-    const edited = selection(["guide"]);
-    expect(settleSave(sent, edited, sent, "building")).toEqual({
-      landed: true,
-      edited: true,
-      saved: false,
-    });
-    // The answer does not match what was sent yet: nothing settles.
-    const earlier = selection(["other"]);
-    expect(settleSave(earlier, sent, sent, "building").landed).toBe(false);
-  });
-
-  test("the city layer settles on the catalog table alone", () => {
-    const sent = selection([]);
-    // A building-scope face legitimately differs from what a city save
-    // sent: the table match is the landing.
-    const held = { ...sent, readingRoom: ["guide"] };
-    expect(settleSave(held, sent, sent, "city").landed).toBe(true);
-    const skills: Readonly<Record<string, Exposure>> = { guide: "off" };
-    const edited = { ...sent, catalog: { tools: {}, namespaces: {}, skills } };
-    expect(settleSave(sent, edited, sent, "city")).toEqual({
-      landed: true,
-      edited: true,
-      saved: false,
-    });
-  });
-});

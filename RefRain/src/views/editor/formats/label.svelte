@@ -6,11 +6,8 @@
 -->
 
 <script lang="ts">
-  // The line above every drawn format: what drew it and how, and which
-  // version it is (refrain S7.12, client/Spec.lean §4-54). A preview is a
-  // reading of the file, not the file, so a person can tell from this
-  // line alone which tool, which settings and which bytes they are
-  // looking at; the notes say what the drawing leaves out.
+  
+  
   import { fill, say } from "../../../core/lang";
   import { ui } from "../../../ui";
   import type { B3Hash } from "../../../wire";
@@ -22,7 +19,7 @@
     readonly format: Drawn;
     readonly tool: string;
     readonly settings: readonly string[];
-    // The version drawn, when no other line on the screen names it.
+    
     readonly version: B3Hash | null;
     readonly notes?: readonly string[];
   }

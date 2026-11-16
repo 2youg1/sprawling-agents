@@ -123,8 +123,8 @@ mod tests {
                     "/* head */\n@import \"tailwindcss\";\n@import \"./theme/b.css\";\n\
                      @import \"./theme/a.css\";\n",
                 ),
-                ("client/src/theme/a.css", "a {}\n"),
-                ("client/src/theme/b.css", "b {}\n"),
+                ("RefRain/src/theme/a.css", "a {}\n"),
+                ("RefRain/src/theme/b.css", "b {}\n"),
             ],
         );
         let theme = Theme::read(&root).unwrap();
@@ -134,7 +134,7 @@ mod tests {
         );
         assert_eq!(
             [theme.declaring("a {"), theme.declaring("head")],
-            ["client/src/theme/a.css", ENTRY]
+            ["RefRain/src/theme/a.css", ENTRY]
         );
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -146,8 +146,8 @@ mod tests {
             "unimported",
             &[
                 (ENTRY, "@import \"./theme/a.css\";\n"),
-                ("client/src/theme/a.css", "a {}\n"),
-                ("client/src/theme/dead.css", "b {}\n"),
+                ("RefRain/src/theme/a.css", "a {}\n"),
+                ("RefRain/src/theme/dead.css", "b {}\n"),
             ],
         );
         let refused = [&missing, &unimported].map(|root| match Theme::read(root) {
@@ -159,8 +159,8 @@ mod tests {
         assert_eq!(
             refused,
             [
-                "missing client/src/theme/gone.css",
-                "unimported client/src/theme/dead.css"
+                "missing RefRain/src/theme/gone.css",
+                "unimported RefRain/src/theme/dead.css"
             ]
         );
         for root in [missing, unimported] {
@@ -173,10 +173,10 @@ mod tests {
         assert_eq!(
             [
                 ENTRY,
-                "client/src/theme/tokens-colour.css",
-                "client/src/theme/deeper/x.css",
-                "client/src/theme/notes.md",
-                "client/src/panel.css",
+                "RefRain/src/theme/tokens-colour.css",
+                "RefRain/src/theme/deeper/x.css",
+                "RefRain/src/theme/notes.md",
+                "RefRain/src/panel.css",
             ]
             .map(is_theme),
             [true, true, false, false, false]

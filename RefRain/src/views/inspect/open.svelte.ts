@@ -3,64 +3,35 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The properties this module must hold are proved in `client/spec/Views/Inspect/Open.lean`.
-//
-// What the right side shows (docs/frontend-method.md §7F, client/Spec.lean §4-45): the one state every
-// opener writes and the inspector reads, so a tool line, a commit row and
-// a file in the world layer open the same side through the same door.
-//
-// **Several items are open at once, one tab each, and one of them is in
-// front.** The front item is the one touched last; the inspector shows,
-// in each of its two regions, the item of that region touched last, so
-// opening a command does not hide the file above it.
-//
-// **Every open item stays mounted until it is closed**, which is what
-// keeps its scroll position, its selection and an unsaved RefRain draft
-// when another tab comes forward. That costs one view per
-// tab, so at most `KEPT` are open, and opening one more closes the one
-// touched longest ago.
-//
-// **Focus goes back where it came from.** The element that had the focus
-// when an item was opened from outside the inspector is remembered, and
-// closing the inspector while the focus is inside it hands the focus back
-// to that element if it is still on the page (7-7). A letter opened from
-// the mailbox gives a way back of its own instead, because the mailbox
-// stows while the letter is open and the row that opened it is no longer
-// on the page (client D73).
 
 import type { Address, B3Hash, GitOid, RunId, Seq } from "../../wire";
 
-// A call, named the way `RoundsAnswer` names one: the run it belongs to
-// and the ledger sequence of the call itself (`Call.at`).
+
 export interface CallItem {
   readonly run: RunId;
   readonly at: Seq;
 }
 
-// A document of a building, at a version the ledger recorded, or at the
-// worktree's current text when `version` is `null`.
+
 export interface DocumentItem {
   readonly building: Address;
   readonly path: string;
   readonly version: B3Hash | null;
 }
 
-// What moved between two commits: a commit picked in the workbench, read
-// against its first parent (refrain §3-9).
+
 export interface ChangesItem {
   readonly base: GitOid;
   readonly head: GitOid;
 }
 
-// One card offered on a document - a letter, as the mailbox shows it -
-// read with the full text before it and the document as it stands, and
-// the run that sent it.
+
 export interface LetterItem {
   readonly doc: Address;
   readonly card: B3Hash;
 }
 
-// One run's context usage report, opened from the ring (not the coin).
+
 export interface ContextItem {
   readonly run: RunId;
   readonly room: Address | null;
@@ -73,12 +44,10 @@ export type RightItem =
   | ({ readonly kind: "letter" } & LetterItem)
   | ({ readonly kind: "context" } & ContextItem);
 
-// Tabs a person keeps open before the oldest is closed for them: enough
-// for a file, its diff and two commands on each side of a comparison.
+
 const KEPT = 8;
 
-// The attribute the inspector's root carries, by which a closing hand
-// knows the focus is its own to give back.
+
 export const INSPECTOR = "data-inspector";
 
 interface Held {
@@ -112,8 +81,7 @@ export function sameItem(a: RightItem | null, b: RightItem): boolean {
   }
 }
 
-// One spelling per item, for keying a tab or a region's view: two
-// readings of the same item are one key.
+
 export function itemKey(item: RightItem): string {
   switch (item.kind) {
     case "call":
@@ -133,8 +101,7 @@ export function rightItem(): RightItem | null {
   return frontWhere(() => true);
 }
 
-// The item touched last among those `pick` accepts: what one region of
-// the inspector shows.
+
 export function frontWhere(pick: (item: RightItem) => boolean): RightItem | null {
   return (
     held.reduce<Held | null>(
@@ -145,7 +112,7 @@ export function frontWhere(pick: (item: RightItem) => boolean): RightItem | null
   );
 }
 
-// Every open item, in the order it was opened: the order of the tabs.
+
 export function openItems(): readonly RightItem[] {
   return held.map((each) => each.item);
 }
@@ -170,8 +137,7 @@ export function openChanges(changes: ChangesItem): void {
   showItem({ kind: "changes", base: changes.base, head: changes.head });
 }
 
-// Open a letter; `comeBack` runs when the right side closes with the
-// focus its own, in place of handing the focus to an element.
+
 export function openLetter(letter: LetterItem, comeBack: () => void): void {
   opener = null;
   back = comeBack;
@@ -183,13 +149,12 @@ export function openContext(context: ContextItem): void {
   showItem({ kind: "context", run: context.run, room: context.room });
 }
 
-// Bring an item forward, opening it when it is not open yet.
+
 export function showItem(item: RightItem): void {
   clock += 1;
   const touched = clock;
-  // Re-show replaces the held record so fields that travel with the same
-  // identity (a context report's room, for example) cannot stick to the
-  // first open while the opener moved.
+  
+  
   const kept = held.some((each) => sameItem(each.item, item))
     ? held.map((each) => (sameItem(each.item, item) ? { item, touched } : each))
     : [...held, { item, touched }];

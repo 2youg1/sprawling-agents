@@ -1,20 +1,8 @@
-<!-- This Source Code Form is subject to the terms of the Mozilla Public
-     License, v. 2.0. If a copy of the MPL was not distributed with this
-     file, You can obtain one at https://mozilla.org/MPL/2.0/.
-     Copyright (c) 2026 2youg1 and the sprawling contributors -->
+
 
 <script lang="ts">
-  // One settings group, drawn in the settings panel's body beside the
-  // tree (client/Spec.lean §7L): its heading, the one line saying what it
-  // governs, its cards, and the city's own `config.toml` folded at the
-  // foot. Which group is the panel's to say (`views/settings/panel.svelte`);
-  // this file only draws the one it is handed.
-  //
-  // Every setting drawn here is one card: a title, one line saying what
-  // the setting governs, the control, and a foot with the constraint or
-  // state on the left and the save receipt on the right (client/Spec.lean
-  // §4-36).
-
+  
+  
   import type { Snippet } from "svelte";
 
   import { QUERIES } from "../core/asking";
@@ -57,9 +45,7 @@
 
   type Setting = "proxying" | "autonomy" | "language";
 
-  // Who answers an approval, as the two settings a person picks between:
-  // `delegate` carries an address on the wire, and the clerk is the only
-  // resident this screen delegates to.
+  
   type AutonomySetting = "owner" | "delegate";
 
   const AUTONOMIES = [
@@ -80,18 +66,15 @@
     }
   }
 
-  // What a caller may hand this group in place of a city - the answers
-  // a city would give and the survey the dependency group draws. Every
-  // one is optional, so the panel's bare `<Setup {group} />` asks its
-  // own questions.
+  
   interface Props {
     readonly group?: SetupGroup | undefined;
-    // The id the heading carries, so the panel can name its dialog by it.
+    
     readonly titleId?: string | undefined;
     readonly endpoints?: EndpointsAnswer | undefined;
     readonly autonomy?: Autonomy | undefined;
     readonly onAutonomy?: ((setting: AutonomySetting) => void) | undefined;
-    // The dependency group's body: the real one asks this machine.
+    
     readonly dependency?: Snippet | undefined;
   }
 
@@ -114,7 +97,7 @@
     const stated = $governance;
     return stated !== undefined && "governance" in stated ? stated.governance.autonomy : undefined;
   });
-  // An injected answer wins over the question this page would ask.
+  
   const answer = $derived(endpoints ?? asked);
   const chosen = $derived(autonomy ?? askedAutonomy);
   const hint = $derived(HINT[shown]);
@@ -123,11 +106,7 @@
   const receipt = saveReceipt();
   const saved = receipt.saved;
 
-  // The one write behind the autonomy control: a caller that owns the
-  // question answers it itself; this page otherwise sends the command.
-  // "Saved" is said once the answer the page reads holds the choice, not
-  // when the frame leaves: a frame the link could not carry, or one the
-  // city refused, never shows the receipt.
+  
   let awaited = $state.raw<AutonomySetting | null>(null);
   $effect(() => {
     if (awaited === null || chosen === undefined || autonomySetting(chosen) !== awaited) return;
@@ -146,9 +125,7 @@
 </script>
 
 {#snippet foot(constraint: string | undefined, name: Setting)}
-  <!-- The `{@render}` lines below each carry one suppression of
-      `no-confusing-void-expression`, the way `parts/segmented.svelte`
-      settles it. -->
+  
   <div class="mt-tight flex items-baseline justify-between gap-base">
     {#if constraint !== undefined}
       <span class="text-note text-text-faint">{constraint}</span>
@@ -199,9 +176,7 @@
   />
 {/snippet}
 
-<!-- The group's header, its cards, and the city's own `config.toml`
-folded at the foot: a proofing tool rather than a setting, so it never
-costs the cards their width (client/Spec.lean §4-30, §4-36). -->
+
 <div class="flex min-w-0 flex-col gap-wide px-wide py-wide narrow:px-base">
   <header class="flex min-w-0 flex-col gap-tight border-b border-edge pb-base">
     <div class="flex flex-wrap items-center gap-base">
@@ -218,12 +193,7 @@ costs the cards their width (client/Spec.lean §4-30, §4-36). -->
     {#if shown === "you"}
       <You />
     {:else if shown === "accounts"}
-      <!-- Five stages, top to bottom: what is already attached, how to
-          attach another, which models fill the city's roles, the run
-          defaults those models inherit, then web search. The form takes
-          the conversation's 760 rather than a measure, because what a
-          person pastes into it is a base URL and a key and 520 cut both
-          off (docs/frontend-method.md §4-33, 4-36). -->
+      
       <div class="flex flex-col gap-wide">
         <div class="min-w-0">
           <ProviderDoor stepped />
@@ -237,9 +207,7 @@ costs the cards their width (client/Spec.lean §4-30, §4-36). -->
             <ModelChoice {answer} />
           {/if}
         </section>
-        <!-- The default thinking level sits beside the default model,
-            because both answer what the city reaches for by default
-            (client D52). -->
+        
         <section class="flex min-w-0 flex-col gap-snug border-t border-edge pt-wide">
           <header class="flex min-w-0 flex-col gap-tight">
             <h3 class="text-label font-label text-text">{say($lang, "setup_step_defaults")}</h3>

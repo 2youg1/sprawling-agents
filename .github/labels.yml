@@ -21,7 +21,7 @@
 # Where the work lands. One or more per issue.
 - name: "area: frontend"
   color: "1d76db"
-  description: "The browser client under client/. 前端：client/ 下的浏览器客户端"
+  description: "The browser client under RefRain/. 前端：RefRain/ 下的浏览器客户端"
 - name: "area: backend"
   color: "0e8a16"
   description: "The Rust binary under Sprawling/ and Tools/. 后端：Sprawling/ 与 Tools/ 下的 Rust 二进制"

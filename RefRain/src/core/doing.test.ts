@@ -15,16 +15,13 @@ const AWAITING: Doing = {
 };
 
 describe("sending", () => {
-  // The defect this pins is one of wording, and it is the one a
-  // streaming page invites: text arriving letter by letter reads as a
-  // conversation, and a person types into it expecting to be heard. A
-  // steer is consumed at a phase boundary, so while a tool call is out
-  // the words wait - and the composer has to say so.
+  
+  
   test("a run that is blocked queues the words instead of saying them", () => {
     const calling: Doing = { kind: "calling", tool: "exec", subject: "just check" };
     expect(sendingInto(calling)).toBe("queued");
     expect(sendingInto({ kind: "waiting" })).toBe("queued");
-    // Waiting for a reply is waiting inside the `send` call.
+    
     expect(sendingInto(AWAITING)).toBe("queued");
   });
 
@@ -32,15 +29,12 @@ describe("sending", () => {
     expect(sendingInto({ kind: "thinking" })).toBe("steer");
   });
 
-  // A phase nobody stated is not a promise that the words land at a
-  // boundary, and the queue is the spelling that promises least.
+  
   test("a run whose phase this page was never told queues", () => {
     expect(sendingInto({ kind: "unknown" })).toBe("queued");
   });
 
-  // Nothing in flight and a run that has ended are the same fact for a
-  // person writing: the next message opens work rather than interrupting
-  // it. `undefined` is "this room has no live run", not "unknown".
+  
   test("no live run and a frozen one both open new work", () => {
     expect(sendingInto(undefined)).toBe("dispatch");
     expect(sendingInto({ kind: "frozen", completion: "done" })).toBe("dispatch");
@@ -48,8 +42,7 @@ describe("sending", () => {
   });
 });
 
-// client/Spec.lean D88: every ending leaves the posture, and only a run
-// still waiting is moved by one.
+
 describe("the end of a reply wait", () => {
   test("a reply or a timeout hands the run back to its model, a run that left is told nothing yet", () => {
     const ends: readonly ReplyEnd[] = ["reply", "timeout", "left"];
@@ -60,8 +53,7 @@ describe("the end of a reply wait", () => {
     ]);
   });
 
-  // The defect this pins: a `run_frozen` folded before the ending would
-  // be read back to thinking, and a finished run would look alive.
+  
   test("an ending leaves a run that is no longer waiting where it is", () => {
     const frozen: Doing = { kind: "frozen", completion: "cancelled" };
     expect(afterWait(frozen, "left")).toEqual(frozen);

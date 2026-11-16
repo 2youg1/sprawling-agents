@@ -1,14 +1,5 @@
-<!-- This Source Code Form is subject to the terms of the Mozilla Public
-License, v. 2.0. If a copy of the MPL was not distributed with this
-file, You can obtain one at https://mozilla.org/MPL/2.0/.
-Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- How the design questions waiting for the person are drawn
-(`WaitingLook`, `./waiting`): each on the one decide card the things
-that stop and ask share (`parts/decide.svelte`, client/Spec.lean §7C),
-its body the question, what it is about, what denying keeps and the
-link to the bin, then how many questions the answer covers and the
-tainted mark. The cards are a pane apart. -->
+
 <script lang="ts">
   import Badge from "../parts/badge.svelte";
   import Decide from "../parts/decide.svelte";

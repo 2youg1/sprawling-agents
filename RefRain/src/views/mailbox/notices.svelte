@@ -6,12 +6,8 @@
 -->
 
 <script lang="ts">
-  // The foot of the mailbox: every ordinary refusal of the session,
-  // newest first and grouped by the day it first arrived (client/Spec.lean
-  // §4-35, the drawer seat). A refusal that stops the work is not here:
-  // it stands in the deciding section, and one refusal has one place on
-  // the screen. What a recovery's control says, when it may be pressed
-  // and what it does is `notice_recovery.ts`'s, shared with the toast.
+  
+  
   import { SvelteMap } from "svelte/reactivity";
 
   import type { Notice as NoticeRecord } from "../../core/belief";
@@ -35,9 +31,7 @@
     $belief.notices.filter((notice) => urgencyOf(notice.error) === "ordinary" && shown(notice)),
   );
 
-  // The notices as they are read: newest first, grouped by the day the
-  // refusal first arrived. A repeat keeps its first-seen stamp, so the
-  // day a refusal belongs to never moves.
+  
   const days = $derived.by(() => {
     const now = u.now();
     const groups = new SvelteMap<string, NoticeRecord[]>();
@@ -54,9 +48,7 @@
     }));
   });
 
-  // A day is named by the two days a person has words for and dated
-  // beyond them. The date is data, formatted where every other time on
-  // this client is formatted (`core/time`).
+  
   function dayOf(tongue: Lang, at: number, now: number): string {
     const day = new Date(at).toDateString();
     if (day === new Date(now).toDateString()) return say(tongue, "notices_today");

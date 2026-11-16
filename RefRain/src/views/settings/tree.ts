@@ -3,20 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The settings tree: six branches grouped by what a setting is about,
-// one open at a time, each with a "more" fold for its second-rank
-// entries, and the two entries that open a level of their own
-// (client/Spec.lean §7L, D52, D53). An entry is either a group the panel
-// draws in its body, or a page the address bar moves to; the tree is
-// the one way every page but the conversation is reached (4-8, client
-// D19), so this table is also the list of those pages.
-//
-// The branches answer one question each: the city's own facts, what
-// the city can reach (connections), what a run is allowed, what the
-// city has taken in, what belongs to this person on this machine
-// (including privacy), and where to look when something went wrong. An
-// entry whose page does not exist yet is not in the table, because a
-// row that goes nowhere is a dead button.
 
 import { createAttachmentKey, type Attachment } from "svelte/attachments";
 
@@ -28,20 +14,17 @@ import type { GlyphName } from "../parts/glyph";
 import { HEADING } from "../setup/groups";
 import type { Fold, Folds } from "./folds";
 
-// A page and the word the tree names it by.
+
 export interface Page {
   readonly kind: "page";
   readonly view: View;
   readonly word: Key;
 }
 
-// The two entries with entries of their own: one per building, and one
-// per lens of the record. Their leaves are read when they are drawn,
-// because the buildings are the city's answer.
+
 export type Nest = "buildings" | "record";
 
-// What a "more" fold may hold: never a nest, so a branch, its "more"
-// and the entry inside it are the three levels the tree is allowed.
+
 export type Leaf = { readonly kind: "group"; readonly group: SetupGroup } | Page;
 
 export type Entry = Leaf | { readonly kind: "nest"; readonly nest: Nest; readonly word: Key };
@@ -67,10 +50,8 @@ export const TREE: readonly Branch[] = [
     more: [],
   },
   {
-    // Access keeps one list: accounts (providers, generation defaults
-    // and models), agents, then how the city reaches the network and
-    // which browsers hold a key. A second "more" fold under this branch
-    // made the side look deeper than it was.
+    
+    
     word: "settings_branch_access",
     entries: [
       group("accounts"),
@@ -92,8 +73,8 @@ export const TREE: readonly Branch[] = [
     more: [],
   },
   {
-    // Privacy sits with preferences: it is what this person allows on
-    // the machine, not a reading taken after something went wrong.
+    
+    
     word: "settings_branch_preferences",
     entries: [group("appearance"), group("colours"), group("keys"), group("privacy")],
     more: [],
@@ -106,16 +87,13 @@ export const TREE: readonly Branch[] = [
       group("tools"),
       group("about"),
     ],
-    // The guide and the developer's tools stay one fold down: they are
-    // reached after the person has left them (refrain 3-15), not on the
-    // first reading of what went wrong.
+    
+    
     more: [{ kind: "page", view: { kind: "welcome" }, word: "welcome_title" }, group("advanced")],
   },
 ];
 
-// A branch mark only when an existing glyph names the object clearly;
-// a weak fit is left blank (docs/ui-design.md: no icon is better than a
-// wrong one).
+
 const BRANCH_MARK: Readonly<Partial<Record<Key, GlyphName>>> = {
   settings_branch_city: "city",
   settings_branch_access: "key",
@@ -124,23 +102,18 @@ const BRANCH_MARK: Readonly<Partial<Record<Key, GlyphName>>> = {
   settings_branch_diagnosis: "search",
 };
 
-// Where the panel stands: the branch drawn open, and whether that
-// branch's "more" fold is open with it.
+
 export interface Standing {
   readonly branch: number;
   readonly more: boolean;
 }
 
-// The branch the panel opens on: the one holding the page beneath when
-// the tree offers that page, else the one holding the group drawn.
+
 export function standingOf(drawn: SetupGroup, beneath: View): Standing {
   return placeOf((leaf) => offers(leaf, beneath)) ?? standingForGroup(drawn);
 }
 
-// The branch that holds the drawn group alone. Used when the person
-// picks a group while the panel stays over the same page: the page
-// beneath must not win again, or every pick under a city / building /
-// cost page would reopen the city branch (CS17.SETUX regression).
+
 export function standingForGroup(drawn: SetupGroup): Standing {
   return placeOf((leaf) => leaf.kind === "group" && leaf.group === drawn) ?? FIRST;
 }
@@ -153,8 +126,7 @@ function placeOf(holds: (entry: Entry) => boolean): Standing | null {
   return found === undefined ? null : { branch, more: !found.entries.some(holds) };
 }
 
-// Whether an entry of the tree is the way to the page beneath. A nest
-// offers every page of its kind; the conversation is offered by none.
+
 function offers(entry: Entry, beneath: View): boolean {
   switch (entry.kind) {
     case "group":
@@ -166,8 +138,7 @@ function offers(entry: Entry, beneath: View): boolean {
   }
 }
 
-// One page per building the city names, the hall among them, so a city
-// of one building still lists it.
+
 export function buildingPages(addresses: readonly Address[]): readonly Page[] {
   return addresses.map((address) => ({
     kind: "page",
@@ -176,12 +147,10 @@ export function buildingPages(addresses: readonly Address[]): readonly Page[] {
   }));
 }
 
-// The group a panel opened without one shows: the first the tree
-// offers, which is who the person and the Mayor are (client/Spec.lean §7L).
+
 export const FIRST_GROUP: SetupGroup = "you";
 
-// The nest the page beneath the panel belongs to, which starts open so
-// the entry that names that page is in sight.
+
 export function nestOf(view: View): Nest | null {
   switch (view.kind) {
     case "building":
@@ -203,8 +172,7 @@ export function nestOf(view: View): Nest | null {
   }
 }
 
-// The entry a line key moves the focus to from the entry at `at`; -1
-// is a focus outside the entries.
+
 export function stepped<T>(
   entries: readonly T[],
   at: number,
@@ -226,8 +194,7 @@ export function stepped<T>(
   }
 }
 
-// The next entry after the focus whose letter is `letter`, from the top
-// again past the last one (client D40).
+
 export function byInitial<T>(
   entries: readonly T[],
   at: number,
@@ -239,20 +206,14 @@ export function byInitial<T>(
   );
 }
 
-// What the tree's look is given. Every word is already in the person's
-// language, and every role, state, id and handler sits in a wire bag
-// the look spreads on the element it belongs to.
 
-// The bag spread on the `<nav>`. Its symbol key is a Svelte attachment
-// that hands the seat the element whose entries the line keys walk.
 export interface NavWire {
   readonly "aria-label": string;
   readonly onkeydown: (event: KeyboardEvent) => void;
   readonly [hold: symbol]: Attachment<HTMLElement>;
 }
 
-// The bag spread on a button that opens a list of its own: a branch, a
-// nest, a "more". `data-entry` marks every element the keys walk.
+
 export interface FoldWire {
   readonly type: "button";
   readonly "data-entry": "";
@@ -261,8 +222,7 @@ export interface FoldWire {
   readonly onclick: () => void;
 }
 
-// The bag spread on a group's button; `data-initial` is the letter the
-// keys reach it by.
+
 export interface GroupWire {
   readonly type: "button";
   readonly "data-entry": "";
@@ -271,7 +231,7 @@ export interface GroupWire {
   readonly onclick: () => void;
 }
 
-// The bag spread on a page's link.
+
 export interface PageWire {
   readonly "data-entry": "";
   readonly href: string;
@@ -281,12 +241,12 @@ export interface PageWire {
 export interface FoldLook {
   readonly label: string;
   readonly open: boolean;
-  // The id of the list the fold opens.
+  
   readonly list: string;
   readonly wire: FoldWire;
 }
 
-// `here` is the group drawn in the panel's body.
+
 export interface GroupLook {
   readonly kind: "group";
   readonly key: string;
@@ -296,8 +256,7 @@ export interface GroupLook {
   readonly wire: GroupWire;
 }
 
-// `here` is the page under the panel; `reading` is the one line the
-// performance page's entry carries about the city's processes.
+
 export interface PageLook {
   readonly kind: "page";
   readonly key: string;
@@ -323,7 +282,7 @@ export interface MoreLook {
 
 export interface BranchLook {
   readonly key: string;
-  // Absent when no shipped glyph names this branch cleanly.
+  
   readonly mark: GlyphName | null;
   readonly fold: FoldLook;
   readonly entries: readonly (LeafLook | NestLook)[];
@@ -335,9 +294,7 @@ export interface TreeLook {
   readonly branches: readonly BranchLook[];
 }
 
-// What the tree reads besides its own presses: the group drawn, the
-// page beneath, the folds, each nest's pages, and the performance
-// reading.
+
 export interface TreeState {
   readonly group: SetupGroup;
   readonly beneath: View;
@@ -346,8 +303,7 @@ export interface TreeState {
   readonly reading: string | null;
 }
 
-// What only the seat holds: the words of the language on the page, the
-// presses, the key handler, and the attachment that finds the `<nav>`.
+
 export interface TreeHands {
   readonly words: (key: Key) => string;
   readonly pick: (group: SetupGroup) => void;
@@ -358,7 +314,7 @@ export interface TreeHands {
 
 const HOLD = createAttachmentKey();
 
-// The whole value the tree's look draws.
+
 export function lookOf(state: TreeState, uid: string, hands: TreeHands): TreeLook {
   const foldOf = (label: Key, open: boolean, list: string, fold: Fold): FoldLook => ({
     label: hands.words(label),
@@ -429,8 +385,7 @@ function groupOf(named: SetupGroup, drawn: SetupGroup, hands: TreeHands): GroupL
   };
 }
 
-// A building's entry is named by its address, which is the city's word
-// and not this page's.
+
 function pageOf(page: Page, state: TreeState, words: (key: Key) => string): PageLook {
   const href = toFragment(page.view);
   const here = href === toFragment(state.beneath);

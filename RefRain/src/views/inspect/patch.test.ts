@@ -5,7 +5,7 @@
 
 // A patch's rows as the seat hands them to any look (client D95): the
 // number a code row carries, and the quote bag that is there only where
-// the page has a conversation (client/Spec.lean §7-2). No look is
+// the page has a conversation (RefRain/Spec.lean §7-2). No look is
 // imported here.
 
 import { describe, expect, test } from "bun:test";

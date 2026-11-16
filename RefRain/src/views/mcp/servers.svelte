@@ -6,26 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // `claude mcp list`, as a page: one line per server with its
-  // transport, where it stands and how many tools it offers, and a row
-  // that opens on the tool list with each tool's input schema.
-  //
-  // A server nobody has reached yet says so rather than looking
-  // healthy. The three states come from the city's own handshake, so
-  // what a person reads here and what a model is given cannot disagree.
-  //
-  // **The row is `parts/row`'s** (client/Spec.lean §7 names this seat): the
-  // list draws `RowList` and each server draws a `Row`, so a keyboard
-  // walks the list and the remove control stays separately reachable.
-  // What the row cannot hold - the opened tool list - is the one row
-  // this file draws for itself, which is the door `Row` leaves open for
-  // a list that holds more than rows.
-  //
-  // Removing a server is the one press on this page that cannot be
-  // undone from here, so it is confirmed through `parts/dialog` before
-  // anything is sent: the cancelling answer is written first
-  // and lands under the hand.
-
+  
+  
   import type { McpServer, McpServerHealth, McpState } from "../../wire";
 
   export interface ServersProps {
@@ -35,7 +17,7 @@
     readonly onRemove: (label: string) => void;
   }
 
-  // The one place a transport becomes the line a person reads.
+  
   function targetOf(server: McpServer): string {
     const transport = server.transport;
     if ("stdio" in transport) return [transport.stdio.command, ...transport.stdio.args].join(" ");
@@ -50,8 +32,7 @@
     return "mcp_kind_sse";
   }
 
-  // The name/value rows a server is configured with, whichever of the
-  // two tables this transport keeps them in.
+  
   function pairsOf(server: McpServer): readonly (readonly [string, string])[] {
     const transport = server.transport;
     if ("stdio" in transport) return transport.stdio.env;
@@ -63,8 +44,7 @@
     return "stdio" in server.transport ? "mcp_env" : "mcp_header";
   }
 
-  // How many tools the server listed, or an em dash where nobody has
-  // asked: "none" and "not asked" are different facts about a server.
+  
   function toolCount(state: McpState | undefined): string {
     if (state === undefined) return "—";
     return "connected" in state ? String(state.connected.tools.length) : "—";
@@ -85,10 +65,7 @@
 
   const { lang } = ui();
 
-  // Which server's tool list is open, and which one is being confirmed
-  // for removal. Two questions with one live answer each; the second is
-  // emptied before the command leaves, so a dialog never survives its
-  // own answer.
+  
   let open = $state<string | null>(null);
   let confirming = $state<string | null>(null);
 
@@ -148,7 +125,7 @@
             <span class="text-text-quiet">{say($lang, pairCaption(server))}</span>
             {#each pairsOf(server) as pair, at (at)}
               <span class="min-w-0 wrap-anywhere font-mono text-text">
-                <!-- wording-ok: the "=" is punctuation in type, not a word; the two values are the city's own. -->
+                
                 {pair[0]}<span class="text-text-faint">&nbsp;=&nbsp;</span>{pair[1]}
               </span>
             {/each}
@@ -179,9 +156,7 @@
   {:else if "authenticating" in state}
     <p class="text-text-faint">{state.authenticating.recovery}</p>
   {:else if "failed" in state}
-    <!-- The three-part refusal: what failed and on what, as the city
-    wrote them, and what a person can do about it in the reader's own
-    language, by the code (`parts/notice_title.ts`). -->
+    
     <p class="text-text-faint">
       {state.failed.refusal.action}: {state.failed.refusal.subject} — {recoveryWords(
         $lang,

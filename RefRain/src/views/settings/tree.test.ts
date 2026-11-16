@@ -152,7 +152,7 @@ describe("the settings tree's branch marks", () => {
   });
 });
 
-// The look is handed every role, state and handler of client/Spec.lean
+// The look is handed every role, state and handler of RefRain/Spec.lean
 // §7-11 in its wire bags, so these hold for whatever look draws the tree.
 describe("the settings tree's wiring", () => {
   const talk = { kind: "talk", address: Address.make("hall/mayor") } as const;

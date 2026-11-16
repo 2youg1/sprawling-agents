@@ -8,18 +8,13 @@
 <script lang="ts" module>
   import type { Placing, Showing, TipSide } from "./tip";
 
-  // Against the wrapper, for an engine without anchor positioning.
+  
   const AGAINST_WRAPPER: Record<TipSide, string> = {
     above: "absolute bottom-full left-1/2 -translate-x-1/2 mb-tight",
     right: "absolute left-full top-1/2 -translate-y-1/2 ml-base",
   };
 
-  // Against the anchor, for an engine with it. `flip-block` drops the
-  // hint below the control when there is no room above.
-  //
-  // `--tip-anchor` is spelled out rather than built from a constant
-  // because Tailwind reads class names out of this file as text: a name
-  // assembled at run time produces no CSS at all.
+  
   const AGAINST_ANCHOR: Record<TipSide, string> = {
     above:
       "supports-[anchor-name:--a]:fixed supports-[anchor-name:--a]:bottom-auto " +
@@ -44,27 +39,14 @@
     }
   }
 
-  // The 300 ms delay is the whole point of the transition: it stops a
-  // pointer crossing a row from lighting its hints one after another,
-  // and client/Spec.lean §4-18 pins it. It is not `HOLD_MS` in
-  // `core/press.ts`, though both read 300: that one tells a key held
-  // from a key pressed and also decides when the layers key peeks at
-  // the blend tier, and hold-to-reveal (theme/expose.css) zeroes this
-  // delay because the hold has already waited. Tuning how long a pointer
-  // must rest on a dense row must not move when Accel-\ peeks.
-  //
-  // Only opacity moves, so the reveal costs no layout, and `still` cuts
-  // it to nothing. The resting state leaves and the shown state arrives
-  // (docs/frontend-method.md §4-43).
+  
   const PAINT =
     "pointer-events-none z-(--layer-popover) w-max max-w-measure rounded-card border border-edge-panel bg-raised " +
     "px-snug py-tight text-note text-text shadow-float " +
     "transition-[opacity,display] transition-discrete delay-300 duration-panel ease-leave " +
     "still:transition-none";
 
-  // Hidden costs nothing to draw and nothing to measure; shown is what
-  // hover and focus both switch to. After Escape: hidden past both hover
-  // and focus, with no class that could bring it back under them.
+  
   const SHOWN: Record<Showing, string> = {
     wanted:
       "hidden opacity-0 group-hover/tip:block group-hover/tip:opacity-100 group-hover/tip:ease-arrive " +

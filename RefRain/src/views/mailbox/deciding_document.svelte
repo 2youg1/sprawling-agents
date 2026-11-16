@@ -6,12 +6,8 @@
 -->
 
 <script lang="ts">
-  // The proposal cards open on one document, in the mailbox's deciding
-  // section (client/Spec.lean §4-55): each card leads with the document's
-  // whole path, when its newest card was offered, and the way to it, which opens the
-  // document on the right side with the same cards above its text, and
-  // the way to the letter, which opens this one card on the right side
-  // with the text before and after it (client D73).
+  
+  
   import { readAnswer } from "../../core/answered";
   import { say } from "../../core/lang";
   import { buildingOf } from "../../core/route";
@@ -20,17 +16,17 @@
   import { ui } from "../../ui";
   import { openDocument, openLetter } from "../inspect/open.svelte";
   import Button from "../parts/button.svelte";
-  import Card from "../refrain/proposals_card.svelte";
+  import Card from "../editor/proposals_card.svelte";
   import { WHY } from "./pending";
   import { returnTo } from "./returning.svelte";
 
   interface Props {
     readonly doc: Address;
-    // When the newest card on it was offered, `null` when the city could
-    // not say.
+    
+    
     readonly at: TimeMs | null;
-    // Puts the mailbox away once the person follows a card to its
-    // document.
+    
+    
     readonly onLeave: () => void;
   }
 
@@ -53,9 +49,7 @@
       <Card {doc} {card} version={read.value.version ?? null}>
         {#snippet lead()}
           <p class="text-note text-text-quiet">{say($lang, WHY.proposal)}</p>
-          <!-- The whole path, wrapped where it must: a path cut short
-          keeps the part that tells two documents apart out of sight, and
-          a hint on words nobody can focus reaches only a pointer. -->
+          
           <p class="font-mono text-note wrap-anywhere text-text-quiet">{doc}</p>
           <div class="flex min-w-0 items-center gap-snug">
             <span class="min-w-0 flex-1 text-note text-text-faint"

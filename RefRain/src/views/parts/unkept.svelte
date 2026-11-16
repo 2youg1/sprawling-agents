@@ -6,18 +6,14 @@
 -->
 
 <script lang="ts">
-  // A draft the browser would not store (refrain §3-14, the second row;
-  // client/Spec.lean §4-63): one line that says the words live in this
-  // tab alone and are gone when it closes, and a copy beside it, so the
-  // person can carry them out before that. The box and RefRain draw it
-  // under what they hold. This is the seat; `./unkept.look.svelte`
-  // draws it, and the copy key is the one copy key (`./copy`).
+  
+  
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Look from "./unkept.look.svelte";
 
   interface Props {
-    // The words as they stand when the copy is pressed.
+    
     readonly words: () => string;
   }
 

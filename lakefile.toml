@@ -66,8 +66,8 @@ globs = [
   "Sprawling.wire.spec.+",
   "Tools.xtask.Spec",
   "Tools.xtask.spec.+",
-  "client.Spec",
-  "client.spec.+",
+  "RefRain.Spec",
+  "RefRain.spec.+",
 ]
 
 # The adversarial checker (Tools/adversary/Spec.lean). It imports no

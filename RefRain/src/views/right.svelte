@@ -6,25 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // The right side, the inspector (docs/frontend-method.md §7F, client/Spec.lean §4-45): a strip of the
-  // items open on it, the editor region above and the terminal region
-  // below, and the line between them. Where it stands on the grid is the
-  // workspace's decision (4-27); what is open on it is
-  // `inspect/open.svelte.ts`'s.
-  //
-  // **Nobody has to open anything for the run to be inspectable.** While
-  // no item is open, the side follows the run in front of the person: the
-  // file its last call read or changed above, the command it last ran
-  // below (`reading.ts`'s `followingIn`). Choosing one of those tabs keeps
-  // them both, as items the person now holds.
-  //
-  // **Each region shows its own front item, and every open item stays
-  // mounted** behind the one shown, so its scroll, its selection and a
-  // RefRain draft survive another tab coming forward.
-  //
-  // **Escape closes the inspector** unless something inside it - an
-  // input method, a panel of RefRain's - took the key first, and the focus
-  // goes back to the control that opened it (7-7).
+  
+  
 </script>
 
 <script lang="ts">
@@ -55,16 +38,16 @@
   import { readFrom, readingOf, regionOf, type Region, type Tab } from "./inspect/reading";
   import Split from "./inspect/split.svelte";
   import Strip from "./inspect/strip.svelte";
-  import RefRain from "./refrain/refrain.svelte";
+  import RefRain from "./editor/refrain.svelte";
   import ContextReport from "./talk/context_report.svelte";
 
   interface Props {
-    // What the side shows while nobody has opened an item.
+    
     readonly following: readonly RightItem[];
-    // The rounds of the run in front, which the page asked already to
-    // know what to follow.
+    
+    
     readonly current: RoundsAnswer | undefined;
-    // The conversation beside it, which a quoted line is written into.
+    
     readonly talk: Address;
   }
 
@@ -78,16 +61,13 @@
     terminal: "inspector-terminal",
   };
 
-  // The fewest lines either region keeps when the line between them moves.
+  
   const LEAST = 6;
 
   const held = $derived(openItems());
   const items = $derived(held.length > 0 ? held : following);
 
-  // The rounds of every run an open call belongs to, asked once per run;
-  // `asking` merges a question the thread beside it asks as well. One
-  // store over all of them, read in the template, so an answer already
-  // held draws in the same pass that opened the item.
+  
   const runs = $derived([
     ...new Set(items.flatMap((item) => (item.kind === "call" ? [item.run] : []))),
   ]);
@@ -110,8 +90,7 @@
       : new Map([...$asked, [current.run, current]]),
   );
 
-  // An open call as its run's rounds hold it: `null` until the rounds are
-  // answered, and a `null` call when they hold no call at that place.
+  
   function callOf(
     item: RightItem,
   ): { readonly rounds: RoundsAnswer; readonly call: Call | null } | null {
@@ -129,7 +108,7 @@
     return call === null ? "editor" : regionOf(readingOf(call));
   }
 
-  // An oid as git prints it short.
+  
   const SHORT = 7;
 
   function labelOf(item: RightItem): string {
@@ -150,8 +129,7 @@
   );
   const front = $derived(held.length > 0 ? rightItem() : (following[0] ?? null));
 
-  // An item as a link to this conversation with it open on the right
-  // (4-63); what moved between two commits has no spelling there.
+  
   function linkOf(item: RightItem): string | null {
     switch (item.kind) {
       case "call":
@@ -178,8 +156,7 @@
     }
   }
 
-  // What each region shows: the item of that region touched last, or
-  // the one the side follows.
+  
   function frontOf(region: Region): RightItem | null {
     return held.length > 0
       ? frontWhere((item) => regionOfItem(item) === region)
@@ -190,7 +167,7 @@
   const editorFront = $derived(frontOf("editor"));
   const terminalFront = $derived(frontOf("terminal"));
 
-  // A tab picked is timed to the frame that draws what it holds.
+  
   function pick(item: RightItem): void {
     markStart("panel_frame");
     if (held.length === 0) for (const kept of following) if (!sameItem(item, kept)) showItem(kept);
@@ -209,8 +186,7 @@
     u.prefs.setPanel(false);
   }
 
-  // The line between the regions, counted in lines of the code below it:
-  // `null` until somebody moves it, and then the editor's own height.
+  
   let step = $state(24);
   onMount(() => {
     const baseline = Number.parseFloat(

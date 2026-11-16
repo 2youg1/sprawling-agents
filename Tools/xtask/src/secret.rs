@@ -49,7 +49,7 @@ fn is_pascal_case_identifier(found: &[u8]) -> bool {
         })
 }
 
-const TREE_ROOTS: [&str; 5] = ["Sprawling/", "Tools/", "Calyx/", "client/", "docs/"];
+const TREE_ROOTS: [&str; 5] = ["Sprawling/", "Tools/", "Calyx/", "RefRain/", "docs/"];
 
 fn is_tree_path(found: &[u8]) -> bool {
     let Ok(text) = std::str::from_utf8(found) else {
@@ -207,7 +207,7 @@ resolver = \"3\"
         empty_workspace(&root);
         let body = key_shaped();
         for rel in [
-            "client/bun.lock",
+            "RefRain/bun.lock",
             "Sprawling/gateway/src/dialect/snapshots/pinned.snap",
             "Sprawling/gateway/src/dialect/request.rs",
         ] {

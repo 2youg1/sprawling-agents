@@ -6,13 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // Documents in the content store (client/Spec.lean §4-61), on a made-up city
-  // that answers `Versions`, `Range` and `Bytes` the way a served city
-  // does: every version the city knows of a Markdown file, one of them
-  // written outside the page and never kept; a PDF in a building drawn
-  // from bytes fetched window by window; and a screenshot drawn from the
-  // store. Each is drawn at the width the right side has beside a
-  // conversation at 1440.
+  
+  
   import { Address, B3Hash, Locator, Seq, TimeMs } from "../../wire";
   import type { Answer, DocumentState, Query } from "../../wire";
   import { pdfOf, utf8 } from "./fmt_samples";
@@ -43,11 +38,7 @@
     },
   ]);
 
-  // A picture of the page the browser tool looked at: a drawing rather
-  // than a photograph, so the fixture carries no image file. Its fills
-  // are the theme's roles, read off the page when the picture is asked
-  // for, so the drawing holds no colour of its own and follows the
-  // lighting the gallery is drawn in.
+  
   const shotBytes = (): Uint8Array => {
     const drawn = getComputedStyle(document.documentElement);
     const fill = (role: string): string => drawn.getPropertyValue(`--color-${role}`).trim();
@@ -88,7 +79,7 @@
     },
   };
 
-  // At most this many bytes a window, so the PDF arrives in several.
+  
   const WINDOW = 1024;
 
   function base64Of(bytes: Uint8Array): string {
@@ -164,8 +155,8 @@
 
 <script lang="ts">
   import Shot from "../inspect/shot.svelte";
-  import Document from "../refrain/document.svelte";
-  import Opaque from "../refrain/formats/opaque.svelte";
+  import Document from "../editor/document.svelte";
+  import Opaque from "../editor/formats/opaque.svelte";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
 
@@ -188,10 +179,7 @@
   </Case>
   <Case label="refrain · a city's PDF drawn from bytes fetched by its version" width={600}>
     <div class={FRAME}>
-      <!-- The part itself rather than the document around it: a part a
-      document mounts once its answer lands mounts after the stand has
-      handed `ui.ts`'s door back to the real city, and would ask that
-      city for bytes this one holds. -->
+      
       <Opaque path={Address.make(`shop/${REPORT}`)} version={PDF} bytes={REPORT_BYTES.length} />
     </div>
   </Case>

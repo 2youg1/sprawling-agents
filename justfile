@@ -9,7 +9,7 @@ default: check
 #
 # `build-web` sits before `gates` because two of the gates - render and
 # npm - judge artifacts rather than sources: they need `Sprawling/app/web-dist`
-# and `client/node_modules` to exist, and they refuse rather than skip
+# and `RefRain/node_modules` to exist, and they refuse rather than skip
 # when those are absent, so a check that never built them would be red,
 # not silently green. CI says the same thing through
 # `.github/actions/client-artifacts`, which runs `build-web` for the jobs
@@ -311,7 +311,7 @@ test-archive file:
 # `environment` names what a slice installs beyond the toolchain and
 # the archive: `compile` builds projects of its own (trybuild), so it
 # needs Zig, the registry and its scratch cache; `client` holds the xtask
-# tests that read `client/node_modules` and the bundle; `plain` needs
+# tests that read `RefRain/node_modules` and the bundle; `plain` needs
 # neither. A part moves between slices by editing one list below.
 test-slice-plan file out:
     #!/usr/bin/env bash
@@ -494,7 +494,7 @@ check-core:
     cargo nextest run {{core_packages}} --locked --all-features --no-fail-fast
 
 # The three gates that judge a built artifact rather than a source:
-# `render` opens `Sprawling/app/web-dist`, `npm` reads `client/node_modules`,
+# `render` opens `Sprawling/app/web-dist`, `npm` reads `RefRain/node_modules`,
 # `budget` weighs both. The one list of them; `gates-sources` runs every
 # other gate on the roster.
 artifact_gates := "render npm budget"
@@ -608,15 +608,15 @@ check-console:
 fuzz-desktop rounds="1000000" seed="5eedf022":
     DESKTOP_FFI_FUZZ_ROUNDS={{rounds}} DESKTOP_FFI_FUZZ_SEED={{seed}} cargo nextest run -p sprawling-desktop-ffi --locked --run-ignored only -E 'test(/for_as_long_as_asked/)'
 
-# The browser client (client/Spec.lean): Svelte + Effect, built by
+# The browser client (RefRain/Spec.lean): Svelte + Effect, built by
 # Vite under bun, bundled into Sprawling/app/web-dist where
 # Sprawling/app/build.rs reads it and where `cargo package` archives it. `just prereqs` names bun. `--frozen-lockfile` makes bun.lock
 # the authority, so a build cannot resolve a version nobody committed.
 build-web:
-    cd client && bun install --frozen-lockfile && bun run build
+    cd RefRain && bun install --frozen-lockfile && bun run build
 
 # The bundle in Sprawling/app/web-dist, built only when it is absent or
-# some file under client/ (its sources, its lockfile, its configuration)
+# some file under RefRain/ (its sources, its lockfile, its configuration)
 # is newer than the bundle's index.html, which Vite writes on every
 # build after emptying the directory. A recipe that measures the binary
 # depends on this one, so a repeated run keeps the bundle's mtimes and
@@ -624,7 +624,7 @@ build-web:
 # always builds. `find -newer`, `-prune` and `-quit` behave the same in
 # Git Bash on Windows and in the find of macOS and Linux.
 web-bundle:
-    if [ -f Sprawling/app/web-dist/index.html ] && [ -z "$(find client -path client/node_modules -prune -o -type f -newer Sprawling/app/web-dist/index.html -print -quit)" ]; then echo "web-bundle: Sprawling/app/web-dist is newer than every file under client/, kept"; else '{{just_executable()}}' --justfile '{{justfile()}}' build-web; fi
+    if [ -f Sprawling/app/web-dist/index.html ] && [ -z "$(find RefRain -path RefRain/node_modules -prune -o -type f -newer Sprawling/app/web-dist/index.html -print -quit)" ]; then echo "web-bundle: Sprawling/app/web-dist is newer than every file under RefRain/, kept"; else '{{just_executable()}}' --justfile '{{justfile()}}' build-web; fi
 
 # The client's own gates: lint (no `any`, no `as`, no throw, no try, no
 # non-exhaustive switch), typecheck, and its tests.
@@ -643,7 +643,7 @@ check-client: build-web client-checks
 # error sooner.
 client-checks:
     bun Sprawling/city/skills/playback/assemble.js --check
-    cd client && bun run lint && bun check && bun run typecheck && bun run test
+    cd RefRain && bun run lint && bun check && bun run typecheck && bun run test
 
 # The gate that opens the gallery in a real engine, on its own: roles,
 # accessible names, landmarks, one left edge, nothing outside its box.
@@ -652,8 +652,8 @@ render:
     cargo xtask render
 
 # The swap test (Tools/xtask/Spec.lean section 8-13): every look under
-# client/swap/ drawn in place of the look at the same path under
-# client/src/, and the client still holds. The replacement satisfies the
+# RefRain/swap/ drawn in place of the look at the same path under
+# RefRain/src/, and the client still holds. The replacement satisfies the
 # look's props type (typecheck), the wiring tests of each replaced part
 # pass untouched (a test imports no look, by the client's lint), the
 # swap build replaces every look it holds, and render, its parts roster
@@ -667,17 +667,17 @@ swap:
     tests=()
     while IFS= read -r look; do
         test="src/${look%.look.svelte}.test.ts"
-        if [ ! -f "client/$test" ]; then
-            echo "swap: client/swap/$look replaces a part with no wiring test at client/$test" >&2
+        if [ ! -f "RefRain/$test" ]; then
+            echo "swap: RefRain/swap/$look replaces a part with no wiring test at RefRain/$test" >&2
             exit 1
         fi
         tests+=("./$test")
-    done < <(cd client/swap && find . -name '*.look.svelte' | sed 's#^\./##' | sort)
+    done < <(cd RefRain/swap && find . -name '*.look.svelte' | sed 's#^\./##' | sort)
     if [ ${#tests[@]} -eq 0 ]; then
-        echo "swap: client/swap holds no look, so nothing would be swapped" >&2
+        echo "swap: RefRain/swap holds no look, so nothing would be swapped" >&2
         exit 1
     fi
-    cd client
+    cd RefRain
     bun run typecheck
     bun run test "${tests[@]}"
     bun run build --config vite.swap.config.ts
@@ -715,14 +715,14 @@ provider script record *listen:
 shots *args: build-web
     cargo xtask shots {{args}}
 
-# The walk through the running window, photographed (client/scripts/walk.ts):
+# The walk through the running window, photographed (RefRain/scripts/walk.ts):
 # a throwaway city under target/walk that the stand-in provider answers,
 # served and paired as a person would, every page at three windows in both
 # lightings, PNG files and an index in target/walk/out. Not a gate: a
 # person reads them. `--keep` leaves the city served for walking by hand.
 walk *args: build-web
     cargo build --package sprawling --bin sprawling --package citysim --bin provider --locked
-    cd client && bun scripts/walk.ts {{args}}
+    cd RefRain && bun scripts/walk.ts {{args}}
 
 # The half of the shots camera's check that needs an engine that draws
 # frames: a page whose state is written by the frame after the scroll

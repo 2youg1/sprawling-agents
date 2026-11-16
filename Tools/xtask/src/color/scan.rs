@@ -157,7 +157,7 @@ pub(super) mod tests {
         let _ = std::fs::remove_dir_all(&root);
         let written = [
             (theme::ENTRY, "  --color-g0: oklch(0.145 0.018 264);"),
-            ("client/src/panel.css", "  color: oklch(0.145 0.018 264);"),
+            ("RefRain/src/panel.css", "  color: oklch(0.145 0.018 264);"),
             (
                 "Sprawling/city/skills/playback/src/style.css",
                 "--page: oklch(0.145 0.014 262);",
@@ -182,7 +182,7 @@ pub(super) mod tests {
         let places: Vec<&str> = found.iter().map(|v| v.location.as_str()).collect();
         assert_eq!(
             places,
-            ["client/src/panel.css:1"],
+            ["RefRain/src/panel.css:1"],
             "only the file that is not the production point is a violation; got {}",
             found
                 .iter()
@@ -199,7 +199,7 @@ pub(super) mod tests {
                 .collect::<Vec<_>>(),
             [
                 "Sprawling/city/skills/playback/template.html:1",
-                "client/src/panel.css:1"
+                "RefRain/src/panel.css:1"
             ]
         );
         std::fs::remove_dir_all(&root).unwrap();
@@ -211,19 +211,19 @@ pub(super) mod tests {
         let _ = std::fs::remove_dir_all(&root);
         let written = [
             (
-                "client/src/theme.css",
+                "RefRain/src/theme.css",
                 "@import \"tailwindcss\";
 @import \"./theme/tokens-colour.css\";
 ",
             ),
             (
-                "client/src/theme/tokens-colour.css",
+                "RefRain/src/theme/tokens-colour.css",
                 "@theme {
   --color-g0: oklch(0.145 0.014 250);
 }
 ",
             ),
-            ("client/src/panel.css", "  color: oklch(0.145 0.018 264);"),
+            ("RefRain/src/panel.css", "  color: oklch(0.145 0.018 264);"),
         ];
         for (rel, body) in written {
             let path = root.join(rel);
@@ -237,7 +237,7 @@ pub(super) mod tests {
                 .iter()
                 .map(|v| v.location.as_str())
                 .collect::<Vec<_>>(),
-            ["client/src/panel.css:1"]
+            ["RefRain/src/panel.css:1"]
         );
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -246,7 +246,7 @@ pub(super) mod tests {
     fn a_component_style_is_judged_as_a_stylesheet_and_its_markup_is_not() {
         let root = std::env::temp_dir().join(format!("color-svelte-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        let path = root.join("client/src/views/panel.svelte");
+        let path = root.join("RefRain/src/views/panel.svelte");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, SVELTE_FIXTURE).unwrap();
 
@@ -256,7 +256,7 @@ pub(super) mod tests {
                 .iter()
                 .map(|v| v.location.as_str())
                 .collect::<Vec<_>>(),
-            ["client/src/views/panel.svelte:7"]
+            ["RefRain/src/views/panel.svelte:7"]
         );
         std::fs::remove_dir_all(&root).unwrap();
     }

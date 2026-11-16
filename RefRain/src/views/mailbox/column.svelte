@@ -6,12 +6,8 @@
 -->
 
 <script lang="ts">
-  // The seat of the mailbox column (client/Spec.lean §4-49): its head -
-  // the name, the link when it is not live, and on a phone the way back -
-  // then deciding, working, recent and the notices, in the order of what
-  // needs the person, drawn by whatever `./column.look.svelte` is.
-  // `mailbox.svelte` seats it in the layer under the keys; `#/gallery`
-  // seats it in a frame of the same width.
+  
+  
   import type { Snippet } from "svelte";
   import { createAttachmentKey } from "svelte/attachments";
 
@@ -27,8 +23,8 @@
   import Working from "./working.svelte";
 
   interface Props {
-    // Puts the mailbox away: after following a row, and from the way
-    // back on a phone.
+    
+    
     readonly onClose: () => void;
   }
 
@@ -40,8 +36,7 @@
 
   let scroller = $state<HTMLElement | undefined>(undefined);
 
-  // One scroller for every section: j, k and the digits are heard on it,
-  // below every entry (client/Spec.lean §7-11).
+  
   const HOLD = createAttachmentKey();
   const hold = (node: HTMLElement): (() => void) => {
     scroller = node;

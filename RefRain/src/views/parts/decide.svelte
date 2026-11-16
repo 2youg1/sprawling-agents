@@ -6,16 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // The one card for everything that stops and asks the person
-  // (client/Spec.lean §7C). This is its seat: it reads the key table and
-  // hears the three chords; `decide.look.svelte` draws the card, and
-  // `decide.ts` holds what an answer is and which chord reaches it.
-  //
-  // **An answer is a choice the caller hands in, never an action this
-  // file knows.** The card decides how answers look and which key
-  // reaches each; what an answer sends is the caller's, because only
-  // the caller knows whether it is an approval, a dismissal or a
-  // proposal's verdict.
+  
+  
   export type { Answer, Choice, DecideKind, DecideProps } from "./decide";
 </script>
 
@@ -33,11 +25,7 @@
   const keys = keymap();
   const uid = $props.id();
 
-  // The three chords answer this card while the focus is anywhere inside
-  // it, and nowhere else: they are the card's, read through the one key
-  // table so a rebinding reaches them. Each holds the accelerator, so a
-  // letter typed while the focus sat on the card answers nothing. The
-  // keys are heard on the card itself, below every control in it.
+  
   const hear: Attachment<HTMLDivElement> = (node) =>
     on(node, "keydown", (event) => {
       if (event.isComposing) return;

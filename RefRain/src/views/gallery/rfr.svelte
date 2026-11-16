@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // RefRain, the right side's document editor (client/Spec.lean §7N), on a
+  // RefRain, the right side's document editor (RefRain/Spec.lean §7N), on a
   // made-up city: a Markdown document in its source and in its preview,
   // a plain text file read literally (a byte-order mark, CRLF lines, a
   // tab), a file larger than RefRain edits, a missing file, and a draft
@@ -196,11 +196,11 @@
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
   import Segmented from "../parts/segmented.svelte";
-  import { receiptWord } from "../refrain/head";
-  import Head from "../refrain/head.look.svelte";
-  import Document from "../refrain/document.svelte";
-  import Preview from "../refrain/preview.svelte";
-  import RefRain from "../refrain/refrain.svelte";
+  import { receiptWord } from "../editor/head";
+  import Head from "../editor/head.look.svelte";
+  import Document from "../editor/document.svelte";
+  import Preview from "../editor/preview.svelte";
+  import RefRain from "../editor/refrain.svelte";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
 

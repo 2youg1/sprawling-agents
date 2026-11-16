@@ -3,107 +3,51 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The properties this module must hold are proved in `client/spec/Views/Parts/Segmented.lean`.
-//
-// What the segmented control decides before anything is drawn: the
-// vocabulary a track is built from, where a track begins and ends,
-// where an arrow key lands, which cell a keyboard arrives at, and the
-// value a look draws. The drawing is `segmented.look.svelte`; this
-// module touches no DOM, so these decisions are testable without
-// compiling a component (`bun test` cannot compile Svelte). Where a
-// box landed is not something a unit test can be told: `cargo xtask
-// render` measures that in a real engine against the gallery fixtures.
-//
-// The control is a seat and a look (client D95): `segmented.svelte` is
-// the seat a caller imports, `segmented.look.svelte` draws, and the
-// value between them is `SegmentedLook`, built here by `lookOf`. Every
-// role, `aria-*` value, tab stop and key handler travels to the look
-// inside a wire bag the look spreads on the element it draws, so a
-// look taken from a component library keeps the key table of
-// client/Spec.lean §7-4 without restating a line of it.
 
 import { createAttachmentKey } from "svelte/attachments";
 import type { Attachment } from "svelte/attachments";
 
-// What paints the chosen cell. It is a caller's decision and never an
-// inference: this control knows nothing about what its values mean.
-//
-// **`plain` is the default, and that is a change of policy.** The
-// slider used to be filled with the accent, which made "which tab is
-// selected" the loudest mark on any page carrying a segmented control
-// - louder than the stop button, and louder than anything the model
-// had just written. The accent is a budget: it buys the focus ring and
-// the bar beside a selected row, and nothing else. Selection is said
-// here the way it is said everywhere else on this page, by lifting the
-// surface a step.
-//
-// `alert` survives because a choice that widens what a run may do is
-// not the same kind of fact as a choice of units, and a person has to
-// be able to see which one they are looking at across the room.
-//
-// `accent` is for a control that sits on a raised card, where the plain
-// lift is one step up from a surface that is already one step up and
-// the chosen cell all but disappears. There the chosen cell is "the
-// chosen one" the accent answers (docs/frontend-method.md §7A), and the
-// caller spends that budget knowingly.
+
 export type Tone = "plain" | "alert" | "accent";
 
-// A heading over a run of cells, with the tone that run is painted in.
-// Cells carrying an equal group are drawn as one track, and a change of
-// group draws a rule between the tracks.
+
 export interface Group {
-  // Already in the person's language.
+  
   readonly label: string;
   readonly tone: Tone;
 }
 
-// One cell of the track.
-//
-// **`why` present means the cell cannot be chosen, and says why.** The
-// two are one fact and therefore one field: a cell disabled without a
-// reason is a dead end, and a reason on a cell a person can choose is
-// never read. This is the reading `parts/button.tsx` already gives the
-// same field.
+
 export interface Choice<V extends string> {
   readonly value: V;
-  // Already in the person's language.
+  
   readonly label: string;
   readonly group?: Group;
   readonly why?: string;
 }
 
 export interface SegmentedProps<V extends string> {
-  // The accessible name of the question, already in the person's
-  // language. A radiogroup without one is announced as a group of
-  // radios and nothing else.
+  
+  
   readonly label: string;
   readonly options: readonly Choice<V>[];
-  // `null` is nobody has chosen yet, which the caller may hold and this
-  // control draws: no cell reports itself chosen, no slider is drawn,
-  // and the tab stop falls to the first cell that can be chosen. A
-  // seventh cell or an empty string standing for absence would give
-  // "nobody said" a second spelling, so absence is spelled once.
+  
+  
   readonly held: V | null;
   readonly onPick: (value: V) => void;
-  // The tone of every cell that states no group of its own; a group
-  // overrides it for the cells under it.
+  
+  
   readonly tone?: Tone;
 }
 
-// A run of neighbouring cells that share one group, with the position
-// of its first cell in the flat list the caller gave.
+
 export interface Band<V extends string> {
   readonly group: Group | undefined;
   readonly from: number;
   readonly cells: readonly Choice<V>[];
 }
 
-// Cut the flat list into the tracks the control draws.
-//
-// Neighbouring cells join one band when their groups agree in both
-// name and tone. Two spellings of one group therefore draw two tracks,
-// which a person sees, rather than one track under one of the two
-// tones, which nobody can tell from the intended drawing.
+
 export function bands<V extends string>(options: readonly Choice<V>[]): readonly Band<V>[] {
   const out: { group: Group | undefined; from: number; cells: Choice<V>[] }[] = [];
   options.forEach((choice, at) => {
@@ -122,12 +66,7 @@ function alike(held: Group | undefined, next: Group | undefined): boolean {
   return held.label === next.label && held.tone === next.tone;
 }
 
-// The cell an arrow key moves to, counted from `from` in `step`.
-//
-// Cells that cannot be chosen are stepped over, because a radiogroup
-// chooses what it focuses: landing on one would choose it. The walk
-// wraps once around and answers `from` when nothing else can be
-// chosen, so a control whose every cell is refused stays where it is.
+
 export function nextStop<V extends string>(
   options: readonly Choice<V>[],
   from: number,
@@ -143,14 +82,7 @@ export function nextStop<V extends string>(
   return from;
 }
 
-// The one cell that is a tab stop, so the control costs a keyboard one
-// stop rather than one per cell.
-//
-// It is the chosen cell. A control whose held value is not among its
-// cells - including one where nobody has chosen - offers the first
-// choosable one instead, and a control where every cell is refused
-// offers its first cell, so that the reason on it can still be
-// reached. An empty control offers nothing.
+
 export function tabStop<V extends string>(options: readonly Choice<V>[], held: V | null): number {
   const chosen = options.findIndex((choice) => choice.value === held);
   if (chosen >= 0) return chosen;
@@ -159,13 +91,7 @@ export function tabStop<V extends string>(options: readonly Choice<V>[], held: V
   return options.length > 0 ? 0 : -1;
 }
 
-// The cell a key selects from the cell at `at`, or `undefined` when the
-// key is not one this control answers. This is the whole APG Radio
-// Group key table (client/Spec.lean §7-4): Right and Down step forward,
-// Left and Up step back, both through `nextStop`, and Space selects the
-// focused cell. Enter is absent on purpose: it reaches the cell's click
-// through the platform's button activation, and answering it here as
-// well would select twice.
+
 export function landing<V extends string>(
   options: readonly Choice<V>[],
   at: number,
@@ -185,20 +111,16 @@ export function landing<V extends string>(
   }
 }
 
-// What a key handler on a cell reads from the event, and nothing more,
-// so the wiring test can press a key without a DOM.
+
 export type KeyPress = Pick<KeyboardEvent, "key" | "preventDefault">;
 
-// The bag spread on the track: the question the cells answer.
+
 export interface GroupWire {
   readonly role: "radiogroup";
   readonly "aria-label": string;
 }
 
-// The bag spread on one cell's focusable element. Its symbol key is a
-// Svelte attachment (`createAttachmentKey`), which hands the seat the
-// element it moves focus to; spreading the bag carries it along, so a
-// look never holds an element reference of its own.
+
 export interface CellWire {
   readonly role: "radio";
   readonly "aria-checked": boolean;
@@ -210,23 +132,19 @@ export interface CellWire {
   readonly [hold: symbol]: Attachment<HTMLElement>;
 }
 
-// The reason a refused cell gives, and the id the cell's
-// `aria-describedby` already names. The seat decides the id, so the
-// look hands it to `Tip` and writes no ARIA of its own.
+
 export interface Why {
   readonly id: string;
   readonly text: string;
 }
 
-// How a cell is drawn. `refused` wins over `held`: a value the caller
-// still holds but may no longer choose is drawn as refused, and the
-// slider still stands under it, because that is what is held.
+
 export type CellState = "held" | "free" | "refused";
 
 export interface CellLook {
-  // The cell's value, unique within the control; a key for `#each`.
+  
   readonly key: string;
-  // Already in the person's language.
+  
   readonly label: string;
   readonly state: CellState;
   readonly why: Why | undefined;
@@ -234,41 +152,34 @@ export interface CellLook {
 }
 
 export interface BandLook {
-  // Where the band starts in the caller's flat list; a key for `#each`.
+  
   readonly key: number;
-  // The group heading, already in the person's language.
+  
   readonly heading: string | undefined;
-  // What paints the chosen cell of this band.
+  
   readonly tone: Tone;
-  // The chosen cell's position inside this band, or -1 when the chosen
-  // cell is in another band or nobody has chosen; the slider stands
-  // here.
+  
+  
   readonly held: number;
   readonly cells: readonly CellLook[];
 }
 
-// Everything a look is given.
+
 export interface SegmentedLook {
   readonly group: GroupWire;
   readonly bands: readonly BandLook[];
 }
 
-// What only the seat can do, because only it holds the drawn elements:
-// move focus to the cell carrying a value, and hand out the attachment
-// that records which element that is. `hold` answers the same
-// attachment for the same value on every call, so a redraw of the look
-// does not let go of an element and take it again.
+
 export interface Hands<V extends string> {
   readonly focus: (value: V) => void;
   readonly hold: (value: V) => Attachment<HTMLElement>;
 }
 
-// One key for every cell's attachment. Svelte keeps one attachment per
-// element under each symbol key, so a single key is enough.
+
 const HOLD = createAttachmentKey();
 
-// The whole value a look draws, from the props a caller gave, the id
-// the seat owns, and the seat's two hands.
+
 export function lookOf<V extends string>(
   props: SegmentedProps<V>,
   uid: string,
@@ -277,9 +188,7 @@ export function lookOf<V extends string>(
   const { options, held } = props;
   const stop = tabStop(options, held);
 
-  // Select the cell at `at` and take focus there. A cell that cannot be
-  // chosen is never selected - not by a click, not by an arrow landing
-  // back on it when nothing else can be chosen, not by Space.
+  
   const choose = (at: number): void => {
     const choice = options[at];
     if (choice === undefined || choice.why !== undefined) return;

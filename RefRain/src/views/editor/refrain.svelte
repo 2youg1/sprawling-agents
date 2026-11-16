@@ -6,12 +6,8 @@
 -->
 
 <script lang="ts">
-  // RefRain, the right side's document editor (client/Spec.lean §7N). The
-  // three props are the whole door: which building, which path in it,
-  // and which version, `null` being the city's current text. A new
-  // document or version is a new session, so nothing of one document's
-  // draft, receipt or editor survives into the next; the same document
-  // drawn again keeps its editor, because the key does not move.
+  
+  
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Address, B3Hash } from "../../wire";

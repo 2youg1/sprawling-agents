@@ -6,13 +6,8 @@
 -->
 
 <script lang="ts">
-  // A hint's two placement branches, each drawn standing so the render
-  // gate measures where it lands (client/Spec.lean §2, §4-18). The gate's
-  // engine has anchor positioning, so `by-engine` is the anchor branch
-  // there, and `against-wrapper` is the branch Safari and Firefox take,
-  // drawn on its own. A hint at rest is `display: none` and nothing on
-  // this route hovers, which is why the look is drawn here directly,
-  // with `standing` in place of `wanted`.
+  
+  
   import { say } from "../../../core/lang";
   import { ui } from "../../../ui";
   import TipLook from "../../parts/tip.look.svelte";
@@ -49,9 +44,7 @@
 
 {#each PLACED as placed, at (placed.label)}
   <Case label={placed.label}>
-    <!-- Room on every side, so the hint lands inside the fold whichever
-    way the engine flips it: a hint above is centred on its control and
-    wider than it, so the control stands in the middle of the fold. -->
+    
     <div class="flex justify-center py-section">
       <TipLook {...standing(placed, at)}>
         {#snippet children(hint: string)}

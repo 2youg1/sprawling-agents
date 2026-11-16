@@ -108,7 +108,7 @@ pub struct RunSummary {
 - **为什么要上线**：run 板以人说的第一句话给一行 run 起名，没有这句话就以目标起名。页面只从事件流里听到 `run_started` 时才知道这两句；重载之后它只有 `city_view` 的答，每一行都只能叫「某房间里的一次 run」，同一个房间里的几次 run 在板上没法分开。
 - **两件都由 `storage::RunHot` 从 `run_started` 折出**（`Sprawling/storage/Spec.lean` §8-5），`summarize` 照抄，不读账本。空串记作 `None`：一句空的任务不是一个名字，页面对 `None` 与空串本来就得同样处理，线上只留一种拼法。
 - **被否：让页面逐行问 `Rounds` 拿 `opening`**。与 §8-48b 否掉逐行问 `closing` 同一个理由：一座两百个 run 的城首屏要问两百次，而热视图本来就在折 `run_started`。
-- **`WIRE_V` 42→43**：给既有答面类型加字段是「语法换形而名字没换」那一类，golden 随之变；`client/src/wire.ts` 由 `cargo xtask wire-ts --write` 同集重生成。
+- **`WIRE_V` 42→43**：给既有答面类型加字段是「语法换形而名字没换」那一类，golden 随之变；`RefRain/src/wire.ts` 由 `cargo xtask wire-ts --write` 同集重生成。
 -/
 
 /-!

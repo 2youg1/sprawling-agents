@@ -6,29 +6,8 @@
 -->
 
 <script lang="ts">
-  // The third section of the mailbox: the sessions of every room this
-  // page knows, newest activity first (client/Spec.lean §4-49). Each room is
-  // asked once (`Query::Sessions`, wire §8-71) and the answers are
-  // merged by the time of each session's last line. A row is a link to
-  // the room, and beside it, always visible rather than on hover, the
-  // way to fork that session from its last turn: the same frame `/fork`
-  // sends, with the session's last run as the mother (4-14 - the
-  // continuation is a fork, not a resume verb). The fork goes through
-  // the page's one branch door (`talk/branching.ts`, client D100): the
-  // mailbox stays open on the row until the city has opened the branch,
-  // and a refusal stays on the row.
-  //
-  // **Only the rows in view are mounted**: the list keeps its whole
-  // height and draws the rows the column shows plus `OVERSCAN` on each
-  // side, so a city of a thousand sessions costs the paint of a screen.
-  // The row height is the `control` token, read from the stylesheet.
-  //
-  // **The search box filters what the page fetched, not what it drew**
-  // (refrain 3-14 row 9): every session of every room asked is matched
-  // by its room and by the task of each run of it this page holds, so a
-  // row the virtual list has not mounted is still found. A room this
-  // page never saw a run in was never asked, and the line under the box
-  // says so rather than let an empty result read as "no such session".
+  
+  
   import { newestWorking } from "../../core/belief/live";
   import { cancel } from "../../core/commands";
   import { fill, say } from "../../core/lang";
@@ -46,10 +25,10 @@
   import Section from "./section.svelte";
 
   interface Props {
-    // The column that scrolls, whose view decides which rows are drawn;
-    // a getter, because the column is bound after this section mounts.
+    
+    
     readonly scroller: () => HTMLElement | undefined;
-    // Following a row or forking leaves the mailbox for the room.
+    
     readonly onLeave: () => void;
   }
 
@@ -64,16 +43,15 @@
   interface Session {
     readonly room: Address;
     readonly line: SessionLine;
-    // Where a fork of this session would cut: its last run's tail, or
-    // nothing when that run is older than the runs this page holds.
+    
+    
     readonly origin: Origin | null;
-    // What the search box matches: the room, then the task of each run
-    // of this session the page holds, folded to one case.
+    
+    
     readonly text: string;
   }
 
-  // Every session of every room this page knows, the one reading the
-  // sessions pane takes too (`world/stretches.svelte.ts`).
+  
   const stretches = askStretches(u);
   let search = $state("");
   const rows = $derived.by((): Session[] => {
@@ -100,8 +78,7 @@
     return row.origin === null ? { kind: "none" } : branchFrom($branching, row.room, row.origin);
   }
 
-  // `/stop` beside a refused branch reaches the run the room's box
-  // would stop (`newestWorking`), read when the row is drawn.
+  
   function stopIn(room: Address): (() => void) | null {
     const going = newestWorking($belief, room);
     if (going === undefined) return null;
@@ -110,8 +87,7 @@
     };
   }
 
-  // The window of rows in view, recomputed as the column scrolls or
-  // changes size.
+  
   let list = $state<HTMLElement | undefined>(undefined);
   let shown = $state({ first: 0, end: OVERSCAN });
   let rowPx = $state(0);

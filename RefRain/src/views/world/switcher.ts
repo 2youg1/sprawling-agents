@@ -26,7 +26,7 @@ export interface SwitchState {
   readonly collapsed: ReadonlySet<string>;
 }
 
-// Mirrors client/spec/Views/SessionSwitch.lean. The boolean says whether
+// Mirrors RefRain/spec/Views/SessionSwitch.lean. The boolean says whether
 // this key asks to open the row under the cursor.
 export function answer(
   nodes: readonly Pick<SessionNode, "key" | "children">[],

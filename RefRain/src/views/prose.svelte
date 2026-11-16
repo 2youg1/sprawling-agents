@@ -6,18 +6,9 @@
 -->
 
 <script lang="ts">
-  // A settled reply, laid out by the city's one Markdown grammar
-  // (`Query::Reply`, client/Spec.lean §4-26, §4-53) and drawn by the same
-  // renderer as RefRain's preview. Until the city has read a stretch it
-  // is drawn as it is, so a page with no city still shows every word.
-  //
-  // **Width is the caller's.** The same reading draws a model's reply
-  // inside the talk thread (the `talk` tier) and a Markdown file inside
-  // the building page's file view (the `measure` tier), and the tier
-  // belongs to the screen that chose the container (docs/frontend-method.md §4-33).
-  // A table or a code block never wraps per character - it scrolls
-  // inside its own box, which `refrain/laid.svelte` holds.
-  import Laid from "./refrain/laid.svelte";
+  
+  
+  import Laid from "./editor/laid.svelte";
   import { laidReply } from "./reply.svelte";
   import { copiedSource } from "./talk/copying";
 
@@ -30,8 +21,7 @@
   const laid = laidReply(() => text, "settled");
   const rest = $derived(text.slice(laid.reached));
 
-  // Copying the whole of it hands over its Markdown (talk/copying.ts);
-  // a selection that reaches past it is the page's, not this reply's.
+  
   function copy(event: ClipboardEvent): void {
     const drawn = event.currentTarget;
     const chosen = document.getSelection();

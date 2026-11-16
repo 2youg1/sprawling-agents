@@ -6,13 +6,8 @@
 -->
 
 <script lang="ts">
-  // An HTML document's preview: its text drawn by this browser in a
-  // sandboxed frame (client/Spec.lean §4-54). The text is the one the editor
-  // held when the reading opened, the draft included, because this
-  // browser draws HTML itself and needs no answer from the city; the
-  // line above says whether a draft is in it; RefRain's head names the
-  // version. HTML is text, so its diff
-  // is RefRain's own between versions of that text.
+  
+  
   import { say } from "../../../core/lang";
   import { ui } from "../../../ui";
   import Frame from "./frame.svelte";

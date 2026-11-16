@@ -40,7 +40,7 @@ describe("VERBS", () => {
   });
 });
 
-describe("door step (client/spec/Views/Door.lean)", () => {
+describe("door step (RefRain/spec/Views/Door.lean)", () => {
   const run = (events: readonly DoorEvent[]): { door: Door; sent: DoorSent[] } => {
     let door = IDLE;
     const sent: DoorSent[] = [];

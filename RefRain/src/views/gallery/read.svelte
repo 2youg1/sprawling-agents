@@ -6,13 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // The reading face (wire D52): the type cards of the appearance group
-  // with Libron chosen, and the reading text Libron is for - a settled
-  // reply laid by the city, the same reply still drawn as it arrived,
-  // and the person's own message - with Chinese and English in one
-  // paragraph, the case a serif stack ending on the generic `serif` has
-  // to hold. Each case carries `data-read` itself, so the page around it
-  // keeps whatever face the person chose.
+  
+  
   import type { Appearance } from "../../core/appearance";
   import type { Block, Inline } from "../../wire";
   import { RunId } from "../../wire";
@@ -80,7 +75,7 @@
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Prose from "../prose.svelte";
-  import Laid from "../refrain/laid.svelte";
+  import Laid from "../editor/laid.svelte";
   import AppearanceType from "../setup/appearance_type.svelte";
   import { receiptOf } from "../setup/card";
   import type { ReceiptLook } from "../setup/card";

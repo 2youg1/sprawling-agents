@@ -115,7 +115,7 @@ pub enum SearchConfiguration {
 
 **理由**：写 handoff 的紧急度因工作方式而异，阈值应由人定。域的下限紧贴第一道阈值之上（D19）。域的上限来自算术——阈值越晚，「剩余预算仍够写 handoff 并 `succeed`」这句提醒越可能说不出口；让这句话从算术派生是收窄它的正解，在那之前 90 是宽容的上端。
 
-**被否**：①第四种配置机制（浏览器偏好存储）——同一个值两个家，浏览器副本会越过文件成为第二个权威（client/Spec.lean §4-28 同一条理）；②域外钳位——钳位把一个写错的值变成一个没人被告知的决定。
+**被否**：①第四种配置机制（浏览器偏好存储）——同一个值两个家，浏览器副本会越过文件成为第二个权威（RefRain/Spec.lean §4-28 同一条理）；②域外钳位——钳位把一个写错的值变成一个没人被告知的决定。
 
 **重开参数**：出现「提醒到得太晚、handoff 写不下」的实际数据时，重开的是上限 90，不是本定规。
 -/
@@ -161,9 +161,9 @@ Native 不可给时 E_SANDBOX_DENIED，不退到 copied_tree；CopiedTree 明确
 -/
 
 /-! container 设置覆盖：kernel 声明文法，building 的 sandbox 卡片写整份 `[sandbox.container]`。
-settings-control ContainerLimits.image client/src/views/building/sandbox.svelte
-settings-control ContainerLimits.user client/src/views/building/sandbox.svelte
-settings-control ContainerLimits.cpu_millis client/src/views/building/sandbox.svelte
-settings-control ContainerLimits.memory_bytes client/src/views/building/sandbox.svelte
-settings-control ContainerLimits.pids client/src/views/building/sandbox.svelte
+settings-control ContainerLimits.image RefRain/src/views/building/sandbox.svelte
+settings-control ContainerLimits.user RefRain/src/views/building/sandbox.svelte
+settings-control ContainerLimits.cpu_millis RefRain/src/views/building/sandbox.svelte
+settings-control ContainerLimits.memory_bytes RefRain/src/views/building/sandbox.svelte
+settings-control ContainerLimits.pids RefRain/src/views/building/sandbox.svelte
 -/

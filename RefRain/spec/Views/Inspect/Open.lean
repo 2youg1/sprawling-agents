@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import client.spec.Views.Parts
+import RefRain.spec.Views.Parts
 
 /-!
 # inspect/open：检视面的页签带
 
-规定 `client/src/views/inspect/open.svelte.ts`（右侧的状态只有这一个家，§4-45）与检视面页签带的键（APG Tabs，键表在 `client/spec/Views/Workspace.lean` §7-11）。焦点还给打开者是 `client/spec/Views/Parts.lean` 的 `closeLayer`：这个模块是 §7-7 表里「状态模块」那一种实现。
+规定 `RefRain/src/views/inspect/open.svelte.ts`（右侧的状态只有这一个家，§4-45）与检视面页签带的键（APG Tabs，键表在 `RefRain/spec/Views/Workspace.lean` §7-11）。焦点还给打开者是 `RefRain/spec/Views/Parts.lean` 的 `closeLayer`：这个模块是 §7-7 表里「状态模块」那一种实现。
 
 每个打开的项一直挂载到关掉为止，所以至多 `KEPT`（8）项；多开一项就关掉最久没碰的那一项。
 

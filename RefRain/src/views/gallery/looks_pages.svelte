@@ -14,12 +14,12 @@
   import type { View } from "../../core/route";
   import { ui } from "../../ui";
   import CodeColumn from "../monitor/code_column.look.svelte";
-  import Conflict from "../refrain/conflict.look.svelte";
-  import Editor from "../refrain/editor.look.svelte";
-  import { editorWire } from "../refrain/editor";
-  import Line from "../refrain/line.look.svelte";
-  import Pair from "../refrain/pair.look.svelte";
-  import { sideWire } from "../refrain/pair";
+  import Conflict from "../editor/conflict.look.svelte";
+  import Editor from "../editor/editor.look.svelte";
+  import { editorWire } from "../editor/editor";
+  import Line from "../editor/line.look.svelte";
+  import Pair from "../editor/pair.look.svelte";
+  import { sideWire } from "../editor/pair";
   import Card from "../settings/card.look.svelte";
   import DoorKey from "../settings/door_key.look.svelte";
   import { foldsOf } from "../settings/folds";

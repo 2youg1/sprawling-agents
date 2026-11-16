@@ -239,7 +239,7 @@ sprawling playback check <file> [--bundle <file>] [--city <city>] [--include-con
 | 分位数 | `bin::monitor::spread::Spread` | `gauge`、citysim 的 `bench`（场景经 `Reading::of`，登记册四行经 `row_line`，两者都经 `spread_of`）与 `bench_startup`（`Samples::of`）、crate 内的仪表（§8-84、§8-99、`instrument_monitor_beat`） | 无；两处 citysim 读法都经 `Spread`，取最近秩（决定 8） |
 | stdout 那头是谁 | `bin::audience::Audience::of_stdout` | `gauge`、`wire_client::watching`（§8-97）、`view`（§8-105） | 无；`main::view` 留着自己的同名枚举（它还带写一行的方法），它的 `of_stdout` 只把库里的判定换成本地的臂 |
 
-**单位。** 时长在测量点取整数微秒，进程内不到 1 µs 的读数（一帧解码、一帧折叠）取整数纳秒；读数行、`gauge` 的 JSON 行与 `budgets.toml` 的字段都带这个整数，键名以 `_us`（或 `_ns`）结尾。给人看的写法只在显示处换算：不到 1 µs 写 `ns`，不到 10 ms 写整数 `µs`，10 ms 及以上写一位小数的 `ms`（截断）。整数微秒到文字的换算 Rust 一侧只有 `monitor::top::Unit::reading` 一处，`Duration` 到整数微秒只有 `monitor::spread::micros` 一处；TypeScript 一侧只有 `client/src/core/monitor.ts` 的 `reading`。见决定 13。
+**单位。** 时长在测量点取整数微秒，进程内不到 1 µs 的读数（一帧解码、一帧折叠）取整数纳秒；读数行、`gauge` 的 JSON 行与 `budgets.toml` 的字段都带这个整数，键名以 `_us`（或 `_ns`）结尾。给人看的写法只在显示处换算：不到 1 µs 写 `ns`，不到 10 ms 写整数 `µs`，10 ms 及以上写一位小数的 `ms`（截断）。整数微秒到文字的换算 Rust 一侧只有 `monitor::top::Unit::reading` 一处，`Duration` 到整数微秒只有 `monitor::spread::micros` 一处；TypeScript 一侧只有 `RefRain/src/core/monitor.ts` 的 `reading`。见决定 13。
 
 时长只取单调钟，理由与 8-121「时间从哪来」相同：墙钟被人调过，一段就可能是负数；城钟又只到毫秒，而人的定规要内部热路径按微秒读。计数不是时间，所以可以在 accounting 与 storage 里累计，不必经过 `bin::assembly` 的采样点。
 

@@ -6,16 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // Which model does the thinking, and how hard by default. `main` is
-  // the one a dispatch is refused without; `digest` reads long documents
-  // on its behalf and follows `main` unless it is pointed elsewhere;
-  // `transcribe` turns a recording into a line of text, and a city with
-  // none draws no microphone.
-  //
-  // One choice per role, each a `parts/combobox.svelte`: an endpoint
-  // that answers with two hundred rows is not a list anybody scrolls,
-  // and the search box the popup opens with is the control that
-  // replaces the arrow (client/Spec.lean §7 names this seat).
+  
+  
   import type { EndpointsAnswer, ModelTag } from "../../wire";
 
   interface ModelChoiceProps {
@@ -33,10 +25,7 @@
   const { answer, tags = ["main", "digest", "transcribe"] }: ModelChoiceProps = $props();
   const { lang, send } = ui();
 
-  // An endpoint is carried by the id a command names it with and read
-  // by the name the person gave it. The label is never empty: an
-  // endpoint nobody named is labelled with its own id by the city
-  // (`wire::EndpointSummary`), so this list needs no fallback.
+  
   const options = $derived(
     answer.endpoints.flatMap((endpoint) =>
       endpoint.models.map((row) => ({

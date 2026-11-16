@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What a combobox decides before anything is drawn - which rows a
-// filter keeps, what each key does - and the whole value its look is
-// given (`ComboboxLook`). The look spreads each wire bag on the element
-// it names and draws nothing it was not given, so a look built from a
-// component library draws the same control by taking the same value.
-// The key table is `client/spec/Views/Parts.lean` §7-5, modelled in
-// `client/spec/Views/Parts/Combobox.lean`.
 
 import { createAttachmentKey } from "svelte/attachments";
 import type { Attachment } from "svelte/attachments";
@@ -18,36 +11,34 @@ import type { Side } from "./layer";
 
 export interface Choice {
   readonly value: string;
-  // Already in the person's language, or an identifier they typed.
+  
   readonly label: string;
-  // The second line: a provider, a price, a context window.
+  
   readonly note?: string;
-  // A CSS `font-family` list that draws this row (and the trigger while
-  // this value is in force). Absent means the page's face; present for a
-  // face picker, so each family is read in its own shape.
+  
+  
   readonly face?: string;
 }
 
 export interface ComboboxProps {
-  // The accessible name of the control.
+  
   readonly label: string;
-  // What the trigger says while nothing is chosen, and what the search
-  // box says while it is empty.
+  
+  
   readonly placeholder: string;
-  // What stands in the list when the search matches nothing.
+  
   readonly empty: string;
   readonly choices: readonly Choice[];
-  // The value in force; the cursor is never marked as chosen.
+  
   readonly value: string | null;
-  // The picked value; closing and focus return stay in the seat.
+  
   readonly onPick: (value: string) => void;
-  // How the popup is drawn before anyone touches it. Every screen
-  // starts closed; the gallery draws it open so the list is measured.
+  
+  
   readonly starts?: "open" | "closed";
 }
 
-// The rows a filter keeps: every choice whose label, note or value
-// holds the trimmed filter, without regard to case.
+
 export function matching(choices: readonly Choice[], query: string): readonly Choice[] {
   const needle = query.trim().toLowerCase();
   if (needle === "") return choices;
@@ -56,36 +47,30 @@ export function matching(choices: readonly Choice[], query: string): readonly Ch
   );
 }
 
-// Where the focus goes when the popup closes: back to the trigger after
-// an answer (Enter, Escape), or wherever a leaving focus was already
-// going (Tab, a click elsewhere).
+
 export type Return = "opener" | "leave";
 
-// What one key does while the popup is open.
+
 export type Answer =
   | { readonly kind: "cursor"; readonly at: number }
   | { readonly kind: "take" }
   | { readonly kind: "close"; readonly focus: Return }
   | { readonly kind: "pass" };
 
-// Where the key landed: the trigger answers Escape alone, so that the
-// popup closes from there too; every other key there is the platform's.
+
 export type Origin = "trigger" | "field";
 
-// A key as the table reads it; a `KeyboardEvent` is one.
+
 export interface Pressed {
   readonly key: string;
-  // Whether an input method is composing: the key is then the input
-  // method's, which confirms a candidate with Enter, walks candidates
-  // with the arrows and abandons the composition with Escape.
+  
+  
   readonly isComposing: boolean;
 }
 
 const PASS: Answer = { kind: "pass" };
 
-// The key table: `cursor` is where the cursor stands now, `count` how
-// many rows the filter left. The arrows clamp at both ends. A key an
-// input method is composing passes, whatever it is (client D99).
+
 export function answer(pressed: Pressed, origin: Origin, cursor: number, count: number): Answer {
   if (pressed.isComposing) return PASS;
   if (origin === "trigger")
@@ -111,8 +96,7 @@ export function answer(pressed: Pressed, origin: Origin, cursor: number, count: 
   }
 }
 
-// Whether the component takes the key from the platform. Tab closes
-// the popup and still moves the focus on, so it is not taken.
+
 export function claims(answered: Answer): boolean {
   switch (answered.kind) {
     case "cursor":
@@ -125,40 +109,36 @@ export function claims(answered: Answer): boolean {
   }
 }
 
-// A key as the wiring reads it; a `KeyboardEvent` is one.
+
 export interface Keyed extends Pressed {
   preventDefault(): void;
 }
 
-// Where the popup is: never opened since the control was mounted, so
-// a page of closed comboboxes builds none of their lists; open; or
-// closed, keeping the rows it last showed while its look draws it away.
+
 export type Layer = "unopened" | "open" | "shut";
 
-// The state the seat holds, as the wiring reads it.
+
 export interface ComboboxView {
   readonly props: ComboboxProps;
-  // The instance's id root: the list and its rows derive their ids
-  // from it, so `aria-controls` and `aria-activedescendant` name
-  // elements that are there.
+  
+  
   readonly uid: string;
   readonly layer: Layer;
   readonly query: string;
-  // Already clamped to the rows.
+  
   readonly cursor: number;
   readonly rows: readonly Choice[];
   readonly side: Side;
 }
 
-// What the seat lends the wiring: what to do with an answered key, and
-// the elements it has to hold.
+
 export interface Hands {
   readonly toggle: () => void;
   readonly act: (answered: Answer) => void;
   readonly type: (query: string) => void;
   readonly point: (at: number) => void;
   readonly take: (choice: Choice) => void;
-  // The focus left an element of the control for `next`.
+  
   readonly leave: (next: EventTarget | null) => void;
   readonly holds: Holds;
 }
@@ -171,9 +151,7 @@ export interface Holds {
   readonly list: Attachment<HTMLUListElement>;
 }
 
-// One key for every attachment a bag carries: a bag carries at most
-// one, and a key made once keeps Svelte from letting go of an element
-// and taking it again on every draw.
+
 const HOLD = createAttachmentKey();
 
 export interface RootWire {
@@ -190,7 +168,7 @@ export interface TriggerWire {
 }
 
 export interface LayerWire {
-  // A leaving popup takes no focus and no pointer, and says nothing.
+  
   readonly inert: boolean;
   readonly [hold: symbol]: Attachment<HTMLDivElement>;
 }
@@ -212,8 +190,8 @@ export interface ListWire {
   readonly id: string;
   readonly role: "listbox";
   readonly "aria-label": string;
-  // A pick by pointer must not move the focus first: the blur would
-  // close the popup before the click landed.
+  
+  
   readonly onmousedown: (event: { preventDefault(): void }) => void;
   readonly [hold: symbol]: Attachment<HTMLUListElement>;
 }
@@ -230,11 +208,11 @@ export interface OptionLook {
   readonly key: string;
   readonly label: string;
   readonly note: string | undefined;
-  // CSS `font-family` for this row, when the choice carries one.
+  
   readonly face: string | undefined;
-  // The value in force, which `aria-selected` says too.
+  
   readonly chosen: boolean;
-  // Where the cursor is, which `aria-activedescendant` says too.
+  
   readonly cursor: boolean;
   readonly wire: OptionWire;
 }
@@ -242,12 +220,12 @@ export interface OptionLook {
 export interface ComboboxLook {
   readonly root: RootWire;
   readonly trigger: TriggerWire;
-  // What the trigger says: the chosen label, or the placeholder.
+  
   readonly face: string;
-  // CSS `font-family` for the trigger while a faced choice is in force.
+  
   readonly faceStyle: string | undefined;
   readonly unset: boolean;
-  // Absent until the popup first opens.
+  
   readonly layer: LayerWire | undefined;
   readonly open: boolean;
   readonly side: Side;
@@ -257,11 +235,10 @@ export interface ComboboxLook {
   readonly empty: string;
 }
 
-// The id of the row at `index`, which the seat finds to scroll it into
-// view and the search box names as `aria-activedescendant`.
+
 export const rowId = (uid: string, index: number): string => `${uid}-${String(index)}`;
 
-// The whole value a look draws, wired to `hands`.
+
 export function lookOf(view: ComboboxView, hands: Hands): ComboboxLook {
   const { props, uid, layer, cursor, rows } = view;
   const open = layer === "open";

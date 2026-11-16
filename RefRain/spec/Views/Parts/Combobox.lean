@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import client.spec.Views.Parts
+import RefRain.spec.Views.Parts
 
 /-!
 # combobox：一层 listbox 弹层
 
-规定 `client/src/views/parts/combobox.svelte`（APG Combobox，listbox 弹层），键表在 `client/spec/Views/Parts.lean` §7-5。
+规定 `RefRain/src/views/parts/combobox.svelte`（APG Combobox，listbox 弹层），键表在 `RefRain/spec/Views/Parts.lean` §7-5。
 
 状态是：弹层开不开、游标在第几行、过滤词、焦点在哪，以及**生效的值**（`chosen`，`aria-selected` 读它）。游标由持焦元素的 `aria-activedescendant` 承担，从不写进 `aria-selected`。
 

@@ -5,11 +5,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  // The world layer's controls one at a time (client/Spec.lean §7K), each
-  // drawn by its own seat so the look it hands its wiring to is measured:
-  // a pane label with its menu open and as words in the blend tier, a
-  // divider on the shell's frame, and the head of the world's sheet on a
-  // phone. The made-up room is the workbench fixture's (`benched.ts`).
+  
+  
   import { say } from "../../core/lang";
   import { roomOf } from "../../core/route";
   import { ui } from "../../ui";
@@ -34,7 +31,7 @@
   </div>
 </Case>
 <Case label="workbench · the divider between the first two panes" width={1440}>
-  <!-- The shell's frame, so the divider snaps to the lines it reads. -->
+  
   <div class="frame grid h-[160px] grid-rows-[minmax(0,1fr)_auto]">
     <div class="row-[1/3] rounded-panel border border-edge-panel" style:grid-column="1 / 4"></div>
     <Divider

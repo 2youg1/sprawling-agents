@@ -46,7 +46,7 @@ This file is the index of the documents below. The Chinese project landing page 
 | [`gates.md`](gates.md) | What each machine gate holds, and the rules for changing one. |
 | [`testing.md`](testing.md) | Scenarios first, the three fixture kinds, and the Rust, Lean and adversary split. |
 | [`ui-design.md`](ui-design.md) | The design judgement a new screen starts from. |
-| [`frontend-method.md`](frontend-method.md) | How a screen under `client/` is built, settled and accepted. |
+| [`frontend-method.md`](frontend-method.md) | How a screen under `RefRain/` is built, settled and accepted. |
 
 ## Reference and policy
 

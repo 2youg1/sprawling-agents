@@ -6,27 +6,8 @@
 -->
 
 <script lang="ts">
-  // A letter on the right side (client D73): one card
-  // offered on a document, read four ways - the card's own diff, the
-  // conversation of the run that sent it, the whole document at the
-  // version the card was written against, and the whole document as it
-  // stands, with every open card above its text - and a link to that
-  // run's page, drawn as the inspector's worded key. The diff is one reading among the four, because a
-  // stretch read without the text around it, or without what the run
-  // was asked and said, does not say what it changes or why. The
-  // conversation is the run page's own thread, drawn with no fork and
-  // no retry, so it is read-only here as it is there, and only the turns
-  // around the line that offered the card, with a link to the whole
-  // session (client D91).
-  //
-  // The heading is the document's whole address, broken across lines
-  // where the column is narrow rather than cut short, because a cut name
-  // reaches a pointer only through a hover and a keyboard not at all.
-  //
-  // The heading takes the focus when the letter opens, so the mailbox
-  // that stowed for it does not hand the focus to its key, and Escape
-  // in here is the inspector's: the way back to the row is
-  // `inspect/open.svelte.ts`'s.
+  
+  
   import { onMount } from "svelte";
   import { readable, type Readable } from "svelte/store";
 
@@ -37,15 +18,15 @@
   import { ui } from "../../ui";
   import type { Address, Answer, B3Hash, RunSummary } from "../../wire";
   import Segmented from "../parts/segmented.svelte";
-  import Card from "../refrain/proposals_card.svelte";
-  import RefRain from "../refrain/refrain.svelte";
+  import Card from "../editor/proposals_card.svelte";
+  import RefRain from "../editor/refrain.svelte";
   import Thread from "../talk/thread.svelte";
   import TextKey from "./text_key.look.svelte";
 
   interface Props {
     readonly doc: Address;
     readonly card: B3Hash;
-    // The reading the letter opens on; the diff unless a caller asks.
+    
     readonly opening?: Reading;
   }
 
@@ -56,7 +37,7 @@
   const belief = u.conn.belief;
 
   type Reading = "diff" | "talk" | "before" | "now";
-  // The prop is only where the letter starts; the segmented control moves it after.
+  
   // svelte-ignore state_referenced_locally
   let reading = $state<Reading>(opening);
   let heading = $state<HTMLElement | undefined>(undefined);
@@ -74,8 +55,7 @@
   const building = $derived(buildingOf(doc));
   const path = $derived(doc.slice(building.length + 1));
 
-  // The sender as the run page reads it: the city's summary adopted
-  // over what this page folded, so a run the page never saw still draws.
+  
   const NOTHING: Readable<Answer | undefined> = readable(undefined);
   const sender = $derived(
     held === null ? NOTHING : u.conn.asking.ask({ run_view: { run: held.run } }),

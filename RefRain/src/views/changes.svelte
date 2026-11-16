@@ -6,13 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // What moved between two checkpoints: the files as rows, and under
-  // the row a hand opened, the patch of that one file. Drawn the same
-  // from a run's lens and from a building's commit list, so one
-  // reading of a diff exists; the patch under a row is the inspector's
-  // own drawing, `inspect/patch.svelte`. The three folds its rows state
-  // live in `changes.ts`, the companion module, because a working-tree
-  // list reads the same `FileChange` through them.
+  
+  
 </script>
 
 <script lang="ts">
@@ -33,11 +28,11 @@
   interface Props {
     readonly base: GitOid;
     readonly head: GitOid | null;
-    // Where a chosen line is sent: the conversation whose composer it
-    // prefills. Absent where the page has no conversation to talk to.
+    
+    
     readonly talk?: Address | undefined;
-    // A control at the end of each file's row, handed the file's path:
-    // a building's commit list puts "take back" there (client/Spec.lean §4-50).
+    
+    
     readonly act?: Snippet<[string]> | undefined;
   }
 
@@ -46,8 +41,7 @@
   const u = ui();
   const lang = u.lang;
 
-  // The one row a hand opened: a patch is asked per file, and one
-  // question at a time is one the page can hold.
+  
   let open = $state<string | null>(null);
 
   const NOTHING: Readable<Answer | undefined> = readable(undefined);
@@ -59,9 +53,7 @@
   );
   const files = $derived(read.kind === "held" ? read.value : undefined);
 
-  // The patch under the open row. The question exists only while a row
-  // is open and both ends are named; `NOTHING` keeps the read below a
-  // subscription to a store rather than a subscription to nothing.
+  
   const patchQuestion = $derived.by((): Query | null => {
     const at = open;
     return at === null || head === null ? null : { hunks: { oid_a: base, oid_b: head, path: at } };

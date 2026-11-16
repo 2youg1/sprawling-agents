@@ -6,16 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // A PDF drawn page by page with pdf.js (client/Spec.lean §4-54). Every page
-  // has its place from the start, at the first page's proportions until
-  // it is drawn, so the scroll bar is the length of the document; a page
-  // is drawn only as it nears the view, and drawn again when the pane's
-  // width moves by a step, so a hundred pages cost what the few on the
-  // screen cost.
-
-  // The width a page is drawn at moves in steps of this many pixels:
-  // dragging the pane's edge redraws a page a few times, not once per
-  // pixel, and the browser scales the drawing across a step.
+  
+  
   const STEP = 32;
 </script>
 
@@ -41,8 +33,8 @@
   const lang = ui().lang;
 
   let opened = $state<Opened | null>(null);
-  // Each page's own proportions once it is drawn, and the first page's
-  // as the stand-in for those not drawn yet.
+  
+  
   let sizes = $state<Readonly<Record<number, Size>>>({});
   let scroller = $state<HTMLDivElement>();
   let measured = $state(0);
@@ -68,12 +60,11 @@
     };
   });
 
-  // A page the size of A4 stands in until the first page is measured.
+  
   const A4: Size = { width: 595, height: 842 };
   const standIn = $derived(sizes[1] ?? A4);
 
-  // One page: drawn once it comes within a screen of the view, and drawn
-  // again at a new width.
+  
   function page(pdf: PDFDocumentProxy, number: number): Attachment<HTMLCanvasElement> {
     return (canvas) => {
       const at = width;
@@ -126,8 +117,7 @@
       {fill(say($lang, "format_broken"), { format: NAME.pdf, reason: opened.reason })}
     </p>
   {:else if pdf !== null}
-    <!-- The pages scroll inside the pane; the column inside measures
-         the width a page may take. -->
+    
     <!-- svelte-ignore a11y_no_noninteractive_tabindex (the pane takes focus so the keyboard can scroll it) -->
     <div
       class="min-h-0 flex-1 overflow-auto bg-raised p-pane"

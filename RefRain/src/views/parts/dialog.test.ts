@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The dialog's wiring as client/Spec.lean §7-3 states it: `aria-labelledby`
+// The dialog's wiring as RefRain/Spec.lean §7-3 states it: `aria-labelledby`
 // on the heading, `aria-describedby` only when there is a detail, Escape
 // answered by the caller rather than by the element, and the way out
 // written before the way through, so the platform focuses it first.

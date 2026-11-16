@@ -6,16 +6,8 @@
 -->
 
 <script lang="ts">
-  // The body of a proposal card (client/Spec.lean §4-55): the line saying
-  // the card is stale, where a sent decision stands, and the diff - as
-  // one run of text, or one row per sentence while the person edits it.
-  // It takes `CardLook` (`./proposals_card`) and nothing else, and
-  // spreads each wire bag on the box it names.
-  //
-  // **A removed sentence and an added one each have one paint**, the
-  // same in the run and in the edit: the added one wears the accent the
-  // accepting answer wears, the removed one the alert ink of a
-  // destructive answer, each as a wash under the text.
+  
+  
   import type { CardLook } from "./proposals_card";
 
   const { lead, stale, region, status, body }: CardLook = $props();
@@ -50,9 +42,7 @@
       {/each}
     </ol>
   {:else}
-    <!-- One run of text, the way the city will land it: what stays, what
-    goes and what comes, with each sentence's own spacing kept, so no
-    whitespace stands between the tags below. -->
+    
     <p class="run">
       {#each body.pieces as piece (piece.key)}{#if piece.kind === "same"}<span
             class="text-text-quiet">{piece.lead}{piece.text}{piece.trail}</span
@@ -66,9 +56,7 @@
 </div>
 
 <style>
-  /* Every sentence of the edit has one shape - a 1px edge and the tight
-   * and snug padding - whether it is kept, struck or written, so the
-   * words of every row start on one line without a sum of offsets. */
+  
   .sentence {
     flex: 1;
     min-width: 0;
@@ -78,9 +66,7 @@
     transition: opacity var(--transition-duration-short) var(--ease-arrive);
   }
 
-  /* The take box stands in a column one glyph wide on every row, the
-   * height of a one-line sentence, so it is centred on the first line
-   * of its sentence and a kept row keeps the column empty. */
+  
   .box {
     display: flex;
     flex: none;
@@ -114,8 +100,7 @@
     resize: none;
   }
 
-  /* A sentence the edit leaves out fades back; it leaves on the leave
-   * curve and returns on the arrive curve. */
+  
   .untaken {
     opacity: 0.6;
     transition-timing-function: var(--ease-leave);

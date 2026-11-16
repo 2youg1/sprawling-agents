@@ -6,28 +6,19 @@
 -->
 
 <script lang="ts" module>
-  // A directory is one of three things, and the page says which. A
-  // **room** has held work, so it is read as the runs that worked there.
-  // The **governance** directory holds the rules a building runs under,
-  // so it is read as those documents. Anything else is a directory, read
-  // as its files. Treating all three as rooms is what put "no runs"
-  // under every folder in the tree.
-  //
-  // The kind is decided from the listing itself rather than from a name
-  // the city does not promise: a room is where a job was written down or
-  // a transcript was left.
+  
+  
   import type { Key } from "../../core/lang";
   import { heldIn } from "../../core/belief/rooms";
   import { roomOf } from "../../core/route";
   import type { Address, Entry } from "../../wire";
 
-  // The directory a building keeps its own rules in.
+  
   const GOVERNANCE = ".sprawling";
 
   type Kind = "room" | "governance" | "ordinary";
 
-  // What each kind is called, one table: `Kind` is closed, so a new
-  // kind cannot be drawn without a word for it.
+  
   const KIND_WORD: Record<Kind, Key> = {
     room: "dir_room",
     governance: "dir_governance",
@@ -83,9 +74,7 @@
 
   const runs = $derived(heldIn($belief, at).reverse());
 
-  // The runs this room's listing has a transcript for and the page holds
-  // no run for: older than the hot view, so the page names them and
-  // their number rather than calling the room empty (client/Spec.lean §4-50).
+  
   const earlier = $derived.by(() => {
     return (entries ?? []).flatMap((entry) => {
       const run = transcriptOf(entry.name);
@@ -93,10 +82,7 @@
     });
   });
 
-  // The cost view names the active runs and the few billed most; the
-  // rest of this building's runs are asked for by name, newest first,
-  // in one question, and the server answers only the newest
-  // RUN_COSTS_MAX of them; older cold runs show no figure.
+  
   const cold = $derived.by(() => {
     const held = $cost;
     if (held === undefined || !("cost" in held)) return [];
@@ -127,8 +113,8 @@
         return say($lang, "talk_waiting_you");
       case "awaiting_reply":
         return say($lang, "run_doing_awaiting_reply");
-      // A phase this page was never told: the run is working and the
-      // page cannot say at what, which is what the one word states.
+      
+      
       case "unknown":
         return say($lang, "city_at_work");
       case "frozen":

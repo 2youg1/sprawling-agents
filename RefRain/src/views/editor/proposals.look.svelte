@@ -6,11 +6,8 @@
 -->
 
 <script lang="ts">
-  // The band of proposal cards above the document in RefRain
-  // (client/Spec.lean §4-55): under its own rule, and scrolling by itself
-  // once it would take more than two fifths of the right side, so a
-  // long card never pushes the editor out. It takes `ProposalsLook`
-  // (`./proposals`) and nothing else.
+  
+  
   import type { ProposalsLook } from "./proposals";
 
   const { band, heading, title, cards }: ProposalsLook = $props();

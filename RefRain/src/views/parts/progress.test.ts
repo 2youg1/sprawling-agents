@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // What a progress bar tells a screen reader, against the progress row
-// of `client/spec/Views/Parts.lean` §7-1: the upper bound and the
+// of `RefRain/spec/Views/Parts.lean` §7-1: the upper bound and the
 // current value appear exactly when there is an end, and the bar is
 // busy exactly when there is not.
 

@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // Proposal cards, the decide card's third kind (client/Spec.lean §4-55), on
+  // Proposal cards, the decide card's third kind (RefRain/Spec.lean §4-55), on
   // a made-up city: a run in `shop/east` offered two cards on one plan,
   // one on the version the plan holds and one on a version it has since
   // left. Each card alone, one opened for editing, both above the
@@ -30,8 +30,8 @@
     Slice,
   } from "../../wire";
   import { decideProposals } from "../../core/commands";
-  import { editOf, rejectionOf, retaken } from "../refrain/proposals";
-  import type { Deciding, Edit } from "../refrain/proposals";
+  import { editOf, rejectionOf, retaken } from "../editor/proposals";
+  import type { Deciding, Edit } from "../editor/proposals";
 
   const SHOP = Address.make("shop");
   const PATH = "notes/plan.md";
@@ -235,11 +235,11 @@
   import Column from "../mailbox/column.svelte";
   import Mailbox from "../mailbox/mailbox.svelte";
   import Letter from "../inspect/letter.svelte";
-  import Proposals from "../refrain/proposals.svelte";
-  import Card from "../refrain/proposals_card.svelte";
-  import Body from "../refrain/proposals_card.look.svelte";
-  import { cardLookOf } from "../refrain/proposals_card";
-  import RefRain from "../refrain/refrain.svelte";
+  import Proposals from "../editor/proposals.svelte";
+  import Card from "../editor/proposals_card.svelte";
+  import Body from "../editor/proposals_card.look.svelte";
+  import { cardLookOf } from "../editor/proposals_card";
+  import RefRain from "../editor/refrain.svelte";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
 

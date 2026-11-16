@@ -46,9 +46,9 @@ impl Slash {
 | `/acp` | `[<text>]` | 两处 |
 | `/wire` | `<verb> [<json>]` | CLI |
 
-- **一张表，两端读**。CLI（`bin::console`）按 `Slash::parse` 读一行的第一个词，客户端读 `client/src/wire.ts` 里由 `cargo xtask wire-ts` 生成的 `SLASH`。表里的拼写不在别处再写一次：控制台此前的 `/at` 与客户端的 `/room` 是同一个概念的两种拼写，从此只有 `/room`。
+- **一张表，两端读**。CLI（`bin::console`）按 `Slash::parse` 读一行的第一个词，客户端读 `RefRain/src/wire.ts` 里由 `cargo xtask wire-ts` 生成的 `SLASH`。表里的拼写不在别处再写一次：控制台此前的 `/at` 与客户端的 `/room` 是同一个概念的两种拼写，从此只有 `/room`。
 - **事实挂在变体上**：拼写、参数、提供处与说明各是 `Slash` 上一个 `const fn` 的一臂，`ALL` 列出每个变体；`match` 穷尽，加一个动词时编译器逼人写下它的四个事实。**否决的方案**：一张 `[(&str, &str, Offered, &str)]` 的静态表加一个按下标取行的函数——下标与变体之间没有东西把它们绑在一起。
 - **`/approve`、`/deny` 只在 CLI**：页面在请求旁边有按钮；`/web`、`/serving`、`/remote`、`/wire` 是终端的事，`/remote` 的配对只能在城自己的控制台上做（`Sprawling/remote_access/Spec.lean` D4）。
 - `/quit` 在两处都发 `CloseCity`（`spec/Command/Kind.lean`）；页面那一端由本地门保证只有同一台电脑上的会话发得出。
-- 客户端此前自有、本表没有列出的拼写（`/dispatch`、`/steer`、`/raise`、`/compact`、`/tag`、`/untag`、`/fork`、`/admit`、`/go`、`/mcp`、`/doctor`、`/diff`）仍由 `client/src/core/slash.ts` 持有；它们并进本表、各写明提供处，是这张表的下一步。
+- 客户端此前自有、本表没有列出的拼写（`/dispatch`、`/steer`、`/raise`、`/compact`、`/tag`、`/untag`、`/fork`、`/admit`、`/go`、`/mcp`、`/doctor`、`/diff`）仍由 `RefRain/src/core/slash.ts` 持有；它们并进本表、各写明提供处，是这张表的下一步。
 -/

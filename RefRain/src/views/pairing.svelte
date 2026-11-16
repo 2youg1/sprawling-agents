@@ -12,7 +12,7 @@
   import type { Credential, Paired, PairWhy } from "../core/local/entering";
 
   // What a browser with no session sees on this machine's port
-  // (client/Spec.lean §4-57b): where the code is, one large box for it,
+  // (RefRain/Spec.lean §4-57b): where the code is, one large box for it,
   // the name this browser will be listed under, and one button. No
   // countdown: the code is good until somebody guesses it wrong.
   export interface PairingProps {

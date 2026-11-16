@@ -7,7 +7,7 @@
 
 <script lang="ts">
   // The blocks the city read out of a stretch of Markdown, drawn as
-  // elements and never through `innerHTML` (client/Spec.lean §4-26,
+  // elements and never through `innerHTML` (RefRain/Spec.lean §4-26,
   // `Sprawling/documents/Spec.lean` D21). A formula is drawn by KaTeX
   // (`formula.svelte`, §4-64a). What the city read and this page does not
   // draw - HTML, front matter, nesting too deep, and a formula KaTeX
@@ -28,7 +28,7 @@
     readonly blocks: readonly Block[];
     // Opens a link relative to the document; absent where links cannot
     // be followed - a reply has no document a relative link could be
-    // relative to, so its link is drawn as its words (client/Spec.lean §4-53).
+    // relative to, so its link is drawn as its words (RefRain/Spec.lean §4-53).
     readonly onOpen?: ((target: string) => void) | undefined;
     // Whether these are a window's top-level blocks, which carry the
     // byte they start at so a reading can find its place among them.

@@ -22,7 +22,7 @@
  * The bar is the leading edge rather than the left one, because the
  * page is also set in languages that run the other way.
  *
- * `client/Spec.lean` carries the rule; this is where it is drawn. */
+ * `RefRain/Spec.lean` carries the rule; this is where it is drawn. */
 @utility asks {
   border-inline-start: var(--spacing-hair) solid var(--color-alert);
   padding-inline-start: var(--spacing-base);
@@ -52,7 +52,7 @@
   font-variant-numeric: var(--figures);
 }
 
-/* A shell narrower than twelve readable columns (client/Spec.lean §4-52,
+/* A shell narrower than twelve readable columns (RefRain/Spec.lean §4-52,
  * client D30). The question is put to the shell's own box, the container
  * named `shell` (the page's body, see the MOB block), rather than to the
  * window: a specimen of the shell on `#/gallery` is its own `shell`, so

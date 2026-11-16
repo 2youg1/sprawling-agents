@@ -253,20 +253,20 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         let written = [
             (
-                "client/src/theme.css",
+                "RefRain/src/theme.css",
                 "@import \"tailwindcss\";
 @import \"./theme/tokens-motion.css\";
 ",
             ),
             (
-                "client/src/theme/tokens-motion.css",
+                "RefRain/src/theme/tokens-motion.css",
                 "@theme {
   --ease-arrive: cubic-bezier(0, 0, 0.1, 1);
 }
 ",
             ),
             (
-                "client/src/views/panel.svelte",
+                "RefRain/src/views/panel.svelte",
                 "<div style=\"transition: x 1s cubic-bezier(0, 0, 0.1, 1)\"></div>
 ",
             ),
@@ -283,7 +283,7 @@ mod tests {
                 .iter()
                 .map(|v| v.location.as_str())
                 .collect::<Vec<_>>(),
-            ["client/src/views/panel.svelte:1"]
+            ["RefRain/src/views/panel.svelte:1"]
         );
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -334,7 +334,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         let written = [
             (
-                "client/src/views/panel.svelte",
+                "RefRain/src/views/panel.svelte",
                 "<div class=\"transition-opacity motion-reduce:transition-none\"></div>
 <p class=\"still:transition-none\"></p>
 <style>
@@ -350,13 +350,13 @@ mod tests {
 ",
             ),
             (
-                "client/src/views/plain.css",
+                "RefRain/src/views/plain.css",
                 ".e { --ease-mine: var(--ease-arrive); }
 .f { animation-delay: 40ms; }
 ",
             ),
             (
-                "client/swap/views/parts/x.look.svelte",
+                "RefRain/swap/views/parts/x.look.svelte",
                 "<div class=\"motion-safe:duration-short\"></div>
 ",
             ),
@@ -374,13 +374,13 @@ mod tests {
                 .map(|v| v.location.as_str())
                 .collect::<Vec<_>>(),
             [
-                "client/src/views/panel.svelte:1",
-                "client/src/views/panel.svelte:4",
-                "client/src/views/panel.svelte:6",
-                "client/src/views/panel.svelte:9",
-                "client/src/views/panel.svelte:11",
-                "client/src/views/plain.css:1",
-                "client/swap/views/parts/x.look.svelte:1",
+                "RefRain/src/views/panel.svelte:1",
+                "RefRain/src/views/panel.svelte:4",
+                "RefRain/src/views/panel.svelte:6",
+                "RefRain/src/views/panel.svelte:9",
+                "RefRain/src/views/panel.svelte:11",
+                "RefRain/src/views/plain.css:1",
+                "RefRain/swap/views/parts/x.look.svelte:1",
             ]
         );
         std::fs::remove_dir_all(&root).unwrap();

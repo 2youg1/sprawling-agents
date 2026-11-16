@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The link's line over a remote session (client/Spec.lean §4-64), against a
+// The link's line over a remote session (RefRain/Spec.lean §4-64), against a
 // city half written here from `seal.ts`: the city opens frames by count,
 // so a frame sealed or opened out of turn is a frame that never opens.
 

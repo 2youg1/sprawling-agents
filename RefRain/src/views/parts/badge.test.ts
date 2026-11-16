@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The count form of a badge (client/Spec.lean §4-32): the number a key
+// The count form of a badge (RefRain/Spec.lean §4-32): the number a key
 // carries in its corner, which must never grow wider than the key and
 // never be read twice by a screen reader that already heard the key's
 // name.

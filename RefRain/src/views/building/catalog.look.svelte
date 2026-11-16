@@ -6,15 +6,13 @@
 -->
 
 <script lang="ts">
-  // The unified catalog look. All behaviour and wording arrives from
-  // `catalog.ts`; this file places the existing controls and plain-text versions.
-  // The RULES.toml editor arrives as a snippet from the seat when the
-  // models or rules pane is open.
+  
+  
   import type { Snippet } from "svelte";
 
   import Button from "../parts/button.svelte";
   import Segmented from "../parts/segmented.svelte";
-  import type { CatalogLook } from "./catalog";
+  import type { CatalogLook } from "./catalog_look";
 
   interface Props extends CatalogLook {
     readonly rules?: Snippet | undefined;

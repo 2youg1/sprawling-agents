@@ -3,35 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The one spelling of "open this file at this line in my editor".
-//
-// The page hands the browser a link and the browser hands it to the
-// editor this machine registered for the scheme; the city starts
-// nothing. Only editors whose own documentation or source code reads a
-// file-and-line URL are offered (client/Spec.lean §4-39 cites each one),
-// because a guessed scheme fails silently: the browser asks for an
-// application nobody installed, or opens the file at its first line.
-//
-// **Only a path inside the city gets a link.** The path is judged by
-// the generated `Address` grammar, which is the city's own rule for a
-// relative path and admits no `..`, no drive, no backslash; the folder
-// is the person's own entry and must be absolute, not a UNC share,
-// with no `.` or `..` segment. Anything else answers `null` and the
-// page draws no link. The check is lexical, on the recorded path: a
-// link on disk that leads outside the city is not followed, because
-// the browser cannot see the disk and the city starts nothing.
 
 import { Schema } from "effect";
 
 import { Address } from "../wire";
 
-// `none` is the posture a browser starts in: no link is drawn until the
-// person names the editor this machine has.
+
 export type Editor =
   "none" | "vscode" | "vscode-insiders" | "vscodium" | "cursor" | "windsurf" | "zed";
 
-// Every value the settings selector offers, in the order it is drawn,
-// and the list a stored word is read back through.
+
 export const EDITORS: readonly Editor[] = [
   "none",
   "vscode",
@@ -44,19 +25,18 @@ export const EDITORS: readonly Editor[] = [
 
 export interface Opening {
   readonly editor: Editor;
-  // The city's folder on this machine, as the person wrote it: either
-  // separator, an optional trailing one.
+  
+  
   readonly folder: string;
-  // Relative to the city, `/`-separated, as the ledger records it.
+  
   readonly path: string;
-  // One-based, as an editor counts.
+  
   readonly line: number;
 }
 
 const isAddress = Schema.is(Address);
 
-// `{scheme}://file/{full path to file}:line:column`. The column is
-// always the first, because a line is what the monitor knows.
+
 export function editorLink(at: Opening): string | null {
   const editor = at.editor;
   if (editor === "none" || !isAddress(at.path) || !Number.isSafeInteger(at.line) || at.line < 1) {
@@ -68,14 +48,7 @@ export function editorLink(at: Opening): string | null {
   return `${fileUrl(editor, folder.drive)}${segments.join("/")}:${String(at.line)}:1`;
 }
 
-// Where each editor's file handler starts reading the path.
-//
-// VS Code opens `{scheme}://file/{path}` for whatever scheme the build
-// registers, so the Insiders build, VSCodium, Cursor and Windsurf take
-// the same form under their own scheme. Zed strips `zed://file` and
-// opens the rest as a path, which on Windows leaves `/C:/...`, a name
-// Windows refuses; `//?/C:/...` is the device form of the same path and
-// opens, with the `?` escaped so the browser does not read a query.
+
 function fileUrl(editor: Exclude<Editor, "none">, drive: string): string {
   switch (editor) {
     case "vscode":
@@ -90,7 +63,7 @@ function fileUrl(editor: Exclude<Editor, "none">, drive: string): string {
 }
 
 interface Folder {
-  // `C:/` on Windows, empty where the root is `/`.
+  
   readonly drive: string;
   readonly segments: readonly string[];
 }
@@ -98,8 +71,8 @@ interface Folder {
 function absoluteFolder(written: string): Folder | null {
   const forward = written.replaceAll("\\", "/");
   const drive = /^[A-Za-z]:\//.exec(forward)?.[0] ?? "";
-  // `//host/share` is a UNC path: its host is not a folder, and read as
-  // one it would point the link at a different file.
+  
+  
   if ((drive === "" && !forward.startsWith("/")) || forward.startsWith("//")) return null;
   const segments = forward
     .slice(drive.length)
@@ -108,23 +81,15 @@ function absoluteFolder(written: string): Folder | null {
   return segments.some((each) => each === "." || each === "..") ? null : { drive, segments };
 }
 
-// Whether a line number was read from the worktree's current text, or
-// from a version the worktree no longer holds.
+
 export type Shown = "current" | "past";
 
-// What the page offers for one line: a link the editor opens, or the
-// location written out for the person to copy.
+
 export type Reach =
   | { readonly kind: "link"; readonly href: string }
   | { readonly kind: "copy"; readonly text: string };
 
-//
-// An editor opens the worktree's file as it is now, so a line read from
-// a past version would land on whatever line stands there today and say
-// nothing about it (client/Spec.lean §4-39). That line, and any line no link
-// can be spelled for, is offered as `path:line` to copy, so the person
-// always has a location to carry and the page never claims an editor
-// opened something.
+
 export function reachOf(at: Opening, shown: Shown): Reach {
   const href = shown === "current" ? editorLink(at) : null;
   return href === null

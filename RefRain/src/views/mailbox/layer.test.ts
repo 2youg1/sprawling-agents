@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Trace vectors for the properties `client/spec/Views/Workspace.lean`
+// Trace vectors for the properties `RefRain/spec/Views/Workspace.lean`
 // proves of the mailbox layer: every trace over the five inputs up to a
 // length, from every state the shell can start in.
 

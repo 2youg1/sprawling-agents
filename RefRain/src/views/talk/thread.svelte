@@ -1,21 +1,8 @@
-<!-- This Source Code Form is subject to the terms of the Mozilla Public
-     License, v. 2.0. If a copy of the MPL was not distributed with this
-     file, You can obtain one at https://mozilla.org/MPL/2.0/.
-     Copyright (c) 2026 2youg1 and the sprawling contributors
--->
+
 
 <script lang="ts">
-  // One run, read as a stretch of conversation: what the person asked,
-  // what the resident said turn by turn under a head naming who and when,
-  // one quiet line per call it made, and - while it is still going - the
-  // words as they arrive. The rounds come from the server; only the live
-  // text, the posture and the rhythm the words arrived in come from what
-  // this page has seen itself.
-  //
-  // Every entry a person could have branched the conversation at - their
-  // own words, a reply, a call - carries the one fork action. Hovering
-  // or focusing shows it; the `fork.here` chord answers for the entry
-  // under the hand.
+  
+  
   import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";
   import type { RunBelief } from "../../core/belief";
@@ -53,20 +40,17 @@
   interface Props {
     readonly through?: Seq | null;
     readonly run: RunBelief;
-    // Absent where the page holding the thread cannot branch: the run
-    // page draws the same conversation with nowhere to fork to.
+    
+    
     readonly onFork?: ((plan: ForkPlan) => void) | undefined;
-    // The run came back with no words: say the task again as a new run.
-    // Absent for the same reason.
+    
+    
     readonly onRetry?: ((task: string) => void) | undefined;
-    // Where this run's frozen facts are said (`seat.ts`): on its first
-    // head when it opens the stretch on screen, else elsewhere - a later
-    // run of the same session leaves them to the first, and on the
-    // workbench the chosen session's gauge says them (docs/frontend-method.md §7D).
+    
+    
     readonly facts?: FrozenFacts;
-    // A letter's line in this run: only the turns around it are drawn,
-    // with a link to the whole session (client D91). Absent everywhere
-    // else, where the thread is the whole session.
+    
+    
     readonly around?: Seq | null;
   }
 
@@ -76,17 +60,13 @@
   const { lang } = u;
   const held = u.prefs.held;
 
-  // The entry under the hand - hovered or focused - which is the one the
-  // `fork.here` chord branches from. Cleared as the hand leaves, so a
-  // chord pressed pages away can never reach a stale entry.
+  
   let active: ForkEntry | null = $state(null);
   const hoverFork = (entry: ForkEntry | null): void => {
     active = entry;
   };
 
-  // The run this thread reads, named once: the page draws one thread
-  // per run and keys it to that run, so the rounds question is minted
-  // once for this run and follows this id for the thread's life.
+  
   // svelte-ignore state_referenced_locally (the capture is the point: the question is minted once, for the run this thread is keyed to)
   const readRun: RunId = run.run;
   const question: Query = { rounds: { run: readRun } };
@@ -98,16 +78,14 @@
   const turns = $derived(answer?.turns ?? []);
   const drawn = $derived(turnsAround(turns, around));
   const task = $derived(answer?.opening?.task ?? run.task ?? "");
-  // The opening task is a person's words like any other, and rides the
-  // first turn - its turn's parent - because the wire gives it no line
-  // of its own.
+  
+  
   const taskEntry = $derived.by((): ForkEntry | null => {
     const first = turns.at(0);
     return first === undefined ? null : { kind: "message", turn: first, text: task };
   });
-  // What this city told the provider a reply may be at most. Read here
-  // rather than per turn, because it is one fact about the city and not
-  // one fact about a turn.
+  
+  
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const ceiling = $derived.by((): number | null => {
     const held = $endpoints;
@@ -116,9 +94,8 @@
   });
   const frozen = $derived(run.doing.kind === "frozen");
   const phase = $derived<Phase>(frozen ? "frozen" : "live");
-  // The word the run froze with: the record once it holds one, and what
-  // the page believes until then. One reading, because the ending the
-  // thread draws and the way out of an empty one are the same word.
+  
+  
   const word = $derived(
     answer?.closing?.completion ?? (run.doing.kind === "frozen" ? run.doing.completion : null),
   );
@@ -136,50 +113,42 @@
         return word;
     }
   });
-  // The turn being said right now is not yet in the rounds; it is the
-  // page's own text until the record holds it. When the call returns,
-  // belief clears `saying` and the settled record takes over, so nothing
-  // has to decide when the growing text stops growing.
+  
+  
   const streaming = $derived(through === null && !frozen && run.saying.length > 0);
   const closedAt = $derived(answer?.closing?.at ?? null);
-  // A frozen run that said nothing at all is one card with the reason
-  // and a way out, not one grey box per turn (ux: the zero-output run).
+  
+  
   const emptyRun = $derived(read.kind === "held" && silentRun(turns, phase));
-  // The error that ended this run, from the closing line: the card at the
-  // end of a wordless run is where the page says why it stopped.
+  
+  
   const failure = $derived(answer?.closing?.failure ?? null);
-  // Whether the run was stopped rather than concluded, which is the same
-  // word for a person's cancel and for a failure.
+  
+  
   const stopped = $derived(word === "cancelled");
-  // Where the way out of a wordless run leads: a failure decides for itself
-  // (a provider that turned the call down is settled on the settings page),
-  // a run the person stopped has nothing there to settle, and a model that
-  // said nothing is asked again elsewhere.
+  
+  
   const wayOut = $derived<"offered" | "absent" | undefined>(
     failure !== null ? undefined : stopped ? "absent" : "offered",
   );
   const why = $derived(cutOff(turns.at(-1)?.stopped));
   const whole = $derived(drawsCalls($held.showing));
-  // A call still running is already a line of its own, with its timer and
-  // what it waits for; the posture line under it would say it twice.
+  
+  
   const lineSaysIt = $derived(
     whole &&
       (run.doing.kind === "calling" || run.doing.kind === "waiting") &&
       (turns.at(-1)?.calls.some((call) => call.outcome === "waiting") ?? false),
   );
-  // Who speaks in this run: the name its session froze, which a rename
-  // after the session began does not reach (refrain §3-13).
+  
+  
   const who = $derived(
     run.addr === null
       ? say($lang, "talk_resident")
       : called(run.addr, answer?.opening?.names?.mayor, $lang),
   );
-  // Who the opening task came from (`Opening.dispatched_by`): the User's
-  // own words are "you", a task a resident handed down names that
-  // resident and links to its room, and one the city's desk dispatched
-  // says so. The link goes to the run that delegated the task
-  // (`Opening.parent`), whose page is the parent's session; a ledger
-  // written before the parent was recorded links to the resident's room.
+  
+  
   const from = $derived.by((): { readonly label: string; readonly href: string | undefined } => {
     const by = dispatcherOf(answer?.opening?.dispatched_by);
     const parent = answer?.opening?.parent ?? null;
@@ -200,11 +169,8 @@
         };
     }
   });
-  // The session facts each round's head states: on the first head the
-  // session's model, the effort and policy its run was dispatched with,
-  // and the sandbox when one restricts the room's building; afterwards
-  // the model again only where a round answered with a different one.
-  // A fact that is not known is left out, never written as "none".
+  
+  
   const firstModel = $derived(turns.at(0)?.model ?? null);
   const building = $derived(
     facts === "head" && run.addr !== null
@@ -230,11 +196,7 @@
     }),
   );
 
-  // What this page sees of the reply while it streams, filed under the
-  // round it becomes (`arrivals.svelte.ts`). That round is opened before
-  // its first word arrives, so it is the newest round still wordless
-  // while the words grow; a reply whose round the page never saw is
-  // dropped rather than drawn on another round.
+  
   let streamedInto: Seq | null = null;
   let wasStreaming = false;
   $effect(() => {
@@ -256,8 +218,8 @@
     else landed(run.run, streamedInto);
     streamedInto = null;
   });
-  // What the run is doing, in words. A run this page knows is live and
-  // cannot place says it is working and claims nothing about the phase.
+  
+  
   const posture = $derived.by((): string => {
     const doing = run.doing;
     switch (doing.kind) {
@@ -278,10 +240,7 @@
     }
   });
 
-  // The press the key table judges: where it landed decides whether a
-  // single letter is the shell's or the person's typing. This mirrors
-  // the shell's own reading of `KeyboardEvent.target`; the rule itself
-  // lives in `core/keys`' `matches`.
+  
   function inField(target: EventTarget | null): boolean {
     return (
       target instanceof HTMLInputElement ||
@@ -350,9 +309,7 @@
       />
     </p>
   {/if}
-  <!-- No `aria-live` on the growing text: a screen reader told every
-       token hears noise (ux B2). The frozen line below is what speaks,
-       and it speaks once. -->
+  
   {#if through === null && !frozen && run.thinking.length > 0 && whole}
     <div class="my-tight">
       <Reasoning text={run.thinking} open />
@@ -360,15 +317,11 @@
   {/if}
   {#if streaming}
     <Saying text={run.saying} {who} />
-    <!-- While the model is still saying this, a steer is heard at the
-         end of it: the pin stands where the words stop (refrain §3-5). -->
+    
     <SteerPin />
   {/if}
   {#if emptyRun}
-    <!-- The zero-output run: what happened where the reply would have
-         been, and one way out, the verb spelled as the command it sends
-         (client/Spec.lean §4-10). A run the person stopped says so rather
-         than blaming the model. -->
+    
     <Failed
       what={stopped
         ? say($lang, "talk_failed_cancelled")

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The settings row's wiring, read off the value its look is given
-// (client/Spec.lean §4-60): which menu a fixture opens, when a binding
+// (RefRain/Spec.lean §4-60): which menu a fixture opens, when a binding
 // the popover hands over again is the one held, and how the permissions
 // panel's switches and selects change one field of the policy each. The
 // model picker's half is `picker.test.ts`. No look is imported.

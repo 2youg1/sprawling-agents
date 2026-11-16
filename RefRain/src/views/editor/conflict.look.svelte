@@ -6,11 +6,8 @@
 -->
 
 <script lang="ts">
-  // How the conflict bar is drawn (client/Spec.lean §7N): one sentence and
-  // its three actions on one line, carrying the `asks` mark of everything
-  // that waits on a person (docs/frontend-method.md §7C). Where it stands
-  // above the editor is the document's to say, so the bar writes no
-  // margin of its own.
+  
+  
   import type { ConflictLook } from "./conflict";
 
   const look: ConflictLook = $props();

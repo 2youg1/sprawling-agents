@@ -76,7 +76,7 @@ pub(super) fn names_of(program: &str) -> Vec<String>;         // Windows 上 .ex
 - **四个文件而不是两个，理由是尺寸与形状**：`doctor.rs` 只留判定（表的形状、`finding_line`、`verdict`），表落 `table.rs`，屏幕与那一问落 `screen.rs`，跑子进程的落 `probe.rs`。判定与驱动同住一个文件时 `doctor.rs` 是 399 行——`xtask length` 的 400 之下一行，即下一次编辑必红。**这不是把文件切碎，是把「判断」与「跟人说话」分开**，两者本就不是一件事。
 - **Windows 上先找带扩展名的那个文件**：`bun` 若由 npm 装出来，同一目录下既有无扩展名的 shell 脚本 `bun`（Windows 起不动）又有 `bun.cmd`。先取无扩展名的那个，报出来的是「装了但不说版本」——一个装好的工具被报成半坏的。故 `names_of` 在 Windows 上按 `.exe`／`.cmd`／`.bat`／无扩展名的次序找，这条次序有它自己的测试。
 - **一项是环境变量而不是程序**：exec 工具 python 臂要的 CPython-WASI 组件由 `PYTHON_WASM_ENV` 指路（`accounting::worker::workbench::tools`），故它的探测是「那个变量指的文件在不在」，安装那一栏是 `Manual`——没有包管理器发它。它是 `Optional`，行尾说明它开启的是什么。
-- **终端里的词是英文，这不违反 wording 门**：AGENTS.md 的语言表把词表的管辖写在客户端上，`xtask wording` 扫的目录是 `client/src`（见 `Tools/xtask/src/wording.rs` 的 `CLIENT` 常量）。控制台是操作者的，与 `install`／`console`／`firstrun` 同一口径。
+- **终端里的词是英文，这不违反 wording 门**：AGENTS.md 的语言表把词表的管辖写在客户端上，`xtask wording` 扫的目录是 `RefRain/src`（见 `Tools/xtask/src/wording.rs` 的 `CLIENT` 常量）。控制台是操作者的，与 `install`／`console`／`firstrun` 同一口径。
 - **机器面是一条缝，而不是一个假想缝**：`Machine` 有两个实现——`ThisMachine`（真跑子进程）与测试里的 `ScriptedMachine`（一张 name→Presence 的表，外加它经 `accounting::Machine::install` 记下的安装请求）。终端与 worker 的安装走同一个 `accounting::Machine::install`，所以测试记下的就是终端真正会启动的那一次。判定因此不需要测试机上真装着什么就能被咬。
 - **核心线程实际站在哪一档（§8-93）**：报告在各层的判定之后多一段 `priority`，一行 `core threads`：`one step above normal`；`normal, as config.toml [core] priority asks`；`normal, the platform refused: <原因>`（Unix 上没有 `CAP_SYS_NICE`）；读不出设置、或问档位的那条临时线程起不来或没答话就结束时是 `unknown: <错误>`（线程 panic 时只报它没答话，不带 panic 的内容）。`ThisMachine` 读人的设置，在一条临时线程上调 `raise_this_thread` 得到这一档，线程随即结束，所以 doctor 自己的线程不换档。报的是运行 doctor 的主机此刻会给核心的档位，而不是某座正在跑的城的线程被安全阀降回之后的档位。派出的命令总是低一档（`Sprawling/runtime/Spec.lean` §8-13-3，降档从不被拒），这一段不重复它。证据：`Sprawling/app/src/doctor/tests/reading.rs` 的 `the_doctor_says_where_the_platform_lets_the_core_stand`（平台拒绝升档的机器，报告里是那一行与平台给的原因）。页面读同一读数：`report::fold` 从同一个 `Machine::core_standing` 折出 `DoctorAnswer::core`（`Sprawling/wire/Spec.lean` §8-25），词由页面选；证据是 `doctor::report::tests` 的 `the_page_is_told_where_the_core_stands`。
 - **机器面是一条缝，而不是一个假想缝**：`Machine` 有两个实现——`ThisMachine`（真跑子进程）与测试里的 `ScriptedMachine`（一张 name→Presence 的表，外加它记下的安装请求）。判定因此不需要测试机上真装着什么就能被咬。
@@ -263,7 +263,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **`Views.registry: Option<fn() -> wire::ReleaseAnswer>`**，由 `views::served` 的 `ask_the_registry_through` 从外面放进来，与 `machine`、`vault` 同形：serve 一座城时装配根交 `bin::release::answer`，`twin` 把它带到另一份。`NewestRelease` 在快照放开之后调它（它要出网）；`None` 是一份没人 serve 的 views（重建、测试），答 `Unavailable` 而不去问注册表。views 因此不直接碰 `bin::release`，搬进 `accounting` 时 `release` 留在 `sprawling`（`Sprawling/accounting/Spec.lean` §7）。钉住它的测试是 `a_newest_release_is_asked_of_the_registry_the_views_were_handed`。
 - **`Views.places: Option<fn(&SetUpDir) -> Option<PathBuf>>`**，由 `look_for_agents_through` 从外面放进来，与 `registry` 同形：serve 一座城时装配根交 `bin::doctor::host::place_set_up`（读这家厂商文档写的变量与家目录，`Sprawling/agent_protocols/Spec.lean` D19）。`Query::AgentCatalog` 在快照放开之后调它找这台电脑上的 agent；`None` 答空的 `detected`（`Sprawling/accounting/spec/Views.lean` D13）。
 - **探测只由 `DoctorRefresh` 触发，服务一座城时一次也不跑**：表从 12 行长到 32 行，其中大半是起一个进程问它的版本（六件 cargo 子命令各起一次 cargo），windows-x86_64 暖缓存四核一档机器上量得 3.3–4.1 s。先前的决定把它放在开门之前，给出的参数是「12 项约 2 秒」，**两个数都已经移动**：项数翻了一倍有余，而问它的那一屏不再是第一屏（`#/` 是对话，机器那一屏在设置页的「依赖项安装」组里）。它当时否决后台探测的理由是「要多一条『还没答上来』的状态」，而那条状态今天已经存在、有夹具、也有它的动作（`MachineSkeleton` 与 `MachineUnchecked`）——那笔代价早已付过。服务因此不再为一个没人问的答案把套接字关着几秒。
-- **客户端**：`client/src/views/machine.svelte` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。**那一屏每次打开都发一次 `DoctorRefresh`**（与「重新检查」同一条命令，不是第二条路），每次打开至多一次；城里已有的答案先画出来，探完的那一份到了再换上（§8-120）。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
+- **客户端**：`RefRain/src/views/machine.svelte` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。**那一屏每次打开都发一次 `DoctorRefresh`**（与「重新检查」同一条命令，不是第二条路），每次打开至多一次；城里已有的答案先画出来，探完的那一份到了再换上（§8-120）。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
 - **不因事件失效**：这份答案说的是城启动时看到的那一眼，账本上没有任何记录能改变它，所以 `asking` 的 `staleBy` 对它落在 `default`（不失效）。
 - **验收**：`doctor::report::tests`——没有任何浏览器引擎的假机器答出 `Absent { NotOnSearchPath }`、`use` 档 `missing == ["a browser engine"]` 而 `develop` 档为空；平台不明时每一项的 `install` 都是 `UnknownPlatform`。
 -/
@@ -761,9 +761,9 @@ fn open_session(&mut self, addr: &Address, carry: Carry) -> Result<(), AxError>;
 
 ### 8-83 客户端包落在 `sprawling` 包里的 `web-dist`，与 cargo 的输出目录无关（`build.rs` 的 `BUNDLE_DIR`）
 
-**原因**：「客户端包在哪」有三个读者：`client/vite.config.ts` 写它，`build.rs` 嵌入它，`xtask::bundle::dist` 交给 `render`、`budget` 与 `shots` 去开。三者各自推导位置时，只要一个跟着 `CARGO_TARGET_DIR` 走、另一个不跟，`just build-web` 写出的真包就没人嵌入，二进制带着占位页通过构建，只留一条 cargo warning。而 crates.io 上的 `.crate` 只装这个包目录里的文件，包体在工作区的 `target/` 下时，从 crates.io 构建的每一份二进制都只有占位页（§8-157）。
+**原因**：「客户端包在哪」有三个读者：`RefRain/vite.config.ts` 写它，`build.rs` 嵌入它，`xtask::bundle::dist` 交给 `render`、`budget` 与 `shots` 去开。三者各自推导位置时，只要一个跟着 `CARGO_TARGET_DIR` 走、另一个不跟，`just build-web` 写出的真包就没人嵌入，二进制带着占位页通过构建，只留一条 cargo warning。而 crates.io 上的 `.crate` 只装这个包目录里的文件，包体在工作区的 `target/` 下时，从 crates.io 构建的每一份二进制都只有占位页（§8-157）。
 
-- **权威是 `build.rs` 的 `const BUNDLE_DIR: &str = "web-dist"`，值是相对本包目录、以 `/` 分段的路径。** `build.rs` 按 `CARGO_MANIFEST_DIR` 接上它，在检出里、在 `target/package/` 的验证目录里、在 registry 解开的包里都指向同一个相对位置。`xtask::bundle` 用 `syn` 读这个常量，再接上 `build.rs` 所在的目录，得出仓库相对的整条路径 `Sprawling/app/web-dist`（Tools/xtask/Spec.lean §8-18）；`artifact` 门要求 `client/vite.config.ts` 与 `justfile` 拼出这条路径。
+- **权威是 `build.rs` 的 `const BUNDLE_DIR: &str = "web-dist"`，值是相对本包目录、以 `/` 分段的路径。** `build.rs` 按 `CARGO_MANIFEST_DIR` 接上它，在检出里、在 `target/package/` 的验证目录里、在 registry 解开的包里都指向同一个相对位置。`xtask::bundle` 用 `syn` 读这个常量，再接上 `build.rs` 所在的目录，得出仓库相对的整条路径 `Sprawling/app/web-dist`（Tools/xtask/Spec.lean §8-18）；`artifact` 门要求 `RefRain/vite.config.ts` 与 `justfile` 拼出这条路径。
 - **`build.rs` 不读 `CARGO_TARGET_DIR`。** 客户端包是 bun 的产物，不是 cargo 的产物；它的位置由写它的那一步决定，与 cargo 把编译产物放在哪无关。
 - **`.gitignore` 挡着它，清单的 `include` 把它收进包。** 有 `include` 时 cargo 按这张表遍历包目录，不再问 git，所以被忽略的 `web-dist/` 照样进 `.crate`；没有 `include` 时 cargo 跳过 git 忽略的文件，包体进不了包。
 - **生成的 `client_embed.rs` 带常量 `CLIENT_BUNDLE_DIR`**，值取自 `BUNDLE_DIR`。`serve` 在只有占位页时提示 `--web-dir`，说这个目录在 `sprawling` 包里叫什么，不再手写一份。
@@ -1011,7 +1011,7 @@ pub(super) fn font_at(platform: Platform, home: Option<PathBuf>,
 
 /-! D6 doctor 的「能做什么」各面自持：终端的英文住需求表，页面的两种语言住 `lang.json`，线上只携 id（`Sprawling/wire/Spec.lean` §8-25）
 
-`Requirement::enables` 是 `sprawling doctor` 那份终端报告的措辞，终端只说英文，这句话与它描述的那一行同住 `bin::doctor::table`，改一行的人在同一处看见它；页面按 `DoctorItem::name` 从 `client/src/lang.json` 的 `machine_enables_<name>`（name 里的连字符写成 `_`，因为词表的键一律 snake_case）取 en 与 zh，与 doctor 其余每一种状态同口径——终端的 `absent` 由 `paint` 拼，页面的 `machine_absent` 由 `lang.json` 给，两面各说各的，线上只携枚举与 id。两面的集合由 `bin::doctor::tests` 的 `every_item_has_the_page_clause_in_both_languages` 钉在一起：需求表多一行而 `lang.json` 没给它词，测试红。**被否掉的**：终端也从 `lang.json` 取英文（二进制在编译期读 `client/` 的一份源文件，每次 doctor 都要解析整张词表，而终端从不说第二种语言）；线上继续携英文句子（页面的词成了服务端的选择，中文读者看到的是英文）。条件变了就重议：终端要说第二种语言时，两面合用一张词表。
+`Requirement::enables` 是 `sprawling doctor` 那份终端报告的措辞，终端只说英文，这句话与它描述的那一行同住 `bin::doctor::table`，改一行的人在同一处看见它；页面按 `DoctorItem::name` 从 `RefRain/src/lang.json` 的 `machine_enables_<name>`（name 里的连字符写成 `_`，因为词表的键一律 snake_case）取 en 与 zh，与 doctor 其余每一种状态同口径——终端的 `absent` 由 `paint` 拼，页面的 `machine_absent` 由 `lang.json` 给，两面各说各的，线上只携枚举与 id。两面的集合由 `bin::doctor::tests` 的 `every_item_has_the_page_clause_in_both_languages` 钉在一起：需求表多一行而 `lang.json` 没给它词，测试红。**被否掉的**：终端也从 `lang.json` 取英文（二进制在编译期读 `RefRain/` 的一份源文件，每次 doctor 都要解析整张词表，而终端从不说第二种语言）；线上继续携英文句子（页面的词成了服务端的选择，中文读者看到的是英文）。条件变了就重议：终端要说第二种语言时，两面合用一张词表。
 -/
 
 /-! D9 Lean 是开发这份代码必需的工具（§8-58）

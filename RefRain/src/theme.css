@@ -25,7 +25,7 @@
  * by, and a stack that starts at whatever the machine happens to have
  * gives that screen a different shape on every machine, with metrics
  * nobody here can measure. All three are licensed OFL-1.1, whose texts
- * travel beside them as client/src/fonts/MapleMono-OFL.txt,
+ * travel beside them as RefRain/src/fonts/MapleMono-OFL.txt,
  * PaperMono-OFL.txt and Libron-OFL.txt; docs/third-party.md carries the
  * obligation.
  * Nothing is fetched at run time - a client that reached out to a font

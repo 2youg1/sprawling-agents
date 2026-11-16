@@ -6,14 +6,8 @@
 -->
 
 <script lang="ts">
-  // The question `/quit` asks before the city closes (client/Spec.lean
-  // §4-57c). With no run going it is close or cancel; with runs going it
-  // is wait for them, stop them now, or cancel, the same three answers
-  // the console's `/quit` gives. A page opened through the remote door
-  // is told only that closing belongs to this machine, because the
-  // relay refuses the verb from a device (`LocalOnly`). The first
-  // control is the way out, so the safe answer is under the hand; the
-  // box is `quit_sheet.svelte`, which the gallery draws as a specimen.
+  
+  
   import { quitAsked } from "../core/quitting";
   import type { CloseMode } from "../wire";
   import { ui } from "../ui";
@@ -24,7 +18,7 @@
   const belief = u.conn.belief;
 
   let open = $state(false);
-  // The count the page was opened with is no ask: only a press after it is.
+  
   let seen = $quitAsked;
   $effect(() => {
     const asks = $quitAsked;

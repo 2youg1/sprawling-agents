@@ -6,11 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // Formulas as a reply or a document preview draws them (client/Spec.lean
-  // §4-64a): an inline formula inside a sentence, a display formula on a
-  // line of its own, and one KaTeX refuses, which stays its source. And
-  // the palette's list on a conversation page where the city
-  // transcribes, with the entry that speaks into the box (4-64b).
+  
+  
   import type { Block, Inline } from "../../wire";
 
   const words = (text: string): Inline => ({ text });
@@ -50,7 +47,7 @@
   import { ui } from "../../ui";
   import type { Entry } from "../palette/entry";
   import Rows from "../palette/rows.svelte";
-  import Laid from "../refrain/laid.svelte";
+  import Laid from "../editor/laid.svelte";
   import Case from "./case.svelte";
 
   const { lang } = ui();

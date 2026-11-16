@@ -138,7 +138,7 @@ Lean 里的名字与 Rust 的对应：
 
 - 落盘与历史归 `storage`：本模块**读** `URBANITE.md`，写入与备份归 storage 与 checkpoint。
 - Building 规则（confidential、写域、阅览室准入）归 `city::policy`：本模块只答「谁」，不答「他能做什么」。
-- 身份的**呈现**归客户端（`client/`）：Dossier 是数值，界面怎么画它是客户端的事。
+- 身份的**呈现**归客户端（`RefRain/`）：Dossier 是数值，界面怎么画它是客户端的事。
 
 workspace 内只依赖 `kernel`（ARCHITECTURE.md §3 的 `depmap`），规格也只 import kernel 的分部与本 crate 的分部。
 -/

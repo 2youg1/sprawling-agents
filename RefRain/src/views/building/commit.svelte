@@ -6,10 +6,8 @@
 -->
 
 <script lang="ts">
-  // One row of a building's commit list (client/Spec.lean §4-50): the commit
-  // as one line, a disclosure that opens its sheet of facts and the
-  // files it changed against the commit before it, and on each of those
-  // files the way to take it back to this checkpoint (UC8).
+  
+  
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Address, CommitAnswer, GitOid } from "../../wire";
@@ -23,10 +21,10 @@
   interface Props {
     readonly building: Address;
     readonly commit: CommitAnswer;
-    // The commit this one is diffed against: the next row down, or
-    // `null` while that row's page has not arrived.
+    
+    
     readonly older: CommitAnswer | null;
-    // Whether this is the building's first commit, with nothing older.
+    
     readonly first: boolean;
     readonly open: boolean;
     readonly onToggle: () => void;

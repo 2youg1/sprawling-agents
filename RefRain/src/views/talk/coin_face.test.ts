@@ -7,13 +7,12 @@ import { describe, expect, test } from "bun:test";
 
 import { pressCoin, type Face } from "./coin_face";
 
-// Every face the key can show, so the property below is checked over
-// the whole type, as the Lean theorem quantifies over it.
+
 const FACES: readonly Face[] = ["send", "idle", "stop"];
 
 describe("the coin key", () => {
-  // `only_the_lit_send_face_sends_words` (client/spec/Views/Workspace.lean):
-  // a press sends the words exactly when the lit send face is up.
+  
+  
   test("only the lit send face sends words", () => {
     expect(FACES.filter((face) => pressCoin(face) === "words")).toEqual(["send"]);
   });

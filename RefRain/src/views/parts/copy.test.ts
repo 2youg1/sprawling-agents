@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The copy key's wiring, driven the way its seat drives it and with no
-// look at all (client/Spec.lean §4-65). Eight hand-written copies of
+// look at all (RefRain/Spec.lean §4-65). Eight hand-written copies of
 // this behaviour used to disagree: one never cleared its previous
 // receipt, three dropped a failed write without a word. These tests
 // hold the one that replaced them.

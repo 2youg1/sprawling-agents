@@ -52,14 +52,14 @@ function shippedFace(): Plugin {
       const { files, families } = declaredFaces();
       for (const name of files) {
         if (!existsSync(at(name))) {
-          this.warn(`client/src/fonts/${name} is absent; the page falls back to the system stack`);
+          this.warn(`RefRain/src/fonts/${name} is absent; the page falls back to the system stack`);
         }
       }
       for (const family of families) {
         const named = licences.some((name) => letters(name).startsWith(letters(family)));
         if (!named) {
           this.warn(
-            `client/src/fonts/ holds no licence for ${family}; a font may not be shipped without one`,
+            `RefRain/src/fonts/ holds no licence for ${family}; a font may not be shipped without one`,
           );
         }
       }

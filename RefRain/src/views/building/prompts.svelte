@@ -6,15 +6,8 @@
 -->
 
 <script lang="ts">
-  // The building page's prompts section (client/Spec.lean 4-50, its
-  // ninth part): what the next run in one room of this building is told,
-  // each document with the layer it comes from, and the steps a person
-  // takes on it. The room is the newest run's until the person picks
-  // another; the header reads that room's newest run as it was sent
-  // (`Query::Prefix`), and the cards read the disk as the next run will
-  // (`Query::Layers`). Editing words is RefRain's, on the right; the
-  // whole-document steps are `PutPrompt`, and the two that remove or
-  // replace words are asked first, because neither can be taken back.
+  
+  
   import { readAnswer } from "../../core/answered";
   import { heldIn, heldWithin } from "../../core/belief/rooms";
   import { putPrompt } from "../../core/commands";
@@ -32,7 +25,7 @@
 
   interface Props {
     readonly building: Address;
-    // The rooms of the building, by name, as the building answer lists them.
+    
     readonly rooms: readonly string[];
   }
 
@@ -42,12 +35,12 @@
   const { lang } = u;
   const belief = u.conn.belief;
 
-  // The room a person picked, or the newest run's room until they do.
+  
   let picked = $state<Address | null>(null);
   const newestRoom = $derived(heldWithin($belief, building).at(-1)?.addr ?? null);
   const room = $derived(picked ?? newestRoom ?? building);
-  // The newest run of that room, by its id alone, so a streamed token
-  // does not ask the city again.
+  
+  
   const last = $derived(heldIn($belief, room).at(-1)?.run);
 
   const layersAsked = $derived<Query>({ layers: { addr: room } });
@@ -65,7 +58,7 @@
     });
   });
 
-  // A step that removes or replaces words, waiting for the person's yes.
+  
   let asking = $state.raw<{ readonly card: CardLook; readonly step: PromptStep } | null>(null);
 
   function act(card: CardLook, action: CardAction): void {

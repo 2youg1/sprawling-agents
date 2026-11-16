@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The path's wiring as client/spec/Views/Parts.lean §7-2 states it: a
+// The path's wiring as RefRain/spec/Views/Parts.lean §7-2 states it: a
 // path the city can address is revealed by the key, one it cannot keeps
 // the key but refuses it with the reason, the text opens the path only
 // when the page gave it somewhere to open, and `base` cuts only a whole

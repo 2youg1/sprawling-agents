@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts">
-  // A file whose bytes are not text, as RefRain opens it (client/Spec.lean
+  // A file whose bytes are not text, as RefRain opens it (RefRain/Spec.lean
   // §4-54, §4-61). A PDF or a DOCX is fetched from the city by its version,
   // window by window, and handed to `pdf.svelte` or `docx.svelte`; a
   // second version picked from the document's list is fetched the same

@@ -8,7 +8,7 @@
 <script lang="ts" module>
   import type { AgentOffer } from "../../wire";
 
-  // One agent's consent card (client/Spec.lean §4-67): the add key sits
+  // One agent's consent card (RefRain/Spec.lean §4-67): the add key sits
   // on the card that shows exactly what will run, so pressing it is the
   // consent and no dialog follows. The card shows the launch line as the
   // city will run it, the version and whether it is pinned, where the

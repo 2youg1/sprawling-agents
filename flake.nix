@@ -58,7 +58,7 @@
           pkgs.${zigAttribute}
             or (throw "nixpkgs has no ${zigAttribute}, the series Sprawling/desktop/ffi/zig-version pins (${zigPin})");
 
-        # Bun's version lives in `client/package.json`, in the `packageManager`
+        # Bun's version lives in `RefRain/package.json`, in the `packageManager`
         # field `oven-sh/setup-bun` reads on every workflow (AGENTS.md, the
         # loop). nixpkgs answers the same question from its own pin and lags:
         # it carries 1.4.2 while the client names 1.4.4, and this flake builds
@@ -70,11 +70,11 @@
         #
         # The digests are base16, the form `sha256sum bun-<platform>.zip`
         # prints, so a reader can check one without another tool.
-        bunManifest = builtins.fromJSON (builtins.readFile ./client/package.json);
+        bunManifest = builtins.fromJSON (builtins.readFile ./RefRain/package.json);
         bunVersion =
           if builtins.isString bunManifest.packageManager && pkgs.lib.hasPrefix "bun@" bunManifest.packageManager
           then pkgs.lib.removePrefix "bun@" bunManifest.packageManager
-          else throw "client/package.json names no `packageManager`; the Nix build reads the Bun version from it";
+          else throw "RefRain/package.json names no `packageManager`; the Nix build reads the Bun version from it";
         bunArchive =
           {
             aarch64-darwin = {
@@ -159,7 +159,7 @@
             }
             console.log(JSON.stringify({ lockfileVersion: 1, packages: lock.packages }));
             JS
-            bun project-lock.js ${./client/bun.lock} > converter.lock
+            bun project-lock.js ${./RefRain/bun.lock} > converter.lock
             bun2nix --lock-file converter.lock --output-file "$out"
           '';
         bunDeps = bunBuilder.fetchBunDeps { inherit bunNix; };

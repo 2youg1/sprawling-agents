@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The run page's sheet, decided (client D95: a seat, a look and this
-// file): how the run stands, how long it took and when it began, what it
-// read and wrote in tokens, what it cost, which model answered, where it
-// lives and who sent it - each fact a cell, its name above its value,
-// every word in the person's language. Every figure is summed from the
-// rounds the page already asked for, so the sheet and the lenses under
-// it cannot disagree, and each fact is written here once: the lenses
-// below do not repeat a total (client/Spec.lean §4-42).
 
 import type { Doing } from "../../core/doing";
 import { POSTURE_WORD } from "../../core/doing";
@@ -26,23 +18,21 @@ export interface HeadProps {
   readonly doing: Doing | undefined;
   readonly closing: Closing | null;
   readonly room: Address | null;
-  // Who sent the run, as its run_started records it: `person`, `city`
-  // or the address of the resident that did; null when the ledger does
-  // not say.
+  
+  
   readonly dispatchedBy: string | null;
-  // The first and last moments the page knows of, in ms.
+  
   readonly from: number | null;
   readonly to: number | null;
 }
 
-// Which line of a cell this is: the value, or the smaller line under it.
+
 export type Rank = "value" | "more";
 
-// How a line is set: running words, a figure on the tabular face, or an
-// identifier on the mono face a person checks character by character.
+
 export type Face = "words" | "figure" | "mono";
 
-// Spread on the anchor.
+
 export interface LinkWire {
   readonly href: string;
 }
@@ -60,9 +50,9 @@ export type LineLook =
       readonly face: Face;
       readonly text: string;
     }
-  // A moment, written for a reader and stated for a machine.
+  
   | { readonly kind: "time"; readonly key: string; readonly text: string; readonly at: string }
-  // Where the run lives: its building, then its room.
+  
   | {
       readonly kind: "place";
       readonly key: string;
@@ -73,8 +63,8 @@ export type LineLook =
 export interface CellLook {
   readonly key: string;
   readonly name: string;
-  // Two columns wide: the start is a whole ISO instant, and cutting it
-  // short would cut the part that says when.
+  
+  
   readonly wide: boolean;
   readonly lines: readonly LineLook[];
 }

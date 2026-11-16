@@ -310,7 +310,7 @@ fn a_decision_number_heads_one_decision_in_its_specification() {
         "crates/j/spec/Part.lean",
         "/-! here D4 lands -/\n/-- D4 cited -/\ndef x := 1\n/-! D3 again -/\n",
     );
-    crate::root::fixture::write(&root, "client/Spec.lean", "/-! D3 the client's own -/\n");
+    crate::root::fixture::write(&root, "RefRain/Spec.lean", "/-! D3 the client's own -/\n");
     assert_eq!(
         judged(&root),
         Ok(vec![

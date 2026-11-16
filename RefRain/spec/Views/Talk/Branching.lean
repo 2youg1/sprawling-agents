@@ -6,7 +6,7 @@
 /-!
 # branching：先分支，再前往
 
-规定 `client/src/views/talk/branching.ts` 的 `pressed` 与 `settled`，以及同一文件里 `keepBranches` 据它们发 `OpenSession`、移动主区的方式（`client/Spec.lean` §4-49、D44）。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`branching.test.ts` 逐条回放本文件末尾 `#eval` 打印的轨迹向量。
+规定 `RefRain/src/views/talk/branching.ts` 的 `pressed` 与 `settled`，以及同一文件里 `keepBranches` 据它们发 `OpenSession`、移动主区的方式（`RefRain/Spec.lean` §4-49、D44）。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`branching.test.ts` 逐条回放本文件末尾 `#eval` 打印的轨迹向量。
 
 开一段新会话有六个入口：信箱「最近」段一行的分支键、过去一段会话里每一回合的分支键、当前一段对话里的分支键与选行器、命令面板的「带着这段对话去…」，以及 `/new` 与 `/compact`。前四个从一行分出（`OpenSession { from }`），后两个从头开、只带不带交接（`OpenSession { carry }`）；六个都经同一个 `keepBranches` 发出，主区只在页面的 belief 显示这个房间开了新的一段之后才移到那个房间。状态机不看新的一段从哪里开始，所以下面的模型对六个入口是同一个。
 

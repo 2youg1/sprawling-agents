@@ -1626,8 +1626,8 @@ duty = "out of product: deterministic validation, statistics and reports for a b
 # Later moves, Lean, CI, Nix and packaging derive paths from this table;
 # adding a product is a row here. `path` is the directory with exact case.
 # `layout` is `current` when the checkout holds that directory today, or
-# `planned` when a later move will create it. `transition` names the
-# directory the tree still holds during a rename (RefRain ← client).
+# `planned` when a later move will create it. `transition` named the
+# directory held during a rename; RefRain R0 retired the legacy page root.
 
 [[product_root]]
 name = "Sprawling"
@@ -1647,8 +1647,7 @@ layout = "current"
 [[product_root]]
 name = "RefRain"
 path = "RefRain"
-layout = "planned"
-transition = "client"
+layout = "current"
 
 [[product_root]]
 name = "Mei"
@@ -1666,5 +1665,5 @@ status = "retired"
 
 [[legacy_path]]
 path = "client"
-status = "live"
+status = "retired"
 

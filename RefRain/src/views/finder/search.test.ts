@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The file finder as an APG Combobox (client/Spec.lean §4-62): the keys
+// The file finder as an APG Combobox (RefRain/Spec.lean §4-62): the keys
 // in the box, the active option it names, and the sentences that say
 // what the city could not, read from the value every look is handed.
 

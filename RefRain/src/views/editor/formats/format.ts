@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The formats RefRain draws as a page besides its text, and the tool
-// that draws each (client/Spec.lean §4-54). The wire's `Format` says only
-// whether a text is Markdown, so which drawing a file gets is read off
-// its name here, once; the tool's version is the one `package.json`
-// pins, so the label on a preview cannot name a version the bundle does
-// not carry.
 
 import { dependencies } from "../../../../package.json";
 
@@ -21,12 +15,10 @@ const BY_EXTENSION: Readonly<Record<string, Drawn>> = {
   htm: "html",
 };
 
-// How a format is named on the screen: the same three letters in every
-// language, as a person sees them on the file.
+
 export const NAME: Readonly<Record<Drawn, string>> = { pdf: "PDF", docx: "DOCX", html: "HTML" };
 
-// The library that draws a format and the version the bundle carries;
-// HTML is drawn by the browser itself, which has no version to state.
+
 export const TOOL: Readonly<Record<Exclude<Drawn, "html">, string>> = {
   pdf: `pdf.js ${dependencies["pdfjs-dist"]}`,
   docx: `docx-preview ${dependencies["docx-preview"]}`,

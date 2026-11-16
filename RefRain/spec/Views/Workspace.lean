@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import client.spec.Views.Parts
+import RefRain.spec.Views.Parts
 
 /-!
 # workspace：外壳的控件
 
-本文件是 `client/Spec.lean` 的一个分部，规定外壳上不在 `views/parts/` 里的控件欠使用者什么。下面一节保留标签 §7-11，别处引作 `client/Spec.lean §7-11`。
+本文件是 `RefRain/Spec.lean` 的一个分部，规定外壳上不在 `views/parts/` 里的控件欠使用者什么。下面一节保留标签 §7-11，别处引作 `RefRain/Spec.lean §7-11`。
 -/
 
 /-!
@@ -22,7 +22,7 @@ import client.spec.Views.Parts
 | 上下文环 | APG Button（同工具行：打开右侧检视，无 `aria-haspopup`），提示同 `tip.svelte`；读数仍在 `aria-valuetext` | Tab | 到达环（硬币键外的环带），提示出现 |
 | | | Enter／Space，或点按环带 | 在右侧打开该会话的上下文用量报告（`openContext`）；硬币键仍是发送／停止／转向 |
 | | | Escape | 撤下提示 |
-| 地址行 | APG Button（`aria-haspopup="dialog"`） | Enter／Space，或点按 | 打开命令面板（client/Spec.lean 4-10a）：键盘与鼠标打开时焦点进框，手指或笔按下时焦点落在面板本身（4-64b）；先列这个房间的会话，列表下读「谁在听」（D36）；Escape 关上，焦点回到地址行 |
+| 地址行 | APG Button（`aria-haspopup="dialog"`） | Enter／Space，或点按 | 打开命令面板（RefRain/Spec.lean 4-10a）：键盘与鼠标打开时焦点进框，手指或笔按下时焦点落在面板本身（4-64b）；先列这个房间的会话，列表下读「谁在听」（D36）；Escape 关上，焦点回到地址行 |
 | 工具行 | APG Button（`aria-pressed`） | Enter／Space | 在右侧打开这次调用（`openCall`）；打开着的那行 `aria-pressed="true"` |
 | | | ↓／↑，j／k | 同一段对话里的下一条或上一条工具行 |
 | | | Escape | 右侧开着这行时收起右侧，焦点留在这行 |
@@ -88,13 +88,13 @@ import client.spec.Views.Parts
 /-!
 ## 模型：图层键、硬币键与信箱的走法
 
-规定 §7-11 里三个外壳控件的状态机；分隔线在 `client/spec/Core/Workbench.lean`，检视面的页签带在 `client/spec/Views/Inspect/Open.lean`，请决定卡在 `client/spec/Views/Parts/Decide.lean`。
+规定 §7-11 里三个外壳控件的状态机；分隔线在 `RefRain/spec/Core/Workbench.lean`，检视面的页签带在 `RefRain/spec/Views/Inspect/Open.lean`，请决定卡在 `RefRain/spec/Views/Parts/Decide.lean`。
 
 1. **图层键**（`views/edge.svelte`）：按一下按 zen → blend → panorama → zen 循环（三档的名字是 client D17），按三下回到原档（`three_presses_come_home`）；按住超过 300 ms 临时进 blend，松开回到人选定的档，看一眼不改选定的档（`a_peek_keeps_the_chosen_tier`）。每次启动从 zen 开始，存下的档不在启动时读回（`a_launch_opens_in_zen`，client D47）。不论此刻开着设置面还是别的页，按一下都回到对话、换到下一档、焦点落进对话框（`a_press_lands_in_the_conversation`、`a_press_moves_the_tier`，client D48）。
-2. **硬币键**（`client/src/views/talk/coin_face.ts` 的 `pressCoin`，client D18）：做朝上那一面，只有没变淡的发送面发出框里的字：变淡的发送面一按落进空操作，停止面只发 `cancel`（`only_the_lit_send_face_sends_words`）。TS 里变淡的发送面叫 `idle`，即这里的 `send true`；`coin_face.test.ts` 在每一面上检查这条定理；点击写在 `coin.ts` 造的接线包里，只按 `pressCoin` 的回答行事，`coin.test.ts` 在每一面上按一次，看停止与提交各自有没有发生。
-3. **信箱的条目**（`client/src/views/mailbox/entries.ts`）：j／k 与 `RowList` 同一种钳住的走法，到最后一条不再走（`k_stops_at_the_last_entry`）；1–9 只落到前九个、且存在的条目上（`a_digit_reaches_only_a_drawn_entry`）。
-4. **信箱面这一层**（`client/src/views/mailbox/layer.ts`，D60）：不论按什么顺序按键，关上的信箱里不留焦点（`no_focus_stays_in_a_closed_mailbox`）；Escape 总是关上它，焦点在面里时回到信箱键（`escape_closes_and_returns_focus`）；信箱键与 Accel-B 是同一个开关，按两下回到原样（`two_presses_come_home`）；点面外——另两个边缘键也在面外——总是关上它（`a_press_outside_closes`）。
-5. **信件在右侧**（`client/src/views/mailbox/layer.ts` 的 `stepLetter`，D73）：信件关上时信箱重新打开、焦点回到打开它的那一行，中间信箱收到什么输入都不改（`closing_a_letter_returns_to_its_row`）；信件的开合不让焦点留在关上的信箱里（`letters_hold_mail_focus`）。
+2. **硬币键**（`RefRain/src/views/talk/coin_face.ts` 的 `pressCoin`，client D18）：做朝上那一面，只有没变淡的发送面发出框里的字：变淡的发送面一按落进空操作，停止面只发 `cancel`（`only_the_lit_send_face_sends_words`）。TS 里变淡的发送面叫 `idle`，即这里的 `send true`；`coin_face.test.ts` 在每一面上检查这条定理；点击写在 `coin.ts` 造的接线包里，只按 `pressCoin` 的回答行事，`coin.test.ts` 在每一面上按一次，看停止与提交各自有没有发生。
+3. **信箱的条目**（`RefRain/src/views/mailbox/entries.ts`）：j／k 与 `RowList` 同一种钳住的走法，到最后一条不再走（`k_stops_at_the_last_entry`）；1–9 只落到前九个、且存在的条目上（`a_digit_reaches_only_a_drawn_entry`）。
+4. **信箱面这一层**（`RefRain/src/views/mailbox/layer.ts`，D60）：不论按什么顺序按键，关上的信箱里不留焦点（`no_focus_stays_in_a_closed_mailbox`）；Escape 总是关上它，焦点在面里时回到信箱键（`escape_closes_and_returns_focus`）；信箱键与 Accel-B 是同一个开关，按两下回到原样（`two_presses_come_home`）；点面外——另两个边缘键也在面外——总是关上它（`a_press_outside_closes`）。
+5. **信件在右侧**（`RefRain/src/views/mailbox/layer.ts` 的 `stepLetter`，D73）：信件关上时信箱重新打开、焦点回到打开它的那一行，中间信箱收到什么输入都不改（`closing_a_letter_returns_to_its_row`）；信件的开合不让焦点留在关上的信箱里（`letters_hold_mail_focus`）。
 -/
 
 namespace Client.Views.Workspace

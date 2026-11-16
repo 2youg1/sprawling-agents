@@ -12,7 +12,7 @@ body {
 }
 
 /* The shell is as tall as the part of the page the person can see
- * (client/Spec.lean §4-52). A phone's soft keyboard shrinks the visual
+ * (RefRain/Spec.lean §4-52). A phone's soft keyboard shrinks the visual
  * viewport and leaves the layout viewport, and with it `100dvh`, where
  * it was, so a shell sized by `dvh` alone keeps its composer under the
  * keyboard; `views/shared/frame.ts` writes the visual viewport's height

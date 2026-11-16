@@ -6,13 +6,13 @@
 /-!
 # views/parts：交互契约
 
-本文件是 `client/Spec.lean` 的一个分部，规定 `client/src/views/parts/` 每个部件欠使用者什么：它遵循哪个 WAI-ARIA 模式、每个键做什么、焦点还给谁、`aria-*` 取什么值。下面各节保留标签 §7、§7-n，别处引作 `client/Spec.lean §7-n`；走动与焦点还原的状态机在本文件末尾，各复合部件的模型在 `client/spec/Views/Parts/` 下。
+本文件是 `RefRain/Spec.lean` 的一个分部，规定 `RefRain/src/views/parts/` 每个部件欠使用者什么：它遵循哪个 WAI-ARIA 模式、每个键做什么、焦点还给谁、`aria-*` 取什么值。下面各节保留标签 §7、§7-n，别处引作 `RefRain/Spec.lean §7-n`；走动与焦点还原的状态机在本文件末尾，各复合部件的模型在 `RefRain/spec/Views/Parts/` 下。
 -/
 
 /-!
 ## §7 `views/parts/` 的交互契约
 
-> **这是规格，不是描述。** 表里写的是部件欠使用者什么，代码照它实现；拆成座位与外观的部件，键、Tab 站与 `aria-*` 都由座位经接线包交给外观（`client/Spec.lean` D95）。模式名与键表借鉴自哪几份文档、为什么不产生许可证义务，一处记在 `docs/third-party.md` §6，本节不复述。
+> **这是规格，不是描述。** 表里写的是部件欠使用者什么，代码照它实现；拆成座位与外观的部件，键、Tab 站与 `aria-*` 都由座位经接线包交给外观（`RefRain/Spec.lean` D95）。模式名与键表借鉴自哪几份文档、为什么不产生许可证义务，一处记在 `docs/third-party.md` §6，本节不复述。
 
 **判定：一个库只在它替换掉一样东西、并且同一变更集里有生产读者时才进来（由人定）。** `Tools/xtask/src/npm.rs` 的 `RUNTIME` 是这条判定的机器面——运行时依赖恰为那张表所列，名单以表为准；加一项是门机制的一次提交，与引入它的变更集分开，好让评审看见门为什么动。**平台先来**：`parts/dialog.svelte` 把模态整个交给原生 `<dialog>`（top layer、焦点陷阱、Esc、其余页面 `inert`，见设计 4-20），`parts/tip.svelte` 把 `title` 换成一个 `role="tooltip"` 的兄弟节点（设计 4-18）；平台已经提供的行为不再引一个库来提供第二遍，因为同一件事两个提供者，第一次分歧就落在键盘用户身上。今天名单上的界面库有两项：`@lucide/svelte`，它替换了 `parts/glyph.ts` 手画的那张路径表，换来人在别的软件里已经认得的图标（`docs/frontend-method.md` §4-34）；CodeMirror 6 的五个包，它替换了 RefRain 原本要手写的编辑面与行级 diff（D23）；pdf.js 与 docx-preview，它们替换了本客户端画不出的 PDF 页与 DOCX 页（D32）。引入的条件写在 7-9。
 -/
@@ -125,7 +125,7 @@
 
 `combobox.svelte` 的 `aria-*`（规格）：文本框是 `role="combobox"`，带 `aria-expanded`、`aria-controls` 指向列表、`aria-activedescendant` 指向游标行；列表 `role="listbox"` ＋ `aria-label`；每行 `role="option"`，`aria-selected` 只标**已选中的那个值**，不标游标。
 
-`popover.svelte` 的 `aria-*`：外层 `role="dialog"` ＋ `aria-label`；每列 `<ul role="listbox">` ＋ `aria-label`；每行 `role="option"`。`aria-selected` 表示当前生效的值，游标由持焦元素的 `aria-activedescendant` 承担。**生效的那一行画成更深的底色**（`wash-strong`），游标只在没有生效值的那一行用底色梯级（`bg-raised-hover`）：两者不互相盖过，也不需要确认键或勾选标记。游标另在行首画一道 accent 竖条，落在生效的那一行上也画：强制色去掉一切底色时边框留着，所以游标不只靠颜色可见；`combobox.svelte` 的列表用同一画法。按钮触发时列表取焦，`tabindex` 只给当前列 `0`；文本框触发时调用方经 `bind` 拿走键表，焦点留在文本框，`aria-activedescendant` 写在文本框上。菜单仍存在时，两条路径都在活动行或数据变化，以及键表采纳按键后的 DOM 更新完成后，将该行滚入当前列的视口；能容纳整行时露出整行，行高超过视口时露出行首，不改变持焦元素或外层页面位置。几何规则与证明在 `client/spec/Views/Parts/Popover.lean`。
+`popover.svelte` 的 `aria-*`：外层 `role="dialog"` ＋ `aria-label`；每列 `<ul role="listbox">` ＋ `aria-label`；每行 `role="option"`。`aria-selected` 表示当前生效的值，游标由持焦元素的 `aria-activedescendant` 承担。**生效的那一行画成更深的底色**（`wash-strong`），游标只在没有生效值的那一行用底色梯级（`bg-raised-hover`）：两者不互相盖过，也不需要确认键或勾选标记。游标另在行首画一道 accent 竖条，落在生效的那一行上也画：强制色去掉一切底色时边框留着，所以游标不只靠颜色可见；`combobox.svelte` 的列表用同一画法。按钮触发时列表取焦，`tabindex` 只给当前列 `0`；文本框触发时调用方经 `bind` 拿走键表，焦点留在文本框，`aria-activedescendant` 写在文本框上。菜单仍存在时，两条路径都在活动行或数据变化，以及键表采纳按键后的 DOM 更新完成后，将该行滚入当前列的视口；能容纳整行时露出整行，行高超过视口时露出行首，不改变持焦元素或外层页面位置。几何规则与证明在 `RefRain/spec/Views/Parts/Popover.lean`。
 -/
 
 /-!
@@ -153,7 +153,7 @@
 /-!
 ### §7-10 这张表的机器读者
 
-**`#/gallery` 的夹具断言本节的键表**，这是让规格不止有人类读者的那一步：每个收键部件在那条路由上有一份夹具，夹具按「初始焦点 ＋ 一串按键 → 焦点落点、`aria-*` 取值、回调是否发生」逐行断言 7-2 至 7-6。夹具与断言的实现属于 `client/src/views/gallery.svelte` 与 `Tools/xtask/src/render/`，本节只定内容。
+**`#/gallery` 的夹具断言本节的键表**，这是让规格不止有人类读者的那一步：每个收键部件在那条路由上有一份夹具，夹具按「初始焦点 ＋ 一串按键 → 焦点落点、`aria-*` 取值、回调是否发生」逐行断言 7-2 至 7-6。夹具与断言的实现属于 `RefRain/src/views/gallery.svelte` 与 `Tools/xtask/src/render/`，本节只定内容。
 
 今天的 `xtask render` 读的是画出来的盒子与它们的名字（`Tools/xtask/Spec.lean` §8-13），**一次按键都没有进过真引擎**——在这第二个读数落地之前，本节的键表没有机器读者，这一点如实记在 §2 的「未验的」里。
 -/
@@ -161,7 +161,7 @@
 /-!
 ## 模型：走动与焦点还原
 
-规定 `client/src/views/parts/` 里收键部件共用的两件事，各部件的分部（`spec/Views/Parts/*.lean`）引用这里的定义而不另写一份：
+规定 `RefRain/src/views/parts/` 里收键部件共用的两件事，各部件的分部（`spec/Views/Parts/*.lean`）引用这里的定义而不另写一份：
 
 1. **方向键怎样走。** 只有两种走法：**环绕**（`wrap`，走到末端回到开头：分段控件、页签、检视面的页签带、弹层的换列）与**钳住**（`clamp`，两端不环绕：`RowList`、组合框与弹层的游标、信箱的 j/k）。环绕一步可逆（`wrap_back_undoes_forward`），走满一圈回到原处（`a_full_turn_comes_home`），从第 0 格出发每一格都走得到（`every_cell_is_reached`）；钳住不出界（`clamp_stays`），在两端是不动点（`clamp_holds_the_last`、`clamp_holds_the_first`）——§7-4 说的「一本上千行的账本从末行跳回首行，是把人移到了他看不出自己去过的地方」。
 2. **焦点还给谁（§7-7）。** 一个把焦点拿走的部件在关闭时把焦点还给打开它的那个元素。模型是一个打开者的栈：`openLayer` 记下此刻持焦点的元素，`closeLayer` 把它还回去，它已不在页面上时不还。一层一层打开再一层一层关上，焦点回到最初的元素（`closing_every_layer_restores_the_page`）。咬得动的演示：关上时把焦点丢给 `body` 的写法（`dropToBody`）在一次打开与关闭之后不回到打开者（`dropping_focus_loses_the_opener`）。

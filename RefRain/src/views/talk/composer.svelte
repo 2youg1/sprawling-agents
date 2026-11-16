@@ -61,25 +61,24 @@
     readonly placeholder: string;
     readonly started?: boolean;
     readonly sending: Sending;
-    // Where the unsent words are kept, when they are kept at all: the
-    // room or the run this box speaks to.
+    
+    
     readonly draft?: string | undefined;
-    // Both answer whether the frame went out, so the box can keep the
-    // words when it did not.
+    
+    
     readonly onSend: (text: string) => boolean;
     readonly onStop: () => boolean;
-    // Whether this city has an endpoint that transcribes. A microphone
-    // on a city with none is a button whose only answer is a refusal.
+    
+    
     readonly hearing?: boolean | undefined;
-    // In the band under the world layer's sheet on one column, what stands above the words (the last thing said);
-    // a box in the band draws no settings row beyond the notice that a change was kept, the session sheet says it (docs/frontend-method.md §7H, §7I).
+    
+    
     readonly band?: Snippet | undefined;
-    // The room this box speaks to, when the page holding it says so; the
-    // address bar answers otherwise.
+    
+    
     readonly room?: Address | undefined;
-    // Drawn in the place of the placeholder while the box holds no words,
-    // the placeholder then naming the box without being drawn: an empty
-    // room's address line (client/Spec.lean 4-10a).
+    
+    
     readonly door?: Snippet | undefined;
   }
 
@@ -101,26 +100,24 @@
   const effort = u.effort;
   const belief = u.conn.belief;
 
-  // The words in the box, and where they are kept while unsent: the
-  // place the page names, followed when it names another, so a room
-  // switched to in this tab gets back its own words and selection (4-63).
+  
   // svelte-ignore state_referenced_locally (the first place; the effect below follows the rest)
   let place = draft;
   let keptDraft = draftAt(u.prefs, place);
   let text = $state(keptDraft.read);
   const field = new TextBox(() => text);
-  // A message the connection would not take: the words stay in the box.
+  
   let kept = $state(false);
-  // How many times words were handed, which the send receipt counts.
+  
   let sent = $state(0);
-  // Whether the box has the focus, which draws its line at full strength.
+  
   let focused = $state(false);
-  // Which list is over the box: the `/` menu is the only one left here.
+  
   let open = $state(false);
-  // The row the menu's cursor is on, as `aria-activedescendant` on the box.
+  
   let activeId = $state<string | null>(null);
-  // The verb that row spells, which a Tab that cannot lengthen the typed
-  // prefix takes into the box.
+  
+  
   let pointed = $state<string | undefined>(undefined);
   let menuBinding = $state<PopoverBinding | null>(null);
 
@@ -141,15 +138,13 @@
     requestAnimationFrame(arrived);
   }
 
-  // A box that arrived at its place: grown to the words, the caret where
-  // the person left it there.
+  
   function arrived(): void {
     field.grow();
     restoreSelection(place, field.element);
   }
 
-  // A line quoted from the inspector while this box is open joins the
-  // words where they end, and the caret stays where the person left it.
+  
   $effect(() => (draft === undefined ? undefined : hearQuotes(draft, quoted)));
   function quoted(quote: string): void {
     keepSelection(place, field.element);
@@ -157,12 +152,10 @@
     requestAnimationFrame(arrived);
   }
 
-  // Whether the browser refused to keep this place's words (4-63).
+  
   const unkept = $derived(draft === undefined ? readable(false) : u.prefs.draftUnkept(draft));
 
-  // Whatever put words in the box - a transcription, a completion, a
-  // command that empties it - goes through here, and the menu follows
-  // the words as it does for typing: `/help` writes `/` to open it.
+  
   function write(words: string): void {
     text = words;
     open = words.startsWith("/");
@@ -175,9 +168,8 @@
   function submit(): void {
     const words = text.trim();
     if (words === "") return;
-    // A line that spells a verb is that verb, whether the menu is open
-    // or the person closed it: sent as a message, `/new` reached the
-    // model as words to answer.
+    
+    
     const call = parse(words);
     const chosen = call === null ? undefined : find(call.verb);
     if (chosen !== undefined) {
@@ -196,8 +188,7 @@
     }
   }
 
-  // The city's answer to the words last handed: a refusal puts them
-  // back in the box (`handing.ts`).
+  
   let handing: Handing = IDLE;
   $effect(() => {
     const next = settle(
@@ -209,8 +200,7 @@
     if (next.box !== null) write(next.box);
   });
 
-  // ------------------------------------------------- what the city offers
-
+  
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const city = u.conn.asking.ask(QUERIES.city);
   const buildings = $derived(
@@ -219,14 +209,14 @@
   const answer = $derived(
     $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints : undefined,
   );
-  // The room this box speaks to: the page's word for it, or the address bar's.
+  
   const shown = $derived(
     room === undefined
       ? Option.getOrNull(current(u.bar))
       : { kind: "talk" as const, address: room },
   );
   const here = $derived(shown !== null && shown.kind === "talk" ? shown.address : null);
-  // The run in front of the person: what a typed `/stop` and `/steer` reach.
+  
   const live = $derived(shown === null ? undefined : runInFront($belief, shown));
 
   const startedHere = $derived(
@@ -236,15 +226,14 @@
     here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null),
   );
   const picks = $derived(picksFor(u, session));
-  // The level this room inherits when the page states none, and what
-  // the picker and the `/` menu offer from the endpoints answer.
+  
+  
   const roomConfig = $derived(
     here === null ? readable(undefined) : u.conn.asking.ask({ config: { addr: here } }),
   );
   const offered = $derived(offeredBy(answer, $effort ?? configLevel($roomConfig), picks));
 
-  // ------------------------------------------------------- the `/` menu
-
+  
   const showing = $derived(open ? menuColumns($lang, text, offered.argued) : []);
 
   function closeMenu(): void {
@@ -295,7 +284,7 @@
         write(completedAt(text, pointed));
         return;
       case "recall": {
-        // ↑ in an empty box brings back what was last sent here.
+        
         const last = here === null ? null : recalled(get(belief), here);
         if (last === null) return;
         event.preventDefault();
@@ -319,17 +308,13 @@
     open = text.startsWith("/");
   }
 
-  // ----------------------------------------------------------- dropping
-
+  
   const zone = new DropZone(u, (paths) => {
     write(insertAt(text, field.element?.selectionStart ?? text.length, paths));
     field.element?.focus();
   });
 
-  // ------------------------------------------------------- the look
-
-  // The door is drawn only while the box is empty; the words an input
-  // method is composing are in `text` already, so they never stand under it.
+  
   const opened = $derived(text === "" ? door : undefined);
 
   const look: ComposerLook = $derived({
@@ -350,8 +335,8 @@
       "aria-label": placeholder,
       "aria-activedescendant": showing.length > 0 ? activeId : null,
       "aria-controls": showing.length > 0 ? menuBinding?.controls.join(" ") : undefined,
-      // The box is what the page exists for, and the shell's own focus
-      // chord reaches it the same way.
+      
+      
       autofocus: true,
       onkeydown: onKeydown,
       oninput: onInput,
@@ -409,7 +394,7 @@
 
 {#snippet drawKeys()}
   {#if hearing === true && canRecord()}
-    <!-- What the microphone heard joins the words; it is never sent by itself (4-16). -->
+    
     <Record
       onWords={(words: string) => {
         write(text === "" ? words : `${text} ${words}`);

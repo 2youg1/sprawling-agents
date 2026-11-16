@@ -6,46 +6,8 @@
 -->
 
 <script lang="ts">
-  // The one thing that may float over a page uninvited: a refusal, in
-  // the three parts the city wrote it in, standing over the composer
-  // (client/Spec.lean §4-35). Three may stand at once; a fourth pushes the
-  // oldest away, and every refusal that reached a corner is in the
-  // drawer afterwards whatever happens here.
-  //
-  // **The page's answer to a stop key with no run in front of it stands
-  // in the same stack and nowhere else** (client D16): it says
-  // what the person just did, and the drawer keeps what the city said.
-  //
-  // **A toast leaves by itself.** Eight seconds, paused while the
-  // pointer or the focus is on it - a person reading one is never
-  // racing it (`refusal.ts` keeps that clock). The departure is the display toggle `parts/dialog`
-  // already models (`transition-behavior: allow-discrete` fading the
-  // opacity first and hiding the box at the end), not a script timing
-  // the animation; the timer here decides *when* a toast goes, never
-  // how it looks going. A departure is cut when the next arrival
-  // prunes it, which `cut needs no class` covers.
-  //
-  // **Over the composer, because that is where the eye is** when a send
-  // or a stop is refused: the stack stands on the composer's upper edge
-  // and takes the width of the column the composer is in, so it moves
-  // with that column when the right pane opens (client/Spec.lean §4-35). A
-  // page with no composer centres it at the foot.
-  //
-  // **When it steps forward is `core/deferral.ts`'s** (client
-  // D26): what stops the work until the person acts comes at once;
-  // an ordinary refusal waits, held here, for the person to send, to
-  // leave the box empty, or to come back to this tab, and meanwhile
-  // only marks the mailbox key. The mailbox keeps every refusal
-  // whatever this stack does, so one the person read there is dropped
-  // here rather than shown late.
-  //
-  // **What a recovery's control says and does is
-  // `notice_recovery.ts`'s**, shared with the drawer (client/Spec.lean
-  // §4-35).
-  //
-  // This is the seat: it keeps the toasts and their clocks and draws
-  // each notice; how the stack and a toast look is
-  // `refusal.look.svelte`'s.
+  
+  
   import { SvelteMap } from "svelte/reactivity";
   import { get } from "svelte/store";
 
@@ -65,23 +27,21 @@
   import { held as heldBy, released, within } from "./refusal";
   import Look from "./refusal.look.svelte";
 
-  // How many may stand at once, and how long one waits before it goes.
+  
   const VISIBLE = 3;
   const LIFE = 8_000;
 
-  // A refusal carries what its subject names, folded where every
-  // notice's subject is folded (`core/belief/shape`), so the deed acts
-  // on the city's own reading rather than a second grammar of its own.
+  
   type Said =
     { readonly kind: "refused"; readonly refused: Refused } | { readonly kind: "no_run_in_front" };
 
   interface Toast {
     readonly id: number;
     readonly said: Said;
-    // Set means it is leaving: the look's display toggle plays the
-    // departure, and the next arrival sweeps it out of the list.
+    
+    
     gone: boolean;
-    // How much of its life is left, and what holds it.
+    
     clock: Clock;
   }
 
@@ -96,9 +56,7 @@
   let heard: AxError | null = null;
   const timers = new SvelteMap<number, number>();
 
-  // What the refusal's subject names, as the belief folded it when the
-  // notice arrived. `null` is the honest answer for a subject that is a
-  // sentence rather than a name.
+  
   function aboutOf(error: AxError): Refused["about"] {
     const found = $belief.notices.find(
       (notice) => notice.error.code === error.code && notice.error.subject === error.subject,
@@ -143,8 +101,8 @@
   }
 
   function push(said: Said): void {
-    // A departure that finished is swept when the next one arrives -
-    // by then its fade has played, so the sweep is never seen.
+    
+    
     const kept = toasts.filter((each) => !each.gone);
     for (const oldest of kept.slice(0, Math.max(0, kept.length + 1 - VISIBLE))) {
       leave(oldest);
@@ -160,8 +118,7 @@
     arm(next);
   }
 
-  // The refusals waiting for a moment, oldest first, and the timer that
-  // wakes when a box left empty becomes one.
+  
   let held: Refused[] = [];
   let wake: number | undefined;
   const attention = attending(u.conversing, u.now, release);
@@ -170,8 +127,7 @@
     window.clearTimeout(wake);
   });
 
-  // Whether the mailbox still calls this refusal unread: one the person
-  // already read there has been told, and is not told again here.
+  
   function unread(error: AxError): boolean {
     return get(belief).notices.some((notice) => notice.error === error && !notice.seen);
   }
@@ -191,12 +147,7 @@
     if (due !== null) wake = window.setTimeout(release, due - now);
   }
 
-  // Every refusal the city comes back with is toasted once, except the
-  // one the open conversation draws as a card where its reply would
-  // have been (`talk/handing.ts`) and the one a branch row draws beside
-  // its fork key (`talk/branching.ts`): the same refusal in two places
-  // is one refusal said twice. The belief hands out a new value per
-  // arrival, so identity is the arrival.
+  
   $effect(() => {
     const refusal = $belief.refusal;
     if (refusal === null || refusal === heard) {
@@ -214,10 +165,7 @@
     release();
   });
 
-  // Where the stack stands: on the composer's upper edge, as wide as its
-  // column, or nowhere in particular when the page has none. Measured
-  // only while a toast stands, and again whenever the composer's box
-  // moves or the window changes size.
+  
   let stand = $state.raw<Stand>({ kind: "foot" });
   const standing = $derived(toasts.some((toast) => !toast.gone));
   $effect(() => {
@@ -247,7 +195,7 @@
     };
   });
 
-  // Each press the shell counted is answered once; the count only grows.
+  
   let answered = 0;
   $effect(() => {
     if (stopsWithoutRun === answered) return;

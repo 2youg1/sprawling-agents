@@ -116,7 +116,7 @@ impl PollBudget { pub(crate) fn read_per_poll(self) -> usize; } // interval_ms �
 
 **装配点注入**：一座被端上来的城（`RunWorker::serve`）把一个 `Sink` 装到自己的 `Backlog` 上，sink 把每块译成 `wire::LiveOutput`（`Sprawling/wire/Spec.lean` §8-48）交给 `Serving::outputs`，那里送进第四条广播通道。没有被端上来的城（citysim、replay、一次一条命令的 worker）不装 sink，所以一个字节都不读。
 
-**页面缓冲**：`client/src/core/live_output.ts` 为每个 run 留一段 `Tail`（stdout、stderr 与丢掉的行数），每条流只留最新的 `LIVE_LINES = 400` 行；`tool_result` 一到就丢掉这个 run 的那段。监视器的终端记录把它画在仍在跑的那一条下面，丢掉的行数照 `mon_lines_cut` 说出来。
+**页面缓冲**：`RefRain/src/core/live_output.ts` 为每个 run 留一段 `Tail`（stdout、stderr 与丢掉的行数），每条流只留最新的 `LIVE_LINES = 400` 行；`tool_result` 一到就丢掉这个 run 的那段。监视器的终端记录把它画在仍在跑的那一条下面，丢掉的行数照 `mon_lines_cut` 说出来。
 
 **服务端缓冲**：`sprawling::serving::output_ring`（`Sprawling/app/Spec.lean` §8-90）为每个 run 按字节留最新的一段，后来打开页面的会话在 `Welcome` 之后先经 `ServeConfig::outputs_so_far`（`Sprawling/wire/Spec.lean` §8-48）拿到它，再接实时帧；这个 run 的 `tool_result` 落账时清空。
 
@@ -125,7 +125,7 @@ impl PollBudget { pub(crate) fn read_per_poll(self) -> usize; } // interval_ms �
 - **读的地方是短窗口的轮询，不另起线程**。`Backlog::run` 每一拍轮询在 `settle` 之后按上次的偏移读两个文件新增的字节，交给调用方注入的一个 sink；窗口外交给后台的命令由 `harvest` 那一拍同样读增量。sink 缺席（citysim、replay、没人看的城）时一个字节都不读，行为与今天相同。
 - **每拍读的字节有上界**，按 `PollBudget` 的间隔推出而不写死：一拍最多读 `PollBudget::read_per_poll()` 字节，即 `interval_ms × READ_BYTES_PER_MS`，间隔越长每拍读得越多、喂给页面的速率不变；读不完的留到下一拍，所以一个刷屏的子进程让页面落后，而不让轮询变慢。
 - **服务端每个 run 一个有界环形缓冲**，按字节计上界，满了丢最旧的整块；后来打开 run 页的会话先拿到缓冲里的内容，再接实时帧。丢了多少不上线：`LiveOutput` 没有这一栏，而加一栏要让 `WIRE_V` 再加一，换来的只是预览里的一个数——调用落账时整段输出本来就会到。缓冲在这次调用的 `tool_returned` 落账时清空，因为那时账本里的结果是这段输出唯一的权威。
-- **线上是一种新的 `ServerFrame`**，与 `Delta` 同一条规则：可丢弃，不带账本序号，调用的结果落账时页面扔掉它，两者不一致时账本赢。这一帧让 `WIRE_V` 加一并重新生成 `client/src/wire.ts`。
+- **线上是一种新的 `ServerFrame`**，与 `Delta` 同一条规则：可丢弃，不带账本序号，调用的结果落账时页面扔掉它，两者不一致时账本赢。这一帧让 `WIRE_V` 加一并重新生成 `RefRain/src/wire.ts`。
 - **页面也是有界环形缓冲**，按行计，监视器的终端记录画它；溢出的行数照 `mon_lines_cut` 的样子说出来。
 -/
 

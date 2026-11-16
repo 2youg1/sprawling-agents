@@ -1,29 +1,8 @@
-<!-- This Source Code Form is subject to the terms of the Mozilla Public
-     License, v. 2.0. If a copy of the MPL was not distributed with this
-     file, You can obtain one at https://mozilla.org/MPL/2.0/.
-     Copyright (c) 2026 2youg1 and the sprawling contributors -->
+
 
 <script lang="ts">
-  // The commits pane's graph (client/Spec.lean §7K): the
-  // commits of the place the conversation is in - the whole city from
-  // the Mayor's room, the building from a room inside one - newest
-  // first, as a swimlane graph drawn from each commit's parents. A row
-  // is the graph's node, the short oid, the message and the room that
-  // made it; the time is said only under the picked row.
-  //
-  // The chosen session's commits and its lane take the accent (docs/frontend-method.md §7B); a
-  // node takes the phase of the run that made it (`runs/phase.ts`), so a
-  // commit whose run is still going reads as going. Picking a row picks
-  // its session - the conversation moves to that room when it is another
-  // - opens what it changed against its first parent on the right side
-  // (refrain §3-9, client/Spec.lean §4-63), and states the commit under its
-  // row: its full oid, the B3 of the checkpoint that announced it, its
-  // parents and the moment it was made. Both hashes are written whole on one line and cut by the
-  // pane's edge, so a copy takes the whole value.
-  //
-  // This file is the seat: it asks, picks and opens; `./commits.ts`
-  // reads each row and `./commits.look.svelte` draws the graph and the
-  // rows.
+  
+  
   import { readAnswer } from "../../core/answered";
   import { fill, say } from "../../core/lang";
   import { MAYOR, buildingOf, roomOf, toFragment } from "../../core/route";

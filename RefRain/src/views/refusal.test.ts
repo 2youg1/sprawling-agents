@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// A toast's clock: paused while the pointer or the focus holds it, and
-// running again only once nothing does (client/Spec.lean §4-35). Before
-// this clock the focus did not pause a toast at all, and a pointer
-// leaving restarted it under a reader whose focus was still inside.
 
 import { describe, expect, test } from "bun:test";
 

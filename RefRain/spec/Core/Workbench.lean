@@ -6,7 +6,7 @@
 /-!
 # workbench：分隔线拖不出一栏比两栏窄的工作台
 
-规定 `client/src/core/workbench.ts` 的 `resized`、`widest` 与 `moved`，分隔线的键表在 `client/spec/Views/Workspace.lean` §7-11（APG Window Splitter）；栏宽存在浏览器里的理由是 client D24。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`workbench.test.ts` 判实现。
+规定 `RefRain/src/core/workbench.ts` 的 `resized`、`widest` 与 `moved`，分隔线的键表在 `RefRain/spec/Views/Workspace.lean` §7-11（APG Window Splitter）；栏宽存在浏览器里的理由是 client D24。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`workbench.test.ts` 判实现。
 
 检阅档的工作台是三栏，共 `COLUMNS`（12）栏，每栏至少 `NARROWEST`（2）栏。一条分隔线只在它两侧的一对栏之间挪宽度：←／→ 是前一栏宽一栏或窄一栏，Home／End 是前一栏到最窄或最宽，Enter 复位到默认。这几个键都经 `resized` 落地，所以只要 `resized` 守住两条，每个键都守住：
 

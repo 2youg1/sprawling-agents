@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What one row of the mailbox's working section is handed: the room,
-// its newest unfrozen run's phase as a mark and in words with how long
-// the run has gone, its task, and the link to the room's conversation
-// (client/Spec.lean §7, D88).
 
 import type { RunBelief } from "../../core/belief";
 import type { Lang } from "../../core/lang";
@@ -19,14 +15,13 @@ import type { EntryLink } from "./entries";
 export interface WorkingRowLook {
   readonly room: string;
   readonly mark: { readonly glyph: GlyphName; readonly weight: Weight };
-  // The phase in words, then how long the run has gone.
+  
   readonly doing: string;
   readonly task: string | null;
   readonly link: EntryLink;
 }
 
-// `now` is the page's one ticking clock (client/Spec.lean §4-59), so the
-// reading is recomputed from the run's own start.
+
 export function rowOf(
   run: Pick<RunBelief, "doing" | "started" | "task">,
   room: string,

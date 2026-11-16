@@ -6,12 +6,8 @@
 -->
 
 <script lang="ts">
-  // Take one file of this building back to what one checkpoint holds
-  // (client/Spec.lean §4-50, UC8). The command rewrites the file in the
-  // working tree, and what the file says now is in no checkpoint, so it
-  // is asked through `parts/dialog` before it leaves (client D1). The city
-  // refuses while a run works in the building; that refusal is a toast,
-  // because nothing on this row can answer it.
+  
+  
   import { Option, Schema } from "effect";
 
   import { restoreFile } from "../../core/commands";
@@ -24,7 +20,7 @@
 
   interface Props {
     readonly building: Address;
-    // The file's path inside the building.
+    
     readonly path: string;
     readonly point: GitOid;
   }
@@ -36,9 +32,7 @@
 
   let asking = $state(false);
 
-  // A path the address grammar does not take is not a file of the
-  // city's tree, so the control says why it cannot rather than sending
-  // a command the city would refuse.
+  
   const at = $derived(Option.getOrNull(Schema.decodeOption(Address)(`${building}/${path}`)));
   const slots = $derived({ path, oid: shortOid(point) });
 </script>

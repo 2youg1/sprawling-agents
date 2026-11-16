@@ -9,14 +9,11 @@
   import type { CloseMode } from "../wire";
   import type { QuitLook } from "./quit";
 
-  // The `/quit` question as drawn (client/Spec.lean §4-57c). Two seats,
-  // as the key sheet has: `modal` is the one `quit.svelte` opens over the
-  // page; `specimen` is the same box drawn open in a gallery fold's flow,
-  // where it takes no focus and answers no Escape.
+  
   export interface QuitSheetProps {
     readonly look: QuitLook;
     readonly seat: "modal" | "specimen";
-    // Whether the modal stands; a specimen always does.
+    
     readonly open: boolean;
     readonly onCancel: () => void;
     readonly onClose: (mode: CloseMode) => void;
@@ -38,9 +35,7 @@
   const uid = $props.id();
   const HOLD = createAttachmentKey();
 
-  // The platform owns the modality: `showModal()` traps the focus and
-  // marks the page inert, and `close()` gives the focus back to whatever
-  // held it before the question opened.
+  
   let sheet = $state<HTMLDialogElement | undefined>(undefined);
   const hold: Attachment<HTMLDialogElement> = (node) => {
     sheet = node;

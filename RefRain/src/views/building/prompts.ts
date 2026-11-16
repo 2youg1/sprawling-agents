@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the building page's prompts section shows (client/Spec.lean 4-50,
-// its ninth part): the bytes each slot of the newest run here was sent,
-// and one card for each prompt document of the next run, in the order
-// `Query::Layers` gives them. Which document is sent, and which a nearer
-// one replaces, is the city's answer; this file only words it and says
-// which steps each card offers.
 
 import { fill, say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
@@ -23,14 +17,14 @@ import type {
 } from "../../wire";
 import { SLOT_WORD } from "../run/prompt";
 
-// One room the section can show, as its key.
+
 export interface RoomChoice {
   readonly label: string;
   readonly current: boolean;
   readonly onPress: () => void;
 }
 
-// Everything `prompts.look.svelte` draws, already worded by the seat.
+
 export interface PromptsLook {
   readonly rooms: readonly RoomChoice[];
   readonly roomsLabel: string;
@@ -45,16 +39,14 @@ export interface PromptsLook {
   readonly onAction: (card: CardLook, action: CardAction) => void;
 }
 
-// One slot of the newest run here, as it was sent.
+
 export interface SlotLook {
   readonly key: string;
   readonly slot: string;
   readonly size: string;
 }
 
-// What a card offers. `open` reads the document in RefRain on the
-// right; the others are `PutPrompt` steps, and the two that remove or
-// replace words are asked first.
+
 export type CardAction =
   | { readonly kind: "open"; readonly path: string }
   | { readonly kind: "step"; readonly step: PromptStep };
@@ -62,16 +54,16 @@ export type CardAction =
 export interface CardLook {
   readonly key: string;
   readonly at: Address;
-  // The version a step starts from: what the city saw on disk.
+  
   readonly base: B3Hash;
   readonly title: string;
   readonly about: string;
   readonly layer: string;
   readonly state: string;
-  // Whether the next run receives it, which the look marks.
+  
   readonly sent: boolean;
-  // How the copy stands against this build's default, for the three
-  // documents the binary carries.
+  
+  
   readonly standing: string | undefined;
   readonly actions: readonly CardAction[];
 }
@@ -83,13 +75,13 @@ const ACTION_WORD: Record<"open" | PromptStep, Key> = {
   restore: "prompts_restore",
 };
 
-// The word a card's action is pressed by.
+
 export function actionWord(action: CardAction | PromptStep, lang: Lang): string {
   if (typeof action === "string") return say(lang, ACTION_WORD[action]);
   return say(lang, ACTION_WORD[action.kind === "open" ? "open" : action.step]);
 }
 
-// The name an action is read by: the verb and the document it acts on.
+
 export function actionName(card: CardLook, action: CardAction, lang: Lang): string {
   return fill(say(lang, "prompts_action_on"), { action: actionWord(action, lang), at: card.at });
 }
@@ -100,7 +92,7 @@ const LAYER_WORD: Record<PromptLayer, Key> = {
   room: "prompts_layer_room",
 };
 
-// The newest run's four slots, in send order.
+
 export function slotsOf(prefix: PrefixAnswer, lang: Lang): readonly SlotLook[] {
   return prefix.segments.map((segment) => ({
     key: segment.slot,
@@ -109,9 +101,7 @@ export function slotsOf(prefix: PrefixAnswer, lang: Lang): readonly SlotLook[] {
   }));
 }
 
-// One card per document. `building` is the page's building: a document
-// inside it opens by its path there, and any other by its path from the
-// city root, which RefRain reads as the city's (`documentAt`).
+
 export function cardsOf(
   documents: readonly LayerDocument[],
   building: Address,
@@ -169,10 +159,7 @@ function standingOf(doc: LayerDocument, lang: Lang): string | undefined {
   }
 }
 
-// What a card offers: a document that is there opens. A building's own
-// `City.md` and the notes of either layer are what a layer may start
-// where it is absent and give up where it is there; the three documents
-// the binary carries are restored to the default unless they hold it.
+
 export function actionsOf(doc: LayerDocument, building: Address): readonly CardAction[] {
   const shipped = doc.shipped ?? null;
   const state = doc.state;
@@ -187,8 +174,7 @@ export function actionsOf(doc: LayerDocument, building: Address): readonly CardA
   return actions;
 }
 
-// The path `openDocument` takes: inside the page's building, the part
-// after it; anywhere else, the address from the city root after a `/`.
+
 export function pathOf(at: Address, building: Address): string {
   const prefix = `${building}/`;
   return at.startsWith(prefix) ? at.slice(prefix.length) : `/${at}`;

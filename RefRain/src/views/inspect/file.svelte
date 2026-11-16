@@ -6,16 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // A call that read one file, as that file opened at the line it read
-  // from (client/Spec.lean §4-45). The text is the worktree's as it stands now
-  // (`Query::Document`), read-only through the one code view, so its line
-  // numbers are the ones the person's editor will open; the call's own
-  // answer stays in the Ledger, where the run page reads it.
-  //
-  // **What the city did not send is said, not filled in.** A file longer
-  // than the window `Document` answers with shows its head; a line past
-  // that head is named as out of reach instead of being marked on a line
-  // it is not.
+  
+  
 </script>
 
 <script lang="ts">

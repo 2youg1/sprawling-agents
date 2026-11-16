@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// pdf.js, set up once for this client (client/Spec.lean §4-54, client D32). This
-// module is its own lazy chunk: nothing of pdf.js is fetched until a
-// PDF is drawn. The worker parses in its own thread; the resources it
-// asks for by name - the Adobe CMaps a font without its own encoding
-// table needs, the two symbol faces no machine is sure to have, and the
-// image decoders built as WebAssembly - are files of this bundle, found
-// by name in `SHIPPED` and handed over by the page, so nothing is
-// fetched from anywhere but the city that served the page. Every other
-// face a file leaves out is drawn with the machine's own, as Firefox's
-// own viewer does.
 
 import { GlobalWorkerOptions, PasswordException, getDocument } from "pdfjs-dist";
 import type { PDFDocumentProxy } from "pdfjs-dist";
@@ -33,9 +23,7 @@ const SHIPPED: ReadonlyMap<string, string> = new Map(
   ).map(([path, url]) => [path.slice(path.lastIndexOf("/") + 1), url]),
 );
 
-// The page's side of pdf.js's resource door: the worker names a file,
-// and this answers with that file of the bundle, or refuses a name the
-// bundle does not carry.
+
 class Shipped {
   fetch({ filename }: { readonly kind: string; readonly filename: string }): Promise<Uint8Array> {
     const url = SHIPPED.get(filename);
@@ -51,8 +39,7 @@ class Shipped {
   }
 }
 
-// pdf.js wants a base for each resource kind, and asks the door above
-// for a name under it; the base is never fetched.
+
 const DOOR = "bundle/";
 
 export type Opened =
@@ -65,8 +52,7 @@ export interface Opening {
   readonly close: () => void;
 }
 
-// Opens a PDF from its bytes. The bytes are copied, because pdf.js
-// hands its buffer to the worker and leaves the caller's empty.
+
 export function openPdf(bytes: Uint8Array): Opening {
   const task = getDocument({
     data: bytes.slice(),
@@ -92,7 +78,7 @@ export function openPdf(bytes: Uint8Array): Opening {
   };
 }
 
-// A page's size in PDF points, which fixes its proportions.
+
 export interface Size {
   readonly width: number;
   readonly height: number;
@@ -102,13 +88,11 @@ export interface Drawing {
   readonly pdf: PDFDocumentProxy;
   readonly number: number;
   readonly canvas: HTMLCanvasElement;
-  // The width the page takes on the screen, in CSS pixels.
+  
   readonly width: number;
 }
 
-// One page drawn into its canvas, sharp on this screen; `measured`
-// hears the page's own size before it is drawn. Answers the way to stop
-// a drawing the page no longer needs.
+
 export function drawPage(drawing: Drawing, measured: (size: Size) => void): () => void {
   const { pdf, number, canvas, width } = drawing;
   let cancel = (): void => undefined;
@@ -132,8 +116,7 @@ export function drawPage(drawing: Drawing, measured: (size: Size) => void): () =
   };
 }
 
-// The text of each page in reading order, a line where the file ends
-// one. A page whose text is empty is drawn but has no words to compare.
+
 export function pagesText(pdf: PDFDocumentProxy): Promise<readonly string[]> {
   const numbers = Array.from({ length: pdf.numPages }, (_, index) => index + 1);
   return Promise.all(

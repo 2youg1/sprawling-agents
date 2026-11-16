@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn the_committed_client_declares_every_hand_written_schema() {
-        let wire_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../client/src/wire");
+        let wire_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../RefRain/src/wire");
         let mut client = String::new();
         let mut entries: Vec<_> = std::fs::read_dir(wire_dir)
             .unwrap_or_else(|why| panic!("read {wire_dir}: {why}"))
@@ -324,7 +324,7 @@ mod tests {
         ] {
             assert!(
                 client.contains(&declared),
-                "client/src/wire lacks\n{declared}"
+                "RefRain/src/wire lacks\n{declared}"
             );
         }
     }

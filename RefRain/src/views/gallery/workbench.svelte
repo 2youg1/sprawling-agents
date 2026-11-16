@@ -5,31 +5,12 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // The world layer as docs/frontend-method.md §7H and client/Spec.lean §7K draw it, in a made-up city
-  // of three buildings: the panorama workbench on a building room with a
-  // commit picked, the same room in the blend tier, the workbench with
-  // the right pane open, and the two readings of the third pane that
-  // follow the workspace - the city beside the Mayor's room and the
-  // files beside a building's - and, closer, what the wire's run-level
-  // fields draw: who is listening, as the palette's foot draws it, the session
-  // pane at the width a panorama gives it, and a picked commit's B3.
-  // The panorama is drawn at 1440 and at 1920, and the instrument sheet
-  // alone at a phone's 390, because the sheet's two speed cells must
-  // hold their figures uncut at each of the three.
-  //
-  // The room's session ran three turns that read, ran and edited, and
-  // checkpointed twice; its building's history holds a branch that
-  // another room's session merged back, so the swimlane graph has a
-  // lane leaving and rejoining. The session's figures are chosen to be
-  // told apart: 1.2 million tokens read, a fifth of them from the cache,
-  // a median time to first content of 412 ms. The run works in its own
-  // worktree under the tested-and-ordinary policy, its finished command
-  // exited 0, and each commit carries the B3 of its checkpoint line.
+  
+  
   import { pickCommit } from "../world/chosen.svelte";
   import { PICKED } from "./benched";
 
-  // The commit the first case shows picked: the session's own last
-  // checkpoint, opened under its row.
+  
   if (PICKED !== undefined) pickCommit(PICKED);
 </script>
 
@@ -90,8 +71,7 @@
       answers={answering}
       {records}
     >
-      <!-- A container named as the shell's body is, so the specimen's
-      silver cut is measured on its own width. -->
+      
       <div class="@container/shell">
         <div class="frame relative h-[860px] translate-x-0 overflow-hidden bg-page">
           <Workspace address={ROOM} tier={shown.tier} seat="specimen" panel={shown.panel} />

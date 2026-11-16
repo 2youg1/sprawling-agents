@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Time as a person reads it: a moment relative to now, and a clock
-// time for the divider between two runs. `now` is a parameter, so the
-// same moment reads the same in a test.
 
 import type { Lang } from "./lang";
 
@@ -30,7 +27,7 @@ export function ago(lang: Lang, at: number, now: number): string {
   return lang === "zh" ? `${String(days)} 天前` : `${String(days)} d ago`;
 }
 
-// The locale each language the page speaks writes its dates in.
+
 const LOCALE: Readonly<Record<Lang, string>> = { en: "en-GB", zh: "zh-CN" };
 
 export function clock(lang: Lang, at: number): string {
@@ -42,8 +39,7 @@ export function clock(lang: Lang, at: number): string {
   }).format(at);
 }
 
-// A day of the calendar in the reader's language, for a date that names
-// a day rather than a moment, such as the day a snapshot was taken.
+
 export function calendarDay(lang: Lang, at: number): string {
   return new Intl.DateTimeFormat(LOCALE[lang], {
     year: "numeric",
@@ -52,8 +48,7 @@ export function calendarDay(lang: Lang, at: number): string {
   }).format(at);
 }
 
-// The time of day alone, for a column where the day is the same on
-// every row.
+
 export function hhmm(at: number): string {
   return new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
@@ -66,46 +61,37 @@ export function hhmmss(at: number): string {
   });
 }
 
-// The time of day to the millisecond, for a column where two moments
-// can fall inside one second and the order between them is read.
+
 export function hhmmssms(at: number): string {
   return `${hhmmss(at)}.${String(new Date(at).getMilliseconds()).padStart(3, "0")}`;
 }
 
-// The local calendar day as `2026-10-02`, for the date said once above
-// a column of times of day, and before the time in a whole moment.
+
 export function ymd(at: number): string {
   const day = new Date(at);
   const two = (n: number): string => String(n).padStart(2, "0");
   return `${String(day.getFullYear())}-${two(day.getMonth() + 1)}-${two(day.getDate())}`;
 }
 
-// A whole moment on one line, the local day and the time to the second,
-// where no column above says the day: `2026-10-02 03:04:05`.
+
 export function moment(at: number): string {
   return `${ymd(at)} ${hhmmss(at)}`;
 }
 
-// The ISO 8601 instant in UTC that a `<time datetime>` carries. Every
-// moment the screen writes is in the reader's own time zone
-// (client/Spec.lean 4-59), so this is the one place UTC is spelled, and
-// no view calls `toISOString` itself.
+
 export function isoInstant(at: number): string {
   return new Date(at).toISOString();
 }
 
-// Whole numbers with a thin separator, and money from micro-dollars.
+
 export function count(n: number): string {
   return n.toLocaleString("en-US");
 }
 
-// A count of tokens as a reader compares two of them at a glance:
-// thousands as `k`, millions as `M`, three significant figures, and no
-// trailing zero, so `82.4k / 200k` reads as a fraction rather than as
-// two long numbers. Under a thousand the count is exact.
+
 export function kilo(n: number): string {
   if (n < 1_000) return String(Math.round(n));
-  // Rounded before the mark is chosen, so 999,999 is `1M` and not `1000k`.
+  
   const thousands = Number((n / 1_000).toPrecision(3));
   if (thousands < 1_000) return `${String(thousands)}k`;
   return `${String(Number((n / 1_000_000).toPrecision(3)))}M`;
@@ -121,9 +107,7 @@ export function kib(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
 
-// A length of time as the largest two units that say it: `42s`,
-// `4m 12s`, `1h 03m`. Under ten seconds keeps a tenth, because a tool
-// call is often that short.
+
 export function lasted(ms: number): string {
   const seconds = Math.max(0, ms) / 1000;
   if (seconds < 10) return `${seconds.toFixed(1)}s`;

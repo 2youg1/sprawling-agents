@@ -101,7 +101,7 @@ pub(super) fn lock_of(document: &Value) -> Result<Manifest, XtaskError> {
         .get("workspaces")
         .and_then(|held| held.get(""))
         .ok_or_else(|| XtaskError::Doc {
-            file: "client/bun.lock".to_owned(),
+            file: "RefRain/bun.lock".to_owned(),
             msg: "no `workspaces` entry for the root package".to_owned(),
         })?;
     Ok(manifest_of(root))

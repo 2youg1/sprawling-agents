@@ -211,18 +211,17 @@ layout = "current"
 [[product_root]]
 name = "RefRain"
 path = "RefRain"
-layout = "planned"
-transition = "client"
+layout = "current"
 [[product_root]]
 name = "Mei"
 path = "Mei"
 layout = "current"
 [[legacy_path]]
 path = "crates"
-status = "live"
+status = "retired"
 [[legacy_path]]
 path = "client"
-status = "live"
+status = "retired"
 "#;
 
     #[test]
@@ -257,14 +256,15 @@ status = "live"
             .iter()
             .find(|root| root.name == "RefRain")
             .unwrap();
-        assert_eq!(refrain.transition.as_deref(), Some("client"));
+        assert_eq!(refrain.layout, Layout::Current);
+        assert_eq!(refrain.transition, None);
         assert_eq!(
             table
                 .retired()
                 .iter()
                 .map(|row| row.path.as_str())
                 .collect::<Vec<_>>(),
-            vec!["crates"]
+            vec!["crates", "client"]
         );
         assert_eq!(table.legacy.len(), 2);
     }

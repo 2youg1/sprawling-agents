@@ -4,7 +4,7 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The privacy group (`#/setup/privacy`, client/Spec.lean §7L): the
+  // The privacy group (`#/setup/privacy`, RefRain/Spec.lean §7L): the
   // Windows settings of the machine running this city that decide what
   // data Windows and apps may collect, upload or read.
   //
@@ -12,7 +12,7 @@
   // no "apply all", every entry states its cost, and an entry changes only
   // after its own press and a confirmation that states the change, what
   // a person could overlook and how it is undone
-  // (client/spec/Views/Privacy.lean). The only bulk action restores what
+  // (RefRain/spec/Views/Privacy.lean). The only bulk action restores what
   // this app itself changed.
   //
   // The page asks `Query::Privacy` when it opens, after each of its own

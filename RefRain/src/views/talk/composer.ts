@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the box a person writes in knows: where a message lands and how
-// that is spelled, what its three choosers offer and what a pick means,
-// which verb a typed `/` line runs, and what a key in the box does.
-// `composer.svelte` seats these and `composer.look.svelte` draws them;
-// this file decides them, so a chooser row and a menu row cannot come to
-// mean two different things. Where unsent words are kept is `draft.ts`.
 
 import type { Snippet } from "svelte";
 import type { HTMLFormAttributes, HTMLTextareaAttributes } from "svelte/elements";
@@ -38,36 +32,25 @@ import type { PopoverColumn } from "../parts/popover";
 import { offersOf } from "./picker";
 import type { PickerFacts } from "./picker_scene";
 
-// What the send control is spelled, for each of the three places a
-// message can land. `queued` is the one a streaming page would
-// otherwise hide: the run is inside a tool call, and the words wait for
-// a boundary (client/Spec.lean §4-13).
+
 export const SPELLING: Record<Sending, Key> = {
   dispatch: "talk_send",
   steer: "talk_steer",
   queued: "talk_steer_queued",
 };
 
-// ------------------------------------------------- the settings row picks
 
-// One model the city could point the `main` face at: the endpoint that
-// serves it and its id.
 export interface Names {
   readonly endpoint: string;
   readonly model: string;
 }
 
-// That, with the name a person reads beside it.
+
 export interface Served extends Names {
   readonly label: string;
 }
 
-// The model the session open in a room answers with: the model of the
-// newest run since the session began that has called one, read from the
-// room's runs oldest start first (`heldIn`). A session keeps the model
-// it was opened with, so this, and not the city's next pick, is what a
-// message sent here reaches, even while its newest run has not called
-// yet; `null` when the session has made no call at all.
+
 export function sessionModel(held: readonly RunBelief[], began: Seq | null): string | null {
   return (
     held.filter((run) => (began === null || run.lastSeq > began) && run.model !== null).at(-1)
@@ -75,16 +58,12 @@ export function sessionModel(held: readonly RunBelief[], began: Seq | null): str
   );
 }
 
-// Whether the room's current session has begun working: a run of it
-// recorded a line after the session began. Until then the settings row
-// draws its controls; after, it draws none, because the model and the
-// effort are frozen and the first message head states them
-// (docs/frontend-method.md §7D).
+
 export function startedIn(held: readonly RunBelief[], began: Seq | undefined): boolean {
   return held.some((run) => run.lastSeq > (began ?? 0));
 }
 
-// A model pick changes the next main selection and never opens a session.
+
 export type ModelMove =
   { readonly kind: "select"; readonly names: Names } | { readonly kind: "stay" };
 
@@ -92,26 +71,19 @@ export function modelMove(names: Names, session: string | null): ModelMove {
   return session !== null ? { kind: "stay" } : { kind: "select", names };
 }
 
-// What a pick on the settings row does: the model picker's two choices.
+
 export interface Picks {
   readonly model: (names: Names) => void;
   readonly effort: (level: Effort) => void;
 }
 
-// The page's hands a pick reaches for.
+
 export interface PickHands {
   readonly send: (command: Command) => boolean;
   readonly chooseEffort: (effort: Effort | null) => void;
 }
 
-// Picks configure the next dispatch; session creation belongs to slash commands.
-// A level picked here is the stored level: it goes to the city's own
-// `[model] effort`, the one key the settings card writes too, and the
-// page drops the level `/effort` stated, so the frame carries none.
-// The city then sends the stored level when the model offers it and
-// the default rule's level when it does not
-// (`gateway::provider::thinking` `ThinkingOffer::ask`);
-// only a level stated for the request is refused before dispatch.
+
 export function picksFor(hands: PickHands, session: string | null): Picks {
   return {
     model: (names) => {
@@ -125,10 +97,7 @@ export function picksFor(hands: PickHands, session: string | null): Picks {
   };
 }
 
-// What the endpoints answer offers this box: every model by the id a
-// command carries next to the name a person reads, the facts the model
-// picker is drawn from, and what `/model` and `/effort` complete their
-// argument from - the levels being those the model in force offers.
+
 export interface Offered {
   readonly models: readonly Served[];
   readonly picker: PickerFacts;
@@ -159,33 +128,24 @@ export function offeredBy(
   };
 }
 
-// The level a room inherits from its configuration ladder, when the
-// room's answer has arrived and states one.
+
 export function configLevel(answer: Answer | undefined): Effort | null {
   return answer !== undefined && "config" in answer ? (answer.config.effort?.effort ?? null) : null;
 }
 
-// ---------------------------------------------------------- the `/` menu
 
 const COMMANDS = "commands";
 
-// What `/model` and `/effort` complete their argument from: the models
-// the city serves, and the levels the model in force offers.
+
 export interface Arguments {
   readonly models: readonly Served[];
   readonly levels: readonly Effort[];
 }
 
-// The two verbs whose argument the menu completes, each with its rows.
+
 const COMPLETED = { model: "/model", effort: "/effort" } as const;
 
-// The menu's one column, built from the same table the Ctrl-K palette
-// reads: a spelling, and beside it the shape its arguments take. A line
-// no verb matches - a message that begins with a path - gets no menu at
-// all, so the box's own Enter sends it rather than an empty list taking
-// the key. `/model` and `/effort` typed in full list their arguments
-// instead, from what the city offers now; each row's id is the whole
-// line it runs.
+
 export function menuColumns(lang: Lang, line: string, offers: Arguments): readonly PopoverColumn[] {
   const verbs = offered(line);
   if (verbs.length === 0) return [];
@@ -211,8 +171,7 @@ function grammarNote(lang: Lang, verb: Slash): string {
   return verb.grammar === "" ? say(lang, verb.about) : `${verb.grammar} · ${say(lang, verb.about)}`;
 }
 
-// `/effort` says which levels the model in force offers, rather than
-// every level the city can spell.
+
 function levelsNote(lang: Lang, levels: readonly Effort[]): string {
   return levels.length === 0
     ? say(lang, "slash_effort_none_offered")
@@ -259,16 +218,12 @@ function argumentRows(lang: Lang, line: string, offers: Arguments): PopoverColum
   }
 }
 
-// What Tab makes of the line when the menu's cursor is on a row: an
-// argument row is the whole line it runs, so Tab takes it as written;
-// a verb row goes to the verb table's own completion.
+
 export function completedAt(line: string, pointed: string | undefined): string {
   return pointed !== undefined && /\s/.test(pointed) ? `${pointed} ` : completed(line, pointed);
 }
 
-// A verb the menu offered, once. A verb that still needs its argument
-// is answered with the line to complete into the box rather than run on
-// nothing; a verb that ran answers `null`.
+
 export function pickSlash(chosen: Slash, line: string, hands: SlashHands): string | null {
   const call = parse(line);
   const needs = chosen.grammar.startsWith("<");
@@ -280,11 +235,7 @@ export function pickSlash(chosen: Slash, line: string, hands: SlashHands): strin
   return `${chosen.spelling} `;
 }
 
-// -------------------------------------------------------- the run in reach
 
-// Everything a typed verb may reach for (`core/slash.ts` fills the same
-// shape from the palette), minus the one conversion this file owns: a
-// run belief becomes the run and position a verb acts on.
 export interface Reach extends SessionHands {
   readonly command: (command: Command) => boolean;
   readonly go: (view: View) => void;
@@ -310,14 +261,7 @@ export function slashHands(reach: Reach): SlashHands {
   };
 }
 
-// ------------------------------------------------------ a key in the box
 
-// What one key pressed in the box does. `complete` takes the menu's
-// verb into the box, `menu` offers the key to the open `/` menu first,
-// `recall` brings back what was last sent here, `send` hands the words
-// on, and `type` leaves the key to the box. A key that confirms an input
-// method's composition belongs to the input method, so it is always
-// `type`: an Enter that picks a candidate must not send half a sentence.
 export type BoxKey = "complete" | "menu" | "recall" | "send" | "type";
 
 export interface KeyPressed {
@@ -327,13 +271,12 @@ export interface KeyPressed {
 }
 
 export interface BoxState {
-  // Whether the `/` menu is over the box with rows in it.
+  
   readonly menu: boolean;
   readonly empty: boolean;
 }
 
-// A key the menu does not take is asked again with `menu: false`, so the
-// box keeps its own keys under an open menu.
+
 export function boxKey(pressed: KeyPressed, box: BoxState): BoxKey {
   if (pressed.isComposing) return "type";
   if (box.menu) return pressed.key === "Tab" ? "complete" : "menu";
@@ -342,30 +285,24 @@ export function boxKey(pressed: KeyPressed, box: BoxState): BoxKey {
   return "type";
 }
 
-// ---------------------------------------------------------- the look
 
-// What `composer.look.svelte` is handed (docs/frontend-method.md §7I):
-// the form's wiring - its name, the submit, and the three handlers of a
-// drop target - and the text box's, each as one bag the look spreads on
-// its element, whether a drag is over the box, and the parts the look
-// places around the words, each already seated.
 export interface ComposerLook {
   readonly form: HTMLFormAttributes;
   readonly over: boolean;
   readonly box: HTMLTextareaAttributes;
-  // The `/` menu, while it is open over the box.
+  
   readonly menu: Snippet | undefined;
-  // What stands in the place of the placeholder while the box holds no
-  // words: an empty room's address line (client/Spec.lean 4-10a).
+  
+  
   readonly door: Snippet | undefined;
-  // What stands above the words in the band (the last thing said).
+  
   readonly band: Snippet | undefined;
-  // What stands at the end of the words' row: the microphone, the
-  // context ring and the coin key.
+  
+  
   readonly keys: Snippet;
-  // The line under the words.
+  
   readonly line: Snippet;
-  // Under the line: the send receipt, the draft the browser did not
-  // keep, the files a drop did not keep, and the settings row.
+  
+  
   readonly under: Snippet;
 }

@@ -6,11 +6,8 @@
 -->
 
 <script lang="ts">
-  // How the two versions a comparison reads are chosen (client/Spec.lean
-  // §7N): two native lists rather than rows of cells, because a version's
-  // name, where it came from and when do not fit an equal cell
-  // (docs/frontend-method.md). Each list's name stands in a column of its
-  // own, so the two lists start on one line whatever the names' lengths.
+  
+  
   import type { PairLook } from "./pair";
 
   const look: PairLook = $props();

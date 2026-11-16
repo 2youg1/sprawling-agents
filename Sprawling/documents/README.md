@@ -105,7 +105,7 @@ source and no global state.
 
 Three decisions change how a caller must use the package. `documents D1`: the wire carries these
 types directly, so changing the shape of `Span`, `Format`, `Encoding`, `Window` or `Preview` moves
-the wire schema. Run `cargo xtask wire-ts --write` to regenerate `client/src/wire.ts`;
+the wire schema. Run `cargo xtask wire-ts --write` to regenerate `RefRain/src/wire.ts`;
 `cargo xtask wire-ts` without `--write` only checks it. `documents D3`: a version's identity is the
 digest of its whole bytes, so a save is judged against a version and never against a timestamp;
 `save` compares the digest of the bytes it is handed with the baseline itself, so a caller passes

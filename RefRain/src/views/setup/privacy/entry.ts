@@ -3,18 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// One privacy entry from the press to the result (client/spec/Views/Privacy.lean):
-// the state machine each control's entry runs, and the props an entry's
-// look is drawn from. The machine is `step` in the model, transcribed;
-// `entry.test.ts` replays the model's trace vectors through it. An
-// idem is whatever the caller mints, compared by identity, so a result
-// for another page's operation never moves this entry.
 
 import type { Weight } from "../../parts/glyph";
 
 export type Action = "apply" | "restore" | "reconcile";
 
-// The three results the page tells apart.
+
 export type Result = "running" | "done" | "refused";
 
 export type Stage<I> =
@@ -44,8 +38,7 @@ export interface Step<I> {
 
 export const IDLE = { kind: "idle" } as const;
 
-// Whether a press may open the confirmation: no dialog is open for this
-// entry and no command of it is in flight.
+
 export function pressable<I>(stage: Stage<I>): boolean {
   switch (stage.kind) {
     case "idle":
@@ -96,12 +89,11 @@ export function step<I>(
   }
 }
 
-// One labelled reading on an entry: the current value, the value
-// written, the original, the scope.
+
 export interface Fact {
   readonly label: string;
   readonly value: string;
-  // A registry value, a path or a number, set in the figure face.
+  
   readonly figure: boolean;
 }
 
@@ -110,40 +102,35 @@ export interface Press {
   readonly onPress: () => void;
 }
 
-// A labelled sentence: what an entry does, what it keeps private, what
-// it affects, what a person could overlook.
+
 export interface Note {
   readonly label: string;
   readonly text: string;
 }
 
-// Everything an entry's look draws, already in the person's language.
-// The look holds no wiring: it calls `onPress` and nothing else, so a
-// look from a UI library that takes these props keeps the entry's
-// behaviour (the front-end ruling: wiring and state apart from the
-// appearance).
+
 export interface EntryLook {
-  // The element id the not-written lines' links scroll to.
+  
   readonly id: string;
   readonly title: string;
-  // The person's own lines this control writes, under their label, or
-  // the note that it was added beyond the list.
+  
+  
   readonly lines: Note;
   readonly notes: readonly Note[];
-  // Drawn without expanding anything.
+  
   readonly overlooked: Note;
-  // The documented editions, the edition note, and how this host's
-  // edition reads; `alert` when the documentation says it ignores it.
+  
+  
   readonly editions: Note;
   readonly editionsNote: string;
   readonly fit: string;
   readonly fitWeight: Weight;
-  // Set when the sources doubt the entry changes anything today.
+  
   readonly effect: string | null;
   readonly facts: readonly Fact[];
-  // The full target, folded under its label.
+  
   readonly target: Note;
   readonly presses: readonly Press[];
-  // What became of this page's last operation on the entry.
+  
   readonly status: { readonly text: string; readonly weight: Weight } | null;
 }

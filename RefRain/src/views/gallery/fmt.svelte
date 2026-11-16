@@ -6,7 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // The formats RefRain draws besides text (client/Spec.lean §4-54), at the
+  // The formats RefRain draws besides text (RefRain/Spec.lean §4-54), at the
   // width the right side has beside a conversation at 1440: a PDF's
   // pages, a DOCX laid out as pages with what it leaves out counted, an
   // HTML page in RefRain's preview with its script and outside picture
@@ -16,7 +16,7 @@
   // `fmt_samples.ts`.
   import { Address, B3Hash } from "../../wire";
   import type { Answer, DocumentState, Query } from "../../wire";
-  import { UNPACKED_MAX } from "../refrain/formats/zip";
+  import { UNPACKED_MAX } from "../editor/formats/zip";
   import { docxOf, pdfOf, utf8, zipOf } from "./fmt_samples";
 
   const SHOP = Address.make("shop");
@@ -106,13 +106,13 @@
 
 <script lang="ts">
   import { ui } from "../../ui";
-  import { againstLookOf } from "../refrain/formats/against";
-  import Against from "../refrain/formats/against.look.svelte";
-  import Compare from "../refrain/formats/compare.svelte";
-  import Docx from "../refrain/formats/docx.svelte";
-  import Pdf from "../refrain/formats/pdf.svelte";
-  import Document from "../refrain/document.svelte";
-  import RefRain from "../refrain/refrain.svelte";
+  import { againstLookOf } from "../editor/formats/against";
+  import Against from "../editor/formats/against.look.svelte";
+  import Compare from "../editor/formats/compare.svelte";
+  import Docx from "../editor/formats/docx.svelte";
+  import Pdf from "../editor/formats/pdf.svelte";
+  import Document from "../editor/document.svelte";
+  import RefRain from "../editor/refrain.svelte";
   import Case from "./case.svelte";
   import Stand from "./stand.svelte";
 

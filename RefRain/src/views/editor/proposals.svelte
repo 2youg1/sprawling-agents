@@ -6,11 +6,8 @@
 -->
 
 <script lang="ts">
-  // The proposal cards open on the document RefRain shows, above its
-  // text (client/Spec.lean §4-55). Nothing is drawn while the document has no
-  // open card. The band takes at most two fifths of the right side and
-  // scrolls on its own, so a long card never pushes the editor out;
-  // `proposals.look.svelte` draws the band.
+  
+  
   import { readAnswer } from "../../core/answered";
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
@@ -21,10 +18,10 @@
 
   interface Props {
     readonly doc: Address;
-    // Why the editor cannot be taken to this card's stretch, or
-    // `undefined` when it can: it holds the card's version.
+    
+    
     readonly unshowable: (card: ProposalCard) => string | undefined;
-    // Puts the cursor at the start of the card's stretch.
+    
     readonly onShow: (card: ProposalCard) => void;
   }
 

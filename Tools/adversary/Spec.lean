@@ -349,8 +349,8 @@ def walkedSteps  : Setting → List String           -- 四段的步名，按走
 def walk         : Setting → (Ground → IO α) → IO α  -- 全部通过后在第三次服务里问一次
 
 -- Acceptance/Checklist.lean —— 人手测什么
-def routeTable : String                            -- client/src/core/route.ts
-def slashTable : String                            -- client/src/core/slash.ts
+def routeTable : String                            -- RefRain/src/core/route.ts
+def slashTable : String                            -- RefRain/src/core/slash.ts
 inductive Takes | written (grammar : String) | computed
 def pagesIn    : String → List String              -- `BARE` 的键，去掉空键
 def commandsIn : String → List (String × Takes)    -- `SLASH` 每条的拼法与它后面跟什么
@@ -564,7 +564,7 @@ D3 **一个会应答的 provider 从 justfile 接收，不在本目录里起。*
 | 楼 `beta`，房间 `beta/planner`、`beta/left`、`beta/right`，计划的一行 `glaze the kiln` 与两片叶子 `1.1`、`1.2` | 演员表里的第二栋楼；叶子的编号是计划表的文法（`Sprawling/city/templates/Roadmap.md`：分出来的子行从父行往下编号），一个人读计划时看到的就是它 | 计划表的编号规则变了时，认领那两步报红 |
 | 计划文件 `Roadmap.md`、表头下的分隔行以 `|---` 开头、`review = false` 那一行 | 人用编辑器改的两处，照模板的字样找；找不到恰好一处就拒，不追加 | 模板变了时这两步报红，并说出找的是哪一行 |
 | 目录 `target/acceptance/` | 解开的归档、脚本、替身的记录、清单都在这里，配方每次先清空它 | 由 justfile 提供 |
-| 客户端的两张表 `client/src/core/route.ts`、`client/src/core/slash.ts`，以及它们的开头行 `const BARE`、`export const SLASH` | 清单的页面与命令两节从这里读；`just acceptance` 在仓库根运行，路径相对于根 | 表搬家或改了开头行时，那一节读成空，清单把空节写成一行要人先查原因的条目，而不是一个空标题 |
+| 客户端的两张表 `RefRain/src/core/route.ts`、`RefRain/src/core/slash.ts`，以及它们的开头行 `const BARE`、`export const SLASH` | 清单的页面与命令两节从这里读；`just acceptance` 在仓库根运行，路径相对于根 | 表搬家或改了开头行时，那一节读成空，清单把空节写成一行要人先查原因的条目，而不是一个空标题 |
 -/
 
 /-! ## 15 影响面

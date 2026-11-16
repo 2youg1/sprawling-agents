@@ -3,23 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// A DOCX is a ZIP archive, and a ZIP archive says how large each part
-// will be before anything is inflated - and may lie (client/Spec.lean §4-54).
-// This reads the archive's own directory, refuses one that promises
-// more than a page should hold, and then inflates every part through
-// the platform's `DecompressionStream`, stopping a part the moment it
-// grows past what the directory promised. Only an archive that kept
-// every promise is handed to the renderer, so the renderer's own
-// inflating can never outgrow these bounds.
 
-// The most one archive may unpack to. A long report with its pictures
-// unpacks to a few MiB; a tab holding a sixteenfold margin over that
-// is still a tab, and an archive past it is refused unopened rather
-// than drawn in part.
 export const UNPACKED_MAX = 64 * 1024 * 1024;
 
-// The most parts one archive may hold: a report has dozens, and a
-// directory of a hundred thousand empty parts is a way to spend a tab.
+
 export const PARTS_MAX = 4096;
 
 export type Unpacked =
@@ -37,8 +24,8 @@ interface Part {
 const END_SIGNATURE = 0x06054b50;
 const ENTRY_SIGNATURE = 0x02014b50;
 const LOCAL_SIGNATURE = 0x04034b50;
-// The end record is 22 bytes and may be followed by a comment of up to
-// 65535 bytes, so it starts within this many bytes of the end.
+
+
 const END_REACH = 22 + 0xffff;
 const STORED = 0;
 const DEFLATED = 8;
@@ -52,9 +39,7 @@ export function unpack(bytes: Uint8Array): Promise<Unpacked> {
   return inflateAll(bytes, listed).catch(() => SHAPE);
 }
 
-// The archive's directory, or why it is not read: a total past the
-// bound, or bytes that are not the shape of a ZIP archive this reads
-// (ZIP64 and split archives included, which a DOCX does not need).
+
 function directoryOf(bytes: Uint8Array): readonly Part[] | "shape" | "too_large" {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const end = endOf(view);
@@ -100,7 +85,7 @@ async function inflateAll(bytes: Uint8Array, parts: readonly Part[]): Promise<Un
   return { kind: "unpacked", parts: out };
 }
 
-// The packed bytes of one part, found through its local header.
+
 function dataOf(bytes: Uint8Array, part: Part): Uint8Array | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const at = part.header;
@@ -109,8 +94,7 @@ function dataOf(bytes: Uint8Array, part: Part): Uint8Array | null {
   return start + part.packed > view.byteLength ? null : bytes.subarray(start, start + part.packed);
 }
 
-// One part, exactly as large as the directory said, or `null` when it
-// is stored in a way this does not read or does not keep that promise.
+
 async function inflate(data: Uint8Array, part: Part): Promise<Uint8Array | null> {
   if (part.method === STORED) return data.length === part.size ? data : null;
   if (part.method !== DEFLATED) return null;

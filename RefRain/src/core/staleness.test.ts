@@ -8,9 +8,7 @@ import { describe, expect, test } from "bun:test";
 import type { EventKind } from "../wire";
 import { reachOf } from "./staleness";
 
-// The settings panel calls a save saved only when the city answers
-// again (client/Spec.lean §7L), so each write the panel makes has to reach
-// the answer the panel reads it back from.
+
 describe("a write reaches the answer that reads it back", () => {
   test("a saved identity card makes the identity answer stale", () => {
     expect(reachOf("identity", "governed_document_written")).toBe("every");
@@ -44,8 +42,7 @@ describe("a write reaches the answer that reads it back", () => {
   });
 });
 
-// The sessions pane lists a room's stretches from this answer, so a
-// session opened, a run started in one, or a run ended has to reach it.
+
 test("a session opened or a run starting or ending makes the sessions answers stale", () => {
   const kinds: EventKind[] = ["session_opened", "run_started", "run_frozen", "model_returned"];
   expect(kinds.map((kind) => reachOf("sessions", kind))).toEqual([

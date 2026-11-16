@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The field's wiring as client/spec/Views/Parts.lean §7-2 states it:
+// The field's wiring as RefRain/spec/Views/Parts.lean §7-2 states it:
 // the label names the box, `aria-invalid` is exactly "the city refused
 // it", `aria-describedby` is the page's description followed by this
 // field's one line, an error replaces the help rather than joining it,

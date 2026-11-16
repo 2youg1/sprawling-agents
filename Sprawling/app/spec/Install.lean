@@ -203,7 +203,7 @@ pub(crate) fn install(direction: Direction) -> Result<Report, AxError>;
 
 `flake.nix` 的 `packages.default` 与 `apps.default` 交出同一份完整应用，devshell 保留。
 选择 release tag 的 flake 引用固定源码，`flake.lock` 固定构建依赖，Cargo 与 Bun 依赖分别只由
-`Cargo.lock` 与 `client/bun.lock` 决定；Rust 工具链只读 `rust-toolchain.toml`，应用版本读工作区清单。
+`Cargo.lock` 与 `RefRain/bun.lock` 决定；Rust 工具链只读 `rust-toolchain.toml`，应用版本读工作区清单。
 没有可用的发行 ref 时，二进制如实说 built from source，不能从版本号猜日期或制造 tag。
 发行 ref 的解释仍由 `kernel::Release` 决定。
 

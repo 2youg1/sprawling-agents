@@ -6,15 +6,8 @@
 -->
 
 <script lang="ts">
-  // One run under seven lenses: where its time went (time), what was said (turns), its code
-  // beside its terminal (monitor), what it was told before it said anything (prompt), what it has seen and how full its
-  // window is (context), what moved on disk (changes), and what it left
-  // to be checked (evidence). The conversation is the same component
-  // the first page draws, so a run reads the same from both doors.
-  //
-  // The lens set is `parts/tabs.svelte`, which owns both halves of the
-  // tab-and-panel association (client/Spec.lean §7-8 item 6).
-
+  
+  
   import { adopted } from "../core/belief/adopted";
   import { cancel, steer } from "../core/commands";
   import { sendingInto } from "../core/doing";
@@ -58,8 +51,7 @@
     evidence: "run_evidence",
   };
 
-  // The lens the person chose; until they choose, the run's own state
-  // picks one (`firstLens` below).
+  
   // svelte-ignore state_referenced_locally (a link's lens is where the page opens; pages.svelte remounts it for another)
   let chosen = $state<RunLens | null>(lens ?? null);
   const lenses = $derived(RUN_LENSES.map((id) => ({ id, label: say($lang, WORDS[id]) })));
@@ -75,24 +67,14 @@
     return held !== undefined && "rounds" in held ? held.rounds : undefined;
   });
 
-  // What the city says this run is, asked of the city rather than
-  // folded out of the record. A page opened on `#/run/<id>` after a
-  // reload has seen none of the records that made this run, and the
-  // city view carries only the runs it still lists - so which room the
-  // run belongs to and whether it is over used to be blank on exactly
-  // the runs a person reaches by a link somebody sent them.
+  
   const summaryStore = $derived(u.conn.asking.ask({ run_view: { run } }));
   const summary = $derived.by((): RunSummary | null => {
     const held = $summaryStore;
     return held !== undefined && "run" in held ? held.run : null;
   });
 
-  // Two readings of one run, and the later one wins. The stream says
-  // what is happening now, the summary says what the city has written
-  // down, and both state a ledger position - so which is newer is a
-  // comparison rather than a preference, and `core/belief` owns that
-  // comparison because the city page folds the same two readings
-  // (client/Spec.lean §4-24 third).
+  
   const mine = $derived($belief.runs[run]);
   const shown = $derived(summary === null ? mine : adopted(summary, mine));
 
@@ -102,27 +84,20 @@
 
   const live = $derived(shown !== undefined && shown.doing.kind !== "frozen");
   const room = $derived(shown?.addr ?? null);
-  // Where the changes lens stops. A live run that has not checkpointed past
-  // its opening is read against the working tree, which is where its
-  // edits are; a closed run stops at its last checkpoint, or at its opening
-  // when it never checkpointed, so edits made after it ended are not counted.
+  
+  
   const changedTo = $derived(
     live ? (lastCheckpoint === checkpoint ? null : lastCheckpoint) : (lastCheckpoint ?? checkpoint),
   );
 
-  // The lens a run opens on (client D28): a run still going is
-  // watched where its time goes; a run that is over and checkpointed
-  // past its opening is read for what it changed, which is what a link
-  // from a finished run, a commit or `/diff` is followed for; a run that
-  // is over and changed nothing is read for what it said.
+  
   const firstLens = $derived.by((): RunLens => {
     if (live) return "time";
     return lastCheckpoint !== null && lastCheckpoint !== checkpoint ? "changes" : "turns";
   });
   const current = $derived(chosen ?? firstLens);
 
-  // The run's clock as the page knows it: from the opening (or the
-  // first turn) to the closing, or to now while the run is live.
+  
   const from = $derived(rounds?.opening?.at ?? turns[0]?.t ?? shown?.started ?? null);
   const to = $derived.by((): number | null => {
     if (rounds?.closing !== null && rounds?.closing !== undefined) return rounds.closing.at;
@@ -149,9 +124,7 @@
     return at === null ? say($lang, "talk_resident") : roomOf(at);
   }
 
-  // A comment on a hunk lands in the composer, unsent: the words wait
-  // in this run's draft and the turns lens, which mounts the composer
-  // and reads the draft as it mounts, is brought forward.
+  
   function draftSteer(text: string): void {
     u.prefs.setDraft(run, text);
     chosen = "turns";
@@ -218,10 +191,7 @@
 <div class="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-base px-wide py-wide">
   <div class="flex min-w-0 items-start justify-between gap-wide">
     <div class="flex min-w-0 flex-col gap-tight">
-      <!-- The run's own id when nothing has named the task yet. The
-           summary's `who` is not offered here: it is the resident, and a
-           resident's name standing where the task stands reads as a task
-           somebody set. -->
+      
       <h1 tabindex="-1" class="truncate text-title font-title">
         {rounds?.opening?.task ?? shown?.task ?? run}
       </h1>

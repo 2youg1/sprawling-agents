@@ -29,7 +29,7 @@
 
 | 取值 | 含义 | 门要求什么 |
 |---|---|---|
-| `client` | 人用的动词，客户端必须画得出 | `client/src` 里有发出点，且 `run_command` 不以 `not_built` 作答 |
+| `client` | 人用的动词，客户端必须画得出 | `RefRain/src` 里有发出点，且 `run_command` 不以 `not_built` 作答 |
 | `push` | 由外部服务推进来，不是人点的 | 只要求 `run_command` 能执行；客户端有没有它都不看 |
 | `handshake` | 在握手层被吃掉，进不到 `run_command` | 两侧都不要求 |
 | `sealed` | 线上不可拼写 | 两侧都不要求；客户端**若**出现即为红 |
@@ -177,7 +177,7 @@ inductive VerbClass where
   | LocalOnly
   deriving DecidableEq, Repr
 
-/-- §19-2 的 reach 列：一行一臂，每臂上方的注释是那一行的说明。`xtask wiring` 读这些臂（Tools/xtask/Spec.lean §8-43），把它与 `enum Command`、`run_command` 的臂和 `client/src` 的发出点对照。 -/
+/-- §19-2 的 reach 列：一行一臂，每臂上方的注释是那一行的说明。`xtask wiring` 读这些臂（Tools/xtask/Spec.lean §8-43），把它与 `enum Command`、`run_command` 的臂和 `RefRain/src` 的发出点对照。 -/
 def Command.reach : Command → Reach
   -- 派活，产品的正面
   | .Dispatch => .client

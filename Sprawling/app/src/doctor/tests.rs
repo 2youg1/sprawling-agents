@@ -335,7 +335,7 @@ fn a_verdict_counts_the_required_items_of_its_own_tier_only() {
 fn every_item_has_the_page_clause_in_both_languages() {
     let words: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../client/src/lang.json"
+        "/../../RefRain/src/lang.json"
     )))
     .unwrap();
     let unworded: Vec<&str> = REQUIREMENTS

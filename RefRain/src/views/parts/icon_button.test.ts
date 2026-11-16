@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The icon-only key's wiring as client/spec/Views/Parts.lean §7-2
+// The icon-only key's wiring as RefRain/spec/Views/Parts.lean §7-2
 // states it: the accessible name is the label whatever the state, the
 // hint shows the name while the key can be used and the reason while it
 // cannot, `aria-describedby` points at the hint only when it carries a

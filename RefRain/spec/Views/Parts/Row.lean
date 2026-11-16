@@ -3,12 +3,12 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import client.spec.Views.Parts
+import RefRain.spec.Views.Parts
 
 /-!
 # row：一串各自可达的行，加上方向键
 
-规定 `client/src/views/parts/row.svelte` 的 `RowList`，键表在 `client/spec/Views/Parts.lean` §7-4。它没有 APG 部件模式：每一行仍是一个 Tab 站，方向键是加法不是替换。信箱面里的条目（`client/spec/Views/Workspace.lean` §7-11 的 j/k）用同一种走法。
+规定 `RefRain/src/views/parts/row.svelte` 的 `RowList`，键表在 `RefRain/spec/Views/Parts.lean` §7-4。它没有 APG 部件模式：每一行仍是一个 Tab 站，方向键是加法不是替换。信箱面里的条目（`RefRain/spec/Views/Workspace.lean` §7-11 的 j/k）用同一种走法。
 
 性质：
 

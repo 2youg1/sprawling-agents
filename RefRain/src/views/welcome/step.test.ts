@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The head of a step of the guide as a disclosure button (client/Spec.lean
+// The head of a step of the guide as a disclosure button (RefRain/Spec.lean
 // §7G): it controls the body it opens, says whether that body is open,
 // and a press reaches the guide.
 

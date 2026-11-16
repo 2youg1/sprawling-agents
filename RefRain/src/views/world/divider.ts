@@ -3,19 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What a workbench divider's look is given (`divider.look.svelte`), and
-// the wiring the seat (`divider.svelte`) builds for it: APG Window
-// Splitter (client/spec/Views/Workspace.lean §7-11). Left and Right move
-// the edge one column, Home and End to the narrowest and widest the pane
-// before it may be, Enter and a double click put the workbench back the
-// way it ships; the clamping is `core/workbench.ts`'s `resized`, whose
-// model is client/spec/Core/Workbench.lean.
 
 import { NARROWEST } from "../../core/workbench";
 import type { KeyPress } from "./drawn";
 
-// What a key on the divider asks for: the pane before it at `span`
-// columns, the workbench as it ships, or nothing.
+
 export type Step =
   | { readonly kind: "span"; readonly span: number }
   | { readonly kind: "reset" }
@@ -38,8 +30,7 @@ export function stepOf(key: string, span: number, widest: number): Step {
   }
 }
 
-// The bag spread on the separator. The pointer handlers capture the
-// pointer on the separator, so a drag that leaves it keeps moving it.
+
 export interface SplitterWire {
   readonly role: "separator";
   readonly tabindex: 0;
@@ -61,15 +52,15 @@ export interface SplitterWire {
 
 export interface DividerLook {
   readonly wire: SplitterWire;
-  // Whether a pointer is dragging it now, which lights it as hover and
-  // focus do.
+  
+  
   readonly dragging: boolean;
 }
 
 export interface DividerState {
-  // Already in the person's language: "width of <pane>".
+  
   readonly label: string;
-  // The id of the pane before the divider.
+  
   readonly controls: string;
   readonly span: number;
   readonly widest: number;
@@ -77,11 +68,11 @@ export interface DividerState {
 }
 
 export interface DividerHands {
-  // The pane before the divider at `span` columns; the seat clamps.
+  
   readonly set: (span: number) => void;
   readonly reset: () => void;
   readonly drag: (dragging: boolean) => void;
-  // A pointer moved to `clientX` while dragging.
+  
   readonly follow: (clientX: number) => void;
 }
 

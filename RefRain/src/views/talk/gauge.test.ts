@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 // The wiring the context ring and a sessions row's bar hand their looks:
-// the meter's values (client/spec/Views/Workspace.lean, the ring's
+// the meter's values (RefRain/spec/Views/Workspace.lean, the ring's
 // `aria-*`), which checkpoints each look is given, and that the bar
 // marks only the handoff.
 

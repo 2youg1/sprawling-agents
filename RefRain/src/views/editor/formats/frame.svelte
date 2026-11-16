@@ -6,18 +6,14 @@
 -->
 
 <script lang="ts">
-  // A page drawn apart from the client: an `iframe` whose empty
-  // `sandbox` runs no script and gives the page an origin of its own, so
-  // nothing it holds can read this page, the city's socket or the
-  // browser's storage, and whose page is first closed to the outside by
-  // `framed.ts` (client/Spec.lean §4-54, client D32). The frame scrolls itself, so
-  // a page longer than the pane is read inside it.
+  
+  
   import { framed } from "./framed";
 
   interface Props {
     readonly page: string;
     readonly scheme: "authored" | "built";
-    // The frame's accessible name: what is drawn in it.
+    
     readonly title: string;
   }
 

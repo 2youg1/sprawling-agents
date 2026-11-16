@@ -3,21 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Where a conversation column stands, which decides the two facts it
-// draws or leaves to a neighbour (client/Spec.lean §7K, "one place on a
-// screen"): the address line, which every tier draws in the box's
-// placeholder or at a past session's head (4-10a), and the frozen facts
-// of the session - model, effort, mode, policy, sandbox - which the first
-// message head states unless the panorama gauge strip above the
-// conversation landmark already does (docs/frontend-method.md §7D,
-// client D113).
-//
-// `page` is the conversation on the zen and blend page; `workbench` is the
-// same column in the panorama tier with a gauge strip that states the
-// frozen facts of `gauged` (`world/chosen.svelte.ts`'s answer, or a past
-// session's last run); `specimen` is a `#/gallery` fixture, which draws a
-// thread with no address line, because the fixture is not the page and
-// names no room a palette could leave.
 
 import type { RunId } from "../../wire";
 
@@ -39,15 +24,10 @@ export function drawsAddress(seat: Seat): boolean {
   }
 }
 
-// Where a run's frozen facts are said: on its first head, or elsewhere -
-// on the head of the run that opened the stretch, or in the gauge.
+
 export type FrozenFacts = "head" | "elsewhere";
 
-// The frozen facts of `run`, at `at` in the stretch on screen: the run
-// that opens the stretch states them on its first head, unless it is the
-// run the workbench's gauge already states them for. An earlier run of a
-// session the gauge reads at a later run keeps its own, because they are
-// that run's facts, not the gauge's.
+
 export function factsAt(seat: Seat, at: number, run: RunId): FrozenFacts {
   if (at !== 0) return "elsewhere";
   switch (seat.kind) {
