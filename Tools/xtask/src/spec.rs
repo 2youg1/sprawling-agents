@@ -3,18 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! `cargo xtask spec <lib>`: create a crate's `Spec.lean` with the MPL
-//! notice and the seventeen numbered section comments `Sprawling/city/skills/sdd` lists
-//! (Tools/xtask/Spec.lean §8-41), in the directory of the package whose lib
-//! (or, for a tool without one, whose package) goes by that name.
-//! Creation only: an existing `Spec.lean` is never overwritten, because
-//! everything past the skeleton is a specification somebody wrote.
-//!
-//! The gate of the same name judges what the tree holds and never
-//! writes (Tools/xtask/Spec.lean §8-42): the command makes a
-//! specification, the gate holds every specification to its rules, and
-//! neither does the other's job.
-
 use std::path::Path;
 
 use crate::header::{Leader, notice};
@@ -28,13 +16,37 @@ mod rustpath;
 mod source;
 mod theorems;
 
-/// The checker's directory. Its own specification sits in it, beside the
-/// checker, and is held to the rules a crate's is (Tools/xtask/Spec.lean
-/// §8-47): the checker is a Lean program, so no cargo package stands for it.
 const CHECKER: &str = "Tools/adversary";
 
-/// The seventeen responsibilities of `Sprawling/city/skills/sdd`, in its order. What each
-/// section holds is that skill's to say, so the skeleton carries titles only.
+fn under_checker(rel: &str) -> Option<&str> {
+    if let Some(rest) = rel.strip_prefix(CHECKER) {
+        return match rest.strip_prefix('/') {
+            Some(inside) => Some(inside),
+            None if rest.is_empty() => Some(""),
+            None => None,
+        };
+    }
+    let prefix = CHECKER.as_bytes();
+    let bytes = rel.as_bytes();
+    if bytes.len() >= prefix.len() && bytes[..prefix.len()].eq_ignore_ascii_case(prefix) {
+        let rest = &rel[prefix.len()..];
+        return match rest.strip_prefix('/') {
+            Some(inside) => Some(inside),
+            None if rest.is_empty() => Some(""),
+            None => None,
+        };
+    }
+    None
+}
+
+fn checker_rel(rel: &str) -> std::borrow::Cow<'_, str> {
+    match under_checker(rel) {
+        Some("") => std::borrow::Cow::Borrowed(CHECKER),
+        Some(inside) => std::borrow::Cow::Owned(format!("{CHECKER}/{inside}")),
+        None => std::borrow::Cow::Borrowed(rel),
+    }
+}
+
 const SECTIONS: [&str; 17] = [
     "需求分解",
     "验收标准",
@@ -55,11 +67,6 @@ const SECTIONS: [&str; 17] = [
     "文档关系",
 ];
 
-/// The `spec` gate: one effective specification per package, no prose
-/// naming a SPEC the tree lacks, the import discipline, no `sorry`,
-/// `admit` or `axiom`, every path a specification cites on disk, the
-/// two counts that may only fall, and each decision number heading one
-/// decision in its specification.
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
     effective::one_per_package(root, &mut violations)?;

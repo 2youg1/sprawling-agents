@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The repository scan: the half only a gate can do, because it is a
-//! statement about every file rather than about one table.
-
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
@@ -13,35 +10,12 @@ use crate::sheet::{self, Reading};
 use crate::theme;
 use crate::walk;
 
-/// Each client names colour in one theme. The browser client's is the
-/// entry and the parts it imports (`theme::is_theme`); playback owns its
-/// own palette because the exported page cannot load the browser
-/// client's CSS.
 const PLAYBACK_THEME: &str = "Sprawling/city/skills/playback/src/style.css";
 
-/// The offline output of the playback stylesheet. Its generation banner
-/// identifies output; the shared Bun recipe verifies the assembled bytes.
 const PLAYBACK_PAGE: &str = "Sprawling/city/skills/playback/template.html";
 
-/// Cities an earlier release wrote, kept byte for byte so this build is
-/// tested against them (`Sprawling/app/tests/previous_release.rs`).
-/// The skills shelved in them carry that release's playback palette:
-/// they are that release's output, not a client of this tree, so they
-/// name no colour this tree owns (Tools/xtask/Spec.lean §8-8).
 const EARLIER_RELEASES: &str = "Sprawling/app/tests/cities/";
 
-/// The files that spell colour because reading a colour means naming
-/// it, and the one test that writes the spelling it asserts. Same shape
-/// and same reason as `Tools/xtask/lexicon.toml` being outside the lexicon
-/// scan - a checker has to be able to spell what it forbids.
-/// `tables.rs` joined them when the token tables moved into the
-/// stylesheet: reading an `oklch()` value means naming the function
-/// that holds it. The probe and the survey's `Paint` test are that same
-/// case one step out: the probe hands the engine a value to resolve and
-/// reads the pixels back, so it must spell the transparent fill that
-/// clears the canvas between readings, and the test states the one
-/// spelling `Paint::to_string` promises a person. `glass.rs` writes the
-/// rungs its tests lay glass over, for the reason `tests.rs` does.
 const SPELLS_COLOUR: [&str; 8] = [
     "Tools/xtask/src/color.rs",
     "Tools/xtask/src/color/glass.rs",
@@ -53,20 +27,8 @@ const SPELLS_COLOUR: [&str; 8] = [
     "Sprawling/browser/src/survey/tests.rs",
 ];
 
-/// Extensions worth scanning: Rust, the two file kinds that carry style,
-/// and the client's components, whose `<style>` block is a stylesheet
-/// (`sheet::lines`).
 const SCAN_EXTS: [&str; 4] = ["rs", "css", "html", "svelte"];
 
-/// Colour spellings that must not appear outside the theme.
-///
-/// Hex is judged differently per language, because `#` means different
-/// things in each. In style files a bare `#1a2b3c` is a colour. In Rust,
-/// and in a component's script and markup, it is far more often a
-/// Locator fragment, an issue number or a block (`{#each}`), so only a
-/// fully-quoted `"#1a2b3c"` counts - the shape somebody actually writes
-/// when they mean a colour. The first run of this gate caught
-/// `cas:b3-…#B01-2` and taught this distinction.
 pub(super) fn literal_at(line: &str, reading: Reading) -> Option<&'static str> {
     for syntax in ["oklch(", "rgb(", "rgba(", "hsl(", "hsla("] {
         if line.contains(syntax) {
@@ -167,14 +129,11 @@ pub(super) mod tests {
         );
         assert_eq!(literal_at("let x = 3;", Reading::Code), None);
 
-        // The shape somebody writes in Rust when they mean a colour.
         assert_eq!(
             literal_at(r##"let bg = "#070A12";"##, Reading::Code),
             Some("#rrggbb")
         );
 
-        // A Locator fragment is not a colour. This exact line is what the
-        // gate's first run tripped on.
         assert_eq!(
             literal_at(r##"format!("cas:b3-{H64}#B01-2"),"##, Reading::Code),
             None
@@ -183,7 +142,6 @@ pub(super) mod tests {
             literal_at("issue #4707 records the status", Reading::Code),
             None
         );
-        // A digest is longer than six hex digits either way.
         assert_eq!(
             literal_at(
                 "// 692b5f963f99f018496b8df111314dfe1bed52ccfe1a40cb9a5975b3bc8664fe",
@@ -193,11 +151,6 @@ pub(super) mod tests {
         );
     }
 
-    /// The client names colour in exactly one file, and only there.
-    ///
-    /// The scan runs over a tree holding the production point and one ordinary
-    /// stylesheet: the production point is silent and the other file is
-    /// reported, which is the whole rule.
     #[test]
     fn the_client_names_colour_in_one_file() {
         let root = std::env::temp_dir().join(format!("color-theme-{}", std::process::id()));
@@ -245,16 +198,13 @@ pub(super) mod tests {
                 .map(|v| v.location.as_str())
                 .collect::<Vec<_>>(),
             [
-                "client/src/panel.css:1",
-                "Sprawling/city/skills/playback/template.html:1"
+                "Sprawling/city/skills/playback/template.html:1",
+                "client/src/panel.css:1"
             ]
         );
         std::fs::remove_dir_all(&root).unwrap();
     }
 
-    /// The theme is its entry and every part the entry imports: a token
-    /// declared in a part is the theme naming a colour, while a
-    /// stylesheet beside the parts that no entry imports is not.
     #[test]
     fn a_part_the_theme_imports_names_colour_as_the_theme() {
         let root = std::env::temp_dir().join(format!("color-theme-part-{}", std::process::id()));
@@ -292,10 +242,6 @@ pub(super) mod tests {
         std::fs::remove_dir_all(&root).unwrap();
     }
 
-    /// A `.svelte` file is markup with one stylesheet inside it. The
-    /// markup is judged as Rust is, where `#` is far more often a
-    /// fragment or a block (`{#each}` would read as the colour `#eac`),
-    /// and the top-level `<style>` block as a stylesheet is.
     #[test]
     fn a_component_style_is_judged_as_a_stylesheet_and_its_markup_is_not() {
         let root = std::env::temp_dir().join(format!("color-svelte-{}", std::process::id()));
@@ -315,10 +261,6 @@ pub(super) mod tests {
         std::fs::remove_dir_all(&root).unwrap();
     }
 
-    /// The component the color gate's tests share: markup that only
-    /// looks like colour, then a `<style>` block with one literal (line
-    /// 7), one rung (8), one misspelt role (9) and one colour declared
-    /// outside the theme (10).
     pub(in crate::color) const SVELTE_FIXTURE: &str = "<script lang=\"ts\">
   const rows = [1];
 </script>
