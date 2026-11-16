@@ -83,7 +83,7 @@ pub fn enableRaw() Error!void {
     if (saved_unix != null) return;
     const fd = posix.STDIN_FILENO;
     var term = posix.tcgetattr(fd) catch |err| return mapTermios(err);
-    saved_unix = term;
+    const original = term;
     term.lflag.ECHO = false;
     term.lflag.ICANON = false;
     term.lflag.ISIG = false;
@@ -94,9 +94,10 @@ pub fn enableRaw() Error!void {
     term.iflag.INPCK = false;
     term.iflag.ISTRIP = false;
     term.oflag.OPOST = false;
-    term.cc[@intFromEnum(posix.V.MIN)] = 1;
-    term.cc[@intFromEnum(posix.V.TIME)] = 0;
+    term.cc[@backingInt(posix.V.MIN)] = 1;
+    term.cc[@backingInt(posix.V.TIME)] = 0;
     posix.tcsetattr(fd, .NOW, term) catch |err| return mapTermios(err);
+    saved_unix = original;
 }
 
 pub fn disableRaw() Error!void {

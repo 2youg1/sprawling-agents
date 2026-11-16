@@ -42,13 +42,13 @@ export fn calyx_shell_replay_flag(
         stack[i] = argv_ptr[i][0..argv_lens[i]];
     }
     return switch (argv.replayFlag(stack[0..n])) {
-        .none => @intFromEnum(ReplayStatus.none),
-        .missing_value => @intFromEnum(ReplayStatus.missing_value),
+        .none => @backingInt(ReplayStatus.none),
+        .missing_value => @backingInt(ReplayStatus.missing_value),
         .path => |path| blk: {
-            if (capacity < path.len) break :blk @intFromEnum(ReplayStatus.buffer_too_small);
+            if (capacity < path.len) break :blk @backingInt(ReplayStatus.buffer_too_small);
             @memcpy(into[0..path.len], path);
             written.* = path.len;
-            break :blk @intFromEnum(ReplayStatus.found);
+            break :blk @backingInt(ReplayStatus.found);
         },
     };
 }
@@ -66,18 +66,18 @@ export fn calyx_shell_mei_program(
     const mei_bin: ?[]const u8 = if (mei_bin_len == 0) null else mei_bin_ptr[0..mei_bin_len];
     const sibling: ?[]const u8 = if (sibling_len == 0) null else sibling_ptr[0..sibling_len];
     const path = mei_path.resolve(mei_bin, sibling, sibling_exists != 0, into[0..capacity]) catch {
-        return @intFromEnum(MeiStatus.buffer_too_small);
+        return @backingInt(MeiStatus.buffer_too_small);
     };
     written.* = path.len;
-    return @intFromEnum(MeiStatus.ok);
+    return @backingInt(MeiStatus.ok);
 }
 
 export fn calyx_shell_mei_sibling_name(into: [*]u8, capacity: usize, written: *usize) u32 {
     const name = mei_path.siblingName();
-    if (capacity < name.len) return @intFromEnum(MeiStatus.buffer_too_small);
+    if (capacity < name.len) return @backingInt(MeiStatus.buffer_too_small);
     @memcpy(into[0..name.len], name);
     written.* = name.len;
-    return @intFromEnum(MeiStatus.ok);
+    return @backingInt(MeiStatus.ok);
 }
 
 // Keep city UI exports in the installed shell archive (not test-only).

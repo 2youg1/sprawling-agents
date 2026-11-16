@@ -43,10 +43,14 @@ pub fn build(b: *std.Build) void {
         .pic = pic,
         .imports = &shell_imports,
         .link_libc = true,
-        // Rust links this archive on Windows without Zig's compiler_rt; stack
-        // probes would pull LdrRegisterDllNotification. City UI poll buffers
-        // are heap-allocated so frames stay small.
+        // Rust links this archive without Zig's compiler_rt. Stack probes,
+        // stack protectors, and unwind/debug printers pull undefined MSVC
+        // symbols (__stack_chk_*, ___chkstk_ms, LdrRegisterDllNotification).
         .stack_check = false,
+        .stack_protector = false,
+        .strip = true,
+        .omit_frame_pointer = true,
+        .unwind_tables = .none,
     });
     const shell = b.addLibrary(.{
         .name = "sprawling_calyx_shell",

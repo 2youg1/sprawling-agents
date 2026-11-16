@@ -199,16 +199,16 @@ fn drawScene(gpa: std.mem.Allocator, bytes: []const u8, into: *std.ArrayList(u8)
             into.items.len,
             &drawn,
         );
-        if (status == @intFromEnum(part.Status.Drawn)) {
+        if (status == @backingInt(part.Status.Drawn)) {
             into.shrinkRetainingCapacity(drawn.written);
             return drawn;
         }
-        if (status == @intFromEnum(part.Status.Full) and capacity < longest) {
+        if (status == @backingInt(part.Status.Full) and capacity < longest) {
             capacity = @min(capacity *| 2, longest);
             continue;
         }
         into.clearRetainingCapacity();
-        return if (status == @intFromEnum(part.Status.Full)) error.too_long else error.malformed;
+        return if (status == @backingInt(part.Status.Full)) error.too_long else error.malformed;
     }
 }
 

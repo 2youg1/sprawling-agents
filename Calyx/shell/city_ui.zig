@@ -36,9 +36,9 @@ pub fn run(
 }
 
 export fn calyx_city_ui_run(config: *const host_mod.CityConfig, host: *const host_mod.Host) i32 {
-    var gpa_state: std.heap.DebugAllocator(.{}) = .init;
-    defer _ = gpa_state.deinit();
-    return run(gpa_state.allocator(), config, host, .tty);
+    // libc allocator: DebugAllocator's error paths pull Zig debug printers
+    // that MSVC cannot resolve when Rust links this archive.
+    return run(std.heap.c_allocator, config, host, .tty);
 }
 
 const LiveMeta = struct {
@@ -112,7 +112,7 @@ const Ui = struct {
         self.dry = mode == .dry;
         if (!self.dry) {
             if (self.screen.take() == .lost) {
-                self.host.tell(self.host.ctx, @intFromEnum(host_mod.LifecycleEvent.terminal_lost), 0);
+                self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.terminal_lost), 0);
                 return 1;
             }
         }
@@ -148,7 +148,7 @@ const Ui = struct {
 
             const event = termio.readEvent(&stdin_buf, &stdin_filled) catch {
                 self.lost = true;
-                self.host.tell(self.host.ctx, @intFromEnum(host_mod.LifecycleEvent.terminal_lost), 0);
+                self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.terminal_lost), 0);
                 continue;
             } orelse continue;
 
@@ -174,7 +174,7 @@ const Ui = struct {
                 .asking => self.onAsking(payload),
                 .lost => {
                     self.screen.cut();
-                    self.host.tell(self.host.ctx, @intFromEnum(host_mod.LifecycleEvent.terminal_lost), 0);
+                    self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.terminal_lost), 0);
                     self.lost = true;
                     return;
                 },
@@ -186,7 +186,7 @@ const Ui = struct {
         if (payload.len < @sizeOf(host_mod.FaceBytes)) return;
         var face: host_mod.FaceBytes = undefined;
         @memcpy(std.mem.asBytes(&face), payload[0..@sizeOf(host_mod.FaceBytes)]);
-        const next: lifecycle.Face = switch (@as(host_mod.FaceTag, @enumFromInt(face.tag))) {
+        const next: lifecycle.Face = switch (@as(host_mod.FaceTag, @fromBackingInt(@intCast(face.tag)))) {
             .opening => .opening,
             .cli => .cli,
             .quiet_host => .quiet_host,
@@ -319,7 +319,7 @@ const Ui = struct {
             },
             .lost => {
                 self.screen.cut();
-                self.host.tell(self.host.ctx, @intFromEnum(host_mod.LifecycleEvent.terminal_lost), 0);
+                self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.terminal_lost), 0);
                 self.lost = true;
             },
         }
@@ -337,7 +337,7 @@ const Ui = struct {
         switch (self.shown) {
             .quiet_host => {
                 if (k.code == .esc) {
-                    self.host.tell(self.host.ctx, @intFromEnum(host_mod.LifecycleEvent.back), 0);
+                    self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.back), 0);
                 } else if (k.code == .enter) {
                     const url = host_mod.urlOf(self.config);
                     _ = self.host.open_paired(self.host.ctx, url.ptr, url.len);
@@ -390,7 +390,7 @@ const Ui = struct {
         self.asking = null;
         if (event) |ev| {
             self.redraw(&.{});
-            self.host.tell(self.host.ctx, @intFromEnum(ev), 0);
+            self.host.tell(self.host.ctx, @backingInt(ev), 0);
         } else {
             var buf: [96]u8 = undefined;
             const msg = std.fmt.bufPrint(&buf, "  the city keeps serving; {d} runs go on", .{going}) catch return;
@@ -444,7 +444,7 @@ const Ui = struct {
             self.redraw(&.{});
             return;
         }
-        self.host.tell(self.host.ctx, @intFromEnum(host_mod.LifecycleEvent.web), 0);
+        self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.web), 0);
     }
 
     fn complete(self: *Ui) void {
@@ -574,7 +574,7 @@ const Ui = struct {
     fn drawn(self: *Ui, written: screen_mod.Written) void {
         if (written == .lost) {
             self.lost = true;
-            self.host.tell(self.host.ctx, @intFromEnum(host_mod.LifecycleEvent.terminal_lost), 0);
+            self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.terminal_lost), 0);
         }
     }
 
@@ -693,7 +693,7 @@ const StubHost = struct {
 
     fn pushFace(self: *StubHost, tag: host_mod.FaceTag) !void {
         var face = host_mod.FaceBytes{
-            .tag = @intFromEnum(tag),
+            .tag = @backingInt(tag),
             .mode = 0,
             .sinks = 0,
             .handoff = 0,
@@ -735,17 +735,17 @@ const StubHost = struct {
         const self: *StubHost = @ptrCast(@alignCast(ctx));
         if (self.events.items.len == 0) {
             written.* = 0;
-            return @intFromEnum(host_mod.HostEventKind.empty);
+            return @backingInt(host_mod.HostEventKind.empty);
         }
         const ev = self.events.orderedRemove(0);
         defer self.gpa.free(ev.bytes);
         if (ev.bytes.len > capacity) {
             written.* = 0;
-            return @intFromEnum(host_mod.HostEventKind.empty);
+            return @backingInt(host_mod.HostEventKind.empty);
         }
         @memcpy(into[0..ev.bytes.len], ev.bytes);
         written.* = ev.bytes.len;
-        return @intFromEnum(ev.kind);
+        return @backingInt(ev.kind);
     }
 
     fn tell(ctx: *anyopaque, event: u32, arg: u32) callconv(.c) void {
@@ -825,7 +825,7 @@ test "dry city ui drains host face entries and handles quiet keys via host" {
     ui.onKey(.{ .code = .esc });
     ui.onKey(.{ .code = .enter });
     try std.testing.expect(stub.tells.items.len >= 1);
-    try std.testing.expectEqual(@intFromEnum(host_mod.LifecycleEvent.back), stub.tells.items[0]);
+    try std.testing.expectEqual(@backingInt(host_mod.LifecycleEvent.back), stub.tells.items[0]);
     try std.testing.expectEqual(@as(usize, 1), stub.opened);
 }
 
@@ -881,5 +881,5 @@ test "host asking event arms quit confirm and enter drains" {
     ui.onKey(.{ .code = .enter });
     try std.testing.expect(ui.asking == null);
     try std.testing.expectEqual(@as(usize, 1), stub.tells.items.len);
-    try std.testing.expectEqual(@intFromEnum(host_mod.LifecycleEvent.quit_drain), stub.tells.items[0]);
+    try std.testing.expectEqual(@backingInt(host_mod.LifecycleEvent.quit_drain), stub.tells.items[0]);
 }

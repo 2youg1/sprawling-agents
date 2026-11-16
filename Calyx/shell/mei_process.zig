@@ -441,8 +441,8 @@ fn driveOutput(
     var msg_buf: [128]u8 = undefined;
     const msg = switch (term) {
         .exited => |code| try std.fmt.bufPrint(&msg_buf, "Mei exited with code {d}", .{code}),
-        .signal => |sig| try std.fmt.bufPrint(&msg_buf, "Mei terminated with signal {d}", .{@intFromEnum(sig)}),
-        .stopped => |sig| try std.fmt.bufPrint(&msg_buf, "Mei stopped with signal {d}", .{@intFromEnum(sig)}),
+        .signal => |sig| try std.fmt.bufPrint(&msg_buf, "Mei terminated with signal {d}", .{@backingInt(sig)}),
+        .stopped => |sig| try std.fmt.bufPrint(&msg_buf, "Mei stopped with signal {d}", .{@backingInt(sig)}),
         .unknown => "Mei terminated unexpectedly",
     };
     return .{ .err = try gpa.dupe(u8, msg) };

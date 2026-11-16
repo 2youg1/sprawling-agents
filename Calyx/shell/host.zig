@@ -206,7 +206,7 @@ pub fn encodeNotes(gpa: std.mem.Allocator, notes: []const []const u8) ![]u8 {
     std.mem.writeInt(u32, &count_buf, @intCast(notes.len), .little);
     try list.appendSlice(gpa, &count_buf);
     for (notes) |said| {
-        try list.append(gpa, @intFromEnum(part.Part.Note));
+        try list.append(gpa, @backingInt(part.Part.Note));
         const length: u32 = @intCast(@min(said.len, std.math.maxInt(u32)));
         var len_buf: [4]u8 = undefined;
         std.mem.writeInt(u32, &len_buf, length, .little);

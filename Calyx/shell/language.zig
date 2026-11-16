@@ -8,38 +8,38 @@ const std = @import("std");
 const off_the_socket = [_][]const u8{ "PutSecret", "Auth" };
 
 pub const command_names = [_][]const u8{
-    "Dispatch",             "ProbeEndpoint",      "ConfigureBuilding", "AttachEndpoint",
-    "SelectModel",          "OpenSession",        "CreateBuilding",    "RemoveBuilding",
-    "PutSecret",            "Steer",              "Cancel",            "Halt",
-    "Reveal",               "RestoreDiscard",     "DoctorInstall",     "DoctorRefresh",
-    "Release",              "BatchByBuilding",    "Approve",           "HandOff",
-    "SetAutonomy",          "Pursue",             "Wake",              "PutDocument",
-    "PutIdentity",          "PutRules",           "SetWorkspaceChoice","RestoreFile",
-    "PutGuide",             "ConfigureCity",      "PutSpine",          "PutRange",
-    "DecideProposals",      "ConnectToolkit",     "PutPreferences",    "PutShelved",
-    "NameSession",          "ChangeRunPolicy",    "OpenRemoteDoor",    "ReplaceCityKey",
-    "ConfirmRemoteDoor",    "CloseRemoteDoor",    "PrivacyOperation",  "ForgetSecret",
-    "CloseCity",            "AddAgent",           "AgentLogin",        "ForgetDevice",
-    "PutPrompt",            "Auth",
+    "Dispatch",          "ProbeEndpoint",   "ConfigureBuilding",  "AttachEndpoint",
+    "SelectModel",       "OpenSession",     "CreateBuilding",     "RemoveBuilding",
+    "PutSecret",         "Steer",           "Cancel",             "Halt",
+    "Reveal",            "RestoreDiscard",  "DoctorInstall",      "DoctorRefresh",
+    "Release",           "BatchByBuilding", "Approve",            "HandOff",
+    "SetAutonomy",       "Pursue",          "Wake",               "PutDocument",
+    "PutIdentity",       "PutRules",        "SetWorkspaceChoice", "RestoreFile",
+    "PutGuide",          "ConfigureCity",   "PutSpine",           "PutRange",
+    "DecideProposals",   "ConnectToolkit",  "PutPreferences",     "PutShelved",
+    "NameSession",       "ChangeRunPolicy", "OpenRemoteDoor",     "ReplaceCityKey",
+    "ConfirmRemoteDoor", "CloseRemoteDoor", "PrivacyOperation",   "ForgetSecret",
+    "CloseCity",         "AddAgent",        "AgentLogin",         "ForgetDevice",
+    "PutPrompt",         "Auth",
 };
 
 pub const query_names = [_][]const u8{
-    "History",        "RunHistory",     "HistoryRange",   "Sessions",
-    "Changes",        "Hunks",          "Commit",         "RunView",
-    "CityView",       "ApprovalQueue",  "InboxView",      "Metrics",
-    "CostView",       "ArchiveSearch",  "RegistryView",   "DiscardView",
-    "EndpointView",   "KnownHosts",     "AgentCatalog",   "ParseAgentSpec",
-    "Devices",        "BuildingView",   "Identity",       "Automation",
-    "GithubLogin",    "Guide",          "Governance",     "Rounds",
-    "Evidence",       "CostOf",         "Listing",        "Find",
-    "Document",       "Proposals",      "OpenProposals",  "Range",
-    "Versions",       "Bytes",          "Export",         "Preview",
-    "Reply",          "Commits",        "Doctor",         "Prefix",
-    "PromptShape",    "Content",        "Skills",         "Template",
-    "GitStatus",      "McpHealth",      "Toolkits",       "NewestRelease",
-    "Privacy",        "Preferences",    "Config",         "RunCosts",
-    "UpstreamVersion","SkillUsage",     "McpUsage",       "UsageExport",
-    "Shells",         "ModelFigures",   "Layers",         "Catalog",
+    "History",         "RunHistory",    "HistoryRange",  "Sessions",
+    "Changes",         "Hunks",         "Commit",        "RunView",
+    "CityView",        "ApprovalQueue", "InboxView",     "Metrics",
+    "CostView",        "ArchiveSearch", "RegistryView",  "DiscardView",
+    "EndpointView",    "KnownHosts",    "AgentCatalog",  "ParseAgentSpec",
+    "Devices",         "BuildingView",  "Identity",      "Automation",
+    "GithubLogin",     "Guide",         "Governance",    "Rounds",
+    "Evidence",        "CostOf",        "Listing",       "Find",
+    "Document",        "Proposals",     "OpenProposals", "Range",
+    "Versions",        "Bytes",         "Export",        "Preview",
+    "Reply",           "Commits",       "Doctor",        "Prefix",
+    "PromptShape",     "Content",       "Skills",        "Template",
+    "GitStatus",       "McpHealth",     "Toolkits",      "NewestRelease",
+    "Privacy",         "Preferences",   "Config",        "RunCosts",
+    "UpstreamVersion", "SkillUsage",    "McpUsage",      "UsageExport",
+    "Shells",          "ModelFigures",  "Layers",        "Catalog",
 };
 
 pub const Offered = enum {
@@ -74,8 +74,8 @@ pub const Slash = enum {
     wire,
 
     pub const all = [_]Slash{
-        .help, .room, .new, .stop, .halt, .release, .model, .effort,
-        .approve, .deny, .web, .quit, .serving, .remote, .acp, .wire,
+        .help,    .room, .new, .stop, .halt,    .release, .model, .effort,
+        .approve, .deny, .web, .quit, .serving, .remote,  .acp,   .wire,
     };
 
     pub fn spelling(self: Slash) []const u8 {

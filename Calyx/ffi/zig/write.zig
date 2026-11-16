@@ -120,7 +120,7 @@ pub fn writeInline(out: *std.Io.Writer, frame: Inline) Error!void {
     try short(out, frame.columns);
     try short(out, frame.rows);
     try short(out, frame.erase);
-    try byte(out, if (frame.previous) |p| @intFromEnum(p) else 0);
+    try byte(out, if (frame.previous) |p| @backingInt(p) else 0);
     try count(out, frame.entries.len);
     for (frame.entries) |entry| try writeEntry(out, entry);
     if (frame.live) |live| try writeLive(out, live);
@@ -172,18 +172,18 @@ fn writeEntry(out: *std.Io.Writer, entry: Entry) Error!void {
             try text(out, t.name);
             try text(out, t.subject);
             try longOpt(out, t.took_us);
-            try byte(out, @intFromEnum(t.outcome));
+            try byte(out, @backingInt(t.outcome));
         },
         .reply => |said| try text(out, said),
         .note => |said| try text(out, said),
         .ended => |e| {
             try time(out, e.at);
-            try byte(out, @intFromEnum(e.ending));
+            try byte(out, @backingInt(e.ending));
             try longOpt(out, e.took_s);
         },
         .resolved => |r| {
             try time(out, r.at);
-            try byte(out, @intFromEnum(r.verdict));
+            try byte(out, @backingInt(r.verdict));
             try text(out, r.what);
         },
     }
@@ -229,7 +229,7 @@ fn writeLive(out: *std.Io.Writer, live: Live) Error!void {
 }
 
 fn tag(out: *std.Io.Writer, value: part.Part) Error!void {
-    try byte(out, @intFromEnum(value));
+    try byte(out, @backingInt(value));
 }
 
 fn byte(out: *std.Io.Writer, value: u8) Error!void {
@@ -325,7 +325,7 @@ test "inline scene round-trips tags and fields" {
     try std.testing.expectEqual(@as(u16, 80), try r.short());
     try std.testing.expectEqual(@as(u16, 24), try r.short());
     try std.testing.expectEqual(@as(u16, 3), try r.short());
-    try std.testing.expectEqual(@as(u8, @intFromEnum(part.Part.Reply)), try r.byte());
+    try std.testing.expectEqual(@as(u8, @backingInt(part.Part.Reply)), try r.byte());
     try std.testing.expectEqual(@as(u32, entries.len), try r.word());
 
     try std.testing.expectEqual(part.Part.Banner, try r.tag());

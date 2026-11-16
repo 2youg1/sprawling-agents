@@ -61,15 +61,25 @@ pub const Session = struct {
 
         const file = std.Io.Dir.cwd().createFile(io, path, .{
             .exclusive = true,
-            .permissions = if (comptime @hasDecl(std.Io.File.Permissions, "fromMode"))
-                .fromMode(0o600)
+            // POSIX: owner read/write only. Windows: default attributes (no Unix mode).
+            .permissions = if (comptime builtin.os.tag == .windows)
+                .default_file
             else
-                .default_file,
+                .fromMode(0o600),
         }) catch |err| {
             const diag = formatFailure(gpa, "create a new Mei session", @errorName(err), path) catch dupeOrStatic(gpa, "create a new Mei session");
             gpa.free(path);
             return .{ .err = diag };
         };
+        if (comptime builtin.os.tag != .windows) {
+            file.setPermissions(io, .fromMode(0o600)) catch {
+                file.close(io);
+                std.Io.Dir.cwd().deleteFile(io, path) catch {};
+                const diag = dupeOrStatic(gpa, "restrict session file permissions");
+                gpa.free(path);
+                return .{ .err = diag };
+            };
+        }
         file.close(io);
 
         return .{ .ok = .{
@@ -234,6 +244,26 @@ fn formatFailureWithRecovery(
         \\resolution = "{s}"
         \\```
     , .{ action, subject, path, path, recovery });
+}
+
+test "createIn session file is owner-only on POSIX" {
+    if (comptime builtin.os.tag == .windows) return;
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const dir_rel = try std.fmt.allocPrint(gpa, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    defer gpa.free(dir_rel);
+    var session = switch (Session.createIn(gpa, io, dir_rel, 7)) {
+        .ok => |s| s,
+        .err => |e| {
+            defer freeDiag(gpa, e);
+            return error.TestUnexpectedResult;
+        },
+    };
+    defer session.deinit();
+    const st = try std.Io.Dir.cwd().statFile(io, session.pathSlice(), .{});
+    try std.testing.expect((st.permissions.toMode() & 0o077) == 0);
 }
 
 test "create import append round-trip" {
