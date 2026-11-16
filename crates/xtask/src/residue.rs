@@ -4,9 +4,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Gate: retired legacy paths leave no residue in active configuration
-//! (xtask D45). Historical CHANGELOG text is outside the scan;
-//! `residue-ok:` covers its line and the following. A legacy path whose
-//! status is still `live` does not fail the present layout.
+//! (xtask D45). Historical CHANGELOG files are outside the scan by
+//! filename scope. A legacy path whose status is still `live` does not
+//! fail the present layout.
 
 use std::path::Path;
 
@@ -17,8 +17,8 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 const GATE: &str = "residue";
-const RULE: &str = "a retired legacy path must not remain in the tree or in active configuration (xtask D45)";
-const MARK: &str = "residue-ok:";
+const RULE: &str =
+    "a retired legacy path must not remain in the tree or in active configuration (xtask D45)";
 
 /// Filename stems treated as historical record, never as active config.
 const HISTORY_FILES: [&str; 1] = ["CHANGELOG.md"];
@@ -41,7 +41,11 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 
 fn missing_current(root: &Path, table: &Table) -> Vec<Violation> {
     let mut violations = Vec::new();
-    for product in table.roots.iter().filter(|product| product.layout == Layout::Current) {
+    for product in table
+        .roots
+        .iter()
+        .filter(|product| product.layout == Layout::Current)
+    {
         let Some(path) = table.path_of(&product.name) else {
             continue;
         };
@@ -67,7 +71,11 @@ fn missing_current(root: &Path, table: &Table) -> Vec<Violation> {
 
 fn wrong_case(root: &Path, table: &Table) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
-    for product in table.roots.iter().filter(|root| root.layout == Layout::Current) {
+    for product in table
+        .roots
+        .iter()
+        .filter(|root| root.layout == Layout::Current)
+    {
         if let Some(found) = sibling_wrong_case(root, &product.path)? {
             violations.push(Violation {
                 gate: GATE,
@@ -138,20 +146,11 @@ fn retired_residue(
     }
     for file in walk::files(root)? {
         let rel = walk::rel(root, &file);
-        if walk::in_isolation_zone(&rel) || !is_active_config(&rel) {
+        if !is_active_config(&rel) {
             continue;
         }
         let text = walk::read_text(&file)?;
-        let lines: Vec<&str> = text.lines().collect();
-        for (number, line) in lines.iter().enumerate() {
-            let marked = line.contains(MARK)
-                || number
-                    .checked_sub(1)
-                    .and_then(|prev| lines.get(prev))
-                    .is_some_and(|prev| prev.contains(MARK));
-            if marked {
-                continue;
-            }
+        for (number, line) in text.lines().enumerate() {
             if defines_legacy_row(&rel, line, legacy) {
                 continue;
             }
@@ -170,7 +169,7 @@ fn retired_residue(
                     legacy.path
                 ),
                 alternative: format!(
-                    "rewrite the path from `{map}`, or mark a historical line with `{MARK}`",
+                    "rewrite the path from `{map}`, or move historical prose into a CHANGELOG",
                     map = modmap::MAP
                 ),
             });
@@ -181,7 +180,10 @@ fn retired_residue(
 
 fn is_active_config(rel: &str) -> bool {
     let name = rel.rsplit('/').next().unwrap_or(rel);
-    if HISTORY_FILES.iter().any(|history| name.eq_ignore_ascii_case(history)) {
+    if HISTORY_FILES
+        .iter()
+        .any(|history| name.eq_ignore_ascii_case(history))
+    {
         return false;
     }
     if name.eq_ignore_ascii_case("justfile") || name.eq_ignore_ascii_case("lakefile.toml") {
@@ -264,10 +266,8 @@ status = "live"
     }
 
     fn scratch(label: &str) -> std::path::PathBuf {
-        let root = std::env::temp_dir().join(format!(
-            "xtask-residue-{label}-{}",
-            std::process::id()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("xtask-residue-{label}-{}", std::process::id()));
         if root.exists() {
             std::fs::remove_dir_all(&root).unwrap();
         }
@@ -300,7 +300,7 @@ status = "live"
     }
 
     #[test]
-    fn changelog_and_residue_ok_lines_are_outside_the_scan() {
+    fn changelog_files_are_outside_the_scan_by_filename_scope() {
         let root = scratch("history");
         fixture::write(&root, modmap::MAP, &minimal_table(true));
         fixture::write(
@@ -308,14 +308,26 @@ status = "live"
             "docs/CHANGELOG.md",
             "- moved out of `crates/kernel`\n",
         );
-        fixture::write(
-            &root,
-            "notes.toml",
-            "# residue-ok: historical map\nold = \"crates/kernel\"\n",
-        );
         let violations = check(&root).unwrap();
         std::fs::remove_dir_all(&root).unwrap();
         assert!(violations.is_empty(), "{violations:?}");
+    }
+
+    #[test]
+    fn an_active_config_path_is_not_skippable_by_a_marker_comment() {
+        let root = scratch("no-waiver");
+        fixture::write(&root, modmap::MAP, &minimal_table(true));
+        fixture::write(
+            &root,
+            "Cargo.toml",
+            "# historical note\nmembers = [\"crates/kernel\"]\n",
+        );
+        let violations = check(&root).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(
+            violations.iter().any(|v| v.violation.contains("crates")),
+            "{violations:?}"
+        );
     }
 
     #[test]
@@ -366,7 +378,10 @@ status = "live"
             "crates"
         ));
         assert!(!line_names_legacy("members = [\"crates\"]", "crates"));
-        assert!(!line_names_legacy("matrix.environment == 'client'", "client"));
+        assert!(!line_names_legacy(
+            "matrix.environment == 'client'",
+            "client"
+        ));
     }
 
     #[test]

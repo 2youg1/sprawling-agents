@@ -238,7 +238,11 @@ status = "live"
         assert_eq!(table.path_of("Calyx"), Some("Calyx"));
         assert_eq!(table.path_of("RefRain"), Some("RefRain"));
         assert_eq!(table.path_of("Mei"), Some("Mei"));
-        let refrain = table.roots.iter().find(|root| root.name == "RefRain").unwrap();
+        let refrain = table
+            .roots
+            .iter()
+            .find(|root| root.name == "RefRain")
+            .unwrap();
         assert_eq!(refrain.transition.as_deref(), Some("client"));
         assert!(table.retired().is_empty());
         assert_eq!(table.legacy.len(), 2);
