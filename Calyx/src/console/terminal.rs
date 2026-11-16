@@ -3,13 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::io::BufRead;
+use std::io::{BufRead, Write};
 use std::net::SocketAddr;
 use std::sync::Arc;
 
 use super::cli::{Next, Say, Session};
 use super::lifecycle::{Asker, Event, Face, Surface};
 pub use wire::Answering;
+
+const HEADLESS_DEPTH: usize = 256;
 
 pub struct Terminal {
     pub url: String,
@@ -98,15 +100,9 @@ pub fn start(
     face: tokio::sync::watch::Receiver<Face>,
 ) -> Started {
     match terminal.surface {
-        Surface::Cli | Surface::QuietHost => {
-            let (writer, notice) = super::ui::start(terminal, inside, watching, face);
-            Started {
-                writer: Some(writer),
-                notice,
-            }
-        }
+        Surface::Cli | Surface::QuietHost => super::host::start(terminal, inside, watching, face),
         Surface::Headless => {
-            let say = super::ui::lines_to_stdout();
+            let say = lines_to_stdout();
             let notice = Arc::clone(&say);
             std::thread::spawn(move || {
                 drive(&terminal, &inside, &mut std::io::stdin().lock(), &say);
@@ -117,6 +113,23 @@ pub fn start(
             }
         }
     }
+}
+
+fn lines_to_stdout() -> Say {
+    let (to, from) = std::sync::mpsc::sync_channel::<String>(HEADLESS_DEPTH);
+    std::thread::spawn(move || {
+        let mut out = std::io::stdout();
+        for line in from {
+            if writeln!(out, "{line}").and_then(|()| out.flush()).is_err() {
+                return;
+            }
+        }
+    });
+    Arc::new(move |line: String| {
+        if to.send(line).is_err() {
+            // Reader gone; headless surface is finished.
+        }
+    })
 }
 
 pub(super) fn drive<R: BufRead>(terminal: &Terminal, inside: &Inside, input: &mut R, say: &Say) {

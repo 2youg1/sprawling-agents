@@ -215,7 +215,7 @@ fn compiled(here: &Path, out: &Path, target: &Target) -> Result<(), String> {
         .arg("--cache-dir")
         .arg(out.join("zig-cache"))
         .arg(format!("-femit-bin={}", out.join(&target.file).display()))
-        .arg("zig/leaf.zig")
+        .arg("zig/leaf_c.zig")
         .output()
         .map_err(|err| format!("zig did not start: {err}"))?;
     if built.status.success() {

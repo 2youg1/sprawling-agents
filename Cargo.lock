@@ -3049,22 +3049,15 @@ dependencies = [
 name = "sprawling-calyx"
 version = "0.0.17"
 dependencies = [
- "base64 0.23.1",
  "chrono",
- "crossterm",
  "getrandom 0.4.3",
- "rustix",
  "serde_json",
  "sprawling-accounting",
  "sprawling-child",
  "sprawling-console-ffi",
  "sprawling-kernel",
- "sprawling-mei",
  "sprawling-wire",
- "tempfile",
  "tokio",
- "toml",
- "win32job",
 ]
 
 [[package]]

@@ -225,7 +225,7 @@ prereqs mode="check":
 # files a generator keeps.
 fmt:
     cargo fmt --all
-    zig fmt Calyx/ffi/zig
+    zig fmt Calyx/ffi/zig Calyx/shell
     {{ if os() == "windows" { "zig fmt Sprawling/desktop/ffi/zig" } else { "echo 'zig fmt: the desktop leaf is built on Windows only'" } }}
     bun fmt
 
@@ -238,7 +238,7 @@ fmt:
 # this phase first.
 fmt-check:
     cargo fmt --all --check
-    zig fmt --check Calyx/ffi/zig
+    zig fmt --check Calyx/ffi/zig Calyx/shell
     {{ if os() == "windows" { "zig fmt --check Sprawling/desktop/ffi/zig" } else { "echo 'zig fmt: the desktop leaf is built on Windows only'" } }}
     bun fmt --check
 

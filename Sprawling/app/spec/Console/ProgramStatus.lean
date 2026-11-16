@@ -4,11 +4,11 @@
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
 /-!
-# calyx::console::program_status
+# calyx::shell::program_status
 
-规定 `Calyx/src/console/program_status/mod.rs`：城用 Program Status Protocol（OSC 7501）告诉它所在的终端，这座城此刻在做什么。本文件是 `Sprawling/app/Spec.lean` 的一个分部，控制台的其余接口在 `Sprawling/app/spec/Console.lean` §8-11。Lean 模型是「必须守住哪些性质」的权威，Rust 是「怎样守住」的权威。
+规定 `Calyx/shell/program_status.zig`：城用 Program Status Protocol（OSC 7501）告诉它所在的终端，这座城此刻在做什么。本文件是 `Sprawling/app/Spec.lean` 的一个分部，控制台的其余接口在 `Sprawling/app/spec/Console.lean` §8-11。Lean 模型是「必须守住哪些性质」的权威，Zig 壳是「怎样守住」的权威（`Calyx/Spec.lean` D7）。
 
-协议本身的权威是它的规范页（Program Status Protocol，rev 0.3）：一条报告是 `ESC ] 7501 ; <pairs> ESC \`，`pairs` 是以 `:` 分隔的 `key=value`，`state` 必有，`msg` 是 UTF-8 文本的标准 base64；每条报告整条替换终端为这个程序存的那条记录；`state=clear` 不带 `id` 时删掉这个终端上的所有记录。模型里没有字节：编码只在 Rust 里，由 `calyx::console::program_status` 的测试按规范的文法与上限逐条检查。
+协议本身的权威是它的规范页（Program Status Protocol，rev 0.3）：一条报告是 `ESC ] 7501 ; <pairs> ESC \`，`pairs` 是以 `:` 分隔的 `key=value`，`state` 必有，`msg` 是 UTF-8 文本的标准 base64；每条报告整条替换终端为这个程序存的那条记录；`state=clear` 不带 `id` 时删掉这个终端上的所有记录。模型里没有字节：编码只在 Zig 里，由 `Calyx/shell/program_status.zig` 的测试按规范的文法与上限逐条检查。
 
 模型只有 UI 线程手里的那一小块状态（`Held`）与喂给它的三种事件，没有 I/O：一次 `Query::Metrics` 的答复在这里是 `Counts`，一条 `run_frozen` 记录在这里是 `ended`，生命周期到达 `Gone` 在这里是 `closed`。
 
@@ -21,7 +21,7 @@
 
 报告的内容只能来自 `Counts` 与 `Rest`：`State` 的每个构造子只带计数或一个结局，所以记录里人打的字、模型的回复、路径与房间地址在类型上就到不了终端。
 
-派生的检查：§5 的 `#eval` 打印判定表与每一个（终端存着的、结局、事件）的一步，`calyx::console::program_status` 的测试逐行回放；实现一旦离开模型，那条测试变红。
+派生的检查：§5 的 `#eval` 打印判定表与每一个（终端存着的、结局、事件）的一步，`Calyx/shell/program_status.zig` 的测试逐行回放；实现一旦离开模型，那条测试变红。
 -/
 
 namespace Sprawling.Console.ProgramStatus
@@ -281,7 +281,7 @@ def someEvents : List Event :=
 
 /-! ## 5 转移向量
 
-两张表，名字是 Rust 的变体名。`judged <runs> <approvals> <rest> <state>` 是判定；`step <shown> <rest> <event> <shown'> <rest'> <report>` 是一步。`calyx::console::program_status` 的测试逐行回放。 -/
+两张表，名字是实现的变体名。`judged <runs> <approvals> <rest> <state>` 是判定；`step <shown> <rest> <event> <shown'> <rest'> <report>` 是一步。`Calyx/shell/program_status.zig` 的测试逐行回放。 -/
 
 def Completion.code : Completion → String
   | .done => "done"

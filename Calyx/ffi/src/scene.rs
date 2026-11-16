@@ -12,6 +12,10 @@ impl TimeOfDay {
     pub fn from_seconds(seconds: u32) -> Option<TimeOfDay> {
         (seconds < 86_400).then_some(TimeOfDay(seconds))
     }
+
+    pub fn seconds(self) -> u32 {
+        self.0
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -179,6 +183,17 @@ impl Scene {
         scene.text(frame.code);
         scene.text(frame.key.unwrap_or_default());
         scene.text(frame.transient.unwrap_or_default());
+        scene
+    }
+
+    /// Host→shell entry list: `u32` count then the same entry encoding as an
+    /// inline scene. The city shell reads this through `host.readEntries`.
+    pub fn entry_list(entries: &[Entry]) -> Scene {
+        let mut scene = Scene::default();
+        scene.count(entries.len());
+        for entry in entries {
+            scene.entry(entry);
+        }
         scene
     }
 

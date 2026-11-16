@@ -158,6 +158,16 @@ scene and writes a borrowed buffer, and its cost is that building the
 workspace on every platform needs the pinned Zig
 (`Calyx/ffi/Spec.lean` D1).
 
+Calyx's shell is Zig by a ruling of the person (`Calyx/Spec.lean` D7):
+input, lifecycle, editor, menu, screen orchestration, Mei and city
+faces, and process bootstrap live under `Calyx/shell` and
+`Calyx/build.zig`. Rust keeps only the narrow city/wire/kernel host that
+feeds events and runs shell-requested city actions; `unsafe` stays inside
+the leaf packages. Calyx Zig at a C ABI uses caller-owned buffers and
+explicit lengths; allocating helpers take an `Allocator`. A residue rule
+refuses `Calyx/src/console/{ui,editor,screen,program_status}` (files or
+directories) from returning under `Calyx/src`.
+
 ## 3 The units and the dependency law
 
 Crates are not a reuse mechanism here. They exist so that **the dependency
@@ -308,6 +318,7 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `accounting::connectors` | Sprawling/accounting/src/connectors.rs | `accounting::worker::mcp`: the stdio, HTTP and SSE links a building's `[[mcp]]` tables name | the scripted connectors in `Sprawling/app/tests/connectors/offering.rs` |
 | `accounting::machine` | Sprawling/accounting/src/machine.rs | `bin::doctor::ThisMachine`: the doctor's report and its one install runner, handed in through `Hands.machine` | the scripted machine in `Sprawling/app/tests/machine.rs` |
 | `accounting::views::snapshot::start` | Sprawling/accounting/src/views/snapshot/start.rs | `accounting::views::Views`: the fold every page is answered from | `accounting::worker::folds::standing_start`: the standing a worker judges from |
+| `console_ffi::shell_abi` | Calyx/ffi/src/shell_abi.rs | `calyx::console::host::Bridge`: city/wire/kernel host for the Zig city face | `ScriptedCityHost` in `shell_abi` tests: scripted poll payloads and recorded carry lines |
 
 The *second adapter* column has no checker: a seam whose double was
 deleted would still read as real here. That is a known hole, not a

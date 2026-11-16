@@ -261,3 +261,17 @@ impl Scene { pub fn inline(&Inline) -> Scene; pub fn quiet(&Quiet) -> Scene; }
 
 重开参数：docs.rs 开始要求最终链接原生库，或文档需要展示叶子的符号。
 -/
+
+/-! D11 Calyx 的 Zig 由 `Calyx/build.zig` 构建；本包链接叶并宿主窄 Rust 面
+
+决定：`Calyx/ffi/build.rs` 在 `Calyx/` 下调用 `zig build`（`Calyx/build.zig`），于
+`ReleaseSafe` 产出帧叶静态库与壳静态库/可执行文件所需产物。壳实现在 `Calyx/shell`
+（`Calyx/Spec.lean` D7）；本包保留 scene 词表的 Rust 定义与叶的安全 `draw`，供测试与
+任何仍从 Rust 构图的宿主使用。壳在进程内直接写 scene、调叶，不经 Rust 画帧。docs.rs
+跳过（D10）同时跳过 Zig 构建。
+
+理由：根 `build.zig` 是 Calyx 下 Zig 的单一构建权威；叶与壳同图避免三元组/PIC/钉检查分叉。
+
+被否：①继续仅 `zig build-lib` 单文件编叶——无法承载整壳；②为壳另开第三 FFI crate——在
+`unsafe` 仍须落在 `LEAVES` 内时扩大例外面而无收益。
+-/

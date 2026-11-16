@@ -67,7 +67,7 @@ import Sprawling.app.spec.WireClient
 | `spec/BrowserBidi.lean` | `bin::browser_bidi` |
 | `spec/Console.lean` | `calyx::console` |
 | `spec/Console/Lifecycle.lean` | `calyx::console::lifecycle` |
-| `spec/Console/ProgramStatus.lean` | `calyx::console::program_status` |
+| `spec/Console/ProgramStatus.lean` | `calyx::shell::program_status` |
 | `spec/Doctor.lean` | `bin::doctor` |
 | `spec/Firstrun.lean` | `bin::firstrun` |
 | `spec/Install.lean` | `bin::install` |

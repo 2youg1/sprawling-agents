@@ -28,6 +28,17 @@ const ACTIVE_EXT: [&str; 8] = ["toml", "yml", "yaml", "nix", "json", "sh", "ps1"
 
 /// Gate entry: validate the product-root table, refuse a wrong-case
 /// sibling of a current root, and refuse retired legacy residue.
+/// Shell implementation paths that must stay deleted under `Calyx/src`
+/// (`Calyx/Spec.lean` D7). Checked as files or directories.
+const CALYX_SHELL_RESIDUE: &[&str] = &[
+    "Calyx/src/console/ui",
+    "Calyx/src/console/ui.rs",
+    "Calyx/src/console/editor.rs",
+    "Calyx/src/console/screen.rs",
+    "Calyx/src/console/program_status",
+    "Calyx/src/console/program_status.rs",
+];
+
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let table = product_roots::load(root)?;
     let mut violations = Vec::new();
@@ -36,7 +47,30 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     for legacy in table.retired() {
         violations.extend(retired_residue(root, legacy, &table)?);
     }
+    violations.extend(calyx_shell_residue(root));
     Ok(violations)
+}
+
+fn calyx_shell_residue(root: &Path) -> Vec<Violation> {
+    let rule = "Calyx shell implementation stays in Zig; Rust under Calyx/src/console/{ui,editor,screen,program_status} is permanent residue (Calyx Spec D7)";
+    let mut violations = Vec::new();
+    for rel in CALYX_SHELL_RESIDUE {
+        let path = root.join(rel);
+        if !path.exists() {
+            continue;
+        }
+        let kind = if path.is_dir() { "directory" } else { "file" };
+        violations.push(Violation {
+            gate: GATE,
+            location: (*rel).to_owned(),
+            rule: rule.to_owned(),
+            violation: format!("Calyx shell residue `{rel}` still exists as a {kind}"),
+            alternative: format!(
+                "delete `{rel}`; the interactive shell lives in `Calyx/shell` and the city host in `Calyx/src/console/host.rs`"
+            ),
+        });
+    }
+    violations
 }
 
 fn missing_current(root: &Path, table: &Table) -> Vec<Violation> {
@@ -127,14 +161,15 @@ fn retired_residue(
     table: &Table,
 ) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
-    let dir = root.join(&legacy.path);
-    if dir.is_dir() {
+    let path = root.join(&legacy.path);
+    if path.exists() {
+        let kind = if path.is_dir() { "directory" } else { "file" };
         violations.push(Violation {
             gate: GATE,
-            location: format!("{}/", legacy.path),
+            location: legacy.path.clone(),
             rule: RULE.to_owned(),
             violation: format!(
-                "retired legacy path `{}` still exists as a directory",
+                "retired legacy path `{}` still exists as a {kind}",
                 legacy.path
             ),
             alternative: format!(
@@ -397,6 +432,40 @@ status = "live"
         std::fs::remove_dir_all(&root).unwrap();
         assert!(
             violations.iter().any(|v| v.violation.contains("crates")),
+            "{violations:?}"
+        );
+    }
+
+    #[test]
+    fn calyx_shell_residue_refuses_a_restored_ui_module() {
+        let root = scratch("calyx-shell");
+        fixture::write(&root, modmap::MAP, &minimal_table(false));
+        fixture::write(&root, "Calyx/src/console/ui.rs", "// restored\n");
+        let violations = check(&root).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(
+            violations
+                .iter()
+                .any(|v| v.location.contains("Calyx/src/console/ui.rs")),
+            "{violations:?}"
+        );
+    }
+
+    #[test]
+    fn calyx_shell_residue_refuses_a_restored_program_status_module() {
+        let root = scratch("calyx-shell-ps");
+        fixture::write(&root, modmap::MAP, &minimal_table(false));
+        fixture::write(
+            &root,
+            "Calyx/src/console/program_status/mod.rs",
+            "// restored\n",
+        );
+        let violations = check(&root).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(
+            violations
+                .iter()
+                .any(|v| v.location.contains("Calyx/src/console/program_status")),
             "{violations:?}"
         );
     }
