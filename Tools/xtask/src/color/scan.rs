@@ -198,8 +198,8 @@ pub(super) mod tests {
                 .map(|v| v.location.as_str())
                 .collect::<Vec<_>>(),
             [
-                "Sprawling/city/skills/playback/template.html:1",
-                "RefRain/src/panel.css:1"
+                "RefRain/src/panel.css:1",
+                "Sprawling/city/skills/playback/template.html:1"
             ]
         );
         std::fs::remove_dir_all(&root).unwrap();
