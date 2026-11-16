@@ -12,7 +12,6 @@ pub const FORMAT_KEY: &str = "format";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FormatFile {
-
     PersonConfig,
 
     LayerConfig,
@@ -24,7 +23,6 @@ pub enum FormatFile {
 pub struct Format(NonZeroU32);
 
 impl Format {
-
     pub const FIRST: Format = Format(NonZeroU32::MIN);
 
     #[must_use]
@@ -38,7 +36,6 @@ impl Format {
 }
 
 impl FormatFile {
-
     #[must_use]
     pub const fn current(self) -> Format {
         match self {
@@ -93,7 +90,6 @@ const RUNGS: &[Rung] = &[];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Forwarded {
-
     Absent,
 
     Current,

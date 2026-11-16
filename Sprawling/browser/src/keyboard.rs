@@ -29,7 +29,6 @@ pub enum NamedKey {
 }
 
 impl NamedKey {
-
     const ALL: [NamedKey; 13] = [
         NamedKey::Enter,
         NamedKey::Tab,
@@ -72,7 +71,6 @@ pub enum Key {
 }
 
 impl Key {
-
     pub fn parse(name: &str) -> Result<Key, AxError> {
         if let Some(named) = NamedKey::ALL
             .into_iter()
@@ -112,7 +110,6 @@ pub enum Modifier {
 }
 
 impl Modifier {
-
     const ALL: [Modifier; 4] = [
         Modifier::Control,
         Modifier::Shift,

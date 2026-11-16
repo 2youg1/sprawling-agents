@@ -86,7 +86,6 @@ fn refusal_makers<'t>(tokens: &[Token<'t>]) -> Vec<&'t str> {
 }
 
 enum Token<'t> {
-
     Word(&'t str),
 
     Mark(char),

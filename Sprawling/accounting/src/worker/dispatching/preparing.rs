@@ -21,14 +21,16 @@ use super::heavy_landing::{HeavyLanding, Swept};
     reason = "one value per run in flight, moved a handful of times on its way to a lane; a box buys nothing a run would notice"
 )]
 pub(in crate::worker) enum Staged {
-
     Model {
         at: Assignment,
         site: Site,
         lane: LaneHalf,
     },
 
-    Harness { at: Assignment, half: HarnessHalf },
+    Harness {
+        at: Assignment,
+        half: HarnessHalf,
+    },
 }
 
 pub(in crate::worker) struct LaneHalf {
@@ -63,7 +65,6 @@ pub(crate) enum Flown {
 }
 
 impl Staged {
-
     pub(in crate::worker) fn assignment(&self) -> &Assignment {
         match self {
             Staged::Model { at, .. } | Staged::Harness { at, .. } => at,
@@ -137,7 +138,6 @@ struct Restock {
 }
 
 impl Restock {
-
     fn owed_by(self, borrowed: Option<&storage::WorktreeLease>) -> Option<Restock> {
         borrowed.map(|_| self)
     }
@@ -179,7 +179,6 @@ struct StockingTurn<'a> {
 }
 
 impl<'a> StockingTurn<'a> {
-
     fn take(city_root: &'a Path) -> Option<StockingTurn<'a>> {
         STOCKING
             .lock()
@@ -190,7 +189,6 @@ impl<'a> StockingTurn<'a> {
 }
 
 impl Drop for StockingTurn<'_> {
-
     fn drop(&mut self) {
         STOCKING
             .lock()
@@ -200,7 +198,6 @@ impl Drop for StockingTurn<'_> {
 }
 
 impl LaneHalf {
-
     fn prepare<L: Ledger>(
         self,
         at: &Assignment,

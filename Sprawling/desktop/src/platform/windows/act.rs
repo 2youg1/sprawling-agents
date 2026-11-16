@@ -43,7 +43,6 @@ struct Screen {
 }
 
 impl Screen {
-
     fn now() -> Screen {
         Screen {
             left: winsafe::GetSystemMetrics(co::SM::XVIRTUALSCREEN),

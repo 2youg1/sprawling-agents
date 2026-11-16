@@ -22,7 +22,6 @@ pub struct WorktreeLease {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct FileWork {
-
     pub created: u64,
 
     pub rewritten: u64,

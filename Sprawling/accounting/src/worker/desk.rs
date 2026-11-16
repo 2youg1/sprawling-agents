@@ -42,7 +42,6 @@ impl Drop for Underway<'_> {
 }
 
 impl Waiting {
-
     fn forget(&mut self, at: usize) -> Option<Posted> {
         let posted = self.queue.remove(at)?;
         if let Some(key) = posted.command.idem() {
@@ -58,7 +57,6 @@ pub struct Posted {
 }
 
 pub enum DeskWait<'desk> {
-
     Command(Box<Posted>, Underway<'desk>),
     Idle,
 
@@ -69,7 +67,6 @@ pub enum DeskWait<'desk> {
 pub(super) const SCHEDULE_TICK_MS: u64 = 20_000;
 
 impl CommandDesk {
-
     pub fn close(&self, why: Closing) {
         if let Closing::Chosen {
             mode: wire::CloseMode::Interrupt,
@@ -102,7 +99,6 @@ impl CommandDesk {
         if let Ok(ringing) = self.bell.lock()
             && let Some(bell) = ringing.as_ref()
         {
-
             drop(bell.send(wake));
         }
     }
@@ -110,7 +106,6 @@ impl CommandDesk {
     pub fn post(&self, command: wire::Command, reply: wire::Reply) {
         if let Ok(mut waiting) = self.waiting.lock() {
             if let Some(key) = command.idem() {
-
                 if kernel::idem::claim(&mut waiting.keys, *key).is_err() {
                     return;
                 }

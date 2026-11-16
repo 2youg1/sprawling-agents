@@ -16,7 +16,6 @@ use interrupting::Interrupting;
 
 #[derive(Clone)]
 pub(crate) struct DriveContext {
-
     pub watching: Option<std::sync::Arc<dyn Fn(wire::Delta) + Send + Sync>>,
 
     pub person: Option<std::sync::Arc<dyn Fn(RunId) -> Interrupt + Send + Sync>>,

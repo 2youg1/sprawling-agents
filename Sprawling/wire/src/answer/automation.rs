@@ -29,17 +29,11 @@ pub struct ScheduledJob {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Cadence {
-    EveryMinutes {
-        minutes: u64,
-    },
+    EveryMinutes { minutes: u64 },
 
-    DailyAt {
-        minute: u64,
-    },
+    DailyAt { minute: u64 },
 
-    WeeklyAt {
-        minute: u64,
-    },
+    WeeklyAt { minute: u64 },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

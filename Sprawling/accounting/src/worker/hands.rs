@@ -11,7 +11,6 @@ use kernel::AxError;
 use super::pool::Memory;
 
 pub struct Hands {
-
     pub vault: gateway::Custodian,
 
     pub clock: Arc<dyn crate::Clock + Send + Sync>,

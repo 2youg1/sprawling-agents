@@ -40,7 +40,6 @@ impl fmt::Display for Paint {
 }
 
 pub struct TextRun {
-
     pub ink: Option<Paint>,
 
     pub px_x100: u32,
@@ -52,10 +51,7 @@ pub enum Cut {
 
     Marked,
 
-    Hidden {
-        shown: i64,
-        needs: i64,
-    },
+    Hidden { shown: i64, needs: i64 },
 }
 
 #[derive(Clone, Copy)]
@@ -67,7 +63,6 @@ pub enum Marking {
 }
 
 impl Cut {
-
     pub fn of(shown: i64, needs: i64, marking: Marking) -> Cut {
         if needs <= shown.saturating_add(SLACK) {
             return Cut::Fits;
@@ -158,7 +153,6 @@ impl Drawn {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Sampled {
-
     Frame,
 
     Words,
@@ -166,7 +160,6 @@ pub enum Sampled {
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Overflow {
-
     Shows,
 
     Clips,

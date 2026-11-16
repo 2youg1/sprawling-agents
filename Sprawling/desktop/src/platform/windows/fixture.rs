@@ -11,7 +11,6 @@ pub(crate) struct Opened {
 }
 
 impl Opened {
-
     pub(crate) fn at(title: &str, left: i32, top: i32, button: Option<&str>) -> Opened {
         let bounds = Bounds::from_corners(
             left,

@@ -218,7 +218,6 @@ pub(super) enum Change<'a> {
 }
 
 impl Change<'_> {
-
     fn state(&self, document: &mut toml::Table, file: &Path) -> Result<(), AxError> {
         match self {
             Change::Session {
@@ -243,7 +242,6 @@ impl Change<'_> {
                 state_generation(section, *generation, file)?;
             }
             Change::Forget => {
-
                 let emptied = match document.get_mut("model") {
                     Some(toml::Value::Table(section)) => {
                         section.remove("name");

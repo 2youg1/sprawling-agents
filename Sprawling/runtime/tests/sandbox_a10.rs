@@ -171,7 +171,6 @@ fn a10_3_fuel_exhaustion_stops_the_guest_and_is_not_a_host_error() {
 
 #[test]
 fn the_boundary_has_no_network_because_no_socket_can_be_opened() {
-
     let tmp = tempfile::tempdir().unwrap();
     let module = build(
         tmp.path(),

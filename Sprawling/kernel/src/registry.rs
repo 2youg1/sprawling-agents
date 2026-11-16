@@ -44,7 +44,6 @@ pub struct Artifact {
 }
 
 impl Artifact {
-
     pub fn verify(claim: Claim, evidence: EventRef) -> Result<Artifact, AxError> {
         if CITABLE.contains(&evidence.kind()) {
             return Ok(Artifact {

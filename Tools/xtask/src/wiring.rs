@@ -20,7 +20,6 @@ use crate::walk::CLIENT_SRC as CLIENT;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Reach {
-
     Client,
 
     Push,

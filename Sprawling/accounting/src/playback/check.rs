@@ -26,7 +26,6 @@ pub struct City<'a> {
 
 #[derive(Debug, Clone, Default)]
 pub struct Asked<'a> {
-
     pub bundle: Option<&'a [u8]>,
 
     pub city: Option<City<'a>>,
@@ -37,22 +36,15 @@ pub struct Asked<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
     Passed,
-    Failed {
-        found: String,
-    },
+    Failed { found: String },
 
-    Unasked {
-        why: &'static str,
-    },
+    Unasked { why: &'static str },
 
-    Unable {
-        why: String,
-    },
+    Unable { why: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Report {
-
     pub file: B3Hash,
     pub digest: Option<B3Hash>,
     pub events: Option<usize>,
@@ -66,7 +58,6 @@ pub struct Report {
 }
 
 impl Report {
-
     #[must_use]
     pub fn holds(&self) -> bool {
         self.items()

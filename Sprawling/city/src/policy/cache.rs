@@ -25,7 +25,6 @@ pub struct RulesCache {
 }
 
 impl RulesCache {
-
     pub fn new(city_root: &Path) -> RulesCache {
         RulesCache {
             city_root: city_root.to_path_buf(),

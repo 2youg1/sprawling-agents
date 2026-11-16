@@ -26,7 +26,6 @@ pub struct SkillPin {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ModelRouting {
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub difficulty: Option<Difficulty>,
     pub model: ModelRef,
@@ -41,7 +40,6 @@ pub struct ModelRouting {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ModelSelectionSource {
-
     Manual,
 
     Difficulty,
@@ -56,7 +54,6 @@ pub enum ModelSelectionSource {
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RunStarted {
-
     #[serde(default)]
     pub task: String,
 
@@ -106,7 +103,6 @@ pub struct RunStarted {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AgentRunIdentity {
-
     pub id: String,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -120,7 +116,6 @@ pub struct AgentRunIdentity {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Opening {
-
     FromJob,
 
     Inherited,
@@ -146,12 +141,10 @@ pub struct RunFrozen {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum FreezeCause {
-
     ProcessDied,
 }
 
 impl RunFrozen {
-
     pub fn of(completion: &Completion) -> RunFrozen {
         Self::of_failure(completion, None)
     }
@@ -198,7 +191,6 @@ pub struct EvidenceCite {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SessionOpened {
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub from: Option<Origin>,
 
@@ -208,7 +200,6 @@ pub struct SessionOpened {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RunForked {
-
     pub from: RunId,
 
     pub at_seq: Seq,
@@ -217,7 +208,6 @@ pub struct RunForked {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EvalRun {
-
     pub probe: String,
     pub version: u32,
 

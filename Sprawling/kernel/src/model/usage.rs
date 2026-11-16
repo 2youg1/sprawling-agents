@@ -16,7 +16,6 @@ pub enum CacheCount {
 }
 
 impl CacheCount {
-
     #[must_use]
     pub const fn reported(self) -> Option<Tokens> {
         match self {

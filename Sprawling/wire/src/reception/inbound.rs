@@ -14,7 +14,6 @@ pub(crate) struct Inbound {
 }
 
 impl Inbound {
-
     pub(crate) const fn new() -> Self {
         Self { unreadable: 0 }
     }

@@ -17,11 +17,8 @@ mod nix_tests;
 const EXPOSE_WHITELIST: [&str; 5] = [
     "Sprawling/kernel/src/secret/sealed.rs",
     "Sprawling/gateway/src/endpoint/call.rs",
-
     "Sprawling/agent_protocols/src/mcp/redeeming.rs",
-
     "Sprawling/agent_protocols/src/mcp/broker.rs",
-
     "Sprawling/remote_access/src/keys.rs",
 ];
 
@@ -181,7 +178,6 @@ resolver = \"3\"
 
     #[test]
     fn a_reviewed_identifier_is_matched_whole_and_nothing_else_is() {
-
         let reviewed = NOT_CREDENTIALS[0];
         assert!(is_reviewed_identifier(reviewed.as_bytes()));
         let longer = format!("{reviewed}Extra");

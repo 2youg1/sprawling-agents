@@ -51,7 +51,6 @@ pub enum Disposal {
 }
 
 impl Disposal {
-
     fn backing_off(until: TimeMs, failure: &AxError) -> Disposal {
         Disposal::BackOff {
             until,

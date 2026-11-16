@@ -14,7 +14,6 @@ pub(crate) enum MachineClass {
 }
 
 impl MachineClass {
-
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             MachineClass::General => "general",
@@ -37,7 +36,6 @@ pub(crate) enum Load {
 }
 
 impl Load {
-
     pub(crate) const ALL: [Load; 4] = [
         Load::LargeLedgerFold,
         Load::LargeWorktreePlacement,
@@ -57,14 +55,12 @@ impl Load {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SubMetric {
-
     Harness,
 
     Whole,
 }
 
 impl SubMetric {
-
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             SubMetric::Harness => "harness",
@@ -82,7 +78,6 @@ pub(crate) struct Reading {
 }
 
 impl Reading {
-
     pub(crate) fn of(
         load: Load,
         sub: SubMetric,

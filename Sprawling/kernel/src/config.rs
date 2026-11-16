@@ -30,7 +30,6 @@ pub use search::{SearchConfiguration, SearchSupplier};
 pub struct EnvVarName(String);
 
 impl EnvVarName {
-
     pub fn parse(raw: &str) -> Result<EnvVarName, AxError> {
         let reject = |violation: &str| {
             Err(AxError::failure(
@@ -98,7 +97,6 @@ pub enum ClockStampGranularity {
 pub struct SecondThreshold(u64);
 
 impl SecondThreshold {
-
     pub fn parse(raw: u64) -> Result<SecondThreshold, AxError> {
         let floor = crate::consts_policy::CTX_REMINDER_SECOND_MIN;
         let ceiling = crate::consts_policy::CTX_REMINDER_SECOND_MAX;
@@ -142,7 +140,6 @@ impl From<SecondThreshold> for u64 {
 pub struct ContextLock(u64);
 
 impl ContextLock {
-
     pub fn parse(raw: u64) -> Result<ContextLock, AxError> {
         if raw == 0 {
             return Err(AxError::failure(
@@ -226,7 +223,6 @@ pub struct McpServer {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum McpTransport {
-
     Stdio {
         command: String,
         args: Vec<String>,

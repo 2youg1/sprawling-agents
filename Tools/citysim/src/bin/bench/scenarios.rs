@@ -13,7 +13,6 @@ use super::reading::{Load, Reading, SubMetric, Taken};
 pub(crate) const PINNED_DRAFTS: u64 = 1_000;
 
 pub(crate) struct Fixture {
-
     pub(crate) fold_records: u64,
     pub(crate) fold_rounds: u32,
 
@@ -27,7 +26,6 @@ pub(crate) struct Fixture {
 }
 
 impl Fixture {
-
     pub(crate) fn digest(&self, scratch: &Path) -> Result<B3Hash, String> {
         let dir = scratch.join("fixture-digest");
         match std::fs::remove_dir_all(&dir) {

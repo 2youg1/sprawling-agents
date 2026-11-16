@@ -26,7 +26,6 @@ use footprint::{clear, files_under, ledger_lines};
 pub(crate) const SAMPLES: usize = 200;
 
 pub struct PerSample {
-
     pub processes: u64,
 
     pub files: u64,
@@ -177,7 +176,6 @@ pub fn open_session(city: &Path) -> Result<Action, AxError> {
         })?;
         totals.push(boundary.elapsed());
         if sample == 0 {
-
             per_sample.files = files_under(city)?.saturating_sub(files_before);
             per_sample.barriers = ledger_lines(&ledger)?.saturating_sub(lines_before);
         }

@@ -15,7 +15,6 @@ mod tests;
 const REALM: &str = "pasted";
 
 impl RunWorker {
-
     pub(in crate::worker) fn take_custody(&mut self, text: String) -> Result<String, AxError> {
         match kept_text(&text, |provider, key| self.keep_pasted(provider, key))? {
             Some(kept) => {

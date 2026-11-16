@@ -13,13 +13,11 @@ use crate::Reached;
 use super::{ConnectorJob, Laying, held};
 
 impl Laying {
-
     pub(in crate::worker) fn mcp_tools(
         &self,
         job: ConnectorJob<'_>,
     ) -> Vec<agent_protocols::McpTool> {
         if job.confidential && !job.servers.is_empty() {
-
             self.note(
                 runtime::diagnostics::Level::Refuse,
                 "accounting::worker",
@@ -32,7 +30,6 @@ impl Laying {
         let mut offered = Vec::new();
         let resolve = crate::held_vault::resolving(std::sync::Arc::clone(&self.vault));
         for server in job.servers {
-
             let site = agent_protocols::McpLink::site(&server.transport);
             match self
                 .connectors

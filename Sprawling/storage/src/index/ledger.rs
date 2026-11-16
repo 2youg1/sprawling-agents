@@ -19,7 +19,6 @@ use super::reader::LineReader;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Refreshed {
-
     Unchanged,
 
     Appended { bytes_read: u64 },
@@ -33,7 +32,6 @@ pub struct LedgerIndex {
 }
 
 impl LedgerIndex {
-
     fn seam(&self) -> MutexGuard<'_, Box<dyn Vfs>> {
         self.vfs.lock().unwrap_or_else(PoisonError::into_inner)
     }
@@ -227,7 +225,6 @@ fn walk<E>(
             .map_err(&lift)?;
         let mut offset: u64 = 0;
         for line in bytes.split_inclusive(|b| *b == b'\n') {
-
             let Some(body) = line.strip_suffix(b"\n") else {
                 break;
             };

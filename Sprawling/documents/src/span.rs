@@ -15,7 +15,6 @@ pub struct Span {
 }
 
 impl Span {
-
     pub fn new(start: u64, end: u64) -> Result<Span, AxError> {
         if start > end {
             return Err(AxError::failure(

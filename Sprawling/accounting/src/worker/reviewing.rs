@@ -11,7 +11,6 @@ use crate::effect;
 use super::{Assignment, RunWorker, Site, held};
 
 impl RunWorker {
-
     pub(super) fn settle_requests(
         &mut self,
         site: &Site,
@@ -25,7 +24,6 @@ impl RunWorker {
 
         let pr_effects = held(pr, "settle the pull request desk")?.take_effects();
         if !pr_effects.is_empty() {
-
             let of = site.provenance(self.city_hash()?, addr);
             let trees = storage::Worktrees::open(&self.city_root)
                 .map_err(storage::StorageError::into_ax)?;
@@ -44,7 +42,6 @@ impl RunWorker {
                         branch,
                     )?,
                     collab::PrEffect::Merged { request, by } => {
-
                         if let runtime::Admission::Refused {
                             because,
                             alternative,
@@ -130,7 +127,6 @@ pub(super) struct Offering<'a> {
 }
 
 impl RunWorker {
-
     pub(super) fn offer(&mut self, offering: &Offering<'_>, branch: String) -> Result<(), AxError> {
         let landed = match storage::Checkpoint::open(offering.tree)
             .map_err(storage::StorageError::into_ax)
@@ -148,7 +144,6 @@ impl RunWorker {
             }) {
             Ok(landed) => landed,
             Err(err) => {
-
                 let failure = runtime::CheckpointFailure::from(err);
                 if let Some(report) = failure.refusal() {
                     self.record_for(

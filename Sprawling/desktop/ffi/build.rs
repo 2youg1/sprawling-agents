@@ -17,7 +17,6 @@ const SYSTEM: [&str; 6] = [
 ];
 
 fn main() -> Result<(), String> {
-
     println!("cargo::rerun-if-env-changed=DOCS_RS");
     if documenting() {
         return Ok(());

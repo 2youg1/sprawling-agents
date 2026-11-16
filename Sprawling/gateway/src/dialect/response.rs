@@ -95,7 +95,6 @@ mod tests {
     use serde_json::{Map, json};
     #[test]
     fn anthropic_returns_thinking_blocks_exactly_as_it_issued_them() {
-
         let wire = json!({
             "content": [
                 { "type": "thinking", "thinking": "two parts", "signature": "WaUjzkyp" },

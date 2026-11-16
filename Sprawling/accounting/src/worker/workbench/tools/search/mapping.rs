@@ -38,7 +38,6 @@ pub(super) fn parameters(supplier: &SearchSupplier) -> Map<String, Value> {
 }
 
 impl Asked {
-
     pub(super) fn read(supplier: &SearchSupplier, args: &Payload) -> Result<Asked, AxError> {
         let args = args.as_map();
         let offered = parameters(supplier);

@@ -12,7 +12,6 @@ pub(super) const LINE_CAP: usize = 512;
 
 #[derive(Clone, Copy)]
 pub(super) enum Limit {
-
     Hits,
 
     Bytes,
@@ -21,7 +20,6 @@ pub(super) enum Limit {
 }
 
 impl Limit {
-
     pub(super) fn said(self) -> String {
         let narrow = "narrow `path` to one directory or file, add a `glob`, or make `pattern` \
                       more specific";

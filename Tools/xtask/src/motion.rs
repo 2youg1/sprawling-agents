@@ -27,7 +27,6 @@ const TIMED: [&str; 2] = ["transition", "animation"];
 
 #[derive(Clone, Copy)]
 enum Refused {
-
     Literal(&'static str),
 
     MachineVariant(&'static str),

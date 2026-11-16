@@ -34,7 +34,6 @@ pub(super) struct DriftBook {
 }
 
 impl DriftBook {
-
     pub(super) fn from_history(city_root: &Path) -> Result<DriftBook, AxError> {
         let book = DriftBook::default();
         for line in storage::read_raw_lines_at(&kernel::layout::CityLayout::new(city_root).ledger())
@@ -123,7 +122,6 @@ pub(in crate::worker) struct Laying {
 }
 
 impl Laying {
-
     pub(super) fn note_drift(
         &self,
         building: &Address,
@@ -160,7 +158,6 @@ impl Laying {
 }
 
 impl super::RunWorker {
-
     pub(in crate::worker) fn laying(&self, who: &str) -> Result<Laying, AxError> {
         Ok(Laying {
             city_root: self.city_root.clone(),
@@ -269,7 +266,6 @@ pub(super) fn held<'a, T>(
 }
 
 impl Workbench {
-
     pub(super) fn shown(&self) -> runtime::ReadShown {
         self.shown.clone()
     }
@@ -302,7 +298,6 @@ impl Workbench {
 }
 
 impl Site {
-
     pub(super) fn checkpoint_scope(&self) -> Result<Vec<String>, AxError> {
         if self.lease.is_some() {
             return Ok(tree_scope(&self.building));

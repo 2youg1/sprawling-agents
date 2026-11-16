@@ -29,7 +29,6 @@ pub struct Discard {
 }
 
 impl Discard {
-
     pub fn new(
         paths: Vec<Address>,
         plan: Restoration,

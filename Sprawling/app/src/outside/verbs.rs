@@ -7,7 +7,6 @@ use remote_access::door::VerbClass;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) enum Passage {
-
     Judged(VerbClass),
 
     Greeting(wire::Hello),

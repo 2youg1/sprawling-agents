@@ -13,7 +13,6 @@ const BRING_HEADING: &str = "<bring>";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Occupancy {
-
     Resident { bring: String },
 
     Empty,
@@ -37,7 +36,6 @@ pub struct Neighbourhood {
 }
 
 impl Neighbourhood {
-
     pub fn scan(
         city_root: &Path,
         building: &Address,

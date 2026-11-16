@@ -197,7 +197,6 @@ pub struct FrozenPrefix {
 }
 
 impl FrozenPrefix {
-
     pub fn assemble(
         city: FrozenSegment,
         building: FrozenSegment,

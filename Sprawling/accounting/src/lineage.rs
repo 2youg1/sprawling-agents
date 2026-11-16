@@ -30,7 +30,6 @@ pub struct RunLine {
 }
 
 impl RunLine {
-
     pub fn to_json(&self) -> serde_json::Value {
         let state = self.state.as_ref().map(|phase| match phase {
             storage::RunPhase::Active => "active",
@@ -60,7 +59,6 @@ pub struct Lineage {
 }
 
 impl Lineage {
-
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "two kinds carry lineage; every other kind only moves last_seq"

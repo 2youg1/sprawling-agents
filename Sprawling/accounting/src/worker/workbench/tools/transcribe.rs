@@ -17,7 +17,6 @@ use crate::worker::workbench::{Laying, Site};
 const ACTION: &str = "transcribe";
 
 impl Laying {
-
     pub(super) fn transcription_tool(
         &self,
         site: &Site,
@@ -47,7 +46,6 @@ pub(super) struct TranscribeTool {
 }
 
 impl TranscribeTool {
-
     fn new(
         reader: runtime::BoundReader,
         transcriber: gateway::Transcriber,

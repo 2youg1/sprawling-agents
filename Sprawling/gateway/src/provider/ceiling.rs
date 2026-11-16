@@ -12,7 +12,6 @@ use crate::market::ModelEntry;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FigureSource {
-
     Person,
 
     Upstream,
@@ -25,7 +24,6 @@ pub enum FigureSource {
 }
 
 impl FigureSource {
-
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -74,7 +72,6 @@ impl<'de> serde::Deserialize<'de> for FigureSource {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputCeiling {
-
     Sent { tokens: Ceiling, from: FigureSource },
 
     ProviderDefault,
@@ -88,7 +85,6 @@ pub struct WindowFigure {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Figures {
-
     pub window: Option<WindowFigure>,
 
     pub ceiling: Option<OutputCeiling>,
@@ -96,7 +92,6 @@ pub struct Figures {
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Statements<'a> {
-
     pub window: Option<Window>,
 
     pub ceiling: Option<Ceiling>,
@@ -133,7 +128,6 @@ struct Stated<T> {
 }
 
 impl<T: Copy> Stated<T> {
-
     fn first(self) -> Option<(T, FigureSource)> {
         self.person
             .map(|figure| (figure, FigureSource::Person))
@@ -146,7 +140,6 @@ impl<T: Copy> Stated<T> {
 }
 
 impl Figures {
-
     #[must_use]
     pub fn resolve(
         said: Statements<'_>,
@@ -204,7 +197,6 @@ fn window_from(
 }
 
 impl OutputCeiling {
-
     fn resolve(
         stated: Stated<Ceiling>,
         pinned: Option<Ceiling>,

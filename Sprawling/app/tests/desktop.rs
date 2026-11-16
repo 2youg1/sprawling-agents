@@ -113,7 +113,6 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
 }
 
 fn this_binary() -> std::io::Result<PathBuf> {
-
     Ok(PathBuf::from(env!("CARGO_BIN_EXE_sprawling")))
 }
 

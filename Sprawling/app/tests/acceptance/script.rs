@@ -61,7 +61,6 @@ struct Lead {
 
 impl Model for Lead {
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
-
         if req.chat.tools.is_empty() {
             return says("done");
         }

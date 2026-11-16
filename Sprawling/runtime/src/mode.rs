@@ -104,7 +104,6 @@ pub struct PolicyCell {
 }
 
 impl PolicyCell {
-
     #[must_use]
     pub fn new(start: RunPolicy) -> PolicyCell {
         PolicyCell {
@@ -138,7 +137,6 @@ pub struct PolicyReader {
 }
 
 impl PolicyReader {
-
     #[must_use]
     pub fn now(&self) -> RunPolicy {
         *self.shared.read().unwrap_or_else(PoisonError::into_inner)
@@ -159,7 +157,6 @@ pub(crate) fn policy_note(policy: &RunPolicy) -> String {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Produced {
-
     pub tests_passed: Option<bool>,
 
     pub contract_moved: bool,

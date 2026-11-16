@@ -15,7 +15,6 @@ const CONFIDENTIAL_LINE: &str = "confidential = true";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuildingTemplate {
-
     Minimal,
 
     Confidential,
@@ -24,7 +23,6 @@ pub enum BuildingTemplate {
 }
 
 impl BuildingTemplate {
-
     pub const ALL: [BuildingTemplate; 3] = [
         BuildingTemplate::Minimal,
         BuildingTemplate::Confidential,

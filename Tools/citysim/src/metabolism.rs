@@ -11,7 +11,6 @@ pub const ASSET_FLOOR_PER_MILLE: u32 = 1_000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Disposal {
-
     Keep,
 
     Warn { because: String },

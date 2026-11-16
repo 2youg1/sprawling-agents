@@ -9,7 +9,6 @@ use kernel::{Address, AxCode, AxError, Payload, RunId, TimeMs, Version};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SenderState {
-
     Running,
 
     Frozen,
@@ -18,7 +17,6 @@ pub enum SenderState {
 }
 
 impl SenderState {
-
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -55,7 +53,6 @@ struct Queued {
 }
 
 impl Signal {
-
     pub fn new(
         id: SignalId,
         kind: SignalKind,

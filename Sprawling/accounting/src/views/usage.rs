@@ -129,7 +129,6 @@ pub(crate) struct CatalogEvidence {
 const EVIDENCE_WINDOW_MS: u64 = 2_592_000_000;
 
 impl UsageAsk {
-
     pub(super) fn answer(self) -> wire::Answer {
         let usage = match self.ledger.usage() {
             Ok(usage) => usage,
@@ -180,7 +179,6 @@ impl UsageAsk {
 }
 
 impl LedgerAsk {
-
     pub(super) fn usage(&self) -> Result<Usage, storage::StorageError> {
         let (index, dir) = self.indexed()?;
         let Some(tail) = index.tail_seq() else {
@@ -205,7 +203,6 @@ impl LedgerAsk {
 }
 
 impl Usage {
-
     pub(crate) fn fold(records: impl IntoIterator<Item = impl Borrow<EventRecord>>) -> Usage {
         let mut usage = Usage::default();
         records

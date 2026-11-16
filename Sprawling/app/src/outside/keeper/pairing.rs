@@ -19,7 +19,6 @@ const PAIRING_MS: u64 = 10 * 60 * 1000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Inviting {
-
     pub(crate) link: String,
 
     pub(crate) shown: String,
@@ -28,7 +27,6 @@ pub(crate) struct Inviting {
 }
 
 impl Doorway {
-
     pub(crate) fn invite(&self, name: &str, authority: Authority) -> Result<Inviting, AxError> {
         let name = DeviceName::parse(name)?;
         let now = (self.senses.clock)()?;

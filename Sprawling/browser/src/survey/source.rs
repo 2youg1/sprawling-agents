@@ -9,12 +9,10 @@ pub const ENOUGH: usize = 16;
 
 #[derive(Default)]
 pub struct Sources {
-
     spelled: Vec<(String, String)>,
 }
 
 impl Sources {
-
     #[must_use]
     pub fn of(spelled: Vec<(String, String)>) -> Sources {
         let mut spelled = spelled;

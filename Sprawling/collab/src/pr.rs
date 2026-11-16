@@ -25,7 +25,6 @@ pub struct Verified {
 }
 
 impl Pr<Open> {
-
     pub fn open(node: NodeId, implementer: String, branch: String) -> Result<Pr<Open>, AxError> {
         if implementer.trim().is_empty() {
             return Err(AxError::failure(
@@ -78,7 +77,6 @@ impl Pr<Open> {
 }
 
 impl Pr<Verified> {
-
     #[must_use]
     pub fn verified_by(&self) -> &str {
         &self.state.by
@@ -138,7 +136,6 @@ mod tests {
 
     #[test]
     fn verification_is_the_only_way_out_of_the_open_phase() {
-
         let verified = request().verified(&artifact("node-1", "lab/room1", "lab/tests"));
         assert!(verified.is_ok());
         assert_eq!(verified.unwrap().verified_by(), "lab/tests");
@@ -146,7 +143,6 @@ mod tests {
 
     #[test]
     fn the_implementer_cannot_be_the_verifier_at_either_gate() {
-
         let err = request()
             .verified(&artifact("node-1", "lab/tests", "lab/room1"))
             .unwrap_err();
@@ -165,7 +161,6 @@ mod tests {
 
     #[test]
     fn the_request_carries_the_three_facts_a_record_is_built_from() {
-
         let request = request();
         assert_eq!(request.node().as_str(), "node-1");
         assert_eq!(request.implementer(), "lab/room1");

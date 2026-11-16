@@ -27,14 +27,12 @@ pub(super) struct Ephemeral {
 }
 
 pub(super) struct Answer {
-
     pub(super) public: Vec<u8>,
     x_secret: [u8; 32],
     kem_secret: SharedSecret,
 }
 
 impl Ephemeral {
-
     pub(super) fn generate() -> Result<(Self, Vec<u8>), AxError> {
         let x25519 =
             PrivateKey::generate(&X25519).map_err(|_| crypto_failure("generate an X25519 key"))?;
@@ -67,7 +65,6 @@ impl Ephemeral {
 }
 
 impl Answer {
-
     pub(super) fn new(x_peer: &[u8], kem_peer: &[u8]) -> Result<Self, AxError> {
         let x25519 =
             PrivateKey::generate(&X25519).map_err(|_| crypto_failure("generate an X25519 key"))?;
@@ -92,7 +89,6 @@ impl Answer {
 }
 
 impl Keys {
-
     pub(super) fn device_session(&self) -> Result<Session, AxError> {
         Ok(Session {
             sealer: Sealer::new(&self.device_to_city, Direction::DeviceToCity)?,

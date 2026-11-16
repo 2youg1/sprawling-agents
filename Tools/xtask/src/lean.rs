@@ -125,7 +125,6 @@ fn step(mode: &mut Mode, current: char, next: Option<char>) -> (usize, bool) {
 }
 
 pub(crate) struct Roster {
-
     pub(crate) line: usize,
     pub(crate) names: Vec<String>,
 }

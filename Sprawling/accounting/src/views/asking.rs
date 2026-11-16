@@ -17,7 +17,6 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 }
 
 impl Views {
-
     pub fn rebuild(ledger_dir: &Path) -> Result<Views, AxError> {
         start_audited::<Views>(ledger_dir).map(|audited| audited.started.folded)
     }

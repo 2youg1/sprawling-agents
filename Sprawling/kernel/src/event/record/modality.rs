@@ -10,7 +10,6 @@ use crate::budget::Tokens;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EmbeddingCalled {
-
     pub model: String,
 
     pub inputs: u64,
@@ -27,7 +26,6 @@ pub struct EmbeddingCalled {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RerankCalled {
-
     pub model: String,
 
     pub passages: u64,

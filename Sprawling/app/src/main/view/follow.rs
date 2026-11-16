@@ -27,7 +27,6 @@ pub(super) struct Row {
 pub(super) type Folded = (Vec<RunLine>, Vec<Row>);
 
 pub(super) enum Polled {
-
     Filled(Folded),
 
     Appended(Folded),
@@ -50,7 +49,6 @@ struct Whole {
 }
 
 impl Follow {
-
     pub(super) fn open(dir: &Path) -> Result<(Follow, Folded), ViewError> {
         let window = window_of(dir)?;
         let (answer, answered) = channel();
@@ -127,7 +125,6 @@ impl Whole {
     }
 
     fn fold_appended(&mut self, dir: &Path) -> Result<Folded, ViewError> {
-
         let folded_to = self.folded_to;
         let unfolded: Vec<Seq> = self
             .index

@@ -13,7 +13,6 @@ const OPENS_TYPE: [&str; 6] = ["error", "struct", "enum", "union", "opaque", "sw
 
 #[derive(Debug, PartialEq, Eq)]
 enum Kind {
-
     Word(String),
 
     Mark(char),

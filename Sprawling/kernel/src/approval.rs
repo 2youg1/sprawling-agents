@@ -14,7 +14,6 @@ use crate::registry::ResidentId;
 pub struct ApprovalId(String);
 
 impl ApprovalId {
-
     pub fn of(run: &RunId, seq: Seq) -> ApprovalId {
         ApprovalId(format!("ap-{run}-{:020}", seq.value()))
     }

@@ -125,7 +125,6 @@ pub(crate) fn beat(
     lock(monitor).tick(|watched| *fresh.insert(read(watched)));
     if let Some(sample) = fresh {
         match samples.send(sample) {
-
             Ok(_) | Err(broadcast::error::SendError(_)) => {}
         }
     }

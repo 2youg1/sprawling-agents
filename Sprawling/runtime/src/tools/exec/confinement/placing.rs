@@ -43,7 +43,6 @@ impl Placed {
 }
 
 impl Confined {
-
     pub fn detect() -> Confined {
         let offered = Offerings::this_machine();
         Confined {
@@ -226,7 +225,6 @@ impl Confined {
         ) {
             Ok(()) => Ok((copy, budget.work())),
             Err(fault) => {
-
                 remove(&copy.at);
                 Err(fault)
             }
@@ -236,7 +234,6 @@ impl Confined {
 
 impl Drop for Confined {
     fn drop(&mut self) {
-
         for copy in self.idle.iter().chain(self.outstanding.values()) {
             remove(&copy.at);
         }

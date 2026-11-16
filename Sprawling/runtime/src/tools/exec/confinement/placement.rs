@@ -8,7 +8,6 @@ use serde_json::{Map, Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Placement {
-
     Sandbox,
 
     Host,
@@ -32,7 +31,6 @@ pub fn parse_placement(args: &Map<String, Value>) -> Result<Placement, AxError> 
 }
 
 impl Placement {
-
     pub fn opened_by(self, setup: &crate::tools::ExecSetup) -> Result<Placement, AxError> {
         match self {
             Placement::Sandbox => Ok(self),

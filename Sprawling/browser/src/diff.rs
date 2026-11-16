@@ -16,7 +16,6 @@ pub struct Difference {
 }
 
 impl Difference {
-
     #[must_use]
     pub fn changed_q4(&self) -> u32 {
         self.changed_q4
@@ -134,7 +133,6 @@ struct Decoded {
 }
 
 impl Decoded {
-
     fn pixel(&self, x: u32, y: u32) -> Option<&[u8]> {
         let row = usize::try_from(y).ok()?.checked_mul(self.stride)?;
         let at = row.checked_add(usize::try_from(x).ok()?.checked_mul(BYTES_PER_PIXEL)?)?;
@@ -144,7 +142,6 @@ impl Decoded {
 
 fn same_pixel(first: &Decoded, second: &Decoded, x: u32, y: u32) -> Result<bool, AxError> {
     match (first.pixel(x, y), second.pixel(x, y)) {
-
         (Some(left), Some(right)) => Ok(left == right),
 
         (None, Some(_)) => Err(ended_early(Short::Before)),
@@ -225,7 +222,6 @@ fn decode_failed(err: png::DecodingError) -> AxError {
 }
 
 impl Grid {
-
     fn boxes(&self) -> Vec<Rect> {
         let mut seen = vec![false; self.hot.len()];
         let mut boxes = Vec::new();

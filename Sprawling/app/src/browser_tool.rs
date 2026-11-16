@@ -54,7 +54,6 @@ struct Browser {
 }
 
 impl BrowserTool {
-
     pub(crate) fn new(
         role: Role,
         port: Box<dyn BrowserPort + Send>,
@@ -66,7 +65,6 @@ impl BrowserTool {
                 ToolName::BROWSER,
                 BUILDING_DISCLOSURE,
                 Payload::empty(),
-
                 Effect::Egress,
             ),
             Role::PersonAt { host } => (
@@ -149,7 +147,6 @@ impl Tool for BrowserTool {
 }
 
 impl Browser {
-
     fn drive(&mut self, call: &ToolCall) -> Result<ToolOutcome, AxError> {
         let verb = Verb::read(&call.args)?;
 
@@ -205,7 +202,6 @@ impl Browser {
 }
 
 impl Browser {
-
     fn refuse_own_page(&mut self, own: &OwnListeners, context: &ContextId) -> Result<(), AxError> {
         if own.is_empty() {
             return Ok(());

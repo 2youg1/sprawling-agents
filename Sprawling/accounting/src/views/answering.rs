@@ -26,7 +26,6 @@ use super::providers::{ProviderAsk, TableRows, endpoints_answer, figures_answer}
 pub(super) const TOP_BILLED: usize = 32;
 
 impl Views {
-
     fn doctor_or_unavailable(&self) -> wire::Answer {
         match &self.machine {
             Some(found) => wire::Answer::Doctor(Box::new(found.clone())),
@@ -344,7 +343,6 @@ fn top_billed(
 }
 
 impl Views {
-
     fn active_names(&self) -> BTreeSet<String> {
         self.hot
             .runs()

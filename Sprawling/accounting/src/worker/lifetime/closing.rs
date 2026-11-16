@@ -8,7 +8,6 @@ use kernel::{AxError, EventKind, Locator};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Closing {
-
     Chosen { by: ClosedBy, mode: wire::CloseMode },
 
     Broken { cause: String },
@@ -16,7 +15,6 @@ pub enum Closing {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClosedBy {
-
     Console,
 
     Page,
@@ -31,7 +29,6 @@ pub enum ClosedBy {
 }
 
 impl ClosedBy {
-
     fn said(self) -> &'static str {
         match self {
             Self::Console => "with /quit in its terminal",
@@ -45,9 +42,7 @@ impl ClosedBy {
 }
 
 impl RunWorker {
-
     pub(crate) fn close_city(&mut self, why: &Closing) -> Result<(), AxError> {
-
         let mut must_read = Vec::new();
         let bytes = city_segment(&self.city_root)?.bytes;
         let hash = self

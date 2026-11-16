@@ -43,7 +43,6 @@ pub enum Lighting {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Face {
-
     Paper,
 
     Maple,
@@ -57,7 +56,6 @@ pub enum Face {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum TypeFeature {
-
     CodingLigatures,
 
     Duospace,
@@ -84,7 +82,6 @@ pub enum Weight {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ReadingFace {
-
     Interface,
 
     Libron,
@@ -184,7 +181,6 @@ pub struct Chord {
 #[serde(default, deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PreferencesAnswer {
-
     pub lang: Option<Lang>,
 
     pub core: CorePreferences,
@@ -209,7 +205,6 @@ pub struct PreferencesAnswer {
 #[serde(default, deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ThemeOverride {
-
     pub tokens: BTreeMap<String, String>,
 
     pub css: Option<String>,
@@ -257,7 +252,6 @@ impl Default for Appearance {
 }
 
 impl PreferencesAnswer {
-
     pub fn apply(&mut self, patch: PreferencePatch) {
         match patch {
             PreferencePatch::Lang(lang) => self.lang = Some(lang),

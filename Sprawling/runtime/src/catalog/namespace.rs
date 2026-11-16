@@ -7,14 +7,12 @@ use kernel::{ReservedNamespace, ServerLabel};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Namespace {
-
     Own(ReservedNamespace),
 
     Server(ServerLabel),
 }
 
 impl Namespace {
-
     #[must_use]
     pub fn as_str(&self) -> &str {
         match self {

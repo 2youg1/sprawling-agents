@@ -11,7 +11,6 @@ use agent_protocols::McpLink;
 const HANDSHAKE_PATIENCE: TimeoutMs = TimeoutMs(15_000);
 
 impl LiveAsk {
-
     pub(super) fn mcp_health_answer(&self, addr: &Address) -> wire::McpHealthAnswer {
         let servers = match city::load_config(&self.city_root, addr) {
             Ok(config) => config

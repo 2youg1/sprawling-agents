@@ -18,14 +18,12 @@ pub enum Confidential {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Reader {
-
     Person(Confidential),
 
     Resident(Address),
 }
 
 impl Reader {
-
     pub(super) fn name(&self) -> ReaderName {
         match self {
             Reader::Person(Confidential::Withheld) => {

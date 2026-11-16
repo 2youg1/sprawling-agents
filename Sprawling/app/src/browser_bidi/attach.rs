@@ -13,13 +13,11 @@ use super::socket::BidiSocket;
 const PATIENCE: Duration = Duration::from_secs(30);
 
 pub(crate) struct AttachedBrowser {
-
     url: Option<String>,
     socket: Option<BidiSocket>,
 }
 
 impl AttachedBrowser {
-
     pub(crate) fn at(url: &str) -> AttachedBrowser {
         AttachedBrowser {
             url: Some(url.to_owned()),

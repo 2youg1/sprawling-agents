@@ -33,7 +33,6 @@ struct Machine {
 }
 
 impl Counters {
-
     pub(crate) fn open(volume: PathBuf) -> Self {
         Self {
             own: OwnProcess::new(),

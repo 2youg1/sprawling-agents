@@ -50,7 +50,6 @@ pub(crate) async fn accept_recording(
     headers: HeaderMap,
     body: Bytes,
 ) -> Response {
-
     let Some(container) = headers
         .get(header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())

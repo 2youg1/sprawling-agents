@@ -64,7 +64,6 @@ pub fn place_everywhere(city_root: &Path) -> Result<(), AxError> {
 }
 
 fn append_missing(path: &Path, rules: &[String]) -> Result<(), AxError> {
-
     crate::document::edit(path, |held| {
         let existing = match std::fs::read_to_string(path) {
             Ok(text) => text,

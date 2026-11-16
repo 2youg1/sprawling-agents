@@ -43,7 +43,6 @@ pub(super) fn declare() -> Result<PhysicalPixels, Refusal> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Awareness {
-
     PerMonitor,
 
     Other,

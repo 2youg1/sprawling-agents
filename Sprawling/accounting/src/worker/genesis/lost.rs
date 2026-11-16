@@ -20,7 +20,6 @@ struct Open {
 }
 
 impl OpenRuns {
-
     pub(super) fn observe(&mut self, record: &EventRecord) {
         let run = record.run();
         let kind = record.kind();

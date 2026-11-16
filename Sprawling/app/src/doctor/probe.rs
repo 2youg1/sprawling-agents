@@ -18,7 +18,6 @@ use super::scanning::Scanning;
 use super::{Absence, Detection, Fault, Platform, Presence, Requirement, Version};
 
 pub(crate) trait Machine: accounting::Machine + Sync {
-
     fn look(&self, requirement: &Requirement) -> Presence;
 
     fn core_standing(&self) -> Result<Standing, AxError>;
@@ -198,7 +197,6 @@ fn windows_font_root() -> Result<Vec<PathBuf>, UnreadableRoot> {
 
 #[cfg(not(windows))]
 fn windows_font_root() -> Result<Vec<PathBuf>, UnreadableRoot> {
-
     Ok(Vec::new())
 }
 
@@ -654,7 +652,6 @@ mod tests {
 
     #[test]
     fn a_broken_first_candidate_does_not_hide_a_present_second_one() {
-
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join(".local/share/fonts");
         std::fs::create_dir_all(&root).unwrap();

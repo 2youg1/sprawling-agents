@@ -31,7 +31,6 @@ pub struct Governance {
 }
 
 impl Governance {
-
     pub fn empty() -> Governance {
         Governance {
             pending: std::collections::BTreeMap::new(),

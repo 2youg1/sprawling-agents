@@ -13,7 +13,6 @@ use crate::model::Effort;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CheckpointFinding {
-
     pub path: String,
 
     pub offset: u64,
@@ -26,7 +25,6 @@ pub struct CheckpointFinding {
 }
 
 impl std::fmt::Display for CheckpointFinding {
-
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -39,7 +37,6 @@ impl std::fmt::Display for CheckpointFinding {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SecretEgressBlocked {
-
     pub code: String,
 
     pub scope: Vec<String>,
@@ -48,7 +45,6 @@ pub struct SecretEgressBlocked {
 }
 
 impl SecretEgressBlocked {
-
     pub fn checkpoint(scope: Vec<String>, withheld: Vec<CheckpointFinding>) -> Self {
         SecretEgressBlocked {
             code: AxCode::SecretEgress.as_str().to_owned(),
@@ -70,7 +66,6 @@ impl SecretEgressBlocked {
 #[serde(untagged)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum CheckpointCommitted {
-
     JobPinned {
         #[cfg_attr(feature = "schema", schemars(with = "String"))]
         job: Locator,
@@ -82,7 +77,6 @@ pub enum CheckpointCommitted {
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CommitAttribution {
-
     #[serde(default)]
     pub model: String,
 
@@ -96,7 +90,6 @@ pub struct CommitAttribution {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Commit {
-
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub oid: GitOid,
     #[serde(flatten)]

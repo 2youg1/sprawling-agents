@@ -21,7 +21,6 @@ pub(crate) enum Phase {
 }
 
 impl Phase {
-
     fn opened(self) -> Result<Phase, Refusal> {
         match self {
             Phase::Fresh => Err(unfinished("finish the handshake")),

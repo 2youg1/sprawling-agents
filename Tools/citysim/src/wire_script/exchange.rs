@@ -58,7 +58,6 @@ impl Record {
 }
 
 impl ScriptedProvider {
-
     pub fn open(
         listener: TcpListener,
         script: &Path,

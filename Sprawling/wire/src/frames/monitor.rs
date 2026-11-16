@@ -16,7 +16,6 @@ pub const BEAT_MAX_MS: u32 = 1_000;
 pub struct BeatMs(u32);
 
 impl BeatMs {
-
     pub const DEFAULT: BeatMs = BeatMs(100);
 
     pub fn new(ms: u32) -> Result<BeatMs, AxError> {
@@ -58,7 +57,6 @@ impl From<BeatMs> for u32 {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Monitoring {
-
     Watch,
 
     WatchSummary,

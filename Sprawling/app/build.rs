@@ -20,12 +20,10 @@ const PLACEHOLDER: &str = r#"<!DOCTYPE html>
 "#;
 
 fn main() {
-
     println!("cargo::rerun-if-env-changed=SPRAWLING_RELEASE_TAG");
     println!("cargo::rerun-if-env-changed=SPRAWLING_NIGHTLY_TAG");
     println!("cargo::rerun-if-env-changed=SPRAWLING_SOURCE_SHA");
     if let Err(msg) = embed() {
-
         println!("cargo::error=binary resource generation failed: {msg}");
     }
 }

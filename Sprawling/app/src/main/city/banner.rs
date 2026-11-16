@@ -39,7 +39,6 @@ pub(super) fn print_banner(
 }
 
 pub(super) enum Reader {
-
     LineConsole,
 
     Log,

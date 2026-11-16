@@ -8,7 +8,6 @@ use kernel::AxError;
 use super::super::RunWorker;
 
 impl RunWorker {
-
     #[must_use]
     pub fn with_machine(self, machine: Box<dyn crate::Machine + Send>) -> RunWorker {
         RunWorker { machine, ..self }

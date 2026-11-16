@@ -13,7 +13,6 @@ use super::preparing::{Flown, LaneHalf, Staged};
 use super::{Assignment, Seat};
 
 pub(in crate::worker) enum Continuation {
-
     Model(Box<Lent>),
 
     Harness,
@@ -27,14 +26,12 @@ pub(in crate::worker) struct Lent {
 }
 
 impl RunWorker {
-
     pub(in crate::worker) fn stage_dispatch(
         &mut self,
         mut at: Assignment,
         task: String,
         goal: String,
     ) -> Result<(Staged, Continuation), AxError> {
-
         let began = (self.monotonic)();
 
         let seat = self.agree_to_work(&mut at)?;

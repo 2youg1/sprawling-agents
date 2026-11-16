@@ -49,7 +49,6 @@ fn nested_rule_candidates(
 }
 
 impl Laying {
-
     pub(in crate::worker) fn lay_out_workbench(
         &self,
         site: &Site,
@@ -275,7 +274,6 @@ fn register(
 }
 
 impl Laying {
-
     fn filed_beyond_sprawling(
         &self,
         site: &Site,
@@ -316,13 +314,11 @@ fn outside_namespace(meta: &kernel::ToolMeta) -> Namespace {
 }
 
 impl Laying {
-
     fn outside_tools(
         &self,
         site: &Site,
         addr: &Address,
     ) -> Result<Vec<Box<dyn kernel::Tool>>, AxError> {
-
         let mut outside = (self.browsers)(&self.city_root, &site.block_origin(), &site.rules)?;
 
         let servers = self.servers(site);

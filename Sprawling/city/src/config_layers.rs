@@ -66,7 +66,6 @@ pub fn path(city_root: &Path, addr: &Address, layer: Layer) -> Result<PathBuf, A
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ConfigLayer {
-
     model: Option<String>,
     endpoint: Option<String>,
 
@@ -97,7 +96,6 @@ pub struct ConfigLayer {
 }
 
 impl ConfigLayer {
-
     pub fn parse(text: &str) -> Result<ConfigLayer, AxError> {
         crate::format::admit_format(crate::format::FormatFile::LayerConfig, text)?;
         let file: ConfigFile = toml::from_str(text).map_err(|err| unreadable(text, &err))?;
@@ -332,7 +330,6 @@ pub fn load(city_root: &Path, addr: &Address) -> Result<FrozenConfig, AxError> {
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ConfigFile {
-
     #[serde(default)]
     #[expect(dead_code, reason = "judged on the text before this struct is read")]
     format: Option<toml::Value>,

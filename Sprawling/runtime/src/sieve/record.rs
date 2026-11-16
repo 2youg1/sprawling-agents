@@ -51,18 +51,11 @@ pub enum Stage {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "outcome", rename_all = "snake_case")]
 pub enum StageOutcome {
-    Applied {
-        bytes_before: u64,
-        bytes_after: u64,
-    },
+    Applied { bytes_before: u64, bytes_after: u64 },
     Noop,
 
-    Rejected {
-        grew_to: u64,
-    },
-    Unavailable {
-        reason: String,
-    },
+    Rejected { grew_to: u64 },
+    Unavailable { reason: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -74,7 +67,6 @@ pub struct StageReport {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SieveAccount {
-
     pub filter: String,
     pub lines_in: u64,
     pub lines_out: u64,
@@ -84,7 +76,6 @@ pub struct SieveAccount {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResultOffloaded {
-
     pub original: Locator,
 
     pub len: u64,
@@ -98,14 +89,12 @@ pub struct ResultOffloaded {
 }
 
 impl ResultOffloaded {
-
     pub fn payload(&self) -> Result<Payload, AxError> {
         Payload::of(self)
     }
 }
 
 impl SieveRecord {
-
     pub fn offloaded(&self) -> ResultOffloaded {
         ResultOffloaded {
             original: self.original.clone(),

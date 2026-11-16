@@ -20,7 +20,6 @@ fn reads_its_own_priority() -> (String, Vec<String>, Vec<&'static str>) {
             vec!["SystemRoot"],
         )
     } else {
-
         (
             "sh".to_owned(),
             vec!["-c".to_owned(), "ps -o nice= -p $$".to_owned()],

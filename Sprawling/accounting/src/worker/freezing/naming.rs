@@ -44,7 +44,6 @@ pub(super) fn session_naming(
 }
 
 impl Frozen {
-
     pub(super) fn city_slot(
         &self,
         city_root: &Path,

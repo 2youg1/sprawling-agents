@@ -37,7 +37,6 @@ pub(super) struct Seeing {
 }
 
 impl Recogniser {
-
     #[must_use]
     pub fn absent() -> Recogniser {
         Recogniser { attached: None }
@@ -69,7 +68,6 @@ impl Recogniser {
 }
 
 impl Seeing {
-
     fn request(&self, seen: ImageRef, policy: &BuildingPolicy) -> ModelRequest<'static> {
         ModelRequest {
             policy: policy.clone(),

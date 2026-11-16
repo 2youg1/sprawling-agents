@@ -36,7 +36,6 @@ pub(crate) struct Report {
 }
 
 pub(crate) enum PathOutcome {
-
     Unchanged,
 
     #[cfg_attr(

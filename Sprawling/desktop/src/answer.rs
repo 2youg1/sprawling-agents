@@ -26,7 +26,6 @@ enum Block {
 }
 
 impl Answer {
-
     #[cfg_attr(
         not(any(windows, test)),
         expect(

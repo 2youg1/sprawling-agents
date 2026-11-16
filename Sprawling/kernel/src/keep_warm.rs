@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum KeepWarm {
-
     #[default]
     Off,
 
@@ -30,7 +29,6 @@ enum Renewal {
 }
 
 impl CacheUse {
-
     pub fn sent(at_ms: u64) -> CacheUse {
         CacheUse {
             used_ms: at_ms,

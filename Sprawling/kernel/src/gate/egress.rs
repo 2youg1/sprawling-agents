@@ -10,24 +10,15 @@ use crate::secret::SecretSpan;
 pub enum EgressTarget {
     Loopback,
     Private,
-    Public {
-        host: String,
-    },
+    Public { host: String },
 
-    Connector {
-        label: crate::tool::ServerLabel,
-    },
+    Connector { label: crate::tool::ServerLabel },
 }
 
 #[derive(Debug)]
 pub enum EgressOutcome {
-    Allow {
-
-        first_public_egress: bool,
-    },
-    Deny {
-        refusal: Box<AxError>,
-    },
+    Allow { first_public_egress: bool },
+    Deny { refusal: Box<AxError> },
 }
 
 pub fn egress(
@@ -82,7 +73,6 @@ pub struct EgressAllowlist {
 }
 
 impl EgressAllowlist {
-
     #[must_use]
     pub fn new(entries: Vec<String>) -> EgressAllowlist {
         let mut suffixes: Vec<String> = entries
@@ -166,7 +156,6 @@ pub fn target_of(host: &str) -> EgressTarget {
         }
     }
     if let Some(leading) = ipv6_leading(&bare) {
-
         if (leading & 0xfe00) == 0xfc00 || (leading & 0xffc0) == 0xfe80 {
             return EgressTarget::Private;
         }
@@ -198,7 +187,6 @@ fn ipv6_leading(host: &str) -> Option<u16> {
 
 #[must_use]
 pub fn egress_target(list: &EgressAllowlist, target: &EgressTarget) -> EgressOutcome {
-
     if let EgressTarget::Connector { .. } = target {
         return EgressOutcome::Allow {
             first_public_egress: true,

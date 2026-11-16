@@ -21,7 +21,6 @@ pub(in crate::worker) mod owing;
 mod placing;
 
 pub(crate) struct Driving {
-
     pub adapter: super::keeping_warm::Door,
 
     pub bench: ToolBench,
@@ -52,7 +51,6 @@ pub(crate) struct Driving {
 }
 
 pub(crate) struct Sieving {
-
     pub cas: std::sync::Arc<std::sync::Mutex<storage::Cas>>,
     pub city_root: PathBuf,
     pub room: Address,
@@ -67,7 +65,6 @@ pub(crate) struct Sieving {
 }
 
 impl Sieving {
-
     fn package(
         &mut self,
         call: &kernel::ToolCall,
@@ -98,7 +95,6 @@ impl Sieving {
 }
 
 impl Sieving {
-
     pub(super) fn package_connector(
         &mut self,
         outcome: kernel::ToolOutcome,
@@ -131,7 +127,6 @@ pub struct Driven {
 }
 
 impl Sieving {
-
     pub(in crate::worker) fn for_run(
         store: &std::sync::Arc<std::sync::Mutex<storage::Cas>>,
         site: &Site,
@@ -157,7 +152,6 @@ impl Sieving {
 }
 
 impl RunWorker {
-
     pub(in crate::worker) fn drive_context(&self) -> lane::DriveContext {
         lane::DriveContext {
             watching: self

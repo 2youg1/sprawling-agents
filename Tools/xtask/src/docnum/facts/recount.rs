@@ -25,7 +25,6 @@ pub(super) fn wire_tags(kind: &str) -> Result<String, XtaskError> {
         })?;
     let mut tags = Vec::with_capacity(members.len());
     for member in members {
-
         if let Some(properties) = member
             .get("properties")
             .and_then(serde_json::Value::as_object)

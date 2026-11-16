@@ -23,7 +23,6 @@ pub(crate) struct Beat {
 }
 
 impl Beat {
-
     pub(crate) fn open(city_root: &Path) -> Beat {
         let file = kernel::layout::CityLayout::new(city_root).monitor();
         let kept = match read(&file) {

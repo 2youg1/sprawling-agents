@@ -129,7 +129,6 @@ pub struct PlannedProgress {
 }
 
 impl PlannedProgress {
-
     pub fn ratio(&self) -> (u32, u32) {
         (self.done, self.total)
     }

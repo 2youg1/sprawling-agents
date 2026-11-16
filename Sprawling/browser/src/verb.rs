@@ -51,33 +51,20 @@ fn tree_script() -> String {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verb {
-    Open {
-        url: String,
-    },
+    Open { url: String },
     Snapshot,
-    Act {
-        generation: u64,
-        action: Action,
-    },
+    Act { generation: u64, action: Action },
     Screenshot(ShotRequest),
-    Measure {
-        references: Vec<String>,
-    },
+    Measure { references: Vec<String> },
     Survey,
 
-    Fetch {
-        url: String,
-    },
+    Fetch { url: String },
     Console,
-    Viewport {
-        width: u32,
-        height: u32,
-    },
+    Viewport { width: u32, height: u32 },
     Close,
 }
 
 impl Verb {
-
     pub fn destination(&self) -> Result<Option<String>, AxError> {
         self.address()
             .map(kernel::gate::host_of)

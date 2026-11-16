@@ -158,7 +158,6 @@ const BEFORE_INTERPRETERS: &str = "system";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FailureClass {
-
     CommandNotFound,
 
     Syntax,
@@ -186,7 +185,6 @@ impl Family {
 }
 
 impl FailureClass {
-
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -234,7 +232,6 @@ impl FailureClass {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ShellCount {
-
     pub calls: u64,
 
     pub failures: BTreeMap<FailureClass, u64>,
@@ -246,7 +243,6 @@ pub struct ShellTally {
 }
 
 impl ShellTally {
-
     pub fn absorb(&mut self, result: &Map<String, Value>) {
         if result.get("arm").and_then(Value::as_str) != Some("shell") {
             return;

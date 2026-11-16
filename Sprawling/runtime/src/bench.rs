@@ -43,22 +43,24 @@ pub struct ToolBench {
 
 #[derive(Debug)]
 pub enum BenchOutcome {
-
     Ran {
         outcome: ToolOutcome,
         checkpointed: Option<String>,
         wrote: kernel::Writes,
     },
 
-    Refused { refusal: Box<AxError> },
+    Refused {
+        refusal: Box<AxError>,
+    },
 
-    Duplicate { outcome: ToolOutcome },
+    Duplicate {
+        outcome: ToolOutcome,
+    },
 }
 
 pub struct DeclaredWrites(BTreeMap<ToolName, kernel::Writes>);
 
 impl DeclaredWrites {
-
     pub fn of(&self, call: &ToolCall) -> kernel::Writes {
         self.0
             .get(&call.name)
@@ -150,7 +152,6 @@ impl ToolBench {
         key: &IdemKey,
         now: kernel::TimeMs,
     ) -> Result<Clearance, AxError> {
-
         if let Some(answered) = self.seen.get(key) {
             return match answered {
                 Ok(outcome) => Ok(Clearance::Answered(BenchOutcome::Duplicate {
@@ -257,7 +258,6 @@ impl ToolBench {
 
 #[derive(Debug)]
 pub enum Clearance {
-
     Answered(BenchOutcome),
 
     Cleared(Ticket),

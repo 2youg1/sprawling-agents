@@ -95,7 +95,6 @@ fn bounded(whole: &str) -> Option<Output> {
 pub fn note_of(kind: EventKind, record: &EventRecord) -> Option<Note> {
     let at = record.seq();
     match kind {
-
         EventKind::GateDenied | EventKind::BudgetLimit => {
             Some(match record.data().read::<AxError>() {
                 Ok(error) => Note::Refused { error, at },

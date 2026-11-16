@@ -32,7 +32,6 @@ fn every_family_is_a_row_and_every_member_says_where_it_is_installed() {
                 member.name
             );
             for platform in Platform::ALL {
-
                 for place in member.places.at(platform).iter() {
                     assert!(
                         place.starts_with('/') || place.contains(":\\"),

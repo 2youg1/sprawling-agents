@@ -16,7 +16,6 @@ const ATTEMPTS: u8 = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Unread {
-
     Leaf(Failure),
 
     Malformed(Malformed),
@@ -75,7 +74,6 @@ pub fn thread_group() -> Result<Group, Failure> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Throttling {
-
     Lifted,
 
     Absent,
@@ -111,7 +109,6 @@ pub struct JobWatch {
 }
 
 impl JobWatch {
-
     pub fn attach(job: isize) -> Result<JobWatch, Failure> {
         let mut port = 0;
         let mut code = co::ERROR::SUCCESS;

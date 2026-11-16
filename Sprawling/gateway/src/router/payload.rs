@@ -18,7 +18,6 @@ mod reading;
 pub(crate) use reading::{read_attached, read_choice};
 
 pub fn attached_payload(endpoint: &AttachedEndpoint) -> Result<Payload, AxError> {
-
     let auth = auth_reference(&endpoint.auth).cloned();
     let auth_header = match &endpoint.auth {
         AuthSpec::Header { name, .. } => Some(name.clone()),

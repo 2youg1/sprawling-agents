@@ -43,7 +43,6 @@ mod tests {
 
     #[test]
     fn a_binary_without_the_client_table_is_named_by_the_gate() {
-
         assert!(contains(
             b"...assets/index-x1.js...",
             CLIENT_MARK.as_bytes()

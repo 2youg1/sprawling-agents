@@ -7,7 +7,6 @@ use super::verbs::{AfterDashes, Need, Row, Takes, VERBS, Verb};
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) enum Invocation {
-
     FirstScreen,
 
     Overview,
@@ -26,7 +25,6 @@ pub(super) struct Arguments {
 }
 
 impl Arguments {
-
     pub(super) fn positional(&self, nth: usize) -> Option<&String> {
         self.positionals.get(nth.checked_sub(1)?)
     }

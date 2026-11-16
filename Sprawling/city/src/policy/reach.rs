@@ -12,7 +12,6 @@ pub enum DomainReach {
 }
 
 impl DomainReach {
-
     pub(super) fn parse(value: &str) -> Result<DomainReach, AxError> {
         match value {
             "everything" => Ok(DomainReach::Everything),

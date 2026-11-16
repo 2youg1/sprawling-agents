@@ -13,7 +13,6 @@ use crate::frames::Query;
 pub struct CityLabel(String);
 
 impl CityLabel {
-
     pub fn parse(raw: &str) -> Result<Self, AxError> {
         if raw.is_empty() || raw.chars().any(char::is_control) {
             return Err(AxError::failure(
@@ -179,7 +178,6 @@ mod tests {
 
     #[test]
     fn merging_is_the_same_sequence_however_the_streams_arrive() {
-
         let left = (city("attic"), vec![event(10, 1), event(30, 2)]);
         let right = (city("studio"), vec![event(10, 7), event(20, 8)]);
 

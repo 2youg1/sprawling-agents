@@ -11,7 +11,6 @@ const ID_MAX: usize = 64;
 pub struct AgentId(String);
 
 impl AgentId {
-
     pub fn parse(text: &str) -> Result<AgentId, AxError> {
         let id = text.trim().to_ascii_lowercase();
         let allowed = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit() || "-_.".contains(c);
@@ -45,7 +44,6 @@ impl AgentId {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentSource {
-
     Registry,
 
     Detected,
@@ -73,7 +71,6 @@ pub struct Launch {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Pin {
-
     Exact,
 
     Floating,
@@ -82,7 +79,6 @@ pub enum Pin {
 }
 
 impl Launch {
-
     #[must_use]
     pub fn digest(&self) -> B3Hash {
         let mut bytes = Vec::new();
@@ -130,7 +126,6 @@ impl Launch {
                 .split_once("==")
                 .map(|(_, version)| version)
                 .or_else(|| {
-
                     package
                         .rsplit_once('@')
                         .filter(|(name, _)| !name.is_empty())
@@ -151,7 +146,6 @@ pub(super) enum Launcher {
 }
 
 impl Launcher {
-
     pub(super) const fn program(self) -> &'static str {
         match self {
             Launcher::Npx if cfg!(windows) => "npx.cmd",
@@ -183,7 +177,6 @@ pub struct Consented {
 }
 
 impl Consented {
-
     pub fn given(entry: AgentEntry, digest: &B3Hash) -> Result<Consented, AxError> {
         if entry.launch.digest() == *digest {
             return Ok(Consented { entry });

@@ -15,7 +15,6 @@ use crate::vfs::Vfs;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SnapshotStart {
-
     Resume {
         snapshot: ChainSnapshot,
         tail: Vec<Vec<u8>>,
@@ -30,9 +29,7 @@ pub enum WholeFold {
 
     Damaged(String),
 
-    OtherFoldVersion {
-        found: u32,
-    },
+    OtherFoldVersion { found: u32 },
 
     Stale,
 
@@ -143,7 +140,6 @@ fn from_the_end(bytes: &[u8], seq: Seq) -> Option<Cut> {
 }
 
 fn from_the_start(bytes: &[u8], first: Seq, seq: Seq) -> Option<Cut> {
-
     let skip = usize::try_from(seq.value().checked_sub(first.value())?).ok()?;
     let mut lines = complete_lines(bytes)
         .0

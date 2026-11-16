@@ -93,7 +93,6 @@ pub fn check(table: &ExposureTable) -> Result<(), AxError> {
 }
 
 impl ConfigLayer {
-
     #[must_use]
     pub fn catalog(&self) -> Option<&ExposureTable> {
         self.catalog.as_ref()

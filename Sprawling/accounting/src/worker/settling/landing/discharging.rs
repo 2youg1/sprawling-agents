@@ -8,7 +8,6 @@ use kernel::AxError;
 use crate::worker::{Assignment, Dispatched, Landed, Owed, Owing, RunWorker};
 
 impl RunWorker {
-
     pub(in crate::worker) fn discharge(
         &mut self,
         owing: Owing,

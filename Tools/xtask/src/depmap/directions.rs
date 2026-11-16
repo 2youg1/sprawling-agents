@@ -15,7 +15,6 @@ const TEST_ATTRIBUTE: &str = "#[cfg(test)]";
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Direction {
-
     module: String,
     forbidden: BTreeSet<String>,
 }

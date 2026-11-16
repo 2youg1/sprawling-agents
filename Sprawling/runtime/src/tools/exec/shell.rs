@@ -10,10 +10,11 @@ use kernel::{AxCode, AxError, Interpreter};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Shell {
-
     Absent,
 
-    Missing { asked: Interpreter },
+    Missing {
+        asked: Interpreter,
+    },
 
     Found {
         program: PathBuf,
@@ -22,7 +23,6 @@ pub enum Shell {
 }
 
 impl Shell {
-
     pub(super) fn command(&self, text: &str) -> Result<(Command, String), AxError> {
         match self {
             Shell::Absent => Err(AxError::failure(

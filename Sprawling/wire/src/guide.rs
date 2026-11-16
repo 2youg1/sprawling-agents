@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GuideProgress {
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub at: Option<GuideStep>,
     #[serde(default)]
@@ -42,7 +41,6 @@ pub enum GuideStep {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum GuideState {
-
     #[default]
     Open,
 

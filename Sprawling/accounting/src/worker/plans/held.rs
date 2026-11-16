@@ -12,7 +12,6 @@ use kernel::{Address, AxError, EventKind, NodeId, Payload};
 use super::super::building_of;
 
 pub(in crate::worker) struct Planning {
-
     pub(in crate::worker) pursuits: BTreeMap<Address, kernel::Pursuit>,
 
     pub(in crate::worker) delegator: kernel::Delegator,
@@ -25,7 +24,6 @@ pub(in crate::worker) struct Planning {
 pub(in crate::worker) type PlanWriter = fn(&Path, &[u8], &[u8]) -> Result<(), AxError>;
 
 impl Planning {
-
     pub(in crate::worker) fn absorb(
         &mut self,
         kind: EventKind,
@@ -40,7 +38,6 @@ impl Planning {
 pub(in crate::worker) struct PlanHolders(BTreeMap<Address, BTreeMap<NodeId, String>>);
 
 impl PlanHolders {
-
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "five kinds move a claim; the rest of the event vocabulary does not"

@@ -29,7 +29,6 @@ pub struct ExposureTable {
 }
 
 impl ExposureTable {
-
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.tools.is_empty() && self.namespaces.is_empty() && self.skills.is_empty()
@@ -47,7 +46,6 @@ impl ExposureTable {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ExposureFrom {
-
     Fixed,
 
     Default,
@@ -67,7 +65,6 @@ pub struct CatalogExposure {
 }
 
 impl CatalogExposure {
-
     #[must_use]
     pub fn stated(&self, tool: &str, namespace: &str) -> Option<(Exposure, ExposureFrom)> {
         self.building

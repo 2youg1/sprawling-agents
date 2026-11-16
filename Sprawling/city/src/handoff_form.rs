@@ -7,7 +7,6 @@ use crate::spine_files::blank::is_guidance;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct HandoffSections {
-
     pub overall: Option<String>,
 
     pub progress: Option<String>,

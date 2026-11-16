@@ -9,7 +9,6 @@ use kernel::{Address, AxCode, AxError, EventDraft, EventKind, Payload, RunId, Ti
 use serde_json::{Value, json};
 
 pub enum History {
-
     Empty,
 
     Runs(u32),

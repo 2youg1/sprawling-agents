@@ -15,7 +15,6 @@ pub enum Carrier {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AxCode {
-
     PathNotFound,
     ToolUnknown,
     ToolUnavailable,
@@ -75,7 +74,6 @@ pub enum AxCode {
 }
 
 impl AxCode {
-
     pub const ALL: [AxCode; 44] = [
         AxCode::PathNotFound,
         AxCode::ToolUnknown,
@@ -261,7 +259,6 @@ mod tests {
 
     #[test]
     fn axcode_is_the_declared_length_and_spelling_is_bijective() {
-
         assert_eq!(AxCode::ALL.len(), 44);
         let spellings: BTreeSet<&str> = AxCode::ALL.iter().map(AxCode::as_str).collect();
         assert_eq!(spellings.len(), 44);

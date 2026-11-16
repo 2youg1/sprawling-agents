@@ -11,7 +11,6 @@ use std::process::Command;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ended {
-
     Chosen,
 
     Degraded,
@@ -25,7 +24,6 @@ enum Launch {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Child {
-
     pub forwarded: Vec<String>,
 
     pub first: Window,

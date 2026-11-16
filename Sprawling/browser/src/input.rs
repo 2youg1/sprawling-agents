@@ -19,7 +19,6 @@ pub struct DragPath {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Origin {
-
     Element(String),
 
     Viewport(Point),

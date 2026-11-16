@@ -40,7 +40,6 @@ pub struct ModelFacts {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Listing {
-
     #[default]
     Listed,
 
@@ -50,7 +49,6 @@ pub enum Listing {
 #[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ThinkingStatement {
-
     #[serde(default)]
     pub levels: Vec<Effort>,
 

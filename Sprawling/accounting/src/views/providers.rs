@@ -15,7 +15,6 @@ use super::prepared::unavailable_because;
 type Vault = Arc<Mutex<gateway::Custodian>>;
 
 pub enum ProviderAsk {
-
     Endpoints {
         held: wire::EndpointsAnswer,
         vault: Option<Vault>,
@@ -29,7 +28,6 @@ pub enum ProviderAsk {
 }
 
 impl ProviderAsk {
-
     pub(super) fn answer(self) -> wire::Answer {
         match self {
             ProviderAsk::Endpoints { held, vault } => match with_keys(held, vault.as_ref()) {

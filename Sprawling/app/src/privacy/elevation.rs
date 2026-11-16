@@ -46,7 +46,6 @@ pub(in crate::privacy) struct MachineWrite {
 
 #[derive(Debug)]
 pub(in crate::privacy) enum ElevationFault {
-
     Declined,
 
     Exited(Option<i32>),

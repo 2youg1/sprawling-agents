@@ -14,7 +14,6 @@ const KEY: &str = "sk-test-0123456789";
 
 #[derive(Debug, PartialEq)]
 struct Shape {
-
     round: String,
     path: String,
     host: Option<String>,

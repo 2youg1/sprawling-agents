@@ -18,12 +18,13 @@ fn transport_detail(err: &reqwest::Error) -> String {
 
 #[derive(Debug)]
 pub(crate) enum ProviderFailure<'e> {
-
     Exchange(&'e reqwest::Error),
 
     Cut(&'e std::io::Error),
 
-    Silence { quiet_ms: u64 },
+    Silence {
+        quiet_ms: u64,
+    },
 
     Refused {
         url: &'e str,
@@ -43,7 +44,9 @@ pub(crate) enum ProviderFailure<'e> {
 
     Unreadable(String),
 
-    Reported { kind: &'e str },
+    Reported {
+        kind: &'e str,
+    },
 
     Unbuilt(&'e reqwest::Error),
 }
@@ -74,7 +77,6 @@ fn names_an_exhausted_quota(said: &str) -> bool {
 }
 
 impl<'e> ProviderFailure<'e> {
-
     pub(crate) fn refusal(
         url: &'e str,
         status: reqwest::StatusCode,

@@ -24,7 +24,6 @@ use crate::worker::driving::harness::{StartHarness, Started};
 
 #[derive(Clone)]
 enum Step {
-
     Answer(Value),
 
     Say(Value),

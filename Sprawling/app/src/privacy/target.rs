@@ -15,14 +15,15 @@ pub(crate) enum Hive {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Target {
-
     Registry {
         hive: Hive,
         path: &'static str,
         name: &'static str,
     },
 
-    UserEnvironment { name: &'static str },
+    UserEnvironment {
+        name: &'static str,
+    },
 
     ScheduledTask {
         path: &'static str,
@@ -56,7 +57,6 @@ impl Target {
 }
 
 impl OperationKind {
-
     pub(crate) const fn scope(self) -> PrivacyScope {
         match self {
             Self::RegistryValueHklm | Self::ScheduledTaskEnabled => PrivacyScope::Machine,
@@ -126,7 +126,6 @@ const REG_SZ: u32 = 1;
 const REG_DWORD: u32 = 4;
 
 impl RawValue {
-
     pub(crate) fn dword(number: u32) -> Self {
         Self::Present {
             kind: REG_DWORD,
@@ -147,7 +146,6 @@ impl RawValue {
 }
 
 impl From<&Snapshot> for PrivacyValue {
-
     fn from(snapshot: &Snapshot) -> Self {
         match snapshot {
             Snapshot::Registry(RawValue::Absent) => Self::Absent,

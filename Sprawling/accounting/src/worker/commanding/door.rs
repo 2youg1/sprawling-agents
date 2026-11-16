@@ -22,7 +22,6 @@ pub(in crate::worker) struct InHand {
 pub(in crate::worker) struct KeptRefusal(std::sync::mpsc::Receiver<AxError>);
 
 impl KeptRefusal {
-
     pub(in crate::worker) fn open() -> (wire::Reply, KeptRefusal) {
         let (keep, kept) = std::sync::mpsc::channel();
         let reply = wire::Reply::to(move |refusal| match keep.send(refusal) {
@@ -43,7 +42,6 @@ impl KeptRefusal {
 }
 
 impl RunWorker {
-
     pub fn handle(&mut self, command: wire::Command) -> Result<(), AxError> {
         self.history_admits(&command)?;
         let (reply, refused_later) = KeptRefusal::open();

@@ -62,7 +62,6 @@ pub(crate) fn conversation_id(req: &ModelRequest) -> Result<String, AxError> {
 }
 
 impl Endpoint {
-
     pub fn list_models(&self, url: &str) -> Result<Vec<ModelFacts>, AxError> {
         let mut facts = Vec::new();
         let mut after: Option<String> = None;

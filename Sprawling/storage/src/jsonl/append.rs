@@ -38,7 +38,6 @@ impl JsonlLedger {
     }
 
     pub fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, StorageError> {
-
         self.finish_unwind()?;
         self.barrier.admit(&self.dir, self.next_seq)?;
         self.halt.admit()?;

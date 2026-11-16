@@ -17,7 +17,6 @@ pub enum AudioType {
 }
 
 impl AudioType {
-
     pub const ALL: [AudioType; 5] = [
         AudioType::Webm,
         AudioType::Ogg,
@@ -145,7 +144,6 @@ pub struct Recording {
 }
 
 impl Recording {
-
     pub fn new(bytes: Vec<u8>, kind: AudioType) -> Result<Recording, AxError> {
         if bytes.is_empty() {
             return Err(AxError::failure(

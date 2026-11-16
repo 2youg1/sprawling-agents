@@ -109,7 +109,6 @@ impl Serialize for GitOid {
 }
 
 impl<'de> Deserialize<'de> for GitOid {
-
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         read_digest(deserializer).map(GitOid)
     }
@@ -155,7 +154,6 @@ pub enum Range {
 }
 
 impl Range {
-
     pub fn lines(from: u64, to: u64) -> Result<Self, AxError> {
         if from == 0 || from > to {
             return Err(range_error("lines", from, to));
@@ -203,7 +201,6 @@ pub enum Locator {
 }
 
 impl Locator {
-
     #[must_use]
     pub const fn cas(hash: B3Hash) -> Self {
         Locator::Cas { hash, range: None }

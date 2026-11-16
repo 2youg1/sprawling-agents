@@ -7,7 +7,6 @@ use super::{Backlog, PollBudget, RunAffinity, Scratch, Shares, Sink};
 use crate::reserve::MachineBudget;
 
 impl Backlog {
-
     #[must_use]
     pub fn with_affinity(self, affinity: RunAffinity) -> Backlog {
         Backlog { affinity, ..self }

@@ -26,7 +26,6 @@ pub(crate) struct Listen {
 
 #[derive(Debug)]
 pub(crate) enum Unheard {
-
     Unreadable(AxError),
 
     Unkeyed(AxError),
@@ -38,7 +37,6 @@ pub(crate) enum Unheard {
 
 #[derive(Debug, PartialEq, Eq)]
 enum Reach {
-
     ThisMachine(u16),
 
     Portless,
@@ -113,7 +111,6 @@ pub(crate) fn call(
     token: Option<&str>,
     listen: Listen,
 ) -> Result<Heard, Unheard> {
-
     let outgoing: wire::ClientFrame = serde_json::from_str(frame).map_err(|err| {
         Unheard::Unreadable(malformed("read the frame to send", &err.to_string()))
     })?;

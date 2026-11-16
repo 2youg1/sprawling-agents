@@ -6,7 +6,6 @@
 use kernel::{Address, EventKind, RunId};
 
 pub(crate) enum Until {
-
     Quiet,
 
     Event(EventKind),
@@ -19,14 +18,12 @@ pub(crate) enum Until {
 
 #[derive(Clone, Copy)]
 pub(crate) enum Milestone {
-
     Started,
 
     Frozen,
 }
 
 impl Milestone {
-
     fn kind(self) -> EventKind {
         match self {
             Self::Started => EventKind::RunStarted,
@@ -47,7 +44,6 @@ pub(crate) struct Heard {
 
 #[derive(Clone, Copy)]
 pub(crate) enum Awaited {
-
     Nothing,
 
     Arrived,
@@ -56,7 +52,6 @@ pub(crate) enum Awaited {
 }
 
 pub(crate) enum Spoken {
-
     Refused,
 
     Answered,
@@ -67,7 +62,6 @@ pub(crate) enum Spoken {
 }
 
 impl Heard {
-
     pub(crate) fn spoken(&self) -> Spoken {
         match (self.refusals, self.answers, self.awaited) {
             (0, 0, Awaited::Nothing | Awaited::Arrived | Awaited::Missing) => Spoken::Quiet,
@@ -91,7 +85,6 @@ pub(super) enum Ending {
 }
 
 impl Ending {
-
     pub(super) fn of(sent: &wire::ClientFrame, until: Until) -> Self {
         match (sent, until) {
             (

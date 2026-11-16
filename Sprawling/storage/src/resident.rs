@@ -17,7 +17,6 @@ pub struct Resident<R, K> {
 }
 
 impl<R: Ord + Clone, K: Ord + Clone> Resident<R, K> {
-
     pub fn new(budget_bytes: usize) -> Self {
         Self {
             budget: budget_bytes,

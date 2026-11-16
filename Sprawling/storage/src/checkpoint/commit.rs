@@ -81,7 +81,6 @@ pub(crate) fn git_err(op: &'static str) -> impl FnOnce(git2::Error) -> StorageEr
 }
 
 impl Checkpoint {
-
     pub fn ensure_base(
         &mut self,
         scopes: &[String],

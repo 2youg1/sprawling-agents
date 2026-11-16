@@ -15,7 +15,6 @@ use super::{Backlog, BacklogId, Body, Claim, Member};
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RunProcesses {
-
     pub pids: BTreeSet<u32>,
 
     pub unfollowed: u32,
@@ -27,7 +26,6 @@ pub struct RunProcesses {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum RunAffinity {
-
     #[default]
     Os,
 
@@ -36,20 +34,17 @@ pub enum RunAffinity {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Shares {
-
     #[default]
     Unset,
 
     Cpu,
 
     CpuAndMemory {
-
         limit: NonZeroU64,
     },
 }
 
 impl Shares {
-
     pub(super) fn memory(self) -> Option<NonZeroU64> {
         match self {
             Shares::Unset | Shares::Cpu => None,
@@ -67,7 +62,6 @@ pub(super) struct Jobs {
 }
 
 impl Backlog {
-
     pub fn processes(&self) -> Result<BTreeMap<RunId, RunProcesses>, AxError> {
         let table = self.hold()?;
         let mut runs: BTreeMap<RunId, RunProcesses> = BTreeMap::new();
@@ -98,7 +92,6 @@ impl Backlog {
 }
 
 impl Jobs {
-
     pub(super) fn ceiling(&mut self, owner: RunId, mark: Mark) -> Option<Ceiling> {
         let count = if mark.watching() {
             self.refusals(owner)
@@ -241,7 +234,6 @@ impl Jobs {
             let reading = readings.entry(*owner).or_default();
             let listed = run.job.as_ref().map(win32job::Job::query_process_id_list);
             if let Some(Ok(pids)) = listed {
-
                 reading
                     .pids
                     .extend(pids.into_iter().filter_map(|pid| u32::try_from(pid).ok()));

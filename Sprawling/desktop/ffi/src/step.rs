@@ -5,7 +5,6 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
-
     Finished,
 
     Absent,
@@ -58,7 +57,6 @@ pub enum Step {
 }
 
 impl Step {
-
     pub const ALL: [Step; 25] = [
         Step::Finished,
         Step::Absent,

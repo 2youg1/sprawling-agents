@@ -263,7 +263,6 @@ fn drive_turn<L: Ledger>(
                     );
                 }
                 Err(uncommitted) => {
-
                     if let Some(report) = uncommitted.refusal() {
                         run.refusal(&mut *ledger, report, clock.now()?)?;
                     }

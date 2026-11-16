@@ -19,7 +19,6 @@ use crate::walk;
 const INCLUDES: [&str; 3] = ["include", "include_str", "include_bytes"];
 
 pub(super) struct Include {
-
     pub(super) file: String,
     pub(super) line: usize,
 
@@ -28,7 +27,6 @@ pub(super) struct Include {
 }
 
 pub(super) enum Target {
-
     Path(PathBuf),
 
     BuildOutput,
@@ -147,14 +145,12 @@ impl<'ast> Visit<'ast> for Reader<'_> {
 }
 
 impl Reader<'_> {
-
     fn declared(&self, attrs: &[syn::Attribute], name: &str) -> Result<Module, XtaskError> {
         let inner = self
             .inline
             .iter()
             .fold(self.children.clone(), |dir, segment| dir.join(segment));
         let candidates = match path_attribute(attrs) {
-
             Some(path) if self.inline.is_empty() => vec![self.here.join(path)],
             Some(path) => vec![inner.join(path)],
             None => vec![

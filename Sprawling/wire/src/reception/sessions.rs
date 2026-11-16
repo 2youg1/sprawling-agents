@@ -28,7 +28,6 @@ struct Session {
 }
 
 impl Session {
-
     fn idle(&self) -> bool {
         match self.hold {
             Hold::Seated(_) => false,
@@ -51,7 +50,6 @@ pub struct Sessions {
 }
 
 impl Sessions {
-
     #[must_use]
     pub fn holds(&self, presented: &str, now: TimeMs) -> bool {
         self.live

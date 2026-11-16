@@ -68,24 +68,13 @@ pub struct RunPlan {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SafePoint {
-    BeforeAssemble {
-        turn: u32,
-    },
-    BeforeCall {
-        turn: u32,
-    },
-    BeforeWave {
-        turn: u32,
-    },
+    BeforeAssemble { turn: u32 },
+    BeforeCall { turn: u32 },
+    BeforeWave { turn: u32 },
 
-    BeforeToolCall {
-        turn: u32,
-        call: u32,
-    },
+    BeforeToolCall { turn: u32, call: u32 },
 
-    BeforeSpawn {
-        turn: u32,
-    },
+    BeforeSpawn { turn: u32 },
 }
 
 #[derive(Debug)]
@@ -101,7 +90,6 @@ pub struct CheckpointFailure {
 }
 
 impl CheckpointFailure {
-
     pub fn refusal(&self) -> Option<&kernel::event::record::SecretEgressBlocked> {
         self.refusal.as_ref()
     }
@@ -112,7 +100,6 @@ impl CheckpointFailure {
 }
 
 impl From<storage::StorageError> for CheckpointFailure {
-
     fn from(err: storage::StorageError) -> Self {
         let refusal = if let storage::StorageError::SecretEgress(report) = &err {
             Some(report.clone())
@@ -127,7 +114,6 @@ impl From<storage::StorageError> for CheckpointFailure {
 }
 
 impl From<AxError> for CheckpointFailure {
-
     fn from(cause: AxError) -> Self {
         CheckpointFailure {
             cause,
@@ -137,7 +123,6 @@ impl From<AxError> for CheckpointFailure {
 }
 
 pub struct RunHooks<'a> {
-
     pub now: &'a mut dyn FnMut() -> Result<TimeMs, AxError>,
 
     pub monotonic_us: &'a mut dyn FnMut() -> u64,
@@ -218,7 +203,6 @@ pub fn drive(
 ) -> Result<Run<Frozen>, AxError> {
     let mut run = Run::dispatch(plan, ledger, hooks)?;
     let ending = loop {
-
         if !run.state.watchdog.round_open() {
             match run.state.watchdog.open_round(model.account_roster()) {
                 Ok(Some(account)) => model.select_account(&account),
@@ -237,7 +221,6 @@ pub fn drive(
             Ok(Advance::Concluded(completion)) => break completion,
 
             Err(err) => {
-
                 run.state.lines.barrier(ledger)?;
                 let Carrier::Event(kind) = err.code().carrier() else {
                     run.state.failure = Some(err.clone());
@@ -274,7 +257,6 @@ pub fn drive(
                     | crate::Disposal::Freeze {
                         reason: crate::FreezeReason::Stall | crate::FreezeReason::ProviderRefused,
                     } => {
-
                         ledger.append(run.line(t, kind, Payload::of(&err)?))?;
                     }
                 }

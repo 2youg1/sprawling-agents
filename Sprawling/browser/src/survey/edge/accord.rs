@@ -13,7 +13,6 @@ const QUORUM: usize = 3;
 
 #[derive(Clone, Copy)]
 pub(super) enum Accord {
-
     Required,
 
     Observed { reach: i64 },

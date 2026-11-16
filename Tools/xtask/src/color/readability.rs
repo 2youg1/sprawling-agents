@@ -58,7 +58,6 @@ pub(super) fn judge_readability(
     }
 
     for (name, px, weight, claimed) in &steps {
-
         let derived = bronze_tier(*px, *weight, name == "body");
         match derived {
             None => violations.push(token_violation(

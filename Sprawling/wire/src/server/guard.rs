@@ -81,7 +81,6 @@ fn judged(origins: &ListenerOrigins, request: &Request, arrival: Arrival) -> Opt
 pub struct Stamp(Vec<(HeaderName, HeaderValue)>);
 
 impl Stamp {
-
     pub(crate) fn of(headers: &PageHeaders, stored: Stored) -> Result<Self, AxError> {
         let extra = match stored {
             Stored::AsPage => None,

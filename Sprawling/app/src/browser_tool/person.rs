@@ -15,7 +15,6 @@ pub(super) const PERSON_DISCLOSURE: &str = "drive the browser the User is alread
      page they have open.";
 
 pub(crate) enum Role {
-
     Building,
 
     PersonAt { host: String },

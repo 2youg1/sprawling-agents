@@ -24,7 +24,6 @@ const ACTIONS: &str =
     "use `list`, `raise` (name, template) or `adopt` (name, for a directory already here)";
 
 impl CityTool {
-
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, description) in [
@@ -117,7 +116,6 @@ enum Request {
 }
 
 impl Request {
-
     fn read(args: &Map<String, Value>) -> Result<Request, AxError> {
         let action = args.get("action").and_then(Value::as_str).ok_or_else(|| {
             AxError::failure(
@@ -132,7 +130,6 @@ impl Request {
             "raise" => {
                 let addr = named(args, "raise a building")?;
                 let template = match args.get("template").and_then(Value::as_str) {
-
                     None => BuildingTemplate::Minimal,
                     Some(raw) => BuildingTemplate::parse(raw)?,
                 };

@@ -116,7 +116,6 @@ fn two_wave_scenario(cancel: Option<CancelPoint>, steer: Option<(u32, String)>) 
 
 #[test]
 fn a_steer_advances_the_run_instead_of_stopping_it() {
-
     let steered = run_scenario(two_wave_scenario(
         None,
         Some((0, "try the other branch".to_owned())),
@@ -142,7 +141,6 @@ fn a_steer_advances_the_run_instead_of_stopping_it() {
 
 #[test]
 fn a_cancel_at_the_same_boundary_beats_a_steer() {
-
     let both = run_scenario(two_wave_scenario(
         Some(CancelPoint::BeforeWave { turn: 0 }),
         Some((0, "keep going".to_owned())),
@@ -158,7 +156,6 @@ fn a_cancel_at_the_same_boundary_beats_a_steer() {
 
 #[test]
 fn a_steered_run_is_still_byte_identical_on_a_second_pass() {
-
     let steer = || Some((1, "narrow the search".to_owned()));
     let first = run_scenario(two_wave_scenario(None, steer())).unwrap();
     let second = run_scenario(two_wave_scenario(None, steer())).unwrap();
@@ -167,7 +164,6 @@ fn a_steered_run_is_still_byte_identical_on_a_second_pass() {
 
 #[test]
 fn a_steer_after_the_last_wave_never_lands_and_changes_nothing() {
-
     let plain = run_scenario(two_wave_scenario(None, None)).unwrap();
     let late = run_scenario(two_wave_scenario(None, Some((99, "too late".to_owned())))).unwrap();
     assert_eq!(plain.lines, late.lines);

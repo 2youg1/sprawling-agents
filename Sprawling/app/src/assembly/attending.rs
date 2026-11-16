@@ -104,7 +104,6 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             spare,
         },
         Broadcast { to_clients, head },
-
         setting,
         crate::serving::standing::monotonic_now,
     )?;
@@ -113,7 +112,6 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
     let worker_thread = std::thread::Builder::new()
         .name("sprawling-runs".to_owned())
         .spawn(move || {
-
             let _seat = crate::serving::placement::seat_this_thread(
                 "sprawling-runs",
                 crate::serving::placement::Role::Serial,
@@ -135,7 +133,6 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             let keeping = Arc::clone(&kept);
             worker.serve(Serving {
                 deltas: std::sync::Arc::new(move |delta: wire::Delta| {
-
                     drop(to_watchers.send(delta));
                 }),
                 outputs: std::sync::Arc::new(move |piece: wire::LiveOutput| {
@@ -203,7 +200,6 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             .with_recovery("check process thread limits")
         })?;
     let (vault, health, relay) = match ready_rx.recv() {
-
         Ok(Ok((vault, health, relay))) => {
             lend(Arc::clone(&vault));
             start_warm_ups(warm_ups);

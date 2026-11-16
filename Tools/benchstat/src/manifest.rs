@@ -11,7 +11,6 @@ use crate::error::BenchError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DesignStatus {
-
     Required,
 
     Optional,
@@ -28,7 +27,6 @@ pub fn design_status(series: &str) -> Option<DesignStatus> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Coverage {
-
     pub series: String,
 
     pub status: String,
@@ -45,7 +43,6 @@ pub struct Coverage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Claim {
-
     pub id: String,
 
     pub series: String,
@@ -66,7 +63,6 @@ pub struct Claim {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Headline {
-
     P50,
 
     P95,
@@ -77,7 +73,6 @@ pub enum Headline {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CellPlan {
-
     pub key: String,
 
     #[serde(default)]
@@ -114,7 +109,6 @@ pub struct CellPlan {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Manifest {
-
     pub schema_version: u64,
 
     pub analysis_revision: String,
@@ -148,7 +142,6 @@ pub struct Manifest {
 }
 
 impl Manifest {
-
     pub fn parse(text: &str) -> Result<Self, BenchError> {
         let manifest: Self = serde_json::from_str(text).map_err(|error| {
             BenchError::input(

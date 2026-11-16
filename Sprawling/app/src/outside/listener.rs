@@ -31,7 +31,6 @@ const TICK: Duration = Duration::from_secs(1);
 
 #[derive(Clone)]
 pub(crate) struct Reaching {
-
     pub(crate) runtime: tokio::runtime::Handle,
 
     pub(crate) city: SocketAddr,

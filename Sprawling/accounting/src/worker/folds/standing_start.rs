@@ -24,7 +24,6 @@ pub(super) struct StandingFolds {
 }
 
 impl StandingFolds {
-
     pub(super) fn settle(self, cut: Result<(), AxError>) -> Result<Standing, AxError> {
         Ok(Standing {
             book: self.book,

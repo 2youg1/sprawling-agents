@@ -23,7 +23,6 @@ use reorder::all_at_once;
 pub(super) use reorder::lost_answer;
 
 pub trait ConcurrentInvoke {
-
     fn meta_of(&self, call: &ToolCall) -> Option<&ToolMeta>;
 
     fn resolve_call(&self, call: ToolCall) -> ToolCall {
@@ -50,7 +49,6 @@ pub trait ConcurrentInvoke {
 
 #[derive(Debug)]
 pub enum Admitted {
-
     Answered(Result<ToolOutcome, AxError>),
 
     Cleared(Ticket),
@@ -86,7 +84,6 @@ struct Timing {
 }
 
 impl<'h> Turn<'h, ToolWave> {
-
     pub(crate) fn calls(&self) -> &[ToolCall] {
         &self.state.calls
     }

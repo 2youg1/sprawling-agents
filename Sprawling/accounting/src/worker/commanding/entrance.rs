@@ -11,7 +11,6 @@ pub(in crate::worker) const IDEM_FIELD: &str = "idem";
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 pub(in crate::worker) struct Entrance {
-
     seen: BTreeSet<IdemKey>,
 
     #[serde(
@@ -25,7 +24,6 @@ pub(in crate::worker) struct Entrance {
 }
 
 impl Entrance {
-
     pub(in crate::worker) fn answered(&self, key: &IdemKey) -> Option<Result<(), AxError>> {
         self.seen
             .contains(key)

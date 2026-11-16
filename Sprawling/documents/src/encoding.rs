@@ -14,7 +14,6 @@ const UTF16_BE_MARK: [u8; 2] = [0xFE, 0xFF];
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Encoding {
-
     Utf8,
 
     Utf8Bom,
@@ -26,14 +25,12 @@ pub enum Encoding {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Reading {
-
     Text(Encoding),
 
     Opaque,
 }
 
 impl Reading {
-
     pub fn of(bytes: &[u8]) -> Reading {
         let encoding = Encoding::of_mark(bytes);
         if encoding.spells(bytes) {
@@ -45,7 +42,6 @@ impl Reading {
 }
 
 impl Encoding {
-
     pub fn of_mark(front: &[u8]) -> Encoding {
         if front.starts_with(&UTF8_MARK) {
             Encoding::Utf8Bom

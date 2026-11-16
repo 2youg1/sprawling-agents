@@ -30,7 +30,6 @@ struct Face<'a> {
 }
 
 impl<'a> Vectors<'a> {
-
     pub fn of(endpoint: &'a AttachedEndpoint, model: String) -> Result<Vectors<'a>, AxError> {
         Ok(Vectors {
             face: Face::of(endpoint, Modality::Embedding, model)?,
@@ -62,7 +61,6 @@ impl<'a> Vectors<'a> {
 }
 
 impl<'a> Ranks<'a> {
-
     pub fn of(endpoint: &'a AttachedEndpoint, model: String) -> Result<Ranks<'a>, AxError> {
         Ok(Ranks {
             face: Face::of(endpoint, Modality::Rerank, model)?,
@@ -96,7 +94,6 @@ impl<'a> Face<'a> {
         modality: Modality,
         model: String,
     ) -> Result<Face<'a>, AxError> {
-
         let url = endpoint
             .connection_kind
             .url_for(&endpoint.base_url, modality)

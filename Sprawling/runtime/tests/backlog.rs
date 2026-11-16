@@ -93,7 +93,6 @@ fn halt_terminates_a_command_that_never_ends_and_the_run_returns_to_a_boundary()
 
 #[test]
 fn a_command_that_outlives_the_window_keeps_running_where_halt_can_reach_it() {
-
     let backlog = Backlog::with_window(runtime::PollBudget::new(1, 1));
     let addr = Address::parse("lab/room1").unwrap();
     let started = backlog

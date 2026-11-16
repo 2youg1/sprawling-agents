@@ -39,7 +39,6 @@ impl<'de> Deserialize<'de> for ModelRecommendation {
 }
 
 impl ModelRecommendation {
-
     #[must_use]
     pub fn model(&self) -> &ModelRef {
         &self.model
@@ -71,7 +70,6 @@ pub struct WorkspaceModelPolicy {
 }
 
 impl WorkspaceModelPolicy {
-
     #[must_use]
     pub fn allowed(&self) -> &[ModelRef] {
         &self.allowed

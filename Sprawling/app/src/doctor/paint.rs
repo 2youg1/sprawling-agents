@@ -15,7 +15,6 @@ pub(crate) enum Ink {
 }
 
 impl Ink {
-
     pub(crate) fn or_plain(self, no_color: Option<OsString>) -> Ink {
         match no_color {
             Some(_) => Ink::Plain,
@@ -33,7 +32,6 @@ impl Ink {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Status {
-
     Present,
 
     Missing,

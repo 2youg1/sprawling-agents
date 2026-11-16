@@ -11,16 +11,13 @@ use kernel::{
 pub(super) enum Authored {
     PromptAssembled,
 
-    ModelCalled {
-        at: TimeMs,
-    },
+    ModelCalled { at: TimeMs },
     CancelReceived,
     SteerReceived,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum RunLine {
-
     PromptShapeCompared,
 
     CheckpointCommitted,
@@ -40,7 +37,6 @@ impl RunLine {
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum Carried {
-
     ModelReturned { at: TimeMs },
 
     PrefixHeld { at: TimeMs },
@@ -95,7 +91,6 @@ pub(super) struct Moment {
 }
 
 impl Moment {
-
     pub(super) fn since(self, earlier: Option<u64>) -> Option<u64> {
         Some(self.us?.saturating_sub(earlier?))
     }
@@ -113,7 +108,6 @@ pub struct HeldLines {
 pub struct Entry(usize);
 
 impl HeldLines {
-
     pub fn open(run: RunId, who: String) -> HeldLines {
         HeldLines {
             run,

@@ -55,7 +55,6 @@ pub struct Unpriced {
 }
 
 impl Unpriced {
-
     fn count(&mut self, data: &serde_json::Map<String, Value>) {
         self.calls = self.calls.saturating_add(1);
         self.tokens = self.tokens.saturating_add(usage_tokens(data));
@@ -137,7 +136,6 @@ impl Attribution {
                     .get("billed_usd_micros")
                     .and_then(Value::as_u64)
                 else {
-
                     self.unpriced.count(record.data().as_map());
                     self.tool_weights.clear();
                     self.skill_weights.clear();

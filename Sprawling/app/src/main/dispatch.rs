@@ -64,7 +64,6 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
     let at = read.value("--at").unwrap_or(DEFAULT_AT);
     match wire_client::send(at, &frame, read.value("--token"), listen) {
         Ok(heard) => {
-
             if let (Milestone::Started, Some(run)) = (milestone, heard.run) {
                 println!("{run}");
             }

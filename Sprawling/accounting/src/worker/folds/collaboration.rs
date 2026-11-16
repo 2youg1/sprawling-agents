@@ -23,7 +23,6 @@ pub(in crate::worker) struct Collaboration {
 }
 
 impl Collaboration {
-
     pub(in crate::worker) fn pursuits(
         &self,
         at: &kernel::Delegator,
@@ -69,7 +68,6 @@ impl CollaborationFold {
                 .enqueued
                 .push(collab::Signal::from_payload(record.data())?),
             EventKind::SignalConsumed => {
-
                 let taken = record
                     .data()
                     .read::<kernel::event::record::SignalConsumed>()?;
@@ -122,7 +120,6 @@ impl CollaborationFold {
         let (goals, requests, consumed) = (self.goals, self.requests, self.consumed);
         let (pursuits, plan_holders) = (self.pursuits, self.plan_holders);
         for signal in self.enqueued {
-
             if let Some(collab::Handback::Finished(artifact)) =
                 collab::Handback::from_signal(&signal)?
             {

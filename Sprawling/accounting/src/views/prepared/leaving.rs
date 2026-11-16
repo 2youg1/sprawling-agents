@@ -17,7 +17,6 @@ pub struct LiveAsk {
 }
 
 impl Prepared {
-
     pub(super) fn preferences_answer() -> wire::Answer {
         match crate::person::read() {
             Ok(settled) => wire::Answer::Preferences(Box::new(settled)),

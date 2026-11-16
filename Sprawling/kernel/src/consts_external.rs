@@ -13,7 +13,6 @@ pub const EVENT_LOG_V: u32 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogVersion {
-
     Current,
 
     Older,
@@ -52,7 +51,6 @@ pub struct SecretShape {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SecretCharset {
-
     Base62,
 
     Base64Url,
@@ -111,7 +109,6 @@ pub const SECRET_SHAPES: [SecretShape; 11] = [
         charset: SecretCharset::Base64Url,
         len: (35, 35),
     },
-
     SecretShape {
         provider: "openrouter",
         prefix: "sk-or-v1-",

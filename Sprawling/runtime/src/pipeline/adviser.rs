@@ -21,7 +21,6 @@ pub struct Ask {
 }
 
 impl Ask {
-
     pub fn noul(subject: impl Into<String>, material: impl Into<String>) -> Ask {
         Ask {
             kind: AdviserAsk::Noul,
@@ -66,7 +65,6 @@ pub enum Consultation {
 }
 
 impl Consultation {
-
     #[must_use]
     pub fn answer(&self) -> Option<&AdviserAnswer> {
         match self {
@@ -116,7 +114,6 @@ pub struct Adviser {
 }
 
 impl Adviser {
-
     #[must_use]
     pub fn none() -> Adviser {
         Adviser { answer: None }

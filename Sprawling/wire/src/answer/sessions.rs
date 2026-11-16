@@ -30,7 +30,6 @@ pub struct SessionRef {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SessionLine {
-
     pub began: Seq,
     pub start: SessionStart,
 
@@ -68,11 +67,13 @@ pub struct SessionLine {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum SessionStart {
-
     Dispatched {
         #[cfg_attr(feature = "schema", schemars(with = "Option<String>"))]
         by: Option<kernel::event::Who>,
     },
 
-    Opened { carry: Carry, from: Option<Origin> },
+    Opened {
+        carry: Carry,
+        from: Option<Origin>,
+    },
 }

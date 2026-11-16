@@ -45,7 +45,6 @@ pub(super) struct Tail {
 }
 
 impl Tail {
-
     pub(super) fn take(
         &mut self,
         dir: &std::path::Path,

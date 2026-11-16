@@ -14,7 +14,6 @@ use super::running::Continuation;
 use super::{Assignment, Dispatched, Given, HarnessSeat, run_id_for};
 
 impl RunWorker {
-
     pub(super) fn stage_harness(
         &mut self,
         at: Assignment,
@@ -159,7 +158,6 @@ impl RunWorker {
 }
 
 impl RunWorker {
-
     fn offer_for_harness(&mut self, offering: &Offering<'_>, branch: &str) -> Result<(), AxError> {
         if self
             .collaborating

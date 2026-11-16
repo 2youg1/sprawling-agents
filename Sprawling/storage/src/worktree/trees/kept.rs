@@ -19,7 +19,6 @@ pub(super) enum Standing {
 }
 
 impl Worktrees {
-
     pub fn lift_abandoned_leases(
         city_root: &std::path::Path,
         _writer: &crate::JsonlLedger,

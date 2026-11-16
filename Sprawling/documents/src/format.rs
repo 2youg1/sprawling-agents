@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Format {
-
     Markdown,
 
     Plain,
@@ -18,7 +17,6 @@ pub enum Format {
 const MARKDOWN_EXTENSIONS: [&str; 2] = ["md", "markdown"];
 
 impl Format {
-
     pub fn of_name(name: &str) -> Format {
         let last = name.rsplit(['/', '\\']).next().unwrap_or(name);
         let markdown = last.rsplit_once('.').is_some_and(|(stem, extension)| {

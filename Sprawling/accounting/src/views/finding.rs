@@ -12,7 +12,6 @@ use super::holding::Views;
 use super::prepared::Prepared;
 
 impl Views {
-
     pub(in crate::views) fn find_ask(&self, under: &Address, text: &str) -> Prepared {
         Prepared::Find(self.city_root.clone(), under.clone(), text.to_owned())
     }

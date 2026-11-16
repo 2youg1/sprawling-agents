@@ -21,7 +21,6 @@ pub struct RulesTool {
 }
 
 impl RulesTool {
-
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut op = Map::new();
         op.insert("type".to_owned(), Value::String("string".to_owned()));
@@ -102,7 +101,6 @@ enum Op {
 }
 
 impl Op {
-
     fn read(args: &Map<String, Value>) -> Result<Op, AxError> {
         match arg(args, "op")? {
             "read" => Ok(Op::Read),

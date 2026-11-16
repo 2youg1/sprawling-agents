@@ -7,7 +7,6 @@ use kernel::{Address, AxCode, AxError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Reflex {
-
     Discard,
 
     Notify,
@@ -39,7 +38,6 @@ pub struct Arrival {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Rule {
-
     pub matches: String,
     pub landing: Address,
     pub reflex: Reflex,
@@ -60,7 +58,6 @@ pub struct Triage {
 }
 
 impl Triage {
-
     pub fn new(rules: Vec<Rule>, fallback: Address) -> Result<Triage, AxError> {
         for rule in &rules {
             if rule.matches.trim().is_empty() {

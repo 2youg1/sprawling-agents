@@ -23,7 +23,6 @@ struct Kept {
 }
 
 impl OutputRing {
-
     pub(crate) fn keep(&self, piece: &LiveOutput) {
         let mut runs = self.runs();
         let kept = runs.entry(piece.run).or_default();

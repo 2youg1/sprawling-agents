@@ -141,7 +141,6 @@ pub(super) fn strip(line: &str, in_block: &mut bool) -> String {
             }
             '"' => in_string = true,
             '\'' => {
-
                 let mut ahead = chars.clone();
                 match ahead.next() {
                     Some('\\') => {

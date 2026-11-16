@@ -18,7 +18,6 @@ pub struct Drift {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkingStatus {
-
     pub branch: Option<String>,
 
     pub drift: Option<Drift>,

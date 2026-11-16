@@ -30,7 +30,6 @@ const REGISTRY_TYPES: [(u32, RegType); 12] = [
 ];
 
 pub(in crate::privacy) enum Reading {
-
     Value { value: RawValue, key_existed: bool },
 
     AccessDenied,
@@ -39,7 +38,6 @@ pub(in crate::privacy) enum Reading {
 }
 
 pub(in crate::privacy) enum WriteFault {
-
     AccessDenied,
 
     NotRewritable,

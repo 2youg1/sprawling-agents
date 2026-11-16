@@ -57,7 +57,6 @@ fn transport(host: &str, port: u16, proxied: bool) -> (Named, Connected) {
             return (Named::NotFound, Connected::Skipped);
         }
         Err(err) => {
-
             let text = err.to_string();
             return (Named::Refused(text), Connected::Skipped);
         }
@@ -178,7 +177,6 @@ mod tests {
 
     #[test]
     fn a_refusal_is_classified_by_the_stage_it_names() {
-
         assert!(matches!(
             stopped_at(String::from("invalid dns name: my_host")),
             Answered::NameNotUsable(_)

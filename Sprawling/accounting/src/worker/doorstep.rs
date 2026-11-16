@@ -11,7 +11,6 @@ use super::commanding::door::InHand;
 use super::{Entrance, Knock};
 
 pub(in crate::worker) struct Doorstep {
-
     pub(in crate::worker) entrance: Entrance,
 
     pub(in crate::worker) knocks: Vec<Knock>,
@@ -22,7 +21,6 @@ pub(in crate::worker) struct Doorstep {
 }
 
 impl Doorstep {
-
     pub(in crate::worker) fn opened(entrance: Entrance) -> Doorstep {
         Doorstep {
             entrance,

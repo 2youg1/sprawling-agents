@@ -13,7 +13,6 @@ use super::redeeming::{Redeemed, redeem};
 
 #[derive(Debug, Default)]
 struct Session {
-
     id: Option<String>,
 
     protocol_version: Option<String>,
@@ -36,7 +35,6 @@ pub(crate) struct HttpServer {
 }
 
 impl std::fmt::Debug for HttpServer {
-
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("HttpServer")
             .field("url", &self.url)
@@ -46,13 +44,11 @@ impl std::fmt::Debug for HttpServer {
 }
 
 impl HttpServer {
-
     pub(crate) fn open(
         url: &str,
         headers: &[(String, String)],
         resolve: &gateway::SecretResolver,
     ) -> Result<HttpServer, AxError> {
-
         let headers = redeem(headers, resolve, "reach an mcp server")?;
         let client = client_for(url, WholeRequest::DefaultTimeout)?;
         Ok(HttpServer {
@@ -69,11 +65,9 @@ impl HttpServer {
             .post(&self.url)
             .timeout(Duration::from_millis(patience.0))
             .header("content-type", "application/json")
-
             .header("accept", "application/json, text/event-stream")
             .body(line.to_owned());
         for header in &self.headers {
-
             request = request.header(header.name(), header.plaintext());
         }
         let mut carried = None;
@@ -174,7 +168,6 @@ impl HttpServer {
         }
         if status == 404 {
             return match &exchange.carried {
-
                 Some(_) => {
                     self.forget();
                     AxError::failure(
@@ -282,7 +275,6 @@ fn one_message(body: &str) -> Option<String> {
 }
 
 pub(super) enum WholeRequest {
-
     DefaultTimeout,
 
     Unbounded,

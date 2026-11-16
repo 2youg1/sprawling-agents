@@ -47,7 +47,6 @@ pub struct WindowLine {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum CeilingLine {
-
     Sent { tokens: Ceiling, from: FigureFrom },
 
     ProviderDefault,
@@ -57,7 +56,6 @@ pub enum CeilingLine {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum FigureFrom {
-
     Person,
 
     Upstream,

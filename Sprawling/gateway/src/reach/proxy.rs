@@ -7,7 +7,6 @@ use kernel::{Proxying, Through};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Locality {
-
     Machine,
 
     Private,
@@ -64,7 +63,6 @@ pub fn through(rule: Proxying, base_url: &str) -> Through {
     match rule {
         Proxying::Never => Through::Disabled,
         Proxying::ExceptLocal => match locality(base_url) {
-
             Locality::Machine | Locality::Private => Through::LocalAddress,
             Locality::Public => named_by_environment(&host, tls),
         },
@@ -123,7 +121,6 @@ fn named_by_environment(host: &str, tls: bool) -> Through {
 
 #[derive(Debug, PartialEq, Eq)]
 enum Exclusions {
-
     Listed(String),
 
     Unset,

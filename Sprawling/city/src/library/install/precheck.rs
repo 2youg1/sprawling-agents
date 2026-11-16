@@ -30,7 +30,6 @@ pub(in crate::library) struct Inspected {
 
 #[derive(Debug, Clone)]
 pub(in crate::library) enum Shape {
-
     Document,
 
     Package(Vec<Item>),

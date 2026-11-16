@@ -64,7 +64,6 @@ enum Lowering {
 }
 
 impl CoreThread {
-
     pub(crate) fn raise(name: &'static str, setting: CorePriority, now: Instant) -> Self {
         let standing = raise_this_thread(setting);
         if let Standing::Normal(Held::Refused(reason)) = &standing {
@@ -197,7 +196,6 @@ pub(crate) struct Valve {
 }
 
 impl Valve {
-
     pub(crate) fn new(limit: Duration, now: Instant) -> Self {
         Self {
             limit,

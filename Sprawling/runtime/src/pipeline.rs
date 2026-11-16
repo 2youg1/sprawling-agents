@@ -53,7 +53,6 @@ pub struct SieveRequest<'a> {
 }
 
 pub struct PackContext<'a> {
-
     pub cap_bytes: u64,
     pub stamp: Option<ClockStamp>,
     pub net_notice: bool,

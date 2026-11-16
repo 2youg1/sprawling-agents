@@ -47,7 +47,6 @@ pub type SecretSink =
 const ENROLMENT_PATIENCE: std::time::Duration = std::time::Duration::from_secs(2);
 
 pub struct ServeConfig {
-
     pub client: Arc<ClientAssets>,
 
     pub transcribe_sink: TranscribeSink,
@@ -198,9 +197,7 @@ pub fn router(
                 post(accept_drop).layer(DefaultBodyLimit::max(DROP_BYTES_MAX)),
             ),
         )
-
         .route("/acp", entered(Arrival::Door(Door::Acp), post(accept_acp)))
-
         .route("/pair", entered(Arrival::Pairing, post(accept_pairing)))
         .route(
             "/session/challenge",

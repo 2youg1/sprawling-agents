@@ -18,7 +18,6 @@ pub(in crate::worker) struct Stamping<'a, L> {
 }
 
 impl<L: Ledger> Stamping<'_, L> {
-
     pub(in crate::worker) fn record_for(
         &mut self,
         run: RunId,
@@ -76,7 +75,6 @@ impl Notes {
 }
 
 impl RunWorker {
-
     pub(super) fn note(&mut self, level: runtime::diagnostics::Level, module: &str, message: &str) {
         self.log
             .write(level, self.ledger.position(), module, message);
@@ -114,7 +112,6 @@ impl RunWorker {
         addr: Option<Address>,
         data: Payload,
     ) -> Result<(), AxError> {
-
         let data = super::commanding::entrance::stamped(self.doorstep.entrance.carrying(), data)?;
         let draft = EventDraft {
             run: RunId::CITY,

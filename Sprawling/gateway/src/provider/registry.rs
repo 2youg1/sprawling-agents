@@ -9,7 +9,6 @@ use crate::router::DialectHint;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ConnectionKind {
-
     OpenAiCompat,
 
     Responses,
@@ -18,7 +17,6 @@ pub enum ConnectionKind {
 }
 
 impl ConnectionKind {
-
     #[must_use]
     pub const fn wire(self) -> DialectKind {
         match self {

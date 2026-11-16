@@ -12,7 +12,6 @@ use super::Note;
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Outcome {
-
     Waiting,
 
     Answered,
@@ -24,7 +23,6 @@ pub enum Outcome {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Timing {
-
     Measured,
 
     Unmeasured,
@@ -33,7 +31,6 @@ pub enum Timing {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Output {
-
     pub head: String,
 
     pub cut: usize,
@@ -64,7 +61,6 @@ pub struct Used {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Call {
-
     pub tool: String,
 
     pub subject: Option<String>,
@@ -99,7 +95,6 @@ pub struct Call {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Turn {
-
     pub number: u32,
 
     pub opened: Seq,
@@ -157,7 +152,6 @@ pub struct Opening {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FrozenNames {
-
     pub mayor: Option<String>,
 }
 

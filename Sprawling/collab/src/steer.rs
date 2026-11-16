@@ -14,7 +14,6 @@ pub struct Steer {
 }
 
 impl Steer {
-
     pub fn from_person(text: &str) -> Result<Steer, AxError> {
         Ok(Steer {
             text: non_empty(text)?,
@@ -29,7 +28,6 @@ impl Steer {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LetterKind {
-
     Steer,
 
     Reply,
@@ -45,7 +43,6 @@ pub struct Letter {
 }
 
 impl Letter {
-
     pub fn from_signal(signal: &Signal) -> Result<Letter, AxError> {
         if signal.kind() != SignalKind::Steer {
             return Err(AxError::failure(

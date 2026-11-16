@@ -65,7 +65,6 @@ impl DeviceKey {
 pub struct DeviceName(String);
 
 impl DeviceName {
-
     pub const MAX_CHARS: usize = 64;
 
     pub fn parse(raw: &str) -> Result<Self, AxError> {
@@ -91,7 +90,6 @@ impl DeviceName {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Authority {
-
     Watch,
 
     Act,
@@ -157,7 +155,6 @@ pub struct Door {
 }
 
 impl Door {
-
     #[must_use]
     pub fn start(devices: Vec<Device>, epoch: Epoch) -> Self {
         Self {

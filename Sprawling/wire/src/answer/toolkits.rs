@@ -12,7 +12,6 @@ use crate::carried_name::ToolkitSlug;
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ToolkitsAnswer {
-
     Unenrolled,
 
     Shelf { toolkits: Vec<ToolkitLine> },
@@ -35,7 +34,6 @@ pub struct ToolkitLine {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Standing {
-
     Absent,
 
     Awaiting { consent_url: String },

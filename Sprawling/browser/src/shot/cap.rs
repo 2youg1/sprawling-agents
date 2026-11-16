@@ -10,7 +10,6 @@ use serde_json::{Value, json};
 pub struct ShotMaxEdge(u32);
 
 impl ShotMaxEdge {
-
     #[must_use]
     pub(crate) const fn new(px: u32) -> ShotMaxEdge {
         ShotMaxEdge(px)

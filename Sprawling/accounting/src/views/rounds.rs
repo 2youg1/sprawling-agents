@@ -27,7 +27,6 @@ use wire::{EventKind, EventRecord, RunId, UsdMicros};
 use super::prepared::LedgerAsk;
 
 impl LedgerAsk {
-
     pub(super) fn records_of(&self, run: RunId) -> Vec<EventRecord> {
         let Ok((index, dir)) = self.indexed() else {
             return Vec::new();
@@ -180,7 +179,6 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                 });
             }
             EventKind::ToolCalled => {
-
                 let turn_at = match folded.len() {
                     0 => continue,
                     open => open.saturating_sub(1),
@@ -215,7 +213,6 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                 turn.calls.push(call);
             }
             EventKind::ModelReturned => {
-
                 let Some(turn) = attempts
                     .answered_by(record)
                     .and_then(|opened| folded.iter_mut().rev().find(|turn| turn.opened == opened))
@@ -277,7 +274,6 @@ pub fn turns<'a>(records: impl IntoIterator<Item = &'a EventRecord>) -> Vec<wire
                 }
             }
             kind => {
-
                 let Some(note) = wire::note_of(kind, record) else {
                     continue;
                 };
@@ -296,7 +292,6 @@ pub(crate) struct Attempts {
 }
 
 impl Attempts {
-
     pub(crate) fn note(&mut self, record: &EventRecord) {
         if record.kind() == EventKind::ModelCalled {
             self.latest.insert(record.run(), record.seq());

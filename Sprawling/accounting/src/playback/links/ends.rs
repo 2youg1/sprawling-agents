@@ -11,7 +11,6 @@ use super::super::document::{Call, Callee, Decimal, End, Message, Moment, Took};
 use super::{CallId, Key, Links, Seat, Visibility};
 
 impl Links {
-
     pub(in crate::playback) fn moments(&self, outside: &mut BTreeSet<Seq>) -> Vec<Moment> {
         self.links
             .iter()

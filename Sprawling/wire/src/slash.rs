@@ -31,7 +31,6 @@ pub enum Offered {
 }
 
 impl Offered {
-
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -51,7 +50,6 @@ impl Offered {
 }
 
 impl Slash {
-
     pub const ALL: [Slash; 16] = [
         Self::Help,
         Self::Room,

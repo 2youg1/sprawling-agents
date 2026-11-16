@@ -14,7 +14,6 @@ use crate::skills::{Shipped, shipped, skills_dir};
 
 #[derive(Debug, PartialEq)]
 struct Seen {
-
     pinned: Vec<(String, B3Hash)>,
 
     read: Vec<String>,

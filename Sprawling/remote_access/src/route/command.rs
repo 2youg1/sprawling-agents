@@ -37,7 +37,6 @@ enum Line {
 }
 
 impl CommandRoute {
-
     #[must_use]
     pub fn new(command: RouteCommand, permanence: Permanence, patience: TimeoutMs) -> Self {
         Self {

@@ -95,7 +95,6 @@ pub enum StorageError {
 }
 
 impl StorageError {
-
     pub fn into_ax(self) -> AxError {
         match self {
 

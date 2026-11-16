@@ -18,7 +18,6 @@ pub(crate) const AGENT_KEY: &str = "[[agent]]";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentRow {
-
     pub id: String,
     pub name: Option<String>,
 

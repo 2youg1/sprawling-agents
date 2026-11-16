@@ -15,7 +15,6 @@ pub(crate) fn fields(
     field: EffortField,
 ) -> Vec<(&'static str, Value)> {
     match dialect {
-
         DialectKind::Anthropic => match ask {
             Ask::Level(level) => vec![("output_config", json!({ "effort": level.as_str() }))],
             Ask::On => vec![("thinking", json!({ "type": "adaptive" }))],

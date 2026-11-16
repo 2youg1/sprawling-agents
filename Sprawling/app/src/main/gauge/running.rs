@@ -54,7 +54,6 @@ fn run_once(running: &Running, index: u32) -> Result<Run, AxError> {
     let beating = match Beating::start(child.id(), running.every) {
         Ok(beating) => beating,
         Err(err) => {
-
             drop(child.kill().and_then(|()| child.wait()));
             return Err(err);
         }
@@ -103,7 +102,6 @@ impl Beating {
     }
 
     fn stop(self) -> Watched {
-
         match self.stop.send(()) {
             Ok(()) | Err(mpsc::SendError(())) => {}
         }

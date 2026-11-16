@@ -23,7 +23,6 @@ pub struct Cas {
 }
 
 impl Cas {
-
     pub fn open(dir: &Path) -> Result<Cas, StorageError> {
         Cas::open_with(Box::new(RealFs::new()), dir)
     }
@@ -160,7 +159,6 @@ static PUTS_BEGUN: AtomicU64 = AtomicU64::new(0);
 struct TmpName(String);
 
 impl TmpName {
-
     fn next(hash: &B3Hash) -> TmpName {
         let count = PUTS_BEGUN.fetch_add(1, Ordering::Relaxed);
         TmpName(format!("{hash}.{}.{count}.part", std::process::id()))
@@ -420,7 +418,6 @@ mod tests {
                     );
                 }
                 if cas.contains(&hash) {
-
                     assert_eq!(cas.get(&hash).unwrap(), content);
                 }
 

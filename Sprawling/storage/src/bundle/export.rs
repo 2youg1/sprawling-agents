@@ -30,7 +30,6 @@ fn agree(what: &str, source: u64, bundle: u64) -> Result<(), StorageError> {
 pub struct Bundle;
 
 impl Bundle {
-
     pub fn export(city_root: &Path, dest: &Path) -> Result<Manifest, StorageError> {
         Bundle::export_with(Box::new(RealFs::new()), city_root, dest)
     }

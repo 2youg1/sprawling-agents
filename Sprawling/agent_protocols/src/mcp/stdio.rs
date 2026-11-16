@@ -27,7 +27,6 @@ struct Connection {
 }
 
 impl StdioServer {
-
     pub(crate) fn start(
         command: &str,
         args: &[String],
@@ -40,7 +39,6 @@ impl StdioServer {
             .current_dir(cwd)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
-
             .stderr(std::process::Stdio::null())
             .spawn()
             .map_err(|err| {
@@ -68,7 +66,6 @@ impl StdioServer {
 }
 
 impl StdioServer {
-
     pub(crate) fn has_ended(&self) -> bool {
         match self.inner.lock() {
             Ok(mut connection) => match connection.child.try_wait() {
@@ -116,7 +113,6 @@ impl crate::Outbound for StdioServer {
 }
 
 impl Connection {
-
     fn tell(&mut self, line: &str) -> Result<(), AxError> {
         self.framed(line)?;
         writeln!(self.requests, "{line}").map_err(|err| self.broken("write to", &err))?;
@@ -214,7 +210,6 @@ fn pipes_missing(command: &str) -> AxError {
 
 #[cfg(any(test, feature = "conformance"))]
 pub fn echoing(answer: &str) -> (String, Vec<String>) {
-
     if cfg!(windows) {
         (
             "powershell".to_owned(),

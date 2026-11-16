@@ -10,7 +10,6 @@ use crate::effect;
 use super::super::{Assignment, Desks, Reporter, RunWorker, Settling, Site, held};
 
 impl RunWorker {
-
     pub(in crate::worker) fn settle_desks(
         &mut self,
         site: &Site,
@@ -40,7 +39,6 @@ impl RunWorker {
                 > usize::try_from(kernel::consts_policy::DISCARD_FILES_MAX).unwrap_or(usize::MAX)
             {
                 let item = kernel::ApprovalItem {
-
                     id: kernel::ApprovalId::of_sweep(&run_id),
                     actor: who.to_owned(),
                     artifact: sweep.job_locator.clone(),

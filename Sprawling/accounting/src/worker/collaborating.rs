@@ -10,7 +10,6 @@ use kernel::Address;
 use super::RoomQueues;
 
 pub(in crate::worker) struct Collaborating {
-
     pub(in crate::worker) rooms: RoomQueues,
 
     pub(in crate::worker) joins: BTreeMap<Address, collab::FanIn>,

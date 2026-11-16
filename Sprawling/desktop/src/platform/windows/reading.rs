@@ -201,7 +201,6 @@ mod tests {
         for wrong in [json!(-4), json!("100"), json!(1.5), json!(null)] {
             let arguments = json!({ "scale": wrong });
             if arguments["scale"].is_null() {
-
                 assert_eq!(whole(&arguments, "scale").unwrap(), None);
                 continue;
             }

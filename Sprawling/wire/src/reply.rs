@@ -20,7 +20,6 @@ pub enum Delivered {
 pub struct Reply(Option<Arc<dyn Fn(AxError) -> Delivered + Send + Sync>>);
 
 impl Reply {
-
     pub fn to(sink: impl Fn(AxError) -> Delivered + Send + Sync + 'static) -> Reply {
         Reply(Some(Arc::new(sink)))
     }
@@ -38,7 +37,6 @@ impl Reply {
 }
 
 impl std::fmt::Debug for Reply {
-
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let face = if self.0.is_some() {
             "Reply(a peer)"

@@ -16,7 +16,6 @@ use crate::mismatch::mismatch;
 pub struct ImageBytes(BTreeMap<String, String>);
 
 impl ImageBytes {
-
     pub fn insert(
         &mut self,
         picture: &ImageRef,

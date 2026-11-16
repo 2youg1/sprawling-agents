@@ -21,7 +21,6 @@ pub struct Manifest {
 }
 
 impl Manifest {
-
     pub(crate) fn of(
         vfs: &dyn Vfs,
         ledger_dir: &Path,

@@ -10,7 +10,6 @@ use crate::event::{RunId, Seq};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Origin {
-
     pub run: RunId,
 
     pub at_seq: Seq,

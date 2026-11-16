@@ -87,7 +87,6 @@ fn each_value_is_judged_on_its_own() {
         ("X-Account".to_owned(), "acme".to_owned()),
         (
             "X-Trace".to_owned(),
-
             format!("ghp_{}{}{}", "aB3dE5fG7hJ9k", "L1mN3pQ5rS7t", "U9vW1xY3zA5"),
         ),
     ]);

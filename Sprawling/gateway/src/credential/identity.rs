@@ -50,7 +50,6 @@ pub(crate) fn bind_identity(
 }
 
 enum Refusal {
-
     Unavailable(AxCode),
     Missing,
     Foreign,

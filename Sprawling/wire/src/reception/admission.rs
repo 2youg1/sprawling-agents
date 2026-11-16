@@ -17,7 +17,6 @@ pub struct Keys<'a> {
 }
 
 impl Keys<'_> {
-
     #[must_use]
     pub fn pairing(&self, offered: Option<&str>) -> Pairing {
         let Some(offered) = offered else {
@@ -57,7 +56,6 @@ pub fn decide_standing(pairing: Pairing) -> Standing {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Door {
-
     Transcribe,
 
     Enroll,
@@ -69,7 +67,6 @@ pub enum Door {
 
 #[derive(Debug)]
 pub enum Admission {
-
     Admit(Pairing),
     Refuse(AxError),
 }

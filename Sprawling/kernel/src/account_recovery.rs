@@ -28,7 +28,6 @@ impl AccountRetries {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Roster {
-
     Single,
 
     Several {
@@ -39,7 +38,6 @@ pub enum Roster {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RoundEnd {
-
     Refused,
 
     Unknown,
@@ -51,7 +49,6 @@ pub enum RoundEnd {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AccountStep {
-
     Resend,
 
     Switch { to: ServerLabel },
@@ -75,7 +72,6 @@ pub struct AccountRound {
 }
 
 impl AccountRound {
-
     pub fn start(
         roster: Roster,
         usable: BTreeSet<ServerLabel>,

@@ -14,7 +14,6 @@ use crate::script::{self, Step, call_id};
 
 #[derive(Debug, PartialEq)]
 struct Reopened {
-
     opening: String,
 
     closed_calls: usize,
@@ -322,7 +321,6 @@ fn lines_of(ledger_dir: &Path) -> Vec<Vec<u8>> {
 
 #[derive(Debug, PartialEq)]
 struct ReopenedAfterTheSwap {
-
     pinned: bool,
 
     kept: bool,

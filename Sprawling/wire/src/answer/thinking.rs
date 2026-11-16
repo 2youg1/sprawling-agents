@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ThinkingOffer {
-
     pub levels: Vec<Effort>,
 
     pub on: Switch,
@@ -25,7 +24,6 @@ pub struct ThinkingOffer {
 }
 
 impl ThinkingOffer {
-
     #[must_use]
     pub fn unknown() -> Self {
         Self {
@@ -53,7 +51,6 @@ pub enum Switch {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum OfferSource {
-
     Person,
 
     Upstream,

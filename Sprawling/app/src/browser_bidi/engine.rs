@@ -12,7 +12,6 @@ use crate::doctor::Presence;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Engine {
-
     Firefox { program: PathBuf },
 
     Chromium { driver: PathBuf },
@@ -26,14 +25,12 @@ pub(crate) struct LaunchPlan {
 }
 
 impl LaunchPlan {
-
     pub(crate) fn socket_url(&self) -> String {
         format!("ws://127.0.0.1:{}/session", self.port)
     }
 }
 
 impl Engine {
-
     pub(crate) fn choose(firefox: &Presence, chromedriver: &Presence) -> Result<Engine, AxError> {
         if let Presence::Present { at, .. } = firefox {
             return Ok(Engine::Firefox {
@@ -112,7 +109,6 @@ pub(crate) struct Engaged {
 
 impl Drop for Engaged {
     fn drop(&mut self) {
-
         drop(self.child.kill());
         drop(self.child.wait());
     }

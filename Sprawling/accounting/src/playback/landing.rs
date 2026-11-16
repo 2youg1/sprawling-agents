@@ -11,7 +11,6 @@ use kernel::{AxCode, AxError, PROTECTED_METADATA};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Place<'a> {
-
     Chosen(&'a Path),
 
     Exports { city_root: &'a Path, file: &'a Path },
@@ -19,7 +18,6 @@ pub enum Place<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Standing {
-
     Outside,
 
     Ignored,

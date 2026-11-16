@@ -21,7 +21,6 @@ pub struct PollBudget {
 }
 
 impl PollBudget {
-
     pub const DEFAULT: PollBudget = PollBudget {
         polls: 500,
         interval_ms: 20,
@@ -53,7 +52,6 @@ impl Default for PollBudget {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Exit {
-
     Ended { code: i32 },
 
     Signalled,
@@ -62,7 +60,6 @@ pub enum Exit {
 }
 
 impl Exit {
-
     pub(super) fn of(status: &ExitStatus) -> Exit {
         match status.code() {
             Some(code) => Exit::Ended { code },
@@ -92,14 +89,12 @@ impl Exit {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Unseen {
-
     LeftTheTable,
 
     WaitRefused,
 }
 
 impl Unseen {
-
     #[must_use]
     pub fn sentence(self) -> &'static str {
         match self {
@@ -116,7 +111,6 @@ impl Unseen {
 }
 
 impl super::Backlog {
-
     pub(super) fn settle(&self, id: BacklogId) -> Result<Option<(Exit, Option<Ceiling>)>, AxError> {
         let mut table = self.hold()?;
         let Table { members, jobs, .. } = &mut *table;

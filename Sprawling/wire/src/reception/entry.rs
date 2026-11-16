@@ -23,17 +23,18 @@ pub struct ListenerOrigins {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Hosts {
-
     Named {
         names: Vec<String>,
         origins: Vec<String>,
     },
 
-    AnyAddress { port: u16, loopback: Vec<String> },
+    AnyAddress {
+        port: u16,
+        loopback: Vec<String>,
+    },
 }
 
 impl ListenerOrigins {
-
     #[must_use]
     pub fn of(local: SocketAddr) -> Self {
         let port = local.port();
@@ -110,7 +111,6 @@ impl ListenerOrigins {
 }
 
 impl Hosts {
-
     fn named(names: Vec<String>) -> Self {
         let origins = names.iter().map(|name| format!("http://{name}")).collect();
         Self::Named { names, origins }
@@ -163,7 +163,6 @@ pub struct PageHeaders {
 }
 
 impl PageHeaders {
-
     #[must_use]
     pub fn every_listener() -> Self {
         let policy = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; \
@@ -197,7 +196,6 @@ pub struct Presented<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Arrival {
-
     Page,
 
     Preflight,
@@ -211,7 +209,6 @@ pub enum Arrival {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Caller {
-
     Native,
 
     Browser,
@@ -219,7 +216,6 @@ pub enum Caller {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Entry {
-
     Page,
 
     Caller(Caller),
@@ -237,7 +233,6 @@ pub enum EntryRefusal {
 }
 
 impl EntryRefusal {
-
     #[must_use]
     pub fn error(self) -> AxError {
         let (subject, recovery) = match self {

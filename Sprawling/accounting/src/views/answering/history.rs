@@ -10,7 +10,6 @@ use crate::views::lines::summarize;
 use crate::views::prepared::{LedgerAsk, Prepared};
 
 impl Views {
-
     pub(in crate::views) fn run_view_ask(&self, run: kernel::RunId) -> Prepared {
         match self.hot.get(&run) {
             Some(hot) => Prepared::Held(wire::Answer::Run(Some(Box::new(summarize(run, hot))))),
@@ -64,7 +63,6 @@ impl Views {
 }
 
 impl LedgerAsk {
-
     pub(in crate::views) fn history(
         &self,
         before: Option<kernel::Seq>,

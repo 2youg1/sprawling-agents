@@ -19,7 +19,6 @@ pub(in crate::worker) struct SessionOrigins {
 }
 
 impl SessionOrigins {
-
     pub(in crate::worker) fn absorb(
         &mut self,
         kind: EventKind,

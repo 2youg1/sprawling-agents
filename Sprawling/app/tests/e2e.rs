@@ -38,7 +38,6 @@ const REQUEST_TIMEOUT_MS: u64 = 60_000;
 const NO_RETRY: u32 = 0;
 
 struct Round {
-
     label: String,
     base_url: String,
     key: String,
@@ -136,7 +135,6 @@ fn settled(round: &Round, key: &str, city_root: &Path) -> Result<RunWorker, AxEr
     let mut worker = RunWorker::new(
         city_root,
         runtime::diagnostics::Diagnostics::off(),
-
         assembly::hands(gateway::Custodian::in_memory()),
     )?;
     worker.handle(wire::Command::PutSecret {

@@ -7,7 +7,6 @@ use kernel::ByteLen;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Elided {
-
     Nothing,
 
     Head,
@@ -26,7 +25,6 @@ pub struct Cut {
 }
 
 impl Cut {
-
     #[must_use]
     pub fn whole(text: &str) -> Cut {
         Cut {
@@ -66,12 +64,10 @@ pub(crate) struct Boundary<'a> {
 }
 
 impl<'a> Boundary<'a> {
-
     #[must_use]
     pub(crate) fn before(text: &'a str, at: usize) -> Boundary<'a> {
         let mut at = at.min(text.len());
         loop {
-
             if let Some((head, tail)) = text.split_at_checked(at) {
                 return Boundary { head, tail };
             }
@@ -83,7 +79,6 @@ impl<'a> Boundary<'a> {
     pub(crate) fn after(text: &'a str, at: usize) -> Boundary<'a> {
         let mut at = at.min(text.len());
         loop {
-
             if let Some((head, tail)) = text.split_at_checked(at) {
                 return Boundary { head, tail };
             }

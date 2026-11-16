@@ -102,7 +102,6 @@ fn text_nodes(code: &str) -> Vec<String> {
     while let Some(byte) = bytes.get(index) {
         let after = bytes.get(index.saturating_add(1));
         if *byte == b'<' {
-
             if after != Some(&b'=') {
                 let before = index.checked_sub(1).and_then(|at| bytes.get(at));
                 opened.push(match before {

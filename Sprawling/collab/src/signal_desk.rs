@@ -13,7 +13,6 @@ use crate::reply_wait::ReplyWait;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SignalEffect {
-
     Enqueued(Signal),
 
     Consumed { signal: Signal, by: String },
@@ -73,7 +72,6 @@ impl std::fmt::Debug for SignalDesk {
 }
 
 impl SignalDesk {
-
     #[must_use]
     pub fn new(
         run: RunId,
@@ -220,7 +218,6 @@ impl SignalDesk {
             kind,
             self.who.clone(),
             to.clone(),
-
             Version::FIRST,
             Payload::new(payload)?,
             self.at,

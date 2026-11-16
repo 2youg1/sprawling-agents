@@ -75,7 +75,6 @@ impl EventQueue {
         let verdict = admit(&self.stats(), &ItemMeta { cost: 1 });
         match verdict {
             Admission::Shed { .. } => {
-
                 self.shed = self.shed.saturating_add(1);
                 Ok(verdict)
             }

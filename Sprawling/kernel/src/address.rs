@@ -18,7 +18,6 @@ pub const PROTECTED_METADATA: [&str; 2] = [RESERVED_PREFIX, GIT_METADATA];
 pub struct Address(String);
 
 impl Address {
-
     pub fn parse(raw: &str) -> Result<Self, AxError> {
         let reject = |violation: &str| {
             Err(
@@ -94,7 +93,6 @@ impl std::fmt::Display for Address {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ReadVerdict {
-
     Open,
 
     Confidential,
@@ -131,7 +129,6 @@ pub(crate) const SESSION_NAME_MAX: usize = 64;
 pub struct SessionName(String);
 
 impl SessionName {
-
     pub fn parse(raw: &str) -> Result<Self, AxError> {
         let trimmed = raw.trim();
         let reject = |violation: &str| {

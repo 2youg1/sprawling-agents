@@ -46,7 +46,6 @@ pub enum StoredSnapshot {
 }
 
 impl ChainSnapshot {
-
     pub fn cut(fold_version: u32, seq: Seq, line: &[u8], views: Vec<u8>) -> ChainSnapshot {
         ChainSnapshot {
             fold_version,

@@ -43,7 +43,6 @@ pub struct Watch {
 }
 
 impl Monitor {
-
     #[must_use]
     pub fn new() -> Self {
         Self::default()

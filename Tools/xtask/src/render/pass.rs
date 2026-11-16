@@ -32,7 +32,6 @@ pub(super) enum Colours {
 }
 
 impl Lighting {
-
     pub(super) fn attribute(&self) -> &'static str {
         match *self {
             Lighting::Dark => "dark",
@@ -92,7 +91,6 @@ const PASSES: [Pass; 5] = [
 ];
 
 impl Pass {
-
     pub(super) fn theme(&self) -> &'static str {
         self.lighting.attribute()
     }
@@ -142,7 +140,6 @@ pub(super) struct Reported {
 }
 
 impl Reported {
-
     pub(super) fn read(forced: &str, scheme: &str) -> Reported {
         Reported {
             lighting: if scheme.contains("light") {

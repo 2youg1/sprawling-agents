@@ -149,7 +149,6 @@ pub enum LogLevel {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LogLine {
-
     pub seq: Seq,
 
     pub t: Option<TimeMs>,

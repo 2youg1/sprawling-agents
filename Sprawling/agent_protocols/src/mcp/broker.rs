@@ -29,7 +29,6 @@ pub struct Toolkit {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Connection {
-
     Absent,
 
     Awaiting { consent_url: String },
@@ -47,7 +46,6 @@ pub struct Broker {
 }
 
 impl Broker {
-
     pub fn new(key: Sealed<String>, rule: Proxying) -> Result<Self, AxError> {
         Self::built(key, rule, BASE)
     }
@@ -232,7 +230,6 @@ fn parsed(base: &str) -> Result<reqwest::Url, AxError> {
 }
 
 impl Broker {
-
     fn url_for(&self, path: &str, pairs: &[(&str, &str)]) -> Result<reqwest::Url, AxError> {
         let mut target = self.base.join(path).map_err(|bad| {
             AxError::failure(
@@ -274,7 +271,6 @@ fn read(sent: reqwest::Result<reqwest::blocking::Response>, path: &str) -> Resul
     let status = response.status();
     let body = response.text();
     if status.is_success() {
-
         let body = body.map_err(|cut| {
             AxError::failure(
                 AxCode::Provider,

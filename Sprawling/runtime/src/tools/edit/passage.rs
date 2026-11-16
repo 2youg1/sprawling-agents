@@ -10,7 +10,6 @@ const MOST_BYTES: usize = 4096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Opened {
-
     AroundOld,
 
     AtHead,

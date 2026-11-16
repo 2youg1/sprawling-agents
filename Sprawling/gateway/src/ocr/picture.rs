@@ -12,7 +12,6 @@ pub struct Picture {
 }
 
 impl Picture {
-
     pub fn new(seen: ImageRef, bytes: Vec<u8>) -> Result<Picture, AxError> {
         let named = Locator::cas(B3Hash::digest(&bytes));
         if seen.locator != named {

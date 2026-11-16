@@ -11,7 +11,6 @@ use crate::tool::ServerLabel;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SearchSupplier {
-
     pub id: ServerLabel,
 
     pub url: String,
@@ -31,7 +30,6 @@ pub struct SearchSupplier {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum SearchConfiguration {
-
     #[default]
     Default,
 

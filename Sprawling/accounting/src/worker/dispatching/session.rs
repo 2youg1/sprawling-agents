@@ -20,7 +20,6 @@ impl RunWorker {
         session: Option<&SessionName>,
     ) -> Result<Address, AxError> {
         match session {
-
             None => {
                 city::claim_room(&self.city_root, &addr)?;
                 Ok(addr)

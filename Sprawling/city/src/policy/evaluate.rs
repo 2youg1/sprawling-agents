@@ -99,7 +99,6 @@ fn reading_room_document(
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Written {
-
     #[serde(default)]
     #[expect(dead_code, reason = "judged on the text before this struct is read")]
     format: Option<toml::Value>,
@@ -178,7 +177,6 @@ pub fn evaluate(addr: &Address, text: &str) -> Result<BuildingRules, AxError> {
     let reach = DomainReach::parse(&written.write)?;
     let mut write_prefixes = Vec::with_capacity(written.prefixes.len());
     for prefix in &written.prefixes {
-
         write_prefixes.push(Address::parse(prefix)?);
     }
     let checkpoint_entropy_allow = written

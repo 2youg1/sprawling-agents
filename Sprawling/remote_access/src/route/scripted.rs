@@ -22,7 +22,6 @@ pub struct ScriptedRoute {
 }
 
 impl ScriptedRoute {
-
     #[must_use]
     pub fn new(answer: Opened) -> Self {
         Self {

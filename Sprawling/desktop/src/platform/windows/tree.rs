@@ -27,7 +27,6 @@ pub(crate) struct Walked {
 }
 
 impl Reader {
-
     pub(crate) fn start() -> Result<Reader, Refusal> {
         let apartment = winsafe::CoInitializeEx(co::COINIT::MULTITHREADED).map_err(|err| {
             fault::com(
@@ -160,7 +159,6 @@ pub(crate) fn walk<T: Branches>(tree: &T, root: T::Element, depth: u32) -> Walke
             continue;
         }
         match tree.children(&element) {
-
             Ok(children) => frontier.extend(
                 children
                     .into_iter()

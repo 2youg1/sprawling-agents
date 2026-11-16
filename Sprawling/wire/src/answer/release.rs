@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ReleaseLine {
-
     pub version: String,
 
     pub released: String,
@@ -19,7 +18,6 @@ pub struct ReleaseLine {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ReleaseAnswer {
-
     Stands {
         mine: ReleaseLine,
 
@@ -40,7 +38,9 @@ pub enum ReleaseAnswer {
         update: UpdateHint,
     },
 
-    Refused { refusal: AxError },
+    Refused {
+        refusal: AxError,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

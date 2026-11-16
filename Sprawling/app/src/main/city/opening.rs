@@ -5,7 +5,6 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Entrance {
-
     Bare,
 
     Up,
@@ -14,7 +13,6 @@ pub(crate) enum Entrance {
 }
 
 impl Entrance {
-
     pub(crate) fn opens(self) -> Open {
         match self {
             Entrance::Up => Open::Browser,
@@ -60,7 +58,6 @@ use sprawling::console::Surface;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Open {
-
     Browser,
 
     Nothing,
@@ -103,7 +100,6 @@ mod tests {
 
     #[test]
     fn a_refusal_to_open_beats_a_request_and_the_entrances_keep_their_own_defaults() {
-
         assert!(matches!(
             deciding(&args(&[]), Open::Browser, None),
             Open::Browser

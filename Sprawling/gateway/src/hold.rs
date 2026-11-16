@@ -18,7 +18,6 @@ const CACHE_LIFETIME: Duration = Duration::from_secs(PROMPT_CACHE_TTL_SECS);
 pub(crate) struct PrefixKey(B3Hash);
 
 impl PrefixKey {
-
     pub(crate) fn of(account: &str, body: &[u8]) -> PrefixKey {
         let mut held =
             Vec::with_capacity(account.len().saturating_add(1).saturating_add(body.len()));
@@ -34,7 +33,6 @@ pub(crate) struct Prewarm(u64);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Arrival {
-
     Go,
 
     Wait { on: Prewarm, until: Instant },
@@ -62,7 +60,6 @@ struct Warming {
 }
 
 impl Holds {
-
     pub(crate) fn arrive(&mut self, key: PrefixKey, now: Instant) -> Arrival {
         if let Some(warm) = self.warm.get_mut(&key)
             && now < warm.until

@@ -23,7 +23,6 @@ pub struct BodyOverride {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EndpointTuning {
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accounts: Option<Vec<kernel::event::record::ProviderAccount>>,
 

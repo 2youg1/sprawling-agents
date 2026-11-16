@@ -5,7 +5,6 @@
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Class {
-
     TextOnly,
 
     ClosedOnly,

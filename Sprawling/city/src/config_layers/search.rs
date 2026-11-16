@@ -164,7 +164,6 @@ fn unlisted(selected: &ServerLabel) -> AxError {
 }
 
 impl ConfigLayer {
-
     #[must_use]
     pub fn search(&self) -> Option<&SearchConfiguration> {
         self.search.as_ref()

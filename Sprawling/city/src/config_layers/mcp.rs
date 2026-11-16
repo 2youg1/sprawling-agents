@@ -145,7 +145,6 @@ pub(super) fn servers(entries: Vec<McpSection>) -> Result<Vec<McpDefinition>, Ax
 
         let transport = match (entry.command.as_deref(), entry.url.as_deref()) {
             (Some(command), None) if !command.trim().is_empty() => {
-
                 if entry.transport.is_some() {
                     return Err(refuse(format!(
                         "{}: a command is spoken to over its own pipes; `transport` \

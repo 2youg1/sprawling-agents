@@ -7,7 +7,6 @@ use kernel::EventKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Holding {
-
     City,
 
     SignalQueued,
@@ -144,7 +143,6 @@ impl Holding {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Evidence {
-
     ToolResult,
 
     Finished,

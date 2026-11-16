@@ -18,7 +18,6 @@ const ANNOUNCEMENT_PATIENCE: Duration = Duration::from_secs(15);
 
 #[derive(Clone)]
 pub(crate) struct SseServer {
-
     messages: String,
     headers: Arc<Vec<Redeemed>>,
     client: reqwest::blocking::Client,
@@ -26,7 +25,6 @@ pub(crate) struct SseServer {
 }
 
 impl std::fmt::Debug for SseServer {
-
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SseServer")
             .field("messages", &self.messages)
@@ -36,7 +34,6 @@ impl std::fmt::Debug for SseServer {
 }
 
 impl SseServer {
-
     pub(crate) fn open(
         url: &str,
         headers: &[(String, String)],
@@ -131,7 +128,6 @@ impl crate::Outbound for SseServer {
                      stream",
                 ),
             })?
-
             .map_err(|refused| answer_unread(&refused))
     }
 
@@ -152,14 +148,12 @@ fn read_in_a_thread(
             let response = match opened(&opened_at, request) {
                 Ok(response) => response,
                 Err(refusal) => {
-
                     drop(sender.send(Err(refusal)));
                     return;
                 }
             };
             let mut reader = std::io::BufReader::new(response);
             loop {
-
                 let data = match read_one_message(&mut reader, &opened_at) {
                     Ok(Received::Message(line)) => match line.strip_prefix("data:") {
                         Some(data) => Ok(data.trim().to_owned()),

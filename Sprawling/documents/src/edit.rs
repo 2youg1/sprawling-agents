@@ -102,7 +102,6 @@ pub struct Applied {
 }
 
 impl Transaction {
-
     pub fn new(baseline: B3Hash, edits: Vec<Edit>) -> Result<Transaction, AxError> {
         let tangled = edits
             .iter()
@@ -176,7 +175,6 @@ impl Transaction {
 }
 
 impl Applied {
-
     pub fn baseline(&self) -> B3Hash {
         self.baseline
     }

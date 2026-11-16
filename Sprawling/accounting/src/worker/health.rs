@@ -28,7 +28,6 @@ struct Counts {
 }
 
 impl Health {
-
     pub fn asked(&self) {
         self.0.queued.fetch_add(1, Ordering::Relaxed);
     }
@@ -84,7 +83,6 @@ fn micros(span: Duration) -> u64 {
 }
 
 fn lower(count: &AtomicU64, n: u64) {
-
     match count.try_update(Ordering::Relaxed, Ordering::Relaxed, |now| {
         Some(now.saturating_sub(n))
     }) {

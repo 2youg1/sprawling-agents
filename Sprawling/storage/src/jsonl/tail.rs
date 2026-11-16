@@ -45,7 +45,6 @@ struct Backward {
 }
 
 impl TailLines {
-
     pub fn at(dir: &Path) -> Result<Self, StorageError> {
         Self::through(Box::new(RealFs::new()), dir)
     }
@@ -153,7 +152,6 @@ impl Iterator for TailLines {
     }
 }
 impl Backward {
-
     fn open(vfs: &dyn Vfs, path: PathBuf) -> Result<Self, StorageError> {
         let unread = vfs.size(&path).map_err(io_err("size segment", &path))?;
         let mut backward = Self {

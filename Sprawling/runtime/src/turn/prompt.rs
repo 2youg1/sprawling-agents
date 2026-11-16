@@ -25,7 +25,6 @@ pub struct PromptRecord {
 }
 
 impl PromptRecord {
-
     pub(super) fn holds(&self, payload: &Payload) -> bool {
         self.written.as_ref() == Some(payload)
     }

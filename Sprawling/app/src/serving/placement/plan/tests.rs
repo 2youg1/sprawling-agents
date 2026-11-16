@@ -202,14 +202,12 @@ fn a_raptor_lake_laptop_seats_one_thread_per_performance_core() {
 
 #[test]
 fn a_raptor_lake_desktop_seats_its_eight_performance_cores() {
-
     let cpus = part(&[(1, 8, 2, 0), (0, 16, 1, 0)]);
     assert_eq!(plan(&Topology::new(cpus)), numbers(&even(16)));
 }
 
 #[test]
 fn a_meteor_lake_laptop_seats_performance_cores_and_never_the_low_power_tier() {
-
     let cpus = part(&[(2, 6, 2, 0), (1, 8, 1, 0), (0, 2, 1, 1)]);
     assert_eq!(plan(&Topology::new(cpus)), numbers(&even(12)));
 }
@@ -235,21 +233,18 @@ fn a_meteor_lake_container_without_performance_cores_prefers_the_e_cores_not_the
 
 #[test]
 fn a_lunar_lake_laptop_seats_its_four_performance_cores() {
-
     let cpus = part(&[(1, 4, 1, 0), (0, 4, 1, 1)]);
     assert_eq!(plan(&Topology::new(cpus)), numbers(&[0, 1, 2, 3]));
 }
 
 #[test]
 fn a_single_ccd_x3d_is_left_to_the_operating_system() {
-
     let cpus = part(&[(0, 8, 2, 0)]);
     assert_eq!(plan(&Topology::new(cpus)), Plan::LeftToOs(Left::OneClass));
 }
 
 #[test]
 fn a_dual_ccd_x3d_is_left_to_the_operating_system_and_its_cache_steering() {
-
     let topology = Topology::new(part(&[(0, 8, 2, 0), (0, 8, 2, 1)]));
     assert_eq!(plan(&topology), Plan::LeftToOs(Left::OneClass));
     assert_eq!(topology.shape().caches, 2);
@@ -257,14 +252,12 @@ fn a_dual_ccd_x3d_is_left_to_the_operating_system_and_its_cache_steering() {
 
 #[test]
 fn a_zen_5_and_zen_5c_laptop_seats_its_four_zen_5_cores() {
-
     let cpus = part(&[(1, 4, 2, 0), (0, 8, 2, 1)]);
     assert_eq!(plan(&Topology::new(cpus)), numbers(&even(8)));
 }
 
 #[test]
 fn a_threadripper_in_two_groups_is_left_to_the_operating_system() {
-
     let cpus: Vec<Cpu> = part(&[(0, 64, 2, 0)])
         .into_iter()
         .map(|cpu| {
@@ -295,7 +288,6 @@ fn a_threadripper_in_two_groups_is_left_to_the_operating_system() {
 
 #[test]
 fn a_snapdragon_x_with_one_class_is_left_to_the_operating_system() {
-
     let cpus = part(&[(0, 4, 1, 0), (0, 4, 1, 1), (0, 4, 1, 2)]);
     assert_eq!(plan(&Topology::new(cpus)), Plan::LeftToOs(Left::OneClass));
 }
@@ -334,7 +326,6 @@ fn a_container_limited_to_two_e_cores_is_left_to_the_operating_system() {
 
 #[test]
 fn a_container_limited_to_one_p_core_and_one_e_core_seats_the_p_core_it_may_use() {
-
     let cpus: Vec<Cpu> = i5_1340p()
         .into_iter()
         .map(|cpu| Cpu {

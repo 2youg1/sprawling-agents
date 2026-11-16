@@ -159,7 +159,6 @@ struct Table {
 }
 
 impl Table {
-
     fn of(gone: &[Piece], come: &[Piece]) -> Option<Table> {
         let width = come.len();
         let size = gone.len().checked_mul(width)?;

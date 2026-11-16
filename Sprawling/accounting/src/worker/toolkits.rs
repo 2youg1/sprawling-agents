@@ -11,7 +11,6 @@ use super::RunWorker;
 use crate::toolkit_broker::broker_for;
 
 impl RunWorker {
-
     pub(in crate::worker) fn connect_toolkit(
         &mut self,
         toolkit: &ToolkitSlug,

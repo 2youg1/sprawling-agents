@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GithubLoginAnswer {
-
     pub host: String,
     pub reading: GithubReading,
 }
@@ -17,7 +16,6 @@ pub struct GithubLoginAnswer {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum GithubReading {
-
     Found { login: String },
 
     NoCli,

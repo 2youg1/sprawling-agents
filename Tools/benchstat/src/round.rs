@@ -11,7 +11,6 @@ use crate::{analysis, error::BenchError, manifest, observation, report as render
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Computed {
-
     pub exports: String,
 
     pub markdown: String,

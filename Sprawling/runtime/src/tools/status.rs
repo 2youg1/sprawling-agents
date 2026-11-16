@@ -72,7 +72,6 @@ pub struct StatusTool {
 }
 
 impl StatusTool {
-
     pub const NAME: &'static str = "status";
 
     pub fn new(snapshot: StatusSnapshot) -> Result<StatusTool, AxError> {
@@ -156,7 +155,6 @@ impl StatusTool {
 }
 
 impl StatusSnapshot {
-
     fn render(&self, live: &Live<'_>) -> String {
         let Live {
             used,

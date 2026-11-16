@@ -8,7 +8,6 @@ use kernel::{B3Hash, Locator};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Arm {
-
     Unverified,
 
     Verified,
@@ -56,7 +55,6 @@ pub fn compare(cases: &[Case]) -> Comparison {
 }
 
 impl Tally {
-
     pub fn precision_per_mille(&self) -> Option<usize> {
         let kept = self.kept_faithful.checked_add(self.kept_planted)?;
         self.kept_faithful.checked_mul(1000)?.checked_div(kept)

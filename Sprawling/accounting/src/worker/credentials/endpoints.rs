@@ -42,7 +42,6 @@ struct ListRequest {
 }
 
 impl ListRequest {
-
     fn read(self) -> Result<Vec<gateway::ModelFacts>, AxError> {
         let ListRequest {
             probe,
@@ -68,7 +67,6 @@ struct Unread {
 }
 
 impl RunWorker {
-
     pub(in crate::worker) fn probe_endpoint(&mut self, entered: Entered) -> Result<(), AxError> {
         let entered = entered.resolved()?;
         let endpoint = self.endpoint_of(entered)?;
@@ -246,7 +244,6 @@ impl RunWorker {
                 return Err(err.rewrite_recovery("name the model ids to admit, then attach again"));
             }
             Err(err) => {
-
                 let earlier = kept.as_ref().map_or(&[][..], |kept| kept.models.as_slice());
                 let Remembered { rows, kept: still } = admission.unread(earlier);
                 endpoint.probed =
@@ -310,7 +307,6 @@ impl RunWorker {
                 pricing: None,
                 proxying: tuning.proxying,
             },
-
             gateway::Redemption::without_images(self.resolver()),
         )?;
         Ok(ListRequest {

@@ -301,7 +301,6 @@ mod conformance_self_test {
 
     #[test]
     fn suite_error_paths_use_invalid_args() {
-
         let err = AxError::failure(AxCode::InvalidArgs, "x", "y").with_recovery("z");
         assert_eq!(err.code(), &AxCode::InvalidArgs);
     }

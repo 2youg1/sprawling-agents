@@ -37,7 +37,6 @@ fn part_of(bytes: Vec<u8>) -> Result<ShapePart, AxError> {
 }
 
 impl PromptShape {
-
     pub(crate) fn of(
         prefix: &FrozenPrefix,
         tools: &[ToolDef],

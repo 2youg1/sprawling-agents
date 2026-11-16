@@ -25,7 +25,6 @@ pub(crate) struct PathGuard {
 }
 
 impl PathLocks {
-
     pub(crate) fn hold(&self, path: &Path) -> PathGuard {
         let key = path.to_string_lossy().to_lowercase();
         let mut held = self.table.held();
@@ -45,7 +44,6 @@ impl PathLocks {
 }
 
 impl Table {
-
     fn held(&self) -> MutexGuard<'_, BTreeSet<String>> {
         self.held.lock().unwrap_or_else(PoisonError::into_inner)
     }

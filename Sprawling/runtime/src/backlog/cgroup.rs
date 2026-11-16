@@ -22,7 +22,6 @@ const RUN_CPU_WEIGHT: u64 = 100;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlatformShares {
-
     None,
 
     Cpu,
@@ -47,7 +46,6 @@ pub fn platform_shares() -> PlatformShares {
 #[cfg(any(not(windows), test))]
 #[derive(Default)]
 pub(super) struct Cgroups {
-
     parent: Option<PathBuf>,
 
     adopted: bool,
@@ -57,7 +55,6 @@ pub(super) struct Cgroups {
 
 #[cfg(any(not(windows), test))]
 impl Cgroups {
-
     #[cfg(test)]
     pub(super) fn adopt(parent: &Path, pid: u32) -> Cgroups {
         let mut cgroups = Cgroups {

@@ -22,7 +22,6 @@ pub struct CpuSet {
 pub struct Flags(pub u8);
 
 impl Flags {
-
     #[must_use]
     pub fn parked(self) -> bool {
         self.0 & 0x1 != 0

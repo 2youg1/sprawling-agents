@@ -19,7 +19,6 @@ pub struct OpenRequest {
 }
 
 impl OpenRequest {
-
     pub fn payload(&self) -> Result<Payload, AxError> {
         Payload::of(self)
     }

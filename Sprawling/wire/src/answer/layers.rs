@@ -32,7 +32,6 @@ pub struct LayerDocument {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PromptKind {
-
     City,
 
     Conventions,
@@ -55,7 +54,6 @@ pub enum PromptLayer {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum LayerState {
-
     Sent { bytes: u64 },
 
     Replaced { by: Address },

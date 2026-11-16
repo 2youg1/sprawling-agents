@@ -32,14 +32,12 @@ enum Graph {
 
 #[derive(Clone, Copy)]
 pub(in crate::worker) enum GraphAfter {
-
     Open,
 
     Closed,
 }
 
 impl GraphAfter {
-
     pub(in crate::worker) fn of(
         driven: &Result<runtime::Run<runtime::run::Frozen>, AxError>,
     ) -> GraphAfter {
@@ -51,7 +49,6 @@ impl GraphAfter {
 }
 
 impl Handing {
-
     pub(in crate::worker) fn new(
         at: &Assignment,
         delegates: Arc<Mutex<collab::DelegateDesk>>,
@@ -71,7 +68,6 @@ impl Handing {
 }
 
 impl Continuation {
-
     pub(in crate::worker) fn handing(&self, at: &Assignment, owing: &Owing) -> Option<Handing> {
         match self {
             Continuation::Model(lent) => Some(Handing::new(
@@ -86,7 +82,6 @@ impl Continuation {
 }
 
 impl RunWorker {
-
     pub(in crate::worker) fn hand_over_at_call(&mut self, run: RunId) -> Result<(), AxError> {
         let Some(handing) = self.collaborating.handing.get_mut(&run) else {
             return Ok(());

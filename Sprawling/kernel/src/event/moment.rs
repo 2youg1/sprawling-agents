@@ -11,7 +11,6 @@ const MOMENTS_SINCE_V: u32 = 2;
 const _: () = assert!(MOMENTS_SINCE_V <= EVENT_LOG_V);
 
 impl EventKind {
-
     pub fn records_a_moment(&self) -> bool {
         matches!(
             self,
@@ -24,7 +23,6 @@ impl EventKind {
 }
 
 impl EventRecord {
-
     pub fn moment(&self) -> Option<TimeMs> {
         (self.v() >= MOMENTS_SINCE_V && self.kind().records_a_moment()).then(|| self.t())
     }

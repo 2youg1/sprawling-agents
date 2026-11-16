@@ -13,7 +13,6 @@ use super::{Arrival, CACHE_LIFETIME, HOLD_MAX, Holds, PrefixKey, Prewarm};
 
 #[derive(Debug, Clone)]
 enum Step {
-
     Arrive(Option<u8>),
 
     Settle(usize, PrewarmEnd),

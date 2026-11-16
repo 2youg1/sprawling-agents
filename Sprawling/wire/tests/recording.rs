@@ -23,7 +23,6 @@ use tower::ServiceExt;
 use wire::{Answer, Command, Reply, ServeConfig};
 
 enum Hearing {
-
     Answers,
 
     Unattached,

@@ -75,7 +75,6 @@ fn the_opening_carries_the_effort_and_the_names_the_run_froze() {
     let answer = rounds_of(
         dir.path(),
         RunId::from_bytes([8u8; 16]),
-
         serde_json::json!({
             "task": "plan the week",
             "goal": "a roadmap",

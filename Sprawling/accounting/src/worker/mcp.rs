@@ -39,7 +39,6 @@ impl crate::Connectors for Residents {
     }
 
     fn invalidate(&self, reference: &kernel::SecretRef) {
-
         let keys = self
             .keys
             .lock()
@@ -72,7 +71,6 @@ pub(in crate::worker) fn names(server: &kernel::McpServer, reference: &kernel::S
 }
 
 impl Residents {
-
     pub fn tools(
         &self,
         server: &kernel::McpServer,
@@ -119,7 +117,6 @@ impl Residents {
 }
 
 impl RunWorker {
-
     #[must_use]
     pub fn with_connectors(
         self,
@@ -133,13 +130,11 @@ impl RunWorker {
 }
 
 impl Resident {
-
     fn connect(
         server: &kernel::McpServer,
         write_root: &std::path::Path,
         resolve: &gateway::SecretResolver,
     ) -> Result<(Resident, agent_protocols::Handshake), AxError> {
-
         let mut link = agent_protocols::McpLink::open(&server.transport, write_root, resolve)?;
         let mut rpc = agent_protocols::Rpc::new();
         let opened = agent_protocols::handshake(

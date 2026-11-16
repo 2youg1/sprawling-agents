@@ -134,7 +134,6 @@ fn a_lane_that_finds_the_turn_taken_skips_and_leaves_it_standing() {
         drop(first);
         StockingTurn::take(&root).is_some()
     } else {
-
         std::mem::forget(first);
         false
     };

@@ -52,7 +52,6 @@ impl Audience {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum HashWidth {
-
     Whole,
 
     Glance,
@@ -131,7 +130,6 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
 }
 
 impl Selection {
-
     fn is_everything(&self) -> bool {
         matches!(
             self,

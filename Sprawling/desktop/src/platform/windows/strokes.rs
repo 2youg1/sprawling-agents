@@ -22,7 +22,6 @@ pub(crate) enum Action {
 }
 
 impl Action {
-
     pub(super) fn lands_at(&self) -> Option<Point> {
         match self {
             Action::Click { at }
@@ -49,14 +48,11 @@ pub(crate) enum Motion {
     RightDown,
     RightUp,
 
-    Wheel {
-        delta: i32,
-    },
+    Wheel { delta: i32 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Stroke {
-
     Key { code: co::VK, edge: Edge },
 
     Unicode { unit: u16, edge: Edge },
@@ -143,7 +139,6 @@ fn spelled(action: &Action) -> Result<Vec<Stroke>, Refusal> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Released {
-
     NothingWasHeld,
 
     All { presses: usize },

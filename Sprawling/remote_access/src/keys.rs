@@ -32,7 +32,6 @@ pub struct SigningKey {
 }
 
 impl SigningKey {
-
     pub fn from_seed(seed: &[u8; SEED_BYTES]) -> Result<Self, AxError> {
         let (ed_seed, ml_seed) = halves(seed)?;
         let ed25519 = Ed25519KeyPair::from_seed_unchecked(&ed_seed)
@@ -98,7 +97,6 @@ fn unreadable_seed() -> AxError {
 pub struct VerifyingKey(Box<[u8; PUBLIC_BYTES]>);
 
 impl VerifyingKey {
-
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, AxError> {
         let fixed: [u8; PUBLIC_BYTES] = bytes.try_into().map_err(|_| {
             AxError::failure(
@@ -141,7 +139,6 @@ impl VerifyingKey {
 pub struct Signature(Box<[u8; SIGNATURE_BYTES]>);
 
 impl Signature {
-
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, AxError> {
         let fixed: [u8; SIGNATURE_BYTES] = bytes.try_into().map_err(|_| {
             AxError::failure(

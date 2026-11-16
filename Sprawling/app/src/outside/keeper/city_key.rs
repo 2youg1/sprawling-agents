@@ -24,7 +24,6 @@ pub(crate) struct CityKey {
 }
 
 impl CityKey {
-
     pub(crate) fn of(
         vault: Arc<Mutex<Custodian>>,
         epoch: Option<B3Hash>,
@@ -78,7 +77,6 @@ impl CityKey {
 }
 
 impl Doorway {
-
     pub(crate) fn replace_key(&self) -> Result<Vec<Device>, AxError> {
         let now = (self.senses.clock)()?;
         let mut kept = self.kept()?;

@@ -16,7 +16,6 @@ pub(crate) enum Barrier {
 }
 
 impl Barrier {
-
     pub(crate) fn admit(&self, dir: &Path, at: Seq) -> Result<(), StorageError> {
         match self {
             Barrier::Whole => Ok(()),

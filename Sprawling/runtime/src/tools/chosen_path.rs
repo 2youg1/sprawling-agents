@@ -109,7 +109,6 @@ pub(crate) struct CityRoot {
 }
 
 impl CityRoot {
-
     pub(crate) fn anchor(written: &Path, action: &'static str) -> Result<CityRoot, AxError> {
         let real = real_location(written, action, "the city root")?.into_path();
         Ok(CityRoot {
@@ -197,7 +196,6 @@ pub(crate) fn still_judged(
 }
 
 pub(crate) enum Located {
-
     Present(PathBuf),
 
     Absent(PathBuf),
@@ -263,7 +261,6 @@ fn no_entry(path: &Path) -> bool {
 }
 
 pub(crate) enum Walked {
-
     Directory(PathBuf),
 
     File(PathBuf),

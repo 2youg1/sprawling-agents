@@ -19,7 +19,6 @@ pub struct Point {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Origin {
-
     Reference(String),
 
     Point(Point),
@@ -58,7 +57,6 @@ pub enum Action {
 pub const STEPS_MAX: u32 = 32;
 
 impl Action {
-
     #[must_use]
     pub fn reference(&self) -> Option<&str> {
         match self {

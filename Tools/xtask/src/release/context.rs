@@ -127,7 +127,6 @@ mod tests {
 
     #[test]
     fn the_product_vocabulary_is_not_a_working_record() {
-
         assert_eq!(working_record("只认回环调用方"), None);
 
         assert_eq!(working_record("4 会话 29 ms → 32 会话 319 ms"), None);

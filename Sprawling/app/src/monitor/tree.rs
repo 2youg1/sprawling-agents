@@ -60,7 +60,6 @@ struct Member {
 }
 
 impl Tree {
-
     #[must_use]
     pub fn open(root: u32) -> Tree {
         Tree {

@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ProviderFailureKind {
-
     Exchange,
 
     Cut,
@@ -33,7 +32,6 @@ pub enum ProviderFailureKind {
 #[serde(rename_all = "lowercase")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum AccountDisposition {
-
     #[default]
     Keep,
 
@@ -41,7 +39,6 @@ pub enum AccountDisposition {
 }
 
 impl AccountDisposition {
-
     pub(crate) fn is_keep(&self) -> bool {
         *self == AccountDisposition::Keep
     }

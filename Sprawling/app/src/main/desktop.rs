@@ -10,7 +10,6 @@ pub(super) fn verb(scope: Option<&str>) -> ExitCode {
     match ::desktop::serve_stdio(scope.map(Path::new)) {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
-
             eprintln!("sprawling desktop: {err}");
             ExitCode::FAILURE
         }

@@ -15,7 +15,6 @@ use super::PlanTree;
 use super::node::{Held, PlanNode};
 
 impl PlanTree {
-
     pub fn build(rows: Vec<RoadmapRow>) -> Result<PlanTree, AxError> {
         let mut nodes: BTreeMap<NodeId, PlanNode> = BTreeMap::new();
         for row in rows {
@@ -185,7 +184,6 @@ impl PlanTree {
             ));
         }
         if node.row.status != RoadmapStatus::NotStarted {
-
             return Err(AxError::failure(
                 AxCode::GoalConflict,
                 "claim a plan node",

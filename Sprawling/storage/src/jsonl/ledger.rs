@@ -15,14 +15,12 @@ pub(crate) const SEGMENT_ROLL_BYTES: u64 = 64 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SegmentPreallocation {
-
     Grow,
 
     ToRollSize,
 }
 
 impl SegmentPreallocation {
-
     pub(crate) fn length_after_open(self, keep: u64, dropped: u64, total: u64) -> u64 {
         match (self, dropped) {
             (SegmentPreallocation::ToRollSize, 0) => total,
@@ -82,7 +80,6 @@ pub struct LedgerHold {
 }
 
 impl LedgerHold {
-
     pub fn take(dir: &Path) -> Result<LedgerHold, StorageError> {
         Ok(LedgerHold {
             _lock: WriterLock::take(dir)?,
@@ -91,7 +88,6 @@ impl LedgerHold {
 }
 
 impl WriterLock {
-
     pub(crate) fn take(dir: &Path) -> Result<WriterLock, StorageError> {
         let name = dir.file_name().ok_or_else(|| {
             io_err("name the ledger lock", dir)(std::io::Error::new(

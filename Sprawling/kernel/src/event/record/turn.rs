@@ -28,7 +28,6 @@ pub struct PromptAssembled {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PromptTools {
-
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub hash: B3Hash,
 
@@ -105,7 +104,6 @@ pub struct PromptSkip {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum SkipReason {
-
     Duplicate,
 
     Unreadable,
@@ -118,7 +116,6 @@ pub enum SkipReason {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ModelCalled {
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_account: Option<super::ProviderAccountBinding>,
 
@@ -133,7 +130,6 @@ pub struct ModelCalled {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ModelReturned {
-
     pub message: Payload,
 
     pub calls: u64,
@@ -165,13 +161,11 @@ pub struct ModelReturned {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SteerReceived {
-
     pub source: String,
     pub text: String,
 }
 
 impl SteerReceived {
-
     pub const PERSON_SOURCE: &'static str = "user";
 
     pub const CITY_SOURCE: &'static str = "city";
@@ -199,7 +193,6 @@ pub enum PartChange {
 pub enum ShapeChanged {
     FirstRequest,
     Compared {
-
         system: Vec<String>,
         tools: PartChange,
         run: PartChange,

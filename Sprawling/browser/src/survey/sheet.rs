@@ -13,7 +13,6 @@ const LISTED: usize = 3;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Shape {
-
     Prose,
 
     Tagged,
@@ -238,7 +237,6 @@ fn remedy_out_of_step(among: Population, moved: i64, step: Option<&str>) -> Stri
 
 fn site(one: &Deviation<'_>, sources: &Sources) -> String {
     match sources.locate(&one.at.class) {
-
         Some(found) => format!("{found} \u{b7} {}", says(one)),
 
         None if one.at.class.is_empty() => says(one),

@@ -9,7 +9,6 @@ use serde_json::{Value, json};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RefusalCode {
-
     ToolUnknown,
 
     ToolUnavailable,
@@ -24,7 +23,6 @@ pub(crate) enum RefusalCode {
 }
 
 impl RefusalCode {
-
     pub(crate) fn code(self) -> AxCode {
         match self {
             RefusalCode::ToolUnknown => AxCode::ToolUnknown,
@@ -59,14 +57,12 @@ pub(crate) struct Refusal {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Aftermath {
-
     Known,
 
     Unknown,
 }
 
 impl Refusal {
-
     pub(crate) fn new(
         code: RefusalCode,
         action: &str,

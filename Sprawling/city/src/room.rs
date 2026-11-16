@@ -26,7 +26,6 @@ pub fn all(city_root: &Path, building: &Address) -> Result<Vec<Address>, AxError
     let entries = std::fs::read_dir(&root).map_err(|err| unreadable(&err))?;
     let mut out = Vec::new();
     for entry in entries {
-
         let entry = entry.map_err(|err| unreadable(&err))?;
         if !entry.path().is_dir() {
             continue;
@@ -57,7 +56,6 @@ pub fn open(city_root: &Path, building: &Address, name: &SessionName) -> Result<
         match std::fs::create_dir_all(dir.parent().unwrap_or(city_root))
             .and_then(|()| std::fs::create_dir(&dir))
         {
-
             Ok(()) => {
                 crate::gitignore::seal_room(&dir)?;
 

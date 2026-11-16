@@ -277,7 +277,6 @@ fn a_dispatch_says_what_it_spent_before_the_drive() {
                     .push(runtime::diagnostics::render(entry));
             }),
         ),
-
         Hands {
             clock: std::sync::Arc::new(LeapingClock::from_now()),
             ..crate::worker::fixture::hands()

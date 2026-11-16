@@ -31,7 +31,6 @@ pub struct AttachedEndpoint {
 }
 
 impl AttachedEndpoint {
-
     pub fn facts_bytes(&self) -> Result<Vec<u8>, kernel::AxError> {
         serde_json::to_vec(&self.models)
             .map_err(|err| crate::mismatch::mismatch("model facts", &err.to_string()))

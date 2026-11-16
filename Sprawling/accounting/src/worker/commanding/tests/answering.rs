@@ -286,7 +286,6 @@ fn the_approval_queue_holds_what_was_asked_and_drops_what_was_answered() {
 }
 #[test]
 fn a_command_with_no_executor_is_refused_by_name_and_not_by_stage() {
-
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
     let mut worker = RunWorker::new(

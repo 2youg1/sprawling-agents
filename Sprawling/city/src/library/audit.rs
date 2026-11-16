@@ -14,7 +14,6 @@ use kernel::{B3Hash, Seq};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuditState {
-
     Unaudited,
 
     Audited { verdict: AuditVerdict, at: Seq },

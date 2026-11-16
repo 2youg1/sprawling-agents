@@ -13,7 +13,6 @@ use super::speculation::{Generating, Speculated, call_ahead};
 
 #[derive(Debug)]
 pub(super) enum SegmentOutcome {
-
     Recovered(ModelReturn),
 
     Failed(AxError),
@@ -42,7 +41,6 @@ enum FirstContent {
 }
 
 impl FirstContent {
-
     fn note(&mut self, held: &Increment, journal: &mut Journal<'_>) {
         let content = match held {
             Increment::Said(text) | Increment::Thought(text) => !text.is_empty(),
@@ -70,7 +68,6 @@ pub(super) struct ModelCall<'a, 'h> {
 }
 
 impl<'a, 'h> ModelCall<'a, 'h> {
-
     pub(super) fn open(
         journal: &'a mut Journal<'h>,
         ledger: &'a mut dyn Ledger,

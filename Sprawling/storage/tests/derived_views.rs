@@ -7,7 +7,6 @@
     clippy::wildcard_enum_match_arm,
     reason = "test code: this suite names the one event kind it is               about and treats the rest as one arm, rather than               modelling an enum it does not assert on"
 )]
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,

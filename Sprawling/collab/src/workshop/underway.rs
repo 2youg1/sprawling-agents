@@ -19,7 +19,6 @@ pub struct Underway {
 }
 
 impl Underway {
-
     #[must_use]
     pub fn new(workshop: Workshop, handed: BTreeSet<NodeId>, desk: DelegateDesk) -> Underway {
         Underway {
@@ -97,7 +96,6 @@ pub(crate) enum Laid {
 }
 
 impl Laid {
-
     pub(crate) fn take(&mut self) -> Option<Underway> {
         match std::mem::replace(self, Laid::Taken) {
             Laid::Held(underway) => Some(underway),

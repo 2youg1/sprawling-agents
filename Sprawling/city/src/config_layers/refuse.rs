@@ -44,7 +44,6 @@ pub(super) fn unreadable(text: &str, err: &toml::de::Error) -> AxError {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Confined {
-
     Shelves,
 
     Remote,
@@ -61,7 +60,6 @@ pub(super) enum Confined {
 }
 
 impl Confined {
-
     pub(super) fn nearest(self) -> Layer {
         match self {
             Confined::Shelves | Confined::Remote | Confined::Agents => Layer::City,

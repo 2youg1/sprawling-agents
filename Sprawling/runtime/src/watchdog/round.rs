@@ -20,7 +20,6 @@ pub(super) struct Round {
 }
 
 impl Round {
-
     pub(super) fn open(roster: Option<AccountRoster>, cap: Retries) -> Result<Round, AxError> {
         let (provider, listed, held, retries) = match roster {
             Some(roster) if roster.accounts.len() > 1 => (

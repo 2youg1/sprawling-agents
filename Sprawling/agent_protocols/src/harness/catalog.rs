@@ -20,7 +20,6 @@ pub struct Catalog {
 }
 
 impl Catalog {
-
     pub fn bundled() -> Result<Catalog, AxError> {
         let index: Value = serde_json::from_str(BUNDLED).map_err(|err| unreadable(&err))?;
         let header = |key: &str| text(&index, key).unwrap_or_default().to_owned();

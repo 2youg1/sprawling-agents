@@ -9,7 +9,6 @@ use super::text_at;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Update {
-
     Text(String),
 
     Thought(String),
@@ -20,9 +19,14 @@ pub enum Update {
         kind: String,
     },
 
-    ToolCallStatus { id: String, status: String },
+    ToolCallStatus {
+        id: String,
+        status: String,
+    },
 
-    Other { variant: String },
+    Other {
+        variant: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -10,7 +10,6 @@ use kernel::{AxCode, AxError, TimeMs};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Kind {
-
     Preference,
 
     Decision,

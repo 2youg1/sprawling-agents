@@ -11,7 +11,6 @@ use super::Browser;
 use super::surveying::surveyed;
 
 impl Browser {
-
     pub(super) fn answer(&mut self, verb: &Verb, result: &Value) -> Result<ToolOutcome, AxError> {
         match verb {
             Verb::Open { url } => {
@@ -103,7 +102,6 @@ impl Browser {
         })?;
         let (word, looks) = step_word(&step);
         if word != "look_again" {
-
             self.began_again();
         }
         Ok(ToolOutcome {

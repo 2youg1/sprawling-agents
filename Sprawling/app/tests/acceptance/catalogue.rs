@@ -123,7 +123,6 @@ fn covered(landing: &Landing<'_>, episodes: &[Episode]) -> Vec<String> {
         }
     }
     for episode in episodes {
-
         let Some(result) = calls
             .iter()
             .find(|call| {

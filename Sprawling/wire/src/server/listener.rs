@@ -20,7 +20,6 @@ pub struct Bound {
 }
 
 impl Bound {
-
     #[must_use]
     pub fn local_addr(&self) -> SocketAddr {
         self.local
@@ -33,7 +32,6 @@ impl Bound {
 }
 
 pub async fn bind(addr: SocketAddr, key: Option<B3Hash>) -> Result<Bound, AxError> {
-
     let face = match decide_bind(&addr, key) {
         BindVerdict::Serve(face) => face,
         BindVerdict::Refuse(err) => return Err(err),

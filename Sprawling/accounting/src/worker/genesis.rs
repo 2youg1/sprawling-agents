@@ -119,7 +119,6 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
     worker.create_building(hall.clone(), template.name())?;
     let mut adopted = Vec::new();
     if let (Adopt::EveryFolder, city::Standing::Work { adoptable, .. }) = (adopt, &standing) {
-
         for addr in adoptable {
             worker.adopt_building(addr.clone())?;
             adopted.push(addr.clone());
@@ -192,7 +191,6 @@ pub(super) fn prompt_segment(path: &Path, at: Address) -> Result<Assembled, AxEr
 }
 
 impl RunWorker {
-
     pub(super) fn create_building(&mut self, addr: Address, template: &str) -> Result<(), AxError> {
         let template = city::BuildingTemplate::parse(template)?;
         let building = city::create_building(&self.city_root, &addr, template)?;
@@ -321,7 +319,6 @@ impl RunWorker {
         match made {
             Ok(record) => Ok(Some(record)),
             Err(err) => {
-
                 let failure = runtime::CheckpointFailure::from(err);
                 if let Some(report) = failure.refusal() {
                     self.record_at(
@@ -336,7 +333,6 @@ impl RunWorker {
     }
 
     pub fn startup_scan(&mut self) -> Result<ScanReport, AxError> {
-
         let mut calls = runtime::replay::DanglingCalls::default();
         let mut runs = lost::OpenRuns::default();
         let index = runtime::replay::fold_ledger_dir(

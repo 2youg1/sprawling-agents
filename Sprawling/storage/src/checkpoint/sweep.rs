@@ -11,7 +11,6 @@ use crate::error::StorageError;
 use super::commit::{Checkpoint, git_err};
 
 impl Checkpoint {
-
     pub fn wave_post(&mut self, pre_oid: &str) -> Result<Vec<Payload>, StorageError> {
         let oid = git2::Oid::from_str(pre_oid).map_err(git_err("parse checkpoint oid"))?;
         let commit = self

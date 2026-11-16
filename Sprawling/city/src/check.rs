@@ -72,7 +72,6 @@ pub(crate) fn files(city_root: &Path) -> Result<Vec<(PathBuf, Kind)>, AxError> {
 }
 
 impl Kind {
-
     pub(crate) fn versioned(&self) -> Option<FormatFile> {
         match self {
             Kind::Config => Some(FormatFile::LayerConfig),

@@ -35,7 +35,6 @@ fn a_nul_without_a_mark_is_not_text() {
 
 #[test]
 fn bytes_that_are_not_utf8_and_carry_no_mark_are_not_text() {
-
     assert_eq!(Reading::of(b"caf\xe9 au lait\n"), Reading::Opaque);
 }
 

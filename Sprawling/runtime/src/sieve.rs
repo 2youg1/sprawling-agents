@@ -262,7 +262,6 @@ pub fn sieve(
     );
     let out = format!("{body}\n{footer}");
     if out.len() > text.len() {
-
         return Ok(Sieved::Passed {
             text: text.to_owned(),
             reason: PassReason::NothingShrank,

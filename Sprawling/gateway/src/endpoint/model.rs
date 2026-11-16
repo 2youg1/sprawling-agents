@@ -35,7 +35,6 @@ impl Endpoint {
     }
 
     pub(crate) fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
-
         if req.policy.confidential {
             return Err(self.confidential_refusal());
         }
@@ -50,7 +49,6 @@ impl Endpoint {
 }
 
 impl Endpoint {
-
     pub(super) fn post_settled(
         &self,
         req: &ModelRequest,
@@ -65,7 +63,6 @@ impl Endpoint {
             .map_err(|err| provider_err("call provider", &ProviderFailure::Exchange(&err)))?;
         let status = response.status();
         if !status.is_success() {
-
             let headers = response.headers().clone();
             return Err(provider_err(
                 "call provider",
@@ -86,7 +83,6 @@ impl Endpoint {
 }
 
 impl Endpoint {
-
     pub(super) fn returned(&self, settled: &Value) -> Result<ModelReturn, AxError> {
         let resp = response_from_wire(self.config.dialect, settled)?;
 
@@ -154,7 +150,6 @@ mod tests {
 
     #[test]
     fn a_model_that_cannot_see_refuses_the_picture_instead_of_dropping_it() {
-
         let blind = crate::market::MarketSnapshot::builtin()
             .unwrap()
             .lookup("local")
@@ -215,7 +210,6 @@ mod tests {
     }
     #[test]
     fn a_confidential_building_never_reaches_a_remote_provider() {
-
         let mut endpoint =
             Endpoint::new(config("http://127.0.0.1:1/v1/messages"), redemption()).unwrap();
         let mut confidential = request();

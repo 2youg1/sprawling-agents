@@ -164,7 +164,6 @@ fn a_run_in_another_building_reads_nothing_of_a_confidential_one() {
 }
 #[test]
 fn a_file_an_exec_deleted_comes_back_with_somewhere_to_come_back_from() {
-
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     let room = dir.path().join("lab").join("room1");

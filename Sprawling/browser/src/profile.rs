@@ -13,7 +13,6 @@ pub struct Profile {
 pub const PROFILES_DIR: &str = "browser-profiles";
 
 impl Profile {
-
     pub fn of(building: &Address) -> Result<Profile, AxError> {
         if building.is_reserved() {
             return Err(AxError::failure(

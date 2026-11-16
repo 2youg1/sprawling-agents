@@ -22,9 +22,7 @@ const ROUTES: [(&str, [&str; 2]); 2] = [
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(tag = "route", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RemoteRoute {
-
     Cloudflare {
-
         tunnel: String,
 
         url: String,

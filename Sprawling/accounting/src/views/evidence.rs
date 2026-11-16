@@ -11,7 +11,6 @@ use super::kinds::Evidence;
 use super::prepared::LedgerAsk;
 
 impl LedgerAsk {
-
     pub(super) fn evidence_answer(&self, run: RunId) -> wire::EvidenceAnswer {
         let items = self
             .records_of(run)

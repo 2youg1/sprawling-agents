@@ -18,7 +18,6 @@ pub struct DomainPrefixes {
 }
 
 impl DomainPrefixes {
-
     pub fn new(prefixes: Vec<Address>) -> Result<DomainPrefixes, AxError> {
         if let Some(reserved) = prefixes.iter().find(|p| p.is_reserved()) {
             return Err(AxError::failure(
@@ -41,14 +40,12 @@ impl DomainPrefixes {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WriteDomain {
-
     Everything(DomainPrefixes),
 
     Documents(DomainPrefixes),
 }
 
 impl WriteDomain {
-
     pub fn new(prefixes: Vec<Address>) -> Result<WriteDomain, AxError> {
         Ok(WriteDomain::Everything(DomainPrefixes::new(prefixes)?))
     }
@@ -89,14 +86,12 @@ impl WriteDomain {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum WriteLimit {
-
     Full,
 
     Create,
 }
 
 impl WriteLimit {
-
     pub const ALL: [WriteLimit; 2] = [WriteLimit::Full, WriteLimit::Create];
 
     #[must_use]
@@ -132,18 +127,13 @@ fn document_verdict(target: &Address) -> DomainVerdict {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DomainVerdict {
     Within,
-    Outside {
-        prefixes: Vec<String>,
-    },
+    Outside { prefixes: Vec<String> },
 
-    NotWritable {
-        reason: DocumentReason,
-    },
+    NotWritable { reason: DocumentReason },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DocumentReason {
-
     NotMarkdown,
 
     ThePlan,

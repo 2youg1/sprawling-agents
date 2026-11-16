@@ -59,7 +59,6 @@ fn is_within_respects_segment_boundaries() {
 
 #[test]
 fn a_session_name_is_one_segment_a_person_typed() {
-
     let named = SessionName::parse(" refactor the ledger ").unwrap();
     assert_eq!(
         named.as_str(),
@@ -191,7 +190,6 @@ fn a_reserved_subtree_is_reserved_at_whatever_depth_it_sits() {
 
 #[test]
 fn protected_metadata_is_reserved_at_whatever_depth_it_sits() {
-
     for reserved in [
         ".git",
         ".git/hooks/pre-run",

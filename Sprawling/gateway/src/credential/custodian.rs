@@ -13,7 +13,6 @@ use zeroize::Zeroizing;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Store {
-
     PlatformService,
 
     EncryptedFile,
@@ -39,7 +38,6 @@ pub struct Custodian {
 }
 
 impl Store {
-
     fn source(self) -> &'static str {
         match self {
             Store::PlatformService => KeyringVault::SOURCE,
@@ -58,7 +56,6 @@ impl Store {
 }
 
 impl Custodian {
-
     pub fn probe() -> (Custodian, Option<Payload>) {
         let probe_ref = match SecretRef::parse("secret:sprawling/startup-probe") {
             Ok(reference) => reference,
@@ -75,7 +72,6 @@ impl Custodian {
         match round_trip {
             Ok(Some(read)) if read.as_str() == "probe" => (
                 Custodian::with_backend(Box::new(KeyringVault), Store::PlatformService, None),
-
                 None,
             ),
             Ok(_) => Custodian::fell_back("platform service returned a different value".to_owned()),

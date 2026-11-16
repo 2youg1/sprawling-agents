@@ -33,7 +33,6 @@ pub(in crate::worker) struct Proposing {
 }
 
 impl crate::worker::RunWorker {
-
     pub(in crate::worker) fn proposing(&self) -> Proposing {
         Proposing {
             relay: self.relay(),
@@ -82,7 +81,6 @@ struct Withdrawing {
 }
 
 impl Laying {
-
     pub(super) fn proposal_tool(
         &self,
         site: &Site,
@@ -107,7 +105,6 @@ impl Laying {
 }
 
 impl<L: Ledger> ProposalTool<L> {
-
     pub(super) fn definition() -> Result<ToolDef, AxError> {
         let params = json!({
             "type": "object",
@@ -185,7 +182,6 @@ impl<L: Ledger> ProposalTool<L> {
         let id = Offer::of(self.filing.run, &offered)?.id();
         let mut desk = held(&self.desk, "take the proposal desk")?;
         match desk.cards.get(&id).copied() {
-
             Some(Held::Open) => {}
             Some(Held::Withdrawn) => {
                 return Err(refused(
@@ -245,7 +241,6 @@ impl<L: Ledger> ProposalTool<L> {
 }
 
 impl<L: Ledger> Desk<L> {
-
     fn file(&mut self, filing: &Filing, kind: EventKind, data: Payload) -> Result<(), AxError> {
         self.ledger.append(EventDraft {
             run: filing.run,

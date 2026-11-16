@@ -7,7 +7,6 @@ use std::path::{Path, PathBuf};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Presence {
-
     Present { at: PathBuf, version: Version },
 
     Broken { at: PathBuf, fault: Fault },
@@ -28,7 +27,6 @@ pub(crate) enum Version {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Fault {
-
     WillNotStart(String),
 
     HalfWritten,
@@ -59,7 +57,6 @@ pub(crate) enum Absence {
 }
 
 impl Presence {
-
     pub(crate) fn usable(&self) -> bool {
         matches!(self, Presence::Present { .. })
     }
@@ -85,7 +82,6 @@ impl Presence {
 }
 
 impl Version {
-
     pub(crate) fn number(&self) -> String {
         let Version::Said(text) = self else {
             return self.describe();

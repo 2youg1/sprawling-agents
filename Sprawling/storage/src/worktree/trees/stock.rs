@@ -36,7 +36,6 @@ struct Links {
 }
 
 impl Links {
-
     fn of(&self, name: &str) -> (String, String) {
         (
             format!("{}worktrees/{name}/\n", self.dot_git),
@@ -46,7 +45,6 @@ impl Links {
 }
 
 impl Worktrees {
-
     pub fn stock(&self) -> Result<FileWork, StorageError> {
         match self.stock_standing()? {
             Stock::Absent => self.place_stock(),

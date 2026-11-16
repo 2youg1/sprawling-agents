@@ -11,7 +11,6 @@ use crate::mismatch::stream_cut;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Event {
-
     TextDelta,
 
     ReasoningDelta,

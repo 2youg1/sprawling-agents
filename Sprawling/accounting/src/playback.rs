@@ -47,7 +47,6 @@ pub const PAGE_MAX_BYTES: usize = BUNDLE_MAX_BYTES + 16 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cutoff {
-
     Latest,
 
     At(Seq),
@@ -76,7 +75,6 @@ pub fn export(city_root: &Path, request: &Request) -> Result<Bundle, AxError> {
 }
 
 enum Projected {
-
     Whole {
         document: Box<Document>,
         #[cfg_attr(

@@ -10,7 +10,6 @@ use crate::{Address, B3Hash};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DocumentWritten {
-
     pub at: Address,
 
     pub baseline: B3Hash,

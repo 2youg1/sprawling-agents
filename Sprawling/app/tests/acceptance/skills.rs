@@ -15,7 +15,6 @@ const CARRIED: &str = "how/references/critique-rubric.md";
 
 #[derive(Debug, PartialEq)]
 struct Seen {
-
     pinned: Vec<(String, B3Hash)>,
 
     read: Vec<String>,

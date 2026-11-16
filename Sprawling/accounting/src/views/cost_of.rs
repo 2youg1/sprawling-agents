@@ -8,7 +8,6 @@ use kernel::{AxError, NodeId, RunId, UsdMicros};
 use super::holding::Views;
 
 impl Views {
-
     pub(super) fn cost_of_answer(&self, node: &NodeId) -> Result<wire::CostOfAnswer, AxError> {
         let held = self.claims.get(node).cloned().unwrap_or_default();
         let mut runs: Vec<(RunId, UsdMicros)> = Vec::with_capacity(held.len());

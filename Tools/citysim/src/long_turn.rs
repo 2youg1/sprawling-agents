@@ -21,7 +21,6 @@ pub const STEP_BYTES: usize = 1024;
 const NOTES: &str = "notes";
 
 pub enum Pauses {
-
     Never,
 
     Every {
@@ -31,7 +30,6 @@ pub enum Pauses {
 }
 
 pub struct TurnReading {
-
     pub completion: &'static str,
 
     pub windows: Vec<u64>,

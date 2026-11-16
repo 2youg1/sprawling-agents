@@ -8,7 +8,6 @@ use kernel::{Address, AxError, NodeId};
 use super::super::{Assignment, Landed, RunWorker};
 
 impl RunWorker {
-
     pub(in crate::worker) fn advance_pursuits(&mut self, landed: &Landed) {
         if let Landed::Row { addr, node } = landed
             && self.ready_in(addr).contains(node)

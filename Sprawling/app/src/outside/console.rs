@@ -27,10 +27,7 @@ const USAGE: &str = "/remote open [--for <30m|12h|2d>], /remote pair <name> [--w
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum RemoteLine {
     Open(Lasting),
-    Pair {
-        name: String,
-        authority: Authority,
-    },
+    Pair { name: String, authority: Authority },
     Close,
     Devices,
     Revoke(Revoking),

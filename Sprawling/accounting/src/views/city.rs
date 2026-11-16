@@ -23,7 +23,6 @@ pub struct CityAsk {
 }
 
 impl Views {
-
     pub fn city(&self) -> Option<Address> {
         self.city
             .clone()
@@ -63,7 +62,6 @@ impl Views {
 }
 
 impl CityAsk {
-
     pub(super) fn read(self) -> wire::Answer {
         let Ok(buildings) = buildings_of(&self.city_root) else {
             return super::prepared::unavailable("CityView".to_owned());

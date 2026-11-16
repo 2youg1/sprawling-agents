@@ -7,7 +7,6 @@ use kernel::{AxCode, AxError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UserBrowser {
-
     Waiting,
 
     At(UserBrowserEndpoint),
@@ -20,7 +19,6 @@ pub struct UserBrowserEndpoint {
 }
 
 impl UserBrowserEndpoint {
-
     pub fn parse(raw: &str) -> Result<UserBrowserEndpoint, AxError> {
         let trimmed = raw.trim();
         let bad = || {

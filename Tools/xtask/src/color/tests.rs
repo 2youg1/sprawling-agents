@@ -144,7 +144,6 @@ fn the_measurement_reproduces_the_readings_the_design_was_solved_against() {
 
 #[test]
 fn a_text_token_that_does_not_reach_its_tier_is_caught() {
-
     let broken = GOOD.replace("--color-text: oklch(0.930", "--color-text: oklch(0.825");
     let found = judge_tokens(&broken, Mode::Dark);
     assert!(
@@ -199,7 +198,6 @@ fn a_twelve_pixel_step_is_legal_and_still_cannot_be_quiet() {
 
 #[test]
 fn text_on_a_surface_the_ladder_may_not_reach_is_caught() {
-
     let broken = GOOD.replace("--surface-ceiling: g2", "--surface-ceiling: g3");
     let found = judge_tokens(&broken, Mode::Dark);
     assert!(
@@ -275,7 +273,6 @@ fn a_ramp_that_stops_short_of_the_ceiling_is_caught() {
 
 #[test]
 fn an_interaction_variant_may_sit_above_the_ramp_ceiling() {
-
     let found = judge_tokens(GOOD, Mode::Dark);
     assert!(found.is_empty(), "{}", rules(&found));
 }

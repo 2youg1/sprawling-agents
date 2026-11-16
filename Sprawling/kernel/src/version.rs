@@ -12,7 +12,6 @@ use crate::error::{AxCode, AxError};
 pub struct Version(u64);
 
 impl Version {
-
     pub const FIRST: Version = Version(1);
 
     pub fn new(value: u64) -> Self {

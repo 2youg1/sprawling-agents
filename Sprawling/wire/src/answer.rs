@@ -142,7 +142,6 @@ pub const HISTORY_MAX: u32 = 500;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CityAnswer {
-
     pub runs: Vec<RunSummary>,
     pub active: u64,
     pub frozen: u64,
@@ -255,7 +254,6 @@ pub struct GovernanceAnswer {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Decision {
-
     pub item: String,
     pub verdict: Ruling,
 

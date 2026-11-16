@@ -7,7 +7,6 @@ use super::super::holding::Views;
 use super::super::prepared::{Prepared, unavailable};
 
 impl Views {
-
     pub(in crate::views) fn github_of(&self, host: Option<&str>) -> Prepared {
         Prepared::GithubLogin {
             ask: self.reach.github,

@@ -13,7 +13,6 @@ use super::recording::Recording;
 use super::wire::{form_body, transcription_of, transcription_path};
 
 pub struct TranscriberConfig {
-
     pub base_url: String,
 
     pub model: String,
@@ -28,7 +27,6 @@ pub struct Transcriber {
 }
 
 impl Transcriber {
-
     #[must_use]
     pub fn absent() -> Transcriber {
         Transcriber { attached: None }
@@ -52,7 +50,6 @@ impl Transcriber {
                 pricing: None,
                 proxying: config.proxying,
             },
-
             Redemption::without_images(secrets),
         )?;
         Ok(Transcriber {

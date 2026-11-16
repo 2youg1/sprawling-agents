@@ -13,7 +13,6 @@ use super::REQUIREMENTS;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Upstream {
-
     Crate(&'static str),
 
     GitHub(&'static str),

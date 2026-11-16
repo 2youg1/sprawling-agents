@@ -26,7 +26,6 @@ use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 
 #[derive(Debug)]
 pub(crate) struct Heard {
-
     pub(crate) path: String,
 
     pub(crate) headers: BTreeMap<String, String>,
@@ -41,7 +40,6 @@ pub(crate) struct StandIn {
 }
 
 impl StandIn {
-
     pub(crate) fn listening(host: &str) -> StandIn {
         let (certificate, config) = server_for(host);
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -87,7 +85,6 @@ pub(crate) struct KeptOpen {
 }
 
 impl KeptOpen {
-
     pub(crate) fn listening(host: &str) -> KeptOpen {
         let (certificate, config) = server_for(host);
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();

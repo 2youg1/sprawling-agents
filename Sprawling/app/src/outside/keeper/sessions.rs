@@ -13,7 +13,6 @@ use remote_access::keys::VerifyingKey;
 use super::{Doorway, drawn, nonce};
 
 impl Doorway {
-
     pub(crate) fn session_reply(&self, hello: &Hello) -> Result<(Reply, CityWaiting), AxError> {
         let nonce = nonce(&self.senses)?;
         let kept = self.kept()?;

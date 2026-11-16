@@ -15,7 +15,6 @@ use crate::views::Views;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Trace {
-
     pub commit: wire::CommitAnswer,
 
     pub calls: Vec<wire::Call>,
@@ -44,7 +43,6 @@ pub fn trace(city_root: &Path, oid: GitOid) -> Result<Option<Trace>, AxError> {
 }
 
 pub(crate) struct History {
-
     views: Result<Box<Views>, AxError>,
 }
 

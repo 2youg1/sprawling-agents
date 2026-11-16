@@ -34,7 +34,6 @@ pub struct TemplateAnswer {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BlockedLine {
-
     pub source: NodeId,
 
     pub line: String,

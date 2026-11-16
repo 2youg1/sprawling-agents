@@ -13,14 +13,12 @@ use crate::tools::chosen_path::{Located, real_location, still_judged};
 use crate::tools::stamp::Stamp;
 
 pub(super) enum Floor {
-
     Document,
 
     Directory { dir: PathBuf, named: String },
 }
 
 impl Floor {
-
     pub(super) fn of_address(city_root: &Path, addr: &Address) -> Floor {
         let Some(first) = addr.as_str().split('/').next() else {
             return Floor::Document;

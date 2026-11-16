@@ -28,7 +28,6 @@ use serde_json::Value;
 use super::config::{AuthSpec, EndpointConfig};
 
 #[cfg(test)]
-
 #[allow(
     clippy::float_arithmetic,
     clippy::unwrap_used,

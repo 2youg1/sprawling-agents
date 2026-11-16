@@ -47,7 +47,6 @@ enum Verb {
 }
 
 impl Front {
-
     pub(crate) fn commands(
         &self,
         desk: impl Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Sync + 'static,
@@ -93,7 +92,6 @@ impl Front {
 }
 
 impl Asking {
-
     fn ask(&self, asked: Asked) -> Result<(), AxError> {
         let senses = self.remote.as_ref().map_err(Clone::clone)?.doorway.senses();
         let mut entropy = [0u8; CONFIRM_BYTES];

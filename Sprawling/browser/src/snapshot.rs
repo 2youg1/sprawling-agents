@@ -8,7 +8,6 @@ use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Node {
-
     pub reference: String,
     pub role: String,
     pub name: String,
@@ -16,7 +15,6 @@ pub struct Node {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PageSnapshot {
-
     generation: u64,
     nodes: Vec<Node>,
 }
@@ -86,7 +84,6 @@ fn truncate_label(raw: &str) -> String {
 }
 
 impl PageSnapshot {
-
     pub fn read(generation: u64, tree: &Value) -> Result<PageSnapshot, AxError> {
         let entries = tree.as_array().ok_or_else(|| {
             AxError::failure(

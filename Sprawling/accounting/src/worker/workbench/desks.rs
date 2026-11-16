@@ -11,7 +11,6 @@ use super::super::RunWorker;
 use super::Site;
 
 impl RunWorker {
-
     pub(in crate::worker) fn open_desks(
         &mut self,
         site: &Site,
@@ -131,7 +130,6 @@ impl RunWorker {
                 clock: clock.as_ref(),
             };
             match landing.record(&mut |line| stamping.record_for(run, line))? {
-
                 crate::effect::Then::Deliver(_) | crate::effect::Then::Nothing => Ok(()),
                 crate::effect::Then::Roadmap { .. } | crate::effect::Then::Shelf(_) => Ok(()),
             }
@@ -210,7 +208,6 @@ impl RunWorker {
 }
 
 impl BenchDesks {
-
     pub(in crate::worker) fn archive_tool(
         &self,
         tree: &std::path::Path,

@@ -10,7 +10,6 @@ use kernel::{Address, AxCode, AxError, NodeId};
 
 #[derive(Clone)]
 pub(in crate::worker) enum Owed {
-
     Asked,
 
     Row { addr: Address, node: NodeId },
@@ -22,7 +21,6 @@ pub(in crate::worker) enum Owed {
 
 #[derive(Clone)]
 pub(in crate::worker) enum Unasked {
-
     Schedule,
 
     Arrival(kernel::TaintSource),
@@ -33,7 +31,6 @@ pub(in crate::worker) enum Unasked {
 }
 
 impl Unasked {
-
     pub(in crate::worker) fn because(&self) -> &'static str {
         match self {
             Unasked::Schedule => "the schedule said it was due",
@@ -76,7 +73,6 @@ const SUCCESSION_HOPS_MAX: u32 = 64;
 const CONVERSATION_RUNS_MAX: u32 = 64;
 
 impl Relays {
-
     fn after_knock(&self) -> Result<Relays, AxError> {
         let hops = self
             .chain
@@ -151,7 +147,6 @@ fn conversation_refused(subject: String) -> AxError {
 
 #[cfg(test)]
 impl KnockChain {
-
     pub(in crate::worker) fn deep(hops: u32) -> KnockChain {
         KnockChain {
             hops,
@@ -161,7 +156,6 @@ impl KnockChain {
 }
 
 impl Owing {
-
     pub(in crate::worker) fn asked(reply: wire::Reply) -> Owing {
         Owing {
             owed: Owed::Asked,

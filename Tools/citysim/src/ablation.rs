@@ -22,7 +22,6 @@ pub(crate) struct Passage {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Cost {
-
     Untouched,
 
     Restated { also_said: Vec<&'static str> },
@@ -43,7 +42,6 @@ pub(crate) struct Ablation {
 }
 
 impl Ablation {
-
     pub(crate) fn new(document: &str, corpus: &'static [Capability]) -> Result<Ablation, AxError> {
         for capability in corpus {
             if !document.contains(capability.cue) {

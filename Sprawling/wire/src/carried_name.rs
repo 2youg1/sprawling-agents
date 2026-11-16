@@ -15,7 +15,6 @@ macro_rules! carried_name {
         pub struct $name(String);
 
         impl $name {
-
             pub fn parse(raw: &str) -> Result<Self, AxError> {
                 if raw.is_empty() || raw.chars().any(char::is_control) {
                     return Err(AxError::failure(

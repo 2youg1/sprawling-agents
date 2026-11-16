@@ -10,7 +10,6 @@ use crate::effect;
 use crate::worker::RunWorker;
 
 impl RunWorker {
-
     pub(super) fn file_the_waiting(
         &mut self,
         at: &Filing<'_>,
@@ -24,7 +23,6 @@ impl RunWorker {
         } = *at;
 
         if tainted {
-
             for item in raised.iter_mut() {
                 item.tainted = true;
             }

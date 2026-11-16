@@ -7,7 +7,6 @@ use std::process::ExitCode;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Exit {
-
     Done,
 
     Refused,

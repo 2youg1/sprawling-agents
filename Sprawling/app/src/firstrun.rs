@@ -77,7 +77,6 @@ pub fn open_when_ready(bind: SocketAddr, url: String, door: wire::LocalDoor) {
     std::thread::spawn(move || {
         for _ in 0..PROBE_ATTEMPTS {
             if std::net::TcpStream::connect_timeout(&addr, PROBE_INTERVAL).is_ok() {
-
                 if let Err(unopened) = open_paired(&url, &door) {
                     eprintln!("  {}: {}", unopened.action(), unopened.recovery());
                 }
@@ -113,7 +112,6 @@ pub(crate) fn open_paired(url: &str, door: &wire::LocalDoor) -> Result<(), kerne
     write_private(&page, &redirect).map_err(unhandled)?;
     let opened = open_in_browser(&page.to_string_lossy(), unhandled);
     std::thread::spawn(move || {
-
         let _waited: Result<(), std::sync::mpsc::RecvTimeoutError> =
             redeemed.recv_timeout(Duration::from_millis(wire::OPEN_CODE_LIFETIME_MS));
         if let Err(left) = std::fs::remove_file(&page) {

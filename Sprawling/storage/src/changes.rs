@@ -94,7 +94,6 @@ pub(crate) fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, StorageE
             .or_else(|| delta.old_file().path())
             .and_then(Path::to_str)
         else {
-
             continue;
         };
         #[expect(
@@ -102,7 +101,6 @@ pub(crate) fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, StorageE
             reason = "git2::Delta is an upstream open enum; every status we do not name is a change to content"
         )]
         let how = match delta.status() {
-
             git2::Delta::Added | git2::Delta::Copied | git2::Delta::Untracked => How::Added,
             git2::Delta::Deleted => How::Deleted,
             git2::Delta::Renamed => How::Renamed {
@@ -132,13 +130,11 @@ pub(crate) fn collect(diff: &git2::Diff<'_>) -> Result<Vec<FileChange>, StorageE
 }
 
 fn line_counts(diff: &git2::Diff<'_>) -> Result<Vec<(u32, u32)>, StorageError> {
-
     let counts = RefCell::new(vec![(0u32, 0u32); diff.deltas().len()]);
     let at = Cell::new(0usize);
     let started = Cell::new(false);
     diff.foreach(
         &mut |_, _| {
-
             if started.replace(true) {
                 at.set(at.get().saturating_add(1));
             }

@@ -18,7 +18,6 @@ pub(super) struct Doorstep {
 }
 
 impl Doorstep {
-
     pub(super) fn kept(door: wire::LocalDoor, port: u16, key: &str) -> Result<Self, AxError> {
         Ok(Self {
             door,
@@ -34,7 +33,6 @@ impl Doorstep {
 }
 
 impl super::Listening {
-
     #[must_use]
     pub fn local_addr(&self) -> std::net::SocketAddr {
         self.bound.local_addr()

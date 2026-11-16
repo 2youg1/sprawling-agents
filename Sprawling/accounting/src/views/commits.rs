@@ -26,7 +26,6 @@ pub(crate) struct CommitFacts {
 }
 
 impl CommitFacts {
-
     fn worked_under(&self, building: &Address) -> bool {
         let actor = self.actor.as_str();
         actor == building.as_str()
@@ -61,11 +60,9 @@ impl CommitFacts {
 }
 
 impl super::holding::Views {
-
     pub(super) fn fold_commit(&mut self, record: &EventRecord) -> Result<(), AxError> {
         if let Some((oid, mut facts)) = commit_facts(record)? {
             facts.previous = match self.commits.get(&oid) {
-
                 Some(first) => first.previous,
                 None => self.last_commit.get(&facts.run).copied(),
             };
@@ -232,7 +229,6 @@ enum Settled {
 }
 
 impl CommitsAsk {
-
     pub(super) fn read(self) -> wire::Answer {
         let CommitsAsk { city_root, settled } = self;
         match settled {

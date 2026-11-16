@@ -56,7 +56,6 @@ mod tests {
 
     #[test]
     fn the_decision_table_holds_in_order() {
-
         assert_eq!(
             decide(&DiscardRequest::Planned(clean(vec![addr("b/x.md")], 100))),
             DiscardVerdict::Allow
@@ -94,4 +93,3 @@ mod tests {
         );
     }
 }
-

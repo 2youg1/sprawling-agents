@@ -180,7 +180,6 @@ pub(super) struct Call {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub(super) enum Callee {
-
     Tool { id: String, name: Option<String> },
 
     Model { name: Option<String> },
@@ -285,7 +284,6 @@ pub(super) enum CallTrace {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub(super) enum Cited {
-
     At(Decimal),
 
     Elsewhere(Decimal),

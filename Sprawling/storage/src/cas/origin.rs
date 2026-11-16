@@ -17,7 +17,6 @@ pub struct BlockOrigin {
 }
 
 impl Cas {
-
     pub fn put_for(&mut self, bytes: &[u8], origin: &BlockOrigin) -> Result<B3Hash, StorageError> {
         let hash = self.put(bytes)?;
         let line = format!("{} {}", origin.run, origin.building.as_str());

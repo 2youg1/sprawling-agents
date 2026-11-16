@@ -17,10 +17,11 @@ const NOTE_EXT: &str = "md";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PromptDocument {
-
     Shipped(Shipped),
 
-    BuildingCity { building: Address },
+    BuildingCity {
+        building: Address,
+    },
 
     ModelNote {
         building: Option<Address>,
@@ -31,7 +32,6 @@ pub enum PromptDocument {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PromptStep {
-
     Own,
 
     Inherit,
@@ -46,7 +46,6 @@ pub struct PromptWritten {
 }
 
 impl PromptDocument {
-
     #[must_use]
     pub fn of(at: &Address) -> Option<PromptDocument> {
         let parts: Vec<&str> = at.as_str().split('/').collect();

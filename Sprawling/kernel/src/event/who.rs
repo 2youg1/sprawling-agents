@@ -17,7 +17,6 @@ const PERSON: &str = "person";
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Who {
-
     City,
 
     Person,
@@ -26,7 +25,6 @@ pub enum Who {
 }
 
 impl Who {
-
     pub fn resident(addr: Address) -> Result<Who, AxError> {
         if addr.as_str() == CITY || addr.as_str() == PERSON {
             return Err(AxError::failure(

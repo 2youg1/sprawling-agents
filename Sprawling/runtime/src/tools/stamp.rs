@@ -65,7 +65,6 @@ impl FileFacts {
 }
 
 impl Stamp {
-
     #[cfg_attr(
         not(any(windows, target_os = "linux", target_os = "macos", test)),
         expect(
@@ -95,7 +94,6 @@ impl Stamp {
 
     #[cfg(windows)]
     fn modified_ms(&self) -> Option<u64> {
-
         const UNIX_EPOCH: u64 = 116_444_736_000_000_000;
         let since_epoch = self.written?.checked_sub(UNIX_EPOCH)?;
         Some(since_epoch / 10_000)
@@ -156,7 +154,6 @@ pub struct ReadStamps {
 }
 
 impl ReadStamps {
-
     pub(crate) fn look(&self, at: &Address, before: Option<Stamp>, after: Option<Stamp>) {
         if let (Some(before), Some(after)) = (before, after)
             && before == after
@@ -182,7 +179,6 @@ pub(crate) enum Intent {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Admission {
-
     Lands,
 
     Unread,

@@ -19,7 +19,6 @@ pub const FREE_SPACE_FLOOR_MAX: u64 = 4 * 1024 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResourceReadings {
-
     pub durable_lag: Duration,
 
     pub commit_floor: Duration,

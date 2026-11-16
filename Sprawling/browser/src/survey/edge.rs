@@ -19,14 +19,12 @@ pub(super) fn every_population_agrees<'a>(page: &'a Page, out: &mut Vec<Deviatio
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Axis {
-
     Column,
 
     Row,
 }
 
 impl Axis {
-
     fn agrees_on(self, side: Side) -> bool {
         match (self, side) {
             (Axis::Column, Side::Left | Side::Right) => true,
@@ -123,7 +121,6 @@ fn boxes_that_share_a_holder<'a>(page: &'a Page, out: &mut Vec<Deviation<'a>>) {
         .iter()
         .filter(|held| held.shows() && held.parent >= 0)
     {
-
         families.entry(held.parent).or_default().push((0, held));
     }
     for children in families.values() {

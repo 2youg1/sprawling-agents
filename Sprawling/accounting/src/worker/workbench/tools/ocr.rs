@@ -17,7 +17,6 @@ use crate::worker::workbench::{Laying, Site};
 const ACTION: &str = "ocr";
 
 impl Laying {
-
     pub(super) fn ocr_tool(
         &self,
         site: &Site,
@@ -54,7 +53,6 @@ pub(super) struct OcrTool {
 }
 
 impl OcrTool {
-
     fn new(
         reader: runtime::BoundReader,
         policy: BuildingPolicy,

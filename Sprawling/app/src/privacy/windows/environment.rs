@@ -11,7 +11,6 @@ use super::registry::{self, Reading, WriteFault};
 const USER_ENVIRONMENT: &str = "Environment";
 
 pub(in crate::privacy) enum Written {
-
     Announced,
 
     Unannounced(kernel::AxError),

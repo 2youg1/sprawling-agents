@@ -30,7 +30,6 @@ pub(super) fn bronze_tier(px: u16, weight: u16, body: bool) -> Option<u16> {
     let rows: &[(u16, &[(u16, u16)])] = if body { &BRONZE_BODY } else { &BRONZE_CONTENT };
     rows.iter()
         .filter(|(_, mins)| {
-
             let floor = mins
                 .iter()
                 .filter(|(w, _)| *w <= weight)

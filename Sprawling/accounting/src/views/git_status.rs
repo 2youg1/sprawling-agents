@@ -16,7 +16,6 @@ pub struct GitStatusAsk {
 }
 
 impl Views {
-
     pub(super) fn git_status_ask(&self, building: &Address) -> Result<GitStatusAsk, AxError> {
         Ok(GitStatusAsk {
             city_root: self.city_root.clone(),
@@ -32,7 +31,6 @@ impl Views {
 }
 
 impl GitStatusAsk {
-
     pub(super) fn read(self) -> wire::Answer {
         let Ok(status) = storage::working_status(
             &self.city_root,

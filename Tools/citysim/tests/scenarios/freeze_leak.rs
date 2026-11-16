@@ -54,7 +54,6 @@ fn a_thousand_freezes_leave_the_same_thing_behind_as_the_first() {
 
 #[test]
 fn a_resume_is_a_new_run_every_time_and_never_the_old_one() {
-
     let handoff = handoff_of(0);
     for session in 0..SESSIONS {
         let mut bytes = [0u8; 16];
@@ -67,7 +66,6 @@ fn a_resume_is_a_new_run_every_time_and_never_the_old_one() {
 
 #[test]
 fn a_handoff_that_asks_for_nothing_cannot_be_built_however_many_times_it_is_tried() {
-
     for _ in 0..SESSIONS {
         assert!(
             Handoff::new(

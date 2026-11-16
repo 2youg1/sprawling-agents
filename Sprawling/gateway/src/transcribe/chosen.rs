@@ -18,7 +18,6 @@ pub fn transcriber_for(
 ) -> Result<Transcriber, AxError> {
     Transcriber::attach(
         TranscriberConfig {
-
             base_url: chosen.endpoint.base_url.clone(),
             model: chosen.entry.id.clone(),
             auth: chosen.endpoint.first_auth()?,

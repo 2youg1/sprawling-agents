@@ -223,7 +223,6 @@ fn watch(watching: &Watching, audience: Audience, out: &mut impl Write) -> Resul
 }
 
 impl Host {
-
     fn here() -> Host {
         Host {
             cores: std::thread::available_parallelism().unwrap_or(NonZeroUsize::MIN),

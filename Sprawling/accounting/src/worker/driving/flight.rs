@@ -35,7 +35,6 @@ struct Driving {
 
 #[derive(Debug)]
 pub(crate) enum Landed {
-
     Nothing,
 
     Row { addr: Address, node: NodeId },
@@ -58,7 +57,6 @@ pub(in crate::worker) struct Flight {
 }
 
 impl Flight {
-
     pub(in crate::worker) fn open(
         read_memory: fn() -> crate::worker::pool::Memory,
         monotonic: fn() -> std::time::Instant,
@@ -171,7 +169,6 @@ struct Home {
 }
 
 impl RunWorker {
-
     pub(in crate::worker) fn serve_flight(
         &mut self,
         patience: Patience,

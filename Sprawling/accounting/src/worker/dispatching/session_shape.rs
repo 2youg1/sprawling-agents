@@ -12,7 +12,6 @@ use super::super::{Assignment, RunWorker};
 mod tests;
 
 impl RunWorker {
-
     pub(super) fn choose_shape(
         &mut self,
         at: &Assignment,

@@ -10,7 +10,6 @@ use super::flight::InLane;
 use crate::worker::dispatching::preparing::Staged;
 
 impl RunWorker {
-
     pub(in crate::worker) fn dispatch_into_lane(
         &mut self,
         at: super::super::Assignment,

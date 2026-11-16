@@ -5,7 +5,6 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
-
     Rejected,
 
     Broken,
@@ -14,7 +13,6 @@ pub enum Severity {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("{code} {action}: {subject}; {recovery}")]
 pub struct BenchError {
-
     pub code: &'static str,
 
     pub action: String,
@@ -27,7 +25,6 @@ pub struct BenchError {
 }
 
 impl BenchError {
-
     pub(crate) fn input(action: &str, subject: String, recovery: &str) -> Self {
         Self::new(
             "E_INVALID_INPUT",

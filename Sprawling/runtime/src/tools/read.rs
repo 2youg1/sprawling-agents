@@ -34,7 +34,6 @@ pub struct RuleCandidate {
 }
 
 impl RuleCandidate {
-
     #[must_use]
     pub fn into_json(self) -> Value {
         let mut rule = Map::new();
@@ -103,7 +102,6 @@ pub type RuleCandidates = Arc<
 const LINE_CAP: u16 = 512;
 
 enum Found {
-
     Chosen(kernel::Address),
 
     Text(String),
@@ -126,7 +124,6 @@ struct Taken {
 }
 
 impl Interval {
-
     fn asked_for(call: &ToolCall) -> Result<Interval, AxError> {
         let args = call.args.as_map();
         let whole = |field: &'static str| -> Result<Option<u64>, AxError> {
@@ -229,7 +226,6 @@ impl Interval {
 }
 
 pub struct ReadTool {
-
     catalog: Arc<Mutex<Catalog>>,
 
     reader: BoundReader,
@@ -246,7 +242,6 @@ pub struct ReadTool {
 }
 
 impl ReadTool {
-
     pub const NAME: &'static str = "read";
 
     pub const FILE_PATH: &'static str = "file_path";

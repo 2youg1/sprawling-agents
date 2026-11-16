@@ -7,7 +7,6 @@ use kernel::event::record::{EndpointProbed, ProbeFailure};
 use kernel::{AxCode, AxError, Payload, Proxying, Reach};
 
 pub(super) struct Probing {
-
     pub(super) reach: Reach,
 
     pub(super) served: Result<Vec<gateway::ModelFacts>, AxError>,
@@ -42,7 +41,6 @@ pub(super) fn probed_payload(
     base_url: &str,
     found: Probing,
 ) -> Result<Payload, AxError> {
-
     let (facts, failed) = match found.served {
         Ok(rows) => (rows, None),
         Err(err) => (

@@ -22,14 +22,12 @@ pub struct Mount {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GuestMemory {
-
     Wasm32,
 
     Ceiling(NonZeroU64),
 }
 
 impl GuestMemory {
-
     #[must_use]
     pub fn of_shares(shares: Shares) -> GuestMemory {
         match shares {
@@ -155,7 +153,6 @@ pub fn assert_sandbox_conformance<S: Sandbox>(sandbox: &mut S, job: &SandboxJob)
     let second = sandbox.run(job);
     match (first, second) {
         (Ok(one), Ok(two)) => {
-
             assert!(
                 matches!(
                     one.exit,

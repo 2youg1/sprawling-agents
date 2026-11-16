@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case", tag = "state", content = "detail")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Named {
-
     Resolved(u32),
 
     NotFound,
@@ -37,7 +36,6 @@ pub enum Connected {
 #[serde(rename_all = "snake_case", tag = "state", content = "detail")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Answered {
-
     Status(u16),
 
     NameNotUsable(String),
@@ -51,7 +49,6 @@ pub enum Answered {
 #[serde(rename_all = "snake_case", tag = "state", content = "detail")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Through {
-
     Direct,
 
     Environment(String),
@@ -67,7 +64,6 @@ pub enum Through {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Proxying {
-
     #[default]
     ExceptLocal,
 
@@ -89,7 +85,6 @@ pub struct Reach {
 }
 
 impl Reach {
-
     pub fn answered_at_all(&self) -> bool {
         matches!(self.answered, Answered::Status(_))
     }

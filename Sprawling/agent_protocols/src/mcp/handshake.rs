@@ -12,7 +12,6 @@ pub const PROTOCOL_VERSION: &str = "2025-06-18";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Handshake {
-
     pub protocol_version: String,
 
     pub server: String,

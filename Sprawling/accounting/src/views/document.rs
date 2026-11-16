@@ -14,7 +14,6 @@ use super::listing::resolve;
 use super::prepared::Prepared;
 
 impl Views {
-
     pub(in crate::views) fn document_ask(&self, at: &Address) -> Prepared {
         Prepared::Document {
             city_root: self.city_root.clone(),

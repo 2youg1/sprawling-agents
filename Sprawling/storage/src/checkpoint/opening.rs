@@ -13,7 +13,6 @@ use crate::error::StorageError;
 use super::commit::{Checkpoint, git_err};
 
 pub(crate) enum IndexOwner {
-
     City,
 
     Writer(PathBuf),
@@ -55,7 +54,6 @@ fn writers_dir(root: &Path) -> PathBuf {
 }
 
 impl Checkpoint {
-
     pub fn open(city_root: &Path) -> Result<Checkpoint, StorageError> {
         let repo = match git2::Repository::open(city_root) {
             Ok(repo) => repo,

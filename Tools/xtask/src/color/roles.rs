@@ -15,26 +15,19 @@ use crate::walk::CLIENT_SRC as VIEWS;
 const VIEW_EXTS: [&str; 4] = ["svelte", "ts", "html", "css"];
 
 const ROLES: [&str; 22] = [
-
     "page",
     "chrome",
     "raised",
     "raised-hover",
-
     "glass",
-
     "speech",
     "track",
     "disabled",
-
     "mark",
-
     "edge",
     "edge-panel",
     "edge-input",
-
     "on-accent",
-
     "drawn-hollow",
     "drawn-solid",
     "drawn-solid-lit",

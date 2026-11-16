@@ -11,14 +11,12 @@ const MARK_EVERY: u64 = 10;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Numbering {
-
     FromZero,
 
     FromOne,
 }
 
 impl Numbering {
-
     #[must_use]
     pub fn of(rendering: Rendering) -> Numbering {
         match rendering {
@@ -229,14 +227,12 @@ pub struct Copied<'a> {
 }
 
 struct CopiedLine<'a> {
-
     whole: &'a str,
 
     mark: Option<(u64, &'a str)>,
 }
 
 impl<'a> Copied<'a> {
-
     #[must_use]
     pub fn of(text: &'a str, numbering: Numbering) -> Copied<'a> {
         let lines = text

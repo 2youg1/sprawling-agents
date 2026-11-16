@@ -18,7 +18,6 @@ use super::name::WorktreeName;
 use super::trees::Worktrees;
 
 impl Worktrees {
-
     pub fn claim_at(
         &self,
         name: &WorktreeName,
@@ -50,7 +49,6 @@ impl Worktrees {
         match self.add_tree(name, Some(branch.get()), &city) {
             Ok(lease) => Ok(lease),
             Err(refusal) => {
-
                 let mut branch = branch;
                 branch.delete().map_err(|err| StorageError::Worktree {
                     op: "remove the branch of a tree that did not open",

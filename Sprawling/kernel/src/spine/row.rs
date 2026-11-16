@@ -32,7 +32,6 @@ pub const ROADMAP_COLUMNS: usize = 6;
 pub const ROADMAP_FILE: &str = "Roadmap.md";
 
 impl RoadmapStatus {
-
     #[must_use]
     pub fn spelling(self) -> &'static str {
         ROADMAP_STATUS_SPELLINGS

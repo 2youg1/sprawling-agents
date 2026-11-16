@@ -18,7 +18,6 @@ const BETWEEN_READS: Duration = Duration::from_millis(20);
 pub(super) struct Aim(pub(super) usize);
 
 impl Aim {
-
     const NOWHERE: Aim = Aim(0);
 
     pub(super) fn of(window: &winsafe::HWND) -> Aim {

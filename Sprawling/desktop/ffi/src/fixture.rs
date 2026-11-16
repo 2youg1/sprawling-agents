@@ -33,7 +33,6 @@ pub struct Opened {
 }
 
 impl Opened {
-
     pub fn at(title: &str, left: i32, top: i32, button: Option<&str>) -> Opened {
         let (sent, opened) = mpsc::channel();
         let title = title.to_owned();
@@ -76,7 +75,6 @@ impl Drop for Opened {
     reason = "a handle is minted from an address only through the binding's unsafe constructor"
 )]
 pub fn made_up(address: usize) -> winsafe::HWND {
-
     unsafe { winsafe::HWND::from_ptr(std::ptr::without_provenance_mut(address)) }
 }
 
@@ -138,7 +136,6 @@ fn pump() {
     let mut message = MSG::default();
 
     while unsafe { GetMessageW(&raw mut message, None, 0, 0) }.0 > 0 {
-
         unsafe {
             let _translated = TranslateMessage(&raw const message);
             DispatchMessageW(&raw const message);
@@ -148,7 +145,6 @@ fn pump() {
 
 #[expect(unsafe_code, reason = "destroying a window is an FFI entry point")]
 fn close(handle: HWND) {
-
     unsafe { DestroyWindow(handle) }.unwrap();
 }
 
@@ -157,7 +153,6 @@ fn close(handle: HWND) {
     reason = "a thread's id is read through an FFI entry point"
 )]
 fn this_thread() -> u32 {
-
     unsafe { GetCurrentThreadId() }
 }
 
@@ -166,6 +161,5 @@ fn this_thread() -> u32 {
     reason = "posting a message to a thread is an FFI entry point"
 )]
 fn quit(thread: u32) {
-
     unsafe { PostThreadMessageW(thread, WM_QUIT, WPARAM(0), LPARAM(0)) }.unwrap();
 }

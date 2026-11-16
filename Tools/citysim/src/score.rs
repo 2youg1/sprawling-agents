@@ -7,7 +7,6 @@ use kernel::ByteLen;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct AssetUse {
-
     pub uses: u32,
 
     pub resident: ByteLen,
@@ -17,7 +16,6 @@ pub struct AssetUse {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Score {
-
     pub per_mille: u32,
 
     pub idle_days: u32,

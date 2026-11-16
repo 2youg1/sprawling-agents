@@ -80,7 +80,6 @@ pub struct UtcSpan {
 }
 
 impl UtcSpan {
-
     pub fn new(since: Option<TimeMs>, until: Option<TimeMs>) -> Result<UtcSpan, AxError> {
         if let (Some(start), Some(end)) = (since, until)
             && end <= start
@@ -128,7 +127,6 @@ pub struct ClockStamp {
 }
 
 impl ClockStamp {
-
     pub fn render(&self) -> String {
         let mut out = format!("clock: {};", iso(self.utc_ms));
         for zone in &self.zones {
@@ -225,7 +223,6 @@ pub struct StampGate {
 }
 
 impl StampGate {
-
     pub fn new(granularity: ClockStampGranularity, zones: Vec<ClockZone>) -> StampGate {
         StampGate {
             granularity,
@@ -269,7 +266,6 @@ impl StampGate {
 pub struct ClockReading(Arc<Mutex<Option<TimeMs>>>);
 
 impl ClockReading {
-
     pub fn keep(&self, at: TimeMs) {
         *self.0.lock().unwrap_or_else(PoisonError::into_inner) = Some(at);
     }
@@ -321,7 +317,6 @@ mod tests {
 
     #[test]
     fn a_zone_row_is_the_same_second_with_its_offset_across_midnight_both_ways() {
-
         let west = ClockZone {
             id: "west".to_owned(),
             offset_min: -780,

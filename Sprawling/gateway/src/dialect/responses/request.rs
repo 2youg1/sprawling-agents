@@ -92,7 +92,6 @@ fn user_items(
             ContentBlock::ToolResult { attachments, .. }
                 if carry == ToolPictureCarry::FollowingUser =>
             {
-
                 for picture in attachments {
                     parts.push(image_part(picture, images)?);
                 }

@@ -47,7 +47,6 @@ pub fn prefix(mother: &VerifiedLedger, at_seq: Seq) -> Result<Vec<Vec<u8>>, AxEr
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Inherited {
-
     pub messages: Vec<ChatMessage>,
 
     pub at: Seq,
@@ -87,7 +86,6 @@ fn fold_run<'a>(
                 at = record.seq();
             }
             EventKind::ModelReturned => {
-
                 let committed = commit(&mut conversation, open.take())?;
                 delivered.extend(committed.rooms);
                 rule_warnings.extend(committed.warnings);
@@ -206,27 +204,21 @@ fn fold_run<'a>(
             | EventKind::AdviserFellBack
             | EventKind::CacheRenewed
             | EventKind::PrefixHeld
-
             | EventKind::HarnessReported
             | EventKind::HarnessAnswered
-
             | EventKind::RemoteOpened
             | EventKind::RemoteClosed
             | EventKind::DevicePaired
             | EventKind::DeviceRevoked
             | EventKind::RemoteSessionStarted
-
             | EventKind::DocumentWritten
             | EventKind::ProposalOffered
             | EventKind::ProposalDecided
             | EventKind::ProposalWithdrawn
-
             | EventKind::RunPolicyChanged
-
             | EventKind::SessionNamed
             | EventKind::SkillAudited
             | EventKind::SkillShelved
-
             | EventKind::SignalWaitStarted
             | EventKind::SignalWaitEnded => {}
         }
@@ -267,7 +259,6 @@ struct Wave {
 }
 
 impl Wave {
-
     fn remember_rules(&mut self, result: &ToolResult) {
         if result.name.as_str() != crate::tools::ReadTool::NAME {
             return;

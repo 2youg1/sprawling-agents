@@ -15,7 +15,6 @@ pub struct Committed {
 }
 
 impl Committed {
-
     pub fn new(record: EventRecord) -> Result<Self, AxError> {
         let unframed = |detail: String| {
             AxError::failure(AxCode::WireMismatch, "frame a committed record", detail)

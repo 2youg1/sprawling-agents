@@ -19,7 +19,6 @@ pub enum Governed {
 }
 
 impl Governed {
-
     #[must_use]
     pub fn file(self) -> &'static str {
         match self {

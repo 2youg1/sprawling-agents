@@ -13,7 +13,6 @@ pub const TRACKING_MIN: i32 = -50;
 pub struct Tracking(i32);
 
 impl Tracking {
-
     pub fn new(per_mille: i32) -> Result<Self, AxError> {
         if per_mille < TRACKING_MIN {
             return Err(AxError::failure(

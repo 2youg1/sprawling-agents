@@ -20,7 +20,6 @@ const AT: char = ':';
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Scope {
-
     City,
 
     Building(Address),
@@ -29,7 +28,6 @@ pub enum Scope {
 }
 
 impl Scope {
-
     #[must_use]
     pub fn covers(&self, addr: &Address) -> bool {
         match self {

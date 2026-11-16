@@ -41,7 +41,6 @@ pub(crate) const PATIENCE: std::time::Duration = std::time::Duration::from_secs(
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Tier {
-
     Use,
 
     Develop,
@@ -69,12 +68,10 @@ pub(crate) enum Need {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Group {
-
     BrowserEngine,
 }
 
 impl Group {
-
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Group::BrowserEngine => "a browser engine",
@@ -90,7 +87,6 @@ pub enum Platform {
 }
 
 impl Platform {
-
     #[cfg(test)]
     pub(crate) const ALL: [Platform; 3] = [Platform::Windows, Platform::MacOs, Platform::Linux];
 
@@ -139,7 +135,6 @@ impl<T> PerPlatform<T> {
 }
 
 pub(crate) enum Detection {
-
     Program {
         program: &'static str,
         version_arg: &'static str,
@@ -162,11 +157,15 @@ pub(crate) enum Detection {
         fallback: PerPlatform<&'static str>,
     },
 
-    Built { carried: bool },
+    Built {
+        carried: bool,
+    },
 
     Family(Family),
 
-    Font { files: &'static [&'static str] },
+    Font {
+        files: &'static [&'static str],
+    },
 }
 
 pub(crate) struct Requirement {
@@ -210,7 +209,6 @@ pub(crate) fn examine_each<E>(
         for (index, requirement) in REQUIREMENTS.iter().enumerate() {
             let arrived = arrived.clone();
             scope.spawn(move || {
-
                 let presence = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     machine.look(requirement)
                 }))

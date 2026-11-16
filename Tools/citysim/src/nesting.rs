@@ -13,7 +13,6 @@ use reading::{read, stops_early};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Shape {
-
     Toml,
 
     Json,
@@ -22,7 +21,6 @@ pub enum Shape {
 }
 
 impl Shape {
-
     pub const ALL: [Shape; 3] = [Shape::Toml, Shape::Json, Shape::Markdown];
 
     #[must_use]
@@ -37,7 +35,6 @@ impl Shape {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Fault {
-
     LostField,
 
     ChangedBystander,
@@ -50,7 +47,6 @@ pub enum Fault {
 }
 
 impl Fault {
-
     pub const ALL: [Fault; 5] = [
         Fault::LostField,
         Fault::ChangedBystander,
@@ -90,7 +86,6 @@ pub fn grade(attempt: &Attempt) -> Result<Verdict, AxError> {
         .with_recovery("the fixture's own `before` does not parse; fix the corpus, not the model")
     })?;
     let Some(after) = read(attempt.shape, &attempt.returned) else {
-
         let fault = if stops_early(attempt.shape, &attempt.returned) {
             Fault::Truncated
         } else {
@@ -144,7 +139,6 @@ pub struct Grades {
 }
 
 impl Grades {
-
     #[must_use]
     pub fn wrong_per_mille(&self) -> u32 {
         if self.tried == 0 {
@@ -186,7 +180,6 @@ pub fn recommended(grades: &[Grades]) -> Option<Shape> {
         .iter()
         .filter(|held| held.tried > 0)
         .min_by_key(|held| {
-
             let worst = Fault::ALL
                 .iter()
                 .position(|fault| held.faults.contains_key(fault))

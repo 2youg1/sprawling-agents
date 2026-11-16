@@ -13,7 +13,6 @@ pub struct Citation {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Reading {
-
     Holds,
 
     OtherVersion,

@@ -13,7 +13,6 @@ use super::super::RunWorker;
 use crate::views::document::keep;
 
 impl RunWorker {
-
     pub(in crate::worker) fn put_range(&mut self, write: &wire::RangeWrite) -> Result<(), AxError> {
         let to = self.destination(&write.doc)?;
         let applied = city::revise_document(&to.path, |held, source| {
@@ -107,7 +106,6 @@ struct Destination {
 }
 
 impl Destination {
-
     fn admits(&self, bytes: &[u8]) -> Result<(), AxError> {
         self.listed.as_ref().map_or(Ok(()), |doc| doc.admits(bytes))
     }

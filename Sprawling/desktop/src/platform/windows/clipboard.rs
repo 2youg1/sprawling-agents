@@ -156,7 +156,6 @@ mod tests {
     fn text_written_to_the_clipboard_reads_back_as_itself() {
         let _pair = pair_turn();
         let Ok(before) = read() else {
-
             return;
         };
         let written = "sprawling desktop connector — round trip 🌍";
@@ -180,7 +179,6 @@ mod tests {
     fn concurrent_threads_each_read_back_a_text_some_thread_wrote() {
         let _pair = pair_turn();
         let Ok(before) = read() else {
-
             return;
         };
         const THREADS: usize = 4;
@@ -193,7 +191,6 @@ mod tests {
                 let every = &texts;
                 threads.spawn(move || {
                     for _round in 0..ROUNDS {
-
                         let taken = despite_contention(|| write(mine).and_then(|()| read()));
                         let seen = taken.expect("a text just written is there");
                         assert!(

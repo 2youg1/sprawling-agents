@@ -103,14 +103,12 @@ impl Topology {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Plan {
-
     Seats(Vec<Processor>),
     LeftToOs(Left),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Left {
-
     OneClass,
 
     Inconsistent,

@@ -30,7 +30,6 @@ pub(crate) struct Control {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Written {
-
     Dword(u32),
 
     Text(&'static str),
@@ -144,7 +143,6 @@ pub(crate) const fn definition(control: PrivacyControl) -> &'static Control {
 }
 
 impl Written {
-
     pub(crate) fn target(self, current: &Snapshot) -> Option<Snapshot> {
         match self {
             Self::Dword(value) => Some(Snapshot::Registry(RawValue::dword(value))),
@@ -163,7 +161,6 @@ impl Written {
 }
 
 impl Editions {
-
     pub(crate) fn fit(&self, edition: Option<PrivacyEdition>) -> PrivacyEditionFit {
         match edition {
             Some(edition) if self.honoured.contains(&edition) => PrivacyEditionFit::Honoured,

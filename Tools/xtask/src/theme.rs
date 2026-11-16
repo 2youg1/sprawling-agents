@@ -33,7 +33,6 @@ pub(crate) fn is_theme(rel: &str) -> bool {
 }
 
 impl Theme {
-
     pub(crate) fn read(root: &Path) -> Result<Self, XtaskError> {
         let entry = walk::read_text(&root.join(ENTRY))?;
         let mut parts = Vec::new();

@@ -6,6 +6,5 @@
 use kernel::{AxError, TimeMs};
 
 pub trait Clock {
-
     fn now(&self) -> Result<TimeMs, AxError>;
 }

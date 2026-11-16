@@ -11,12 +11,10 @@ use super::name::WorktreeName;
 use super::trees::{WORKTREE_DIR, Worktrees, open_city};
 
 impl Worktrees {
-
     pub fn sweep_abandoned(
         city_root: &Path,
         held: &[WorktreeName],
     ) -> Result<Vec<WorktreeName>, StorageError> {
-
         let repo = match open_city(city_root) {
             Ok(repo) => repo,
             Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(Vec::new()),

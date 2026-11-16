@@ -7,7 +7,6 @@ use super::prepared::LiveAsk;
 use crate::toolkit_broker::broker_for;
 
 impl LiveAsk {
-
     pub(super) fn toolkits_answer(&self) -> wire::ToolkitsAnswer {
         let held = match broker_for(self.vault.as_ref(), self.city.as_ref()) {
             Ok(Some(held)) => held,

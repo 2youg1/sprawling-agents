@@ -49,7 +49,6 @@ pub struct EndpointAttached {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AttachedTuning {
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accounts: Option<Vec<super::ProviderAccount>>,
     #[serde(
@@ -197,7 +196,6 @@ pub struct ModelSelected {
 }
 
 impl ModelSelected {
-
     #[must_use]
     pub fn ceiling(&self) -> Option<Ceiling> {
         self.max_output_tokens.and_then(Ceiling::new)

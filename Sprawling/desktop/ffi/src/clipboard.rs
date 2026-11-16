@@ -18,7 +18,6 @@ const FIRST_ROOM: usize = 4_096;
 const ATTEMPTS: u8 = 4;
 
 pub fn text() -> Result<Option<Vec<u16>>, Failure> {
-
     let _turn = TURN.lock().unwrap_or_else(PoisonError::into_inner);
     let mut room = FIRST_ROOM;
     let mut found = 0;

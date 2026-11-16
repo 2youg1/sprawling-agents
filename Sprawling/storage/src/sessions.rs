@@ -38,7 +38,6 @@ struct Open {
 }
 
 impl Sessions {
-
     pub(crate) fn for_ledger(dir: &Path) -> Option<Sessions> {
         let layout = CityLayout::of_ledger(dir)?;
         let city = layout.city_address();
@@ -114,7 +113,6 @@ impl Sessions {
             .map_err(io_err("read a session slice", path))?;
         let (lines, consumed) = complete_lines(&bytes);
         if consumed < bytes.len() {
-
             let len = u64::try_from(consumed).unwrap_or(u64::MAX);
             self.vfs
                 .truncate(path, len)
@@ -177,7 +175,6 @@ impl Sessions {
         found: &[(Seq, Vec<u8>)],
     ) -> Result<Open, StorageError> {
         let Some((first_seq, _)) = found.first() else {
-
             return Ok(Open {
                 addr: addr.clone(),
                 last: None,

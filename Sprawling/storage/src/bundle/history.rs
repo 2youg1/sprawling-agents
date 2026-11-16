@@ -33,7 +33,6 @@ pub(crate) struct Carried {
 }
 
 impl Carried {
-
     pub(crate) fn of(vfs: &dyn Vfs, bundle: &Path) -> Result<Carried, StorageError> {
         let dir = bundle.join(HISTORY);
         let at = dir.join(REFS);
@@ -113,7 +112,6 @@ pub(crate) struct History {
 }
 
 impl History {
-
     pub(crate) fn read(
         vfs: &dyn Vfs,
         bundle: &Path,
@@ -159,7 +157,6 @@ impl History {
             };
             (pack, text, at)
         } else {
-
             for borrowed in [
                 whole.join("objects").join("info").join("alternates"),
                 whole.join("commondir"),

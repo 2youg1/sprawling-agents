@@ -20,7 +20,6 @@ pub struct Selection {
 }
 
 impl Selection {
-
     #[must_use]
     pub fn everything() -> Selection {
         Selection {
@@ -107,7 +106,6 @@ pub struct Window<'a> {
 }
 
 impl Window<'_> {
-
     pub fn span(&self) -> Result<UtcSpan, AxError> {
         let day = self.day.map(day_of).transpose()?;
         let since = self.since.map(parse_iso).transpose()?;

@@ -10,7 +10,6 @@ use kernel::AxError;
 use crate::worker::workbench::{Laying, Site};
 
 impl Laying {
-
     pub(super) fn endpoint_tools(
         &self,
         site: &Site,

@@ -184,7 +184,6 @@ impl Vfs for RealFs {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SegmentDurability {
-
     SyncData,
 
     #[expect(

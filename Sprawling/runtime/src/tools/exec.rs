@@ -48,7 +48,6 @@ pub struct PythonGuest {
 }
 
 impl PythonGuest {
-
     pub fn at(wasm: PathBuf) -> PythonGuest {
         let stdlib = wasm.parent().unwrap_or_else(|| Path::new("")).join("lib");
         PythonGuest::with_stdlib(wasm, stdlib)
@@ -100,7 +99,6 @@ pub struct ExecTool {
 }
 
 impl ExecTool {
-
     pub fn definition(disclosure: String) -> Result<ToolDef, AxError> {
         Ok(ToolDef {
             name: ToolName::parse("exec")?,
@@ -331,7 +329,6 @@ impl Tool for ExecTool {
         crate::mode::mode_admits(&self.setup.policy.now(), kernel::ToolName::EXEC)?;
         let placement = parse_placement(call.args.as_map())?.opened_by(&self.setup)?;
         let answer = match parse_arm(call.args.as_map())? {
-
             ExecArm::Shell { text } if self.setup.shell == Shell::Absent => {
                 let (path, args) = program_line::program_line(&text)?;
                 self.run_program(&path, &args, placement)

@@ -93,7 +93,6 @@ impl Folded {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct RunTable {
-
     runs: Vec<RunSpans>,
 }
 
@@ -202,7 +201,6 @@ impl RunSpans {
 }
 
 impl Span {
-
     fn place(&self, seq: Seq) -> Ordering {
         if seq < self.start {
             Ordering::Greater

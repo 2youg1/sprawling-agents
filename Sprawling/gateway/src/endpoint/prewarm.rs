@@ -27,7 +27,6 @@ pub(super) struct Prewarming {
 }
 
 impl Endpoint {
-
     pub(super) fn prewarm_for(
         &self,
         account: Option<&kernel::ServerLabel>,

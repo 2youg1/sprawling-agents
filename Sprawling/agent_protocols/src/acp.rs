@@ -15,7 +15,6 @@ pub struct Incoming {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Admitted {
-
     Dispatch {
         addr: Address,
         task: String,
@@ -24,7 +23,6 @@ pub enum Admitted {
 }
 
 impl Incoming {
-
     pub fn parse(body: &Value) -> Result<Incoming, AxError> {
         let text = |key: &str| -> Result<String, AxError> {
             body.get(key)
@@ -72,7 +70,6 @@ pub struct Progress {
 }
 
 impl Progress {
-
     #[must_use]
     pub fn to_body(&self) -> Value {
         serde_json::json!({

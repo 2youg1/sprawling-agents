@@ -39,7 +39,6 @@ pub struct ModelRequest<'a> {
 }
 
 impl ModelRequest<'_> {
-
     pub fn into_owned(self) -> ModelRequest<'static> {
         ModelRequest {
             policy: self.policy,
@@ -59,7 +58,6 @@ pub struct ModelReturn {
 }
 
 impl ModelReturn {
-
     pub fn bare(message: Payload, calls: Vec<ToolCall>) -> ModelReturn {
         ModelReturn {
             message,

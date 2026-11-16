@@ -13,7 +13,6 @@ use crate::error::StorageError;
 use super::trees::Worktrees;
 
 pub struct Landing<'a> {
-
     pub t: TimeMs,
     pub of: &'a Provenance,
     pub subject: &'a str,
@@ -21,7 +20,6 @@ pub struct Landing<'a> {
 }
 
 impl Landing<'_> {
-
     pub(super) fn reviewer(&self, city_root: &Path) -> String {
         if !self.reviewed_by_person {
             return String::new();
@@ -44,7 +42,6 @@ impl Landing<'_> {
 }
 
 pub struct PlannedMerge<'a> {
-
     pub(super) trees: &'a Worktrees,
     pub(super) target: git2::Oid,
 }
@@ -58,7 +55,6 @@ impl std::fmt::Debug for PlannedMerge<'_> {
 }
 
 impl PlannedMerge<'_> {
-
     pub fn commit(&self) -> String {
         self.target.to_string()
     }

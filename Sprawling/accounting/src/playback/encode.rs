@@ -15,7 +15,6 @@ pub struct Bundle {
 }
 
 impl Bundle {
-
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
         &self.bytes

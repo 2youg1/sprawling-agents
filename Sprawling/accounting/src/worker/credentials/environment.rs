@@ -12,7 +12,6 @@ use super::{
 use crate::worker::commanding::door::{InHand, KeptRefusal};
 
 impl RunWorker {
-
     fn seed_from_environment(&mut self, base_url: &str, model: &str) -> Result<(), AxError> {
         let facts = local_model_facts(model)?;
         let (reply, refusal) = KeptRefusal::open();

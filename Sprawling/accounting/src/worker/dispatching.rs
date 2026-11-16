@@ -6,7 +6,6 @@
 use kernel::{Address, AxError, Locator, RunId};
 
 pub(super) struct Assignment {
-
     pub(super) addr: Address,
 
     pub(super) session: Option<kernel::SessionName>,
@@ -56,7 +55,6 @@ pub(super) struct Given {
 }
 
 impl super::RunWorker {
-
     pub(super) fn give(
         &mut self,
         at: &Assignment,
@@ -100,7 +98,6 @@ pub(super) struct Agreed {
 }
 
 pub(super) enum Seat {
-
     Model(Agreed),
 
     Harness(HarnessSeat),
@@ -113,7 +110,6 @@ pub(super) struct HarnessSeat {
 }
 
 impl Seat {
-
     pub(super) fn building(&self) -> &city::Building {
         match self {
             Seat::Model(agreed) => &agreed.building,

@@ -62,7 +62,6 @@ fn exactly_one_door_asks_a_person() {
 
 #[test]
 fn gate_code_carriers_all_point_at_gate_denied() {
-
     use kernel::{AxCode, Carrier, EventKind};
     for code in [
         AxCode::OutsideWriteDomain,

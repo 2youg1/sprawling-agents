@@ -61,7 +61,6 @@ impl LazyEngine {
                 Err(refusal) => {
                     last = Some(refusal);
                     if knock.saturating_add(1) < STARTUP_KNOCKS {
-
                         std::thread::sleep(BETWEEN_KNOCKS);
                     }
                 }

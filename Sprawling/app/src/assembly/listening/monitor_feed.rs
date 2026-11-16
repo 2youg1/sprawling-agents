@@ -23,7 +23,6 @@ pub(super) fn watched(
     Ok(wire::MonitorFeed {
         beat: Arc::new(move |chosen| beat.set(chosen)),
         watch: Arc::new(move |watched| -> Box<dyn Send> {
-
             let held = monitor
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);

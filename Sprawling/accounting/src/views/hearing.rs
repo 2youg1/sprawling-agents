@@ -8,12 +8,10 @@ use kernel::AxError;
 use super::holding::Views;
 
 impl Views {
-
     pub fn transcriber(
         &self,
         secrets: gateway::SecretResolver,
     ) -> Result<gateway::Transcriber, AxError> {
-
         let chosen = self.book.select(
             kernel::ModelTag::Transcribe,
             &kernel::BuildingPolicy::new(false),

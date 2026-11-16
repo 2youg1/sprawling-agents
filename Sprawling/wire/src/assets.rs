@@ -7,7 +7,6 @@ use kernel::{AxCode, AxError};
 
 #[derive(Debug, Clone, Copy)]
 pub struct EmbeddedFile {
-
     pub path: &'static str,
 
     pub gz: &'static [u8],
@@ -15,7 +14,6 @@ pub struct EmbeddedFile {
 
 #[derive(Debug)]
 pub enum ClientAssets {
-
     Embedded(&'static [EmbeddedFile]),
 
     Disk(std::path::PathBuf),
@@ -33,7 +31,6 @@ pub enum AssetReply {
 }
 
 impl ClientAssets {
-
     #[must_use]
     pub fn lookup(&self, request_path: &str) -> AssetReply {
         let Some(rel) = sanitize_asset_path(request_path) else {

@@ -11,7 +11,6 @@ use super::barrier::Barrier;
 use super::ledger::{JsonlLedger, SegmentPreallocation};
 
 impl JsonlLedger {
-
     pub(crate) fn write_wave(
         &mut self,
         writes: &[(PathBuf, u64, Vec<u8>)],

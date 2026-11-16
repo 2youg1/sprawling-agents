@@ -17,7 +17,6 @@ pub struct HistoryAnswer {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HistoryRangeAnswer {
-
     pub from: Seq,
 
     pub to: Seq,

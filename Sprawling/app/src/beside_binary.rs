@@ -9,7 +9,6 @@ use kernel::{AxCode, AxError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Homing {
-
     NothingBeside,
 
     Moved {
@@ -18,7 +17,10 @@ pub enum Homing {
         relinked: Result<usize, AxError>,
     },
 
-    OnAnotherVolume { at: PathBuf, home: PathBuf },
+    OnAnotherVolume {
+        at: PathBuf,
+        home: PathBuf,
+    },
 }
 
 pub fn bring_home(exe_dir: &Path, to: &Path) -> Result<Homing, AxError> {

@@ -7,14 +7,12 @@ use std::io::IsTerminal;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Audience {
-
     Agent,
 
     Person,
 }
 
 impl Audience {
-
     #[must_use]
     pub fn of_stdout() -> Audience {
         Self::of(&std::io::stdout())

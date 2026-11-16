@@ -13,7 +13,6 @@ pub const BODY_PX_MIN: u32 = 12;
 pub struct BodyPx(u32);
 
 impl BodyPx {
-
     pub fn new(px: u32) -> Result<Self, AxError> {
         if px < BODY_PX_MIN {
             return Err(

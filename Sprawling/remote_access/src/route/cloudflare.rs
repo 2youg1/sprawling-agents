@@ -20,7 +20,6 @@ const NAME_MAX_CHARS: usize = 64;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tunnel {
-
     pub program: PathBuf,
     pub name: TunnelName,
 
@@ -37,7 +36,6 @@ pub struct NamedTunnel {
 }
 
 impl TunnelName {
-
     pub fn parse(text: &str) -> Result<Self, AxError> {
         let spelled = text
             .chars()
@@ -65,7 +63,6 @@ impl TunnelName {
 }
 
 impl NamedTunnel {
-
     #[must_use]
     pub fn new(tunnel: Tunnel, patience: TimeoutMs) -> Self {
         Self {

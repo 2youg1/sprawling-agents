@@ -11,7 +11,6 @@ pub struct Share(u64);
 pub const WHOLE_PPB: u64 = 1_000_000_000;
 
 impl Share {
-
     pub const WHOLE: Share = Share(WHOLE_PPB);
 
     pub const NONE: Share = Share(0);

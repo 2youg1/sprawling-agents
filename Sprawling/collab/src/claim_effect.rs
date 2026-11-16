@@ -33,7 +33,6 @@ pub enum ClaimEffect {
 }
 
 impl ClaimEffect {
-
     #[must_use]
     pub fn id(&self) -> &NodeId {
         match self {

@@ -8,14 +8,12 @@ use std::sync::{Arc, Mutex};
 use kernel::{AxError, EventKind, Payload};
 
 pub(in crate::worker) struct Credentials {
-
     pub(in crate::worker) book: gateway::EndpointBook,
 
     pub(in crate::worker) vault: Arc<Mutex<gateway::Custodian>>,
 }
 
 impl Credentials {
-
     pub(in crate::worker) fn opened(
         book: gateway::EndpointBook,
         vault: gateway::Custodian,

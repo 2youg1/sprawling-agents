@@ -290,7 +290,6 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         upstream: Upstream::Unread(DoctorUnread::NoSource),
         pack: None,
     },
-
     Requirement {
         name: "sarasa-gothic",
         tier: Tier::Use,

@@ -43,7 +43,6 @@ pub struct PromptShapeAsk {
 }
 
 impl PromptShapeAsk {
-
     pub(super) fn read(self) -> wire::Answer {
         let Some(seq) = self.latest else {
             return unavailable(format!("PromptShape({})", self.run));
@@ -83,7 +82,6 @@ impl PromptShapeAsk {
 }
 
 impl PrefixAsk {
-
     pub(super) fn read(self) -> wire::Answer {
         match self.segments() {
             Some((segments, tools)) => wire::Answer::Prefix(Box::new(wire::PrefixAnswer {

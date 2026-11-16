@@ -25,7 +25,6 @@ pub struct WorkshopDesk {
 }
 
 impl WorkshopDesk {
-
     #[must_use]
     pub fn new(who: String, joined: FanIn, handed: BTreeSet<NodeId>) -> WorkshopDesk {
         WorkshopDesk {
@@ -114,7 +113,6 @@ mod op;
 use op::Op;
 
 impl WorkshopTool {
-
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [

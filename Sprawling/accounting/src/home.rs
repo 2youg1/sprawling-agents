@@ -25,7 +25,6 @@ pub struct Home {
 }
 
 impl Home {
-
     pub fn detect() -> Result<Home, AxError> {
         let root = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"));
         match root {

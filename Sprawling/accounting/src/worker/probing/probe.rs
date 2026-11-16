@@ -18,7 +18,6 @@ pub(crate) struct Probe {
 }
 
 impl Probe {
-
     pub fn new(id: ProbeId, questions: Vec<String>) -> Result<Probe, AxError> {
         if questions.is_empty() {
             return Err(AxError::failure(
@@ -98,7 +97,6 @@ pub struct Answers {
 }
 
 impl Answers {
-
     #[must_use]
     pub fn answers(&self) -> &[String] {
         &self.answers

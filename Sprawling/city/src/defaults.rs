@@ -11,7 +11,6 @@ use crate::governed::Governed;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shipped {
-
     City,
 
     Mayor,
@@ -20,7 +19,6 @@ pub enum Shipped {
 }
 
 impl Shipped {
-
     pub const ALL: [Shipped; 3] = [Shipped::City, Shipped::Mayor, Shipped::Clerk];
 
     #[must_use]
@@ -87,7 +85,6 @@ const EARLIER_CLERK: &[&str] = &[
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CopyStanding {
-
     Absent,
 
     Current,

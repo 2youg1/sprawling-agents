@@ -41,7 +41,6 @@ struct ErrorDetail {
 #[serde(rename_all = "lowercase")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Retry {
-
     Yes,
 
     No,
@@ -80,7 +79,6 @@ pub struct ErrorDraft {
 }
 
 impl AxError {
-
     pub fn failure(
         code: AxCode,
         action: impl Into<String>,
@@ -173,7 +171,6 @@ impl AxError {
 }
 
 impl ErrorDraft {
-
     pub fn with_nearby(mut self, nearby: Vec<String>) -> Self {
         self.pending.detail.nearby = nearby;
         self

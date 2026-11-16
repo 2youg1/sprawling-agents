@@ -7,7 +7,6 @@ use kernel::{AxCode, AxError};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Observation {
-
     pub text: String,
 
     pub complained: bool,
@@ -15,7 +14,6 @@ pub struct Observation {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Step {
-
     Settled { looks: u32 },
 
     LookAgain { looks: u32 },
@@ -154,7 +152,6 @@ mod tests {
 
     #[test]
     fn every_loop_ends_whatever_the_page_does() {
-
         for pattern in [0u32, 1, 2, 3] {
             let mut loop_ = DevLoop::new();
             let mut ended = false;

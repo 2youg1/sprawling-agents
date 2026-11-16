@@ -16,7 +16,6 @@ use super::step::{
 pub type WireCommand = Command<NoSecret>;
 
 impl<Secret> Command<Secret> {
-
     pub fn idem(&self) -> Option<&IdemKey> {
         match *self {
             Self::Dispatch { ref idem, .. }
@@ -73,10 +72,8 @@ impl<Secret> Command<Secret> {
 }
 
 impl From<WireCommand> for Command {
-
     fn from(wire: WireCommand) -> Self {
         match wire {
-
             #[rustfmt::skip]
             Command::Wake { source, subject, body, idem } => Self::Wake { source, subject, body, idem },
             Command::Dispatch {

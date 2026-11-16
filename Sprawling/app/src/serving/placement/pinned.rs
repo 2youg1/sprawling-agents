@@ -8,7 +8,6 @@ use super::{MODULE, notice};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Did {
-
     #[cfg_attr(
         not(windows),
         expect(
@@ -26,9 +25,13 @@ pub(crate) enum Did {
         not(target_os = "linux"),
         expect(dead_code, reason = "only Linux answers with a taskset list")
     )]
-    External { list: String },
+    External {
+        list: String,
+    },
 
-    Nothing { reason: String },
+    Nothing {
+        reason: String,
+    },
 }
 
 static TAKEN: std::sync::OnceLock<Did> = std::sync::OnceLock::new();

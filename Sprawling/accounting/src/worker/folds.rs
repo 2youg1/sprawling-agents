@@ -42,7 +42,6 @@ pub struct Standing {
 }
 
 impl Standing {
-
     pub fn fold(ledger_dir: &Path) -> Result<Standing, AxError> {
         if !ledger_dir.exists() {
             return StandingFolds::empty(ledger_dir).settle(Ok(()));
@@ -61,7 +60,6 @@ pub(crate) fn fold_city(
     cost: &mut OpeningCost,
     log: &mut Diagnostics,
 ) -> Result<(Started<Views>, Held), AxError> {
-
     let records = storage::ProofRecords::read_only(&proof_dir(city_root_of(ledger_dir)));
     let (ledger, report) = JsonlLedger::open_reusing(ledger_dir, now, &records)
         .map_err(storage::StorageError::into_ax)?;

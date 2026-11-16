@@ -24,7 +24,6 @@ pub struct NightlyBuild {
 }
 
 impl NightlyBuild {
-
     pub fn new(tag: &str, source_sha: &str) -> Result<NightlyBuild, AxError> {
         let body = tag.strip_prefix("nightly-").ok_or_else(|| refused(tag))?;
         let (date, commit) = body.split_once('-').ok_or_else(|| refused(tag))?;
@@ -75,7 +74,6 @@ mod tests {
     fn malformed_identities_are_refused() {
         for (tag, full) in [
             ("v0.0.15-Alpha-261102", SOURCE),
-
             (
                 "nightly-261300-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
                 SOURCE,

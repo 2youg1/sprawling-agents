@@ -99,7 +99,6 @@ const UPGRADE: [(&str, &str); 4] = [
     ("connection", "upgrade"),
     ("upgrade", "websocket"),
     ("sec-websocket-version", "13"),
-
     (
         "sec-websocket-key",
         concat!("dGhl", "IHNh", "bXBs", "ZSBu", "b25j", "ZQ=="),

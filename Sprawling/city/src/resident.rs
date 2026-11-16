@@ -19,7 +19,6 @@ pub enum Identity {
 }
 
 impl Identity {
-
     pub fn load(city_root: &Path, addr: &Address) -> Result<Identity, AxError> {
         let path = urbanite_path(city_root, addr);
         match std::fs::read(&path) {

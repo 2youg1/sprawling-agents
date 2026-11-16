@@ -42,7 +42,6 @@ pub enum PursuitMove {
 }
 
 impl PursuitChanged {
-
     pub fn held(self) -> Result<Option<(String, PursuitState)>, AxError> {
         let state = match self.step {
             PursuitMove::Set | PursuitMove::Resume => PursuitState::Running,
@@ -97,7 +96,6 @@ pub struct SignalWaitEnded {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "end")]
 pub enum WaitEnd {
-
     Reply { reply: SignalId },
 
     Timeout,
@@ -115,7 +113,6 @@ pub struct SignalLanded {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Landing {
-
     Delivered,
 
     Queued,
@@ -155,7 +152,6 @@ impl From<SignalId> for String {
 }
 
 impl SignalId {
-
     pub fn parse(raw: &str) -> Result<SignalId, AxError> {
         if raw.is_empty() || raw.chars().any(char::is_whitespace) {
             return Err(AxError::failure(

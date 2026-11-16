@@ -7,28 +7,15 @@ use std::num::NonZeroU64;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ceiling {
+    Hit { limit: NonZeroU64 },
 
-    Hit {
+    Unapplied { limit: NonZeroU64, why: Unapplied },
 
-        limit: NonZeroU64,
-    },
-
-    Unapplied {
-
-        limit: NonZeroU64,
-
-        why: Unapplied,
-    },
-
-    Unread {
-
-        limit: NonZeroU64,
-    },
+    Unread { limit: NonZeroU64 },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Unapplied {
-
     Platform,
 
     NotDelegated,
@@ -39,7 +26,6 @@ pub enum Unapplied {
 }
 
 impl Unapplied {
-
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -53,7 +39,6 @@ impl Unapplied {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Mark {
-
     NotAsked,
 
     Unapplied { limit: NonZeroU64, why: Unapplied },
@@ -64,7 +49,6 @@ pub(super) enum Mark {
 }
 
 impl Mark {
-
     pub(super) fn entered(limit: NonZeroU64, count: Option<u64>) -> Mark {
         match count {
             Some(before) => Mark::Watching { limit, before },

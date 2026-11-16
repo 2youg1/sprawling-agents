@@ -22,7 +22,6 @@ impl std::fmt::Debug for Offered {
 }
 
 impl Offered {
-
     pub(crate) fn remember<'e>(&self, entries: impl IntoIterator<Item = &'e AgentEntry>) {
         let mut held = self.held();
         for entry in entries {

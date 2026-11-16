@@ -12,7 +12,6 @@ use kernel::{Address, AxCode, AxError, EventKind, Payload, Seq};
 use super::super::RunWorker;
 
 impl RunWorker {
-
     pub(in crate::worker) fn open_session(
         &mut self,
         addr: &Address,
@@ -62,7 +61,6 @@ impl RunWorker {
 }
 
 impl RunWorker {
-
     pub(in crate::worker) fn name_session(
         &mut self,
         room: &Address,
@@ -111,7 +109,6 @@ struct SessionShape {
 }
 
 impl RunWorker {
-
     fn origin_shape(&mut self, origin: kernel::Origin) -> Result<Option<SessionShape>, AxError> {
         let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
         let seqs: Vec<Seq> = self.index.run_seqs_before(origin.run, None).collect();
@@ -150,7 +147,6 @@ impl RunWorker {
             .refresh(&dir)
             .map_err(storage::StorageError::into_ax)?;
         let owner = match self.index.reader(&dir).line_at(origin.at_seq) {
-
             Ok(line) => match storage::read_line(&line) {
                 Ok(storage::CheckedLine::Known(record)) => Some(record.run()),
                 Ok(storage::CheckedLine::IgnoredUnknown(_)) => None,

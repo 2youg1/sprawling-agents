@@ -28,7 +28,6 @@ pub struct PairBody {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PairProof {
-
     Open(String),
 
     Code(String),
@@ -78,7 +77,6 @@ pub(super) async fn open_session(
     headers: HeaderMap,
     Json(body): Json<SessionBody>,
 ) -> Response {
-
     let Some(origin) = headers.get(ORIGIN).and_then(|value| value.to_str().ok()) else {
         return refusal(
             &AxError::failure(

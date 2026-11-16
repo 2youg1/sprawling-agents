@@ -18,7 +18,6 @@ mod wave;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ChainAudit {
-
     Whole { lines: u64 },
 
     Broken(AxError),
@@ -26,7 +25,6 @@ pub enum ChainAudit {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ProofCount {
-
     pub lines_checked: u64,
 
     pub segments_by_digest: u64,
@@ -57,7 +55,6 @@ enum Verdict {
 
 #[derive(Debug, Clone, Copy, Default)]
 enum Before {
-
     #[default]
     Admit,
 
@@ -65,7 +62,6 @@ enum Before {
 }
 
 impl ChainHalt {
-
     pub fn awaiting_proof() -> ChainHalt {
         ChainHalt {
             verdict: Arc::default(),
@@ -135,7 +131,6 @@ impl ChainHalt {
 }
 
 impl JsonlLedger {
-
     pub fn halt_on(&mut self, halt: ChainHalt) {
         self.halt = halt;
     }
@@ -201,7 +196,6 @@ struct Walked {
 }
 
 impl Walked {
-
     fn segment(&mut self, read: Read, version: u32) -> Result<SegmentRecord, AxError> {
         let Read { bytes, hashed } = read;
         self.counted.bytes_read = self.counted.bytes_read.saturating_add(len_of(&bytes));

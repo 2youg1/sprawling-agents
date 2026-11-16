@@ -74,7 +74,6 @@ pub struct Face {
 }
 
 impl HostPreset {
-
     #[must_use]
     pub fn default_dialect(&self) -> Option<DialectKind> {
         match self.faces {
@@ -131,7 +130,6 @@ pub struct ChatSpelling {
 }
 
 impl ChatSpelling {
-
     pub const DOCUMENTED: ChatSpelling = ChatSpelling {
         ceiling: CeilingField::MaxTokens,
         effort: EffortField::ReasoningEffort,
@@ -143,7 +141,6 @@ impl ChatSpelling {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolPictureCarry {
-
     FollowingUser,
 
     InToolContent,
@@ -158,7 +155,6 @@ pub enum CeilingField {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EffortField {
-
     ReasoningEffort,
 
     ReasoningObject,
@@ -192,7 +188,6 @@ pub struct ModelPreset {
 }
 
 pub struct PresetThinking {
-
     pub levels: &'static [kernel::Effort],
 
     pub default: Option<kernel::Effort>,

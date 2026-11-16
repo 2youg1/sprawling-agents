@@ -11,7 +11,6 @@ use kernel::{Address, AxCode, AxError, B3Hash, EventKind, EventRecord, Payload, 
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Proposals {
-
     offered: u64,
     open: BTreeMap<B3Hash, Open>,
     handled: BTreeMap<B3Hash, Handled>,
@@ -30,7 +29,6 @@ enum Handled {
 }
 
 impl Proposals {
-
     pub(crate) fn offered(&mut self, run: RunId, payload: &Payload) -> Result<(), AxError> {
         let offer = Offer::of(run, &payload.read::<ProposalOffered>()?)?;
         let id = offer.id();
@@ -99,7 +97,6 @@ impl Proposals {
 pub(crate) struct OfferTimes(BTreeMap<B3Hash, TimeMs>);
 
 impl OfferTimes {
-
     pub(super) fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError> {
         if record.kind() != EventKind::ProposalOffered {
             return Ok(());
@@ -111,7 +108,6 @@ impl OfferTimes {
 }
 
 impl super::Views {
-
     pub(in crate::views) fn proposals_ask(&self, doc: &Address) -> super::prepared::Prepared {
         super::prepared::Prepared::Proposals {
             ledger: self.ledger_ask(),
@@ -122,7 +118,6 @@ impl super::Views {
 }
 
 impl super::Views {
-
     pub(in crate::views) fn open_proposals_answer(&self) -> wire::OpenProposalsAnswer {
         let open = self
             .governance
@@ -144,7 +139,6 @@ pub(super) fn proposals_answer(
     doc: Address,
     open: Vec<Offer>,
 ) -> wire::Answer {
-
     let version = match std::fs::read(super::listing::resolve(&ledger.city_root, Some(&doc))) {
         Ok(bytes) => Some(B3Hash::digest(&bytes)),
         Err(_no_version_now) => None,

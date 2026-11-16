@@ -7,7 +7,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 pub struct FaultPlan {
-
     pub cut_at_op: Option<u64>,
 
     pub cut_on_write: Option<&'static str>,

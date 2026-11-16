@@ -129,7 +129,6 @@ pub(crate) fn settled(frames: &[Value]) -> Result<Value, AxError> {
     {
         let mut wired = Vec::new();
         for (at, (id, name, arguments)) in calls {
-
             settled_tool_arguments(&name, at, &arguments)?;
             wired.push(json!({
                 "id": id,

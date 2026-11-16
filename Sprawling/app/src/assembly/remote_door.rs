@@ -30,7 +30,6 @@ pub(super) struct Outdoors {
 }
 
 pub(super) struct CityPort {
-
     pub(super) at: SocketAddr,
 
     pub(super) token: String,
@@ -56,7 +55,6 @@ impl Outdoors {
     pub(super) fn keep_aside(self, then: impl FnOnce(Result<Remote, AxError>) + Send + 'static) {
         let runtime = tokio::runtime::Handle::try_current();
         std::thread::spawn(move || {
-
             let _inside_the_runtime = runtime.as_ref().map(tokio::runtime::Handle::enter);
             then(self.keep());
         });

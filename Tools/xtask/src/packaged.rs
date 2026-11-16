@@ -50,7 +50,6 @@ struct Reach<'a> {
 }
 
 impl Reach<'_> {
-
     fn judge(&self, include: &Include) -> Option<Violation> {
         let location = format!("{}:{}", include.file, include.line);
         match &include.target {

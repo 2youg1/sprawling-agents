@@ -11,7 +11,6 @@ use kernel::event::record::GoverningDocument;
 use super::super::RunWorker;
 
 impl RunWorker {
-
     pub(super) fn configure_building(
         &mut self,
         settings: &wire::BuildingSettings,
@@ -196,7 +195,6 @@ fn held_pin_must_answer(
 }
 
 impl RunWorker {
-
     pub(in crate::worker) fn put_rules(&mut self, write: &wire::RulesWrite) -> Result<(), AxError> {
         let building = city::Building::of(&write.building)?;
         city::write_rules_against_with(

@@ -27,7 +27,6 @@ pub(crate) struct Bounds {
 }
 
 impl Bounds {
-
     pub(crate) fn from_corners(
         left: i32,
         top: i32,

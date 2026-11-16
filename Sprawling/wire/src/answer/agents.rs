@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AgentCatalogAnswer {
-
     pub detected: Vec<AgentOffer>,
 
     pub catalog: Vec<AgentOffer>,
@@ -21,7 +20,6 @@ pub struct AgentCatalogAnswer {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CatalogSnapshot {
-
     pub date: String,
 
     pub etag: String,
@@ -49,7 +47,6 @@ pub struct AgentOffer {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum AgentSource {
-
     Registry,
 
     Detected,
@@ -61,7 +58,6 @@ pub enum AgentSource {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PinState {
-
     Exact,
 
     Floating,
@@ -73,7 +69,6 @@ pub enum PinState {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum LoginKind {
-
     Agent,
 
     Terminal,
@@ -98,7 +93,6 @@ pub struct AgentLine {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum LoginState {
-
     Unasked,
 
     Ready,

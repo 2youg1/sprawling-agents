@@ -64,7 +64,6 @@ pub struct Held<'a> {
 }
 
 impl Held<'_> {
-
     pub fn replace(&self, body: &[u8]) -> Result<(), AxError> {
         let dir = self.path.parent().ok_or_else(|| {
             storage(

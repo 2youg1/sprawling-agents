@@ -19,7 +19,6 @@ pub enum AuthSpec {
 
 #[derive(Debug, Clone)]
 pub struct EndpointConfig {
-
     pub base_url: String,
     pub dialect: DialectKind,
 
@@ -48,7 +47,6 @@ pub struct Endpoint {
 }
 
 impl Endpoint {
-
     pub fn new(config: EndpointConfig, redemption: Redemption) -> Result<Endpoint, AxError> {
         Endpoint::over(&super::transport::Transport::default(), config, redemption)
     }

@@ -27,7 +27,6 @@ impl From<NodeId> for String {
 }
 
 impl NodeId {
-
     pub fn parse(raw: &str) -> Result<NodeId, AxError> {
         if raw.is_empty() || raw.chars().any(char::is_whitespace) {
             return Err(AxError::failure(
@@ -59,7 +58,6 @@ pub struct NodeContract {
 }
 
 impl NodeContract {
-
     #[expect(
         clippy::too_many_arguments,
         reason = "the contract is eight fields by design; a builder would hide which are required"
@@ -176,7 +174,6 @@ pub struct Workshop {
 }
 
 impl Workshop {
-
     pub fn new(contracts: Vec<NodeContract>) -> Result<Workshop, AxError> {
         let mut nodes = BTreeMap::new();
         for contract in contracts {

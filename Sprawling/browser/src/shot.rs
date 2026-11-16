@@ -94,7 +94,6 @@ fn unreadable(percent: u32) -> AxError {
 }
 
 impl ShotRequest {
-
     pub fn read(args: &Payload) -> Result<ShotRequest, AxError> {
         let rect = match args.as_map().get("clip") {
             None | Some(Value::Null) => None,

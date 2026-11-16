@@ -9,7 +9,6 @@ use serde_json::Value;
 pub const EXTERNAL_CALL_PATIENCE: TimeoutMs = TimeoutMs(60_000);
 
 pub trait Outbound: Send {
-
     fn call(&mut self, line: &str, patience: TimeoutMs) -> Result<String, AxError>;
 
     fn notify(&mut self, line: &str, patience: TimeoutMs) -> Result<(), AxError>;
@@ -65,7 +64,6 @@ fn key_of(request: &str) -> Result<String, AxError> {
 }
 
 impl Outbound for ScriptedOutbound {
-
     fn notify(&mut self, line: &str, _patience: TimeoutMs) -> Result<(), AxError> {
         key_of(line).map(|_| ())
     }

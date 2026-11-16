@@ -12,10 +12,7 @@ pub(super) enum Entry {
 
     Passed,
 
-    Unread {
-        child: String,
-        why: String,
-    },
+    Unread { child: String, why: String },
 }
 
 pub(super) enum Step {

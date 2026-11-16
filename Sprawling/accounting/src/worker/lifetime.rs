@@ -19,7 +19,6 @@ use storage::{Cas, JsonlLedger, OpenReport};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum LedgerOpening {
-
     Intact,
 
     TailDropped { bytes: u64 },
@@ -37,7 +36,6 @@ impl From<OpenReport> for LedgerOpening {
 }
 
 impl LedgerOpening {
-
     pub fn notice(self) -> Option<String> {
         match self {
             LedgerOpening::Intact => None,
@@ -77,7 +75,6 @@ fn old_skill_bindings(
 }
 
 impl RunWorker {
-
     pub fn new(
         city_root: &Path,
         log: runtime::diagnostics::Diagnostics,

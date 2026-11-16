@@ -12,7 +12,6 @@ use crate::model::ModelUsage;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PrefixHeld {
-
     pub waited_us: u64,
 
     pub ended: PrewarmEnd,
@@ -25,7 +24,6 @@ pub struct PrefixHeld {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum PrewarmEnd {
-
     Answered,
 
     Refused,
@@ -39,14 +37,11 @@ pub enum PrewarmEnd {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(untagged)]
 pub enum PrewarmSent {
-
     Refused {
-
         refused: AxError,
     },
 
     Answered {
-
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[cfg_attr(
             feature = "schema",

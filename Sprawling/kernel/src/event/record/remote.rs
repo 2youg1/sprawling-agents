@@ -10,7 +10,6 @@ use crate::event::TimeMs;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RemoteOpened {
-
     pub closes_at: TimeMs,
 
     pub url: String,
@@ -26,7 +25,6 @@ pub struct RemoteClosed {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum RemoteClosing {
-
     Console,
 
     Locked,
@@ -37,7 +35,6 @@ pub enum RemoteClosing {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DevicePaired {
-
     pub device: String,
 
     pub name: String,

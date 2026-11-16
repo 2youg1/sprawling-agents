@@ -29,7 +29,6 @@ pub struct CatalogDrift {
 }
 
 impl CatalogDrift {
-
     #[must_use]
     pub fn between(
         subject: CatalogSubject,

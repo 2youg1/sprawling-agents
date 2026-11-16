@@ -26,7 +26,6 @@ const HALT_TICK_MS: u64 = 200;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Permit {
-
     Chosen(String),
 
     Cancelled,
@@ -42,7 +41,6 @@ pub enum StopReason {
 }
 
 pub struct Listener<'a> {
-
     pub halted: &'a mut dyn FnMut() -> bool,
 
     pub cancelling: &'a mut dyn FnMut() -> Result<(), AxError>,
@@ -75,7 +73,6 @@ pub struct AcpSession<W: Write> {
 }
 
 impl<W: Write> AcpSession<W> {
-
     pub fn open(lines: Lines, writer: W, name: &str, cwd: &Path) -> Result<Self, AxError> {
         let mut session = AcpSession {
             lines,

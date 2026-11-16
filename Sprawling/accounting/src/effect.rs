@@ -15,7 +15,6 @@ pub struct Line {
 }
 
 pub enum Then {
-
     Nothing,
 
     Deliver(Vec<collab::Signal>),
@@ -45,7 +44,6 @@ pub struct Closing {
 }
 
 impl<L> Landing<L> {
-
     pub fn record(
         self,
         append: &mut impl FnMut(L) -> Result<(), AxError>,
@@ -58,7 +56,6 @@ impl<L> Landing<L> {
 }
 
 impl Landing {
-
     pub fn signals(
         effects: Vec<collab::SignalEffect>,
         room: &Address,
@@ -168,7 +165,6 @@ pub enum Claims {
 }
 
 impl Claims {
-
     pub fn of(
         effects: &[collab::ClaimEffect],
         on_disk: &str,
@@ -190,7 +186,6 @@ impl Claims {
             }
             text = effect.apply(&text)?;
             let closes = match effect {
-
                 collab::ClaimEffect::Claimed { .. } => continue,
                 collab::ClaimEffect::PutDown { id, .. } => Some(id.clone()),
                 collab::ClaimEffect::Split { parent, .. } => Some(parent.clone()),

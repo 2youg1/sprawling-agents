@@ -58,11 +58,9 @@ pub struct PlanReading {
 }
 
 impl PlanView {
-
     pub fn apply(&mut self, record: &EventRecord) {
         let reach = may_move_plan(record.kind());
         let Some(building) = record.addr().and_then(building_of) else {
-
             if !matches!(reach, PlanReach::Untouched) {
                 self.read.clear();
                 self.moved_all = self.moved_all.wrapping_add(1);
@@ -165,7 +163,6 @@ pub fn plans_of(
 }
 
 impl PlanView {
-
     pub fn take_back(shared: &Mutex<Self>) -> std::sync::MutexGuard<'_, Self> {
         shared.lock().unwrap_or_else(|poisoned| {
             let mut view = poisoned.into_inner();
@@ -178,7 +175,6 @@ impl PlanView {
 }
 
 enum PlanAsk {
-
     Held(PlanReading),
 
     Unread {
@@ -188,7 +184,6 @@ enum PlanAsk {
 }
 
 impl PlanAsk {
-
     fn read(self, city_root: &Path, addr: &Address) -> (PlanReading, Option<FreshPlan>) {
         match self {
             Self::Held(reading) => (reading, None),
@@ -209,7 +204,6 @@ impl PlanAsk {
 
 fn read_plan(city_root: &Path, addr: &Address) -> Reading {
     match city::roadmap(city_root, addr) {
-
         Err(err) => Reading::Unreadable(vec![err.to_string()]),
         Ok(text) => match kernel::spine::check_roadmap_shape(&text) {
             RoadmapShape::WellFormed { rows } => match PlanTree::build(rows) {

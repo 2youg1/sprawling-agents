@@ -35,7 +35,6 @@ pub(super) enum OwnShelf {
 }
 
 impl OwnShelf {
-
     pub(super) fn root(&self, layout: &CityLayout) -> PathBuf {
         match self {
             OwnShelf::Library => layout.library(),
@@ -55,7 +54,6 @@ impl OwnShelf {
 pub(super) struct ShelfKey(String);
 
 impl ShelfKey {
-
     pub(super) fn of(name: &str) -> ShelfKey {
         ShelfKey(name.trim().to_owned())
     }
@@ -63,7 +61,6 @@ impl ShelfKey {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Shelf {
-
     Library,
 
     Building(Address),
@@ -110,7 +107,6 @@ pub(super) struct HoldingSource<'a> {
 }
 
 impl Holding {
-
     pub(super) fn of(source: HoldingSource<'_>) -> Holding {
         let carried = source.shelf.is_external().then(|| source.text.to_owned());
         Holding {

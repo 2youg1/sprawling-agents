@@ -72,7 +72,6 @@ impl MachineBudget {
 }
 
 impl Reservation {
-
     #[must_use]
     pub fn waited(&self) -> Option<Waited> {
         self.waited

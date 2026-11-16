@@ -15,7 +15,6 @@ use kernel::account_recovery::AccountRetries;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TuningDefaults {
-
     pub timeout_ms: u64,
 
     pub retries: Retries,
@@ -27,7 +26,6 @@ pub struct TuningDefaults {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct EndpointTuning {
-
     #[serde(default)]
     pub accounts: Option<Vec<kernel::event::record::ProviderAccount>>,
 
@@ -55,7 +53,6 @@ pub struct EndpointTuning {
 }
 
 impl EndpointTuning {
-
     pub const DEFAULTS: TuningDefaults = TuningDefaults {
         timeout_ms: 120_000,
         retries: Retries::UntilHalted,

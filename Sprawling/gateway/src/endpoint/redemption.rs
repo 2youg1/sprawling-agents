@@ -73,7 +73,6 @@ impl Redemption {
 )]
 pub(crate) fn resolver() -> SecretResolver {
     Box::new(|_reference: &SecretRef| {
-
         let token = ["sk-test-", "0123456789"].concat();
         Ok(Sealed::new(Box::new(token)))
     })

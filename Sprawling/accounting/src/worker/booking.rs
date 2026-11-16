@@ -16,7 +16,6 @@ use crate::effect;
 pub(crate) struct PlanRead(u64);
 
 pub(crate) struct Claimant {
-
     pub building: Address,
 
     pub room: Address,
@@ -58,7 +57,6 @@ pub(crate) struct OpenClaims {
 }
 
 impl OpenClaims {
-
     pub fn close(&mut self, node: &NodeId) {
         self.put_backs.remove(node);
     }
@@ -69,7 +67,6 @@ impl OpenClaims {
 }
 
 impl ClaimBook {
-
     pub fn answer(&mut self, ask: ClaimAsk, ledger: &mut impl Ledger) -> Option<EventDraft> {
         let ClaimAsk {
             building,

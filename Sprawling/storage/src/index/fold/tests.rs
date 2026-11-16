@@ -56,7 +56,6 @@ struct Line {
 }
 
 fn run_names() -> impl Strategy<Value = Option<String>> {
-
     let valid = prop_oneof![Just(0u8), Just(1u8), Just(2u8), Just(u8::MAX),];
     prop_oneof![
         8 => valid.prop_map(|byte| Some(run_id(byte).to_string())),
@@ -72,7 +71,6 @@ fn run_id(byte: u8) -> RunId {
 }
 
 fn lines() -> impl Strategy<Value = Vec<Line>> {
-
     let seq = prop_oneof![6 => 0u64..12, 1 => 12u64..4000];
     let offset = prop_oneof![8 => 0u64..65536, 1 => (1u64 << 48)..(1u64 << 49)];
     let line = (0u8..4, offset, seq, run_names()).prop_map(|(seg, offset, seq, run)| Line {

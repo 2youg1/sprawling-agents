@@ -316,7 +316,6 @@ fn a_tool_error_flows_back_as_a_tool_result_and_the_loop_continues() {
 
 #[test]
 fn a_scenario_ledger_forks_into_a_byte_identical_prefix() {
-
     let report = run_scenario(scenario(None)).unwrap();
     let verified = runtime::replay::verify_lines(report.lines.clone()).unwrap();
     let at = kernel::Seq::new(4);
@@ -502,7 +501,6 @@ fn s3_14_one_resident_closes_the_loop_through_the_real_adapters() {
 
 #[test]
 fn s3_14_the_run_is_byte_identical_when_replayed() {
-
     let first = run_scenario(scenario(None)).unwrap();
     let second = run_scenario(scenario(None)).unwrap();
     assert_eq!(first.lines, second.lines);
@@ -524,7 +522,6 @@ fn two_reads_in_one_wave_are_two_calls() {
     }
 
     let report = run_scenario(Scenario {
-
         model: ScriptModel::new(vec![
             ModelReturn {
                 usage: None,

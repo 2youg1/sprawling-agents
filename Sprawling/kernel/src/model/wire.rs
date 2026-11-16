@@ -29,7 +29,6 @@ impl std::fmt::Display for ModelRef {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BuildingPolicy {
-
     pub confidential: bool,
 }
 
@@ -60,7 +59,6 @@ pub enum StopReason {
 pub struct Ceiling(NonZeroU64);
 
 impl Ceiling {
-
     pub const fn new(tokens: u64) -> Option<Ceiling> {
         match NonZeroU64::new(tokens) {
             Some(tokens) => Some(Ceiling(tokens)),
@@ -100,7 +98,6 @@ pub enum DialectKind {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ModelTag {
-
     Main,
 
     Digest,
@@ -111,7 +108,6 @@ pub enum ModelTag {
 }
 
 impl ModelTag {
-
     pub const ALL: [ModelTag; 4] = [
         ModelTag::Main,
         ModelTag::Digest,
@@ -151,7 +147,6 @@ pub enum Effort {
 }
 
 impl Effort {
-
     pub const ALL: [Effort; 7] = [
         Effort::None,
         Effort::Minimal,
@@ -180,7 +175,6 @@ impl Effort {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Increment {
-
     Said(String),
 
     Thought(String),
@@ -246,7 +240,6 @@ pub struct ToolDef {
 }
 
 impl ToolDef {
-
     pub fn pin_bytes(&self) -> Result<Vec<u8>, crate::AxError> {
         serde_json::to_vec(self).map_err(|err| {
             crate::AxError::failure(
@@ -292,7 +285,6 @@ pub struct ChatResponse {
 }
 
 impl ChatRequest<'_> {
-
     pub fn empty(model: &str, max_tokens: Ceiling) -> ChatRequest<'static> {
         ChatRequest {
             model: model.to_owned(),

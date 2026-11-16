@@ -11,13 +11,11 @@ pub(super) mod handing;
 pub(super) mod landing;
 
 impl RunWorker {
-
     pub(super) fn wake(&mut self, source: &str, subject: &str, body: &str) -> Result<(), AxError> {
         let watch = city::Watch::load(&self.city_root)?;
         let standing: Vec<Address> = city::buildings(&self.city_root)?;
         let listening = watch.listening(&standing);
         if listening.is_empty() {
-
             self.note(
                 runtime::diagnostics::Level::Refuse,
                 "city::watch",
@@ -179,7 +177,6 @@ impl RunWorker {
 
     pub(super) fn answer_knocks(&mut self) {
         for knock in std::mem::take(&mut self.doorstep.knocks) {
-
             if self.collaborating.rooms.worked_by(&knock.addr).is_some() {
                 self.doorstep.defer(knock);
                 continue;

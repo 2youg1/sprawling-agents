@@ -21,7 +21,6 @@ pub fn city_root_of(ledger_dir: &Path) -> &Path {
 }
 
 pub trait SnapshotFold: Sized {
-
     const DIR: &'static str;
 
     fn fold_version() -> u32;
@@ -54,7 +53,6 @@ pub struct Started<F> {
 }
 
 impl<F> Started<F> {
-
     pub fn last_seq(&self) -> Option<Seq> {
         self.last.as_ref().map(|(seq, _)| *seq)
     }
@@ -62,7 +60,6 @@ impl<F> Started<F> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FoldStart {
-
     Resumed { tail: usize },
 
     Whole(WholeFold),
@@ -76,7 +73,6 @@ pub fn start<F: SnapshotFold>(ledger_dir: &Path) -> Result<Started<F>, AxError> 
 
 #[derive(Clone, Copy)]
 enum Resuming {
-
     AsItStands,
 
     AfterProof,

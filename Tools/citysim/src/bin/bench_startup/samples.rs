@@ -29,7 +29,6 @@ pub struct Samples {
 }
 
 impl Samples {
-
     #[must_use]
     pub fn of(head: Duration, tail: Vec<Duration>) -> Samples {
         let spread = Spread::of(head, tail.iter().copied());

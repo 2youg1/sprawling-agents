@@ -58,7 +58,6 @@ struct Held {
 }
 
 impl LocalDoor {
-
     pub fn new(
         browsers: Vec<PairedBrowser>,
         senses: DoorSenses,
@@ -194,7 +193,6 @@ impl LocalDoor {
                     ));
                 };
                 if let Some(tell) = held.waiting.remove(&digest) {
-
                     let _unheard: Result<(), mpsc::SendError<()>> = tell.send(());
                 }
             }

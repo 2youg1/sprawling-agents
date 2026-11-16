@@ -15,7 +15,6 @@ pub mod scripted;
 mod tests;
 
 pub trait Route {
-
     fn open(&mut self, local: SocketAddr) -> Result<Opened, AxError>;
 
     fn close(&mut self) -> Result<(), AxError>;
@@ -37,7 +36,6 @@ pub enum Permanence {
 }
 
 impl PublicUrl {
-
     pub fn parse(text: &str) -> Result<Self, AxError> {
         let (scheme, rest) = text
             .split_once("://")
@@ -91,7 +89,6 @@ pub(crate) struct Running {
 }
 
 impl Running {
-
     pub(crate) fn start(command: &mut Command, recovery: &str) -> Result<Self, AxError> {
         let program = command.get_program().to_string_lossy().into_owned();
         let child = command.spawn().map_err(|err| {
@@ -156,7 +153,6 @@ fn lost(program: &str, verb: &str, err: &std::io::Error) -> AxError {
 }
 
 impl Drop for Running {
-
     fn drop(&mut self) {
         match self.stop() {
             Ok(()) => {}

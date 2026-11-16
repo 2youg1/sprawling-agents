@@ -26,7 +26,6 @@ pub(super) fn initialize_params() -> Value {
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Introduced {
-
     pub version: Option<String>,
 
     pub auth_methods: Vec<AuthMethod>,
@@ -41,7 +40,6 @@ pub struct AuthMethod {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LoginKind {
-
     Agent,
 
     Terminal,

@@ -13,7 +13,6 @@ use super::verbs::{Passage, passage};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Step {
-
     Forward(String),
 
     Answer(Vec<u8>),

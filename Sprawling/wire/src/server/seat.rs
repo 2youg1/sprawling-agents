@@ -17,13 +17,11 @@ pub(crate) struct Seat {
 }
 
 impl Seat {
-
     pub(crate) fn presented(&self) -> Option<&str> {
         self.presented.as_deref()
     }
 
     pub(crate) async fn ended(&mut self) {
-
         if self.ended.changed().await.is_err() {
             std::future::pending::<()>().await;
         }

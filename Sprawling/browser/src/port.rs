@@ -14,7 +14,6 @@ pub struct Frame {
 }
 
 impl Frame {
-
     pub fn new(id: u64, method: &str, params: Value) -> Result<Frame, AxError> {
         if method.is_empty() {
             return Err(AxError::failure(
@@ -82,7 +81,6 @@ pub enum Reply {
 }
 
 impl Reply {
-
     pub fn parse(line: &str) -> Result<Reply, AxError> {
         let value: Value = serde_json::from_str(line).map_err(|err| {
             AxError::failure(
@@ -152,7 +150,6 @@ impl Reply {
 }
 
 pub trait BrowserPort {
-
     fn send(&mut self, frame: &Frame) -> Result<Reply, AxError>;
 }
 

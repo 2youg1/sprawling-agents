@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum AdviserAsk {
-
     Noul,
 
     Score,
@@ -20,7 +19,6 @@ pub enum AdviserAsk {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AdviserAsked {
-
     pub ask: AdviserAsk,
 
     pub subject: String,
@@ -30,7 +28,6 @@ pub struct AdviserAsked {
 #[serde(tag = "ask", rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum AdviserAnswer {
-
     Noul { keep: bool, confidence_bp: u16 },
 
     Score { score_bp: u16 },
@@ -41,7 +38,6 @@ pub enum AdviserAnswer {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AdviserAnswered {
-
     pub subject: String,
     #[serde(flatten)]
     pub answer: AdviserAnswer,
@@ -53,7 +49,6 @@ pub struct AdviserAnswered {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum AdviserFailure {
-
     Unavailable,
 
     Timeout,
@@ -64,7 +59,6 @@ pub enum AdviserFailure {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AdviserFellBack {
-
     pub subject: String,
 
     pub reason: AdviserFailure,

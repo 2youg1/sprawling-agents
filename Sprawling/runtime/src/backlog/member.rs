@@ -32,7 +32,6 @@ pub(super) enum Body {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Claim {
-
     Window(RunId),
 
     Run(RunId),

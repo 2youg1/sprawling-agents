@@ -18,7 +18,6 @@ pub struct GoalBooking(Box<Ask>);
 type Ask = dyn FnMut(&GoalEntry) -> Result<(), AxError> + Send;
 
 impl GoalBooking {
-
     #[must_use]
     pub fn new(ask: impl FnMut(&GoalEntry) -> Result<(), AxError> + Send + 'static) -> GoalBooking {
         GoalBooking(Box::new(ask))
@@ -132,7 +131,6 @@ pub struct GoalTool {
 }
 
 impl GoalTool {
-
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [

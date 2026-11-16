@@ -18,7 +18,6 @@ pub struct HarnessProcess {
 }
 
 impl HarnessProcess {
-
     pub fn start(
         agent: &Consented,
         cwd: &Path,

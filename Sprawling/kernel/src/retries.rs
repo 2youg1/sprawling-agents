@@ -5,7 +5,6 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
 pub enum Retries {
-
     #[default]
     UntilHalted,
 
@@ -13,7 +12,6 @@ pub enum Retries {
 }
 
 impl Retries {
-
     #[must_use]
     pub const fn without_a_brake(self) -> u32 {
         match self {

@@ -140,7 +140,6 @@ const ROWS: [Row; 15] = [
 ];
 
 impl Unit {
-
     #[must_use]
     pub fn reading(&self, value: u64) -> String {
         match self {

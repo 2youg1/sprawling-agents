@@ -47,7 +47,6 @@ fn filter_table(city_root: &Path, building: &Address) -> Result<runtime::FilterT
 }
 
 impl Site {
-
     pub(in crate::worker) fn block_origin(&self) -> storage::BlockOrigin {
         storage::BlockOrigin {
             run: self.run_id,
@@ -84,7 +83,6 @@ pub(in crate::worker) struct Placing<'a> {
 }
 
 impl Site {
-
     fn works_apart(&self, at: &super::super::Assignment) -> bool {
         match at.policy.landing {
             kernel::LandingPolicy::Experiment => true,
@@ -188,7 +186,6 @@ pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
 }
 
 impl Site {
-
     pub(in crate::worker) fn name_tree(
         &mut self,
         at: &super::super::Assignment,
@@ -201,7 +198,6 @@ impl Site {
 }
 
 impl RunWorker {
-
     pub(in crate::worker) fn stand_up(
         &mut self,
         agreed: Agreed,

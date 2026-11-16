@@ -58,7 +58,6 @@ pub(crate) fn find_program(program: &str) -> Option<PathBuf> {
 }
 
 pub(crate) fn place_set_up(dir: &agent_protocols::SetUpDir) -> Option<PathBuf> {
-
     let variable = dir.variable.and_then(std::env::var_os);
     match accounting::home::Home::detect() {
         Ok(home) => dir.on(Some(home.path()), variable),

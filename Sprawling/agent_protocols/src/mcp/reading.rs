@@ -13,7 +13,6 @@ pub const MESSAGE_CEILING: usize = 8_388_608;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Received {
-
     Message(String),
 
     EndOfInput,
@@ -32,7 +31,6 @@ pub(crate) enum Heard {
 }
 
 impl Lines {
-
     pub fn over<R: BufRead + Send + 'static>(mut reader: R, name: &str) -> Result<Lines, AxError> {
         let (sender, heard) = std::sync::mpsc::sync_channel(0);
         let named = name.to_owned();
@@ -116,7 +114,6 @@ pub(super) fn answer_unread(refused: &AxError) -> AxError {
 }
 
 enum Framing {
-
     Complete,
 
     EndOfInput,

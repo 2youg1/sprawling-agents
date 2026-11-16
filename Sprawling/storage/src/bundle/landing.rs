@@ -14,7 +14,6 @@ use crate::real_fs::RealFs;
 use crate::vfs::Vfs;
 
 pub(crate) enum Bits<'a> {
-
     Of(&'a Path),
 
     OfReplaced,
@@ -72,7 +71,6 @@ pub(crate) fn create(target: WriteTarget, bytes: &[u8]) -> Result<(), StorageErr
     let written = file.write_all(bytes).and_then(|()| file.sync_data());
     drop(file);
     if let Err(err) = written {
-
         std::fs::remove_file(path).map_err(io_err("take back a half-created file", path))?;
         return Err(io_err("create a file", path)(err));
     }

@@ -68,8 +68,9 @@ pub struct WatchdogFired {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum FiredAction {
-
-    Steer { text: String },
+    Steer {
+        text: String,
+    },
 
     BackOff {
         until_ms: u64,
@@ -83,7 +84,9 @@ pub enum FiredAction {
         subject: String,
     },
 
-    Freeze { reason: String },
+    Freeze {
+        reason: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]

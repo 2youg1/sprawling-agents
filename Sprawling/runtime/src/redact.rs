@@ -10,14 +10,12 @@ const REDACTED_REALM: &str = "redacted";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Marker {
-
     Plain,
 
     Fingerprinted,
 }
 
 impl Marker {
-
     #[must_use]
     pub fn spell(self, found: &[u8]) -> String {
         match self {

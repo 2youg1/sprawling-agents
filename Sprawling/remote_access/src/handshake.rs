@@ -70,7 +70,6 @@ pub struct CityWaiting {
 }
 
 impl Hello {
-
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, AxError> {
         let array: [u8; HELLO_BYTES] = fixed(bytes, "read a handshake hello")?;
         let (id, _) = array
@@ -109,7 +108,6 @@ impl Hello {
 }
 
 impl Reply {
-
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, AxError> {
         fixed(bytes, "read a handshake reply").map(|array| Self(Box::new(array)))
     }
@@ -132,7 +130,6 @@ impl Reply {
 }
 
 impl Finish {
-
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, AxError> {
         Signature::from_bytes(bytes).map(Self)
     }
@@ -197,7 +194,6 @@ pub fn city_reply(
 }
 
 impl CityWaiting {
-
     #[must_use]
     pub fn device(&self) -> DeviceId {
         self.device

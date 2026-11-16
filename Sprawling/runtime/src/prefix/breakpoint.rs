@@ -9,14 +9,12 @@ use super::segment::SegmentSlot;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Breakpoint {
-
     Edge(SegmentSlot),
 
     Tail,
 }
 
 impl Breakpoint {
-
     pub fn as_str(self) -> &'static str {
         match self {
             Breakpoint::Edge(slot) => slot.as_str(),
@@ -31,7 +29,6 @@ pub struct BreakpointPlan {
 }
 
 impl BreakpointPlan {
-
     pub fn for_conversation(messages: &[ChatMessage]) -> BreakpointPlan {
         BreakpointPlan {
             tail: messages.len().checked_sub(1),

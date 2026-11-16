@@ -14,7 +14,6 @@ use super::config::Endpoint;
 use super::failure::{ProviderFailure, provider_err};
 
 impl Endpoint {
-
     pub(crate) fn stream(
         &mut self,
         req: &ModelRequest,
@@ -45,7 +44,6 @@ impl Endpoint {
             .map_err(|err| provider_err("call provider", &ProviderFailure::Exchange(&err)))?;
         let status = response.status();
         if !status.is_success() {
-
             let headers = response.headers().clone();
             return Err(provider_err(
                 "call provider",
@@ -95,7 +93,6 @@ impl Endpoint {
         response: reqwest::blocking::Response,
         mut each: impl FnMut(String) -> Result<(), AxError>,
     ) -> Result<(), AxError> {
-
         let quiet_ms = self
             .config
             .stream_idle_timeout_ms

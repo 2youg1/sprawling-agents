@@ -28,7 +28,6 @@ impl Conversation {
 
     pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening, from: &str) {
         self.push_user_text(match opening {
-
             Opening::FromJob => format!("The task is in JOB.md above, handed down by {from}."),
 
             Opening::Inherited => format!(
@@ -173,7 +172,6 @@ fn duplicate_picture(locator: &str) -> String {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Speaker {
-
     Person,
 
     City,
@@ -183,7 +181,6 @@ pub enum Speaker {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Letter {
-
     pub from: String,
 
     pub run: Option<RunId>,
@@ -194,7 +191,6 @@ pub struct Letter {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LetterKind {
-
     Steer,
 
     Reply,
@@ -220,7 +216,6 @@ const PERSON: &str = kernel::event::record::SteerReceived::PERSON_SOURCE;
 const CITY: &str = kernel::event::record::SteerReceived::CITY_SOURCE;
 
 impl Speaker {
-
     #[must_use]
     pub fn recorded(&self) -> String {
         match self {
@@ -283,7 +278,6 @@ impl Speaker {
 }
 
 impl Letter {
-
     fn attributes(&self) -> Vec<(&'static str, String)> {
         [
             self.run.map(|run| ("run", run.to_string())),

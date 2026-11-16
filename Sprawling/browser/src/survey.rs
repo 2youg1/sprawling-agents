@@ -23,7 +23,6 @@ const SLACK: i64 = 1;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Population {
-
     RegionsInTheMainColumn,
 
     RowsOfANavigationColumn,
@@ -41,7 +40,6 @@ pub enum Side {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Surface {
-
     Ink,
 
     Fill,
@@ -59,7 +57,6 @@ pub struct Near<'a> {
 }
 
 pub enum Finding<'a> {
-
     OutOfStep {
         among: Population,
         is: i64,
@@ -69,9 +66,15 @@ pub enum Finding<'a> {
         step: Option<&'a str>,
     },
 
-    Escapes { holder: &'a Drawn, side: Side },
+    Escapes {
+        holder: &'a Drawn,
+        side: Side,
+    },
 
-    TextCut { shown: i64, needs: i64 },
+    TextCut {
+        shown: i64,
+        needs: i64,
+    },
 
     UndeclaredPaint {
         painted: Paint,
@@ -85,7 +88,6 @@ pub enum Finding<'a> {
     },
 
     Echoed {
-
         other: &'a Drawn,
 
         text: &'a str,
@@ -104,7 +106,6 @@ pub enum Group {
 }
 
 impl Group {
-
     pub const IN_ORDER: [Group; 5] = [
         Group::Fact,
         Group::Paint,
@@ -131,13 +132,11 @@ pub enum Standing {
 }
 
 pub struct Deviation<'a> {
-
     pub at: &'a Drawn,
     pub finding: Finding<'a>,
 }
 
 impl Deviation<'_> {
-
     pub fn standing(&self) -> Standing {
         match self.finding {
             Finding::Escapes { .. } => match self.at.sampled {
@@ -177,7 +176,6 @@ pub fn judge(page: &Page) -> Vec<Deviation<'_>> {
 }
 
 impl Finding<'_> {
-
     pub fn group(&self) -> Group {
         match *self {
             Finding::Echoed { .. } => Group::Fact,
@@ -227,7 +225,6 @@ impl Population {
 }
 
 impl Side {
-
     pub fn of(self) -> &'static str {
         match self {
             Side::Left => "left edge",

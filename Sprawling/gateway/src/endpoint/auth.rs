@@ -8,7 +8,6 @@ use kernel::{DialectKind, SecretRef};
 use super::config::AuthSpec;
 
 impl AuthSpec {
-
     #[must_use]
     pub fn for_dialect(
         dialect: DialectKind,

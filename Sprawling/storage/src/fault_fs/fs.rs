@@ -80,7 +80,6 @@ fn cut(state: &mut State) {
     let torn = state.plan.torn_tail;
     state.files.retain(|_, file| file.durable_entry);
     for file in state.files.values_mut() {
-
         let common = file
             .durable
             .iter()
@@ -121,7 +120,6 @@ impl Vfs for FaultFs {
     }
 
     fn list(&self, dir: &Path) -> io::Result<Vec<PathBuf>> {
-
         FaultFs::charge(self, "list")?;
         let state = self.state();
         let mut files: Vec<PathBuf> = state
@@ -241,7 +239,6 @@ impl Vfs for FaultFs {
     }
 
     fn sync_data(&mut self, path: &Path) -> io::Result<()> {
-
         self.charge("sync_data")?;
         let mut state = self.state();
         let file = state.files.get_mut(path).ok_or_else(|| not_found(path))?;

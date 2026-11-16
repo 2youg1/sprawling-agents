@@ -9,7 +9,6 @@ use kernel::{Address, AxCode, AxError, RunId};
 use std::process::{Command, Stdio};
 
 impl Backlog {
-
     pub fn run(
         &self,
         owner: RunId,

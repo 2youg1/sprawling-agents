@@ -60,7 +60,6 @@ pub struct PromptShapeAnswer {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ContentAnswer {
-
     pub locator: Locator,
     pub text: String,
     pub bytes: u64,

@@ -19,7 +19,6 @@ fn exceeds(limit: u64, observed: usize) -> bool {
 pub struct ImagesPerTurn(u64);
 
 impl ImagesPerTurn {
-
     pub(crate) const fn new(max: u64) -> ImagesPerTurn {
         ImagesPerTurn(max)
     }
@@ -45,7 +44,6 @@ impl ImagesPerTurn {
 pub struct ImageMaxBytes(u64);
 
 impl ImageMaxBytes {
-
     pub(crate) const fn new(max: u64) -> ImageMaxBytes {
         ImageMaxBytes(max)
     }
@@ -78,7 +76,6 @@ impl ImageMaxBytes {
 pub struct ImageQuality(u64);
 
 impl ImageQuality {
-
     pub(crate) const fn new(max: u64) -> ImageQuality {
         ImageQuality(max)
     }
@@ -103,7 +100,6 @@ impl ImageQuality {
 pub struct ClockZonesMax(u64);
 
 impl ClockZonesMax {
-
     pub(crate) const fn new(max: u64) -> ClockZonesMax {
         ClockZonesMax(max)
     }

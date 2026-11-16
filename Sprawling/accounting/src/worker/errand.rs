@@ -13,7 +13,6 @@ use super::keeping_warm::Renewed;
 use super::relay::Wake;
 
 pub(crate) enum Answer {
-
     Renewed(Renewed),
 
     Probed(Probed),
@@ -40,7 +39,6 @@ impl Errands {
         std::thread::Builder::new()
             .name("sprawling-errand".to_owned())
             .spawn(move || {
-
                 drop(bell.send(Wake::Answered(Box::new(request()))));
             })
             .map_err(|source| {
@@ -65,7 +63,6 @@ impl Errands {
 }
 
 impl RunWorker {
-
     pub(in crate::worker) fn take_answer(&mut self, answer: Answer) {
         match answer {
             Answer::Renewed(renewed) => self.record_renewal(renewed),

@@ -18,7 +18,6 @@ const EPOCH_WEEKDAY_OFFSET: u64 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cadence {
-
     EveryMinutes(u64),
 
     DailyAt(u64),
@@ -27,7 +26,6 @@ pub enum Cadence {
 }
 
 impl Cadence {
-
     fn last_firing(self, now_minutes: u64) -> u64 {
         match self {
             Cadence::EveryMinutes(period) => {
@@ -103,7 +101,6 @@ pub struct Schedule {
 }
 
 impl Schedule {
-
     pub fn parse(text: &str) -> Result<Schedule, AxError> {
         let file: ScheduleFile = toml::from_str(text).map_err(|err| refuse(err.to_string()))?;
         let mut entries = Vec::new();

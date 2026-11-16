@@ -15,7 +15,6 @@ pub const NODE_DEPTH_MAX: usize = 10;
 pub struct NodeId(String);
 
 impl NodeId {
-
     pub fn parse(raw: &str) -> Result<NodeId, AxError> {
         let text = raw.trim();
         let refuse = |why: String| {

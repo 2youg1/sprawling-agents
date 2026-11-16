@@ -21,7 +21,6 @@ enum Reach {
 }
 
 impl McpLink {
-
     pub fn open(
         transport: &McpTransport,
         write_root: &std::path::Path,

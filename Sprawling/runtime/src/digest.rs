@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StructureNode {
-
     pub level: u8,
     pub title: String,
 
@@ -26,7 +25,6 @@ pub struct Digest {
 }
 
 impl Digest {
-
     #[must_use]
     pub fn structural(source: B3Hash, origin: Option<Locator>, text: &str) -> Digest {
         Digest {
@@ -143,7 +141,6 @@ pub struct Breaker {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BreakerVerdict {
-
     Attempt,
 
     Open { after: u32 },
@@ -185,7 +182,6 @@ impl Breaker {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DigestOutcome {
-
     Cached(Digest),
 
     Fresh(Digest),

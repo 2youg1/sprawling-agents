@@ -76,7 +76,6 @@ pub struct Watch {
 }
 
 impl Watch {
-
     pub fn parse(text: &str) -> Result<Watch, AxError> {
         let file: WatchFile = toml::from_str(text).map_err(|err| refuse(err.to_string()))?;
         let mut sources = Vec::new();

@@ -36,7 +36,6 @@ fn exposed() -> SocketAddr {
 
 #[test]
 fn the_command_and_query_tables_hold_their_declared_counts() {
-
     assert_eq!(COMMAND_NAMES.len(), 50, "command table");
     assert_eq!(QUERY_NAMES.len(), 64, "query table");
 
@@ -53,7 +52,6 @@ fn the_command_and_query_tables_hold_their_declared_counts() {
 
 #[test]
 fn every_command_name_is_registered_in_the_table() {
-
     for command in sample_of_every_command() {
         let name = command.name();
         assert!(
@@ -129,7 +127,6 @@ const WIRE_SHAPE_GOLDEN: &str = "a3a6221d2774e42b59806125a7da6644f9b1168d7ae4004
 #[cfg(feature = "server")]
 #[test]
 fn the_binding_face_refuses_exactly_when_no_key_is_given() {
-
     let secret = kernel::B3Hash::digest(b"pair-me-during-binding");
     for addr in [loopback(), exposed()] {
         let BindVerdict::Refuse(err) = decide_bind(&addr, None) else {
@@ -259,7 +256,6 @@ fn an_exposed_server_rejects_a_wrong_token_and_accepts_the_right_one() {
 
 #[test]
 fn put_secret_has_no_byte_form_in_either_direction() {
-
     let json = r#"{"put_secret":{"realm":"anthropic","name":"api","value":"sk-not-a-real-key"}}"#;
     let decoded: Result<wire::WireCommand, _> = serde_json::from_str(json);
     let err = decoded.expect_err("PutSecret has no wire form");
@@ -279,7 +275,6 @@ fn put_secret_has_no_byte_form_in_either_direction() {
 
 #[test]
 fn every_state_changing_command_carries_an_idempotency_key() {
-
     for command in sample_of_every_command() {
         let name = command.name();
         if name == "Auth" || name == "PutSecret" {
@@ -684,7 +679,6 @@ fn the_command_sample_covers_the_whole_table() {
 
 #[test]
 fn a_query_never_carries_an_idempotency_key() {
-
     for name in QUERY_NAMES {
         assert!(!name.is_empty());
     }

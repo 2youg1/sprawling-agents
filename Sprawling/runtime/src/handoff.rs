@@ -16,7 +16,6 @@ pub struct Handoff {
 }
 
 impl Handoff {
-
     pub fn new(
         must_read: Vec<Locator>,
         overview: String,

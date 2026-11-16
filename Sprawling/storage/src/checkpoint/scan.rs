@@ -101,7 +101,6 @@ pub(crate) struct CommitPlan<'a> {
 }
 
 impl Checkpoint {
-
     pub fn scan_staged(
         &mut self,
         scopes: &[String],
@@ -109,7 +108,6 @@ impl Checkpoint {
         let index = self.repo.index().map_err(git_err("read index"))?;
         let mut findings = ScanFindings::default();
         match self.last_tree()? {
-
             None => {
                 for entry in index.iter() {
                     if entry.mode != GITLINK {
@@ -279,7 +277,6 @@ impl Checkpoint {
         nested.sort();
         nested.dedup();
         for root in nested {
-
             if index.get_path(&root, 0).is_some() {
                 index.remove_path(&root).map_err(git_err("stage scope"))?;
             }

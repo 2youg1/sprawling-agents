@@ -17,7 +17,6 @@ type WebSocket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 
 impl BidiSocket {
-
     pub(crate) fn connect(url: &str, patience: std::time::Duration) -> Result<BidiSocket, AxError> {
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()

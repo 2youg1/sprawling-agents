@@ -9,7 +9,6 @@ use crate::error::StorageError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AliasKind {
-
     Link,
 
     HardLink,
@@ -93,7 +92,6 @@ impl std::fmt::Debug for WriteTarget {
 }
 
 impl WriteTarget {
-
     pub fn at(op: &'static str, path: &Path) -> Result<WriteTarget, StorageError> {
         for parent in path.ancestors().skip(1) {
             if let Some(kind) = kind_at(parent)? {

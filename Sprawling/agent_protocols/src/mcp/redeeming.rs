@@ -15,7 +15,6 @@ pub(crate) struct Redeemed {
 
 #[derive(Clone)]
 enum Value {
-
     Plain(String),
 
     Sealed(Arc<Sealed<String>>),
@@ -35,7 +34,6 @@ impl Redeemed {
 }
 
 impl std::fmt::Debug for Redeemed {
-
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Redeemed({})", self.name)
     }

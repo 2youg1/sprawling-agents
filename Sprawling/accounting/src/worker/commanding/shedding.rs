@@ -14,7 +14,6 @@ use kernel::{AxCode, AxError};
 use super::super::RunWorker;
 
 impl RunWorker {
-
     pub(in crate::worker) fn room_for_new_work(&self) -> Result<(), AxError> {
         (self.read_volume)(&self.city_root)
             .map_or(Ok(()), degradation::admit_work)

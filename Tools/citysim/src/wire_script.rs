@@ -35,7 +35,6 @@ pub(crate) struct Turn {
 }
 
 impl WireScript {
-
     pub fn parse(text: &str) -> Result<WireScript, AxError> {
         let whole: Value =
             serde_json::from_str(text).map_err(|err| unreadable("the script", &err.to_string()))?;
@@ -190,7 +189,6 @@ impl Refusal {
 }
 
 impl Answer {
-
     pub(crate) fn status(&self) -> (u16, &'static str) {
         match self {
             Answer::Models(_) | Answer::Reply(_) => (200, "OK"),

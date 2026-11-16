@@ -19,7 +19,6 @@ pub(super) enum Attempt {
 }
 
 impl Attempt {
-
     pub(super) fn log_suffix(self) -> &'static str {
         match self {
             Attempt::First => ".log",

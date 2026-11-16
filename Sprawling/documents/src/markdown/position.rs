@@ -15,7 +15,6 @@ pub(super) struct Positions<'t> {
 }
 
 impl<'t> Positions<'t> {
-
     pub(super) fn of(text: &'t str, at: u64) -> Positions<'t> {
         let bytes = text.as_bytes();
         let mut starts = vec![0];

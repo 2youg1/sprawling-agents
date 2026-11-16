@@ -12,7 +12,6 @@ use crate::error::io_err;
 const GITDIR_PREFIX: &str = "gitdir: ";
 
 impl Worktrees {
-
     pub fn relink_moved(city_root: &Path, moved_from: &Path) -> Result<usize, StorageError> {
         let registrations = match std::fs::read_dir(city_root.join(".git").join("worktrees")) {
             Ok(entries) => entries,

@@ -25,7 +25,6 @@ pub(super) enum Class {
 }
 
 impl Class {
-
     fn parse(word: &str) -> Option<Self> {
         match word {
             "Read" => Some(Self::Read),

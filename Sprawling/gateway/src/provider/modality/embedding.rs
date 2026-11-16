@@ -16,7 +16,6 @@ pub struct EmbeddingRequest {
 const ENCODING_FORMAT: &str = "float";
 
 impl EmbeddingRequest {
-
     pub fn new(model: String, inputs: Vec<String>) -> Result<EmbeddingRequest, AxError> {
         if inputs.is_empty() || inputs.iter().any(String::is_empty) {
             return Err(AxError::failure(
@@ -78,7 +77,6 @@ pub struct Embeddings {
 }
 
 impl Embeddings {
-
     pub fn parse(answer: &Value, asked: &EmbeddingRequest) -> Result<Embeddings, AxError> {
         let data = answer
             .get("data")

@@ -48,7 +48,6 @@ impl RunWorker {
                 let knocks_mark = self.doorstep.knocks.len();
                 let outcome = (|| {
                     for signal in signals {
-
                         let arrival = self.arrive(signal)?;
 
                         self.knock(arrival.signal(), &at.addr, at.policy, chain)?;
@@ -61,7 +60,6 @@ impl RunWorker {
                 match outcome {
                     Ok(()) => Ok(()),
                     Err(err) => {
-
                         self.doorstep.knocks.truncate(knocks_mark);
                         Err(err)
                     }

@@ -27,7 +27,6 @@ pub struct EditTool {
 
 #[derive(Clone)]
 pub struct EditDesk {
-
     pub policy: crate::mode::PolicyReader,
 
     pub seen: ReadStamps,
@@ -36,7 +35,6 @@ pub struct EditDesk {
 }
 
 impl EditTool {
-
     pub const NAME: &'static str = "edit";
 
     const FILE_PATH: &'static str = "file_path";
@@ -220,7 +218,6 @@ impl Tool for EditTool {
                 Stamp::of(&path).map_err(|err| unreadable(rel, &err))?,
             ),
             Intent::Replace => {
-
                 match kernel::gate::replacing(policy.write, &target) {
                     kernel::GateOutcome::Allow => {}
                     kernel::GateOutcome::Deny { refusal } => return Err(*refusal),
@@ -255,7 +252,6 @@ impl Tool for EditTool {
                 )));
             }
             Admission::Moved => {
-
                 self.desk.seen.look(&target, current.clone(), current);
                 let why = match passage::around(&text, old) {
                     (passage::Opened::AroundOld, window) => {
@@ -310,7 +306,6 @@ impl Tool for EditTool {
 }
 
 impl EditTool {
-
     fn create(
         &self,
         target: &kernel::Address,

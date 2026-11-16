@@ -17,7 +17,6 @@ pub(in crate::worker) enum FirstChat {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::worker) enum Reply {
-
     Status {
         status: u16,
         headers: Vec<(String, String)>,
@@ -28,7 +27,6 @@ pub(in crate::worker) enum Reply {
 }
 
 impl Reply {
-
     pub(in crate::worker) fn answered(body: String) -> Reply {
         Reply::Status {
             status: 200,
@@ -288,7 +286,6 @@ fn serve(
     let drops = std::sync::atomic::AtomicBool::new(first_chat == FirstChat::Dropped);
     let dropping = std::sync::Arc::new(drops);
     let handle = std::thread::spawn(move || {
-
         let mut refused = 0_u32;
         for stream in listener.incoming() {
             let Ok(mut stream) = stream else {
@@ -312,7 +309,6 @@ fn serve(
                 let mut whole = false;
                 loop {
                     let n = match std::io::Read::read(&mut stream, &mut buf) {
-
                         Ok(0) => break,
                         Ok(n) => n,
                         Err(e)
@@ -355,7 +351,6 @@ fn serve(
 
                 recorder.lock().unwrap().push(head.clone());
                 let reply = if a_chat {
-
                     script.lock().unwrap().answer(&head)
                 } else if lists.load(std::sync::atomic::Ordering::SeqCst) {
                     Reply::answered(list)

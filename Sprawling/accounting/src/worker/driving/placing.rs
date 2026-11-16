@@ -18,14 +18,12 @@ use super::Sieving;
 use crate::prompt_chain::RuleDelivery;
 
 pub(super) struct Checkpointing {
-
     pub(super) checkpointed: RefCell<Vec<String>>,
 
     wrote: RefCell<Writes>,
 }
 
 impl Checkpointing {
-
     pub(super) fn opened() -> Checkpointing {
         Checkpointing {
             checkpointed: RefCell::new(Vec::new()),

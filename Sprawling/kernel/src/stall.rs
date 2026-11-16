@@ -73,7 +73,6 @@ mod tests {
 
     #[test]
     fn a_broken_repetition_recovered_itself() {
-
         let sample = [
             print("loop"),
             print("loop"),

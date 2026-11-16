@@ -22,7 +22,6 @@ use serde_json::{Value, json};
 use super::*;
 
 enum Step {
-
     Answer(Value),
 
     Say(Value),

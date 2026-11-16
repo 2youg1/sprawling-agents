@@ -26,7 +26,6 @@ pub struct Spread {
 }
 
 impl Spread {
-
     #[must_use]
     pub fn of(head: Duration, tail: impl IntoIterator<Item = Duration>) -> Spread {
         let mut sorted: Vec<Duration> = std::iter::once(head).chain(tail).collect();

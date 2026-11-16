@@ -11,14 +11,12 @@ use super::registry::ConnectionKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Modality {
-
     Embedding,
 
     Rerank,
 }
 
 impl Modality {
-
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -31,7 +29,6 @@ impl Modality {
 }
 
 impl ConnectionKind {
-
     #[must_use]
     pub const fn path_for(self, modality: Modality) -> Option<&'static str> {
         match self {

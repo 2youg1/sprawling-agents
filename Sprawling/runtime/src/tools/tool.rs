@@ -28,7 +28,6 @@ enum Op<'a> {
 }
 
 impl ToolTool {
-
     pub const NAME: &'static str = "tool";
 
     pub const RUN: &'static str = "run";

@@ -181,7 +181,6 @@ pub enum Clip {
 }
 
 impl Rect {
-
     #[must_use]
     pub fn covers(&self, x: u32, y: u32) -> bool {
         let right = self.x.saturating_add(self.width);
@@ -220,7 +219,6 @@ impl Rect {
 }
 
 impl Clip {
-
     pub fn of(
         rect: Option<Rect>,
         element: Option<Element>,

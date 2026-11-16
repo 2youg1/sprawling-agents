@@ -8,7 +8,6 @@ use crate::Address;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Writes {
-
     Nothing,
 
     Paths(Vec<Address>),
@@ -17,7 +16,6 @@ pub enum Writes {
 }
 
 impl Writes {
-
     pub fn of(effect: &Effect) -> Self {
         match effect {
             Effect::Read => Self::Nothing,

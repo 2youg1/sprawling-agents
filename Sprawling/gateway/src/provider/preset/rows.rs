@@ -69,7 +69,6 @@ pub const PRESETS: [HostPreset; 13] = [
         source: "https://github.com/openai/openai-openapi/blob/master/openapi.yaml",
     },
     HostPreset {
-
         host: "api.deepseek.com",
 
         faces: &[
@@ -161,7 +160,6 @@ pub const PRESETS: [HostPreset; 13] = [
         source: "https://ai.google.dev/gemini-api/docs/openai",
     },
     HostPreset {
-
         host: "open.bigmodel.cn",
         faces: &[Face {
             dialect: DialectKind::OpenAi,
@@ -188,7 +186,6 @@ pub const PRESETS: [HostPreset; 13] = [
         source: "https://docs.z.ai/api-reference/llm/chat-completion",
     },
     HostPreset {
-
         host: "opencode.ai",
 
         faces: &[
@@ -213,7 +210,6 @@ pub const PRESETS: [HostPreset; 13] = [
         source: "https://opencode.ai/docs/go/",
     },
     HostPreset {
-
         host: "api.kimi.com",
 
         faces: &[
@@ -249,7 +245,6 @@ pub const PRESETS: [HostPreset; 13] = [
         source: "https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/auth/platforms.py",
     },
     HostPreset {
-
         host: "api.moonshot.ai",
         faces: &[Face {
             dialect: DialectKind::OpenAi,
@@ -263,7 +258,6 @@ pub const PRESETS: [HostPreset; 13] = [
         source: "https://github.com/MoonshotAI/kimi-cli/blob/main/src/kimi_cli/auth/platforms.py",
     },
     HostPreset {
-
         host: "dashscope-us.aliyuncs.com",
         faces: &[Face {
             dialect: DialectKind::OpenAi,

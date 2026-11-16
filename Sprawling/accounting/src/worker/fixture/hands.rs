@@ -78,7 +78,6 @@ impl crate::Clock for WallClock {
 pub(crate) struct LeapingClock(std::sync::atomic::AtomicU64);
 
 impl LeapingClock {
-
     pub(crate) const LEAP_MS: u64 = 60_000;
 
     pub(crate) fn from_now() -> LeapingClock {

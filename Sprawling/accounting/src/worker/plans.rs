@@ -19,7 +19,6 @@ pub(super) struct Reporter<'a> {
 }
 
 impl RunWorker {
-
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "one claim effect stops a node red; the others do not stop one"
@@ -164,7 +163,6 @@ impl RunWorker {
 
         let change = match step {
             wire::PursuitStep::Set { goal } => {
-
                 self.require_plan_to_pursue(addr, &goal)?;
 
                 PursuitChange::Declare(kernel::Pursuit::declare(&self.planning.delegator, goal)?)

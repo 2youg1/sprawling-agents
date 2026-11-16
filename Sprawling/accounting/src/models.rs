@@ -6,7 +6,6 @@
 use kernel::AxError;
 
 pub trait ModelFactory {
-
     fn build(
         &self,
         chosen: &gateway::Chosen<'_>,

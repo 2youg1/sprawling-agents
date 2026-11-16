@@ -7,7 +7,6 @@ use kernel::{Address, EventKind, EventRecord, NodeId, StopCause};
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) enum PlanReach {
-
     Untouched,
 
     Stale,
@@ -27,16 +26,13 @@ pub(super) fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::RunFrozen
         | EventKind::RoadmapClaimed
         | EventKind::RoadmapSplit
-
         | EventKind::SpineDocumentWritten => PlanReach::Stale,
         EventKind::BuildingConfigured
-
         | EventKind::BuildingRemoved
         | EventKind::SessionOpened
         | EventKind::RunStarted
         | EventKind::RunForked
         | EventKind::PromptAssembled
-
         | EventKind::PromptShapeCompared
         | EventKind::ModelCalled
         | EventKind::ModelReturned
@@ -94,7 +90,6 @@ pub(super) fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::GovernedDocumentWritten
         | EventKind::RulesChanged
         | EventKind::ToolkitLinkOpened
-
         | EventKind::EmbeddingCalled
         | EventKind::RerankCalled
         | EventKind::AdviserAsked
@@ -104,23 +99,19 @@ pub(super) fn may_move_plan(kind: EventKind) -> PlanReach {
         | EventKind::PrefixHeld
         | EventKind::HarnessReported
         | EventKind::HarnessAnswered
-
         | EventKind::RemoteOpened
         | EventKind::RemoteClosed
         | EventKind::DevicePaired
         | EventKind::DeviceRevoked
         | EventKind::RemoteSessionStarted
-
         | EventKind::DocumentWritten
         | EventKind::ProposalOffered
         | EventKind::ProposalDecided
         | EventKind::ProposalWithdrawn
-
         | EventKind::RunPolicyChanged
         | EventKind::SessionNamed
         | EventKind::SkillAudited
         | EventKind::SkillShelved
-
         | EventKind::SignalWaitStarted
         | EventKind::SignalWaitEnded => PlanReach::Untouched,
     }

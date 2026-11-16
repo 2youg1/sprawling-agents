@@ -9,7 +9,6 @@ use crate::step::Step;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Failure {
-
     At { step: Step, code: co::ERROR },
 
     Unspelled(u32),

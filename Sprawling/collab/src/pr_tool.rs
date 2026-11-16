@@ -21,10 +21,14 @@ pub use request::{MergedRequest, OpenRequest, RejectedRequest};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrEffect {
+    Opened {
+        branch: String,
+    },
 
-    Opened { branch: String },
-
-    Merged { request: OpenRequest, by: String },
+    Merged {
+        request: OpenRequest,
+        by: String,
+    },
 
     Rejected {
         request: OpenRequest,
@@ -210,7 +214,6 @@ pub struct PrTool {
 }
 
 impl PrTool {
-
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [

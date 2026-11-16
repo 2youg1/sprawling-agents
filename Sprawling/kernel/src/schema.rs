@@ -210,7 +210,6 @@ mod tests {
         LazyLock::new(|| Regex::new(&session_name_pattern()).unwrap());
 
     fn boundary() -> Vec<String> {
-
         let mut pieces: Vec<String> = "a|ab|notes.md|.|..|.sprawling|.SPRAWLING|x."
             .split('|')
             .map(str::to_owned)
@@ -369,7 +368,6 @@ mod tests {
                     let parsed = SessionName::parse(&raw).is_ok();
                     assert!(matched || !parsed, "session name {raw:?}");
                     if matched && !parsed {
-
                         assert!(raw.trim().eq_ignore_ascii_case(RESERVED_PREFIX), "{raw:?}");
                     }
                 }

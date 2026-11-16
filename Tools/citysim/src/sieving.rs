@@ -20,7 +20,6 @@ pub struct SieveWorld {
 }
 
 impl SieveWorld {
-
     pub fn open(root: &std::path::Path, table: FilterTable) -> Result<SieveWorld, AxError> {
         let cas = Cas::open(&root.join("cas")).map_err(storage::StorageError::into_ax)?;
         Ok(SieveWorld {

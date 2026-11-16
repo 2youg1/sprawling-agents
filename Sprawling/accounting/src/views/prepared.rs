@@ -42,7 +42,6 @@ pub(super) fn unavailable_because(query: String, stopped: &kernel::AxError) -> w
 }
 
 pub enum Prepared {
-
     Held(wire::Answer),
 
     GitStatus(GitStatusAsk),
@@ -51,9 +50,13 @@ pub enum Prepared {
 
     Preferences,
 
-    Identity { city_root: PathBuf },
+    Identity {
+        city_root: PathBuf,
+    },
 
-    Automation { city_root: PathBuf },
+    Automation {
+        city_root: PathBuf,
+    },
 
     GithubLogin {
         ask: Option<fn(&str) -> wire::GithubReading>,
@@ -93,7 +96,10 @@ pub enum Prepared {
         locator: Locator,
     },
 
-    Archives { city_root: PathBuf, needle: String },
+    Archives {
+        city_root: PathBuf,
+        needle: String,
+    },
 
     Skills {
         city_root: PathBuf,
@@ -101,7 +107,10 @@ pub enum Prepared {
         pins: SkillPins,
     },
 
-    McpHealth { live: LiveAsk, addr: Address },
+    McpHealth {
+        live: LiveAsk,
+        addr: Address,
+    },
 
     Toolkits(LiveAsk),
 
@@ -119,7 +128,10 @@ pub enum Prepared {
 
     Find(PathBuf, Address, String),
 
-    Document { city_root: PathBuf, at: Address },
+    Document {
+        city_root: PathBuf,
+        at: Address,
+    },
 
     Proposals {
         ledger: LedgerAsk,
@@ -143,7 +155,10 @@ pub enum Prepared {
 
     Versions(super::versions::VersionsAsk),
 
-    Layers { city_root: PathBuf, addr: Address },
+    Layers {
+        city_root: PathBuf,
+        addr: Address,
+    },
 
     Catalog(super::catalog::CatalogAsk),
 
@@ -184,11 +199,20 @@ pub enum Prepared {
         limit: u32,
     },
 
-    Rounds { ledger: LedgerAsk, run: RunId },
+    Rounds {
+        ledger: LedgerAsk,
+        run: RunId,
+    },
 
-    Evidence { ledger: LedgerAsk, run: RunId },
+    Evidence {
+        ledger: LedgerAsk,
+        run: RunId,
+    },
 
-    Recalled { ledger: LedgerAsk, run: RunId },
+    Recalled {
+        ledger: LedgerAsk,
+        run: RunId,
+    },
 }
 
 pub struct LedgerAsk {
@@ -197,7 +221,6 @@ pub struct LedgerAsk {
 }
 
 impl LedgerAsk {
-
     pub(super) fn indexed(
         &self,
     ) -> Result<(MutexGuard<'_, storage::LedgerIndex>, PathBuf), storage::StorageError> {
@@ -214,7 +237,6 @@ impl LedgerAsk {
 }
 
 impl Prepared {
-
     pub fn finish(self) -> wire::Answer {
         match self {
             Self::Held(answer) => answer,

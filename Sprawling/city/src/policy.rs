@@ -73,7 +73,6 @@ pub struct BuildingRules {
 }
 
 impl BuildingRules {
-
     #[must_use]
     pub fn policy(&self) -> &BuildingPolicy {
         &self.policy

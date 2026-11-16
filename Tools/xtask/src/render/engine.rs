@@ -134,13 +134,10 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
         .arg("--headless=new")
         .arg("--disable-gpu")
         .arg("--no-sandbox")
-
         .arg("--no-first-run")
         .arg("--no-default-browser-check")
         .arg("--hide-scrollbars")
-
         .arg("--use-mock-keychain")
-
         .arg("--allow-file-access-from-files")
         .arg(format!("--user-data-dir={}", profile.display()))
         .arg(format!("--window-size={},{HEIGHT}", pass.width))
@@ -177,7 +174,6 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
     };
     let vocabulary = declared(words);
     if vocabulary.is_empty() {
-
         return Err(XtaskError::Cmd {
             cmd: format!("{} --dump-dom {route}", browser.display()),
             msg: "the probe read no declared words off the root element; the engine does not \

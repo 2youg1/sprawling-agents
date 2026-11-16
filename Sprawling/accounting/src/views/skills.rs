@@ -13,7 +13,6 @@ use super::holding::Views;
 pub(super) type SkillPins = BTreeMap<(String, B3Hash), Vec<RunId>>;
 
 impl Views {
-
     pub(super) fn fold_skill_pins(&mut self, record: &EventRecord) {
         let Ok(started) = record.data().read::<kernel::event::record::RunStarted>() else {
             return;
@@ -142,7 +141,6 @@ mod tests {
                 .join(city::CONFIG_FILE),
             format!(
                 "[skills]\nshelves = [\"{}\"]\n",
-
                 elsewhere.display().to_string().replace('\\', "/")
             ),
         )

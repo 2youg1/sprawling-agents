@@ -13,7 +13,6 @@ pub struct Selection {
 }
 
 impl Selection {
-
     pub const fn collapsed(at: u64) -> Selection {
         Selection {
             anchor: at,

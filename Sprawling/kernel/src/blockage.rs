@@ -23,7 +23,6 @@ pub struct Blockage {
 }
 
 impl Blockage {
-
     #[must_use]
     pub fn line(&self) -> String {
         let branch = self
@@ -41,7 +40,6 @@ impl Blockage {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Notice {
-
     pub to: String,
     pub about: NodeId,
     pub line: String,

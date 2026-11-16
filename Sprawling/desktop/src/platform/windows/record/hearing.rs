@@ -24,14 +24,12 @@ pub(super) struct Hearing {
 }
 
 pub(super) struct Heard {
-
     pub(super) into: PathBuf,
 
     pub(super) cut_short: Option<Refusal>,
 }
 
 impl Hearing {
-
     pub(super) fn open(device: &str, into: &Path) -> Result<Hearing, Refusal> {
         let spawned = child::command("ffmpeg")
             .args(arguments(device, into))
@@ -110,7 +108,6 @@ impl Hearing {
 }
 
 impl Heard {
-
     pub(super) fn carried(&self) -> Result<Vec<u8>, String> {
         let shown = self.into.display();
         let size = std::fs::metadata(&self.into)

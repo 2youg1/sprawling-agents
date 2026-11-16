@@ -20,7 +20,6 @@ mod tests;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Side {
-
     Written,
 
     Output,

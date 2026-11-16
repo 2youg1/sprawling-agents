@@ -25,7 +25,6 @@ impl Direction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Payload {
-
     Frame(String),
 
     Lock,
@@ -36,7 +35,6 @@ const FRAME: u8 = 0;
 const LOCK: u8 = 1;
 
 impl Payload {
-
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         match self {

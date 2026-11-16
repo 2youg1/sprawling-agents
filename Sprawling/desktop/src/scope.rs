@@ -42,11 +42,7 @@ struct ScopeFile {
 }
 
 pub(crate) enum Scope {
-
-    Closed {
-        code: RefusalCode,
-        because: String,
-    },
+    Closed { code: RefusalCode, because: String },
     Open(Allowance),
 }
 
@@ -79,7 +75,6 @@ pub(crate) struct Admitted<'a> {
 }
 
 impl Admitted<'_> {
-
     #[cfg(any(windows, test))]
     pub(crate) fn visible(&self, title: &str, process: &str) -> bool {
         self.allowance.visible(title, process)
@@ -101,7 +96,6 @@ impl Admitted<'_> {
 }
 
 impl Scope {
-
     pub(crate) fn read(path: Option<&Path>) -> Scope {
         let Some(path) = path else {
             return Scope::Closed {
@@ -202,7 +196,6 @@ fn switched_off(switch: &str) -> Refusal {
         RefusalCode::GateDenied,
         "use the desktop",
         format!("this scope does not switch `{switch}` on"),
-
         &format!("set `{switch} = true` in DESKTOP.toml if this machine's operator wants it"),
     )
 }

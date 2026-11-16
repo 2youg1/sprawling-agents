@@ -83,7 +83,6 @@ impl Warmth {
 
 #[derive(Debug, Default)]
 pub struct RenewalRound {
-
     pub answers: Vec<ModelReturn>,
 
     pub refused: Option<AxError>,
@@ -99,7 +98,6 @@ fn renewal_of(request: &ModelRequest<'static>) -> ModelRequest<'static> {
 pub struct Lead(Arc<AtomicU64>);
 
 impl Lead {
-
     pub fn ms(&self) -> u64 {
         self.0.load(Ordering::Relaxed)
     }
@@ -117,7 +115,6 @@ pub struct Warmed<C> {
 }
 
 impl<C: FnMut() -> Result<TimeMs, AxError>> Warmed<C> {
-
     pub fn new(model: Box<dyn Model + Send>, setting: KeepWarm, clock: C, lead: Lead) -> Warmed<C> {
         Warmed {
             model,

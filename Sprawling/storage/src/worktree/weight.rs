@@ -70,7 +70,6 @@ pub(super) fn measure(root: &Path) -> Result<Weight, StorageError> {
                 continue;
             }
             if kind.is_dir() {
-
                 let ours = path
                     .strip_prefix(root)
                     .is_ok_and(|relative| !outside_reserved(relative));

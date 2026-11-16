@@ -15,7 +15,6 @@ use super::super::RunWorker;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::worker) enum Arrival {
-
     Enrolment,
 
     Pasted,
@@ -31,7 +30,6 @@ impl Arrival {
 }
 
 impl RunWorker {
-
     pub(in crate::worker) fn put_secret(
         &mut self,
         reference: &kernel::SecretRef,

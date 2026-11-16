@@ -22,7 +22,6 @@ pub(crate) const WEBKIT: &str = "webkit";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Family {
-
     Gecko,
 
     Chromium,
@@ -31,7 +30,6 @@ pub(crate) enum Family {
 }
 
 impl Family {
-
     #[cfg(test)]
     pub(crate) const ALL: [Family; 3] = [Family::Gecko, Family::Chromium, Family::WebKit];
 
@@ -46,7 +44,6 @@ impl Family {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Confidence {
-
     Tried,
 
     NeedsConfirmation,
@@ -55,7 +52,6 @@ pub(crate) enum Confidence {
 }
 
 impl Confidence {
-
     pub(crate) fn caveat(self) -> &'static str {
         match self {
             Confidence::Tried => "",
@@ -66,7 +62,6 @@ impl Confidence {
 }
 
 pub(crate) struct Member {
-
     pub(crate) name: &'static str,
 
     pub(crate) program: &'static str,

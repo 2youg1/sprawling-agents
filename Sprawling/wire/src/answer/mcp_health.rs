@@ -28,9 +28,7 @@ pub struct McpServerHealth {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum McpState {
-
     Connected {
-
         protocol_version: String,
 
         server: String,
@@ -38,17 +36,17 @@ pub enum McpState {
     },
 
     Authenticating {
-
         recovery: String,
     },
 
-    Failed { refusal: Box<AxError> },
+    Failed {
+        refusal: Box<AxError>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct McpToolLine {
-
     pub remote: String,
 
     pub name: String,

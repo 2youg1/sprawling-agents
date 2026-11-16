@@ -25,7 +25,6 @@ pub enum CheckedLine {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LineFault {
-
     NotALine(String),
 
     VersionAhead(u64),
@@ -55,7 +54,6 @@ struct Envelope<'a> {
 }
 
 impl LineCheck {
-
     pub fn at_genesis() -> Self {
         Self::after(GENESIS_PREV, Seq::FIRST)
     }
@@ -153,7 +151,6 @@ fn canonical_record(raw: &[u8]) -> Result<EventRecord, LineFault> {
 }
 
 impl LineFault {
-
     pub fn into_ax(self, line_no: u64) -> AxError {
         let newer = |detail: String| {
             AxError::failure(AxCode::LogVersionUnsupported, "verify ledger", detail).with_recovery(

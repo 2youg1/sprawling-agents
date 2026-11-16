@@ -17,7 +17,6 @@ pub enum Interpreter {
 }
 
 impl Interpreter {
-
     pub const KEY: &'static str = "interpreter";
 
     pub fn parse(raw: &str) -> Result<Interpreter, AxError> {

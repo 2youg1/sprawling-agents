@@ -77,7 +77,6 @@ pub struct CityLayout {
 }
 
 impl CityLayout {
-
     #[must_use]
     pub fn new(root: &Path) -> Self {
         Self {

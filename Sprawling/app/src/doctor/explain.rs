@@ -11,7 +11,6 @@ use super::{Finding, Platform};
 
 #[derive(Debug)]
 pub(crate) enum Explanation {
-
     NoSuchCode(String),
 
     NotAboutThisMachine(AxCode),

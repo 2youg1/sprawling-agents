@@ -14,14 +14,12 @@ use super::charter::{Charter, Verdict};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cut {
-
     Halt,
 
     Deadline,
 }
 
 pub struct Conclusion<'c> {
-
     pub committed: Payload,
     pub answered: HarnessAnswered,
     pub handoff: &'c Handoff,
@@ -34,7 +32,6 @@ pub struct HarnessRun<'a> {
 }
 
 impl<'a> HarnessRun<'a> {
-
     pub fn open(
         charter: Charter<'a>,
         ledger: &mut dyn Ledger,

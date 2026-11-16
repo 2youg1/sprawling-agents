@@ -8,7 +8,6 @@ use kernel::{AxError, Increment, Model, ModelRequest, ModelReturn, ToolCall, Too
 use super::wave::{ConcurrentInvoke, lost_answer, reads_only};
 
 pub enum Generating<'a, 'sink> {
-
     Unwatched,
 
     Watched(&'a mut (dyn FnMut(&Increment) + 'sink)),
@@ -25,7 +24,6 @@ pub(super) struct Speculated {
 }
 
 impl Speculated {
-
     pub(super) fn answers_for(
         self,
         calls: &[&ToolCall],
@@ -57,7 +55,6 @@ pub(super) fn call_ahead(
         let mut started = Vec::new();
         let mut prefix = Prefix::Reading;
         let returned = model.call_speculating(request, onto, &mut |call: &ToolCall| {
-
             let call = tools.resolve_call(call.clone());
             if let Prefix::Reading = prefix
                 && reads_only(tools, &call)

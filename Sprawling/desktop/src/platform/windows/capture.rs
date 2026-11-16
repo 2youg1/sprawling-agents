@@ -61,7 +61,6 @@ fn refused(failure: Failure, width: u32, height: u32) -> Refusal {
     };
     let machine = |doing: &str, recovery: &str| fault::system(doing, recovery, code);
     match step {
-
         Step::NoWindow => Refusal::new(
             RefusalCode::ToolUnavailable,
             DOING,

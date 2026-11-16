@@ -14,7 +14,6 @@ use crate::real_fs::RealFs;
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModelChoice {
-
     pub id: String,
 
     pub effort: Option<Effort>,
@@ -31,7 +30,6 @@ pub struct Provenance {
 }
 
 impl Provenance {
-
     pub fn new(run: RunId, actor: Address, city: B3Hash, chosen: ModelChoice) -> Provenance {
         Provenance {
             run,
@@ -190,7 +188,6 @@ mod tests {
 
     #[test]
     fn an_effort_nobody_asked_for_is_recorded_as_the_level_none() {
-
         assert_eq!(recorded_effort(None), Effort::None);
         assert_eq!(recorded_effort(Some(Effort::High)), Effort::High);
         assert_eq!(recorded_effort(None).as_str(), "none");

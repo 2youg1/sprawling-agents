@@ -47,7 +47,6 @@ fn concluded(report: &TurnReport, lines: &HeldLines) -> Result<Completion, AxErr
 }
 
 impl Run<Active> {
-
     pub(super) fn line(&self, t: TimeMs, kind: kernel::EventKind, data: Payload) -> EventDraft {
         EventDraft {
             run: self.plan.run,
@@ -177,7 +176,6 @@ impl Run<Active> {
             ledger,
             model,
             &self.plan.policy,
-
             Generating::Speculating {
                 deltas: hooks.deltas.as_deref_mut(),
                 tools: &*hooks.invoke,

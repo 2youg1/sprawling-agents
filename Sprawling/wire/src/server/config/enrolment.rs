@@ -63,7 +63,6 @@ pub(super) async fn accept_enrolment(
         return (StatusCode::UNPROCESSABLE_ENTITY, refusal_text(&err)).into_response();
     }
     let waited = tokio::time::timeout(ENROLMENT_PATIENCE, async move {
-
         let mut refusal_possible = true;
         loop {
             tokio::select! {
@@ -144,9 +143,6 @@ enum Waited {
 }
 
 enum Enrolled {
-
-    Stored {
-        reference: String,
-    },
+    Stored { reference: String },
     Refused(AxError),
 }

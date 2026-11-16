@@ -9,7 +9,6 @@ use crate::error::StorageError;
 pub struct WorktreeName(String);
 
 impl WorktreeName {
-
     pub fn parse(raw: &str) -> Result<WorktreeName, StorageError> {
         let refuse = |detail: &str| StorageError::Worktree {
             op: "name a worktree",

@@ -28,7 +28,6 @@ pub(crate) struct Folding {
 pub(crate) struct Backlog(Arc<AtomicU64>);
 
 impl Backlog {
-
     pub(crate) fn records(&self) -> u64 {
         self.0.load(Ordering::Relaxed)
     }
@@ -87,7 +86,6 @@ pub(crate) fn spawn_folding(
     let thread = std::thread::Builder::new()
         .name("sprawling-views".to_owned())
         .spawn(move || {
-
             let _seat = crate::serving::placement::seat_this_thread(
                 "sprawling-views",
                 crate::serving::placement::Role::Serial,
@@ -201,7 +199,6 @@ enum Folded {
 }
 
 impl Cadence {
-
     fn folded(&mut self, cost: Duration, last: Option<&EventRecord>, verdict: Folded) {
         self.folded_since_cut = self.folded_since_cut.saturating_add(cost);
         if let Some(record) = last {
@@ -278,7 +275,6 @@ fn file_slices(slices: &mut Option<storage::Sessions>, batch: Vec<Fold>) -> u64 
 fn send_committed(broadcast: &Broadcast, record: &EventRecord) {
     broadcast.head.advance(record.seq());
     match wire::Committed::new(record.clone()) {
-
         Ok(committed) => drop(broadcast.to_clients.send(committed)),
 
         Err(unframed) => {
@@ -291,7 +287,6 @@ fn fold_batch(views: &mut Views, batch: &[Fold]) -> Folded {
     batch
         .iter()
         .fold(Folded::Clean, |verdict, fold| match fold {
-
             Fold::Committed(record) => match views.apply(record) {
                 Ok(()) => verdict,
                 Err(err) => {

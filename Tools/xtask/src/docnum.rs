@@ -97,7 +97,6 @@ struct Span {
 }
 
 impl Span {
-
     fn framed(&self, value: &str) -> String {
         if self.content.contains('\n') {
             format!("\n{value}\n")

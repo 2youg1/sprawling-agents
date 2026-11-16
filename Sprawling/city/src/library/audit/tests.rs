@@ -73,9 +73,7 @@ const VECTORS: &[(&[Event], Shown)] = &[
         &[Install(1), Audit(1, Pass), Edit(2), Audit(2, Fail)],
         Shown::Audited(Fail),
     ),
-
     (&[Install(1), Edit(2), Audit(1, Pass)], Shown::Stale),
-
     (
         &[Install(1), Audit(1, Pass), Edit(2), Edit(1)],
         Shown::Audited(Pass),

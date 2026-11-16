@@ -11,14 +11,12 @@ use crate::write_domain::WriteLimit;
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Mode {
-
     Chat,
 
     Work,
 }
 
 impl Mode {
-
     pub const ALL: [Mode; 2] = [Mode::Chat, Mode::Work];
 
     #[must_use]
@@ -40,7 +38,6 @@ impl std::fmt::Display for Mode {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum AdmissionRequirement {
-
     Standing,
 
     Tested,
@@ -51,7 +48,6 @@ pub enum AdmissionRequirement {
 }
 
 impl AdmissionRequirement {
-
     pub const ALL: [AdmissionRequirement; 4] = [
         AdmissionRequirement::Standing,
         AdmissionRequirement::Tested,
@@ -74,14 +70,12 @@ impl AdmissionRequirement {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum LandingPolicy {
-
     Ordinary,
 
     Experiment,
 }
 
 impl LandingPolicy {
-
     pub const ALL: [LandingPolicy; 2] = [LandingPolicy::Ordinary, LandingPolicy::Experiment];
 
     #[must_use]
@@ -106,7 +100,6 @@ pub struct RunPolicy {
 }
 
 impl RunPolicy {
-
     #[must_use]
     pub const fn of(mode: Mode) -> RunPolicy {
         RunPolicy {

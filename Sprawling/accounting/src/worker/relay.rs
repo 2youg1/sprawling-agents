@@ -24,7 +24,6 @@ pub(crate) struct RelayRequest {
 }
 
 pub(crate) enum Wake {
-
     Relay(RelayRequest),
 
     Claim(ClaimAsk),
@@ -41,7 +40,6 @@ pub(crate) enum Wake {
 }
 
 pub(crate) struct Drained {
-
     pub written: Vec<EventDraft>,
 
     pub goals: Vec<GoalAsk>,
@@ -50,7 +48,6 @@ pub(crate) struct Drained {
 }
 
 pub(crate) enum Patience {
-
     Now,
 
     For(Duration),
@@ -66,7 +63,6 @@ pub struct Relay {
 }
 
 impl Ledger for Relay {
-
     fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
         self.append_all(vec![draft])?
             .into_iter()
@@ -142,7 +138,6 @@ impl RelayGate {
         ledger: &mut impl Ledger,
         homes: &mut VecDeque<Arrival>,
     ) -> Drained {
-
         let asleep = (self.monotonic)();
         let first = match patience {
             Patience::Now => self.wakes.try_recv().ok(),
@@ -190,7 +185,6 @@ impl RelayGate {
         self.health.taken(batch);
         match ledger.append_all(drafts) {
             Ok(echoes) => {
-
                 let mut echoes = echoes.into_iter();
                 for (back, size) in senders.into_iter().zip(sizes) {
                     let theirs: Vec<EventRef> = echoes.by_ref().take(size).collect();
@@ -296,7 +290,6 @@ mod tests {
 
     impl LedgerInspect for Relayed {
         fn raw_lines(&self) -> Result<Vec<Vec<u8>>, AxError> {
-
             storage::read_raw_lines_at(self.dir.path()).map_err(storage::StorageError::into_ax)
         }
     }

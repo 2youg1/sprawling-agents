@@ -56,7 +56,6 @@ pub(super) struct Hashed {
 }
 
 impl Read {
-
     fn ahead(
         dir: &Path,
         name: &str,

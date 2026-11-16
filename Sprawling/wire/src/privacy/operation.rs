@@ -20,7 +20,6 @@ pub struct PrivacyRequest {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PrivacyAction {
-
     Apply {
         control: PrivacyControl,
         expected: PrivacyValue,
@@ -31,7 +30,9 @@ pub enum PrivacyAction {
         expected: PrivacyValue,
     },
 
-    Reconcile { expected: PrivacyValue },
+    Reconcile {
+        expected: PrivacyValue,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -46,7 +47,6 @@ pub struct PrivacyOutcome {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PrivacyResult {
-
     Running,
 
     Applied {

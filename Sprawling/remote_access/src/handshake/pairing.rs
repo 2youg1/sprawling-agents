@@ -70,7 +70,6 @@ pub struct CityPairing {
 }
 
 impl CityFingerprint {
-
     #[must_use]
     pub fn of(city: &VerifyingKey) -> Self {
         Self(sha256(city.as_bytes()))
@@ -96,7 +95,6 @@ impl CityFingerprint {
 }
 
 impl PairHello {
-
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, AxError> {
         fixed(bytes, "read a pairing hello").map(|array| Self(Box::new(array)))
     }
@@ -114,7 +112,6 @@ impl PairHello {
 }
 
 impl PairReply {
-
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, AxError> {
         fixed(bytes, "read a pairing reply").map(|array| Self(Box::new(array)))
     }
@@ -138,7 +135,6 @@ impl PairReply {
 }
 
 impl Claim {
-
     #[must_use]
     pub fn code(&self) -> PairingCode {
         self.code
@@ -220,7 +216,6 @@ pub fn city_pair_reply(
 }
 
 impl CityPairing {
-
     pub fn open_claim(self, sealed: &[u8]) -> Result<(Claim, Session), AxError> {
         let mut session = self.keys.city_session()?;
         let opened = session

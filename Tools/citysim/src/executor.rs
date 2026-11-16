@@ -203,15 +203,12 @@ pub fn run_scenario_on(
 
     let placed = Cell::new(Some(0u64));
     let mut invoke = |call: &kernel::ToolCall, t: TimeMs| {
-
         let key = IdemKey::derive(&run, next_place(&placed)?, &call.action()?);
         let temporal = bench
             .meta_of(&call.name)
             .map_or(Temporal::Timeless, |meta| meta.temporal);
         match bench.invoke(call, &key, t)? {
-
             BenchOutcome::Ran { outcome, .. } | BenchOutcome::Duplicate { outcome } => {
-
                 let stamp = stamps.observe(t, temporal)?;
                 if let Some(world) = sieve.as_mut()
                     && call.name.as_str() == kernel::ToolName::EXEC
@@ -253,7 +250,6 @@ pub fn run_scenario_on(
 
     let frozen = match checkpoint.as_mut() {
         Some((net, scope)) => {
-
             let of = storage::Provenance::new(
                 run,
                 addr.clone(),

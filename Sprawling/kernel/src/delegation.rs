@@ -22,7 +22,6 @@ pub enum DelegateKind {
 }
 
 impl DelegateKind {
-
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -36,7 +35,6 @@ impl DelegateKind {
 pub struct Delegator(());
 
 impl Delegator {
-
     pub fn root() -> Delegator {
         Delegator(())
     }
@@ -71,12 +69,9 @@ pub enum DelegationVerdict {
 
 pub fn admit(parent: Depth, kind: &DelegateKind) -> DelegationVerdict {
     match parent {
-        Depth::Root => {
-
-            match kind {
-                DelegateKind::Resident | DelegateKind::Ephemeral => DelegationVerdict::Allow,
-            }
-        }
+        Depth::Root => match kind {
+            DelegateKind::Resident | DelegateKind::Ephemeral => DelegationVerdict::Allow,
+        },
         Depth::Delegated => DelegationVerdict::Deny,
     }
 }
@@ -117,6 +112,5 @@ mod tests {
         let root = Delegator::root();
         let child = root.delegate(DelegateKind::Ephemeral);
         assert_eq!(child.kind(), &DelegateKind::Ephemeral);
-
     }
 }

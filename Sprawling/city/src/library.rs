@@ -40,7 +40,6 @@ pub struct Library {
 }
 
 impl Library {
-
     pub fn scan(
         city_root: &Path,
         building: Option<&Address>,

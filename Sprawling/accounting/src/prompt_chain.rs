@@ -19,7 +19,6 @@ pub(crate) struct Convention {
 }
 
 pub(crate) enum Reading {
-
     Sent(Vec<u8>),
 
     Absent,
@@ -250,7 +249,6 @@ pub(crate) struct RuleDelivery {
 }
 
 impl RuleDelivery {
-
     pub(crate) fn seen(&self) -> BTreeSet<Address> {
         self.delivered
             .iter()

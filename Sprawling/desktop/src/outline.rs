@@ -59,7 +59,6 @@ pub(crate) enum Role {
 }
 
 impl Role {
-
     pub(crate) const fn word(self) -> &'static str {
         match self {
             Role::Button => "button",
@@ -160,7 +159,6 @@ pub(crate) struct Line<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Ending {
-
     Whole,
 
     RefLimit { most: usize },

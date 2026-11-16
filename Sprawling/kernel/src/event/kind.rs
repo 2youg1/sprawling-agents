@@ -12,7 +12,6 @@ pub use window::WindowClass;
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum EventKind {
-
     CityInitialized,
     BuildingCreated,
 
@@ -155,7 +154,6 @@ pub enum EventKind {
 }
 
 impl EventKind {
-
     pub const ALL: [EventKind; 97] = [
         EventKind::CityInitialized,
         EventKind::BuildingCreated,

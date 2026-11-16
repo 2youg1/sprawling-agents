@@ -28,7 +28,6 @@ pub struct TranscriptRecord {
 }
 
 impl Transcript {
-
     pub fn of(run: RunId, conversation: &Conversation) -> Result<Transcript, AxError> {
         let mut lines = Vec::with_capacity(conversation.messages().len());
         let mut redacted: u32 = 0;

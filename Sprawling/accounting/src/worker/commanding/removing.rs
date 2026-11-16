@@ -8,7 +8,6 @@ use kernel::{Address, AxCode, AxError, EventKind};
 use super::super::RunWorker;
 
 impl RunWorker {
-
     pub(in crate::worker) fn remove_building(&mut self, addr: &Address) -> Result<(), AxError> {
         if let Some((room, working)) = self.collaborating.rooms.worked_within(addr) {
             return Err(AxError::failure(

@@ -21,7 +21,6 @@ pub struct SignalTool {
 }
 
 impl SignalTool {
-
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, description) in [

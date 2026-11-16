@@ -21,7 +21,6 @@ use sink::{Sink, somewhere};
 pub(crate) struct RecordingId(u64);
 
 pub(crate) enum Wanted {
-
     Start(Sound),
 
     Stop(RecordingId),
@@ -76,7 +75,6 @@ fn named_neither(subject: String) -> Refusal {
 }
 
 struct Running {
-
     of: usize,
     title: String,
     into: PathBuf,
@@ -189,7 +187,6 @@ impl Recordings {
 }
 
 impl Drop for Recordings {
-
     fn drop(&mut self) {
         let running: Vec<RecordingId> = self.running.keys().copied().collect();
         for id in running {
@@ -223,7 +220,6 @@ mod tests {
     }
 
     impl Recordings {
-
         fn start_silent(&mut self, window: Window) -> Result<Value, Refusal> {
             self.start(window, None)
         }

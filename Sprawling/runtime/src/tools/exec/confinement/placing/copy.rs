@@ -241,7 +241,6 @@ fn discard(target: &Path, kept: &Metadata) -> Result<(), AxError> {
     let gone = if kept.is_dir() {
         std::fs::remove_dir_all(target)
     } else {
-
         std::fs::remove_file(target).or_else(|first| match kept.is_symlink() {
             true => std::fs::remove_dir(target).map_err(|_| first),
             false => Err(first),

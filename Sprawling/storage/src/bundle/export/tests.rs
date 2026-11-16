@@ -190,7 +190,6 @@ fn a_restore_through_a_link_to_a_reserved_path_is_refused() {
     let root = elsewhere.path();
     std::fs::create_dir_all(root.join(".git")).unwrap();
     if !crate::alias::tests::place_link(true, &root.join(".git"), &root.join("lab")) {
-
         return;
     }
     let err = Bundle::restore(carried.path(), root).unwrap_err();

@@ -29,7 +29,6 @@ pub struct DiscardRestored {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AssetArchived {
-
     #[serde(default = "fact")]
     pub kind: String,
 

@@ -30,11 +30,9 @@ macro_rules! rungs {
 rungs!(City, Building, Resident);
 
 impl Layer {
-
     pub(crate) fn file(self, city_root: &Path, addr: &Address) -> Result<PathBuf, AxError> {
         let layout = CityLayout::new(city_root);
         Ok(match self {
-
             Layer::City => layout.city_config(),
             Layer::Building => layout.config(Building::of(addr)?.addr()),
             Layer::Resident => layout.config(addr),
@@ -48,7 +46,6 @@ pub(crate) struct Ladder {
 }
 
 impl Ladder {
-
     pub(crate) fn read(city_root: &Path, addr: &Address) -> Result<Ladder, AxError> {
         let mut rungs: Vec<(Layer, ConfigLayer)> = Vec::with_capacity(Layer::ALL.len());
         let mut read: Vec<PathBuf> = Vec::with_capacity(Layer::ALL.len());
@@ -91,7 +88,6 @@ impl Ladder {
 
 pub(crate) fn stated(file: &Path, rung: Layer) -> Result<ConfigLayer, AxError> {
     let stated = match std::fs::read_to_string(file) {
-
         Ok(text) => ConfigLayer::parse(&text).map_err(|err| in_file(file, &err))?,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => ConfigLayer::default(),
         Err(err) => {

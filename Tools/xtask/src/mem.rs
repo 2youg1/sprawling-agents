@@ -22,7 +22,6 @@ enum Target {
 }
 
 enum Fixture {
-
     EmptyCity,
 
     City(PathBuf),

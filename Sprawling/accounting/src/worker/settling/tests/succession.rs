@@ -61,7 +61,6 @@ fn three_successions_keep_the_tools_and_leave_a_lineage_of_four() {
             completion("over to you", None),
             probed(),
             probed(),
-
             tool_completion(
                 "noting",
                 "tu_4",

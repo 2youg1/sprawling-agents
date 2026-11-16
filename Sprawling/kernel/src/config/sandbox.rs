@@ -21,7 +21,6 @@ pub enum SandboxArm {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SandboxLimits {
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub arm: Option<SandboxArm>,
 
@@ -45,7 +44,6 @@ pub struct SandboxLimits {
 }
 
 impl SandboxLimits {
-
     pub fn selected_arm(&self) -> Result<Option<SandboxArm>, AxError> {
         match (self.arm, self.container.as_ref()) {
             (Some(SandboxArm::Container), None) => Err(AxError::failure(

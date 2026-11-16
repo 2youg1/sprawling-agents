@@ -36,7 +36,6 @@ pub(crate) fn first_line(vfs: &dyn Vfs, path: &Path) -> io::Result<Option<Vec<u8
 }
 
 impl JsonlLedger {
-
     pub(super) fn probe_version(&mut self, segments: &[PathBuf]) -> Result<(), StorageError> {
         let Some(first) = segments.first() else {
             return Ok(());
@@ -44,7 +43,6 @@ impl JsonlLedger {
         let Some(first_line) =
             first_line(self.vfs.as_ref(), first).map_err(io_err("read segment", first))?
         else {
-
             return Ok(());
         };
 
@@ -71,7 +69,6 @@ impl JsonlLedger {
             None => return Ok(()),
         };
         match readable_log_v(v) {
-
             LogVersion::Current | LogVersion::Older => Ok(()),
             LogVersion::Ahead => Err(StorageError::VersionAhead {
                 path: first.clone(),

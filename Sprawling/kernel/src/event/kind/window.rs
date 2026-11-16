@@ -12,7 +12,6 @@ pub enum WindowClass {
 }
 
 impl EventKind {
-
     pub fn window_class(&self) -> WindowClass {
         match self {
             EventKind::PromptAssembled
@@ -24,9 +23,7 @@ impl EventKind {
             | EventKind::SteerReceived
             | EventKind::SignalConsumed
             | EventKind::AdviserAnswered
-
             | EventKind::RunPolicyChanged
-
             | EventKind::SignalWaitStarted
             | EventKind::SignalWaitEnded => WindowClass::InWindow,
             EventKind::CityInitialized
@@ -34,9 +31,7 @@ impl EventKind {
             | EventKind::BuildingConfigured
             | EventKind::BuildingRemoved
             | EventKind::RunStarted
-
             | EventKind::SessionOpened
-
             | EventKind::PromptShapeCompared
             | EventKind::RunForked
             | EventKind::GateChecked
@@ -91,41 +86,30 @@ impl EventKind {
             | EventKind::AutonomyChanged
             | EventKind::WentBack
             | EventKind::FileRestored
-
             | EventKind::ToolkitLinkOpened
-
             | EventKind::EmbeddingCalled
             | EventKind::RerankCalled
             | EventKind::AdviserAsked
-
             | EventKind::AdviserFellBack
             | EventKind::GovernedDocumentWritten
             | EventKind::SpineDocumentWritten
             | EventKind::RulesChanged
-
             | EventKind::CacheRenewed
-
             | EventKind::HarnessReported
             | EventKind::HarnessAnswered
-
             | EventKind::RemoteOpened
             | EventKind::RemoteClosed
             | EventKind::DevicePaired
             | EventKind::DeviceRevoked
             | EventKind::RemoteSessionStarted
-
             | EventKind::DocumentWritten
             | EventKind::ProposalOffered
             | EventKind::ProposalDecided
             | EventKind::ProposalWithdrawn
-
             | EventKind::SessionNamed
             | EventKind::SkillAudited
-
             | EventKind::SignalLanded
-
             | EventKind::SkillShelved
-
             | EventKind::PrefixHeld => WindowClass::RecordOnly,
         }
     }

@@ -14,7 +14,6 @@ use super::SkillShelf;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SkillUsageAnswer {
-
     pub skills: Vec<SkillUsageLine>,
 }
 
@@ -44,7 +43,6 @@ pub struct HeldSkill {
 #[serde(tag = "state", rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum SkillAudit {
-
     Unaudited,
 
     Audited { verdict: AuditVerdict, at: Seq },
@@ -68,8 +66,10 @@ pub struct SkillVersion {
 #[serde(tag = "by", rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum VersionAuthor {
-
-    Shelved { seq: Seq, from: ShelvedFrom },
+    Shelved {
+        seq: Seq,
+        from: ShelvedFrom,
+    },
 
     OutsideShelf,
 
@@ -105,7 +105,6 @@ pub enum UseOutcome {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DayCount {
-
     pub day: String,
     pub count: u32,
 }
@@ -113,14 +112,12 @@ pub struct DayCount {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct McpUsageAnswer {
-
     pub servers: Vec<McpServerUsage>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct McpServerUsage {
-
     pub server: Option<String>,
 
     pub configured: bool,
@@ -131,7 +128,6 @@ pub struct McpServerUsage {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct McpToolUsage {
-
     pub tool: String,
     pub uses: Vec<McpUse>,
     pub per_day: Vec<DayCount>,
@@ -175,14 +171,12 @@ pub struct UsageExportAnswer {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ShellsAnswer {
-
     pub interpreters: Vec<ShellCalls>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ShellCalls {
-
     pub interpreter: String,
     pub calls: u64,
 

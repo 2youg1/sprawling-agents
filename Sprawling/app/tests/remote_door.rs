@@ -298,7 +298,6 @@ async fn refused(page: &mut Socket, text: &str) -> Option<AxCode> {
 }
 
 fn fetched(at: &str, path: &str) -> (String, Vec<String>, Vec<u8>) {
-
     let mut stream = match std::net::TcpStream::connect(at) {
         Ok(stream) => stream,
         Err(refused) => return (format!("{at}: {refused}"), Vec::new(), Vec::new()),
@@ -332,7 +331,6 @@ fn fetched(at: &str, path: &str) -> (String, Vec<String>, Vec<u8>) {
 
 #[derive(Debug, PartialEq, Eq)]
 struct Visit {
-
     welcomed: bool,
 
     read_answered: bool,
@@ -530,10 +528,8 @@ struct Served {
 }
 
 impl Served {
-
     #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
     fn start(city_root: &Path) -> Served {
-
         let mut child = Command::new(env!("CARGO_BIN_EXE_sprawling"))
             .arg("serve")
             .arg(city_root)

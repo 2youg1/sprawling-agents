@@ -11,7 +11,6 @@ use super::health::Health;
 use super::relay::Patience;
 
 impl RunWorker {
-
     pub fn health(&self) -> Health {
         self.flight.gate.health()
     }
@@ -32,13 +31,11 @@ pub fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
 
     let mut patience = Patience::Now;
     loop {
-
         if let Err(err) = worker.serve_flight(patience) {
             eprintln!("a run could not be landed: {err}");
         }
 
         patience = match desk.next(|run| worker.drives(run)) {
-
             DeskWait::Command(posted, carrying) => {
                 worker.serve_one(*posted);
                 drop(carrying);
@@ -74,7 +71,6 @@ pub fn attend(worker: &mut RunWorker, desk: &CommandDesk) {
                 ))
             }
             DeskWait::Close(why) => {
-
                 worker.await_proof();
 
                 if desk.interrupting() {

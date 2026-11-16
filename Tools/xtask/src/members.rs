@@ -14,7 +14,6 @@ use crate::report::XtaskError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Role {
-
     Product,
 
     Tool,
@@ -22,7 +21,6 @@ pub(crate) enum Role {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Member {
-
     pub(crate) package: String,
 
     pub(crate) lib: Option<String>,
@@ -39,14 +37,12 @@ pub(crate) struct Member {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Publish {
-
     Registry,
 
     Never,
 }
 
 impl Member {
-
     pub(crate) fn name(&self) -> &str {
         self.lib.as_deref().unwrap_or(&self.package)
     }
@@ -84,7 +80,6 @@ const USAGE: &str = "usage: cargo xtask members --owning [<path>...] | --dir <pa
 
 #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 pub(crate) fn members(root: &Path) -> Result<Vec<Member>, XtaskError> {
-
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
     let output = Command::new(cargo)
         .args(METADATA)

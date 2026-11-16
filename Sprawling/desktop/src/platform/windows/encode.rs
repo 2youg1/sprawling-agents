@@ -18,7 +18,6 @@ pub(crate) enum Format {
 }
 
 impl Format {
-
     pub(crate) fn parse(named: &str) -> Result<Format, Refusal> {
         match named {
             "png" => Ok(Format::Png),
@@ -138,7 +137,6 @@ fn encode(pixels: &RgbaImage, wanted: Wanted) -> Result<Vec<u8>, Refusal> {
 fn onto_white(pixels: &RgbaImage) -> RgbImage {
     let mut opaque = RgbImage::new(pixels.width(), pixels.height());
     for (x, y, source) in pixels.enumerate_pixels() {
-
         let blend = |channel: u8, alpha: u8| {
             let over = u32::from(channel).saturating_mul(u32::from(alpha));
             let clear = u32::from(u8::MAX.saturating_sub(alpha));

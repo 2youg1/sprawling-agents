@@ -51,7 +51,6 @@ pub struct Charter<'a> {
 }
 
 impl RunPlan {
-
     pub fn charter(&self) -> Charter<'_> {
         Charter {
             run: self.run,
@@ -76,7 +75,6 @@ impl RunPlan {
 }
 
 impl Charter<'_> {
-
     pub(crate) fn open(
         &self,
         ledger: &mut dyn Ledger,

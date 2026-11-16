@@ -19,7 +19,6 @@ pub(super) struct Interrupting {
 }
 
 impl Interrupting {
-
     pub(super) fn halted(&mut self) -> bool {
         if let Some(held) = &self.held {
             return matches!(held, Interrupt::Cancel) || self.scope_stopping();

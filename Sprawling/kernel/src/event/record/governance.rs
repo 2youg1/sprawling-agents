@@ -15,7 +15,6 @@ use crate::registry::ResidentId;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ApprovalResolved {
-
     pub id: ApprovalId,
 
     pub verdict: Ruling,
@@ -79,7 +78,6 @@ pub mod autonomy_word {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AutonomyChanged {
-
     #[serde(default = "city_wide")]
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub scope: Scope,
@@ -96,7 +94,6 @@ fn city_wide() -> Scope {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Admittance {
-
     Halted,
 
     Released,
@@ -113,7 +110,6 @@ pub struct CityHalted {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GovernedDocumentWritten {
-
     pub which: String,
 
     pub bytes: usize,
@@ -133,7 +129,6 @@ pub struct GovernedDocumentWritten {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RulesChanged {
-
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub scope: Scope,
 
@@ -152,7 +147,6 @@ pub struct RulesChanged {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum GoverningDocument {
-
     #[serde(rename = "RULES.toml")]
     Rules,
 
@@ -163,7 +157,6 @@ pub enum GoverningDocument {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SpineDocumentWritten {
-
     pub building: String,
 
     pub which: String,

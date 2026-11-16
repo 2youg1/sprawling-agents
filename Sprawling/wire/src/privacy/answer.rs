@@ -31,9 +31,7 @@ pub struct PrivacyAnswer {
 pub enum PrivacyHost {
     Windows(PrivacyWindows),
 
-    Unreadable {
-        error: AxError,
-    },
+    Unreadable { error: AxError },
 
     NotWindows,
 }
@@ -41,7 +39,6 @@ pub enum PrivacyHost {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PrivacyWindows {
-
     pub edition_id: String,
 
     pub edition: Option<PrivacyEdition>,
@@ -97,7 +94,6 @@ pub struct PrivacyNotWrittenEntry {
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PrivacyTarget {
-
     RegistryValueHklm { path: String, name: String },
 
     RegistryValueHkcu { path: String, name: String },
@@ -111,14 +107,10 @@ pub enum PrivacyTarget {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PrivacyCurrent {
-    Read {
-        value: PrivacyValue,
-    },
+    Read { value: PrivacyValue },
 
     AccessDenied,
-    Failed {
-        error: AxError,
-    },
+    Failed { error: AxError },
 
     NotRead,
 }
@@ -127,51 +119,40 @@ pub enum PrivacyCurrent {
 #[serde(tag = "value", rename_all = "snake_case", deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PrivacyValue {
-
     Absent,
-    Dword {
-        number: u32,
-    },
-    Text {
-        text: String,
-    },
+    Dword { number: u32 },
+    Text { text: String },
 
-    Raw {
-        kind: u32,
-        hex: String,
-    },
+    Raw { kind: u32, hex: String },
 
     TaskAbsent,
 
-    TaskEnabled {
-        definition_sha256: String,
-    },
-    TaskDisabled {
-        definition_sha256: String,
-    },
+    TaskEnabled { definition_sha256: String },
+    TaskDisabled { definition_sha256: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PrivacyHistory {
-
     Disclosed {
-
         owned: Vec<PrivacyIntent>,
 
         unresolved: Option<PrivacyIntent>,
     },
 
-    Withheld { error: AxError },
+    Withheld {
+        error: AxError,
+    },
 
-    Unreadable { error: AxError },
+    Unreadable {
+        error: AxError,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PrivacyIntent {
-
     pub operation: u64,
     pub control: PrivacyControl,
     pub original: PrivacyValue,

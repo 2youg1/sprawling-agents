@@ -10,7 +10,6 @@ struct Oklch {
 }
 
 enum Chroma {
-
     Fixed(u16),
 
     Scaled,

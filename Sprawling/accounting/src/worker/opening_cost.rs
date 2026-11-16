@@ -9,7 +9,6 @@ use crate::views::snapshot::start::TailFrom;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
-
     Bind,
 
     OpenLedger,
@@ -33,7 +32,6 @@ pub struct OpeningCost {
 }
 
 impl OpeningCost {
-
     pub fn begin(clock: fn() -> Instant) -> OpeningCost {
         let began = clock();
         OpeningCost {

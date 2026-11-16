@@ -16,7 +16,6 @@ const ONE_LINE: &str =
     "this search matches one line at a time; write a `pattern` that matches within one line";
 
 pub(super) enum Predicate {
-
     Lines(Lines, Option<Names>),
 
     Names(Names),
@@ -36,7 +35,6 @@ pub(super) struct Context {
 
 #[derive(Clone, Copy)]
 pub(super) enum Mode {
-
     Files,
 
     Content,
@@ -51,7 +49,6 @@ pub(super) struct Names {
 }
 
 impl Predicate {
-
     pub(super) fn asked_by(call: &ToolCall) -> Result<Predicate, AxError> {
         let args = call.args.as_map();
         refuse_misleading(args)?;
@@ -98,7 +95,6 @@ impl Predicate {
 }
 
 impl Mode {
-
     const SPELLED: [(&'static str, Mode); 3] = [
         ("files_with_matches", Mode::Files),
         ("content", Mode::Content),
@@ -140,7 +136,6 @@ impl Mode {
 }
 
 impl Context {
-
     fn asked(args: &Map<String, Value>) -> Result<Context, AxError> {
         let both = match side(args, "context")? {
             Some(lines) => lines,
@@ -154,7 +149,6 @@ impl Context {
 }
 
 impl Names {
-
     fn of(asked: &Value) -> Result<Names, AxError> {
         let glob = asked
             .as_str()

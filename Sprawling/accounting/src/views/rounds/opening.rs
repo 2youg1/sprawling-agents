@@ -13,7 +13,6 @@ pub(super) fn opening(records: &[EventRecord], city_root: &Path) -> Option<wire:
         .iter()
         .find(|record| record.kind() == EventKind::RunStarted)
         .map(|record| {
-
             let started = record
                 .data()
                 .read::<kernel::event::record::RunStarted>()

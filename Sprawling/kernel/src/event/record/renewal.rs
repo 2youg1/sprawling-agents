@@ -13,14 +13,11 @@ use crate::model::{CacheCount, ModelUsage};
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(untagged)]
 pub enum CacheRenewed {
-
     Refused {
-
         refused: AxError,
     },
 
     Answered {
-
         #[serde(default, skip_serializing_if = "Option::is_none")]
         #[cfg_attr(
             feature = "schema",
@@ -35,7 +32,6 @@ pub enum CacheRenewed {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RenewalOutcome {
-
     Read,
 
     Late,
@@ -46,7 +42,6 @@ pub enum RenewalOutcome {
 }
 
 impl CacheRenewed {
-
     pub fn outcome(&self) -> RenewalOutcome {
         match self {
             CacheRenewed::Refused { .. } => RenewalOutcome::Refused,

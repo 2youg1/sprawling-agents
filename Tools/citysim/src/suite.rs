@@ -9,7 +9,6 @@ use kernel::{AxCode, AxError, Locator};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Half {
-
     HeldIn,
 
     HeldOut,
@@ -71,7 +70,6 @@ pub struct Suite {
 }
 
 impl Suite {
-
     pub fn new(tasks: Vec<Task>) -> Result<Suite, AxError> {
         let mut held: BTreeMap<String, Task> = BTreeMap::new();
         for task in tasks {

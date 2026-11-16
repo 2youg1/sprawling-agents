@@ -135,7 +135,6 @@ pub struct CitySettings {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Carry {
-
     #[default]
     Nothing,
 
@@ -155,7 +154,6 @@ pub enum HaltScope {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum GovernedDocument {
-
     Mayor,
 
     Clerk,
@@ -167,21 +165,21 @@ pub enum GovernedDocument {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum IdentityCard {
-
     Person {
         user_id: Option<String>,
         imported_from: Option<String>,
         about: Option<String>,
     },
 
-    Mayor { name: Option<String> },
+    Mayor {
+        name: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum SpineDocument {
-
     Roadmap,
 
     Memo,
@@ -195,10 +193,7 @@ pub enum SpineDocument {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PursuitStep {
-
-    Set {
-        goal: String,
-    },
+    Set { goal: String },
     Pause,
     Resume,
     Clear,
@@ -217,7 +212,6 @@ pub struct PromptWrite {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PromptStep {
-
     Own,
 
     Inherit,
@@ -236,7 +230,6 @@ pub struct CityClosing {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum CloseMode {
-
     Drain,
 
     Interrupt,

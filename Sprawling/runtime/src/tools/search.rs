@@ -39,7 +39,6 @@ struct Findings {
 }
 
 impl Findings {
-
     fn could_not_look(&mut self, rel: &str, why: String) {
         self.unreadable = self.unreadable.saturating_add(1);
         if self.unread.len() < UNREAD_SHOWN {
@@ -58,7 +57,6 @@ impl Findings {
 }
 
 pub struct SearchTool {
-
     city: chosen_path::CityRoot,
 
     bound: ReadBound,
@@ -66,7 +64,6 @@ pub struct SearchTool {
 }
 
 impl SearchTool {
-
     pub const NAME: &'static str = "search";
 
     pub fn definition() -> Result<ToolDef, AxError> {
@@ -185,7 +182,6 @@ impl SearchTool {
             };
             match sorted_entries(&path) {
                 Ok(entries) => {
-
                     for name in entries.into_iter().rev() {
                         match admissible(&rel, &name, &*self.bound) {
                             Entry::Descend(child) => {
@@ -276,7 +272,6 @@ impl SearchTool {
             hit.insert("path".to_owned(), Value::String(rel.to_owned()));
             hit.insert("line".to_owned(), Value::Number(at.into()));
             if from < at {
-
                 hit.insert("from".to_owned(), Value::Number(from.into()));
             }
             hit.insert("text".to_owned(), Value::String(text));

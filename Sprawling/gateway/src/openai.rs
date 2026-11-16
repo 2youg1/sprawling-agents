@@ -122,7 +122,6 @@ pub(crate) fn request(
 ) -> Result<Value, AxError> {
     let mut messages = Vec::new();
     if !req.system.is_empty() {
-
         let system: Vec<&str> = req.system.iter().map(|b| b.text.as_str()).collect();
         messages.push(json!({ "role": "system", "content": system.join("\n\n") }));
     }

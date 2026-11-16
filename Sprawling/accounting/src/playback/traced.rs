@@ -18,7 +18,6 @@ use crate::trace::History;
 use crate::views::commits::commit_facts;
 
 pub(super) struct Evidence {
-
     city_root: PathBuf,
     history: History,
 
@@ -29,7 +28,6 @@ pub(super) struct Evidence {
 }
 
 pub(super) struct Known<'a> {
-
     pub(super) events: &'a [Event],
 
     pub(super) hidden: &'a BTreeSet<Seq>,
@@ -142,7 +140,6 @@ fn base_of(commit: &wire::CommitAnswer) -> Base {
 }
 
 impl Known<'_> {
-
     fn line_at(&self, seq: Seq) -> Option<&Event> {
         self.events
             .binary_search_by_key(&Decimal(seq.value()), |event| event.seq)

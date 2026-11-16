@@ -89,7 +89,6 @@ pub(super) enum Space {
 }
 
 impl Page {
-
     pub(super) fn read(text: &str) -> Page {
         parse_document(Builder::new(), ParseOpts::default()).one(StrTendril::from(text))
     }
@@ -157,7 +156,6 @@ impl Page {
 }
 
 impl Element {
-
     pub(super) fn local(&self) -> &str {
         &self.name.local
     }

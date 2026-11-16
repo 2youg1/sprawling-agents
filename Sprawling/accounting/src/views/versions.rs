@@ -26,7 +26,6 @@ pub(crate) struct Save {
 }
 
 impl DocumentSaves {
-
     pub(super) fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError> {
         let written = record.data().read::<DocumentWritten>()?;
         self.0.entry(written.at).or_default().push(Save {
@@ -47,7 +46,6 @@ pub struct VersionsAsk {
 }
 
 impl Views {
-
     pub(in crate::views) fn versions_ask(&self, at: &Address) -> Prepared {
         Prepared::Versions(VersionsAsk {
             city_root: self.city_root.clone(),
@@ -58,7 +56,6 @@ impl Views {
 }
 
 impl VersionsAsk {
-
     pub(in crate::views) fn answer(self) -> wire::Answer {
         let on_disk = on_disk(&self.city_root, self.at.clone());
         let store =

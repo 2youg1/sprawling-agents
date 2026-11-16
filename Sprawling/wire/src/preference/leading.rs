@@ -13,7 +13,6 @@ pub const LINE_HEIGHT_MIN: u32 = 1200;
 pub struct LineHeight(u32);
 
 impl LineHeight {
-
     pub fn new(per_mille: u32) -> Result<Self, AxError> {
         if per_mille < LINE_HEIGHT_MIN {
             return Err(AxError::failure(

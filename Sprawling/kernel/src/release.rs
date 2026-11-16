@@ -25,7 +25,6 @@ pub fn is_aur_install(exe: &std::path::Path) -> bool {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Maturity {
-
     PreAlpha,
 
     Alpha,
@@ -34,7 +33,6 @@ pub enum Maturity {
 pub const MATURITY: Maturity = Maturity::Alpha;
 
 impl Maturity {
-
     #[must_use]
     pub const fn word(self) -> &'static str {
         match self {
@@ -73,7 +71,6 @@ pub struct Release {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ReleaseVerdict {
-
     Current,
 
     Behind,
@@ -82,7 +79,6 @@ pub enum ReleaseVerdict {
 }
 
 impl Release {
-
     pub fn from_tag(tag: &str, expected_version: &str) -> Result<Release, AxError> {
         Release::decode_tag(tag, expected_version, MATURITY)
     }

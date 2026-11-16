@@ -33,7 +33,6 @@ pub struct McpReference {
 }
 
 impl McpReference {
-
     #[must_use]
     pub fn legacy(label: ServerLabel) -> McpReference {
         McpReference {

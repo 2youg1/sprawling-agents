@@ -34,7 +34,6 @@ pub(crate) struct Renewed {
 }
 
 impl Kept {
-
     pub(in crate::worker) fn lead_of(&mut self, endpoint: &str) -> Lead {
         self.leads.entry(endpoint.to_owned()).or_default().clone()
     }
@@ -113,7 +112,6 @@ fn answered(answer: ModelReturn) -> CacheRenewed {
 }
 
 impl RunWorker {
-
     pub(crate) fn warm_due(&self) -> Option<u64> {
         self.warm.next_due()
     }

@@ -28,7 +28,6 @@ pub(crate) struct Arrival {
 }
 
 pub(crate) struct DrivingPool {
-
     home: mpsc::Sender<Wake>,
 
     running: std::collections::BTreeMap<RunId, std::thread::JoinHandle<()>>,
@@ -59,7 +58,6 @@ struct Waiting {
 }
 
 impl DrivingPool {
-
     pub fn open(home: mpsc::Sender<Wake>, lanes: LaneHands, health: Health) -> DrivingPool {
         DrivingPool {
             home,
@@ -151,7 +149,6 @@ impl DrivingPool {
             .spawn(move || {
                 let _seat = seat_lane();
                 staged.fly(&mut ledger, context, |flown| {
-
                     drop(home.send(Wake::Home(Box::new(Arrival { run, flown }))));
                 });
             })
@@ -190,10 +187,8 @@ impl DrivingPool {
 }
 
 impl Drop for DrivingPool {
-
     fn drop(&mut self) {
         for (_, lane) in self.trailing.drain(..) {
-
             drop(lane.join());
         }
     }

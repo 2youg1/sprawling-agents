@@ -23,7 +23,6 @@ static ROOTS: AtomicU64 = AtomicU64::new(0);
 struct FakeRoot(PathBuf);
 
 impl FakeRoot {
-
     fn delegated() -> FakeRoot {
         let root = FakeRoot::fresh();
         for name in ["cgroup.procs", "cgroup.subtree_control"] {

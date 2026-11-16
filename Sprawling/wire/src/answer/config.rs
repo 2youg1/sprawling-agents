@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 
 pub enum ConfigLayer {
-
     Default,
 
     City,
@@ -32,7 +31,6 @@ pub struct SettledEffort {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SettledSecond {
-
     pub percent: u64,
     pub from: ConfigLayer,
     pub domain: SecondDomain,
@@ -48,7 +46,6 @@ pub struct SecondDomain {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TuningDefaults {
-
     pub from: ConfigLayer,
 
     pub timeout_ms: u64,
@@ -65,7 +62,6 @@ pub struct TuningDefaults {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ConfigAnswer {
-
     pub addr: Address,
 
     pub effort: Option<SettledEffort>,
@@ -85,7 +81,6 @@ pub struct ConfigAnswer {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SettledSearch {
-
     pub configuration: SearchConfiguration,
 
     pub from: ConfigLayer,

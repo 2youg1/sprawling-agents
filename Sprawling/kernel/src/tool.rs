@@ -15,7 +15,6 @@ pub mod writes;
 pub struct ToolName(String);
 
 impl ToolName {
-
     pub const BROWSER: &'static str = "browser";
 
     pub const USER_BROWSER: &'static str = "usersbrowser";
@@ -50,7 +49,6 @@ impl std::fmt::Display for ToolName {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ReservedNamespace {
-
     Computer,
 
     Media,
@@ -65,7 +63,6 @@ pub enum ReservedNamespace {
 }
 
 impl ReservedNamespace {
-
     pub const ALL: [ReservedNamespace; 6] = [
         ReservedNamespace::Computer,
         ReservedNamespace::Media,
@@ -100,7 +97,6 @@ impl ReservedNamespace {
 pub struct ServerLabel(String);
 
 impl ServerLabel {
-
     pub fn parse(raw: &str) -> Result<ServerLabel, AxError> {
         let well_formed = !raw.is_empty()
             && raw
@@ -206,9 +202,7 @@ pub enum CostTier {
 pub enum RenderIntent {
     Generic,
     Terminal,
-    Diff {
-        locations: Vec<Address>,
-    },
+    Diff { locations: Vec<Address> },
 
     Signal,
 
@@ -229,14 +223,12 @@ pub struct ToolMeta {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolCall {
-
     pub id: String,
     pub name: ToolName,
     pub args: Payload,
 }
 
 impl ToolCall {
-
     pub fn action(&self) -> Result<Vec<u8>, AxError> {
         let mut action = self.name.as_str().as_bytes().to_vec();
         let args = serde_json::to_string(&self.args).map_err(|err| {
@@ -265,7 +257,6 @@ pub struct ToolOutcome {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GateSubject {
-
     Area(Address),
 
     Room(Address),

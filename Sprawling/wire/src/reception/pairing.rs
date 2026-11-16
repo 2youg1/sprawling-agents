@@ -30,7 +30,6 @@ const DEVICE_ID_LEN: usize = 16;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Guess {
-
     Paired,
 
     Wrong,
@@ -42,7 +41,6 @@ pub enum Guess {
 pub struct DeviceKey([u8; 32]);
 
 impl DeviceKey {
-
     #[must_use]
     pub fn parse(text: &str) -> Option<Self> {
         decode_hex(text).map(Self)
@@ -75,7 +73,6 @@ pub struct PairedBrowser {
 }
 
 impl PairedBrowser {
-
     #[must_use]
     pub fn new(key: DeviceKey, label: String, now: TimeMs) -> Self {
         Self {
@@ -99,7 +96,6 @@ pub struct BrowserDoor {
 }
 
 impl BrowserDoor {
-
     #[must_use]
     pub fn new(browsers: Vec<PairedBrowser>, entropy: [u8; 32]) -> Self {
         Self {

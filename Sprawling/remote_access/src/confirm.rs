@@ -33,7 +33,6 @@ struct Pending<V> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Miss {
-
     Wrong,
 
     TooSoon,
@@ -42,7 +41,6 @@ pub enum Miss {
 }
 
 impl Miss {
-
     #[must_use]
     pub fn refusal(self) -> AxError {
         let (subject, recovery) = match self {
@@ -76,7 +74,6 @@ impl<V> Default for Confirm<V> {
 }
 
 impl<V> Confirm<V> {
-
     pub fn request(
         &mut self,
         verb: V,

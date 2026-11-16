@@ -16,7 +16,6 @@ use super::super::reader::Sight;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::playback) enum Scanning {
-
     #[cfg(test)]
     Full,
 
@@ -32,7 +31,6 @@ pub(super) enum Fate {
 }
 
 impl Fate {
-
     pub(super) fn visibility(&self) -> Visibility {
         match self {
             Fate::Shown => Visibility::Visible,

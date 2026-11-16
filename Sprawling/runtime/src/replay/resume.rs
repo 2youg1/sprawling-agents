@@ -15,7 +15,6 @@ pub struct DanglingCalls {
 }
 
 impl DanglingCalls {
-
     pub fn observe(&mut self, record: &EventRecord) {
         let key = *record.run().as_bytes();
         #[expect(

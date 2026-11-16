@@ -21,7 +21,6 @@ const PAYLOAD_DEPTH_MAX: usize = 126;
 pub struct Payload(serde_json::Map<String, serde_json::Value>);
 
 impl Payload {
-
     pub fn new(map: serde_json::Map<String, serde_json::Value>) -> Result<Self, AxError> {
         reject_floats_and_depth(&map)?;
         Ok(Payload(map))
@@ -81,7 +80,6 @@ impl<'de> Deserialize<'de> for Payload {
 fn reject_floats_and_depth(
     map: &serde_json::Map<String, serde_json::Value>,
 ) -> Result<(), AxError> {
-
     let mut pending: Vec<(&serde_json::Value, usize)> =
         map.values().map(|value| (value, 1)).collect();
     while let Some((value, above)) = pending.pop() {
@@ -160,7 +158,6 @@ pub struct EventRecord {
 }
 
 impl EventRecord {
-
     pub fn from_draft(draft: EventDraft, seq: Seq, prev: B3Hash) -> Self {
         EventRecord {
             v: EVENT_LOG_V,

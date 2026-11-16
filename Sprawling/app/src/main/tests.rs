@@ -83,7 +83,6 @@ fn embedded_client_table_is_present_and_marked() {
         .expect("the page shell is always embedded");
     assert!(!index.gz.is_empty());
     if CLIENT_COMPLETE {
-
         assert!(
             CLIENT_FILES
                 .iter()

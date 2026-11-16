@@ -8,7 +8,6 @@ use winsafe::co;
 use crate::leaf;
 
 pub fn declare(awareness: u32) -> Result<(), co::HRESULT> {
-
     #[expect(unsafe_code, reason = "the one call that declares DPI awareness")]
     let answered = unsafe { leaf::sprawling_desktop_dpi_declare(awareness) };
     if answered == co::HRESULT::S_OK {

@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DoctorAnswer {
-
     pub items: Vec<DoctorItem>,
 
     pub tiers: Vec<DoctorVerdict>,
@@ -26,7 +25,6 @@ pub struct DoctorAnswer {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorCore {
-
     Raised,
 
     HeldBySetting,
@@ -42,7 +40,6 @@ pub enum DoctorCore {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorTier {
-
     Use,
 
     Develop,
@@ -60,7 +57,6 @@ pub enum DoctorNeed {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DoctorItem {
-
     pub name: String,
     pub tier: DoctorTier,
     pub need: DoctorNeed,
@@ -78,14 +74,12 @@ pub struct DoctorItem {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorPack {
-
     RustTools,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DoctorUpstream {
-
     pub item: String,
     pub newest: DoctorNewest,
 }
@@ -94,7 +88,6 @@ pub struct DoctorUpstream {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorNewest {
-
     Asking,
 
     Read { version: String },
@@ -108,7 +101,6 @@ pub enum DoctorNewest {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorUnread {
-
     WithToolchain,
 
     ManyBrands,
@@ -126,28 +118,17 @@ pub enum DoctorUnread {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorState {
+    Present { at: String, version: DoctorVersion },
 
-    Present {
-        at: String,
-        version: DoctorVersion,
-    },
-
-    Broken {
-        at: String,
-        fault: DoctorFault,
-    },
-    Absent {
-        absence: DoctorAbsence,
-    },
+    Broken { at: String, fault: DoctorFault },
+    Absent { absence: DoctorAbsence },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorVersion {
-    Said {
-        text: String,
-    },
+    Said { text: String },
 
     Silent,
 
@@ -160,15 +141,10 @@ pub enum DoctorVersion {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorFault {
-
-    WillNotStart {
-        said: String,
-    },
+    WillNotStart { said: String },
 
     HalfWritten,
-    Unreadable {
-        said: String,
-    },
+    Unreadable { said: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -177,13 +153,8 @@ pub enum DoctorFault {
 pub enum DoctorAbsence {
     NotOnSearchPath,
 
-    VariableNamesNothing {
-        variable: String,
-        path: String,
-    },
-    NoComponent {
-        dir: String,
-    },
+    VariableNamesNothing { variable: String, path: String },
+    NoComponent { dir: String },
     NoHome,
     NotInThisBuild,
 }
@@ -192,7 +163,6 @@ pub enum DoctorAbsence {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorInstall {
-
     Command { spelled: String },
 
     Print { spelled: String },
@@ -224,7 +194,6 @@ pub struct DoctorSandbox {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorSandboxArm {
-
     LinuxNamespaces,
 
     WindowsJobObject,
@@ -284,7 +253,6 @@ pub struct DoctorCustody {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorCustodyStore {
-
     PlatformService,
 
     EncryptedFile,

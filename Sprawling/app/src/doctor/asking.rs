@@ -13,7 +13,6 @@ pub(crate) const TICK: Duration = Duration::from_millis(50);
 pub(super) const LINE_MAX_BYTES: usize = 4096;
 
 pub(crate) enum Ended {
-
     Exited { code: Option<i32>, kept: String },
 
     Unstarted,
@@ -68,7 +67,6 @@ fn drain(stdout: ChildStdout, keep: impl FnMut(&str) -> bool + Send + 'static) -
     let reading = std::thread::Builder::new()
         .name("doctor-asking".to_owned())
         .spawn(move || {
-
             drop(sender.send(kept_lines(BufReader::new(stdout), keep)));
         });
 

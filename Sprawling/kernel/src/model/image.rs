@@ -18,7 +18,6 @@ pub enum ImageType {
 }
 
 impl ImageType {
-
     #[must_use]
     pub fn mime(&self) -> &'static str {
         match self {
@@ -33,7 +32,6 @@ impl ImageType {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ImageRef {
-
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub locator: Locator,
     pub media_type: ImageType,

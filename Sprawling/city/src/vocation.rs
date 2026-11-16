@@ -8,7 +8,6 @@ use kernel::consts_policy::HALL_BUILDING;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Vocation {
-
     Builds,
 
     Plans,

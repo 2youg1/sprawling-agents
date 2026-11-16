@@ -18,7 +18,6 @@ fn main() -> ExitCode {
 
 #[derive(Debug)]
 enum Failure {
-
     Usage,
 
     Start(std::io::Error),

@@ -23,7 +23,6 @@ pub(super) enum Key {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) enum CallId {
-
     Tool(String),
 
     Model(Seq),
@@ -57,7 +56,6 @@ pub(super) enum Visibility {
 }
 
 impl Visibility {
-
     fn may_show(self) -> bool {
         match self {
             Visibility::Visible | Visibility::Deferred => true,
@@ -97,7 +95,6 @@ pub(super) struct Links {
 }
 
 impl Links {
-
     #[expect(
         clippy::wildcard_enum_match_arm,
         reason = "ten kinds open or close a pair; every other kind is at most a member of its run"

@@ -51,7 +51,6 @@ pub struct RosterEntry {
 }
 
 pub trait Model {
-
     fn provider_account(&self) -> Option<crate::event::record::ProviderAccountBinding> {
         None
     }

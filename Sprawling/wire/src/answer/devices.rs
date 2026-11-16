@@ -29,7 +29,6 @@ pub struct DeviceLine {
 pub struct DeviceId(String);
 
 impl DeviceId {
-
     #[must_use]
     pub fn new(text: String) -> Self {
         Self(text)

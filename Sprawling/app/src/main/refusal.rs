@@ -12,7 +12,6 @@ pub(super) enum Form {
 }
 
 impl Form {
-
     pub(super) fn of(args: &[String]) -> Self {
         if args.iter().any(|a| a == "--json") {
             Form::Json

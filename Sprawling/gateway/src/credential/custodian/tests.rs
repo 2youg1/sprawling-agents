@@ -5,7 +5,6 @@
 
 use super::*;
 fn sample_token() -> String {
-
     ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat()
 }
 

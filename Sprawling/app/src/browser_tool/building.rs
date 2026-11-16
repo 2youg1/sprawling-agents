@@ -38,7 +38,6 @@ pub(crate) fn for_building(
     let cas = open_cas(city_root)?;
     let port = crate::browser_bidi::port_for(city_root);
     BrowserTool::new(
-
         Role::Building,
         Box::new(crate::browser_bidi::LazyEngine::new(profile, false, port)),
         cas,

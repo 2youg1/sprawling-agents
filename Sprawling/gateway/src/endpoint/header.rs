@@ -7,14 +7,12 @@ use kernel::{AxCode, AxError, SecretRef};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum HeaderValue {
-
     Plain(String),
 
     Redeemed(SecretRef),
 }
 
 impl HeaderValue {
-
     pub fn parse(name: &str, text: &str) -> Result<HeaderValue, AxError> {
         if let Ok(reference) = SecretRef::parse(text) {
             return Ok(HeaderValue::Redeemed(reference));
@@ -75,7 +73,6 @@ mod tests {
 
     #[test]
     fn a_key_typed_into_a_header_box_is_refused_where_it_is_typed() {
-
         let key = format!(
             "sk-{}-{}{}{}",
             "ant-api03", "Zx8Qv2LmNpR4", "tYw7BcDfGhJk", "LmNpQrStUvWxYz01"

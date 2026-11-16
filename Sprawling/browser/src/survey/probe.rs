@@ -11,7 +11,6 @@ use super::{Page, PaintSource};
 
 #[derive(serde::Deserialize)]
 pub struct Read {
-
     pub sink: String,
 
     pub declared: String,
@@ -20,7 +19,6 @@ pub struct Read {
 }
 
 impl Read {
-
     #[must_use]
     pub fn page(&self, painted_by: PaintSource) -> Page {
         Page {

@@ -31,7 +31,6 @@ pub struct ModelEntry {
 }
 
 impl ModelEntry {
-
     pub fn states_a_price(&self) -> bool {
         [
             self.input_price,
@@ -51,7 +50,6 @@ pub struct MarketSnapshot {
 }
 
 impl MarketSnapshot {
-
     pub fn builtin() -> Result<MarketSnapshot, AxError> {
         let rows = vec![
             ModelEntry {

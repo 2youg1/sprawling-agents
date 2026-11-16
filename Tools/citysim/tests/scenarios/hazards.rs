@@ -22,7 +22,6 @@ use runtime::redact::{Marker, redact_text};
 
 #[test]
 fn a_pasted_credential_leaves_no_plaintext_behind_it() {
-
     let pasted = format!("sk-ant-{}{}", "A7bQ2xLm".repeat(2), "Zk91Rp4T");
     let line = format!("the person pasted {pasted} into the field");
 
@@ -68,7 +67,6 @@ fn a_configured_reference_resolves_sealed_and_describes_without_telling() {
 
 #[test]
 fn a_delete_with_no_way_back_is_refused_rather_than_queued() {
-
     let unplanned = DiscardRequest::Unplanned {
         paths: vec![Address::parse("notes/draft.md").unwrap()],
         taint: TaintSet::default(),
@@ -101,7 +99,6 @@ fn a_delete_with_a_checkpoint_behind_it_is_allowed() {
 
 #[test]
 fn the_forecaster_is_advisory_and_the_checkpoint_is_the_defence() {
-
     let obvious = ExecArm::Shell {
         text: "rm -rf build".to_owned(),
     };
@@ -127,7 +124,6 @@ fn the_forecaster_is_advisory_and_the_checkpoint_is_the_defence() {
 
 #[test]
 fn resuming_the_same_handoff_twice_does_not_double_the_work() {
-
     use runtime::handoff::Handoff;
     let oid = "7c".repeat(20);
     let job = Locator::parse(&format!("file:sim/lobby/room1/JOB.md@{oid}")).unwrap();

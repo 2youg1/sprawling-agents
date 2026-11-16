@@ -20,7 +20,6 @@ enum Sounded {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContextReminder {
-
     Usage { used: Tokens, window: Tokens },
 
     HandoverWindow { used: Tokens, window: Tokens },
@@ -29,7 +28,6 @@ pub enum ContextReminder {
 }
 
 impl ContextReminder {
-
     #[must_use]
     pub fn render(&self) -> String {
         match self {
@@ -73,7 +71,6 @@ fn percent(used: Tokens, window: Tokens) -> u64 {
 pub struct ContextReading(Arc<AtomicU64>);
 
 impl ContextReading {
-
     #[must_use]
     pub fn tokens(&self) -> Tokens {
         Tokens::new(self.0.load(Ordering::Relaxed))
@@ -95,7 +92,6 @@ pub struct ContextGauge {
 }
 
 impl ContextGauge {
-
     #[must_use]
     pub fn new(window: Tokens, second: Option<SecondThreshold>) -> ContextGauge {
         ContextGauge::locked(window, second, false)

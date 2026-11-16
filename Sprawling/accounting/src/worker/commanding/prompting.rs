@@ -9,7 +9,6 @@ use kernel::{AxCode, AxError, EventKind, Payload};
 use super::super::RunWorker;
 
 impl RunWorker {
-
     pub(in crate::worker) fn put_prompt(
         &mut self,
         write: &wire::PromptWrite,

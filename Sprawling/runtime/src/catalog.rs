@@ -39,7 +39,6 @@ pub struct CatalogEntry {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expansion {
-
     Skill { manifest: B3Hash },
 
     Said { text: String },
@@ -47,7 +46,6 @@ pub enum Expansion {
 
 #[derive(Debug, Default)]
 pub struct Catalog {
-
     tools: BTreeMap<String, Filed>,
 
     withheld: BTreeMap<String, Filed>,

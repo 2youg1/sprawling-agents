@@ -41,7 +41,6 @@ struct Table {
 }
 
 impl Backlog {
-
     #[must_use]
     pub fn with_shares(self, shares: Shares) -> Backlog {
         Backlog { shares, ..self }
@@ -161,7 +160,6 @@ impl Backlog {
                     ceiling: jobs.ceiling(owner, *ceiling),
                 });
             } else {
-
                 drop(std::fs::remove_dir_all(dir));
             }
         }

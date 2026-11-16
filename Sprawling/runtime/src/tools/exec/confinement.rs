@@ -7,7 +7,6 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Guarantee {
-
     Filesystem,
 
     Network,
@@ -20,7 +19,6 @@ pub enum Guarantee {
 }
 
 impl Guarantee {
-
     pub const ALL: [Guarantee; 5] = [
         Guarantee::Filesystem,
         Guarantee::Network,
@@ -66,7 +64,6 @@ pub struct Assurances {
 }
 
 impl Assurances {
-
     pub fn of(self, axis: Guarantee) -> Kept {
         match axis {
             Guarantee::Filesystem => self.filesystem,
@@ -80,12 +77,10 @@ impl Assurances {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Missing {
-
     ScratchDirectory,
 }
 
 impl Missing {
-
     pub fn phrase(self) -> &'static str {
         match self {
             Missing::ScratchDirectory => "a writable scratch directory",
@@ -104,7 +99,6 @@ impl Missing {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Confinement {
-
     LinuxNamespaces { wrapper: PathBuf },
 
     WindowsJobObject,
@@ -117,7 +111,6 @@ pub enum Confinement {
 }
 
 impl Confinement {
-
     pub fn detect() -> Confinement {
         Confinement::choose(&Offerings::this_machine())
     }
@@ -229,14 +222,12 @@ impl Confinement {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Offerings {
-
     pub namespace_tool: Option<PathBuf>,
 
     pub scratch: Option<PathBuf>,
 }
 
 impl Offerings {
-
     pub fn this_machine() -> Offerings {
         let scratch = std::env::temp_dir();
         Offerings {

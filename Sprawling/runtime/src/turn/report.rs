@@ -20,7 +20,6 @@ pub struct TurnReport {
 }
 
 impl TurnReport {
-
     pub fn shortened(&self) -> &std::collections::BTreeSet<String> {
         &self.shortened
     }
@@ -65,7 +64,6 @@ pub struct CallShape {
 }
 
 impl CallShape {
-
     pub fn verified_against(&self, frozen: &CallShape) -> Result<(), AxError> {
         if self.model != frozen.model {
             return Err(shape_moved(format!(

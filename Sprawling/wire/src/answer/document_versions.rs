@@ -32,7 +32,6 @@ pub struct DocumentVersion {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum VersionSource {
-
     OnDisk,
 
     Saved { seq: Seq, at: TimeMs },

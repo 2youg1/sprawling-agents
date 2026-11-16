@@ -28,7 +28,6 @@ pub struct Booking(Box<Ask>);
 type Ask = dyn FnMut(&ClaimEffect) -> Result<(), AxError> + Send;
 
 impl Booking {
-
     #[must_use]
     pub fn new(ask: impl FnMut(&ClaimEffect) -> Result<(), AxError> + Send + 'static) -> Booking {
         Booking(Box::new(ask))

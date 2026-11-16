@@ -13,7 +13,6 @@ pub(crate) use exchange::Exchange;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Content {
-
     Prose,
 
     Code,
@@ -33,7 +32,6 @@ pub enum Content {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Strategy {
-
     Head,
 
     Ends,
@@ -45,7 +43,6 @@ pub enum Strategy {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shrink {
-
     Keep,
 
     Cut(Strategy),

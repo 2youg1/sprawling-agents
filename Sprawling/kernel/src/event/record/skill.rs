@@ -10,7 +10,6 @@ use crate::B3Hash;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SkillAudited {
-
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub local_only_reason: Option<String>,
     pub skill: String,
@@ -42,7 +41,6 @@ pub struct SkillShelved {
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ShelvedFrom {
-
     Path,
 
     Git { url: String, rev: Option<String> },
@@ -58,7 +56,6 @@ pub enum ShelvedFrom {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum AuditSource {
-
     SkillsSh,
 
     SkillSpector,

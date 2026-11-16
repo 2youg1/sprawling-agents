@@ -37,7 +37,6 @@ pub(crate) struct Senses {
 }
 
 pub(crate) struct Keeping {
-
     pub(crate) devices: PathBuf,
 
     pub(crate) ledger: Box<dyn Ledger + Send>,
@@ -50,7 +49,6 @@ pub(crate) struct Keeping {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Revoking {
-
     Named(String),
     All,
 }
@@ -85,7 +83,6 @@ struct Standing {
 }
 
 impl Doorway {
-
     pub(crate) fn keep(keeping: Keeping) -> Result<Doorway, AxError> {
         let Keeping {
             devices,
@@ -224,7 +221,6 @@ impl Doorway {
 }
 
 impl Kept {
-
     fn revoked(&mut self, now: TimeMs, chosen: Vec<Device>) -> Result<Vec<Device>, AxError> {
         for device in &chosen {
             self.door.revoke(device.id)?;

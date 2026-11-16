@@ -21,7 +21,6 @@ pub const RUN_COSTS_MAX: usize = 64;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RunCostsAnswer {
-
     pub asked: Vec<RunId>,
 
     pub runs: Vec<(RunId, UsdMicros)>,

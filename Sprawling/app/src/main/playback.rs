@@ -95,7 +95,6 @@ pub(super) fn check(read: &Arguments) -> ExitCode {
 
 #[derive(Debug)]
 enum Refused {
-
     Line(String),
 
     Selection(AxError),

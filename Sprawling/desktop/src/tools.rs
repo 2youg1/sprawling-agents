@@ -17,7 +17,6 @@ pub(crate) enum ToolName {
 }
 
 impl ToolName {
-
     pub(crate) const ALL: [ToolName; 6] = [
         ToolName::Windows,
         ToolName::Snapshot,

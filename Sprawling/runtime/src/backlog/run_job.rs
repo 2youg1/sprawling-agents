@@ -26,7 +26,6 @@ pub(super) struct RunJob {
 }
 
 impl RunJob {
-
     pub(super) fn mark(&mut self, asked: Option<NonZeroU64>) -> Mark {
         match (asked, self.share, self.watch.is_some()) {
             (None, ..) => Mark::NotAsked,
@@ -73,7 +72,6 @@ impl RunJob {
                 let job = win32job::Job::create().map_err(|_refused| Unapplied::Refused)?;
                 (self.share, self.watch) = given(&job, shares);
                 if let RunAffinity::Mask(mask) = affinity {
-
                     let applied = job.query_extended_limit_info().and_then(|mut info| {
                         info.limit_affinity(mask.get());
                         job.set_extended_limit_info(&info)

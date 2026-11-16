@@ -10,7 +10,6 @@ pub(crate) use agent_protocols::PROTOCOL_VERSION;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Request {
-
     pub(crate) id: Option<Value>,
     pub(crate) method: String,
 

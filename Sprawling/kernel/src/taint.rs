@@ -76,7 +76,6 @@ pub struct Tainted<T> {
 }
 
 impl<T> Tainted<T> {
-
     pub fn new(value: T, source: TaintSource) -> Tainted<T> {
         Tainted {
             value,

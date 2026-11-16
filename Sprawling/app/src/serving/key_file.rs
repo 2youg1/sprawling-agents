@@ -16,7 +16,6 @@ pub(crate) struct KeyFile {
 }
 
 impl KeyFile {
-
     pub(crate) fn write(port: u16, key: &str) -> Result<Self, AxError> {
         let dir = runtime_dir()?;
         let path = dir.join(format!("{port}.key"));

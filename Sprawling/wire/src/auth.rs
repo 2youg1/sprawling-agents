@@ -22,7 +22,6 @@ const MIN_CONFIGURED_LEN: usize = 16;
 pub struct PairingToken(B3Hash);
 
 impl PairingToken {
-
     #[must_use]
     pub fn mint(entropy: [u8; 32]) -> (Self, String) {
         let text = spell(&entropy, GROUP_LEN, GROUP_COUNT);

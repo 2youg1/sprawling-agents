@@ -48,7 +48,6 @@ pub struct RunWaiting {
 }
 
 impl RunWaiting {
-
     fn stated_by(record: &EventRecord) -> Option<RunWaiting> {
         let data = record.data().as_map();
         let on = data

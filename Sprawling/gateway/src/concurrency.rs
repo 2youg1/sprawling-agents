@@ -35,7 +35,6 @@ impl From<MaxInFlight> for u32 {
 }
 
 impl MaxInFlight {
-
     #[must_use]
     pub fn get(self) -> u32 {
         self.0.get()
@@ -65,7 +64,6 @@ impl TryFrom<u32> for MaxInFlight {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Take {
-
     Granted,
 
     Full,
@@ -83,7 +81,6 @@ pub(crate) struct Permits {
 }
 
 impl Permits {
-
     pub(crate) fn new(cap: MaxInFlight) -> Permits {
         Permits {
             cap,

@@ -15,7 +15,6 @@ use super::verify::{LineCheck, LineFault};
 use crate::vfs::Vfs;
 
 impl JsonlLedger {
-
     pub(super) fn boundary(
         &mut self,
         segments: &[PathBuf],

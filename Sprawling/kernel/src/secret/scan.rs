@@ -18,7 +18,6 @@ pub struct EntropyAllowlist {
 }
 
 impl EntropyAllowlist {
-
     pub fn allows(&self, path: &str) -> bool {
         self.paths.contains(path)
     }
@@ -123,7 +122,6 @@ fn entropy_passes(bytes: &[u8], work: &mut Work) -> bool {
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Work {
-
     pub(super) bytes_read: u64,
 
     pub(super) entropy_readings: u64,
@@ -349,7 +347,6 @@ mod tests {
 
     #[test]
     fn high_entropy_tokens_hit_and_prose_does_not() {
-
         let token = ["kJ8vQ2xR9m", "W4nZ7pL3sT", "6yB1cD5fG0", "hN8aE2iU4o"].concat();
         let noisy = format!("token = {token} ok");
         let hits = scan(noisy.as_bytes());
@@ -362,7 +359,6 @@ mod tests {
 
     #[test]
     fn city_native_artifacts_do_not_light_up() {
-
         let hex = format!("prev: {}", "ab".repeat(32));
         assert!(scan(hex.as_bytes()).is_empty());
 
@@ -383,7 +379,6 @@ mod tests {
 
     #[test]
     fn aggregator_tokens_with_lowercase_hex_bodies_are_found() {
-
         let hex64 = "0f1e2d3c".repeat(8);
         for (prefix, provider) in [("sk-or-v1-", "openrouter"), ("sk-ai-v1-", "zenmux")] {
             let text = format!("KEY={prefix}{hex64}");
@@ -399,7 +394,6 @@ mod tests {
 
     #[test]
     fn a_bare_hex_run_still_does_not_hit_without_its_prefix() {
-
         let hex64 = "0f1e2d3c".repeat(8);
         assert!(scan(format!("prev: {hex64}").as_bytes()).is_empty());
     }
@@ -416,7 +410,6 @@ mod tests {
 
     #[test]
     fn uniform_bytes_have_full_entropy() {
-
         let bytes: Vec<u8> = (0u8..64).collect();
         let mb = entropy_millibits_per_char(&bytes);
         assert!((5900..=6000).contains(&mb), "{mb}");

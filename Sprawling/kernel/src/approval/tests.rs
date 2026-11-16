@@ -46,12 +46,10 @@ fn answerer(who: Who) -> Answerer {
 fn the_answer_table_holds_row_by_row() {
     let delegated = Autonomy::Delegate(resident(DELEGATE));
     let table: [(&Autonomy, Who, &str, AnswerVerdict); 12] = [
-
         (&Autonomy::Owner, Who::Person, DELEGATE, AnswerVerdict::May),
         (&Autonomy::Owner, Who::Person, BYSTANDER, AnswerVerdict::May),
         (&delegated, Who::Person, DELEGATE, AnswerVerdict::May),
         (&delegated, Who::Person, BYSTANDER, AnswerVerdict::May),
-
         (
             &Autonomy::Owner,
             Who::TheDelegate,
@@ -76,7 +74,6 @@ fn the_answer_table_holds_row_by_row() {
             BYSTANDER,
             AnswerVerdict::NotTheDelegate,
         ),
-
         (&delegated, Who::TheDelegate, BYSTANDER, AnswerVerdict::May),
         (
             &delegated,
@@ -90,7 +87,6 @@ fn the_answer_table_holds_row_by_row() {
             BYSTANDER,
             AnswerVerdict::NotTheDelegate,
         ),
-
         (
             &delegated,
             Who::TheDelegate,
@@ -141,7 +137,6 @@ fn the_clerk_answers_as_the_appointed_delegate_and_no_further() {
 
 #[test]
 fn two_runs_raising_their_first_question_get_two_ids() {
-
     let left = RunId::from_bytes([1; 16]);
     let right = RunId::from_bytes([2; 16]);
     assert_ne!(

@@ -18,7 +18,6 @@ pub(super) struct Remembered {
 }
 
 impl Admission {
-
     pub(in crate::worker) fn everything_served() -> Admission {
         Admission {
             ticked: Vec::new(),

@@ -7,7 +7,6 @@ use super::holding::Views;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub(super) struct Reach {
-
     pub(super) registry: Option<fn() -> wire::ReleaseAnswer>,
 
     pub(super) upstream: Option<fn(&str) -> wire::DoctorUpstream>,
@@ -18,7 +17,6 @@ pub(super) struct Reach {
 }
 
 impl Views {
-
     pub fn found_on_this_machine(&mut self, report: wire::DoctorAnswer) {
         self.machine = Some(report);
     }

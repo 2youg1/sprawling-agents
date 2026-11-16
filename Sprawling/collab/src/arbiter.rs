@@ -8,7 +8,6 @@ use kernel::{AxError, GoalEntry, GoalId, GoalResource, GoalVerdict, Payload};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Level {
-
     Serialize { after: GoalId },
 
     Arbitrate { with: GoalId },
@@ -99,7 +98,6 @@ mod tests {
 
     #[test]
     fn a_clash_that_needs_reading_goes_to_a_resident() {
-
         let registered = vec![goal("a", "lab/one", true)];
         assert_eq!(
             arbitrate(&registered, &goal("b", "lab/one", true)),

@@ -13,9 +13,7 @@ static BACKLOGS: AtomicU64 = AtomicU64::new(0);
 pub(super) struct Scratch(u64);
 
 impl Scratch {
-
     pub(super) fn open() -> Scratch {
-
         Scratch(BACKLOGS.fetch_add(1, Ordering::Relaxed))
     }
 

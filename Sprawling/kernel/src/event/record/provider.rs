@@ -11,7 +11,6 @@ use crate::error::AxError;
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(untagged)]
 pub enum ProviderDegraded {
-
     Refused(AxError),
 
     VaultFellBack(VaultFellBack),
@@ -38,7 +37,6 @@ impl<'de> Deserialize<'de> for ProviderDegraded {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct VaultFellBack {
-
     pub component: String,
 
     pub fallback: String,

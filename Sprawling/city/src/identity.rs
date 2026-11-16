@@ -21,7 +21,6 @@ pub const NAME_MAX_CHARS: usize = 64;
 pub struct DisplayName(String);
 
 impl DisplayName {
-
     pub fn parse(raw: &str) -> Result<DisplayName, AxError> {
         let trimmed = raw.trim();
         let count = trimmed.chars().count();
@@ -71,7 +70,6 @@ pub struct Unreadable {
 }
 
 impl Unreadable {
-
     #[must_use]
     pub fn into_ax(self) -> AxError {
         AxError::failure(
@@ -99,7 +97,6 @@ pub enum NamingEdit {
 }
 
 impl NamingEdit {
-
     #[must_use]
     pub fn document(&self) -> Governed {
         match self {
@@ -168,7 +165,6 @@ pub fn persona(written: Vec<u8>) -> Vec<u8> {
 }
 
 impl Naming {
-
     pub fn read(city_root: &Path) -> Result<Naming, AxError> {
         read_naming(city_root)?.map_err(Unreadable::into_ax)
     }

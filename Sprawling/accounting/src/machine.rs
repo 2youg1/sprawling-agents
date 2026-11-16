@@ -6,14 +6,12 @@
 use kernel::{AxCode, AxError};
 
 pub trait Machine {
-
     fn report(&self, city: &std::path::Path) -> wire::DoctorAnswer;
 
     fn install(&self, item: &str, runnable: &Runnable<'_>) -> Result<(), AxError>;
 }
 
 pub enum Recipe {
-
     Command {
         program: &'static str,
         args: &'static [&'static str],
@@ -25,7 +23,6 @@ pub enum Recipe {
 }
 
 impl Recipe {
-
     #[must_use]
     pub fn spelled(&self) -> String {
         match self {

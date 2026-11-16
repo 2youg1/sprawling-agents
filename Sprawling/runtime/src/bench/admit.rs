@@ -6,7 +6,6 @@
 use super::*;
 
 impl ToolBench {
-
     #[must_use]
     pub fn limit_egress(mut self, list: kernel::EgressAllowlist) -> ToolBench {
         self.egress = Some(list);
@@ -40,7 +39,6 @@ impl ToolBench {
                 }
             }
             Effect::Connector { label } => {
-
                 let spans = kernel::secret::scan(&scanned(call, "scan connector args")?);
                 let verdict = kernel::gate::egress(
                     &spans,
@@ -66,7 +64,6 @@ impl ToolBench {
                 }
             }
             Effect::Egress => {
-
                 let target = bytes_target(name, subject, "send bytes out")?;
                 if let Some(answered) = self.listed(&target) {
                     return Ok(Some(answered));
@@ -78,7 +75,6 @@ impl ToolBench {
                 }
             }
             Effect::AttachUserBrowser { address } => {
-
                 let endpoint = address.as_deref().map(kernel::gate::target_of);
                 let verdict = kernel::gate::attach(endpoint.as_ref());
                 if let Some(answered) = self.settled(verdict) {
@@ -95,11 +91,8 @@ impl ToolBench {
                     return Ok(Some(answered));
                 }
             }
-            Effect::Spawn => {
-
-            }
+            Effect::Spawn => {}
             Effect::Govern => {
-
                 let scope = match subject {
                     GateSubject::Scope(scope) => scope.clone(),
 
@@ -125,7 +118,6 @@ impl ToolBench {
                 ));
             }
             Effect::Spend => {
-
                 return Err(AxError::failure(
                     AxCode::ToolUnavailable,
                     "invoke tool",

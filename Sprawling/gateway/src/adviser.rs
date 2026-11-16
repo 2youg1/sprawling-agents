@@ -39,7 +39,6 @@ pub struct AdviserClient {
 }
 
 impl AdviserClient {
-
     pub fn attached(
         chosen: &Chosen<'_>,
         redemption: Redemption,
@@ -85,7 +84,6 @@ impl AdviserClient {
             },
         };
         let returned = self.model.call(&request).map_err(|err| {
-
             if *err.code() == AxCode::Timeout {
                 AdviserFailure::Timeout
             } else {

@@ -54,7 +54,6 @@ struct Kept {
 }
 
 impl From<Kept> for Held {
-
     fn from(Kept { endpoint }: Kept) -> Held {
         let ceiling = endpoint
             .tuning

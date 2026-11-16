@@ -45,7 +45,6 @@ pub struct SucceedTool {
 }
 
 impl SucceedTool {
-
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut reason = Map::new();
         reason.insert("type".to_owned(), Value::String("string".to_owned()));

@@ -14,9 +14,7 @@ use crate::span::Span;
 pub enum Preview {
     Laid(Laid),
 
-    Unsupported {
-        encoding: Encoding,
-    },
+    Unsupported { encoding: Encoding },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -30,7 +28,6 @@ pub struct Laid {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ReplyState {
-
     Streaming,
 
     Settled,
@@ -40,7 +37,6 @@ pub enum ReplyState {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Block {
-
     Heading {
         span: Span,
         level: u8,
@@ -176,7 +172,6 @@ pub enum Align {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Construct {
-
     Html,
 
     Math,

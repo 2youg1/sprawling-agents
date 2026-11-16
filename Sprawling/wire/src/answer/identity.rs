@@ -24,7 +24,6 @@ pub enum IdentityAnswer {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StatedIdentity {
-
     pub user_id: Option<String>,
 
     pub imported_from: Option<String>,

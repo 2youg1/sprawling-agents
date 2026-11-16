@@ -11,7 +11,6 @@ use super::answering::payload;
 use browser::{SHOT_MAX_EDGE_PX, Shot, ShotRequest};
 
 impl Browser {
-
     pub(super) fn stored(
         &mut self,
         request: &ShotRequest,

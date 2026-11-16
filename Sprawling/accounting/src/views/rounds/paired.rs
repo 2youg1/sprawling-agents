@@ -24,7 +24,6 @@ struct Sending {
 }
 
 impl LedgerAsk {
-
     pub(super) fn pair_arrivals(&self, turns: &mut [wire::Turn], records: &[EventRecord]) {
         let taken: BTreeMap<kernel::Seq, String> = records
             .iter()
@@ -125,7 +124,6 @@ fn sending_of(record: &EventRecord) -> Option<(String, Sending)> {
 }
 
 pub(super) fn land_sends(turns: &mut [wire::Turn], records: &[EventRecord]) {
-
     let mut open: Vec<(String, kernel::Seq, String)> = Vec::new();
     let mut letters: BTreeMap<String, kernel::Seq> = BTreeMap::new();
     let mut landed: BTreeMap<kernel::Seq, Landing> = BTreeMap::new();

@@ -90,7 +90,6 @@ pub fn hall_discipline(addr: &Address) -> Option<Discipline> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Discipline {
-
     pub opening: &'static str,
 
     pub closing: &'static str,

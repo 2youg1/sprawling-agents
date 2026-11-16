@@ -18,7 +18,6 @@ pub(crate) struct RoomSessions {
 }
 
 impl RoomSessions {
-
     pub(crate) fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError> {
         let Some(room) = record.addr() else {
             return Ok(());

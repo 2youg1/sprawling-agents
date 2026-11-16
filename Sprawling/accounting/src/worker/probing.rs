@@ -61,7 +61,6 @@ fn text_of(returned: &kernel::ModelReturn) -> String {
 }
 
 impl RunWorker {
-
     pub(super) fn probe_before(
         &mut self,
         adapter: Option<&mut super::keeping_warm::Door>,
@@ -120,7 +119,6 @@ impl RunWorker {
 }
 
 impl Site {
-
     pub(super) fn probe_after<L: Ledger>(
         &mut self,
         plan: &runtime::RunPlan,

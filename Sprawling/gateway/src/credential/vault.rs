@@ -75,7 +75,6 @@ pub struct Described {
 pub(crate) struct KeyringVault;
 
 impl KeyringVault {
-
     pub(crate) const SOURCE: &'static str = if cfg!(target_os = "linux") {
         "kernel-keyring"
     } else {

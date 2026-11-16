@@ -10,7 +10,6 @@ use kernel::AxError;
 use runtime::ExecTool;
 
 impl Laying {
-
     pub(super) fn exec_tool(
         &self,
         site: &Site,

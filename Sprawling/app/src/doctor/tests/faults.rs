@@ -240,7 +240,6 @@ fn a_half_written_component_directory_is_broken() {
 
 #[test]
 fn a_present_tool_that_says_nothing_is_still_present() {
-
     let (program, arg) = if cfg!(windows) {
         (PathBuf::from("findstr.exe"), "/V")
     } else {

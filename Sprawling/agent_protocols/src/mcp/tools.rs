@@ -54,7 +54,6 @@ pub(crate) fn float_at(value: &Value, path: String) -> Option<String> {
 }
 
 pub struct Listed {
-
     pub remote: String,
 
     pub meta: ToolMeta,
@@ -140,7 +139,6 @@ struct Link {
 }
 
 impl McpTool {
-
     pub fn new(
         meta: ToolMeta,
         remote: String,

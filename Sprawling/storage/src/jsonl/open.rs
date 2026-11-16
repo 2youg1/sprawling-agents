@@ -20,7 +20,6 @@ use super::ledger::{
 use super::verify::{LineCheck, LineFault};
 
 impl JsonlLedger {
-
     pub fn open(dir: &Path, now: TimeMs) -> Result<(Self, OpenReport), StorageError> {
         JsonlLedger::open_locked(dir, now, TailProof::Strict)
     }
@@ -210,7 +209,6 @@ impl JsonlLedger {
 
         if self.preallocation.length_after_open(keep, dropped, total) < total {
             if valid_len == 0 {
-
                 self.vfs
                     .truncate(last, 0)
                     .map_err(io_err("truncate segment", last))?;
@@ -255,14 +253,12 @@ impl JsonlLedger {
 
 #[derive(Clone, Copy)]
 enum TailProof<'a> {
-
     Strict,
 
     Records(&'a ProofRecords),
 }
 
 impl TailProof<'_> {
-
     fn start(self, vfs: &dyn Vfs, last: &Path, entry: LineCheck) -> std::io::Result<TailStart> {
         match self {
             TailProof::Strict => Ok(TailStart::strict(entry)),
@@ -310,7 +306,6 @@ mod preallocated;
 
 #[cfg(test)]
 impl JsonlLedger {
-
     pub(crate) fn open_preallocated(
         fs: crate::fault_fs::FaultFs,
         dir: &Path,

@@ -57,7 +57,6 @@ pub(super) struct Shot {
 }
 
 impl Shot {
-
     pub(super) fn file(&self) -> String {
         format!(
             "{}-{:02}-{}-{}.png",

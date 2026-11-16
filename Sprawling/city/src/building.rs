@@ -23,7 +23,6 @@ pub struct Building {
 }
 
 impl Building {
-
     pub fn of(addr: &Address) -> Result<Building, AxError> {
         let head = addr.as_str().split('/').next().unwrap_or(addr.as_str());
         let head = Address::parse(head)?;
@@ -69,7 +68,6 @@ pub fn all(city_root: &Path) -> Result<Vec<Address>, AxError> {
     let entries = std::fs::read_dir(city_root).map_err(|err| unreadable(&err))?;
     let mut out = Vec::new();
     for entry in entries {
-
         let entry = entry.map_err(|err| unreadable(&err))?;
         if !entry.path().is_dir() {
             continue;
@@ -91,7 +89,6 @@ pub(crate) fn names_a_building(name: &str) -> Option<Address> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RulesText<'a> {
-
     Template,
 
     Written(&'a str),
@@ -99,7 +96,6 @@ pub enum RulesText<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Founding {
-
     Built,
 
     Adopted,
@@ -352,7 +348,6 @@ fn lay_out(city_root: &Path, building: &Building, rules: &str) -> Result<(), AxE
 }
 
 fn lay_out_at(root: &Path, addr: &Address, rules: &str) -> Result<(), AxError> {
-
     let governed = root.join(kernel::RESERVED_PREFIX);
     std::fs::create_dir_all(&governed).map_err(|err| storage(&governed, &err))?;
     let file = governed.join(RULES_FILE);

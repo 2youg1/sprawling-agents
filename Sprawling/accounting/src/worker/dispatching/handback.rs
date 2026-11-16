@@ -15,7 +15,6 @@ use super::super::{Assignment, CITY_VERIFIER, KnockChain, Owing, RunWorker};
 use super::Dispatched;
 
 pub(in crate::worker) struct Unstarted<'a> {
-
     pub(in crate::worker) parent: &'a Address,
 
     pub(in crate::worker) asker: RunId,
@@ -26,7 +25,6 @@ pub(in crate::worker) struct Unstarted<'a> {
 }
 
 impl RunWorker {
-
     pub(in crate::worker) fn deliver_unstarted(
         &mut self,
         unstarted: Unstarted<'_>,

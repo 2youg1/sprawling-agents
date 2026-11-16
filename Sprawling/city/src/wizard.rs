@@ -9,11 +9,9 @@ use crate::building::BuildingTemplate;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Standing {
-
     Empty,
 
     Work {
-
         adoptable: Vec<Address>,
 
         loose: usize,
@@ -47,7 +45,6 @@ pub fn survey(entries: &[(String, bool)], has_history: bool) -> Standing {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CityPlan {
-
     dirs: Vec<Address>,
 
     hall: (Address, BuildingTemplate),
@@ -56,7 +53,6 @@ pub struct CityPlan {
 }
 
 impl CityPlan {
-
     pub fn new(first: Option<(&str, &str)>) -> Result<CityPlan, AxError> {
         let hall_addr = Address::parse(kernel::consts_policy::HALL_BUILDING)?;
         let mut dirs = vec![Address::parse(RESERVED_PREFIX)?, hall_addr.clone()];

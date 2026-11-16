@@ -53,7 +53,6 @@ pub struct Views {
         serialize_with = "super::snapshot::encode_index",
         deserialize_with = "super::snapshot::decode_index"
     )]
-
     pub(super) index: std::sync::Arc<std::sync::Mutex<storage::LedgerIndex>>,
 
     pub(super) first_prompts: std::collections::BTreeMap<kernel::RunId, kernel::Seq>,
@@ -110,13 +109,11 @@ pub(super) struct RunPrompt {
 }
 
 impl Views {
-
     pub fn over(ledger_dir: &Path) -> Views {
         Views::new(city_root_of(ledger_dir))
     }
 
     pub fn new(city_root: &Path) -> Views {
-
         Views::sharing(
             city_root,
             super::snapshot::fresh_index(),
@@ -192,7 +189,6 @@ impl Views {
     }
 
     pub fn apply(&mut self, record: &EventRecord) -> Result<(), AxError> {
-
         let next_unfolded = record.seq().next()?;
         self.head = Some(record.seq());
         self.hot
@@ -255,7 +251,6 @@ impl Views {
                 }
             }
             Holding::Claimed => {
-
                 let node = record
                     .data()
                     .read::<kernel::event::record::RoadmapMoved>()?

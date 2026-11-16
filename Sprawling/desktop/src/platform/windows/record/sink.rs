@@ -34,7 +34,6 @@ pub(super) struct Sink {
 }
 
 pub(super) struct Closed {
-
     pub(super) kind: &'static str,
     pub(super) frames: u64,
 
@@ -47,14 +46,12 @@ struct Ended {
 }
 
 enum Writer {
-
     Mp4 { child: Child, stdin: ChildStdin },
 
     Frames { into: PathBuf },
 }
 
 impl Sink {
-
     pub(super) fn open(
         handle: winsafe::HWND,
         bounds: Bounds,
@@ -133,7 +130,6 @@ fn recorded(
     let mut frames: u64 = 0;
     let mut cut_short = None;
     while !stopping.load(Ordering::Acquire) && frames < MOST_FRAMES {
-
         match capture::window(handle, bounds).and_then(|frame| writer.put(&frame, frames)) {
             Ok(()) => frames = frames.saturating_add(1),
             Err(refusal) => {
@@ -149,7 +145,6 @@ fn recorded(
 }
 
 impl Writer {
-
     fn put(&mut self, frame: &image::RgbaImage, nth: u64) -> Result<(), Refusal> {
         match self {
             Writer::Mp4 { stdin, .. } => stdin.write_all(frame.as_raw()).map_err(|err| {

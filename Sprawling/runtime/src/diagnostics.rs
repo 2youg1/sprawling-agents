@@ -8,7 +8,6 @@ use kernel::{RunId, Seq};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Level {
-
     Refuse,
 
     Effect,
@@ -21,7 +20,6 @@ pub enum Level {
 }
 
 impl Level {
-
     pub const DEFAULT: Level = Level::Effect;
 
     pub const ALL: [Level; 5] = [
@@ -78,7 +76,6 @@ pub struct Diagnostics {
 }
 
 impl std::fmt::Debug for Diagnostics {
-
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Diagnostics")
             .field("floor", &self.floor)
@@ -87,7 +84,6 @@ impl std::fmt::Debug for Diagnostics {
 }
 
 impl Diagnostics {
-
     #[must_use]
     pub fn new(floor: Level, sink: Sink) -> Diagnostics {
         Diagnostics {
@@ -224,7 +220,6 @@ mod tests {
 
     #[test]
     fn a_credential_that_reaches_a_line_does_not_leave_in_it() {
-
         let token = ["sk-live-", "Zk29fQ4t", "Rr7mVx1L", "pA6c"].concat();
         let (mut log, held) = recorder();
         log.write(

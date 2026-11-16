@@ -7,7 +7,6 @@ use crate::worker::RunWorker;
 use kernel::{AxCode, AxError, EventKind, Locator, Payload, Restoration};
 
 impl RunWorker {
-
     pub(in crate::worker) fn restore_discard(
         &mut self,
         restoration: &Restoration,
@@ -66,7 +65,6 @@ impl RunWorker {
 }
 
 impl RunWorker {
-
     pub(in crate::worker) fn take_back(
         &mut self,
         at: &kernel::Address,

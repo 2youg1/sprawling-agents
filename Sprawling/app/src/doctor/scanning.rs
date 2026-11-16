@@ -23,12 +23,10 @@ const LABEL: usize = 16;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Scanning {
-
     DoesNotApply,
 
     Stopped,
     Read {
-
         city: PathBuf,
         drive: Drive,
         exclusion: Exclusion,
@@ -37,33 +35,23 @@ pub(crate) enum Scanning {
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Drive {
-
     Trusted,
 
-    Untrusted {
-        volume: String,
-    },
+    Untrusted { volume: String },
 
-    Not {
-        volume: String,
-        file_system: String,
-    },
+    Not { volume: String, file_system: String },
     Untold(Untold),
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Exclusion {
-
-    Inside {
-        under: String,
-    },
+    Inside { under: String },
     Outside,
     Untold(Untold),
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub(crate) enum Untold {
-
     NoDisk,
 
     AdminOnly,

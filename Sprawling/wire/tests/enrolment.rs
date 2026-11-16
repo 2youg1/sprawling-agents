@@ -8,7 +8,6 @@
     clippy::let_underscore_untyped,
     reason = "test code: this stand-in drops what a production reader               would act on, because the assertion is about the status               the route answers and not about the reply reaching anyone"
 )]
-
 #![cfg(feature = "server")]
 #![allow(
     clippy::unwrap_used,
@@ -29,7 +28,6 @@ use tower::ServiceExt;
 use wire::{Answer, AxCode, AxError, Command, Reply, ServeConfig};
 
 enum Worker {
-
     Stores,
 
     Refuses,

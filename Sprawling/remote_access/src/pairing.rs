@@ -17,7 +17,6 @@ pub const CODE_BYTES: usize = 16;
 pub struct PairingCode(B3Hash);
 
 impl PairingCode {
-
     #[must_use]
     pub fn mint(entropy: [u8; CODE_BYTES]) -> (Self, String) {
         let canonical = encode(&entropy);
@@ -121,7 +120,6 @@ mod tests {
 
     #[test]
     fn the_code_is_rfc_4648_base32_of_its_entropy() {
-
         assert_eq!(encode(b"foobar"), "mzxw6ytboi");
         let (_, shown) = PairingCode::mint([0xff; CODE_BYTES]);
         assert_eq!(shown.chars().filter(|each| *each != '-').count(), 26);

@@ -92,7 +92,6 @@ use runtime::Interrupt;
 use storage::{Cas, JsonlLedger};
 
 pub struct ScanReport {
-
     pub opening: LedgerOpening,
     pub lines: usize,
     pub closed_calls: usize,
@@ -103,7 +102,6 @@ pub struct ScanReport {
 }
 
 impl ScanReport {
-
     #[must_use]
     pub fn summary(&self) -> String {
         let counts = format!(
@@ -119,7 +117,6 @@ impl ScanReport {
 }
 
 pub struct Serving {
-
     pub deltas: Arc<dyn Fn(wire::Delta) + Send + Sync>,
 
     pub outputs: Arc<dyn Fn(wire::LiveOutput) + Send + Sync>,
@@ -192,7 +189,6 @@ pub struct RunWorker {
 }
 
 impl RunWorker {
-
     pub(crate) fn city_hash(&self) -> Result<kernel::B3Hash, AxError> {
         if let Some(known) = self.city.get() {
             return Ok(*known);

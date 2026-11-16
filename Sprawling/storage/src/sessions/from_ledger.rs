@@ -18,7 +18,6 @@ pub(super) struct Segments<'a> {
 }
 
 impl Segments<'_> {
-
     pub(super) fn first_seen(&self) -> Result<BTreeMap<Address, Seq>, StorageError> {
         let (vfs, ledger) = (self.vfs, self.ledger);
         let mut folded = BTreeMap::new();

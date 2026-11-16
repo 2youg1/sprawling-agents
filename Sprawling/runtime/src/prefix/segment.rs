@@ -17,7 +17,6 @@ pub enum SegmentSlot {
 }
 
 impl SegmentSlot {
-
     pub const ALL: [SegmentSlot; 4] = [
         SegmentSlot::City,
         SegmentSlot::Building,
@@ -51,7 +50,6 @@ pub struct FrozenSegment {
 }
 
 impl FrozenSegment {
-
     pub fn new(slot: SegmentSlot, bytes: Vec<u8>) -> FrozenSegment {
         FrozenSegment::assembled(slot, bytes, Vec::new())
     }
@@ -118,7 +116,6 @@ pub struct SegmentSource {
 }
 
 impl SegmentSource {
-
     pub fn whole(addr: Address, bytes: &[u8]) -> SegmentSource {
         SegmentSource::cut(addr, bytes, 0)
     }

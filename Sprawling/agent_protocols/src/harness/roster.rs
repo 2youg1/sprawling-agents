@@ -10,7 +10,6 @@ use super::entry::{AgentEntry, AgentId, Consented};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Official {
-
     pub word: &'static str,
 
     pub registry_id: &'static str,
@@ -75,7 +74,6 @@ pub const OFFICIAL: [Official; 5] = [
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SetUpDir {
-
     pub variable: Option<&'static str>,
 
     pub under_home: &'static [&'static str],
@@ -84,7 +82,6 @@ pub struct SetUpDir {
 }
 
 impl SetUpDir {
-
     #[must_use]
     pub fn on(
         &self,
@@ -110,7 +107,6 @@ pub struct Roster {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Unseated {
-
     Unknown,
 
     Refused(AxError),

@@ -10,7 +10,6 @@ use crate::worker::RunWorker;
 use crate::worker::credentials::{Chosen, Stated};
 
 impl RunWorker {
-
     pub(in crate::worker) fn select_model(
         &mut self,
         chosen: Chosen,

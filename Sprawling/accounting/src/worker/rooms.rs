@@ -11,7 +11,6 @@ use kernel::{Address, Admission, AxCode, AxError, RunId};
 use super::{INBOX_CAPACITY, new_inbox};
 
 enum RoomQueue {
-
     Home(collab::Inbox),
 
     Lent {
@@ -25,9 +24,7 @@ enum RoomQueue {
 pub(in crate::worker) struct PolicySlot(Arc<Mutex<Option<kernel::RunPolicy>>>);
 
 impl PolicySlot {
-
     fn post(&self, policy: kernel::RunPolicy) {
-
         *self.0.lock().unwrap_or_else(PoisonError::into_inner) = Some(policy);
     }
 
@@ -37,7 +34,6 @@ impl PolicySlot {
 }
 
 pub(in crate::worker) enum QueueTenure {
-
     TheRoomQueue,
 
     ASpare { held_by: RunId },
@@ -57,7 +53,6 @@ pub(in crate::worker) struct RoomQueues {
 }
 
 impl RoomQueues {
-
     pub(in crate::worker) fn worked_by(&self, addr: &Address) -> Option<RunId> {
         match self.rooms.get(addr) {
             Some(RoomQueue::Lent { to, .. }) => Some(*to),
@@ -205,7 +200,6 @@ impl RoomQueues {
 
 #[cfg(test)]
 impl RoomQueues {
-
     pub(in crate::worker) fn at_home(&self, addr: &Address) -> Option<&collab::Inbox> {
         match self.rooms.get(addr) {
             Some(RoomQueue::Home(inbox)) => Some(inbox),

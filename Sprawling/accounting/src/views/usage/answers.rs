@@ -8,7 +8,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::{McpCall, Shelved, Usage, per_day};
 
 impl Usage {
-
     pub(crate) fn shells(&self) -> wire::ShellsAnswer {
         wire::ShellsAnswer {
             interpreters: self

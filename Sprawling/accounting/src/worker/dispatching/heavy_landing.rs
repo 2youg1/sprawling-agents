@@ -13,7 +13,6 @@ use super::super::workbench::held;
 use super::super::{Assignment, Driven, Site};
 
 pub(in crate::worker) struct Swept {
-
     pub(in crate::worker) base: String,
 
     pub(in crate::worker) discarded: Result<Vec<kernel::Payload>, AxError>,
@@ -28,7 +27,6 @@ pub(super) struct HeavyLanding {
 }
 
 impl HeavyLanding {
-
     pub(super) fn carry_out(
         self,
         at: &Assignment,

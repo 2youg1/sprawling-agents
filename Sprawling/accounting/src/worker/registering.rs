@@ -35,7 +35,6 @@ pub(crate) fn booking(bell: mpsc::Sender<Wake>, run: RunId, room: Address) -> co
 }
 
 impl RunWorker {
-
     pub(super) fn answer_goal(&mut self, ask: GoalAsk) {
         let GoalAsk {
             run,

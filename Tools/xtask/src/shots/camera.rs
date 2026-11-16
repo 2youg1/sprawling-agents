@@ -30,7 +30,6 @@ const TREE_PATIENCE: Duration = Duration::from_secs(2);
 
 #[derive(Clone, Copy)]
 pub(super) enum Source<'a> {
-
     Bundle(&'a Path),
 
     Origin(&'a str),
@@ -47,7 +46,6 @@ pub(super) struct Camera<'a> {
 }
 
 impl<'a> Camera<'a> {
-
     pub(super) fn open(
         browser: &'a Path,
         work: &Path,
@@ -186,7 +184,6 @@ impl<'a> Camera<'a> {
             .arg("--headless=new")
             .arg("--disable-gpu")
             .arg("--no-sandbox")
-
             .arg("--no-first-run")
             .arg("--no-default-browser-check")
             .arg("--hide-scrollbars")

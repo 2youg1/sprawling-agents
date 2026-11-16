@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 pub struct Window(NonZeroU64);
 
 impl Window {
-
     #[must_use]
     pub const fn new(tokens: u64) -> Option<Window> {
         match NonZeroU64::new(tokens) {

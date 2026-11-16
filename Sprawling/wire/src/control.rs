@@ -16,7 +16,6 @@ pub enum Intervention {
 }
 
 impl Intervention {
-
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -66,61 +65,41 @@ pub fn classify(command: &Command) -> ControlVerdict {
         | Command::ConfigureBuilding(_)
         | Command::AttachEndpoint { .. }
         | Command::SelectModel { .. }
-
         | Command::OpenSession { .. }
         | Command::CreateBuilding { .. }
-
         | Command::RemoveBuilding { .. }
         | Command::PutSecret { .. }
-
         | Command::Reveal { .. }
-
         | Command::RestoreDiscard { .. }
-
         | Command::DoctorInstall { .. }
         | Command::DoctorRefresh { .. }
         | Command::BatchByBuilding { .. }
         | Command::Approve { .. }
-
         | Command::HandOff { .. }
         | Command::SetAutonomy { .. }
-
         | Command::Pursue { .. }
-
         | Command::PutDocument { .. }
         | Command::PutIdentity { .. }
-
         | Command::PutRules(_)
         | Command::SetWorkspaceChoice(_)
-
         | Command::RestoreFile { .. }
-
         | Command::PutGuide { .. }
         | Command::ConfigureCity(_)
-
         | Command::PutSpine { .. }
-
         | Command::PutRange(_)
         | Command::PutPrompt(_)
         | Command::DecideProposals(_)
-
         | Command::PutPreferences { .. }
         | Command::PutShelved { .. }
-
         | Command::ConnectToolkit { .. }
-
         | Command::NameSession(_)
         | Command::ChangeRunPolicy(_)
-
         | Command::OpenRemoteDoor { .. }
         | Command::ReplaceCityKey { .. }
         | Command::ConfirmRemoteDoor { .. }
         | Command::CloseRemoteDoor { .. }
-
         | Command::PrivacyOperation { .. }
-
         | Command::ForgetSecret(_)
-
         | Command::CloseCity(_)
         | Command::AddAgent(_)
         | Command::AgentLogin(_)

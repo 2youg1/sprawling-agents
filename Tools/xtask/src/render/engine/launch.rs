@@ -18,7 +18,6 @@ const DRAIN: Duration = Duration::from_secs(2);
 const AFTER_KILL: Duration = Duration::from_secs(5);
 
 pub(crate) struct Launch<'a> {
-
     pub(crate) cmd: &'a str,
     pub(crate) stderr: Stderr<'a>,
 
@@ -34,7 +33,6 @@ pub(crate) enum Stderr<'a> {
 
 #[derive(Clone, Copy)]
 pub(crate) enum AfterExit {
-
     Drain,
 
     AwaitTree(Duration),

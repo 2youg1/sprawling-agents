@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum EvidenceKind {
-
     Screenshot,
 
     Finished,
@@ -27,7 +26,6 @@ pub struct Picture {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct EvidenceItem {
-
     pub at: Seq,
     pub kind: EvidenceKind,
     pub locator: Locator,

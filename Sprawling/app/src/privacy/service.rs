@@ -42,7 +42,6 @@ pub(super) struct Operation {
 }
 
 impl Service<super::system::System> {
-
     pub(crate) fn of_this_machine() -> Result<Self, AxError> {
         Ok(Self::new(
             super::system::this_machine,
@@ -52,7 +51,6 @@ impl Service<super::system::System> {
 }
 
 impl<M: Machine + 'static> Service<M> {
-
     pub(super) fn new(machine: impl Fn() -> M + Send + Sync + 'static, history: PathBuf) -> Self {
         Self {
             machine: Box::new(machine),
@@ -131,7 +129,6 @@ impl<M: Machine + 'static> Service<M> {
 
     pub(super) fn perform(&self, operation: Operation) {
         let result = {
-
             let _turn = self.turn.lock().unwrap_or_else(PoisonError::into_inner);
             let mut machine = (self.machine)();
             match coordinator::run(

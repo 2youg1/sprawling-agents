@@ -13,7 +13,6 @@ pub(in crate::worker) const DESKTOP_LABEL: &str = "desktop";
 const DESKTOP_VERB: &str = "desktop";
 
 impl Laying {
-
     pub(in crate::worker) fn servers(&self, site: &Site) -> Vec<McpServer> {
         let mut servers = site.config.mcp.clone();
         if !site.rules.desktop() {

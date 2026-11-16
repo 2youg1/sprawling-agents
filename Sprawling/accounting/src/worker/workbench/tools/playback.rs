@@ -64,7 +64,6 @@ impl Kind {
 }
 
 impl Laying {
-
     pub(super) fn playback_tool(
         &self,
         site: &Site,
@@ -75,7 +74,6 @@ impl Laying {
 }
 
 impl PlaybackTool {
-
     pub(super) fn definition() -> Result<ToolDef, AxError> {
         let params = json!({
             "type": "object",

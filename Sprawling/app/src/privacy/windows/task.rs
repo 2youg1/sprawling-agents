@@ -45,7 +45,6 @@ pub(in crate::privacy) enum Switch {
 
 #[derive(Debug)]
 pub(in crate::privacy) enum TaskFault {
-
     Unavailable(kernel::AxError),
 
     Refused(Option<i32>),

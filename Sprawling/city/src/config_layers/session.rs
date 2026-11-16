@@ -19,7 +19,6 @@ pub struct SessionShape {
 }
 
 impl SessionShape {
-
     pub fn new(
         model: impl Into<String>,
         effort: Option<Effort>,

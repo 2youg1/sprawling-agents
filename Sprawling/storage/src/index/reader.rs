@@ -19,7 +19,6 @@ pub struct LineReader<'index> {
 }
 
 impl LineReader<'_> {
-
     pub fn line_at(&mut self, seq: Seq) -> Result<Vec<u8>, StorageError> {
         let Some((name, offset)) = self.index.folded.loc_of(seq) else {
             return Err(StorageError::SeqMissing { seq: seq.value() });
@@ -54,7 +53,6 @@ impl OpenSegment {
 
     fn line_at(&mut self, offset: u64) -> Result<Vec<u8>, StorageError> {
         if self.resume != Some(offset) {
-
             let distance = self.resume.and_then(|at| {
                 i64::try_from(offset)
                     .ok()?

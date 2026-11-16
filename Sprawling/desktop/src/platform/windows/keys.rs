@@ -16,7 +16,6 @@ pub(crate) enum Modifier {
 }
 
 impl Modifier {
-
     pub(crate) fn parse(named: &str) -> Result<Modifier, Refusal> {
         match named {
             "ctrl" => Ok(Modifier::Ctrl),

@@ -13,7 +13,6 @@ use super::run_slot::task_line;
 const NOT_RECORDED: &str = "not recorded: the room's Handoff.md does not say";
 
 impl Freezing<'_> {
-
     pub(super) fn frozen_handoff(
         &mut self,
         plan: &RunPlan,

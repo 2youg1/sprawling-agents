@@ -30,7 +30,6 @@ impl std::fmt::Debug for Inbox {
 }
 
 impl Inbox {
-
     #[must_use]
     pub fn new(capacity: u64, bandwidth: u32) -> Inbox {
         Inbox {
@@ -103,7 +102,6 @@ impl Inbox {
 pub struct Mailslot(std::sync::Arc<std::sync::Mutex<Vec<Signal>>>);
 
 impl Mailslot {
-
     pub fn drop_in(&self, signal: Signal, capacity: u64) -> Result<Admission, AxError> {
         let mut waiting = self.0.lock().map_err(|_| poisoned())?;
         if u64::try_from(waiting.len()).unwrap_or(u64::MAX) >= capacity {

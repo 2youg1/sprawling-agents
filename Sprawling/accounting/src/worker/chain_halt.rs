@@ -19,7 +19,6 @@ pub struct ChainUnderAudit {
 }
 
 impl RunWorker {
-
     pub fn chain_under_audit(&mut self, halt: storage::ChainHalt) -> ChainUnderAudit {
         self.ledger.halt_on(halt.clone());
         ChainUnderAudit {

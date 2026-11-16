@@ -30,7 +30,6 @@ pub fn acp_dispatch(
     pairing: wire::Pairing,
 ) -> Result<wire::AcpProgress, AxError> {
     if matches!(pairing, wire::Pairing::Absent) {
-
         return Err(AxError::failure(
             AxCode::GateDenied,
             "admit an external request",
@@ -70,7 +69,6 @@ pub fn acp_dispatch(
 }
 
 impl RunWorker {
-
     pub(super) fn agree_to_work(&mut self, at: &mut Assignment) -> Result<Seat, AxError> {
         let addr = &at.addr;
         if let Some(scope) = self.halted_by(addr) {
@@ -233,7 +231,6 @@ enum RoomSeat {
 }
 
 fn seat_from_files(city_root: &Path, asked: &Asked<'_>) -> Result<RoomSeat, AxError> {
-
     let building = city::Building::of(asked.addr)?;
     let rules = city::load(city_root, building.addr())?;
 

@@ -13,7 +13,6 @@ pub const TAG_MAX: usize = 24;
 pub struct Tag(String);
 
 impl Tag {
-
     pub fn parse(raw: &str) -> Result<Self, AxError> {
         let length = raw.chars().count();
         if length == 0 || length > TAG_MAX || !raw.chars().all(belongs) {
@@ -65,7 +64,6 @@ impl schemars::JsonSchema for Tag {
 #[serde(deny_unknown_fields)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SessionTags {
-
     pub city: Address,
     pub room: Address,
 
@@ -74,7 +72,6 @@ pub struct SessionTags {
 }
 
 impl SessionTags {
-
     #[must_use]
     pub fn names(&self, other: &SessionTags) -> bool {
         self.city == other.city && self.room == other.room && self.began == other.began

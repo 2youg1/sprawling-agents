@@ -16,7 +16,6 @@ pub struct Shot {
 }
 
 impl Shot {
-
     pub fn read(result: &Value, media: ImageType) -> Result<Shot, AxError> {
         let encoded = result.get("data").and_then(Value::as_str).ok_or_else(|| {
             AxError::failure(AxCode::WireMismatch, "read a screenshot", "no `data`")

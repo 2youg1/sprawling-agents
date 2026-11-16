@@ -26,18 +26,13 @@ pub use undoable::{ConnectorCall, reaches_the_undoable, undoable};
 #[derive(Debug)]
 pub enum GateOutcome {
     Allow,
-    Deny {
-        refusal: Box<AxError>,
-    },
+    Deny { refusal: Box<AxError> },
 
-    Ask {
-        question: Box<AxError>,
-    },
+    Ask { question: Box<AxError> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DoorId {
-
     Domain,
 
     Reach,
@@ -73,7 +68,6 @@ pub const DOORS: [DoorId; 10] = [
 ];
 
 impl DoorId {
-
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {

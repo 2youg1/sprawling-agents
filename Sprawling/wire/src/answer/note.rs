@@ -11,10 +11,15 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Note {
+    Refused {
+        error: AxError,
+        at: Seq,
+    },
 
-    Refused { error: AxError, at: Seq },
-
-    Checkpointed { oid: GitOid, at: Seq },
+    Checkpointed {
+        oid: GitOid,
+        at: Seq,
+    },
 
     Waiting {
         at: Seq,
@@ -45,13 +50,18 @@ pub enum Note {
         at: Seq,
     },
 
-    Discarded { count: usize, at: Seq },
+    Discarded {
+        count: usize,
+        at: Seq,
+    },
 
-    Unreadable { cause: String, at: Seq },
+    Unreadable {
+        cause: String,
+        at: Seq,
+    },
 }
 
 impl Note {
-
     #[must_use]
     pub fn at(&self) -> Seq {
         match *self {

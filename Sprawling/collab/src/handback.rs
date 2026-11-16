@@ -13,14 +13,12 @@ use kernel::event::record::{SignalId, SignalKind};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Handback {
-
     Finished(Artifact),
 
     Stopped { claim: Claim, because: String },
 }
 
 impl Handback {
-
     #[must_use]
     pub fn of(claim: Claim, done_check_passed: bool, verifier: &str) -> Handback {
         match claim.clone().verified(done_check_passed, verifier) {
@@ -135,7 +133,6 @@ enum HandbackBody {
 }
 
 impl HandbackBody {
-
     const TAG: &'static str = "handback";
 }
 

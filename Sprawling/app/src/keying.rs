@@ -7,7 +7,6 @@ use std::net::SocketAddr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Keying {
-
     Adopt,
 
     MintUnshown,
@@ -16,7 +15,6 @@ pub(crate) enum Keying {
 }
 
 impl Keying {
-
     pub(crate) fn decide(bind: SocketAddr, configured: bool) -> Self {
         match (configured, bind.ip().is_loopback()) {
             (true, _) => Self::Adopt,

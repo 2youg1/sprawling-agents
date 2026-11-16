@@ -17,7 +17,6 @@ pub struct NeighboursTool {
 }
 
 impl NeighboursTool {
-
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut scope = Map::new();
         scope.insert("type".to_owned(), Value::String("string".to_owned()));

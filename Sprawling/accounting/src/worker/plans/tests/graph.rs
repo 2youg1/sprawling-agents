@@ -171,7 +171,6 @@ fn mentioned(history: &str, word: &str) -> String {
 }
 
 fn excerpt(history: &str, at: usize) -> String {
-
     let before = history.get(..at).unwrap_or_default();
     let start = before
         .rfind(char::from(10))

@@ -13,7 +13,6 @@ use crate::spine::{RoadmapRow, RoadmapStatus};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum StopCause {
-
     Blocked { note: String },
 
     HandedBack { note: String },
@@ -26,7 +25,6 @@ pub enum StopCause {
 }
 
 impl StopCause {
-
     #[must_use]
     pub fn status(&self) -> RoadmapStatus {
         match self {

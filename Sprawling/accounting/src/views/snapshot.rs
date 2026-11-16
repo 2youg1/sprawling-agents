@@ -102,7 +102,6 @@ impl SnapshotFold for Views {
 }
 
 impl Views {
-
     pub fn encode(&self) -> Result<Vec<u8>, AxError> {
         postcard::to_allocvec(self).map_err(|fault| {
             AxError::failure(AxCode::StorageFatal, "encode the views", fault.to_string())

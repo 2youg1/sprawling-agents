@@ -86,7 +86,6 @@ pub(in crate::worker) struct Asked {
 }
 
 impl RunWorker {
-
     fn dispatch_asked(
         &mut self,
         at: Assignment,
@@ -115,7 +114,6 @@ impl RunWorker {
                 ..
             } => self.dispatch_asked(
                 Assignment {
-
                     origin: self.origins.get(&addr),
 
                     policy: self.origins.policy(&addr).unwrap_or(policy),

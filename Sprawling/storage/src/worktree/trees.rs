@@ -38,7 +38,6 @@ impl std::fmt::Debug for Worktrees {
 }
 
 impl Worktrees {
-
     pub fn open(city_root: &Path) -> Result<Worktrees, StorageError> {
         let repo = open_city(city_root).map_err(|err| StorageError::Worktree {
             op: "open the city repository",

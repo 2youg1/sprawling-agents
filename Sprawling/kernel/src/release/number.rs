@@ -13,7 +13,6 @@ pub struct Version {
 }
 
 impl Version {
-
     pub fn from_crates_version(text: &str) -> Result<Version, AxError> {
         Version::parse(text, &|msg| {
             AxError::failure(

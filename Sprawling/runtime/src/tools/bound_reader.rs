@@ -19,7 +19,6 @@ pub struct BoundReader {
 }
 
 impl BoundReader {
-
     #[must_use]
     pub fn new(city_root: &Path, bound: ReadBound, block_store: &Path) -> BoundReader {
         BoundReader {
@@ -98,14 +97,12 @@ pub struct Opened {
 }
 
 enum Source {
-
     Disk(Handle),
 
     Held(Cursor<Vec<u8>>),
 }
 
 impl Opened {
-
     #[must_use]
     pub fn named(&self) -> &Named {
         &self.named

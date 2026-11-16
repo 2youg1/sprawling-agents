@@ -27,7 +27,6 @@ pub(crate) struct Seats {
 }
 
 impl Seats {
-
     pub(crate) fn new(plan: Vec<Processor>) -> Self {
         let mut lanes = plan;
         let serial = lanes.split_off(lanes.len().saturating_sub(SERIAL_SEATS));

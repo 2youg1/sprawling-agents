@@ -20,7 +20,6 @@ pub(crate) struct CrashBudget {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Next {
-
     Stop,
 
     Restart(CrashBudget),
@@ -29,7 +28,6 @@ pub(crate) enum Next {
 }
 
 impl CrashBudget {
-
     pub(crate) fn fresh() -> Self {
         Self {
             crashes: Vec::with_capacity(CRASH_LIMIT),

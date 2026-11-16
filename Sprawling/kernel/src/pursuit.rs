@@ -21,7 +21,6 @@ pub struct Pursuit {
 }
 
 impl Pursuit {
-
     pub fn declare(_at: &Delegator, goal: String) -> Result<Pursuit, crate::error::AxError> {
         if goal.trim().is_empty() {
             return Err(crate::error::AxError::failure(
@@ -60,7 +59,6 @@ impl Pursuit {
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum PursuitVerdict {
-
     Work { next: NodeId },
 
     Waiting { in_flight: u32 },

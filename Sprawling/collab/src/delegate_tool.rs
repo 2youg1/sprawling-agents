@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Delegated {
-
     pub room: Address,
     pub task: String,
     pub goal: String,
@@ -27,7 +26,6 @@ pub struct StartCheck(Arc<Judge>);
 type Judge = dyn Fn(&Address) -> Result<(), AxError> + Send + Sync;
 
 impl StartCheck {
-
     #[must_use]
     pub fn new(
         judge: impl Fn(&Address) -> Result<(), AxError> + Send + Sync + 'static,
@@ -44,7 +42,6 @@ impl std::fmt::Debug for StartCheck {
 
 #[derive(Debug)]
 pub struct DelegateDesk {
-
     depth: Depth,
 
     building: Address,
@@ -125,7 +122,6 @@ pub struct DelegateTool {
 }
 
 impl DelegateTool {
-
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, description) in [

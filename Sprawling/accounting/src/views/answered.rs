@@ -8,7 +8,6 @@ use kernel::{AxError, EventRecord};
 use super::holding::Views;
 
 impl Views {
-
     pub(super) fn fold_ruling(&mut self, record: &EventRecord) -> Result<(), AxError> {
         let ruled = record
             .data()

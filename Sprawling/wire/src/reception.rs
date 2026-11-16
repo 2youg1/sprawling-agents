@@ -30,14 +30,12 @@ use crate::frames::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BindFace {
-
     Loopback { key: B3Hash },
 
     Exposed { key: B3Hash },
 }
 
 impl BindFace {
-
     #[must_use]
     pub fn key(&self) -> &B3Hash {
         match self {
@@ -76,7 +74,6 @@ pub enum EnrollVerdict {
 
 #[must_use]
 pub fn decide_enroll(peer: &SocketAddr) -> EnrollVerdict {
-
     if peer.ip().to_canonical().is_loopback() {
         return EnrollVerdict::Accept;
     }
@@ -138,7 +135,6 @@ pub enum SessionState {
 
 #[derive(Debug)]
 pub enum SessionStep {
-
     Welcome(Box<Welcome>),
 
     Deliver(Box<WireCommand>),
@@ -238,14 +234,12 @@ pub(crate) fn decide_lag(delivered: Option<Seq>, next: Seq) -> Option<Lagged> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Stream {
-
     Even(Option<Seq>),
 
     Owed(Option<Seq>),
 }
 
 impl Stream {
-
     pub(crate) const fn opening() -> Stream {
         Stream::Even(None)
     }
@@ -269,7 +263,6 @@ impl Stream {
     #[must_use]
     pub(crate) fn before(self, next: Seq) -> (Option<Lagged>, Stream) {
         let lag = match self {
-
             Stream::Even(None) => None,
             Stream::Even(delivered @ Some(_)) | Stream::Owed(delivered) => {
                 decide_lag(delivered, next)

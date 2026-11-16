@@ -22,7 +22,6 @@ pub(super) struct Assembled {
 }
 
 impl Assembled {
-
     pub(super) fn of_nothing(bytes: Vec<u8>) -> Assembled {
         Assembled {
             bytes,
@@ -54,7 +53,6 @@ impl Assembled {
 pub(super) const NEWLINE: u8 = 10;
 
 pub(super) fn building_segment(city_root: &Path, building: &Address) -> Result<Assembled, AxError> {
-
     let mut out = Assembled::of_nothing(building.as_str().as_bytes().to_vec());
     let rules_at = city::rules_path(city_root, building);
     if let Ok(rules) = std::fs::read(&rules_at) {
@@ -69,7 +67,6 @@ pub(super) fn building_segment(city_root: &Path, building: &Address) -> Result<A
 }
 
 impl Assembled {
-
     fn extend_conventions(
         &mut self,
         city_root: &Path,
@@ -109,7 +106,6 @@ pub(super) struct Freezing<'a> {
 }
 
 impl Freezing<'_> {
-
     fn intern_prefix(&mut self, prefix: &FrozenPrefix) -> Result<(), AxError> {
         for segment in prefix.segments() {
             self.cas

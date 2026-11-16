@@ -9,7 +9,6 @@ use super::RunWorker;
 use super::credentials::dialect_headers;
 
 pub(crate) struct GatewayModels {
-
     pub(crate) monotonic: fn() -> std::time::Instant,
 }
 
@@ -32,7 +31,6 @@ impl crate::ModelFactory for GatewayModels {
 }
 
 impl RunWorker {
-
     #[must_use]
     pub fn with_models(self, models: Box<dyn crate::ModelFactory + Send>) -> RunWorker {
         RunWorker { models, ..self }

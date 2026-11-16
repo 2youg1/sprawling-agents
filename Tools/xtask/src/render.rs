@@ -45,7 +45,6 @@ enum Errand {
 }
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-
     let bundle = match asked_for(BUNDLE) {
         Some(dir) => root.join(dir),
         None => crate::bundle::dist(root)?,
@@ -122,7 +121,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         }
         let readings = survey::judge(page);
         for reading in readings.iter().filter(refusable) {
-
             let located = match sources.locate(&reading.at.class) {
                 Some(found) => format!("{at} \u{b7} {found}"),
                 None => at.clone(),
@@ -153,7 +151,6 @@ fn measure_every<'p>(
     opening: &Opening,
     passes: Vec<&'p Pass>,
 ) -> Result<Vec<(&'p Pass, Measured)>, XtaskError> {
-
     let at_once = match std::thread::available_parallelism() {
         Ok(processors) => (processors.get() / PROCESSORS_PER_PASS).max(1),
         Err(_) => 1,

@@ -64,7 +64,6 @@ fn tuning_of(kept: AttachedTuning) -> Result<EndpointTuning, AxError> {
             .extra_headers
             .into_iter()
             .map(|(name, text)| {
-
                 let value = match HeaderValue::parse(&name, &text) {
                     Ok(value) => value,
                     Err(_) => HeaderValue::Plain(text),

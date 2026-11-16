@@ -9,7 +9,6 @@ const UNLISTED_HOST_PATH: &str = "/v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DialectHint {
-
     Unset,
 
     Chat,
@@ -20,7 +19,6 @@ pub enum DialectHint {
 }
 
 impl DialectHint {
-
     #[must_use]
     pub const fn of(dialect: DialectKind) -> DialectHint {
         match dialect {
@@ -43,14 +41,12 @@ impl DialectHint {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Normalised {
-
     pub base_url: String,
 
     pub dialect: DialectHint,
 }
 
 impl Normalised {
-
     #[must_use]
     pub const fn face(&self) -> DialectKind {
         match self.dialect.dialect() {
@@ -61,7 +57,6 @@ impl Normalised {
 }
 
 pub(crate) trait HostDefaults {
-
     fn default_path(&self, host: &str, face: DialectHint) -> Option<&str>;
 
     fn default_dialect(&self, host: &str) -> Option<DialectHint>;
@@ -118,7 +113,6 @@ pub fn normalise(
     let segments: Vec<&str> = entered_path.split('/').filter(|s| !s.is_empty()).collect();
     let (kept, from_url) = strip_face(&segments);
     let dialect = match resolve_dialect(from_url, hint, &host, presets) {
-
         DialectHint::Unset if crate::is_local(&probe) => DialectHint::Chat,
         settled @ (DialectHint::Unset
         | DialectHint::Chat

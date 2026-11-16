@@ -12,7 +12,6 @@ use crate::error::{AxCode, AxError};
 pub struct RunId(#[serde(deserialize_with = "read_run_id")] uuid::Uuid);
 
 impl RunId {
-
     pub const CITY: RunId = RunId(uuid::Uuid::nil());
 
     pub fn from_bytes(bytes: [u8; 16]) -> Self {
@@ -65,7 +64,6 @@ impl std::fmt::Display for RunId {
 pub struct Seq(u64);
 
 impl Seq {
-
     pub const FIRST: Seq = Seq(0);
 
     pub fn new(value: u64) -> Self {

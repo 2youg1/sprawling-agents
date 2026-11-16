@@ -13,7 +13,6 @@ const OBSERVED_MAX_BYTES: usize = 1024 * 1024;
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Observation {
-
     page: String,
 
     paths: Vec<String>,

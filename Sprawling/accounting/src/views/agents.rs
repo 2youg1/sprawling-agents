@@ -25,7 +25,6 @@ pub(super) fn catalog_ask(views: &Views) -> Prepared {
 }
 
 impl CatalogAsk {
-
     pub(super) fn answer(self) -> wire::Answer {
         match crate::roster::roster(&self.city_root) {
             Ok(roster) => {
@@ -62,7 +61,6 @@ fn evidence(
     let configs: Vec<String> = agent_protocols::CLIENT_CONFIGS
         .iter()
         .filter_map(place)
-
         .flat_map(std::fs::read_to_string)
         .collect();
     agent_protocols::detected(

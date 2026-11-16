@@ -310,7 +310,6 @@ fn throughput_line(head: &str, taken: &Taken) -> String {
         per_s(records),
         per_s(tool_calls),
         taken.idle_us,
-
         wall_us.saturating_sub(u128::from(taken.idle_us)) * 1000 / wall_us,
         machine()
     )

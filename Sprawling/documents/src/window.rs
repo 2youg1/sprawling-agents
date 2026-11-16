@@ -24,7 +24,6 @@ pub struct Window {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Lifted<'a> {
-
     pub at: u64,
     pub bytes: &'a [u8],
 
@@ -97,7 +96,6 @@ fn bounded_end(wanted: Span, size: u64) -> u64 {
 }
 
 impl Lifted<'_> {
-
     fn boundary_at_or_before(&self, encoding: Encoding, at: u64) -> u64 {
         let floor = self.at.min(at);
         let mut probe = at;

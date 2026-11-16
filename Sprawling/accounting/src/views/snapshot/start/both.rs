@@ -23,7 +23,6 @@ pub struct BothStarted<A, B> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TailFrom {
-
     Snapshots,
 
     Genesis,

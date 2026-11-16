@@ -7,7 +7,6 @@ use kernel::AxError;
 use kernel::Locator;
 
 pub(super) struct Sweep<'a> {
-
     pub(super) swept: Option<super::dispatching::heavy_landing::Swept>,
     pub(super) raised: &'a mut Vec<kernel::ApprovalItem>,
     pub(super) job_locator: &'a Locator,

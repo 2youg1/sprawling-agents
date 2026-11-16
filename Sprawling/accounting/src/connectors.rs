@@ -6,7 +6,6 @@
 use kernel::AxError;
 
 pub trait Connectors {
-
     fn connect(
         &self,
         server: &kernel::McpServer,
@@ -19,7 +18,6 @@ pub trait Connectors {
 }
 
 pub enum Reached {
-
     Connected(agent_protocols::Handshake),
 
     Resident,

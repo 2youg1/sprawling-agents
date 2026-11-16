@@ -7,7 +7,6 @@ use kernel::ToolCall;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum WaveCheckpoint {
-
     Skip,
 
     Stage,
@@ -15,7 +14,6 @@ pub(crate) enum WaveCheckpoint {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Wave {
-
     Empty,
 
     ReadOnly,
@@ -24,7 +22,6 @@ pub(crate) enum Wave {
 }
 
 impl Wave {
-
     pub(crate) fn of(calls: &[ToolCall], writes: &dyn Fn(&ToolCall) -> kernel::Writes) -> Wave {
         match calls {
             [] => Wave::Empty,
@@ -42,7 +39,6 @@ impl Wave {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SinceCheckpoint {
-
     NotYet,
 
     Checkpointed,
@@ -56,7 +52,6 @@ pub(crate) struct CheckpointPolicy {
 }
 
 impl CheckpointPolicy {
-
     pub(crate) fn opening() -> Self {
         Self {
             since: SinceCheckpoint::NotYet,

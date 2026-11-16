@@ -24,7 +24,6 @@ pub const PROPOSAL_ID_TAG: &[u8] = b"sprawling proposal v1\0";
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum SliceKind {
-
     Same,
 
     Delete,
@@ -55,7 +54,6 @@ pub struct Review {
 }
 
 impl Review {
-
     pub fn of(before: &str, after: &str) -> Review {
         Review {
             slices: slices::align(slices::pieces(before), slices::pieces(after)),
@@ -117,7 +115,6 @@ pub struct Offer {
 }
 
 impl Offer {
-
     pub fn of(run: RunId, offered: &ProposalOffered) -> Result<Offer, AxError> {
         let span = Span::new(offered.start, offered.end)?;
         for (side, text) in [

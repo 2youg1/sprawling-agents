@@ -26,7 +26,6 @@ fn outside_the_grammar(raw: &str) -> AxError {
 }
 
 impl SecretRef {
-
     pub fn new(realm: &str, name: &str) -> Result<SecretRef, AxError> {
         if !segment_ok(realm) || !segment_ok(name) {
             return Err(outside_the_grammar(&format!("secret:{realm}/{name}")));
@@ -83,7 +82,6 @@ pub struct SecretSpan {
 }
 
 impl SecretSpan {
-
     pub fn reason(&self) -> &'static str {
         self.provider.unwrap_or("high entropy")
     }

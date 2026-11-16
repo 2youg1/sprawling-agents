@@ -19,7 +19,6 @@ use super::scan::CommitPlan;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BaseProgress {
-
     Staged { files: usize },
 
     Packed { bytes: usize },
@@ -32,14 +31,12 @@ pub(super) struct BaseOf<'a> {
 }
 
 pub(super) enum BaseTarget {
-
     Head,
 
     Filed,
 }
 
 impl Checkpoint {
-
     pub fn base_checkpoint(
         self,
         scopes: &[String],
@@ -133,7 +130,6 @@ impl Checkpoint {
 
         super::scan::write_index(&mut self.repo.index().map_err(git_err("read index"))?)?;
         match target {
-
             BaseTarget::Head => {
                 let branch = self
                     .repo

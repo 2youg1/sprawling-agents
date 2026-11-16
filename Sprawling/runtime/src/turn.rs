@@ -70,7 +70,6 @@ pub struct Recording {
 }
 
 impl<'h> Turn<'h, Assembling> {
-
     pub fn begin(
         lines: &'h mut HeldLines,
         t: TimeMs,
@@ -133,7 +132,6 @@ impl<'h> Turn<'h, Assembling> {
 }
 
 impl<'h, 'c> Turn<'h, Calling<'c>> {
-
     #[must_use]
     pub fn under(self, watchdog: &'c mut crate::Watchdog) -> Turn<'h, Calling<'c>> {
         Turn {
@@ -147,7 +145,6 @@ impl<'h, 'c> Turn<'h, Calling<'c>> {
 }
 
 impl<'h> Turn<'h, Calling<'_>> {
-
     pub fn call<'sink>(
         mut self,
         interrupt: Interrupt,
@@ -230,7 +227,6 @@ impl<'h> Turn<'h, Calling<'_>> {
 }
 
 impl Turn<'_, Recording> {
-
     pub fn record(
         mut self,
         interrupt: Interrupt,
@@ -261,7 +257,6 @@ impl Turn<'_, Recording> {
 }
 
 impl<S> Turn<'_, S> {
-
     pub(crate) fn hold_run_line(&mut self, line: RunLine, addr: Address, data: Payload) {
         self.journal.append_run_line(line, addr, data);
     }

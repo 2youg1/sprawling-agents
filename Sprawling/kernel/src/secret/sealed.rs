@@ -19,7 +19,6 @@ impl<T: Zeroize> Sealed<T> {
 }
 
 impl Sealed<String> {
-
     #[must_use]
     pub fn into_vault_value(self) -> Zeroizing<String> {
         Zeroizing::new(self.expose().clone())
@@ -47,6 +46,5 @@ mod tests {
     fn sealed_exposes_by_borrow_and_nothing_else() {
         let sealed = Sealed::new(Box::new("hunter2".to_owned()));
         assert_eq!(sealed.expose(), "hunter2");
-
     }
 }

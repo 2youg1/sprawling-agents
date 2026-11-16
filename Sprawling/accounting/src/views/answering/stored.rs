@@ -21,7 +21,6 @@ pub struct StoredAsk {
 }
 
 enum StoredRead {
-
     Bytes(Span),
 
     Export(Address),
@@ -46,7 +45,6 @@ impl Views {
 }
 
 impl StoredAsk {
-
     pub(in crate::views) fn answer(self) -> wire::Answer {
         let store = match Cas::open(&kernel::layout::CityLayout::new(&self.city_root).cas()) {
             Ok(store) => store,

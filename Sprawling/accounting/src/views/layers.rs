@@ -16,7 +16,6 @@ use super::prepared::{Prepared, unavailable_because};
 use crate::prompt_chain::{self, Reading, addressed};
 
 impl Views {
-
     pub(in crate::views) fn layers_ask(&self, addr: &Address) -> Prepared {
         Prepared::Layers {
             city_root: self.city_root.clone(),

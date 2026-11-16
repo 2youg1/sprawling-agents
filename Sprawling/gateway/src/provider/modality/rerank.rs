@@ -13,7 +13,6 @@ pub struct RerankRequest {
 }
 
 impl RerankRequest {
-
     pub fn new(query: String, passages: Vec<String>) -> Result<RerankRequest, AxError> {
         if query.is_empty() || passages.is_empty() {
             return Err(AxError::failure(
@@ -46,7 +45,6 @@ impl RerankRequest {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rank {
-
     pub passage: usize,
 
     pub score: f64,
@@ -58,7 +56,6 @@ pub struct Ranking {
 }
 
 impl Ranking {
-
     pub fn parse(answer: &Value, asked: &RerankRequest) -> Result<Ranking, AxError> {
         let rows = answer
             .as_array()

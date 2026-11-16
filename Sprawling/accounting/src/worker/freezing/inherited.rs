@@ -14,7 +14,6 @@ pub(in crate::worker) struct InheritedContext {
 }
 
 impl RunWorker {
-
     pub(in crate::worker) fn inherited(
         &mut self,
         at: &Assignment,

@@ -24,7 +24,6 @@ pub(super) struct Entered {
 }
 
 impl Entered {
-
     pub(super) fn resolved(mut self) -> Result<Entered, kernel::AxError> {
         let settled =
             gateway::normalise_entered(&self.base_url, gateway::DialectHint::of(self.dialect))?;
@@ -35,8 +34,9 @@ impl Entered {
 }
 
 pub(super) enum Credential {
-
-    Absent { header: Option<String> },
+    Absent {
+        header: Option<String>,
+    },
 
     Key {
         reference: String,
@@ -45,7 +45,6 @@ pub(super) enum Credential {
 }
 
 impl Credential {
-
     pub(super) fn entered(reference: Option<String>, header: Option<String>) -> Credential {
         match reference {
             None => Credential::Absent { header },
@@ -61,7 +60,6 @@ pub(super) struct Chosen {
 }
 
 pub(super) struct Stated {
-
     pub(super) context_tokens: Option<kernel::Window>,
     pub(super) max_output_tokens: Option<kernel::Ceiling>,
 
@@ -69,7 +67,6 @@ pub(super) struct Stated {
 }
 
 impl Stated {
-
     pub(super) const fn new(
         context_tokens: Option<kernel::Window>,
         max_output_tokens: Option<kernel::Ceiling>,

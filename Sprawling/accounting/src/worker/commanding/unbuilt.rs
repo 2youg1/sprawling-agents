@@ -16,7 +16,6 @@ pub(super) enum Unbuilt<'a> {
 }
 
 impl Unbuilt<'_> {
-
     pub(super) fn not_built(self) -> AxError {
         match self {
             Unbuilt::HandOff(item) => not_built(

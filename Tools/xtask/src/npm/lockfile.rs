@@ -57,7 +57,6 @@ pub(super) fn read_jsonc(text: &str) -> String {
                 }
             }
             ',' => {
-
                 let (closing, skipped) = closes_next(&mut chars);
                 if !closing {
                     out.push(here);
@@ -164,7 +163,6 @@ struct Spdx<'a> {
 }
 
 impl Spdx<'_> {
-
     fn any_of(&mut self) -> Option<bool> {
         let mut verdict = self.all_of()?;
         while self.tokens.next_if_eq(&"OR").is_some() {

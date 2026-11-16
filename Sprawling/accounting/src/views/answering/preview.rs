@@ -13,7 +13,6 @@ use super::super::prepared::{Prepared, unavailable};
 use super::range::stored;
 
 impl Views {
-
     pub(in crate::views) fn preview_ask(&self, version: B3Hash, viewport: Span) -> Prepared {
         Prepared::Preview {
             city_root: self.city_root.clone(),

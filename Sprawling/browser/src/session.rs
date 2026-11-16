@@ -14,7 +14,6 @@ use crate::port::{BrowserPort, Frame, Reply};
 pub struct ContextId(String);
 
 impl ContextId {
-
     pub fn parse(raw: &str) -> Result<ContextId, AxError> {
         if raw.is_empty() {
             return Err(AxError::failure(
@@ -35,7 +34,6 @@ impl ContextId {
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SessionRequest {
-
     pub network: bool,
 }
 

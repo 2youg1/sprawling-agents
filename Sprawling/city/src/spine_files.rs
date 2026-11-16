@@ -45,7 +45,6 @@ use crate::building::template::NAME_PLACEHOLDER;
 const PROJECT_PLACEHOLDER: &str = "<project name>";
 
 pub struct JobBrief<'a> {
-
     pub from: &'a str,
 
     pub task: &'a str,
@@ -55,7 +54,6 @@ pub struct JobBrief<'a> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RunBrief {
-
     Job { text: String },
 
     Principal,
@@ -66,7 +64,6 @@ const PRINCIPAL_BRIEF: &str = "No task file was written for this session. You ar
      answer there.\n";
 
 impl RunBrief {
-
     #[must_use]
     pub fn segment_text(&self) -> &str {
         match self {

@@ -43,7 +43,6 @@ pub(crate) fn system_root_location() -> std::path::PathBuf {
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct HostFacts {
-
     pub(super) edition_id: String,
 
     pub(super) edition: Option<PrivacyEdition>,

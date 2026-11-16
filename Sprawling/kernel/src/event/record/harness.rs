@@ -9,19 +9,15 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "report", rename_all = "snake_case")]
 pub enum HarnessReported {
-
     Said {
-
         text: String,
     },
 
     Thought {
-
         text: String,
     },
 
     ToolCall {
-
         call: String,
 
         title: String,
@@ -30,26 +26,22 @@ pub enum HarnessReported {
     },
 
     ToolCallStatus {
-
         call: String,
 
         status: String,
     },
 
     Other {
-
         variant: String,
     },
 
     PermissionAsked {
-
         title: String,
 
         options: Vec<HarnessPermit>,
     },
 
     PermissionAnswered {
-
         chosen: Option<String>,
     },
 }
@@ -57,7 +49,6 @@ pub enum HarnessReported {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HarnessPermit {
-
     pub id: String,
 
     pub name: String,
@@ -69,7 +60,6 @@ pub struct HarnessPermit {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum HarnessPermitKind {
-
     AllowOnce,
 
     AllowAlways,
@@ -82,7 +72,6 @@ pub enum HarnessPermitKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HarnessAnswered {
-
     pub stop: HarnessStop,
 
     pub text: String,
@@ -92,7 +81,6 @@ pub struct HarnessAnswered {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum HarnessStop {
-
     EndTurn,
 
     MaxTokens,

@@ -25,7 +25,6 @@ pub(crate) struct Transport {
 }
 
 impl Transport {
-
     #[cfg(test)]
     pub(crate) fn limit(&self) -> u32 {
         self.gate.limit()
@@ -80,7 +79,6 @@ impl Transport {
 
 #[derive(Debug, Clone)]
 pub(crate) struct ClientShape {
-
     pub(crate) url: String,
     pub(crate) proxying: Proxying,
     pub(crate) timeout_ms: u64,
@@ -136,7 +134,6 @@ impl std::fmt::Debug for Detour {
 }
 
 impl Endpoint {
-
     pub(crate) fn over(
         transport: &Transport,
         config: EndpointConfig,

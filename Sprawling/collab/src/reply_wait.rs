@@ -105,7 +105,6 @@ pub(crate) fn wanted(args: &Map<String, Value>, already: bool) -> Result<bool, A
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WaitTurn {
-
     Idle,
 
     Waiting,
@@ -116,7 +115,6 @@ pub enum WaitTurn {
 }
 
 impl SignalDesk {
-
     pub fn wait_out(&mut self, now: TimeMs) -> Result<WaitTurn, AxError> {
         let Some(mut wait) = self.waiting.clone() else {
             return Ok(WaitTurn::Idle);

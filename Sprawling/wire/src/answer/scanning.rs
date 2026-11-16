@@ -9,12 +9,10 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorScanning {
-
     DoesNotApply,
 
     Stopped,
     Read {
-
         city: String,
         drive: DoctorDrive,
         exclusion: DoctorExclusion,
@@ -25,41 +23,27 @@ pub enum DoctorScanning {
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorDrive {
-
     Trusted,
 
-    Untrusted {
-        volume: String,
-    },
+    Untrusted { volume: String },
 
-    Not {
-        volume: String,
-        file_system: String,
-    },
-    Untold {
-        why: DoctorUntold,
-    },
+    Not { volume: String, file_system: String },
+    Untold { why: DoctorUntold },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorExclusion {
-
-    Inside {
-        under: String,
-    },
+    Inside { under: String },
     Outside,
-    Untold {
-        why: DoctorUntold,
-    },
+    Untold { why: DoctorUntold },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum DoctorUntold {
-
     NoDisk,
 
     AdminOnly,

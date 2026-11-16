@@ -7,7 +7,6 @@ use kernel::{AxCode, AxError, Payload};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Keyed {
-
     Unshown(String),
 
     Adopted(String),
@@ -16,7 +15,6 @@ pub enum Keyed {
 }
 
 impl Keyed {
-
     #[must_use]
     pub fn code(&self) -> &str {
         match self {
@@ -35,7 +33,6 @@ impl Keyed {
 
 pub fn key_for(bind: std::net::SocketAddr, configured: Option<String>) -> Result<Keyed, AxError> {
     match crate::keying::Keying::decide(bind, configured.is_some()) {
-
         crate::keying::Keying::Adopt => configured.map(Keyed::Adopted).ok_or_else(|| {
             AxError::failure(
                 AxCode::ConfigInvalid,

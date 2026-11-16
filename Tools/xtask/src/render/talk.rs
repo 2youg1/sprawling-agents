@@ -25,7 +25,6 @@ pub(super) struct Words {
 }
 
 impl Words {
-
     pub(super) fn read(root: &Path) -> Result<Self, XtaskError> {
         let text = walk::read_text(&root.join(LANG))?;
         let table: BTreeMap<String, BTreeMap<String, String>> = serde_json::from_str(&text)

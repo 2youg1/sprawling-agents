@@ -10,7 +10,6 @@ use browser::survey::Drawn;
 const EMPTY: &str = "empty";
 
 pub(super) struct Entry {
-
     part: &'static str,
 
     contract: &'static str,
@@ -25,7 +24,6 @@ struct Need {
 
 #[derive(Clone, Copy)]
 enum Shown {
-
     Role(&'static str),
 
     AnyRole(&'static [&'static str]),

@@ -9,7 +9,6 @@ use super::{Authority, DeviceId, DeviceKey};
 use crate::pairing::{decode, encode};
 
 impl DeviceId {
-
     #[must_use]
     pub fn text(&self) -> String {
         encode(&self.0)
@@ -25,7 +24,6 @@ impl DeviceId {
 }
 
 impl DeviceKey {
-
     #[must_use]
     pub fn text(&self) -> String {
         encode(&self.0)
@@ -39,7 +37,6 @@ impl DeviceKey {
 }
 
 impl Authority {
-
     #[must_use]
     pub fn word(self) -> &'static str {
         match self {

@@ -24,7 +24,6 @@ pub(super) struct Tip {
 }
 
 pub(super) struct Reached {
-
     pub(super) tip: Option<Tip>,
 
     pub(super) index: LedgerIndex,

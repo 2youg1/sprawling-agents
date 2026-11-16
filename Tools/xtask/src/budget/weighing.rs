@@ -25,7 +25,6 @@ pub(crate) fn lockfile_packages(root: &Path) -> Result<u64, XtaskError> {
 
 pub(crate) fn measure(root: &Path, name: &str) -> Result<Option<u64>, XtaskError> {
     match name {
-
         "frontend_artifact" => gzipped_total(&crate::bundle::dist(root)?),
         "release_binary" => Ok(binary_bytes(root)),
 

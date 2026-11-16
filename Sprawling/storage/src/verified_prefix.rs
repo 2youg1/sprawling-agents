@@ -39,7 +39,6 @@ enum May {
 }
 
 impl ProofRecords {
-
     pub fn read_only(dir: &Path) -> ProofRecords {
         ProofRecords {
             dir: dir.to_path_buf(),
@@ -95,7 +94,6 @@ pub(crate) struct TailStart {
 }
 
 impl TailStart {
-
     pub(crate) fn strict(entry: LineCheck) -> TailStart {
         TailStart {
             from: 0,
@@ -107,7 +105,6 @@ impl TailStart {
 }
 
 impl ProofRecords {
-
     pub(crate) fn tail_start(
         &self,
         vfs: &dyn Vfs,
@@ -160,7 +157,6 @@ impl ProofRecords {
 }
 
 impl JsonlLedger {
-
     pub fn proof_records(&self, dir: &Path) -> ProofRecords {
         ProofRecords {
             dir: dir.to_path_buf(),
@@ -184,7 +180,6 @@ pub(crate) struct SegmentRecord {
 }
 
 impl SegmentRecord {
-
     fn encode(&self) -> Vec<u8> {
         let body = [
             MAGIC.as_slice(),
@@ -229,7 +224,6 @@ impl SegmentRecord {
 }
 
 impl SegmentRecord {
-
     pub(crate) fn prefix_length(&self, total: u64, version: u32) -> Option<u64> {
         (self.version == version && self.len <= total).then_some(self.len)
     }

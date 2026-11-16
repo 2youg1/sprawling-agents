@@ -13,7 +13,6 @@ use kernel::{Address, AxCode, AxError, EventKind, Payload, RunId, Seq};
 use super::super::{RunWorker, Unasked, scope_of};
 
 impl RunWorker {
-
     pub(in crate::worker) fn set_admission(
         &mut self,
         scope: &wire::HaltScope,
@@ -115,7 +114,6 @@ impl RunWorker {
             && let Some(job) = blocked
             && let Some(sent) = self.sent_out(job.run)?
         {
-
             self.start_unasked(job.addr, sent.task, sent.goal, Unasked::Unblocked);
         }
         Ok(())

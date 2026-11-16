@@ -32,7 +32,6 @@ fn a_city_whose_norms_cannot_be_read_refuses_to_say_it_wrote_them_down() {
 
 #[test]
 fn deleting_every_log_line_leaves_the_history_byte_identical() {
-
     let (base_url, _provider) = fake_openai(
         &["m-local"],
         vec![

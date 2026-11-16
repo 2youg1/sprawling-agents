@@ -18,7 +18,6 @@ pub struct IdemKey {
 }
 
 impl IdemKey {
-
     pub fn derive(run: &RunId, seq: Seq, action_canonical: &[u8]) -> IdemKey {
         let mut hasher = blake3::Hasher::new();
         hasher.update(run.as_bytes());
@@ -52,7 +51,6 @@ pub struct IdemGuard {
 }
 
 impl IdemGuard {
-
     #[must_use]
     pub fn key(&self) -> &IdemKey {
         &self.key

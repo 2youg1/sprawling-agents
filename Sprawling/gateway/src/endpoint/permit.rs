@@ -39,7 +39,6 @@ impl Default for Gate {
 }
 
 impl Gate {
-
     pub(crate) fn admitting(ceiling: MaxInFlight) -> Gate {
         Gate {
             state: Mutex::new(Admission {
@@ -107,7 +106,6 @@ impl Gate {
             let now = monotonic();
             state.holds.expire(now);
             if !state.holds.waits(on) {
-
                 let ended = state.holds.ended(key, on).unwrap_or(PrewarmEnd::TimedOut);
                 drop(state);
                 self.turn.notify_all();
@@ -212,7 +210,6 @@ struct Admitted {
 }
 
 impl Admitted {
-
     fn settle(&self, outcome: &Result<ModelReturn, AxError>) {
         let now = (self.monotonic)();
         let mut state = self.gate.lock();

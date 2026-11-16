@@ -13,7 +13,6 @@ const SUBJECT_KEYS: [&str; 4] = ["file_path", "path", "addr", "command"];
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ToolCalled {
-
     pub id: String,
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub name: ToolName,
@@ -30,7 +29,6 @@ pub struct ToolCalled {
 }
 
 impl ToolCalled {
-
     #[must_use]
     pub fn subject_of(args: &Payload) -> Option<String> {
         for key in SUBJECT_KEYS {
@@ -48,7 +46,6 @@ impl ToolCalled {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ToolResult {
-
     pub tool_use_id: String,
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub name: ToolName,
@@ -72,7 +69,6 @@ pub struct ToolResult {
 #[serde(rename_all = "lowercase")]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Rendering {
-
     V1,
 
     V2,
@@ -83,7 +79,6 @@ pub enum Rendering {
 }
 
 impl Rendering {
-
     #[must_use]
     pub fn of(recorded: Option<Rendering>) -> Rendering {
         recorded.unwrap_or(Rendering::V1)
@@ -94,7 +89,6 @@ impl Rendering {
 #[serde(untagged)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ToolAnswer {
-
     Answered { result: Payload },
 
     Failed { error: Payload },

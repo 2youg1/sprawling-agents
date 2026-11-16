@@ -10,7 +10,6 @@ use crate::secret::SecretRef;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SecretCaptured {
-
     #[serde(rename = "ref")]
     #[cfg_attr(feature = "schema", schemars(with = "String"))]
     pub reference: SecretRef,
@@ -22,7 +21,6 @@ pub struct SecretCaptured {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ToolkitLinkOpened {
-
     pub toolkit: String,
 }
 

@@ -17,7 +17,6 @@ pub const LIST_CEILING: usize = 4096;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Grade {
-
     Text,
 
     Inside,
@@ -47,7 +46,6 @@ struct Candidate<'a> {
 }
 
 impl Catalog {
-
     #[must_use]
     pub fn list(&self, namespace: Option<&str>) -> String {
         let Some(asked) = namespace.map(str::trim) else {
@@ -94,7 +92,6 @@ impl Catalog {
 
     #[must_use]
     pub fn find(&self, query: &str) -> String {
-
         let words: Vec<String> = query
             .split(|c: char| !(c.is_alphanumeric() || c == '_'))
             .filter(|word| !word.is_empty())

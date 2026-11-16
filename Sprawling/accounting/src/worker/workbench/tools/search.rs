@@ -23,7 +23,6 @@ use mapping::Asked;
 const NAME: &str = "web_search";
 
 impl Laying {
-
     pub(super) fn search_tool(&self, site: &Site) -> Result<Option<WebSearch>, AxError> {
         self.web_search(
             site.rules.policy(),
@@ -86,7 +85,6 @@ struct Reaching {
 }
 
 impl WebSearch {
-
     pub(super) fn definition(supplier: &SearchSupplier) -> Result<kernel::ToolDef, AxError> {
         Ok(kernel::ToolDef {
             name: kernel::ToolName::parse(NAME)?,
@@ -324,7 +322,6 @@ fn within(
 }
 
 impl WebSearch {
-
     fn exhausted(&self, last: &BTreeMap<ServerLabel, AxCode>) -> AxError {
         let accounts = self
             .supplier

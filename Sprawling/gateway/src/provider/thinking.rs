@@ -65,7 +65,6 @@ pub enum Switch {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OfferSource {
-
     Person,
     Upstream,
     Preset,
@@ -94,7 +93,6 @@ pub struct ThinkingOffer {
 }
 
 impl ThinkingOffer {
-
     pub const UNKNOWN: ThinkingOffer = ThinkingOffer {
         levels: EffortSet(0),
         on: Switch::Unknown,
