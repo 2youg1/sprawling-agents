@@ -4,7 +4,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 const std = @import("std");
-const builtin = @import("builtin");
 const leaf = @import("leaf");
 const write = leaf.write;
 const part = leaf.part;
@@ -823,14 +822,7 @@ fn editing(key: termio.Key) ?editor_mod.Edit {
 }
 
 fn pollStdin(timeout_ms: i32) bool {
-    if (builtin.os.tag == .windows) return false;
-    var fds = [_]std.posix.pollfd{.{
-        .fd = std.posix.STDIN_FILENO,
-        .events = std.posix.POLL.IN,
-        .revents = 0,
-    }};
-    const n = std.posix.poll(&fds, timeout_ms) catch return false;
-    return n > 0 and (fds[0].revents & std.posix.POLL.IN) != 0;
+    return termio.waitReadable(timeout_ms);
 }
 
 fn nowMs(io: std.Io) u64 {

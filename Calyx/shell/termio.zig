@@ -201,7 +201,7 @@ fn readStdin(buf: []u8) Error!usize {
     return posix.read(posix.STDIN_FILENO, buf) catch return error.Unexpected;
 }
 
-fn waitReadable(timeout_ms: i32) bool {
+pub fn waitReadable(timeout_ms: i32) bool {
     if (is_windows) return waitReadableWindows(timeout_ms);
     var fds = [_]posix.pollfd{.{
         .fd = posix.STDIN_FILENO,

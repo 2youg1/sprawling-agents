@@ -30,8 +30,17 @@ pub fn run(
     host: *const host_mod.Host,
     mode: RunMode,
 ) i32 {
-    var ui = Ui.init(gpa, config, host) catch return 1;
-    defer ui.deinit();
+    // Heap-allocate: a stack Ui is >4KiB and forces ___chkstk_ms, which MSVC
+    // Rust does not resolve when linking this archive.
+    const ui = gpa.create(Ui) catch return 1;
+    ui.init(gpa, config, host) catch {
+        gpa.destroy(ui);
+        return 1;
+    };
+    defer {
+        ui.deinit();
+        gpa.destroy(ui);
+    }
     return ui.loop(mode);
 }
 
@@ -70,19 +79,36 @@ const Ui = struct {
     lost: bool = false,
     dry: bool = false,
     poll_buf: []u8 = &.{},
+    stdin_scratch: [4096]u8 = undefined,
 
-    fn init(gpa: std.mem.Allocator, config: *const host_mod.CityConfig, host: *const host_mod.Host) !Ui {
-        return .{
-            .gpa = gpa,
-            .host = host,
-            .config = config,
-            .editor = editor_mod.Editor.init(gpa),
-            .screen = .{ .gpa = gpa },
-            .held_arena = .init(gpa),
-            .frame_arena = .init(gpa),
-            .pairing = try gpa.dupe(u8, ""),
-            .poll_buf = try gpa.alloc(u8, 64 * 1024),
-        };
+    // Field-by-field into *Ui: returning Ui by value keeps a >4KiB temporary on
+    // the caller's stack and forces ___chkstk_ms under Windows-gnu.
+    fn init(self: *Ui, gpa: std.mem.Allocator, config: *const host_mod.CityConfig, host: *const host_mod.Host) !void {
+        self.gpa = gpa;
+        self.host = host;
+        self.config = config;
+        self.editor = .{ .allocator = gpa };
+        self.screen = .{ .gpa = gpa };
+        self.shown = .opening;
+        self.menu = null;
+        self.transient = null;
+        self.pairing = "";
+        self.live = .{};
+        self.held_back = .empty;
+        self.held_arena = .init(gpa);
+        self.frame_arena = .init(gpa);
+        self.asking = null;
+        self.hinted = false;
+        self.lost = false;
+        self.dry = false;
+        self.poll_buf = &.{};
+        errdefer {
+            self.held_arena.deinit();
+            self.frame_arena.deinit();
+        }
+        self.pairing = try gpa.dupe(u8, "");
+        errdefer gpa.free(self.pairing);
+        self.poll_buf = try gpa.alloc(u8, 64 * 1024);
     }
 
     fn deinit(self: *Ui) void {
@@ -132,7 +158,6 @@ const Ui = struct {
         const surface: lifecycle.Face = if (self.config.surface == 1) .quiet_host else .cli;
         self.turnTo(surface);
 
-        var stdin_buf: [4096]u8 = undefined;
         var stdin_filled: usize = 0;
 
         while (true) {
@@ -146,7 +171,7 @@ const Ui = struct {
             const timeout: i32 = face_look_ms;
             if (!pollStdin(timeout) and stdin_filled == 0) continue;
 
-            const event = termio.readEvent(&stdin_buf, &stdin_filled) catch {
+            const event = termio.readEvent(&self.stdin_scratch, &stdin_filled) catch {
                 self.lost = true;
                 self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.terminal_lost), 0);
                 continue;
@@ -662,14 +687,7 @@ fn editing(key: termio.Key) ?editor_mod.Edit {
 }
 
 fn pollStdin(timeout_ms: i32) bool {
-    if (builtin.os.tag == .windows) return false;
-    var fds = [_]std.posix.pollfd{.{
-        .fd = std.posix.STDIN_FILENO,
-        .events = std.posix.POLL.IN,
-        .revents = 0,
-    }};
-    const n = std.posix.poll(&fds, timeout_ms) catch return false;
-    return n > 0 and (fds[0].revents & std.posix.POLL.IN) != 0;
+    return termio.waitReadable(timeout_ms);
 }
 
 // --- stub host + key handling tests ---
@@ -818,7 +836,8 @@ test "dry city ui drains host face entries and handles quiet keys via host" {
     try std.testing.expectEqual(@as(i32, 0), code);
 
     // Simulate QuietHost Esc → Back and Enter → open_paired without TTY.
-    var ui = try Ui.init(gpa, &config, &host);
+    var ui: Ui = undefined;
+    try ui.init(gpa, &config, &host);
     defer ui.deinit();
     ui.dry = true;
     ui.shown = .quiet_host;
@@ -845,7 +864,8 @@ test "cli enter forwards the line to the host" {
         .surface = 0,
     };
     var host = stub.asHost();
-    var ui = try Ui.init(gpa, &config, &host);
+    var ui: Ui = undefined;
+    try ui.init(gpa, &config, &host);
     defer ui.deinit();
     ui.dry = true;
     ui.shown = .cli;
@@ -872,7 +892,8 @@ test "host asking event arms quit confirm and enter drains" {
         .surface = 0,
     };
     var host = stub.asHost();
-    var ui = try Ui.init(gpa, &config, &host);
+    var ui: Ui = undefined;
+    try ui.init(gpa, &config, &host);
     defer ui.deinit();
     ui.dry = true;
     ui.shown = .cli;

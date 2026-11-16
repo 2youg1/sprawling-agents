@@ -408,6 +408,16 @@ fn driveOutput(
             };
         }
     }.run, .{&stdout_ctx});
+    var joined = false;
+    errdefer {
+        if (!joined) {
+            child.kill(io);
+            stdout_thread.join();
+            joined = true;
+            if (stdout_ctx.out) |out| gpa.free(out);
+            stdout_ctx.out = null;
+        }
+    }
 
     var err_buf: [4096]u8 = undefined;
     var stderr_reader = stderr_file.readerStreaming(io, &err_buf);
@@ -428,6 +438,7 @@ fn driveOutput(
 
     const term = try child.wait(io);
     stdout_thread.join();
+    joined = true;
     stdout_file.close(io);
     child.stdout = null;
 
