@@ -56,6 +56,7 @@ pub enum StopReason {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(title = "Ceiling"))]
 pub struct Ceiling(NonZeroU64);
 
 impl Ceiling {

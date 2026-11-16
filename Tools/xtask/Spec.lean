@@ -53,7 +53,7 @@ Markdown 时的标签 `8-n`，别处引作 `Tools/xtask/Spec.lean §8-n`。
 | unused | 清单里声明、源码里从不点名的依赖（§8-37） |
 | proof | kani harness 名册只住 `#[kani::proof]` 属性；CI 不得点名 harness，文档不得手写总数 |
 | docnum | 文档里的数字由 `docnum::FACTS` 生成并由 `--write` 回写；区段陈旧、事实未知、标记不闭合各自即红（§8-16） |
-| wire-ts | `client/src/wire.ts` 由 `wire::wire_schema()` 生成：每个具名类型一条 Effect `Schema` 值加一条 TS `type`，外加 `WIRE_V`、`WIRE_HASH`、`CITY_RUN`（§8-21）与 `BODY_PX`（§8-36）；不带 `--write` 时与盘上文件逐字节比对，第一处不同的行即红 |
+| wire-ts | `client/src/wire/` 由 `wire::wire_schema()` 生成：`index.ts` 持常量与再导出，`cNN.ts` 按依赖拓扑分块写出每个具名类型的 Effect `Schema` 与 TS `type`（每块至多 450 行，守 length 的 500 行门），外加 `WIRE_V`、`WIRE_HASH`、`CITY_RUN`（§8-21）与 `BODY_PX`（§8-36）；不带 `--write` 时与盘上每个生成文件逐字节比对，第一处不同的行即红；残留的 `client/src/wire.ts` 亦红 |
 | gates（命令） | 不带名字时跑全部门，带名字时只跑点名的那几道（按门表次序）；名字不在门表里即以 `unknown-gate` 退出码 2 拒绝并列出全部门名，不退回「全跑」；`length comments --files <path>...` 只判点名的文件，空清单判空且不退回全树，其他门配 `--files` 以使用错误拒绝（D44）；聚合报告，任一违规即退出码 1（D2，`spec/Report.lean`） |
 | spec（命令） | 在那个包的目录下新建 `Spec.lean` 骨架；名字是包的 lib 名，没有 lib 的包用包名（`just spec`，§8-39、§8-41）。同名的门判树、不写盘（§8-42） |
 | members（命令） | 包在哪：`--owning` 答一组路径属于哪些工作区包，`--dir` 答一个包住在哪个目录；`justfile` 用它，不再从路径里推包名（§8-39） |
@@ -134,7 +134,7 @@ gate／Violation／rule／violation／alternative（三段式拒绝的施工侧�
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——字段一变，只有一处要改。同理，`[family.<键>]` 的 `duty` 也只由 `modmap::duties` 读，`docnum` 的 `crate_table` 经它取每个 crate 拥有什么（§8-40）。
 
-**本模块不做什么（否定式两条）**：判定路径不改任何文件；写盘只发生在带 `--write` 的命令上，且每条只重写它自己生成的那一面——`spec` 只新建不覆盖，`wire-ts` 只写 `client/src/wire.ts`，`docnum` 只写受管区段两个标记之间的字节。不缓存扫描结果（每次全量重扫——确定性优于速度）。
+**本模块不做什么（否定式两条）**：判定路径不改任何文件；写盘只发生在带 `--write` 的命令上，且每条只重写它自己生成的那一面——`spec` 只新建不覆盖，`wire-ts` 只写 `client/src/wire/`（并删掉陈旧的单文件 `client/src/wire.ts` 与多余的 `cNN.ts`），`docnum` 只写受管区段两个标记之间的字节。不缓存扫描结果（每次全量重扫——确定性优于速度）。
 
 **secret 门细则**：扫描面是仓内全部文件（含 fixtures 与语料），排除隔离区 `local/` 与 `walk` 跳过的目录（§10 第 1 条）；判定器是 `kernel::secret::scan`（xtask 依赖 kernel，工作区成员不占产品拓扑，合法）；命中只报文件、偏移与长度，恒不回显字节；无内联豁免（豁免口会被注入内容利用）。兼查：产品包（§8-39）`src/**` 内 `.expose(` 的调用点只许出现在 `EXPOSE_WHITELIST` 列出的文件里——定义处与每一个出线前的最后一格，理由逐条写在表旁；命中即红。自测纪律：扫描器自身测试的高熵样本在源码中必须拆段拼接，不留可扫描的完整字面量。
 
@@ -203,12 +203,12 @@ pub(crate) struct Violation {
 
 /-! ### 命令 `wire-ts`：线的 TS 面由 Rust 面生成
 
-**它关掉的门是「手写第二份线」。** `client/` 用 TypeScript 说 `Sprawling/wire` 的语言，而一份手写的 `wire.ts` 就是同一形状的第二个权威，它漂了也要到握手之后才被发现。故 TS 面由 Rust 面生成，且生成物入库、门盯着它：`cargo xtask wire-ts --write` 写 `client/src/wire.ts`，`cargo xtask wire-ts` 只比对——盘上文件与当场生成的文本逐字节不同即红，拒词点名文件与第一处不同的行号并给出 `--write`。生成物由门自己写、由门自己校验。
+**它关掉的门是「手写第二份线」。** `client/` 用 TypeScript 说 `Sprawling/wire` 的语言，而一份手写的线面就是同一形状的第二个权威，它漂了也要到握手之后才被发现。故 TS 面由 Rust 面生成，且生成物入库、门盯着它：`cargo xtask wire-ts --write` 写 `client/src/wire/`（`index.ts` 与分块 `cNN.ts`），`cargo xtask wire-ts` 只比对——盘上每个生成文件与当场生成的文本逐字节不同即红，拒词点名文件与第一处不同的行号并给出 `--write`。生成物由门自己写、由门自己校验。分块是为 length 门（D39）服务：一个巨石文件不能靠豁免过关。
 
 | 文件 | 它回答什么 |
 |---|---|
 | `Tools/xtask/src/wire_ts.rs` | 命令本身：文本从哪来（`render`：`wire::wire_schema()`＋`WIRE_V`＋`schema_hash()`）、写到哪（`TARGET`）、怎么比（`check`、`first_difference`）、怎么写（`write`） |
-| `Tools/xtask/src/wire_ts/emit.rs` | 一份 JSON Schema 文档怎么变成一份 `wire.ts`（`emit`）：文件抬头与三个常量、`$defs` 按名排序后按依赖拓扑输出（`ordered`、`refs_within`）、一条定义怎么命名与打 brand（`definition`）、以及拒绝长什么样（`Refused`、`refuse`） |
+| `Tools/xtask/src/wire_ts/emit.rs` | 一份 JSON Schema 文档怎么变成 `client/src/wire/`（`emit`）：`index.ts` 的抬头与常量、`$defs` 按名排序后按依赖拓扑分块输出（`ordered`、`refs_within`、每块 ≤450 行）、一条定义怎么命名与打 brand（`definition`）、以及拒绝长什么样（`Refused`、`refuse`） |
 | `Tools/xtask/src/wire_ts/emit/types.rs` | 一个 schema 在 TypeScript 里是什么类型（`denoted`），解码后与编码前两侧（`Side`）：只给递归定义写显式注解用，非递归定义的类型仍由 `typeof X.Type` 推出 |
 | `Tools/xtask/src/wire_ts/emit/values.rs` | 一个 schema 怎么变成一个 Effect `Schema` 表达式（`expression`、`typed`、`fields`、`union`、`literals`）与它认得的关键字子集（`KNOWN`）：读 schema 的那一半，与读文档的那一半在 `expression` 处相接 |
 | `Tools/xtask/src/wire_ts/tests.rs` | 具名裸 `string` 打上 brand；带 `pattern` 的 `string` 收成 `Schema.isPattern` 检查；外标签枚举成 `Union`；依赖先于引用；子集外关键字被点名拒绝；递归类型经 `Schema.suspend` 接上并带两侧的显式类型；真实文档能发出；第一处不同的行被点名 |

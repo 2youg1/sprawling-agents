@@ -21,9 +21,27 @@ pub(super) struct Refused {
     pub(super) why: String,
 }
 
-const REF_PREFIX: &str = "#/$defs/";
+#[derive(Debug)]
+pub(super) struct Bundle {
+    pub(super) files: Vec<(String, String)>,
+}
 
-pub(super) fn emit(document: &Value, constants: &Constants) -> Result<String, Refused> {
+impl Bundle {
+    #[cfg(test)]
+    pub(super) fn text(&self) -> String {
+        self.files
+            .iter()
+            .map(|(_, body)| body.as_str())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+}
+
+const REF_PREFIX: &str = "#/$defs/";
+const CHUNK_BODY_LIMIT: usize = 400;
+const WIRE_DIR: &str = "wire";
+
+pub(super) fn emit(document: &Value, constants: &Constants) -> Result<Bundle, Refused> {
     let defs: BTreeMap<&str, &Value> = document
         .get("$defs")
         .and_then(Value::as_object)
@@ -31,21 +49,66 @@ pub(super) fn emit(document: &Value, constants: &Constants) -> Result<String, Re
         .iter()
         .map(|(name, schema)| (name.as_str(), schema))
         .collect();
-    let mut out = String::from(HEADER);
+    let edges = edges(&defs);
+    let recursive = recursive(&edges);
+    let mut bodies: Vec<(BTreeSet<String>, String)> = Vec::new();
+    let mut current_names: BTreeSet<String> = BTreeSet::new();
+    let mut current_body = String::new();
+    let mut current_lines = 0_usize;
+    for name in ordered(&edges)? {
+        let schema = defs
+            .get(name.as_str())
+            .ok_or_else(|| refuse(&name, "named by a `$ref` and absent from `$defs`"))?;
+        let piece = definition(&name, schema, &recursive)?;
+        let piece_lines = piece.lines().count();
+        if current_lines > 0 && current_lines.saturating_add(piece_lines) > CHUNK_BODY_LIMIT {
+            bodies.push((
+                std::mem::take(&mut current_names),
+                std::mem::take(&mut current_body),
+            ));
+            current_lines = 0;
+        }
+        current_names.insert(name);
+        current_body.push_str(&piece);
+        current_lines = current_lines.saturating_add(piece_lines);
+    }
+    if current_lines > 0 || bodies.is_empty() {
+        bodies.push((current_names, current_body));
+    }
+
+    let mut defined: Vec<(usize, BTreeSet<String>)> = Vec::new();
+    let mut chunks: Vec<String> = Vec::with_capacity(bodies.len());
+    for (i, (names, body)) in bodies.into_iter().enumerate() {
+        let mut header = String::from(CHUNK_HEADER);
+        let mut needed: BTreeMap<usize, BTreeSet<String>> = BTreeMap::new();
+        for (earlier, earlier_names) in &defined {
+            for name in earlier_names {
+                if body_mentions(&body, name) {
+                    needed.entry(*earlier).or_default().insert(name.clone());
+                }
+            }
+        }
+        for (earlier, imports) in needed {
+            let _ = write!(header, "import {{\n");
+            for name in &imports {
+                let _ = writeln!(header, "  {name},");
+            }
+            let _ = writeln!(header, "}} from \"./c{earlier:02}\";\n");
+        }
+        header.push_str(&body);
+        defined.push((i, names));
+        chunks.push(header);
+    }
+
+    let mut index = String::from(INDEX_HEADER);
     let _ = write!(
-        out,
+        index,
         "export const WIRE_V = {} as const;\n\
-         /** The schema hash the server checks: `wire::schema_hash()`. */\n\
          export const WIRE_HASH = \"{}\" as const;\n\
-         /** The run a city-level record carries: `kernel::RunId::CITY`. */\n\
          export const CITY_RUN = \"{}\" as const;\n\
-         /** The smallest body size a person may ask for: `wire::BODY_PX_MIN`. */\n\
          export const BODY_PX = {{ min: {} }} as const;\n\
-         /** The smallest line box, in thousandths of the font size: `wire::LINE_HEIGHT_MIN`. */\n\
          export const LINE_HEIGHT = {{ min: {} }} as const;\n\
-         /** The tightest letter spacing, in thousandths of an em: `wire::TRACKING_MIN`. */\n\
          export const TRACKING = {{ min: {} }} as const;\n\
-         /** The default thinking level: `kernel::consts_policy::DEFAULT_EFFORT`. */\n\
          export const DEFAULT_EFFORT = {} as const;\n\n",
         constants.wire_v,
         constants.hash,
@@ -55,12 +118,10 @@ pub(super) fn emit(document: &Value, constants: &Constants) -> Result<String, Re
         constants.tracking_min,
         quoted(constants.default_effort)
     );
-    out.push_str(
-        "/** The slash verbs a person types: `wire::Slash::ALL`. */\nexport const SLASH = [\n",
-    );
+    index.push_str("export const SLASH = [\n");
     for [spelling, takes, offered, says] in &constants.slash {
         let _ = writeln!(
-            out,
+            index,
             "  {{ spelling: {}, takes: {}, offered: {}, says: {} }},",
             quoted(spelling),
             quoted(takes),
@@ -68,29 +129,33 @@ pub(super) fn emit(document: &Value, constants: &Constants) -> Result<String, Re
             quoted(says)
         );
     }
-    out.push_str("] as const;\n\n");
-    let edges = edges(&defs);
-    let recursive = recursive(&edges);
-    for name in ordered(&edges)? {
-        let schema = defs
-            .get(name.as_str())
-            .ok_or_else(|| refuse(&name, "named by a `$ref` and absent from `$defs`"))?;
-        out.push_str(&definition(&name, schema, &recursive)?);
+    index.push_str("] as const;\n\n");
+    let mut files = Vec::with_capacity(chunks.len().saturating_add(1));
+    for (i, chunk) in chunks.iter().enumerate() {
+        let name = format!("c{i:02}");
+        let _ = writeln!(index, "export * from \"./{name}\";");
+        let _ = writeln!(index, "export type * from \"./{name}\";");
+        files.push((format!("{WIRE_DIR}/{name}.ts"), chunk.clone()));
     }
-    Ok(out)
+    drop(defined);
+    files.insert(0, (format!("{WIRE_DIR}/index.ts"), index));
+    Ok(Bundle { files })
 }
 
-const HEADER: &str = "// This Source Code Form is subject to the terms of the Mozilla Public
+const INDEX_HEADER: &str = "// This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
-//
-// Generated by `cargo xtask wire-ts` from `Sprawling/wire` (Sprawling/wire/Spec.lean
-// section 8-16). Do not edit: change the Rust wire types and regenerate.
+
+";
+
+const CHUNK_HEADER: &str = "// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { Schema } from \"effect\";
 
-/** The wire version both ends compare on connect. */
 ";
 
 fn refuse(at: &str, why: impl Into<String>) -> Refused {
@@ -98,6 +163,21 @@ fn refuse(at: &str, why: impl Into<String>) -> Refused {
         at: at.to_owned(),
         why: why.into(),
     }
+}
+
+fn body_mentions(body: &str, name: &str) -> bool {
+    let mut rest = body;
+    while let Some(at) = rest.find(name) {
+        let before = rest[..at].chars().next_back();
+        let after = rest[at.saturating_add(name.len())..].chars().next();
+        let start_ok = before.is_none_or(|c| !c.is_ascii_alphanumeric() && c != '_');
+        let end_ok = after.is_none_or(|c| !c.is_ascii_alphanumeric() && c != '_');
+        if start_ok && end_ok {
+            return true;
+        }
+        rest = &rest[at.saturating_add(1)..];
+    }
+    false
 }
 
 fn ordered(edges: &BTreeMap<String, BTreeSet<String>>) -> Result<Vec<String>, Refused> {
@@ -182,13 +262,6 @@ fn definition(name: &str, schema: &Value, recursive: &BTreeSet<String>) -> Resul
         return Err(refuse(name, "not a TypeScript identifier"));
     }
     let mut out = String::new();
-    if let Some(description) = schema.get("description").and_then(Value::as_str) {
-        out.push_str("/**\n");
-        for line in description.lines() {
-            let _ = writeln!(out, " * {}", line.replace("*/", "*\\/"));
-        }
-        out.push_str(" */\n");
-    }
     let none = BTreeSet::new();
     let is_recursive = recursive.contains(name);
     let suspended = if is_recursive { recursive } else { &none };

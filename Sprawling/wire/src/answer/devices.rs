@@ -26,6 +26,7 @@ pub struct DeviceLine {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(title = "DeviceId"))]
 pub struct DeviceId(String);
 
 impl DeviceId {

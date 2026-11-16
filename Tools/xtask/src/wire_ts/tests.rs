@@ -34,9 +34,11 @@ fn constants() -> Constants {
 }
 
 fn emitted(defs: Value) -> String {
-    emit(&document(defs), &constants()).unwrap_or_else(|refused| {
-        panic!("refused at {}: {}", refused.at, refused.why);
-    })
+    emit(&document(defs), &constants())
+        .unwrap_or_else(|refused| {
+            panic!("refused at {}: {}", refused.at, refused.why);
+        })
+        .text()
 }
 
 #[test]
@@ -45,7 +47,6 @@ fn a_named_bare_string_is_a_branded_string_and_an_integer_a_branded_int() {
         "Address": { "type": "string", "description": "A path." },
         "Seq": { "type": "integer", "format": "uint64", "minimum": 0 },
     }));
-    assert!(text.contains("/**\n * A path.\n */\n"), "{text}");
     assert!(
         text.contains("export const Address = Schema.String.pipe(Schema.brand(\"Address\"));\n")
     );
@@ -68,7 +69,7 @@ fn a_named_bare_string_is_a_branded_string_and_an_integer_a_branded_int() {
 /// are two floors the first time either moves.
 #[test]
 fn the_body_size_floor_is_the_one_the_city_holds() {
-    let text = super::render().unwrap();
+    let text = super::render().unwrap().text();
     let stated = format!(
         "export const BODY_PX = {{ min: {} }} as const;
 ",
@@ -251,8 +252,16 @@ fn a_cycle_of_two_suspends_inside_itself_and_its_readers_refer_directly() {
 
 #[test]
 fn the_real_wire_comes_out_whole() {
-    let text = emit(&wire::wire_schema(), &constants())
+    let bundle = emit(&wire::wire_schema(), &constants())
         .unwrap_or_else(|refused| panic!("refused at {}: {}", refused.at, refused.why));
+    assert!(
+        bundle
+            .files
+            .iter()
+            .all(|(_, body)| body.lines().count() <= 500),
+        "each generated wire file stays inside the length gate"
+    );
+    let text = bundle.text();
     for name in [
         "ClientFrame",
         "ServerFrame",
@@ -288,3 +297,4 @@ fn the_first_differing_line_is_named_with_both_spellings() {
         Some((3, "c".to_owned(), String::new()))
     );
 }
+

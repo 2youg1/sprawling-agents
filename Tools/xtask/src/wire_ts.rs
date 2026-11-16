@@ -3,13 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use std::collections::BTreeSet;
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
 
 mod emit;
 
-const TARGET: &str = concat!(crate::walk::client_src!(), "/wire.ts");
+const TARGET_DIR: &str = concat!(crate::walk::client_src!(), "/wire");
+const LEGACY_FILE: &str = concat!(crate::walk::client_src!(), "/wire.ts");
 
 pub(super) struct Constants {
     pub(super) wire_v: u32,
@@ -27,7 +29,7 @@ pub(super) struct Constants {
     pub(super) slash: Vec<[&'static str; 4]>,
 }
 
-fn render() -> Result<String, XtaskError> {
+fn render() -> Result<emit::Bundle, XtaskError> {
     let constants = Constants {
         wire_v: wire::WIRE_V,
         hash: wire::schema_hash().to_string(),
@@ -56,47 +58,115 @@ fn render() -> Result<String, XtaskError> {
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let expected = render()?;
-    let path = root.join(TARGET);
-    let actual = match std::fs::read_to_string(&path) {
-        Ok(text) => text,
-        Err(source) if source.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(source) => {
-            return Err(XtaskError::Io {
-                path: path.display().to_string(),
-                source,
-            });
+    let mut violations = Vec::new();
+    let legacy = root.join(LEGACY_FILE);
+    if legacy.is_file() {
+        violations.push(Violation {
+            gate: "wire-ts",
+            location: LEGACY_FILE.to_owned(),
+            rule: "the client's wire types live under client/src/wire/".to_owned(),
+            violation: "client/src/wire.ts is still present".to_owned(),
+            alternative: "run `cargo xtask wire-ts --write` and commit the result".to_owned(),
+        });
+    }
+    let mut expected_paths = BTreeSet::new();
+    for (rel, body) in &expected.files {
+        let path = root.join(crate::walk::client_src!()).join(rel);
+        expected_paths.insert(rel.clone());
+        let actual = match std::fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(source) if source.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(source) => {
+                return Err(XtaskError::Io {
+                    path: path.display().to_string(),
+                    source,
+                });
+            }
+        };
+        let Some((line, wanted, found)) = first_difference(body, &actual) else {
+            continue;
+        };
+        let location = format!("{}/{rel}:{line}", crate::walk::client_src!());
+        violations.push(Violation {
+            gate: "wire-ts",
+            location,
+            rule: "the client's wire types are the ones the Rust wire generates".to_owned(),
+            violation: if actual.is_empty() {
+                "the file is absent".to_owned()
+            } else {
+                format!("line {line} reads `{found}` where the wire says `{wanted}`")
+            },
+            alternative: "run `cargo xtask wire-ts --write` and commit the result".to_owned(),
+        });
+    }
+    let dir = root.join(TARGET_DIR);
+    if dir.is_dir() {
+        for file in crate::walk::files_with_ext(&dir, &["ts"])? {
+            let rel = crate::walk::rel(root, &file);
+            let Some(under) = rel.strip_prefix(&format!("{}/", crate::walk::client_src!())) else {
+                continue;
+            };
+            if !expected_paths.contains(under) {
+                violations.push(Violation {
+                    gate: "wire-ts",
+                    location: rel,
+                    rule: "the client's wire types are the ones the Rust wire generates".to_owned(),
+                    violation: "this file is not part of the generated set".to_owned(),
+                    alternative: "run `cargo xtask wire-ts --write` and commit the result"
+                        .to_owned(),
+                });
+            }
         }
-    };
-    let Some((line, wanted, found)) = first_difference(&expected, &actual) else {
-        return Ok(Vec::new());
-    };
-    Ok(vec![Violation {
-        gate: "wire-ts",
-        location: format!("{TARGET}:{line}"),
-        rule: "the client's wire types are the ones the Rust wire generates".to_owned(),
-        violation: if actual.is_empty() {
-            "the file is absent".to_owned()
-        } else {
-            format!("line {line} reads `{found}` where the wire says `{wanted}`")
-        },
-        alternative: "run `cargo xtask wire-ts --write` and commit the result".to_owned(),
-    }])
+    }
+    Ok(violations)
 }
 
 pub(crate) fn write(root: &Path) -> Result<String, XtaskError> {
-    let text = render()?;
-    let path = root.join(TARGET);
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).map_err(|source| XtaskError::Io {
-            path: dir.display().to_string(),
+    let bundle = render()?;
+    let dir = root.join(TARGET_DIR);
+    std::fs::create_dir_all(&dir).map_err(|source| XtaskError::Io {
+        path: dir.display().to_string(),
+        source,
+    })?;
+    let legacy = root.join(LEGACY_FILE);
+    if legacy.is_file() {
+        std::fs::remove_file(&legacy).map_err(|source| XtaskError::Io {
+            path: legacy.display().to_string(),
             source,
         })?;
     }
-    std::fs::write(&path, text).map_err(|source| XtaskError::Io {
-        path: path.display().to_string(),
-        source,
-    })?;
-    Ok(format!("written: {TARGET}\n"))
+    let mut kept = BTreeSet::new();
+    let mut written = Vec::new();
+    for (rel, body) in &bundle.files {
+        let path = root.join(crate::walk::client_src!()).join(rel);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|source| XtaskError::Io {
+                path: parent.display().to_string(),
+                source,
+            })?;
+        }
+        std::fs::write(&path, body).map_err(|source| XtaskError::Io {
+            path: path.display().to_string(),
+            source,
+        })?;
+        kept.insert(rel.clone());
+        written.push(format!("{}/{}", crate::walk::client_src!(), rel));
+    }
+    if dir.is_dir() {
+        for file in crate::walk::files_with_ext(&dir, &["ts"])? {
+            let rel = crate::walk::rel(root, &file);
+            let Some(under) = rel.strip_prefix(&format!("{}/", crate::walk::client_src!())) else {
+                continue;
+            };
+            if !kept.contains(under) {
+                std::fs::remove_file(&file).map_err(|source| XtaskError::Io {
+                    path: file.display().to_string(),
+                    source,
+                })?;
+            }
+        }
+    }
+    Ok(format!("written: {}\n", written.join(", ")))
 }
 
 fn first_difference(expected: &str, actual: &str) -> Option<(usize, String, String)> {

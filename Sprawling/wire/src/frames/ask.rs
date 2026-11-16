@@ -11,6 +11,7 @@ use super::{Answer, Query};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(title = "AskId"))]
 pub struct AskId(pub u32);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

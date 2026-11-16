@@ -30,7 +30,7 @@ pub(super) struct Values<'a> {
 /// Every keyword the emitter reads; one it does not know is a refusal.
 const KNOWN: &str = concat!(
     "$ref additionalProperties anyOf const default description enum format items ",
-    "maxItems maximum minItems minimum oneOf pattern prefixItems properties required type",
+    "maxItems maximum minItems minimum oneOf pattern prefixItems properties required title type",
 );
 
 impl Values<'_> {

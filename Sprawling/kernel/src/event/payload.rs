@@ -18,6 +18,7 @@ const PAYLOAD_DEPTH_MAX: usize = 126;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(title = "Payload"))]
 pub struct Payload(serde_json::Map<String, serde_json::Value>);
 
 impl Payload {

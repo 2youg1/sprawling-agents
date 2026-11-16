@@ -12,6 +12,7 @@ pub const NODE_DEPTH_MAX: usize = 10;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(title = "NodeId"))]
 pub struct NodeId(String);
 
 impl NodeId {

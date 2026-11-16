@@ -61,6 +61,7 @@ impl std::fmt::Display for RunId {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(title = "Seq"))]
 pub struct Seq(u64);
 
 impl Seq {
@@ -85,6 +86,7 @@ impl Seq {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(transparent)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schema", schemars(title = "TimeMs"))]
 pub struct TimeMs(u64);
 
 impl TimeMs {
