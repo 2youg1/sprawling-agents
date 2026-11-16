@@ -513,14 +513,14 @@ gates-sources mode="" *paths:
     set -euo pipefail
     if [ "{{mode}}" = "changed" ]; then
         if [ -n "${GATES_CHANGED_NUL:-}" ]; then
-            mapfile -d '' -t files < "$GATES_CHANGED_NUL"
+            cargo xtask gates length comments --files-from "$GATES_CHANGED_NUL"
         else
             files=("$@")
             if [ "${#files[@]}" -gt 0 ] && [ "${files[0]}" = "changed" ]; then
                 files=("${files[@]:1}")
             fi
+            cargo xtask gates length comments --files "${files[@]}"
         fi
-        cargo xtask gates length comments --files "${files[@]}"
         cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}|length|comments')
     else
         cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}')

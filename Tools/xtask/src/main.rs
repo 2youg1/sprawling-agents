@@ -95,7 +95,10 @@ fn main() -> ExitCode {
             }
             ExitCode::SUCCESS
         }
-        Some("gates") => gates::run(&root, &gate_names(&args), file_args(&args)),
+        Some("gates") => match file_scope(&args) {
+            Ok(files) => gates::run(&root, &gate_names(&args), files),
+            Err(err) => report::internal_failure(&err),
+        },
         Some("color") => report::finish("color", color::check(&root)),
         Some("render") => report::finish("render", render::check(&root)),
         Some("budget") => match budget::report(&root) {
@@ -280,14 +283,15 @@ fn value_arg(args: &[String], flag: &str) -> Option<String> {
 }
 
 /// The gate names typed after `gates`: every argument that is neither a
-/// flag nor the value `--range` takes. No gate reads history, so a
-/// `--range` a CI job still passes is skipped rather than read as a gate
-/// name. Arguments after `--files` belong to the file scope.
+/// flag nor the value `--range` or `--files-from` takes. No gate reads
+/// history, so a `--range` a CI job still passes is skipped rather than
+/// read as a gate name. Arguments after `--files` belong to the file
+/// scope; `--files-from` takes one path and ends the name list.
 fn gate_names(args: &[String]) -> Vec<String> {
     let mut names = Vec::new();
     let mut it = args.iter().skip(1);
     while let Some(arg) = it.next() {
-        if arg == "--range" {
+        if arg == "--range" || arg == "--files-from" {
             it.next();
         } else if arg == "--files" {
             break;
@@ -298,10 +302,26 @@ fn gate_names(args: &[String]) -> Vec<String> {
     names
 }
 
-fn file_args(args: &[String]) -> Option<Vec<String>> {
-    args.iter()
+/// File scope from `--files <path>...` or `--files-from <nul-list>`.
+/// The NUL list is what CI writes so a rename that touches thousands of
+/// paths does not blow the process argument limit.
+fn file_scope(args: &[String]) -> Result<Option<Vec<String>>, XtaskError> {
+    if let Some(path) = value_arg(args, "--files-from") {
+        let bytes = std::fs::read(&path).map_err(|source| XtaskError::Io {
+            path: path.clone(),
+            source,
+        })?;
+        let files = bytes
+            .split(|byte| *byte == 0)
+            .filter(|chunk| !chunk.is_empty())
+            .map(|chunk| String::from_utf8_lossy(chunk).into_owned())
+            .collect();
+        return Ok(Some(files));
+    }
+    Ok(args
+        .iter()
         .position(|arg| arg == "--files")
-        .map(|index| args.iter().skip(index.saturating_add(1)).cloned().collect())
+        .map(|index| args.iter().skip(index.saturating_add(1)).cloned().collect()))
 }
 
 /// One command this tool answers beyond running a gate: what a person
@@ -322,7 +342,7 @@ const TOOLS: [Tool; 17] = [
         gives: "the ACP registry index, written as the catalog snapshot the build ships",
     },
     Tool {
-        call: "gates [<gate>...] [--files <path>...]",
+        call: "gates [<gate>...] [--files <path>... | --files-from <nul-list>]",
         gives: "every gate, named gates, or length/comments over only the named files",
     },
     Tool {
