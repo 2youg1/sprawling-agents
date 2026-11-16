@@ -22,7 +22,7 @@ export function localPaths(uriList: string): readonly string[] {
       const url = new URL(line);
       const path = decodeURIComponent(url.pathname);
       const host = url.host === "" ? "" : `//${url.host}`;
-      return /^\/[A-Za-z]:\
+      return /^\/[A-Za-z]:\//.test(path) ? path.slice(1) : `${host}${path}`;
     });
 }
 
