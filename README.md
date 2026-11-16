@@ -5,12 +5,13 @@
 <p><a href="README.md">English</a> · <a href="docs/README.zh-CN.md">简体中文</a></p>
 
 <p>
-  <a href="https://docs.rs/sprawling"><img src="https://docs.rs/sprawling/badge.svg" alt="docs.rs"></a>
-  <a href="https://crates.io/crates/sprawling"><img src="https://img.shields.io/crates/v/sprawling?logo=rust&amp;labelColor=171717&amp;color=DEA584" alt="crates.io"></a>
-  <a href="https://www.npmjs.com/package/sprawling"><img src="https://img.shields.io/npm/v/sprawling?logo=npm&amp;labelColor=171717&amp;color=CB3837" alt="npm"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/2youg1/sprawling-agents?labelColor=171717&amp;color=4C8BF5" alt="License"></a>
-  <a href="https://deepwiki.com/2youg1/sprawling-agents"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
-  <a href="https://github.com/2youg1/sprawling-agents/actions/workflows/ci.yml"><img src="https://github.com/2youg1/sprawling-agents/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://crates.io/crates/sprawling"><img src="https://img.shields.io/crates/v/sprawling?color=9f5f37&amp;labelColor=3d444d&amp;style=flat-square" alt="crates.io"></a>
+  <a href="https://www.npmjs.com/package/sprawling"><img src="https://img.shields.io/static/v1?label=npm&amp;message=sprawling&amp;color=a45953&amp;labelColor=3d444d&amp;style=flat-square" alt="npm"></a>
+  <a href="https://docs.rs/sprawling"><img src="https://img.shields.io/docsrs/sprawling?label=docs.rs&amp;style=flat-square&amp;labelColor=3d444d" alt="docs.rs"></a> ·
+  <a href="https://zread.ai/2youg1/sprawling-agents"><img src="https://img.shields.io/static/v1?label=Ask&amp;message=Zread&amp;color=00837e&amp;labelColor=3d444d&amp;style=flat-square" alt="Ask Zread"></a>
+  <a href="https://deepwiki.com/2youg1/sprawling-agents"><img src="https://img.shields.io/static/v1?label=Ask&amp;message=DeepWiki&amp;color=3877a8&amp;labelColor=3d444d&amp;style=flat-square" alt="Ask DeepWiki"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/2youg1/sprawling-agents?color=6f6f6f&amp;labelColor=3d444d&amp;style=flat-square" alt="License"></a>
+  <a href="https://github.com/2youg1/sprawling-agents/releases"><img src="https://img.shields.io/github/v/release/2youg1/sprawling-agents?include_prereleases&amp;style=flat-square&amp;labelColor=3d444d&amp;color=6f6f6f" alt="Release"></a>
 </p>
 
 > **Looking for collaborators and fellow travellers**: `sprawling` is still in development, and new collaborators and feedback of any kind are welcome.<br>
