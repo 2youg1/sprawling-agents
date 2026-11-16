@@ -105,10 +105,10 @@ impl CommandDesk {
 
     pub fn post(&self, command: wire::Command, reply: wire::Reply) {
         if let Ok(mut waiting) = self.waiting.lock() {
-            if let Some(key) = command.idem() {
-                if kernel::idem::claim(&mut waiting.keys, *key).is_err() {
-                    return;
-                }
+            if let Some(key) = command.idem()
+                && kernel::idem::claim(&mut waiting.keys, *key).is_err()
+            {
+                return;
             }
             waiting.queue.push_back(Posted { command, reply });
         }

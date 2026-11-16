@@ -28,8 +28,11 @@ fn under_checker(rel: &str) -> Option<&str> {
     }
     let prefix = CHECKER.as_bytes();
     let bytes = rel.as_bytes();
-    if bytes.len() >= prefix.len() && bytes[..prefix.len()].eq_ignore_ascii_case(prefix) {
-        let rest = &rel[prefix.len()..];
+    if bytes
+        .get(..prefix.len())
+        .is_some_and(|head| head.eq_ignore_ascii_case(prefix))
+    {
+        let rest = rel.get(prefix.len()..)?;
         return match rest.strip_prefix('/') {
             Some(inside) => Some(inside),
             None if rest.is_empty() => Some(""),

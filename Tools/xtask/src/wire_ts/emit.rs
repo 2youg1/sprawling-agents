@@ -118,7 +118,7 @@ pub(super) fn emit(document: &Value, constants: &Constants) -> Result<Bundle, Re
             }
         }
         for (earlier, imports) in needed {
-            let _ = write!(header, "import {{\n");
+            let _ = writeln!(header, "import {{");
             for name in &imports {
                 let _ = writeln!(header, "  {name},");
                 let encoded = format!("{name}Encoded");
@@ -201,14 +201,16 @@ fn refuse(at: &str, why: impl Into<String>) -> Refused {
 fn body_mentions(body: &str, name: &str) -> bool {
     let mut rest = body;
     while let Some(at) = rest.find(name) {
-        let before = rest[..at].chars().next_back();
-        let after = rest[at.saturating_add(name.len())..].chars().next();
+        let before = rest.get(..at).and_then(|s| s.chars().next_back());
+        let after = rest
+            .get(at.saturating_add(name.len())..)
+            .and_then(|s| s.chars().next());
         let start_ok = before.is_none_or(|c| !c.is_ascii_alphanumeric() && c != '_');
         let end_ok = after.is_none_or(|c| !c.is_ascii_alphanumeric() && c != '_');
         if start_ok && end_ok {
             return true;
         }
-        rest = &rest[at.saturating_add(1)..];
+        rest = rest.get(at.saturating_add(1)..).unwrap_or("");
     }
     false
 }

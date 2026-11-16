@@ -18,11 +18,10 @@ use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, Instant};
 
 use futures_util::{SinkExt, StreamExt};
-use kernel::{Address, AxCode, EventKind, EventRecord, IdemKey, RunId, Seq};
+use kernel::{Address, AxCode, EventKind, IdemKey, RunId, Seq};
 use remote_access::door::DeviceId;
-use remote_access::handshake::{self, CityFingerprint, Invitation, PairReply, Reply, Session};
+use remote_access::handshake::{self, Invitation, PairReply, Reply, Session};
 use remote_access::keys::{SigningKey, VerifyingKey};
-use remote_access::route::command::LOCAL_ENV;
 use remote_access::seal::Payload;
 use tokio::net::TcpStream;
 // boundary-ok: the device's half of the remote door exists only in remote_access, so this check speaks it from Rust (`Sprawling/app/Spec.lean` §8-151)
@@ -125,13 +124,13 @@ pub(crate) fn fetched(at: &str, path: &str) -> (String, Vec<String>, Vec<u8>) {
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Visit {
-    welcomed: bool,
+    pub(crate) welcomed: bool,
 
-    read_answered: bool,
+    pub(crate) read_answered: bool,
 
-    act_carried_out: bool,
+    pub(crate) act_carried_out: bool,
 
-    local_only_refused: Option<AxCode>,
+    pub(crate) local_only_refused: Option<AxCode>,
 }
 
 pub(crate) async fn visit(at: &str, invitation: &Invitation) -> Visit {
@@ -323,7 +322,7 @@ pub(crate) fn read_until<'a>(
 pub(crate) struct Served {
     child: Child,
     console: ChildStdin,
-    printed: Receiver<String>,
+    pub(crate) printed: Receiver<String>,
 
     logged: Receiver<String>,
 }

@@ -400,6 +400,7 @@ mod shipped_tests;
     clippy::expect_used,
     clippy::panic,
     clippy::indexing_slicing,
+    clippy::wildcard_enum_match_arm,
     reason = "test code"
 )]
 mod startup_tests;
