@@ -139,7 +139,7 @@ fn pinned_fixture(scratch: &Path) -> Result<B3Hash, String> {
     clippy::disallowed_methods,
     reason = "a bench harness is a measuring Main; time is its subject, not its input"
 )]
-fn stamp() -> Instant {
+pub(crate) fn stamp() -> Instant {
     Instant::now()
 }
 

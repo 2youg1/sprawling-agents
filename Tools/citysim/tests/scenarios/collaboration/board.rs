@@ -13,22 +13,19 @@
 )]
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
-use accounting::worker::hands::Hands;
-use accounting::worker::{Closing, CommandDesk, RunWorker};
-use kernel::event::record::RunStarted;
 use kernel::layout::CityLayout;
 use kernel::{
-    Address, AxError, ContentBlock, EventKind, EventRecord, IdemKey, Model, ModelRequest,
-    ModelReturn, Payload, RunId, Seq, TimeMs, ToolCall, ToolName,
+    Address, AxError, ContentBlock, EventKind, EventRecord, Model, ModelRequest,
+    ModelReturn, RunId,
 };
 use serde_json::{Value, json};
 
-use super::ledger::{Lines, city, dispatch, raise, serve};
-use super::roles::{CLERK, MAYOR, hands, idem};
+use super::ledger::{Lines, read};
+use super::roles::{SIBLINGS, calls, says};
 
 pub(super) const NOTES: &str = "notes.md";
 pub(super) const NOTES_BEFORE: &str = "before\n";
@@ -41,6 +38,15 @@ pub(super) const REDO: &str = "the kiln fired, delegated again if it cracks";
 pub(super) const CHILD_TASK: &str = "claim node 1 and fire it";
 pub(super) const CHILD_GOAL: &str = "node 1 fired";
 
+pub(super) const PLAN: &str = "\
+# Roadmap
+
+| # | Item | Weight | Needs | Status | Evidence |
+|---|------|--------|-------|--------|----------|
+| 1 | fire the kiln | 1 |  | Not started |  |
+";
+
+
 /// The marks the plan scenarios' runs wait on, and the ledger the lead
 /// reads to know a child has frozen.
 #[derive(Default)]
@@ -48,7 +54,7 @@ pub(super) struct Board {
     marks: Mutex<std::collections::BTreeSet<&'static str>>,
     moved: Condvar,
     children: AtomicU32,
-    ledger: Mutex<Option<PathBuf>>,
+    pub(super) ledger: Mutex<Option<PathBuf>>,
 }
 
 impl Board {
@@ -117,7 +123,7 @@ impl Board {
     }
 }
 
-pub(super) struct Planners(Arc<Board>);
+pub(super) struct Planners(pub(super) Arc<Board>);
 
 impl accounting::ModelFactory for Planners {
     fn build(
@@ -341,7 +347,7 @@ const PLAN_KINDS: [EventKind; 5] = [
 ];
 
 /// The room a run was started in.
-fn room_of(lines: &Lines, run: RunId) -> Option<&str> {
+pub(super) fn room_of(lines: &Lines, run: RunId) -> Option<&str> {
     lines
         .iter()
         .find(|(record, _)| record.kind() == EventKind::RunStarted && record.run() == run)

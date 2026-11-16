@@ -21,15 +21,15 @@ use kernel::{
 use accounting::worker::genesis::{Adopt, form};
 use sprawling::assembly;
 
-pub(super) const LAB: &str = "lab";
-pub(super) const MODEL: &str = "scripted";
+pub(crate) const LAB: &str = "lab";
+pub(crate) const MODEL: &str = "scripted";
 
-pub(super) const LISTING: &str = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[{\"name\":\"ping\",\"description\":\"answer with pong\",\"inputSchema\":{\"type\":\"object\"}}]}}";
-pub(super) const OFFERED: &str = "apps_ping";
+pub(crate) const LISTING: &str = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[{\"name\":\"ping\",\"description\":\"answer with pong\",\"inputSchema\":{\"type\":\"object\"}}]}}";
+pub(crate) const OFFERED: &str = "apps_ping";
 
-pub(super) const NAMESPACE: &str = "apps";
+pub(crate) const NAMESPACE: &str = "apps";
 
-pub(super) fn two_hundred_tools() -> String {
+pub(crate) fn two_hundred_tools() -> String {
     const VERBS: [&str; 10] = [
         "create", "get", "list", "update", "delete", "search", "close", "merge", "add", "remove",
     ];
@@ -70,7 +70,7 @@ pub(super) fn two_hundred_tools() -> String {
     serde_json::json!({"jsonrpc": "2.0", "id": 1, "result": {"tools": tools}}).to_string()
 }
 
-pub(super) fn dormant_names(req: &ModelRequest) -> Vec<String> {
+pub(crate) fn dormant_names(req: &ModelRequest) -> Vec<String> {
     req.chat
         .system
         .iter()
@@ -86,7 +86,7 @@ pub(super) fn dormant_names(req: &ModelRequest) -> Vec<String> {
         .collect()
 }
 
-pub(super) struct Listening(Arc<Mutex<Vec<String>>>);
+pub(crate) struct Listening(Arc<Mutex<Vec<String>>>);
 
 impl Model for Listening {
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
@@ -107,7 +107,7 @@ impl Model for Listening {
     }
 }
 
-pub(super) struct Listeners(Arc<Mutex<Vec<String>>>);
+pub(crate) struct Listeners(Arc<Mutex<Vec<String>>>);
 
 impl accounting::ModelFactory for Listeners {
     fn build(
@@ -119,10 +119,10 @@ impl accounting::ModelFactory for Listeners {
     }
 }
 
-pub(super) struct Scripted(String);
+pub(crate) struct Scripted(String);
 
-pub(super) type Listing = Arc<Mutex<Option<String>>>;
-pub(super) struct Revisions(Listing);
+pub(crate) type Listing = Arc<Mutex<Option<String>>>;
+pub(crate) struct Revisions(Listing);
 
 impl accounting::Connectors for Revisions {
     fn connect(
@@ -194,18 +194,18 @@ impl accounting::Connectors for Scripted {
     fn invalidate(&self, _reference: &kernel::SecretRef) {}
 }
 
-pub(super) fn refusing_url() -> String {
+pub(crate) fn refusing_url() -> String {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     drop(listener);
     format!("http://127.0.0.1:{port}/v1")
 }
 
-pub(super) fn idem(what: &[u8]) -> IdemKey {
+pub(crate) fn idem(what: &[u8]) -> IdemKey {
     IdemKey::derive(&RunId::CITY, Seq::FIRST, what)
 }
 
-pub(super) fn name_an_absent_server(city_root: &std::path::Path) {
+pub(crate) fn name_an_absent_server(city_root: &std::path::Path) {
     let path = city::config_path(
         city_root,
         &Address::parse(LAB).unwrap(),
@@ -224,7 +224,7 @@ pub(super) fn name_an_absent_server(city_root: &std::path::Path) {
         .unwrap();
 }
 
-pub(super) fn listing(tools: &[(&str, &str)]) -> String {
+pub(crate) fn listing(tools: &[(&str, &str)]) -> String {
     let tools: Vec<serde_json::Value> = tools
         .iter()
         .map(|(name, description)| {
@@ -238,7 +238,7 @@ pub(super) fn listing(tools: &[(&str, &str)]) -> String {
     serde_json::json!({"jsonrpc": "2.0", "id": 1, "result": {"tools": tools}}).to_string()
 }
 
-pub(super) fn revision_city(
+pub(crate) fn revision_city(
     initial: &str,
 ) -> (
     tempfile::TempDir,
@@ -255,7 +255,7 @@ pub(super) fn revision_city(
     (dir, worker, listing, offered)
 }
 
-pub(super) fn dispatch_one_run(
+pub(crate) fn dispatch_one_run(
     models: Box<dyn accounting::ModelFactory + Send>,
     connectors: Box<dyn accounting::Connectors + Send + Sync>,
 ) -> String {
@@ -263,7 +263,7 @@ pub(super) fn dispatch_one_run(
     dispatch(&mut worker, "s1")
 }
 
-pub(super) fn dispatch(worker: &mut accounting::worker::RunWorker, session: &str) -> String {
+pub(crate) fn dispatch(worker: &mut accounting::worker::RunWorker, session: &str) -> String {
     let dispatched = worker.handle(wire::Command::Dispatch {
         addr: Address::parse(LAB).unwrap(),
         task: "Answer.".to_owned(),
@@ -277,7 +277,7 @@ pub(super) fn dispatch(worker: &mut accounting::worker::RunWorker, session: &str
     format!("{dispatched:?}")
 }
 
-pub(super) fn lab_city(
+pub(crate) fn lab_city(
     models: Box<dyn accounting::ModelFactory + Send>,
     connectors: Box<dyn accounting::Connectors + Send + Sync>,
 ) -> (tempfile::TempDir, accounting::worker::RunWorker) {

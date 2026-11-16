@@ -12,20 +12,18 @@
     reason = "test code; readings are read through their Debug form in the report"
 )]
 
-use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 use accounting::worker::hands::Hands;
-use accounting::worker::{Closing, CommandDesk, RunWorker};
-use kernel::event::record::RunStarted;
-use kernel::layout::CityLayout;
 use kernel::{
-    Address, AxError, ContentBlock, EventKind, EventRecord, IdemKey, Model, ModelRequest,
+    AxError, ContentBlock, EventKind, EventRecord, IdemKey, Model, ModelRequest,
     ModelReturn, Payload, RunId, Seq, TimeMs, ToolCall, ToolName,
 };
 use serde_json::{Value, json};
+
+use super::ledger::{city, dispatch, move_in, path_of, quiet, serve};
 
 pub(super) const CHILDREN: [&str; 3] = ["lab/kiln", "lab/glaze", "lab/clay"];
 
@@ -42,10 +40,11 @@ pub(super) const HANDBOOK: &str = "hall/soup.md";
 pub(super) const MAYOR: &str = "hall/mayor";
 pub(super) const CLERK: &str = "hall/clerk";
 
+#[derive(Debug)]
 pub(super) struct Child {
-    started: u64,
-    frozen: u64,
-    parent: bool,
+    pub(super) started: u64,
+    pub(super) frozen: u64,
+    pub(super) parent: bool,
 }
 
 /// What one game left behind: the counts a TP3 reading compares, and
@@ -53,22 +52,22 @@ pub(super) struct Child {
 /// freeze, which counts clock reads rather than milliseconds.
 #[derive(Debug)]
 pub(super) struct Reading {
-    runs: u32,
-    reads_at_start: u32,
-    model_calls: u32,
-    span_reads: u64,
-    seq_span: u64,
+    pub(super) runs: u32,
+    pub(super) reads_at_start: u32,
+    pub(super) model_calls: u32,
+    pub(super) span_reads: u64,
+    pub(super) seq_span: u64,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Counts {
-    runs: u32,
-    reads_at_start: u32,
-    model_calls: u32,
+    pub(super) runs: u32,
+    pub(super) reads_at_start: u32,
+    pub(super) model_calls: u32,
 }
 
 impl Reading {
-    fn counts(&self) -> Counts {
+    pub(super) fn counts(&self) -> Counts {
         Counts {
             runs: self.runs,
             reads_at_start: self.reads_at_start,
@@ -160,7 +159,7 @@ impl Siblings {
         }
     }
 
-    fn all_met(&self) -> bool {
+    pub(super) fn all_met(&self) -> bool {
         self.met.load(Ordering::SeqCst) == 3
     }
 }
@@ -173,7 +172,7 @@ pub(super) struct Roles {
 }
 
 impl Roles {
-    fn new(siblings: Arc<Siblings>, shared: Shared, send: Send) -> Roles {
+    pub(super) fn new(siblings: Arc<Siblings>, shared: Shared, send: Send) -> Roles {
         Roles {
             siblings,
             shared,
@@ -364,7 +363,7 @@ pub(super) fn says(text: &str) -> Result<ModelReturn, AxError> {
 }
 
 /// A clock that counts the times it is read, from a fixed start.
-pub(super) struct Counted(AtomicU64);
+pub(super) struct Counted(pub(super) AtomicU64);
 
 impl accounting::Clock for Counted {
     fn now(&self) -> Result<TimeMs, AxError> {

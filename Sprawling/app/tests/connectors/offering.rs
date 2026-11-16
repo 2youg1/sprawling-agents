@@ -5,10 +5,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use accounting::ModelRequest;
-use kernel::{IdemKey, Model};
-
 use super::*;
+use super::drift::{Callers, Calling, Seen};
 
 #[test]
 fn a_run_is_offered_the_tools_the_worker_was_handed() {
@@ -72,7 +70,7 @@ fn two_hundred_tools_of_one_server_take_one_index_line_and_are_found() {
 }
 
 /// The `apps` rows of the building's capabilities answer.
-fn apps_rows(city_root: &std::path::Path) -> Vec<wire::CatalogTool> {
+pub(crate) fn apps_rows(city_root: &std::path::Path) -> Vec<wire::CatalogTool> {
     let answer = accounting::views::ask(
         city_root,
         &wire::Query::Catalog {
@@ -155,7 +153,7 @@ fn a_namespace_a_building_turns_off_leaves_the_next_run_and_stays_listed() {
     );
 }
 
-fn apps_reference(city_root: &std::path::Path) -> kernel::McpReference {
+pub(crate) fn apps_reference(city_root: &std::path::Path) -> kernel::McpReference {
     city::load_config(city_root, &Address::parse("lab/room1").unwrap())
         .unwrap()
         .mcp_references
@@ -164,7 +162,7 @@ fn apps_reference(city_root: &std::path::Path) -> kernel::McpReference {
         .unwrap()
 }
 
-fn catalog_drifts(city_root: &std::path::Path) -> Vec<kernel::event::record::CatalogDrift> {
+pub(crate) fn catalog_drifts(city_root: &std::path::Path) -> Vec<kernel::event::record::CatalogDrift> {
     storage::read_raw_lines_at(&kernel::layout::CityLayout::new(city_root).ledger())
         .unwrap()
         .iter()
@@ -179,7 +177,7 @@ fn catalog_drifts(city_root: &std::path::Path) -> Vec<kernel::event::record::Cat
         .collect()
 }
 
-fn assert_only_namespace_count(offered: &Arc<Mutex<Vec<String>>>, count: usize) {
+pub(crate) fn assert_only_namespace_count(offered: &Arc<Mutex<Vec<String>>>, count: usize) {
     let names = offered.lock().unwrap();
     assert!(
         names

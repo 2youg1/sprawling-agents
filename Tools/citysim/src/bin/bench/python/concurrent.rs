@@ -3,19 +3,21 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::path::Path;
+use std::sync::{Barrier, mpsc};
 use std::time::Duration;
 
-use kernel::B3Hash;
-use runtime::sandbox::WasmtimeSandbox;
+use sprawling::monitor::spread::micros;
+use sprawling::monitor::tree::{Tree, TreeReading};
+use runtime::{Sandbox as _, SandboxExit};
 
+use crate::reading::MachineClass;
 use super::{
-    CONCURRENT_BURSTS, CONCURRENT_CALLERS, EXPECTED, Identity, MEMORY_BEAT, Prepared, STATE_CLEAN,
-    STATE_LEAKED, STATE_WRITTEN, Sample, WARM_SAMPLES, checked_output, fixture, output_detail,
-    prerequisite, raw_job, run_checked, timed_outcome,
+    CONCURRENT_BURSTS, CONCURRENT_CALLERS, Identity, MEMORY_BEAT, Prepared, STATE_CLEAN,
+    STATE_LEAKED, STATE_WRITTEN, Sample, WARM_SAMPLES, checked_output, fixture, raw_job,
+    timed_outcome,
 };
 
-pub(super) fn warm_calls(prepared: &mut Prepared) -> Result<Vec<Sample>, String> {
+pub(crate) fn warm_calls(prepared: &mut Prepared) -> Result<Vec<Sample>, String> {
     check_state_isolation(prepared)?;
     (0..WARM_SAMPLES)
         .map(|index| {
@@ -64,38 +66,38 @@ pub(super) fn output_line(marker: &str) -> Vec<u8> {
     format!("{marker}\n").into_bytes()
 }
 
-pub(super) struct Call {
-    latency: Duration,
-    start_delay: Duration,
-    round: usize,
-    returned: std::time::Instant,
-    outcome: runtime::SandboxOutcome,
+pub(crate) struct Call {
+    pub(crate) latency: Duration,
+    pub(crate) start_delay: Duration,
+    pub(crate) round: usize,
+    pub(crate) returned: std::time::Instant,
+    pub(crate) outcome: runtime::SandboxOutcome,
 }
 
-pub(super) struct Concurrent {
-    calls: Vec<Call>,
-    walls: Vec<Duration>,
-    calls_per_s: u64,
+pub(crate) struct Concurrent {
+    pub(crate) calls: Vec<Call>,
+    pub(crate) walls: Vec<Duration>,
+    pub(crate) calls_per_s: u64,
 }
 
-pub(super) struct Memory {
-    before: TreeReading,
-    peak_address_bytes: u64,
-    peak_resident_bytes: u64,
-    after: TreeReading,
-    beats: u64,
+pub(crate) struct Memory {
+    pub(crate) before: TreeReading,
+    pub(crate) peak_address_bytes: u64,
+    pub(crate) peak_resident_bytes: u64,
+    pub(crate) after: TreeReading,
+    pub(crate) beats: u64,
 }
 
 /// `sysinfo` calls the same field virtual size on Unix but PrivateUsage on
 /// Windows. The report names the measured counter rather than promising an
 /// unavailable Windows address-space reservation reading.
-pub(super) enum VirtualCounter {
+pub(crate) enum VirtualCounter {
     Virtual,
     PrivateCommit,
 }
 
 impl VirtualCounter {
-    fn current() -> VirtualCounter {
+    pub(crate) fn current() -> VirtualCounter {
         if cfg!(windows) {
             VirtualCounter::PrivateCommit
         } else {
@@ -103,7 +105,7 @@ impl VirtualCounter {
         }
     }
 
-    fn names(self) -> [&'static str; 3] {
+    pub(crate) fn names(self) -> [&'static str; 3] {
         match self {
             VirtualCounter::Virtual => ["before_virtual", "peak_virtual", "after_virtual"],
             VirtualCounter::PrivateCommit => [
@@ -115,7 +117,7 @@ impl VirtualCounter {
     }
 }
 
-pub(super) fn concurrent_calls(prepared: &Prepared) -> Result<Concurrent, String> {
+pub(crate) fn concurrent_calls(prepared: &Prepared) -> Result<Concurrent, String> {
     let mut calls = Vec::new();
     let mut walls = Vec::new();
     let mut wall_us = 0_u64;
@@ -139,12 +141,12 @@ pub(super) fn concurrent_calls(prepared: &Prepared) -> Result<Concurrent, String
 
 /// Memory is read in a separate burst so the process-table walk never
 /// disturbs the latency and throughput samples.
-pub(super) fn measure_memory(prepared: &Prepared) -> Result<Memory, String> {
+pub(crate) fn measure_memory(prepared: &Prepared) -> Result<Memory, String> {
     let mut tree = Tree::open(std::process::id());
     let before = tree
         .read(Duration::ZERO)
         .ok_or_else(|| fixture("the memory reader could not find this bench process"))?;
-    let before_at = super::stamp();
+    let before_at = crate::stamp();
     let (stop, stopped) = mpsc::channel();
     let monitor = std::thread::spawn(move || monitor_memory(tree, stopped, before_at));
     let measured: Result<(), String> = (|| {
@@ -160,12 +162,12 @@ pub(super) fn measure_memory(prepared: &Prepared) -> Result<Memory, String> {
         .and_then(|result| result);
     let cleanup = keep_both(sent, monitored).map(|((), monitored)| monitored);
     let ((), (mut tree, beats, last_read)) = keep_both(measured, cleanup)?;
-    let now = super::stamp();
+    let now = crate::stamp();
     let remaining = MEMORY_BEAT.saturating_sub(now.saturating_duration_since(last_read));
     if !remaining.is_zero() {
         std::thread::sleep(remaining);
     }
-    let after_at = super::stamp();
+    let after_at = crate::stamp();
     let after = tree
         .read(after_at.saturating_duration_since(last_read))
         .ok_or_else(|| fixture("the memory reader lost this bench process after the burst"))?;
@@ -186,7 +188,7 @@ pub(super) fn concurrent_burst(
     round: usize,
 ) -> Result<(Vec<Call>, Duration), String> {
     let barrier = Barrier::new(CONCURRENT_CALLERS.saturating_add(1));
-    let spawned_at = super::stamp();
+    let spawned_at = crate::stamp();
     std::thread::scope(|scope| {
         let mut handles = Vec::with_capacity(CONCURRENT_CALLERS);
         for _ in 0..CONCURRENT_CALLERS {
@@ -206,7 +208,7 @@ pub(super) fn concurrent_burst(
                 })
             }));
         }
-        let started = super::stamp();
+        let started = crate::stamp();
         barrier.wait();
         let joined: Vec<_> = handles.into_iter().map(|handle| handle.join()).collect();
         let mut calls = Vec::with_capacity(CONCURRENT_CALLERS);
@@ -238,7 +240,7 @@ pub(super) fn monitor_memory(
                 return Ok((tree, beats, previous));
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                let now = super::stamp();
+                let now = crate::stamp();
                 if tree.read(now.duration_since(previous)).is_none() {
                     return Err(fixture("the memory monitor lost this bench process"));
                 }
@@ -250,7 +252,7 @@ pub(super) fn monitor_memory(
 }
 
 /// Neither a measurement failure nor a cleanup failure erases the other.
-fn keep_both<T, U>(work: Result<T, String>, cleanup: Result<U, String>) -> Result<(T, U), String> {
+pub(crate) fn keep_both<T, U>(work: Result<T, String>, cleanup: Result<U, String>) -> Result<(T, U), String> {
     match (work, cleanup) {
         (Ok(work), Ok(cleanup)) => Ok((work, cleanup)),
         (Err(work), Ok(_)) => Err(work),
@@ -259,7 +261,7 @@ fn keep_both<T, U>(work: Result<T, String>, cleanup: Result<U, String>) -> Resul
     }
 }
 
-pub(super) fn memory_line(identity: Identity, memory: &Memory) -> Result<String, String> {
+pub(crate) fn memory_line(identity: Identity, memory: &Memory) -> Result<String, String> {
     if memory.before.private_bytes == 0
         || memory.before.working_set_bytes == 0
         || memory.after.private_bytes == 0

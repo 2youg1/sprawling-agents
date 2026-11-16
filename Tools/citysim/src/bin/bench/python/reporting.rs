@@ -3,17 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use kernel::{AxError, B3Hash};
+use kernel::{AxCode, AxError};
 use sprawling::monitor::spread::micros;
+use crate::reading::{MachineClass, row_line, spread_of};
 
-use super::{
-    Arm, Call, Concurrent, Identity, MachineClass, Measurement, Memory, Observation, Report, Sample,
-};
+use super::concurrent::{VirtualCounter, keep_both};
+use super::{Arm, Identity, Measurement, Memory, Observation, Report, Sample};
 
-pub(super) fn record(
+pub(crate) fn record(
     row: &str,
     samples: Vec<Sample>,
     identity: Identity,
@@ -60,12 +61,12 @@ pub(super) fn record(
 }
 
 impl Report {
-    fn add(&mut self, measurement: Measurement) {
+    pub(crate) fn add(&mut self, measurement: Measurement) {
         self.lines.extend(measurement.lines);
         self.observations.extend(measurement.observations);
     }
 
-    fn new(arm: Arm) -> Report {
+    pub(crate) fn new(arm: Arm) -> Report {
         Report {
             lines: Vec::new(),
             observations: Vec::new(),
@@ -91,7 +92,7 @@ impl Report {
         Ok(path)
     }
 
-    fn write_csv_at(&self, path: &Path) -> Result<(), String> {
+    pub(crate) fn write_csv_at(&self, path: &Path) -> Result<(), String> {
         let parent = path
             .parent()
             .ok_or_else(|| fixture("the CSV output path has no parent directory"))?;
@@ -123,7 +124,7 @@ impl Report {
 }
 
 const CSV_SCHEMA_VERSION: u8 = 1;
-const CSV_HEADER: &str = "schema_version,build_blake3,workload,observation,round,cohort,arm,metric,value,unit,guest_blake3,script_blake3,machine_class,os,arch\n";
+pub(crate) const CSV_HEADER: &str = "schema_version,build_blake3,workload,observation,round,cohort,arm,metric,value,unit,guest_blake3,script_blake3,machine_class,os,arch\n";
 
 impl Observation {
     fn write_csv(&self, out: &mut impl std::io::Write) -> std::io::Result<()> {
@@ -147,7 +148,7 @@ impl Observation {
     }
 }
 
-fn round_observations(identity: Identity, walls: &[Duration]) -> Vec<Observation> {
+pub(crate) fn round_observations(identity: Identity, walls: &[Duration]) -> Vec<Observation> {
     walls
         .iter()
         .enumerate()
@@ -163,7 +164,7 @@ fn round_observations(identity: Identity, walls: &[Duration]) -> Vec<Observation
         .collect()
 }
 
-fn memory_observations(identity: Identity, memory: &Memory) -> Vec<Observation> {
+pub(crate) fn memory_observations(identity: Identity, memory: &Memory) -> Vec<Observation> {
     let [before_name, peak_name, after_name] = VirtualCounter::current().names();
     [
         (before_name, memory.before.private_bytes),
@@ -196,7 +197,7 @@ fn memory_observations(identity: Identity, memory: &Memory) -> Vec<Observation> 
 }
 
 /// Associates write/sync errors with the partial file and link errors with the result.
-pub(super) fn publish_csv(
+pub(crate) fn publish_csv(
     written: std::io::Result<()>,
     part: &Path,
     path: &Path,
@@ -206,7 +207,7 @@ pub(super) fn publish_csv(
 }
 
 /// Preserves both paths when publication succeeded before cleanup failed.
-pub(super) fn csv_cleanup_error(
+pub(crate) fn csv_cleanup_error(
     path: &Path,
     part: &Path,
     published: bool,
@@ -251,7 +252,7 @@ pub(super) fn csv_storage(path: &Path, detail: impl std::fmt::Display) -> String
     )
 }
 
-pub(super) fn prerequisite(detail: String) -> String {
+pub(crate) fn prerequisite(detail: String) -> String {
     error_with_recovery(
         AxError::failure(
             AxCode::ToolUnavailable,
@@ -265,7 +266,7 @@ pub(super) fn prerequisite(detail: String) -> String {
     )
 }
 
-pub(super) fn fixture(detail: impl Into<String>) -> String {
+pub(crate) fn fixture(detail: impl Into<String>) -> String {
     let error = AxError::failure(
         AxCode::InvalidArgs,
         "measure the registered CPython-WASI scenario",

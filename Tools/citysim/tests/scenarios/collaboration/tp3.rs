@@ -12,23 +12,18 @@
     reason = "test code; readings are read through their Debug form in the report"
 )]
 
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
-use std::time::Duration;
+use std::sync::Arc;
 
-use accounting::worker::hands::Hands;
-use accounting::worker::{Closing, CommandDesk, RunWorker};
-use kernel::event::record::RunStarted;
-use kernel::layout::CityLayout;
-use kernel::{
-    Address, AxError, ContentBlock, EventKind, EventRecord, IdemKey, Model, ModelRequest,
-    ModelReturn, Payload, RunId, Seq, TimeMs, ToolCall, ToolName,
+use kernel::EventKind;
+
+use super::ledger::{
+    city, dispatch, frozen, frozen_seq, raise, serve,
+    started,
 };
-use serde_json::{Value, json};
-
-use super::ledger::{frozen, look_until, quiet, raise, read, serve, serve_in_turn, started};
-use super::roles::{CHILDREN, HANDBOOK, MAYOR, ROUNDS, Reading, SIBLINGS, Send, play};
+use super::roles::{
+    CHILDREN, Child, Counts, ROUNDS, Roles, Send, Shared, Siblings,
+    play,
+};
 
 #[test]
 fn tp3_three_delegated_children_start_at_the_call_and_run_side_by_side() {

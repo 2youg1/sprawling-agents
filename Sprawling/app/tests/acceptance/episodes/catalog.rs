@@ -5,14 +5,13 @@
 
 use std::path::Path;
 
-use kernel::event::record::ToolAnswer;
-use kernel::{EventKind, RunId};
-use serde_json::{Map, Value, json};
+use kernel::EventKind;
+use serde_json::{Value, json};
 
 use crate::script::Step;
 
 use super::{
-    Episode, Observed, Setup, address, answered, answered_text, ensure, failed, notes,
+    Episode, Setup, address, answered, answered_text, ensure, failed, notes,
     started_under,
 };
 

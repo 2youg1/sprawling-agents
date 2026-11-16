@@ -12,35 +12,20 @@
     reason = "test code; readings are read through their Debug form in the report"
 )]
 
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
-use std::time::Duration;
+use std::sync::Arc;
 
-use accounting::worker::hands::Hands;
-use accounting::worker::{Closing, CommandDesk, RunWorker};
-use kernel::event::record::RunStarted;
 use kernel::layout::CityLayout;
 use kernel::{
-    Address, AxError, ContentBlock, EventKind, EventRecord, IdemKey, Model, ModelRequest,
-    ModelReturn, Payload, RunId, Seq, TimeMs, ToolCall, ToolName,
+    Address, EventKind, EventRecord,
 };
-use serde_json::{Value, json};
 
 use super::board::{
-    Board, CHECKER, CHILD_GOAL, CHILD_TASK, GLAZER, MAKER, NOTES, NOTES_BEFORE, POTTER, Planners,
+    Board, CHECKER, GLAZER, MAKER, NOTES, NOTES_BEFORE, POTTER, Planners,
+    room_of,
     REDO, plan_lab, plan_trace,
 };
-use super::ledger::{Lines, city, dispatch, frozen_seq, look_until, raise, read, serve, started};
-use super::roles::{CLERK, MAYOR, hands, idem};
+use super::ledger::{Lines, Mark, city, dispatch, frozen, quiet, raise, serve, serve_in_turn, started};
 
-const PLAN: &str = "\
-# Roadmap
-
-| # | Item | Weight | Needs | Status | Evidence |
-|---|------|--------|-------|--------|----------|
-| 1 | fire the kiln | 1 |  | Not started |  |
-";
 
 #[test]
 fn a_node_two_residents_read_as_ready_in_one_wave_is_held_by_the_first_to_claim() {

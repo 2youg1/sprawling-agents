@@ -9,22 +9,21 @@
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use std::sync::{Barrier, LazyLock, mpsc};
+use std::sync::LazyLock;
 use std::time::Duration;
 
-use kernel::{AxCode, AxError, B3Hash};
+use kernel::B3Hash;
 use runtime::{
     Fuel, GuestMemory, Mount, PythonGuest, Sandbox as _, SandboxExit, SandboxJob, WasmtimeSandbox,
 };
-use sprawling::monitor::spread::micros;
-use sprawling::monitor::tree::{Tree, TreeReading};
-
-use super::reading::{MachineClass, row_line, spread_of};
 
 mod cold;
 mod concurrent;
 mod reporting;
 pub(crate) use cold::COLD_COMMAND;
+use reporting::{memory_observations, round_observations};
+use concurrent::memory_line;
+
 
 /// Pilot counts for a baseline capture; a final comparison chooses precision
 /// from its pre-registered interval width instead of treating these as enough.
@@ -437,9 +436,7 @@ pub(super) fn output_detail(outcome: &runtime::SandboxOutcome) -> Result<(), Str
     Ok(())
 }
 
-pub(super) use concurrent::{
-    Call, Concurrent, Memory, concurrent_calls, measure_memory, warm_calls,
-};
+pub(super) use concurrent::{Memory, concurrent_calls, measure_memory, warm_calls};
 pub(super) use reporting::{fixture, prerequisite, record};
 
 #[cfg(test)]

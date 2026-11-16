@@ -3,6 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects,
+    clippy::wildcard_enum_match_arm,
+    reason = "test code"
+)]
+
 use super::{Built, Registries, built, channel, judged};
 use kernel::ReleaseVerdict;
 use std::io::{BufRead, BufReader, Write};

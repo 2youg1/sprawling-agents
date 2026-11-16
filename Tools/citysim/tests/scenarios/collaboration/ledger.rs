@@ -13,21 +13,18 @@
 )]
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 use std::time::Duration;
 
-use accounting::worker::hands::Hands;
 use accounting::worker::{Closing, CommandDesk, RunWorker};
 use kernel::event::record::RunStarted;
 use kernel::layout::CityLayout;
 use kernel::{
-    Address, AxError, ContentBlock, EventKind, EventRecord, IdemKey, Model, ModelRequest,
-    ModelReturn, Payload, RunId, Seq, TimeMs, ToolCall, ToolName,
+    Address, EventKind, EventRecord, IdemKey, RunId, Seq,
 };
-use serde_json::{Value, json};
 
-use super::roles::{Counted, Roles, hands, idem};
+use super::roles::{Counted, hands, idem};
 
 /// A founded city whose main model sits behind a loopback port nothing
 /// answers, so the vault's keep-warm never leaves this process.
@@ -224,10 +221,10 @@ pub(super) fn read(ledger: &Path) -> Lines {
 }
 
 pub(super) struct Start {
-    run: RunId,
-    seq: u64,
-    t: u64,
-    parent: Option<RunId>,
+    pub(super) run: RunId,
+    pub(super) seq: u64,
+    pub(super) t: u64,
+    pub(super) parent: Option<RunId>,
 }
 
 pub(super) fn started(lines: &Lines, room: &str) -> Vec<Start> {

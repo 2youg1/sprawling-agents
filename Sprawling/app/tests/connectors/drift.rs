@@ -5,10 +5,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use accounting::ModelRequest;
-use kernel::{IdemKey, Model};
-
 use super::*;
+use super::offering::{apps_reference, assert_only_namespace_count, catalog_drifts, apps_rows};
 
 #[test]
 fn a_removed_tool_is_recorded_without_removing_its_pin() {
@@ -201,17 +199,17 @@ impl accounting::Connectors for Answering {
 /// What a calling model saw: the dormant index of its first request,
 /// and every tool result it read back.
 #[derive(Default)]
-struct Seen {
-    index: Vec<String>,
-    read: Vec<String>,
+pub(crate) struct Seen {
+    pub(crate) index: Vec<String>,
+    pub(crate) read: Vec<String>,
 }
 
 /// Makes one tool call, then records what it read back.
 #[derive(Clone)]
-struct Calling {
-    seen: Arc<Mutex<Seen>>,
-    tool: &'static str,
-    args: serde_json::Value,
+pub(crate) struct Calling {
+    pub(crate) seen: Arc<Mutex<Seen>>,
+    pub(crate) tool: &'static str,
+    pub(crate) args: serde_json::Value,
 }
 
 impl Model for Calling {
@@ -257,7 +255,7 @@ impl Model for Calling {
     }
 }
 
-struct Callers(Calling);
+pub(crate) struct Callers(pub(crate) Calling);
 
 impl accounting::ModelFactory for Callers {
     fn build(
