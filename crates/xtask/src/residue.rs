@@ -89,9 +89,10 @@ fn wrong_case(root: &Path, table: &Table) -> Result<Vec<Violation>, XtaskError> 
 }
 
 fn sibling_wrong_case(root: &Path, exact: &str) -> Result<Option<String>, XtaskError> {
-    let Ok(entries) = std::fs::read_dir(root) else {
-        return Ok(None);
-    };
+    let entries = std::fs::read_dir(root).map_err(|source| XtaskError::Io {
+        path: root.display().to_string(),
+        source,
+    })?;
     let want = exact.to_ascii_lowercase();
     for entry in entries {
         let entry = entry.map_err(|source| XtaskError::Io {
@@ -140,9 +141,7 @@ fn retired_residue(
         if walk::in_isolation_zone(&rel) || !is_active_config(&rel) {
             continue;
         }
-        let Ok(text) = std::fs::read_to_string(&file) else {
-            continue;
-        };
+        let text = walk::read_text(&file)?;
         let lines: Vec<&str> = text.lines().collect();
         for (number, line) in lines.iter().enumerate() {
             let marked = line.contains(MARK)
@@ -213,11 +212,11 @@ fn transition_row(rel: &str, line: &str, table: &Table, legacy: &LegacyPath) -> 
 
 fn line_names_legacy(line: &str, legacy: &str) -> bool {
     let needle = format!("{legacy}/");
-    let needle_win = format!("{legacy}\\");
-    release::path_tokens(line).into_iter().any(|token| {
+    let normalized = line.replace('\\', "/");
+    release::path_tokens(&normalized).into_iter().any(|token| {
         let trimmed = token.trim_end_matches(['.', '-']);
         let rest = trimmed.strip_prefix("./").unwrap_or(trimmed);
-        rest.starts_with(&needle) || rest.starts_with(&needle_win)
+        rest.starts_with(&needle)
     })
 }
 
@@ -347,6 +346,7 @@ status = "live"
     fn a_wrong_case_sibling_of_a_current_root_is_refused() {
         let root = scratch("case");
         fixture::write(&root, modmap::MAP, &minimal_table(false));
+        std::fs::remove_dir(root.join("Calyx")).unwrap();
         std::fs::create_dir_all(root.join("calyx")).unwrap();
         let violations = check(&root).unwrap();
         std::fs::remove_dir_all(&root).unwrap();
@@ -361,7 +361,28 @@ status = "live"
         assert!(line_names_legacy("members = [\"crates/kernel\"]", "crates"));
         assert!(!line_names_legacy("the crates themselves", "crates"));
         assert!(line_names_legacy("path = \"./crates/xtask\"", "crates"));
+        assert!(line_names_legacy(
+            "cargo --manifest-path crates\\kernel\\Cargo.toml",
+            "crates"
+        ));
         assert!(!line_names_legacy("members = [\"crates\"]", "crates"));
         assert!(!line_names_legacy("matrix.environment == 'client'", "client"));
+    }
+
+    #[test]
+    fn a_windows_path_in_active_config_is_refused_when_retired() {
+        let root = scratch("backslash");
+        fixture::write(&root, modmap::MAP, &minimal_table(true));
+        fixture::write(
+            &root,
+            "build.ps1",
+            "cargo --manifest-path crates\\kernel\\Cargo.toml\n",
+        );
+        let violations = check(&root).unwrap();
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(
+            violations.iter().any(|v| v.violation.contains("crates")),
+            "{violations:?}"
+        );
     }
 }

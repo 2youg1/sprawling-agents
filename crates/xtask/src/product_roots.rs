@@ -141,25 +141,9 @@ fn validate(table: &Table) -> Result<(), XtaskError> {
         });
     }
     for root in &table.roots {
-        if root.path.is_empty() || root.path.contains('/') || root.path.contains('\\') {
-            return Err(XtaskError::Doc {
-                file: file.to_owned(),
-                msg: format!(
-                    "product root `{}` has path `{}`; a root is one path segment with exact case",
-                    root.name, root.path
-                ),
-            });
-        }
-        if let Some(transition) = &root.transition
-            && (transition.is_empty() || transition.contains('/') || transition.contains('\\'))
-        {
-            return Err(XtaskError::Doc {
-                file: file.to_owned(),
-                msg: format!(
-                    "product root `{}` has transition `{transition}`; it is one path segment",
-                    root.name
-                ),
-            });
+        refuse_one_segment(file, "product root path", &root.path)?;
+        if let Some(transition) = &root.transition {
+            refuse_one_segment(file, "product root transition", transition)?;
         }
     }
     let legacy_paths: BTreeSet<&str> = table.legacy.iter().map(|row| row.path.as_str()).collect();
@@ -170,17 +154,21 @@ fn validate(table: &Table) -> Result<(), XtaskError> {
         });
     }
     for row in &table.legacy {
-        if row.path.is_empty() || row.path.contains('/') || row.path.contains('\\') {
-            return Err(XtaskError::Doc {
-                file: file.to_owned(),
-                msg: format!(
-                    "legacy path `{}` must be one path segment",
-                    row.path
-                ),
-            });
-        }
+        refuse_one_segment(file, "legacy path", &row.path)?;
     }
     Ok(())
+}
+
+fn refuse_one_segment(file: &str, kind: &str, value: &str) -> Result<(), XtaskError> {
+    use std::path::{Component, Path};
+    let mut parts = Path::new(value).components();
+    match (parts.next(), parts.next()) {
+        (Some(Component::Normal(name)), None) if name.to_str() == Some(value) => Ok(()),
+        _ => Err(XtaskError::Doc {
+            file: file.to_owned(),
+            msg: format!("{kind} `{value}` must be exactly one ordinary path segment"),
+        }),
+    }
 }
 
 #[cfg(test)]
@@ -280,5 +268,19 @@ status = "live"
                 .as_deref(),
             Some("Tools/xtask")
         );
+    }
+
+    #[test]
+    fn dot_and_dotdot_are_refused_as_root_segments() {
+        for bad in [".", ".."] {
+            let body = MINIMAL.replace(
+                "path = \"Calyx\"\nlayout = \"current\"",
+                &format!("path = \"{bad}\"\nlayout = \"current\""),
+            );
+            let root = write_table(&body);
+            let err = load(&root).unwrap_err().to_string();
+            std::fs::remove_dir_all(&root).unwrap();
+            assert!(err.contains(bad), "{err}");
+        }
     }
 }
