@@ -217,10 +217,11 @@ pub const Process = struct {
     }
 
     fn closeJob(self: *Process) void {
-        if (comptime builtin.os.tag != .windows) return;
-        if (self.job) |job| {
-            _ = windows.kernel32.CloseHandle(job);
-            self.job = null;
+        if (comptime builtin.os.tag == .windows) {
+            if (self.job) |job| {
+                _ = WinJob.CloseHandle(job);
+                self.job = null;
+            }
         }
     }
 
@@ -283,34 +284,36 @@ const WinJob = if (builtin.os.tag == .windows) struct {
     extern "kernel32" fn CreateJobObjectW(
         lpJobAttributes: ?*anyopaque,
         lpName: ?[*:0]const u16,
-    ) callconv(windows.WINAPI) ?windows.HANDLE;
+    ) callconv(.winapi) ?windows.HANDLE;
 
     extern "kernel32" fn SetInformationJobObject(
         hJob: windows.HANDLE,
         JobObjectInformationClass: u32,
         lpJobObjectInformation: *anyopaque,
         cbJobObjectInformationLength: windows.DWORD,
-    ) callconv(windows.WINAPI) windows.BOOL;
+    ) callconv(.winapi) windows.BOOL;
 
     extern "kernel32" fn AssignProcessToJobObject(
         hJob: windows.HANDLE,
         hProcess: windows.HANDLE,
-    ) callconv(windows.WINAPI) windows.BOOL;
+    ) callconv(.winapi) windows.BOOL;
+
+    extern "kernel32" fn CloseHandle(hObject: windows.HANDLE) callconv(.winapi) windows.BOOL;
 
     fn create(process: ?windows.HANDLE) !windows.HANDLE {
         const proc = process orelse return error.NoProcess;
         const job = CreateJobObjectW(null, null) orelse return error.CreateJob;
-        errdefer _ = windows.kernel32.CloseHandle(job);
+        errdefer _ = CloseHandle(job);
 
         var info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION{};
         info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-        if (SetInformationJobObject(
+        if (!SetInformationJobObject(
             job,
             JobObjectExtendedLimitInformation,
             &info,
             @sizeOf(JOBOBJECT_EXTENDED_LIMIT_INFORMATION),
-        ) == 0) return error.SetJobInfo;
-        if (AssignProcessToJobObject(job, proc) == 0) return error.AssignJob;
+        ).toBool()) return error.SetJobInfo;
+        if (!AssignProcessToJobObject(job, proc).toBool()) return error.AssignJob;
         return job;
     }
 } else struct {

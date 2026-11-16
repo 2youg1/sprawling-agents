@@ -305,19 +305,26 @@ const Ui = struct {
     ) !Ui {
         const model = environ.get("HARNESS_MODEL") orelse "HARNESS_MODEL is not set";
         var cwd_buf: [std.fs.max_path_bytes]u8 = undefined;
-        const cwd_len = std.process.currentPath(io, &cwd_buf) catch 1;
-        const session_dir = try gpa.dupe(u8, if (cwd_len > 0) cwd_buf[0..cwd_len] else ".");
+        const session_cwd: []const u8 = blk: {
+            const cwd_len = std.process.currentPath(io, &cwd_buf) catch break :blk ".";
+            if (cwd_len == 0) break :blk ".";
+            break :blk cwd_buf[0..cwd_len];
+        };
+        const session_dir = try gpa.dupe(u8, session_cwd);
 
         const mei_bin = environ.get("MEI_BIN");
         var sibling_owned: ?[]u8 = null;
         defer if (sibling_owned) |p| gpa.free(p);
         const sibling_exists = blk: {
-            if (builtin.os.tag != .linux) break :blk false;
             var exe_buf: [std.fs.max_path_bytes]u8 = undefined;
-            const n = std.Io.Dir.readLinkAbsolute(io, "/proc/self/exe", &exe_buf) catch break :blk false;
+            const n = std.process.executablePath(io, &exe_buf) catch break :blk false;
             const dir = std.fs.path.dirname(exe_buf[0..n]) orelse break :blk false;
             var sib_buf: [std.fs.max_path_bytes]u8 = undefined;
-            const sib = std.fmt.bufPrint(&sib_buf, "{s}/{s}", .{ dir, mei_path.siblingName() }) catch break :blk false;
+            const sib = std.fmt.bufPrint(&sib_buf, "{s}{c}{s}", .{
+                dir,
+                std.fs.path.sep,
+                mei_path.siblingName(),
+            }) catch break :blk false;
             sibling_owned = try gpa.dupe(u8, sib);
             std.Io.Dir.cwd().access(io, sibling_owned.?, .{}) catch {
                 gpa.free(sibling_owned.?);

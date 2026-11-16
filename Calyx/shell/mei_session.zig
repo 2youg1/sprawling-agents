@@ -61,7 +61,10 @@ pub const Session = struct {
 
         const file = std.Io.Dir.cwd().createFile(io, path, .{
             .exclusive = true,
-            .permissions = .fromMode(0o600),
+            .permissions = if (comptime @hasDecl(std.Io.File.Permissions, "fromMode"))
+                .fromMode(0o600)
+            else
+                .default_file,
         }) catch |err| {
             const diag = formatFailure(gpa, "create a new Mei session", @errorName(err), path) catch dupeOrStatic(gpa, "create a new Mei session");
             gpa.free(path);

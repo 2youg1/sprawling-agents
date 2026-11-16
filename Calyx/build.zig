@@ -49,6 +49,8 @@ pub fn build(b: *std.Build) void {
         .linkage = .static,
         .root_module = shell_mod,
     });
+    // Rust links this archive; without compiler_rt, large Zig frames miss __zig_probe_stack.
+    shell.bundle_compiler_rt = true;
     b.getInstallStep().dependOn(&b.addInstallArtifact(shell, .{}).step);
 
     const calyx_mod = b.createModule(.{

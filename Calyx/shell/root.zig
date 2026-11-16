@@ -80,6 +80,11 @@ export fn calyx_shell_mei_sibling_name(into: [*]u8, capacity: usize, written: *u
     return @intFromEnum(MeiStatus.ok);
 }
 
+// Keep city UI exports in the installed shell archive (not test-only).
+comptime {
+    _ = @import("city_ui.zig");
+}
+
 test {
     _ = argv;
     _ = mei_path;
