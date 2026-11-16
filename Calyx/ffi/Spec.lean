@@ -261,3 +261,21 @@ impl Scene { pub fn inline(&Inline) -> Scene; pub fn quiet(&Quiet) -> Scene; }
 
 重开参数：docs.rs 开始要求最终链接原生库，或文档需要展示叶子的符号。
 -/
+
+/-! D11 Calyx 的 Zig 由 `Calyx/build.zig` 构建；本包暂时宿主壳启动缝
+
+决定：`Calyx/ffi/build.rs` 不再直接 `zig build-lib` 单文件，而是在 `Calyx/` 下调用
+`zig build`（`Calyx/build.zig`），在 `ReleaseSafe` 下安装帧叶静态库
+`sprawling_console_leaf` 与壳启动缝静态库 `sprawling_calyx_shell`；本包链接二者，
+并对壳导出提供安全 Rust 面（`console_ffi::shell`）。壳源码在 `Calyx/shell`，合同在
+`Calyx/Spec.lean` D7。docs.rs 跳过（D10）同时跳过叶与壳。
+
+理由：根 `build.zig` 是 Calyx 下 Zig 的单一构建权威；叶与壳同属 Calyx 的 Zig 面，一次
+构建图避免两套三元组/PIC/钉检查分叉。壳的 `unsafe` 仍须落在本包，因工作区只有
+`LEAVES` 内的包可将 `unsafe_code` 降为 `deny`。
+
+被否：①为壳另开第三个 FFI crate——在启动缝垂直尚未证明前扩大 lint 例外面；
+②继续 `zig build-lib` 只编叶——无法成为后续 FZ 增量的构建权威。
+
+重开参数：Zig 进程入口完全取代 Rust `calyx` 二进制，或壳拆出独立 FFI 包之时。
+-/

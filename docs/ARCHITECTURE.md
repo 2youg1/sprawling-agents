@@ -158,6 +158,15 @@ scene and writes a borrowed buffer, and its cost is that building the
 workspace on every platform needs the pinned Zig
 (`Calyx/ffi/Spec.lean` D1).
 
+Calyx's shell is Zig by a ruling of the person (`Calyx/Spec.lean` D7):
+input, lifecycle, editor, menu, screen orchestration, Mei and city
+faces, and process bootstrap live under `Calyx/shell` and
+`Calyx/build.zig`. Rust keeps only the narrow city/wire/kernel host that
+feeds events and runs shell-requested city actions; `unsafe` stays inside
+the leaf packages. Calyx Zig at a C ABI uses caller-owned buffers and
+explicit lengths; allocating helpers take an `Allocator`. A residue rule
+refuses shell implementation regressing into `Calyx/src`.
+
 ## 3 The units and the dependency law
 
 Crates are not a reuse mechanism here. They exist so that **the dependency
