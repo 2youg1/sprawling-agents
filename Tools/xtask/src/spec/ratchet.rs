@@ -169,11 +169,17 @@ fn numbered<'t>(
 
 /// A `.lean` under a `spec/` directory, the checker's own code aside.
 fn is_part(rel: &str) -> bool {
-    let checker = format!("{}/", super::CHECKER);
-    let checker_parts = format!("{checker}{}/", lean::PARTS);
     let mut dirs = rel.split('/').rev().skip(1);
-    dirs.any(|dir| dir == lean::PARTS)
-        && (!rel.starts_with(&checker) || rel.starts_with(&checker_parts))
+    let under_parts = dirs.any(|dir| dir == lean::PARTS);
+    if !under_parts {
+        return false;
+    }
+    match super::under_checker(rel) {
+        None => true,
+        Some(inside) => inside
+            .strip_prefix(lean::PARTS)
+            .is_some_and(|rest| rest.starts_with('/')),
+    }
 }
 
 /// Whether `part` is the file a stateful anchor names, or below the

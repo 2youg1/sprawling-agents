@@ -58,7 +58,9 @@ fn a_roster_and_a_table_are_read_one_row_per_line() {
 fn imports_and_module_names_map_onto_files() {
     assert_eq!(
         (
-            imports("import Lean.Data.Json\n-- import Sprawling\nimport Sprawling.kernel.Spec Std\n"),
+            imports(
+                "import Lean.Data.Json\n-- import Sprawling\nimport Sprawling.kernel.Spec Std\n"
+            ),
             module_file("Sprawling.storage.spec.Jsonl.Barrier"),
         ),
         (

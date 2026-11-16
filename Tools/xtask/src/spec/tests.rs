@@ -227,11 +227,11 @@ fn a_part_is_text_closed_quantified_or_checked() {
     assert_eq!(
         classes,
         vec![
+            ("Tools/adversary/spec/Y.lean".to_owned(), Class::TextOnly),
             ("a/spec/C.lean".to_owned(), Class::ClosedOnly),
             ("a/spec/D.lean".to_owned(), Class::QuantifiedChecked),
             ("a/spec/Q.lean".to_owned(), Class::QuantifiedUnchecked),
             ("a/spec/T.lean".to_owned(), Class::TextOnly),
-            ("Tools/adversary/spec/Y.lean".to_owned(), Class::TextOnly),
         ]
     );
 }
@@ -280,14 +280,14 @@ fn the_two_counts_are_held_to_their_pins() {
     assert_eq!(
         judged(&root),
         Ok(vec![
+            "Tools/xtask/budgets.toml: [rust_paths_unresolved]: [rust_paths_unresolved] counts \
+             3, below its pin of 5"
+                .to_owned(),
             "crates/j/spec/Machine.lean: [spec_parts_without_theorem] counts 2 against a pin of \
              1; this is one of them"
                 .to_owned(),
             "crates/j/spec/Machine/Step.lean: [spec_parts_without_theorem] counts 2 against a \
              pin of 1; this is one of them"
-                .to_owned(),
-            "Tools/xtask/budgets.toml: [rust_paths_unresolved]: [rust_paths_unresolved] counts \
-             3, below its pin of 5"
                 .to_owned(),
         ])
     );

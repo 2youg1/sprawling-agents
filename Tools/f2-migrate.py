@@ -192,6 +192,10 @@ def should_skip(path: Path) -> bool:
     parts = set(path.parts)
     if parts & SKIP_DIR_NAMES:
         return True
+    # Previous-release city fixtures stay byte-for-byte; rewriting them
+    # breaks CAS digests the open path verifies.
+    if "cities" in parts and "tests" in parts:
+        return True
     if path.is_symlink():
         return True
     if not path.is_file():

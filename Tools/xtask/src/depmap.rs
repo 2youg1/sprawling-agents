@@ -128,7 +128,14 @@ fn seams_in(declared: &[&str]) -> BTreeSet<String> {
 
 /// A seam cell is a repository-relative Rust path under a product root.
 fn seam_path(path: &str) -> bool {
-    const ROOTS: [&str; 6] = ["Sprawling/", "Tools/", "Calyx/", "Mei/", "client/", "RefRain/"];
+    const ROOTS: [&str; 6] = [
+        "Sprawling/",
+        "Tools/",
+        "Calyx/",
+        "Mei/",
+        "client/",
+        "RefRain/",
+    ];
     ROOTS.iter().any(|root| path.starts_with(root))
 }
 

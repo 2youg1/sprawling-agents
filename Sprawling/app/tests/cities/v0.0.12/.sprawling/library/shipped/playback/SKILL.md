@@ -77,7 +77,7 @@ The bundle is `sprawling.playback/3`, one JSON object with these sections in thi
 
 <reference-page>
 
-`template.html` is generated from `src/skeleton.html` and its inline fragments by `bun Sprawling/city/skills/playback/assemble.js`; `--check` compares the assembled bytes with the shipped file. Edit the source fragments and regenerate when maintaining the reference page; use the assembled `template.html` when exporting or customising a page. `src/rendering.js` owns timeline rendering and is the place for future Three.js or WebGPU code, which must also be assembled inline to keep the page offline. The fragments share one script scope in the order the skeleton declares.
+`template.html` is generated from `src/skeleton.html` and its inline fragments by `bun crates/city/skills/playback/assemble.js`; `--check` compares the assembled bytes with the shipped file. Edit the source fragments and regenerate when maintaining the reference page; use the assembled `template.html` when exporting or customising a page. `src/rendering.js` owns timeline rendering and is the place for future Three.js or WebGPU code, which must also be assembled inline to keep the page offline. The fragments share one script scope in the order the skeleton declares.
 
 `template.html` is a page that the structure and offline checks pass with any bundle this build writes; read it before you write your own, and change whatever the User's preferences or your design skills ask for. What it does, so you know what you would be replacing:
 

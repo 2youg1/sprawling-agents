@@ -27,16 +27,11 @@ fn one_machine_stays_behind_and_everything_that_explains_the_code_goes_out() {
     ] {
         assert!(!is_scaffolding(out), "{out} is published");
     }
-    // `localise.rs` is not the isolation zone, and a prefix rule
-    // written without care would say it is.
     assert!(!is_scaffolding("Sprawling/city/src/building.rs"));
 }
 
 #[test]
 fn anything_the_rule_does_not_name_is_published() {
-    // The failure direction is deliberate. An unclassified file
-    // shows up in the artefact, where somebody sees it; the other
-    // way round it disappears, where nobody does.
     assert!(!is_scaffolding("docs/some-new-page.md"));
     assert!(!is_scaffolding("Sprawling/kernel/src/brand_new.rs"));
 }
@@ -70,9 +65,6 @@ fn a_link_that_differs_only_in_case_is_caught_here_and_nowhere_else() {
     .collect();
     let spellings = Spellings::of(&published);
 
-    // The case that happened: eight documents linked to
-    // `docs/glossary.md` while the tree carried `docs/GLOSSARY.md`,
-    // and every assertion in this gate was green on Windows.
     assert_eq!(
         spellings.miscased("docs/Glossary.md"),
         Some("docs/glossary.md")
@@ -81,18 +73,13 @@ fn a_link_that_differs_only_in_case_is_caught_here_and_nowhere_else() {
         spellings.miscased("DOCS/GETTING-STARTED.MD"),
         Some("docs/getting-started.md")
     );
-    // A name that is already mixed case is judged the same way round.
     assert_eq!(
         spellings.miscased("Sprawling/kernel/kernel-spec.md"),
         Some("Sprawling/kernel/kernel-SPEC.md")
     );
 
-    // Right as written.
     assert_eq!(spellings.miscased("docs/glossary.md"), None);
     assert_eq!(spellings.miscased("AGENTS.md"), None);
-    // Not a published file at all. Whether that is a directory, a
-    // scaffolding path or a dead link is another assertion's question,
-    // and answering it here would report the weaker sentence first.
     assert_eq!(spellings.miscased("docs"), None);
     assert_eq!(spellings.miscased("local/Handoff.md"), None);
     assert_eq!(spellings.miscased("docs/never-written.md"), None);
@@ -100,16 +87,10 @@ fn a_link_that_differs_only_in_case_is_caught_here_and_nowhere_else() {
 
 #[test]
 fn a_path_from_one_machine_is_caught_and_a_url_is_not() {
-    // The false positive this shape invites is every URL in the
-    // repository: `https://` ends in a letter, a colon and a slash.
     assert!(machine_path("see https://example.invalid/a/b").is_none());
     assert!(machine_path("run it in /tmp/city or /etc/hosts").is_none());
     assert!(machine_path("~/cities/first is fine").is_none());
     assert!(machine_path("nothing here").is_none());
-    // A test that proves an absolute path is refused has to write
-    // one, and `C:/windows` names a kind of machine rather than a
-    // person. Flagging those would make the gate wrong about the
-    // three files that assert the refusal.
     assert!(machine_path(r"C:\repo\crates").is_none());
     assert!(machine_path("C:/windows/system32").is_none());
 
@@ -118,58 +99,49 @@ fn a_path_from_one_machine_is_caught_and_a_url_is_not() {
     assert!(machine_path("/home/someone/cities/first").is_some());
     assert!(machine_path("/Users/someone/cities").is_some());
     assert!(machine_path("stored under /root/city").is_some());
-    // The report carries enough to find it and not the whole line.
     let found = machine_path(r"the log said C:\Users\someone\a\b\c\d\e").unwrap();
     assert!(found.chars().count() <= 20);
     assert!(!found.contains("the log said"));
-    // A line of Chinese prose puts the byte offset well past the
-    // character count; the report must still carry the path.
     let chinese = machine_path(r"日志里写的是 C:\Users\someone\city").unwrap();
     assert!(chinese.starts_with(":\\users\\"), "{chinese}");
 }
 
 #[test]
 fn a_document_anchored_outside_the_repository_is_caught_and_shorthand_is_not() {
-    let dirs: BTreeSet<String> = ["crates", "docs", "src", "tools", "xtask", "local", "target"]
-        .into_iter()
-        .map(str::to_owned)
-        .collect();
+    let dirs: BTreeSet<String> = [
+        "Sprawling",
+        "Tools",
+        "docs",
+        "src",
+        "client",
+        "local",
+        "target",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect();
 
-    // The case that happened. Six files cited this; no other
-    // assertion in this gate said anything about it.
     assert_eq!(
         outside_the_tree("see `WORKSPACE/FRONTEND-METHOD.md` section 4", &dirs).as_deref(),
         Some("WORKSPACE/FRONTEND-METHOD.md")
     );
     assert!(outside_the_tree("WORKSPACE/sprawling-ui/UX-DECISIONS.md", &dirs).is_some());
 
-    // Crate-relative shorthand is how every SPEC here is written.
-    // Flagging it would send eleven people to rewrite prose that was
-    // never wrong.
-    assert!(outside_the_tree("// tools/exec.rs", &dirs).is_none());
+    assert!(outside_the_tree("// Tools/xtask/src/lex.rs", &dirs).is_none());
     assert!(outside_the_tree("`read src/lex.rs` differs by", &dirs).is_none());
     assert!(outside_the_tree("Sprawling/city/src/building.rs", &dirs).is_none());
     assert!(outside_the_tree("see local/Handoff.md", &dirs).is_none());
 
-    // A URL is somebody else's tree. The colon ends the token, so
-    // what reaches the test has an empty first segment.
     assert!(outside_the_tree("https://example.invalid/a/b.md", &dirs).is_none());
-    // A relative walk upwards is the link assertion's business, and
-    // a path inside a city is not a path inside this repository.
     assert!(outside_the_tree("[a](../../docs/frontend-method.md)", &dirs).is_none());
     assert!(outside_the_tree("edit `.sprawling/RULES.toml`", &dirs).is_none());
-    // The build directory is not published and still exists.
     assert!(outside_the_tree("written to target/screens/tokens.css", &dirs).is_none());
-    // A word with no extension is not a citation.
     assert!(outside_the_tree("and/or, either/or", &dirs).is_none());
-    // Trailing punctuation must not hide the extension.
     assert!(outside_the_tree("open WORKSPACE/notes.md.", &dirs).is_some());
 }
 
 #[test]
 fn only_prose_is_read_for_citations() {
-    // A city address in a fixture is not a path in this repository,
-    // and there are seventy-nine of them.
     assert!(!is_prose(
         "Sprawling/city/src/building.rs",
         "    assert!(a(\"lab/x.md\"));"
@@ -191,11 +163,10 @@ fn directory_names_carry_no_depth() {
         "Sprawling/runtime/src/tools/exec.rs".to_owned(),
         "README.md".to_owned(),
     ]);
-    for present in ["crates", "runtime", "src", "tools", "local"] {
+    for present in ["Sprawling", "runtime", "src", "tools", "local"] {
         assert!(names.contains(present), "{present} is a directory here");
     }
     assert!(!names.contains("WORKSPACE"));
-    // The file itself is not a directory.
     assert!(!names.contains("exec.rs"));
     assert!(!names.contains("README.md"));
 }
@@ -206,8 +177,6 @@ fn a_bracket_that_is_not_a_link_is_not_a_target() {
     assert!(link_targets("nothing here at all").is_empty());
 }
 
-/// A Lean specification is prose throughout, and a `.lean` it names is a
-/// document it tells a reader to open.
 #[test]
 fn a_lean_specification_is_prose_and_cites_lean() {
     let dirs: BTreeSet<String> = ["crates".to_owned()].into_iter().collect();
