@@ -6,11 +6,6 @@
 -->
 
 <script lang="ts">
-  // How one printed path is drawn, and nothing else: one line in the
-  // mono face cut off with an ellipsis at the end, a button when it
-  // opens inside the page, and the reveal key beside it. What is shown
-  // and what each press does arrive decided (`./path.ts`), so another
-  // look draws the same path by taking the same `PathLook`.
   import IconButton from "./icon_button.svelte";
   import type { PathLook } from "./path";
 

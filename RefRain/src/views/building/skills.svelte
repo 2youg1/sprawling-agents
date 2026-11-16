@@ -6,21 +6,12 @@
 -->
 
 <script lang="ts" module>
-  // What this building can do: the city's library and the building's
-  // own shelf, in one list with the shelf named on each row. A row says
-  // whether the reading room admits it, how many runs were frozen with
-  // it, and whether the building's newest run was frozen with another
-  // version of it. City and building shelves are CAS indexes, and an
-  // external shelf is outside the city: none is a document address to
-  // hand `Query::Document`, so the row names its source without a file link.
   import type { Lang } from "../../core/lang";
   import { fill, say } from "../../core/lang";
   import type { Address, SkillLine, SkillShelf } from "../../wire";
 
   interface Place {
-    // Already in the person's language.
     readonly word: string;
-    // Absent for every CAS-indexed shelf, which is not a document address.
     readonly at: Address | null;
   }
 
@@ -36,8 +27,6 @@
     };
   }
 
-  // A row's identity: the same name may sit on two shelves, so the name
-  // alone is not the row.
   function skillId(skill: SkillLine): string {
     const shelf = skill.shelf;
     if (shelf === "library") return `library·${skill.name}`;
@@ -57,16 +46,11 @@
   interface Props {
     readonly building: Address;
     readonly onPick: (picked: Picked) => void;
-    // The building's newest run whose prompt was frozen, if any: an
-    // admitted skill that run did not pin at today's version is marked.
     readonly newest?: RunId | undefined;
   }
 
   const { building, onPick, newest }: Props = $props();
 
-  // Whether the next run reads another version of this skill than the
-  // newest run was frozen with: admitted, and not pinned by that run at
-  // the hash the shelf holds now.
   function changed(skill: SkillLine): string | undefined {
     if (newest === undefined || !skill.admitted || skill.pinned_by.includes(newest))
       return undefined;
@@ -81,9 +65,6 @@
   const read = $derived(readAnswer($asked, (held) => ("skills" in held ? held.skills : undefined)));
   const answer = $derived(read.kind === "held" ? read.value : undefined);
 
-  // A row this city cannot open is not a button's promise. An external
-  // shelf is read-only and lives outside every address this client can
-  // ask about, so the row states where it came from and stops there.
   function open(at: Address | null): void {
     if (at !== null) {
       onPick({ at, kind: "file" });
@@ -127,10 +108,6 @@
         {/each}
       </ul>
     {:else}
-      <!-- An empty shelf says what to do next: where a skill goes and
-           how a building's runs come to read it. The audit and usage
-           panels a skill will carry are not drawn until the city
-           answers for them, so no empty frame passes for data. -->
       <p class="text-text-faint">{say($lang, "skills_empty_next")}</p>
     {/if}
     {#if answer.missing.length > 0}

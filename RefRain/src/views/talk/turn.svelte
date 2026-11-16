@@ -3,15 +3,6 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- One round of the model, in the order the template sets a message:
-the head, what it reasoned (folded), what it said, and the calls it made
-under that (refrain §3-2). Words that arrived from a person stand before
-the round they arrived in; a refusal or a wait on the person after it.
-
-**The block names its phase for the read-wear bar** (`data-wear`): a
-round that waited on the person, one that worked through tools, or one
-that only spoke. `wear.svelte` reads the attribute off the page, so the
-bar and the thread cannot disagree about where a round is. -->
 <script lang="ts">
   import { fill, say } from "../../core/lang";
   import { count } from "../../core/time";
@@ -37,27 +28,21 @@ bar and the thread cannot disagree about where a round is. -->
     readonly turn: Turn;
     readonly run: RunId;
     readonly who: string;
-    // The model this round's head states, or `null` when an earlier head
-    // on this screen already said it.
+
     readonly model: string | null;
     readonly live: Live;
-    // The run's posture, handed only to the round the run is in now.
+
     readonly doing: Doing | undefined;
-    // Whether a round that said nothing draws its own warning; a run
-    // that said nothing at all draws one card for all of them instead.
+
     readonly showEmpty: boolean;
-    // What this city lets a reply be at most, when it says.
     readonly ceiling: number | null;
-    // Whether the calls and the reasoning are drawn at all (`results`
-    // draws neither).
+
     readonly whole: boolean;
     readonly onFork?: ((plan: ForkPlan) => void) | undefined;
     readonly onHover: (entry: ForkEntry | null) => void;
   }
-
   const { turn, run, who, model, live, doing, showEmpty, ceiling, whole, onFork, onHover }: Props =
     $props();
-
   const { lang } = ui();
 
   const said = $derived(turn.said ?? "");
@@ -75,10 +60,7 @@ bar and the thread cannot disagree about where a round is. -->
   {#each turn.notes.filter((note) => "arrived" in note) as note (noteAt(note))}
     <NoteLine {note} {turn} {run} {onFork} {onHover} />
   {/each}
-  <!-- The reply is one entry to branch from: its head, its reasoning and
-  its words reveal the fork button at the end of the head's line. The
-  person's words above and the calls below are entries of their own, so
-  they stay outside this group. -->
+
   {#if said !== "" || model !== null || (turn.thought && whole)}
     <div class="group flex flex-col gap-snug">
       {#if said !== "" || model !== null}

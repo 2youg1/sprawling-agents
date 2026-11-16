@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
@@ -23,7 +21,7 @@
 <Case label="tip · inside a box that scrolls, which clips or is escaped">
   <div class="h-output overflow-auto rounded-card border border-edge-panel p-base">
     <Button label={say($lang, "part_save")} tone="primary" why={say($lang, "part_why_halted")} />
-    
+
     <div class="h-output" aria-hidden="true"></div>
   </div>
 </Case>

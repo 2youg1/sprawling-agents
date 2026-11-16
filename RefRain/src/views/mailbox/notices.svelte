@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { SvelteMap } from "svelte/reactivity";
 
   import type { Notice as NoticeRecord } from "../../core/belief";
@@ -31,7 +29,6 @@
     $belief.notices.filter((notice) => urgencyOf(notice.error) === "ordinary" && shown(notice)),
   );
 
-  
   const days = $derived.by(() => {
     const now = u.now();
     const groups = new SvelteMap<string, NoticeRecord[]>();
@@ -48,7 +45,6 @@
     }));
   });
 
-  
   function dayOf(tongue: Lang, at: number, now: number): string {
     const day = new Date(at).toDateString();
     if (day === new Date(now).toDateString()) return say(tongue, "notices_today");

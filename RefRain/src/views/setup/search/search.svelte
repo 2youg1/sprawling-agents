@@ -6,15 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // The seat of the web search card: it asks the city what `[search]`
-  // says at the hall, holds the card's state, lends the wiring
-  // (`./search_editor`, `./search`) the socket and the language, and
-  // draws whatever `./search.look.svelte` is. What a press does is
-  // decided in the wiring and nowhere here (client D94).
-  //
-  // A caller may hand the card an answer in place of the city's - the
-  // gallery does - and an injected answer wins over the question.
-
   import type { SettledSearch } from "../../../wire";
 
   export interface SearchCardProps {

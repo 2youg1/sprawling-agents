@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
 </script>
 
 <script lang="ts">
@@ -33,7 +31,6 @@
     fetched.start(object);
   });
 
-  
   let source = $state<string | null>(null);
   $effect(() => {
     const value = fetched.value;
@@ -61,7 +58,7 @@
       media: picture.media_type,
     })}
   </p>
-  
+
   <div class="flex min-h-0 flex-1 items-center justify-center [container-type:size]">
     {#if source !== null}
       <img

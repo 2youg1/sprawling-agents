@@ -6,24 +6,12 @@
 -->
 
 <script lang="ts">
-  // How the code column is drawn, and nothing else (client D95): every
-  // file the run changed, one after another, each cut down to the
-  // stretches that moved (Zed's multibuffer). A line carries its number
-  // on the side it exists on: a removed line its old number, an added
-  // line its new one, so a person can find either in the file. The file
-  // header sticks to the top while its hunks scroll under it, which
-  // keeps the question "which file am I in" answered without looking up.
-  // Every word and every action's handler or address arrives in
-  // `CodeColumnLook` (`./code_column.ts`); a wire bag is spread
-  // unchanged on the element it is for.
   import Inked from "../parts/inked.svelte";
   import type { CodeColumnLook } from "./code_column";
   import type { Sign } from "./trace";
 
   const look: CodeColumnLook = $props();
 
-  // A hunk action is a quiet control: its fill arrives decelerating and
-  // leaves accelerating (docs/frontend-method.md §4-43).
   const ACTION =
     "inline-flex h-control-sm items-center rounded-control px-snug text-label text-text-quiet transition-colors ease-leave hover:bg-raised hover:text-text hover:ease-arrive";
 
@@ -83,8 +71,6 @@
     line-height: 1.65;
   }
 
-  /* Room for a five-digit line number and its sign, in the width of the
-  digits themselves. */
   .number {
     width: 4.5ch;
   }
@@ -93,8 +79,6 @@
     width: 2.5ch;
   }
 
-  /* A wrapped line hangs under its own first character, so the
-  continuation never reads as a new line. */
   .text {
     padding-inline-start: 2ch;
     text-indent: -2ch;

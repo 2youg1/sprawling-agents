@@ -3,9 +3,6 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- The sandbox of the room's building as a read-only fact in the shape
-of the settings row's chips. Nothing is drawn while no sandbox restricts
-a run there (`sandbox.ts`), so the row never says "none". -->
 <script lang="ts">
   import { readable } from "svelte/store";
   import { ui } from "../../ui";

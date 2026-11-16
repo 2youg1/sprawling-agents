@@ -3,23 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Reading the `mcpServers` block a person copied out of Claude Code,
-// Cursor or a project's `.mcp.json`.
-//
-// The block is other software's file format, so it is read with the
-// same door every wire frame is read with: a Schema that answers
-// `Result`, never a parse that throws. What comes back is drafts -
-// `encode` alone decides which of them this city can be told about, so
-// a fragment carrying an environment variable is refused with the same
-// sentence the command door shows.
-
 import { Result, Schema } from "effect";
 
 import type { Draft, Pair, Transport } from "./draft";
 
-// Every field is optional because every writer of this format leaves
-// some of them out, and a block that states nothing useful is better
-// read as a server with nothing in it than as unreadable text.
 const Entry = Schema.Struct({
   type: Schema.optional(Schema.String),
   transport: Schema.optional(Schema.String),
@@ -38,10 +25,6 @@ const readWrapped = Schema.decodeUnknownResult(
   Schema.fromJsonString(Schema.Struct({ mcpServers: Servers })),
 );
 const readBare = Schema.decodeUnknownResult(Schema.fromJsonString(Servers));
-// Whether the wrapper is there at all, asked before the block inside it
-// is judged. Without this question a settings file holding one bad
-// entry reads as a single server called `mcpServers`, because a block
-// of blocks is itself a block of servers that state nothing.
 const readKeys = Schema.decodeUnknownResult(
   Schema.fromJsonString(Schema.Record(Schema.String, Schema.Unknown)),
 );
@@ -49,8 +32,6 @@ const readKeys = Schema.decodeUnknownResult(
 export type Fragment =
   { readonly kind: "servers"; readonly drafts: readonly Draft[] } | { readonly kind: "unreadable" };
 
-// Both shapes people paste: the whole settings file with its
-// `mcpServers` key, and the block alone.
 export function readFragment(text: string): Fragment {
   const keys = readKeys(text);
   if (Result.isSuccess(keys) && Object.hasOwn(keys.success, "mcpServers")) {
@@ -76,9 +57,6 @@ function drafted(servers: Readonly<Record<string, Entry>>): readonly Draft[] {
   }));
 }
 
-// What the block says, and what its shape says when it says nothing.
-// `streamable-http` and `http-stream` are the same transport under two
-// spellings that both appear in the wild.
 function transportOf(entry: Entry): Transport {
   const stated = entry.type ?? entry.transport;
   if (stated === undefined) {

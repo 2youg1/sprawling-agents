@@ -4,16 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the palette and the file finder are drawn around what they
-  // hold, and nothing else: the key sheet's box (`parts/kbd.svelte`) - a
-  // section below the top edge, centred, a shadowed face with no border
-  // over a page dimmed behind it. It fades in through `@starting-style`
-  // on the arriving curve and out through `allow-discrete` on the
-  // leaving one, moves only opacity, and stands still when the person or
-  // the machine asks for less motion (docs/frontend-method.md §4-43).
-  //
-  // The padding sits on the inner box, which fills the element, so a
-  // click that lands on the element itself is a click on its backdrop.
   import type { Snippet } from "svelte";
 
   import type { ModalWire, Seat } from "./modal";

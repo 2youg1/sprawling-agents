@@ -10,10 +10,6 @@
 </script>
 
 <script lang="ts">
-  // The seat of the one labelled box: callers import this file, and it
-  // draws whatever `./field.look.svelte` is with the value `./field.ts`
-  // builds from the props and this seat's id. Which description is read
-  // out and when an edit may land are decided there and nowhere here.
   import { lookOf, type FieldProps } from "./field";
   import Look from "./field.look.svelte";
 

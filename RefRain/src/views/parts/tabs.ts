@@ -3,36 +3,29 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Snippet } from "svelte";
 import { createAttachmentKey } from "svelte/attachments";
 import type { Attachment } from "svelte/attachments";
 
-
 export interface Lens {
   readonly id: string;
-  
+
   readonly label: string;
 }
 
 export interface TabsProps {
-  
   readonly label: string;
   readonly lenses: readonly Lens[];
-  
+
   readonly current: string;
   readonly onPick: (id: string) => void;
-  
-  
+
   readonly panel: Snippet<[Lens]>;
-  
-  
+
   readonly mark?: Snippet<[Lens]>;
 }
 
-
 export type Pressed = Pick<KeyboardEvent, "key" | "preventDefault">;
-
 
 const HOLD = createAttachmentKey();
 
@@ -57,25 +50,22 @@ export interface PanelWire {
   readonly id: string;
   readonly "aria-labelledby": string;
   readonly hidden: boolean;
-  
-  
+
   readonly tabindex: 0 | undefined;
-  
-  
+
   readonly [watch: symbol]: Attachment<HTMLElement>;
 }
 
 export interface TabLook {
   readonly lens: Lens;
-  
+
   readonly current: boolean;
   readonly wire: TabWire;
 }
 
 export interface PanelLook {
   readonly lens: Lens;
-  
-  
+
   readonly shown: boolean;
   readonly wire: PanelWire;
 }
@@ -88,20 +78,15 @@ export interface TabsLook {
   readonly mark: Snippet<[Lens]> | undefined;
 }
 
-
 export interface Hands {
-  
   readonly focus: (id: string) => void;
-  
-  
+
   readonly keep: (id: string) => Attachment<HTMLElement>;
-  
+
   readonly watch: Attachment<HTMLElement>;
-  
-  
+
   readonly reachable: boolean;
 }
-
 
 export const REACHABLE = [
   "a[href]",
@@ -113,7 +98,6 @@ export const REACHABLE = [
   "[contenteditable]:not([contenteditable=false])",
   "[tabindex]:not([tabindex='-1'])",
 ].join(", ");
-
 
 export function landing(total: number, at: number, key: string): number | undefined {
   const last = total - 1;
@@ -147,7 +131,6 @@ export function lookOf(props: TabsProps, uid: string, hands: Hands): TabsLook {
     hands.focus(lens.id);
   };
 
-  
   const stop = lenses[at === -1 ? 0 : at]?.id;
 
   const tabOf = (lens: Lens): TabLook => {

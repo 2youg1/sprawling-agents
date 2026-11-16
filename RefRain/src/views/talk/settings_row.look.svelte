@@ -3,24 +3,10 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- How the settings row is drawn, and nothing else (client D95): the
-facts on the left, the model picker's token and the permissions entry
-on the right, and the panel each opens above the row. The facts' text
-hangs one padding outside the row's edges, so the words line up with
-the composer's line above them on a wide column; on one column the row
-keeps its padding. When the token and the permissions entry do not fit
-beside the facts (on one column, beside the three keys), they fold to
-a line of their own on the right rather than cutting the model's name
-to its first letters. The token is one control in three segments - model,
-provider, thinking level - each marked with the section a press on it
-opens; the open picker is its own seat, `picker.svelte`. Every word arrives translated and every role, key
-handler and `aria-*` value arrives in a wire bag spread on the element
-it is for. -->
 <script lang="ts">
   import Fact from "./fact.look.svelte";
   import Picker from "./picker.svelte";
   import type { SettingsRowLook } from "./settings_row";
-
   const look: SettingsRowLook = $props();
 </script>
 

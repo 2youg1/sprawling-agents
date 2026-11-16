@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { QUERIES } from "../core/asking";
   import { readAnswer } from "../core/answered";
   import { say } from "../core/lang";
@@ -29,12 +25,9 @@
   import Showing from "./shared/showing.svelte";
   import WorkspaceNav from "./shared/workspace.svelte";
 
-  
   const VIEWS = ["table", "drawing"] as const;
 
   interface Props {
-    
-    
     readonly rank?: "page" | "section" | undefined;
   }
 
@@ -52,7 +45,6 @@
   const read = $derived(readAnswer($answer, (held) => ("city" in held ? held.city : undefined)));
   const city = $derived(read.kind === "held" ? read.value : undefined);
 
-  
   const board = $derived({ runs: boardRuns($belief.runs), now: u.now() });
 
   const halted = $derived(cityIsShut($belief.halted));

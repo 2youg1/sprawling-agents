@@ -7,9 +7,6 @@ import { expect, test } from "bun:test";
 
 import { earlierDrawn } from "./earlier";
 
-// One accepted `/new` after a round: the current session is visibly
-// empty until its first run arrives, then the earlier stretch is one
-// folded entry in both readings. No history is deleted.
 test("an empty new session draws no earlier run, and its first run folds the earlier stretch", () => {
   expect([
     earlierDrawn(0, 1, false),

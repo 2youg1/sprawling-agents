@@ -3,14 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 export interface LocalDevice {
-  
   readonly id: string;
-  
+
   readonly key: CryptoKey;
 }
-
 
 export interface MadeKey {
   readonly key: CryptoKey;
@@ -21,7 +18,6 @@ const BASE = "sprawling-local";
 const STORE = "device";
 const ONLY = "this";
 
-
 export async function makeKey(): Promise<MadeKey | null> {
   const pair = await crypto.subtle
     .generateKey({ name: "Ed25519" }, false, ["sign"])
@@ -30,7 +26,6 @@ export async function makeKey(): Promise<MadeKey | null> {
   const raw = await crypto.subtle.exportKey("raw", pair.publicKey).catch(() => null);
   return raw === null ? null : { key: pair.privateKey, public: hex(new Uint8Array(raw)) };
 }
-
 
 export async function signed(
   device: LocalDevice,
@@ -42,11 +37,9 @@ export async function signed(
   return signature === null ? null : hex(new Uint8Array(signature));
 }
 
-
 export function challenged(origin: string, nonce: string): Uint8Array<ArrayBuffer> {
   return new TextEncoder().encode(`sprawling local session v1\n${nonce}\n${origin}`);
 }
-
 
 export function hex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -82,7 +75,6 @@ function done<T>(request: IDBRequest<T>): Promise<T | null> {
   });
 }
 
-
 export async function kept(): Promise<LocalDevice | null> {
   const base = await opened();
   if (base === null) return null;
@@ -90,7 +82,6 @@ export async function kept(): Promise<LocalDevice | null> {
   base.close();
   return isDevice(found) ? found : null;
 }
-
 
 export async function keep(device: LocalDevice): Promise<boolean> {
   const base = await opened();
@@ -102,7 +93,6 @@ export async function keep(device: LocalDevice): Promise<boolean> {
   return written !== null;
 }
 
-
 export async function forget(): Promise<boolean> {
   const base = await opened();
   if (base === null) return false;
@@ -110,7 +100,6 @@ export async function forget(): Promise<boolean> {
   base.close();
   return removed !== null;
 }
-
 
 function isDevice(value: unknown): value is LocalDevice {
   return (

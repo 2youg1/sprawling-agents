@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts">
-  // One printed path in each of its states: text the city can reveal, a
-  // path cut by the directory the reader is already in and opening in
-  // the page, and a path outside the city whose reveal key says why it
-  // cannot be used. The last is in a narrow frame, so the ellipsis shows.
   import Path from "../../parts/path.svelte";
   import Case from "../case.svelte";
 </script>

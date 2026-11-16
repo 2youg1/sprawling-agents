@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";
   import { say } from "../../core/lang";

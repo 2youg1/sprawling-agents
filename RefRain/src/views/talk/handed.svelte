@@ -6,12 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // The box's send receipt: for a moment after words were handed, a
-  // screen reader is told where they went, so a press is heard to land;
-  // nowhere to name, no receipt. Drawn by nothing a sighted reader sees,
-  // because the thread already shows the words arriving.
-
-  // How long the receipt holds its words.
   const RECEIPT_MS = 400;
 </script>
 
@@ -24,7 +18,6 @@
 
   interface Props {
     readonly room: Address | null;
-    // How many times words were handed; each new count is one receipt.
     readonly sent: number;
   }
 

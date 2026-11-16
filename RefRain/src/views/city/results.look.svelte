@@ -4,17 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the results city's runs are drawn, and nothing else
-  // (`./results.ts`, `ResultsLook`): a section per recency band under a
-  // ruled heading with its count, and in it one row per run - when it
-  // began, how it ended, its room, its task, and the end the judge
-  // chose. A run waiting for the person carries the alert edge on its
-  // left, so the rows that need an answer are found by their edge.
-  //
-  // A row is a row of the page, so the pointer lays the page's wash over
-  // it rather than raising a surface (docs/frontend-method.md §7A-4);
-  // the wash arrives on the theme's arrive curve and leaves on leave
-  // (§4-43).
   import Glyph from "../parts/glyph.svelte";
   import { OUTCOME_GLYPH, OUTCOME_INK } from "../shared/outcome";
   import Produced from "./produced.svelte";
@@ -45,9 +34,6 @@
               class="flex items-baseline gap-base px-tight py-snug text-note transition-colors ease-leave hover:wash hover:ease-arrive"
             >
               <span class="w-figure shrink-0 font-mono text-text-faint">{row.at}</span>
-              <!-- The mark's slot stands even where a run has no outcome
-            yet, so the room and task columns start at one edge down the
-            list. -->
               <span
                 class={[
                   "inline-flex size-glyph-sm shrink-0 self-center",

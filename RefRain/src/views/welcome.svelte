@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { tick, untrack, type Snippet } from "svelte";
 
   import { QUERIES } from "../core/asking";
@@ -32,13 +28,10 @@
   import Step from "./welcome/step.look.svelte";
 
   interface Props {
-    
-    
     readonly rank?: "page" | "section" | undefined;
-    
+
     readonly step?: GuideStep | undefined;
-    
-    
+
     readonly back?: Snippet | undefined;
   }
 
@@ -76,7 +69,7 @@
   }
 
   const read = $derived(readAnswer($guide, (held) => ("guide" in held ? held.guide : undefined)));
-  
+
   let sent = $state<GuideProgress | null>(null);
   $effect(() => {
     if ($guide === undefined) return;
@@ -86,10 +79,9 @@
   });
   const progress = $derived(sent ?? (read.kind === "held" ? read.value : {}));
   const current = $derived(currentOf(progress, configured));
-  
+
   let folded = $state(false);
-  
-  
+
   let linked = $state<GuideStep | null>(null);
   $effect(() => {
     const asked = step ?? null;
@@ -102,7 +94,6 @@
   const open = $derived(folded ? null : (linked ?? current));
   const ready = $derived(configured.provider === true);
 
-  
   let before: Configured | null = null;
   $effect(() => {
     const after = configured;
@@ -136,7 +127,6 @@
     write(opened(progress, step));
   }
 
-  
   function later(step: Exclude<GuideStep, "provider">): void {
     folded = false;
     linked = null;
@@ -157,7 +147,6 @@
     return `${uid}-${step}`;
   }
 </script>
-
 
 <div class="flex min-w-0 flex-1 flex-col @min-[64rem]:silver-columns">
   <div class="flex min-w-0 flex-1 flex-col @min-[64rem]:col-start-2">

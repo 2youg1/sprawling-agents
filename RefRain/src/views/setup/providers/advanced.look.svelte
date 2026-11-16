@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts">
-  // How the attach form's fold is drawn, and nothing else: every word
-  // arrives translated and every press arrives wired (`./advanced`,
-  // `AdvancedLook`), so another look draws the same fold by taking the
-  // same value.
   import Button from "../../parts/button.svelte";
   import Field from "../../parts/field.svelte";
   import Glyph from "../../parts/glyph.svelte";
@@ -34,9 +30,6 @@
 {/snippet}
 
 {#snippet pairTable(table: PairTableLook)}
-  <!-- A row keeps its boxes - and its `key`, which is what the list is
-  keyed by - when another row is removed, so the box a person is typing
-  in never becomes somebody else's row. -->
   <div class="flex flex-col gap-tight text-note text-text-quiet">
     {table.title}
     {#each table.rows as row (row.key)}
@@ -107,10 +100,6 @@
 </details>
 
 <style>
-  /* As many columns of boxes as the fold holds, each at least one
-   * field track wide; a fold narrower than one track - the settings
-   * sheet on a narrow window - gets one column as wide as the fold
-   * rather than boxes drawn past its edge. */
   .fields {
     grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--spacing-field-track)), 1fr));
   }

@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { ui } from "../../ui";
   import { lookOf } from "./reasoning";
   import Look from "./reasoning.look.svelte";
@@ -15,7 +11,6 @@
   const { text, open }: Props = $props();
   const { lang } = ui();
 
-  
   let shown = $state<string | null>(null);
   $effect(() => {
     const next = text;

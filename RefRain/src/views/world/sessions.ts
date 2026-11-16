@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { RunBelief } from "../../core/belief";
 import { fill, say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
@@ -20,7 +19,6 @@ import { noteOf } from "../talk/branch_note";
 import type { BranchNote } from "../talk/branch_note";
 import { phaseSaid } from "../runs/phase";
 import { called, dispatcherOf } from "../talk/naming";
-
 
 export type Dot = "run" | "ask" | "done";
 
@@ -40,7 +38,6 @@ export function dotOf(stretch: Stretch): Dot {
   }
 }
 
-
 export interface FilterWire {
   readonly role: "group";
   readonly "aria-label": string;
@@ -53,11 +50,10 @@ export interface ToggleWire {
 
 export interface ToggleLook {
   readonly key: string;
-  
+
   readonly word: string;
   readonly wire: ToggleWire;
 }
-
 
 export interface LinkWire {
   readonly href: string;
@@ -73,12 +69,10 @@ export interface DisclosureWire {
   readonly onclick: () => void;
 }
 
-
 export interface PinLook {
   readonly hint: string;
   readonly wire: { readonly role: "img"; readonly "aria-label": string };
 }
-
 
 export interface MenuProps {
   readonly named: Named | null;
@@ -86,58 +80,51 @@ export interface MenuProps {
   readonly tags: readonly Tag[];
   readonly pinning: Pinning;
   readonly session: { readonly name: string; readonly run: RunId | null };
-  
+
   readonly read: View | null;
 }
-
 
 export interface RowLook {
   readonly key: string;
   readonly depth: number;
   readonly disclosure: DisclosureWire | undefined;
   readonly link: LinkWire;
-  
+
   readonly chosen: boolean;
-  
+
   readonly dot: Dot | undefined;
   readonly title: string;
-  
+
   readonly room: string;
-  
+
   readonly current: boolean;
   readonly pin: PinLook | undefined;
-  
-  
+
   readonly when: string | undefined;
-  
-  
+
   readonly phase: string | undefined;
   readonly delegated: string | undefined;
   readonly about: string | undefined;
   readonly ranOn: string | undefined;
   readonly tags: readonly Tag[];
-  
-  
+
   readonly context: { readonly room: Address; readonly run: RunId } | undefined;
   readonly menu: MenuProps;
-  
+
   readonly note: BranchNote | null;
 }
 
 export interface SessionsLook {
-  
   readonly filter:
     { readonly wire: FilterWire; readonly toggles: readonly ToggleLook[] } | undefined;
-  
-  
+
   readonly narrow: boolean;
   readonly rows: readonly RowLook[];
 }
 
-
 export interface RowContext {
   readonly lang: Lang;
-  
+
   readonly now: number;
   readonly chosen: boolean;
   readonly tags: readonly Tag[];
@@ -210,7 +197,6 @@ export function rowOf(stretch: Stretch, at: RowContext): RowLook {
   };
 }
 
-
 type Told = Pick<RowLook, "phase" | "delegated" | "about" | "ranOn" | "context">;
 
 function toldOf(stretch: Stretch, dot: Dot, at: RowContext): Told {
@@ -230,7 +216,6 @@ function toldOf(stretch: Stretch, dot: Dot, at: RowContext): Told {
       stretch.current && last !== undefined ? { room: stretch.room, run: last.run } : undefined,
   };
 }
-
 
 function pinOf(pinning: Exclude<Pinning, "none">, lang: Lang): PinLook {
   const hint = say(lang, pinning === "mayor" ? "world_pinned_mayor" : "world_pinned_tagged");
@@ -258,7 +243,6 @@ function whenOf(stretch: Stretch, dot: Dot, lang: Lang, now: number): string {
   }
 }
 
-
 function aboutOf(stretch: Stretch, last: RunBelief | undefined, lang: Lang): string {
   return stretch.line.preview ?? last?.task ?? say(lang, startOf(stretch));
 }
@@ -267,7 +251,6 @@ export function titleOf(stretch: Stretch): string {
   const name = stretch.line.name ?? "";
   return name === "" ? roomOf(stretch.room) : name;
 }
-
 
 function ranOnOf(stretch: Stretch, lang: Lang): string {
   const { model, effort, workspace } = stretch.line;
@@ -287,7 +270,6 @@ function startOf(stretch: Stretch): Key {
   return start.opened.carry === "handoff" ? "mailbox_start_carried" : "mailbox_start_new";
 }
 
-
 function delegatedBy(stretch: Stretch, lang: Lang): string {
   const start = stretch.line.start;
   const by = "dispatched" in start ? dispatcherOf(start.dispatched.by) : null;
@@ -295,7 +277,6 @@ function delegatedBy(stretch: Stretch, lang: Lang): string {
     ? fill(say(lang, "talk_dispatched_by"), { who: called(by.address, null, lang) })
     : "";
 }
-
 
 export function filterOf(
   offered: readonly Tag[],

@@ -6,15 +6,6 @@
 -->
 
 <script lang="ts">
-  // The seat of the prompt lens: what this run was told, in the four
-  // segments it was sent as. It asks the city, holds which segments are
-  // open and whose copy receipt shows, and draws whatever
-  // `./prompt.look.svelte` is (`./prompt` decides the rest).
-  //
-  // The bytes come from the store, addressed by the hash the ledger
-  // recorded; a segment the store no longer holds says so rather than
-  // showing an empty box a reader would take for an empty prompt.
-
   import { SvelteSet } from "svelte/reactivity";
 
   import { buildingOf } from "../../core/route";
@@ -33,10 +24,7 @@
   const u = ui();
   const lang = u.lang;
 
-  // Each segment folds on its own: a person compares two segments and
-  // should not lose the first while opening the second.
   const open = new SvelteSet<string>();
-  // Which segment's copy receipt is showing right now.
   let receipt = $state<string | null>(null);
 
   const asked = $derived(u.conn.asking.ask({ prefix: { run } }));
@@ -46,7 +34,6 @@
     return "prefix" in held ? held.prefix : { segments: [], tools: null };
   });
 
-  // A copy receipt lasts long enough to be seen and no longer.
   $effect(() => {
     const at = receipt;
     if (at === null) return;

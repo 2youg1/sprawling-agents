@@ -10,9 +10,6 @@
 </script>
 
 <aside {...region} class="min-w-0">
-  <!-- The summary keeps the platform's disclosure mark, which a flex
-  summary would drop, and brightens under the pointer with the page's
-  own duration and curve. -->
   <details class="rounded-card bg-chrome/60 px-base py-tight">
     <summary
       class="cursor-pointer text-label text-text-quiet transition-colors duration-short ease-leave hover:text-text hover:ease-arrive"

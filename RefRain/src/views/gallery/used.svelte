@@ -6,19 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // The two usage panels - every skill and what runs read of it, every
-  // tool server and what its tools were called for - each in three
-  // cities: one whose ledger holds nothing to count, one with the few
-  // rows a city has after a week, and one long enough that names, rows
-  // and day counts have to hold their shape at the width the panel is
-  // drawn in. The skill panel stands under the skills page at the
-  // page's width; the MCP panel stands in the right column of the MCP
-  // page, so its cases are drawn at that column's width.
-  //
-  // The answers are a fixed script - counted runs, counted days, one
-  // minute apart - rather than a random one, so the render gate sees
-  // the same table every time.
-
   import type {
     Answer,
     DayCount,
@@ -43,14 +30,10 @@
     return RunId.make(`0199c0de-0000-4000-8000-${n.toString(16).padStart(12, "0")}`);
   }
 
-  // A day as the city writes it, a UTC calendar date.
   function dayOf(n: number): string {
     return new Date(START + n * DAY).toISOString().slice(0, 10);
   }
 
-  // `count` uses spread over `days` days, one minute apart within a day,
-  // with every seventh one refused and every eleventh unrecorded, and
-  // the per-day counts that fold them.
   function spread(
     count: number,
     days: number,
@@ -132,17 +115,12 @@
   const STALE: SkillAudit = { state: "stale", audited: digest(1) };
   const UNAUDITED: SkillAudit = { state: "unaudited" };
 
-  // A week: two skills read, one whose content changed since its audit,
-  // and one on the shelf nobody has read.
   const SKILLS_TYPICAL: readonly SkillUsageLine[] = [
     skill("diagnosing-bugs", 9, 4, PASSED, "SKILL.md"),
     skill("resolving-merge-conflicts", 3, 2, STALE, "SKILL.md"),
     skill("kiln-firing", 0, 1, UNAUDITED, "SKILL.md"),
   ];
 
-  // Long names, a skill read every day for a month, every audit state,
-  // a copy no shelf holds any more, and a long list of skills nobody
-  // has read.
   const SKILLS_LONG: readonly SkillUsageLine[] = [
     skill(
       "apostle-opusmethodology-karatani-origins",
@@ -180,8 +158,6 @@
     ].map((name) => skill(name, 0, 1, UNAUDITED, "SKILL.md")),
   ];
 
-  // A week: one server with two tools in use, one a building names and
-  // nobody has called.
   const SERVERS_TYPICAL: readonly McpServerUsage[] = [
     {
       server: "github",
@@ -191,9 +167,6 @@
     { server: "filesystem", configured: true, tools: [] },
   ];
 
-  // Long server and tool names, a server no building names any more,
-  // a tool called every day for a month, and the calls the ledger can
-  // no longer tie to a server.
   const SERVERS_LONG: readonly McpServerUsage[] = [
     {
       server: "composio-github-enterprise-cloud-integration",
@@ -228,7 +201,6 @@
         : undefined;
   }
 
-  // The right column of the MCP page at a 1440 window.
   const MCP_COLUMN = 520;
 </script>
 

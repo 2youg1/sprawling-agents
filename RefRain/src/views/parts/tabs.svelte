@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
   export type { Lens, TabsProps } from "./tabs";
 </script>
 
@@ -21,7 +19,6 @@
   const props: TabsProps = $props();
   const uid = $props.id();
 
-  
   const drawn: Record<string, HTMLElement | undefined> = {};
   const kept: Record<string, Attachment<HTMLElement> | undefined> = {};
 
@@ -38,7 +35,6 @@
     return made;
   };
 
-  
   let reachable = $state(true);
 
   const watch: Attachment<HTMLElement> = (node) => {

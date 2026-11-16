@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import type { CardLook } from "./proposals_card";
 
   const { lead, stale, region, status, body }: CardLook = $props();
@@ -42,7 +40,6 @@
       {/each}
     </ol>
   {:else}
-    
     <p class="run">
       {#each body.pieces as piece (piece.key)}{#if piece.kind === "same"}<span
             class="text-text-quiet">{piece.lead}{piece.text}{piece.trail}</span
@@ -56,7 +53,6 @@
 </div>
 
 <style>
-  
   .sentence {
     flex: 1;
     min-width: 0;
@@ -66,7 +62,6 @@
     transition: opacity var(--transition-duration-short) var(--ease-arrive);
   }
 
-  
   .box {
     display: flex;
     flex: none;
@@ -100,7 +95,6 @@
     resize: none;
   }
 
-  
   .untaken {
     opacity: 0.6;
     transition-timing-function: var(--ease-leave);

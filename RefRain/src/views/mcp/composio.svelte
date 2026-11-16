@@ -6,43 +6,14 @@
 -->
 
 <script lang="ts" module>
-  // One key, then one press per application.
-  //
-  // The key goes to the vault over the enrolment door and what comes
-  // back is a reference, so the key itself is never in a frame and
-  // never in `CONFIG.toml`. Everything after that is the broker's to
-  // answer: the directory, which account is connected, and the consent
-  // page to send somebody to.
-  //
-  // **Pressing connect opens a tab in the same gesture**, before the
-  // city has answered with the page to put in it. A browser blocks a
-  // popup opened after a round trip, and a person who pressed a button
-  // and got nothing has no way to tell a blocked popup from a broken
-  // city; the blank tab is opened while the click is still on the stack
-  // and given its address when the answer lands. The routing of that
-  // tab is a one-shot: a plain latch marks the press that has been
-  // served, so the effect that watches the shelf writes nothing the
-  // reactivity reads and a later shelf answer cannot drag a tab that
-  // has since navigated back to the consent page.
-  //
-  // The directory, the four standings and the by-id door are drawn as
-  // snippets of this one component: they share the shelf and the
-  // intake, and a second component would owe each of them a prop list
-  // that restates this one.
-
   import type { Intake } from "./draft";
 
   export interface ComposioProps {
     readonly intake: Intake;
   }
 
-  // Where a Composio-hosted server answers, for somebody who made one
-  // in the broker's own console and wants to point this city at it by
-  // id. The path every connected application takes does not pass
-  // through here.
   const COMPOSIO_BASE = "https://backend.composio.dev/v3/mcp/";
 
-  // The header the broker reads the key from.
   const KEY_HEADER = "x-api-key";
 </script>
 
@@ -67,8 +38,6 @@
   const u = ui();
   const { lang } = u;
   const shelf = shelfOf();
-  // What the shelf last answered, read once per redraw so the four
-  // directory arms below narrow one value rather than re-reading it.
   const read = $derived(shelf.answer());
   const answer = $derived(read.kind === "held" ? read.value : undefined);
 
@@ -76,17 +45,9 @@
   let reference = $state<string | null>(null);
   let refused = $state(false);
   let pressed = $state<ToolkitSlug | null>(null);
-  // The tab the press opened, and the press that has already been given
-  // its address: plain storage, because only the effect below and the
-  // press that fills it ever look, and reactivity has nothing to redraw
-  // from either.
   let tab: Window | null = null;
   let routed: ToolkitSlug | null = null;
 
-  // For somebody who already made a server in the broker's own
-  // console: the two boxes of the by-id door, kept because it costs one
-  // collapsed section and answers the one case the directory cannot: a
-  // server this city did not open.
   let serverId = $state("");
   let userId = $state("");
 
@@ -105,8 +66,6 @@
       if (outcome.kind === "stored") {
         reference = outcome.reference;
         key = "";
-        // The key is what the shelf could not be read without, so the
-        // directory is asked for the moment there is one.
         shelf.recheck();
         return;
       }
@@ -114,9 +73,6 @@
     });
   }
 
-  // The tab opened by the press, given its address as soon as the city
-  // says where the consent page is. A person who dismissed the tab gets
-  // the link on the row instead, which is why the url keeps travelling.
   $effect(() => {
     const waiting = pressed;
     const rows = shelf.rows();
@@ -171,7 +127,6 @@
 
 <div class="flex flex-col gap-base">
   <div class="flex flex-wrap items-end gap-base">
-    <!-- The key field wraps below the buttons before it is narrower than its label. -->
     <div class="min-w-0 flex-[1_1_16ch]">
       <Field
         label={say($lang, "mcp_api_key")}
@@ -185,9 +140,6 @@
     </div>
     <Button label={say($lang, "mcp_key_store")} tone="secondary" onPress={store} />
   </div>
-  <!-- Where a key comes from, on a line of its own: beside the field and
-       the store key it took the field's width in the page's narrow right
-       column and stood off their baseline. -->
   <a
     href="https://platform.composio.dev"
     target="_blank"
@@ -208,7 +160,6 @@
     </p>
   {/if}
 
-  <!-- The directory, or the one sentence that stands in for it. -->
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={QUERIES.toolkits} />
   {:else if answer === undefined}
@@ -232,9 +183,6 @@
     </ul>
   {/if}
 
-  <!-- For somebody who already made a server in the broker's own
-  console. Kept because it costs one collapsed section and answers the
-  one case the directory cannot: a server this city did not open. -->
   <details class="text-note">
     <summary
       class="cursor-pointer text-text-faint transition-colors ease-leave hover:text-text-quiet hover:ease-arrive"
@@ -272,7 +220,6 @@
   </details>
 </div>
 
-<!-- One application: what it is, and the one thing to do about it. -->
 {#snippet toolkit(line: ToolkitLine)}
   <li class="rounded-card bg-chrome">
     <div class="flex min-w-0 items-center gap-base px-base py-snug text-note">
@@ -285,10 +232,6 @@
   </li>
 {/snippet}
 
-<!-- Four standings, four different next actions and no fifth. The
-connect press is a row's action rather than the screen's one primary:
-many rows stand on this screen at once, and a page with six primaries
-has none. -->
 {#snippet action(line: ToolkitLine)}
   {#if line.standing === "absent"}
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
@@ -302,9 +245,6 @@ has none. -->
       rel="noopener noreferrer"
       class="text-note text-accent hover:underline"
       onclick={() => {
-        // Returning to this window re-reads the shelf, so a person who
-        // finishes here sees the row settle without pressing anything
-        // else.
         shelf.recheck();
       }}
     >

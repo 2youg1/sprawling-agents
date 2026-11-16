@@ -8,11 +8,6 @@
 </script>
 
 <script lang="ts">
-  // The seat of the city drawn as a skyline at night: it reads the
-  // belief, the language and the stylesheet's corner exponent, and hands
-  // `./skyline.ts`'s value to whatever `./skyline.look.svelte` is. A
-  // click or Enter on a tower picks it, and the panel beside the drawing
-  // says what was picked.
   import { heldWithin } from "../../core/belief/rooms";
   import { ui } from "../../ui";
   import type { Address, CityAnswer } from "../../wire";
@@ -31,8 +26,6 @@
   const u = ui();
   const { lang } = u;
   const belief = u.conn.belief;
-  // The towers' corners curve the way the page's boxes do; read once,
-  // since the exponent is a constant of the stylesheet.
   const power = cornerPower(document.documentElement);
 
   const look = $derived(

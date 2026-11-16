@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { get, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
@@ -12,15 +11,12 @@ import { openSession } from "../../core/commands";
 import type { View } from "../../core/route";
 import type { Address, AxError, Carry, Command, Origin, Seq } from "../../wire";
 
-
 export type Opening =
   | { readonly kind: "branch"; readonly origin: Origin }
   | { readonly kind: "fresh"; readonly carry: Carry };
 
 export type Branching =
   | { readonly kind: "idle" }
-  
-  
   | {
       readonly kind: "opening";
       readonly room: Address;
@@ -28,8 +24,6 @@ export type Branching =
       readonly session: Seq | null;
       readonly refusal: AxError | null;
     }
-  
-  
   | {
       readonly kind: "refused";
       readonly room: Address;
@@ -41,18 +35,15 @@ export const NOT_BRANCHING: Branching = { kind: "idle" };
 
 export interface Branches {
   readonly held: Readable<Branching>;
-  
-  
+
   readonly open: (room: Address, opening: Opening, went: () => void) => boolean;
 }
-
 
 export interface BranchDoors {
   readonly belief: Readable<Belief>;
   readonly send: (command: Command) => boolean;
   readonly go: (view: View) => void;
 }
-
 
 export function keepBranches(doors: BranchDoors): Branches {
   const held = writable<Branching>(NOT_BRANCHING);
@@ -87,7 +78,6 @@ export function keepBranches(doors: BranchDoors): Branches {
   };
 }
 
-
 function pressed(
   held: Branching,
   belief: Belief,
@@ -104,7 +94,6 @@ function pressed(
   };
 }
 
-
 function settled(held: Branching, belief: Belief): Branching {
   if (held.kind !== "opening") return held;
   if ((belief.sessions[held.room] ?? 0) > (held.session ?? 0)) return NOT_BRANCHING;
@@ -113,18 +102,15 @@ function settled(held: Branching, belief: Belief): Branching {
   return { kind: "refused", room: held.room, opening: held.opening, error: refusal };
 }
 
-
 export function branchClaims(branching: Branching, refusal: AxError): boolean {
   return branching.kind === "refused" && branching.error === refusal;
 }
-
 
 export type BranchHere =
   | { readonly kind: "none" }
   | { readonly kind: "opening"; readonly of: Opening["kind"] }
   | { readonly kind: "refused"; readonly of: Opening["kind"]; readonly error: AxError }
   | { readonly kind: "elsewhere" };
-
 
 export function branchFrom(branching: Branching, room: Address, origin: Origin): BranchHere {
   return here(
@@ -135,7 +121,6 @@ export function branchFrom(branching: Branching, room: Address, origin: Origin):
       sameOrigin(branching.opening.origin, origin),
   );
 }
-
 
 export function branchInto(branching: Branching, room: Address): BranchHere {
   return here(branching, branching.kind !== "idle" && branching.room === room);

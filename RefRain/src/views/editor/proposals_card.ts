@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Snippet } from "svelte";
 
 import { fill, say } from "../../core/lang";
@@ -13,7 +12,6 @@ import { takesAny } from "./proposals";
 import type { Deciding, Edit, Standing, Take } from "./proposals";
 import { short } from "./reading";
 
-
 export interface TakeWire {
   readonly type: "checkbox";
   readonly checked: boolean;
@@ -21,14 +19,12 @@ export interface TakeWire {
   readonly onchange: (event: { readonly currentTarget: { readonly checked: boolean } }) => void;
 }
 
-
 export interface WordsWire {
   readonly rows: 1;
   readonly "aria-label": string;
   readonly value: string;
   readonly oninput: (event: { readonly currentTarget: { readonly value: string } }) => void;
 }
-
 
 export type RowLook =
   | { readonly key: number; readonly kind: "kept"; readonly text: string }
@@ -47,7 +43,6 @@ export type RowLook =
       readonly words: WordsWire;
     };
 
-
 export interface PieceLook {
   readonly key: number;
   readonly kind: Slice["kind"];
@@ -62,26 +57,20 @@ export type BodyLook =
   | { readonly kind: "diff"; readonly pieces: readonly PieceLook[] }
   | { readonly kind: "edit"; readonly rows: readonly RowLook[] };
 
-
 export interface StatusLook {
   readonly tone: "faint" | "alert";
   readonly text: string;
 }
 
-
 export interface CardLook {
-  
   readonly lead: Snippet | undefined;
-  
-  
+
   readonly stale: string | undefined;
-  
-  
+
   readonly region: { readonly role: "status" };
   readonly status: StatusLook | undefined;
   readonly body: BodyLook;
 }
-
 
 export interface Held {
   readonly standing: Standing;
@@ -89,7 +78,6 @@ export interface Held {
   readonly edit: Edit | null;
   readonly lead: Snippet | undefined;
 }
-
 
 export interface Hands {
   readonly retake: (place: number, change: Partial<Take>) => void;
@@ -110,7 +98,6 @@ export function cardLookOf(card: ProposalCard, held: Held, lang: Lang, hands: Ha
         : { kind: "edit", rows: rowsOf(card, held.edit, lang, hands) },
   };
 }
-
 
 export interface Refusals {
   readonly accept: string | undefined;
@@ -201,13 +188,11 @@ function rowsOf(card: ProposalCard, edit: Edit, lang: Lang, hands: Hands): reado
   });
 }
 
-
 function abuts(card: ProposalCard, place: number): boolean {
   const before = card.slices[place - 1];
   const here = card.slices[place];
   return before?.kind === "delete" && before.trail === "" && here?.lead === "";
 }
-
 
 function opening(slice: Slice): string {
   const words = slice.text.trim().split(/\s+/u).slice(0, 6).join(" ");

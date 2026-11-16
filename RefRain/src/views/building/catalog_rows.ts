@@ -181,8 +181,6 @@ function comparisonOf(
   currentSchema: Readonly<Record<string, unknown>> | undefined,
   audit: string | undefined,
 ): RowLook["comparison"] {
-  
-  
   if (pinnedText === undefined || currentText === undefined) return undefined;
   return {
     pinned: `${pinnedText}\n${JSON.stringify(pinnedSchema ?? {}, null, 2)}`,
@@ -204,4 +202,3 @@ function selectionPinsSkill(selection: Selection, skill: CatalogSkill): boolean 
   const held = selection.skillPins[skill.name];
   return skill.candidate == null ? held === undefined : held === skill.candidate;
 }
-

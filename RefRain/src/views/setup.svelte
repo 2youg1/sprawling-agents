@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import type { Snippet } from "svelte";
 
   import { QUERIES } from "../core/asking";
@@ -45,7 +41,6 @@
 
   type Setting = "proxying" | "autonomy" | "language";
 
-  
   type AutonomySetting = "owner" | "delegate";
 
   const AUTONOMIES = [
@@ -66,15 +61,14 @@
     }
   }
 
-  
   interface Props {
     readonly group?: SetupGroup | undefined;
-    
+
     readonly titleId?: string | undefined;
     readonly endpoints?: EndpointsAnswer | undefined;
     readonly autonomy?: Autonomy | undefined;
     readonly onAutonomy?: ((setting: AutonomySetting) => void) | undefined;
-    
+
     readonly dependency?: Snippet | undefined;
   }
 
@@ -97,7 +91,7 @@
     const stated = $governance;
     return stated !== undefined && "governance" in stated ? stated.governance.autonomy : undefined;
   });
-  
+
   const answer = $derived(endpoints ?? asked);
   const chosen = $derived(autonomy ?? askedAutonomy);
   const hint = $derived(HINT[shown]);
@@ -106,7 +100,6 @@
   const receipt = saveReceipt();
   const saved = receipt.saved;
 
-  
   let awaited = $state.raw<AutonomySetting | null>(null);
   $effect(() => {
     if (awaited === null || chosen === undefined || autonomySetting(chosen) !== awaited) return;
@@ -125,7 +118,6 @@
 </script>
 
 {#snippet foot(constraint: string | undefined, name: Setting)}
-  
   <div class="mt-tight flex items-baseline justify-between gap-base">
     {#if constraint !== undefined}
       <span class="text-note text-text-faint">{constraint}</span>
@@ -176,7 +168,6 @@
   />
 {/snippet}
 
-
 <div class="flex min-w-0 flex-col gap-wide px-wide py-wide narrow:px-base">
   <header class="flex min-w-0 flex-col gap-tight border-b border-edge pb-base">
     <div class="flex flex-wrap items-center gap-base">
@@ -193,7 +184,6 @@
     {#if shown === "you"}
       <You />
     {:else if shown === "accounts"}
-      
       <div class="flex flex-col gap-wide">
         <div class="min-w-0">
           <ProviderDoor stepped />
@@ -207,7 +197,7 @@
             <ModelChoice {answer} />
           {/if}
         </section>
-        
+
         <section class="flex min-w-0 flex-col gap-snug border-t border-edge pt-wide">
           <header class="flex min-w-0 flex-col gap-tight">
             <h3 class="text-label font-label text-text">{say($lang, "setup_step_defaults")}</h3>

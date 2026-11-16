@@ -42,18 +42,17 @@ export interface CatalogLook {
   readonly scopes: readonly Choice<Scope>[];
   readonly scope: Scope;
   readonly onScope: (scope: Scope) => void;
-  
+
   readonly panesLabel: string;
   readonly panes: readonly Choice<CatalogPane>[];
   readonly pane: CatalogPane;
   readonly onPane: (pane: CatalogPane) => void;
   readonly meter: string;
   readonly delta: string | undefined;
-  
-  
+
   readonly beforeRun: string | undefined;
   readonly empty: string | undefined;
-  
+
   readonly rulesNote: string | undefined;
   readonly groups: readonly GroupLook[];
   readonly save: {
@@ -166,8 +165,7 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
     const members = tools.filter((row) => row.tool.namespace === namespace);
     return toolGroup(namespace, members, seat, lang, hands, choices);
   });
-  
-  
+
   if (!seat.unusedOnly) {
     for (const reference of seat.draft.references) {
       if (mcpGroups.some((group) => group.key === reference.label)) continue;
@@ -200,8 +198,7 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
     context: "catalog_door_context",
     rules: "catalog_door_rules",
   };
-  
-  
+
   const scoped = seat.pane !== "models" && seat.pane !== "context" && seat.pane !== "rules";
   return {
     scopeLabel: say(lang, "catalog_scope"),
@@ -268,8 +265,6 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
       },
       offLabel: say(lang, "catalog_turn_off_unused"),
       onOff: () => {
-        
-        
         let next = seat.draft;
         switch (seat.pane) {
           case "tools":
@@ -306,8 +301,7 @@ export function catalogLook(seat: Seat, lang: Lang, hands: Hands): CatalogLook {
 
 function emptyOf(seat: Seat, groups: number, lang: Lang): string | undefined {
   if (seat.pane === "models" || seat.pane === "context" || seat.pane === "rules") return undefined;
-  
-  
+
   if (seat.pane === "tools" && seat.answer.run == null && groups === 0) {
     return say(lang, "catalog_no_run");
   }
@@ -379,4 +373,3 @@ function groupSummary(n: number, held: readonly Exposure[], lang: Lang): string 
     off: String(tally[2] ?? 0),
   });
 }
-

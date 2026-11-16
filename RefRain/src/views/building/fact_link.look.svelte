@@ -5,14 +5,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- A fact in a line of facts that can be followed: inline, in the ink of
-the facts around it, turning accent under the pointer and while focused,
-so a hand or the keyboard finds that it goes somewhere. The accent arrives
-on the arriving curve and leaves on the leaving one
-(docs/frontend-method.md §4-43). -->
 <script lang="ts">
   import type { FactInk, FactLinkLook } from "./fact_link";
-
   const look: FactLinkLook = $props();
 
   const INK: Record<FactInk, string> = {

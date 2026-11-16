@@ -3,27 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { EventKind, ReplyEnd, Waiting } from "../wire";
 import type { Key } from "./lang";
 
 export type Doing =
-  
-  
   | { readonly kind: "unknown" }
   | { readonly kind: "thinking" }
-  
-  
   | { readonly kind: "calling"; readonly tool: string | null; readonly subject: string | null }
   | { readonly kind: "waiting" }
-  
-  
   | { readonly kind: "awaiting_reply"; readonly wait: Waiting }
   | { readonly kind: "frozen"; readonly completion: string | null };
 
-
 export type Sending = "dispatch" | "steer" | "queued";
-
 
 export function sendingInto(doing: Doing | undefined): Sending {
   if (doing === undefined) return "dispatch";
@@ -32,8 +23,7 @@ export function sendingInto(doing: Doing | undefined): Sending {
       return "dispatch";
     case "thinking":
       return "steer";
-    
-    
+
     case "unknown":
     case "calling":
     case "waiting":
@@ -41,7 +31,6 @@ export function sendingInto(doing: Doing | undefined): Sending {
       return "queued";
   }
 }
-
 
 export function afterWait(doing: Doing, end: ReplyEnd): Doing {
   if (doing.kind !== "awaiting_reply") return doing;
@@ -54,7 +43,6 @@ export function afterWait(doing: Doing, end: ReplyEnd): Doing {
   }
 }
 
-
 const MOVING = [
   "run_started",
   "model_called",
@@ -66,11 +54,9 @@ const MOVING = [
 
 type Moving = (typeof MOVING)[number];
 
-
 export function moves(kind: EventKind): kind is Moving {
   return MOVING.some((each) => each === kind);
 }
-
 
 export const PHASES: Record<Moving, Doing> = {
   run_started: { kind: "thinking" },
@@ -80,7 +66,6 @@ export const PHASES: Record<Moving, Doing> = {
   tool_called: { kind: "calling", tool: null, subject: null },
   run_frozen: { kind: "frozen", completion: null },
 };
-
 
 export const POSTURE_WORD: Record<Doing["kind"], Key> = {
   unknown: "city_at_work",

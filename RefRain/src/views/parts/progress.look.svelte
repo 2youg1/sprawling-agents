@@ -4,14 +4,6 @@
   // file, You can obtain one at https://mozilla.org/MPL/2.0/.
   // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-  // How a progress bar is drawn, and nothing else (`./progress`,
-  // `ProgressLook`).
-  //
-  // While the end is unknown the empty track breathes with the theme's
-  // `pulse`, and nothing is filled: a part-filled bar would claim a
-  // fraction the bar does not have, and with motion off the track stands
-  // still and empty, which is what is known.
-
   import type { ProgressLook } from "./progress";
 
   const look: ProgressLook = $props();

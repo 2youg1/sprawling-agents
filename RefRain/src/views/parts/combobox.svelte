@@ -5,8 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  
-  
   import { tick, untrack } from "svelte";
   import type { Attachment } from "svelte/attachments";
 
@@ -16,7 +14,6 @@
   import { revealIn, sideFor } from "./layer";
   import type { Side } from "./layer";
 
-  
   const PREFERRED: Side = "below";
 
   const props: ComboboxProps = $props();
@@ -24,10 +21,9 @@
 
   let layer = $state<Layer>(untrack(() => props.starts) === "open" ? "open" : "unopened");
   let query = $state("");
-  
-  
+
   let at = $state(0);
-  
+
   let kept = $state<readonly Choice[]>([]);
   let side = $state<Side>(PREFERRED);
 
@@ -41,7 +37,6 @@
   const rows = $derived(layer === "open" ? live : kept);
   const cursor = $derived(Math.max(0, Math.min(at, rows.length - 1)));
 
-  
   function close(focus: Return): void {
     kept = live;
     layer = "shut";
@@ -60,7 +55,7 @@
     switch (answered.kind) {
       case "cursor":
         at = answered.at;
-        
+
         void tick().then(revealCursor);
         return;
       case "take":
@@ -97,13 +92,11 @@
       }
       side = PREFERRED;
       layer = "open";
-      
-      
+
       void tick().then(() => search?.focus({ preventScroll: true }));
     },
     act,
     type: (typed) => {
-      
       query = typed;
       at = 0;
     },
@@ -111,8 +104,7 @@
       at = index;
     },
     take,
-    
-    
+
     leave: (next) => {
       if (layer !== "open") return;
       if (next instanceof Node && root?.contains(next) === true) return;
@@ -139,12 +131,10 @@
 
   const look = $derived(lookOf({ props, uid, layer, query, cursor, rows, side }, hands));
 
-  
   $effect(() => {
     if (layer === "open" && panel !== undefined) side = sideFor(panel, PREFERRED);
   });
 
-  
   $effect(revealCursor);
 </script>
 

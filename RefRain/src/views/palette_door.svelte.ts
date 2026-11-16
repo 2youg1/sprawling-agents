@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 export type Arrival = "keys" | "touch";
 
 let shown = $state(false);
@@ -25,7 +24,6 @@ export function openPalette(arrival: Arrival): void {
 export function closePalette(): void {
   shown = false;
 }
-
 
 export function togglePalette(): void {
   arrived = "keys";

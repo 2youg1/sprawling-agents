@@ -6,9 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // The line above a diff in the editor region (docs/frontend-method.md §7F): the
-  // file's folder and name, the two trees being compared, and at the
-  // right end the way to the person's own editor.
 </script>
 
 <script lang="ts">
@@ -18,9 +15,7 @@
   import Reach from "./reach.svelte";
 
   interface Props {
-    // Relative to the city, as the ledger records it.
     readonly path: string;
-    // The line the reach control names, one-based.
     readonly line: number;
     readonly shown: Shown;
     readonly children?: Snippet;

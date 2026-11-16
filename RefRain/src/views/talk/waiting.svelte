@@ -5,10 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // What waits for the person, as cards in the conversation rather than
-  // a page of their own: a question that stops a run belongs where the
-  // person is already looking. This file asks for the queue; the cards
-  // are `waiting_cards.svelte`, which the gallery seats on its own.
   import WaitingCards from "./waiting_cards.svelte";
 
   export { WaitingCards };
@@ -20,9 +16,6 @@
   import type { ApprovalItem } from "../../wire";
 
   interface Props {
-    // The queue, already read by the caller. Absent means this file
-    // asks for it itself, which is the talk page's one call site: two
-    // handlings of the same answer would be two readings of one fact.
     readonly items?: readonly ApprovalItem[] | undefined;
   }
 

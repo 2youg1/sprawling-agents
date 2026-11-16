@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { GlobalWorkerOptions, PasswordException, getDocument } from "pdfjs-dist";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import worker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -23,7 +22,6 @@ const SHIPPED: ReadonlyMap<string, string> = new Map(
   ).map(([path, url]) => [path.slice(path.lastIndexOf("/") + 1), url]),
 );
 
-
 class Shipped {
   fetch({ filename }: { readonly kind: string; readonly filename: string }): Promise<Uint8Array> {
     const url = SHIPPED.get(filename);
@@ -39,7 +37,6 @@ class Shipped {
   }
 }
 
-
 const DOOR = "bundle/";
 
 export type Opened =
@@ -51,7 +48,6 @@ export interface Opening {
   readonly opened: Promise<Opened>;
   readonly close: () => void;
 }
-
 
 export function openPdf(bytes: Uint8Array): Opening {
   const task = getDocument({
@@ -78,7 +74,6 @@ export function openPdf(bytes: Uint8Array): Opening {
   };
 }
 
-
 export interface Size {
   readonly width: number;
   readonly height: number;
@@ -88,10 +83,9 @@ export interface Drawing {
   readonly pdf: PDFDocumentProxy;
   readonly number: number;
   readonly canvas: HTMLCanvasElement;
-  
+
   readonly width: number;
 }
-
 
 export function drawPage(drawing: Drawing, measured: (size: Size) => void): () => void {
   const { pdf, number, canvas, width } = drawing;
@@ -115,7 +109,6 @@ export function drawPage(drawing: Drawing, measured: (size: Size) => void): () =
     cancel();
   };
 }
-
 
 export function pagesText(pdf: PDFDocumentProxy): Promise<readonly string[]> {
   const numbers = Array.from({ length: pdf.numPages }, (_, index) => index + 1);

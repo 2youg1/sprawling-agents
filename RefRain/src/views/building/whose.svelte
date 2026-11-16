@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { readAnswer } from "../../core/answered";
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";

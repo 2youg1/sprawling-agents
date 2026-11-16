@@ -4,9 +4,6 @@
   // file, You can obtain one at https://mozilla.org/MPL/2.0/.
   // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-  // The seat of an empty state: it turns the caller's key into the
-  // person's words (`./empty`) and draws `./empty.look.svelte`.
-
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Look from "./empty.look.svelte";

@@ -1,6 +1,4 @@
 <script lang="ts" module>
-  
-  
   import type { Key } from "../core/lang";
   import type { Lens } from "../core/route";
   import type { Source } from "./record/timeline";
@@ -27,7 +25,6 @@
     }
   }
 
-  
   function lensOf(source: Source): Lens {
     return source === "log" ? "log" : "ledger";
   }
@@ -45,8 +42,7 @@
 
   interface Props {
     readonly lens: Lens;
-    
-    
+
     readonly rank?: "page" | "section" | undefined;
   }
 
@@ -55,7 +51,6 @@
   const u = ui();
   const lang = u.lang;
 
-  
   let picked = $state<Source>("every");
   const source = $derived<Source>(lens === "log" ? "log" : picked === "log" ? "every" : picked);
 
@@ -65,7 +60,7 @@
 
   function pick(id: string): void {
     const found = READINGS.find((each) => each === id);
-    
+
     if (found === undefined || found === readingOf(lens)) return;
     u.go({ kind: "record", lens: found === "timeline" ? lensOf(source) : found });
   }

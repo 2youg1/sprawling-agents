@@ -6,11 +6,6 @@
 -->
 
 <script lang="ts">
-  // The editor itself: the CodeMirror view `editing.ts` builds, mounted
-  // once per document with the baseline's editor text and a kept draft's
-  // changes on it, and handed to the session. Imported lazily by
-  // `document.svelte`, so the editor's chunk is fetched with the first
-  // document a person opens.
   import { untrack } from "svelte";
 
   import { editorWire } from "./editor";
@@ -31,10 +26,6 @@
     host = box;
   });
 
-  // The view is built once the box is drawn, from the opening the
-  // session held then; nothing it reads afterwards rebuilds it, because a
-  // rebuilt view would drop the cursor, the undo history and a
-  // composition in progress.
   $effect(() => {
     const parent = host;
     if (parent === undefined) return undefined;

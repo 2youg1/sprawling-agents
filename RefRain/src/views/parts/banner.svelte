@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  // The seat of the page banner (`./banner`): it decides the strip's
-  // role from its weight and draws whatever `./banner.look.svelte` is.
   import { bannerOf } from "./banner";
   import type { BannerProps } from "./banner";
   import Look from "./banner.look.svelte";

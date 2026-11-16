@@ -1,12 +1,7 @@
-
-
 <script lang="ts">
-  
-  
   import type { Snippet } from "svelte";
   import type { AddressLineLook, BoxWords, Lesson } from "./address_line";
 
-  
   type Seat = { readonly at: "head" } | ({ readonly at: "box" } & BoxWords);
 
   interface Props extends AddressLineLook {
@@ -16,14 +11,12 @@
 
   const { seat, lesson, ...look }: Props = $props();
 
-  
   const lessonOf: Snippet<[Lesson | undefined]> = taught;
   const button: Snippet<[string, Lesson | undefined]> = press;
 </script>
 
 {#snippet taught(lesson: Lesson | undefined)}
   {#if lesson !== undefined}
-    
     <span class="min-w-0 shrink-10000 truncate text-text-faint" aria-hidden="true"
       >&emsp;{lesson.words}{#if lesson.chord !== ""}<span class="pointer-coarse:hidden"
           >&ensp;{lesson.chord}</span
@@ -48,7 +41,6 @@
     {/if}
     <span class="min-w-0 truncate text-text-quiet group-hover:text-text">{look.room}</span>
     {#if look.session !== undefined}
-      
       <span class="shrink-0 px-tight" aria-hidden="true">·</span>
       <span class="figure shrink-0">{look.session}</span>
     {/if}

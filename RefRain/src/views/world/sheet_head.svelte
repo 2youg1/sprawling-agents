@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { say } from "../../core/lang";
   import type { Pane } from "../../core/workbench";
   import { ui } from "../../ui";
@@ -13,12 +9,9 @@
   import Look from "./sheet_head.look.svelte";
 
   interface Props {
-    
-    
     readonly tabs: readonly { readonly pane: Pane; readonly label: string }[];
     readonly shown: Pane;
-    
-    
+
     readonly prefix: string;
     readonly onShow: (pane: Pane) => void;
   }

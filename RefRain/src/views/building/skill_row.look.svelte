@@ -5,21 +5,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- One skill, in two lines: what the skill is (its name and the summary
-its SKILL.md opens with), then where it lives - the shelf, the file on
-it, and the two qualifiers - so a person who finds a name twice can see
-which copy runs read. A row that opens takes the row's wash under the
-pointer; a disabled one stays as it is, because nothing would answer the
-press.
-
-The two trailing qualifiers shrink; they do not hold their width
-against the row. The name and the shelf keep their width because they
-are what identifies the row; whether it is admitted and who pinned it
-are qualifiers, and a qualifier that has to be cut short is still
-read. -->
 <script lang="ts">
   import type { SkillRowLook } from "./skill_row";
-
   const look: SkillRowLook = $props();
 </script>
 

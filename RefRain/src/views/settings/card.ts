@@ -3,12 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Snippet } from "svelte";
 
 import type { Key } from "../../core/lang";
 import type { Saving } from "./saving";
-
 
 export interface Standing {
   readonly word: string | null;
@@ -17,15 +15,13 @@ export interface Standing {
   readonly detail: string | null;
 }
 
-
 export interface Press {
   readonly label: string;
   readonly loading: boolean;
-  
+
   readonly why: string | undefined;
   readonly onPress: () => void;
 }
-
 
 export interface CardLook {
   readonly title: string;
@@ -43,7 +39,6 @@ const WORD: Record<Saving["kind"], Key | null> = {
   refused: "saving_refused",
   unverified: "saving_unverified",
 };
-
 
 export function standingOf(
   saving: Saving,
@@ -73,7 +68,6 @@ function detailOf(saving: Saving, settled: string, pressed: boolean): string | n
       return pressed ? null : settled;
   }
 }
-
 
 export function pressable(saving: Saving): boolean {
   switch (saving.kind) {

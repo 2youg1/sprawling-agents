@@ -4,10 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The results-only switch, one control with three seats: a room, the
-  // city and the appearance settings. Every seat writes the same
-  // preference, so the choice made on a page is the default the next
-  // page opens with, and the settings seat is where it is set on purpose.
   import { say } from "../../core/lang";
   import { SHOWINGS } from "../../core/results";
   import type { Showing } from "../../core/results";

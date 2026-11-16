@@ -1,13 +1,10 @@
 <script lang="ts" module>
-  
-  
   import type { Key } from "../core/lang";
   import type { Renewals, UnpricedCalls, UsdMicros } from "../wire";
 
   type Cut = "by_run" | "by_actor" | "by_segment" | "by_tool" | "by_skill";
   const CUTS: readonly Cut[] = ["by_run", "by_actor", "by_segment", "by_tool", "by_skill"];
 
-  
   const TITLES: Record<Cut, Key> = {
     by_run: "cost_by_run",
     by_actor: "cost_by_actor",
@@ -30,8 +27,6 @@
   import { costReading, renewalsSent } from "./pricing";
 
   interface Props {
-    
-    
     readonly rank?: "page" | "section" | undefined;
   }
 
@@ -85,7 +80,6 @@
 {/snippet}
 
 {#snippet total()}
-  
   {#if answer !== undefined && reading !== undefined && reading.kind !== "idle"}
     <span class="flex items-baseline gap-snug">
       <span class="text-note text-text-faint">{say($lang, "cost_total")}</span>
@@ -96,7 +90,6 @@
   {/if}
 {/snippet}
 
-
 <Page title={say($lang, "cost_title")} {rank} aside={total}>
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={QUERIES.cost} />
@@ -106,7 +99,6 @@
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
     {@render unpriced(answer.unpriced)}
   {:else if reading.kind === "idle"}
-    
     <EmptyState missing="cost_empty" seat="region">
       {#snippet action()}
         <AskMayor />
@@ -121,7 +113,7 @@
       <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
       {@render renewed(answer.renewals)}
     {/if}
-    
+
     <div class="grid grid-fit gap-x-gutter gap-y-wide">
       {#each CUTS as each (each)}
         <section

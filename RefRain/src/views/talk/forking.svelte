@@ -14,9 +14,6 @@
   import type { ForkEntry, ForkFilter, ForkPlan } from "./forking";
 
   interface Props {
-    // The run being branched from, in the shape the thread already
-    // asked for: its turns, its opening task, and its id all arrive in
-    // the one answer, so no second question and no second reading.
     readonly rounds: RoundsAnswer;
     readonly onFork: (plan: ForkPlan) => void;
     readonly onClose: () => void;
@@ -32,25 +29,15 @@
   };
   const FILTERS: readonly ForkFilter[] = ["all", "quiet", "user"];
 
-  // One row per pickable thing, oldest first: the person's task, then
-  // each turn with the person's words that arrived inside it. The
-  // opening task has no line of its own on the wire, so it rides the
-  // first turn - its turn's parent - and a run still on its first call
-  // offers no message rows at all.
   interface Row {
     readonly id: string;
     readonly entry: ForkEntry;
     readonly label: string;
     readonly secondary?: string;
-    // Whether this row's turn reached for tools: the one question the
-    // `quiet` filter asks of every row.
     readonly tools: boolean;
   }
 
   let filter = $state<ForkFilter>("all");
-  // The row the cursor sits on in the left list; the right list answers
-  // it. Rows the cursor visits in the right list leave it alone, or the
-  // calls would slide out from under the person.
   let cursor = $state("");
 
   const turns = $derived(rounds.turns);
@@ -102,8 +89,6 @@
     }
   });
 
-  // The turn the right column speaks for: the one under the cursor, and
-  // the first row's when no cursor has landed yet.
   const held = $derived(rows.find((row) => row.id === cursor) ?? shown.at(0));
   const calls = $derived(held?.entry.turn.calls ?? []);
   const heldPlan = $derived(held === undefined ? null : planFork(rounds.run, held.entry));
@@ -125,10 +110,6 @@
     { id: "calls", label: "talk_calls", rows: calls.map(callRow) },
   ]);
 
-  // The picker opens over the box and this line stands under it: which
-  // list is showing, that the conversation being branched from stays as
-  // it is, and - when the cursor has landed inside a call still open -
-  // where the branch will really cut.
   const footer = $derived.by((): string => {
     const told = `${say($lang, FILTER_KEY[filter])} · ${say($lang, "fork_keeps")}`;
     return heldPlan?.walkedBack ? `${told} · ${say($lang, "fork_safe_point")}` : told;
@@ -145,9 +126,6 @@
     if (rowId !== null && !rowId.startsWith("c:")) cursor = rowId;
   }
 
-  // Ctrl-O cycles the list's narrowing. The accelerator is held, so the
-  // chord belongs to the shell even while the person is typing
-  // elsewhere; the file dialog the browser would open is not theirs.
   function keys(event: KeyboardEvent): void {
     if (!event.ctrlKey || event.metaKey || event.key.toLowerCase() !== "o") return;
     event.preventDefault();

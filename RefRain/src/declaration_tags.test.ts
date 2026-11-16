@@ -7,12 +7,6 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 
-// A Svelte declaration tag, `{const x = …}` or `{let x = …}`, runs once
-// when its block is created and never again, so a value it reads from
-// state is frozen at that moment: the building tree's folders held
-// their first openness and ignored every click. `{@const}` is derived
-// and follows the state it reads, which is what every template here
-// means, so the plain declaration tag has no seat in this client.
 const DECLARATION_TAG = /^\s*\{(?:const|let)\s/;
 
 function svelteFiles(dir: string): readonly string[] {

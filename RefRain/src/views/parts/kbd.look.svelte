@@ -6,9 +6,6 @@
 -->
 
 <script lang="ts">
-  // One chord, drawn: one glyph per `<kbd>`, no focus and no keys of its
-  // own. Quiet ink, because a chord beside a control is a reminder, not
-  // the control.
   import type { KbdLook } from "./kbd";
 
   const { marks, class: placed }: KbdLook = $props();

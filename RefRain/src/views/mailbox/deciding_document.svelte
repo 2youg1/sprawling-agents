@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { readAnswer } from "../../core/answered";
   import { say } from "../../core/lang";
   import { buildingOf } from "../../core/route";
@@ -22,11 +20,9 @@
 
   interface Props {
     readonly doc: Address;
-    
-    
+
     readonly at: TimeMs | null;
-    
-    
+
     readonly onLeave: () => void;
   }
 
@@ -49,7 +45,7 @@
       <Card {doc} {card} version={read.value.version ?? null}>
         {#snippet lead()}
           <p class="text-note text-text-quiet">{say($lang, WHY.proposal)}</p>
-          
+
           <p class="font-mono text-note wrap-anywhere text-text-quiet">{doc}</p>
           <div class="flex min-w-0 items-center gap-snug">
             <span class="min-w-0 flex-1 text-note text-text-faint"

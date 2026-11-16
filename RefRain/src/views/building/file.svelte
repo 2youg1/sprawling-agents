@@ -6,16 +6,6 @@
 -->
 
 <script lang="ts">
-  // A file as it is on disk: Markdown set as prose unless the reader
-  // asks for the source, everything else numbered line by line. The
-  // head of the file says where it is, and says how much was left out
-  // when the answer was cut short.
-  //
-  // **Rendered Markdown is a reading column and the source is not.**
-  // The prose takes the `measure` tier and is centred inside its pane -
-  // one of the two seats `mx-auto` is allowed in (docs/frontend-method.md §4-33) -
-  // while numbered lines grow to their longest line and scroll, because
-  // code and tables are never capped.
   import { putSpine } from "../../core/commands";
   import { readDocument } from "../../core/document";
   import { fill, say } from "../../core/lang";
@@ -31,9 +21,6 @@
   import { textBoxWire } from "./text_box";
   import TextBox from "./text_box.look.svelte";
 
-  // The four documents a person may write through this door. `PutSpine`
-  // names one of them and never a path, so a file outside this table has
-  // no control to draw and no way to be written from here.
   const SPINE: Record<string, SpineDocument | undefined> = {
     "Roadmap.md": "roadmap",
     "Memo.md": "memo",
@@ -53,8 +40,6 @@
 
   const question = $derived<Query>({ document: { at } });
   const asked = $derived(u.conn.asking.ask(question));
-  // Three readings, not two: still asking, the city could not look (a
-  // file it does not hold answers this way too), or the head itself.
   const read = $derived(readDocument($asked));
   const doc = $derived(read.kind === "held" ? read.value : undefined);
 
@@ -63,9 +48,6 @@
   let editing = $state(false);
   let draft = $state("");
 
-  // Which spine document this is, and the building it belongs to. The
-  // name decides, and the building is whatever stands above it: these
-  // four sit at a building's root, so the path already says both.
   const spine = $derived.by((): { which: SpineDocument; building: Address } | null => {
     const cut = at.lastIndexOf("/");
     if (cut < 0) return null;
@@ -80,9 +62,6 @@
     editing = true;
   }
 
-  // The body is sent whole with the text the person started from, so a
-  // resident that rewrote the file underneath is refused rather than
-  // written over.
   function save(): void {
     const to = spine;
     const held = doc;
@@ -91,8 +70,6 @@
   }
 
   const lines = $derived(doc === undefined ? [] : doc.text.split("\n").map((text) => ({ text })));
-  // The gutter is as wide as the largest line number it holds plus one,
-  // in the same face as the code it numbers.
   const gutter = $derived(`${String(String(lines.length).length + 1)}ch`);
 </script>
 
@@ -104,7 +81,6 @@
     {/if}
     <span class="flex-1"></span>
     {#if markdown && doc !== undefined && !doc.binary}
-      <!-- wording-ok: the name of the file format this toggle shows the source of -->
       <SourceToggle
         label=".md"
         pressed={raw}
@@ -155,9 +131,6 @@
           </div>
         {:else}
           <ol class="overflow-x-auto font-mono text-note leading-read text-text-quiet">
-            <!-- Each line carries its own identity, so a file that
-                 repeats a line keys no two rows alike; the number beside
-                 it is the position, which is what the number says. -->
             {#each lines as line, index (line)}
               <li class="flex whitespace-pre">
                 <span

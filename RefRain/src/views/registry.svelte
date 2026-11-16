@@ -4,15 +4,6 @@
   // file, You can obtain one at https://mozilla.org/MPL/2.0/.
   // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-  // What this city has decided is worth keeping: one line per asset a run
-  // filed, with when it was filed, what kind of thing it is, the building
-  // it belongs to, and what it is about.
-  //
-  // The registry is the one place an external event that outlived its run
-  // can be found, and until this screen existed `Query::RegistryView` had
-  // no reader at all - a question the city answers and nobody asks is a
-  // defect of the same family as an answer nobody draws.
-
   export { default as RegistryTable } from "./registry/table.svelte";
 </script>
 
@@ -26,8 +17,6 @@
   import Table from "./registry/table.svelte";
 
   interface Props {
-    // Whether this is the page or a fixture inside one: a document may
-    // have exactly one heading of the page's own rank.
     readonly rank?: "page" | "section" | undefined;
   }
 
@@ -43,9 +32,6 @@
   const answer = $derived(read.kind === "held" ? read.value : undefined);
 </script>
 
-<!-- The screen: the one question, and the table that draws its answer.
-A table is not capped by content kind (docs/frontend-method.md §4-33) - it grows with
-its container and scrolls sideways rather than break a value. -->
 {#snippet count()}
   {#if answer !== undefined && answer.assets.length > 0}
     <span class="figure text-note text-text-quiet"

@@ -6,16 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // The city's runs board: the lineage tree of `sprawling view` with a
-  // time bar on every run, the runs waiting for the person pinned above
-  // it and leading the tree. The keys are the terminal's - the line keys
-  // of `core/lines.ts` move (j and k, gg and G, the arrows, Home and End),
-  // h and l fold - so a person who learned one learned both.
-  //
-  // **Only the rows on screen are drawn.** A city of a thousand runs is
-  // a thousand rows; the list keeps the viewport's rows and a margin,
-  // and pads the rest, so the cost of the board is its height.
-
   import type { BoardRun } from "./lineage";
 
   export interface RunsBoardProps {
@@ -26,10 +16,6 @@
 </script>
 
 <script lang="ts">
-  // The seat (client D95): it owns the tree's state - which rows are
-  // folded, where the cursor stands, which rows are drawn - and the keys
-  // that change it, asks `lookOf` (`./board`) for the whole value, and
-  // draws whatever `./board.look.svelte` is.
   import { Option } from "effect";
   import { SvelteSet } from "svelte/reactivity";
   import { createAttachmentKey } from "svelte/attachments";
@@ -46,8 +32,6 @@
   const u = ui();
   const { lang } = u;
 
-  // Rows drawn beyond each edge of the viewport, so a fast scroll meets
-  // drawn rows rather than padding.
   const MARGIN = 12;
 
   const folded = new SvelteSet<string>();
@@ -67,9 +51,6 @@
     ),
   );
 
-  // Measured here rather than bound: a bound height observes the list,
-  // and the padding that stands in for undrawn rows resizes it, which
-  // is a resize loop the browser reports as an error.
   $effect(() => {
     if (list === undefined || rows.length === 0) return;
     if (rowPx === 0) rowPx = list.querySelector("li")?.getBoundingClientRect().height ?? 0;
@@ -121,8 +102,6 @@
     event.preventDefault();
   }
 
-  // h and l, and the side arrows, fold and unfold the row under the
-  // cursor: the tree's own keys, not a list's.
   function folding(event: KeyboardEvent, row: Row | undefined): void {
     const openable = row !== undefined && row.kind !== "run";
     switch (event.key) {
@@ -140,7 +119,6 @@
     event.preventDefault();
   }
 
-  // A row opens the page of what it names (S07 E36).
   function open(row: Row): void {
     cursorKey = row.key;
     Option.map(viewOf(row), u.go);

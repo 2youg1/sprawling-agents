@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the inspector's terminal prints for one call (docs/frontend-method.md §7F).
-//
-// **The Ledger is the authority on a command's output; the live tail is a
-// preview of it.** While the call is waiting, the terminal prints what
-// the running command has written so far (`core/live_output.ts`); the
-// moment the call has an outcome, it prints the result the Ledger holds
-// and the tail is not read again, even if a stale one is still in hand.
-// A command's line, its two streams and its exit code are read the way
-// the monitor reads them (`monitor/trace.ts`), so the two terminals of
-// this client cannot disagree about what a command printed.
-
 import { Option, Schema } from "effect";
 
 import type { Tail } from "../../core/live_output";
@@ -23,23 +12,15 @@ import { lastedOf } from "../talk/timing";
 import { commandOf, type CeilingNote, type Ending } from "../monitor/trace";
 
 export interface Printed {
-  // The command line, or what any other call was called on.
   readonly line: string;
   readonly out: string;
   readonly err: string;
-  // Lines the view withheld from `out` and `err` together.
   readonly cut: number;
-  // How a command ended; `null` for a call that is not a command.
   readonly ending: Ending | null;
-  // Milliseconds from call to answer, and the moment it was answered;
-  // both `null` until it is.
   readonly took: number | null;
   readonly finished: TimeMs | null;
-  // Where the whole original is kept, when the city kept it.
   readonly pinned: Locator | null;
-  // Whether `out` and `err` are the live tail rather than the Ledger's.
   readonly live: boolean;
-  // What the result said about the person's memory ceiling.
   readonly ceilings: readonly CeilingNote[];
 }
 

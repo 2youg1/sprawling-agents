@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import type { Address } from "../wire";
   import Search from "./finder/search.svelte";
   import { modalHold, modalWire } from "./modal";

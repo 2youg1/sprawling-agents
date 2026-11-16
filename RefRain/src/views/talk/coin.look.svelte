@@ -4,12 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the coin key is drawn, and nothing else (docs/frontend-method.md
-  // §7I): send and pause are two faces of one key that turns about its
-  // vertical axis. With motion off or reduced the faces cross-fade in
-  // place instead. The idle face is not drawn — an empty box with no
-  // run leaves the ring alone. The tip always names the command a press
-  // would send, so the key and the context ring stay distinguishable.
   import type { Snippet } from "svelte";
 
   import Glyph from "../parts/glyph.svelte";
@@ -18,9 +12,6 @@
 
   const look: CoinLook = $props();
 
-  // The checker types a `{#snippet}` name as a void call, which the lint
-  // lane rejects inside a render tag; the name is taken again as its
-  // `Snippet` type, and the template renders that.
   const key: Snippet<[string | undefined]> = drawKey;
 </script>
 
@@ -56,9 +47,6 @@
     flex-shrink: 0;
     width: var(--spacing-coin);
     height: var(--spacing-coin);
-    /* Seven and a half key widths away: near enough that the half turn
-     * reads as a coin turning, far enough that its edge never fills the
-     * key. */
     perspective: calc(var(--spacing-coin) * 7.5);
     transition:
       scale var(--transition-duration-short) var(--ease-leave),
@@ -90,8 +78,7 @@
   .face[data-face="stop"] {
     transform: rotateY(180deg);
   }
-  /* Hover lifts the wash and grows the key a hair; a press yields by the
-   * theme's press scale; release returns on the leave curve. */
+
   .coin:hover .face {
     background-color: color-mix(in oklch, var(--color-text) 8%, var(--color-page));
     transition-timing-function: var(--ease-arrive);
@@ -103,8 +90,7 @@
   .coin[data-up="stop"] .faces {
     transform: rotateY(180deg);
   }
-  /* Dispatch takes the accent; steer keeps the quieter ink so the two
-   * send kinds stay distinguishable before the tip is read. */
+
   .coin[data-kind="dispatch"] .face[data-face="send"] {
     color: var(--color-accent);
   }

@@ -5,12 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  // What an approval card asks about, drawn on the card. The one line
-  // of `action_desc` names the question; the artifact is the thing the
-  // question is about, and a person who has to open another page to
-  // read it answers slower or answers blind. Bounded like a tool's
-  // output, and cut by the same content answer the file view reads.
-
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Look from "./asked.look.svelte";
@@ -19,8 +13,6 @@
 
   interface Props {
     readonly locator: Locator;
-    // The content a caller hands in place of a city; absent, the card
-    // asks for it.
     readonly content?: ContentAnswer | undefined;
   }
 

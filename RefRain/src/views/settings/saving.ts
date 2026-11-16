@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { AxCode, AxError } from "../../wire";
 
 export type Saving =
@@ -16,9 +15,7 @@ export type Saving =
 
 export const HELD: Saving = { kind: "held" };
 
-
 export const RECEIPT_MS = 15_000;
-
 
 const WRITE_REFUSED: ReadonlySet<AxCode> = new Set<AxCode>([
   "E_CONFIG_INVALID",
@@ -26,16 +23,13 @@ const WRITE_REFUSED: ReadonlySet<AxCode> = new Set<AxCode>([
   "E_STORAGE_FATAL",
 ]);
 
-
 export function edited(changed: boolean): Saving {
   return changed ? { kind: "draft" } : HELD;
 }
 
-
 export function sent(from: string): Saving {
   return { kind: "saving", from };
 }
-
 
 export function answered(saving: Saving, version: string): Saving {
   switch (saving.kind) {
@@ -50,7 +44,6 @@ export function answered(saving: Saving, version: string): Saving {
   }
 }
 
-
 export function refused(saving: Saving, error: AxError): Saving {
   switch (saving.kind) {
     case "saving":
@@ -64,17 +57,14 @@ export function refused(saving: Saving, error: AxError): Saving {
   }
 }
 
-
 export function waited(saving: Saving): Saving {
   return saving.kind === "saving" ? { kind: "unverified", from: saving.from } : saving;
 }
-
 
 export interface Slot {
   readonly now: () => Saving;
   readonly mark: (saving: Saving) => void;
 }
-
 
 export function awaitReceipt(mine: Saving, slot: Slot): void {
   setTimeout(() => {

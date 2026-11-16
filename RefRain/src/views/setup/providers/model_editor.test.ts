@@ -19,7 +19,6 @@ import {
   awaiting,
   choose,
   freshModelEditor,
-  lookOf,
   refresh,
   refuse,
   save,
@@ -28,6 +27,7 @@ import {
   untick,
 } from "./model_editor";
 import type { Hands } from "./model_editor";
+import { lookOf } from "./model_editor_look";
 
 function model(id: string, listing: "listed" | "named" = "listed"): ModelFactsSummary {
   return {

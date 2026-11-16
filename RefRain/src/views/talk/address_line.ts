@@ -3,15 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
 import type { Seq } from "../../wire";
 import type { Arrival } from "../palette_door.svelte";
 
-
 export type At = "head" | "box";
-
 
 export interface BoxWords {
   readonly before: string;
@@ -19,7 +16,6 @@ export interface BoxWords {
 }
 
 const ADDRESS_SLOT = "{address}";
-
 
 export function boxWords(lang: Lang): BoxWords {
   const phrase = say(lang, "talk_placeholder_address");
@@ -33,11 +29,9 @@ export interface AddressLineWire {
   readonly "aria-haspopup": "dialog";
   readonly "aria-label": string;
   readonly onclick: () => void;
-  
-  
+
   readonly onpointerdown: (event: Pressed) => void;
 }
-
 
 export interface Pressed {
   readonly pointerType: string;
@@ -45,18 +39,14 @@ export interface Pressed {
 }
 
 export interface AddressLineLook {
-  
   readonly head: string;
-  
-  
+
   readonly building: string;
   readonly room: string;
-  
-  
+
   readonly session: string | undefined;
   readonly wire: AddressLineWire;
 }
-
 
 export interface Lesson {
   readonly words: string;

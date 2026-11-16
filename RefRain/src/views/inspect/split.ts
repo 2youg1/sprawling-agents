@@ -3,30 +3,25 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { createAttachmentKey } from "svelte/attachments";
 import type { Attachment } from "svelte/attachments";
 
 export interface SplitProps {
-  
-  
   readonly lines: number;
   readonly least: number;
   readonly most: number;
-  
+
   readonly controls: string;
-  
+
   readonly step: number;
   readonly onLines: (lines: number) => void;
   readonly onReset: () => void;
 }
 
-
 export interface Grip {
   readonly y: number;
   readonly lines: number;
 }
-
 
 export interface SplitHands {
   readonly capture: (pointer: number) => void;
@@ -34,10 +29,8 @@ export interface SplitHands {
   readonly grip: { from: Grip | null };
 }
 
-
 export type KeyPress = Pick<KeyboardEvent, "key" | "preventDefault">;
 export type PointerPress = Pick<PointerEvent, "clientY" | "pointerId">;
-
 
 export interface SplitWire {
   readonly role: "separator";
@@ -56,11 +49,9 @@ export interface SplitWire {
   readonly [hold: symbol]: Attachment<HTMLElement>;
 }
 
-
 export interface SplitLook {
   readonly wire: SplitWire;
 }
-
 
 export type Keyed =
   { readonly kind: "lines"; readonly lines: number } | { readonly kind: "reset" } | undefined;
@@ -86,7 +77,6 @@ export function keyed(props: Pick<SplitProps, "lines" | "least" | "most">, key: 
   }
 }
 
-
 export function dragged(
   props: Pick<SplitProps, "least" | "most" | "step">,
   from: Grip,
@@ -96,7 +86,6 @@ export function dragged(
 }
 
 const HOLD = createAttachmentKey();
-
 
 export function lookOf(props: SplitProps, label: string, hands: SplitHands): SplitLook {
   const { grip } = hands;

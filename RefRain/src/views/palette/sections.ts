@@ -6,7 +6,6 @@
 import type { Key } from "../../core/lang";
 import type { Section } from "../../core/slash_hands";
 
-// The word for each section a verb names for itself in `core/slash.ts`.
 export const SECTION_WORD: Readonly<Record<Section, Key>> = {
   actions: "palette_group_actions",
   navigation: "palette_group_navigation",

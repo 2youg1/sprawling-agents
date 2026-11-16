@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Key, Lang } from "../../core/lang";
 import { say } from "../../core/lang";
 import { MAYOR, toFragment } from "../../core/route";
@@ -11,14 +10,12 @@ import type { View } from "../../core/route";
 import { count, usd } from "../../core/time";
 import type { MetricsAnswer } from "../../wire";
 
-
 interface Figure {
   readonly label: Key;
   readonly of: (held: MetricsAnswer) => number;
   readonly to: View | null;
   readonly waits: boolean;
 }
-
 
 const FIGURES: readonly Figure[] = [
   {
@@ -44,14 +41,12 @@ const FIGURES: readonly Figure[] = [
   },
 ];
 
-
 export interface ReadingLook {
   readonly key: string;
   readonly label: string;
   readonly value: string;
   readonly tone: "alert" | "plain";
-  
-  
+
   readonly wire: { readonly href: string } | null;
 }
 
@@ -59,7 +54,6 @@ export interface BarLook {
   readonly label: string;
   readonly readings: readonly ReadingLook[];
 }
-
 
 export function barLookOf(
   metrics: MetricsAnswer | null,

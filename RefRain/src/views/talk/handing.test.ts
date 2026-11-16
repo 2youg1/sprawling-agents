@@ -13,7 +13,6 @@ import { IDLE, NOT_CONVERSING, claims, hand, settle } from "./handing";
 
 const WORDS = "add a test for price";
 
-// The refusal a city without a main model answers a dispatch with.
 const NO_MODEL: AxError = {
   action: "choose the main model",
   code: "E_CONFIG_INVALID",
@@ -37,8 +36,6 @@ function started(at: number): EventRecord {
 }
 
 describe("the words a box handed to the city", () => {
-  // The defect: the box emptied when the socket took the frame, and the
-  // refusal that came after it had nothing to give back.
   test("a refused line goes back into the empty box", () => {
     const store = createBelief(() => 0);
     const handing = hand(WORDS, get(store.belief));
@@ -56,10 +53,6 @@ describe("the words a box handed to the city", () => {
     });
   });
 
-  // An accepted line must never come back: a person who meets it in the
-  // box again sends it twice. The city recording anything after the
-  // send ends the wait, so a later refusal of some other command
-  // cannot refill the box.
   test("a line the city recorded after is not given back", () => {
     const store = createBelief(() => 0);
     const handing = hand(WORDS, get(store.belief));
@@ -70,8 +63,6 @@ describe("the words a box handed to the city", () => {
     expect(settle(accepted.handing, get(store.belief), "")).toEqual({ handing: IDLE, box: null });
   });
 
-  // A refusal already on the page when the words went out is not the
-  // answer to them.
   test("a refusal older than the send leaves the words handed", () => {
     const store = createBelief(() => 0);
     store.refused(NO_MODEL);
@@ -81,9 +72,6 @@ describe("the words a box handed to the city", () => {
 });
 
 describe("which refusal the conversation draws itself", () => {
-  // The defect: a refused dispatch was said twice, by the card in the
-  // conversation and by the toast in the corner. Either may read the
-  // refusal first, so both readings of the claim are held here.
   test("a conversation still waiting claims the refusal that settles its words", () => {
     const store = createBelief(() => 0);
     const handing = hand(WORDS, get(store.belief));
@@ -100,8 +88,6 @@ describe("which refusal the conversation draws itself", () => {
     expect(claims({ kind: "answered", refusal: drawn }, drawn, now)).toBe(true);
   });
 
-  // A refusal of a command sent from somewhere else - the palette, the
-  // settings - has no card, so the corner is its one place.
   test("a refusal nobody in the conversation waited on stays the corner's", () => {
     const store = createBelief(() => 0);
     store.refused(NO_MODEL);

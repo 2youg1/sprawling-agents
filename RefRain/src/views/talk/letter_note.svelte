@@ -3,12 +3,6 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- What a resident said to this room, drawn as a letter rather than
-as the User's bubble (client D86): left-aligned, unfilled, with an
-accent edge, and headed by the kind it was sent as, who sent it, linked
-to the sender's room, the session that sent it, and when it arrived
-(wire D43, client D90). A letter whose sending was not paired says
-"letter" and links the room only, rather than guess either. -->
 <script lang="ts">
   import { ui } from "../../ui";
   import { say } from "../../core/lang";

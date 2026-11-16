@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { SvelteMap } from "svelte/reactivity";
   import { get } from "svelte/store";
 
@@ -27,21 +25,18 @@
   import { held as heldBy, released, within } from "./refusal";
   import Look from "./refusal.look.svelte";
 
-  
   const VISIBLE = 3;
   const LIFE = 8_000;
 
-  
   type Said =
     { readonly kind: "refused"; readonly refused: Refused } | { readonly kind: "no_run_in_front" };
 
   interface Toast {
     readonly id: number;
     readonly said: Said;
-    
-    
+
     gone: boolean;
-    
+
     clock: Clock;
   }
 
@@ -56,7 +51,6 @@
   let heard: AxError | null = null;
   const timers = new SvelteMap<number, number>();
 
-  
   function aboutOf(error: AxError): Refused["about"] {
     const found = $belief.notices.find(
       (notice) => notice.error.code === error.code && notice.error.subject === error.subject,
@@ -101,8 +95,6 @@
   }
 
   function push(said: Said): void {
-    
-    
     const kept = toasts.filter((each) => !each.gone);
     for (const oldest of kept.slice(0, Math.max(0, kept.length + 1 - VISIBLE))) {
       leave(oldest);
@@ -118,7 +110,6 @@
     arm(next);
   }
 
-  
   let held: Refused[] = [];
   let wake: number | undefined;
   const attention = attending(u.conversing, u.now, release);
@@ -127,7 +118,6 @@
     window.clearTimeout(wake);
   });
 
-  
   function unread(error: AxError): boolean {
     return get(belief).notices.some((notice) => notice.error === error && !notice.seen);
   }
@@ -147,7 +137,6 @@
     if (due !== null) wake = window.setTimeout(release, due - now);
   }
 
-  
   $effect(() => {
     const refusal = $belief.refusal;
     if (refusal === null || refusal === heard) {
@@ -165,7 +154,6 @@
     release();
   });
 
-  
   let stand = $state.raw<Stand>({ kind: "foot" });
   const standing = $derived(toasts.some((toast) => !toast.gone));
   $effect(() => {
@@ -195,7 +183,6 @@
     };
   });
 
-  
   let answered = 0;
   $effect(() => {
     if (stopsWithoutRun === answered) return;

@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
 </script>
 
 <script lang="ts">
@@ -42,12 +40,10 @@
   import ContextReport from "./talk/context_report.svelte";
 
   interface Props {
-    
     readonly following: readonly RightItem[];
-    
-    
+
     readonly current: RoundsAnswer | undefined;
-    
+
     readonly talk: Address;
   }
 
@@ -61,13 +57,11 @@
     terminal: "inspector-terminal",
   };
 
-  
   const LEAST = 6;
 
   const held = $derived(openItems());
   const items = $derived(held.length > 0 ? held : following);
 
-  
   const runs = $derived([
     ...new Set(items.flatMap((item) => (item.kind === "call" ? [item.run] : []))),
   ]);
@@ -90,7 +84,6 @@
       : new Map([...$asked, [current.run, current]]),
   );
 
-  
   function callOf(
     item: RightItem,
   ): { readonly rounds: RoundsAnswer; readonly call: Call | null } | null {
@@ -108,7 +101,6 @@
     return call === null ? "editor" : regionOf(readingOf(call));
   }
 
-  
   const SHORT = 7;
 
   function labelOf(item: RightItem): string {
@@ -129,7 +121,6 @@
   );
   const front = $derived(held.length > 0 ? rightItem() : (following[0] ?? null));
 
-  
   function linkOf(item: RightItem): string | null {
     switch (item.kind) {
       case "call":
@@ -156,7 +147,6 @@
     }
   }
 
-  
   function frontOf(region: Region): RightItem | null {
     return held.length > 0
       ? frontWhere((item) => regionOfItem(item) === region)
@@ -167,7 +157,6 @@
   const editorFront = $derived(frontOf("editor"));
   const terminalFront = $derived(frontOf("terminal"));
 
-  
   function pick(item: RightItem): void {
     markStart("panel_frame");
     if (held.length === 0) for (const kept of following) if (!sameItem(item, kept)) showItem(kept);
@@ -186,7 +175,6 @@
     u.prefs.setPanel(false);
   }
 
-  
   let step = $state(24);
   onMount(() => {
     const baseline = Number.parseFloat(

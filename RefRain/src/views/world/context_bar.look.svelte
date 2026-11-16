@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts">
-  // How a sessions row's context bar is drawn, and nothing else: a hair
-  // of track, the used share filled from the left, and the handoff
-  // checkpoint drawn by the same look the context ring uses. The share
-  // in words, already said, is for a screen reader; the bar is drawing.
   import Checkpoint from "../talk/checkpoint.look.svelte";
   import type { ContextBarLook } from "../talk/gauge";
 

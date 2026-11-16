@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
 </script>
 
 <script lang="ts">
@@ -25,13 +23,12 @@
   interface Props {
     readonly tabs: readonly Tab[];
     readonly front: RightItem | null;
-    
+
     readonly panels: Readonly<Record<Region, string>>;
     readonly onPick: (item: RightItem) => void;
     readonly onClose: (item: RightItem) => void;
     readonly onCloseAll: () => void;
-    
-    
+
     readonly linkOf: (item: RightItem) => string | null;
   }
 
@@ -39,7 +36,6 @@
 
   const lang = ui().lang;
 
-  
   const drawn: Record<string, HTMLElement | undefined> = {};
   const holds: Record<string, Attachment<HTMLElement> | undefined> = {};
 
@@ -56,7 +52,6 @@
     return made;
   }
 
-  
   async function focusAt(at: number): Promise<void> {
     await tick();
     const tab = tabs[at];

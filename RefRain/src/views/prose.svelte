@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import Laid from "./editor/laid.svelte";
   import { laidReply } from "./reply.svelte";
   import { copiedSource } from "./talk/copying";
@@ -21,7 +19,6 @@
   const laid = laidReply(() => text, "settled");
   const rest = $derived(text.slice(laid.reached));
 
-  
   function copy(event: ClipboardEvent): void {
     const drawn = event.currentTarget;
     const chosen = document.getSelection();

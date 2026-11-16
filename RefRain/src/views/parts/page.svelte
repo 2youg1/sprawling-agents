@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  // The seat of the page frame (`./page`): it decides which heading
-  // takes focus and draws whatever `./page.look.svelte` is.
   import { pageOf } from "./page";
   import type { PageProps } from "./page";
   import Look from "./page.look.svelte";

@@ -5,17 +5,10 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- How the recycle bin is drawn (`./bin`, `BinLook`): a row per
-discard, what and when on the first line with whether it is back, and
-the way back under it. The press that restores is the client's one
-button, in its quiet tone, at the end of the line it acts on. A row is
-two lines, so it is not a `settled-row`, whose deferral reserves one
-step and lets the second line spill out of the row until it is in view. -->
 <script lang="ts">
   import Button from "../parts/button.svelte";
   import Path from "../parts/path.svelte";
   import type { BinLook, Standing } from "./bin";
-
   const look: BinLook = $props();
 
   const INK: Record<Standing, string> = {

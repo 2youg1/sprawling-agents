@@ -3,13 +3,8 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- How who is listening is drawn (client D95): a heading, then one
-term per listener with who it is, the size of its segment, what the
-budget cut off it and the files it was read from. Nothing here is a
-control; the palette's keys belong to its list. -->
 <script lang="ts">
   import type { ListeningLook } from "./listening";
-
   const look: ListeningLook = $props();
 </script>
 
@@ -38,8 +33,6 @@ control; the palette's keys belong to its list. -->
 </div>
 
 <style>
-  /* The words that name the listeners take their own width and the rest
-   * of the row goes to what each was told. */
   .listeners {
     grid-template-columns: max-content minmax(0, 1fr);
   }

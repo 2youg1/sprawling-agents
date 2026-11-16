@@ -6,9 +6,6 @@
 -->
 
 <script lang="ts">
-  // How an unanswered question is drawn (`./unanswered`,
-  // `UnansweredLook`): the sentence, the city's reason in its own
-  // words, and the one recovery.
   import Button from "./button.svelte";
   import type { UnansweredLook } from "./unanswered";
 

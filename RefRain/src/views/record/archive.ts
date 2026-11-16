@@ -3,14 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the archive's list of hits is given (client D95: a seat, a look
-// and this file): one row per hit, the day and the kind it was filed
-// under, the building as the link to it, and what was filed.
-
 import { toFragment } from "../../core/route";
 import type { ArchiveHit } from "../../wire";
 
-// Spread on the building's anchor.
 export interface HitWire {
   readonly href: string;
 }
@@ -31,8 +26,6 @@ export interface ArchiveLook {
 export function lookOf(hits: readonly ArchiveHit[]): ArchiveLook {
   return {
     hits: hits.map((hit, at) => ({
-      // Two hits may say the same thing on the same day; where each
-      // stands in the answer is what tells them apart.
       key: `${String(at)}\u0000${hit.building}`,
       day: String(hit.day),
       kind: hit.kind,

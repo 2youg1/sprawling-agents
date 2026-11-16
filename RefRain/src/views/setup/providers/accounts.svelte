@@ -6,17 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // The seat of one account editor - a provider's or a search
-  // supplier's, as the roster it is handed says: it holds the editor's
-  // state, lends the wiring (`./account_editor`, `./accounts`) the page's doors - the
-  // socket, the vault route, the language - and the two elements focus
-  // returns to, and draws whatever `./accounts.look.svelte` is. What a
-  // press does is decided in the wiring and nowhere here (client D93).
-  //
-  // The city's refusal of a list this editor sent is this editor's to
-  // show, beside the list, for the same reason the attach form keeps
-  // its own: the corner is for refusals no open page is responsible for.
-
   import type { Roster } from "./account_editor";
   import type { FlightState } from "./flight";
 
@@ -45,10 +34,6 @@
 
   const editor: Editor = $state(freshEditor());
   let heading: HTMLElement | undefined;
-  // Two registries no draw reads, so plain records rather than
-  // reactive maps: a `SvelteMap` read inside the derived look and
-  // written by the attachment it hands out would be a write during a
-  // derivation.
   const held: Record<string, HTMLElement | undefined> = {};
   const attachments: Record<string, Attachment<HTMLElement> | undefined> = {};
 
@@ -67,8 +52,6 @@
     ...(flight === undefined ? {} : { flight }),
   }));
 
-  // One attachment per control for the life of the seat, so a redraw
-  // does not let go of an element and take it again.
   const holds: Holds = {
     heading: (node) => {
       heading = node;

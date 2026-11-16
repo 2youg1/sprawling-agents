@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The wiring of the folded part of the attach form: everything a person
-// may state about an endpoint and almost nobody has to, as the whole
-// value a look draws (`AdvancedLook`). Every change leaves through
-// `setDraft`, the form's own setter, because the draft is the form's
-// state and this fold is a set of boxes standing at a distance from it.
-// Nothing here touches the DOM or uses a rune.
-
 import { say } from "../../../core/lang";
 import type { Key, Lang } from "../../../core/lang";
 import type { Proxying, TuningDefaults } from "../../../wire";
@@ -27,16 +20,11 @@ import type { Draft, Line, TuningField } from "./draft";
 
 export type SetDraft = <K extends keyof Draft>(part: K, value: Draft[K]) => void;
 
-// What the fold is lent by its seat.
 export interface Hands {
   readonly setDraft: SetDraft;
-  // A rename retires the last report: what it said was about the name
-  // the form carried then.
   readonly onRenamed: () => void;
 }
 
-// The three tuning figures, each with the word it is offered under and
-// the step one arrow key moves it by.
 const TUNING: readonly (readonly [Key, TuningField, number])[] = [
   ["setup_timeout_ms", "timeoutMs", 1000],
   ["setup_request_retries", "requestRetries", 1],
@@ -69,7 +57,6 @@ export interface PairRowLook {
   readonly remove: { readonly label: string; readonly press: () => void };
 }
 
-// One boxed key-value table: the word over it and the rows it edits.
 export interface PairTableLook {
   readonly key: "headers" | "overrides";
   readonly title: string;
@@ -79,10 +66,6 @@ export interface PairTableLook {
 
 export interface AdvancedLook {
   readonly title: string;
-  // The two naming boxes lead, because they are the two the form stopped
-  // asking for on the way in; each shows its derived value as the
-  // placeholder, so an empty box is a statement of what will be used
-  // rather than a question nobody answered.
   readonly naming: readonly BoxLook[];
   readonly tuning: readonly BoxLook[];
   readonly proxying: {
@@ -93,13 +76,9 @@ export interface AdvancedLook {
     readonly help: string;
     readonly note: string | undefined;
   };
-  // A header every request carries, and a JSON pointer into the body it
-  // sends.
   readonly tables: readonly PairTableLook[];
 }
 
-// One row's name or value, replaced in the list by the row's own key,
-// so the box a person is typing in never becomes somebody else's row.
 export function retyped(
   rows: readonly Line[],
   key: string,
@@ -192,9 +171,6 @@ export function lookOf(
   };
 }
 
-// A row with no name is left out where the value is read (`./draft`),
-// because the form keeps an empty row open while somebody types into it
-// and a half-written header must not reach a provider.
 function pairTable(
   part: "headers" | "overrides",
   rows: readonly Line[],

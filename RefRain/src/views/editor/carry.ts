@@ -3,24 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Which place a change of reading carries over. Only a Markdown preview
-// has blocks to carry a place to and from; the source and the diff are
-// one editor, so a switch between them carries nothing.
-
 import type { Reading } from "./reading";
 
-// Where the reader stands in the editor: the first line in view, as an
-// editor offset in the baseline. The caret is not the place, because a
-// reader scrolls away from it to read, and the switch keeps what they
-// read at the top.
 export interface EditorPlace {
   readonly top: number;
 }
 
 export type Carried =
-  // The preview opens with the block holding this baseline offset.
   | { readonly kind: "preview_at"; readonly offset: number }
-  // The editor scrolls so this baseline byte is its first line.
   | { readonly kind: "editor_at"; readonly byte: number }
   | { readonly kind: "nothing" };
 

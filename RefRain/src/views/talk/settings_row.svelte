@@ -1,5 +1,3 @@
-
-
 <script lang="ts">
   import { untrack } from "svelte";
   import type { Attachment } from "svelte/attachments";
@@ -26,8 +24,7 @@
     readonly room: Address | null;
     readonly draws: RowDraws;
     readonly kept: boolean;
-    
-    
+
     readonly menu?: RowStarts;
   }
 
@@ -50,8 +47,7 @@
 
   let menu = $state<RowMenu>(menuOf(untrack(() => starts)));
   let preview = untrack(() => starts) !== "closed";
-  
-  
+
   let drawnOpen = untrack(() => starts) !== "closed";
   let segment = $state<Segment | null>(startSegment(untrack(() => starts)));
   let pick = $state<PickerHeld["pick"]>(null);
@@ -61,7 +57,6 @@
   let binding = $state<PopoverBinding | null>(null);
   let active = $state<string | null>(null);
 
-  
   const pinnedNow = (): PickerHeld["pinned"] => {
     const offers = offersOf(picker.endpoints);
     const order = orderOf(offers);
@@ -74,11 +69,9 @@
   };
   let pinned = $state<PickerHeld["pinned"]>(untrack(pinnedNow));
   let opened = $state<Combination | null>(untrack(() => inForce(picker)));
-  
-  
+
   let ended: Combination | null = null;
 
-  
   const drawn: Record<"token" | "frame" | "permission" | "policyFrame", HTMLElement | undefined> = {
     token: undefined,
     frame: undefined,
@@ -99,8 +92,7 @@
     permission: keep("permission"),
     policyFrame: keep("policyFrame"),
   };
-  
-  
+
   let filter = $state<HTMLElement | undefined>(undefined);
   let first = $state<HTMLElement | undefined>(undefined);
   const holdFilter: Attachment<HTMLElement> = (node) => {
@@ -116,7 +108,6 @@
     };
   };
 
-  
   $effect(() => {
     if (menu !== "policy" || first === undefined) return;
     if (preview) {
@@ -232,7 +223,6 @@
         : undefined,
   });
 
-  
   const outside = (event: PointerEvent): void => {
     if (menu !== "model" || drawnOpen) return;
     if (event.target instanceof Node && drawn.frame?.contains(event.target) === true) return;

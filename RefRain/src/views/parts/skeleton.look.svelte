@@ -4,10 +4,6 @@
   // file, You can obtain one at https://mozilla.org/MPL/2.0/.
   // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-  // How a skeleton is drawn, and nothing else (`./skeleton`,
-  // `SkeletonLook`). Each bar is the theme's `shimmer`, which stops with
-  // every other movement when motion is off.
-
   import type { SkeletonLook, Width } from "./skeleton";
 
   const look: SkeletonLook = $props();

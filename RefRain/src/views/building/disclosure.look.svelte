@@ -5,20 +5,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- A row that opens in place. The chevron in the first column says the
-row opens before a hand finds out by pressing it, and it turns with the
-row: toward open on the arriving curve, back on the leaving one
-(docs/frontend-method.md §4-43). The row takes the wash under the
-pointer, the way every row does; a control's lift is for controls. -->
 <script lang="ts">
   import Glyph from "../parts/glyph.svelte";
   import type { DisclosureLayout, DisclosureLook } from "./disclosure";
-
   const look: DisclosureLook = $props();
 
-  // A plan row stands in the narrow middle column beside its badge, so
-  // its chevron sits close to the node and the row keeps its width for
-  // the step's words; the other two rows run the width of their pane.
   const COLUMNS: Record<DisclosureLayout, string> = {
     plan: "min-h-control grid-cols-[var(--spacing-glyph-sm)_minmax(0,1fr)_auto] gap-x-snug py-tight pr-snug",
     commit:

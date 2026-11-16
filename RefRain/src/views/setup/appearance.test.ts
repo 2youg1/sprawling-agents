@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The fallback chain as the stylesheet reads it. Two halves meet here and
-// neither can be checked by reading one: the page writes the names, each
-// with the comma after it, and the family stacks put that token where a
-// family would stand. A chain of one, of two, and of none are the three
-// cases the stacks have to stay valid through.
-
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

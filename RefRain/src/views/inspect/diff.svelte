@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
 </script>
 
 <script lang="ts">
@@ -38,7 +36,6 @@
 
   const NOTHING: Readable<Answer | undefined> = readable(undefined);
 
-  
   const path = $derived.by((): string => {
     const render = call.render;
     const located =
@@ -58,7 +55,6 @@
   const asked = $derived(question === null ? NOTHING : u.conn.asking.ask(question));
   const read = $derived(readAnswer($asked, (held) => ("hunks" in held ? held.hunks : undefined)));
 
-  
   const sinceQuestion = $derived.by((): Query | null =>
     bracket.head === null ? null : { changes: { base: bracket.head, head: null } },
   );

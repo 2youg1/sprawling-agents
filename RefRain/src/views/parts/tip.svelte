@@ -10,8 +10,6 @@
 </script>
 
 <script lang="ts">
-  
-  
   import type { Attachment } from "svelte/attachments";
   import { on } from "svelte/events";
 

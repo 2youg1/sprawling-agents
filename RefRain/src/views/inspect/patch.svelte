@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
 </script>
 
 <script lang="ts">
@@ -23,10 +21,9 @@
 
   interface Props {
     readonly patch: HunksAnswer;
-    
-    
+
     readonly talk?: Address | undefined;
-    
+
     readonly cursor?: number | null;
     readonly onCursor?: (line: CodeLine) => void;
   }
@@ -36,7 +33,6 @@
   const u = ui();
   const lang = u.lang;
 
-  
   function choose(line: CodeLine): void {
     if (talk === undefined) return;
     quoteInto(u.prefs, talk, quoteLine(patch, line));

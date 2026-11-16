@@ -3,18 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The verbs that only open a page, as rows of the one slash table
-// (`slash.ts` spreads them into `SLASH`, which stays the only list a
-// menu reads).
-
 import { Option } from "effect";
 
 import { PAGES, page } from "./route";
 import type { View } from "./route";
 import type { Slash } from "./slash_hands";
 
-// Only what `/go` advertises, resolved by the router: a page this
-// build cannot name is not a page this verb opens.
 function paged(name: string | undefined): View | null {
   if (name === undefined || !PAGES.includes(name)) {
     return null;
@@ -46,9 +40,6 @@ export const PAGE_VERBS: readonly Slash[] = [
     },
   },
   {
-    // The ACP agents page; a launch spec typed after the verb is pasted
-    // into the page's box by hand, because the box is where the city's
-    // reading of it is shown before anything is added.
     spelling: "/acp",
     grammar: "",
     about: "slash_acp",
@@ -64,14 +55,11 @@ export const PAGE_VERBS: readonly Slash[] = [
     about: "slash_doctor",
     section: "navigation",
     run: (hands) => {
-      // The machine report is the welcome's first step, and that page
-      // asks the `doctor` query again when it opens.
       hands.go({ kind: "welcome" });
       hands.write("");
     },
   },
   {
-    // The changes are a lens of the run page: open this run's, or the newest here.
     spelling: "/diff",
     grammar: "",
     about: "slash_diff",

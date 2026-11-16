@@ -5,14 +5,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- How one narrowing choice is drawn (`./narrowing`, `NarrowingLook`):
-its name, then the browser's own select, which keeps the platform's
-keyboard and its list on a phone. It is a control, so it lifts from
-raised to raised-hover on the arriving curve (docs/frontend-method.md
-§4-43). -->
 <script lang="ts">
   import type { NarrowingLook } from "./narrowing";
-
   const look: NarrowingLook = $props();
 </script>
 

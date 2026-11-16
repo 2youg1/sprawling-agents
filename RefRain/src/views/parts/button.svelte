@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts">
-  // The seat of the one button in the client: callers import this file,
-  // and it draws whatever `./button.look.svelte` is with the value
-  // `./button.ts` builds from the props. What a press does, and when it
-  // may not land, is decided there and nowhere here.
   import { lookOf, type ButtonProps } from "./button";
   import Look from "./button.look.svelte";
 

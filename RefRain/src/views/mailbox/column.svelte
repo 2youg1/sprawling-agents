@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import type { Snippet } from "svelte";
   import { createAttachmentKey } from "svelte/attachments";
 
@@ -23,8 +21,6 @@
   import Working from "./working.svelte";
 
   interface Props {
-    
-    
     readonly onClose: () => void;
   }
 
@@ -36,7 +32,6 @@
 
   let scroller = $state<HTMLElement | undefined>(undefined);
 
-  
   const HOLD = createAttachmentKey();
   const hold = (node: HTMLElement): (() => void) => {
     scroller = node;

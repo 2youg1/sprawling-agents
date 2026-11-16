@@ -4,22 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the runs board is drawn, and nothing else (`./board.ts`,
-  // `BoardLook`): the heading and its counts; the runs waiting for the
-  // person, each a key that brings its row into view; the legend; the
-  // folded clock's scale; the tree, a scrolling list whose drawn rows
-  // are padded above and below to the whole tree's height; and the line
-  // that names the keys. Every role, `aria-*` value, key and scroll
-  // handler arrives in a wire bag spread unchanged on its element.
-  //
-  // A row is a row of the page: the pointer lays the page's wash over
-  // it, and the cursor row the stronger wash with the accent edge on its
-  // left (docs/frontend-method.md §7A-4, §7B); the wash arrives on the
-  // arrive curve and leaves on leave (§4-43).
-  //
-  // The scale carries the rows' right inset, so its fold lines stand over
-  // the rows' bars and over the building table's above it on the city
-  // page, whose header carries the same inset.
   import Glyph from "../parts/glyph.svelte";
   import type { BoardLook } from "./board";
   import { PHASE_FILL, PHASE_MARK } from "./phase";
@@ -40,8 +24,6 @@
   </header>
 
   {#if look.asking !== null}
-    <!-- The word stands above the runs rather than in their row, so a
-    row that wraps starts every line at the same edge with a run. -->
     <nav class="flex flex-col gap-tight text-note" aria-label={look.asking.label}>
       <span class="text-alert">{look.asking.label}</span>
       <div class="flex flex-wrap items-center gap-snug">

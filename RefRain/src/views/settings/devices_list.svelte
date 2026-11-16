@@ -8,17 +8,10 @@
 <script lang="ts" module>
   import type { DeviceId, DeviceLine } from "../../wire";
 
-  // One row per paired browser: its name, when it paired and was last
-  // seen, a mark on the row of the browser drawing the list, and a
-  // forget key behind a question, because a forgotten browser cannot
-  // come back without the pairing code. A page opened through the
-  // remote door says where forgetting is done instead of offering it.
   export interface DevicesLookProps {
     readonly devices: readonly DeviceLine[];
-    // This browser's own device id, when it has one.
     readonly here: string | null;
     readonly now: number;
-    // Whether this page is on the city's own machine.
     readonly local: boolean;
     readonly onForget: (device: DeviceId) => void;
   }
@@ -39,10 +32,6 @@
 
   let asking = $state<DeviceLine | null>(null);
 
-  // The name a row is read by. Browsers of one kind pair under one
-  // label ("Edge · Windows"), and a compact list draws only the title,
-  // so a label two rows share carries when that browser paired: the
-  // title and the forget key's name then tell the rows apart.
   const named = $derived.by(() => {
     const shared = new Set(
       devices

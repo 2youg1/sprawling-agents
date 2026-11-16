@@ -3,12 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Action, Chord } from "../../core/keys";
 
-
 const MODIFIERS: readonly string[] = ["Control", "Meta", "Shift", "Alt", "AltGraph", "CapsLock"];
-
 
 export interface ChordPress {
   readonly key: string;
@@ -18,11 +15,8 @@ export interface ChordPress {
   readonly preventDefault: () => void;
 }
 
-
 export type Heard =
-  
   | { readonly kind: "modifier" }
-  
   | { readonly kind: "cancel" }
   | { readonly kind: "chord"; readonly chord: Chord };
 
@@ -32,7 +26,6 @@ export function heard(press: ChordPress): Heard {
   const accel = press.ctrlKey || press.metaKey;
   return { kind: "chord", chord: { accel, shift: accel && press.shiftKey, key: press.key } };
 }
-
 
 export interface ChordWire {
   readonly type: "button";
@@ -44,19 +37,15 @@ export interface ChordWire {
 
 export interface ChordLook {
   readonly wire: ChordWire;
-  
+
   readonly action: Action;
-  
-  
+
   readonly spelled: string;
-  
-  
+
   readonly word: string | undefined;
-  
-  
+
   readonly tip: string;
 }
-
 
 export interface ChordHands {
   readonly listen: (action: Action | null) => void;
@@ -66,11 +55,11 @@ export interface ChordHands {
 export interface ChordProps {
   readonly action: Action;
   readonly spelled: string;
-  
+
   readonly listening: boolean;
-  
+
   readonly prompt: string;
-  
+
   readonly unbound: string;
   readonly tip: string;
 }

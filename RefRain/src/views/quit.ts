@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the `/quit` question offers (`quit.svelte`): which sentence
-// explains it, and which answers besides cancel it gives.
-
 import type { Key } from "../core/lang";
 import type { CloseMode } from "../wire";
 import type { Tone } from "./parts/button";
@@ -23,9 +20,7 @@ export interface QuitLook {
 }
 
 export interface QuitAsked {
-  // Runs still going in the city.
   readonly runs: number;
-  // The page's origin: the remote door is https, this machine's port is not.
   readonly here: string;
 }
 

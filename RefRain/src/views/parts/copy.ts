@@ -3,41 +3,34 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { fill, say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
 import type { GlyphName } from "./glyph";
 
-
 export const RECEIPT_MS = 1200;
-
 
 export type Copied =
   | { readonly kind: "rest" }
   | { readonly kind: "copied" }
   | { readonly kind: "refused"; readonly why: Refusal };
 
-
 export type Refusal =
   { readonly kind: "absent" } | { readonly kind: "refused"; readonly said: string };
 
 export const REST: Copied = { kind: "rest" };
 
-
 export interface Board {
   writeText(text: string): Promise<void>;
 }
-
 
 export type Later = (run: () => void, ms: number) => () => void;
 
 export interface Hands {
   readonly board: () => Board | undefined;
   readonly later: Later;
-  
+
   readonly show: (copied: Copied) => void;
 }
-
 
 export function presser(hands: Hands): (text: string) => void {
   let pressed = 0;
@@ -60,7 +53,6 @@ export function presser(hands: Hands): (text: string) => void {
   };
 }
 
-
 export function written(board: Board | undefined, text: string): Promise<Copied> {
   if (board === undefined) return Promise.resolve({ kind: "refused", why: { kind: "absent" } });
   return board.writeText(text).then(
@@ -72,9 +64,7 @@ export function written(board: Board | undefined, text: string): Promise<Copied>
   );
 }
 
-
 export type CopyForm = "named" | "bare";
-
 
 export interface KeyWire {
   readonly type: "button";
@@ -82,35 +72,27 @@ export interface KeyWire {
   readonly onclick: () => void;
 }
 
-
 export interface CopyLook {
   readonly form: CopyForm;
-  
-  
+
   readonly name: string;
   readonly face: GlyphName;
   readonly refused: boolean;
-  
-  
+
   readonly note: string;
-  
-  
+
   readonly said: string;
   readonly heard: HeardWire;
   readonly key: KeyWire;
 }
-
 
 export interface HeardWire {
   readonly role: "status";
 }
 
 export interface CopyProps {
-  
-  
   readonly text: string | (() => string);
-  
-  
+
   readonly note?: string | undefined;
   readonly form?: CopyForm | undefined;
 }
@@ -118,7 +100,6 @@ export interface CopyProps {
 export function textOf(text: CopyProps["text"]): string {
   return typeof text === "string" ? text : text();
 }
-
 
 export function lookOf(props: CopyProps, copied: Copied, lang: Lang, press: () => void): CopyLook {
   const form = props.form ?? "named";

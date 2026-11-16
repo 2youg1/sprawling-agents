@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { EDITORS } from "../../core/editor";
   import type { Editor, Opening } from "../../core/editor";
   import { say } from "../../core/lang";
@@ -15,7 +11,6 @@
   import { doorOf } from "./door";
   import Door from "./door.look.svelte";
 
-  
   const WORDS: Record<Editor, Key> = {
     none: "setup_editor_none",
     vscode: "setup_editor_vscode",
@@ -35,7 +30,6 @@
     held = next;
   }
 
-  
   function pick(word: string): void {
     const editor = EDITORS.find((each) => each === word);
     if (editor !== undefined) keep({ ...held, editor });
@@ -63,10 +57,10 @@
     />
   </Card>
   <Admission />
-  
+
   <Card title={say($lang, "privacy_open")} note={say($lang, "privacy_open_note")}>
     <Door {...doorOf({ kind: "setup", group: "privacy" }, say($lang, "setup_group_privacy"))} />
   </Card>
-  
+
   <Door {...doorOf({ kind: "welcome" }, say($lang, "setup_rerun"))} />
 </div>

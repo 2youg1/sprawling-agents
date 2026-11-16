@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { diff, unifiedMergeView } from "@codemirror/merge";
 import { search, searchKeymap } from "@codemirror/search";
@@ -21,46 +20,40 @@ import type { EditorChange } from "../../core/document_pos";
 
 export interface EditorSetup {
   readonly parent: HTMLElement;
-  
+
   readonly text: string;
   readonly changes: readonly EditorChange[];
-  
+
   readonly label: string;
-  
+
   readonly phrases: Readonly<Record<string, string>>;
   readonly onEdit: () => void;
   readonly onSave: () => void;
 }
 
 export interface Editing {
-  
   readonly changes: () => EditorChange[];
-  
-  
+
   readonly editedSinceSent: () => boolean | null;
   readonly text: () => string;
-  
+
   readonly sent: () => void;
-  
-  
+
   readonly landed: () => void;
   readonly unsent: () => void;
-  
-  
+
   readonly rebase: (theirs: string) => void;
   readonly follow: (theirs: string) => void;
-  
+
   readonly diffing: (on: boolean) => void;
   readonly readOnly: (on: boolean) => void;
   readonly composing: () => boolean;
-  
-  
+
   readonly top: () => number;
   readonly reveal: (at: number) => void;
-  
-  
+
   readonly scrollTop: (at: number) => void;
-  
+
   readonly focus: () => void;
   readonly toBaseline: (at: number) => number;
   readonly fromBaseline: (at: number) => number;
@@ -68,13 +61,11 @@ export interface Editing {
   readonly destroy: () => void;
 }
 
-
 const Moved = Annotation.define<boolean>();
 
 function textOf(text: string): Text {
   return Text.of(text.split("\n"));
 }
-
 
 function between(from: string, to: string): ChangeSet {
   return ChangeSet.of(
@@ -103,7 +94,6 @@ function compared(original: string): Extension {
     syntaxHighlightDeletions: false,
   });
 }
-
 
 function common(label: string, phrases: Readonly<Record<string, string>>): Extension[] {
   return [
@@ -169,7 +159,6 @@ export function openEditor(setup: EditorSetup): Editing {
     if (showing) view.dispatch({ effects: merge.reconfigure(compared(base)) });
   };
 
-  
   const move = (theirs: string, then: (onTheirs: ChangeSet) => ChangeSet): void => {
     const onTheirs = between(base, theirs);
     const kept = then(onTheirs);
@@ -243,7 +232,6 @@ export function openEditor(setup: EditorSetup): Editing {
     },
   };
 }
-
 
 export function openComparison(
   parent: HTMLElement,

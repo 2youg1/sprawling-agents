@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts">
-  // The building's standing goal, one line under the page header: a box
-  // to give it one, or the goal it is pursuing with the verdict of its
-  // last step and the two verbs that pause it and take it away. The
-  // city's pursuit line is the one authority; this line draws it.
   import { QUERIES } from "../../core/asking";
   import { pursue } from "../../core/commands";
   import { say } from "../../core/lang";
@@ -38,9 +34,6 @@
       : undefined;
   });
 
-  // An empty goal sends nothing; the press moves the caret to the box,
-  // so the person sees where the goal is missing. The box is the form's
-  // one input, so the form is where the caret is sent from.
   function setGoalNow(form: HTMLFormElement): void {
     const words = goal.trim();
     if (words === "") {
@@ -54,9 +47,6 @@
 <div class="flex min-w-0 items-center gap-base" role="group" aria-label={say($lang, "bld_goal")}>
   <span class="w-figure shrink-0 text-note text-text-faint">{say($lang, "bld_goal")}</span>
   {#if pursuit === undefined}
-    <!-- The box is the one every other input is, and its button is
-         always there, so a person reads it as a place to type rather
-         than as a label. A form, so Enter in the box is the button. -->
     <form
       class="flex min-w-0 flex-1 items-center gap-base"
       onsubmit={(event) => {

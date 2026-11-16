@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Snippet } from "svelte";
 import type { Attachment } from "svelte/attachments";
 
@@ -17,12 +16,11 @@ import { linkWord } from "./link_word";
 
 export interface ColumnLook {
   readonly title: string;
-  
-  
+
   readonly back: Press;
   readonly link: LinkLook | undefined;
   readonly scroller: ScrollerWire;
-  
+
   readonly body: Snippet;
 }
 
@@ -31,15 +29,12 @@ export interface Press {
   readonly onPress: () => void;
 }
 
-
 export interface LinkLook {
   readonly word: string;
   readonly recovery: Press | undefined;
 }
 
-
 export type ScrollerWire = Readonly<Record<symbol, Attachment<HTMLElement>>>;
-
 
 export function linkOf(
   link: LinkState,

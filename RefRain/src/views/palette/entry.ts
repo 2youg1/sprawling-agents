@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// One row of the palette, the rows grouped by the section a verb names,
-// and which of the two lists is showing: the shapes the box builds and
-// `rows.svelte` draws.
-
 import type { Action } from "../../core/keys";
 import type { Key } from "../../core/lang";
 import type { Section } from "../../core/slash_hands";
@@ -15,17 +11,10 @@ import type { View } from "../../core/route";
 export interface Entry {
   readonly label: string;
   readonly hint: string;
-  // Present on a page a key reaches: the row shows that key's chord
-  // where other rows show their hint.
   readonly action?: Action | undefined;
   readonly act: () => void;
-  // A navigation destination, used to keep a pasted address from
-  // drawing a second row for a place already listed.
   readonly to?: View | undefined;
-  // Present means the verb cannot run here, and names why.
   readonly why?: Key | undefined;
-  // Present means pressing the row changes the list rather than going
-  // somewhere, so the box stays open.
   readonly keeps?: true | undefined;
 }
 
@@ -34,6 +23,5 @@ export interface Group {
   readonly entries: readonly Entry[];
 }
 
-// Places to go, or - once the line begins with `/` - the verbs.
 export type Listing =
   { readonly kind: "verbs"; readonly groups: readonly Group[] } | { readonly kind: "places" };

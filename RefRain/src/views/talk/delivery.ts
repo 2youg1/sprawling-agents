@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { AxError } from "../../wire";
 
 export type Delivery =
@@ -25,20 +24,17 @@ export type Delivery =
 
 export const NONE: Delivery = { kind: "none" };
 
-
 export interface Heard {
   readonly live: boolean;
   readonly newest: number;
   readonly refusal: AxError | null;
 }
 
-
 export function sent(words: string, heard: Heard): Delivery {
   return heard.live
     ? { kind: "pending", words, refusal: heard.refusal, mark: heard.newest }
     : { kind: "held", words, refusal: heard.refusal };
 }
-
 
 export function delivered(delivery: Delivery, heard: Heard): Delivery {
   switch (delivery.kind) {

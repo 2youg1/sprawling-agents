@@ -3,46 +3,37 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { AxCode, AxError } from "../wire";
 
 export type Urgency = "needs_you" | "ordinary";
 
-
 const URGENCY: Readonly<Record<AxCode, Urgency>> = {
-  
-  
   E_APPROVAL_PENDING: "needs_you",
-  
-  
+
   E_MODEL_UNCHOSEN: "needs_you",
   E_CREDENTIAL_MISSING: "needs_you",
-  
-  
+
   E_PROVIDER_ACCOUNTS_EXHAUSTED: "needs_you",
   E_ENDPOINT_DIALECT_UNSUPPORTED: "needs_you",
-  
-  
+
   E_CONFIG_INVALID: "needs_you",
-  
+
   E_BUDGET_EXHAUSTED: "needs_you",
-  
+
   E_PLAN_MISSING: "needs_you",
-  
+
   E_WIRE_MISMATCH: "needs_you",
-  
+
   E_CAS_CORRUPT: "needs_you",
   E_STORAGE_FATAL: "needs_you",
   E_LEDGER_HELD: "needs_you",
   E_LOG_VERSION_UNSUPPORTED: "needs_you",
   E_HISTORY_UNPROVEN: "needs_you",
   E_DIGEST_SUSPECT: "needs_you",
-  
-  
+
   E_AUTH_REQUIRED: "needs_you",
   E_PAIRING_REFUSED: "needs_you",
-  
-  
+
   E_PATH_NOT_FOUND: "ordinary",
   E_TOOL_UNKNOWN: "ordinary",
   E_TOOL_UNAVAILABLE: "ordinary",
@@ -76,7 +67,6 @@ export function urgencyOf(error: Pick<AxError, "code">): Urgency {
   return URGENCY[error.code];
 }
 
-
 export type Box =
   | { readonly kind: "absent" }
   | { readonly kind: "holding" }
@@ -84,18 +74,15 @@ export type Box =
 
 export interface Attention {
   readonly box: Box;
-  
-  
+
   readonly visible: boolean;
-  
+
   readonly returnedAt: number | null;
 }
 
 export type Moment = "sent" | "idle" | "returned";
 
-
 export const IDLE_MS = 5_000;
-
 
 export const RETURNED_MS = 1_000;
 
@@ -122,7 +109,6 @@ export function deliverable(urgency: Urgency, attention: Attention, now: number)
       return momentOf(attention, now) !== null;
   }
 }
-
 
 export function wakeAt(attention: Attention, now: number): number | null {
   const box = attention.box;

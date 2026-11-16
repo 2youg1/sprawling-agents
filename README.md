@@ -207,7 +207,7 @@ Honestly, no multi-agent scheme yet delivers gains that justify the cost after s
 
 Agent memory is one road to RSI, but not by black-box injection inside the harness. Your files, code and document libraries are the memory. Before LLMs leave the stateless regime, most attempts to make an agent truly grow with you only drag the model down.
 
-If you already have a harness you like, any harness that speaks ACP can join the city as a resident ([integrations](docs/integrations.md)). Beyond migrating the business skills, MCP and ACP you need, I suggest staying lean and adding rules by hand when a concrete problem shows up, since the same model behaves completely differently under a different harness. kasanagi, another project I am preparing, helps build chat software, and will later work as an MCP server for remote collaboration between several sprawling instances.
+If you already have a harness you like, any harness that speaks ACP can join the city as a resident ([integrations](docs/integrations.md)). Beyond migrating the business skills, MCP and ACP you need, I suggest staying lean and adding rules by hand when a concrete problem shows up, since the same model behaves completely differently under a different harness. [Kasanagi](Kasanagi/README.md), another project I am preparing, helps build chat software, and will later work as an MCP server for remote collaboration between several sprawling instances.
 
 Two more things are plain reality. My own computer is modest, so I will not let multi-agent work grow its cost exponentially. That also lets sprawling run on an old laptop or a cheap cloud box. I do not sell APIs and cannot afford a disk full of your data, so data stays local by default; the city has a confidential building that calls no remote model and starts no MCP server, and with a local model it can hold private data. The price is that I cannot run very large tests in the cloud.
 
@@ -237,6 +237,10 @@ Apart from the two READMEs, the two getting-started guides and the comments in t
 | [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Preparing a contribution, the five admission tests for a feature, and the submission process |
 | [`docs/frontend-method.md`](docs/frontend-method.md) | How a screen is built and accepted, and the approved visual design |
 | [`Sprawling/README.md`](Sprawling/README.md) | What each product crate owns and where its specification is; `<dir>/Spec.lean` holds the interfaces, decisions and proofs |
+| [`RefRain/README.md`](RefRain/README.md) | The browser client, its toolchain, commands and source layout |
+| [`Calyx/README.md`](Calyx/README.md) | The native terminal shell for the city and Mei, and its Zig/Rust boundary |
+| [`Mei/README.md`](Mei/README.md) | The standalone headless agent harness and its Calyx interactive face |
+| [`Kasanagi/README.md`](Kasanagi/README.md) | The planned private agent-messaging project and future MCP integration |
 | [`Tools/README.md`](Tools/README.md) | Development tools, fixtures, adversary and fuzz workspaces |
 | [`Sprawling/city/templates/`](Sprawling/city/templates/) | The form templates the city writes into each building |
 | [`Sprawling/city/skills/`](Sprawling/city/skills/) | The skills distributed with the release |

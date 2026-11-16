@@ -3,14 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 export type Face = "send" | "stop" | "idle";
 
 export function faceOf(words: string, running: boolean): Face {
   if (words.trim() !== "") return "send";
   return running ? "stop" : "idle";
 }
-
 
 export type Sent = "words" | "cancel" | "nothing";
 

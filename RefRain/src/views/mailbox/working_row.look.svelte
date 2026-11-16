@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts">
-  // How one working room is drawn: a link row with the phase's mark in
-  // the tier the runs board paints it, the room, what the run is doing
-  // and for how long, the digit that reaches the row, and the task on a
-  // second line under the room.
   import Glyph from "../parts/glyph.svelte";
   import type { Weight } from "../parts/glyph";
   import type { WorkingRowLook } from "./working_row";

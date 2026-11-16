@@ -9,7 +9,7 @@
   import type { Snippet } from "svelte";
   import type { Attachment } from "svelte/attachments";
 
-  import type { ModelEditorLook } from "./model_editor";
+  import type { ModelEditorLook } from "./model_editor_look";
 
   export interface ModelEditorLookProps extends ModelEditorLook {
     readonly table: Snippet;
@@ -21,9 +21,6 @@
 </script>
 
 <script lang="ts">
-  // The native disclosure and the row-level controls. The table arrives
-  // from the seat as the same ModelTable the attach form uses; every
-  // word, refusal and press is already wired by ./model_editor.
   import Button from "../../parts/button.svelte";
 
   const look: ModelEditorLookProps = $props();
@@ -53,10 +50,6 @@
     {@render look.table()}
   </div>
 </details>
-<!-- Generation stays outside the model-table disclosure so Access always
-  shows the sampling defaults without opening another fold. Save, its
-  flight and its refusal sit with it: generation edits need the same
-  commit as the table, and a closed fold must not hide that control. -->
 <div class="mt-snug flex flex-col gap-snug border-t border-edge pt-snug">
   <h4 class="text-label font-label text-text-quiet">{look.generationHeading}</h4>
   <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
@@ -74,11 +67,9 @@
     >
       <p class="font-label text-alert">{look.alert.title}</p>
       {#if look.alert.subject !== ""}
-        <!-- wording-ok: the city's own refusal subject, which names the model or endpoint as the city spells it -->
         <p class="mt-tight font-mono wrap-anywhere text-text">{look.alert.subject}</p>
       {/if}
       {#if look.alert.code !== undefined}
-        <!-- wording-ok: the city's stable error code -->
         <p class="mt-tight font-mono text-text-faint">{look.alert.code}</p>
       {/if}
     </div>

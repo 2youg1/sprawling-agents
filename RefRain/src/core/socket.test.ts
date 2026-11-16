@@ -11,8 +11,6 @@ import { plainDial } from "./line";
 import { openConnection } from "./socket";
 import { RunId, WIRE_HASH, WIRE_V } from "../wire";
 
-// One fake socket per `new WebSocket(...)`, kept so a test can deliver
-// a frame and read whether the browser half closed it.
 class FakeSocket {
   static readonly opened: FakeSocket[] = [];
   static readonly OPEN = 1;
@@ -75,9 +73,6 @@ const realTimers = {
   document: globalThis.document,
 };
 
-// A page the browser has hidden: it never calls an animation frame, and
-// it tells the page when it is shown again through the one listener kept
-// here.
 function hide(): { show: () => void } {
   const heard: (() => void)[] = [];
   const page = {
@@ -110,10 +105,6 @@ afterEach(() => {
 });
 
 describe("the browser half", () => {
-  // The defect, end to end: a frame the client cannot read used to
-  // close the socket, which the machine read as an outage, so a fresh
-  // socket opened 250 ms later and met the same frame. Here the ladder
-  // books nothing, and whatever it had booked is cancelled.
   test("cancels the reconnect when a frame cannot be read", () => {
     install();
     const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
@@ -128,8 +119,6 @@ describe("the browser half", () => {
     expect(FakeSocket.opened).toHaveLength(1);
   });
 
-  // A socket that drops is the outage the ladder is for, so one attempt
-  // is booked and it opens a second socket when it fires.
   test("books a reconnect when the socket drops", () => {
     install();
     openConnection(plainDial("ws://city.invalid/ws"), "en");
@@ -142,9 +131,6 @@ describe("the browser half", () => {
     expect(FakeSocket.opened).toHaveLength(2);
   });
 
-  // The header's promise: what arrived between two paints is one belief
-  // update, so a burst of tokens repaints the page once and not once per
-  // token.
   test("folds a frame's burst into one belief update", () => {
     install();
     const painting: (() => void)[] = [];
@@ -172,9 +158,6 @@ describe("the browser half", () => {
       saying: "abc",
     });
   });
-  // A browser stops calling animation frames in a hidden tab, so a page
-  // that drained only on a paint held every frame - an approval request
-  // included - until the person came back to the tab.
   test("drains on a timer while the page is hidden", () => {
     install();
     hide();
@@ -190,9 +173,6 @@ describe("the browser half", () => {
     expect(get(conn.belief).runs[run]?.saying).toBe("a");
   });
 
-  // A tab shown again while the ladder waits tries at once: the person is
-  // looking now, and the rung's remaining seconds are seconds of a blank
-  // page.
   test("retries at once when a hidden page in backoff is shown", () => {
     install();
     const page = hide();
@@ -207,9 +187,6 @@ describe("the browser half", () => {
       waiting: booked.filter((entry) => !entry.cancelled).length,
     }).toEqual({ opened: 2, waiting: 0 });
   });
-  // Words said while the link is down are the person's, not the socket's:
-  // they wait for the city and go out, in order, once it greets again,
-  // and the banner counts them meanwhile.
   test("holds words said off the link and sends them on the welcome", () => {
     install();
     const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
@@ -233,9 +210,6 @@ describe("the browser half", () => {
       sent: [JSON.stringify({ command: words })],
     });
   });
-  // A refused link reaches no welcome until the person acts, and the
-  // only lever some refusals offer is a reload, which drops the queue:
-  // so the words are not taken, and the composer keeps the draft.
   test("refuses to hold words while the link is refused", () => {
     install();
     const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
@@ -252,8 +226,6 @@ describe("the browser half", () => {
     });
   });
 
-  // A press made while the link is down sends nothing, and the page says
-  // so where every refusal lands, instead of a button that does nothing.
   test("says in the corner that a command made off the link was not sent", () => {
     install();
     const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
@@ -274,10 +246,6 @@ describe("the browser half", () => {
     });
   });
 
-  // Fifty records written while the page was away are fifty records to
-  // fetch, not every answer on the page asked again: the welcome names
-  // the ledger head, and the page asks for the range between its own
-  // high-water mark and that head.
   test("fetches the records written while it was away rather than a snapshot", () => {
     install();
     const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
@@ -327,9 +295,6 @@ describe("the browser half", () => {
       { ask: { ask_id: 2, query: { history_range: { from: 11, to: 60, limit: 200 } } } },
     ]);
   });
-  // A welcome from another ledger - the city was made again - names a
-  // head the old mark means nothing against: the page forgets what it
-  // folded and asks everything again rather than fetching a range.
   test("rebuilds from a snapshot when the ledger's epoch changed", () => {
     install();
     const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");

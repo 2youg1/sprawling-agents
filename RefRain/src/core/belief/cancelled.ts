@@ -3,24 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// How many runs this city cancelled. The wire carries no count of what
-// one halt froze, so this counts the runs whose own freeze says
-// `cancelled`, which is what a halt writes; belief keeps the count as it
-// folds, so the page's halt line does not walk the table on every
-// record.
-
 import type { RunBelief } from "./shape";
 
 function cancelled(run: RunBelief | undefined): boolean {
   return run?.doing.kind === "frozen" && run.doing.completion === "cancelled";
 }
 
-// The count over the whole table, for a write that replaces the table.
 export function cancelledOf(runs: Readonly<Record<string, RunBelief>>): number {
   return Object.values(runs).filter((run) => cancelled(run)).length;
 }
 
-// The count after one run read `run` where it read `was` before.
 export function recounted(count: number, was: RunBelief | undefined, run: RunBelief): number {
   return count - Number(cancelled(was)) + Number(cancelled(run));
 }

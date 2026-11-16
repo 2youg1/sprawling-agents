@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { Option, Schema } from "effect";
 
   import { restoreFile } from "../../core/commands";
@@ -20,7 +18,7 @@
 
   interface Props {
     readonly building: Address;
-    
+
     readonly path: string;
     readonly point: GitOid;
   }
@@ -32,7 +30,6 @@
 
   let asking = $state(false);
 
-  
   const at = $derived(Option.getOrNull(Schema.decodeOption(Address)(`${building}/${path}`)));
   const slots = $derived({ path, oid: shortOid(point) });
 </script>

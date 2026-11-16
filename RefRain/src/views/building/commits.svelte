@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import type { Attachment } from "svelte/attachments";
   import { SvelteSet } from "svelte/reactivity";
   import { derived } from "svelte/store";
@@ -35,25 +33,22 @@
   const u = ui();
   const lang = u.lang;
 
-  
   let befores = $state<readonly (Seq | null)[]>([null]);
   let open = $state<string | null>(null);
-  
+
   let typed = $state("");
   let whose = $state<GitOid | null>(null);
-  
+
   let refused = $state(false);
 
   interface Pages {
     readonly rows: readonly CommitAnswer[];
     readonly more: boolean;
-    
-    
+
     readonly newest: Answered<CommitsAnswer>;
     readonly edge: Seq | undefined;
   }
 
-  
   function foldPages(answers: readonly (Answer | undefined)[]): Pages {
     const rows: CommitAnswer[] = [];
     const seen = new SvelteSet<string>();
@@ -87,7 +82,6 @@
     befores = befores.at(-1) === edge ? befores : [...befores, edge];
   }
 
-  
   const sentinel: Attachment<HTMLLIElement> = (node) => {
     const watcher = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) grow();
@@ -100,8 +94,7 @@
 
   function toggle(commit: CommitAnswer, last: boolean): void {
     open = open === commit.oid ? null : commit.oid;
-    
-    
+
     if (last) grow();
   }
 
@@ -109,7 +102,6 @@
     return pages.rows.some((row) => row.oid === oid);
   }
 
-  
   function openRow(oid: string): void {
     open = oid;
     requestAnimationFrame(() => {
@@ -123,7 +115,7 @@
 <div class="flex min-w-0 flex-col gap-base">
   <div class="flex min-w-0 flex-wrap items-end justify-between gap-x-wide gap-y-snug">
     <h2 class="sr-only">{say($lang, "bld_commits")}</h2>
-    
+
     <form
       class="w-[42ch] max-w-full min-w-0"
       onsubmit={(event) => {

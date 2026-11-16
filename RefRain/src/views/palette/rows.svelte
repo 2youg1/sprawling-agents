@@ -6,11 +6,6 @@
 -->
 
 <script lang="ts">
-  // The palette's list: places, or - once the line begins with `/` -
-  // the verbs under the section each one names. The box owns the line,
-  // the cursor and what a pick does; this is the seat that hands
-  // `./rows.ts`'s value to whatever `./rows.look.svelte` is, and reports
-  // the pointer.
   import { ui } from "../../ui";
   import type { Entry, Listing } from "./entry";
   import { rowsLookOf } from "./rows";
@@ -18,14 +13,10 @@
 
   interface Props {
     readonly listing: Listing;
-    // The flat list the cursor walks, in the order the rows are drawn.
     readonly shown: readonly Entry[];
     readonly cursor: number;
     readonly onHover: (at: number) => void;
     readonly onPick: (entry: Entry) => void;
-    // The listbox's id, which the box's `aria-controls` and
-    // `aria-activedescendant` name; one of its own when the caller
-    // names none.
     readonly id?: string | undefined;
   }
 

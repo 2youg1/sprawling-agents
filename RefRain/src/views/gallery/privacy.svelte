@@ -6,15 +6,6 @@
 -->
 
 <script lang="ts">
-  // The privacy group in the states a person meets: the page on a Home
-  // host, where most entries' edition fit is not stated and one is
-  // documented as ignored; a change with no conclusion, where only its
-  // check is offered; a city on another system; and single entries in
-  // the stages an operation passes through. The last case draws one entry
-  // through a second look (`privacy_swap.look.svelte`), which is the swap
-  // test the front-end ruling asks for: the same seat, the same wiring,
-  // another appearance, measured by the same gate.
-
   import type { PrivacyControl } from "../../wire";
   import Entry from "../setup/privacy/entry.svelte";
   import { sectionsOf, type EntryModel } from "../setup/privacy/page";

@@ -15,13 +15,11 @@ const AWAITING: Doing = {
 };
 
 describe("sending", () => {
-  
-  
   test("a run that is blocked queues the words instead of saying them", () => {
     const calling: Doing = { kind: "calling", tool: "exec", subject: "just check" };
     expect(sendingInto(calling)).toBe("queued");
     expect(sendingInto({ kind: "waiting" })).toBe("queued");
-    
+
     expect(sendingInto(AWAITING)).toBe("queued");
   });
 
@@ -29,19 +27,16 @@ describe("sending", () => {
     expect(sendingInto({ kind: "thinking" })).toBe("steer");
   });
 
-  
   test("a run whose phase this page was never told queues", () => {
     expect(sendingInto({ kind: "unknown" })).toBe("queued");
   });
 
-  
   test("no live run and a frozen one both open new work", () => {
     expect(sendingInto(undefined)).toBe("dispatch");
     expect(sendingInto({ kind: "frozen", completion: "done" })).toBe("dispatch");
     expect(sendingInto({ kind: "frozen", completion: null })).toBe("dispatch");
   });
 });
-
 
 describe("the end of a reply wait", () => {
   test("a reply or a timeout hands the run back to its model, a run that left is told nothing yet", () => {
@@ -53,7 +48,6 @@ describe("the end of a reply wait", () => {
     ]);
   });
 
-  
   test("an ending leaves a run that is no longer waiting where it is", () => {
     const frozen: Doing = { kind: "frozen", completion: "cancelled" };
     expect(afterWait(frozen, "left")).toEqual(frozen);

@@ -6,14 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // The notice in its three seats: inline beneath what it is about, as
-  // toasts at the corner, and as the drawer's history.
-
-  // One refusal as the wire carries it: the action that failed, its
-  // stable code, what it was against, and what a person can do next.
-  // The words are the city's own English originals, which the notice
-  // folds under its translated title - fixture data exactly as they
-  // arrive.
   interface Refusal {
     readonly action: string;
     readonly code: string;
@@ -22,7 +14,6 @@
   }
 
   interface Entry {
-    // Already formatted by the fixture's clock.
     readonly at: string;
     readonly count: number;
     readonly one: Refusal;
@@ -36,9 +27,6 @@
     return { at, count, one };
   }
 
-  // Three refusals across a quarter hour, arriving twelve times: the
-  // drawer keeps every arrival as its own row with the count that
-  // merged into it.
   const MISSING_KEY = refusal(
     "E_CREDENTIAL_MISSING",
     "example",
@@ -94,10 +82,6 @@
   />
 </Case>
 
-<!-- Two seats, two widths, each shown where it lands. A toast is
-capped and floats at the corner; an entry fills the panel it belongs
-to. Drawn stacked in one case they read as a page whose right edge
-disagrees with itself. -->
 <Case label="notices · toasts">
   <div
     class="flex min-h-output w-full items-end justify-end rounded-card border border-dashed border-edge-input p-snug"

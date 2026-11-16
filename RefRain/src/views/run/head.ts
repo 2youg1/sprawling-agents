@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Doing } from "../../core/doing";
 import { POSTURE_WORD } from "../../core/doing";
 import type { Lang } from "../../core/lang";
@@ -18,20 +17,16 @@ export interface HeadProps {
   readonly doing: Doing | undefined;
   readonly closing: Closing | null;
   readonly room: Address | null;
-  
-  
+
   readonly dispatchedBy: string | null;
-  
+
   readonly from: number | null;
   readonly to: number | null;
 }
 
-
 export type Rank = "value" | "more";
 
-
 export type Face = "words" | "figure" | "mono";
-
 
 export interface LinkWire {
   readonly href: string;
@@ -50,9 +45,7 @@ export type LineLook =
       readonly face: Face;
       readonly text: string;
     }
-  
   | { readonly kind: "time"; readonly key: string; readonly text: string; readonly at: string }
-  
   | {
       readonly kind: "place";
       readonly key: string;
@@ -63,8 +56,7 @@ export type LineLook =
 export interface CellLook {
   readonly key: string;
   readonly name: string;
-  
-  
+
   readonly wide: boolean;
   readonly lines: readonly LineLook[];
 }

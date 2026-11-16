@@ -3,18 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { GlyphName } from "./glyph";
 
 export interface IconButtonProps {
   readonly glyph: GlyphName;
-  
+
   readonly label: string;
-  
+
   readonly why?: string;
   readonly onPress?: () => void;
 }
-
 
 export interface IconButtonWire {
   readonly type: "button";
@@ -26,11 +24,9 @@ export interface IconButtonWire {
 
 export interface IconButtonLook {
   readonly glyph: GlyphName;
-  
-  
+
   readonly hint: string;
-  
-  
+
   readonly wire: (hint: string) => IconButtonWire;
 }
 

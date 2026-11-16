@@ -3,10 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Key } from "../../core/lang";
 import type { SetupGroup } from "../../core/route";
-
 
 export const HEADING: Record<SetupGroup, Key> = {
   you: "setup_group_you",
@@ -29,7 +27,6 @@ export const HEADING: Record<SetupGroup, Key> = {
   about: "release_title",
 };
 
-
 export const HINT: Record<SetupGroup, Key | null> = {
   you: "setup_group_hint_you",
   performance: "setup_group_hint_performance",
@@ -51,7 +48,6 @@ export const HINT: Record<SetupGroup, Key | null> = {
   about: null,
 };
 
-
 export const WIDTH: Record<SetupGroup, string> = {
   you: "",
   performance: "max-w-talk",
@@ -72,6 +68,5 @@ export const WIDTH: Record<SetupGroup, string> = {
   privacy: "",
   about: "max-w-talk",
 };
-
 
 export const PREFERRED: readonly SetupGroup[] = ["network", "appearance", "colours", "keys"];

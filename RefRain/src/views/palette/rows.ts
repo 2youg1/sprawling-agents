@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the palette's list look is handed (`rows.look.svelte`): the
-// listbox the palette's box controls, its sections, and each row with
-// its words, its state and its wiring. The box keeps the focus and walks
-// the cursor (`../cursor.ts`); a row is an option the box names as
-// active, so a screen reader hears the row the cursor is on. A verb
-// this place cannot run stays in the list with `aria-disabled` and its
-// reason where the hint goes (ux 7-8).
-
 import type { Action } from "../../core/keys";
 import { say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
@@ -23,8 +15,6 @@ export interface ListWire {
   readonly "aria-label": string;
 }
 
-// A section of verbs is a group named by its heading; the places are
-// one section with no heading, drawn as the list itself.
 export type SectionWire =
   | { readonly role: "group"; readonly "aria-labelledby": string }
   | { readonly role: "presentation" };
@@ -41,16 +31,10 @@ export interface RowWire {
 export interface RowLook {
   readonly key: string;
   readonly label: string;
-  // What stands at the row's end: the chord of the key that reaches
-  // the same page, or a short line - the address, the verb's purpose,
-  // or the reason it cannot run here.
   readonly end:
     | { readonly kind: "chord"; readonly action: Action }
     | { readonly kind: "hint"; readonly text: string };
-  // The row Enter would take.
   readonly active: boolean;
-  // A verb this place cannot run; the cursor may still stand on it, so
-  // its reason can be read.
   readonly refused: boolean;
   readonly wire: RowWire;
 }
@@ -74,10 +58,8 @@ export interface RowsLook {
 
 export interface RowsState {
   readonly listing: Listing;
-  // The flat list the cursor walks, in the order the rows are drawn.
   readonly shown: readonly Entry[];
   readonly cursor: number;
-  // The listbox's id; each row's id is derived from it (`rowId`).
   readonly id: string;
   readonly lang: Lang;
 }

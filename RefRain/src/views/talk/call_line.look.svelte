@@ -1,5 +1,3 @@
-
-
 <script lang="ts">
   import { Kbd } from "../parts/kbd.svelte";
   import Tip from "../parts/tip.svelte";

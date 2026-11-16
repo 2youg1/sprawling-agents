@@ -5,8 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- The sandbox's choice of arm: the platform's own menu, on the surface
-and edge every input wears, at the height of a control. -->
 <script lang="ts">
   import type { ArmSelectLook } from "./arm_select";
 

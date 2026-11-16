@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import Laid from "../editor/laid.svelte";
   import { laidReply } from "../reply.svelte";
   import Look from "./saying.look.svelte";

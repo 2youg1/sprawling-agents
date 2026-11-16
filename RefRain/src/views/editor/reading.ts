@@ -7,14 +7,11 @@ import { say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
 import type { B3Hash } from "../../wire";
 
-
 export type Reading = "source" | "preview" | "diff" | "versions";
-
 
 export function short(version: B3Hash): string {
   return version.slice(0, 7);
 }
-
 
 const PHRASES: Readonly<Record<string, Key>> = {
   Find: "refrain_cm_find",

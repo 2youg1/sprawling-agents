@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { tick } from "svelte";
   import { createAttachmentKey } from "svelte/attachments";
 
@@ -24,11 +22,8 @@
   import { takeRow, wantedRow } from "./returning.svelte";
 
   interface Props {
-    
-    
     readonly asked: number;
-    
-    
+
     readonly hint: (words: string) => string;
   }
 
@@ -52,7 +47,6 @@
     };
   };
 
-  
   let heard = 0;
   $effect(() => {
     const now = asked;
@@ -61,7 +55,6 @@
     feed("toggle");
   });
 
-  
   function focusNow(): MailFocus {
     const at = document.activeElement;
     if (at !== null && column?.contains(at) === true) return "inside";
@@ -81,7 +74,6 @@
     if (next.focus === "key" && focus !== "key") key?.focus();
   }
 
-  
   $effect(() => {
     const row = wantedRow();
     if (row === null) return;
@@ -105,7 +97,6 @@
     feed("outside");
   }
 
-  
   function escaped(event: KeyboardEvent): void {
     if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
     if (column !== undefined && column.querySelector(":popover-open") !== null) return;
@@ -123,13 +114,11 @@
     };
   });
 
-  
   const blocking = $derived(
     $belief.notices.filter((notice) => !notice.seen && urgencyOf(notice.error) === "needs_you")
       .length,
   );
-  
-  
+
   const proposed = openCards(u.conn.asking);
   const needs = $derived(($approvals?.length ?? 0) + blocking + $proposed.length);
   const fresh = $derived(
@@ -149,7 +138,6 @@
 </script>
 
 <Look {...look} />
-
 
 {#if open}
   <aside

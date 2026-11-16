@@ -4,36 +4,15 @@
   // file, You can obtain one at https://mozilla.org/MPL/2.0/.
   // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-  // How a popover is drawn, and nothing else: every word arrives
-  // translated and every key and press arrives wired (`./popover_wiring`,
-  // `PopoverLook`), and each wire bag is spread on the element it names.
-  // Another look - one built from a component library - draws the same
-  // list by taking the same value.
-  //
-  // What is applied reads as the deeper wash. The cursor is a bar at the
-  // row's leading edge, on an applied row as well, and takes the rung of
-  // the surface only where nothing is applied, so the two fills never
-  // paint over each other; the bar keeps its shape when forced colours
-  // take every fill away.
   import type { PopoverLook } from "./popover_wiring";
 
   const look: PopoverLook = $props();
 
-  // Cap the panel at the room on this side of the anchor
-  // (`PopoverView.room`). The gap it keeps from the anchor (and as much
-  // again from the clip edge) comes off — same arithmetic as the model
-  // picker — so a short viewport scrolls the panel instead of letting it
-  // rise past the window. Lists keep the palette height as their own
-  // inner scroll.
   const panelCap = $derived(
     look.room === null ? undefined : `calc(${String(look.room)}px - var(--spacing-snug) * 2)`,
   );
 </script>
 
-<!-- The panel takes the theme's popover layer, so it paints and
-     hit-tests above the content it opens over. It rises into place from
-     the side it opens on through the theme's entrances, which fall back
-     to a cut under reduced motion. -->
 <div
   class={[
     "absolute left-0 z-(--layer-popover) w-max min-w-full max-w-full overflow-y-auto rounded-panel border border-edge-panel bg-raised p-snug shadow-float",
@@ -51,9 +30,6 @@
           {#each list.rows as item (item.key)}
             <li
               class={[
-                // Press scale is shared; the active fill is not — a chosen
-                // row already sits on wash-strong, so its press uses
-                // raised-hover instead of fighting another wash-strong.
                 "relative flex cursor-pointer items-center justify-between gap-snug rounded-control px-snug py-tight text-body transition-[background-color,color,scale] ease-leave active:scale-(--scale-press) active:ease-arrive still:active:scale-100",
                 item.chosen
                   ? "applied wash-strong text-text active:bg-raised-hover"
@@ -67,9 +43,6 @@
               {#if look.row !== undefined}
                 {@render look.row(item.row)}
               {:else}
-                <!-- The name wraps rather than crushing; the secondary
-                     cell still yields first. Caps keep one long line
-                     from stretching the popover past the column. -->
                 <span class="min-w-0 max-w-[28ch] wrap-anywhere text-pretty">{item.row.label}</span>
                 {#if item.row.secondary !== undefined}
                   <span class="min-w-0 max-w-[20ch] line-clamp-2 text-note text-text-faint"
@@ -97,7 +70,7 @@
     inset-inline-start: 0;
     border-inline-start: var(--spacing-hair) solid var(--color-accent);
   }
-  /* Forced colours drop the wash and keep an outline. */
+
   .applied {
     outline: 1px solid transparent;
     outline-offset: -1px;

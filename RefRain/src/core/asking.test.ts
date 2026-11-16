@@ -12,8 +12,6 @@ import type { Key } from "./lang";
 import { Address, AskId, B3Hash, Query, RunId, Seq, TimeMs } from "../wire";
 import type { Answer, AskOutcome, EventRecord } from "../wire";
 
-// Every question the wire lets a page ask by name alone. The union is
-// generated, so this reads the same table the city answers from.
 function nullaryQueries(): readonly string[] {
   return Query.members.flatMap((member) => {
     if ("literals" in member) return member.literals.filter((value) => typeof value === "string");
@@ -22,15 +20,10 @@ function nullaryQueries(): readonly string[] {
   });
 }
 
-// A clock the test moves, and the timers the patience books against it.
-// The module reads neither global itself, which is the whole point of
-// handing it a clock: a deadline nobody can drive is a deadline nobody
-// has checked.
 interface Driven {
   readonly ask: ReturnType<typeof createAsking>;
   readonly reports: [Key, Reported][];
   readonly sent: string[];
-  // The id of each question that went out, in send order.
   readonly ids: AskId[];
   readonly pass: (ms: number) => void;
 }
@@ -69,8 +62,6 @@ function driven(send: (query: Query) => boolean = () => true): Driven {
     reports,
     sent,
     ids,
-    // Time passes, then every timer that was due in it fires once, in
-    // the order it was booked - which is how a browser would do it.
     pass: (ms: number) => {
       at += ms;
       const due = booked.filter((timer) => timer.due <= at);
@@ -84,8 +75,6 @@ function driven(send: (query: Query) => boolean = () => true): Driven {
 
 const answer = (value: Answer): AskOutcome => ({ answer: value });
 
-// The id the n-th question went out under. The driver mints from 1, so
-// a question that never went out answers under 0 and lands nowhere.
 function nth(driver: Driven, at: number): AskId {
   return driver.ids[at] ?? AskId.make(0);
 }
@@ -104,10 +93,6 @@ function record(at: number): EventRecord {
 }
 
 describe("asking", () => {
-  // An answer is filed by the question it settles. A question absent
-  // from `QUERIES` matched nothing on arrival, so its answer was
-  // dropped in silence and the page waited for ever: that is how
-  // `toolkits`, `release` and `mcp_health` went blank.
   test("every question the wire takes by name alone has a row", () => {
     const rows: readonly string[] = Object.values(QUERIES);
     for (const name of nullaryQueries()) {
@@ -142,9 +127,6 @@ describe("asking", () => {
     expect(get(city)).toBeDefined();
   });
 
-  // The defect: a question the city never answered left `inflight`
-  // true for the life of the tab, so the page drew a skeleton over an
-  // answer that was never coming and nothing said why.
   test("a question nobody answers is reported", () => {
     const driver = driven();
     const doctor = driver.ask.ask(QUERIES.doctor);
@@ -160,10 +142,6 @@ describe("asking", () => {
     expect(driver.reports[0]?.[1].subject).toBe(keyOf(QUERIES.doctor));
   });
 
-  // The defect: the privacy answer reads every control on the host and
-  // took longer than the common patience, so every visit to the page
-  // reported the city late and asked the whole read a second time. A
-  // fast question asked behind it is still judged at its own deadline.
   test("a question that reads the host gets its own patience, and a fast one behind it keeps the common one", () => {
     const driver = driven();
     driver.ask.ask(QUERIES.privacy);
@@ -184,9 +162,6 @@ describe("asking", () => {
     ]);
   });
 
-  // The late answer is still the answer: a question whose patience ran
-  // out has left the queue, so the answer lands on the slot that asked
-  // for it rather than being reported a second time as unplaceable.
   test("an answer that arrives after the patience still settles", () => {
     const driver = driven();
     const toolkits = driver.ask.ask(QUERIES.toolkits);
@@ -198,11 +173,6 @@ describe("asking", () => {
     expect(driver.reports, "a late answer is not an unplaceable one").toHaveLength(1);
   });
 
-  // Two rounds of matching, both missed. Nothing a person can do about
-  // an answer no question waits for, and it is not a protocol mismatch:
-  // a page and a city from one build said "the versions differ" while
-  // they were connected. The question that still waits is what a
-  // person meets, once, when its patience runs out.
   test("an answer that matches no question is not a refusal", () => {
     const driver = driven();
     driver.ask.ask(QUERIES.doctor);
@@ -220,11 +190,6 @@ describe("asking", () => {
     ]);
   });
 
-  // A page somebody is looking at asks again after the patience runs
-  // out, so the screen fills itself the moment the city comes back.
-  // The report is not repeated with it: the corner would otherwise
-  // pop the same alert every fifteen seconds, and the second one
-  // tells a person nothing the first did not.
   test("a watched question is asked again, and reported once", () => {
     const driver = driven();
     const watching = driver.ask.ask(QUERIES.doctor).subscribe(() => undefined);
@@ -241,9 +206,6 @@ describe("asking", () => {
     watching();
   });
 
-  // A question that was never sent is not a question waiting on an
-  // answer: the link was down, the slot is stale, and the patience has
-  // nothing to run out on.
   test("a question the link refused is not reported as late", () => {
     const driver = driven(() => false);
     driver.ask.ask(QUERIES.doctor);
@@ -252,9 +214,6 @@ describe("asking", () => {
     expect(driver.reports).toHaveLength(0);
   });
 
-  // A long-lived tab visits more buildings than it keeps on screen, so
-  // what it holds is bounded: past the cap the answer used least
-  // recently and watched by nobody goes, and asking it again goes out.
   test("past the cap the least recently used unwatched answer is dropped", () => {
     const driver = driven();
     const health = (at: number): Query => ({
@@ -286,9 +245,6 @@ describe("asking", () => {
     watching();
   });
 
-  // The answer names the ledger position it was read at, so a record it
-  // already holds - one that arrived while the question was out, or one
-  // at or before that position afterwards - does not ask the city again.
   test("a record the answer already holds marks nothing stale", () => {
     const driver = driven();
     const watching = driver.ask.ask(QUERIES.city).subscribe(() => undefined);
@@ -310,9 +266,6 @@ describe("asking", () => {
     watching();
   });
 
-  // A view that has folded nothing answers with the first seq as the next
-  // one it has not folded, so the genesis record that lands afterwards is
-  // news rather than something the answer already holds.
   test("an answer read before genesis is stale once genesis lands", () => {
     const driver = driven();
     const watching = driver.ask.ask(QUERIES.city).subscribe(() => undefined);

@@ -6,12 +6,9 @@
 -->
 
 <script lang="ts" module>
-  
-  
   import type { Key } from "../core/lang";
   import type { Picked } from "./building/tree.svelte";
 
-  
   const SECTIONS = ["plan", "commits", "changes", "prompts", "catalog", "sandbox"] as const;
   type Section = (typeof SECTIONS)[number];
 
@@ -57,13 +54,11 @@
 
   interface Props {
     readonly address: Address;
-    
-    
+
     readonly rank?: "page" | "section" | undefined;
-    
-    
+
     readonly beside?: readonly RightItem[] | undefined;
-    
+
     readonly initialSection?: "catalog" | undefined;
   }
 
@@ -73,7 +68,6 @@
   const lang = u.lang;
   const belief = u.conn.belief;
 
-  
   let section = $state<Section | null>("plan");
   $effect(() => {
     if (initialSection !== undefined) section = initialSection;
@@ -96,8 +90,7 @@
 
   const halted = $derived(buildingIsShut($belief.halted, address));
   const removal = $derived(removalOf(address, livingIn(address)));
-  
-  
+
   let removing = $state(false);
   const done = $derived.by(() => {
     const held = building;
@@ -107,7 +100,6 @@
     return held.progress.planned;
   });
 
-  
   // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access -- typescript-eslint resolves no named export of a `.svelte` module; `svelte-check` resolves it and is the type gate
   const shownAddress: string = $derived(picked?.at ?? "");
   const shownLabel: string = $derived(
@@ -139,7 +131,6 @@
     ),
   );
 
-  
   function livingIn(room: Address): number {
     return $belief.live.filter((run) => within(run, room)).length;
   }
@@ -151,7 +142,7 @@
       {fill(say($lang, "bld_progress"), { done: String(done.done), total: String(done.total) })}
     </span>
   {/if}
-  
+
   {#if !halted && livingIn(address) === 0}
     <span class="text-note text-text-faint">{say($lang, "bld_halt_idle")}</span>
   {/if}
@@ -177,7 +168,7 @@
 <Page title={address} {rank} {aside}>
   <WorkspaceNav current={address} />
   <Goal {address} />
-  
+
   <div
     class="grid grid-cols-11 grid-rows-[auto_1fr] items-start gap-x-gutter gap-y-wide narrow:grid-cols-1 narrow:grid-rows-none"
   >

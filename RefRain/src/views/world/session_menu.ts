@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What a session row's menu look is given (`session_menu.look.svelte`),
-// and the wiring the seat (`session_menu.svelte`) builds for it: the menu
-// button of `./menu.ts`, whose items the seat decides, and the one field
-// the menu turns into for "add a tag" and "rename".
-
 import type { Attachment } from "svelte/attachments";
 
 import { HOLD } from "./drawn";
@@ -15,12 +10,10 @@ import { opening, popupOf, walking } from "./menu";
 import type { KeyPress } from "./drawn";
 import type { ItemLook, ListWire, MenuHands, PopupWire, TriggerWire } from "./menu";
 
-// The bag spread on the form the field stands in.
 export interface FormWire {
   readonly onsubmit: (event: SubmitEvent) => void;
 }
 
-// The bag spread on the field.
 export interface FieldWire {
   readonly "aria-label": string;
   readonly "aria-invalid": boolean;
@@ -34,7 +27,6 @@ export interface FieldWire {
   readonly [hold: symbol]: Attachment<HTMLElement>;
 }
 
-// The field the menu has turned into, and the grammar hint under it.
 export interface NamingLook {
   readonly form: FormWire;
   readonly field: FieldWire;
@@ -43,26 +35,20 @@ export interface NamingLook {
 
 export interface SessionMenuLook {
   readonly trigger: TriggerWire;
-  // Why the button cannot be pressed, already in the person's
-  // language; absent while it can.
   readonly why: string | undefined;
   readonly open: boolean;
   readonly popup: PopupWire;
   readonly list: ListWire;
   readonly items: readonly ItemLook[];
-  // The field, while "add a tag" or "rename" holds the menu; the items
-  // are not drawn then.
   readonly naming: NamingLook | undefined;
 }
 
-// One thing the menu does, decided by the seat.
 export interface Item {
   readonly id: string;
   readonly word: string;
   readonly act: () => void;
 }
 
-// The field's state while it stands in the menu.
 export interface Naming {
   readonly label: string;
   readonly hint: string;
@@ -74,7 +60,6 @@ export interface Naming {
 export interface SessionMenuState {
   readonly uid: string;
   readonly open: boolean;
-  // Absent: the button is pressable.
   readonly why: string | undefined;
   readonly name: string;
   readonly items: readonly Item[];
@@ -144,8 +129,6 @@ export function sessionMenuLookOf(
               oninput: (event) => {
                 hands.type(event.currentTarget.value);
               },
-              // Escape during a composition abandons the composition,
-              // not the name being typed (client D99).
               onkeydown: (event) => {
                 if (event.key !== "Escape" || event.isComposing) return;
                 event.preventDefault();

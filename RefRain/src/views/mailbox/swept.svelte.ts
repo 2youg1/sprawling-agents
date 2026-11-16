@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the person put out of the mailbox, by notice key and the count
-// it had then. A refusal that arrives again is news again, so a repeat
-// past the swept count shows; nothing here deletes the city's answer,
-// which stays in the belief. Module state, so the deciding section and
-// the notices section, which each sweep their own, read one record.
-
 import type { Notice } from "../../core/belief";
 
 let swept = $state.raw<Readonly<Record<string, number>>>({});

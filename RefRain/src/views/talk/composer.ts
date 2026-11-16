@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Snippet } from "svelte";
 import type { HTMLFormAttributes, HTMLTextareaAttributes } from "svelte/elements";
 
@@ -32,24 +31,20 @@ import type { PopoverColumn } from "../parts/popover";
 import { offersOf } from "./picker";
 import type { PickerFacts } from "./picker_scene";
 
-
 export const SPELLING: Record<Sending, Key> = {
   dispatch: "talk_send",
   steer: "talk_steer",
   queued: "talk_steer_queued",
 };
 
-
 export interface Names {
   readonly endpoint: string;
   readonly model: string;
 }
 
-
 export interface Served extends Names {
   readonly label: string;
 }
-
 
 export function sessionModel(held: readonly RunBelief[], began: Seq | null): string | null {
   return (
@@ -58,11 +53,9 @@ export function sessionModel(held: readonly RunBelief[], began: Seq | null): str
   );
 }
 
-
 export function startedIn(held: readonly RunBelief[], began: Seq | undefined): boolean {
   return held.some((run) => run.lastSeq > (began ?? 0));
 }
-
 
 export type ModelMove =
   { readonly kind: "select"; readonly names: Names } | { readonly kind: "stay" };
@@ -71,18 +64,15 @@ export function modelMove(names: Names, session: string | null): ModelMove {
   return session !== null ? { kind: "stay" } : { kind: "select", names };
 }
 
-
 export interface Picks {
   readonly model: (names: Names) => void;
   readonly effort: (level: Effort) => void;
 }
 
-
 export interface PickHands {
   readonly send: (command: Command) => boolean;
   readonly chooseEffort: (effort: Effort | null) => void;
 }
-
 
 export function picksFor(hands: PickHands, session: string | null): Picks {
   return {
@@ -96,7 +86,6 @@ export function picksFor(hands: PickHands, session: string | null): Picks {
     },
   };
 }
-
 
 export interface Offered {
   readonly models: readonly Served[];
@@ -128,23 +117,18 @@ export function offeredBy(
   };
 }
 
-
 export function configLevel(answer: Answer | undefined): Effort | null {
   return answer !== undefined && "config" in answer ? (answer.config.effort?.effort ?? null) : null;
 }
 
-
 const COMMANDS = "commands";
-
 
 export interface Arguments {
   readonly models: readonly Served[];
   readonly levels: readonly Effort[];
 }
 
-
 const COMPLETED = { model: "/model", effort: "/effort" } as const;
-
 
 export function menuColumns(lang: Lang, line: string, offers: Arguments): readonly PopoverColumn[] {
   const verbs = offered(line);
@@ -170,7 +154,6 @@ export function menuColumns(lang: Lang, line: string, offers: Arguments): readon
 function grammarNote(lang: Lang, verb: Slash): string {
   return verb.grammar === "" ? say(lang, verb.about) : `${verb.grammar} · ${say(lang, verb.about)}`;
 }
-
 
 function levelsNote(lang: Lang, levels: readonly Effort[]): string {
   return levels.length === 0
@@ -218,11 +201,9 @@ function argumentRows(lang: Lang, line: string, offers: Arguments): PopoverColum
   }
 }
 
-
 export function completedAt(line: string, pointed: string | undefined): string {
   return pointed !== undefined && /\s/.test(pointed) ? `${pointed} ` : completed(line, pointed);
 }
-
 
 export function pickSlash(chosen: Slash, line: string, hands: SlashHands): string | null {
   const call = parse(line);
@@ -234,7 +215,6 @@ export function pickSlash(chosen: Slash, line: string, hands: SlashHands): strin
   }
   return `${chosen.spelling} `;
 }
-
 
 export interface Reach extends SessionHands {
   readonly command: (command: Command) => boolean;
@@ -261,7 +241,6 @@ export function slashHands(reach: Reach): SlashHands {
   };
 }
 
-
 export type BoxKey = "complete" | "menu" | "recall" | "send" | "type";
 
 export interface KeyPressed {
@@ -271,11 +250,9 @@ export interface KeyPressed {
 }
 
 export interface BoxState {
-  
   readonly menu: boolean;
   readonly empty: boolean;
 }
-
 
 export function boxKey(pressed: KeyPressed, box: BoxState): BoxKey {
   if (pressed.isComposing) return "type";
@@ -285,24 +262,20 @@ export function boxKey(pressed: KeyPressed, box: BoxState): BoxKey {
   return "type";
 }
 
-
 export interface ComposerLook {
   readonly form: HTMLFormAttributes;
   readonly over: boolean;
   readonly box: HTMLTextareaAttributes;
-  
+
   readonly menu: Snippet | undefined;
-  
-  
+
   readonly door: Snippet | undefined;
-  
+
   readonly band: Snippet | undefined;
-  
-  
+
   readonly keys: Snippet;
-  
+
   readonly line: Snippet;
-  
-  
+
   readonly under: Snippet;
 }

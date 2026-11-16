@@ -5,15 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  // How a combobox is drawn, and nothing else: every word arrives
-  // translated and every key and press arrives wired (`./combobox`,
-  // `ComboboxLook`), and each wire bag is spread on the element it
-  // names. Another look - one built from a component library - draws
-  // the same control by taking the same value.
-  //
-  // The value in force is the deeper wash; the cursor is a bar at the
-  // row's leading edge as well as a rung of the surface, because a
-  // border keeps its shape when forced colours take every fill away.
   import type { ComboboxLook } from "./combobox";
 
   const look: ComboboxLook = $props();
@@ -29,9 +20,6 @@
     </span>
   </button>
   {#if look.layer !== undefined}
-    <!-- The theme's popover layer, because every combobox root is
-			positioned: without it the next picker in the same form, later
-			in the document, is painted over this list. -->
     <div
       class={[
         "layer absolute left-0 z-(--layer-popover) w-full flex-col rounded-panel border border-edge-panel bg-raised p-tight shadow-float",
@@ -75,11 +63,6 @@
 </div>
 
 <style>
-  /* The popup arrives from the trigger's side and leaves the same way:
-	 * arriving decelerates over `panel`, leaving accelerates over `short`,
-	 * and `display` is held until the leaving ends. Every duration is a
-	 * token, so a person who turned motion off sees it open and close in
-	 * place. */
   .layer {
     display: none;
     opacity: 0;
@@ -115,7 +98,7 @@
     inset-inline-start: 0;
     border-inline-start: var(--spacing-hair) solid var(--color-accent);
   }
-  /* Forced colours drop the wash and keep an outline. */
+
   .applied {
     outline: 1px solid transparent;
     outline-offset: -1px;

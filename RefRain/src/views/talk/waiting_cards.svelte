@@ -5,12 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  // The cards themselves. Separate from the ask so the gallery can show
-  // what a person waiting on a run sees without a run being blocked
-  // (docs/frontend-method.md). A design question is drawn on the one
-  // decide card the things that stop and ask share; this seat gives the
-  // card its two answers, y to allow and n to deny, and one answer
-  // rules every question of its group (`grouped`, `./waiting`).
   import { approve } from "../../core/commands";
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
@@ -38,9 +32,6 @@
     }
   }
 
-  // "Deny" reads like "give the files back", and it is not: it stops
-  // the work and undoes nothing, so the card names the place that does
-  // bring a file back.
   const cards = $derived(
     grouped(items).map((group): WaitingCardLook => ({
       key: group.key,

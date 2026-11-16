@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { untrack } from "svelte";
 
 import { readAnswer } from "../../core/answered";
@@ -13,7 +12,6 @@ import type { Fetched, Fetching } from "../../core/document_bytes";
 import type { B3Hash } from "../../wire";
 
 export class StoredBytes {
-  
   lost = $state<string | null>(null);
   private at = $state.raw<Fetching | null>(null);
 

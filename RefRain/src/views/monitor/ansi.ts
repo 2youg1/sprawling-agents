@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What a terminal meant by its colours, in the two hues this client
-// owns.
-//
-// A command's output arrives with SGR escapes in it, and eight ANSI
-// colours cannot be drawn by a theme with one hue axis and its one
-// complement (the theme). So the colours are read for what tools use
-// them to say rather than for what they look like: red, yellow and
-// magenta are trouble and take the alert; green, blue and cyan are
-// progress and take the accent; white is emphasis and bright black is
-// the aside. Bold survives as weight. Every other escape is dropped
-// rather than printed, because an escape drawn as text is noise a
-// person has to read past.
-
 export type Tone = "plain" | "trouble" | "progress" | "strong" | "aside";
 
 export interface Span {
@@ -24,9 +11,6 @@ export interface Span {
   readonly text: string;
 }
 
-// Built from the character rather than written as a literal, because
-// a control character inside a regular expression literal reads as a
-// mistake to every linter and every reader.
 const ESC = String.fromCharCode(27);
 const SGR = new RegExp(`${ESC}\\[([0-9;]*)m`, "g");
 const OTHER = new RegExp(`${ESC}\\[[0-9;?]*[A-Za-z]`, "g");
@@ -70,8 +54,6 @@ export function spans(text: string): readonly Span[] {
   return out;
 }
 
-// The same spans cut at each line end, so a pane can draw a line as one
-// box and fold a long one under itself the way a terminal does.
 export function rows(text: string): readonly (readonly Span[])[] {
   const out: Span[][] = [[]];
   for (const span of spans(text)) {
@@ -84,8 +66,6 @@ export function rows(text: string): readonly (readonly Span[])[] {
   return out;
 }
 
-// Every colour comes from the theme; this names the class a tone
-// paints with.
 export const INK: Readonly<Record<Tone, string>> = {
   plain: "text-text-quiet",
   trouble: "text-alert",

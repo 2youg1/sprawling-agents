@@ -4,14 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // One privacy entry: the seat. It turns the host's reading of one
-  // control and where this page's operation on it stands into the
-  // entry's look, and hands the look one callback per action. Which
-  // look draws it is a prop, so a look from a UI library that takes
-  // `EntryLook` replaces this one without touching the wiring; the
-  // gallery draws the same entry through a second look to hold that
-  // (`gallery/privacy.svelte`).
-
   import type { Component } from "svelte";
 
   import { ui } from "../../../ui";
@@ -25,8 +17,6 @@
     readonly held: Held;
     readonly onPress: (action: Action) => void;
     readonly look?: Component<EntryLook>;
-    // The id root the entry's id hangs off; the page passes its own so its
-    // links can find the entry.
     readonly root?: string;
   }
 

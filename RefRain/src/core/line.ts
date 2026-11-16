@@ -3,29 +3,23 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 export function socketUrl(location: Pick<Location, "protocol" | "host">): string {
   const scheme = location.protocol === "https:" ? "wss" : "ws";
   return `${scheme}://${location.host}/ws`;
 }
-
 
 export interface Line {
   readonly send: (text: string) => boolean;
   readonly close: () => void;
 }
 
-
 export interface Hearing {
-  
-  
   readonly opened: (credential: string | null) => void;
   readonly heard: (text: string) => void;
   readonly closed: () => void;
 }
 
 export type Dial = (hearing: Hearing) => Line;
-
 
 export function plainDial(url: string): Dial {
   return (hearing) => {

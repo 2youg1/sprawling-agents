@@ -3,12 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { isoInstant, moment } from "../../core/time";
 import type { Phase } from "../runs/lineage";
 import type { CommitAnswer, GitOid } from "../../wire";
 import type { Graph, Line } from "./lanes";
-
 
 export const SHORT = 7;
 
@@ -17,7 +15,6 @@ export const HEIGHT = 44;
 const MID = HEIGHT / 2;
 
 const x = (lane: number): number => LANE / 2 + lane * LANE;
-
 
 export function pathOf(line: Line): string {
   const [x1, x2] = [x(line.from), x(line.to)];
@@ -31,13 +28,11 @@ export function pathOf(line: Line): string {
   }
 }
 
-
 export interface CommitWire {
   readonly type: "button";
   readonly "aria-expanded": boolean;
   readonly onclick: () => void;
 }
-
 
 export interface Facts {
   readonly oid: GitOid;
@@ -50,14 +45,11 @@ export interface CommitRow {
   readonly key: GitOid;
   readonly wire: CommitWire;
   readonly picked: boolean;
-  
-  
+
   readonly here: boolean;
-  
-  
+
   readonly lines: readonly { readonly d: string; readonly mine: boolean }[];
-  
-  
+
   readonly node: { readonly left: number; readonly phase: Phase; readonly mine: boolean };
   readonly short: string;
   readonly message: string;
@@ -66,19 +58,17 @@ export interface CommitRow {
 }
 
 export interface CommitsLook {
-  
   readonly width: number;
   readonly height: number;
   readonly rows: readonly CommitRow[];
-  
-  
+
   readonly labels: {
     readonly oid: string;
     readonly b3: string;
     readonly parents: string;
     readonly at: string;
   };
-  
+
   readonly more: { readonly href: string; readonly word: string } | undefined;
 }
 
@@ -89,8 +79,7 @@ export interface CommitInput {
   readonly picked: boolean;
   readonly here: boolean;
   readonly phase: Phase;
-  
-  
+
   readonly mine: (row: number) => boolean;
   readonly room: string;
   readonly pick: (commit: CommitAnswer) => void;

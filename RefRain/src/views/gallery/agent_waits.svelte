@@ -6,15 +6,12 @@
 -->
 
 <script lang="ts" module>
-  
-  
   import { afterWait } from "../../core/doing";
   import type { Doing } from "../../core/doing";
   import type { BoardRun } from "../runs/lineage";
   import type { EventKind, EventRecord } from "../../wire";
   import { Address, B3Hash, RunId, Seq, TimeMs } from "../../wire";
 
-  
   const NOW = Date.now();
   const MINUTE = 60_000;
   const PLANNER = Address.make("lab/planner");
@@ -44,7 +41,6 @@
     };
   }
 
-  
   function recordsOf(ending: Ending | null): readonly EventRecord[] {
     const waiting = [
       record(1, 6 * MINUTE, "run_started", { task: TASK }),

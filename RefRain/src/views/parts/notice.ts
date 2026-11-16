@@ -3,19 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Snippet } from "svelte";
 
 import { say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
 import { noticeTitle, recoveryWords } from "./notice_title";
 
-
 export type Weight = "info" | "alert";
 
-
 export type Seat = "inline" | "toast" | "drawer";
-
 
 export type Said =
   | {
@@ -37,34 +33,32 @@ export type Said =
 
 export interface Common {
   readonly seat: Seat;
-  
+
   readonly weight?: Weight | undefined;
-  
+
   readonly at?: string | undefined;
-  
+
   readonly count?: number | undefined;
-  
+
   readonly actions?: Snippet | undefined;
 }
 
 export type NoticeProps = Common & Said;
 
-
 export interface NoticeLook {
   readonly seat: Seat;
   readonly weight: Weight;
-  
+
   readonly region: { readonly role: "alert" | "status" };
   readonly title: string;
   readonly at: string | undefined;
-  
+
   readonly count: string | undefined;
-  
+
   readonly code: string | undefined;
-  
-  
+
   readonly next: string;
-  
+
   readonly fold: { readonly summary: string; readonly lines: readonly string[] } | undefined;
   readonly actions: Snippet | undefined;
 }
@@ -91,8 +85,7 @@ export function noticeOf(props: NoticeProps, lang: Lang): NoticeLook {
       props.heading === undefined
         ? {
             summary: say(lang, "notices_detail"),
-            
-            
+
             lines: [
               props.action,
               props.subject,

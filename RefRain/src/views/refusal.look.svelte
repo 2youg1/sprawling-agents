@@ -4,15 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the stack of refusals is drawn, and nothing else
-  // (`./refusal.ts`, `RefusalLook`): a column of toasts, each the
-  // notice the seat draws in it. On the composer the stack stands on the
-  // composer's upper edge, clear of it, so it never covers the coin key,
-  // which is the retry; at a page's foot it is centred, a measure wide
-  // at most. A toast arrives on the arriving curve and fades out on the
-  // leaving one before its box is hidden (`allow-discrete`), and stands
-  // still when the person or the machine asks for less motion
-  // (docs/frontend-method.md §4-43).
   import type { RefusalLook } from "./refusal";
 
   const look: RefusalLook = $props();
@@ -48,9 +39,6 @@
     padding-bottom: var(--spacing-snug);
   }
 
-  /* Where the composer would stand on a page that has none: above the
-   * frame's margin by the height of an eight-line box and its two
-   * section gaps. */
   .foot {
     bottom: calc(var(--spacing-margin) + 8 * var(--spacing-baseline) + var(--spacing-section) * 2);
     left: 50%;

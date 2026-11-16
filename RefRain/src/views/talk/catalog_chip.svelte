@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts">
-  // Four quiet doors under the composer into the building's catalog and
-  // its neighbours: tools, skills, MCP, and the session's worktree. The
-  // counts that used to stand here (Always / On call) named no action a
-  // hand could take, so the letters name the doors instead.
   import { say } from "../../core/lang";
   import { buildingOf } from "../../core/route";
   import { ui } from "../../ui";
@@ -39,8 +35,6 @@
   ];
 
   function open(focus: CatalogFocus): void {
-    // MCP and the worktree leave the catalog page, so a focus left for
-    // them would stick until a later catalog visit and open the wrong pane.
     if (focus === "mcp") {
       u.go({ kind: "mcp" });
       return;
@@ -61,7 +55,6 @@
 >
   {#each DOORS as door, at (door.key)}
     {#if at > 0}
-      <!-- wording-ok: a visual separator between lettered doors, not a word -->
       <span aria-hidden="true" class="text-text-faint">/</span>
     {/if}
     <button
@@ -72,7 +65,6 @@
         open(door.key);
       }}
     >
-      <!-- wording-ok: the letter is the door's mnemonic key, same in every language -->
       <span class="font-mono text-text-quiet">{door.letter}</span>
       <span>{say($lang, door.word)}</span>
     </button>

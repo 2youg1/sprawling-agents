@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import type { PanelLook } from "./panel";
 
   const { dialog, children }: PanelLook = $props();
@@ -17,7 +13,6 @@
 </dialog>
 
 <style>
-  
   .settings-panel {
     transition: translate var(--transition-duration-panel) var(--ease-arrive);
   }

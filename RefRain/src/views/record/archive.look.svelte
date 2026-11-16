@@ -5,13 +5,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- How the archive's hits are drawn (`./archive`, `ArchiveLook`): a row
-per hit on shared column lines, the building as the link. The link
-lights on the arriving curve and settles on the leaving one
-(docs/frontend-method.md §4-43). -->
 <script lang="ts">
   import type { ArchiveLook } from "./archive";
-
   const look: ArchiveLook = $props();
 </script>
 

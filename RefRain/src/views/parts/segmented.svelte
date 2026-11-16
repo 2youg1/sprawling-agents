@@ -1,6 +1,4 @@
 <script lang="ts" generics="V extends string">
-  
-  
   import type { Attachment } from "svelte/attachments";
 
   import { lookOf } from "./segmented";
@@ -10,7 +8,6 @@
   const props: SegmentedProps<V> = $props();
   const uid = $props.id();
 
-  
   const drawn: Record<string, HTMLElement | undefined> = {};
   const holds: Record<string, Attachment<HTMLElement> | undefined> = {};
 

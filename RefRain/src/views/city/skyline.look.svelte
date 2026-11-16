@@ -1,17 +1,11 @@
-
-
 <script lang="ts">
-  
-  
   import Mark from "./marks.svelte";
   import type { Pane, SkylineLook } from "./skyline";
 
   const look: SkylineLook = $props();
 
-  
   const PLINTH = 14;
 
-  
   const PANE: Record<Pane, string> = {
     dark: "fill-drawn-hollow ease-leave",
     ended: "fill-drawn-line ease-leave",

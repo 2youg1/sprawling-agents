@@ -4,13 +4,6 @@
   // file, You can obtain one at https://mozilla.org/MPL/2.0/.
   // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-  // The three documents that govern the city - who the mayor is, who the
-  // clerk is, and how this person wants the city run - each edited whole
-  // in one box and saved once, the way the city writes them
-  // (`city::governed`). The page reads the file where the city keeps it,
-  // in the reserved subtree at the city's root, and saves through
-  // `PutDocument`, which names the document rather than the path.
-
   import type { GovernedDocument } from "../../wire";
   import { Address } from "../../wire";
 
@@ -51,14 +44,9 @@
 
   const question = $derived<Query>({ document: { at: governedAt(which) } });
   const held = $derived(u.conn.asking.ask(question));
-  // A document the city has not written yet answers `unavailable`, as an
-  // unreadable one does; either way the box starts empty and the page
-  // says it could not read one, and a save writes the file whole.
   const read = $derived(readDocument($held));
   const onDisk = $derived(read.kind === "held" ? read.value.text : "");
 
-  // The box follows the file until somebody types in it, and follows it
-  // again once their text has landed or another document is chosen.
   let was: GovernedDocument | undefined = undefined;
   $effect(() => {
     const at = which;

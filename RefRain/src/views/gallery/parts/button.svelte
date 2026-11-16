@@ -6,9 +6,6 @@
 -->
 
 <script lang="ts">
-  // The button and the icon-only key in every state they can be in: the
-  // four tones, the two postures that answer "not now", and an icon key
-  // that can be pressed beside one that says why it cannot.
   import { say } from "../../../core/lang";
   import { ui } from "../../../ui";
   import Button from "../../parts/button.svelte";
@@ -34,8 +31,6 @@
   </div>
 </Case>
 
-<!-- The key's name is its hint: hover or focus the first two to read
-it; the third cannot be used and its hint says why. -->
 <Case label="button · icon keys, live and refused">
   <div class="flex flex-wrap items-center gap-snug">
     <IconButton glyph="copy" label={say($lang, "setup_copy")} />

@@ -6,14 +6,11 @@
 -->
 
 <script lang="ts">
-  
-  
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import Look from "./unkept.look.svelte";
 
   interface Props {
-    
     readonly words: () => string;
   }
 

@@ -3,14 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { diff } from "@codemirror/merge";
 
 import { fill, say } from "../../../core/lang";
 import type { Lang } from "../../../core/lang";
 
 export interface Side {
-  
   readonly label: string;
   readonly text: string;
 }
@@ -19,11 +17,9 @@ export interface Comparison {
   readonly name: string;
   readonly from: Side;
   readonly to: Side;
-  
-  
+
   readonly about: readonly string[];
 }
-
 
 export function comparedName(name: string): string {
   return `${name}.comparison.md`;
@@ -55,7 +51,6 @@ export function comparedMarkdown(lang: Lang, comparison: Comparison): string {
   ]);
   return [...head, ...passages].join("\n");
 }
-
 
 function fenced(text: string): readonly string[] {
   const longest = Math.max(0, ...[...text.matchAll(/`+/gu)].map((run) => run[0].length));

@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Snippet } from "svelte";
 import { createAttachmentKey } from "svelte/attachments";
 import type { Attachment } from "svelte/attachments";
@@ -12,22 +11,18 @@ import type { Key } from "../../core/lang";
 import type { Side } from "./layer";
 import type { PopoverColumn, PopoverRow } from "./popover";
 
-
 export type Layout = "content" | "equal";
-
 
 export interface Place {
   readonly column: number;
   readonly cursor: number;
 }
 
-
 export type Pressed =
   | { readonly kind: "move"; readonly to: Place }
   | { readonly kind: "apply" }
   | { readonly kind: "close" }
   | { readonly kind: "pass" };
-
 
 export interface Keyed {
   readonly key: string;
@@ -36,7 +31,6 @@ export interface Keyed {
 }
 
 const PASS: Pressed = { kind: "pass" };
-
 
 export function pressed(place: Place, key: Keyed, rows: readonly number[]): Pressed {
   const here = rows.at(place.column) ?? 0;
@@ -47,8 +41,7 @@ export function pressed(place: Place, key: Keyed, rows: readonly number[]): Pres
           kind: "move",
           to: { column: place.column, cursor: Math.min(here - 1, Math.max(0, place.cursor + by)) },
         };
-  
-  
+
   const turn = (by: number): Pressed =>
     rows.length === 0
       ? { kind: "move", to: place }
@@ -76,42 +69,33 @@ export function pressed(place: Place, key: Keyed, rows: readonly number[]): Pres
   }
 }
 
-
 export const listId = (seat: string, column: number): string => `${seat}-c${String(column)}`;
 export const rowId = (seat: string, column: number, index: number): string =>
   `${seat}-r${String(column)}-${String(index)}`;
-
 
 export interface PopoverView {
   readonly seat: string;
   readonly layout: Layout;
   readonly columns: readonly PopoverColumn[];
   readonly place: Place;
-  
-  
+
   readonly holder: "list" | "caller";
   readonly side: Side;
-  
-  
+
   readonly room: number | null;
-  
-  
+
   readonly title: Key;
-  
+
   readonly say: (key: Key) => string;
 }
 
-
 export interface Hands {
-  
-  
   readonly place: (to: Place) => void;
   readonly apply: (column: PopoverColumn, row: PopoverRow) => void;
   readonly close: () => void;
   readonly holdDialog: Attachment<HTMLDivElement>;
   readonly holdList: (column: number) => Attachment<HTMLUListElement>;
 }
-
 
 export function keysOf(view: PopoverView, hands: Hands): (key: Keyed) => boolean {
   return (key) => {
@@ -167,7 +151,7 @@ export interface OptionWire {
 
 export interface RowLook {
   readonly key: string;
-  
+
   readonly row: PopoverRow;
   readonly chosen: boolean;
   readonly cursor: boolean;
@@ -192,12 +176,10 @@ export interface PopoverLook {
   readonly row: Snippet<[PopoverRow]> | undefined;
 }
 
-
 export interface Slots {
   readonly header: Snippet | undefined;
   readonly row: Snippet<[PopoverRow]> | undefined;
 }
-
 
 export function lookOf(view: PopoverView, hands: Hands, slots: Slots): PopoverLook {
   const keys = keysOf(view, hands);

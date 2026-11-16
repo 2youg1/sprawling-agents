@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import type { Snippet } from "svelte";
 
   import Button from "../parts/button.svelte";

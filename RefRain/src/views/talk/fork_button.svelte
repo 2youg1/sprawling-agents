@@ -3,13 +3,6 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- The one branch action, revealed where a hand rests or a focus lands,
-on a person's words, a reply and a call alike. This is its
-seat: it owns the words and the wiring (`fork_button.ts`), and
-`fork_button.look.svelte` draws it.
-
-`onHover` reports the entry under the hand, which is the one the
-`fork.here` chord branches from; a press branches from this entry. -->
 <script lang="ts">
   import { ui } from "../../ui";
   import { say } from "../../core/lang";

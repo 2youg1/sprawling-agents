@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { onDestroy } from "svelte";
   import { get } from "svelte/store";
 
@@ -28,7 +26,7 @@
   const lang = u.lang;
   let waiting = $state<ExportFormat | null>(null);
   let missed = $state<Exported | null>(null);
-  
+
   const waits: Record<ExportFormat, (() => void) | undefined> = {
     jsonl: undefined,
     csv: undefined,
@@ -42,8 +40,7 @@
     waiting = format;
     missed = null;
     const held = u.conn.asking.ask(query);
-    
-    
+
     const before = get(held);
     u.conn.asking.refresh(query);
     const off = held.subscribe((answer) => {

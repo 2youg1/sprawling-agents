@@ -3,35 +3,21 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Recording what somebody says, and getting the line of text back.
-//
-// The browser picks the container: `MediaRecorder` supports a different
-// set in each engine, and the one it chose is the one the city is told
-// about. The city refuses a container it cannot send on, by name, so a
-// guess here would be a guess the person pays for.
-
 import { derived, get, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
 import { bearing } from "./socket";
 
-// What a recording attempt ended as. Exhaustive because the composer
-// draws a different control for each: a refusal is worth saying, and a
-// person who changed their mind is not.
 export type Heard =
   | { readonly kind: "text"; readonly text: string }
   | { readonly kind: "refused"; readonly said: string }
   | { readonly kind: "silent" };
 
-// One recording in progress. `stop` resolves once the city has answered.
 export interface Recording {
   readonly stop: () => Promise<Heard>;
   readonly cancel: () => void;
 }
 
-// Whether this browser can record at all. A page in a tab served over
-// plain http to something other than localhost has no microphone, and a
-// control that cannot work is a control that should not be drawn.
 export function canRecord(): boolean {
   return typeof MediaRecorder !== "undefined" && typeof navigator.mediaDevices !== "undefined";
 }
@@ -49,8 +35,6 @@ async function ask(origin: string, token: string | null, blob: Blob): Promise<He
   return said.trim() === "" ? { kind: "silent" } : { kind: "text", text: said };
 }
 
-// Opens the microphone and starts recording. The caller holds the
-// handle; nothing here touches the page.
 export async function record(origin: string, token: string | null): Promise<Recording | null> {
   const media = await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => null);
   if (media === null) {
@@ -89,15 +73,6 @@ export async function record(origin: string, token: string | null): Promise<Reco
   };
 }
 
-// Dictation as the three states a person can see it in, kept here
-// rather than in the box that draws them.
-//
-// The box owns where words go; this owns whether a recording is
-// running, whether the city is still transcribing, and whether the last
-// attempt was refused. Splitting it the other way put four stores and
-// a two-branch handler inside a view that already had eleven, and the
-// state was never about the view: a second control that dictates into
-// somewhere else needs the same machine and must not grow a second one.
 export interface Dictation {
   readonly taking: Readable<boolean>;
   readonly hearing: Readable<boolean>;
@@ -105,10 +80,6 @@ export interface Dictation {
   readonly speak: () => void;
 }
 
-// `into` is handed the whole new value, not an appendix, so that the
-// read of what is already there happens at the moment the city answers
-// rather than at the moment the button was pressed: somebody goes on
-// typing while a recording is being transcribed.
 export function dictation(
   origin: string,
   credential: () => string | null,

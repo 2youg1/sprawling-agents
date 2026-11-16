@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { QUERIES } from "../../core/asking";
   import { say } from "../../core/lang";
   import { buildingDestination, toFragment } from "../../core/route";
@@ -16,8 +14,6 @@
   import { buildingsOf } from "./buildings";
 
   interface Props {
-    
-    
     readonly current?: Address | undefined;
   }
 

@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { Option } from "effect";
   import { onMount, tick } from "svelte";
 
@@ -54,7 +50,6 @@
   import { launchOf, opensGuide } from "./views/welcome/guide";
   import { keepSheets, leaveSheet, openSheet, sheetsOpen } from "./views/sheets.svelte";
 
-  
   const props: { opening: Opening } = $props();
   // svelte-ignore state_referenced_locally (the shell captures this value once at mount and never follows the prop)
   setUi(props.opening);
@@ -67,10 +62,8 @@
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const bindings = keymap();
 
-  
   type GoAction = Extract<Action, `go.${string}`>;
 
-  
   const GOES: Readonly<Record<GoAction, View>> = {
     "go.talk": { kind: "talk", address: MAYOR },
     "go.waiting": { kind: "talk", address: MAYOR },
@@ -85,29 +78,27 @@
   let view = $state.raw<View>(DEFAULT_VIEW);
   let sheetOpen = $state(false);
   let sessionSwitcherOpen = $state(false);
-  
+
   let stopsWithoutRun = $state(0);
-  
+
   let opener: HTMLElement | null = null;
-  
+
   let arrived = false;
 
   const waiting = $derived($approvals?.length ?? 0);
   const working = $derived($belief.live.length > 0);
-  
+
   const launch = $derived(
     $endpoints !== undefined && "endpoints" in $endpoints
       ? launchOf($endpoints.endpoints, $held.welcomed)
       : undefined,
   );
 
-  
   function focusComposer(): void {
     const box = document.querySelector("main textarea");
     if (box instanceof HTMLTextAreaElement) box.focus();
   }
 
-  
   function focusTitle(): void {
     const heading = document.querySelector("main h1");
     if (heading instanceof HTMLElement) {
@@ -116,7 +107,6 @@
     }
   }
 
-  
   function settle(): void {
     const was = view;
     view = Option.getOrElse(current(u.bar), () => DEFAULT_VIEW);
@@ -135,8 +125,6 @@
       markEndAtFrame("layer_drawn");
       void tick().then(focusComposer);
     } else if (arrived && view.kind !== "setup") {
-      
-      
       const intoComposer = switchedSession && view.kind === "talk" && view.session === undefined;
       void tick().then(() => {
         if (back !== null) {
@@ -150,11 +138,9 @@
     arrived = true;
   }
 
-  
   function follow(): void {
     const next = Option.getOrElse(current(u.bar), () => DEFAULT_VIEW);
-    
-    
+
     if (
       view.kind === "setup" ||
       next.kind === "setup" ||
@@ -177,7 +163,6 @@
     opener = null;
   }
 
-  
   function homeZen(): void {
     tierOnLanding = null;
     u.prefs.setTier("zen");
@@ -188,7 +173,6 @@
     u.go(DEFAULT_VIEW);
   }
 
-  
   let columns = $state<Columns>("twelve");
   let tierOnLanding: Tier | null = null;
   function cycleTier(): void {
@@ -223,7 +207,6 @@
         : $held.tier,
   );
 
-  
   let mailboxAsked = $state(0);
 
   let tierHeld: ReturnType<typeof setTimeout> | null = null;
@@ -243,7 +226,6 @@
     }, HOLD_MS);
   }
 
-  
   function releaseTier(): void {
     if (tierHeld === null) return;
     clearTimeout(tierHeld);
@@ -252,7 +234,6 @@
     else cycleTier();
   }
 
-  
   function letGo(event: KeyboardEvent): void {
     if (event.key === "Control" || event.key === "Meta") expose(false);
     const tierKey = folded(event.key) === folded(bindings.chord("tier.cycle")?.key ?? "");
@@ -268,7 +249,6 @@
 
   function act(action: Action): void {
     switch (action) {
-      
       case "go.talk":
       case "go.city":
       case "go.mcp":
@@ -295,7 +275,6 @@
         mailboxAsked += 1;
         return;
       case "inspect":
-        
         u.prefs.setPanel(rightItem() === null && !$held.panel);
         closeRight();
         return;
@@ -319,16 +298,13 @@
       case "decide.yes":
       case "decide.edit":
       case "decide.no":
-        
-        
         return;
     }
   }
 
   function keys(event: KeyboardEvent): void {
     const accel = event.ctrlKey || event.metaKey;
-    
-    
+
     expose(
       (event.key === "Control" || event.key === "Meta") && !event.isComposing && !event.repeat,
     );
@@ -339,8 +315,7 @@
       return;
     }
     if (event.repeat && tierHeld !== null) return;
-    
-    
+
     if (paletteShown() && !accel) return;
     const action = bindings.acting(pressedOf(event));
     if (action !== null) {
@@ -349,10 +324,8 @@
     }
   }
 
-  
   $effect(() => u.conn.asking.ask(QUERIES.city).subscribe(() => undefined));
 
-  
   let launched = false;
   $effect(() => {
     if (launch === undefined || launched) return;
@@ -360,9 +333,7 @@
     if (opensGuide(launch) && view.kind === "talk") u.go({ kind: "welcome" });
   });
 
-  
   $effect(() => {
-    
     const name = $belief.city ?? say($lang, "nav_city");
     document.title = waiting > 0 ? `(${String(waiting)}) ${name}` : name;
     document.documentElement.lang = $lang;

@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The recycle bin as decided, with no look: which rows the page can
-// bring back itself, what the press hands on, and the way back each
-// row states in words.
-
 import { beforeAll, describe, expect, test } from "bun:test";
 
 import { Locator, TimeMs } from "../../wire";
@@ -25,10 +21,6 @@ const INTERRED: Restoration = { interred: Locator.make("interred/2026-10-02/draf
 const REBUILT: Restoration = { rebuildable: { reason: "rebuilt on the next read" } };
 
 describe("the recycle bin", () => {
-  // Every row writes its moment through Intl, and the first locale-aware
-  // date format in a Bun process loads the ICU data - about a second on
-  // an idle machine, several on a loaded one. That cost is the runtime's,
-  // so it is paid once here and no test's budget measures it.
   beforeAll(() => {
     clock("en", 0);
   });

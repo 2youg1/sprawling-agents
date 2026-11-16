@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the results city lists under its filter, already in words: one
-// section per recency band, one row per run, and what the end of a row
-// says - what a finished run produced and its pull request, what a run
-// waiting for the person asks, or why a failed run stopped. The look
-// draws `ResultsLook` and decides nothing (client D95).
-
 import type { RunBelief } from "../../core/belief";
 import type { Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
@@ -18,9 +12,6 @@ import { toFragment } from "../../core/route";
 import { hhmm } from "../../core/time";
 import type { RunId } from "../../wire";
 
-// The end of a row. A finished run's produced figures are asked for by
-// the row itself (`./produced.svelte`), so the look is handed the run
-// rather than a number.
 export type Tail =
   | { readonly kind: "produced"; readonly run: RunId; readonly pr: string | null }
   | { readonly kind: "asks"; readonly text: string }
@@ -34,7 +25,6 @@ export interface ResultRowLook {
   readonly addr: string;
   readonly title: string;
   readonly tail: Tail;
-  // Spread on the row's link to the run's page.
   readonly wire: { readonly href: string };
 }
 
@@ -45,7 +35,6 @@ export interface ResultsLook {
     readonly count: number;
     readonly rows: readonly ResultRowLook[];
   }[];
-  // Said where the filter keeps no run at all.
   readonly none: string | null;
 }
 

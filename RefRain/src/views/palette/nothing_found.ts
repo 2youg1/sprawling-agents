@@ -5,9 +5,6 @@
 
 import type { Key } from "../../core/lang";
 
-// What the palette says when nothing matches. Two names no command
-// answers to are answered anyway, each by a reader of cities: David
-// Harvey and Manfredo Tafuri.
 export function nothingFound(query: string): Key {
   switch (query.trim().toLowerCase()) {
     case "harvey":

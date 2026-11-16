@@ -6,21 +6,6 @@
 -->
 
 <script lang="ts">
-  // How the inspector's tab strip is drawn, and nothing else (client
-  // D95): a row of tabs cut from the region below - the front one on the
-  // page's own fill, its bottom edge open into the region - each with a
-  // close mark, and the key that closes the whole inspector at the right
-  // end. Every word arrives translated and every role, tab stop, handler
-  // and `aria-*` value arrives inside a wire bag spread unchanged on the
-  // element it is for.
-  //
-  // A tab keeps the same padding in front and behind, so bringing it
-  // forward changes its fill and never moves its words. The close mark
-  // of a tab behind is drawn only while the pointer or the focus is on
-  // that tab, which is when a hand can reach it; the rest of the time it
-  // is not a standing control (refrain P2), and its place stays held so
-  // the tab does not widen when the mark comes. Delete on the tab is the
-  // keyboard's way to the same action.
   import Glyph from "../parts/glyph.svelte";
 
   import type { StripLook } from "./strip";
@@ -79,8 +64,6 @@
     max-width: calc(24 * var(--spacing-baseline));
   }
 
-  /* The front tab's fill runs over the strip's bottom rule, so the tab
-   * and the region below read as one sheet. */
   .front::after {
     content: "";
     position: absolute;
@@ -90,9 +73,6 @@
     background-color: var(--color-page);
   }
 
-  /* Ink and fill fade back when the pointer leaves and arrive when it
-   * comes: the resting state leaves, the hovered state arrives
-   * (docs/frontend-method.md §4-43). */
   .tab,
   .mark,
   .key {
@@ -107,8 +87,6 @@
     transition-timing-function: var(--ease-arrive);
   }
 
-  /* A forced-colour mode paints every fill alike, so the front tab would
-   * look like the others; its name keeps a rule under it instead. */
   @media (forced-colors: active) {
     .front .name {
       text-decoration: underline;

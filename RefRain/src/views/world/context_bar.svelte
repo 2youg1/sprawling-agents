@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { QUERIES } from "../../core/asking";
   import { ui } from "../../ui";
   import type { Address, RoundsAnswer, RunId } from "../../wire";

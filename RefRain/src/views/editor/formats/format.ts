@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { dependencies } from "../../../../package.json";
 
 export type Drawn = "pdf" | "docx" | "html";
@@ -15,9 +14,7 @@ const BY_EXTENSION: Readonly<Record<string, Drawn>> = {
   htm: "html",
 };
 
-
 export const NAME: Readonly<Record<Drawn, string>> = { pdf: "PDF", docx: "DOCX", html: "HTML" };
-
 
 export const TOOL: Readonly<Record<Exclude<Drawn, "html">, string>> = {
   pdf: `pdf.js ${dependencies["pdfjs-dist"]}`,

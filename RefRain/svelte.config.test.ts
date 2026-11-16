@@ -7,8 +7,6 @@ import { describe, expect, test } from "bun:test";
 
 import { runesFor } from "./svelte.config";
 
-// Vite hands the plugin a normalised path: forward slashes, a drive
-// letter on Windows. `import.meta.dirname` spells it the platform's way.
 const client = import.meta.dirname.replaceAll("\\", "/");
 
 describe("svelte config", () => {

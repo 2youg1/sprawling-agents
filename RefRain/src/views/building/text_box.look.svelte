@@ -5,9 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- A box of several lines, on the surface and edge every input wears,
-set in the code face because what it holds is a file or a list of
-addresses and names. A refused box takes the alert edge. -->
 <script lang="ts">
   import type { TextBoxLook, TextBoxSize } from "./text_box";
 

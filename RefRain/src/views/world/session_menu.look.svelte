@@ -3,11 +3,6 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- How a session row's menu is drawn: a small square key with the
-"more" mark, and under its right edge a raised box holding either the
-items or the one field the menu turned into. While the key cannot be
-pressed, a hint says why on hover. Every role, key and `aria-*` value
-comes in the bags. -->
 <script lang="ts">
   import Glyph from "../parts/glyph.svelte";
   import Tip from "../parts/tip.svelte";
@@ -15,7 +10,6 @@ comes in the bags. -->
 
   const look: SessionMenuLook = $props();
 
-  // Trigger: wash on hover, yield on press, return on release.
   const KEY =
     "grid size-control-sm place-items-center rounded-control text-text-quiet " +
     "transition-[background-color,color,scale] ease-leave " +
@@ -23,8 +17,7 @@ comes in the bags. -->
     "active:scale-(--scale-press) active:ease-arrive " +
     "aria-expanded:wash aria-expanded:text-text " +
     "disabled:text-text-disabled still:transition-none still:active:scale-100";
-  // Long policy lines wrap instead of crushing into one control height;
-  // the list scrolls under a thin scrollbar once it outgrows the palette.
+
   const ITEM =
     "flex min-h-control-sm w-full items-center rounded-control px-snug py-tight text-left text-note text-pretty text-text " +
     "transition-[background-color,color] ease-leave " +

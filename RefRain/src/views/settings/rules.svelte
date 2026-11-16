@@ -4,16 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // A building's `RULES.toml`, read and written whole through
-  // `PutRules`. The city reads the text before it lands and
-  // refuses one it cannot read, and refuses a write made against text
-  // the Mayor has changed since this box read it: the draft stays in the
-  // box either way, and saving again writes against what is there now.
-  // This page writes no TOML of its own and checks none: the city is the
-  // one reader of this grammar. The door is the person's at this
-  // machine; a remote page is refused by the city, and the refusal is
-  // what it reads.
-
   import { putRules } from "../../core/commands";
   import { readDocument } from "../../core/document";
   import { say } from "../../core/lang";
@@ -32,8 +22,6 @@
 
   let chosen = $state<Address>(HALL);
   const held = $derived(u.conn.asking.ask({ document: { at: rulesAt(chosen) } }));
-  // A building that has no rules file yet reads as empty text, and the
-  // first save writes it.
   const onDisk = $derived.by(() => {
     const read = readDocument($held);
     return read.kind === "held" ? read.value.text : read.kind === "unavailable" ? "" : null;
@@ -43,8 +31,6 @@
   let saving = $state.raw<Saving>(HELD);
   const slot: Slot = { now: () => saving, mark: (next) => (saving = next) };
 
-  // The box follows the file until somebody types, and again once their
-  // text has landed or another building is chosen.
   let was: Address | null = null;
   $effect(() => {
     const at = chosen;
@@ -70,11 +56,6 @@
   }
 </script>
 
-<!-- The building is picked in a native <select> rather than the column
-     the skills and MCP pages draw (client D78): a column of one row reads
-     as a label, so a city with only the hall showed nothing to open,
-     while a select is a control with one option or with fifty, and the
-     platform owns its keys. -->
 <div class="flex flex-col gap-base">
   <select
     class="h-control w-tree max-w-full rounded-control border border-edge-input bg-raised px-base text-body text-text"

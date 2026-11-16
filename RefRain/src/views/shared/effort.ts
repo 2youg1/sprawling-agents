@@ -3,9 +3,4 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// This module keeps the surface `effort.tsx` had - `EffortSection`
-// reaches a caller through the specifier it always had - so the
-// component is re-exported here, the shape `parts/table.ts`
-// established.
-
 export { default as EffortSection } from "./effort.svelte";

@@ -3,21 +3,10 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- How the open model picker is drawn, and nothing else (client D95,
-docs/frontend-method.md §7I): the popover's lists as the picker's
-sections, top to bottom - recent combinations, the filter, the first
-choice level, the second, the thinking band - each under its heading.
-Every key, role and `aria-*` value arrives in a wire bag from the
-popover seat or from `picker_look.ts`. What is applied reads as the
-deeper wash; the cursor is the accent bar at the row's leading edge
-(§7B). A section keeps the room of the largest state reachable without
-typing, drawn as rows nobody can see, so a choice never moves a target
-already on the screen; a list opened in full scrolls inside that room. -->
 <script lang="ts">
   import type { ListLook, PopoverLook, RowLook } from "../parts/popover_wiring";
   import { SECTION } from "./picker";
   import type { PickerMenu, SectionLook } from "./picker_look";
-
   interface Props {
     readonly look: PopoverLook;
     readonly menu: PickerMenu;
@@ -48,18 +37,12 @@ already on the screen; a list opened in full scrolls inside that room. -->
         : "text-text-quiet hover:bg-raised-hover hover:text-text",
     item.cursor ? "chosen" : "",
   ];
-  // The window's height caps the panel, and so does the room on the side
-  // it opened on: a box standing in the middle of an empty room leaves
-  // less above it than the panel wants, and the panel then scrolls
-  // inside that room rather than rising past the window's top. The gap
-  // it keeps from its anchor, and as much again from the edge, comes off.
+
   const cap = $derived(
     look.room === null
       ? undefined
       : `min(85dvh, calc(${String(look.room)}px - var(--spacing-snug) * 2))`,
   );
-  // The sentence under the band: the level the cursor is on, else the
-  // level in use.
   const noteOf = (list: ListLook): string | undefined =>
     (list.rows.find((item) => item.cursor) ?? list.rows.find((item) => item.chosen))?.row.secondary;
 </script>
@@ -72,9 +55,6 @@ already on the screen; a list opened in full scrolls inside that room. -->
 
 <div
   class={[
-    // The window's height is the one cap: a picker taller than the
-    // room a short window leaves scrolls rather than leaving the screen.
-    // The scroller's reserved gutter stands in for the right padding.
     "absolute right-0 flex max-h-[85dvh] w-[34rem] max-w-full flex-col gap-snug overflow-y-auto rounded-panel border border-edge-panel bg-raised py-snug pl-snug shadow-float",
     look.side === "above" ? "bottom-full mb-snug rise" : "top-full mt-snug drop",
   ]}
@@ -113,8 +93,6 @@ already on the screen; a list opened in full scrolls inside that room. -->
             aria-label={section.heard[item.row.id]}
             {...item.wire}
           >
-            <!-- The name keeps its width and the facts beside it give
-                 way, so a provider is never cut to a prefix. -->
             <span
               class={section.band || item.row.secondary === undefined
                 ? "min-w-0 truncate"
@@ -141,8 +119,6 @@ already on the screen; a list opened in full scrolls inside that room. -->
     </div>
   {/each}
   {#if menu.bandRoom}
-    <!-- The thinking band's room, kept for a reachable model that has
-         one while the model chosen now has none. -->
     <div class="invisible flex flex-col gap-tight" aria-hidden="true">
       <div class={HEADING}></div>
       <div class="h-touch"></div>

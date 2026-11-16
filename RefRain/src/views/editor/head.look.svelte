@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import type { HeadLook } from "./head";
 
   const look: HeadLook = $props();

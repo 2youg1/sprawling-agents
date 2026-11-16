@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// One version's text as it arrives: the page asks the next window of a
-// `Gathering` (`core/document_windows.ts`) until the text is whole, past
-// what RefRain gathers, or the city says it can no longer read that
-// version. Made while a component initialises, so the asking stops with
-// the component.
-
 import { untrack } from "svelte";
 
 import { readAnswer } from "../../core/answered";
@@ -18,7 +12,6 @@ import type { Asking } from "../../core/asking";
 
 export class Gathered {
   value = $state<Gathering | null>(null);
-  // The question the city could not answer, when it could not.
   lost = $state<string | null>(null);
 
   constructor(asking: Asking) {

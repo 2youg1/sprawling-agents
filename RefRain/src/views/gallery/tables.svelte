@@ -6,27 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // The two shapes a list of facts is drawn in, at their extremes.
-  //
-  // A table is the one place a client can be wrong without looking
-  // wrong: a long identifier with nowhere to go wraps a character per
-  // line, and the page still "works". The fixtures here hold the long
-  // value, the narrow container, the clipped path and the empty list,
-  // which are the states the column and truncation rules exist for.
-  //
-  // **The two widths are the argument, not decoration.** At 320 the id
-  // column is held by its own 24ch minimum and the container scrolls;
-  // at the settings measure of 520 the three figures and the two text
-  // columns leave the id no room to give, and the table scrolls again.
-  // Before the minima existed, both widths answered by breaking the id
-  // into a vertical word, which is the defect these cases are a reader
-  // for.
-  //
-  // The cells are snippets and the column declarations are one
-  // function of them: a cell drawn twice would give one column two
-  // drawings, and the two tables in this file would drift the first
-  // time somebody tightened one of them.
-
   import type { Snippet } from "svelte";
 
   import type { Lang } from "../../core/lang";
@@ -34,7 +13,6 @@
   import { fill, say } from "../../core/lang";
   import type { Column } from "../parts/table";
 
-  // One row of the table, in the shape a probe answers with.
   interface Served {
     readonly id: string;
     readonly context: string;
@@ -44,10 +22,6 @@
     readonly role: string;
   }
 
-  // The identifier the whole rule exists for: a vendor, a family, a
-  // version and a date in one string with no space to break at. A
-  // stand-in rather than a real vendor's id: a fixture needs the
-  // shape, and the shape is what a live model list brings.
   const LONG = "acme-inference/orion-3-ultra-preview-2026-09";
 
   const SERVED: readonly Served[] = [
@@ -90,8 +64,6 @@
     readonly role: Snippet<[Served]>;
   }
 
-  // The six columns the settings page draws, with each one's floor
-  // stated: nothing here is broken over two lines to make the id fit.
   function columnsOf(lang: Lang, cells: Cells): readonly Column<Served>[] {
     return [
       {
@@ -192,8 +164,6 @@
   </div>
 </Case>
 
-<!-- One row of three is ticked, so the header box is drawn in the
-third state it has: neither all nor none. -->
 <Case label="table · six columns inside 520px, one row ticked" width={520}>
   <div class="min-w-0">
     <Table

@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import type { ProposalsLook } from "./proposals";
 
   const { band, heading, title, cards }: ProposalsLook = $props();

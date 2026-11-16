@@ -3,9 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 export const UNPACKED_MAX = 64 * 1024 * 1024;
-
 
 export const PARTS_MAX = 4096;
 
@@ -25,7 +23,6 @@ const END_SIGNATURE = 0x06054b50;
 const ENTRY_SIGNATURE = 0x02014b50;
 const LOCAL_SIGNATURE = 0x04034b50;
 
-
 const END_REACH = 22 + 0xffff;
 const STORED = 0;
 const DEFLATED = 8;
@@ -38,7 +35,6 @@ export function unpack(bytes: Uint8Array): Promise<Unpacked> {
     return Promise.resolve({ kind: "refused", why: listed });
   return inflateAll(bytes, listed).catch(() => SHAPE);
 }
-
 
 function directoryOf(bytes: Uint8Array): readonly Part[] | "shape" | "too_large" {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -85,7 +81,6 @@ async function inflateAll(bytes: Uint8Array, parts: readonly Part[]): Promise<Un
   return { kind: "unpacked", parts: out };
 }
 
-
 function dataOf(bytes: Uint8Array, part: Part): Uint8Array | null {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const at = part.header;
@@ -93,7 +88,6 @@ function dataOf(bytes: Uint8Array, part: Part): Uint8Array | null {
   const start = at + 30 + view.getUint16(at + 26, true) + view.getUint16(at + 28, true);
   return start + part.packed > view.byteLength ? null : bytes.subarray(start, start + part.packed);
 }
-
 
 async function inflate(data: Uint8Array, part: Part): Promise<Uint8Array | null> {
   if (part.method === STORED) return data.length === part.size ? data : null;

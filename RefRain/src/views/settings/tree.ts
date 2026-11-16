@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { createAttachmentKey, type Attachment } from "svelte/attachments";
 
 import type { Key } from "../../core/lang";
@@ -14,16 +13,13 @@ import type { GlyphName } from "../parts/glyph";
 import { HEADING } from "../setup/groups";
 import type { Fold, Folds } from "./folds";
 
-
 export interface Page {
   readonly kind: "page";
   readonly view: View;
   readonly word: Key;
 }
 
-
 export type Nest = "buildings" | "record";
-
 
 export type Leaf = { readonly kind: "group"; readonly group: SetupGroup } | Page;
 
@@ -50,8 +46,6 @@ export const TREE: readonly Branch[] = [
     more: [],
   },
   {
-    
-    
     word: "settings_branch_access",
     entries: [
       group("accounts"),
@@ -73,8 +67,6 @@ export const TREE: readonly Branch[] = [
     more: [],
   },
   {
-    
-    
     word: "settings_branch_preferences",
     entries: [group("appearance"), group("colours"), group("keys"), group("privacy")],
     more: [],
@@ -87,12 +79,10 @@ export const TREE: readonly Branch[] = [
       group("tools"),
       group("about"),
     ],
-    
-    
+
     more: [{ kind: "page", view: { kind: "welcome" }, word: "welcome_title" }, group("advanced")],
   },
 ];
-
 
 const BRANCH_MARK: Readonly<Partial<Record<Key, GlyphName>>> = {
   settings_branch_city: "city",
@@ -102,17 +92,14 @@ const BRANCH_MARK: Readonly<Partial<Record<Key, GlyphName>>> = {
   settings_branch_diagnosis: "search",
 };
 
-
 export interface Standing {
   readonly branch: number;
   readonly more: boolean;
 }
 
-
 export function standingOf(drawn: SetupGroup, beneath: View): Standing {
   return placeOf((leaf) => offers(leaf, beneath)) ?? standingForGroup(drawn);
 }
-
 
 export function standingForGroup(drawn: SetupGroup): Standing {
   return placeOf((leaf) => leaf.kind === "group" && leaf.group === drawn) ?? FIRST;
@@ -126,7 +113,6 @@ function placeOf(holds: (entry: Entry) => boolean): Standing | null {
   return found === undefined ? null : { branch, more: !found.entries.some(holds) };
 }
 
-
 function offers(entry: Entry, beneath: View): boolean {
   switch (entry.kind) {
     case "group":
@@ -138,7 +124,6 @@ function offers(entry: Entry, beneath: View): boolean {
   }
 }
 
-
 export function buildingPages(addresses: readonly Address[]): readonly Page[] {
   return addresses.map((address) => ({
     kind: "page",
@@ -147,9 +132,7 @@ export function buildingPages(addresses: readonly Address[]): readonly Page[] {
   }));
 }
 
-
 export const FIRST_GROUP: SetupGroup = "you";
-
 
 export function nestOf(view: View): Nest | null {
   switch (view.kind) {
@@ -172,7 +155,6 @@ export function nestOf(view: View): Nest | null {
   }
 }
 
-
 export function stepped<T>(
   entries: readonly T[],
   at: number,
@@ -194,7 +176,6 @@ export function stepped<T>(
   }
 }
 
-
 export function byInitial<T>(
   entries: readonly T[],
   at: number,
@@ -206,13 +187,11 @@ export function byInitial<T>(
   );
 }
 
-
 export interface NavWire {
   readonly "aria-label": string;
   readonly onkeydown: (event: KeyboardEvent) => void;
   readonly [hold: symbol]: Attachment<HTMLElement>;
 }
-
 
 export interface FoldWire {
   readonly type: "button";
@@ -222,7 +201,6 @@ export interface FoldWire {
   readonly onclick: () => void;
 }
 
-
 export interface GroupWire {
   readonly type: "button";
   readonly "data-entry": "";
@@ -230,7 +208,6 @@ export interface GroupWire {
   readonly "aria-current": "true" | undefined;
   readonly onclick: () => void;
 }
-
 
 export interface PageWire {
   readonly "data-entry": "";
@@ -241,11 +218,10 @@ export interface PageWire {
 export interface FoldLook {
   readonly label: string;
   readonly open: boolean;
-  
+
   readonly list: string;
   readonly wire: FoldWire;
 }
-
 
 export interface GroupLook {
   readonly kind: "group";
@@ -255,7 +231,6 @@ export interface GroupLook {
   readonly here: boolean;
   readonly wire: GroupWire;
 }
-
 
 export interface PageLook {
   readonly kind: "page";
@@ -282,7 +257,7 @@ export interface MoreLook {
 
 export interface BranchLook {
   readonly key: string;
-  
+
   readonly mark: GlyphName | null;
   readonly fold: FoldLook;
   readonly entries: readonly (LeafLook | NestLook)[];
@@ -294,7 +269,6 @@ export interface TreeLook {
   readonly branches: readonly BranchLook[];
 }
 
-
 export interface TreeState {
   readonly group: SetupGroup;
   readonly beneath: View;
@@ -302,7 +276,6 @@ export interface TreeState {
   readonly leaves: Readonly<Record<Nest, readonly Page[]>>;
   readonly reading: string | null;
 }
-
 
 export interface TreeHands {
   readonly words: (key: Key) => string;
@@ -313,7 +286,6 @@ export interface TreeHands {
 }
 
 const HOLD = createAttachmentKey();
-
 
 export function lookOf(state: TreeState, uid: string, hands: TreeHands): TreeLook {
   const foldOf = (label: Key, open: boolean, list: string, fold: Fold): FoldLook => ({
@@ -384,7 +356,6 @@ function groupOf(named: SetupGroup, drawn: SetupGroup, hands: TreeHands): GroupL
     },
   };
 }
-
 
 function pageOf(page: Page, state: TreeState, words: (key: Key) => string): PageLook {
   const href = toFragment(page.view);

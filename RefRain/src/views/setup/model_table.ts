@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The wiring of the probed-model table: the whole value a look draws
-// (`ModelTableLook`), built over the rows `./model_rows` offers - every
-// word translated, every column's ordering, and what each press writes.
-// Nothing here touches the DOM or uses a rune, so the wiring test drives
-// it with plain objects and no look, and another look - one built from a
-// component library - draws the same table by taking the same value
-// (client D93's cut, applied to a screen of its own).
-
 import { fill, say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
 import type { ModelFact } from "../../core/probed";
@@ -29,20 +21,14 @@ import {
 } from "./model_rows";
 import type { TableState } from "./model_rows";
 
-// The input kinds a person may state, in the wire's own order.
 const INPUTS: readonly InputKinds[] = InputKindsSchema.literals;
 
-// wording-ok: model ids, which are the same letters in every language.
 const MANUAL_PLACEHOLDER = "gpt-5-mini, claude-sonnet-4";
 
-// A row that states no figure sorts below every row that does, because
-// the question this column is ordered to answer is which of them is the
-// biggest.
 function bySize(a: number | null, b: number | null): number {
   return (a ?? 0) - (b ?? 0);
 }
 
-// The sentence under a figure box for the rung that stated it.
 function fromKey(from: FigureFrom): Key {
   switch (from) {
     case "person":
@@ -58,12 +44,6 @@ function fromKey(from: FigureFrom): Key {
   }
 }
 
-// What an untouched box shows: the figure a pick with this box empty
-// registers, drawn as a placeholder rather than as a value, because a
-// placeholder says "this is what the city will use" where a value would
-// claim a person decided it, and under it the rung that stated it. The
-// city answers both (`Query::ModelFigures`, client D103); until it has,
-// the box is blank and says nothing.
 interface Untouched {
   readonly placeholder: string;
   readonly source: string;
@@ -87,8 +67,6 @@ function ceilingShown(line: FiguresLine | undefined, lang: Lang): Untouched {
     : { placeholder: String(ceiling.sent.tokens), source: say(lang, fromKey(ceiling.sent.from)) };
 }
 
-// The figure the city answered for a row, which a column orders an
-// untouched row by.
 function cityWindow(line: FiguresLine | undefined): number | null {
   return line?.window?.tokens ?? null;
 }
@@ -105,7 +83,6 @@ export interface BoxLook {
   readonly input: (value: string) => void;
 }
 
-// A figure box, with the rung its placeholder came from.
 export interface FigureLook extends BoxLook {
   readonly source: string;
 }
@@ -119,21 +96,15 @@ export interface ChoiceLook {
   readonly pick: (value: string) => void;
 }
 
-// One drawn row of the table: every control it holds, already wired.
 export interface ModelRowLook {
   readonly id: string;
-  // Present on a row the person named and the endpoint's list does not
-  // carry: the city registers it on the person's word.
   readonly named: string | undefined;
   readonly window: FigureLook;
   readonly ceiling: FigureLook;
   readonly input: ChoiceLook;
-  // The input modalities the provider itself stated, spelled as the
-  // provider spelled them; empty when it stated none.
   readonly said: string;
   readonly price: string;
   readonly role: ChoiceLook;
-  // Why unticking this row was refused, announced beside its id.
   readonly refusal: string | undefined;
 }
 
@@ -143,7 +114,6 @@ export interface ColumnLook {
   readonly key: ColumnKey;
   readonly header: string;
   readonly min: Min;
-  // Present makes the column sortable.
   readonly compare: ((a: ModelRowLook, b: ModelRowLook) => number) | undefined;
 }
 
@@ -176,8 +146,6 @@ export interface ModelTableLook {
     readonly toggle: (on: boolean) => void;
   };
   readonly count: string;
-  // Absent while there is no row at all, because an empty table under
-  // an empty count says nothing the count did not.
   readonly table:
     | {
         readonly caption: string;
@@ -190,10 +158,6 @@ export interface ModelTableLook {
   readonly manual: BoxLook;
 }
 
-// The whole value a look draws, built from the state the seat holds,
-// the rows the provider served, the city's answer for each row (empty
-// while it has not answered), and the person's language. Every press
-// writes into `state`; the seat's own derivation draws the result.
 export function lookOf(
   state: TableState,
   served: readonly ModelFact[],
@@ -298,8 +262,6 @@ export function lookOf(
   };
 }
 
-// One row as the table draws it: the provider's facts, the city's
-// answer for it, and whether the person named it.
 interface Drawn {
   readonly row: ModelFact;
   readonly line: FiguresLine | undefined;
@@ -331,10 +293,6 @@ function rowLook(state: TableState, { row, line, named }: Drawn, lang: Lang): Mo
         state.output[row.id] = value;
       },
     },
-    // What the model takes as input, as the person states it (X6): a
-    // model that reads pictures is the one a picture may be sent to, and
-    // an unstated row is the city's to look up. The same choice control
-    // as the role beside it, so one row offers one kind of choice.
     input: {
       ...choice(say(lang, "setup_model_modalities")),
       placeholder:
@@ -350,7 +308,6 @@ function rowLook(state: TableState, { row, line, named }: Drawn, lang: Lang): Mo
     },
     said: row.inputModalities.join(" "),
     price: priceOf(row),
-    // The three roles, and the one that takes a role back off a row.
     role: {
       ...choice(say(lang, "setup_model_role")),
       choices: [

@@ -3,16 +3,9 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- How the head of the world's sheet is drawn: a bar-high back key at
-the top of the side the sheet came from, then the strip of tabs on a
-hairline, the shown tab underlined in the accent. On a phone the names
-outrun the strip; the shown tab keeps its whole name and the others give
-up their ends, so the name of what the sheet shows is never the one
-cut. Every role, key and `aria-*` value comes in the bags. -->
 <script lang="ts">
   import Glyph from "../parts/glyph.svelte";
   import type { SheetHeadLook } from "./sheet_head";
-
   const look: SheetHeadLook = $props();
 </script>
 

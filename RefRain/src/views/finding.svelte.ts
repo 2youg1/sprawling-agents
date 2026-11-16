@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { MAYOR, buildingOf } from "../core/route";
 import type { View } from "../core/route";
 import type { Address } from "../wire";
@@ -21,7 +20,6 @@ export function openFinder(): void {
 export function closeFinder(): void {
   shown = false;
 }
-
 
 export function underOf(view: View): Address {
   switch (view.kind) {

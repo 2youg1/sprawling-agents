@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Doing } from "../../core/doing";
 import { fill, say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
@@ -22,7 +21,6 @@ export const PHASES: readonly Phase[] = [
   "stopped",
   "capped",
 ];
-
 
 export const PHASE_MARK: Record<Phase, { readonly glyph: GlyphName; readonly weight: Weight }> = {
   model: { glyph: "pulse", weight: "live" },
@@ -56,7 +54,6 @@ export const PHASE_WORD: Record<Phase, Key> = {
   stopped: "runs_phase_stopped",
   capped: "runs_phase_capped",
 };
-
 
 export function phaseSaid(lang: Lang, doing: Doing, now: number): string {
   if (doing.kind !== "awaiting_reply") return say(lang, PHASE_WORD[phaseOf(doing)]);

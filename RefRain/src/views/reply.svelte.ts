@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { untrack } from "svelte";
 
 import { readAnswer } from "../core/answered";
@@ -12,18 +11,15 @@ import type { Laying } from "../core/replying";
 import { ui } from "../ui";
 import type { Block, ReplyState } from "../wire";
 
-
 export interface Drawn {
   readonly blocks: readonly Block[];
   readonly reached: number;
 }
 
-
 interface Streamed {
   readonly covered: string;
   readonly blocks: readonly Block[];
 }
-
 
 const STREAMED_KEPT = 4;
 let streamed: readonly Streamed[] = [];
@@ -45,21 +41,18 @@ function takenOver(text: string): Laying | null {
     : { ...UNLAID, blocks: longest.blocks, reached: longest.covered.length };
 }
 
-
 export function laidReply(said: () => string, state: ReplyState): Drawn {
   const asking = ui().conn.asking;
   const before = state === "settled" ? takenOver(said()) : null;
   let laying = $state<Laying>(UNLAID);
-  
+
   let covered = "";
-  
+
   let asked = $state<string | null>(null);
 
   $effect(() => {
     const text = said();
     untrack(() => {
-      
-      
       if (!text.startsWith(covered)) {
         laying = UNLAID;
         covered = "";

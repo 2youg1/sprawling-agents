@@ -9,11 +9,10 @@
   import type { CloseMode } from "../wire";
   import type { QuitLook } from "./quit";
 
-  
   export interface QuitSheetProps {
     readonly look: QuitLook;
     readonly seat: "modal" | "specimen";
-    
+
     readonly open: boolean;
     readonly onCancel: () => void;
     readonly onClose: (mode: CloseMode) => void;
@@ -35,7 +34,6 @@
   const uid = $props.id();
   const HOLD = createAttachmentKey();
 
-  
   let sheet = $state<HTMLDialogElement | undefined>(undefined);
   const hold: Attachment<HTMLDialogElement> = (node) => {
     sheet = node;

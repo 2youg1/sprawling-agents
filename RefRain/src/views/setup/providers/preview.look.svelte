@@ -6,11 +6,6 @@
 -->
 
 <script lang="ts">
-  // How the two readings of a draft are drawn, and nothing else: each
-  // arrives as its title and its text (`./preview`, `ReadingLook`).
-  // Both are folded away and sit at the foot of the form, because they
-  // answer a question somebody asks about a draft they have already
-  // finished writing.
   import type { ReadingLook } from "./preview";
 
   const { readings }: { readonly readings: readonly ReadingLook[] } = $props();

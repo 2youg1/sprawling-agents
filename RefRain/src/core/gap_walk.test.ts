@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// A range the stream skipped is folded without invalidating anything,
-// because the answers of the open socket were asked after it. Once that
-// socket dies those answers die with it, so a reconnect inside the
-// resume threshold turns the pending range into one whose records mark
-// stale what they touch.
-
 import { expect, test } from "bun:test";
 import { Schema } from "effect";
 

@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Who is listening in a room, as the words `listening.look.svelte` draws:
-// the city, the building, the resident and the run, one row each in the
-// order a prompt stacks their segments, and beside each what the room's
-// newest run was told for it. The seat (`listening.svelte`) asks the
-// city for the segments; this module only reads them, so the reading is
-// testable without a component.
-
 import { fill, say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
 import { buildingOf } from "../../core/route";
@@ -17,32 +10,20 @@ import { count } from "../../core/time";
 import type { Address, PrefixSegment, PrefixSlot } from "../../wire";
 
 export interface ListenerLook {
-  // The slot, unique among the four; a key for `#each`.
   readonly key: PrefixSlot;
-  // What listens: city, building, resident or run.
   readonly word: string;
-  // Who it is, absent for the run, which has no name beyond the
-  // conversation it already is.
   readonly who: string | undefined;
-  // The size of the segment the run was told for it, absent when the
-  // run was told none.
   readonly size: string | undefined;
-  // What the budget cut off that segment, absent when nothing was.
   readonly cut: string | undefined;
-  // The files the segment was read from, absent when it was read from
-  // none.
   readonly sources: string | undefined;
 }
 
-// Everything the look is given.
 export interface ListeningLook {
   readonly heading: string;
   readonly listeners: readonly ListenerLook[];
-  // Where the full text is read, said only once a run has been told.
   readonly note: string | undefined;
 }
 
-// What the reading is drawn from.
 export interface Heard {
   readonly city: string | null | undefined;
   readonly room: Address;
@@ -65,9 +46,6 @@ export function listeningOf(lang: Lang, heard: Heard): ListeningLook {
   ];
   return {
     heading: say(lang, "talk_listening"),
-    // A listener with no name and nothing told - the run before any run
-    // was told, a city that has not said its name - is a label over an
-    // empty cell, which reads as a reading that failed, so it is left out.
     listeners: listeners.flatMap((listener) => {
       const told = heard.segments.find((each) => each.slot === listener.slot);
       if (listener.who === "" && told === undefined) return [];

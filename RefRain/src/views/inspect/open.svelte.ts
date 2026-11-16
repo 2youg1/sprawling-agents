@@ -3,15 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Address, B3Hash, GitOid, RunId, Seq } from "../../wire";
-
 
 export interface CallItem {
   readonly run: RunId;
   readonly at: Seq;
 }
-
 
 export interface DocumentItem {
   readonly building: Address;
@@ -19,18 +16,15 @@ export interface DocumentItem {
   readonly version: B3Hash | null;
 }
 
-
 export interface ChangesItem {
   readonly base: GitOid;
   readonly head: GitOid;
 }
 
-
 export interface LetterItem {
   readonly doc: Address;
   readonly card: B3Hash;
 }
-
 
 export interface ContextItem {
   readonly run: RunId;
@@ -44,9 +38,7 @@ export type RightItem =
   | ({ readonly kind: "letter" } & LetterItem)
   | ({ readonly kind: "context" } & ContextItem);
 
-
 const KEPT = 8;
-
 
 export const INSPECTOR = "data-inspector";
 
@@ -81,7 +73,6 @@ export function sameItem(a: RightItem | null, b: RightItem): boolean {
   }
 }
 
-
 export function itemKey(item: RightItem): string {
   switch (item.kind) {
     case "call":
@@ -101,7 +92,6 @@ export function rightItem(): RightItem | null {
   return frontWhere(() => true);
 }
 
-
 export function frontWhere(pick: (item: RightItem) => boolean): RightItem | null {
   return (
     held.reduce<Held | null>(
@@ -111,7 +101,6 @@ export function frontWhere(pick: (item: RightItem) => boolean): RightItem | null
     )?.item ?? null
   );
 }
-
 
 export function openItems(): readonly RightItem[] {
   return held.map((each) => each.item);
@@ -137,7 +126,6 @@ export function openChanges(changes: ChangesItem): void {
   showItem({ kind: "changes", base: changes.base, head: changes.head });
 }
 
-
 export function openLetter(letter: LetterItem, comeBack: () => void): void {
   opener = null;
   back = comeBack;
@@ -149,12 +137,10 @@ export function openContext(context: ContextItem): void {
   showItem({ kind: "context", run: context.run, room: context.room });
 }
 
-
 export function showItem(item: RightItem): void {
   clock += 1;
   const touched = clock;
-  
-  
+
   const kept = held.some((each) => sameItem(each.item, item))
     ? held.map((each) => (sameItem(each.item, item) ? { item, touched } : each))
     : [...held, { item, touched }];

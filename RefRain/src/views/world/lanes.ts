@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { GitOid } from "../../wire";
 
 export interface Commit {
@@ -11,12 +10,11 @@ export interface Commit {
   readonly parents?: readonly GitOid[] | null | undefined;
 }
 
-
 export interface Line {
   readonly from: number;
   readonly to: number;
   readonly part: "through" | "in" | "out";
-  
+
   readonly owner: number;
 }
 
@@ -27,10 +25,9 @@ export interface Placed {
 
 export interface Graph {
   readonly rows: readonly Placed[];
-  
+
   readonly lanes: number;
 }
-
 
 interface Waiting {
   readonly oid: GitOid;

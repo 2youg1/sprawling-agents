@@ -6,22 +6,18 @@
 -->
 
 <script lang="ts">
-  
-  
   import { within } from "../../core/belief/live";
   import { say } from "../../core/lang";
   import { kib } from "../../core/time";
   import { ui } from "../../ui";
   import type { Address, Entry, RunId } from "../../wire";
   import { Address as AddressSchema } from "../../wire";
-  
-  
+
   import Branch from "./tree.svelte";
   import { transcriptOf } from "./transcript";
   import { treeRowWire, type TreeMark, type TreeRowLook } from "./tree_row";
   import Row from "./tree_row.look.svelte";
 
-  
   export interface Picked {
     readonly at: Address;
     readonly kind: "file" | "directory";
@@ -31,8 +27,7 @@
     readonly root: Address;
     readonly picked: Picked | null;
     readonly onPick: (picked: Picked) => void;
-    
-    
+
     readonly at?: Address | undefined;
     readonly depth?: number | undefined;
   }
@@ -50,8 +45,7 @@
   const entries = $derived.by(() => {
     const answer = $listing;
     if (answer === undefined || !("listing" in answer)) return undefined;
-    
-    
+
     const rank = (entry: Entry) =>
       (entry.kind === "directory" ? 0 : 2) + (entry.name.startsWith(".") ? 1 : 0);
     return [...answer.listing.entries].sort(
@@ -59,21 +53,18 @@
     );
   });
 
-  
   const opened = $state<Record<string, boolean>>({});
 
   function join(at: Address, name: string): Address {
     return AddressSchema.make(`${at}/${name}`);
   }
 
-  
   function nameOf(name: string, transcript: RunId | null): string {
     if (transcript === null) return name;
     const run = $belief.runs[transcript];
     return run?.task ?? transcript.slice(0, 8);
   }
 
-  
   function rowOf(entry: Entry, here: Address, open: boolean): TreeRowLook {
     const transcript = transcriptOf(entry.name);
     const mark: TreeMark =
@@ -95,7 +86,6 @@
     };
   }
 
-  
   function press(entry: Entry, here: Address, transcript: RunId | null, open: boolean): void {
     if (transcript !== null) {
       u.go({ kind: "run", run: transcript });
@@ -106,7 +96,6 @@
     onPick({ at: here, kind: isDir ? "directory" : "file" });
   }
 
-  
   function lit(isDir: boolean, here: Address, transcript: RunId | null): boolean {
     if (isDir) {
       return $belief.live.some((run) => within(run, here));

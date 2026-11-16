@@ -4,12 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // Every page but the conversation, between the first column, which
-  // the edge keys stand at the foot of, and the last one, which mirrors
-  // it (docs/frontend-method.md §4-33): a page is centred on the screen as the
-  // conversation is, and a page in columns stands them on the same
-  // silver lines (`silver-columns`, client D24). The conversation page lays
-  // itself out by the tier and is not here (`workspace.svelte`).
   import type { View } from "../core/route";
   import { say } from "../core/lang";
   import { ui } from "../ui";
@@ -42,11 +36,6 @@
   class="col-[2/12] row-start-2 flex min-h-0 min-w-0 flex-col overflow-y-auto narrow:col-span-full"
   aria-label={say($lang, "region_main")}
 >
-  <!-- A building keeps one back key to the city at the top left, so no
-       page draws its own; pages opened from the settings tree leave by
-       the edge settings key or a click on either blank side instead.
-       The welcome page is handed the key snippet so a future back still
-       stands on its one column. -->
   {#snippet backKey()}
     {#if back !== undefined}
       <div class="mb-snug">
@@ -79,12 +68,7 @@
   {:else if view.kind === "monitor"}
     <Monitor samples={$samples} watch={u.conn.monitor.watch} beat={u.conn.monitor.setBeat} />
   {:else if view.kind === "gallery"}
-    <!-- The storybook and its fixture tables are a chunk of their own,
-         fetched only when a person opens `#/gallery`, so the page every
-         other route loads does not carry them. -->
     {#await import("./gallery.svelte")}
-      <!-- Pending until the chunk lands; the render gate waits for this
-           mark to go before it measures the page. -->
       <div data-pending></div>
     {:then gallery}
       <gallery.default />

@@ -5,12 +5,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  
-  
   import { pickCommit } from "../world/chosen.svelte";
   import { PICKED } from "./benched";
 
-  
   if (PICKED !== undefined) pickCommit(PICKED);
 </script>
 
@@ -71,7 +68,6 @@
       answers={answering}
       {records}
     >
-      
       <div class="@container/shell">
         <div class="frame relative h-[860px] translate-x-0 overflow-hidden bg-page">
           <Workspace address={ROOM} tier={shown.tier} seat="specimen" panel={shown.panel} />

@@ -3,12 +3,6 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- The open model picker's seat (client D95): it hands the shared
-popover seat the picker's lists and wiring, so the key table, the bind
-mode and the focus rules are the popover's, and has the popover drawn
-by `picker.look.svelte`. What is open, chosen and typed is held by
-`settings_row.svelte`; `picker_look.ts` builds `menu`. It writes no
-class. -->
 <script lang="ts">
   import { Popover } from "../parts/popover";
   import type { PopoverLook } from "../parts/popover_wiring";

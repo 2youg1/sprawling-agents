@@ -3,29 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The walk through the running window, photographed
-// (docs/frontend-method.md, "The walk through the running window"): a
-// throwaway city under `target/walk/`, answered by the stand-in provider
-// (`walk_provider.json`), served the way a person serves one, paired with
-// a headless browser, and every page and a few pressed states kept as PNG
-// files at three windows in both lightings, with an index beside them.
-// `just walk` builds what it needs and runs this. Not a gate: a person
-// reads the pictures, as with `cargo xtask shots`, which photographs the
-// bundle's fixtures with no city behind them.
-//
-// What it photographs comes from the client: the pages from
-// `core/route.ts`, the names it presses from `lang.json`, the frames it
-// sends from `core/commands.ts`. A page added there is walked without an
-// edit here, and a renamed button fails its shot instead of passing it.
-//
-//   bun scripts/walk.ts [--keep] [--only <text>] [--frames <list>] [--lightings <list>] [--web-dir <dir>]
-//
-// `--keep` leaves the city served after the shots, for walking it by hand
-// in the paired profile; `--only` takes the shots whose name holds the
-// text; a frame is `<width>x<height>@<ratio>`, with `:touch` for a phone;
-// `--web-dir` serves a client bundle from disk, as `serve --web-dir` does,
-// so a rebuilt client is walked without rebuilding the binary.
-
 import { appendFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -48,24 +25,14 @@ const EXE = process.platform === "win32" ? ".exe" : "";
 const AT = "127.0.0.1:8799";
 export const ORIGIN = `http://${AT}`;
 const DEVTOOLS_PORT = 9333;
-// The one model the stand-in's script lists.
 const MODEL = "stand-in-1";
 
 const FRAMES: readonly Frame[] = [
   { name: "1920x1080", width: 1920, height: 1080, dpr: 1, touch: false },
-  // A 2560 by 1600 laptop at the 150 % its system scales to.
   { name: "2560x1600", width: 1707, height: 1067, dpr: 1.5, touch: false },
   { name: "390x844", width: 390, height: 844, dpr: 2, touch: true },
 ];
 
-// A step taken on a page before its picture: press the control a screen
-// reader calls `name` (a phrase of `lang.json`), the first element a
-// selector finds where the name is built from data, the layers key
-// until it names the tier, or the world sheet's tab for a pane, which
-// only one column draws: wider, the workbench shows every pane at once
-// and the step presses nothing. The tier is the tab's and outlives a
-// shot, so a shot names the tier it wants rather than counting presses
-// from whatever tier the shot before it left.
 type Step =
   | { readonly press: keyof typeof phrases }
   | { readonly select: string }
@@ -78,9 +45,6 @@ interface Shot {
   readonly steps: readonly Step[];
 }
 
-// What a walk started and must end however it ends: the stand-in, the
-// served city and the browser hold a port each, and one left running
-// keeps the next walk from starting.
 const started: (() => void)[] = [];
 process.on("exit", () => {
   started.forEach((stop) => {
@@ -146,15 +110,12 @@ function frameOf(spelled: string): Frame {
   };
 }
 
-// --------------------------------------------------------------- the city
-
 const decoder = new TextDecoder();
 const binary = (name: string): string => {
   const path = join(BINARIES, `${name}${EXE}`);
   return existsSync(path) ? path : fail(`${path} is missing; \`just walk\` builds it`);
 };
 
-// Where the stand-in listens, read from the line it prints before it answers.
 async function standIn(
   record: string,
 ): Promise<{ readonly url: string; readonly process: ReturnType<typeof Bun.spawn> }> {
@@ -181,12 +142,8 @@ async function standIn(
     : { url, process: provider };
 }
 
-// What a terminal is told about colour and the cursor, taken out before
-// its words are read.
 const STYLING = new RegExp(`${String.fromCharCode(27)}\\[[0-9;?]*[ -/]*[@-~]`, "g");
 
-// Serves the city on a pseudo-terminal, because the quiet host that `up`
-// shows prints the pairing code only to a terminal, and waits for it.
 async function serve(
   city: string,
   env: Record<string, string | undefined>,
@@ -216,8 +173,6 @@ async function serve(
   return fail(`the city printed no pairing code:\n${said.slice(-2000)}`);
 }
 
-// Sends one command through `sprawling call` and hands back every frame
-// that came back, or the city's refusal.
 function call(
   command: Command,
   env: Record<string, string | undefined>,
@@ -268,9 +223,6 @@ function runStarted(frames: readonly unknown[]): string {
   return fail("a dispatch started no run");
 }
 
-// The city a walk photographs: two buildings, three rooms that each ran
-// once, an empty Mayor's room and a folder nobody adopted. The runs take
-// the stand-in's replies in this order.
 export function settle(env: Record<string, string | undefined>, city: string): string {
   for (const building of ["atlas", "garden"]) {
     held(
@@ -330,9 +282,6 @@ export interface PreparedCity {
   readonly close: () => Promise<void>;
 }
 
-// One throwaway city, paired and ready. A populated walk gets the three
-// settled runs and a configured main model; the first-hours path starts
-// with the endpoint attached but no main model and chooses it by keyboard.
 export async function prepareCity(
   webDir: string | undefined,
   populated: boolean,
@@ -376,8 +325,6 @@ export async function prepareCity(
   return { city, env, run, tools, served, close };
 }
 
-// ------------------------------------------------------------- the shots
-
 function shots(run: string): readonly Shot[] {
   const at = (name: string, fragment: string, ...steps: Step[]): Shot => ({
     name,
@@ -391,14 +338,7 @@ function shots(run: string): readonly Shot[] {
     at("talk-work", "#/talk/atlas/notes"),
     at("talk-chat", "#/talk/atlas/review"),
     at("talk-code", "#/talk/garden/sensors"),
-    // The tiers come before any shot opens a file on the right, because
-    // an opened file stays open from room to room and folds the world's
-    // panes away. The blend tier where its panels show: a room whose run
-    // wrote no file, so the right side does not follow it there.
     at("talk-layers", "#/talk/atlas/review", { tier: "blend" }),
-    // The panorama workbench twice: beside the file the run wrote, which
-    // the right side follows and so folds the place column away, and in a
-    // room with no file, where all three panes stand over the conversation.
     at("talk-panorama", "#/talk/atlas/notes", { tier: "panorama" }),
     at("talk-panorama-bench", "#/talk/atlas/review", { tier: "panorama" }, { sheet: "session" }),
     at("talk-file-beside", "#/talk/atlas/notes?building=atlas&path=notes/README.md", {
@@ -423,8 +363,6 @@ function shots(run: string): readonly Shot[] {
   ];
 }
 
-// Presses what a person would: the control whose accessible name or text
-// is the phrase, the whole of it before any that start with it.
 const PRESS = `(name) => {
   const all = [...document.querySelectorAll("button, a, [role=button], [role=option], [role=tab], [role=menuitem], summary")];
   const said = (e) => [(e.getAttribute("aria-label") || "").trim(), (e.textContent || "").trim()];
@@ -433,10 +371,6 @@ const PRESS = `(name) => {
   found.click();
 }`;
 
-// Presses the layers key until its name is the wanted one. On one column
-// the key opens and closes the world's sheet, which is the panorama
-// there, and there is no blend: a key back at the name it started from
-// has gone round every tier this width has, and the shot keeps that one.
 const TIERED = `async (wanted, called) => {
   const key = () => {
     const found = [...document.querySelectorAll("button[aria-label]")].find((e) => e.getAttribute("aria-label").startsWith(called));
@@ -508,7 +442,6 @@ async function photograph(tools: DevTools, wanted: Options, run: string): Promis
           missed += 1;
           console.error(`walk: ${file}: ${kept.why}`);
         }
-        // A state that opened a dialog or a menu closes before the next.
         await tools.key("Escape", "Escape", 27);
       }
     }
@@ -516,8 +449,6 @@ async function photograph(tools: DevTools, wanted: Options, run: string): Promis
   console.log(`walk: pictures and index.md in ${out}`);
   return missed;
 }
-
-// ------------------------------------------------------------------ main
 
 if (import.meta.main) {
   const wanted = options(Bun.argv.slice(2));

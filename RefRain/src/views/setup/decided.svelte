@@ -5,12 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  // What was answered on the person's behalf, under the control that
-  // delegated it. A delegation whose use nobody can see is a delegation
-  // nobody can judge, so the record sits where the choice is made.
-  // Newest first: the question a person brings here is "what did it
-  // just decide for me".
-
   import { QUERIES } from "../../core/asking";
   import { say } from "../../core/lang";
   import { clock } from "../../core/time";
@@ -18,8 +12,6 @@
   import type { Decision } from "../../wire";
 
   interface Props {
-    // The record a caller hands in place of a city; absent, this
-    // section asks the city its own question.
     readonly decided?: readonly Decision[] | undefined;
   }
 

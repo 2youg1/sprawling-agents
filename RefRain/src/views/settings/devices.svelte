@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { onMount } from "svelte";
 
   import { QUERIES } from "../../core/asking";
@@ -24,7 +22,7 @@
   const read = $derived(
     readAnswer($asked, (held) => ("devices" in held ? held.devices.devices : undefined)),
   );
-  
+
   let here = $state<string | null>(null);
   onMount(() => {
     void kept().then((device) => (here = device?.id ?? null));

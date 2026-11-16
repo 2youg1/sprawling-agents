@@ -5,15 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  // How the composer is laid out, and nothing else (docs/frontend-method.md
-  // §7I): a page, not a card - the words on top, a one-pixel line under
-  // them, the settings under the line, with no box, no ground and no
-  // shadow. Focus is said by the line coming to full strength, and a drag
-  // over the box by the wash it takes. Every handler, name and state
-  // arrives in `ComposerLook` (`./composer.ts`); the parts around the
-  // words arrive seated. `field-sizing: content` grows the box with the
-  // words where the engine has it; the seat grows it by hand where it
-  // does not.
   import type { ComposerLook } from "./composer";
 
   const look: ComposerLook = $props();
@@ -32,8 +23,6 @@
     <div class="flex min-h-key items-end gap-base">
       <div class="relative min-w-0 flex-1">
         {#if look.door !== undefined}
-          <!-- In the place of the placeholder, above the box so its one
-               control takes a press; the rest lets a press through. -->
           <div
             class="pointer-events-none absolute inset-x-0 top-0 z-(--layer-raised) flex py-snug text-body leading-read text-text-faint"
           >

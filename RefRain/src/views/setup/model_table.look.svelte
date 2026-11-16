@@ -6,15 +6,6 @@
 -->
 
 <script lang="ts">
-  // How the probed-model table is drawn, and nothing else: every word
-  // arrives translated and every press arrives wired (`./model_table`,
-  // `ModelTableLook`), so another look draws the same table by taking
-  // the same value.
-  //
-  // The table itself is `parts/table.svelte`: the sticky header, the
-  // ordering, the tick column and the scroll box are that part's. Every
-  // control a row holds stands at the one control height, so the boxes
-  // and the two choices in a row line up along one edge.
   import Combobox from "../parts/combobox.svelte";
   import Field from "../parts/field.svelte";
   import { Table, type Column } from "../parts/table";
@@ -28,13 +19,6 @@
 
   const look: ModelTableLook = $props();
 
-  // Every column states what it may not be drawn narrower than, and
-  // nothing in a cell is broken across lines to make it fit. The id
-  // column is the one that must never break: a model id is the whole of
-  // what a person ticks, and the columns together are wider than the
-  // measure this table sits in, so the container scrolls sideways
-  // rather than squeezing the id into a vertical word
-  // (docs/frontend-method.md §4-33).
   const columns = $derived(
     (look.table?.columns ?? []).map((column): Column<ModelRowLook> => ({
       key: column.key,
@@ -74,8 +58,6 @@
   />
 {/snippet}
 
-<!-- The id, and under it, on a row the person named and the
-     endpoint's list does not carry, the sentence that says so. -->
 {#snippet renderId(row: ModelRowLook)}
   <div class="flex flex-col gap-hair">
     <span class="block whitespace-nowrap font-mono text-note text-text">{row.id}</span>
@@ -88,8 +70,6 @@
   </div>
 {/snippet}
 
-<!-- A figure box, and under it the rung the city answered its
-     placeholder from. -->
 {#snippet figureBox(box: FigureLook)}
   <div class="flex flex-col gap-hair">
     <Field
@@ -118,14 +98,11 @@
   {@render figureBox(row.ceiling)}
 {/snippet}
 
-<!-- The person's statement first, and under it the provider's own
-     list, when it gave one, as the evidence. -->
 {#snippet renderModalities(row: ModelRowLook)}
   <div class="flex flex-col gap-hair">
     <!-- eslint-disable-next-line @typescript-eslint/no-confusing-void-expression (a snippet call is the render itself; the typechecker types local snippet calls as returning void) -->
     {@render choose(row.input)}
     {#if row.said !== ""}
-      <!-- wording-ok: the modalities the provider itself stated, spelled as the provider spelled them -->
       <span class="text-note text-text-faint">{row.said}</span>
     {/if}
   </div>
@@ -145,9 +122,6 @@
 {/snippet}
 
 <div class="flex flex-col gap-snug text-note">
-  <!-- One row above the table, and it stays one row: the search box
-       takes what the filter does not need, so a narrow column makes the
-       box shorter rather than dropping the switch under it. -->
   <div class="flex items-center gap-snug">
     <div class="min-w-0 flex-1">
       <Field

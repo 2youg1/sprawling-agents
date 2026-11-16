@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { fill, say } from "../../core/lang";
   import { WORKBENCH, resized, widest } from "../../core/workbench";
   import type { Divider } from "../../core/workbench";
@@ -13,12 +9,10 @@
 
   interface Props {
     readonly divider: Divider;
-    
-    
+
     readonly label: string;
     readonly controls: string;
-    
-    
+
     readonly column: number;
   }
 
@@ -28,7 +22,6 @@
   const { lang } = u;
   const bench = u.prefs.workbench;
 
-  
   const start = $derived(divider === 0 ? 1 : 1 + $bench[0].span);
   const span = $derived(divider === 0 ? $bench[0].span : $bench[1].span);
 
@@ -40,7 +33,6 @@
     u.prefs.setWorkbench(WORKBENCH);
   }
 
-  
   function lineAt(grid: HTMLElement, clientX: number): number {
     const frame = grid.closest<HTMLElement>(".frame") ?? grid;
     const style = getComputedStyle(frame);
@@ -83,7 +75,6 @@
     ),
   );
 </script>
-
 
 <div
   bind:this={gutter}

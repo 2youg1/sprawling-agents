@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import ArmSelect from "../building/arm_select.look.svelte";
@@ -44,8 +42,7 @@
   const still = (): void => undefined;
   const SHOP = Address.make("shop");
   const VERSION = B3Hash.make("af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262");
-  
-  
+
   const LAYERS: readonly LayerDocument[] = [
     {
       at: Address.make("City.md"),
@@ -126,8 +123,7 @@
     actionName: (card, action) => actionName(card, action, $lang),
     onAction: still,
   }));
-  
-  
+
   function digest(tag: string): B3Hash {
     return B3Hash.make(tag.padStart(64, "0"));
   }

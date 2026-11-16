@@ -6,7 +6,6 @@
 -->
 
 <script lang="ts">
-  // The hint, as a caller outside a part writes the relation.
   import { say } from "../../../core/lang";
   import { ui } from "../../../ui";
   import Tip from "../../parts/tip.svelte";
@@ -15,10 +14,6 @@
   const { lang } = ui();
 </script>
 
-<!-- The relation `tip.svelte` documents on a control that is named by
-its own text: the hint is `aria-describedby`, never the name.
-`button.svelte` composes the same relation for `why`; this is the
-pattern as a caller outside that component writes it. -->
 <Case label="tip · a hint on a control named by its own text">
   <Tip text={say($lang, "part_why_halted")}>
     {#snippet children(hint: string)}

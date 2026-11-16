@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import type { Sending } from "../../core/doing";
   import { ui } from "../../ui";
   import { lookOf } from "./coin";
@@ -11,8 +7,7 @@
 
   interface Props {
     readonly face: Face;
-    
-    
+
     readonly sending: Sending;
     readonly onStop: () => void;
   }

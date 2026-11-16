@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
   import type { Block, Inline } from "../../wire";
 
   const words = (text: string): Inline => ({ text });

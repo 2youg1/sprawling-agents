@@ -5,15 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  // How the microphone is drawn, and nothing else: a round key that
-  // shows the mic mark (never the word "speak", which a person reading
-  // for the first time has to guess), turns the alert colour while it
-  // records and goes faint while the city transcribes (`./record.ts`,
-  // `RecordLook`). Hover lifts the wash, a press yields by the theme's
-  // press scale only while the key can be used, release returns on the
-  // leave curve (§4-43). Its hit area reaches past the key, because the
-  // drawn square is shorter than a fingertip. The action name rides in a
-  // `Tip`, so focus and touch reach it the way other icon keys do.
   import Glyph from "../parts/glyph.svelte";
   import Tip from "../parts/tip.svelte";
   import type { RecordLook } from "./record";
@@ -51,8 +42,6 @@
   .microphone::before {
     content: "";
     position: absolute;
-    /* Reach the theme's touch square (§4-34), centred on the drawn key,
-     * so a compact density does not shrink the hit area below 44 px. */
     inset: calc((var(--spacing-touch) - var(--spacing-control-sm)) / -2);
   }
   .microphone[data-hearing="ready"]:hover {

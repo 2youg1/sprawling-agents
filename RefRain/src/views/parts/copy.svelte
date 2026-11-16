@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { onDestroy } from "svelte";
 
   import { ui } from "../../ui";
@@ -19,8 +17,7 @@
   const { lang } = ui();
 
   let copied: Copied = $state(REST);
-  
-  
+
   let waiting: ReturnType<typeof setTimeout> | undefined = undefined;
   onDestroy(() => {
     clearTimeout(waiting);

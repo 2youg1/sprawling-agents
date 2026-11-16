@@ -6,19 +6,15 @@
 -->
 
 <script lang="ts" module>
-  
-  
   import type { Key } from "../../core/lang";
   import { heldIn } from "../../core/belief/rooms";
   import { roomOf } from "../../core/route";
   import type { Address, Entry } from "../../wire";
 
-  
   const GOVERNANCE = ".sprawling";
 
   type Kind = "room" | "governance" | "ordinary";
 
-  
   const KIND_WORD: Record<Kind, Key> = {
     room: "dir_room",
     governance: "dir_governance",
@@ -74,7 +70,6 @@
 
   const runs = $derived(heldIn($belief, at).reverse());
 
-  
   const earlier = $derived.by(() => {
     return (entries ?? []).flatMap((entry) => {
       const run = transcriptOf(entry.name);
@@ -82,7 +77,6 @@
     });
   });
 
-  
   const cold = $derived.by(() => {
     const held = $cost;
     if (held === undefined || !("cost" in held)) return [];
@@ -113,8 +107,7 @@
         return say($lang, "talk_waiting_you");
       case "awaiting_reply":
         return say($lang, "run_doing_awaiting_reply");
-      
-      
+
       case "unknown":
         return say($lang, "city_at_work");
       case "frozen":

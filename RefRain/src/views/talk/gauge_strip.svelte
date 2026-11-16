@@ -4,14 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The panorama gauge as a strip in the talk column, outside the
-  // conversation landmark (client D113): the same instrument sheet the
-  // chosen-session pane used to own above a second grid row, now above
-  // the scroller so the talk box never moves. Asks the same rounds
-  // question the thread asks; `asking` merges them by content. The
-  // run-page link lives here because desktop panorama has no separate
-  // session pane; standing outside the conversation landmark keeps the
-  // render talk gate from treating it as a floating bar.
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
@@ -52,7 +44,6 @@
           >
         {/if}
         {#if worktree !== null && base !== null}
-          <!-- wording-ok: a separator glyph between two facts, hidden from screen readers -->
           <span aria-hidden="true">·</span>
         {/if}
         {#if base !== null}

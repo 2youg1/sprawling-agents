@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Key } from "../core/lang";
 import { fill, say } from "../core/lang";
 import type { Lang } from "../core/lang";
@@ -17,7 +16,6 @@ import { ago } from "../core/time";
 import type { Address, Origin, Seq, SessionLine } from "../wire";
 import { boxKey } from "./cursor";
 import { rowId } from "./palette/rows";
-
 
 export function paletteWorkspace(
   query: string,
@@ -56,13 +54,11 @@ export function directEntry(
   };
 }
 
-
 export interface Reach {
   readonly here: string | null;
   readonly live: boolean;
   readonly models: number;
 }
-
 
 export function whyFor(spelling: string, reach: Reach): Key | undefined {
   switch (spelling) {
@@ -72,7 +68,7 @@ export function whyFor(spelling: string, reach: Reach): Key | undefined {
     case "/tag":
     case "/untag":
       return reach.here === null ? "palette_needs_room" : undefined;
-    
+
     case "/diff":
       return !reach.live && reach.here === null ? "palette_needs_room" : undefined;
     case "/steer":
@@ -85,7 +81,6 @@ export function whyFor(spelling: string, reach: Reach): Key | undefined {
   }
 }
 
-
 export interface SessionPlace {
   readonly label: string;
   readonly hint: string;
@@ -93,15 +88,12 @@ export interface SessionPlace {
   readonly origin: Origin | null;
 }
 
-
 export interface SessionsAt {
   readonly room: Address;
   readonly viewing: Seq | undefined;
 }
 
-
 export const SESSIONS_AT_REST = 5;
-
 
 export function sessionPlaces(
   at: SessionsAt,
@@ -131,14 +123,11 @@ export function sessionPlaces(
   });
 }
 
-
 export interface CarryReach {
-  
   readonly here: Address;
-  
+
   readonly rooms: readonly Address[];
-  
-  
+
   readonly typed: Address | null;
   readonly working: (room: Address) => boolean;
 }
@@ -155,7 +144,6 @@ export function carryPlaces(reach: CarryReach): CarryPlace[] {
       : [...reach.rooms, reach.typed];
   return rooms.map((to) => ({ to, why: carryWhy(reach, to) }));
 }
-
 
 function carryWhy(reach: CarryReach, to: Address): Key | undefined {
   if (to === reach.here) return "palette_carry_here";
@@ -182,27 +170,24 @@ export interface BoxWire {
   readonly onkeydown: (event: KeyPress) => void;
 }
 
-
 export type Asking = "places" | "carry";
 
 export interface BoxState {
   readonly asking: Asking;
   readonly query: string;
   readonly cursor: number;
-  
+
   readonly count: number;
-  
+
   readonly list: string;
   readonly lang: Lang;
 }
-
 
 export interface BoxHands {
   readonly write: (line: string) => void;
   readonly point: (at: number) => void;
   readonly pick: () => void;
 }
-
 
 export function boxOf(state: BoxState, hands: BoxHands): BoxWire {
   const { asking, query, cursor, count, list, lang } = state;
@@ -220,8 +205,6 @@ export function boxOf(state: BoxState, hands: BoxHands): BoxWire {
       hands.write(event.currentTarget.value);
     },
     onkeydown: (event) => {
-      
-      
       if (event.key === "Tab" && verbs && !event.isComposing) {
         event.preventDefault();
         hands.write(completed(query.trim()));

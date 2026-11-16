@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import type { RunBelief } from "../../core/belief";
   import { toFragment } from "../../core/route";
   import { ui } from "../../ui";
@@ -18,7 +16,6 @@
   import Row from "./working_row.look.svelte";
 
   interface Props {
-    
     readonly onLeave: () => void;
   }
 
@@ -28,7 +25,6 @@
   const { lang } = u;
   const belief = u.conn.belief;
 
-  
   const rows = $derived.by(() => {
     const newest: Record<string, { readonly room: Address; readonly run: RunBelief }> = {};
     for (const run of $belief.live) {
@@ -37,7 +33,6 @@
     return Object.values(newest).sort((a, b) => (b.run.started ?? 0) - (a.run.started ?? 0));
   });
 
-  
   const tick = ticker(u.now);
 </script>
 

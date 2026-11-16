@@ -6,16 +6,6 @@
 -->
 
 <script lang="ts">
-  // A second look for the segmented control, written the way a
-  // component library writes one: no utility classes, every style in its
-  // own block and read from the theme's tokens, and a different drawing
-  // - a vertical list of options, a check before the chosen one, an
-  // accent edge around it, and a fade where the shipped look slides. It
-  // takes the same `SegmentedLook` as the shipped look and nothing else,
-  // and spreads every wire bag where the shipped look does, so drawing
-  // the control with it proves the key table, the tab stop and the
-  // `aria-*` values live in `segmented.ts` and the seat, not in the
-  // shipped markup (client D95).
   import Glyph from "../../../src/views/parts/glyph.svelte";
   import Tip from "../../../src/views/parts/tip.svelte";
   import type { CellLook, SegmentedLook } from "../../../src/views/parts/segmented";

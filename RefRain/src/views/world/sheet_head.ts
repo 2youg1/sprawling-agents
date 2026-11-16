@@ -3,13 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Attachment } from "svelte/attachments";
 
 import type { Pane } from "../../core/workbench";
 import { HOLD } from "./drawn";
 import type { KeyPress } from "./drawn";
-
 
 export function landing(count: number, at: number, key: string): number | undefined {
   const last = count - 1;
@@ -28,19 +26,16 @@ export function landing(count: number, at: number, key: string): number | undefi
   }
 }
 
-
 export interface BackWire {
   readonly type: "button";
   readonly "aria-label": string;
   readonly onclick: () => void;
 }
 
-
 export interface StripWire {
   readonly role: "tablist";
   readonly "aria-label": string;
 }
-
 
 export interface TabWire {
   readonly type: "button";
@@ -56,7 +51,7 @@ export interface TabWire {
 
 export interface TabLook {
   readonly key: Pane;
-  
+
   readonly label: string;
   readonly shown: boolean;
   readonly wire: TabWire;
@@ -71,8 +66,7 @@ export interface SheetHeadLook {
 export interface SheetHeadInput {
   readonly tabs: readonly { readonly pane: Pane; readonly label: string }[];
   readonly shown: Pane;
-  
-  
+
   readonly prefix: string;
   readonly words: { readonly back: string; readonly strip: string };
 }

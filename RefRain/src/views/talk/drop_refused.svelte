@@ -6,9 +6,6 @@
 -->
 
 <script lang="ts">
-  // The seat of the files a drop on the box did not take: it reads the
-  // language and hands `./drop_refused.ts`'s value to whatever
-  // `./drop_refused.look.svelte` is.
   import { ui } from "../../ui";
   import type { Refused } from "./dropping";
   import { lookOf } from "./drop_refused";

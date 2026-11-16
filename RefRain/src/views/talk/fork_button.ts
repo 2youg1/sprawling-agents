@@ -3,9 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { ForkEntry } from "./forking";
-
 
 export interface ForkWire {
   readonly type: "button";
@@ -17,8 +15,6 @@ export interface ForkWire {
 }
 
 export interface ForkButtonLook {
-  
-  
   readonly label: string;
   readonly hint: string;
   readonly wire: ForkWire;

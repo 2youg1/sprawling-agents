@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Every session of every room this page has seen a run in, asked of the
-// city one room at a time (`Query::Sessions`, wire §8-71) and laid out by
-// `core/stretches.ts`. The sessions pane and the mailbox's recent section
-// both read it, so the two lists are one answer.
-//
-// Called while a component initialises: the asking lives as long as the
-// component that asked.
-
 import { untrack } from "svelte";
 import { get } from "svelte/store";
 
@@ -21,9 +13,7 @@ import type { Ui } from "../../ui";
 import type { SessionsAnswer } from "../../wire";
 
 export interface Stretches {
-  // Every stretch, newest activity first.
   readonly all: readonly Stretch[];
-  // How many older stretches the answers leave out, summed over rooms.
   readonly earlier: number;
 }
 
@@ -36,9 +26,6 @@ export function askStretches(u: Ui): Stretches {
     }),
   );
 
-  // Every room this page has seen a run in, spelled as its runs carry it.
-  // Keyed by the joined names, so the asking follows the set of rooms and
-  // not every record that moves a run.
   const rooms = $derived(
     [...held.rooms.keys()].flatMap((room) => {
       const addr = heldIn(held, room).at(-1)?.addr ?? null;
@@ -51,8 +38,6 @@ export function askStretches(u: Ui): Stretches {
   $effect(() => {
     const stops = (roomsKey === "" ? [] : untrack(() => rooms)).map((room) =>
       u.conn.asking.ask({ sessions: { room } }).subscribe((answer) => {
-        // Read without following: the store answers inside this effect,
-        // and the effect must not wait on what it writes.
         if (answer !== undefined && "sessions" in answer)
           answers = { ...untrack(() => answers), [room]: answer.sessions };
       }),

@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the sandbox card's choice of arm is given (client D95:
-// `sandbox.svelte` is the seat, `arm_select.look.svelte` draws the
-// choice): the arms in the order the card offers them, each named in the
-// person's language, and the one held.
-
 export interface ArmOption {
   readonly value: string;
   readonly label: string;
@@ -24,8 +19,6 @@ export interface ArmSelectLook {
   readonly wire: ArmSelectWire;
 }
 
-// The bag for a choice holding `held`; `pick` receives the value a
-// person chose, which is always one of `options`.
 export function armSelectWire(
   label: string,
   held: string,

@@ -6,14 +6,6 @@
 -->
 
 <script lang="ts">
-  // How a set of tabs is drawn, and nothing else: every name arrives
-  // translated and every role, id, key and focus arrives decided in the
-  // wire bags (`./tabs`, `TabsLook`), which this look spreads on the
-  // element each one names. The bar under the current tab is the one
-  // accent this part takes (docs/frontend-method.md §7B); every other
-  // tab is said by its own ink. In a column too narrow for every name
-  // the strip wraps rather than running past its frame, so no lens is
-  // hidden behind a scroll the person cannot see.
   import type { TabsLook } from "./tabs";
 
   const look: TabsLook = $props();
@@ -43,20 +35,11 @@
 {/each}
 
 <style>
-  /* The bar sits on the list's rule rather than above it, so the current
-   * tab and the rule read as one line. It grows from the middle as its
-   * tab arrives and shrinks as it leaves; leaving accelerates and
-   * arriving decelerates (§4-43), so the base state names the leaving
-   * curve and the current state the arriving one. The ink follows the
-   * same two curves on hover. The bar is a border rather than a fill
-   * because forced colours keep a border in the system's ink and
-   * paint a fill over with the page. */
   .tab {
     position: relative;
     color: var(--color-text-quiet);
     transition: color var(--transition-duration-short) var(--ease-leave);
   }
-
   .tab:hover,
   .tab.current {
     color: var(--color-text);

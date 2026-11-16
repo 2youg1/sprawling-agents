@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
 </script>
 
 <script lang="ts">
@@ -22,7 +20,6 @@
 
   const lang = ui().lang;
 
-  
   let line: HTMLElement | undefined;
   const grip: { from: Grip | null } = { from: null };
   const hold: Attachment<HTMLElement> = (node) => {

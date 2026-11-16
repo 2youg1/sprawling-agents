@@ -6,24 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // Where the context reminder's second rung sits: a whole percent of
-  // the window. The span and its reason are
-  // `kernel::config::SecondThreshold`'s one construction point - thirty-one
-  // through ninety, so the line about a handoff can still be said
-  // before the window closes - and this page states the span the city
-  // answers with rather than judging it: the city's refusal comes back
-  // carrying the span, and a page that enforced it here, or spelled it
-  // itself, would be the second place the rule lives.
-  //
-  // A box left empty is the city's own default, written as nothing at
-  // all. What is in force is what `Query::Config` answers - the file's
-  // word, read fresh, and the layer it came from - not this page's
-  // memory of a save. The default is one of those layers, so the page
-  // draws the city's figure as the empty box's hint rather than keeping
-  // a copy of it.
-  //
-  // The card stands in the settings tree's run group and picks its
-  // building itself, the way the rules group does (client 4-66, D78).
 </script>
 
 <script lang="ts">
@@ -48,15 +30,10 @@
 
   const question = $derived<Query>({ config: { addr } });
   const config = $derived(u.conn.asking.ask(question));
-  // What is in force here and which layer said it, once the city has
-  // answered; a city that could not answer is said so, not drawn as a
-  // rung nobody set.
   const read = $derived(
     readAnswer($config, (answer) => ("config" in answer ? answer.config.second : undefined)),
   );
   const settled = $derived(read.kind === "held" ? read.value : undefined);
-  // What a file says, or an empty box where no file states the rung -
-  // which is the default in force rather than a gap.
   const onDisk = $derived(
     settled === undefined || settled.from === "default" ? "" : String(settled.percent),
   );
@@ -120,8 +97,6 @@
   {#if read.kind === "unavailable"}
     <Unanswered query={read.query} asked={question} />
   {/if}
-  <!-- The key keeps its one-line name: the domain sentence beside it
-    is what wraps when the column is narrow. -->
   <div class="flex items-center gap-base">
     <div class="shrink-0">
       <Button

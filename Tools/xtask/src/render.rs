@@ -146,13 +146,14 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
 }
 
 const PROCESSORS_PER_PASS: usize = 3;
+const MAX_AT_ONCE: usize = 2;
 
 fn measure_every<'p>(
     opening: &Opening,
     passes: Vec<&'p Pass>,
 ) -> Result<Vec<(&'p Pass, Measured)>, XtaskError> {
     let at_once = match std::thread::available_parallelism() {
-        Ok(processors) => (processors.get() / PROCESSORS_PER_PASS).max(1),
+        Ok(processors) => passes_at_once(processors.get()),
         Err(_) => 1,
     };
     let mut measured = Vec::with_capacity(passes.len());
@@ -175,6 +176,10 @@ fn measure_every<'p>(
         })?);
     }
     Ok(measured)
+}
+
+fn passes_at_once(processors: usize) -> usize {
+    (processors / PROCESSORS_PER_PASS).clamp(1, MAX_AT_ONCE)
 }
 
 fn refusable(reading: &&Deviation<'_>) -> bool {

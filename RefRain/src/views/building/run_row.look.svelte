@@ -5,9 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- One run of a room, as a row that is a link: the dot (accent while it
-works, the mark ink once it froze), the task, what it is doing, what it
-cost and when it started. A row takes the row's wash under the pointer. -->
 <script lang="ts">
   import type { RunRowLook } from "./run_row";
 

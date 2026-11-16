@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
   import { Address, B3Hash, Locator, Seq, TimeMs } from "../../wire";
   import type { Answer, DocumentState, Query } from "../../wire";
   import { pdfOf, utf8 } from "./fmt_samples";
@@ -38,7 +36,6 @@
     },
   ]);
 
-  
   const shotBytes = (): Uint8Array => {
     const drawn = getComputedStyle(document.documentElement);
     const fill = (role: string): string => drawn.getPropertyValue(`--color-${role}`).trim();
@@ -79,7 +76,6 @@
     },
   };
 
-  
   const WINDOW = 1024;
 
   function base64Of(bytes: Uint8Array): string {
@@ -179,7 +175,6 @@
   </Case>
   <Case label="refrain · a city's PDF drawn from bytes fetched by its version" width={600}>
     <div class={FRAME}>
-      
       <Opaque path={Address.make(`shop/${REPORT}`)} version={PDF} bytes={REPORT_BYTES.length} />
     </div>
   </Case>

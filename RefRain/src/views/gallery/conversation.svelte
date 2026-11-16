@@ -6,23 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // The room a person works in: the box they write in, the words a
-  // model is still saying, the two lists that open over that box, and
-  // the questions the city is holding for them - plus the session and
-  // fork shapes a thread gains when one room runs more than once: one
-  // round, the divider that folds a previous segment away, the fork
-  // button on a message, and the picker a bare `/fork` opens.
-  //
-  // Two of these need room the page gives them and a fixture does not.
-  // The list that opens over the composer opens *upward*, so the
-  // padding above it is the room the foot of a page has; the sheet the
-  // questions sit in is drawn where the page draws it.
-  //
-  // The divider is drawn here, frozen at the state worth looking at;
-  // a person's words are the real `talk/person.svelte` with its real
-  // fork button, and the picker is the real multi-column `parts`
-  // popover.
-
   import type { Doing } from "../../core/doing";
   import { sendingInto } from "../../core/doing";
   import { fill, say } from "../../core/lang";
@@ -35,11 +18,8 @@
   import { CALLS, EARLIER_SEGMENT, ONE_QUESTION, ROUND, TURNS, WAITING } from "./served";
   import { SAYING } from "./saying";
 
-  // The question the mailbox key's badge counts stays reachable under
-  // the name it always had, for the mailbox fixture that reads it.
   export { ONE_QUESTION } from "./served";
 
-  // The postures a run can be in, in the order a dispatch meets them.
   const POSTURES: readonly Doing[] = [
     { kind: "thinking" },
     { kind: "calling", tool: "exec", subject: "just check" },
@@ -48,15 +28,8 @@
     { kind: "unknown" },
   ];
 
-  // The mother run the forked segment branches from: an id in the
-  // shape a run id has, so the link under the divider is a link a
-  // person can follow.
   const MOTHER = RunId.make("0199c0de-1a2b-4c3d-8e4f-5a6b7c8d9e0f");
-  // What the mother run was asked: the divider names it by its first
-  // sentence, never by the id above.
   const MOTHER_TASK = EARLIER_SEGMENT.find((line) => line.speaker === "person")?.text ?? "";
-  // The turn a person's words in these fixtures arrived in: a fork from
-  // a message cuts before the turn it landed in.
   const LANDED: Turn = {
     calls: [],
     notes: [],
@@ -89,7 +62,6 @@
   import { AT_DEEPSEEK, MANY_PROVIDERS, pickerFacts } from "./picked";
 
   const { lang } = ui();
-  // The previous segment is folded away until somebody asks for it.
   let open = $state(false);
   const picker = pickerFacts(MANY_PROVIDERS, AT_DEEPSEEK, null);
   const overlap: ComposerLookValue = $derived({
@@ -123,9 +95,6 @@
   {/if}
 {/snippet}
 
-<!-- A line of a thread that can be branched from: a person's words are
-the real message with its real fork button, revealed on hover or focus
-like the thread's own. -->
 {#snippet branchable(line: Utterance)}
   {#if line.speaker === "person"}
     <Person
@@ -178,9 +147,6 @@ like the thread's own. -->
   />
 </Case>
 
-<!-- The empty room lifts the box into the upper third rather than
-centring it: two thousand pixels of white under a composer in a room
-with one round in it reads as a page that broke. -->
 {#snippet inBox()}
   <AddressLine
     {...addressLineOf($lang, "hall/mayor", null, () => undefined)}
@@ -245,9 +211,6 @@ with one round in it reads as a page that broke. -->
   </div>
 </Case>
 
-<!-- The two lists that open over the composer, each in the two layers
-of padding that stand in for the page under them. -->
-
 <Case label="menu · a line that begins with a slash">
   <div class="pt-palette">
     <div class="pt-output">
@@ -276,9 +239,6 @@ of padding that stand in for the page under them. -->
   </div>
 </Case>
 
-<!-- One round of a room, with the box docked: the drop from the
-middle of an empty room to the foot of a full one happens the first
-time somebody sends, so both landings are on this page. -->
 <Case label="talk · one round, and the box docked">
   <div class="flex min-h-output flex-col">
     <div class="flex-1">
@@ -299,9 +259,6 @@ time somebody sends, so both landings are on this page. -->
   </div>
 </Case>
 
-<!-- A session divider folds the segment before it into one line and
-keeps the fold one press away: the rounds are still the room's
-history, and five of them is not what the person came back for. -->
 <Case label="session divider · the previous segment folded away">
   {#if open}
     <div class="fade">
@@ -339,9 +296,6 @@ history, and five of them is not what the person came back for. -->
   {/each}
 </Case>
 
-<!-- The branched reading of the same rule: which turn of which
-conversation the branch came from, and the way back to that
-conversation, which stays as it was. -->
 <Case label="talk · forked from turn 3, with the mother run linked">
   <Rule
     parts={[
@@ -371,11 +325,6 @@ conversation, which stays as it was. -->
   </p>
 </Case>
 
-<!-- The fork button in its revealed state, because a state that only
-appears under a pointer is a state nobody judges: on any message it
-arrives on hover or when anything inside the message holds focus, at
-the end of the line under the words, and the keyboard reaches it in
-the message's own tab stop. -->
 <Case label="message · fork from here, revealed under the message">
   <div class="[&_[data-fork]]:opacity-100">
     {#each ROUND as line (line.text)}
@@ -385,9 +334,6 @@ the message's own tab stop. -->
   </div>
 </Case>
 
-<!-- A bare `/fork` opens the picker: turns of this run down the left,
-what the marked turn did down the right. The columns are the real
-multi-column listbox, so the two-column reading is the shipped one. -->
 <Case label="fork picker · open, turns and calls in two columns">
   <div class="pt-palette">
     <div class="pt-output">

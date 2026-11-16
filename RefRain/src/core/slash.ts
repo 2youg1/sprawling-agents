@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The verbs a person can type. One table, read by both places that
-// offer them - the `/` menu above the composer and the Accel-/ palette -
-// so a button spelled `/stop` and a line somebody types cannot drift
-// into meaning two different things.
-//
-// A command holds five things and no more: how it is spelled, what it
-// takes after the spelling, the phrase that explains it, the palette
-// section it is listed under, and what it does. What it does is
-// written against `SlashHands` (`slash_hands.ts`), which is every
-// capability a verb may reach for; a view fills the hands in and stays
-// out of the verbs. That is why this file names no view, no signal and
-// no query: the same table runs from a text box and from a palette.
-
 import { Option, Schema } from "effect";
 
 import { Address } from "../wire";
@@ -44,17 +31,10 @@ import { compact, fresh, retag } from "./slash_session";
 
 const ALL = "--all";
 
-// The two spellings a button elsewhere shows as its own name: the verb
-// that cancels the run in front of the person, and the one that lets
-// the whole city work again. Written here once, so the button and the
-// line a person types are one spelling.
 export const STOP = "/stop";
 const RELEASE = "/release";
 export const RELEASE_ALL = `${RELEASE} ${ALL}`;
 
-// The short words `/admit` takes, each naming the admission requirement
-// the next run's work must meet; the bare verb goes back to the
-// building's own checks.
 const ADMITS: Readonly<Record<string, AdmissionRequirement>> = {
   standing: "standing",
   tested: "tested",
@@ -62,15 +42,6 @@ const ADMITS: Readonly<Record<string, AdmissionRequirement>> = {
   double: "double_validated",
 };
 
-// The word for an effort nobody chose. The page keeps that state as
-// `null` and the frame leaves the field out; this is its one written
-// form - what a person types after `/effort`, and the id the selector
-// over the composer gives the row that reaches it, so the line and
-// the menu cannot come to mean two different things.
-//
-// The assertion keeps the word one word: without it, a menu that
-// builds its rows from `[UNSTATED, ...EFFORTS]` widens the whole list
-// to `string` and loses the phrase key each row is named by.
 export const UNSTATED = "unstated" as const;
 
 function addressed(raw: string | undefined): Address | null {
@@ -80,11 +51,6 @@ function addressed(raw: string | undefined): Address | null {
   return Option.getOrNull(Schema.decodeOption(Address)(raw));
 }
 
-// `/halt` and `/release` take the same three shapes, and the pair would
-// otherwise be one body copied twice with a frame swapped. A bare verb
-// or `--all` reaches the city; a word that is not an address sends
-// nothing and leaves the line to edit, because widening a typo to the
-// whole city is the one reading the person cannot have meant.
 function scoped(hands: SlashHands, call: SlashCall, frame: typeof halt): void {
   const first = call.words.at(0);
   if (first === undefined || call.words.includes(ALL)) {
@@ -130,7 +96,6 @@ export const SLASH: readonly Slash[] = [
     },
   },
   {
-    // Cancel, the run in front of the person; the wider brake is `/halt`.
     spelling: STOP,
     grammar: "",
     about: "slash_stop",
@@ -165,8 +130,6 @@ export const SLASH: readonly Slash[] = [
     about: "slash_raise",
     section: "actions",
     run: (hands, call) => {
-      // Without an address the page that raises a building opens, where
-      // the address, the template and the rules are filled in at once.
       if (call.words.length === 0) {
         hands.go({ kind: "raise" });
         hands.write("");
@@ -220,15 +183,10 @@ export const SLASH: readonly Slash[] = [
     run: (hands, call) => {
       const room = addressed(call.words.at(0));
       if (room === null) {
-        // No address means the point is in this conversation: the
-        // picker above the box knows the turns and where each one sits.
         askFork();
         hands.write("");
         return;
       }
-      // With an address the branch goes to that room, from the tail of
-      // the newest run there: forking into another room predates the
-      // picker and keeps its meaning.
       const newest = hands.newest(room);
       if (newest === null) return;
       hands.command(openSession(room, "nothing", { run: newest.run, at_seq: newest.at }));
@@ -255,13 +213,6 @@ export const SLASH: readonly Slash[] = [
     section: "actions",
     run: (hands, call) => {
       const asked = call.words.at(0);
-      // `/effort unstated`, and bare `/effort`, both take the choice
-      // back off the table and leave it to the provider, which is what
-      // an unset selector means and what `"none"` - think as little as
-      // possible - does not. The word is named in the grammar because
-      // a person who has chosen a level needs to see the way back; the
-      // bare form stays because omitting the argument is what the
-      // request itself does. A level nobody offers changes nothing.
       if (asked === undefined || asked === UNSTATED) {
         hands.setEffort(null);
         hands.write("");
@@ -319,8 +270,6 @@ export const SLASH: readonly Slash[] = [
     },
   },
   {
-    // Closing the city is a question first: with runs going, whether to
-    // wait for them (`views/quit.svelte`).
     spelling: "/quit",
     grammar: "",
     about: "slash_quit",
@@ -336,17 +285,12 @@ export const SLASH: readonly Slash[] = [
     about: "slash_help",
     section: "actions",
     run: (hands) => {
-      // A lone slash is what opens the whole list, so `/help` is that
-      // list rather than a second page describing it.
       hands.write("/");
     },
   },
   ...PAGE_VERBS,
 ];
 
-// A line that begins with a slash, cut into verb and arguments. `null`
-// for anything else, which is the answer that keeps every caller from
-// asking `startsWith` for itself.
 export function parse(line: string): SlashCall | null {
   if (!line.startsWith("/")) {
     return null;
@@ -361,9 +305,6 @@ export function find(verb: string): Slash | undefined {
   return SLASH.find((known) => known.spelling === verb);
 }
 
-// What the menu shows for a line. A verb already typed in full, with a
-// space after it, narrows the list to itself: what a person needs then
-// is its grammar, not every other verb.
 export function offered(line: string): readonly Slash[] {
   const call = parse(line);
   if (call === null) {

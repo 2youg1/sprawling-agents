@@ -8,13 +8,11 @@
 <script lang="ts" module>
   import type { Placing, Showing, TipSide } from "./tip";
 
-  
   const AGAINST_WRAPPER: Record<TipSide, string> = {
     above: "absolute bottom-full left-1/2 -translate-x-1/2 mb-tight",
     right: "absolute left-full top-1/2 -translate-y-1/2 ml-base",
   };
 
-  
   const AGAINST_ANCHOR: Record<TipSide, string> = {
     above:
       "supports-[anchor-name:--a]:fixed supports-[anchor-name:--a]:bottom-auto " +
@@ -39,14 +37,12 @@
     }
   }
 
-  
   const PAINT =
     "pointer-events-none z-(--layer-popover) w-max max-w-measure rounded-card border border-edge-panel bg-raised " +
     "px-snug py-tight text-note text-text shadow-float " +
     "transition-[opacity,display] transition-discrete delay-300 duration-panel ease-leave " +
     "still:transition-none";
 
-  
   const SHOWN: Record<Showing, string> = {
     wanted:
       "hidden opacity-0 group-hover/tip:block group-hover/tip:opacity-100 group-hover/tip:ease-arrive " +

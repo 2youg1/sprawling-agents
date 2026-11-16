@@ -3,50 +3,40 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 export interface FieldProps {
-  
   readonly label: string;
-  
-  
+
   readonly labelling?: "above" | "hidden";
   readonly value: string;
   readonly onInput: (value: string) => void;
   readonly help?: string;
-  
+
   readonly error?: string;
-  
+
   readonly prefix?: string;
   readonly suffix?: string;
   readonly placeholder?: string;
-  
-  
+
   readonly mono?: boolean;
-  
-  
+
   readonly kind?: "text" | "password" | "number";
-  
+
   readonly step?: number;
-  
+
   readonly pattern?: string;
-  
-  
+
   readonly describedBy?: string;
-  
-  
+
   readonly disabled?: boolean;
 }
-
 
 export interface Typed {
   readonly currentTarget: { value: string };
 }
 
-
 export interface LabelWire {
   readonly for: string;
 }
-
 
 export interface BoxWire {
   readonly id: string;
@@ -62,11 +52,10 @@ export interface BoxWire {
   readonly oninput: (event: Typed) => void;
 }
 
-
 export interface NoteLook {
   readonly kind: "error" | "help";
   readonly text: string;
-  
+
   readonly wire: { readonly id: string; readonly role: "alert" | undefined };
 }
 
@@ -77,13 +66,12 @@ export interface FieldLook {
   readonly suffix: string | undefined;
   readonly mono: boolean;
   readonly disabled: boolean;
-  
+
   readonly refused: boolean;
   readonly labelWire: LabelWire;
   readonly box: BoxWire;
   readonly note: NoteLook | undefined;
 }
-
 
 export function describedOf(props: FieldProps, note: string): string | undefined {
   const own = props.help === undefined && props.error === undefined ? [] : [note];
@@ -98,7 +86,6 @@ function noteOf(props: FieldProps, id: string): NoteLook | undefined {
     return { kind: "help", text: props.help, wire: { id, role: undefined } };
   return undefined;
 }
-
 
 export function lookOf(props: FieldProps, uid: string): FieldLook {
   const box = `${uid}-box`;

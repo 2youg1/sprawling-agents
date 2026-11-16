@@ -8,8 +8,6 @@ import { describe, expect, test } from "bun:test";
 import table from "../lang.json";
 import { endonym, fill, LANGS, langOf, say } from "./lang";
 
-// The slot names a pattern uses, sorted, so two languages of one
-// sentence can be compared for asking the same values.
 function slotsOf(pattern: string): string[] {
   const found: string[] = [];
   for (const match of pattern.matchAll(/\{([^}]*)\}/g)) {
@@ -28,10 +26,6 @@ describe("lang", () => {
     expect(say("en", "talk_placeholder_mayor")).not.toBe(say("zh", "talk_placeholder_mayor"));
   });
 
-  // A phrase may read the same in both languages only when it is a
-  // term rather than a sentence: a slash command, or one token (`MCP`,
-  // `http`, `Composio`) or a figure made of slots, which a translation
-  // would only misspell.
   const term = (phrase: string) =>
     phrase.startsWith("/") || phrase.startsWith("{") || (!/\s/.test(phrase) && phrase.length <= 12);
 
@@ -45,9 +39,6 @@ describe("lang", () => {
     }
   });
 
-  // A domain role is a word in the reader's language: the palette and
-  // the key sheet both name the Mayor's page, and a Chinese
-  // screen that names it in English reads as untranslated.
   test("no Chinese phrase names the Mayor in English", () => {
     for (const [key, phrase] of Object.entries(table)) {
       expect(phrase.zh, `${key} says Mayor in English`).not.toContain("Mayor");

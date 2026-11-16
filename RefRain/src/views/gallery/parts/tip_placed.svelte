@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { say } from "../../../core/lang";
   import { ui } from "../../../ui";
   import TipLook from "../../parts/tip.look.svelte";
@@ -44,7 +42,6 @@
 
 {#each PLACED as placed, at (placed.label)}
   <Case label={placed.label}>
-    
     <div class="flex justify-center py-section">
       <TipLook {...standing(placed, at)}>
         {#snippet children(hint: string)}

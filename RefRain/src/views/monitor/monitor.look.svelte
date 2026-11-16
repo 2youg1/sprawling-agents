@@ -6,17 +6,6 @@
 -->
 
 <script lang="ts">
-  // How the monitor is drawn, and nothing else (client D95): a header
-  // with the run's file count and two toggles, then the code pane with
-  // the terminal or the folded column of files beside it. Every word
-  // arrives translated and every role, `aria-*` value, handler and pane
-  // attachment arrives inside a wire bag (`./monitor.ts`), spread
-  // unchanged on the element it is for, so another look draws the same
-  // monitor by taking the same `MonitorLook`.
-  //
-  // Each control's colour arrives decelerating and leaves accelerating
-  // (docs/frontend-method.md §4-43); the durations are theme tokens, so
-  // motion off stills them with no rule here.
   import type { MonitorLook } from "./monitor";
 
   const look: MonitorLook = $props();
@@ -33,9 +22,6 @@
   >
     <span class="text-label text-text">{look.heading}</span>
     <span class="text-text-faint figure">{look.tally}</span>
-    <!-- Following is the resting state and reads as a lit word; paused
-    stands on a raised fill, because it is the state that asks to be
-    taken back up. -->
     <button
       class="{TOGGLE} ms-auto {look.follow.held
         ? 'text-accent hover:bg-raised'
@@ -75,8 +61,6 @@
 </section>
 
 <style>
-  /* The code takes the larger share beside the terminal, because a
-  hunk's lines are wider than a command's output. */
   .pane.beside {
     flex-grow: 1.4;
   }

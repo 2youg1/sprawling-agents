@@ -3,13 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The text box a governed document is edited in. The bag the look
-// spreads on the `<textarea>` is built here; the seat is
-// `governed.svelte`, which owns the draft, and the look is
-// `draft.look.svelte`.
-
 export interface DraftWire {
-  // Already in the person's language: the document being edited.
   readonly "aria-label": string;
   readonly value: string;
   readonly oninput: (event: { readonly currentTarget: { readonly value: string } }) => void;

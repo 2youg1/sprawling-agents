@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { fill, say } from "../../core/lang";
   import { roomOf, toFragment } from "../../core/route";
   import { usd } from "../../core/time";
@@ -37,7 +35,6 @@
     return "git_status" in held ? held.git_status : null;
   });
 
-  
   function isOpen(path: string): boolean {
     const item = rightItem();
     return (

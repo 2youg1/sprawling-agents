@@ -5,11 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  // The signals queued for this room and not yet read by a run, asked
-  // without taking them (`Query::InboxView`). The city bar counts them
-  // across the city; this is where a person sees which they are.
-  // Each row says the kind, the first line of the text and who sent it,
-  // and leads to the sender's room (client D86).
   import { say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { ago } from "../../core/time";

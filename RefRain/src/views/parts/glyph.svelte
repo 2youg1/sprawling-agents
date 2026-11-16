@@ -4,20 +4,6 @@
   // file, You can obtain one at https://mozilla.org/MPL/2.0/.
   // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-  // The one thing in the client that draws an icon. Every icon is one name
-  // in `glyph.ts`, drawn here as one icon of the lucide set, so a person
-  // meets the shapes they already know from other software and no file
-  // draws an `<svg>` of its own.
-  //
-  // The drawing is decorative without exception: a glyph names a control
-  // whose word is beside it or whose accessible name the caller states, so
-  // the `<svg>` is always hidden from a screen reader.
-  //
-  // The stroke is one width at every size, held to the screen rather than
-  // to the drawing's units, so a mark inside a line of text is not drawn
-  // thinner than a key's. Nothing here is coloured by hand: the stroke is
-  // `currentColor`, and the caller's text colour is the paint.
-
   import type { Component } from "svelte";
   import type { ClassValue } from "svelte/elements";
 
@@ -56,7 +42,6 @@
 
   import type { GlyphName } from "./glyph";
 
-  // Keyed by `GlyphName`, so a name without a drawing does not compile.
   const DRAWN: Record<
     GlyphName,
     Component<{
@@ -105,8 +90,6 @@
   export interface GlyphProps {
     readonly name: GlyphName;
     readonly size?: GlyphSize;
-    // A shape drawn solid rather than as an outline: the stop face of the
-    // coin key, which has to be the strongest mark on the screen.
     readonly solid?: boolean;
     readonly class?: ClassValue;
   }

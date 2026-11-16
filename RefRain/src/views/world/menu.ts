@@ -3,18 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Attachment } from "svelte/attachments";
 
 import type { KeyPress } from "./drawn";
-
 
 export type Walked =
   | { readonly kind: "focus"; readonly at: number }
   | { readonly kind: "close" }
   | { readonly kind: "leave" }
   | { readonly kind: "none" };
-
 
 export function walked(count: number, now: number, key: string): Walked {
   switch (key) {
@@ -31,7 +28,6 @@ export function walked(count: number, now: number, key: string): Walked {
   }
 }
 
-
 export interface TriggerWire {
   readonly type: "button";
   readonly "aria-haspopup": "menu";
@@ -44,14 +40,12 @@ export interface TriggerWire {
   readonly [hold: symbol]: Attachment<HTMLElement>;
 }
 
-
 export interface ListWire {
   readonly role: "menu";
   readonly tabindex: -1;
   readonly "aria-label": string;
   readonly onkeydown: (event: KeyPress) => void;
 }
-
 
 export interface PopupWire {
   readonly id: string;
@@ -60,11 +54,9 @@ export interface PopupWire {
   ) => void;
 }
 
-
 export interface HolderWire {
   readonly role: "none";
 }
-
 
 export interface ItemWire {
   readonly type: "button";
@@ -75,24 +67,20 @@ export interface ItemWire {
 }
 
 export interface ItemLook {
-  
   readonly key: string;
-  
+
   readonly word: string;
   readonly holder: HolderWire;
   readonly wire: ItemWire;
 }
 
-
 export interface MenuHands {
-  
   readonly live: () => readonly HTMLElement[];
   readonly show: () => void;
   readonly close: () => void;
-  
+
   readonly leave: () => void;
 }
-
 
 export function walking(hands: MenuHands): (event: KeyPress) => void {
   return (event) => {
@@ -120,7 +108,6 @@ export function walking(hands: MenuHands): (event: KeyPress) => void {
   };
 }
 
-
 export function popupOf(id: string, hands: Pick<MenuHands, "leave">): PopupWire {
   return {
     id,
@@ -130,7 +117,6 @@ export function popupOf(id: string, hands: Pick<MenuHands, "leave">): PopupWire 
     },
   };
 }
-
 
 export function opening(open: boolean, hands: Pick<MenuHands, "show">): (event: KeyPress) => void {
   return (event) => {

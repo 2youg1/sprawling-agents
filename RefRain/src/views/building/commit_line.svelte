@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { say } from "../../core/lang";
   import { roomOf } from "../../core/route";
   import { ui } from "../../ui";
@@ -23,10 +21,7 @@
 
   const lang = ui().lang;
 
-  
   const subject = $derived(commit.message?.split("\n", 1)[0]?.trim() ?? "");
-  
-  
 </script>
 
 <span class="figure text-text-quiet">{shortOid(commit.oid)}</span>

@@ -4,24 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // One session row's menu (APG Menu Button, as `pane_menu.svelte`): pin
-  // or unpin, take each tag off, add a tag, rename the session, and - for
-  // a room's current session - switch its mode or its write limit from
-  // the run's next safe point (`Command::ChangeRunPolicy`, kernel D21;
-  // model and effort stay what the session opened with). Enter, Space or Down opens it
-  // on its first item, Up and Down walk the items, Escape or Tab closes it
-  // with the focus back on the button. "Add a tag" and "rename" each turn
-  // the menu into one field: Enter gives the session the word or the
-  // name and closes, Escape closes without it, and the focus goes back to
-  // the button either way.
-  //
-  // The Mayor's current session is pinned by being current, not by a
-  // tag, so its menu offers no way to unpin it.
-  //
-  // This file is the seat: it decides the items and what each does,
-  // owns whether the menu is open and the field it turns into, and
-  // draws whatever `./session_menu.look.svelte` is; the keys are
-  // `./menu.ts`.
   import { tick } from "svelte";
 
   import { readAnswer } from "../../core/answered";
@@ -39,25 +21,17 @@
   import Look from "./session_menu.look.svelte";
 
   interface Props {
-    // The session as its tags name it; null where the city has no name
-    // to keep tags under, which leaves the button disabled.
     readonly named: Named | null;
-    // The row's own name, which the button's accessible name carries.
     readonly label: string;
     readonly tags: readonly Tag[];
     readonly pinning: Pinning;
-    // The session's display name ("" for none), and the run whose
-    // policy a change starts from: the room's current run, or null for
-    // a session the city no longer goes on with.
     readonly session: { readonly name: string; readonly run: RunId | null };
     readonly read: View | null;
   }
 
   const { named, label, tags, pinning, session, read }: Props = $props();
 
-  // The longest display name the field takes: a row shows a line of it.
   const NAME_MAX = 80;
-  // The longest tag the field takes, as the hint under it says.
   const TAG_MAX = 24;
 
   const u = ui();
@@ -65,9 +39,6 @@
   const held = u.tags.held;
   const seat = $props.id();
 
-  // The policy the run opened under, asked only while the menu is open;
-  // until it is held the menu offers no policy change, because a change
-  // carries the whole policy and a guessed field would be sent with it.
   let opened = $state<RunPolicy | null>(null);
   $effect(() => {
     const run = session.run;
@@ -81,8 +52,6 @@
     });
   });
 
-  // The policy now in force: the room's newest change inside this
-  // session (`run_policy_changed`), else the one the run opened under.
   const belief = u.conn.belief;
   const policy = $derived.by((): RunPolicy | null => {
     if (named === null || session.run === null) return null;
@@ -172,7 +141,6 @@
   ]);
 
   let open = $state(false);
-  // Which field the menu has turned into, if any.
   let naming = $state<"tag" | "name" | null>(null);
   let typed = $state("");
   const drawn = drawnElements();

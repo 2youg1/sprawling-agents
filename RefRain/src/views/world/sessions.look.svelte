@@ -3,14 +3,6 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- How the sessions pane is drawn under its label: a row of tag toggles
-when rows carry tags, then the groups, each a quiet heading over its
-rows. A row is a state dot, its title with the pin when it is pinned and
-its time, and under them the lines the session has to say; the row in
-main is washed, carries the chosen bar on its leading edge and leaves out
-whatever the seat left out of it (`sessions.ts`), and the
-row's menu key shows on hover, on focus and on the row in main. Every
-link, role and `aria-*` value comes in the bags. -->
 <script lang="ts">
   import Glyph from "../parts/glyph.svelte";
   import Button from "../parts/button.svelte";
@@ -34,9 +26,7 @@ link, role and `aria-*` value comes in the bags. -->
     {/each}
   </div>
 {/if}
-<!-- A row reaches out by one step on each side, so its wash and its
-chosen bar stand outside the text; the column that scrolls is widened
-by that step into the pane's own inset, so the pane clips neither. -->
+
 <div class="-mx-snug min-h-0 flex-1 overflow-y-auto px-snug">
   <ul>
     {#each look.rows as row (row.key)}
@@ -146,16 +136,10 @@ by that step into the pane's own inset, so the pane clips neither. -->
 </div>
 
 <style>
-  /* The dot's lane, the title's and the time's. The lane is a step
-   * wider than the dot, so a halo round it is not cut by the title. */
   .cells {
     grid-template-columns: var(--spacing-base) minmax(0, 1fr) auto;
   }
 
-  /* The state dot. A running session glows in the accent and one
-   * waiting for the person in the alert, each a halo three eighths of
-   * the dot wide; a done one is a ring, so the three read apart without
-   * their colours. */
   .dot[data-dot="run"] {
     background-color: var(--color-accent);
     box-shadow: 0 0 0 calc(var(--spacing-dot) * 3 / 8)
@@ -170,10 +154,6 @@ by that step into the pane's own inset, so the pane clips neither. -->
     border: calc(var(--spacing-dot) * 3 / 16) solid var(--color-mark);
   }
 
-  /* The row in main carries the chosen bar down its leading edge,
-   * standing in by one step from the row's top and bottom
-   * (docs/frontend-method.md §7B). A border rather than a fill, so a
-   * forced-colour mode keeps it. */
   .row.here::before {
     content: "";
     position: absolute;

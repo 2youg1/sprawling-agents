@@ -6,15 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // The page lost the city. Drawn with the banner the halt uses and in
-  // the slot the halt uses, above every page, because both say the same
-  // kind of thing - nothing on this page is moving, and here is why - and
-  // a person should learn one place to look. The one control ends the
-  // ladder's wait early.
   export interface LinkBannerProps {
-    // Counted from one: the attempt the ladder is on.
     readonly attempt: number;
-    // Words said since the link went down, sent once it is back.
     readonly unsent: number;
     readonly onRetry: () => void;
   }

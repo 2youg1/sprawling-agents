@@ -3,10 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 const POLICY =
   "default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; media-src data:; form-action 'none'";
-
 
 export function framed(source: string, scheme: "authored" | "built"): string {
   const page = new DOMParser().parseFromString(source, "text/html");

@@ -6,9 +6,6 @@
 -->
 
 <script lang="ts">
-  // How the export buttons are drawn (`./usage_export`,
-  // `UsageExportLook`): two quiet buttons in a row, and under them the
-  // city's reason when it could not answer the last press.
   import Button from "./button.svelte";
   import type { UsageExportLook } from "./usage_export";
 

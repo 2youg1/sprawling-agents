@@ -1,5 +1,3 @@
-
-
 <script lang="ts">
   import { fill, say } from "../../core/lang";
   import type { Doing } from "../../core/doing";
@@ -18,8 +16,7 @@
   interface Props {
     readonly call: Call;
     readonly run: RunId;
-    
-    
+
     readonly doing?: Doing | undefined;
   }
 
@@ -37,19 +34,16 @@
     const item = rightItem();
     return item !== null && item.kind === "call" && item.run === run && item.at === call.at;
   });
-  
-  
+
   const pinned = $derived(call.outcome === "waiting" && doing?.kind === "calling");
-  
-  
+
   const waitsForYou = $derived(
     call.outcome === "waiting" &&
       doing?.kind === "waiting" &&
       time.kind === "running" &&
       time.ms >= NAMED_AFTER_MS,
   );
-  
-  
+
   const failedWords = $derived.by((): string => {
     const failure = failureOf(call);
     switch (failure.kind) {
@@ -71,8 +65,7 @@
   const hint = $derived(call.outcome === "failed" ? `${failedWords} · ${when}` : when);
 
   const walk = lineWalker();
-  
-  
+
   const MOVES_DRAWN = ["line.previous", "line.next", "line.open", "line.close"] as const;
 
   function linesBeside(from: HTMLElement): HTMLElement[] {

@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// How the queued-signal section says a signal's kind and its count
-// (client D86), and the value its look draws (`inbox.look.svelte`).
-// `SignalLine.kind` is the wire word `kernel::SignalKind` spells; a word
-// this build has no phrase for is shown as written, so a new kind reads
-// as itself rather than as nothing.
-
 import { fill, isKey, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
 import { count } from "../../core/time";
@@ -22,9 +16,6 @@ export function waitingSaid(lang: Lang, n: number): string {
   return n === 1 ? say(lang, "inbox_count_one") : fill(say(lang, "inbox_count"), { n: count(n) });
 }
 
-// One queued signal: its kind, the first line of its text, who sent it
-// and how long ago, leading to the sender's room where the sender is a
-// resident with one.
 export interface InboxRow {
   readonly key: string;
   readonly href: string | undefined;

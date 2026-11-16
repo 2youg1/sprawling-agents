@@ -1,13 +1,8 @@
-
-
 <script lang="ts" module>
-  
-  
   import type { Device } from "../../core/remote/device";
   import type { Standing } from "../settings/remote";
   import type { DoctorCustodyLifetime } from "../../wire";
 
-  
   const KEEPS: readonly (DoctorCustodyLifetime | null)[] = [
     null,
     "until_reboot",

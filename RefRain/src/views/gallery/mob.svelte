@@ -5,8 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  
-  
   import type { Tier } from "../../core/prefs";
   import { ui } from "../../ui";
   import type { Address as AddressType } from "../../wire";
@@ -90,7 +88,6 @@
       answers={answering(shown.panel)}
       {records}
     >
-      
       <div class="@container/shell">
         <div
           class="frame relative translate-x-0 overflow-hidden bg-page"

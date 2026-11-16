@@ -3,17 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { createAttachmentKey } from "svelte/attachments";
 import type { Attachment } from "svelte/attachments";
 
 import type { Cancelling, SheetWire, Stands } from "./sheet";
 
-
 export type Seat = "modal" | "specimen";
 
 export interface KbdLook {
-  
   readonly marks: readonly string[];
   readonly class?: string | undefined;
 }
@@ -24,7 +21,6 @@ export interface Said {
 }
 
 export interface Row {
-  
   readonly key: string;
   readonly label: string;
   readonly marks: readonly string[];
@@ -38,7 +34,6 @@ export interface CheatsheetLook {
   readonly rows: readonly Row[];
   readonly where: Said;
 }
-
 
 export interface Sheeting {
   readonly uid: string;
@@ -60,7 +55,6 @@ const STANDS: Readonly<Record<Seat, Stands>> = {
 };
 
 const HOLD = createAttachmentKey();
-
 
 export function sheetOf(sheeting: Sheeting, words: Words): CheatsheetLook {
   const heading = { id: `${sheeting.uid}-title`, text: words.title };

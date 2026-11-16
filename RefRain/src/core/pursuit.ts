@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The clause a person reads about a pursuit. The city decides the verdict
-// and sends its kind; the words are this client's, one entry per kind in
-// `lang.json`, so a Chinese page never has to show the city's English.
-
 import type { PursuitVerdict } from "../wire";
 import { fill, say, type Lang } from "./lang";
 

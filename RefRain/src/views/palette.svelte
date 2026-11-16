@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { Option, Schema } from "effect";
   import { heldIn } from "../core/belief/rooms";
   import { newestWorking } from "../core/belief/live";
@@ -62,15 +60,13 @@
 
   interface Props {
     readonly onClose: () => void;
-    
+
     readonly seat?: Seat | undefined;
-    
-    
+
     readonly here?: Address | undefined;
-    
-    
+
     readonly arrival?: Arrival | undefined;
-    
+
     readonly initial?: string | undefined;
   }
 
@@ -79,17 +75,15 @@
   // svelte-ignore state_referenced_locally (a fixture's initial text is captured once)
   let query = $state(initial);
   let cursor = $state(0);
-  
+
   let carrying = $state(false);
 
   const uid = $props.id();
   const listId = `${uid}-list`;
-  
-  
+
   // svelte-ignore state_referenced_locally
   const hold = modalHold(seat, arrival === "touch" ? "sheet" : "control");
-  
-  
+
   // svelte-ignore state_referenced_locally
   if (seat === "modal") u.prefs.findPalette();
   const sheet = $derived(
@@ -112,13 +106,11 @@
 
   const halted = $derived(cityIsShut($belief.halted));
 
-  
   const viewed = $derived(Option.getOrNull(current(u.bar)));
   const here = $derived(
     named ?? (viewed !== null && viewed.kind === "talk" ? viewed.address : null),
   );
-  
-  
+
   let sessionLines = $state.raw<readonly SessionLine[]>([]);
   $effect(() => {
     const room = here;
@@ -129,8 +121,7 @@
     });
   });
   const live = $derived(reached(viewed === null ? undefined : runInFront($belief, viewed)));
-  
-  
+
   const carryFrom = $derived(
     here !== null &&
       viewed?.kind === "talk" &&
@@ -141,8 +132,6 @@
   );
 
   const entries = $derived.by((): Entry[] => {
-    
-    
     const goTo = (to: View, label: string, hint = toFragment(to)): Entry => ({
       label,
       hint,
@@ -151,14 +140,12 @@
         u.go(to);
       },
     });
-    
-    
+
     const page = (action: Action, to: View): Entry => ({
       ...goTo(to, say($lang, LABELS[action])),
       action,
     });
-    
-    
+
     const viewing = viewed?.kind === "talk" ? viewed.session : undefined;
     const room = here;
     const sessions = (
@@ -212,8 +199,7 @@
       goTo({ kind: "welcome" }, say($lang, "setup_rerun")),
       { label: say($lang, LABELS.finder), hint: "", action: "finder", act: openFinder },
     ];
-    
-    
+
     if (here !== null && u.hearing() && canRecord()) {
       out.push({ label: say($lang, "palette_transcribe"), hint: here, act: askToSpeak });
     }
@@ -221,7 +207,7 @@
       label: halted ? RELEASE_ALL : say($lang, "city_stop"),
       hint: "halt",
       // wording-ok: `halt` is the command frame's own verb and is
-      
+
       act: () => {
         u.send(halted ? release(CITY) : halt(CITY));
       },
@@ -239,8 +225,6 @@
     }
     const answer = $city;
     if (answer !== undefined && "city" in answer) {
-      
-      
       for (const building of answer.city.buildings) {
         out.push(
           building.adoptable
@@ -278,10 +262,7 @@
     return reached(heldIn($belief, room).at(-1));
   }
 
-  
   function runSlash(chosen: Slash): void {
-    
-    
     const written: { line: string | null; acted: boolean } = { line: null, acted: false };
     const hands: SlashHands = {
       command: (command) => {
@@ -329,7 +310,6 @@
     }
   }
 
-  
   const grouped = $derived.by((): Group[] => {
     const typed = offered(query.trim());
     return SECTIONS.map((section) => ({
@@ -348,7 +328,6 @@
   });
   const commands = $derived(grouped.flatMap((group) => group.entries));
 
-  
   const carried = $derived.by((): Entry[] => {
     const from = carryFrom;
     if (!carrying || here === null || from === null) return [];
@@ -400,8 +379,7 @@
               (entry) => entry.to === undefined || toFragment(entry.to) !== direct.hint,
             ),
           ];
-    
-    
+
     const searched = (entry: Entry): string =>
       carrying ? entry.label : `${entry.label} ${entry.hint}`;
     return needle === ""
@@ -412,14 +390,12 @@
   function pick(entry: Entry | undefined): void {
     if (entry === undefined || entry.why !== undefined) return;
     entry.act();
-    
-    
+
     if (entry.keeps !== true && (carrying || !query.trim().startsWith("/"))) {
       onClose();
     }
   }
 </script>
-
 
 {#snippet listening()}
   {#if here !== null}<Listening room={here} />{/if}

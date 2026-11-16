@@ -6,11 +6,6 @@
 -->
 
 <script lang="ts">
-  // The card that stops and asks, drawn: a 2 px bar down the leading
-  // edge (`asks`, theme/surface.css) and a glyph, a heading that says
-  // who asks and when, the kind's own body, and at most three answers,
-  // each with its chord beside it. A person learns the card once; every
-  // later one is recognised rather than read.
   import Button from "./button.svelte";
   import Glyph from "./glyph.svelte";
   import Kbd from "./kbd.look.svelte";
@@ -27,8 +22,6 @@
     <Glyph name={glyph} size="sm" class="shrink-0 text-alert" />
     <span id={asker.id} class="min-w-0 flex-1 truncate text-text-quiet">{asker.text}</span>
     <span class="figure shrink-0 text-text-faint">{at}</span>
-    <!-- The digit a list of entries draws beside each one; empty
-    wherever the card is not in such a list (theme/mailbox.css). -->
     <kbd class="entry-n" aria-hidden="true"></kbd>
   </div>
   <div class="min-w-0">{@render body()}</div>

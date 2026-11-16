@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import type { PairLook } from "./pair";
 
   const look: PairLook = $props();

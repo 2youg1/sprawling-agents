@@ -4,12 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the file finder is drawn, and nothing else (`./search.ts`,
-  // `SearchLook`): the title, the box sunk one step into the raised
-  // sheet, and the paths as menu entries - a file's name in mono, then
-  // its directory, quieter. An entry rests on the sheet and lifts one
-  // step under the pointer and under the cursor (docs/frontend-method.md
-  // §7A-5), arriving and leaving on the theme's two curves (§4-43).
   import type { SearchLook } from "./search";
 
   const look: SearchLook = $props();

@@ -3,29 +3,24 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { createAttachmentKey } from "svelte/attachments";
 import type { Attachment } from "svelte/attachments";
 
-
 export interface StripTab {
-  
   readonly key: string;
-  
+
   readonly label: string;
-  
+
   readonly terminal: boolean;
-  
+
   readonly unsaved: boolean;
-  
+
   readonly front: boolean;
-  
-  
+
   readonly href: string | null;
-  
+
   readonly controls: string;
 }
-
 
 export interface StripWords {
   readonly tabs: string;
@@ -33,7 +28,6 @@ export interface StripWords {
   readonly closeAll: string;
   readonly closeItem: (name: string) => string;
 }
-
 
 export interface StripHands {
   readonly pick: (at: number) => void;
@@ -43,16 +37,13 @@ export interface StripHands {
   readonly hold: (key: string) => Attachment<HTMLElement>;
 }
 
-
 export type KeyPress = Pick<KeyboardEvent, "key" | "preventDefault">;
 export type Press = Pick<MouseEvent, "preventDefault">;
-
 
 export interface ListWire {
   readonly role: "tablist";
   readonly "aria-label": string;
 }
-
 
 export interface TabWire {
   readonly role: "tab";
@@ -65,14 +56,12 @@ export interface TabWire {
   readonly [hold: symbol]: Attachment<HTMLElement>;
 }
 
-
 export interface CloseWire {
   readonly type: "button";
   readonly tabindex: -1;
   readonly "aria-label": string;
   readonly onclick: () => void;
 }
-
 
 export interface CloseAllWire {
   readonly type: "button";
@@ -85,12 +74,11 @@ export interface TabLook {
   readonly label: string;
   readonly terminal: boolean;
   readonly front: boolean;
-  
+
   readonly unsaved: string | undefined;
   readonly wire: TabWire;
   readonly close: CloseWire;
 }
-
 
 export interface StripLook {
   readonly list: ListWire;
@@ -98,12 +86,10 @@ export interface StripLook {
   readonly closeAll: CloseAllWire;
 }
 
-
 export function tabStop(tabs: readonly StripTab[]): number {
   const front = tabs.findIndex((tab) => tab.front);
   return front === -1 ? 0 : front;
 }
-
 
 export function landing(count: number, at: number, key: string): number | undefined {
   const last = count - 1;
@@ -121,9 +107,7 @@ export function landing(count: number, at: number, key: string): number | undefi
   }
 }
 
-
 const HOLD = createAttachmentKey();
-
 
 export function lookOf(tabs: readonly StripTab[], words: StripWords, hands: StripHands): StripLook {
   const stop = tabStop(tabs);

@@ -1,5 +1,3 @@
-
-
 <script lang="ts"></script>
 
 <span class="steer-pin" aria-hidden="true"></span>

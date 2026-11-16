@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { Option, Schema } from "effect";
   import { untrack } from "svelte";
 
@@ -27,10 +25,9 @@
 
   interface Props {
     readonly address: Address;
-    
+
     readonly held: SandboxLimits | null;
-    
-    
+
     readonly known: boolean;
   }
 
@@ -45,13 +42,11 @@
   const CONTAINER_FIELDS = ["image", "user", "cpu_millis", "memory_bytes", "pids"] as const;
   type ContainerField = (typeof CONTAINER_FIELDS)[number];
 
-  
   type ListKey = "mounts" | "env" | "trusted";
 
   interface Draft {
     readonly shell: (typeof SHELL)[number];
-    
-    
+
     readonly interpreter: Interpreter;
     readonly arm: ArmChoice;
     readonly containerFields: Readonly<Record<ContainerField, string>>;
@@ -82,10 +77,9 @@
 
   let draft = $state<Draft>(draftOf(null));
   let edited = $state(false);
-  
+
   let sent = $state<string | null>(null);
 
-  
   $effect(() => {
     const now = held;
     if (!untrack(() => edited)) draft = draftOf(now);
@@ -98,7 +92,6 @@
       .filter((line) => line !== "");
   }
 
-  
   function decoded<T>(
     text: string,
     schema: Schema.Codec<T, string>,
@@ -168,7 +161,6 @@
     edit({ lists: { ...draft.lists, [key]: value } });
   }
 
-  
   const LISTS = $derived([
     {
       key: "mounts",

@@ -8,7 +8,7 @@ Chinese: [`README.zh-CN.md`](README.zh-CN.md).
 
 Calyx is the interactive face around the city console and the Mei process Face. It owns raw terminal mode, keys and paste, the line editor, slash menus, face lifecycle, screen orchestration (including OSC 7501 program status), and spawning the headless `mei` binary. The frame renderer is a pure Zig leaf: a scene in, one terminal frame out.
 
-WebUI (future `RefRain/`) is a separate consumer. Calyx does not implement the model loop, declare tools, or inject AGENTS.
+WebUI (`RefRain/`) is a separate consumer. Calyx does not implement the model loop, declare tools, or inject AGENTS.
 
 ## Layout
 

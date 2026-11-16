@@ -3,16 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { closeRight, rightItem } from "./inspect/open.svelte";
 
 export type Sheet = "world" | "right";
 
-
 const KEY = "sheets";
 
 let open = $state.raw<readonly Sheet[]>([]);
-
 
 let opener: HTMLElement | null = null;
 
@@ -25,11 +22,9 @@ function sheetsIn(state: unknown): readonly Sheet[] {
   );
 }
 
-
 export function sheetsOpen(): readonly Sheet[] {
   return open;
 }
-
 
 export function openSheet(sheet: Sheet): void {
   if (open.at(-1) === sheet) return;
@@ -40,11 +35,9 @@ export function openSheet(sheet: Sheet): void {
   open = next;
 }
 
-
 export function leaveSheet(sheet: Sheet): void {
   if (open.at(-1) === sheet) history.back();
 }
-
 
 export function keepSheets(): () => void {
   const read = (): void => {

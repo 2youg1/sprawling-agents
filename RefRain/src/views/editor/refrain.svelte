@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Address, B3Hash } from "../../wire";

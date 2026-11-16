@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { readDocument } from "../../core/document";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";

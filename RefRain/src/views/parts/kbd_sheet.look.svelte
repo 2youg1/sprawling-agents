@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts">
-  // The sheet every chord is read on, drawn in the same box as the
-  // irreversible question: a heading with the way out beside it, one row
-  // per action with its chord at the row's end, and where the chords
-  // are rebound.
   import Button from "./button.svelte";
   import Kbd from "./kbd.look.svelte";
   import Sheet from "./sheet.look.svelte";

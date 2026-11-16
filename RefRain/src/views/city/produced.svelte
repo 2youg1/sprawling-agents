@@ -4,11 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // What a finished run of the results city produced, at the end of its
-  // row. The city answer carries no produced figures, so the row asks
-  // the run's rounds for the two trees the room's line measures between
-  // and hands them to that same line; only the rows drawn ask, which the
-  // city's `FIRST` cut keeps to a handful.
   import Produced from "../talk/produced.svelte";
   import { lastCheckpointIn } from "../checkpoints";
   import { ui } from "../../ui";

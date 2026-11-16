@@ -3,16 +3,8 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- How the words of a turn still arriving are drawn (`SayingLook`,
-`./saying`): the speaker in the note's faint ink, the laid-out blocks,
-then the open tail as raw text, its last characters faint, and after
-it the caret - an accent square, `--spacing-caret` across, sitting on
-the line's baseline. The caret blinks with the theme's `blink`, which
-the person's motion choice and the machine's reduced motion both
-still, so a stilled caret stands lit rather than vanishing. -->
 <script lang="ts">
   import type { SayingLook } from "./saying";
-
   const { who, laid, settled, edge }: SayingLook = $props();
 </script>
 

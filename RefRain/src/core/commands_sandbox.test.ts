@@ -9,7 +9,6 @@ import { Address, EnvVarName, ServerLabel } from "../wire";
 import type { SandboxLimits } from "../wire";
 import { configureSandbox } from "./commands";
 
-
 describe("configureSandbox", () => {
   test("states the sandbox whole and leaves the other four faces alone", () => {
     const limits: SandboxLimits = {

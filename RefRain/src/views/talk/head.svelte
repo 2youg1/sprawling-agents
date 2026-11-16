@@ -1,5 +1,3 @@
-
-
 <script lang="ts">
   import { fill, say } from "../../core/lang";
   import { hhmmss, isoInstant } from "../../core/time";
@@ -12,14 +10,13 @@
   interface Props {
     readonly who: string;
     readonly at: number;
-    
-    
+
     readonly model: string | null;
-    
+
     readonly ttft: Took | null;
-    
+
     readonly tps: number | null;
-    
+
     readonly rhythm: readonly number[] | null;
   }
 

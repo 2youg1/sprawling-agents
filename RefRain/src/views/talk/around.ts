@@ -3,18 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Which turns a letter draws of the run that sent it (client D91): the
-// turn that holds the line, found as the last turn opened at or before
-// it, and `AROUND` turns on either side. A line the thread cannot place -
-// none given, or earlier than the first turn - draws every turn, as the
-// thread always did.
-
 import type { Seq, Turn } from "../../wire";
 
 export const AROUND = 1;
 
-// The turns drawn are `turns.slice(from, to)`; `cut` says whether any
-// were left out, so the thread can point at the whole conversation.
 export interface Window {
   readonly from: number;
   readonly to: number;

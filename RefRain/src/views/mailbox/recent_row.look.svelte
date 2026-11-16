@@ -6,14 +6,6 @@
 -->
 
 <script lang="ts">
-  // How one recent session is drawn: one control-tall row whose link
-  // holds the room, how the session began and how long ago it was last
-  // written, in three columns that line up from row to row; then the
-  // fork key, always drawn rather than on hover, and the digit that
-  // reaches the row. The fork key names itself in a hint, or says there
-  // why it cannot fork. A branch waiting on the city is said in the
-  // middle column, which a screen reader hears as it changes, and a
-  // refused one keeps `/stop` after the fork key.
   import Button from "../parts/button.svelte";
   import Glyph from "../parts/glyph.svelte";
   import Tip from "../parts/tip.svelte";
@@ -38,8 +30,6 @@
         {...look.fork.wire}
         aria-describedby={hint}
       >
-        <!-- The same mark the thread's branch action carries, so the
-        two doors to one act look alike. -->
         <Glyph name="branch" size="sm" />
       </button>
     {/snippet}
@@ -51,8 +41,6 @@
 </li>
 
 <style>
-  /* The key's ground comes in decelerating and goes accelerating
-   * (docs/frontend-method.md §4-43). */
   .fork {
     transition:
       background-color var(--transition-duration-short) var(--ease-leave),

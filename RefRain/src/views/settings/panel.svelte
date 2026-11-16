@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import type { SetupGroup, View } from "../../core/route";
   import { dialogOf } from "./panel";
   import Look from "./panel.look.svelte";
@@ -28,7 +24,6 @@
     };
   };
 
-  
   $effect(() => {
     if (sheet === undefined || sheet.open) return;
     sheet.showModal();

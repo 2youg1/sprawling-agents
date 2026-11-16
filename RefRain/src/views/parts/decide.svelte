@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
   export type { Answer, Choice, DecideKind, DecideProps } from "./decide";
 </script>
 
@@ -25,7 +23,6 @@
   const keys = keymap();
   const uid = $props.id();
 
-  
   const hear: Attachment<HTMLDivElement> = (node) =>
     on(node, "keydown", (event) => {
       if (event.isComposing) return;

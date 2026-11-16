@@ -6,24 +6,8 @@
 -->
 
 <script lang="ts" module>
-  // The sliding chooser in the six states it can be drawn in: two
-  // cells, three cells, three cells under two group headings, a cell
-  // that cannot be chosen and says why, a control nobody has answered
-  // yet, and the whole control with motion turned off.
-  //
-  // Each fixture holds the choice a person made in it, so pressing a
-  // cell on `#/gallery` moves the slider as it would on a page.
-
   import type { Choice, Group } from "../../parts/segmented";
 
-  // The two laboratories the three dialects come from, and the colour
-  // each is given. The sliding chooser is the only control in the
-  // client that paints by family, and the mapping is spelled at the
-  // call site because the control itself knows no vendor's name.
-  //
-  // wording-ok: the laboratory names are proper nouns - the same
-  // letters in every language - so they are written here rather than
-  // in `lang.json`.
   const OPEN_AI: Group = { label: "OpenAI", tone: "plain" };
   const ANTHROPIC: Group = { label: "Anthropic", tone: "alert" };
 </script>
@@ -47,9 +31,6 @@
   let gated = $state<WireApi>("chat");
   let unchosen = $state<WireApi | null>(null);
 
-  // The dialect list the provider form offers, grouped by the
-  // laboratory whose wire it speaks. The words are the literal values
-  // of Codex's `wire_api` key, which no language translates.
   function dialects(): readonly Choice<WireApi>[] {
     return WIRE_APIS.map((api) => ({
       value: api,
@@ -58,9 +39,6 @@
     }));
   }
 
-  // The same list as this city can serve it today: the middle dialect
-  // is named, drawn and refused, so the reason arrives under the
-  // pointer instead of after the click.
   function carried(): readonly Choice<WireApi>[] {
     return dialects().map((choice) =>
       choice.value === "responses"
@@ -139,10 +117,6 @@
   />
 </Case>
 
-<!-- A caller holding nothing passes `null`, and the track answers by
-drawing no slider: no cell may report itself chosen when nobody has
-chosen. The first cell a person can choose is still the one tab stop,
-so the control is reachable by keyboard before it has an answer. -->
 <Case label="segmented · nothing chosen yet">
   <Segmented
     label={say($lang, "setup_wire_api")}
@@ -154,10 +128,6 @@ so the control is reachable by keyboard before it has an answer. -->
   />
 </Case>
 
-<!-- The one subtree on this route that asks for motion to stop
-(ux B6). Everything under the mark keeps its state changes and loses
-its travel, so `xtask render` can read the same classes at rest here
-and in flight in every case above. -->
 <Case label="segmented · motion off">
   <div data-motion="off">
     <Segmented

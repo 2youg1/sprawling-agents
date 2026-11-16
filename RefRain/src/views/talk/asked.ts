@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What an approval card's question is about, as its look is given it
-// (`asked.look.svelte`): still being asked for, a binary the card can
-// only weigh, or the text, with what the cut left out when the content
-// answer was cut.
-
 import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
 import { kib } from "../../core/time";

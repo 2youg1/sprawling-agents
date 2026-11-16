@@ -3,11 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { Result } from "effect";
 import { readable, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
-
 
 export interface Store {
   readonly getItem: (key: string) => string | null;
@@ -15,13 +13,11 @@ export interface Store {
   readonly removeItem: (key: string) => void;
 }
 
-
 export interface Rows extends Store {
   readonly unkept: Readable<ReadonlySet<string>>;
 }
 
 const NONE: Readable<ReadonlySet<string>> = readable(new Set());
-
 
 export function memory(): Rows {
   const held = new Map<string, string>();
@@ -37,14 +33,11 @@ export function memory(): Rows {
   };
 }
 
-
 function attempted<T>(act: () => T): T | null {
   return Result.getOrNull(Result.try(act));
 }
 
-
 const PROBE_KEY = "sprawling.probe";
-
 
 interface Unkept {
   readonly store: Readable<ReadonlySet<string>>;
@@ -67,7 +60,6 @@ function unkeptRows(): Unkept {
   };
 }
 
-
 function guarded(store: Store, spare: Rows): Rows {
   const unkept = unkeptRows();
   return {
@@ -85,8 +77,6 @@ function guarded(store: Store, spare: Rows): Rows {
       unkept.mark(key, took === null ? "tab" : "browser");
     },
     removeItem: (key) => {
-      
-      
       attempted(() => {
         store.removeItem(key);
         return true;
@@ -97,7 +87,6 @@ function guarded(store: Store, spare: Rows): Rows {
     unkept: unkept.store,
   };
 }
-
 
 function tabOnly(spare: Rows): Rows {
   const unkept = unkeptRows();
@@ -115,7 +104,6 @@ function tabOnly(spare: Rows): Rows {
   };
 }
 
-
 export function keptRows(reach: () => Store): Rows {
   const spare = memory();
   const store = attempted<Store>(reach);
@@ -130,12 +118,9 @@ export function keptRows(reach: () => Store): Rows {
   return kept === null ? tabOnly(spare) : guarded(store, spare);
 }
 
-
 let reached: Rows | undefined;
 
 export function browserRows(): Rows {
-  
-  
   reached ??= keptRows(() => localStorage);
   return reached;
 }

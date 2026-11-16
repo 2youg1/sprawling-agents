@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The queued-signal section names every kind `kernel::SignalKind` spells
-// and shows an unknown one as written; one signal is said in the
-// singular (client D86).
-
 import { describe, expect, test } from "bun:test";
 
 import { kindSaid, waitingSaid } from "./inbox";

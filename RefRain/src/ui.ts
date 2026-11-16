@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What every view is handed: the connection, the person's preferences,
-// the address bar, and the commands a page can send. One door - `setUi`
-// opens it once as the shell mounts, `ui()` is the only way in - so a
-// view reaches the browser through exactly what it was given.
-//
-// **Words are not context.** `core/lang.ts`'s `say` stays a pure
-// function and the template writes `say($lang, key)`: the subscription
-// to `lang` below is the whole reason a language change redraws a word.
-
 import { derived, get, readable, writable } from "svelte/store";
 import type { Readable, Writable } from "svelte/store";
 
@@ -37,67 +28,24 @@ import type { Conversing } from "./views/talk/handing";
 export interface Ui {
   readonly conn: Connection;
   readonly prefs: PreferenceDoor;
-  // The tags the person gave sessions, as the city keeps them (`core/tags.ts`).
   readonly tags: Tagging;
-  // The language the page is drawn in. Every word subscribes to it
-  // through `say($lang, key)`, which is the only thing that has to be
-  // told when the person picks another language.
   readonly lang: Readable<Lang>;
-  // The level `/effort <level>` stated for the next dispatch, which the
-  // frame carries as `Dispatch.effort`; `null` when nobody typed one -
-  // which leaves the field out of the frame, so the city's own
-  // `[model] effort` answers through its default rule.
-  //
-  // **It is held for this page and kept nowhere.** A stated level is
-  // refused before dispatch when the model does not offer it, so it
-  // holds only what a person typed for this request: the picker's
-  // level is the stored one, which it writes to the city's layer
-  // (`talk/composer.ts` `picksFor`), and a pick there clears this one.
   readonly effort: Readable<Effort | null>;
-  // The run policy the next dispatch runs under - its mode, write
-  // limit, admission requirement and landing - held for this page the
-  // way effort is; it starts at the first each control offers.
   readonly policy: Readable<RunPolicy>;
-  // What the open conversation waits on, so the corner leaves the
-  // refusal the conversation draws to the conversation
-  // (`views/talk/handing.ts`). Written by the talk page alone.
   readonly conversing: Writable<Conversing>;
-  // The branch this page has asked the city for, and the one door every
-  // fork entry sends it through: main moves once the city opened it
-  // (`views/talk/branching.ts`, client D100).
   readonly branches: Branches;
-  // The questions this city is holding for the person, as one reading
-  // the views share: the mailbox key's badge and its deciding section,
-  // the notifier, and the tab's mark. Before this each of them folded
-  // the same answer by hand, and another reader would have folded it
-  // once more.
-  // `undefined` until the city first answers: an empty list is a
-  // snapshot, and a reader that took the placeholder for one (the
-  // notifier's first snapshot) would raise every item that follows.
   readonly approvals: Readable<readonly ApprovalItem[] | undefined>;
   readonly bar: AddressBar;
   readonly origin: string;
-  // The session token in force, read at the moment an HTTP door is
-  // called, because it is renewed before every socket attempt
-  // (`core/local/entering.ts`); null for a page that holds none.
   readonly credential: () => string | null;
-  // Milliseconds now, read where a view needs a relative time.
   readonly now: () => number;
   readonly chooseEffort: (level: Effort | null) => void;
   readonly choosePolicy: (policy: RunPolicy) => void;
   readonly go: (view: View) => void;
-  // Sends a command, and says so when it could not be sent.
   readonly send: (command: Command) => boolean;
-  // Whether this city has a model chosen to turn speech into text.
-  // The composer draws no microphone without one: a control whose only
-  // possible answer is a refusal is a control nobody should meet.
   readonly hearing: () => boolean;
 }
 
-// What `main.ts` reads once off the page and hands down: the link, the
-// door onto the person's preferences, and the facts an address bar and
-// an origin carry. Every reading a view takes beyond these is folded
-// from them here, so a fold has one home.
 export interface Opening {
   readonly conn: Connection;
   readonly prefs: PreferenceDoor;
@@ -107,9 +55,6 @@ export interface Opening {
   readonly now: () => number;
 }
 
-// The folds, built in one place: the shell's door and the orphaned view
-// below must arrive at the same `Ui`, or an error path becomes a second
-// statement of what a page reads.
 function readied(value: Opening): Ui {
   const effort = writable<Effort | null>(null);
   const policy = writable<RunPolicy>(FIRST_POLICY);
@@ -145,18 +90,10 @@ function readied(value: Opening): Ui {
 
 let opened: Ui | null = null;
 
-// The one call that opens the door, made as the shell mounts.
 export function setUi(value: Opening): void {
   opened = readied(value);
 }
 
-// What a view mounted outside the shell is handed. Reaching this is a
-// programming error rather than a state, so the page draws with an
-// idle socket, a store that lasts as long as the call, and the
-// postures the client ships with - none of which this file spells:
-// `loadPreferences` answers them from an empty store, and the belief is
-// the constructor's own empty value, so an error path cannot become a
-// second statement of a default.
 export function ui(): Ui {
   if (opened !== null) {
     return opened;

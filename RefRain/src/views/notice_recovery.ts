@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { Option } from "effect";
 import { get } from "svelte/store";
 
@@ -19,24 +18,19 @@ import { readRunId } from "../core/run_id";
 import type { Ui } from "../ui";
 import type { Address, AxError, RunId } from "../wire";
 
-
 export type About = Address | RunId | null;
-
 
 export interface Refused {
   readonly error: AxError;
   readonly about: About;
 }
 
-
 const VERBS: Readonly<Record<string, Key>> = {
   "/new": "act_open_session",
   "/fork": "act_fork",
 };
 
-
 const NO_TARGET: Key = "act_no_target";
-
 
 interface Target {
   readonly run: RunId | null;
@@ -54,7 +48,6 @@ function targetFor(u: Ui, about: About): Target {
   };
 }
 
-
 function composerRoom(view: View, runs: Belief["runs"]): Address | null {
   if (view.kind === "talk") {
     return view.address;
@@ -64,7 +57,6 @@ function composerRoom(view: View, runs: Belief["runs"]): Address | null {
   }
   return null;
 }
-
 
 export function recoveryLabel(recovery: Recovery, lang: Lang): string {
   switch (recovery.kind) {
@@ -84,7 +76,6 @@ function commandLabel(spelled: string, lang: Lang): string {
   return key === undefined ? spelled : say(lang, key);
 }
 
-
 export function recoveryWhy(u: Ui, recovery: Recovery, refused: Refused): Key | undefined {
   if (recovery.kind === "reconnect" || recovery.kind === "settings" || recovery.kind === "reload") {
     return undefined;
@@ -99,14 +90,12 @@ export function recoveryWhy(u: Ui, recovery: Recovery, refused: Refused): Key | 
   return target.room === null ? NO_TARGET : undefined;
 }
 
-
 export function recover(u: Ui, recovery: Recovery, refused: Refused): void {
   if (recovery.kind === "reconnect") {
     u.conn.retry();
     return;
   }
-  
-  
+
   if (recovery.kind === "settings") {
     u.go({ kind: "setup", group: "accounts" });
     return;
@@ -141,8 +130,6 @@ export function recover(u: Ui, recovery: Recovery, refused: Refused): void {
       }
       return;
     default:
-      
-      
       return;
   }
 }

@@ -1,5 +1,3 @@
-
-
 <script lang="ts">
   import type { Snippet } from "svelte";
 
@@ -11,8 +9,7 @@
     readonly wire?: TriggerWire | undefined;
     readonly asks?: boolean;
     readonly glyph?: GlyphName | undefined;
-    
-    
+
     readonly heard?: string | undefined;
     readonly children: Snippet;
   }
@@ -41,12 +38,10 @@
 {/if}
 
 <style>
-  
   .fact {
     max-width: 16rem;
   }
 
-  
   .trigger {
     transition-property: background-color, color;
     transition-duration: var(--transition-duration-short);

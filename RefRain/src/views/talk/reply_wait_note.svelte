@@ -3,11 +3,6 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- A run waiting for another room's reply (client D86): the room
-waited on, linked, and while the wait is open the time left before its
-deadline on the page's one clock; once it ends, which of the three
-endings it was, each in its own ink. The reply itself is an arrival of
-its own, drawn as a letter. -->
 <script lang="ts">
   import { ui } from "../../ui";
   import { toFragment } from "../../core/route";

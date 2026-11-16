@@ -1,5 +1,3 @@
-
-
 <script lang="ts">
   import Badge from "../parts/badge.svelte";
   import Decide from "../parts/decide.svelte";

@@ -7,10 +7,6 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// A template value written `{const x = ...}` instead of `{@const x = ...}`
-// is not a declaration Svelte derives: the run prompt's segments never
-// opened because of one, and six other views carried the same tag. The
-// compiler accepts it, so this walk is what refuses it.
 describe("template values are declared with {@const}", () => {
   test("no view declares a template value with a bare {const}", () => {
     const views = join(import.meta.dir, "..", "..");

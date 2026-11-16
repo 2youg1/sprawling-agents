@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
   import type { Appearance } from "../../core/appearance";
   import type { Block, Inline } from "../../wire";
   import { RunId } from "../../wire";

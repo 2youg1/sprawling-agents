@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { tick } from "svelte";
 
   import { fill, say } from "../../core/lang";
@@ -16,7 +12,7 @@
 
   interface Props {
     readonly pane: Pane;
-    
+
     readonly label: string;
     readonly arranged: Arranged;
   }
@@ -44,7 +40,6 @@
     queueMicrotask(() => live()[0]?.focus());
   }
 
-  
   function close(): void {
     open = false;
     void tick().then(() => drawn.get("trigger")?.focus());

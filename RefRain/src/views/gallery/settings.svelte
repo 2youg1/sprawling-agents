@@ -6,40 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // The settings page, whole, in the states a person has room for.
-  //
-  // **The page is the one screen whose defects were only visible at a
-  // width it was never measured at.** Three columns inside a container
-  // centred and capped at the page width put the model table's id
-  // column under forty points and wrapped an English sentence over a
-  // dozen lines, and `cargo xtask render` had never opened `#/setup`
-  // at all. A fixture that mounts the page itself is what makes the
-  // layout a thing the gate holds to, rather than a thing somebody
-  // has to open a city to see.
-  //
-  // **The page is mounted, not drawn.** Every case below hands `Setup`
-  // the answers a city would hand it - an endpoint list, a machine
-  // survey, nothing at all - so the two-column layout, the group
-  // headings, the collapsed `config.toml` and the card grids are the
-  // shipped ones. The rank is `section` because the gallery already
-  // has the page's first heading, and a document has exactly one.
-  //
-  // The full-page cases state the two windows the roadmap measures the
-  // settled screen at: 1280, where the accounts form and the proof
-  // beside it sit side by side, and 820, where the group navigation
-  // folds over and the columns become one. Both mount the real page
-  // with fixture answers - the endpoints above, the survey below, and
-  // the shelves `shelved.svelte` stands up - so what the width rule
-  // does to each content kind is what a person meets.
-  //
-  // The machine below is this section's own: three required programs,
-  // one of them here and two missing, a pair of interchangeable drivers
-  // of which one is here - so the other is a spare, drawn quiet - and
-  // one optional driver with no recipe for this platform. It is a different survey from the one
-  // `screens.svelte` draws, whose subject is the sandbox arm and the
-  // tier verdicts; this one's subject is the width of a card at the
-  // front of a grid.
-
   import type { DoctorAnswer, DoctorNewest } from "../../wire";
   import type { Walk } from "../setup/installing";
 
@@ -176,8 +142,6 @@
     ],
   };
 
-  // The one press that installs what the develop tier lacks, part way:
-  // one item done, one failed with the city's recovery, one running.
   const WALK: Walk = [
     { name: "just", state: "done", why: null },
     {
@@ -188,9 +152,6 @@
     { name: "cargo-deny", state: "running", why: null },
   ];
 
-  // What the publishers answered, one of each kind a row draws: a newer
-  // release, a current one, a reading that cannot exist, a refusal, one
-  // the city is still reading, and one not answered yet (absent).
   const NEWEST: Readonly<Record<string, DoctorNewest>> = {
     git: { read: { version: "2.55.1" } },
     just: { read: { version: "1.58.0" } },
@@ -215,8 +176,6 @@
   import { answered } from "./shelved.svelte";
   import Stand from "./stand.svelte";
 
-  // Three questions the clerk answered while the person was away: two
-  // allowed, one denied, so both verdicts are drawn.
   function ruled(item: string, detail: string, at: number, verdict: Decision["verdict"]): Decision {
     return { at: TimeMs.make(at), cluster: { class: "question", detail }, item, verdict };
   }
@@ -229,7 +188,6 @@
         }
       : undefined;
   }
-  // The same group after the person entered an 8 GiB ceiling.
   function cappedAnswer(query: Query): Answer | undefined {
     return query === QUERIES.preferences
       ? {
@@ -247,9 +205,6 @@
   ];
 </script>
 
-<!-- What the dependency group's body is, per case. The real one asks
-the city; these two are the survey above and the state before anyone
-has asked. -->
 {#snippet cards()}
   <MachineReport
     answer={MACHINE}
@@ -275,10 +230,6 @@ has asked. -->
     dependency={unchecked}
   />
 </Case>
-
-<!-- The mcp reading needs no case of its own any more: its door is a
-link in every group's navigation now, so each case above and below
-draws it where a person meets it. -->
 
 <Case label="settings · dependencies, one card per program" width={1440}>
   <Setup
@@ -310,11 +261,6 @@ draws it where a person meets it. -->
   />
 </Case>
 
-<!-- The three content kinds at the two windows the roadmap settles
-the screen at. Each case states the window it is a page of: 1280 is
-the wide reading, where the provider form keeps its 760 and the proof
-drops beside it; 820 is the narrow one, where the group navigation
-turns into a row across the top and every grid is down to one column. -->
 <Case label="setup · accounts at 1280" width={1280}>
   <Setup
     group="accounts"

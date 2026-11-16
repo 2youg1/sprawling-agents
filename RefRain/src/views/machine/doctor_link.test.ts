@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The doctor item name is a link to its release or installation page
-// when the city gives one. The link must open in a new browsing context
-// so the doctor page stays open and the browser opens the page.
-
 import { describe, expect, test } from "bun:test";
 
 import type { DoctorItem } from "../../wire";
@@ -47,10 +43,6 @@ describe("a doctor item link", () => {
   });
 
   test("every item in the doctor table that has a homepage links to an https page", () => {
-    // The look is the one authority on whether and where the link goes;
-    // the component spreads these values on the anchor. A target of
-    // `_blank` with an https href is what makes the browser open the
-    // release or installation page instead of leaving the doctor page.
     const withHome = lookOf(ITEM);
     expect(withHome.homepage).toMatch(/^https:\/\//u);
     expect(withHome.target).toBe("_blank");

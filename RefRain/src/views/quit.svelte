@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { quitAsked } from "../core/quitting";
   import type { CloseMode } from "../wire";
   import { ui } from "../ui";
@@ -18,7 +16,7 @@
   const belief = u.conn.belief;
 
   let open = $state(false);
-  
+
   let seen = $quitAsked;
   $effect(() => {
     const asks = $quitAsked;

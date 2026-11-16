@@ -4,12 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The seat of what was picked on the drawing or the table: it reads
-  // the belief and the language and hands `./panel.ts`'s value to
-  // whatever `./panel.look.svelte` is. The panel is the third column on
-  // a wide screen, a drawer over the drawing on a medium one, and a
-  // block under the drawing on a narrow one - one component either way,
-  // so the three widths cannot drift apart.
   import { heldWithin } from "../../core/belief/rooms";
   import { ui } from "../../ui";
   import type { Address, CityAnswer } from "../../wire";

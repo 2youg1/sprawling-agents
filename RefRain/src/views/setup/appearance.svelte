@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { onMount } from "svelte";
 
   import type { Key } from "../../core/lang";
@@ -45,14 +41,12 @@
   const lang = u.lang;
   const held = u.prefs.held;
   const root = document.documentElement;
-  
-  
+
   const look: Appearance = $derived($held.appearance);
   const said = (key: Key): string => say($lang, key);
   const landing = saveReceipt();
   const saved = landing.saved;
 
-  
   let blend = $state<number | null>(null);
 
   const write = (next: Appearance, name: Setting): void => {
@@ -61,7 +55,6 @@
     landing.landed(name);
   };
 
-  
   onMount(() => {
     applyAppearance(root, look);
     blend = look.blend ?? drawnBlend(root);
@@ -84,7 +77,6 @@
       step: String(BLEND_PERCENT.step),
     });
 </script>
-
 
 <div class="contents">
   <Card

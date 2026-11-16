@@ -3,11 +3,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
-
-// The archive as the buildings filed it, searched across every
-// building at once: one row per hit, and the building is the link. This
-// seat asks the city and places the search box over the answer; the
-// hits are drawn by whatever `./archive.look.svelte` is.
 -->
 
 <script lang="ts">
@@ -35,8 +30,6 @@
 </script>
 
 <div class="flex flex-col gap-base">
-  <!-- The box is named by the word it used to show only as a
-       placeholder, which a screen reader does not take for a name. -->
   <div class="max-w-talk">
     <Field
       label={say($lang, "rec_search")}

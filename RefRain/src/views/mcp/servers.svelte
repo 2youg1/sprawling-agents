@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
   import type { McpServer, McpServerHealth, McpState } from "../../wire";
 
   export interface ServersProps {
@@ -17,7 +15,6 @@
     readonly onRemove: (label: string) => void;
   }
 
-  
   function targetOf(server: McpServer): string {
     const transport = server.transport;
     if ("stdio" in transport) return [transport.stdio.command, ...transport.stdio.args].join(" ");
@@ -32,7 +29,6 @@
     return "mcp_kind_sse";
   }
 
-  
   function pairsOf(server: McpServer): readonly (readonly [string, string])[] {
     const transport = server.transport;
     if ("stdio" in transport) return transport.stdio.env;
@@ -44,7 +40,6 @@
     return "stdio" in server.transport ? "mcp_env" : "mcp_header";
   }
 
-  
   function toolCount(state: McpState | undefined): string {
     if (state === undefined) return "—";
     return "connected" in state ? String(state.connected.tools.length) : "—";
@@ -65,7 +60,6 @@
 
   const { lang } = ui();
 
-  
   let open = $state<string | null>(null);
   let confirming = $state<string | null>(null);
 
@@ -125,7 +119,7 @@
             <span class="text-text-quiet">{say($lang, pairCaption(server))}</span>
             {#each pairsOf(server) as pair, at (at)}
               <span class="min-w-0 wrap-anywhere font-mono text-text">
-                
+                <!-- wording-ok: punctuation joining a request-header name to its value. -->
                 {pair[0]}<span class="text-text-faint">&nbsp;=&nbsp;</span>{pair[1]}
               </span>
             {/each}
@@ -156,7 +150,6 @@
   {:else if "authenticating" in state}
     <p class="text-text-faint">{state.authenticating.recovery}</p>
   {:else if "failed" in state}
-    
     <p class="text-text-faint">
       {state.failed.refusal.action}: {state.failed.refusal.subject} — {recoveryWords(
         $lang,

@@ -1,8 +1,6 @@
 <script lang="ts" module>
-  
-  
   // wording-ok: the project's own release page; a proper noun identical
-  
+
   const RELEASES = "https://github.com/2youg1/sprawling-agents/releases";
 </script>
 
@@ -20,7 +18,6 @@
   const u = ui();
   const lang = u.lang;
 
-  
   let slot: Readable<Answer | undefined> = $state(readable<Answer | undefined>(undefined));
   let asking = $state(false);
 
@@ -28,7 +25,7 @@
     const now = $slot;
     return now !== undefined && "release" in now ? now.release : undefined;
   });
-  
+
   $effect(() => {
     if (answer !== undefined) {
       asking = false;
@@ -37,13 +34,11 @@
 
   function check(): void {
     asking = true;
-    
-    
+
     slot = u.conn.asking.ask(QUERIES.release);
     u.conn.asking.refresh(QUERIES.release);
   }
 </script>
-
 
 <section class="flex min-w-0 flex-col gap-snug">
   <div class="flex flex-wrap items-center gap-snug">

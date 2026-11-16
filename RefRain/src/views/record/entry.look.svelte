@@ -5,18 +5,9 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- How one row of the record's timeline is drawn, and nothing else
-(`./entry`, `EntryLook`): time, position, what happened, where, on
-column lines every row shares. Under 30rem the line becomes two: the
-time and the position, then what happened, whole. A ledger row takes the
-wash under the pointer on the arriving curve and gives it back on the
-leaving one (docs/frontend-method.md §4-43), and keeps it while it is
-open, so the record under it reads as that row's. -->
 <script lang="ts">
   import type { EntryLook } from "./entry";
-
   const look: EntryLook = $props();
-
   const ROW =
     "grid grid-cols-[14ch_6ch_minmax(0,1fr)] items-baseline gap-x-base py-tight text-note @min-[48rem]:grid-cols-[14ch_6ch_minmax(0,1fr)_minmax(0,24ch)] @max-[30rem]:grid-cols-[14ch_minmax(0,1fr)]";
   const SEQ = "figure text-right text-text-faint @max-[30rem]:text-left";

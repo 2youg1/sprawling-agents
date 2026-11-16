@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the picked building's panel says, already in words: how far the
-// plan has got, what is ready, what is stuck and why, the standing goal,
-// and the newest runs that worked there. The look draws `PanelLook` and
-// decides nothing (client D95).
-
 import type { RunBelief } from "../../core/belief";
 import type { Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
@@ -16,20 +11,16 @@ import { clock } from "../../core/time";
 import type { Address, CityAnswer } from "../../wire";
 import type { Weight } from "../parts/glyph";
 
-// How many of the building's runs the panel lists, newest first.
 const RUNS = 8;
 
 export interface PanelLook {
   readonly name: string;
   readonly close: { readonly label: string; readonly onPress: () => void };
-  // The plan's progress, what is ready and what is stuck, each a badge
-  // at its tier.
   readonly badges: readonly {
     readonly key: string;
     readonly text: string;
     readonly weight: Weight;
   }[];
-  // Spread on the link into the building's page.
   readonly enter: { readonly label: string; readonly wire: { readonly href: string } };
   readonly pursuit: { readonly goal: string; readonly running: boolean } | null;
   readonly problems: readonly string[];
@@ -46,7 +37,6 @@ export interface PanelLook {
       readonly title: string;
       readonly moving: boolean;
       readonly at: string | null;
-      // Spread on the line's link to the run's page.
       readonly wire: { readonly href: string };
     }[];
   };
@@ -55,7 +45,6 @@ export interface PanelLook {
 export interface PanelSeat {
   readonly addr: Address;
   readonly city: CityAnswer;
-  // Every run the belief holds in the building, oldest first.
   readonly held: readonly RunBelief[];
   readonly lang: Lang;
 }
@@ -68,8 +57,6 @@ export function panelLookOf(seat: PanelSeat, onClose: () => void): PanelLook {
     name: addr,
     close: { label: say(lang, "panel_close"), onPress: onClose },
     badges: building === undefined ? [] : badgesOf(building, lang),
-    // A folder nobody has drawn rules over is not a building yet: the
-    // link goes to the page that adopts it, its address filled in.
     enter:
       building?.adoptable === true
         ? {
@@ -105,9 +92,6 @@ export function panelLookOf(seat: PanelSeat, onClose: () => void): PanelLook {
   };
 }
 
-// A building with no plan has no denominator, so it carries no
-// progress badge rather than a zero that would read as a plan nobody
-// has started; what is ready is said only of a planned building.
 function badgesOf(building: CityAnswer["buildings"][number], lang: Lang): PanelLook["badges"] {
   const planned = "planned" in building.progress ? building.progress.planned : null;
   const progress =

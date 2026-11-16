@@ -22,13 +22,7 @@
   import { choiceOf, tiersOf } from "./subagent";
   import type { Tier } from "./subagent";
   import { rulesAt } from "../settings/files";
-  import {
-    HELD,
-    answered,
-    awaitReceipt,
-    refused,
-    sent as markSent,
-  } from "../settings/saving";
+  import { HELD, answered, awaitReceipt, refused, sent as markSent } from "../settings/saving";
   import type { Saving, Slot } from "../settings/saving";
   import { useBuildings } from "../shared/buildings";
   import { draftOf, selectionOf, settleSave } from "./catalog";

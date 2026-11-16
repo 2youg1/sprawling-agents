@@ -1,5 +1,3 @@
-
-
 <script lang="ts">
   import { untrack } from "svelte";
   import type { Snippet } from "svelte";
@@ -13,13 +11,10 @@
   import Wear from "./wear.svelte";
 
   interface Props {
-    
-    
     readonly empty: boolean;
-    
-    
+
     readonly rejoined: number;
-    
+
     readonly place: string;
     readonly children: Snippet;
   }
@@ -31,8 +26,7 @@
   let anchoring = $state<Anchoring>("follow");
   let scroller = $state<HTMLDivElement | undefined>(undefined);
   let column = $state<HTMLDivElement | undefined>(undefined);
-  
-  
+
   let blocks = $state(0);
   let left = $state<number | null>(null);
   const unread = $derived(left === null ? 0 : Math.max(0, blocks - left));
@@ -41,7 +35,6 @@
     return column?.querySelectorAll("[data-wear]").length ?? 0;
   }
 
-  
   function selecting(): boolean {
     const selection = document.getSelection();
     return (
@@ -61,7 +54,6 @@
     toFoot();
   }
 
-  
   let pending: number | null = null;
 
   function reach(): void {
@@ -71,12 +63,10 @@
     if (box.scrollTop >= pending - 1) pending = null;
   }
 
-  
   function letGo(): void {
     pending = null;
   }
 
-  
   function arrive(at: string): void {
     const top = readingAt(at);
     if (top === null) {
@@ -115,8 +105,7 @@
   $effect(() => {
     const held = column;
     if (held === undefined || scroller === undefined) return;
-    
-    
+
     untrack(() => {
       arrive(place);
     });
@@ -165,7 +154,6 @@
     <Wear {scroller} {column} />
   {/if}
   {#if unread > 0}
-    
     <div class="absolute bottom-snug left-1/2 -translate-x-1/2">
       <Unread
         text={fill(say($lang, "talk_unread"), { n: String(unread) })}

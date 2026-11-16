@@ -3,11 +3,6 @@
   // License, v. 2.0. If a copy of the MPL was not distributed with this
   // file, You can obtain one at https://mozilla.org/MPL/2.0/.
   // Copyright (c) 2026 2youg1 and the sprawling contributors
-
-  // The seat of the code column (client D95): it reads the person's
-  // language and editor and hands them, with the run's files, to
-  // `./code_column.ts`, whose value the look (`code_column.look.svelte`)
-  // draws.
 </script>
 
 <script lang="ts">
@@ -18,11 +13,8 @@
 
   interface Props {
     readonly files: readonly Touched[];
-    // Whether the run still takes steers; a finished run refuses them.
     readonly live: boolean;
-    // Puts a steer in front of the person to finish and send.
     readonly onDraft: (text: string) => void;
-    // Sends a steer to the run as it stands.
     readonly onSteer: (text: string) => void;
   }
 

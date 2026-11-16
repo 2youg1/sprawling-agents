@@ -7,7 +7,6 @@ import type { Belief, RunBelief } from "./belief";
 import { newestWorking } from "./belief/live";
 import type { View } from "./route";
 
-
 export function runInFront(belief: Belief, view: View): RunBelief | undefined {
   switch (view.kind) {
     case "talk":

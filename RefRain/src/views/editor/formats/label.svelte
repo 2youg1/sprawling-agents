@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { fill, say } from "../../../core/lang";
   import { ui } from "../../../ui";
   import type { B3Hash } from "../../../wire";
@@ -19,7 +17,7 @@
     readonly format: Drawn;
     readonly tool: string;
     readonly settings: readonly string[];
-    
+
     readonly version: B3Hash | null;
     readonly notes?: readonly string[];
   }

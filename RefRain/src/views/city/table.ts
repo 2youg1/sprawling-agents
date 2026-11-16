@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The city's buildings as the table the city page opens on: one row a
-// building, what its runs are doing counted into waiting, working and
-// done, and the moments its runs began, which the row's time bar draws
-// on the board's folded clock.
-//
-// **A row is a fixed-size summary.** It keeps counts and the start of
-// each run it holds, never a run's history, so a table of a city that
-// has run for a week costs what its runs' starts cost.
-
 import type { Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
 import { ago } from "../../core/time";
@@ -21,8 +12,6 @@ import { waiting } from "../raise";
 import type { BoardRun, Phase } from "../runs/lineage";
 import { ended, guide, phaseOf, placeByNeed, placeOf } from "../runs/lineage";
 
-// One run's start on a building's bar, coloured by what the run is
-// doing now.
 export interface Start {
   readonly run: string;
   readonly at: number;
@@ -35,17 +24,11 @@ export interface BuildingRow {
   readonly waiting: number;
   readonly working: number;
   readonly done: number;
-  // The newest start among the building's runs; null while it has none.
   readonly latest: number | null;
-  // The oldest start among the runs still going, where the bar's live
-  // stretch begins; null when every run has ended.
   readonly since: number | null;
   readonly starts: readonly Start[];
 }
 
-// The table's rows, ordered as the board orders its buildings: one
-// holding a waiting run first, then by name. A run whose building the
-// city does not name is left out, because the board below lists it.
 export function tableOf(
   buildings: readonly BuildingProgress[],
   runs: readonly BoardRun[],
@@ -80,9 +63,6 @@ function rowOf(addr: Address, runs: readonly BoardRun[], place: string): Buildin
   };
 }
 
-// What `table.look.svelte` is handed: the scale over the bars, and each
-// row with its words said and its moments placed along the folded
-// clock, in per cent of the bar (client D95).
 export interface TableLook {
   readonly label: string;
   readonly folds: readonly {
@@ -98,19 +78,14 @@ export interface TableRowLook {
   readonly key: string;
   readonly guide: string;
   readonly name: string;
-  // Folder path shown beside the building id: city-relative when no city
-  // folder is set, otherwise absolute under that folder (including `/`).
   readonly path: string;
   readonly picked: boolean;
   readonly waiting: number;
   readonly working: number;
   readonly done: number;
   readonly latest: string;
-  // The live stretch from the oldest run still going to now.
   readonly live: { readonly left: number; readonly width: number } | null;
   readonly starts: readonly { readonly key: string; readonly at: number; readonly phase: Phase }[];
-  // Spread on the row's button: picking a row opens the building's
-  // panel, as picking its tower in the drawing does.
   readonly wire: {
     readonly type: "button";
     readonly "aria-pressed": boolean;
@@ -125,16 +100,12 @@ export interface TableSeat {
   readonly now: number;
   readonly picked: Address | null;
   readonly lang: Lang;
-  // Absolute folder of the city on this machine, when the person set one
-  // for the editor; empty means only the city-relative path is shown.
   readonly cityFolder: string;
 }
 
 export function lookOf(seat: TableSeat, onPick: (addr: Address) => void): TableLook {
   const { lang, now } = seat;
   const unadopted = waiting(seat.city.buildings);
-  // A bare `/` (or `\`) is the filesystem root, not an unset folder: only
-  // strip a trailing separator when something remains after it.
   const trimmed = seat.cityFolder.replace(/[\\/]+$/u, "");
   const folder = trimmed === "" && /^[\\/]+$/u.test(seat.cityFolder) ? "/" : trimmed;
   return {
@@ -163,8 +134,6 @@ export function lookOf(seat: TableSeat, onPick: (addr: Address) => void): TableL
         waiting: row.waiting,
         working: row.working,
         done: row.done,
-        // A folder waiting to be adopted has had no run; the row says what
-        // it is instead, and its panel offers the adoption.
         latest: unadopted.includes(row.addr)
           ? say(lang, "city_adoptable")
           : row.latest === null

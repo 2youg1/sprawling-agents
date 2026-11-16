@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import type { ConflictLook } from "./conflict";
 
   const look: ConflictLook = $props();

@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Which runs each room has held, working or frozen, oldest start first:
-// the one index the room's page, its directory, the city's panel and its
-// skyline read (client D4). The index keeps ids rather than runs:
-// every fold hands the table a fresh run object, and only a run arriving,
-// changing room or changing start moves an id.
-
 import type { RunId } from "../../wire";
 import type { Belief, RunBelief } from "./shape";
 import { inside } from "./live";
@@ -19,8 +13,6 @@ function earlier(left: RunBelief, right: RunBelief): number {
   return (left.started ?? 0) - (right.started ?? 0);
 }
 
-// The index built from the whole table, for a write that replaces the
-// table.
 export function roomsOf(runs: Readonly<Record<string, RunBelief>>): Rooms {
   const rooms = new Map<string, RunBelief[]>();
   for (const run of Object.values(runs)) {
@@ -34,9 +26,6 @@ export function roomsOf(runs: Readonly<Record<string, RunBelief>>): Rooms {
   );
 }
 
-// The index after one run took a new reading in `held.runs`, where it
-// read `was` before: unchanged unless the run arrived, moved room, or
-// moved its start.
 export function roomed(held: Belief, was: RunBelief | undefined, run: RunBelief): Rooms {
   if (was?.addr === run.addr && was.started === run.started) return held.rooms;
   const rooms = new Map(held.rooms);
@@ -59,7 +48,6 @@ export function roomed(held: Belief, was: RunBelief | undefined, run: RunBelief)
   return rooms;
 }
 
-// The runs of exactly this room, oldest start first.
 export function heldIn(belief: Belief, room: string): RunBelief[] {
   return (belief.rooms.get(room) ?? []).flatMap((id) => {
     const run = belief.runs[id];
@@ -67,7 +55,6 @@ export function heldIn(belief: Belief, room: string): RunBelief[] {
   });
 }
 
-// The runs of this room and every room below it, oldest start first.
 export function heldWithin(belief: Belief, room: string): RunBelief[] {
   return [...belief.rooms.keys()]
     .filter((each) => inside(each, room))

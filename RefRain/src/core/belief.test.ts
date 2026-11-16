@@ -56,24 +56,15 @@ function event(
   };
 }
 
-// One record of a run, which is how this page first hears of a run the
-// city has not listed to it yet.
 function started(run: RunId, at: number): EventRecord {
   return event(run, at, "run_started", { task: "write the report" });
 }
 
-// One record of the city itself. A halt is about the whole city or one
-// of its buildings, so it carries the nil run id every city-level record
-// carries.
 function halt(at: number, data: Record<string, unknown>): EventRecord {
   return event(NIL, at, "city_halted", data);
 }
 
 describe("the runs a page believes in", () => {
-  // The defect: `adoptCity` only ever added. A city that restarted, or
-  // a `run_frozen` that landed while the socket was down, left a run
-  // that says `thinking` for the life of the tab - counting in the
-  // skyline, the metrics and the tab's title while nothing runs.
   test("a run the answer no longer mentions is dropped", () => {
     const store = createBelief(() => 0);
     store.adoptCity(city([summary(ONE, 7), summary(TWO, 9)]));
@@ -84,10 +75,6 @@ describe("the runs a page believes in", () => {
     expect(get(store.belief).runs[TWO]?.lastSeq).toBe(Seq.make(11));
   });
 
-  // The exception, and the reason a boolean has to carry it: a run
-  // dispatched a moment ago is missing from an answer folded before it
-  // started, which is not the city saying the run is over. `CityAnswer`
-  // states no ledger position, so only the page can tell the two apart.
   test("a run the stream introduced survives an answer that predates it", () => {
     const store = createBelief(() => 0);
     store.apply(started(ONE, 4));
@@ -96,15 +83,11 @@ describe("the runs a page believes in", () => {
     store.adoptCity(city([summary(TWO, 2)]));
     expect(Object.keys(get(store.belief).runs).sort()).toEqual([ONE, TWO].sort());
 
-    // And once an answer has named it, the city owns when it goes.
     store.adoptCity(city([summary(ONE, 4), summary(TWO, 2)]));
     store.adoptCity(city([summary(TWO, 2)]));
     expect(Object.keys(get(store.belief).runs)).toEqual([TWO]);
   });
 
-  // The exemption is good for one answer, which is what keeps it from
-  // becoming the ghost it was written to prevent: a city that restarts
-  // and no longer knows the run gets to say so with its second answer.
   test("a run no second answer lists is dropped even if the stream began it", () => {
     const store = createBelief(() => 0);
     store.apply(started(ONE, 4));
@@ -114,8 +97,6 @@ describe("the runs a page believes in", () => {
     expect(Object.keys(get(store.belief).runs)).toEqual([TWO]);
   });
 
-  // A run the page is ahead of keeps its own reading: the answer is a
-  // position, and the page holds more than a position.
   test("an answer older than the stream does not roll a run back", () => {
     const store = createBelief(() => 0);
     store.apply(started(ONE, 12));
@@ -124,8 +105,6 @@ describe("the runs a page believes in", () => {
     expect(get(store.belief).runs[ONE]?.task).toBe("write the report");
   });
 
-  // After a reload the answer is all a page has of a run's opening, and
-  // the run board titles the run by it.
   test("a run met only in an answer keeps the task and goal the answer carries", () => {
     const store = createBelief(() => 0);
     store.adoptCity(city([{ ...summary(ONE, 5), task: "draft the plan", goal: "a plan in hall" }]));
@@ -135,18 +114,12 @@ describe("the runs a page believes in", () => {
 });
 
 describe("the phase a run is in", () => {
-  // The defect: a run adopted from an answer was drawn as `thinking`,
-  // while the row's own `last_kind` said it was stopped at an approval
-  // - the page told a person nothing waited for them while the city was
-  // waiting for them.
   test("an answer's last kind settles the phase it can state", () => {
     const store = createBelief(() => 0);
     store.adoptCity(city([summary(ONE, 7, "approval_requested")]));
     expect(get(store.belief).runs[ONE]?.doing).toEqual({ kind: "waiting" });
   });
 
-  // A kind that states no phase does not overwrite one the page read
-  // off the stream: the answer is newer, and it still says nothing here.
   test("a kind that states no phase leaves the page's own reading alone", () => {
     const store = createBelief(() => 0);
     store.apply(event(ONE, 4, "approval_requested", {}));
@@ -162,8 +135,6 @@ describe("the phase a run is in", () => {
     expect(get(store.belief).runs[ONE]?.doing).toEqual({ kind: "unknown" });
   });
 
-  // An answer carries no payload, so the phase it states is the whole of
-  // what it can say about a call: the call is named, the tool is not.
   test("a run whose last kind is a tool call is calling with no tool named", () => {
     const store = createBelief(() => 0);
     store.adoptCity(city([summary(ONE, 7, "tool_called")]));
@@ -176,29 +147,21 @@ describe("the phase a run is in", () => {
 });
 
 describe("the scopes a person shut", () => {
-  // The defect: an answer replaced the whole list while a `city_halted`
-  // record changed one scope, and nothing compared them by position - so
-  // a gap folded back in after the answer undid it.
   test("a halt older than the answer that answered it changes nothing", () => {
     const store = createBelief(() => 0);
     store.apply(halt(10, { scope: "building:hall", state: "halted" }));
     expect(get(store.belief).halted).toEqual([{ building: Address.make("hall") }]);
 
-    // An answer folded at 20 says the building takes work again.
     store.adoptCity(city([summary(ONE, 20)]));
     expect(get(store.belief).halted).toEqual([]);
 
-    // The record it already folded, delivered again as a gap page.
     store.apply(halt(10, { scope: "building:hall", state: "halted" }));
     expect(get(store.belief).halted).toEqual([]);
 
-    // A halt newer than the answer still lands.
     store.apply(halt(21, { scope: "city", state: "halted" }));
     expect(get(store.belief).halted).toEqual(["city"]);
   });
 
-  // An answer whose runs are all behind the list cannot take the page
-  // back over what it has already folded.
   test("an answer older than the list does not release a scope", () => {
     const store = createBelief(() => 0);
     store.apply(halt(10, { scope: "city", state: "halted" }));
@@ -208,15 +171,10 @@ describe("the scopes a person shut", () => {
 });
 
 describe("reading one record", () => {
-  // The defect: every payload key was read through a helper that
-  // answered null for a value present in another shape, so a key this
-  // build had mis-spelled or mis-typed read as "this did not happen".
   test("a payload this build cannot read answers the field", () => {
     const store = createBelief(() => 0);
     const bad = store.apply(event(ONE, 3, "tool_called", { name: 7, subject: "a file" }));
     expect(bad).toBe("tool_called.name");
-    // The rest of the record is still folded: the position and the one
-    // field that did read are facts, and only the call's name is lost.
     expect(get(store.belief).runs[ONE]?.lastSeq).toBe(Seq.make(3));
     expect(get(store.belief).runs[ONE]?.doing).toEqual({
       kind: "calling",
@@ -225,9 +183,6 @@ describe("reading one record", () => {
     });
   });
 
-  // A record whose two words decide between stopping and starting is
-  // not read as a release when one of them is a word this build does not
-  // know.
   test("a halt word this build does not know changes nothing", () => {
     const store = createBelief(() => 0);
     const bad = store.apply(halt(4, { scope: "city", state: "frozen" }));
@@ -235,8 +190,6 @@ describe("reading one record", () => {
     expect(get(store.belief).halted).toEqual([]);
   });
 
-  // The two absences the structs state: `ToolCalled::subject` is an
-  // `Option` and `RunStarted::task` carries `#[serde(default)]`.
   test("an absent optional key is a state and not a failure", () => {
     const store = createBelief(() => 0);
     expect(store.apply(event(ONE, 3, "tool_called", { name: "exec" }))).toBeNull();
@@ -255,10 +208,6 @@ describe("reading one record", () => {
 });
 
 describe("text for a run this page has not met", () => {
-  // A page that joins in the middle of a call hears the model before it
-  // hears the run. Dropping those words lost the beginning of the
-  // sentence a person was reading; the run's own records fill in the
-  // address, the task and the phase as they arrive.
   test("a delta that outran its run is held rather than dropped", () => {
     const store = createBelief(() => 0);
     store.say({ run: ONE, increment: { said: "half a sentence" } });
@@ -281,10 +230,6 @@ describe("one refusal, however often it arrived", () => {
     recovery: "",
   };
 
-  // The defect: every arrival pushed a fresh notice, so the bell listed
-  // one refusal four times and a person could not tell a city that
-  // failed once from one that failed twenty times. What makes two
-  // refusals one refusal is the code and the subject together.
   test("the same code and subject are one notice with a count", () => {
     let at = 1_000;
     const store = createBelief(() => at);
@@ -304,8 +249,6 @@ describe("one refusal, however often it arrived", () => {
     ]);
   });
 
-  // A repeat after the bell was read is news again, and one code covers
-  // several subjects: each subject is its own line.
   test("a repeat clears the read mark, and another subject is another notice", () => {
     const store = createBelief(() => 0);
     store.refused(BUSY);
@@ -333,8 +276,6 @@ describe("one refusal, however often it arrived", () => {
     ]);
   });
 
-  // The window keeps the newest: the bell is a list a person reads, so
-  // the oldest go when it closes (`NOTICE_WINDOW`).
   test("the window drops the oldest refusal, not the newest", () => {
     const store = createBelief(() => 0);
     for (let n = 0; n < 51; n += 1) {
@@ -345,14 +286,9 @@ describe("one refusal, however often it arrived", () => {
     expect(notices[0]?.error.subject).toBe("hall/room1");
   });
 
-  // The subject is read as what the grammar names: a run id is a run, a
-  // path is a room, and a subject outside both grammars is neither (the
-  // drawer links from `about`). The widest judgement only - a sentence
-  // the city's own address grammar accepts is an address here too.
   test("the subject is read as a run, a room, or nothing", () => {
     const store = createBelief(() => 0);
     store.refused({ ...BUSY, subject: ONE });
-    // A colon is outside the address grammar, as a label would carry.
     store.refused({ ...BUSY, subject: "wire: ours 3, theirs 2" });
     const notices = get(store.belief).notices;
     expect(notices[0]?.about).toBe(ONE);
@@ -361,9 +297,6 @@ describe("one refusal, however often it arrived", () => {
 });
 
 describe("batch", () => {
-  // The defect: a fold that failed inside a batch left the nesting depth
-  // above zero, and from then on no write reached a subscriber - the page
-  // froze on the belief it held when the fold failed.
   test("a fold that fails inside a batch leaves later writes published", () => {
     const store = createBelief(() => 0);
     expect(() => {
@@ -378,9 +311,6 @@ describe("batch", () => {
 });
 
 describe("the model a session answers with", () => {
-  // The defect: the page showed the model the city would pick next, and
-  // a session keeps the model it was opened with, so a refused switch
-  // left the facts strip naming a model that was not answering.
   test("the model a run's call went to is the run's model", () => {
     const store = createBelief(() => 0);
     store.apply(started(ONE, 2));
@@ -393,11 +323,6 @@ describe("the model a session answers with", () => {
 });
 
 describe("the run policy a room holds", () => {
-  // A change lands as `run_policy_changed`, and the menu
-  // and the conversation read the newest one per room. A page that
-  // reloads folds an older range after a newer one, so the newest seq
-  // holds whatever order the records arrive in; a policy the build
-  // cannot read leaves the held one.
   test("the newest readable change holds per room, in any arrival order", () => {
     const store = createBelief(() => 0);
     const room = Address.make("lab/policy");

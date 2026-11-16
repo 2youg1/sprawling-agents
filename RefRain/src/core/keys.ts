@@ -3,49 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Every key the shell listens for, in one table.
-//
-// A key was three facts spread over three files: the shell matched a
-// letter, a view drew a string, and nothing could change either. Here
-// an action names what a key does, a chord says which keys reach it,
-// the person's own chord replaces the default, and one function answers
-// "which action was that". The edge keys, the shell and the settings
-// section read this table; none of them spells a key itself. Walking
-// the lines of a list is `lines.ts`'s table, and a press is `press.ts`'s.
-//
-// **A chord is what every other application on the machine means by
-// one**: the accelerator (Cmd on a Mac, Ctrl everywhere else), Shift,
-// and the key itself. The `g`-then-letter prefix this table shipped
-// with is gone (roadmap 3.9). It was a habit borrowed from one text
-// editor rather than from the platform, it held a `g` typed anywhere
-// outside a text box for a second and a half before deciding it meant
-// nothing, and no other window the person has open answers it.
-//
-// **An action that changes state or opens a layer holds the
-// accelerator.** A single key is what a person types, and a person
-// types into the wrong place: a letter pressed while the focus sat on a
-// message, a card or the page rather than in the box would fork a
-// conversation, answer a decide card, change the tier or open a sheet.
-// Only `composer.focus` stays a single key, because all `/` does is
-// move the focus into the message box, and a `/` pressed by mistake
-// leaves the next letters typed there, which is where they were meant
-// to go.
-//
-// **Shift is a fact only beside the accelerator.** With no modifier
-// held, the browser hands over the character the layout produced, and
-// that character already says whether Shift was down: `?` is `?`
-// however a keyboard types it. With the accelerator held, the chord
-// has to name Shift itself, or `Ctrl+Shift+A` and `Ctrl+A` would be
-// one key.
-//
-// The person's overrides are kept with the rest of their preferences,
-// one row per action, and this file asks `prefs.ts` for the chord of
-// an action rather than naming the row: what a row is called is that
-// file's single decision, and so is what a browser with no storage
-// gets instead. `spell` below is already the written form the person's
-// own `[ui.keys]` table will hold when roadmap 3.1 moves these rows
-// out of the browser.
-
 import { derived, get, writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
@@ -54,8 +11,6 @@ import { preferences } from "./prefs";
 import type { PreferenceDoor } from "./prefs";
 import type { Pressed } from "./press";
 
-// What a key can do. `go.*` moves the address bar, the rest act on the
-// shell itself.
 export const ACTIONS = [
   "go.talk",
   "go.city",
@@ -82,27 +37,17 @@ export const ACTIONS = [
 
 export type Action = (typeof ACTIONS)[number];
 
-// Which modifier this machine calls the accelerator, and therefore
-// which glyph a chord is drawn with.
 export type Platform = "mac" | "other";
 
 export interface Chord {
-  // Cmd on a Mac, Ctrl elsewhere. One fact, drawn two ways, so a chord
-  // a person set on one machine still reads correctly on another.
   readonly accel: boolean;
-  // Held beside the accelerator. False on every chord that holds no
-  // accelerator, because the character such a press produces already
-  // says whether Shift was down.
   readonly shift: boolean;
-  // What `KeyboardEvent.key` holds, in the case the person types it.
   readonly key: string;
 }
 
 const ACCEL_MARK = "accel+";
 const SHIFT_MARK = "shift+";
 
-// A key is stored and matched without case, and this is the one place
-// that decides what "without case" means.
 export function folded(key: string): string {
   return key.toLowerCase();
 }
@@ -117,23 +62,8 @@ export function accelShift(key: string): Chord {
   return { accel: true, shift: true, key };
 }
 
-// What an action is reached by: a chord, or `null` for an action no key
-// reaches until the person binds one in settings. An unbound action
-// keeps every other way in it had - its page in the settings tree, its
-// verb in the palette and after `/`, its button.
 export type Bound = Chord | null;
 
-// The chords this client ships with. **No default sits on a chord a
-// browser gives a function of its own** (`browser_keys.ts`, D96): the
-// person who pressed Accel-P to print or Accel-1 for the first tab must
-// get the browser, not this page. So most actions ship unbound and keep
-// the route they already had (settings tree, palette and `/` verbs,
-// buttons), and the person may bind any of them. The palette is the
-// one door to every page and verb, so it keeps a chord, on the slash
-// beside the accelerator, which none of the four browsers lists; the
-// tier keeps the backslash. `/` alone holds no modifier; the paragraph
-// at the top of this file says why, and `matches` keeps it out of a
-// text box.
 export const DEFAULTS: Readonly<Record<Action, Bound>> = {
   "go.talk": null,
   "go.city": null,
@@ -158,8 +88,6 @@ export const DEFAULTS: Readonly<Record<Action, Bound>> = {
   finder: null,
 };
 
-// The word each action is called by, which is a phrase key rather than
-// a phrase: this file holds no words.
 export const LABELS: Readonly<Record<Action, Key>> = {
   "go.talk": "nav_mayor",
   "go.city": "nav_city",
@@ -184,22 +112,12 @@ export const LABELS: Readonly<Record<Action, Key>> = {
   finder: "keys_finder",
 };
 
-// The keys a browser keeps for itself beside the accelerator: it
-// closes a tab, opens a tab and opens a window before the page is
-// told anything, with or without Shift. A chord bound to one of them
-// therefore never fires. It is shown to the person rather than
-// refused, for the same reason a collision is.
 const RESERVED: readonly string[] = ["n", "t", "w"];
 
 export function reserved(held: Bound): boolean {
   return held !== null && held.accel && RESERVED.includes(folded(held.key));
 }
 
-// ------------------------------------------------------------- spelling
-
-// The one written form of a chord: what is stored, and what a chord
-// read back from storage is compared against. An unbound action is
-// spelled as nothing.
 export function spell(held: Bound): string {
   if (held === null) return "";
   const accelMark = held.accel ? ACCEL_MARK : "";
@@ -207,27 +125,18 @@ export function spell(held: Bound): string {
   return `${accelMark}${shiftMark}${folded(held.key)}`;
 }
 
-// The chord a written form names, or none when the text is not one.
-// Storage is the only writer, but a row a person edited by hand is
-// still a row this has to answer for.
 export function readChord(text: string): Chord | null {
   const written = text.trim();
   const accel = written.startsWith(ACCEL_MARK);
   const afterAccel = accel ? written.slice(ACCEL_MARK.length) : written;
   const shift = afterAccel.startsWith(SHIFT_MARK);
   const key = shift ? afterAccel.slice(SHIFT_MARK.length) : afterAccel;
-  // Shift without the accelerator is a chord nothing here can match,
-  // because a press holding no accelerator is judged by the character
-  // it produced rather than by the modifiers that produced it.
   if (key === "" || /\s/.test(key) || (shift && !accel)) {
     return null;
   }
   return { accel, shift, key: folded(key) };
 }
 
-// ------------------------------------------------------------ rendering
-
-// Keys whose own name is longer than the mark a person expects to see.
 const FACES: Readonly<Record<string, string>> = {
   " ": "Space",
   escape: "Esc",
@@ -247,8 +156,6 @@ export function face(key: string): string {
   return key.length === 1 ? key.toUpperCase() : key;
 }
 
-// The marks a chord is drawn as, in the order they are pressed, each
-// the way this platform writes it; none for an unbound action.
 export function marks(held: Bound, platform: Platform): readonly string[] {
   if (held === null) return [];
   const mac = platform === "mac";
@@ -263,14 +170,9 @@ export function marks(held: Bound, platform: Platform): readonly string[] {
   return out;
 }
 
-// Which modifier this browser's machine calls the accelerator.
-// `navigator.platform` is what everybody used and what every engine
-// deprecated, so the user agent string answers instead.
 export function platformOf(userAgent: string): Platform {
   return /mac|iphone|ipad|ipod/i.test(userAgent) ? "mac" : "other";
 }
-
-// ------------------------------------------------------------- matching
 
 export function matches(held: Bound, pressed: Pressed): boolean {
   if (held === null || pressed.altKey) {
@@ -279,15 +181,9 @@ export function matches(held: Bound, pressed: Pressed): boolean {
   if (held.accel !== (pressed.ctrlKey || pressed.metaKey)) {
     return false;
   }
-  // Inside a text field a single key is what the person is typing, so
-  // only a chord holding the accelerator is the shell's. Without this
-  // rule a `/` in a sentence moved the focus to the composer and a
-  // backslash changed the tier mid-word.
   if (pressed.target === "field" && !held.accel) {
     return false;
   }
-  // Shift is asked about only beside the accelerator; the file's
-  // opening paragraph says why the other case must not ask.
   if (held.accel && held.shift !== pressed.shiftKey) {
     return false;
   }
@@ -299,10 +195,6 @@ export interface Conflict {
   readonly actions: readonly Action[];
 }
 
-// Every chord that two or more actions claim. A conflict is shown, not
-// prevented: the person deciding which of the two they meant needs to
-// see both, and a binding that silently refuses to take teaches
-// nothing.
 export function conflictsOf(bound: Readonly<Record<Action, Bound>>): readonly Conflict[] {
   const byChord = new Map<string, Action[]>();
   for (const action of ACTIONS) {
@@ -324,19 +216,15 @@ export function conflictsOf(bound: Readonly<Record<Action, Bound>>): readonly Co
   return out;
 }
 
-// -------------------------------------------------------------- the map
-
 export interface Keymap {
   readonly platform: Platform;
   readonly bound: Readable<Readonly<Record<Action, Bound>>>;
   readonly chord: (action: Action) => Bound;
   readonly bind: (action: Action, chord: Chord) => void;
-  // Back to what this client ships with.
   readonly reset: (action: Action) => void;
   readonly resetAll: () => void;
   readonly changed: (action: Action) => boolean;
   readonly conflicts: Readable<readonly Conflict[]>;
-  // Which action a key press reaches.
   readonly acting: (pressed: Pressed) => Action | null;
 }
 
@@ -345,9 +233,6 @@ function stored(kept: PreferenceDoor): Record<Action, Bound> {
   for (const action of ACTIONS) {
     out[action] = readChord(kept.chord(action)) ?? DEFAULTS[action];
   }
-  // Built from the same list the type is built from, so every action
-  // has a chord; the fallback keeps that true for a reader who cannot
-  // see the loop.
   return { ...DEFAULTS, ...out };
 }
 
@@ -384,9 +269,6 @@ export function loadKeys(kept: PreferenceDoor, userAgent: string): Keymap {
   };
 }
 
-// The map this page runs on. One per document, because the shell that
-// listens and the settings section that rebinds have to be looking at
-// the same table; a second copy would let a rebind go unheard.
 let shared: Keymap | undefined;
 
 export function keymap(): Keymap {

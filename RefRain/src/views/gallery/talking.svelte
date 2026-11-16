@@ -5,22 +5,14 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // The states of the Mayor room's box that only show once a person
-  // acts: the coin key's three faces and the microphone's states beside
-  // the box, the lines a drop leaves under the box for files it did not
-  // keep, and the card a refused dispatch leaves where the reply would
-  // have been.
   import type { AxError } from "../../wire";
 
   const NO_MODEL: AxError = {
-    // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
     action: "choose the main model",
     code: "E_MODEL_UNCHOSEN",
     nearby: [],
-    // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
     recovery: "attach a provider on the settings page and pick a model for this tag",
     retry: "no",
-    // wording-ok: fixture states the wire's own refusal fields, English as the city writes them
     subject: "no model is chosen for this tag",
   };
 </script>
@@ -40,17 +32,13 @@
 
   const ignore = (): void => undefined;
   const FACES = ["send", "stop", "idle"] as const;
-  // The microphone is drawn from its look: its seat records through the
-  // browser, which a fixture has no microphone for.
   const HEARD = [
     { taking: false, hearing: false, refused: false },
     { taking: true, hearing: false, refused: false },
     { taking: false, hearing: true, refused: false },
     { taking: false, hearing: false, refused: true },
   ] as const;
-  // One reason the city gave, and one drop whose answer never came back.
   const NOT_KEPT: readonly Refused[] = [
-    // wording-ok: fixture states the city's own refusal, English as the city writes it
     { kind: "refused", name: "report.pdf", said: "the file is larger than the city keeps" },
     { kind: "refused", name: "notes.md", said: "" },
   ];

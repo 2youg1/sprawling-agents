@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import Button from "../parts/button.svelte";
   import type { ColumnLook } from "./column";
 
@@ -37,7 +35,6 @@
 </div>
 
 <style>
-  
   @counter-style mailbox-blank {
     system: cyclic;
     symbols: "";

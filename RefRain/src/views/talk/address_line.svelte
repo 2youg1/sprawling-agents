@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { keymap, marks } from "../../core/keys";
   import { say } from "../../core/lang";
   import { lineIn } from "../../core/stretches";
@@ -16,12 +12,11 @@
 
   interface Props {
     readonly address: Address;
-    
+
     readonly session?: Seq | undefined;
-    
+
     readonly onOpen?: ((arrival: Arrival) => void) | undefined;
-    
-    
+
     readonly at?: At | undefined;
   }
 

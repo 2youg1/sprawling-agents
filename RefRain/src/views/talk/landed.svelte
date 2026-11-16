@@ -4,11 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // One line where the person sent from, when the work they dispatched
-  // started in another room: the room is a link, and the page stays put
-  // so the box and its draft stay under the person's hands
-  // (client D6). A run that started here needs no line, because
-  // the thread already draws it.
   import { say } from "../../core/lang";
   import type { Landing } from "../../core/landing";
   import { toFragment } from "../../core/route";

@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts">
-  // How a building's desktop allowlist editor is drawn, and nothing else
-  // (client D95): one box holding the whole file, the save, and where
-  // the file lives. Every word arrives translated in `DesktopLook`
-  // (`./desktop.ts`); the box's bag is spread unchanged on the box.
   import Button from "./parts/button.svelte";
   import type { DesktopLook } from "./desktop";
 

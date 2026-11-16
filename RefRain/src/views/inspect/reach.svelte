@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
   const RECEIPT_MS = 1200;
 </script>
 
@@ -20,9 +18,8 @@
   import Look from "./text_key.look.svelte";
 
   interface Props {
-    
     readonly path: string;
-    
+
     readonly line: number;
     readonly shown: Shown;
   }
@@ -36,7 +33,6 @@
 
   let copied = $state(false);
 
-  
   function copy(text: string): void {
     void navigator.clipboard.writeText(text).then(() => {
       copied = true;

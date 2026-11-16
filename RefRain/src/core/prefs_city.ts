@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { get } from "svelte/store";
 
 import { QUERIES } from "./asking";
@@ -14,14 +13,7 @@ import { themeOf } from "./theme_override";
 import type { Connection } from "./socket";
 import type { Appearance as WireAppearance, PreferencesAnswer } from "../wire";
 
-
-export type Keeper =
-  
-  
-  | "browser"
-  
-  
-  | "city";
+export type Keeper = "browser" | "city";
 
 export function keepWithCity(door: PreferenceDoor, conn: Connection): void {
   door.tell((patch) => {
@@ -32,7 +24,6 @@ export function keepWithCity(door: PreferenceDoor, conn: Connection): void {
     door.adopt(adopted(get(door.held), answer.preferences), answer.preferences.chords ?? []);
   });
 }
-
 
 export function adopted(held: Preferences, answer: PreferencesAnswer): Preferences {
   return {
@@ -71,7 +62,6 @@ export function appearanceOnWire(next: Appearance): WireAppearance {
   };
 }
 
-
 function appearanceOfCity(stated: WireAppearance, held: Appearance): Appearance {
   return {
     lighting: stated.lighting,
@@ -80,8 +70,7 @@ function appearanceOfCity(stated: WireAppearance, held: Appearance): Appearance 
     sansStack: stated.sans_stack,
     monoStack: stated.mono_stack,
     reading: stated.reading ?? held.reading,
-    
-    
+
     fallbacks:
       stated.fallbacks === undefined
         ? held.fallbacks

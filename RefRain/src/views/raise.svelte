@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { untrack } from "svelte";
 
   import { QUERIES } from "../core/asking";
@@ -27,9 +25,8 @@
   import { fillable, OFFERED, raisingOf, sourceOf, sourceRefusal } from "./raise";
 
   interface Props {
-    
     readonly address?: Address | undefined;
-    
+
     readonly rank?: "page" | "section" | undefined;
   }
 
@@ -42,19 +39,15 @@
 
   // svelte-ignore state_referenced_locally
   let typed = $state<string>(address ?? "");
-  
-  
+
   let addressGroup = $state<HTMLDivElement>();
   let template = $state<Exclude<Template, "hall">>("minimal");
   let rules = $state("");
-  
-  
+
   let from = $state("");
-  
-  
+
   let edited = $state(false);
-  
-  
+
   let sent = $state.raw<{
     readonly addr: Address;
     readonly before: AxError | null;
@@ -68,7 +61,6 @@
     raising.kind === "build" || raising.kind === "adopt" ? raising.addr : null,
   );
 
-  
   let offered = $state<string | null>(null);
   let answered = $state(false);
   $effect(() => {
@@ -86,12 +78,10 @@
         answered = answer !== undefined;
       });
   });
-  
-  
+
   const ready = $derived(target !== null && (edited || answered));
   const importOf = $derived(sourceOf(from));
-  
-  
+
   const importing = $derived(sent?.importing ?? importOf !== null);
   const sourceWhy = $derived(sourceRefusal(from));
   $effect(() => {
@@ -99,7 +89,6 @@
     if (text !== null && !untrack(() => edited)) rules = text;
   });
 
-  
   $effect(() => {
     const held = sent;
     if (held === null) return;
@@ -116,15 +105,12 @@
   });
 
   function raise(): void {
-    
-    
     if (target === null || !ready || sent !== null || sourceWhy !== null) return;
     refusal = null;
     const before = $belief.refusal;
     if (u.send(createBuilding(target, template, edited ? rules : null, importOf))) {
       sent = { addr: target, before, importing: importOf !== null };
-      
-      
+
       u.conn.asking.refresh(QUERIES.city);
     }
   }
@@ -184,7 +170,7 @@
         </div>
       {/if}
     </div>
-    
+
     <Field
       label={say($lang, "raise_source_label")}
       value={from}
@@ -254,7 +240,6 @@
                 : { why: say($lang, "raise_rules_waiting") }}
       />
       {#if sent !== null}
-        
         <p class="text-note text-text-quiet" role="status">
           {say($lang, importing ? "raise_importing" : "raise_raising")}
         </p>

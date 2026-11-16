@@ -4,11 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // One settings card, the shipped look: markup only. Every word and
-  // the save's standing arrive as `CardLook` from the seat
-  // (`card.svelte`). The standing is a live region, so the receipt is
-  // announced when it arrives rather than when the button is pressed.
-
   import Button from "../parts/button.svelte";
   import Glyph from "../parts/glyph.svelte";
   import type { CardLook } from "./card";

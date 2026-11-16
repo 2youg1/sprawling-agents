@@ -4,20 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The city's own layer, written from here (refrain roadmap UG): the
-  // standing thinking level `[model] effort` and whether the city renews
-  // a warm prompt cache before it expires, both in the city's
-  // `CONFIG.toml`, through `ConfigureCity`, one fact per pick so a pick
-  // never rewrites the other. Each pick takes effect for the runs that
-  // start after it, so the card has no button (`card.svelte` without
-  // `onSave`); its foot says saved only once the city's file reads back
-  // changed.
-  //
-  // The level shown is what `Query::Config` answers for the hall when
-  // the city's file settled it. Whether the cache is kept warm is not on
-  // any answer, so that control starts with nothing chosen and the file
-  // itself, folded at the foot of this group, is where the value reads.
-
   import { configureCity, EFFORTS } from "../../core/commands";
   import { readDocument } from "../../core/document";
   import { say } from "../../core/lang";
@@ -43,7 +29,6 @@
     const settled = answer !== undefined && "config" in answer ? answer.config.effort : null;
     return settled?.from === "city" ? settled.effort : null;
   });
-  // The file's text is the version a pick waits to see move.
   const text = $derived.by(() => {
     const read = readDocument($file);
     return read.kind === "held" ? read.value.text : read.kind === "unavailable" ? "" : null;

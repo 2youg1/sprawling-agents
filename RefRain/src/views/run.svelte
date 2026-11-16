@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { adopted } from "../core/belief/adopted";
   import { cancel, steer } from "../core/commands";
   import { sendingInto } from "../core/doing";
@@ -51,7 +49,6 @@
     evidence: "run_evidence",
   };
 
-  
   // svelte-ignore state_referenced_locally (a link's lens is where the page opens; pages.svelte remounts it for another)
   let chosen = $state<RunLens | null>(lens ?? null);
   const lenses = $derived(RUN_LENSES.map((id) => ({ id, label: say($lang, WORDS[id]) })));
@@ -67,14 +64,12 @@
     return held !== undefined && "rounds" in held ? held.rounds : undefined;
   });
 
-  
   const summaryStore = $derived(u.conn.asking.ask({ run_view: { run } }));
   const summary = $derived.by((): RunSummary | null => {
     const held = $summaryStore;
     return held !== undefined && "run" in held ? held.run : null;
   });
 
-  
   const mine = $derived($belief.runs[run]);
   const shown = $derived(summary === null ? mine : adopted(summary, mine));
 
@@ -84,20 +79,17 @@
 
   const live = $derived(shown !== undefined && shown.doing.kind !== "frozen");
   const room = $derived(shown?.addr ?? null);
-  
-  
+
   const changedTo = $derived(
     live ? (lastCheckpoint === checkpoint ? null : lastCheckpoint) : (lastCheckpoint ?? checkpoint),
   );
 
-  
   const firstLens = $derived.by((): RunLens => {
     if (live) return "time";
     return lastCheckpoint !== null && lastCheckpoint !== checkpoint ? "changes" : "turns";
   });
   const current = $derived(chosen ?? firstLens);
 
-  
   const from = $derived(rounds?.opening?.at ?? turns[0]?.t ?? shown?.started ?? null);
   const to = $derived.by((): number | null => {
     if (rounds?.closing !== null && rounds?.closing !== undefined) return rounds.closing.at;
@@ -124,7 +116,6 @@
     return at === null ? say($lang, "talk_resident") : roomOf(at);
   }
 
-  
   function draftSteer(text: string): void {
     u.prefs.setDraft(run, text);
     chosen = "turns";
@@ -191,7 +182,6 @@
 <div class="flex min-h-0 w-full min-w-0 flex-1 flex-col gap-base px-wide py-wide">
   <div class="flex min-w-0 items-start justify-between gap-wide">
     <div class="flex min-w-0 flex-col gap-tight">
-      
       <h1 tabindex="-1" class="truncate text-title font-title">
         {rounds?.opening?.task ?? shown?.task ?? run}
       </h1>

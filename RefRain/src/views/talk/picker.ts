@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import {
   DEFAULT_EFFORT,
   type Effort,
@@ -13,12 +12,9 @@ import {
 } from "../../wire";
 import type { Names } from "./composer";
 
-
 export interface Offer extends Names {
-  
   readonly provider: string;
-  
-  
+
   readonly canonical: string;
   readonly facts: ModelFactsSummary;
   readonly local: boolean;
@@ -37,7 +33,6 @@ export function offersOf(endpoints: readonly EndpointSummary[]): readonly Offer[
   );
 }
 
-
 export type Order = "providers_first" | "models_first";
 
 export function orderOf(offers: readonly Offer[]): Order {
@@ -46,12 +41,10 @@ export function orderOf(offers: readonly Offer[]): Order {
   return models > providers ? "providers_first" : "models_first";
 }
 
-
 export interface Entry {
   readonly id: string;
   readonly offers: readonly Offer[];
 }
-
 
 export function parentOf(order: Order, offer: Names & { readonly canonical: string }): string {
   return order === "models_first" ? offer.canonical : offer.endpoint;
@@ -60,7 +53,6 @@ export function parentOf(order: Order, offer: Names & { readonly canonical: stri
 export function childOf(order: Order, offer: Names): string {
   return order === "models_first" ? offer.endpoint : offer.model;
 }
-
 
 export function firstLevel(order: Order, offers: readonly Offer[]): readonly Entry[] {
   const groups = new Map<string, Offer[]>();
@@ -71,15 +63,12 @@ export function firstLevel(order: Order, offers: readonly Offer[]): readonly Ent
   return [...groups].map(([id, held]) => ({ id, offers: held }));
 }
 
-
 export function secondLevel(order: Order, parent: Entry | undefined): readonly Entry[] {
   return (parent?.offers ?? []).map((offer) => ({ id: childOf(order, offer), offers: [offer] }));
 }
 
-
 export const SHOWN = 5;
 export const RECENT = 3;
-
 
 export interface Windowed {
   readonly entries: readonly Entry[];
@@ -100,11 +89,9 @@ export function windowed(
   };
 }
 
-
 export function drawnRows(count: number): number {
   return count > SHOWN ? SHOWN + 1 : count;
 }
-
 
 export interface Room {
   readonly first: number;
@@ -121,7 +108,6 @@ export function roomOf(order: Order, offers: readonly Offer[]): Room {
   };
 }
 
-
 export function matches(entry: Entry, query: string): boolean {
   const needle = query.trim().toLowerCase();
   return entry.offers.some((offer) =>
@@ -130,7 +116,6 @@ export function matches(entry: Entry, query: string): boolean {
     ),
   );
 }
-
 
 export interface Used {
   readonly level: Effort;
@@ -146,9 +131,7 @@ export function usedLevel(offer: ThinkingOffer, stated: Effort | null): Used | n
   return null;
 }
 
-
 export type Segment = "model" | "provider" | "level";
-
 
 export const SECTION = {
   recent: "recent",
@@ -157,7 +140,6 @@ export const SECTION = {
   thinking: "thinking",
 } as const;
 export type Section = (typeof SECTION)[keyof typeof SECTION];
-
 
 export function sectionOf(order: Order, segment: Segment | null): Section {
   switch (segment) {
@@ -172,7 +154,6 @@ export function sectionOf(order: Order, segment: Segment | null): Section {
   }
 }
 
-
 export type Applied = "stays" | "closes";
 
 export function appliedIn(section: Section): Applied {
@@ -186,14 +167,12 @@ export function appliedIn(section: Section): Applied {
   }
 }
 
-
 export interface Combination extends Names {
   readonly level: Effort | null;
 }
 
 export const sameCombination = (a: Combination, b: Combination): boolean =>
   a.endpoint === b.endpoint && a.model === b.model && a.level === b.level;
-
 
 export function recentOf(
   now: Combination | null,

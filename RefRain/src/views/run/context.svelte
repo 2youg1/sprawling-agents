@@ -6,11 +6,6 @@
 -->
 
 <script lang="ts">
-  // The context lens: how full each turn's window was, split into what
-  // the cache held, what was read fresh and what was written, and the
-  // files the run kept going back to, most consulted first. The window's
-  // own list says what it holds; this says what the run leaned on.
-
   import { Option, Schema } from "effect";
   import { SvelteMap } from "svelte/reactivity";
 
@@ -61,9 +56,6 @@
     return (value / peak) * 100;
   }
 
-  // A file the run read is opened where the page can open it: the
-  // building it belongs to. Which file the page then shows is not in
-  // the address bar's vocabulary, so the path stops at the door.
   function opening(file: string): (() => void) | undefined {
     const at = Option.getOrNull(Schema.decodeOption(Address)(file));
     if (at === null) return undefined;
@@ -77,18 +69,13 @@
   <section>
     <h2 class="mb-base text-note text-text-faint">{say($lang, "run_window")}</h2>
     {#if turns.some((turn) => turn.used !== null && turn.used !== undefined)}
-      <!-- One grid for every row, each row on its columns through
-           `subgrid`: the turn's name is as wide as the widest name, so
-           "turn 10" neither wraps nor pushes its bar off the bars above. -->
       <ul class="grid grid-cols-[max-content_minmax(0,1fr)_max-content] gap-x-snug text-note">
         {#each turns as turn (turn.number)}
           <li class="col-span-full my-tight grid grid-cols-subgrid items-center">
             <span class="whitespace-nowrap text-text-faint"
               >{fill(say($lang, "run_turn_n"), { n: String(turn.number) })}</span
             >
-            <!-- The legend under the list names the three colours, so a
-                 hint on each segment would say a second time what the
-                 page already says once. -->
+
             <span
               class="flex h-dot flex-1 overflow-hidden rounded-pill bg-track"
               aria-hidden="true"

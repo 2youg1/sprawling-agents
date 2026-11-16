@@ -5,14 +5,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- How the run page's sheet is drawn, and nothing else (`./head`,
-`HeadLook`): each fact a cell of one grid, its name small above its
-value, the way the panorama's session sheet sets them. A link lights on
-the arriving curve and settles on the leaving one
-(docs/frontend-method.md §4-43). -->
 <script lang="ts">
   import type { Face, HeadLook, LineLook } from "./head";
-
   const look: HeadLook = $props();
 
   const FACE: Record<Face, string> = {

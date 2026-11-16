@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { RunId } from "../../wire";
 
 export type Seat =
@@ -24,9 +23,7 @@ export function drawsAddress(seat: Seat): boolean {
   }
 }
 
-
 export type FrozenFacts = "head" | "elsewhere";
-
 
 export function factsAt(seat: Seat, at: number, run: RunId): FrozenFacts {
   if (at !== 0) return "elsewhere";

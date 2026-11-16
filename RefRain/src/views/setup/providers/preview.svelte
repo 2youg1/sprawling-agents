@@ -6,16 +6,10 @@
 -->
 
 <script lang="ts" module>
-  // The seat of the two readings of a draft: the `config.toml` table the
-  // form would have written and the call the endpoint would make. What
-  // each says is `./preview`; whatever `./preview.look.svelte` is draws
-  // them.
   import type { Draft } from "./draft";
 
   export interface PreviewsProps {
     readonly draft: Draft;
-    // What the key is filed under, which the form holds because only
-    // the form knows whether one has been enrolled yet.
     readonly reference: string;
     readonly model: string;
   }

@@ -61,24 +61,18 @@
     readonly placeholder: string;
     readonly started?: boolean;
     readonly sending: Sending;
-    
-    
+
     readonly draft?: string | undefined;
-    
-    
+
     readonly onSend: (text: string) => boolean;
     readonly onStop: () => boolean;
-    
-    
+
     readonly hearing?: boolean | undefined;
-    
-    
+
     readonly band?: Snippet | undefined;
-    
-    
+
     readonly room?: Address | undefined;
-    
-    
+
     readonly door?: Snippet | undefined;
   }
 
@@ -100,24 +94,22 @@
   const effort = u.effort;
   const belief = u.conn.belief;
 
-  
   // svelte-ignore state_referenced_locally (the first place; the effect below follows the rest)
   let place = draft;
   let keptDraft = draftAt(u.prefs, place);
   let text = $state(keptDraft.read);
   const field = new TextBox(() => text);
-  
+
   let kept = $state(false);
-  
+
   let sent = $state(0);
-  
+
   let focused = $state(false);
-  
+
   let open = $state(false);
-  
+
   let activeId = $state<string | null>(null);
-  
-  
+
   let pointed = $state<string | undefined>(undefined);
   let menuBinding = $state<PopoverBinding | null>(null);
 
@@ -138,13 +130,11 @@
     requestAnimationFrame(arrived);
   }
 
-  
   function arrived(): void {
     field.grow();
     restoreSelection(place, field.element);
   }
 
-  
   $effect(() => (draft === undefined ? undefined : hearQuotes(draft, quoted)));
   function quoted(quote: string): void {
     keepSelection(place, field.element);
@@ -152,10 +142,8 @@
     requestAnimationFrame(arrived);
   }
 
-  
   const unkept = $derived(draft === undefined ? readable(false) : u.prefs.draftUnkept(draft));
 
-  
   function write(words: string): void {
     text = words;
     open = words.startsWith("/");
@@ -168,8 +156,7 @@
   function submit(): void {
     const words = text.trim();
     if (words === "") return;
-    
-    
+
     const call = parse(words);
     const chosen = call === null ? undefined : find(call.verb);
     if (chosen !== undefined) {
@@ -188,7 +175,6 @@
     }
   }
 
-  
   let handing: Handing = IDLE;
   $effect(() => {
     const next = settle(
@@ -200,7 +186,6 @@
     if (next.box !== null) write(next.box);
   });
 
-  
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const city = u.conn.asking.ask(QUERIES.city);
   const buildings = $derived(
@@ -209,14 +194,14 @@
   const answer = $derived(
     $endpoints !== undefined && "endpoints" in $endpoints ? $endpoints.endpoints : undefined,
   );
-  
+
   const shown = $derived(
     room === undefined
       ? Option.getOrNull(current(u.bar))
       : { kind: "talk" as const, address: room },
   );
   const here = $derived(shown !== null && shown.kind === "talk" ? shown.address : null);
-  
+
   const live = $derived(shown === null ? undefined : runInFront($belief, shown));
 
   const startedHere = $derived(
@@ -226,14 +211,12 @@
     here === null ? null : sessionModel(heldIn($belief, here), $belief.sessions[here] ?? null),
   );
   const picks = $derived(picksFor(u, session));
-  
-  
+
   const roomConfig = $derived(
     here === null ? readable(undefined) : u.conn.asking.ask({ config: { addr: here } }),
   );
   const offered = $derived(offeredBy(answer, $effort ?? configLevel($roomConfig), picks));
 
-  
   const showing = $derived(open ? menuColumns($lang, text, offered.argued) : []);
 
   function closeMenu(): void {
@@ -284,7 +267,6 @@
         write(completedAt(text, pointed));
         return;
       case "recall": {
-        
         const last = here === null ? null : recalled(get(belief), here);
         if (last === null) return;
         event.preventDefault();
@@ -308,13 +290,11 @@
     open = text.startsWith("/");
   }
 
-  
   const zone = new DropZone(u, (paths) => {
     write(insertAt(text, field.element?.selectionStart ?? text.length, paths));
     field.element?.focus();
   });
 
-  
   const opened = $derived(text === "" ? door : undefined);
 
   const look: ComposerLook = $derived({
@@ -335,8 +315,7 @@
       "aria-label": placeholder,
       "aria-activedescendant": showing.length > 0 ? activeId : null,
       "aria-controls": showing.length > 0 ? menuBinding?.controls.join(" ") : undefined,
-      
-      
+
       autofocus: true,
       onkeydown: onKeydown,
       oninput: onInput,
@@ -394,7 +373,6 @@
 
 {#snippet drawKeys()}
   {#if hearing === true && canRecord()}
-    
     <Record
       onWords={(words: string) => {
         write(text === "" ? words : `${text} ${words}`);

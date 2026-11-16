@@ -6,22 +6,6 @@
 -->
 
 <script lang="ts">
-  // How the one labelled box is drawn, and nothing else: the words
-  // arrive in the person's language and every id, ARIA property and the
-  // input gate arrive in the bags (`./field.ts`), so another look draws
-  // the same field by taking the same `FieldLook`.
-  //
-  // **Two authorities decide the red border, and they say different
-  // things.** `refused` is the city's answer, so it is drawn the moment
-  // the page is told; `:user-invalid` is the browser's own reading of
-  // `type` and `pattern`, and it holds off until the person has left the
-  // box, so a URL is never red while it is half typed. A box nobody may
-  // edit is never graded on what it holds, so `:user-invalid` is
-  // switched off while disabled.
-  //
-  // The box carries no `outline` rule of its own. The focus ring is one
-  // declaration in `theme/base.css`, and a box that hid it was the reason
-  // a keyboard user could not see where they were on the settings page.
   import type { FieldLook } from "./field";
 
   const look: FieldLook = $props();

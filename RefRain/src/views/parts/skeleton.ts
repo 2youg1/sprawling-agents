@@ -3,16 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 export interface SkeletonProps {
-  
   readonly label: string;
   readonly rows?: number;
-  
-  
+
   readonly tall?: boolean;
 }
-
 
 export type Width = "whole" | "five-sixths" | "two-thirds" | "three-quarters";
 
@@ -23,21 +19,17 @@ const WIDTHS: readonly [Width, ...Width[]] = [
   "three-quarters",
 ];
 
-
 export interface BlockWire {
   readonly role: "status";
   readonly "aria-label": string;
   readonly "aria-busy": "true";
 }
 
-
 export interface BarWire {
   readonly "aria-hidden": "true";
 }
 
 export interface BarLook {
-  
-  
   readonly slot: number;
   readonly width: Width;
   readonly wire: BarWire;

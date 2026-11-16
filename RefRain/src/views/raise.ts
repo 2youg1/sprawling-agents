@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { Option, Schema } from "effect";
 
 import type { Key } from "../core/lang";
@@ -11,7 +10,6 @@ import { buildingDestination, buildingOf } from "../core/route";
 import type { Template } from "../core/commands";
 import { Address } from "../wire";
 import type { BuildingProgress } from "../wire";
-
 
 export type Raising =
   | { readonly kind: "blank" }
@@ -35,20 +33,16 @@ export function raisingOf(typed: string, buildings: readonly BuildingProgress[])
   }
 }
 
-
 export const OFFERED: readonly Exclude<Template, "hall">[] = ["minimal", "confidential"];
-
 
 export function waiting(buildings: readonly BuildingProgress[]): readonly Address[] {
   return buildings.filter((each) => each.adoptable).map((each) => each.addr);
 }
 
-
 export function sourceOf(written: string): string | null {
   const text = written.trim();
   return text === "" ? null : text;
 }
-
 
 export function sourceRefusal(written: string): Key | null {
   const text = written.trim();
@@ -56,7 +50,6 @@ export function sourceRefusal(written: string): Key | null {
   const absolute = text.startsWith("/") || text.startsWith("\\\\") || /^[A-Za-z]:[\\/]/.test(text);
   return absolute ? null : "raise_source_relative";
 }
-
 
 export function fillable(
   buildings: readonly BuildingProgress[],

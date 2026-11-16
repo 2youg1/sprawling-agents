@@ -4,19 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The context ring round the coin key (docs/frontend-method.md §7J): where the eye
-  // already is, without taking a place of its own. A whole one-pixel
-  // ring is an empty window; the used part is eaten away clockwise from
-  // twelve o'clock, and two checkpoints mark where the reminders sound.
-  // The ring stands still while the key turns over inside it.
-  //
-  // It asks three questions the page already asks elsewhere, and
-  // `asking` merges them by content: the session's rounds, the
-  // endpoints with their models' windows, and this room's settled
-  // config, which states both reminders. What it draws from them is
-  // `gauge.ts`'s, and how it is drawn is `gauge.look.svelte`'s: this seat
-  // only asks and hands the answer on. Pressing the band (not the coin)
-  // opens the context report on the right.
   import type { Snippet } from "svelte";
 
   import { QUERIES } from "../../core/asking";
@@ -28,8 +15,6 @@
   import type { Reminders } from "./gauge";
 
   interface Props {
-    // The room the composer speaks to; its newest session is the one the
-    // ring measures.
     readonly room: Address | null;
     readonly children: Snippet;
   }

@@ -1,6 +1,4 @@
 <script lang="ts">
-  
-  
   import { toFragment } from "../../core/route";
   import { clock } from "../../core/time";
   import { say } from "../../core/lang";
@@ -18,12 +16,10 @@
 
   const { lang } = ui();
 
-  
   function keyOf(line: RegistryLine): string {
     return `${String(line.at)}\u0000${line.addr}\u0000${line.kind}\u0000${line.subject}`;
   }
 
-  
   const lines = $derived([...assets].sort((a, b) => b.at - a.at));
 </script>
 
@@ -32,12 +28,10 @@
 {/snippet}
 
 {#snippet kindCell(line: RegistryLine)}
-  
   <span class="whitespace-nowrap font-mono text-note text-text-quiet">{line.kind}</span>
 {/snippet}
 
 {#snippet addrCell(line: RegistryLine)}
-  
   <a
     href={toFragment({ kind: "building", address: line.addr })}
     class="block truncate font-mono text-note text-text-quiet underline decoration-edge underline-offset-2 transition-colors ease-leave hover:decoration-accent hover:ease-arrive"
@@ -47,7 +41,6 @@
 {/snippet}
 
 {#snippet subjectCell(line: RegistryLine)}
-  
   <span class="line-clamp-2 min-w-0 text-note text-text">{line.subject}</span>
 {/snippet}
 
@@ -89,7 +82,6 @@
   ]}
 >
   {#snippet empty()}
-    
     <EmptyState missing="registry_empty" seat="inset">
       {#snippet action()}
         <AskMayor />

@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What Tab makes of a typed line against the verb table. Its own
-// module because the question is its own: the table says what a verb
-// is, the parser says what a line is, and this says what the gap
-// between a prefix and its matches is worth.
-
 import { SLASH, parse } from "./slash";
 
 function shared(spellings: readonly string[]): string {
@@ -24,12 +19,6 @@ function shared(spellings: readonly string[]): string {
   return out;
 }
 
-// The one match completed, or the longest prefix every match shares.
-// When several match and their shared prefix is already typed, the
-// verb the list's cursor points at is taken instead: a second Tab on
-// `/st` gives the row the person is looking at, where the prefix alone
-// would leave Tab doing nothing. A line Tab cannot improve comes back
-// unchanged, so the caller has nothing to decide.
 export function completed(line: string, pointed?: string): string {
   const call = parse(line);
   if (call === null) {

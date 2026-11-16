@@ -1,7 +1,7 @@
 # Tools
 
 
-These directories under `crates/` hold what checks, simulates, fuzzes, attacks and analyzes the product. None of it enters a release build: no tool is a dependency of the `sprawling` binary, and the release archive carries only the entries the table `ARCHIVE` in `Tools/xtask/src/package/contents.rs` names. The `artifact` gate holds the first half, by refusing test scaffolding inside the binary.
+These directories under `Tools/` hold what checks, simulates, fuzzes, attacks and analyzes the product. None of it enters a release build: no tool is a dependency of the `sprawling` binary, and the release archive carries only the entries the table `ARCHIVE` in `Tools/xtask/src/package/contents.rs` names. The `artifact` gate holds the first half, by refusing test scaffolding inside the binary.
 
 A tool useful across tasks lives in the crate that owns the operation, with the tests and documentation of that crate; a one-off experiment stays out of the shipped tree, and no crate exists only to share a helper.
 

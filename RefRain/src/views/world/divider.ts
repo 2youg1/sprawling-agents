@@ -3,10 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { NARROWEST } from "../../core/workbench";
 import type { KeyPress } from "./drawn";
-
 
 export type Step =
   | { readonly kind: "span"; readonly span: number }
@@ -30,7 +28,6 @@ export function stepOf(key: string, span: number, widest: number): Step {
   }
 }
 
-
 export interface SplitterWire {
   readonly role: "separator";
   readonly tabindex: 0;
@@ -52,15 +49,13 @@ export interface SplitterWire {
 
 export interface DividerLook {
   readonly wire: SplitterWire;
-  
-  
+
   readonly dragging: boolean;
 }
 
 export interface DividerState {
-  
   readonly label: string;
-  
+
   readonly controls: string;
   readonly span: number;
   readonly widest: number;
@@ -68,11 +63,10 @@ export interface DividerState {
 }
 
 export interface DividerHands {
-  
   readonly set: (span: number) => void;
   readonly reset: () => void;
   readonly drag: (dragging: boolean) => void;
-  
+
   readonly follow: (clientX: number) => void;
 }
 

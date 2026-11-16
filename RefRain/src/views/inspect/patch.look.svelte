@@ -6,13 +6,6 @@
 -->
 
 <script lang="ts">
-  // How one file's patch is drawn, and nothing else (client D95): every
-  // row one baseline step of three high, the code rows on a grid of a
-  // number column, a sign column and the line, added and removed lines
-  // on the accent and alert washes, and the chosen line marked by a
-  // 2 px accent bar at its left edge. A number that quotes its line
-  // arrives as a wire bag and is drawn as a link; one that does not is
-  // plain ink.
   import Inked from "../parts/inked.svelte";
 
   import type { PatchLook, PatchRow } from "./patch";
@@ -21,7 +14,6 @@
 
   type Tone = Extract<PatchRow, { readonly kind: "code" }>["tone"];
 
-  // Spelled whole so Tailwind reads them out of this file as text.
   const WASH: Record<Tone, string> = {
     added: "bg-accent/12",
     removed: "bg-alert/12",
@@ -61,7 +53,6 @@
             >{row.place}</a
           >
         {/if}
-        <!-- wording-ok: the diff format's own marks, not words. -->
         <span class="select-none {MARK[row.tone]}" aria-hidden="true">{row.sign}</span>
         <span class="whitespace-pre text-text"><Inked text={row.text} source={look.source} /></span>
       </div>
@@ -74,8 +65,6 @@
     line-height: calc(3 * var(--spacing-baseline));
   }
 
-  /* Rows that are not code start where the code does, past the number
-   * and sign columns. */
   .lead {
     padding-left: calc(9 * var(--spacing-baseline));
   }
@@ -88,8 +77,6 @@
     box-shadow: inset var(--spacing-hair) 0 0 var(--color-accent);
   }
 
-  /* The resting number leaves, the hovered number arrives
-   * (docs/frontend-method.md §4-43). */
   .number {
     transition: color var(--transition-duration-short) var(--ease-leave);
   }
@@ -97,9 +84,6 @@
     transition-timing-function: var(--ease-arrive);
   }
 
-  /* A forced-colour mode drops both the washes and the inset bar, so the
-   * chosen line keeps a rule at its left edge in the system's selection
-   * colour. */
   @media (forced-colors: active) {
     .chosen {
       border-left: var(--spacing-hair) solid Highlight;

@@ -3,18 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { AxCode } from "../wire";
 import type { WireApi } from "./commands";
 import type { Key } from "./lang";
-
 
 export interface Staged {
   readonly state: string;
   readonly detail: string | null;
   readonly figure: number | null;
 }
-
 
 export interface Reached {
   readonly host: string;
@@ -24,7 +21,6 @@ export interface Reached {
   readonly through: Staged;
   readonly elapsedMs: number;
 }
-
 
 export interface ModelFact {
   readonly id: string;
@@ -37,14 +33,12 @@ export interface ModelFact {
 
 export interface Probed {
   readonly name: string;
-  
-  
+
   readonly baseUrl: string | null;
   readonly models: readonly string[];
   readonly facts: readonly ModelFact[];
   readonly reach: Reached | null;
-  
-  
+
   readonly failure: { readonly code: string; readonly subject: string } | null;
 }
 
@@ -55,7 +49,6 @@ function isRecord(held: unknown): held is Record<string, unknown> {
 function str(held: unknown): string | null {
   return typeof held === "string" && held !== "" ? held : null;
 }
-
 
 function figure(held: unknown): number | null {
   return typeof held === "number" && Number.isInteger(held) && held > 0 ? held : null;
@@ -109,7 +102,6 @@ function failure(held: unknown): { readonly code: string; readonly subject: stri
   return code === null ? null : { code, subject: str(held.subject) ?? "" };
 }
 
-
 export function readProbed(data: Record<string, unknown>): Probed | null {
   const name = str(data.name);
   if (name === null) return null;
@@ -129,7 +121,6 @@ export function readProbed(data: Record<string, unknown>): Probed | null {
   };
 }
 
-
 export interface Sent {
   readonly id: string;
   readonly baseUrl: string;
@@ -137,12 +128,10 @@ export interface Sent {
   readonly before: Probed | null;
 }
 
-
 export interface Asked {
   readonly baseUrl: string;
   readonly wireApi: WireApi;
 }
-
 
 export function normalisedFrom(
   probed: Probed | null,
@@ -160,7 +149,6 @@ export function normalisedFrom(
   const recorded = probed.baseUrl;
   return recorded === null || recorded === pending.baseUrl.trim() ? null : recorded;
 }
-
 
 export function stoppedAt(reach: Reached, listed: Probed["failure"]): Key {
   switch (reach.named.state) {
@@ -204,9 +192,7 @@ function byStatus(status: number | null, listed: Probed["failure"]): Key {
   return "setup_reach_status";
 }
 
-
 const UNREACHED: readonly AxCode[] = ["E_PROVIDER", "E_TIMEOUT"];
-
 
 export function refusalOf(code: AxCode): "reach" | "form" {
   return UNREACHED.includes(code) ? "reach" : "form";

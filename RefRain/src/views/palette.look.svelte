@@ -4,11 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the palette's box is drawn, and nothing else (`./palette.ts`,
-  // `BoxWire`): the line sunk one step into the raised sheet, as the
-  // file finder's is, the list the seat hands over under it, and the
-  // empty state when nothing matches. The sheet around all of it is
-  // `modal.look.svelte`.
   import type { Snippet } from "svelte";
 
   import type { Key } from "../core/lang";
@@ -18,10 +13,7 @@
   interface Props {
     readonly box: BoxWire;
     readonly list: Snippet;
-    // What the empty state says, present only while nothing matches.
     readonly nothing: Key | undefined;
-    // Read under the list, never pressed: who hears a message sent in the
-    // room the palette stands over (client D36).
     readonly foot?: Snippet | undefined;
   }
 

@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { RunBelief } from "../../core/belief";
 import type { Lang } from "../../core/lang";
 import { lasted } from "../../core/time";
@@ -15,12 +14,11 @@ import type { EntryLink } from "./entries";
 export interface WorkingRowLook {
   readonly room: string;
   readonly mark: { readonly glyph: GlyphName; readonly weight: Weight };
-  
+
   readonly doing: string;
   readonly task: string | null;
   readonly link: EntryLink;
 }
-
 
 export function rowOf(
   run: Pick<RunBelief, "doing" | "started" | "task">,

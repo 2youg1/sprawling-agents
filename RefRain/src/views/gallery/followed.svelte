@@ -6,12 +6,6 @@
 -->
 
 <script lang="ts">
-  // Where a dispatch landed, seen from the room it was sent from, in the
-  // docked composer it sits over. A run that started in this room draws
-  // no line, because the thread above already holds it; a run that
-  // started in a room of its own leaves one line naming that room as a
-  // link (client D6). The room name is Chinese on purpose: the
-  // link has to carry a name the address bar percent-encodes.
   import type { Landing } from "../../core/landing";
   import { say } from "../../core/lang";
   import { Address, RunId } from "../../wire";

@@ -8,7 +8,6 @@ import { describe, expect, test } from "bun:test";
 import type { EventKind } from "../wire";
 import { reachOf } from "./staleness";
 
-
 describe("a write reaches the answer that reads it back", () => {
   test("a saved identity card makes the identity answer stale", () => {
     expect(reachOf("identity", "governed_document_written")).toBe("every");
@@ -41,7 +40,6 @@ describe("a write reaches the answer that reads it back", () => {
     expect(reachOf("automation", "rules_changed")).toBe("none");
   });
 });
-
 
 test("a session opened or a run starting or ending makes the sessions answers stale", () => {
   const kinds: EventKind[] = ["session_opened", "run_started", "run_frozen", "model_returned"];

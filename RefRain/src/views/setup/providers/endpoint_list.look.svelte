@@ -11,18 +11,12 @@
   import type { EndpointListLook } from "./endpoint_list";
 
   export interface EndpointListLookProps extends EndpointListLook {
-    // A row's account editor, drawn by the seat under the endpoint's id.
     readonly accounts: Snippet<[string]>;
-    // The second native disclosure, drawn by the model editor's seat.
     readonly models: Snippet<[string]>;
   }
 </script>
 
 <script lang="ts">
-  // How the list of attached endpoints is drawn, and nothing else: every
-  // word arrives translated (`./endpoint_list`, `EndpointListLook`), and
-  // each row's account editor arrives as a snippet, so another look
-  // draws the same list by taking the same value.
   import Badge from "../../parts/badge.svelte";
   import EmptyState from "../../parts/empty.svelte";
 

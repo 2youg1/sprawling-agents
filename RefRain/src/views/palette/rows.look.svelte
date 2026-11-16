@@ -4,18 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the palette's list is drawn, and nothing else (`./rows.ts`,
-  // `RowsLook`): each row is a menu entry - its label in mono, and at its
-  // end the key's chord or a quieter line. An entry rests on the raised
-  // sheet and lifts one step, to `raised-hover`, under the pointer and
-  // under the cursor (docs/frontend-method.md §7A-5); the lift arrives
-  // and leaves on the theme's two curves (§4-43). A verb this place
-  // cannot run is drawn in the disabled ink and never lifts under the
-  // pointer, but the cursor still marks it, because the cursor is how a
-  // keyboard reaches its reason. A row is for its label, so where the
-  // two do not fit the quieter line at the end gives way first; a chord
-  // is short and never cut. A refused row's end is its reason, which a
-  // person needs whole, so there it moves under the label instead.
   import { Kbd } from "../parts/kbd.svelte";
   import type { RowsLook } from "./rows";
 

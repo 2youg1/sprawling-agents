@@ -3,18 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Which held answers one ledger record makes stale. The verdict is
-// taken per question name, not per held answer, so a record costs one
-// judgement for each name a page holds, however many answers sit under
-// it; only the two reaches that depend on the question's own subject
-// look at its key.
-
 import type { EventKind } from "../wire";
 
 export type Reach = "every" | "none" | "same_run" | "newest_page";
 
-// Whether an answer held under `key` is inside the reach of a record
-// written by `run`.
 export function reaches(reach: Reach, key: string, run: string): boolean {
   switch (reach) {
     case "every":
@@ -23,9 +15,6 @@ export function reaches(reach: Reach, key: string, run: string): boolean {
       return false;
     case "same_run":
       return key.includes(run);
-    // Only the newest page can grow: an older page is bounded above by
-    // a seq already written, and a commit's lineage walks backwards
-    // from the run that made it, so a later successor never changes it.
     case "newest_page":
       return key.includes('"before":null');
   }
@@ -35,10 +24,6 @@ function reached(moved: boolean): Reach {
   return moved ? "every" : "none";
 }
 
-// What moves a provider's standing, a decision, and a building's
-// papers. Named rather than written out at the arm that reads them: a
-// set has a name a reader can hold, and the arm then states which
-// question it belongs to and nothing else.
 const PROVIDER_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
   "endpoint_attached",
   "endpoint_lost",
@@ -77,8 +62,6 @@ const BUILDING_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
   "rules_changed",
 ]);
 
-// What moves the proposal cards open on a document: a card offered,
-// decided or taken back, and a save that makes a card stale.
 const PROPOSALS_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
   "proposal_offered",
   "proposal_decided",
@@ -86,9 +69,6 @@ const PROPOSALS_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
   "document_written",
 ]);
 
-// A room's prompt documents move when a page steps one (own, inherit,
-// restore) or saves one word by word, and when a run writes a convention
-// file in the room's chain, which every wave's checkpoint carries.
 const LAYERS_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
   "governed_document_written",
   "document_written",
@@ -96,8 +76,6 @@ const LAYERS_MOVED: ReadonlySet<EventKind> = new Set<EventKind>([
   "file_restored",
 ]);
 
-// How far one record of this kind reaches into the answers held under
-// one question name.
 export function reachOf(name: string, kind: EventKind): Reach {
   switch (name) {
     case "city_view":
@@ -113,8 +91,6 @@ export function reachOf(name: string, kind: EventKind): Reach {
       return reached(kind === "approval_requested" || kind === "approval_resolved");
     case "governance":
       return reached(GOVERNANCE_MOVED.has(kind));
-    // The model table's question reads the earlier registration of each
-    // row's role, which a pick moves.
     case "endpoint_view":
     case "model_figures":
       return reached(PROVIDER_MOVED.has(kind));
@@ -127,11 +103,6 @@ export function reachOf(name: string, kind: EventKind): Reach {
     case "cost_view":
     case "cost_of":
       return reached(kind === "model_returned" || kind === "roadmap_claimed");
-    // A prompt is frozen once for the life of a run and the object
-    // behind a hash never changes, so none of these answers can go
-    // stale: a range, a preview, bytes and an export are read from one
-    // stored object, and a reply's blocks from the text the question
-    // carries.
     case "prefix":
     case "content":
     case "range":
@@ -140,18 +111,12 @@ export function reachOf(name: string, kind: EventKind): Reach {
     case "bytes":
     case "export":
       return "none";
-    // The growing halves of a request move every turn that compares a
-    // shape; the frozen prefix itself does not.
     case "prompt_shape":
       return kind === "prompt_shape_compared" ? "same_run" : "none";
-    // A shelf moves when somebody mounts one on the city's layer, edits
-    // the building's rules, or a run starts under them and pins a version.
     case "skills":
       return reached(
         kind === "building_configured" || kind === "run_started" || kind === "rules_changed",
       );
-    // The working tree moves whenever a wave writes, and every wave
-    // ends in a checkpoint; a file taken back from one moves it too.
     case "git_status":
       return reached(
         kind === "checkpoint_committed" || kind === "pr_merged" || kind === "file_restored",
@@ -169,36 +134,20 @@ export function reachOf(name: string, kind: EventKind): Reach {
       return reached(PROPOSALS_MOVED.has(kind));
     case "layers":
       return reached(LAYERS_MOVED.has(kind));
-    // The city's list names cards and offer times, which a save does not
-    // move: a stale card is still open.
     case "open_proposals":
       return reached(
         kind === "proposal_offered" || kind === "proposal_decided" || kind === "proposal_withdrawn",
       );
-    // An identity card lands as a governed document written, and the
-    // answer read back after it is the save's receipt.
     case "identity":
       return reached(kind === "governed_document_written");
-    // A layer moves when its file is written: the city's own and a
-    // building's through `rules_changed`, a building's settings through
-    // `building_configured`.
     case "config":
       return reached(kind === "rules_changed" || kind === "building_configured");
-    // A building's tools move with either `[catalog]` table, which land as
-    // the two records above, and with a run that ends: it may carry a
-    // newer table and new evidence of use. Not every turn, because the
-    // answer folds the whole ledger.
     case "catalog":
       return reached(
         kind === "rules_changed" || kind === "building_configured" || kind === "run_frozen",
       );
-    // A room's stretches move when one opens and when a run in one starts
-    // or ends, which is also when its last line and run count move.
     case "sessions":
       return reached(kind === "session_opened" || kind === "run_started" || kind === "run_frozen");
-    // The usage tables fold the whole ledger, so they are asked again when
-    // a run ends with its uses complete and when an audit lands, not on
-    // every call; an export is asked on each press.
     case "skill_usage":
     case "mcp_usage":
     case "shells":

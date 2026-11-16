@@ -4,12 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the city's row of figures is drawn, and nothing else
-  // (`./bar.ts`, `BarLook`): a description list in as many columns as
-  // the page holds, each figure under its word and closed by one rule.
-  // A figure with a page to act on is a link whose ink turns to the
-  // accent under the pointer, arriving on the arrive curve and leaving
-  // on leave (docs/frontend-method.md §4-43).
   import type { BarLook } from "./bar";
 
   const look: BarLook = $props();

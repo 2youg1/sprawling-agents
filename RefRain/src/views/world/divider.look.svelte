@@ -3,15 +3,8 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- How a workbench divider is drawn: the whole gutter is the handle, so
-a pointer finds it without aiming at a line, and a hairline down its
-middle lights when the pointer is over it, when it has the focus and
-while it is being dragged. The line lights with the arriving curve and
-fades with the leaving one. The focus ring stands inside the gutter,
-because the panes on either side would cover one drawn outside it. -->
 <script lang="ts">
   import type { DividerLook } from "./divider";
-
   const look: DividerLook = $props();
 </script>
 

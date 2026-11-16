@@ -3,25 +3,21 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Snippet } from "svelte";
 
 import type { Key } from "../../core/lang";
 
 export interface EmptyStateProps {
-  
   readonly missing: Key;
-  
+
   readonly shape?: Snippet;
-  
+
   readonly action?: Snippet;
-  
-  
+
   readonly seat?: EmptySeat;
 }
 
 export type EmptySeat = "centred" | "region" | "inset";
-
 
 export interface ShapeWire {
   readonly "aria-hidden": "true";
@@ -30,9 +26,9 @@ export interface ShapeWire {
 export interface EmptyLook {
   readonly seat: EmptySeat;
   readonly shapeWire: ShapeWire;
-  
+
   readonly shape: Snippet | undefined;
-  
+
   readonly sentence: string;
   readonly action: Snippet | undefined;
 }

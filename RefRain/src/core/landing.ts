@@ -3,15 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Where the work a page dispatched actually started. A dispatch at a
-// bare building opens a room the city names (`<building>/<room>`), so
-// the page that sent it is not where the run is; this is the one place
-// that recognises the run as the one sent from here (client D6).
-
 import type { Address, RunId } from "../wire";
 import type { RunBelief } from "./belief";
 
-// A dispatch this page sent, as it stood the moment it went out.
 export interface Sent {
   readonly from: Address;
   readonly task: string;
@@ -31,9 +25,6 @@ export function sentFrom(
   return { from, task, known: new Set(Object.values(runs).map((run) => run.run)) };
 }
 
-// The first run to start after the dispatch that carries its words and
-// sits in its room or under it. `shopfront` is not under `shop`: the
-// room is compared a whole segment at a time.
 export function landingOf(sent: Sent, runs: Readonly<Record<RunId, RunBelief>>): Landing {
   const under = `${sent.from}/`;
   const opened = Object.values(runs)

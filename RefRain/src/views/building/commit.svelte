@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { Address, CommitAnswer, GitOid } from "../../wire";
@@ -21,10 +19,9 @@
   interface Props {
     readonly building: Address;
     readonly commit: CommitAnswer;
-    
-    
+
     readonly older: CommitAnswer | null;
-    
+
     readonly first: boolean;
     readonly open: boolean;
     readonly onToggle: () => void;

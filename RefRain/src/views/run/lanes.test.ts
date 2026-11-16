@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the time lens decides before anything is drawn: which share
-// each turn belongs to, how many boxes a lane may hold, and which rows
-// of a long call list exist in the page at all. Where the boxes land is
-// measured by `cargo xtask render`, not here.
-
 import { describe, expect, test } from "bun:test";
 
 import { Seq, TimeMs, type Call, type Note, type Turn } from "../../wire";
@@ -53,8 +48,6 @@ describe("the time lens", () => {
     expect(stretchesOf(turns, 60, "tool").at(-1)?.share).toBe("tool");
   });
 
-  // Two calls overlap between 14 and 22; the model spoke before the
-  // first and after the last answer, and those are its own stretches.
   test("a turn that called tools is cut where its calls were measured", () => {
     const turns = [turn(1, 10, [call(1, 14, 20), call(2, 16, 22)]), turn(2, 30, [call(3, 31)])];
     expect(stretchesOf(turns, 40, null)).toEqual([
@@ -66,9 +59,6 @@ describe("the time lens", () => {
     ]);
   });
 
-  // Turn 1 asked at 38 after a call ran 31..34, was answered at 41, then
-  // called again 42..44. Turn 2 asked at 50 and its answer is not on the
-  // wire, so the rest of it is the person's.
   test("a turn that waited is cut where the request and the answer were recorded", () => {
     const wait = (t: number, answered: number | null): Note => ({
       waiting: {
@@ -94,9 +84,6 @@ describe("the time lens", () => {
     ]);
   });
 
-  // Ten thousand turns across four hundred columns: a lane is at most
-  // one box per column, so the page holds a bounded number of boxes
-  // however long the run went on.
   test("a lane never holds more boxes than it has columns", () => {
     const turns = Array.from({ length: 10_000 }, (_, n) =>
       turn(n + 1, n * 1000, n % 3 === 0 ? [call(n)] : []),

@@ -3,14 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { renderAsync } from "docx-preview";
 import type { Options } from "docx-preview";
 
 import { unpack } from "./zip";
 
 const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-
 
 export interface Coverage {
   readonly revisions: number;
@@ -22,7 +20,6 @@ export type Read =
   | { readonly kind: "drawn"; readonly page: string; readonly coverage: Coverage }
   | { readonly kind: "refused"; readonly why: "too_large" | "shape" }
   | { readonly kind: "broken"; readonly reason: string };
-
 
 const OPTIONS: Partial<Options> = {
   className: "docx",
@@ -36,12 +33,10 @@ const OPTIONS: Partial<Options> = {
   experimental: false,
 };
 
-
 function boardOf(gutter: number): string {
   const px = `${String(gutter)}px`;
   return `.docx-wrapper { background: transparent; padding: ${px}; align-items: safe center; } .docx-wrapper > section.docx { margin-bottom: ${px}; }`;
 }
-
 
 function gutterOf(doc: Document): number {
   const probe = doc.createElement("div");
@@ -51,7 +46,6 @@ function gutterOf(doc: Document): number {
   probe.remove();
   return Number.isFinite(px) ? px : 0;
 }
-
 
 const FIT_STEP = 40;
 const FIT_MIN = 280;
@@ -77,7 +71,6 @@ function drawn(bytes: Uint8Array, parts: ReadonlyMap<string, Uint8Array>): Promi
   );
 }
 
-
 function widthOf(body: HTMLElement): number | null {
   const stated = body
     .querySelector("section.docx")
@@ -85,7 +78,6 @@ function widthOf(body: HTMLElement): number | null {
     ?.match(/(?:^|;)\s*width:\s*([\d.]+)pt/);
   return stated?.[1] === undefined ? null : (Number(stated[1]) * 4) / 3;
 }
-
 
 function fitted(width: number | null, gutter: number): string {
   if (width === null) return "";
@@ -120,7 +112,6 @@ function textOf(parts: ReadonlyMap<string, Uint8Array>, name: string): string {
   const part = parts.get(name);
   return part === undefined ? "" : new TextDecoder().decode(part);
 }
-
 
 export function docxLines(bytes: Uint8Array): Promise<readonly string[] | null> {
   return unpack(bytes).then((unpacked) => {

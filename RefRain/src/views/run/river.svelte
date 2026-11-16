@@ -6,13 +6,6 @@
 -->
 
 <script lang="ts">
-  // The time lens: one lane per share of the run's clock - the model
-  // speaking, tools running, the person being waited on - drawn as
-  // parallel tracks the way a profiler draws threads, and under them
-  // every tool call the run made, in order. `lanes.ts` decides what is
-  // drawn; this file only lays it out, so a ten-thousand-call run costs
-  // the page one box per column and one row per visible line.
-
   import { POSTURE_WORD } from "../../core/doing";
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
@@ -25,10 +18,8 @@
 
   interface Props {
     readonly turns: readonly Turn[];
-    // The run's first and last known moments, in ms.
     readonly from: number;
     readonly to: number;
-    // What a live run is doing now; `null` once it is over.
     readonly tail: Share | null;
   }
 
@@ -40,8 +31,6 @@
     tool: POSTURE_WORD.calling,
     person: POSTURE_WORD.waiting,
   };
-  // The height every call row takes (`h-control-sm`), which also sizes
-  // the spacers standing in for the rows not drawn.
   const ROW_TOKEN = "--spacing-control-sm";
   const FILL: Record<Share, string> = {
     model: "bg-accent",
@@ -49,17 +38,9 @@
     person: "bg-alert",
   };
 
-  // One observer reports every size the lens reads, and what it reports
-  // lands on the next frame. Written inside the report, a size would
-  // redraw the lanes and the rows while the browser is still reporting
-  // sizes, and the browser names that a ResizeObserver loop.
   let width = $state(0);
   let height = $state(0);
   let top = $state(0);
-  // The row token, read once from the stylesheet that sizes each row:
-  // the spacers are counted in the same token, so the list is as long
-  // as its calls whichever rows are drawn, and nothing drawn feeds back
-  // into the window.
   let row = $state(0);
   let list: Element | null = null;
   let frame = 0;

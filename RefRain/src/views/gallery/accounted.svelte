@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts">
-  // The account editor of one provider, open, in the two states its
-  // list can be in: ordered accounts with every kind of key a row can
-  // report, and a provider attached with one key and no list yet.
-
   import Accounts from "../setup/providers/accounts.svelte";
   import { endpointRoster } from "../setup/providers/rosters";
   import Case from "./case.svelte";

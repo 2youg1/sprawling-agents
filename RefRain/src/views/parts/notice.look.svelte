@@ -6,15 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // How a notice is drawn (`./notice`, `NoticeLook`).
-  //
-  // Each seat carries the one entrance the motion vocabulary grants it:
-  // a toast is a popover, and a popover rises into place; a strip in a
-  // form and an entry in a list are state changes that keep their
-  // position, so they fade. `theme/motion-state.css` stills every one of
-  // these under the two reduction lists. There is deliberately no exit
-  // class: a leaving notice is removed by whoever keeps the list, and
-  // that owner animates the departure if it wants one at all.
   import type { Seat } from "./notice";
 
   const PAINT: Record<Seat, string> = {
@@ -39,9 +30,6 @@
     "flex min-w-0 flex-wrap items-start justify-between gap-base text-note",
   ]}
 >
-  <!-- The words keep a readable measure and the buttons move under them
-  when the seat is narrower than both, rather than the words being
-  squeezed to one character a line beside buttons that never shrink. -->
   <div class="flex min-w-0 grow basis-[16rem] flex-col gap-tight">
     <div class="flex min-w-0 flex-wrap items-baseline gap-snug">
       <span
@@ -86,9 +74,6 @@
 </div>
 
 <style>
-  /* A toast keeps a readable measure and never runs past the viewport's
-  inset on a narrow screen, nor past the stack or the box that holds it,
-  which can be narrower than the viewport leaves. */
   .toast {
     width: min(var(--container-measure), calc(100vw - 2 * var(--spacing-pane)));
     max-width: 100%;

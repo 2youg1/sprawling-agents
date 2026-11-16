@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 export type MailFocus = "key" | "inside" | "elsewhere";
 
 export interface Mail {
@@ -12,7 +11,6 @@ export interface Mail {
 }
 
 export type MailInput = "toggle" | "escape" | "outside" | "enter" | "follow";
-
 
 function stow(mail: Mail): Mail {
   return { shown: false, focus: mail.focus === "inside" ? "key" : mail.focus };
@@ -31,7 +29,6 @@ export function stepMail(mail: Mail, input: MailInput): Mail {
       return mail.shown ? { ...mail, focus: "inside" } : mail;
   }
 }
-
 
 export interface LetterSide<Row> {
   readonly mail: Mail;

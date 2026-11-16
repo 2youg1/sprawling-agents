@@ -6,17 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // The first-run guide in four states a person meets it in: a fresh
-  // city; an attached endpoint whose required main-model editor must be
-  // reachable by keyboard; a city with a main model and the texts step
-  // open; and a guide walked to its end. Each is
-  // drawn at a phone's 390 and a desktop's 1440, because the step list
-  // is one column at both and its order is the whole point.
-  //
-  // The refusal below is the one a person meets when they assign work
-  // before the first step: the city's way out stands under the heading,
-  // unfolded, since it is the only sentence that knows the cause.
-
   import { QUERIES } from "../../core/asking";
   import type { Answer, EndpointsAnswer, GuideProgress, IdentityAnswer, Query } from "../../wire";
   import { ENDPOINTS } from "./served";

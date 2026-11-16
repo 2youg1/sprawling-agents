@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
@@ -39,27 +38,22 @@ export interface Connection {
   readonly state: Readable<LinkState>;
   readonly belief: Readable<Belief>;
   readonly asking: Asking;
-  
-  
+
   readonly live: Readable<Readonly<Partial<Record<RunId, Tail>>>>;
-  
+
   readonly unsent: Readable<number>;
-  
-  
+
   readonly command: (command: Command) => boolean;
   readonly retry: () => void;
-  
-  
+
   readonly closeCity: (mode: CloseMode) => boolean;
-  
-  
+
   readonly closing: Readable<CloseMode | null>;
   readonly dismissRefusal: () => void;
-  
+
   readonly markNoticesSeen: () => void;
   readonly monitor: Pick<Watching, "samples" | "watch" | "watchSummary" | "setBeat">;
 }
-
 
 export function bearing(token: string | null): Readonly<Record<string, string>> {
   return token === null ? {} : { authorization: `Bearer ${token}` };
@@ -72,8 +66,7 @@ function hidden(): boolean {
 export function openConnection(dial: Dial, lang: Lang): Connection {
   let link: Link = newLink(lang);
   let line: Line | null = null;
-  
-  
+
   const now = () => Date.now();
   const state = writable<LinkState>(link.state);
   const store = createBelief(now);
@@ -83,14 +76,11 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
 
   const queue: ServerFrame[] = [];
   let scheduled = false;
-  
-  
+
   let lastAsk = 0;
-  
-  
+
   let reconnect: ReturnType<typeof setTimeout> | null = null;
 
-  
   function sendAsk(query: Query): AskId | null {
     lastAsk = lastAsk >= 0xffff_ffff ? 1 : lastAsk + 1;
     const askId = AskId.make(lastAsk);
@@ -105,8 +95,7 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
   const asking = createAsking(
     (query: Query) => (isLive(link) ? sendAsk(query) : null),
     now,
-    
-    
+
     (phrase, error) => {
       const lang = langOf(document.documentElement.lang);
       store.refused({ ...error, recovery: say(lang, phrase) });
@@ -132,8 +121,6 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
         watching.reconnected();
         return;
       case "deliver": {
-        
-        
         const bad = walk.fold(action.event);
         if (action.event.kind === "tool_result") {
           live.update(({ [action.event.run]: _settled, ...rest }) => rest);
@@ -145,8 +132,7 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
       case "answered": {
         const { ask_id, as_of, outcome } = action.answered;
         if ("refusal" in outcome) store.refused(outcome.refusal);
-        
-        
+
         if (walk.answered(ask_id, outcome)) return;
         if ("answer" in outcome && "city" in outcome.answer) {
           store.adoptCity(outcome.answer.city);
@@ -198,8 +184,6 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
     }
     perform(action);
     if (isStopped(link)) {
-      
-      
       if (reconnect !== null) {
         clearTimeout(reconnect);
         reconnect = null;
@@ -210,7 +194,6 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
     }
   }
 
-  
   function drain(): void {
     scheduled = false;
     store.batch(() => {
@@ -221,8 +204,6 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
   }
 
   function open(): void {
-    
-    
     const mine = () => line === opened;
     const opened: Line = dial({
       opened: (credential) => {
@@ -243,13 +224,10 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
   function heard(text: string): void {
     const frame = decodeFrame(text);
     if (frame === null) {
-      
-      
       step({ kind: "undecodable" });
       return;
     }
-    
-    
+
     if ("welcome" in frame || "refusal" in frame) {
       store.batch(() => {
         drain();
@@ -260,21 +238,18 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
     queue.push(frame);
     if (!scheduled) {
       scheduled = true;
-      
-      
+
       if (hidden()) setTimeout(drain, 0);
       else requestAnimationFrame(drain);
     }
   }
 
-  
   function visibilityChanged(): void {
     if (queue.length > 0) drain();
     if (hidden() || reconnect === null) return;
     step(unbook({ kind: "wait_elapsed" }));
   }
 
-  
   function unbook(event: LinkEvent): LinkEvent {
     if (reconnect !== null) clearTimeout(reconnect);
     reconnect = null;
@@ -298,8 +273,7 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
       switch (link.state.kind) {
         case "live":
           return sendText(encodeFrame({ command }));
-        
-        
+
         case "idle":
         case "refused":
         case "closed":

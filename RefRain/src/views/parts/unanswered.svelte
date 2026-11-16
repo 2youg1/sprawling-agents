@@ -6,9 +6,6 @@
 -->
 
 <script lang="ts">
-  // The seat of the unanswered question (`./unanswered`): it says the
-  // question in the reader's language, wires the retry to this page's
-  // asking, and draws whatever `./unanswered.look.svelte` is.
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { UnansweredProps } from "./unanswered";

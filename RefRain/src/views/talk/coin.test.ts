@@ -8,7 +8,6 @@ import { describe, expect, test } from "bun:test";
 import { lookOf } from "./coin";
 import type { Face } from "./coin_face";
 
-
 function clicked(face: Face): { readonly stopped: boolean; readonly held: boolean } {
   let stopped = false;
   let held = false;
@@ -26,8 +25,6 @@ function clicked(face: Face): { readonly stopped: boolean; readonly held: boolea
 }
 
 describe("the coin key's wiring", () => {
-  
-  
   test("each face's click does what its face says and nothing else", () => {
     expect((["send", "stop", "idle"] as const).map(clicked)).toEqual([
       { stopped: false, held: false },

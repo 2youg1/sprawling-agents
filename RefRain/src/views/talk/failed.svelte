@@ -4,9 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // A message that got no reply, drawn where the reply would have been,
-  // as the thread's refusal card (`failedLook`): nothing a person sent
-  // may end in silence.
   import { ui } from "../../ui";
   import type { AxError } from "../../wire";
   import Card from "./refusal_card.look.svelte";
@@ -14,12 +11,8 @@
   import { failedLook } from "./refused";
 
   interface Props {
-    // What happened, already in the reader's language.
     readonly what: string;
-    // The city's refusal, when there is one to show.
     readonly error?: AxError | undefined;
-    // Whether the way out goes through the model settings; absent, the
-    // refusal decides.
     readonly settings?: "offered" | "absent" | undefined;
     readonly onRetry?: (() => void) | undefined;
   }

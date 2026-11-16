@@ -5,15 +5,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- The entries of the building page's index; the page keeps the
-landmark and where it stands. A column of entries from 768 px, a
-wrapping row of them below. The current entry is marked the way a chosen
-row is marked everywhere - the strong wash and the 2 px accent bar on its
-left (docs/frontend-method.md §7B) - and the others take the row's wash
-under the pointer. -->
 <script lang="ts">
   import type { SectionsLook } from "./sections";
-
   const look: SectionsLook = $props();
 </script>
 

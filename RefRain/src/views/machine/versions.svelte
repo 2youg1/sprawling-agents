@@ -4,11 +4,6 @@
   // file, You can obtain one at https://mozilla.org/MPL/2.0/.
   // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-  // One item's three versions on one line: what this machine has, what
-  // this repository pins, and the newest upstream, with a mark when the
-  // first is behind the last (`views/setup/versions`). A column with
-  // nothing to say is left out rather than drawn as a dash.
-
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { DoctorItem, DoctorNewest } from "../../wire";
@@ -28,8 +23,6 @@
   const pinned = $derived(item.pinned ?? null);
   const upstream = $derived(newestOf(newest));
   const stale = $derived("version" in upstream && behind(installed, upstream.version));
-  // The newest column's text, and what the network said when the
-  // source could not be read.
   const reading = $derived.by(
     (): {
       readonly version: string | null;
@@ -44,8 +37,6 @@
 
 <p class="flex min-w-0 flex-wrap items-baseline gap-x-base gap-y-tight text-note">
   {#if installed !== null}
-    <!-- A banner with no dotted number in it is shown whole, so it is
-    cut at the row's edge rather than pushing its label onto two lines. -->
     <span class="flex min-w-0 max-w-full items-baseline gap-tight">
       <span class="shrink-0 text-text-faint">{say($lang, "machine_version_installed")}</span>
       <span class="min-w-0 truncate font-mono text-text">{installed}</span>

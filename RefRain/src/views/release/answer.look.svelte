@@ -4,12 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How one answer about this release is drawn, and nothing else
-  // (client D95): where this binary stands, what each registry the city
-  // asked said, and the command that updates it, with a copy key. Every
-  // word arrives translated in `AnswerLook` (`./answer.ts`), and the
-  // channel choice's handler arrives in a wire bag spread unchanged on
-  // the select.
   import Copy from "../parts/copy.svelte";
   import type { AnswerLook, Ink } from "./answer";
 
@@ -57,9 +51,6 @@
     <div class="flex min-w-0 flex-col gap-tight">
       <span class="text-note text-text-quiet">{update.channel}</span>
       {#if update.choice !== undefined}
-        <!-- The select's fill answers the pointer as every control does:
-        it arrives decelerating and leaves accelerating
-        (docs/frontend-method.md §4-43). -->
         <select
           class="h-control w-fit max-w-full min-w-0 rounded-control bg-raised px-snug text-note text-text transition-colors ease-leave hover:bg-raised-hover hover:ease-arrive"
           {...update.choice.wire}
@@ -84,8 +75,6 @@
 </div>
 
 <style>
-  /* The registry's name in a column wide enough for the longest of
-  the three, and the reading beside it. */
   .registries {
     grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
   }

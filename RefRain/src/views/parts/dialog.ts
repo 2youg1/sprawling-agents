@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Snippet } from "svelte";
 import { createAttachmentKey } from "svelte/attachments";
 import type { Attachment } from "svelte/attachments";
@@ -12,18 +11,17 @@ import type { Cancelling, SheetWire, Stands } from "./sheet";
 
 export interface DialogProps {
   readonly open: boolean;
-  
+
   readonly title: string;
-  
+
   readonly detail?: string;
   readonly confirmLabel: string;
   readonly cancelLabel: string;
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
-  
+
   readonly destructive?: boolean;
-  
-  
+
   readonly children?: Snippet;
 }
 
@@ -44,11 +42,9 @@ export interface DialogLook {
   readonly heading: Said;
   readonly detail: Said | undefined;
   readonly grounds: Snippet | undefined;
-  
-  
+
   readonly answers: readonly [Answer, Answer];
 }
-
 
 const HOLD = createAttachmentKey();
 
@@ -65,8 +61,7 @@ export function lookOf(
       [HOLD]: hold,
       "aria-labelledby": heading.id,
       "aria-describedby": detail?.id,
-      
-      
+
       oncancel: (event: Cancelling) => {
         event.preventDefault();
         props.onCancel();

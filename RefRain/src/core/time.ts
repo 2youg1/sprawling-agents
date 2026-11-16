@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Lang } from "./lang";
 
 const MINUTE = 60_000;
@@ -27,7 +26,6 @@ export function ago(lang: Lang, at: number, now: number): string {
   return lang === "zh" ? `${String(days)} 天前` : `${String(days)} d ago`;
 }
 
-
 const LOCALE: Readonly<Record<Lang, string>> = { en: "en-GB", zh: "zh-CN" };
 
 export function clock(lang: Lang, at: number): string {
@@ -39,7 +37,6 @@ export function clock(lang: Lang, at: number): string {
   }).format(at);
 }
 
-
 export function calendarDay(lang: Lang, at: number): string {
   return new Intl.DateTimeFormat(LOCALE[lang], {
     year: "numeric",
@@ -47,7 +44,6 @@ export function calendarDay(lang: Lang, at: number): string {
     day: "numeric",
   }).format(at);
 }
-
 
 export function hhmm(at: number): string {
   return new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
@@ -61,11 +57,9 @@ export function hhmmss(at: number): string {
   });
 }
 
-
 export function hhmmssms(at: number): string {
   return `${hhmmss(at)}.${String(new Date(at).getMilliseconds()).padStart(3, "0")}`;
 }
-
 
 export function ymd(at: number): string {
   const day = new Date(at);
@@ -73,25 +67,21 @@ export function ymd(at: number): string {
   return `${String(day.getFullYear())}-${two(day.getMonth() + 1)}-${two(day.getDate())}`;
 }
 
-
 export function moment(at: number): string {
   return `${ymd(at)} ${hhmmss(at)}`;
 }
-
 
 export function isoInstant(at: number): string {
   return new Date(at).toISOString();
 }
 
-
 export function count(n: number): string {
   return n.toLocaleString("en-US");
 }
 
-
 export function kilo(n: number): string {
   if (n < 1_000) return String(Math.round(n));
-  
+
   const thousands = Number((n / 1_000).toPrecision(3));
   if (thousands < 1_000) return `${String(thousands)}k`;
   return `${String(Number((n / 1_000_000).toPrecision(3)))}M`;
@@ -106,7 +96,6 @@ export function kib(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`;
 }
-
 
 export function lasted(ms: number): string {
   const seconds = Math.max(0, ms) / 1000;

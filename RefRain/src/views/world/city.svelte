@@ -4,15 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The city, as the world layer draws it beside the Mayor's room: the
-  // city page's skyline at the size the
-  // city page draws it, scrolled sideways to City Hall at its centre. A
-  // pane is narrower than the drawing, and the drawing scaled down to a
-  // pane's width puts every tower's name under seven pixels, so the
-  // pane scrolls rather than shrinks it. Picking a tower moves the
-  // workspace there - to the newest room
-  // of that building that ran anything, or to the building itself, where
-  // the conversation opens a room of its own.
   import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";
   import { heldWithin } from "../../core/belief/rooms";
@@ -26,7 +17,6 @@
   const city = u.conn.asking.ask(QUERIES.city);
   const read = $derived(readAnswer($city, (held) => ("city" in held ? held.city : undefined)));
 
-  // City Hall stands at the centre of the avenue, so the pane opens there.
   function centred(box: HTMLDivElement): void {
     box.scrollLeft = (box.scrollWidth - box.clientWidth) / 2;
   }

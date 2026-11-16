@@ -4,19 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The type cards of the appearance group: the interface face, the mono
-  // face, the reading face, the fallback chain, the body size, the three
-  // ratios that set a line, the features the bundled faces carry, and one
-  // preview that wears the three roles together so a change is read once.
-  //
-  // The record and its writing are the group's (`appearance.svelte`):
-  // this file is handed the record as it stands, the one way to write a
-  // change to it, and the receipt every card of the group ends with, so a
-  // change made here lands through the same door, the same root element
-  // and the same receipt as a change made on any other card. What it
-  // owns is the state these cards alone have - the boxes mid-edit and the
-  // faces this machine has installed.
-
   import { onMount } from "svelte";
 
   import type { Key } from "../../core/lang";
@@ -55,9 +42,6 @@
   import Card from "./card.look.svelte";
   import type { Choice } from "../parts/combobox";
 
-  // The two states of one feature switch. A word of this card rather than
-  // of the wire: the wire records which features are on, and a switch has
-  // exactly these two postures.
   type Switch = "off" | "on";
   const SWITCHES: readonly Switch[] = ["off", "on"];
   const SWITCH_WORDS: Record<Switch, Key> = {
@@ -68,7 +52,6 @@
   interface Props {
     readonly look: Appearance;
     readonly write: (next: Appearance, name: Setting) => void;
-    // The receipt of one card, said when the last change landed on it.
     readonly receipt: (name: Setting) => ReceiptLook;
   }
 
@@ -77,22 +60,13 @@
   const lang = ui().lang;
   const said = (key: Key): string => say($lang, key);
 
-  // What is in the size box, which is not the size: a box mid-edit holds
-  // text the page must not act on yet. The two fallback slots and the two
-  // ratio boxes are the same: a name half typed or a number half typed is
-  // text, not a value, so each keeps what was typed until it is one.
   let box = $state("");
   let slot1 = $state("");
   let slot2 = $state("");
   let leading = $state("");
   let tracking = $state("");
-  // The faces this machine has, once a person asks for them and the
-  // browser agrees. Empty until both happen. Both axes and the fallback
-  // slots share one list, so the person is asked once.
   let installed = $state<readonly string[]>([]);
   let note = $state<string | undefined>(undefined);
-  // Each family drawn in its own face so the list is a comparison, not a
-  // roster of identical labels.
   const localChoices: readonly Choice[] = $derived(
     installed.map((family) => ({ value: family, label: family, face: faceStyle(family) })),
   );
@@ -108,13 +82,8 @@
     tracking = look.tracking === null ? "" : spelledRatio(look.tracking);
   });
 
-  // The features the faces in use declare, drawn as one set: a switch one
-  // of them declares moves that face's text, so it is live
-  // (`featuresOffered`, `core/appearance.ts`).
   const live: ReadonlySet<TypeFeature> = $derived(featuresOffered([look.sans, look.mono]));
 
-  // Every keystroke in the size box is read once, and only a whole
-  // number from the floor up reaches the page.
   const resize = (typed: string): void => {
     box = typed;
     const saidSize = sizingOf(typed);
@@ -130,8 +99,6 @@
     }
   };
 
-  // A family from this machine pins its axis to `custom`; the axis is
-  // the one the list is drawn under, never inferred.
   const wear = (axis: Axis, family: string): void => {
     write(
       axis === "sans"
@@ -141,10 +108,6 @@
     );
   };
 
-  // One fallback slot. A name that is not a name is kept in the box and
-  // not written: the field says why, and the chain keeps what it had.
-  // An empty slot is dropped from the chain, so the second one only takes
-  // a name once the first holds one.
   const wearFallback = (slot: 0 | 1, typed: string): void => {
     if (slot === 0) slot1 = typed;
     else slot2 = typed;
@@ -152,16 +115,10 @@
     if (!both.every((name) => name === "" || FAMILY_SHAPE.test(name))) return;
     const chain = both.filter((name) => name !== "");
     write({ ...look, fallbacks: chain }, "fallbacks");
-    // A chain has no gaps, so emptying the first slot moves the second
-    // name up: the boxes follow the record rather than showing a name in
-    // a slot the record no longer keeps it in.
     slot1 = chain[0] ?? "";
     slot2 = chain[1] ?? "";
   };
 
-  // The two ratio boxes, read the way the size box is: only a value at or
-  // above the wire's floor reaches the page, and an empty box takes the
-  // page back to the ratio the theme draws.
   const resizeLeading = (typed: string): void => {
     leading = typed;
     const said = ratioOf(typed, LINE_HEIGHT_FLOOR);
@@ -192,8 +149,6 @@
     }
   };
 
-  // One switch. The set is written in the order `FEATURES` declares,
-  // which is the order the file and the stylesheet read it in.
   const toggleFeature = (feature: TypeFeature, next: Switch): void => {
     const on = next === "on";
     write(
@@ -205,8 +160,6 @@
     );
   };
 
-  // Chromium lists this machine's faces after asking the person; any
-  // other engine has no such door, and the text field is the fallback.
   const offered = (): boolean => typeof window.queryLocalFonts === "function";
 
   const list = (): void => {
@@ -217,8 +170,6 @@
     }
     void ask()
       .then((faces) => {
-        // Only names a fallback slot or a single-family stack can keep:
-        // a family with a comma or quote would splice the CSS list.
         installed = [
           ...new Set(
             faces.map((face) => face.family).filter((family) => FAMILY_SHAPE.test(family)),
@@ -231,21 +182,15 @@
       });
   };
 
-  // The size box's one line of constraint: the card's foot carries it,
-  // and a refused box repeats it where the person is looking.
   const sizeFloor = (): string =>
     fill(say($lang, "appearance_body_floor"), { min: String(BODY_PX.min) });
 
-  // A refusal, or no such property at all: spreading it keeps an absent
-  // error apart from `error={undefined}`, which marks the box.
   const refusal = (stack: string): Pick<FieldProps, "error"> =>
     stackRefused(stack) ? { error: say($lang, "appearance_stack_refused") } : {};
 
   const sizeRefusal = (): Pick<FieldProps, "error"> =>
     sizingOf(box).kind === "refused" ? { error: sizeFloor() } : {};
 
-  // A fallback slot's one line of constraint: a family name and nothing
-  // that could splice a second one into the slot.
   const slotRefusal = (typed: string): Pick<FieldProps, "error"> =>
     typed !== "" && !FAMILY_SHAPE.test(typed)
       ? { error: say($lang, "appearance_fallback_refused") }
@@ -283,10 +228,6 @@
 
 {#snippet localPicker(label: string, held: string, onPick: (family: string) => void)}
   {#if localChoices.length > 0}
-    <!-- A machine has hundreds of faces, so they are searched rather
-    than scrolled; each row wears that family so two neighbours can be
-    told apart by eye. The families are this machine's own words, never
-    translated. -->
     <Combobox
       {label}
       placeholder={say($lang, "part_search")}
@@ -400,9 +341,7 @@
     {@render localPicker(say($lang, "appearance_fallback_first"), slot1, (family: string) => {
       wearFallback(0, family);
     })}
-    <!-- A chain with no gap: the second name is taken once the first
-    holds one, so a name typed into the second slot is never read back in
-    the first. -->
+
     <Field
       label={say($lang, "appearance_fallback_second")}
       {...slotRefusal(slot2)}
@@ -490,8 +429,6 @@
 >
   <div class="flex flex-col gap-snug">
     {#each FEATURES as feature (feature)}
-      <!-- A switch the faces in use do not declare is left out of reach and
-      says why, and its drawn posture is the one the page draws: off. -->
       {@const available = live.has(feature)}
       {@const absent = available ? {} : { why: say($lang, "appearance_feature_absent") }}
       <div class="flex flex-wrap items-center justify-between gap-base">
@@ -509,8 +446,6 @@
   </div>
 </Card>
 
-<!-- One sample for the whole group: the three roles update as soon as
-a face, size or metric lands, so the person never hunts a second preview. -->
 <Card title={say($lang, "appearance_preview")} note={say($lang, "appearance_preview_note")}>
   <div class="flex flex-col gap-base rounded-card bg-chrome p-base">
     <div class="flex flex-col gap-tight">

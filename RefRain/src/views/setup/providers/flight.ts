@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// One in-flight operation per attached endpoint row. The account and
-// model editors hold the same state, so neither can replay a summary
-// from before the other editor's command settled.
-
 export type FlightKind = "accounts" | "probe" | "models";
 
 export interface Flight {

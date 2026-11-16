@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts">
-  // The web search card in the two states a person reads differently:
-  // a city that never wrote `[search]`, and one that lists its own
-  // services while the hall's file states something else.
-
   import SearchCard from "../setup/search/search.svelte";
   import Case from "./case.svelte";
   import { SEARCH, SEARCH_CUSTOM } from "./configured";

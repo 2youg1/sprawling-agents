@@ -3,27 +3,20 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { PreferenceDoor } from "../../core/prefs";
 import type { Address, Seq } from "../../wire";
-
 
 export function draftPlace(room: Address, began: Seq | null): string {
   return began === null ? room : `${room}:${String(began)}`;
 }
 
-
 const DRAFT_MS = 500;
 
-
 export interface Draft {
-  
-  
   readonly read: string;
-  
+
   keep(words: string): void;
-  
-  
+
   replace(words: string): void;
   flush(): void;
 }

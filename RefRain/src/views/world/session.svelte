@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import type { Snippet } from "svelte";
 
   import { fill, say } from "../../core/lang";
@@ -15,13 +11,11 @@
 
   interface Props {
     readonly here: Address;
-    
-    
+
     readonly shown?: RunId | null | undefined;
-    
-    
+
     readonly title?: string | undefined;
-    
+
     readonly head: Snippet;
   }
 
@@ -43,7 +37,6 @@
     });
   });
 
-  
   const worktree = $derived(rounds?.worktree ?? null);
   const base = $derived(rounds?.opened_at ?? null);
 </script>
@@ -56,17 +49,15 @@
   {#if title !== undefined}
     <h3 class="truncate text-heading font-heading text-text">{title}</h3>
   {/if}
-  
+
   <div class="flex shrink-0 items-baseline justify-between gap-pane">
     <p class="flex min-w-0 items-baseline gap-snug text-note text-text-quiet">
-      
       {#if worktree !== null}
         <span class="min-w-0 truncate"
           >{fill(say($lang, "world_worktree"), { name: worktree })}</span
         >
       {/if}
       {#if worktree !== null && base !== null}
-        
         <span aria-hidden="true">·</span>
       {/if}
       {#if base !== null}

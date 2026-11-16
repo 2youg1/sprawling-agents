@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Attachment } from "svelte/attachments";
 
 import { ADMISSIONS, FIRST_POLICY, LANDINGS, WRITE_LIMITS } from "../../core/commands";
@@ -23,7 +22,6 @@ export const POLICY_SWITCHES = {
 };
 
 type Chosen = "write" | "admit" | "landing";
-
 
 export function policyColumns(lang: Lang, policy: RunPolicy): readonly PopoverColumn[] {
   const column = <K extends Chosen>(
@@ -46,7 +44,6 @@ export function policyColumns(lang: Lang, policy: RunPolicy): readonly PopoverCo
   ];
 }
 
-
 export function picked(policy: RunPolicy, column: string, row: string): RunPolicy {
   const write = WRITE_LIMITS.find((each) => column === "write" && each === row);
   const admit = ADMISSIONS.find((each) => column === "admit" && each === row);
@@ -59,7 +56,6 @@ export function picked(policy: RunPolicy, column: string, row: string): RunPolic
   };
 }
 
-
 export function policyFace(lang: Lang, policy: RunPolicy): string {
   return [
     say(lang, `admission_value_${policy.write}`),
@@ -69,7 +65,6 @@ export function policyFace(lang: Lang, policy: RunPolicy): string {
     .filter((each) => each !== null)
     .join(" · ");
 }
-
 
 export interface SwitchWire {
   readonly type: "checkbox";
@@ -85,7 +80,6 @@ export interface SwitchLook {
   readonly wire: SwitchWire;
 }
 
-
 export interface SelectWire {
   readonly value: string | undefined;
   readonly onchange: (event: { readonly currentTarget: { readonly value: string } }) => void;
@@ -97,7 +91,6 @@ export interface SelectLook {
   readonly options: readonly { readonly key: string; readonly label: string }[];
   readonly wire: SelectWire;
 }
-
 
 export interface PanelWire {
   readonly role: "dialog";
@@ -112,15 +105,13 @@ export interface PanelLook {
   readonly selects: readonly SelectLook[];
 }
 
-
 export interface PermissionsLook {
   readonly frame: FrameWire;
   readonly trigger: TriggerWire;
-  
+
   readonly face: string;
   readonly panel: PanelLook | undefined;
 }
-
 
 export interface PermissionsHands {
   readonly choose: (policy: RunPolicy) => void;
@@ -130,7 +121,7 @@ export interface PermissionsHands {
   readonly hold: {
     readonly frame: Attachment<HTMLElement>;
     readonly trigger: Attachment<HTMLElement>;
-    
+
     readonly first: Attachment<HTMLElement>;
   };
 }
@@ -179,7 +170,7 @@ function panelOf(lang: Lang, policy: RunPolicy, hands: PermissionsHands): PanelL
       },
     },
   });
-  
+
   const work = switchOf("mode", "talk_work_switch");
   return {
     wire: {

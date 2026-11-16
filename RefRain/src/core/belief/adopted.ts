@@ -8,13 +8,11 @@ import type { Doing } from "../doing";
 import type { RunSummary } from "../../wire";
 import type { RunBelief } from "./shape";
 
-
 function frozen(summary: RunSummary, held: RunBelief | undefined): Doing {
   const completion = summary.completion ?? null;
   if (completion !== null) return { kind: "frozen", completion };
   return held?.doing.kind === "frozen" ? held.doing : PHASES.run_frozen;
 }
-
 
 function going(summary: RunSummary, held: RunBelief | undefined): Doing {
   const wait = summary.waiting ?? null;
@@ -24,10 +22,7 @@ function going(summary: RunSummary, held: RunBelief | undefined): Doing {
   return known.kind === "awaiting_reply" ? { kind: "unknown" } : known;
 }
 
-
 export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBelief {
-  
-  
   if (held !== undefined && held.lastSeq >= summary.last_seq) {
     const at = held.started ?? summary.started ?? null;
     const pr = held.pr ?? summary.pr ?? null;
@@ -41,8 +36,7 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
       local: false,
     };
   }
-  
-  
+
   return {
     run: summary.run,
     addr: summary.addr ?? held?.addr ?? null,

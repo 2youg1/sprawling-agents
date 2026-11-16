@@ -3,24 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { forget, keep, kept, makeKey } from "./device";
 import type { LocalDevice } from "./device";
 import { doorHere, pair, session } from "./door";
 import type { PairProof } from "./door";
 
-
 export interface Credential {
-  
-  
   readonly current: () => string | null;
-  
-  
+
   readonly renew: () => Promise<Renewal>;
 }
 
 export type Renewal = "renewed" | "kept" | "forgotten";
-
 
 export type PairWhy = "first" | "open_used" | "session_lost" | "keyless";
 
@@ -28,13 +22,11 @@ export type Entry =
   | { readonly kind: "enter"; readonly credential: Credential }
   | { readonly kind: "pair"; readonly why: PairWhy };
 
-
 export type Paired =
   | { readonly kind: "paired"; readonly credential: Credential }
   | { readonly kind: "refused"; readonly said: string }
   | { readonly kind: "keyless" }
   | { readonly kind: "unreachable" };
-
 
 export const NO_CREDENTIAL: Credential = {
   current: () => null,
@@ -43,18 +35,15 @@ export const NO_CREDENTIAL: Credential = {
 
 const OPEN = "#open=";
 
-
 export function openCodeIn(hash: string): string | null {
   if (!hash.startsWith(OPEN)) return null;
   const code = hash.slice(OPEN.length);
   return code === "" ? null : code;
 }
 
-
 export function withoutOpenCode(location: Pick<Location, "pathname" | "search">): string {
   return `${location.pathname}${location.search}`;
 }
-
 
 export function mayHaveDoor(protocol: string): boolean {
   return protocol === "http:";
@@ -80,7 +69,6 @@ export async function enter(origin: string, open: string | null, label: string):
     : { kind: "enter", credential };
 }
 
-
 export async function pairWith(origin: string, proof: PairProof, label: string): Promise<Paired> {
   const made = await makeKey();
   if (made === null) return { kind: "keyless" };
@@ -100,7 +88,6 @@ export async function pairWith(origin: string, proof: PairProof, label: string):
       return { kind: "unreachable" };
   }
 }
-
 
 export function credentialOf(origin: string, device: LocalDevice): Credential {
   let token: string | null = null;
@@ -124,13 +111,11 @@ export function credentialOf(origin: string, device: LocalDevice): Credential {
   };
 }
 
-
 export function browserLabel(userAgent: string): string {
   const browser = BROWSERS.find(([pattern]) => pattern.test(userAgent))?.[1] ?? "Browser";
   const system = SYSTEMS.find(([pattern]) => pattern.test(userAgent))?.[1];
   return system === undefined ? browser : `${browser} · ${system}`;
 }
-
 
 const BROWSERS: readonly (readonly [RegExp, string])[] = [
   [/Edg\//, "Edge"],

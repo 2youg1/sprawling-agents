@@ -6,27 +6,12 @@
 -->
 
 <script lang="ts" module>
-  // The thread in the two states its anchoring decides between (ux B1),
-  // each drawn as the viewport shows it: one conversation in one
-  // scroller, once at the foot where the growing edge is followed, and
-  // once left mid-history where the person's place is held while the
-  // same words arrive below the fold. Both specimens carry identical
-  // content, so the only difference a person judges is which end of it
-  // the box shows.
-  //
-  // The reply still arriving is stated as two fixture values - what has
-  // settled and what is still faint at the growing edge - rather than
-  // one string cut at a number: the live thread owns that number, and
-  // the `saying` fixtures beside these are where its size is judged.
-
   import type { Snippet } from "svelte";
 
   import { say } from "../../core/lang";
   import type { Utterance } from "./served";
   import { EARLIER_SEGMENT, ROUND } from "./served";
 
-  // The one thread both specimens draw: the segment the session
-  // divider folds away, then this round, then the reply arriving.
   const LINES: readonly Utterance[] = [...EARLIER_SEGMENT, ...ROUND];
 
   const SETTLED =
@@ -40,9 +25,6 @@
 
   const { lang } = ui();
 
-  // The checker types a `{#snippet}` name as a void call, which the
-  // lint lane rejects inside a render tag. Each name is taken again as
-  // its `Snippet` type, and the template renders that.
   const drawUtterance: Snippet<Parameters<typeof utterance>> = utterance;
   const drawArriving: Snippet = arriving;
 </script>
@@ -65,9 +47,6 @@
   {/if}
 {/snippet}
 
-<!-- The reply as the thread draws it mid-turn: the settled words, the
-     last characters faint so text emerges instead of appearing, and
-     the cursor the `blink` animation carries. -->
 {#snippet arriving()}
   <div class="my-base text-body">
     <div class="mb-tight text-note text-text-faint">{say($lang, "talk_resident")}</div>
@@ -79,9 +58,6 @@
   </div>
 {/snippet}
 
-<!-- At the foot: `justify-end` packs the thread to the foot of its
-     scroller exactly as the live column does, so the growing edge is
-     what the viewport holds and the append follows it. -->
 <Case label="thread · at the foot, the growing edge followed">
   <div class="h-output overflow-y-auto">
     <div class="flex min-h-full w-full flex-col justify-end px-pane pb-wide">
@@ -93,9 +69,6 @@
   </div>
 </Case>
 
-<!-- Reading back: the same thread with the foot free, so the viewport
-     sits in the history and the words arriving below it change nothing
-     on screen. -->
 <Case label="thread · reading back, the place held while words arrive">
   <div class="h-output overflow-y-auto">
     <div class="flex min-h-full w-full flex-col px-pane pb-wide">

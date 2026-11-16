@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// A ratio box refuses exactly what the wire type refuses: a value under
-// its floor. There is no ceiling, and an empty box is not a refusal —
-// it is the person saying nothing, which is a different act.
-
 import { expect, test } from "bun:test";
 
 import { LINE_HEIGHT_FLOOR, TRACKING_FLOOR, ratioOf, spelledRatio } from "./metrics";
@@ -34,8 +30,6 @@ test("a tracking is signed, read in thousandths, and anything under the floor is
   expect(ratioOf("-0.051", TRACKING_FLOOR)).toEqual({ kind: "refused" });
   expect(ratioOf("-0.05", TRACKING_FLOOR)).toEqual({ kind: "set", perMille: -50 });
   expect(ratioOf("--1", TRACKING_FLOOR)).toEqual({ kind: "refused" });
-  // More than the integer the wire holds is refused here rather than left
-  // for the city to refuse the whole appearance over.
   expect(ratioOf("99999999999", LINE_HEIGHT_FLOOR)).toEqual({ kind: "refused" });
 });
 

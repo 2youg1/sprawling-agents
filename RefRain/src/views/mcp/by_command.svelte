@@ -6,15 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // `claude mcp add <name> -- <cmd> [args]`, as a form: a name, the
-  // shell line that starts the program, and the environment that line
-  // is given.
-  //
-  // The environment table is here because a stdio server that needs a
-  // token is the ordinary case; today it can be filled in and not sent,
-  // and the sentence under it says which half of that is the city's
-  // fault.
-
   import type { Draft, Intake } from "./draft";
 
   export interface ByCommandProps {

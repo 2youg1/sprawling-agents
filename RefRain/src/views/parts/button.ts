@@ -3,28 +3,22 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 export type Tone = "primary" | "secondary" | "quiet" | "destructive";
-
 
 export type ButtonState = "idle" | "loading" | "stopped";
 
 export interface ButtonProps {
-  
   readonly label: string;
-  
-  
+
   readonly name?: string;
   readonly tone?: Tone;
   readonly type?: "button" | "submit";
-  
+
   readonly loading?: boolean;
-  
-  
+
   readonly why?: string;
   readonly onPress?: () => void;
 }
-
 
 export interface ButtonWire {
   readonly type: "button" | "submit";
@@ -39,19 +33,16 @@ export interface ButtonLook {
   readonly label: string;
   readonly tone: Tone;
   readonly state: ButtonState;
-  
+
   readonly why: string | undefined;
-  
-  
+
   readonly wire: (hint: string | undefined) => ButtonWire;
 }
-
 
 export function stateOf(props: ButtonProps): ButtonState {
   if (props.why !== undefined) return "stopped";
   return props.loading === true ? "loading" : "idle";
 }
-
 
 export function lookOf(props: ButtonProps): ButtonLook {
   const state = stateOf(props);

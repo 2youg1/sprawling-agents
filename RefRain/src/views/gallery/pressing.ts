@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// A fixture opens on the state it names - the filter chosen, the menu
-// open - each time it comes into view, because another fixture on the
-// route may take the focus away and close a menu meanwhile.
 export function pressing(selector: string): (node: HTMLElement) => () => void {
   return (node) => {
     const seen = new IntersectionObserver((entries) => {

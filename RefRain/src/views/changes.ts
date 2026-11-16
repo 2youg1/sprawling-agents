@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The three folds a file-change row states: what happened to the file,
-// how much of it moved, and the seven characters of an object id that
-// tell two commits apart in a row. `changes.svelte` draws them and a
-// working-tree list states the same three facts about the same
-// `FileChange`, so the folds live here rather than being translated
-// twice (`parts/glyph.ts` is the companion module of the same kind).
-
 import { fill, say } from "../core/lang";
 import type { Lang } from "../core/lang";
 import type { HunksAnswer, How, Lines } from "../wire";
@@ -39,8 +32,6 @@ export function shortOid(oid: string): string {
   return oid.slice(0, 7);
 }
 
-// One line of a patch as a reader points at it. `number` is the line's
-// place in the patch text and is what keys it on the page.
 export type Numbered =
   | { readonly kind: "head"; readonly number: number; readonly text: string }
   | {
@@ -65,18 +56,10 @@ export type Numbered =
     }
   | { readonly kind: "withheld"; readonly number: number; readonly reason: string };
 
-// A line's number in one of the two files, or `null` once a withheld
-// line has made the count unknowable until the next hunk header.
 export type Place = number | null;
 
-// A hunk header's two starts and the new side's length: `@@ -a[,b] +c[,d] @@`.
 const HUNK = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,(\d+))? @@/u;
 
-// Walks the patch in its own order, withheld lines in their places. The
-// hunk headers are the only authority on where a line sits in either
-// file, so a withheld line - whose side the patch no longer says -
-// leaves both counts unknown until the next header restores them, and
-// the page draws a blank rather than a number that may be one off.
 export function numbered(patch: HunksAnswer): Numbered[] {
   const withheld: Numbered[] = patch.withheld.map((each) => ({
     kind: "withheld",
@@ -125,9 +108,6 @@ export function numbered(patch: HunksAnswer): Numbered[] {
   return drawn;
 }
 
-// What a chosen patch line puts in the composer: where it is, then the
-// line itself as a quote. A removed line lives only in the older tree,
-// so its place names that tree's commit.
 export function quoteLine(patch: HunksAnswer, line: CodeLine): string {
   switch (line.kind) {
     case "added":
@@ -146,8 +126,6 @@ export function quoteLine(patch: HunksAnswer, line: CodeLine): string {
   }
 }
 
-// The lines a person can point at: the ones that are code in one tree
-// or the other.
 export type CodeLine = Extract<Numbered, { readonly kind: "added" | "context" | "removed" }>;
 
 function quoted(place: string, text: string): string {

@@ -6,15 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // How a copy key is drawn, and nothing else: its words arrive
-  // translated and its press arrives wired (`./copy`, `CopyLook`).
-  //
-  // The named key stands at the ordinary control height, level with a
-  // Button beside it in a command row; the bare key is the small square
-  // of a header corner. Both widen their touch surface to the 44-point
-  // floor with `::before` while the drawn control stays on the control
-  // scale (docs/frontend-method.md §4-34). The receipt is a cut between
-  // two marks, with no motion between them.
   import type { CopyForm } from "./copy";
 
   const SHAPE: Record<CopyForm, string> = {

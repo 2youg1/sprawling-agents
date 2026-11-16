@@ -9,9 +9,6 @@
   const { wire, shown }: SliderLook = $props();
 </script>
 
-<!-- The track takes the accent, the colour the page reserves for what a
-person moves; the figure keeps a fixed width so the track does not shift
-as the number grows a digit. -->
 <div class="flex h-control items-center gap-base">
   <input {...wire} class="min-w-0 flex-1 accent-accent" />
   <span class="figure w-figure text-right text-body text-text">{shown}</span>

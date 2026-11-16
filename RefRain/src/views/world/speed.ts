@@ -3,18 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Turn } from "../../wire";
 import { tpsOf, ttftOf } from "../talk/timing";
 
 export interface Speed {
-  
   readonly ttft: number;
   readonly ttftMean: number;
   readonly turns: number;
   readonly tps: Spread | null;
 }
-
 
 export interface Spread {
   readonly p50: number;
@@ -47,7 +44,6 @@ function measuredBy(
     return value === null ? [] : [value];
   });
 }
-
 
 export function rankOf(values: readonly number[], percent: number): number | null {
   const sorted = [...values].sort((a, b) => a - b);

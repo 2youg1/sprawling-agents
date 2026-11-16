@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import type { Snippet } from "svelte";
 
   import { say } from "../../core/lang";
@@ -16,7 +12,7 @@
     readonly title: Key;
     readonly note: Key;
     readonly saving: Saving;
-    
+
     readonly settled: Key;
     readonly onSave?: () => void;
     readonly children: Snippet;

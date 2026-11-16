@@ -3,28 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The tab's icon, painted from the theme rather than shipped: a hidden
-// tab shows whether the city is idle, working, or waiting for the
-// person, or whether the page is not being told at all. Each state is a
-// shape of its own and a colour the page uses, because a tab strip is
-// small and a hue alone is lost on a person who cannot tell two apart.
-// No colour is spelled here - each is read back from the stylesheet
-// through an element, so the coloured tokens' chroma coefficient
-// resolves the way it does on the page.
-
 import type { LinkState } from "./link";
 
 export type Mark = "quiet" | "live" | "waiting" | "untold";
 
-// What the page knows, reduced to the one word the tab can say.
 export interface Standing {
   readonly waiting: number;
   readonly working: boolean;
   readonly link: LinkState["kind"];
 }
 
-// Off the link, what the belief last said may have moved on, so the tab
-// makes no claim about the city until the page is told again.
 export function markOf(standing: Standing): Mark {
   if (standing.link !== "live") return "untold";
   if (standing.waiting > 0) return "waiting";
@@ -38,7 +26,6 @@ const TOKEN: Readonly<Record<Mark, string>> = {
   untold: "--color-g5",
 };
 
-// The figure each mark draws on the 32-unit ground, in the ink's colour.
 const FIGURE: Readonly<Record<Mark, (ink: string) => string>> = {
   quiet: (ink) => `<circle cx="16" cy="16" r="6" fill="none" stroke="${ink}" stroke-width="3"/>`,
   live: (ink) => `<circle cx="16" cy="16" r="7" fill="${ink}"/>`,
@@ -46,7 +33,6 @@ const FIGURE: Readonly<Record<Mark, (ink: string) => string>> = {
   untold: (ink) => `<rect x="7" y="14" width="18" height="4" rx="2" fill="${ink}"/>`,
 };
 
-// The resolved colour of one token, as the engine would paint it.
 function resolved(doc: Document, token: string): string {
   const probe = doc.createElement("span");
   probe.style.color = `var(${token})`;
@@ -68,7 +54,6 @@ export function paintMark(doc: Document, mark: Mark): void {
   link.href = `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-// The icon itself, given the two colours it is painted in.
 export function markSvg(mark: Mark, ground: string, ink: string): string {
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">` +

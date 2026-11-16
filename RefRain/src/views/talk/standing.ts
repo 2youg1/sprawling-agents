@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { heldIn } from "../../core/belief/rooms";
 import type { Belief } from "../../core/belief/shape";
 import type { Address } from "../../wire";
@@ -16,9 +15,7 @@ interface Selection {
 
 const selections = new Map<string, Selection>();
 
-
 const readings = new Map<string, number>();
-
 
 export function keepSelection(
   place: string | undefined,
@@ -32,7 +29,6 @@ export function keepSelection(
     });
   }
 }
-
 
 export function restoreSelection(
   place: string | undefined,
@@ -50,7 +46,6 @@ export function keepReading(place: string, top: number | null): void {
 export function readingAt(place: string): number | null {
   return readings.get(place) ?? null;
 }
-
 
 export function recalled(belief: Belief, room: Address): string | null {
   return (

@@ -3,19 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The whole value the release answer's look draws (`AnswerLook`), built
-// from one `ReleaseAnswer` with `./reading.ts`: the sentences saying
-// where this binary stands, one line per registry the city asked, and
-// the update command for the channel that installed it, with every word
-// translated and the channel choice's handler inside a wire bag (client
-// D95).
-//
-// Nothing here updates anything: the command is the city's
-// `update.command`, printed for a User to run, because the channel that
-// installed the binary owns updating it. Where the city could not tell
-// two channels apart it offers `update.alternatives`, and no command is
-// shown until the person picks the one that installed this binary.
-
 import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
 import type {
@@ -27,7 +14,6 @@ import type {
 } from "../../wire";
 import { confirmedCommand, registryLineOf, updateOf } from "./reading";
 
-// The four inks a sentence about this release is set in.
 export type Ink = "text" | "quiet" | "accent" | "alert";
 
 export interface Statement {
@@ -36,15 +22,11 @@ export interface Statement {
 }
 
 export interface RegistryLook {
-  // The registry's name, translated; one line per registry, so it keys
-  // the `#each`.
   readonly name: string;
   readonly newest: ReleaseLine | undefined;
   readonly reason: { readonly text: string; readonly said: string | undefined } | undefined;
 }
 
-// The bag spread on the channel choice. The look draws it as it likes
-// (a native select or a library's) and hands the chosen value back.
 export interface ChannelWire {
   readonly "aria-label": string;
   readonly value: string;
@@ -52,10 +34,7 @@ export interface ChannelWire {
 }
 
 export interface UpdateLook {
-  // How this binary was installed, as a sentence.
   readonly channel: string;
-  // Present when the city offers more than one command: the choice that
-  // decides which, with its unchosen first entry and the commands.
   readonly choice:
     | {
         readonly unchosen: string;
@@ -63,12 +42,10 @@ export interface UpdateLook {
         readonly wire: ChannelWire;
       }
     | undefined;
-  // The command to run, once it is known.
   readonly command: string | undefined;
 }
 
 export interface AnswerLook {
-  // The city could not ask the registries: what it said to do instead.
   readonly refused: { readonly text: string; readonly recovery: string } | undefined;
   readonly statements: readonly Statement[];
   readonly registries: readonly RegistryLook[];
@@ -76,8 +53,6 @@ export interface AnswerLook {
 }
 
 export interface Hands {
-  // The person picked the command that installed this binary, or went
-  // back to the unchosen entry.
   readonly choose: (command: string | null) => void;
 }
 

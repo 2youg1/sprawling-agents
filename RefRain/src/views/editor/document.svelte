@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { draftPlace } from "../../core/document_save";
   import { fill, say } from "../../core/lang";
   import { kib } from "../../core/time";
@@ -34,7 +32,7 @@
     readonly at: Address;
     readonly building: Address;
     readonly version: B3Hash | null;
-    
+
     readonly reading?: Reading;
   }
 
@@ -44,14 +42,14 @@
   const lang = u.lang;
   // svelte-ignore state_referenced_locally (a session belongs to one document and version; refrain.svelte keys this component on both)
   const session = new Session(u, at, version);
-  
+
   // svelte-ignore state_referenced_locally (one document per component, as above)
   const unkept = u.prefs.draftUnkept(draftPlace(at));
   const drafted = $derived(session.receipt.kind !== "clean" && session.receipt.kind !== "saved");
 
   // svelte-ignore state_referenced_locally (the first reading only; the person picks the rest)
   let reading = $state<Reading>(first);
-  
+
   let anchor = $state<number | null>(null);
   let top = 0;
 
@@ -59,13 +57,11 @@
   const markdown = $derived(
     session.file?.kind === "text" && session.file.gathering.format === "markdown",
   );
-  
-  
+
   const html = $derived(session.file?.kind === "text" && drawnAs(at) === "html");
 
   const phrases = $derived(phrasesIn($lang));
 
-  
   function pick(next: Reading): void {
     const editing = session.editing;
     const base = session.positions;
@@ -116,7 +112,6 @@
 
   const editorShown = $derived(reading === "source" || reading === "diff");
 
-  
   function unshowable(card: ProposalCard): string | undefined {
     return session.editing !== null && session.positions?.version === card.baseline
       ? undefined

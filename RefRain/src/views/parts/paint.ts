@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { highlightCode, tagHighlighter, tags } from "@lezer/highlight";
 
 import type { Ink, Piece } from "./code";
@@ -13,7 +12,6 @@ type Tree = Parameters<typeof highlightCode>[1];
 interface Grammar {
   parse(text: string): Tree;
 }
-
 
 type Family =
   | "cpp"
@@ -47,7 +45,6 @@ const LOAD: Record<Family, () => Promise<Grammar>> = {
   yaml: () => import("@lezer/yaml").then((grammar) => grammar.parser),
 };
 
-
 const FAMILY = new Map<string, Family>([
   ["c", "cpp"],
   ["cc", "cpp"],
@@ -74,7 +71,6 @@ const FAMILY = new Map<string, Family>([
   ["yml", "yaml"],
 ]);
 
-
 const HIGHLIGHT = tagHighlighter([
   { tag: tags.comment, class: "comment" },
   { tag: tags.string, class: "string" },
@@ -89,7 +85,6 @@ const INK = new Map<string, Ink>([
   ["word", "word"],
 ]);
 
-
 const loaded = new Map<Family, Promise<Grammar>>();
 
 function grammarOf(family: Family): Promise<Grammar> {
@@ -99,7 +94,6 @@ function grammarOf(family: Family): Promise<Grammar> {
   loaded.set(family, asked);
   return asked;
 }
-
 
 function nameOf(source: string): string {
   const name = source.slice(source.lastIndexOf("/") + 1);

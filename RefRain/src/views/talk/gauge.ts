@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Belief } from "../../core/belief";
 import { heldIn } from "../../core/belief/rooms";
 import type { Lang } from "../../core/lang";
@@ -11,23 +10,19 @@ import { fill, say } from "../../core/lang";
 import { kilo } from "../../core/time";
 import type { Address, Answer, RunId } from "../../wire";
 
-
 export interface ContextTurn {
   readonly model?: string | null | undefined;
   readonly used?: { readonly input: number } | null | undefined;
 }
-
 
 export interface ContextModel {
   readonly id: string;
   readonly context_tokens?: number | null | undefined;
 }
 
-
 export interface ContextEndpoint {
   readonly models: readonly ContextModel[];
 }
-
 
 export interface Reminders {
   readonly first: number | null;
@@ -39,19 +34,16 @@ export interface Context extends Reminders {
   readonly window: number;
 }
 
-
 export function remindersOf(answer: Answer | undefined): Reminders {
   if (answer === undefined || !("config" in answer)) return { first: null, second: null };
   return { first: answer.config.first ?? null, second: answer.config.second.percent };
 }
-
 
 export function lockOfConfig(answer: Answer | undefined): number | null {
   if (answer === undefined || !("config" in answer)) return null;
   const lock = answer.config.context_lock_tokens;
   return lock === undefined || lock === null || lock <= 0 ? null : lock;
 }
-
 
 export function remindersSaid(lang: Lang, reminders: Reminders): readonly string[] {
   return [
@@ -64,14 +56,12 @@ export function remindersSaid(lang: Lang, reminders: Reminders): readonly string
   ];
 }
 
-
 export function sessionRunOf(belief: Belief, room: Address): RunId | undefined {
   const began = belief.sessions[room] ?? null;
   return heldIn(belief, room)
     .filter((each) => began === null || each.lastSeq > began)
     .at(-1)?.run;
 }
-
 
 export function contextOf(
   turns: readonly ContextTurn[],
@@ -91,26 +81,22 @@ export function contextOf(
   return { used: latest?.used?.input ?? 0, window, ...reminders };
 }
 
-
 export function usedPercent(context: Context): number {
   return Math.min(100, Math.max(0, Math.round((context.used / context.window) * 100)));
 }
-
 
 export function remainingArc(context: Context): Arc {
   const used = usedPercent(context);
   return { dasharray: `${String(100 - used)} 100`, dashoffset: String(-used) };
 }
 
-
 export type Reminder = "first" | "second";
 
 export interface Checkpoint {
   readonly reminder: Reminder;
-  
+
   readonly at: number;
 }
-
 
 export function checkpointsOf(reminders: Reminders): readonly Checkpoint[] {
   return [
@@ -118,7 +104,6 @@ export function checkpointsOf(reminders: Reminders): readonly Checkpoint[] {
     ...(reminders.second === null ? [] : [{ reminder: "second" as const, at: reminders.second }]),
   ];
 }
-
 
 export interface MeterWire {
   readonly role: "button";
@@ -131,10 +116,9 @@ export interface MeterWire {
   readonly "aria-valuetext": string;
 }
 
-
 export interface RingLook {
   readonly meter: MeterWire;
-  
+
   readonly reading: string;
   readonly arc: Arc;
   readonly checkpoints: readonly Checkpoint[];
@@ -144,7 +128,6 @@ export interface Arc {
   readonly dasharray: string;
   readonly dashoffset: string;
 }
-
 
 export function ringOf(lang: Lang, context: Context | null): RingLook | null {
   if (context === null) return null;
@@ -170,13 +153,11 @@ export function ringOf(lang: Lang, context: Context | null): RingLook | null {
   };
 }
 
-
 export interface ContextBarLook {
   readonly share: number;
   readonly handoff: Checkpoint | undefined;
   readonly said: string;
 }
-
 
 export function barOf(lang: Lang, context: Context | null): ContextBarLook | null {
   if (context === null) return null;

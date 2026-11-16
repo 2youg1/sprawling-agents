@@ -5,14 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts" module>
-  // The shell, whole, in the states docs/frontend-method.md §7H and §7I name: an empty
-  // room, a working room in each of the three tiers, and the right pane
-  // open. Every case mounts the conversation page and the edge keys the
-  // shell mounts, on the shell's own grid at a window of 1440 by 860, in
-  // a made-up city (`stand.svelte`, `shelled.ts`): the runs of
-  // `resulted.svelte`'s six rooms, a session whose last turn used a fifth
-  // of a 204,800-token window, the two reminders at 30% and 65%, and a
-  // page of commits.
   import { recordsAt } from "./resulted.svelte";
   import { EMPTY_ROOM, ROOM, answering } from "./shelled";
 </script>
@@ -54,10 +46,6 @@
       answers={answering(shown.panel)}
       {records}
     >
-      <!-- A container named as the shell's body is, so the specimen's
-      silver cut is measured on its own width; a transform makes the frame
-      the containing block of everything fixed inside it, so the drawer
-      and the toasts stay in the specimen. -->
       <div class="@container/shell">
         <div class="frame relative h-[860px] translate-x-0 overflow-hidden bg-page">
           <Workspace address={shown.room} tier={shown.tier} seat="specimen" panel={shown.panel} />

@@ -5,15 +5,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- One changed file of the working tree. The row whose file is in front
-on the right side is marked the way a chosen row is marked everywhere -
-the strong wash and the 2 px accent bar on its left
-(docs/frontend-method.md §7B); any other row takes the row's wash under
-the pointer. The bar stands on the row rather than in the button, so it
-spans the row's height beside whatever control follows. -->
 <script lang="ts">
   import type { FileRowLook } from "./file_row";
-
   const look: FileRowLook = $props();
 </script>
 

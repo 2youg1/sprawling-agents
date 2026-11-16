@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { describe, expect, test } from "bun:test";
 
 import type { CatalogAnswer, CatalogSkill, Exposure } from "../../wire";
@@ -24,7 +23,6 @@ import {
 } from "./catalog";
 import { catalogLook } from "./catalog_look";
 import type { Row, Selection, Table } from "./catalog";
-
 
 function row(
   name: number,
@@ -128,7 +126,6 @@ describe("the capabilities draft", () => {
     ).toBe(true);
   });
 
-  
   const VECTORS: readonly {
     readonly edits: readonly Edit[];
     readonly tools: Readonly<Record<string, Exposure>>;
@@ -344,8 +341,7 @@ describe("the capabilities draft", () => {
       unused: () => undefined,
       copy: () => undefined,
     };
-    
-    
+
     const removedTools = catalogLook(
       {
         answer,
@@ -455,4 +451,3 @@ describe("the capabilities draft", () => {
     }
   });
 });
-

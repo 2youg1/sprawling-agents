@@ -3,29 +3,23 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { Option, Schema } from "effect";
 
 import { Address } from "../../wire";
 import type { IconButtonProps } from "./icon_button";
 
 export interface PathProps {
-  
   readonly path: string;
-  
-  
+
   readonly base?: string | undefined;
-  
-  
+
   readonly onOpen?: (() => void) | undefined;
 }
-
 
 export interface PathWords {
   readonly reveal: string;
   readonly inert: string;
 }
-
 
 export interface OpenWire {
   readonly type: "button";
@@ -34,9 +28,9 @@ export interface OpenWire {
 
 export interface PathLook {
   readonly shown: string;
-  
+
   readonly open: OpenWire | undefined;
-  
+
   readonly reveal: IconButtonProps;
 }
 

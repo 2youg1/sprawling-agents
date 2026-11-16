@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { onMount } from "svelte";
 
   import { fill, say } from "../../core/lang";
@@ -30,10 +26,8 @@
   const held = u.prefs.held;
   const theme: Theme = $derived($held.theme);
 
-  
   let tokens = $state<readonly string[]>([]);
-  
-  
+
   let drawn = $state<Readonly<Record<string, string>>>({});
   let warnings = $state<readonly string[]>([]);
   let host = $state<HTMLDivElement | undefined>(undefined);
@@ -63,7 +57,6 @@
     };
   });
 
-  
   $effect(() => {
     const resolve = drawnRgb(document.documentElement);
     drawn = Object.fromEntries(
@@ -142,7 +135,6 @@
   </Card>
   <div class="flex flex-col gap-base">
     <Card title={say($lang, "colours_legibility")}>
-      
       <div role="status">
         {#if warnings.length === 0}
           <p class="text-note text-text-faint">{say($lang, "colours_fine")}</p>
@@ -156,7 +148,6 @@
       </div>
     </Card>
     <Card title={say($lang, "colours_css")} note={say($lang, "colours_css_note")}>
-      
       <div class="flex h-output flex-col overflow-hidden rounded-control border border-edge-input">
         <Editor {wire} />
       </div>

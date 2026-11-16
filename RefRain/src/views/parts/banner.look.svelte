@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // How the page banner is drawn (`./banner`, `BannerLook`): the
-  // condition and the one control that ends it. The strip drops in from
-  // the edge it belongs to, and stays still for a machine that asks for
-  // less motion.
   import type { Weight } from "./banner";
 
   const PAINT: Record<Weight, string> = {
@@ -31,8 +27,6 @@
     PAINT[look.weight],
   ]}
 >
-  <!-- The condition wraps rather than truncating, because on a narrow
-  screen a cut sentence hides the very thing the strip is there to say. -->
   <div class="flex min-w-0 flex-wrap items-baseline gap-x-snug wrap-anywhere">
     <span>{look.text}</span>
     {#if look.detail !== undefined}

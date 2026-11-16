@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The size box refuses exactly what `wire::BodyPx` refuses: a size under
-// the floor. There is no ceiling, so a size the old range refused is read.
-
 import { expect, test } from "bun:test";
 
 import { BODY_PX } from "../wire";

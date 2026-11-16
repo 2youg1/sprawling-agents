@@ -4,11 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // One control of the remote group's door, the shipped look: a glyph
-  // and a visible name on a raised key, its note in a `Tip`. The type,
-  // the disabled state and the press arrive in `wire` from the seat
-  // (`remote_door.svelte`), spread whole on the button.
-
   import Glyph from "../parts/glyph.svelte";
   import Tip from "../parts/tip.svelte";
   import type { DoorKeyLook } from "./remote_door";
@@ -30,9 +25,6 @@
 </Tip>
 
 <style>
-  /* The key lights under the pointer and fades back when it leaves: the
-   * resting state leaves, the hovered state arrives
-   * (docs/frontend-method.md §4-43). Motion off zeroes the duration. */
   .door-key {
     transition:
       background-color var(--transition-duration-short) var(--ease-leave),

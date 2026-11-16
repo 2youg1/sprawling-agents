@@ -7,9 +7,6 @@ import { describe, expect, test } from "bun:test";
 
 import { carried } from "./carry";
 
-// A reader who scrolled away from the caret switches reading: the line
-// at the top of the editor, not the caret far below it, is what the
-// preview opens at, so the page does not jump (A34).
 describe("a change of reading", () => {
   const away = { cursor: 9000, top: 120 };
 

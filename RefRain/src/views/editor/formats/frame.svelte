@@ -6,14 +6,12 @@
 -->
 
 <script lang="ts">
-  
-  
   import { framed } from "./framed";
 
   interface Props {
     readonly page: string;
     readonly scheme: "authored" | "built";
-    
+
     readonly title: string;
   }
 

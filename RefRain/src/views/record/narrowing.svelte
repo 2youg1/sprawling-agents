@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts">
-  // The seat of one narrowing choice: it lends the decision
-  // (`./narrowing`) the person's language and draws whatever
-  // `./narrowing.look.svelte` is.
-
   import { ui } from "../../ui";
   import { lookOf } from "./narrowing";
   import type { NarrowingProps } from "./narrowing";

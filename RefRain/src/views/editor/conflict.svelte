@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { fill, say } from "../../core/lang";
   import { ui } from "../../ui";
   import Button from "../parts/button.svelte";
@@ -29,7 +27,7 @@
   let asking = $state(false);
 
   const theirs = $derived(session.theirs);
-  
+
   const waiting = $derived(theirs === null ? { why: say($lang, "refrain_conflict_unknown") } : {});
 </script>
 

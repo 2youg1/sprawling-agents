@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The city's runs as the lineage tree `sprawling view` prints - city,
-// building, room, run - flattened into the rows the board draws, with
-// the guide a terminal would print before each one.
-//
-// **What needs the person leads, at every level.** A run waiting for
-// the person sorts first in its room, a room holding one sorts first in
-// its building, and a building holding one sorts first in the city, so
-// the first screen of a board of a thousand runs is the part a person
-// has to act on. The address is the directory tree, so its first
-// segment is the building and the rest is the room.
-
 import { Option, Schema } from "effect";
 
 import type { RunBelief } from "../../core/belief";
@@ -22,8 +11,6 @@ import type { View } from "../../core/route";
 import { readRunId } from "../../core/run_id";
 import { Address } from "../../wire";
 
-// One run as the board needs it: what the belief already holds about
-// it. `ended` is null until the wire carries a run's last moment.
 export interface BoardRun {
   readonly run: string;
   readonly addr: string | null;
@@ -34,10 +21,6 @@ export interface BoardRun {
   readonly doing: Doing;
 }
 
-// The board's runs, read from the belief's run table. A run's last
-// moment is not on the wire yet, so every run's bar reaches now. The
-// fields are named rather than spread: a streamed token writes the run's
-// `saying`, and a board that read it would be rebuilt for every token.
 export function boardRuns(runs: Readonly<Record<string, RunBelief>>): BoardRun[] {
   return Object.values(runs).map(({ run, addr, task, goal, started, doing }) => ({
     run,
@@ -50,12 +33,6 @@ export function boardRuns(runs: Readonly<Record<string, RunBelief>>): BoardRun[]
   }));
 }
 
-// The phase a run's bar is coloured by: whose turn it is, and for a
-// run that has ended, how it ended. A run somebody stopped and a run
-// that ran out of budget are not a run that finished, and drawing all
-// three with one check mark told a person their cancelled work was done.
-// `reply` is a run stopped at a synchronous `send` until another room
-// answers: live, because nobody but that room has to act.
 export type Phase = "model" | "tool" | "person" | "reply" | "idle" | "done" | "stopped" | "capped";
 
 export function phaseOf(doing: Doing): Phase {
@@ -79,7 +56,6 @@ export function phaseOf(doing: Doing): Phase {
   }
 }
 
-// Whether a phase is one a run ends in.
 export function ended(phase: Phase): boolean {
   return phase === "done" || phase === "stopped" || phase === "capped";
 }
@@ -135,8 +111,6 @@ function grouped(runs: readonly BoardRun[]): Building[] {
   return [...buildings.values()];
 }
 
-// Waiting runs first, then newest first, then by id, so two runs
-// started in one millisecond still hold their places between renders.
 function byNeed(a: BoardRun, b: BoardRun): number {
   return (
     Number(asking(b)) - Number(asking(a)) ||
@@ -145,7 +119,6 @@ function byNeed(a: BoardRun, b: BoardRun): number {
   );
 }
 
-// A place holding a waiting run first, then by name.
 export function placeByNeed(
   a: { readonly name: string; readonly runs: readonly BoardRun[] },
   b: { readonly name: string; readonly runs: readonly BoardRun[] },
@@ -153,8 +126,6 @@ export function placeByNeed(
   return Number(b.runs.some(asking)) - Number(a.runs.some(asking)) || a.name.localeCompare(b.name);
 }
 
-// The board's rows. A key in `folded` closes that building or room: its
-// own row stays and everything beneath it leaves.
 export function rowsOf(runs: readonly BoardRun[], folded: ReadonlySet<string>): readonly Row[] {
   const rows: Row[] = [];
   const buildings = grouped(runs)
@@ -196,10 +167,6 @@ export function rowsOf(runs: readonly BoardRun[], folded: ReadonlySet<string>): 
   return rows;
 }
 
-// The rows a scrolled list draws: those the viewport shows and a margin
-// either side, so a thousand runs cost the rows on screen. Before the
-// first row has been measured `rowPx` is zero and the first `margin`
-// rows are drawn.
 export interface Window {
   readonly from: number;
   readonly to: number;
@@ -218,9 +185,6 @@ export function windowOf(
   return { from, to };
 }
 
-// Where a row leads when it is opened: a run to its page, a room to its
-// conversation, a building to its page. `None` for a name the address
-// grammar refuses, which a row built from the ledger should never carry.
 export function viewOf(row: Row): Option.Option<View> {
   switch (row.kind) {
     case "building":

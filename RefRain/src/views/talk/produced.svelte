@@ -6,13 +6,6 @@
 -->
 
 <script lang="ts">
-  // What a run produced, as the one phrase a results row or block ends
-  // with: how many files it changed and how many lines moved, measured
-  // from the tree the run opened at (`RoundsAnswer.opened_at`) to the
-  // tree it last checkpointed (`lastCheckpointIn` in `views/checkpoints.ts`, the same bound the
-  // run page asks with). The numbers are that `Changes` answer summed
-  // once in `core/results.ts`. A run that checkpointed nothing passes
-  // `head = null`, the working tree, exactly as the run page does.
   import { fill, say } from "../../core/lang";
   import { producedOf } from "../../core/results";
   import { ui } from "../../ui";

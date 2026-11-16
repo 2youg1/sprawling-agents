@@ -3,16 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The read stretches the wear bar keeps stay a sorted list of disjoint
-// pieces whose union is exactly what the viewport has shown, however
-// the view wandered.
-
 import { expect, test } from "bun:test";
 import { worn } from "./wear";
 import type { Stretch } from "./wear";
 
 test("a view that wanders keeps the read stretches sorted, disjoint and whole", () => {
-  // A fixed walk of views, as a person reads, jumps and comes back.
   const views: readonly Stretch[] = [
     [0, 100],
     [80, 180],

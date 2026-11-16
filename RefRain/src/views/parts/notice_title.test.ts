@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// A page that asks several questions at once and hears nothing back
-// used to put up one heading per question, each reading "this took too
-// long and was cut", so a person could not tell which of them the city
-// left unanswered without opening every fold.
-
 import { describe, expect, test } from "bun:test";
 
 import { noticeTitle, recoveryWords } from "./notice_title";
@@ -28,8 +23,6 @@ describe("the heading of a timeout", () => {
   });
 });
 
-// The defect: the city writes its recovery in English, and a Chinese
-// page showed it as written - the no-model refusal among them.
 describe("the next step under a refusal", () => {
   const CITY = "attach a provider on the settings page and pick a model for this tag";
 

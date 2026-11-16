@@ -3,10 +3,6 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- A child session handing its work back to this room (client D86):
-the child, linked to the session that did the work (`Arrived.session`,
-wire D43; the child's room when the sending was not paired), then how
-it ended, finished with who verified it or stopped with the reason. -->
 <script lang="ts">
   import { ui } from "../../ui";
   import { toFragment } from "../../core/route";

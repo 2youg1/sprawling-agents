@@ -3,12 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { statusLook } from "./glyph";
 import type { GlyphName, Status, Weight } from "./glyph";
 
 export interface BadgeProps {
-  
   readonly text: string;
   readonly status?: Status;
   readonly weight?: undefined;
@@ -19,20 +17,16 @@ export interface BadgeProps {
 export interface BadgeTierProps {
   readonly text: string;
   readonly status?: undefined;
-  
-  
+
   readonly weight?: Weight;
-  
+
   readonly dot?: boolean;
   readonly count?: undefined;
 }
 
 export interface BadgeCountProps {
-  
-  
   readonly count: number | "fresh";
-  
-  
+
   readonly cap?: number;
   readonly weight?: Weight;
   readonly text?: undefined;
@@ -44,7 +38,6 @@ export type AnyBadgeProps = BadgeProps | BadgeTierProps | BadgeCountProps;
 
 export const CAP = 99;
 
-
 export type BadgeLook =
   | {
       readonly form: "word";
@@ -54,7 +47,7 @@ export type BadgeLook =
     }
   | {
       readonly form: "count";
-      
+
       readonly text: string | undefined;
       readonly tier: Weight;
       readonly quiet: Quiet;
@@ -63,7 +56,6 @@ export type BadgeLook =
 export interface Quiet {
   readonly "aria-hidden": "true";
 }
-
 
 export function badgeOf(props: AnyBadgeProps): BadgeLook | undefined {
   if (props.count !== undefined)

@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { untrack } from "svelte";
   import type { Snippet } from "svelte";
   import { get } from "svelte/store";
@@ -33,14 +31,11 @@
   import { short } from "./reading";
 
   interface Props {
-    
     readonly doc: Address;
     readonly card: ProposalCard;
-    
-    
+
     readonly version: B3Hash | null;
-    
-    
+
     readonly lead?: Snippet;
   }
 
@@ -51,13 +46,12 @@
   const belief = u.conn.belief;
 
   let deciding = $state<Deciding>({ kind: "idle" });
-  
+
   let edit = $state<Edit | null>(null);
   let editing = $state(false);
 
   const standing = $derived(standingOf(card, version));
-  
-  
+
   const held = $derived({ standing, deciding, edit: editing ? edit : null, lead });
   const asker = $derived(
     fill(say($lang, "proposal_from"), {
@@ -116,7 +110,6 @@
 
   const look = $derived(cardLookOf(card, held, $lang, { retake }));
 
-  
   $effect(() => {
     let last: AxError | null = get(belief).refusal;
     return belief.subscribe((believed) => {
@@ -131,7 +124,6 @@
     });
   });
 
-  
   $effect(() => {
     let live = get(u.conn.state).kind === "live";
     return u.conn.state.subscribe((state) => {

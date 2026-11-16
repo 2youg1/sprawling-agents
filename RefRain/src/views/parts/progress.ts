@@ -3,15 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 export interface ProgressProps {
-  
   readonly label: string;
   readonly done: number;
-  
+
   readonly total: number;
 }
-
 
 export interface BarWire {
   readonly role: "progressbar";
@@ -22,17 +19,16 @@ export interface BarWire {
   readonly "aria-busy": "true" | "false";
 }
 
-
 export interface Reached {
   readonly done: number;
   readonly total: number;
-  
+
   readonly share: number;
 }
 
 export interface ProgressLook {
   readonly bar: BarWire;
-  
+
   readonly reached: Reached | undefined;
 }
 

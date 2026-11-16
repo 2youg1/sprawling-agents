@@ -6,19 +6,10 @@
 -->
 
 <script lang="ts" module>
-  // The performance panel before its first sample, with ten seconds
-  // behind it whose readings run from a few nanoseconds to terabytes,
-  // and with a full five minutes behind it; then the sampling beat
-  // control in its header, on one of its steps and off all of them.
-  // The history is a fixed script rather than a random one, so the
-  // render gate sees the same curves every time.
-
   import type { Sample } from "../../wire";
 
   const GIB = 1024 ** 3;
 
-  // Three hundred samples, one a second, each counter on its own
-  // saw-tooth so every curve reaches its lowest and highest block.
   const FULL: readonly Sample[] = Array.from({ length: 300 }, (_, second) => ({
     core_cpu_permille: 20 + (second % 40),
     core_private_bytes: 180 * 1024 * 1024 + (second % 60) * 65_536,
@@ -38,9 +29,6 @@
     beat_ms: 100,
   }));
 
-  // Ten seconds where each counter moves by a sliver of a large value or
-  // by one unit of a small one, the two cases a plot scaled from zero
-  // draws flat: the window's own scale has to show both.
   const SHORT: readonly Sample[] = Array.from({ length: 10 }, (_, second) => ({
     core_cpu_permille: 1 + (second % 2),
     core_private_bytes: 3_330_000_000 + second * 10_000_000,
@@ -60,17 +48,12 @@
     beat_ms: 100,
   }));
 
-  // Ten seconds sampled at 75 ms, a beat another device set that is
-  // none of the five steps the page offers, so no step is chosen.
   const OFF_STEP: readonly Sample[] = SHORT.map((sample) => ({ ...sample, beat_ms: 75 }));
 
-  // The gallery has no city to ask, so opening the panel starts nothing.
   function watch(): () => void {
     return () => undefined;
   }
 
-  // Nor any city to set a beat on: the control is drawn, and a pick
-  // sends nothing, so the step stays where the last reading put it.
   const beat = (): void => undefined;
 </script>
 

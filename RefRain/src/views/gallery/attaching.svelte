@@ -6,18 +6,6 @@
 -->
 
 <script lang="ts">
-  // The parts of attaching a provider, each drawn by its own seat or
-  // look so the render gate reads every one of them: the list of what is
-  // attached with a long address and a row nobody named, the attach
-  // form's fold and the two readings of a draft that has headers and an
-  // override, and the probed-model table in the states its seat reaches
-  // only after a person has typed - rows ticked with figures and roles
-  // stated, an endpoint that served no list, filled in by hand, and the
-  // city's answer for every untouched box with an id named beside the
-  // list. The
-  // table's look is drawn from the wiring's own value over a state
-  // written here, which stays live: a press in the fixture redraws as it
-  // does on the page.
   import { ui } from "../../ui";
   import type { EndpointsAnswer } from "../../wire";
   import { freshTable } from "../setup/model_rows";
@@ -37,8 +25,6 @@
 
   const { lang } = ui();
 
-  // One endpoint whose address runs past its row and whose id differs
-  // from its name, beside one that has listed no model yet.
   const LISTED: EndpointsAnswer = {
     chosen: [],
     endpoints: ENDPOINTS.endpoints.map((endpoint, at) =>

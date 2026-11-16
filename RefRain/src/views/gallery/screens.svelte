@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
   import type { DoctorAnswer } from "../../wire";
   import type { Lang } from "../../core/lang";
   import { RELEASE_ALL } from "../../core/slash";
@@ -17,7 +15,6 @@
   import { Address, NodeId, Tokens, UsdMicros } from "../../wire";
   import Plan from "../building/plan.svelte";
 
-  
   const PLANNED: BuildingAnswer = {
     addr: Address.make("lab"),
     archive: [],
@@ -64,7 +61,6 @@
     sandbox: null,
   };
 
-  
   const UNPLANNED: BuildingAnswer = {
     ...PLANNED,
     plan: [],
@@ -77,7 +73,6 @@
     },
   };
 
-  
   const idle = {
     unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 },
   };
@@ -107,7 +102,6 @@
     ],
   };
 
-  
   const MACHINE: DoctorAnswer = {
     core: "raised",
     scanning: "does_not_apply",
@@ -157,7 +151,6 @@
     ],
   };
 
-  
   function wordOf(lang: Lang, recovery: Recovery): string {
     switch (recovery.kind) {
       case "command":
@@ -244,7 +237,6 @@
   <ModelTable served={PROBED} about={null} onChosen={() => undefined} />
 </Case>
 
-
 <Case label="settings · how hard the city thinks">
   <EffortSection />
 </Case>
@@ -269,7 +261,6 @@
     <Shelves />
   </Stand>
 </Case>
-
 
 <Case label="notices · the drawer, twelve entries across three days" width={440}>
   <div class="flex flex-col bg-chrome shadow-sheet">
@@ -308,7 +299,6 @@
   </div>
 </Case>
 
-
 <Case label="notices · three toasts, stacked at the corner">
   <div
     class="flex min-h-output w-full flex-col items-end justify-end gap-snug rounded-card border border-dashed border-edge-input p-snug"
@@ -342,7 +332,6 @@
   </div>
 </Case>
 
-
 <Case label="notices · inline under the field it belongs to">
   <div class="max-w-measure">
     <Field
@@ -363,7 +352,6 @@
     />
   </div>
 </Case>
-
 
 <Case label="building · plan showing a share and a leaf count">
   <Plan answer={PLANNED} />

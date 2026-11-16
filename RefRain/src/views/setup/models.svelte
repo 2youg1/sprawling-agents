@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
   import type { EndpointsAnswer, ModelTag } from "../../wire";
 
   interface ModelChoiceProps {
@@ -25,7 +23,6 @@
   const { answer, tags = ["main", "digest", "transcribe"] }: ModelChoiceProps = $props();
   const { lang, send } = ui();
 
-  
   const options = $derived(
     answer.endpoints.flatMap((endpoint) =>
       endpoint.models.map((row) => ({

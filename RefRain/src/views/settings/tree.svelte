@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { onDestroy, tick } from "svelte";
 
   import { initialTyped, lineWalker } from "../../core/lines";
@@ -20,9 +16,8 @@
   import Look from "./tree.look.svelte";
 
   interface Props {
-    
     readonly group: SetupGroup;
-    
+
     readonly beneath: View;
     readonly onPick: (group: SetupGroup) => void;
   }
@@ -45,7 +40,6 @@
   // svelte-ignore state_referenced_locally (the folds the panel opened on start open; the person folds them after)
   let folds = $state.raw<Folds>(foldsOf(group, beneath));
 
-  
   const leaves = $derived<Record<Nest, readonly Page[]>>({
     buildings: buildingPages($buildings),
     record: LENSES.map((lens) => ({
@@ -65,7 +59,6 @@
 
   const lines = lineWalker();
 
-  
   let drawn: SetupGroup | null = null;
   let stood: View | null = null;
   $effect(() => {

@@ -4,12 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // What one step of the guide opens onto: the door the city already has
-  // for that job, mounted here rather than copied, so the guide and the
-  // settings cannot come to disagree about how a provider is attached or
-  // a document saved. Each door asks its own questions only while its
-  // step is open.
-
   import { QUERIES } from "../../core/asking";
   import { readAnswer } from "../../core/answered";
   import { ui } from "../../ui";

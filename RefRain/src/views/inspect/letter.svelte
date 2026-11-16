@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { onMount } from "svelte";
   import { readable, type Readable } from "svelte/store";
 
@@ -26,7 +24,7 @@
   interface Props {
     readonly doc: Address;
     readonly card: B3Hash;
-    
+
     readonly opening?: Reading;
   }
 
@@ -37,7 +35,7 @@
   const belief = u.conn.belief;
 
   type Reading = "diff" | "talk" | "before" | "now";
-  
+
   // svelte-ignore state_referenced_locally
   let reading = $state<Reading>(opening);
   let heading = $state<HTMLElement | undefined>(undefined);
@@ -55,7 +53,6 @@
   const building = $derived(buildingOf(doc));
   const path = $derived(doc.slice(building.length + 1));
 
-  
   const NOTHING: Readable<Answer | undefined> = readable(undefined);
   const sender = $derived(
     held === null ? NOTHING : u.conn.asking.ask({ run_view: { run: held.run } }),

@@ -6,36 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // How hard the city thinks, and the three things a person has to know
-  // before they choose: the choice is frozen for the length of a run,
-  // the two wire formats disagree about where `none` is written, and
-  // saying nothing is not the same as saying `none`.
-  //
-  // **There is no picker here, because this page cannot keep an
-  // answer.** The standing level is the city's own `[model] effort`,
-  // read from `CONFIG.toml` by the configuration ladder that freezes
-  // every run; a level kept in this browser instead would ride on every
-  // dispatch from it and outrank the file without saying so. What this page states
-  // about the file is where the answer lives - the level is
-  // `Query::Config`'s to answer and the session selector's to write - so
-  // the section says that and stops there.
-  //
-  // **A session states its own level in the selector over the
-  // composer**, which is where a dispatch is made and the only scope
-  // this client can honestly offer: the city writes that level into the
-  // room it opens, and every run in that room then holds it.
-  //
-  // **The level in force is read, never kept.** `Query::Config` answers
-  // for an address rather than for the city, because the ladder has a
-  // building's rung; the section asks for the first building in the
-  // city's own order and names it beside the level, so the answer is
-  // exactly as wide as what was asked. A city with no building yet
-  // shows no line, because nothing would say which rung is in play.
-  //
-  // The welcome walk and the settings page both show this, so the
-  // paragraph cannot be present on one page and missing from the other.
-  // The words are in `lang.json` like every other word a reader is
-  // handed - this file only says where they go.
 </script>
 
 <script lang="ts">

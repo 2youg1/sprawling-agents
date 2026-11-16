@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import type { LineLook } from "./line";
 
   const { tone, children }: LineLook = $props();

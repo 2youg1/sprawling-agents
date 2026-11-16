@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { createAttachmentKey } from "svelte/attachments";
 import type { Attachment } from "svelte/attachments";
 
@@ -11,33 +10,28 @@ import type { Side } from "./layer";
 
 export interface Choice {
   readonly value: string;
-  
+
   readonly label: string;
-  
+
   readonly note?: string;
-  
-  
+
   readonly face?: string;
 }
 
 export interface ComboboxProps {
-  
   readonly label: string;
-  
-  
+
   readonly placeholder: string;
-  
+
   readonly empty: string;
   readonly choices: readonly Choice[];
-  
+
   readonly value: string | null;
-  
+
   readonly onPick: (value: string) => void;
-  
-  
+
   readonly starts?: "open" | "closed";
 }
-
 
 export function matching(choices: readonly Choice[], query: string): readonly Choice[] {
   const needle = query.trim().toLowerCase();
@@ -47,9 +41,7 @@ export function matching(choices: readonly Choice[], query: string): readonly Ch
   );
 }
 
-
 export type Return = "opener" | "leave";
-
 
 export type Answer =
   | { readonly kind: "cursor"; readonly at: number }
@@ -57,19 +49,15 @@ export type Answer =
   | { readonly kind: "close"; readonly focus: Return }
   | { readonly kind: "pass" };
 
-
 export type Origin = "trigger" | "field";
-
 
 export interface Pressed {
   readonly key: string;
-  
-  
+
   readonly isComposing: boolean;
 }
 
 const PASS: Answer = { kind: "pass" };
-
 
 export function answer(pressed: Pressed, origin: Origin, cursor: number, count: number): Answer {
   if (pressed.isComposing) return PASS;
@@ -96,7 +84,6 @@ export function answer(pressed: Pressed, origin: Origin, cursor: number, count: 
   }
 }
 
-
 export function claims(answered: Answer): boolean {
   switch (answered.kind) {
     case "cursor":
@@ -109,28 +96,23 @@ export function claims(answered: Answer): boolean {
   }
 }
 
-
 export interface Keyed extends Pressed {
   preventDefault(): void;
 }
 
-
 export type Layer = "unopened" | "open" | "shut";
-
 
 export interface ComboboxView {
   readonly props: ComboboxProps;
-  
-  
+
   readonly uid: string;
   readonly layer: Layer;
   readonly query: string;
-  
+
   readonly cursor: number;
   readonly rows: readonly Choice[];
   readonly side: Side;
 }
-
 
 export interface Hands {
   readonly toggle: () => void;
@@ -138,7 +120,7 @@ export interface Hands {
   readonly type: (query: string) => void;
   readonly point: (at: number) => void;
   readonly take: (choice: Choice) => void;
-  
+
   readonly leave: (next: EventTarget | null) => void;
   readonly holds: Holds;
 }
@@ -150,7 +132,6 @@ export interface Holds {
   readonly search: Attachment<HTMLInputElement>;
   readonly list: Attachment<HTMLUListElement>;
 }
-
 
 const HOLD = createAttachmentKey();
 
@@ -168,7 +149,6 @@ export interface TriggerWire {
 }
 
 export interface LayerWire {
-  
   readonly inert: boolean;
   readonly [hold: symbol]: Attachment<HTMLDivElement>;
 }
@@ -190,8 +170,7 @@ export interface ListWire {
   readonly id: string;
   readonly role: "listbox";
   readonly "aria-label": string;
-  
-  
+
   readonly onmousedown: (event: { preventDefault(): void }) => void;
   readonly [hold: symbol]: Attachment<HTMLUListElement>;
 }
@@ -208,11 +187,11 @@ export interface OptionLook {
   readonly key: string;
   readonly label: string;
   readonly note: string | undefined;
-  
+
   readonly face: string | undefined;
-  
+
   readonly chosen: boolean;
-  
+
   readonly cursor: boolean;
   readonly wire: OptionWire;
 }
@@ -220,12 +199,12 @@ export interface OptionLook {
 export interface ComboboxLook {
   readonly root: RootWire;
   readonly trigger: TriggerWire;
-  
+
   readonly face: string;
-  
+
   readonly faceStyle: string | undefined;
   readonly unset: boolean;
-  
+
   readonly layer: LayerWire | undefined;
   readonly open: boolean;
   readonly side: Side;
@@ -235,9 +214,7 @@ export interface ComboboxLook {
   readonly empty: string;
 }
 
-
 export const rowId = (uid: string, index: number): string => `${uid}-${String(index)}`;
-
 
 export function lookOf(view: ComboboxView, hands: Hands): ComboboxLook {
   const { props, uid, layer, cursor, rows } = view;

@@ -6,18 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // What came back from the far side, drawn beside the fields it is
-  // about. Two panels, because a probe and an attachment fail
-  // differently: an attachment that was turned away carries the city's
-  // own refusal, headed by its code (`core/probed.ts` `refusalOf`), and a probe carries a
-  // staged reading of how far the call got. The two slots are filled independently, because both can
-  // be true of one attempt and dropping one would be this file
-  // deciding which failure a person needed to see.
-  //
-  // The words are the caller's language, read here through `say`,
-  // because this panel owns which sentence answers which code and the
-  // caller owns when the language changes.
-
   import { refusalOf, stoppedAt } from "../../../core/probed";
   import type { Probed } from "../../../core/probed";
   import type { Key } from "../../../core/lang";
@@ -26,16 +14,9 @@
   export interface ReachProps {
     readonly probed: Probed | null;
     readonly error: AxError | null;
-    // What the fields are about, as the person reads it.
     readonly host: string;
   }
 
-  // What a person can do about a refusal, by the code it carries. The
-  // city's own `recovery` speaks to the runtime that must retry or fail
-  // over, so it is copied rather than shown; this table is the half
-  // written for the person filling in the form. `E_MODEL_UNCHOSEN` has
-  // no row: the router's model choice refuses with it, and a reach
-  // probe talks to the endpoint without asking the router.
   const NEXT_STEP: readonly (readonly [AxCode, Key])[] = [
     ["E_PROVIDER", "setup_next_provider"],
     ["E_TIMEOUT", "setup_next_timeout"],
@@ -60,12 +41,8 @@
   const { probed, error, host }: ReachProps = $props();
   const { lang } = ui();
 
-  // The call's destination reading, kept once so the stages below and
-  // the panel's own gate read the same value.
   const reach = $derived(probed === null ? null : probed.reach);
 
-  // The four stages as one list, so the table below draws from the
-  // same order the reading is taken in.
   const stages = $derived(
     reach === null
       ? []
@@ -79,9 +56,6 @@
 </script>
 
 {#if error !== null}
-  <!-- A refusal the city sent back, which is what an attachment that
-  failed produces. A probe answers with a reading instead, and that is
-  the other panel below. -->
   <div role="alert" class="rounded-card border border-alert/50 bg-chrome px-base py-snug text-note">
     {#if refusalOf(error.code) === "reach"}
       <p class="font-label text-alert">
@@ -89,7 +63,7 @@
       </p>
     {:else}
       <p class="font-label text-alert">{say($lang, "setup_form_refused")}</p>
-      <!-- wording-ok: the city's own account of what it refused, which names models, roles and ids as the city spells them -->
+
       <p class="mt-tight font-mono wrap-anywhere text-text">{error.subject}</p>
     {/if}
     <p class="mt-tight text-text-quiet">{say($lang, nextStep(error.code))}</p>
@@ -108,13 +82,6 @@
   </div>
 {/if}
 
-<!-- Where the call stopped, stage by stage, as the city measured it.
-Four stages, each with the word the city wrote for it, and above them
-the one sentence a person can act on. The stages are shown even when
-the call went through: a host that resolved and answered in 90 ms is
-not a proxy problem, and somebody sent to look at one has been sent the
-wrong way. The stages ask without the key, so their 401 is read beside
-the model list, which was asked with it (`core/probed.ts`). -->
 {#if probed !== null && reach !== null}
   {@const found = reach}
   {@const failed = probed.failure}
@@ -132,7 +99,7 @@ the model list, which was asked with it (`core/probed.ts`). -->
     <dl class="mt-snug grid grid-cols-2 gap-x-base gap-y-tight text-text-faint">
       {#each stages as [word, stage] (word)}
         <dt>{say($lang, word)}</dt>
-        <!-- wording-ok: the word the city itself wrote for this stage -->
+
         <dd class="min-w-0 font-mono">
           <Tip text={stage.detail ?? stage.state}>
             {#snippet children(hint: string)}

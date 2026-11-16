@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// A person on a local model, or on an endpoint that states no price, is
-// never billed per call, so a city that has run a dozen times answers
-// with a zero total.
-// The server counts those calls in `unpriced`; the page has to read that
-// count, or it tells the person that nothing happened.
-
 import { describe, expect, test } from "bun:test";
 
 import { costReading, runSpend } from "./pricing";

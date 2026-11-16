@@ -6,11 +6,6 @@
 -->
 
 <script lang="ts">
-  // How the unkept-draft line is drawn (`./unkept`, `UnkeptLook`): the
-  // sentence in the alert ink, the copy key at its end. The sentence
-  // starts from no width and wraps into what the key leaves, because
-  // the key's tip holder may shrink and a long sentence would otherwise
-  // push the key past the line's end.
   import Copy from "./copy.svelte";
   import type { UnkeptLook } from "./unkept";
 

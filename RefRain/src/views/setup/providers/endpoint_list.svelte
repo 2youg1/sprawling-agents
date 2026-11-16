@@ -6,18 +6,10 @@
 -->
 
 <script lang="ts" module>
-  // The seat of the list of what is attached: it asks the city for the
-  // retry count an endpoint calls with when none is chosen, lends each
-  // row its account editor (`./accounts.svelte`), and draws whatever
-  // `./endpoint_list.look.svelte` is. What a row says is
-  // `./endpoint_list`; `../providers.ts` is the one specifier a caller
-  // reaches this list and the attach form through.
-
   import type { EndpointsAnswer } from "../../../wire";
 
   export interface EndpointListProps {
     readonly answer: EndpointsAnswer;
-    // Initial model-disclosure state, used by the required welcome step.
     readonly openModels?: boolean;
   }
 </script>
@@ -36,8 +28,6 @@
   const { answer, openModels = false }: EndpointListProps = $props();
   const u = ui();
   const { lang } = u;
-  // The retry count an endpoint calls with when none is chosen is the
-  // same at every address, and the hall is the one every city has.
   const config = u.conn.asking.ask({ config: { addr: HALL } });
   const fallback = $derived.by(() => {
     const held = $config;

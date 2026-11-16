@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the head of one step of the guide is handed (`step.look.svelte`):
-// its number, its title, the word for where it stands, and the
-// disclosure button's wiring. Which step is open and what a press does
-// are `welcome.svelte`'s; the words are decided here, once.
-
 import type { Key } from "../../core/lang";
 import { say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
@@ -23,22 +18,18 @@ export interface StepWire {
 }
 
 export interface StepLook {
-  // Two digits, so the titles stand on one line whatever the count.
   readonly number: string;
   readonly title: string;
   readonly standing: Standing;
-  // The word for the standing; a step nobody touched says nothing.
   readonly word: string | undefined;
   readonly wire: StepWire;
 }
 
 export interface StepState {
   readonly step: GuideStep;
-  // Its place in the guide, from 0.
   readonly at: number;
   readonly standing: Standing;
   readonly open: boolean;
-  // The id of the head; the body is `${id}-body`.
   readonly id: string;
   readonly lang: Lang;
 }
@@ -51,7 +42,6 @@ const TITLE: Readonly<Record<GuideStep, Key>> = {
   mcp: "guide_step_mcp",
 };
 
-// What a step is for, drawn at the top of its body.
 export const ABOUT: Readonly<Record<GuideStep, Key>> = {
   provider: "guide_step_provider_about",
   dependencies: "guide_step_dependencies_about",

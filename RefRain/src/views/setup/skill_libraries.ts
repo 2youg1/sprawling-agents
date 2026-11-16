@@ -3,15 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Key } from "../../core/lang";
-
 
 export type Offered =
   | { readonly kind: "blank" }
   | { readonly kind: "refused"; readonly why: Key }
   | { readonly kind: "path"; readonly path: string };
-
 
 export function offered(written: string): Offered {
   const text = written.trim();
@@ -22,16 +19,13 @@ export function offered(written: string): Offered {
   return absolute ? { kind: "path", path: text } : { kind: "refused", why: "skill_mount_relative" };
 }
 
-
 export function alreadyMounted(shelves: readonly string[], path: string): boolean {
   return shelves.some((each) => each.trim() === path.trim());
 }
 
-
 export function withLibrary(shelves: readonly string[], path: string): readonly string[] {
   return alreadyMounted(shelves, path) ? shelves : [...shelves, path.trim()];
 }
-
 
 export function withoutLibrary(shelves: readonly string[], path: string): readonly string[] {
   return shelves.filter((each) => each !== path);

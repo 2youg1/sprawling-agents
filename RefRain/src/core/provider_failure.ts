@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The way out a person reads when a model call failed. The city names
-// the kind of failure; the words are this client's, one entry per kind in
-// `lang.json`, and the city's own English sentence stays in the fold.
-// Whether a refusal is worth asking again is the city's decision, carried
-// as `retry`; the words follow it rather than judging the status here.
-
 import type { ProviderFailureKind, Retry } from "../wire";
 import { fill, say, type Lang } from "./lang";
 

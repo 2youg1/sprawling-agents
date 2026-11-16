@@ -3,22 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What a person said while the link was down, kept in order until the
-// city greets the page again. Only words wait: a stop, a release or an
-// approval pressed now and carried out a minute later may no longer be
-// what the person wanted, so those are refused at the press instead.
-
 import { writable } from "svelte/store";
 import type { Readable } from "svelte/store";
 
 import type { Command } from "../wire";
 
 export interface Unsent {
-  // How many are waiting; the disconnect banner says this number.
   readonly count: Readable<number>;
   hold(command: Command): void;
-  // Sends in order and stops at the first that does not go, keeping it
-  // and everything after it for the next welcome.
   release(send: (command: Command) => boolean): void;
 }
 

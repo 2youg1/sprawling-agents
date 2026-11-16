@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  // The seat of the badge: it reads which of the three forms it was
-  // given (`./badge`) and draws whatever `./badge.look.svelte` is.
   import { badgeOf } from "./badge";
   import type { AnyBadgeProps } from "./badge";
   import Look from "./badge.look.svelte";

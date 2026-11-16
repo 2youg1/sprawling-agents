@@ -5,9 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- One room of the building, a row like the tree's beside it: the row's
-wash under the pointer, and the live badge at its end while runs work
-there. -->
 <script lang="ts">
   import Badge from "../parts/badge.svelte";
   import type { RoomRowLook } from "./room_row";

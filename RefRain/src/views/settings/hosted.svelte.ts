@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { DEFAULT_VIEW, toFragment } from "../../core/route";
 import { markEndAtFrame, markStart } from "../../core/timing";
 import type { SetupGroup, View } from "../../core/route";
@@ -12,7 +11,6 @@ import { FIRST_GROUP } from "./tree";
 let beneath = $state.raw<View>(DEFAULT_VIEW);
 
 let last = $state.raw<SetupGroup>(FIRST_GROUP);
-
 
 let pushed = false;
 
@@ -26,7 +24,6 @@ export function panelBeneath(): View {
 export function panelGroup(view: { readonly group?: SetupGroup }): SetupGroup {
   return view.group ?? last;
 }
-
 
 export function hostSettled(was: View, now: View, arrived: boolean): HTMLElement | null {
   if (now.kind === "setup") {
@@ -44,12 +41,10 @@ export function hostSettled(was: View, now: View, arrived: boolean): HTMLElement
   return back;
 }
 
-
 export function pickGroup(group: SetupGroup): void {
   markStart("settings_switch");
   location.replace(toFragment({ kind: "setup", group }));
 }
-
 
 export function closePanel(): void {
   closing = true;

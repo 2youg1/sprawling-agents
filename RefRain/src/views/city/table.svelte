@@ -4,12 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The seat of the building table the city page opens on: the ledger
-  // tree's first level, one row a building, with the counts a person
-  // reads the city by - waiting for them, at work, done, the last start
-  // - and one time bar per building on the runs board's folded clock. It
-  // reads the language and hands `./table.ts`'s value to whatever
-  // `./table.look.svelte` is.
   import { ui } from "../../ui";
   import type { Address, CityAnswer } from "../../wire";
   import type { BoardRun } from "../runs/lineage";

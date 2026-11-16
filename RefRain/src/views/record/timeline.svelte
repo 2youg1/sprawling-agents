@@ -4,21 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts" module>
-  // The record's diagnostics as one timeline (refrain S7.6 6c): what the
-  // ledger wrote and what the process logged, in one column on one axis,
-  // the ledger position. `timeline.ts` decides what stands in the column;
-  // `entry` draws each row: the day once above the first row of it, then
-  // a row per entry: the local time of day to the millisecond, the ledger
-  // position, what happened, and where.
-  // This file places the choices above the column and the column itself.
-  //
-  // **The process log is a source, not a lens.** It used to be a tab of
-  // its own, which put a line and the record it explains on two screens;
-  // now it is one of three sources, and `#/record/log` still opens the
-  // timeline with only the log showing. Choosing a source moves the
-  // address bar the same way, so a link to what the machine was writing
-  // is still a link.
-
   import type { Key } from "../../core/lang";
   import type { LogLine } from "../../wire";
   import type { Source } from "./timeline";
@@ -29,8 +14,6 @@
     log: "rec_log",
   };
 
-  // Every module that has spoken, sorted: the modules worth offering as
-  // a filter are the ones that wrote lines.
   function modulesIn(lines: readonly LogLine[]): readonly string[] {
     return [...new Set(lines.map((line) => line.module))].sort();
   }

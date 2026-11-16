@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// A line that renews the page's credential before it dials, so every
-// socket attempt shows the city a token minted for it: a token outlives
-// the socket it opened only by the city's idle allowance, and a city
-// that restarted knows no token at all, while it still knows the
-// device key that signs for a new one.
-
 import type { Dial, Line } from "../line";
 import type { Credential } from "./entering";
 
@@ -16,8 +10,6 @@ export function renewing(dial: Dial, credential: Credential, forgotten: () => vo
   return (hearing) => {
     let line: Line | null = null;
     let dropped = false;
-    // Read through a call: the link may drop the line while the renewal
-    // is awaited.
     const gone = (): boolean => dropped;
     void credential.renew().then((renewed) => {
       if (gone()) return;

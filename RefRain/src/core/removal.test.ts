@@ -7,8 +7,6 @@ import { expect, test } from "bun:test";
 import { Address } from "../wire";
 import { removalOf } from "./removal";
 
-// The page offers removal only where the city would carry it out: not
-// City Hall, and not a building a run is working in.
 test("removal is offered only for an idle building a person raised", () => {
   expect([
     removalOf(Address.make("lab"), 0),

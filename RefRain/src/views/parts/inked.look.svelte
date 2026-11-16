@@ -6,11 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // How a run of inked code is drawn, inside a `<pre>` the caller owns
-  // (`./code`, `InkedLook`). Every colour comes from the theme; this
-  // file states no value. The fifth ink is the plain text around the
-  // four the theme distinguishes. The file view and a Markdown code
-  // block both draw through here, which is why the ink table lives here.
   import type { Ink, InkedLook } from "./code";
 
   const PAINT: Record<Ink, string> = {

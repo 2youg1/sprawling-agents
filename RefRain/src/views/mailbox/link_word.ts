@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The link's state in one word, read by the mailbox key's name and by
-// the head of its column. Four of the six states are one word to a
-// person: the socket is on its way up.
-
 import type { LinkState } from "../../core/link";
 import type { Lang } from "../../core/lang";
 import { say } from "../../core/lang";

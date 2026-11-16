@@ -3,11 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Weight } from "../../parts/glyph";
 
 export type Action = "apply" | "restore" | "reconcile";
-
 
 export type Result = "running" | "done" | "refused";
 
@@ -37,7 +35,6 @@ export interface Step<I> {
 }
 
 export const IDLE = { kind: "idle" } as const;
-
 
 export function pressable<I>(stage: Stage<I>): boolean {
   switch (stage.kind) {
@@ -89,11 +86,10 @@ export function step<I>(
   }
 }
 
-
 export interface Fact {
   readonly label: string;
   readonly value: string;
-  
+
   readonly figure: boolean;
 }
 
@@ -102,35 +98,30 @@ export interface Press {
   readonly onPress: () => void;
 }
 
-
 export interface Note {
   readonly label: string;
   readonly text: string;
 }
 
-
 export interface EntryLook {
-  
   readonly id: string;
   readonly title: string;
-  
-  
+
   readonly lines: Note;
   readonly notes: readonly Note[];
-  
+
   readonly overlooked: Note;
-  
-  
+
   readonly editions: Note;
   readonly editionsNote: string;
   readonly fit: string;
   readonly fitWeight: Weight;
-  
+
   readonly effect: string | null;
   readonly facts: readonly Fact[];
-  
+
   readonly target: Note;
   readonly presses: readonly Press[];
-  
+
   readonly status: { readonly text: string; readonly weight: Weight } | null;
 }

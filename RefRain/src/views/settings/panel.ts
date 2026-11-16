@@ -3,10 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Snippet } from "svelte";
 import { createAttachmentKey, type Attachment } from "svelte/attachments";
-
 
 export interface Cancel {
   readonly preventDefault: () => void;
@@ -15,7 +13,6 @@ export interface Click {
   readonly target: unknown;
   readonly currentTarget: unknown;
 }
-
 
 export interface DialogWire {
   readonly "aria-labelledby": string;
@@ -30,7 +27,6 @@ export interface PanelLook {
 }
 
 const HOLD = createAttachmentKey();
-
 
 export function dialogOf(
   titleId: string,

@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  // The labelled box in every state it can be in, each holding its own
-  // value so a person can type into the fixture and watch the borders.
   import { referenceFor, referenceText } from "../../../core/enrol";
   import { say } from "../../../core/lang";
   import { ui } from "../../../ui";
@@ -23,9 +21,6 @@
   let stepped = $state("200000");
 </script>
 
-<!-- Two red edges that mean two things: `error` is the city's answer
-and arrives red at once; `:user-invalid` is the browser reading
-`pattern`, and turns red only after the person has left the box. -->
 <Case label="field · help, the city's error, the browser's user-invalid, mono with fixed parts">
   <div class="flex flex-col gap-base">
     <Field
@@ -66,9 +61,6 @@ and arrives red at once; `:user-invalid` is the browser reading
   </div>
 </Case>
 
-<!-- A box nobody may change keeps its seat in the Tab order and puts
-back what is typed; a box in a column that already names it hides its
-label; a number steps with the arrow keys. -->
 <Case label="field · disabled, a hidden label, a number that steps">
   <div class="flex flex-col gap-base">
     <Field label={say($lang, "setup_key")} value={key} onInput={() => undefined} mono disabled />

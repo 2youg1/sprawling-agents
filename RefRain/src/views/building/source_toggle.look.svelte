@@ -5,9 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-<!-- The key that shows a Markdown file's source: a small pill, lifted
-while the source is showing, quiet otherwise. The lift and the ink
-arrive on the arriving curve and leave on the leaving one. -->
 <script lang="ts">
   import type { SourceToggleLook } from "./source_toggle";
 

@@ -5,8 +5,6 @@
 
 import type { Note } from "../../wire";
 
-// One note's own line in the Ledger, which is what a list of notes is
-// keyed on: every variant carries one, and `note_line.svelte` draws each.
 export function noteAt(note: Note): number {
   if ("arrived" in note) return note.arrived.at;
   if ("refused" in note) return note.refused.at;

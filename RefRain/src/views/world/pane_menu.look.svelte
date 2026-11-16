@@ -3,14 +3,8 @@
      file, You can obtain one at https://mozilla.org/MPL/2.0/.
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- How a workbench pane's label is drawn: words in the blend tier, and
-in the panorama a quiet button that opens a small menu under it. The
-button reaches a step past the column's edge so its words stand on the
-same line as the pane's text below. Every role, key and `aria-*` value
-comes in the bags. -->
 <script lang="ts">
   import type { PaneMenuLook } from "./pane_menu";
-
   const look: PaneMenuLook = $props();
 </script>
 

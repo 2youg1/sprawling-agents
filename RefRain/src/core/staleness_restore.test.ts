@@ -7,7 +7,6 @@ import { describe, expect, test } from "bun:test";
 
 import { reachOf } from "./staleness";
 
-
 describe("a file taken back from a checkpoint", () => {
   test("makes the working tree, the listing and the document stale", () => {
     expect([

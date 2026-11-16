@@ -3,9 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 export type Columns = "one" | "twelve";
-
 
 export function watchColumns(element: Element, onColumns: (columns: Columns) => void): () => void {
   const report = (): void => {
@@ -22,7 +20,6 @@ export function watchColumns(element: Element, onColumns: (columns: Columns) => 
     observer.disconnect();
   };
 }
-
 
 export function followViewport(frame: HTMLElement, viewport: VisualViewport): () => void {
   const follow = (): void => {

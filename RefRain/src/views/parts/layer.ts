@@ -3,12 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 export type Side = "above" | "below";
 
-
 export type Opening = "preferred" | "other";
-
 
 export function reveal(top: number, bottom: number, scroll: number, height: number): number {
   if (top < scroll || height < bottom - top) return top;
@@ -16,11 +13,9 @@ export function reveal(top: number, bottom: number, scroll: number, height: numb
   return scroll;
 }
 
-
 export function opensOn(seen: boolean, here: number, there: number, height: number): Opening {
   return seen && here < height && here < there ? "other" : "preferred";
 }
-
 
 export function sideFor(layer: HTMLElement, preferred: Side): Side {
   const anchor = layer.offsetParent;
@@ -33,15 +28,13 @@ export function sideFor(layer: HTMLElement, preferred: Side): Side {
     preferred === "below"
       ? layer.offsetTop + layer.offsetHeight - anchor.offsetHeight
       : -layer.offsetTop;
-  
-  
+
   const seen = box.bottom >= clip.top && box.top <= clip.bottom;
   const opening =
     preferred === "below" ? opensOn(seen, below, above, reach) : opensOn(seen, above, below, reach);
   if (opening === "preferred") return preferred;
   return preferred === "below" ? "above" : "below";
 }
-
 
 export function roomOn(layer: HTMLElement, side: Side): number | null {
   const anchor = layer.offsetParent;
@@ -50,7 +43,6 @@ export function roomOn(layer: HTMLElement, side: Side): number | null {
   const clip = clipOf(anchor);
   return Math.max(0, side === "above" ? box.top - clip.top : clip.bottom - box.bottom);
 }
-
 
 export function revealIn(list: HTMLElement, row: HTMLElement): void {
   const viewport = list.getBoundingClientRect();
@@ -63,7 +55,6 @@ interface Span {
   readonly top: number;
   readonly bottom: number;
 }
-
 
 function clipOf(node: HTMLElement): Span {
   for (let up = node.parentElement; up !== null && up !== document.body; up = up.parentElement) {

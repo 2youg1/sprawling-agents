@@ -5,8 +5,6 @@
 -->
 
 <script lang="ts">
-  // One refusal a turn came to, said by `refusedLook` and drawn as the
-  // thread's refusal card.
   import { ui } from "../../ui";
   import Card from "./refusal_card.look.svelte";
   import NotePlace from "./note_place.svelte";

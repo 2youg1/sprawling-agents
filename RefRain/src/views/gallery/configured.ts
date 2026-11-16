@@ -3,19 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What a made-up city answers about how it is set up, written once for
-// every fixture that asks: an endpoint's tuning as it reads back, and
-// the `[search]` part of the configuration answer.
-
 import type { EndpointSummary, EndpointTuning, SettledSearch } from "../../wire";
 import { ServerLabel } from "../../wire";
 
-// What an endpoint read back when nobody opened its advanced section:
-// every figure absent, and the proxy rule the city settles absence to.
 export const UNTUNED: EndpointTuning = { headers: [], overrides: [], proxying: "except_local" };
 
-// `[search]` as a city that never wrote one answers it: the default
-// supplier, stated by no file, at the address the city declares.
 export const SEARCH: SettledSearch = {
   account_status: [],
   configuration: "default",
@@ -23,9 +15,6 @@ export const SEARCH: SettledSearch = {
   from: "default",
 };
 
-// One provider with three accounts in order, one for each state a key
-// can be in that a person has to read differently: stored, missing,
-// and read from an environment variable the page cannot write.
 export const ACCOUNTED: EndpointSummary = {
   base_url: "https://api.example.test/v1",
   connection_kind: "openai_compat",
@@ -65,13 +54,8 @@ export const ACCOUNTED: EndpointSummary = {
   ],
 };
 
-// The same provider as it stands when it was attached with one key and
-// no list: the editor says what a first account replaces.
 export const UNLISTED: EndpointSummary = { ...ACCOUNTED, account_status: [], tuning: UNTUNED };
 
-// A city that lists two search services of its own, the second in use
-// with one keyed account, while the hall's own file turns search off:
-// the card edits the city's value and says the hall's stands apart.
 export const SEARCH_CUSTOM: SettledSearch = {
   account_status: [
     {

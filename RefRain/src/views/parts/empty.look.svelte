@@ -4,11 +4,6 @@
   // file, You can obtain one at https://mozilla.org/MPL/2.0/.
   // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-  // How an empty state is drawn, and nothing else (`./empty`,
-  // `EmptyLook`). Without a shape of the page's own it draws the empty
-  // ring, the glyph that already means "nothing in particular is
-  // happening", quiet enough that the sentence stays what is read.
-
   import Glyph from "./glyph.svelte";
   import type { EmptyLook, EmptySeat } from "./empty";
 

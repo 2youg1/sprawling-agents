@@ -3,12 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { say } from "../../../core/lang";
 import type { Lang } from "../../../core/lang";
 import type { B3Hash, DocumentVersion } from "../../../wire";
 import { short } from "../reading";
-
 
 export interface AgainstWire {
   readonly value: string;
@@ -17,7 +15,7 @@ export interface AgainstWire {
 
 export interface AgainstLook {
   readonly label: string;
-  
+
   readonly none: string;
   readonly options: readonly { readonly value: B3Hash; readonly label: string }[];
   readonly wire: AgainstWire;

@@ -4,10 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the skyline's legend is drawn, and nothing else: a disclosure
-  // whose summary names it, and under it each mark the drawing carries,
-  // drawn small in the drawing's own inks, beside its word
-  // (`./legend.ts`, `LegendLook`).
   import type { LegendLook } from "./legend";
 
   const look: LegendLook = $props();

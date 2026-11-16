@@ -7,8 +7,6 @@ import { describe, expect, test } from "bun:test";
 
 import { EMPTY, encode } from "./draft";
 
-// A draft with every field but its label filled in, so the label is the
-// only thing the verdict can turn on.
 const labelled = (label: string) => encode({ ...EMPTY, label, command: "npx mcp-docs" }, []);
 
 describe("a server label", () => {

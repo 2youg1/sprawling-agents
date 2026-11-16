@@ -4,26 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the building table is drawn, and nothing else (`./table.ts`,
-  // `TableLook`): the folded clock's scale over the bars, then one row a
-  // building - its place in the tree, its name, the three counts, the
-  // last start - and its time bar, where the quiet stretch runs from the
-  // oldest run still going to now and each run's start is a tick in the
-  // colour of what that run is doing.
-  //
-  // The header carries the row's right inset and every count stands in
-  // a box of one width, so the fold lines over the bars and the counts
-  // down the rows stay on one line whatever the digits (A3). Where the
-  // table is wide a row is one line; where it is narrow the bar takes a
-  // line of its own under the counts, so neither the names nor the bar
-  // shrink to a sliver. The table asks its own width rather than the
-  // page's, because the picked building's panel can stand beside it and
-  // take half the page.
-  //
-  // A row is a row of the page: the pointer lays the page's wash over
-  // it and the picked row the stronger wash, with the accent edge on
-  // its left (docs/frontend-method.md §7A-4, §7B); the wash arrives on
-  // the arrive curve and leaves on leave (§4-43).
   import Glyph from "../parts/glyph.svelte";
   import { PHASE_FILL } from "../runs/phase";
   import type { TableLook } from "./table";

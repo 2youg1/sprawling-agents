@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { cancel, dispatch, steer } from "../core/commands";
   import { sendingInto } from "../core/doing";
   import { newestWorking } from "../core/belief/live";
@@ -50,11 +46,9 @@
 
   interface Props {
     readonly address: Address;
-    
-    
+
     readonly band: boolean;
-    
-    
+
     readonly seat: Seat;
   }
 
@@ -67,11 +61,9 @@
   const policy = u.policy;
   const held = u.prefs.held;
 
-  
   const runs = $derived(heldIn($belief, address));
   const live = $derived(newestWorking($belief, address));
-  
-  
+
   const branching = u.branches.held;
   const branchNote = $derived.by(() => {
     const going = live;
@@ -84,8 +76,7 @@
     return noteOf(branchInto($branching, address), address, $lang, stop);
   });
   const isMayor = $derived(address === MAYOR);
-  
-  
+
   const identity = u.conn.asking.ask(QUERIES.identity);
   const stated = $derived(
     $identity !== undefined && "identity" in $identity && "stated" in $identity.identity
@@ -94,7 +85,6 @@
   );
   const who = $derived(called(address, stated, $lang));
 
-  
   const began = $derived($belief.sessions[address] ?? null);
   const sessionAnswer = $derived(u.conn.asking.ask({ sessions: { room: address } }));
   const currentLine = $derived(
@@ -120,7 +110,6 @@
   );
   const shown = $derived(began === null ? runs : runs.filter((run) => run.lastSeq > began));
 
-  
   const changed = $derived.by(() => {
     const change = $belief.policies[address] ?? null;
     return change === null || (began !== null && change.seq <= began) ? null : change;
@@ -137,12 +126,10 @@
         }),
   );
 
-  
   const current = $derived(
     live ?? shown.at(-1) ?? (origin === null ? undefined : $belief.runs[origin.run]),
   );
 
-  
   let rawAnswer = $state<RoundsAnswer | undefined>(undefined);
   const answer = $derived(
     rawAnswer === undefined
@@ -161,13 +148,10 @@
     });
   });
 
-  
   const said = $derived(answer?.turns.filter((turn) => typeof turn.said === "string").at(-1));
 
-  
   let story = $state<Boundary | null>(null);
-  
-  
+
   let ours = false;
   let watching = false;
   let seen: Seq | null = null;
@@ -201,7 +185,6 @@
     story = { kind: "opened", at: u.now() };
   });
 
-  
   let sent = $state<Sent | null>(null);
   const landing = $derived.by((): Landing => {
     if (sent?.from !== address) return { kind: "pending" };
@@ -211,14 +194,12 @@
       : found;
   });
 
-  
   const link = u.conn.state;
   function hear(): Heard {
     return { live: $link.kind === "live", newest: newestSeq($belief), refusal: $belief.refusal };
   }
   let delivery = $state<Delivery>(NONE);
-  
-  
+
   $effect(() => {
     const kind = delivery.kind;
     if (kind === "none") return;
@@ -233,10 +214,8 @@
   });
   const echo = $derived(delivery.kind === "none" ? null : delivery);
 
-  
   const blank = $derived(shown.length === 0 && origin === null && echo === null);
-  
-  
+
   const addressed = $derived(!band && drawsAddress(seat));
 
   function send(text: string): boolean {
@@ -267,14 +246,12 @@
     return went;
   }
 
-  
   function awaitAnswer(text: string): void {
     refused = null;
     handing = hand(text, $belief);
     u.conversing.set({ kind: "waiting", handing });
   }
 
-  
   let handing: Handing = IDLE;
   let refused = $state<{ readonly words: string; readonly error: AxError } | null>(null);
   $effect(() => {
@@ -291,7 +268,6 @@
     u.conversing.set(NOT_CONVERSING);
   });
 
-  
   function doFork(plan: ForkPlan): void {
     picking = false;
     u.branches.open(address, { kind: "branch", origin: plan.origin }, () => {
@@ -306,12 +282,11 @@
         mother: plan.mother,
         origin: plan.origin,
       };
-      
+
       rejoined += 1;
     });
   }
 
-  
   let picking = $state(false);
   let asked = 0;
   $effect(() => {
@@ -322,17 +297,14 @@
     }
   });
 
-  
   let rejoined = $state(0);
 
-  
   const placeholder = $derived(
     isMayor && stated === null
       ? say($lang, "talk_placeholder_mayor")
       : fill(say($lang, "talk_placeholder_room"), { room: who }),
   );
 
-  
   const composer: Snippet = drawComposer;
 </script>
 
@@ -386,7 +358,6 @@
   />
 {/snippet}
 
-
 <div
   class={["flex min-h-0 flex-col", band ? "" : "h-full"]}
   style:container-type={band ? undefined : "size"}
@@ -420,7 +391,7 @@
       {#if echo !== null}
         <Delivered delivery={echo} />
       {/if}
-      
+
       <Waiting />
       <Inbox addr={address} />
     </Scroller>

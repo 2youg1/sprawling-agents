@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What one `CostAnswer` lets a page say. `cost.svelte` draws the whole
-// answer and the panorama sheet draws two figures out of it, and both
-// have to tell the same three situations apart: nothing has run, a provider
-// priced what ran, and calls ran that no provider priced. The fold
-// lives here so the two pages cannot answer that question differently.
-
 import type { Answered } from "../core/answered";
 import type { CostAnswer, Renewals, RunId } from "../wire";
 
@@ -20,10 +14,6 @@ export function costReading(answer: CostAnswer): CostReading {
   return answer.unpriced.calls > 0 ? { kind: "unpriced" } : { kind: "idle" };
 }
 
-// What the facts row says one run has spent. A page with no run moving
-// has nothing to say about a run, so that case answers `none` before the
-// cost answer is consulted: a cost query the city could not answer is
-// not a fact about a run that does not exist.
 export type RunSpend =
   | { readonly kind: "none" }
   | { readonly kind: "unreadable" }
@@ -39,8 +29,6 @@ export function runSpend(read: Answered<CostAnswer>, run: RunId | null): RunSpen
   return { kind: "spent", micros: found === undefined ? 0 : found[1] };
 }
 
-// How many keep-warm renewals the city sent: the server counts each one
-// under exactly one of the four outcomes, so they sum to it.
 export function renewalsSent(renewals: Renewals): number {
   return renewals.read + renewals.late + renewals.unreported + renewals.refused;
 }

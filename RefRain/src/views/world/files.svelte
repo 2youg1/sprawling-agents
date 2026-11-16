@@ -4,11 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The building's files, as the world layer draws them beside a room in
-  // it: the building page's own tree, one
-  // `Query::Listing` per open folder, and a file picked here opens on the
-  // right side through the one door every opener uses, at the text the
-  // worktree holds now.
   import { buildingOf } from "../../core/route";
   import type { Address } from "../../wire";
   import Tree from "../building/tree.svelte";
@@ -21,10 +16,6 @@
   const { here }: Props = $props();
 
   const building = $derived(buildingOf(here));
-  // What the tree hands back, spelled here rather than imported: the
-  // tree states it as a named export of a `.svelte` module, which
-  // typescript-eslint cannot resolve, and the two shapes are checked
-  // against each other where `svelte-check` passes this callback in.
   interface Picked {
     readonly at: Address;
     readonly kind: "file" | "directory";

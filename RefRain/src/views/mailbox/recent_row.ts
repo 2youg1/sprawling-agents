@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { HTMLButtonAttributes } from "svelte/elements";
 
 import { fill, say } from "../../core/lang";
@@ -16,12 +15,10 @@ import type { EntryLink } from "./entries";
 
 export interface RecentRowLook {
   readonly room: string;
-  
-  
+
   readonly began: string;
   readonly ago: string;
-  
-  
+
   readonly link: EntryLink;
   readonly fork: ForkKey;
   readonly stop: StopKey | null;
@@ -29,19 +26,17 @@ export interface RecentRowLook {
 
 export interface ForkKey {
   readonly name: string;
-  
+
   readonly why: string | undefined;
   readonly wire: Pick<HTMLButtonAttributes, "type" | "aria-label" | "aria-disabled" | "onclick">;
 }
 
-
 export interface Shown {
   readonly room: Address;
   readonly line: SessionLine;
-  
-  
+
   readonly forkable: boolean;
-  
+
   readonly branch: BranchHere;
 }
 
@@ -49,7 +44,7 @@ export interface RowHands {
   readonly href: string;
   readonly follow: () => void;
   readonly fork: () => void;
-  
+
   readonly stop: (() => void) | null;
 }
 
@@ -80,7 +75,6 @@ export function rowOf(shown: Shown, lang: Lang, ago: string, hands: RowHands): R
     stop: note?.stop ?? null,
   };
 }
-
 
 function startOf(line: SessionLine): Key {
   if ("dispatched" in line.start) return "mailbox_start_dispatched";

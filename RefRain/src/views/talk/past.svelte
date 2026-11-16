@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { newestWorking } from "../../core/belief/live";
   import { cancel } from "../../core/commands";
   import { say } from "../../core/lang";
@@ -24,15 +20,12 @@
 
   interface Props {
     readonly address: Address;
-    
-    
+
     readonly session: Seq;
-    
-    
+
     readonly stretch: Stretch | null;
     readonly band: boolean;
-    
-    
+
     readonly seat: Seat;
   }
 

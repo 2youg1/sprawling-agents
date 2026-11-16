@@ -3,42 +3,35 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Snippet } from "svelte";
 
 export interface RowProps {
-  
   readonly primary: string;
   readonly secondary?: string;
-  
+
   readonly status?: Snippet;
-  
+
   readonly actions?: Snippet;
-  
+
   readonly onOpen?: () => void;
-  
+
   readonly chosen?: boolean;
 }
 
 export interface RowListProps {
-  
   readonly label: string;
-  
-  
+
   readonly rows: Snippet;
 }
-
 
 export interface ItemWire {
   readonly "aria-current"?: "true";
 }
 
-
 export interface OpenWire {
   readonly type: "button";
   readonly onclick: () => void;
 }
-
 
 export interface RowLook {
   readonly item: ItemWire;
@@ -72,12 +65,9 @@ export function lookOf(props: RowProps): RowLook {
   };
 }
 
-
 export type Target = "row" | "text" | "select" | "editable";
 
-
 export type Step = "next" | "previous" | "first" | "last";
-
 
 export function taken(target: Target, key: string): Step | null {
   switch (target) {
@@ -105,7 +95,6 @@ function stepOf(key: string): Step | null {
   }
 }
 
-
 function courseOf(step: Step, from: number, last: number): readonly [number, number] {
   switch (step) {
     case "next":
@@ -118,7 +107,6 @@ function courseOf(step: Step, from: number, last: number): readonly [number, num
       return [last, -1];
   }
 }
-
 
 export function landing<T>(
   reach: readonly (T | undefined)[],

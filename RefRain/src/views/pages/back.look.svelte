@@ -4,12 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How a page's back key is drawn, and nothing else (`./back.ts`,
-  // `BackLook`): a quiet control, a chevron pointing back and the name
-  // of the place it leads to. Like a quiet button it rests on the page
-  // and lifts to `raised` under the pointer (docs/frontend-method.md
-  // §7A-5), and the lift arrives and leaves on the theme's two curves
-  // (§4-43). Its gap to what follows is the caller's.
   import Glyph from "../parts/glyph.svelte";
   import type { BackLook } from "./back";
 

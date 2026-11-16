@@ -4,25 +4,12 @@
   // file, You can obtain one at https://mozilla.org/MPL/2.0/.
   // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-  // How a table is drawn, and nothing else (`./table`, `TableLook`).
-  //
-  // **A column states what it is worth; the table scrolls rather than
-  // squeezing it.** The header is one line whatever the column's width,
-  // every row is a control tall, and rows are separated by a hairline
-  // rather than by stripes: a band of alternating colour is one more
-  // thing competing with the values in the cells. A row lights with the
-  // ink wash as every row does (docs/frontend-method.md §7A-5), arriving
-  // in `short` and leaving on the leaving curve.
-
   import type { Snippet } from "svelte";
 
   import type { HeldLook, Min, TableLook } from "./table";
 
   const look: TableLook<T> = $props();
 
-  // The class a column's stated minimum resolves to, and nothing at all
-  // when the column states none: the width rules of
-  // docs/frontend-method.md §4-33 have one spelling and this is it.
   function breadthOf(min: Min | undefined): string | undefined {
     switch (min) {
       case undefined:
@@ -36,9 +23,6 @@
     }
   }
 
-  // The checker types a `{#snippet}` name as a void call, which the
-  // lint lane rejects inside a render tag. The name is taken again as
-  // its `Snippet` type, and the template renders that.
   const held: Snippet<[HeldLook<T>]> = drawHeld;
 </script>
 
@@ -57,9 +41,6 @@
   {#if look.lines.length > 0}
     <table class="w-full border-collapse text-body">
       <caption class="sr-only">{look.caption}</caption>
-      <!-- No stacking number: a sticky header is positioned and the
-           rows that scroll under it are not, so the header is painted
-           last of the two. -->
       <thead class="sticky top-0 bg-raised">
         <tr class="border-b border-edge">
           {#if look.all !== undefined}
@@ -108,17 +89,6 @@
                   cell.summary && "summary",
                 ]}
               >
-                <!-- A figure column hands its control a box of the
-                     figure's width. `width` on the cell states what the
-                     column prefers; only a definite width on the box
-                     **inside** the cell caps what the control
-                     contributes to the column's minimum - an input asked
-                     for its intrinsic width answers with its whole
-                     default width, and a cell holding it grows past the
-                     figure however small the column was declared to be.
-                     The box is the figure plus the control's own padding
-                     and border, so a six-digit token count stays whole
-                     inside an input rather than losing its last digits. -->
                 {#if cell.min === "figure"}
                   <div class="figure-box">{@render held(cell.held)}</div>
                 {:else}

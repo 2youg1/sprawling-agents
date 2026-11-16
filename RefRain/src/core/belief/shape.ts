@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { Option, Schema } from "effect";
 
 import { Address } from "../../wire";
@@ -17,100 +16,72 @@ export interface RunBelief {
   readonly run: RunId;
   readonly addr: Address | null;
   readonly started: TimeMs | null;
-  
-  
+
   readonly task: string | null;
   readonly goal: string | null;
   readonly lastSeq: Seq;
   readonly doing: Doing;
-  
-  
+
   readonly model: string | null;
-  
-  
+
   readonly pr: string | null;
-  
-  
+
   readonly ask: string | null;
-  
-  
+
   readonly local: boolean;
-  
-  
+
   saying: string;
-  
-  
+
   thinking: string;
 }
 
-
 export interface Belief {
-  
-  
   runs: Record<string, RunBelief>;
-  
-  
+
   live: readonly RunBelief[];
-  
-  
+
   rooms: ReadonlyMap<string, readonly RunId[]>;
-  
+
   cancelled: number;
   halted: HaltScope[];
-  
-  
+
   haltedAt: Seq;
-  
-  
+
   refusal: AxError | null;
-  
-  
+
   notices: Notice[];
   city: string | null;
-  
+
   sessions: Record<string, Seq>;
-  
-  
+
   policies: Record<string, PolicyChange>;
-  
-  
+
   probed: Probed | null;
-  
-  
+
   logs: LogLine[];
 }
 
-
 export const LOG_WINDOW = 500;
-
 
 export interface Notice {
   readonly error: AxError;
-  
-  
+
   seen: boolean;
-  
-  
+
   readonly at: TimeMs;
-  
-  
+
   readonly key: string;
-  
-  
+
   count: number;
-  
-  
+
   readonly about: Address | RunId | null;
 }
 
-
 export const NOTICE_WINDOW = 50;
-
 
 function noticeKey(error: AxError): string {
   return `${error.code}\u0000${error.subject}`;
 }
-
 
 const readAddress = Schema.decodeOption(Address);
 
@@ -119,7 +90,6 @@ function about(subject: string): Address | RunId | null {
   if (Option.isSome(run)) return run.value;
   return Option.getOrElse(readAddress(subject), () => null);
 }
-
 
 export function merged(notices: readonly Notice[], error: AxError, at: TimeMs): Notice[] {
   const key = noticeKey(error);
@@ -135,5 +105,3 @@ export function merged(notices: readonly Notice[], error: AxError, at: TimeMs): 
     each.key === key ? { ...each, error, seen: false, count: each.count + 1 } : each,
   );
 }
-
-

@@ -6,26 +6,12 @@
 -->
 
 <script lang="ts">
-  // How the read-wear bar is drawn, and nothing else (refrain S7.3): a
-  // hairline track, the stretches already read worn a shade darker over
-  // it, each round's tick as a short centred hairline in its phase's
-  // colour from `runs/phase.ts`, and the thumb where the view is — drawn
-  // last, so it stays on top and in a colour of its own. Every layer
-  // arrives in shares of the whole content (`WearLook`, `./wear`), so
-  // the bar needs no height of its own.
-  //
-  // The whole bar sits at 60 % so it stays a map rather than a chrome
-  // strip; under the pointer it widens by one pixel on each side and the
-  // thumb darkens, which is what says the track can be pressed.
   import { PHASE_FILL } from "../runs/phase";
   import type { WearLook } from "./wear";
 
   const { hint, track, read, thumb, marks }: WearLook = $props();
 
   const pct = (share: number): string => `${String(share * 100)}%`;
-  // A round's tick is a fixed short hairline at its midpoint, so a short
-  // round and a long one read as the same kind of mark rather than a
-  // scatter of dots of random size.
   const TICK = 0.012;
 </script>
 
@@ -57,7 +43,6 @@
   }
   .track:hover {
     opacity: 0.85;
-    /* One pixel wider on each side under the pointer. */
     padding-inline: 1px;
     transition-timing-function: var(--ease-arrive);
   }
@@ -93,7 +78,6 @@
     width: var(--spacing-wear);
     min-height: var(--spacing-wear);
     border-radius: var(--radius-pill);
-    /* Above every tick: the view's place must stay readable. */
     z-index: 2;
     transition:
       background-color var(--transition-duration-short) var(--ease-leave),

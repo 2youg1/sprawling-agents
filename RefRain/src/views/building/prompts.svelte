@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { readAnswer } from "../../core/answered";
   import { heldIn, heldWithin } from "../../core/belief/rooms";
   import { putPrompt } from "../../core/commands";
@@ -25,7 +23,7 @@
 
   interface Props {
     readonly building: Address;
-    
+
     readonly rooms: readonly string[];
   }
 
@@ -35,12 +33,10 @@
   const { lang } = u;
   const belief = u.conn.belief;
 
-  
   let picked = $state<Address | null>(null);
   const newestRoom = $derived(heldWithin($belief, building).at(-1)?.addr ?? null);
   const room = $derived(picked ?? newestRoom ?? building);
-  
-  
+
   const last = $derived(heldIn($belief, room).at(-1)?.run);
 
   const layersAsked = $derived<Query>({ layers: { addr: room } });
@@ -58,7 +54,6 @@
     });
   });
 
-  
   let asking = $state.raw<{ readonly card: CardLook; readonly step: PromptStep } | null>(null);
 
   function act(card: CardLook, action: CardAction): void {

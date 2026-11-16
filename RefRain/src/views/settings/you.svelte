@@ -4,24 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // You and the main agent: two cards, each
-  // saved on its own against the document it lives in. The person's ID
-  // and the "about you" text live in `PREFERENCES.md`, the Mayor's name
-  // in `MAYOR.md`; the city reads both in one place (`city::Naming`)
-  // and answers them through `Query::Identity`, so this page holds no
-  // second copy: each card starts from the answer, saves through
-  // `PutIdentity` against the text the answer named as its base, and
-  // calls itself saved only when the city answers with a new version
-  // (`views/settings/saving.ts`).
-  //
-  // An identity area the city cannot read is its own answer rather than
-  // a default name: drawing the default would let the next save write
-  // over the line the person got wrong, so the cards step aside and the
-  // page says which line, and the raw documents stay one entry away.
-  //
-  // A name takes effect at the next session: a session freezes the
-  // names its first run read (glossary, identity area).
-
   import { QUERIES } from "../../core/asking";
   import { putIdentity } from "../../core/commands";
   import { say } from "../../core/lang";
@@ -53,7 +35,6 @@
       : null;
   });
 
-  // The two cards' fields, which follow the answer until somebody types.
   let userId = $state("");
   let importedFrom = $state<string | null>(null);
   let about = $state("");
@@ -74,7 +55,6 @@
     if (named.kind === "held" || named.kind === "saved") mayor = stated.mayor ?? "";
   });
 
-  // A refusal that arrives while a card waits is that card's answer.
   let seen = $belief.refusal;
   $effect(() => {
     const error = $belief.refusal;
@@ -87,8 +67,6 @@
   const personSlot: Slot = { now: () => person, mark: (next) => (person = next) };
   const namedSlot: Slot = { now: () => named, mark: (next) => (named = next) };
 
-  // Sends one card against the text the answer named as its base, and
-  // marks the card sent; the receipt or the patience settles it later.
   function settle(card: IdentityCard, base: string, slot: Slot): void {
     if (stated === null || !u.send(putIdentity(card, base))) return;
     const mine = sent(stated.version);

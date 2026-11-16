@@ -32,12 +32,12 @@
     choose,
     freshModelEditor,
     leave,
-    lookOf,
     refuse,
     settleAnswer,
     settleProbe,
   } from "./model_editor";
   import type { Hands } from "./model_editor";
+  import { lookOf } from "./model_editor_look";
   import Generation from "./generation.svelte";
   import Look from "./model_editor.look.svelte";
 

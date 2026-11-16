@@ -4,15 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // One privacy entry: the shipped look. Markup only; every word, value
-  // and callback arrives as `EntryLook` from the seat (`entry.svelte`).
-  //
-  // What a person could overlook is drawn open, not folded, because it
-  // is the part of an entry a person most needs before pressing; the
-  // full target path is folded, because it is for the person who wants
-  // to check it with another tool. Long tokens (registry paths, the
-  // person's own lines) break anywhere rather than run out of the card.
-
   import Button from "../../parts/button.svelte";
   import type { EntryLook } from "./entry";
 

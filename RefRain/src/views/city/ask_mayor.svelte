@@ -4,9 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The seat of the way to the Mayor an empty page offers: it reads the
-  // language and hands `./ask_mayor.ts`'s value to whatever
-  // `./ask_mayor.look.svelte` is.
   import { ui } from "../../ui";
   import { lookOf } from "./ask_mayor";
   import Look from "./ask_mayor.look.svelte";

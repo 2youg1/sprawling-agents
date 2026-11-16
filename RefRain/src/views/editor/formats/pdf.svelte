@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
   const STEP = 32;
 </script>
 
@@ -33,8 +31,7 @@
   const lang = ui().lang;
 
   let opened = $state<Opened | null>(null);
-  
-  
+
   let sizes = $state<Readonly<Record<number, Size>>>({});
   let scroller = $state<HTMLDivElement>();
   let measured = $state(0);
@@ -60,11 +57,9 @@
     };
   });
 
-  
   const A4: Size = { width: 595, height: 842 };
   const standIn = $derived(sizes[1] ?? A4);
 
-  
   function page(pdf: PDFDocumentProxy, number: number): Attachment<HTMLCanvasElement> {
     return (canvas) => {
       const at = width;
@@ -117,7 +112,6 @@
       {fill(say($lang, "format_broken"), { format: NAME.pdf, reason: opened.reason })}
     </p>
   {:else if pdf !== null}
-    
     <!-- svelte-ignore a11y_no_noninteractive_tabindex (the pane takes focus so the keyboard can scroll it) -->
     <div
       class="min-h-0 flex-1 overflow-auto bg-raised p-pane"

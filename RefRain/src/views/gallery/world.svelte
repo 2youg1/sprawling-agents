@@ -5,8 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  
-  
   import { say } from "../../core/lang";
   import { roomOf } from "../../core/route";
   import { ui } from "../../ui";
@@ -31,7 +29,6 @@
   </div>
 </Case>
 <Case label="workbench · the divider between the first two panes" width={1440}>
-  
   <div class="frame grid h-[160px] grid-rows-[minmax(0,1fr)_auto]">
     <div class="row-[1/3] rounded-panel border border-edge-panel" style:grid-column="1 / 4"></div>
     <Divider

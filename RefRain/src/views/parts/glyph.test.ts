@@ -3,19 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The five states are told apart by their drawings and only reinforced
-// by colour, because a forced-colours mode repaints every fill and
-// border and leaves the shapes alone. Two states sharing one paint tier
-// is therefore correct and checked past here; two states sharing one
-// drawing would leave those machines with nothing to read, and that is
-// what the test below holds the line on.
-
 import { describe, expect, test } from "bun:test";
 
 import { statusLook, type Status } from "./glyph";
 
-// The closed set spelled out as its own record, so a sixth state cannot
-// be added without touching this file too.
 const FIVE: Record<Status, Status> = {
   idle: "idle",
   live: "live",

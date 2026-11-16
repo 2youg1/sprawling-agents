@@ -6,13 +6,6 @@
 -->
 
 <script lang="ts">
-  // The evidence lens: what the run left to be checked - a screenshot,
-  // the word that it finished - one row each, in the order the ledger
-  // wrote them. The question is asked while this lens is mounted and no
-  // longer: a watched answer is refreshed when stale, and nobody is
-  // looking at this one between visits (`parts/tabs` mounts a panel
-  // only while its lens is current).
-
   import { readAnswer } from "../../core/answered";
   import type { Key } from "../../core/lang";
   import { say } from "../../core/lang";

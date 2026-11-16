@@ -6,24 +6,6 @@
 -->
 
 <script lang="ts" module>
-  // The tool servers a scope may reach, laid out the way Claude Code
-  // taught people to expect: what is already reachable, three ways to
-  // add one more, and Composio as a directory.
-  //
-  // The page starts where every content column begins and caps itself
-  // at the page width (docs/frontend-method.md §4-33). It
-  // keeps its own address because a tool server is a thing a person
-  // returns to on its own; the way in is the settings page's MCP group.
-  //
-  // This file is the router. It owns the two choices that are the
-  // page's own - which scope a server is written into and which
-  // building's list is on screen - and hands every door one `Intake`,
-  // so a door never learns what a scope is and the scope rule stays in
-  // one place. The three doors are `parts/tabs`' (7-4), and the
-  // tab/panel association is the part's to draw (7-8 item 6): one
-  // `panel` snippet receives the lens being shown, and this file
-  // answers with one exhaustive chain over the three door ids.
-
   import type { Key } from "../core/lang";
 
   type Door = "command" | "url" | "json";
@@ -41,10 +23,6 @@
     }
   }
 
-  // The three scopes Claude Code offers. Only the middle one has a
-  // field on the wire; the page says what the other two are waiting for
-  // rather than hiding them, because a person who used `--scope user`
-  // looks for them first.
   type Scope = "city" | "building" | "machine";
 
   const SCOPES: readonly Scope[] = ["city", "building", "machine"];
@@ -93,8 +71,6 @@
   import { BuildingColumn, HALL, useBuildings } from "./shared/buildings";
 
   interface Props {
-    // The shell draws this as a page; the gallery draws it as one region
-    // among many, where it may not carry the page's heading.
     readonly rank?: "page" | "section" | undefined;
   }
 
@@ -109,21 +85,13 @@
   let scope = $state<Scope>("building");
   let door = $state<Door>("command");
 
-  // The three scopes as one question: a screen reader hears one choice
-  // with three answers instead of three pressed buttons, and the two
-  // that the wire cannot carry stay choosable, because the banner under
-  // them is where their gap is explained.
   const scopes = $derived(SCOPES.map((each) => ({ value: each, label: say($lang, scoped(each)) })));
-  // The sentence that stops every send, or null when a send may go.
   const banner = $derived.by((): string | null => {
     const said = gapOf(scope);
     return said === null ? null : say($lang, said);
   });
   const why = (): string | null => banner;
 
-  // One question and one door for the chosen building: the list, the
-  // three doors and Composio all write into the same scope, so they
-  // share one reading of it and one `Intake`.
   const reach = reachOf({
     get addr() {
       return chosen;
@@ -135,8 +103,6 @@
 
   const lenses = $derived(DOORS.map((each) => ({ id: each, label: say($lang, doorWord(each)) })));
 
-  // The lens id comes back as a string; this is where it becomes one of
-  // the three doors again, and a name that is no door picks nothing.
   function doorOf(id: string): Door | null {
     for (const each of DOORS) {
       if (each === id) return each;
@@ -162,14 +128,6 @@
   />
 {/snippet}
 
-<!-- Three columns once the page holds them, on Main's silver lines
-(client D24): the building a server is added for in the left part, the
-servers it has and the form that adds one in the middle part, where the
-conversation stands, and the two other ways in - Composio and the
-desktop - in the right part. Each section is a rule and a small name
-over its body rather than a lifted card, so the page reads as one sheet
-in columns; under the wide container the columns stand one above the
-other. -->
 <Page title={say($lang, "mcp_title")} aside={scopeControl} {rank}>
   {#if banner !== null}
     <Banner text={banner} />

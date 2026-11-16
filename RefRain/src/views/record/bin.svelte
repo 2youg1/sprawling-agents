@@ -6,10 +6,6 @@
 -->
 
 <script lang="ts">
-  // The seat of the recycle bin: it asks the city, lends the decision
-  // (`./bin`) the person's language and the restore it sends, and draws
-  // whatever `./bin.look.svelte` is.
-
   import { QUERIES } from "../../core/asking";
   import { restoreDiscard } from "../../core/commands";
   import { ui } from "../../ui";

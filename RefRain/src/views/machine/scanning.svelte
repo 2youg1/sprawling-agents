@@ -4,11 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The scan in front of the city's directory, one line per fact the
-  // city read (`scanning.ts`): on Windows the directory, the Dev Drive
-  // and Defender's exclusion; on macOS and Linux the reason there is
-  // nothing to read.
-
   import { say } from "../../core/lang";
   import { ui } from "../../ui";
   import type { DoctorScanning } from "../../wire";

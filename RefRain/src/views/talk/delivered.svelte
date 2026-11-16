@@ -3,11 +3,6 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- The words a person just sent, drawn at the foot of the thread the
-moment they leave the box, with where they stand (`delivery.ts`). It is
-the page's own echo, so it is marked `data-local-feedback` and drawn
-quieter than a message the city holds; the run's thread replaces it with
-the same words as its task once the city starts the run. -->
 <script lang="ts">
   import { say } from "../../core/lang";
   import { ui } from "../../ui";

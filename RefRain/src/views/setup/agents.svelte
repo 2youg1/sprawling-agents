@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { QUERIES } from "../../core/asking";
   import { readAnswer } from "../../core/answered";
   import { addAgent } from "../../core/access";
@@ -27,8 +25,7 @@
   let text = $state("");
   let adding = $state<ReadonlySet<string>>(new Set());
   const reading = $derived(readingOf(text, read.kind === "held" ? read.value : undefined));
-  
-  
+
   let parsed = $state<AgentOffer | null>(null);
   $effect(() => {
     if (reading.kind !== "paste") {
@@ -40,13 +37,11 @@
     });
   });
 
-  
   const room = $derived.by(() => {
     const under = panelBeneath();
     return under.kind === "talk" ? under.address : null;
   });
 
-  
   $effect(() => {
     if (read.kind !== "held") return;
     const added = new Set(read.value.added.map((line) => line.id));
@@ -61,7 +56,6 @@
     u.conn.asking.refresh(QUERIES.agentCatalog);
   }
 
-  
   function paste(): void {
     void navigator.clipboard
       .readText()

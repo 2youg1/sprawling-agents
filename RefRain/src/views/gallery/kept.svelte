@@ -6,14 +6,6 @@
 -->
 
 <script lang="ts">
-  // Both answers the settings page can give to "where does this choice
-  // live".
-  //
-  // A running client reaches the second one only once the city has
-  // answered `Query::Preferences` (`core/prefs_city.ts`), so a fixture
-  // seats both: the badge is drawn, measured and read out at every page
-  // width the gate opens, whichever state the page first paints in.
-
   import Kept from "../setup/kept.svelte";
   import Case from "./case.svelte";
 </script>

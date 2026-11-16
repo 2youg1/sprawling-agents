@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { fill, say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
 import { count } from "../../core/time";
@@ -17,13 +16,11 @@ import type {
 } from "../../wire";
 import { SLOT_WORD } from "../run/prompt";
 
-
 export interface RoomChoice {
   readonly label: string;
   readonly current: boolean;
   readonly onPress: () => void;
 }
-
 
 export interface PromptsLook {
   readonly rooms: readonly RoomChoice[];
@@ -39,13 +36,11 @@ export interface PromptsLook {
   readonly onAction: (card: CardLook, action: CardAction) => void;
 }
 
-
 export interface SlotLook {
   readonly key: string;
   readonly slot: string;
   readonly size: string;
 }
-
 
 export type CardAction =
   | { readonly kind: "open"; readonly path: string }
@@ -54,16 +49,15 @@ export type CardAction =
 export interface CardLook {
   readonly key: string;
   readonly at: Address;
-  
+
   readonly base: B3Hash;
   readonly title: string;
   readonly about: string;
   readonly layer: string;
   readonly state: string;
-  
+
   readonly sent: boolean;
-  
-  
+
   readonly standing: string | undefined;
   readonly actions: readonly CardAction[];
 }
@@ -75,12 +69,10 @@ const ACTION_WORD: Record<"open" | PromptStep, Key> = {
   restore: "prompts_restore",
 };
 
-
 export function actionWord(action: CardAction | PromptStep, lang: Lang): string {
   if (typeof action === "string") return say(lang, ACTION_WORD[action]);
   return say(lang, ACTION_WORD[action.kind === "open" ? "open" : action.step]);
 }
-
 
 export function actionName(card: CardLook, action: CardAction, lang: Lang): string {
   return fill(say(lang, "prompts_action_on"), { action: actionWord(action, lang), at: card.at });
@@ -92,7 +84,6 @@ const LAYER_WORD: Record<PromptLayer, Key> = {
   room: "prompts_layer_room",
 };
 
-
 export function slotsOf(prefix: PrefixAnswer, lang: Lang): readonly SlotLook[] {
   return prefix.segments.map((segment) => ({
     key: segment.slot,
@@ -100,7 +91,6 @@ export function slotsOf(prefix: PrefixAnswer, lang: Lang): readonly SlotLook[] {
     size: fill(say(lang, "run_prompt_bytes"), { n: count(segment.bytes) }),
   }));
 }
-
 
 export function cardsOf(
   documents: readonly LayerDocument[],
@@ -159,7 +149,6 @@ function standingOf(doc: LayerDocument, lang: Lang): string | undefined {
   }
 }
 
-
 export function actionsOf(doc: LayerDocument, building: Address): readonly CardAction[] {
   const shipped = doc.shipped ?? null;
   const state = doc.state;
@@ -173,7 +162,6 @@ export function actionsOf(doc: LayerDocument, building: Address): readonly CardA
     actions.push({ kind: "step", step: "restore" });
   return actions;
 }
-
 
 export function pathOf(at: Address, building: Address): string {
   const prefix = `${building}/`;

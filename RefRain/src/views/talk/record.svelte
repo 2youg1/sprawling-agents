@@ -5,10 +5,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 <script lang="ts">
-  // The seat of the microphone beside the composer. One press records and
-  // a second stops; what the city heard comes back as words for the box,
-  // and a city that refused to transcribe says so beside the button. How
-  // it is drawn is `./record.look.svelte`.
   import { onMount } from "svelte";
   import { get } from "svelte/store";
 
@@ -34,8 +30,6 @@
     heard.speak();
   }
 
-  // The palette's "speak" (`speak_asked.ts`): only a request made after
-  // this microphone was drawn presses it.
   onMount(() => {
     let seen = get(speakAsked);
     return speakAsked.subscribe((count) => {

@@ -3,15 +3,9 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- How a refusal is drawn in the thread (`CardLook`, `./refused`): a
-card with a faint alert edge, its first line led by the alert ink, the
-lines under it, the city's own sentence one fold away in the mono face,
-and the ways out in one row - a place to go as an underlined link, an
-action as a button. -->
 <script lang="ts">
   import Button from "../parts/button.svelte";
   import type { CardLook } from "./refused";
-
   const { role, head, after, lines, fold, ways }: CardLook = $props();
 </script>
 

@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The box as a drop target: whether a drag is over it, which the box
-// draws as the wash it takes, and the files the last drop could not
-// keep, each said under the box. What a drop carries is `dropping.ts`'s
-// decision; where its paths land in the words is the box's, handed in
-// as `place`.
-
 import type { Ui } from "../../ui";
 import { dropped } from "./dropping";
 import type { Refused } from "./dropping";

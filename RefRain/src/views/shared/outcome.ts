@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// How an outcome is marked wherever a result is listed: the results city
-// and the results room draw the same glyph in the same ink, so a person
-// who learned one reads the other.
-
 import type { Outcome } from "../../core/results";
 import type { GlyphName } from "../parts/glyph";
 

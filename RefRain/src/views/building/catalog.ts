@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Key } from "../../core/lang";
 import type {
   B3Hash,
@@ -74,7 +73,6 @@ export function selectionOf(answer: CatalogAnswer): Selection {
 export function sameSelection(left: Selection, right: Selection): boolean {
   return canonicalSelection(left) === canonicalSelection(right);
 }
-
 
 export interface SaveSettle {
   readonly landed: boolean;
@@ -284,8 +282,6 @@ export const CHANGE_WORD: Record<CatalogChange, Key> = {
   changed: "catalog_changed",
   removed: "catalog_removed",
 };
-
-
 
 export function bytesOf(tool: CatalogTool): number {
   return tool.current?.bytes ?? tool.pinned?.bytes ?? 0;

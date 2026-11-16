@@ -6,12 +6,6 @@
 -->
 
 <script lang="ts">
-  // RefRain's head line, the seat (client D95): where the document is,
-  // which version the editor stands on and what became of the last save,
-  // then the readings and the save, drawn by `./head.look.svelte`. The
-  // receipt says a word only when there is something unsaved or a save
-  // to report; a document nobody touched shows none. A Markdown version
-  // can be exported as one HTML file the city writes (4-61).
   import { readAnswer } from "../../core/answered";
   import { say } from "../../core/lang";
   import type { Key } from "../../core/lang";
@@ -29,8 +23,6 @@
     readonly at: Address;
     readonly session: Session;
     readonly reading: Reading;
-    // Whether the document has a preview: Markdown, read by the city, or
-    // HTML, drawn by this browser.
     readonly previewed: boolean;
     readonly onPick: (reading: Reading) => void;
   }
@@ -39,8 +31,6 @@
 
   const lang = ui().lang;
 
-  // A document's address starts with its building's (`documentAt`), so
-  // its folder already reads from the building's name.
   const cut = $derived(at.lastIndexOf("/") + 1);
   const name = $derived(at.slice(cut));
 
@@ -58,7 +48,6 @@
   );
 
   const said = $derived(receiptWord(session.receipt.kind));
-  // Why the save cannot be pressed, when it cannot.
   const blocked = $derived.by((): { readonly why?: string } => {
     const kind = session.receipt.kind;
     if (session.locked !== null || session.positions === null)
@@ -76,8 +65,6 @@
   );
   let exporting = $state<"asking" | "refused" | null>(null);
 
-  // Asks the city once for the export of the version the editor stands
-  // on, and hands the answer to the browser to save.
   function exportHtml(): void {
     const standing = session.positions?.version;
     if (standing === undefined) return;
@@ -104,7 +91,6 @@
 >
   {#snippet actions()}
     {#if session.file?.kind === "text"}
-      <!-- A file that is not text has no source, diff or versions to read. -->
       <Segmented label={say($lang, "refrain_reading")} {options} held={reading} {onPick} />
     {/if}
     {#if exporting === "refused"}

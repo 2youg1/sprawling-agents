@@ -6,20 +6,9 @@
 -->
 
 <script lang="ts">
-  // One reminder's checkpoint (docs/frontend-method.md §7J): a dot at its
-  // percent of the window, ringed in the page colour so it reads over the
-  // line it sits on, green for the first reminder and red for the
-  // handoff. The context ring and a sessions row's context bar both draw
-  // it here, so the two cannot come to draw a checkpoint two ways; only
-  // where it stands differs - round the ring, or along the bar.
-  //
-  // Drawing only: the reading it belongs to is said in words by the
-  // element that owns it.
   import type { Checkpoint } from "./gauge";
 
   interface Props extends Checkpoint {
-    // Round the context ring, turned from twelve o'clock; or along a
-    // flat bar, from its left end.
     readonly along: "ring" | "line";
   }
 
@@ -43,9 +32,6 @@
   .second {
     background-color: var(--color-reminder-second);
   }
-  /* The ring's stroke is drawn at 18 of the 40 units of its view box
-   * (`gauge.look.svelte`), which scales to the key's square, so the dot
-   * is turned about the centre and pushed out by the same share. */
   .ring {
     left: 50%;
     top: 50%;
@@ -57,8 +43,7 @@
     top: 50%;
     translate: -50% -50%;
   }
-  /* Forced colours replace both green and red, so the two dots are
-   * drawn in the system ink and told apart by where they sit. */
+
   @media (forced-colors: active) {
     .checkpoint {
       background-color: CanvasText;

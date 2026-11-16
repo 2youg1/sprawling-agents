@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Attachment } from "svelte/attachments";
 
 import type { Pane, Side, Workbench } from "../../core/workbench";
@@ -11,11 +10,9 @@ import { HOLD } from "./drawn";
 import { opening, popupOf, walking } from "./menu";
 import type { ItemLook, ListWire, MenuHands, PopupWire, TriggerWire } from "./menu";
 
-
 export type Arranged = "menu" | "words";
 
 export interface PaneMenuLook {
-  
   readonly label: string;
   readonly arranged: Arranged;
   readonly open: boolean;
@@ -24,7 +21,6 @@ export interface PaneMenuLook {
   readonly list: ListWire;
   readonly items: readonly ItemLook[];
 }
-
 
 export interface PaneMenuWords {
   readonly label: string;
@@ -38,19 +34,17 @@ export interface PaneMenuState {
   readonly bench: Workbench;
   readonly arranged: Arranged;
   readonly open: boolean;
-  
+
   readonly uid: string;
 }
 
 export interface PaneMenuHands extends MenuHands {
   readonly move: (side: Side) => void;
-  
-  
+
   readonly hold: (key: string) => Attachment<HTMLElement>;
 }
 
 const SIDES: readonly Side[] = ["left", "right"];
-
 
 export function possible(bench: Workbench, pane: Pane, side: Side): boolean {
   const at = bench.findIndex((column) => column.pane === pane);

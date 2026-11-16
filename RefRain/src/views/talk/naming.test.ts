@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// `dispatcherOf` reads `Opening.dispatched_by` as `kernel::event::Who`
-// spells it; a word it cannot read names nobody (client D83).
-
 import { describe, expect, test } from "bun:test";
 
 import { Address } from "../../wire";

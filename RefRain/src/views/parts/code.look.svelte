@@ -6,16 +6,6 @@
 -->
 
 <script lang="ts">
-  // How the code view is drawn, and nothing else (`./code`, `CodeLook`).
-  //
-  // The row that names the file also carries the one secondary action:
-  // copy, shown when the pointer or the keyboard is inside this view and
-  // nowhere else, so the code is the only thing that greets the eye. At
-  // rest the key is invisible and click-through, so the corner never
-  // stands between a hand and the text under it, and it arrives as
-  // `fade` - the motion vocabulary's name for a state change that keeps
-  // its position; a machine that asks for less motion gets the key
-  // without the arrival.
   import Copy from "./copy.svelte";
   import Inked from "./inked.svelte";
   import type { CodeLook } from "./code";
@@ -47,8 +37,6 @@
         >{@render look.aside()}</span
       >{/if}
   </div>
-  <!-- The code scrolls sideways and never folds a line in half: the
-  gutter stays put at the left while the text runs under it. -->
   <div class="min-h-0 flex-1 overflow-auto" {@attach look.scroller}>
     <div class="relative flex min-w-max font-mono text-note leading-read">
       <pre
@@ -68,8 +56,6 @@
 </div>
 
 <style>
-  /* The cited line's accent bar, drawn inside its left edge so it takes
-  no width from the code. */
   .cited {
     box-shadow: inset var(--spacing-hair) 0 0 var(--color-accent);
   }

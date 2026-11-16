@@ -4,11 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // Where the stretch now open began, and the earlier stretch of the
-  // room folded above it (ux B7). A branch's rule says which turn of
-  // which conversation it came from and leads back to that conversation,
-  // which stays as it was: the act a person reads here is "a new line
-  // from one turn, the original untouched" (client D44).
   import { fill, say } from "../../core/lang";
   import { toFragment } from "../../core/route";
   import { clock } from "../../core/time";
@@ -26,13 +21,7 @@
 
   interface Props {
     readonly session?: Seq | null;
-    // Everything before the boundary, oldest first. Folded to one line
-    // and opened in place: this is the same conversation, earlier -
-    // neither a dialog nor a route is the right weight for a scroll
-    // (ux B7).
     readonly earlier: readonly RunBelief[];
-    // How many runs the session now open holds, which decides whether
-    // the earlier stretch appears at all (client D80).
     readonly shown: number;
     readonly boundary: Boundary | null;
     readonly onFork: (plan: ForkPlan) => void;
@@ -44,8 +33,6 @@
   const { lang, conn } = ui();
   const belief = conn.belief;
 
-  // The person's own choice, once they press the line; until then the
-  // rule both modes share decides.
   let pressed = $state<boolean | null>(null);
   let previousSession: Seq | null | undefined;
   $effect(() => {
@@ -56,9 +43,6 @@
   const drawn = $derived(earlierDrawn(shown, earlier.length, boundary?.kind === "forked"));
   const open = $derived(pressed ?? drawn === "open");
 
-  // The count is the folded runs themselves: what expands is one thread
-  // per run, so the number a person reads is the number of things the
-  // line is holding down.
   const folded = $derived<RuleLook>({
     parts: [
       {
@@ -75,10 +59,6 @@
     wire: {},
   });
 
-  // The mother is looked up in the whole city, not only among the runs
-  // folded above: a branch cut from a run outside this stretch still
-  // names whom it came from, and its room's sessions say which stretch
-  // the way back opens.
   const mother = $derived(boundary?.kind === "forked" ? $belief.runs[boundary.mother] : undefined);
   let motherRounds = $state<RoundsAnswer | undefined>(undefined);
   $effect(() => {
@@ -127,9 +107,6 @@
       ];
       return { parts, mark: "branch", wire: {} };
     }
-    // A boundary this page watched open knows its minute; one found
-    // here after a reload says only that the stretch is new, which is
-    // the part that is true in every case.
     if (boundary.at === null) return null;
     return {
       parts: [

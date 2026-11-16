@@ -3,19 +3,17 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { HTMLButtonAttributes } from "svelte/elements";
 
 import type { Lang } from "../../core/lang";
 import { say } from "../../core/lang";
-
 
 export type Hearing = "taking" | "hearing" | "ready";
 
 export interface RecordLook {
   readonly hearing: Hearing;
   readonly label: string;
-  
+
   readonly refused: string | undefined;
   readonly wire: RecordWire;
 }
@@ -23,8 +21,7 @@ export interface RecordLook {
 export interface RecordWire {
   readonly type: "button";
   readonly "aria-label": string;
-  
-  
+
   readonly "aria-disabled": boolean;
   readonly onclick: HTMLButtonAttributes["onclick"];
 }
@@ -34,7 +31,6 @@ export interface Heard {
   readonly hearing: boolean;
   readonly refused: boolean;
 }
-
 
 export function hearingOf(heard: Heard): Hearing {
   if (heard.hearing) return "hearing";
@@ -50,12 +46,10 @@ export function lookOf(heard: Heard, lang: Lang, press: () => void): RecordLook 
     refused: heard.refused ? say(lang, "link_refused") : undefined,
     wire: {
       type: "button",
-      
-      
+
       "aria-label": label,
       "aria-disabled": hearing === "hearing",
-      
-      
+
       onclick: press,
     },
   };

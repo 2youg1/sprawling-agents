@@ -6,13 +6,6 @@
 -->
 
 <script lang="ts">
-  // A second look for the copy key, written the way a component library
-  // writes one: a native button, no utility classes, every style in its
-  // own block and read from the theme's tokens, and the hint drawn as a
-  // line of text rather than a floating tip. It takes the same
-  // `CopyLook` as the shipped look and nothing else, so drawing the key
-  // with it proves the receipt, the refusal and the press live in
-  // `parts/copy.ts` and its seat, not in the shipped markup.
   import type { CopyLook } from "../../../src/views/parts/copy";
 
   const look: CopyLook = $props();
@@ -32,9 +25,6 @@
 </span>
 
 <style>
-  /* The note is a whole line of text, so the key and its note take at
-     most half the row: the words the key copies, drawn beside it, keep
-     the other half instead of folding a glyph to a line. */
   .copy {
     display: inline-flex;
     align-items: baseline;

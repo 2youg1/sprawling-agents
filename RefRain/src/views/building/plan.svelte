@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import type { Key } from "../../core/lang";
   import { fill, say } from "../../core/lang";
   import { percent } from "../../core/share";
@@ -28,7 +26,6 @@
 
   const lang = ui().lang;
 
-  
   let open = $state<string | null>(null);
 
   const STATUS_WORD: Record<RoadmapStatus, Key> = {
@@ -46,7 +43,6 @@
     );
   }
 
-  
   function weightOf(row: PlanRow): Weight {
     switch (row.status) {
       case "in_progress":
@@ -61,7 +57,6 @@
     }
   }
 
-  
   function indentOf(node: string): string {
     return `calc(var(--spacing-pane) * ${String(node.split(".").length - 1)})`;
   }
@@ -69,8 +64,7 @@
 
 <div>
   <h2 class="sr-only">{say($lang, "bld_plan")}</h2>
-  
-  
+
   {#if "planned" in answer.progress && answer.progress.planned.total > 0}
     <div class="mb-base flex items-center gap-base">
       <Progress

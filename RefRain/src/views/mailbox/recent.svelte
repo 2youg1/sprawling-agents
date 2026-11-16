@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts">
-  
-  
   import { newestWorking } from "../../core/belief/live";
   import { cancel } from "../../core/commands";
   import { fill, say } from "../../core/lang";
@@ -25,10 +23,8 @@
   import Section from "./section.svelte";
 
   interface Props {
-    
-    
     readonly scroller: () => HTMLElement | undefined;
-    
+
     readonly onLeave: () => void;
   }
 
@@ -43,15 +39,12 @@
   interface Session {
     readonly room: Address;
     readonly line: SessionLine;
-    
-    
+
     readonly origin: Origin | null;
-    
-    
+
     readonly text: string;
   }
 
-  
   const stretches = askStretches(u);
   let search = $state("");
   const rows = $derived.by((): Session[] => {
@@ -78,7 +71,6 @@
     return row.origin === null ? { kind: "none" } : branchFrom($branching, row.room, row.origin);
   }
 
-  
   function stopIn(room: Address): (() => void) | null {
     const going = newestWorking($belief, room);
     if (going === undefined) return null;
@@ -87,7 +79,6 @@
     };
   }
 
-  
   let list = $state<HTMLElement | undefined>(undefined);
   let shown = $state({ first: 0, end: OVERSCAN });
   let rowPx = $state(0);

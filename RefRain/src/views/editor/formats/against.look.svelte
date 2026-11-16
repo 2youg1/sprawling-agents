@@ -6,9 +6,6 @@
 -->
 
 <script lang="ts">
-  // The line above a PDF or a DOCX that picks the version it is compared
-  // with: a native list, because a version's name fits no equal cell.
-  // It takes `AgainstLook` (`./against`) and nothing else.
   import type { AgainstLook } from "./against";
 
   const { label, none, options, wire }: AgainstLook = $props();

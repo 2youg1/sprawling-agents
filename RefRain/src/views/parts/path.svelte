@@ -6,9 +6,6 @@
 -->
 
 <script lang="ts">
-  // The seat of one printed path: callers import this file, and it lends
-  // `./path.ts` the page's language and the city's `reveal` command, then
-  // draws whatever `./path.look.svelte` is with the value that builds.
   import { reveal } from "../../core/commands";
   import { say } from "../../core/lang";
   import { ui } from "../../ui";

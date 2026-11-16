@@ -4,13 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // How the head of one step of the guide is drawn, and nothing else
-  // (`./step.ts`, `StepLook`): a row across the column - the number in
-  // figures, the title, and at the end where the step stands, in the ink
-  // that standing takes. The head is a row of a list, so it takes the
-  // ink wash under the pointer and while it holds the focus
-  // (docs/frontend-method.md §7A-5), arriving on the arriving curve and
-  // leaving on the leaving one (§4-43).
   import Glyph from "../parts/glyph.svelte";
   import type { Standing } from "./guide";
   import type { StepLook } from "./step";

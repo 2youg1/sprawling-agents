@@ -6,18 +6,6 @@
 -->
 
 <script lang="ts">
-  // The rooms of one building, each a way into its directory, and the
-  // field that names a new one. A room is opened by talking in it: the
-  // talk page's first dispatch to `<building>/<name>` opens that room,
-  // so no model has to name it.
-  //
-  // **The field names a room and does nothing else.** It is not a task
-  // box: the task is said inside the room, which is why the label is
-  // "room name", the help says where the conversation happens, and the
-  // key reads "talk there". A building with no rooms yet offers that
-  // same key as its first action, focused on the box, so a person who has
-  // just raised a building is not looking at a sentence with nothing to
-  // press.
   import { Option } from "effect";
   import { fill, say } from "../../core/lang";
   import { go, roomIn, roomOf } from "../../core/route";
@@ -30,8 +18,6 @@
 
   interface RoomsProps {
     readonly answer: BuildingAnswer;
-    // How many runs are working at or below a room, which the list
-    // lights its dots for.
     readonly living: (room: Address) => number;
     readonly onPick: (room: Address) => void;
   }
@@ -50,9 +36,6 @@
     roomName = "";
   }
 
-  // The first room's key does not create anything by itself: it puts the
-  // caret in the box that names the room, because the name is the one
-  // thing only the person can supply.
   function begin(): void {
     naming?.querySelector("input")?.focus();
   }
@@ -83,10 +66,6 @@
   {:else}
     <Button label={say($lang, "bld_no_rooms")} tone="primary" onPress={begin} />
   {/if}
-  <!-- The box keeps room for its whole placeholder, and in a column too
-  narrow for both the button moves under it rather than cutting the
-  words that say what the box is for. A form, so Enter in the box is the
-  same request as the button. -->
   <form
     class="mt-base flex flex-wrap items-end gap-snug"
     bind:this={naming}

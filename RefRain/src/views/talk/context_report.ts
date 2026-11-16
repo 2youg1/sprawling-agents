@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the context report draws from the city's answers: payload
-// composition by byte weight, ranked so the largest eater is first,
-// and the provider's window fullness as a single header figure.
-//
-// Fullness stays the provider's `input_tokens` against `context_tokens`
-// (glossary: context reminder). Composition is bytes from Prefix and
-// PromptShape — never a second tokenizer. Shares of the payload sum to
-// 100 by largest remainder, the same rule cost attribution uses.
-
 import type { Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
 import { kilo } from "../../core/time";
@@ -26,7 +17,6 @@ import type {
 import type { Context } from "./gauge";
 import { usedPercent } from "./gauge";
 
-/** The six regions of one request, in cache order. */
 export type BucketId = "tools" | "city" | "building" | "resident" | "run" | "conversation";
 
 const BUCKETS: readonly BucketId[] = [
@@ -38,11 +28,9 @@ const BUCKETS: readonly BucketId[] = [
   "conversation",
 ];
 
-/** How many child rows a bucket may disclose — the rest are noise. */
 const CHILD_CAP = 8;
 
 export interface ReportChild {
-  /** Stable list key: tool name, or the source's full address. */
   readonly key: string;
   readonly name: string;
   readonly bytes: number;
@@ -54,9 +42,7 @@ export interface ReportBucket {
   readonly said: string;
   readonly bytes: number;
   readonly bytesSaid: string;
-  /** Whole percent of the known payload; shares sum to 100. */
   readonly share: number;
-  /** Note when the bucket has no child rows (conversation or empty). */
   readonly emptyNote: string;
   readonly children: readonly ReportChild[];
 }
@@ -64,24 +50,17 @@ export interface ReportBucket {
 export interface ReportLook {
   readonly run: RunId;
   readonly title: string;
-  /** Caption under the centre when no bucket is held. */
   readonly fullLabel: string;
   readonly pickHint: string;
   readonly waiting: string;
   readonly openPrompt: string;
-  /** Provider fullness, or null when the model stated no window. */
   readonly fullness: Context | null;
-  /** Used share of the window, or 0 when there is no window. */
   readonly fullPercent: number;
   readonly usedSaid: string;
   readonly shareSaid: string;
-  /** One sentence: which bucket eats the most of the known payload. */
   readonly insight: string;
-  /** Quiet alert when a reminder threshold is crossed, else null. */
   readonly warning: string | null;
-  /** Non-zero buckets, largest first. */
   readonly buckets: readonly ReportBucket[];
-  /** Payload byte total the shares were taken from. */
   readonly payload: number;
   readonly promptHref: string;
 }
@@ -101,8 +80,6 @@ export function reportOf(
     const row = byId.get(id);
     const bytes = row?.bytes ?? 0;
     const share = row?.share ?? 0;
-    // Empty of bytes stays out; a non-empty row that rounded to 0% still
-    // stays so the person can open its sources (shown as 0% on the chip).
     if (bytes <= 0) return [];
     const children = childrenOf(id, prefix);
     return [
@@ -186,9 +163,6 @@ function bucketKey(
 
 function warningOf(lang: Lang, fullness: Context | null): string | null {
   if (fullness === null) return null;
-  // Integer compare so a 64.6% window does not trip a 65% handoff from
-  // Math.round on the header, and an exact threshold is not lost to float
-  // remainder (`used * 100` vs `threshold * window`).
   if (fullness.second !== null && atLeastPercent(fullness, fullness.second)) {
     return fill(say(lang, "context_report_handoff"), { n: String(fullness.second) });
   }
@@ -208,10 +182,6 @@ function weightsOf(
 ): readonly (readonly [BucketId, number])[] {
   const segment = (slot: PrefixSegment["slot"]): number =>
     prefix?.segments.find((each) => each.slot === slot)?.bytes ?? 0;
-  // Prefer the shape's live tool-table bytes when present: that is what
-  // the last request carried. Fall back to the frozen table length.
-  // Child rows for tools still come from Prefix (below): PromptShape has
-  // no per-tool breakdown, so the unfold is the frozen table.
   const tools = shape?.tools.bytes ?? prefix?.tools?.len ?? 0;
   const conversation = shape?.conversation.bytes ?? 0;
   return [
@@ -227,8 +197,6 @@ function weightsOf(
 function childrenOf(id: BucketId, prefix: PrefixAnswer | null): readonly ReportChild[] {
   switch (id) {
     case "tools":
-      // Frozen table only — see weightsOf. Off stays out; dormant stays in,
-      // because a dormant schema still sits in the live tools.bytes share.
       return toolChildren(prefix?.tools?.rows ?? []);
     case "city":
     case "building":
@@ -249,7 +217,6 @@ function toolChildren(rows: readonly PromptTool[]): readonly ReportChild[] {
     )
     .slice(0, CHILD_CAP)
     .map((row) => {
-      // Namespace + name: two catalogs can ship the same tool spelling.
       const label = `${row.namespace}/${row.name}`;
       return { key: label, name: label, bytes: row.len, bytesSaid: kilo(row.len) };
     });
@@ -262,14 +229,12 @@ function sourceChildren(sources: readonly PrefixSource[]): readonly ReportChild[
     .slice(0, CHILD_CAP)
     .map((source) => ({
       key: source.addr,
-      // Full address: two nested AGENTS.md files would otherwise look alike.
       name: source.addr,
       bytes: source.kept,
       bytesSaid: kilo(source.kept),
     }));
 }
 
-/** Whole percents that sum to 100, or all zeros when the payload is empty. */
 export function splitPercents(
   weights: readonly (readonly [BucketId, number])[],
 ): readonly { id: BucketId; bytes: number; share: number }[] {
@@ -300,7 +265,6 @@ export function splitPercents(
   }));
 }
 
-/** Arc segments for a donut with `pathLength="100"`, clockwise from noon. */
 export function arcsOf(
   buckets: readonly ReportBucket[],
 ): readonly { id: BucketId; share: number; offset: number; tone: number }[] {

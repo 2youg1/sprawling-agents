@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import { Option, Schema } from "effect";
 
 import { Address, B3Hash, GuideStep, Seq, SessionName } from "../wire";
@@ -11,14 +10,11 @@ import type { BuildingProgress, RunId } from "../wire";
 import { isInvitation } from "./remote/invitation";
 import { readRunId } from "./run_id";
 
-
 const readAddress = Schema.decodeOption(Address);
-
 
 export type Lens = "ledger" | "archive" | "bin" | "log";
 
 export const LENSES: readonly Lens[] = ["ledger", "archive", "bin", "log"];
-
 
 export const SETUP_GROUPS = [
   "you",
@@ -43,7 +39,6 @@ export const SETUP_GROUPS = [
 
 export type SetupGroup = (typeof SETUP_GROUPS)[number];
 
-
 export const RUN_LENSES = [
   "time",
   "turns",
@@ -56,7 +51,6 @@ export const RUN_LENSES = [
 
 export type RunLens = (typeof RUN_LENSES)[number];
 
-
 export type ItemLink =
   | { readonly kind: "call"; readonly run: RunId; readonly at: Seq }
   | {
@@ -66,16 +60,11 @@ export type ItemLink =
       readonly version: B3Hash | null;
     };
 
-
 export const MAYOR: Address = Address.make("hall/mayor");
-
 
 const STRETCH = ":";
 
-
 export type View =
-  
-  
   | {
       readonly kind: "talk";
       readonly address: Address;
@@ -84,30 +73,18 @@ export type View =
     }
   | { readonly kind: "city" }
   | { readonly kind: "building"; readonly address: Address; readonly section?: "catalog" }
-  
-  
   | { readonly kind: "raise"; readonly address?: Address }
-  
-  
   | { readonly kind: "run"; readonly run: RunId; readonly lens?: RunLens }
-  
-  
   | { readonly kind: "setup"; readonly group?: SetupGroup }
   | { readonly kind: "mcp" }
   | { readonly kind: "record"; readonly lens: Lens }
   | { readonly kind: "cost" }
   | { readonly kind: "registry" }
-  
-  
   | { readonly kind: "welcome"; readonly step?: GuideStep }
   | { readonly kind: "monitor" }
-  
-  
   | { readonly kind: "gallery" };
 
-
 export const DEFAULT_VIEW: View = { kind: "talk", address: MAYOR };
-
 
 export function toFragment(view: View): string {
   switch (view.kind) {
@@ -145,7 +122,6 @@ export function toFragment(view: View): string {
   }
 }
 
-
 function itemQuery(item: ItemLink): string {
   switch (item.kind) {
     case "call":
@@ -158,7 +134,6 @@ function itemQuery(item: ItemLink): string {
       }).toString();
   }
 }
-
 
 function readItem(query: string): Option.Option<ItemLink> {
   const asked = new URLSearchParams(query);
@@ -208,7 +183,6 @@ function recordFragment(lens: Lens): string {
   }
 }
 
-
 const BARE: Readonly<Record<string, View>> = {
   "": DEFAULT_VIEW,
   talk: DEFAULT_VIEW,
@@ -224,7 +198,6 @@ const BARE: Readonly<Record<string, View>> = {
   gallery: { kind: "gallery" },
 };
 
-
 const OLD: Readonly<Record<string, View>> = {
   overview: { kind: "city" },
   live: DEFAULT_VIEW,
@@ -238,19 +211,15 @@ const OLD: Readonly<Record<string, View>> = {
   settings: { kind: "setup" },
 };
 
-
 export const PAGES: readonly string[] = Object.keys(BARE).filter((head) => head !== "");
-
 
 export function page(name: string): Option.Option<View> {
   return Option.fromNullishOr(BARE[name] ?? OLD[name]);
 }
 
-
 function escaped(address: Address): string {
   return address.split("/").map(encodeURIComponent).join("/");
 }
-
 
 const decodeSegment = Option.liftThrowable(decodeURIComponent);
 
@@ -279,10 +248,7 @@ function named(raw: string): string {
   return raw.replace(/^#*/, "").replace(/^\/*/, "");
 }
 
-
 export function fromFragment(raw: string): Option.Option<View> {
-  
-  
   if (isInvitation(raw)) return Option.some({ kind: "setup", group: "remote" });
   const whole = named(raw);
   const mark = whole.indexOf("?");
@@ -341,7 +307,6 @@ export function fromFragment(raw: string): Option.Option<View> {
   }
 }
 
-
 function talkWith(path: string, query: string): Option.Option<View> {
   const head = ["talk/", "s/"].find((prefix) => path.startsWith(prefix));
   if (head === undefined) return Option.none();
@@ -352,7 +317,6 @@ function talkWith(path: string, query: string): Option.Option<View> {
   );
 }
 
-
 export function unresolved(hash: string): Option.Option<string> {
   const name = named(hash);
   if (name === "" || Option.isSome(fromFragment(hash))) {
@@ -360,7 +324,6 @@ export function unresolved(hash: string): Option.Option<string> {
   }
   return Option.some(`#/${name}`);
 }
-
 
 export interface AddressBar {
   hash: string;
@@ -370,13 +333,11 @@ export function current(bar: Readonly<AddressBar>): Option.Option<View> {
   return fromFragment(bar.hash);
 }
 
-
 export function go(bar: AddressBar, view: View): void {
   bar.hash = toFragment(view);
 }
 
 export type WorkspaceView = Extract<View, { kind: "talk" }>;
-
 
 export function readWorkspace(raw: string): WorkspaceView | null {
   const text = raw.trim();
@@ -396,7 +357,6 @@ export function readWorkspace(raw: string): WorkspaceView | null {
   );
 }
 
-
 export function workspaceDestination(
   view: WorkspaceView,
   buildings: readonly BuildingProgress[],
@@ -405,7 +365,6 @@ export function workspaceDestination(
   if (building === view.address) return buildingDestination(building, buildings).view;
   return buildings.some((held) => held.addr === building && !held.adoptable) ? view : null;
 }
-
 
 export function buildingOf(address: Address): Address {
   const slash = address.indexOf("/");
@@ -422,7 +381,6 @@ export type BuildingDestination =
       readonly view: { readonly kind: "raise"; readonly address: Address };
     };
 
-
 export function buildingDestination(
   addr: Address,
   buildings: readonly BuildingProgress[],
@@ -433,12 +391,10 @@ export function buildingDestination(
   return { kind: "building", view: { kind: "building", address: addr } };
 }
 
-
 export function roomOf(address: Address): string {
   const slash = address.lastIndexOf("/");
   return slash < 0 ? address : address.slice(slash + 1);
 }
-
 
 export function roomIn(building: Address, name: string): Option.Option<Address> {
   const named = name.trim();

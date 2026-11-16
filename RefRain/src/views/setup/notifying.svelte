@@ -4,9 +4,6 @@
      Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
 <script lang="ts">
-  // The switch for browser notifications (client D7). Off until
-  // the person turns it on, and the browser is asked for its permission
-  // only at that moment, never when the page opens.
   import type { Key } from "../../core/lang";
   import { say } from "../../core/lang";
   import type { Notifying } from "../../core/notify";
@@ -21,9 +18,6 @@
 
   const WORDS: Readonly<Record<Notifying, Key>> = { off: "notify_off", on: "notify_on" };
 
-  // A switch that reads `on` while the browser refuses every
-  // notification promises what never happens, so a browser that has no
-  // notifications, or that says no, puts the switch back.
   function pick(next: Notifying): void {
     u.prefs.setNotifying(next);
     if (next === "off") return;

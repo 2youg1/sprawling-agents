@@ -6,8 +6,6 @@
 -->
 
 <script lang="ts" module>
-  
-  
 </script>
 
 <script lang="ts">
@@ -28,11 +26,9 @@
   interface Props {
     readonly base: GitOid;
     readonly head: GitOid | null;
-    
-    
+
     readonly talk?: Address | undefined;
-    
-    
+
     readonly act?: Snippet<[string]> | undefined;
   }
 
@@ -41,7 +37,6 @@
   const u = ui();
   const lang = u.lang;
 
-  
   let open = $state<string | null>(null);
 
   const NOTHING: Readable<Answer | undefined> = readable(undefined);
@@ -53,7 +48,6 @@
   );
   const files = $derived(read.kind === "held" ? read.value : undefined);
 
-  
   const patchQuestion = $derived.by((): Query | null => {
     const at = open;
     return at === null || head === null ? null : { hunks: { oid_a: base, oid_b: head, path: at } };

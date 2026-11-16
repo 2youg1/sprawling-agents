@@ -6,9 +6,6 @@
 -->
 
 <script lang="ts">
-  // The seat of the run page's sheet: it lends the decision (`./head`)
-  // the person's language and draws whatever `./head.look.svelte` is.
-
   import { ui } from "../../ui";
   import { lookOf } from "./head";
   import type { HeadProps } from "./head";

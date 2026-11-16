@@ -3,17 +3,9 @@ License, v. 2.0. If a copy of the MPL was not distributed with this
 file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors -->
 
-<!-- How a note's row is drawn, and nothing else (`NoteLook`, `./note`):
-one line of note text in the faint ink, its pieces a snug gap apart and
-wrapping where the column ends, every name in the quieter ink until a
-pointer rests on it. The hover runs both ways: the ink arrives easing
-out and leaves easing in, on the short duration the motion choice
-stills. -->
 <script lang="ts">
   import type { Ink, NoteLook } from "./note";
-
   const { role, pieces }: NoteLook = $props();
-
   const INK: Readonly<Record<Ink, string>> = {
     faint: "text-text-faint",
     quiet: "text-text-quiet",

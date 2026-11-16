@@ -1,8 +1,4 @@
-
-
 <script lang="ts">
-  
-  
   import { readAnswer } from "../../core/answered";
   import { QUERIES } from "../../core/asking";
   import type { RunBelief } from "../../core/belief";
@@ -40,17 +36,13 @@
   interface Props {
     readonly through?: Seq | null;
     readonly run: RunBelief;
-    
-    
+
     readonly onFork?: ((plan: ForkPlan) => void) | undefined;
-    
-    
+
     readonly onRetry?: ((task: string) => void) | undefined;
-    
-    
+
     readonly facts?: FrozenFacts;
-    
-    
+
     readonly around?: Seq | null;
   }
 
@@ -60,13 +52,11 @@
   const { lang } = u;
   const held = u.prefs.held;
 
-  
   let active: ForkEntry | null = $state(null);
   const hoverFork = (entry: ForkEntry | null): void => {
     active = entry;
   };
 
-  
   // svelte-ignore state_referenced_locally (the capture is the point: the question is minted once, for the run this thread is keyed to)
   const readRun: RunId = run.run;
   const question: Query = { rounds: { run: readRun } };
@@ -78,14 +68,12 @@
   const turns = $derived(answer?.turns ?? []);
   const drawn = $derived(turnsAround(turns, around));
   const task = $derived(answer?.opening?.task ?? run.task ?? "");
-  
-  
+
   const taskEntry = $derived.by((): ForkEntry | null => {
     const first = turns.at(0);
     return first === undefined ? null : { kind: "message", turn: first, text: task };
   });
-  
-  
+
   const endpoints = u.conn.asking.ask(QUERIES.endpoints);
   const ceiling = $derived.by((): number | null => {
     const held = $endpoints;
@@ -94,8 +82,7 @@
   });
   const frozen = $derived(run.doing.kind === "frozen");
   const phase = $derived<Phase>(frozen ? "frozen" : "live");
-  
-  
+
   const word = $derived(
     answer?.closing?.completion ?? (run.doing.kind === "frozen" ? run.doing.completion : null),
   );
@@ -113,42 +100,34 @@
         return word;
     }
   });
-  
-  
+
   const streaming = $derived(through === null && !frozen && run.saying.length > 0);
   const closedAt = $derived(answer?.closing?.at ?? null);
-  
-  
+
   const emptyRun = $derived(read.kind === "held" && silentRun(turns, phase));
-  
-  
+
   const failure = $derived(answer?.closing?.failure ?? null);
-  
-  
+
   const stopped = $derived(word === "cancelled");
-  
-  
+
   const wayOut = $derived<"offered" | "absent" | undefined>(
     failure !== null ? undefined : stopped ? "absent" : "offered",
   );
   const why = $derived(cutOff(turns.at(-1)?.stopped));
   const whole = $derived(drawsCalls($held.showing));
-  
-  
+
   const lineSaysIt = $derived(
     whole &&
       (run.doing.kind === "calling" || run.doing.kind === "waiting") &&
       (turns.at(-1)?.calls.some((call) => call.outcome === "waiting") ?? false),
   );
-  
-  
+
   const who = $derived(
     run.addr === null
       ? say($lang, "talk_resident")
       : called(run.addr, answer?.opening?.names?.mayor, $lang),
   );
-  
-  
+
   const from = $derived.by((): { readonly label: string; readonly href: string | undefined } => {
     const by = dispatcherOf(answer?.opening?.dispatched_by);
     const parent = answer?.opening?.parent ?? null;
@@ -169,8 +148,7 @@
         };
     }
   });
-  
-  
+
   const firstModel = $derived(turns.at(0)?.model ?? null);
   const building = $derived(
     facts === "head" && run.addr !== null
@@ -196,7 +174,6 @@
     }),
   );
 
-  
   let streamedInto: Seq | null = null;
   let wasStreaming = false;
   $effect(() => {
@@ -218,8 +195,7 @@
     else landed(run.run, streamedInto);
     streamedInto = null;
   });
-  
-  
+
   const posture = $derived.by((): string => {
     const doing = run.doing;
     switch (doing.kind) {
@@ -240,7 +216,6 @@
     }
   });
 
-  
   function inField(target: EventTarget | null): boolean {
     return (
       target instanceof HTMLInputElement ||
@@ -309,7 +284,7 @@
       />
     </p>
   {/if}
-  
+
   {#if through === null && !frozen && run.thinking.length > 0 && whole}
     <div class="my-tight">
       <Reasoning text={run.thinking} open />
@@ -317,11 +292,10 @@
   {/if}
   {#if streaming}
     <Saying text={run.saying} {who} />
-    
+
     <SteerPin />
   {/if}
   {#if emptyRun}
-    
     <Failed
       what={stopped
         ? say($lang, "talk_failed_cancelled")
