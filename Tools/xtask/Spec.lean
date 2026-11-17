@@ -1383,6 +1383,7 @@ D47 **验证结果只绑定实际读取的完整输入闭包。** `Tools/xtask/s
 **接口**：`cargo xtask ci <plan|run> [--full | --base <rev>] [--scope-base <rev>] [--store <dir>]`。
 缺省选择完整图；`--base` 明确选择 affected 图并为文件门提供同一基线，`--scope-base` 只限定文件门，不改变节点选择。
 两种 base 互斥；`--full` 与 `--base` 互斥，与 `--scope-base` 可同时使用。固定基线与 owned manifest 只比较一次，结果同时供选择与文件作用域使用；基线错误必须失败，不当成空差异。
+所有基线 Git 读取使用 `--no-replace-objects`，不允许可变 `refs/replace` 在固定对象号下替换 tree 或 blob 字节。
 图完整覆盖现有源码门与六个外部节点，共 29 个。只有 `length`／`comments` 接收文件作用域，其他门保持整树结论。
 作用域的合法性与规范化只住 `source::Scope::new`，排序后的同一具体值既入键也传给 `gates::run`；执行不重新打开清单或读取 live diff。
 `source::Scope::paths()` 只读地暴露规范化有序清单，供键和实际调用共享；`PreparedAction` 持有该已验证值。

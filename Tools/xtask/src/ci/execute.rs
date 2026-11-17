@@ -220,7 +220,15 @@ fn isolated_process(
 fn process(root: &Path, prepared: &PreparedAction, log: &Path) -> Result<Outcome, XtaskError> {
     let operation = prepared.action.operation;
     if let Operation::Gate(name) | Operation::ScopedGate(name) = operation {
-        let code = crate::gates::run(root, &[name.to_owned()], None);
+        let files = if matches!(operation, Operation::ScopedGate(_)) {
+            prepared
+                .files
+                .as_ref()
+                .map(|scope| scope.paths().iter().cloned().collect())
+        } else {
+            None
+        };
+        let code = crate::gates::run(root, &[name.to_owned()], files);
         return Ok(if code == ExitCode::SUCCESS {
             Outcome::Green
         } else if code == ExitCode::FAILURE {

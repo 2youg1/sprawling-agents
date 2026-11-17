@@ -295,6 +295,47 @@ mod tests {
     }
 
     #[test]
+    fn replacement_refs_cannot_change_fixed_tree_or_blob_bytes() {
+        let root = tempfile::tempdir().unwrap();
+        command(root.path(), &["init", "--quiet"]);
+        std::fs::write(root.path().join("original.txt"), "original\n").unwrap();
+        std::fs::write(root.path().join("replacement.txt"), "replacement\n").unwrap();
+        command(root.path(), &["add", "--all"]);
+        let oid = |args: &[&str]| {
+            String::from_utf8(git(root.path(), args).unwrap().stdout)
+                .unwrap()
+                .trim()
+                .to_owned()
+        };
+        let original = oid(&["hash-object", "original.txt"]);
+        let replacement = oid(&["hash-object", "replacement.txt"]);
+        let base = oid(&["write-tree"]);
+        let captured = Snapshot::capture(root.path()).unwrap();
+        command(root.path(), &["replace", &original, &replacement]);
+        assert!(
+            changed(root.path(), &base, &captured).unwrap().is_empty(),
+            "a blob replacement cannot rewrite the baseline bytes"
+        );
+        command(root.path(), &["replace", "-d", &original]);
+        command(
+            root.path(),
+            &[
+                "update-index",
+                "--cacheinfo",
+                &format!("100644,{replacement},original.txt"),
+            ],
+        );
+        let replaced_tree = oid(&["write-tree"]);
+        command(root.path(), &["replace", &base, &replaced_tree]);
+        assert!(
+            changed(root.path(), &base, &captured).unwrap().is_empty(),
+            "a tree replacement cannot rewrite the baseline entries"
+        );
+        captured.close().unwrap();
+        root.close().unwrap();
+    }
+
+    #[test]
     fn nul_records_preserve_tabs_newlines_and_backslashes() {
         let rows = entries(b"100644 blob aaaa\tname\twith\nnewline\\and-slash.rs\0").unwrap();
         assert_eq!(rows.len(), 1);
