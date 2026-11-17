@@ -16,11 +16,6 @@
     )
 )]
 
-//! Gate runner. One gate per module; `gates` runs them all in order.
-//! Exit codes: 0 clean, 1 violations found, 2 usage or gate-internal failure.
-//! A broken gate must fail loudly (code 2): silent passes are the worst
-//! failure mode a gate can have (xtask D1).
-
 mod acp_catalog;
 mod architecture;
 mod artifact;
@@ -29,6 +24,7 @@ mod boundary;
 mod budget;
 mod bundle;
 mod channel;
+mod ci;
 mod color;
 mod comments;
 mod commits;
@@ -76,9 +72,6 @@ use std::process::ExitCode;
 
 use report::XtaskError;
 
-/// Dispatch the command in the current checkout and report its outcome.
-/// Returns 0 on success, 1 for rule violations, or 2 for usage errors or
-/// internal failures, including failure to identify the checkout.
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let judged = std::env::current_dir()
@@ -92,9 +85,6 @@ fn main() -> ExitCode {
         Err(err) => return report::internal_failure(&err),
     };
     match args.first().map(String::as_str) {
-        // The roster documents quote, printed from the same array the
-        // usage text renders from: a gate table in a document is checked
-        // against this output rather than maintained beside it.
         Some("gates") if args.iter().any(|a| a == "--list") => {
             for gate in &gates::GATES {
                 println!("{}", gate.name);
@@ -105,6 +95,7 @@ fn main() -> ExitCode {
             Ok(files) => gates::run(&root, &gate_names(&args), files),
             Err(err) => report::internal_failure(&err),
         },
+        Some("ci") => ci::run(&root, args.get(1..).unwrap_or(&[])),
         Some("color") => report::finish("color", color::check(&root)),
         Some("render") => report::finish("render", render::check(&root)),
         Some("budget") => match budget::report(&root) {
@@ -143,9 +134,6 @@ fn main() -> ExitCode {
                 Err(err) => report::internal_failure(&err),
             }
         }
-        // The npm channel is assembled out of a tag's own archives, so
-        // it takes the tag and where they were downloaded to rather
-        // than discovering either.
         Some("channel") => match channel::run(
             &root,
             &value_arg(&args, "--tag").unwrap_or_default(),
@@ -172,9 +160,6 @@ fn main() -> ExitCode {
             }
             Err(err) => report::internal_failure(&err),
         },
-        // `--list` is the roster CI consumes; bare `proof` proves it.
-        // Both read the same `#[kani::proof]` attributes, so the list a
-        // person reads and the set a machine proves cannot disagree.
         Some("proof") if args.iter().any(|a| a == "--list") => match proof::list(&root) {
             Ok(message) => {
                 print!("{message}");
@@ -189,8 +174,6 @@ fn main() -> ExitCode {
             }
             Err(err) => report::internal_failure(&err),
         },
-        // `--write` is the recovery the gate itself names, so it is the
-        // same command with one flag rather than a second spelling.
         Some("docnum") if args.iter().any(|a| a == "--write") => match docnum::write(&root) {
             Ok(message) => {
                 print!("{message}");
@@ -247,7 +230,6 @@ fn main() -> ExitCode {
             }
         },
         Some("release") => report::finish("release", release::check(&root)),
-        // Not a gate: a person reads what it writes (section 12-10).
         Some("shots") => match shots::run(&root, args.get(1..).unwrap_or(&[])) {
             Ok(message) => {
                 print!("{message}");
@@ -274,10 +256,6 @@ fn main() -> ExitCode {
     }
 }
 
-/// The value of one named flag anywhere after the subcommand: `--target`
-/// for `package`, `--tag`, `--assets` and `--out` for `release`, and
-/// `--title` for `commits`. One reader, so two flags cannot end up with
-/// two spellings of what "the value after it" means.
 fn value_arg(args: &[String], flag: &str) -> Option<String> {
     let mut it = args.iter();
     while let Some(arg) = it.next() {
@@ -288,11 +266,6 @@ fn value_arg(args: &[String], flag: &str) -> Option<String> {
     None
 }
 
-/// The gate names typed after `gates`: every argument that is neither a
-/// flag nor the value `--range` or `--files-from` takes. No gate reads
-/// history, so a `--range` a CI job still passes is skipped rather than
-/// read as a gate name. Arguments after `--files` belong to the file
-/// scope; `--files-from` takes one path and ends the name list.
 fn gate_names(args: &[String]) -> Vec<String> {
     let mut names = Vec::new();
     let mut it = args.iter().skip(1);
@@ -308,9 +281,6 @@ fn gate_names(args: &[String]) -> Vec<String> {
     names
 }
 
-/// File scope from `--files <path>...` or `--files-from <nul-list>`.
-/// The NUL list is what CI writes so a rename that touches thousands of
-/// paths does not blow the process argument limit.
 fn file_scope(args: &[String]) -> Result<Option<Vec<String>>, XtaskError> {
     if let Some(path) = value_arg(args, "--files-from") {
         let bytes = std::fs::read(&path).map_err(|source| XtaskError::Io {
@@ -330,19 +300,16 @@ fn file_scope(args: &[String]) -> Result<Option<Vec<String>>, XtaskError> {
         .map(|index| args.iter().skip(index.saturating_add(1)).cloned().collect()))
 }
 
-/// One command this tool answers beyond running a gate: what a person
-/// types after `cargo xtask`, and what they get for it.
 struct Tool {
-    /// The subcommand and the arguments it takes, as they are typed.
     call: &'static str,
-    /// What it produces, in one clause.
     gives: &'static str,
 }
 
-/// Everything `cargo xtask` answers that is not a gate, plus the flags
-/// that change what a gate does. The dispatcher above and this array are
-/// read together, so a command that grows a flag is printed with it.
-const TOOLS: [Tool; 17] = [
+const TOOLS: [Tool; 18] = [
+    Tool {
+        call: "ci <plan|run> [--full | --base <rev>] [--scope-base <rev>] [--store <dir>]",
+        gives: "the source graph with independent node selection and file-gate scope",
+    },
     Tool {
         call: "acp-catalog",
         gives: "the ACP registry index, written as the catalog snapshot the build ships",

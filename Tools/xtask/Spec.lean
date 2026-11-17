@@ -3,6 +3,7 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
+import Tools.xtask.spec.Ci
 import Tools.xtask.spec.Comments
 import Tools.xtask.spec.Guard.Wall
 import Tools.xtask.spec.Packaged
@@ -1368,6 +1369,54 @@ D42 **nightly 保留最新一份，加上稳定版尚未包含的那一份。** 
 **验证**：`.github/workflows/test-nightly-release.sh` 用 mock 的 GitHub 响应驱动这一步，覆盖三份、被包含、`identical`、annotated tag、快照领先稳定版、`diverged`、没有 curated release、tag ref 缺失、`compare` 失败、以及上限与被包含同时命中的十种情形。
 
 **重开参数**：curated release 的频率高到「最多滞后一次 nightly 发布」不可接受，或 nightly 通道需要保留可回退的上一份——那时改的是保留几份，不是这条判据。
+-/
+
+/-! ### 8-54 内容寻址验证图：源码门的生产切片
+
+D47 **验证结果只绑定实际读取的完整输入闭包。** `Tools/xtask/src/ci.rs` 与其分部持有验证节点、输入散列、依赖闭包、结果存储与并行执行；`ci/view.rs`
+在每用户私有临时目录持有本轮输入副本，`ci/baseline.rs` 只比较固定 Git tree 的对象与该副本；形式模型住
+`Tools/xtask/spec/Ci.lean`。`ci.yml` 的 `gates-sources` 调用 `cargo xtask ci run`，不再把一组互相独立的
+步骤写成固定的串行列表。默认、branch 与 CI 使用同一图；`gates-sources changed` 保留以
+`--files-from` 或显式路径调用 gates roster 的公开兼容入口，不复用内容结果。commit-message 的历史／标题输入仍在
+`.github/actions/commit-messages` 中，每次运行，不进内容缓存。
+
+**接口**：`cargo xtask ci <plan|run> [--full | --base <rev>] [--scope-base <rev>] [--store <dir>]`。
+缺省选择完整图；`--base` 明确选择 affected 图并为文件门提供同一基线，`--scope-base` 只限定文件门，不改变节点选择。
+两种 base 互斥；`--full` 与 `--base` 互斥，与 `--scope-base` 可同时使用。固定基线与 owned manifest 只比较一次，结果同时供选择与文件作用域使用；基线错误必须失败，不当成空差异。
+图完整覆盖现有源码门与六个外部节点，共 29 个。只有 `length`／`comments` 接收文件作用域，其他门保持整树结论。
+作用域的合法性与规范化只住 `source::Scope::new`，排序后的同一具体值既入键也传给 `gates::run`；执行不重新打开清单或读取 live diff。
+`source::Scope::paths()` 只读地暴露规范化有序清单，供键和实际调用共享；`PreparedAction` 持有该已验证值。
+没有基线时 `None` 保留全树迁移盘点，显式空名单是 `Some(empty)` 且严格判空；非空名单只判那些触改文件。
+CI 使用 `--full --scope-base <event-base>`，始终选择完整图，不用 affected 模式绕过旧债。`--store <dir>` 明确选择
+本地结果目录；GitHub 适配器由 `SPRAWLING_CI_CACHE_ADAPTER` 指向 `.github/ci-cache/cache.ts`。
+`just verify-sources` 按位置完整转发参数；`--full` 与 `--base` 互斥，重复选项明确拒绝。
+相对 store 与适配器路径以原检出为基准；store 与执行日志必须位于扫描面之外，解析现存父目录的别名后仍落在源码内时拒绝。
+显式外部 `--store` 不能跳过 `target/ci/logs` 的同一边界检查；日志写入解析后的路径。
+Windows 的脚本 shell 从实际 Git 安装的 exec-path 定位，不假定安装盘符；不可用时给出修复诊断。
+GitHub 通过同目录 `runs.using: node24` 的本地 action 启动原有 `just verify-sources`，让 runner 的缓存运行时环境
+直接传给子进程。只有 SDK 的 frozen 安装步骤允许失败；验证器启动失败、拒绝与异常退出必须令 action 失败。
+SDK、适配器与缓存目录留在原检出，安装产物不进入输入副本；Linux core 另运行 xtask clippy、ci 域测试与同一生产图。
+所有键使用工作区唯一的 BLAKE3，内容记录包含路径、字节摘要、节点定义、平台、实际验证器字节身份与依赖键。
+capture 每文件只读取一次，同一 buffer 写入独立普通文件并计算身份；检查读取副本而不是之后可能改变的原树。
+副本保留全部源码扫描面，包括顶层 workspace member；链接或特殊项无法忠实表示时明确拒绝。副本不复制
+`.git`、依赖或构建目录，原入口仍先通过 `root::judged`；需要 HEAD 的工作流自测使用一次捕获的显式值。
+该自测在已有 API 与 jq 替身旁固定 Git describe/count 的夹具答案，不从副本外读取标签或历史。
+清理失败明确报告，不能把运行后丢弃副本当成检查成功的一部分默默忽略。可复用纯门独占其只读输入视图；
+每个不可复用动作从该捕获视图取得独立的可写副本，外部命令与 Cargo 不能改写纯门读取的目录。
+
+**复用边界**：只读 `green` 且键完全相等的结果；`refused`、`broken`、损坏记录、缺失文件与不可达存储
+都回到真实执行。缓存写失败不改变已经得到的绿色结论，缓存读失败也不会把未执行读成绿色。非 hermetic
+节点必须声明 `never`，包括依赖外部进程或尚未固定 Cargo 配置的门；只有显式声明的纯源码门可复用，新增门默认
+不可复用。未闭包门的源码声明保守取全树，因此顶层 workspace member 和两种 Cargo config 文件名的变化都进入选择。
+当前六个纯门是 header、lexicon、motion、wording、wire-ts、release；Linux 从
+`/proc/self/exe` 读取实际运行映像作为身份，其他平台无法由现有接口固定该身份，全部真实执行而不读写结果缓存。
+Linux 映像探测失败也记录原因并降为不可复用；可选缓存能力不能阻止真实验证。
+图拒绝重名节点、未知依赖与环；独立失败不遮住其他可执行节点，后继在前置非绿时
+不得执行。
+
+**验收**：`lake build Tools.xtask.spec.Ci` 证明复用、闭包与完整性的性质；Rust 测试覆盖相同输入、不同
+内容、不同路径、删除输入、损坏缓存、失败重跑、受影响及前置闭包、并发执行和原子发布。生产验收是
+`cargo xtask ci run --full --scope-base <base>` 在本变更的完整图上全绿，并在两个不同输入树上展示正确的 miss／hit 与节点选择。
 -/
 
 /-! ## 9 工作流程
