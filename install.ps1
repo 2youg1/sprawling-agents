@@ -20,9 +20,10 @@
 #     `releases/latest` endpoint excludes those - it answers 404 here. The
 #     list endpoint is asked for the newest entry in the selected channel.
 #   * The tag and the archive carry different versions: tag
-#     `v0.0.3-Pre-alpha-260903` ships `sprawling-0.0.3-windows-x86_64.zip`.
-#     An asset is chosen by its platform suffix, never by a name built out
-#     of the tag.
+#     `v0.17.0-261117` ships `sprawling-0.17.0-windows-x86_64.zip`.
+#     An asset is chosen by its product and platform suffix, never by a
+#     name built out of the tag: one release also carries `mei-` archives
+#     whose names end with the same platform suffix.
 #   * Only the platforms the release workflow builds are installable. A
 #     platform with no archive is reported with the list the release does
 #     carry, rather than guessed at.
@@ -171,9 +172,11 @@ try {
 if (-not $release) { Die "no release found; see $releases" }
 if ($release.draft) { Die 'the selected release is a draft; choose a published fixed tag' }
 
-$asset = $release.assets | Where-Object { $_.name.EndsWith($suffix) } | Select-Object -First 1
+$asset = $release.assets | Where-Object {
+    $_.name.StartsWith('sprawling-') -and $_.name.EndsWith($suffix)
+} | Select-Object -First 1
 if (-not $asset) {
-    Write-Host "sprawling: $($release.tag_name) carries no archive ending $suffix. What it does carry:"
+    Write-Host "sprawling: $($release.tag_name) carries no sprawling archive ending $suffix. What it does carry:"
     $release.assets | ForEach-Object { Write-Host "  $($_.name)" }
     Die "download one of those from $releases, or build from source with ``just dist``"
 }

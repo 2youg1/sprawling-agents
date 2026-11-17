@@ -92,7 +92,7 @@ pub use plan::{Held, PlanExit, PlanNode, PlanTree, StopCause};
 pub use pursuit::{Pursuit, PursuitState, PursuitVerdict};
 pub use reach::{Answered, Connected, Named, Proxying, Reach, Through};
 pub use registry::{Artifact, Claim, RegisterVerdict, Registry, ResidentId};
-pub use release::{Maturity, Release, ReleaseVerdict};
+pub use release::{Release, ReleaseVerdict};
 pub use repair::RepairVerdict;
 pub use retries::Retries;
 pub use secret::{EntropyAllowlist, Sealed, SecretRef, SecretSpan};

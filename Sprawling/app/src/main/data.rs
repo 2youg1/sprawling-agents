@@ -250,7 +250,7 @@ pub(super) fn status(args: &[String]) -> ExitCode {
         print!("{DEPENDENCIES}");
         return ExitCode::SUCCESS;
     }
-    println!("{}", headline(kernel::release::MATURITY));
+    println!("{}", headline());
     println!("client: {}", client_summary());
     println!(
         "built from {} crate(s); list them with status --deps",

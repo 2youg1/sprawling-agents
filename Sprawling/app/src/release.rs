@@ -34,7 +34,7 @@ pub use nightly::NightlyBuild;
 
 /// Reads the build tag.
 /// # Errors
-/// Refuses a tag that disagrees with the Cargo version or maturity.
+/// Refuses a tag that disagrees with the Cargo version.
 pub fn built() -> Result<Built, AxError> {
     let curated = option_env!("SPRAWLING_RELEASE_TAG").filter(|tag| !tag.is_empty());
     let nightly = option_env!("SPRAWLING_NIGHTLY_TAG").filter(|tag| !tag.is_empty());

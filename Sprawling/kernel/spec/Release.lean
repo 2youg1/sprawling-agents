@@ -6,124 +6,78 @@
 /-!
 # kernel::release
 
-规定 `kernel::release`（`Sprawling/kernel/src/release.rs`）：一次发布的两种拼法与谁更新。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
+规定 `kernel::release`（`Sprawling/kernel/src/release.rs`）：一次发布的三种拼法与谁更新。本文件是 `Sprawling/kernel/Spec.lean` 的一个分部；下面每一节保留它在 kernel 规格里的标签 §8-n，别处引作 `Sprawling/kernel/Spec.lean §8-n`。
 -/
 
 /-!
-### 8-54 `kernel::release`：一次发布的两种拼法，以及两次发布谁更新
+### 8-54 `kernel::release`：一次发布的三种拼法，以及两次发布谁更新
 
 ```rust
-pub struct Release { /* major, minor, patch, year, month, day —— 私有 */ }
+pub struct Release { /* maturity, repository, package, year, month, day —— 私有 */ }
 impl Release {
     pub fn from_tag(tag: &str, expected_version: &str) -> Result<Release, AxError>;
     pub fn from_published_tag(tag: &str) -> Result<Release, AxError>;
     pub fn from_npm_version(text: &str) -> Result<Release, AxError>;
-    pub fn version(&self) -> String;      // 0.0.5
-    pub fn tag(&self) -> String;          // v0.0.9-Alpha-261004
-    pub fn npm_version(&self) -> String;  // 0.0.5-pre.260912
-    pub fn released(&self) -> String;     // 2026-09-12
+    pub fn version(&self) -> String;      // 0.17.0
+    pub fn tag(&self) -> String;          // v0.17.0-261117
+    pub fn npm_version(&self) -> String;  // 0.17.0-pre.261117
+    pub fn released(&self) -> String;     // 2026-11-17
 }
 pub enum ReleaseVerdict { Current, Behind, Ahead }
 pub fn stands(mine: &Release, newest: &Release) -> ReleaseVerdict;
-
-pub enum Maturity { PreAlpha, Alpha }
-impl Maturity {
-    pub const fn word(self) -> &'static str;    // alpha：句子里的写法
-    pub const fn titled(self) -> &'static str;  // Alpha：tag 与标题里的写法
-}
-pub const MATURITY: Maturity;                   // 这棵树切出的每一次发布的成熟度，现为 Alpha
 ```
 
-`from_published_tag` 读取发布列表中 Alpha 与 PreAlpha 两种历史中缀，仍调用同一 `decode_tag` 验证版本与日期；这不改变构建身份检查，`from_tag` 只认中缀为 `-<MATURITY.titled()>-` 的 tag，`tag()` 写的也是这一个中缀；`Maturity` 经 `kernel::Maturity` 重导出。
+`from_tag` 只认 `v<version>-<YYMMDD>`，并要求 version 与 Cargo 构建版本相同；`tag()` 生成同一形状。
+`from_published_tag` 先按历史 `v0.0.*-<旧中缀>-<YYMMDD>` 读，读不出再按当前形状读，
+所以不带旧中缀的 `v0.0.*-<YYMMDD>` 这类已发布 tag 也读得出。旧中缀仅作为已经发布的 tag 形状保留，
+不进入当前版本输出，也不影响版本号与日期解码。
 
 **五条口径：**
 
-1. **一次发布有三种拼法，而只有这一处同时认识它们。** crates.io 的裸版本号是第三种（§8-54-1）。 一次 pre-alpha 发布的 git tag 写 `v0.0.5-Pre-alpha-260912`（alpha 写 `-Alpha-`，第 5 条）；npm 只收 semver，同一次发布因此发成 `0.0.5-pre.260912`。`xtask channel` 按前者转出后者去发布，运行中的二进制按后者读回注册表——两边转换各写一份，就是「这是哪一次发布」有了两个答案。
-2. **排序是 semver 自己的。** 日期落在 pre-release 段，于是 `0.0.5-pre.260912` 高于 `0.0.5-pre.260911` 而低于裸的 `0.0.5`——semver 对点分数字标识符按数值比。`Ord` 按字段声明顺序派生即复现该规则，本 crate 与注册表因而对同一对发布给出同一个次序。**这正是本类型存在的理由**：二进制拿自己的裸 `0.0.5` 去比注册表的 `0.0.5-pre.260912`，会把最新的那一版读成更旧的那一版，且无声。
-3. **日期必须随版本一起走，不能摆在旁边。** 一个 0.0.x 的版本号几乎说不出树有多旧，而树有多旧正是它的读者最需要知道的（CHANGELOG.md 开篇）。故 `released()` 是给人读的那一个渲染，`npm_version()` 是给注册表的那一个。
+1. **一次发布有三种拼法，而只有这一处同时认识它们。** crates.io 的裸版本号是第三种（§8-54-1）。当前 git tag 写 `v0.17.0-261117`；npm 只收 semver，同一次发布因此发成 `0.17.0-pre.261117`。`xtask channel` 按前者转出后者去发布，运行中的二进制按后者读回注册表——两边转换各写一份，就是「这是哪一次发布」有了两个答案。
+2. **排序是 semver 自己的。** 日期落在 pre-release 段，于是 `0.17.0-pre.261117` 高于 `0.17.0-pre.261116` 而低于裸的 `0.17.0`——semver 对点分数字标识符按数值比。`Ord` 按字段声明顺序派生即复现该规则，本 crate 与注册表因而对同一对发布给出同一个次序。**这正是本类型存在的理由**：二进制拿自己的裸 `0.17.0` 去比注册表的 `0.17.0-pre.261117`，会把最新的那一版读成更旧的那一版，且无声。
+3. **日期必须随版本一起走，不能摆在旁边。** 版本号本身几乎说不出树有多旧，而树有多旧正是它的读者最需要知道的（CHANGELOG.md 开篇）。故 `released()` 是给人读的那一个渲染，`npm_version()` 是给注册表的那一个。
 4. **无钟无套接字。** 注册表此刻给的是什么，归调用方去取；本模块只判它被递到的东西（ARCHITECTURE.md 第 1 段）。
-5. **成熟度只写在 `MATURITY` 一处。** tag 的中缀、`sprawling status` 版本行里的说法（`Sprawling/app/Spec.lean` §8-162）、文档里由 `cargo xtask docnum` 的 `maturity` 事实渲染的字样（Tools/xtask/Spec.lean §8-16），都从这个常量读；npm 那一种拼法的 `-pre.` 不随它变（D18）。
+5. **版本号直接携带阶段与发布粒度。** 第一位表达成熟度，第二位表达全仓版本，第三位表达单独包的版本；不再另设阶段名称、阶段表或文本常量。npm 的 `-pre.` 是 registry 拼法，不是另一套成熟度合同（D18）。
 -/
 
 namespace Kernel.Release
 
-/-! D18 **成熟度是 kernel 的一个枚举常量，每一个读者从它渲染。** `MATURITY` 是这棵树切出的发布处在哪一级；tag 的中缀、`status` 的说法、README 两份与 CHANGELOG 里的字样都由它渲染，于是进 alpha 只改这一个常量，下面的定理说明每一处渲染都随之变。它是枚举而不是一段字符串：tag 写 `Pre-alpha`、句子写 `pre-alpha`，两种写法由 `Maturity` 的两个方法各给一次，读者不自己改大小写。值住 Rust（`Sprawling/kernel/src/release.rs`），模型对任一取值成立，所以这里是参数而不是定义。
-被否：①写成 `Cargo.toml` 版本号的 pre-release 段（`0.0.8-alpha`）——它改的是 semver 次序与 crates.io 上的每一处 `=` 钉子，而成熟度不是版本号的一部分；②npm 那一种拼法也带成熟度——semver 按字典序比 pre-release 标识，`alpha` 排在 `pre` 之前，一个 alpha 的发布在注册表上会被读成比最后一个 pre-alpha 更旧，所以 `-pre.` 留到定 V0.1.0 的那一次改动再定。
-重开参数：成熟度要进 npm 的版本串，或一棵树要同时切出两级成熟度的发布。 -/
-
-/-- 与 `kernel::Maturity` 逐变体同名：这个项目站在哪一级。 -/
-inductive Maturity where
-  | PreAlpha
-  | Alpha
-  deriving DecidableEq, Repr
-
-/-- 一个成熟度的两种写法：`word` 是句子里的（`status` 的版本行、README 的状态句），`titled` 是 tag 与标题里的。
-两种写法的值住 Rust 的 `Maturity::word` 与 `Maturity::titled`，模型把它们当参数，只要求各自分得开两级成熟度。 -/
-structure Spelling where
-  word : Maturity → String
-  titled : Maturity → String
-  word_injective : Function.Injective word
-  titled_injective : Function.Injective titled
-
-/-- tag 里隔开版本与日期的那一段：`-` 加 `titled` 再加 `-`，即 `Release::tag` 写出、`Release::from_tag` 切开的中缀。 -/
-def tagInfix (spelling : Spelling) (maturity : Maturity) : String :=
-  "-" ++ spelling.titled maturity ++ "-"
-
-/-- 中缀分得开两级成熟度：一个 tag 只属于一级，按 alpha 切出的 tag 不会被一个 pre-alpha 的构建读成自己的。 -/
-theorem a_tag_infix_names_one_maturity (spelling : Spelling) :
-    Function.Injective (tagInfix spelling) := by
-  intro a b same
-  apply spelling.titled_injective
-  simpa [tagInfix] using same
-
-/-- 两级成熟度之间的任何一次挪动，都让每一处渲染跟着变：tag 的中缀、句子里的写法、标题里的写法。 -/
-theorem moving_the_maturity_moves_every_rendering (spelling : Spelling)
-    {before after : Maturity} (moved : before ≠ after) :
-    tagInfix spelling before ≠ tagInfix spelling after ∧
-      spelling.word before ≠ spelling.word after ∧
-      spelling.titled before ≠ spelling.titled after :=
-  ⟨fun same => moved (a_tag_infix_names_one_maturity spelling same),
-   fun same => moved (spelling.word_injective same),
-   fun same => moved (spelling.titled_injective same)⟩
-
-/-- 前提可满足：存在分得开两级的写法，所以上面的定理不是从空前提推出来的。这里的字符串只是见证，不是 Rust 的拼法。 -/
-def witness : Spelling where
-  word | .PreAlpha => "a" | .Alpha => "b"
-  titled | .PreAlpha => "A" | .Alpha => "B"
-  word_injective := by intro a b h; cases a <;> cases b <;> first | rfl | (simp at h)
-  titled_injective := by intro a b h; cases a <;> cases b <;> first | rfl | (simp at h)
-
-/-- 见证之下，从 pre-alpha 挪到 alpha，tag 的中缀确实变了。 -/
-example : tagInfix witness .PreAlpha ≠ tagInfix witness .Alpha :=
-  (moving_the_maturity_moves_every_rendering witness (by decide)).1
+/-! D18 **版本三段依次表达成熟度、全仓版本与单包版本（人的定规）。**
+版本本身是唯一权威，不再维护阶段枚举、阶段中缀、状态句或阶段表；当前全仓基线是 `0.17.0`。
+全仓发布让公开包共用同一个 `<成熟度>.<全仓>.<单包>`，单包更新只移动第三位，全仓更新移动第二位并将第三位归零。
+被否：保留独立阶段文本——同一事实会在 Cargo、tag、状态行与文档中各写一遍，且文本不能参与 semver 排序。
+历史 `0.0.*` tag 只在读取已发布列表时兼容，不以旧文本生成新 tag，也不要求重写或删除历史 release。
+重开参数：三段各自的所有权或发布节奏改变。 -/
 
 /-! ### 8-54-1 crates.io 上的第三种拼法，以及三种拼法给出同一个次序
 
 ```rust
-pub struct Version { /* major, minor, patch —— 私有 */ }   // 只有版本号、没有日期的一次发布
+pub struct Version { /* maturity, repository, package —— 私有 */ } // 只有版本号、没有日期的一次发布
 impl Version { pub fn from_crates_version(text: &str) -> Result<Version, AxError>; }
 pub fn stands_on_versions(mine: &Version, newest: &Version) -> ReleaseVerdict;
 pub fn stands_on_crates(mine: &Release, newest: &Version) -> ReleaseVerdict;
 ```
 
-- **crates.io 收的是裸版本号**：工作区的 `[workspace.package] version`（`0.0.9`）原样发上去，日期不在里面；同一次发布在 npm 上是 `0.0.9-pre.261004`。`from_crates_version` 只认三个点分数字，拒法与 `from_npm_version` 的版本那一半是同一套（`assemble` 的前半），所以两种读法不会一个收、一个拒。
-- **只比版本号**：没有发行 tag 的 Cargo 源码安装经 `stands_on_versions` 比较编译版本与注册表版本，日期为空；没有安装身份的开发构建仍然不比较。`stands_on_crates` 按 `mine` 的版本号对 `newest` 判，日期不参与。拿注册表的裸 `0.0.9` 去和自己的 npm 拼法 `0.0.9-pre.261004` 按 semver 比，会把同一次发布读成「注册表更新」；下面的 `a_bare_version_outranks_its_own_npm_spelling` 说这个陷阱对每一次发布都成立，所以两种拼法之间永远不直接比。
+- **crates.io 收的是裸版本号**：工作区的 `[workspace.package] version`（`0.17.0`）原样发上去，日期不在里面；同一次发布在 npm 上是 `0.17.0-pre.261117`。`from_crates_version` 只认三个点分数字，拒法与 `from_npm_version` 的版本那一半是同一套（`assemble` 的前半），所以两种读法不会一个收、一个拒。
+- **只比版本号**：没有发行 tag 的 Cargo 源码安装经 `stands_on_versions` 比较编译版本与注册表版本，日期为空；没有安装身份的开发构建仍然不比较。`stands_on_crates` 按 `mine` 的版本号对 `newest` 判，日期不参与。拿注册表的裸 `0.17.0` 去和自己的 npm 拼法 `0.17.0-pre.261117` 按 semver 比，会把同一次发布读成「注册表更新」；下面的 `a_bare_version_outranks_its_own_npm_spelling` 说这个陷阱对每一次发布都成立，所以两种拼法之间永远不直接比。
 - **预发布的「更新」**：在 npm 上，版本号相同、日期更晚的那一次更新，因为日期落在 pre-release 段、按数值比；在 crates.io 上，同一版本号只能发一次，日期更晚的重切发不上去，所以 crates.io 对同一版本号恒答 `Current`。这对用 cargo 装的人是真话：`cargo install sprawling --locked` 本来就取不到一次只改了日期的重切。
-- **拼回去**：crates.io 的拼法就是 `Release::version()`（`0.0.9`），不另设一个返回同值的函数；`Version` 不在 kernel 根上导出，因为根上的 `kernel::Version` 是另一个概念，调用方写 `kernel::release::Version`。
+- **拼回去**：crates.io 的拼法就是 `Release::version()`（`0.17.0`），不另设一个返回同值的函数；`Version` 不在 kernel 根上导出，因为根上的 `kernel::Version` 是另一个概念，调用方写 `kernel::release::Version`。
 - **平台**：只读字符串，Windows、macOS、Linux 一致；向 crates.io 的那一次 HTTPS GET（带 User-Agent）归调用方（口径 4），与问 npm 用同一个 reqwest 客户端。打印的更新命令随安装方式（npm、cargo、压缩包、源码）而变，不随平台变。
 - **派生检查**（`Sprawling/kernel/src/release.rs` 的测试）：proptest 在 `0..=9` 的三个版本数与合法日期上抽两次发布 `a`、`b`，断言：版本号不同时 `stands_on_crates(a, &b_version)` 与 `stands(a, b)` 相等；版本号相同时前者是 `Current`；把两次发布的 `npm_version()` 按 semver 第 11 条（测试里手写的标识比较）排出的次序与 `Release` 的 `Ord` 相同。坏的变体：`stands_on_crates` 把 `newest` 补成日期为零的 `Release` 再交给 `stands`，版本号相同的每一对都红成 `Ahead`。
 -/
 
-/-- 一个版本号：三个点分数字。 -/
+/-- 一个版本号：成熟度、全仓版本、单包版本。 -/
 structure Version where
-  major : Nat
-  minor : Nat
-  patch : Nat
+  maturity : Nat
+  repository : Nat
+  package : Nat
   deriving DecidableEq
 
 /-- 版本号的次序：逐段按数值比。 -/
 def Version.cmp (a b : Version) : Ordering :=
-  (compare a.major b.major).then ((compare a.minor b.minor).then (compare a.patch b.patch))
+  (compare a.maturity b.maturity).then
+    ((compare a.repository b.repository).then (compare a.package b.package))
 
 /-- 一次发布：版本号与日期。`yy` 是 tag 与 npm 拼法里的两位年份；Rust 存四位年份，两者差一个常数，次序相同。三个数各小于 100，正是六位日期的形状。 -/
 structure Release where

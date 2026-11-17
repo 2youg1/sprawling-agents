@@ -22,4 +22,4 @@ Report unauthorized network access, breaches of enforced file or credential boun
 
 ## Supported versions
 
-sprawling is in <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->. Confirmed fixes ship with the next release; we aim to publish fixes promptly. Older releases do not receive backports.
+The first component of a sprawling version expresses maturity. Confirmed fixes ship with the next release; we aim to publish fixes promptly. Older releases do not receive backports.
