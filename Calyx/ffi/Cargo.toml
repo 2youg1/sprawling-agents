@@ -16,6 +16,20 @@ links = "sprawling_console_leaf"
 name = "console_ffi"
 path = "src/lib.rs"
 
+[target.'cfg(unix)'.dependencies]
+# The one call the console's local-time rendering makes on unix:
+# libc's localtime_r, wrapped safe in `zone` (`Calyx/ffi/Spec.lean` D3).
+libc = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+# The same reading on Windows, as FileTimeToSystemTime +
+# SystemTimeToTzSpecificLocalTime: the OS applies the moment's own DST
+# rule, so no civil calendar code lives on this side of the boundary (D3).
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_System_Time",
+] }
+
 [dev-dependencies]
 vt100 = { workspace = true }
 

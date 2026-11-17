@@ -171,6 +171,9 @@ pub struct Live<'a> { pub waiting, pub working, pub calling, pub asking, pub com
 pub struct Inline<'a> { pub columns: u16, pub rows: u16, pub erase: u16, pub previous: Option<Part>, pub entries: &'a [Entry], pub live: Option<Live<'a>> }
 pub struct Quiet<'a> { pub columns: u16, pub rows: u16, pub url, pub code, pub key, pub transient }
 impl Scene { pub fn inline(&Inline) -> Scene; pub fn quiet(&Quiet) -> Scene; }
+
+// console_ffi::zone
+pub fn seconds_since_midnight(millis: u64) -> Option<u32>; // 系统本地时区里那一刻的午夜以来秒
 ```
 
 - **主屏一帧**：从上一帧光标所在的行向上 `erase` 行回到活动区第一行，清到屏底，写下新的转写行，再画活动区，把光标放回 composer。`rows` 是可见窗口的高度，活动区的位置由 D8 决定。整帧包在 `ESC [ ? 2026 h` 与 `ESC [ ? 2026 l` 之间；不认 2026 的终端忽略它，画出同样的字节。
@@ -178,7 +181,7 @@ impl Scene { pub fn inline(&Inline) -> Scene; pub fn quiet(&Quiet) -> Scene; }
 - **安静宿主**：备用屏中央两行——地址、配对码（为超出这台电脑的 serve 现铸的 key 跟在配对码后面）——至多再一行临时行，在下方隔一行。
 -/
 
-/-! D1 渲染器是一片 Zig 叶子，在它自己的包里，`unsafe` 只在那一次调用
+/-! D1 渲染器是一片 Zig 叶子，在它自己的包里；渲染路径的 `unsafe` 只在 leaf 那一次调用
 
 决定：控制台的排版与转义序列由 Zig 写成，静态链接进二进制；叶子只读借来的 scene、只写借来的缓冲，不读时钟、不开文件、不留状态；包的 lint 表与工作区相同，只有 `unsafe_code` 是 `deny`，`console_ffi::leaf` 里那一次调用在最窄处以 `#[expect(unsafe_code, reason = …)]` 放开，旁边一行 `SAFETY:` 写使它成立、可能为假的前提。`build.rs` 用 `zig-version` 钉住的 Zig 按目标三元组 `zig build-lib`，非 Windows 目标加 `-fPIC`；仓库里构建时这份钉与 `Sprawling/desktop/ffi/zig-version` 必须相同。`ReleaseSafe` 让叶子的每个越界与溢出检查留在发布的二进制里，失败即陷入；`panic = std.debug.no_panic`，叶子不带栈回溯机制，在每个目标上构建得一样。
 
@@ -274,4 +277,17 @@ impl Scene { pub fn inline(&Inline) -> Scene; pub fn quiet(&Quiet) -> Scene; }
 
 被否：①继续仅 `zig build-lib` 单文件编叶——无法承载整壳；②为壳另开第三 FFI crate——在
 `unsafe` 仍须落在 `LEAVES` 内时扩大例外面而无收益。
+-/
+
+/-! D12 本地时刻经 `zone` 读系统时区，chrono 不进树
+
+决定：`console_ffi::zone::seconds_since_midnight(millis)` 把 UTC 毫秒换成系统本地时区里那一刻的午夜以来秒：Windows 经 `FileTimeToSystemTime`＋`GetTimeZoneInformation`＋`SystemTimeToTzSpecificLocalTime`（OS 按那一刻自己的夏令时规则换算），Unix 经 `libc::localtime_r`；这几个调用是 `unsafe` 绑定，住在本包，各带一行 `SAFETY:`。`Calyx` 侧的 `console::local_time::local` 只调它。
+
+理由：RUSTSEC-2026-0543（chrono 全部版本停止维护，2026-11-17 发布）经 Calyx 的直依赖进锁，release 的 advisories 门按设计在任何暴露下保持红色；console 场景时刻是 chrono 在树里的最后一个用途，其余时间需求已由自研 UTC 时钟（`runtime::clock`）与 std 承担。不再多养一个日历库，也不要一个清除条件不在我们手里的 ignore。
+
+定规：系统与 agent 读得到的事实恒为 UTC——唯一时间权威是 `runtime::clock` 的 ISO UTC（`Sprawling/runtime/Spec.lean` §8-10），记录、打戳行与 ISO 串不是 UTC 就是带显式偏移的 UTC；本地时刻只允许渲染给人的表盘（console 条目的 `HH:MM:SS`，D6），由 UTC 毫秒换算，不落盘、不进任何 agent 读得到的面。本模块是这条边界上唯一的例外，重开它需要先说动这条定规。
+
+被否：①`deny.toml` 登记对 RUSTSEC-2026-0543 的 ignore——chrono 留在锁里，清除条件在上游；②chrono 换 `time`/`jiff`——`runtime::clock` 已覆盖 UTC 数学，这两个 crate 只为取本地偏移而来；③取「当前偏移」做算术——跨夏令时边界的旧时刻会差一小时，而 `FileTimeToLocalFileTime` 与 `localtime_r` 按时刻换算，与 chrono 的旧行为等价。
+
+剩余限制（写明，不当作已解决）：只读系统配置的那一个本地时区，不做多时区；两个平台调用失败时该时刻不渲染（与旧 chrono 答 `None` 相同）。
 -/

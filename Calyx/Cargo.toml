@@ -19,7 +19,6 @@ path = "src/lib.rs"
 [dependencies]
 accounting = { workspace = true }
 child = { workspace = true }
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
 console_ffi = { workspace = true }
 getrandom = { workspace = true }
 kernel = { workspace = true }

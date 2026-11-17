@@ -64,14 +64,14 @@ impl Reader {
             .automation
             .element_from_handle(HWND(window.ptr()))
             .map_err(|err| {
-            fault::automation(
-                "read the window's accessibility tree",
-                "call `desktop.windows` again; a window that has closed has no tree, and a \
+                fault::automation(
+                    "read the window's accessibility tree",
+                    "call `desktop.windows` again; a window that has closed has no tree, and a \
                  window drawn without accessibility information cannot be read this way — use \
                  `desktop.screenshot` to see it instead",
-                &err,
-            )
-        })?;
+                    &err,
+                )
+            })?;
         Ok(walk(self, root, depth))
     }
 }
