@@ -160,6 +160,10 @@ fn a_captured_bad_header_cannot_borrow_a_later_good_header() {
 
 #[cfg(target_os = "linux")]
 #[test]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "test fixture re-executes its own verifier image (child D4)"
+)]
 fn a_replaced_executable_path_does_not_replace_the_loaded_identity() {
     const CHILD: &str = "XTASK_CI_IMAGE_REPLACEMENT_TEST";
     if std::env::var_os(CHILD).is_some() {
