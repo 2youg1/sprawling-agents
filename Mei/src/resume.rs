@@ -101,18 +101,13 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
                 )
                 .with_value(offending_value(content_value))
             })?;
-        if messages.is_empty() && (role != "user" || !content.is_string()) {
-            let offending = if role != "user" {
-                role_value
-            } else {
-                Some(content)
-            };
+        if messages.is_empty() && role != "user" {
             return Err(failure(
                 "validate the initial Mei prompt",
-                "the first line must contain the initial user prompt as a string",
+                "the first line must contain the initial user prompt",
                 where_failed,
             )
-            .with_value(offending_value(offending))
+            .with_value(offending_value(role_value))
             .into());
         }
         messages.push(json!({"role": role, "content": content}));
@@ -174,6 +169,34 @@ mod tests {
     }
 
     #[test]
+    fn an_initial_multimodal_prompt_is_preserved() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("multimodal.jsonl");
+        let content = json!([
+            {"type": "text", "text": "inspect"},
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "aW1hZ2U="}},
+            {"type": "audio", "source": {"type": "base64", "media_type": "audio/wav", "data": "YXVkaW8="}},
+            {"type": "video", "source": {"type": "url", "url": "https://example.invalid/video"}}
+        ]);
+        std::fs::write(
+            &path,
+            format!(
+                "{}\n{}",
+                json!({"role": "user", "content": content}),
+                json!({"role": "assistant", "content": "done", "stop_reason": "end_turn"})
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            read(&path).unwrap(),
+            vec![
+                json!({"role": "user", "content": content}),
+                json!({"role": "assistant", "content": "done"})
+            ]
+        );
+    }
+
+    #[test]
     fn validation_failures_carry_role_content_and_stop_values() {
         let dir = tempfile::tempdir().unwrap();
         for (name, bytes, expected) in [
@@ -183,14 +206,6 @@ mod tests {
                 "\"system\"",
             ),
             ("bad-content", "{\"role\":\"user\",\"content\":42}\n", "42"),
-            (
-                "array-prompt",
-                concat!(
-                    "{\"role\":\"user\",\"content\":[]}\n",
-                    "{\"role\":\"assistant\",\"content\":\"done\",\"stop_reason\":\"end_turn\"}\n"
-                ),
-                "[]",
-            ),
             (
                 "bad-stop",
                 concat!(

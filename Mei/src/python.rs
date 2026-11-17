@@ -3,16 +3,39 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The persistent Python adapter (`Mei/Spec.lean` §6, §10-§12).
-//! Each `run` returns the path of the file that captured stdout+stderr.
+//! The persistent Python3 adapter (`Mei/Spec.lean` §6, §10-§12).
+//! Small UTF-8 captures are returned whole; large captures stay at their paths.
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::time::Duration;
 
 use crate::error::{Code, Diagnostic, Error, Result};
 
 const BOOT: &str = include_str!("boot.py");
+
+/// The largest combined stdout/stderr capture returned inline.
+pub const INLINE_BYTES: u64 = 16 * 1024;
+const INLINE_KIB: u64 = INLINE_BYTES / 1024;
+
+/// Describes the Python3 tool using the same output budget as [`observable_output`].
+pub fn tool_description() -> String {
+    format!(
+        concat!(
+            "<python3>\nA persistent Python3 interpreter. Variables, imports, and the working directory (cwd) persist across calls. ",
+            "An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. ",
+            "Expressions do not auto-echo, so explicitly print any values you need to inspect. ",
+            "If combined UTF-8 stdout/stderr is up to {} KiB, the tool returns it inline. ",
+            "Larger or non-UTF-8 output returns a notice and the path to a file containing the full output; ",
+            "filter that file, or re-run with narrower output, in the next Python call. ",
+            "Run shell commands and CLIs through subprocess, capture their output, and check return codes. ",
+            "Start Python with sys.executable rather than bare python3, so child processes inherit the active environment. ",
+            "Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, ",
+            "Python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python3>"
+        ),
+        INLINE_KIB
+    )
+}
 
 const CLOSE_POLL: Duration = Duration::from_millis(20);
 const CLOSE_GRACE: Duration = Duration::from_secs(5);
@@ -91,10 +114,10 @@ impl Py {
         })
     }
 
-    /// Executes one code string; returns the path of the capture file.
+    /// Executes one code string and returns its observable tool result.
     ///
     /// # Errors
-    /// Channel, frame and process failures. Tracebacks live in the file.
+    /// Channel, frame, capture-file and process failures.
     pub fn run(&mut self, code: &str) -> Result<String> {
         let frame = serde_json::to_vec(code).map_err(|err| {
             failure(
@@ -104,7 +127,8 @@ impl Py {
             )
         })?;
         self.write_frame(&frame)?;
-        self.read_frame()
+        let path = self.read_frame()?;
+        observable_output(&path)
     }
 
     fn write_frame(&mut self, frame: &[u8]) -> Result<()> {
@@ -232,6 +256,54 @@ impl Py {
     }
 }
 
+fn output_too_large(path: &str) -> String {
+    format!(
+        "Output exceeds {INLINE_BYTES} bytes. Use Python3 to filter and print the needed result.\n{path}"
+    )
+}
+
+fn observable_output(path: &str) -> Result<String> {
+    let file = std::fs::File::open(path).map_err(|err| {
+        failure(
+            "open Python3 output",
+            format!("{path}: {err}"),
+            "keep the capture file available until the tool result is read",
+        )
+    })?;
+    let bytes = file
+        .metadata()
+        .map_err(|err| {
+            failure(
+                "read Python3 output metadata",
+                format!("{path}: {err}"),
+                "keep the capture file readable until the tool result is read",
+            )
+        })?
+        .len();
+    if bytes > INLINE_BYTES {
+        return Ok(output_too_large(path));
+    }
+    let mut captured = Vec::new();
+    file.take(INLINE_BYTES.saturating_add(1))
+        .read_to_end(&mut captured)
+        .map_err(|err| {
+            failure(
+                "read Python3 output",
+                format!("{path}: {err}"),
+                "keep the capture file readable until the tool result is read",
+            )
+        })?;
+    if u64::try_from(captured.len()).unwrap_or(u64::MAX) > INLINE_BYTES {
+        return Ok(output_too_large(path));
+    }
+    match String::from_utf8(captured) {
+        Ok(text) => Ok(text),
+        Err(_) => Ok(format!(
+            "Output is not UTF-8. Process it with Python3.\n{path}"
+        )),
+    }
+}
+
 fn python_program() -> &'static str {
     if cfg!(windows) { "python" } else { "python3" }
 }
@@ -265,23 +337,100 @@ mod tests {
     }
 
     #[test]
-    fn state_and_path_handles_survive_calls() {
+    fn state_and_small_outputs_survive_calls() {
         let mut python = Py::spawn().unwrap();
-        let path = python.run("x = 40\nprint(x)").unwrap();
-        assert_eq!(read_path(&path), "40\n");
-        let path = python.run("x += 2\nprint(x)").unwrap();
-        assert_eq!(read_path(&path), "42\n");
-        let path = python.run("pass").unwrap();
-        assert_eq!(read_path(&path), "");
-        assert!(read_path(&python.run("raise SystemExit(3)").unwrap()).contains("SystemExit: 3"));
+        assert_eq!(python.run("x = 40").unwrap(), "");
+        assert_eq!(python.run("40 + 2").unwrap(), "");
+        assert!(
+            python
+                .run("raise ValueError('recoverable')")
+                .unwrap()
+                .contains("ValueError: recoverable")
+        );
+        assert_eq!(
+            python.run("print(x)").unwrap().replace("\r\n", "\n"),
+            "40\n"
+        );
+        assert_eq!(
+            python
+                .run("x += 2\nprint(x)")
+                .unwrap()
+                .replace("\r\n", "\n"),
+            "42\n"
+        );
+        assert!(
+            python
+                .run("raise SystemExit(3)")
+                .unwrap()
+                .contains("SystemExit: 3")
+        );
+        assert_eq!(
+            python.run("print(x)").unwrap().replace("\r\n", "\n"),
+            "42\n"
+        );
+        assert_eq!(python.run("pass").unwrap(), "");
         python.close().unwrap();
     }
 
     #[test]
-    fn large_output_is_a_full_file_path() {
+    fn tool_description_uses_the_inline_budget() {
+        assert!(tool_description().contains(&format!("up to {INLINE_KIB} KiB")));
+    }
+
+    #[test]
+    fn imports_and_cwd_survive_calls() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = serde_json::to_string(&directory.path().to_string_lossy()).unwrap();
         let mut python = Py::spawn().unwrap();
-        let path = python.run("print('x' * 50000)").unwrap();
-        assert_eq!(read_path(&path).len(), 50001);
+        let first = python
+            .run(&format!("import os\nos.chdir({path})\nprint(os.getcwd())"))
+            .unwrap();
+        let second = python.run("print(os.getcwd())").unwrap();
+        assert_eq!(first, second);
+        assert_eq!(
+            std::path::Path::new(second.trim()).canonicalize().unwrap(),
+            directory.path().canonicalize().unwrap()
+        );
+        python.close().unwrap();
+    }
+
+    #[test]
+    fn sys_executable_starts_a_captured_child_python() {
+        let mut python = Py::spawn().unwrap();
+        let output = python
+            .run("import subprocess, sys\nchild = subprocess.run([sys.executable, '-c', 'print(42)'], capture_output=True, text=True, check=True)\nprint(child.stdout, end='')")
+            .unwrap();
+        assert_eq!(output.replace("\r\n", "\n"), "42\n");
+        python.close().unwrap();
+    }
+
+    #[test]
+    fn large_output_is_a_notice_and_full_file_path() {
+        let mut python = Py::spawn().unwrap();
+        let notice = python.run("print('x' * 50000)").unwrap();
+        assert!(notice.starts_with("Output exceeds 16384 bytes."));
+        let path = notice.lines().last().unwrap();
+        assert_eq!(read_path(path).len(), 50001);
+        python.close().unwrap();
+    }
+
+    #[test]
+    fn the_inline_budget_is_exact() {
+        let mut python = Py::spawn().unwrap();
+        let inline = python.run("import os\nos.write(1, b'x' * 16384)").unwrap();
+        assert_eq!(inline.len(), 16384);
+        let notice = python.run("os.write(1, b'x' * 16385)").unwrap();
+        assert!(notice.starts_with("Output exceeds 16384 bytes."));
+        python.close().unwrap();
+    }
+
+    #[test]
+    fn non_utf8_output_is_a_notice_and_full_file_path() {
+        let mut python = Py::spawn().unwrap();
+        let notice = python.run("import os\nos.write(1, b'\\xff')").unwrap();
+        assert!(notice.starts_with("Output is not UTF-8."));
+        let path = notice.lines().last().unwrap();
+        assert_eq!(std::fs::read(path).unwrap(), [255]);
         python.close().unwrap();
     }
 
@@ -303,10 +452,10 @@ mod tests {
     #[test]
     fn leftover_threads_cannot_hold_the_answer() {
         let mut python = Py::spawn().unwrap();
-        let path = python
+        let output = python
             .run("import threading\nthreading.Thread(target=threading.Event().wait).start()\nprint('answered')")
             .unwrap();
-        assert_eq!(read_path(&path), "answered\n");
+        assert_eq!(output.replace("\r\n", "\n"), "answered\n");
         python
             .close_within(Duration::from_millis(200))
             .expect("the close escalates instead of hanging");

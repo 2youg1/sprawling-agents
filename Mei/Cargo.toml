@@ -8,7 +8,7 @@ repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
 publish.workspace = true
-description = "Mei, a minimal headless Agent Harness: one Python tool, path-only effects, and a process Face for Calyx or scripts."
+description = "Mei, a minimal headless Agent Harness: one persistent Python3 tool, bounded observable output, and a process Face for Calyx or scripts."
 keywords = ["agents", "llm", "harness", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 
@@ -22,6 +22,10 @@ path = "src/main.rs"
 [[test]]
 name = "cli"
 path = "test/cli.rs"
+
+[[test]]
+name = "observation"
+path = "test/observation.rs"
 
 [dependencies]
 serde_json.workspace = true

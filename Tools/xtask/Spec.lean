@@ -569,26 +569,23 @@ npm 根包是 `sprawling` 与 `@sprawling/mei`，Mei 平台包是
 `sprawling-mei`。
 
 根包描述读取工作区或 `Mei/Cargo.toml` 的 description，不在打包器另写产品文案。
-sprawling 根包主 bin 指向 `bin/sprawling.js`，Mei 根包主 bin 指向 `bin/mei.js`。
-同一 `channel::RUNTIME_ENTRY` 常量生成 sprawling 内部运行时 bin 名和主脚本 shebang；
-Mei 使用独立的 `MEI_RUNTIME_ENTRY`，避免两个根包争夺一个 bin 名。两个根包共享一份
-`SHIM`，它从自身 `package.json` 辨认产品与平台表，只定位已装平台包并启动子进程，
-传递参数、退出状态和 Unix 终止信号。对 `@sprawling/mei`：argv 含 `-p` 或 stdin 非 TTY
-时 exec 平台包内无头核；否则 exec 同包 `calyx` 并把 `MEI_BIN` 设为无头核路径。运行时
-入口在已有 Bun 与 Node 中选择，不安装工具，缺少两者或缺少主脚本参数时退出失败。选择器
-是 shell/batch 混合脚本，Unix exec 所选运行时，Windows 传入完整参数并返回其退出码。
-安装来源只由已有明确元数据与缓存目录辨认，运行时不是安装器。
+sprawling 根包主 bin 指向 `bin/sprawling.js`，Mei 根包唯一 bin `mei` 指向
+`bin/mei.js`；后者的 shebang 是 `#!/usr/bin/env bun`，不生成 `mei-runtime` 或 `.cmd`。
+两个根包共享一份 `SHIM`，它从自身 `package.json` 辨认产品与平台表，只定位已装平台包
+并启动子进程，传递参数、退出状态和 Unix 终止信号。对 `@sprawling/mei`：argv 含 `-p`
+或 stdin 非 TTY 时 exec 平台包内无头核；否则 exec 同包 `calyx` 并把 `MEI_BIN` 设为无头核
+路径。Mei 的 npm 入口要求 Bun，与文档的 `bunx` 前提一致；npm exec 可调用同一入口，
+但不因此支持无 Bun 的机器。安装来源只由已有明确元数据与缓存目录辨认，运行时不是安装器。
 
 发布顺序保持平台 npm 包、两个 npm 根包、crates.io：根包的可选依赖先存在，crates.io
 仍在其它渠道之后，因为其版本不可替换。首次出现的 npm 包与 crate 先由有权限的人完成
 首次发布并登记这一 workflow 的 trusted publisher；以后同一 Tag 的发布才由 OIDC 接管。
 
-参数与理由：Bun 与 npm 的 bin 链接行为不同，Node shebang 会在 JavaScript 回退执行之前
-先要求 Node，而无 shebang 的脚本不能直接供 `bunx` exec。内部运行时入口保留合法主
-shebang 和现有运行时选择，不要求二者同时安装。被否：只在 JavaScript 中检测 Bun；
-推断执行 JavaScript 的运行时就是安装器；为 Mei 复制第二份 shim；把 Mei 塞进 sprawling
-归档或 npm 根包；只发无头核而把交互推给人手写 `MEI_BIN`。若包管理器提供可移植的条件
-bin，此二入口可重议。
+参数与理由：Bun 官方 `bunx` 合同支持以 `bun` shebang 固定运行时。单 bin 消除了
+Windows 上把自定义 `mei-runtime` 当 PATH 解释器解析的启动失败，也不让 Node 成为隐藏前提。
+被否：双 bin + 自定义运行时（已复现不能启动）；`node` shebang（只装 Bun 的用户仍失败）；
+只在 JavaScript 中检测 Bun；推断执行 JavaScript 的运行时就是安装器；为 Mei 复制第二份
+shim；把 Mei 塞进 sprawling 归档或 npm 根包；只发无头核而把交互推给人手写 `MEI_BIN`。
 -/
 
 /-! ### 8-20 `argument_count` 的豁免表自清理，与一个地址上的两个函数
