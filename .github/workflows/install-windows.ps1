@@ -3,7 +3,7 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2026 2youg1 and the sprawling contributors
 
-param([Parameter(Mandatory)][string]$Archives, [Parameter(Mandatory)][string]$Evidence, [string]$Tag = 'v0.0.0-Alpha-260101')
+param([Parameter(Mandatory)][string]$Archives, [Parameter(Mandatory)][string]$Evidence, [string]$Tag = 'v0.0.0-260101')
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows') {

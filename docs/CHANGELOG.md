@@ -1,13 +1,13 @@
 # Changelog
 
-Every release is a tag of the form `v<version>-<maturity>-<YYMMDD>`, and the
-releases this tree cuts are <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->; `kernel::release::MATURITY`
-is the one place that is decided. The date is part of the name because an
-early version number says almost nothing about how old the tree is, and how
-old the tree is, is what a reader of an early release most needs to know. A
-section written before its release is cut is headed by the version the
-workspace manifest carries and the release's name, and takes its tag when the
-release is cut.
+Every curated release is a tag of the form `v<version>-<YYMMDD>`. The three
+version components name maturity, the whole-repository release and an
+individual package release, in that order. A whole-repository release gives
+every public package the same version; an individual package update uses the
+third component. The date is part of the tag because a version number alone
+does not say how old the tree is. A section written before its release is cut
+is headed by the version the workspace manifest carries and takes its tag when
+the release is cut.
 
 Each entry records what changed. A wall-clock figure names the class of
 machine that produced it, because the same figure from a busier or slower
@@ -19,6 +19,38 @@ The three releases before this file existed are reconstructed here from their
 release notes and their commits.
 
 ---
+
+## v0.17.0-261117
+
+**sprawling 0.17.0**
+
+Cut on 2026-11-17 (UTC+8) as `v0.17.0-261117`. It records what landed after 0.0.17 and migrates the version protocol: the first component expresses maturity, the second the whole-repository release, and the third an individual package release. A whole-repository release synchronizes every public package; an individual package update uses the third component. Existing tags and releases remain available. The wire moves from 79 to 80, so reload a browser tab left open by the previous release. EVENT_LOG_V stays 2 and the configuration formats stay at format 1; a city written by 0.0.17 opens without a new migration. Stop the city and verify a restorable backup before updating.
+
+### Version and distribution
+
+- **The version protocol moves to `0.17.0`.** Current tags drop the separate stage infix, the status line carries only the version and build identity, and current documents no longer carry a stage ladder. Historical tags remain readable by update checks.
+- **All public crates move to 0.17.0 together.** The corresponding npm packages carry the same three components and the release date. GitHub, npm and crates.io are updated by the curated release chain; existing releases are not deleted.
+- **A curated tag now carries six archives.** Three sprawling archives are joined by Mei for Windows x64, macOS arm64 and Linux x64 musl; publication refuses an incomplete set (#312, #320, #322).
+
+### Mei and Calyx
+
+- **Mei's persistent Python3 tool restores observation.** Complete UTF-8 stdout and stderr up to 16 KiB return inline; larger or non-UTF-8 output stays complete on disk and returns only a notice and path. Expressions do not auto-echo, variables, imports and cwd survive calls, and an exception does not end the interpreter (#322, #327).
+- **Complete-log resume is broader.** Legacy tool names and string or content-block arrays, including media blocks, pass through unchanged; Python state itself is not restored (#322).
+- **Mei's npm entry works through Bun on all three platforms.** One `mei` bin serves `bunx` and `npm exec`; a TTY opens Calyx, while `-p`, `--resume` and pipes stay headless (#312, #322).
+- **Calyx owns the interactive shell in Zig.** Rust retains the narrow city host; the same face serves the city console and Mei. OSC 7501 can report working, done, error and idle states without carrying prompt text (#312, #320, #327).
+- **Mei's prompt and tool description now match executable behavior.** The description is generated from the same output budget as observation, and bilingual guides disclose the exact static request and interactive status boundary (#327).
+
+### Repository and verification
+
+- **Product roots are named explicitly.** `Sprawling/`, `Calyx/`, `Mei/` and `RefRain/` hold product sources, `Tools/` holds development tools, and residue checks reject retired paths (#313, #314, #320, #321).
+- **Source cleanliness is executable.** Changed-file length and comment gates replace review-only limits, with no legacy waiver registry (#311).
+- **Dependencies and actions move through their regular groups** (#317, #324).
+
+### Known and unfixed
+
+- Mei has no sandbox, permission prompts or undo. Use only disposable project copies and a separate, revocable, spending-limited API key.
+- The Windows sprawling binary remains unsigned.
+- Some refusals remain too broad and logs too sparse. Some workspace git conflicts can still stop a reply from being recorded.
 
 ## v0.0.17-Alpha-261115
 

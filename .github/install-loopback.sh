@@ -56,7 +56,7 @@ origin="http://127.0.0.1:${port}"
 # The list in the shape GitHub's API answers with: an array of releases,
 # each asset carrying its size, its digest and its download URL.
 mkdir -p "$root/www/releases"
-python3 - "$root/www/$name" "$origin" "${LOOPBACK_RELEASE_TAG:-v0.0.0-Alpha-260101}" "$root/www" \
+python3 - "$root/www/$name" "$origin" "${LOOPBACK_RELEASE_TAG:-v0.0.0-260101}" "$root/www" \
     >"$root/www/releases/index.html" <<'PY'
 import hashlib, json, os, sys
 path, origin, tag, www = sys.argv[1:5]

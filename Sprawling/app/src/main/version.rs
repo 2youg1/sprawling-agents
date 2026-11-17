@@ -3,19 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use kernel::Maturity;
 use sprawling::release;
 use sprawling::release::Built;
 use std::process::ExitCode;
 use wire::{Registry, RegistryNewest, RegistryReading, ReleaseAnswer};
 
-pub(super) fn headline(maturity: Maturity) -> String {
-    format!(
-        "sprawling {} ({}){}",
-        env!("CARGO_PKG_VERSION"),
-        maturity.word(),
-        cut()
-    )
+pub(super) fn headline() -> String {
+    format!("sprawling {}{}", env!("CARGO_PKG_VERSION"), cut())
 }
 
 fn cut() -> String {
@@ -132,13 +126,12 @@ fn registry_said(line: &RegistryNewest) -> String {
 #[cfg(test)]
 mod tests {
     use super::{cut, headline};
-    use kernel::Maturity;
 
     #[test]
-    fn the_status_line_says_the_maturity_it_is_given() {
+    fn the_status_line_carries_only_the_version() {
         assert_eq!(
-            headline(Maturity::Alpha),
-            format!("sprawling {} (alpha){}", env!("CARGO_PKG_VERSION"), cut())
+            headline(),
+            format!("sprawling {}{}", env!("CARGO_PKG_VERSION"), cut())
         );
     }
 }

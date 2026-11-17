@@ -238,12 +238,12 @@ workflow 只组装归档、读取期望值和调用检查器，不自行断言�
 
 Nix 用户的唯一渠道是本仓库的 flake（人的决定）：项目不向 nixpkgs 提交包，也不维护为 nixpkgs
 准备的二进制包定义或候选验证入口。理由：nixpkgs 的新包指引（https://github.com/NixOS/nixpkgs/blob/master/pkgs/README.md ）要求新包已可普遍使用、有足够
-用户、能从源码构建就从源码构建，而 Alpha 阶段的本项目只能以 musl 发行二进制交给 nixpkgs——源码
+用户、能从源码构建就从源码构建，而当前本项目只能以 musl 发行二进制交给 nixpkgs——源码
 构建所需的 Rust 工具链比 nixpkgs 新，Bun 依赖的转换又需要 nixpkgs 禁止的 import from derivation。
 
 被否：继续只交出占位页的开发运行；另写 Bun 下载器或手工维护 Nix 依赖锁；每次 release 自建
 跨仓库更新机器人；以二进制重打包申请 nixpkgs 收录。重开条件：nixpkgs 提供原 Bun 锁构建器时移除
-转换器依赖，或交付改为由 Cargo 构建客户端时重新评估客户端步骤；项目脱离 Alpha、nixpkgs 的 rustc
+转换器依赖，或交付改为由 Cargo 构建客户端时重新评估客户端步骤；版本第一位离开当前阶段、nixpkgs 的 rustc
 不低于 `rust-toolchain.toml`、Bun 依赖可不经 import from derivation 求值，且有项目之外的使用者
 提出需求时，重新评估 nixpkgs 收录。README 与上手文档的 Nix 段只陈述实际验收所支持的平台。
 -/

@@ -23,37 +23,6 @@ pub fn is_aur_install(exe: &std::path::Path) -> bool {
         .is_some_and(|directory| directory.ends_with(aur_install_directory()))
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Maturity {
-    PreAlpha,
-
-    Alpha,
-}
-
-pub const MATURITY: Maturity = Maturity::Alpha;
-
-impl Maturity {
-    #[must_use]
-    pub const fn word(self) -> &'static str {
-        match self {
-            Maturity::PreAlpha => "pre-alpha",
-            Maturity::Alpha => "alpha",
-        }
-    }
-
-    #[must_use]
-    pub const fn titled(self) -> &'static str {
-        match self {
-            Maturity::PreAlpha => "Pre-alpha",
-            Maturity::Alpha => "Alpha",
-        }
-    }
-
-    fn tag_infix(self) -> String {
-        format!("-{}-", self.titled())
-    }
-}
-
 const NPM_INFIX: &str = "-pre.";
 
 const CENTURY: u32 = 2000;
@@ -80,29 +49,12 @@ pub enum ReleaseVerdict {
 
 impl Release {
     pub fn from_tag(tag: &str, expected_version: &str) -> Result<Release, AxError> {
-        Release::decode_tag(tag, expected_version, MATURITY)
-    }
-
-    fn decode_tag(
-        tag: &str,
-        expected_version: &str,
-        maturity: Maturity,
-    ) -> Result<Release, AxError> {
-        let refused = |msg: &str| {
+        let (version, date) = Self::current_parts(tag).ok_or_else(|| {
             AxError::failure(AxCode::ConfigInvalid, "read a release tag", tag.to_owned())
-                .with_recovery(msg.to_owned())
-        };
-        let infix = maturity.tag_infix();
-        let body = tag.strip_prefix('v').ok_or_else(|| {
-            refused(&format!(
-                "a release tag begins with `v`, as in `v0.0.5{infix}260912`"
-            ))
-        })?;
-        let (version, date) = body.split_once(infix.as_str()).ok_or_else(|| {
-            refused(&format!(
-                "a release tag of this build reads `v<version>{infix}<YYMMDD>`; \
-                 a tag of another shape or another maturity is not one of its releases"
-            ))
+                .with_recovery(
+                    "a release tag of this build reads `v<version>-<YYMMDD>`; \
+                     another shape is not one of its releases",
+                )
         })?;
         if version != expected_version {
             return Err(AxError::failure(
@@ -118,19 +70,37 @@ impl Release {
         Release::assemble(version, date, tag, "read a release tag")
     }
 
-    pub fn from_published_tag(tag: &str) -> Result<Release, AxError> {
-        for maturity in [Maturity::Alpha, Maturity::PreAlpha] {
-            if let Some((version, _)) = tag
-                .strip_prefix('v')
-                .and_then(|body| body.split_once(maturity.tag_infix().as_str()))
-            {
-                return Self::decode_tag(tag, version, maturity);
-            }
+    fn current_parts(tag: &str) -> Option<(&str, &str)> {
+        tag.strip_prefix('v')?.split_once('-')
+    }
+
+    fn legacy_parts(tag: &str) -> Option<(&str, &str)> {
+        let (version, rest) = tag.strip_prefix('v')?.split_once('-')?;
+        if !version.starts_with("0.0.") {
+            return None;
         }
-        Err(
-            AxError::failure(AxCode::ConfigInvalid, "read a published tag", tag)
-                .with_recovery("use a published Alpha or Pre-alpha release tag"),
-        )
+        let (stage, date) = rest.rsplit_once('-')?;
+        if stage.is_empty() {
+            return None;
+        }
+        Some((version, date))
+    }
+
+    pub fn from_published_tag(tag: &str) -> Result<Release, AxError> {
+        let parts = if tag.starts_with("v0.0.") {
+            Self::legacy_parts(tag)
+        } else {
+            Self::current_parts(tag)
+        };
+        let Some((version, date)) = parts else {
+            return Err(AxError::failure(
+                AxCode::ConfigInvalid,
+                "read a published tag",
+                tag.to_owned(),
+            )
+            .with_recovery("use a published current or historical release tag"));
+        };
+        Release::assemble(version, date, tag, "read a published tag")
     }
 
     pub fn from_npm_version(text: &str) -> Result<Release, AxError> {
@@ -195,19 +165,11 @@ impl Release {
 
     #[must_use]
     pub fn tag(&self) -> String {
-        self.tag_at(MATURITY)
-    }
-
-    fn tag_at(&self, maturity: Maturity) -> String {
         let Release {
             year, month, day, ..
         } = *self;
         let short = year.checked_sub(CENTURY).unwrap_or(year);
-        format!(
-            "v{}{}{short:02}{month:02}{day:02}",
-            self.version(),
-            maturity.tag_infix()
-        )
+        format!("v{}-{short:02}{month:02}{day:02}", self.version())
     }
 
     #[must_use]
@@ -265,7 +227,7 @@ fn pair(digits: &mut impl Iterator<Item = char>) -> Option<u32> {
     reason = "test code"
 )]
 mod tests {
-    use super::{Maturity, Release, ReleaseVerdict, Version, stands, stands_on_crates};
+    use super::{Release, ReleaseVerdict, Version, stands, stands_on_crates};
     use proptest::prelude::*;
 
     fn any_release() -> impl Strategy<Value = Release> {
@@ -277,9 +239,9 @@ mod tests {
             1u32..=12,
             1u32..=31,
         )
-            .prop_map(|(major, minor, patch, year, month, day)| {
+            .prop_map(|(maturity, repository, package, year, month, day)| {
                 Release::from_npm_version(&format!(
-                    "{major}.{minor}.{patch}-pre.{year:02}{month:02}{day:02}"
+                    "{maturity}.{repository}.{package}-pre.{year:02}{month:02}{day:02}"
                 ))
                 .unwrap()
             })
@@ -328,35 +290,26 @@ mod tests {
     }
 
     #[test]
-    fn an_alpha_build_cuts_and_reads_alpha_tags() {
-        let read = |tag: &str| {
-            Release::decode_tag(tag, "0.1.0", Maturity::Alpha)
-                .map(|cut| cut.tag_at(Maturity::Alpha))
-                .map_err(|err| err.recovery().to_owned())
-        };
-        assert_eq!(
-            (
-                read("v0.1.0-Alpha-270101"),
-                read("v0.1.0-Pre-alpha-270101").is_err()
-            ),
-            (Ok("v0.1.0-Alpha-270101".to_owned()), true)
-        );
+    fn a_build_cuts_and_reads_current_tags() {
+        let cut = Release::from_tag("v0.17.0-270101", "0.17.0").unwrap();
+        assert_eq!(cut.tag(), "v0.17.0-270101");
+        assert!(Release::from_tag("v0.17.0-extra-270101", "0.17.0").is_err());
     }
 
     #[test]
     fn a_release_tag_becomes_the_semver_npm_accepts() {
-        let cut =
-            Release::decode_tag("v0.0.5-Pre-alpha-260912", "0.0.5", Maturity::PreAlpha).unwrap();
-        assert_eq!(cut.npm_version(), "0.0.5-pre.260912");
-        assert_eq!(cut.version(), "0.0.5");
-        assert_eq!(cut.released(), "2026-09-12");
+        let cut = Release::from_tag("v0.17.0-261115", "0.17.0").unwrap();
+        assert_eq!(cut.npm_version(), "0.17.0-pre.261115");
+        assert_eq!(cut.version(), "0.17.0");
+        assert_eq!(cut.released(), "2026-11-15");
     }
 
     #[test]
     fn both_spellings_round_trip_through_one_another() {
-        let tag = "v0.0.5-Pre-alpha-260912";
-        let cut = Release::decode_tag(tag, "0.0.5", Maturity::PreAlpha).unwrap();
-        assert_eq!(cut.tag_at(Maturity::PreAlpha), tag);
+        let tag = "v0.17.0-261115";
+        let cut = Release::from_tag(tag, "0.17.0").unwrap();
+        assert_eq!(cut.tag(), tag);
+        assert_eq!(Release::from_published_tag(tag).unwrap(), cut);
         assert_eq!(Release::from_npm_version(&cut.npm_version()).unwrap(), cut);
     }
 
@@ -370,9 +323,16 @@ mod tests {
     }
 
     #[test]
-    fn a_maturity_is_one_word_in_two_cases() {
-        for maturity in [Maturity::PreAlpha, Maturity::Alpha] {
-            assert_eq!(maturity.word(), maturity.titled().to_lowercase());
+    fn historical_tags_remain_readable_without_reusing_their_text() {
+        for (tag, version, released) in [
+            ("v0.0.5-Pre-alpha-260912", "0.0.5", "2026-09-12"),
+            ("v0.0.17-Alpha-261115", "0.0.17", "2026-11-15"),
+        ] {
+            let cut = Release::from_published_tag(tag).unwrap();
+            assert_eq!(cut.version(), version);
+            assert_eq!(cut.released(), released);
+            let date = tag.rsplit_once('-').unwrap().1;
+            assert_eq!(cut.tag(), format!("v{version}-{date}"));
         }
     }
 
@@ -389,8 +349,7 @@ mod tests {
 
     #[test]
     fn a_tag_disagreeing_with_the_build_is_refused() {
-        let err = Release::decode_tag("v0.0.3-Pre-alpha-260911", "0.0.4", Maturity::PreAlpha)
-            .unwrap_err();
+        let err = Release::from_tag("v0.17.0-260911", "0.17.1").unwrap_err();
         assert!(err.recovery().contains("two version numbers"), "{err:?}");
     }
 
@@ -399,16 +358,16 @@ mod tests {
         for refused in [
             "0.0.4",
             "v0.0.4",
-            "v0.0.4-Pre-alpha-26091",
-            "v0.0.4-Pre-alpha-2609111",
-            "v0.0.4-Pre-alpha-2609xx",
-            "v0.0.4-Pre-alpha-261301",
-            "v0.0.4-Pre-alpha-260900",
-            "v0.0.4.1-Pre-alpha-260911",
-            "v0.00.4-Pre-alpha-260911",
+            "v0.17.0-26091",
+            "v0.17.0-2609111",
+            "v0.17.0-2609xx",
+            "v0.17.0-261301",
+            "v0.17.0-260900",
+            "v0.17.0.1-260911",
+            "v0.017.0-260911",
         ] {
             assert!(
-                Release::decode_tag(refused, "0.0.4", Maturity::PreAlpha).is_err(),
+                Release::from_tag(refused, "0.17.0").is_err(),
                 "{refused} was accepted"
             );
         }
@@ -435,7 +394,7 @@ mod tests {
 
     #[test]
     fn an_npm_version_this_project_does_not_publish_is_refused() {
-        for refused in ["0.0.5", "0.0.5-alpha.1", "0.0.5-pre.", "latest"] {
+        for refused in ["0.17.0", "0.17.0-test.1", "0.17.0-pre.", "latest"] {
             assert!(
                 Release::from_npm_version(refused).is_err(),
                 "{refused} was accepted"

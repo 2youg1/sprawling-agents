@@ -553,7 +553,7 @@ pub fn answer() -> ReleaseAnswer;
 `release.rs` 识别构建与安装来源，选择比较版本和手动更新命令；帧与选择契约由
 `Sprawling/wire/spec/Answer/Release.lean` D24 定义。未带发行 tag 的 Cargo 安装按编译版本
 比较 crates.io，开发构建保留 FromSource，不能从缺席 tag 推出安装来源。
-`SPRAWLING_RELEASE_TAG` 由构建脚本声明重跑条件，存在时必须与 Cargo 版本及成熟度一致。
+`SPRAWLING_RELEASE_TAG` 由构建脚本声明重跑条件，存在时必须与 Cargo 版本一致。
 nightly 身份与发布状态由 `Sprawling/app/spec/Nightly.lean` D105 规定：`SPRAWLING_NIGHTLY_TAG`
 与 `SPRAWLING_SOURCE_SHA` 成对出现，完整 SHA 用于幂等与 compare，正式与 nightly 环境输入互斥。
 
@@ -808,21 +808,20 @@ pub(crate) fn pinned(pin: Pin) -> Option<String>;   // 文件为空即 None，�
 - **新可发布包先登记，CI 才发得出去。** 换来的令牌只覆盖登记与这次运行四项全部对上的那些包：仓库 `2youg1/sprawling-agents` 与其 owner 的 GitHub 用户名或组织名、工作流文件名 `release.yml`、environment（两边都不声明，或两边相等）。每个包在 crates.io 上各有一条自己的登记，所以没有登记的包只能由人发——登记在包名第一次由人发布之后、下一次由 CI 发布之前做，因为 crates.io 要求包名先存在才能登记。漏掉登记的包让 job 在 `publish` 步以 `403 Forbidden: The provided access token is not valid for crate <名字>` 停在第一个待发包上，其余一律不发，而此时 GitHub 发布、npm 与 system channels 已经成立。恢复是重跑同一个 run 里失败的 job：令牌按当时的登记重新换发，`pending` 一步跳过已发布的包，不需要新 tag，也不需要长期令牌。
 - **`cargo binstall sprawling` 取发行归档**：本包清单的 `[package.metadata.binstall]` 按目标三元组各写一条 `pkg-url` 与 `bin-dir`，指向 `release.yml` 打出的三份归档（`x86_64-pc-windows-msvc` → `-windows-x86_64.zip`，`aarch64-apple-darwin` → `-macos-aarch64.zip`，`x86_64-unknown-linux-musl` → `-x86_64-unknown-linux-musl.zip`，归档名的后缀表在 `Tools/xtask/src/platform.rs`），`pkg-fmt = "zip"`，可执行文件在归档里的 `sprawling-<版本>-<后缀>/` 目录下。glibc 的 Linux 上 binstall 自己退到 musl 那一份；没有归档的目标，binstall 退回从 `.crate` 编译。仓库里的地址用 `v{ version }` 作 tag，`crates` job 发布前把它换成这次的 tag（D32）。
 
-**本节接口的当前状态**：从 crates.io 构建的二进制仍有两处与归档不同。`[profile.release]` 写在工作区清单里，`cargo package` 不把它带进包，`cargo install` 按 cargo 的默认 release profile 编（`opt-level = 3`，不做 fat LTO，不剥符号）；`SPRAWLING_RELEASE_TAG` 只有 `release.yml` 设，所以 `status` 如实自称 built from source，成熟度照样从 `kernel::release::MATURITY` 读（§8-162）。工具链钉子不在包里时，develop 层的 `lean` 与 `zig` 两行装不钉的版本（§8-162）。
+**本节接口的当前状态**：从 crates.io 构建的二进制仍有两处与归档不同。`[profile.release]` 写在工作区清单里，`cargo package` 不把它带进包，`cargo install` 按 cargo 的默认 release profile 编（`opt-level = 3`，不做 fat LTO，不剥符号）；`SPRAWLING_RELEASE_TAG` 只有 `release.yml` 设，所以 `status` 如实自称 built from source（§8-162）。工具链钉子不在包里时，develop 层的 `lean` 与 `zig` 两行装不钉的版本（§8-162）。
 
 **本章验收**：Windows 上构建后，文件版本 API 读出的 `ProductName` 等于 Cargo metadata 的包名，`ProductVersion` 与 `FileVersion` 等于 Cargo metadata 的包版本，PE 的资源目录非空；这项检查读取真实链接产物，资源编译器的行为属于环境假设，不由本文件证明。非 Windows 目标的构建不要求 Windows resource toolchain。
 
 **本章测试**：`doctor::pin::tests` 读出的钉子与检出里的文件相等，空文件读成不钉；`cargo package -p sprawling --list --allow-dirty` 的列表里有包体的 `index.html`（在 `web-dist` 下）与 `Cargo.lock`；`cargo xtask gates packaged guard` 为绿；`cargo publish --workspace --dry-run --locked` 走完打包与验证构建；把清单里的 `v{ version }` 换成一个已发布的 tag 之后，`cargo binstall --dry-run --manifest-path Sprawling/app/Cargo.toml sprawling` 解析到那个 tag 下真实存在的归档地址。
 
-### 8-162 成熟度只有一处，不钉的构建装不钉的版本（`main::version`、`bin::doctor::table::toolchain`）
+### 8-162 版本行不加阶段文字，不钉的构建装不钉的版本（`main::version`、`bin::doctor::table::toolchain`）
 
-**原因**：`status` 的第一行曾自己写着 `(pre-alpha)`，tag 的中缀、README 两份与 CHANGELOG 又各写一遍；进 alpha 时漏掉的那一处会照旧说 pre-alpha，而没有一道门看得见。成熟度现在只写在 `kernel::release::MATURITY`（kernel D18），本 crate 是它的一个读者。另一半是 §8-157 留下的：从 `.crate` 构建时三份钉子文件都不在，`lean` 与 `zig` 两行的装法拼出一个空参数，elan 与 winget 都会拒绝这条命令。
+**原因**：版本号第一位已经表达成熟度，状态行再附阶段文字就是同一事实的第二个家（kernel D18）。另一半是 §8-157 留下的：从 `.crate` 构建时三份钉子文件都不在，`lean` 与 `zig` 两行的装法拼出一个空参数，elan 与 winget 都会拒绝这条命令。
 
 ```rust
 // main::version
-/// `sprawling 0.0.9 (alpha), built from source`：`status` 打印的第一行。
-/// 生产路径传 `kernel::release::MATURITY`；参数让一条测试看得见成熟度换成 alpha 时这一行跟着变。
-pub(super) fn headline(maturity: kernel::Maturity) -> String;
+/// `sprawling 0.17.0, built from source`：`status` 打印的第一行。
+pub(super) fn headline() -> String;
 
 // bin::doctor::table::toolchain
 /// 交给 `elan toolchain install` 的那一个：钉住的工具链，构建没找到 `lean-toolchain` 时是 `stable`。
@@ -831,11 +830,11 @@ const fn lean_install(pin: &'static str) -> &'static str;
 macro_rules! winget_zig { ($pin:expr) => { /* &'static [&'static str] */ } }
 ```
 
-- **`status` 读常量，不写字面。** 版本行是 `sprawling <CARGO_PKG_VERSION> (<MATURITY.word()>)<发布日期或 built from source>`；tag 的中缀与文档的字样是同一个常量的另外几个读者（kernel D18、Tools/xtask/Spec.lean §8-16 的 `maturity` 事实）。
+- **`status` 只读 Cargo 版本。** 版本行是 `sprawling <CARGO_PKG_VERSION><发布日期或 built from source>`，不追加阶段名称（kernel D18）。
 - **钉子为空时装不钉的版本。** `lean` 装 `stable`，那是 elan 认的通道名；`zig` 在 Windows 上去掉 `--version` 与它的值，winget 装它给的那一版；macOS 与 Linux 两列本来就不带版本，不变。探测不变：空前缀接受任何一版（§8-157）。
 - **winget 的参数用宏写，不用 `const fn`。** 一条装法的参数是 `&'static [&'static str]`，`const fn` 拿自己的参数造不出一段 `'static` 的切片；宏在 `const` 项里展开，钉子是常量，切片照常提升。测试用同一个宏展开空钉子，所以它判的是生产那一行的写法，而不是一份抄本。
 
-**本章测试**：`main::version::tests::the_status_line_says_the_maturity_it_is_given`——给 `Maturity::Alpha` 时版本行说 `(alpha)`；kernel 的 `release::tests::an_alpha_build_cuts_and_reads_alpha_tags` 是同一次挪动在 tag 一侧的读者。`doctor::table::toolchain::tests::a_build_without_pins_installs_lean_stable_and_any_zig`——空钉子时 `lean_install` 给 `stable`，`winget_zig!` 不带 `--version`，也没有空参数；钉子非空时两者都带着钉子。
+**本章测试**：`main::version::tests::the_status_line_carries_only_the_version` 钉住版本行不带阶段文字；kernel 的 tag 测试覆盖当前形状与历史读取。`doctor::table::toolchain::tests::a_build_without_pins_installs_lean_stable_and_any_zig`——空钉子时 `lean_install` 给 `stable`，`winget_zig!` 不带 `--version`，也没有空参数；钉子非空时两者都带着钉子。
 
 ### 8-84 记账线程的循环是一个有名字的函数，两件仪表直接驱动它（`accounting::worker::attend::attend`、`accounting::worker::driving::tests::instruments`）
 
@@ -1041,7 +1040,7 @@ crates.io 上的 `.crate` 只是一个包目录，所以一个构建要读的每
 
 /-! D32 binstall 的下载地址在发布时填入 tag（§8-157）
 
-发行的 tag 是 `v<版本>-<成熟度>-<YYMMDD>`，binstall 的模板只认得 `{ version }`、`{ target }` 这类变量，拼不出日期，所以仓库里的 `pkg-url` 写 `releases/download/v{ version }/`，`crates` job 在 `cargo publish` 之前把这一段换成 `${GITHUB_REF_NAME}`，并核对三条地址都换到了。tag 只有一个权威，就是这次运行的 ref。这是 D10 的一个例外：改的只是 cargo 构建时不读的 `[package.metadata]`，包里的源码与清单的其余部分仍与提交一致，`.cargo_vcs_info.json` 照实记下 `dirty`。**被否**：①把整个 tag 写进清单——每次发版要在打 tag 之前猜出日期，清单与 tag 成了同一个事实的两份；②发版时另推一个 `v<版本>` 的 tag 并挂同一组归档——一份归档挂在两个 release 上，`gh release delete` 重发时还要收拾两处；③指向 `releases/latest/download`——本项目的每个 release 都是 pre-release，GitHub 的 latest 不指向它们。**重开参数**：tag 改成 `v<版本>`，那时删掉这一步改写，模板原样可用。
+发行的 tag 是 `v<版本>-<YYMMDD>`，binstall 的模板只认得 `{ version }`、`{ target }` 这类变量，拼不出日期，所以仓库里的 `pkg-url` 写 `releases/download/v{ version }/`，`crates` job 在 `cargo publish` 之前把这一段换成 `${GITHUB_REF_NAME}`，并核对三条地址都换到了。tag 只有一个权威，就是这次运行的 ref。这是 D10 的一个例外：改的只是 cargo 构建时不读的 `[package.metadata]`，包里的源码与清单的其余部分仍与提交一致，`.cargo_vcs_info.json` 照实记下 `dirty`。**被否**：①把整个 tag 写进清单——每次发版要在打 tag 之前猜出日期，清单与 tag 成了同一个事实的两份；②发版时另推一个 `v<版本>` 的 tag 并挂同一组归档——一份归档挂在两个 release 上，`gh release delete` 重发时还要收拾两处；③指向 `releases/latest/download`——本项目的每个 release 都是 pre-release，GitHub 的 latest 不指向它们。**重开参数**：tag 改成 `v<版本>`，那时删掉这一步改写，模板原样可用。
 -/
 
 /-! D49 产品资源在每次 Windows 构建中生成，包名与版本由 Cargo 提供（§8-157）

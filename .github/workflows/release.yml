@@ -153,7 +153,7 @@ jobs:
       NIGHTLY_TAG: ${{ inputs.nightly-tag }}
       SOURCE_SHA: ${{ inputs.source-sha }}
       SIGN_ARCHIVES: ${{ !inputs.channel || inputs.sign }}
-      LOOPBACK_RELEASE_TAG: ${{ inputs.channel == 'nightly' && inputs.nightly-tag || (github.event_name == 'push' && github.ref_name || 'v0.0.0-Alpha-260101') }}
+      LOOPBACK_RELEASE_TAG: ${{ inputs.channel == 'nightly' && inputs.nightly-tag || (github.event_name == 'push' && github.ref_name || 'v0.0.0-260101') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -463,7 +463,7 @@ jobs:
           tag="$GITHUB_REF_NAME"
           if [ "$GITHUB_EVENT_NAME" != push ]; then
             version=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | select(.name == "sprawling") | .version')
-            tag="v${version}-$(sed -n 's/.*pub const MATURITY: Maturity = Maturity::\([A-Za-z]*\);/\1/p' Sprawling/kernel/src/release.rs)-$(date -u +%y%m%d)"
+            tag="v${version}-$(date -u +%y%m%d)"
           fi
           cargo xtask channel --tag "$tag" --assets target/package --out target/channels
       - name: validate native payloads without decoding binaries
@@ -499,18 +499,19 @@ jobs:
           pattern: &release-archives archive-*
           path: assets
           merge-multiple: true
-      # A curated tag carries three sprawling archives and two POSIX Mei
+      # A curated tag carries three sprawling archives and three Mei
       # archives. Check the complete set before attestation or publication:
       # a missing product must never become a public release by accident.
       - name: require every curated archive
         shell: bash
         run: |
           set -euo pipefail
-          test "$(find assets -maxdepth 1 -type f -name '*.zip' | wc -l)" -eq 5
+          test "$(find assets -maxdepth 1 -type f -name '*.zip' | wc -l)" -eq 6
           for pattern in \
             'sprawling-*-windows-x86_64.zip' \
             'sprawling-*-macos-aarch64.zip' \
             'sprawling-*-x86_64-unknown-linux-musl.zip' \
+            'mei-*-windows-x86_64.zip' \
             'mei-*-macos-aarch64.zip' \
             'mei-*-x86_64-unknown-linux-musl.zip'; do
             compgen -G "assets/${pattern}" >/dev/null || {
@@ -546,7 +547,7 @@ jobs:
           fi
           # Pre-release is the state this project is in, and it was being
           # set by hand after every publish - which means it was one
-          # forgotten click away from a pre-alpha presenting itself as the
+          # forgotten click away from a prerelease presenting itself as the
           # release a person should download. The day that stops being
           # true, this flag is what gets deleted, deliberately.
           # The notice is authored; the line pointing at this tag's
@@ -565,8 +566,8 @@ jobs:
           # that broken link. Only an absolute URL survives.
           #
           # The fragment is GitHub's own heading slug, which lowercases
-          # and drops punctuation: `v0.0.5-Pre-alpha-260912` addresses
-          # the heading of the same name as `v005-pre-alpha-260912`.
+          # and drops punctuation: `v0.17.0-261117` addresses
+          # the heading of the same name as `v0170-261117`.
           anchor=$(printf '%s' "${GITHUB_REF_NAME}" | tr 'A-Z' 'a-z' | tr -d '.')
           notes="${RUNNER_TEMP}/release-notes.md"
           cp .github/release-notes.md "${notes}"
@@ -593,8 +594,9 @@ jobs:
           fi
           gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
             "${generated[@]}" -q .body >>"${notes}"
+          title="sprawling ${GITHUB_REF_NAME%-*} ${GITHUB_REF_NAME##*-}"
           gh release create "${GITHUB_REF_NAME}" assets/*.zip \
-            --title "sprawling ${GITHUB_REF_NAME}" \
+            --title "${title}" \
             --prerelease \
             --notes-file "${notes}"
 
@@ -675,7 +677,7 @@ jobs:
           # prerelease version carrying no dist-tag. Every release of
           # this project is a pre-release, so `--tag pre` would leave
           # these packages with no `latest` at all, and either bunx root
-          # would fail to resolve rather than install a pre-alpha -
+          # would fail to resolve rather than install a prerelease -
           # install.sh carries the same lesson about the download
           # channel. The version string carries `-pre.<YYMMDD>` and the
           # release notes say not to use it; the dist-tag is not where
@@ -805,7 +807,7 @@ jobs:
             | jq -r '.packages[] | select(.publish == null) | "\(.name) \(.version)"')
           echo "packages=${packages}" >>"${GITHUB_OUTPUT}"
       # binstall's templates cannot spell this project's tag, which carries
-      # the maturity and a date, so the manifest says `v{ version }` and the
+      # a date, so the manifest says `v{ version }` and the
       # tag this run was cut from replaces it here (`Sprawling/app/Spec.lean`
       # D32). Only `[package.metadata]` changes, which cargo does not build from.
       - name: point the binstall address at this tag

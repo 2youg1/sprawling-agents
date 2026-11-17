@@ -7,9 +7,9 @@ use crate::error::{AxCode, AxError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Version {
-    major: u32,
-    minor: u32,
-    patch: u32,
+    maturity: u32,
+    repository: u32,
+    package: u32,
 }
 
 impl Version {
@@ -30,10 +30,11 @@ impl Version {
     ) -> Result<Version, AxError> {
         let mut parts = version.split('.');
         let mut next_number = || parts.next().and_then(number);
-        let (Some(major), Some(minor), Some(patch)) = (next_number(), next_number(), next_number())
+        let (Some(maturity), Some(repository), Some(package)) =
+            (next_number(), next_number(), next_number())
         else {
             return Err(refused(format!(
-                "`{version}` is not three dot-separated numbers, as in `0.0.5`"
+                "`{version}` is not three dot-separated numbers, as in `0.17.0`"
             )));
         };
         if parts.next().is_some() {
@@ -43,9 +44,9 @@ impl Version {
             )));
         }
         Ok(Version {
-            major,
-            minor,
-            patch,
+            maturity,
+            repository,
+            package,
         })
     }
 }
@@ -53,11 +54,11 @@ impl Version {
 impl std::fmt::Display for Version {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Version {
-            major,
-            minor,
-            patch,
+            maturity,
+            repository,
+            package,
         } = *self;
-        write!(f, "{major}.{minor}.{patch}")
+        write!(f, "{maturity}.{repository}.{package}")
     }
 }
 

@@ -11,8 +11,9 @@ project rules, skills and tool connections shape the workflow.
 One Rust binary serves the browser client and records the city's history in an
 append-only Ledger. The project supports long-running project work and
 experiments in agent communication, coordination and social simulation. It is
-in <!-- xtask:begin maturity:word -->alpha<!-- xtask:end -->; use the behavior in the reader's installed version when describing
-what they can do.
+at <!-- xtask:begin workspace_version -->0.17.0<!-- xtask:end -->; the three numbers name maturity, the whole-repository release and an individual package
+release, in that order. Use the behavior in the reader's installed version when describing what
+they can do.
 
 This file helps a model introduce sprawling to a user or another agent.
 Installation belongs to [getting started](docs/getting-started.md), operation
@@ -199,7 +200,7 @@ addresses. Their messages and run outcomes are recorded, so you can inspect a
 coordination experiment against one history, while accounting for the limits of
 what an external harness reports.”
 
-Keep the alpha status and conditions that change the reader's decision. Explain
+Keep the version's three-part meaning and conditions that change the reader's decision. Explain
 only capabilities supported by the version being discussed, and attribute
 measurements to their workload and hardware rather than predicting a speedup
 for every task.

@@ -20,7 +20,7 @@
 #     `releases/latest` endpoint excludes those - it answers 404 here. The
 #     list endpoint is asked for the newest entry in the selected channel.
 #   * The tag and the archive carry different versions: tag
-#     `v0.0.3-Pre-alpha-260903` ships `sprawling-0.0.3-windows-x86_64.zip`.
+#     `v0.17.0-261117` ships `sprawling-0.17.0-windows-x86_64.zip`.
 #     An asset is chosen by its platform suffix, never by a name built out
 #     of the tag.
 #   * Only the platforms the release workflow builds are installable. A
