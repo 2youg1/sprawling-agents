@@ -10,7 +10,10 @@ import { readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 
 function git(args, workspace) {
-  const result = spawnSync("git", args, { cwd: workspace, encoding: "utf8" });
+  const result = spawnSync("git", ["--no-replace-objects", ...args], {
+    cwd: workspace,
+    encoding: "utf8",
+  });
   if (result.error || result.signal || result.status !== 0) {
     throw new Error(`git ${args[0]} could not verify the baseline (verification-base)`);
   }

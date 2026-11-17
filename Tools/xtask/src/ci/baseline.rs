@@ -125,7 +125,7 @@ fn entries(bytes: &[u8]) -> Result<Vec<Entry>, XtaskError> {
 fn blobs(root: &Path, entries: &[Entry]) -> Result<Vec<u8>, XtaskError> {
     let mut child = Command::new("git")
         .current_dir(root)
-        .args(["cat-file", "--batch"])
+        .args(["--no-replace-objects", "cat-file", "--batch"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -201,6 +201,7 @@ fn blob(bytes: &mut &[u8], oid: &str) -> Result<blake3::Hash, XtaskError> {
 pub(super) fn git(root: &Path, args: &[&str]) -> Result<Output, XtaskError> {
     let command = format!("git {}", args.join(" "));
     let output = Command::new("git")
+        .arg("--no-replace-objects")
         .current_dir(root)
         .args(args)
         .output()
