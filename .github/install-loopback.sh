@@ -40,7 +40,6 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 mkdir "$root/www" "$root/sandbox" "$root/unpacked"
-cp "$archives"/*.zip "$root/www/"
 name=$(basename "$archive")
 
 # Port 0: the kernel picks a free one, so parallel runs never collide.
@@ -60,12 +59,18 @@ origin="http://127.0.0.1:${port}"
 # The list in the shape GitHub's API answers with: an array of releases,
 # each asset carrying its size, its digest and its download URL. Every
 # archive in the directory is listed, in the order the glob names them,
-# so the installer has to choose instead of being handed one asset.
-mkdir -p "$root/www/releases"
-python3 - "$origin" "${LOOPBACK_RELEASE_TAG:-v0.0.0-260101}" "$root/www" "$root/www"/*.zip \
+# so the installer has to choose instead of being handed one asset. The
+# download URLs carry the repository path, where a release serves them,
+# because a product check on that path alone passes for Mei's archives.
+repo="${GITHUB_REPOSITORY:-2youg1/sprawling-agents}"
+tag="${LOOPBACK_RELEASE_TAG:-v0.0.0-260101}"
+downloads="$root/www/$repo/releases/download/$tag"
+mkdir -p "$root/www/releases" "$downloads"
+cp "$archives"/*.zip "$downloads"
+python3 - "$origin/$repo/releases/download/$tag" "$tag" "$root/www" "$downloads"/*.zip \
     >"$root/www/releases/index.html" <<'PY'
 import hashlib, json, os, sys
-origin, tag, www, *paths = sys.argv[1:]
+asset_base, tag, www, *paths = sys.argv[1:]
 assets = []
 for path in paths:
     with open(path, "rb") as f:
@@ -75,7 +80,7 @@ for path in paths:
         "name": name,
         "size": os.path.getsize(path),
         "digest": "sha256:" + digest,
-        "browser_download_url": origin + "/" + name,
+        "browser_download_url": asset_base + "/" + name,
     })
 release = {
     "tag_name": tag,

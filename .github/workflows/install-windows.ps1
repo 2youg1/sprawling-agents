@@ -26,8 +26,13 @@ $pathKind = if ($hadPath) { $key.GetValueKind('Path') } else { $null }
 try {
     $www = Join-Path $root 'www'
     $unpacked = Join-Path $root 'unpacked'
-    New-Item -ItemType Directory -Path $www -Force | Out-Null
-    Copy-Item -LiteralPath $carried.FullName -Destination $www
+    # The archives are served under the repository path, where a release
+    # serves them: that path holds `/sprawling-`, so a product check on the
+    # URL alone passes for Mei's archives too.
+    $repo = if ($env:GITHUB_REPOSITORY) { $env:GITHUB_REPOSITORY } else { '2youg1/sprawling-agents' }
+    $downloads = Join-Path $www "$repo/releases/download/$Tag"
+    New-Item -ItemType Directory -Path $www, $downloads -Force | Out-Null
+    Copy-Item -LiteralPath $carried.FullName -Destination $downloads
     $log = Join-Path $root 'server.out'
     $err = Join-Path $root 'server.err'
     $server = Start-Process python -ArgumentList @('-u', '-m', 'http.server', '0', '--bind', '127.0.0.1', '--directory', $www) -PassThru -RedirectStandardOutput $log -RedirectStandardError $err
@@ -46,7 +51,7 @@ try {
     if (-not $port) { throw 'The loopback asset server did not report its port.' }
     $hash = (Get-FileHash -LiteralPath $assets[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     $served = @(foreach ($file in $carried) {
-        @{ name = $file.Name; size = $file.Length; browser_download_url = "http://127.0.0.1:$port/$($file.Name)";
+        @{ name = $file.Name; size = $file.Length; browser_download_url = "http://127.0.0.1:$port/$repo/releases/download/$Tag/$($file.Name)";
            digest = 'sha256:' + (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
     })
     $sprawlingIndex = [Array]::IndexOf([string[]]@($served | ForEach-Object { $_.name }), $assets[0].Name)

@@ -182,13 +182,14 @@ release_json() {
 # `-e` is load-bearing too: the suffix begins with `-`, and grep reads a
 # bare `-macos-aarch64.zip` as a run of options rather than as a pattern.
 #
-# `/sprawling-` is the other half of the choice: a curated release carries
-# Mei's archives beside this product's, and `mei-0.17.0-macos-aarch64.zip`
-# ends with the same platform suffix as `sprawling-0.17.0-macos-aarch64.zip`.
+# The product is read from an asset's own `name`, not from its URL: a
+# download URL carries the repository path, and this repository's path
+# itself holds `/sprawling-`, so a product check on the URL also passes
+# for Mei's archives. `mei-0.17.0-macos-aarch64.zip` ends with the same
+# platform suffix `sprawling-0.17.0-macos-aarch64.zip` does.
 asset_chunk() {
     printf '%s' "$1" | tr -d '\n\r' | tr '{' '\n' |
-        grep -F -e 'browser_download_url' | grep -F -e '/sprawling-' |
-        grep -F -e "$2" | head -n 1
+        grep -E -e '"name": *"sprawling-' | grep -F -e "$2" | head -n 1
 }
 
 # `|` delimits the sed expressions here because every value being read is
