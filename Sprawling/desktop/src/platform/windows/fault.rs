@@ -16,8 +16,8 @@ pub(crate) fn com(doing: &str, recovery: &str, err: winsafe::co::HRESULT) -> Ref
     refused(doing, recovery, &err.to_string())
 }
 
-pub(crate) fn automation(doing: &str, recovery: &str, err: &uiautomation::Error) -> Refusal {
-    refused(doing, recovery, err.message())
+pub(crate) fn automation(doing: &str, recovery: &str, err: &windows::core::Error) -> Refusal {
+    refused(doing, recovery, &err.to_string())
 }
 
 pub(crate) fn leaf(doing: &str, recovery: &str, failure: Failure) -> Refusal {

@@ -170,7 +170,6 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [toml](https://crates.io/crates/toml) | MIT OR Apache-2.0 |
 | [tower](https://crates.io/crates/tower) | MIT |
 | [trybuild](https://crates.io/crates/trybuild) | MIT OR Apache-2.0 |
-| [uiautomation](https://crates.io/crates/uiautomation) | Apache-2.0 |
 | [url](https://crates.io/crates/url) | MIT OR Apache-2.0 |
 | [uuid](https://crates.io/crates/uuid) | Apache-2.0 OR MIT |
 | [vt100](https://crates.io/crates/vt100) | MIT |
