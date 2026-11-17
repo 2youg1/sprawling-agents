@@ -20,11 +20,11 @@ release notes and their commits.
 
 ---
 
-## v0.17.0-261117
+## 0.17.0
 
 **sprawling 0.17.0**
 
-Cut on 2026-11-17 (UTC+8) as `v0.17.0-261117`. It records what landed after 0.0.17 and migrates the version protocol: the first component expresses maturity, the second the whole-repository release, and the third an individual package release. A whole-repository release synchronizes every public package; an individual package update uses the third component. Existing tags and releases remain available. The wire moves from 79 to 80, so reload a browser tab left open by the previous release. EVENT_LOG_V stays 2 and the configuration formats stay at format 1; a city written by 0.0.17 opens without a new migration. Stop the city and verify a restorable backup before updating.
+The workspace manifest carries 0.17.0. Cutting it on 2026-11-17 (UTC+8) makes `v0.17.0-261117`, and this heading takes that tag when the release is cut. It records what landed after 0.0.17 and migrates the version protocol: the first component expresses maturity, the second the whole-repository release, and the third an individual package release. A whole-repository release synchronizes every public package; an individual package update uses the third component. Existing tags and releases remain available. The wire moves from 79 to 80, so reload a browser tab left open by the previous release. EVENT_LOG_V stays 2 and the configuration formats stay at format 1; a city written by 0.0.17 opens without a new migration. Stop the city and verify a restorable backup before updating.
 
 ### Version and distribution
 
