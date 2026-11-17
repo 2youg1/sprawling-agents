@@ -174,6 +174,34 @@ mod tests {
     }
 
     #[test]
+    fn an_initial_multimodal_prompt_is_preserved() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("multimodal.jsonl");
+        let content = json!([
+            {"type": "text", "text": "inspect"},
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "aW1hZ2U="}},
+            {"type": "audio", "source": {"type": "base64", "media_type": "audio/wav", "data": "YXVkaW8="}},
+            {"type": "video", "source": {"type": "url", "url": "https://example.invalid/video"}}
+        ]);
+        std::fs::write(
+            &path,
+            format!(
+                "{}\n{}",
+                json!({"role": "user", "content": content}),
+                json!({"role": "assistant", "content": "done", "stop_reason": "end_turn"})
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            read(&path).unwrap(),
+            vec![
+                json!({"role": "user", "content": content}),
+                json!({"role": "assistant", "content": "done"})
+            ]
+        );
+    }
+
+    #[test]
     fn validation_failures_carry_role_content_and_stop_values() {
         let dir = tempfile::tempdir().unwrap();
         for (name, bytes, expected) in [

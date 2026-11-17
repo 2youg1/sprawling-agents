@@ -23,6 +23,10 @@ path = "src/main.rs"
 name = "cli"
 path = "test/cli.rs"
 
+[[test]]
+name = "observation"
+path = "test/observation.rs"
+
 [dependencies]
 serde_json.workspace = true
 
