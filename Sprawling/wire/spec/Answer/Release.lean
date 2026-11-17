@@ -36,7 +36,7 @@ pub struct UpdateHint { pub channel: InstallChannel, pub command: Option<String>
 Cargo 的裸版本号由 `Version` 判，不与 npm 的预发布串直接比较；日期未知时为空，
 未带发行 tag 的 Cargo 源码安装仍比较已编译版本，不制造发布日期。
 开发构建答 `Unreleased`，保留实际已知安装来源与手动命令但不给 verdict；来源未知的发行二进制答 `Unconfirmed`，不猜一个 verdict。
-更新命令只供人选择、复制和运行，查询与选择不下载或覆写二进制。归档更新命令将实际发布 tag 同时固定到脚本源码 ref 和 SPRAWLING_VERSION，不从 Release 的当前成熟度重造历史 tag。
+更新命令只供人选择、复制和运行，查询与选择不下载或覆写二进制。归档更新命令将实际发布 tag 同时固定到脚本源码 ref 和 SPRAWLING_VERSION，不从当前版本重造历史 tag。
 -/
 
 /-!
@@ -52,7 +52,7 @@ Cargo 的裸版本号由 `Version` 判，不与 npm 的预发布串直接比较�
 npm/Bun/Package 读 npm latest；Cargo/Binstall/CargoOrBinstall 读 crates.io；Archive/Aur
 读 GitHub 发布列表首个非 draft 的发布，与脚本安装器的列表来源一致，包含 prerelease。
 GitHub 的 latest 排除 prerelease，不能用于本项目归档检查；没有可用发布时拒绝判定。
-两种历史成熟度的 tag 通过 `Release::from_published_tag` 的同一 tag 解码器读取。
+当前 tag 与带旧式中缀的历史 tag 通过 `Release::from_published_tag` 的同一解码器读取。
 GitHub API、归档脚本与发行页面的 repository 身份取自根清单并经 Cargo 的
 `CARGO_PKG_REPOSITORY` 进入 release 模块，不在 HTTP URL 中另写 owner/repo。
 

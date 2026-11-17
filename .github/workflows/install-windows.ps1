@@ -3,14 +3,18 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 # Copyright (c) 2026 2youg1 and the sprawling contributors
 
-param([Parameter(Mandatory)][string]$Archives, [Parameter(Mandatory)][string]$Evidence, [string]$Tag = 'v0.0.0-Alpha-260101')
+param([Parameter(Mandatory)][string]$Archives, [Parameter(Mandatory)][string]$Evidence, [string]$Tag = 'v0.0.0-260101')
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows') {
     throw 'This installer check writes the disposable Windows runner profile only.'
 }
-$assets = @(Get-ChildItem -LiteralPath $Archives -Filter '*.zip' -File)
-if ($assets.Count -ne 1) { throw 'Expected exactly one Windows archive.' }
+$assets = @(Get-ChildItem -LiteralPath $Archives -Filter 'sprawling-*.zip' -File)
+if ($assets.Count -ne 1) { throw 'Expected exactly one sprawling Windows archive.' }
+# One curated release carries Mei's archives beside the sprawling one, and
+# lists them first. Serving the build's whole set is what makes install.ps1's
+# own product filter, rather than this directory, choose the archive.
+$carried = @(Get-ChildItem -LiteralPath $Archives -Filter '*.zip' -File | Sort-Object Name)
 $root = Join-Path $env:RUNNER_TEMP "install-check-$([Guid]::NewGuid())"
 New-Item -ItemType Directory -Path $root, $Evidence -Force | Out-Null
 $server = $null
@@ -22,8 +26,13 @@ $pathKind = if ($hadPath) { $key.GetValueKind('Path') } else { $null }
 try {
     $www = Join-Path $root 'www'
     $unpacked = Join-Path $root 'unpacked'
-    New-Item -ItemType Directory -Path $www -Force | Out-Null
-    Copy-Item -LiteralPath $assets[0].FullName -Destination $www
+    # The archives are served under the repository path, where a release
+    # serves them: that path holds `/sprawling-`, so a product check on the
+    # URL alone passes for Mei's archives too.
+    $repo = if ($env:GITHUB_REPOSITORY) { $env:GITHUB_REPOSITORY } else { '2youg1/sprawling-agents' }
+    $downloads = Join-Path $www "$repo/releases/download/$Tag"
+    New-Item -ItemType Directory -Path $www, $downloads -Force | Out-Null
+    Copy-Item -LiteralPath $carried.FullName -Destination $downloads
     $log = Join-Path $root 'server.out'
     $err = Join-Path $root 'server.err'
     $server = Start-Process python -ArgumentList @('-u', '-m', 'http.server', '0', '--bind', '127.0.0.1', '--directory', $www) -PassThru -RedirectStandardOutput $log -RedirectStandardError $err
@@ -41,7 +50,13 @@ try {
     }
     if (-not $port) { throw 'The loopback asset server did not report its port.' }
     $hash = (Get-FileHash -LiteralPath $assets[0].FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-    $release = @(@{ tag_name = $Tag; published_at = '2026-01-01T00:00:00Z'; draft = $false; assets = @(@{ name = $assets[0].Name; size = $assets[0].Length; digest = "sha256:$hash"; browser_download_url = "http://127.0.0.1:$port/$($assets[0].Name)" }) })
+    $served = @(foreach ($file in $carried) {
+        @{ name = $file.Name; size = $file.Length; browser_download_url = "http://127.0.0.1:$port/$repo/releases/download/$Tag/$($file.Name)";
+           digest = 'sha256:' + (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
+    })
+    $sprawlingIndex = [Array]::IndexOf([string[]]@($served | ForEach-Object { $_.name }), $assets[0].Name)
+    if ($sprawlingIndex -lt 0) { throw 'The served release list is missing the sprawling archive.' }
+    $release = @(@{ tag_name = $Tag; published_at = '2026-01-01T00:00:00Z'; draft = $false; assets = $served })
     $release | ConvertTo-Json -Depth 5 -AsArray | Set-Content -LiteralPath (Join-Path $www 'releases.json') -Encoding utf8
     $env:LOCALAPPDATA = Join-Path $root 'profile'
     $env:SPRAWLING_API = "http://127.0.0.1:$port/releases.json"
@@ -88,7 +103,7 @@ try {
     $origin = Join-Path $installedDir $originDefinition.Groups[1].Value
     if (Test-Path -LiteralPath $origin) { throw 'Uninstall left the archive origin marker.' }
 
-    $release[0].assets[0].digest = 'sha256:' + ('0' * 64)
+    $release[0].assets[$sprawlingIndex].digest = 'sha256:' + ('0' * 64)
     $release | ConvertTo-Json -Depth 5 -AsArray | Set-Content -LiteralPath (Join-Path $www 'releases.json') -Encoding utf8
     & pwsh -NoProfile -File $installer *> (Join-Path $Evidence 'powershell-bad-digest.log')
     if ($LASTEXITCODE -eq 0 -or (Test-Path -LiteralPath $installed[0].FullName)) { throw 'A mismatched archive digest must refuse installation.' }

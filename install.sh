@@ -21,9 +21,10 @@
 #     `releases/latest` endpoint excludes those - it answers 404 here. The
 #     list endpoint is asked for the newest entry in the selected channel.
 #   * The tag and the archive carry different versions: tag
-#     `v0.0.3-Pre-alpha-260903` ships `sprawling-0.0.3-macos-aarch64.zip`.
-#     An asset is chosen by its platform suffix, never by a name built out
-#     of the tag.
+#     `v0.17.0-261117` ships `sprawling-0.17.0-macos-aarch64.zip`.
+#     An asset is chosen by its product and platform suffix, never by a
+#     name built out of the tag: one release also carries `mei-` archives
+#     whose names end with the same platform suffix.
 #   * Only the platforms the release workflow builds are installable. A
 #     platform with no archive is reported with the list the release does
 #     carry, rather than guessed at.
@@ -180,9 +181,15 @@ release_json() {
 #
 # `-e` is load-bearing too: the suffix begins with `-`, and grep reads a
 # bare `-macos-aarch64.zip` as a run of options rather than as a pattern.
+#
+# The product is read from an asset's own `name`, not from its URL: a
+# download URL carries the repository path, and this repository's path
+# itself holds `/sprawling-`, so a product check on the URL also passes
+# for Mei's archives. `mei-0.17.0-macos-aarch64.zip` ends with the same
+# platform suffix `sprawling-0.17.0-macos-aarch64.zip` does.
 asset_chunk() {
-    printf '%s' "$1" | tr -d '\n\r' | tr '{' '\n' | grep -F -e "$2" |
-        grep -F -e 'browser_download_url' | head -n 1
+    printf '%s' "$1" | tr -d '\n\r' | tr '{' '\n' |
+        grep -E -e '"name": *"sprawling-' | grep -F -e "$2" | head -n 1
 }
 
 # `|` delimits the sed expressions here because every value being read is

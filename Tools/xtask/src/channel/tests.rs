@@ -18,10 +18,9 @@ const UNSCOPED_THROUGH: &str = "0.0.4";
 /// agree.
 #[test]
 fn the_published_version_is_the_one_a_running_binary_decodes() {
-    // The tag this tree would cut, so moving `MATURITY` leaves it true.
-    let tag = format!("v0.0.4-{}-260911", kernel::release::MATURITY.titled());
-    let cut = kernel::Release::from_tag(&tag, "0.0.4").expect("a release tag of this project");
-    assert_eq!(cut.npm_version(), "0.0.4-pre.260911");
+    let cut = kernel::Release::from_tag("v0.17.0-260911", "0.17.0")
+        .expect("a release tag of this project");
+    assert_eq!(cut.npm_version(), "0.17.0-pre.260911");
     assert_eq!(
         kernel::Release::from_npm_version(&cut.npm_version()).expect("what this channel published"),
         cut
@@ -176,7 +175,7 @@ description = 'fixture description'
         zip.finish().unwrap();
     }
     let out = fixture.join("npm");
-    super::run(&fixture, "v0.0.10-Alpha-261005", &assets, &out).unwrap();
+    super::run(&fixture, "v0.0.10-261005", &assets, &out).unwrap();
     let manifest: serde_json::Value = serde_json::from_slice(
         &std::fs::read(out.join(ROOT_PACKAGE).join("package.json")).unwrap(),
     )
@@ -272,7 +271,7 @@ fn channel_requires_mei_archives_with_the_platform_binary_name() {
 
     let missing = super::run(
         &fixture,
-        "v0.0.10-Alpha-261005",
+        "v0.0.10-261005",
         &assets,
         &fixture.join("missing"),
     )
@@ -292,7 +291,7 @@ fn channel_requires_mei_archives_with_the_platform_binary_name() {
     zip.finish().unwrap();
     let wrong_name = super::run(
         &fixture,
-        "v0.0.10-Alpha-261005",
+        "v0.0.10-261005",
         &assets,
         &fixture.join("wrong-name"),
     )
@@ -363,7 +362,7 @@ description = 'fixture'
         zip.finish().unwrap();
     }
     let out = fixture.join("out");
-    super::run(&fixture, "v0.0.10-Alpha-261005", &assets, &out).unwrap();
+    super::run(&fixture, "v0.0.10-261005", &assets, &out).unwrap();
     let pkgbuild = std::fs::read_to_string(out.join("aur/PKGBUILD")).unwrap();
     let srcinfo = std::fs::read_to_string(out.join("aur/.SRCINFO")).unwrap();
     assert!(pkgbuild.contains("pkgver=0.0.10_pre.261005"));
@@ -391,6 +390,6 @@ description = 'fixture'
         .find_map(|line| line.trim().strip_prefix("sha256sums = "))
         .unwrap();
     assert!(pkgbuild.contains(digest));
-    assert!(pkgbuild.contains("/releases/download/v0.0.10-Alpha-261005/"));
+    assert!(pkgbuild.contains("/releases/download/v0.0.10-261005/"));
     std::fs::remove_dir_all(fixture).unwrap();
 }
