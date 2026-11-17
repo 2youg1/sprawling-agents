@@ -45,8 +45,8 @@ fn a_real_tool_wave_keeps_order_state_and_opaque_blocks() {
         serde_json::json!({"type": "thinking", "thinking": "why", "signature": "signed"});
     let first = serde_json::json!({"stop_reason": "tool_use", "content": [
         thinking.clone(),
-        {"type": "tool_use", "name": "python", "id": "a", "input": {"code": "x = 40\nprint(x)"}},
-        {"type": "tool_use", "name": "python", "id": "b", "input": {"code": "x += 2\nprint(x)"}}
+        {"type": "tool_use", "name": "Python3", "id": "a", "input": {"code": "x = 40\nprint(x)"}},
+        {"type": "tool_use", "name": "Python3", "id": "b", "input": {"code": "x += 2\nprint(x)"}}
     ]});
     let second = serde_json::json!({"stop_reason": "end_turn", "content": "42"});
     let (base, handle) = serve(vec![first, second]);
@@ -70,7 +70,7 @@ fn a_real_tool_wave_keeps_order_state_and_opaque_blocks() {
 #[test]
 fn a_preset_harness_is_not_overwritten() {
     let first = serde_json::json!({"stop_reason": "tool_use", "content": [
-        {"type": "tool_use", "name": "python", "id": "a", "input": {"code": "import os\nprint(os.environ['HARNESS'])"}}
+        {"type": "tool_use", "name": "Python3", "id": "a", "input": {"code": "import os\nprint(os.environ['HARNESS'])"}}
     ]});
     let second = serde_json::json!({"stop_reason": "end_turn", "content": "done"});
     let (base, handle) = serve(vec![first, second]);
@@ -113,7 +113,7 @@ fn a_non_200_body_reaches_stderr_unchanged() {
 #[test]
 fn a_recursive_child_has_an_independent_request_and_stdout_answer() {
     let parent = serde_json::json!({"stop_reason": "tool_use", "content": [
-        {"type": "tool_use", "name": "python", "id": "parent", "input": {"code": "import os, subprocess\nchild = subprocess.run([os.environ['HARNESS'], '-p', 'child prompt'], capture_output=True, text=True)\nprint(child.stdout, end='')"}}
+        {"type": "tool_use", "name": "Python3", "id": "parent", "input": {"code": "import os, subprocess\nchild = subprocess.run([os.environ['HARNESS'], '-p', 'child prompt'], capture_output=True, text=True)\nprint(child.stdout, end='')"}}
     ]});
     let (base, handle) = serve(vec![
         parent,
@@ -156,7 +156,7 @@ fn pause_turn_continues_without_a_user_message() {
     assert_eq!(output.stdout, b"done");
     let requests = handle.join().unwrap();
     assert_eq!(requests.len(), 2);
-    assert_eq!(requests[0]["tools"][0]["name"], "python");
+    assert_eq!(requests[0]["tools"][0]["name"], "Python3");
     assert_eq!(requests[1]["messages"].as_array().unwrap().len(), 2);
     assert_eq!(requests[1]["messages"][1]["content"][0], thinking);
 }
@@ -184,10 +184,10 @@ fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     std::fs::create_dir(&first).unwrap();
     let (base, first_gateway) = serve_with(3, |request, index| match index {
         0 => serde_json::json!({"stop_reason": "tool_use", "content": [
-            {"type": "tool_use", "name": "python", "id": "assign", "input": {"code": "answer = 40"}}
+            {"type": "tool_use", "name": "Python3", "id": "assign", "input": {"code": "answer = 40"}}
         ]}),
         1 => serde_json::json!({"stop_reason": "tool_use", "content": [
-            {"type": "tool_use", "name": "python", "id": "calculate", "input": {"code": "answer += 2\nprint(answer)"}}
+            {"type": "tool_use", "name": "Python3", "id": "calculate", "input": {"code": "answer += 2\nprint(answer)"}}
         ]}),
         2 => {
             let observed = tool_result_text(&request["messages"][4]["content"][0]["content"]);
@@ -219,7 +219,7 @@ fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     .unwrap();
     let (base, project_gateway) = serve(vec![
         serde_json::json!({"stop_reason": "tool_use", "content": [
-            {"type": "tool_use", "name": "python", "id": "repair", "input": {"code": r#"from pathlib import Path
+            {"type": "tool_use", "name": "Python3", "id": "repair", "input": {"code": r#"from pathlib import Path
 import subprocess
 import sys
 path = Path("greeting.py")

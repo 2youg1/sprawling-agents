@@ -216,7 +216,7 @@ fn initial_request(task: Task, extra: Option<&str>) -> Result<Value> {
             return Err(Error::Diagnostic(Diagnostic::new(
                 Code::Config,
                 "merge HARNESS_EXTRA",
-                "tools would replace the sole local Python tool",
+                "tools would replace the sole local Python3 tool",
                 "keep tools out of HARNESS_EXTRA; Mei declares only python",
             )));
         }
@@ -265,8 +265,8 @@ fn initial_request(task: Task, extra: Option<&str>) -> Result<Value> {
 
 fn python_tool() -> Value {
     json!({
-        "name": "python",
-        "description": "A persistent Python 3 interpreter. Variables survive across calls. Each call writes stdout+stderr to a file and returns that file path; open the path to read output. Use subprocess for shell commands.",
+        "name": agent::TOOL_NAME,
+        "description": "A persistent Python3 interpreter. Variables survive across calls; expressions do not auto-echo, so print what you need. Small UTF-8 stdout+stderr is returned whole. Larger or non-UTF-8 output returns only a notice and full file path; use the next Python3 call to filter and print the needed result. Use subprocess with captured output and checked return codes for shell commands.",
         "input_schema": {
             "type": "object",
             "properties": {"code": {"type": "string"}},
@@ -296,7 +296,7 @@ mod tests {
         assert_eq!(request["max_tokens"], 42);
         assert_eq!(request["messages"][0]["content"], "new prompt");
         assert_eq!(request["tools"].as_array().unwrap().len(), 1);
-        assert_eq!(request["tools"][0]["name"], "python");
+        assert_eq!(request["tools"][0]["name"], "Python3");
     }
 
     #[test]

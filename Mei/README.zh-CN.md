@@ -2,7 +2,7 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-Archetype:Mei 是极简 Agent Harness：把任务交给模型，模型通过一个 Python 3 工具行动，每次效应只拿回**路径句柄**，再继续直到最终答案。本包是**无头核**。Mei 不含终端壳。
+Archetype:Mei 是极简 Agent Harness：把任务交给模型，模型通过一个有状态的 **Python3** 工具行动并看到小结果，再继续直到最终答案。大型或非 UTF-8 结果完整留在磁盘，只返回提示与路径。本包是**无头核**。Mei 不含终端壳。
 
 交互面是 [Calyx](../Calyx/)。`@sprawling/mei` 同时发布无头 `mei` 与 `calyx` 面：TTY 且无 `-p` 时走 Calyx，`-p` 或管道仍走无头核。脚本只用无头路径。
 
@@ -19,25 +19,33 @@ Archetype:Mei 是极简 Agent Harness：把任务交给模型，模型通过一�
 
 ## 黑盒路径（只用键盘）
 
-需要能联网、支持工具调用的模型 API key，以及可弄坏的目录。不必克隆本仓库。
+需要能联网、[Bun](https://bun.sh)、PATH 上的 Python 3、Magpie、支持工具调用的模型 API key，以及可弄坏的目录。不必克隆本仓库。
 
 ### A. 脚本冒烟
 
-1. 需要时安装 [bun](https://bun.sh)。
-2. 一个终端里配置 magpie：
+1. 在 Windows 检查 `bun --version` 和 `python --version`，其它系统检查 `python3 --version`。
+2. 安装并打开 [Magpie](https://usemagpie.ai)，在 **Providers → Add provider** 添加服务商；保持应用打开，它已提供 gateway。纯终端可改用 `magpie serve`。
+3. 从 `magpie models` 选择模型，再打开可弄坏的目录。
 
-```sh
-curl -fsSL https://usemagpie.ai/install.sh | sh -s -- --tui
-magpie provider add deepseek
-magpie serve
-```
-
-3. 第二个终端：
+Bash：
 
 ```sh
 export HARNESS_MODEL='deepseek/deepseek-flash'
 mkdir -p ~/mei-playground && cd ~/mei-playground
-bunx @sprawling/mei -p '请调用 Python 计算 40 + 2，只回答数字。'
+```
+
+Windows PowerShell：
+
+```powershell
+$env:HARNESS_MODEL='deepseek/deepseek-flash'
+New-Item -ItemType Directory -Force "$HOME/mei-playground" | Out-Null
+Set-Location "$HOME/mei-playground"
+```
+
+运行：
+
+```sh
+bunx @sprawling/mei -p '请调用 Python3 计算 40 + 2，只回答数字。'
 ```
 
 stdout 为 `42`。失败时是带 `description` / `cause` / `resolution` 的 `toml` 块。
@@ -76,11 +84,11 @@ bunx @sprawling/mei
 
 ```sh
 cargo test -p sprawling-mei --test cli e2e_beginner_workflow_from_first_prompt_to_project_change
-cargo test -p sprawling-calyx --lib console::mei
-cargo test -p sprawling-calyx --lib console::ui::mei
+cargo test -p sprawling-mei --test observation
+cd Calyx && zig build test
 ```
 
-第一条用真实 `mei` + Python + 本地脚本网关（计算 → 改项目 → 测项目）。不安装 npm，也不驱动 TUI。
+第一条在 Windows 与 Unix 用真实 `mei` + Python3；网关只在下一请求携带观察结果时才给出正确答案。第二条还覆盖大输出完整落盘、按路径筛选，以及旧日志与媒体块的 resume 透传。二者都不安装 npm 包，也不驱动 TUI。
 
 ## 进程 Face
 
@@ -93,7 +101,9 @@ cargo test -p sprawling-calyx --lib console::ui::mei
 | stdout | 最终答案，不补换行 |
 | stderr | 消息 JSONL；`mei.obs` pulse/usage；失败为三段诊断 |
 | 取消 | 杀进程组 |
-| tool_result | 捕获 stdout+stderr 的路径 |
+| tool_result | 不超过 16 KiB 的完整 stdout+stderr；否则为提示与完整捕获路径 |
+
+Resume 保留旧工具名与字符串/数组 content，包括图片、音频和视频块。Provider 与模型必须支持这些块；Mei 没有附件旗标，也不恢复 Python 现场。
 
 | 变量 | 含义 |
 |---|---|
@@ -105,7 +115,7 @@ cargo test -p sprawling-calyx --lib console::ui::mei
 
 ## 边界
 
-核内无 Python 超时；连接 10s / IO 600s；空输出仍是路径；无 `MEI_TOOLS`、无输出窗截断、无运行时 AGENTS/Skills 注入、无核内 TUI。
+核内无 Python3 超时；连接 10s / IO 600s；空输出为空文本；超过 16 KiB 或非 UTF-8 只给提示与路径，从不返回头尾样本；无 `MEI_TOOLS`、运行时 AGENTS/Skills 注入或核内 TUI。
 
 ## 规格与检查
 
@@ -114,6 +124,7 @@ cargo test -p sprawling-calyx --lib console::ui::mei
 ```sh
 cargo nextest run -p sprawling-mei
 cargo test -p sprawling-mei --test cli
+cargo test -p sprawling-mei --test observation
 cargo test -p sprawling-calyx --lib console::mei
 cargo clippy -p sprawling-mei -p sprawling-calyx --all-targets -- -D warnings
 lake build Mei.Spec Mei.spec.Agent Mei.spec.Session

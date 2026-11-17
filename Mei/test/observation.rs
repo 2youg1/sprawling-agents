@@ -18,7 +18,7 @@ use support::{run, run_resume, serve_with, tool_result_text};
 
 fn tool(code: &str) -> Value {
     json!({"stop_reason": "tool_use", "content": [
-        {"type": "tool_use", "name": "python", "id": "call", "input": {"code": code}}
+        {"type": "tool_use", "name": "Python3", "id": "call", "input": {"code": code}}
     ]})
 }
 
@@ -99,7 +99,7 @@ fn resume_preserves_legacy_history_and_media_blocks() {
         {"role": "user", "content": "next"}
     ]);
     assert_eq!(requests[0]["messages"], expected);
-    assert_eq!(requests[0]["tools"][0]["name"], "python");
+    assert_eq!(requests[0]["tools"][0]["name"], "Python3");
 }
 
 #[test]
