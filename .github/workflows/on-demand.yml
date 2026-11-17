@@ -90,6 +90,7 @@ on:
             keychain,
             container,
             bench,
+            ci-verdict-probe,
           ]
       responses_base:
         description: optional ref with the matched Responses instrument
@@ -954,4 +955,110 @@ jobs:
         with:
           name: bench-${{ runner.os }}-${{ steps.tree.outputs.sha }}
           path: target/bench-out
+          if-no-files-found: error
+
+  ci-verdict-probe:
+    if: inputs.job == 'ci-verdict-probe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain
+      - uses: ./.github/actions/zig
+      - uses: ./.github/actions/ci-tools
+        with:
+          tool: just
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: RefRain/package.json
+      - name: install optional verification cache adapter
+        continue-on-error: true
+        run: bun install --frozen-lockfile --cwd .github/ci-cache
+      - name: build once and fix the source baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build -p xtask --locked
+          mkdir -p target/probe
+          base=$(git --no-replace-objects merge-base origin/main HEAD)
+          git --no-replace-objects cat-file -e "$base^{commit}"
+          printf '%s\n' "$base" > "$RUNNER_TEMP/ci-probe-base"
+          git --no-replace-objects rev-parse HEAD 'HEAD^{tree}' > target/probe/source.txt
+          sha256sum target/debug/xtask > target/probe/verifier.sha256
+          stat -c '%s' target/debug/xtask > target/probe/verifier.size
+      - name: plan A
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=$(cat "$RUNNER_TEMP/ci-probe-base")
+          test "$(git --no-replace-objects merge-base origin/main HEAD)" = "$base"
+          target/debug/xtask ci plan --full --scope-base "$base" > target/probe/A.plan.json
+          sha256sum target/debug/xtask > target/probe/A.sha256
+          cmp target/probe/verifier.sha256 target/probe/A.sha256
+      - name: verify A through the Node action
+        uses: ./.github/ci-cache
+      - name: change one tracked input and plan B
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '\n' >> docs/verification.md
+          base=$(cat "$RUNNER_TEMP/ci-probe-base")
+          test "$(git --no-replace-objects merge-base origin/main HEAD)" = "$base"
+          target/debug/xtask ci plan --full --scope-base "$base" > target/probe/B.plan.json
+          sha256sum target/debug/xtask > target/probe/B.sha256
+          cmp target/probe/verifier.sha256 target/probe/B.sha256
+      - name: verify B through the Node action
+        uses: ./.github/ci-cache
+      - name: restore the tracked input and plan A2
+        shell: bash
+        run: |
+          set -euo pipefail
+          git --no-replace-objects restore --source=HEAD --worktree -- docs/verification.md
+          base=$(cat "$RUNNER_TEMP/ci-probe-base")
+          test "$(git --no-replace-objects merge-base origin/main HEAD)" = "$base"
+          target/debug/xtask ci plan --full --scope-base "$base" > target/probe/A2.plan.json
+          sha256sum target/debug/xtask > target/probe/A2.sha256
+          cmp target/probe/verifier.sha256 target/probe/A2.sha256
+      - name: verify A2 through the Node action
+        uses: ./.github/ci-cache
+      - name: compare production keys and the loaded image
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum target/debug/xtask > target/probe/final.sha256
+          cmp target/probe/verifier.sha256 target/probe/final.sha256
+          stat -c '%s' target/debug/xtask > target/probe/final.size
+          cmp target/probe/verifier.size target/probe/final.size
+          bun -e '
+          const pure = ["header", "lexicon", "motion", "wording", "wire-ts", "release"].sort();
+          const plans = await Promise.all(["A", "B", "A2"].map(p => Bun.file(`target/probe/${p}.plan.json`).json()));
+          for (const plan of plans) {
+            if (plan.length !== 29 || plan.some(row => !row.selected)) throw new Error("expected the complete production graph");
+            const reusable = plan.filter(row => row.reuse === "success-only").map(row => row.id).sort();
+            if (JSON.stringify(reusable) !== JSON.stringify(pure)) throw new Error("expected six identified pure Linux gates");
+          }
+          const [a, b, a2] = plans.map(plan => new Map(plan.map(row => [row.id, row.key])));
+          const changed = pure.filter(id => a.get(id) !== b.get(id));
+          if (JSON.stringify(changed) !== JSON.stringify(["lexicon", "release"])) throw new Error("the document mutation must invalidate its two pure readers");
+          for (const [id, key] of a) if (a2.get(id) !== key) throw new Error(`A2 did not restore ${id}`);
+          await Bun.write("target/probe/comparison.json", JSON.stringify({nodes: 29, pure, changed, restored: true}, null, 2));
+          '
+      - name: restore and require a clean source tree
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p target/probe
+          git --no-replace-objects restore --source=HEAD --worktree -- docs/verification.md
+          git --no-replace-objects diff --exit-code > target/probe/cleanup.diff
+          git --no-replace-objects status --porcelain > target/probe/status.txt
+          test ! -s target/probe/status.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: ci-verdict-probe-${{ github.sha }}
+          path: target/probe
           if-no-files-found: error
