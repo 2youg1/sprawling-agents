@@ -70,6 +70,8 @@ bunx @sprawling/mei
 
 横幅显示 cwd；composer 显示 `HARNESS_MODEL · usage`（尚无 usage 时为 `unknown`）。有任务在跑时显示 Mei working；pulse 行不刷屏。
 
+Calyx 面通过 Program Status Protocol（OSC 7501）报告 `working`、`done`、`error`，或取消后的 `idle`。理解该协议的终端或 agent dashboard 因而无需读取对话，就能观察被另一个 agent 召唤的 Mei 子进程；报告只带计数，不带 prompt 文本。Mei 不发送支持探测，不识别该序列的终端会忽略它，Calyx 在交还终端前清除状态。设置 `SPRAWLING_PROGRAM_STATUS=never` 可关闭报告。无头 `-p` 与管道运行不发送 OSC 7501。
+
 首句：
 
 ```text
@@ -112,6 +114,52 @@ Resume 保留旧工具名与字符串/数组 content，包括图片、音频和�
 | `ANTHROPIC_API_KEY` | 默认 `magpie` |
 | `HARNESS_EXTRA` | 启动时浅合并一次；拒绝 `stream` / `tools` |
 | `MEI_BIN` | Calyx spawn 本核时的路径；npm shim 设为同目录无头核 |
+| `SPRAWLING_PROGRAM_STATUS` | `never` 关闭 Calyx 交互面的 OSC 7501 |
+
+## 系统提示词与静态开销
+
+`Mei/src/MEI.md` 在构建时进入 `system`；唯一的 Python3 定义位于 `tools[0]`。假设用户输入为 0 字节，这两个值就是输入之外的固定内容。表中不含消息外层，也不含 provider 自行添加的内容。
+
+| 部分 | UTF-8 字节 | 估算 tokens |
+|---|---:|---:|
+| `system` | 257 | 63 |
+| 完整 compact `tools[0]` JSON | 1131 | 246 |
+| 合计 | 1388 | 309 |
+
+Token 估算使用 `@google/genai` **2.21.0** 的 `LocalTokenizer`，模型名为 `gemini-2.0-flash-001`（gemma3）；两个值分别计数后相加。结果只代表这个分词器，不是 provider 的 usage 或账单。下面的 JSON 为便于阅读做了 pretty-print；字节数按线上 compact 形式计算。
+
+### `system`
+
+```text
+<agent-harness>
+You are operating inside Mei.
+No files are injected or pre-loaded; fetch what you need.
+Workflow: Sense → Act → Verify → Adapt…
+Aligned with context, fulfill user intent thoroughly and resourcefully and stay scoped.
+</agent-harness>
+```
+
+### `tools[0]`
+
+```json
+{
+  "description": "<python3>\nA persistent Python3 interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the path to a file containing the full output; filter that file, or re-run with narrower output, in the next Python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start Python with sys.executable rather than bare python3, so child processes inherit the active environment. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, Python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python3>",
+  "input_schema": {
+    "properties": {
+      "code": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "code"
+    ],
+    "type": "object"
+  },
+  "name": "Python3"
+}
+```
+
+Mei 只保留一份跨 provider 的 schema，并在 agent loop 中校验整个工具调用波；不声明 provider 专有的 `strict` 模式。
 
 ## 边界
 
