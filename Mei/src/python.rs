@@ -13,7 +13,29 @@ use std::time::Duration;
 use crate::error::{Code, Diagnostic, Error, Result};
 
 const BOOT: &str = include_str!("boot.py");
-const INLINE_BYTES: u64 = 16 * 1024;
+
+/// The largest combined stdout/stderr capture returned inline.
+pub const INLINE_BYTES: u64 = 16 * 1024;
+const INLINE_KIB: u64 = INLINE_BYTES / 1024;
+
+/// Describes the Python3 tool using the same output budget as [`observable_output`].
+pub fn tool_description() -> String {
+    format!(
+        concat!(
+            "<python3>\nA persistent Python3 interpreter. Variables, imports, and the working directory (cwd) persist across calls. ",
+            "An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. ",
+            "Expressions do not auto-echo, so explicitly print any values you need to inspect. ",
+            "If combined UTF-8 stdout/stderr is up to {} KiB, the tool returns it inline. ",
+            "Larger or non-UTF-8 output returns a notice and the path to a file containing the full output; ",
+            "filter that file, or re-run with narrower output, in the next Python call. ",
+            "Run shell commands and CLIs through subprocess, capture their output, and check return codes. ",
+            "Start Python with sys.executable rather than bare python3, so child processes inherit the active environment. ",
+            "Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, ",
+            "Python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python3>"
+        ),
+        INLINE_KIB
+    )
+}
 
 const CLOSE_POLL: Duration = Duration::from_millis(20);
 const CLOSE_GRACE: Duration = Duration::from_secs(5);
@@ -318,6 +340,13 @@ mod tests {
     fn state_and_small_outputs_survive_calls() {
         let mut python = Py::spawn().unwrap();
         assert_eq!(python.run("x = 40").unwrap(), "");
+        assert_eq!(python.run("40 + 2").unwrap(), "");
+        assert!(
+            python
+                .run("raise ValueError('recoverable')")
+                .unwrap()
+                .contains("ValueError: recoverable")
+        );
         assert_eq!(
             python.run("print(x)").unwrap().replace("\r\n", "\n"),
             "40\n"
@@ -329,13 +358,49 @@ mod tests {
                 .replace("\r\n", "\n"),
             "42\n"
         );
-        assert_eq!(python.run("pass").unwrap(), "");
         assert!(
             python
                 .run("raise SystemExit(3)")
                 .unwrap()
                 .contains("SystemExit: 3")
         );
+        assert_eq!(
+            python.run("print(x)").unwrap().replace("\r\n", "\n"),
+            "42\n"
+        );
+        assert_eq!(python.run("pass").unwrap(), "");
+        python.close().unwrap();
+    }
+
+    #[test]
+    fn tool_description_uses_the_inline_budget() {
+        assert!(tool_description().contains(&format!("up to {INLINE_KIB} KiB")));
+    }
+
+    #[test]
+    fn imports_and_cwd_survive_calls() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = serde_json::to_string(&directory.path().to_string_lossy()).unwrap();
+        let mut python = Py::spawn().unwrap();
+        let first = python
+            .run(&format!("import os\nos.chdir({path})\nprint(os.getcwd())"))
+            .unwrap();
+        let second = python.run("print(os.getcwd())").unwrap();
+        assert_eq!(first, second);
+        assert_eq!(
+            std::path::Path::new(second.trim()).canonicalize().unwrap(),
+            directory.path().canonicalize().unwrap()
+        );
+        python.close().unwrap();
+    }
+
+    #[test]
+    fn sys_executable_starts_a_captured_child_python() {
+        let mut python = Py::spawn().unwrap();
+        let output = python
+            .run("import subprocess, sys\nchild = subprocess.run([sys.executable, '-c', 'print(42)'], capture_output=True, text=True, check=True)\nprint(child.stdout, end='')")
+            .unwrap();
+        assert_eq!(output.replace("\r\n", "\n"), "42\n");
         python.close().unwrap();
     }
 
