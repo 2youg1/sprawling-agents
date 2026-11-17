@@ -28,7 +28,8 @@ pub fn stands(mine: &Release, newest: &Release) -> ReleaseVerdict;
 ```
 
 `from_tag` 只认 `v<version>-<YYMMDD>`，并要求 version 与 Cargo 构建版本相同；`tag()` 生成同一形状。
-`from_published_tag` 还读取历史 `v0.0.*-<旧中缀>-<YYMMDD>`，旧中缀仅作为已经发布的 tag 形状保留，
+`from_published_tag` 先按历史 `v0.0.*-<旧中缀>-<YYMMDD>` 读，读不出再按当前形状读，
+所以不带旧中缀的 `v0.0.*-<YYMMDD>` 这类已发布 tag 也读得出。旧中缀仅作为已经发布的 tag 形状保留，
 不进入当前版本输出，也不影响版本号与日期解码。
 
 **五条口径：**

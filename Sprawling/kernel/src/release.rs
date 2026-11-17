@@ -87,11 +87,7 @@ impl Release {
     }
 
     pub fn from_published_tag(tag: &str) -> Result<Release, AxError> {
-        let parts = if tag.starts_with("v0.0.") {
-            Self::legacy_parts(tag)
-        } else {
-            Self::current_parts(tag)
-        };
+        let parts = Self::legacy_parts(tag).or_else(|| Self::current_parts(tag));
         let Some((version, date)) = parts else {
             return Err(AxError::failure(
                 AxCode::ConfigInvalid,
@@ -333,6 +329,13 @@ mod tests {
             assert_eq!(cut.released(), released);
             let date = tag.rsplit_once('-').unwrap().1;
             assert_eq!(cut.tag(), format!("v{version}-{date}"));
+        }
+    }
+
+    #[test]
+    fn a_published_tag_without_a_stage_infix_reads_as_the_current_shape() {
+        for tag in ["v0.0.10-261005", "v0.0.17-261115"] {
+            assert_eq!(Release::from_published_tag(tag).unwrap().tag(), tag);
         }
     }
 
