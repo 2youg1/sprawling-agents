@@ -181,7 +181,7 @@ const Seen = struct {
                 if (!std.mem.eql(u8, ty, "tool_result")) continue;
                 try entries.append(arena, .{ .tool = .{
                     .at = tod(at),
-                    .name = "python",
+                    .name = "Python3",
                     .subject = "",
                     .took_us = null,
                     .outcome = .Answered,
@@ -762,7 +762,7 @@ const Ui = struct {
 
         var calling_buf: [1]write.Calling = undefined;
         const calling: []const write.Calling = if (self.seen.calling) blk: {
-            calling_buf[0] = .{ .name = "python", .subject = "工具波执行中" };
+            calling_buf[0] = .{ .name = "Python3", .subject = "工具波执行中" };
             break :blk calling_buf[0..1];
         } else &.{};
 

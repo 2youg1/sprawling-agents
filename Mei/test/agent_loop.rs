@@ -3,79 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::io::{BufRead, BufReader, Read, Write};
-use std::process::{Command, Output};
+use std::io::{BufReader, Write};
+use std::process::Command;
 
 use serde_json::Value;
 
-fn read_request_body(reader: &mut BufReader<std::net::TcpStream>) -> Vec<u8> {
-    let mut length = 0;
-    loop {
-        let mut line = String::new();
-        if reader.read_line(&mut line).unwrap() == 0 {
-            panic!("client closed before sending complete request headers");
-        }
-        if line == "\r\n" {
-            break;
-        }
-        if let Some(value) = line.strip_prefix("Content-Length: ") {
-            length = value.trim().parse::<usize>().unwrap();
-        }
-    }
-    let mut body = vec![0; length];
-    reader.read_exact(&mut body).unwrap();
-    body
-}
-
-fn serve(answers: Vec<Value>) -> (String, std::thread::JoinHandle<Vec<Value>>) {
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    let address = listener.local_addr().unwrap();
-    let handle = std::thread::spawn(move || {
-        let mut requests = Vec::new();
-        for answer in answers {
-            let (stream, _) = listener.accept().unwrap();
-            let mut reader = BufReader::new(stream);
-            let body = read_request_body(&mut reader);
-            requests.push(serde_json::from_slice(&body).unwrap());
-            let body = serde_json::to_vec(&answer).unwrap();
-            let mut stream = reader.into_inner();
-            write!(
-                stream,
-                "HTTP/1.0 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                body.len()
-            )
-            .unwrap();
-            stream.write_all(&body).unwrap();
-            stream.shutdown(std::net::Shutdown::Both).unwrap();
-        }
-        requests
-    });
-    (format!("http://{address}"), handle)
-}
-
-fn tool_result_text(content: &Value) -> String {
-    let path = content
-        .as_str()
-        .expect("tool_result content is a result-file path");
-    std::fs::read_to_string(path).unwrap_or_else(|err| panic!("read {path}: {err}"))
-}
-
-#[expect(clippy::disallowed_methods, reason = "test fixture process")]
-fn run(base: &str, prompt: &str, harness: Option<&str>) -> Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_mei"));
-    command
-        .args(["-p", prompt])
-        .env("HARNESS_MODEL", "test/model")
-        .env("ANTHROPIC_BASE_URL", base)
-        .env("ANTHROPIC_API_KEY", "magpie")
-        .env_remove("HARNESS_EXTRA");
-    if let Some(harness) = harness {
-        command.env("HARNESS", harness);
-    } else {
-        command.env_remove("HARNESS");
-    }
-    command.output().unwrap()
-}
+use crate::support::{read_request_body, run, serve, serve_with, tool_result_text};
 
 #[test]
 fn direct_answer_has_only_the_final_text_on_stdout() {
@@ -112,8 +45,8 @@ fn a_real_tool_wave_keeps_order_state_and_opaque_blocks() {
         serde_json::json!({"type": "thinking", "thinking": "why", "signature": "signed"});
     let first = serde_json::json!({"stop_reason": "tool_use", "content": [
         thinking.clone(),
-        {"type": "tool_use", "name": "python", "id": "a", "input": {"code": "x = 40\nprint(x)"}},
-        {"type": "tool_use", "name": "python", "id": "b", "input": {"code": "x += 2\nprint(x)"}}
+        {"type": "tool_use", "name": "Python3", "id": "a", "input": {"code": "x = 40\nprint(x)"}},
+        {"type": "tool_use", "name": "Python3", "id": "b", "input": {"code": "x += 2\nprint(x)"}}
     ]});
     let second = serde_json::json!({"stop_reason": "end_turn", "content": "42"});
     let (base, handle) = serve(vec![first, second]);
@@ -137,7 +70,7 @@ fn a_real_tool_wave_keeps_order_state_and_opaque_blocks() {
 #[test]
 fn a_preset_harness_is_not_overwritten() {
     let first = serde_json::json!({"stop_reason": "tool_use", "content": [
-        {"type": "tool_use", "name": "python", "id": "a", "input": {"code": "import os\nprint(os.environ['HARNESS'])"}}
+        {"type": "tool_use", "name": "Python3", "id": "a", "input": {"code": "import os\nprint(os.environ['HARNESS'])"}}
     ]});
     let second = serde_json::json!({"stop_reason": "end_turn", "content": "done"});
     let (base, handle) = serve(vec![first, second]);
@@ -180,7 +113,7 @@ fn a_non_200_body_reaches_stderr_unchanged() {
 #[test]
 fn a_recursive_child_has_an_independent_request_and_stdout_answer() {
     let parent = serde_json::json!({"stop_reason": "tool_use", "content": [
-        {"type": "tool_use", "name": "python", "id": "parent", "input": {"code": "import os, subprocess\nchild = subprocess.run([os.environ['HARNESS'], '-p', 'child prompt'], capture_output=True, text=True)\nprint(child.stdout, end='')"}}
+        {"type": "tool_use", "name": "Python3", "id": "parent", "input": {"code": "import os, subprocess\nchild = subprocess.run([os.environ['HARNESS'], '-p', 'child prompt'], capture_output=True, text=True)\nprint(child.stdout, end='')"}}
     ]});
     let (base, handle) = serve(vec![
         parent,
@@ -223,7 +156,7 @@ fn pause_turn_continues_without_a_user_message() {
     assert_eq!(output.stdout, b"done");
     let requests = handle.join().unwrap();
     assert_eq!(requests.len(), 2);
-    assert_eq!(requests[0]["tools"][0]["name"], "python");
+    assert_eq!(requests[0]["tools"][0]["name"], "Python3");
     assert_eq!(requests[1]["messages"].as_array().unwrap().len(), 2);
     assert_eq!(requests[1]["messages"][1]["content"][0], thinking);
 }
@@ -249,15 +182,19 @@ fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
 
     let first = playground.path().join("first");
     std::fs::create_dir(&first).unwrap();
-    let (base, first_gateway) = serve(vec![
-        serde_json::json!({"stop_reason": "tool_use", "content": [
-            {"type": "tool_use", "name": "python", "id": "assign", "input": {"code": "answer = 40"}}
+    let (base, first_gateway) = serve_with(3, |request, index| match index {
+        0 => serde_json::json!({"stop_reason": "tool_use", "content": [
+            {"type": "tool_use", "name": "Python3", "id": "assign", "input": {"code": "answer = 40"}}
         ]}),
-        serde_json::json!({"stop_reason": "tool_use", "content": [
-            {"type": "tool_use", "name": "python", "id": "calculate", "input": {"code": "answer += 2\nprint(answer)"}}
+        1 => serde_json::json!({"stop_reason": "tool_use", "content": [
+            {"type": "tool_use", "name": "Python3", "id": "calculate", "input": {"code": "answer += 2\nprint(answer)"}}
         ]}),
-        serde_json::json!({"stop_reason": "end_turn", "content": "42"}),
-    ]);
+        2 => {
+            let observed = tool_result_text(&request["messages"][4]["content"][0]["content"]);
+            serde_json::json!({"stop_reason": "end_turn", "content": if observed == "42\n" { "42" } else { "not observed" }})
+        }
+        _ => panic!("unexpected gateway request"),
+    });
     let output = run(&first, &base, "Use Python to calculate 40 + 2");
     let trace = std::fs::read_to_string(first.join("run.jsonl")).unwrap();
     assert!(output.status.success(), "{trace}");
@@ -282,11 +219,12 @@ fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     .unwrap();
     let (base, project_gateway) = serve(vec![
         serde_json::json!({"stop_reason": "tool_use", "content": [
-            {"type": "tool_use", "name": "python", "id": "repair", "input": {"code": r#"from pathlib import Path
+            {"type": "tool_use", "name": "Python3", "id": "repair", "input": {"code": r#"from pathlib import Path
 import subprocess
+import sys
 path = Path("greeting.py")
 path.write_text(path.read_text(encoding="utf-8").replace('return "hello"', 'return "hello Mei"'), encoding="utf-8")
-result = subprocess.run(["python3", "-m", "unittest", "discover", "-v"], capture_output=True, text=True)
+result = subprocess.run([sys.executable, "-m", "unittest", "discover", "-v"], capture_output=True, text=True)
 print(result.stdout, end="")
 print(result.stderr, end="")
 assert result.returncode == 0
@@ -320,7 +258,9 @@ assert result.returncode == 0
         .expect("repair tool_result in the JSONL trace");
     assert!(repair.contains("OK"), "{repair}");
     assert_eq!(
-        std::fs::read_to_string(project.join("greeting.py")).unwrap(),
+        std::fs::read_to_string(project.join("greeting.py"))
+            .unwrap()
+            .replace("\r\n", "\n"),
         "def greeting():\n    return \"hello Mei\"\n"
     );
     let requests = project_gateway.join().unwrap();
@@ -331,6 +271,7 @@ assert result.returncode == 0
     );
 }
 
+#[cfg(unix)]
 #[test]
 #[expect(clippy::disallowed_methods, reason = "resume fixture process")]
 fn cli_resume_imports_only_complete_message_history() {
@@ -391,6 +332,7 @@ fn cli_resume_imports_only_complete_message_history() {
     );
 }
 
+#[cfg(unix)]
 #[test]
 #[expect(clippy::disallowed_methods, reason = "invalid resume fixture process")]
 fn cli_resume_rejects_an_incomplete_log_before_starting_python() {

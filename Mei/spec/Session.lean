@@ -25,17 +25,14 @@ structure Entry where
 
 abbrev Log := List Entry
 
-/-- 完整日志以字符串内容的 user prompt 开始，以已观察为 `end_turn` 的 assistant 结束。 -/
+/-- 完整日志以 user prompt（字符串或内容块）开始，以已观察为 `end_turn` 的 assistant 结束。 -/
 def completed (entries : Log) : Bool :=
   match entries.head? with
   | some first =>
     first.message.role == Role.user &&
-      (match first.message.content with
-       | .string _ =>
-         match entries.getLast? with
-         | some last => last.message.role == Role.assistant && last.stop == some Stop.endTurn
-         | none => false
-       | .items _ => false)
+      (match entries.getLast? with
+       | some last => last.message.role == Role.assistant && last.stop == some Stop.endTurn
+       | none => false)
   | none => false
 
 /-- 恢复保留消息内容与顺序，剥去仅属于日志的 stop 元数据；不完整日志没有恢复结果。 -/
@@ -89,10 +86,11 @@ example : restore [⟨Mei.Agent.assistant (.string "done"), some Stop.endTurn⟩
   native_decide
 
 example :
-    restore [
+    let entries := [
       ⟨(⟨Role.user, Content.items []⟩ : Message), none⟩,
       ⟨Mei.Agent.assistant (.string "done"), some Stop.endTurn⟩
-    ] = none := by
+    ]
+    restore entries = some (entries.map Entry.message) := by
   native_decide
 
 example :

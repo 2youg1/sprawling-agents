@@ -106,8 +106,8 @@ fn a_wave_runs_in_order_and_preserves_thinking() {
         "tool_use",
         json!([
             thinking.clone(),
-            {"type": "tool_use", "name": "python", "id": "a", "input": {"code": "x = 40"}},
-            {"type": "tool_use", "name": "python", "id": "b", "input": {"code": "x += 2; print(x)"}}
+            {"type": "tool_use", "name": "Python3", "id": "a", "input": {"code": "x = 40"}},
+            {"type": "tool_use", "name": "Python3", "id": "b", "input": {"code": "x += 2; print(x)"}}
         ]),
     );
     let (answer, request, trace, executed) = drive(vec![first, response("end_turn", json!("42"))]);
@@ -144,7 +144,7 @@ fn an_invalid_member_prevents_the_whole_wave() {
     let (answer, request, _, executed) = drive(vec![response(
         "tool_use",
         json!([
-            {"type": "tool_use", "name": "python", "id": "a", "input": {"code": "write()"}},
+            {"type": "tool_use", "name": "Python3", "id": "a", "input": {"code": "write()"}},
             {"type": "tool_use", "name": "shell", "id": "b", "input": {"code": "remove()"}}
         ]),
     )]);
@@ -158,8 +158,8 @@ fn a_duplicate_id_prevents_the_whole_wave() {
     let (answer, _, _, executed) = drive(vec![response(
         "tool_use",
         json!([
-            {"type": "tool_use", "name": "python", "id": "same", "input": {"code": "first()"}},
-            {"type": "tool_use", "name": "python", "id": "same", "input": {"code": "second()"}}
+            {"type": "tool_use", "name": "Python3", "id": "same", "input": {"code": "first()"}},
+            {"type": "tool_use", "name": "Python3", "id": "same", "input": {"code": "second()"}}
         ]),
     )]);
     assert!(answer.is_err());
@@ -187,7 +187,7 @@ fn an_execution_failure_does_not_invent_a_complete_result_message() {
         |_, _| {
             Ok(response(
                 "tool_use",
-                json!([{"type": "tool_use", "name": "python", "id": "a", "input": {"code": "exit()"}}]),
+                json!([{"type": "tool_use", "name": "Python3", "id": "a", "input": {"code": "exit()"}}]),
             ))
         },
         |_| {
@@ -221,8 +221,8 @@ fn protocol_errors_name_the_offending_path_and_value() {
     let wave = response(
         "tool_use",
         json!([
-            {"type": "tool_use", "name": "python", "id": "a", "input": {"code": "first()"}},
-            {"type": "tool_use", "name": "python", "input": {"code": "second()"}}
+            {"type": "tool_use", "name": "Python3", "id": "a", "input": {"code": "first()"}},
+            {"type": "tool_use", "name": "Python3", "input": {"code": "second()"}}
         ]),
     );
     let (result, _, _, executed) = drive(vec![wave]);

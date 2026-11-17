@@ -208,6 +208,13 @@ description = 'fixture description'
     let mei_manifest: serde_json::Value =
         serde_json::from_slice(&std::fs::read(mei_root.join("package.json")).unwrap()).unwrap();
     assert_eq!(mei_manifest["bin"]["mei"], "bin/mei.js");
+    assert_eq!(mei_manifest["bin"].as_object().unwrap().len(), 1);
+    assert!(
+        std::fs::read_to_string(mei_root.join("bin/mei.js"))
+            .unwrap()
+            .starts_with("#!/usr/bin/env bun\n")
+    );
+    assert!(!mei_root.join("bin/mei.cmd").exists());
     assert_eq!(
         mei_manifest["optionalDependencies"]
             .as_object()
@@ -226,11 +233,6 @@ description = 'fixture description'
             b"Calyx archive binary bytes"
         );
     }
-    assert!(
-        std::fs::read_to_string(mei_root.join("bin/mei.cmd"))
-            .unwrap()
-            .contains("mei: install Bun or Node.js")
-    );
     std::fs::remove_dir_all(fixture).unwrap();
 }
 

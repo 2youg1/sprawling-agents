@@ -11,8 +11,8 @@
     reason = "test code"
 )]
 
-#[cfg(unix)]
 mod agent_loop;
+mod support;
 
 use std::process::Command;
 
