@@ -28,3 +28,5 @@ mod leaf;
 mod reference;
 #[cfg(windows)]
 pub mod top_level;
+#[cfg(windows)]
+pub mod uia;

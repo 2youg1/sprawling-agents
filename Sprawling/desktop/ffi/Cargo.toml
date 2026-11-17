@@ -21,14 +21,22 @@ path = "src/lib.rs"
 # handles a bookkeeping test names: test scaffolding, which only the
 # desktop server's Windows dev-dependencies switch on, so no shipped
 # binary carries it (`xtask artifact`).
-fixture = ["dep:windows"]
+# The window a contract test opens in its own process, and the made-up
+# handles a bookkeeping test names: test scaffolding, which only the
+# desktop server's Windows dev-dependencies switch on, so no shipped
+# binary carries it (`xtask artifact`). Its two Win32 namespaces ride
+# the same `windows` dependency only while the feature is on.
+fixture = [
+    "windows/Win32_System_Threading",
+    "windows/Win32_UI_WindowsAndMessaging",
+]
 
 [target.'cfg(windows)'.dependencies]
 winsafe = { workspace = true }
-windows = { workspace = true, optional = true, features = [
+windows = { workspace = true, features = [
     "Win32_Foundation",
-    "Win32_System_Threading",
-    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Com",
+    "Win32_UI_Accessibility",
 ] }
 
 [dev-dependencies]

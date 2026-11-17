@@ -274,7 +274,7 @@ impl Desk {
 | `windows::enumerate` | 这台桌面上有哪些顶层窗口（经 `desktop_ffi::top_level`），各自的 title／process／bounds | 4 适配器 | **是**（窗口事实经 `winsafe`）|
 | `windows::target` | 从一串窗口里按 title／process 挑出**恰好一个** | 1 判定 | 否 |
 | `windows::views` | 一次快照铸了哪些 ref、一扇窗口（按句柄）现在是第几代、快照时它的矩形，以及一个动作该不该被这一代接受 | 1 判定 | 否 |
-| `windows::tree` | UIA 树：role／name／ref／bounds，经 `uiautomation`；一张桌子读树用的公寓与 automation 对象（`Reader`） | 4 适配器 | **是** |
+| `windows::tree` | UIA 树：role／name／ref／bounds，经 `desktop_ffi::uia`；一张桌子读树用的公寓与 automation 对象（`Reader`） | 4 适配器 | **是** |
 | `windows::keys` | 键名到虚拟键码的那张表 | 6 数据 | 否 |
 | `windows::strokes` | 一个动作是哪几个事件（键、Unicode 单元、指针）；一批只被收下前 k 个时哪些键与鼠标键还按着，以及那句拒词 | 1 判定 | 否 |
 | `windows::focus` | 键盘现在在谁手里、一个屏幕点下面是哪个窗口，以及两者都不是它时的那句拒词 | 1 判定 | **是**（两次只读，加一次置前）|
@@ -316,25 +316,25 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 | 一扇窗口的事实：可见、标题、进程映像名、外框 | `enumerate` | `IsWindowVisible`、`GetWindowText`、`GetWindowThreadProcessId`、`OpenProcess`＋`QueryFullProcessImageName`、`GetWindowRect` | `winsafe` | `winsafe` | 同上 |
 | 前台与落点 | `focus` | `GetForegroundWindow`、`WindowFromPoint`、`GetAncestor`、`SetForegroundWindow` | `winsafe` | `winsafe` | `the_window_under_a_point_is_the_window_drawn_there` |
 | 输入 | `act` | `SendInput`、`GetSystemMetrics` | `winsafe` | `winsafe` | `each_stroke_becomes_the_event_it_names` |
-| 可访问性树 | `tree` | UIA 的 automation 对象、control view walker、元素属性；COM 公寓 | `uiautomation`，公寓经 `winsafe` | `uiautomation`，公寓经 `winsafe` | `a_windows_tree_names_the_control_inside_it` |
+| 可访问性树 | `tree` | UIA 的 automation 对象、control view walker、元素属性；COM 公寓 | `desktop_ffi::uia`（windows 绑定），公寓经 `winsafe` | `desktop_ffi::uia`，公寓经 `winsafe` | `a_windows_tree_names_the_control_inside_it` |
 | 按窗口捕获 | `capture` | `GetDC`／`ReleaseDC`、`CreateCompatibleDC`、`CreateCompatibleBitmap`、`SelectObject`、`PrintWindow`、`GetDIBits` | `desktop_ffi`（Zig 叶子） | 无 | `a_window_this_process_opens_is_read_back_whole`、`capturing_a_window_gives_back_every_gdi_object_it_took` |
 | 剪贴板文本 | `clipboard` | owner 窗口、`OpenClipboard`、`GetClipboardData`、`GlobalSize`／`GlobalLock`、`GlobalAlloc`、`EmptyClipboard`、`SetClipboardData` | `desktop_ffi`（Zig 叶子） | 无 | `text_written_to_the_clipboard_reads_back_as_itself`；锁不住的块由 `leaf.zig` 的测试 `a block that will not lock is a refusal, not an empty clipboard` 判 |
 | DPI 感知 | `dpi` | `SetProcessDpiAwareness`、`GetProcessDpiAwareness` | `desktop_ffi`（Zig 叶子） | 无 | `a_desk_reads_this_desktop_in_physical_pixels` |
 
-**句柄只在一处铸出。** `winsafe::HWND` 从裸指针构造（`from_ptr`）要写 `unsafe`，反方向（`ptr()` 交给叶子或 `uiautomation`）不要。所以窗口句柄只在边界的另一侧铸出：叶子把 `EnumWindows` 交来的值写进 Rust 借出的 `winsafe::HWND` 槽里（它是 `#[repr(transparent)]` 的指针），`desktop_ffi::top_level::windows` 答的就是这些槽，本 package 一处 `from_ptr` 也不写；其余模块只借用它，需要 `uiautomation` 的类型时就地转过去。
+**句柄只在一处铸出。** `winsafe::HWND` 从裸指针构造（`from_ptr`）要写 `unsafe`，反方向（`ptr()` 交给叶子或 `desktop_ffi::uia`）不要。所以窗口句柄只在边界的另一侧铸出：叶子把 `EnumWindows` 交来的值写进 Rust 借出的 `winsafe::HWND` 槽里（它是 `#[repr(transparent)]` 的指针），`desktop_ffi::top_level::windows` 答的就是这些槽，本 package 一处 `from_ptr` 也不写；其余模块只借用它，需要 `windows::HWND` 时就地转过去（`tree` 把 `ptr()` 交给 `desktop_ffi::uia`）。
 
 **契约测试在真窗口上跑，只碰测试自己建的窗口。** 枚举、落点、树与捕获这几行的契约，由测试在本进程里建一扇不抢焦点的窗口（`desktop_ffi::fixture`，只在 `fixture` feature 下编译，本 package 只在 Windows 的 dev 依赖里打开它；`platform/windows/fixture.rs` 只把它的外框换成本 package 的 `Bounds`）再读回它来判；它们不读、不点、不改人桌面上别的窗口。输入这一行的旧实现把事件写进 `INPUT` 联合体，不写 `unsafe` 读不回来，所以它的契约测试随替换一起写，判的是每个 stroke 变成了哪个 `HwKbMouse` 值；真的把事件送到窗口上仍是 §16.2 的操作者检查。
 
 ### 8-12 Zig 缝：`Sprawling/desktop/ffi`
 
-没有准入安全接口的四组调用（§8-11 里「实现」写 `desktop_ffi` 的四行）由一个包做完：
+没有准入安全接口的调用（§8-11 里「实现」写 `desktop_ffi` 的五行）都由这一个包做完；枚举、捕获、剪贴板、DPI 四组走一片 Zig 叶子，UIA 树一组在 Rust 面经 `windows` 绑定（D10）：
 
 - **位置**：`Sprawling/desktop/ffi/`，包名 `sprawling-desktop-ffi`，库名 `desktop_ffi`，规格是 `Sprawling/desktop/ffi/Spec.lean`（边界规则与资源配对的定理在那里）。Zig 源码在 `Sprawling/desktop/ffi/zig/`：`leaf.zig`（四组操作与 export）、`boundary.zig`（叶子往借来的缓冲里写什么）、`step.zig`（step 的 Zig 拼写）。
 - **一张自己的表**：两个包都是根工作区的成员，包元数据与 `winsafe` 的版本行都以 `workspace = true` 继承。本 package 的 `[lints]` 是 `workspace = true`；`desktop_ffi` 的 `[lints]` 是它自己的一张，与根 `[workspace.lints]` 逐键相同，只有 `unsafe_code` 是 `deny`，`xtask guard` 判这一张表，例外只有那一行（Tools/xtask/Spec.lean §8-46、D14）。
 - **构建**：`Sprawling/desktop/ffi/build.rs` 只用标准库起 `zig build-lib`（`ReleaseSafe`，目标取自 cargo 的目标），只在 Windows 目标上；别的目标上本包只剩 `step`，本 package 也只在 Windows 上依赖它。Zig 的版本只写在 `Sprawling/desktop/ffi/zig-version`：构建脚本、doctor 的 `zig` 一行（`Sprawling/app/Spec.lean` §8-146）与 CI 的安装步骤都读它。
 - **对拍与 fuzz 的配方**：`desktop_ffi::boundary` 的测试以种子化输入比对叶子与 Rust 参考（`Sprawling/desktop/ffi/src/reference.rs`），每条规则两万个；`just fuzz-desktop <rounds> <seed>` 把同一比对按给定的轮数与种子跑下去（Rust 一侧的 fuzz）；`just check-desktop` 里的 `zig test Sprawling/desktop/ffi/zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试（Zig 一侧的 fuzz）。
 
-生产代码的每一个 `unsafe` 都在这张表里，各是一次叶子调用，`SAFETY:` 写在调用旁：
+生产代码的每一个 `unsafe` 都在这张表里，各是一次叶子调用或一次 UIA 绑定调用，`SAFETY:` 写在调用旁：
 
 | 位置 | 调用 | 前提（`SAFETY:` 的要点） |
 |---|---|---|
@@ -349,6 +349,14 @@ Windows 臂的每一次平台调用都落在下表的一行。「实现」一栏
 | `desktop_ffi::boundary::text_copy` | `sprawling_desktop_text_copy` | 同上 |
 | `desktop_ffi::boundary::text_fill` | `sprawling_desktop_text_fill` | 同上 |
 | `desktop_ffi::boundary::bitmap_bytes` | `sprawling_desktop_bitmap_bytes` | 两个整数与一个出参 |
+| `desktop_ffi::uia::Automation::direct` | `CoCreateInstance`（`CUIAutomation`） | 静态 CLSID 全程有效；不请求 outer；返回的接口由 windows_core 拥有并释放 |
+| `desktop_ffi::uia::Automation::control_view_walker` | `IUIAutomation::ControlViewWalker` | self 是本桌子持有的活 automation；返回的 walker 引用所有权移交 |
+| `desktop_ffi::uia::Automation::element_from_handle` | `IUIAutomation::ElementFromHandle` | 同上；HWND 值只借此一次调用 |
+| `desktop_ffi::uia::Walker::first_child` | `IUIAutomationTreeWalker::GetFirstChildElement` | walker 与元素在一次调用内活着；SOK-null 是「没有子元素」这一层到头 |
+| `desktop_ffi::uia::Walker::next_sibling` | `IUIAutomationTreeWalker::GetNextSiblingElement` | 同上，答「没有下一个兄弟」 |
+| `desktop_ffi::uia::Element::name` | `IUIAutomationElement::CurrentName` | 活元素；BSTR 出参就地转换并释放 |
+| `desktop_ffi::uia::Element::control_type` | `IUIAutomationElement::CurrentControlType` | 同上，普通整数出参 |
+| `desktop_ffi::uia::Element::bounds` | `IUIAutomationElement::CurrentBoundingRectangle` | 同上，普通结构出参 |
 
 叶子答 step（`desktop_ffi::step::Step`）与调用线程当时的 Win32 错误码；本 package 的 `platform::windows::fault` 是把它们写成三段式拒词的唯一一处，每个 step 对应一句「拒了什么」，码只在停在 Win32 调用上的 step 里读出。
 
@@ -506,14 +514,13 @@ D3 效果未知写在 `_meta` 的一个命名空间键里。
 
 /-! ## 13 依赖选型
 
-三个 workspace crate（`kernel`、`agent_protocols`、`desktop_ffi`，§7、D14），加八个外部依赖。`serde`、`serde_json`、`toml`、`base64` 经 `workspace = true` 取工作区的版本行，只做协议、scope 文件与 image content 的读写；另外四个各自买到什么，写在下表，后三个与 `desktop_ffi` 只在 Windows 上链接。**恒不引入**：async runtime、HTTP 客户端、glob crate（§10 第 4 条）。
+三个 workspace crate（`kernel`、`agent_protocols`、`desktop_ffi`，§7、D14），加七个外部依赖。`serde`、`serde_json`、`toml`、`base64` 经 `workspace = true` 取工作区的版本行，只做协议、scope 文件与 image content 的读写；另外四个各自买到什么，写在下表，后三个与 `desktop_ffi` 只在 Windows 上链接。**恒不引入**：async runtime、HTTP 客户端、glob crate（§10 第 4 条）。
 
 | crate | 买到什么 | 为什么不是别的 |
 |---|---|---|
-| `desktop_ffi`（同一工作区，§8-12） | 枚举、捕获、剪贴板、DPI 四组调用的安全函数，由 Zig 叶子做完 | 手写 `windows` 绑定的 `unsafe`（口径 ① 要的正是业务代码零 `unsafe`，D12） |
-| `windows` 0.62 | 绑定里的常量（`WHEEL_DELTA`、DPI 感知值）、交给 `uiautomation` 的 `HWND`、Win32 错误的文字；生产代码不调它的任何函数，测试用它建自己的窗口 | `windows-sys` 只有裸函数；`uiautomation` 本身也链接同一版 `windows`，锁里不多一个包 |
+| `desktop_ffi`（同一工作区，§8-12） | 枚举、捕获、剪贴板、DPI 四组调用的安全函数，由 Zig 叶子做完；UIA 树一组在 Rust 面经 `windows` 绑定（D10） | 手写 `windows` 绑定的 `unsafe` 收进这一个缝，业务代码零 `unsafe`（口径 ①，D12） |
+| `windows` 0.62 | 绑定里的常量（`WHEEL_DELTA`、DPI 感知值、UIA control type）、交给缝的 `HWND`、Win32 错误的文字；生产代码不调它的任何函数，测试用它建自己的窗口 | `windows-sys` 只有裸函数；准入的正是这套安全接口，UIA 那一组在缝里整段包住（D10） |
 | `winsafe` 0.0.29（只开 `user`、`ole`） | 输入与窗口事实的安全接口、COM 公寓的守卫（D9、D10），以及缝上的 `HWND`、`co::ERROR`、`co::HRESULT` | 没有 Cargo 依赖；它的 `EnumWindows` 与剪贴板写法不准入，理由在 D9 |
-| `uiautomation` 0.25.1（`default-features = false`，只开 `input`） | UIA 树的安全封装：automation 对象、walker、元素属性（D10） | 关掉默认特性，于是它的截图、剪贴板与控件匹配都不进来；`input` 只因它的 core 模块不开就编不过而开着，本 package 不调它；手写 COM 调用是被它换掉的那九个 `unsafe` 块 |
 | `image` 0.25（`default-features = false`，只开 `png`／`jpeg`／`webp`） | `desktop.screenshot` 点名的三种编码，以及缩放 | 关掉默认特性是因为本 package 只编码、从不解码，也不碰另外十种格式 |
 | `base64` 0.23 | image content 的 `data` 那一层编码，只在 `answer` 里编 | 与 workspace 的 `gateway::dialect::images` 同一条版本行（`workspace = true`） |
 
@@ -528,13 +535,13 @@ D9 输入与窗口事实经 `winsafe`；枚举、捕获、剪贴板、DPI 仍走
 - **击败的备选**：把这几组一起搬进 Zig 缝（有合格安全接口的调用不需要一道新的 FFI 缝）；留在 `windows` 绑定上继续手写 `unsafe`（口径 ①要的正是业务代码零 `unsafe`）。
 - **重开的参数**：`winsafe` 修好 `EnumWindows`，枚举这一行随之换过去；或者新版本改了这里准入的签名，那一行的契约测试先红。
 
-D10 树经 `uiautomation` 读、按文档序铸 ref、折成文字；COM 公寓每张桌子进一次。
+D10 树经 `desktop_ffi::uia` 读、按文档序铸 ref、折成文字；COM 公寓每张桌子进一次。
 
-- **决定**：`tree` 经 `uiautomation` 0.25.1 读树，默认 feature 关掉，只开 `input`（它的 core 模块不开 `input` 编不过），只用 `UIAutomation::new_direct`、`element_from_handle`、control view walker 与元素的三项属性（role、name、外框）。COM 公寓由 `Desk` 在第一次 snapshot 时进入一次，用多线程公寓（MTA），经 `winsafe::CoInitializeEx` 的守卫；automation 对象与 walker 同这个守卫一起住在桌子里，字段的析构次序保证先放 COM 对象、后退出公寓。元素仍只活在一次 snapshot 之内（§10 设计六）。walker 答「没有这个元素」（错误码 0）是这一层到头；答别的错误是 provider 出了故障，遍历在那里停下，而不是当作到头。
-- **理由**：微软对不开窗口的 UIA 工作线程推荐 MTA；进一次、配对退出，公寓的生存期就是连接的生存期。旧写法每次 snapshot 都以 STA 进入而从不退出，并且每次新建 automation 对象；`uiautomation::UIAutomation::new()` 同样每次进入而不退出，故不用它。把 provider 的故障读成「到头了」，模型拿到的是一棵看起来完整、其实缺了一块的树。
-- **剩余限制**（写明，不当作已解决）：`winsafe` 的 `CoUninitializeGuard` 在进入公寓答 `RPC_E_CHANGED_MODE` 时也会调 `CoUninitialize`；本 package 的读循环线程不进入任何别的公寓，这条路走不到。剪贴板走的是 Win32 剪贴板而不是 OLE 剪贴板，同一线程上的 MTA 与它无关。
-- **击败的备选**：保留经 `windows` 绑定手写的 COM 调用（九个 `unsafe` 块）；让 UIA 也回答窗口事实（UIA 根的子元素、`IsOffscreen` 与 `EnumWindows`、`WS_VISIBLE` 不是同一个定义，安全判断会跟着 provider 的实现走）。
-- **重开的参数**：需要 UIA patterns（按元素投递动作）时，那是另一项能力，另写一节；或 `uiautomation` 的新版本改了这里用到的签名，`a_windows_tree_names_the_control_inside_it` 先红。
+- **决定**：`tree` 经 `desktop_ffi::uia` 读树——缝在 `windows` 0.62 的 `IUIAutomation` 绑定上包的一层安全函数，只用 `CoCreateInstance`（`CUIAutomation`，缝内唯一新写的 `unsafe` 组）、`ControlViewWalker`、`ElementFromHandle`、walker 的两步与元素的三项当前属性（role、name、外框）。COM 公寓由 `Desk` 在第一次 snapshot 时进入一次，用多线程公寓（MTA），经 `winsafe::CoInitializeEx` 的守卫；automation 对象与 walker 同这个守卫一起住在桌子里，字段的析构次序保证先放 COM 对象、后退出公寓。元素仍只活在一次 snapshot 之内（§10 设计六）。walker 答「没有这个元素」是这一层到头：`windows` 绑定把「S_OK 且交出 null」读成错误码 0 的空错误，`desktop_ffi::uia` 把它映射成 `None`；答别的错误是 provider 出了故障，遍历在那里停下，而不是当作到头。
+- **理由**：chrono 全版本停止维护（RUSTSEC-2026-0543，2026-11-17 发布）经 `uiautomation` 0.25.1 的硬依赖进锁，而 crates.io 上没有第二个 Windows UIA 客户端绑定可换；`windows` 0.62 对这组接口的签名除 `CoCreateInstance` 外没有一个合格的准入安全接口，于是整组调用收进缝，本 package 依旧零 `unsafe`。微软对不开窗口的 UIA 工作线程推荐 MTA；进一次、配对退出，公寓的生存期就是连接的生存期。旧写法每次 snapshot 都以 STA 进入而从不退出，并且每次新建 automation 对象。把 provider 的故障读成「到头了」，模型拿到的是一棵看起来完整、其实缺了一块的树。
+- **剩余限制**（写明，不当作已解决）：`winsafe` 的 `CoUninitializeGuard` 在进入公寓答 `RPC_E_CHANGED_MODE` 时也会调 `CoUninitialize`；本 package 的读循环线程不进入任何别的公寓，这条路走不到。剪贴板走的是 Win32 剪贴板而不是 OLE 剪贴板，同一线程上的 MTA 与它无关。control type 编号不在 41 个 `UIA_*ControlTypeId` 常量内的元素不占一行也不铸 ref（旧封装对它答错误，效果相同），它们的子元素照读。
+- **击败的备选**：保留 `uiautomation` 并在 `deny.toml` 登记对 RUSTSEC-2026-0543 的 ignore（一个不再维护的依赖留在锁里，清除条件不在我们手里）；给上游提 PR 把那两行 `Local::now()` 换成 `Instant`（发版节奏不在我们手里）；只把 chrono 直依赖换成 `time`/`jiff`（不解决传递路径，还多养一个日历库）。三者都被「锁里不再有 chrono」这一个终态击败。
+- **重开的参数**：需要 UIA patterns（按元素投递动作）时，那是另一项能力，另写一节；或 `windows` 的新版本改了这里用到的签名，`a_windows_tree_names_the_control_inside_it` 先红。
 - **(b) 读给模型的是文字**：`desktop.snapshot` 的答复是 `outline` 折成的一段文字，不再是每个节点一个带 bounds 的 JSON 对象。形状照 `browser::snapshot` 的折法（名字不照抄）：一行一个元素，`e<n> <role> "<name>"`，按深度缩进两格；名字去控制字符、压空白、截到 80 个字符。role 取 control type 的编号，映到一张封闭词表，词就是 UIA 自己的类型名的小写；本地化字符串随机器的语言变，同一个按钮在两台机器上会是两个词。没有名字的 pane、group、custom、separator 不占一行也不铸 ref，它们的子元素照读。遍历按文档序：先父后子，兄弟按窗口列出的次序；旧写法用栈，同一层倒着铸 ref。遍历提前停下（ref 到 500 个，或 provider 出了故障）时，文字最后一行说出停在哪里、为什么。
 - **(b) 理由**：模型读一行一个元素的文字比读嵌套 JSON 快，bounds 对模型没有用处，`desktop.act` 按 ref 从 `Views` 取；一个可读的词表比一串编号或一个随语言变的字符串更好对照。
 - **(b) 击败的备选**：继续回每个节点的 JSON（答复是现在的四五倍长，bounds 占去一半）；另造一套平台无关的 role 词（在只有一个平台的今天，它只是一层没有第二个读者的翻译）。
