@@ -38,11 +38,12 @@ LLM compaction、验真门、运行时 AGENTS/Skills 注入、为弱模型准备
 - `spec/Agent.lean` 与 `agent::run` 闭包测试：整波预检、顺序执行、thinking 保真、
   pause、max_tokens、异常 stop、执行失败不伪造 tool_result。
 - TCP 工装：HTTP/1.0、EOF、非 200 原文、chunked 拒绝、停滞返回 `E_MEI_TRANSPORT`。
-- 真实 Python3：变量跨调用保留；每次 `run` 的 tool_result 是完整的小型 UTF-8 捕获；
+- 真实 Python3：变量、imports 与 cwd 跨调用保留；异常打印 traceback 后不结束会话，
+  下一调用可继续使用既有状态；表达式不自动回显；每次 `run` 的 tool_result 是完整的小型 UTF-8 捕获；
   文件字节等于该次捕获的 stdout+stderr；空输出返回空字符串；
   超过 16 KiB 或非 UTF-8 时只返回一条提示与完整文件路径，不内联头尾片段；
-  下一次 Python3 调用可按路径读取、筛选或切片后打印；非法帧与解释器死亡为核错误；
-  Windows 与 Unix 均可 spawn。
+  下一次 Python3 调用可按路径读取、筛选或切片后打印；`sys.executable` 可启动并捕获子 Python；
+  非法帧与解释器死亡为核错误；Windows 与 Unix 均可 spawn。
 - stderr：消息 JSONL；可选 `{"type":"mei.obs",...}` 观测行（pulse / usage）；
   失败诊断为 Description/Cause/Resolution 的 toml 块。
 - stdout：最终 text，不加换行。
@@ -73,7 +74,8 @@ V1/V2 实测以 magpie + 已测模型为准，不外推。
 - User ruling：极简核；小输出直接观察，大输出只给提示与路径；Calyx 为生产终端壳；无运行时注入；
   诊断 Description/Cause/Resolution；Mei 不含壳（核进程不内嵌 TUI）；一次完成——
   npm 以机制装配交互面。
-- Anthropic Messages / client tools；magpie reference（`docs/third-party.md` §1）。
+- Anthropic Messages / client tools；[strict tool use](https://platform.claude.com/docs/zh-CN/agents-and-tools/tool-use/strict-tool-use)；
+  magpie reference（`docs/third-party.md` §1）。
 - Rust `std::process::Child`：须显式收口。
 - `Calyx/Spec.lean`：终端与斜杠；本文件不复制。
 -/
@@ -128,7 +130,9 @@ stderr 观测行（穷尽；非 Messages role）：
 构造，对外版式固定为三段。`Body` 仅非 200 原文。
 
 启动请求：`model`、`max_tokens`（默认见 §14）、`system`、`tools = [Python3]`、messages。
-工具描述与持久状态、主动打印和 16 KiB 内联预算一致；不写 REPL。
+工具描述与持久变量/imports/cwd、异常后恢复、主动打印、16 KiB 内联预算、完整捕获路径、
+subprocess 和 `sys.executable` 一致；内联数字由 `INLINE_BYTES` 生成；不写 REPL 或核内超时。
+唯一工具 schema 与 agent 整波预检跨 provider 生效，不声明 provider 专有的 `strict` 模式。
 `HARNESS_EXTRA` 浅合并一次；拒绝 `stream: true` 与 `HARNESS_EXTRA.tools`。
 无 `MEI_TOOLS`。`HARNESS_MODEL` 必填。
 
@@ -161,7 +165,8 @@ tool_use → 预检 → exec 得捕获或小结果提示 → user tool_result co
 
 - 传输：HTTP/1.0、Connection: close、读至 EOF；CONNECT 10s、IO 600s；
   阻塞读期间可按固定间隔写 `mei.obs` pulse，不改 messages。
-- `boot.py`：每帧一行 JSON string；stdout/stderr 重定向到临时文件；
+- `boot.py`：每帧一行 JSON string；stdout/stderr 重定向到临时文件；同一执行命名空间保留
+  变量与 imports，解释器进程保留 cwd；异常只形成 traceback 反馈，循环继续；
   结束后把**该文件路径**经控制信道回传；不改写文件、无 alarm。
 - `Py::run` 先读文件元数据；仅不超过 16 KiB 时做有界读取。完整 UTF-8 文本直接作为
   tool_result；更大或非 UTF-8 时只给提示与路径，完整文件保留供下一次调用筛选。
@@ -192,6 +197,7 @@ chunked、停滞、空工具波、未知客户端工具、重复 id、max_tokens
 `max_tokens` 默认 `65536`（可被 `HARNESS_EXTRA` 覆盖）、连接 10s、IO 600s、
 收口宽限 5s、poll 20ms、输出内联上限 16 KiB、默认网关与 key、
 `anthropic-version: 2023-06-01`、pulse 间隔 5s、各一处权威。`MEI.md` 构建时注入。
+`INLINE_BYTES` 同时驱动内联判定、超限提示和工具描述的数字，没有第二份阈值或换算目标。
 16 KiB 覆盖本仓绝大多数源码/文档，避免普通文件多读一轮；无头尾采样、无 250s alarm。
 -/
 
@@ -237,3 +243,9 @@ live V1/V2 以 §2 为准。
 理由：Mei 不含壳；Calyx 同时服务城控制台，权威在 sprawling 依赖而非 Mei 安装面。 -/
 /-! D12 人可见诊断版式为 Description / Cause / Resolution。 -/
 /-! D13 无核内超时；超时外置。 -/
+/-! D14 不声明 provider 专有 `strict`；唯一 schema 与 agent 整波预检是跨 provider 合同。
+理由：Anthropic 的 strict 模式可约束 Claude 的工具输入，但默认 magpie 0.1.4347 的
+`internal/gateway/anthropic.go` 既不读入工具级 strict，也不在上游构造中转发；启用会在默认路径静默失效。
+当前 schema 只有一个必需 string，agent 已拒绝未知工具、缺失或错型 code、重复 id 与空调用波。
+被否：为 Claude 增加配置或第二套规格，以及宣称默认路径已获得语法约束。重开参数：默认网关端到端保留
+该字段，且目标模型实测证明它能阻止本会终止运行的 malformed tool call。 -/

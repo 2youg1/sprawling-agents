@@ -266,7 +266,7 @@ fn initial_request(task: Task, extra: Option<&str>) -> Result<Value> {
 fn python_tool() -> Value {
     json!({
         "name": agent::TOOL_NAME,
-        "description": "A persistent Python3 interpreter. Variables survive across calls; expressions do not auto-echo, so print what you need. Small UTF-8 stdout+stderr is returned whole. Larger or non-UTF-8 output returns only a notice and full file path; use the next Python3 call to filter and print the needed result. Use subprocess with captured output and checked return codes for shell commands.",
+        "description": python::tool_description(),
         "input_schema": {
             "type": "object",
             "properties": {"code": {"type": "string"}},
@@ -297,6 +297,11 @@ mod tests {
         assert_eq!(request["messages"][0]["content"], "new prompt");
         assert_eq!(request["tools"].as_array().unwrap().len(), 1);
         assert_eq!(request["tools"][0]["name"], "Python3");
+        assert_eq!(
+            request["tools"][0]["description"],
+            python::tool_description()
+        );
+        assert!(request["tools"][0].get("strict").is_none());
     }
 
     #[test]
@@ -321,6 +326,24 @@ mod tests {
                 {"role": "user", "content": "new"}
             ])
         );
+    }
+
+    #[test]
+    fn readmes_match_the_static_request_contract() {
+        let tool = python_tool();
+        let pretty = serde_json::to_string_pretty(&tool).unwrap();
+        let tool_bytes = serde_json::to_vec(&tool).unwrap().len();
+        let total = SYSTEM.len().checked_add(tool_bytes).unwrap();
+        for readme in [
+            include_str!("../README.md"),
+            include_str!("../README.zh-CN.md"),
+        ] {
+            assert!(readme.contains(SYSTEM));
+            assert!(readme.contains(&pretty));
+            for bytes in [SYSTEM.len(), tool_bytes, total] {
+                assert!(readme.contains(&format!("| {bytes} |")));
+            }
+        }
     }
 
     #[test]

@@ -70,6 +70,8 @@ bunx @sprawling/mei
 
 Banner shows cwd; composer shows `HARNESS_MODEL · usage` (or `unknown` until a response carries usage). A live run shows Mei working; pulse lines are silent.
 
+The Calyx face reports Program Status Protocol (OSC 7501) states: `working`, `done`, `error`, or `idle` after cancellation. A terminal or agent dashboard that understands the protocol can therefore observe a Mei child spawned by another agent without reading its conversation; reports carry counts, not prompt text. Mei sends no support probe, unsupported terminals ignore the sequence, and Calyx clears it before handing back the terminal. Set `SPRAWLING_PROGRAM_STATUS=never` to disable reporting. Headless `-p` and piped runs do not emit OSC 7501.
+
 First prompt:
 
 ```text
@@ -112,6 +114,52 @@ Resume preserves legacy tool names and string/array content, including image, au
 | `ANTHROPIC_API_KEY` | Default `magpie` |
 | `HARNESS_EXTRA` | One JSON object at startup; refuses `stream` / `tools` |
 | `MEI_BIN` | Path Calyx uses to spawn this core; npm shim sets it to the sibling core |
+| `SPRAWLING_PROGRAM_STATUS` | `never` disables OSC 7501 in the Calyx interactive face |
+
+## System prompt and static overhead
+
+`Mei/src/MEI.md` is compiled into `system`; the sole Python3 definition occupies `tools[0]`. With zero bytes of user input, these two values are the fixed content beyond that input. The table excludes message envelopes and anything a provider adds itself.
+
+| Part | UTF-8 bytes | Estimated tokens |
+|---|---:|---:|
+| `system` | 257 | 63 |
+| Complete compact `tools[0]` JSON | 1131 | 246 |
+| Total | 1388 | 309 |
+
+Token estimates use `@google/genai` **2.21.0** `LocalTokenizer` with `gemini-2.0-flash-001` (gemma3), counting the two values separately and adding the results. They describe this tokenizer only, not a provider's usage or billing. The JSON below is pretty-printed for reading; the byte count uses its compact wire form.
+
+### `system`
+
+```text
+<agent-harness>
+You are operating inside Mei.
+No files are injected or pre-loaded; fetch what you need.
+Workflow: Sense → Act → Verify → Adapt…
+Aligned with context, fulfill user intent thoroughly and resourcefully and stay scoped.
+</agent-harness>
+```
+
+### `tools[0]`
+
+```json
+{
+  "description": "<python3>\nA persistent Python3 interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the path to a file containing the full output; filter that file, or re-run with narrower output, in the next Python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start Python with sys.executable rather than bare python3, so child processes inherit the active environment. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, Python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python3>",
+  "input_schema": {
+    "properties": {
+      "code": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "code"
+    ],
+    "type": "object"
+  },
+  "name": "Python3"
+}
+```
+
+Mei keeps one provider-neutral schema and validates every tool wave in the agent loop; it does not declare provider-specific `strict` modes.
 
 ## Boundaries
 
