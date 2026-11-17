@@ -18,7 +18,6 @@ mod system;
 
 const SHIM: &str = include_str!("channel/shim.js");
 const RUNTIME_ENTRY: &str = "sprawling-runtime";
-const MEI_RUNTIME_ENTRY: &str = "mei-runtime";
 const LAUNCHER: &str = include_str!("channel/launcher.cmd");
 
 struct ArchiveBinary {
@@ -238,7 +237,7 @@ fn write_mei_channel(
         .collect::<Vec<_>>()
         .join(",\n");
     let extra = format!(
-        "  \"bin\": {{ \"mei\": \"bin/mei.js\", \"{MEI_RUNTIME_ENTRY}\": \"bin/mei.cmd\" }},\n  \
+        "  \"bin\": {{ \"mei\": \"bin/mei.js\" }},\n  \
          \"files\": [\"bin\"],\n  \"optionalDependencies\": {{\n{optional}\n  }}\n"
     );
     let dir = out.join(MEI_ROOT_PACKAGE);
@@ -248,11 +247,7 @@ fn write_mei_channel(
     )?;
     write(
         &dir.join("bin/mei.js"),
-        format!("#!/usr/bin/env {MEI_RUNTIME_ENTRY}\n{SHIM}").as_bytes(),
-    )?;
-    write(
-        &dir.join("bin/mei.cmd"),
-        LAUNCHER.replace("sprawling:", "mei:").as_bytes(),
+        format!("#!/usr/bin/env bun\n{SHIM}").as_bytes(),
     )?;
     Ok(carried
         .into_iter()
