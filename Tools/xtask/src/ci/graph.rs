@@ -18,6 +18,7 @@ pub(crate) enum Reuse {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Operation {
     Gate(&'static str),
+    ScopedGate(&'static str),
     Just(&'static str),
     Process {
         program: &'static str,

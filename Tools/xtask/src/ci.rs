@@ -6,15 +6,17 @@
 //! Content-addressed verification: the graph owns identity and selection;
 //! storage and process execution live behind adapters (xtask D47).
 
+mod baseline;
 mod content;
 mod execute;
 mod graph;
 mod store;
 mod suite;
+mod view;
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 
 use serde::Serialize;
 
@@ -44,6 +46,7 @@ enum CommandKind {
 struct Options {
     command: CommandKind,
     base: Option<String>,
+    scope_base: Option<String>,
     store: Option<PathBuf>,
 }
 
@@ -56,15 +59,28 @@ fn parse(args: &[String]) -> Result<Options, XtaskError> {
         }
     };
     let mut base = None;
+    let mut scope_base = None;
+    let mut full = false;
     let mut store = None;
     let mut it = args.iter().skip(1);
     while let Some(arg) = it.next() {
         match arg.as_str() {
-            "--full" if base.is_none() => {}
-            "--base" if base.is_none() => {
+            "--full" if !full && base.is_none() => {
+                full = true;
+            }
+            "--base" if !full && base.is_none() && scope_base.is_none() => {
                 base = Some(
                     it.next()
                         .ok_or_else(|| usage("--base needs a revision", "missing-base"))?
+                        .clone(),
+                );
+            }
+            "--scope-base" if base.is_none() && scope_base.is_none() => {
+                scope_base = Some(
+                    it.next()
+                        .ok_or_else(|| {
+                            usage("--scope-base needs a revision", "missing-scope-base")
+                        })?
                         .clone(),
                 );
             }
@@ -84,13 +100,16 @@ fn parse(args: &[String]) -> Result<Options, XtaskError> {
     Ok(Options {
         command,
         base,
+        scope_base,
         store,
     })
 }
 
 fn usage(detail: &str, code: &'static str) -> XtaskError {
     XtaskError::Doc {
-        file: format!("cargo xtask ci <plan|run> [--full | --base <rev>] [--store <dir>] ({code})"),
+        file: format!(
+            "cargo xtask ci <plan|run> [--full | --base <rev>] [--scope-base <rev>] [--store <dir>] ({code})"
+        ),
         msg: detail.to_owned(),
     }
 }
@@ -103,62 +122,106 @@ struct PlanRow {
     needs: &'static [&'static str],
     reuse: &'static str,
     selected: bool,
+    files: Option<Vec<String>>,
 }
 
 fn plan(root: &Path, options: &Options) -> Result<ExitCode, XtaskError> {
     let environment = Environment::current();
-    let prepared = suite::prepare(root, &environment)?;
-    let selected = selected(root, options, &prepared)?;
-    let rows: Vec<PlanRow> = prepared
-        .iter()
-        .map(|prepared| PlanRow {
-            id: prepared.action.id,
-            key: store::remote_key(prepared.action.id, &prepared.key, &environment),
-            operation: operation_name(prepared.action.operation).to_owned(),
-            needs: prepared.action.needs,
-            reuse: match prepared.action.reuse {
-                Reuse::SuccessOnly => "success-only",
-                Reuse::Never => "never",
-            },
-            selected: selected.contains(prepared.action.id),
-        })
-        .collect();
-    let text = serde_json::to_string_pretty(&rows).map_err(|err| XtaskError::Doc {
-        file: "ci plan (plan-serialize)".to_owned(),
-        msg: err.to_string(),
-    })?;
-    println!("{text}");
-    Ok(ExitCode::SUCCESS)
+    let head = baseline::head(root)?;
+    let snapshot = view::Snapshot::capture(root)?;
+    let result = (|| {
+        let changed = comparison(root, options, &snapshot)?;
+        let files = changed
+            .as_ref()
+            .map(|paths| crate::source::Scope::new(&paths.iter().cloned().collect::<Vec<_>>()))
+            .transpose()?;
+        let prepared = suite::prepare(&snapshot, &environment, &head, files.as_ref())?;
+        let selected = selected(options, changed.as_ref(), &prepared)?;
+        let rows: Vec<PlanRow> = prepared
+            .iter()
+            .map(|prepared| PlanRow {
+                id: prepared.action.id,
+                key: store::remote_key(prepared.action.id, &prepared.key, &environment),
+                operation: operation_name(prepared.action.operation).to_owned(),
+                needs: prepared.action.needs,
+                reuse: match environment.reuse(prepared.action.reuse) {
+                    Reuse::SuccessOnly => "success-only",
+                    Reuse::Never => "never",
+                },
+                selected: selected.contains(prepared.action.id),
+                files: prepared
+                    .files
+                    .as_ref()
+                    .map(|scope| scope.paths().iter().cloned().collect()),
+            })
+            .collect();
+        let text = serde_json::to_string_pretty(&rows).map_err(|err| XtaskError::Doc {
+            file: "ci plan (plan-serialize)".to_owned(),
+            msg: err.to_string(),
+        })?;
+        println!("{text}");
+        Ok(ExitCode::SUCCESS)
+    })();
+    snapshot.finish(result)
 }
 
 fn execute(root: &Path, options: &Options) -> Result<ExitCode, XtaskError> {
+    let store = Store::for_root(root, options.store.clone())?;
     let environment = Environment::current();
-    let prepared = suite::prepare(root, &environment)?;
-    let selected = selected(root, options, &prepared)?;
-    let store = Store::for_root(root, options.store.clone());
-    Ok(execute::run(
-        &execute::Execution {
-            root,
-            store: &store,
-            environment: &environment,
-        },
-        &prepared,
-        &selected,
-    ))
+    let head = baseline::head(root)?;
+    let snapshot = view::Snapshot::capture(root)?;
+    let result = (|| {
+        let changed = comparison(root, options, &snapshot)?;
+        let files = changed
+            .as_ref()
+            .map(|paths| crate::source::Scope::new(&paths.iter().cloned().collect::<Vec<_>>()))
+            .transpose()?;
+        let prepared = suite::prepare(&snapshot, &environment, &head, files.as_ref())?;
+        let selected = selected(options, changed.as_ref(), &prepared)?;
+        Ok(execute::run(
+            &execute::Execution {
+                view: &snapshot,
+                work: root,
+                store: &store,
+                environment: &environment,
+            },
+            &prepared,
+            &selected,
+        ))
+    })();
+    snapshot.finish(result)
+}
+
+fn comparison(
+    root: &Path,
+    options: &Options,
+    snapshot: &view::Snapshot,
+) -> Result<Option<BTreeSet<String>>, XtaskError> {
+    options
+        .base
+        .as_ref()
+        .or(options.scope_base.as_ref())
+        .map(|base| baseline::changed(root, base, snapshot))
+        .transpose()
 }
 
 fn selected(
-    root: &Path,
     options: &Options,
+    changed: Option<&BTreeSet<String>>,
     prepared: &[suite::PreparedAction],
 ) -> Result<BTreeSet<String>, XtaskError> {
-    if let Some(base) = &options.base {
-        let changed = changed(root, base)?;
+    if options.base.is_some() {
+        let changed = changed.ok_or_else(|| {
+            usage(
+                "an affected graph requires its captured comparison",
+                "missing-base-comparison",
+            )
+        })?;
         let actions: Vec<graph::Action> = prepared.iter().map(|row| *row.action).collect();
         Ok(graph::affected_with_base(
             &actions,
             suite::BASE_INPUTS,
-            &changed,
+            changed,
         ))
     } else {
         let actions: Vec<graph::Action> = prepared.iter().map(|row| *row.action).collect();
@@ -169,6 +232,7 @@ fn selected(
 fn operation_name(operation: graph::Operation) -> String {
     match operation {
         graph::Operation::Gate(name) => format!("gate:{name}"),
+        graph::Operation::ScopedGate(name) => format!("scoped-gate:{name}"),
         graph::Operation::Just(recipe) => format!("just:{recipe}"),
         graph::Operation::Process { program, args } => {
             format!("process:{program} {}", args.join(" "))
@@ -176,36 +240,6 @@ fn operation_name(operation: graph::Operation) -> String {
     }
 }
 
-fn changed(root: &Path, base: &str) -> Result<BTreeSet<String>, XtaskError> {
-    let tracked = git(root, &["diff", "--name-only", "--no-renames", base, "--"])?;
-    let untracked = git(root, &["ls-files", "--others", "--exclude-standard"])?;
-    Ok(tracked
-        .into_iter()
-        .chain(untracked)
-        .filter(|path| !crate::walk::in_isolation_zone(path))
-        .collect())
-}
-
-#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
-fn git(root: &Path, args: &[&str]) -> Result<Vec<String>, XtaskError> {
-    let output = Command::new("git")
-        .current_dir(root)
-        .args(args)
-        .output()
-        .map_err(|source| XtaskError::Io {
-            path: format!("git {}", args.join(" ")),
-            source,
-        })?;
-    if !output.status.success() {
-        return Err(XtaskError::Cmd {
-            cmd: format!("git {}", args.join(" ")),
-            msg: String::from_utf8_lossy(&output.stderr).into_owned(),
-        });
-    }
-    String::from_utf8(output.stdout)
-        .map(|text| text.lines().map(str::to_owned).collect())
-        .map_err(|err| XtaskError::Doc {
-            file: format!("git {}", args.join(" ")),
-            msg: format!("paths are not UTF-8: {err} (non-utf8-path)"),
-        })
-}
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests;

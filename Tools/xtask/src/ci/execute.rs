@@ -17,10 +17,12 @@ use super::content::Environment;
 use super::graph::{Operation, Reuse};
 use super::store::{Store, Verdict};
 use super::suite::PreparedAction;
+use super::view::Snapshot;
 
 /// The execution environment shared by every action in one run.
 pub(crate) struct Execution<'a> {
-    pub(crate) root: &'a Path,
+    pub(crate) view: &'a Snapshot,
+    pub(crate) work: &'a Path,
     pub(crate) store: &'a Store,
     pub(crate) environment: &'a Environment,
 }
@@ -142,12 +144,12 @@ fn schedule(
     reason = "developer-tool action timing; never a verification decision"
 )]
 fn execute_one(execution: &Execution, prepared: &PreparedAction) -> Outcome {
-    let root = execution.root;
     let store = execution.store;
     let environment = execution.environment;
     let action = prepared.action;
+    let policy = environment.reuse(action.reuse);
     let started = std::time::Instant::now();
-    let cached = match store.restore(action.id, &prepared.key, environment, action.reuse) {
+    let cached = match store.restore(action.id, &prepared.key, environment, policy) {
         Ok(cached) => cached,
         Err(err) => {
             eprintln!(
@@ -161,10 +163,15 @@ fn execute_one(execution: &Execution, prepared: &PreparedAction) -> Outcome {
         println!("hit {} ({:?})", action.id, started.elapsed());
         return Outcome::Green;
     }
-    let log = root
-        .join("target/ci/logs")
-        .join(format!("{}-{}.log", action.id, std::process::id()));
-    let outcome = match process(root, action.operation, &log) {
+    let logs = match super::store::output_path(execution.work, Path::new("target/ci/logs")) {
+        Ok(path) => path,
+        Err(error) => {
+            eprintln!("{} log output refused: {error}", action.id);
+            return Outcome::Broken;
+        }
+    };
+    let log = logs.join(format!("{}-{}.log", action.id, std::process::id()));
+    let outcome = match isolated_process(execution.view, prepared, &log) {
         Ok(outcome) => outcome,
         Err(err) => {
             eprintln!("{} could not execute: {err}", action.id);
@@ -172,12 +179,17 @@ fn execute_one(execution: &Execution, prepared: &PreparedAction) -> Outcome {
         }
     };
     if outcome == Outcome::Green
-        && action.reuse == Reuse::SuccessOnly
+        && policy == Reuse::SuccessOnly
         && let Err(err) = store.save_green(action.id, &prepared.key, environment)
     {
         eprintln!("cache save unavailable for {}: {err}", action.id);
     }
-    if outcome != Outcome::Green {
+    if outcome != Outcome::Green
+        && !matches!(
+            action.operation,
+            Operation::Gate(_) | Operation::ScopedGate(_)
+        )
+    {
         match std::fs::read_to_string(&log) {
             Ok(text) => eprintln!("--- {} ---\n{text}", action.id),
             Err(err) => eprintln!("read the failed action log {}: {err}", log.display()),
@@ -187,8 +199,36 @@ fn execute_one(execution: &Execution, prepared: &PreparedAction) -> Outcome {
     outcome
 }
 
+/// Only the explicitly audited pure gates read the identity-bearing view.
+/// Every other action gets an independent ordinary-file copy, so even a tool
+/// that rewrites its inputs cannot change another action's named bytes.
+fn isolated_process(
+    view: &Snapshot,
+    prepared: &PreparedAction,
+    log: &Path,
+) -> Result<Outcome, XtaskError> {
+    let action = prepared.action;
+    if action.reuse == Reuse::SuccessOnly {
+        return process(view.root(), prepared, log);
+    }
+    let workspace = Snapshot::capture(view.root())?;
+    let result = process(workspace.root(), prepared, log);
+    workspace.finish(result)
+}
+
 #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
-fn process(root: &Path, operation: Operation, log: &Path) -> Result<Outcome, XtaskError> {
+fn process(root: &Path, prepared: &PreparedAction, log: &Path) -> Result<Outcome, XtaskError> {
+    let operation = prepared.action.operation;
+    if let Operation::Gate(name) | Operation::ScopedGate(name) = operation {
+        let code = crate::gates::run(root, &[name.to_owned()], None);
+        return Ok(if code == ExitCode::SUCCESS {
+            Outcome::Green
+        } else if code == ExitCode::FAILURE {
+            Outcome::Refused
+        } else {
+            Outcome::Broken
+        });
+    }
     if let Some(parent) = log.parent() {
         std::fs::create_dir_all(parent).map_err(|source| XtaskError::Io {
             path: parent.display().to_string(),
@@ -204,17 +244,19 @@ fn process(root: &Path, operation: Operation, log: &Path) -> Result<Outcome, Xta
         source,
     })?;
     let mut command = match operation {
-        Operation::Gate(name) => {
-            let executable = std::env::current_exe().map_err(|source| XtaskError::Io {
-                path: "current xtask executable".to_owned(),
-                source,
-            })?;
-            let mut command = Command::new(executable);
-            command.args(["gates", name]);
-            command
+        Operation::Gate(_) | Operation::ScopedGate(_) => {
+            return Err(XtaskError::Doc {
+                file: "verification dispatch (gate-dispatch)".to_owned(),
+                msg: "source gates must use the in-process roster over the owned view".to_owned(),
+            });
         }
         Operation::Just(recipe) => {
             let mut command = Command::new("just");
+            #[cfg(windows)]
+            command
+                .arg("--shell")
+                .arg(executable("bash")?)
+                .arg("--shell-arg=-uc");
             command.arg(recipe);
             command
         }
@@ -227,6 +269,8 @@ fn process(root: &Path, operation: Operation, log: &Path) -> Result<Outcome, Xta
     let status = command
         .current_dir(root)
         .env("PYTHONUTF8", "1")
+        .env("PYTHONDONTWRITEBYTECODE", "1")
+        .envs(&prepared.variables)
         .stdout(Stdio::from(output))
         .stderr(Stdio::from(errors))
         .status()
@@ -246,17 +290,49 @@ fn process(root: &Path, operation: Operation, log: &Path) -> Result<Outcome, Xta
 /// development and Actions images.
 fn executable(program: &str) -> Result<PathBuf, XtaskError> {
     #[cfg(windows)]
-    if program == "bash" {
-        let path = PathBuf::from("C:/Program Files/Git/bin/bash.exe");
-        if path.is_file() {
-            return Ok(path);
-        }
-        return Err(XtaskError::Cmd {
-            cmd: "locate Git Bash for a repository script".to_owned(),
-            msg: "C:/Program Files/Git/bin/bash.exe is absent (git-bash-missing); install Git for Windows or make the workflow use its explicit shell path".to_owned(),
-        });
+    if ["bash", "sh"].contains(&program) {
+        return git_shell(program);
     }
     Ok(PathBuf::from(program))
+}
+
+#[cfg(windows)]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "developer tool Git shell discovery (child D4)"
+)]
+fn git_shell(program: &str) -> Result<PathBuf, XtaskError> {
+    let output = Command::new("git")
+        .arg("--exec-path")
+        .output()
+        .map_err(|source| XtaskError::Io {
+            path: "git --exec-path (git-bash-missing)".to_owned(),
+            source,
+        })?;
+    if !output.status.success() {
+        return Err(XtaskError::Cmd {
+            cmd: "git --exec-path (git-bash-missing)".to_owned(),
+            msg: "put Git for Windows on PATH and rerun verification".to_owned(),
+        });
+    }
+    let path = String::from_utf8(output.stdout).map_err(|error| XtaskError::Doc {
+        file: "Git exec-path (git-bash-path)".to_owned(),
+        msg: format!(
+            "{error}; install Git for Windows at a UTF-8 path and put its cmd directory on PATH"
+        ),
+    })?;
+    for ancestor in Path::new(path.trim()).ancestors() {
+        for directory in ["bin", "usr/bin"] {
+            let candidate = ancestor.join(directory).join(format!("{program}.exe"));
+            if candidate.is_file() {
+                return Ok(candidate);
+            }
+        }
+    }
+    Err(XtaskError::Cmd {
+        cmd: format!("locate Git for Windows {program} (git-bash-missing)"),
+        msg: "install Git for Windows with its Unix tools, put its cmd directory on PATH and rerun verification".to_owned(),
+    })
 }
 
 fn report(outcomes: &BTreeMap<String, Outcome>) -> ExitCode {
@@ -289,70 +365,12 @@ fn report(outcomes: &BTreeMap<String, Outcome>) -> ExitCode {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, reason = "test code")]
-mod tests {
-    use std::sync::Mutex;
+mod tests;
 
-    use super::*;
-    use crate::ci::content::Key;
-    use crate::ci::graph::Action;
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod wire_tests;
 
-    fn prepared(id: &'static str, needs: &'static [&'static str]) -> PreparedAction {
-        PreparedAction {
-            action: Box::leak(Box::new(Action {
-                id,
-                operation: Operation::Just(id),
-                inputs: &[],
-                needs,
-                reuse: Reuse::Never,
-                required: true,
-            })),
-            key: Key::named(id.to_owned()),
-        }
-    }
-
-    #[test]
-    fn a_failure_blocks_dependents_but_not_independent_work() {
-        let graph = vec![
-            prepared("base", &[]),
-            prepared("dependent", &["base"]),
-            prepared("independent", &[]),
-        ];
-        let ran = Mutex::new(Vec::new());
-        let outcomes = schedule(
-            &graph,
-            &BTreeSet::from([
-                "base".to_owned(),
-                "dependent".to_owned(),
-                "independent".to_owned(),
-            ]),
-            |action| {
-                ran.lock().unwrap().push(action.action.id);
-                if action.action.id == "base" {
-                    Outcome::Refused
-                } else {
-                    Outcome::Green
-                }
-            },
-        );
-        assert_eq!(outcomes.get("base"), Some(&Outcome::Refused));
-        assert_eq!(outcomes.get("dependent"), Some(&Outcome::Blocked));
-        assert_eq!(outcomes.get("independent"), Some(&Outcome::Green));
-        assert!(!ran.lock().unwrap().contains(&"dependent"));
-        assert!(ran.lock().unwrap().contains(&"independent"));
-    }
-
-    #[test]
-    fn an_empty_affected_scope_is_green_without_work() {
-        let outcomes = schedule(&[], &BTreeSet::new(), |_| Outcome::Broken);
-        assert_eq!(report(&outcomes), ExitCode::SUCCESS);
-    }
-
-    #[test]
-    fn workflow_bash_never_resolves_to_the_wsl_name_on_windows() {
-        let resolved = executable("bash").unwrap();
-        #[cfg(windows)]
-        assert_eq!(resolved, PathBuf::from("C:/Program Files/Git/bin/bash.exe"));
-        #[cfg(not(windows))]
-        assert_eq!(resolved, PathBuf::from("bash"));
-    }
-}
+#[cfg(all(test, unix))]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod output_tests;

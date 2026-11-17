@@ -56,17 +56,20 @@ impl Store {
         Self::Local(path)
     }
 
-    pub(crate) fn for_root(root: &Path, local_override: Option<PathBuf>) -> Self {
+    pub(crate) fn for_root(
+        root: &Path,
+        local_override: Option<PathBuf>,
+    ) -> Result<Self, XtaskError> {
         if let Some(path) = local_override {
-            return Self::Local(path);
+            return output_path(root, &path).map(Self::Local);
         }
-        match std::env::var_os("SPRAWLING_CI_CACHE_ADAPTER") {
+        Ok(match std::env::var_os("SPRAWLING_CI_CACHE_ADAPTER") {
             Some(adapter) if !adapter.is_empty() => Self::Remote(RemoteStore {
-                adapter: PathBuf::from(adapter),
-                work: root.join("target/ci/remote"),
+                adapter: root.join(adapter),
+                work: output_path(root, Path::new("target/ci/remote"))?,
             }),
-            _ => Self::Local(root.join("target/ci/verdicts")),
-        }
+            _ => Self::Local(output_path(root, Path::new("target/ci/verdicts"))?),
+        })
     }
 
     pub(crate) fn restore(
@@ -76,7 +79,7 @@ impl Store {
         environment: &Environment,
         policy: Reuse,
     ) -> Result<Option<Cached>, XtaskError> {
-        if policy == Reuse::Never {
+        if environment.reuse(policy) == Reuse::Never {
             return Ok(None);
         }
         let cached = match self {
@@ -94,6 +97,14 @@ impl Store {
         key: &Key,
         environment: &Environment,
     ) -> Result<(), XtaskError> {
+        if environment.verifier.is_none() {
+            return Err(XtaskError::Doc {
+                file: "verification cache (verifier-unavailable)".to_owned(),
+                msg:
+                    "execute the check; this platform cannot identify the loaded verifier for reuse"
+                        .to_owned(),
+            });
+        }
         let cached = Cached {
             key: key.as_str().to_owned(),
             verdict: Verdict::Green,
@@ -122,7 +133,68 @@ fn read_local(path: &Path) -> Result<Option<Cached>, XtaskError> {
             });
         }
     };
-    Ok(serde_json::from_slice(&bytes).ok())
+    match serde_json::from_slice(&bytes) {
+        Ok(cached) => Ok(Some(cached)),
+        Err(error) => {
+            eprintln!(
+                "```toml\ncode = \"verdict-corrupt\"\naction = \"restore cached verification\"\npath = {:?}\nvalue = {:?}\nrule = \"a complete JSON verdict with an exact green content key\"\nrepair = \"rerun verification; a successful execution replaces this entry\"\n```",
+                path.display().to_string(),
+                error.to_string()
+            );
+            Ok(None)
+        }
+    }
+}
+
+/// Resolve the existing prefix before checking the scan boundary, so a
+/// directory alias outside the checkout cannot write back into source.
+pub(super) fn output_path(root: &Path, requested: &Path) -> Result<PathBuf, XtaskError> {
+    let path = root.join(requested);
+    if path
+        .components()
+        .any(|part| part == std::path::Component::ParentDir)
+    {
+        return Err(store_in_source(&path));
+    }
+    let mut prefix = path.as_path();
+    let mut tail = Vec::new();
+    while !prefix.try_exists().map_err(|source| XtaskError::Io {
+        path: prefix.display().to_string(),
+        source,
+    })? {
+        let name = prefix.file_name().ok_or_else(|| store_in_source(&path))?;
+        tail.push(name);
+        prefix = prefix.parent().ok_or_else(|| store_in_source(&path))?;
+    }
+    let mut resolved = prefix.canonicalize().map_err(|source| XtaskError::Io {
+        path: prefix.display().to_string(),
+        source,
+    })?;
+    for name in tail.into_iter().rev() {
+        resolved.push(name);
+    }
+    let root = root.canonicalize().map_err(|source| XtaskError::Io {
+        path: root.display().to_string(),
+        source,
+    })?;
+    if let Ok(relative) = resolved.strip_prefix(&root) {
+        let relative = relative
+            .to_str()
+            .ok_or_else(|| store_in_source(&resolved))?;
+        #[cfg(windows)]
+        let relative = relative.replace('\\', "/");
+        if !crate::walk::excluded_source_path(&format!("{relative}/verdict.json")) {
+            return Err(store_in_source(&resolved));
+        }
+    }
+    Ok(resolved)
+}
+
+fn store_in_source(path: &Path) -> XtaskError {
+    XtaskError::Doc {
+        file: format!("{} (store-in-source)", path.display()),
+        msg: "keep target as an ordinary build directory or a link outside source; choose --store target/ci/verdicts or an absolute external directory without parent components".to_owned(),
+    }
 }
 
 fn write_local(path: &Path, cached: &Cached) -> Result<(), XtaskError> {
@@ -247,170 +319,4 @@ impl RemoteStore {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, reason = "test code")]
-mod tests {
-    use std::collections::BTreeSet;
-
-    use super::*;
-
-    fn key() -> Key {
-        Key::named("same-content".to_owned())
-    }
-
-    #[test]
-    fn only_the_same_green_content_is_reused() {
-        let green = Cached {
-            key: "same-content".to_owned(),
-            verdict: Verdict::Green,
-        };
-        assert!(may_reuse(Reuse::SuccessOnly, &green, &key()));
-        assert!(!may_reuse(Reuse::Never, &green, &key()));
-        assert!(!may_reuse(
-            Reuse::SuccessOnly,
-            &green,
-            &Key::named("changed".to_owned())
-        ));
-        for verdict in [Verdict::Refused, Verdict::Broken] {
-            assert!(!may_reuse(
-                Reuse::SuccessOnly,
-                &Cached {
-                    key: green.key.clone(),
-                    verdict
-                },
-                &key()
-            ));
-        }
-    }
-
-    #[test]
-    fn local_round_trip_and_corruption_fail_closed() {
-        let root = std::env::temp_dir().join(format!("xtask-ci-store-{}", std::process::id()));
-        let store = Store::local(root.clone());
-        let environment = Environment {
-            os: "test".to_owned(),
-            arch: "test".to_owned(),
-        };
-        store.save_green("gate", &key(), &environment).unwrap();
-        assert!(
-            store
-                .restore("gate", &key(), &environment, Reuse::SuccessOnly)
-                .unwrap()
-                .is_some()
-        );
-        assert!(
-            store
-                .restore(
-                    "gate",
-                    &Key::named("other".to_owned()),
-                    &environment,
-                    Reuse::SuccessOnly
-                )
-                .unwrap()
-                .is_none()
-        );
-        let record = local_path(&root, "gate", &key());
-        std::fs::write(&record, "not json").unwrap();
-        assert!(
-            store
-                .restore("gate", &key(), &environment, Reuse::SuccessOnly)
-                .unwrap()
-                .is_none()
-        );
-        store.save_green("gate", &key(), &environment).unwrap();
-        assert!(
-            store
-                .restore("gate", &key(), &environment, Reuse::SuccessOnly)
-                .unwrap()
-                .is_some(),
-            "publishing over a corrupted entry must heal it"
-        );
-        std::fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn concurrent_publication_leaves_one_valid_green_result() {
-        let root = std::env::temp_dir().join(format!("xtask-ci-store-race-{}", std::process::id()));
-        let store = Store::local(root.clone());
-        let environment = Environment {
-            os: "test".to_owned(),
-            arch: "test".to_owned(),
-        };
-        std::thread::scope(|scope| {
-            for _ in 0..8 {
-                scope.spawn(|| store.save_green("gate", &key(), &environment).unwrap());
-            }
-        });
-        assert!(
-            store
-                .restore("gate", &key(), &environment, Reuse::SuccessOnly)
-                .unwrap()
-                .is_some()
-        );
-        let files = std::fs::read_dir(root.join("gate")).unwrap().count();
-        assert_eq!(files, 1);
-        std::fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn remote_cache_keys_include_environment() {
-        let environment = Environment {
-            os: "windows".to_owned(),
-            arch: "x86_64".to_owned(),
-        };
-        let other = Environment {
-            os: "linux".to_owned(),
-            arch: "x86_64".to_owned(),
-        };
-        let keys = BTreeSet::from([key().cache_key(&environment), key().cache_key(&other)]);
-        assert_eq!(keys.len(), 2);
-        assert_ne!(
-            remote_key("one", &key(), &environment),
-            remote_key("two", &key(), &environment)
-        );
-    }
-
-    #[test]
-    fn the_remote_adapter_round_trip_preserves_each_content_generation() {
-        let root =
-            std::env::temp_dir().join(format!("xtask-ci-remote-store-{}", std::process::id()));
-        std::fs::create_dir_all(&root).unwrap();
-        let adapter = root.join("adapter.ts");
-        let store = serde_json::to_string(&root.join("objects")).unwrap();
-        std::fs::write(
-            &adapter,
-            format!(
-                r#"import {{ join }} from "node:path";
-const [operation, key, directory] = process.argv.slice(2);
-const object = join({store}, `${{key}}.json`);
-if (operation === "save") {{
-  await Bun.write(object, await Bun.file(join(directory, "verdict.json")).text());
-}} else if (await Bun.file(object).exists()) {{
-  await Bun.write(join(directory, "verdict.json"), await Bun.file(object).text());
-  console.log("hit");
-}} else {{
-  console.log("miss");
-}}
-"#
-            ),
-        )
-        .unwrap();
-        std::fs::create_dir_all(root.join("objects")).unwrap();
-        let store = Store::Remote(RemoteStore {
-            adapter,
-            work: root.join("work"),
-        });
-        let environment = Environment {
-            os: "test".to_owned(),
-            arch: "test".to_owned(),
-        };
-        for key in [key(), Key::named("next-generation".to_owned())] {
-            store.save_green("gate", &key, &environment).unwrap();
-            assert!(
-                store
-                    .restore("gate", &key, &environment, Reuse::SuccessOnly)
-                    .unwrap()
-                    .is_some()
-            );
-        }
-        std::fs::remove_dir_all(root).unwrap();
-    }
-}
+mod tests;

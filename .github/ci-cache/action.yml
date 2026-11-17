@@ -1,0 +1,5 @@
+name: Content-addressed source verification
+description: Run the complete source graph with a fixed event baseline and the cache runtime environment.
+runs:
+  using: node24
+  main: index.js
