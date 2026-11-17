@@ -5,12 +5,15 @@
 # Copyright (c) 2026 2youg1 and the sprawling contributors
 #
 # Installs this run's own archive the way a person does - `install.sh`
-# asking a release list - with the list and the archive served from
+# asking a release list - with the list and the archives served from
 # 127.0.0.1, then runs the binary the installer placed.
 #
-#     sh .github/install-loopback.sh <directory holding one sprawling archive>
-# A directory may also carry Mei's independent archives; they are not the
-# input to this sprawling installer check.
+#     sh .github/install-loopback.sh <directory holding the release's archives>
+# The directory is the release's own set: Mei's archives beside the
+# sprawling one, listed for the installer in the order the published
+# release lists them (Mei first). A script that chose an archive by its
+# platform suffix alone would install Mei's and fail here, which is the
+# regression this check exists to catch.
 #
 # Green means three things at once: install.sh exited 0, the file it
 # placed is byte for byte the `sprawling` inside this archive, and that
@@ -22,7 +25,8 @@ set -eu
 
 die() { printf 'install-loopback: %s\n' "$*" >&2; exit 1; }
 
-[ $# -eq 1 ] || die "usage: install-loopback.sh <directory holding one sprawling archive>"
+[ $# -eq 1 ] || die "usage: install-loopback.sh <directory holding the release's archives>"
+archives=$1
 set -- "$1"/sprawling-*.zip
 [ $# -eq 1 ] && [ -f "$1" ] || die "expected exactly one sprawling .zip in the directory, found: $*"
 archive=$1
@@ -36,7 +40,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 mkdir "$root/www" "$root/sandbox" "$root/unpacked"
-cp "$archive" "$root/www/"
+cp "$archives"/*.zip "$root/www/"
 name=$(basename "$archive")
 
 # Port 0: the kernel picks a free one, so parallel runs never collide.
@@ -54,25 +58,30 @@ done
 origin="http://127.0.0.1:${port}"
 
 # The list in the shape GitHub's API answers with: an array of releases,
-# each asset carrying its size, its digest and its download URL.
+# each asset carrying its size, its digest and its download URL. Every
+# archive in the directory is listed, in the order the glob names them,
+# so the installer has to choose instead of being handed one asset.
 mkdir -p "$root/www/releases"
-python3 - "$root/www/$name" "$origin" "${LOOPBACK_RELEASE_TAG:-v0.0.0-260101}" "$root/www" \
+python3 - "$origin" "${LOOPBACK_RELEASE_TAG:-v0.0.0-260101}" "$root/www" "$root/www"/*.zip \
     >"$root/www/releases/index.html" <<'PY'
 import hashlib, json, os, sys
-path, origin, tag, www = sys.argv[1:5]
-with open(path, "rb") as f:
-    digest = hashlib.sha256(f.read()).hexdigest()
-name = os.path.basename(path)
-release = {
-    "tag_name": tag,
-    "published_at": "2026-01-01T00:00:00Z",
-    "draft": False,
-    "assets": [{
+origin, tag, www, *paths = sys.argv[1:]
+assets = []
+for path in paths:
+    with open(path, "rb") as f:
+        digest = hashlib.sha256(f.read()).hexdigest()
+    name = os.path.basename(path)
+    assets.append({
         "name": name,
         "size": os.path.getsize(path),
         "digest": "sha256:" + digest,
         "browser_download_url": origin + "/" + name,
-    }],
+    })
+release = {
+    "tag_name": tag,
+    "published_at": "2026-01-01T00:00:00Z",
+    "draft": False,
+    "assets": assets,
 }
 json.dump([release], sys.stdout, indent=2)
 os.makedirs(os.path.join(www, "releases", "tags", tag), exist_ok=True)
