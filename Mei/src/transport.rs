@@ -8,7 +8,7 @@
 
 use std::io::{ErrorKind, Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
@@ -276,16 +276,22 @@ impl Client {
     }
 }
 
+#[expect(
+    clippy::disallowed_methods,
+    clippy::arithmetic_side_effects,
+    reason = "the IO budget is measured from the transport's own monotonic clock, and a Duration added to an Instant cannot wrap inside any configured budget"
+)]
 fn read_to_eof(
     stream: &mut TcpStream,
     timeouts: &Timeouts,
     pulse: &mut dyn Write,
     path: &str,
 ) -> Result<Vec<u8>> {
-    let mut remaining = timeouts.io;
+    let deadline = Instant::now() + timeouts.io;
     let mut response = Vec::new();
     let mut chunk = [0_u8; 8192];
     loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             return Err(Error::Diagnostic(
                 Diagnostic::new(
@@ -325,18 +331,6 @@ fn read_to_eof(
             Err(err)
                 if err.kind() == ErrorKind::WouldBlock || err.kind() == ErrorKind::TimedOut =>
             {
-                remaining = remaining.saturating_sub(slice);
-                if remaining.is_zero() {
-                    return Err(Error::Diagnostic(
-                        Diagnostic::new(
-                            Code::Transport,
-                            "read the Messages response to EOF",
-                            err.to_string(),
-                            "check that the gateway closes non-streaming responses without chunking; no retry was attempted",
-                        )
-                        .with_path(path),
-                    ));
-                }
                 write_pulse(pulse, path)?;
             }
             Err(err) => {
