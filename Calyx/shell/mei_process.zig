@@ -239,8 +239,8 @@ pub const Process = struct {
     fn terminateTree(self: *Process) StopResult {
         const id = self.id orelse return .ok;
         if (comptime builtin.os.tag == .windows) {
-            if (self.job != null) {
-                self.closeJob();
+            if (self.job) |job| {
+                WinJob.terminate(job);
                 return .ok;
             }
             _ = windows.ntdll.NtTerminateProcess(id, @fromBackingInt(1));
@@ -376,7 +376,7 @@ fn driveThread(ctx: *DriverCtx) void {
 fn drive(ctx: *DriverCtx) Finished {
     var child = ctx.child;
     const answer = driveOutput(ctx, &child) catch |err| {
-        killTree(ctx, &child);
+        killTree(ctx, child.id);
         const msg = mei_line.failureText(ctx.gpa, err) catch
             ctx.gpa.dupe(u8, "Mei I/O failure") catch unreachable;
         return .{
@@ -423,11 +423,16 @@ fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
     var joined = false;
     errdefer {
         if (!joined) {
-            killTree(ctx, child);
+            killTree(ctx, child.id);
             stdout_thread.join();
             joined = true;
             if (stdout_ctx.out) |out| gpa.free(out);
             stdout_ctx.out = null;
+            stderr_file.close(io);
+            child.stderr = null;
+            _ = child.wait(io) catch {};
+            stdout_file.close(io);
+            child.stdout = null;
         }
     }
 
@@ -440,8 +445,9 @@ fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
     stderr_file.close(io);
     child.stderr = null;
 
+    const child_id = child.id;
     const term = try child.wait(io);
-    killTree(ctx, child);
+    killTree(ctx, child_id);
     stdout_thread.join();
     joined = true;
     stdout_file.close(io);
@@ -586,14 +592,14 @@ test "stopping a process group reaps its driver" {
     try std.testing.expect(false);
 }
 
-/// Ends the whole Mei tree: POSIX kills the process group the child leads,
+/// Ends the whole Mei tree: POSIX kills the process group the child led,
 /// Windows terminates its job. Called before waiting on the stdout thread,
-/// whose end needs every writer of that pipe to be gone.
-fn killTree(ctx: *DriverCtx, child: *std.process.Child) void {
+/// whose end needs every writer of that pipe to be gone. `id` is read before
+/// `Child.wait`, which clears it.
+fn killTree(ctx: *DriverCtx, id: ?std.process.Child.Id) void {
     if (comptime builtin.os.tag == .windows) {
         if (ctx.job) |job| WinJob.terminate(job);
-        child.kill(ctx.io);
-    } else if (child.id) |pid| {
+    } else if (id) |pid| {
         _ = std.posix.kill(-pid, .KILL) catch {};
     }
 }
