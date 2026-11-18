@@ -13,7 +13,7 @@ The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the head
 | Route | Command | What arrives |
 |---|---|---|
 | Bun | `bun install --global @sprawling/mei@latest` | The npm package carries the headless `mei` core and the Calyx face; on a TTY, `mei` opens Calyx, and `mei -p` stays headless. `bunx @sprawling/mei` runs it once without the global install. |
-| crates.io | `cargo install sprawling-mei --locked` | The headless `mei` core. With 0.17.0, `cargo install sprawling-mei sprawling-calyx --locked` adds the Calyx face; the published 0.0.17 channel has only the core. |
+| crates.io | `cargo install sprawling-mei --locked` | The headless `mei` core. The Calyx face is not a crate binary: it arrives with the Bun package or a source build. |
 
 The published packages trail this tree until the next release. Build from source for the version in this repository.
 
@@ -77,7 +77,7 @@ Mei injects the workspace root's regular `AGENTS.md` into the first message of e
 start
 ```
 
-The single Python call returns both the image and any printed text. PNG, JPEG, GIF, and WebP are accepted, up to 5 MiB per image before base64 encoding. This is visual input to the model, not a path or an image encoded as ordinary text.
+The single Python call returns both the image and any printed text. PNG, JPEG, GIF, and WebP are accepted, up to 5 MiB per image before base64 encoding, at most two pictures per call, attached on that call's own thread; a third picture, or one attached from another thread or after the call ends, is refused with the reason in the tool result. This is visual input to the model, not a path or an image encoded as ordinary text.
 
 ### 2. Continue or switch sessions
 
@@ -168,8 +168,8 @@ The core and its python guest exist only while a task runs; Calyx alone is the i
 | Part | UTF-8 bytes | Tokens (`o200k_base`) |
 |---|---:|---:|
 | `system` | 297 | 57 |
-| Complete compact `tools[0]` JSON | 1315 | 289 |
-| Total | 1612 | 346 |
+| Complete compact `tools[0]` JSON | 1489 | 332 |
+| Total | 1786 | 389 |
 
 Tokens use OpenAI's `o200k_base` tokenizer (the GPT-4o/4.1/5 family) on the same text, with no chat envelope or provider additions; another tokenizer gives another count. The JSON below is pretty-printed for reading, while the byte and token counts use its compact wire form.
 
@@ -188,7 +188,7 @@ Aligned with context, fulfill user intent thoroughly and resourcefully and stay 
 
 ```json
 {
-  "description": "<python version=\"3.12.13\" uv_version=\"0.12.3\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the full path, or a Python expression that losslessly reconstructs a non-Unicode native path; filter that file, or re-run with narrower output, in the next python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start child interpreters with sys.executable, so they inherit the active environment. Call show_image(path) to attach PNG, JPEG, GIF, or WebP bytes as visual tool-result content; the image is not text output. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>",
+  "description": "<python version=\"3.12.13\" uv_version=\"0.12.3\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the full path, or a Python expression that losslessly reconstructs a non-Unicode native path; filter that file, or re-run with narrower output, in the next python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start child interpreters with sys.executable, so they inherit the active environment. Call show_image(path) to attach a PNG, JPEG, GIF, or WebP picture as visual tool-result content; a picture is not text output. Attach at most 2 pictures per call and at most 5 MiB per picture, on the call's own thread; a picture from another thread or a later call is refused with how to read it. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>",
   "input_schema": {
     "properties": {
       "code": {

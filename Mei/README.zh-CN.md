@@ -13,7 +13,7 @@ Archetype:Mei 是极简 Agent Harness：模型接收任务，通过唯一持久�
 | 方式 | 命令 | 得到什么 |
 |---|---|---|
 | Bun | `bun install --global @sprawling/mei@latest` | npm 包同时携带无头 `mei` 核与 Calyx 面；TTY 下 `mei` 直接进入 Calyx，`mei -p` 走无头。`bunx @sprawling/mei` 可不安装直接运行一次。 |
-| crates.io | `cargo install sprawling-mei --locked` | 只装无头 `mei` 核。0.17.0 起可用 `cargo install sprawling-mei sprawling-calyx --locked` 一并装上 Calyx 面；已发布的 0.0.17 通道只有核。 |
+| crates.io | `cargo install sprawling-mei --locked` | 只装无头 `mei` 核。Calyx 面不是 crate 二进制：它随 Bun 包或源码构建而来。 |
 
 已发布包会落后于本树，直到下一次发布；要本仓库的版本，用下方源码构建。
 
@@ -77,7 +77,7 @@ Mei 会把工作区顶层普通文件 `AGENTS.md` 注入新会话的首条消息
 开始
 ```
 
-这一次 Python 调用同时返回图片和打印文本。支持 PNG、JPEG、GIF、WebP，单图 base64 编码前至多 5 MiB。模型收到的是真正的视觉输入，不是路径或普通文本形式的 base64。
+这一次 Python 调用同时返回图片和打印文本。支持 PNG、JPEG、GIF、WebP，单图 base64 编码前至多 5 MiB，一次调用最多两张，且只在该调用自己的线程上附加；第三张、别的线程的或调用结束后的提交会被拒绝，原因写进工具结果。模型收到的是真正的视觉输入，不是路径或普通文本形式的 base64。
 
 ### 2. 继续或切换会话
 
@@ -168,8 +168,8 @@ Calyx 通过 Program Status Protocol（OSC 7501）报告 `working`、`done`、`e
 | 部分 | UTF-8 字节 | Token（`o200k_base`） |
 |---|---:|---:|
 | `system` | 297 | 57 |
-| 完整紧凑 `tools[0]` JSON | 1315 | 289 |
-| 合计 | 1612 | 346 |
+| 完整紧凑 `tools[0]` JSON | 1489 | 332 |
+| 合计 | 1786 | 389 |
 
 Token 列用 OpenAI 的 `o200k_base` 分词器（GPT-4o/4.1/5 家族）对同一文本计数，不含聊天信封或 provider 追加内容；换成其他分词器数值会不同。以下 JSON 为便于阅读而格式化；字节数和 Token 数按紧凑线上格式计算。
 
@@ -188,7 +188,7 @@ Aligned with context, fulfill user intent thoroughly and resourcefully and stay 
 
 ```json
 {
-  "description": "<python version=\"3.12.13\" uv_version=\"0.12.3\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the full path, or a Python expression that losslessly reconstructs a non-Unicode native path; filter that file, or re-run with narrower output, in the next python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start child interpreters with sys.executable, so they inherit the active environment. Call show_image(path) to attach PNG, JPEG, GIF, or WebP bytes as visual tool-result content; the image is not text output. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>",
+  "description": "<python version=\"3.12.13\" uv_version=\"0.12.3\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the full path, or a Python expression that losslessly reconstructs a non-Unicode native path; filter that file, or re-run with narrower output, in the next python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start child interpreters with sys.executable, so they inherit the active environment. Call show_image(path) to attach a PNG, JPEG, GIF, or WebP picture as visual tool-result content; a picture is not text output. Attach at most 2 pictures per call and at most 5 MiB per picture, on the call's own thread; a picture from another thread or a later call is refused with how to read it. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>",
   "input_schema": {
     "properties": {
       "code": {

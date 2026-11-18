@@ -22,6 +22,13 @@ const BOOT: &str = include_str!("boot.py");
 
 const INLINE_KIB: u64 = INLINE_BYTES / 1024;
 
+/// The pictures one python call may attach and the bytes one picture may carry.
+/// `boot.py` enforces both and names them in the message the model reads; this
+/// copy is the number the tool description states, and a test keeps the two
+/// equal.
+pub const IMAGE_CALL_LIMIT: usize = 2;
+pub const IMAGE_MIB: usize = 5;
+
 /// Describes the python tool with the selected runtime versions and output budget.
 pub fn tool_description(environment: &Environment) -> String {
     format!(
@@ -34,11 +41,12 @@ pub fn tool_description(environment: &Environment) -> String {
             "filter that file, or re-run with narrower output, in the next python call. ",
             "Run shell commands and CLIs through subprocess, capture their output, and check return codes. ",
             "Start child interpreters with sys.executable, so they inherit the active environment. ",
-            "Call show_image(path) to attach PNG, JPEG, GIF, or WebP bytes as visual tool-result content; the image is not text output. ",
+            "Call show_image(path) to attach a PNG, JPEG, GIF, or WebP picture as visual tool-result content; a picture is not text output. ",
+            "Attach at most {} pictures per call and at most {} MiB per picture, on the call's own thread; a picture from another thread or a later call is refused with how to read it. ",
             "Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, ",
             "python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>"
         ),
-        environment.python.version, environment.uv.version, INLINE_KIB
+        environment.python.version, environment.uv.version, INLINE_KIB, IMAGE_CALL_LIMIT, IMAGE_MIB
     )
 }
 
@@ -382,7 +390,18 @@ mod tests {
         );
         let description = tool_description(&environment);
         assert!(description.contains(&format!("up to {INLINE_KIB} KiB")));
+        assert!(description.contains(&format!(
+            "at most {IMAGE_CALL_LIMIT} pictures per call and at most {IMAGE_MIB} MiB"
+        )));
         assert!(description.starts_with("<python version=\"3.12.13\" uv_version=\"0.12.3\">"));
+    }
+
+    #[test]
+    fn boot_py_enforces_the_limits_the_description_states() {
+        assert!(BOOT.contains("IMAGE_CALL_LIMIT = 2\n"));
+        assert!(BOOT.contains("IMAGE_LIMIT = 5 * 1024 * 1024\n"));
+        assert_eq!(IMAGE_CALL_LIMIT.to_string(), "2");
+        assert_eq!(IMAGE_MIB.to_string(), "5");
     }
 
     #[test]
