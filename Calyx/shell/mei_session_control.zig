@@ -13,6 +13,10 @@ const mei_session = @import("mei_session.zig");
 
 pub const Action = enum { task, handled, quit };
 
+/// A `/resume` argument is either what the person typed, resolved against the
+/// session directory, or the session the UI just left, which already is.
+const ResumeArg = enum { typed, resolved };
+
 pub fn dispatch(ui: anytype, typed: []const u8) Action {
     const parsed = command.parse(typed);
     if (parsed == .quit) return .quit;
@@ -29,9 +33,9 @@ pub fn dispatch(ui: anytype, typed: []const u8) Action {
         .new_session => _ = createSession(ui),
         .resume_session => |path| {
             if (path) |named| {
-                resumeSession(ui, named);
+                resumeSession(ui, named, .typed);
             } else if (ui.previous_session) |previous| {
-                resumeSession(ui, previous);
+                resumeSession(ui, previous, .resolved);
             } else {
                 ui.printNote("no previous Mei session; use /resume <jsonl>");
             }
@@ -79,15 +83,24 @@ pub fn createSession(ui: anytype) bool {
     }
 }
 
-fn resumeSession(ui: anytype, path_in: []const u8) void {
-    const path = if (std.fs.path.isAbsolute(path_in))
-        path_in
-    else
-        std.fs.path.join(ui.gpa, &.{ ui.session_dir, path_in }) catch {
-            ui.printNote("join resume path");
+fn resumeSession(ui: anytype, path_in: []const u8, arg: ResumeArg) void {
+    const path = switch (arg) {
+        .resolved => ui.gpa.dupe(u8, path_in) catch {
+            ui.printNote("copy resume path");
             return;
-        };
-    defer if (!std.fs.path.isAbsolute(path_in)) ui.gpa.free(path);
+        },
+        .typed => if (std.fs.path.isAbsolute(path_in))
+            ui.gpa.dupe(u8, path_in) catch {
+                ui.printNote("copy resume path");
+                return;
+            }
+        else
+            std.fs.path.join(ui.gpa, &.{ ui.session_dir, path_in }) catch {
+                ui.printNote("join resume path");
+                return;
+            },
+    };
+    defer ui.gpa.free(path);
     switch (mei_session.Session.import(ui.gpa, ui.io, path)) {
         .ok => |session| {
             const at = ui.now();
@@ -133,4 +146,101 @@ fn switchEffort(ui: anytype) void {
     var buf: [128]u8 = undefined;
     const msg = std.fmt.bufPrint(&buf, "requested effort for the next run: {s}", .{selected}) catch "requested effort updated";
     ui.printNote(msg);
+}
+
+const Fake = struct {
+    gpa: std.mem.Allocator,
+    io: std.Io,
+    environ: std.process.Environ.Map,
+    seen: observation.Seen,
+    session: ?mei_session.Session = null,
+    previous_session: ?[]u8 = null,
+    pending: std.ArrayList([]u8) = .empty,
+    session_dir: []const u8,
+    frame_arena: std.heap.ArenaAllocator,
+    process: ?u8 = null,
+    replay_path: ?[]const u8 = null,
+    printed: usize = 0,
+
+    fn release(self: *Fake) void {
+        if (self.session) |*session| session.deinit();
+        if (self.previous_session) |path| self.gpa.free(path);
+        for (self.pending.items) |line| self.gpa.free(line);
+        self.pending.deinit(self.gpa);
+        self.seen.deinit();
+        self.environ.deinit();
+        self.frame_arena.deinit();
+    }
+
+    fn printNote(self: *Fake, said: []const u8) void {
+        _ = self;
+        _ = said;
+    }
+
+    fn print(self: *Fake, entries: []const write.Entry) void {
+        self.printed += entries.len;
+    }
+
+    fn now(self: *Fake) u64 {
+        _ = self;
+        return 0;
+    }
+};
+
+fn commit(ui: *Fake, line: []const u8) !void {
+    const session = if (ui.session) |*session| session else return error.TestUnexpectedResult;
+    switch (session.append(&.{line})) {
+        .ok => {},
+        else => return error.TestUnexpectedResult,
+    }
+}
+
+fn resumeSwitch(gpa: std.mem.Allocator, io: std.Io, dir: []const u8) !void {
+    var ui = Fake{
+        .gpa = gpa,
+        .io = io,
+        .environ = std.process.Environ.Map.init(gpa),
+        .seen = try observation.Seen.init(gpa, "auto"),
+        .session_dir = dir,
+        .frame_arena = .init(gpa),
+    };
+    defer ui.release();
+
+    try std.testing.expectEqual(Action.handled, dispatch(&ui, "/new"));
+    const first = try gpa.dupe(u8, ui.session.?.pathSlice());
+    defer gpa.free(first);
+    try commit(&ui, "{\"role\":\"assistant\",\"content\":\"one\"}");
+
+    try std.testing.expectEqual(Action.handled, dispatch(&ui, "/new"));
+    const second = try gpa.dupe(u8, ui.session.?.pathSlice());
+    defer gpa.free(second);
+    try commit(&ui, "{\"role\":\"assistant\",\"content\":\"two\"}");
+
+    try std.testing.expectEqual(Action.handled, dispatch(&ui, "/resume"));
+    try std.testing.expectEqualStrings(first, ui.session.?.pathSlice());
+    try std.testing.expectEqualStrings(second, ui.previous_session.?);
+}
+
+test "a resume to the previous session owns its path" {
+    const gpa = std.testing.allocator;
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const relative = try std.fmt.allocPrint(gpa, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    defer gpa.free(relative);
+    var cwd_buf: [std.fs.max_path_bytes]u8 = undefined;
+    const cwd_len = try std.process.currentPath(io, &cwd_buf);
+    const absolute = try std.fs.path.join(gpa, &.{ cwd_buf[0..cwd_len], relative });
+    defer gpa.free(absolute);
+    try resumeSwitch(gpa, io, absolute);
+}
+
+test "a resume into a relative session directory joins its path once" {
+    const gpa = std.testing.allocator;
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const relative = try std.fmt.allocPrint(gpa, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    defer gpa.free(relative);
+    try resumeSwitch(gpa, io, relative);
 }
