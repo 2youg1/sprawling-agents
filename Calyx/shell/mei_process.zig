@@ -180,6 +180,7 @@ pub const Process = struct {
                 return .{ .err = configFailure(gpa, "create Mei job object", program) };
             };
             process.job = job;
+            ctx.job = job;
         }
 
         process.driver = std.Thread.spawn(.{}, driveThread, .{ctx}) catch {
@@ -310,6 +311,12 @@ const WinJob = if (builtin.os.tag == .windows) struct {
 
     extern "kernel32" fn CloseHandle(hObject: windows.HANDLE) callconv(.winapi) windows.BOOL;
 
+    extern "kernel32" fn TerminateJobObject(hJob: windows.HANDLE, uExitCode: u32) callconv(.winapi) windows.BOOL;
+
+    fn terminate(job: windows.HANDLE) void {
+        _ = TerminateJobObject(job, 1);
+    }
+
     fn create(process: ?windows.HANDLE) !windows.HANDLE {
         const proc = process orelse return error.NoProcess;
         const job = CreateJobObjectW(null, null) orelse return error.CreateJob;
@@ -349,6 +356,11 @@ const DriverCtx = struct {
     child: std.process.Child,
     prompt: []u8,
     signals: *Signals,
+    /// Borrowed from `Process`, which closes it only after this thread is
+    /// joined; the driver uses it to end the whole tree before it waits for
+    /// the pipe to close.
+    job: if (builtin.os.tag == .windows) ?windows.HANDLE else void =
+        if (builtin.os.tag == .windows) null else {},
 };
 
 fn driveThread(ctx: *DriverCtx) void {
@@ -363,14 +375,8 @@ fn driveThread(ctx: *DriverCtx) void {
 
 fn drive(ctx: *DriverCtx) Finished {
     var child = ctx.child;
-    const answer = driveOutput(ctx.gpa, ctx.io, &child, ctx.prompt, ctx.bus) catch |err| {
-        if (builtin.os.tag != .windows) {
-            if (child.id) |pid| {
-                _ = std.posix.kill(-pid, .KILL) catch {};
-            }
-        } else {
-            child.kill(ctx.io);
-        }
+    const answer = driveOutput(ctx, &child) catch |err| {
+        killTree(ctx, &child);
         const msg = mei_line.failureText(ctx.gpa, err) catch
             ctx.gpa.dupe(u8, "Mei I/O failure") catch unreachable;
         return .{
@@ -384,15 +390,11 @@ fn drive(ctx: *DriverCtx) Finished {
     };
 }
 
-fn driveOutput(
-    gpa: std.mem.Allocator,
-    io: std.Io,
-    child: *std.process.Child,
-    prompt: []const u8,
-    bus: *Bus,
-) !Result {
+fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
+    const gpa = ctx.gpa;
+    const io = ctx.io;
     if (child.stdin) |stdin| {
-        try stdin.writeStreamingAll(io, prompt);
+        try stdin.writeStreamingAll(io, ctx.prompt);
         stdin.close(io);
         child.stdin = null;
     } else return error.OpenStdin;
@@ -421,7 +423,7 @@ fn driveOutput(
     var joined = false;
     errdefer {
         if (!joined) {
-            child.kill(io);
+            killTree(ctx, child);
             stdout_thread.join();
             joined = true;
             if (stdout_ctx.out) |out| gpa.free(out);
@@ -433,12 +435,13 @@ fn driveOutput(
     var stderr_reader = stderr_file.readerStreaming(io, &err_buf);
     while (true) {
         const line = (try mei_line.read(gpa, &stderr_reader.interface, mei_line.MAX_BYTES)) orelse break;
-        bus.push(.{ .line = line });
+        ctx.bus.push(.{ .line = line });
     }
     stderr_file.close(io);
     child.stderr = null;
 
     const term = try child.wait(io);
+    killTree(ctx, child);
     stdout_thread.join();
     joined = true;
     stdout_file.close(io);
@@ -581,4 +584,16 @@ test "stopping a process group reaps its driver" {
         io.sleep(std.Io.Duration.fromMilliseconds(10), .real) catch {};
     }
     try std.testing.expect(false);
+}
+
+/// Ends the whole Mei tree: POSIX kills the process group the child leads,
+/// Windows terminates its job. Called before waiting on the stdout thread,
+/// whose end needs every writer of that pipe to be gone.
+fn killTree(ctx: *DriverCtx, child: *std.process.Child) void {
+    if (comptime builtin.os.tag == .windows) {
+        if (ctx.job) |job| WinJob.terminate(job);
+        child.kill(ctx.io);
+    } else if (child.id) |pid| {
+        _ = std.posix.kill(-pid, .KILL) catch {};
+    }
 }
