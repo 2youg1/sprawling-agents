@@ -115,6 +115,42 @@ fn resume_preserves_legacy_history_and_media_blocks() {
 }
 
 #[test]
+fn show_image_returns_a_real_image_block_and_text_in_one_python_call() {
+    let directory = tempfile::tempdir().unwrap();
+    let code = r"import base64, struct, zlib
+
+def chunk(kind, body):
+    return struct.pack('>I', len(body)) + kind + body + struct.pack('>I', zlib.crc32(kind + body))
+
+png = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', 1, 1, 8, 6, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(b'\x00\x00\x00\x00\x00')) + chunk(b'IEND', b'')
+open('tiny.png', 'wb').write(png)
+show_image('tiny.png')
+print(base64.b64encode(png).decode())";
+    let (base, gateway) = serve_with(2, move |request, index| {
+        if index == 0 {
+            return tool(code);
+        }
+        let content = &request["messages"][2]["content"][0]["content"];
+        let encoded = content[0]["text"].as_str().unwrap_or_default().trim_end();
+        let image_ok = content[1]["type"] == "image"
+            && content[1]["source"]["media_type"] == "image/png"
+            && content[1]["source"]["data"] == encoded;
+        answer(if image_ok { "seen" } else { "missing" })
+    });
+    let output = support::command(&base, "inspect the picture")
+        .current_dir(directory.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(output.stdout, b"seen");
+    assert_eq!(gateway.join().unwrap().len(), 2);
+}
+
+#[test]
 fn large_output_is_withheld_then_selectively_read() {
     let (base, gateway) = serve_with(3, |request, index| {
         if index == 0 {

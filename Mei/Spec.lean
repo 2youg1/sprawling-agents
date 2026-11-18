@@ -6,6 +6,7 @@
 import Mei.spec.Agent
 import Mei.spec.Capture
 import Mei.spec.Environment
+import Mei.spec.Gateway
 import Mei.spec.Session
 
 /-! # Mei 的规格
@@ -13,8 +14,10 @@ import Mei.spec.Session
 `Mei/` 是极简 Agent Harness：一个可变 Anthropic Messages 请求、一个串行反馈循环、
 一个有状态 python 进程。Cargo 包名 `sprawling-mei`，库名 `mei`，无头命令名 `mei`。
 唯一工具名为 `python`；小型 UTF-8 输出直接返回，大输出只返提示与完整路径，非 Unicode 原生路径则用可无损还原的 Python 表达式表示。
+`show_image(path)` 在同一 python 调用中追加 PNG/JPEG/GIF/WebP 图片块，因此模型实际看见图片而非只看到路径或像素统计。
 终端居住面属于顶层生产包 `Calyx/`（非 Archetype）；Mei 核不含 TUI。
 指令 / MCP / Skills 的权威在 magpie；Agent 自去 skill 仓库。`MEI.md` 仅在构建时进入 system；
+缺省 `HARNESS_MODEL` 时选择 Magpie `/v1/models` 的首选可见路由；默认明确请求 adaptive thinking + high effort。
 新会话只额外读取工作区顶层的 `AGENTS.md`，并将其冻结在首个 user 消息。
 -/
 
@@ -24,7 +27,9 @@ import Mei.spec.Session
 |---|---|
 | `main` | 装配环境、参数、stdin/stdout、退出与解释器收口 |
 | `agent` | 唯一反馈循环；只读 JSON 与 `std::io::Write` |
-| `transport` | 非流式 Anthropic Messages HTTP/1.0；阻塞读时可写存活观测 |
+| `transport` | 非流式 Anthropic Messages 与 Magpie catalog/route HTTP/1.0；阻塞读时可写存活观测 |
+| `catalog` | Magpie 首选模型、上下文窗口与 effort 列表的纯 JSON 解析选择 |
+| `observation` | `mei.obs` 单行 JSON 的唯一写出接口 |
 | `python` 与 `boot.py` | 持久 python；完整输出落盘；小输出内联，大输出只给提示与路径 |
 | `workspace` | 新会话顶层 AGENTS 的读取与首消息构造 |
 | `doctor` | 当前 Mei 代次的 python/uv 缓存、探测与必要安装 |
@@ -60,11 +65,12 @@ LLM compaction、验真门、Skills/MCP 自动暴露、Mei 自动更新、为弱
 - inline capture 在 fd 转移后或解释器 reap 后回收；spilled 路径跨解释器退出与 resume 有效；
   成功回收解释器后的 inline 清理失败单独报警，不吞掉最终答复或 spilled 交接；失败清理保留路径供重试。
   Calyx 只删除本 run 独占创建且未提交的 capture 目录。宿主崩溃后的 orphan 回收不在本次承诺内。
-- stderr：消息 JSONL；可选 `{"type":"mei.obs",...}` 观测行（pulse / usage）；
+- stderr：消息 JSONL；可选 `{"type":"mei.obs",...}` 观测行（pulse / model / route / usage）；
   失败诊断为 Description/Cause/Resolution 的 toml 块。
 - stdout：最终 text，不加换行。
 - resume：完整日志的首条 user content 可为字符串或内容块数组；旧工具名、路径与媒体块原样保留，
-  不恢复 Python 现场。Provider 是否接受图片/音频/视频由其模型合同决定，不由 JSONL 透传测试代替。
+  不恢复 Python 现场。`show_image` 写入 tool_result 的 base64 image 块随日志恢复，供后续图片比较。
+  Provider 是否接受图片/音频/视频由其模型合同决定，不由 JSONL 透传测试代替。
 - live V1/V2（magpie）须实测后宣称；范围以本节记录为准。
 -/
 
@@ -100,7 +106,7 @@ V1/V2 实测以 magpie + 已测模型为准，不外推。
 /-! ## 6 命名统一
 
 状态只有 `request: serde_json::Value`。`python` 是唯一本地客户端工具。
-tool_result 的 `content` 是小型完整输出，或“提示 + 完整结果路径”；不含 BLAKE3。
+tool_result 的 `content` 是小型完整文本，或“提示 + 完整结果路径”；有图片时是文本与 base64 image 块；不含 BLAKE3。
 `pause_turn` 不是取消或持久化。观测行 `type=mei.obs` 不是 Messages role。
 `python` 是有状态执行器而非 REPL：表达式不自动回显，`print` 是主动观察。
 `inline` / `spilled` 描述输出是否只内联或把路径交给模型；`run` / `session` / `caller` 是文件 owner。
@@ -114,6 +120,10 @@ tool_result 的 `content` 是小型完整输出，或“提示 + 完整结果路
 Calyx（及任何 Face 消费者）在进程边界 spawn 无头 `mei`；Mei 不知道 Entry/Zig。
 
 `ANTHROPIC_BASE_URL` 出站默认 `http://127.0.0.1:3425`；Mei 不监听 2501/3425。
+缺省模型时 GET `/v1/models`，以 `first_id` 命中的可见条目为首选，缺席或失配才取 `data[0]`；空目录失败。
+目录条目同时给出 `context_window` 与 `reasoning_levels`。每次自动路由请求携带独立
+`X-Magpie-Session`，完整响应后 GET `/v1/magpie/route?session=…`，把实际 model/effort 写给 Face。
+路由观测失败不推翻已成功的模型回答，Face 保留 requested model/effort，不声称它们是实际值。
 -/
 
 /-! ## 8 接口先行
@@ -122,18 +132,19 @@ Calyx（及任何 Face 消费者）在进程边界 spawn 无头 `mei`；Mei 不�
 pub fn run(
     request: &mut Value,
     post: impl FnMut(&Value, &mut dyn Write) -> Result<Value>,
-    exec: impl FnMut(&str) -> Result<String>,
+    exec: impl FnMut(&str) -> Result<Value>,
     trace: &mut dyn Write,
 ) -> Result<String>;
 
 impl Client {
     pub fn new(base: &str, key: String) -> Result<Client>;
+    pub fn discover(&mut self, now: u64) -> Result<Selection>;
     pub fn post(&self, request: &Value, pulse: &mut dyn Write) -> Result<Value>;
 }
 
 impl Py {
     pub fn spawn_in(environment: &Environment) -> Result<Py>;
-    pub fn run(&mut self, code: &str) -> Result<String>; // Ok = tool_result content
+    pub fn run(&mut self, code: &str) -> Result<Value>; // string，或 text + image blocks
     pub fn close(&mut self) -> Result<()>;
     pub fn kill_and_wait(&mut self) -> Result<()>;
 }
@@ -142,6 +153,8 @@ impl Py {
 stderr 观测行（穷尽；非 Messages role）：
 
 - `{"type":"mei.obs","kind":"pulse"}` — 阻塞读满一个 pulse 间隔仍无字节时写一行
+- `{"type":"mei.obs","kind":"model","model":…,"context_tokens":…,"efforts":[…],"effort":…,"effort_source":"requested"}` — 本次启动请求的选择
+- `{"type":"mei.obs","kind":"route","model":…,"effort":…,"effort_source":"actual"}` — Magpie 已完成的实际路由；不可用时 `available=false`
 - `{"type":"mei.obs","kind":"usage","usage": <response.usage>}` — 响应带 usage 时写一行
 
 `Diagnostic` 渲染 toml 块字段：`code`、`description`、`cause`、`resolution`，
@@ -152,18 +165,23 @@ stderr 观测行（穷尽；非 Messages role）：
 `write_cache` 写入当前 Mei 代次的完整记录。`CaptureStore::create/observe/complete/discard` 分别对应
 run 创建、结果分类、成功收口与未提交回收。
 
-启动请求：`model`、`max_tokens`（默认见 §14）、`system`、`tools = [python]`、messages。
+启动请求：`model`、`max_tokens`（默认见 §14）、`thinking={"type":"adaptive"}`、
+`output_config={"effort":"high"}`、`system`、`tools = [python]`、messages。
+`HARNESS_EXTRA` 最后浅合并，因此 Calyx `/e` 可覆盖 thinking 与 effort；最终请求中的 effort 是 requested 事实。
 新会话且顶层 AGENTS 存在时，首个 user content 依次是指令文本块与 prompt 文本块；否则仍为字符串。
 resume 只重放日志已有消息，不读取或补注当前 AGENTS。工具描述以 `<python version="…" uv_version="…">`
 携带精确版本，与持久变量/imports/cwd、异常后恢复、主动打印、16 KiB 内联预算、完整捕获路径、
-subprocess 和 `sys.executable` 一致；内联数字由 `INLINE_BYTES` 生成；不写 REPL 或核内超时。
+subprocess、`sys.executable` 和 `show_image(path)` 一致；内联数字由 `INLINE_BYTES` 生成；不写 REPL 或核内超时。
+`show_image` 是 python 命名空间内的展示原语，不是第二工具；按文件魔数只接受 PNG/JPEG/GIF/WebP，
+单图编码前至多 5 MiB，图片经私有控制帧的 base64 字段返回，不污染 stdout capture。
+无图片时 tool_result content 保持字符串；有图片时为 text（可含大输出提示）+ image 内容块，并完整进入日志。
 `MEI_CAPTURE_DIR` 是 Face 分配当前 run 目录的内部环境接口；缺席时无头核创建临时 run 目录。
 Calyx 先独占创建空目录，再以 `MEI_CAPTURE_CREATED=1` 让 Mei 接管；没有这个标记时既有目录一律拒绝。
-私有控制信道只传 ASCII capture 文件名，`Store` 在捕获 root 下拼接原生路径；spilled 提示给完整 Unicode 路径，
+私有控制信道请求传代码，响应传 ASCII capture 文件名与图片块；`Store` 在捕获 root 下拼接原生路径；spilled 提示给完整 Unicode 路径，
 或给能在 Python 中无损还原非 Unicode 原生路径的表达式。
 唯一工具 schema 与 agent 整波预检跨 provider 生效，不声明 provider 专有的 `strict` 模式。
 `HARNESS_EXTRA` 浅合并一次；拒绝 `stream: true` 与 `HARNESS_EXTRA.tools`。
-无 `MEI_TOOLS`。`HARNESS_MODEL` 必填。
+无 `MEI_TOOLS`。`HARNESS_MODEL` 可省略；省略表示使用 Magpie 首选路由，显式空字符串仍是配置错误。
 
 无头语法：`mei [-p PROMPT] [--resume JSONL]`；无 `-p` 时非 TTY stdin 为 prompt。
 恢复只带 role/content；环境重定 model/system/tools/网关；Python 重启。
@@ -182,7 +200,7 @@ trace 本次 user prompt（首个有效响应）
 R.messages.push(assistant); trace
 pause_turn → continue
 end_turn → return text
-tool_use → 预检 → exec 得捕获或小结果提示 → user tool_result content=文本 → continue
+tool_use → 预检 → exec 得文本捕获与可选图片 → user tool_result content=文本或内容块 → continue
 其它 stop → fail
 ```
 
@@ -193,10 +211,12 @@ tool_use → 预检 → exec 得捕获或小结果提示 → user tool_result co
 /-! ## 10 实现逻辑
 
 - 传输：HTTP/1.0、Connection: close、读至 EOF；CONNECT 10s、IO 600s；
-  阻塞读期间可按固定间隔写 `mei.obs` pulse，不改 messages。
-- `boot.py`：每帧一行 JSON string；stdout/stderr 重定向到当前 run 的捕获文件；同一执行命名空间保留
+  阻塞读期间可按固定间隔写 `mei.obs` pulse，不改 messages。自动模型路径把目录选择与路由观测作为
+  独立 GET，不为自定义 `HARNESS_MODEL` 的旧网关增加前置目录请求；路由观测失败只写 unavailable。
+- `boot.py`：请求是每帧一行 JSON string，响应是 `{capture, images}` 对象；stdout/stderr 重定向到当前 run 的捕获文件；同一执行命名空间保留
   变量与 imports，解释器进程保留 cwd；异常只形成 traceback 反馈，循环继续；
-  结束后只把**该文件的 ASCII basename** 经控制信道回传；不改写文件、无 alarm。
+  `show_image` 只把图片的 media type 与 base64 数据加入本次响应；结束后捕获文件的 ASCII basename 经控制信道回传；
+  不改写文件、无 alarm。
   `MEI_CAPTURE_DIR` 与 `MEI_CAPTURE_CREATED` 在模型代码运行前由 `boot.py` 移出环境，递归子 Mei 不会误继承父 run 目录。
 - `Py::run` 先读文件元数据；仅不超过 16 KiB 时做有界读取。完整 UTF-8 文本直接作为
   tool_result；更大或非 UTF-8 时只给提示与路径。下一响应已把 fd 1/2 移到新文件，
@@ -221,13 +241,13 @@ tool_use → 预检 → exec 得捕获或小结果提示 → user tool_result co
 
 /-! ## 11 边界枚举
 
-空/Unicode prompt、stdin EOF、重复参数、恢复残缺、缺模型、非法 URL、非 200、
+空/Unicode prompt、stdin EOF、重复参数、恢复残缺、缺省模型目录为空或首选失配、非法 URL、非 200、
 chunked、停滞、空工具波、未知客户端工具、重复 id、max_tokens、pause、
 AGENTS 缺失/修改/删除/非 UTF-8、重复 resume、无 AGENTS 旧日志、失败首轮重试、
 doctor 缓存命中/损坏/更新/记录程序缺失或非普通文件/遗留锁文件/并发首启/安装失败、
 EOL 日期边界（与 `Mei/spec/Environment.lean` 的向量一致）、非 Unicode 可执行路径、
 inline 文件占用、spilled 跨进程读取、失败/取消 run、宿主崩溃 orphan、
-解释器死亡、非法帧、非 UTF-8、空文件路径、收口非 daemon 线程、取消杀组。
+解释器死亡、非法帧、非 UTF-8、空文件路径、图片格式/大小边界、route 不可用、收口非 daemon 线程、取消杀组。
 -/
 
 /-! ## 12 错误处理
@@ -246,7 +266,7 @@ Mei 自更新器、为输出捕获引入异步 runtime。uv 官方 installer、`
 
 /-! ## 14 硬编码声明
 
-`max_tokens` 默认 `65536`（可被 `HARNESS_EXTRA` 覆盖）、连接 10s、IO 600s、
+`max_tokens` 默认 `65536`、effort 默认 `high`、thinking 默认 `adaptive`（均可被 `HARNESS_EXTRA` 覆盖）、单图编码前上限 5 MiB、连接 10s、IO 600s、
 收口宽限 5s、poll 20ms、输出内联上限 16 KiB、默认网关与 key、
 `anthropic-version: 2023-06-01`、pulse 间隔 5s、完整 doctor 修复预算 900s（锁等待 905s，含 5s 发布余量）、
 各一处权威。`MEI.md` 构建时注入。
@@ -269,7 +289,7 @@ Calyx 依赖进程 Face；City 账本/wire 不变。接口变化先改本文件�
 ```bash
 cargo nextest run -p sprawling-mei
 cargo clippy -p sprawling-mei --all-targets --all-features -- -D warnings
-lake build Mei.Spec Mei.spec.Agent Mei.spec.Session Mei.spec.Environment Mei.spec.Capture
+lake build Mei.Spec Mei.spec.Agent Mei.spec.Session Mei.spec.Environment Mei.spec.Capture Mei.spec.Gateway
 cargo test -p sprawling-mei --test cli
 cargo test -p sprawling-mei --test observation
 ```
@@ -299,9 +319,9 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 /-! D8 传输 10s/600s；被否无时限与过短时限。 -/
 /-! D9 会话斜杠与 JSONL 代次归 Calyx；核只提供 `--resume` 消息恢复。 -/
 /-! D10 恢复路径保留 OsString；诊断带实际 value。 -/
-/-! D11 crate `sprawling-mei`、npm `@sprawling/mei`；发布含 Windows；只发无头核；
-交互走 `sprawling mei`（Calyx）；被否核内嵌壳、根包装配 Calyx 进 `mei` 命令、为未来工具留槽。
-理由：Mei 不含壳；Calyx 同时服务城控制台，权威在 sprawling 依赖而非 Mei 安装面。 -/
+/-! D11 crate `sprawling-mei`、npm `@sprawling/mei`；发布含 Windows；归档并列无头核与 Calyx 面；
+交互经 `calyx`（Calyx D4）；被否核内嵌壳、把 Calyx 链进 `mei` 进程、为未来工具留槽。
+理由：Mei 不含壳；两个独立二进制由同一包完成一次安装，壳的权威在 Calyx。 -/
 /-! D12 人可见诊断版式为 Description / Cause / Resolution。 -/
 /-! D13 无核内超时；超时外置。 -/
 /-! D14 不声明 provider 专有 `strict`；唯一 schema 与 agent 整波预检是跨 provider 合同。
@@ -318,3 +338,6 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 /-! D17 inline 文件归 run，spilled 文件归 session/caller；path 是引用而非所有权转移。
 被否：Python 退出时删除全部 capture（resume 路径失效）、永久保留 inline（无引用文件随调用数增长）、
 以管道 lazy-spill 替换当前文件捕获（后台子孙的 drain 合同超出本次改动）。 -/
+/-! D18 `HARNESS_MODEL` 缺省时服从 Magpie `first_id` 的可见路由，空目录失败；理由：零参数启动应使用人已配置的路由，而不是另存一份模型配置。被否：编译期模型名、扫描并改写 Magpie 配置、静默取任意不可用模型。 -/
+/-! D19 图片仍经唯一 python 工具的 `show_image` 原语返回标准 image tool-result；理由：模型必须收到视觉块才能真正看图，base64 不进入 stdout 就不会挤占小结果预算。被否：第二图片工具、OCR/外部视觉 API 冒充 Mei 自身看图、把 base64 当普通文本。 -/
+/-! D20 默认 adaptive + high 只定义请求；实际 model/effort 仅以 Magpie route 为确认来源，未确认就标 requested。被否：把路由组 ID 当最终模型、把支持级别列表当当前级别、为显示状态而伪报 default。 -/

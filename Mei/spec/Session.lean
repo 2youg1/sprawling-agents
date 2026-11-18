@@ -8,8 +8,8 @@ import Mei.spec.Agent
 /-!
 # Mei 的显式 JSONL 会话模型
 
-User 要求在现有 `sprawling mei` CLI 中只增加 `/new` 与 `/resume <jsonl>`。
-每次 `/new` 建立一个新日志文件，旧文件不动；恢复路径由 User 明示。
+User 要求极简会话操作：`/new`（`/n`）新建，`/resume`（`/r`）恢复上一个会话，仍可用
+`/resume <jsonl>` 明示路径；`/quit`（`/q`）退出。每次新建保留旧文件；无参恢复使用刚离开的非空会话。
 本模型拥有消息历史、会话代次与完整日志恢复，不拥有 Python 进程现场、文件副作用或模型请求。
 assistant `stop` 是日志元数据，恢复时剥去。文件命名与追加 I/O 由 Rust 适配器验证。
 -/

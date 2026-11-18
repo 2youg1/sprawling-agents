@@ -12,9 +12,10 @@ use std::process::ExitCode;
 use serde_json::{Value, json};
 
 use mei::error::{Code, Diagnostic, Error, Result};
-use mei::{agent, doctor, python, resume, transport, workspace};
+use mei::{agent, doctor, observation, python, resume, transport, workspace};
 
 const MAX_TOKENS: u64 = 65536;
+const DEFAULT_EFFORT: &str = "high";
 const SYSTEM: &str = include_str!("MEI.md");
 const DEFAULT_BASE: &str = "http://127.0.0.1:3425";
 
@@ -40,22 +41,28 @@ fn run() -> Result<String> {
     let arguments = arguments()?;
     let prompt = prompt(arguments.prompt)?;
     let history = arguments.resume.as_deref().map(resume::read).transpose()?;
-    let model = optional_environment("HARNESS_MODEL")?.ok_or_else(|| {
-        Error::Diagnostic(Diagnostic::new(
-            Code::Config,
-            "read HARNESS_MODEL",
-            "the variable is required and must not be empty",
-            "set HARNESS_MODEL to magpie's provider/model spelling",
-        ))
-    })?;
-    if model.is_empty() {
-        return Err(Error::Diagnostic(Diagnostic::new(
-            Code::Config,
-            "read HARNESS_MODEL",
-            "the variable must not be empty",
-            "set HARNESS_MODEL to magpie's provider/model spelling",
-        )));
-    }
+    let configured_model = optional_environment("HARNESS_MODEL")?;
+    let now = current_unix_seconds()?;
+    let base = environment_or("ANTHROPIC_BASE_URL", DEFAULT_BASE)?;
+    let key = environment_or("ANTHROPIC_API_KEY", "magpie")?;
+    let mut client = transport::Client::new(&base, key)?;
+    let (model, discovered) = match configured_model {
+        Some(model) => {
+            if model.is_empty() {
+                return Err(Error::Diagnostic(Diagnostic::new(
+                    Code::Config,
+                    "read HARNESS_MODEL",
+                    "the variable must not be empty",
+                    "set HARNESS_MODEL to magpie's provider/model spelling, or unset it to use Magpie's preferred route",
+                )));
+            }
+            (model, None)
+        }
+        None => {
+            let selection = client.discover(now)?;
+            (selection.model.clone(), Some(selection))
+        }
+    };
     let extra = parse_extra(optional_environment("HARNESS_EXTRA")?.as_deref())?;
     let guide = match history {
         Some(_) => None,
@@ -67,13 +74,31 @@ fn run() -> Result<String> {
         history,
         guide: guide.as_deref(),
     };
-    let base = environment_or("ANTHROPIC_BASE_URL", DEFAULT_BASE)?;
-    let key = environment_or("ANTHROPIC_API_KEY", "magpie")?;
-    let client = transport::Client::new(&base, key)?;
-    let environment = doctor::ensure(current_unix_seconds()?)?;
+    let environment = doctor::ensure(now)?;
     let mut request = initial_request(task, extra, &environment)?;
-    let mut python = python::Py::spawn_in(&environment)?;
+    let (context_tokens, efforts) = match &discovered {
+        Some(selection) => (selection.context_tokens, selection.efforts.clone()),
+        None => (None, Vec::new()),
+    };
+    let effort = request
+        .pointer("/output_config/effort")
+        .and_then(Value::as_str)
+        .unwrap_or("default");
     let mut trace = std::io::stderr();
+    observation::write(
+        &mut trace,
+        &json!({
+            "type": "mei.obs",
+            "kind": "model",
+            "model": model,
+            "context_tokens": context_tokens,
+            "efforts": efforts,
+            "effort": effort,
+            "effort_source": "requested",
+        }),
+        "trace the selected Mei model",
+    )?;
+    let mut python = python::Py::spawn_in(&environment)?;
     let result = agent::run(
         &mut request,
         |request, pulse| client.post(request, pulse),
@@ -225,6 +250,8 @@ fn initial_request(
     let mut request = json!({
         "model": model,
         "max_tokens": MAX_TOKENS,
+        "thinking": {"type": "adaptive"},
+        "output_config": {"effort": DEFAULT_EFFORT},
         "system": SYSTEM,
         "tools": [python_tool(environment)],
         "messages": [{"role": "user", "content": prompt}],

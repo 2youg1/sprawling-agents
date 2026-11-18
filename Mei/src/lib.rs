@@ -5,8 +5,10 @@
 
 pub mod agent;
 pub mod capture;
+pub mod catalog;
 pub mod doctor;
 pub mod error;
+pub mod observation;
 pub mod python;
 pub mod resume;
 pub mod transport;

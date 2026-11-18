@@ -32,8 +32,12 @@ Calyx 通过 `MEI_CAPTURE_CREATED=1` 把空目录交给 Mei。成功段保留 se
 /-! ## 2 验收标准
 
 - 交互：`calyx` 在工作区打开 Mei 后端；`MEI_BIN`、同目录 sibling、或 PATH 名 `mei` 解析无头核；
-  `/new`、`/resume`、Esc 保持 Console §8-174；横幅为 cwd；composer 为 `model · usage|unknown`；
-  运行中显示 working；`mei.obs` pulse/usage 不落成 Note；Esc 在 Windows 上结束子树。
+  `/new`/`/n`、`/resume [jsonl]`/`/r [jsonl]`、`/quit`/`/q`、Esc 保持 Console §8-174 的会话边界；
+  无参 `/resume` 恢复刚离开的非空会话。`/e`/`/effect` 按 Magpie `reasoning_levels` 循环切换下一次请求的 effort。
+  横幅为 cwd；composer 显示实际或 requested model/effort、`Agent Step`、已用上下文/最大上下文及两位小数百分比；
+  已用量是 `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`，不是累计多轮账单。
+  运行中显示 working；`mei.obs` pulse/model/route/usage 不落成 Note；图片块只显示简短图片提示，不显示 base64；Esc 在 Windows 上结束子树。
+  Esc 仅清草稿或停止当前 run，空闲时不动作，绝不退出 Calyx；只有 `/quit`/`/q` 关闭终端面并回收其子树。
 - 城：`sprawling` 经宿主 ABI 进入同一套 Zig 壳；斜杠、远程钩子、生命周期与今日 Console 合同一致。
 - 无头 `mei -p`、`mei --resume` 与管道 stdin 不依赖 Calyx 进程。
 - 每个交互 run 的 capture 目录只经子进程环境传入；成功时保留 spilled，失败或取消时删除整个未提交目录。
@@ -84,7 +88,7 @@ Rust `sprawling-calyx` 只保留城/Mei 宿主适配与对外库面（`sprawling
 /-! D2 Mei 交互只经进程 Face spawn 无头 `mei`。 -/
 /-! D3 不设 Archetype 前缀；本包为生产面。 -/
 /-! D4 `@sprawling/mei` 归档与平台包同时携带无头 `mei` 与交互 `calyx`；npm shim 在 TTY 且无 `-p`／`--resume` 时 exec `calyx` 并设置 `MEI_BIN` 为同包无头核，否则 exec 无头核（`-p`、`--resume`、非 TTY stdin）。理由：一次完成要求无参 TTY 即可进入交互；无头 `--resume` 是核旗标，不得被面吞掉；「Mei 不含壳」约束的是核进程不内嵌 TUI，不是拒绝同归档并列二进制。被否：只发无头核、强制人另装 `sprawling` 并手写 `MEI_BIN`；把 Calyx 链进 `mei` 进程；TTY 上把 `--resume` 交给只认 `--replay` 的 `calyx`。 -/
-/-! D5 Mei 状态行：cwd、model·usage|unknown、working；pulse/usage 观测吞掉不刷 Note。 -/
+/-! D5 Mei 状态行：cwd、实际/requested model 与 effort、Agent Step、上下文两位小数百分比及 used/max；pulse/model/route/usage 观测吞掉不刷 Note。 -/
 /-! D5a Calyx 拥有交互 session 的 spilled captures，并按 run 回收未提交目录。理由：只有 Calyx 持有正式日志的追加结果，能区分成功、确认未写入与回滚后不确定；Mei 在进程边界前无法作出最终保留决定。路径可跨 Python 进程与 resume 使用；Python 退出不等于 session 所有权结束。目录由 Calyx 独占创建，只有这个创建事实授权失败、取消与析构时的递归删除；回滚失败的追加视为"可能已写盘"，不删除任何捕获文件。被否：由 Mei 在解释器退出时决定交互 session 的最终保留（看不到其后的日志追加结果），以及只凭进程号、时间和计数生成的路径删除既有目录（可能删除其他 run 的内容）。 -/
 /-! D6 `calyx` 二进制是壳的装配根；墙钟采样在进入壳时注入，库面仍可接收宿主提供的时刻。 -/
 /-! D7 整壳 Zig；Rust 只做城/线/核宿主
@@ -117,3 +121,5 @@ Rust 是宿主边界，不是壳实现。
 
 被否：①`deny.toml` 登记 ignore——清除条件在上游手里；②chrono 换 `time`/`jiff`——`runtime::clock` 已覆盖 UTC 数学，这两个只为取本地偏移而来；③「当前偏移」算术——跨夏令时边界的旧时刻差一小时，OS 按时刻换算与 chrono 旧行为等价（细节与 SAFETY 前提在 `Calyx/ffi/Spec.lean` D12）。
 -/
+
+/-! D9 Mei 短命令与无参恢复归 Calyx：`/n` 等价 `/new`，`/r` 无参恢复刚离开的非空会话，`/q` 等价 `/quit`；`/e` 只改后续请求，不伪造当前 route 已确认。模型切换不另做 `/m`，由 Magpie 路由拥有。Esc 只停止，不退出。 -/

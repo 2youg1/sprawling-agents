@@ -96,6 +96,11 @@ test {
     _ = menu;
     _ = @import("termio.zig");
     _ = @import("screen.zig");
+    _ = @import("mei_command.zig");
+    _ = @import("mei_effort.zig");
+    _ = @import("mei_observation.zig");
+    _ = @import("mei_session_control.zig");
+    _ = @import("mei_runtime.zig");
     _ = @import("mei_process.zig");
     _ = @import("mei_session.zig");
     _ = @import("mei_ui.zig");

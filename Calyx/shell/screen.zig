@@ -50,7 +50,8 @@ pub const Screen = struct {
     }
 
     pub fn take(self: *Screen) Written {
-        termio.enableRaw() catch {
+        termio.enableRaw() catch |err| {
+            std.debug.print("Calyx terminal initialization failed: {s}\n", .{@errorName(err)});
             self.lost = true;
             return .lost;
         };

@@ -49,7 +49,7 @@ struct Call {
 pub fn run(
     request: &mut Value,
     mut post: impl FnMut(&Value, &mut dyn Write) -> Result<Value>,
-    mut exec: impl FnMut(&str) -> Result<String>,
+    mut exec: impl FnMut(&str) -> Result<Value>,
     trace: &mut dyn Write,
 ) -> Result<String> {
     let mut first_response = true;

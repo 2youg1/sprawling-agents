@@ -14,6 +14,8 @@ use crate::capture::Store as CaptureStore;
 use crate::doctor::Environment;
 use crate::error::{Code, Diagnostic, Error, Result};
 
+mod frame;
+
 pub use crate::capture::INLINE_BYTES;
 
 const BOOT: &str = include_str!("boot.py");
@@ -32,6 +34,7 @@ pub fn tool_description(environment: &Environment) -> String {
             "filter that file, or re-run with narrower output, in the next python call. ",
             "Run shell commands and CLIs through subprocess, capture their output, and check return codes. ",
             "Start child interpreters with sys.executable, so they inherit the active environment. ",
+            "Call show_image(path) to attach PNG, JPEG, GIF, or WebP bytes as visual tool-result content; the image is not text output. ",
             "Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, ",
             "python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>"
         ),
@@ -145,7 +148,7 @@ impl Py {
     ///
     /// # Errors
     /// Channel, frame, capture-file and process failures.
-    pub fn run(&mut self, code: &str) -> Result<String> {
+    pub fn run(&mut self, code: &str) -> Result<serde_json::Value> {
         let frame = serde_json::to_vec(code).map_err(|err| {
             failure(
                 "serialize a Python control frame",
@@ -154,8 +157,9 @@ impl Py {
             )
         })?;
         self.write_frame(&frame)?;
-        let path = self.read_frame()?;
-        self.captures.observe(path)
+        let frame = self.read_frame()?;
+        let text = self.captures.observe(frame.capture)?;
+        Ok(frame::content(text, frame.images))
     }
 
     fn write_frame(&mut self, frame: &[u8]) -> Result<()> {
@@ -179,7 +183,7 @@ impl Py {
             })
     }
 
-    fn read_frame(&mut self) -> Result<String> {
+    fn read_frame(&mut self) -> Result<frame::Frame> {
         let mut line = String::new();
         let count = self.output.read_line(&mut line).map_err(|err| {
             failure(
@@ -202,20 +206,7 @@ impl Py {
                 "the interpreter or private channel died; start a new Mei process",
             ));
         }
-        let value: serde_json::Value = serde_json::from_str(&line).map_err(|err| {
-            failure(
-                "parse a Python response frame",
-                err.to_string(),
-                "the private channel must contain exactly one JSON string per response",
-            )
-        })?;
-        value.as_str().map(str::to_owned).ok_or_else(|| {
-            failure(
-                "parse a Python response frame",
-                "the JSON value is not a string",
-                "the private channel must contain JSON strings, not objects",
-            )
-        })
+        frame::parse(&line)
     }
 
     /// Closes control input and reaps within [`CLOSE_GRACE`], else kills.
@@ -333,6 +324,10 @@ impl Drop for Py {
 mod tests {
     use super::*;
 
+    fn text(value: serde_json::Value) -> String {
+        value.as_str().unwrap().to_owned()
+    }
+
     fn read_path(path: &str) -> String {
         std::fs::read_to_string(path).unwrap().replace("\r\n", "\n")
     }
@@ -343,30 +338,20 @@ mod tests {
         assert_eq!(python.run("x = 40").unwrap(), "");
         assert_eq!(python.run("40 + 2").unwrap(), "");
         assert!(
-            python
-                .run("raise ValueError('recoverable')")
-                .unwrap()
+            text(python.run("raise ValueError('recoverable')").unwrap())
                 .contains("ValueError: recoverable")
         );
         assert_eq!(
-            python.run("print(x)").unwrap().replace("\r\n", "\n"),
+            text(python.run("print(x)").unwrap()).replace("\r\n", "\n"),
             "40\n"
         );
         assert_eq!(
-            python
-                .run("x += 2\nprint(x)")
-                .unwrap()
-                .replace("\r\n", "\n"),
+            text(python.run("x += 2\nprint(x)").unwrap()).replace("\r\n", "\n"),
             "42\n"
         );
-        assert!(
-            python
-                .run("raise SystemExit(3)")
-                .unwrap()
-                .contains("SystemExit: 3")
-        );
+        assert!(text(python.run("raise SystemExit(3)").unwrap()).contains("SystemExit: 3"));
         assert_eq!(
-            python.run("print(x)").unwrap().replace("\r\n", "\n"),
+            text(python.run("print(x)").unwrap()).replace("\r\n", "\n"),
             "42\n"
         );
         assert_eq!(python.run("pass").unwrap(), "");
@@ -408,7 +393,7 @@ mod tests {
         let first = python
             .run(&format!("import os\nos.chdir({path})\nprint(os.getcwd())"))
             .unwrap();
-        let second = python.run("print(os.getcwd())").unwrap();
+        let second = text(python.run("print(os.getcwd())").unwrap());
         assert_eq!(first, second);
         assert_eq!(
             std::path::Path::new(second.trim()).canonicalize().unwrap(),
@@ -420,9 +405,9 @@ mod tests {
     #[test]
     fn sys_executable_starts_a_captured_child_python() {
         let mut python = Py::spawn().unwrap();
-        let output = python
+        let output = text(python
             .run("import subprocess, sys\nchild = subprocess.run([sys.executable, '-c', 'print(42)'], capture_output=True, text=True, check=True)\nprint(child.stdout, end='')")
-            .unwrap();
+            .unwrap());
         assert_eq!(output.replace("\r\n", "\n"), "42\n");
         python.close().unwrap();
     }
@@ -430,7 +415,7 @@ mod tests {
     #[test]
     fn large_output_is_a_notice_and_full_file_path() {
         let mut python = Py::spawn().unwrap();
-        let notice = python.run("print('x' * 50000)").unwrap();
+        let notice = text(python.run("print('x' * 50000)").unwrap());
         assert!(notice.starts_with("Output exceeds 16384 bytes."));
         let path = notice.lines().last().unwrap();
         assert_eq!(read_path(path).len(), 50001);
@@ -441,8 +426,8 @@ mod tests {
     fn the_inline_budget_is_exact() {
         let mut python = Py::spawn().unwrap();
         let inline = python.run("import os\nos.write(1, b'x' * 16384)").unwrap();
-        assert_eq!(inline.len(), 16384);
-        let notice = python.run("os.write(1, b'x' * 16385)").unwrap();
+        assert_eq!(text(inline).len(), 16384);
+        let notice = text(python.run("os.write(1, b'x' * 16385)").unwrap());
         assert!(notice.starts_with("Output exceeds 16384 bytes."));
         python.close().unwrap();
     }
@@ -450,7 +435,7 @@ mod tests {
     #[test]
     fn non_utf8_output_is_a_notice_and_full_file_path() {
         let mut python = Py::spawn().unwrap();
-        let notice = python.run("import os\nos.write(1, b'\\xff')").unwrap();
+        let notice = text(python.run("import os\nos.write(1, b'\\xff')").unwrap());
         assert!(notice.starts_with("Output is not UTF-8."));
         let path = notice.lines().last().unwrap();
         assert_eq!(std::fs::read(path).unwrap(), [255]);
@@ -475,9 +460,9 @@ mod tests {
     #[test]
     fn leftover_threads_cannot_hold_the_answer() {
         let mut python = Py::spawn().unwrap();
-        let output = python
+        let output = text(python
             .run("import threading\nthreading.Thread(target=threading.Event().wait).start()\nprint('answered')")
-            .unwrap();
+            .unwrap());
         assert_eq!(output.replace("\r\n", "\n"), "answered\n");
         python
             .close_within(Duration::from_millis(200))

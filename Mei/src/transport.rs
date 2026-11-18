@@ -12,7 +12,9 @@ use std::time::Duration;
 
 use serde_json::{Value, json};
 
+use crate::catalog::{self, Selection};
 use crate::error::{Code, Diagnostic, Error, Result, protocol};
+use crate::observation;
 
 /// Per-address TCP connect budget. The gateway is normally loopback, so a
 /// handshake with no answer in this long is a dead gateway, not a slow one.
@@ -39,6 +41,7 @@ pub struct Client {
     authority: String,
     addresses: Vec<SocketAddr>,
     key: String,
+    session: Option<String>,
     timeouts: Timeouts,
 }
 
@@ -99,8 +102,20 @@ impl Client {
             authority,
             addresses,
             key,
+            session: None,
             timeouts,
         })
+    }
+
+    /// Selects Magpie's preferred visible route and enables per-run route observation.
+    ///
+    /// # Errors
+    /// The catalog is unreachable, malformed, or contains no usable chat model.
+    pub fn discover(&mut self, now: u64) -> Result<Selection> {
+        let answer = self.get("/v1/models")?;
+        let selection = catalog::select(&answer)?;
+        self.session = Some(format!("mei-{}-{now}", std::process::id()));
+        Ok(selection)
     }
 
     /// Sends one complete request and reads its complete response to EOF.
@@ -119,6 +134,10 @@ impl Client {
             )
         })?;
         let path = format!("http://{}/v1/messages", self.authority);
+        let session = match &self.session {
+            Some(session) => format!("X-Magpie-Session: {session}\r\n"),
+            None => String::new(),
+        };
         let mut stream = self.connect()?;
         stream
             .set_write_timeout(Some(self.timeouts.io))
@@ -135,9 +154,10 @@ impl Client {
             })?;
         write!(
             stream,
-            "POST /v1/messages HTTP/1.0\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nx-api-key: {}\r\nanthropic-version: 2023-06-01\r\n\r\n",
+            "POST /v1/messages HTTP/1.0\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nx-api-key: {}\r\nanthropic-version: 2023-06-01\r\n{}\r\n",
             body.len(),
             self.key,
+            session,
         ).and_then(|()| stream.write_all(&body)).and_then(|()| stream.flush()).map_err(|err| {
             Error::Diagnostic(
                 Diagnostic::new(Code::Transport, "write the Messages request", err.to_string(), "check the gateway connection; no retry was attempted")
@@ -145,6 +165,84 @@ impl Client {
             )
         })?;
         let response = read_to_eof(&mut stream, &self.timeouts, pulse, &path)?;
+        let answer = parse(&response)?;
+        if self.session.is_some() {
+            let route = match self.route_observation() {
+                Ok(route) => route,
+                Err(error) => json!({
+                    "type": "mei.obs",
+                    "kind": "route",
+                    "available": false,
+                    "reason": error.to_string(),
+                }),
+            };
+            observation::write(pulse, &route, "trace a Magpie route observation")?;
+        }
+        Ok(answer)
+    }
+
+    fn route_observation(&self) -> Result<Value> {
+        let Some(session) = &self.session else {
+            return Err(Error::Diagnostic(Diagnostic::new(
+                Code::Protocol,
+                "observe a Magpie route without a session",
+                "the client has no X-Magpie-Session id",
+                "use discover before post, or leave HARNESS_MODEL explicit",
+            )));
+        };
+        let target = format!("/v1/magpie/route?session={session}");
+        let answer = self.get(&target)?;
+        let route = catalog::route(&answer)?;
+        let effort_source = if route.effort.is_some() {
+            "actual"
+        } else {
+            "unstated"
+        };
+        Ok(json!({
+            "type": "mei.obs",
+            "kind": "route",
+            "available": true,
+            "model": route.model,
+            "effort": route.effort,
+            "effort_source": effort_source,
+        }))
+    }
+
+    fn get(&self, target: &str) -> Result<Value> {
+        let path = format!("http://{}{}", self.authority, target);
+        let mut stream = self.connect()?;
+        stream
+            .set_write_timeout(Some(self.timeouts.io))
+            .map_err(|err| {
+                Error::Diagnostic(
+                    Diagnostic::new(
+                        Code::Transport,
+                        "arm the Magpie socket timeouts",
+                        err.to_string(),
+                        "retry against the same gateway; no retry was attempted",
+                    )
+                    .with_path(path.clone()),
+                )
+            })?;
+        write!(
+            stream,
+            "GET {target} HTTP/1.0\r\nConnection: close\r\nx-api-key: {}\r\n\r\n",
+            self.key,
+        )
+        .and_then(|()| stream.flush())
+        .map_err(|err| {
+            Error::Diagnostic(
+                Diagnostic::new(
+                    Code::Transport,
+                    "write the Magpie request",
+                    err.to_string(),
+                    "check the gateway connection; no retry was attempted",
+                )
+                .with_path(path.clone()),
+            )
+        })?;
+        let mut sink = std::io::sink();
+        let response = read_to_eof(&mut stream, &self.timeouts, &mut sink, &path)?;
         parse(&response)
     }
 

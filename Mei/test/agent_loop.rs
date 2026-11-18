@@ -9,6 +9,15 @@ use serde_json::Value;
 
 use crate::support::{read_request_body, run, serve, serve_with, tool_result_text};
 
+fn assert_model_observation(line: &str) {
+    let value: Value = serde_json::from_str(line).unwrap();
+    assert_eq!(value["type"], "mei.obs");
+    assert_eq!(value["kind"], "model");
+    assert_eq!(value["model"], "test/model");
+    assert_eq!(value["effort"], "high");
+    assert_eq!(value["effort_source"], "requested");
+}
+
 #[test]
 fn direct_answer_has_only_the_final_text_on_stdout() {
     let (base, handle) = serve(vec![
@@ -21,9 +30,10 @@ fn direct_answer_has_only_the_final_text_on_stdout() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(output.stdout, b"answer");
-    let trace: Vec<Value> = String::from_utf8(output.stderr)
-        .unwrap()
-        .lines()
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let mut lines = stderr.lines();
+    assert_model_observation(lines.next().unwrap());
+    let trace: Vec<Value> = lines
         .map(|line| serde_json::from_str(line).unwrap())
         .collect();
     assert_eq!(
@@ -102,10 +112,10 @@ fn a_non_200_body_reaches_stderr_unchanged() {
     });
     let output = run(&base, "hello", None);
     assert!(!output.status.success());
-    assert_eq!(
-        String::from_utf8(output.stderr).unwrap(),
-        "provider says no\n"
-    );
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let (observation, body) = stderr.split_once('\n').unwrap();
+    assert_model_observation(observation);
+    assert_eq!(body, "provider says no\n");
     handle.join().unwrap();
 }
 
@@ -192,7 +202,9 @@ fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     let trace = std::fs::read_to_string(first.join("run.jsonl")).unwrap();
     assert!(output.status.success(), "{trace}");
     assert_eq!(output.stdout, b"42");
-    assert_eq!(trace.lines().count(), 6);
+    let mut lines = trace.lines();
+    assert_model_observation(lines.next().unwrap());
+    assert_eq!(lines.count(), 6);
     let requests = first_gateway.join().unwrap();
     assert_eq!(requests.len(), 3);
     assert_eq!(requests[0]["model"], "test/model");
@@ -305,9 +317,10 @@ fn cli_resume_imports_only_complete_message_history() {
             {"role": "user", "content": "second"}
         ])
     );
-    let trace: Vec<Value> = String::from_utf8(output.stderr)
-        .unwrap()
-        .lines()
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let mut lines = stderr.lines();
+    assert_model_observation(lines.next().unwrap());
+    let trace: Vec<Value> = lines
         .map(|line| serde_json::from_str(line).unwrap())
         .collect();
     assert_eq!(
