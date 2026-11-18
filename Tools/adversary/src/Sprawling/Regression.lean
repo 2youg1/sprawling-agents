@@ -142,8 +142,7 @@ private def refused (world : World) (index : Nat) (act : Action y) : List String
     ++ handed 8 index act
     ++ [ "        .unwrap_err();"
        , s!"    assert_eq!(*{named}.code(), AxCode::{owed});"
-       , "    // A refusal is a promise in three parts; a code with no way forward"
-       , "    // keeps only one of them."
+       , ""
        , s!"    assert!(!{named}.recovery().is_empty());" ]
 
 /-- Whether any step names an address, and so needs `Address`. -/
@@ -178,9 +177,7 @@ private def imports (trace : Trace) : List String :=
     | [only] => "use kernel::" ++ only ++ ";"
     | names => "use kernel::{" ++ String.intercalate ", " names ++ "};"
   [ taken
-  , "// The city is formed with an in-memory vault, because these tests are"
-  , "// about the worker and must not write to the credential service of the"
-  , "// machine that runs them."
+  , ""
   , "use accounting::worker::genesis::{Adopt, form};"
   , "use sprawling::assembly;" ]
 
@@ -192,12 +189,7 @@ element of the outer join, and a trailing newline would end the file on a blank
 line. -/
 private def standingHelper : String :=
   String.intercalate "\n"
-    [ "/// The addresses this city's history says stand, sorted."
-    , "///"
-    , "/// The address is read from the payload rather than from the envelope: a"
-    , "/// city-level record is written against `RunId::CITY` with no address of its"
-    , "/// own, so an envelope check would pass for the wrong reason."
-    , "fn standing(ledger: &std::path::Path) -> Vec<String> {"
+    [ "fn standing(ledger: &std::path::Path) -> Vec<String> {"
     , "    let mut addresses: Vec<String> = stated(ledger, kernel::EventKind::BuildingCreated, \"addr\")"
     , "        .iter()"
     , "        .filter_map(|addr| addr.as_str().map(str::to_owned))"
@@ -223,8 +215,6 @@ private def cityAndWorker (named : Bool) : List String :=
   , "    )"
   , "    .unwrap();"
   , ""
-  , "    // The vault is the in-session one: a test that reached the platform"
-  , "    // credential service would write to the machine running it."
   , "    let mut worker = accounting::worker::RunWorker::new("
   , "        dir.path(),"
   , "        runtime::diagnostics::Diagnostics::off(),"
@@ -238,15 +228,6 @@ private def preamble (name : String) (trace : Trace) : List String :=
   , "// License, v. 2.0. If a copy of the MPL was not distributed with this"
   , "// file, You can obtain one at https://mozilla.org/MPL/2.0/."
   , "// Copyright (c) 2026 2youg1 and the sprawling contributors"
-  , ""
-  , "//! The traces the adversary found, kept here so this repository remembers them."
-  , "//!"
-  , "//! Written by `Tools/adversary/src/Sprawling/Regression.lean` and compared against it"
-  , "//! byte for byte. Change the trace there; changing it here turns the adversary"
-  , "//! red, which is exactly what should happen when the two disagree."
-  , "//!"
-  , "//! The adversary drives the shipped binary over the wire. This enters by the"
-  , "//! same door `wire::server` does, so the trace runs without a port."
   , ""
   , "#![allow("
   , "    clippy::unwrap_used,"
@@ -282,9 +263,6 @@ private def oneUrlRegistered : List String :=
   [ "#[test]"
   , "fn every_spelling_of_one_endpoint_is_registered_as_one_url() {" ]
   ++ cityAndWorker true
-  ++ [ "    // A provider prints one endpoint several ways and a person pastes"
-     , "    // whichever one they were shown. Nothing listens on this address, so"
-     , "    // every attachment below is one the person's own model id carried." ]
   ++ spelled.zipIdx.map (fun entry => attaching entry.fst entry.snd)
   ++ [ ""
      , "    let written = stated("
@@ -292,9 +270,7 @@ private def oneUrlRegistered : List String :=
      , "        kernel::EventKind::EndpointAttached,"
      , "        \"base_url\","
      , "    );"
-     , "    // One registration per spelling, and the same URL in each: what is"
-     , "    // asserted is the relation between the readings, so no normalisation"
-     , "    // is recomputed here."
+     , ""
      , s!"    assert_eq!(written.len(), {spelled.length});"
      , "    assert!("
      , "        written.windows(2).all(|pair| pair[0] == pair[1]),"
@@ -314,9 +290,7 @@ private def ceilingRegistered : List String :=
   , "fn a_model_no_catalogue_prices_is_registered_with_a_ceiling() {" ]
   ++ cityAndWorker true
   ++ [ s!"    attach(&mut worker, {quoted relayName}, {quoted attachedUrl}).unwrap();"
-     , "    // The box a person left empty. The Anthropic wire requires"
-     , "    // `max_tokens` in every request, so a registration that kept the"
-     , "    // ceiling unstated is a model this city cannot call at all."
+     , ""
      , "    worker"
      , "        .handle(wire::Command::SelectModel {"
      , s!"            endpoint: wire::ProviderName::parse({quoted relayName}).unwrap(),"
@@ -341,9 +315,7 @@ private def ceilingRegistered : List String :=
      , "            .is_some_and(|tokens| tokens > 0),"
      , "        \"a model nobody priced was registered with {ceilings:?}\""
      , "    );"
-     , "    // Which rung answered, read back in the ladder's own spelling: this"
-     , "    // id is in no catalogue and under no preset host, so the policy"
-     , "    // default is the rung that was left."
+     , ""
      , "    let rungs = stated("
      , "        &raised.ledger_dir,"
      , "        kernel::EventKind::ModelSelected,"
@@ -361,14 +333,7 @@ The model id is named rather than left to the probe, for the product's own
 reason: an attachment that declared no id is refused when the probe reaches
 nobody, and nothing listens on this address. -/
 private def attachHelper : List String :=
-  [ "/// One endpoint attached under a name of its own, with the model id the"
-  , "/// person named."
-  , "///"
-  , "/// The id is named rather than left to the probe: most compatible"
-  , "/// endpoints serve no model list, and this address serves nothing at"
-  , "/// all, so an attachment that declared no id would be refused for an"
-  , "/// interface the endpoint never promised."
-  , "fn attach("
+  [ "fn attach("
   , "    worker: &mut accounting::worker::RunWorker,"
   , "    name: &str,"
   , "    base_url: &str,"
@@ -392,13 +357,7 @@ Every assertion above asks it, and `standing` is written in terms of it rather
 than beside it: two readers of one ledger would be two accounts of what a record
 is. -/
 private def statedHelper : List String :=
-  [ "/// What this city's history states under one kind of record and one"
-  , "/// field, oldest first."
-  , "///"
-  , "/// The ledger is the only reading these tests take: what a city"
-  , "/// registered is what its history says it registered, and a field read"
-  , "/// off a live structure would be a second account of the same fact."
-  , "fn stated("
+  [ "fn stated("
   , "    ledger: &std::path::Path,"
   , "    kind: kernel::EventKind,"
   , "    field: &str,"
