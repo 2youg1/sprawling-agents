@@ -393,11 +393,6 @@ fn drive(ctx: *DriverCtx) Finished {
 fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
     const gpa = ctx.gpa;
     const io = ctx.io;
-    if (child.stdin) |stdin| {
-        try stdin.writeStreamingAll(io, ctx.prompt);
-        stdin.close(io);
-        child.stdin = null;
-    } else return error.OpenStdin;
 
     const stdout_file = child.stdout orelse return error.OpenStdout;
     const stderr_file = child.stderr orelse return error.OpenStderr;
@@ -410,7 +405,46 @@ fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
         err: ?anyerror = null,
     };
     var stdout_ctx: StdoutCtx = .{ .gpa = gpa, .io = io, .file = stdout_file };
-    const stdout_thread = try std.Thread.spawn(.{}, struct {
+    var stdout_thread: ?std.Thread = null;
+    var waited = false;
+    // A failed prompt write or thread spawn must not strand the child or the
+    // pipes, so every cleanup below guards on the field it owns instead of
+    // running only after the thread exists.
+    errdefer {
+        killTree(ctx, child.id);
+        if (stdout_thread) |thread| {
+            thread.join();
+            stdout_thread = null;
+        }
+        if (stdout_ctx.out) |out| {
+            gpa.free(out);
+            stdout_ctx.out = null;
+        }
+        if (child.stdin) |stdin| {
+            stdin.close(io);
+            child.stdin = null;
+        }
+        if (child.stderr) |file| {
+            file.close(io);
+            child.stderr = null;
+        }
+        if (!waited) {
+            _ = child.wait(io) catch {};
+            waited = true;
+        }
+        if (child.stdout) |file| {
+            file.close(io);
+            child.stdout = null;
+        }
+    }
+
+    if (child.stdin) |stdin| {
+        try stdin.writeStreamingAll(io, ctx.prompt);
+        stdin.close(io);
+        child.stdin = null;
+    } else return error.OpenStdin;
+
+    stdout_thread = try std.Thread.spawn(.{}, struct {
         fn run(c: *StdoutCtx) void {
             var buf: [4096]u8 = undefined;
             var reader = c.file.readerStreaming(c.io, &buf);
@@ -420,21 +454,6 @@ fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
             };
         }
     }.run, .{&stdout_ctx});
-    var joined = false;
-    errdefer {
-        if (!joined) {
-            killTree(ctx, child.id);
-            stdout_thread.join();
-            joined = true;
-            if (stdout_ctx.out) |out| gpa.free(out);
-            stdout_ctx.out = null;
-            stderr_file.close(io);
-            child.stderr = null;
-            _ = child.wait(io) catch {};
-            stdout_file.close(io);
-            child.stdout = null;
-        }
-    }
 
     var err_buf: [8192]u8 = undefined;
     var stderr_reader = stderr_file.readerStreaming(io, &err_buf);
@@ -447,9 +466,12 @@ fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
 
     const child_id = child.id;
     const term = try child.wait(io);
+    waited = true;
     killTree(ctx, child_id);
-    stdout_thread.join();
-    joined = true;
+    if (stdout_thread) |thread| {
+        thread.join();
+        stdout_thread = null;
+    }
     stdout_file.close(io);
     child.stdout = null;
 
@@ -590,6 +612,69 @@ test "stopping a process group reaps its driver" {
         io.sleep(std.Io.Duration.fromMilliseconds(10), .real) catch {};
     }
     try std.testing.expect(false);
+}
+
+test "a child gone before the prompt write still ends and drops its pipes" {
+    if (builtin.os.tag == .windows) return;
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+    var bus: Bus = .{ .gpa = gpa, .io = io };
+    defer bus.deinit();
+
+    const prompt = try gpa.alloc(u8, 4 * 1024 * 1024);
+    defer gpa.free(prompt);
+    @memset(prompt, 'x');
+
+    var drained: std.ArrayList(Event) = .empty;
+    defer {
+        for (drained.items) |ev| freeEvent(gpa, ev);
+        drained.deinit(gpa);
+    }
+
+    const settled = if (builtin.os.tag == .linux) try openFileCount(io) else 0;
+    var runs: usize = 0;
+    while (runs < 8) : (runs += 1) {
+        var process = switch (Process.spawn(gpa, io, &bus, "true", prompt, null, null, null)) {
+            .ok => |p| p,
+            .err => |e| {
+                defer gpa.free(e);
+                return error.TestUnexpectedResult;
+            },
+        };
+        var done = false;
+        var spins: usize = 0;
+        while (spins < 400 and !done) : (spins += 1) {
+            bus.drainInto(&drained);
+            for (drained.items) |ev| {
+                if (ev == .finished) {
+                    try std.testing.expect(!ev.finished.cancelled);
+                    switch (ev.finished.result) {
+                        .err => {},
+                        .ok => return error.TestUnexpectedResult,
+                    }
+                    done = true;
+                }
+            }
+            if (done) break;
+            io.sleep(std.Io.Duration.fromMilliseconds(5), .real) catch {};
+        }
+        try std.testing.expect(done);
+        for (drained.items) |ev| freeEvent(gpa, ev);
+        drained.clearRetainingCapacity();
+        process.deinit();
+    }
+    if (builtin.os.tag == .linux) {
+        try std.testing.expectEqual(settled, try openFileCount(io));
+    }
+}
+
+fn openFileCount(io: std.Io) !usize {
+    var dir = try std.Io.Dir.openDirAbsolute(io, "/proc/self/fd", .{ .iterate = true });
+    defer dir.close(io);
+    var count: usize = 0;
+    var it = dir.iterate();
+    while (try it.next(io)) |_| count += 1;
+    return count;
 }
 
 /// Ends the whole Mei tree: POSIX kills the process group the child led,
