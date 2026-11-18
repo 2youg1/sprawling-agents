@@ -5,6 +5,7 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+const mei_line = @import("mei_line.zig");
 
 var next_session: std.atomic.Value(u64) = .init(1);
 var next_run: std.atomic.Value(u64) = .init(1);
@@ -131,24 +132,33 @@ pub const Session = struct {
             return .{ .err = dupeOrStatic(gpa, "duplicate resume path") };
         };
 
-        const text = std.Io.Dir.cwd().readFileAlloc(io, path, gpa, .limited(64 * 1024 * 1024)) catch |err| {
+        var file = std.Io.Dir.cwd().openFile(io, path, .{}) catch |err| {
             const diag = formatFailure(gpa, "read the Mei resume log", @errorName(err), path) catch dupeOrStatic(gpa, "read the Mei resume log");
             gpa.free(path);
             return .{ .err = diag };
         };
-        defer gpa.free(text);
+        defer file.close(io);
+        const log_len = file.length(io) catch |err| {
+            const diag = formatFailure(gpa, "measure the Mei resume log", @errorName(err), path) catch dupeOrStatic(gpa, "measure the Mei resume log");
+            gpa.free(path);
+            return .{ .err = diag };
+        };
 
         var history: std.ArrayList([]u8) = .empty;
-        var it = std.mem.splitScalar(u8, text, '\n');
-        while (it.next()) |line| {
-            if (line.len == 0 and it.peek() == null) break;
-            const owned = gpa.dupe(u8, line) catch {
+        var buf: [8192]u8 = undefined;
+        var reader = file.readerStreaming(io, &buf);
+        while (true) {
+            const line = (mei_line.read(gpa, &reader.interface, mei_line.MAX_BYTES) catch |err| {
                 freeHistory(gpa, &history);
+                const diag = switch (err) {
+                    error.MessageLineTooLong => mei_line.tooLong(gpa, mei_line.MAX_BYTES, path) catch dupeOrStatic(gpa, "read one Mei message line"),
+                    else => formatFailure(gpa, "read the Mei resume log", @errorName(err), path) catch dupeOrStatic(gpa, "read the Mei resume log"),
+                };
                 gpa.free(path);
-                return .{ .err = dupeOrStatic(gpa, "duplicate history line") };
-            };
-            history.append(gpa, owned) catch {
-                gpa.free(owned);
+                return .{ .err = diag };
+            }) orelse break;
+            history.append(gpa, line) catch {
+                gpa.free(line);
                 freeHistory(gpa, &history);
                 gpa.free(path);
                 return .{ .err = dupeOrStatic(gpa, "store history line") };
@@ -161,7 +171,7 @@ pub const Session = struct {
             .path = path,
             .history = history,
             .resume_flag = true,
-            .log_len = @intCast(text.len),
+            .log_len = log_len,
         } };
     }
 

@@ -10,6 +10,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const windows = std.os.windows;
+const mei_line = @import("mei_line.zig");
 
 pub const Event = union(enum) {
     line: []u8,
@@ -370,7 +371,7 @@ fn drive(ctx: *DriverCtx) Finished {
         } else {
             child.kill(ctx.io);
         }
-        const msg = std.fmt.allocPrint(ctx.gpa, "{s}", .{@errorName(err)}) catch
+        const msg = mei_line.failureText(ctx.gpa, err) catch
             ctx.gpa.dupe(u8, "Mei I/O failure") catch unreachable;
         return .{
             .result = .{ .err = msg },
@@ -428,19 +429,11 @@ fn driveOutput(
         }
     }
 
-    var err_buf: [4096]u8 = undefined;
+    var err_buf: [8192]u8 = undefined;
     var stderr_reader = stderr_file.readerStreaming(io, &err_buf);
     while (true) {
-        const line = stderr_reader.interface.takeDelimiterExclusive('\n') catch |err| switch (err) {
-            error.EndOfStream => break,
-            error.StreamTooLong => {
-                _ = stderr_reader.interface.discardRemaining() catch {};
-                break;
-            },
-            else => return err,
-        };
-        const owned = try gpa.dupe(u8, std.mem.trimEnd(u8, line, "\r"));
-        bus.push(.{ .line = owned });
+        const line = (try mei_line.read(gpa, &stderr_reader.interface, mei_line.MAX_BYTES)) orelse break;
+        bus.push(.{ .line = line });
     }
     stderr_file.close(io);
     child.stderr = null;

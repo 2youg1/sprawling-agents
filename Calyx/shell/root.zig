@@ -5,6 +5,7 @@
 
 const std = @import("std");
 const argv = @import("argv.zig");
+const mei_line = @import("mei_line.zig");
 const mei_path = @import("mei_path.zig");
 const lifecycle = @import("lifecycle.zig");
 const editor = @import("editor.zig");

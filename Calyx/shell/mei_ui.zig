@@ -13,6 +13,7 @@ const program_status = @import("program_status.zig");
 const screen_mod = @import("screen.zig");
 const termio = @import("termio.zig");
 const mei_process = @import("mei_process.zig");
+const mei_line = @import("mei_line.zig");
 const mei_session = @import("mei_session.zig");
 const observation = @import("mei_observation.zig");
 const session_control = @import("mei_session_control.zig");
@@ -60,6 +61,8 @@ pub const Ui = struct {
     pending: std.ArrayList([]u8) = .empty,
     replay_path: ?[]const u8,
     replay_file: ?std.Io.File = null,
+    replay_buf: [8192]u8 = undefined,
+    replay_reader: ?std.Io.File.Reader = null,
     replay_done: bool,
     reporting: program_status.Reporting,
     held: program_status.Held = .opening,
@@ -252,26 +255,36 @@ pub const Ui = struct {
         return nowMs(self.io);
     }
 
+    fn replayReader(self: *Ui) ?*std.Io.Reader {
+        if (self.replay_reader == null) {
+            const file = self.replay_file orelse return null;
+            self.replay_reader = std.Io.File.Reader.initStreaming(file, self.io, &self.replay_buf);
+        }
+        return &self.replay_reader.?.interface;
+    }
+
     fn advanceReplay(self: *Ui) void {
         var index: usize = 0;
         while (index < replay_batch) : (index += 1) {
             if (self.replay_done or self.process != null or self.lost) return;
-            const file = self.replay_file orelse return;
-            var buf: [64 * 1024]u8 = undefined;
-            var reader = file.readerStreaming(self.io, &buf);
-            const line = reader.interface.takeDelimiterExclusive('\n') catch |err| {
+            const reader = self.replayReader() orelse return;
+            const line = (mei_line.read(self.gpa, reader, mei_line.MAX_BYTES) catch |err| {
                 self.replay_done = true;
-                if (err != error.EndOfStream) {
-                    var msg_buf: [128]u8 = undefined;
-                    const msg = std.fmt.bufPrint(&msg_buf, "read Mei replay: {s}", .{@errorName(err)}) catch "read Mei replay";
-                    self.printNote(msg);
-                }
+                const said = mei_line.failureText(self.gpa, err) catch {
+                    self.printNote("read Mei replay: the line outgrew its ceiling or the file failed");
+                    return;
+                };
+                defer self.gpa.free(said);
+                self.printNote(said);
+                return;
+            }) orelse {
+                self.replay_done = true;
                 return;
             };
-            const trimmed = std.mem.trimEnd(u8, line, "\r");
+            defer self.gpa.free(line);
             _ = self.frame_arena.reset(.retain_capacity);
             const arena = self.frame_arena.allocator();
-            const entries = self.seen.line(arena, trimmed, self.now()) catch continue;
+            const entries = self.seen.line(arena, line, self.now()) catch continue;
             self.print(entries);
         }
     }
