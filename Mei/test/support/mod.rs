@@ -67,6 +67,10 @@ pub fn serve(answers: Vec<Value>) -> (String, std::thread::JoinHandle<Vec<Value>
     serve_with(count, move |_, _| answers.next().unwrap())
 }
 
+#[allow(
+    dead_code,
+    reason = "shared support is compiled per integration test target"
+)]
 pub fn tool_result_text(content: &Value) -> String {
     content
         .as_str()
@@ -75,7 +79,7 @@ pub fn tool_result_text(content: &Value) -> String {
 }
 
 #[expect(clippy::disallowed_methods, reason = "test fixture process")]
-fn command(base: &str, prompt: &str) -> Command {
+pub fn command(base: &str, prompt: &str) -> Command {
     let mut command = Command::new(env!("CARGO_BIN_EXE_mei"));
     command
         .args(["-p", prompt])
@@ -86,6 +90,10 @@ fn command(base: &str, prompt: &str) -> Command {
     command
 }
 
+#[allow(
+    dead_code,
+    reason = "shared support is compiled per integration test target"
+)]
 pub fn run(base: &str, prompt: &str, harness: Option<&str>) -> Output {
     let mut command = command(base, prompt);
     if let Some(harness) = harness {

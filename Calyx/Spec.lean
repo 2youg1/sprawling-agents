@@ -23,7 +23,8 @@ ABI 向壳供事件、执行壳发起的城动作。WebUI（未来 `RefRain/`）
 | Mei 核 | 无头 `mei` 进程本身 | 独立二进制；壳负责 spawn/停组 |
 | 装配 | `sprawling-calyx` 链宿主；`calyx` 二进制由 `Calyx/build.zig` 产出；`@sprawling/mei` 归档携 `mei`+`calyx` | Zig + Rust 宿主 |
 
-Calyx 不实现模型环、不声明工具、不注入 AGENTS。
+Calyx 不实现模型环、不声明工具、不注入 AGENTS。Mei capture 的 session owner 由 Calyx 担任：
+每次 run 使用独立的捕获目录，成功段保留 session 所有的 spilled 文件，失败或取消段整目录回收。
 -/
 
 /-! ## 2 验收标准
@@ -33,6 +34,7 @@ Calyx 不实现模型环、不声明工具、不注入 AGENTS。
   运行中显示 working；`mei.obs` pulse/usage 不落成 Note；Esc 在 Windows 上结束子树。
 - 城：`sprawling` 经宿主 ABI 进入同一套 Zig 壳；斜杠、远程钩子、生命周期与今日 Console 合同一致。
 - 无头 `mei -p`、`mei --resume` 与管道 stdin 不依赖 Calyx 进程。
+- 每个交互 run 的 capture 目录只经子进程环境传入；成功时保留 spilled，失败或取消时删除整个未提交目录。
 - `Calyx/src` 不得再含壳实现（输入/生命周期/编辑器/菜单/屏面编排/按键/Mei 交互面）；由
   Calyx 壳残留门禁与 `zig build test`（`Calyx/`）守住。
 - **兼容回归**（生产门）：Mei 交互与无头、城控制台斜杠/生命周期、帧叶 vt100 对照、生命周期 160 向量，
@@ -77,6 +79,7 @@ Rust `sprawling-calyx` 只保留城/Mei 宿主适配与对外库面（`sprawling
 /-! D3 不设 Archetype 前缀；本包为生产面。 -/
 /-! D4 `@sprawling/mei` 归档与平台包同时携带无头 `mei` 与交互 `calyx`；npm shim 在 TTY 且无 `-p`／`--resume` 时 exec `calyx` 并设置 `MEI_BIN` 为同包无头核，否则 exec 无头核（`-p`、`--resume`、非 TTY stdin）。理由：一次完成要求无参 TTY 即可进入交互；无头 `--resume` 是核旗标，不得被面吞掉；「Mei 不含壳」约束的是核进程不内嵌 TUI，不是拒绝同归档并列二进制。被否：只发无头核、强制人另装 `sprawling` 并手写 `MEI_BIN`；把 Calyx 链进 `mei` 进程；TTY 上把 `--resume` 交给只认 `--replay` 的 `calyx`。 -/
 /-! D5 Mei 状态行：cwd、model·usage|unknown、working；pulse/usage 观测吞掉不刷 Note。 -/
+/-! D5a Calyx 拥有交互 session 的 spilled captures，并按 run 回收未提交目录。路径可跨 Python 进程与 resume 使用；Python 退出不等于 session 所有权结束。 -/
 /-! D6 `calyx` 二进制是壳的装配根；墙钟采样在进入壳时注入，库面仍可接收宿主提供的时刻。 -/
 /-! D7 整壳 Zig；Rust 只做城/线/核宿主
 

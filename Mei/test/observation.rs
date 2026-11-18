@@ -18,12 +18,24 @@ use support::{run, run_resume, serve_with, tool_result_text};
 
 fn tool(code: &str) -> Value {
     json!({"stop_reason": "tool_use", "content": [
-        {"type": "tool_use", "name": "Python3", "id": "call", "input": {"code": code}}
+        {"type": "tool_use", "name": "python", "id": "call", "input": {"code": code}}
     ]})
 }
 
 fn answer(text: &str) -> Value {
     json!({"stop_reason": "end_turn", "content": text})
+}
+
+#[test]
+fn lowercase_tool_carries_exact_runtime_versions() {
+    let (base, gateway) = serve_with(1, |_, _| answer("done"));
+    let output = run(&base, "inspect", None);
+    assert!(output.status.success());
+    let requests = gateway.join().unwrap();
+    assert_eq!(requests[0]["tools"][0]["name"], "python");
+    let description = requests[0]["tools"][0]["description"].as_str().unwrap();
+    assert!(description.starts_with("<python version=\""));
+    assert!(description.contains("\" uv_version=\""));
 }
 
 #[test]
@@ -99,7 +111,7 @@ fn resume_preserves_legacy_history_and_media_blocks() {
         {"role": "user", "content": "next"}
     ]);
     assert_eq!(requests[0]["messages"], expected);
-    assert_eq!(requests[0]["tools"][0]["name"], "Python3");
+    assert_eq!(requests[0]["tools"][0]["name"], "python");
 }
 
 #[test]

@@ -27,6 +27,14 @@ path = "test/cli.rs"
 name = "observation"
 path = "test/observation.rs"
 
+[[test]]
+name = "workspace"
+path = "test/workspace.rs"
+
+[[test]]
+name = "capture"
+path = "test/capture.rs"
+
 [dependencies]
 serde_json.workspace = true
 
