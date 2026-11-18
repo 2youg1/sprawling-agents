@@ -65,6 +65,7 @@ mod spec;
 mod specalign;
 mod theme;
 mod unused;
+mod upstream;
 mod vocabulary;
 mod walk;
 mod wire_ts;
