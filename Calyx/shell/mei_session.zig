@@ -138,6 +138,12 @@ pub const Session = struct {
             return .{ .err = diag };
         };
         defer file.close(io);
+        file.lock(io, .shared) catch |err| {
+            const diag = formatFailure(gpa, "lock the Mei resume log for reading", @errorName(err), path) catch dupeOrStatic(gpa, "lock the Mei resume log for reading");
+            gpa.free(path);
+            return .{ .err = diag };
+        };
+        defer file.unlock(io);
         const log_len = file.length(io) catch |err| {
             const diag = formatFailure(gpa, "measure the Mei resume log", @errorName(err), path) catch dupeOrStatic(gpa, "measure the Mei resume log");
             gpa.free(path);
