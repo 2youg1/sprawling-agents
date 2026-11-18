@@ -67,7 +67,7 @@ impl Code {
                 "The response must satisfy the minimal Anthropic Messages and sole-python-tool contract"
             }
             Code::Python => {
-                "The private Python channel must carry one valid JSON string frame per call and the interpreter must stay alive"
+                "The private Python channel must carry one valid {capture, images} response frame per call and the interpreter must stay alive"
             }
             Code::Session => {
                 "A resume log must contain complete Mei messages from the initial user prompt through an assistant end_turn"

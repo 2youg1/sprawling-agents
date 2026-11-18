@@ -9,6 +9,15 @@ use serde_json::Value;
 
 use crate::support::{read_request_body, run, serve, serve_with, tool_result_text};
 
+fn assert_model_observation(line: &str) {
+    let value: Value = serde_json::from_str(line).unwrap();
+    assert_eq!(value["type"], "mei.obs");
+    assert_eq!(value["kind"], "model");
+    assert_eq!(value["model"], "test/model");
+    assert_eq!(value["effort"], "high");
+    assert_eq!(value["effort_source"], "requested");
+}
+
 #[test]
 fn direct_answer_has_only_the_final_text_on_stdout() {
     let (base, handle) = serve(vec![
@@ -21,9 +30,10 @@ fn direct_answer_has_only_the_final_text_on_stdout() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(output.stdout, b"answer");
-    let trace: Vec<Value> = String::from_utf8(output.stderr)
-        .unwrap()
-        .lines()
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let mut lines = stderr.lines();
+    assert_model_observation(lines.next().unwrap());
+    let trace: Vec<Value> = lines
         .map(|line| serde_json::from_str(line).unwrap())
         .collect();
     assert_eq!(
@@ -102,10 +112,10 @@ fn a_non_200_body_reaches_stderr_unchanged() {
     });
     let output = run(&base, "hello", None);
     assert!(!output.status.success());
-    assert_eq!(
-        String::from_utf8(output.stderr).unwrap(),
-        "provider says no\n"
-    );
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let (observation, body) = stderr.split_once('\n').unwrap();
+    assert_model_observation(observation);
+    assert_eq!(body, "provider says no\n");
     handle.join().unwrap();
 }
 
@@ -192,7 +202,9 @@ fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     let trace = std::fs::read_to_string(first.join("run.jsonl")).unwrap();
     assert!(output.status.success(), "{trace}");
     assert_eq!(output.stdout, b"42");
-    assert_eq!(trace.lines().count(), 6);
+    let mut lines = trace.lines();
+    assert_model_observation(lines.next().unwrap());
+    assert_eq!(lines.count(), 6);
     let requests = first_gateway.join().unwrap();
     assert_eq!(requests.len(), 3);
     assert_eq!(requests[0]["model"], "test/model");
@@ -305,9 +317,10 @@ fn cli_resume_imports_only_complete_message_history() {
             {"role": "user", "content": "second"}
         ])
     );
-    let trace: Vec<Value> = String::from_utf8(output.stderr)
-        .unwrap()
-        .lines()
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let mut lines = stderr.lines();
+    assert_model_observation(lines.next().unwrap());
+    let trace: Vec<Value> = lines
         .map(|line| serde_json::from_str(line).unwrap())
         .collect();
     assert_eq!(
@@ -356,4 +369,85 @@ fn cli_resume_rejects_an_incomplete_log_before_starting_python() {
     let error = String::from_utf8_lossy(&output.stderr);
     assert!(error.contains("E_MEI_SESSION"), "{error}");
     assert!(!marker.exists(), "an invalid log reached Python");
+}
+
+fn catalog() -> Value {
+    serde_json::json!({
+        "first_id": "test/model",
+        "data": [{"id": "test/model", "context_window": 200000, "reasoning_levels": ["low", "high"]}]
+    })
+}
+
+#[test]
+fn the_model_observation_reports_the_model_the_request_carried() {
+    let (base, gateway) = crate::support::serve_paths(3, |path, _, _| match path {
+        "/v1/models" => crate::support::Answer::Json(catalog()),
+        "/v1/messages" => crate::support::Answer::Json(
+            serde_json::json!({"stop_reason": "end_turn", "content": [{"type": "text", "text": "answer"}]}),
+        ),
+        _ => crate::support::Answer::Json(
+            serde_json::json!({"route": {"model": "test/model", "effort": "high"}}),
+        ),
+    });
+    let output = crate::support::command(&base, "hello")
+        .env_remove("HARNESS_MODEL")
+        .env("HARNESS_EXTRA", r#"{"model":"provider/b"}"#)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(output.stdout, b"answer");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let first: Value = serde_json::from_str(stderr.lines().next().unwrap()).unwrap();
+    assert_eq!(first["kind"], "model");
+    assert_eq!(first["model"], "provider/b");
+    assert_eq!(first["context_tokens"], Value::Null);
+    assert_eq!(first["efforts"], serde_json::json!([]));
+    let requests = gateway.join().unwrap();
+    let carried = requests
+        .iter()
+        .find(|(path, _)| path == "/v1/messages")
+        .expect("one Messages request");
+    assert_eq!(carried.1["model"], "provider/b");
+}
+
+#[test]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "test: the evidence is one wall-clock interval around the run"
+)]
+fn a_hanging_route_probe_does_not_hold_the_answer() {
+    let started = std::time::Instant::now();
+    let (base, _gateway) = crate::support::serve_paths(3, |path, _, _| match path {
+        "/v1/models" => crate::support::Answer::Json(catalog()),
+        "/v1/messages" => crate::support::Answer::Json(
+            serde_json::json!({"stop_reason": "end_turn", "content": [{"type": "text", "text": "answer"}]}),
+        ),
+        _ => crate::support::Answer::Hang(std::time::Duration::from_secs(60)),
+    });
+    let output = crate::support::command(&base, "hello")
+        .env_remove("HARNESS_MODEL")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(output.stdout, b"answer");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(20),
+        "the route probe held the answer for {:?}",
+        started.elapsed()
+    );
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let route = stderr
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .find(|value| value["kind"] == "route")
+        .expect("one route observation");
+    assert_eq!(route["available"], false);
 }

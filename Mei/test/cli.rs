@@ -16,6 +16,8 @@ mod support;
 
 use std::process::Command;
 
+use serde_json::Value;
+
 #[cfg(unix)]
 fn non_unicode_argument() -> std::ffi::OsString {
     use std::os::unix::ffi::OsStringExt as _;
@@ -65,12 +67,87 @@ fn invalid_gateway_configuration_precedes_doctor_side_effects() {
 }
 
 #[test]
+fn absent_model_uses_the_magpie_route_and_reports_actual_effort() {
+    use std::io::{BufReader, Write as _};
+
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let gateway = std::thread::spawn(move || {
+        let mut seen = Vec::new();
+        for index in 0..3 {
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream);
+            let mut request_line = String::new();
+            std::io::BufRead::read_line(&mut reader, &mut request_line).unwrap();
+            let body = crate::support::read_request_body(&mut reader);
+            let request = if body.is_empty() {
+                Value::Null
+            } else {
+                serde_json::from_slice::<Value>(&body).unwrap()
+            };
+            seen.push((request_line.clone(), request));
+            let response = match index {
+                0 => serde_json::json!({
+                    "first_id": "group/plan-first",
+                    "data": [{"id": "group/plan-first", "context_window": 1048576, "reasoning_levels": ["none", "low", "high", "max"]}]
+                }),
+                1 => serde_json::json!({
+                    "stop_reason": "end_turn",
+                    "content": "done",
+                    "usage": {"input_tokens": 231, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 256}
+                }),
+                2 => {
+                    serde_json::json!({"route": {"model": "kimi-code-cn/kimi-for-coding", "effort": "high"}})
+                }
+                _ => panic!("unexpected gateway request"),
+            };
+            let bytes = serde_json::to_vec(&response).unwrap();
+            let mut stream = reader.into_inner();
+            write!(
+                stream,
+                "HTTP/1.0 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                bytes.len()
+            )
+            .unwrap();
+            stream.write_all(&bytes).unwrap();
+            stream.shutdown(std::net::Shutdown::Both).unwrap();
+        }
+        seen
+    });
+    let output = crate::support::command(&base, "hello")
+        .env_remove("HARNESS_MODEL")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(output.stdout, b"done");
+    let seen = gateway.join().unwrap();
+    assert!(seen[0].0.starts_with("GET /v1/models "));
+    assert!(seen[1].0.starts_with("POST /v1/messages "));
+    assert_eq!(seen[1].1["model"], "group/plan-first");
+    assert_eq!(
+        seen[1].1["thinking"],
+        serde_json::json!({"type": "adaptive"})
+    );
+    assert_eq!(seen[1].1["output_config"]["effort"], "high");
+    assert!(seen[2].0.starts_with("GET /v1/magpie/route?session=mei-"));
+    let trace = String::from_utf8(output.stderr).unwrap();
+    assert!(trace.contains("\"kind\":\"model\""), "{trace}");
+    assert!(trace.contains("\"context_tokens\":1048576"), "{trace}");
+    assert!(trace.contains("\"kind\":\"route\""), "{trace}");
+    assert!(trace.contains("kimi-code-cn/kimi-for-coding"), "{trace}");
+}
+
+#[test]
 #[expect(clippy::disallowed_methods, reason = "test fixture process")]
-fn missing_model_is_an_actionable_failure() {
+fn empty_model_is_an_actionable_failure() {
     let output = Command::new(env!("CARGO_BIN_EXE_mei"))
         .arg("-p")
         .arg("hello")
-        .env_remove("HARNESS_MODEL")
+        .env("HARNESS_MODEL", "")
         .output()
         .unwrap();
     assert!(!output.status.success());

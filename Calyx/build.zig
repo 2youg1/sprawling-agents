@@ -43,9 +43,10 @@ pub fn build(b: *std.Build) void {
         .pic = pic,
         .imports = &shell_imports,
         .link_libc = true,
-        // Rust links this archive without Zig's compiler_rt. Stack probes,
-        // stack protectors, and unwind/debug printers pull undefined MSVC
-        // symbols (__stack_chk_*, ___chkstk_ms, LdrRegisterDllNotification).
+        // std.Io's Windows path helpers use stack frames that emit
+        // ___chkstk_ms, which MSVC Rust does not provide; the archive carries
+        // compiler_rt for that probe. Stack protectors and unwind/debug
+        // printers stay off so LdrRegisterDllNotification is not pulled in.
         .stack_check = false,
         .stack_protector = false,
         .strip = true,
@@ -57,6 +58,7 @@ pub fn build(b: *std.Build) void {
         .linkage = .static,
         .root_module = shell_mod,
     });
+    shell.bundle_compiler_rt = true;
     b.getInstallStep().dependOn(&b.addInstallArtifact(shell, .{}).step);
 
     const calyx_mod = b.createModule(.{

@@ -33,7 +33,7 @@ fn drive(answers: Vec<Value>) -> (Result<String>, Value, String, Vec<String>) {
         |_, _| Ok(answers.pop_front().unwrap()),
         |code| {
             executed.push(code.to_owned());
-            Ok(format!("out:{code}"))
+            Ok(Value::String(format!("out:{code}")))
         },
         &mut trace,
     );
