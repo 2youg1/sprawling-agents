@@ -2,7 +2,7 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-Archetype:Mei 是极简 Agent Harness：把任务交给模型，模型通过一个有状态的 **python** 工具行动并看到小结果，再继续直到最终答案。大型或非 UTF-8 结果完整留在磁盘，只返回提示与路径。本包是**无头核**。Mei 不含终端壳。
+Archetype:Mei 是极简 Agent Harness：把任务交给模型，模型通过一个有状态的 **python** 工具行动并看到小结果，再继续直到最终答案。大型或非 UTF-8 结果完整留在磁盘，只返回提示与完整路径；非 Unicode 本机路径则返回可由 Python 无损还原的表达式。本包是**无头核**。Mei 不含终端壳。
 
 交互面是 [Calyx](../Calyx/)。`@sprawling/mei` 同时发布无头 `mei` 与 `calyx` 面：TTY 且无 `-p` 时走 Calyx，`-p` 或管道仍走无头核。脚本只用无头路径。
 
@@ -96,13 +96,13 @@ cd Calyx && zig build test
 
 ## 工作区、运行环境与捕获
 
-新会话启动时，Mei 只读取工作区根目录中存在的 `AGENTS.md`，并把它放在首个 user 消息中真正 prompt 之前。日志冻结这个开头。后续任务和 `/resume` 不重读也不补注 AGENTS，即使文件新出现、修改或删除；只有 `/new` 才重新读取。Skills、MCP 配置与环境工具不自动暴露。
+新会话启动时，Mei 只读取工作区根目录中存在的普通 `AGENTS.md`，不跟随符号链接，也不打开非普通文件，并把它放在首个 user 消息中真正 prompt 之前。日志冻结这个开头。后续任务和 `/resume` 不重读也不补注 AGENTS，即使文件新出现、修改或删除；只有 `/new` 才重新读取。Skills、MCP 配置与环境工具不自动暴露。
 
 每个 Mei 版本的第一次启动，doctor 探测 Python 与 uv 并缓存完整环境。该版本的有效缓存会跳过全部探测与网络访问。仍受支持的 Python 直接使用；缺失、损坏或已 EOL 的 Python 会换成最新稳定 managed 版本。缺失或损坏的 uv 会被安装。修复 Python 前先刷新 Mei 私有 uv，避免旧 uv 决定哪个 Python 才是最新。
 
-安装留在每用户 doctor 目录，不替换系统 Python、不修改全局 PATH、不编辑 shell profile。所选绝对路径仅用于本地执行；工具描述只携带 `version` 与 `uv_version` 属性。uv 在 python 工具所启动 subprocess 的 PATH 上可用。doctor 永不更新 Mei 本身。`MEI_DOCTOR_DIR` 可覆盖每用户目录，用于隔离和测试。
+安装留在每用户 doctor 目录，不替换系统 Python、不修改全局 PATH、不编辑 shell profile，也不写 Windows Python 注册表。所选绝对路径仅用于本地执行；工具描述只携带 `version` 与 `uv_version` 属性。uv 在 python 工具所启动 subprocess 的 PATH 上可用。完整 uv+Python 修复共享 900 秒截止时间，并发 doctor 另等 5 秒用于缓存发布；修复结果写入缓存前再次验证版本。doctor 永不更新 Mei 本身。`MEI_DOCTOR_DIR` 可覆盖每用户目录，用于隔离和测试。
 
-每个 run 拥有一个全新的 capture 目录。小型 UTF-8 捕获内联，其文件在 fd 转移或解释器收口后回收。大型与非 UTF-8 捕获会 spill：交互路径归 session，位于 `<session>.captures/<run>`，跨 resume 有效；无头路径归调用者，进程退出后仍保留。失败或取消的交互 run 会删除整个未提交目录。Mei 拒绝复用已有 capture 目录。宿主强制崩溃可能留下 orphan 目录；本次不承诺崩溃清理器。
+每个 run 拥有一个全新的 capture 目录。小型 UTF-8 捕获内联，其文件在 fd 转移或解释器收口后回收；解释器成功收口后的 inline 清理失败会单独报告，不丢弃答复或 spilled 文件。大型与非 UTF-8 捕获会 spill：交互路径归 session，位于 `<session>.captures/<run>`，跨 resume 有效；无头路径归调用者，进程退出后仍保留。失败或取消的交互 run 只删除 Calyx 为该 run 独占创建的目录。Mei 拒绝复用已有 capture 目录，除非调用者以 `MEI_CAPTURE_CREATED=1` 标记它是本 run 新建的空目录。宿主强制崩溃可能留下 orphan 目录；本次不承诺崩溃清理器。
 
 ## 进程 Face
 
@@ -115,7 +115,7 @@ cd Calyx && zig build test
 | stdout | 最终答案，不补换行 |
 | stderr | 消息 JSONL；`mei.obs` pulse/usage；失败为三段诊断 |
 | 取消 | 杀进程组 |
-| tool_result | 不超过 16 KiB 的完整 stdout+stderr；否则为提示与完整捕获路径 |
+| tool_result | 不超过 16 KiB 的完整 stdout+stderr；否则为提示与完整捕获路径，或无损还原本机路径的 Python 表达式 |
 
 Resume 保留旧工具名与字符串/数组 content，包括图片、音频和视频块。Provider 与模型必须支持这些块；Mei 没有附件旗标，也不恢复 Python 现场。
 
@@ -127,7 +127,8 @@ Resume 保留旧工具名与字符串/数组 content，包括图片、音频和�
 | `HARNESS_EXTRA` | 启动时浅合并一次；拒绝 `stream` / `tools` |
 | `MEI_BIN` | Calyx spawn 本核时的路径；npm shim 设为同目录无头核 |
 | `MEI_DOCTOR_DIR` | 可选的隔离 doctor 缓存与私有运行环境目录 |
-| `MEI_CAPTURE_DIR` | Face 传入的内部 run 目录；该目录不得预先存在 |
+| `MEI_CAPTURE_DIR` | Face 传入的内部 run 目录；除 Calyx 独占创建外，该目录不得预先存在 |
+| `MEI_CAPTURE_CREATED` | 内部 `1` 标记，证明 Calyx 为本 run 创建了空 capture 目录 |
 | `SPRAWLING_PROGRAM_STATUS` | `never` 关闭 Calyx 交互面的 OSC 7501 |
 
 ## 提示词与工具合同
@@ -137,8 +138,8 @@ Resume 保留旧工具名与字符串/数组 content，包括图片、音频和�
 | 部分 | UTF-8 字节 |
 |---|---:|
 | `system` | 297 |
-| 完整 compact `tools[0]` JSON | 1145 |
-| 合计 | 1442 |
+| 完整 compact `tools[0]` JSON | 1192 |
+| 合计 | 1489 |
 
 下面的 JSON 为便于阅读做了 pretty-print；字节数按线上 compact 形式计算。
 
@@ -157,7 +158,7 @@ Aligned with context, fulfill user intent thoroughly and resourcefully and stay 
 
 ```json
 {
-  "description": "<python version=\"3.12.13\" uv_version=\"0.12.3\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the path to a file containing the full output; filter that file, or re-run with narrower output, in the next python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start child interpreters with sys.executable, so they inherit the active environment. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>",
+  "description": "<python version=\"3.12.13\" uv_version=\"0.12.3\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the full path, or a Python expression that losslessly reconstructs a non-Unicode native path; filter that file, or re-run with narrower output, in the next python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start child interpreters with sys.executable, so they inherit the active environment. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>",
   "input_schema": {
     "properties": {
       "code": {
@@ -177,7 +178,7 @@ Mei 只保留一份跨 provider 的 schema，并在 agent loop 中校验整个�
 
 ## 边界
 
-核内无 python 超时；连接 10s / IO 600s；空输出为空文本；超过 16 KiB 或非 UTF-8 只给提示与路径，从不返回头尾样本；无 `MEI_TOOLS`、Skills/MCP 自动暴露、Mei 自更新或核内 TUI。只有新会话的顶层 AGENTS 会注入。
+核内无 python 超时；连接 10s / IO 600s；空输出为空文本；超过 16 KiB 或非 UTF-8 只给提示与路径或无损路径表达式，从不返回头尾样本；无 `MEI_TOOLS`、Skills/MCP 自动暴露、Mei 自更新或核内 TUI。只有新会话顶层的普通 AGENTS 会注入。
 
 ## 规格与检查
 

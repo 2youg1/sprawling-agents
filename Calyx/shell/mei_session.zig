@@ -15,10 +15,19 @@ var next_run: std.atomic.Value(u64) = .init(1);
 /// restored, so nothing refers to the run's captures. `uncertain` means the
 /// write failed and the rollback did too: the log may already name those files,
 /// so the caller must keep them.
+pub const Diagnostic = struct {
+    text: []const u8,
+    owned: bool,
+
+    pub fn deinit(self: Diagnostic, gpa: std.mem.Allocator) void {
+        if (self.owned) gpa.free(self.text);
+    }
+};
+
 pub const Outcome = union(enum) {
     ok: void,
-    err: []u8,
-    uncertain: []u8,
+    err: Diagnostic,
+    uncertain: Diagnostic,
 };
 
 pub const CreateResult = union(enum) {
@@ -32,7 +41,7 @@ pub const Session = struct {
     path: []u8,
     history: std.ArrayList([]u8) = .empty,
     resume_flag: bool = false,
-    run_generation: u64 = 0,
+    log_len: u64 = 0,
 
     pub fn deinit(self: *Session) void {
         for (self.history.items) |line| self.gpa.free(line);
@@ -53,16 +62,20 @@ pub const Session = struct {
         return if (self.resume_flag) self.path else null;
     }
 
-    /// Names one run's capture directory.
-    ///
-    /// The name carries the process id and a value every `Session` in this
-    /// process draws from one counter, so two sessions opened on the same path
-    /// in the same millisecond still own different directories: a discarded run
-    /// can never delete another run's spilled output.
-    pub fn captureDirectory(self: *Session, gpa: std.mem.Allocator, at_ms: u64) ![]u8 {
-        self.run_generation +|= 1;
-        const run = next_run.fetchAdd(1, .monotonic);
-        return std.fmt.allocPrint(gpa, "{s}.captures/run-{d}-{d}-{d}", .{ self.path, at_ms, processId(), run });
+    pub fn captureDirectory(self: *Session, gpa: std.mem.Allocator, io: std.Io, at_ms: u64) ![]u8 {
+        const parent = try std.fmt.allocPrint(gpa, "{s}.captures", .{self.path});
+        defer gpa.free(parent);
+        try std.Io.Dir.cwd().createDirPath(io, parent);
+        while (true) {
+            const run = next_run.fetchAdd(1, .monotonic);
+            const path = try std.fmt.allocPrint(gpa, "{s}/run-{d}-{d}-{d}", .{ parent, at_ms, processId(), run });
+            std.Io.Dir.cwd().createDir(io, path, .default_dir) catch |err| {
+                gpa.free(path);
+                if (err == error.PathAlreadyExists) continue;
+                return err;
+            };
+            return path;
+        }
     }
 
     fn processId() u32 {
@@ -148,39 +161,51 @@ pub const Session = struct {
             .path = path,
             .history = history,
             .resume_flag = true,
+            .log_len = @intCast(text.len),
         } };
     }
 
-    /// Appends one run's completed messages.
-    ///
-    /// The history slots are reserved before the log is touched, so a line that
-    /// cannot be remembered is a line that is never written. What a failed
-    /// write returns says exactly how much reached the disk: `err` when the
-    /// original length was restored, `uncertain` when the rollback failed and
-    /// the log may already name the run's captures.
     pub fn append(self: *Session, lines: []const []const u8) Outcome {
         if (lines.len == 0) return .ok;
 
         const original_len = self.history.items.len;
         self.history.ensureUnusedCapacity(self.gpa, lines.len) catch {
-            return .{ .err = dupeOrStatic(self.gpa, "reserve appended lines") };
+            return .{ .err = outOfMemory() };
         };
         for (lines) |line| {
             const owned = self.gpa.dupe(u8, line) catch {
                 shrinkHistory(self.gpa, &self.history, original_len);
-                return .{ .err = dupeOrStatic(self.gpa, "duplicate appended line") };
+                return .{ .err = outOfMemory() };
             };
             self.history.appendAssumeCapacity(owned);
         }
 
         const file = std.Io.Dir.cwd().openFile(self.io, self.path, .{ .mode = .read_write }) catch |err| {
             shrinkHistory(self.gpa, &self.history, original_len);
-            return .{ .err = formatFailure(self.gpa, "open the current Mei session for append", @errorName(err), self.path) catch dupeOrStatic(self.gpa, "open session") };
+            const diag = formatFailure(self.gpa, "open the current Mei session for append", @errorName(err), self.path) catch return .{ .err = outOfMemory() };
+            return .{ .err = ownedDiagnostic(diag) };
         };
         defer file.close(self.io);
+        file.lock(self.io, .exclusive) catch |err| {
+            shrinkHistory(self.gpa, &self.history, original_len);
+            const diag = formatFailure(self.gpa, "lock the current Mei session for append", @errorName(err), self.path) catch return .{ .err = outOfMemory() };
+            return .{ .err = ownedDiagnostic(diag) };
+        };
+        defer file.unlock(self.io);
 
-        switch (appendContents(self.io, file, lines)) {
-            .ok => {},
+        switch (appendContents(self.io, file, lines, self.log_len)) {
+            .ok => |new_len| self.log_len = new_len,
+            .stale => {
+                shrinkHistory(self.gpa, &self.history, original_len);
+                const diag = formatFailureWithRecovery(
+                    self.gpa,
+                    "append to a stale Mei session",
+                    "another process committed to this log after it was resumed",
+                    self.path,
+                    "use /resume <jsonl> on the latest complete log, then submit this run again",
+                ) catch return .{ .err = outOfMemory() };
+                return .{ .err = ownedDiagnostic(diag) };
+            },
             .failed => |failure| {
                 shrinkHistory(self.gpa, &self.history, original_len);
                 if (failure.rollback) |roll| {
@@ -189,15 +214,17 @@ pub const Session = struct {
                         @errorName(roll),
                     }) catch null;
                     defer if (subject) |owned| self.gpa.free(owned);
-                    return .{ .uncertain = formatFailureWithRecovery(
+                    const diag = formatFailureWithRecovery(
                         self.gpa,
                         "roll back a failed Mei segment append",
                         subject orelse @errorName(failure.write),
                         self.path,
                         "keep the log and the run's captured output for manual recovery; use /new for further work and resume only a complete backup",
-                    ) catch dupeOrStatic(self.gpa, "rollback failed") };
+                    ) catch return .{ .uncertain = uncertainOutOfMemory() };
+                    return .{ .uncertain = ownedDiagnostic(diag) };
                 }
-                return .{ .err = formatFailure(self.gpa, "append a successful Mei segment", @errorName(failure.write), self.path) catch dupeOrStatic(self.gpa, "append failed") };
+                const diag = formatFailure(self.gpa, "append a successful Mei segment", @errorName(failure.write), self.path) catch return .{ .err = outOfMemory() };
+                return .{ .err = ownedDiagnostic(diag) };
             },
         }
         self.resume_flag = true;
@@ -218,31 +245,33 @@ const AppendFailure = struct {
 };
 
 const AppendResult = union(enum) {
-    ok: void,
+    ok: u64,
+    stale: void,
     failed: AppendFailure,
 };
 
-fn appendContents(io: std.Io, file: std.Io.File, lines: []const []const u8) AppendResult {
+fn appendContents(io: std.Io, file: std.Io.File, lines: []const []const u8, expected_len: u64) AppendResult {
     const original_len = file.length(io) catch |err| {
         return .{ .failed = .{ .write = err, .rollback = null } };
     };
+    if (original_len != expected_len) return .stale;
 
-    writeSegment(io, file, original_len, lines) catch |err| {
+    const new_len = writeSegment(io, file, original_len, lines) catch |err| {
         file.setLength(io, original_len) catch |roll| {
             return .{ .failed = .{ .write = err, .rollback = roll } };
         };
         return .{ .failed = .{ .write = err, .rollback = null } };
     };
-    return .ok;
+    return .{ .ok = new_len };
 }
 
-fn writeSegment(io: std.Io, file: std.Io.File, original_len: u64, lines: []const []const u8) !void {
+fn writeSegment(io: std.Io, file: std.Io.File, original_len: u64, lines: []const []const u8) !u64 {
     var end = original_len;
     if (original_len > 0) {
         var last: [1]u8 = undefined;
         const n = try file.readPositionalAll(io, &last, original_len - 1);
         if (n == 1 and last[0] != '\n') {
-            try file.writeStreamingAll(io, "\n");
+            try file.writePositionalAll(io, "\n", original_len);
             end += 1;
         }
     }
@@ -252,13 +281,41 @@ fn writeSegment(io: std.Io, file: std.Io.File, original_len: u64, lines: []const
     for (lines) |line| {
         try writer.interface.writeAll(line);
         try writer.interface.writeAll("\n");
+        end += line.len + 1;
     }
     try writer.interface.flush();
+    return end;
 }
 
 fn freeHistory(gpa: std.mem.Allocator, history: *std.ArrayList([]u8)) void {
     for (history.items) |line| gpa.free(line);
     history.deinit(gpa);
+}
+
+fn outOfMemory() Diagnostic {
+    return .{ .text =
+    \\```toml
+    \\code = "E_MEI_SESSION"
+    \\description = "remember a Mei session append: the allocator is exhausted"
+    \\cause = "no history or diagnostic allocation succeeded; the log was not changed"
+    \\resolution = "close other processes to free memory, then resume the complete log and retry"
+    \\```
+    , .owned = false };
+}
+
+fn uncertainOutOfMemory() Diagnostic {
+    return .{ .text =
+    \\```toml
+    \\code = "E_MEI_SESSION"
+    \\description = "report a Mei session rollback failure: the allocator is exhausted"
+    \\cause = "the append failed, rollback failed, and the log may already name the run's captures"
+    \\resolution = "keep the log and captured output for manual recovery; free memory, then resume only a complete backup"
+    \\```
+    , .owned = false };
+}
+
+fn ownedDiagnostic(text: []u8) Diagnostic {
+    return .{ .text = text, .owned = true };
 }
 
 fn dupeOrStatic(gpa: std.mem.Allocator, text: []const u8) []u8 {
@@ -441,6 +498,63 @@ test "append after missing final newline stays parseable" {
         },
     }
     try std.testing.expectEqual(@as(usize, 4), session.historyLines().len);
+    const contents = try std.Io.Dir.cwd().readFileAlloc(io, full, gpa, .limited(4096));
+    defer gpa.free(contents);
+    try std.testing.expectEqualStrings(
+        "{\"role\":\"user\",\"content\":\"first\"}\n{\"role\":\"assistant\",\"content\":\"done\",\"stop_reason\":\"end_turn\"}\n{\"role\":\"user\",\"content\":\"next\"}\n{\"role\":\"assistant\",\"content\":\"again\",\"stop_reason\":\"end_turn\"}\n",
+        contents,
+    );
+}
+
+test "a stale session cannot append over another instance's commit" {
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const root = try std.fmt.allocPrint(gpa, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    defer gpa.free(root);
+    const path = try std.fs.path.join(gpa, &.{ root, "session.jsonl" });
+    defer gpa.free(path);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = "{\"role\":\"user\",\"content\":\"first\"}\n" });
+    var first = switch (Session.import(gpa, io, path)) {
+        .ok => |s| s,
+        .err => |e| {
+            defer freeDiag(gpa, e);
+            return error.TestUnexpectedResult;
+        },
+    };
+    defer first.deinit();
+    var second = switch (Session.import(gpa, io, path)) {
+        .ok => |s| s,
+        .err => |e| {
+            defer freeDiag(gpa, e);
+            return error.TestUnexpectedResult;
+        },
+    };
+    defer second.deinit();
+    switch (first.append(&.{"{\"role\":\"assistant\",\"content\":\"first commit\"}"})) {
+        .ok => {},
+        .err, .uncertain => |e| {
+            defer freeDiag(gpa, e);
+            return error.TestUnexpectedResult;
+        },
+    }
+    const committed = try std.Io.Dir.cwd().readFileAlloc(io, path, gpa, .limited(4096));
+    defer gpa.free(committed);
+    switch (second.append(&.{"{\"role\":\"assistant\",\"content\":\"stale commit\"}"})) {
+        .ok => return error.TestUnexpectedResult,
+        .err => |e| {
+            defer freeDiag(gpa, e);
+            try std.testing.expect(std.mem.indexOf(u8, e.text, "stale Mei session") != null);
+        },
+        .uncertain => |e| {
+            defer freeDiag(gpa, e);
+            return error.TestUnexpectedResult;
+        },
+    }
+    const after = try std.Io.Dir.cwd().readFileAlloc(io, path, gpa, .limited(4096));
+    defer gpa.free(after);
+    try std.testing.expectEqualStrings(committed, after);
 }
 
 test "capture directories are unique across instances of one session path" {
@@ -469,11 +583,55 @@ test "capture directories are unique across instances of one session path" {
         },
     };
     defer second.deinit();
-    const first_capture = try first.captureDirectory(gpa, 100);
+    const first_capture = try first.captureDirectory(gpa, io, 100);
     defer gpa.free(first_capture);
-    const second_capture = try second.captureDirectory(gpa, 100);
+    const second_capture = try second.captureDirectory(gpa, io, 100);
     defer gpa.free(second_capture);
     try std.testing.expect(!std.mem.eql(u8, first_capture, second_capture));
+    try std.Io.Dir.cwd().access(io, first_capture, .{});
+    try std.Io.Dir.cwd().access(io, second_capture, .{});
+
+    const collision = try std.fmt.allocPrint(gpa, "{s}.captures/run-100-{d}-{d}", .{ path, Session.processId(), next_run.load(.monotonic) });
+    defer gpa.free(collision);
+    try std.Io.Dir.cwd().createDirPath(io, collision);
+    const marker = try std.fs.path.join(gpa, &.{ collision, "keep" });
+    defer gpa.free(marker);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = marker, .data = "keep" });
+    const replacement = try first.captureDirectory(gpa, io, 100);
+    defer gpa.free(replacement);
+    try std.testing.expect(!std.mem.eql(u8, collision, replacement));
+    const kept = try std.Io.Dir.cwd().readFileAlloc(io, marker, gpa, .limited(5));
+    defer gpa.free(kept);
+    try std.testing.expectEqualStrings("keep", kept);
+}
+
+test "a fully exhausted allocator still returns an append error" {
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const root = try std.fmt.allocPrint(gpa, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    defer gpa.free(root);
+    const path = try std.fs.path.join(gpa, &.{ root, "session.jsonl" });
+    defer gpa.free(path);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = "log\n" });
+    var storage: [0]u8 = .{};
+    var fixed: std.heap.FixedBufferAllocator = .init(&storage);
+    var session: Session = .{ .gpa = fixed.allocator(), .io = io, .path = @constCast(path) };
+    switch (session.append(&.{"line"})) {
+        .ok => return error.TestUnexpectedResult,
+        .err => |e| {
+            defer freeDiag(fixed.allocator(), e);
+            try std.testing.expect(std.mem.indexOf(u8, e.text, "E_MEI_SESSION") != null);
+        },
+        .uncertain => |e| {
+            defer freeDiag(fixed.allocator(), e);
+            return error.TestUnexpectedResult;
+        },
+    }
+    const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, gpa, .limited(4096));
+    defer gpa.free(contents);
+    try std.testing.expectEqualStrings("log\n", contents);
 }
 
 test "an append allocation failure cannot leave unreported lines in the log" {
@@ -495,9 +653,9 @@ test "an append allocation failure cannot leave unreported lines in the log" {
     @memset(line, 'x');
     switch (session.append(&.{line})) {
         .ok => return error.TestUnexpectedResult,
-        .err => |e| limited.free(e),
+        .err => |e| e.deinit(limited),
         .uncertain => |e| {
-            limited.free(e);
+            e.deinit(limited);
             return error.TestUnexpectedResult;
         },
     }
@@ -512,8 +670,12 @@ pub fn discardCaptureDirectory(io: std.Io, path: []const u8) !void {
     try std.Io.Dir.cwd().deleteTree(io, path);
 }
 
-fn freeDiag(gpa: std.mem.Allocator, text: []u8) void {
-    gpa.free(text);
+fn freeDiag(gpa: std.mem.Allocator, value: anytype) void {
+    if (comptime @TypeOf(value) == Diagnostic) {
+        value.deinit(gpa);
+    } else {
+        gpa.free(value);
+    }
 }
 
 test "uncommitted capture directory is removed without touching the session" {

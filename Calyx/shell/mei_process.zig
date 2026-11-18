@@ -472,6 +472,7 @@ fn captureEnvironment(gpa: std.mem.Allocator, base: *const std.process.Environ.M
     var child = try base.clone(gpa);
     errdefer child.deinit();
     try child.put("MEI_CAPTURE_DIR", directory);
+    try child.put("MEI_CAPTURE_CREATED", "1");
     return child;
 }
 
@@ -520,7 +521,9 @@ test "capture directory is copied into only the child environment" {
     defer child.deinit();
     try std.testing.expectEqualStrings("yes", child.get("KEEP").?);
     try std.testing.expectEqualStrings("session.captures/run-1", child.get("MEI_CAPTURE_DIR").?);
+    try std.testing.expectEqualStrings("1", child.get("MEI_CAPTURE_CREATED").?);
     try std.testing.expect(base.get("MEI_CAPTURE_DIR") == null);
+    try std.testing.expect(base.get("MEI_CAPTURE_CREATED") == null);
 }
 
 test "missing program yields a structured diagnostic" {

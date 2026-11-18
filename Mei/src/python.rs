@@ -28,7 +28,7 @@ pub fn tool_description(environment: &Environment) -> String {
             "An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. ",
             "Expressions do not auto-echo, so explicitly print any values you need to inspect. ",
             "If combined UTF-8 stdout/stderr is up to {} KiB, the tool returns it inline. ",
-            "Larger or non-UTF-8 output returns a notice and the path to a file containing the full output; ",
+            "Larger or non-UTF-8 output returns a notice and the full path, or a Python expression that losslessly reconstructs a non-Unicode native path; ",
             "filter that file, or re-run with narrower output, in the next python call. ",
             "Run shell commands and CLIs through subprocess, capture their output, and check return codes. ",
             "Start child interpreters with sys.executable, so they inherit the active environment. ",
@@ -80,7 +80,6 @@ impl Py {
         reason = "an independent harness process starts its own interpreter, not a city child"
     )]
     fn with_boot(boot: &str, environment: Option<&Environment>) -> Result<Py> {
-        let captures = CaptureStore::create()?;
         let mut command = match environment {
             Some(environment) => Command::new(&environment.python.executable),
             None => Command::new(python_program()),
@@ -88,7 +87,6 @@ impl Py {
         if let Some(environment) = environment {
             command.env("PATH", environment.child_path()?);
         }
-        command.env("MEI_CAPTURE_DIR", captures.root());
         command.args(["-u", "-c", boot]);
         command.stdin(Stdio::piped());
         command.stdout(Stdio::piped());
@@ -105,6 +103,8 @@ impl Py {
         }
         #[cfg(test)]
         command.env("LC_ALL", "C").env("PYTHONUTF8", "0");
+        let captures = CaptureStore::create()?;
+        command.env("MEI_CAPTURE_DIR", captures.root());
         let mut child = match command.spawn() {
             Ok(child) => child,
             Err(err) => {
@@ -224,7 +224,10 @@ impl Py {
     /// Waiting on or killing/reaping the interpreter fails.
     pub fn close(&mut self) -> Result<()> {
         self.close_within(CLOSE_GRACE)?;
-        self.captures.complete()
+        if let Err(err) = self.captures.complete() {
+            eprintln!("{err}");
+        }
+        Ok(())
     }
 
     fn close_within(&mut self, grace: Duration) -> Result<()> {

@@ -12,9 +12,10 @@
 
 Python 3 各 minor 的 EOL 时刻取 `python/peps` 仓库 `release_management/` 目录下的
 `python-releases.toml`（`docs/third-party.md` §1 跟踪其提交）。
-下面的 `#eval` 打印边界向量，`Mei/src/doctor_tests.rs` 的
-`the_lean_environment_vectors_replay` 逐条重放；`Mei/src/doctor/support.rs` 是同一张表
-的第二份实现，两者之一漂移都会让该测试变红。
+下面的 `#eval` 将模型生成的全部已记录 minor 边界向量与独立维护的
+`Mei/src/doctor_vectors.txt` 自动比对；`Mei/src/doctor_tests.rs` 的
+`the_lean_environment_vectors_replay` 再逐条重放该文件。`Mei/src/doctor/support.rs`
+是第二份实现，任一表单独漂移都会使对应检查变红。
 -/
 
 namespace Mei.Environment
@@ -105,12 +106,6 @@ def plan (python : Support) (uvPresent : Bool) : Option Repair :=
   | .supported => if uvPresent then none else some .uv
   | .absent | .endOfLife => some .python
 
-theorem a_supported_python_with_uv_needs_no_repair :
-    plan .supported true = none := rfl
-
-theorem a_supported_python_without_uv_repairs_uv_only :
-    plan .supported false = some .uv := rfl
-
 theorem an_unusable_python_repairs_python (python : Support)
     (unusable : python = .absent ∨ python = .endOfLife) (uvPresent : Bool) :
     plan python uvPresent = some .python := by
@@ -137,22 +132,28 @@ def vectorLine (probed : Option (Nat × Minor)) (now : Nat) (uvPresent : Bool) :
   let uv := if uvPresent then "uv" else "none"
   s!"{python} {now} {uv} {repair}"
 
-#eval vectorLine (some (3, 12)) 1790812800 true
-#eval vectorLine (some (3, 12)) 1790812800 false
-#eval vectorLine (some (3, 10)) 1790812799 true
-#eval vectorLine (some (3, 10)) 1790812800 true
-#eval vectorLine (some (3, 9)) 1761868799 true
-#eval vectorLine (some (3, 9)) 1761868800 true
-#eval vectorLine (some (3, 2)) 1455926400 false
-#eval vectorLine (some (3, 4)) 1552867200 true
-#eval vectorLine (some (3, 16)) 1980201599 false
-#eval vectorLine (some (3, 16)) 1980201600 true
-#eval vectorLine (some (3, 17)) 4102444800 true
-#eval vectorLine (some (2, 7)) 0 false
-#eval vectorLine (some (3, 8)) 1728259200 true
-#eval vectorLine (some (3, 8)) 1728259199 true
-#eval vectorLine (some (3, 0)) 1246060800 true
-#eval vectorLine none 0 true
-#eval vectorLine none 0 false
+/-- 每个已记录 minor 的 EOL 前一刻、EOL 时刻及 uv 缺席分支。 -/
+def boundaryVectors : List String :=
+  ((List.range 17).flatMap fun minor =>
+    match endOfLife minor with
+    | none => []
+    | some instant =>
+      [ vectorLine (some (3, minor)) (instant - 1) true
+      , vectorLine (some (3, minor)) instant true
+      , vectorLine (some (3, minor)) (instant - 1) false
+      ])
+  ++ [ vectorLine (some (3, 17)) 4102444800 true
+     , vectorLine (some (2, 7)) 0 false
+     , vectorLine none 0 true
+     , vectorLine none 0 false
+     ]
+
+#eval do
+  let expected ← IO.FS.readFile "Mei/src/doctor_vectors.txt"
+  let actual := String.intercalate "\n" boundaryVectors
+  unless expected.trimAscii.toString == actual do
+    IO.eprintln actual
+    throw <| IO.userError "Mei environment vectors drifted from Mei/src/doctor_vectors.txt"
+  IO.println "Mei environment vectors match Mei/src/doctor_vectors.txt"
 
 end Mei.Environment

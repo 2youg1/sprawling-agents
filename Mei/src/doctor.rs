@@ -122,7 +122,7 @@ impl<'a> Request<'a> {
 }
 
 pub fn ensure(now: u64) -> Result<Environment> {
-    let root = state_root()?;
+    let root = cache::state_root()?;
     ensure_with(
         Request::new(root, env!("CARGO_PKG_VERSION"), now),
         probe_with,
@@ -175,6 +175,17 @@ fn ensure_with(
             }
         },
     };
+    if !python_supported(&environment.python.version, now) {
+        return Err(failure(
+            "validate the repaired Python before publishing the cache",
+            "the repaired interpreter is outside the supported Python 3 lifetime",
+            format!(
+                "remove the unsupported private installation and retry: {}",
+                crate::error::remove_tree_instruction(&paths.python)
+            ),
+        )
+        .at_with_value(&environment.python.executable, &environment.python.version));
+    }
     write_environment(&paths, release, &environment)?;
     Ok(environment)
 }
@@ -195,7 +206,7 @@ fn plan(observed: &Observed, now: u64) -> Option<Repair> {
 
 fn probe_with(paths: &Paths) -> Result<Observed> {
     Ok(Observed {
-        python: probe_python(OsStr::new(python_program()))?,
+        python: probe_python_from_path()?,
         uv: match probe_uv_from_path()? {
             Some(uv) => Some(uv),
             None => probe_private_uv(paths)?,
@@ -204,9 +215,10 @@ fn probe_with(paths: &Paths) -> Result<Observed> {
 }
 
 fn repair(kind: Repair, paths: &Paths, observed: Observed) -> Result<Environment> {
+    let deadline = install::Deadline::start()?;
     match kind {
         Repair::Uv => {
-            let uv = install::uv(paths)?;
+            let uv = install::uv(paths, &deadline)?;
             let python = observed.python.ok_or_else(|| {
                 failure(
                     "assemble the uv-only repair",
@@ -217,8 +229,8 @@ fn repair(kind: Repair, paths: &Paths, observed: Observed) -> Result<Environment
             Ok(Environment::new(python, uv))
         }
         Repair::Python => {
-            let uv = install::uv(paths)?;
-            let python = install::python(paths, &uv)?;
+            let uv = install::uv(paths, &deadline)?;
+            let python = install::python(paths, &uv, &deadline)?;
             Ok(Environment::new(python, uv))
         }
     }
@@ -243,17 +255,22 @@ fn probe_python(program: &OsStr) -> Result<Option<Program>> {
         Ok(_) => return Ok(None),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(err) => {
-            let diagnostic = failure(
-                "probe the Python interpreter",
-                err.to_string(),
-                format!(
-                    "make the interpreter runnable, or remove it from the probe path: {}",
-                    crate::error::remove_file_command(Path::new(program))
-                ),
-            );
             return Err(match probe_path(program) {
-                Some(path) => diagnostic.at_with_value(path, program.to_string_lossy()),
-                None => diagnostic.value(program.to_string_lossy()),
+                Some(path) => failure(
+                    "probe the Python interpreter",
+                    err.to_string(),
+                    format!(
+                        "make the interpreter runnable, or remove it from the probe path: {}",
+                        crate::error::remove_file_instruction(path)
+                    ),
+                )
+                .at_with_value(path, program.to_string_lossy()),
+                None => failure(
+                    "probe the Python interpreter",
+                    err.to_string(),
+                    "fix PATH so the intended Python interpreter is runnable; no unlocated file is deleted",
+                )
+                .value(program.to_string_lossy()),
             });
         }
     };
@@ -276,15 +293,21 @@ fn probe_path(program: &OsStr) -> Option<&Path> {
     path.has_root().then_some(path)
 }
 
-fn probe_uv_from_path() -> Result<Option<Program>> {
-    let Some(path) = std::env::var_os("PATH") else {
-        return Ok(None);
-    };
-    for directory in std::env::split_paths(&path) {
-        let candidate = directory.join(uv_program());
-        if !candidate.is_file() {
-            continue;
+fn probe_python_from_path() -> Result<Option<Program>> {
+    for candidate in executable_candidates(python_program(), std::env::var_os("PATH"))? {
+        if let Some(program) = probe_python(candidate.as_os_str())? {
+            return Ok(Some(program));
         }
+    }
+    Ok(None)
+}
+
+fn probe_uv_from_path() -> Result<Option<Program>> {
+    probe_uv_search(std::env::var_os("PATH"))
+}
+
+fn probe_uv_search(path: Option<OsString>) -> Result<Option<Program>> {
+    for candidate in executable_candidates(uv_program(), path)? {
         if let Some(program) = probe_uv(&candidate)? {
             return Ok(Some(program));
         }
@@ -292,9 +315,64 @@ fn probe_uv_from_path() -> Result<Option<Program>> {
     Ok(None)
 }
 
+fn executable_candidates(program: &str, path: Option<OsString>) -> Result<Vec<PathBuf>> {
+    let Some(path) = path else {
+        return Ok(Vec::new());
+    };
+    let mut candidates = Vec::new();
+    for directory in std::env::split_paths(&path) {
+        let directory = if directory.as_os_str().is_empty() {
+            PathBuf::from(".")
+        } else {
+            directory
+        };
+        if cfg!(windows) && Path::new(program).extension().is_none() {
+            let extensions = std::env::var("PATHEXT").unwrap_or_else(|_| ".EXE".to_owned());
+            for extension in extensions
+                .split(';')
+                .filter(|extension| !extension.is_empty())
+            {
+                let candidate = directory.join(format!("{program}{extension}"));
+                if is_executable_file(&candidate)? {
+                    candidates.push(candidate);
+                }
+            }
+        } else {
+            let candidate = directory.join(program);
+            if is_executable_file(&candidate)? {
+                candidates.push(candidate);
+            }
+        }
+    }
+    Ok(candidates)
+}
+
+fn is_executable_file(path: &Path) -> Result<bool> {
+    let metadata = match path.metadata() {
+        Ok(metadata) => metadata,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(err) => {
+            return Err(failure(
+                "inspect a runtime candidate",
+                err.to_string(),
+                "keep the runtime candidate readable or remove it from PATH",
+            )
+            .at(path));
+        }
+    };
+    #[cfg(unix)]
+    let executable = {
+        use std::os::unix::fs::PermissionsExt as _;
+        metadata.permissions().mode() & 0o111 != 0
+    };
+    #[cfg(windows)]
+    let executable = true;
+    Ok(metadata.is_file() && executable)
+}
+
 fn probe_private_uv(paths: &Paths) -> Result<Option<Program>> {
     let candidate = paths.bin.join(uv_program());
-    if !candidate.is_file() {
+    if !is_executable_file(&candidate)? {
         return Ok(None);
     }
     probe_uv(&candidate)
@@ -319,7 +397,7 @@ fn probe_uv(path: &Path) -> Result<Option<Program>> {
                 err.to_string(),
                 format!(
                     "make uv runnable or remove it: {}",
-                    crate::error::remove_file_command(path)
+                    crate::error::remove_file_instruction(path)
                 ),
             )
             .at(path));
@@ -341,35 +419,6 @@ fn probe_uv(path: &Path) -> Result<Option<Program>> {
     Ok(version.and_then(|version| {
         Version::parse(version).map(|_| Program::new(version, executable.clone()))
     }))
-}
-
-fn state_root() -> Result<PathBuf> {
-    if let Some(path) = std::env::var_os("MEI_DOCTOR_DIR") {
-        if path.is_empty() {
-            return Err(failure(
-                "read MEI_DOCTOR_DIR",
-                "the variable is empty",
-                "leave MEI_DOCTOR_DIR unset or give it a writable directory",
-            )
-            .value("\"\""));
-        }
-        return Ok(PathBuf::from(path));
-    }
-    #[cfg(windows)]
-    let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
-    #[cfg(not(windows))]
-    let base = std::env::var_os("XDG_CACHE_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cache")));
-    base.map(|base| base.join("sprawling").join("mei"))
-        .ok_or_else(|| -> Error {
-            failure(
-                "locate the doctor directory",
-                "neither the platform cache directory nor a home directory is available",
-                "set MEI_DOCTOR_DIR to a writable per-user directory",
-            )
-            .into()
-        })
 }
 
 fn failure(

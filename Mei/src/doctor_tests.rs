@@ -51,6 +51,21 @@ fn writable(environment: &Environment) {
     std::fs::write(&environment.uv.executable, []).unwrap();
 }
 
+#[expect(clippy::disallowed_methods, reason = "compile a standalone uv fixture")]
+fn fake_uv(directory: &Path) {
+    std::fs::create_dir_all(directory).unwrap();
+    let source = directory.join("fixture.rs");
+    std::fs::write(&source, "fn main() { println!(\"uv 0.12.3\"); }").unwrap();
+    let executable = directory.join(uv_program());
+    let status = Command::new("rustc")
+        .arg(&source)
+        .arg("-o")
+        .arg(&executable)
+        .status()
+        .unwrap();
+    assert!(status.success());
+}
+
 #[test]
 fn a_current_complete_cache_never_probes_or_installs() {
     let directory = tempfile::tempdir().unwrap();
@@ -248,9 +263,9 @@ fn a_private_uv_is_reused_when_the_path_has_none() {
     let paths = Paths::new(directory.path().to_path_buf());
     std::fs::create_dir_all(&paths.bin).unwrap();
     let python = probe_python(OsStr::new(python_program())).unwrap().unwrap();
-    std::fs::copy(&python.executable, paths.bin.join(uv_program())).unwrap();
+    fake_uv(&paths.bin);
     let uv = probe_private_uv(&paths).unwrap().unwrap();
-    assert_eq!(uv.version, python.version);
+    assert_eq!(uv.version, "0.12.3");
     let observed = Observed {
         python: Some(python),
         uv: Some(uv),
@@ -288,7 +303,7 @@ fn a_waiter_reports_a_holder_that_outlasts_its_budget() {
 
 #[test]
 fn the_waiter_outlasts_every_installer() {
-    assert!(lock::LOCK_WAIT >= install::BUDGET);
+    assert!(lock::LOCK_WAIT > install::BUDGET);
 }
 
 #[test]
@@ -385,3 +400,6 @@ fn cache_paths_preserve_windows_unicode() {
     let path = PathBuf::from("C:\\工作区\\python.exe");
     assert_eq!(cache::decode_path(&cache::encode_path(&path)), Some(path));
 }
+
+#[path = "doctor_tests/tests.rs"]
+mod review;

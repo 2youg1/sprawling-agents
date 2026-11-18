@@ -2,7 +2,7 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-Archetype:Mei is a minimal Agent Harness: a model receives a task, acts through one persistent **python** tool, sees each small result, and repeats until it has a final answer. A large or non-UTF-8 result stays complete on disk and returns only a notice with its path. This package is the **headless** core. Mei does not contain a terminal shell.
+Archetype:Mei is a minimal Agent Harness: a model receives a task, acts through one persistent **python** tool, sees each small result, and repeats until it has a final answer. A large or non-UTF-8 result stays complete on disk and returns only a notice with its full path, or a Python expression that losslessly reconstructs a non-Unicode native path. This package is the **headless** core. Mei does not contain a terminal shell.
 
 The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the headless `mei` binary and the `calyx` face; a TTY without `-p` becomes Calyx, while `-p` or a pipe stays headless. Scripts use the headless path alone.
 
@@ -96,13 +96,13 @@ These drive real `mei` + Python on Windows and Unix against a local gateway, inc
 
 ## Workspace, runtime and captures
 
-When a new session starts, Mei reads only the workspace root's `AGENTS.md`, if present, and places it before the actual prompt in the first user message. The log freezes that opening. Later tasks and `/resume` neither reread nor backfill AGENTS, even when the file appears, changes or disappears; `/new` starts a fresh reading. Skills, MCP configuration and environment tools are not automatically exposed.
+When a new session starts, Mei reads only the workspace root's regular `AGENTS.md`, if present, without following symbolic links or opening non-regular entries, and places it before the actual prompt in the first user message. The log freezes that opening. Later tasks and `/resume` neither reread nor backfill AGENTS, even when the file appears, changes or disappears; `/new` starts a fresh reading. Skills, MCP configuration and environment tools are not automatically exposed.
 
 On the first start of a Mei version, doctor probes Python and uv and caches the complete environment. A valid cache for that version skips all probes and network access. A supported Python is reused; a missing, broken or end-of-life Python is replaced by the latest stable managed installation. Missing or broken uv is installed. Python repair refreshes Mei's private uv first, so an old uv release does not define which Python is newest.
 
-Installs stay in the per-user doctor directory and never replace system Python, modify the global PATH or edit shell profiles. The selected absolute paths stay local; the tool description carries only `version` and `uv_version` attributes. uv is available on PATH for subprocesses started by the python tool. Doctor never updates Mei itself. `MEI_DOCTOR_DIR` overrides the per-user directory for isolation and tests.
+Installs stay in the per-user doctor directory and never replace system Python, modify the global PATH, edit shell profiles, or write the Windows Python registry. The selected absolute paths stay local; the tool description carries only `version` and `uv_version` attributes. uv is available on PATH for subprocesses started by the python tool. One complete uv+Python repair has a 900-second deadline, while a concurrent doctor waits an additional 5 seconds for cache publication. Repaired versions are checked again before caching. Doctor never updates Mei itself. `MEI_DOCTOR_DIR` overrides the per-user directory for isolation and tests.
 
-Every run owns a new capture directory. Small UTF-8 captures are inlined and their files are reclaimed after fd transfer or interpreter shutdown. Large and non-UTF-8 captures are spilled: interactive paths belong to the session under `<session>.captures/<run>` and survive resume; headless paths belong to the caller and survive process exit. Failed or cancelled interactive runs delete their uncommitted directory. Mei refuses to reuse a pre-existing capture directory. Forced host crashes can leave orphan directories; no crash janitor is claimed.
+Every run owns a new capture directory. Small UTF-8 captures are inlined and their files are reclaimed after fd transfer or interpreter shutdown; after a successful interpreter close, an inline cleanup failure is reported separately without discarding the answer or spilled files. Large and non-UTF-8 captures are spilled: interactive paths belong to the session under `<session>.captures/<run>` and survive resume; headless paths belong to the caller and survive process exit. Failed or cancelled interactive runs delete only the directory Calyx exclusively created for that run. Mei refuses to reuse a pre-existing capture directory unless the caller marks its newly created empty directory with `MEI_CAPTURE_CREATED=1`. Forced host crashes can leave orphan directories; no crash janitor is claimed.
 
 ## Process Face
 
@@ -115,7 +115,7 @@ Every run owns a new capture directory. Small UTF-8 captures are inlined and the
 | stdout | Final answer, no added newline |
 | stderr | Message JSONL; `mei.obs` pulse/usage; failures as Description/Cause/Resolution |
 | cancel | Kill the process group |
-| tool_result | Complete stdout+stderr up to 16 KiB; otherwise a notice and full-capture path |
+| tool_result | Complete stdout+stderr up to 16 KiB; otherwise a notice and full-capture path or lossless native-path Python expression |
 
 Resume preserves legacy tool names and string/array content, including image, audio and video blocks. The provider and model must accept those blocks; Mei has no attachment flags and does not restore Python state.
 
@@ -127,7 +127,8 @@ Resume preserves legacy tool names and string/array content, including image, au
 | `HARNESS_EXTRA` | One JSON object at startup; refuses `stream` / `tools` |
 | `MEI_BIN` | Path Calyx uses to spawn this core; npm shim sets it to the sibling core |
 | `MEI_DOCTOR_DIR` | Optional isolated doctor cache and private runtime directory |
-| `MEI_CAPTURE_DIR` | Internal per-run directory supplied by a face; it must not already exist |
+| `MEI_CAPTURE_DIR` | Internal per-run directory supplied by a face; it must not already exist unless exclusively created by Calyx |
+| `MEI_CAPTURE_CREATED` | Internal `1` marker proving Calyx created the empty capture directory for this run |
 | `SPRAWLING_PROGRAM_STATUS` | `never` disables OSC 7501 in the Calyx interactive face |
 
 ## Prompt and tool contract
@@ -137,8 +138,8 @@ Resume preserves legacy tool names and string/array content, including image, au
 | Part | UTF-8 bytes |
 |---|---:|
 | `system` | 297 |
-| Complete compact `tools[0]` JSON | 1145 |
-| Total | 1442 |
+| Complete compact `tools[0]` JSON | 1192 |
+| Total | 1489 |
 
 The JSON below is pretty-printed for reading; the byte count uses its compact wire form.
 
@@ -157,7 +158,7 @@ Aligned with context, fulfill user intent thoroughly and resourcefully and stay 
 
 ```json
 {
-  "description": "<python version=\"3.12.13\" uv_version=\"0.12.3\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the path to a file containing the full output; filter that file, or re-run with narrower output, in the next python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start child interpreters with sys.executable, so they inherit the active environment. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>",
+  "description": "<python version=\"3.12.13\" uv_version=\"0.12.3\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the full path, or a Python expression that losslessly reconstructs a non-Unicode native path; filter that file, or re-run with narrower output, in the next python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start child interpreters with sys.executable, so they inherit the active environment. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>",
   "input_schema": {
     "properties": {
       "code": {
@@ -177,7 +178,7 @@ Mei keeps one provider-neutral schema and validates every tool wave in the agent
 
 ## Boundaries
 
-No in-process python timeout; connect 10s / IO 600s; empty output is empty text; output over 16 KiB or non-UTF-8 returns only a notice and path, never a head/tail sample; no `MEI_TOOLS`, automatic Skills/MCP exposure, Mei self-update, or in-core TUI. Only a new session's top-level AGENTS is injected.
+No in-process python timeout; connect 10s / IO 600s; empty output is empty text; output over 16 KiB or non-UTF-8 returns only a notice and path or lossless path expression, never a head/tail sample; no `MEI_TOOLS`, automatic Skills/MCP exposure, Mei self-update, or in-core TUI. Only a new session's regular top-level AGENTS is injected.
 
 ## Spec and checks
 

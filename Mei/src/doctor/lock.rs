@@ -11,15 +11,18 @@ use crate::error::Result;
 
 pub(super) const LOCK_POLL: Duration = Duration::from_millis(100);
 
-/// The wait must exceed one installer's budget, or a waiter reports a stuck
-/// lock while a legitimate download is still running (`Mei/Spec.lean` §10).
-pub(super) const LOCK_WAIT: Duration = super::install::BUDGET;
+pub(super) const LOCK_WAIT: Duration =
+    super::install::BUDGET.saturating_add(Duration::from_secs(5));
 
 pub(super) struct Lock {
     file: std::fs::File,
 }
 
 impl Lock {
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "Mei's lock adapter samples monotonic time for its polling deadline"
+    )]
     pub(super) fn acquire(paths: &Paths, wait: Duration) -> Result<Lock> {
         std::fs::create_dir_all(&paths.root).map_err(|err| {
             failure(
@@ -42,15 +45,24 @@ impl Lock {
                 )
                 .at(&paths.lock)
             })?;
-        let polls = wait
-            .as_millis()
-            .checked_div(LOCK_POLL.as_millis())
-            .and_then(|polls| u32::try_from(polls).ok())
-            .unwrap_or(u32::MAX);
-        for _ in 0..polls {
+        let deadline = std::time::Instant::now().checked_add(wait).ok_or_else(|| {
+            failure(
+                "set the doctor lock deadline",
+                format!("the wait budget {wait:?} is not representable"),
+                "use a finite doctor wait budget",
+            )
+            .at(&paths.lock)
+        })?;
+        loop {
             match file.try_lock() {
                 Ok(()) => return Ok(Lock { file }),
-                Err(std::fs::TryLockError::WouldBlock) => std::thread::sleep(LOCK_POLL),
+                Err(std::fs::TryLockError::WouldBlock) => {
+                    let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+                    if remaining.is_zero() {
+                        break;
+                    }
+                    std::thread::sleep(LOCK_POLL.min(remaining));
+                }
                 Err(std::fs::TryLockError::Error(err)) => {
                     return Err(failure(
                         "take the doctor lock",

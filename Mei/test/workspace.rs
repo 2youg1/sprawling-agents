@@ -13,6 +13,7 @@
 
 mod support;
 
+#[cfg(unix)]
 use std::process::Command;
 
 use serde_json::Value;
@@ -30,8 +31,9 @@ fn run_at(directory: &std::path::Path, base: &str, prompt: &str, log: &std::path
         .unwrap();
     assert!(
         output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
+        "{}: {}",
+        output.status,
+        std::fs::read_to_string(log).unwrap()
     );
 }
 
@@ -51,8 +53,9 @@ fn resume_at(
         .unwrap();
     assert!(
         output.status.success(),
-        "{}",
-        String::from_utf8_lossy(&output.stderr)
+        "{}: {}",
+        output.status,
+        std::fs::read_to_string(segment).unwrap()
     );
 }
 
@@ -60,6 +63,7 @@ fn append(target: &std::path::Path, segment: &std::path::Path) {
     use std::io::Write as _;
     let mut file = std::fs::OpenOptions::new()
         .append(true)
+        .create(true)
         .open(target)
         .unwrap();
     file.write_all(&std::fs::read(segment).unwrap()).unwrap();
@@ -145,6 +149,7 @@ fn a_failed_first_run_is_not_logged_or_duplicated_on_retry() {
     let directory = tempfile::tempdir().unwrap();
     std::fs::write(directory.path().join("AGENTS.md"), "retry-rule").unwrap();
     let failed_segment = directory.path().join("failed.jsonl");
+    let formal_log = directory.path().join("formal.jsonl");
     let (base, first) = serve(vec![
         serde_json::json!({"stop_reason": "max_tokens", "content": []}),
     ]);
@@ -155,6 +160,7 @@ fn a_failed_first_run_is_not_logged_or_duplicated_on_retry() {
         .unwrap();
     assert!(!output.status.success());
     first.join().unwrap();
+    assert!(!formal_log.exists(), "a failed run reached the formal log");
 
     let successful = directory.path().join("successful.jsonl");
     let (base, second) = serve(vec![answer()]);
@@ -162,8 +168,9 @@ fn a_failed_first_run_is_not_logged_or_duplicated_on_retry() {
     let request = second.join().unwrap().remove(0);
     assert_eq!(guide_occurrences(&request, "retry-rule"), 1);
     assert_eq!(request["messages"].as_array().unwrap().len(), 1);
+    append(&formal_log, &successful);
     assert_eq!(
-        std::fs::read_to_string(successful)
+        std::fs::read_to_string(formal_log)
             .unwrap()
             .matches("retry-rule")
             .count(),
@@ -203,22 +210,88 @@ fn only_the_exact_workspace_top_level_is_read() {
 }
 
 #[test]
-#[expect(clippy::disallowed_methods, reason = "test fixture process")]
 fn malformed_workspace_input_fails_before_calling_the_model() {
     let directory = tempfile::tempdir().unwrap();
     std::fs::write(directory.path().join("AGENTS.md"), [0xff]).unwrap();
-    let base = "http://127.0.0.1:1";
-    let output = Command::new(env!("CARGO_BIN_EXE_mei"))
-        .args(["-p", "task"])
+    let output = support::command("http://127.0.0.1:1", "task")
         .current_dir(directory.path())
-        .env("HARNESS_MODEL", "test/model")
-        .env("ANTHROPIC_BASE_URL", base)
         .output()
         .unwrap();
     assert!(!output.status.success());
     let shown = String::from_utf8_lossy(&output.stderr);
     assert!(shown.contains("E_MEI_WORKSPACE"), "{shown}");
     assert!(shown.contains("start a new session"), "{shown}");
-    let command = mei::error::remove_file_command(&directory.path().join("AGENTS.md"));
-    assert!(shown.contains(&command.replace('\\', "\\\\")), "{shown}");
+    #[cfg(unix)]
+    let directory = directory.path().canonicalize().unwrap();
+    #[cfg(windows)]
+    let directory = directory.path().to_path_buf();
+    let command = mei::error::remove_file_command(&directory.join("AGENTS.md")).unwrap();
+    assert!(shown.contains(&command), "{shown}");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_symbolic_link_guide_is_refused_before_calling_the_model() {
+    let directory = tempfile::tempdir().unwrap();
+    let outside = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(outside.path(), "outside-secret").unwrap();
+    std::os::unix::fs::symlink(outside.path(), directory.path().join("AGENTS.md")).unwrap();
+    let output = support::command("http://127.0.0.1:1", "task")
+        .current_dir(directory.path())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let shown = String::from_utf8_lossy(&output.stderr);
+    assert!(shown.contains("E_MEI_WORKSPACE"), "{shown}");
+    assert!(!shown.contains("outside-secret"), "{shown}");
+}
+
+#[test]
+fn a_directory_guide_has_a_preserving_repair() {
+    let directory = tempfile::tempdir().unwrap();
+    let guide = directory.path().join("AGENTS.md");
+    std::fs::create_dir(&guide).unwrap();
+    std::fs::write(guide.join("keep"), "keep").unwrap();
+    let output = support::command("http://127.0.0.1:1", "task")
+        .current_dir(directory.path())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let shown = String::from_utf8_lossy(&output.stderr);
+    assert!(shown.contains("E_MEI_WORKSPACE"), "{shown}");
+    assert!(shown.contains("AGENTS.md.not-a-guide"), "{shown}");
+    assert_eq!(std::fs::read_to_string(guide.join("keep")).unwrap(), "keep");
+}
+
+#[cfg(unix)]
+#[test]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "test FIFO fixture and child timeout"
+)]
+fn a_fifo_guide_is_rejected_without_blocking() {
+    let directory = tempfile::tempdir().unwrap();
+    let guide = directory.path().join("AGENTS.md");
+    let made = Command::new("mkfifo").arg(&guide).status().unwrap();
+    assert!(made.success());
+    let mut child = support::command("http://127.0.0.1:1", "task")
+        .current_dir(directory.path())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let started = std::time::Instant::now();
+    let output = loop {
+        if child.try_wait().unwrap().is_some() {
+            break child.wait_with_output().unwrap();
+        }
+        if started.elapsed() > std::time::Duration::from_secs(5) {
+            child.kill().unwrap();
+            let _: std::process::Output = child.wait_with_output().unwrap();
+            panic!("Mei blocked while opening a FIFO guide");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    };
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("E_MEI_WORKSPACE"));
 }

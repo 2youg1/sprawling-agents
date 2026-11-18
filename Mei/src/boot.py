@@ -6,6 +6,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 g = {"__name__": "__main__"}
 capture_dir = os.environ.pop("MEI_CAPTURE_DIR", None)
+os.environ.pop("MEI_CAPTURE_CREATED", None)
 for line in rx:
     code = json.loads(line.decode("utf-8"))
     if not isinstance(code, str):
@@ -20,7 +21,7 @@ for line in rx:
     finally:
         sys.stdout.flush()
         sys.stderr.flush()
-    name = f.name
+    name = os.path.basename(f.name)
     f.close()
-    tx.write(json.dumps(name).encode("utf-8") + b"\n")
+    tx.write(json.dumps(name).encode("ascii") + b"\n")
     tx.flush()

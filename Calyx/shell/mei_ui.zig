@@ -513,8 +513,8 @@ const Ui = struct {
         if (self.command(typed)) return;
         if (self.session == null and !self.createSession()) return;
         std.debug.assert(self.capture_dir == null);
-        self.capture_dir = self.session.?.captureDirectory(self.gpa, at) catch {
-            self.printNote("allocate the run capture directory");
+        self.capture_dir = self.session.?.captureDirectory(self.gpa, self.io, at) catch {
+            self.printNote("create the run capture directory");
             return;
         };
 
@@ -679,25 +679,21 @@ const Ui = struct {
                 switch (session.append(self.pending.items)) {
                     .ok => capture = .keep,
                     .err => |diag| {
-                        // Confirmed not written: nothing refers to the run's
-                        // captures, so the directory goes with the failed run.
-                        defer self.gpa.free(diag);
+                        defer diag.deinit(self.gpa);
                         if (self.session) |*s| {
                             s.deinit();
                             self.session = null;
                         }
-                        self.printNote(diag);
+                        self.printNote(diag.text);
                     },
                     .uncertain => |diag| {
-                        // The log may already name these files, so they stay
-                        // beside it for the person to recover from.
-                        defer self.gpa.free(diag);
+                        defer diag.deinit(self.gpa);
                         if (self.session) |*s| {
                             s.deinit();
                             self.session = null;
                         }
                         capture = .keep;
-                        self.printNote(diag);
+                        self.printNote(diag.text);
                     },
                 }
             }

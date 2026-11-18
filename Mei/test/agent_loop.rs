@@ -338,10 +338,17 @@ fn cli_resume_rejects_an_incomplete_log_before_starting_python() {
     use std::os::unix::fs::PermissionsExt as _;
     permissions.set_mode(0o755);
     std::fs::set_permissions(&python, permissions).unwrap();
+    let doctor = tempfile::tempdir().unwrap();
+    let runtime = mei::doctor::Environment::new(
+        mei::doctor::Program::new("3.12.13", python.clone()),
+        mei::doctor::Program::new("0.12.3", python),
+    );
+    mei::doctor::write_cache(doctor.path(), &runtime).unwrap();
     let output = crate::support::command("http://127.0.0.1:1", "second")
         .arg("--resume")
         .arg(&session)
         .current_dir(dir.path())
+        .env("MEI_DOCTOR_DIR", doctor.path())
         .env("PATH", &bin)
         .output()
         .unwrap();

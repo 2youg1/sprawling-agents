@@ -8,9 +8,56 @@ use std::path::{Path, PathBuf};
 use serde_json::{Value, json};
 
 use super::{Environment, Paths, Program, failure};
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 const CACHE_SCHEMA: u64 = 1;
+
+pub(super) fn state_root() -> Result<PathBuf> {
+    if let Some(path) = std::env::var_os("MEI_DOCTOR_DIR") {
+        if path.is_empty() {
+            return Err(failure(
+                "read MEI_DOCTOR_DIR",
+                "the variable is empty",
+                "leave MEI_DOCTOR_DIR unset or give it a writable directory",
+            )
+            .value("\"\""));
+        }
+        return absolute_override(PathBuf::from(path));
+    }
+    #[cfg(windows)]
+    let base = std::env::var_os("LOCALAPPDATA").map(PathBuf::from);
+    #[cfg(not(windows))]
+    let base = cache_base(
+        std::env::var_os("XDG_CACHE_HOME").map(PathBuf::from),
+        std::env::var_os("HOME").map(PathBuf::from),
+    );
+    base.map(|base| base.join("sprawling").join("mei"))
+        .ok_or_else(|| -> Error {
+            failure(
+                "locate the doctor directory",
+                "neither the platform cache directory nor a home directory is available",
+                "set MEI_DOCTOR_DIR to a writable per-user directory",
+            )
+            .into()
+        })
+}
+
+pub(super) fn absolute_override(path: PathBuf) -> Result<PathBuf> {
+    std::path::absolute(&path).map_err(|err| {
+        failure(
+            "resolve MEI_DOCTOR_DIR",
+            err.to_string(),
+            "keep the current directory readable or use an absolute doctor directory",
+        )
+        .at(&path)
+    })
+}
+
+#[cfg(not(windows))]
+pub(super) fn cache_base(xdg: Option<PathBuf>, home: Option<PathBuf>) -> Option<PathBuf> {
+    xdg.filter(|path| !path.as_os_str().is_empty() && path.is_absolute())
+        .or_else(|| home.map(|home| home.join(".cache")))
+}
 
 pub(super) fn read_environment(paths: &Paths, release: &str) -> Result<Option<Environment>> {
     let bytes = match std::fs::read(&paths.cache) {
@@ -22,7 +69,7 @@ pub(super) fn read_environment(paths: &Paths, release: &str) -> Result<Option<En
                 err.to_string(),
                 format!(
                     "keep the cache readable, or remove it to rebuild the environment: {}",
-                    crate::error::remove_file_command(&paths.cache)
+                    crate::error::remove_file_instruction(&paths.cache)
                 ),
             )
             .at(&paths.cache));
@@ -80,16 +127,14 @@ pub(super) fn write_environment(
         )
         .at(&paths.cache)
     })?;
-    let temporary = paths
-        .root
-        .join(format!("environment-{}.json", std::process::id()));
+    let temporary = temporary_cache_path(paths);
     std::fs::write(&temporary, bytes).map_err(|err| {
         failure(
             "write the doctor cache candidate",
             err.to_string(),
             format!(
                 "keep the doctor directory writable, or remove the candidate: {}",
-                crate::error::remove_file_command(&temporary)
+                crate::error::remove_file_instruction(&temporary)
             ),
         )
         .at(&temporary)
@@ -105,6 +150,15 @@ pub(super) fn write_environment(
         )
         .at(&paths.cache)
     })
+}
+
+pub(super) fn temporary_cache_path(paths: &Paths) -> PathBuf {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let sequence = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    paths.root.join(format!(
+        "environment-{}-{sequence}.json",
+        std::process::id()
+    ))
 }
 
 fn program_json(program: &Program) -> Value {

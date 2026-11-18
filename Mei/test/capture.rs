@@ -101,6 +101,83 @@ fn an_existing_directory_is_never_reused_or_deleted() {
 }
 
 #[test]
+fn a_calyx_created_empty_directory_is_adopted() {
+    let directory = tempfile::tempdir().unwrap();
+    let created = directory.path().join("created");
+    std::fs::create_dir(&created).unwrap();
+    let (base, gateway) = serve(vec![
+        serde_json::json!({"stop_reason": "end_turn", "content": "done"}),
+    ]);
+    let output = support::command(&base, "task")
+        .env("MEI_CAPTURE_DIR", &created)
+        .env("MEI_CAPTURE_CREATED", "1")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    gateway.join().unwrap();
+    assert!(!created.exists());
+}
+
+#[test]
+fn an_empty_capture_override_has_an_exact_repair() {
+    let (base, _gateway) = serve(vec![]);
+    let output = support::command(&base, "task")
+        .env("MEI_CAPTURE_DIR", "")
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let shown = String::from_utf8_lossy(&output.stderr);
+    assert!(shown.contains("E_MEI_CAPTURE"), "{shown}");
+    assert!(shown.contains("value = \\\"\\\""), "{shown}");
+    let repair = if cfg!(windows) {
+        "Remove-Item Env:MEI_CAPTURE_DIR"
+    } else {
+        "unset MEI_CAPTURE_DIR"
+    };
+    assert!(shown.contains(repair), "{shown}");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_non_unicode_capture_root_round_trips_through_python() {
+    use std::os::unix::ffi::{OsStrExt as _, OsStringExt as _};
+    let directory = tempfile::tempdir().unwrap();
+    let mut bytes = directory.path().as_os_str().as_bytes().to_vec();
+    bytes.extend_from_slice(b"/capture-\xff");
+    let root = std::path::PathBuf::from(std::ffi::OsString::from_vec(bytes));
+    let (base, gateway) = serve_with(4, move |request, index| match index {
+        0 => call("print('small')"),
+        1 => call("print('x' * 20000)"),
+        2 => {
+            let notice = tool_result_text(&request["messages"][4]["content"][0]["content"]);
+            let expression = notice.lines().last().unwrap();
+            call(&format!("print(len(open({expression}, 'rb').read()))"))
+        }
+        3 => {
+            let observed = tool_result_text(&request["messages"][6]["content"][0]["content"]);
+            serde_json::json!({"stop_reason": "end_turn", "content": if observed == "20001\n" { "readable" } else { "missing" }})
+        }
+        _ => panic!("unexpected request"),
+    });
+    let output = support::command(&base, "non-unicode capture")
+        .env("MEI_CAPTURE_DIR", &root)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(output.stdout, b"readable");
+    gateway.join().unwrap();
+    assert!(root.exists());
+}
+
+#[test]
 fn spilled_output_remains_readable_after_interpreter_exit() {
     let temporary = tempfile::tempdir().unwrap();
     let (base, gateway) = serve(vec![

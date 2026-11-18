@@ -12,7 +12,7 @@ import Mei.spec.Session
 
 `Mei/` 是极简 Agent Harness：一个可变 Anthropic Messages 请求、一个串行反馈循环、
 一个有状态 python 进程。Cargo 包名 `sprawling-mei`，库名 `mei`，无头命令名 `mei`。
-唯一工具名为 `python`；小型 UTF-8 输出直接返回，大输出只返提示与完整文件路径。
+唯一工具名为 `python`；小型 UTF-8 输出直接返回，大输出只返提示与完整路径，非 Unicode 本机路径则用可无损还原的 Python 表达式表示。
 终端居住面属于顶层生产包 `Calyx/`（非 Archetype）；Mei 核不含 TUI。
 指令 / MCP / Skills 的权威在 magpie；Agent 自去 skill 仓库。`MEI.md` 仅在构建时进入 system；
 新会话只额外读取工作区顶层的 `AGENTS.md`，并将其冻结在首个 user 消息。
@@ -52,13 +52,14 @@ LLM compaction、验真门、Skills/MCP 自动暴露、Mei 自动更新、为弱
   超过 16 KiB 或非 UTF-8 时只返回一条提示与完整文件路径，不内联头尾片段；
   下一次 python 调用可按路径读取、筛选或切片后打印；`sys.executable` 可启动并捕获子 python；
   非法帧与解释器死亡为核错误；Windows 与 Unix 均可 spawn。
-- AGENTS 只在新会话首轮注入一次；同会话后续轮次与 resume 不重读、不补注；`/new` 才可读取新代次。
+- AGENTS 只在新会话首轮注入一次；只接受打开后确认的普通文件，拒绝符号链接、目录、FIFO 与其他文件类型；同会话后续轮次与 resume 不重读、不补注；`/new` 才可读取新代次。
 - doctor 对当前 Mei 版本的完整缓存不探测、不联网；缺席、损坏、版本更新、或记录的程序已不是普通文件
   才重建；受支持 python 不追新，缺失/EOL 才安装最新稳定版；uv 缺失或不可执行才安装，PATH 无 uv 时
   复用私有目录里可用的 uv。精确版本只进入 `<python version=… uv_version=…>`，
   路径仅供本地执行，不进入模型描述，python 子进程可通过 PATH 调用 uv。
 - inline capture 在 fd 转移后或解释器 reap 后回收；spilled 路径跨解释器退出与 resume 有效；
-  Calyx 删除失败或取消 run 的整个未提交 capture 目录。宿主崩溃后的 orphan 回收不在本次承诺内。
+  成功回收解释器后的 inline 清理失败单独报警，不吞掉最终答复或 spilled 交接；失败清理保留路径供重试。
+  Calyx 只删除本 run 独占创建且未提交的 capture 目录。宿主崩溃后的 orphan 回收不在本次承诺内。
 - stderr：消息 JSONL；可选 `{"type":"mei.obs",...}` 观测行（pulse / usage）；
   失败诊断为 Description/Cause/Resolution 的 toml 块。
 - stdout：最终 text，不加换行。
@@ -157,6 +158,9 @@ resume 只重放日志已有消息，不读取或补注当前 AGENTS。工具描
 携带精确版本，与持久变量/imports/cwd、异常后恢复、主动打印、16 KiB 内联预算、完整捕获路径、
 subprocess 和 `sys.executable` 一致；内联数字由 `INLINE_BYTES` 生成；不写 REPL 或核内超时。
 `MEI_CAPTURE_DIR` 是 Face 分配当前 run 目录的内部环境接口；缺席时无头核创建临时 run 目录。
+Calyx 先独占创建空目录，再以 `MEI_CAPTURE_CREATED=1` 让 Mei 接管；没有这个标记时既有目录一律拒绝。
+私有控制信道只传 ASCII capture 文件名，`Store` 在本机 root 下拼接；spilled 提示给完整 Unicode 路径，
+或给能在 Python 中无损还原非 Unicode 本机路径的表达式。
 唯一工具 schema 与 agent 整波预检跨 provider 生效，不声明 provider 专有的 `strict` 模式。
 `HARNESS_EXTRA` 浅合并一次；拒绝 `stream: true` 与 `HARNESS_EXTRA.tools`。
 无 `MEI_TOOLS`。`HARNESS_MODEL` 必填。
@@ -192,21 +196,25 @@ tool_use → 预检 → exec 得捕获或小结果提示 → user tool_result co
   阻塞读期间可按固定间隔写 `mei.obs` pulse，不改 messages。
 - `boot.py`：每帧一行 JSON string；stdout/stderr 重定向到当前 run 的捕获文件；同一执行命名空间保留
   变量与 imports，解释器进程保留 cwd；异常只形成 traceback 反馈，循环继续；
-  结束后把**该文件路径**经控制信道回传；不改写文件、无 alarm。
-  `MEI_CAPTURE_DIR` 在模型代码运行前由 `boot.py` 读取并移出环境，递归子 Mei 不会误继承父 run 目录。
+  结束后只把**该文件的 ASCII basename** 经控制信道回传；不改写文件、无 alarm。
+  `MEI_CAPTURE_DIR` 与 `MEI_CAPTURE_CREATED` 在模型代码运行前由 `boot.py` 移出环境，递归子 Mei 不会误继承父 run 目录。
 - `Py::run` 先读文件元数据；仅不超过 16 KiB 时做有界读取。完整 UTF-8 文本直接作为
   tool_result；更大或非 UTF-8 时只给提示与路径。下一响应已把 fd 1/2 移到新文件，
   此时回收此前的 inline 文件；当前 inline 文件在解释器收口后回收。
 - 空输出：仍创建零字节文件，tool_result 为空字符串，文件按 inline 回收。
-- 成功 `close` 只回收 run 所有的 inline；spilled 转归 session/caller。失败 `kill_and_wait` 回收整个未提交 run。
-  `Py` 被丢弃时，子解释器已退出且未 `close` 的 run 视为未交接，回收其未提交 run；成功交接后只留 spilled。
-  Calyx 在强制取消后删除它分配的 run 目录。`close` 的 5s 宽限后 kill+wait；成功收口的强制清理不是运行失败。
+- 成功 `close` 先完成 spilled 交接，再回收 run 所有的 inline；inline 删除失败只报警并保留清理记录，答复仍成功。
+  失败 `kill_and_wait` 回收整个未提交 run。`Py` 被丢弃时，子解释器已退出且未 `close` 的 run 视为未交接，回收其未提交 run。
+  Calyx 在强制取消后只删除它独占创建的 run 目录。`close` 的 5s 宽限后 kill+wait；成功收口的强制清理不是运行失败。
 - doctor 以 `CARGO_PKG_VERSION` 和缓存 schema 判定代次；缓存命中不执行探测或安装，但记录里的两个程序
   必须仍是普通文件，否则整条记录作废并重建。
   缺失/EOL python 的修复先刷新 Mei 私有的最新稳定 uv，再在隔离目录安装最新稳定 python，
   不读取工作区 `.python-version`，不改系统 python、全局 PATH 或 shell profile。
   首启互斥用操作系统的文件咨询锁，锁随持有进程退出由系统释放，遗留锁文件不会阻塞下一次启动；
-  等待上限不小于安装预算，取得锁后重读缓存再决定探测。
+  等待按单调截止时间轮询，最后一次休眠后仍尝试取锁；等待上限覆盖完整修复截止时间与缓存发布余量，取得锁后重读缓存。
+  完整 uv+Python 修复共享一个 900s 单调截止时间，到期 kill+wait 且不发布缓存；锁等待另加 5s 发布余量。
+  uv 子进程移除 `UV_PYTHON`，find 使用 `--no-project`，Windows install 使用 `--no-registry`；损坏安装以 `--reinstall` 重试一次。
+  修复结果写缓存前按同一个 `now` 再验证 Python 支持期，过期结果不发布。PATH 中不可执行候选跳过并可回退私有 uv，
+  成功探测使用同一绝对候选路径。`MEI_DOCTOR_DIR` 在切换 uv cwd 前转绝对路径；空或相对 XDG 缓存路径回退 HOME。
   探测脚本以 `-I` 运行：工作区文件与 `PYTHON*` 变量都不影响结果，只有 `NotFound` 视为"该程序缺席"，
   其他 I/O 失败按错误上报。缓存写入与锁错误均产生带路径、值、可执行修复命令的诊断；失败不写成功缓存。
 -/
@@ -240,13 +248,13 @@ Mei 自更新器、为输出捕获引入异步 runtime。uv 官方 installer、`
 
 `max_tokens` 默认 `65536`（可被 `HARNESS_EXTRA` 覆盖）、连接 10s、IO 600s、
 收口宽限 5s、poll 20ms、输出内联上限 16 KiB、默认网关与 key、
-`anthropic-version: 2023-06-01`、pulse 间隔 5s、doctor 安装预算 900s（锁等待同值）、
+`anthropic-version: 2023-06-01`、pulse 间隔 5s、完整 doctor 修复预算 900s（锁等待 905s，含 5s 发布余量）、
 各一处权威。`MEI.md` 构建时注入。
 `INLINE_BYTES` 同时驱动内联判定、超限提示和工具描述的数字，没有第二份阈值或换算目标。
 16 KiB 覆盖本仓绝大多数源码/文档，避免普通文件多读一轮；无头尾采样、无 250s alarm。
 Python EOL 日期表在 `Mei/src/doctor/support.rs` 与 `Mei/spec/Environment.lean` 各一份，二者由
-`doctor_tests::the_lean_environment_vectors_replay` 对齐：Lean 打印边界向量，Rust 逐条重放自己的
-`plan`，任一侧漂移都红。日期取自 `python/peps` 仓库 `release_management/` 目录下的 `python-releases.toml`，
+`doctor_tests::the_lean_environment_vectors_replay` 对齐：Lean 将全部已记录 minor 的边界向量与独立提交的
+`doctor_vectors.txt` 自动比对，Rust 逐条重放同一文件，任一侧单独漂移都红。日期取自 `python/peps` 仓库 `release_management/` 目录下的 `python-releases.toml`，
 `docs/third-party.md` §1 跟踪其提交。当前时间作参数；doctor 目录覆写只用于隔离状态与测试。
 -/
 
@@ -285,8 +293,8 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 /-! D4 核不知 TUI；终端属 Calyx；被否核内 Entry 类型。 -/
 /-! D5 删除 `MEI_TOOLS`；透明服务端工具不由 Mei 声明；`pause_turn` 续跑。 -/
 /-! D6 `MEI.md` 仅构建时注入；新会话唯一运行时文档例外是顶层 AGENTS。它冻结于首个 user 消息，
-后续 resume 不重读、不补注；Skills/MCP/环境工具不自动暴露。被否：独立 AGENTS 消息（现有日志只记录
-本次 prompt，会丢失它）、拼入 system（顺序与会话冻结均不符）、每轮刷新（重复且漂移）。 -/
+后续 resume 不重读、不补注；只读取打开后确认的普通文件，Unix 非阻塞打开防止 FIFO 卡住启动，发布目标禁止跟随链接/reparse point，避免把工作区外内容发给 provider。被否：独立 AGENTS 消息（现有日志只记录
+本次 prompt，会丢失它）、拼入 system（顺序与会话冻结均不符）、每轮刷新（重复且漂移）、跟随符号链接读取外部指南。 -/
 /-! D7 `close` 5s 后 kill；被否无限 wait。 -/
 /-! D8 传输 10s/600s；被否无时限与过短时限。 -/
 /-! D9 会话斜杠与 JSONL 代次归 Calyx；核只提供 `--resume` 消息恢复。 -/
