@@ -4,7 +4,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use std::io::{BufReader, Write};
-use std::process::Command;
 
 use serde_json::Value;
 
@@ -162,19 +161,13 @@ fn pause_turn_continues_without_a_user_message() {
 }
 
 #[test]
-#[expect(clippy::disallowed_methods, reason = "end-to-end fixture process")]
 fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     let playground = tempfile::tempdir().unwrap();
     let run = |directory: &std::path::Path, base: &str, prompt: &str| {
         let trace = std::fs::File::create(directory.join("run.jsonl")).unwrap();
-        Command::new(env!("CARGO_BIN_EXE_mei"))
-            .args(["-p", prompt])
+        crate::support::command(base, prompt)
             .current_dir(directory)
-            .env("HARNESS_MODEL", "test/model")
-            .env("ANTHROPIC_BASE_URL", base)
-            .env("ANTHROPIC_API_KEY", "magpie")
             .env_remove("HARNESS")
-            .env_remove("HARNESS_EXTRA")
             .stderr(trace)
             .output()
             .unwrap()
@@ -273,7 +266,6 @@ assert result.returncode == 0
 
 #[cfg(unix)]
 #[test]
-#[expect(clippy::disallowed_methods, reason = "resume fixture process")]
 fn cli_resume_imports_only_complete_message_history() {
     use std::os::unix::ffi::OsStrExt as _;
 
@@ -292,15 +284,10 @@ fn cli_resume_imports_only_complete_message_history() {
     let (base, gateway) = serve(vec![
         serde_json::json!({"stop_reason": "end_turn", "content": "continued"}),
     ]);
-    let output = Command::new(env!("CARGO_BIN_EXE_mei"))
-        .args(["--resume"])
+    let output = crate::support::command(&base, "second")
+        .arg("--resume")
         .arg(&session)
-        .args(["-p", "second"])
-        .env("HARNESS_MODEL", "test/model")
-        .env("ANTHROPIC_BASE_URL", &base)
-        .env("ANTHROPIC_API_KEY", "magpie")
         .env_remove("HARNESS")
-        .env_remove("HARNESS_EXTRA")
         .output()
         .unwrap();
     assert!(
@@ -334,7 +321,6 @@ fn cli_resume_imports_only_complete_message_history() {
 
 #[cfg(unix)]
 #[test]
-#[expect(clippy::disallowed_methods, reason = "invalid resume fixture process")]
 fn cli_resume_rejects_an_incomplete_log_before_starting_python() {
     let dir = tempfile::tempdir().unwrap();
     let session = dir.path().join("incomplete.jsonl");
@@ -352,14 +338,10 @@ fn cli_resume_rejects_an_incomplete_log_before_starting_python() {
     use std::os::unix::fs::PermissionsExt as _;
     permissions.set_mode(0o755);
     std::fs::set_permissions(&python, permissions).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_mei"))
-        .args(["--resume"])
+    let output = crate::support::command("http://127.0.0.1:1", "second")
+        .arg("--resume")
         .arg(&session)
-        .args(["-p", "second"])
         .current_dir(dir.path())
-        .env("HARNESS_MODEL", "test/model")
-        .env("ANTHROPIC_BASE_URL", "http://127.0.0.1:1")
-        .env("ANTHROPIC_API_KEY", "magpie")
         .env("PATH", &bin)
         .output()
         .unwrap();

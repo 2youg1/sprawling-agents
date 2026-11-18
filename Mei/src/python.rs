@@ -305,7 +305,11 @@ fn python_program() -> &'static str {
 impl Drop for Py {
     fn drop(&mut self) {
         match self.child.try_wait() {
-            Ok(Some(_)) => {}
+            Ok(Some(_)) => {
+                if let Err(err) = self.captures.abandon() {
+                    eprintln!("{err}");
+                }
+            }
             Ok(None) | Err(_) => {
                 if let Err(err) = self.kill_and_wait() {
                     eprintln!("{err}");
@@ -364,6 +368,22 @@ mod tests {
         );
         assert_eq!(python.run("pass").unwrap(), "");
         python.close().unwrap();
+    }
+
+    #[test]
+    fn dropping_an_exited_interpreter_reclaims_uncommitted_captures() {
+        let mut python = Py::spawn().unwrap();
+        let captures = python.captures.root().to_path_buf();
+        assert!(python.run("import os\nos._exit(0)").is_err());
+        for _ in 0..500 {
+            if python.child.try_wait().unwrap().is_some() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(python.child.try_wait().unwrap().is_some());
+        drop(python);
+        assert!(!captures.exists());
     }
 
     #[test]

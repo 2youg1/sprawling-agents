@@ -275,6 +275,14 @@ fn tod(at: u64) ?u32 {
     return if (local_time.local(at)) |t| t.seconds else null;
 }
 
+/// What one finished run leaves behind for the session log.
+const CaptureFate = enum {
+    /// Keep the directory: committed, or possibly referenced by the log.
+    keep,
+    /// Remove it: nothing can refer to it.
+    discard,
+};
+
 const Ui = struct {
     gpa: std.mem.Allocator,
     io: std.Io,
@@ -520,7 +528,7 @@ const Ui = struct {
             .ok => |proc| self.process = proc,
             .err => |diag| {
                 defer self.gpa.free(diag);
-                self.finishCapture(false);
+                self.finishCapture(.discard);
                 _ = self.frame_arena.reset(.retain_capacity);
                 const failure_arena = self.frame_arena.allocator();
                 const entries = self.seen.finished(failure_arena, .{ .err = diag }, nowMs(self.io)) catch return;
@@ -665,12 +673,14 @@ const Ui = struct {
         }
 
         const successful = !self.lost and !fin.cancelled and fin.result == .ok;
-        var committed = false;
+        var capture = CaptureFate.discard;
         if (successful) {
             if (self.session) |*session| {
                 switch (session.append(self.pending.items)) {
-                    .ok => committed = true,
+                    .ok => capture = .keep,
                     .err => |diag| {
+                        // Confirmed not written: nothing refers to the run's
+                        // captures, so the directory goes with the failed run.
                         defer self.gpa.free(diag);
                         if (self.session) |*s| {
                             s.deinit();
@@ -678,15 +688,23 @@ const Ui = struct {
                         }
                         self.printNote(diag);
                     },
+                    .uncertain => |diag| {
+                        // The log may already name these files, so they stay
+                        // beside it for the person to recover from.
+                        defer self.gpa.free(diag);
+                        if (self.session) |*s| {
+                            s.deinit();
+                            self.session = null;
+                        }
+                        capture = .keep;
+                        self.printNote(diag);
+                    },
                 }
             }
-            for (self.pending.items) |line| self.gpa.free(line);
-            self.pending.clearRetainingCapacity();
-        } else {
-            for (self.pending.items) |line| self.gpa.free(line);
-            self.pending.clearRetainingCapacity();
         }
-        self.finishCapture(committed);
+        for (self.pending.items) |line| self.gpa.free(line);
+        self.pending.clearRetainingCapacity();
+        self.finishCapture(capture);
 
         _ = self.frame_arena.reset(.retain_capacity);
         const arena = self.frame_arena.allocator();
@@ -713,9 +731,15 @@ const Ui = struct {
         }
     }
 
-    fn finishCapture(self: *Ui, committed: bool) void {
+    /// Ends one run's ownership of its capture directory.
+    ///
+    /// `discard` removes the directory only when this run's outcome cannot have
+    /// been referenced: the session was never told about it, or the append is
+    /// confirmed not to have landed. Every other outcome keeps the directory,
+    /// because the log or a person may still read the spilled files in it.
+    fn finishCapture(self: *Ui, fate: CaptureFate) void {
         const path = self.capture_dir orelse return;
-        if (!committed) {
+        if (fate == .discard) {
             mei_session.discardCaptureDirectory(self.io, path) catch |err| {
                 const message = std.fmt.allocPrint(self.gpa, "discard the uncommitted capture directory {s}: {s}", .{ path, @errorName(err) }) catch null;
                 if (message) |owned| {

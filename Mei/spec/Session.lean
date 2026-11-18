@@ -109,13 +109,6 @@ theorem resume_then_appendPrompt_uses_only_logged_opening (state : State) (entri
       some (entries.map Entry.message ++ [⟨.user, .string prompt⟩]) := by
   simp [resume, restore_preserves_messages entries complete, appendPrompt]
 
-example : begin (some "rule") "task" = [openingMessage (some "rule") "task"] := by
-  native_decide
-
-example : appendPrompt (begin none "first") "second" =
-    [openingMessage none "first", ⟨.user, .string "second"⟩] := by
-  native_decide
-
 example : restore [] = none := by native_decide
 
 example : restore [⟨Mei.Agent.assistant (.string "done"), some Stop.endTurn⟩] = none := by

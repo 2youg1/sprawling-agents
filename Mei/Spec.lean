@@ -53,8 +53,9 @@ LLM compaction、验真门、Skills/MCP 自动暴露、Mei 自动更新、为弱
   下一次 python 调用可按路径读取、筛选或切片后打印；`sys.executable` 可启动并捕获子 python；
   非法帧与解释器死亡为核错误；Windows 与 Unix 均可 spawn。
 - AGENTS 只在新会话首轮注入一次；同会话后续轮次与 resume 不重读、不补注；`/new` 才可读取新代次。
-- doctor 对当前 Mei 版本的完整缓存不探测、不联网；缺席或版本更新才重建；受支持 python 不追新，
-  缺失/EOL 才安装最新稳定版；uv 缺失或不可执行才安装。精确版本只进入 `<python version=… uv_version=…>`，
+- doctor 对当前 Mei 版本的完整缓存不探测、不联网；缺席、损坏、版本更新、或记录的程序已不是普通文件
+  才重建；受支持 python 不追新，缺失/EOL 才安装最新稳定版；uv 缺失或不可执行才安装，PATH 无 uv 时
+  复用私有目录里可用的 uv。精确版本只进入 `<python version=… uv_version=…>`，
   路径仅供本地执行，不进入模型描述，python 子进程可通过 PATH 调用 uv。
 - inline capture 在 fd 转移后或解释器 reap 后回收；spilled 路径跨解释器退出与 resume 有效；
   Calyx 删除失败或取消 run 的整个未提交 capture 目录。宿主崩溃后的 orphan 回收不在本次承诺内。
@@ -198,11 +199,16 @@ tool_use → 预检 → exec 得捕获或小结果提示 → user tool_result co
   此时回收此前的 inline 文件；当前 inline 文件在解释器收口后回收。
 - 空输出：仍创建零字节文件，tool_result 为空字符串，文件按 inline 回收。
 - 成功 `close` 只回收 run 所有的 inline；spilled 转归 session/caller。失败 `kill_and_wait` 回收整个未提交 run。
+  `Py` 被丢弃时，子解释器已退出且未 `close` 的 run 视为未交接，回收其未提交 run；成功交接后只留 spilled。
   Calyx 在强制取消后删除它分配的 run 目录。`close` 的 5s 宽限后 kill+wait；成功收口的强制清理不是运行失败。
-- doctor 以 `CARGO_PKG_VERSION` 和缓存 schema 判定代次；缓存命中不执行探测或安装。
+- doctor 以 `CARGO_PKG_VERSION` 和缓存 schema 判定代次；缓存命中不执行探测或安装，但记录里的两个程序
+  必须仍是普通文件，否则整条记录作废并重建。
   缺失/EOL python 的修复先刷新 Mei 私有的最新稳定 uv，再在隔离目录安装最新稳定 python，
   不读取工作区 `.python-version`，不改系统 python、全局 PATH 或 shell profile。
-  缓存写入与首启锁错误均产生可修复诊断；失败不写成功缓存。
+  首启互斥用操作系统的文件咨询锁，锁随持有进程退出由系统释放，遗留锁文件不会阻塞下一次启动；
+  等待上限不小于安装预算，取得锁后重读缓存再决定探测。
+  探测脚本以 `-I` 运行：工作区文件与 `PYTHON*` 变量都不影响结果，只有 `NotFound` 视为"该程序缺席"，
+  其他 I/O 失败按错误上报。缓存写入与锁错误均产生带路径、值、可执行修复命令的诊断；失败不写成功缓存。
 -/
 
 /-! ## 11 边界枚举
@@ -210,7 +216,8 @@ tool_use → 预检 → exec 得捕获或小结果提示 → user tool_result co
 空/Unicode prompt、stdin EOF、重复参数、恢复残缺、缺模型、非法 URL、非 200、
 chunked、停滞、空工具波、未知客户端工具、重复 id、max_tokens、pause、
 AGENTS 缺失/修改/删除/非 UTF-8、重复 resume、无 AGENTS 旧日志、失败首轮重试、
-doctor 缓存命中/损坏/更新/并发首启/安装失败、EOL 日期边界、非 Unicode 可执行路径、
+doctor 缓存命中/损坏/更新/记录程序缺失或非普通文件/遗留锁文件/并发首启/安装失败、
+EOL 日期边界（与 `Mei/spec/Environment.lean` 的向量一致）、非 Unicode 可执行路径、
 inline 文件占用、spilled 跨进程读取、失败/取消 run、宿主崩溃 orphan、
 解释器死亡、非法帧、非 UTF-8、空文件路径、收口非 daemon 线程、取消杀组。
 -/
@@ -233,10 +240,14 @@ Mei 自更新器、为输出捕获引入异步 runtime。uv 官方 installer、`
 
 `max_tokens` 默认 `65536`（可被 `HARNESS_EXTRA` 覆盖）、连接 10s、IO 600s、
 收口宽限 5s、poll 20ms、输出内联上限 16 KiB、默认网关与 key、
-`anthropic-version: 2023-06-01`、pulse 间隔 5s、各一处权威。`MEI.md` 构建时注入。
+`anthropic-version: 2023-06-01`、pulse 间隔 5s、doctor 安装预算 900s（锁等待同值）、
+各一处权威。`MEI.md` 构建时注入。
 `INLINE_BYTES` 同时驱动内联判定、超限提示和工具描述的数字，没有第二份阈值或换算目标。
 16 KiB 覆盖本仓绝大多数源码/文档，避免普通文件多读一轮；无头尾采样、无 250s alarm。
-Python EOL 日期表只有 doctor 一处权威，当前时间作参数；doctor 目录覆写只用于隔离状态与测试。
+Python EOL 日期表在 `Mei/src/doctor/support.rs` 与 `Mei/spec/Environment.lean` 各一份，二者由
+`doctor_tests::the_lean_environment_vectors_replay` 对齐：Lean 打印边界向量，Rust 逐条重放自己的
+`plan`，任一侧漂移都红。日期取自 `python/peps` 仓库 `release_management/` 目录下的 `python-releases.toml`，
+`docs/third-party.md` §1 跟踪其提交。当前时间作参数；doctor 目录覆写只用于隔离状态与测试。
 -/
 
 /-! ## 15 影响面

@@ -10,18 +10,29 @@
 
 use std::path::Path;
 use std::process::{Command, Output};
+use std::time::Duration;
 
 use super::{Paths, Program, failure};
-use crate::error::Result;
+use crate::error::{Result, remove_file_command, remove_tree_command};
+
+/// The wall-clock budget one installer may spend.
+///
+/// The doctor lock is held for the whole repair, so this is also what a second
+/// Mei may legitimately wait: `lock::LOCK_WAIT` reads this value, and a change
+/// here moves that ceiling with it.
+pub(super) const BUDGET: Duration = Duration::from_secs(900);
+
+const BUDGET_SECONDS: u64 = 900;
+const CONNECT_TIMEOUT_SECONDS: u64 = 10;
 
 pub fn uv(paths: &Paths) -> Result<Program> {
     std::fs::create_dir_all(&paths.bin).map_err(|err| {
         failure(
             "create Mei's uv directory",
             err.to_string(),
-            "keep the private doctor directory writable",
-            Some(&paths.bin),
+            format!("keep it writable: {}", remove_tree_command(&paths.bin)),
         )
+        .at(&paths.bin)
     })?;
     let script = paths.root.join(if cfg!(windows) {
         "uv-install.ps1"
@@ -36,7 +47,14 @@ pub fn uv(paths: &Paths) -> Result<Program> {
                     "-ExecutionPolicy",
                     "Bypass",
                     "-Command",
-                    "$ErrorActionPreference = 'Stop'; Invoke-RestMethod -Uri 'https://astral.sh/uv/install.ps1' -OutFile $env:MEI_UV_INSTALL_SCRIPT; & $env:MEI_UV_INSTALL_SCRIPT",
+                    &format!(
+                        concat!(
+                            "$ErrorActionPreference = 'Stop'; ",
+                            "Invoke-RestMethod -TimeoutSec {0} -Uri 'https://astral.sh/uv/install.ps1' ",
+                            "-OutFile $env:MEI_UV_INSTALL_SCRIPT; & $env:MEI_UV_INSTALL_SCRIPT"
+                        ),
+                        BUDGET_SECONDS
+                    ),
                 ])
                 .env("MEI_UV_INSTALL_SCRIPT", &script)
                 .env("UV_UNMANAGED_INSTALL", &paths.bin),
@@ -48,7 +66,18 @@ pub fn uv(paths: &Paths) -> Result<Program> {
             Command::new("sh")
                 .args([
                     "-c",
-                    "if command -v curl >/dev/null 2>&1; then curl --fail --silent --show-error --location --connect-timeout 10 --max-time 300 --output \"$MEI_UV_INSTALL_SCRIPT\" https://astral.sh/uv/install.sh; elif command -v wget >/dev/null 2>&1; then wget -q -O \"$MEI_UV_INSTALL_SCRIPT\" https://astral.sh/uv/install.sh; else echo 'curl or wget is required' >&2; exit 127; fi && sh \"$MEI_UV_INSTALL_SCRIPT\"",
+                    &format!(
+                        concat!(
+                            "if command -v curl >/dev/null 2>&1; then ",
+                            "curl --fail --silent --show-error --location ",
+                            "--connect-timeout {0} --max-time {1} ",
+                            "--output \"$MEI_UV_INSTALL_SCRIPT\" https://astral.sh/uv/install.sh; ",
+                            "elif command -v wget >/dev/null 2>&1; then ",
+                            "wget --tries=1 --timeout={1} -q -O \"$MEI_UV_INSTALL_SCRIPT\" https://astral.sh/uv/install.sh; ",
+                            "else echo 'curl or wget is required' >&2; exit 127; fi && sh \"$MEI_UV_INSTALL_SCRIPT\""
+                        ),
+                        CONNECT_TIMEOUT_SECONDS, BUDGET_SECONDS
+                    ),
                 ])
                 .env("MEI_UV_INSTALL_SCRIPT", &script)
                 .env("UV_UNMANAGED_INSTALL", &paths.bin),
@@ -61,89 +90,98 @@ pub fn uv(paths: &Paths) -> Result<Program> {
         failure(
             "verify the installed uv",
             "the private uv executable did not return a numeric version",
-            "remove the private uv directory and retry with network access to astral.sh",
-            Some(&executable),
+            format!(
+                "remove the half-installed tool and retry: {}",
+                remove_file_command(&executable)
+            ),
         )
+        .at(&executable)
     })
 }
 
 pub fn python(paths: &Paths, uv: &Program) -> Result<Program> {
-    let mut command = Command::new(&uv.executable);
-    command
-        .args(["--no-config", "--no-progress", "python", "install"])
-        .current_dir(&paths.root)
-        .env("UV_PYTHON_INSTALL_DIR", &paths.python)
-        .env("UV_PYTHON_BIN_DIR", &paths.python_bin)
-        .env("UV_CACHE_DIR", &paths.uv_cache);
-    run(
-        &mut command,
+    let installed = uv_command(paths, uv)
+        .args(["python", "install"])
+        .env("UV_HTTP_TIMEOUT", BUDGET_SECONDS.to_string())
+        .output();
+    run_output(
+        installed,
         "install the latest stable Python through uv",
         &uv.executable,
     )?;
 
-    let output = run(
-        Command::new(&uv.executable)
-            .args([
-                "--no-config",
-                "--no-progress",
-                "python",
-                "find",
-                "--managed-python",
-            ])
-            .current_dir(&paths.root)
-            .env("UV_PYTHON_INSTALL_DIR", &paths.python)
-            .env("UV_PYTHON_BIN_DIR", &paths.python_bin)
-            .env("UV_CACHE_DIR", &paths.uv_cache),
-        "locate the installed Python",
-        &uv.executable,
-    )?;
+    let found = uv_command(paths, uv)
+        .args(["python", "find", "--managed-python"])
+        .output();
+    let output = run_output(found, "locate the installed Python", &uv.executable)?;
     let text = String::from_utf8(output.stdout).map_err(|err| {
         failure(
             "read the installed Python path",
             err.to_string(),
             "install into a UTF-8 doctor directory or set MEI_DOCTOR_DIR to one",
-            Some(&paths.root),
         )
+        .at(&paths.root)
     })?;
     let path = text.trim();
     if path.is_empty() {
         return Err(failure(
             "locate the installed Python",
             "uv returned an empty path",
-            "remove the incomplete private Python installation and retry",
-            Some(&paths.root),
-        ));
+            format!(
+                "remove the incomplete private installation and retry: {}",
+                remove_tree_command(&paths.python)
+            ),
+        )
+        .at(&paths.root));
     }
     super::probe_python(Path::new(path).as_os_str())?.ok_or_else(|| {
         failure(
             "verify the installed Python",
             "the managed interpreter did not return its version and executable",
-            "remove the incomplete private Python installation and retry",
-            Some(Path::new(path)),
+            format!(
+                "remove the incomplete private installation and retry: {}",
+                remove_tree_command(&paths.python)
+            ),
         )
+        .at_with_value(Path::new(path), path)
     })
 }
 
+fn uv_command(paths: &Paths, uv: &Program) -> Command {
+    let mut command = Command::new(&uv.executable);
+    command
+        .args(["--no-config", "--no-progress"])
+        .current_dir(&paths.root)
+        .env("UV_PYTHON_INSTALL_DIR", &paths.python)
+        .env("UV_PYTHON_BIN_DIR", &paths.python_bin)
+        .env("UV_CACHE_DIR", &paths.uv_cache);
+    command
+}
+
 fn run(command: &mut Command, action: &str, subject: &Path) -> Result<Output> {
-    let output = command.output().map_err(|err| {
+    run_output(command.output(), action, subject)
+}
+
+fn run_output(output: std::io::Result<Output>, action: &str, subject: &Path) -> Result<Output> {
+    let output = output.map_err(|err| {
         failure(
             action,
             err.to_string(),
             "keep the installer available and retry with network access",
-            Some(subject),
         )
+        .at(subject)
     })?;
     if output.status.success() {
         return Ok(output);
     }
+    let stderr = String::from_utf8_lossy(&output.stderr);
     Err(failure(
         action,
+        format!("exit status {}", output.status),
         format!(
-            "exit status {}; stderr: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr).trim()
+            "repair network access or the named installer, then start Mei again; no successful cache was written: {}",
+            remove_file_command(subject)
         ),
-        "repair network access or the named installer, then start Mei again; no successful cache was written",
-        Some(subject),
-    ))
+    )
+    .at_with_value(subject, stderr.trim()))
 }

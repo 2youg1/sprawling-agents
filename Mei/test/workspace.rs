@@ -216,5 +216,9 @@ fn malformed_workspace_input_fails_before_calling_the_model() {
         .output()
         .unwrap();
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("E_MEI_WORKSPACE"));
+    let shown = String::from_utf8_lossy(&output.stderr);
+    assert!(shown.contains("E_MEI_WORKSPACE"), "{shown}");
+    assert!(shown.contains("start a new session"), "{shown}");
+    let command = mei::error::remove_file_command(&directory.path().join("AGENTS.md"));
+    assert!(shown.contains(&command.replace('\\', "\\\\")), "{shown}");
 }

@@ -92,14 +92,22 @@ pub fn command(base: &str, prompt: &str) -> Command {
     command
 }
 
+/// A doctor cache shared by every test process of this build, under the
+/// directory Cargo gives integration tests and `cargo clean` reclaims.
+///
+/// `write_environment` publishes by renaming a process-named candidate, so
+/// concurrent first starts converge on the same record instead of exhausting
+/// the temporary directory one `TempDir` per process.
 #[expect(clippy::disallowed_methods, reason = "test fixture process")]
 fn doctor_directory() -> &'static std::path::Path {
-    static FIXTURE: OnceLock<tempfile::TempDir> = OnceLock::new();
+    static FIXTURE: OnceLock<std::path::PathBuf> = OnceLock::new();
     FIXTURE
         .get_or_init(|| {
-            let directory = tempfile::tempdir().unwrap();
+            let root = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("doctor");
+            std::fs::create_dir_all(&root).unwrap();
             let probe = Command::new(if cfg!(windows) { "python" } else { "python3" })
                 .args([
+                    "-I",
                     "-c",
                     "import platform, sys; print(platform.python_version()); print(sys.executable)",
                 ])
@@ -108,20 +116,17 @@ fn doctor_directory() -> &'static std::path::Path {
             assert!(probe.status.success());
             let text = String::from_utf8(probe.stdout).unwrap();
             let mut lines = text.lines();
-            let python = mei::doctor::Program::new(
-                lines.next().unwrap(),
-                std::path::PathBuf::from(lines.next().unwrap()),
-            );
-            let uv_path = directory
-                .path()
-                .join(if cfg!(windows) { "uv.exe" } else { "uv" });
-            std::fs::write(&uv_path, []).unwrap();
-            let uv = mei::doctor::Program::new("0.0.0", uv_path);
-            mei::doctor::write_cache(directory.path(), &mei::doctor::Environment::new(python, uv))
-                .unwrap();
-            directory
+            let executable = std::path::PathBuf::from(lines.next_back().unwrap());
+            let version = lines.next_back().unwrap();
+            let python = mei::doctor::Program::new(version, executable.clone());
+            // An interpreter answers `--version` with a numeric token, so the
+            // same fixture stays usable if a cache is ever rebuilt on a machine
+            // without uv: no test reaches the network for a stand-in.
+            let uv = mei::doctor::Program::new(version, executable);
+            mei::doctor::write_cache(&root, &mei::doctor::Environment::new(python, uv)).unwrap();
+            root
         })
-        .path()
+        .as_path()
 }
 
 #[allow(

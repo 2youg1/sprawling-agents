@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-use super::{Environment, Paths, Program, failure, valid_version};
+use super::{Environment, Paths, Program, failure};
 use crate::error::Result;
 
 const CACHE_SCHEMA: u64 = 1;
@@ -20,9 +20,12 @@ pub(super) fn read_environment(paths: &Paths, release: &str) -> Result<Option<En
             return Err(failure(
                 "read the doctor cache",
                 err.to_string(),
-                "keep the cache readable or remove it to rebuild the environment",
-                Some(&paths.cache),
-            ));
+                format!(
+                    "keep the cache readable, or remove it to rebuild the environment: {}",
+                    crate::error::remove_file_command(&paths.cache)
+                ),
+            )
+            .at(&paths.cache));
         }
     };
     let value: Value = match serde_json::from_slice(&bytes) {
@@ -44,7 +47,7 @@ fn program(value: &Value, key: &str) -> Option<Program> {
     let item = value.get(key)?;
     let version = item.get("version")?.as_str()?;
     let executable = decode_path(item.get("executable")?)?;
-    if !valid_version(version) || executable.as_os_str().is_empty() {
+    if super::Version::parse(version).is_none() || !executable.is_file() {
         return None;
     }
     Some(Program::new(version, executable))
@@ -60,8 +63,8 @@ pub(super) fn write_environment(
             "create the doctor directory",
             err.to_string(),
             "keep the per-user doctor directory writable",
-            Some(&paths.root),
         )
+        .at(&paths.root)
     })?;
     let value = json!({
         "schema": CACHE_SCHEMA,
@@ -74,8 +77,8 @@ pub(super) fn write_environment(
             "serialize the doctor cache",
             err.to_string(),
             "keep environment versions and paths serializable",
-            Some(&paths.cache),
         )
+        .at(&paths.cache)
     })?;
     let temporary = paths
         .root
@@ -84,28 +87,23 @@ pub(super) fn write_environment(
         failure(
             "write the doctor cache candidate",
             err.to_string(),
-            "keep the doctor directory writable",
-            Some(&temporary),
+            format!(
+                "keep the doctor directory writable, or remove the candidate: {}",
+                crate::error::remove_file_command(&temporary)
+            ),
         )
+        .at(&temporary)
     })?;
-    #[cfg(windows)]
-    if paths.cache.exists() {
-        std::fs::remove_file(&paths.cache).map_err(|err| {
-            failure(
-                "replace the previous doctor cache",
-                err.to_string(),
-                "keep the old cache removable during an update",
-                Some(&paths.cache),
-            )
-        })?;
-    }
+    // `rename` replaces the target on every platform this tree builds for, so
+    // concurrent writers of the same record converge instead of leaving the
+    // cache absent for a reader that is mid-probe.
     std::fs::rename(&temporary, &paths.cache).map_err(|err| {
         failure(
             "publish the doctor cache",
             err.to_string(),
             "keep the cache directory writable and retry the environment check",
-            Some(&paths.cache),
         )
+        .at(&paths.cache)
     })
 }
 

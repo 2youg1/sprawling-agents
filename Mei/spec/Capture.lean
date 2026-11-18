@@ -6,8 +6,11 @@
 /-!
 # Mei 的输出捕获所有权模型
 
-`inline` 的完整内容进入消息且路径不暴露，文件归当前 run；`spilled` 的路径进入消息，
-文件在交互中归 session，在无头运行中归调用者。模型不覆盖宿主崩溃后的物理删除。
+这一部是**描述**，不是证明：捕获的所有权由 `Mei/src/capture.rs` 的 `Store` 与
+`Calyx/shell/mei_session.zig` 的运行目录决定，这里只写下两者共用的分类。行为由
+`Mei/test/capture.rs` 经生产门（真实进程、真实文件计数）与 `Calyx/shell` 的
+`zig build test` 判定：commit 保留 spilled、非 commit 回收整个目录、解释器退出不删除
+session/caller 所有的文件。模型不覆盖宿主崩溃后的物理删除。
 -/
 
 namespace Mei.Capture
@@ -29,29 +32,7 @@ def owner : Kind → Surface → Owner
   | .spilled, .interactive => .session
   | .spilled, .headless => .caller
 
-/-- Python 退出只回收 run 所有的文件；session/caller 所有的完整输出仍可经旧路径读取。 -/
 def fileSurvivesInterpreterExit (kind : Kind) (surface : Surface) : Bool :=
   owner kind surface != .run
-
-/-- 未提交 run 的两类捕获都没有会话引用，均可由 run owner 清理。 -/
-def reclaimUncommitted : Kind → Bool
-  | .inline | .spilled => true
-
-theorem inline_file_ends_with_run (surface : Surface) :
-    fileSurvivesInterpreterExit .inline surface = false := by
-  cases surface <;> native_decide
-
-theorem spilled_file_survives_resume (kind : Kind) (surface : Surface)
-    (spilled : kind = .spilled) :
-    fileSurvivesInterpreterExit kind surface = true := by
-  subst kind
-  cases surface <;> native_decide
-
-theorem uncommitted_captures_are_reclaimable (kind : Kind) :
-    reclaimUncommitted kind = true := by
-  cases kind <;> rfl
-
-example : owner .spilled .interactive = .session := by native_decide
-example : owner .spilled .headless = .caller := by native_decide
 
 end Mei.Capture

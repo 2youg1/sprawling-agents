@@ -5,7 +5,7 @@
 
 use serde_json::{Value, json};
 
-use crate::error::{Code, Diagnostic, Error, Result};
+use crate::error::{Code, Diagnostic, Error, Result, remove_file_command};
 
 pub fn read_new_session() -> Result<Option<String>> {
     let directory = std::env::current_dir()
@@ -33,12 +33,14 @@ pub fn opening_content(guide: Option<&str>, prompt: &str) -> Value {
 }
 
 fn workspace_error(action: &str, subject: String, path: Option<&std::path::Path>) -> Error {
-    let diagnostic = Diagnostic::new(
-        Code::Workspace,
-        action,
-        subject,
-        "keep the workspace readable and AGENTS.md as UTF-8, or remove it before starting a new session",
-    );
+    let recovery = match path {
+        Some(path) => format!(
+            "rewrite the guide as UTF-8, or delete it and start a new session: {}",
+            remove_file_command(path)
+        ),
+        None => "keep the workspace readable and AGENTS.md as UTF-8".to_owned(),
+    };
+    let diagnostic = Diagnostic::new(Code::Workspace, action, subject, recovery);
     Error::Diagnostic(match path {
         Some(path) => diagnostic.with_path(path.display().to_string()),
         None => diagnostic,
@@ -59,5 +61,20 @@ mod tests {
             ])
         );
         assert_eq!(opening_content(None, "task"), json!("task"));
+    }
+
+    #[test]
+    fn an_unreadable_guide_names_a_runnable_repair() {
+        let path = std::path::Path::new("work space/AGENTS.md");
+        let shown = workspace_error(
+            "read the top-level AGENTS.md",
+            "invalid UTF-8".to_owned(),
+            Some(path),
+        )
+        .to_string();
+        assert!(shown.contains("path = work space/AGENTS.md"), "{shown}");
+        assert!(shown.contains("start a new session"), "{shown}");
+        let command = remove_file_command(path).replace('\\', "\\\\");
+        assert!(shown.contains(&command), "{shown}");
     }
 }

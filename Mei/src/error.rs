@@ -190,6 +190,31 @@ impl Display for Error {
 
 impl std::error::Error for Error {}
 
+/// The one command that deletes the file at `path`, quoted for the platform's
+/// own shell so a reader can paste it and have it work.
+pub fn remove_file_command(path: &std::path::Path) -> String {
+    removal(path, "-f", "")
+}
+
+/// The one command that deletes the tree at `path`, quoted for the platform's
+/// own shell.
+pub fn remove_tree_command(path: &std::path::Path) -> String {
+    removal(path, "-rf", " -Recurse")
+}
+
+fn removal(path: &std::path::Path, rm_flag: &str, recurse: &str) -> String {
+    let shown = path.display().to_string();
+    if cfg!(windows) {
+        format!(
+            "Remove-Item -LiteralPath '{}'{} -Force",
+            shown.replace('\'', "''"),
+            recurse
+        )
+    } else {
+        format!("rm {rm_flag} '{}'", shown.replace('\'', "'\\''"))
+    }
+}
+
 /// Convenience for the frequent protocol family: a `Diagnostic` carrying
 /// the `Protocol` code, ready for `with_path`/`with_value`. `?` and
 /// [`From<Diagnostic>`] lift it into [`Error`] at the call site.
@@ -239,5 +264,22 @@ mod tests {
             shown.contains(r#"quote \" \\ \t \u001B \u0000 \u007F"#),
             "{shown}"
         );
+    }
+
+    #[test]
+    fn removal_commands_quote_the_platform_shell() {
+        let path = std::path::Path::new("a b/it's.txt");
+        let file = remove_file_command(path);
+        let tree = remove_tree_command(path);
+        if cfg!(windows) {
+            assert_eq!(file, "Remove-Item -LiteralPath 'a b/it''s.txt' -Force");
+            assert_eq!(
+                tree,
+                "Remove-Item -LiteralPath 'a b/it''s.txt' -Recurse -Force"
+            );
+        } else {
+            assert_eq!(file, "rm -f 'a b/it'\\''s.txt'");
+            assert_eq!(tree, "rm -rf 'a b/it'\\''s.txt'");
+        }
     }
 }

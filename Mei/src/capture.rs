@@ -13,6 +13,7 @@ pub const INLINE_BYTES: u64 = 16 * 1024;
 pub struct Store {
     root: PathBuf,
     inline: Vec<PathBuf>,
+    handed_off: bool,
 }
 
 impl Store {
@@ -50,6 +51,7 @@ impl Store {
         Ok(Store {
             root,
             inline: Vec::new(),
+            handed_off: false,
         })
     }
 
@@ -71,6 +73,7 @@ impl Store {
 
     pub fn complete(&mut self) -> Result<()> {
         self.reclaim_inline()?;
+        self.handed_off = true;
         match std::fs::remove_dir(&self.root) {
             Ok(()) => Ok(()),
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -85,6 +88,7 @@ impl Store {
     }
 
     pub fn discard(&mut self) -> Result<()> {
+        self.handed_off = true;
         match std::fs::remove_dir_all(&self.root) {
             Ok(()) => {
                 self.inline.clear();
@@ -101,6 +105,15 @@ impl Store {
                 Some(&self.root),
             )),
         }
+    }
+
+    /// Reclaims a run nobody committed: the interpreter exited without
+    /// [`Store::complete`] handing its spilled files to the session or caller.
+    pub fn abandon(&mut self) -> Result<()> {
+        if self.handed_off {
+            return Ok(());
+        }
+        self.discard()
     }
 
     fn reclaim_inline(&mut self) -> Result<()> {
