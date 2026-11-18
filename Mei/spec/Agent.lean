@@ -72,13 +72,13 @@ def Content.text : Content → String
       | _ => rest) ""
 
 def validCall (call : Call) : Bool :=
-  call.name == "Python3" && !call.id.isEmpty
+  call.name == "python" && !call.id.isEmpty
 
 def distinctIds : List String → Bool
   | [] => true
   | id :: rest => !rest.contains id && distinctIds rest
 
-/-- 一波至少一个调用、全部只能调用 Python3、ID 非空且本波唯一。 -/
+/-- 一波至少一个调用、全部只能调用 `python`、ID 非空且本波唯一。 -/
 def validWave (calls : List Call) : Bool :=
   !calls.isEmpty && calls.all validCall && distinctIds (calls.map Call.id)
 
@@ -180,8 +180,8 @@ example : (step (fun _ => some []) [] ⟨.endTurn, .items [.text "a", .thinking 
 example :
     let content := Content.items [
       .thinking "reason" "signature",
-      .python "Python3" "a" "x = 40",
-      .python "Python3" "b" "x += 2; print(x)"
+      .python "python" "a" "x = 40",
+      .python "python" "b" "x += 2; print(x)"
     ]
     let calls := content.calls
     step (fun _ => some ["40", "42"]) [] ⟨.toolUse, content⟩ =
@@ -191,7 +191,7 @@ example :
 /-- 第二个调用不合法时，即使第一个合法，整波也没有 Python 副作用。 -/
 example (exec : Exec) :
     (step exec [] ⟨.toolUse, .items [
-      .python "Python3" "a" "write_file()",
+      .python "python" "a" "write_file()",
       .client "shell" "b" "rm_file()"
     ]⟩).effects = [] := by
   simp [step, Content.calls, Block.call, validWave, validCall, distinctIds, Outcome.effects]
@@ -199,15 +199,15 @@ example (exec : Exec) :
 /-- 重复 ID 也在副作用之前拒绝。 -/
 example (exec : Exec) :
     (step exec [] ⟨.toolUse, .items [
-      .python "Python3" "same" "first()",
-      .python "Python3" "same" "second()"
+      .python "python" "same" "first()",
+      .python "python" "same" "second()"
     ]⟩).effects = [] := by
   simp [step, Content.calls, Block.call, validWave, validCall, distinctIds, Outcome.effects]
 
 /-- 解释器死亡不伪造完整的 tool-result 消息。 -/
 example :
-    (step (fun _ => none) [] ⟨.toolUse, .items [.python "Python3" "a" "exit(7)"]⟩)
-    = .failed [assistant (.items [.python "Python3" "a" "exit(7)"])] := by
+    (step (fun _ => none) [] ⟨.toolUse, .items [.python "python" "a" "exit(7)"]⟩)
+    = .failed [assistant (.items [.python "python" "a" "exit(7)"])] := by
   simp [step, Content.calls, Block.call, validWave, validCall, distinctIds]
 
 end Mei.Agent

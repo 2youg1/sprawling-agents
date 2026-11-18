@@ -44,6 +44,28 @@ fn cli_non_unicode_prompt_is_a_usage_error() {
 
 #[test]
 #[expect(clippy::disallowed_methods, reason = "test fixture process")]
+fn invalid_gateway_configuration_precedes_doctor_side_effects() {
+    let directory = tempfile::tempdir().unwrap();
+    let blocked = directory.path().join("not-a-directory");
+    std::fs::write(&blocked, "block").unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_mei"))
+        .args(["-p", "hello"])
+        .current_dir(directory.path())
+        .env("HARNESS_MODEL", "test/model")
+        .env("ANTHROPIC_BASE_URL", "https://gateway.invalid")
+        .env("ANTHROPIC_API_KEY", "magpie")
+        .env("MEI_DOCTOR_DIR", &blocked)
+        .env_remove("HARNESS_EXTRA")
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let error = String::from_utf8_lossy(&output.stderr);
+    assert!(error.contains("E_MEI_CONFIG"), "{error}");
+    assert!(!error.contains("E_MEI_DOCTOR"), "{error}");
+}
+
+#[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture process")]
 fn missing_model_is_an_actionable_failure() {
     let output = Command::new(env!("CARGO_BIN_EXE_mei"))
         .arg("-p")

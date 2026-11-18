@@ -181,7 +181,7 @@ const Seen = struct {
                 if (!std.mem.eql(u8, ty, "tool_result")) continue;
                 try entries.append(arena, .{ .tool = .{
                     .at = tod(at),
-                    .name = "Python3",
+                    .name = "python",
                     .subject = "",
                     .took_us = null,
                     .outcome = .Answered,
@@ -275,6 +275,14 @@ fn tod(at: u64) ?u32 {
     return if (local_time.local(at)) |t| t.seconds else null;
 }
 
+/// What one finished run leaves behind for the session log.
+const CaptureFate = enum {
+    /// Keep the directory: committed, or possibly referenced by the log.
+    keep,
+    /// Remove it: nothing can refer to it.
+    discard,
+};
+
 const Ui = struct {
     gpa: std.mem.Allocator,
     io: std.Io,
@@ -285,6 +293,7 @@ const Ui = struct {
     bus: mei_process.Bus,
     process: ?mei_process.Process = null,
     session: ?mei_session.Session = null,
+    capture_dir: ?[]u8 = null,
     session_dir: []u8,
     pending: std.ArrayList([]u8) = .empty,
     replay_path: ?[]const u8,
@@ -379,6 +388,10 @@ const Ui = struct {
 
     fn deinit(self: *Ui) void {
         if (self.process) |*p| p.deinit();
+        if (self.capture_dir) |path| {
+            mei_session.discardCaptureDirectory(self.io, path) catch {};
+            self.gpa.free(path);
+        }
         if (self.session) |*s| s.deinit();
         for (self.pending.items) |line| self.gpa.free(line);
         self.pending.deinit(self.gpa);
@@ -499,6 +512,11 @@ const Ui = struct {
         }
         if (self.command(typed)) return;
         if (self.session == null and !self.createSession()) return;
+        std.debug.assert(self.capture_dir == null);
+        self.capture_dir = self.session.?.captureDirectory(self.gpa, self.io, at) catch {
+            self.printNote("create the run capture directory");
+            return;
+        };
 
         for (self.pending.items) |line| self.gpa.free(line);
         self.pending.clearRetainingCapacity();
@@ -506,11 +524,14 @@ const Ui = struct {
         self.status(.{ .counted = self.seen.counts() });
 
         const resume_path = if (self.session) |*s| s.resumePath() else null;
-        switch (mei_process.Process.spawn(self.gpa, self.io, &self.bus, self.mei_program, typed, resume_path)) {
+        switch (mei_process.Process.spawn(self.gpa, self.io, &self.bus, self.mei_program, typed, resume_path, self.capture_dir.?, self.environ)) {
             .ok => |proc| self.process = proc,
             .err => |diag| {
                 defer self.gpa.free(diag);
-                const entries = self.seen.finished(arena, .{ .err = diag }, nowMs(self.io)) catch return;
+                self.finishCapture(.discard);
+                _ = self.frame_arena.reset(.retain_capacity);
+                const failure_arena = self.frame_arena.allocator();
+                const entries = self.seen.finished(failure_arena, .{ .err = diag }, nowMs(self.io)) catch return;
                 self.print(entries);
                 self.ended();
             },
@@ -652,26 +673,34 @@ const Ui = struct {
         }
 
         const successful = !self.lost and !fin.cancelled and fin.result == .ok;
+        var capture = CaptureFate.discard;
         if (successful) {
             if (self.session) |*session| {
                 switch (session.append(self.pending.items)) {
-                    .ok => {},
+                    .ok => capture = .keep,
                     .err => |diag| {
-                        defer self.gpa.free(diag);
+                        defer diag.deinit(self.gpa);
                         if (self.session) |*s| {
                             s.deinit();
                             self.session = null;
                         }
-                        self.printNote(diag);
+                        self.printNote(diag.text);
+                    },
+                    .uncertain => |diag| {
+                        defer diag.deinit(self.gpa);
+                        if (self.session) |*s| {
+                            s.deinit();
+                            self.session = null;
+                        }
+                        capture = .keep;
+                        self.printNote(diag.text);
                     },
                 }
             }
-            for (self.pending.items) |line| self.gpa.free(line);
-            self.pending.clearRetainingCapacity();
-        } else {
-            for (self.pending.items) |line| self.gpa.free(line);
-            self.pending.clearRetainingCapacity();
         }
+        for (self.pending.items) |line| self.gpa.free(line);
+        self.pending.clearRetainingCapacity();
+        self.finishCapture(capture);
 
         _ = self.frame_arena.reset(.retain_capacity);
         const arena = self.frame_arena.allocator();
@@ -696,6 +725,27 @@ const Ui = struct {
                 },
             }
         }
+    }
+
+    /// Ends one run's ownership of its capture directory.
+    ///
+    /// `discard` removes the directory only when this run's outcome cannot have
+    /// been referenced: the session was never told about it, or the append is
+    /// confirmed not to have landed. Every other outcome keeps the directory,
+    /// because the log or a person may still read the spilled files in it.
+    fn finishCapture(self: *Ui, fate: CaptureFate) void {
+        const path = self.capture_dir orelse return;
+        if (fate == .discard) {
+            mei_session.discardCaptureDirectory(self.io, path) catch |err| {
+                const message = std.fmt.allocPrint(self.gpa, "discard the uncommitted capture directory {s}: {s}", .{ path, @errorName(err) }) catch null;
+                if (message) |owned| {
+                    defer self.gpa.free(owned);
+                    self.printNote(owned);
+                }
+            };
+        }
+        self.gpa.free(path);
+        self.capture_dir = null;
     }
 
     fn ended(self: *Ui) void {
@@ -762,7 +812,7 @@ const Ui = struct {
 
         var calling_buf: [1]write.Calling = undefined;
         const calling: []const write.Calling = if (self.seen.calling) blk: {
-            calling_buf[0] = .{ .name = "Python3", .subject = "工具波执行中" };
+            calling_buf[0] = .{ .name = "python", .subject = "工具波执行中" };
             break :blk calling_buf[0..1];
         } else &.{};
 

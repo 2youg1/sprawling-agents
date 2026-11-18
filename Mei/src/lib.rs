@@ -4,9 +4,12 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 pub mod agent;
+pub mod capture;
+pub mod doctor;
 pub mod error;
 pub mod python;
 pub mod resume;
 pub mod transport;
+pub mod workspace;
 
 pub use error::{Error, Result};

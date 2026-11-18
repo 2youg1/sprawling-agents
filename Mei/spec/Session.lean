@@ -49,6 +49,29 @@ theorem restore_preserves_messages (entries : Log) (complete : completed entries
     restore entries = some (entries.map Entry.message) := by
   simp [restore, complete]
 
+/-- 顶层 AGENTS 只在空历史的新会话进入首个 user 消息；无文件时保持字符串 prompt。 -/
+def openingMessage (guide : Option String) (prompt : String) : Message :=
+  match guide with
+  | some body => ⟨.user, .items [
+      .text ("<workspace-instructions source=\"AGENTS.md\">\n" ++ body ++ "\n</workspace-instructions>"),
+      .text prompt
+    ]⟩
+  | none => ⟨.user, .string prompt⟩
+
+def begin (guide : Option String) (prompt : String) : History :=
+  [openingMessage guide prompt]
+
+/-- 同一会话的新任务只追加 prompt；没有读取或补注 AGENTS 的输入。 -/
+def appendPrompt (history : History) (prompt : String) : History :=
+  history ++ [⟨.user, .string prompt⟩]
+
+theorem begin_is_one_message (guide : Option String) (prompt : String) :
+    (begin guide prompt).length = 1 := rfl
+
+theorem appendPrompt_preserves_history (history : History) (prompt : String) :
+    (appendPrompt history prompt).take history.length = history := by
+  simp [appendPrompt]
+
 /-- 当前消息与供下次 `/new` 使用的单调文件代次；恢复外部文件不消耗新代次。 -/
 structure State where
   current : History
@@ -79,6 +102,12 @@ theorem resume_preserves_messages (state : State) (entries : Log)
     (complete : completed entries = true) :
     resume state entries = some { state with current := entries.map Entry.message } := by
   simp [resume, restore_preserves_messages entries complete]
+
+theorem resume_then_appendPrompt_uses_only_logged_opening (state : State) (entries : Log)
+    (prompt : String) (complete : completed entries = true) :
+    (resume state entries).map (fun next => appendPrompt next.current prompt) =
+      some (entries.map Entry.message ++ [⟨.user, .string prompt⟩]) := by
+  simp [resume, restore_preserves_messages entries complete, appendPrompt]
 
 example : restore [] = none := by native_decide
 
