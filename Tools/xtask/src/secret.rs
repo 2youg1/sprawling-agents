@@ -22,7 +22,7 @@ const EXPOSE_WHITELIST: [&str; 5] = [
     "Sprawling/remote_access/src/keys.rs",
 ];
 
-const NOT_CREDENTIALS: [&str; 8] = [
+const NOT_CREDENTIALS: [&str; 10] = [
     "CC_x86_64_unknown_linux_musl",
     "io/badge/Ask-DeepWiki-2B6CB0",
     "Win32_System_DataExchange",
@@ -31,6 +31,8 @@ const NOT_CREDENTIALS: [&str; 8] = [
     "Win32_UI_Accessibility",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging",
+    "windows/Win32_System_Threading",
+    "windows/Win32_UI_WindowsAndMessaging",
 ];
 
 fn is_reviewed_identifier(found: &[u8]) -> bool {

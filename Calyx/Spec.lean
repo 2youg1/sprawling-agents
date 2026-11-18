@@ -102,3 +102,12 @@ Rust 是宿主边界，不是壳实现。
 
 代价：城记录泵与斜杠动作须经 ABI；一次迁移动作面大，但完成后无第二套壳可漂移。
 -/
+
+/-! D8 console 场景条目的本地时刻经 `console_ffi::zone` 读，chrono 已出树
+
+决定：`calyx::console::local_time::local` 把一条记录的 UTC 毫秒渲染成「本地午夜以来的秒」（`Calyx/ffi/Spec.lean` §8 的 `TimeOfDay`），经 `console_ffi::zone::seconds_since_midnight`；系统时区由 OS 按那一刻自己读，Calyx 不再依赖 chrono。
+
+理由：RUSTSEC-2026-0543（chrono 全部版本停止维护，2026-11-17 发布）经 Calyx 的直依赖进锁，release 的 advisories 门按设计在任何暴露下保持红色；console 场景时刻是 chrono 在树里的最后一个一产业务用途，其余时间需求已由自研 UTC 时钟（`runtime::clock`）与 std 承担。
+
+被否：①`deny.toml` 登记 ignore——清除条件在上游手里；②chrono 换 `time`/`jiff`——`runtime::clock` 已覆盖 UTC 数学，这两个只为取本地偏移而来；③「当前偏移」算术——跨夏令时边界的旧时刻差一小时，OS 按时刻换算与 chrono 旧行为等价（细节与 SAFETY 前提在 `Calyx/ffi/Spec.lean` D12）。
+-/

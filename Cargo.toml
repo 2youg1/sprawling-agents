@@ -170,6 +170,13 @@ futures-util = { version = "0.3", default-features = false, features = ["sink"] 
 # party can open. Already in the tree as a transitive dependency, so
 # this adds a name rather than a crate.
 getrandom = "0.4"
+# The console's scene renders a moment as seconds since local midnight
+# (`Calyx/src/console/local_time.rs`), and the only fact chrono was still
+# bought for was the system zone's reading of one instant. localtime_r is
+# that reading on unix; RUSTSEC-2026-0543 retired chrono from the tree, so
+# the offset crosses `console_ffi::zone` instead (`Calyx/ffi/Spec.lean` D3).
+# Already in the lock beneath wasmtime-wasi, under the same licence.
+libc = "0.2"
 # A skill package is read by walking directory handles, never by
 # re-resolving a path: a directory swapped for a link after its judgement
 # is then outside anything the walk can open (`Sprawling/city/Spec.lean` §8-28).

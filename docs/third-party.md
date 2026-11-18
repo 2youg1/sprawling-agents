@@ -111,7 +111,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 
 **What this repository chose** is the table below: every crate named in the `Cargo.toml` of a workspace member, with the licence its own manifest declares. A person asking "whose work did these authors decide to stand on" reads this. The version each is pinned at is in the manifests, and the version it resolves to is in `Cargo.lock`; neither is repeated here.
 
-**What Cargo.lock resolves for the workspace** is <!-- xtask:begin dependency_count -->490<!-- xtask:end --> packages, including workspace members and dependencies used only by tools. This is a workspace lockfile count, not a binary dependency count. `cargo deny check` checks the lockfile on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. The SBOM describes the lockfile, not only packages linked into a binary. **That is the machine authority, and this table is deliberately not a second one**: it is a list a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
+**What Cargo.lock resolves for the workspace** is <!-- xtask:begin dependency_count -->484<!-- xtask:end --> packages, including workspace members and dependencies used only by tools. This is a workspace lockfile count, not a binary dependency count. `cargo deny check` checks the lockfile on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. The SBOM describes the lockfile, not only packages linked into a binary. **That is the machine authority, and this table is deliberately not a second one**: it is a list a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
 
 
 <!-- /coderabbit-ai-generated:v1 -->
@@ -126,7 +126,6 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [cap-fs-ext](https://crates.io/crates/cap-fs-ext) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
 | [cap-std](https://crates.io/crates/cap-std) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
 | [chacha20poly1305](https://crates.io/crates/chacha20poly1305) | Apache-2.0 OR MIT |
-| [chrono](https://crates.io/crates/chrono) | MIT OR Apache-2.0 |
 | [comrak](https://crates.io/crates/comrak) | BSD-2-Clause |
 | [cpu-time](https://crates.io/crates/cpu-time) | MIT OR Apache-2.0 |
 | [crossterm](https://crates.io/crates/crossterm) | MIT |
@@ -142,6 +141,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [image](https://crates.io/crates/image) | MIT OR Apache-2.0 |
 | [insta](https://crates.io/crates/insta) | Apache-2.0 |
 | [keyring-core](https://crates.io/crates/keyring-core) | MIT OR Apache-2.0 |
+| [libc](https://crates.io/crates/libc) | MIT OR Apache-2.0 |
 | [linux-keyutils-keyring-store](https://crates.io/crates/linux-keyutils-keyring-store) | MIT OR Apache-2.0 |
 | [memory-stats](https://crates.io/crates/memory-stats) | MIT OR Apache-2.0 |
 | [png](https://crates.io/crates/png) | MIT OR Apache-2.0 |
@@ -174,7 +174,6 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [toml](https://crates.io/crates/toml) | MIT OR Apache-2.0 |
 | [tower](https://crates.io/crates/tower) | MIT |
 | [trybuild](https://crates.io/crates/trybuild) | MIT OR Apache-2.0 |
-| [uiautomation](https://crates.io/crates/uiautomation) | Apache-2.0 |
 | [url](https://crates.io/crates/url) | MIT OR Apache-2.0 |
 | [uuid](https://crates.io/crates/uuid) | Apache-2.0 OR MIT |
 | [vt100](https://crates.io/crates/vt100) | MIT |
