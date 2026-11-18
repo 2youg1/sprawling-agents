@@ -166,11 +166,13 @@ fn a_picture_is_bound_to_the_call_that_attached_it() {
             return tool(second);
         }
         let late = tool_result_text(&request["messages"][4]["content"][0]["content"]);
-        answer(if late.contains("attaches only during the call that started it") {
-            "refused"
-        } else {
-            "attached"
-        })
+        answer(
+            if late.contains("attaches only during the call that started it") {
+                "refused"
+            } else {
+                "attached"
+            },
+        )
     });
     let output = support::command(&base, "inspect the picture")
         .current_dir(directory.path())
@@ -205,7 +207,8 @@ fn one_call_attaches_at_most_two_pictures_and_names_the_limit() {
             .as_str()
             .unwrap_or_default()
             .contains("at most 2 pictures");
-        let shape = blocks.len() == 3 && blocks[1]["type"] == "image" && blocks[2]["type"] == "image";
+        let shape =
+            blocks.len() == 3 && blocks[1]["type"] == "image" && blocks[2]["type"] == "image";
         answer(if limit && shape { "seen" } else { "missing" })
     });
     let output = support::command(&base, "inspect the pictures")

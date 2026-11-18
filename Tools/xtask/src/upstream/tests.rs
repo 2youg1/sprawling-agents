@@ -37,13 +37,24 @@ fn one_path_and_one_commit_per_row_is_accepted() {
 
 #[test]
 fn two_paths_in_one_row_are_refused() {
-    let text = one_row("`docs/reference.md`, `docs/integrating.md`", "`3438b7bd9c56`");
+    let text = one_row(
+        "`docs/reference.md`, `docs/integrating.md`",
+        "`3438b7bd9c56`",
+    );
     let found = judge(&text);
     let violation = found.first().expect("one violation");
     assert_eq!(violation.gate, "upstream");
     assert!(violation.location.ends_with(":3"), "{}", violation.location);
-    assert!(violation.violation.contains("2 paths"), "{}", violation.violation);
-    assert!(violation.alternative.contains("own row"), "{}", violation.alternative);
+    assert!(
+        violation.violation.contains("2 paths"),
+        "{}",
+        violation.violation
+    );
+    assert!(
+        violation.alternative.contains("own row"),
+        "{}",
+        violation.alternative
+    );
 }
 
 #[test]
@@ -51,8 +62,16 @@ fn a_watermark_that_is_not_a_commit_is_refused() {
     let text = one_row("`docs/reference.md`", "`moved`");
     let found = judge(&text);
     let violation = found.first().expect("one violation");
-    assert!(violation.rule.contains("12 to 40 hexadecimal"), "{}", violation.rule);
-    assert!(violation.violation.contains("moved"), "{}", violation.violation);
+    assert!(
+        violation.rule.contains("12 to 40 hexadecimal"),
+        "{}",
+        violation.rule
+    );
+    assert!(
+        violation.violation.contains("moved"),
+        "{}",
+        violation.violation
+    );
 }
 
 #[test]
@@ -64,7 +83,11 @@ fn a_row_without_a_github_project_is_refused() {
 ";
     let found = judge(text);
     let violation = found.first().expect("one violation");
-    assert!(violation.rule.contains("GitHub project"), "{}", violation.rule);
+    assert!(
+        violation.rule.contains("GitHub project"),
+        "{}",
+        violation.rule
+    );
 }
 
 #[test]
@@ -72,7 +95,11 @@ fn a_cell_holding_no_path_is_refused() {
     let text = one_row("docs/reference.md", "`d01e0a465aaf`");
     let found = judge(&text);
     let violation = found.first().expect("one violation");
-    assert!(violation.violation.contains("no backticked path"), "{}", violation.violation);
+    assert!(
+        violation.violation.contains("no backticked path"),
+        "{}",
+        violation.violation
+    );
 }
 
 #[test]

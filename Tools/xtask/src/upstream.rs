@@ -43,7 +43,16 @@ fn judge(text: &str) -> Vec<Violation> {
 }
 
 fn judge_row(number: usize, cells: &[&str]) -> Option<Violation> {
-    let [_, project, _licence, _followed, watched_cell, tracked_cell, _] = cells else {
+    let [
+        _,
+        project,
+        _licence,
+        _followed,
+        watched_cell,
+        tracked_cell,
+        _,
+    ] = cells
+    else {
         return Some(at(
             number,
             "a watched row has the six columns the table header names",

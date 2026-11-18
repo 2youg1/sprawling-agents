@@ -222,19 +222,17 @@ impl Client {
     fn get(&self, target: &str, budget: &Timeouts) -> Result<Value> {
         let path = format!("http://{}{}", self.authority, target);
         let mut stream = self.connect(budget)?;
-        stream
-            .set_write_timeout(Some(budget.io))
-            .map_err(|err| {
-                Error::Diagnostic(
-                    Diagnostic::new(
-                        Code::Transport,
-                        "arm the Magpie socket timeouts",
-                        err.to_string(),
-                        "retry against the same gateway; no retry was attempted",
-                    )
-                    .with_path(path.clone()),
+        stream.set_write_timeout(Some(budget.io)).map_err(|err| {
+            Error::Diagnostic(
+                Diagnostic::new(
+                    Code::Transport,
+                    "arm the Magpie socket timeouts",
+                    err.to_string(),
+                    "retry against the same gateway; no retry was attempted",
                 )
-            })?;
+                .with_path(path.clone()),
+            )
+        })?;
         write!(
             stream,
             "GET {target} HTTP/1.0\r\nConnection: close\r\nx-api-key: {}\r\n\r\n",
