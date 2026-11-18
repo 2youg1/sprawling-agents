@@ -19,12 +19,12 @@ pub const Error = error{ MessageLineTooLong, OutOfMemory, ReadFailed };
 /// Reads one line and its delimiter from `reader` and owns the answer, with a
 /// Windows producer's trailing carriage return dropped. Answers null only
 /// when the stream ended before a byte arrived, so an empty line and end of
-/// stream stay distinguishable. A line longer than `cap` is an error and
-/// never a shortened line.
+/// stream stay distinguishable. A line of exactly `cap` bytes is read; one
+/// byte more is an error and never a shortened line.
 pub fn read(gpa: std.mem.Allocator, reader: *std.Io.Reader, cap: u64) Error!?[]u8 {
     var allocating: std.Io.Writer.Allocating = .init(gpa);
     errdefer allocating.deinit();
-    _ = reader.streamDelimiterLimit(&allocating.writer, '\n', .limited(cap)) catch |err| switch (err) {
+    _ = reader.streamDelimiterLimit(&allocating.writer, '\n', .limited(cap +| 1)) catch |err| switch (err) {
         error.StreamTooLong => return error.MessageLineTooLong,
         error.WriteFailed => return error.OutOfMemory,
         error.ReadFailed => return error.ReadFailed,
@@ -179,4 +179,34 @@ test "an empty stream, an empty line and a carriage return are told apart" {
     defer gpa.free(three);
     try std.testing.expectEqualStrings("x", three);
     try std.testing.expect((try read(gpa, &blank_opened.stream.interface, MAX_BYTES)) == null);
+}
+
+test "a line of exactly the cap is read with and without a delimiter" {
+    const gpa = std.testing.allocator;
+    const io = std.testing.io;
+    var fixture = try Fixture.init(gpa, io, "abcd\nabcd");
+    defer fixture.deinit(gpa);
+
+    var buf: [8]u8 = undefined;
+    var opened = try fixture.reader(io, &buf);
+    defer opened.file.close(io);
+    const first = (try read(gpa, &opened.stream.interface, 4)).?;
+    defer gpa.free(first);
+    try std.testing.expectEqualStrings("abcd", first);
+    const second = (try read(gpa, &opened.stream.interface, 4)).?;
+    defer gpa.free(second);
+    try std.testing.expectEqualStrings("abcd", second);
+    try std.testing.expect((try read(gpa, &opened.stream.interface, 4)) == null);
+}
+
+test "a line one byte past the cap is refused" {
+    const gpa = std.testing.allocator;
+    const io = std.testing.io;
+    var fixture = try Fixture.init(gpa, io, "abcde");
+    defer fixture.deinit(gpa);
+
+    var buf: [8]u8 = undefined;
+    var opened = try fixture.reader(io, &buf);
+    defer opened.file.close(io);
+    try std.testing.expectError(error.MessageLineTooLong, read(gpa, &opened.stream.interface, 4));
 }
