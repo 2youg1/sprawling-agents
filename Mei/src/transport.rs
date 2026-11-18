@@ -29,6 +29,11 @@ const IO_TIMEOUT: Duration = Duration::from_secs(600);
 /// How long a blocked read may stay silent before a `mei.obs` pulse line.
 const PULSE_INTERVAL: Duration = Duration::from_secs(5);
 
+/// The completed route is an auxiliary observation taken after the answer
+/// arrived, so it gets its own short budget: a gateway that accepts and stays
+/// silent delays the answer by this long rather than by [`IO_TIMEOUT`].
+const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
+
 /// Connect, IO, and pulse budgets that travel together on one client.
 struct Timeouts {
     connect: Duration,
@@ -43,6 +48,7 @@ pub struct Client {
     key: String,
     session: Option<String>,
     timeouts: Timeouts,
+    probe: Timeouts,
 }
 
 impl Client {
@@ -103,6 +109,11 @@ impl Client {
             addresses,
             key,
             session: None,
+            probe: Timeouts {
+                connect: timeouts.connect.min(PROBE_TIMEOUT),
+                io: timeouts.io.min(PROBE_TIMEOUT),
+                pulse: timeouts.pulse.min(PROBE_TIMEOUT),
+            },
             timeouts,
         })
     }
@@ -112,7 +123,7 @@ impl Client {
     /// # Errors
     /// The catalog is unreachable, malformed, or contains no usable chat model.
     pub fn discover(&mut self, now: u64) -> Result<Selection> {
-        let answer = self.get("/v1/models")?;
+        let answer = self.get("/v1/models", &self.timeouts)?;
         let selection = catalog::select(&answer)?;
         self.session = Some(format!("mei-{}-{now}", std::process::id()));
         Ok(selection)
@@ -138,7 +149,7 @@ impl Client {
             Some(session) => format!("X-Magpie-Session: {session}\r\n"),
             None => String::new(),
         };
-        let mut stream = self.connect()?;
+        let mut stream = self.connect(&self.timeouts)?;
         stream
             .set_write_timeout(Some(self.timeouts.io))
             .map_err(|err| {
@@ -191,7 +202,7 @@ impl Client {
             )));
         };
         let target = format!("/v1/magpie/route?session={session}");
-        let answer = self.get(&target)?;
+        let answer = self.get(&target, &self.probe)?;
         let route = catalog::route(&answer)?;
         let effort_source = if route.effort.is_some() {
             "actual"
@@ -208,11 +219,11 @@ impl Client {
         }))
     }
 
-    fn get(&self, target: &str) -> Result<Value> {
+    fn get(&self, target: &str, budget: &Timeouts) -> Result<Value> {
         let path = format!("http://{}{}", self.authority, target);
-        let mut stream = self.connect()?;
+        let mut stream = self.connect(budget)?;
         stream
-            .set_write_timeout(Some(self.timeouts.io))
+            .set_write_timeout(Some(budget.io))
             .map_err(|err| {
                 Error::Diagnostic(
                     Diagnostic::new(
@@ -242,15 +253,15 @@ impl Client {
             )
         })?;
         let mut sink = std::io::sink();
-        let response = read_to_eof(&mut stream, &self.timeouts, &mut sink, &path)?;
+        let response = read_to_eof(&mut stream, budget, &mut sink, &path)?;
         parse(&response)
     }
 
     /// Connects to the first gateway address that answers within the budget.
-    fn connect(&self) -> Result<TcpStream> {
+    fn connect(&self, budget: &Timeouts) -> Result<TcpStream> {
         let mut last = None;
         for address in &self.addresses {
-            match TcpStream::connect_timeout(address, self.timeouts.connect) {
+            match TcpStream::connect_timeout(address, budget.connect) {
                 Ok(stream) => return Ok(stream),
                 Err(err) => last = Some(err),
             }

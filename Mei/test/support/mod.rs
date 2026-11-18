@@ -84,6 +84,95 @@ pub fn serve(answers: Vec<Value>) -> (String, std::thread::JoinHandle<Vec<Value>
     serve_with(count, move |_, _| answers.next().unwrap())
 }
 
+/// What one served request answers.
+#[allow(
+    dead_code,
+    reason = "shared support is compiled per integration test target"
+)]
+pub enum Answer {
+    Json(Value),
+    Hang(std::time::Duration),
+}
+
+/// Serves `count` requests on one listener, dispatching on the request path so
+/// a catalog GET, a Messages POST and a route GET can answer differently.
+#[allow(
+    dead_code,
+    reason = "shared support is compiled per integration test target"
+)]
+#[expect(clippy::disallowed_methods, reason = "test gateway accept deadline")]
+pub fn serve_paths(
+    count: usize,
+    mut respond: impl FnMut(&str, &Value, usize) -> Answer + Send + 'static,
+) -> (String, std::thread::JoinHandle<Vec<(String, Value)>>) {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let address = listener.local_addr().unwrap();
+    let handle = std::thread::spawn(move || {
+        let mut requests = Vec::new();
+        for index in 0..count {
+            let started = std::time::Instant::now();
+            let (stream, _) = loop {
+                match listener.accept() {
+                    Ok(connection) => break connection,
+                    Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                        assert!(
+                            started.elapsed() < std::time::Duration::from_secs(10),
+                            "gateway request {index} did not arrive"
+                        );
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
+                    Err(err) => panic!("gateway accept failed: {err}"),
+                }
+            };
+            stream.set_nonblocking(false).unwrap();
+            let mut reader = BufReader::new(stream);
+            let (path, request) = read_request(&mut reader);
+            let answer = respond(&path, &request, index);
+            requests.push((path, request));
+            match answer {
+                Answer::Json(value) => {
+                    let body = serde_json::to_vec(&value).unwrap();
+                    let mut stream = reader.into_inner();
+                    write!(
+                        stream,
+                        "HTTP/1.0 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                        body.len()
+                    )
+                    .unwrap();
+                    stream.write_all(&body).unwrap();
+                    stream.shutdown(std::net::Shutdown::Both).unwrap();
+                }
+                Answer::Hang(delay) => {
+                    std::thread::sleep(delay);
+                    reader
+                        .into_inner()
+                        .shutdown(std::net::Shutdown::Both)
+                        .unwrap();
+                }
+            }
+        }
+        requests
+    });
+    (format!("http://{address}"), handle)
+}
+
+fn read_request(reader: &mut BufReader<std::net::TcpStream>) -> (String, Value) {
+    let mut line = String::new();
+    reader.read_line(&mut line).unwrap();
+    let path = match line.split_whitespace().nth(1) {
+        Some(found) => found.to_owned(),
+        None => String::new(),
+    };
+    let body = read_request_body(reader);
+    let request = if body.is_empty() {
+        Value::Null
+    } else {
+        serde_json::from_slice(&body).unwrap()
+    };
+    (path, request)
+}
+
 #[allow(
     dead_code,
     reason = "shared support is compiled per integration test target"

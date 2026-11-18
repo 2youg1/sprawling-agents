@@ -76,9 +76,25 @@ fn run() -> Result<String> {
     };
     let environment = doctor::ensure(now)?;
     let mut request = initial_request(task, extra, &environment)?;
+    let sent = request
+        .get("model")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            Error::Diagnostic(
+                Diagnostic::new(
+                    Code::Config,
+                    "read the model the request carries",
+                    "HARNESS_EXTRA replaced `model` with a value that is not a string",
+                    "keep HARNESS_EXTRA's `model` a string, or omit it to use the selected model",
+                )
+                .with_path("request.model"),
+            )
+        })?;
     let (context_tokens, efforts) = match &discovered {
-        Some(selection) => (selection.context_tokens, selection.efforts.clone()),
-        None => (None, Vec::new()),
+        Some(selection) if selection.model == sent => {
+            (selection.context_tokens, selection.efforts.clone())
+        }
+        _ => (None, Vec::new()),
     };
     let effort = request
         .pointer("/output_config/effort")
@@ -90,7 +106,7 @@ fn run() -> Result<String> {
         &json!({
             "type": "mei.obs",
             "kind": "model",
-            "model": model,
+            "model": sent,
             "context_tokens": context_tokens,
             "efforts": efforts,
             "effort": effort,

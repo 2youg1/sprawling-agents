@@ -153,7 +153,7 @@ impl Py {
 stderr 观测行（穷尽；非 Messages role）：
 
 - `{"type":"mei.obs","kind":"pulse"}` — 阻塞读满一个 pulse 间隔仍无字节时写一行
-- `{"type":"mei.obs","kind":"model","model":…,"context_tokens":…,"efforts":[…],"effort":…,"effort_source":"requested"}` — 本次启动请求的选择
+- `{"type":"mei.obs","kind":"model","model":…,"context_tokens":…,"efforts":[…],"effort":…,"effort_source":"requested"}` — 本次请求实际携带的 model；只有它与目录选择一致时才带目录的 `context_tokens`/`efforts`，否则两者为空
 - `{"type":"mei.obs","kind":"route","model":…,"effort":…,"effort_source":"actual"}` — Magpie 已完成的实际路由；不可用时 `available=false`
 - `{"type":"mei.obs","kind":"usage","usage": <response.usage>}` — 响应带 usage 时写一行
 
@@ -213,9 +213,11 @@ tool_use → 预检 → exec 得文本捕获与可选图片 → user tool_result
 - 传输：HTTP/1.0、Connection: close、读至 EOF；CONNECT 10s、IO 600s；
   阻塞读期间可按固定间隔写 `mei.obs` pulse，不改 messages。自动模型路径把目录选择与路由观测作为
   独立 GET，不为自定义 `HARNESS_MODEL` 的旧网关增加前置目录请求；路由观测失败只写 unavailable。
+  路由观测是答案到达后的辅助观测，用它自己的短预算（连接与读各不超过 2 s）：网关接受后不再发字节时，
+  已到的答案不被辅助观测拖住。
 - `boot.py`：请求是每帧一行 JSON string，响应是 `{capture, images}` 对象；stdout/stderr 重定向到当前 run 的捕获文件；同一执行命名空间保留
   变量与 imports，解释器进程保留 cwd；异常只形成 traceback 反馈，循环继续；
-  `show_image` 只把图片的 media type 与 base64 数据加入本次响应；结束后捕获文件的 ASCII basename 经控制信道回传；
+  `show_image` 只把图片的 media type 与 base64 数据加入本次调用：一次调用最多 2 张、单张最多 5 MiB，且只在该调用自己的线程上追加，别的线程的或调用结束后的提交被拒绝并给出重读方式；结束后捕获文件的 ASCII basename 经控制信道回传；
   不改写文件、无 alarm。
   `MEI_CAPTURE_DIR` 与 `MEI_CAPTURE_CREATED` 在模型代码运行前由 `boot.py` 移出环境，递归子 Mei 不会误继承父 run 目录。
 - `Py::run` 先读文件元数据；仅不超过 16 KiB 时做有界读取。完整 UTF-8 文本直接作为
@@ -247,7 +249,7 @@ AGENTS 缺失/修改/删除/非 UTF-8、重复 resume、无 AGENTS 旧日志、�
 doctor 缓存命中/损坏/更新/记录程序缺失或非普通文件/遗留锁文件/并发首启/安装失败、
 EOL 日期边界（与 `Mei/spec/Environment.lean` 的向量一致）、非 Unicode 可执行路径、
 inline 文件占用、spilled 跨进程读取、失败/取消 run、宿主崩溃 orphan、
-解释器死亡、非法帧、非 UTF-8、空文件路径、图片格式/大小边界、route 不可用、收口非 daemon 线程、取消杀组。
+解释器死亡、非法帧、非 UTF-8、空文件路径、图片格式/大小边界、图片数量与线程归属、route 不可用、收口非 daemon 线程、取消杀组。
 -/
 
 /-! ## 12 错误处理
@@ -316,7 +318,7 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 后续 resume 不重读、不补注；只读取打开后确认的普通文件，Unix 非阻塞打开防止 FIFO 卡住启动，发布目标禁止跟随链接/reparse point，避免把工作区外内容发给 provider。被否：独立 AGENTS 消息（现有日志只记录
 本次 prompt，会丢失它）、拼入 system（顺序与会话冻结均不符）、每轮刷新（重复且漂移）、跟随符号链接读取外部指南。 -/
 /-! D7 `close` 5s 后 kill；被否无限 wait。 -/
-/-! D8 传输 10s/600s；被否无时限与过短时限。 -/
+/-! D8 传输 10s/600s；被否无时限与过短时限。路由观测是答案后的辅助读取，用它自己的 2 s 预算；被否：复用 600 s、不设上限、把观测放进后台线程。 -/
 /-! D9 会话斜杠与 JSONL 代次归 Calyx；核只提供 `--resume` 消息恢复。 -/
 /-! D10 恢复路径保留 OsString；诊断带实际 value。 -/
 /-! D11 crate `sprawling-mei`、npm `@sprawling/mei`；发布含 Windows；归档并列无头核与 Calyx 面；
@@ -340,4 +342,4 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 以管道 lazy-spill 替换当前文件捕获（后台子孙的 drain 合同超出本次改动）。 -/
 /-! D18 `HARNESS_MODEL` 缺省时服从 Magpie `first_id` 的可见路由，空目录失败；理由：零参数启动应使用人已配置的路由，而不是另存一份模型配置。被否：编译期模型名、扫描并改写 Magpie 配置、静默取任意不可用模型。 -/
 /-! D19 图片仍经唯一 python 工具的 `show_image` 原语返回标准 image tool-result；理由：模型必须收到视觉块才能真正看图，base64 不进入 stdout 就不会挤占小结果预算。被否：第二图片工具、OCR/外部视觉 API 冒充 Mei 自身看图、把 base64 当普通文本。 -/
-/-! D20 默认 adaptive + high 只定义请求；实际 model/effort 仅以 Magpie route 为确认来源，未确认就标 requested。被否：把路由组 ID 当最终模型、把支持级别列表当当前级别、为显示状态而伪报 default。 -/
+/-! D20 默认 adaptive + high 只定义请求；实际 model/effort 仅以 Magpie route 为确认来源，未确认就标 requested。`requested` 是请求实际携带的值：`HARNESS_EXTRA` 覆盖 `model` 时，model 行与目录元数据都以请求为准，另一模型的 context/efforts 不沿用。被否：把路由组 ID 当最终模型、把支持级别列表当当前级别、为显示状态而伪报 default、把目录选择而非请求当 requested。 -/
