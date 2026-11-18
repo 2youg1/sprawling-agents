@@ -5,6 +5,7 @@
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Command, Output};
+use std::sync::OnceLock;
 
 use serde_json::Value;
 
@@ -27,16 +28,32 @@ pub fn read_request_body(reader: &mut BufReader<std::net::TcpStream>) -> Vec<u8>
     body
 }
 
+#[expect(clippy::disallowed_methods, reason = "test gateway accept deadline")]
 pub fn serve_with(
     count: usize,
     mut respond: impl FnMut(&Value, usize) -> Value + Send + 'static,
 ) -> (String, std::thread::JoinHandle<Vec<Value>>) {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
     let address = listener.local_addr().unwrap();
     let handle = std::thread::spawn(move || {
         let mut requests = Vec::new();
         for index in 0..count {
-            let (stream, _) = listener.accept().unwrap();
+            let started = std::time::Instant::now();
+            let (stream, _) = loop {
+                match listener.accept() {
+                    Ok(connection) => break connection,
+                    Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                        assert!(
+                            started.elapsed() < std::time::Duration::from_secs(10),
+                            "gateway request {index} did not arrive"
+                        );
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
+                    Err(err) => panic!("gateway accept failed: {err}"),
+                }
+            };
+            stream.set_nonblocking(false).unwrap();
             let mut reader = BufReader::new(stream);
             let body = read_request_body(&mut reader);
             let request = serde_json::from_slice(&body).unwrap();
@@ -67,6 +84,10 @@ pub fn serve(answers: Vec<Value>) -> (String, std::thread::JoinHandle<Vec<Value>
     serve_with(count, move |_, _| answers.next().unwrap())
 }
 
+#[allow(
+    dead_code,
+    reason = "shared support is compiled per integration test target"
+)]
 pub fn tool_result_text(content: &Value) -> String {
     content
         .as_str()
@@ -74,18 +95,102 @@ pub fn tool_result_text(content: &Value) -> String {
         .replace("\r\n", "\n")
 }
 
+pub struct FixtureCommand {
+    command: Command,
+    _doctor: tempfile::TempDir,
+}
+
+impl std::ops::Deref for FixtureCommand {
+    type Target = Command;
+
+    fn deref(&self) -> &Command {
+        &self.command
+    }
+}
+
+impl std::ops::DerefMut for FixtureCommand {
+    fn deref_mut(&mut self) -> &mut Command {
+        &mut self.command
+    }
+}
+
 #[expect(clippy::disallowed_methods, reason = "test fixture process")]
-fn command(base: &str, prompt: &str) -> Command {
+pub fn command(base: &str, prompt: &str) -> FixtureCommand {
+    let doctor = doctor_directory();
     let mut command = Command::new(env!("CARGO_BIN_EXE_mei"));
     command
         .args(["-p", prompt])
         .env("HARNESS_MODEL", "test/model")
         .env("ANTHROPIC_BASE_URL", base)
         .env("ANTHROPIC_API_KEY", "magpie")
-        .env_remove("HARNESS_EXTRA");
-    command
+        .env("MEI_DOCTOR_DIR", doctor.path())
+        .env_remove("HARNESS_EXTRA")
+        .env_remove("MEI_CAPTURE_DIR")
+        .env_remove("MEI_CAPTURE_CREATED");
+    FixtureCommand {
+        command,
+        _doctor: doctor,
+    }
 }
 
+#[expect(clippy::disallowed_methods, reason = "test fixture process")]
+fn doctor_directory() -> tempfile::TempDir {
+    static PYTHON: OnceLock<mei::doctor::Program> = OnceLock::new();
+    let python = PYTHON.get_or_init(|| {
+        let probe = Command::new(if cfg!(windows) { "python" } else { "python3" })
+            .args([
+                "-I",
+                "-c",
+                "import json, os, platform, sys; raw = sys.executable.encode('utf-16-le') if os.name == 'nt' else os.fsencode(sys.executable); print(json.dumps({'version': platform.python_version(), 'executable': list(raw)}))",
+            ])
+            .output()
+            .unwrap();
+        assert!(probe.status.success());
+        let value: Value = serde_json::from_slice(&probe.stdout).unwrap();
+        let version = value["version"].as_str().unwrap();
+        let executable = native_path(&value["executable"]);
+        mei::doctor::Program::new(version, executable)
+    });
+    let root = tempfile::tempdir().unwrap();
+    let environment = mei::doctor::Environment::new(python.clone(), python.clone());
+    mei::doctor::write_cache(root.path(), &environment).unwrap();
+    root
+}
+
+#[cfg(unix)]
+fn native_path(value: &Value) -> std::path::PathBuf {
+    use std::os::unix::ffi::OsStringExt as _;
+    let bytes = value
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|byte| u8::try_from(byte.as_u64().unwrap()).unwrap())
+        .collect::<Vec<_>>();
+    std::path::PathBuf::from(std::ffi::OsString::from_vec(bytes))
+}
+
+#[cfg(windows)]
+fn native_path(value: &Value) -> std::path::PathBuf {
+    use std::os::windows::ffi::OsStringExt as _;
+    let bytes = value
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|byte| u8::try_from(byte.as_u64().unwrap()).unwrap())
+        .collect::<Vec<_>>();
+    let (pairs, remainder) = bytes.as_chunks::<2>();
+    assert!(remainder.is_empty());
+    let wide = pairs
+        .iter()
+        .map(|pair| u16::from_le_bytes(*pair))
+        .collect::<Vec<_>>();
+    std::path::PathBuf::from(std::ffi::OsString::from_wide(&wide))
+}
+
+#[allow(
+    dead_code,
+    reason = "shared support is compiled per integration test target"
+)]
 pub fn run(base: &str, prompt: &str, harness: Option<&str>) -> Output {
     let mut command = command(base, prompt);
     if let Some(harness) = harness {

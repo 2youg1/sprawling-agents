@@ -3,37 +3,39 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The persistent Python3 adapter (`Mei/Spec.lean` §6, §10-§12).
+//! The persistent python adapter (`Mei/Spec.lean` §6, §10-§12).
 //! Small UTF-8 captures are returned whole; large captures stay at their paths.
 
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::time::Duration;
 
+use crate::capture::Store as CaptureStore;
+use crate::doctor::Environment;
 use crate::error::{Code, Diagnostic, Error, Result};
+
+pub use crate::capture::INLINE_BYTES;
 
 const BOOT: &str = include_str!("boot.py");
 
-/// The largest combined stdout/stderr capture returned inline.
-pub const INLINE_BYTES: u64 = 16 * 1024;
 const INLINE_KIB: u64 = INLINE_BYTES / 1024;
 
-/// Describes the Python3 tool using the same output budget as [`observable_output`].
-pub fn tool_description() -> String {
+/// Describes the python tool with the selected runtime versions and output budget.
+pub fn tool_description(environment: &Environment) -> String {
     format!(
         concat!(
-            "<python3>\nA persistent Python3 interpreter. Variables, imports, and the working directory (cwd) persist across calls. ",
+            "<python version=\"{}\" uv_version=\"{}\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. ",
             "An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. ",
             "Expressions do not auto-echo, so explicitly print any values you need to inspect. ",
             "If combined UTF-8 stdout/stderr is up to {} KiB, the tool returns it inline. ",
-            "Larger or non-UTF-8 output returns a notice and the path to a file containing the full output; ",
-            "filter that file, or re-run with narrower output, in the next Python call. ",
+            "Larger or non-UTF-8 output returns a notice and the full path, or a Python expression that losslessly reconstructs a non-Unicode native path; ",
+            "filter that file, or re-run with narrower output, in the next python call. ",
             "Run shell commands and CLIs through subprocess, capture their output, and check return codes. ",
-            "Start Python with sys.executable rather than bare python3, so child processes inherit the active environment. ",
+            "Start child interpreters with sys.executable, so they inherit the active environment. ",
             "Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, ",
-            "Python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python3>"
+            "python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>"
         ),
-        INLINE_KIB
+        environment.python.version, environment.uv.version, INLINE_KIB
     )
 }
 
@@ -53,6 +55,7 @@ pub struct Py {
     child: Child,
     input: Option<ChildStdin>,
     output: BufReader<ChildStdout>,
+    captures: CaptureStore,
 }
 
 impl Py {
@@ -61,15 +64,29 @@ impl Py {
     /// # Errors
     /// The interpreter cannot be started or its private pipes cannot be opened.
     pub fn spawn() -> Result<Py> {
-        Py::with_boot(BOOT)
+        Py::with_boot(BOOT, None)
+    }
+
+    /// Starts the doctor-selected interpreter with uv available to descendants.
+    ///
+    /// # Errors
+    /// The selected interpreter cannot be started or its environment is invalid.
+    pub fn spawn_in(environment: &Environment) -> Result<Py> {
+        Py::with_boot(BOOT, Some(environment))
     }
 
     #[expect(
         clippy::disallowed_methods,
         reason = "an independent harness process starts its own interpreter, not a city child"
     )]
-    fn with_boot(boot: &str) -> Result<Py> {
-        let mut command = Command::new(python_program());
+    fn with_boot(boot: &str, environment: Option<&Environment>) -> Result<Py> {
+        let mut command = match environment {
+            Some(environment) => Command::new(&environment.python.executable),
+            None => Command::new(python_program()),
+        };
+        if let Some(environment) = environment {
+            command.env("PATH", environment.child_path()?);
+        }
         command.args(["-u", "-c", boot]);
         command.stdin(Stdio::piped());
         command.stdout(Stdio::piped());
@@ -86,13 +103,22 @@ impl Py {
         }
         #[cfg(test)]
         command.env("LC_ALL", "C").env("PYTHONUTF8", "0");
-        let mut child = command.spawn().map_err(|err| {
-            failure(
-                "start Python for Mei",
-                err.to_string(),
-                "install Python 3 on PATH as python3 or python",
-            )
-        })?;
+        let captures = CaptureStore::create()?;
+        command.env("MEI_CAPTURE_DIR", captures.root());
+        let mut child = match command.spawn() {
+            Ok(child) => child,
+            Err(err) => {
+                let mut captures = captures;
+                if let Err(cleanup) = captures.discard() {
+                    eprintln!("{cleanup}");
+                }
+                return Err(failure(
+                    "start Python for Mei",
+                    err.to_string(),
+                    "install Python 3 on PATH as python3 or python",
+                ));
+            }
+        };
         let input = child.stdin.take().ok_or_else(|| {
             failure(
                 "open the Python control input",
@@ -111,6 +137,7 @@ impl Py {
             child,
             input: Some(input),
             output: BufReader::new(output),
+            captures,
         })
     }
 
@@ -128,7 +155,7 @@ impl Py {
         })?;
         self.write_frame(&frame)?;
         let path = self.read_frame()?;
-        observable_output(&path)
+        self.captures.observe(path)
     }
 
     fn write_frame(&mut self, frame: &[u8]) -> Result<()> {
@@ -196,7 +223,11 @@ impl Py {
     /// # Errors
     /// Waiting on or killing/reaping the interpreter fails.
     pub fn close(&mut self) -> Result<()> {
-        self.close_within(CLOSE_GRACE)
+        self.close_within(CLOSE_GRACE)?;
+        if let Err(err) = self.captures.complete() {
+            eprintln!("{err}");
+        }
+        Ok(())
     }
 
     fn close_within(&mut self, grace: Duration) -> Result<()> {
@@ -224,7 +255,7 @@ impl Py {
         }
         match self.child.try_wait() {
             Ok(Some(_)) => Ok(()),
-            Ok(None) => self.kill_and_wait(),
+            Ok(None) => self.terminate_process(),
             Err(err) => Err(failure(
                 "close and wait for Python",
                 err.to_string(),
@@ -238,6 +269,20 @@ impl Py {
     /// # Errors
     /// Kill or wait failed.
     pub fn kill_and_wait(&mut self) -> Result<()> {
+        let process = self.terminate_process();
+        let captures = self.captures.discard();
+        match (process, captures) {
+            (Ok(()), Ok(())) => Ok(()),
+            (Err(err), Ok(())) | (Ok(()), Err(err)) => Err(err),
+            (Err(process), Err(captures)) => Err(failure(
+                "clean up a failed Python run",
+                format!("{process}; {captures}"),
+                "stop remaining processes and remove the named capture directory before retrying",
+            )),
+        }
+    }
+
+    fn terminate_process(&mut self) -> Result<()> {
         let killed = self.child.kill();
         let waited = self.child.wait();
         match (killed, waited) {
@@ -256,54 +301,6 @@ impl Py {
     }
 }
 
-fn output_too_large(path: &str) -> String {
-    format!(
-        "Output exceeds {INLINE_BYTES} bytes. Use Python3 to filter and print the needed result.\n{path}"
-    )
-}
-
-fn observable_output(path: &str) -> Result<String> {
-    let file = std::fs::File::open(path).map_err(|err| {
-        failure(
-            "open Python3 output",
-            format!("{path}: {err}"),
-            "keep the capture file available until the tool result is read",
-        )
-    })?;
-    let bytes = file
-        .metadata()
-        .map_err(|err| {
-            failure(
-                "read Python3 output metadata",
-                format!("{path}: {err}"),
-                "keep the capture file readable until the tool result is read",
-            )
-        })?
-        .len();
-    if bytes > INLINE_BYTES {
-        return Ok(output_too_large(path));
-    }
-    let mut captured = Vec::new();
-    file.take(INLINE_BYTES.saturating_add(1))
-        .read_to_end(&mut captured)
-        .map_err(|err| {
-            failure(
-                "read Python3 output",
-                format!("{path}: {err}"),
-                "keep the capture file readable until the tool result is read",
-            )
-        })?;
-    if u64::try_from(captured.len()).unwrap_or(u64::MAX) > INLINE_BYTES {
-        return Ok(output_too_large(path));
-    }
-    match String::from_utf8(captured) {
-        Ok(text) => Ok(text),
-        Err(_) => Ok(format!(
-            "Output is not UTF-8. Process it with Python3.\n{path}"
-        )),
-    }
-}
-
 fn python_program() -> &'static str {
     if cfg!(windows) { "python" } else { "python3" }
 }
@@ -311,7 +308,11 @@ fn python_program() -> &'static str {
 impl Drop for Py {
     fn drop(&mut self) {
         match self.child.try_wait() {
-            Ok(Some(_)) => {}
+            Ok(Some(_)) => {
+                if let Err(err) = self.captures.abandon() {
+                    eprintln!("{err}");
+                }
+            }
             Ok(None) | Err(_) => {
                 if let Err(err) = self.kill_and_wait() {
                     eprintln!("{err}");
@@ -373,8 +374,30 @@ mod tests {
     }
 
     #[test]
+    fn dropping_an_exited_interpreter_reclaims_uncommitted_captures() {
+        let mut python = Py::spawn().unwrap();
+        let captures = python.captures.root().to_path_buf();
+        assert!(python.run("import os\nos._exit(0)").is_err());
+        for _ in 0..500 {
+            if python.child.try_wait().unwrap().is_some() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(python.child.try_wait().unwrap().is_some());
+        drop(python);
+        assert!(!captures.exists());
+    }
+
+    #[test]
     fn tool_description_uses_the_inline_budget() {
-        assert!(tool_description().contains(&format!("up to {INLINE_KIB} KiB")));
+        let environment = Environment::new(
+            crate::doctor::Program::new("3.12.13", std::path::PathBuf::from("python")),
+            crate::doctor::Program::new("0.12.3", std::path::PathBuf::from("uv")),
+        );
+        let description = tool_description(&environment);
+        assert!(description.contains(&format!("up to {INLINE_KIB} KiB")));
+        assert!(description.starts_with("<python version=\"3.12.13\" uv_version=\"0.12.3\">"));
     }
 
     #[test]

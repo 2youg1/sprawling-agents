@@ -4,7 +4,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use std::io::{BufReader, Write};
-use std::process::Command;
 
 use serde_json::Value;
 
@@ -45,8 +44,8 @@ fn a_real_tool_wave_keeps_order_state_and_opaque_blocks() {
         serde_json::json!({"type": "thinking", "thinking": "why", "signature": "signed"});
     let first = serde_json::json!({"stop_reason": "tool_use", "content": [
         thinking.clone(),
-        {"type": "tool_use", "name": "Python3", "id": "a", "input": {"code": "x = 40\nprint(x)"}},
-        {"type": "tool_use", "name": "Python3", "id": "b", "input": {"code": "x += 2\nprint(x)"}}
+        {"type": "tool_use", "name": "python", "id": "a", "input": {"code": "x = 40\nprint(x)"}},
+        {"type": "tool_use", "name": "python", "id": "b", "input": {"code": "x += 2\nprint(x)"}}
     ]});
     let second = serde_json::json!({"stop_reason": "end_turn", "content": "42"});
     let (base, handle) = serve(vec![first, second]);
@@ -70,7 +69,7 @@ fn a_real_tool_wave_keeps_order_state_and_opaque_blocks() {
 #[test]
 fn a_preset_harness_is_not_overwritten() {
     let first = serde_json::json!({"stop_reason": "tool_use", "content": [
-        {"type": "tool_use", "name": "Python3", "id": "a", "input": {"code": "import os\nprint(os.environ['HARNESS'])"}}
+        {"type": "tool_use", "name": "python", "id": "a", "input": {"code": "import os\nprint(os.environ['HARNESS'])"}}
     ]});
     let second = serde_json::json!({"stop_reason": "end_turn", "content": "done"});
     let (base, handle) = serve(vec![first, second]);
@@ -113,7 +112,7 @@ fn a_non_200_body_reaches_stderr_unchanged() {
 #[test]
 fn a_recursive_child_has_an_independent_request_and_stdout_answer() {
     let parent = serde_json::json!({"stop_reason": "tool_use", "content": [
-        {"type": "tool_use", "name": "Python3", "id": "parent", "input": {"code": "import os, subprocess\nchild = subprocess.run([os.environ['HARNESS'], '-p', 'child prompt'], capture_output=True, text=True)\nprint(child.stdout, end='')"}}
+        {"type": "tool_use", "name": "python", "id": "parent", "input": {"code": "import os, subprocess\nchild = subprocess.run([os.environ['HARNESS'], '-p', 'child prompt'], capture_output=True, text=True)\nprint(child.stdout, end='')"}}
     ]});
     let (base, handle) = serve(vec![
         parent,
@@ -156,25 +155,19 @@ fn pause_turn_continues_without_a_user_message() {
     assert_eq!(output.stdout, b"done");
     let requests = handle.join().unwrap();
     assert_eq!(requests.len(), 2);
-    assert_eq!(requests[0]["tools"][0]["name"], "Python3");
+    assert_eq!(requests[0]["tools"][0]["name"], "python");
     assert_eq!(requests[1]["messages"].as_array().unwrap().len(), 2);
     assert_eq!(requests[1]["messages"][1]["content"][0], thinking);
 }
 
 #[test]
-#[expect(clippy::disallowed_methods, reason = "end-to-end fixture process")]
 fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     let playground = tempfile::tempdir().unwrap();
     let run = |directory: &std::path::Path, base: &str, prompt: &str| {
         let trace = std::fs::File::create(directory.join("run.jsonl")).unwrap();
-        Command::new(env!("CARGO_BIN_EXE_mei"))
-            .args(["-p", prompt])
+        crate::support::command(base, prompt)
             .current_dir(directory)
-            .env("HARNESS_MODEL", "test/model")
-            .env("ANTHROPIC_BASE_URL", base)
-            .env("ANTHROPIC_API_KEY", "magpie")
             .env_remove("HARNESS")
-            .env_remove("HARNESS_EXTRA")
             .stderr(trace)
             .output()
             .unwrap()
@@ -184,10 +177,10 @@ fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     std::fs::create_dir(&first).unwrap();
     let (base, first_gateway) = serve_with(3, |request, index| match index {
         0 => serde_json::json!({"stop_reason": "tool_use", "content": [
-            {"type": "tool_use", "name": "Python3", "id": "assign", "input": {"code": "answer = 40"}}
+            {"type": "tool_use", "name": "python", "id": "assign", "input": {"code": "answer = 40"}}
         ]}),
         1 => serde_json::json!({"stop_reason": "tool_use", "content": [
-            {"type": "tool_use", "name": "Python3", "id": "calculate", "input": {"code": "answer += 2\nprint(answer)"}}
+            {"type": "tool_use", "name": "python", "id": "calculate", "input": {"code": "answer += 2\nprint(answer)"}}
         ]}),
         2 => {
             let observed = tool_result_text(&request["messages"][4]["content"][0]["content"]);
@@ -219,7 +212,7 @@ fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     .unwrap();
     let (base, project_gateway) = serve(vec![
         serde_json::json!({"stop_reason": "tool_use", "content": [
-            {"type": "tool_use", "name": "Python3", "id": "repair", "input": {"code": r#"from pathlib import Path
+            {"type": "tool_use", "name": "python", "id": "repair", "input": {"code": r#"from pathlib import Path
 import subprocess
 import sys
 path = Path("greeting.py")
@@ -273,7 +266,6 @@ assert result.returncode == 0
 
 #[cfg(unix)]
 #[test]
-#[expect(clippy::disallowed_methods, reason = "resume fixture process")]
 fn cli_resume_imports_only_complete_message_history() {
     use std::os::unix::ffi::OsStrExt as _;
 
@@ -292,15 +284,10 @@ fn cli_resume_imports_only_complete_message_history() {
     let (base, gateway) = serve(vec![
         serde_json::json!({"stop_reason": "end_turn", "content": "continued"}),
     ]);
-    let output = Command::new(env!("CARGO_BIN_EXE_mei"))
-        .args(["--resume"])
+    let output = crate::support::command(&base, "second")
+        .arg("--resume")
         .arg(&session)
-        .args(["-p", "second"])
-        .env("HARNESS_MODEL", "test/model")
-        .env("ANTHROPIC_BASE_URL", &base)
-        .env("ANTHROPIC_API_KEY", "magpie")
         .env_remove("HARNESS")
-        .env_remove("HARNESS_EXTRA")
         .output()
         .unwrap();
     assert!(
@@ -334,7 +321,6 @@ fn cli_resume_imports_only_complete_message_history() {
 
 #[cfg(unix)]
 #[test]
-#[expect(clippy::disallowed_methods, reason = "invalid resume fixture process")]
 fn cli_resume_rejects_an_incomplete_log_before_starting_python() {
     let dir = tempfile::tempdir().unwrap();
     let session = dir.path().join("incomplete.jsonl");
@@ -352,14 +338,17 @@ fn cli_resume_rejects_an_incomplete_log_before_starting_python() {
     use std::os::unix::fs::PermissionsExt as _;
     permissions.set_mode(0o755);
     std::fs::set_permissions(&python, permissions).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_mei"))
-        .args(["--resume"])
+    let doctor = tempfile::tempdir().unwrap();
+    let runtime = mei::doctor::Environment::new(
+        mei::doctor::Program::new("3.12.13", python.clone()),
+        mei::doctor::Program::new("0.12.3", python),
+    );
+    mei::doctor::write_cache(doctor.path(), &runtime).unwrap();
+    let output = crate::support::command("http://127.0.0.1:1", "second")
+        .arg("--resume")
         .arg(&session)
-        .args(["-p", "second"])
         .current_dir(dir.path())
-        .env("HARNESS_MODEL", "test/model")
-        .env("ANTHROPIC_BASE_URL", "http://127.0.0.1:1")
-        .env("ANTHROPIC_API_KEY", "magpie")
+        .env("MEI_DOCTOR_DIR", doctor.path())
         .env("PATH", &bin)
         .output()
         .unwrap();
