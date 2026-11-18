@@ -1536,3 +1536,32 @@ validate.py 只替换 aur/PKGBUILD 与 aur/.SRCINFO 的下载基址为回环 HTT
 发布仅限 tag push，AUR_SSH_KEY 缺失以 notice 跳过发布，生成与验证仍执行。
 验收：channel 摘要与共享布局 fixture、makepkg --printsrcinfo 对拍与 --version。
 -/
+
+/-! ### 8-54 `upstream`：被监视的上游表一行一个项目、一个路径、一个水位（形状 1 判定）
+
+`docs/third-party.md` §1 的表不是散文：`upstream-watch.yml` 自己拆它——项目取行里的
+`github.com/<owner>/<repo>`，路径列删掉反引号与空格后原样交给 commits API，水位列与返回的
+head 做前缀比较。于是「一行能拆成一次监视」这条规则不在工作流里，也不在任何门里，两次真实
+失效都从这里来：一格写两个路径时，API 对一个不存在的路径回 `[]`，`python3` 取 `[0]` 抛错，
+`set -euo pipefail` 结束整步，其后 85 行一次也没查过。
+
+`upstream::check(root: &Path) -> Result<Vec<Violation>, XtaskError>`（`Tools/xtask/src/upstream.rs`）
+读同一份文档，判工作流真会动手的行：以 `| [` 开头且含 `github.com/` 链接的行。§3 的
+crate/许可表以 `| [` 开头但没有 GitHub 链接，§4 的字体表不以 `| [` 开头，两者都不判；把 §1
+的一行写成没有 GitHub 链接的六列表行时，形状本身让它仍然被判。判据四条：项目链接映射到
+owner/repo；路径格去掉首尾空白后恰好是一对反引号包住的非空路径，反引号外无别的内容，路径内
+无空格与逗号；水位是 12 到 40 位十六进制。违规位置是 `docs/third-party.md:<行号>`，修复语
+分别是「一行一个路径」「链接成 github.com/<owner>/<repo>」「把读过的 commit 写回水位」。
+
+**D33 判形状而不联网（形状 1 判定）。** 门只回答「工作流能否把这一行拆成一次监视」，不回答
+「上游是否仍如这一行所述」，也不发网络请求：事实是否仍成立由人在同一个 change-set 里对着上游
+复核，`docs/CONTRIBUTING.md` 已把这件事写成提交规则。被否：①只修那一行——下一个人照样写回两
+格；②让工作流按逗号拆多路径——文档的约定是一行一路径，宽松解析会把「两个路径共用一份水位」
+这种错误数据也吞下去；③在门里手写一张路径清单——同一份表有两个权威；④在门里联网核对
+head——门的红会由 CDN 与限流决定，而 `cargo xtask gates` 必须在离线树上可重放。
+
+**已知的限**：门判单元格形状与水位格式，不判 commit 是否真的读过该路径；前缀比较也发现不了
+「水位指向一个从不触及该路径的 commit」。这两件事只能由人复核，写在明处而不是静默。
+
+**本节属门禁机具，与产品代码分开提交。**
+-/

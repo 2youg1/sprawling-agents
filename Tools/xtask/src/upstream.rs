@@ -71,27 +71,17 @@ fn judge_row(number: usize, cells: &[&str]) -> Option<Violation> {
             "link the project as `https://github.com/<owner>/<repo>`",
         ));
     }
-    let watched = paths(watched_cell);
-    let [path] = watched.as_slice() else {
+    if one_path(watched_cell).is_none() {
         return Some(at(
             number,
-            "a watched row names one path, since the commits API is asked for that cell as one path",
-            if watched.is_empty() {
-                format!("`{watched_cell}` holds no backticked path")
-            } else {
-                format!("`{watched_cell}` holds {} paths", watched.len())
-            },
-            "give each followed path its own row, with the commit read for that path",
+            "a watched row puts exactly one path in one pair of backticks, since the workflow strips the backticks and hands the rest of the cell to the commits API",
+            format!(
+                "`{}` is not exactly one backticked path",
+                watched_cell.trim()
+            ),
+            "keep one path in the cell, wrapped in backticks with nothing beside them, and move every other followed path to its own row",
         ));
     };
-    if path.contains(',') || path.contains(' ') {
-        return Some(at(
-            number,
-            "a watched path is one path the commits API accepts",
-            format!("`{path}` is not one path"),
-            "split the row so each row carries one path, spelled as the upstream repository spells it",
-        ));
-    }
     let tracked = tracked_cell.trim_matches('`').trim();
     if tracked.len() < 12 || tracked.len() > 40 || !tracked.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Some(at(
@@ -122,17 +112,13 @@ fn github_project(cell: &str) -> bool {
         && !name.contains(['(', ' ', '/'])
 }
 
-fn paths(cell: &str) -> Vec<&str> {
-    let mut found = Vec::new();
-    let mut rest = cell;
-    while let Some((_, tail)) = rest.split_once('`') {
-        let Some((path, after)) = tail.split_once('`') else {
-            break;
-        };
-        found.push(path);
-        rest = after;
+fn one_path(cell: &str) -> Option<&str> {
+    let trimmed = cell.trim();
+    let inner = trimmed.strip_prefix('`')?.strip_suffix('`')?;
+    if inner.is_empty() || inner.contains('`') || inner.contains(',') || inner.contains(' ') {
+        return None;
     }
-    found
+    Some(inner)
 }
 
 fn at(number: usize, rule: &str, violation: String, alternative: &str) -> Violation {

@@ -23,7 +23,7 @@ A violation turns the check red with a message naming the rule, the violation an
 | `xtask wiring` | every verb the city can carry out reached by some control, or classified on the wire seam with the reason a person may not ask for it |
 | `xtask wire-ts` | `RefRain/src/wire.ts` regenerated whenever `WIRE_V` moves |
 | `xtask docnum` | every number a document quotes, and every kernel enum table a SPEC carries, equal to the code that decides it |
-| `xtask upstream` | every row of `docs/third-party.md` names one GitHub project, one watched path and the commit that path was read at, because `upstream-watch.yml` decomposes those cells itself |
+| `xtask upstream` | every row of `docs/third-party.md` that links a GitHub project names that project, one watched path and the commit that path was read at, because `upstream-watch.yml` decomposes those cells itself; the crate-licence and font tables carry no GitHub link and are not judged |
 | `xtask proof` | kani roster read from the `#[kani::proof]` attributes: no workflow names a harness, a stated total is the total, a harness left unproved cites where that was decided |
 | `xtask budget` | sizes inside their budget |
 | `xtask specalign` | kernel enums and the tables and rosters of `Sprawling/kernel/Spec.lean` agree variant by variant; every module's SPEC anchor resolves |

@@ -46,7 +46,7 @@ fn two_paths_in_one_row_are_refused() {
     assert_eq!(violation.gate, "upstream");
     assert!(violation.location.ends_with(":3"), "{}", violation.location);
     assert!(
-        violation.violation.contains("2 paths"),
+        violation.violation.contains("exactly one backticked path"),
         "{}",
         violation.violation
     );
@@ -96,7 +96,7 @@ fn a_cell_holding_no_path_is_refused() {
     let found = judge(&text);
     let violation = found.first().expect("one violation");
     assert!(
-        violation.violation.contains("no backticked path"),
+        violation.violation.contains("exactly one backticked path"),
         "{}",
         violation.violation
     );
@@ -116,4 +116,23 @@ fn rows_outside_a_watched_table_are_not_judged() {
 fn this_checkout_passes() {
     let found = check(crate::root::this_checkout()).unwrap();
     assert!(found.is_empty(), "{found:#?}");
+}
+
+#[test]
+fn a_cell_with_text_beside_the_path_is_refused() {
+    let empty_pair = format!("{tick}{tick}", tick = '`');
+    for cell in [
+        "`docs/reference.md`/extra",
+        "`docs/reference.md` and `docs/x.md`",
+        empty_pair.as_str(),
+    ] {
+        let text = one_row(cell, "`d01e0a465aaf`");
+        let found = judge(&text);
+        let violation = found.first().expect("one violation");
+        assert!(
+            violation.violation.contains("exactly one backticked path"),
+            "{cell}: {}",
+            violation.violation
+        );
+    }
 }
