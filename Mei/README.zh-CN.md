@@ -2,7 +2,7 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-Archetype:Mei 是极简 Agent Harness：把任务交给模型，模型通过一个有状态的 **python** 工具行动并看到小结果，再继续直到最终答案。大型或非 UTF-8 结果完整留在磁盘，只返回提示与完整路径；非 Unicode 本机路径则返回可由 Python 无损还原的表达式。本包是**无头核**。Mei 不含终端壳。
+Archetype:Mei 是极简 Agent Harness：把任务交给模型，模型通过一个有状态的 **python** 工具行动并看到小结果，再继续直到最终答案。大型或非 UTF-8 结果完整留在磁盘，只返回提示与完整路径；非 Unicode 原生路径则返回可由 Python 无损还原的表达式。本包是**无头核**。Mei 不含终端壳。
 
 交互面是 [Calyx](../Calyx/)。`@sprawling/mei` 同时发布无头 `mei` 与 `calyx` 面：TTY 且无 `-p` 时走 Calyx，`-p` 或管道仍走无头核。脚本只用无头路径。
 
@@ -115,7 +115,7 @@ cd Calyx && zig build test
 | stdout | 最终答案，不补换行 |
 | stderr | 消息 JSONL；`mei.obs` pulse/usage；失败为三段诊断 |
 | 取消 | 杀进程组 |
-| tool_result | 不超过 16 KiB 的完整 stdout+stderr；否则为提示与完整捕获路径，或无损还原本机路径的 Python 表达式 |
+| tool_result | 不超过 16 KiB 的完整 stdout+stderr；否则为提示与完整捕获路径，或无损还原原生路径的 Python 表达式 |
 
 Resume 保留旧工具名与字符串/数组 content，包括图片、音频和视频块。Provider 与模型必须支持这些块；Mei 没有附件旗标，也不恢复 Python 现场。
 

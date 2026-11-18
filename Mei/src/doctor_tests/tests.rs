@@ -67,7 +67,7 @@ fn path_probes_skip_nonexecutables_and_record_the_absolute_candidate() {
     std::fs::create_dir(&bad).unwrap();
     std::fs::write(bad.join("uv"), []).unwrap();
     std::fs::set_permissions(bad.join("uv"), std::fs::Permissions::from_mode(0o644)).unwrap();
-    fake_uv(&good);
+    compile_uv_fixture(&good);
     let path = std::env::join_paths([bad, good]).unwrap();
     let uv = probe_uv_search(Some(path)).unwrap().unwrap();
     assert_eq!(uv.version, "0.12.3");
@@ -99,7 +99,7 @@ fn a_relative_doctor_override_is_made_absolute() {
 #[cfg(not(windows))]
 #[test]
 fn empty_and_relative_xdg_paths_fall_back_to_home() {
-    let home = PathBuf::from("/home/person");
+    let home = PathBuf::from("/fixture-home");
     assert_eq!(
         cache::cache_base(Some(PathBuf::new()), Some(home.clone())),
         Some(home.join(".cache"))

@@ -52,7 +52,7 @@ fn writable(environment: &Environment) {
 }
 
 #[expect(clippy::disallowed_methods, reason = "compile a standalone uv fixture")]
-fn fake_uv(directory: &Path) {
+fn compile_uv_fixture(directory: &Path) {
     std::fs::create_dir_all(directory).unwrap();
     let source = directory.join("fixture.rs");
     std::fs::write(&source, "fn main() { println!(\"uv 0.12.3\"); }").unwrap();
@@ -263,7 +263,7 @@ fn a_private_uv_is_reused_when_the_path_has_none() {
     let paths = Paths::new(directory.path().to_path_buf());
     std::fs::create_dir_all(&paths.bin).unwrap();
     let python = probe_python(OsStr::new(python_program())).unwrap().unwrap();
-    fake_uv(&paths.bin);
+    compile_uv_fixture(&paths.bin);
     let uv = probe_private_uv(&paths).unwrap().unwrap();
     assert_eq!(uv.version, "0.12.3");
     let observed = Observed {

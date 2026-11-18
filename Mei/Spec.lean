@@ -12,7 +12,7 @@ import Mei.spec.Session
 
 `Mei/` 是极简 Agent Harness：一个可变 Anthropic Messages 请求、一个串行反馈循环、
 一个有状态 python 进程。Cargo 包名 `sprawling-mei`，库名 `mei`，无头命令名 `mei`。
-唯一工具名为 `python`；小型 UTF-8 输出直接返回，大输出只返提示与完整路径，非 Unicode 本机路径则用可无损还原的 Python 表达式表示。
+唯一工具名为 `python`；小型 UTF-8 输出直接返回，大输出只返提示与完整路径，非 Unicode 原生路径则用可无损还原的 Python 表达式表示。
 终端居住面属于顶层生产包 `Calyx/`（非 Archetype）；Mei 核不含 TUI。
 指令 / MCP / Skills 的权威在 magpie；Agent 自去 skill 仓库。`MEI.md` 仅在构建时进入 system；
 新会话只额外读取工作区顶层的 `AGENTS.md`，并将其冻结在首个 user 消息。
@@ -159,8 +159,8 @@ resume 只重放日志已有消息，不读取或补注当前 AGENTS。工具描
 subprocess 和 `sys.executable` 一致；内联数字由 `INLINE_BYTES` 生成；不写 REPL 或核内超时。
 `MEI_CAPTURE_DIR` 是 Face 分配当前 run 目录的内部环境接口；缺席时无头核创建临时 run 目录。
 Calyx 先独占创建空目录，再以 `MEI_CAPTURE_CREATED=1` 让 Mei 接管；没有这个标记时既有目录一律拒绝。
-私有控制信道只传 ASCII capture 文件名，`Store` 在本机 root 下拼接；spilled 提示给完整 Unicode 路径，
-或给能在 Python 中无损还原非 Unicode 本机路径的表达式。
+私有控制信道只传 ASCII capture 文件名，`Store` 在捕获 root 下拼接原生路径；spilled 提示给完整 Unicode 路径，
+或给能在 Python 中无损还原非 Unicode 原生路径的表达式。
 唯一工具 schema 与 agent 整波预检跨 provider 生效，不声明 provider 专有的 `strict` 模式。
 `HARNESS_EXTRA` 浅合并一次；拒绝 `stream: true` 与 `HARNESS_EXTRA.tools`。
 无 `MEI_TOOLS`。`HARNESS_MODEL` 必填。
