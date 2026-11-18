@@ -2,7 +2,7 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-Archetype:Mei is a minimal Agent Harness: a model receives a task, acts through one persistent **Python3** tool, sees each small result, and repeats until it has a final answer. A large or non-UTF-8 result stays complete on disk and returns only a notice with its path. This package is the **headless** core. Mei does not contain a terminal shell.
+Archetype:Mei is a minimal Agent Harness: a model receives a task, acts through one persistent **python** tool, sees each small result, and repeats until it has a final answer. A large or non-UTF-8 result stays complete on disk and returns only a notice with its path. This package is the **headless** core. Mei does not contain a terminal shell.
 
 The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the headless `mei` binary and the `calyx` face; a TTY without `-p` becomes Calyx, while `-p` or a pipe stays headless. Scripts use the headless path alone.
 
@@ -19,11 +19,11 @@ The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the head
 
 ## Black-box path (keyboard only)
 
-Needs internet, [Bun](https://bun.sh), Python 3 on PATH, Magpie, a tool-calling model API key, and a disposable folder. No clone of this repository.
+Needs internet, [Bun](https://bun.sh), Magpie, a tool-calling model API key, and a disposable folder. Python 3 and uv may already be installed; Mei's doctor repairs them when required. No clone of this repository.
 
 ### A. Script smoke
 
-1. Check `bun --version` and `python --version` on Windows, or `python3 --version` elsewhere.
+1. Check `bun --version`.
 2. Install and open [Magpie](https://usemagpie.ai). Add the provider under **Providers → Add provider**, then keep the app open; it already serves the gateway. `magpie serve` is the terminal-only alternative.
 3. Choose an entry from `magpie models`, then open a disposable workspace.
 
@@ -45,7 +45,7 @@ Set-Location "$HOME/mei-playground"
 Run:
 
 ```sh
-bunx @sprawling/mei -p 'Use Python3 to calculate 40 + 2, then answer with only the number.'
+bunx @sprawling/mei -p 'Use python to calculate 40 + 2, then answer with only the number.'
 ```
 
 Stdout is `42`. Failures are a `toml` block with `description` / `cause` / `resolution`.
@@ -87,10 +87,22 @@ From source without npm: `cargo install sprawling-mei sprawling-calyx --locked`,
 ```sh
 cargo test -p sprawling-mei --test cli e2e_beginner_workflow_from_first_prompt_to_project_change
 cargo test -p sprawling-mei --test observation
+cargo test -p sprawling-mei --test workspace
+cargo test -p sprawling-mei --test capture
 cd Calyx && zig build test
 ```
 
-The first drives real `mei` + Python3 on Windows and Unix against a local gateway that answers correctly only when the next request carries the observed result. The second also covers a large capture staying on disk before a selective read, plus legacy and media-block resume passthrough. Neither installs npm packages or drives the TUI.
+These drive real `mei` + Python on Windows and Unix against a local gateway, including observed results, large-output recovery, workspace freezing and legacy/media resume. They use an isolated doctor cache and never install npm packages, Python, uv, or a TUI.
+
+## Workspace, runtime and captures
+
+When a new session starts, Mei reads only the workspace root's `AGENTS.md`, if present, and places it before the actual prompt in the first user message. The log freezes that opening. Later tasks and `/resume` neither reread nor backfill AGENTS, even when the file appears, changes or disappears; `/new` starts a fresh reading. Skills, MCP configuration and environment tools are not automatically exposed.
+
+On the first start of a Mei version, doctor probes Python and uv and caches the complete environment. A valid cache for that version skips all probes and network access. A supported Python is reused; a missing, broken or end-of-life Python is replaced by the latest stable managed installation. Missing or broken uv is installed. Python repair refreshes Mei's private uv first, so an old uv release does not define which Python is newest.
+
+Installs stay in the per-user doctor directory and never replace system Python, modify the global PATH or edit shell profiles. The selected absolute paths stay local; the tool description carries only `version` and `uv_version` attributes. uv is available on PATH for subprocesses started by the python tool. Doctor never updates Mei itself. `MEI_DOCTOR_DIR` overrides the per-user directory for isolation and tests.
+
+Every run owns a new capture directory. Small UTF-8 captures are inlined and their files are reclaimed after fd transfer or interpreter shutdown. Large and non-UTF-8 captures are spilled: interactive paths belong to the session under `<session>.captures/<run>` and survive resume; headless paths belong to the caller and survive process exit. Failed or cancelled interactive runs delete their uncommitted directory. Mei refuses to reuse a pre-existing capture directory. Forced host crashes can leave orphan directories; no crash janitor is claimed.
 
 ## Process Face
 
@@ -114,26 +126,28 @@ Resume preserves legacy tool names and string/array content, including image, au
 | `ANTHROPIC_API_KEY` | Default `magpie` |
 | `HARNESS_EXTRA` | One JSON object at startup; refuses `stream` / `tools` |
 | `MEI_BIN` | Path Calyx uses to spawn this core; npm shim sets it to the sibling core |
+| `MEI_DOCTOR_DIR` | Optional isolated doctor cache and private runtime directory |
+| `MEI_CAPTURE_DIR` | Internal per-run directory supplied by a face; it must not already exist |
 | `SPRAWLING_PROGRAM_STATUS` | `never` disables OSC 7501 in the Calyx interactive face |
 
-## System prompt and static overhead
+## Prompt and tool contract
 
-`Mei/src/MEI.md` is compiled into `system`; the sole Python3 definition occupies `tools[0]`. With zero bytes of user input, these two values are the fixed content beyond that input. The table excludes message envelopes and anything a provider adds itself.
+`Mei/src/MEI.md` is compiled into `system`; the sole python definition occupies `tools[0]`. The table below uses a fixed documentation fixture with Python `3.12.13` and uv `0.12.3`; actual version attributes come from doctor. Byte counts exclude message envelopes and anything a provider adds itself.
 
-| Part | UTF-8 bytes | Estimated tokens |
-|---|---:|---:|
-| `system` | 257 | 63 |
-| Complete compact `tools[0]` JSON | 1131 | 246 |
-| Total | 1388 | 309 |
+| Part | UTF-8 bytes |
+|---|---:|
+| `system` | 297 |
+| Complete compact `tools[0]` JSON | 1145 |
+| Total | 1442 |
 
-Token estimates use `@google/genai` **2.21.0** `LocalTokenizer` with `gemini-2.0-flash-001` (gemma3), counting the two values separately and adding the results. They describe this tokenizer only, not a provider's usage or billing. The JSON below is pretty-printed for reading; the byte count uses its compact wire form.
+The JSON below is pretty-printed for reading; the byte count uses its compact wire form.
 
 ### `system`
 
 ```text
 <agent-harness>
 You are operating inside Mei.
-No files are injected or pre-loaded; fetch what you need.
+No additional documents or environment capabilities are injected or exposed; fetch what you need.
 Workflow: Sense → Act → Verify → Adapt…
 Aligned with context, fulfill user intent thoroughly and resourcefully and stay scoped.
 </agent-harness>
@@ -143,7 +157,7 @@ Aligned with context, fulfill user intent thoroughly and resourcefully and stay 
 
 ```json
 {
-  "description": "<python3>\nA persistent Python3 interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the path to a file containing the full output; filter that file, or re-run with narrower output, in the next Python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start Python with sys.executable rather than bare python3, so child processes inherit the active environment. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, Python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python3>",
+  "description": "<python version=\"3.12.13\" uv_version=\"0.12.3\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the path to a file containing the full output; filter that file, or re-run with narrower output, in the next python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start child interpreters with sys.executable, so they inherit the active environment. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>",
   "input_schema": {
     "properties": {
       "code": {
@@ -155,7 +169,7 @@ Aligned with context, fulfill user intent thoroughly and resourcefully and stay 
     ],
     "type": "object"
   },
-  "name": "Python3"
+  "name": "python"
 }
 ```
 
@@ -163,17 +177,19 @@ Mei keeps one provider-neutral schema and validates every tool wave in the agent
 
 ## Boundaries
 
-No in-process Python3 timeout; connect 10s / IO 600s; empty output is empty text; output over 16 KiB or non-UTF-8 returns only a notice and path, never a head/tail sample; no `MEI_TOOLS`, runtime AGENTS/Skills injection, or in-core TUI.
+No in-process python timeout; connect 10s / IO 600s; empty output is empty text; output over 16 KiB or non-UTF-8 returns only a notice and path, never a head/tail sample; no `MEI_TOOLS`, automatic Skills/MCP exposure, Mei self-update, or in-core TUI. Only a new session's top-level AGENTS is injected.
 
 ## Spec and checks
 
-[`Spec.lean`](Spec.lean), [`spec/Agent.lean`](spec/Agent.lean), [`spec/Session.lean`](spec/Session.lean); terminal [`Calyx/Spec.lean`](../Calyx/Spec.lean).
+[`Spec.lean`](Spec.lean), [`spec/Agent.lean`](spec/Agent.lean), [`spec/Session.lean`](spec/Session.lean), [`spec/Environment.lean`](spec/Environment.lean), [`spec/Capture.lean`](spec/Capture.lean); terminal [`Calyx/Spec.lean`](../Calyx/Spec.lean).
 
 ```sh
 cargo nextest run -p sprawling-mei
 cargo test -p sprawling-mei --test cli
 cargo test -p sprawling-mei --test observation
+cargo test -p sprawling-mei --test workspace
+cargo test -p sprawling-mei --test capture
 cargo test -p sprawling-calyx --lib console::mei
 cargo clippy -p sprawling-mei -p sprawling-calyx --all-targets -- -D warnings
-lake build Mei.Spec Mei.spec.Agent Mei.spec.Session
+lake build Mei.Spec Mei.spec.Agent Mei.spec.Session Mei.spec.Environment Mei.spec.Capture
 ```

@@ -39,6 +39,7 @@ The workspace manifest carries 0.17.0. Cutting it on 2026-11-17 (UTC+8) makes `v
 - **Mei's npm entry works through Bun on all three platforms.** One `mei` bin serves `bunx` and `npm exec`; a TTY opens Calyx, while `-p`, `--resume` and pipes stay headless (#312, #322).
 - **Calyx owns the interactive shell in Zig.** Rust retains the narrow city host; the same face serves the city console and Mei. OSC 7501 can report working, done, error and idle states without carrying prompt text (#312, #320, #327).
 - **Mei's prompt and tool description now match executable behavior.** The description is generated from the same output budget as observation, and bilingual guides disclose the exact static request and interactive status boundary (#327).
+- **Mei freezes workspace guidance and manages runtime and output lifetimes.** A new session reads only its top-level AGENTS once; resume never refreshes or backfills it. The lowercase python tool carries doctor-selected Python and uv versions. Current-version caches skip environment probes, private installation repairs missing or unsupported tools without changing global shell configuration, inline captures are reclaimed, and spilled paths remain valid across interpreter restarts and resume.
 
 ### Repository and verification
 

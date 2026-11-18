@@ -8,7 +8,7 @@ repository.workspace = true
 homepage.workspace = true
 readme = "README.md"
 publish.workspace = true
-description = "Mei, a minimal headless Agent Harness: one persistent Python3 tool, bounded observable output, and a process Face for Calyx or scripts."
+description = "Mei, a minimal headless Agent Harness: one persistent python tool, bounded observable output, and a process Face for Calyx or scripts."
 keywords = ["agents", "llm", "harness", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 

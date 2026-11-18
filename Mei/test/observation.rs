@@ -123,7 +123,7 @@ fn large_output_is_withheld_then_selectively_read() {
         if index == 1 {
             let notice = tool_result_text(&request["messages"][2]["content"][0]["content"]);
             let path = notice
-                .strip_prefix("Output exceeds 16384 bytes. Use Python3 to filter and print the needed result.\n")
+                .strip_prefix("Output exceeds 16384 bytes. Use python to filter and print the needed result.\n")
                 .unwrap_or("");
             let literal = serde_json::to_string(path).unwrap();
             return tool(&format!(

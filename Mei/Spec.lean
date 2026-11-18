@@ -55,7 +55,7 @@ LLM compaction、验真门、Skills/MCP 自动暴露、Mei 自动更新、为弱
 - AGENTS 只在新会话首轮注入一次；同会话后续轮次与 resume 不重读、不补注；`/new` 才可读取新代次。
 - doctor 对当前 Mei 版本的完整缓存不探测、不联网；缺席或版本更新才重建；受支持 python 不追新，
   缺失/EOL 才安装最新稳定版；uv 缺失或不可执行才安装。精确版本只进入 `<python version=… uv_version=…>`，
-  路径留在本机执行合同中，python 子进程可通过 PATH 调用 uv。
+  路径仅供本地执行，不进入模型描述，python 子进程可通过 PATH 调用 uv。
 - inline capture 在 fd 转移后或解释器 reap 后回收；spilled 路径跨解释器退出与 resume 有效；
   Calyx 删除失败或取消 run 的整个未提交 capture 目录。宿主崩溃后的 orphan 回收不在本次承诺内。
 - stderr：消息 JSONL；可选 `{"type":"mei.obs",...}` 观测行（pulse / usage）；
@@ -130,7 +130,7 @@ impl Client {
 }
 
 impl Py {
-    pub fn spawn() -> Result<Py>;
+    pub fn spawn_in(environment: &Environment) -> Result<Py>;
     pub fn run(&mut self, code: &str) -> Result<String>; // Ok = tool_result content
     pub fn close(&mut self) -> Result<()>;
     pub fn kill_and_wait(&mut self) -> Result<()>;
@@ -146,9 +146,13 @@ stderr 观测行（穷尽；非 Messages role）：
 以及可选 `path` / `value`（写入 cause 叙事所需处）。内部仍可用 action/subject/recovery
 构造，对外版式固定为三段。`Body` 仅非 200 原文。
 
+`doctor::ensure(now)` 接收装配采样时间；`Environment` 同时持有两个程序的精确版本与绝对路径，
+`write_cache` 写入当前 Mei 代次的完整记录。`CaptureStore::create/observe/complete/discard` 分别对应
+run 创建、结果分类、成功收口与未提交回收。
+
 启动请求：`model`、`max_tokens`（默认见 §14）、`system`、`tools = [python]`、messages。
 新会话且顶层 AGENTS 存在时，首个 user content 依次是指令文本块与 prompt 文本块；否则仍为字符串。
-resume 只使用日志已有消息，不读取或补注当前 AGENTS。工具描述以 `<python version="…" uv_version="…">`
+resume 只重放日志已有消息，不读取或补注当前 AGENTS。工具描述以 `<python version="…" uv_version="…">`
 携带精确版本，与持久变量/imports/cwd、异常后恢复、主动打印、16 KiB 内联预算、完整捕获路径、
 subprocess 和 `sys.executable` 一致；内联数字由 `INLINE_BYTES` 生成；不写 REPL 或核内超时。
 `MEI_CAPTURE_DIR` 是 Face 分配当前 run 目录的内部环境接口；缺席时无头核创建临时 run 目录。
@@ -188,6 +192,7 @@ tool_use → 预检 → exec 得捕获或小结果提示 → user tool_result co
 - `boot.py`：每帧一行 JSON string；stdout/stderr 重定向到当前 run 的捕获文件；同一执行命名空间保留
   变量与 imports，解释器进程保留 cwd；异常只形成 traceback 反馈，循环继续；
   结束后把**该文件路径**经控制信道回传；不改写文件、无 alarm。
+  `MEI_CAPTURE_DIR` 在模型代码运行前由 `boot.py` 读取并移出环境，递归子 Mei 不会误继承父 run 目录。
 - `Py::run` 先读文件元数据；仅不超过 16 KiB 时做有界读取。完整 UTF-8 文本直接作为
   tool_result；更大或非 UTF-8 时只给提示与路径。下一响应已把 fd 1/2 移到新文件，
   此时回收此前的 inline 文件；当前 inline 文件在解释器收口后回收。

@@ -13,7 +13,7 @@ use serde_json::{Value, json};
 
 use crate::error::{Error, Result, protocol};
 
-pub const TOOL_NAME: &str = "Python3";
+pub const TOOL_NAME: &str = "python";
 
 /// Renders the value found at a failed field, naming absence plainly.
 fn found(value: Option<&Value>) -> String {
@@ -112,9 +112,9 @@ pub fn run(
                 let calls = calls(&content, &base)?;
                 if calls.is_empty() {
                     return Err(protocol(
-                        "validate a Python3 tool wave",
+                        "validate a python tool wave",
                         "stop_reason is tool_use but no client tool call is present",
-                        "return at least one valid Python3 tool_use block, or use another stop_reason",
+                        "return at least one valid python tool_use block, or use another stop_reason",
                     )
                     .with_path(format!("{base}.content"))
                     .with_value(found(Some(&content)))
@@ -277,9 +277,9 @@ fn calls(content: &Value, base: &str) -> Result<Vec<Call>> {
                 ("input.code", found(block.pointer("/input/code")))
             };
             return Err(protocol(
-                "validate a Python3 tool call",
+                "validate a python tool call",
                 "tool_use id or input.code is missing or has the wrong type",
-                "return a non-empty string id and a string input.code for every Python3 call",
+                "return a non-empty string id and a string input.code for every python call",
             )
             .with_path(format!("{base}.content[{index}].{field}"))
             .with_value(value)
@@ -295,7 +295,7 @@ fn calls(content: &Value, base: &str) -> Result<Vec<Call>> {
                         .and_then(Value::as_str)
                         .unwrap_or("<missing>")
                 ),
-                "the only local client tool is Python3; server_tool_use blocks need no local result",
+                "the only local client tool is python; server_tool_use blocks need no local result",
             )
             .with_path(format!("{base}.content[{index}].name"))
             .with_value(found(block.get("name")))
@@ -303,7 +303,7 @@ fn calls(content: &Value, base: &str) -> Result<Vec<Call>> {
         }
         if !ids.insert(id.to_owned()) {
             return Err(protocol(
-                "validate a Python3 tool wave",
+                "validate a python tool wave",
                 format!("duplicate tool_use id `{id}`"),
                 "give every tool_use in this wave a unique id; no call in the wave was executed",
             )

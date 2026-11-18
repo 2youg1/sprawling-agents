@@ -17,11 +17,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Code {
     Usage,
+    Capture,
     Config,
+    Doctor,
     Transport,
     Protocol,
     Python,
     Session,
+    Workspace,
     Unsupported,
 }
 
@@ -30,11 +33,14 @@ impl Code {
     pub fn as_str(self) -> &'static str {
         match self {
             Code::Usage => "E_MEI_USAGE",
+            Code::Capture => "E_MEI_CAPTURE",
             Code::Config => "E_MEI_CONFIG",
+            Code::Doctor => "E_MEI_DOCTOR",
             Code::Transport => "E_MEI_TRANSPORT",
             Code::Protocol => "E_MEI_PROTOCOL",
             Code::Python => "E_MEI_PYTHON",
             Code::Session => "E_MEI_SESSION",
+            Code::Workspace => "E_MEI_WORKSPACE",
             Code::Unsupported => "E_MEI_UNSUPPORTED",
         }
     }
@@ -45,20 +51,29 @@ impl Code {
             Code::Usage => {
                 "Only `mei [-p PROMPT] [--resume JSONL]` or a non-terminal stdin prompt is accepted"
             }
+            Code::Capture => {
+                "A capture directory must be new and run-owned; spilled files outlive their interpreter"
+            }
             Code::Config => {
                 "Configuration must preserve the closed Messages and transport contract"
+            }
+            Code::Doctor => {
+                "A current-version cache or a working Python and uv environment is required; installation never updates Mei"
             }
             Code::Transport => {
                 "Only plain HTTP with a complete status line, header/body boundary and JSON body is accepted"
             }
             Code::Protocol => {
-                "The response must satisfy the minimal Anthropic Messages and sole-Python-tool contract"
+                "The response must satisfy the minimal Anthropic Messages and sole-python-tool contract"
             }
             Code::Python => {
                 "The private Python channel must carry one valid JSON string frame per call and the interpreter must stay alive"
             }
             Code::Session => {
                 "A resume log must contain complete Mei messages from the initial user prompt through an assistant end_turn"
+            }
+            Code::Workspace => {
+                "Only a readable UTF-8 AGENTS.md at the workspace's top level can open a new session"
             }
             Code::Unsupported => "This Mei build does not support the current platform",
         }

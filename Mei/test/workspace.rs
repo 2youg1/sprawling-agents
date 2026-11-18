@@ -97,7 +97,7 @@ fn later_turns_and_resume_keep_exactly_the_original_guide() {
     assert_eq!(guide_occurrences(&second_request, "original-rule"), 1);
     assert_eq!(guide_occurrences(&second_request, "changed-rule"), 0);
     assert_eq!(second_request["messages"].as_array().unwrap().len(), 3);
-    assert_eq!(second_request["messages"][3]["content"], "second");
+    assert_eq!(second_request["messages"][2]["content"], "second");
     append(&session, &second_segment);
 
     std::fs::remove_file(&guide).unwrap();
@@ -107,7 +107,7 @@ fn later_turns_and_resume_keep_exactly_the_original_guide() {
     let third_request = third.join().unwrap().remove(0);
     assert_eq!(guide_occurrences(&third_request, "original-rule"), 1);
     assert_eq!(third_request["messages"].as_array().unwrap().len(), 5);
-    assert_eq!(third_request["messages"][5]["content"], "third");
+    assert_eq!(third_request["messages"][4]["content"], "third");
 }
 
 #[test]
@@ -138,6 +138,37 @@ fn resume_never_backfills_a_guide_absent_from_history() {
         ])
     );
     assert_eq!(guide_occurrences(&request, "new-rule"), 0);
+}
+
+#[test]
+fn a_failed_first_run_is_not_logged_or_duplicated_on_retry() {
+    let directory = tempfile::tempdir().unwrap();
+    std::fs::write(directory.path().join("AGENTS.md"), "retry-rule").unwrap();
+    let failed_segment = directory.path().join("failed.jsonl");
+    let (base, first) = serve(vec![
+        serde_json::json!({"stop_reason": "max_tokens", "content": []}),
+    ]);
+    let output = support::command(&base, "first")
+        .current_dir(directory.path())
+        .stderr(std::fs::File::create(&failed_segment).unwrap())
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    first.join().unwrap();
+
+    let successful = directory.path().join("successful.jsonl");
+    let (base, second) = serve(vec![answer()]);
+    run_at(directory.path(), &base, "retry", &successful);
+    let request = second.join().unwrap().remove(0);
+    assert_eq!(guide_occurrences(&request, "retry-rule"), 1);
+    assert_eq!(request["messages"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        std::fs::read_to_string(successful)
+            .unwrap()
+            .matches("retry-rule")
+            .count(),
+        1
+    );
 }
 
 #[test]
@@ -172,6 +203,7 @@ fn only_the_exact_workspace_top_level_is_read() {
 }
 
 #[test]
+#[expect(clippy::disallowed_methods, reason = "test fixture process")]
 fn malformed_workspace_input_fails_before_calling_the_model() {
     let directory = tempfile::tempdir().unwrap();
     std::fs::write(directory.path().join("AGENTS.md"), [0xff]).unwrap();

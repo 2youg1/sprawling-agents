@@ -5,6 +5,7 @@
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::process::{Command, Output};
+use std::sync::OnceLock;
 
 use serde_json::Value;
 
@@ -86,8 +87,41 @@ pub fn command(base: &str, prompt: &str) -> Command {
         .env("HARNESS_MODEL", "test/model")
         .env("ANTHROPIC_BASE_URL", base)
         .env("ANTHROPIC_API_KEY", "magpie")
+        .env("MEI_DOCTOR_DIR", doctor_directory())
         .env_remove("HARNESS_EXTRA");
     command
+}
+
+#[expect(clippy::disallowed_methods, reason = "test fixture process")]
+fn doctor_directory() -> &'static std::path::Path {
+    static FIXTURE: OnceLock<tempfile::TempDir> = OnceLock::new();
+    FIXTURE
+        .get_or_init(|| {
+            let directory = tempfile::tempdir().unwrap();
+            let probe = Command::new(if cfg!(windows) { "python" } else { "python3" })
+                .args([
+                    "-c",
+                    "import platform, sys; print(platform.python_version()); print(sys.executable)",
+                ])
+                .output()
+                .unwrap();
+            assert!(probe.status.success());
+            let text = String::from_utf8(probe.stdout).unwrap();
+            let mut lines = text.lines();
+            let python = mei::doctor::Program::new(
+                lines.next().unwrap(),
+                std::path::PathBuf::from(lines.next().unwrap()),
+            );
+            let uv_path = directory
+                .path()
+                .join(if cfg!(windows) { "uv.exe" } else { "uv" });
+            std::fs::write(&uv_path, []).unwrap();
+            let uv = mei::doctor::Program::new("0.0.0", uv_path);
+            mei::doctor::write_cache(directory.path(), &mei::doctor::Environment::new(python, uv))
+                .unwrap();
+            directory
+        })
+        .path()
 }
 
 #[allow(

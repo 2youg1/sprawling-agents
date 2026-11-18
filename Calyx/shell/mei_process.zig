@@ -97,6 +97,8 @@ pub const Process = struct {
         program: []const u8,
         prompt: []const u8,
         resume_path: ?[]const u8,
+        capture_directory: ?[]const u8,
+        environ: ?*const std.process.Environ.Map,
     ) SpawnResult {
         var argv_list: std.ArrayList([]const u8) = .empty;
         defer argv_list.deinit(gpa);
@@ -112,8 +114,15 @@ pub const Process = struct {
             };
         }
 
+        var child_environment = if (capture_directory) |directory| blk: {
+            const base = environ orelse return .{ .err = configFailure(gpa, "missing base environment", program) };
+            break :blk captureEnvironment(gpa, base, directory) catch return .{ .err = configFailure(gpa, "set capture directory", program) };
+        } else null;
+        defer if (child_environment) |*environment| environment.deinit();
+
         const child = std.process.spawn(io, .{
             .argv = argv_list.items,
+            .environ_map = if (child_environment) |*environment| environment else null,
             .stdin = .pipe,
             .stdout = .pipe,
             .stderr = .pipe,
@@ -459,6 +468,13 @@ fn driveOutput(
     return .{ .err = try gpa.dupe(u8, msg) };
 }
 
+fn captureEnvironment(gpa: std.mem.Allocator, base: *const std.process.Environ.Map, directory: []const u8) !std.process.Environ.Map {
+    var child = try base.clone(gpa);
+    errdefer child.deinit();
+    try child.put("MEI_CAPTURE_DIR", directory);
+    return child;
+}
+
 fn configFailure(gpa: std.mem.Allocator, subject: []const u8, program: []const u8) []u8 {
     return std.fmt.allocPrint(gpa,
         \\```toml
@@ -495,12 +511,24 @@ test "resume path is passed on the argv" {
     try std.testing.expectEqualStrings("/tmp/chosen.jsonl", argv[2]);
 }
 
+test "capture directory is copied into only the child environment" {
+    const gpa = std.testing.allocator;
+    var base = std.process.Environ.Map.init(gpa);
+    defer base.deinit();
+    try base.put("KEEP", "yes");
+    var child = try captureEnvironment(gpa, &base, "session.captures/run-1");
+    defer child.deinit();
+    try std.testing.expectEqualStrings("yes", child.get("KEEP").?);
+    try std.testing.expectEqualStrings("session.captures/run-1", child.get("MEI_CAPTURE_DIR").?);
+    try std.testing.expect(base.get("MEI_CAPTURE_DIR") == null);
+}
+
 test "missing program yields a structured diagnostic" {
     const io = std.testing.io;
     const gpa = std.testing.allocator;
     var bus: Bus = .{ .gpa = gpa, .io = io };
     defer bus.deinit();
-    switch (Process.spawn(gpa, io, &bus, "mei-definitely-not-on-path-xyz", "prompt", null)) {
+    switch (Process.spawn(gpa, io, &bus, "mei-definitely-not-on-path-xyz", "prompt", null, null, null)) {
         .ok => |proc| {
             var p = proc;
             defer p.deinit();
@@ -522,7 +550,7 @@ test "stopping a process group reaps its driver" {
     var bus: Bus = .{ .gpa = gpa, .io = io };
     defer bus.deinit();
 
-    var process = switch (Process.spawn(gpa, io, &bus, "sh", "sleep 30", null)) {
+    var process = switch (Process.spawn(gpa, io, &bus, "sh", "sleep 30", null, null, null)) {
         .ok => |p| p,
         .err => |e| {
             defer gpa.free(e);

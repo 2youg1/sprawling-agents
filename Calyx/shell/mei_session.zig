@@ -24,6 +24,7 @@ pub const Session = struct {
     path: []u8,
     history: std.ArrayList([]u8) = .empty,
     resume_flag: bool = false,
+    run_generation: u64 = 0,
 
     pub fn deinit(self: *Session) void {
         for (self.history.items) |line| self.gpa.free(line);
@@ -42,6 +43,11 @@ pub const Session = struct {
 
     pub fn resumePath(self: *const Session) ?[]const u8 {
         return if (self.resume_flag) self.path else null;
+    }
+
+    pub fn captureDirectory(self: *Session, gpa: std.mem.Allocator, at_ms: u64) ![]u8 {
+        self.run_generation +|= 1;
+        return std.fmt.allocPrint(gpa, "{s}.captures/run-{d}-{d}", .{ self.path, at_ms, self.run_generation });
     }
 
     pub fn createIn(gpa: std.mem.Allocator, io: std.Io, directory: []const u8, at_ms: u64) CreateResult {
@@ -397,6 +403,31 @@ test "append after missing final newline stays parseable" {
     try std.testing.expectEqual(@as(usize, 4), session.historyLines().len);
 }
 
+pub fn discardCaptureDirectory(io: std.Io, path: []const u8) !void {
+    try std.Io.Dir.cwd().deleteTree(io, path);
+}
+
 fn freeDiag(gpa: std.mem.Allocator, text: []u8) void {
     gpa.free(text);
+}
+
+test "uncommitted capture directory is removed without touching the session" {
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const root = try std.fmt.allocPrint(gpa, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    defer gpa.free(root);
+    const session_path = try std.fs.path.join(gpa, &.{ root, "session.jsonl" });
+    defer gpa.free(session_path);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = session_path, .data = "log" });
+    const captures = try std.fmt.allocPrint(gpa, "{s}.captures/run-1", .{session_path});
+    defer gpa.free(captures);
+    try std.Io.Dir.cwd().createDirPath(io, captures);
+    const output = try std.fs.path.join(gpa, &.{ captures, "output.txt" });
+    defer gpa.free(output);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output, .data = "complete" });
+    try discardCaptureDirectory(io, captures);
+    try std.testing.expectError(error.FileNotFound, std.Io.Dir.cwd().access(io, captures, .{}));
+    try std.Io.Dir.cwd().access(io, session_path, .{});
 }
