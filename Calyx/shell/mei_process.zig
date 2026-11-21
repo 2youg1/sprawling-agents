@@ -10,6 +10,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const windows = std.os.windows;
+const mei_line = @import("mei_line.zig");
 
 pub const Event = union(enum) {
     line: []u8,
@@ -97,6 +98,8 @@ pub const Process = struct {
         program: []const u8,
         prompt: []const u8,
         resume_path: ?[]const u8,
+        capture_directory: ?[]const u8,
+        environ: ?*const std.process.Environ.Map,
     ) SpawnResult {
         var argv_list: std.ArrayList([]const u8) = .empty;
         defer argv_list.deinit(gpa);
@@ -112,8 +115,15 @@ pub const Process = struct {
             };
         }
 
+        var child_environment = if (capture_directory) |directory| blk: {
+            const base = environ orelse return .{ .err = configFailure(gpa, "missing base environment", program) };
+            break :blk captureEnvironment(gpa, base, directory) catch return .{ .err = configFailure(gpa, "set capture directory", program) };
+        } else null;
+        defer if (child_environment) |*environment| environment.deinit();
+
         const child = std.process.spawn(io, .{
             .argv = argv_list.items,
+            .environ_map = if (child_environment) |*environment| environment else null,
             .stdin = .pipe,
             .stdout = .pipe,
             .stderr = .pipe,
@@ -170,6 +180,7 @@ pub const Process = struct {
                 return .{ .err = configFailure(gpa, "create Mei job object", program) };
             };
             process.job = job;
+            ctx.job = job;
         }
 
         process.driver = std.Thread.spawn(.{}, driveThread, .{ctx}) catch {
@@ -228,8 +239,8 @@ pub const Process = struct {
     fn terminateTree(self: *Process) StopResult {
         const id = self.id orelse return .ok;
         if (comptime builtin.os.tag == .windows) {
-            if (self.job != null) {
-                self.closeJob();
+            if (self.job) |job| {
+                WinJob.terminate(job);
                 return .ok;
             }
             _ = windows.ntdll.NtTerminateProcess(id, @fromBackingInt(1));
@@ -300,6 +311,12 @@ const WinJob = if (builtin.os.tag == .windows) struct {
 
     extern "kernel32" fn CloseHandle(hObject: windows.HANDLE) callconv(.winapi) windows.BOOL;
 
+    extern "kernel32" fn TerminateJobObject(hJob: windows.HANDLE, uExitCode: u32) callconv(.winapi) windows.BOOL;
+
+    fn terminate(job: windows.HANDLE) void {
+        _ = TerminateJobObject(job, 1);
+    }
+
     fn create(process: ?windows.HANDLE) !windows.HANDLE {
         const proc = process orelse return error.NoProcess;
         const job = CreateJobObjectW(null, null) orelse return error.CreateJob;
@@ -339,6 +356,11 @@ const DriverCtx = struct {
     child: std.process.Child,
     prompt: []u8,
     signals: *Signals,
+    /// Borrowed from `Process`, which closes it only after this thread is
+    /// joined; the driver uses it to end the whole tree before it waits for
+    /// the pipe to close.
+    job: if (builtin.os.tag == .windows) ?windows.HANDLE else void =
+        if (builtin.os.tag == .windows) null else {},
 };
 
 fn driveThread(ctx: *DriverCtx) void {
@@ -353,15 +375,9 @@ fn driveThread(ctx: *DriverCtx) void {
 
 fn drive(ctx: *DriverCtx) Finished {
     var child = ctx.child;
-    const answer = driveOutput(ctx.gpa, ctx.io, &child, ctx.prompt, ctx.bus) catch |err| {
-        if (builtin.os.tag != .windows) {
-            if (child.id) |pid| {
-                _ = std.posix.kill(-pid, .KILL) catch {};
-            }
-        } else {
-            child.kill(ctx.io);
-        }
-        const msg = std.fmt.allocPrint(ctx.gpa, "{s}", .{@errorName(err)}) catch
+    const answer = driveOutput(ctx, &child) catch |err| {
+        killTree(ctx, child.id);
+        const msg = mei_line.failureText(ctx.gpa, err) catch
             ctx.gpa.dupe(u8, "Mei I/O failure") catch unreachable;
         return .{
             .result = .{ .err = msg },
@@ -374,18 +390,9 @@ fn drive(ctx: *DriverCtx) Finished {
     };
 }
 
-fn driveOutput(
-    gpa: std.mem.Allocator,
-    io: std.Io,
-    child: *std.process.Child,
-    prompt: []const u8,
-    bus: *Bus,
-) !Result {
-    if (child.stdin) |stdin| {
-        try stdin.writeStreamingAll(io, prompt);
-        stdin.close(io);
-        child.stdin = null;
-    } else return error.OpenStdin;
+fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
+    const gpa = ctx.gpa;
+    const io = ctx.io;
 
     const stdout_file = child.stdout orelse return error.OpenStdout;
     const stderr_file = child.stderr orelse return error.OpenStderr;
@@ -398,7 +405,46 @@ fn driveOutput(
         err: ?anyerror = null,
     };
     var stdout_ctx: StdoutCtx = .{ .gpa = gpa, .io = io, .file = stdout_file };
-    const stdout_thread = try std.Thread.spawn(.{}, struct {
+    var stdout_thread: ?std.Thread = null;
+    var waited = false;
+    // A failed prompt write or thread spawn must not strand the child or the
+    // pipes, so every cleanup below guards on the field it owns instead of
+    // running only after the thread exists.
+    errdefer {
+        killTree(ctx, child.id);
+        if (stdout_thread) |thread| {
+            thread.join();
+            stdout_thread = null;
+        }
+        if (stdout_ctx.out) |out| {
+            gpa.free(out);
+            stdout_ctx.out = null;
+        }
+        if (child.stdin) |stdin| {
+            stdin.close(io);
+            child.stdin = null;
+        }
+        if (child.stderr) |file| {
+            file.close(io);
+            child.stderr = null;
+        }
+        if (!waited) {
+            _ = child.wait(io) catch {};
+            waited = true;
+        }
+        if (child.stdout) |file| {
+            file.close(io);
+            child.stdout = null;
+        }
+    }
+
+    if (child.stdin) |stdin| {
+        try stdin.writeStreamingAll(io, ctx.prompt);
+        stdin.close(io);
+        child.stdin = null;
+    } else return error.OpenStdin;
+
+    stdout_thread = try std.Thread.spawn(.{}, struct {
         fn run(c: *StdoutCtx) void {
             var buf: [4096]u8 = undefined;
             var reader = c.file.readerStreaming(c.io, &buf);
@@ -408,37 +454,24 @@ fn driveOutput(
             };
         }
     }.run, .{&stdout_ctx});
-    var joined = false;
-    errdefer {
-        if (!joined) {
-            child.kill(io);
-            stdout_thread.join();
-            joined = true;
-            if (stdout_ctx.out) |out| gpa.free(out);
-            stdout_ctx.out = null;
-        }
-    }
 
-    var err_buf: [4096]u8 = undefined;
+    var err_buf: [8192]u8 = undefined;
     var stderr_reader = stderr_file.readerStreaming(io, &err_buf);
     while (true) {
-        const line = stderr_reader.interface.takeDelimiterExclusive('\n') catch |err| switch (err) {
-            error.EndOfStream => break,
-            error.StreamTooLong => {
-                _ = stderr_reader.interface.discardRemaining() catch {};
-                break;
-            },
-            else => return err,
-        };
-        const owned = try gpa.dupe(u8, std.mem.trimEnd(u8, line, "\r"));
-        bus.push(.{ .line = owned });
+        const line = (try mei_line.read(gpa, &stderr_reader.interface, mei_line.MAX_BYTES)) orelse break;
+        ctx.bus.push(.{ .line = line });
     }
     stderr_file.close(io);
     child.stderr = null;
 
+    const child_id = child.id;
     const term = try child.wait(io);
-    stdout_thread.join();
-    joined = true;
+    waited = true;
+    killTree(ctx, child_id);
+    if (stdout_thread) |thread| {
+        thread.join();
+        stdout_thread = null;
+    }
     stdout_file.close(io);
     child.stdout = null;
 
@@ -457,6 +490,14 @@ fn driveOutput(
         .unknown => "Mei terminated unexpectedly",
     };
     return .{ .err = try gpa.dupe(u8, msg) };
+}
+
+fn captureEnvironment(gpa: std.mem.Allocator, base: *const std.process.Environ.Map, directory: []const u8) !std.process.Environ.Map {
+    var child = try base.clone(gpa);
+    errdefer child.deinit();
+    try child.put("MEI_CAPTURE_DIR", directory);
+    try child.put("MEI_CAPTURE_CREATED", "1");
+    return child;
 }
 
 fn configFailure(gpa: std.mem.Allocator, subject: []const u8, program: []const u8) []u8 {
@@ -495,12 +536,26 @@ test "resume path is passed on the argv" {
     try std.testing.expectEqualStrings("/tmp/chosen.jsonl", argv[2]);
 }
 
+test "capture directory is copied into only the child environment" {
+    const gpa = std.testing.allocator;
+    var base = std.process.Environ.Map.init(gpa);
+    defer base.deinit();
+    try base.put("KEEP", "yes");
+    var child = try captureEnvironment(gpa, &base, "session.captures/run-1");
+    defer child.deinit();
+    try std.testing.expectEqualStrings("yes", child.get("KEEP").?);
+    try std.testing.expectEqualStrings("session.captures/run-1", child.get("MEI_CAPTURE_DIR").?);
+    try std.testing.expectEqualStrings("1", child.get("MEI_CAPTURE_CREATED").?);
+    try std.testing.expect(base.get("MEI_CAPTURE_DIR") == null);
+    try std.testing.expect(base.get("MEI_CAPTURE_CREATED") == null);
+}
+
 test "missing program yields a structured diagnostic" {
     const io = std.testing.io;
     const gpa = std.testing.allocator;
     var bus: Bus = .{ .gpa = gpa, .io = io };
     defer bus.deinit();
-    switch (Process.spawn(gpa, io, &bus, "mei-definitely-not-on-path-xyz", "prompt", null)) {
+    switch (Process.spawn(gpa, io, &bus, "mei-definitely-not-on-path-xyz", "prompt", null, null, null)) {
         .ok => |proc| {
             var p = proc;
             defer p.deinit();
@@ -522,7 +577,7 @@ test "stopping a process group reaps its driver" {
     var bus: Bus = .{ .gpa = gpa, .io = io };
     defer bus.deinit();
 
-    var process = switch (Process.spawn(gpa, io, &bus, "sh", "sleep 30", null)) {
+    var process = switch (Process.spawn(gpa, io, &bus, "sh", "sleep 30", null, null, null)) {
         .ok => |p| p,
         .err => |e| {
             defer gpa.free(e);
@@ -557,4 +612,79 @@ test "stopping a process group reaps its driver" {
         io.sleep(std.Io.Duration.fromMilliseconds(10), .real) catch {};
     }
     try std.testing.expect(false);
+}
+
+test "a child gone before the prompt write still ends and drops its pipes" {
+    if (builtin.os.tag == .windows) return;
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+    var bus: Bus = .{ .gpa = gpa, .io = io };
+    defer bus.deinit();
+
+    const prompt = try gpa.alloc(u8, 4 * 1024 * 1024);
+    defer gpa.free(prompt);
+    @memset(prompt, 'x');
+
+    var drained: std.ArrayList(Event) = .empty;
+    defer {
+        for (drained.items) |ev| freeEvent(gpa, ev);
+        drained.deinit(gpa);
+    }
+
+    const settled = if (builtin.os.tag == .linux) try openFileCount(io) else 0;
+    var runs: usize = 0;
+    while (runs < 8) : (runs += 1) {
+        var process = switch (Process.spawn(gpa, io, &bus, "true", prompt, null, null, null)) {
+            .ok => |p| p,
+            .err => |e| {
+                defer gpa.free(e);
+                return error.TestUnexpectedResult;
+            },
+        };
+        var done = false;
+        var spins: usize = 0;
+        while (spins < 400 and !done) : (spins += 1) {
+            bus.drainInto(&drained);
+            for (drained.items) |ev| {
+                if (ev == .finished) {
+                    try std.testing.expect(!ev.finished.cancelled);
+                    switch (ev.finished.result) {
+                        .err => {},
+                        .ok => return error.TestUnexpectedResult,
+                    }
+                    done = true;
+                }
+            }
+            if (done) break;
+            io.sleep(std.Io.Duration.fromMilliseconds(5), .real) catch {};
+        }
+        try std.testing.expect(done);
+        for (drained.items) |ev| freeEvent(gpa, ev);
+        drained.clearRetainingCapacity();
+        process.deinit();
+    }
+    if (builtin.os.tag == .linux) {
+        try std.testing.expectEqual(settled, try openFileCount(io));
+    }
+}
+
+fn openFileCount(io: std.Io) !usize {
+    var dir = try std.Io.Dir.openDirAbsolute(io, "/proc/self/fd", .{ .iterate = true });
+    defer dir.close(io);
+    var count: usize = 0;
+    var it = dir.iterate();
+    while (try it.next(io)) |_| count += 1;
+    return count;
+}
+
+/// Ends the whole Mei tree: POSIX kills the process group the child led,
+/// Windows terminates its job. Called before waiting on the stdout thread,
+/// whose end needs every writer of that pipe to be gone. `id` is read before
+/// `Child.wait`, which clears it.
+fn killTree(ctx: *DriverCtx, id: ?std.process.Child.Id) void {
+    if (comptime builtin.os.tag == .windows) {
+        if (ctx.job) |job| WinJob.terminate(job);
+    } else if (id) |pid| {
+        _ = std.posix.kill(-pid, .KILL) catch {};
+    }
 }

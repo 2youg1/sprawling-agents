@@ -217,3 +217,94 @@ fn a_slow_gateway_emits_pulse_observations() {
     );
     delayed.join().unwrap();
 }
+
+/// Answers the request headers, writes one byte per beat, and never finishes:
+/// the shape that made a per-read timeout a budget that never runs out.
+fn dribble(beat: Duration) -> (String, thread::JoinHandle<()>) {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let writer = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut length = 0;
+        {
+            let mut reader = BufReader::new(&mut stream);
+            let mut line = String::new();
+            loop {
+                line.clear();
+                reader.read_line(&mut line).unwrap();
+                if line == "\r\n" {
+                    break;
+                }
+                if let Some(value) = line.strip_prefix("Content-Length: ") {
+                    length = value.trim().parse::<usize>().unwrap();
+                }
+            }
+            let mut body = vec![0; length];
+            reader.read_exact(&mut body).unwrap();
+        }
+        if stream.write_all(b"HTTP/1.0 200 OK\r\n\r\n").is_err() {
+            return;
+        }
+        for _ in 0..200 {
+            if stream.write_all(b"x").is_err() {
+                return;
+            }
+            thread::sleep(beat);
+        }
+    });
+    (format!("http://{address}"), writer)
+}
+
+#[test]
+#[expect(clippy::disallowed_methods, reason = "test: elapsed is the evidence")]
+fn a_dribbling_response_cannot_extend_the_io_budget() {
+    let (base, writer) = dribble(Duration::from_millis(40));
+    let client = Client::with_timeouts(
+        &base,
+        "magpie".to_owned(),
+        Timeouts {
+            connect: Duration::from_secs(2),
+            io: Duration::from_millis(300),
+            pulse: Duration::from_millis(50),
+        },
+    )
+    .unwrap();
+    let started = std::time::Instant::now();
+    let error = client
+        .post(&serde_json::json!({}), &mut Vec::new())
+        .unwrap_err()
+        .to_string();
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "the budget did not end the read: {:?}",
+        started.elapsed()
+    );
+    assert!(error.contains("IO budget elapsed"), "{error}");
+    writer.join().unwrap();
+}
+
+#[test]
+#[expect(clippy::disallowed_methods, reason = "test: elapsed is the evidence")]
+fn a_dribbling_route_probe_still_ends() {
+    let (base, writer) = dribble(Duration::from_millis(40));
+    let mut client = Client::with_timeouts(
+        &base,
+        "magpie".to_owned(),
+        Timeouts {
+            connect: Duration::from_secs(2),
+            io: Duration::from_millis(300),
+            pulse: Duration::from_millis(50),
+        },
+    )
+    .unwrap();
+    client.session = Some("mei-test".to_owned());
+    let started = std::time::Instant::now();
+    let error = client.route_observation().unwrap_err().to_string();
+    assert!(
+        started.elapsed() < Duration::from_secs(3),
+        "the probe outlived its budget: {:?}",
+        started.elapsed()
+    );
+    assert!(error.contains("IO budget elapsed"), "{error}");
+    writer.join().unwrap();
+}

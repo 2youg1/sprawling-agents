@@ -7,6 +7,7 @@ mod leaf;
 pub mod part;
 pub mod scene;
 pub mod shell_abi;
+pub mod zone;
 
 pub use leaf::{Frame, Refused, draw};
 pub use shell_abi::{CityConfig, CityHost, run_city_ui};

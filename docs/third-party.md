@@ -20,7 +20,15 @@ Calling a face this city did not invent requires knowing the shape of the reques
 | [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | how a registry entry describes an agent: its distribution kinds (`npx`, `uvx`, `binary`), the fields of each, and which of them are required, which the bundled catalog snapshot and the paste parser read | `FORMAT.md` | `3edede43cc86` |
 | [agentclientprotocol/registry](https://github.com/agentclientprotocol/registry) | Apache-2.0 | the JSON schema of one registry entry, `agent.json`, which the paste parser accepts and the catalog snapshot is checked against | `agent.schema.json` | `3edede43cc86` |
 | [agentclientprotocol/agent-client-protocol](https://github.com/agentclientprotocol/agent-client-protocol) | Apache-2.0 | the ACP version 1 wire `agent_protocols::harness` speaks to every harness: `initialize`, `session/new`, `session/prompt` and its stop reasons, the `session/update` variants, and `session/request_permission` with its four option kinds, as its stable `schema.json` states them | `schema/v1/` | `67cde2d5ba3e` |
-| [yetone/magpie](https://github.com/yetone/magpie) | MIT | the local Anthropic Messages gateway, its loopback address and arbitrary key, `provider/model` spellings, and cross-protocol translation used by the standalone Mei client | `docs/reference.md` | `4739ec92cc85` |
+| [yetone/magpie](https://github.com/yetone/magpie) | MIT | the local Anthropic Messages gateway, its loopback address and arbitrary key, `provider/model` spellings, cross-protocol translation, and the `/v1/magpie/route` inspection face used by the standalone Mei client | `docs/reference.md` | `d01e0a465aaf` |
+| [yetone/magpie](https://github.com/yetone/magpie) | MIT | the `/v1/models` catalog the preferred route is selected from: `id`, `context_window`, `supported_reasoning_levels` and `reasoning_levels`, `first_id`; and `X-Magpie-Session` with the actual model and effort `/v1/magpie/route` reports for that session | `docs/integrating.md` | `15e1d65bcd48` |
+| [astral-sh/uv](https://github.com/astral-sh/uv) | Apache-2.0 OR MIT | Mei's private uv installation through `UV_UNMANAGED_INSTALL`, with no shell-profile or environment modification | `docs/reference/installer.md` | `7f396534d583` |
+| [astral-sh/uv](https://github.com/astral-sh/uv) | Apache-2.0 OR MIT | managed Python installation, stable-version selection, project-version-file discovery and `--no-config` used by Mei's doctor | `docs/concepts/python-versions.md` | `7f396534d583` |
+| [astral-sh/uv](https://github.com/astral-sh/uv) | Apache-2.0 OR MIT | the doctor's `UV_PYTHON` override removal and the `--no-project`, `--no-registry` and `--reinstall` command flags | `crates/uv-cli/src/lib.rs` | `7f396534d583` |
+| [astral-sh/uv](https://github.com/astral-sh/uv) | Apache-2.0 OR MIT | the private Python and executable directories selected with `UV_PYTHON_INSTALL_DIR` and `UV_PYTHON_BIN_DIR` | `docs/reference/storage.md` | `7f396534d583` |
+| [python/peps](https://github.com/python/peps) | CC0 1.0 | the Python lifecycle data itself, in the file `python-releases.toml`: each 3.x minor's `status`, `end-of-bugfix` and `end-of-life`, from which Mei's EOL instants are read | `release_management/` | `88b6b2d2f4d9` |
+| [python/devguide](https://github.com/python/devguide) | CC0 1.0 | the generator that turns the lifecycle data into the release-cycle API and the PEPs, used to confirm which field is the end-of-life date | `_tools/generate_release_cycle.py` | `2439c5ff4529` |
+| [MicrosoftDocs/PowerShell-Docs](https://github.com/MicrosoftDocs/PowerShell-Docs) | CC-BY-4.0 | the single-quote and typographic-quote escaping in `about_Quoting_Rules.md`, used by Mei's displayed PowerShell repair commands | `reference/7.5/Microsoft.PowerShell.Core/About/` | `f835d0e7aa7c` |
 | [anthropics/anthropic-sdk-typescript](https://github.com/anthropics/anthropic-sdk-typescript) | MIT | Messages request/response blocks, string content shorthand, client tool results, opaque thinking and server-tool blocks, and `pause_turn` continuation | `src/resources/messages/messages.ts` | `590783078cd9` |
 | [bytecodealliance/wasmtime](https://github.com/bytecodealliance/wasmtime) | Apache-2.0 with the LLVM exception | the `wasmtime-wasi` feature graph: selecting `p1` without default features excludes p3, while p1 still implies p2 and its component-model and async features | `crates/wasi/Cargo.toml` | `b67df87c061d` |
 | [bytecodealliance/wasmtime](https://github.com/bytecodealliance/wasmtime) | Apache-2.0 with the LLVM exception | the core module resources reported for allocator sizing, and when `initialize_copy_on_write_image` does its work | `crates/wasmtime/src/runtime/module.rs` | `571456d91a06e6fb54d026694f6c6b1005eb42c1` |
@@ -107,7 +115,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 
 **What this repository chose** is the table below: every crate named in the `Cargo.toml` of a workspace member, with the licence its own manifest declares. A person asking "whose work did these authors decide to stand on" reads this. The version each is pinned at is in the manifests, and the version it resolves to is in `Cargo.lock`; neither is repeated here.
 
-**What Cargo.lock resolves for the workspace** is <!-- xtask:begin dependency_count -->490<!-- xtask:end --> packages, including workspace members and dependencies used only by tools. This is a workspace lockfile count, not a binary dependency count. `cargo deny check` checks the lockfile on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. The SBOM describes the lockfile, not only packages linked into a binary. **That is the machine authority, and this table is deliberately not a second one**: it is a list a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
+**What Cargo.lock resolves for the workspace** is <!-- xtask:begin dependency_count -->484<!-- xtask:end --> packages, including workspace members and dependencies used only by tools. This is a workspace lockfile count, not a binary dependency count. `cargo deny check` checks the lockfile on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. The SBOM describes the lockfile, not only packages linked into a binary. **That is the machine authority, and this table is deliberately not a second one**: it is a list a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
 
 
 <!-- /coderabbit-ai-generated:v1 -->
@@ -122,7 +130,6 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [cap-fs-ext](https://crates.io/crates/cap-fs-ext) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
 | [cap-std](https://crates.io/crates/cap-std) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
 | [chacha20poly1305](https://crates.io/crates/chacha20poly1305) | Apache-2.0 OR MIT |
-| [chrono](https://crates.io/crates/chrono) | MIT OR Apache-2.0 |
 | [comrak](https://crates.io/crates/comrak) | BSD-2-Clause |
 | [cpu-time](https://crates.io/crates/cpu-time) | MIT OR Apache-2.0 |
 | [crossterm](https://crates.io/crates/crossterm) | MIT |
@@ -138,6 +145,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [image](https://crates.io/crates/image) | MIT OR Apache-2.0 |
 | [insta](https://crates.io/crates/insta) | Apache-2.0 |
 | [keyring-core](https://crates.io/crates/keyring-core) | MIT OR Apache-2.0 |
+| [libc](https://crates.io/crates/libc) | MIT OR Apache-2.0 |
 | [linux-keyutils-keyring-store](https://crates.io/crates/linux-keyutils-keyring-store) | MIT OR Apache-2.0 |
 | [memory-stats](https://crates.io/crates/memory-stats) | MIT OR Apache-2.0 |
 | [png](https://crates.io/crates/png) | MIT OR Apache-2.0 |
@@ -170,7 +178,6 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [toml](https://crates.io/crates/toml) | MIT OR Apache-2.0 |
 | [tower](https://crates.io/crates/tower) | MIT |
 | [trybuild](https://crates.io/crates/trybuild) | MIT OR Apache-2.0 |
-| [uiautomation](https://crates.io/crates/uiautomation) | Apache-2.0 |
 | [url](https://crates.io/crates/url) | MIT OR Apache-2.0 |
 | [uuid](https://crates.io/crates/uuid) | Apache-2.0 OR MIT |
 | [vt100](https://crates.io/crates/vt100) | MIT |

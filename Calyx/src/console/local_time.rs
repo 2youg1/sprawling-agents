@@ -9,10 +9,7 @@ use kernel::TimeMs;
 pub(crate) type Zone = fn(TimeMs) -> Option<TimeOfDay>;
 
 pub(crate) fn local(at: TimeMs) -> Option<TimeOfDay> {
-    use chrono::{TimeZone as _, Timelike as _};
-    let millis = i64::try_from(at.value()).ok()?;
-    let moment = chrono::Local.timestamp_millis_opt(millis).single()?;
-    TimeOfDay::from_seconds(moment.num_seconds_from_midnight())
+    TimeOfDay::from_seconds(console_ffi::zone::seconds_since_midnight(at.value())?)
 }
 
 #[cfg(test)]

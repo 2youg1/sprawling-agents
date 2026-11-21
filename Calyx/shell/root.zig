@@ -5,6 +5,7 @@
 
 const std = @import("std");
 const argv = @import("argv.zig");
+const mei_line = @import("mei_line.zig");
 const mei_path = @import("mei_path.zig");
 const lifecycle = @import("lifecycle.zig");
 const editor = @import("editor.zig");
@@ -96,6 +97,11 @@ test {
     _ = menu;
     _ = @import("termio.zig");
     _ = @import("screen.zig");
+    _ = @import("mei_command.zig");
+    _ = @import("mei_effort.zig");
+    _ = @import("mei_observation.zig");
+    _ = @import("mei_session_control.zig");
+    _ = @import("mei_runtime.zig");
     _ = @import("mei_process.zig");
     _ = @import("mei_session.zig");
     _ = @import("mei_ui.zig");

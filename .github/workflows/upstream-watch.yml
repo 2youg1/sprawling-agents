@@ -43,7 +43,11 @@ jobs:
             followed=$(printf '%s\n' "$line" | cut -d'|' -f4 | sed 's/^ *//; s/ *$//')
             path=$(printf '%s\n' "$line" | cut -d'|' -f5 | tr -d '\140 ')
             tracked=$(printf '%s\n' "$line" | cut -d'|' -f6 | tr -d '\140 ')
-            head=$(curl -fsSL "https://api.github.com/repos/$repo/commits?path=$path&per_page=1" | python3 -c "import json,sys; print(json.load(sys.stdin)[0]['sha'])")
+            head=$(curl -fsSL "https://api.github.com/repos/$repo/commits?path=$path&per_page=1" | python3 -c 'import json,sys; rows=json.load(sys.stdin); print(rows[0]["sha"] if rows else "")')
+            if [ -z "$head" ]; then
+              echo "::error file=docs/third-party.md::the $repo row names the path '$path', which the commits API answers with no commit; the upstream gate asks for one path per row"
+              exit 1
+            fi
             if [[ "$head" == "$tracked"* ]]; then
               echo "$repo $path: unchanged ($tracked)"
               continue

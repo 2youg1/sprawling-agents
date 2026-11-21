@@ -87,7 +87,7 @@ jobs:
           ref: ${{ inputs.source-sha || github.sha }}
       - name: install pinned toolchain
         run: rustup show
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21 # v2
+      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2
         with:
           tool: cargo-deny
       - name: advisories
@@ -182,7 +182,7 @@ jobs:
       - uses: ./.github/actions/client-artifacts
         with:
           want: bundle
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21 # v2
+      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2
         with:
           tool: just
       # The same two recipes for all three rows: `just dist` here and

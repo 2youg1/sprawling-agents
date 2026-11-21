@@ -3,8 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use uiautomation::types::{ControlType, Handle};
-use uiautomation::{UIAutomation, UIElement, UITreeWalker};
+use desktop_ffi::uia::{Automation, Element, Walker};
+use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::Accessibility::*;
 use winsafe::co;
 use winsafe::guard::CoUninitializeGuard;
 
@@ -15,8 +16,8 @@ use crate::outline::{self, Ending, Role};
 use crate::refusal::Refusal;
 
 pub(crate) struct Reader {
-    walker: UITreeWalker,
-    automation: UIAutomation,
+    walker: Walker,
+    automation: Automation,
     _apartment: CoUninitializeGuard,
 }
 
@@ -36,7 +37,7 @@ impl Reader {
                 err,
             )
         })?;
-        let automation = UIAutomation::new_direct().map_err(|err| {
+        let automation = Automation::direct().map_err(|err| {
             fault::automation(
                 "start UI Automation on this machine",
                 "take a `desktop.screenshot` of the window instead; this machine's UI \
@@ -44,7 +45,7 @@ impl Reader {
                 &err,
             )
         })?;
-        let walker = automation.get_control_view_walker().map_err(|err| {
+        let walker = automation.control_view_walker().map_err(|err| {
             fault::automation(
                 "open a walk over the window's tree",
                 "take a `desktop.screenshot` of this window instead",
@@ -59,16 +60,18 @@ impl Reader {
     }
 
     pub(crate) fn read(&self, window: &winsafe::HWND, depth: u32) -> Result<Walked, Refusal> {
-        let handle = Handle::from(windows::Win32::Foundation::HWND(window.ptr()));
-        let root = self.automation.element_from_handle(handle).map_err(|err| {
-            fault::automation(
-                "read the window's accessibility tree",
-                "call `desktop.windows` again; a window that has closed has no tree, and a \
+        let root = self
+            .automation
+            .element_from_handle(HWND(window.ptr()))
+            .map_err(|err| {
+                fault::automation(
+                    "read the window's accessibility tree",
+                    "call `desktop.windows` again; a window that has closed has no tree, and a \
                  window drawn without accessibility information cannot be read this way — use \
                  `desktop.screenshot` to see it instead",
-                &err,
-            )
-        })?;
+                    &err,
+                )
+            })?;
         Ok(walk(self, root, depth))
     }
 }
@@ -89,46 +92,33 @@ pub(crate) struct Seen {
 }
 
 impl Branches for Reader {
-    type Element = UIElement;
+    type Element = Element;
 
-    fn seen(&self, element: &UIElement) -> Option<Seen> {
-        let rect = element.get_bounding_rectangle().ok()?;
+    fn seen(&self, element: &Element) -> Option<Seen> {
+        let rect = element.bounds().ok()?;
         Some(Seen {
-            role: role(element.get_control_type().ok()?),
-            name: element.get_name().ok()?,
-            bounds: Bounds::from_corners(
-                rect.get_left(),
-                rect.get_top(),
-                rect.get_right(),
-                rect.get_bottom(),
-            )
-            .ok()?,
+            role: role(element.control_type().ok()?)?,
+            name: element.name().ok()?,
+            bounds: Bounds::from_corners(rect.left, rect.top, rect.right, rect.bottom).ok()?,
         })
     }
 
-    fn children(&self, parent: &UIElement) -> Result<Vec<UIElement>, String> {
-        let mut found: Vec<UIElement> = Vec::new();
-        let mut next = listed(self.walker.get_first_child(parent))?;
+    fn children(&self, parent: &Element) -> Result<Vec<Element>, String> {
+        let mut found: Vec<Element> = Vec::new();
+        let mut next = listed(self.walker.first_child(parent))?;
         while let Some(child) = next {
             if found.len() >= MOST_REFS_PER_SNAPSHOT {
                 break;
             }
-            next = listed(self.walker.get_next_sibling(&child))?;
+            next = listed(self.walker.next_sibling(&child))?;
             found.push(child);
         }
         Ok(found)
     }
 }
 
-fn listed(step: uiautomation::Result<UIElement>) -> Result<Option<UIElement>, String> {
-    match step {
-        Ok(element) => Ok(Some(element)),
-        Err(err) if err.code() == 0 => Ok(None),
-        Err(err) => Err(format!(
-            "an element would not list what it holds ({})",
-            err.message()
-        )),
-    }
+fn listed(step: Result<Option<Element>, windows::core::Error>) -> Result<Option<Element>, String> {
+    step.map_err(|err| format!("an element would not list what it holds ({err})"))
 }
 
 pub(crate) fn walk<T: Branches>(tree: &T, root: T::Element, depth: u32) -> Walked {
@@ -179,49 +169,55 @@ pub(crate) fn walk<T: Branches>(tree: &T, root: T::Element, depth: u32) -> Walke
     }
 }
 
-fn role(control: ControlType) -> Role {
+#[expect(
+    non_upper_case_globals,
+    reason = "the UIA catalog spells its control type constants in camelCase; matching \
+              them by name keeps this table greppable against that catalog"
+)]
+fn role(control: UIA_CONTROLTYPE_ID) -> Option<Role> {
     match control {
-        ControlType::Button => Role::Button,
-        ControlType::Calendar => Role::Calendar,
-        ControlType::CheckBox => Role::CheckBox,
-        ControlType::ComboBox => Role::ComboBox,
-        ControlType::Edit => Role::Edit,
-        ControlType::Hyperlink => Role::Hyperlink,
-        ControlType::Image => Role::Image,
-        ControlType::ListItem => Role::ListItem,
-        ControlType::List => Role::List,
-        ControlType::Menu => Role::Menu,
-        ControlType::MenuBar => Role::MenuBar,
-        ControlType::MenuItem => Role::MenuItem,
-        ControlType::ProgressBar => Role::ProgressBar,
-        ControlType::RadioButton => Role::RadioButton,
-        ControlType::ScrollBar => Role::ScrollBar,
-        ControlType::Slider => Role::Slider,
-        ControlType::Spinner => Role::Spinner,
-        ControlType::StatusBar => Role::StatusBar,
-        ControlType::Tab => Role::Tab,
-        ControlType::TabItem => Role::TabItem,
-        ControlType::Text => Role::Text,
-        ControlType::ToolBar => Role::ToolBar,
-        ControlType::ToolTip => Role::ToolTip,
-        ControlType::Tree => Role::Tree,
-        ControlType::TreeItem => Role::TreeItem,
-        ControlType::Custom => Role::Custom,
-        ControlType::Group => Role::Group,
-        ControlType::Thumb => Role::Thumb,
-        ControlType::DataGrid => Role::DataGrid,
-        ControlType::DataItem => Role::DataItem,
-        ControlType::Document => Role::Document,
-        ControlType::SplitButton => Role::SplitButton,
-        ControlType::Window => Role::Window,
-        ControlType::Pane => Role::Pane,
-        ControlType::Header => Role::Header,
-        ControlType::HeaderItem => Role::HeaderItem,
-        ControlType::Table => Role::Table,
-        ControlType::TitleBar => Role::TitleBar,
-        ControlType::Separator => Role::Separator,
-        ControlType::SemanticZoom => Role::SemanticZoom,
-        ControlType::AppBar => Role::AppBar,
+        UIA_ButtonControlTypeId => Some(Role::Button),
+        UIA_CalendarControlTypeId => Some(Role::Calendar),
+        UIA_CheckBoxControlTypeId => Some(Role::CheckBox),
+        UIA_ComboBoxControlTypeId => Some(Role::ComboBox),
+        UIA_EditControlTypeId => Some(Role::Edit),
+        UIA_HyperlinkControlTypeId => Some(Role::Hyperlink),
+        UIA_ImageControlTypeId => Some(Role::Image),
+        UIA_ListItemControlTypeId => Some(Role::ListItem),
+        UIA_ListControlTypeId => Some(Role::List),
+        UIA_MenuControlTypeId => Some(Role::Menu),
+        UIA_MenuBarControlTypeId => Some(Role::MenuBar),
+        UIA_MenuItemControlTypeId => Some(Role::MenuItem),
+        UIA_ProgressBarControlTypeId => Some(Role::ProgressBar),
+        UIA_RadioButtonControlTypeId => Some(Role::RadioButton),
+        UIA_ScrollBarControlTypeId => Some(Role::ScrollBar),
+        UIA_SliderControlTypeId => Some(Role::Slider),
+        UIA_SpinnerControlTypeId => Some(Role::Spinner),
+        UIA_StatusBarControlTypeId => Some(Role::StatusBar),
+        UIA_TabControlTypeId => Some(Role::Tab),
+        UIA_TabItemControlTypeId => Some(Role::TabItem),
+        UIA_TextControlTypeId => Some(Role::Text),
+        UIA_ToolBarControlTypeId => Some(Role::ToolBar),
+        UIA_ToolTipControlTypeId => Some(Role::ToolTip),
+        UIA_TreeControlTypeId => Some(Role::Tree),
+        UIA_TreeItemControlTypeId => Some(Role::TreeItem),
+        UIA_CustomControlTypeId => Some(Role::Custom),
+        UIA_GroupControlTypeId => Some(Role::Group),
+        UIA_ThumbControlTypeId => Some(Role::Thumb),
+        UIA_DataGridControlTypeId => Some(Role::DataGrid),
+        UIA_DataItemControlTypeId => Some(Role::DataItem),
+        UIA_DocumentControlTypeId => Some(Role::Document),
+        UIA_SplitButtonControlTypeId => Some(Role::SplitButton),
+        UIA_WindowControlTypeId => Some(Role::Window),
+        UIA_PaneControlTypeId => Some(Role::Pane),
+        UIA_HeaderControlTypeId => Some(Role::Header),
+        UIA_HeaderItemControlTypeId => Some(Role::HeaderItem),
+        UIA_TableControlTypeId => Some(Role::Table),
+        UIA_TitleBarControlTypeId => Some(Role::TitleBar),
+        UIA_SeparatorControlTypeId => Some(Role::Separator),
+        UIA_SemanticZoomControlTypeId => Some(Role::SemanticZoom),
+        UIA_AppBarControlTypeId => Some(Role::AppBar),
+        _ => None,
     }
 }
 

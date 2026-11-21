@@ -23,16 +23,31 @@ ABI 向壳供事件、执行壳发起的城动作。WebUI（未来 `RefRain/`）
 | Mei 核 | 无头 `mei` 进程本身 | 独立二进制；壳负责 spawn/停组 |
 | 装配 | `sprawling-calyx` 链宿主；`calyx` 二进制由 `Calyx/build.zig` 产出；`@sprawling/mei` 归档携 `mei`+`calyx` | Zig + Rust 宿主 |
 
-Calyx 不实现模型环、不声明工具、不注入 AGENTS。
+Calyx 不实现模型环、不声明工具、不注入 AGENTS。Mei capture 的 session owner 由 Calyx 担任：
+每次 run 以独占创建取得独立捕获目录；名字含进程号与进程内单调计数，同名既有目录保留并尝试下一候选。
+Calyx 通过 `MEI_CAPTURE_CREATED=1` 把空目录交给 Mei。成功段保留 session 所有的 spilled 文件，
+失败或取消段整目录回收，只有确认未写盘时才删除。
 -/
 
 /-! ## 2 验收标准
 
 - 交互：`calyx` 在工作区打开 Mei 后端；`MEI_BIN`、同目录 sibling、或 PATH 名 `mei` 解析无头核；
-  `/new`、`/resume`、Esc 保持 Console §8-174；横幅为 cwd；composer 为 `model · usage|unknown`；
-  运行中显示 working；`mei.obs` pulse/usage 不落成 Note；Esc 在 Windows 上结束子树。
+  `/new`/`/n`、`/resume [jsonl]`/`/r [jsonl]`、`/quit`/`/q`、Esc 保持 Console §8-174 的会话边界；
+  无参 `/resume` 恢复刚离开的非空会话。`/e`/`/effect` 按 Magpie `reasoning_levels` 循环切换下一次请求的 effort。
+  横幅为 cwd；composer 显示实际或 requested model/effort、`Agent Step`、已用上下文/最大上下文及两位小数百分比；
+  已用量是 `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`，不是累计多轮账单。
+  运行中显示 working；`mei.obs` pulse/model/route/usage 不落成 Note；图片块只显示简短图片提示，不显示 base64；Esc 在 Windows 上结束子树。
+  Esc 仅清草稿或停止当前 run，空闲时不动作，绝不退出 Calyx；只有 `/quit`/`/q` 关闭终端面并回收其子树。
 - 城：`sprawling` 经宿主 ABI 进入同一套 Zig 壳；斜杠、远程钩子、生命周期与今日 Console 合同一致。
 - 无头 `mei -p`、`mei --resume` 与管道 stdin 不依赖 Calyx 进程。
+- 每个交互 run 的 capture 目录只经子进程环境传入；成功时保留 spilled，失败或取消时删除整个未提交目录。
+  删除只发生在本次 run 独占创建的目录上，既有同名目录永不删除；日志已写盘或回滚失败时一律保留文件。
+  会话追加先在内存中预留行，再持锁检查日志基线并写盘，因此写盘成功后不再有分配失败；
+  基线已被另一实例推进时拒绝旧段并要求重新 resume；写盘失败而回滚成功才算"确认未写入"，回滚失败为不确定。
+  导入在测量文件长度与读取历史期间持共享锁，于是历史与 `log_len` 来自同一快照，导入后的 stale 检查仍然有效；导入返回前释放该锁。
+  追加诊断可持有静态文本，完全耗尽的分配器也不会使错误路径 panic。
+- 读行：实时 stderr、`--replay` 与会话导入共用一个可增长读行器（`Calyx/shell/mei_line.zig`）与同一上限
+  32 MiB；超过上限是一次带 `E_MEI_LINE` 诊断的失败，不是静默停止，也不是被截断的行。
 - `Calyx/src` 不得再含壳实现（输入/生命周期/编辑器/菜单/屏面编排/按键/Mei 交互面）；由
   Calyx 壳残留门禁与 `zig build test`（`Calyx/`）守住。
 - **兼容回归**（生产门）：Mei 交互与无头、城控制台斜杠/生命周期、帧叶 vt100 对照、生命周期 160 向量，
@@ -76,7 +91,8 @@ Rust `sprawling-calyx` 只保留城/Mei 宿主适配与对外库面（`sprawling
 /-! D2 Mei 交互只经进程 Face spawn 无头 `mei`。 -/
 /-! D3 不设 Archetype 前缀；本包为生产面。 -/
 /-! D4 `@sprawling/mei` 归档与平台包同时携带无头 `mei` 与交互 `calyx`；npm shim 在 TTY 且无 `-p`／`--resume` 时 exec `calyx` 并设置 `MEI_BIN` 为同包无头核，否则 exec 无头核（`-p`、`--resume`、非 TTY stdin）。理由：一次完成要求无参 TTY 即可进入交互；无头 `--resume` 是核旗标，不得被面吞掉；「Mei 不含壳」约束的是核进程不内嵌 TUI，不是拒绝同归档并列二进制。被否：只发无头核、强制人另装 `sprawling` 并手写 `MEI_BIN`；把 Calyx 链进 `mei` 进程；TTY 上把 `--resume` 交给只认 `--replay` 的 `calyx`。 -/
-/-! D5 Mei 状态行：cwd、model·usage|unknown、working；pulse/usage 观测吞掉不刷 Note。 -/
+/-! D5 Mei 状态行：cwd、实际/requested model 与 effort、Agent Step、上下文两位小数百分比及 used/max；pulse/model/route/usage 观测吞掉不刷 Note。 -/
+/-! D5a Calyx 拥有交互 session 的 spilled captures，并按 run 回收未提交目录。理由：只有 Calyx 持有正式日志的追加结果，能区分成功、确认未写入与回滚后不确定；Mei 在进程边界前无法作出最终保留决定。路径可跨 Python 进程与 resume 使用；Python 退出不等于 session 所有权结束。目录由 Calyx 独占创建，只有这个创建事实授权失败、取消与析构时的递归删除；回滚失败的追加视为"可能已写盘"，不删除任何捕获文件。被否：由 Mei 在解释器退出时决定交互 session 的最终保留（看不到其后的日志追加结果），以及只凭进程号、时间和计数生成的路径删除既有目录（可能删除其他 run 的内容）。 -/
 /-! D6 `calyx` 二进制是壳的装配根；墙钟采样在进入壳时注入，库面仍可接收宿主提供的时刻。 -/
 /-! D7 整壳 Zig；Rust 只做城/线/核宿主
 
@@ -98,4 +114,26 @@ Rust 是宿主边界，不是壳实现。
 被否：①只迁启动缝或只加深帧叶——半迁；②Rust/Zig 双实现并行——永久债务；③导出面使用隐藏全局分配器。
 
 代价：城记录泵与斜杠动作须经 ABI；一次迁移动作面大，但完成后无第二套壳可漂移。
+-/
+
+/-! D8 console 场景条目的本地时刻经 `console_ffi::zone` 读，chrono 已出树
+
+决定：`calyx::console::local_time::local` 把一条记录的 UTC 毫秒渲染成「本地午夜以来的秒」（`Calyx/ffi/Spec.lean` §8 的 `TimeOfDay`），经 `console_ffi::zone::seconds_since_midnight`；系统时区由 OS 按那一刻自己读，Calyx 不再依赖 chrono。
+
+理由：RUSTSEC-2026-0543（chrono 全部版本停止维护，2026-11-17 发布）经 Calyx 的直依赖进锁，release 的 advisories 门按设计在任何暴露下保持红色；console 场景时刻是 chrono 在树里的最后一个一产业务用途，其余时间需求已由自研 UTC 时钟（`runtime::clock`）与 std 承担。
+
+被否：①`deny.toml` 登记 ignore——清除条件在上游手里；②chrono 换 `time`/`jiff`——`runtime::clock` 已覆盖 UTC 数学，这两个只为取本地偏移而来；③「当前偏移」算术——跨夏令时边界的旧时刻差一小时，OS 按时刻换算与 chrono 旧行为等价（细节与 SAFETY 前提在 `Calyx/ffi/Spec.lean` D12）。
+-/
+
+/-! D9 Mei 短命令与无参恢复归 Calyx：`/n` 等价 `/new`，`/r` 无参恢复刚离开的非空会话，`/q` 等价 `/quit`；`/e` 只改后续请求，不伪造当前 route 已确认。模型切换不另做 `/m`，由 Magpie 路由拥有。Esc 只停止，不退出。 -/
+
+/-! D10 实时、回放与会话导入共用一个可增长读行器，单行上限 32 MiB
+
+决定：`Calyx/shell/mei_line.zig` 拥有「一条 Mei 消息行」的读取、上限与超限诊断；实时 stderr、
+`--replay` 与 `Session.import` 都经它，整行读出后才算一条消息，超限以 `E_MEI_LINE` 结束该次运行、
+回放或导入。理由：一条消息行是一个完整 tool_result，可以携带图片的 base64（单图上限 5 MiB，
+base64 约 6.7 MiB），而固定的 4 KiB/64 KiB 缓冲、两个互不相干的上限与「读不全就 break」会让实时面
+与回放在含图会话上静默停住，`/resume` 另有整文件 64 MiB 的第三个上限。上限 32 MiB 覆盖一次
+python 调用允许的图片总量与 JSON 信封。被否：①加大固定缓冲——仍是静默悬崖，且每条行都占满；
+②无上限——内存无界；③按行截断——伪造观察；④保留整文件上限——同一规则的第二份副本。
 -/

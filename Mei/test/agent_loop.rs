@@ -4,11 +4,19 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use std::io::{BufReader, Write};
-use std::process::Command;
 
 use serde_json::Value;
 
 use crate::support::{read_request_body, run, serve, serve_with, tool_result_text};
+
+fn assert_model_observation(line: &str) {
+    let value: Value = serde_json::from_str(line).unwrap();
+    assert_eq!(value["type"], "mei.obs");
+    assert_eq!(value["kind"], "model");
+    assert_eq!(value["model"], "test/model");
+    assert_eq!(value["effort"], "high");
+    assert_eq!(value["effort_source"], "requested");
+}
 
 #[test]
 fn direct_answer_has_only_the_final_text_on_stdout() {
@@ -22,9 +30,10 @@ fn direct_answer_has_only_the_final_text_on_stdout() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(output.stdout, b"answer");
-    let trace: Vec<Value> = String::from_utf8(output.stderr)
-        .unwrap()
-        .lines()
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let mut lines = stderr.lines();
+    assert_model_observation(lines.next().unwrap());
+    let trace: Vec<Value> = lines
         .map(|line| serde_json::from_str(line).unwrap())
         .collect();
     assert_eq!(
@@ -45,8 +54,8 @@ fn a_real_tool_wave_keeps_order_state_and_opaque_blocks() {
         serde_json::json!({"type": "thinking", "thinking": "why", "signature": "signed"});
     let first = serde_json::json!({"stop_reason": "tool_use", "content": [
         thinking.clone(),
-        {"type": "tool_use", "name": "Python3", "id": "a", "input": {"code": "x = 40\nprint(x)"}},
-        {"type": "tool_use", "name": "Python3", "id": "b", "input": {"code": "x += 2\nprint(x)"}}
+        {"type": "tool_use", "name": "python", "id": "a", "input": {"code": "x = 40\nprint(x)"}},
+        {"type": "tool_use", "name": "python", "id": "b", "input": {"code": "x += 2\nprint(x)"}}
     ]});
     let second = serde_json::json!({"stop_reason": "end_turn", "content": "42"});
     let (base, handle) = serve(vec![first, second]);
@@ -70,7 +79,7 @@ fn a_real_tool_wave_keeps_order_state_and_opaque_blocks() {
 #[test]
 fn a_preset_harness_is_not_overwritten() {
     let first = serde_json::json!({"stop_reason": "tool_use", "content": [
-        {"type": "tool_use", "name": "Python3", "id": "a", "input": {"code": "import os\nprint(os.environ['HARNESS'])"}}
+        {"type": "tool_use", "name": "python", "id": "a", "input": {"code": "import os\nprint(os.environ['HARNESS'])"}}
     ]});
     let second = serde_json::json!({"stop_reason": "end_turn", "content": "done"});
     let (base, handle) = serve(vec![first, second]);
@@ -103,17 +112,17 @@ fn a_non_200_body_reaches_stderr_unchanged() {
     });
     let output = run(&base, "hello", None);
     assert!(!output.status.success());
-    assert_eq!(
-        String::from_utf8(output.stderr).unwrap(),
-        "provider says no\n"
-    );
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let (observation, body) = stderr.split_once('\n').unwrap();
+    assert_model_observation(observation);
+    assert_eq!(body, "provider says no\n");
     handle.join().unwrap();
 }
 
 #[test]
 fn a_recursive_child_has_an_independent_request_and_stdout_answer() {
     let parent = serde_json::json!({"stop_reason": "tool_use", "content": [
-        {"type": "tool_use", "name": "Python3", "id": "parent", "input": {"code": "import os, subprocess\nchild = subprocess.run([os.environ['HARNESS'], '-p', 'child prompt'], capture_output=True, text=True)\nprint(child.stdout, end='')"}}
+        {"type": "tool_use", "name": "python", "id": "parent", "input": {"code": "import os, subprocess\nchild = subprocess.run([os.environ['HARNESS'], '-p', 'child prompt'], capture_output=True, text=True)\nprint(child.stdout, end='')"}}
     ]});
     let (base, handle) = serve(vec![
         parent,
@@ -156,25 +165,19 @@ fn pause_turn_continues_without_a_user_message() {
     assert_eq!(output.stdout, b"done");
     let requests = handle.join().unwrap();
     assert_eq!(requests.len(), 2);
-    assert_eq!(requests[0]["tools"][0]["name"], "Python3");
+    assert_eq!(requests[0]["tools"][0]["name"], "python");
     assert_eq!(requests[1]["messages"].as_array().unwrap().len(), 2);
     assert_eq!(requests[1]["messages"][1]["content"][0], thinking);
 }
 
 #[test]
-#[expect(clippy::disallowed_methods, reason = "end-to-end fixture process")]
 fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     let playground = tempfile::tempdir().unwrap();
     let run = |directory: &std::path::Path, base: &str, prompt: &str| {
         let trace = std::fs::File::create(directory.join("run.jsonl")).unwrap();
-        Command::new(env!("CARGO_BIN_EXE_mei"))
-            .args(["-p", prompt])
+        crate::support::command(base, prompt)
             .current_dir(directory)
-            .env("HARNESS_MODEL", "test/model")
-            .env("ANTHROPIC_BASE_URL", base)
-            .env("ANTHROPIC_API_KEY", "magpie")
             .env_remove("HARNESS")
-            .env_remove("HARNESS_EXTRA")
             .stderr(trace)
             .output()
             .unwrap()
@@ -184,10 +187,10 @@ fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     std::fs::create_dir(&first).unwrap();
     let (base, first_gateway) = serve_with(3, |request, index| match index {
         0 => serde_json::json!({"stop_reason": "tool_use", "content": [
-            {"type": "tool_use", "name": "Python3", "id": "assign", "input": {"code": "answer = 40"}}
+            {"type": "tool_use", "name": "python", "id": "assign", "input": {"code": "answer = 40"}}
         ]}),
         1 => serde_json::json!({"stop_reason": "tool_use", "content": [
-            {"type": "tool_use", "name": "Python3", "id": "calculate", "input": {"code": "answer += 2\nprint(answer)"}}
+            {"type": "tool_use", "name": "python", "id": "calculate", "input": {"code": "answer += 2\nprint(answer)"}}
         ]}),
         2 => {
             let observed = tool_result_text(&request["messages"][4]["content"][0]["content"]);
@@ -199,7 +202,9 @@ fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     let trace = std::fs::read_to_string(first.join("run.jsonl")).unwrap();
     assert!(output.status.success(), "{trace}");
     assert_eq!(output.stdout, b"42");
-    assert_eq!(trace.lines().count(), 6);
+    let mut lines = trace.lines();
+    assert_model_observation(lines.next().unwrap());
+    assert_eq!(lines.count(), 6);
     let requests = first_gateway.join().unwrap();
     assert_eq!(requests.len(), 3);
     assert_eq!(requests[0]["model"], "test/model");
@@ -219,7 +224,7 @@ fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     .unwrap();
     let (base, project_gateway) = serve(vec![
         serde_json::json!({"stop_reason": "tool_use", "content": [
-            {"type": "tool_use", "name": "Python3", "id": "repair", "input": {"code": r#"from pathlib import Path
+            {"type": "tool_use", "name": "python", "id": "repair", "input": {"code": r#"from pathlib import Path
 import subprocess
 import sys
 path = Path("greeting.py")
@@ -273,7 +278,6 @@ assert result.returncode == 0
 
 #[cfg(unix)]
 #[test]
-#[expect(clippy::disallowed_methods, reason = "resume fixture process")]
 fn cli_resume_imports_only_complete_message_history() {
     use std::os::unix::ffi::OsStrExt as _;
 
@@ -292,15 +296,10 @@ fn cli_resume_imports_only_complete_message_history() {
     let (base, gateway) = serve(vec![
         serde_json::json!({"stop_reason": "end_turn", "content": "continued"}),
     ]);
-    let output = Command::new(env!("CARGO_BIN_EXE_mei"))
-        .args(["--resume"])
+    let output = crate::support::command(&base, "second")
+        .arg("--resume")
         .arg(&session)
-        .args(["-p", "second"])
-        .env("HARNESS_MODEL", "test/model")
-        .env("ANTHROPIC_BASE_URL", &base)
-        .env("ANTHROPIC_API_KEY", "magpie")
         .env_remove("HARNESS")
-        .env_remove("HARNESS_EXTRA")
         .output()
         .unwrap();
     assert!(
@@ -318,9 +317,10 @@ fn cli_resume_imports_only_complete_message_history() {
             {"role": "user", "content": "second"}
         ])
     );
-    let trace: Vec<Value> = String::from_utf8(output.stderr)
-        .unwrap()
-        .lines()
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let mut lines = stderr.lines();
+    assert_model_observation(lines.next().unwrap());
+    let trace: Vec<Value> = lines
         .map(|line| serde_json::from_str(line).unwrap())
         .collect();
     assert_eq!(
@@ -334,7 +334,6 @@ fn cli_resume_imports_only_complete_message_history() {
 
 #[cfg(unix)]
 #[test]
-#[expect(clippy::disallowed_methods, reason = "invalid resume fixture process")]
 fn cli_resume_rejects_an_incomplete_log_before_starting_python() {
     let dir = tempfile::tempdir().unwrap();
     let session = dir.path().join("incomplete.jsonl");
@@ -352,14 +351,17 @@ fn cli_resume_rejects_an_incomplete_log_before_starting_python() {
     use std::os::unix::fs::PermissionsExt as _;
     permissions.set_mode(0o755);
     std::fs::set_permissions(&python, permissions).unwrap();
-    let output = Command::new(env!("CARGO_BIN_EXE_mei"))
-        .args(["--resume"])
+    let doctor = tempfile::tempdir().unwrap();
+    let runtime = mei::doctor::Environment::new(
+        mei::doctor::Program::new("3.12.13", python.clone()),
+        mei::doctor::Program::new("0.12.3", python),
+    );
+    mei::doctor::write_cache(doctor.path(), &runtime).unwrap();
+    let output = crate::support::command("http://127.0.0.1:1", "second")
+        .arg("--resume")
         .arg(&session)
-        .args(["-p", "second"])
         .current_dir(dir.path())
-        .env("HARNESS_MODEL", "test/model")
-        .env("ANTHROPIC_BASE_URL", "http://127.0.0.1:1")
-        .env("ANTHROPIC_API_KEY", "magpie")
+        .env("MEI_DOCTOR_DIR", doctor.path())
         .env("PATH", &bin)
         .output()
         .unwrap();
@@ -367,4 +369,85 @@ fn cli_resume_rejects_an_incomplete_log_before_starting_python() {
     let error = String::from_utf8_lossy(&output.stderr);
     assert!(error.contains("E_MEI_SESSION"), "{error}");
     assert!(!marker.exists(), "an invalid log reached Python");
+}
+
+fn catalog() -> Value {
+    serde_json::json!({
+        "first_id": "test/model",
+        "data": [{"id": "test/model", "context_window": 200000, "reasoning_levels": ["low", "high"]}]
+    })
+}
+
+#[test]
+fn the_model_observation_reports_the_model_the_request_carried() {
+    let (base, gateway) = crate::support::serve_paths(3, |path, _, _| match path {
+        "/v1/models" => crate::support::Answer::Json(catalog()),
+        "/v1/messages" => crate::support::Answer::Json(
+            serde_json::json!({"stop_reason": "end_turn", "content": [{"type": "text", "text": "answer"}]}),
+        ),
+        _ => crate::support::Answer::Json(
+            serde_json::json!({"route": {"model": "test/model", "effort": "high"}}),
+        ),
+    });
+    let output = crate::support::command(&base, "hello")
+        .env_remove("HARNESS_MODEL")
+        .env("HARNESS_EXTRA", r#"{"model":"provider/b"}"#)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(output.stdout, b"answer");
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let first: Value = serde_json::from_str(stderr.lines().next().unwrap()).unwrap();
+    assert_eq!(first["kind"], "model");
+    assert_eq!(first["model"], "provider/b");
+    assert_eq!(first["context_tokens"], Value::Null);
+    assert_eq!(first["efforts"], serde_json::json!([]));
+    let requests = gateway.join().unwrap();
+    let carried = requests
+        .iter()
+        .find(|(path, _)| path == "/v1/messages")
+        .expect("one Messages request");
+    assert_eq!(carried.1["model"], "provider/b");
+}
+
+#[test]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "test: the evidence is one wall-clock interval around the run"
+)]
+fn a_hanging_route_probe_does_not_hold_the_answer() {
+    let started = std::time::Instant::now();
+    let (base, _gateway) = crate::support::serve_paths(3, |path, _, _| match path {
+        "/v1/models" => crate::support::Answer::Json(catalog()),
+        "/v1/messages" => crate::support::Answer::Json(
+            serde_json::json!({"stop_reason": "end_turn", "content": [{"type": "text", "text": "answer"}]}),
+        ),
+        _ => crate::support::Answer::Hang(std::time::Duration::from_secs(60)),
+    });
+    let output = crate::support::command(&base, "hello")
+        .env_remove("HARNESS_MODEL")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(output.stdout, b"answer");
+    assert!(
+        started.elapsed() < std::time::Duration::from_secs(20),
+        "the route probe held the answer for {:?}",
+        started.elapsed()
+    );
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    let route = stderr
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .find(|value| value["kind"] == "route")
+        .expect("one route observation");
+    assert_eq!(route["available"], false);
 }

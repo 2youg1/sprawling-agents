@@ -8,11 +8,13 @@
 
 use std::io::{ErrorKind, Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
+use crate::catalog::{self, Selection};
 use crate::error::{Code, Diagnostic, Error, Result, protocol};
+use crate::observation;
 
 /// Per-address TCP connect budget. The gateway is normally loopback, so a
 /// handshake with no answer in this long is a dead gateway, not a slow one.
@@ -27,6 +29,11 @@ const IO_TIMEOUT: Duration = Duration::from_secs(600);
 /// How long a blocked read may stay silent before a `mei.obs` pulse line.
 const PULSE_INTERVAL: Duration = Duration::from_secs(5);
 
+/// The completed route is an auxiliary observation taken after the answer
+/// arrived, so it gets its own short budget: a gateway that accepts and stays
+/// silent delays the answer by this long rather than by [`IO_TIMEOUT`].
+const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
+
 /// Connect, IO, and pulse budgets that travel together on one client.
 struct Timeouts {
     connect: Duration,
@@ -39,7 +46,9 @@ pub struct Client {
     authority: String,
     addresses: Vec<SocketAddr>,
     key: String,
+    session: Option<String>,
     timeouts: Timeouts,
+    probe: Timeouts,
 }
 
 impl Client {
@@ -99,8 +108,25 @@ impl Client {
             authority,
             addresses,
             key,
+            session: None,
+            probe: Timeouts {
+                connect: timeouts.connect.min(PROBE_TIMEOUT),
+                io: timeouts.io.min(PROBE_TIMEOUT),
+                pulse: timeouts.pulse.min(PROBE_TIMEOUT),
+            },
             timeouts,
         })
+    }
+
+    /// Selects Magpie's preferred visible route and enables per-run route observation.
+    ///
+    /// # Errors
+    /// The catalog is unreachable, malformed, or contains no usable chat model.
+    pub fn discover(&mut self, now: u64) -> Result<Selection> {
+        let answer = self.get("/v1/models", &self.timeouts)?;
+        let selection = catalog::select(&answer)?;
+        self.session = Some(format!("mei-{}-{now}", std::process::id()));
+        Ok(selection)
     }
 
     /// Sends one complete request and reads its complete response to EOF.
@@ -119,7 +145,11 @@ impl Client {
             )
         })?;
         let path = format!("http://{}/v1/messages", self.authority);
-        let mut stream = self.connect()?;
+        let session = match &self.session {
+            Some(session) => format!("X-Magpie-Session: {session}\r\n"),
+            None => String::new(),
+        };
+        let mut stream = self.connect(&self.timeouts)?;
         stream
             .set_write_timeout(Some(self.timeouts.io))
             .map_err(|err| {
@@ -135,9 +165,10 @@ impl Client {
             })?;
         write!(
             stream,
-            "POST /v1/messages HTTP/1.0\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nx-api-key: {}\r\nanthropic-version: 2023-06-01\r\n\r\n",
+            "POST /v1/messages HTTP/1.0\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nx-api-key: {}\r\nanthropic-version: 2023-06-01\r\n{}\r\n",
             body.len(),
             self.key,
+            session,
         ).and_then(|()| stream.write_all(&body)).and_then(|()| stream.flush()).map_err(|err| {
             Error::Diagnostic(
                 Diagnostic::new(Code::Transport, "write the Messages request", err.to_string(), "check the gateway connection; no retry was attempted")
@@ -145,14 +176,90 @@ impl Client {
             )
         })?;
         let response = read_to_eof(&mut stream, &self.timeouts, pulse, &path)?;
+        let answer = parse(&response)?;
+        if self.session.is_some() {
+            let route = match self.route_observation() {
+                Ok(route) => route,
+                Err(error) => json!({
+                    "type": "mei.obs",
+                    "kind": "route",
+                    "available": false,
+                    "reason": error.to_string(),
+                }),
+            };
+            observation::write(pulse, &route, "trace a Magpie route observation")?;
+        }
+        Ok(answer)
+    }
+
+    fn route_observation(&self) -> Result<Value> {
+        let Some(session) = &self.session else {
+            return Err(Error::Diagnostic(Diagnostic::new(
+                Code::Protocol,
+                "observe a Magpie route without a session",
+                "the client has no X-Magpie-Session id",
+                "use discover before post, or leave HARNESS_MODEL explicit",
+            )));
+        };
+        let target = format!("/v1/magpie/route?session={session}");
+        let answer = self.get(&target, &self.probe)?;
+        let route = catalog::route(&answer)?;
+        let effort_source = if route.effort.is_some() {
+            "actual"
+        } else {
+            "unstated"
+        };
+        Ok(json!({
+            "type": "mei.obs",
+            "kind": "route",
+            "available": true,
+            "model": route.model,
+            "effort": route.effort,
+            "effort_source": effort_source,
+        }))
+    }
+
+    fn get(&self, target: &str, budget: &Timeouts) -> Result<Value> {
+        let path = format!("http://{}{}", self.authority, target);
+        let mut stream = self.connect(budget)?;
+        stream.set_write_timeout(Some(budget.io)).map_err(|err| {
+            Error::Diagnostic(
+                Diagnostic::new(
+                    Code::Transport,
+                    "arm the Magpie socket timeouts",
+                    err.to_string(),
+                    "retry against the same gateway; no retry was attempted",
+                )
+                .with_path(path.clone()),
+            )
+        })?;
+        write!(
+            stream,
+            "GET {target} HTTP/1.0\r\nConnection: close\r\nx-api-key: {}\r\n\r\n",
+            self.key,
+        )
+        .and_then(|()| stream.flush())
+        .map_err(|err| {
+            Error::Diagnostic(
+                Diagnostic::new(
+                    Code::Transport,
+                    "write the Magpie request",
+                    err.to_string(),
+                    "check the gateway connection; no retry was attempted",
+                )
+                .with_path(path.clone()),
+            )
+        })?;
+        let mut sink = std::io::sink();
+        let response = read_to_eof(&mut stream, budget, &mut sink, &path)?;
         parse(&response)
     }
 
     /// Connects to the first gateway address that answers within the budget.
-    fn connect(&self) -> Result<TcpStream> {
+    fn connect(&self, budget: &Timeouts) -> Result<TcpStream> {
         let mut last = None;
         for address in &self.addresses {
-            match TcpStream::connect_timeout(address, self.timeouts.connect) {
+            match TcpStream::connect_timeout(address, budget.connect) {
                 Ok(stream) => return Ok(stream),
                 Err(err) => last = Some(err),
             }
@@ -169,16 +276,22 @@ impl Client {
     }
 }
 
+#[expect(
+    clippy::disallowed_methods,
+    clippy::arithmetic_side_effects,
+    reason = "the IO budget is measured from the transport's own monotonic clock, and a Duration added to an Instant cannot wrap inside any configured budget"
+)]
 fn read_to_eof(
     stream: &mut TcpStream,
     timeouts: &Timeouts,
     pulse: &mut dyn Write,
     path: &str,
 ) -> Result<Vec<u8>> {
-    let mut remaining = timeouts.io;
+    let deadline = Instant::now() + timeouts.io;
     let mut response = Vec::new();
     let mut chunk = [0_u8; 8192];
     loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             return Err(Error::Diagnostic(
                 Diagnostic::new(
@@ -218,18 +331,6 @@ fn read_to_eof(
             Err(err)
                 if err.kind() == ErrorKind::WouldBlock || err.kind() == ErrorKind::TimedOut =>
             {
-                remaining = remaining.saturating_sub(slice);
-                if remaining.is_zero() {
-                    return Err(Error::Diagnostic(
-                        Diagnostic::new(
-                            Code::Transport,
-                            "read the Messages response to EOF",
-                            err.to_string(),
-                            "check that the gateway closes non-streaming responses without chunking; no retry was attempted",
-                        )
-                        .with_path(path),
-                    ));
-                }
                 write_pulse(pulse, path)?;
             }
             Err(err) => {
