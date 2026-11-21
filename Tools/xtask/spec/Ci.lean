@@ -106,6 +106,7 @@ structure Node where
   reads : List String
   needs : List String
   required : Bool
+  policy : Reuse
 deriving DecidableEq, Repr
 
 /-- 变更直接触及的节点及其全部反向依赖。 -/
@@ -172,7 +173,7 @@ deriving DecidableEq, Repr
 def Complete (nodes : List Node) (judgments : List Judgment) : Prop :=
   ∀ node : Node, node ∈ nodes → node.required = true →
     ∃ judgment : Judgment, judgment ∈ judgments ∧ judgment.node = node.id ∧
-      Disposition.valid .successOnly judgment.current judgment.disposition = true
+      Disposition.valid node.policy judgment.current judgment.disposition = true
 
 /-- 每个节点都真实执行是一份可实现的全量验证，不依赖缓存中存在任何结果。 -/
 theorem full_execution_is_realizable (nodes : List Node) :
@@ -190,10 +191,17 @@ theorem cached_failure_cannot_complete (cached : Cached) (bad : cached.verdict �
   cases cached with | mk key verdict =>
     cases verdict <;> simp_all [Disposition.valid, may_reuse]
 
-/-- 三类源语义都是可达的：直接读取、反向依赖、前置依赖；绿色复用与真实执行也都可达。 -/
-theorem the_model_is_not_vacuous :
-    (may_reuse .successOnly { key := "a", verdict := .green } "a" = true) ∧
-    (Disposition.valid .never "a" .execute = true) := by
-  decide
+/-- 必需的 Never 节点在完整记录中必有本次执行，不能由同键绿色缓存代替。 -/
+theorem complete_runs_never_nodes (nodes : List Node) (judgments : List Judgment)
+    (complete : Complete nodes judgments) (node : Node)
+    (in_nodes : node ∈ nodes) (required : node.required = true)
+    (never : node.policy = .never) :
+    ∃ judgment : Judgment, judgment ∈ judgments ∧ judgment.node = node.id ∧
+      judgment.disposition = .execute := by
+  obtain ⟨judgment, in_judgments, named, valid⟩ := complete node in_nodes required
+  refine ⟨judgment, in_judgments, named, ?_⟩
+  cases disposition : judgment.disposition with
+  | execute => rfl
+  | reuse cached => simp [never, disposition, Disposition.valid, may_reuse] at valid
 
 end Xtask.Ci

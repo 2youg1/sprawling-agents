@@ -113,6 +113,43 @@ fn the_production_gate_door_refuses_scope_on_an_unsupported_gate() {
     root.close().unwrap();
 }
 
+#[cfg(unix)]
+#[test]
+fn captured_file_scope_keeps_unix_punctuation_through_real_file_gate() {
+    static LENGTH: Action = Action {
+        id: "length",
+        operation: Operation::ScopedGate("length"),
+        inputs: &[],
+        needs: &[],
+        reuse: Reuse::Never,
+        required: true,
+    };
+    let root = crate::root::fixture::relocated("ci-scoped-punctuation");
+    crate::root::fixture::write(
+        &root,
+        crate::budget::REGISTER,
+        "[function_length]\nbudget_lines = 200\n[argument_count]\nbudget_arguments = 4\n",
+    );
+    let path = r"tools/k/src/changed:and\local.rs";
+    crate::root::fixture::write(&root, path, &"// fixture\n".repeat(501));
+    let view = Snapshot::capture(&root).unwrap();
+    assert!(view.files().contains_key(path));
+    let prepared = PreparedAction {
+        action: &LENGTH,
+        key: Key::named("punctuation".to_owned()),
+        variables: BTreeMap::new(),
+        files: Some(crate::source::Scope::from_capture(&BTreeSet::from([
+            path.to_owned()
+        ]))),
+    };
+    assert_eq!(
+        isolated_process(&view, &prepared, &root.join("target")).unwrap(),
+        Outcome::Refused
+    );
+    view.close().unwrap();
+    std::fs::remove_dir_all(root).unwrap();
+}
+
 #[test]
 fn a_later_good_tree_cannot_publish_green_for_a_captured_bad_tree() {
     let original = tempfile::tempdir().unwrap();
@@ -327,7 +364,7 @@ fn a_mutating_non_reusable_process_cannot_rewrite_pure_inputs() {
             variables: BTreeMap::new(),
             files: None,
         },
-        &original.path().join("target/process.log"),
+        &original.path().join("target"),
     )
     .unwrap();
     assert_eq!(outcome, Outcome::Green);
@@ -390,6 +427,22 @@ fn a_failure_blocks_dependents_but_not_independent_work() {
 fn an_empty_affected_scope_is_green_without_work() {
     let outcomes = schedule(&[], &BTreeSet::new(), |_| Outcome::Broken);
     assert_eq!(report(&outcomes), ExitCode::SUCCESS);
+}
+
+#[test]
+fn refused_prerequisites_block_reverse_order_chains() {
+    let graph = vec![
+        prepared("leaf", &["middle"]),
+        prepared("middle", &["base"]),
+        prepared("base", &[]),
+    ];
+    let selected = BTreeSet::from(["leaf", "middle", "base"].map(str::to_owned));
+    let outcomes = schedule(&graph, &selected, |action| {
+        assert_eq!(action.action.id, "base");
+        Outcome::Refused
+    });
+    assert_eq!(outcomes.get("leaf"), Some(&Outcome::Blocked));
+    assert_eq!(report(&outcomes), ExitCode::FAILURE);
 }
 
 #[test]

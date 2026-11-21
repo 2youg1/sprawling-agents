@@ -6,10 +6,10 @@
 //! Canonical content identity for one verification node (xtask `spec/Ci.lean`).
 
 use std::collections::BTreeMap;
-#[cfg(any(test, target_os = "linux"))]
 use std::path::Path;
 
-use super::view::Snapshot;
+use super::diagnostic::Diagnostic;
+use super::view::{CapturedFile, Snapshot};
 use crate::report::XtaskError;
 
 use super::graph::{Action, Input, Operation};
@@ -53,10 +53,16 @@ impl Environment {
         let verifier = match image {
             Ok(identity) => identity,
             Err(error) => {
-                eprintln!(
-                    "```toml\ncode = \"verifier-unavailable\"\naction = \"identify the loaded verifier for result reuse\"\nsubject = \"running image\"\npath = \"/proc/self/exe\"\nvalue = {:?}\nrule = \"only an identified loaded image may reuse verdicts\"\nrepair = \"continue with real verification; result reuse stays disabled\"\n```",
-                    error.to_string()
-                );
+                Diagnostic {
+                    code: "verifier-unavailable",
+                    action: "identify the loaded verifier for result reuse",
+                    subject: "running image",
+                    path: Path::new("/proc/self/exe"),
+                    value: &error.to_string(),
+                    rule: "only an identified loaded image may reuse verdicts",
+                    repair: "Run readlink /proc/self/exe. If procfs is unavailable, rerun just verify-sources inside a Linux environment with procfs mounted.",
+                }
+                .emit();
                 None
             }
         };
@@ -166,9 +172,17 @@ pub(crate) fn key_in_snapshot(
         text(&mut hash, id)?;
         text(&mut hash, key.as_str())?;
     }
-    for (path, digest) in files {
+    for (path, file) in files {
         text(&mut hash, path)?;
-        text(&mut hash, digest.as_bytes())?;
+        text(&mut hash, file.digest.as_bytes())?;
+        text(
+            &mut hash,
+            match file.executable {
+                Some(true) => b"x",
+                Some(false) => b"-",
+                None => b"?",
+            },
+        )?;
     }
     Ok(Key(hash.finalize().to_hex().to_string()))
 }
@@ -176,7 +190,7 @@ pub(crate) fn key_in_snapshot(
 fn matching_files<'a>(
     snapshot: &'a Snapshot,
     specs: &[Input],
-) -> Result<BTreeMap<&'a String, &'a blake3::Hash>, XtaskError> {
+) -> Result<BTreeMap<&'a String, &'a CapturedFile>, XtaskError> {
     let mut found = BTreeMap::new();
     for (path, digest) in snapshot.files() {
         if specs.iter().any(|spec| spec.matches(path)) {

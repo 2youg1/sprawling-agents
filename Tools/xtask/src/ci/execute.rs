@@ -7,6 +7,7 @@
 //! failures never prevent unrelated nodes from reporting (xtask D47).
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::io::{Read as _, Seek as _};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode, Stdio};
 use std::sync::mpsc;
@@ -14,6 +15,7 @@ use std::sync::mpsc;
 use crate::report::XtaskError;
 
 use super::content::Environment;
+use super::diagnostic::Diagnostic;
 use super::graph::{Operation, Reuse};
 use super::store::{Store, Verdict};
 use super::suite::PreparedAction;
@@ -70,6 +72,7 @@ fn schedule(
     std::thread::scope(|scope| {
         let (send, receive) = mpsc::channel();
         while outcomes.len() < selected.len() {
+            let settled_before = outcomes.len();
             for action in prepared
                 .iter()
                 .filter(|action| selected.contains(action.action.id))
@@ -111,6 +114,9 @@ fn schedule(
                 });
             }
             if running.is_empty() {
+                if outcomes.len() > settled_before {
+                    continue;
+                }
                 if outcomes.len() < selected.len() {
                     for action in prepared
                         .iter()
@@ -152,10 +158,7 @@ fn execute_one(execution: &Execution, prepared: &PreparedAction) -> Outcome {
     let cached = match store.restore(action.id, &prepared.key, environment, policy) {
         Ok(cached) => cached,
         Err(err) => {
-            eprintln!(
-                "cache restore unavailable for {}; executing: {err}",
-                action.id
-            );
+            cache_warning(execution.work, action.id, "restore", &err);
             None
         }
     };
@@ -166,15 +169,14 @@ fn execute_one(execution: &Execution, prepared: &PreparedAction) -> Outcome {
     let logs = match super::store::output_path(execution.work, Path::new("target/ci/logs")) {
         Ok(path) => path,
         Err(error) => {
-            eprintln!("{} log output refused: {error}", action.id);
+            action_failure(execution.work, action.id, &error);
             return Outcome::Broken;
         }
     };
-    let log = logs.join(format!("{}-{}.log", action.id, std::process::id()));
-    let outcome = match isolated_process(execution.view, prepared, &log) {
+    let outcome = match isolated_process(execution.view, prepared, &logs) {
         Ok(outcome) => outcome,
         Err(err) => {
-            eprintln!("{} could not execute: {err}", action.id);
+            action_failure(execution.work, action.id, &err);
             Outcome::Broken
         }
     };
@@ -182,21 +184,36 @@ fn execute_one(execution: &Execution, prepared: &PreparedAction) -> Outcome {
         && policy == Reuse::SuccessOnly
         && let Err(err) = store.save_green(action.id, &prepared.key, environment)
     {
-        eprintln!("cache save unavailable for {}: {err}", action.id);
-    }
-    if outcome != Outcome::Green
-        && !matches!(
-            action.operation,
-            Operation::Gate(_) | Operation::ScopedGate(_)
-        )
-    {
-        match std::fs::read_to_string(&log) {
-            Ok(text) => eprintln!("--- {} ---\n{text}", action.id),
-            Err(err) => eprintln!("read the failed action log {}: {err}", log.display()),
-        }
+        cache_warning(execution.work, action.id, "save", &err);
     }
     println!("{:?} {} ({:?})", outcome, action.id, started.elapsed());
     outcome
+}
+
+fn cache_warning(root: &Path, id: &str, operation: &str, error: &XtaskError) {
+    Diagnostic {
+        code: "verdict-cache-unavailable",
+        action: &format!("{operation} a verification verdict"),
+        subject: id,
+        path: root,
+        value: &error.to_string(),
+        rule: "cache entries must remain in the configured output boundary",
+        repair: "Run cargo xtask ci run --store target/ci/recovery-verdicts with a fresh output directory.",
+    }
+    .emit();
+}
+
+fn action_failure(root: &Path, id: &str, error: &XtaskError) {
+    Diagnostic {
+        code: "ci-action-execution",
+        action: "execute the verification action and keep its log",
+        subject: id,
+        path: root,
+        value: &error.to_string(),
+        rule: "the action and its log must have usable destinations",
+        repair: "Run just prereqs, restore target/ci/logs as a writable output directory, then rerun just verify-sources.",
+    }
+    .emit();
 }
 
 /// Only the explicitly audited pure gates read the identity-bearing view.
@@ -205,30 +222,26 @@ fn execute_one(execution: &Execution, prepared: &PreparedAction) -> Outcome {
 fn isolated_process(
     view: &Snapshot,
     prepared: &PreparedAction,
-    log: &Path,
+    logs: &Path,
 ) -> Result<Outcome, XtaskError> {
     let action = prepared.action;
     if action.reuse == Reuse::SuccessOnly {
-        return process(view.root(), prepared, log);
+        return process(view.root(), prepared, logs);
     }
     let workspace = Snapshot::capture(view.root())?;
-    let result = process(workspace.root(), prepared, log);
+    let result = process(workspace.root(), prepared, logs);
     workspace.finish(result)
 }
 
 #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
-fn process(root: &Path, prepared: &PreparedAction, log: &Path) -> Result<Outcome, XtaskError> {
+fn process(root: &Path, prepared: &PreparedAction, logs: &Path) -> Result<Outcome, XtaskError> {
     let operation = prepared.action.operation;
     if let Operation::Gate(name) | Operation::ScopedGate(name) = operation {
-        let files = if matches!(operation, Operation::ScopedGate(_)) {
-            prepared
-                .files
-                .as_ref()
-                .map(|scope| scope.paths().iter().cloned().collect())
-        } else {
-            None
+        let scope = match operation {
+            Operation::ScopedGate(_) => prepared.files.as_ref(),
+            _ => None,
         };
-        let code = crate::gates::run(root, &[name.to_owned()], files);
+        let code = crate::gates::run_scoped(root, &[name.to_owned()], scope);
         return Ok(if code == ExitCode::SUCCESS {
             Outcome::Green
         } else if code == ExitCode::FAILURE {
@@ -237,20 +250,23 @@ fn process(root: &Path, prepared: &PreparedAction, log: &Path) -> Result<Outcome
             Outcome::Broken
         });
     }
-    if let Some(parent) = log.parent() {
-        std::fs::create_dir_all(parent).map_err(|source| XtaskError::Io {
-            path: parent.display().to_string(),
+    std::fs::create_dir_all(logs).map_err(|source| XtaskError::Io {
+        path: logs.display().to_string(),
+        source,
+    })?;
+    let (mut log, log_path) = tempfile::Builder::new()
+        .prefix(prepared.action.id)
+        .suffix(".log")
+        .tempfile_in(logs)
+        .and_then(|file| file.keep().map_err(|error| error.error))
+        .map_err(|source| XtaskError::Io {
+            path: logs.display().to_string(),
             source,
         })?;
-    }
-    let output = std::fs::File::create(log).map_err(|source| XtaskError::Io {
-        path: log.display().to_string(),
+    let log_error = |source| XtaskError::Io {
+        path: log_path.display().to_string(),
         source,
-    })?;
-    let errors = output.try_clone().map_err(|source| XtaskError::Io {
-        path: log.display().to_string(),
-        source,
-    })?;
+    };
     let mut command = match operation {
         Operation::Gate(_) | Operation::ScopedGate(_) => {
             return Err(XtaskError::Doc {
@@ -279,13 +295,21 @@ fn process(root: &Path, prepared: &PreparedAction, log: &Path) -> Result<Outcome
         .env("PYTHONUTF8", "1")
         .env("PYTHONDONTWRITEBYTECODE", "1")
         .envs(&prepared.variables)
-        .stdout(Stdio::from(output))
-        .stderr(Stdio::from(errors))
+        .stdout(Stdio::from(log.try_clone().map_err(log_error)?))
+        .stderr(Stdio::from(log.try_clone().map_err(log_error)?))
         .status()
-        .map_err(|source| XtaskError::Io {
-            path: log.display().to_string(),
-            source,
-        })?;
+        .map_err(log_error)?;
+    if !status.success() {
+        let mut output = Vec::new();
+        match log.rewind().and_then(|()| log.read_to_end(&mut output)) {
+            Ok(_) => eprintln!(
+                "--- {} ---\n{}",
+                prepared.action.id,
+                String::from_utf8_lossy(&output)
+            ),
+            Err(source) => action_failure(root, prepared.action.id, &log_error(source)),
+        }
+    }
     Ok(match status.code() {
         Some(0) => Outcome::Green,
         Some(1) => Outcome::Refused,

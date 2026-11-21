@@ -39,10 +39,15 @@ pub(crate) fn changed(
         return Err(invalid("unexpected trailing Git blob data"));
     }
     let mut changed = BTreeSet::new();
-    for (path, digest) in captured.files() {
+    for (path, file) in captured.files() {
         match previous.remove(path) {
             Some((before, mode))
-                if before == *digest && ["100644", "100755"].contains(&mode.as_str()) => {}
+                if before == file.digest
+                    && match mode.as_str() {
+                        "100644" => file.executable != Some(true),
+                        "100755" => file.executable != Some(false),
+                        _ => false,
+                    } => {}
             _ => {
                 changed.insert(path.clone());
             }
@@ -345,5 +350,36 @@ mod tests {
             "name\twith\nnewline\\and-slash.rs"
         );
         assert!(entries(b"100644 blob aaaa\tbad\xff\0").is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn owner_executable_mode_survives_capture_and_changes_the_base_comparison() {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let root = tempfile::tempdir().unwrap();
+        command(root.path(), &["init", "--quiet"]);
+        let path = root.path().join("fixture.sh");
+        std::fs::write(&path, "exit 0\n").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        command(root.path(), &["add", "fixture.sh"]);
+        let tree = git(root.path(), &["write-tree"]).unwrap().stdout;
+        let tree = std::str::from_utf8(&tree).unwrap().trim();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o744)).unwrap();
+        let snapshot = Snapshot::capture(root.path()).unwrap();
+        assert_eq!(
+            changed(root.path(), tree, &snapshot).unwrap(),
+            BTreeSet::from(["fixture.sh".to_owned()])
+        );
+        assert!(
+            std::fs::metadata(snapshot.root().join("fixture.sh"))
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o100
+                != 0
+        );
+        snapshot.close().unwrap();
+        root.close().unwrap();
     }
 }

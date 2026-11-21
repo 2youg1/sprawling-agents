@@ -6,15 +6,16 @@
 //! Success-only verdict storage. The local disk and GitHub Actions cache
 //! adapters share one validation rule (xtask `spec/Ci.lean`).
 
-use std::path::{Path, PathBuf};
+use std::io::Write as _;
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde::{Deserialize, Serialize};
 
 use crate::report::XtaskError;
 
 use super::content::{Environment, Key};
+use super::diagnostic::Diagnostic;
 use super::graph::Reuse;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -83,7 +84,7 @@ impl Store {
             return Ok(None);
         }
         let cached = match self {
-            Self::Local(root) => read_local(&local_path(root, action, key))?,
+            Self::Local(root) => read_local(&managed_path(root, &local_entry(action, key))?)?,
             Self::Remote(remote) => remote.restore(action, key, environment)?,
         };
         Ok(cached.filter(|cached| may_reuse(policy, cached, key)))
@@ -110,22 +111,44 @@ impl Store {
             verdict: Verdict::Green,
         };
         match self {
-            Self::Local(root) => write_local(&local_path(root, action, key), &cached),
+            Self::Local(root) => {
+                write_local(&managed_path(root, &local_entry(action, key))?, &cached)
+            }
             Self::Remote(remote) => remote.save(action, key, environment, &cached),
         }
     }
 }
 
-fn local_path(root: &Path, action: &str, key: &Key) -> PathBuf {
-    root.join(action).join(format!("{}.json", key.as_str()))
+fn local_entry(action: &str, key: &Key) -> PathBuf {
+    Path::new(action).join(format!("{}.json", key.as_str()))
+}
+
+fn managed_path(root: &Path, relative: &Path) -> Result<PathBuf, XtaskError> {
+    let check = |path: &Path| match std::fs::symlink_metadata(path) {
+        Ok(metadata) if crate::walk::is_alias(&metadata) => Err(store_in_source(path)),
+        Ok(_) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(source) => Err(XtaskError::Io {
+            path: path.display().to_string(),
+            source,
+        }),
+    };
+    let mut path = root.to_path_buf();
+    check(&path)?;
+    for part in relative.components() {
+        let Component::Normal(name) = part else {
+            return Err(store_in_source(&root.join(relative)));
+        };
+        path.push(name);
+        check(&path)?;
+    }
+    Ok(path)
 }
 
 fn read_local(path: &Path) -> Result<Option<Cached>, XtaskError> {
-    if !path.is_file() {
-        return Ok(None);
-    }
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(source) => {
             return Err(XtaskError::Io {
                 path: path.display().to_string(),
@@ -136,11 +159,16 @@ fn read_local(path: &Path) -> Result<Option<Cached>, XtaskError> {
     match serde_json::from_slice(&bytes) {
         Ok(cached) => Ok(Some(cached)),
         Err(error) => {
-            eprintln!(
-                "```toml\ncode = \"verdict-corrupt\"\naction = \"restore cached verification\"\npath = {:?}\nvalue = {:?}\nrule = \"a complete JSON verdict with an exact green content key\"\nrepair = \"rerun verification; a successful execution replaces this entry\"\n```",
-                path.display().to_string(),
-                error.to_string()
-            );
+            Diagnostic {
+                code: "verdict-corrupt",
+                action: "restore cached verification",
+                subject: "stored verification verdict",
+                path,
+                value: &error.to_string(),
+                rule: "a complete JSON verdict with an exact green content key",
+                repair: "Run just verify-sources to compute a replacement for the corrupt entry.",
+            }
+            .emit();
             Ok(None)
         }
     }
@@ -158,10 +186,17 @@ pub(super) fn output_path(root: &Path, requested: &Path) -> Result<PathBuf, Xtas
     }
     let mut prefix = path.as_path();
     let mut tail = Vec::new();
-    while !prefix.try_exists().map_err(|source| XtaskError::Io {
-        path: prefix.display().to_string(),
-        source,
-    })? {
+    loop {
+        match std::fs::symlink_metadata(prefix) {
+            Ok(_) => break,
+            Err(source) if source.kind() == std::io::ErrorKind::NotFound => {}
+            Err(source) => {
+                return Err(XtaskError::Io {
+                    path: prefix.display().to_string(),
+                    source,
+                });
+            }
+        }
         let name = prefix.file_name().ok_or_else(|| store_in_source(&path))?;
         tail.push(name);
         prefix = prefix.parent().ok_or_else(|| store_in_source(&path))?;
@@ -209,35 +244,33 @@ fn write_local(path: &Path, cached: &Cached) -> Result<(), XtaskError> {
     if read_local(path)?.is_some() {
         return Ok(());
     }
-    static SEQUENCE: AtomicU64 = AtomicU64::new(0);
-    let sequence = SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    let temporary = parent.join(format!(".{}-{sequence}.tmp", std::process::id()));
     let bytes = serde_json::to_vec(cached).map_err(|err| XtaskError::Doc {
         file: path.display().to_string(),
         msg: format!("serialize a green verdict: {err} (verdict-serialize)"),
     })?;
-    std::fs::write(&temporary, bytes).map_err(|source| XtaskError::Io {
-        path: temporary.display().to_string(),
-        source,
-    })?;
-    match std::fs::rename(&temporary, path) {
-        Ok(()) => Ok(()),
-        Err(_already_exists) if path.is_file() => {
-            std::fs::remove_file(&temporary).map_err(|source| XtaskError::Io {
-                path: temporary.display().to_string(),
-                source,
-            })?;
-            Ok(())
-        }
-        Err(source) => Err(XtaskError::Io {
-            path: path.display().to_string(),
+    let mut temporary =
+        tempfile::NamedTempFile::new_in(parent).map_err(|source| XtaskError::Io {
+            path: parent.display().to_string(),
             source,
+        })?;
+    temporary
+        .write_all(&bytes)
+        .map_err(|source| XtaskError::Io {
+            path: temporary.path().display().to_string(),
+            source,
+        })?;
+    match temporary.persist(path) {
+        Ok(_file) => Ok(()),
+        Err(_already_exists) if path.is_file() => Ok(()),
+        Err(error) => Err(XtaskError::Io {
+            path: path.display().to_string(),
+            source: error.error,
         }),
     }
 }
 
-fn remote_dir(work: &Path, action: &str, key: &Key) -> PathBuf {
-    work.join(action).join(key.as_str())
+fn remote_entry(action: &str, key: &Key) -> PathBuf {
+    Path::new(action).join(key.as_str())
 }
 
 pub(crate) fn remote_key(action: &str, key: &Key, environment: &Environment) -> String {
@@ -252,7 +285,8 @@ impl RemoteStore {
         key: &Key,
         environment: &Environment,
     ) -> Result<Option<Cached>, XtaskError> {
-        let dir = remote_dir(&self.work, action, key);
+        let entry = remote_entry(action, key);
+        let dir = managed_path(&self.work, &entry)?;
         if dir.exists() {
             std::fs::remove_dir_all(&dir).map_err(|source| XtaskError::Io {
                 path: dir.display().to_string(),
@@ -280,7 +314,7 @@ impl RemoteStore {
             });
         }
         if String::from_utf8_lossy(&output.stdout).lines().last() == Some("hit") {
-            read_local(&dir.join("verdict.json"))
+            read_local(&managed_path(&self.work, &entry.join("verdict.json"))?)
         } else {
             Ok(None)
         }
@@ -294,8 +328,12 @@ impl RemoteStore {
         environment: &Environment,
         cached: &Cached,
     ) -> Result<(), XtaskError> {
-        let dir = remote_dir(&self.work, action, key);
-        write_local(&dir.join("verdict.json"), cached)?;
+        let entry = remote_entry(action, key);
+        let dir = managed_path(&self.work, &entry)?;
+        write_local(
+            &managed_path(&self.work, &entry.join("verdict.json"))?,
+            cached,
+        )?;
         let output = Command::new("bun")
             .arg(&self.adapter)
             .arg("save")

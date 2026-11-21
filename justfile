@@ -36,16 +36,27 @@ check: prereqs gates-sources models build-web clippy features test gates check-c
 # Each phase logs to <target>/check-all/<phase>.log, and phases.tsv holds
 # one `phase<TAB>exit<TAB>seconds` row per phase. Naming phases runs
 # those alone, which is how a red phase is rerun after its fix.
+[positional-arguments]
 check-all *phases:
     #!/usr/bin/env bash
     set -uo pipefail
+    defaults="sources build-web clippy features test artifacts supply models client"
+    available="$defaults fmt gates desktop console"
+    wanted=" "
+    for name in "$@"; do
+        if [[ ! "$name" =~ ^[a-z-]+$ || " $available " != *" $name "* ]]; then
+            printf 'check-all: unknown phase %q. Choose from: %s\n' "$name" "$available" >&2
+            exit 2
+        fi
+        wanted+="$name "
+    done
+    [ "$#" -ne 0 ] || wanted=" $defaults "
     out="${CARGO_TARGET_DIR:-target}/check-all"
     rm -rf "$out" && mkdir -p "$out" || exit 2
-    wanted=" {{phases}} "
     phase() {
         local name=$1 start=$SECONDS rc
         shift
-        [ "$wanted" = "  " ] || [[ "$wanted" == *" $name "* ]] || return 0
+        [[ "$wanted" == *" $name "* ]] || return 0
         "$@" > "$out/$name.log" 2>&1
         rc=$?
         printf '%s\t%s\t%s\n' "$name" "$rc" "$((SECONDS - start))" >> "$out/phases.tsv"
@@ -57,6 +68,10 @@ check-all *phases:
       phase test just test --no-fail-fast; phase artifacts just gates-artifacts; phase supply just deny; } &
     { phase models just models; } &
     { phase client just client-checks; } &
+    if [ "$#" -ne 0 ]; then
+        { phase fmt just fmt-check; phase gates just gates; } &
+        { phase desktop just check-desktop; phase console just check-console; } &
+    fi
     wait
     touch "$out/phases.tsv"
     column -t -s $'\t' "$out/phases.tsv"

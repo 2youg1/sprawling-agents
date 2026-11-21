@@ -142,6 +142,7 @@ pub(crate) const ACTIONS: &[Action] = &[
     gate("spec"),
     pure("release", ALL),
     gate("guard"),
+    gate("upstream"),
     process(
         "channel-validation",
         "python",

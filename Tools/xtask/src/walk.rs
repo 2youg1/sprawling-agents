@@ -67,12 +67,11 @@ pub(crate) fn files_under<'d>(
 }
 
 pub(crate) fn rel(root: &Path, path: &Path) -> String {
-    let full = path.to_string_lossy().replace('\\', "/");
-    let base = root.to_string_lossy().replace('\\', "/");
-    match full.strip_prefix(&base) {
-        Some(tail) => tail.trim_start_matches('/').to_owned(),
-        None => full,
-    }
+    let relative = path.strip_prefix(root).unwrap_or(path).to_string_lossy();
+    #[cfg(windows)]
+    return relative.replace('\\', "/");
+    #[cfg(not(windows))]
+    relative.into_owned()
 }
 
 pub(crate) fn in_isolation_zone(rel: &str) -> bool {
@@ -156,13 +155,13 @@ fn collect(
 }
 
 #[cfg(windows)]
-fn is_alias(metadata: &std::fs::Metadata) -> bool {
+pub(crate) fn is_alias(metadata: &std::fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt as _;
     metadata.file_attributes() & 0x400 != 0
 }
 
 #[cfg(not(windows))]
-fn is_alias(metadata: &std::fs::Metadata) -> bool {
+pub(crate) fn is_alias(metadata: &std::fs::Metadata) -> bool {
     metadata.file_type().is_symlink()
 }
 

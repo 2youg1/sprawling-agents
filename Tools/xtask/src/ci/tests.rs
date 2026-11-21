@@ -42,17 +42,16 @@ fn file_scope_keeps_the_full_roster_and_invalid_baselines_fail() {
             files: None,
         })
         .collect::<Vec<_>>();
-    assert_eq!(prepared.len(), 29);
     assert_eq!(
         selected(&full, Some(&changed), &prepared).unwrap().len(),
-        29
+        prepared.len()
     );
     let affected = parse(&["plan", "--base", &base].map(str::to_owned)).unwrap();
     assert!(
         selected(&affected, Some(&changed), &prepared)
             .unwrap()
             .len()
-            < 29
+            < prepared.len()
     );
     for flag in ["--base", "--scope-base"] {
         let invalid = parse(&["plan", flag, "missing-base-object"].map(str::to_owned)).unwrap();

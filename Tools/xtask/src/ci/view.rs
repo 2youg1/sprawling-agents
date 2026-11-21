@@ -8,7 +8,7 @@
 //! and snapshots regular hard-linked sources as independent ordinary files.
 
 use std::collections::BTreeMap;
-use std::io::Write as _;
+use std::io::{Read as _, Write as _};
 use std::path::Path;
 
 use crate::report::XtaskError;
@@ -18,8 +18,14 @@ use crate::walk;
 /// Its directory is private before any source bytes are written to it.
 #[derive(Debug)]
 pub(crate) struct Snapshot {
-    files: BTreeMap<String, blake3::Hash>,
+    files: BTreeMap<String, CapturedFile>,
     owned: tempfile::TempDir,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct CapturedFile {
+    pub(crate) digest: blake3::Hash,
+    pub(crate) executable: Option<bool>,
 }
 
 impl Snapshot {
@@ -42,7 +48,7 @@ impl Snapshot {
         self.owned.path()
     }
 
-    pub(crate) fn files(&self) -> &BTreeMap<String, blake3::Hash> {
+    pub(crate) fn files(&self) -> &BTreeMap<String, CapturedFile> {
         &self.files
     }
 
@@ -57,7 +63,7 @@ impl Snapshot {
     }
 }
 
-fn capture(root: &Path, owned: &Path) -> Result<BTreeMap<String, blake3::Hash>, XtaskError> {
+fn capture(root: &Path, owned: &Path) -> Result<BTreeMap<String, CapturedFile>, XtaskError> {
     let mut files = BTreeMap::new();
     for source in walk::files_without_aliases(root)? {
         let relative = source.strip_prefix(root).map_err(|error| XtaskError::Doc {
@@ -74,10 +80,7 @@ fn capture(root: &Path, owned: &Path) -> Result<BTreeMap<String, blake3::Hash>, 
             .to_owned();
         #[cfg(windows)]
         let name = name.replace('\\', "/");
-        let bytes = std::fs::read(&source).map_err(|source_error| XtaskError::Io {
-            path: source.display().to_string(),
-            source: source_error,
-        })?;
+        let (bytes, executable) = read_input(&source)?;
         let target = owned.join(relative);
         let parent = target.parent().ok_or_else(|| XtaskError::Doc {
             file: target.display().to_string(),
@@ -100,7 +103,17 @@ fn capture(root: &Path, owned: &Path) -> Result<BTreeMap<String, blake3::Hash>, 
             path: target.display().to_string(),
             source,
         })?;
-        if files.insert(name, blake3::hash(&bytes)).is_some() {
+        if executable == Some(true) {
+            make_executable(&file).map_err(|source| XtaskError::Io {
+                path: target.display().to_string(),
+                source,
+            })?;
+        }
+        let captured = CapturedFile {
+            digest: blake3::hash(&bytes),
+            executable,
+        };
+        if files.insert(name, captured).is_some() {
             return Err(XtaskError::Doc {
                 file: source.display().to_string(),
                 msg: "capture source path (capture-name-collision): give every input a distinct UTF-8 relative path".to_owned(),
@@ -108,6 +121,39 @@ fn capture(root: &Path, owned: &Path) -> Result<BTreeMap<String, blake3::Hash>, 
         }
     }
     Ok(files)
+}
+
+fn read_input(path: &Path) -> Result<(Vec<u8>, Option<bool>), XtaskError> {
+    let read = || -> std::io::Result<_> {
+        let mut file = std::fs::File::open(path)?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+        #[cfg(unix)]
+        let executable = {
+            use std::os::unix::fs::PermissionsExt as _;
+            Some(file.metadata()?.permissions().mode() & 0o100 != 0)
+        };
+        #[cfg(not(unix))]
+        let executable = None;
+        Ok((bytes, executable))
+    };
+    read().map_err(|source| XtaskError::Io {
+        path: path.display().to_string(),
+        source,
+    })
+}
+
+#[cfg(unix)]
+fn make_executable(file: &std::fs::File) -> std::io::Result<()> {
+    use std::os::unix::fs::PermissionsExt as _;
+    file.set_permissions(std::fs::Permissions::from_mode(
+        file.metadata()?.permissions().mode() | 0o100,
+    ))
+}
+
+#[cfg(not(unix))]
+fn make_executable(_file: &std::fs::File) -> std::io::Result<()> {
+    Ok(())
 }
 
 fn close<T>(owned: tempfile::TempDir, result: Result<T, XtaskError>) -> Result<T, XtaskError> {

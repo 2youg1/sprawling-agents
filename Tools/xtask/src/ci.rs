@@ -8,6 +8,7 @@
 
 mod baseline;
 mod content;
+mod diagnostic;
 mod execute;
 mod graph;
 mod store;
@@ -20,8 +21,9 @@ use std::process::ExitCode;
 
 use serde::Serialize;
 
-use crate::report::{self, XtaskError};
+use crate::report::XtaskError;
 use content::Environment;
+use diagnostic::Diagnostic;
 use graph::Reuse;
 use store::Store;
 
@@ -32,7 +34,31 @@ pub(crate) fn run(root: &Path, args: &[String]) -> ExitCode {
         CommandKind::Run => execute(root, &options),
     }) {
         Ok(code) => code,
-        Err(err) => report::internal_failure(&err),
+        Err(error) => {
+            let (code, rule, repair) = match &error {
+                XtaskError::CiUsage { code, .. } => (
+                    *code,
+                    "name plan or run and supply the value of each distinct option",
+                    "Run cargo xtask ci plan, then add a named option and its value separately.",
+                ),
+                _ => (
+                    "ci-verification-failed",
+                    "capture a valid checkout and resolve each requested baseline",
+                    "Run git status and git fsck in this checkout, then run cargo xtask ci plan --scope-base HEAD.",
+                ),
+            };
+            Diagnostic {
+                code,
+                action: "plan or run source verification",
+                subject: "xtask ci invocation",
+                path: root,
+                value: &error.to_string(),
+                rule,
+                repair,
+            }
+            .emit();
+            ExitCode::from(2)
+        }
     }
 }
 
@@ -106,10 +132,8 @@ fn parse(args: &[String]) -> Result<Options, XtaskError> {
 }
 
 fn usage(detail: &str, code: &'static str) -> XtaskError {
-    XtaskError::Doc {
-        file: format!(
-            "cargo xtask ci <plan|run> [--full | --base <rev>] [--scope-base <rev>] [--store <dir>] ({code})"
-        ),
+    XtaskError::CiUsage {
+        code,
         msg: detail.to_owned(),
     }
 }
@@ -131,10 +155,7 @@ fn plan(root: &Path, options: &Options) -> Result<ExitCode, XtaskError> {
     let snapshot = view::Snapshot::capture(root)?;
     let result = (|| {
         let changed = comparison(root, options, &snapshot)?;
-        let files = changed
-            .as_ref()
-            .map(|paths| crate::source::Scope::new(&paths.iter().cloned().collect::<Vec<_>>()))
-            .transpose()?;
+        let files = changed.as_ref().map(crate::source::Scope::from_capture);
         let prepared = suite::prepare(&snapshot, &environment, &head, files.as_ref())?;
         let selected = selected(options, changed.as_ref(), &prepared)?;
         let rows: Vec<PlanRow> = prepared
@@ -172,10 +193,7 @@ fn execute(root: &Path, options: &Options) -> Result<ExitCode, XtaskError> {
     let snapshot = view::Snapshot::capture(root)?;
     let result = (|| {
         let changed = comparison(root, options, &snapshot)?;
-        let files = changed
-            .as_ref()
-            .map(|paths| crate::source::Scope::new(&paths.iter().cloned().collect::<Vec<_>>()))
-            .transpose()?;
+        let files = changed.as_ref().map(crate::source::Scope::from_capture);
         let prepared = suite::prepare(&snapshot, &environment, &head, files.as_ref())?;
         let selected = selected(options, changed.as_ref(), &prepared)?;
         Ok(execute::run(

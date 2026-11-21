@@ -31,7 +31,23 @@ function scopeBase(workspace) {
     } catch {
       throw new Error("cannot read a valid GitHub event payload (verification-event)");
     }
-    base = name === "pull_request" ? event?.pull_request?.base?.sha : event?.before;
+    if (name === "pull_request") {
+      base = event?.pull_request?.base?.sha;
+    } else {
+      base = event?.before;
+      const releaseTag = typeof event?.ref === "string" && event.ref.startsWith("refs/tags/v");
+      if (releaseTag && event.deleted === true) {
+        throw new Error("a deleted release tag has no source tree to verify (verification-base)");
+      }
+      if (
+        releaseTag &&
+        event.created === true &&
+        event.deleted === false &&
+        base === "0".repeat(40)
+      ) {
+        base = git(["rev-parse", "--verify", "HEAD^"], workspace);
+      }
+    }
   } else {
     base = git(["merge-base", "origin/main", "HEAD"], workspace);
   }

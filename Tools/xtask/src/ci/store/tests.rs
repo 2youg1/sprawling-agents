@@ -122,7 +122,7 @@ fn local_round_trip_and_corruption_fail_closed() {
             .unwrap()
             .is_none()
     );
-    let record = local_path(&root, "gate", &key());
+    let record = root.join(local_entry("gate", &key()));
     std::fs::write(&record, "not json").unwrap();
     assert!(
         store

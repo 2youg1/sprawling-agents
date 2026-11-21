@@ -52,10 +52,16 @@ fn external_store_does_not_allow_logs_to_follow_target_into_source() {
     std::fs::create_dir(&external).unwrap();
     std::os::unix::fs::symlink(&external, &target).unwrap();
     assert_eq!(execute_one(&execution, &prepared), Outcome::Green);
-    let log = external
-        .join("ci/logs")
-        .join(format!("logged-tool-{}.log", std::process::id()));
-    assert!(std::fs::read_to_string(log).unwrap().contains("verified"));
+    let logs = std::fs::read_dir(external.join("ci/logs"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect::<Vec<_>>();
+    assert_eq!(logs.len(), 1);
+    assert!(
+        std::fs::read_to_string(&logs[0])
+            .unwrap()
+            .contains("verified")
+    );
     assert!(!root.join("src/cache/ci").exists());
     view.close().unwrap();
     outer.close().unwrap();

@@ -16,7 +16,7 @@ just check                    # the whole check: fmt, gates, Lean specifications
 |---|---|
 | `just check` | the whole check; *Verification* says when it runs |
 | `just check-branch [base]` | the local equivalent of `ci.yml` tier 2 for a change that cannot reach the runners, over `<base>...HEAD`; every step runs even after another fails, and a green result is recorded against the tree |
-| `just check-all [phase...]` | every phase of `just check`, each run even after another fails; logs and `phases.tsv` under `$CARGO_TARGET_DIR/check-all`; named phases run alone |
+| `just check-all [phase...]` | every phase of `just check`, each run even after another fails; logs and `phases.tsv` under `$CARGO_TARGET_DIR/check-all`; named phases run alone, including the existing fmt, gates, desktop and console phases; unknown names fail |
 | `just gates` | the machine gates, then the supply-chain read |
 | `just verify-sources [--full] [--scope-base <base>]` | the complete source graph; only length/comments use the optional changed-file scope |
 | `cargo xtask ci plan [--base <base>]` | content keys and selection; `--base` explicitly selects the affected graph |
@@ -41,9 +41,9 @@ just check                    # the whole check: fmt, gates, Lean specifications
 
 ## Source verdicts
 
-`just verify-sources` runs 29 required nodes: the 23 source gates, formatting, channel validation, the CI-tools and nightly contract tests, and the desktop and console Zig recipes. The console recipe tests the frame leaf; shell formatting belongs to `fmt`. The separate shell test command is `(cd Calyx && zig build test)`. Each action reads an owned source snapshot. External and Cargo-backed actions receive separate copies, so their writes cannot change another gate's inputs.
+`just verify-sources` runs every source gate in the gate roster, formatting, channel validation, the CI-tools and nightly contract tests, and the desktop and console Zig recipes. The console recipe tests the frame leaf; shell formatting belongs to `fmt`. The separate shell test command is `(cd Calyx && zig build test)`. Each action reads an owned source snapshot. External and Cargo-backed actions receive separate copies, so their writes cannot change another gate's inputs.
 
-CI runs the complete graph with `--full --scope-base <event-base>`. The baseline is resolved once to immutable Git objects and compared with the captured manifest. Only `length` and `comments` receive those changed paths; other gates keep their whole-tree judgement. An invalid baseline fails. Without either base option, the two file gates retain the full migration inventory, including untouched debt. An explicit empty scope judges no files. `--base` opts into affected-node selection as well as that same file scope; it conflicts with `--full` and `--scope-base`.
+CI runs the complete graph with `--full --scope-base <event-base>`. The baseline is resolved once to immutable Git objects and compared with the captured manifest. Only `length` and `comments` receive those changed paths; other gates keep their whole-tree judgement. A new release-tag push without an old commit uses the first parent of its checked-out commit. Other invalid baselines fail. On Unix the comparison and snapshot also preserve the Git executable bit. Without either base option, the two file gates retain the full migration inventory, including untouched debt. An explicit empty scope judges no files. `--base` opts into affected-node selection as well as that same file scope; it conflicts with `--full` and `--scope-base`.
 
 Six gates can reuse a successful verdict on Linux: `header`, `lexicon`, `motion`, `wording`, `wire-ts` and `release`. Their keys bind captured source bytes, operation, toolchain inputs, dependency keys and the loaded verifier read through `/proc/self/exe`. A failed identity probe disables reuse and still runs verification; other platforms always execute. Other nodes remain `Never` because their external environment is not closed by the key. A refusal or execution failure is never a reusable success.
 
