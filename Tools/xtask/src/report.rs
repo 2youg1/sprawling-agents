@@ -30,6 +30,8 @@ pub(crate) enum XtaskError {
     Doc { file: String, msg: String },
     #[error("command `{cmd}` failed: {msg}")]
     Cmd { cmd: String, msg: String },
+    #[error("{msg} ({code})")]
+    CiUsage { code: &'static str, msg: String },
     #[error("run gate `{name}`: no gate has that name (unknown-gate); name one of: {known}")]
     UnknownGate { name: String, known: String },
     #[error(
