@@ -74,8 +74,6 @@ pub(super) const GIT: Requirement = row(
     Detection::Program {
         program: "git",
         version_arg: "--version",
-        // Where winget puts it, so the row answers before this process
-        // has seen the search path the installer changed.
         places: PerPlatform {
             windows: &[r"C:\Program Files\Git\cmd\git.exe"],
             macos: &[],
@@ -97,11 +95,6 @@ pub(super) const GIT: Requirement = row(
 )
 .from(Upstream::GitHub("git-for-windows/git"));
 
-/// The shell every recipe of this repository runs in: the `justfile`
-/// opens with `set shell := ["bash", "-uc"]`. The listing asks for the
-/// line only a real bash prints, so the WSL launcher a Windows search
-/// path can resolve first is reported as absent, which is what `just`
-/// would meet (`Sprawling/app/spec/Doctor.lean` §8-130).
 pub(super) const BASH: Requirement = row(
     "bash",
     Need::Required,
@@ -247,12 +240,6 @@ pub(super) const RENDER_BROWSER: Requirement = row(
 )
 .from(Upstream::Unread(DoctorUnread::ManyBrands));
 
-/// elan has no winget package, and its official installers are
-/// scripts. On Windows this city runs `elan-init.ps1` without a prompt
-/// once the person presses install, because a fresh machine has to
-/// finish in one pass; the Linux line stays printed (`Sprawling/app/spec/Doctor.lean`
-/// §8-58). `-DefaultToolchain none` leaves the Lean version to
-/// the `lean` row, which installs the one `lean-toolchain` pins.
 pub(super) const ELAN: Requirement = row(
     "elan",
     Need::Required,
@@ -283,9 +270,6 @@ pub(super) const ELAN: Requirement = row(
 )
 .from(Upstream::GitHub("leanprover/elan"));
 
-/// What `elan toolchain install` is handed for one pin: the toolchain
-/// `lean-toolchain` names, or `stable` when the build found no pin file,
-/// because elan refuses an empty toolchain name (`Sprawling/app/spec/Doctor.lean` §8-162).
 const fn lean_install(pin: &'static str) -> &'static str {
     if pin.is_empty() { "stable" } else { pin }
 }
@@ -309,12 +293,6 @@ pub(super) const LEAN: Requirement = row(
 
 const ZIG_PIN: &str = crate::doctor::pin::ZIG_VERSION;
 
-/// winget's arguments for Zig at one pin, without `--version` when the
-/// build found no pin file, because winget refuses an empty version
-/// (`Sprawling/app/spec/Doctor.lean` §8-162). A macro rather than a `const fn`: a recipe's
-/// arguments are a `'static` slice, which a `const fn` cannot build out of
-/// its parameter, while a macro expands into a `const` item where the pin
-/// is a constant.
 macro_rules! winget_zig {
     ($pin:expr) => {
         if $pin.is_empty() {
@@ -361,8 +339,8 @@ pub(super) const ZIG: Requirement = row(
 
 pub(super) const UV: Requirement = row(
     "uv",
-    Need::Optional,
-    "the Python this repository's probes and maintenance scripts run on",
+    Need::Required,
+    "the Python required by source gates, probes and maintenance scripts",
     program("uv"),
     "https://docs.astral.sh/uv/getting-started/installation/",
     PerPlatform {
@@ -381,8 +359,8 @@ pub(super) const UV: Requirement = row(
 
 pub(super) const PYTHON: Requirement = row(
     "python",
-    Need::Optional,
-    "Python for the probes and data transforms, installed and managed by uv",
+    Need::Required,
+    "Python for the comments gate, probes and data transforms, installed and managed by uv",
     Detection::Listed {
         program: "uv",
         args: &["python", "find"],
@@ -431,10 +409,6 @@ pub(super) const KANI: Requirement = row(
 mod tests {
     use super::lean_install;
 
-    /// A build from the crates.io archive finds none of the pin files, so
-    /// both pins are empty there. The two rows then install a version
-    /// nobody pinned rather than a command with an empty argument, which
-    /// elan and winget both refuse (`Sprawling/app/spec/Doctor.lean` §8-162).
     #[test]
     fn a_build_without_pins_installs_lean_stable_and_any_zig() {
         const UNPINNED: &[&str] = winget_zig!("");
