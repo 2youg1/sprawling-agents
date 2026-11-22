@@ -193,3 +193,61 @@ fn cli_acp_rejects_prompt_flags() {
     let error = String::from_utf8_lossy(&output.stderr);
     assert!(error.contains("E_MEI_USAGE"), "{error}");
 }
+
+#[test]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "fixture locates the host python executable and restores the process cwd"
+)]
+fn python_tool_cwd_matches_session_cwd_not_spawn_cwd() {
+    struct Restore(std::path::PathBuf);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            if let Err(err) = std::env::set_current_dir(&self.0) {
+                eprintln!("restore process cwd after ACP cwd fixture: {err}");
+            }
+        }
+    }
+
+    let spawn_home = tempfile::tempdir().unwrap();
+    let session_home = tempfile::tempdir().unwrap();
+    let session = session_home.path().canonicalize().unwrap();
+    std::fs::write(session.join("marker.txt"), "session-tree").unwrap();
+    std::fs::write(spawn_home.path().join("marker.txt"), "spawn-tree").unwrap();
+    let _restore = Restore(std::env::current_dir().unwrap());
+    std::env::set_current_dir(spawn_home.path()).unwrap();
+
+    let executable = std::process::Command::new(if cfg!(windows) {
+        "python"
+    } else {
+        "python3"
+    })
+    .args(["-c", "import sys; print(sys.executable, end='')"])
+    .output()
+    .unwrap();
+    assert!(executable.status.success());
+    let executable = std::path::PathBuf::from(String::from_utf8(executable.stdout).unwrap());
+    let environment = mei::doctor::Environment::new(
+        mei::doctor::Program::new("fixture", executable.clone()),
+        mei::doctor::Program::new("fixture", executable),
+    );
+    let mut python = None;
+    let mut bound = None;
+    mei::launch::bind_python_to_cwd(&mut python, &mut bound, &session, &environment).unwrap();
+    assert_eq!(bound.as_ref(), Some(&session));
+    let python = python.as_mut().unwrap();
+    let cwd = python
+        .run("import os\nprint(os.getcwd(), end='')")
+        .unwrap();
+    assert_eq!(
+        std::path::Path::new(cwd.as_str().unwrap())
+            .canonicalize()
+            .unwrap(),
+        session
+    );
+    let marker = python
+        .run("print(open('marker.txt', encoding='utf-8').read(), end='')")
+        .unwrap();
+    assert_eq!(marker.as_str().unwrap(), "session-tree");
+    python.close().unwrap();
+}

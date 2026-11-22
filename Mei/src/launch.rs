@@ -193,3 +193,22 @@ pub fn resolve_model(
         }
     }
 }
+
+pub fn bind_python_to_cwd(
+    python: &mut Option<crate::python::Py>,
+    bound: &mut Option<std::path::PathBuf>,
+    cwd: &std::path::Path,
+    environment: &doctor::Environment,
+) -> Result<()> {
+    if bound.as_deref() != Some(cwd) {
+        if let Some(mut previous) = python.take() {
+            previous.kill_and_wait()?;
+        }
+        crate::acp::enter_cwd(cwd)?;
+        *bound = Some(cwd.to_path_buf());
+    }
+    if python.is_none() {
+        *python = Some(crate::python::Py::spawn_in(environment)?);
+    }
+    Ok(())
+}

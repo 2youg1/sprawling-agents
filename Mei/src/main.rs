@@ -188,16 +188,21 @@ fn run_acp() -> Result<()> {
     let (model, discovered) = launch::resolve_model(&mut client, now)?;
     let extra = launch::parse_extra(launch::optional_environment("HARNESS_EXTRA")?.as_deref())?;
     let environment = doctor::ensure(now)?;
-    let mut python = python::Py::spawn_in(&environment)?;
+    let mut python: Option<python::Py> = None;
     let mut request: Option<Value> = None;
     let mut opened_cwd = None;
     let stdin = std::io::stdin();
     let stdout = std::io::stdout();
     let result = acp::serve(stdin, stdout, |turn: Turn| {
-        if opened_cwd.as_ref() != Some(&turn.cwd) {
-            acp::enter_cwd(&turn.cwd)?;
-            opened_cwd = Some(turn.cwd.clone());
-        }
+        launch::bind_python_to_cwd(&mut python, &mut opened_cwd, &turn.cwd, &environment)?;
+        let python = python.as_mut().ok_or_else(|| {
+            Error::Diagnostic(Diagnostic::new(
+                Code::Protocol,
+                "bind the ACP python interpreter",
+                "no interpreter is bound to the session cwd",
+                "restart `mei --acp` and open a new session",
+            ))
+        })?;
         if turn.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
             return Ok(Outcome {
                 stop: StopReason::Cancelled,
@@ -270,11 +275,15 @@ fn run_acp() -> Result<()> {
     });
     match result {
         Ok(()) => {
-            python.close()?;
+            if let Some(mut python) = python {
+                python.close()?;
+            }
             Ok(())
         }
         Err(error) => {
-            if let Err(cleanup) = python.kill_and_wait() {
+            if let Some(mut python) = python
+                && let Err(cleanup) = python.kill_and_wait()
+            {
                 eprintln!("{cleanup}");
             }
             Err(error)

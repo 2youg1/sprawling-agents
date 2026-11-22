@@ -255,6 +255,8 @@ pub struct Outcome {
 见取消则 `finish` 为 `cancelled`（`Mei.spec.Acp`）。最终文本经 `session/update` 的
 `agent_message_chunk` 写出后再返回 `stopReason`。同一 ACP session 内多次 prompt 共享 Messages
 与 python 进程；进程退出时收口解释器。
+python 在获知 `session/new` 的 cwd 并 `enter_cwd` 之后才 spawn，使 sole tool 的工作目录与
+AGENTS 读取的同一工作树一致；cwd 变更时先收口旧解释器再于新目录重生。
 
 发布：`sprawling-mei` / `@sprawling/mei`；平台含 Windows；平台包含 `mei` 与 `calyx`。
 交互经 `calyx` + 无头核解析（Calyx D4）；城控制台仍经 `sprawling`。打包次序归
@@ -440,4 +442,5 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 理由：锁定目标是「支持 ACP 的 harness 像工具一样调用 Mei」，对称面是 agent 而非再做一个 client。
 被否：经 HTTP `/acp` 伪装（非 stdio ACP）、把 Mei 做成 MCP 工具（另一产品面）、依赖
 `agent_protocols` crate（Mei 保持 `serde_json` 单依赖）、`loadSession`/富媒体 prompt/自动连 MCP、
-在回合内中断 HTTP（无核内取消点；取消见 `Mei.spec.Acp.finish`，于回合返回后从 stdin 队列兑现）。 -/
+在回合内中断 HTTP（无核内取消点；取消见 `Mei.spec.Acp.finish`，于回合返回后从 stdin 队列兑现）；
+在 `session/new` 之前 spawn python（子进程 cwd 不会随随后的 `set_current_dir` 改变）。 -/
