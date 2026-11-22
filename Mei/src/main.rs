@@ -167,6 +167,7 @@ fn run_headless(arguments: Arguments) -> Result<String> {
         client: &mut client,
         python: &mut python,
         intake: &mut intake,
+        cancelled: None,
     };
     let mut trace = std::io::stderr();
     let result = agent::drive(&mut request, &mut live, &mut trace);
@@ -194,6 +195,7 @@ fn run_acp() -> Result<()> {
     let environment = doctor::ensure(now)?;
     let mut python: Option<python::Py> = None;
     let mut request: Option<Value> = None;
+    let mut guide_pending = true;
     let mut opened_cwd = None;
     let stdin = std::io::stdin();
     let stdout = std::io::stdout();
@@ -215,11 +217,12 @@ fn run_acp() -> Result<()> {
         }
         let mut trace = std::io::stderr();
         if turn.first || request.is_none() {
-            let guide = if turn.first {
+            let guide = if guide_pending {
                 workspace::read_new_session()?
             } else {
                 None
             };
+            guide_pending = false;
             let built = launch::initial_request(
                 Task {
                     model: &model,
@@ -278,6 +281,7 @@ fn run_acp() -> Result<()> {
                 client: &mut client,
                 python: interpreter,
                 intake: &mut intake,
+                cancelled: Some(turn.cancelled.as_ref()),
             };
             agent::drive(body, &mut live, &mut trace)
         };
@@ -286,7 +290,7 @@ fn run_acp() -> Result<()> {
             Err(error) => {
                 request = None;
                 if let Some(mut dead) = python.take()
-                    && let Err(cleanup) = dead.kill_and_wait()
+                    && let Err(cleanup) = dead.close()
                 {
                     eprintln!("{cleanup}");
                 }
@@ -309,7 +313,7 @@ fn run_acp() -> Result<()> {
         }
         Err(error) => {
             if let Some(mut python) = python
-                && let Err(cleanup) = python.kill_and_wait()
+                && let Err(cleanup) = python.close()
             {
                 eprintln!("{cleanup}");
             }

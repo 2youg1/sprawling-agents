@@ -159,6 +159,7 @@ pub struct Live<'a> {
     pub client: &'a mut Client,
     pub python: &'a mut Py,
     pub intake: &'a mut Option<Intake>,
+    pub cancelled: Option<&'a AtomicBool>,
 }
 
 pub fn drive(
@@ -250,15 +251,19 @@ pub struct Outcome {
 
 `initialize` 答复：`protocolVersion: 1`，`agentInfo.name = "mei"`，`agentInfo.version` 为包版本，
 `authMethods: []`，`agentCapabilities.loadSession = false`，不声明 image/audio/embeddedContext，
-不声明 MCP http/sse。`session/new` 接受 `cwd`（绝对路径，UTF-8）与忽略的 `mcpServers`，返回 `sessionId`。
-`session/prompt` 只拼接 `type=text` 块；空文本拒。回合中可并发读到 `session/cancel`；
-见取消则 `finish` 为 `cancelled`（`Mei.spec.Acp`）。最终文本经 `session/update` 的
-`agent_message_chunk` 写出后再返回 `stopReason`。同一 ACP session 内多次 prompt 共享 Messages
-与 python 进程；进程退出时收口解释器。
+不声明 MCP http/sse。本面是**文本会话用的 ACP v1 子集**：不连接 `session/new` 的 `mcpServers`，
+一条 stdio 连接只打开一次 `session/new`（再开返回 `-32601`）；不承诺通用 ACP v1 全能力。
+`session/new` 接受 `cwd`（绝对路径，UTF-8）与忽略的 `mcpServers`，返回 `sessionId`。
+`session/prompt` 拼接 `type=text` 与 `type=resource_link`（保留 name/uri）；二者皆空则拒。
+回合中并发排空 stdin：匹配当前 `sessionId` 的 `session/cancel` 置位取消；下一 `post`/`exec` 前拒
+绝新工作。见取消则 `finish` 为 `cancelled`（`Mei.spec.Acp`），即使同回合 `agent::drive` 已返回错误。
+最终文本经 `session/update` 的 `agent_message_chunk` 写出后再返回 `stopReason`。同一 ACP session
+内多次 prompt 共享 Messages 与 python 进程；进程退出时收口解释器。
 python 在获知 `session/new` 的 cwd 并 `enter_cwd` 之后才 spawn，使 sole tool 的工作目录与
 AGENTS 读取的同一工作树一致；cwd 变更时先收口旧解释器再于新目录重生。
-回合若在 `agent::drive` 中失败：丢弃当前 Messages 请求并收口解释器，下一 prompt 以无 guide 的新
-请求重建，避免把未配对的 `tool_use` 再交给 provider；stdin 断开只结束排空，不标 `cancelled`。
+回合若在 `agent::drive` 中失败：丢弃当前 Messages 请求并以 `close` 收口解释器（完成 spilled 交接，
+D17），下一 prompt 以无 guide 的新请求重建；stdin 断开只结束排空，不标 `cancelled`。
+新会话仅第一次构建请求时注入 AGENTS；失败重建不再注入。
 
 发布：`sprawling-mei` / `@sprawling/mei`；平台含 Windows；平台包含 `mei` 与 `calyx`。
 交互经 `calyx` + 无头核解析（Calyx D4）；城控制台仍经 `sprawling`。打包次序归
@@ -439,10 +444,10 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 ②另开一条 user 消息——多一轮角色边界，且与接到工具回复末尾的合同不符；③改写已组装请求——
 在途字节无法收回。
 -/
-/-! D22 Mei 在 `--acp` 下成为 ACP v1 **agent**（stdio JSON-RPC），复用同一 Magpie + python 核；
-城已有的 harness **client** 可粘贴 `mei --acp` 入座，无须改 client 或 HTTP `POST /acp`。
+/-! D22 Mei 在 `--acp` 下成为面向文本会话的 ACP v1 **agent** 子集（stdio JSON-RPC），复用同一
+Magpie + python 核；城已有的 harness **client** 可粘贴 `mei --acp` 入座，无须改 client 或 HTTP
+`POST /acp`。一条连接一次 `session/new`；`mcpServers` 忽略；`resource_link` 以 name/uri 进入提示。
+取消置位后不再启动下一 `post`/`exec`（不中断已在途的 HTTP）。失败收口用 `close` 保 spilled。
 理由：锁定目标是「支持 ACP 的 harness 像工具一样调用 Mei」，对称面是 agent 而非再做一个 client。
-被否：经 HTTP `/acp` 伪装（非 stdio ACP）、把 Mei 做成 MCP 工具（另一产品面）、依赖
-`agent_protocols` crate（Mei 保持 `serde_json` 单依赖）、`loadSession`/富媒体 prompt/自动连 MCP、
-在回合内中断 HTTP（无核内取消点；取消见 `Mei.spec.Acp.finish`，于回合返回后从 stdin 队列兑现）；
-在 `session/new` 之前 spawn python（子进程 cwd 不会随随后的 `set_current_dir` 改变）。 -/
+被否：经 HTTP `/acp` 伪装、把 Mei 做成 MCP 工具、依赖 `agent_protocols`、同连接多会话隔离、
+自动连 MCP、在途 HTTP 强制中断、在 `session/new` 前 spawn python。 -/

@@ -22,8 +22,24 @@ use serde_json::{Value, json};
 
 fn read_line(reader: &mut impl BufRead) -> Value {
     let mut line = String::new();
-    reader.read_line(&mut line).unwrap();
-    serde_json::from_str(&line).unwrap()
+    let read = reader
+        .read_line(&mut line)
+        .expect("ACP stdout closed early");
+    assert!(read > 0, "ACP stdout closed without a reply");
+    let message: Value = serde_json::from_str(&line).expect("ACP reply must be JSON");
+    if let Some(error) = message.get("error") {
+        panic!("unexpected JSON-RPC error: {error}");
+    }
+    message
+}
+
+fn read_line_allow_error(reader: &mut impl BufRead) -> Value {
+    let mut line = String::new();
+    let read = reader
+        .read_line(&mut line)
+        .expect("ACP stdout closed early");
+    assert!(read > 0, "ACP stdout closed without a reply");
+    serde_json::from_str(&line).expect("ACP reply must be JSON")
 }
 
 fn write_line(writer: &mut impl Write, message: Value) {
@@ -42,6 +58,52 @@ fn prompt_text_keeps_nonempty_text_blocks() {
         Some("a\nb".to_owned())
     );
     assert_eq!(acp::prompt_text(&[json!({"type":"text","text":""})]), None);
+    assert_eq!(
+        acp::prompt_text(&[json!({
+            "type":"resource_link",
+            "name":"notes.txt",
+            "uri":"file:///notes.txt"
+        })]),
+        Some("resource_link name=notes.txt uri=file:///notes.txt".to_owned())
+    );
+}
+
+#[test]
+fn parse_error_replies_minus_32700_and_keeps_serving() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let (agent_stdin, mut client_stdout) = std::io::pipe().unwrap();
+    let (client_stdin, agent_stdout) = std::io::pipe().unwrap();
+    let server = thread::spawn(move || {
+        acp::serve(agent_stdin, agent_stdout, |_turn| {
+            Ok(Outcome {
+                stop: StopReason::EndTurn,
+                text: "ok".to_owned(),
+            })
+        })
+        .unwrap();
+    });
+    let mut reader = BufReader::new(client_stdin);
+    writeln!(client_stdout, "{{").unwrap();
+    client_stdout.flush().unwrap();
+    let broken = read_line_allow_error(&mut reader);
+    assert_eq!(broken["error"]["code"], -32_700);
+    write_line(
+        &mut client_stdout,
+        json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1}}),
+    );
+    let init = read_line(&mut reader);
+    assert_eq!(init["result"]["protocolVersion"], 1);
+    write_line(
+        &mut client_stdout,
+        json!({
+            "jsonrpc":"2.0","id":1,"method":"session/new",
+            "params":{"cwd": cwd.to_str().unwrap(), "mcpServers": []}
+        }),
+    );
+    let _: Value = read_line(&mut reader);
+    drop(client_stdout);
+    server.join().unwrap();
 }
 
 #[test]
@@ -176,7 +238,10 @@ fn cancel_after_a_turn_marks_cancelled() {
     gate.store(true, Ordering::SeqCst);
     let mut stop = None;
     for _ in 0..8 {
-        let message = read_line(&mut reader);
+        let message = read_line_allow_error(&mut reader);
+        if let Some(error) = message.get("error") {
+            panic!("prompt failed before cancel could finish: {error}");
+        }
         if let Some(reason) = message
             .pointer("/result/stopReason")
             .and_then(Value::as_str)
@@ -186,6 +251,85 @@ fn cancel_after_a_turn_marks_cancelled() {
         }
     }
     assert_eq!(stop.as_deref(), Some("cancelled"));
+    drop(client_stdout);
+    server.join().unwrap();
+}
+
+#[test]
+fn cancel_without_matching_session_id_is_ignored() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let (agent_stdin, mut client_stdout) = std::io::pipe().unwrap();
+    let (client_stdin, agent_stdout) = std::io::pipe().unwrap();
+    let gate = Arc::new(AtomicBool::new(false));
+    let wait = Arc::clone(&gate);
+    let lines_read = Arc::new(AtomicU64::new(0));
+    let meter = Arc::clone(&lines_read);
+    let server = thread::spawn(move || {
+        acp::serve_with_meter(
+            agent_stdin,
+            agent_stdout,
+            move |_turn| {
+                while !wait.load(Ordering::SeqCst) {
+                    thread::sleep(Duration::from_millis(5));
+                }
+                Ok(Outcome {
+                    stop: StopReason::EndTurn,
+                    text: "kept".to_owned(),
+                })
+            },
+            Some(meter),
+        )
+        .unwrap();
+    });
+    let mut reader = BufReader::new(client_stdin);
+    write_line(
+        &mut client_stdout,
+        json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1}}),
+    );
+    let _: Value = read_line(&mut reader);
+    write_line(
+        &mut client_stdout,
+        json!({
+            "jsonrpc":"2.0","id":1,"method":"session/new",
+            "params":{"cwd": cwd.to_str().unwrap(), "mcpServers": []}
+        }),
+    );
+    let opened = read_line(&mut reader);
+    let session = opened["result"]["sessionId"].as_str().unwrap().to_owned();
+    write_line(
+        &mut client_stdout,
+        json!({
+            "jsonrpc":"2.0","id":2,"method":"session/prompt",
+            "params":{"sessionId": session, "prompt":[{"type":"text","text":"go"}]}
+        }),
+    );
+    let before = wait_for_lines(&lines_read, 3);
+    write_line(
+        &mut client_stdout,
+        json!({"jsonrpc":"2.0","method":"session/cancel","params":{}}),
+    );
+    write_line(
+        &mut client_stdout,
+        json!({
+            "jsonrpc":"2.0","method":"session/cancel",
+            "params":{"sessionId":42}
+        }),
+    );
+    wait_for_lines(&lines_read, before.saturating_add(2));
+    gate.store(true, Ordering::SeqCst);
+    let mut stop = None;
+    for _ in 0..8 {
+        let message = read_line_allow_error(&mut reader);
+        if let Some(reason) = message
+            .pointer("/result/stopReason")
+            .and_then(Value::as_str)
+        {
+            stop = Some(reason.to_owned());
+            break;
+        }
+    }
+    assert_eq!(stop.as_deref(), Some("end_turn"));
     drop(client_stdout);
     server.join().unwrap();
 }

@@ -10,15 +10,22 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::thread;
+use std::time::Duration;
 
 use serde_json::{Value, json};
 
 use crate::error::{Code, Diagnostic, Error, Result};
 
-const PROTOCOL_VERSION: u64 = 1;
+mod codec;
+use codec::{
+    initialize_result, open_session, prompt_params, write_error, write_result, write_update,
+};
+
+const PARSE_ERROR: i64 = -32_700;
+const INVALID_REQUEST: i64 = -32_600;
 const METHOD_NOT_FOUND: i64 = -32_601;
 const INVALID_PARAMS: i64 = -32_602;
-const INVALID_REQUEST: i64 = -32_600;
+const INTERNAL_ERROR: i64 = -32_603;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StopReason {
@@ -60,12 +67,22 @@ enum Phase {
 pub fn prompt_text(blocks: &[Value]) -> Option<String> {
     let mut parts = Vec::new();
     for block in blocks {
-        if block.get("type").and_then(Value::as_str) != Some("text") {
-            continue;
-        }
-        let text = block.get("text").and_then(Value::as_str)?;
-        if !text.is_empty() {
-            parts.push(text.to_owned());
+        match block.get("type").and_then(Value::as_str) {
+            Some("text") => {
+                let text = block.get("text").and_then(Value::as_str)?;
+                if !text.is_empty() {
+                    parts.push(text.to_owned());
+                }
+            }
+            Some("resource_link") => {
+                let name = block.get("name").and_then(Value::as_str).unwrap_or("");
+                let uri = block.get("uri").and_then(Value::as_str).unwrap_or("");
+                if name.is_empty() && uri.is_empty() {
+                    continue;
+                }
+                parts.push(format!("resource_link name={name} uri={uri}"));
+            }
+            _ => {}
         }
     }
     if parts.is_empty() {
@@ -97,7 +114,7 @@ pub fn serve_with_meter(
     mut turn: impl FnMut(Turn) -> Result<Outcome>,
     lines_read: Option<Arc<AtomicU64>>,
 ) -> Result<()> {
-    let (tx, rx) = mpsc::channel::<std::io::Result<String>>();
+    let (tx, mut rx) = mpsc::channel::<std::io::Result<String>>();
     let meter = lines_read.clone();
     thread::spawn(move || {
         let reader = BufReader::new(input);
@@ -135,14 +152,13 @@ pub fn serve_with_meter(
         if line.trim().is_empty() {
             continue;
         }
-        let message: Value = serde_json::from_str(&line).map_err(|err| {
-            Error::Diagnostic(Diagnostic::new(
-                Code::Protocol,
-                "parse an ACP line",
-                err.to_string(),
-                "send one JSON-RPC object per line as ACP version 1 requires",
-            ))
-        })?;
+        let message: Value = match serde_json::from_str(&line) {
+            Ok(message) => message,
+            Err(err) => {
+                write_error(&mut output, &Value::Null, PARSE_ERROR, err.to_string())?;
+                continue;
+            }
+        };
         let id = message.get("id").cloned();
         let method = message.get("method").and_then(Value::as_str);
         let params = message.get("params").cloned().unwrap_or(Value::Null);
@@ -167,34 +183,63 @@ pub fn serve_with_meter(
                 match prompt_params(&params, &session_id) {
                     Ok(prompt) => {
                         let cancelled = Arc::new(AtomicBool::new(false));
-                        let result = turn(Turn {
+                        let turn_input = Turn {
                             session_id: session_id.clone(),
                             cwd: cwd.clone(),
                             prompt,
                             first,
                             cancelled: Arc::clone(&cancelled),
-                        });
-                        drain_during_turn(&rx, &mut pending, &session_id, &cancelled)?;
-                        let outcome = match result {
-                            Ok(outcome) => outcome,
-                            Err(error) => {
-                                write_error(&mut output, id, -32_603, error.to_string())?;
-                                continue;
-                            }
                         };
-                        let stop = finish(cancelled.load(Ordering::SeqCst), outcome.stop);
-                        if !outcome.text.is_empty() {
-                            write_update(
-                                &mut output,
-                                &session_id,
-                                json!({
-                                    "sessionUpdate": "agent_message_chunk",
-                                    "content": { "type": "text", "text": outcome.text }
-                                }),
-                            )?;
+                        let drained = run_turn_while_draining(TurnDrain {
+                            turn_input,
+                            turn: &mut turn,
+                            rx,
+                            session_id: &session_id,
+                            cancelled: &cancelled,
+                        })?;
+                        rx = drained.rx;
+                        pending.append(&mut { drained.pending });
+                        drain_during_turn(&rx, &mut pending, &session_id, &cancelled)?;
+                        let result = drained.result;
+                        match result {
+                            Ok(outcome) => {
+                                let stop = finish(cancelled.load(Ordering::SeqCst), outcome.stop);
+                                if !outcome.text.is_empty() {
+                                    write_update(
+                                        &mut output,
+                                        &session_id,
+                                        json!({
+                                            "sessionUpdate": "agent_message_chunk",
+                                            "content": { "type": "text", "text": outcome.text }
+                                        }),
+                                    )?;
+                                }
+                                write_result(
+                                    &mut output,
+                                    id,
+                                    json!({ "stopReason": stop.as_str() }),
+                                )?;
+                                first = false;
+                            }
+                            Err(error) => {
+                                if cancelled.load(Ordering::SeqCst) {
+                                    eprintln!("{error}");
+                                    write_result(
+                                        &mut output,
+                                        id,
+                                        json!({ "stopReason": StopReason::Cancelled.as_str() }),
+                                    )?;
+                                    first = false;
+                                } else {
+                                    write_error(
+                                        &mut output,
+                                        id,
+                                        INTERNAL_ERROR,
+                                        error.to_string(),
+                                    )?;
+                                }
+                            }
                         }
-                        write_result(&mut output, id, json!({ "stopReason": stop.as_str() }))?;
-                        first = false;
                     }
                     Err(error) => write_error(&mut output, id, INVALID_PARAMS, error)?,
                 }
@@ -222,6 +267,104 @@ pub fn serve_with_meter(
     }
 }
 
+struct TurnDrain<'a, F> {
+    turn_input: Turn,
+    turn: &'a mut F,
+    rx: mpsc::Receiver<std::io::Result<String>>,
+    session_id: &'a str,
+    cancelled: &'a Arc<AtomicBool>,
+}
+
+struct DrainedTurn {
+    result: Result<Outcome>,
+    rx: mpsc::Receiver<std::io::Result<String>>,
+    pending: VecDeque<String>,
+}
+
+fn run_turn_while_draining<F>(parts: TurnDrain<'_, F>) -> Result<DrainedTurn>
+where
+    F: FnMut(Turn) -> Result<Outcome>,
+{
+    let TurnDrain {
+        turn_input,
+        turn,
+        rx,
+        session_id,
+        cancelled,
+    } = parts;
+    let (done_tx, done_rx) = mpsc::channel::<()>();
+    let (back_tx, back_rx) = mpsc::channel::<
+        std::result::Result<(mpsc::Receiver<std::io::Result<String>>, VecDeque<String>), String>,
+    >();
+    let session = session_id.to_owned();
+    let flag = Arc::clone(cancelled);
+    let drain = thread::spawn(move || {
+        let mut pending = VecDeque::new();
+        let mut rx = rx;
+        let outcome = loop {
+            if done_rx.try_recv().is_ok() {
+                break Ok((rx, pending));
+            }
+            match rx.recv_timeout(Duration::from_millis(5)) {
+                Ok(Ok(line)) => note_cancel_or_queue(&line, &session, &flag, &mut pending),
+                Ok(Err(err)) => break Err(err.to_string()),
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => break Ok((rx, pending)),
+            }
+        };
+        let _ = back_tx.send(outcome);
+    });
+    let result = turn(turn_input);
+    let _ = done_tx.send(());
+    let reclaimed = back_rx.recv().map_err(|_| {
+        Error::Diagnostic(Diagnostic::new(
+            Code::Protocol,
+            "reclaim ACP stdin after a turn",
+            "the cancel drain thread exited without returning the reader",
+            "restart `mei --acp`",
+        ))
+    })?;
+    let _ = drain.join();
+    let (rx, pending) = reclaimed.map_err(|err| {
+        Error::Diagnostic(Diagnostic::new(
+            Code::Protocol,
+            "read an ACP line during a turn",
+            err,
+            "keep stdin open until the prompt response is written",
+        ))
+    })?;
+    Ok(DrainedTurn {
+        result,
+        rx,
+        pending,
+    })
+}
+
+fn note_cancel_or_queue(
+    line: &str,
+    session_id: &str,
+    cancelled: &AtomicBool,
+    pending: &mut VecDeque<String>,
+) {
+    if line.trim().is_empty() {
+        return;
+    }
+    if let Ok(message) = serde_json::from_str::<Value>(line)
+        && message.get("method").and_then(Value::as_str) == Some("session/cancel")
+    {
+        let matches = message
+            .get("params")
+            .and_then(|params| params.get("sessionId"))
+            .and_then(Value::as_str)
+            .is_some_and(|id| id == session_id);
+        if matches {
+            cancelled.store(true, Ordering::SeqCst);
+        }
+        return;
+    }
+    pending.push_back(line.to_owned());
+}
+
 fn drain_during_turn(
     rx: &mpsc::Receiver<std::io::Result<String>>,
     pending: &mut VecDeque<String>,
@@ -230,25 +373,7 @@ fn drain_during_turn(
 ) -> Result<()> {
     loop {
         match rx.try_recv() {
-            Ok(Ok(line)) => {
-                if line.trim().is_empty() {
-                    continue;
-                }
-                if let Ok(message) = serde_json::from_str::<Value>(&line)
-                    && message.get("method").and_then(Value::as_str) == Some("session/cancel")
-                {
-                    let matches = message
-                        .get("params")
-                        .and_then(|params| params.get("sessionId"))
-                        .and_then(Value::as_str)
-                        .is_none_or(|id| id == session_id);
-                    if matches {
-                        cancelled.store(true, Ordering::SeqCst);
-                    }
-                    continue;
-                }
-                pending.push_back(line);
-            }
+            Ok(Ok(line)) => note_cancel_or_queue(&line, session_id, cancelled, pending),
             Ok(Err(err)) => {
                 return Err(Error::Diagnostic(Diagnostic::new(
                     Code::Protocol,
@@ -261,120 +386,6 @@ fn drain_during_turn(
             Err(mpsc::TryRecvError::Disconnected) => return Ok(()),
         }
     }
-}
-
-fn initialize_result() -> Value {
-    json!({
-        "protocolVersion": PROTOCOL_VERSION,
-        "agentCapabilities": {
-            "loadSession": false,
-            "promptCapabilities": {}
-        },
-        "agentInfo": {
-            "name": "mei",
-            "title": "Mei",
-            "version": env!("CARGO_PKG_VERSION")
-        },
-        "authMethods": []
-    })
-}
-
-fn open_session(params: &Value, next: &mut u64) -> std::result::Result<(String, PathBuf), String> {
-    let cwd = params
-        .get("cwd")
-        .and_then(Value::as_str)
-        .ok_or_else(|| "session/new requires a UTF-8 cwd string".to_owned())?;
-    if cwd.is_empty() {
-        return Err("session/new cwd must not be empty".to_owned());
-    }
-    let path = PathBuf::from(cwd);
-    if !path.is_absolute() {
-        return Err("session/new cwd must be an absolute path".to_owned());
-    }
-    if !path.is_dir() {
-        return Err(format!(
-            "session/new cwd is not a directory: {}",
-            path.display()
-        ));
-    }
-    let id = *next;
-    *next = next
-        .checked_add(1)
-        .ok_or_else(|| "too many ACP sessions in one process; restart mei --acp".to_owned())?;
-    Ok((format!("mei_{id}"), path))
-}
-
-fn prompt_params(params: &Value, session_id: &str) -> std::result::Result<String, String> {
-    let asked = params
-        .get("sessionId")
-        .and_then(Value::as_str)
-        .ok_or_else(|| "session/prompt requires sessionId".to_owned())?;
-    if asked != session_id {
-        return Err(format!("unknown sessionId `{asked}`"));
-    }
-    let prompt = params
-        .get("prompt")
-        .and_then(Value::as_array)
-        .ok_or_else(|| "session/prompt requires a prompt array".to_owned())?;
-    prompt_text(prompt)
-        .ok_or_else(|| "session/prompt needs at least one non-empty text block".to_owned())
-}
-
-fn write_result(output: &mut impl Write, id: &Value, result: Value) -> Result<()> {
-    write_message(
-        output,
-        &json!({ "jsonrpc": "2.0", "id": id, "result": result }),
-    )
-}
-
-fn write_error(output: &mut impl Write, id: &Value, code: i64, message: String) -> Result<()> {
-    write_message(
-        output,
-        &json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "error": { "code": code, "message": message }
-        }),
-    )
-}
-
-fn write_update(output: &mut impl Write, session_id: &str, update: Value) -> Result<()> {
-    write_message(
-        output,
-        &json!({
-            "jsonrpc": "2.0",
-            "method": "session/update",
-            "params": { "sessionId": session_id, "update": update }
-        }),
-    )
-}
-
-fn write_message(output: &mut impl Write, message: &Value) -> Result<()> {
-    let mut line = serde_json::to_string(message).map_err(|err| {
-        Error::Diagnostic(Diagnostic::new(
-            Code::Protocol,
-            "encode an ACP message",
-            err.to_string(),
-            "keep ACP payloads within JSON object limits",
-        ))
-    })?;
-    line.push('\n');
-    output.write_all(line.as_bytes()).map_err(|err| {
-        Error::Diagnostic(Diagnostic::new(
-            Code::Protocol,
-            "write an ACP message",
-            err.to_string(),
-            "keep the client stdout pipe open for JSON-RPC replies",
-        ))
-    })?;
-    output.flush().map_err(|err| {
-        Error::Diagnostic(Diagnostic::new(
-            Code::Protocol,
-            "flush ACP stdout",
-            err.to_string(),
-            "keep the client stdout pipe open for JSON-RPC replies",
-        ))
-    })
 }
 
 pub fn enter_cwd(cwd: &Path) -> Result<()> {
