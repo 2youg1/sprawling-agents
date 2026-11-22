@@ -104,11 +104,38 @@ fn svelte_control_blocks_do_not_swallow_following_comments() {
 }
 
 #[test]
+fn svelte_block_expressions_use_javascript_lexing() {
+    let source = r#"{#if "}" /* first */ ready}
+<p>ok</p>
+{:else if other /* second */}
+<p>other</p>
+{/if}
+<!-- after -->
+"#;
+    let reading = lexer::measure(source, Language::Svelte);
+    assert_eq!(reading.comment_lines, 3, "{reading:?}");
+    let data = r#"{#if ready}
+<p>ok</p>
+{:else if "/* data */"}
+<p>other</p>
+{/if}
+"#;
+    assert_eq!(lexer::measure(data, Language::Svelte).comment_lines, 0);
+}
+
+#[test]
 fn svelte_script_open_tags_may_span_lines() {
     let source =
         "<script\n  lang=\"ts\"\n>\n  // first\n  // second\n  const value = 1;\n</script>\n";
     let reading = lexer::measure(source, Language::Svelte);
     assert_eq!(reading.comment_lines, 2, "{reading:?}");
+}
+
+#[test]
+fn javascript_line_comments_after_colons_count() {
+    let source = "const value = { key:// reason\n    1 };\n";
+    let reading = lexer::measure(source, Language::TypeScript);
+    assert_eq!(reading.comment_lines, 1, "{reading:?}");
 }
 
 #[test]
@@ -220,6 +247,16 @@ triple = """
         lexer::measure(&format!("{header}\n# real\n"), Language::Python).comment_lines,
         1
     );
+}
+
+#[test]
+fn python_fstring_expression_comments_reach_the_real_gate() {
+    let source = "value = f\"\"\"{1 # forbidden\n}\"\"\"\n";
+    assert_eq!(lexer::measure(source, Language::Python).comment_lines, 1);
+    let root = crate::root::fixture::relocated("comments-python-fstring");
+    crate::root::fixture::write(&root, "tools/k/src/fstring.py", source);
+    assert_eq!(check(&root).unwrap().len(), 1);
+    std::fs::remove_dir_all(&root).unwrap();
 }
 
 #[test]

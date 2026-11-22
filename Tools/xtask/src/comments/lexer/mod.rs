@@ -44,6 +44,7 @@ pub(super) enum Mode {
     Code(CodeMode),
     Template,
     Markup,
+    PythonString { quote: u8, triple: bool },
 }
 
 impl Language {
@@ -85,9 +86,9 @@ fn code(syntax: Syntax) -> Mode {
     })
 }
 
-fn expression() -> Mode {
+fn expression(syntax: Syntax) -> Mode {
     Mode::Code(CodeMode {
-        syntax: Syntax::JavaScript,
+        syntax,
         template_expression: true,
         braces: 0,
         embedded: false,
@@ -118,6 +119,9 @@ impl Scanner<'_> {
                 Some(Mode::Markup) => self.markup(index),
                 Some(Mode::Template) => self.template(index),
                 Some(Mode::Code(mode)) => self.code(index, mode),
+                Some(Mode::PythonString { quote, triple }) => {
+                    self.python_string(index, quote, triple)
+                }
                 None => self.bytes.len(),
             };
         }
@@ -134,13 +138,10 @@ impl Scanner<'_> {
             return self.html_comment(index);
         }
         if byte == b'{' {
-            if matches!(
-                self.bytes.get(index.saturating_add(1)),
-                Some(b'/' | b'#' | b':')
-            ) {
-                return self.svelte_block(index);
+            if self.bytes.get(index.saturating_add(1)) == Some(&b'/') {
+                return self.svelte_close(index);
             }
-            self.modes.push(expression());
+            self.modes.push(expression(Syntax::JavaScript));
             return self.advance(index);
         }
         if byte == b'<'
@@ -152,27 +153,15 @@ impl Scanner<'_> {
         self.advance(index)
     }
 
-    fn svelte_block(&mut self, mut index: usize) -> usize {
-        let mut depth = 0_usize;
+    fn svelte_close(&mut self, mut index: usize) -> usize {
         while index < self.bytes.len() {
             let Some(&byte) = self.bytes.get(index) else {
                 break;
             };
-            if byte == b'\n' {
-                index = self.advance(index);
-                continue;
-            }
-            if byte == b'{' {
-                depth = depth.saturating_add(1);
-            } else if byte == b'}' {
-                index = self.advance(index);
-                depth = depth.saturating_sub(1);
-                if depth == 0 {
-                    return index;
-                }
-                continue;
-            }
             index = self.advance(index);
+            if byte == b'}' {
+                break;
+            }
         }
         index
     }
@@ -237,10 +226,14 @@ impl Scanner<'_> {
         if matches!(mode.syntax, Syntax::Rust | Syntax::JavaScript | Syntax::Zig)
             && at(self.bytes, index, b"//")
         {
-            if mode.syntax == Syntax::JavaScript
+            let markup_url = mode.syntax == Syntax::JavaScript
                 && index > 0
                 && self.bytes.get(index.saturating_sub(1)) == Some(&b':')
-            {
+                && self
+                    .bytes
+                    .get(index.saturating_add(2))
+                    .is_some_and(|byte| !byte.is_ascii_whitespace());
+            if markup_url {
                 return self.advance(index);
             }
             return self.line_comment(index);
@@ -264,6 +257,14 @@ impl Scanner<'_> {
             return self.advance(index);
         }
         if mode.syntax == Syntax::Python && matches!(byte, b'\'' | b'"') {
+            if self.python_formatted(index) {
+                let triple = at(self.bytes, index, &[byte, byte, byte]);
+                self.modes.push(Mode::PythonString {
+                    quote: byte,
+                    triple,
+                });
+                return self.python_string_open(index, triple);
+            }
             return self.python_quoted(index, byte);
         }
         if mode.syntax == Syntax::Rust

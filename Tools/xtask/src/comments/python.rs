@@ -29,19 +29,87 @@ for node in ast.walk(tree):
 print(json.dumps(found))
 "#;
 
+pub(super) fn documentation_lines(file: &Path, rel: &str) -> Result<usize, XtaskError> {
+    let interpreter = interpreter(file)?;
+    parse_with(&interpreter, file, rel)
+}
+
+#[expect(
+    clippy::disallowed_methods,
+    reason = "doctor and the comments gate share uv's interpreter resolution"
+)]
+fn interpreter(file: &Path) -> Result<std::path::PathBuf, XtaskError> {
+    let output = Command::new("uv")
+        .args(["python", "find"])
+        .output()
+        .map_err(|source| {
+            process_failure(
+                file,
+                Failure {
+                    code: "python-resolver-unavailable",
+                    action: "resolve the Python interpreter for the comments gate",
+                    value: "uv python find",
+                    error: &source.to_string(),
+                },
+            )
+        })?;
+    if !output.status.success() {
+        return Err(process_failure(
+            file,
+            Failure {
+                code: "python-resolution-failed",
+                action: "resolve the Python interpreter for the comments gate",
+                value: "uv python find",
+                error: &String::from_utf8_lossy(&output.stderr),
+            },
+        ));
+    }
+    let path = String::from_utf8(output.stdout).map_err(|error| {
+        process_failure(
+            file,
+            Failure {
+                code: "python-path-not-utf8",
+                action: "read the interpreter selected by uv",
+                value: "uv python find standard output",
+                error: &error.to_string(),
+            },
+        )
+    })?;
+    let path = path.trim();
+    if path.is_empty() {
+        return Err(process_failure(
+            file,
+            Failure {
+                code: "python-path-empty",
+                action: "read the interpreter selected by uv",
+                value: "uv python find standard output",
+                error: "the command succeeded without printing a path",
+            },
+        ));
+    }
+    Ok(std::path::PathBuf::from(path))
+}
+
 #[expect(
     clippy::disallowed_methods,
     reason = "Python's own AST identifies documentation strings"
 )]
-pub(super) fn documentation_lines(file: &Path, rel: &str) -> Result<usize, XtaskError> {
-    let output = Command::new("python")
+fn parse_with(interpreter: &Path, file: &Path, rel: &str) -> Result<usize, XtaskError> {
+    let output = Command::new(interpreter)
         .arg("-c")
         .arg(DOCUMENTATION)
         .arg(file)
         .output()
-        .map_err(|source| XtaskError::Io {
-            path: "python -c ast".to_owned(),
-            source,
+        .map_err(|source| {
+            process_failure(
+                file,
+                Failure {
+                    code: "python-launch-failed",
+                    action: "start Python to identify documentation strings",
+                    value: &interpreter.display().to_string(),
+                    error: &source.to_string(),
+                },
+            )
         })?;
     if !output.status.success() {
         return Err(XtaskError::Doc {
@@ -65,10 +133,65 @@ pub(super) fn documentation_lines(file: &Path, rel: &str) -> Result<usize, Xtask
         })
 }
 
+struct Failure<'a> {
+    code: &'a str,
+    action: &'a str,
+    value: &'a str,
+    error: &'a str,
+}
+
+fn process_failure(file: &Path, failure: Failure<'_>) -> XtaskError {
+    let path = file.display().to_string();
+    let fields = [
+        ("code", failure.code),
+        ("action", failure.action),
+        ("subject", "comments gate Python AST"),
+        ("path", &path),
+        ("value", failure.value),
+        (
+            "rule",
+            "the gate must use the interpreter selected by uv python find",
+        ),
+        (
+            "repair",
+            "Run just prereqs and follow its uv installation line if needed; run uv python install, confirm uv python find prints a path, then rerun cargo xtask gates comments.",
+        ),
+        ("error", failure.error),
+    ];
+    let mut msg = "```toml\n".to_owned();
+    for (name, value) in fields {
+        msg.push_str(&format!(
+            "{name} = {}\n",
+            toml::Value::String(value.to_owned())
+        ));
+    }
+    msg.push_str("```");
+    XtaskError::Doc { file: path, msg }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_missing_interpreter_names_the_file_and_the_uv_repair() {
+        let root = crate::root::fixture::relocated("python-missing-interpreter");
+        let rel = "tools/k/src/documented.py";
+        crate::root::fixture::write(&root, rel, "value = 1\n");
+        let missing = root.join("missing-python");
+        let error = parse_with(&missing, &root.join(rel), rel).unwrap_err();
+        let text = error.to_string();
+        for expected in [
+            "python-launch-failed",
+            &root.join(rel).display().to_string(),
+            "uv python install",
+            "uv python find",
+        ] {
+            assert!(text.contains(expected), "{text}");
+        }
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 
     #[test]
     fn documentation_strings_count_but_assigned_and_returned_strings_do_not() {

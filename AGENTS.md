@@ -52,7 +52,7 @@ The workspace lint table owns the mechanical rules: warnings are errors, arithme
 </rust>
 
 <comments>
-Write no comment in code. The exact leading MPL notice is the only exception; make invalid states unrepresentable or enforce the constraint with a concrete lint, test or gate, never prose.
+Write no comment in source code covered by the `comments` gate; make invalid states unrepresentable or enforce the constraint with a concrete lint, test or gate, never prose. The exact leading MPL notice is the only comment admitted there. Lean `Spec.lean` and `spec/` parts retain the natural-language contracts and `D<n>` decision records required by the specification workflow.
 </comments>
 
 <where_code_goes>

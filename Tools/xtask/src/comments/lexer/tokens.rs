@@ -22,7 +22,7 @@ impl Scanner<'_> {
             return self.advance(index);
         }
         if at(self.bytes, index, b"${") {
-            self.modes.push(expression());
+            self.modes.push(expression(Syntax::JavaScript));
             let next = self.advance(index);
             return self.advance(next);
         }
@@ -73,6 +73,52 @@ impl Scanner<'_> {
             }
         }
         index
+    }
+
+    pub(super) fn python_formatted(&self, index: usize) -> bool {
+        let previous = index.checked_sub(1).and_then(|at| self.bytes.get(at));
+        if matches!(previous, Some(b'f' | b'F')) {
+            return true;
+        }
+        matches!(previous, Some(b'r' | b'R'))
+            && index
+                .checked_sub(2)
+                .and_then(|at| self.bytes.get(at))
+                .is_some_and(|byte| matches!(byte, b'f' | b'F'))
+    }
+
+    pub(super) fn python_string_open(&mut self, mut index: usize, triple: bool) -> usize {
+        let width = if triple { 3 } else { 1 };
+        for _ in 0..width {
+            index = self.advance(index);
+        }
+        index
+    }
+
+    pub(super) fn python_string(&mut self, index: usize, quote: u8, triple: bool) -> usize {
+        let Some(&byte) = self.bytes.get(index) else {
+            return self.bytes.len();
+        };
+        if byte == b'\\' {
+            let next = self.advance(index);
+            return self.advance(next);
+        }
+        if (triple && at(self.bytes, index, &[quote, quote, quote])) || (!triple && byte == quote) {
+            self.modes.pop();
+            return self.python_string_open(index, triple);
+        }
+        if !triple && byte == b'\n' {
+            self.modes.pop();
+            return self.advance(index);
+        }
+        if byte == b'{' {
+            if self.bytes.get(index.saturating_add(1)) == Some(&b'{') {
+                let next = self.advance(index);
+                return self.advance(next);
+            }
+            self.modes.push(expression(Syntax::Python));
+        }
+        self.advance(index)
     }
 
     pub(super) fn python_quoted(&mut self, mut index: usize, quote: u8) -> usize {
