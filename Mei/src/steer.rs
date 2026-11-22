@@ -71,7 +71,7 @@ pub fn land(results: &mut [Value], steers: &[String]) {
 pub struct Intake {
     path: PathBuf,
     offset: u64,
-    pending: String,
+    pending: Vec<u8>,
 }
 
 impl Intake {
@@ -79,7 +79,7 @@ impl Intake {
         Ok(Intake {
             path: path.as_ref().to_path_buf(),
             offset: 0,
-            pending: String::new(),
+            pending: Vec::new(),
         })
     }
 
@@ -91,8 +91,8 @@ impl Intake {
         };
         file.seek(SeekFrom::Start(self.offset))
             .map_err(|err| self.io("seek the Mei steer file", err))?;
-        let mut chunk = String::new();
-        file.read_to_string(&mut chunk)
+        let mut chunk = Vec::new();
+        file.read_to_end(&mut chunk)
             .map_err(|err| self.io("read the Mei steer file", err))?;
         let read = u64::try_from(chunk.len()).map_err(|_| {
             Error::Diagnostic(
@@ -106,20 +106,31 @@ impl Intake {
             )
         })?;
         self.offset = self.offset.saturating_add(read);
-        self.pending.push_str(&chunk);
+        self.pending.extend_from_slice(&chunk);
         let mut steers = Vec::new();
-        while let Some(end) = self.pending.find('\n') {
-            let mut line: String = self.pending.drain(..=end).collect();
-            if line.ends_with('\n') {
+        while let Some(end) = self.pending.iter().position(|byte| *byte == b'\n') {
+            let mut line = self.pending.drain(..=end).collect::<Vec<u8>>();
+            if line.last() == Some(&b'\n') {
                 line.pop();
             }
-            if line.ends_with('\r') {
+            if line.last() == Some(&b'\r') {
                 line.pop();
             }
             if line.is_empty() {
                 continue;
             }
-            steers.push(self.parse_line(&line)?);
+            let text = std::str::from_utf8(&line).map_err(|err| {
+                Error::Diagnostic(
+                    Diagnostic::new(
+                        Code::Config,
+                        "decode a Mei steer line",
+                        err.to_string(),
+                        "append one UTF-8 JSON object per line shaped as {\"text\":\"…\"}",
+                    )
+                    .with_path(self.path.display().to_string()),
+                )
+            })?;
+            steers.push(self.parse_line(text)?);
         }
         Ok(steers)
     }
@@ -227,5 +238,26 @@ mod tests {
         writeln!(file, "ial\"}}").unwrap();
         file.flush().unwrap();
         assert_eq!(intake.drain().unwrap(), ["partial"]);
+    }
+
+    #[test]
+    fn intake_waits_when_a_multibyte_character_is_split() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("steer.jsonl");
+        let mut intake = Intake::open(&path).unwrap();
+        let mut file = File::create(&path).unwrap();
+        let line = "{\"text\":\"窄搜索\"}\n";
+        let bytes = line.as_bytes();
+        let split = bytes
+            .iter()
+            .position(|byte| *byte == 0xE7)
+            .and_then(|start| start.checked_add(1))
+            .expect("narrow starts with a three-byte character");
+        file.write_all(&bytes[..split]).unwrap();
+        file.flush().unwrap();
+        assert!(intake.drain().unwrap().is_empty());
+        file.write_all(&bytes[split..]).unwrap();
+        file.flush().unwrap();
+        assert_eq!(intake.drain().unwrap(), ["窄搜索"]);
     }
 }
