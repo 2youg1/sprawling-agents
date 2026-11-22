@@ -129,7 +129,7 @@ Rust 是宿主边界，不是壳实现。
 
 /-! D9 Mei 短命令与无参恢复归 Calyx：`/n` 等价 `/new`，`/r` 无参恢复刚离开的非空会话，`/q` 等价 `/quit`；`/e` 只改后续请求，不伪造当前 route 已确认。模型切换不另做 `/m`，由 Magpie 路由拥有。Esc 只停止，不退出。 -/
 
-/-! D11 任务进行中的普通提交是 Steer，经 `MEI_STEER_PATH` 投递给无头核
+/-! D12 任务进行中的普通提交是 Steer，经 `MEI_STEER_PATH` 投递给无头核
 
 决定：Calyx 在每次 run 的 capture 目录**旁**独占创建 `{capture}.steer.jsonl`（兄弟文件，
 不写入 capture 目录内），经子进程环境 `MEI_STEER_PATH` 交给 Mei；人在进程仍在时提交的
