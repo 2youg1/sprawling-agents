@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 use std::collections::BTreeSet;
 use std::io::Write;
 
@@ -14,7 +13,7 @@ use crate::steer;
 
 pub const TOOL_NAME: &str = "python";
 
-pub trait Ports {
+pub(crate) trait Ports {
     fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value>;
     fn exec(&mut self, code: &str) -> Result<Value>;
     fn steer(&mut self) -> Result<Vec<String>>;
@@ -41,11 +40,7 @@ struct Call {
     code: String,
 }
 
-pub fn run(
-    request: &mut Value,
-    ports: &mut dyn Ports,
-    trace: &mut dyn Write,
-) -> Result<String> {
+pub fn run(request: &mut Value, ports: &mut dyn Ports, trace: &mut dyn Write) -> Result<String> {
     let mut first_response = true;
     loop {
         let response = ports.post(request, trace)?;

@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -195,7 +194,10 @@ mod tests {
     fn string_content_grows_with_a_user_prefix() {
         let mut content = Value::String("40\n".to_owned());
         append_to_content(&mut content, "narrow the search");
-        assert_eq!(content, Value::String("40\nuser: narrow the search".to_owned()));
+        assert_eq!(
+            content,
+            Value::String("40\nuser: narrow the search".to_owned())
+        );
     }
 
     #[test]
@@ -232,7 +234,11 @@ mod tests {
         let mut intake = Intake::open(&path).unwrap();
         assert!(intake.drain().unwrap().is_empty());
         let mut file = File::create(&path).unwrap();
-        write!(file, "{{\"text\":\"one\"}}\n{{\"text\":\"two\"}}\n{{\"text\":\"part").unwrap();
+        write!(
+            file,
+            "{{\"text\":\"one\"}}\n{{\"text\":\"two\"}}\n{{\"text\":\"part"
+        )
+        .unwrap();
         file.flush().unwrap();
         assert_eq!(intake.drain().unwrap(), ["one", "two"]);
         writeln!(file, "ial\"}}").unwrap();

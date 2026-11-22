@@ -52,8 +52,7 @@ impl Ports for Script {
     }
 
     fn exec(&mut self, code: &str) -> Result<Value> {
-        self.steered_during_exec
-            .set(self.drained.get() > 0);
+        self.steered_during_exec.set(self.drained.get() > 0);
         if self.fail_exec {
             return Err(Error::from(protocol(
                 "execute Python",
@@ -245,7 +244,10 @@ fn a_steer_lands_on_the_latest_tool_result_after_exec() {
     assert_eq!(ports.executed, ["print(1)", "print(2)"]);
     let results = request["messages"][2]["content"].as_array().unwrap();
     assert_eq!(results[0]["content"], "out:print(1)");
-    assert_eq!(results[1]["content"], "out:print(2)\nuser: narrow the search");
+    assert_eq!(
+        results[1]["content"],
+        "out:print(2)\nuser: narrow the search"
+    );
 }
 
 #[test]

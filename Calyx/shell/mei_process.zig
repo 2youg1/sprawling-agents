@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Mei child driver: spawn with stdin prompt, stream stderr lines, stop the
-// Unix process group (pgid=0 at spawn). Windows: Job Object with
-// KILL_ON_JOB_CLOSE so Esc ends the whole subtree (Console §8-174).
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -84,9 +81,7 @@ pub const Process = struct {
     io: std.Io,
     bus: *Bus,
     signals: *Signals,
-    /// Unix process id (group leader when pgid=0). Windows: process HANDLE.
     id: ?std.process.Child.Id = null,
-    /// Windows Job Object; closing it kills the assigned subtree.
     job: if (builtin.os.tag == .windows) ?windows.HANDLE else void =
         if (builtin.os.tag == .windows) null else {},
     driver: ?std.Thread = null,
@@ -214,7 +209,6 @@ pub const Process = struct {
         return .ok;
     }
 
-    /// Join the driver and free signals without sending another stop.
     pub fn finish(self: *Process) void {
         _ = self.reap();
         self.closeJob();
@@ -359,9 +353,6 @@ const DriverCtx = struct {
     child: std.process.Child,
     prompt: []u8,
     signals: *Signals,
-    /// Borrowed from `Process`, which closes it only after this thread is
-    /// joined; the driver uses it to end the whole tree before it waits for
-    /// the pipe to close.
     job: if (builtin.os.tag == .windows) ?windows.HANDLE else void =
         if (builtin.os.tag == .windows) null else {},
 };
@@ -410,9 +401,6 @@ fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
     var stdout_ctx: StdoutCtx = .{ .gpa = gpa, .io = io, .file = stdout_file };
     var stdout_thread: ?std.Thread = null;
     var waited = false;
-    // A failed prompt write or thread spawn must not strand the child or the
-    // pipes, so every cleanup below guards on the field it owns instead of
-    // running only after the thread exists.
     errdefer {
         killTree(ctx, child.id);
         if (stdout_thread) |thread| {
@@ -495,8 +483,6 @@ fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
     return .{ .err = try gpa.dupe(u8, msg) };
 }
 
-/// Steer delivery sits beside the capture directory, never inside it, so Mei
-/// can still adopt an empty `MEI_CAPTURE_DIR`.
 pub fn steerPath(gpa: std.mem.Allocator, capture_directory: []const u8) ![]u8 {
     return std.fmt.allocPrint(gpa, "{s}.steer.jsonl", .{capture_directory});
 }
@@ -703,10 +689,6 @@ fn openFileCount(io: std.Io) !usize {
     return count;
 }
 
-/// Ends the whole Mei tree: POSIX kills the process group the child led,
-/// Windows terminates its job. Called before waiting on the stdout thread,
-/// whose end needs every writer of that pipe to be gone. `id` is read before
-/// `Child.wait`, which clears it.
 fn killTree(ctx: *DriverCtx, id: ?std.process.Child.Id) void {
     if (comptime builtin.os.tag == .windows) {
         if (ctx.job) |job| WinJob.terminate(job);
