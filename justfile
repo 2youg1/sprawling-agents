@@ -23,7 +23,7 @@ default: check
 # clippy's minutes.
 #
 # `ci.yml` runs the same recipes, one job per slice of this line. Its
-# length/comments checks use the changed-file scope; this full `check`
+# length/comments/unsafe checks use the changed-file scope; this full `check`
 # remains the migration inventory and the integrated-tree gate after cleanup.
 check: prereqs gates-sources models build-web clippy features test gates check-client
 
@@ -524,15 +524,15 @@ gates-sources mode="" *paths:
     set -euo pipefail
     if [ "{{mode}}" = "changed" ]; then
         if [ -n "${GATES_CHANGED_NUL:-}" ]; then
-            cargo xtask gates length comments --files-from "$GATES_CHANGED_NUL"
+            cargo xtask gates length comments unsafe --files-from "$GATES_CHANGED_NUL"
         else
             files=("$@")
             if [ "${#files[@]}" -gt 0 ] && [ "${files[0]}" = "changed" ]; then
                 files=("${files[@]:1}")
             fi
-            cargo xtask gates length comments --files "${files[@]}"
+            cargo xtask gates length comments unsafe --files "${files[@]}"
         fi
-        cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}|length|comments')
+        cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}|length|comments|unsafe')
     else
         just verify-sources
     fi

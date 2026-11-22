@@ -19,7 +19,8 @@ namespace DesktopFfi
 - **边界规则**（`zig/boundary.zig`，Rust 面 `desktop_ffi::boundary`）：叶子往 Rust 的内存里写什么。四条：一串句柄按缓冲长度保留、按全长计数（`kept`）；一段别的程序写的剪贴板文本复制到第一个零单元为止、恒不越过块的大小（`textCopy`）；一段新文本恰好带一个终止符写进恰好那么长的块（`textFill`）；一张位图的字节数不溢出（`bitmapBytes`）。
 - **资源配对**（`zig/leaf.zig`）：每个操作在它自己的 export 之内取得、也释放它取得的一切。剪贴板写的那块内存要么交给剪贴板、要么由叶子释放（`write`）；捕获取得的三个 GDI 对象各释放一次，位图解除选择之后才读回（`captured`）。
 - **处理器与份额**（`desktop_ffi` 的 `cpu_set`、`cpu`，D4）：叶子把 CPU set 的原始记录写进借来的缓冲、读调用线程的组亲和、关掉本进程的执行速度限流、给一只 job 设 CPU 权重与内存上限、挂上读撞限的 completion port（D6）；记录由 `cpu_set::parse` 按每条自己的 `Size` 走，走法的性质在 §10 证明。
-- **Rust 面**（`desktop_ffi` 的 `top_level`、`capture`、`clipboard`、`dpi`、`ended`）：每个 export 一个安全函数，函数里恰好一个 `unsafe` 块，块上一行 `SAFETY:` 写使它成立、并且可能为假的前提。来源：AGENTS.md「Rust」一节的平台调用次序；路线图 X3。
+- **Rust 面**（`desktop_ffi` 的 `top_level`、`capture`、`clipboard`、`dpi`、`ended`）：未触及旧实现中，每个 export 一个安全函数，函数里一个 `unsafe` 块，块上一行 `SAFETY:` 写使它成立、并且可能为假的前提；新增与变更文件服从 D8 的零 token 规则。
+D8 **本包的既有 `unsafe` 是逐文件迁移的旧债，不是新代码入口。** `xtask unsafe` 对新增与变更文件拒绝任何真实 token；本规格前文的 `SAFETY:` 与逐调用块形状只描述未触及旧实现。触及文件须用安全接口或重设计边界保持同一契约，旧债清零后删除本包 lint 差异与 guard 记录。
 -/
 
 /-! ## 2 验收标准
@@ -628,7 +629,7 @@ owner 持有：`JobWatch` 只持 port 的句柄值，`Drop` 关它。被否：�
 
 /-! ## 16 测试与约束
 
-已证：§10 的定理。测试：`desktop_ffi` 的 `ended` 与 `boundary` 单测（对拍）；`zig test Sprawling/desktop/ffi/zig/leaf.zig`（Zig 侧单测、种子化性质、fuzz 测试的单次输入）；`just fuzz-desktop`（按给定轮数与种子的长时对拍）。libFuzzer 在这里没有平台：叶子只在 Windows 上编，而 cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时；所以 Rust 一侧以抽样而不是以覆盖来 fuzz。重开参数：cargo-fuzz 在 windows-msvc 上链接得出。环境假设：§3。约束：`unsafe` 恒只在本包、恒是一次 export 调用、恒带一行 `SAFETY:`；lint 表是 `Sprawling/desktop/Cargo.toml` 的 `[workspace.lints]`，与根工作区逐键比对（`xtask guard`）。
+已证：§10 的定理。测试：`desktop_ffi` 的 `ended` 与 `boundary` 单测（对拍）；`zig test Sprawling/desktop/ffi/zig/leaf.zig`（Zig 侧单测、种子化性质、fuzz 测试的单次输入）；`just fuzz-desktop`（按给定轮数与种子的长时对拍）。libFuzzer 在这里没有平台：叶子只在 Windows 上编，而 cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时；所以 Rust 一侧以抽样而不是以覆盖来 fuzz。重开参数：cargo-fuzz 在 windows-msvc 上链接得出。环境假设：§3。约束：未触及旧实现的 `unsafe` 只在本包、只包住一次 export 调用并带一行 `SAFETY:`；新增与变更文件由 D8 判零。lint 表与根工作区逐键比对（`xtask guard`），旧债清零后删除差异。
 -/
 
 /-! ## 17 文档关系
@@ -636,7 +637,7 @@ owner 持有：`JobWatch` 只持 port 的句柄值，`Drop` 关它。被否：�
 - `Sprawling/desktop/Spec.lean` §8-11、§8-12、D12、D14：server 一侧的调用组表、缝的位置，以及本包那一张只差 `unsafe_code` 一行的 lint 表；那里的表变了，§1 的四组随之变。
 - `Tools/xtask/Spec.lean` §8-46：guard 怎么读这堵墙。
 - `Sprawling/app/Spec.lean` §8-146：doctor 的 `zig` 一行。
-- `AGENTS.md`「Rust」一节：平台调用的次序与 `SAFETY:` 行的写法；那里的规则变了，D1 重议。
+- `AGENTS.md`「Rust」一节与 D8：新增及变更文件零 `unsafe`，旧 FFI 只按文件迁移。
 -/
 
 end DesktopFfi

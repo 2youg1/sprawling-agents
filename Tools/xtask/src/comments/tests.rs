@@ -9,22 +9,12 @@ use super::*;
 use crate::header::{self, Leader};
 
 #[test]
-fn the_boundary_is_ten_percent_and_one_more_comment_is_rejected() {
+fn only_the_exact_mpl_header_is_admitted() {
     let mut source = header::notice(Leader::Rust).join("\n");
     source.push('\n');
-    source.push_str(&"// necessary contract\n".repeat(10));
-    source.push_str(&"const VALUE: u8 = 1;\n".repeat(90));
-    let accepted = lexer::measure(&source, Language::Rust);
-    assert_eq!(
-        accepted,
-        Reading {
-            comment_lines: 10,
-            judged_lines: 100,
-        }
-    );
-    assert!(!over(accepted));
-    source.push_str("// one too many\n");
-    assert!(over(lexer::measure(&source, Language::Rust)));
+    assert_eq!(lexer::measure(&source, Language::Rust).comment_lines, 0);
+    source.push_str("// forbidden\n");
+    assert_eq!(lexer::measure(&source, Language::Rust).comment_lines, 1);
 }
 
 #[test]
@@ -34,9 +24,7 @@ fn an_inline_comment_counts_and_an_empty_file_is_clean() {
         Language::TypeScript,
     );
     assert_eq!(reading.comment_lines, 1);
-    assert_eq!(reading.judged_lines, 2);
-    assert!(over(reading));
-    assert!(!over(lexer::measure("", Language::Rust)));
+    assert_eq!(lexer::measure("", Language::Rust).comment_lines, 0);
 }
 
 #[test]
@@ -60,7 +48,6 @@ fn rust_block_comments_nest() {
         Language::Rust,
     );
     assert_eq!(reading.comment_lines, 4);
-    assert_eq!(reading.judged_lines, 5);
 }
 
 #[test]
@@ -117,11 +104,38 @@ fn svelte_control_blocks_do_not_swallow_following_comments() {
 }
 
 #[test]
+fn svelte_block_expressions_use_javascript_lexing() {
+    let source = r#"{#if "}" /* first */ ready}
+<p>ok</p>
+{:else if other /* second */}
+<p>other</p>
+{/if}
+<!-- after -->
+"#;
+    let reading = lexer::measure(source, Language::Svelte);
+    assert_eq!(reading.comment_lines, 3, "{reading:?}");
+    let data = r#"{#if ready}
+<p>ok</p>
+{:else if "/* data */"}
+<p>other</p>
+{/if}
+"#;
+    assert_eq!(lexer::measure(data, Language::Svelte).comment_lines, 0);
+}
+
+#[test]
 fn svelte_script_open_tags_may_span_lines() {
     let source =
         "<script\n  lang=\"ts\"\n>\n  // first\n  // second\n  const value = 1;\n</script>\n";
     let reading = lexer::measure(source, Language::Svelte);
     assert_eq!(reading.comment_lines, 2, "{reading:?}");
+}
+
+#[test]
+fn javascript_line_comments_after_colons_count() {
+    let source = "const value = { key:// reason\n    1 };\n";
+    let reading = lexer::measure(source, Language::TypeScript);
+    assert_eq!(reading.comment_lines, 1, "{reading:?}");
 }
 
 #[test]
@@ -172,7 +186,6 @@ fn only_the_exact_leading_mpl_header_is_excluded() {
     let source = format!("{header}\n{header}\n");
     let reading = lexer::measure(&source, Language::Rust);
     assert_eq!(reading.comment_lines, 4);
-    assert_eq!(reading.judged_lines, 4);
 }
 
 #[test]
@@ -206,4 +219,90 @@ fn file_scope_judges_only_the_named_files_and_never_falls_back_to_the_tree() {
     assert!(check_scoped(&root, &empty).unwrap().is_empty());
     assert!(crate::source::Scope::new(&["../escape.rs".to_owned()]).is_err());
     std::fs::remove_dir_all(&root).unwrap();
+}
+
+#[test]
+fn zig_multiline_strings_do_not_hide_real_comments() {
+    let source = r#"const text =
+    \\// not a comment
+    \\/* also text */
+    ;
+// real
+"#;
+    assert_eq!(lexer::measure(source, Language::Zig).comment_lines, 1);
+}
+
+#[test]
+fn python_strings_and_hashes_are_distinct() {
+    let source = r##"#!/usr/bin/env python3
+text = "# not a comment"
+triple = """
+# also text
+"""
+# real
+"##;
+    assert_eq!(lexer::measure(source, Language::Python).comment_lines, 2);
+    let header = header::NOTICE.map(|row| format!("# {row}")).join("\n");
+    assert_eq!(
+        lexer::measure(&format!("{header}\n# real\n"), Language::Python).comment_lines,
+        1
+    );
+}
+
+#[test]
+fn python_fstring_expression_comments_reach_the_real_gate() {
+    let source = "value = f\"\"\"{1 # forbidden\n}\"\"\"\n";
+    assert_eq!(lexer::measure(source, Language::Python).comment_lines, 1);
+    let root = crate::root::fixture::relocated("comments-python-fstring");
+    crate::root::fixture::write(&root, "tools/k/src/fstring.py", source);
+    assert_eq!(check(&root).unwrap().len(), 1);
+    std::fs::remove_dir_all(&root).unwrap();
+}
+
+#[test]
+fn python_fstring_format_specifiers_are_not_comments() {
+    let source = "value = f\"{42:#x}\"\n";
+    assert_eq!(lexer::measure(source, Language::Python).comment_lines, 0);
+    let root = crate::root::fixture::relocated("comments-python-format");
+    crate::root::fixture::write(&root, "tools/k/src/format.py", source);
+    assert!(check(&root).unwrap().is_empty());
+    std::fs::remove_dir_all(&root).unwrap();
+}
+
+#[test]
+fn python_raw_fstring_backslashes_preserve_expression_boundaries() {
+    let source = "value = rf\"\"\"\\{1 # forbidden\n}\"\"\"\n";
+    assert_eq!(lexer::measure(source, Language::Python).comment_lines, 1);
+    let root = crate::root::fixture::relocated("comments-python-raw-fstring");
+    crate::root::fixture::write(&root, "tools/k/src/raw.py", source);
+    assert_eq!(check(&root).unwrap().len(), 1);
+    std::fs::remove_file(root.join("tools/k/src/raw.py")).unwrap();
+    let escaped = "value = rf\"\\\"\" # forbidden\n";
+    assert_eq!(lexer::measure(escaped, Language::Python).comment_lines, 1);
+    crate::root::fixture::write(&root, "tools/k/src/escaped.py", escaped);
+    assert_eq!(check(&root).unwrap().len(), 1);
+    std::fs::remove_file(root.join("tools/k/src/escaped.py")).unwrap();
+    let data = r#"value = f"\N{LATIN SMALL LETTER A}"
+quoted = f"\""
+braces = f"{{# data}}"
+"#;
+    crate::root::fixture::write(&root, "tools/k/src/data.py", data);
+    assert!(check(&root).unwrap().is_empty());
+    std::fs::remove_dir_all(&root).unwrap();
+}
+
+#[test]
+fn css_mpl_and_strings_leave_only_the_real_comment() {
+    let source = "/* This Source Code Form is subject to the terms of the Mozilla Public\n * License, v. 2.0. If a copy of the MPL was not distributed with this\n * file, You can obtain one at https://mozilla.org/MPL/2.0/.\n * Copyright (c) 2026 2youg1 and the sprawling contributors */\n.a::after { content: \"/* not a comment */\"; }\n/* real */\n";
+    assert_eq!(lexer::measure(source, Language::Css).comment_lines, 1);
+}
+
+#[test]
+fn svelte_style_uses_css_and_script_uses_javascript() {
+    let source = r#"<style>.a::after { content: "// text"; }</style>
+<style>.b::after { content: "/* text */"; }</style>
+<style>/* real css */</style>
+<script>// real script</script>
+"#;
+    assert_eq!(lexer::measure(source, Language::Svelte).comment_lines, 2);
 }

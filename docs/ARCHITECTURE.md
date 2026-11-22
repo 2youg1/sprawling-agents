@@ -90,7 +90,7 @@ every week.
 
 | Concern | Choice | Why it, and what it costs |
 |---|---|---|
-| Language | Rust, edition 2024, toolchain pinned in `rust-toolchain.toml`, the oldest supported compiler in `Cargo.toml`'s `rust-version` | The invariants this design cares about are expressible as types. `unsafe_code` is `forbid` in the workspace lint table, and only the two FFI crates, `desktop_ffi` and `console_ffi`, lower it to `deny` so that each call into their Zig leaf can lift it alone (*Hardening* in §10). Cost: compile times, and a client that has to be built before the binary that embeds it. |
+| Language | Rust, edition 2024, toolchain pinned in `rust-toolchain.toml`, the oldest supported compiler in `Cargo.toml`'s `rust-version` | The invariants this design cares about are expressible as types. New and changed Rust writes no `unsafe`; `xtask unsafe` enforces that file by file. The two legacy FFI crates, `desktop_ffi` and `console_ffi`, temporarily lower `unsafe_code` to `deny` while their existing calls migrate to safe interfaces or redesigned boundaries (*Hardening* in §10). Cost: compile times, and a client that has to be built before the binary that embeds it. |
 | Async runtime | `tokio`, only in `wire` and the binary | The turn loop is synchronous on purpose — a decision that awaits is a decision that interleaves. Async stops at the process boundary. Cost: one blocking HTTP call per model request, paid inside a worker rather than a reactor. |
 | Inbound WebSocket | `axum` with its `ws` feature (`Sprawling/wire/Cargo.toml`; `Sprawling/app/Cargo.toml` for the remote listener) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
 | Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (`Sprawling/wire/Spec.lean` §8-41). |
@@ -111,7 +111,7 @@ every week.
 (properties before examples), `insta` (golden output), `trybuild` (proof
 that something cannot be expressed), `kani` (bounded proof, Linux CI),
 `cargo-mutants` (do the tests bite), `cargo-fuzz` (parsers against hostile
-bytes). Miri is not among them: the only `unsafe` left is FFI into Zig or
+bytes). Miri is not among them: the legacy `unsafe` is FFI into Zig or
 Win32, which Miri cannot see; the reason and the alternative live in
 [verification.md](verification.md#why-miri-is-not-a-gate).
 
@@ -119,7 +119,8 @@ Win32, which Miri cannot see; the reason and the alternative live in
 a ruling of the person. Safe Rust comes first; Zig comes next, and only for
 a hot leaf where a benchmark shows it clearly faster than the safe Rust
 version, or where the alternative would be `unsafe` Rust (FFI, SIMD, raw
-memory); `unsafe` Rust comes last. Domain rules stay in Rust whichever
+memory). New `unsafe` Rust is not admitted; existing FFI calls are migration
+debt judged by `xtask unsafe`. Domain rules stay in Rust whichever
 language computes a leaf. A Zig leaf enters the tree for one of two
 reasons. A **hot leaf** enters only when all six conditions below hold at
 once. A **platform leaf** — Win32 calls with no admitted safe interface,
@@ -162,8 +163,9 @@ Calyx's shell is Zig by a ruling of the person (`Calyx/Spec.lean` D7):
 input, lifecycle, editor, menu, screen orchestration, Mei and city
 faces, and process bootstrap live under `Calyx/shell` and
 `Calyx/build.zig`. Rust keeps only the narrow city/wire/kernel host that
-feeds events and runs shell-requested city actions; `unsafe` stays inside
-the leaf packages. Calyx Zig at a C ABI uses caller-owned buffers and
+feeds events and runs shell-requested city actions; legacy `unsafe` stays inside
+the leaf packages until its file is touched and migrated; no changed Rust file
+may retain or add it. Calyx Zig at a C ABI uses caller-owned buffers and
 explicit lengths; allocating helpers take an `Allocator`. A residue rule
 refuses `Calyx/src/console/{ui,editor,screen,program_status}` (files or
 directories) from returning under `Calyx/src`.
@@ -210,9 +212,8 @@ process group, the city's secrets removed from its environment), so every
 unit that starts one may name it and it names nothing (`Sprawling/child/Spec.lean`).
 
 The `desktop_ffi` row is the desktop server's FFI seam (`Sprawling/desktop/ffi`),
-one of the two members whose lint table is their own: it is the workspace's table with
-`unsafe_code` at `deny`, so each call into its Zig leaf can relax the lint at
-that one statement (`Sprawling/desktop/Spec.lean` D14). `sprawling` and `runtime` read it for the
+one of the two members whose lint table is their own during the unsafe migration: it is the workspace's table with
+`unsafe_code` at `deny`, so its existing calls can relax the lint while they await migration; changed files nevertheless satisfy `xtask unsafe` (`Sprawling/desktop/Spec.lean` D14). `sprawling` and `runtime` read it for the
 processor topology, the power-throttling opt-out and a job's CPU weight and
 memory limit, which no safe crate offers (`Sprawling/desktop/ffi/Spec.lean` D4). `desktop` reads `kernel`
 and `agent_protocols` for four facts the city defines, the error codes, the
@@ -221,8 +222,8 @@ nothing else.
 
 The `console_ffi` row is the other: the console's renderer
 (`Calyx/ffi`), a Zig leaf that turns a scene into the bytes of
-one terminal frame, with the same lint table and its one `unsafe` at the
-call into the leaf (`Calyx/ffi/Spec.lean` D1). Its row is empty
+one terminal frame, with the same legacy lint table and its existing `unsafe` at the
+call into the leaf (`Calyx/ffi/Spec.lean` D1 and D13). Its row is empty
 because the scene is written in its own words: the console decides what
 the screen holds and names `console_ffi`, and the leaf names nothing.
 
@@ -711,7 +712,7 @@ the part worth knowing before starting, not after.
 | what a building may do | `city::policy` (`RULES.toml`) + `Sprawling/city/Spec.lean` | a run's write domain is what its building declares |
 | the documents a building is raised with | `Sprawling/city/templates/` + `city::building::template` | compiled in with `include_str!`, so a moved template breaks the build; laying out a confidential building is refused when the line its template flips is gone |
 | how a host command is confined | `runtime::tools::exec::confinement` + `Sprawling/runtime/spec/Tools/Exec.lean` | every arm states all five guarantees, so a new axis is a compile error in each arm |
-| the Windows desktop a resident may drive | `Sprawling/desktop` + `Sprawling/desktop/Spec.lean` | `unsafe` only in `Sprawling/desktop/ffi`, under the Zig rule of §2; `xtask guard` holds its lint table |
+| the Windows desktop a resident may drive | `Sprawling/desktop` + `Sprawling/desktop/Spec.lean` | legacy `unsafe` only in `Sprawling/desktop/ffi`, under the migration rule of §2; changed files satisfy `xtask unsafe` and `xtask guard` holds its lint table |
 | a crate depending on another | the `depmap` block in §3 | actual edges must be a subset; a hidden edge is a red build |
 | a new seam | §4, and the trait's file | `depmap` refuses a `pub trait` outside the files §4 names |
 | a new module, or a deleted one | `architecture.toml` | `modmap` refuses a production file with no entry, and an entry whose file is gone; a test module needs no entry |
@@ -813,13 +814,13 @@ model call — a changed world would diverge through no defect of the record.
 production except where a test module relaxes it locally: no `unwrap`,
 `expect`, `panic!`, `todo!`, `unreachable!`, bare indexing or slicing;
 arithmetic is checked; narrowing goes through `TryFrom`; `as` casts are
-denied; `unsafe_code` is forbidden in every workspace crate but two. The
-desktop server's FFI seam (`Sprawling/desktop/ffi`) and the console's renderer
-(`Calyx/ffi`) each carry the workspace's table with `unsafe_code`
-at `deny`, and hold one `unsafe` block per call into their Zig leaf, each
-with the precondition that makes it sound (`Sprawling/desktop/Spec.lean`
-section 8-12 and D14, `Calyx/ffi/Spec.lean` D1); `xtask guard`
-holds both tables to the workspace's, key by key. Money and quantities are
+denied; new and changed Rust contains no `unsafe` token. Legacy `unsafe_code`
+remains enabled only in the desktop server's FFI seam (`Sprawling/desktop/ffi`)
+and the console's renderer (`Calyx/ffi`) until each file is touched and migrated.
+Their lint tables carry `unsafe_code` at `deny`, and `xtask guard` holds both
+tables to the workspace's, key by key; `xtask unsafe` independently rejects any
+occurrence in a changed file. Once the inventory is empty, both lint exceptions
+are deleted and every crate inherits `forbid`. Money and quantities are
 integer newtypes (`UsdMicros`, `Tokens`, `ByteLen`, `Seq`), and floats stay
 out of every decision path.
 

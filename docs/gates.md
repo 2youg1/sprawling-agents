@@ -4,11 +4,12 @@ A violation turns the check red with a message naming the rule, the violation an
 
 | Gate | Holds |
 |---|---|
-| workspace lints, `-D warnings` | the Rust rules in [AGENTS.md](../AGENTS.md#rust) and the hardening contract in [ARCHITECTURE.md](ARCHITECTURE.md#10-determinism-and-hardening); `unsafe` only in `Sprawling/desktop/ffi` and `Calyx/ffi` |
+| workspace lints, `-D warnings` | the Rust rules in [AGENTS.md](../AGENTS.md#rust) and the hardening contract in [ARCHITECTURE.md](ARCHITECTURE.md#10-determinism-and-hardening); during migration, legacy `unsafe` remains only in `Sprawling/desktop/ffi` and `Calyx/ffi` |
 | `xtask header` | the MPL-2.0 notice, then the copyright line, atop every `.rs` file |
 | `xtask lexicon` | one name per concept, from the glossary |
 | `xtask modmap`, `xtask length` | production modules in the module map; Rust, TypeScript and Svelte source files within 500 lines; production functions within 200 lines and 4 parameters |
-| `xtask comments` | comment-bearing lines within 10% of nonblank lines after the exact MPL header is stripped, across Rust, TypeScript and Svelte sources |
+| `xtask comments` | zero comment-bearing lines after the exact MPL header is stripped, across changed Rust, TypeScript, Svelte, Zig, Python, JavaScript and CSS sources; untouched legacy violations remain in the full-tree inventory |
+| `xtask unsafe` | zero real `unsafe` tokens in changed Rust sources, including macro token trees; untouched legacy violations remain in the full-tree inventory |
 | `xtask boundary` | white-box checks in Rust beside the code; stranger-entry checks in Lean under `Tools/adversary/` |
 | `xtask artifact` | nothing written for a test is compiled into the binary a person downloads |
 | `xtask packaged` | files a publishable package compiles in production (`include!`, `include_str!`, `include_bytes!`) lie inside its directory or its build script's `OUT_DIR`, since crates.io carries nothing else |
@@ -34,5 +35,5 @@ A violation turns the check red with a message naming the rule, the violation an
 
 - A red gate has three exits: fix the code, narrow the rule to a precise scope, or delete the gate. Never add an exception. A scope names the property that makes every included case legitimate and has positive and negative fixtures. Review judges that property; a waiver, suppression, grandfather entry or re-priced threshold is not a substitute for it.
 - Put a change to gate machinery — `Tools/xtask/`, `justfile`, `.github/`, `flake.nix`, the root `Cargo.toml`, `deny.toml`, `clippy.toml`, `rust-toolchain.toml`, `lakefile.toml`, `lean-toolchain`, `Tools/xtask/budgets.toml`, `architecture.toml` — in a commit apart from the source it judges, so review sees whether the gate moved to admit it.
-- Existing `length` and `comments` violations remain visible in full-tree inventory runs until cleaned. Daily and branch checks pass changed paths through `cargo xtask gates length comments --files <path>...`; an empty list judges nothing and never falls back to the tree. A change touching a violating file clears every violation in it, and a change may not add a violation elsewhere. No register exempts old content, and every other gate stays blocking.
+- Existing `length`, `comments` and `unsafe` violations remain visible in full-tree inventory runs until cleaned. Daily and branch checks pass changed paths through `cargo xtask gates length comments unsafe --files <path>...`; an empty list judges nothing and never falls back to the tree. A change touching a violating file clears every violation in it, and a change may not add a violation elsewhere. For `comments` and `unsafe`, the allowance is exactly zero. No register exempts old content, and every other gate stays blocking.
 - A rule that excludes an architecture carries the parameter that made it right, and when that parameter moves, re-argue the rule instead of obeying it. Rules that exclude a defect — the panic bans, the arithmetic bans, the determinism rules — carry no such condition, because nothing about them expires.

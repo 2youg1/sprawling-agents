@@ -29,25 +29,36 @@ fn scoped_gates_execute_owned_changed_files_without_unrelated_debt() {
         reuse: Reuse::Never,
         required: true,
     };
-    for action in [&LENGTH, &COMMENTS] {
+    static UNSAFE: Action = Action {
+        id: "unsafe",
+        operation: Operation::ScopedGate("unsafe"),
+        inputs: &[],
+        needs: &[],
+        reuse: Reuse::Never,
+        required: true,
+    };
+    for action in [&LENGTH, &COMMENTS, &UNSAFE] {
         let root = crate::root::fixture::relocated(&format!("ci-scoped-{}", action.id));
         crate::root::fixture::write(
             &root,
             crate::budget::REGISTER,
             "[function_length]\nbudget_lines = 200\n[argument_count]\nbudget_arguments = 4\n",
         );
-        crate::root::fixture::write(
-            &root,
-            "tools/k/src/legacy.rs",
-            &"// existing debt\n".repeat(501),
-        );
+        let (legacy_debt, later_bad_input) = if action.id == "unsafe" {
+            (
+                "pub fn legacy() { unsafe {} }\n".to_owned(),
+                "pub fn changed() { unsafe {} }\n".to_owned(),
+            )
+        } else {
+            (
+                "// existing debt\n".repeat(501),
+                "// later bad input\n".repeat(501),
+            )
+        };
+        crate::root::fixture::write(&root, "tools/k/src/legacy.rs", &legacy_debt);
         crate::root::fixture::write(&root, "tools/k/src/changed.rs", "pub fn clear() {}\n");
         let view = Snapshot::capture(&root).unwrap();
-        crate::root::fixture::write(
-            &root,
-            "tools/k/src/changed.rs",
-            &"// later bad input\n".repeat(501),
-        );
+        crate::root::fixture::write(&root, "tools/k/src/changed.rs", &later_bad_input);
         let mut prepared = PreparedAction {
             action,
             key: Key::named("scoped-fixture".to_owned()),

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use super::{Language, Mode, Scanner, at};
+use super::{PythonString, Scanner, Syntax, at, expression};
 
 impl Scanner<'_> {
     pub(super) fn template(&mut self, index: usize) -> usize {
@@ -14,35 +14,23 @@ impl Scanner<'_> {
             return self.advance(index);
         }
         if byte == b'\\' {
-            self.mark_code();
             let next = self.advance(index);
-            if next < self.bytes.len() {
-                self.mark_code();
-            }
             return self.advance(next);
         }
         if byte == b'`' {
-            self.mark_code();
             self.modes.pop();
             return self.advance(index);
         }
         if at(self.bytes, index, b"${") {
-            self.mark_code();
-            self.modes.push(Mode::Code {
-                template_expression: true,
-                braces: 0,
-            });
+            self.modes.push(expression(Syntax::JavaScript));
             let next = self.advance(index);
             return self.advance(next);
-        }
-        if !byte.is_ascii_whitespace() {
-            self.mark_code();
         }
         self.advance(index)
     }
 
-    pub(super) fn single_quote_starts_literal(&self, index: usize) -> bool {
-        if self.language != Language::Rust {
+    pub(super) fn single_quote_starts_literal(&self, index: usize, syntax: Syntax) -> bool {
+        if syntax != Syntax::Rust {
             return true;
         }
         let Some(&first) = self.bytes.get(index.saturating_add(1)) else {
@@ -72,26 +60,131 @@ impl Scanner<'_> {
     }
 
     pub(super) fn quoted(&mut self, mut index: usize, quote: u8) -> usize {
-        self.mark_code();
         index = self.advance(index);
         while index < self.bytes.len() {
             let Some(&byte) = self.bytes.get(index) else {
                 break;
             };
-            if !byte.is_ascii_whitespace() {
-                self.mark_code();
-            }
             index = self.advance(index);
             if byte == b'\\' && index < self.bytes.len() {
-                if self
-                    .bytes
-                    .get(index)
-                    .is_some_and(|next| !next.is_ascii_whitespace())
-                {
-                    self.mark_code();
-                }
                 index = self.advance(index);
             } else if byte == quote {
+                break;
+            }
+        }
+        index
+    }
+
+    pub(super) fn python_format(&self, index: usize) -> Option<bool> {
+        let previous = index.checked_sub(1).and_then(|at| self.bytes.get(at))?;
+        let earlier = index.checked_sub(2).and_then(|at| self.bytes.get(at));
+        if matches!(previous, b'f' | b'F') {
+            return Some(earlier.is_some_and(|byte| matches!(byte, b'r' | b'R')));
+        }
+        if !matches!(previous, b'r' | b'R') {
+            return None;
+        }
+        earlier
+            .is_some_and(|byte| matches!(byte, b'f' | b'F'))
+            .then_some(true)
+    }
+
+    pub(super) fn python_string_open(&mut self, mut index: usize, triple: bool) -> usize {
+        let width = if triple { 3 } else { 1 };
+        for _ in 0..width {
+            index = self.advance(index);
+        }
+        index
+    }
+
+    pub(super) fn python_string(&mut self, index: usize, string: PythonString) -> usize {
+        let Some(&byte) = self.bytes.get(index) else {
+            return self.bytes.len();
+        };
+        if byte == b'\\' {
+            if string.raw {
+                if self.bytes.get(index.saturating_add(1)) == Some(&string.quote) {
+                    let next = self.advance(index);
+                    return self.advance(next);
+                }
+                return self.advance(index);
+            }
+            if at(self.bytes, index, b"\\N{") {
+                let mut cursor = self.advance(index);
+                cursor = self.advance(cursor);
+                cursor = self.advance(cursor);
+                while cursor < self.bytes.len() && self.bytes.get(cursor) != Some(&b'}') {
+                    cursor = self.advance(cursor);
+                }
+                return self.advance(cursor);
+            }
+            let next = self.advance(index);
+            return self.advance(next);
+        }
+        if (string.triple
+            && at(
+                self.bytes,
+                index,
+                &[string.quote, string.quote, string.quote],
+            ))
+            || (!string.triple && byte == string.quote)
+        {
+            self.modes.pop();
+            return self.python_string_open(index, string.triple);
+        }
+        if !string.triple && byte == b'\n' {
+            self.modes.pop();
+            return self.advance(index);
+        }
+        if byte == b'{' {
+            if self.bytes.get(index.saturating_add(1)) == Some(&b'{') {
+                let next = self.advance(index);
+                return self.advance(next);
+            }
+            self.modes.push(expression(Syntax::Python));
+        } else if byte == b'}' && self.bytes.get(index.saturating_add(1)) == Some(&b'}') {
+            let next = self.advance(index);
+            return self.advance(next);
+        }
+        self.advance(index)
+    }
+
+    pub(super) fn python_format_spec(&mut self, index: usize) -> usize {
+        let Some(&byte) = self.bytes.get(index) else {
+            return self.bytes.len();
+        };
+        if byte == b'}' {
+            self.modes.pop();
+            self.modes.pop();
+            return self.advance(index);
+        }
+        if byte == b'{' {
+            self.modes.push(expression(Syntax::Python));
+        }
+        self.advance(index)
+    }
+
+    pub(super) fn python_quoted(&mut self, mut index: usize, quote: u8) -> usize {
+        let delimiter = [quote, quote, quote];
+        let triple = at(self.bytes, index, &delimiter);
+        let width = if triple { 3 } else { 1 };
+        for _ in 0..width {
+            index = self.advance(index);
+        }
+        while index < self.bytes.len() {
+            if triple && at(self.bytes, index, &delimiter) {
+                for _ in 0..3 {
+                    index = self.advance(index);
+                }
+                break;
+            }
+            let Some(&byte) = self.bytes.get(index) else {
+                break;
+            };
+            index = self.advance(index);
+            if byte == b'\\' && index < self.bytes.len() {
+                index = self.advance(index);
+            } else if !triple && (byte == quote || byte == b'\n') {
                 break;
             }
         }
@@ -122,23 +215,14 @@ impl Scanner<'_> {
 
     pub(super) fn raw_string(&mut self, mut index: usize, prefix: usize, hashes: usize) -> usize {
         for _ in 0..prefix {
-            self.mark_code();
             index = self.advance(index);
         }
         while index < self.bytes.len() {
             if self.bytes.get(index) == Some(&b'"') && self.raw_close(index, hashes) {
                 for _ in 0..hashes.saturating_add(1) {
-                    self.mark_code();
                     index = self.advance(index);
                 }
                 break;
-            }
-            if self
-                .bytes
-                .get(index)
-                .is_some_and(|byte| !byte.is_ascii_whitespace())
-            {
-                self.mark_code();
             }
             index = self.advance(index);
         }
@@ -201,7 +285,6 @@ impl Scanner<'_> {
 
     pub(super) fn regex(&mut self, mut index: usize) -> usize {
         let mut in_class = false;
-        self.mark_code();
         index = self.advance(index);
         while index < self.bytes.len() {
             let Some(&byte) = self.bytes.get(index) else {
@@ -217,20 +300,10 @@ impl Scanner<'_> {
                 ) {
                     return index;
                 }
-                self.mark_code();
                 return self.advance(index);
             }
             if byte == b'\\' {
-                self.mark_code();
                 index = self.advance(index);
-                if index < self.bytes.len()
-                    && self
-                        .bytes
-                        .get(index)
-                        .is_some_and(|next| !next.is_ascii_whitespace())
-                {
-                    self.mark_code();
-                }
                 if index < self.bytes.len() {
                     index = self.advance(index);
                 }
@@ -240,9 +313,6 @@ impl Scanner<'_> {
                 in_class = true;
             } else if byte == b']' {
                 in_class = false;
-            }
-            if !byte.is_ascii_whitespace() {
-                self.mark_code();
             }
             index = self.advance(index);
         }

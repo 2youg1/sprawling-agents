@@ -21,6 +21,8 @@ A design is made once, with unlimited cost spent now and no cost owed later, and
 
 A prohibition in prose costs context on every task and is exact about nothing, while the same prohibition as a gate or test costs no context, is exact, and speaks only when someone errs. What must not happen is therefore written as a gate or a test, and prose carries only what a machine cannot judge.
 
+Apply experience first, outcome-oriented execution and subtract before you add: choose Users' experience and the verifiable end state, remove before adding, and commit only durable checks that quickly expose real failures, never one-off or low-signal tests.
+
 Before designing or changing code, load [`ub-mode`](Sprawling/city/skills/ub-mode/SKILL.md) and follow its loop; it owns the change workflow, and the sections below add repository contracts. Every path needed here is tracked in this tree. An issue or pull request is acted on only after every comment, review and inline review comment is read, together with the recent history of the code to be touched (`git log -p -n <count> -- <path>`); [CONTRIBUTING §1](docs/CONTRIBUTING.md#1-read-before-you-write) holds the commands.
 </one_change>
 
@@ -39,18 +41,18 @@ Summaries, blog posts and memory drift from the version this tree pins, so befor
 </read_before_you_write>
 
 <rust>
-The workspace lint table owns the mechanical rules: warnings are errors, arithmetic is checked, `#[expect]` carries a reason, and `unsafe_code` is forbidden outside `Sprawling/desktop/ffi` and `Calyx/ffi`. A red check is fixed at its cause. For the judgment the compiler cannot supply:
+The workspace lint table owns the mechanical rules: warnings are errors, arithmetic is checked, and `#[expect]` carries a reason. A red check is fixed at its cause. For the judgment the compiler cannot supply:
 
 - `let _ =`, `unwrap_or_default()` and `.ok()` erase the reason a caller needs, so every `Result` is handled or returned.
 - An error is the only message its reader has at the moment of failure, so one error names exactly one concrete problem, its root cause and a recommended fix. It is rendered as one fenced block whose tag names the format (`toml`), opening with the stable error code and carrying the failed action, the subject, the full path of what failed, the offending value, the rule it broke, and the exact command or edit that fixes it, one whose success the author has checked. Prose may surround the block and the block is what a reader acts on; a field it omits is a defect, because a symptom stated without its repair spends the attention it was meant to save.
 - What the type system can exclude is excluded with enums, newtypes and typestate, and values that always travel together form one named value.
 - Time is taken as a parameter, decision-path iteration is ordered, floats stay out of ledger payloads, and tasks start from the one spawn point.
-- A platform call uses a safe standard-library or crate interface; otherwise the measured Zig-leaf contract in [ARCHITECTURE.md](docs/ARCHITECTURE.md) §2 applies and each `unsafe` block carries a falsifiable `SAFETY:` precondition.
+- Write no unsafe Rust.
 - Google's [Rust Style Guide](https://google.github.io/styleguide/rustguide.html) is consulted only where the repository authorities leave a style question open.
 </rust>
 
 <comments>
-Code that needs narration has a defect in its names, shape or types, and a comment above it is a second copy that goes stale and hides the defect. The default is therefore no comment. A comment exists only for a legal notice, a non-suppression tool directive, a falsifiable safety precondition, a non-obvious external constraint, or an interface contract the signature cannot carry, and it covers only the smallest minimalist scope that needs it (The best way to record errors or failures is to set up a precise gate, rather than wasting time writing a document explaining why it shouldn’t be done that way). Any other constraint is encoded in a type, test, lint, gate or SPEC, and narration, restated behaviour and workaround justification are deleted by renaming or reshaping the code.
+Write no comment in source code covered by the `comments` gate; make invalid states unrepresentable or enforce the constraint with a concrete lint, test or gate, never prose. The exact leading MPL notice is the only comment admitted there. Lean `Spec.lean` and `spec/` parts retain the natural-language contracts and `D<n>` decision records required by the specification workflow.
 </comments>
 
 <where_code_goes>
@@ -96,7 +98,7 @@ Risk decides how much testing a change needs, and [testing.md](docs/testing.md) 
 </machine_gates>
 
 <verification>
-A check left for CI is found late and by someone else, so while iterating and again on the final diff every check the diff affects runs: tests, gates, dependents and platform lanes. Tests are selected by affected crate and test name, and `just check` runs only when the change is broad enough to need every phase. [verification.md](docs/verification.md) owns the commands and three tiers. For `length` and `comments`, every changed source path is passed through `cargo xtask gates length comments --files <path>...`; an empty list is an empty judgement, never a full-tree fallback.
+A check left for CI is found late and by someone else, so while iterating and again on the final diff every check the diff affects runs: tests, gates, dependents and platform lanes. Tests are selected by affected crate and test name, and `just check` runs only when the change is broad enough to need every phase. [verification.md](docs/verification.md) owns the commands and three tiers. For `length`, `comments` and `unsafe`, every changed source path is passed through `cargo xtask gates length comments unsafe --files <path>...`; an empty list is an empty judgement, never a full-tree fallback.
 
 A fixture written by the author encodes the author's assumptions, and a corpus drawn from real use is where those assumptions fail. The final acceptance of a change whose behaviour a person or an agent can observe is therefore black-box fuzzing through the production doors with real inputs, run against the scenario from the premise. The acceptance record names the command, the source of the inputs and the result, and a change whose fuzz run has not passed is not accepted.
 

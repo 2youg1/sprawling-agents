@@ -60,6 +60,7 @@ mod source;
 mod spec;
 mod specalign;
 mod theme;
+mod unsafe_code;
 mod unused;
 mod upstream;
 mod vocabulary;
@@ -206,6 +207,7 @@ fn main() -> ExitCode {
         Some("lexicon") => report::finish("lexicon", lexicon::check(&root)),
         Some("length") => report::finish("length", length::check(&root)),
         Some("comments") => report::finish("comments", comments::check(&root)),
+        Some("unsafe") => report::finish("unsafe", unsafe_code::check(&root)),
         Some("boundary") => report::finish("boundary", boundary::check(&root)),
         Some("artifact") => report::finish("artifact", artifact::check(&root)),
         Some("packaged") => report::finish("packaged", packaged::check(&root)),
@@ -317,7 +319,7 @@ const TOOLS: [Tool; 18] = [
     },
     Tool {
         call: "gates [<gate>...] [--files <path>... | --files-from <nul-list>]",
-        gives: "every gate, named gates, or length/comments over only the named files",
+        gives: "every gate, named gates, or length/comments/unsafe over only the named files",
     },
     Tool {
         call: "gates --list",

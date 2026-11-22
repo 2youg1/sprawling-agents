@@ -42,7 +42,7 @@ These are investigation branches, not a finding quota. Enter only the branches t
 | Shared writers, partial updates and needless serialization | Name the writer, invariant and atomic boundary, then exercise concurrent or interrupted execution. Keep one writer where the invariant requires it; otherwise separate the state. |
 | Structural regression or missed simplification | Show the branches, invalid states or hidden state the reshape removes and verify the behavior pin. A cleaner-looking diff without those deltas is not a finding. |
 
-File length belongs to `length`, comment density to `comments`, and ordinary runtime reach to `blast-radius`. Do not manufacture findings from file-size thresholds, textual similarity, speculative YAGNI or a second generic review pass.
+File length belongs to `length`, non-MPL comments to `comments`, and ordinary runtime reach to `blast-radius`. Do not manufacture findings from file-size thresholds, textual similarity, speculative YAGNI or a second generic review pass.
 
 ## Completion
 

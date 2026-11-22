@@ -10,62 +10,115 @@ mod tokens;
 pub(crate) enum Language {
     Rust,
     TypeScript,
+    JavaScript,
     Svelte,
+    Zig,
+    Python,
+    Css,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) struct Reading {
     pub(crate) comment_lines: usize,
-    pub(crate) judged_lines: usize,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum Syntax {
+    Rust,
+    JavaScript,
+    Zig,
+    Python,
+    Css,
 }
 
 #[derive(Clone, Copy)]
-enum Mode {
-    Code {
-        template_expression: bool,
-        braces: usize,
-    },
+pub(super) struct CodeMode {
+    syntax: Syntax,
+    template_expression: bool,
+    braces: usize,
+    delimiters: usize,
+    embedded: bool,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct PythonString {
+    pub(super) quote: u8,
+    pub(super) triple: bool,
+    pub(super) raw: bool,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum Mode {
+    Code(CodeMode),
     Template,
     Markup,
+    PythonString(PythonString),
+    PythonFormat,
+}
+
+impl Language {
+    fn syntax(self) -> Syntax {
+        match self {
+            Self::Rust => Syntax::Rust,
+            Self::TypeScript | Self::JavaScript | Self::Svelte => Syntax::JavaScript,
+            Self::Zig => Syntax::Zig,
+            Self::Python => Syntax::Python,
+            Self::Css => Syntax::Css,
+        }
+    }
 }
 
 pub(crate) fn measure(text: &str, language: Language) -> Reading {
-    let body = license::without_license(text);
-    let lines = body.lines().count();
-    let start = match language {
-        Language::Svelte => Mode::Markup,
-        Language::Rust | Language::TypeScript => Mode::Code {
-            template_expression: false,
-            braces: 0,
-        },
+    let body = license::without_license(text, language);
+    let start = if language == Language::Svelte {
+        Mode::Markup
+    } else {
+        code(language.syntax())
     };
     let mut scanner = Scanner {
         bytes: body.as_bytes(),
-        language,
-        comment: vec![false; lines],
-        code: vec![false; lines],
+        comment: vec![false; body.lines().count()],
         line: 0,
         modes: vec![start],
     };
     scanner.run();
     let comment_lines = scanner.comment.iter().filter(|line| **line).count();
-    let judged_lines = scanner
-        .comment
-        .iter()
-        .zip(&scanner.code)
-        .filter(|(comment, code)| **comment || **code)
-        .count();
-    Reading {
-        comment_lines,
-        judged_lines,
-    }
+    Reading { comment_lines }
+}
+
+fn code(syntax: Syntax) -> Mode {
+    Mode::Code(CodeMode {
+        syntax,
+        template_expression: false,
+        braces: 0,
+        delimiters: 0,
+        embedded: false,
+    })
+}
+
+fn expression(syntax: Syntax) -> Mode {
+    Mode::Code(CodeMode {
+        syntax,
+        template_expression: true,
+        braces: 0,
+        delimiters: 0,
+        embedded: false,
+    })
+}
+
+fn embedded(syntax: Syntax) -> Mode {
+    Mode::Code(CodeMode {
+        syntax,
+        template_expression: false,
+        braces: 0,
+        delimiters: 0,
+        embedded: true,
+    })
 }
 
 struct Scanner<'a> {
     bytes: &'a [u8],
-    language: Language,
     comment: Vec<bool>,
-    code: Vec<bool>,
     line: usize,
     modes: Vec<Mode>,
 }
@@ -77,10 +130,9 @@ impl Scanner<'_> {
             index = match self.modes.last().copied() {
                 Some(Mode::Markup) => self.markup(index),
                 Some(Mode::Template) => self.template(index),
-                Some(Mode::Code {
-                    template_expression,
-                    braces,
-                }) => self.code(index, template_expression, braces),
+                Some(Mode::Code(mode)) => self.code(index, mode),
+                Some(Mode::PythonString(string)) => self.python_string(index, string),
+                Some(Mode::PythonFormat) => self.python_format_spec(index),
                 None => self.bytes.len(),
             };
         }
@@ -97,66 +149,39 @@ impl Scanner<'_> {
             return self.html_comment(index);
         }
         if byte == b'{' {
-            if matches!(
-                self.bytes.get(index.saturating_add(1)),
-                Some(b'/' | b'#' | b':')
-            ) {
-                return self.svelte_block(index);
+            if self.bytes.get(index.saturating_add(1)) == Some(&b'/') {
+                return self.svelte_close(index);
             }
-            self.mark_code();
-            self.modes.push(Mode::Code {
-                template_expression: true,
-                braces: 0,
-            });
+            self.modes.push(expression(Syntax::JavaScript));
             return self.advance(index);
         }
         if byte == b'<'
-            && let Some(end) = self.script_or_style_open(index)
+            && let Some((syntax, end)) = self.embedded_open(index)
         {
-            self.mark_code_range(index, end);
-            self.modes.push(Mode::Code {
-                template_expression: false,
-                braces: 0,
-            });
+            self.modes.push(embedded(syntax));
             return end;
-        }
-        if !byte.is_ascii_whitespace() {
-            self.mark_code();
         }
         self.advance(index)
     }
 
-    fn svelte_block(&mut self, mut index: usize) -> usize {
-        let mut depth = 0_usize;
+    fn svelte_close(&mut self, mut index: usize) -> usize {
         while index < self.bytes.len() {
             let Some(&byte) = self.bytes.get(index) else {
                 break;
             };
-            if byte == b'\n' {
-                index = self.advance(index);
-                continue;
-            }
-            if byte == b'{' {
-                depth = depth.saturating_add(1);
-                self.mark_code();
-            } else if byte == b'}' {
-                self.mark_code();
-                index = self.advance(index);
-                depth = depth.saturating_sub(1);
-                if depth == 0 {
-                    return index;
-                }
-                continue;
-            } else if !byte.is_ascii_whitespace() {
-                self.mark_code();
-            }
             index = self.advance(index);
+            if byte == b'}' {
+                break;
+            }
         }
         index
     }
 
-    fn script_or_style_open(&self, index: usize) -> Option<usize> {
-        for name in [b"script".as_slice(), b"style".as_slice()] {
+    fn embedded_open(&self, index: usize) -> Option<(Syntax, usize)> {
+        for (name, syntax) in [
+            (b"script".as_slice(), Syntax::JavaScript),
+            (b"style".as_slice(), Syntax::Css),
+        ] {
             let start = index.saturating_add(1);
             if !tag_name_at(self.bytes, start, name) {
                 continue;
@@ -164,7 +189,7 @@ impl Scanner<'_> {
             let mut cursor = start.saturating_add(name.len());
             while cursor < self.bytes.len() {
                 match self.bytes.get(cursor) {
-                    Some(b'>') => return Some(cursor.saturating_add(1)),
+                    Some(b'>') => return Some((syntax, cursor.saturating_add(1))),
                     None => return None,
                     _ => cursor = cursor.saturating_add(1),
                 }
@@ -173,104 +198,138 @@ impl Scanner<'_> {
         None
     }
 
-    fn script_or_style_close(&self, index: usize) -> Option<usize> {
+    fn embedded_close(&self, index: usize, syntax: Syntax) -> Option<usize> {
+        let name = match syntax {
+            Syntax::JavaScript => b"script".as_slice(),
+            Syntax::Css => b"style".as_slice(),
+            _ => return None,
+        };
         if self.bytes.get(index) != Some(&b'<')
             || self.bytes.get(index.saturating_add(1)) != Some(&b'/')
         {
             return None;
         }
-        for name in [b"script".as_slice(), b"style".as_slice()] {
-            let start = index.saturating_add(2);
-            if !self.bytes.get(start..).is_some_and(|rest| {
-                rest.len() >= name.len()
-                    && rest
-                        .get(..name.len())
-                        .is_some_and(|found| found.eq_ignore_ascii_case(name))
-                    && rest.get(name.len()) == Some(&b'>')
-            }) {
-                continue;
-            }
-            return Some(start.saturating_add(name.len()).saturating_add(1));
-        }
-        None
+        let start = index.saturating_add(2);
+        self.bytes.get(start..).and_then(|rest| {
+            (rest.len() >= name.len()
+                && rest
+                    .get(..name.len())
+                    .is_some_and(|found| found.eq_ignore_ascii_case(name))
+                && rest.get(name.len()) == Some(&b'>'))
+            .then_some(start.saturating_add(name.len()).saturating_add(1))
+        })
     }
 
-    fn mark_code_range(&mut self, mut index: usize, end: usize) {
-        while index < end && index < self.bytes.len() {
-            if self
-                .bytes
-                .get(index)
-                .is_some_and(|byte| !byte.is_ascii_whitespace())
-            {
-                self.mark_code();
-            }
-            index = self.advance(index);
-        }
-    }
-
-    fn code(&mut self, index: usize, template_expression: bool, braces: usize) -> usize {
+    fn code(&mut self, index: usize, mode: CodeMode) -> usize {
         let Some(&byte) = self.bytes.get(index) else {
             return self.bytes.len();
         };
         if byte == b'\n' {
             return self.advance(index);
         }
-        if self.language == Language::Svelte
-            && !template_expression
-            && let Some(end) = self.script_or_style_close(index)
+        if mode.embedded
+            && !mode.template_expression
+            && let Some(end) = self.embedded_close(index, mode.syntax)
         {
-            self.mark_code_range(index, end);
             self.modes.pop();
             return end;
         }
-        if at(self.bytes, index, b"//") {
-            if self.language == Language::TypeScript
+        if matches!(mode.syntax, Syntax::Rust | Syntax::JavaScript | Syntax::Zig)
+            && at(self.bytes, index, b"//")
+        {
+            let markup_url = mode.syntax == Syntax::JavaScript
                 && index > 0
                 && self.bytes.get(index.saturating_sub(1)) == Some(&b':')
-            {
-                self.mark_code();
+                && self
+                    .bytes
+                    .get(index.saturating_add(2))
+                    .is_some_and(|byte| !byte.is_ascii_whitespace());
+            if markup_url {
                 return self.advance(index);
             }
             return self.line_comment(index);
         }
-        if at(self.bytes, index, b"/*") {
-            return self.block_comment(index);
+        if mode.syntax == Syntax::Python && byte == b'#' {
+            return self.line_comment(index);
         }
-        if self.language == Language::Svelte && at(self.bytes, index, b"<!--") {
-            return self.html_comment(index);
+        if matches!(mode.syntax, Syntax::Rust | Syntax::JavaScript | Syntax::Css)
+            && at(self.bytes, index, b"/*")
+        {
+            return self.block_comment(index, mode.syntax);
+        }
+        if mode.syntax == Syntax::Zig && at(self.bytes, index, b"\\\\") {
+            return self.line_literal(index);
         }
         if byte.is_ascii_whitespace() {
             return self.advance(index);
         }
-        if self.language != Language::Rust && byte == b'`' {
-            self.mark_code();
+        if mode.syntax == Syntax::JavaScript && byte == b'`' {
             self.modes.push(Mode::Template);
             return self.advance(index);
         }
-        if byte == b'"' || (byte == b'\'' && self.single_quote_starts_literal(index)) {
-            return self.quoted(index, byte);
+        if mode.syntax == Syntax::Python
+            && mode.template_expression
+            && mode.delimiters == 0
+            && byte == b':'
+        {
+            self.modes.push(Mode::PythonFormat);
+            return self.advance(index);
         }
-        if self.language == Language::Rust
+        if mode.syntax == Syntax::Python && matches!(byte, b'\'' | b'"') {
+            if let Some(raw) = self.python_format(index) {
+                let triple = at(self.bytes, index, &[byte, byte, byte]);
+                self.modes.push(Mode::PythonString(PythonString {
+                    quote: byte,
+                    triple,
+                    raw,
+                }));
+                return self.python_string_open(index, triple);
+            }
+            return self.python_quoted(index, byte);
+        }
+        if mode.syntax == Syntax::Rust
             && let Some((prefix, hashes)) = self.raw_string_start(index)
         {
             return self.raw_string(index, prefix, hashes);
         }
-        if self.language != Language::Rust && byte == b'/' && self.regex_allowed(index) {
+        if byte == b'"' || (byte == b'\'' && self.single_quote_starts_literal(index, mode.syntax)) {
+            return self.quoted(index, byte);
+        }
+        if mode.syntax == Syntax::JavaScript && byte == b'/' && self.regex_allowed(index) {
             return self.regex(index);
         }
-        self.mark_code();
-        if template_expression && byte == b'{' {
-            if let Some(Mode::Code { braces, .. }) = self.modes.last_mut() {
-                *braces = braces.saturating_add(1);
+        if mode.syntax == Syntax::Python && mode.template_expression {
+            if matches!(byte, b'(' | b'[')
+                && let Some(Mode::Code(code)) = self.modes.last_mut()
+            {
+                code.delimiters = code.delimiters.saturating_add(1);
+            } else if matches!(byte, b')' | b']')
+                && let Some(Mode::Code(code)) = self.modes.last_mut()
+            {
+                code.delimiters = code.delimiters.saturating_sub(1);
             }
-        } else if template_expression && byte == b'}' {
-            if braces == 0 {
+        }
+        if mode.template_expression && byte == b'{' {
+            if let Some(Mode::Code(code)) = self.modes.last_mut() {
+                code.braces = code.braces.saturating_add(1);
+                code.delimiters = code.delimiters.saturating_add(1);
+            }
+        } else if mode.template_expression && byte == b'}' {
+            if mode.braces == 0 {
                 self.modes.pop();
-            } else if let Some(Mode::Code { braces, .. }) = self.modes.last_mut() {
-                *braces = braces.saturating_sub(1);
+            } else if let Some(Mode::Code(code)) = self.modes.last_mut() {
+                code.braces = code.braces.saturating_sub(1);
+                code.delimiters = code.delimiters.saturating_sub(1);
             }
         }
         self.advance(index)
+    }
+
+    fn line_literal(&mut self, mut index: usize) -> usize {
+        while index < self.bytes.len() && self.bytes.get(index) != Some(&b'\n') {
+            index = self.advance(index);
+        }
+        index
     }
 
     fn line_comment(&mut self, mut index: usize) -> usize {
@@ -281,11 +340,11 @@ impl Scanner<'_> {
         index
     }
 
-    fn block_comment(&mut self, mut index: usize) -> usize {
+    fn block_comment(&mut self, mut index: usize, syntax: Syntax) -> usize {
         let mut depth = 1_usize;
         index = self.comment_bytes(index, 2);
         while index < self.bytes.len() && depth > 0 {
-            if self.language == Language::Rust && at(self.bytes, index, b"/*") {
+            if syntax == Syntax::Rust && at(self.bytes, index, b"/*") {
                 depth = depth.saturating_add(1);
                 index = self.comment_bytes(index, 2);
             } else if at(self.bytes, index, b"*/") {
@@ -335,12 +394,6 @@ impl Scanner<'_> {
 
     fn mark_comment(&mut self) {
         if let Some(line) = self.comment.get_mut(self.line) {
-            *line = true;
-        }
-    }
-
-    fn mark_code(&mut self) {
-        if let Some(line) = self.code.get_mut(self.line) {
             *line = true;
         }
     }

@@ -159,11 +159,39 @@ fn a_captured_bad_header_cannot_borrow_a_later_good_header() {
 }
 
 #[cfg(target_os = "linux")]
-#[test]
+const EXECUTABLE_BUSY_RETRIES: usize = 50;
+
+#[cfg(target_os = "linux")]
 #[expect(
     clippy::disallowed_methods,
     reason = "test fixture re-executes its own verifier image (child D4)"
 )]
+fn execute_copy(
+    executable: &std::path::Path,
+    env: &str,
+    test: &str,
+) -> std::io::Result<std::process::Output> {
+    let mut attempts = 0;
+    loop {
+        let result = std::process::Command::new(executable)
+            .args(["--exact", test, "--nocapture"])
+            .env(env, "1")
+            .output();
+        match result {
+            Err(error)
+                if error.kind() == std::io::ErrorKind::ExecutableFileBusy
+                    && attempts < EXECUTABLE_BUSY_RETRIES =>
+            {
+                attempts = attempts.saturating_add(1);
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            other => return other,
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
 fn a_replaced_executable_path_does_not_replace_the_loaded_identity() {
     const CHILD: &str = "XTASK_CI_IMAGE_REPLACEMENT_TEST";
     if std::env::var_os(CHILD).is_some() {
@@ -185,15 +213,12 @@ fn a_replaced_executable_path_does_not_replace_the_loaded_identity() {
     let dir = tempfile::tempdir().unwrap();
     let executable = dir.path().join("verifier");
     std::fs::copy(std::env::current_exe().unwrap(), &executable).unwrap();
-    let output = std::process::Command::new(executable)
-        .args([
-            "--exact",
-            "ci::content::tests::a_replaced_executable_path_does_not_replace_the_loaded_identity",
-            "--nocapture",
-        ])
-        .env(CHILD, "1")
-        .output()
-        .unwrap();
+    let output = execute_copy(
+        &executable,
+        CHILD,
+        "ci::content::tests::a_replaced_executable_path_does_not_replace_the_loaded_identity",
+    )
+    .unwrap();
     assert!(
         output.status.success(),
         "{}",

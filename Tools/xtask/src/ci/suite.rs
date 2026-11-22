@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The production source-verification graph. Inputs default to the whole
-//! repository where a narrower ownership claim is not explicit (xtask D47).
-
 use std::collections::BTreeMap;
 
 use crate::report::XtaskError;
@@ -14,7 +11,6 @@ use super::content::{Environment, Identity, Key};
 use super::graph::{Action, Input, Operation, Reuse};
 use super::view::Snapshot;
 
-/// Engine, command and toolchain inputs shared by every node.
 pub(crate) const BASE_INPUTS: &[Input] = &[
     Input::all("Cargo.toml"),
     Input::all("Cargo.lock"),
@@ -70,8 +66,6 @@ const fn gate(id: &'static str) -> Action {
     }
 }
 
-/// Only a gate whose complete dependency surface is the owned source view
-/// and linked verifier may opt into reuse. New gates remain non-reusable.
 const fn pure(id: &'static str, inputs: &'static [Input]) -> Action {
     Action {
         inputs,
@@ -114,7 +108,6 @@ const fn process(
     }
 }
 
-/// Every verdict formerly folded into `gates-sources`, with its input ownership.
 pub(crate) const ACTIONS: &[Action] = &[
     just("fmt", "fmt-check", ALL),
     pure("header", RUST),
@@ -122,11 +115,10 @@ pub(crate) const ACTIONS: &[Action] = &[
     gate("modmap"),
     scoped("length"),
     scoped("comments"),
+    scoped("unsafe"),
     gate("boundary"),
     gate("artifact"),
     gate("residue"),
-    // Any file can be named by an include directive; narrowing this input to
-    // Rust sources would miss a deleted included document.
     gate("packaged"),
     gate("depmap"),
     gate("unused"),
@@ -173,7 +165,6 @@ pub(crate) struct PreparedAction {
     pub(crate) files: Option<crate::source::Scope>,
 }
 
-/// Capture once, validate the graph, and derive every key in prerequisite order.
 pub(crate) fn prepare(
     snapshot: &Snapshot,
     environment: &Environment,

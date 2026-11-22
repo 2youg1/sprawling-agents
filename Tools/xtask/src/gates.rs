@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Run every gate in roster order and aggregate findings. `GATES`/`COUNT`
-//! are the only authority for which gates run; `report` owns the exit.
-
 use std::path::Path;
 use std::process::ExitCode;
 use std::thread;
@@ -14,19 +11,16 @@ use crate::report::{self, Violation, XtaskError};
 use crate::{
     artifact, boundary, budget, color, comments, depmap, docnum, guard, header, length, lexicon,
     modmap, motion, npm, packaged, proof, release, render, residue, secret, spec, specalign,
-    unused, upstream, wire_ts, wiring, wording,
+    unsafe_code, unused, upstream, wire_ts, wiring, wording,
 };
 
-/// Roster length; types `GATES` so the count and the list cannot disagree.
-pub(crate) const COUNT: usize = 27;
+pub(crate) const COUNT: usize = 28;
 
-/// One gate: the name a person types, and the check it runs.
 pub(crate) struct Gate {
     pub(crate) name: &'static str,
     check: fn(&Path) -> Result<Vec<Violation>, XtaskError>,
 }
 
-/// Sole roster: `--list`, usage and name selection all read it.
 pub(crate) const GATES: [Gate; COUNT] = [
     Gate {
         name: "header",
@@ -47,6 +41,10 @@ pub(crate) const GATES: [Gate; COUNT] = [
     Gate {
         name: "comments",
         check: comments::check,
+    },
+    Gate {
+        name: "unsafe",
+        check: unsafe_code::check,
     },
     Gate {
         name: "boundary",
@@ -138,12 +136,6 @@ pub(crate) const GATES: [Gate; COUNT] = [
     },
 ];
 
-/// The gates a run judges: all of them when `names` is empty, otherwise
-/// exactly the named ones in roster order.
-///
-/// # Errors
-/// [`XtaskError::UnknownGate`] for the first name the roster does not
-/// hold, so a mistyped name refuses instead of running every gate.
 pub(crate) fn select(names: &[String]) -> Result<Vec<&'static Gate>, XtaskError> {
     if let Some(unknown) = names
         .iter()
@@ -160,8 +152,6 @@ pub(crate) fn select(names: &[String]) -> Result<Vec<&'static Gate>, XtaskError>
         .collect())
 }
 
-/// Run the gates `names` selects and report them together; the gates
-/// judge in parallel, and the report keeps roster order.
 pub(crate) fn run(root: &Path, names: &[String], files: Option<Vec<String>>) -> ExitCode {
     let scope = match files
         .map(|paths| crate::source::Scope::new(&paths))
@@ -193,17 +183,13 @@ pub(crate) fn run_scoped(
 fn ensure_scope_supported(gates: &[&Gate]) -> Result<(), XtaskError> {
     if let Some(gate) = gates
         .iter()
-        .find(|gate| !matches!(gate.name, "comments" | "length"))
+        .find(|gate| !matches!(gate.name, "comments" | "length" | "unsafe"))
     {
         return Err(XtaskError::UnsupportedFileScope { name: gate.name });
     }
     Ok(())
 }
 
-/// Every gate's verdict, in the order `gates` lists them. Each gate
-/// judges on a thread of its own, so the wall time is the slowest gate's
-/// rather than their sum; joining in roster order keeps the report
-/// byte-identical between runs on one tree.
 fn judge(
     gates: &[&'static Gate],
     root: &Path,
@@ -218,6 +204,7 @@ fn judge(
                     scope.spawn(move || match (gate.name, file_scope) {
                         ("comments", Some(scope)) => comments::check_scoped(root, scope),
                         ("length", Some(scope)) => length::check_scoped(root, scope),
+                        ("unsafe", Some(scope)) => unsafe_code::check_scoped(root, scope),
                         _ => (gate.check)(root),
                     }),
                 )
@@ -239,8 +226,6 @@ fn judge(
     })
 }
 
-/// The text a panic carried: `panic!` with a literal leaves a `&str`,
-/// with format arguments a `String`; any other payload has no words.
 fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
     payload
         .downcast_ref::<&str>()
