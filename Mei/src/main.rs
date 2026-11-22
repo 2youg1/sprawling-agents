@@ -3,16 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The assembly point: arguments, environment, stdin/stdout and shutdown
-//! (`Mei/Spec.lean` §8-§10).
-
 use std::io::{IsTerminal, Read, Write};
 use std::process::ExitCode;
 
 use serde_json::{Value, json};
 
 use mei::error::{Code, Diagnostic, Error, Result};
-use mei::{agent, doctor, observation, python, resume, transport, workspace};
+use mei::{agent, doctor, observation, python, resume, steer, transport, workspace};
 
 const MAX_TOKENS: u64 = 65536;
 const DEFAULT_EFFORT: &str = "high";
@@ -115,12 +112,16 @@ fn run() -> Result<String> {
         "trace the selected Mei model",
     )?;
     let mut python = python::Py::spawn_in(&environment)?;
-    let result = agent::run(
-        &mut request,
-        |request, pulse| client.post(request, pulse),
-        |code| python.run(code),
-        &mut trace,
-    );
+    let mut intake = match optional_environment("MEI_STEER_PATH")? {
+        Some(path) => Some(steer::Intake::open(path)?),
+        None => None,
+    };
+    let mut ports = Live {
+        client: &mut client,
+        python: &mut python,
+        intake: &mut intake,
+    };
+    let result = agent::run(&mut request, &mut ports, &mut trace);
     match result {
         Ok(answer) => {
             python.close()?;
@@ -131,6 +132,29 @@ fn run() -> Result<String> {
                 eprintln!("{cleanup}");
             }
             Err(error)
+        }
+    }
+}
+
+struct Live<'a> {
+    client: &'a mut transport::Client,
+    python: &'a mut python::Py,
+    intake: &'a mut Option<steer::Intake>,
+}
+
+impl agent::Ports for Live<'_> {
+    fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value> {
+        self.client.post(request, pulse)
+    }
+
+    fn exec(&mut self, code: &str) -> Result<Value> {
+        self.python.run(code)
+    }
+
+    fn steer(&mut self) -> Result<Vec<String>> {
+        match self.intake.as_mut() {
+            Some(intake) => intake.drain(),
+            None => Ok(Vec::new()),
         }
     }
 }

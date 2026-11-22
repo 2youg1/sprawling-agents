@@ -58,6 +58,7 @@ pub const Ui = struct {
     session: ?mei_session.Session = null,
     previous_session: ?[]u8 = null,
     capture_dir: ?[]u8 = null,
+    steer_path: ?[]u8 = null,
     session_dir: []u8,
     pending: std.ArrayList([]u8) = .empty,
     replay_path: ?[]const u8,
@@ -144,6 +145,7 @@ pub const Ui = struct {
 
     fn deinit(self: *Ui) void {
         if (self.process) |*process| process.deinit();
+        if (self.steer_path) |path| self.gpa.free(path);
         if (self.capture_dir) |path| {
             mei_session.discardCaptureDirectory(self.io, path) catch {};
             self.gpa.free(path);
@@ -258,6 +260,10 @@ pub const Ui = struct {
             .handled => return,
             .quit => {
                 self.quit = true;
+                return;
+            },
+            .steer => {
+                runtime.steer(self, typed);
                 return;
             },
             .task => {},

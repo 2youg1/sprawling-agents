@@ -117,7 +117,10 @@ pub const Process = struct {
 
         var child_environment = if (capture_directory) |directory| blk: {
             const base = environ orelse return .{ .err = configFailure(gpa, "missing base environment", program) };
-            break :blk captureEnvironment(gpa, base, directory) catch return .{ .err = configFailure(gpa, "set capture directory", program) };
+            const steer_path = std.fmt.allocPrint(gpa, "{s}{c}steer.jsonl", .{ directory, std.fs.path.sep }) catch
+                return .{ .err = configFailure(gpa, "allocate steer path", program) };
+            defer gpa.free(steer_path);
+            break :blk captureEnvironment(gpa, base, directory, steer_path) catch return .{ .err = configFailure(gpa, "set capture directory", program) };
         } else null;
         defer if (child_environment) |*environment| environment.deinit();
 
@@ -492,11 +495,17 @@ fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
     return .{ .err = try gpa.dupe(u8, msg) };
 }
 
-fn captureEnvironment(gpa: std.mem.Allocator, base: *const std.process.Environ.Map, directory: []const u8) !std.process.Environ.Map {
+fn captureEnvironment(
+    gpa: std.mem.Allocator,
+    base: *const std.process.Environ.Map,
+    directory: []const u8,
+    steer_path: []const u8,
+) !std.process.Environ.Map {
     var child = try base.clone(gpa);
     errdefer child.deinit();
     try child.put("MEI_CAPTURE_DIR", directory);
     try child.put("MEI_CAPTURE_CREATED", "1");
+    try child.put("MEI_STEER_PATH", steer_path);
     return child;
 }
 
@@ -541,13 +550,15 @@ test "capture directory is copied into only the child environment" {
     var base = std.process.Environ.Map.init(gpa);
     defer base.deinit();
     try base.put("KEEP", "yes");
-    var child = try captureEnvironment(gpa, &base, "session.captures/run-1");
+    var child = try captureEnvironment(gpa, &base, "session.captures/run-1", "session.captures/run-1/steer.jsonl");
     defer child.deinit();
     try std.testing.expectEqualStrings("yes", child.get("KEEP").?);
     try std.testing.expectEqualStrings("session.captures/run-1", child.get("MEI_CAPTURE_DIR").?);
     try std.testing.expectEqualStrings("1", child.get("MEI_CAPTURE_CREATED").?);
+    try std.testing.expectEqualStrings("session.captures/run-1/steer.jsonl", child.get("MEI_STEER_PATH").?);
     try std.testing.expect(base.get("MEI_CAPTURE_DIR") == null);
     try std.testing.expect(base.get("MEI_CAPTURE_CREATED") == null);
+    try std.testing.expect(base.get("MEI_STEER_PATH") == null);
 }
 
 test "missing program yields a structured diagnostic" {

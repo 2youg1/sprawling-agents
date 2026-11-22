@@ -12,10 +12,23 @@ const CaptureFate = enum { keep, discard };
 
 pub fn submit(ui: anytype, typed: []const u8, at: u64) void {
     std.debug.assert(ui.capture_dir == null);
+    std.debug.assert(ui.steer_path == null);
     ui.capture_dir = ui.session.?.captureDirectory(ui.gpa, ui.io, at) catch {
         ui.printNote("create the run capture directory");
         return;
     };
+    const steer_path = std.fmt.allocPrint(ui.gpa, "{s}{c}steer.jsonl", .{ ui.capture_dir.?, std.fs.path.sep }) catch {
+        finishCapture(ui, .discard);
+        ui.printNote("allocate the Mei steer path");
+        return;
+    };
+    createEmptySteer(ui.io, steer_path) catch {
+        ui.gpa.free(steer_path);
+        finishCapture(ui, .discard);
+        ui.printNote("create the Mei steer file");
+        return;
+    };
+    ui.steer_path = steer_path;
     for (ui.pending.items) |line| ui.gpa.free(line);
     ui.pending.clearRetainingCapacity();
     ui.seen.begin(at);
@@ -33,6 +46,16 @@ pub fn submit(ui: anytype, typed: []const u8, at: u64) void {
             ui.ended();
         },
     }
+}
+
+pub fn steer(ui: anytype, typed: []const u8) void {
+    const path = ui.steer_path orelse {
+        ui.printNote("no running Mei task to steer");
+        return;
+    };
+    appendSteer(ui.gpa, ui.io, path, typed) catch {
+        ui.printNote("append the Mei steer");
+    };
 }
 
 pub fn drain(ui: anytype) void {
@@ -125,6 +148,10 @@ pub fn stop(ui: anytype) void {
 }
 
 fn finishCapture(ui: anytype, fate: CaptureFate) void {
+    if (ui.steer_path) |path| {
+        ui.gpa.free(path);
+        ui.steer_path = null;
+    }
     const path = ui.capture_dir orelse return;
     if (fate == .discard) {
         mei_session.discardCaptureDirectory(ui.io, path) catch |err| {
@@ -137,4 +164,35 @@ fn finishCapture(ui: anytype, fate: CaptureFate) void {
     }
     ui.gpa.free(path);
     ui.capture_dir = null;
+}
+
+fn createEmptySteer(io: std.Io, path: []const u8) !void {
+    const file = try std.Io.Dir.cwd().createFile(io, path, .{});
+    file.close(io);
+}
+
+fn appendSteer(gpa: std.mem.Allocator, io: std.Io, path: []const u8, text: []const u8) !void {
+    const line = try std.json.Stringify.valueAlloc(gpa, .{ .text = text }, .{});
+    defer gpa.free(line);
+    const file = try std.Io.Dir.cwd().openFile(io, path, .{ .mode = .read_write });
+    defer file.close(io);
+    const end = try file.length(io);
+    var buf: [512]u8 = undefined;
+    var writer = file.writer(io, &buf);
+    try writer.seekTo(end);
+    try writer.interface.writeAll(line);
+    try writer.interface.writeAll("\n");
+    try writer.interface.flush();
+}
+
+test "a steer line is one JSON object ending in a newline" {
+    const gpa = std.testing.allocator;
+    const io = std.testing.io;
+    const file_path = "mei-steer-append-test.jsonl";
+    defer std.Io.Dir.cwd().deleteFile(io, file_path) catch {};
+    try createEmptySteer(io, file_path);
+    try appendSteer(gpa, io, file_path, "narrow the search");
+    const contents = try std.Io.Dir.cwd().readFileAlloc(io, file_path, gpa, .limited(4096));
+    defer gpa.free(contents);
+    try std.testing.expectEqualStrings("{\"text\":\"narrow the search\"}\n", contents);
 }

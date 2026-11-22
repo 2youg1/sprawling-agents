@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The only feedback loop (`Mei/spec/Agent.lean`). JSON is the sole
-//! conversation state; closures and `Write` are the only outside faces.
 
 use std::collections::BTreeSet;
 use std::io::Write;
@@ -12,16 +10,20 @@ use std::io::Write;
 use serde_json::{Value, json};
 
 use crate::error::{Error, Result, protocol};
+use crate::steer;
 
 pub const TOOL_NAME: &str = "python";
 
-/// Renders the value found at a failed field, naming absence plainly.
+pub trait Ports {
+    fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value>;
+    fn exec(&mut self, code: &str) -> Result<Value>;
+    fn steer(&mut self) -> Result<Vec<String>>;
+}
+
 fn found(value: Option<&Value>) -> String {
     value.map_or_else(|| "<missing>".to_owned(), |value| value.to_string())
 }
 
-/// The path of the assistant message just appended, so a diagnostic can
-/// name the offending content block.
 fn message_path(request: &Value) -> String {
     request
         .get("messages")
@@ -39,22 +41,14 @@ struct Call {
     code: String,
 }
 
-/// Runs until the model ends a turn, or a transport, protocol, trace or
-/// interpreter failure makes continuation invalid.
-///
-/// # Errors
-/// Any adapter error, malformed control field, invalid client tool wave,
-/// unexpected stop reason, or trace write failure stops the run. A failed
-/// wave can already have external effects only after every call validated.
 pub fn run(
     request: &mut Value,
-    mut post: impl FnMut(&Value, &mut dyn Write) -> Result<Value>,
-    mut exec: impl FnMut(&str) -> Result<Value>,
+    ports: &mut dyn Ports,
     trace: &mut dyn Write,
 ) -> Result<String> {
     let mut first_response = true;
     loop {
-        let response = post(request, trace)?;
+        let response = ports.post(request, trace)?;
         if let Some(usage) = response.get("usage") {
             write_message(
                 trace,
@@ -122,13 +116,15 @@ pub fn run(
                 }
                 let mut results = Vec::with_capacity(calls.len());
                 for call in calls {
-                    let output = exec(&call.code)?;
+                    let output = ports.exec(&call.code)?;
                     results.push(json!({
                         "type": "tool_result",
                         "tool_use_id": call.id,
                         "content": output,
                     }));
                 }
+                let arrived = ports.steer()?;
+                steer::land(&mut results, &arrived);
                 append(
                     request,
                     json!({"role": "user", "content": results}),

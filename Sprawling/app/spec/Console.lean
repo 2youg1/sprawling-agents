@@ -167,8 +167,9 @@ pub(crate) fn verb(replay: Option<&str>) -> ExitCode;
   有当前会话文件时下一项继承其消息；`/new` 换文件并切断历史，`/resume` 导入指定文件。
   当前段先留在内存，完整成功后才追加。非空旧文件缺少末尾 LF 时先补一个 LF；写入或 flush
   失败以追加前长度截回旧文件，恢复失败与追加失败一起明确报告，不能宣称该段已保存。
-- **键**：Enter 提交，Shift+Enter 插入换行（与 City 的 typing 同一规则）；Esc 先清草稿，
-  再停任务，最后退出。
+- **键**：Enter 提交，Shift+Enter 插入换行（与 City 的 typing 同一规则）；任务进行中的普通
+  文本是 Steer（经 `MEI_STEER_PATH` 投递，不启新进程；`Mei/Spec.lean` D21），斜杠仍被拒绝；
+  Esc 先清草稿，再停任务；只有 `/quit`/`/q` 退出。
 - **回放分批**：每批至多读 `REPLAY_BATCH`（64）行，批次之间处理积压事件（Esc、终端丢失）；
   回放未读完前不等待键盘，读完才回到等键的阻塞读。
 - **终端交还**：screen take 失败、主循环发现终端丢失或正常退出，都经同一条 `give_back`

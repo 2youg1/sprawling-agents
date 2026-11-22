@@ -11,6 +11,7 @@ pub mod error;
 pub mod observation;
 pub mod python;
 pub mod resume;
+pub mod steer;
 pub mod transport;
 pub mod workspace;
 

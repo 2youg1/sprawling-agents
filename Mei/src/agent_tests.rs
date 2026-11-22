@@ -11,6 +11,7 @@
     reason = "test code"
 )]
 
+use std::cell::Cell;
 use std::collections::VecDeque;
 
 use super::*;
@@ -23,21 +24,64 @@ fn response(stop: &str, content: Value) -> Value {
     json!({"stop_reason": stop, "content": content})
 }
 
+struct Script {
+    answers: VecDeque<Value>,
+    executed: Vec<String>,
+    steers: VecDeque<Vec<String>>,
+    fail_exec: bool,
+    drained: Cell<usize>,
+    steered_during_exec: Cell<bool>,
+}
+
+impl Script {
+    fn answers(answers: Vec<Value>) -> Script {
+        Script {
+            answers: VecDeque::from(answers),
+            executed: Vec::new(),
+            steers: VecDeque::new(),
+            fail_exec: false,
+            drained: Cell::new(0),
+            steered_during_exec: Cell::new(false),
+        }
+    }
+}
+
+impl Ports for Script {
+    fn post(&mut self, _request: &Value, _pulse: &mut dyn Write) -> Result<Value> {
+        Ok(self.answers.pop_front().unwrap())
+    }
+
+    fn exec(&mut self, code: &str) -> Result<Value> {
+        self.steered_during_exec
+            .set(self.drained.get() > 0);
+        if self.fail_exec {
+            return Err(Error::from(protocol(
+                "execute Python",
+                "the interpreter died",
+                "start a new Mei process",
+            )));
+        }
+        self.executed.push(code.to_owned());
+        Ok(Value::String(format!("out:{code}")))
+    }
+
+    fn steer(&mut self) -> Result<Vec<String>> {
+        self.drained.set(self.drained.get().saturating_add(1));
+        Ok(self.steers.pop_front().unwrap_or_default())
+    }
+}
+
 fn drive(answers: Vec<Value>) -> (Result<String>, Value, String, Vec<String>) {
-    let mut answers = VecDeque::from(answers);
     let mut request = request();
     let mut trace = Vec::new();
-    let mut executed = Vec::new();
-    let result = run(
-        &mut request,
-        |_, _| Ok(answers.pop_front().unwrap()),
-        |code| {
-            executed.push(code.to_owned());
-            Ok(Value::String(format!("out:{code}")))
-        },
-        &mut trace,
-    );
-    (result, request, String::from_utf8(trace).unwrap(), executed)
+    let mut ports = Script::answers(answers);
+    let result = run(&mut request, &mut ports, &mut trace);
+    (
+        result,
+        request,
+        String::from_utf8(trace).unwrap(),
+        ports.executed,
+    )
 }
 
 #[test]
@@ -62,26 +106,14 @@ fn a_direct_answer_preserves_stdout_and_history() {
 
 #[test]
 fn usage_is_traced_as_mei_obs_and_not_appended_to_messages() {
-    let mut answers = VecDeque::from(vec![json!({
+    let mut request = request();
+    let mut trace = Vec::new();
+    let mut ports = Script::answers(vec![json!({
         "stop_reason": "end_turn",
         "content": "answer",
         "usage": {"input_tokens": 3, "output_tokens": 1}
     })]);
-    let mut request = request();
-    let mut trace = Vec::new();
-    let answer = run(
-        &mut request,
-        |_, _| Ok(answers.pop_front().unwrap()),
-        |_| {
-            Err(Error::from(protocol(
-                "execute Python",
-                "usage fixture must not call a tool",
-                "keep the fixture on end_turn without tool_use",
-            )))
-        },
-        &mut trace,
-    )
-    .unwrap();
+    let answer = run(&mut request, &mut ports, &mut trace).unwrap();
     assert_eq!(answer, "answer");
     assert_eq!(request["messages"].as_array().unwrap().len(), 2);
     let trace: Vec<Value> = String::from_utf8(trace)
@@ -182,26 +214,63 @@ fn max_tokens_and_empty_waves_do_not_execute() {
 fn an_execution_failure_does_not_invent_a_complete_result_message() {
     let mut request = request();
     let mut trace = Vec::new();
-    let result = run(
-        &mut request,
-        |_, _| {
-            Ok(response(
-                "tool_use",
-                json!([{"type": "tool_use", "name": "python", "id": "a", "input": {"code": "exit()"}}]),
-            ))
-        },
-        |_| {
-            Err(Error::from(protocol(
-                "execute Python",
-                "the interpreter died",
-                "start a new Mei process",
-            )))
-        },
-        &mut trace,
-    );
+    let mut ports = Script::answers(vec![response(
+        "tool_use",
+        json!([{"type": "tool_use", "name": "python", "id": "a", "input": {"code": "exit()"}}]),
+    )]);
+    ports.fail_exec = true;
+    let result = run(&mut request, &mut ports, &mut trace);
     assert!(result.is_err());
     assert_eq!(request["messages"].as_array().unwrap().len(), 2);
     assert_eq!(String::from_utf8(trace).unwrap().lines().count(), 2);
+}
+
+#[test]
+fn a_steer_lands_on_the_latest_tool_result_after_exec() {
+    let mut request = request();
+    let mut trace = Vec::new();
+    let mut ports = Script::answers(vec![
+        response(
+            "tool_use",
+            json!([
+                {"type": "tool_use", "name": "python", "id": "a", "input": {"code": "print(1)"}},
+                {"type": "tool_use", "name": "python", "id": "b", "input": {"code": "print(2)"}}
+            ]),
+        ),
+        response("end_turn", json!("done")),
+    ]);
+    ports.steers.push_back(vec!["narrow the search".to_owned()]);
+    let answer = run(&mut request, &mut ports, &mut trace).unwrap();
+    assert_eq!(answer, "done");
+    assert_eq!(ports.executed, ["print(1)", "print(2)"]);
+    let results = request["messages"][2]["content"].as_array().unwrap();
+    assert_eq!(results[0]["content"], "out:print(1)");
+    assert_eq!(results[1]["content"], "out:print(2)\nuser: narrow the search");
+}
+
+#[test]
+fn a_steer_is_not_read_until_the_wave_finishes() {
+    let mut request = request();
+    let mut trace = Vec::new();
+    let mut ports = Script::answers(vec![
+        response(
+            "tool_use",
+            json!([{"type": "tool_use", "name": "python", "id": "a", "input": {"code": "slow()"}}]),
+        ),
+        response("end_turn", json!("ok")),
+    ]);
+    ports.steers.push_back(vec!["after the call".to_owned()]);
+    let answer = run(&mut request, &mut ports, &mut trace).unwrap();
+    assert_eq!(answer, "ok");
+    assert!(
+        !ports.steered_during_exec.get(),
+        "steer must not run inside exec"
+    );
+    assert_eq!(ports.drained.get(), 1);
+    assert_eq!(
+        request["messages"][2]["content"][0]["content"],
+        "out:slow()\nuser: after the call"
+    );
 }
 
 #[test]
