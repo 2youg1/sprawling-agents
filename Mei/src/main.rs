@@ -195,14 +195,14 @@ fn run_acp() -> Result<()> {
     let stdout = std::io::stdout();
     let result = acp::serve(stdin, stdout, |turn: Turn| {
         launch::bind_python_to_cwd(&mut python, &mut opened_cwd, &turn.cwd, &environment)?;
-        let python = python.as_mut().ok_or_else(|| {
-            Error::Diagnostic(Diagnostic::new(
+        if python.is_none() {
+            return Err(Error::Diagnostic(Diagnostic::new(
                 Code::Protocol,
                 "bind the ACP python interpreter",
                 "no interpreter is bound to the session cwd",
                 "restart `mei --acp` and open a new session",
-            ))
-        })?;
+            )));
+        }
         if turn.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
             return Ok(Outcome {
                 stop: StopReason::Cancelled,
@@ -210,8 +210,12 @@ fn run_acp() -> Result<()> {
             });
         }
         let mut trace = std::io::stderr();
-        if turn.first {
-            let guide = workspace::read_new_session()?;
+        if turn.first || request.is_none() {
+            let guide = if turn.first {
+                workspace::read_new_session()?
+            } else {
+                None
+            };
             let built = launch::initial_request(
                 Task {
                     model: &model,
@@ -256,13 +260,35 @@ fn run_acp() -> Result<()> {
                 "restart `mei --acp` and open a new session",
             ))
         })?;
-        let mut intake = None;
-        let mut live = agent::Live {
-            client: &mut client,
-            python: &mut python,
-            intake: &mut intake,
+        let run_result = {
+            let interpreter = python.as_mut().ok_or_else(|| {
+                Error::Diagnostic(Diagnostic::new(
+                    Code::Protocol,
+                    "run an ACP turn",
+                    "no interpreter is bound to the session cwd",
+                    "restart `mei --acp` and open a new session",
+                ))
+            })?;
+            let mut intake = None;
+            let mut live = agent::Live {
+                client: &mut client,
+                python: interpreter,
+                intake: &mut intake,
+            };
+            agent::drive(body, &mut live, &mut trace)
         };
-        let answer = agent::drive(body, &mut live, &mut trace)?;
+        let answer = match run_result {
+            Ok(answer) => answer,
+            Err(error) => {
+                request = None;
+                if let Some(mut dead) = python.take()
+                    && let Err(cleanup) = dead.kill_and_wait()
+                {
+                    eprintln!("{cleanup}");
+                }
+                return Err(error);
+            }
+        };
         let stop = if turn.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
             StopReason::Cancelled
         } else {

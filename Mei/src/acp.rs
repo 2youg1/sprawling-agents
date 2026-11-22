@@ -6,7 +6,7 @@
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
@@ -85,15 +85,28 @@ pub fn finish(saw_cancel: bool, produced: StopReason) -> StopReason {
 
 pub fn serve(
     input: impl Read + Send + 'static,
+    output: impl Write,
+    turn: impl FnMut(Turn) -> Result<Outcome>,
+) -> Result<()> {
+    serve_with_meter(input, output, turn, None)
+}
+
+pub fn serve_with_meter(
+    input: impl Read + Send + 'static,
     mut output: impl Write,
     mut turn: impl FnMut(Turn) -> Result<Outcome>,
+    lines_read: Option<Arc<AtomicU64>>,
 ) -> Result<()> {
     let (tx, rx) = mpsc::channel::<std::io::Result<String>>();
+    let meter = lines_read.clone();
     thread::spawn(move || {
         let reader = BufReader::new(input);
         for line in reader.lines() {
             if tx.send(line).is_err() {
                 break;
+            }
+            if let Some(meter) = &meter {
+                meter.fetch_add(1, Ordering::SeqCst);
             }
         }
     });
@@ -250,10 +263,7 @@ fn drain_during_turn(
                 )));
             }
             Err(mpsc::TryRecvError::Empty) => return Ok(()),
-            Err(mpsc::TryRecvError::Disconnected) => {
-                cancelled.store(true, Ordering::SeqCst);
-                return Ok(());
-            }
+            Err(mpsc::TryRecvError::Disconnected) => return Ok(()),
         }
     }
 }

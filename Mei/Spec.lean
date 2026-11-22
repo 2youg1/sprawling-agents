@@ -257,6 +257,8 @@ pub struct Outcome {
 与 python 进程；进程退出时收口解释器。
 python 在获知 `session/new` 的 cwd 并 `enter_cwd` 之后才 spawn，使 sole tool 的工作目录与
 AGENTS 读取的同一工作树一致；cwd 变更时先收口旧解释器再于新目录重生。
+回合若在 `agent::run` 中失败：丢弃当前 Messages 请求并收口解释器，下一 prompt 以无 guide 的新
+请求重建，避免把未配对的 `tool_use` 再交给 provider；stdin 断开只结束排空，不标 `cancelled`。
 
 发布：`sprawling-mei` / `@sprawling/mei`；平台含 Windows；平台包含 `mei` 与 `calyx`。
 交互经 `calyx` + 无头核解析（Calyx D4）；城控制台仍经 `sprawling`。打包次序归

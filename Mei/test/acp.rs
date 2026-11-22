@@ -12,7 +12,7 @@
 )]
 
 use std::io::{BufRead, BufReader, Write};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -126,14 +126,81 @@ fn cancel_after_a_turn_marks_cancelled() {
     let (client_stdin, agent_stdout) = std::io::pipe().unwrap();
     let gate = Arc::new(AtomicBool::new(false));
     let wait = Arc::clone(&gate);
+    let lines_read = Arc::new(AtomicU64::new(0));
+    let meter = Arc::clone(&lines_read);
     let server = thread::spawn(move || {
-        acp::serve(agent_stdin, agent_stdout, move |_turn| {
-            while !wait.load(Ordering::SeqCst) {
-                thread::sleep(Duration::from_millis(5));
-            }
+        acp::serve_with_meter(
+            agent_stdin,
+            agent_stdout,
+            move |_turn| {
+                while !wait.load(Ordering::SeqCst) {
+                    thread::sleep(Duration::from_millis(5));
+                }
+                Ok(Outcome {
+                    stop: StopReason::EndTurn,
+                    text: "late".to_owned(),
+                })
+            },
+            Some(meter),
+        )
+        .unwrap();
+    });
+    let mut reader = BufReader::new(client_stdin);
+    write_line(
+        &mut client_stdout,
+        json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1}}),
+    );
+    let _: Value = read_line(&mut reader);
+    write_line(
+        &mut client_stdout,
+        json!({
+            "jsonrpc":"2.0","id":1,"method":"session/new",
+            "params":{"cwd": cwd.to_str().unwrap(), "mcpServers": []}
+        }),
+    );
+    let opened = read_line(&mut reader);
+    let session = opened["result"]["sessionId"].as_str().unwrap().to_owned();
+    write_line(
+        &mut client_stdout,
+        json!({
+            "jsonrpc":"2.0","id":2,"method":"session/prompt",
+            "params":{"sessionId": session, "prompt":[{"type":"text","text":"go"}]}
+        }),
+    );
+    let before_cancel = wait_for_lines(&lines_read, 3);
+    write_line(
+        &mut client_stdout,
+        json!({
+            "jsonrpc":"2.0","method":"session/cancel",
+            "params":{"sessionId": session}
+        }),
+    );
+    wait_for_lines(&lines_read, before_cancel.saturating_add(1));
+    gate.store(true, Ordering::SeqCst);
+    let mut stop = None;
+    for _ in 0..8 {
+        let message = read_line(&mut reader);
+        if let Some(reason) = message.pointer("/result/stopReason").and_then(Value::as_str) {
+            stop = Some(reason.to_owned());
+            break;
+        }
+    }
+    assert_eq!(stop.as_deref(), Some("cancelled"));
+    drop(client_stdout);
+    server.join().unwrap();
+}
+
+#[test]
+fn prompt_without_cancel_keeps_end_turn() {
+    let directory = tempfile::tempdir().unwrap();
+    let cwd = directory.path().canonicalize().unwrap();
+    let (agent_stdin, mut client_stdout) = std::io::pipe().unwrap();
+    let (client_stdin, agent_stdout) = std::io::pipe().unwrap();
+    let server = thread::spawn(move || {
+        acp::serve(agent_stdin, agent_stdout, |_turn| {
             Ok(Outcome {
                 stop: StopReason::EndTurn,
-                text: "late".to_owned(),
+                text: "ok".to_owned(),
             })
         })
         .unwrap();
@@ -160,26 +227,26 @@ fn cancel_after_a_turn_marks_cancelled() {
             "params":{"sessionId": session, "prompt":[{"type":"text","text":"go"}]}
         }),
     );
-    thread::sleep(Duration::from_millis(30));
-    write_line(
-        &mut client_stdout,
-        json!({
-            "jsonrpc":"2.0","method":"session/cancel",
-            "params":{"sessionId": session}
-        }),
-    );
-    gate.store(true, Ordering::SeqCst);
-    let mut stop = None;
-    for _ in 0..8 {
-        let message = read_line(&mut reader);
-        if let Some(reason) = message.pointer("/result/stopReason").and_then(Value::as_str) {
-            stop = Some(reason.to_owned());
-            break;
-        }
-    }
-    assert_eq!(stop.as_deref(), Some("cancelled"));
+    let update = read_line(&mut reader);
+    let answer = read_line(&mut reader);
+    assert_eq!(update["method"], "session/update");
+    assert_eq!(answer["result"]["stopReason"], "end_turn");
     drop(client_stdout);
     server.join().unwrap();
+}
+
+fn wait_for_lines(meter: &AtomicU64, at_least: u64) -> u64 {
+    for _ in 0..1_000 {
+        let seen = meter.load(Ordering::SeqCst);
+        if seen >= at_least {
+            return seen;
+        }
+        thread::sleep(Duration::from_millis(1));
+    }
+    panic!(
+        "ACP reader did not enqueue {at_least} lines; saw {}",
+        meter.load(Ordering::SeqCst)
+    );
 }
 
 #[test]
