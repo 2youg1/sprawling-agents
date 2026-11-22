@@ -5,17 +5,8 @@
 
 use crate::platform::{PLATFORMS, ROOT_PACKAGE};
 
-/// The last version whose platform packages reached the registry under
-/// bare names. npm never reuses a `name@version`, so the scope cannot
-/// be applied to it afterwards.
 const UNSCOPED_THROUGH: &str = "0.0.4";
 
-/// What this channel publishes a release as, held against the spelling
-/// `kernel::Release` decodes - the tag conversion itself is that type's
-/// and is tested there. This is the seam: the job publishes
-/// `npm_version()`, and `status --check` reads the registry back through
-/// `from_npm_version`, so a release only stays findable while those two
-/// agree.
 #[test]
 fn the_published_version_is_the_one_a_running_binary_decodes() {
     let cut = kernel::Release::from_tag("v0.17.0-260911", "0.17.0")
@@ -27,10 +18,6 @@ fn the_published_version_is_the_one_a_running_binary_decodes() {
     );
 }
 
-/// The decision beside `ROWS`, carried to the version that can honour
-/// it. Nothing here fires while the workspace still states the version
-/// whose packages are already published; the first commit that moves
-/// that number turns this red, and the message says what to rename.
 #[test]
 fn the_platform_packages_take_the_scope_from_the_next_version() {
     let root = crate::root::this_checkout();
@@ -56,9 +43,6 @@ fn the_platform_packages_take_the_scope_from_the_next_version() {
     }
 }
 
-/// The shim is what every root package carries, so its own contract
-/// is worth holding: it resolves a platform package and never
-/// installs anything.
 #[test]
 fn the_shim_execs_rather_than_installs() {
     let shim = super::SHIM;
@@ -66,6 +50,29 @@ fn the_shim_execs_rather_than_installs() {
     assert!(
         !shim.contains("sprawling install"),
         "PATH belongs to whoever installed; the shim must not install"
+    );
+}
+
+#[test]
+fn mei_postinstall_prints_fix_path_when_unreachable() {
+    let post = super::POSTINSTALL;
+    assert!(post.contains("Fix your PATH"));
+    assert!(post.contains("bun pm bin --global"));
+    assert!(post.contains(".local"));
+    assert!(post.contains("Open a NEW terminal"));
+    assert!(post.contains("package bin field"));
+    assert!(post.contains("session only"));
+    assert!(post.contains("exec \""));
+    assert!(
+        !post.contains("bashrc")
+            && !post.contains("zshrc")
+            && !post.contains("WriteAllText")
+            && !post.contains("HKCU"),
+        "postinstall must not write shell startup files: {post}"
+    );
+    assert!(
+        !post.contains("copyFileSync"),
+        "copy fallback breaks module resolve; wrappers keep absolute paths: {post}"
     );
 }
 
@@ -88,11 +95,14 @@ fn mei_shim_smoke_routes_tty_to_calyx_and_headless_flags_to_core() {
     assert!(
         function.contains("\"-p\"")
             && function.contains("--resume")
+            && function.contains("--acp")
             && function.contains("stdinIsTTY"),
         "{function}"
     );
     assert!(shim.contains("childEnv.MEI_BIN = core"));
     assert!(shim.contains("row.face"));
+    assert!(shim.contains("entryName"));
+    assert!(shim.contains("forceFace"));
 
     let script = format!(
         "{function}\n\
@@ -100,6 +110,7 @@ fn mei_shim_smoke_routes_tty_to_calyx_and_headless_flags_to_core() {
            [['-p', 'x'], true, true],\n\
            [['--resume', 'a.jsonl'], true, true],\n\
            [['--resume=a.jsonl'], true, true],\n\
+           [['--acp'], true, true],\n\
            [[], true, false],\n\
            [[], false, true],\n\
            [['--replay', 'a.jsonl'], true, false],\n\
@@ -207,11 +218,25 @@ description = 'fixture description'
     let mei_manifest: serde_json::Value =
         serde_json::from_slice(&std::fs::read(mei_root.join("package.json")).unwrap()).unwrap();
     assert_eq!(mei_manifest["bin"]["mei"], "bin/mei.js");
-    assert_eq!(mei_manifest["bin"].as_object().unwrap().len(), 1);
+    assert_eq!(mei_manifest["bin"]["calyx"], "bin/calyx.js");
+    assert_eq!(mei_manifest["bin"].as_object().unwrap().len(), 2);
+    assert_eq!(
+        mei_manifest["scripts"]["postinstall"],
+        "bun bin/postinstall.js"
+    );
     assert!(
         std::fs::read_to_string(mei_root.join("bin/mei.js"))
             .unwrap()
             .starts_with("#!/usr/bin/env bun\n")
+    );
+    assert_eq!(
+        std::fs::read(mei_root.join("bin/mei.js")).unwrap(),
+        std::fs::read(mei_root.join("bin/calyx.js")).unwrap()
+    );
+    assert!(
+        std::fs::read_to_string(mei_root.join("bin/postinstall.js"))
+            .unwrap()
+            .contains("Fix your PATH")
     );
     assert!(!mei_root.join("bin/mei.cmd").exists());
     assert_eq!(

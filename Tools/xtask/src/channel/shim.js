@@ -2,11 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
-//
-// The npm channel's entry point: find the binary for this machine and
-// become it. Never installs. For @sprawling/mei: a TTY without `-p` or
-// `--resume` becomes Calyx; `-p`, `--resume`, or a non-TTY stdin becomes
-// the headless core.
 
 "use strict";
 
@@ -60,8 +55,15 @@ function spec(name) {
   return typeof packageManifest.version === "string" ? `${name}@${packageManifest.version}` : name;
 }
 
+function entryName(argv1 = process.argv[1]) {
+  const base = path.basename(argv1 || "").toLowerCase();
+  if (base === "calyx" || base === "calyx.js" || base === "calyx.exe") return "calyx";
+  return "mei";
+}
+
 function wantsHeadless(argv, stdinIsTTY = process.stdin.isTTY) {
   if (argv.includes("-p")) return true;
+  if (argv.includes("--acp")) return true;
   if (argv.some((arg) => arg === "--resume" || arg.startsWith("--resume="))) return true;
   if (!stdinIsTTY) return true;
   return false;
@@ -94,7 +96,8 @@ let binary;
 let childEnv = { ...process.env };
 if (isMei) {
   const core = resolveBinary(row.package, row.core);
-  if (wantsHeadless(process.argv.slice(2))) {
+  const forceFace = entryName() === "calyx";
+  if (!forceFace && wantsHeadless(process.argv.slice(2))) {
     binary = core;
   } else {
     binary = resolveBinary(row.package, row.face);

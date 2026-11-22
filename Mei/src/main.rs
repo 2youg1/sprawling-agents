@@ -110,13 +110,26 @@ fn usage(subject: String) -> Error {
     .into()
 }
 
+fn interactive_face_hint(subject: String) -> Error {
+    Diagnostic::new(
+        Code::Usage,
+        "open the interactive face",
+        subject,
+        "this `mei` is the headless core only; install `@sprawling/mei` with Bun \
+         (`bun install --global @sprawling/mei@latest`) or run `calyx` from a source \
+         build that includes sprawling-calyx",
+    )
+    .into()
+}
+
 fn prompt(argument: Option<String>) -> Result<String> {
     if let Some(prompt) = argument {
         return Ok(prompt);
     }
     if std::io::stdin().is_terminal() {
-        return Err(usage(
-            "without -p, stdin must be a complete non-terminal prompt".to_owned(),
+        return Err(interactive_face_hint(
+            "TTY `mei` without `-p` is not an interactive shell; the Calyx face is a separate binary"
+                .to_owned(),
         ));
     }
     let mut prompt = String::new();

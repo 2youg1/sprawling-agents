@@ -96,8 +96,10 @@ LLM compaction、验真门、Skills/MCP 自动暴露、Mei 自动更新、为弱
 /-! ## 4 现状分析
 
 核去掉输出窗与 POSIX-only 拒绝；删除 `MEI_TOOLS`。交互后端在 `Calyx/src/console`，
-入口为 `calyx` 二进制（npm：TTY 且无 `-p`／`--resume` 时由 shim 启动）并通过 `MEI_BIN`／同目录
-`mei`／PATH 解析无头核。`@sprawling/mei` 归档同时携带无头核与 Calyx 面（含 Windows）。
+入口为 `calyx` 二进制（npm：`calyx` bin，或 `mei` 在 TTY 且无 `-p`／`--resume`／`--acp` 时由
+shim 启动）并通过 `MEI_BIN`／同目录 `mei`／PATH 解析无头核。`@sprawling/mei` 归档同时携带无头核
+与 Calyx 面（含 Windows）。crates.io 的 `sprawling-mei` 仅无头核：TTY 无 `-p` 时以 `E_MEI_USAGE`
+拒绝并指向 Bun 包／源码 `calyx`，不假装有交互面。
 V1/V2 实测以 magpie + 已测模型为准，不外推。
 城已有 ACP **client**（`agent_protocols::harness`）与 HTTP 入站 `POST /acp`（非 stdio ACP）；
 Mei 补齐 ACP **agent** stdio 面后，可被粘贴/入座为 `mei --acp` 而无须改城 client。

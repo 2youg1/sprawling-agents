@@ -17,6 +17,7 @@ use crate::report::XtaskError;
 mod system;
 
 const SHIM: &str = include_str!("channel/shim.js");
+const POSTINSTALL: &str = include_str!("channel/postinstall.js");
 const RUNTIME_ENTRY: &str = "sprawling-runtime";
 const LAUNCHER: &str = include_str!("channel/launcher.cmd");
 
@@ -39,9 +40,6 @@ fn extract(archive: &Path, wanted: &str) -> Result<ArchiveBinary, XtaskError> {
             cmd: format!("read {}", archive.display()),
             msg: err.to_string(),
         })?;
-        // The archive holds `sprawling-<version>-<platform>/<name>`, and
-        // the directory carries the version, so the entry is matched on
-        // its file name rather than on a path this would have to rebuild.
         let is_wanted = {
             let name = entry.name().map_err(|err| XtaskError::Cmd {
                 cmd: format!("read {}", archive.display()),
@@ -237,17 +235,22 @@ fn write_mei_channel(
         .collect::<Vec<_>>()
         .join(",\n");
     let extra = format!(
-        "  \"bin\": {{ \"mei\": \"bin/mei.js\" }},\n  \
-         \"files\": [\"bin\"],\n  \"optionalDependencies\": {{\n{optional}\n  }}\n"
+        "  \"bin\": {{ \"mei\": \"bin/mei.js\", \"calyx\": \"bin/calyx.js\" }},\n  \
+         \"files\": [\"bin\"],\n  \
+         \"scripts\": {{ \"postinstall\": \"bun bin/postinstall.js\" }},\n  \
+         \"optionalDependencies\": {{\n{optional}\n  }}\n"
     );
     let dir = out.join(MEI_ROOT_PACKAGE);
     write(
         &dir.join("package.json"),
         manifest(stem, MEI_ROOT_PACKAGE, &description, &extra).as_bytes(),
     )?;
+    let shim = format!("#!/usr/bin/env bun\n{SHIM}");
+    write(&dir.join("bin/mei.js"), shim.as_bytes())?;
+    write(&dir.join("bin/calyx.js"), shim.as_bytes())?;
     write(
-        &dir.join("bin/mei.js"),
-        format!("#!/usr/bin/env bun\n{SHIM}").as_bytes(),
+        &dir.join("bin/postinstall.js"),
+        format!("#!/usr/bin/env bun\n{POSTINSTALL}").as_bytes(),
     )?;
     Ok(carried
         .into_iter()
@@ -259,9 +262,6 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
     let workspace = crate::package::workspace_package(root, "version")?;
     let repository = crate::package::workspace_package(root, "repository")?;
     let description = crate::package::workspace_package(root, "description")?;
-    // `kernel::Release` owns both spellings of one release, because the
-    // binary this channel packages has to recognise on the registry the
-    // same release this job publishes there.
     let version = kernel::Release::from_tag(tag, &workspace)
         .map_err(|err| XtaskError::Cmd {
             cmd: format!("npm version for {tag}"),
