@@ -9,7 +9,9 @@ use std::io::Write;
 use serde_json::{Value, json};
 
 use crate::error::{Error, Result, protocol};
-use crate::steer;
+use crate::python::Py;
+use crate::steer::{self, Intake};
+use crate::transport::Client;
 
 pub const TOOL_NAME: &str = "python";
 
@@ -17,6 +19,33 @@ pub(crate) trait Ports {
     fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value>;
     fn exec(&mut self, code: &str) -> Result<Value>;
     fn steer(&mut self) -> Result<Vec<String>>;
+}
+
+pub struct Live<'a> {
+    pub client: &'a mut Client,
+    pub python: &'a mut Py,
+    pub intake: &'a mut Option<Intake>,
+}
+
+impl Ports for Live<'_> {
+    fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value> {
+        self.client.post(request, pulse)
+    }
+
+    fn exec(&mut self, code: &str) -> Result<Value> {
+        self.python.run(code)
+    }
+
+    fn steer(&mut self) -> Result<Vec<String>> {
+        match self.intake.as_mut() {
+            Some(intake) => intake.drain(),
+            None => Ok(Vec::new()),
+        }
+    }
+}
+
+pub fn drive(request: &mut Value, live: &mut Live<'_>, trace: &mut dyn Write) -> Result<String> {
+    run(request, live, trace)
 }
 
 fn found(value: Option<&Value>) -> String {
@@ -40,7 +69,11 @@ struct Call {
     code: String,
 }
 
-pub fn run(request: &mut Value, ports: &mut dyn Ports, trace: &mut dyn Write) -> Result<String> {
+pub(crate) fn run(
+    request: &mut Value,
+    ports: &mut dyn Ports,
+    trace: &mut dyn Write,
+) -> Result<String> {
     let mut first_response = true;
     loop {
         let response = ports.post(request, trace)?;

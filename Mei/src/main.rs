@@ -116,12 +116,12 @@ fn run() -> Result<String> {
         Some(path) => Some(steer::Intake::open(path)?),
         None => None,
     };
-    let mut ports = Live {
+    let mut live = agent::Live {
         client: &mut client,
         python: &mut python,
         intake: &mut intake,
     };
-    let result = agent::run(&mut request, &mut ports, &mut trace);
+    let result = agent::drive(&mut request, &mut live, &mut trace);
     match result {
         Ok(answer) => {
             python.close()?;
@@ -132,29 +132,6 @@ fn run() -> Result<String> {
                 eprintln!("{cleanup}");
             }
             Err(error)
-        }
-    }
-}
-
-struct Live<'a> {
-    client: &'a mut transport::Client,
-    python: &'a mut python::Py,
-    intake: &'a mut Option<steer::Intake>,
-}
-
-impl agent::Ports for Live<'_> {
-    fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value> {
-        self.client.post(request, pulse)
-    }
-
-    fn exec(&mut self, code: &str) -> Result<Value> {
-        self.python.run(code)
-    }
-
-    fn steer(&mut self) -> Result<Vec<String>> {
-        match self.intake.as_mut() {
-            Some(intake) => intake.drain(),
-            None => Ok(Vec::new()),
         }
     }
 }

@@ -131,15 +131,27 @@ Calyx（及任何 Face 消费者）在进程边界 spawn 无头 `mei`；Mei 不�
 /-! ## 8 接口先行
 
 ```rust
-pub trait Ports {
+pub(crate) trait Ports {
     fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value>;
     fn exec(&mut self, code: &str) -> Result<Value>;
     fn steer(&mut self) -> Result<Vec<String>>;
 }
 
-pub fn run(
+pub(crate) fn run(
     request: &mut Value,
     ports: &mut dyn Ports,
+    trace: &mut dyn Write,
+) -> Result<String>;
+
+pub struct Live<'a> {
+    pub client: &'a mut Client,
+    pub python: &'a mut Py,
+    pub intake: &'a mut Option<Intake>,
+}
+
+pub fn drive(
+    request: &mut Value,
+    live: &mut Live<'_>,
     trace: &mut dyn Write,
 ) -> Result<String>;
 
