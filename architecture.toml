@@ -14,6 +14,9 @@
 # One line per module, in the order a reader meets them.
 module = [
   { name = "mei::main", file = "Mei/src/main.rs", owns = "the standalone CLI assembly: arguments, environment, stdin/stdout and interpreter shutdown", shape = "adapter", since = "CS18", status = "built", spec = "Mei.Spec" },
+  { name = "mei::launch", file = "Mei/src/launch.rs", owns = "shared Magpie request construction, environment resolution, and binding the python interpreter to an ACP session cwd", shape = "adapter", since = "CS26", status = "built", spec = "Mei.Spec" },
+  { name = "mei::acp", file = "Mei/src/acp/mod.rs", owns = "the ACP version 1 agent face over stdio JSON-RPC", shape = "adapter", since = "CS26", status = "built", spec = "Mei.spec.Acp" },
+  { name = "mei::acp::codec", file = "Mei/src/acp/codec.rs", owns = "ACP JSON-RPC line encode and session/prompt parameter checks", shape = "adapter", since = "CS26", status = "built", spec = "Mei.spec.Acp" },
   { name = "mei::agent", file = "Mei/src/agent.rs", owns = "the one serial feedback loop over the mutable Messages request", shape = "decision", since = "CS18", status = "built", spec = "Mei.spec.Agent" },
   { name = "mei::steer", file = "Mei/src/steer.rs", owns = "mid-task steers appended to the latest tool result via MEI_STEER_PATH", shape = "adapter", since = "CS26", status = "built", spec = "Mei.spec.Agent" },
   { name = "mei::workspace", file = "Mei/src/workspace.rs", owns = "the top-level AGENTS read once per new session and its frozen opening content", shape = "adapter", since = "CS24", status = "built", spec = "Mei.spec.Session" },
@@ -1586,7 +1589,7 @@ module = [
 # Sprawling/README.md is rendered from these lines.
 
 [family.mei]
-duty = "a standalone single-shot harness: one Messages request, one serial loop and one persistent Python interpreter"
+duty = "a standalone harness: one Messages request, one serial loop and one persistent Python interpreter, also as an ACP agent over stdio"
 
 [family.kernel]
 duty = "every decision in the city, and nothing that touches a disk"

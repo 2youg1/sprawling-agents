@@ -3,6 +3,7 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
+import Mei.spec.Acp
 import Mei.spec.Agent
 import Mei.spec.Capture
 import Mei.spec.Environment
@@ -19,6 +20,8 @@ import Mei.spec.Session
 指令 / MCP / Skills 的权威在 magpie；Agent 自去 skill 仓库。`MEI.md` 仅在构建时进入 system；
 缺省 `HARNESS_MODEL` 时选择 Magpie `/v1/models` 的首选可见路由；默认明确请求 adaptive thinking + high effort。
 新会话只额外读取工作区顶层的 `AGENTS.md`，并将其冻结在首个 user 消息。
+`--acp` 使同一无头核以 ACP version 1 的 agent 角色在 stdio 上被任意 ACP client（含城的
+`agent_protocols::harness`）按工具式会话调用；不引入第二本地工具，也不自动连接 `mcpServers`。
 -/
 
 /-! ## 1 需求分解
@@ -36,15 +39,17 @@ import Mei.spec.Session
 | `doctor` | 当前 Mei 代次的 python/uv 缓存、探测与必要安装 |
 | `capture` | inline/spilled 捕获的文件所有权与回收 |
 | `error` | 人可见诊断：Description / Cause / Resolution |
+| `acp` | ACP v1 agent：stdio JSON-RPC、相位、prompt 文本提取、`session/update` 与 stopReason |
 | `MEI.md` | 构建时静态系统提示；改之须重建；不作运行时注入面 |
 | `spec/Agent.lean` | 反馈顺序与整波预检的形式模型 |
 | `spec/Session.lean` | 完整日志恢复的形式模型 |
 | `spec/Environment.lean` | doctor 代次与修复判定 |
 | `spec/Capture.lean` | 捕获所有权与退出后的文件有效性 |
+| `spec/Acp.lean` | ACP agent 相位、prompt 文本与取消结束原因 |
 
-禁止：第二本地工具、`MEI_TOOLS`、阈值截断/头尾窗、内置超时 alarm、核内 TUI、
+禁止：第二本地工具、`MEI_TOOLS`、配额截断/头尾窗、内置超时 alarm、核内 TUI、
 LLM compaction、验真门、Skills/MCP 自动暴露、Mei 自动更新、为弱模型准备的重试。
-交互斜杠与会话文件由 Calyx 拥有；无头 `mei` 仍可纯脚本使用。
+交互斜杠与会话文件由 Calyx 拥有；无头 `mei` 仍可纯脚本使用；`--acp` 不放宽上述禁止。
 -/
 
 /-! ## 2 验收标准
@@ -69,11 +74,14 @@ LLM compaction、验真门、Skills/MCP 自动暴露、Mei 自动更新、为弱
   Calyx 只删除本 run 独占创建且未提交的 capture 目录。宿主崩溃后的 orphan 回收不在本次承诺内。
 - stderr：消息 JSONL；可选 `{"type":"mei.obs",...}` 观测行（pulse / model / route / usage）；
   失败诊断为 Description/Cause/Resolution 的 toml 块。
-- stdout：最终 text，不加换行。
+- stdout：无头模式为最终 text，不加换行；`--acp` 模式为 JSON-RPC 行，最终 text 只经 `agent_message_chunk`。
 - resume：完整日志的首条 user content 可为字符串或内容块数组；旧工具名、路径与媒体块原样保留，
   不恢复 Python 现场。`show_image` 写入 tool_result 的 base64 image 块随日志恢复，供后续图片比较。
   Provider 是否接受图片/音频/视频由其模型合同决定，不由 JSONL 透传测试代替。
 - live V1/V2（magpie）须实测后宣称；范围以本节记录为准。
+- ACP：`mei --acp` 与城 client 同形的 `initialize` → `session/new` → `session/prompt` 可联调；
+  stdout 只有 JSON-RPC 行；`agent_message_chunk` 携带最终答复文本；`stopReason` 为
+  `end_turn` 或 `cancelled`；`spec/Acp.lean` 相位与 `cargo test -p sprawling-mei --test acp` 钉住。
 -/
 
 /-! ## 3 假设与歧义
@@ -91,6 +99,8 @@ LLM compaction、验真门、Skills/MCP 自动暴露、Mei 自动更新、为弱
 入口为 `calyx` 二进制（npm：TTY 且无 `-p`／`--resume` 时由 shim 启动）并通过 `MEI_BIN`／同目录
 `mei`／PATH 解析无头核。`@sprawling/mei` 归档同时携带无头核与 Calyx 面（含 Windows）。
 V1/V2 实测以 magpie + 已测模型为准，不外推。
+城已有 ACP **client**（`agent_protocols::harness`）与 HTTP 入站 `POST /acp`（非 stdio ACP）；
+Mei 补齐 ACP **agent** stdio 面后，可被粘贴/入座为 `mei --acp` 而无须改城 client。
 -/
 
 /-! ## 5 权威信源
@@ -117,9 +127,11 @@ tool_result 的 `content` 是小型完整文本，或“提示 + 完整结果路
 /-! ## 7 模块边界
 
 `agent` 决策；`transport` / `python` 适配；`resume` 读完整 JSONL；`workspace` 读取顶层 AGENTS；
-`doctor` 管理运行环境；`capture` 管理输出文件；`main` 装配；`error` 诊断。
+`doctor` 管理运行环境；`capture` 管理输出文件；`acp` 拥有 ACP agent 线协议与相位；
+`main` 装配无头与 `--acp` 两条入口；`error` 诊断。
 生产依赖只有 `serde_json`，安装经操作系统已有的 shell、curl/wget 或 PowerShell 与官方 uv installer。
 Calyx（及任何 Face 消费者）在进程边界 spawn 无头 `mei`；Mei 不知道 Entry/Zig。
+ACP client（城 harness、编辑器或其他）spawn `mei --acp`；`acp` 不依赖 `agent_protocols` crate。
 
 `ANTHROPIC_BASE_URL` 出站默认 `http://127.0.0.1:3425`；Mei 不监听 2501/3425。
 缺省模型时 GET `/v1/models`，以 `first_id` 命中的可见条目为首选，缺席或失配才取 `data[0]`；空目录失败。
@@ -147,6 +159,7 @@ pub struct Live<'a> {
     pub client: &'a mut Client,
     pub python: &'a mut Py,
     pub intake: &'a mut Option<Intake>,
+    pub cancelled: Option<&'a AtomicBool>,
 }
 
 pub fn drive(
@@ -210,7 +223,47 @@ Calyx 先独占创建空目录，再以 `MEI_CAPTURE_CREATED=1` 让 Mei 接管�
 无 `MEI_TOOLS`。`HARNESS_MODEL` 可省略；省略表示使用 Magpie 首选路由，显式空字符串仍是配置错误。
 
 无头语法：`mei [-p PROMPT] [--resume JSONL]`；无 `-p` 时非 TTY stdin 为 prompt。
+ACP 语法：`mei --acp`；与 `-p` / `--resume` 互斥；stdin/stdout 为 JSON-RPC 行，观测与诊断在 stderr。
 恢复只带 role/content；环境重定 model/system/tools/网关；Python 重启。
+
+`acp::serve` 接口（回合体由 `main` 注入，保持 Magpie + python 所有权在装配层）：
+
+```rust
+pub fn serve(
+    input: impl Read + Send + 'static,
+    output: impl Write,
+    turn: impl FnMut(Turn) -> Result<Outcome>,
+) -> Result<()>;
+
+pub struct Turn {
+    pub session_id: String,
+    pub cwd: PathBuf,
+    pub prompt: String,
+    pub first: bool,
+    pub cancelled: Arc<AtomicBool>,
+}
+
+pub struct Outcome {
+    pub stop: StopReason, // end_turn | cancelled
+    pub text: String,
+}
+```
+
+`initialize` 答复：`protocolVersion: 1`，`agentInfo.name = "mei"`，`agentInfo.version` 为包版本，
+`authMethods: []`，`agentCapabilities.loadSession = false`，不声明 image/audio/embeddedContext，
+不声明 MCP http/sse。本面是**文本会话用的 ACP v1 子集**：不连接 `session/new` 的 `mcpServers`，
+一条 stdio 连接只打开一次 `session/new`（再开返回 `-32601`）；不承诺通用 ACP v1 全能力。
+`session/new` 接受 `cwd`（绝对路径，UTF-8）与忽略的 `mcpServers`，返回 `sessionId`。
+`session/prompt` 拼接 `type=text` 与 `type=resource_link`（保留 name/uri）；二者皆空则拒。
+回合中并发排空 stdin：匹配当前 `sessionId` 的 `session/cancel` 置位取消；下一 `post`/`exec` 前拒
+绝新工作。见取消则 `finish` 为 `cancelled`（`Mei.spec.Acp`），即使同回合 `agent::drive` 已返回错误。
+最终文本经 `session/update` 的 `agent_message_chunk` 写出后再返回 `stopReason`。同一 ACP session
+内多次 prompt 共享 Messages 与 python 进程；进程退出时收口解释器。
+python 在获知 `session/new` 的 cwd 并 `enter_cwd` 之后才 spawn，使 sole tool 的工作目录与
+AGENTS 读取的同一工作树一致；cwd 变更时先收口旧解释器再于新目录重生。
+回合若在 `agent::drive` 中失败：丢弃当前 Messages 请求并以 `close` 收口解释器（完成 spilled 交接，
+D17），下一 prompt 以无 guide 的新请求重建；stdin 断开只结束排空，不标 `cancelled`。
+新会话仅第一次构建请求时注入 AGENTS；失败重建不再注入。
 
 发布：`sprawling-mei` / `@sprawling/mei`；平台含 Windows；平台包含 `mei` 与 `calyx`。
 交互经 `calyx` + 无头核解析（Calyx D4）；城控制台仍经 `sprawling`。打包次序归
@@ -237,8 +290,8 @@ Steer：任务进行中 Face 追加的指示。不打断当前 `exec` / `post`�
 本次到达的文本丢弃，不另开 user 消息。取消 / Esc 仍是杀进程组，与 Steer 分立。
 `MEI_STEER_PATH` 指向 JSONL 投递文件（每行 `{"text":"…"}`）；缺席则 `steer()` 恒为空。
 
-取消 = 杀掉 harness 进程组。无 turn ceiling。
-会话斜杠与 JSONL 文件代次由 Calyx 合同拥有。
+无头取消 = 杀掉 harness 进程组。ACP `session/cancel` 在回合返回后兑现为 `cancelled`（D22）。
+无 turn ceiling。会话斜杠与 JSONL 文件代次由 Calyx 合同拥有。
 -/
 
 /-! ## 10 实现逻辑
@@ -315,8 +368,8 @@ Python EOL 日期表在 `Mei/src/doctor/support.rs` 与 `Mei/spec/Environment.le
 
 /-! ## 15 影响面
 
-Calyx 依赖进程 Face；City 账本/wire 不变。接口变化先改本文件与 Agent/Session，
-再改实现与测试。
+Calyx 依赖进程 Face；City 账本/wire 与 harness client 不变。接口变化先改本文件与
+Agent/Session/Acp，再改实现与测试。`docs/integrations.md` 记录 Mei 作为可 spawn 的 ACP agent。
 -/
 
 /-! ## 16 测试与约束
@@ -324,22 +377,24 @@ Calyx 依赖进程 Face；City 账本/wire 不变。接口变化先改本文件�
 ```bash
 cargo nextest run -p sprawling-mei
 cargo clippy -p sprawling-mei --all-targets --all-features -- -D warnings
-lake build Mei.Spec Mei.spec.Agent Mei.spec.Session Mei.spec.Environment Mei.spec.Capture Mei.spec.Gateway
+lake build Mei.Spec Mei.spec.Agent Mei.spec.Session Mei.spec.Environment Mei.spec.Capture Mei.spec.Gateway Mei.spec.Acp
 cargo test -p sprawling-mei --test cli
 cargo test -p sprawling-mei --test observation
+cargo test -p sprawling-mei --test acp
 ```
 
 Windows 与 Unix 都实际执行 beginner E2E；网关只有在下一请求确实携带小输出时才回答正确结果。
 大输出 E2E 钉住不内联、下一次 python 按路径筛选和 resume 后读取；测试失败不得退化为 0 tests。
 AGENTS 生产门测试统计新会话、后续轮次、resume、无 AGENTS 旧日志与失败重试的精确消息形状。
 doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；capture 用 N/2N 精确文件计数，
-不据此声称墙钟提速。live V1/V2 以 §2 为准。
+不据此声称墙钟提速。live V1/V2 以 §2 为准。ACP 测试用注入回合闭包，不依赖 Magpie。
 -/
 
 /-! ## 17 文档关系
 
 `Mei/README*.md`；`Calyx/Spec.lean`；`architecture.toml`；`docs/ARCHITECTURE.md`；
-`docs/third-party.md`。斜杠与 TUI 细节以 Calyx 为准。
+`docs/third-party.md`；`docs/integrations.md`（ACP agent 入座）。斜杠与 TUI 细节以 Calyx 为准。
+城 harness client 合同以 `Sprawling/agent_protocols/Spec.lean` §8-19 为准，本文件不复制。
 -/
 
 /-! D1 请求 JSON 唯一状态；闭包替代单实现 trait。 -/
@@ -389,3 +444,10 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 ②另开一条 user 消息——多一轮角色边界，且与接到工具回复末尾的合同不符；③改写已组装请求——
 在途字节无法收回。
 -/
+/-! D22 Mei 在 `--acp` 下成为面向文本会话的 ACP v1 **agent** 子集（stdio JSON-RPC），复用同一
+Magpie + python 核；城已有的 harness **client** 可粘贴 `mei --acp` 入座，无须改 client 或 HTTP
+`POST /acp`。一条连接一次 `session/new`；`mcpServers` 忽略；`resource_link` 以 name/uri 进入提示。
+取消置位后不再启动下一 `post`/`exec`（不中断已在途的 HTTP）。失败收口用 `close` 保 spilled。
+理由：锁定目标是「支持 ACP 的 harness 像工具一样调用 Mei」，对称面是 agent 而非再做一个 client。
+被否：经 HTTP `/acp` 伪装、把 Mei 做成 MCP 工具、依赖 `agent_protocols`、同连接多会话隔离、
+自动连 MCP、在途 HTTP 强制中断、在 `session/new` 前 spawn python。 -/

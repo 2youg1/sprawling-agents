@@ -5,6 +5,7 @@
 
 use std::collections::BTreeSet;
 use std::io::Write;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use serde_json::{Value, json};
 
@@ -25,14 +26,17 @@ pub struct Live<'a> {
     pub client: &'a mut Client,
     pub python: &'a mut Py,
     pub intake: &'a mut Option<Intake>,
+    pub cancelled: Option<&'a AtomicBool>,
 }
 
 impl Ports for Live<'_> {
     fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value> {
+        refuse_if_cancelled(self.cancelled)?;
         self.client.post(request, pulse)
     }
 
     fn exec(&mut self, code: &str) -> Result<Value> {
+        refuse_if_cancelled(self.cancelled)?;
         self.python.run(code)
     }
 
@@ -42,6 +46,18 @@ impl Ports for Live<'_> {
             None => Ok(Vec::new()),
         }
     }
+}
+
+fn refuse_if_cancelled(cancelled: Option<&AtomicBool>) -> Result<()> {
+    if cancelled.is_some_and(|flag| flag.load(Ordering::SeqCst)) {
+        return Err(protocol(
+            "continue an ACP turn",
+            "session/cancel arrived before the next model or tool step",
+            "wait for stopReason cancelled; start a new prompt if the task should continue",
+        )
+        .into());
+    }
+    Ok(())
 }
 
 pub fn drive(request: &mut Value, live: &mut Live<'_>, trace: &mut dyn Write) -> Result<String> {

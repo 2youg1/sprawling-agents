@@ -4,7 +4,7 @@
 
 Archetype:Mei is a minimal Agent Harness: a model receives a task, acts through one persistent **python** tool, sees each small result, and repeats until it has a final answer. A large or non-UTF-8 result stays complete on disk and returns only a notice with its full path, or a Python expression that losslessly reconstructs a non-Unicode native path. This package is the **headless** core. Mei does not contain a terminal shell.
 
-The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the headless `mei` binary and the `calyx` face; a TTY without `-p` becomes Calyx, while `-p` or a pipe stays headless. Scripts use the headless path alone.
+The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the headless `mei` binary and the `calyx` face; a TTY without `-p` becomes Calyx, while `-p` or a pipe stays headless. Scripts use the headless path alone. `mei --acp` speaks [Agent Client Protocol](https://agentclientprotocol.com/) version 1 as an agent over stdio so an ACP client (including the sprawling city harness) can call Mei like any other ACP agent; see [integrations](../docs/integrations.md).
 
 > **Safety first:** Mei has no sandbox, permission prompts, or undo. Generated Python can read and write files, use the network, and run commands with the current account's authority. Use only disposable project copies and a separate, revocable API key with a spending limit. Never supply private data, important credentials, or the only copy of a project.
 
