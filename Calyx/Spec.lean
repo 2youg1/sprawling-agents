@@ -36,8 +36,10 @@ Calyx 通过 `MEI_CAPTURE_CREATED=1` 把空目录交给 Mei。成功段保留 se
   无参 `/resume` 恢复刚离开的非空会话。`/e`/`/effect` 按 Magpie `reasoning_levels` 循环切换下一次请求的 effort。
   横幅为 cwd；composer 显示实际或 requested model/effort、`Agent Step`、已用上下文/最大上下文及两位小数百分比；
   已用量是 `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`，不是累计多轮账单。
+  状态行在当前列宽内排版：room 名保留可见，过长 offer 以省略号截断；不得为画不下的 offer 预留空白挤掉 room。
   运行中显示 working；`mei.obs` pulse/model/route/usage 不落成 Note；图片块只显示简短图片提示，不显示 base64；Esc 在 Windows 上结束子树。
   Esc 仅清草稿或停止当前 run，空闲时不动作，绝不退出 Calyx；只有 `/quit`/`/q` 关闭终端面并回收其子树。
+  `/resume <jsonl>` 拒绝空文件与无法解析为 JSON 对象的损坏行，诊断为 `E_MEI_SESSION` toml 块；无参 `/resume` 在无非空前会话时提示明示路径。
   任务进行中提交的普通文本是 Steer：写入该 run 的 `MEI_STEER_PATH` JSONL，不启新进程、不杀组；
   Mei 在下一波工具结果末尾消费它。斜杠命令在运行中仍被拒绝（Esc 才是停止）。
 - 城：`sprawling` 经宿主 ABI 进入同一套 Zig 壳；斜杠、远程钩子、生命周期与今日 Console 合同一致。
@@ -128,6 +130,27 @@ Rust 是宿主边界，不是壳实现。
 -/
 
 /-! D9 Mei 短命令与无参恢复归 Calyx：`/n` 等价 `/new`，`/r` 无参恢复刚离开的非空会话，`/q` 等价 `/quit`；`/e` 只改后续请求，不伪造当前 route 已确认。模型切换不另做 `/m`，由 Magpie 路由拥有。Esc 只停止，不退出。 -/
+
+/-! D13 composer 状态行按列宽截断 offer，不预留未绘制空间
+
+决定：`Calyx/ffi` 的 composer 底行先为 room 名保留至少一列（且不超过可用宽度的四分之一），
+再把剩余列（扣去间距）交给 offer；`paint.fit` 对超长 offer 画省略号。offer 画不下时
+不得按完整 offer 宽度从 room 侧扣留空白。宽度矩阵（20/40/60/80/120/200）下每一行
+视觉列数不超过窗口列宽，且 room 名仍可见。理由：窄终端上完整
+`model · effort · Agent Step · % · tokens` 会挤掉 room 或留下空白带；截断保留可辨认的
+状态片段。被否：①offer 放不下就整段省略却仍按全宽占位——空白浪费且 room 被挤；
+②整行换行折到多行——composer 合同是单行状态；③缩短 offer 字符串生成逻辑——排版属叶。
+-/
+
+/-! D14 `/resume` 拒绝空日志与损坏 JSONL，理由须可行动
+
+决定：`Session.import` 读完后若无历史行，或以非 JSON 对象行作为消息行，则失败并返回
+`E_MEI_SESSION` toml 诊断（空：`the resume log is empty`；损坏：`parse a Mei resume log line`），
+不把坏行投影成 Note。交互 `/resume` 不要求末行 `end_turn`（取消后的非空会话仍可恢复）；
+无头 `mei --resume` 的完整日志合同仍由 `Mei/src/resume.rs` 拥有。理由：空文件与坏 JSON
+被当成「已恢复」会让人以为会话在，实际无内容或内容是噪声。被否：①坏行当 Note 刷屏——
+掩盖拒绝；②交互也强制 `end_turn`——Esc 取消后无法 `/resume` 刚离开的非空会话。
+-/
 
 /-! D12 任务进行中的普通提交是 Steer，经 `MEI_STEER_PATH` 投递给无头核
 

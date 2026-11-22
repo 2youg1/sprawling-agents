@@ -17,6 +17,34 @@ Archetype:Mei 是极简 Agent Harness：模型接收任务，通过唯一持久�
 
 已发布包会落后于本树，直到下一次发布；要本仓库的版本，用下方源码构建。
 
+### 该敲哪个命令
+
+| 安装方式 | 交互 | 无头 / CI |
+|---|---|---|
+| Bun `@sprawling/mei` | TTY 下敲 `mei`（npm shim 打开 Calyx）；`calyx` 也可 | `mei -p …`、`mei --acp` 或管道 |
+| 源码构建 / release zip | 只用 `calyx` | `mei -p …`、`mei --acp` 或管道 |
+| crates.io `sprawling-mei` | 无 Calyx 面；TTY 无 `-p` 的 `mei` 以 `E_MEI_USAGE` 拒绝 | `mei -p …` 或管道 |
+
+Bun 用户只需记住 `mei`。源码、release zip 或 crates.io 的无头 `mei` 二进制不会打开 Calyx；交互请运行含 `sprawling-calyx` 构建里的 `calyx`。
+
+### 更新与卸载
+
+Mei 没有自更新。要换版本，用同一通道再装一次：
+
+```sh
+bun install --global @sprawling/mei@latest
+# 或
+cargo install sprawling-mei --locked
+```
+
+卸载 Bun 全局安装时，去掉根包，并清掉当前平台的 optional 依赖：
+
+```sh
+bun remove --global @sprawling/mei
+```
+
+crates.io 安装用 `cargo uninstall sprawling-mei` 卸掉。源码构建只删 `target/debug`（或 `target/release`）下的 `mei` 与 `calyx` 程序，保留共享 target 树；release zip 只删解压出的 `mei`/`calyx`。这些路径都不改 shell profile。
+
 ## 从源码构建
 
 ### 1. 启动 Magpie
@@ -55,7 +83,7 @@ Set-Location "$HOME/mei-playground"
 calyx
 ```
 
-模型、网关和其他参数都不用输入。TTY 会进入 Calyx；`-p` 和管道仍走无头路径。
+模型、网关和其他参数都不用输入。交互面请运行 `calyx`；`mei -p` 与管道仍走无头。非交互 CI 必须用 `mei -p` 或管道，避免误进 Calyx 面等待输入。
 
 ## 一次一步使用
 

@@ -17,6 +17,34 @@ The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the head
 
 The published packages trail this tree until the next release. Build from source for the version in this repository.
 
+### Which command to type
+
+| How you installed | Interactive | Headless / CI |
+|---|---|---|
+| Bun `@sprawling/mei` | `mei` on a TTY (npm shim opens Calyx); `calyx` also works | `mei -p …`, `mei --acp`, or a pipe |
+| Source build / release zip | `calyx` only | `mei -p …`, `mei --acp`, or a pipe |
+| crates.io `sprawling-mei` | No Calyx face; TTY `mei` without `-p` refuses with `E_MEI_USAGE` | `mei -p …` or a pipe |
+
+Bun users only need to remember `mei`. The headless `mei` binary from source, a release zip, or crates.io never opens Calyx; run `calyx` from a build that includes `sprawling-calyx`.
+
+### Update and uninstall
+
+Mei has no self-updater. Install the version you want again through the same channel:
+
+```sh
+bun install --global @sprawling/mei@latest
+# or
+cargo install sprawling-mei --locked
+```
+
+To remove a Bun global install, uninstall the package and drop any leftover platform optional dependency for your OS:
+
+```sh
+bun remove --global @sprawling/mei
+```
+
+A crates.io install is removed with `cargo uninstall sprawling-mei`. For a source build, delete only the `mei` and `calyx` programs under `target/debug` (or `target/release`); leave the shared target tree. For a release zip, delete the unpacked `mei`/`calyx` files. None of these paths rewrite shell profiles.
+
 ## Build from source
 
 ### 1. Start Magpie
@@ -55,7 +83,7 @@ Set-Location "$HOME/mei-playground"
 calyx
 ```
 
-No model, gateway, or extra argument is required. A TTY opens Calyx; `-p` and pipes stay headless.
+No model, gateway, or extra argument is required. Run `calyx` for the interactive face; `mei -p` and pipes stay headless. Non-interactive CI must use `mei -p` or a pipe so the process never waits on a Calyx face.
 
 ## Use one step at a time
 

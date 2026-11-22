@@ -177,14 +177,31 @@ fn composer(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!Cursor {
         _ = try r.tag();
         try menu(p, r, left);
     } else {
-        try p.to(left);
-        try p.fit(.faint, room, p.room() -| (text.width(offer) + 2));
-        if (offer.len > 0 and p.room() >= text.width(offer) + 2) {
-            try p.to(p.limit - text.width(offer));
-            try p.fit(.faint, offer, p.room());
-        }
+        try statusRow(p, left, room, offer);
     }
     return cursor;
+}
+
+fn statusRow(p: *paint.Painter, left: usize, room: []const u8, offer: []const u8) paint.Error!void {
+    try p.to(left);
+    const avail = p.room();
+    if (offer.len == 0 or avail == 0) {
+        try p.fit(.faint, room, avail);
+        return;
+    }
+    const room_w = text.width(room);
+    const offer_w = text.width(offer);
+    const room_budget = @min(room_w, @max(@as(usize, 1), avail / 4));
+    const offer_budget = if (offer_w + room_budget + 2 <= avail)
+        offer_w
+    else
+        avail -| (room_budget + 2);
+    const room_fit = if (offer_budget > 0) avail -| (offer_budget + 2) else avail;
+    try p.fit(.faint, room, room_fit);
+    if (offer_budget > 0) {
+        try p.to(p.limit - offer_budget);
+        try p.fit(.faint, offer, offer_budget);
+    }
 }
 
 fn underline(p: *paint.Painter, left: usize, words: usize, solid_style: paint.Style) paint.Error!void {
@@ -239,4 +256,23 @@ fn widestChoice(ahead: scene.Reader, count: u32) Error!usize {
         widest = @max(widest, text.width(spelling) + takes_width);
     }
     return @min(widest, 28);
+}
+
+test "composer status row keeps room and truncates long offer across widths" {
+    const offer = "provider/actual · effort high · Agent Step 12 · 12.34% · 123456/1048576";
+    for ([_]usize{ 20, 40, 60, 80, 120, 200 }) |columns| {
+        var buffer: [512]u8 = undefined;
+        var out: std.Io.Writer = .fixed(&buffer);
+        var p = paint.Painter.init(&out, columns);
+        try statusRow(&p, 0, "Mei", offer);
+        try std.testing.expect(p.column <= columns);
+        const drawn = out.buffered();
+        try std.testing.expect(std.mem.indexOf(u8, drawn, "Mei") != null);
+        if (columns >= 80) {
+            try std.testing.expect(std.mem.indexOf(u8, drawn, "Agent Step") != null);
+        }
+        if (text.width(offer) + text.width("Mei") + 2 > columns) {
+            try std.testing.expect(std.mem.indexOf(u8, drawn, "…") != null);
+        }
+    }
 }

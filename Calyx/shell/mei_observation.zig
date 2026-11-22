@@ -414,6 +414,25 @@ pub fn tod(at: u64) ?u32 {
     return if (local_time.local(at)) |t| t.seconds else null;
 }
 
+test "mei.obs pulse model route usage never become notes" {
+    const gpa = std.testing.allocator;
+    var seen = try Seen.init(gpa, "auto");
+    defer seen.deinit();
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const lines = [_][]const u8{
+        "{\"type\":\"mei.obs\",\"kind\":\"pulse\"}",
+        "{\"type\":\"mei.obs\",\"kind\":\"model\",\"model\":\"m\",\"context_tokens\":100}",
+        "{\"type\":\"mei.obs\",\"kind\":\"route\",\"available\":true,\"model\":\"m\",\"effort\":\"high\"}",
+        "{\"type\":\"mei.obs\",\"kind\":\"usage\",\"usage\":{\"input_tokens\":1,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":0}}",
+    };
+    for (lines) |raw| {
+        const entries = try seen.line(arena, raw, 1);
+        try std.testing.expectEqual(@as(usize, 0), entries.len);
+    }
+}
+
 test "observations drive actual effort step and two-decimal context" {
     const gpa = std.testing.allocator;
     var seen = try Seen.init(gpa, "auto");

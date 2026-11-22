@@ -230,13 +230,13 @@ pub const Ui = struct {
     }
 
     fn escape(self: *Ui) ?u8 {
-        if (!self.editor.isEmpty()) {
-            self.editor.apply(.clear) catch {};
-            self.touch(true);
-            return null;
-        }
-        if (self.process != null) {
-            runtime.stop(self);
+        switch (escEffect(self.editor.isEmpty(), self.process != null)) {
+            .clear_draft => {
+                self.editor.apply(.clear) catch {};
+                self.touch(true);
+            },
+            .stop_run => runtime.stop(self),
+            .idle => {},
         }
         return null;
     }
@@ -436,6 +436,14 @@ pub const Ui = struct {
     }
 };
 
+const EscEffect = enum { clear_draft, stop_run, idle };
+
+fn escEffect(draft_empty: bool, running: bool) EscEffect {
+    if (!draft_empty) return .clear_draft;
+    if (running) return .stop_run;
+    return .idle;
+}
+
 fn editing(key: termio.Key) ?editor_mod.Edit {
     const alt = key.modifiers.alt;
     return switch (key.code) {
@@ -467,4 +475,11 @@ fn nowNs(io: std.Io) u64 {
     const timestamp = std.Io.Clock.real.now(io);
     const nanoseconds = timestamp.toNanoseconds();
     return if (nanoseconds < 0) 0 else @intCast(nanoseconds);
+}
+
+test "idle Esc neither clears a draft nor stops a run" {
+    try std.testing.expectEqual(EscEffect.idle, escEffect(true, false));
+    try std.testing.expectEqual(EscEffect.clear_draft, escEffect(false, false));
+    try std.testing.expectEqual(EscEffect.stop_run, escEffect(true, true));
+    try std.testing.expectEqual(EscEffect.clear_draft, escEffect(false, true));
 }
