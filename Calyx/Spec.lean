@@ -100,8 +100,8 @@ Rust `sprawling-calyx` 只保留城/Mei 宿主适配与对外库面（`sprawling
 Mei 与城交互面、启动参数与 `mei` 程序解析、Mei 子进程生命周期）。`Calyx/build.zig` 是 Calyx
 下全部 Zig 的构建权威，产出 `calyx` 可执行文件与供宿主链接的静态库。帧叶仍在 `Calyx/ffi`，
 壳在进程内直接调用叶，不再经 Rust 画帧。Rust 仅实现窄宿主：把 `wire`/accounting/kernel 的
-记录与动作接到壳的 C ABI；`unsafe` 仍只出现在 `Calyx/ffi`（及若壳静态库由该包链接时的同包
-包装）。壳侧 C ABI 使用调用方持有缓冲与显式长度；可分配逻辑取 `Allocator` 参数。Zig 钉保持
+记录与动作接到壳的 C ABI；既有 `unsafe` 仍只出现在 `Calyx/ffi`（及若壳静态库由该包链接时的同包
+包装）的未触及旧文件中，新增与变更文件由 `xtask unsafe` 判零，迁移契约见 `Calyx/ffi/Spec.lean` D13。壳侧 C ABI 使用调用方持有缓冲与显式长度；可分配逻辑取 `Allocator` 参数。Zig 钉保持
 0.17.0，除非另有 SPEC 改钉。
 
 机器门禁：`cargo xtask residue`（或同等 Calyx 壳残留检查）拒绝 `Calyx/src` 下壳实现路径的回归

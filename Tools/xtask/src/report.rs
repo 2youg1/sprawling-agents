@@ -3,11 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Three-part refusal: rule | violation | alternative (xtask Spec §10-8).
-
 use std::process::ExitCode;
 
-/// One gate finding.
 #[derive(Debug)]
 pub(crate) struct Violation {
     pub(crate) gate: &'static str,
@@ -17,7 +14,6 @@ pub(crate) struct Violation {
     pub(crate) alternative: String,
 }
 
-/// Gate-internal failure; exits 2, never silent pass or false judgement.
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum XtaskError {
     #[error("io on {path}: {source}")]
@@ -37,7 +33,7 @@ pub(crate) enum XtaskError {
     )]
     GatePanicked { name: &'static str, message: String },
     #[error(
-        "run gate `{name}` with --files: this gate has no file-scoped judgement (unsupported-file-scope); select only `length` and/or `comments`, or omit --files for a full-tree judgement"
+        "run gate `{name}` with --files: this gate has no file-scoped judgement (unsupported-file-scope); select only `length`, `comments` and/or `unsafe`, or omit --files for a full-tree judgement"
     )]
     UnsupportedFileScope { name: &'static str },
     #[error(
@@ -87,7 +83,6 @@ pub(crate) fn render(violations: &[Violation]) {
     }
 }
 
-/// Render a single gate's outcome and map it to an exit code.
 pub(crate) fn finish(gate: &'static str, result: Result<Vec<Violation>, XtaskError>) -> ExitCode {
     match result {
         Ok(violations) if violations.is_empty() => {
@@ -103,8 +98,6 @@ pub(crate) fn finish(gate: &'static str, result: Result<Vec<Violation>, XtaskErr
     }
 }
 
-/// Render a whole run. A gate that could not judge does not stop the
-/// walk (xtask D2): every gate is evaluated before the first line prints.
 pub(crate) fn finish_all(
     results: impl IntoIterator<Item = (&'static str, Result<Vec<Violation>, XtaskError>)>,
 ) -> ExitCode {
@@ -137,7 +130,6 @@ pub(crate) fn finish_all(
     outcome.code()
 }
 
-/// Run conclusion. Exit 2 (gate broken) outranks exit 1 (tree broken).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RunOutcome {
     Green,
@@ -170,8 +162,6 @@ pub(crate) fn internal_failure(err: &XtaskError) -> ExitCode {
     ExitCode::from(2)
 }
 
-/// The one wording for "a gate could not judge", so the single-gate path
-/// and the whole-run path cannot describe the same event differently.
 fn say_internal_failure(err: &XtaskError) {
     eprintln!("xtask internal failure: {err}");
 }

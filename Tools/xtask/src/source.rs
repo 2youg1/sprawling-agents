@@ -3,13 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! First-party Rust and client sources shared by the file-level gates.
-
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use crate::report::XtaskError;
 use crate::walk;
+
+pub(crate) const EARLIER_RELEASES: &str = "Sprawling/app/tests/cities/";
 
 pub(crate) struct Scope {
     files: BTreeSet<String>,
@@ -38,7 +38,10 @@ impl Scope {
     }
 }
 
-pub(crate) fn files_in(root: &Path, scope: Option<&Scope>) -> Result<Vec<PathBuf>, XtaskError> {
+pub(crate) fn length_files_in(
+    root: &Path,
+    scope: Option<&Scope>,
+) -> Result<Vec<PathBuf>, XtaskError> {
     let members = crate::members::members(root)?;
     let mut files = walk::files_under(
         root,
@@ -49,10 +52,36 @@ pub(crate) fn files_in(root: &Path, scope: Option<&Scope>) -> Result<Vec<PathBuf
     if page.is_dir() {
         files.extend(walk::files_with_ext(&page, &["ts", "tsx", "svelte"])?);
     }
+    Ok(selected(root, scope, files))
+}
+
+pub(crate) fn comment_files_in(
+    root: &Path,
+    scope: Option<&Scope>,
+) -> Result<Vec<PathBuf>, XtaskError> {
+    let mut files = length_files_in(root, None)?;
+    files.extend(walk::files_with_ext(
+        root,
+        &["zig", "py", "js", "mjs", "css"],
+    )?);
+    files.retain(|path| !walk::rel(root, path).starts_with(EARLIER_RELEASES));
+    Ok(selected(root, scope, files))
+}
+
+pub(crate) fn unsafe_files_in(
+    root: &Path,
+    scope: Option<&Scope>,
+) -> Result<Vec<PathBuf>, XtaskError> {
+    let mut files = walk::files_with_ext(root, &["rs"])?;
+    files.retain(|path| !walk::rel(root, path).starts_with(EARLIER_RELEASES));
+    Ok(selected(root, scope, files))
+}
+
+fn selected(root: &Path, scope: Option<&Scope>, mut files: Vec<PathBuf>) -> Vec<PathBuf> {
     files.sort_by_key(|path| walk::rel(root, path));
     files.dedup();
     if let Some(scope) = scope {
         files.retain(|path| scope.allows(&walk::rel(root, path)));
     }
-    Ok(files)
+    files
 }

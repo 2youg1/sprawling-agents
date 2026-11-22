@@ -23,7 +23,7 @@ default: check
 # clippy's minutes.
 #
 # `ci.yml` runs the same recipes, one job per slice of this line. Its
-# length/comments checks use the changed-file scope; this full `check`
+# length/comments/unsafe checks use the changed-file scope; this full `check`
 # remains the migration inventory and the integrated-tree gate after cleanup.
 check: prereqs fmt-check gates-sources models build-web clippy features test gates check-client check-desktop check-console
 
@@ -90,7 +90,7 @@ check-branch base="main":
     packages=$(printf '%s\0' "${changed[@]}" | tr '\0' '\n' | cargo xtask members --owning | tr -d '\r') || exit 2
     rc=0
     step() { echo "== $1"; shift; "$@" || { rc=1; echo "== red: $*"; }; }
-    gates=$(cargo xtask gates --list | tr -d '\r' | grep -Evx 'guard|features|render|budget|npm|length|comments') || exit 2
+    gates=$(cargo xtask gates --list | tr -d '\r' | grep -Evx 'guard|features|render|budget|npm|length|comments|unsafe') || exit 2
     step guard cargo xtask gates guard --range "$mb..HEAD"
     step fmt just fmt-check
     touched RefRain && step build-web just build-web
@@ -100,7 +100,7 @@ check-branch base="main":
     fi
     # shellcheck disable=SC2086
     step gates cargo xtask gates $gates --range "$mb..HEAD"
-    step file-gates cargo xtask gates length comments --files "${changed[@]}"
+    step file-gates cargo xtask gates length comments unsafe --files "${changed[@]}"
     step deny just deny
     touched RefRain && step client just client-checks && step artifacts cargo xtask gates render budget npm
     touched Sprawling/desktop/ffi && step desktop just check-desktop
@@ -513,15 +513,15 @@ gates-sources mode="" *paths:
     set -euo pipefail
     if [ "{{mode}}" = "changed" ]; then
         if [ -n "${GATES_CHANGED_NUL:-}" ]; then
-            cargo xtask gates length comments --files-from "$GATES_CHANGED_NUL"
+            cargo xtask gates length comments unsafe --files-from "$GATES_CHANGED_NUL"
         else
             files=("$@")
             if [ "${#files[@]}" -gt 0 ] && [ "${files[0]}" = "changed" ]; then
                 files=("${files[@]:1}")
             fi
-            cargo xtask gates length comments --files "${files[@]}"
+            cargo xtask gates length comments unsafe --files "${files[@]}"
         fi
-        cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}|length|comments')
+        cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}|length|comments|unsafe')
     else
         cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}')
     fi

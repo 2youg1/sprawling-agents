@@ -193,3 +193,47 @@ fn file_scope_judges_only_the_named_files_and_never_falls_back_to_the_tree() {
     assert!(crate::source::Scope::new(&["../escape.rs".to_owned()]).is_err());
     std::fs::remove_dir_all(&root).unwrap();
 }
+
+#[test]
+fn zig_multiline_strings_do_not_hide_real_comments() {
+    let source = r#"const text =
+    \\// not a comment
+    \\/* also text */
+    ;
+// real
+"#;
+    assert_eq!(lexer::measure(source, Language::Zig).comment_lines, 1);
+}
+
+#[test]
+fn python_strings_and_hashes_are_distinct() {
+    let source = r##"#!/usr/bin/env python3
+text = "# not a comment"
+triple = """
+# also text
+"""
+# real
+"##;
+    assert_eq!(lexer::measure(source, Language::Python).comment_lines, 2);
+    let header = header::NOTICE.map(|row| format!("# {row}")).join("\n");
+    assert_eq!(
+        lexer::measure(&format!("{header}\n# real\n"), Language::Python).comment_lines,
+        1
+    );
+}
+
+#[test]
+fn css_mpl_and_strings_leave_only_the_real_comment() {
+    let source = "/* This Source Code Form is subject to the terms of the Mozilla Public\n * License, v. 2.0. If a copy of the MPL was not distributed with this\n * file, You can obtain one at https://mozilla.org/MPL/2.0/.\n * Copyright (c) 2026 2youg1 and the sprawling contributors */\n.a::after { content: \"/* not a comment */\"; }\n/* real */\n";
+    assert_eq!(lexer::measure(source, Language::Css).comment_lines, 1);
+}
+
+#[test]
+fn svelte_style_uses_css_and_script_uses_javascript() {
+    let source = r#"<style>.a::after { content: "// text"; }</style>
+<style>.b::after { content: "/* text */"; }</style>
+<style>/* real css */</style>
+<script>// real script</script>
+"#;
+    assert_eq!(lexer::measure(source, Language::Svelte).comment_lines, 2);
+}

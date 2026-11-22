@@ -9,6 +9,7 @@ use crate::report::{Violation, XtaskError};
 use crate::walk;
 
 mod lexer;
+mod python;
 
 use lexer::Language;
 
@@ -28,12 +29,17 @@ fn check_with(
     scope: Option<&crate::source::Scope>,
 ) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
-    for file in crate::source::files_in(root, scope)? {
+    for file in crate::source::comment_files_in(root, scope)? {
         let Some(language) = language(&file) else {
             continue;
         };
         let text = walk::read_text(&file)?;
-        let reading = lexer::measure(&text, language);
+        let mut reading = lexer::measure(&text, language);
+        if language == Language::Python {
+            reading.comment_lines = reading
+                .comment_lines
+                .saturating_add(python::documentation_lines(&file, &walk::rel(root, &file))?);
+        }
         if reading.comment_lines > 0 {
             let rel = walk::rel(root, &file);
             violations.push(Violation {
@@ -52,7 +58,11 @@ fn language(file: &Path) -> Option<Language> {
     match file.extension().and_then(|part| part.to_str()) {
         Some("rs") => Some(Language::Rust),
         Some("ts" | "tsx") => Some(Language::TypeScript),
+        Some("js" | "mjs") => Some(Language::JavaScript),
         Some("svelte") => Some(Language::Svelte),
+        Some("zig") => Some(Language::Zig),
+        Some("py") => Some(Language::Python),
+        Some("css") => Some(Language::Css),
         _ => None,
     }
 }

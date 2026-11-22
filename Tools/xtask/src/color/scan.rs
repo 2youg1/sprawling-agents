@@ -14,8 +14,6 @@ const PLAYBACK_THEME: &str = "Sprawling/city/skills/playback/src/style.css";
 
 const PLAYBACK_PAGE: &str = "Sprawling/city/skills/playback/template.html";
 
-const EARLIER_RELEASES: &str = "Sprawling/app/tests/cities/";
-
 const SPELLS_COLOUR: [&str; 8] = [
     "Tools/xtask/src/color.rs",
     "Tools/xtask/src/color/glass.rs",
@@ -75,7 +73,7 @@ pub(super) fn scan_for_literals(root: &Path) -> Result<Vec<Violation>, XtaskErro
         if walk::in_isolation_zone(&rel)
             || theme::is_theme(&rel)
             || rel == PLAYBACK_THEME
-            || rel.starts_with(EARLIER_RELEASES)
+            || rel.starts_with(crate::source::EARLIER_RELEASES)
             || SPELLS_COLOUR.contains(&rel.as_str())
         {
             continue;

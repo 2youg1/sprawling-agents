@@ -55,7 +55,7 @@ import Sprawling.desktop.spec.Session
 | windows::dpi | 连接器答第一次调用之前，本进程恒已按显示器感知 DPI；做不到时每一次调用恒被拒，恒不在两种坐标之间混算 |
 | windows::clipboard | 读恒以 `GlobalSize` 为上界；锁不住恒是拒绝而不是「没有文本」；写恒先备好整块内存再清空剪贴板，交不出时恒释放那块内存，拒词恒说明剪贴板已被清空 |
 | windows::record | 同一窗口重复 start 恒被拒；未 start 就 stop 恒被拒；每一帧恒取自 `capture::window`；抓帧失败恒让录制停下，`stop` 恒交出落盘路径并说出写了多少帧、为什么提前停；`audio: true` 恒只录 scope 文件点名的那一个设备；`stop` 恒把不超过 `SOUND_CARRIED_MOST` 的声音作为一块 audio content 放在文字之前交回，更长的只交路径并说出为什么 |
-| unsafe | 生产代码的 `unsafe` 恒只在 `Sprawling/desktop/ffi/src/` 之下，恒是一次对 Zig 叶子的调用或那一处声明（§8-12 的表）；每一个 `unsafe` 块恒带一行 `SAFETY:`，写的是**使它成立、并且可能为假的前提**，而不是把这次调用换句话再说一遍 |
+| unsafe | 新增与变更 Rust 文件零 `unsafe`；未触及旧实现只留在 `Sprawling/desktop/ffi/src/`，按 D18 逐文件迁移 |
 
 分部里的定理是模型对性质的证明：scope 缺与坏都关成全拒、两个标识都要中、空 allowlist 不准任何窗口、没写 `sound` 不录声音；`*` 匹配任何名字、不带 `*` 的 pattern 只匹配等长的名字；握手完成之前不出工具；名字无控制字符且有上界；部分输入只补发前缀里按下过的东西的抬起；旧的一代与挪动过的窗口都被拒；两扇以上中了恒不挑。每个分部各有一条「拿掉守卫即反例」的定理。表里其余的行由各模块旁的测试经生产入口断言（§16）。
 -/
@@ -299,6 +299,8 @@ impl Desk {
 
 几条最容易写成复述的前提，在这里点名。剪贴板的两次调用要求本进程没有别的线程正处在一次打开与关闭之间：`desktop_ffi::clipboard` 的进程内轮次锁就是这条前提，所以 SAFETY 行写的是「锁在手里」这件可能为假的事。句柄写进 `winsafe::HWND` 的槽里，前提是槽数与交给叶子的容量是同一个数。叶子里那几条前提——位图解除选择之后才读回、`ReleaseDC` 传取得 DC 时的那扇窗口、剪贴板的块以 `GlobalSize` 为界——不再是 Rust 的 `SAFETY:`，而是 `Sprawling/desktop/ffi/Spec.lean` 证明的模型性质与 `leaf.zig` 里写在取得旁边的 `defer`。
 
+D18 **新增与变更的 Rust 文件零 `unsafe`，既有 FFI 按文件迁移。** `xtask unsafe` 对变更文件拒绝任何真实 `unsafe` token；§8-9、§8-12、D12 与 D14 描述的调用和 `SAFETY:` 形状只适用于尚未触及的旧实现，不再授权新增或修改代码保留它。触及旧文件时必须以安全接口或重设计的边界完成同一契约，不得把 token 搬到别的文件或加 suppression。旧债清零后，`desktop_ffi` 的 `unsafe_code` lint 差异与 guard 中对应记录一并删除。被否：立即把叶子的 lint 改为 `forbid`——那只会使现有调用无法编译，没有完成接口迁移。
+
 ### 8-10 进程的两端住城里
 
 本 package 没有自己的可执行文件，公开面只有 `serve_stdio` 一个函数。
@@ -370,7 +372,7 @@ D1 定规：`visible` 只在 Windows 与测试里编译。
 D12 没有准入安全接口的四组调用经一片 Zig 叶子，Rust 面零业务 `unsafe`。
 
 - **决定**：枚举、捕获、剪贴板、DPI 四组调用由 `Sprawling/desktop/ffi` 的 Zig 叶子整段做完（§8-12）：一个 export 一个完整操作，Rust 借出缓冲、读回 step 与错误码，句柄、DC 与全局块恒不跨边界。Rust 面每次调用一个 `unsafe` 块，加那一处 `unsafe extern` 声明，全部在 §8-12 的表里；本 package 的 `src/` 生产代码不写 `unsafe`。两个包都是根工作区的成员，共享锁、包元数据与 `winsafe` 的一条版本行；lint 表只有 `desktop_ffi` 那一张与工作区差一行（D14）。叶子往缓冲里写什么、资源怎么配对，由 `Sprawling/desktop/ffi/Spec.lean` 证明模型性质，由对拍、fuzz 与真窗口上的契约测试检查实现。
-- **理由**：AGENTS.md「Rust」一节给平台调用定了次序：先找安全接口，没有合格的就用 Zig 叶子，`unsafe` Rust 只在测量表明它整体最好时才准入。这四组在 X2 的审查里没有合格的安全接口（D9），口径 ① 要的正是业务代码零 `unsafe`、只留一个经审的 FFI 缝。整段操作放进叶子，是因为这四组的风险不在某一次调用，而在调用之间：位图选进之后要选回、DC 要随取得它的窗口还回去、全局块要么交出要么释放。这些次序在叶子里写成取得旁边的 `defer`，在 Lean 里写成可穷举的模型；若每个 Win32 调用各包一个 export，次序就又回到 Rust 的 `Drop` 与 `unsafe` 里（`desktop_ffi` D1）。
+- **理由**：旧设计先找安全接口，没有合格的就用 Zig 叶子，并把 `unsafe` Rust 留在经审的 FFI 缝；D18 起这只是未触及旧实现的迁移起点，不再授权新 token。这四组在 X2 的审查里没有合格的安全接口（D9），口径 ① 要的正是业务代码零 `unsafe`、只留一个经审的 FFI 缝。整段操作放进叶子，是因为这四组的风险不在某一次调用，而在调用之间：位图选进之后要选回、DC 要随取得它的窗口还回去、全局块要么交出要么释放。这些次序在叶子里写成取得旁边的 `defer`，在 Lean 里写成可穷举的模型；若每个 Win32 调用各包一个 export，次序就又回到 Rust 的 `Drop` 与 `unsafe` 里（`desktop_ffi` D1）。
 - **剩余限制**（写明，不当作已解决）：两侧的 fuzz 都是抽样而不是覆盖引导。Zig 的覆盖引导 fuzz（`--fuzz`）今天不在 Windows 上实现；cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时，而叶子只在 Windows 上编，所以 libFuzzer 没有一个能跑它的平台。叶子以 `ReleaseSafe` 编，抽样到的越界即 trap。Lean 证明的是叶子对操作系统回答的处理，操作系统本身是假设。
 - **击败的备选**：①留在 `windows` 绑定上继续手写 `unsafe`（33 个块，与口径 ① 相反）；②一个独立的 Zig 可执行程序、经进程边界说话（多一个交付物与它的监管，而本 server 本来就是一个子进程，多一层隔离买不到新东西）；③每个 Win32 调用一个 export（见上）；④把叶子的调用留在本 package 里、本 package 整个用 `deny`（`unsafe` 的许可就落到了协议壳与平台臂上，那里一行也不需要它）。
 - **重开的参数**：一个安全 crate 修好了其中一组（例如 `winsafe` 修好 `EnumWindows`），那一行先写契约测试、再离开叶子；Zig 的 `--fuzz` 或 cargo-fuzz 在 Windows 上落地，`just fuzz-desktop` 换成覆盖引导的那一种。
@@ -620,7 +622,7 @@ D17 录制起的两个 ffmpeg（`windows::record::sink` 编码画面、`windows:
 
 逐模块 `#[cfg(test)]`。真的把进程拉起来的那一条住城里（`Sprawling/app/tests/desktop.rs`，§8-10）：它是唯一一处证明「城起的 `sprawling desktop` 真的接得上」的测试，其余测试都只证明库里的判断。
 
-**约束**：`unsafe` 只在 `platform/windows/` 之下且每块携一行 `SAFETY:`（§8-9）；其余处恒不出现 `unsafe`、`unwrap`、`expect`、`panic!`、`todo!`、裸下标、`as`；算术走 `checked_*`／`saturating_*`；每个文件 ≤400 行、每个函数 ≤200 行且 ≤4 参数。`scope.rs` 因这条尺子而在 446 行处切出 `scope/pattern.rs`——切口落在「一行 allowlist 匹配什么」与「这份文件许可什么」之间，是语义的，不是为了凑行数；`Admitted` 落地时它再次抵线，这一次切出的是 `scope/tests.rs`（形状同 `session/tests.rs`），判定与对判定的断言各占一个文件。
+**约束**：新增与变更 Rust 文件零 `unsafe`（D18）；未触及旧 FFI 仍按 §8-9 记录前提。其余处恒不出现 `unsafe`、`unwrap`、`expect`、`panic!`、`todo!`、裸下标、`as`；算术走 `checked_*`／`saturating_*`；每个文件 ≤400 行、每个函数 ≤200 行且 ≤4 参数。`scope.rs` 因这条尺子而在 446 行处切出 `scope/pattern.rs`——切口落在「一行 allowlist 匹配什么」与「这份文件许可什么」之间，是语义的，不是为了凑行数；`Admitted` 落地时它再次抵线，这一次切出的是 `scope/tests.rs`（形状同 `session/tests.rs`），判定与对判定的断言各占一个文件。
 
 验收命令：本 package 与 `desktop_ffi` 是工作区成员，`just clippy`、`just test` 与 `just fmt-check` 判它们，与判其余 crate 是同一条命令；Windows 上 `just check-desktop` 另跑 `zig test` 判叶子自己的测试（`zig fmt --check` 在 `just fmt-check` 里）。`xtask guard` 判 `desktop_ffi` 那一张自己的 lint 表，例外只有记下理由的 `unsafe_code` 一行（D14）。叶子的三份 `.zig` 与 `.rs` 受同样的 `xtask header`、`length`、`modmap`：MPL 头、函数 200 行与文件 400 行、模块表里各一行（Tools/xtask/Spec.lean §8-48，ARCHITECTURE §2 条件 5）。`record.rs` 因 `xtask length` 的 400 行文件尺子在 443 行处切出 `record/sink.rs`——切口落在「可不可以开始录」与「由谁写、写到哪」之间。
 

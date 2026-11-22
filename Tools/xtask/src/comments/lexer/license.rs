@@ -5,22 +5,47 @@
 
 use std::borrow::Cow;
 
-use crate::header::{self, Leader};
+use super::Language;
+use crate::header;
 
-pub(super) fn without_license(text: &str) -> Cow<'_, str> {
-    if let Some(rest) = strip_prefix_lines(text, &header::notice(Leader::Rust)) {
+pub(super) fn without_license(text: &str, language: Language) -> Cow<'_, str> {
+    let plain = match language {
+        Language::Rust | Language::TypeScript | Language::JavaScript | Language::Zig => {
+            strip_prefix_lines(text, &notice("//"))
+        }
+        Language::Python => strip_prefix_lines(text, &notice("#")),
+        Language::Css => strip_prefix_lines(text, &css_notice()),
+        Language::Svelte => None,
+    };
+    if let Some(rest) = plain {
         return Cow::Borrowed(rest);
     }
-    if let Some(rest) = strip_html_wrapped_slash(text) {
-        return Cow::Borrowed(rest);
-    }
-    if let Some(rest) = strip_html_inline_notice(text) {
-        return Cow::Borrowed(rest);
-    }
-    if let Some(owned) = strip_script_embedded_notice(text) {
-        return Cow::Owned(owned);
+    if language == Language::Svelte {
+        if let Some(rest) = strip_html_wrapped_slash(text) {
+            return Cow::Borrowed(rest);
+        }
+        if let Some(rest) = strip_html_inline_notice(text) {
+            return Cow::Borrowed(rest);
+        }
+        if let Some(owned) = strip_script_embedded_notice(text) {
+            return Cow::Owned(owned);
+        }
     }
     Cow::Borrowed(text)
+}
+
+fn notice(mark: &str) -> [String; 4] {
+    header::NOTICE.map(|row| format!("{mark} {row}"))
+}
+
+fn css_notice() -> [String; 4] {
+    let [first, second, third, fourth] = header::NOTICE;
+    [
+        format!("/* {first}"),
+        format!(" * {second}"),
+        format!(" * {third}"),
+        format!(" * {fourth} */"),
+    ]
 }
 
 fn strip_prefix_lines<'a>(text: &'a str, expected: &[String]) -> Option<&'a str> {
@@ -43,7 +68,7 @@ fn strip_html_wrapped_slash(text: &str) -> Option<&str> {
     if rows.next() != Some("<!--") {
         return None;
     }
-    let expected = header::notice(Leader::Rust);
+    let expected = notice("//");
     if !expected
         .iter()
         .all(|want| rows.next() == Some(want.as_str()))
@@ -99,7 +124,7 @@ fn strip_script_embedded_notice(text: &str) -> Option<String> {
     if !first.trim_start().starts_with("<script") {
         return None;
     }
-    let expected = header::notice(Leader::Rust);
+    let expected = notice("//");
     for want in &expected {
         let row = lines.next()?;
         let content = row

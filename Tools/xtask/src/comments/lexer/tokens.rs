@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use super::{Language, Mode, Scanner, at};
+use super::{Scanner, Syntax, at, expression};
 
 impl Scanner<'_> {
     pub(super) fn template(&mut self, index: usize) -> usize {
@@ -22,18 +22,15 @@ impl Scanner<'_> {
             return self.advance(index);
         }
         if at(self.bytes, index, b"${") {
-            self.modes.push(Mode::Code {
-                template_expression: true,
-                braces: 0,
-            });
+            self.modes.push(expression());
             let next = self.advance(index);
             return self.advance(next);
         }
         self.advance(index)
     }
 
-    pub(super) fn single_quote_starts_literal(&self, index: usize) -> bool {
-        if self.language != Language::Rust {
+    pub(super) fn single_quote_starts_literal(&self, index: usize, syntax: Syntax) -> bool {
+        if syntax != Syntax::Rust {
             return true;
         }
         let Some(&first) = self.bytes.get(index.saturating_add(1)) else {
@@ -72,6 +69,33 @@ impl Scanner<'_> {
             if byte == b'\\' && index < self.bytes.len() {
                 index = self.advance(index);
             } else if byte == quote {
+                break;
+            }
+        }
+        index
+    }
+
+    pub(super) fn python_quoted(&mut self, mut index: usize, quote: u8) -> usize {
+        let delimiter = [quote, quote, quote];
+        let triple = at(self.bytes, index, &delimiter);
+        let width = if triple { 3 } else { 1 };
+        for _ in 0..width {
+            index = self.advance(index);
+        }
+        while index < self.bytes.len() {
+            if triple && at(self.bytes, index, &delimiter) {
+                for _ in 0..3 {
+                    index = self.advance(index);
+                }
+                break;
+            }
+            let Some(&byte) = self.bytes.get(index) else {
+                break;
+            };
+            index = self.advance(index);
+            if byte == b'\\' && index < self.bytes.len() {
+                index = self.advance(index);
+            } else if !triple && (byte == quote || byte == b'\n') {
                 break;
             }
         }

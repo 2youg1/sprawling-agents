@@ -118,6 +118,7 @@
           pkgs.git
           pkgs.elan
           pkgs.uv
+          pkgs.python3
           zig
         ];
 

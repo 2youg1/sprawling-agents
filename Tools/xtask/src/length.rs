@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! File and production-function length gate (xtask D39).
-//! `syn` measures functions because literals and `#[cfg(test)]` defeat
-//! brace counting. Test items and `data` modules are outside the function
-//! budget; Zig leaves share it without sharing the file or parameter rules.
-//! `[argument_count.predating]` is audited and removes spent entries.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -46,8 +40,6 @@ fn check_with(
     let arg_limit = limit(root, ARG_ROW)?;
     let excused = excused(root)?;
     let shapes = modmap::shapes(root)?;
-    // Keep the widest signature at one address so a second `new` cannot
-    // mark a live exception spent.
     let mut still_here: BTreeMap<String, usize> = BTreeMap::new();
     for file in sources(root)? {
         let rel = walk::rel(root, &file);
@@ -102,7 +94,7 @@ fn source_files(
     scope: Option<&crate::source::Scope>,
 ) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();
-    for file in crate::source::files_in(root, scope)? {
+    for file in crate::source::length_files_in(root, scope)? {
         let lines = walk::read_text(&file)?.lines().count();
         if lines > FILE_LINE_LIMIT {
             violations.push(Violation {
@@ -119,7 +111,6 @@ fn source_files(
     Ok(violations)
 }
 
-/// Registered signatures that no longer exist or no longer exceed `limit`.
 fn spent_signatures(
     excused: &BTreeSet<String>,
     still_here: &BTreeMap<String, usize>,
@@ -179,7 +170,6 @@ fn over(rel: &str, body: &Body, limit: usize) -> Violation {
     }
 }
 
-/// Production Rust sources; external test and bench directories are excluded.
 fn sources(root: &Path) -> Result<Vec<std::path::PathBuf>, XtaskError> {
     let mut out = Vec::new();
     for member in crate::members::members(root)? {
@@ -191,7 +181,6 @@ fn sources(root: &Path) -> Result<Vec<std::path::PathBuf>, XtaskError> {
     Ok(out)
 }
 
-/// Zig sources beside package manifests, deduplicated across nested packages.
 fn zig_sources(root: &Path) -> Result<Vec<std::path::PathBuf>, XtaskError> {
     let members = crate::members::members(root)?;
     walk::files_under(

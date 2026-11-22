@@ -4,7 +4,7 @@
 # of its own, so the check a person runs at their desk and the check a pull
 # request gets are one set of commands rather than two copies that drift.
 # The jobs together are `just check`, plus commit messages and Linux kani.
-# During the length/comments migration these two gates judge changed files
+# During the length/comments/unsafe migration these three gates judge changed files
 # rather than the full legacy tree; `just check` remains the full inventory.
 #
 #   gates-sources / gates-artifacts / gates

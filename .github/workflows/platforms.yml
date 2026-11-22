@@ -170,7 +170,7 @@ jobs:
         if: ${{ !cancelled() }}
         # File-level migration debt is judged on the files each change touches
         # in ci.yml; this platform lane checks every other source gate.
-        run: cargo xtask gates $(cargo xtask gates --list | grep -vxE 'length|comments')
+        run: cargo xtask gates $(cargo xtask gates --list | grep -vxE 'length|comments|unsafe')
 
   # The oldest compiler a `cargo install sprawling` may use, exactly.
   #

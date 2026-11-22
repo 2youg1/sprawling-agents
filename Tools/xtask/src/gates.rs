@@ -11,10 +11,10 @@ use crate::report::{self, Violation, XtaskError};
 use crate::{
     artifact, boundary, budget, color, comments, depmap, docnum, guard, header, length, lexicon,
     modmap, motion, npm, packaged, proof, release, render, residue, secret, spec, specalign,
-    unused, upstream, wire_ts, wiring, wording,
+    unsafe_code, unused, upstream, wire_ts, wiring, wording,
 };
 
-pub(crate) const COUNT: usize = 27;
+pub(crate) const COUNT: usize = 28;
 
 pub(crate) struct Gate {
     pub(crate) name: &'static str,
@@ -41,6 +41,10 @@ pub(crate) const GATES: [Gate; COUNT] = [
     Gate {
         name: "comments",
         check: comments::check,
+    },
+    Gate {
+        name: "unsafe",
+        check: unsafe_code::check,
     },
     Gate {
         name: "boundary",
@@ -171,7 +175,7 @@ pub(crate) fn run(root: &Path, names: &[String], files: Option<Vec<String>>) -> 
 fn ensure_scope_supported(gates: &[&Gate]) -> Result<(), XtaskError> {
     if let Some(gate) = gates
         .iter()
-        .find(|gate| !matches!(gate.name, "comments" | "length"))
+        .find(|gate| !matches!(gate.name, "comments" | "length" | "unsafe"))
     {
         return Err(XtaskError::UnsupportedFileScope { name: gate.name });
     }
@@ -192,6 +196,7 @@ fn judge(
                     scope.spawn(move || match (gate.name, file_scope) {
                         ("comments", Some(scope)) => comments::check_scoped(root, scope),
                         ("length", Some(scope)) => length::check_scoped(root, scope),
+                        ("unsafe", Some(scope)) => unsafe_code::check_scoped(root, scope),
                         _ => (gate.check)(root),
                     }),
                 )

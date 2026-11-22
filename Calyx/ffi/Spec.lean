@@ -291,3 +291,10 @@ pub fn seconds_since_midnight(millis: u64) -> Option<u32>; // 系统本地时区
 
 剩余限制（写明，不当作已解决）：只读系统配置的那一个本地时区，不做多时区；两个平台调用失败时该时刻不渲染（与旧 chrono 答 `None` 相同）。
 -/
+
+/-! D13 新增与变更的 Rust 文件零 `unsafe`，D1 与 D12 的既有调用按文件迁移
+
+决定：`xtask unsafe` 对变更文件拒绝任何真实 `unsafe` token；D1、D11、D12 中的 `unsafe` 与 `SAFETY:` 形状只适用于未触及旧实现。触及文件须以安全接口或重设计的进程边界完成同一契约，不得迁移 token 或添加 suppression。旧债清零后，本包 lint 差异与 guard 中对应记录删除。
+
+被否：立即把本包 `unsafe_code` 改为 `forbid`——现有 Zig 与系统绑定尚未迁移时只会使构建失败，不构成替代实现。
+-/
