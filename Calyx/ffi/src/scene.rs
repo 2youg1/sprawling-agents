@@ -308,25 +308,19 @@ impl Scene {
         self.0.extend_from_slice(&value.to_le_bytes());
     }
 
-    
-    
     fn count(&mut self, value: usize) {
         self.word(u32::try_from(value).unwrap_or(u32::MAX));
     }
 
-    
     fn long(&mut self, value: Option<u64>) {
         self.0
             .extend_from_slice(&value.unwrap_or(u64::MAX).to_le_bytes());
     }
 
-    
     fn time(&mut self, at: Option<TimeOfDay>) {
         self.word(at.map_or(u32::MAX, |TimeOfDay(seconds)| seconds));
     }
 
-    
-    
     fn text(&mut self, text: &str) {
         let bytes = text.as_bytes();
         let length = u32::try_from(bytes.len()).unwrap_or(u32::MAX);
