@@ -16,7 +16,6 @@ pub(crate) enum Language {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) struct Reading {
     pub(crate) comment_lines: usize,
-    pub(crate) judged_lines: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -43,29 +42,18 @@ pub(crate) fn measure(text: &str, language: Language) -> Reading {
         bytes: body.as_bytes(),
         language,
         comment: vec![false; lines],
-        code: vec![false; lines],
         line: 0,
         modes: vec![start],
     };
     scanner.run();
     let comment_lines = scanner.comment.iter().filter(|line| **line).count();
-    let judged_lines = scanner
-        .comment
-        .iter()
-        .zip(&scanner.code)
-        .filter(|(comment, code)| **comment || **code)
-        .count();
-    Reading {
-        comment_lines,
-        judged_lines,
-    }
+    Reading { comment_lines }
 }
 
 struct Scanner<'a> {
     bytes: &'a [u8],
     language: Language,
     comment: Vec<bool>,
-    code: Vec<bool>,
     line: usize,
     modes: Vec<Mode>,
 }
@@ -103,7 +91,6 @@ impl Scanner<'_> {
             ) {
                 return self.svelte_block(index);
             }
-            self.mark_code();
             self.modes.push(Mode::Code {
                 template_expression: true,
                 braces: 0,
@@ -113,15 +100,11 @@ impl Scanner<'_> {
         if byte == b'<'
             && let Some(end) = self.script_or_style_open(index)
         {
-            self.mark_code_range(index, end);
             self.modes.push(Mode::Code {
                 template_expression: false,
                 braces: 0,
             });
             return end;
-        }
-        if !byte.is_ascii_whitespace() {
-            self.mark_code();
         }
         self.advance(index)
     }
@@ -138,17 +121,13 @@ impl Scanner<'_> {
             }
             if byte == b'{' {
                 depth = depth.saturating_add(1);
-                self.mark_code();
             } else if byte == b'}' {
-                self.mark_code();
                 index = self.advance(index);
                 depth = depth.saturating_sub(1);
                 if depth == 0 {
                     return index;
                 }
                 continue;
-            } else if !byte.is_ascii_whitespace() {
-                self.mark_code();
             }
             index = self.advance(index);
         }
@@ -195,19 +174,6 @@ impl Scanner<'_> {
         None
     }
 
-    fn mark_code_range(&mut self, mut index: usize, end: usize) {
-        while index < end && index < self.bytes.len() {
-            if self
-                .bytes
-                .get(index)
-                .is_some_and(|byte| !byte.is_ascii_whitespace())
-            {
-                self.mark_code();
-            }
-            index = self.advance(index);
-        }
-    }
-
     fn code(&mut self, index: usize, template_expression: bool, braces: usize) -> usize {
         let Some(&byte) = self.bytes.get(index) else {
             return self.bytes.len();
@@ -219,7 +185,6 @@ impl Scanner<'_> {
             && !template_expression
             && let Some(end) = self.script_or_style_close(index)
         {
-            self.mark_code_range(index, end);
             self.modes.pop();
             return end;
         }
@@ -228,7 +193,6 @@ impl Scanner<'_> {
                 && index > 0
                 && self.bytes.get(index.saturating_sub(1)) == Some(&b':')
             {
-                self.mark_code();
                 return self.advance(index);
             }
             return self.line_comment(index);
@@ -243,7 +207,6 @@ impl Scanner<'_> {
             return self.advance(index);
         }
         if self.language != Language::Rust && byte == b'`' {
-            self.mark_code();
             self.modes.push(Mode::Template);
             return self.advance(index);
         }
@@ -258,7 +221,6 @@ impl Scanner<'_> {
         if self.language != Language::Rust && byte == b'/' && self.regex_allowed(index) {
             return self.regex(index);
         }
-        self.mark_code();
         if template_expression && byte == b'{' {
             if let Some(Mode::Code { braces, .. }) = self.modes.last_mut() {
                 *braces = braces.saturating_add(1);
@@ -335,12 +297,6 @@ impl Scanner<'_> {
 
     fn mark_comment(&mut self) {
         if let Some(line) = self.comment.get_mut(self.line) {
-            *line = true;
-        }
-    }
-
-    fn mark_code(&mut self) {
-        if let Some(line) = self.code.get_mut(self.line) {
             *line = true;
         }
     }

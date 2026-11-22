@@ -14,29 +14,20 @@ impl Scanner<'_> {
             return self.advance(index);
         }
         if byte == b'\\' {
-            self.mark_code();
             let next = self.advance(index);
-            if next < self.bytes.len() {
-                self.mark_code();
-            }
             return self.advance(next);
         }
         if byte == b'`' {
-            self.mark_code();
             self.modes.pop();
             return self.advance(index);
         }
         if at(self.bytes, index, b"${") {
-            self.mark_code();
             self.modes.push(Mode::Code {
                 template_expression: true,
                 braces: 0,
             });
             let next = self.advance(index);
             return self.advance(next);
-        }
-        if !byte.is_ascii_whitespace() {
-            self.mark_code();
         }
         self.advance(index)
     }
@@ -72,24 +63,13 @@ impl Scanner<'_> {
     }
 
     pub(super) fn quoted(&mut self, mut index: usize, quote: u8) -> usize {
-        self.mark_code();
         index = self.advance(index);
         while index < self.bytes.len() {
             let Some(&byte) = self.bytes.get(index) else {
                 break;
             };
-            if !byte.is_ascii_whitespace() {
-                self.mark_code();
-            }
             index = self.advance(index);
             if byte == b'\\' && index < self.bytes.len() {
-                if self
-                    .bytes
-                    .get(index)
-                    .is_some_and(|next| !next.is_ascii_whitespace())
-                {
-                    self.mark_code();
-                }
                 index = self.advance(index);
             } else if byte == quote {
                 break;
@@ -122,23 +102,14 @@ impl Scanner<'_> {
 
     pub(super) fn raw_string(&mut self, mut index: usize, prefix: usize, hashes: usize) -> usize {
         for _ in 0..prefix {
-            self.mark_code();
             index = self.advance(index);
         }
         while index < self.bytes.len() {
             if self.bytes.get(index) == Some(&b'"') && self.raw_close(index, hashes) {
                 for _ in 0..hashes.saturating_add(1) {
-                    self.mark_code();
                     index = self.advance(index);
                 }
                 break;
-            }
-            if self
-                .bytes
-                .get(index)
-                .is_some_and(|byte| !byte.is_ascii_whitespace())
-            {
-                self.mark_code();
             }
             index = self.advance(index);
         }
@@ -201,7 +172,6 @@ impl Scanner<'_> {
 
     pub(super) fn regex(&mut self, mut index: usize) -> usize {
         let mut in_class = false;
-        self.mark_code();
         index = self.advance(index);
         while index < self.bytes.len() {
             let Some(&byte) = self.bytes.get(index) else {
@@ -217,20 +187,10 @@ impl Scanner<'_> {
                 ) {
                     return index;
                 }
-                self.mark_code();
                 return self.advance(index);
             }
             if byte == b'\\' {
-                self.mark_code();
                 index = self.advance(index);
-                if index < self.bytes.len()
-                    && self
-                        .bytes
-                        .get(index)
-                        .is_some_and(|next| !next.is_ascii_whitespace())
-                {
-                    self.mark_code();
-                }
                 if index < self.bytes.len() {
                     index = self.advance(index);
                 }
@@ -240,9 +200,6 @@ impl Scanner<'_> {
                 in_class = true;
             } else if byte == b']' {
                 in_class = false;
-            }
-            if !byte.is_ascii_whitespace() {
-                self.mark_code();
             }
             index = self.advance(index);
         }

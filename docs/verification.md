@@ -19,7 +19,7 @@ just check                    # the whole check: fmt, gates, Lean specifications
 | `just check-all [phase...]` | every phase of `just check`, each run even after another fails; logs and `phases.tsv` under `$CARGO_TARGET_DIR/check-all`; named phases run alone |
 | `just gates` | the machine gates, then the supply-chain read |
 | `cargo xtask gates <name>...` | the named gates only; `--list` prints the roster |
-| `cargo xtask gates length comments --files <path>...` | file length and comment density only on the named changed sources; an empty list is an empty judgement |
+| `cargo xtask gates length comments --files <path>...` | file length and zero non-MPL comments only on the named changed sources; an empty list is an empty judgement |
 | `just commits <base>..<tip>` | commit subjects and `Verdict:` trailers in a range, judged against *Commits* in [AGENTS.md](../AGENTS.md#commits); CI runs it on the change-set, while `just check` cannot, because a tree has no range |
 | `just models` | every Lean specification, built with no `sorry`, `admit` or `axiom`; fails where Lean is absent |
 | `just fmt` | rustfmt, `zig fmt` and `bun fmt` (width and file list in `bunfig.toml`); `just fmt-check` runs them in check mode |
@@ -43,7 +43,7 @@ Run the narrowest command that can fail for the change, as soon as the change ex
 
 Before opening a pull request, apply that selection to the complete final diff, including repairs made during review, and record the commands and outcomes in the description. Do not leave an affected local check for CI to discover. `just check` is not required for every change: use it when the change is broad enough to need every phase, or use `just check-branch` when the branch cannot reach the runners. Whole suites, mutation, fuzzing, kani, the adversary, screenshots and release builds otherwise belong to the next tiers. Code behind `#[cfg(unix)]` or `#[cfg(not(windows))]` is linted only where it compiles, and CI lints Windows on every push but macOS once a night, so before such a change merges run `cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu -- -D warnings` or wait for the macOS job.
 
-The `length` and `comments` gates carry a progressive migration: old violations may remain in full-tree inventory runs, but daily and branch checks judge only changed files. A change touching such a file must clear every violation in it and leave none behind, and a change may not create new violations elsewhere. `check-branch` and CI pass their changed-file lists explicitly; full-tree runs are debt inventories rather than the daily loop. No baseline or waiver hides old content. Every other gate remains blocking.
+The `length` and `comments` gates carry a progressive migration: old violations may remain in full-tree inventory runs, but daily and branch checks judge only changed files. A change touching such a file must clear every violation in it and leave none behind, and a change may not create new violations elsewhere. The changed-file comment allowance is zero, so no non-MPL comment can enter as new debt. `check-branch` and CI pass their changed-file lists explicitly; full-tree runs are debt inventories rather than the daily loop. No baseline or waiver hides old content. Every other gate remains blocking.
 
 ## Tier 2 — the branch's CI
 

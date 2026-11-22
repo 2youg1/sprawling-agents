@@ -9,22 +9,12 @@ use super::*;
 use crate::header::{self, Leader};
 
 #[test]
-fn the_boundary_is_ten_percent_and_one_more_comment_is_rejected() {
+fn only_the_exact_mpl_header_is_admitted() {
     let mut source = header::notice(Leader::Rust).join("\n");
     source.push('\n');
-    source.push_str(&"// necessary contract\n".repeat(10));
-    source.push_str(&"const VALUE: u8 = 1;\n".repeat(90));
-    let accepted = lexer::measure(&source, Language::Rust);
-    assert_eq!(
-        accepted,
-        Reading {
-            comment_lines: 10,
-            judged_lines: 100,
-        }
-    );
-    assert!(!over(accepted));
-    source.push_str("// one too many\n");
-    assert!(over(lexer::measure(&source, Language::Rust)));
+    assert_eq!(lexer::measure(&source, Language::Rust).comment_lines, 0);
+    source.push_str("// forbidden\n");
+    assert_eq!(lexer::measure(&source, Language::Rust).comment_lines, 1);
 }
 
 #[test]
@@ -34,9 +24,7 @@ fn an_inline_comment_counts_and_an_empty_file_is_clean() {
         Language::TypeScript,
     );
     assert_eq!(reading.comment_lines, 1);
-    assert_eq!(reading.judged_lines, 2);
-    assert!(over(reading));
-    assert!(!over(lexer::measure("", Language::Rust)));
+    assert_eq!(lexer::measure("", Language::Rust).comment_lines, 0);
 }
 
 #[test]
@@ -60,7 +48,6 @@ fn rust_block_comments_nest() {
         Language::Rust,
     );
     assert_eq!(reading.comment_lines, 4);
-    assert_eq!(reading.judged_lines, 5);
 }
 
 #[test]
@@ -172,7 +159,6 @@ fn only_the_exact_leading_mpl_header_is_excluded() {
     let source = format!("{header}\n{header}\n");
     let reading = lexer::measure(&source, Language::Rust);
     assert_eq!(reading.comment_lines, 4);
-    assert_eq!(reading.judged_lines, 4);
 }
 
 #[test]

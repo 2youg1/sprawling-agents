@@ -45,7 +45,7 @@ Markdown 时的标签 `8-n`，别处引作 `Tools/xtask/Spec.lean §8-n`。
 | motion | 过渡的曲线与时长只住客户端的主题（入口 `RefRain/src/theme.css` 与它 import 的部分）：别处的 `cubic-bezier(`、`linear(`、`steps(`、Tailwind 的 `duration-<数字>`、`duration-[`、`ease-[` 与只听系统的 `motion-reduce:`／`motion-safe:` 即红；组件样式表里的时长字面量、`@keyframes` 与动效令牌的声明即红（§8-51） |
 | release | 公开树由过滤生成；六条断言：公开树上零脚手架路径、产品文档不得链向或在正文里点名脚手架、任何发布文件不得携家目录路径、不得引用树里没有的文件、不得把一台机器的工作记录写进产品文档、链接的拼法与树上的名字逐字节相等（§8-15） |
 | length | 一个 Rust／TypeScript／Svelte 源文件至多 500 行（D39）；一个生产函数不得长过 `function_length`、不得多于 `argument_count` 个参数（不含接收者）；两个函数面预算都住 `Tools/xtask/budgets.toml`；函数尺寸与签名以 `syn` 量得；`.zig` 只受函数面、不受文件面与参数面，按 Zig 的词法量（§8-48、D15） |
-| comments | 一个 Rust／TypeScript／Svelte 源文件里，含注释的物理行至多占非空物理行的 10%；精确的 MPL 文件头不进扫描；字符串、raw string、template 与 regex 的内容不算注释；嵌套块注释与行尾注释照算（D43） |
+| comments | 一个新增或变更的 Rust／TypeScript／Svelte 源文件里，精确的 MPL 文件头之外不得有任何注释；字符串、raw string、template 与 regex 的内容不算注释；嵌套块注释、Svelte HTML 注释与行尾注释均拒绝（D43）。全量运行列出未触及旧债，日常与分支检查判变更文件（D44） |
 | npm | `RefRain/` 的依赖面：锁文件在盘且与 `package.json` 逐条同、运行时依赖恰为 `npm::RUNTIME` 那张表、树上每个包的许可证都在 `deny.toml` 的准许表内（§8-12） |
 | boundary | Rust 检查不得跨进程边界够到本产品；黑箱那一半住 `Tools/adversary/` |
 | artifact | 发布出去的那件东西的形状：测试脚手架不得进产品二进制、客户端落点只有一个家（§8-18）、平台与归档命名只有一张表（§8-19）、挂到 tag 上的归档先有构件证明（§8-34） |
@@ -80,7 +80,7 @@ Markdown 时的标签 `8-n`，别处引作 `Tools/xtask/Spec.lean §8-n`。
 
 - 每门在违规夹具上报告非零、在干净仓库上报告零（单测覆盖解析与判定核心）。
 - 违规输出恒为三段式：rule｜violation｜alternative，附 `gate` 名与 `file:line`。
-- 门自身的夹具测试全绿；本仓既有的 `length`／`comments` 违规在全量盘点中逐文件列出，不设 baseline 或豁免。日常与分支检查只判变更文件；旧文件可以暂留违规，后续变更一旦触及它，必须把它在这两门下的违规全部清除；其他门不接受这种渐进迁移（人的定规）。
+- 门自身的夹具测试全绿；本仓既有的 `length`／`comments` 违规在全量盘点中逐文件列出，不设 baseline 或豁免。日常与分支检查只判变更文件；旧文件可以暂留违规，后续变更一旦触及它，必须把它在这两门下的违规全部清除；其他门不接受这种渐进迁移。`comments` 的变更面预算是零，任何非 MPL 注释都不能作为新债进入。
 - 一次运行的退出码取最重的一态，判不动的门不吞掉别的门的结论：`spec/Report.lean` 的
   `a_broken_gate_outranks_a_violation`、`a_broken_gate_drops_no_later_finding`、
   `green_means_every_gate_judged_and_found_nothing`、`the_outcome_ignores_gate_order`；Rust 侧由
@@ -1401,11 +1401,11 @@ D3 **判的是哪棵树。** 仓库根取「当前目录往上第一个含 `Carg
 
    D39 **Rust／TypeScript／Svelte 源文件至多 500 行（人的定规）。** 未来的代码以模块边界清楚、一次能读完为目标； sprawling `read` 单页 512 行使 500 行留下少量余量，但这只是附带收益，不是拆分必须依赖工具分页的理由。旧文件阈值曾逼出无缺陷收益的拆分，所以这次不把历史阈值当成证据：新决定接受一段渐进迁移，全量门先列出全部旧违规，触及旧文件时才强制清完，不设旧文件豁免。被否：①只在 `ub-mode` 提醒——提醒不能阻止新的大文件继续出现；②把阈值写成 512——500 是本工作流选择的模块预算，不冒充工具上限。重开参数：拆分反而造成可复现的正确性或可维护性退化，且更小的职责边界无法消除它。
 
-   **comments**：扫描面与文件面相同。注释行是含有行注释、块注释或 Svelte HTML 注释任一token的物理行；同一行同时有代码与注释仍只算一行，行尾注释不能逃逸。精确的 MPL 文件头在扫描前整段剥除，不进分子或分母：Rust／TypeScript 的四行 `//` 头、Svelte 的 `<!--` 包裹 `//` 头、HTML 注释体即为 NOTICE 正文的头，以及 `<script>` 后紧跟的缩进 `//` 头。其他 license、rustdoc、TSDoc、SAFETY 与工具指令全部计入，因为本门的目的是限制总量，必要性由 AGENTS.md 的写作契约判断，而不是给文档注释另开一个额度。Svelte 从 markup 态起扫，正文与标签中的 `https://` 不算行注释；比较用整数 `comment_lines * 100 > total_lines * 10`，零行文件的比率为零；渲染百分比也用整数，不引入浮点。
+   **comments**：扫描面与文件面相同。精确的 MPL 文件头在扫描前整段剥除：Rust／TypeScript 的四行 `//` 头、Svelte 的 `<!--` 包裹 `//` 头、HTML 注释体即为 NOTICE 正文的头，以及 `<script>` 后紧跟的缩进 `//` 头。除此之外，含行注释、块注释或 Svelte HTML 注释任一 token 的物理行都使文件被拒；同一行同时有代码与注释仍拒绝，rustdoc、TSDoc、SAFETY 与工具指令没有例外。Svelte 从 markup 态起扫，正文与标签中的 `https://` 不算行注释。判定只问注释行数是否为零，不再计算比例、分母或百分比。
 
-   D43 **注释上限是拒止线，不是写作目标（人的定规）。** 默认不写注释，只有代码、类型、测试或 SPEC 不能替代的必要契约才保留；MPL 头已不进扫描之后，10% 只阻止注释继续膨胀，作者不得向这个比例填充。15% 在 200 行正文上比 10% 多放行约 10 行注释，松到会留下叙述空间，故不取。拒词要求从零注释重新思考什么必须存在，而不是把现有注释压缩到额度内。被否：①全仓禁止注释——外部平台约束、SAFETY 前提和非显而易见的接口契约仍需要就近记录；②给 rustdoc、TSDoc 或普通注释分别设比例——多个额度鼓励把一种注释改写成另一种，失去总量约束；③MPL 剔除后仍用 15%——额度只量作者注释时，15% 过宽。重开参数：出现一类必要契约无法在这一个总量预算内表达，且移入类型或 SPEC 会削弱可验证性。
+   D43 **新增与触及文件的非 MPL 注释零容忍，存量按文件迁移。** 注释会把代码的命名、形状或类型缺陷复制成第二份会陈旧的叙述；非法状态应在类型中不可表示，其余约束由具体的 lint、测试或门禁执行，不搬进另一段 prose。精确 MPL 头是唯一豁免，因为它承载法律通告而不是代码说明。任何新增或修改的源文件不得带入或保留其他注释；未触及文件的旧债只在全量盘点中报告。被否：①保留 10% 总额——任何正数额度都准许新注释继续进入；②给 rustdoc、SAFETY 或工具指令单列例外——同一说明换一种注释引导符就能绕过禁令；③立即机械删除全仓旧注释——rustdoc 可进入 schemars 产物，SAFETY 与工具指令也可承载语义，未迁移契约就删除会改变行为。重开参数：法律或工具实现要求一种无法放在 MPL 头、属性、配置或独立数据文件中的注释语法。
 
-   D44 **文件门支持显式的变更文件作用域（人的定规）。** `length comments --files <path>...` 只判这些仓库相对路径；空清单判空，绝不回退全树，绝对路径、盘符与 `..` 以 `invalid-file-scope` 拒绝。只有这两道文件级门接受该参数，其他门入选时以 `unsupported-file-scope` 拒绝，因为局部读取不能冒充它们的整树结论。全量运行保留为迁移盘点；日常与 `check-branch`／CI 判变更文件，触及旧违规就必须清完。被否：①记录旧文件豁免表——第二份债务名册会漂移，而路径范围来自本次变更本身；②无路径时自动全扫——一次没有源码变更的提交会重新背上全部旧债。重开参数：其他门形成同等的局部判定契约，逐门增加，不共用一个假称全树的参数。
+   D44 **文件门支持显式的变更文件作用域。** `length comments --files <path>...` 只判这些仓库相对路径；空清单判空，绝不回退全树，绝对路径、盘符与 `..` 以 `invalid-file-scope` 拒绝。只有这两道文件级门接受该参数，其他门入选时以 `unsupported-file-scope` 拒绝，因为局部读取不能冒充它们的整树结论。全量运行保留迁移盘点；日常与 `check-branch`／CI 判变更文件，触及旧违规就必须清完。被否：①记录旧文件豁免表——第二份债务名册会漂移，而路径范围来自本次变更本身；②无路径时自动全扫——一次没有源码变更的提交会重新背上全部旧债；③comments 只按增量行判断——在旧文件任何位置改动都必须清理整份文件，不能靠把新注释放在未变行里逃逸。重开参数：其他门形成同等的局部判定契约，逐门增加，不共用一个假称全树的参数。
 
 D45 **产品根路径表是搬迁与残留门的唯一权威；旧路径在标记 retired 之前不判红。** `architecture.toml` 的 `[[product_root]]` 列出 `Sprawling`／`Tools`／`Calyx`／`RefRain`／`Mei` 五个根（路径大小写锁定），`layout` 区分今日已有与计划根，`transition` 记录改名前仍持有的目录（今日 `RefRain`←`client`）；`[[legacy_path]]` 记录 `crates`／`client`，`status = "live"` 时本门只校验表形与当前根的错误大小写同级目录，不因未搬迁布局变红；`status = "retired"` 后拒绝根目录残留与活动配置中的路径记号（`crates/` 形），隔离区 `local/`（遍历跳过）与 `CHANGELOG.md` 文件名范围除外，表内定义该路径的行除外；无逐行豁免；引号标签不算路径。`product_roots::path_of` 供后续搬迁与包叶名拼接成目录，禁止第二张路径对照表。被否：①在 CI／Nix／Lean 各自硬编码根——加产品要改多处；②迁完才加残留门——迁后无法证明「零残留」曾被机器拒绝过。重开参数：第二个过渡别名，或活动配置的文件类需要扩大。
 8. **报告**：三段式渲染，与产品的 Gate 拒绝同构——施工者被拒时拿到的也是「规则｜违反点｜替代」，不是一句 fail。
@@ -1446,7 +1446,7 @@ D1 **门自身的故障是一个类型，退出码 2。** `XtaskError`（thiserr
 
 serde 与 serde_json（cargo metadata 解析；工作区已钉）；toml（`lexicon.toml`、`architecture.toml`、`budgets.toml`；xtask 独用，不入产品面）；thiserror（工作区已钉）；kernel（secret 门复用 `kernel::secret::scan`，一个判定一个家）。不引 walkdir/regex/clap：手写遍历十几行；判定用子串与前缀即可；子命令分发一个 match 足矣。
 
-**comments 不新增解析依赖。** `syn` 会丢掉普通注释，不能回答注释占比；这里需要的是词法扫描而不是语法树。一个共享扫描器按语言处理行／块注释、字符串、Rust raw string 与嵌套块注释、TypeScript template 与 regex、Svelte HTML 注释；模板插值使用有界输入驱动的显式状态栈，不按模板嵌套递归。正反夹具覆盖注释标记出现在字符串、字符、生命期、raw string、regex、模板文本与插值里的情况。
+**comments 不新增解析依赖。** `syn` 会丢掉普通注释，不能识别它们；这里需要的是词法扫描而不是语法树。一个共享扫描器按语言处理行／块注释、字符串、Rust raw string 与嵌套块注释、TypeScript template 与 regex、Svelte HTML 注释；模板插值使用有界输入驱动的显式状态栈，不按模板嵌套递归。正反夹具覆盖注释标记出现在字符串、字符、生命期、raw string、regex、模板文本与插值里的情况。
 
 **syn 与 proc-macro2**（`syn` 开 `full`，`proc-macro2` 开 `span-locations`）：**量一个 Rust 函数从哪行到哪行是一个解析问题，不是一个数括号问题**。按行数括号的量法有三处必然的计数错误，每一处都产出一张错的违规名单：`#[cfg(test)]` 被当成文件截断点，其后的生产函数全部隐形；`'{'` 这样的字符字面量被当成开括号；跨行字符串同理。一道量错的门比没有门更坏：它会把人送去拆一个不需要拆的函数。被击败的备选是手写一个状态扫描器（行注释、可嵌套块注释、转义与跨行字符串、raw string 的 `#` 计数、以及 `'a` 生命期与 `'x'` 字符的区分）——八十行代码养第四个计数错误的地方。`syn` 是编译器旁的那个解析器，且已因每一个 derive 宏而在 `Cargo.lock` 里。维护成本：仅工作区工具链，恒不入产品二进制（同 flate2／zip）。
 
@@ -1462,7 +1462,7 @@ D28 **发行 ZIP 使用 Deflate level 9，级别只在 `package::write_archive` 
 
 /-! ## 14 硬编码声明
 
-函数行数与参数预算都**不**硬编码在门里，它们是 `Tools/xtask/budgets.toml` 的行（`[function_length]` 与 `[argument_count]`，后者带子表 `[argument_count.predating]`）——那份登记表持着设计所声明的每一项函数面预算。文件面的 500 行只住 `length::FILE_LINE_LIMIT`，注释面的 10% 只住 `comments::COMMENT_PERCENT_LIMIT`；`spec/Comments.lean` 的同名常量是跨语言规格对照，Rust 边界测试与 Lean 边界定理共同钉住它们。改这些值是门机械的改动，与被判源码分开提交。
+函数行数与参数预算都**不**硬编码在门里，它们是 `Tools/xtask/budgets.toml` 的行（`[function_length]` 与 `[argument_count]`，后者带子表 `[argument_count.predating]`）——那份登记表持着设计所声明的每一项函数面预算。文件面的 500 行只住 `length::FILE_LINE_LIMIT`；注释规则没有数值预算，`comments` 直接拒绝非零注释行，`spec/Comments.lean` 证明同一零条件。改这些值或条件是门机械的改动，与被判源码分开提交。
 
 MPL 头四行（通告三行加版权一行）的文字只写在 `header::NOTICE`，不带注释引导符；`header::notice(Leader)` 按 Rust 与 Zig 的 `//` 或 Lean 的 `--` 拼出整行，`header` 门与 `spec` 骨架都从这里取；判据是「整份文件只出现一次」而不是「前四行相等」——只比前四行时，一个由两份文件拼起来的模块可以带着第二份头与半段属于别处的 rustdoc 过关；门机械的路径清单（`Tools/xtask/`、`.github/`、`deny.toml`、`Cargo.toml`、`rust-toolchain.toml`、`clippy.toml`、`justfile`）；`boundary` 的 `FUZZ`（`Tools/fuzz/` 自成一个工作区，不是任何包的成员或依赖，`members` 看不见它，故以一个具名常量写明它整个是测试代码）；两份数据文件的仓库相对路径 `budget::REGISTER` 与 `lexicon::PATH`，拼路径与报错都用这两个常量；模块状态四值。各随其权威变更而改。
 
@@ -1479,7 +1479,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 /-! ## 16 测试与约束
 
-单测：`length` 的文件面在 500 行通过、501 行拒绝；`comments` 在恰好 10% 通过、超过 10% 拒绝，行尾注释、空文件、精确 MPL 头（含 Svelte 三种领先形状）、markup URL、嵌套块注释、raw string、生命期、template 插值、regex 与 Svelte HTML 注释各有正反例，超标夹具必须触红。文件作用域只交出目标文件的结果，空作用域无违规，非相对路径与不支持局部判定的门各自拒绝。`spec/Comments.lean` 对同一整数比较证明边界、空输入与两种拒绝都可实现。`members` 读本仓（kernel 在 `Sprawling/kernel`，desktop 与它的叶子都是成员，xtask 是 Tool，仓库根不是一个包）；包目录落在检出之外以 `member-outside-checkout` 拒读；一棵包名、lib 名、目录三种拼法各不相同的夹具检出（`root::fixture::relocated`：`sprawling-k`，lib `k`，住 `tools/k`）上，depmap 按 lib 名判边、`spec` 把骨架写进 `tools/k`、specalign 读到 `tools/` 下的模块行、proof 读到 `tools/k` 的 harness、`root::judged` 从 `Tools/xtask` 找到检出根，五条各一个测试；`architecture.toml` 条目解析（正例／状态非法／同一文件两个条目）；索引文件判定；三种拼法的测试模块无条目不报、旁边的生产文件照报（D40）；lexicon 命中与 `lexicon-ok:` 豁免；`wording-ok:` 豁免跨过格式化器折出的行、块关掉之后不再豁免、同行的豁免仍生效；shim 表被折成多行时每个条目仍读成一行；depmap 块解析；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；`guard::wall` 五例（叶子的表少一条 lint、放宽一条 lint、多一条 lint、一个别的成员写了自己的表、叶子不在成员里）加一条自清理断言（记下的差异消失即须划掉）；docnum 区段解析（整行形与行内形各保持自己的形状、陈旧区段的拒词带 `--write`、未知事实不写盘、三种坏标记各报一例）；`crate_table` 在 relocated 夹具上画出整张表（`sprawling-j` 的模块名写 `bin::`，于是读 `[family.bin]`；duty 里的竖线被转义；没有边的写 `nothing`），夹具缺 `[family.k]` 时以点名它的 `Doc` 拒读（§8-40）。不写「本仓自身通过」一类的单测：门在 `just check` 里对本仓跑一遍，同一断言再跑一遍只多花时间，不多判一件事。约束：全门无网络；判定路径无写盘，写盘只在带 `--write` 的命令上发生（§7）；输出顺序确定。
+单测：`length` 的文件面在 500 行通过、501 行拒绝；`comments` 对精确 MPL 头通过，对任意其他注释拒绝，行尾注释、空文件、Svelte 三种领先头形状、markup URL、嵌套块注释、raw string、生命期、template 插值、regex 与 Svelte HTML 注释各有正反例。文件作用域只交出目标文件的结果，空作用域无违规，非相对路径与不支持局部判定的门各自拒绝。`spec/Comments.lean` 对同一零条件证明空输入、合法输入与两种拒绝都可实现。`members` 读本仓（kernel 在 `Sprawling/kernel`，desktop 与它的叶子都是成员，xtask 是 Tool，仓库根不是一个包）；包目录落在检出之外以 `member-outside-checkout` 拒读；一棵包名、lib 名、目录三种拼法各不相同的夹具检出（`root::fixture::relocated`：`sprawling-k`，lib `k`，住 `tools/k`）上，depmap 按 lib 名判边、`spec` 把骨架写进 `tools/k`、specalign 读到 `tools/` 下的模块行、proof 读到 `tools/k` 的 harness、`root::judged` 从 `Tools/xtask` 找到检出根，五条各一个测试；`architecture.toml` 条目解析（正例／状态非法／同一文件两个条目）；索引文件判定；三种拼法的测试模块无条目不报、旁边的生产文件照报（D40）；lexicon 命中与 `lexicon-ok:` 豁免；`wording-ok:` 豁免跨过格式化器折出的行、块关掉之后不再豁免、同行的豁免仍生效；shim 表被折成多行时每个条目仍读成一行；depmap 块解析；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；`guard::wall` 五例（叶子的表少一条 lint、放宽一条 lint、多一条 lint、一个别的成员写了自己的表、叶子不在成员里）加一条自清理断言（记下的差异消失即须划掉）；docnum 区段解析（整行形与行内形各保持自己的形状、陈旧区段的拒词带 `--write`、未知事实不写盘、三种坏标记各报一例）；`crate_table` 在 relocated 夹具上画出整张表（`sprawling-j` 的模块名写 `bin::`，于是读 `[family.bin]`；duty 里的竖线被转义；没有边的写 `nothing`），夹具缺 `[family.k]` 时以点名它的 `Doc` 拒读（§8-40）。不写「本仓自身通过」一类的单测：门在 `just check` 里对本仓跑一遍，同一断言再跑一遍只多花时间，不多判一件事。约束：全门无网络；判定路径无写盘，写盘只在带 `--write` 的命令上发生（§7）；输出顺序确定。
 
 **证明的性质**（`lake build Spec`，经 `just models`；不依赖 `sorry`、`admit`、`axiom`）：
 

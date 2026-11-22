@@ -2,9 +2,11 @@
 
 Start from the real scenarios — what a person or an agent actually does, with realistic data and order — then, where relevant, the edges that break them: empty, maximal, malformed, repeated, out of order, interrupted, concurrent, and each platform's own paths, line endings and text encodings. A test that passes only on the tidy path proves little.
 
+A test enters required CI only as durable protection for a real scenario, invariant or observed regression, with a failure it can plausibly expose and a runtime proportionate to that value. One-off demonstrations, assertions that restate implementation trivia, and low-value unit tests that spend CI time without catching a credible defect stay out of commits; keep disposable experiments outside the committed tree, and delete an existing test when it no longer earns its runtime. A fast test is not automatically valuable, and a slow test is not automatically worth keeping.
+
 Test what types and the Lean models leave open, and every regression that has actually occurred. A test of a statically defined value, or a negative test for logic that was removed, restates the code and doubles its maintenance. Compare whole objects, not fields one at a time.
 
-Match effort to risk: code a reader can check by reading it once, and code that ships nowhere (a probe, a one-off script, a measurement), gets at most the smallest test that can fail, with no fixture, mock, seam or generator built only for it. A gate under `Tools/xtask/` is outside this class because every change depends on its verdict; test it on fixtures its tests build, since the gate run already judges this tree.
+Match effort to risk: code a reader can check by reading it once, and code that ships nowhere (a probe, a one-off script, a measurement), gets at most the smallest test that can fail, with no fixture, mock, seam or generator built only for it. Such a test remains local unless it protects a durable contract; the experiment and its disposable checks are not committed merely to preserve the work. A gate under `Tools/xtask/` is outside this class because every change depends on its verdict; test it on fixtures its tests build, since the gate run already judges this tree.
 
 Tests use the same doors as production code: to exercise something internal, put a seam on that face and give it a second adapter, or drive it through citysim. A citysim failure replays byte for byte from its scenario, a fixed script on a counted clock with no random source; when it does not, the defect is the determinism.
 
