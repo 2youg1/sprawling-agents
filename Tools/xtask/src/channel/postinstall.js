@@ -13,6 +13,7 @@ const path = require("node:path");
 const ROOT = path.resolve(__dirname, "..");
 const MEI_SHIM = path.join(ROOT, "bin", "mei.js");
 const CALYX_SHIM = path.join(ROOT, "bin", "calyx.js");
+const BUN_EXEC = process.execPath;
 
 function line(text) {
   process.stdout.write(`${text}\n`);
@@ -30,7 +31,7 @@ function userLocalBin() {
 }
 
 function bunGlobalBin() {
-  const result = spawnSync("bun", ["pm", "bin", "--global"], {
+  const result = spawnSync(BUN_EXEC, ["pm", "bin", "--global"], {
     encoding: "utf8",
     env: process.env,
   });
@@ -57,31 +58,73 @@ function pathHas(dir) {
     });
 }
 
-function linkInto(dir, name, target) {
+function oursSymlink(dest, target) {
+  try {
+    const st = fs.lstatSync(dest);
+    if (!st.isSymbolicLink()) {
+      return false;
+    }
+    const current = fs.readlinkSync(dest);
+    return path.resolve(path.dirname(dest), current) === path.resolve(target);
+  } catch {
+    return false;
+  }
+}
+
+function oursWrapper(dest, target) {
+  try {
+    const text = fs.readFileSync(dest, "utf8");
+    return text.includes(path.resolve(target)) && text.includes(path.resolve(BUN_EXEC));
+  } catch {
+    return false;
+  }
+}
+
+function writeWrapper(dest, target) {
+  const body =
+    process.platform === "win32"
+      ? `@echo off\r\n"${BUN_EXEC}" "${target}" %*\r\n`
+      : `#!/bin/sh\nexec "${BUN_EXEC}" "${target}" "$@"\n`;
+  fs.writeFileSync(dest, body, { mode: 0o755 });
+  if (process.platform !== "win32") {
+    fs.chmodSync(dest, 0o755);
+  }
+}
+
+function installEntry(dir, name, target) {
   if (!dir || !fs.existsSync(target)) {
-    return null;
+    return { ok: false, reason: "missing" };
   }
   try {
     fs.mkdirSync(dir, { recursive: true });
   } catch {
-    return null;
+    return { ok: false, reason: "mkdir" };
   }
   const dest = path.join(dir, name);
+  let exists = false;
   try {
     fs.lstatSync(dest);
-    fs.unlinkSync(dest);
-  } catch {}
-  try {
-    fs.symlinkSync(target, dest);
-    return dest;
+    exists = true;
   } catch {
-    try {
-      fs.copyFileSync(target, dest);
-      fs.chmodSync(dest, 0o755);
-      return dest;
-    } catch {
-      return null;
+    exists = false;
+  }
+  if (exists) {
+    if (oursSymlink(dest, target) || oursWrapper(dest, target)) {
+      try {
+        fs.unlinkSync(dest);
+      } catch {
+        return { ok: false, reason: "busy" };
+      }
+    } else {
+      line(`kept existing ${dest} (not replaced; not this package's entry)`);
+      return { ok: false, reason: "conflict" };
     }
+  }
+  try {
+    writeWrapper(dest, target);
+    return { ok: true, dest, kind: "wrapper" };
+  } catch {
+    return { ok: false, reason: "write" };
   }
 }
 
@@ -92,26 +135,37 @@ function exportLine(dir) {
   return `export PATH="${dir}:$PATH"`;
 }
 
+function persistHint(dir) {
+  if (process.platform === "win32") {
+    return `session only above; for new terminals, add ${dir} to your user Path`;
+  }
+  return `session only above; for new terminals, add that line to the file your login shell reads`;
+}
+
 const localBin = userLocalBin();
-const linkedMei = linkInto(localBin, "mei", MEI_SHIM);
-const linkedCalyx = linkInto(localBin, "calyx", CALYX_SHIM);
+const mei = installEntry(localBin, "mei", MEI_SHIM);
+const calyx = installEntry(localBin, "calyx", CALYX_SHIM);
 const bunBin = bunGlobalBin();
-const reachable = pathHas(localBin) || pathHas(bunBin);
+const linked = mei.ok && calyx.ok;
+const viaLocal = linked && pathHas(localBin);
+const viaBunBin = pathHas(bunBin);
 
 blank();
 line("@sprawling/mei installed.");
+line("Bun already linked the mei and calyx commands into its global bin");
+line("(package bin field; no lifecycle script required).");
 line("Open a NEW terminal, then run:");
 line("  mei");
 line("Headless one-shot:");
 line('  mei -p "…"');
 line("Face by name:");
 line("  calyx");
-if (linkedMei || linkedCalyx) {
+if (linked) {
   line(`User links: ${localBin}`);
 }
 blank();
 
-if (reachable) {
+if (viaLocal || viaBunBin) {
   line("PATH already reaches the install.");
   line("A new terminal should resolve mei and calyx.");
   blank();
@@ -120,16 +174,19 @@ if (reachable) {
 
 line("Fix your PATH");
 line("mei and calyx are installed, but this shell cannot see them yet.");
-line("Add ONE directory below to PATH, then open a NEW terminal:");
+line("Run ONE export in this terminal (session only), then try mei:");
 blank();
 if (bunBin) {
   line(`  ${exportLine(bunBin)}`);
+  line(`  (${persistHint(bunBin)})`);
 }
-if (localBin) {
+if (localBin && linked) {
   line(`  ${exportLine(localBin)}`);
+  line(`  (${persistHint(localBin)})`);
 }
 blank();
 line("Ask Bun where globals land:");
 line("  bun pm bin --global");
+line("If a lifecycle script was skipped, that command still works after PATH is fixed.");
 blank();
 process.exit(0);

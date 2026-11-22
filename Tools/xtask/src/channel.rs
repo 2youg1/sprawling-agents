@@ -40,9 +40,6 @@ fn extract(archive: &Path, wanted: &str) -> Result<ArchiveBinary, XtaskError> {
             cmd: format!("read {}", archive.display()),
             msg: err.to_string(),
         })?;
-        // The archive holds `sprawling-<version>-<platform>/<name>`, and
-        // the directory carries the version, so the entry is matched on
-        // its file name rather than on a path this would have to rebuild.
         let is_wanted = {
             let name = entry.name().map_err(|err| XtaskError::Cmd {
                 cmd: format!("read {}", archive.display()),
@@ -265,9 +262,6 @@ pub(crate) fn run(root: &Path, tag: &str, assets: &Path, out: &Path) -> Result<S
     let workspace = crate::package::workspace_package(root, "version")?;
     let repository = crate::package::workspace_package(root, "repository")?;
     let description = crate::package::workspace_package(root, "description")?;
-    // `kernel::Release` owns both spellings of one release, because the
-    // binary this channel packages has to recognise on the registry the
-    // same release this job publishes there.
     let version = kernel::Release::from_tag(tag, &workspace)
         .map_err(|err| XtaskError::Cmd {
             cmd: format!("npm version for {tag}"),

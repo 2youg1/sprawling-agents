@@ -5,17 +5,8 @@
 
 use crate::platform::{PLATFORMS, ROOT_PACKAGE};
 
-/// The last version whose platform packages reached the registry under
-/// bare names. npm never reuses a `name@version`, so the scope cannot
-/// be applied to it afterwards.
 const UNSCOPED_THROUGH: &str = "0.0.4";
 
-/// What this channel publishes a release as, held against the spelling
-/// `kernel::Release` decodes - the tag conversion itself is that type's
-/// and is tested there. This is the seam: the job publishes
-/// `npm_version()`, and `status --check` reads the registry back through
-/// `from_npm_version`, so a release only stays findable while those two
-/// agree.
 #[test]
 fn the_published_version_is_the_one_a_running_binary_decodes() {
     let cut = kernel::Release::from_tag("v0.17.0-260911", "0.17.0")
@@ -27,10 +18,6 @@ fn the_published_version_is_the_one_a_running_binary_decodes() {
     );
 }
 
-/// The decision beside `ROWS`, carried to the version that can honour
-/// it. Nothing here fires while the workspace still states the version
-/// whose packages are already published; the first commit that moves
-/// that number turns this red, and the message says what to rename.
 #[test]
 fn the_platform_packages_take_the_scope_from_the_next_version() {
     let root = crate::root::this_checkout();
@@ -56,9 +43,6 @@ fn the_platform_packages_take_the_scope_from_the_next_version() {
     }
 }
 
-/// The shim is what every root package carries, so its own contract
-/// is worth holding: it resolves a platform package and never
-/// installs anything.
 #[test]
 fn the_shim_execs_rather_than_installs() {
     let shim = super::SHIM;
@@ -77,12 +61,19 @@ fn mei_postinstall_prints_fix_path_when_unreachable() {
     assert!(post.contains("bun pm bin --global"));
     assert!(post.contains(".local"));
     assert!(post.contains("Open a NEW terminal"));
+    assert!(post.contains("package bin field"));
+    assert!(post.contains("session only"));
+    assert!(post.contains("exec \""));
     assert!(
         !post.contains("bashrc")
             && !post.contains("zshrc")
             && !post.contains("WriteAllText")
             && !post.contains("HKCU"),
         "postinstall must not write shell startup files: {post}"
+    );
+    assert!(
+        !post.contains("copyFileSync"),
+        "copy fallback breaks module resolve; wrappers keep absolute paths: {post}"
     );
 }
 

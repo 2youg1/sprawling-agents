@@ -15,7 +15,13 @@ Archetype:Mei 是极简 Agent Harness：模型接收任务，通过唯一持久�
 | Bun | `bun install --global @sprawling/mei@latest` | npm 包同时携带无头 `mei` 核与 Calyx 面，并提供 `mei`、`calyx` 两个命令。TTY 下 `mei` 进入 Calyx；`mei -p`、`mei --acp` 与管道仍走无头。`bunx @sprawling/mei` 可不安装直接跑一次。 |
 | crates.io | `cargo install sprawling-mei --locked` | 只装无头 `mei` 核。TTY 下无 `-p` 的 `mei` 会以 `E_MEI_USAGE` 拒绝并指向本说明：此通道没有 Calyx 面。交互请用 Bun 或源码构建。 |
 
-Bun 全局安装后，**新开终端**再运行 `mei` 或 `calyx`。安装后脚本在可能时把两个名字链到 `~/.local/bin`；否则打印 Claude 级 **Fix your PATH** 块（含可复制的 `export PATH=…` 与 `bun pm bin --global`）。用同一条 Bun 命令重装即可一并刷新 shim、平台二进制与链接。不要省略 optionalDependencies：平台包里才有两个二进制。
+Bun 全局安装后，**新开终端**再运行 `mei` 或 `calyx`。包的 `bin` 字段已足够：Bun 会把两个名字链进它的 global bin，**不依赖**生命周期脚本。若新壳找不到命令，先跑 `bun pm bin --global`，再（仅当前会话）：
+
+```sh
+export PATH="$(bun pm bin --global):$PATH"
+```
+
+把该目录写进登录壳会读的文件，之后新终端才一直可用。若 Bun 执行了包的 postinstall，它还可能在 `~/.local/bin` 放包装器并打印同样的 **Fix your PATH**；生命周期被跳过时，上面的 global bin PATH 修复仍然有效。用同一条 Bun 命令重装即可刷新 shim 与平台二进制。不要省略 optionalDependencies：平台包里才有两个二进制。
 
 已发布包会落后于本树，直到下一次发布；要本仓库的版本，用下方源码构建。
 

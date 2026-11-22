@@ -15,7 +15,13 @@ The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the head
 | Bun | `bun install --global @sprawling/mei@latest` | The npm package carries the headless `mei` core and the Calyx face as `mei` and `calyx` commands. On a TTY, `mei` opens Calyx; `mei -p`, `mei --acp`, and pipes stay headless. `bunx @sprawling/mei` runs once without a global install. |
 | crates.io | `cargo install sprawling-mei --locked` | The headless `mei` core only. A TTY `mei` without `-p` refuses with `E_MEI_USAGE` and points here: the Calyx face is not on this route. Use Bun or a source build for interactive use. |
 
-After a Bun global install, open a **new** terminal and run `mei` or `calyx`. The package postinstall links both names into `~/.local/bin` when it can, and otherwise prints a **Fix your PATH** block with a copyable `export PATH=…` line and `bun pm bin --global`. Reinstall with the same Bun command; it refreshes the shim, platform binaries, and links together. Do not omit optional dependencies: the platform package holds both binaries.
+After a Bun global install, open a **new** terminal and run `mei` or `calyx`. The package `bin` field is enough: Bun links both names into its global bin without needing a lifecycle script. If the new shell cannot see them, run `bun pm bin --global`, then (session only):
+
+```sh
+export PATH="$(bun pm bin --global):$PATH"
+```
+
+Add that directory to the file your login shell reads so later terminals keep it. When Bun does run the package postinstall, it may also place wrappers under `~/.local/bin` and print the same **Fix your PATH** block; if lifecycle scripts were skipped, the global-bin PATH fix above is still the path. Reinstall with the same Bun command; it refreshes the shim and platform binaries together. Do not omit optional dependencies: the platform package holds both binaries.
 
 The published packages trail this tree until the next release. Build from source for the version in this repository.
 

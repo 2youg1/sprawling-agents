@@ -108,17 +108,19 @@ if grep -Eq 'E_MEI_TRANSPORT|E_MEI_CONFIG|E_MEI_DOCTOR|E_MEI_PROTOCOL|E_MEI_PYTH
 else
   echo "S2b mei: FAIL status=$s2b_status"; cat "$OUT/logs/s2b.err"; exit 1
 fi
-# Face binary must resolve through the calyx entry (NotATerminal is OK off PTY).
 set +e
 env -i HOME="$HOME" PATH="$S2B_PATH" \
   bash -lc 'calyx' >"$OUT/logs/s2b-calyx.out" 2>"$OUT/logs/s2b-calyx.err"
+s2b_calyx_status=$?
 set -e
 if grep -Eq 'NotATerminal|E_MEI_CONFIG|code =' "$OUT/logs/s2b-calyx.err" \
-  || [[ -s "$OUT/logs/s2b-calyx.out" ]]; then
+  || [[ -s "$OUT/logs/s2b-calyx.out" ]] \
+  || [[ $s2b_calyx_status -eq 0 ]]; then
   echo "S2b calyx: PASS"
 else
-  test -x "$PLAT/bin/calyx"
-  echo "S2b calyx: PASS (platform face present)"
+  echo "S2b calyx: FAIL status=$s2b_calyx_status"
+  cat "$OUT/logs/s2b-calyx.err"
+  exit 1
 fi
 
 echo "S3 cold shell without install bin (local links or Fix-PATH)"
@@ -126,14 +128,17 @@ S3_PATH="$HOME/.local/bin:/usr/bin:/bin"
 if env -i HOME="$HOME" PATH="$S3_PATH" bash -lc 'command -v mei >/dev/null' \
   && env -i HOME="$HOME" PATH="$S3_PATH" bash -lc 'command -v calyx >/dev/null'; then
   set +e
-  env -i HOME="$HOME" PATH="$S3_PATH:$BUN_DIR" \
+  env -i HOME="$HOME" PATH="$S3_PATH" \
     bash -lc "mei -p 'cold-s3'" >"$OUT/logs/s3.out" 2>"$OUT/logs/s3.err"
+  s3_status=$?
   set -e
   if grep -Eq 'E_MEI_TRANSPORT|E_MEI_CONFIG|E_MEI_DOCTOR|E_MEI_PROTOCOL|E_MEI_PYTHON' "$OUT/logs/s3.err" \
-    || [[ -s "$OUT/logs/s3.out" ]]; then
+    || [[ $s3_status -eq 0 ]]; then
     echo "S3 local-bin persistence: PASS"
   else
-    echo "S3 resolve ok but mei silent-fail"; cat "$OUT/logs/s3.err"; exit 1
+    echo "S3 resolve ok but mei silent-fail status=$s3_status"
+    cat "$OUT/logs/s3.err"
+    exit 1
   fi
 elif grep -q 'Fix your PATH' "$OUT/logs/s1-postinstall.txt" \
   && grep -Eq 'export PATH=|bun pm bin --global' "$OUT/logs/s1-postinstall.txt"; then

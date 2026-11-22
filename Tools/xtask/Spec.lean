@@ -579,12 +579,15 @@ sprawling 根包主 bin 指向 `bin/sprawling.js`，Mei 根包两个产品 bin�
 Mei 的 npm 入口要求 Bun，与文档的 `bunx` 前提一致；npm exec 可调用同一入口，但不因此支持
 无 Bun 的机器。安装来源只由已有明确元数据与缓存目录辨认，运行时不是安装器。
 
-`@sprawling/mei` 根包携带 `bin/postinstall.js`（`scripts.postinstall`），在安装／重装后：
-① 尽量把 `mei`／`calyx` 链到用户 `~/.local/bin`（Windows 跳过强制链、只诊断）；② 若 Bun
-global bin 与该目录均不在当前 `PATH`，向 stdout 打印 Claude 级「Fix your PATH」块（含可复制
-`export PATH=…` 与 `bun pm bin --global`）；③ 成功提示短而分行，窄宽下不叠关键步骤。
-postinstall 不改 shell profile、不改系统 PATH 注册表；二次 `bun install -g` 覆盖同一版本号
-的平台包与 shim，链目标指向本次安装路径。
+主安装面是根包 `bin` 字段：Bun／npm 把 `mei`／`calyx` 链进 global bin，**不依赖**生命周期
+脚本。`bin/postinstall.js`（`scripts.postinstall`）是附加辅助：在 Bun 实际执行该脚本时，
+① 仅当 `~/.local/bin` 目标不存在或已是本包指向同 shim 的链／包装器时才刷新，否则保留并提示
+冲突（不得删 `cargo install` 等外来命令）；② 写入 `#!/bin/sh`／cmd 包装器，以绝对路径
+`exec` 当前 `bun` 与 shim，使冷壳在 PATH 无 `bun` 时仍可启动（禁止复制 shim 字节，以免
+`require` 基准漂到 `~/.local/bin`）；③ 若 Bun global bin 与已成功写入的 `~/.local/bin`
+均不在 `PATH`，打印 Claude 级「Fix your PATH」（可复制 session `export`／`$env:Path`，并
+注明持久化需人写入启动文件；含 `bun pm bin --global`）。脚本跳过时，人仍靠 global bin +
+该 Fix-PATH 文案（README）完成冷启动。不改 shell profile、不改系统 PATH 注册表。
 
 发布顺序保持平台 npm 包、两个 npm 根包、crates.io：根包的可选依赖先存在，crates.io
 仍在其它渠道之后，因为其版本不可替换。首次出现的 npm 包与 crate 先由有权限的人完成
