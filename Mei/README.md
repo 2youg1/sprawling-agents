@@ -104,9 +104,9 @@ actual-model · effort high · Agent Step 2 · 0.05% · 487/1048576
 
 Before Magpie confirms a route, the model and effort are marked `requested`. `Agent Step` counts model responses in the current run. Context use is `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`, displayed against the model's maximum with exactly two decimal places; it is not a cumulative bill.
 
-### 4. Interrupt and close safely
+### 4. Steer mid-task and close safely
 
-Start a long task and press Esc once. It stops only that run and its descendants. Start another and use `/q`: it closes that Calyx and its descendants. Neither action is used to stop a different Calyx session. Esc on an idle face does nothing, so an accidental keypress cannot close the session.
+While a run is working, submitting ordinary text does not interrupt the current tool call: the words go to that run's `MEI_STEER_PATH`, and Mei appends them to the latest tool_result text after the wave finishes (prefixed `user: `). Esc still stops only that run and its descendants; `/q` closes that Calyx. Esc on an idle face does nothing.
 
 ## Workspace, runtime and captures
 
@@ -143,6 +143,7 @@ Resume preserves legacy tool names and string/array content, including image blo
 | `MEI_DOCTOR_DIR` | Optional isolated doctor cache and private runtime directory |
 | `MEI_CAPTURE_DIR` | Internal per-run directory supplied by a face |
 | `MEI_CAPTURE_CREATED` | Internal `1` marker proving Calyx created the empty capture directory |
+| `MEI_STEER_PATH` | Face-supplied steer JSONL (one `{"text":"…"}` per line); absent means no steers |
 | `SPRAWLING_PROGRAM_STATUS` | `never` disables OSC 7501 in the Calyx interactive face |
 
 Calyx reports Program Status Protocol (OSC 7501) states: `working`, `done`, `error`, or `idle` after cancellation. Unsupported terminals ignore it. Headless `-p` and piped runs do not emit OSC 7501.

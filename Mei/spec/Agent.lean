@@ -113,8 +113,27 @@ def assistant (content : Content) : Message := ⟨.assistant, content⟩
 def userResults (calls : List Call) (outputs : List Output) : Message :=
   ⟨.user, .items ((calls.zip outputs).map (fun pair => .result pair.1.id pair.2) )⟩
 
-/-- 先追加 assistant；整波通过预检后才调用 `exec`，随后才追加同一条 user 结果消息。 -/
-def step (exec : Exec) (history : History) (response : Response) : Outcome :=
+/-- 人的追加指示渲染为 `user: …`，与城侧 Person steer 同一前缀。 -/
+def renderSteer (text : String) : String := "user: " ++ text
+
+/-- 把一段 steer 接到最新一条工具结果文本的末尾；已有尾随换行时不再多插一行。 -/
+def Output.appendSteer (output : Output) (text : String) : Output :=
+  let suffix := renderSteer text
+  let body :=
+    if output.text.isEmpty then suffix
+    else if output.text.endsWith "\n" then output.text ++ suffix
+    else output.text ++ "\n" ++ suffix
+  ⟨body, output.images⟩
+
+/-- 整波执行完毕后，把已到达的 steers 按到达序接到最后一条结果上；不回写更早的结果。 -/
+def landSteers (outputs : List Output) (steers : List String) : List Output :=
+  match outputs.reverse with
+  | [] => []
+  | last :: earlier => (steers.foldl Output.appendSteer last :: earlier).reverse
+
+/-- 先追加 assistant；整波通过预检后才调用 `exec`；`exec` 返回后才把已到达的 steers
+接到最新一条 tool_result，再追加同一条 user 结果消息。Steer 从不打断进行中的调用。 -/
+def step (exec : Exec) (steers : List String) (history : History) (response : Response) : Outcome :=
   let appended := history ++ [assistant response.content]
   match response.stop with
   | .endTurn => .answered appended response.content.text
@@ -127,11 +146,14 @@ def step (exec : Exec) (history : History) (response : Response) : Outcome :=
       | none => .failed appended
       | some outputs =>
         if outputs.length != calls.length then .failed appended
-        else .again (appended ++ [userResults calls outputs]) outputs
+        else
+          let landed := landSteers outputs steers
+          .again (appended ++ [userResults calls landed]) landed
 
 /-- 每次转移都以刚收到的 assistant 消息开头，历史只有追加，没有改写。 -/
-theorem assistant_precedes_every_outcome (exec : Exec) (history : History) (response : Response) :
-    ∃ suffix, (step exec history response).history =
+theorem assistant_precedes_every_outcome (exec : Exec) (steers : List String)
+    (history : History) (response : Response) :
+    ∃ suffix, (step exec steers history response).history =
       history ++ [assistant response.content] ++ suffix := by
   cases response with | mk stop content =>
   cases stop <;> simp [step, Outcome.history]
@@ -141,46 +163,52 @@ theorem assistant_precedes_every_outcome (exec : Exec) (history : History) (resp
     | none => exact ⟨[], rfl⟩
     | some outputs =>
       by_cases same : outputs.length = content.calls.length
-      · exact ⟨[userResults content.calls outputs], by simp [same]⟩
+      · exact ⟨[userResults content.calls (landSteers outputs steers)], by simp [same]⟩
       · exact ⟨[], by simp [same]⟩
   · exact ⟨[], by simp [valid]⟩
 
 /-- 不合法的一波在任何执行效果之前终止；执行闭包不会被调用。 -/
-theorem invalid_wave_has_no_effects (exec : Exec) (history : History) (content : Content)
+theorem invalid_wave_has_no_effects (exec : Exec) (steers : List String)
+    (history : History) (content : Content)
     (invalid : validWave content.calls = false) :
-    (step exec history ⟨.toolUse, content⟩).effects = [] := by
+    (step exec steers history ⟨.toolUse, content⟩).effects = [] := by
   simp [step, invalid, Outcome.effects]
 
-/-- 合法的一波按 content 顺序产出同 ID、同数量的结果，然后才进入下一轮。 -/
-theorem valid_wave_preserves_call_order (exec : Exec) (history : History) (content : Content)
+/-- 合法的一波按 content 顺序产出同 ID、同数量的结果；steers 只改最后一条文本。 -/
+theorem valid_wave_preserves_call_order (exec : Exec) (steers : List String)
+    (history : History) (content : Content)
     (outputs : List Output)
     (valid : validWave content.calls = true)
     (ran : exec content.calls = some outputs)
     (sameLength : outputs.length = content.calls.length) :
-    step exec history ⟨.toolUse, content⟩ =
-      .again (history ++ [assistant content] ++ [userResults content.calls outputs]) outputs := by
+    step exec steers history ⟨.toolUse, content⟩ =
+      .again (history ++ [assistant content] ++
+        [userResults content.calls (landSteers outputs steers)])
+        (landSteers outputs steers) := by
   simp [step, valid, ran, sameLength]
 
 /-- `pause_turn` 只回传 assistant，不添加 user，也不执行客户端工具。 -/
-theorem pause_reposts_assistant_only (exec : Exec) (history : History) (content : Content) :
-    step exec history ⟨.pauseTurn, content⟩ =
+theorem pause_reposts_assistant_only (exec : Exec) (steers : List String)
+    (history : History) (content : Content) :
+    step exec steers history ⟨.pauseTurn, content⟩ =
       .again (history ++ [assistant content]) [] := by
   simp [step]
 
 /-- `max_tokens` 与其它 stop reason 不执行可能截断的调用。 -/
-theorem non_continuing_stops_fail (exec : Exec) (history : History) (content : Content) :
-    (step exec history ⟨.maxTokens, content⟩).effects = [] ∧
-    (step exec history ⟨.other, content⟩).effects = [] := by
+theorem non_continuing_stops_fail (exec : Exec) (steers : List String)
+    (history : History) (content : Content) :
+    (step exec steers history ⟨.maxTokens, content⟩).effects = [] ∧
+    (step exec steers history ⟨.other, content⟩).effects = [] := by
   simp [step, Outcome.effects]
 
 /-- string content 宽容读作一个 text block；写回历史的仍是原来的 string 值。 -/
 example (history : History) (exec : Exec) :
-    step exec history ⟨.endTurn, .string "answer"⟩ =
+    step exec [] history ⟨.endTurn, .string "answer"⟩ =
       .answered (history ++ [assistant (.string "answer")]) "answer" := by
   simp [step, Content.text]
 
 /-- 直接答复是可达的正常出口。 -/
-example : (step (fun _ => some []) [] ⟨.endTurn, .items [.text "a", .thinking "t" "s", .text "b"]⟩)
+example : (step (fun _ => some []) [] [] ⟨.endTurn, .items [.text "a", .thinking "t" "s", .text "b"]⟩)
     = .answered [assistant (.items [.text "a", .thinking "t" "s", .text "b"])] "ab" := by
   simp [step, Content.text]
 
@@ -192,13 +220,13 @@ example :
       .python "python" "b" "x += 2; print(x)"
     ]
     let calls := content.calls
-    step (fun _ => some [Output.onlyText "40", Output.onlyText "42"]) [] ⟨.toolUse, content⟩ =
+    step (fun _ => some [Output.onlyText "40", Output.onlyText "42"]) [] [] ⟨.toolUse, content⟩ =
       .again [assistant content, userResults calls [Output.onlyText "40", Output.onlyText "42"]] [Output.onlyText "40", Output.onlyText "42"] := by
   native_decide
 
 /-- 第二个调用不合法时，即使第一个合法，整波也没有 Python 副作用。 -/
 example (exec : Exec) :
-    (step exec [] ⟨.toolUse, .items [
+    (step exec [] [] ⟨.toolUse, .items [
       .python "python" "a" "write_file()",
       .client "shell" "b" "rm_file()"
     ]⟩).effects = [] := by
@@ -206,7 +234,7 @@ example (exec : Exec) :
 
 /-- 重复 ID 也在副作用之前拒绝。 -/
 example (exec : Exec) :
-    (step exec [] ⟨.toolUse, .items [
+    (step exec [] [] ⟨.toolUse, .items [
       .python "python" "same" "first()",
       .python "python" "same" "second()"
     ]⟩).effects = [] := by
@@ -214,7 +242,7 @@ example (exec : Exec) :
 
 /-- 解释器死亡不伪造完整的 tool-result 消息。 -/
 example :
-    (step (fun _ => none) [] ⟨.toolUse, .items [.python "python" "a" "exit(7)"]⟩)
+    (step (fun _ => none) [] [] ⟨.toolUse, .items [.python "python" "a" "exit(7)"]⟩)
     = .failed [assistant (.items [.python "python" "a" "exit(7)"])] := by
   simp [step, Content.calls, Block.call, validWave, validCall, distinctIds]
 
@@ -222,8 +250,28 @@ example :
 example :
     let content := Content.items [.python "python" "image" "show_image('one.png')"]
     let visual := Output.mk "opened" ["base64-png"]
-    step (fun _ => some [visual]) [] ⟨.toolUse, content⟩ =
+    step (fun _ => some [visual]) [] [] ⟨.toolUse, content⟩ =
       .again [assistant content, userResults content.calls [visual]] [visual] := by
+  native_decide
+
+/-- Steer 只改最新一条结果的文本；更早结果与图片块保持原样。 -/
+example :
+    let content := Content.items [
+      .python "python" "a" "print(1)",
+      .python "python" "b" "show_image('x.png')"
+    ]
+    let first := Output.onlyText "1\n"
+    let second := Output.mk "opened" ["img"]
+    let landed := landSteers [first, second] ["narrow the search"]
+    step (fun _ => some [first, second]) ["narrow the search"] [] ⟨.toolUse, content⟩ =
+      .again [assistant content, userResults content.calls landed] landed ∧
+      landed = [first, Output.mk "opened\nuser: narrow the search" ["img"]] := by
+  native_decide
+
+/-- 已有尾随换行时，steer 直接接上而不多插空行。 -/
+example :
+    Output.appendSteer (Output.onlyText "1\n") "prefer metres" =
+      Output.onlyText "1\nuser: prefer metres" := by
   native_decide
 
 end Mei.Agent

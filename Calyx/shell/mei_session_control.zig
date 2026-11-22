@@ -11,7 +11,7 @@ const effort = @import("mei_effort.zig");
 const observation = @import("mei_observation.zig");
 const mei_session = @import("mei_session.zig");
 
-pub const Action = enum { task, handled, quit };
+pub const Action = enum { task, steer, handled, quit };
 
 const ResumeArg = enum { typed, resolved };
 
@@ -19,6 +19,7 @@ pub fn dispatch(ui: anytype, typed: []const u8) Action {
     const parsed = command.parse(typed);
     if (parsed == .quit) return .quit;
     if (ui.process != null) {
+        if (parsed == .task) return .steer;
         ui.printNote("one Mei task is already running; Esc stops it");
         return .handled;
     }
@@ -198,6 +199,21 @@ fn commit(ui: *Fake, line: []const u8) !void {
         .ok => {},
         else => return error.TestUnexpectedResult,
     }
+}
+
+test "a running task turns ordinary text into steer" {
+    var ui = Fake{
+        .gpa = std.testing.allocator,
+        .io = std.testing.io,
+        .environ = std.process.Environ.Map.init(std.testing.allocator),
+        .seen = try observation.Seen.init(std.testing.allocator, "auto"),
+        .session_dir = ".",
+        .frame_arena = .init(std.testing.allocator),
+        .process = 1,
+    };
+    defer ui.release();
+    try std.testing.expect(dispatch(&ui, "narrow the search") == .steer);
+    try std.testing.expect(dispatch(&ui, "/new") == .handled);
 }
 
 fn resumeSwitch(gpa: std.mem.Allocator, io: std.Io, dir: []const u8) !void {

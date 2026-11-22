@@ -104,9 +104,9 @@ actual-model · effort high · Agent Step 2 · 0.05% · 487/1048576
 
 Magpie 尚未确认路由时，模型和思考强度标记为 `requested`。`Agent Step` 统计本次任务的模型响应数。上下文用量是 `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`，相对模型最大上下文显示，比例固定两位小数；它不是累计账单。
 
-### 4. 安全打断与关闭
+### 4. 进行中追加（Steer）与关闭
 
-启动长任务后按一次 Esc，只停止该任务及其子孙进程。再启动一个任务并使用 `/q`，只关闭当前 Calyx 及其子孙进程。两者都不会用来停止另一个 Calyx 会话。空闲时按 Esc 不做任何事，误触不会关闭会话。
+任务仍在跑时再提交普通文本，不会打断当前工具调用：文字写入该次 run 的 `MEI_STEER_PATH`，Mei 在本波工具全部返回后接到最新一条 tool_result 文本末尾（前缀 `user: `）。Esc 仍只停止该任务及其子孙；`/q` 关闭当前 Calyx。空闲时按 Esc 不做任何事。
 
 ## 工作区、运行环境与捕获
 
@@ -143,6 +143,7 @@ Resume 保留旧工具名、字符串/数组内容以及图片块，不恢复 Py
 | `MEI_DOCTOR_DIR` | 可选的隔离 doctor 缓存与私有运行目录 |
 | `MEI_CAPTURE_DIR` | Face 提供的内部单次运行捕获目录 |
 | `MEI_CAPTURE_CREATED` | 证明 Calyx 创建了空捕获目录的内部 `1` 标记 |
+| `MEI_STEER_PATH` | Face 提供的 Steer JSONL（每行 `{"text":"…"}`）；缺席则无追加 |
 | `SPRAWLING_PROGRAM_STATUS` | `never` 禁用 Calyx 的 OSC 7501 |
 
 Calyx 通过 Program Status Protocol（OSC 7501）报告 `working`、`done`、`error`，以及取消后的 `idle`。不支持的终端会忽略它。无头 `-p` 和管道运行不发送 OSC 7501。

@@ -39,6 +39,7 @@ def show_image(path):
 g = {"__name__": "__main__", "show_image": show_image}
 capture_dir = os.environ.pop("MEI_CAPTURE_DIR", None)
 os.environ.pop("MEI_CAPTURE_CREATED", None)
+os.environ.pop("MEI_STEER_PATH", None)
 for line in rx:
     code = json.loads(line.decode("utf-8"))
     if not isinstance(code, str):

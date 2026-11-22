@@ -26,7 +26,8 @@ import Mei.spec.Session
 | 单元 | 责任 |
 |---|---|
 | `main` | 装配环境、参数、stdin/stdout、退出与解释器收口 |
-| `agent` | 唯一反馈循环；只读 JSON 与 `std::io::Write` |
+| `agent` | 唯一反馈循环；只读 JSON 与 `std::io::Write`；工具波边界消费 Steer |
+| `steer` | 把 Face 追加文本接到最新 tool_result；`MEI_STEER_PATH` JSONL 投递 |
 | `transport` | 非流式 Anthropic Messages 与 Magpie catalog/route HTTP/1.0；阻塞读时可写存活观测 |
 | `catalog` | Magpie 首选模型、上下文窗口与 effort 列表的纯 JSON 解析选择 |
 | `observation` | `mei.obs` 单行 JSON 的唯一写出接口 |
@@ -49,7 +50,8 @@ LLM compaction、验真门、Skills/MCP 自动暴露、Mei 自动更新、为弱
 /-! ## 2 验收标准
 
 - `spec/Agent.lean` 与 `agent::run` 闭包测试：整波预检、顺序执行、thinking 保真、
-  pause、max_tokens、异常 stop、执行失败不伪造 tool_result。
+  pause、max_tokens、异常 stop、执行失败不伪造 tool_result、Steer 只在 exec 之后接到
+  最新 tool_result 且不改变更早结果。
 - TCP 工装：HTTP/1.0、EOF、非 200 原文、chunked 拒绝、停滞返回 `E_MEI_TRANSPORT`。
 - 真实 python：变量、imports 与 cwd 跨调用保留；异常打印 traceback 后不结束会话，
   下一调用可继续使用既有状态；表达式不自动回显；每次 `run` 的 tool_result 是完整的小型 UTF-8 捕获；
@@ -129,12 +131,36 @@ Calyx（及任何 Face 消费者）在进程边界 spawn 无头 `mei`；Mei 不�
 /-! ## 8 接口先行
 
 ```rust
-pub fn run(
+pub(crate) trait Ports {
+    fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value>;
+    fn exec(&mut self, code: &str) -> Result<Value>;
+    fn steer(&mut self) -> Result<Vec<String>>;
+}
+
+pub(crate) fn run(
     request: &mut Value,
-    post: impl FnMut(&Value, &mut dyn Write) -> Result<Value>,
-    exec: impl FnMut(&str) -> Result<Value>,
+    ports: &mut dyn Ports,
     trace: &mut dyn Write,
 ) -> Result<String>;
+
+pub struct Live<'a> {
+    pub client: &'a mut Client,
+    pub python: &'a mut Py,
+    pub intake: &'a mut Option<Intake>,
+}
+
+pub fn drive(
+    request: &mut Value,
+    live: &mut Live<'_>,
+    trace: &mut dyn Write,
+) -> Result<String>;
+
+impl Intake {
+    pub fn open(path: impl AsRef<Path>) -> Result<Intake>;
+    pub fn drain(&mut self) -> Result<Vec<String>>;
+}
+
+pub fn append_to_content(content: &mut Value, text: &str);
 
 impl Client {
     pub fn new(base: &str, key: String) -> Result<Client>;
@@ -200,9 +226,16 @@ trace 本次 user prompt（首个有效响应）
 R.messages.push(assistant); trace
 pause_turn → continue
 end_turn → return text
-tool_use → 预检 → exec 得文本捕获与可选图片 → user tool_result content=文本或内容块 → continue
+tool_use → 预检 → 顺序 exec（不读 steer）→ drain steer →
+  把已到达文本接到本波最新一条 tool_result 末尾 → user tool_result → continue
 其它 stop → fail
 ```
+
+Steer：任务进行中 Face 追加的指示。不打断当前 `exec` / `post`；整波执行完后
+`steer()` 一次取尽已到达文本，按到达序接到本波最后一条 tool_result 的文本末尾，
+前缀 `user: `（与城 Person steer 同字）。无 tool_result 可接时（例如直接 `end_turn`）
+本次到达的文本丢弃，不另开 user 消息。取消 / Esc 仍是杀进程组，与 Steer 分立。
+`MEI_STEER_PATH` 指向 JSONL 投递文件（每行 `{"text":"…"}`）；缺席则 `steer()` 恒为空。
 
 取消 = 杀掉 harness 进程组。无 turn ceiling。
 会话斜杠与 JSONL 文件代次由 Calyx 合同拥有。
@@ -219,7 +252,7 @@ tool_use → 预检 → exec 得文本捕获与可选图片 → user tool_result
   变量与 imports，解释器进程保留 cwd；异常只形成 traceback 反馈，循环继续；
   `show_image` 只把图片的 media type 与 base64 数据加入本次调用：一次调用最多 2 张、单张最多 5 MiB，且只在该调用自己的线程上追加，别的线程的或调用结束后的提交被拒绝并给出重读方式；结束后捕获文件的 ASCII basename 经控制信道回传；
   不改写文件、无 alarm。
-  `MEI_CAPTURE_DIR` 与 `MEI_CAPTURE_CREATED` 在模型代码运行前由 `boot.py` 移出环境，递归子 Mei 不会误继承父 run 目录。
+  `MEI_CAPTURE_DIR`、`MEI_CAPTURE_CREATED` 与 `MEI_STEER_PATH` 在模型代码运行前由 `boot.py` 移出环境，递归子 Mei 不会误继承父 run 目录或 steer 文件。
 - `Py::run` 先读文件元数据；仅不超过 16 KiB 时做有界读取。完整 UTF-8 文本直接作为
   tool_result；更大或非 UTF-8 时只给提示与路径。下一响应已把 fd 1/2 移到新文件，
   此时回收此前的 inline 文件；当前 inline 文件在解释器收口后回收。
@@ -343,3 +376,16 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 /-! D18 `HARNESS_MODEL` 缺省时服从 Magpie `first_id` 的可见路由，空目录失败；理由：零参数启动应使用人已配置的路由，而不是另存一份模型配置。被否：编译期模型名、扫描并改写 Magpie 配置、静默取任意不可用模型。 -/
 /-! D19 图片仍经唯一 python 工具的 `show_image` 原语返回标准 image tool-result；理由：模型必须收到视觉块才能真正看图，base64 不进入 stdout 就不会挤占小结果预算。被否：第二图片工具、OCR/外部视觉 API 冒充 Mei 自身看图、把 base64 当普通文本。 -/
 /-! D20 默认 adaptive + high 只定义请求；实际 model/effort 仅以 Magpie route 为确认来源，未确认就标 requested。`requested` 是请求实际携带的值：`HARNESS_EXTRA` 覆盖 `model` 时，model 行与目录元数据都以请求为准，另一模型的 context/efforts 不沿用。被否：把路由组 ID 当最终模型、把支持级别列表当当前级别、为显示状态而伪报 default、把目录选择而非请求当 requested。 -/
+/-! D21 任务进行中的 Steer 接到本波最新一条 tool_result 文本末尾，不打断当前工具调用。
+
+决定：`agent::run` 在整波 `exec` 全部返回之后才 `steer()` 取尽已到达文本，按到达序追加到
+该波最后一条 `tool_result` 的 content 文本（字符串直接接；含图片时接在既有 text 块或新建
+尾部 text 块），行前缀 `user: `。Face 经 `MEI_STEER_PATH` 追加 JSONL 行投递；核只在工具波
+边界读取，因此进行中的 python 调用与在途的 `post` 都不被改写。Esc / 杀组仍是取消，与 Steer
+分立。无下一条 tool_result 时丢弃已到达文本，不另开 user 消息。
+
+理由：人要在长工具波中途改道，又不能把已发出的请求或正在跑的副作用撕开；接到最新工具回复
+末尾是城侧已验证的落点，也是本核最小可观测形状。被否：①打断当前 `exec`——取消已有专门指令；
+②另开一条 user 消息——多一轮角色边界，且与接到工具回复末尾的合同不符；③改写已组装请求——
+在途字节无法收回。
+-/

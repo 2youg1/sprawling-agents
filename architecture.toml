@@ -15,6 +15,7 @@
 module = [
   { name = "mei::main", file = "Mei/src/main.rs", owns = "the standalone CLI assembly: arguments, environment, stdin/stdout and interpreter shutdown", shape = "adapter", since = "CS18", status = "built", spec = "Mei.Spec" },
   { name = "mei::agent", file = "Mei/src/agent.rs", owns = "the one serial feedback loop over the mutable Messages request", shape = "decision", since = "CS18", status = "built", spec = "Mei.spec.Agent" },
+  { name = "mei::steer", file = "Mei/src/steer.rs", owns = "mid-task steers appended to the latest tool result via MEI_STEER_PATH", shape = "adapter", since = "CS26", status = "built", spec = "Mei.spec.Agent" },
   { name = "mei::workspace", file = "Mei/src/workspace.rs", owns = "the top-level AGENTS read once per new session and its frozen opening content", shape = "adapter", since = "CS24", status = "built", spec = "Mei.spec.Session" },
   { name = "mei::doctor", file = "Mei/src/doctor.rs", owns = "the current-release Python and uv environment, cache short-circuit and repair decision", shape = "decision", since = "CS24", status = "built", spec = "Mei.spec.Environment" },
   { name = "mei::doctor::cache", file = "Mei/src/doctor/cache.rs", owns = "the versioned environment record, per-user state location and platform path encoding", shape = "adapter", since = "CS24", status = "built", spec = "Mei.spec.Environment" },

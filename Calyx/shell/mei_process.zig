@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Mei child driver: spawn with stdin prompt, stream stderr lines, stop the
-// Unix process group (pgid=0 at spawn). Windows: Job Object with
-// KILL_ON_JOB_CLOSE so Esc ends the whole subtree (Console §8-174).
-
 const std = @import("std");
 const builtin = @import("builtin");
 const windows = std.os.windows;
@@ -84,9 +80,7 @@ pub const Process = struct {
     io: std.Io,
     bus: *Bus,
     signals: *Signals,
-    /// Unix process id (group leader when pgid=0). Windows: process HANDLE.
     id: ?std.process.Child.Id = null,
-    /// Windows Job Object; closing it kills the assigned subtree.
     job: if (builtin.os.tag == .windows) ?windows.HANDLE else void =
         if (builtin.os.tag == .windows) null else {},
     driver: ?std.Thread = null,
@@ -117,7 +111,10 @@ pub const Process = struct {
 
         var child_environment = if (capture_directory) |directory| blk: {
             const base = environ orelse return .{ .err = configFailure(gpa, "missing base environment", program) };
-            break :blk captureEnvironment(gpa, base, directory) catch return .{ .err = configFailure(gpa, "set capture directory", program) };
+            const steer_path = steerPath(gpa, directory) catch
+                return .{ .err = configFailure(gpa, "allocate steer path", program) };
+            defer gpa.free(steer_path);
+            break :blk captureEnvironment(gpa, base, directory, steer_path) catch return .{ .err = configFailure(gpa, "set capture directory", program) };
         } else null;
         defer if (child_environment) |*environment| environment.deinit();
 
@@ -211,7 +208,6 @@ pub const Process = struct {
         return .ok;
     }
 
-    /// Join the driver and free signals without sending another stop.
     pub fn finish(self: *Process) void {
         _ = self.reap();
         self.closeJob();
@@ -356,9 +352,6 @@ const DriverCtx = struct {
     child: std.process.Child,
     prompt: []u8,
     signals: *Signals,
-    /// Borrowed from `Process`, which closes it only after this thread is
-    /// joined; the driver uses it to end the whole tree before it waits for
-    /// the pipe to close.
     job: if (builtin.os.tag == .windows) ?windows.HANDLE else void =
         if (builtin.os.tag == .windows) null else {},
 };
@@ -407,9 +400,6 @@ fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
     var stdout_ctx: StdoutCtx = .{ .gpa = gpa, .io = io, .file = stdout_file };
     var stdout_thread: ?std.Thread = null;
     var waited = false;
-    // A failed prompt write or thread spawn must not strand the child or the
-    // pipes, so every cleanup below guards on the field it owns instead of
-    // running only after the thread exists.
     errdefer {
         killTree(ctx, child.id);
         if (stdout_thread) |thread| {
@@ -492,11 +482,21 @@ fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
     return .{ .err = try gpa.dupe(u8, msg) };
 }
 
-fn captureEnvironment(gpa: std.mem.Allocator, base: *const std.process.Environ.Map, directory: []const u8) !std.process.Environ.Map {
+pub fn steerPath(gpa: std.mem.Allocator, capture_directory: []const u8) ![]u8 {
+    return std.fmt.allocPrint(gpa, "{s}.steer.jsonl", .{capture_directory});
+}
+
+fn captureEnvironment(
+    gpa: std.mem.Allocator,
+    base: *const std.process.Environ.Map,
+    directory: []const u8,
+    steer_path: []const u8,
+) !std.process.Environ.Map {
     var child = try base.clone(gpa);
     errdefer child.deinit();
     try child.put("MEI_CAPTURE_DIR", directory);
     try child.put("MEI_CAPTURE_CREATED", "1");
+    try child.put("MEI_STEER_PATH", steer_path);
     return child;
 }
 
@@ -541,13 +541,24 @@ test "capture directory is copied into only the child environment" {
     var base = std.process.Environ.Map.init(gpa);
     defer base.deinit();
     try base.put("KEEP", "yes");
-    var child = try captureEnvironment(gpa, &base, "session.captures/run-1");
+    const steer = try steerPath(gpa, "session.captures/run-1");
+    defer gpa.free(steer);
+    var child = try captureEnvironment(gpa, &base, "session.captures/run-1", steer);
     defer child.deinit();
     try std.testing.expectEqualStrings("yes", child.get("KEEP").?);
     try std.testing.expectEqualStrings("session.captures/run-1", child.get("MEI_CAPTURE_DIR").?);
     try std.testing.expectEqualStrings("1", child.get("MEI_CAPTURE_CREATED").?);
+    try std.testing.expectEqualStrings("session.captures/run-1.steer.jsonl", child.get("MEI_STEER_PATH").?);
     try std.testing.expect(base.get("MEI_CAPTURE_DIR") == null);
     try std.testing.expect(base.get("MEI_CAPTURE_CREATED") == null);
+    try std.testing.expect(base.get("MEI_STEER_PATH") == null);
+}
+
+test "steer path is a sibling of the capture directory" {
+    const gpa = std.testing.allocator;
+    const path = try steerPath(gpa, "session.captures/run-9");
+    defer gpa.free(path);
+    try std.testing.expectEqualStrings("session.captures/run-9.steer.jsonl", path);
 }
 
 test "missing program yields a structured diagnostic" {
@@ -677,10 +688,6 @@ fn openFileCount(io: std.Io) !usize {
     return count;
 }
 
-/// Ends the whole Mei tree: POSIX kills the process group the child led,
-/// Windows terminates its job. Called before waiting on the stdout thread,
-/// whose end needs every writer of that pipe to be gone. `id` is read before
-/// `Child.wait`, which clears it.
 fn killTree(ctx: *DriverCtx, id: ?std.process.Child.Id) void {
     if (comptime builtin.os.tag == .windows) {
         if (ctx.job) |job| WinJob.terminate(job);
