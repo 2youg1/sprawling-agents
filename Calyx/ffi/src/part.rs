@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// This file is the one definition of the words a scene is written in.
-// The library declares it as a module, and `build.rs` includes it to
-// hold `zig/part.zig` to the same names and numbers on every build, so
-// the Zig reader cannot drift from the Rust writer without the build
-// refusing (`Calyx/ffi/Spec.lean` D2).
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Part {
@@ -28,10 +23,11 @@ pub enum Part {
     Asking,
     Composer,
     Menu,
+    Replying,
 }
 
 impl Part {
-    pub const ALL: [Part; 17] = [
+    pub const ALL: [Part; 18] = [
         Part::Inline,
         Part::Quiet,
         Part::Banner,
@@ -49,6 +45,7 @@ impl Part {
         Part::Asking,
         Part::Composer,
         Part::Menu,
+        Part::Replying,
     ];
 
     pub const fn number(self) -> u8 {
@@ -70,6 +67,7 @@ impl Part {
             Part::Asking => 33,
             Part::Composer => 34,
             Part::Menu => 35,
+            Part::Replying => 36,
         }
     }
 }

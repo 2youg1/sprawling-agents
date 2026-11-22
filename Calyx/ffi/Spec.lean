@@ -167,7 +167,7 @@ pub enum Refused { Malformed, TooLong }
 // console_ffi::scene
 pub struct TimeOfDay(u32);                             // 本地午夜以来的秒
 pub enum Entry { Banner{..}, You{..}, Head{..}, Reasoning{..}, Tool{..}, Reply{..}, Note{..}, Ended{..}, Resolved{..} }
-pub struct Live<'a> { pub waiting, pub working, pub calling, pub asking, pub composer, pub menu }
+pub struct Live<'a> { pub waiting, pub working, pub calling, pub asking, pub replying, pub composer, pub menu }
 pub struct Inline<'a> { pub columns: u16, pub rows: u16, pub erase: u16, pub previous: Option<Part>, pub entries: &'a [Entry], pub live: Option<Live<'a>> }
 pub struct Quiet<'a> { pub columns: u16, pub rows: u16, pub url, pub code, pub key, pub transient }
 impl Scene { pub fn inline(&Inline) -> Scene; pub fn quiet(&Quiet) -> Scene; }
@@ -212,9 +212,29 @@ pub fn seconds_since_midnight(millis: u64) -> Option<u32>; // 系统本地时区
 
 /-! D4 没有自己会动的东西
 
-决定：活动区只在有事发生时重画——一条记录、一个键、一次缩放；正在工作的那一行写「since 时刻」，不跳秒、不转圈。
+决定：活动区只在已有脏状态时重画——一条记录、一条流式增量、一个键、一次粘贴、一次缩放、
+一次结束；壳可用显示节拍（`Calyx/Spec.lean` D11，≤360 Hz）推迟呈现，但不发明新状态。
+正在工作的那一行写「since 时刻」，不跳秒、不转圈。进行中的助手正文是活动区 `Replying`，
+不是定时动画。
 
-理由：一个在输出时滚到底部的终端里，每秒一次的重画会让人读不了回滚；旧 conhost 在选中文字时会暂停输出。城在工作这件事另有 OSC 7501 告诉终端（`Sprawling/app/spec/Console/ProgramStatus.lean` D77）。
+理由：一个在输出时滚到底部的终端里，无事件的周期重画会让人读不了回滚；旧 conhost 在选中
+文字时会暂停输出。城在工作这件事另有 OSC 7501 告诉终端（`Sprawling/app/spec/Console/ProgramStatus.lean` D77）。
+高吞吐流式输出的合并呈现由壳拥有，叶子仍不读时钟（D1）。
+
+被否：①工作行每秒刷新——妨碍回滚；②无脏状态的 vsync 空转——发明运动；③增量写入转写——
+与「转写只写一次」冲突。
+-/
+
+/-! D14 活动区可含进行中的助手正文 `Replying`
+
+决定：词表增加 `Replying = 36`；`Live.replying` 是可选正文，画在 Asking/Calling 之后、
+Composer 之前，排版与 `Reply` 相同（plain、折行、无时刻标记）。缺席时不写该 tag。
+Rust `scene` 与 Zig `write`/`live` 同形；`part.rs` 仍是唯一词表权威（D2）。
+
+理由：流式增量必须可擦写，只能进每帧重画的活动区；完整后再进转写 `Reply`（`Calyx/Spec.lean` D11）。
+
+被否：①复用 `Note`/`Reply` 进转写——回滚留下半句；②把草稿塞进 `Working` 行——语义是
+run 状态不是正文。
 -/
 
 /-! D5 记录里的控制字符到不了终端

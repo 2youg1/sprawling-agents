@@ -137,3 +137,32 @@ base64 约 6.7 MiB），而固定的 4 KiB/64 KiB 缓冲、两个互不相干的
 python 调用允许的图片总量与 JSON 信封。被否：①加大固定缓冲——仍是静默悬崖，且每条行都占满；
 ②无上限——内存无界；③按行截断——伪造观察；④保留整文件上限——同一规则的第二份副本。
 -/
+
+/-! D11 Mei 面流式呈现：活动区草稿 + ≤360 Hz 合并提交
+
+场景：1k+ TPS 的模型（或同等速率的 `mei.stream` 增量行、突发回放）在 Calyx CLI 上输出；
+人在 360 Hz 显示器上阅读。若每个增量立刻整帧重画，终端写入积压、撕裂，键入被拖住。
+
+决定：
+1. 进行中的助手正文只进活动区 `Replying`（`Calyx/ffi` 词表），不写转写；完整答复、
+   `mei.stream` 的 `commit`、或 run 结束时的未提交草稿，才写成一次 `Entry.Reply` 进回滚。
+2. `Calyx/shell/mei_present.zig` 拥有呈现节拍：脏状态由事件（记录、流增量、键、粘贴、
+   缩放、结束）置位；呈现至多 `MAX_HZ = 360`（最短间隔 `1_000_000_000 / 360` 纳秒）。
+   键/粘贴/缩放/结束强制立即呈现。中间帧不排队：只保留最新草稿与尚未呈现的转写条目。
+3. 线型：`{"type":"mei.stream","kind":"delta","text":…}` 追加草稿；
+   `{"type":"mei.stream","kind":"commit"}` 把草稿提交为 `Reply`。完整
+   `role`/`content` assistant 行仍按既有投影；若当时有草稿则先丢弃草稿再投影完整正文。
+4. 会话 JSONL 只收完整消息行；`mei.stream` 不进 `pending` 追加。
+5. 本决定只约束 Calyx CLI（Mei 面）；不改 RefRain；不强制 Mei 核改 D2 非流式 HTTP——
+   核仍可发完整消息，壳侧节拍对突发完整行与增量行同样生效。
+
+理由：显示刷新是观察上限；超过 360 Hz 的帧对人不可见却占用写入与排版。草稿进活动区
+守住「转写只写一次」（`Calyx/ffi/Spec.lean`）。节拍与脏位在壳，叶子仍无时钟（D1）。
+
+被否：①每行一帧——高 TPS 下必然积压；②把增量写入转写——污染回滚且与 write-once 冲突；
+③用动画/跳秒制造「在动」——违背「不发明运动」；④无上限帧队列——延迟无界；
+⑤在 RefRain 或 Mei 核内做帧合并——锁定范围是 Calyx CLI。
+
+验收：`mei_present` 的节拍单测；`mei_observation` 对 delta/commit 与完整行的投影；
+含 `Replying` 的叶/vt100 帧；`zig build test`（`Calyx/`）与受影响的 `console_ffi` 测试绿色。
+-/

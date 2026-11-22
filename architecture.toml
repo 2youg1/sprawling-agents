@@ -1412,6 +1412,7 @@ module = [
   { name = "calyx::shell::mei_observation", file = "Calyx/shell/mei_observation.zig", owns = "Mei model/route/usage projection and two-decimal context offer", shape = "state machine", since = "CS25", status = "built", spec = "Calyx.Spec" },
   { name = "calyx::shell::mei_session_control", file = "Calyx/shell/mei_session_control.zig", owns = "Mei new/previous/resume and effort commands", shape = "adapter", since = "CS25", status = "built", spec = "Calyx.Spec" },
   { name = "calyx::shell::mei_runtime", file = "Calyx/shell/mei_runtime.zig", owns = "Mei child events, session append and capture ownership", shape = "adapter", since = "CS25", status = "built", spec = "Calyx.Spec" },
+  { name = "calyx::shell::mei_present", file = "Calyx/shell/mei_present.zig", owns = "Mei face present cadence at most 360 Hz", shape = "decision", since = "CS26", status = "built", spec = "Calyx.Spec" },
   { name = "calyx::shell::mei_process", file = "Calyx/shell/mei_process.zig", owns = "mei child spawn, stderr bus, and process-group stop", shape = "adapter", since = "CS19", status = "built", spec = "Calyx.Spec" },
   { name = "calyx::shell::mei_line", file = "Calyx/shell/mei_line.zig", owns = "one owned Mei message line and the single ceiling that bounds it", shape = "value", since = "CS25", status = "built", spec = "Calyx.Spec" },
   { name = "calyx::shell::mei_session", file = "Calyx/shell/mei_session.zig", owns = "Mei JSONL session create/import/append with rollback", shape = "adapter", since = "CS19", status = "built", spec = "Calyx.Spec" },

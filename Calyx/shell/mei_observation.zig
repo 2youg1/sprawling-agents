@@ -25,6 +25,7 @@ pub const Seen = struct {
     rest: program_status.Rest = .idle,
     headed: bool = false,
     last_text: []u8 = "",
+    draft: []u8 = "",
     run: bool = false,
 
     pub fn init(gpa: std.mem.Allocator, model: []const u8) !Seen {
@@ -33,6 +34,7 @@ pub const Seen = struct {
             .model = try gpa.dupe(u8, model),
             .effort = try gpa.dupe(u8, "high"),
             .last_text = try gpa.dupe(u8, ""),
+            .draft = try gpa.dupe(u8, ""),
         };
     }
 
@@ -42,7 +44,12 @@ pub const Seen = struct {
         self.clearEfforts();
         self.efforts.deinit(self.gpa);
         self.gpa.free(self.last_text);
+        self.gpa.free(self.draft);
         self.* = undefined;
+    }
+
+    pub fn draftText(self: *const Seen) []const u8 {
+        return self.draft;
     }
 
     fn replace(self: *Seen, field: *[]u8, value: []const u8) void {
@@ -66,6 +73,7 @@ pub const Seen = struct {
         self.run = false;
         self.effort_actual = false;
         self.setLast("");
+        self.clearDraft();
     }
 
     pub fn begin(self: *Seen, at: u64) void {
@@ -78,6 +86,7 @@ pub const Seen = struct {
         self.step = 0;
         self.effort_actual = false;
         self.setLast("");
+        self.clearDraft();
     }
 
     pub fn counts(self: *const Seen) program_status.Counts {
@@ -137,13 +146,68 @@ pub const Seen = struct {
             if (ty == .string and std.mem.eql(u8, ty.string, "mei.obs")) {
                 return try self.observation(arena, value);
             }
+            if (ty == .string and std.mem.eql(u8, ty.string, "mei.stream")) {
+                return try self.stream(arena, value, at);
+            }
         }
         const role = value.object.get("role") orelse return try noteEntries(arena, raw);
         const content = value.object.get("content") orelse return try noteEntries(arena, raw);
         if (role != .string) return try noteEntries(arena, raw);
-        if (std.mem.eql(u8, role.string, "assistant")) return try self.assistant(arena, content, at);
+        if (std.mem.eql(u8, role.string, "assistant")) {
+            self.clearDraft();
+            return try self.assistant(arena, content, at);
+        }
         if (std.mem.eql(u8, role.string, "user")) return try self.toolResults(arena, content, at);
         return try noteEntries(arena, raw);
+    }
+
+    fn stream(self: *Seen, arena: std.mem.Allocator, value: std.json.Value, at: u64) ![]write.Entry {
+        const kind = if (value.object.get("kind")) |k| (if (k == .string) k.string else "") else "";
+        if (std.mem.eql(u8, kind, "delta")) {
+            const text = if (value.object.get("text")) |tx| (if (tx == .string) tx.string else "") else "";
+            if (text.len > 0) self.appendDraft(text);
+            return &.{};
+        }
+        if (std.mem.eql(u8, kind, "commit")) {
+            return try self.commitDraft(arena, at);
+        }
+        return &.{};
+    }
+
+    pub fn flushDraft(self: *Seen, arena: std.mem.Allocator, at: u64) ![]write.Entry {
+        return try self.commitDraft(arena, at);
+    }
+
+    fn commitDraft(self: *Seen, arena: std.mem.Allocator, at: u64) ![]write.Entry {
+        if (self.draft.len == 0) return &.{};
+        var entries: std.ArrayList(write.Entry) = .empty;
+        if (!self.headed) {
+            self.headed = true;
+            const facts: []const []const u8 = if (self.model.len == 0) &.{} else &.{self.model};
+            try entries.append(arena, .{ .head = .{
+                .at = tod(at),
+                .resident = "Mei",
+                .facts = try arena.dupe([]const u8, facts),
+            } });
+        }
+        const said = try arena.dupe(u8, self.draft);
+        self.setLast(said);
+        self.clearDraft();
+        try entries.append(arena, .{ .reply = said });
+        return try entries.toOwnedSlice(arena);
+    }
+
+    fn appendDraft(self: *Seen, text: []const u8) void {
+        const next = std.fmt.allocPrint(self.gpa, "{s}{s}", .{ self.draft, text }) catch return;
+        self.gpa.free(self.draft);
+        self.draft = next;
+    }
+
+    fn clearDraft(self: *Seen) void {
+        if (self.draft.len == 0) return;
+        const empty = self.gpa.alloc(u8, 0) catch return;
+        self.gpa.free(self.draft);
+        self.draft = empty;
     }
 
     fn observation(self: *Seen, arena: std.mem.Allocator, value: std.json.Value) ![]write.Entry {
@@ -308,6 +372,8 @@ pub const Seen = struct {
         self.since = null;
         self.calling = false;
         var entries: std.ArrayList(write.Entry) = .empty;
+        const flushed = try self.commitDraft(arena, at);
+        try entries.appendSlice(arena, flushed);
         if (answer) |a| {
             if (a.len > 0) {
                 if (ending == .Done and !std.mem.eql(u8, a, self.last_text)) {
@@ -328,6 +394,8 @@ pub const Seen = struct {
         self.since = null;
         self.calling = false;
         var entries: std.ArrayList(write.Entry) = .empty;
+        const flushed = try self.commitDraft(arena, at);
+        try entries.appendSlice(arena, flushed);
         try entries.append(arena, .{ .ended = .{ .at = tod(at), .ending = .Cancelled, .took_s = took_s } });
         return try entries.toOwnedSlice(arena);
     }
@@ -375,4 +443,39 @@ test "image results never print base64" {
     const entries = try seen.line(arena_state.allocator(), "{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"a\",\"content\":[{\"type\":\"image\",\"source\":{\"data\":\"secret-base64\"}}]}]}", 1);
     try std.testing.expectEqual(@as(usize, 2), entries.len);
     try std.testing.expectEqualStrings("[image attached]", entries[1].note);
+}
+
+test "stream deltas stay in the draft until commit" {
+    const gpa = std.testing.allocator;
+    var seen = try Seen.init(gpa, "model");
+    defer seen.deinit();
+    seen.begin(10);
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const first = try seen.line(arena, "{\"type\":\"mei.stream\",\"kind\":\"delta\",\"text\":\"Hel\"}", 11);
+    try std.testing.expectEqual(@as(usize, 0), first.len);
+    try std.testing.expectEqualStrings("Hel", seen.draftText());
+    const second = try seen.line(arena, "{\"type\":\"mei.stream\",\"kind\":\"delta\",\"text\":\"lo\"}", 12);
+    try std.testing.expectEqual(@as(usize, 0), second.len);
+    try std.testing.expectEqualStrings("Hello", seen.draftText());
+    const committed = try seen.line(arena, "{\"type\":\"mei.stream\",\"kind\":\"commit\"}", 13);
+    try std.testing.expect(committed.len >= 1);
+    try std.testing.expectEqualStrings("Hello", committed[committed.len - 1].reply);
+    try std.testing.expectEqualStrings("", seen.draftText());
+}
+
+test "a complete assistant line drops an open draft" {
+    const gpa = std.testing.allocator;
+    var seen = try Seen.init(gpa, "model");
+    defer seen.deinit();
+    seen.begin(1);
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    _ = try seen.line(arena, "{\"type\":\"mei.stream\",\"kind\":\"delta\",\"text\":\"partial\"}", 2);
+    try std.testing.expectEqualStrings("partial", seen.draftText());
+    const entries = try seen.line(arena, "{\"role\":\"assistant\",\"content\":\"final\"}", 3);
+    try std.testing.expectEqualStrings("", seen.draftText());
+    try std.testing.expectEqualStrings("final", entries[entries.len - 1].reply);
 }

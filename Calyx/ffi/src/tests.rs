@@ -12,10 +12,6 @@
     reason = "test code"
 )]
 
-//! The leaf judged by the screen a person sees: every frame is written
-//! into a terminal emulator (`vt100`) and the rows it shows are compared
-//! whole, so a test reads like the screen it checks.
-
 use std::num::NonZeroU16;
 
 use crate::part::{Ending, Outcome, Part, Verdict};
@@ -27,8 +23,6 @@ fn at(h: u32, m: u32, s: u32) -> Option<TimeOfDay> {
     TimeOfDay::from_seconds(h * 3600 + m * 60 + s)
 }
 
-/// The rows a terminal of this size shows after `frames`, trailing
-/// spaces cut, and the cursor's place.
 fn screen(columns: u16, rows: u16, frames: &[Vec<u8>]) -> (String, (u16, u16)) {
     let mut parser = vt100::Parser::new(
         NonZeroU16::new(rows).unwrap(),
@@ -122,6 +116,7 @@ fn live<'a>(typed: &'a str, cursor: usize, menu: Option<Menu<'a>>) -> Live<'a> {
             subject: "cargo test -p report",
         }],
         asking: None,
+        replying: None,
         composer: Composer {
             typed,
             cursor,
@@ -251,6 +246,7 @@ fn the_next_frame_erases_the_live_region_and_writes_under_the_transcript() {
             working: None,
             calling: Vec::new(),
             asking: None,
+            replying: None,
             composer: Composer {
                 typed: "",
                 cursor: 0,
@@ -308,6 +304,7 @@ fn the_slash_menu_takes_the_place_of_the_settings_row() {
             working: None,
             calling: Vec::new(),
             asking: None,
+            replying: None,
             composer: Composer {
                 typed: "/w",
                 cursor: 2,
@@ -353,6 +350,43 @@ fn a_narrow_window_drops_the_times_and_keeps_every_line_inside_it() {
         assert!(row.chars().count() <= 39, "{row}");
         assert!(!row.starts_with("01:"), "{row}");
     }
+}
+
+#[test]
+fn a_replying_draft_sits_above_the_composer() {
+    let scene = Scene::inline(&Inline {
+        columns: 80,
+        rows: 8,
+        erase: 0,
+        previous: None,
+        entries: &[],
+        live: Some(Live {
+            waiting: None,
+            working: Some(Working {
+                resident: "Mei",
+                since: at(1, 0, 0),
+            }),
+            calling: Vec::new(),
+            asking: None,
+            replying: Some("streaming hello"),
+            composer: Composer {
+                typed: "",
+                cursor: 0,
+                placeholder: "to Mei…",
+                room: "Mei",
+                offer: "model · high",
+            },
+            menu: None,
+        }),
+    });
+    let (bytes, _) = drawn(&scene);
+    let (shown, _) = screen(80, 8, &[bytes]);
+    assert!(shown.contains("streaming hello"), "{shown}");
+    assert!(shown.contains("to Mei…"), "{shown}");
+    assert!(
+        shown.find("streaming hello").unwrap() < shown.find("to Mei…").unwrap(),
+        "{shown}"
+    );
 }
 
 #[test]

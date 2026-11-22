@@ -26,10 +26,10 @@ pub fn submit(ui: anytype, typed: []const u8, at: u64) void {
         .err => |diag| {
             defer ui.gpa.free(diag);
             finishCapture(ui, .discard);
-            _ = ui.frame_arena.reset(.retain_capacity);
             const arena = ui.frame_arena.allocator();
             const entries = ui.seen.finished(arena, .{ .err = diag }, ui.now()) catch return;
             ui.print(entries);
+            ui.touch(true);
             ui.ended();
         },
     }
@@ -65,7 +65,6 @@ fn onLine(ui: anytype, line: []u8) void {
         };
     }
     defer if (!is_message) ui.gpa.free(line);
-    _ = ui.frame_arena.reset(.retain_capacity);
     const arena = ui.frame_arena.allocator();
     const entries = ui.seen.line(arena, line, ui.now()) catch return;
     ui.print(entries);
@@ -101,7 +100,6 @@ fn onFinished(ui: anytype, finished: mei_process.Finished) void {
     for (ui.pending.items) |line| ui.gpa.free(line);
     ui.pending.clearRetainingCapacity();
     finishCapture(ui, capture);
-    _ = ui.frame_arena.reset(.retain_capacity);
     const arena = ui.frame_arena.allocator();
     const at = ui.now();
     const entries = if (finished.cancelled)
@@ -110,6 +108,7 @@ fn onFinished(ui: anytype, finished: mei_process.Finished) void {
         ui.seen.finished(arena, finished.result, at) catch return;
     finished.result.deinit(ui.gpa);
     ui.print(entries);
+    ui.touch(true);
     ui.ended();
 }
 

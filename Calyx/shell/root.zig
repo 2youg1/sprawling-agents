@@ -81,7 +81,6 @@ export fn calyx_shell_mei_sibling_name(into: [*]u8, capacity: usize, written: *u
     return @backingInt(MeiStatus.ok);
 }
 
-// Keep city UI exports in the installed shell archive (not test-only).
 comptime {
     _ = @import("city_ui.zig");
 }
@@ -102,6 +101,7 @@ test {
     _ = @import("mei_observation.zig");
     _ = @import("mei_session_control.zig");
     _ = @import("mei_runtime.zig");
+    _ = @import("mei_present.zig");
     _ = @import("mei_process.zig");
     _ = @import("mei_session.zig");
     _ = @import("mei_ui.zig");
