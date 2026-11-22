@@ -14,7 +14,7 @@
   import type { Key } from "../../core/lang";
   import { ui } from "../../ui";
   import { ContainerLimits, EnvVarName, ServerLabel } from "../../wire";
-  import type { Interpreter, SandboxArm, SandboxLimits } from "../../wire";
+  import type { Address, Interpreter, SandboxArm, SandboxLimits } from "../../wire";
   import Button from "../parts/button.svelte";
   import Field from "../parts/field.svelte";
   import Segmented from "../parts/segmented.svelte";

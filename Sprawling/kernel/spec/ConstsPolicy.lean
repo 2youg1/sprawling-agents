@@ -1,4 +1,4 @@
-﻿-- This Source Code Form is subject to the terms of the Mozilla Public
+-- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
@@ -41,7 +41,7 @@ pub const WORKTREE_MAX_BYTES: u64 = 2_147_483_648;                   // 2 GiB
 ```rust
 pub const BYTES_PER_TOKEN: u64 = 4;                                  // 字节到 token 的估算比
 pub const PREFIX_SLOTS: NonZeroU64 = 4;                              // 整份 prefix 预算均分的槽数
-// SANDBOX_FUEL_DEFAULT retired with wasip1; host Python has no fuel meter
+// fuel default retired with wasip1; host Python has no fuel meter
 pub const CREDENTIAL_NAME_MARKERS: [&str; 11];                       // §8-22 凭据形状名字的标记词
 pub const OUTPUT_CEILING_DEFAULT: u64 = 8_192;                       // messages 面输出上限梯的最后一档（token；`Sprawling/gateway/Spec.lean` §8-17）
 pub const CLOCK_STAMP_DEFAULT: ClockStampGranularity = ClockStampGranularity::Minute;   // runtime D8

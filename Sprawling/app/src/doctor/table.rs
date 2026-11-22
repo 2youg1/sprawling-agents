@@ -159,7 +159,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         name: PYTHON,
         tier: Tier::Use,
         need: Need::Optional,
-        enables: "the exec tool's python arm, which runs this machine's interpreter under the building's confinement",
+        enables: "the exec tool's python arm, which runs the host interpreter under the building's confinement",
         detect: Detection::Interpreter {
             variable: PerPlatform {
                 windows: PYTHON_VARIABLE,

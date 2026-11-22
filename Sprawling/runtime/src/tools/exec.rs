@@ -135,20 +135,24 @@ impl ExecTool {
     }
 
     fn run_python(&self, code: &str, placement: Placement) -> Result<ToolOutcome, AxError> {
-        let Some(python) = self.setup.python.as_ref() else {
-            return Err(AxError::failure(
-                AxCode::ToolUnavailable,
-                "run python",
-                "no Python interpreter is configured on this machine",
-            )
-            .with_recovery(
-                "install Python 3 on PATH as python3 or python, set SPRAWLING_PYTHON to an \
-                 interpreter, or pass the work as a `command`",
-            ));
+        let program = match (placement, &self.container, self.setup.python.as_ref()) {
+            (Placement::Sandbox, Some(_), _) => PathBuf::from("python3"),
+            (_, _, Some(python)) => python.clone(),
+            (_, _, None) => {
+                return Err(AxError::failure(
+                    AxCode::ToolUnavailable,
+                    "run python",
+                    "no Python interpreter is configured for the host",
+                )
+                .with_recovery(
+                    "install Python 3 on PATH as python3 or python, set SPRAWLING_PYTHON to an \
+                     interpreter, or pass the work as a `command`",
+                ));
+            }
         };
-        let mut command = child::command(python);
+        let mut command = child::command(&program);
         command.current_dir(&self.setup.workdir).args(["-c", code]);
-        let what = format!("{} -c <script>", display_program(python));
+        let what = format!("{} -c <script>", display_program(&program));
         self.through_the_backlog(command, what, "python", placement)
     }
 

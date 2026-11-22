@@ -5132,8 +5132,8 @@
     "zh": "对 Edge 使用浏览器工具，每台 Windows 机器都自带 Edge"
   },
   "machine_enables_host_python": {
-    "en": "the exec tool's python arm, which runs this machine's interpreter under the building's confinement",
-    "zh": "exec 工具的 python 一支，用本机解释器在楼的围栏下运行"
+    "en": "the exec tool's python arm, which runs the host interpreter under the building's confinement",
+    "zh": "exec 工具的 python 一支，用宿主解释器在楼的围栏下运行"
   },
   "machine_enables_python_wasi": {
     "en": "the exec tool's python arm, which runs in the sandbox with no socket",

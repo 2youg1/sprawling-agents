@@ -132,13 +132,13 @@ pub(super) fn ask(command: &mut Command, knocks: u32, keep: impl FnMut(&str) -> 
 /-!
 ## 8-47 六处探测收成一处：doctor 是「运行中的机器有什么」的唯一权威（`bin::doctor::host`、`bin::doctor::presence`）
 
-**原因**：运行中的机器被问了六次，每次一套读法——`SPRAWLING_PYTHON_WASM` 在 `accounting::worker::mcp` 与 `doctor::table` 各拼一次（§8-166 记下的债）；`host_shell()` 与 `execution_engine()` 住 `accounting::worker::workbench::engine`；Firefox 与 `chromedriver` 由 `bin::browser_bidi::lazy` 按名字盲起（Windows 上 Firefox 不在 PATH，于是 doctor 说「有」而浏览器工具说「没有」）；`ffmpeg` 在 `Sprawling/desktop/` 里按名字起。六个答案各自漂，一个人看到的「缺什么」与 run 撞上的「缺什么」不是同一份。
+**原因**：运行中的机器被问了六次，每次一套读法——`SPRAWLING_PYTHON_WASM` 在 `accounting::worker::mcp` 与 `doctor::table` 各拼一次（§8-166 记下的债）；`host_shell()` 住 `accounting::worker::workbench::engine`；Firefox 与 `chromedriver` 由 `bin::browser_bidi::lazy` 按名字盲起（Windows 上 Firefox 不在 PATH，于是 doctor 说「有」而浏览器工具说「没有」）；`ffmpeg` 在 `Sprawling/desktop/` 里按名字起。六个答案各自漂，一个人看到的「缺什么」与 run 撞上的「缺什么」不是同一份。
 
 **主机事实住机器层**（沿 `Sprawling/kernel/Spec.lean` §8-22「主机事实不入城」）。doctor 装的东西落 `~/.sprawling/components/<item>/`，**恒不落进任何一座城**——一座城搬到另一台机器时不该带着运行中的机器的组件。城里 `CONFIG.toml` 仍只说能力位（`sandbox.shell`）与限额，不说路径。
 
 ```rust
 // lib.rs：doctor 从二进制半边搬进 lib，装配层与浏览器层才够得着它
-pub mod doctor;                                   // 公开面：`screen::verb` 与 Python bench 共用的 `host::usable_python_wasm`
+pub mod doctor;                                   // 公开面：`screen::verb` 与 Python bench 共用的 `host::usable_python`
 
 // bin::doctor::presence（形状 2 value）：运行中的机器对一项东西的回答，三态而非两态
 pub(crate) enum Presence {
@@ -165,7 +165,7 @@ pub(crate) enum Detection {
 pub(crate) fn firefox() -> Presence;        // Gecko 族里运行中的机器有的那个牌子（§8-57）
 pub(crate) fn chromedriver() -> Presence;   // chromedriver 或 msedgedriver，先答上来的那个
 pub(crate) fn python_wasm() -> Presence;             // 默认组件先过 OnceLock 中的内容 pin；覆盖报 unpinned
-pub fn usable_python_wasm() -> Option<PathBuf>;      // 生产 exec 与 citysim 的 CPython baseline 共用同一选择门
+pub fn usable_python() -> Option<PathBuf>;           // 生产 exec 与 citysim 的宿主 Python 共用同一选择门
 // bin::doctor::table
 pub(super) const PYTHON_GUEST_B3: &str;              // 登记 guest 的 64 位小写 BLAKE3；资产与值也见 docs/third-party.md
 // bin::doctor::host
@@ -173,7 +173,7 @@ static PYTHON_GUEST_CHECK: OnceLock<Result<(), Fault>>; // 默认组件每进程
 pub(crate) fn shell() -> Presence;
 pub(crate) fn pwsh() -> Presence;              // 表里的 `pwsh` 行（runtime D30）
 pub(crate) fn usable_pwsh() -> Option<PathBuf>; // 只在 `pwsh --version` 读出的主版本不小于 7 时
-pub(crate) fn execution_engine() -> Result<Box<dyn runtime::Sandbox>, AxError>;   // 从 workbench::engine 搬来
+// execution_engine 与 Sandbox trait 随 wasip1 退役
 pub(crate) const ENGINE_CARRIED: bool;                                             // cfg!(feature = "sandbox") 的唯一拼写
 pub(crate) fn components_dir() -> Option<PathBuf>;                                 // ~/.sprawling/components
 
@@ -194,7 +194,7 @@ pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Res
 - **`Detection::Built` 的探测是真起一次引擎**，而不是读一个 cfg：一份声称带引擎却起不来的构建，doctor 必须报 `Broken { WillNotStart }`；`ENGINE_CARRIED` 是那个 cfg 的唯一拼写，表引用它。
 - **`ffmpeg` 进表但 doctor 管不到 `Sprawling/desktop/`**：`Sprawling/desktop/` 跑在 `sprawling desktop` 这个子进程里，它在录制时按名字起 `ffmpeg`，与 doctor 的 `on_search_path` 走同一条 PATH，两个答案因此一致而非因此合一。doctor 报它（Optional，Use 层），`Sprawling/desktop/` 不改——这是这里的边界，如实记。桌面 server 本身不进表：它是本二进制的一个动词（§8-4d），没有要装的东西。
 - **`browser::profile` 没有探测可搬**：读 `Sprawling/browser/Spec.lean` 的 D4 确认 profile 是「楼的登录态住城的保留区」这条纯判定，浏览器探测住 `bin::browser_bidi::lazy`，故不改 `Sprawling/browser`。
-- **doctor 进 lib 的公开面只有 verb 与既有 guest 选择门的 re-export**：`pub use screen::verb` 供二进制半边的 `main/router.rs` 调用；`pub use host::usable_python_wasm` 供 citysim 的 CPython baseline 与生产 exec 读同一份变量优先、组件目录回退答案，不新增一个只改名的包装函数。`Machine` 仍是 `pub(crate) trait`，不上缝清单。
+- **doctor 进 lib 的公开面只有 verb 与既有 guest 选择门的 re-export**：`pub use screen::verb` 供二进制半边的 `main/router.rs` 调用；`pub use host::usable_python` 供 citysim 的 CPython baseline 与生产 exec 读同一份变量优先、组件目录回退答案，不新增一个只改名的包装函数。`Machine` 仍是 `pub(crate) trait`，不上缝清单。
 
 **探测可失败的路径，逐条**（本节与 §8-48 共用，测试点名「丑的那几条」）：
 

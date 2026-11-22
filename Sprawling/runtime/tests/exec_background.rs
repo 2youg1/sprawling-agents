@@ -50,24 +50,29 @@ fn slow_then_mark() -> Value {
             "cmd",
             vec![
                 "/C".to_owned(),
-                format!("ping -n 2 127.0.0.1 >NUL & echo {MARK}"),
+                format!("ping -n 4 127.0.0.1 >NUL & echo {MARK}"),
             ],
         )
     } else {
-        ("sh", vec!["-c".to_owned(), format!("sleep 1; echo {MARK}")])
+        ("sh", vec!["-c".to_owned(), format!("sleep 3; echo {MARK}")])
     };
     let quoted: Vec<String> = args.iter().map(|arg| format!("\"{arg}\"")).collect();
     json!({ "command": format!("{path} {}", quoted.join(" ")), "where": "host" })
 }
 
 fn quick_look() -> Value {
-    json!({ "python": "pass" })
+    let command = if cfg!(windows) {
+        "cmd /C echo looking"
+    } else {
+        "echo looking"
+    };
+    json!({ "command": command, "where": "host" })
 }
 
 #[test]
 fn a_background_result_reaches_only_the_run_that_started_it() {
     let work = tempfile::tempdir().unwrap();
-    let backlog = Backlog::with_window(PollBudget::new(1, 1));
+    let backlog = Backlog::with_window(PollBudget::new(50, 20));
     let mut starter = a_run_at(&backlog, "vault", 1, work.path());
     let mut stranger = a_run_at(&backlog, "lab", 2, work.path());
 
@@ -82,7 +87,15 @@ fn a_background_result_reaches_only_the_run_that_started_it() {
             seen.get("background").is_none(),
             "another run's output reached this run: {seen}"
         );
+        assert!(
+            seen.get("outcome").is_none(),
+            "the poll itself must settle so it does not invent background rows: {seen}"
+        );
         let mine = invoke(&mut starter, quick_look());
+        assert!(
+            mine.get("outcome").is_none(),
+            "the poll itself must settle so a background row is only the slow command: {mine}"
+        );
         if let Some(rows) = mine.get("background") {
             delivered = Some(rows.clone());
             break;

@@ -90,7 +90,7 @@ impl ExecTool {
     pub fn python_only(mut self) -> Self {
         self.container = None;
         self.program_route = ProgramRoute::Python;
-        self.meta.disclosure = "Executes a Python script with this machine's interpreter under \
+        self.meta.disclosure = "Executes a Python script with the host interpreter under \
                                 the building's confinement. Commands in the sandbox refuse."
             .to_owned();
         self

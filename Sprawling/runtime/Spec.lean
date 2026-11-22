@@ -345,7 +345,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 | D98 | 每次尝试之后问一次端点门前的等待，有就记一行 `prefix_held` | `Sprawling/runtime/spec/Turn/Recovery.lean` |
 | D99 | 保温门转发 `Model` 的每一扇调用门，不让任何一扇落到 trait 的缺省实现 | `Sprawling/runtime/spec/Prefix.lean`（§8-4-2） |
 | D100 | 提前量是「发出到 provider 开始处理」的时间，按 endpoint 存一个读数 | `Sprawling/runtime/spec/Prefix.lean`（§8-4-2） |
-| D101 | guest 模块每个进程只读、只编译一次，`WasmtimeSandbox` 的克隆共用一个 Engine 与一格已编译模块 | `Sprawling/runtime/spec/Sandbox.lean` |
+| D101 | （已退役）guest 模块每进程编译一次；wasip1／Wasmtime 已删除 | `Sprawling/runtime/spec/Sandbox.lean` |
 | D102 | guest 的内存上限就是它的 run 的内存上限，撞到时结果带 `memory_ceiling` | `Sprawling/runtime/spec/Sandbox.lean` |
 | D103 | 机器级预约按号先来后到、不回填，比整份预算大的预约在没有别人持有时单独放行 | `Sprawling/runtime/spec/Reserve.lean` |
 | D104 | 只有人填过的上限才预约，run 的前台命令与 python 调用各预约那个数，只持有到前台窗口结束 | `Sprawling/runtime/spec/Reserve.lean` |
@@ -371,7 +371,7 @@ envelope 探查与全解共用 kernel 的解析（Value 探查仅取五键，不
 /-! ## 13 依赖选型
 
 kernel、storage（读面与 cas）；serde_json（envelope 探查）。dev：proptest、tempfile、trybuild、insta（prefix golden）。
-`regex`（search 的 `pattern`，D120：ripgrep 缺省引擎的同一份语法，有限自动机匹配、不回溯；被否：`fancy-regex`，多环视而回溯）、`regex-syntax`（同一份语法的解析器，`regex` 本来就带着它；search 用它判 `pattern` 是否写出换行，D121）与 `globset`（search 的 `glob`，D117：ripgrep 的 `--glob` 的同一个实现，带 `{a,b}` 与 `**`；被否：`glob` crate，没有 `{a,b}`；自写 glob 到正则的翻译，第二份语法）。`wasmtime`／`wasmtime-wasi = "48.0.7"`（feature `wasm` 内藏，钉版理由见 §8-13；wat 为 dev 依赖供 A10 模块）；`similar`？否——unified diff 自写最小形（edit 回显只需逐行对照，不引第三方 diff 库；被否理由：依赖面换一处 80 行纯函数，不值）。其余无新第三方（分段哈希经 kernel `B3Hash::digest`，不直依 blake3）。
+`regex`（search 的 `pattern`，D120：ripgrep 缺省引擎的同一份语法，有限自动机匹配、不回溯；被否：`fancy-regex`，多环视而回溯）、`regex-syntax`（同一份语法的解析器，`regex` 本来就带着它；search 用它判 `pattern` 是否写出换行，D121）与 `globset`（search 的 `glob`，D117：ripgrep 的 `--glob` 的同一个实现，带 `{a,b}` 与 `**`；被否：`glob` crate，没有 `{a,b}`；自写 glob 到正则的翻译，第二份语法）。wasip1／`wasmtime`／`wasmtime-wasi`／`wat`／feature `wasm` 已退役；Python 走宿主解释器。`similar`？否——unified diff 自写最小形（edit 回显只需逐行对照，不引第三方 diff 库；被否理由：依赖面换一处 80 行纯函数，不值）。其余无新第三方（分段哈希经 kernel `B3Hash::digest`，不直依 blake3）。
 
 规格本身不加依赖：分部只 import 工具链的库与本 crate 的分部（ARCHITECTURE.md §3 的 `depmap` 允许 runtime 引 kernel、storage、gateway 的分部，今天一个都不需要）。
 -/
@@ -394,7 +394,7 @@ citysim 是 `run::drive` 的调用方（§8-15），assemble 的签名变动波�
 /-! ## 16 测试与约束
 
 单测：五步各拒绝分支＋ig 跳过；fork 越界；fork_draft 载荷形。proptest：对任意合法 draft 序列（经内存 Ledger 物化）verify 恒过；任意单字节翻转恒拒。A2/A19 演示测试入 Sprawling/runtime/tests/。约束：clippy 零告警。
-A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）；A7 往返四断言；A18 零字节；watchdog 分级序；A10 三断言（feature `wasm` 下真 wasmtime＋WAT）；L0×失败注入矩阵（三臂×（正常／工具错／拒收））；ToolBench 门路由（Deny 回流／门的提问回流／dedup 先于副作用）。
+A4 golden（build_prefix 重跑逐字节同）；A15（rebuild_prefix 对拍）；A7 往返四断言；A18 零字节；watchdog 分级序；A10（wasip1／wasmtime）已退役；L0×失败注入矩阵（三臂×（正常／工具错／拒收））；ToolBench 门路由（Deny 回流／门的提问回流／dedup 先于副作用）。
 回合边界的压缩（§8-44）：`compaction::exchange::tests` 三例（预算内全保留；超预算回复按 `plan` 裁、结构化结果整块保留；份额随 exchange 大小走）；`turn/tests/compaction` 两例（收尾边界才换快照、波中达阈值按全波分组一次压）；`fork/tests` 一例（分支继承的是压缩后的 exchange）；citysim `compaction` 两例（波中达阈值账本全字节保留、同剧本逐字节重放）。
 
 形式化的义务由证明清偿：`lake build Sprawling.runtime.Spec`（`just models` 在 `just check` 里构建全部规格），不留 `sorry`、`admit` 与 `axiom`，`cargo xtask gates spec` 检查这一点。模型与生产实现的对应由这些 Rust 测试检查，它们是行为比对，不是精化证明：

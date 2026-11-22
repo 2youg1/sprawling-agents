@@ -54,7 +54,7 @@ def buildingLayer : String := s!"{configured}/.sprawling/CONFIG.toml"
 /-- The layer above it, which this world writes nothing into. -/
 def cityLayer : String := ".sprawling/CONFIG.toml"
 
-/-- The instruction budgets this world writes, and why they look like this.
+/-- The container cpu_millis figures this world writes, and why they look like this.
 
 Four digits each, all distinct, and no one of them a substring of another: the
 file is compared by asking whether it states a figure, so two budgets where one
@@ -121,39 +121,41 @@ def Door.readDocument (door : Door) (ground : Ground) (path : String) : IO Strin
     throw <| IO.userError s!"a file of the city could not be read: {complaint}"
   | .quiet => throw <| IO.userError s!"the city said nothing about {path}"
 
-/-- The instruction budget one building's own layer states, folded by the city.
+/-- The container CPU millicores one building's own layer states, folded by the city.
 
 `none` is a building whose own layer states no sandbox, which is a different
-answer from one that states a budget of zero. -/
+answer from one that states a figure of zero. -/
 def Door.readBudget (door : Door) (ground : Ground) (addr : String) : IO (Option Nat) := do
   match ← door.ask ground.port (.buildingView addr) with
   | .accepted frames =>
     match answerOf "building" frames with
     | some body =>
       match (body.getObjVal? "sandbox").toOption with
-      | some sandbox => return (sandbox.getObjVal? "fuel" >>= Json.getNat?).toOption
+      | some sandbox =>
+        return (sandbox.getObjVal? "container" >>= (·.getObjVal? "cpu_millis")
+          >>= Json.getNat?).toOption
       | none => throw <| IO.userError "a building answer carried no sandbox field"
     | none => throw <| IO.userError s!"the city did not answer with a building: {addr}"
   | other => throw <| IO.userError s!"a building could not be read: {other}"
 
-/-- Writes one budget into the building's own layer and waits for the answer.
+/-- Writes one CPU millicores figure into the building's own layer and waits for the answer.
 
 A refusal here is the finding, so it is returned rather than thrown: the
 sequence that produced it is what the property prints. -/
 def Door.writeBudget (door : Door) (ground : Ground) (budget : Nat) (index : Nat) :
     IO (Option String) := do
   match ← door.ask ground.port (.configureBuilding configured budget (idemKey (400 + index))) with
-  | .denied complaint => return some s!"writing a budget of {budget} was refused: {complaint}"
-  | .quiet => return some s!"writing a budget of {budget} was answered with silence"
+  | .denied complaint => return some s!"writing cpu_millis of {budget} was refused: {complaint}"
+  | .quiet => return some s!"writing cpu_millis of {budget} was answered with silence"
   | .accepted _ => return none
 
 /-- After any sequence of writes, the file and the answer state the same figure.
 
 Three readings, and each one answers a way the two homes could come apart:
 
-* the answer states the last budget written, so a page cannot show what the
+* the answer states the last cpu_millis written, so a page cannot show what the
   next run will not read;
-* the file states that budget and no earlier one, so a write replaces the value
+* the file states that figure and no earlier one, so a write replaces the value
   rather than adding a second statement of it;
 * the layer above states none of them, so a building's own choice was written
   at the rung a person edits rather than resolved upward into the city's.
@@ -182,7 +184,7 @@ def writtenReadsBack (door : Door) (written : List Nat) : IO Verdict :=
         | none =>
           match written.find? (states above) with
           | some leaked =>
-            return .broke s!"a building's own budget of {leaked} was written into the city's layer"
+            return .broke s!"a building's own cpu_millis of {leaked} was written into the city's layer"
           | none => return .held
 where
   writeAll (ground : Ground) : List Nat → Nat → IO (Option String)

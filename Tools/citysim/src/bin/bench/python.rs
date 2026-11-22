@@ -138,13 +138,13 @@ pub(crate) fn measure_as(arm: Arm) -> Result<Report, String> {
 }
 
 pub(crate) fn cold_child(expected: &str, interpreter: &Path) -> Result<(), String> {
-    let prepared = prepare_at(interpreter)?;
-    if prepared.interpreter.digest.to_string() != expected {
+    let held = Interpreter::at(interpreter.to_path_buf())?;
+    if held.digest.to_string() != expected {
         return Err(fixture(
             "the cold child received a different interpreter from its parent",
         ));
     }
-    run_checked(&prepared.interpreter, SCRIPT.as_str())?;
+    run_checked(&held, SCRIPT.as_str())?;
     let mut out = std::io::stdout().lock();
     out.write_all(cold::COMPLETE_LINE.as_bytes())
         .and_then(|()| out.flush())

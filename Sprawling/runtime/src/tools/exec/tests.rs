@@ -64,7 +64,7 @@ const NO_ARGS: &[&str] = &[];
 fn setup(workdir: &std::path::Path, python: Option<PathBuf>, shell: Option<PathBuf>) -> ExecSetup {
     ExecSetup {
         workdir: workdir.to_path_buf(),
-        python: python,
+        python,
         shell: shell.map_or(Shell::Absent, |program| Shell::Found {
             program,
             interpreter: kernel::Interpreter::System,
@@ -388,16 +388,29 @@ fn the_python_arm_runs_on_the_host_interpreter_when_asked() {
 }
 
 fn host_python() -> Option<PathBuf> {
-    if let Some(named) = std::env::var_os("SPRAWLING_PYTHON") {
-        let path = PathBuf::from(named);
-        return path.is_file().then_some(path);
-    }
-    for name in ["python3", "python"] {
-        if let Ok(output) = std::process::Command::new(name).arg("--version").output()
-            && output.status.success()
-        {
-            return Some(PathBuf::from(name));
+    if let Some(named) = std::env::var_os("SPRAWLING_PYTHON")
+        && !named.is_empty()
+    {
+        let path = PathBuf::from(&named);
+        if path.is_file() {
+            return Some(path);
         }
+        let search = std::env::var_os("PATH").unwrap_or_default();
+        return std::env::split_paths(&search).find_map(|dir| {
+            let candidate = dir.join(&named);
+            candidate.is_file().then_some(candidate)
+        });
     }
-    None
+    let search = std::env::var_os("PATH").unwrap_or_default();
+    let names: &[&str] = if cfg!(windows) {
+        &["python.exe", "python3.exe", "python", "python3"]
+    } else {
+        &["python3", "python"]
+    };
+    names.iter().find_map(|name| {
+        std::env::split_paths(&search).find_map(|dir| {
+            let candidate = dir.join(name);
+            candidate.is_file().then_some(candidate)
+        })
+    })
 }

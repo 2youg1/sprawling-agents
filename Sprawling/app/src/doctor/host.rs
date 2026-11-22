@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use kernel::AxError;
 
 use super::family::GECKO;
-use super::table::{CHROMEDRIVER, MSEDGEDRIVER, PWSH, PYTHON_VARIABLE, REQUIREMENTS, SHELL};
+use super::table::{CHROMEDRIVER, MSEDGEDRIVER, PWSH, PYTHON, REQUIREMENTS, SHELL};
 use super::{Absence, Machine, PATIENCE, Platform, Presence, ThisMachine};
 
 pub(crate) fn components_dir() -> Option<PathBuf> {
@@ -80,11 +80,7 @@ pub(crate) fn chromedriver() -> Presence {
 }
 
 pub fn usable_python() -> Option<PathBuf> {
-    if let Some(named) = std::env::var_os(PYTHON_VARIABLE) {
-        let path = PathBuf::from(named);
-        return path.is_file().then_some(path);
-    }
-    find_program("python3").or_else(|| find_program("python"))
+    usable_path(&look(PYTHON))
 }
 
 pub(crate) fn shell() -> Presence {

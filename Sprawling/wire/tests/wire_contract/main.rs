@@ -126,7 +126,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 }
 
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "e0e0ca4f1f5aa8b6a7a3d4a0f38aceb14a153c977917ece491c0dfea3196c71a";
+const WIRE_SHAPE_GOLDEN: &str = "d2642389c18f2f4664543ac9dc549dbf0b67476800ff96e569dd1c975115c5cf";
 
 #[cfg(feature = "server")]
 #[test]

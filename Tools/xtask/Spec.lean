@@ -639,7 +639,7 @@ Bun 的用户仍失败）；只在 JavaScript 中检测 Bun；推断执行 JavaS
 
 **归档里那个可执行文件叫什么，向平台表要**（§8-19）：那张表有 `binary` 一列，打包器不另用 `cfg!(windows)` 或「三元组里含不含 `windows`」再判一次。打包器按即将写下的归档名 `-<label>.zip` 向 `platform::with_suffix` 取行；**本次发布不出这份归档的目标被拒绝**，这正是平台表为自己写下的政策。
 
-**发布二进制必须带执行引擎**：`AbsentSandbox` 的恢复语让人去装一个带执行引擎的构建，而下载发布档的人开不了任何 feature。判法与 `budget::carries_client` 同形——`budget::carries_engine` 读产物的字节，找只有 wasmtime 会写下的那句燃料陷阱文案（默认 feature 集下这棵树一个 wasm crate 都没有，故别处写不出它）。`sandbox` feature 在 `Sprawling/app/Cargo.toml` 里默认关闭，发布构建（`justfile` 的 release 构建行）显式打开它；`package` 在打包前拒绝一个不带引擎的二进制。
+**发布二进制不再携带 Wasmtime 执行引擎**：wasip1／`sandbox` feature／`carries_engine` 已退役。Python 臂依赖宿主解释器（`SPRAWLING_PYTHON` 或 PATH），围栏由楼臂提供；`package` 仍用 `budget::carries_client` 核对客户端捆绑，不再核对引擎字节。
 
 **发行归档还不带 cargo 包的许可原文。** 归档带 `LICENSE`（本仓库的 MPL-2.0）与 CycloneDX 物料清单；清单列出每个 cargo 包的名字、版本与 SPDX 标识，不带 MIT 与 Apache-2.0 要求随分发附上的版权与许可原文。npm 那一半由客户端产物里的 `THIRD-PARTY-NOTICES.txt` 随二进制发出（client D13）。cargo 这一半缺的是：一个从 `cargo metadata` 的 `manifest_path` 旁读许可文件、按正文去重后写出的步骤，与 `Packaged` 里带着它的一个变体。
 

@@ -102,7 +102,7 @@ Rust 检查：`a_reading_line_is_stable_and_carries_its_machine_class`——一�
 /-!
 ### 8-6-1 CPython-WASI 执行基线（`bench::python`）
 
-这一族量居民经 `exec` 的 Python 臂实际抵达的 `runtime::sandbox` 适配器，不量工具信封与结果扫描；后两者仍由 `[tool_phases]` 的仪表负责。负载是一段使用 `collections`、`difflib`、`itertools`、`re` 的确定性脚本，guest 与脚本的完整 BLAKE3 摘要都进读数行。`SandboxJob` 与 Python 臂同形：`argv = ["python", "-c", script]`、无环境继承、一个只读 stdlib mount、`GuestMemory::Wasm32`，燃料取 `kernel::consts_policy::SANDBOX_FUEL_DEFAULT`。场景只走产品已有的 `WasmtimeSandbox` 与 `PythonGuest`，不复制一份 Wasmtime 驱动或 stdlib 布局。
+这一族量居民经 `exec` 的 Python 臂实际抵达的宿主解释器，不量工具信封与结果扫描；后两者仍由 `[tool_phases]` 的仪表负责。负载是一段使用 `collections`、`difflib`、`itertools`、`re` 的确定性脚本，解释器与脚本的完整 BLAKE3 摘要都进读数行。场景只走产品已有的宿主 Python 路径（`doctor::host::usable_python`），不另起 guest ABI。
 
 ```rust
 // bench 是二进制，以下都是 pub(crate)
@@ -114,7 +114,7 @@ pub fn cold_child(expected_guest: &str, snapshot: &Path, stdlib: &Path) -> Resul
 impl Report { pub fn write_csv(&self) -> Result<PathBuf, String>; }
 ```
 
-`measure` 经 `sprawling::doctor::usable_python_wasm` 取得与生产 Python 臂相同的 guest 路径，变量优先、组件目录回退与默认组件的内容 pin 都不由 bench 重写。`PythonGuest::at` 补上同一个只读 stdlib 来源；`Guest::at` 只读 wasm 来源一次，把同样的字节写进本次测量私有的 tempfile 快照，同时保留 stdlib 的 Mount。父进程与冷子进程都只执行这份快照并挂载同一个 stdlib 来源，摘要也从同一份字节算出；冷进程协议多带一个 stdlib 宿主路径，不复制这棵树。Main 以 args_os 接收参数，只对命令、arm 与 guest 摘要文本校验 UTF-8，路径不转字符串。测量前后按 docs/third-party.md 的规范化规则分别摘要所选 stdlib 树；摘要不同或读取失败即拒掉整份 Report，不检测结束前已恢复的变化。全部场景结束后重读快照，不同就拒掉整份 Report；冷子进程另核对父进程交给它的摘要。默认组件因此是经来源门与内容门选择的固定工件，开发覆盖则按 Doctor 的报告保持未钉。没有可用路径时是 `E_TOOL_UNAVAILABLE`，recovery 指向同一个外部 guest 配置门。取得路径后先建快照，再运行校验脚本：它检查 `sys.implementation.name == "cpython"`，且固定脚本的完整 stdout 必须逐字节等于登记值，不能把第一次的任意标记输出收养成基准；宿主错误、非零退出、trap、fuel 耗尽、stdout 不符都以 `E_TOOL_UNAVAILABLE` 报「前置条件不满足」。校验发生在任何计时之前，`Report` 又在全部场景成功之后才交给 Main 打印，因此缺失、坏 Wasm、非 CPython 或中途失败都不会留下半份 Python 读数，更不会留下零成本读数。
+`measure` 经 `sprawling::doctor::usable_python` 取得与生产 Python 臂相同的宿主解释器路径，`SPRAWLING_PYTHON` 与 PATH 回退都不由 bench 重写。`PythonGuest::at` 补上同一个只读 stdlib 来源；`Guest::at` 只读 wasm 来源一次，把同样的字节写进本次测量私有的 tempfile 快照，同时保留 stdlib 的 Mount。父进程与冷子进程都只执行这份快照并挂载同一个 stdlib 来源，摘要也从同一份字节算出；冷进程协议多带一个 stdlib 宿主路径，不复制这棵树。Main 以 args_os 接收参数，只对命令、arm 与 guest 摘要文本校验 UTF-8，路径不转字符串。测量前后按 docs/third-party.md 的规范化规则分别摘要所选 stdlib 树；摘要不同或读取失败即拒掉整份 Report，不检测结束前已恢复的变化。全部场景结束后重读快照，不同就拒掉整份 Report；冷子进程另核对父进程交给它的摘要。默认组件因此是经来源门与内容门选择的固定工件，开发覆盖则按 Doctor 的报告保持未钉。没有可用路径时是 `E_TOOL_UNAVAILABLE`，recovery 指向同一个外部 guest 配置门。取得路径后先建快照，再运行校验脚本：它检查 `sys.implementation.name == "cpython"`，且固定脚本的完整 stdout 必须逐字节等于登记值，不能把第一次的任意标记输出收养成基准；宿主错误、非零退出、trap、fuel 耗尽、stdout 不符都以 `E_TOOL_UNAVAILABLE` 报「前置条件不满足」。校验发生在任何计时之前，`Report` 又在全部场景成功之后才交给 Main 打印，因此缺失、坏 Wasm、非 CPython 或中途失败都不会留下半份 Python 读数，更不会留下零成本读数。
 
 场景与读数行：
 

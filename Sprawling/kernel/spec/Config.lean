@@ -57,7 +57,7 @@ impl CatalogExposure { pub fn stated(&self, tool: &str, namespace: &str) -> Opti
 
 **思考强度（config）**：`FrozenConfig.effort: Option<Effort>`（类型住 §8-24），缺省 `None`＝没有人为这一层说过，这次请求用哪一档由 gateway 的思考档梯子（`gateway::provider` 下的 `thinking` 模块） 按默认规则解出（`DEFAULT_EFFORT`，§8-24 D56）。
 
-**沙箱限额（config）**：`SandboxLimits { shell: bool, interpreter: Interpreter, env_passthrough: Vec<EnvVarName>, trusted: Vec<ServerLabel>, container: Option<ContainerLimits>, arm: Option<SandboxArm> }`，即 `FrozenConfig.sandbox`。三条口径：①**整值解析而非逐字段合并**——一层说到 sandbox 就说全部，于是欠说的层只会收窄而恒不会悄悄放开上层没提过的能力；②**主机事实不入城**（Python 解释器路径、shell 可执行文件位置走环境变量 `SPRAWLING_PYTHON` 与 `PATH`）——一座城被搬到另一台机器时不该带着运行中的机器的路径；③冻结的理由与工具表相同：**能改变可达范围的东西恒不在回合中变宽**，否则变宽的那一刻没有人审过。缺省 `shell = false`——shell 是唯一一条从参数读不出可达范围的臂。`arm = Python` 时脚本走本机解释器，围栏与 program 臂同一套楼臂（`copied_tree`／`native`／`container`／`none`），不另起 guest ABI。
+**沙箱限额（config）**：`SandboxLimits { shell: bool, interpreter: Interpreter, env_passthrough: Vec<EnvVarName>, trusted: Vec<ServerLabel>, container: Option<ContainerLimits>, arm: Option<SandboxArm> }`，即 `FrozenConfig.sandbox`。三条口径：①**整值解析而非逐字段合并**——一层说到 sandbox 就说全部，于是欠说的层只会收窄而恒不会悄悄放开上层没提过的能力；②**主机事实不入城**（Python 解释器路径、shell 可执行文件位置走环境变量 `SPRAWLING_PYTHON` 与 `PATH`）——一座城被搬到另一台机器时不该带着运行中的机器的路径；③冻结的理由与工具表相同：**能改变可达范围的东西恒不在回合中变宽**，否则变宽的那一刻没有人审过。缺省 `shell = false`——shell 是唯一一条从参数读不出可达范围的臂。`arm = Python` 时脚本走宿主解释器，围栏与 program 臂同一套楼臂（`copied_tree`／`native`／`container`／`none`），不另起 guest ABI。
 
 **shell 臂的解释器（config）**：`pub enum Interpreter { System, Pwsh }`，`SandboxLimits.interpreter`，缺省 `System`，文件里写作 `[sandbox] interpreter = "system"` 或 `"pwsh"`（serde 小写，`#[serde(default)]`，所以没写这个键的层与线上旧帧读作 `System`）。配置文件里的值只经 `Interpreter::parse` 构造（`city::config_layers` 把这个键读成文本再交给它；serde 只读线上帧与冻结配置）：别的拼写以 `E_CONFIG_INVALID` 拒，主语是这个键与写下的值，恢复语给出两种拼法；不猜，也不当作缺省。它与 `shell` 是两件事：`shell` 决定 shell 臂给不给，`interpreter` 决定给的时候是哪一个；写的是名字而不是路径，理由同「主机事实不入城」。口径与 env／trusted 同形：整值上梯、Run 起点冻结、解析点拒。为什么要它、在主机上怎么解析、缺席时怎么拒，住 `Sprawling/runtime/Spec.lean` §8-13-2 D30。
 
@@ -156,8 +156,7 @@ wire 重导出这个值，避免配置与 doctor 的同名选项各定义一份�
 保留平台缺省；arm 缺席但 container 有值时选择 Container，兼容显式容器子表。
 显式 Container 必须有完整 container；别的显式臂同时带 container 被拒，不能忽略输入。
 Native 不可给时 E_SANDBOX_DENIED，不退到 copied_tree；CopiedTree 明确用副本；None
-明确请求 host，仍受 Create 写限制；Python 臂拒绝 sandbox program/shell，python guest
-沿用既有 WASI 接口。选择在 Run 起点冻结，在工具入 catalogue 之前接入并描述其实际保证。
+明确请求 host，仍受 Create 写限制；Python 臂拒绝 sandbox program/shell，脚本走宿主解释器，围栏与 program 臂同一套楼臂（`copied_tree`／`native`／`container`／`none`），不另起 guest ABI。选择在 Run 起点冻结，在工具入 catalogue 之前接入并描述其实际保证。
 -/
 
 /-! container 设置覆盖：kernel 声明文法，building 的 sandbox 卡片写整份 `[sandbox.container]`。

@@ -175,12 +175,12 @@ fn explain_connects_a_refusal_code_to_what_this_machine_has() {
         .find(|line| line.contains("host-python"))
         .expect("host Python is one of the items");
     assert!(python.contains("absent"), "{python}");
+    let suggestion = python
+        .split_once("->")
+        .map(|(_, rest)| rest)
+        .expect("the line ends in what to do next");
     assert!(
-        python.contains("->"),
-        "the line ends in what to do next: {python}"
-    );
-    assert!(
-        python.contains("manual") || python.contains("Python") || python.contains("python"),
+        suggestion.contains("manual") || suggestion.contains("Python"),
         "{python}"
     );
 
