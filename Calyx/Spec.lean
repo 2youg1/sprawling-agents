@@ -94,7 +94,13 @@ Rust `sprawling-calyx` 只保留城/Mei 宿主适配与对外库面（`sprawling
 /-! D1 Calyx 是唯一终端壳权威；城与 Mei 后端都是它的适配。 -/
 /-! D2 Mei 交互只经进程 Face spawn 无头 `mei`。 -/
 /-! D3 不设 Archetype 前缀；本包为生产面。 -/
-/-! D4 `@sprawling/mei` 归档与平台包同时携带无头 `mei` 与交互 `calyx`；npm shim 在 TTY 且无 `-p`／`--resume` 时 exec `calyx` 并设置 `MEI_BIN` 为同包无头核，否则 exec 无头核（`-p`、`--resume`、非 TTY stdin）。理由：一次完成要求无参 TTY 即可进入交互；无头 `--resume` 是核旗标，不得被面吞掉；「Mei 不含壳」约束的是核进程不内嵌 TUI，不是拒绝同归档并列二进制。被否：只发无头核、强制人另装 `sprawling` 并手写 `MEI_BIN`；把 Calyx 链进 `mei` 进程；TTY 上把 `--resume` 交给只认 `--replay` 的 `calyx`。 -/
+/-! D4 `@sprawling/mei` 归档与平台包同时携带无头 `mei` 与交互 `calyx`；npm 根包暴露 `mei` 与
+`calyx` 两个 bin（同一 shim）。入口名 `calyx` 恒 exec 面并设 `MEI_BIN`；入口名 `mei` 在 TTY
+且无 `-p`／`--resume`／`--acp` 时 exec `calyx` 并设 `MEI_BIN`，否则 exec 无头核（含非 TTY
+stdin）。理由：一次完成要求无参 TTY 与显式 `calyx` 均可进交互；无头 `--resume`／`--acp` 是核
+旗标，不得被面吞掉；「Mei 不含壳」约束的是核进程不内嵌 TUI，不是拒绝同归档并列二进制。被否：
+只发无头核、强制人另装 `sprawling` 并手写 `MEI_BIN`；把 Calyx 链进 `mei` 进程；TTY 上把
+`--resume`／`--acp` 交给只认 `--replay` 的 `calyx`。 -/
 /-! D5 Mei 状态行：cwd、实际/requested model 与 effort、Agent Step、上下文两位小数百分比及 used/max；pulse/model/route/usage 观测吞掉不刷 Note。 -/
 /-! D5a Calyx 拥有交互 session 的 spilled captures，并按 run 回收未提交目录。理由：只有 Calyx 持有正式日志的追加结果，能区分成功、确认未写入与回滚后不确定；Mei 在进程边界前无法作出最终保留决定。路径可跨 Python 进程与 resume 使用；Python 退出不等于 session 所有权结束。目录由 Calyx 独占创建，只有这个创建事实授权失败、取消与析构时的递归删除；回滚失败的追加视为"可能已写盘"，不删除任何捕获文件。被否：由 Mei 在解释器退出时决定交互 session 的最终保留（看不到其后的日志追加结果），以及只凭进程号、时间和计数生成的路径删除既有目录（可能删除其他 run 的内容）。 -/
 /-! D6 `calyx` 二进制是壳的装配根；墙钟采样在进入壳时注入，库面仍可接收宿主提供的时刻。 -/

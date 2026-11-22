@@ -960,6 +960,11 @@ archive target="":
 archive-mei target="":
     cargo xtask package --mei {{ if target == "" { "" } else { "--target " + target } }}
 
+# Local pack fixture: install → kill → cold open (D-OPEN / PATH / reinstall).
+# No registry publish; uses debug mei+calyx and the channel shim/postinstall.
+mei-install-fuzz:
+    bash Mei/test/install_cold_start_fuzz.sh
+
 # Offline chain verification (A2); strictly read-only.
 replay log:
     cargo run -p sprawling --locked -- replay {{log}}

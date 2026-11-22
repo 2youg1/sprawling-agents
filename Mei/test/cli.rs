@@ -44,6 +44,29 @@ fn cli_non_unicode_prompt_is_a_usage_error() {
     assert!(!error.contains("panicked"), "{error}");
 }
 
+#[cfg(unix)]
+#[test]
+#[expect(clippy::disallowed_methods, reason = "TTY fixture process for crates.io face hint")]
+fn tty_mei_without_prompt_points_at_the_calyx_install() {
+    let mei = env!("CARGO_BIN_EXE_mei");
+    let output = Command::new("script")
+        .args(["-q", "-e", "-c", mei, "/dev/null"])
+        .output()
+        .expect("script provides a PTY for the headless mei TTY path");
+    assert!(!output.status.success());
+    let error = String::from_utf8_lossy(&output.stderr);
+    let combined = format!("{error}{}", String::from_utf8_lossy(&output.stdout));
+    assert!(
+        combined.contains("E_MEI_USAGE"),
+        "stderr={error} stdout={}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert!(
+        combined.contains("@sprawling/mei") || combined.contains("calyx"),
+        "{combined}"
+    );
+}
+
 #[test]
 #[expect(clippy::disallowed_methods, reason = "test fixture process")]
 fn invalid_gateway_configuration_precedes_doctor_side_effects() {

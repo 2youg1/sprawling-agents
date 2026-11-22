@@ -17,6 +17,7 @@ use crate::report::XtaskError;
 mod system;
 
 const SHIM: &str = include_str!("channel/shim.js");
+const POSTINSTALL: &str = include_str!("channel/postinstall.js");
 const RUNTIME_ENTRY: &str = "sprawling-runtime";
 const LAUNCHER: &str = include_str!("channel/launcher.cmd");
 
@@ -237,17 +238,22 @@ fn write_mei_channel(
         .collect::<Vec<_>>()
         .join(",\n");
     let extra = format!(
-        "  \"bin\": {{ \"mei\": \"bin/mei.js\" }},\n  \
-         \"files\": [\"bin\"],\n  \"optionalDependencies\": {{\n{optional}\n  }}\n"
+        "  \"bin\": {{ \"mei\": \"bin/mei.js\", \"calyx\": \"bin/calyx.js\" }},\n  \
+         \"files\": [\"bin\"],\n  \
+         \"scripts\": {{ \"postinstall\": \"bun bin/postinstall.js\" }},\n  \
+         \"optionalDependencies\": {{\n{optional}\n  }}\n"
     );
     let dir = out.join(MEI_ROOT_PACKAGE);
     write(
         &dir.join("package.json"),
         manifest(stem, MEI_ROOT_PACKAGE, &description, &extra).as_bytes(),
     )?;
+    let shim = format!("#!/usr/bin/env bun\n{SHIM}");
+    write(&dir.join("bin/mei.js"), shim.as_bytes())?;
+    write(&dir.join("bin/calyx.js"), shim.as_bytes())?;
     write(
-        &dir.join("bin/mei.js"),
-        format!("#!/usr/bin/env bun\n{SHIM}").as_bytes(),
+        &dir.join("bin/postinstall.js"),
+        format!("#!/usr/bin/env bun\n{POSTINSTALL}").as_bytes(),
     )?;
     Ok(carried
         .into_iter()

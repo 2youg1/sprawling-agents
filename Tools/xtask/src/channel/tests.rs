@@ -71,6 +71,23 @@ fn the_shim_execs_rather_than_installs() {
 
 #[test]
 #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
+fn mei_postinstall_prints_fix_path_when_unreachable() {
+    let post = super::POSTINSTALL;
+    assert!(post.contains("Fix your PATH"));
+    assert!(post.contains("bun pm bin --global"));
+    assert!(post.contains(".local"));
+    assert!(post.contains("Open a NEW terminal"));
+    assert!(
+        !post.contains("bashrc")
+            && !post.contains("zshrc")
+            && !post.contains("WriteAllText")
+            && !post.contains("HKCU"),
+        "postinstall must not write shell startup files: {post}"
+    );
+}
+
+#[test]
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn mei_shim_smoke_routes_tty_to_calyx_and_headless_flags_to_core() {
     let shim = super::SHIM;
     let start = shim
@@ -88,11 +105,14 @@ fn mei_shim_smoke_routes_tty_to_calyx_and_headless_flags_to_core() {
     assert!(
         function.contains("\"-p\"")
             && function.contains("--resume")
+            && function.contains("--acp")
             && function.contains("stdinIsTTY"),
         "{function}"
     );
     assert!(shim.contains("childEnv.MEI_BIN = core"));
     assert!(shim.contains("row.face"));
+    assert!(shim.contains("entryName"));
+    assert!(shim.contains("forceFace"));
 
     let script = format!(
         "{function}\n\
@@ -100,6 +120,7 @@ fn mei_shim_smoke_routes_tty_to_calyx_and_headless_flags_to_core() {
            [['-p', 'x'], true, true],\n\
            [['--resume', 'a.jsonl'], true, true],\n\
            [['--resume=a.jsonl'], true, true],\n\
+           [['--acp'], true, true],\n\
            [[], true, false],\n\
            [[], false, true],\n\
            [['--replay', 'a.jsonl'], true, false],\n\
@@ -207,11 +228,25 @@ description = 'fixture description'
     let mei_manifest: serde_json::Value =
         serde_json::from_slice(&std::fs::read(mei_root.join("package.json")).unwrap()).unwrap();
     assert_eq!(mei_manifest["bin"]["mei"], "bin/mei.js");
-    assert_eq!(mei_manifest["bin"].as_object().unwrap().len(), 1);
+    assert_eq!(mei_manifest["bin"]["calyx"], "bin/calyx.js");
+    assert_eq!(mei_manifest["bin"].as_object().unwrap().len(), 2);
+    assert_eq!(
+        mei_manifest["scripts"]["postinstall"],
+        "bun bin/postinstall.js"
+    );
     assert!(
         std::fs::read_to_string(mei_root.join("bin/mei.js"))
             .unwrap()
             .starts_with("#!/usr/bin/env bun\n")
+    );
+    assert_eq!(
+        std::fs::read(mei_root.join("bin/mei.js")).unwrap(),
+        std::fs::read(mei_root.join("bin/calyx.js")).unwrap()
+    );
+    assert!(
+        std::fs::read_to_string(mei_root.join("bin/postinstall.js"))
+            .unwrap()
+            .contains("Fix your PATH")
     );
     assert!(!mei_root.join("bin/mei.cmd").exists());
     assert_eq!(
