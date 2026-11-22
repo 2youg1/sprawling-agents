@@ -10,12 +10,6 @@ const mei_line = @import("mei_line.zig");
 var next_session: std.atomic.Value(u64) = .init(1);
 var next_run: std.atomic.Value(u64) = .init(1);
 
-/// What one append left on disk.
-///
-/// `err` means the segment was not written and the original length was
-/// restored, so nothing refers to the run's captures. `uncertain` means the
-/// write failed and the rollback did too: the log may already name those files,
-/// so the caller must keep them.
 pub const Diagnostic = struct {
     text: []const u8,
     owned: bool,
@@ -99,7 +93,6 @@ pub const Session = struct {
 
         const file = std.Io.Dir.cwd().createFile(io, path, .{
             .exclusive = true,
-            // POSIX: owner read/write only. Windows: default attributes (no Unix mode).
             .permissions = if (comptime builtin.os.tag == .windows)
                 .default_file
             else
@@ -153,6 +146,7 @@ pub const Session = struct {
         var history: std.ArrayList([]u8) = .empty;
         var buf: [8192]u8 = undefined;
         var reader = file.readerStreaming(io, &buf);
+        var line_number: u64 = 0;
         while (true) {
             const line = (mei_line.read(gpa, &reader.interface, mei_line.MAX_BYTES) catch |err| {
                 freeHistory(gpa, &history);
@@ -163,12 +157,38 @@ pub const Session = struct {
                 gpa.free(path);
                 return .{ .err = diag };
             }) orelse break;
+            line_number += 1;
+            if (!resumeLineIsObject(gpa, line)) {
+                gpa.free(line);
+                freeHistory(gpa, &history);
+                const where = std.fmt.allocPrint(gpa, "{s}:{d}", .{ path, line_number }) catch {
+                    gpa.free(path);
+                    return .{ .err = dupeOrStatic(gpa, "parse a Mei resume log line") };
+                };
+                defer gpa.free(where);
+                const diag = formatFailure(gpa, "parse a Mei resume log line", "each line must be one JSON object", where) catch {
+                    gpa.free(path);
+                    return .{ .err = dupeOrStatic(gpa, "parse a Mei resume log line") };
+                };
+                gpa.free(path);
+                return .{ .err = diag };
+            }
             history.append(gpa, line) catch {
                 gpa.free(line);
                 freeHistory(gpa, &history);
                 gpa.free(path);
                 return .{ .err = dupeOrStatic(gpa, "store history line") };
             };
+        }
+
+        if (history.items.len == 0) {
+            freeHistory(gpa, &history);
+            const diag = formatFailure(gpa, "validate the Mei resume log", "the resume log is empty", path) catch {
+                gpa.free(path);
+                return .{ .err = dupeOrStatic(gpa, "validate the Mei resume log") };
+            };
+            gpa.free(path);
+            return .{ .err = diag };
         }
 
         return .{ .ok = .{
@@ -306,6 +326,12 @@ fn writeSegment(io: std.Io, file: std.Io.File, original_len: u64, lines: []const
 fn freeHistory(gpa: std.mem.Allocator, history: *std.ArrayList([]u8)) void {
     for (history.items) |line| gpa.free(line);
     history.deinit(gpa);
+}
+
+fn resumeLineIsObject(gpa: std.mem.Allocator, line: []const u8) bool {
+    var parsed = std.json.parseFromSlice(std.json.Value, gpa, line, .{}) catch return false;
+    defer parsed.deinit();
+    return parsed.value == .object;
 }
 
 fn outOfMemory() Diagnostic {
@@ -522,6 +548,50 @@ test "append after missing final newline stays parseable" {
     );
 }
 
+test "import refuses an empty resume log with E_MEI_SESSION" {
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const path = try std.fmt.allocPrint(gpa, ".zig-cache/tmp/{s}/empty.jsonl", .{tmp.sub_path});
+    defer gpa.free(path);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = "" });
+    switch (Session.import(gpa, io, path)) {
+        .ok => |s| {
+            var session = s;
+            session.deinit();
+            return error.TestUnexpectedResult;
+        },
+        .err => |diag| {
+            defer freeDiag(gpa, diag);
+            try std.testing.expect(std.mem.indexOf(u8, diag, "E_MEI_SESSION") != null);
+            try std.testing.expect(std.mem.indexOf(u8, diag, "the resume log is empty") != null);
+        },
+    }
+}
+
+test "import refuses a corrupt resume line with E_MEI_SESSION" {
+    const io = std.testing.io;
+    const gpa = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const path = try std.fmt.allocPrint(gpa, ".zig-cache/tmp/{s}/corrupt.jsonl", .{tmp.sub_path});
+    defer gpa.free(path);
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = "not-json\n" });
+    switch (Session.import(gpa, io, path)) {
+        .ok => |s| {
+            var session = s;
+            session.deinit();
+            return error.TestUnexpectedResult;
+        },
+        .err => |diag| {
+            defer freeDiag(gpa, diag);
+            try std.testing.expect(std.mem.indexOf(u8, diag, "E_MEI_SESSION") != null);
+            try std.testing.expect(std.mem.indexOf(u8, diag, "parse a Mei resume log line") != null);
+        },
+    }
+}
+
 test "a stale session cannot append over another instance's commit" {
     const io = std.testing.io;
     const gpa = std.testing.allocator;
@@ -582,7 +652,7 @@ test "capture directories are unique across instances of one session path" {
     defer gpa.free(root);
     const path = try std.fs.path.join(gpa, &.{ root, "session.jsonl" });
     defer gpa.free(path);
-    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = "log\n" });
+    try std.Io.Dir.cwd().writeFile(io, .{ .sub_path = path, .data = "{\"role\":\"user\",\"content\":\"first\"}\n" });
     var first = switch (Session.import(gpa, io, path)) {
         .ok => |s| s,
         .err => |e| {
@@ -680,8 +750,6 @@ test "an append allocation failure cannot leave unreported lines in the log" {
     try std.testing.expectEqualStrings("log\n", contents);
 }
 
-/// Removes one run's capture directory. A directory that is already gone is
-/// the same result as one just removed, so a failed spawn reports nothing.
 pub fn discardCaptureDirectory(io: std.Io, path: []const u8) !void {
     try std.Io.Dir.cwd().deleteTree(io, path);
 }

@@ -17,6 +17,34 @@ The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the head
 
 The published packages trail this tree until the next release. Build from source for the version in this repository.
 
+### Which command to type
+
+| How you installed | Interactive | Headless / CI |
+|---|---|---|
+| Bun `@sprawling/mei` | `mei` on a TTY (shim opens Calyx) | `mei -p …` or a pipe |
+| Source build / release zip | `calyx` (or `mei` on a TTY once both binaries are on `PATH`) | `mei -p …` or a pipe |
+| crates.io `sprawling-mei` | No Calyx face on this path | `mei -p …` or a pipe |
+
+Bun users only need to remember `mei`. Source and archive layouts keep a separate `calyx` binary beside `mei`.
+
+### Update and uninstall
+
+Mei has no self-updater. Install the version you want again through the same channel:
+
+```sh
+bun install --global @sprawling/mei@latest
+# or
+cargo install sprawling-mei --locked
+```
+
+To remove a Bun global install, uninstall the package and drop any leftover platform optional dependency for your OS:
+
+```sh
+bun remove --global @sprawling/mei
+```
+
+A crates.io install is removed with `cargo uninstall sprawling-mei`. Source and zip layouts are deleted by removing the directory that holds the binaries; they never rewrite shell profiles.
+
 ## Build from source
 
 ### 1. Start Magpie
@@ -43,7 +71,8 @@ Bash:
 export PATH="$PWD/target/debug:$PATH"
 mkdir -p /tmp/mei-playground
 cd /tmp/mei-playground
-calyx
+calyx   # source layout: open the face directly
+# mei   # also opens Calyx on a TTY when both binaries are on PATH
 ```
 
 Windows PowerShell:
@@ -52,10 +81,10 @@ Windows PowerShell:
 $env:PATH = "$PWD\target\debug;$env:PATH"
 New-Item -ItemType Directory -Force "$HOME/mei-playground" | Out-Null
 Set-Location "$HOME/mei-playground"
-calyx
+calyx   # source layout: open the face directly
 ```
 
-No model, gateway, or extra argument is required. A TTY opens Calyx; `-p` and pipes stay headless.
+No model, gateway, or extra argument is required. A TTY opens Calyx; `-p` and pipes stay headless. Non-interactive CI must use `mei -p` or a pipe so the process never waits on a Calyx face.
 
 ## Use one step at a time
 

@@ -417,4 +417,45 @@ fn the_quiet_host_is_two_lines_in_the_middle_of_the_window() {
     assert_eq!(shown, wanted);
 }
 
+#[test]
+fn composer_status_line_renders_across_the_install_width_matrix() {
+    let offer = "provider/actual · effort high · Agent Step 12 · 12.34% · 123456/1048576";
+    for columns in [20_u16, 40, 60, 80, 120, 200] {
+        let scene = Scene::inline(&Inline {
+            columns,
+            rows: 8,
+            erase: 0,
+            previous: None,
+            entries: &[],
+            live: Some(Live {
+                waiting: None,
+                working: None,
+                calling: Vec::new(),
+                asking: None,
+                replying: None,
+                composer: Composer {
+                    typed: "",
+                    cursor: 0,
+                    placeholder: "to Mei…",
+                    room: "Mei",
+                    offer,
+                },
+                menu: None,
+            }),
+        });
+        let (bytes, _) = drawn(&scene);
+        let (shown, _) = screen(columns, 8, &[bytes]);
+        assert!(shown.contains("Mei"), "cols={columns}: {shown}");
+        for row in shown.lines() {
+            assert!(
+                row.chars().count() <= usize::from(columns),
+                "cols={columns} overflows: {row}"
+            );
+        }
+        if columns >= 80 {
+            assert!(shown.contains("Agent Step"), "cols={columns}: {shown}");
+        }
+    }
+}
+
 mod edges;

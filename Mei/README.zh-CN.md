@@ -17,6 +17,34 @@ Archetype:Mei 是极简 Agent Harness：模型接收任务，通过唯一持久�
 
 已发布包会落后于本树，直到下一次发布；要本仓库的版本，用下方源码构建。
 
+### 该敲哪个命令
+
+| 安装方式 | 交互 | 无头 / CI |
+|---|---|---|
+| Bun `@sprawling/mei` | TTY 下敲 `mei`（shim 打开 Calyx） | `mei -p …` 或管道 |
+| 源码构建 / release zip | `calyx`（或两个二进制都在 `PATH` 时 TTY 下的 `mei`） | `mei -p …` 或管道 |
+| crates.io `sprawling-mei` | 此路径没有 Calyx 面 | `mei -p …` 或管道 |
+
+Bun 用户只需记住 `mei`。源码与归档布局在 `mei` 旁另放 `calyx` 二进制。
+
+### 更新与卸载
+
+Mei 没有自更新。要换版本，用同一通道再装一次：
+
+```sh
+bun install --global @sprawling/mei@latest
+# 或
+cargo install sprawling-mei --locked
+```
+
+卸载 Bun 全局安装时，去掉根包，并清掉本机平台的 optional 依赖：
+
+```sh
+bun remove --global @sprawling/mei
+```
+
+crates.io 安装用 `cargo uninstall sprawling-mei` 卸掉。源码与 zip 布局删掉放二进制的目录即可；它们不改 shell profile。
+
 ## 从源码构建
 
 ### 1. 启动 Magpie
@@ -43,7 +71,8 @@ Bash：
 export PATH="$PWD/target/debug:$PATH"
 mkdir -p /tmp/mei-playground
 cd /tmp/mei-playground
-calyx
+calyx   # 源码布局：直接打开面
+# mei   # 两个二进制都在 PATH 时，TTY 下也会进 Calyx
 ```
 
 Windows PowerShell：
@@ -52,10 +81,10 @@ Windows PowerShell：
 $env:PATH = "$PWD\target\debug;$env:PATH"
 New-Item -ItemType Directory -Force "$HOME/mei-playground" | Out-Null
 Set-Location "$HOME/mei-playground"
-calyx
+calyx   # 源码布局：直接打开面
 ```
 
-模型、网关和其他参数都不用输入。TTY 会进入 Calyx；`-p` 和管道仍走无头路径。
+模型、网关和其他参数都不用输入。TTY 会进入 Calyx；`-p` 和管道仍走无头路径。非交互 CI 必须用 `mei -p` 或管道，避免误进 Calyx 面等待输入。
 
 ## 一次一步使用
 
