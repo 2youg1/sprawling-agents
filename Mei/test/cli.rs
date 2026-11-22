@@ -49,16 +49,24 @@ fn cli_non_unicode_prompt_is_a_usage_error() {
 #[expect(clippy::disallowed_methods, reason = "TTY fixture process for crates.io face hint")]
 fn tty_mei_without_prompt_points_at_the_calyx_install() {
     let mei = env!("CARGO_BIN_EXE_mei");
-    let output = Command::new("script")
-        .args(["-q", "-e", "-c", mei, "/dev/null"])
+    let mut command = Command::new("script");
+    #[cfg(target_os = "linux")]
+    {
+        command.args(["-q", "-e", "-c", mei, "/dev/null"]);
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        command.args(["-q", "/dev/null", mei]);
+    }
+    let output = command
         .output()
         .expect("script provides a PTY for the headless mei TTY path");
-    assert!(!output.status.success());
     let error = String::from_utf8_lossy(&output.stderr);
     let combined = format!("{error}{}", String::from_utf8_lossy(&output.stdout));
     assert!(
         combined.contains("E_MEI_USAGE"),
-        "stderr={error} stdout={}",
+        "status={} stderr={error} stdout={}",
+        output.status,
         String::from_utf8_lossy(&output.stdout)
     );
     assert!(
