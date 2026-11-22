@@ -73,9 +73,7 @@ fn a_dispatched_command_runs_below_the_core() {
             .collect(),
         ..setup(chamber.path(), None, None)
     };
-    let tool = regression_boundary(
-        ExecTool::new(declared, patient()).unwrap(),
-    );
+    let tool = regression_boundary(ExecTool::new(declared, patient()).unwrap());
     let outcome = tool.invoke(&call(line_of(path, args))).unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
     let dispatched = result["stdout"].as_str().unwrap();
@@ -100,12 +98,7 @@ fn a_dispatched_command_runs_below_the_core() {
 #[test]
 fn a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level() {
     let chamber = tempfile::tempdir().unwrap();
-    let tool = ExecTool::new(
-        setup(chamber.path(), None, None),
-        
-        patient(),
-    )
-    .unwrap();
+    let tool = ExecTool::new(setup(chamber.path(), None, None), patient()).unwrap();
     let outcome = tool.invoke(&call(line_of("ionice", NO_ARGS))).unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
     assert_eq!(

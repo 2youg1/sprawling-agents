@@ -21,7 +21,6 @@ fn call(args: Value) -> ToolCall {
     }
 }
 
-/// The call as the agent writes it: what to run, and where it runs.
 fn call_at(mut args: Value, placement: &str) -> ToolCall {
     args["where"] = Value::String(placement.to_owned());
     call(args)
@@ -35,8 +34,6 @@ fn python(code: &str) -> Value {
     serde_json::json!({ "python": code })
 }
 
-/// A command line that names `path` and hands it `args` word for word,
-/// each word quoted the way the program-line grammar reads it back.
 fn line_of<S: AsRef<str>>(path: impl AsRef<str>, args: impl IntoIterator<Item = S>) -> Value {
     let quoted = |word: &str| {
         if word.contains('"') {
@@ -55,12 +52,6 @@ fn line_of<S: AsRef<str>>(path: impl AsRef<str>, args: impl IntoIterator<Item = 
 #[cfg(unix)]
 const NO_ARGS: &[&str] = &[];
 
-/// A working directory of the test's own.
-///
-/// It is small on purpose. A sandboxed command runs in a copy of this
-/// directory, and pointing the tools at this machine's temporary
-/// directory - which holds whatever the machine left there - would make
-/// every one of these tests copy gigabytes.
 fn setup(workdir: &std::path::Path, python: Option<PathBuf>, shell: Option<PathBuf>) -> ExecSetup {
     ExecSetup {
         workdir: workdir.to_path_buf(),
@@ -76,11 +67,7 @@ fn setup(workdir: &std::path::Path, python: Option<PathBuf>, shell: Option<PathB
     }
 }
 
-fn a_tool(
-    workdir: &std::path::Path,
-    python: Option<PathBuf>,
-    shell: Option<PathBuf>,
-) -> ExecTool {
+fn a_tool(workdir: &std::path::Path, python: Option<PathBuf>, shell: Option<PathBuf>) -> ExecTool {
     regression_boundary(ExecTool::new(setup(workdir, python, shell), patient()).unwrap())
 }
 
@@ -98,22 +85,10 @@ fn regression_boundary(tool: ExecTool) -> ExecTool {
     tool
 }
 
-/// A table whose callers wait for the command to settle rather than for
-/// the ten seconds a person is given. These tests read a settled answer,
-/// and the wait ends at the poll that sees the command exit, so a quick
-/// command costs no more than it did. On a machine loaded by parallel
-/// builds these tests failed at ten seconds and passed alone. Two
-/// minutes stays under the suite's own three-minute limit
-/// (`.config/nextest.toml`), so a command that really hangs still fails.
 fn patient() -> Backlog {
     Backlog::with_window(crate::backlog::PollBudget::new(6_000, 20))
 }
 
-/// One variable this process really has, which no building declares by
-/// default and which no rule refuses. Picked from the parent environment
-/// rather than written down, so the test does not depend on which
-/// machine it runs on; taken in sorted order so it picks the same one
-/// twice.
 fn a_name_this_machine_sets() -> (String, String) {
     let mut candidates: std::collections::BTreeMap<String, String> =
         std::collections::BTreeMap::new();
@@ -158,9 +133,7 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
         env_passthrough: vec![kernel::EnvVarName::parse(&name).unwrap()],
         ..setup(chamber.path(), None, None)
     };
-    let tool = regression_boundary(
-        ExecTool::new(declared, patient()).unwrap(),
-    );
+    let tool = regression_boundary(ExecTool::new(declared, patient()).unwrap());
     let outcome = tool
         .invoke(&call(line_of(path.clone(), args.clone())))
         .unwrap();
@@ -175,14 +148,8 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
         "the ledger says what it inherited: {result}"
     );
 
-    // The same command in a building that declared nothing sees nothing.
     let bare_chamber = tempfile::tempdir().unwrap();
-    let bare = a_tool(
-        bare_chamber.path(),
-        None,
-        
-        None,
-    );
+    let bare = a_tool(bare_chamber.path(), None, None);
     let outcome = bare.invoke(&call(line_of(path, args))).unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
     assert!(
@@ -208,9 +175,6 @@ fn a_missing_component_refuses_and_names_the_alternative() {
     );
 }
 
-/// D118: where the building offers no shell, a command is one program
-/// and its arguments, and shell syntax is refused rather than passed on
-/// as an argument.
 #[test]
 fn without_a_shell_a_command_runs_its_program_and_refuses_shell_syntax() {
     let chamber = tempfile::tempdir().unwrap();
@@ -240,8 +204,6 @@ fn without_a_shell_a_command_runs_its_program_and_refuses_shell_syntax() {
     );
 }
 
-/// What a call asks to run is read off its arguments alone: a command,
-/// a script, and nothing else - not the older `arm` spelling, not both.
 #[test]
 fn a_call_names_a_command_or_a_script_and_nothing_else() {
     let read = |args: Value| {
@@ -293,8 +255,7 @@ fn an_unrecognised_arm_is_refused_not_guessed() {
 fn the_program_arm_runs_a_real_child_with_a_scrubbed_environment() {
     let chamber = tempfile::tempdir().unwrap();
     let tool = a_tool(chamber.path(), None, None);
-    // A program every supported host has, printing nothing useful:
-    // the assertion is that it ran and reported its own exit code.
+
     let (path, args) = if cfg!(windows) {
         ("cmd", vec!["/C".to_owned(), "exit 3".to_owned()])
     } else {
@@ -306,9 +267,6 @@ fn the_program_arm_runs_a_real_child_with_a_scrubbed_environment() {
     assert_eq!(result["arm"], "program");
 }
 
-/// A command that writes a file beside itself, and prints what it
-/// wrote. Both halves matter: the first proves it could write where it
-/// ran, the second proves where it ran.
 fn writes_beside_itself(name: &str) -> (String, Vec<String>) {
     if cfg!(windows) {
         (
@@ -329,9 +287,6 @@ fn writes_beside_itself(name: &str) -> (String, Vec<String>) {
     }
 }
 
-/// The one promise the floor arm makes, asked of a real command on a
-/// real tree: it may write, and what it writes does not reach the tree
-/// the person has.
 #[test]
 fn a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone() {
     let chamber = tempfile::tempdir().unwrap();
@@ -355,9 +310,6 @@ fn a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone() {
         "the tree it read is the tree the person has"
     );
 
-    // The same command with the host placement is what reaches the tree,
-    // which is what makes the assertion above a capability decision
-    // rather than a command that never wrote anything.
     let host = a_tool(chamber.path(), None, None);
     let (path, args) = writes_beside_itself("made.txt");
     host.invoke(&call_at(line_of(path, args), "host")).unwrap();
@@ -375,15 +327,10 @@ fn the_python_arm_runs_on_the_host_interpreter_when_asked() {
     };
     let chamber = tempfile::tempdir().unwrap();
     let tool = a_tool(chamber.path(), Some(interpreter), None);
-    let outcome = tool
-        .invoke(&call_at(python("print(7)"), "host"))
-        .unwrap();
+    let outcome = tool.invoke(&call_at(python("print(7)"), "host")).unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
     assert_eq!(result["exit_code"], 0, "{result}");
-    assert!(
-        result["stdout"].as_str().unwrap().contains('7'),
-        "{result}"
-    );
+    assert!(result["stdout"].as_str().unwrap().contains('7'), "{result}");
     assert_eq!(result["arm"], "python");
 }
 

@@ -16,5 +16,5 @@ wasip1／wasmtime 适配器已退役。Python 与命令执行都走 `runtime::to
 
 ## 验收
 
-Python 臂经 `exec` 的 `-c` 跑宿主解释器；缺解释器时 `E_TOOL_UNAVAILABLE`，恢复语点出 `SPRAWLING_PYTHON`／安装 Python 3。A10（fuel／preopen／wasip1）不再适用。
+Python 臂经 `exec` 的 `-c` 跑宿主解释器；缺解释器时 `E_TOOL_UNAVAILABLE`，恢复语点出 `SPRAWLING_PYTHON`／安装 Python 3。围栏与 program 同界：`copied_tree` 不限制网络，保密楼上的外连缺口与 command 臂相同（`docs/operating.md`）。A10（fuel／preopen／wasip1）不再适用。
 -/

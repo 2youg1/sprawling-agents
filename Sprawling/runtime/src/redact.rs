@@ -308,7 +308,7 @@ mod phases {
 
     use crate::backlog::{Backlog, PollBudget};
     use crate::catalog::Catalog;
-        use crate::tools::{EditTool, ExecSetup, ExecTool, ReadBound, ReadTool, SearchTool};
+    use crate::tools::{EditTool, ExecSetup, ExecTool, ReadBound, ReadTool, SearchTool};
 
     #[test]
     #[ignore = "an instrument: run it by name with --run-ignored only --no-capture"]

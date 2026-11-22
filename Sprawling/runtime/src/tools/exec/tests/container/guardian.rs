@@ -26,13 +26,9 @@ fn guardian_parent_process() {
     let runtime = ContainerRuntime::probe(ContainerEngine::Docker, program)
         .unwrap()
         .guarded(harness);
-    let tool = ExecTool::new(
-        setup(&work, None, None),
-        
-        patient(),
-    )
-    .unwrap()
-    .with_container(limits(), runtime);
+    let tool = ExecTool::new(setup(&work, None, None), patient())
+        .unwrap()
+        .with_container(limits(), runtime);
     tool.invoke(&call(line_of("/bin/true", NO_ARGS))).unwrap();
 }
 
@@ -84,7 +80,6 @@ fn guardian_eof_waits_for_late_create_and_reaps_its_client() {
         parent.kill().unwrap();
         parent.wait().unwrap();
         if creator == parent_id {
-            // The parent-owned client can outlive a guardian that accepted absence.
             wait_for_fixture(&exited);
         }
         let absent = Command::new(&daemon.program)
@@ -147,13 +142,9 @@ fn guardian_timeout_retains_the_member_until_harvest() {
         let runtime = ContainerRuntime::probe(ContainerEngine::Docker, daemon.program.clone())
             .unwrap()
             .guarded(daemon.guardian());
-        let tool = ExecTool::new(
-            setup(work.path(), None, None),
-            
-            backlog.clone(),
-        )
-        .unwrap()
-        .with_container(limits(), runtime);
+        let tool = ExecTool::new(setup(work.path(), None, None), backlog.clone())
+            .unwrap()
+            .with_container(limits(), runtime);
         let scope = tool.setup.domain.clone();
         let run = tool.setup.run;
         if lost_response {
@@ -181,9 +172,9 @@ fn guardian_timeout_retains_the_member_until_harvest() {
                     .unwrap();
             });
             wait_for_fixture(&daemon.dir.path().join("create-entered"));
-            // The parent budget counts polls; the fixture also allows for OS scheduling.
+
             let returned = response.recv_timeout(Duration::from_secs(30));
-            // Release even a regressed unbounded parent before joining the scoped thread.
+
             if returned.is_err() {
                 std::fs::write(daemon.dir.path().join("create-fifo"), "release\n").unwrap();
             }

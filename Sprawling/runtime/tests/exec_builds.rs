@@ -56,7 +56,7 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
     let run = RunId::from_bytes([1; 16]);
     let setup = ExecSetup {
         workdir: crate_dir,
-            python: None,
+        python: None,
         shell: runtime::Shell::Absent,
         env_passthrough: declared,
         domain: Address::parse("lab").unwrap(),

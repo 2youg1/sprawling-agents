@@ -7,9 +7,6 @@ use super::*;
 use crate::views::building_page::read_building;
 use crate::worker::fixture::*;
 
-/// The rules a person may read on the building page are the rules
-/// the city obeys, and the page reads them from a directory the
-/// walk deliberately skips.
 #[test]
 fn a_building_page_still_shows_the_rules_that_govern_it() {
     let dir = tempfile::tempdir().unwrap();
@@ -36,22 +33,13 @@ fn a_building_page_still_shows_the_rules_that_govern_it() {
     );
 }
 
-/// A plan nobody can open and a plan somebody wrote badly are two
-/// different facts, and the page states the first.
-///
-/// Reading the file as empty runs it through `check_roadmap_shape`,
-/// which finds no header row and answers `no six-column table
-/// found`. That sends a person to edit a table when what they have
-/// to fix is a file that will not open - the same misreport already
-/// removed from the dispatch path, still standing on the page.
 #[test]
 fn a_building_page_says_the_plan_cannot_be_read_rather_than_that_it_is_malformed() {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
     let lab = Address::parse("lab").unwrap();
     city::create_building(dir.path(), &lab, city::BuildingTemplate::Minimal).unwrap();
-    // A directory where the plan belongs, so the read fails for a
-    // reason that is not "it is not there yet".
+
     let plan = city::roadmap_path(dir.path(), &lab);
     let _ = std::fs::remove_file(&plan);
     std::fs::create_dir_all(&plan).unwrap();
@@ -83,8 +71,7 @@ addr = \"gone/room1\"
     .unwrap();
     let (base_url, provider) = fake_openai(&["m-local"], vec![completion("unused", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    // Not a refusal: nothing listening is a fact about the city, and
-    // the person who wrote the table is the one who can act on it.
+
     worker
         .handle(wire::Command::Wake {
             source: "github".to_owned(),
@@ -96,9 +83,6 @@ addr = \"gone/room1\"
     drop(provider);
 }
 
-/// `[sandbox]` and `[mcp]` resolve city -> building -> room and
-/// nothing wrote either, so a person was governed by settings they
-/// could not change without a text editor.
 #[test]
 fn a_building_can_be_told_what_its_runs_may_reach() {
     let dir = tempfile::tempdir().unwrap();
@@ -150,17 +134,12 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
         }))
         .unwrap();
 
-    // The ladder is the authority: what a run in the room resolves
-    // to is what the building's own rung now says.
     let after = city::load_config(dir.path(), &room).unwrap();
     assert!(after.sandbox.shell);
     assert_eq!(after.sandbox.interpreter, kernel::Interpreter::Pwsh);
     assert_eq!(after.mcp.len(), 1);
     assert_eq!(after.mcp[0].label.as_str(), "docs");
 
-    // And the page reads the building's own rung back, not the
-    // resolved value, so saving twice does not copy the city's
-    // settings down into the building.
     let lab = Address::parse("lab").unwrap();
     let plan = crate::plan_view::PlanView::default().of(dir.path(), &lab);
     let shown = read_building(dir.path(), &lab, plan).expect("the building page has an answer");
@@ -168,13 +147,6 @@ fn a_building_can_be_told_what_its_runs_may_reach() {
     assert!(shown.sandbox.is_some_and(|limits| limits.shell));
 }
 
-/// The desktop allowlist travels on the same frame as the rest of
-/// what a building's runs may reach, and lands where no write domain
-/// goes (`Sprawling/city/Spec.lean` §8-26).
-///
-/// The bytes a person wrote are the bytes on disk: this side never
-/// parses the file, because the connector that reads it at start-up
-/// is the authority on its syntax and fails closed.
 #[test]
 fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
     let dir = tempfile::tempdir().unwrap();
@@ -230,9 +202,6 @@ fn the_desktop_allowlist_is_written_where_no_resident_reaches_it() {
     );
 }
 
-/// A run does not change what governs it. The rules tool answers the
-/// model with a refusal rather than a rewrite, and the building it was
-/// asked about stands exactly as it did.
 #[test]
 fn a_run_that_asks_to_rewrite_its_own_rules_is_refused_and_told_where_to_go() {
     let dir = tempfile::tempdir().unwrap();
@@ -336,10 +305,6 @@ fn a_new_building_is_visible_in_the_city_view_with_a_denominator_of_zero() {
     );
 }
 
-/// The page's write of a building's rules lands only over the text the
-/// page read, and only once the city can read what it says: a stale base
-/// and a body that does not evaluate both leave the file as it was and
-/// book nothing, and the write that holds both books one line.
 #[test]
 fn a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing() {
     let dir = tempfile::tempdir().unwrap();
@@ -411,8 +376,6 @@ fn a_rules_write_against_a_moved_file_or_that_does_not_evaluate_lands_nothing() 
     );
 }
 
-/// Registry-dependent policy validation happens before the existing rules
-/// write door: an unknown reference leaves the old file byte for byte.
 #[test]
 fn a_workspace_policy_save_checks_the_registry_before_landing() {
     let dir = tempfile::tempdir().unwrap();

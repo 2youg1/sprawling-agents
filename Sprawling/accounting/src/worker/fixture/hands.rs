@@ -182,7 +182,6 @@ fn absent_path() -> Option<PathBuf> {
     None
 }
 
-
 pub(crate) fn roomy_volume(_city: &Path) -> Option<kernel::degradation::VolumeSpace> {
     Some(kernel::degradation::VolumeSpace {
         free_bytes: 1 << 50,

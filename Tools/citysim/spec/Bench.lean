@@ -94,13 +94,13 @@ D17 **读数行一个文法、机器类属进字段，基线读数（含机器�
 
 D18 **多 run 并行不在本 crate 里量。** relay、`serve_flight` 与 desk 都是 `sprawling-accounting`（库名 `accounting`）在 `accounting::worker` 之内的件，本 crate 够不到，这里的场景只能抄一份 relay 的形状：数条 lane 经 mpsc 汇到一条线程，计时只包住那条线程上的一次 `append`。抄件量的是抄件：它的 `harness` 是 MemLedger 一次追加（5 µs 量级），而一次往返的代价取决于生产循环怎么等，抄件没有那份等法，也就量不到它；它的 `persist` 每条一道屏障，生产的 `append_all` 一批一道；盘的份额由那件仪表 `store=disk` 与 `store=memory` 两行之差读出，所以 `SubMetric` 没有 `persist`。被否：给 `accounting` 开一扇公共门让本 crate 驱动 `serve_flight`。那扇门没有生产调用者，而仪表放在 crate 内已经能驱动生产循环本身（`Sprawling/app/Spec.lean` §8-84 的决定）。
 
-D9 **被量的产品 feature 集就是 `sprawling` 包的默认 feature，只写在 `Sprawling/app/Cargo.toml` 的 `[features] default` 一处。** 人下载的二进制带执行引擎（`sandbox` feature），而 `sandbox` 是默认 feature，所以 `dist`、`bench`、`bench-startup`、`mem` 四个 recipe 不写 `--features` 就构建出人下载的那个二进制；citysim 经工作区依赖带着 `sprawling` 的默认 feature，`bench` 里的场景与仪表也在同一套 feature 下编译。于是 install 解包的、startup 拉起的、首字节服务的、内存读数量到的，与人下载的是同一个二进制。被否：①justfile 再留一个变量写 `sprawling/sandbox`——它重述清单的默认 feature，两处可以只改一处，而读数看不出它们已经分开；②每个 recipe 自己写 `--features`——漏写的那个 recipe 量的是一个没人下载的二进制。**重开参数**：人下载的二进制要带一个不是默认的 feature，那时这套 feature 回到 justfile 的一个变量里，由每个构建与测量的 recipe 读。
+D9 **被量的产品 feature 集就是 `sprawling` 包的默认 feature，只写在 `Sprawling/app/Cargo.toml` 的 `[features] default` 一处。** `dist`、`bench`、`bench-startup`、`mem` 四个 recipe 不写 `--features` 就构建出人下载的那个二进制；citysim 经工作区依赖带着 `sprawling` 的默认 feature，`bench` 里的场景与仪表也在同一套 feature 下编译。wasip1／`sandbox` feature 已退役。被否：每个 recipe 自己写 `--features`——漏写的那个 recipe 量的是一个没人下载的二进制。**重开参数**：人下载的二进制要带一个不是默认的 feature，那时这套 feature 回到 justfile 的一个变量里，由每个构建与测量的 recipe 读。
 
 Rust 检查：`a_reading_line_is_stable_and_carries_its_machine_class`——一行读数按字节对拍既有文法且带 `machine_class` 与 `fixture` 字段；`a_reading_line_carries_its_floor_beside_the_middle`——同一文法下 floor 与 p50 并列；`every_load_scenario_reruns_and_emits_the_stable_format`——本 crate 的每个场景各跑两遍，每行键序恒为文法键序（可复跑、格式稳定）；`the_registered_fixture_writes_the_bytes_its_digest_pins`——`REGISTERED.digest` 等于 `REGISTERED.pinned`（D8）。
 -/
 
 /-!
-### 8-6-1 CPython-WASI 执行基线（`bench::python`）
+### 8-6-1 宿主 Python 执行基线（`bench::python`）
 
 这一族量居民经 `exec` 的 Python 臂实际抵达的宿主解释器，不量工具信封与结果扫描；后两者仍由 `[tool_phases]` 的仪表负责。负载是一段使用 `collections`、`difflib`、`itertools`、`re` 的确定性脚本，解释器与脚本的完整 BLAKE3 摘要都进读数行。场景只走产品已有的宿主 Python 路径（`doctor::host::usable_python`），不另起 guest ABI。
 
@@ -110,19 +110,19 @@ pub struct Report { pub lines: Vec<String>, /* arm 与原始 Observation 行私�
 pub enum Arm { Baseline, Candidate }
 pub fn measure() -> Result<Report, String>;             // Baseline
 pub fn measure_as(arm: Arm) -> Result<Report, String>;
-pub fn cold_child(expected_guest: &str, snapshot: &Path, stdlib: &Path) -> Result<(), String>; // 仅 Main 的 python-cold 内部入口调用
+pub fn cold_child(expected: &str, interpreter: &Path) -> Result<(), String>; // 仅 Main 的 python-cold 内部入口调用
 impl Report { pub fn write_csv(&self) -> Result<PathBuf, String>; }
 ```
 
-`measure` 经 `sprawling::doctor::usable_python` 取得与生产 Python 臂相同的宿主解释器路径，`SPRAWLING_PYTHON` 与 PATH 回退都不由 bench 重写。`PythonGuest::at` 补上同一个只读 stdlib 来源；`Guest::at` 只读 wasm 来源一次，把同样的字节写进本次测量私有的 tempfile 快照，同时保留 stdlib 的 Mount。父进程与冷子进程都只执行这份快照并挂载同一个 stdlib 来源，摘要也从同一份字节算出；冷进程协议多带一个 stdlib 宿主路径，不复制这棵树。Main 以 args_os 接收参数，只对命令、arm 与 guest 摘要文本校验 UTF-8，路径不转字符串。测量前后按 docs/third-party.md 的规范化规则分别摘要所选 stdlib 树；摘要不同或读取失败即拒掉整份 Report，不检测结束前已恢复的变化。全部场景结束后重读快照，不同就拒掉整份 Report；冷子进程另核对父进程交给它的摘要。默认组件因此是经来源门与内容门选择的固定工件，开发覆盖则按 Doctor 的报告保持未钉。没有可用路径时是 `E_TOOL_UNAVAILABLE`，recovery 指向同一个外部 guest 配置门。取得路径后先建快照，再运行校验脚本：它检查 `sys.implementation.name == "cpython"`，且固定脚本的完整 stdout 必须逐字节等于登记值，不能把第一次的任意标记输出收养成基准；宿主错误、非零退出、trap、fuel 耗尽、stdout 不符都以 `E_TOOL_UNAVAILABLE` 报「前置条件不满足」。校验发生在任何计时之前，`Report` 又在全部场景成功之后才交给 Main 打印，因此缺失、坏 Wasm、非 CPython 或中途失败都不会留下半份 Python 读数，更不会留下零成本读数。
+`measure` 经 `sprawling::doctor::usable_python` 取得与生产 Python 臂相同的宿主解释器路径，`SPRAWLING_PYTHON` 与 PATH 回退都不由 bench 重写。`prepare_at` 只读解释器路径并算出 BLAKE3 摘要；`run_script` 直接以该路径起 `-c`。冷子进程协议是 `python-cold <解释器摘要> <解释器路径>`：子进程再读一次路径、核对摘要与父进程一致后跑同一固定脚本，完成时冲刷协议行。Main 以 args_os 接收参数，只对命令与摘要文本校验 UTF-8，路径不转字符串。没有可用路径时是前置条件失败，recovery 指向 `SPRAWLING_PYTHON`／安装 Python 3。取得路径后先跑校验脚本：它检查 `sys.implementation.name == "cpython"`，且固定脚本的完整 stdout 必须等于登记值（Windows 上先去掉 `\r` 再比）；宿主错误、非零退出、stdout 不符都以前置条件失败报出。校验发生在任何计时之前，`Report` 又在全部场景成功之后才交给 Main 打印，因此缺失、非 CPython 或中途失败都不会留下半份 Python 读数。
 
 场景与读数行：
 
 | 行 | 驱动方式 | 回答的问题 |
 |---|---|---|
-| `python_cold_call` | 每样本拉起当前 bench 可执行文件的 `python-cold <guest 摘要> <快照路径> <stdlib 宿主路径>` 子进程；子进程读取同一快照、挂载同一 stdlib、校验并运行负载，完成时冲刷协议行，读取线程在 `read_line` 返回时记时。父进程等待退出时若消息尚未送达，会再有界等待，不把正常竞态误报成失败 | 当前无 pre-warm 适配器里，冷进程到第一次完成 Python 调用；`mode=no_prewarm`；子进程与父进程摘要不同即拒 |
-| `python_warm_call` | 同一 sandbox 已校验并编译 guest 后重复运行负载，返回时先停表再做输出校验；另写一次全局并检查下一次调用看不到它 | 热调用分布、重复输出逐字节相等与新解释器状态隔离 |
-| `python_concurrent_call` | 固定并发度的 scoped threads 从同一屏障出发，每个线程持有共享 Engine/Module 的克隆与新 Store/WASI context；以最后一次 sandbox 返回为每轮 wall 终点，之后核对输出 | 并发调用延迟、整批吞吐与尾延迟；每轮原始 wall 也进 CSV，可重算终端的 calls_per_s |
+| `python_cold_call` | 每样本拉起当前 bench 可执行文件的 `python-cold <摘要> <解释器路径>` 子进程；子进程校验并运行负载，完成时冲刷协议行，读取线程在 `read_line` 返回时记时。父进程等待退出时若消息尚未送达，会再有界等待，不把正常竞态误报成失败 | 冷进程到第一次完成 Python 调用；`mode=no_prewarm`；子进程与父进程摘要不同即拒 |
+| `python_warm_call` | 同一解释器已校验后重复运行负载，返回时先停表再做输出校验；另写一次全局并检查下一次调用看不到它 | 热调用分布、重复输出逐字节相等与新解释器状态隔离 |
+| `python_concurrent_call` | 固定并发度的 scoped threads 从同一屏障出发，每个线程对同一解释器路径各起一次 `-c`；以最后一次返回为每轮 wall 终点，之后核对输出 | 并发调用延迟、整批吞吐与尾延迟；每轮原始 wall 也进 CSV，可重算终端的 calls_per_s |
 | `python_start_delay` | 同上，每线程记录从本轮开始到屏障后实际起跑的时间，CSV 保留其 burst 轮次 | 起跑调度分布；当前没有 admission queue，故不把它改名成 queue delay |
 | `python_memory` | 并发 burst 前、期间与排空后经 `sprawling::monitor::tree::Tree` 读当前进程；相邻整表读取遵守 `MINIMUM_BEAT`，必要时延后最终读取 | Unix 的 virtual 与 resident；Windows 明确写 private commit 与 resident，不伪称取得虚拟地址预留。before／peak／after 与 beats 都进 CSV；peak 只是采样看到的下界 |
 
@@ -134,15 +134,13 @@ impl Report { pub fn write_csv(&self) -> Result<PathBuf, String>; }
 
 后续变化报告按 `docs/performance.md` 做预注册的 DiD 与分布分析：CSV 的臂和轮次是分析输入，不把两个 P50 的差改名为 DiD。大型或横向测量另附人类可读、带分布图与 DiD 表的 HTML 或 LaTeX 报告；本族的原始 CSV 不冒充那份报告。`python_memory` 是字节读数，不套 duration 行，也不印假的 `floor_us=0`。可执行文件、包大小、构建时间与 startup-to-ready 继续分别由 `[release_binary]` 与 `bench-startup` 的既有行负责，本族不另造第二仪表。
 
-当前适配器没有 pre-warm 或阶段观察面，所以本切片不产 pre-warm awaited／racing、`instantiate` 或 `interpreter_initialization` 行；S1 的这些读数仍欠。冷／热之差不能冒充其中任何一项，WAT 正确性夹具也不能成为 CPython 计时。后续测量面须同时守住 roadmap 的「不新增 callback API」与计时采样点约束。
+D27 **真实宿主 CPython 是唯一的 Python 性能夹具，缺前置条件时整族无读数。** 理由：手写 WAT 能证明沙箱能力行为，却没有 CPython 的解释器初始化、标准库和内存形状；把它的时间登记成 Python baseline 会让之后的判断建立在另一份负载上。被否：缺解释器时跳过校验后印零、用假适配器替代。
 
-D27 **真实 CPython-WASI guest 是唯一的 Python 性能夹具，缺前置条件时整族无读数。** 理由：手写 WAT 能证明 sandbox 的燃料与能力行为，却没有 CPython 的解释器初始化、标准库和内存形状；把它的时间登记成 Python baseline 会让之后的 pooling 与 pre-warm 判断建立在另一份负载上。被否：缺 guest 时跳过校验后印零、用 EchoSandbox 替代、用 WAT 时间补行。重开参数：若以后取消开发覆盖、固定 guest 成为唯一工件，路径解析可以删除，校验仍须确认实际运行的是该工件。
+准备阶段的输出校验失败保留失败详情，只报告前置条件失败与配置真实宿主 Python 的恢复建议。
 
-准备阶段的输出校验失败保留失败详情，只报告 `E_TOOL_UNAVAILABLE` 和配置真实 CPython-WASI guest 的恢复建议，不嵌入 `E_INVALID_ARGS`。
+**计时后的 `checked_output` 校验失败沿用 bench 自身的 `E_INVALID_ARGS`，不新增错误码，也不冒充计时前的前置条件失败。** 热调用与并发调用的非成功状态、stderr 非空或 stdout 不符都经 `AxError::failure` 给出动作、主体与检查解释器／固定脚本的恢复方法；Main 的 `finish` 保留格式化错误并退出非零。
 
-**计时后的 `checked_output` 校验失败沿用 bench 自身的 `E_INVALID_ARGS`，不新增错误码，也不冒充计时前的 `E_TOOL_UNAVAILABLE`。** 热调用与并发调用的非成功状态、stderr 非空或 stdout 不符都经 `AxError::failure` 给出动作、主体与检查 guest／固定脚本的恢复方法；Main 的 `finish` 保留格式化错误并退出非零。这样复用既有失败出口，正常路径不增加分配；被否：把中途失败全归为 guest 前置条件失败，混淆可用性与测量有效性。
-
-Rust 检查：`measured_output_failures_carry_a_code_action_and_recovery`、`a_missing_guest_is_a_prerequisite_error`、`an_invalid_guest_produces_no_reading`、`a_correctness_module_is_not_cpython_evidence`、`the_csv_report_keeps_raw_observations_in_long_form`、`csv_publication_preserves_an_existing_target_and_removes_the_partial_file`、`csv_write_failure_names_the_partial_path_and_keeps_cleanup`、`csv_cleanup_failure_keeps_the_published_and_residual_paths`；这些检查走默认测试套件，不要求测量环境已有 CPython。真实 guest 的测量由 `just bench` 或 `cargo run --release -p citysim --bin bench -- python [baseline|candidate]` 触发，缺工件即非零拒绝。
+Rust 检查：`measured_output_failures_carry_a_code_action_and_recovery`、`a_missing_interpreter_is_a_prerequisite_error`、`the_csv_report_keeps_raw_observations_in_long_form`、`csv_publication_preserves_an_existing_target_and_removes_the_partial_file`、`csv_write_failure_names_the_partial_path_and_keeps_cleanup`、`csv_cleanup_failure_keeps_the_published_and_residual_paths`；这些检查走默认测试套件，不要求测量环境已有 CPython。真实测量由 `just bench` 或 `cargo run --release -p citysim --bin bench -- python [baseline|candidate]` 触发，缺解释器即非零拒绝。
 -/
 
 /-!

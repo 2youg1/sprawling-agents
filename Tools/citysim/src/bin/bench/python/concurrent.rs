@@ -10,9 +10,9 @@ use sprawling::monitor::spread::micros;
 use sprawling::monitor::tree::{Tree, TreeReading};
 
 use super::{
-    CONCURRENT_BURSTS, CONCURRENT_CALLERS, Identity, MEMORY_BEAT, Prepared, RunOutcome, STATE_CLEAN,
-    STATE_LEAKED, STATE_WRITTEN, Sample, WARM_SAMPLES, checked_output, fixture, run_script,
-    timed_outcome,
+    CONCURRENT_BURSTS, CONCURRENT_CALLERS, Identity, MEMORY_BEAT, Prepared, RunOutcome,
+    STATE_CLEAN, STATE_LEAKED, STATE_WRITTEN, Sample, WARM_SAMPLES, checked_output, fixture,
+    run_script, timed_outcome,
 };
 use crate::reading::MachineClass;
 
@@ -35,7 +35,7 @@ pub(super) fn check_state_isolation(prepared: &mut Prepared) -> Result<(), Strin
     let write_script = format!("bench_state = 41\nprint('{STATE_WRITTEN}')\n");
     let written = run_script(&prepared.interpreter, &write_script)?;
     if written.exit_code != 0
-        || written.stdout != output_line(STATE_WRITTEN)
+        || super::normalize_newlines(&written.stdout) != output_line(STATE_WRITTEN)
         || !written.stderr.is_empty()
     {
         return Err(fixture(
@@ -45,7 +45,10 @@ pub(super) fn check_state_isolation(prepared: &mut Prepared) -> Result<(), Strin
     let read_script =
         format!("print('{STATE_LEAKED}' if 'bench_state' in globals() else '{STATE_CLEAN}')\n");
     let read = run_script(&prepared.interpreter, &read_script)?;
-    if read.exit_code != 0 || read.stdout != output_line(STATE_CLEAN) || !read.stderr.is_empty() {
+    if read.exit_code != 0
+        || super::normalize_newlines(&read.stdout) != output_line(STATE_CLEAN)
+        || !read.stderr.is_empty()
+    {
         return Err(fixture(
             "a second Python interpreter observed its predecessor's global",
         ));

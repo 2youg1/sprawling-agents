@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Disposable-runner conformance through the same ExecTool invocation as production.
-
 use super::*;
 use crate::tools::exec::{ExecSetup, ExecTool, Shell};
 use kernel::{Address, Payload, RunId, Tool, ToolCall, ToolName};
@@ -56,7 +54,6 @@ fn native_windows_disposable_production_axes_and_cleanup() {
             run: owner,
             policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
         },
-        
         backlog.clone(),
     )
     .unwrap()

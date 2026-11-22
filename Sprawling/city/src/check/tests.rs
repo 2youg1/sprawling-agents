@@ -28,8 +28,6 @@ fn a_city_whose_files_all_parse_has_no_findings() {
     assert!(report.read >= 1, "the building's RULES.toml was read");
 }
 
-/// One bad sample per kind of file; each points at the key its parser
-/// stops on, so the position a person is sent to is the one they wrote.
 #[test]
 fn each_kind_of_file_is_refused_at_the_line_and_column_of_its_error() {
     let dir = tempfile::tempdir().unwrap();

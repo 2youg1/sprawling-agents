@@ -275,6 +275,7 @@ pub(super) fn prepare_at(python: &Path) -> Result<Prepared, String> {
 }
 
 pub(super) fn run_script(interpreter: &Interpreter, script: &str) -> Result<RunOutcome, String> {
+    #[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
     let output = Command::new(&interpreter.path)
         .arg("-c")
         .arg(script)
@@ -331,10 +332,18 @@ pub(super) fn output_detail(outcome: &RunOutcome) -> Result<(), String> {
     if !outcome.stderr.is_empty() {
         return Err("the benchmark interpreter wrote to stderr".to_owned());
     }
-    if outcome.stdout != *EXPECTED {
+    if normalize_newlines(&outcome.stdout) != *EXPECTED {
         return Err("the fixed CPython script produced unexpected stdout".to_owned());
     }
     Ok(())
+}
+
+pub(super) fn normalize_newlines(bytes: &[u8]) -> Vec<u8> {
+    bytes
+        .iter()
+        .copied()
+        .filter(|byte| *byte != b'\r')
+        .collect()
 }
 
 pub(super) use concurrent::{Memory, concurrent_calls, measure_memory, warm_calls};

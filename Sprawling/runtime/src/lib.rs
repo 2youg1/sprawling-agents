@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Turn loop and tool surface: frozen prefix, handoff, replay/fork,
-//! result pipeline, and the confined exec ladder.
-
 pub mod backlog;
 pub mod catalog;
 pub mod clock;

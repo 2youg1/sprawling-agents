@@ -74,11 +74,6 @@ impl Report {
         }
     }
 
-    /// Writes raw observations, not copied summaries, as one CSV artifact.
-    ///
-    /// # Errors
-    /// Refuses an existing result and reports creation, write or publication failure
-    /// without presenting the partial file as a completed measurement.
     pub(crate) fn write_csv(&self) -> Result<PathBuf, String> {
         let root = std::env::var_os("CARGO_TARGET_DIR")
             .map(PathBuf::from)
@@ -113,8 +108,7 @@ impl Report {
             })
             .and_then(|()| file.sync_all());
         drop(file);
-        // A same-directory hard link publishes atomically and fails when the
-        // target already exists, unlike a replacement-style rename.
+
         let published = publish_csv(written, &part, path);
         let cleanup = std::fs::remove_file(&part)
             .map_err(|why| csv_cleanup_error(path, &part, published.is_ok(), why));
@@ -196,7 +190,6 @@ pub(crate) fn memory_observations(identity: Identity, memory: &Memory) -> Vec<Ob
     .collect()
 }
 
-/// Associates write/sync errors with the partial file and link errors with the result.
 pub(crate) fn publish_csv(
     written: std::io::Result<()>,
     part: &Path,
@@ -206,7 +199,6 @@ pub(crate) fn publish_csv(
     std::fs::hard_link(part, path).map_err(|why| csv_storage(path, why))
 }
 
-/// Preserves both paths when publication succeeded before cleanup failed.
 pub(crate) fn csv_cleanup_error(
     path: &Path,
     part: &Path,
@@ -234,7 +226,6 @@ pub(crate) fn csv_cleanup_error(
     )
 }
 
-/// Keeps the existing error display and its actionable recovery together.
 pub(super) fn error_with_recovery(error: AxError) -> String {
     format!("{error}; recovery: {}", error.recovery())
 }

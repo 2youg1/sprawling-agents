@@ -272,4 +272,3 @@ impl ShellTally {
             .map(|(name, count)| (name.as_str(), count))
     }
 }
-

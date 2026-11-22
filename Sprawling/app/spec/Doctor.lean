@@ -164,37 +164,27 @@ pub(crate) enum Detection {
 // bin::doctor::host（形状 4 adapter）：二进制里其他模块问运行中的机器的那一扇门
 pub(crate) fn firefox() -> Presence;        // Gecko 族里运行中的机器有的那个牌子（§8-57）
 pub(crate) fn chromedriver() -> Presence;   // chromedriver 或 msedgedriver，先答上来的那个
-pub(crate) fn python_wasm() -> Presence;             // 默认组件先过 OnceLock 中的内容 pin；覆盖报 unpinned
 pub fn usable_python() -> Option<PathBuf>;           // 生产 exec 与 citysim 的宿主 Python 共用同一选择门
-// bin::doctor::table
-pub(super) const PYTHON_GUEST_B3: &str;              // 登记 guest 的 64 位小写 BLAKE3；资产与值也见 docs/third-party.md
-// bin::doctor::host
-static PYTHON_GUEST_CHECK: OnceLock<Result<(), Fault>>; // 默认组件每进程至多读、算一次
 pub(crate) fn shell() -> Presence;
 pub(crate) fn pwsh() -> Presence;              // 表里的 `pwsh` 行（runtime D30）
 pub(crate) fn usable_pwsh() -> Option<PathBuf>; // 只在 `pwsh --version` 读出的主版本不小于 7 时
-// execution_engine 与 Sandbox trait 随 wasip1 退役
-pub(crate) const ENGINE_CARRIED: bool;                                             // cfg!(feature = "sandbox") 的唯一拼写
 pub(crate) fn components_dir() -> Option<PathBuf>;                                 // ~/.sprawling/components
 
 // accounting::worker::workbench::engine（仍是 adapter，但不再自己探测）
-pub(super) struct MachineHalf { python_wasm: Option<PathBuf>, shell: runtime::Shell, engine: Box<dyn Sandbox> }
+pub(super) struct MachineHalf { python: Option<PathBuf>, shell: runtime::Shell }
 pub(super) fn machine_half(limits: &kernel::SandboxLimits, host: &ExecHost) -> Result<MachineHalf, AxError>;
 
 // bin::browser_bidi::engine（decision）：吃 doctor 的三态答案，拒绝时说出是哪一种
 pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Result<Engine, AxError>;
 ```
 
-- **谁问谁**：`workbench::engine::machine_half` 问 `doctor::host` 三次（组件、shell、引擎），它自己只留一条判定——shell 只在冻结配置说 `shell = true` 时才递给 bench，问的是 `shell` 还是 `pwsh` 由冻结配置的 `interpreter` 定（`Sprawling/runtime/Spec.lean` §8-13-2 D30），组件缺席不拦派活（python 臂在被调用时才拒），引擎起不来则拒派活。`browser_bidi::lazy::start` 不再按名字盲起，改为 `Engine::choose(&host::firefox(), &host::chromedriver())` 后按路径起。accounting 的 mcp 模块里的 `PYTHON_WASM_ENV` 删除。
-- **`SPRAWLING_PYTHON_WASM` 只拼一次，且保留为兼容读法**：拼写唯一处是 `doctor::table::PYTHON_WASM_VARIABLE`。**选的是「变量优先、组件目录次之」**：一个人显式指了一处，就该用那一处；指错了（变量设了但文件不在）报 `Absent(VariableNamesNothing)` 而**不悄悄落到组件目录**——被否决的备选是「目录优先、变量兜底」，它会让一个设错的变量永远没人发现。没设变量时看 `~/.sprawling/components/python-wasi/python.wasm`。测试遍历本 crate 的 `src/`，断言含该字面量的文件恰好一个。
-- **默认组件按内容 pin，开发覆盖明说未钉**：变量未设而组件文件在时，真实扫描与 `python_wasm` 共用 Component 探测后的同一来源判定，不经 host::look 递归；经 `PYTHON_GUEST_CHECK` 读取全文件并以 `kernel::B3Hash` 核对 `PYTHON_GUEST_B3`；相同且旁置 lib/python3.14 下的 encodings、collections、difflib、re 与 os 模块已安装才是 `Present`；stdlib 不完整报 `Broken { HalfWritten }`，不同是 `Broken { fault: DigestMismatch { expected, found } }`，读失败仍是 `Broken { Unreadable }`。`OnceLock` 缓存这次判定，进程内不为每次 exec 重读 guest。变量设为非空时跳过 pin，存在的文件报 `Present`，其 `Version::Said` 为 `unpinned override`；缺席与损坏仍按原三态回答。线上 `DigestMismatch` 映到既有 `DoctorFault::Unreadable`，其文本保留 expected 与 found，wire 的封闭 fault 集与 `WIRE_V` 不变。这个检查针对损坏与版本错配，不针对已经能写安装目录的人；`Sprawling/runtime/spec/Sandbox.lean` 记录同一边界。
-- **手工安装仍不自动联网**：`python-wasi` 的 recipe 保持 `Manual`，文本点名 `docs/third-party.md` 登记的版本化资产、完整解包位置与 wasm 的 BLAKE3；不把 guest 或 stdlib 提交进 git。
-- **`Broken` 是第三态，不是 `Absent` 的别名**：一个在 PATH 上却起不来的二进制（权限、坏文件、架构不符）、一个存在却没有那份文件的组件目录（下载中断）、一个读不了的目录（权限），三者对 verdict 都算缺，但每一个都带着自己的原因进报告行——**绝不以「absent」一词吞掉一个可以说清的故障**。`Version` 的四态同理：说了、没说、说的不是文本、超时没说；后三者仍算 Present（§8-166 已定：不说话的工具仍是装了的工具）。
+- **谁问谁**：`workbench::engine::machine_half` 问 `doctor::host` 两次（宿主 Python、shell），它自己只留一条判定——shell 只在冻结配置说 `shell = true` 时才递给 bench，问的是 `shell` 还是 `pwsh` 由冻结配置的 `interpreter` 定（`Sprawling/runtime/Spec.lean` §8-13-2 D30）；解释器缺席不拦派活（python 臂在被调用时才拒）。`browser_bidi::lazy::start` 不再按名字盲起，改为 `Engine::choose(&host::firefox(), &host::chromedriver())` 后按路径起。accounting 的 mcp 模块里的 `PYTHON_WASM_ENV` 删除。
+- **`SPRAWLING_PYTHON` 只拼一次**：拼写唯一处是 `doctor::table::PYTHON_VARIABLE`。**选的是「变量优先、PATH 次回」**：设了变量就只信那一处（绝对路径或不在 PATH 上的名字）；空变量与未设一样走 `PATH` 上的 `python3`／`python`。不读组件目录；wasip1 guest 与内容 pin 已退役。
+- **`Broken` 是第三态，不是 `Absent` 的别名**：一个在 PATH 上却起不来的二进制（权限、坏文件、架构不符）、一个读不了的路径（权限），对 verdict 都算缺，但每一个都带着自己的原因进报告行——**绝不以「absent」一词吞掉一个可以说清的故障**。`Version` 的四态同理：说了、没说、说的不是文本、超时没说；后三者仍算 Present（§8-166 已定：不说话的工具仍是装了的工具）。
 - **本二进制起的每个子进程都由 `doctor::running::stop` 结束**：`ask_version` 读到第一行后杀掉子进程，用的是安装程序超时后走的同一段——杀不掉或收不了尸都不是可以丢掉的 `Result`，而是一句带进 `Fault::Unreadable` 的话，于是「本城起了一个它停不掉的进程」这件事排在它印出的版本号之前给人看。`Fault::Unreadable` 因此是「这台电脑不让本城把这一项做完」的那一态，它携带的那句话就是全部解释，`describe` 原样印出。
-- **`Detection::Built` 的探测是真起一次引擎**，而不是读一个 cfg：一份声称带引擎却起不来的构建，doctor 必须报 `Broken { WillNotStart }`；`ENGINE_CARRIED` 是那个 cfg 的唯一拼写，表引用它。
 - **`ffmpeg` 进表但 doctor 管不到 `Sprawling/desktop/`**：`Sprawling/desktop/` 跑在 `sprawling desktop` 这个子进程里，它在录制时按名字起 `ffmpeg`，与 doctor 的 `on_search_path` 走同一条 PATH，两个答案因此一致而非因此合一。doctor 报它（Optional，Use 层），`Sprawling/desktop/` 不改——这是这里的边界，如实记。桌面 server 本身不进表：它是本二进制的一个动词（§8-4d），没有要装的东西。
 - **`browser::profile` 没有探测可搬**：读 `Sprawling/browser/Spec.lean` 的 D4 确认 profile 是「楼的登录态住城的保留区」这条纯判定，浏览器探测住 `bin::browser_bidi::lazy`，故不改 `Sprawling/browser`。
-- **doctor 进 lib 的公开面只有 verb 与既有 guest 选择门的 re-export**：`pub use screen::verb` 供二进制半边的 `main/router.rs` 调用；`pub use host::usable_python` 供 citysim 的 CPython baseline 与生产 exec 读同一份变量优先、组件目录回退答案，不新增一个只改名的包装函数。`Machine` 仍是 `pub(crate) trait`，不上缝清单。
+- **doctor 进 lib 的公开面只有 verb 与宿主 Python 选择门的 re-export**：`pub use screen::verb` 供二进制半边的 `main/router.rs` 调用；`pub use host::usable_python` 供 citysim 与生产 exec 读同一份 `SPRAWLING_PYTHON`／PATH 答案，不新增一个只改名的包装函数。`Machine` 仍是 `pub(crate) trait`，不上缝清单。
 
 **探测可失败的路径，逐条**（本节与 §8-48 共用，测试点名「丑的那几条」）：
 
@@ -202,16 +192,10 @@ pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Res
 |---|---|---|
 | 程序在 PATH 上却起不来 | `Broken { WillNotStart(err) }` | `firefox  broken at <path>: will not start: <err>` |
 | 起来了但一行也不说／说的不是文本／超时 | `Present { version: Silent／Unreadable／Late }` | `present <path> (said nothing／unreadable version／no version within the deadline)` |
-| 变量设了却指向不存在的文件 | `Absent(VariableNamesNothing)` | `absent: SPRAWLING_PYTHON_WASM names <path>, which is not there` |
-| 组件目录在、文件不在（半写） | `Broken { HalfWritten }` | `broken at <dir>: half-written; delete it and install again` |
-| 组件目录或文件读不了 | `Broken { Unreadable(err) }` | `broken at <dir>: <err>` |
-| 默认 guest 的内容与 pin 不同 | `Broken { DigestMismatch { expected, found } }` | `broken at <file>: pinned guest digest mismatch: expected <expected>, found <found>` |
-| 开发覆盖指向一个存在的 guest | `Present`，version 为 `unpinned override` | `present <file> (unpinned override)` |
-| 找不到 home | `Absent(NoHome)` | `absent: neither USERPROFILE nor HOME is set` |
-| 构建带引擎却起不来 | `Broken { WillNotStart }` | `sandbox-engine  broken at <exe>: will not start: <err>` |
+| 变量设了却指向不存在的文件 | `Absent(VariableNamesNothing)` | `absent: SPRAWLING_PYTHON names <path>, which is not there` |
 | `--install` 的网络超时 | 包管理器自己的退出码 → `E_TOOL_UNAVAILABLE`，recovery「run the printed line yourself」 | doctor 自己不上网、不重试、不静默 |
 
-**本章测试**：`the_python_variable_is_spelled_once`；`a_program_that_will_not_start_is_broken_not_absent`（临时目录里放一个不是可执行文件的 `broken.exe`／`broken`）；`a_variable_that_names_nothing_is_said_so`；`a_half_written_component_directory_is_broken`；`a_present_tool_that_says_nothing_is_still_present`；`a_broken_firefox_is_refused_by_its_fault_not_as_absent`（`Engine::choose`）；`a_guest_with_the_wrong_digest_is_broken_not_absent`（含 expected 与 found）；`a_pinned_guest_requires_its_stdlib_even_after_a_cached_digest_match`；`an_override_scan_is_reported_unpinned`（真实扫描覆盖不校验文件内容）。
+**本章测试**：`the_python_variable_is_spelled_once`；`a_program_that_will_not_start_is_broken_not_absent`（临时目录里放一个不是可执行文件的 `broken.exe`／`broken`）；`a_variable_that_names_nothing_is_said_so`；`a_present_tool_that_says_nothing_is_still_present`；`a_broken_firefox_is_refused_by_its_fault_not_as_absent`（`Engine::choose`）。
 
 **本章验收**：`cargo clippy -p sprawling --all-targets --all-features --locked -- -D warnings`、`cargo nextest run -p sprawling --locked --all-features` 绿；`cargo xtask modmap`／`length`／`header`／`specalign` 绿；`cargo run -p sprawling -- doctor` 仍报 Firefox 那一行。
 -/

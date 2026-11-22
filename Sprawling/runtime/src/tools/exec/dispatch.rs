@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Frozen program placement (`Sprawling/runtime/spec/Tools/Exec/Container.lean`).
-
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 
@@ -25,8 +23,6 @@ pub(super) enum ProgramRoute {
 }
 
 impl ExecTool {
-    /// Uses an explicitly admitted daemon and frozen limits for program and shell calls.
-    /// The daemon must be discovered by the host, rather than by a second configuration path.
     #[must_use]
     pub fn with_container(
         mut self,
@@ -62,8 +58,6 @@ impl ExecTool {
         self
     }
 
-    /// Chooses an execution boundary before the tool is admitted to a run.
-    /// The disclosure and actual placement always read the same confinement.
     pub fn confined(mut self, confinement: Confined) -> Self {
         self.program_route = ProgramRoute::Confined;
         self.container = None;
@@ -72,7 +66,6 @@ impl ExecTool {
         self
     }
 
-    /// Places sandbox program calls on the explicitly selected host arm.
     #[must_use]
     pub fn on_host(mut self) -> Self {
         self.container = None;
@@ -85,7 +78,6 @@ impl ExecTool {
         self
     }
 
-    /// Offers the host Python interpreter while refusing sandbox program and shell calls.
     #[must_use]
     pub fn python_only(mut self) -> Self {
         self.container = None;
@@ -96,12 +88,6 @@ impl ExecTool {
         self
     }
 
-    /// Every host command goes through the table, whichever arm asked
-    /// for it: there is no `background` argument, because two paths would
-    /// be two authorities and the one with the hole in it would always be
-    /// the one nobody remembered. The command is lowered before its
-    /// environment is cleared, so the clearing lands on whatever process
-    /// is actually spawned.
     pub(super) fn through_the_backlog(
         &self,
         command: std::process::Command,
@@ -190,8 +176,7 @@ impl ExecTool {
                 None,
             ),
         };
-        // The foreground window has ended: the command settled or went to
-        // the background, and either way it holds no reservation (D104).
+
         let waited = reservation.as_ref().and_then(Reservation::waited);
         drop(reservation);
         let result = match started {
@@ -216,13 +201,6 @@ impl ExecTool {
         with_wait(with_environment(result, &inherited)?, waited)
     }
 
-    /// The variables this run's children actually get: the floor every
-    /// city grants, plus the names this building declared, minus every
-    /// name this machine does not set.
-    ///
-    /// A name with no value on this machine is left out rather than set
-    /// empty, because an empty variable and an absent one are two
-    /// different things to the programs that read them.
     fn inherited_environment(&self) -> BTreeMap<String, String> {
         let mut chosen = BTreeMap::new();
         let declared = self

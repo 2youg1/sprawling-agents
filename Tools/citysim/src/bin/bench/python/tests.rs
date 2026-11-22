@@ -35,7 +35,8 @@ fn measured_output_failures_carry_a_code_action_and_recovery() {
 
 #[test]
 fn a_missing_interpreter_is_a_prerequisite_error() {
-    let refused = measure_from(None, Arm::Baseline).expect_err("a missing interpreter produced a report");
+    let refused =
+        measure_from(None, Arm::Baseline).expect_err("a missing interpreter produced a report");
     assert!(refused.contains("E_TOOL_UNAVAILABLE"), "{refused}");
     assert!(
         refused.contains("SPRAWLING_PYTHON") || refused.contains("host Python"),

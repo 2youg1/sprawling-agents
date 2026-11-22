@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The L0 three. Index only: no logic lives here.
-
 mod bound_reader;
 mod chosen_path;
 mod edit;
@@ -38,9 +36,7 @@ pub use path_lock::PathLocks;
 pub use stamp::ReadStamps;
 #[cfg(test)]
 pub(crate) use stamp::Stamp;
-// Where a host command runs is public through this module for the two
-// readers outside the tool: the machine's own dependency report, and a
-// caller deciding whether a task can be done here at all.
+
 pub use exec::{Assurances, Confined, Confinement, Guarantee, Kept, Missing, Offerings};
 pub use read::{ReadClock, ReadTool, RuleCandidate, RuleCandidates, RuleContext};
 pub use search::SearchTool;

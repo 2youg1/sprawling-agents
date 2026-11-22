@@ -28,8 +28,7 @@
 | 摘要缓存（`DigestCache`） | `storage::digest_cache` | 在盘上，进程里不留 | 无 |
 | playback 导出 | `accounting::playback` | 走账本是流式的，编码直接写进 bundle 的那一份缓冲、到 `BUNDLE_MAX_BYTES`（32 MiB）即停；整份 `Document` 在编码之前仍在内存里（`Sprawling/accounting/Spec.lean` §3） | 选中的记录数 |
 | doctor 扫描 | `bin::doctor` | 子进程的输出逐行读，每行至多 4 KiB，只留调用者选中的行（`doctor::asking`，`Sprawling/app/spec/Doctor.lean` §8-166 之一） | 选中的行数 |
-| guest 的内容 pin | `bin::doctor::host` | 默认组件每进程首次选择时读入完整 wasm、算完 BLAKE3 即释放；`OnceLock` 只留判定，不留字节 | 无 |
-| （已退役）wasip1 guest 编译产物与线性内存 | — | 随 Wasmtime／wasip1 退役删除；Python 现为宿主进程，内存与进程树由楼臂与 backlog 份额管 | — |
+| （已退役）wasip1 guest 与内容 pin | — | 随 Wasmtime／wasip1 退役删除；Python 现为宿主进程，内存与进程树由楼臂与 backlog 份额管 | — |
 
 账本与 CAS 已经在盘上，所以上表里随城增长的几项（视图、墓碑、旁索引）都可以改成「在盘上，按需读回」；它们读回时走下面的缓存模型。
 

@@ -218,9 +218,6 @@ fn granularity_serde_is_snake_case() {
 
 #[test]
 fn a_credential_shaped_variable_name_is_refused_where_the_config_is_read() {
-    // The judgement has to happen here: a name handed to a child process
-    // cannot be taken back, so it is refused at the one construction
-    // point rather than at the point it would have been used.
     for shaped in [
         "AWS_SECRET_ACCESS_KEY",
         "GITHUB_TOKEN",
@@ -265,8 +262,6 @@ fn the_second_rung_resolves_down_the_same_ladder() {
     );
 }
 
-/// The refusal is the only sentence a person editing a `CONFIG.toml`
-/// gets, so it carries the legal domain; nothing is clamped.
 #[test]
 fn a_stated_rung_is_refused_outside_its_domain_with_the_domain_in_the_refusal() {
     for refused in [30, 91] {

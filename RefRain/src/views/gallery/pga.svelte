@@ -6,15 +6,7 @@
 -->
 
 <script lang="ts" module>
-  // The building page and its sections (RefRain/Spec.lean §4-50), standing in a
-  // made-up city: a page at the width `<main>` has in a 1440 window, then
-  // each section at the width the middle column gives it - the commits
-  // with and without messages, the changes since the last checkpoint,
-  // the sandbox the building has and the one it inherits, a commit asked
-  // for by its oid, and a room whose runs are older than the page.
-  //
-  // The moments are fixed rather than read off the clock, so a picture
-  // of this route compares with yesterday's.
+
   import type {
     Answer,
     BuildingAnswer,
@@ -45,9 +37,8 @@
   const HALL = Address.make("hall");
   const AT = 1_790_000_000_000;
 
-  // `<main>` at a 1440 window: eleven of the shell's twelve columns.
   export const PAGE_WIDTH = 1259;
-  // The building page's middle column at that window: eight columns.
+
   export const MIDDLE_WIDTH = 915;
   function oid(seed: string): GitOid {
     return GitOid.make(seed.repeat(40).slice(0, 40));
@@ -79,7 +70,6 @@
     };
   }
 
-  // The newest commit, which the opened-row case opens.
   const NEWEST = commit(
     1,
     "parser: read unicode escapes in string literals\n\nThe lexer took \\u as two characters.",
@@ -237,8 +227,6 @@
     { kind: { file: { bytes: 3_406 } }, name: "escape.rs" },
   ];
 
-  // Two skills a building reads: one on its own shelf, which opens, and
-  // one mounted from outside the city, which has no address to open.
   const SKILLS: SkillsAnswer = {
     building: LAB,
     external_shelves: ["~/elsewhere/skills"],
@@ -267,15 +255,11 @@
 
   const ROADMAP = "# Roadmap\n\n- Read unicode escapes\n- Review the escape table\n";
 
-  // Which listing a directory answers: the rooms hold transcripts, the
-  // source directory holds files.
   function listingOf(at: Address | null | undefined): readonly Entry[] {
     if (at === LAB) return ROOT;
     return at === Address.make("lab/src") ? FILES : ROOM;
   }
 
-  // What this made-up city answers; anything else stays unanswered, the
-  // way a page that has asked and not been answered holds it.
   export function answers(query: Query): Answer | undefined {
     if (query === "city_view") return { city: WORKSPACES };
     if (typeof query === "string") return undefined;

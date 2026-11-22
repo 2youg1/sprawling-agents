@@ -36,7 +36,6 @@ fn a_real_daemon_executes_and_cleans_the_production_container() {
     let backlog = patient();
     let tool = ExecTool::new(
         setup(work.path(), None, Some(PathBuf::from("/bin/sh"))),
-        
         backlog.clone(),
     )
     .unwrap()

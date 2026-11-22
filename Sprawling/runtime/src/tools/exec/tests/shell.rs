@@ -3,14 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The shell arm's interpreter and its failure tally
-//! (`Sprawling/runtime/Spec.lean` §8-13-2 D30).
-
 use super::*;
 
-/// A building that asked for PowerShell 7 on a machine without it is
-/// refused by name, and the refusal says how to get either interpreter
-/// back (`Sprawling/runtime/Spec.lean` §8-13-2 D30).
 #[test]
 fn a_shell_line_under_a_missing_pwsh_is_refused_by_name_not_run_by_cmd() {
     let chamber = tempfile::tempdir().unwrap();
@@ -21,7 +15,6 @@ fn a_shell_line_under_a_missing_pwsh_is_refused_by_name_not_run_by_cmd() {
             },
             ..setup(chamber.path(), None, None)
         },
-        
         patient(),
     )
     .unwrap();
@@ -37,8 +30,6 @@ fn a_shell_line_under_a_missing_pwsh_is_refused_by_name_not_run_by_cmd() {
     );
 }
 
-/// The platform's own shell runs a line, and the result names which
-/// program that was, so the tally can count it per interpreter.
 #[test]
 fn a_shell_result_names_the_interpreter_that_ran_it() {
     let chamber = tempfile::tempdir().unwrap();
@@ -48,19 +39,13 @@ fn a_shell_result_names_the_interpreter_that_ran_it() {
         PathBuf::from("/bin/sh")
     };
     let expected = if cfg!(windows) { "cmd" } else { "sh" };
-    let tool = a_tool(
-        chamber.path(),
-        None,
-        
-        Some(program),
-    );
+    let tool = a_tool(chamber.path(), None, Some(program));
     let answer = tool.invoke(&call_at(command("echo hi"), "host")).unwrap();
     let result = answer.result.as_map();
     assert_eq!(result["interpreter"], Value::String(expected.to_owned()));
     assert_eq!(result["exit_code"], Value::from(0));
 }
 
-/// One row per rule of D30, with the interpreter it applies to.
 #[test]
 fn each_interpreter_s_failures_fall_in_the_class_its_own_signal_names() {
     use FailureClass::{CommandNotFound, Encoding, Syntax};
@@ -119,8 +104,6 @@ fn each_interpreter_s_failures_fall_in_the_class_its_own_signal_names() {
     }
 }
 
-/// The tally counts shell lines that ended with a code, per interpreter,
-/// and leaves every other result out.
 #[test]
 fn the_tally_counts_ended_shell_lines_per_interpreter_and_nothing_else() {
     let results = [
@@ -153,9 +136,6 @@ fn the_tally_counts_ended_shell_lines_per_interpreter_and_nothing_else() {
     );
 }
 
-/// The description names the interpreter a shell line runs under, in
-/// the spelling the result records, and says nothing of one that is not
-/// offered.
 #[test]
 fn the_tool_description_names_the_interpreter_its_shell_lines_run_under() {
     let chamber = tempfile::tempdir().unwrap();
@@ -165,7 +145,6 @@ fn the_tool_description_names_the_interpreter_its_shell_lines_run_under() {
                 shell,
                 ..setup(chamber.path(), None, None)
             },
-            
             patient(),
         )
         .unwrap()

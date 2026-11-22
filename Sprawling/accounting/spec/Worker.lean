@@ -34,10 +34,11 @@ pub struct Hands {
 pub type SeatLane = fn() -> Box<dyn std::any::Any>;
 /// exec 工具取自这台电脑的三件事。
 pub struct ExecHost {
-    pub python_wasm: fn() -> Option<PathBuf>,            // 可用的那一份，坏的不算
+    pub python: fn() -> Option<PathBuf>,                 // 宿主解释器；不可用时为 None
     pub shell: fn() -> Option<PathBuf>,
     pub pwsh: fn() -> Option<PathBuf>,                   // PowerShell 7；低于 7 的不算（runtime D30）
-    pub engine: fn() -> Result<Box<dyn runtime::Sandbox>, AxError>,
+    pub confinement: fn(kernel::SandboxArm) -> Result<runtime::tools::Confined, AxError>,
+    pub container: fn() -> Result<runtime::tools::ContainerRuntime, AxError>,
 }
 pub type Browsers = fn(&Path, &storage::BlockOrigin, &city::BuildingRules) -> Result<Vec<Box<dyn kernel::Tool>>, AxError>;
 pub type DesktopProgram = fn() -> std::io::Result<PathBuf>;

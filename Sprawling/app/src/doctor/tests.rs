@@ -18,11 +18,6 @@ use accounting::Runnable;
 use super::*;
 use crate::serving::standing::Standing;
 
-/// A machine that answers from a script and installs nothing.
-///
-/// It is the second implementation of `Machine`, which is what makes
-/// that trait a seam rather than a hypothetical one: a verdict is judged
-/// here without the machine this test runs on being asked anything.
 pub(super) struct ScriptedMachine {
     absent: BTreeSet<&'static str>,
     asked: Mutex<Vec<String>>,
@@ -89,12 +84,6 @@ pub(super) fn finding_for(name: &str, absent: &[&'static str]) -> Finding {
         .expect("the table carries this item")
 }
 
-/// Every row answers both questions a person has: how do I find out
-/// whether I have it, and what would getting it cost me here.
-///
-/// A row with no detection method cannot be checked, and a platform
-/// column with no recipe leaves a person on that platform holding an
-/// item and no next move - which is what `Manual` says out loud.
 #[test]
 fn every_row_is_detectable_and_per_platform_installable_or_manual() {
     assert!(
@@ -172,10 +161,6 @@ fn every_row_is_detectable_and_per_platform_installable_or_manual() {
     }
 }
 
-/// The table is the authority on what this repository needs, so the
-/// items its own documents name are in it - including the one that is
-/// not a program on a path: the component the exec tool's python arm
-/// reads from an environment variable.
 #[test]
 fn the_table_names_what_this_repository_actually_asks_for() {
     let named: BTreeSet<&str> = REQUIREMENTS.iter().map(|item| item.name).collect();
@@ -228,9 +213,6 @@ fn the_table_names_what_this_repository_actually_asks_for() {
     );
 }
 
-/// The variable the host Python interpreter is looked for under is
-/// spelled once in this crate, in the doctor's table, and the exec tool
-/// asks the doctor rather than reading it a second time.
 #[test]
 fn the_python_variable_is_spelled_once() {
     let variable = REQUIREMENTS
@@ -268,8 +250,6 @@ fn the_python_variable_is_spelled_once() {
     );
 }
 
-/// A tier is answered on its own, and an optional item absent never
-/// stands between a person and a tier.
 #[test]
 fn a_verdict_counts_the_required_items_of_its_own_tier_only() {
     let all_here = examine(&ScriptedMachine::missing(&[]));
@@ -327,9 +307,6 @@ fn a_verdict_counts_the_required_items_of_its_own_tier_only() {
     );
 }
 
-/// The page says what an item enables in its own words, looked up by the
-/// item's name (sprawling D6): a row the table gains without a
-/// clause in both languages would reach a reader as a bare name.
 #[test]
 fn every_item_has_the_page_clause_in_both_languages() {
     let words: serde_json::Value = serde_json::from_str(include_str!(concat!(
@@ -350,9 +327,6 @@ fn every_item_has_the_page_clause_in_both_languages() {
     assert_eq!(unworded, Vec::<&str>::new());
 }
 
-/// `just prereqs` reads the develop tier out of `prereqs.tsv`, so the
-/// file is exactly what the table renders; when they differ this prints
-/// the file the table wants.
 #[test]
 fn the_prereqs_file_is_the_develop_tier_rendered() {
     let path =
@@ -366,11 +340,6 @@ fn the_prereqs_file_is_the_develop_tier_rendered() {
     );
 }
 
-/// Every recipe of this repository runs in the shell the `justfile`
-/// names, so that program is a required row of the develop tier. The
-/// shell is read out of the `justfile` rather than written here, so a
-/// recipe file that moves to another shell turns this red until the
-/// table follows it (`Sprawling/app/spec/Doctor.lean` §8-130).
 #[test]
 fn the_shell_every_recipe_runs_in_is_a_required_develop_row() {
     let justfile = std::fs::read_to_string(
