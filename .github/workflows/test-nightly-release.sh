@@ -12,7 +12,7 @@ set -eu
 root=$(mktemp -d)
 trap 'rm -rf "$root"' EXIT INT TERM
 mkdir -p "$root/bin"
-source_sha=$(git rev-parse HEAD)
+source_sha=${SPRAWLING_CI_SOURCE_SHA:-$(git rev-parse HEAD)}
 other=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 python - "$root" <<'PY'
@@ -110,6 +110,48 @@ case "$1" in
 esac
 SH
 chmod +x "$root/bin/gh"
+
+# Prepare's Git queries consume this fixture, not mutable tags or history
+# outside the captured source view. Standalone HEAD discovery above remains
+# real Git unless the source graph supplies its once-captured source SHA.
+cat > "$root/bin/git" <<'SH'
+#!/bin/sh
+set -eu
+case "$1" in
+    describe)
+        test "$#" = 6
+        test "$2" = --tags
+        test "$3" = --match
+        test "$4" = 'v[0-9]*'
+        test "$5" = --abbrev=0
+        test "$6" = "$GITHUB_SHA"
+        printf 'v0.0.0\n'
+        ;;
+    rev-list)
+        test "$#" = 3
+        test "$2" = --count
+        test "$3" = "v0.0.0..$GITHUB_SHA"
+        printf '1\n'
+        ;;
+    *) printf 'unexpected git fixture query\n' >&2; exit 94 ;;
+esac
+SH
+chmod +x "$root/bin/git"
+
+# Keep the fixture strict: unknown commands and altered query arguments
+# must fail, rather than silently turning a new production read into green.
+if PATH="$root/bin:$PATH" git status >/dev/null 2>&1; then
+    printf 'Git fixture accepted an unknown command\n' >&2
+    exit 1
+fi
+if PATH="$root/bin:$PATH" GITHUB_SHA="$source_sha" git describe --tags --match 'v[0-9]*' --abbrev=0 wrong-source >/dev/null 2>&1; then
+    printf 'Git fixture accepted a different source\n' >&2
+    exit 1
+fi
+if PATH="$root/bin:$PATH" GITHUB_SHA="$source_sha" git rev-list --count wrong-range >/dev/null 2>&1; then
+    printf 'Git fixture accepted a different range\n' >&2
+    exit 1
+fi
 
 # A minimal stand-in for only the jq queries prepare uses. GitHub runners
 # supply jq; this also lets the test run on a machine without installing it.

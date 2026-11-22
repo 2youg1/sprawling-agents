@@ -3,16 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Deterministic file walker: sorted output, fixed skip set, forward-slash
-//! relative paths (Tools/xtask/Spec.lean §10-1).
-
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use crate::report::XtaskError;
 
-/// Build-output directories. The day this needs a non-build entry, read
-/// `.gitignore` instead of extending the list (xtask Spec §10-1).
 const SKIP_DIRS: [&str; 6] = [
     "target",
     "node_modules",
@@ -22,19 +17,29 @@ const SKIP_DIRS: [&str; 6] = [
     "web-dist",
 ];
 
-/// Directory or pointer file naming another checkout; never walked.
 const GIT: &str = ".git";
 
-/// Regular files under `root`, sorted by forward-slash relative path.
-/// Does not enter root-level `local/` (isolation zone).
 pub(crate) fn files(root: &Path) -> Result<Vec<PathBuf>, XtaskError> {
+    source_files(root, Aliases::Follow)
+}
+
+pub(crate) fn files_without_aliases(root: &Path) -> Result<Vec<PathBuf>, XtaskError> {
+    source_files(root, Aliases::Refuse)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Aliases {
+    Follow,
+    Refuse,
+}
+
+fn source_files(root: &Path, aliases: Aliases) -> Result<Vec<PathBuf>, XtaskError> {
     let mut out = Vec::new();
-    collect(root, root, &mut out)?;
+    collect(root, root, &mut out, aliases)?;
     out.sort_by_key(|p| rel(root, p));
     Ok(out)
 }
 
-/// Like [`files`], keeping only the given extensions (lowercase, no dot).
 pub(crate) fn files_with_ext(root: &Path, keep: &[&str]) -> Result<Vec<PathBuf>, XtaskError> {
     let all = files(root)?;
     Ok(all
@@ -47,7 +52,6 @@ pub(crate) fn files_with_ext(root: &Path, keep: &[&str]) -> Result<Vec<PathBuf>,
         .collect())
 }
 
-/// Like [`files_with_ext`] over several directories of `root` at once.
 pub(crate) fn files_under<'d>(
     root: &Path,
     dirs: impl IntoIterator<Item = &'d str>,
@@ -62,23 +66,31 @@ pub(crate) fn files_under<'d>(
     Ok(found.into_values().collect())
 }
 
-/// Repo-relative path with forward slashes.
 pub(crate) fn rel(root: &Path, path: &Path) -> String {
-    let full = path.to_string_lossy().replace('\\', "/");
-    let base = root.to_string_lossy().replace('\\', "/");
-    match full.strip_prefix(&base) {
-        Some(tail) => tail.trim_start_matches('/').to_owned(),
-        None => full,
-    }
+    let relative = path.strip_prefix(root).unwrap_or(path).to_string_lossy();
+    #[cfg(windows)]
+    return relative.replace('\\', "/");
+    #[cfg(not(windows))]
+    relative.into_owned()
 }
 
-/// Root-level `local/` — gitignored machine notes; gates skip it (Spec §10-1).
 pub(crate) fn in_isolation_zone(rel: &str) -> bool {
     rel == "local" || rel.starts_with("local/")
 }
 
-/// One spelling of the client source tree for every gate that walks it.
-/// Macro form feeds `concat!` at compile time without a second literal.
+pub(crate) fn excluded_source_path(path: &str) -> bool {
+    if in_isolation_zone(path) {
+        return true;
+    }
+    let mut parts = path.split('/').peekable();
+    while let Some(part) = parts.next() {
+        if part == GIT || (parts.peek().is_some() && SKIP_DIRS.contains(&part)) {
+            return true;
+        }
+    }
+    false
+}
+
 macro_rules! client_src {
     () => {
         "RefRain/src"
@@ -88,10 +100,8 @@ pub(crate) use client_src;
 
 pub(crate) const CLIENT_SRC: &str = client_src!();
 
-/// Swap-build replacement looks under the mirrored path of [`CLIENT_SRC`].
 pub(crate) const CLIENT_SWAP: &str = "RefRain/swap";
 
-/// Client sources and replacement looks (the latter only when present).
 pub(crate) fn client_files(root: &Path, keep: &[&str]) -> Result<Vec<PathBuf>, XtaskError> {
     files_under(
         root,
@@ -100,7 +110,12 @@ pub(crate) fn client_files(root: &Path, keep: &[&str]) -> Result<Vec<PathBuf>, X
     )
 }
 
-fn collect(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), XtaskError> {
+fn collect(
+    root: &Path,
+    dir: &Path,
+    out: &mut Vec<PathBuf>,
+    aliases: Aliases,
+) -> Result<(), XtaskError> {
     let entries = std::fs::read_dir(dir).map_err(|source| XtaskError::Io {
         path: dir.to_string_lossy().into_owned(),
         source,
@@ -112,19 +127,42 @@ fn collect(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), XtaskE
         })?;
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
-        if name == GIT {
+        if name == GIT || in_isolation_zone(&rel(root, &path)) {
             continue;
         }
-        if in_isolation_zone(&rel(root, &path)) {
+        if path.is_dir() && SKIP_DIRS.contains(&name.as_str()) {
             continue;
+        }
+        if aliases == Aliases::Refuse {
+            let metadata = std::fs::symlink_metadata(&path).map_err(|source| XtaskError::Io {
+                path: path.display().to_string(),
+                source,
+            })?;
+            if is_alias(&metadata) || (!metadata.is_dir() && !metadata.is_file()) {
+                return Err(XtaskError::Doc {
+                    file: path.display().to_string(),
+                    msg: "capture source input (source-alias): replace the link, reparse point or special item with ordinary source files before running verification".to_owned(),
+                });
+            }
         }
         if !path.is_dir() {
             out.push(path);
-        } else if !SKIP_DIRS.contains(&name.as_str()) && !is_checkout(&path)? {
-            collect(root, &path, out)?;
+        } else if !is_checkout(&path)? {
+            collect(root, &path, out, aliases)?;
         }
     }
     Ok(())
+}
+
+#[cfg(windows)]
+pub(crate) fn is_alias(metadata: &std::fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt as _;
+    metadata.file_attributes() & 0x400 != 0
+}
+
+#[cfg(not(windows))]
+pub(crate) fn is_alias(metadata: &std::fs::Metadata) -> bool {
+    metadata.file_type().is_symlink()
 }
 
 fn is_checkout(dir: &Path) -> Result<bool, XtaskError> {
@@ -135,7 +173,6 @@ fn is_checkout(dir: &Path) -> Result<bool, XtaskError> {
     })
 }
 
-/// Lossy UTF-8 read; gates judge text and never panic on bytes.
 pub(crate) fn read_text(path: &Path) -> Result<String, XtaskError> {
     let bytes = std::fs::read(path).map_err(|source| XtaskError::Io {
         path: path.to_string_lossy().into_owned(),
@@ -146,7 +183,6 @@ pub(crate) fn read_text(path: &Path) -> Result<String, XtaskError> {
 
 const GENERATED: &str = "Generated by `";
 
-/// True when a generator wrote this file (first ten lines name it).
 pub(crate) fn generated(text: &str) -> bool {
     text.lines().take(10).any(|line| line.contains(GENERATED))
 }

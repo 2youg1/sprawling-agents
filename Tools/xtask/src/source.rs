@@ -11,11 +11,18 @@ use std::path::{Path, PathBuf};
 use crate::report::XtaskError;
 use crate::walk;
 
+#[derive(Debug, Clone)]
 pub(crate) struct Scope {
     files: BTreeSet<String>,
 }
 
 impl Scope {
+    pub(crate) fn from_capture(paths: &BTreeSet<String>) -> Self {
+        Self {
+            files: paths.clone(),
+        }
+    }
+
     pub(crate) fn new(paths: &[String]) -> Result<Self, XtaskError> {
         let mut files = BTreeSet::new();
         for path in paths {
@@ -35,6 +42,10 @@ impl Scope {
 
     pub(crate) fn allows(&self, relative: &str) -> bool {
         self.files.contains(relative)
+    }
+
+    pub(crate) fn paths(&self) -> &BTreeSet<String> {
+        &self.files
     }
 }
 

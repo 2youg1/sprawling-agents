@@ -47,3 +47,5 @@ PROGRESS.md
 # The workflow runner's own directory: per-agent worktrees and run state,
 # one machine's scratch, never part of the product.
 /.pi/
+
+.github/ci-cache/node_modules/

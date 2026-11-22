@@ -163,10 +163,6 @@ pub(crate) fn select(names: &[String]) -> Result<Vec<&'static Gate>, XtaskError>
 /// Run the gates `names` selects and report them together; the gates
 /// judge in parallel, and the report keeps roster order.
 pub(crate) fn run(root: &Path, names: &[String], files: Option<Vec<String>>) -> ExitCode {
-    let gates = match select(names) {
-        Ok(gates) => gates,
-        Err(err) => return report::internal_failure(&err),
-    };
     let scope = match files
         .map(|paths| crate::source::Scope::new(&paths))
         .transpose()
@@ -174,12 +170,24 @@ pub(crate) fn run(root: &Path, names: &[String], files: Option<Vec<String>>) -> 
         Ok(scope) => scope,
         Err(err) => return report::internal_failure(&err),
     };
+    run_scoped(root, names, scope.as_ref())
+}
+
+pub(crate) fn run_scoped(
+    root: &Path,
+    names: &[String],
+    scope: Option<&crate::source::Scope>,
+) -> ExitCode {
+    let gates = match select(names) {
+        Ok(gates) => gates,
+        Err(err) => return report::internal_failure(&err),
+    };
     if scope.is_some()
         && let Err(err) = ensure_scope_supported(&gates)
     {
         return report::internal_failure(&err);
     }
-    report::finish_all(judge(&gates, root, scope.as_ref()))
+    report::finish_all(judge(&gates, root, scope))
 }
 
 fn ensure_scope_supported(gates: &[&Gate]) -> Result<(), XtaskError> {

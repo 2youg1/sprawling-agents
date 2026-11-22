@@ -1,9 +1,8 @@
 # The gate a change closes on, run by a machine.
 #
-# Every job calls the recipes `just check` is made of and spells no command
-# of its own, so the check a person runs at their desk and the check a pull
-# request gets are one set of commands rather than two copies that drift.
-# The jobs together are `just check`, plus commit messages and Linux kani.
+# Recipes and the xtask source-verification graph own the check commands;
+# jobs schedule them. The required jobs together are `just check`, plus
+# commit messages and Linux kani.
 # During the length/comments migration these two gates judge changed files
 # rather than the full legacy tree; `just check` remains the full inventory.
 #
@@ -21,8 +20,8 @@
 #             the suite, compiled once into a nextest archive and run in
 #             four slices on separate runners; `test` collects all
 #             verdicts, so the check a branch protection names stays one
-#   core      clippy and the suite of the packages every platform ships
-#             (`just check-core`), on ubuntu when Rust paths moved; macOS
+#   core      `just check-core`, xtask's verification tests and clippy, and
+#             the source graph on ubuntu when Rust paths moved; macOS
 #             check-core lives in `platforms.yml`
 #   supply    licences, bans and sources; compiles nothing
 #   client    the client's own linter, typecheck and tests
@@ -71,15 +70,15 @@
 # fuzz targets rides in `nightly.yml` with the sanitizer campaign.
 #
 # Any branch can ask for this run by hand (`gh workflow run ci.yml --ref
-# wave/<name>`); nothing below assumes the ref is `main` except the cache
-# writes, which only `main` makes.
+# wave/<name>`); the same verification runs without an open pull request.
 #
 # Rust cache hashes the installed toolchains, Cargo/Rust environment and
 # dependency files; shared-key separates each compilation use. Bun keys on
 # `RefRain/bun.lock`. Rust and Bun entries are written only by main: a pull
 # request's save is readable by that pull request alone and pushes the shared
-# entry out of the cache budget by age. The small `ci-tools` entries are the
-# exception: pull requests may save them, and pressure pruning removes them.
+# entry out of the cache budget by age. Pull requests may save small
+# `ci-tools` entries and exact-key pure verification verdicts; dependency
+# cache hits are not verification verdicts.
 # Every job that compiles installs its toolchain through
 # `./.github/actions/toolchain`, which leaves the pinned toolchain alone
 # in its rustup home, so a runner image that moves its own `stable` no
@@ -197,6 +196,7 @@ jobs:
               - 'architecture.toml'
               - '.github/workflows/**'
               - '.github/actions/**'
+              - '.github/ci-cache/**'
               - 'deny.toml'
             # Client sources and the formatter config that judges them.
             client:
@@ -221,6 +221,7 @@ jobs:
               - 'architecture.toml'
               - '.github/workflows/**'
               - '.github/actions/**'
+              - '.github/ci-cache/**'
               - 'deny.toml'
             lean:
               - '**/*.lean'
@@ -282,58 +283,19 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version-file: RefRain/package.json
-      - name: native payloads in system channel validation
+      - name: install optional verification cache adapter
         if: ${{ !cancelled() }}
-        env:
-          PYTHONUTF8: "1"
-        run: python Tools/xtask/src/channel/validate_test.py
-      - name: fmt
+        continue-on-error: true
+        run: bun install --frozen-lockfile --cwd .github/ci-cache
+      - name: source verification graph
         if: ${{ !cancelled() }}
-        run: just fmt-check
-      - name: CI tool cache contract
-        if: ${{ !cancelled() }}
-        run: bash .github/workflows/test-ci-tools.sh
-      - name: the gates that read sources
-        if: ${{ !cancelled() }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base="${{ github.event.pull_request.base.sha }}"
-          elif [ "${{ github.event_name }}" = "push" ]; then
-            base="${{ github.event.before }}"
-          else
-            base=$(git merge-base origin/main HEAD)
-          fi
-          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
-            echo "gates-sources: base commit is missing; refusing an empty file scope" >&2
-            exit 2
-          fi
-          git cat-file -e "$base^{commit}"
-          nul="${RUNNER_TEMP:-/tmp}/gates-changed.nul"
-          git diff --name-only -z "$base" HEAD > "$nul"
-          GATES_CHANGED_NUL="$nul" just gates-sources changed
-      - name: nightly publication decisions, without GitHub
-        if: ${{ !cancelled() }}
-        run: sh .github/workflows/test-nightly-release.sh
+        uses: ./.github/ci-cache
       # The judged range, the pattern and the recovery live in the
       # action, so this job and `title-judge.yml` read one authority
       # (Tools/xtask/Spec.lean §8-35).
       - name: commit messages
         if: ${{ !cancelled() }}
         uses: ./.github/actions/commit-messages
-      # The desktop server and its FFI seam are workspace members, so
-      # clippy and the suite judge them; what is left is the Zig leaf's
-      # own tests, which no cargo command runs (`Sprawling/desktop/Spec.lean`
-      # section 8-12).
-      - name: the Zig leaf's own tests
-        if: ${{ !cancelled() }}
-        run: just check-desktop
-      # The console renderer's own Zig tests, which no cargo command runs
-      # either (`Calyx/ffi/Spec.lean`).
-      - name: the console leaf's own tests
-        if: ${{ !cancelled() }}
-        run: just check-console
 
   # Bundle half of the gates: npm, render and budget. Its own runner so
   # the five render passes do not share four processors with zig test
@@ -620,6 +582,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
       - uses: ./.github/actions/toolchain
       # The Zig the console's renderer is built with on every platform
       # (`Calyx/ffi/Spec.lean` D1).
@@ -631,6 +595,13 @@ jobs:
       - uses: ./.github/actions/ci-tools
         with:
           tool: cargo-nextest,just
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version-file: RefRain/package.json
+      - name: install optional verification cache adapter
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: bun install --frozen-lockfile --cwd .github/ci-cache
       # The same scratch the `compile` test slice keeps, for the same
       # reason: cold, the trybuild suites dominate this job's test run.
       # Restored after the Rust cache, which never holds `target/tests`.
@@ -642,6 +613,15 @@ jobs:
           restore-keys: trybuild-${{ runner.os }}-core-
       - name: clippy and the suite of the core packages
         run: just check-core
+      - name: xtask source verification clippy
+        if: ${{ !cancelled() }}
+        run: cargo clippy -p xtask --all-targets --all-features --locked -- -D warnings
+      - name: xtask source verification tests
+        if: ${{ !cancelled() }}
+        run: "cargo test -p xtask --locked ci::"
+      - name: source verification graph
+        if: ${{ !cancelled() }}
+        uses: ./.github/ci-cache
       - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         if: ${{ github.ref == 'refs/heads/main' && steps.trybuild-scratch.outputs.cache-hit != 'true' }}
         with:

@@ -25,7 +25,7 @@ default: check
 # `ci.yml` runs the same recipes, one job per slice of this line. Its
 # length/comments checks use the changed-file scope; this full `check`
 # remains the migration inventory and the integrated-tree gate after cleanup.
-check: prereqs fmt-check gates-sources models build-web clippy features test gates check-client check-desktop check-console
+check: prereqs gates-sources models build-web clippy features test gates check-client
 
 # The merge's whole check: the phases of `check`, but every phase runs
 # even after another has failed, so one run names every red rather than
@@ -36,29 +36,42 @@ check: prereqs fmt-check gates-sources models build-web clippy features test gat
 # Each phase logs to <target>/check-all/<phase>.log, and phases.tsv holds
 # one `phase<TAB>exit<TAB>seconds` row per phase. Naming phases runs
 # those alone, which is how a red phase is rerun after its fix.
+[positional-arguments]
 check-all *phases:
     #!/usr/bin/env bash
     set -uo pipefail
+    defaults="sources build-web clippy features test artifacts supply models client"
+    available="$defaults fmt gates desktop console"
+    wanted=" "
+    for name in "$@"; do
+        if [[ ! "$name" =~ ^[a-z-]+$ || " $available " != *" $name "* ]]; then
+            printf 'check-all: unknown phase %q. Choose from: %s\n' "$name" "$available" >&2
+            exit 2
+        fi
+        wanted+="$name "
+    done
+    [ "$#" -ne 0 ] || wanted=" $defaults "
     out="${CARGO_TARGET_DIR:-target}/check-all"
     rm -rf "$out" && mkdir -p "$out" || exit 2
-    wanted=" {{phases}} "
     phase() {
         local name=$1 start=$SECONDS rc
         shift
-        [ "$wanted" = "  " ] || [[ "$wanted" == *" $name "* ]] || return 0
+        [[ "$wanted" == *" $name "* ]] || return 0
         "$@" > "$out/$name.log" 2>&1
         rc=$?
         printf '%s\t%s\t%s\n' "$name" "$rc" "$((SECONDS - start))" >> "$out/phases.tsv"
     }
     just prereqs || exit 2
-    phase fmt just fmt-check
+    phase sources just verify-sources
     phase build-web just build-web
     { phase clippy just clippy; phase features just features
-      phase test just test --no-fail-fast; phase gates just gates; } &
+      phase test just test --no-fail-fast; phase artifacts just gates-artifacts; phase supply just deny; } &
     { phase models just models; } &
     { phase client just client-checks; } &
-    { phase desktop just check-desktop; } &
-    { phase console just check-console; } &
+    if [ "$#" -ne 0 ]; then
+        { phase fmt just fmt-check; phase gates just gates; } &
+        { phase desktop just check-desktop; phase console just check-console; } &
+    fi
     wait
     touch "$out/phases.tsv"
     column -t -s $'\t' "$out/phases.tsv"
@@ -90,21 +103,14 @@ check-branch base="main":
     packages=$(printf '%s\0' "${changed[@]}" | tr '\0' '\n' | cargo xtask members --owning | tr -d '\r') || exit 2
     rc=0
     step() { echo "== $1"; shift; "$@" || { rc=1; echo "== red: $*"; }; }
-    gates=$(cargo xtask gates --list | tr -d '\r' | grep -Evx 'guard|features|render|budget|npm|length|comments') || exit 2
-    step guard cargo xtask gates guard --range "$mb..HEAD"
-    step fmt just fmt-check
+    step sources just verify-sources --full --scope-base "$mb"
     touched RefRain && step build-web just build-web
     if [ -n "$packages" ]; then
         step clippy just clippy
         step tests just test --no-fail-fast --no-tests=warn -E "$(just branch-tests "$mb" $packages)"
     fi
-    # shellcheck disable=SC2086
-    step gates cargo xtask gates $gates --range "$mb..HEAD"
-    step file-gates cargo xtask gates length comments --files "${changed[@]}"
     step deny just deny
     touched RefRain && step client just client-checks && step artifacts cargo xtask gates render budget npm
-    touched Sprawling/desktop/ffi && step desktop just check-desktop
-    touched Calyx/ffi && step console just check-console
     # A Lean specification is proved by `models`, which no other step runs;
     # the Lean package's own three files change what it proves
     # (Tools/xtask/Spec.lean §8-43).
@@ -483,9 +489,9 @@ test-timings baseline current:
 
 # The packages every non-Windows platform builds and tests. The desktop
 # server and its FFI seam serve a Windows desktop only, and xtask judges
-# the repository rather than shipping in it, so `ci.yml` lints and tests
-# those three on Windows alone; Linux `core` and `platforms.yml`'s macOS
-# job compile the two desktop packages only as what the binary links.
+# the repository rather than shipping in it. `check-core` excludes all
+# three; ci.yml separately lints and tests xtask on Linux, while the two
+# desktop packages compile there only as what the binary links.
 core_packages := "--workspace --exclude sprawling-desktop --exclude sprawling-desktop-ffi --exclude xtask"
 
 # Clippy and the suite over the core packages, on whatever platform runs it.
@@ -505,6 +511,11 @@ artifact_gates := "render npm budget"
 gates: gates-sources gates-artifacts
     just deny
 
+# Plan or execute the source graph; positional forwarding preserves option boundaries.
+[positional-arguments]
+verify-sources *args:
+    cargo xtask ci run "$@"
+
 # The gates that read sources alone, which answer in seconds, so `check`
 # runs them before clippy's minutes and a red arrives first.
 [positional-arguments]
@@ -523,7 +534,7 @@ gates-sources mode="" *paths:
         fi
         cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}|length|comments')
     else
-        cargo xtask gates $(cargo xtask gates --list | grep -vxE '{{replace(artifact_gates, " ", "|")}}')
+        just verify-sources
     fi
 
 # The gates that judge the client bundle, after it is built.
