@@ -32,6 +32,12 @@ pub(crate) enum XtaskError {
     Cmd { cmd: String, msg: String },
     #[error("{msg} ({code})")]
     CiUsage { code: &'static str, msg: String },
+    #[error("cannot resolve requested base {revision:?}: {source}")]
+    CiBaselineRevision {
+        revision: String,
+        #[source]
+        source: Box<XtaskError>,
+    },
     #[error("run gate `{name}`: no gate has that name (unknown-gate); name one of: {known}")]
     UnknownGate { name: String, known: String },
     #[error(

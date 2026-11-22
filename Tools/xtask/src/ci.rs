@@ -41,10 +41,15 @@ pub(crate) fn run(root: &Path, args: &[String]) -> ExitCode {
                     "name plan or run and supply the value of each distinct option",
                     "Run cargo xtask ci plan, then add a named option and its value separately.",
                 ),
+                XtaskError::CiBaselineRevision { .. } => (
+                    "ci-baseline-revision",
+                    "the requested comparison revision must resolve to a Git tree",
+                    "Run git fetch origin if the intended base is missing, or correct its spelling. Rerun the original command with the intended revision and the same options.",
+                ),
                 _ => (
                     "ci-verification-failed",
-                    "capture a valid checkout and resolve each requested baseline",
-                    "Run git status and git fsck in this checkout, then run cargo xtask ci plan --scope-base HEAD.",
+                    "capture a valid checkout and read its physical inputs",
+                    "Run git status and git fsck in this checkout. Correct the reported input or output, then rerun the original command with the same options.",
                 ),
             };
             Diagnostic {

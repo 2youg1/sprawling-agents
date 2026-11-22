@@ -1380,7 +1380,7 @@ D42 **nightly 保留最新一份，加上稳定版尚未包含的那一份。** 
 **接口**：`cargo xtask ci <plan|run> [--full | --base <rev>] [--scope-base <rev>] [--store <dir>]`。
 缺省选择完整图；`--base` 明确选择 affected 图并为文件门提供同一基线，`--scope-base` 只限定文件门，不改变节点选择。
 Unix 上固定基线比较也包括普通文件的 owner 执行位，副本保留该位；无法表示 Unix 执行位的平台只比较内容，不把特殊 Git 模式视为普通文件。
-两种 base 互斥；`--full` 与 `--base` 互斥，与 `--scope-base` 可同时使用。固定基线与 owned manifest 只比较一次，结果同时供选择与文件作用域使用；基线错误必须失败，不当成空差异。
+两种 base 互斥；`--full` 与 `--base` 互斥，与 `--scope-base` 可同时使用。固定基线与 owned manifest 只比较一次，结果同时供选择与文件作用域使用。无法解析的基线报告原修订与恢复办法，保留原比较和选择，不替换成空差异。
 所有基线 Git 读取使用 `--no-replace-objects`，不允许可变 `refs/replace` 在固定对象号下替换 tree 或 blob 字节。
 图覆盖门表中的源码门并加入外部节点，生产切片测试核对门表。只有 `length`／`comments` 接收文件作用域，其他门保持整树结论。
 命令行路径继续经 `source::Scope::new` 校验；捕获清单的仓库相对 UTF-8 路径直接成为有序作用域，保留 Unix 名称中的合法冒号与反斜杠。执行和内容键共享同一范围，不重新打开清单或读取 live diff。

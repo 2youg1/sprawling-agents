@@ -55,7 +55,10 @@ fn file_scope_keeps_the_full_roster_and_invalid_baselines_fail() {
     );
     for flag in ["--base", "--scope-base"] {
         let invalid = parse(&["plan", flag, "missing-base-object"].map(str::to_owned)).unwrap();
-        assert!(comparison(root.path(), &invalid, &captured).is_err());
+        assert!(matches!(
+            comparison(root.path(), &invalid, &captured),
+            Err(XtaskError::CiBaselineRevision { revision, .. }) if revision == "missing-base-object"
+        ));
     }
     captured.close().unwrap();
     root.close().unwrap();

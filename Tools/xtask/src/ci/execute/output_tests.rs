@@ -58,7 +58,7 @@ fn external_store_does_not_allow_logs_to_follow_target_into_source() {
         .collect::<Vec<_>>();
     assert_eq!(logs.len(), 1);
     assert!(
-        std::fs::read_to_string(&logs[0])
+        std::fs::read_to_string(logs.first().unwrap())
             .unwrap()
             .contains("verified")
     );

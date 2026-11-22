@@ -23,7 +23,10 @@ pub(crate) fn changed(
     base: &str,
     captured: &Snapshot,
 ) -> Result<BTreeSet<String>, XtaskError> {
-    let tree = revision(root, base, "tree")?;
+    let tree = revision(root, base, "tree").map_err(|source| XtaskError::CiBaselineRevision {
+        revision: base.to_owned(),
+        source: Box::new(source),
+    })?;
     let output = git(root, &["ls-tree", "-r", "-z", "--full-tree", &tree])?;
     let entries = entries(&output.stdout)?;
     let bytes = blobs(root, &entries)?;
