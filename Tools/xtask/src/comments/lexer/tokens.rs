@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use super::{Scanner, Syntax, at, expression};
+use super::{PythonString, Scanner, Syntax, at, expression};
 
 impl Scanner<'_> {
     pub(super) fn template(&mut self, index: usize) -> usize {
@@ -75,16 +75,18 @@ impl Scanner<'_> {
         index
     }
 
-    pub(super) fn python_formatted(&self, index: usize) -> bool {
-        let previous = index.checked_sub(1).and_then(|at| self.bytes.get(at));
-        if matches!(previous, Some(b'f' | b'F')) {
-            return true;
+    pub(super) fn python_format(&self, index: usize) -> Option<bool> {
+        let previous = index.checked_sub(1).and_then(|at| self.bytes.get(at))?;
+        let earlier = index.checked_sub(2).and_then(|at| self.bytes.get(at));
+        if matches!(previous, b'f' | b'F') {
+            return Some(earlier.is_some_and(|byte| matches!(byte, b'r' | b'R')));
         }
-        matches!(previous, Some(b'r' | b'R'))
-            && index
-                .checked_sub(2)
-                .and_then(|at| self.bytes.get(at))
-                .is_some_and(|byte| matches!(byte, b'f' | b'F'))
+        if !matches!(previous, b'r' | b'R') {
+            return None;
+        }
+        earlier
+            .is_some_and(|byte| matches!(byte, b'f' | b'F'))
+            .then_some(true)
     }
 
     pub(super) fn python_string_open(&mut self, mut index: usize, triple: bool) -> usize {
@@ -95,19 +97,38 @@ impl Scanner<'_> {
         index
     }
 
-    pub(super) fn python_string(&mut self, index: usize, quote: u8, triple: bool) -> usize {
+    pub(super) fn python_string(&mut self, index: usize, string: PythonString) -> usize {
         let Some(&byte) = self.bytes.get(index) else {
             return self.bytes.len();
         };
         if byte == b'\\' {
+            if string.raw {
+                return self.advance(index);
+            }
+            if at(self.bytes, index, b"\\N{") {
+                let mut cursor = self.advance(index);
+                cursor = self.advance(cursor);
+                cursor = self.advance(cursor);
+                while cursor < self.bytes.len() && self.bytes.get(cursor) != Some(&b'}') {
+                    cursor = self.advance(cursor);
+                }
+                return self.advance(cursor);
+            }
             let next = self.advance(index);
             return self.advance(next);
         }
-        if (triple && at(self.bytes, index, &[quote, quote, quote])) || (!triple && byte == quote) {
+        if (string.triple
+            && at(
+                self.bytes,
+                index,
+                &[string.quote, string.quote, string.quote],
+            ))
+            || (!string.triple && byte == string.quote)
+        {
             self.modes.pop();
-            return self.python_string_open(index, triple);
+            return self.python_string_open(index, string.triple);
         }
-        if !triple && byte == b'\n' {
+        if !string.triple && byte == b'\n' {
             self.modes.pop();
             return self.advance(index);
         }
@@ -116,6 +137,24 @@ impl Scanner<'_> {
                 let next = self.advance(index);
                 return self.advance(next);
             }
+            self.modes.push(expression(Syntax::Python));
+        } else if byte == b'}' && self.bytes.get(index.saturating_add(1)) == Some(&b'}') {
+            let next = self.advance(index);
+            return self.advance(next);
+        }
+        self.advance(index)
+    }
+
+    pub(super) fn python_format_spec(&mut self, index: usize) -> usize {
+        let Some(&byte) = self.bytes.get(index) else {
+            return self.bytes.len();
+        };
+        if byte == b'}' {
+            self.modes.pop();
+            self.modes.pop();
+            return self.advance(index);
+        }
+        if byte == b'{' {
             self.modes.push(expression(Syntax::Python));
         }
         self.advance(index)

@@ -260,6 +260,33 @@ fn python_fstring_expression_comments_reach_the_real_gate() {
 }
 
 #[test]
+fn python_fstring_format_specifiers_are_not_comments() {
+    let source = "value = f\"{42:#x}\"\n";
+    assert_eq!(lexer::measure(source, Language::Python).comment_lines, 0);
+    let root = crate::root::fixture::relocated("comments-python-format");
+    crate::root::fixture::write(&root, "tools/k/src/format.py", source);
+    assert!(check(&root).unwrap().is_empty());
+    std::fs::remove_dir_all(&root).unwrap();
+}
+
+#[test]
+fn python_raw_fstring_backslashes_preserve_expression_boundaries() {
+    let source = "value = rf\"\"\"\\{1 # forbidden\n}\"\"\"\n";
+    assert_eq!(lexer::measure(source, Language::Python).comment_lines, 1);
+    let root = crate::root::fixture::relocated("comments-python-raw-fstring");
+    crate::root::fixture::write(&root, "tools/k/src/raw.py", source);
+    assert_eq!(check(&root).unwrap().len(), 1);
+    std::fs::remove_file(root.join("tools/k/src/raw.py")).unwrap();
+    let data = r#"value = f"\N{LATIN SMALL LETTER A}"
+quoted = f"\""
+braces = f"{{# data}}"
+"#;
+    crate::root::fixture::write(&root, "tools/k/src/data.py", data);
+    assert!(check(&root).unwrap().is_empty());
+    std::fs::remove_dir_all(&root).unwrap();
+}
+
+#[test]
 fn css_mpl_and_strings_leave_only_the_real_comment() {
     let source = "/* This Source Code Form is subject to the terms of the Mozilla Public\n * License, v. 2.0. If a copy of the MPL was not distributed with this\n * file, You can obtain one at https://mozilla.org/MPL/2.0/.\n * Copyright (c) 2026 2youg1 and the sprawling contributors */\n.a::after { content: \"/* not a comment */\"; }\n/* real */\n";
     assert_eq!(lexer::measure(source, Language::Css).comment_lines, 1);

@@ -99,4 +99,14 @@ unsafe extern "C" { fn call(); }
         assert_eq!(check_scoped(&root, &scope).unwrap().len(), 1);
         std::fs::remove_dir_all(&root).unwrap();
     }
+
+    #[test]
+    fn historical_city_rust_is_not_exempt_from_an_explicit_scope() {
+        let root = crate::root::fixture::relocated("unsafe-historical-city");
+        let rel = "Sprawling/app/tests/cities/probe.rs";
+        crate::root::fixture::write(&root, rel, "pub fn blocked() { unsafe {} }\n");
+        let scope = crate::source::Scope::new(&[rel.to_owned()]).unwrap();
+        assert_eq!(check_scoped(&root, &scope).unwrap().len(), 1);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 }

@@ -83,9 +83,7 @@ pub(crate) fn unsafe_files_in(
     root: &Path,
     scope: Option<&Scope>,
 ) -> Result<Vec<PathBuf>, XtaskError> {
-    let mut files = walk::files_with_ext(root, &["rs"])?;
-    files.retain(|path| !walk::rel(root, path).starts_with(EARLIER_RELEASES));
-    Ok(selected(root, scope, files))
+    Ok(selected(root, scope, walk::files_with_ext(root, &["rs"])?))
 }
 
 fn selected(root: &Path, scope: Option<&Scope>, mut files: Vec<PathBuf>) -> Vec<PathBuf> {

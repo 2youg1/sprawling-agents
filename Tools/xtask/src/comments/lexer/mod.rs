@@ -36,7 +36,15 @@ pub(super) struct CodeMode {
     syntax: Syntax,
     template_expression: bool,
     braces: usize,
+    delimiters: usize,
     embedded: bool,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct PythonString {
+    pub(super) quote: u8,
+    pub(super) triple: bool,
+    pub(super) raw: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -44,7 +52,8 @@ pub(super) enum Mode {
     Code(CodeMode),
     Template,
     Markup,
-    PythonString { quote: u8, triple: bool },
+    PythonString(PythonString),
+    PythonFormat,
 }
 
 impl Language {
@@ -82,6 +91,7 @@ fn code(syntax: Syntax) -> Mode {
         syntax,
         template_expression: false,
         braces: 0,
+        delimiters: 0,
         embedded: false,
     })
 }
@@ -91,6 +101,7 @@ fn expression(syntax: Syntax) -> Mode {
         syntax,
         template_expression: true,
         braces: 0,
+        delimiters: 0,
         embedded: false,
     })
 }
@@ -100,6 +111,7 @@ fn embedded(syntax: Syntax) -> Mode {
         syntax,
         template_expression: false,
         braces: 0,
+        delimiters: 0,
         embedded: true,
     })
 }
@@ -119,9 +131,8 @@ impl Scanner<'_> {
                 Some(Mode::Markup) => self.markup(index),
                 Some(Mode::Template) => self.template(index),
                 Some(Mode::Code(mode)) => self.code(index, mode),
-                Some(Mode::PythonString { quote, triple }) => {
-                    self.python_string(index, quote, triple)
-                }
+                Some(Mode::PythonString(string)) => self.python_string(index, string),
+                Some(Mode::PythonFormat) => self.python_format_spec(index),
                 None => self.bytes.len(),
             };
         }
@@ -256,13 +267,22 @@ impl Scanner<'_> {
             self.modes.push(Mode::Template);
             return self.advance(index);
         }
+        if mode.syntax == Syntax::Python
+            && mode.template_expression
+            && mode.delimiters == 0
+            && byte == b':'
+        {
+            self.modes.push(Mode::PythonFormat);
+            return self.advance(index);
+        }
         if mode.syntax == Syntax::Python && matches!(byte, b'\'' | b'"') {
-            if self.python_formatted(index) {
+            if let Some(raw) = self.python_format(index) {
                 let triple = at(self.bytes, index, &[byte, byte, byte]);
-                self.modes.push(Mode::PythonString {
+                self.modes.push(Mode::PythonString(PythonString {
                     quote: byte,
                     triple,
-                });
+                    raw,
+                }));
                 return self.python_string_open(index, triple);
             }
             return self.python_quoted(index, byte);
@@ -278,15 +298,28 @@ impl Scanner<'_> {
         if mode.syntax == Syntax::JavaScript && byte == b'/' && self.regex_allowed(index) {
             return self.regex(index);
         }
+        if mode.syntax == Syntax::Python && mode.template_expression {
+            if matches!(byte, b'(' | b'[')
+                && let Some(Mode::Code(code)) = self.modes.last_mut()
+            {
+                code.delimiters = code.delimiters.saturating_add(1);
+            } else if matches!(byte, b')' | b']')
+                && let Some(Mode::Code(code)) = self.modes.last_mut()
+            {
+                code.delimiters = code.delimiters.saturating_sub(1);
+            }
+        }
         if mode.template_expression && byte == b'{' {
             if let Some(Mode::Code(code)) = self.modes.last_mut() {
                 code.braces = code.braces.saturating_add(1);
+                code.delimiters = code.delimiters.saturating_add(1);
             }
         } else if mode.template_expression && byte == b'}' {
             if mode.braces == 0 {
                 self.modes.pop();
             } else if let Some(Mode::Code(code)) = self.modes.last_mut() {
                 code.braces = code.braces.saturating_sub(1);
+                code.delimiters = code.delimiters.saturating_sub(1);
             }
         }
         self.advance(index)

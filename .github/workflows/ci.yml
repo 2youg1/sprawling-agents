@@ -278,7 +278,8 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: ./.github/actions/ci-tools
         with:
-          tool: just
+          # uv resolves the interpreter the comments gate's Python AST needs.
+          tool: just,uv
       # `fmt-check` includes `bun fmt --check`, so Bun has to be present.
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
@@ -518,7 +519,8 @@ jobs:
         if: matrix.environment == 'compile'
       - uses: ./.github/actions/ci-tools
         with:
-          tool: cargo-nextest,just
+          # The archive carries xtask's comments tests, which run Python's AST.
+          tool: cargo-nextest,just,uv
       # The trybuild suites are cold rather than slow: one suite is 21.4s
       # against an empty scratch and 0.9s against a warm one, so the
       # scratch is cached on its own. trybuild gives every suite one
@@ -594,7 +596,8 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: ./.github/actions/ci-tools
         with:
-          tool: cargo-nextest,just
+          # xtask's ci tests and the source graph both run the Python AST gate.
+          tool: cargo-nextest,just,uv
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version-file: RefRain/package.json
