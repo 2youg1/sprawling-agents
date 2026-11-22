@@ -71,6 +71,7 @@ pub const Ui = struct {
     quit: bool = false,
     mei_program: []u8,
     frame_arena: std.heap.ArenaAllocator,
+    queue_arena: std.heap.ArenaAllocator,
     cadence: present.Cadence = .{},
     queued: std.ArrayList(write.Entry) = .empty,
 
@@ -137,6 +138,7 @@ pub const Ui = struct {
             .reporting = program_status.Reporting.deciding(environ.get("SPRAWLING_PROGRAM_STATUS")),
             .mei_program = mei_program,
             .frame_arena = .init(gpa),
+            .queue_arena = .init(gpa),
         };
     }
 
@@ -156,6 +158,7 @@ pub const Ui = struct {
         self.editor.deinit();
         self.screen.deinit();
         self.frame_arena.deinit();
+        self.queue_arena.deinit();
         self.gpa.free(self.session_dir);
         self.gpa.free(self.mei_program);
         if (self.replay_file) |file| file.close(self.io);
@@ -308,21 +311,40 @@ pub const Ui = struct {
 
     pub fn print(self: *Ui, entries: []const write.Entry) void {
         if (entries.len > 0) {
-            self.queued.appendSlice(self.gpa, entries) catch {
-                const at = nowNs(self.io);
+            if (!self.enqueueOwned(entries)) {
                 self.cadence.mark();
-                if (self.queued.items.len > 0) {
-                    self.redraw(self.queued.items);
-                    self.queued.clearRetainingCapacity();
+                self.flushPresent(true);
+                if (!self.enqueueOwned(entries)) {
+                    self.redraw(entries);
+                    if (self.queued.items.len == 0) {
+                        _ = self.queue_arena.reset(.retain_capacity);
+                    }
+                    _ = self.frame_arena.reset(.retain_capacity);
+                    self.cadence.mark();
+                    self.cadence.presented(nowNs(self.io));
+                    return;
                 }
-                self.redraw(entries);
-                _ = self.frame_arena.reset(.retain_capacity);
-                self.cadence.presented(at);
-                return;
-            };
+            }
+            _ = self.frame_arena.reset(.retain_capacity);
         }
         self.cadence.mark();
         self.flushPresent(false);
+    }
+
+    fn enqueueOwned(self: *Ui, entries: []const write.Entry) bool {
+        const start = self.queued.items.len;
+        const q = self.queue_arena.allocator();
+        for (entries) |entry| {
+            const owned = present.cloneEntry(q, entry) catch {
+                self.queued.shrinkRetainingCapacity(start);
+                return false;
+            };
+            self.queued.append(self.gpa, owned) catch {
+                self.queued.shrinkRetainingCapacity(start);
+                return false;
+            };
+        }
+        return true;
     }
 
     pub fn touch(self: *Ui, force: bool) void {
@@ -335,7 +357,7 @@ pub const Ui = struct {
         if (!self.cadence.due(at, force)) return;
         self.redraw(self.queued.items);
         self.queued.clearRetainingCapacity();
-        _ = self.frame_arena.reset(.retain_capacity);
+        _ = self.queue_arena.reset(.retain_capacity);
         self.cadence.presented(at);
     }
 

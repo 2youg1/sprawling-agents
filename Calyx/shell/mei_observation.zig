@@ -181,20 +181,27 @@ pub const Seen = struct {
     fn commitDraft(self: *Seen, arena: std.mem.Allocator, at: u64) ![]write.Entry {
         if (self.draft.len == 0) return &.{};
         var entries: std.ArrayList(write.Entry) = .empty;
-        if (!self.headed) {
-            self.headed = true;
-            const facts: []const []const u8 = if (self.model.len == 0) &.{} else &.{self.model};
-            try entries.append(arena, .{ .head = .{
-                .at = tod(at),
-                .resident = "Mei",
-                .facts = try arena.dupe([]const u8, facts),
-            } });
-        }
+        if (!self.headed) try entries.append(arena, try self.headEntry(arena, at));
         const said = try arena.dupe(u8, self.draft);
         self.setLast(said);
         self.clearDraft();
         try entries.append(arena, .{ .reply = said });
         return try entries.toOwnedSlice(arena);
+    }
+
+    fn headEntry(self: *Seen, arena: std.mem.Allocator, at: u64) !write.Entry {
+        self.headed = true;
+        const facts: []const []const u8 = if (self.model.len == 0) &.{} else blk: {
+            const owned = try arena.dupe(u8, self.model);
+            const list = try arena.alloc([]const u8, 1);
+            list[0] = owned;
+            break :blk list;
+        };
+        return .{ .head = .{
+            .at = tod(at),
+            .resident = "Mei",
+            .facts = facts,
+        } };
     }
 
     fn appendDraft(self: *Seen, text: []const u8) void {
@@ -271,15 +278,7 @@ pub const Seen = struct {
 
     fn assistant(self: *Seen, arena: std.mem.Allocator, content: std.json.Value, at: u64) ![]write.Entry {
         var entries: std.ArrayList(write.Entry) = .empty;
-        if (!self.headed) {
-            self.headed = true;
-            const facts: []const []const u8 = if (self.model.len == 0) &.{} else &.{self.model};
-            try entries.append(arena, .{ .head = .{
-                .at = tod(at),
-                .resident = "Mei",
-                .facts = try arena.dupe([]const u8, facts),
-            } });
-        }
+        if (!self.headed) try entries.append(arena, try self.headEntry(arena, at));
         if (content == .string) {
             const text = try arena.dupe(u8, content.string);
             self.setLast(text);
@@ -478,4 +477,20 @@ test "a complete assistant line drops an open draft" {
     const entries = try seen.line(arena, "{\"role\":\"assistant\",\"content\":\"final\"}", 3);
     try std.testing.expectEqualStrings("", seen.draftText());
     try std.testing.expectEqualStrings("final", entries[entries.len - 1].reply);
+}
+
+test "head facts keep a copy of the model after it is replaced" {
+    const gpa = std.testing.allocator;
+    var seen = try Seen.init(gpa, "provider/old");
+    defer seen.deinit();
+    seen.begin(1);
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    const entries = try seen.line(arena, "{\"role\":\"assistant\",\"content\":\"hi\"}", 2);
+    try std.testing.expect(entries.len >= 2);
+    try std.testing.expectEqualStrings("provider/old", entries[0].head.facts[0]);
+    _ = try seen.line(arena, "{\"type\":\"mei.obs\",\"kind\":\"model\",\"model\":\"provider/new\"}", 3);
+    try std.testing.expectEqualStrings("provider/old", entries[0].head.facts[0]);
+    try std.testing.expectEqualStrings("provider/new", seen.model);
 }

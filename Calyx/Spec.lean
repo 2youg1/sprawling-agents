@@ -149,6 +149,8 @@ python 调用允许的图片总量与 JSON 信封。被否：①加大固定缓�
 2. `Calyx/shell/mei_present.zig` 拥有呈现节拍：脏状态由事件（记录、流增量、键、粘贴、
    缩放、结束）置位；呈现至多 `MAX_HZ = 360`（最短间隔 `1_000_000_000 / 360` 纳秒）。
    键/粘贴/缩放/结束强制立即呈现。中间帧不排队：只保留最新草稿与尚未呈现的转写条目。
+   入队时深拷贝条目字符串到独立 `queue_arena`，呈现前不借用 `frame_arena` 或 `Seen` 的
+   可变字段（含 `model`）；呈现后才释放该副本。
 3. 线型：`{"type":"mei.stream","kind":"delta","text":…}` 追加草稿；
    `{"type":"mei.stream","kind":"commit"}` 把草稿提交为 `Reply`。完整
    `role`/`content` assistant 行仍按既有投影；若当时有草稿则先丢弃草稿再投影完整正文。
@@ -163,6 +165,7 @@ python 调用允许的图片总量与 JSON 信封。被否：①加大固定缓�
 ③用动画/跳秒制造「在动」——违背「不发明运动」；④无上限帧队列——延迟无界；
 ⑤在 RefRain 或 Mei 核内做帧合并——锁定范围是 Calyx CLI。
 
-验收：`mei_present` 的节拍单测；`mei_observation` 对 delta/commit 与完整行的投影；
-含 `Replying` 的叶/vt100 帧；`zig build test`（`Calyx/`）与受影响的 `console_ffi` 测试绿色。
+验收：`mei_present` 的节拍与深拷贝单测（源 `model`/临时缓冲释放后副本仍可读）；
+`mei_observation` 对 delta/commit 与完整行的投影；含 `Replying` 的叶/vt100 帧；
+`zig build test`（`Calyx/`）与受影响的 `console_ffi` 测试绿色。
 -/
