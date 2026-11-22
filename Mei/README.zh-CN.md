@@ -37,7 +37,7 @@ bun install --global @sprawling/mei@latest
 cargo install sprawling-mei --locked
 ```
 
-卸载 Bun 全局安装时，去掉根包，并清掉本机平台的 optional 依赖：
+卸载 Bun 全局安装时，去掉根包，并清掉当前平台的 optional 依赖：
 
 ```sh
 bun remove --global @sprawling/mei
