@@ -16,8 +16,10 @@ just check                    # the whole check: fmt, gates, Lean specifications
 |---|---|
 | `just check` | the whole check; *Verification* says when it runs |
 | `just check-branch [base]` | the local equivalent of `ci.yml` tier 2 for a change that cannot reach the runners, over `<base>...HEAD`; every step runs even after another fails, and a green result is recorded against the tree |
-| `just check-all [phase...]` | every phase of `just check`, each run even after another fails; logs and `phases.tsv` under `$CARGO_TARGET_DIR/check-all`; named phases run alone |
+| `just check-all [phase...]` | every phase of `just check`, each run even after another fails; logs and `phases.tsv` under `$CARGO_TARGET_DIR/check-all`; named phases run alone, including the existing fmt, gates, desktop and console phases; unknown names fail |
 | `just gates` | the machine gates, then the supply-chain read |
+| `just verify-sources [--full] [--scope-base <base>]` | the complete source graph; only length/comments/unsafe use the optional changed-file scope |
+| `cargo xtask ci plan [--base <base>]` | content keys and selection; `--base` explicitly selects the affected graph |
 | `cargo xtask gates <name>...` | the named gates only; `--list` prints the roster |
 | `cargo xtask gates length comments unsafe --files <path>...` | file length, zero non-MPL comments and zero unsafe tokens only on the named changed sources; an empty list is an empty judgement |
 | `just commits <base>..<tip>` | commit subjects and `Verdict:` trailers in a range, judged against *Commits* in [AGENTS.md](../AGENTS.md#commits); CI runs it on the change-set, while `just check` cannot, because a tree has no range |
@@ -37,13 +39,25 @@ just check                    # the whole check: fmt, gates, Lean specifications
 
 - Let a Rust command finish, and never kill it by PID; waiting on the build lock is expected. Time a slow build with `cargo build --timings` before tuning it, because the seconds sit in particular compilation units.
 
+## Source verdicts
+
+`just verify-sources` runs every source gate in the gate roster, formatting, channel validation, the CI-tools and nightly contract tests, and the desktop and console Zig recipes. The console recipe tests the frame leaf; shell formatting belongs to `fmt`. The separate shell test command is `(cd Calyx && zig build test)`. Each action reads an owned source snapshot. External and Cargo-backed actions receive separate copies, so their writes cannot change another gate's inputs.
+
+CI runs the complete graph with `--full --scope-base <event-base>`. The baseline is resolved once to immutable Git objects and compared with the captured manifest. Only `length`, `comments` and `unsafe` receive those changed paths; other gates keep their whole-tree judgement. A new release-tag push without an old commit uses the first parent of its checked-out commit. Other invalid baselines fail. On Unix the comparison and snapshot also preserve the Git executable bit. Without either base option, the three file gates retain the full migration inventory, including untouched debt. An explicit empty scope judges no files. `--base` opts into affected-node selection as well as that same file scope; it conflicts with `--full` and `--scope-base`.
+
+Six gates can reuse a successful verdict on Linux: `header`, `lexicon`, `motion`, `wording`, `wire-ts` and `release`. Their keys bind captured source bytes, operation, toolchain inputs, dependency keys and the loaded verifier read through `/proc/self/exe`. A failed identity probe disables reuse and still runs verification; other platforms always execute. Other nodes remain `Never` because their external environment is not closed by the key. A refusal or execution failure is never a reusable success.
+
+The optional `.github/ci-cache` adapter uses the GitHub cache service through a Node 24 action, keeping its SDK and storage in the original checkout. Only SDK installation is nonfatal. Missing, corrupt or unavailable cache entries cause real verification. The cache may accelerate execution but cannot turn a failed action green. The Rust build cache remains separate from these verdict records.
+
+Cache acceptance requires a cold production run, an exact-key hit on a fresh runner at the same tree and ref, and a changed-input miss followed by real execution. Restoring a build target or observing a cache prefix match does not establish verdict reuse. Linux `core` separately lints xtask and runs its CI-domain tests, including Unix paths and loaded-image identity, before running this same graph; its existing collector and release policy is unchanged.
+
 ## Tier 1 — while iterating
 
 Run the narrowest command that can fail for the change, as soon as the change exists: `cargo nextest run -p <crate> -E '<filter>'` naming the new test and the tests of the modules you changed; `cargo clippy -p <crate> --all-targets --all-features -- -D warnings`; `cargo check -p <dependent>` for each direct dependent (`cargo tree --workspace -i <crate> --depth 1`) after a `pub` surface changed; `cargo xtask gates <name>...` naming the gates that judge the files you touched, with `length comments unsafe --files <changed path>...` for the three file-level gates; `lake build <module>` for a Lean file you touched; and `cargo fmt --check`, which compiles nothing. A measurement also runs locally, alone on the machine.
 
 Before opening a pull request, apply that selection to the complete final diff, including repairs made during review, and record the commands and outcomes in the description. Do not leave an affected local check for CI to discover. `just check` is not required for every change: use it when the change is broad enough to need every phase, or use `just check-branch` when the branch cannot reach the runners. Whole suites, mutation, fuzzing, kani, the adversary, screenshots and release builds otherwise belong to the next tiers. Code behind `#[cfg(unix)]` or `#[cfg(not(windows))]` is linted only where it compiles, and CI lints Windows on every push but macOS once a night, so before such a change merges run `cargo clippy --workspace --all-targets --all-features --target x86_64-unknown-linux-gnu -- -D warnings` or wait for the macOS job.
 
-The `length`, `comments` and `unsafe` gates carry a progressive migration: old violations may remain in full-tree inventory runs, but daily and branch checks judge only changed files. A change touching such a file must clear every violation in it and leave none behind, and a change may not create new violations elsewhere. The changed-file comment and unsafe-token allowances are zero. `check-branch` and CI pass their changed-file lists explicitly; full-tree runs are debt inventories rather than the daily loop. No baseline or waiver hides old content. Every other gate remains blocking.
+The `length`, `comments` and `unsafe` gates carry a progressive migration: old violations may remain in full-tree inventory runs, but daily and branch checks judge only changed files. The no-base `just check` remains the full migration inventory. A change touching such a file must clear every violation in it and leave none behind, and a change may not create new violations elsewhere. The changed-file comment and unsafe-token allowances are zero. `check-branch` and CI provide a fixed baseline for the graph to capture those lists once; full-tree runs are debt inventories rather than the daily loop. No baseline or waiver hides old content. Every other gate remains blocking.
 
 ## Tier 2 — the branch's CI
 

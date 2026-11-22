@@ -4785,6 +4785,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 name = "xtask"
 version = "0.17.0"
 dependencies = [
+ "blake3",
  "flate2",
  "proc-macro2",
  "serde",
@@ -4794,6 +4795,7 @@ dependencies = [
  "sprawling-kernel",
  "sprawling-wire",
  "syn 3.0.10",
+ "tempfile",
  "thiserror 2.0.21",
  "toml",
  "zip",

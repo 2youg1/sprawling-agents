@@ -3,6 +3,7 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
+import Tools.xtask.spec.Ci
 import Tools.xtask.spec.Comments
 import Tools.xtask.spec.Guard.Wall
 import Tools.xtask.spec.Packaged
@@ -135,7 +136,7 @@ gate／Violation／rule／violation／alternative（三段式拒绝的施工侧�
 
 **length 门的形状属于 modmap 而不属于自己**：形状列的解析只住 `modmap::shapes`，因为模块表只应有一个读者——字段一变，只有一处要改。同理，`[family.<键>]` 的 `duty` 也只由 `modmap::duties` 读，`docnum` 的 `crate_table` 经它取每个 crate 拥有什么（§8-40）。
 
-**本模块不做什么（否定式两条）**：判定路径不改任何文件；写盘只发生在带 `--write` 的命令上，且每条只重写它自己生成的那一面——`spec` 只新建不覆盖，`wire-ts` 只写 `RefRain/src/wire/`（并删掉陈旧的单文件 `RefRain/src/wire.ts` 与多余的 `cNN.ts`），`docnum` 只写受管区段两个标记之间的字节。不缓存扫描结果（每次全量重扫——确定性优于速度）。
+**本模块不做什么（否定式两条）**：单独运行门不改任何文件或缓存扫描结果。CI 编排 `ci`（§8-55）另行拥有捕获、排序执行、内容键和编排结果存储，`view` 持有输入副本，`baseline` 比较 Git 对象，`content` 计算键，`suite` 构造动作，`graph` 选择节点，`execute` 执行动作，`store` 保存结果，`diagnostic` 渲染 TOML 修复诊断：临时副本与构建输出不写入源码扫描面。源码生成写盘只发生在带 `--write` 的命令上，且每条只重写它自己生成的那一面——`spec` 只新建不覆盖，`wire-ts` 只写 `RefRain/src/wire/`（并删掉陈旧的单文件 `RefRain/src/wire.ts` 与多余的 `cNN.ts`），`docnum` 只写受管区段两个标记之间的字节。
 
 **secret 门细则**：扫描面是仓内全部文件（含 fixtures 与语料），排除隔离区 `local/` 与 `walk` 跳过的目录（§10 第 1 条）；判定器是 `kernel::secret::scan`（xtask 依赖 kernel，工作区成员不占产品拓扑，合法）；命中只报文件、偏移与长度，恒不回显字节；无内联豁免（豁免口会被注入内容利用）。兼查：产品包（§8-39）`src/**` 内 `.expose(` 的调用点只许出现在 `EXPOSE_WHITELIST` 列出的文件里——定义处与每一个出线前的最后一格，理由逐条写在表旁；命中即红。自测纪律：扫描器自身测试的高熵样本在源码中必须拆段拼接，不留可扫描的完整字面量。
 
@@ -1368,6 +1369,57 @@ D42 **nightly 保留最新一份，加上稳定版尚未包含的那一份。** 
 **重开参数**：curated release 的频率高到「最多滞后一次 nightly 发布」不可接受，或 nightly 通道需要保留可回退的上一份——那时改的是保留几份，不是这条判据。
 -/
 
+/-! ### 8-55 内容寻址验证图：源码门的生产切片
+
+**验证结果只绑定实际读取的完整输入闭包（D47）。** `Tools/xtask/src/ci.rs` 与其分部持有验证节点、输入散列、依赖闭包、结果存储与并行执行；`ci/view.rs`
+在每用户私有临时目录持有本轮输入副本，`ci/baseline.rs` 只比较固定 Git tree 的对象与该副本；形式模型住
+`Tools/xtask/spec/Ci.lean`。`ci.yml` 的 `gates-sources` 调用 `cargo xtask ci run`，不再把一组互相独立的
+步骤写成固定的串行列表。默认、branch 与 CI 使用同一图；`gates-sources changed` 保留以
+`--files-from` 或显式路径调用 gates roster 的公开兼容入口，不复用内容结果。commit-message 的历史／标题输入仍在
+`.github/actions/commit-messages` 中，每次运行，不进内容缓存。
+
+**接口**：`cargo xtask ci <plan|run> [--full | --base <rev>] [--scope-base <rev>] [--store <dir>]`。
+缺省选择完整图；`--base` 明确选择 affected 图并为文件门提供同一基线，`--scope-base` 只限定文件门，不改变节点选择。
+Unix 上固定基线比较也包括普通文件的 owner 执行位，副本保留该位；无法表示 Unix 执行位的平台只比较内容，不把特殊 Git 模式视为普通文件。
+两种 base 互斥；`--full` 与 `--base` 互斥，与 `--scope-base` 可同时使用。固定基线与 owned manifest 只比较一次，结果同时供选择与文件作用域使用。无法解析的基线报告原修订与恢复办法，保留原比较和选择，不替换成空差异。
+所有基线 Git 读取使用 `--no-replace-objects`，不允许可变 `refs/replace` 在固定对象号下替换 tree 或 blob 字节。
+图覆盖门表中的源码门并加入外部节点，生产切片测试核对门表。只有 `length`／`comments`／`unsafe` 接收文件作用域，其他门保持整树结论。
+命令行路径继续经 `source::Scope::new` 校验；捕获清单的仓库相对 UTF-8 路径直接成为有序作用域，保留 Unix 名称中的合法冒号与反斜杠。执行和内容键共享同一范围，不重新打开清单或读取 live diff。
+`source::Scope::paths()` 只读地暴露规范化有序清单，供键和实际调用共享；`PreparedAction` 持有该已验证值。
+没有基线时 `None` 保留全树迁移盘点，显式空名单是 `Some(empty)` 且严格判空；非空名单只判那些触改文件。
+CI 使用 `--full --scope-base <event-base>`，始终选择完整图，不用 affected 模式绕过旧债。`--store <dir>` 明确选择
+本地结果目录；GitHub 适配器由 `SPRAWLING_CI_CACHE_ADAPTER` 指向 `.github/ci-cache/cache.ts`。
+`just verify-sources` 按位置完整转发参数；`--full` 与 `--base` 互斥，重复选项明确拒绝。
+相对 store 与适配器路径以原检出为基准；store 与执行日志必须位于扫描面之外，解析现存父目录的别名后仍落在源码内时拒绝。
+显式外部 `--store` 不能跳过 `target/ci/logs` 的同一边界检查；日志写入解析后的路径。
+Windows 的脚本 shell 从实际 Git 安装的 exec-path 定位，不假定安装盘符；不可用时给出修复诊断。
+GitHub 通过同目录 `runs.using: node24` 的本地 action 启动原有 `just verify-sources`，让 runner 的缓存运行时环境
+直接传给子进程。只有 SDK 的 frozen 安装步骤允许失败；验证器启动失败、拒绝与异常退出必须令 action 失败。
+新建发行标签的 push 若没有旧提交（before 为零），使用检出提交的第一个物理父提交作为文件门基线；其他事件的无效基线仍拒绝。
+SDK、适配器与缓存目录留在原检出，安装产物不进入输入副本；Linux core 另运行 xtask clippy、ci 域测试与同一生产图。
+所有键使用工作区唯一的 BLAKE3，内容记录包含路径、字节摘要、可观察的执行位、节点定义、平台、实际验证器字节身份与依赖键。
+capture 每文件只读取一次，同一 buffer 写入独立普通文件并计算身份；检查读取副本而不是之后可能改变的原树。
+副本保留全部源码扫描面，包括顶层 workspace member；链接或特殊项无法忠实表示时明确拒绝。副本不复制
+`.git`、依赖或构建目录，原入口仍先通过 `root::judged`；需要 HEAD 的工作流自测使用一次捕获的显式值。
+该自测在已有 API 与 jq 替身旁固定 Git describe/count 的夹具答案，不从副本外读取标签或历史。
+清理失败明确报告，不能把运行后丢弃副本当成检查成功的一部分默默忽略。可复用纯门独占其只读输入视图；
+每个不可复用动作从该捕获视图取得独立的可写副本，外部命令与 Cargo 不能改写纯门读取的目录。
+
+**复用边界**：只读 `green` 且键完全相等的结果；`refused`、`broken`、损坏记录、缺失文件与不可达存储
+都回到真实执行。缓存写失败不改变已经得到的绿色结论，缓存读失败也不会把未执行读成绿色。非 hermetic
+节点必须声明 `never`，包括依赖外部进程或尚未固定 Cargo 配置的门；只有显式声明的纯源码门可复用，新增门默认
+不可复用。未闭包门的源码声明保守取全树，因此顶层 workspace member 和两种 Cargo config 文件名的变化都进入选择。
+当前六个纯门是 header、lexicon、motion、wording、wire-ts、release；Linux 从
+`/proc/self/exe` 读取实际运行映像作为身份，其他平台无法由现有接口固定该身份，全部真实执行而不读写结果缓存。
+Linux 映像探测失败也记录原因并降为不可复用；可选缓存能力不能阻止真实验证。
+图拒绝重名节点、未知依赖与环；独立失败不遮住其他可执行节点，后继在前置非绿时不得执行，阻塞逐级传播且不依赖声明顺序。
+缓存的动作与键子路径逐段拒绝文件系统别名，日志使用独占的新文件；缓存失败改为执行并报告结构化修复诊断，命令用法错误、无法执行及日志失败以结构化诊断返回。
+
+**验收**：`lake build Tools.xtask.spec.Ci` 证明复用、闭包与完整性的性质；Rust 测试覆盖相同输入、不同
+内容、不同路径、删除输入、损坏缓存、失败重跑、受影响及前置闭包、并发执行和原子发布。生产验收是
+`cargo xtask ci run --full --scope-base <base>` 在本变更的完整图上全绿，并在两个不同输入树上展示正确的 miss／hit 与节点选择。
+-/
+
 /-! ## 9 工作流程
 
 `cargo xtask <gate>` → 定位仓库根（`root::judged`，见 D3）→ 读数据面（`architecture.toml`／ARCHITECTURE.md／`lexicon.toml`／`budgets.toml`）→ 纯函数判定 → 渲染违规 → 退出码。`gates` 每道门各占一条 `thread::scope` 线程并行判定，按门序汇合结果后统一渲染（§8-31）；汇合取哪个退出码，见 `spec/Report.lean`。
@@ -1447,7 +1499,7 @@ D1 **门自身的故障是一个类型，退出码 2。** `XtaskError`（thiserr
 
 /-! ## 13 依赖选型
 
-serde 与 serde_json（cargo metadata 解析；工作区已钉）；toml（`lexicon.toml`、`architecture.toml`、`budgets.toml`；xtask 独用，不入产品面）；thiserror（工作区已钉）；kernel（secret 门复用 `kernel::secret::scan`，一个判定一个家）。不引 walkdir/regex/clap：手写遍历十几行；判定用子串与前缀即可；子命令分发一个 match 足矣。
+serde 与 serde_json（cargo metadata 解析；工作区已钉）；toml（`lexicon.toml`、`architecture.toml`、`budgets.toml`；xtask 独用，不入产品面）；thiserror（工作区已钉）；kernel（secret 门复用 `kernel::secret::scan`，一个判定一个家）。blake3（内容身份复用工作区实现）与 tempfile（CI 的私有输入、独占输出与原子落位）；不引 walkdir/regex/clap：手写遍历十几行；判定用子串与前缀即可；子命令分发一个 match 足矣。
 
 **comments 不新增 Rust 解析依赖。** `syn` 会丢掉普通注释，不能识别它们；这里需要的是词法扫描而不是语法树。一个共享扫描器按 Mode 携带 Rust、JavaScript、Python、Zig 或 CSS 的词法；Svelte 在 markup、script、style 与表达式之间切换。模板插值使用有界输入驱动的显式状态栈，不按模板嵌套递归。Python docstring 由该文件语法自己的 Python `ast` 标准库识别，不引入 Rust Python parser，也不把 docstring 的位置规则复制到手写扫描器。正反夹具覆盖注释标记出现在各类字符串、字符、生命期、raw string、regex、模板文本与插值里的情况，以及文档字符串与数据字符串的区别。
 
@@ -1482,7 +1534,7 @@ CI 与 justfile 调用面；ARCHITECTURE.md §3（`depmap`、`directions` 围栏
 
 /-! ## 16 测试与约束
 
-单测：`length` 的文件面在 500 行通过、501 行拒绝；`comments` 对精确 MPL 头通过，对任意其他注释拒绝，覆盖行尾注释、空文件、Svelte 三种领先头形状、markup URL、嵌套块注释、raw string、生命期、template 插值、regex、Zig 多行字符串、Python 三引号、docstring 与 CSS 字符串。`unsafe` 在字符串、注释与 `unsafe_code` lint 名上不报，在普通块、unsafe extern 与宏 token 树内必报；真实违规夹具触红，文件作用域只交出目标文件。文件作用域空清单无违规，非相对路径与不支持局部判定的门各自拒绝。`spec/Comments.lean` 对同一零条件证明空输入、合法输入与两种拒绝都可实现。`members` 读本仓（kernel 在 `Sprawling/kernel`，desktop 与它的叶子都是成员，xtask 是 Tool，仓库根不是一个包）；包目录落在检出之外以 `member-outside-checkout` 拒读；一棵包名、lib 名、目录三种拼法各不相同的夹具检出（`root::fixture::relocated`：`sprawling-k`，lib `k`，住 `tools/k`）上，depmap 按 lib 名判边、`spec` 把骨架写进 `tools/k`、specalign 读到 `tools/` 下的模块行、proof 读到 `tools/k` 的 harness、`root::judged` 从 `Tools/xtask` 找到检出根，五条各一个测试；`architecture.toml` 条目解析（正例／状态非法／同一文件两个条目）；索引文件判定；三种拼法的测试模块无条目不报、旁边的生产文件照报（D40）；lexicon 命中与 `lexicon-ok:` 豁免；`wording-ok:` 豁免跨过格式化器折出的行、块关掉之后不再豁免、同行的豁免仍生效；shim 表被折成多行时每个条目仍读成一行；depmap 块解析；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；`guard::wall` 五例（叶子的表少一条 lint、放宽一条 lint、多一条 lint、一个别的成员写了自己的表、叶子不在成员里）加一条自清理断言（记下的差异消失即须划掉）；docnum 区段解析（整行形与行内形各保持自己的形状、陈旧区段的拒词带 `--write`、未知事实不写盘、三种坏标记各报一例）；`crate_table` 在 relocated 夹具上画出整张表（`sprawling-j` 的模块名写 `bin::`，于是读 `[family.bin]`；duty 里的竖线被转义；没有边的写 `nothing`），夹具缺 `[family.k]` 时以点名它的 `Doc` 拒读（§8-40）。不写「本仓自身通过」一类的单测：门在 `just check` 里对本仓跑一遍，同一断言再跑一遍只多花时间，不多判一件事。约束：全门无网络；判定路径无写盘，写盘只在带 `--write` 的命令上发生（§7）；输出顺序确定。
+单测：`length` 的文件面在 500 行通过、501 行拒绝；`comments` 对精确 MPL 头通过，对任意其他注释拒绝，覆盖行尾注释、空文件、Svelte 三种领先头形状、markup URL、嵌套块注释、raw string、生命期、template 插值、regex、Zig 多行字符串、Python 三引号、docstring 与 CSS 字符串。`unsafe` 在字符串、注释与 `unsafe_code` lint 名上不报，在普通块、unsafe extern 与宏 token 树内必报；真实违规夹具触红，文件作用域只交出目标文件。文件作用域空清单无违规，非相对路径与不支持局部判定的门各自拒绝。`spec/Comments.lean` 对同一零条件证明空输入、合法输入与两种拒绝都可实现。`members` 读本仓（kernel 在 `Sprawling/kernel`，desktop 与它的叶子都是成员，xtask 是 Tool，仓库根不是一个包）；包目录落在检出之外以 `member-outside-checkout` 拒读；一棵包名、lib 名、目录三种拼法各不相同的夹具检出（`root::fixture::relocated`：`sprawling-k`，lib `k`，住 `tools/k`）上，depmap 按 lib 名判边、`spec` 把骨架写进 `tools/k`、specalign 读到 `tools/` 下的模块行、proof 读到 `tools/k` 的 harness、`root::judged` 从 `Tools/xtask` 找到检出根，五条各一个测试；`architecture.toml` 条目解析（正例／状态非法／同一文件两个条目）；索引文件判定；三种拼法的测试模块无条目不报、旁边的生产文件照报（D40）；lexicon 命中与 `lexicon-ok:` 豁免；`wording-ok:` 豁免跨过格式化器折出的行、块关掉之后不再豁免、同行的豁免仍生效；shim 表被折成多行时每个条目仍读成一行；depmap 块解析；header 比对（CRLF）；隔离区前缀判定（`local/` 命中、`localx/` 不命中）；`guard::wall` 五例（叶子的表少一条 lint、放宽一条 lint、多一条 lint、一个别的成员写了自己的表、叶子不在成员里）加一条自清理断言（记下的差异消失即须划掉）；docnum 区段解析（整行形与行内形各保持自己的形状、陈旧区段的拒词带 `--write`、未知事实不写盘、三种坏标记各报一例）；`crate_table` 在 relocated 夹具上画出整张表（`sprawling-j` 的模块名写 `bin::`，于是读 `[family.bin]`；duty 里的竖线被转义；没有边的写 `nothing`），夹具缺 `[family.k]` 时以点名它的 `Doc` 拒读（§8-40）。不写「本仓自身通过」一类的单测：门在 `just check` 里对本仓跑一遍，同一断言再跑一遍只多花时间，不多判一件事。约束：直接执行门不读网络、不写盘；CI 编排的临时副本与结果适配器另由 §8-55 约束（§7）；输出顺序确定。
 
 **证明的性质**（`lake build Spec`，经 `just models`；不依赖 `sorry`、`admit`、`axiom`）：
 

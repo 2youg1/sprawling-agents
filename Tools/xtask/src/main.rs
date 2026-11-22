@@ -24,6 +24,7 @@ mod boundary;
 mod budget;
 mod bundle;
 mod channel;
+mod ci;
 mod color;
 mod comments;
 mod commits;
@@ -96,6 +97,7 @@ fn main() -> ExitCode {
             Ok(files) => gates::run(&root, &gate_names(&args), files),
             Err(err) => report::internal_failure(&err),
         },
+        Some("ci") => ci::run(&root, args.get(1..).unwrap_or(&[])),
         Some("color") => report::finish("color", color::check(&root)),
         Some("render") => report::finish("render", render::check(&root)),
         Some("budget") => match budget::report(&root) {
@@ -306,7 +308,11 @@ struct Tool {
     gives: &'static str,
 }
 
-const TOOLS: [Tool; 17] = [
+const TOOLS: [Tool; 18] = [
+    Tool {
+        call: "ci <plan|run> [--full | --base <rev>] [--scope-base <rev>] [--store <dir>]",
+        gives: "the source graph with independent node selection and file-gate scope",
+    },
     Tool {
         call: "acp-catalog",
         gives: "the ACP registry index, written as the catalog snapshot the build ships",
