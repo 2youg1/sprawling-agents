@@ -77,11 +77,7 @@ impl Machine for ThisMachine {
             Detection::Component { variable, file } => {
                 let dir = super::host::components_dir().map(|dir| dir.join(requirement.name));
                 let value = std::env::var_os(variable);
-                if *variable == super::table::PYTHON_WASM_VARIABLE {
-                    super::host::python_component(value, dir, file)
-                } else {
-                    component_at(variable, value, dir, file)
-                }
+                component_at(variable, value, dir, file)
             }
             Detection::Interpreter { variable, fallback } => {
                 let Some(platform) = self.platform else {
@@ -101,7 +97,7 @@ impl Machine for ThisMachine {
                     Some(path) => ask_version(&path, "--version", self.patience),
                 }
             }
-            Detection::Built { carried } => super::host::built(*carried),
+            Detection::Built { .. } => Presence::Absent(Absence::NotInThisBuild),
             Detection::Family(family) => super::family::look(*family, self.platform, &search_path),
             Detection::Font { files } => match self.platform {
                 Some(platform) => {

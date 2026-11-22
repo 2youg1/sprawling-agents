@@ -11,10 +11,8 @@
     reason = "test code"
 )]
 
-use std::path::PathBuf;
-
 use kernel::{Address, Payload, RunId, Tool, ToolCall, ToolName};
-use runtime::{Backlog, EchoSandbox, ExecSetup, ExecTool, Fuel, PollBudget, PythonGuest};
+use runtime::{Backlog, ExecSetup, ExecTool, PollBudget};
 use serde_json::{Value, json};
 
 const MARK: &str = "only-for-the-run-that-started-it";
@@ -22,17 +20,14 @@ const MARK: &str = "only-for-the-run-that-started-it";
 fn a_run_at(backlog: &Backlog, building: &str, run: u8, workdir: &std::path::Path) -> ExecTool {
     let setup = ExecSetup {
         workdir: workdir.to_path_buf(),
-        mounts: Vec::new(),
-
-        python_wasm: Some(PythonGuest::at(PathBuf::from("python.wasm"))),
+        python: None,
         shell: runtime::Shell::Absent,
-        fuel: Fuel(1_000_000),
         env_passthrough: Vec::new(),
         domain: Address::parse(building).unwrap(),
         run: RunId::from_bytes([run; 16]),
         policy: runtime::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
     };
-    ExecTool::new(setup, Box::new(EchoSandbox::new()), backlog.clone()).unwrap()
+    ExecTool::new(setup, backlog.clone()).unwrap()
 }
 
 fn invoke(tool: &mut ExecTool, args: Value) -> Value {

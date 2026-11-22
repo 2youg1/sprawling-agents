@@ -9,7 +9,7 @@ use std::process::Command;
 fn native_tool(source: &std::path::Path, scratch: &std::path::Path, backlog: Backlog) -> ExecTool {
     ExecTool::new(
         setup(source, None, None),
-        Box::new(EchoSandbox::new()),
+        
         backlog,
     )
     .unwrap()
@@ -190,7 +190,7 @@ fn native_macos_initialization_failure_never_runs_target_or_retains_copy() {
     let missing = source.path().join("missing-wrapper");
     let tool = ExecTool::new(
         setup(source.path(), None, None),
-        Box::new(EchoSandbox::new()),
+        
         patient(),
     )
     .unwrap()

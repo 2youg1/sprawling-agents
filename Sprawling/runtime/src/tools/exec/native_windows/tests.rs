@@ -6,7 +6,6 @@
 //! Disposable-runner conformance through the same ExecTool invocation as production.
 
 use super::*;
-use crate::sandbox::{EchoSandbox, Fuel};
 use crate::tools::exec::{ExecSetup, ExecTool, Shell};
 use kernel::{Address, Payload, RunId, Tool, ToolCall, ToolName};
 use serde_json::Value;
@@ -50,16 +49,14 @@ fn native_windows_disposable_production_axes_and_cleanup() {
     let tool = ExecTool::new(
         ExecSetup {
             workdir: work.path().to_path_buf(),
-            mounts: Vec::new(),
-            python_wasm: None,
+            python: None,
             shell: Shell::Absent,
-            fuel: Fuel(1),
             env_passthrough: Vec::new(),
             domain: Address::parse("work").unwrap(),
             run: owner,
             policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
         },
-        Box::new(EchoSandbox::new()),
+        
         backlog.clone(),
     )
     .unwrap()

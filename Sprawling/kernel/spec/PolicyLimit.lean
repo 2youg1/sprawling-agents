@@ -1,4 +1,4 @@
--- This Source Code Form is subject to the terms of the Mozilla Public
+﻿-- This Source Code Form is subject to the terms of the Mozilla Public
 -- License, v. 2.0. If a copy of the MPL was not distributed with this
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
@@ -37,7 +37,7 @@
 
 - `WORKTREE_MAX_BYTES`：有拒因，但今天拒因是 `StorageError::WorktreeBusy` 的 detail（两个数都在里面），迁它的前提是那句 detail 也从类型派生。
 - `OUTPUT_CEILING_DEFAULT`：合法域（非零）今天是两个家——`consts_policy` 的测试与 `gateway::provider::ceiling` 的 `Ceiling::new(..)?`；铸成 `Ceiling` 实例即一个家。
-- `SANDBOX_FUEL_DEFAULT`：`SandboxLimits.fuel` 是裸 `u64`，域未设。
+- （已退役）`SANDBOX_FUEL_DEFAULT` 随 wasip1 燃料字段一并删除。
 - `STARTUP_BUDGET_TOKENS`／`BYTES_PER_TOKEN`／`LOOP_REPEAT_THRESHOLD`／`OFFLOAD_MIN_BYTES`／`DRAFT_HELD_ESCALATE`／`EDIT_WAR_FREEZE`／`DISCARD_FILES_MAX`／`DISCARD_RETENTION_DAYS`：算术输入或判定输入，无拒因句式，保持裸数即是正确形状。
 - `PREFIX_SLOTS`：域已在类型上（`NonZeroU64`），不迁。
 -/

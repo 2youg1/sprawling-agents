@@ -42,7 +42,7 @@ fn each_kind_of_file_is_refused_at_the_line_and_column_of_its_error() {
     let city_config = CityLayout::new(root).city_config();
     write(&city_config, "# the city\n  wrong = true\n");
     let lab_config = Layer::Building.file(root, &lab).unwrap();
-    write(&lab_config, "\n\n[sandbox]\nmounts = []\nwat = 1\n");
+    write(&lab_config, "\n\n[sandbox]\nshell = false\nwat = 1\n");
     write(&schedule_path(root), "[[job]]\nname = \"a\"\n    zap = 2\n");
     write(&watch_path(root), "\n[[source]]\nname = \"a\"\n\tzap = 1\n");
 

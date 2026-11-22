@@ -87,10 +87,8 @@ fn an_existing_file_is_unchanged_under_create_by_edit_exec_and_link() {
     let exec = runtime::ExecTool::new(
         runtime::ExecSetup {
             workdir: root.join("work"),
-            mounts: Vec::new(),
-            python_wasm: None,
+            python: None,
             shell: runtime::Shell::Absent,
-            fuel: runtime::Fuel(1_000_000),
             env_passthrough: Vec::new(),
             domain: work,
             run: kernel::RunId::from_bytes([1; 16]),
@@ -100,7 +98,6 @@ fn an_existing_file_is_unchanged_under_create_by_edit_exec_and_link() {
             })
             .reader(),
         },
-        Box::new(runtime::EchoSandbox::new()),
         runtime::Backlog::with_window(runtime::PollBudget::new(6_000, 20)),
     )
     .unwrap();

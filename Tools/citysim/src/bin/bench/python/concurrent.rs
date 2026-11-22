@@ -6,13 +6,12 @@
 use std::sync::{Barrier, mpsc};
 use std::time::Duration;
 
-use runtime::{Sandbox as _, SandboxExit};
 use sprawling::monitor::spread::micros;
 use sprawling::monitor::tree::{Tree, TreeReading};
 
 use super::{
-    CONCURRENT_BURSTS, CONCURRENT_CALLERS, Identity, MEMORY_BEAT, Prepared, STATE_CLEAN,
-    STATE_LEAKED, STATE_WRITTEN, Sample, WARM_SAMPLES, checked_output, fixture, raw_job,
+    CONCURRENT_BURSTS, CONCURRENT_CALLERS, Identity, MEMORY_BEAT, Prepared, RunOutcome, STATE_CLEAN,
+    STATE_LEAKED, STATE_WRITTEN, Sample, WARM_SAMPLES, checked_output, fixture, run_script,
     timed_outcome,
 };
 use crate::reading::MachineClass;
@@ -21,7 +20,7 @@ pub(crate) fn warm_calls(prepared: &mut Prepared) -> Result<Vec<Sample>, String>
     check_state_isolation(prepared)?;
     (0..WARM_SAMPLES)
         .map(|index| {
-            let measured = timed_outcome(&mut prepared.sandbox, &prepared.guest)?;
+            let measured = timed_outcome(&prepared.interpreter)?;
             checked_output(&measured.outcome)?;
             Ok(Sample {
                 took: measured.took,
@@ -34,29 +33,21 @@ pub(crate) fn warm_calls(prepared: &mut Prepared) -> Result<Vec<Sample>, String>
 
 pub(super) fn check_state_isolation(prepared: &mut Prepared) -> Result<(), String> {
     let write_script = format!("bench_state = 41\nprint('{STATE_WRITTEN}')\n");
-    let write = raw_job(&prepared.guest, &write_script);
-    let written = prepared
-        .sandbox
-        .run(&write)
-        .map_err(|why| why.to_string())?;
-    if written.exit != SandboxExit::Success
+    let written = run_script(&prepared.interpreter, &write_script)?;
+    if written.exit_code != 0
         || written.stdout != output_line(STATE_WRITTEN)
         || !written.stderr.is_empty()
     {
         return Err(fixture(
-            "the state-writing CPython call did not complete as written",
+            "the state-writing Python call did not complete as written",
         ));
     }
     let read_script =
         format!("print('{STATE_LEAKED}' if 'bench_state' in globals() else '{STATE_CLEAN}')\n");
-    let read = raw_job(&prepared.guest, &read_script);
-    let read = prepared.sandbox.run(&read).map_err(|why| why.to_string())?;
-    if read.exit != SandboxExit::Success
-        || read.stdout != output_line(STATE_CLEAN)
-        || !read.stderr.is_empty()
-    {
+    let read = run_script(&prepared.interpreter, &read_script)?;
+    if read.exit_code != 0 || read.stdout != output_line(STATE_CLEAN) || !read.stderr.is_empty() {
         return Err(fixture(
-            "a second CPython interpreter observed its predecessor's global",
+            "a second Python interpreter observed its predecessor's global",
         ));
     }
     Ok(())
@@ -71,7 +62,7 @@ pub(crate) struct Call {
     pub(crate) start_delay: Duration,
     pub(crate) round: usize,
     pub(crate) returned: std::time::Instant,
-    pub(crate) outcome: runtime::SandboxOutcome,
+    pub(crate) outcome: RunOutcome,
 }
 
 pub(crate) struct Concurrent {
@@ -88,9 +79,6 @@ pub(crate) struct Memory {
     pub(crate) beats: u64,
 }
 
-/// `sysinfo` calls the same field virtual size on Unix but PrivateUsage on
-/// Windows. The report names the measured counter rather than promising an
-/// unavailable Windows address-space reservation reading.
 pub(crate) enum VirtualCounter {
     Virtual,
     PrivateCommit,
@@ -139,8 +127,6 @@ pub(crate) fn concurrent_calls(prepared: &Prepared) -> Result<Concurrent, String
     })
 }
 
-/// Memory is read in a separate burst so the process-table walk never
-/// disturbs the latency and throughput samples.
 pub(crate) fn measure_memory(prepared: &Prepared) -> Result<Memory, String> {
     let mut tree = Tree::open(std::process::id());
     let before = tree
@@ -193,12 +179,11 @@ pub(super) fn concurrent_burst(
         let mut handles = Vec::with_capacity(CONCURRENT_CALLERS);
         for _ in 0..CONCURRENT_CALLERS {
             let barrier = &barrier;
-            let mut sandbox = prepared.sandbox.clone();
-            let guest = &prepared.guest;
+            let interpreter = &prepared.interpreter;
             handles.push(scope.spawn(move || {
                 barrier.wait();
                 let start_delay = spawned_at.elapsed();
-                let measured = timed_outcome(&mut sandbox, guest)?;
+                let measured = timed_outcome(interpreter)?;
                 Ok::<Call, String>(Call {
                     latency: measured.took,
                     start_delay,
@@ -213,7 +198,7 @@ pub(super) fn concurrent_burst(
         let joined: Vec<_> = handles.into_iter().map(|handle| handle.join()).collect();
         let mut calls = Vec::with_capacity(CONCURRENT_CALLERS);
         for result in joined {
-            calls.push(result.map_err(|_| fixture("a concurrent CPython caller panicked"))??);
+            calls.push(result.map_err(|_| fixture("a concurrent Python caller panicked"))??);
         }
         let wall = calls
             .iter()
@@ -251,7 +236,6 @@ pub(super) fn monitor_memory(
     }
 }
 
-/// Neither a measurement failure nor a cleanup failure erases the other.
 pub(crate) fn keep_both<T, U>(
     work: Result<T, String>,
     cleanup: Result<U, String>,

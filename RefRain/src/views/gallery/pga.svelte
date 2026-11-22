@@ -113,8 +113,6 @@
 
   export const SANDBOX: SandboxLimits = {
     shell: true,
-    fuel: 4_000_000,
-    mounts: [Address.make("lab/shared"), Address.make("docs")],
     env_passthrough: [EnvVarName.make("CC"), EnvVarName.make("LIB")],
     trusted: [ServerLabel.make("desktop")],
   };

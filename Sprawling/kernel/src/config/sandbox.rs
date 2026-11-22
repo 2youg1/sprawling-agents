@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::{ContainerLimits, EnvVarName, Interpreter};
-use crate::{Address, AxCode, AxError, ServerLabel};
+use crate::{AxCode, AxError, ServerLabel};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -31,10 +31,6 @@ pub struct SandboxLimits {
 
     #[serde(default)]
     pub interpreter: Interpreter,
-
-    pub fuel: u64,
-
-    pub mounts: Vec<Address>,
 
     #[serde(default)]
     pub env_passthrough: Vec<EnvVarName>,
@@ -85,8 +81,6 @@ impl Default for SandboxLimits {
             arm: None,
             shell: false,
             interpreter: Interpreter::System,
-            fuel: crate::consts_policy::SANDBOX_FUEL_DEFAULT,
-            mounts: Vec::new(),
             env_passthrough: Vec::new(),
             trusted: Vec::new(),
         }

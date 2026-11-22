@@ -21,7 +21,7 @@ fn a_shell_line_under_a_missing_pwsh_is_refused_by_name_not_run_by_cmd() {
             },
             ..setup(chamber.path(), None, None)
         },
-        Box::new(EchoSandbox::new()),
+        
         patient(),
     )
     .unwrap();
@@ -51,7 +51,7 @@ fn a_shell_result_names_the_interpreter_that_ran_it() {
     let tool = a_tool(
         chamber.path(),
         None,
-        Box::new(EchoSandbox::new()),
+        
         Some(program),
     );
     let answer = tool.invoke(&call_at(command("echo hi"), "host")).unwrap();
@@ -165,7 +165,7 @@ fn the_tool_description_names_the_interpreter_its_shell_lines_run_under() {
                 shell,
                 ..setup(chamber.path(), None, None)
             },
-            Box::new(EchoSandbox::new()),
+            
             patient(),
         )
         .unwrap()

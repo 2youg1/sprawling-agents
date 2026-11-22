@@ -5,7 +5,7 @@
 
 use crate::Reached;
 use agent_protocols::Outbound as _;
-use kernel::{Address, AxError};
+use kernel::AxError;
 
 use super::RunWorker;
 
@@ -184,20 +184,6 @@ impl Resident {
             })
             .collect()
     }
-}
-
-pub(super) fn mounts_under(
-    write_root: &std::path::Path,
-    mounts: &[Address],
-) -> Vec<runtime::Mount> {
-    mounts
-        .iter()
-        .map(|addr| runtime::Mount {
-            host: write_root.join(addr.as_str()),
-            guest: format!("/{}", addr.as_str()),
-            writable: false,
-        })
-        .collect()
 }
 
 #[cfg(test)]

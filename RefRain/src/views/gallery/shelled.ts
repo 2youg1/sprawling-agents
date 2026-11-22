@@ -122,7 +122,7 @@ export function answering(calling: boolean): (query: Query) => Answer | undefine
             unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 },
           },
           rooms: [ROOM],
-          sandbox: { arm: "copied_tree", fuel: 0, mounts: [SANDBOXED], shell: true },
+          sandbox: { arm: "copied_tree", shell: true },
         },
       };
     }

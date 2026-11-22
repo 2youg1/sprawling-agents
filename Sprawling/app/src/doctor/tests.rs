@@ -197,8 +197,7 @@ fn the_table_names_what_this_repository_actually_asks_for() {
         "chromedriver",
         "msedgedriver",
         "git",
-        "python-wasi",
-        "sandbox-engine",
+        "host-python",
         "shell",
         "ffmpeg",
         "sarasa-gothic",
@@ -224,28 +223,25 @@ fn the_table_names_what_this_repository_actually_asks_for() {
         "a browser engine is what the use tier asks for, by family rather than by brand"
     );
     assert!(
-        use_tier.contains(&"python-wasi") && use_tier.contains(&"shell"),
+        use_tier.contains(&"host-python") && use_tier.contains(&"shell"),
         "what a run's tools reach for is a use-tier fact: {use_tier:?}"
     );
 }
 
-/// The variable the python component is looked for under is spelled
-/// once in this crate, in the doctor's table, and the exec tool asks
-/// the doctor rather than reading it a second time.
-///
-/// Wave A left two spellings and a test pinning them equal; two pinned
-/// spellings are still two authorities. Every source file under this
-/// crate is read here, so a third spelling anywhere turns this red.
+/// The variable the host Python interpreter is looked for under is
+/// spelled once in this crate, in the doctor's table, and the exec tool
+/// asks the doctor rather than reading it a second time.
 #[test]
 fn the_python_variable_is_spelled_once() {
     let variable = REQUIREMENTS
         .iter()
-        .find(|item| item.name == "python-wasi")
+        .find(|item| item.name == "host-python")
         .and_then(|item| match &item.detect {
-            Detection::Component { variable, .. } => Some(*variable),
+            Detection::Interpreter { variable, .. } => Some(variable.windows),
             _ => None,
         })
-        .expect("the table carries the python component as a Component");
+        .expect("the table carries host Python as an Interpreter");
+    assert_eq!(variable, crate::doctor::table::PYTHON_VARIABLE);
     let literal = format!("\"{variable}\"");
     let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut spelled_in = Vec::new();
@@ -254,6 +250,9 @@ fn the_python_variable_is_spelled_once() {
         for entry in std::fs::read_dir(&dir).unwrap().flatten() {
             let path = entry.path();
             if path.is_dir() {
+                if path.file_name().is_some_and(|name| name == "tests") {
+                    continue;
+                }
                 pending.push(path);
             } else if path.extension().is_some_and(|ext| ext == "rs")
                 && std::fs::read_to_string(&path).unwrap().contains(&literal)

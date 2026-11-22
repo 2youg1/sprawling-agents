@@ -334,9 +334,7 @@ export const SandboxLimits = Schema.Struct({
   arm: Schema.optional(Schema.NullOr(SandboxArm)),
   container: Schema.optional(Schema.NullOr(ContainerLimits)),
   env_passthrough: Schema.optional(Schema.Array(EnvVarName)),
-  fuel: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   interpreter: Schema.optional(Interpreter),
-  mounts: Schema.Array(Address),
   shell: Schema.Boolean,
   trusted: Schema.optional(Schema.Array(ServerLabel)),
 }).annotate({ identifier: "SandboxLimits" });

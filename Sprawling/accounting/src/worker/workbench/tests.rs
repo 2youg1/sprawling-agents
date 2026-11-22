@@ -188,10 +188,9 @@ fn the_shell_arm_exists_only_where_a_layer_asked_for_it() {
     );
     let building = city::config_path(dir.path(), &room, city::Layer::Building).unwrap();
     std::fs::create_dir_all(building.parent().unwrap()).unwrap();
-    std::fs::write(&building, "[sandbox]\nshell = true\nfuel = 1000\n").unwrap();
+    std::fs::write(&building, "[sandbox]\nshell = true\n").unwrap();
     let opened = city::load_config(dir.path(), &room).unwrap();
     assert!(opened.sandbox.shell);
-    assert_eq!(opened.sandbox.fuel, 1000);
 }
 
 #[test]

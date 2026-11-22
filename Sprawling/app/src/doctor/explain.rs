@@ -6,7 +6,7 @@
 use kernel::AxCode;
 
 use super::family::{CHROMIUM, GECKO, WEBKIT};
-use super::table::{CHROMEDRIVER, FFMPEG, MSEDGEDRIVER, PWSH, PYTHON_WASI, SANDBOX_ENGINE, SHELL};
+use super::table::{CHROMEDRIVER, FFMPEG, MSEDGEDRIVER, PWSH, PYTHON, SHELL};
 use super::{Finding, Platform};
 
 #[derive(Debug)]
@@ -24,7 +24,7 @@ pub(crate) enum Explanation {
 )]
 fn items_behind(code: AxCode) -> Option<&'static [&'static str]> {
     match code {
-        AxCode::ToolUnavailable => Some(&[SANDBOX_ENGINE, PYTHON_WASI, SHELL, PWSH, FFMPEG]),
+        AxCode::ToolUnavailable => Some(&[PYTHON, SHELL, PWSH, FFMPEG]),
         AxCode::BrowserUnavailable => Some(&[GECKO, CHROMIUM, CHROMEDRIVER, MSEDGEDRIVER, WEBKIT]),
         _ => None,
     }

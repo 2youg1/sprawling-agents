@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Fresh-process CPython calls and their completion protocol. The timing ends
-//! when the reader receives the flushed line, not on a later poll or process
-//! teardown (`Tools/citysim/spec/Bench.lean` §8-6-1).
-
 use std::io::BufRead as _;
 use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
@@ -15,7 +11,7 @@ use std::time::Duration;
 
 use kernel::B3Hash;
 
-use super::{Guest, Sample, fixture, prerequisite};
+use super::{Interpreter, Sample, fixture, prerequisite};
 
 pub(super) const COLD_SAMPLES: usize = 5;
 pub(crate) const COLD_COMMAND: &str = "python-cold";
@@ -26,10 +22,10 @@ const PROCESS_POLL: Duration = Duration::from_millis(10);
 
 type Completion = Result<(String, Duration), String>;
 
-pub(super) fn calls(guest: &Guest) -> Result<Vec<Sample>, String> {
+pub(super) fn calls(interpreter: &Interpreter) -> Result<Vec<Sample>, String> {
     (0..COLD_SAMPLES)
         .map(|index| {
-            call(guest.digest, &guest.path, &guest.stdlib.host).map(|took| Sample {
+            call(interpreter.digest, &interpreter.path).map(|took| Sample {
                 took,
                 round: index.saturating_add(1),
                 metric: "latency",
@@ -42,19 +38,18 @@ pub(super) fn calls(guest: &Guest) -> Result<Vec<Sample>, String> {
     clippy::disallowed_methods,
     reason = "a developer bench spawns its own executable; it is not a city child"
 )]
-fn call(guest: B3Hash, snapshot: &Path, stdlib: &Path) -> Result<Duration, String> {
+fn call(digest: B3Hash, interpreter: &Path) -> Result<Duration, String> {
     let started = super::super::stamp();
     let executable = std::env::current_exe()
         .map_err(|why| cold_process("locate the cold benchmark executable", why.to_string()))?;
     let mut child = Command::new(executable)
         .arg(COLD_COMMAND)
-        .arg(guest.to_string())
-        .arg(snapshot)
-        .arg(stdlib)
+        .arg(digest.to_string())
+        .arg(interpreter)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|why| cold_process("start the cold CPython benchmark child", why.to_string()))?;
+        .map_err(|why| cold_process("start the cold Python benchmark child", why.to_string()))?;
     let Some(stdout) = child.stdout.take() else {
         return Err(stop_child(
             &mut child,
@@ -74,12 +69,7 @@ fn call(guest: B3Hash, snapshot: &Path, stdlib: &Path) -> Result<Duration, Strin
         send.send(read).map_err(|why| why.to_string())
     });
     match wait_for_cold(&mut child, received) {
-        Err(why) => {
-            // A failed kill can leave the reader blocked on a live child's
-            // stdout. Returning without joining lets process exit reclaim it;
-            // the error already says that the child may still be running.
-            Err(why)
-        }
+        Err(why) => Err(why),
         Ok((completed, status)) => {
             let read = reader
                 .join()
@@ -89,7 +79,7 @@ fn call(guest: B3Hash, snapshot: &Path, stdlib: &Path) -> Result<Duration, Strin
             let output = child.wait_with_output().map_err(|why| why.to_string())?;
             if !status.success() {
                 return Err(prerequisite(format!(
-                    "the cold CPython child exited with {status}: {}",
+                    "the cold Python child exited with {status}: {}",
                     String::from_utf8_lossy(&output.stderr)
                 )));
             }
@@ -156,7 +146,7 @@ fn wait_for_cold(
             Err(why) => {
                 return Err(stop_child(
                     child,
-                    format!("wait for a cold CPython bench child: {why}"),
+                    format!("wait for a cold Python bench child: {why}"),
                 ));
             }
         }
@@ -164,7 +154,7 @@ fn wait_for_cold(
             return Err(stop_child(
                 child,
                 format!(
-                    "the cold CPython child did not finish within {} seconds",
+                    "the cold Python child did not finish within {} seconds",
                     COLD_PATIENCE.as_secs()
                 ),
             ));
@@ -186,11 +176,11 @@ fn completion_took(message: Completion) -> Result<Duration, String> {
 fn stop_child(child: &mut std::process::Child, detail: String) -> String {
     let stopped = child
         .kill()
-        .map_err(|why| format!("kill the cold CPython bench child: {why}"))
+        .map_err(|why| format!("kill the cold Python bench child: {why}"))
         .and_then(|()| {
             child
                 .wait()
-                .map_err(|why| format!("reap the cold CPython bench child: {why}"))
+                .map_err(|why| format!("reap the cold Python bench child: {why}"))
         });
     match stopped {
         Ok(_) => prerequisite(detail),
@@ -201,13 +191,9 @@ fn stop_child(child: &mut std::process::Child, detail: String) -> String {
 }
 
 fn cold_process(action: &str, detail: String) -> String {
-    kernel::AxError::failure(
-        kernel::AxCode::ToolUnavailable,
-        action,
-        detail,
-    )
-    .with_recovery(
-        "check that the bench executable can start a child process, then rerun; no cold reading is produced",
-    )
-    .to_string()
+    kernel::AxError::failure(kernel::AxCode::ToolUnavailable, action, detail)
+        .with_recovery(
+            "check that the bench executable can start a child process, then rerun; no cold reading is produced",
+        )
+        .to_string()
 }

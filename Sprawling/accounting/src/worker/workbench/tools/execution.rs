@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use super::super::super::{Assignment, mounts_under};
+use super::super::super::Assignment;
 use super::super::engine::machine_half;
 use super::super::{Laying, Site};
 use kernel::AxError;
@@ -21,18 +21,13 @@ impl Laying {
         let tool = ExecTool::new(
             runtime::ExecSetup {
                 workdir: site.write_root.join(addr.as_str()),
-                mounts: mounts_under(&site.write_root, &site.config.sandbox.mounts),
-                python_wasm: machine.python_wasm.map(runtime::PythonGuest::at),
+                python: machine.python,
                 shell: machine.shell,
-                fuel: runtime::Fuel(site.config.sandbox.fuel),
-
                 env_passthrough: site.config.sandbox.env_passthrough.clone(),
                 domain: addr.clone(),
                 run: site.run_id,
-
                 policy,
             },
-            machine.engine,
             self.backlog.clone(),
         )?;
         match site.config.sandbox.selected_arm()? {

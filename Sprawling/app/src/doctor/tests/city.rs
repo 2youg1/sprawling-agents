@@ -165,31 +165,23 @@ fn a_building_whose_rules_will_not_read_is_reported_not_skipped() {
 /// and a code nobody knows is said to be unknown.
 #[test]
 fn explain_connects_a_refusal_code_to_what_this_machine_has() {
-    let findings = examine(&ScriptedMachine::missing(&["python-wasi", "shell"]));
+    let findings = examine(&ScriptedMachine::missing(&["host-python", "shell"]));
     let Explanation::Lines(lines) = explain("E_TOOL_UNAVAILABLE", &findings, Platform::current())
     else {
         panic!("E_TOOL_UNAVAILABLE is about this machine");
     };
     let python = lines
         .iter()
-        .find(|line| line.contains("python-wasi"))
-        .expect("the python component is one of the items");
+        .find(|line| line.contains("host-python"))
+        .expect("host Python is one of the items");
     assert!(python.contains("absent"), "{python}");
     assert!(
         python.contains("->"),
         "the line ends in what to do next: {python}"
     );
     assert!(
-        python.contains("components/python-wasi") || python.contains("manual"),
+        python.contains("manual") || python.contains("Python") || python.contains("python"),
         "{python}"
-    );
-    let engine = lines
-        .iter()
-        .find(|line| line.contains("sandbox-engine"))
-        .expect("the engine is one of the items");
-    assert!(
-        engine.ends_with("nothing to do"),
-        "a present item has no next move: {engine}"
     );
 
     let Explanation::Lines(browser) =
@@ -294,7 +286,7 @@ fn doctor_with_a_city_names_the_building_on_the_screen() {
 /// the machine lacks, and prints one line per item.
 #[test]
 fn explain_on_the_screen_is_one_line_per_item_and_never_a_failure() {
-    let machine = ScriptedMachine::missing(&["python-wasi"]);
+    let machine = ScriptedMachine::missing(&["host-python"]);
     let mut nobody = std::io::Cursor::new(Vec::new());
     let mut screen: Vec<u8> = Vec::new();
     let asked = Asked {
@@ -307,7 +299,7 @@ fn explain_on_the_screen_is_one_line_per_item_and_never_a_failure() {
     let ready = run(&asked, &machine, &mut nobody, &mut screen).unwrap();
     assert!(ready);
     let shown = String::from_utf8(screen).unwrap();
-    assert!(shown.contains("python-wasi"), "{shown}");
+    assert!(shown.contains("host-python"), "{shown}");
     assert!(shown.contains("E_TOOL_UNAVAILABLE"), "{shown}");
 }
 

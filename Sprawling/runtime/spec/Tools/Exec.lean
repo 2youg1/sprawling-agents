@@ -15,7 +15,7 @@
 ### 8-13-2 runtime::tools::exec::confinement（宿主进程沙箱：按平台穷尽枚举＋每臂保证清单；形状 3＋2）
 
 
-上面的 wasip1 面给的是 **guest** 的隔离；exec 的 program／shell 两臂跑的是**宿主进程**，它的隔离只能向平台买，而没有哪个平台把它全卖。故本模块的产物不是开关而是一份分类法：每一臂逐轴说出自己保什么、不保什么，跑在哪一臂上对人与 Agent 都可见（工具 disclosure＋doctor 回报），不是假定。
+exec 的 program／shell／python 三臂都跑**宿主进程**；隔离只能向平台（楼所选的臂）买，而没有哪个平台把它全卖。故本模块的产物不是开关而是一份分类法：每一臂逐轴说出自己保什么、不保什么，跑在哪一臂上对人与 Agent 都可见（工具 disclosure＋doctor 回报），不是假定。
 
 | 臂 | 保 | 不保 |
 |---|---|---|
@@ -58,8 +58,7 @@ pub fn parse_placement(&Map<String, Value>) -> Result<Placement, AxError>;
 - **逐平台的臂**：Linux 读 `bwrap`，Windows 明写 `native` 时使用本构建的 AppContainer/Job leaf，macOS 缺省仍为 CopiedTree，显式 MacosSeatbelt 由 D40 固定策略探测，缺席或拒绝返回 E_SANDBOX_DENIED，不执行裸目标；无 scratch 的机器都拒绝。所有保证来自同一 `Assurances`，工具与 doctor 不另算。
 - **Windows native 的实际执行**：`Sprawling/runtime/spec/Tools/Exec/NativeWindows.lean` 规定挂起起动、command job 与 run job 在第一条指令之前的 assignment、无网络 capability、scratch ACL、CPU hard cap、aggregate committed-memory 与所有权清理。`ExecTool::through_the_backlog` 把 Windows sandbox 交给 `Backlog::run_native`，host 仍用普通命令；两者共享同一轮询与收场。native process 从表中消失前终止仍存活的后代。AppContainer 是独立 package security principal，base user SID 不改变，不宣称建立新 Windows 账户。
 - **副本按工具一份，每条命令之前同步成工作目录此刻的样子，有界。** `place()` 取这个 `Confined` 留着的副本（没有，或留着的那份抄的是别的目录，就在 scratch 根下新建一个），把它同步成 `workdir` 此刻的样子，命令在副本里跑；`settled()` 在等待结束时把副本留给下一条命令（已留着一份时删掉这份）；交给 backlog 的后台命令由 `handed(id, …)` 记名，其成员报结时 `reaped(&[Finished])` 同样把副本留下或删掉；`Drop` 删掉留着的与未报结的副本。同步的规则：源侧跟随链接（指向树外的链接带进来的是内容，而不是通向人那棵树的入口）；副本侧不跟随链接，因为副本里的东西是上一条命令写的。副本里的一项与源不同类（命令把文件换成了链接、把目录换成了文件），或同名文件内容不同，就先删掉这一项再从源复制，落成一个新的目录项——命令可能在副本里造了指向别处的硬链接，就地改写会写穿到那一头；同名同类同长的文件逐字节比较，相同就不动；副本里源没有的项删掉。于是每条命令开始时，副本与工作目录逐文件相同，上一条命令写下的东西不会留给下一条。逐字节比较而不比 mtime 与长度：同一个时间戳刻度里的等长改写比不出来，副本就会为一个它没有带上的版本担保；比较只读两边的文件，不新建，而实时扫描等的是新建的文件。`Placed::work()` 报这次同步的 `storage::FileWork`（`Sprawling/storage/Spec.lean` §8-31）：第一次放置 `created` 是树里的文件数，一次什么都没变的再放置 `created`、`rewritten`、`removed` 都是 0，`walked` 是两侧读过的目录项；`confinement::tests` 的 `a_sandbox_copy_is_synced_rather_than_made_again` 在 N 与 2N 个文件的树上断言这些数。**删不掉不把命令判成失败**（与 `backlog/member.rs`、`collect()` 同一条判断：命令的收场是调用方应得的事实，一个临时目录只值磁盘）。界：`MAX_FILES = 100_000`、`MAX_BYTES = 256 MiB`、`MAX_DEPTH = 64`，按源侧计；越界**拒**并报出越过的那一对数字，已同步一半的副本随之删掉——半份副本会为一堆没带上的文件担保，而本模块的全部理由是防这个。`MAX_DEPTH` 同时终结自指链接造成的无底走查。
-- **`Mount`／`Fuel` 不沿用**：`Fuel` 是 wasmtime 指令计量、`Mount.guest` 是 guest 路径别名，二者 wasip1 专属。本模块保留的是**判断**（能力面＝能到达的路径集）而不是词形。宿主环境照旧不继承（exec 的 env allowlist 未动）；`SandboxJob.env` 的显式注入属 guest 面。
-- **placement**：调用参数 `where: sandbox|host`，缺省 `sandbox`。`host` 是「在原地跑」——它才是碰得到人那棵树的那一臂，故必须由调用方按名说出，也正是与 A-8 同一条纪律（默认引导先在沙箱里做，出沙箱才需要审批）里「需要审批」的那个动作。python 臂无 host 形（它是 wasip1 guest）：要宿主解释器走 program 臂。
+- **placement**：调用参数 `where: sandbox|host`，缺省 `sandbox`。`host` 是「在原地跑」——它才是碰得到人那棵树的那一臂，故必须由调用方按名说出。python 臂始终用本机解释器，围栏与 program 在同一套楼臂上；`where: host` 对 python 同样适用。
 - **公开路径经 `runtime::tools`**：`confinement` 住 `tools/exec/`，doctor 的依赖回报与工具自己的 disclosure 都从 `runtime::tools::{Confinement, Guarantee, Kept, Missing}` 读这一份定义。
 - 证据：`Sprawling/runtime/src/tools/exec/tests.rs` 的 `a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone`（真命令、真树：沙箱里写得到、人那棵树不动；同一命令 `where: host` 则写进原树——此对拍使「没动」是能力判定而非命令没写）；`Sprawling/runtime/src/tools/exec/confinement/tests.rs` 的 `the_sandbox_arm_a_machine_gets_is_chosen_from_what_it_has`、`every_sandbox_arm_states_what_it_does_not_hold`、`a_sandbox_refuses_a_tree_deeper_than_its_walk_can_end`、`a_sandbox_copy_is_synced_rather_than_made_again`、`a_sandbox_copy_goes_with_the_tool`；Linux 的 `a_namespaced_command_requires_a_user_namespace` 经 `Confined::place()` 放置命令，以成功的 wrapper 替身通过探测，断言返回命令的强制参数紧跟 `--unshare-all`，`a_namespace_setup_failure_refuses_before_copying` 以失败和缺席的 wrapper 验证拒绝与未创建副本。
 
@@ -152,7 +151,7 @@ pub(super) fn program_line(text: &str) -> Result<(String, Vec<String>), AxError>
 
 - **`command` 是一行命令，怎么跑由楼定**（D118）。楼给了 shell（`Shell::Found`）时它交给那个解释器，即 shell 臂；楼没要 shell（`Shell::Absent`，这是缺省，`Sprawling/kernel/spec/Config.lean` §8-22）时它被读成一个程序与它的参数，经 program 臂跑；楼要了 shell 而所在的主机上没有（`Shell::Missing`）照旧拒（D30）。`parse_arm` 只读参数，所以 bench 的删除预判（`kernel::discard::forecast`）与 sieve 的命令键（§8-27）看到的总是 `Shell { text }`，与楼无关；换成 program 臂发生在 `ExecTool::invoke` 里，在放置之后、起进程之前。
 - **程序行的文法**（`program_line`）：引号外的空白分词；一对单引号或双引号里的字符，包括空白，原样并进当前的词，引号本身不进词，引号里不做任何展开；反斜杠是普通字符，因为它是 Windows 路径的分隔符。引号外出现 `|`、`&`、`;`、`<`、`>`、`(`、`)`、`$`、反引号、`*`、`?`、`[`、`]`、`{`、`}`、`~`、`#` 或换行时拒绝：这些字符在 shell 里有意义，原样当参数传下去，跑的就是另一条命令，而模型不会知道。引号没有闭合、整行没有一个词，也拒。拒绝是 `E_INVALID_ARGS`，主语点出那个字符，恢复语说这栋楼没有 shell，只能跑一个程序和它的参数：管道与重定向写成 `python`，或请 User 在楼的 `CONFIG.toml` 里设 `[sandbox] shell = true`。
-- **`python`** 是一段脚本，交给 python 臂（wasip1 guest，§8-13）；它没有 host 形，`where: host` 时拒。需要外置 stdlib 时，它除 run 的 mounts 外还得到 `PythonGuest` 携带的一个只读 stdlib 目录。
+- **`python`** 是一段脚本，交给本机解释器（`SPRAWLING_PYTHON` 或 `PATH` 上的 `python3`／`python`）以 `-c` 运行，围栏与 program 臂相同。
 - **旧形状**：`arm` 是较早的版本拼这次调用的方式（D115），收到它时以 `E_INVALID_ARGS` 拒绝，恢复语说出 `command` 与 `python`。两者都给、或都不给，同码拒绝。
 -/
 
@@ -381,7 +380,7 @@ pub enum Shell {                                    // runtime::tools::exec::she
 | （不收） | microVM（Firecracker） | Linux | 要 KVM（`/dev/kvm`） | 保 | 保 | 保 | 保 | 保 | 能 | 要内核镜像与根文件系统的供给；桌面与 CI 主机常没有 `/dev/kvm` |
 | `native` | Seatbelt（`sandbox-exec` 配置） | macOS | macOS 26.6.2 runner 上无需提权；缺席或策略拒绝时拒开 | 保（写入只落副本；读取不受限） | 保（TCP／UDP，fork／exec 后代同受策略约束） | 不保 | 不保 | 不保 | 不适用：当前只放 exec，关网不能直接装要连 provider 的居民 | 系统 `sandbox-exec(1)` 已标 DEPRECATED；平台继承假设与支持边界见 `Sprawling/runtime/spec/Tools/Exec/NativeMacos.lean` |
 | （不收） | NVIDIA OpenShell | 三个平台 | 它的 Support Matrix：沙箱靠 Landlock 与 seccomp，网络按策略放行，要一个跑在 Docker、Podman、Kubernetes 或 MicroVM 上的 gateway；Windows 上只在 WSL 2 加 Docker Desktop 下，标为 Experimental | —— | —— | —— | —— | —— | —— | 它的隔离来自上面已经各成一行的机制，再加一个 gateway 进程与它自己的策略层；本调研没有重新取它的页面 |
-| `python` | wasip1 里的 Python（§8-13） | 三个平台 | 否 | 保（只够得到 preopen） | 保（wasip1 没有获得 socket 的途径） | 保（wasip1 没有起进程的接口） | 不保 | 条件：CPU 由 fuel 限，内存没有另设上限 | 不能：只跑 Python | `wasm` feature 里的 wasmtime 50 |
+| `python` | 本机 Python（`-c`） | 三个平台 | 否 | 同所选楼臂 | 同所选楼臂 | 同所选楼臂 | 不保 | 同所选楼臂 | 能：只跑本机解释器 | 系统 Python 或 `SPRAWLING_PYTHON` |
 
 **每条命令的起动开销**（暂定读数，取于一台负载很重的 Windows 11 x86_64 笔记本，别的构建同时在跑；登记的读数归之后的测量）：`cmd /c exit 0` 起动并等它退出，各 200 次——直接起动 p50 33.9 ms、p99 60.7 ms；起动后装进一个 job p50 32.0 ms、p99 55.2 ms，这个次数下看不出装 job 的开销。`copied_tree` 的开销是同步副本的开销，见 D10。其余的臂在取读数的那一类电脑上没有，读数归 SB1 第 8 条的实跑。
 

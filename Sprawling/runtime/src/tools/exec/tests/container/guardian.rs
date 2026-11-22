@@ -28,7 +28,7 @@ fn guardian_parent_process() {
         .guarded(harness);
     let tool = ExecTool::new(
         setup(&work, None, None),
-        Box::new(EchoSandbox::new()),
+        
         patient(),
     )
     .unwrap()
@@ -149,7 +149,7 @@ fn guardian_timeout_retains_the_member_until_harvest() {
             .guarded(daemon.guardian());
         let tool = ExecTool::new(
             setup(work.path(), None, None),
-            Box::new(EchoSandbox::new()),
+            
             backlog.clone(),
         )
         .unwrap()

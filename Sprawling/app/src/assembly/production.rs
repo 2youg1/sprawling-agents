@@ -55,10 +55,9 @@ pub fn hands(vault: gateway::Custodian) -> Hands {
         desktop_program: std::env::current_exe,
         recipe_for: crate::doctor::recipe_for,
         exec_host: ExecHost {
-            python_wasm: crate::doctor::host::usable_python_wasm,
+            python: crate::doctor::host::usable_python,
             shell: crate::doctor::host::usable_shell,
             pwsh: crate::doctor::host::usable_pwsh,
-            engine: crate::doctor::host::execution_engine,
             container: crate::doctor::host::container,
             confinement: crate::doctor::host::confinement,
         },

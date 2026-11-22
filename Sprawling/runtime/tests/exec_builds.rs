@@ -12,7 +12,7 @@
 )]
 
 use kernel::{Address, EnvVarName, Payload, RunId, Tool, ToolCall, ToolName};
-use runtime::{Backlog, EchoSandbox, ExecSetup, ExecTool, Fuel};
+use runtime::{Backlog, ExecSetup, ExecTool};
 
 #[cfg(windows)]
 const DECLARED: [&str; 8] = [
@@ -56,10 +56,8 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
     let run = RunId::from_bytes([1; 16]);
     let setup = ExecSetup {
         workdir: crate_dir,
-        mounts: Vec::new(),
-        python_wasm: None,
+            python: None,
         shell: runtime::Shell::Absent,
-        fuel: Fuel(1_000_000),
         env_passthrough: declared,
         domain: Address::parse("lab").unwrap(),
         run,
@@ -67,7 +65,7 @@ fn a_building_that_declares_the_names_can_build_a_rust_program() {
     };
 
     let backlog = Backlog::new();
-    let tool = ExecTool::new(setup, Box::new(EchoSandbox::new()), backlog.clone()).unwrap();
+    let tool = ExecTool::new(setup, backlog.clone()).unwrap();
     #[cfg(windows)]
     let tool = if std::env::var("SPRAWLING_DISPOSABLE_NATIVE").as_deref() == Ok("1") {
         let tool = tool.confined(runtime::tools::Confined::with_arm(

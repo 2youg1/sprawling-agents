@@ -4,9 +4,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
-#[cfg(feature = "wasm")]
-use crate::WasmtimeSandbox;
-use crate::sandbox::{EchoSandbox, FaultSandbox};
 use kernel::Address;
 
 mod container;
@@ -67,13 +64,11 @@ const NO_ARGS: &[&str] = &[];
 fn setup(workdir: &std::path::Path, python: Option<PathBuf>, shell: Option<PathBuf>) -> ExecSetup {
     ExecSetup {
         workdir: workdir.to_path_buf(),
-        mounts: Vec::new(),
-        python_wasm: python.map(PythonGuest::at),
+        python: python,
         shell: shell.map_or(Shell::Absent, |program| Shell::Found {
             program,
             interpreter: kernel::Interpreter::System,
         }),
-        fuel: Fuel(1_000_000),
         env_passthrough: Vec::new(),
         domain: Address::parse("work").unwrap(),
         run: kernel::RunId::from_bytes([1; 16]),
@@ -84,10 +79,9 @@ fn setup(workdir: &std::path::Path, python: Option<PathBuf>, shell: Option<PathB
 fn a_tool(
     workdir: &std::path::Path,
     python: Option<PathBuf>,
-    sandbox: Box<dyn Sandbox>,
     shell: Option<PathBuf>,
 ) -> ExecTool {
-    regression_boundary(ExecTool::new(setup(workdir, python, shell), sandbox, patient()).unwrap())
+    regression_boundary(ExecTool::new(setup(workdir, python, shell), patient()).unwrap())
 }
 
 fn regression_boundary(tool: ExecTool) -> ExecTool {
@@ -165,7 +159,7 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
         ..setup(chamber.path(), None, None)
     };
     let tool = regression_boundary(
-        ExecTool::new(declared, Box::new(EchoSandbox::new()), patient()).unwrap(),
+        ExecTool::new(declared, patient()).unwrap(),
     );
     let outcome = tool
         .invoke(&call(line_of(path.clone(), args.clone())))
@@ -186,7 +180,7 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
     let bare = a_tool(
         bare_chamber.path(),
         None,
-        Box::new(EchoSandbox::new()),
+        
         None,
     );
     let outcome = bare.invoke(&call(line_of(path, args))).unwrap();
@@ -202,7 +196,7 @@ fn a_child_sees_the_names_its_building_declared_and_no_others() {
 #[test]
 fn a_missing_component_refuses_and_names_the_alternative() {
     let chamber = tempfile::tempdir().unwrap();
-    let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let tool = a_tool(chamber.path(), None, None);
     let err = match tool.invoke(&call(python("print(1)"))) {
         Err(err) => err,
         Ok(_) => panic!("a missing component must refuse"),
@@ -220,7 +214,7 @@ fn a_missing_component_refuses_and_names_the_alternative() {
 #[test]
 fn without_a_shell_a_command_runs_its_program_and_refuses_shell_syntax() {
     let chamber = tempfile::tempdir().unwrap();
-    let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let tool = a_tool(chamber.path(), None, None);
     let line = if cfg!(windows) {
         r#"cmd /C "exit 3""#
     } else {
@@ -285,112 +279,9 @@ fn a_call_names_a_command_or_a_script_and_nothing_else() {
 }
 
 #[test]
-fn python_mounts_follow_the_selected_guests_stdlib_layout() {
-    struct Capture(std::sync::Arc<Mutex<Vec<Mount>>>);
-    impl Sandbox for Capture {
-        fn run(&mut self, job: &SandboxJob) -> Result<SandboxOutcome, AxError> {
-            *self.0.lock().unwrap() = job.mounts.clone();
-            EchoSandbox::new().run(job)
-        }
-    }
-    let chamber = tempfile::tempdir().unwrap();
-    let seen = std::sync::Arc::new(Mutex::new(Vec::new()));
-    let wasm = chamber.path().join("python.wasm");
-    let authorized = Mount {
-        host: chamber.path().to_path_buf(),
-        guest: "/work".to_owned(),
-        writable: false,
-    };
-    for external in [false, true] {
-        if external {
-            std::fs::create_dir(chamber.path().join("lib")).unwrap();
-        }
-        let mut config = setup(chamber.path(), Some(wasm.clone()), None);
-        config.mounts.push(authorized.clone());
-        let guest = config.python_wasm.clone().unwrap();
-        let tool = ExecTool::new(config, Box::new(Capture(seen.clone())), patient()).unwrap();
-        tool.invoke(&call(python("print(1)"))).unwrap();
-        let expected = if external {
-            vec![authorized.clone(), guest.stdlib().clone()]
-        } else {
-            vec![authorized.clone()]
-        };
-        assert_eq!(*seen.lock().unwrap(), expected);
-    }
-}
-
-#[cfg(feature = "wasm")]
-#[test]
-fn the_python_guest_imports_the_advertised_stdlib() {
-    let Some(wasm) = std::env::var_os("SPRAWLING_PYTHON_WASM").map(PathBuf::from) else {
-        eprintln!("skip: SPRAWLING_PYTHON_WASM does not name a real CPython-WASI guest");
-        return;
-    };
-    let chamber = tempfile::tempdir().unwrap();
-    let setup = ExecSetup {
-        fuel: Fuel(kernel::consts_policy::SANDBOX_FUEL_DEFAULT),
-        ..setup(chamber.path(), Some(wasm), None)
-    };
-    let sandbox = WasmtimeSandbox::new().unwrap();
-    let tool = ExecTool::new(setup, Box::new(sandbox), patient()).unwrap();
-    let outcome = tool
-        .invoke(&call(python(
-            "import collections, difflib, itertools, re; print('stdlib-ok')",
-        )))
-        .unwrap();
-    let result = serde_json::to_value(&outcome.result).unwrap();
-    assert_eq!(result["exit_code"], 0, "{result}");
-    assert_eq!(result["stdout"], "stdlib-ok\n", "{result}");
-}
-
-#[test]
-fn the_python_arm_runs_in_the_sandbox_and_reports_its_own_exit() {
-    let chamber = tempfile::tempdir().unwrap();
-    let mut echo = EchoSandbox::new();
-    echo.queue_stdout(b"42\n".to_vec());
-    let tool = a_tool(
-        chamber.path(),
-        Some(PathBuf::from("python.wasm")),
-        Box::new(echo),
-        None,
-    );
-    let outcome = tool.invoke(&call(python("print(42)"))).unwrap();
-    let result = serde_json::to_value(&outcome.result).unwrap();
-    assert_eq!(result["stdout"], "42\n");
-    assert_eq!(result["exit_code"], 0);
-    assert_eq!(result["arm"], "python");
-}
-
-#[test]
-fn exhaustion_and_traps_reach_the_caller_as_themselves() {
-    let chamber = tempfile::tempdir().unwrap();
-    let sandbox = FaultSandbox::new(vec![
-        SandboxExit::FuelExhausted,
-        SandboxExit::Trap {
-            message: "unreachable".to_owned(),
-        },
-    ]);
-    let tool = a_tool(
-        chamber.path(),
-        Some(PathBuf::from("python.wasm")),
-        Box::new(sandbox),
-        None,
-    );
-    let first = tool.invoke(&call(python("while True: pass"))).unwrap();
-    assert_eq!(
-        serde_json::to_value(&first.result).unwrap()["outcome"],
-        "fuel_exhausted"
-    );
-    let second = tool.invoke(&call(python("boom"))).unwrap();
-    let value = serde_json::to_value(&second.result).unwrap();
-    assert_eq!(value["outcome"], "trap");
-    assert_eq!(value["detail"], "unreachable");
-}
-
-#[test]
 fn an_unrecognised_arm_is_refused_not_guessed() {
     let chamber = tempfile::tempdir().unwrap();
-    let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let tool = a_tool(chamber.path(), None, None);
     let err = match tool.invoke(&call(serde_json::json!({ "bash": "ls" }))) {
         Err(err) => err,
         Ok(_) => panic!("an unknown arm must refuse"),
@@ -401,7 +292,7 @@ fn an_unrecognised_arm_is_refused_not_guessed() {
 #[test]
 fn the_program_arm_runs_a_real_child_with_a_scrubbed_environment() {
     let chamber = tempfile::tempdir().unwrap();
-    let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let tool = a_tool(chamber.path(), None, None);
     // A program every supported host has, printing nothing useful:
     // the assertion is that it ran and reported its own exit code.
     let (path, args) = if cfg!(windows) {
@@ -445,7 +336,7 @@ fn writes_beside_itself(name: &str) -> (String, Vec<String>) {
 fn a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone() {
     let chamber = tempfile::tempdir().unwrap();
     std::fs::write(chamber.path().join("kept.txt"), b"the person's own\n").unwrap();
-    let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let tool = a_tool(chamber.path(), None, None);
     let (path, args) = writes_beside_itself("made.txt");
     let outcome = tool.invoke(&call(line_of(path, args))).unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
@@ -467,7 +358,7 @@ fn a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone() {
     // The same command with the host placement is what reaches the tree,
     // which is what makes the assertion above a capability decision
     // rather than a command that never wrote anything.
-    let host = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let host = a_tool(chamber.path(), None, None);
     let (path, args) = writes_beside_itself("made.txt");
     host.invoke(&call_at(line_of(path, args), "host")).unwrap();
     assert!(
@@ -477,18 +368,36 @@ fn a_sandboxed_command_writes_in_a_copy_and_leaves_the_source_tree_alone() {
 }
 
 #[test]
-fn the_python_arm_has_no_sandbox_host_form() {
-    let chamber = tempfile::tempdir().unwrap();
-    let tool = a_tool(
-        chamber.path(),
-        Some(PathBuf::from("python.wasm")),
-        Box::new(EchoSandbox::new()),
-        None,
-    );
-    let err = match tool.invoke(&call_at(python("print(1)"), "host")) {
-        Err(err) => err,
-        Ok(_) => panic!("the wasip1 guest has no host interpreter to run it"),
+fn the_python_arm_runs_on_the_host_interpreter_when_asked() {
+    let Some(interpreter) = host_python() else {
+        eprintln!("skip: no Python interpreter on PATH or SPRAWLING_PYTHON");
+        return;
     };
-    assert_eq!(*err.code(), AxCode::SandboxDenied);
-    assert!(err.recovery().contains("`command`"), "{}", err.recovery());
+    let chamber = tempfile::tempdir().unwrap();
+    let tool = a_tool(chamber.path(), Some(interpreter), None);
+    let outcome = tool
+        .invoke(&call_at(python("print(7)"), "host"))
+        .unwrap();
+    let result = serde_json::to_value(&outcome.result).unwrap();
+    assert_eq!(result["exit_code"], 0, "{result}");
+    assert!(
+        result["stdout"].as_str().unwrap().contains('7'),
+        "{result}"
+    );
+    assert_eq!(result["arm"], "python");
+}
+
+fn host_python() -> Option<PathBuf> {
+    if let Some(named) = std::env::var_os("SPRAWLING_PYTHON") {
+        let path = PathBuf::from(named);
+        return path.is_file().then_some(path);
+    }
+    for name in ["python3", "python"] {
+        if let Ok(output) = std::process::Command::new(name).arg("--version").output()
+            && output.status.success()
+        {
+            return Some(PathBuf::from(name));
+        }
+    }
+    None
 }

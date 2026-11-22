@@ -50,8 +50,6 @@ pub const DISCARD_RETENTION_DAYS: u32 = 30;
 pub const CLOCK_ZONES_MAX: crate::policy_limit::ClockZonesMax =
     crate::policy_limit::ClockZonesMax::new(4);
 
-pub const SANDBOX_FUEL_DEFAULT: u64 = 200_000_000;
-
 pub const CREDENTIAL_NAME_MARKERS: [&str; 11] = [
     "secret",
     "token",
@@ -120,7 +118,6 @@ mod tests {
         assert_eq!(DISCARD_FILES_MAX, 16);
         assert_eq!(DISCARD_RETENTION_DAYS, 30);
         assert_eq!(CLOCK_ZONES_MAX, crate::policy_limit::ClockZonesMax::new(4));
-        assert_eq!(SANDBOX_FUEL_DEFAULT, 200_000_000);
         assert_eq!(
             IMAGE_MAX_BYTES,
             crate::policy_limit::ImageMaxBytes::new(4_194_304)

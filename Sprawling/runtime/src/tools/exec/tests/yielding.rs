@@ -74,7 +74,7 @@ fn a_dispatched_command_runs_below_the_core() {
         ..setup(chamber.path(), None, None)
     };
     let tool = regression_boundary(
-        ExecTool::new(declared, Box::new(EchoSandbox::new()), patient()).unwrap(),
+        ExecTool::new(declared, patient()).unwrap(),
     );
     let outcome = tool.invoke(&call(line_of(path, args))).unwrap();
     let result = serde_json::to_value(&outcome.result).unwrap();
@@ -102,7 +102,7 @@ fn a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level() {
     let chamber = tempfile::tempdir().unwrap();
     let tool = ExecTool::new(
         setup(chamber.path(), None, None),
-        Box::new(EchoSandbox::new()),
+        
         patient(),
     )
     .unwrap();
@@ -119,7 +119,7 @@ fn a_dispatched_command_reads_and_writes_at_the_lowest_best_effort_io_level() {
 #[test]
 fn a_missing_program_still_refuses_under_nice() {
     let chamber = tempfile::tempdir().unwrap();
-    let tool = a_tool(chamber.path(), None, Box::new(EchoSandbox::new()), None);
+    let tool = a_tool(chamber.path(), None, None);
     let err = match tool.invoke(&call(line_of("sprawling-no-such-program", NO_ARGS))) {
         Err(err) => err,
         Ok(outcome) => panic!(

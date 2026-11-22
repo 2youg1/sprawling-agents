@@ -243,7 +243,7 @@ pub(super) fn csv_storage(path: &Path, detail: impl std::fmt::Display) -> String
     error_with_recovery(
         AxError::failure(
             AxCode::StorageFatal,
-            "write raw CPython-WASI measurements",
+            "write raw host Python measurements",
             format!("{}: {detail}", path.display()),
         )
         .with_recovery(
@@ -256,12 +256,12 @@ pub(crate) fn prerequisite(detail: String) -> String {
     error_with_recovery(
         AxError::failure(
             AxCode::ToolUnavailable,
-            "measure the real CPython-WASI baseline",
+            "measure the real host Python baseline",
             detail,
         )
         .with_recovery(
-            "configure a real CPython-WASI guest through the external guest door documented by \
-         `sprawling doctor`, then rerun; a WAT correctness fixture is not a timing substitute",
+            "install Python 3 on PATH or set SPRAWLING_PYTHON to an interpreter, then rerun; \
+         doctor reports the usable host interpreter",
         ),
     )
 }
@@ -269,9 +269,11 @@ pub(crate) fn prerequisite(detail: String) -> String {
 pub(crate) fn fixture(detail: impl Into<String>) -> String {
     let error = AxError::failure(
         AxCode::InvalidArgs,
-        "measure the registered CPython-WASI scenario",
+        "measure the registered host Python scenario",
         detail.into(),
     )
-    .with_recovery("check the selected guest and the fixed script; no partial report is emitted");
+    .with_recovery(
+        "check the selected interpreter and the fixed script; no partial report is emitted",
+    );
     error_with_recovery(error)
 }

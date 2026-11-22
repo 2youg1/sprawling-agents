@@ -54,11 +54,10 @@ pub type DesktopProgram = fn() -> std::io::Result<PathBuf>;
 
 #[derive(Clone, Copy)]
 pub struct ExecHost {
-    pub python_wasm: fn() -> Option<PathBuf>,
+    pub python: fn() -> Option<PathBuf>,
     pub shell: fn() -> Option<PathBuf>,
 
     pub pwsh: fn() -> Option<PathBuf>,
-    pub engine: fn() -> Result<Box<dyn runtime::Sandbox>, AxError>,
 
     pub confinement: fn(kernel::SandboxArm) -> Result<runtime::tools::Confined, AxError>,
     pub container: fn() -> Result<runtime::tools::ContainerRuntime, AxError>,

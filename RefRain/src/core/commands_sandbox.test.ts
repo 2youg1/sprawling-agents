@@ -13,8 +13,6 @@ describe("configureSandbox", () => {
   test("states the sandbox whole and leaves the other four faces alone", () => {
     const limits: SandboxLimits = {
       shell: true,
-      fuel: 2_000_000,
-      mounts: [Address.make("lab/shared")],
       env_passthrough: [EnvVarName.make("CC")],
       trusted: [ServerLabel.make("desktop")],
     };

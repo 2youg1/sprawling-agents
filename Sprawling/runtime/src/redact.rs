@@ -308,8 +308,7 @@ mod phases {
 
     use crate::backlog::{Backlog, PollBudget};
     use crate::catalog::Catalog;
-    use crate::sandbox::{EchoSandbox, Fuel};
-    use crate::tools::{EditTool, ExecSetup, ExecTool, ReadBound, ReadTool, SearchTool};
+        use crate::tools::{EditTool, ExecSetup, ExecTool, ReadBound, ReadTool, SearchTool};
 
     #[test]
     #[ignore = "an instrument: run it by name with --run-ignored only --no-capture"]
@@ -373,17 +372,15 @@ mod phases {
         std::fs::write(chamber.path().join("history.txt"), history_text()).unwrap();
         let setup = ExecSetup {
             workdir: chamber.path().to_path_buf(),
-            mounts: Vec::new(),
-            python_wasm: None,
+            python: None,
             shell: crate::Shell::Absent,
-            fuel: Fuel(1_000_000),
             env_passthrough: Vec::new(),
             domain: Address::parse("work").unwrap(),
             run: kernel::RunId::from_bytes([1; 16]),
             policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
         };
         let patient = Backlog::with_window(PollBudget::new(6_000, 20));
-        let tool = ExecTool::new(setup, Box::new(EchoSandbox::new()), patient).unwrap();
+        let tool = ExecTool::new(setup, patient).unwrap();
         let line = if cfg!(windows) {
             r#"cmd /C "type history.txt""#
         } else {

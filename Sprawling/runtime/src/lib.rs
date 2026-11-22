@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 //! Turn loop and tool surface: frozen prefix, handoff, replay/fork,
-//! result pipeline, sandbox ladder.
+//! result pipeline, and the confined exec ladder.
 
 pub mod backlog;
 pub mod catalog;
@@ -42,33 +42,16 @@ pub use tools::ToolTool;
 pub use tools::parse_arm;
 pub use tools::{BoundReader, Opened};
 pub use tools::{EditDesk, EditTool, PathLocks, ReadStamps};
-pub use tools::{ExecSetup, ExecTool, PythonGuest};
+pub use tools::{ExecSetup, ExecTool};
 pub use tools::{FailureClass, Shell, ShellCount, ShellTally};
 pub use tools::{ReadShown, ReadTool, RuleCandidate, RuleCandidates, RuleContext};
 pub use tools::{SucceedTool, Succession, SuccessionDesk};
 
 pub mod bench;
 pub mod conversation;
-mod sandbox;
 pub mod turn;
 
 pub use reserve::{MachineBudget, Reservation, Waited};
-pub use sandbox::AbsentSandbox;
-pub use sandbox::EchoSandbox;
-pub use sandbox::FaultSandbox;
-pub use sandbox::Fuel;
-pub use sandbox::GuestMemory;
-pub use sandbox::Mount;
-pub use sandbox::Sandbox;
-pub use sandbox::SandboxExit;
-pub use sandbox::SandboxJob;
-pub use sandbox::SandboxOutcome;
-
-#[cfg(feature = "wasm")]
-pub use sandbox::WasmtimeSandbox;
-
-#[cfg(feature = "conformance")]
-pub use sandbox::assert_sandbox_conformance;
 
 mod watchdog;
 

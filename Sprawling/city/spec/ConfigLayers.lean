@@ -99,7 +99,7 @@ tools = { docs_search = "<tool-definition-b3>" }  # 旧引用迁移前可缺席�
 
 D112 楼的连接器配置只保存引用、位置与 pin，定义默认只在城层。理由：一栋楼想多用或少用一台服务器不该重述传输与凭据引用；城层修改命令后，所有引用它的楼应在下一次 run 使用新定义，同时工具自己的 digest 仍决定哪些内容已获批准。被否：整表上梯复制 `[[mcp]]`，改一处必须逐楼重复，且近层静默遮蔽远层。重开参数：出现独立于楼的第二个定义拥有者时，先扩展 scope 类型与重复判定，不在引用行里塞第二份定义。
 
-**`[sandbox]` 一节**：`CONFIG.toml` 第二节 `[sandbox]`，字段 `shell`（bool，默认 false）、`fuel`（整数，缺省取 `SANDBOX_FUEL_DEFAULT`）、`mounts`（相对 city root 的路径表，reserved prefix 在解析点即拒）。解析仍是「本版本不读的键即拒」——被写下却什么都不发生是唯一没人能诊断的状态。整节整值上梯，语义住 `Sprawling/kernel/Spec.lean` §8-22，此处不复述。
+**`[sandbox]` 一节**：`CONFIG.toml` 第二节 `[sandbox]`，字段 `shell`（bool，默认 false）、`interpreter`、`arm`、`container`、`env_passthrough`、`trusted`。解析仍是「本版本不读的键即拒」——被写下却什么都不发生是唯一没人能诊断的状态。整节整值上梯，语义住 `Sprawling/kernel/Spec.lean` §8-22，此处不复述。
 
 **`[sandbox.container]`**：可选子表由 `kernel::ContainerLimits` 的 serde 输入权威直接解析，
 不另写镜像或额度文法；字段缺席不选择 container。写面通过 `write_sandbox` 原样写回整份
@@ -516,9 +516,7 @@ settings-control ConfigFile.sandbox RefRain/src/views/building/sandbox.svelte
 settings-control SandboxSection.arm RefRain/src/views/building/sandbox.svelte
 settings-control SandboxSection.container RefRain/src/views/building/sandbox.svelte
 settings-control SandboxSection.env_passthrough RefRain/src/views/building/sandbox.svelte
-settings-control SandboxSection.fuel RefRain/src/views/building/sandbox.svelte
 settings-control SandboxSection.interpreter RefRain/src/views/building/sandbox.svelte
-settings-control SandboxSection.mounts RefRain/src/views/building/sandbox.svelte
 settings-control SandboxSection.shell RefRain/src/views/building/sandbox.svelte
 settings-control SandboxSection.trusted RefRain/src/views/building/sandbox.svelte
 settings-control ConfigFile.search RefRain/src/views/setup/search/search.svelte

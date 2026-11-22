@@ -25,7 +25,7 @@ mod version_file;
 mod visit;
 
 pub(crate) use family::Family;
-pub use host::usable_python_wasm;
+pub use host::usable_python;
 pub(crate) use pack::Pack;
 pub(crate) use pin::Pin;
 pub(crate) use presence::{Absence, Fault, Presence, Version};
@@ -147,6 +147,10 @@ pub(crate) enum Detection {
         line: &'static str,
     },
 
+    #[expect(
+        dead_code,
+        reason = "kept for probe coverage of component installs that are not currently required"
+    )]
     Component {
         variable: &'static str,
         file: &'static str,
@@ -157,6 +161,10 @@ pub(crate) enum Detection {
         fallback: PerPlatform<&'static str>,
     },
 
+    #[expect(
+        dead_code,
+        reason = "kept for probe coverage of build-carried tools that are not currently required"
+    )]
     Built {
         carried: bool,
     },

@@ -99,16 +99,6 @@ pub(crate) fn run(root: &Path, target: &ReleaseTarget) -> Result<String, XtaskEr
                 .to_owned(),
         });
     }
-    if !crate::budget::carries_engine(&binary)? {
-        return Err(XtaskError::Cmd {
-            cmd: "package".to_owned(),
-            msg: "this binary carries no execution engine, so every `python` call in the \
-                  archive would be refused; build the release with the engine (the \
-                  `sandbox` feature of the `sprawling` package), then `just dist`"
-                .to_owned(),
-        });
-    }
-
     let stem = format!(
         "sprawling-{}-{}",
         workspace_package(root, "version")?,

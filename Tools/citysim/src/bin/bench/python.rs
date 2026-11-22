@@ -3,19 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Real CPython-WASI execution readings; WAT correctness fixtures are
-//! never performance substitutes (`Tools/citysim/spec/Bench.lean` §8-6-1).
-
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
-
+use std::process::{Command, Stdio};
 use std::sync::LazyLock;
 use std::time::Duration;
 
 use kernel::B3Hash;
-use runtime::{
-    Fuel, GuestMemory, Mount, PythonGuest, Sandbox as _, SandboxExit, SandboxJob, WasmtimeSandbox,
-};
 
 mod cold;
 mod concurrent;
@@ -24,22 +18,15 @@ pub(crate) use cold::COLD_COMMAND;
 use concurrent::memory_line;
 use reporting::{memory_observations, round_observations};
 
-/// Pilot counts for a baseline capture; a final comparison chooses precision
-/// from its pre-registered interval width instead of treating these as enough.
 pub(super) const WARM_SAMPLES: usize = 20;
 pub(super) const CONCURRENT_CALLERS: usize = 4;
 pub(super) const CONCURRENT_BURSTS: usize = 5;
-/// The process-table reader is deliberately not run more often than gauge's
-/// shortest beat: a finer reading can disturb the latency it is measuring.
 pub(super) const MEMORY_BEAT: Duration = sprawling::monitor::tree::MINIMUM_BEAT;
 
 pub(super) const STATE_WRITTEN: &str = "sprawling-state-written";
 pub(super) const STATE_CLEAN: &str = "sprawling-state-clean";
 pub(super) const STATE_LEAKED: &str = "sprawling-state-leaked";
 
-/// A deterministic resident-shaped script against the advertised stdlib. Its
-/// implementation assertion and exact output validate the configured fixture;
-/// S2 still owns supply-chain provenance.
 pub(super) const MARKER: &str = "sprawling-python-bench-v1:";
 pub(super) const EXPECTED_SUFFIX: &str = "7:2:alpha,beta\n";
 pub(super) static EXPECTED: LazyLock<Vec<u8>> =
@@ -63,7 +50,6 @@ print(f"{MARKER}{{len(diff)}}:{{counts['beta']}}:{{','.join(names)}}")
     )
 });
 
-/// Python readings are returned only after the whole family succeeds.
 #[derive(Debug)]
 pub(crate) struct Report {
     pub(crate) lines: Vec<String>,
@@ -78,30 +64,38 @@ pub(super) struct Measurement {
 
 #[derive(Clone, Copy)]
 pub(super) struct Sample {
-    took: Duration,
-    round: usize,
-    metric: &'static str,
+    pub(crate) took: Duration,
+    pub(crate) round: usize,
+    pub(crate) metric: &'static str,
 }
 
-/// The two arms a later DiD analysis compares. The label is explicit in the
-/// raw CSV rather than inferred from which file happened to be named first.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
+pub(super) struct Observation {
+    pub(crate) row: String,
+    pub(crate) index: usize,
+    pub(crate) round: usize,
+    pub(crate) metric: &'static str,
+    pub(crate) value: u64,
+    pub(crate) unit: &'static str,
+    pub(crate) identity: Identity,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Arm {
     Baseline,
     Candidate,
 }
 
 impl Arm {
-    /// `None` is an unknown CLI label; no arm is inferred from the filename.
-    pub(crate) fn parse(raw: &str) -> Option<Arm> {
-        match raw {
+    pub(crate) fn parse(text: &str) -> Option<Arm> {
+        match text {
             "baseline" => Some(Arm::Baseline),
             "candidate" => Some(Arm::Candidate),
             _ => None,
         }
     }
 
-    fn as_str(self) -> &'static str {
+    pub(crate) fn as_str(self) -> &'static str {
         match self {
             Arm::Baseline => "baseline",
             Arm::Candidate => "candidate",
@@ -109,100 +103,73 @@ impl Arm {
     }
 }
 
-/// One raw observation in the long-form CSV. Derived summaries are computed
-/// from these rows rather than copied into a second table.
-#[derive(Debug)]
-pub(super) struct Observation {
-    row: String,
-    index: usize,
-    round: usize,
-    metric: &'static str,
-    value: u64,
-    unit: &'static str,
-    identity: Identity,
+#[derive(Clone)]
+pub(super) struct Interpreter {
+    pub(super) path: PathBuf,
+    pub(super) digest: B3Hash,
 }
 
-/// The guest selected for measurement and the identity every line carries.
-pub(super) struct Guest {
-    path: PathBuf,
-    digest: B3Hash,
-    stdlib: Mount,
-    /// Owns the snapshot directory for every call in this measurement.
-    _snapshot: tempfile::TempDir,
-}
-
-/// Two digests always travel together: neither a guest nor a script reading
-/// is comparable when the other input changed.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Identity {
-    build: B3Hash,
-    guest: B3Hash,
-    script: B3Hash,
-    arm: Arm,
+    pub(super) build: B3Hash,
+    pub(super) guest: B3Hash,
+    pub(super) script: B3Hash,
+    pub(super) arm: Arm,
 }
 
+#[derive(Clone)]
 pub(super) struct Prepared {
-    guest: Guest,
-    sandbox: WasmtimeSandbox,
+    pub(super) interpreter: Interpreter,
 }
 
-/// Measures the external guest selected by the production doctor door.
-///
-/// # Errors
-/// A missing or non-CPython guest is `E_TOOL_UNAVAILABLE`; no Python reading
-/// is returned in either case.
+#[derive(Debug, Clone)]
+pub(super) struct RunOutcome {
+    pub(crate) exit_code: i32,
+    pub(crate) stdout: Vec<u8>,
+    pub(crate) stderr: Vec<u8>,
+}
+
 pub(crate) fn measure() -> Result<Report, String> {
     measure_as(Arm::Baseline)
 }
 
-/// Measures one explicitly labelled arm for a later matched comparison.
 pub(crate) fn measure_as(arm: Arm) -> Result<Report, String> {
-    measure_from(sprawling::doctor::usable_python_wasm(), arm)
+    measure_from(sprawling::doctor::usable_python(), arm)
 }
 
-/// Runs exactly one real CPython call in this fresh process, then writes and
-/// flushes the completion line that ends the parent's timing.
-pub(crate) fn cold_child(
-    expected_guest: &str,
-    snapshot: &Path,
-    stdlib: &Path,
-) -> Result<(), String> {
-    let selected = PythonGuest::with_stdlib(snapshot.to_path_buf(), stdlib.to_path_buf());
-    let prepared = prepare(&selected)?;
-    if prepared.guest.digest.to_string() != expected_guest {
+pub(crate) fn cold_child(expected: &str, interpreter: &Path) -> Result<(), String> {
+    let prepared = prepare_at(interpreter)?;
+    if prepared.interpreter.digest.to_string() != expected {
         return Err(fixture(
-            "the cold child received different guest bytes from its parent",
+            "the cold child received a different interpreter from its parent",
         ));
     }
+    run_checked(&prepared.interpreter, SCRIPT.as_str())?;
     let mut out = std::io::stdout().lock();
     out.write_all(cold::COMPLETE_LINE.as_bytes())
         .and_then(|()| out.flush())
-        .map_err(|why| format!("report the cold CPython call's completion: {why}"))
+        .map_err(|why| format!("report the cold Python call's completion: {why}"))
 }
 
-pub(super) fn measure_from(wasm: Option<PathBuf>, arm: Arm) -> Result<Report, String> {
-    let wasm = wasm
-        .ok_or_else(|| prerequisite("the doctor found no usable CPython-WASI guest".to_owned()))?;
-    measure_at_as(&wasm, arm)
+pub(super) fn measure_from(python: Option<PathBuf>, arm: Arm) -> Result<Report, String> {
+    let python = python.ok_or_else(|| {
+        prerequisite("the doctor found no usable host Python interpreter".to_owned())
+    })?;
+    measure_at_as(&python, arm)
 }
 
-pub(super) fn measure_at_as(wasm: &Path, arm: Arm) -> Result<Report, String> {
-    measure_guest_as(PythonGuest::at(wasm.to_path_buf()), arm)
-}
-
-pub(super) fn measure_guest_as(selected: PythonGuest, arm: Arm) -> Result<Report, String> {
-    let stdlib_before = stdlib_digest(&selected.stdlib().host)?;
-    let mut prepared = prepare(&selected)?;
+pub(super) fn measure_at_as(python: &Path, arm: Arm) -> Result<Report, String> {
+    let mut prepared = prepare_at(python)?;
     let identity = Identity {
         build: current_build()?,
-        guest: prepared.guest.digest,
+        guest: prepared.interpreter.digest,
         script: B3Hash::digest(SCRIPT.as_bytes()),
         arm,
     };
     let mut report = Report::new(arm);
     report.add(record(
         "python_cold_call",
-        cold::calls(&prepared.guest)?,
+        cold::calls(&prepared.interpreter)?,
         identity,
         " mode=no_prewarm",
     )?);
@@ -252,101 +219,35 @@ pub(super) fn measure_guest_as(selected: PythonGuest, arm: Arm) -> Result<Report
     report
         .observations
         .extend(memory_observations(identity, &memory));
-    if Guest::digest_at(&prepared.guest.path)? != prepared.guest.digest {
+    if Interpreter::digest_at(&prepared.interpreter.path)? != prepared.interpreter.digest {
         return Err(fixture(
-            "the guest bytes changed while the baseline was running",
-        ));
-    }
-    if stdlib_digest(&selected.stdlib().host)? != stdlib_before {
-        return Err(fixture(
-            "the stdlib tree changed while the baseline was running",
+            "the interpreter bytes changed while the baseline was running",
         ));
     }
     Ok(report)
 }
 
 #[cfg(test)]
-fn measure_at(wasm: &Path) -> Result<Report, String> {
-    measure_at_as(wasm, Arm::Baseline)
+fn measure_at(python: &Path) -> Result<Report, String> {
+    measure_at_as(python, Arm::Baseline)
 }
 
-impl Guest {
-    /// Reads the configured source once, then executes only a bench-owned
-    /// snapshot whose digest is the identity of those same bytes.
-    fn at(selected: &PythonGuest) -> Result<Guest, String> {
-        let source = selected.wasm();
-        let bytes = std::fs::read(source).map_err(|why| {
-            prerequisite(format!(
-                "read the CPython-WASI guest {}: {why}",
-                source.display()
-            ))
-        })?;
-        let snapshot = tempfile::tempdir().map_err(|why| {
-            prerequisite(format!("create a private CPython guest snapshot: {why}"))
-        })?;
-        let path = snapshot.path().join("python.wasm");
-        std::fs::write(&path, &bytes).map_err(|why| {
-            prerequisite(format!("write the private CPython guest snapshot: {why}"))
-        })?;
-        Ok(Guest {
-            path,
-            digest: B3Hash::digest(&bytes),
-            stdlib: selected.stdlib().clone(),
-            _snapshot: snapshot,
-        })
+impl Interpreter {
+    fn at(path: PathBuf) -> Result<Interpreter, String> {
+        let digest = Self::digest_at(&path)?;
+        Ok(Interpreter { path, digest })
     }
 
     fn digest_at(path: &Path) -> Result<B3Hash, String> {
         std::fs::read(path)
             .map(|bytes| B3Hash::digest(&bytes))
-            .map_err(|why| prerequisite(format!("reread the CPython guest snapshot: {why}")))
+            .map_err(|why| {
+                prerequisite(format!(
+                    "read the host Python interpreter {}: {why}",
+                    path.display()
+                ))
+            })
     }
-}
-
-/// Canonical regular-file entries from docs/third-party.md, including raw path bytes.
-pub(super) fn stdlib_digest(root: &Path) -> Result<B3Hash, String> {
-    fn visit(
-        root: &Path,
-        relative: Vec<u8>,
-        entries: &mut Vec<(Vec<u8>, PathBuf)>,
-    ) -> std::io::Result<()> {
-        for entry in std::fs::read_dir(root)? {
-            let entry = entry?;
-            let mut name = relative.clone();
-            if !name.is_empty() {
-                name.push(b'/');
-            }
-            name.extend_from_slice(entry.file_name().as_encoded_bytes());
-            let kind = entry.file_type()?;
-            if kind.is_dir() {
-                visit(&entry.path(), name, entries)?;
-            } else if kind.is_file() {
-                entries.push((name, entry.path()));
-            }
-        }
-        Ok(())
-    }
-    let read = || -> std::io::Result<B3Hash> {
-        let mut entries = Vec::new();
-        visit(root, Vec::new(), &mut entries)?;
-        entries.sort_by(|left, right| left.0.cmp(&right.0));
-        let mut bytes = Vec::new();
-        for (name, path) in entries {
-            let contents = std::fs::read(path)?;
-            let length = u64::try_from(contents.len()).map_err(std::io::Error::other)?;
-            bytes.extend_from_slice(&name);
-            bytes.push(0);
-            bytes.extend_from_slice(&length.to_le_bytes());
-            bytes.extend_from_slice(&contents);
-        }
-        Ok(B3Hash::digest(&bytes))
-    };
-    read().map_err(|why| {
-        prerequisite(format!(
-            "digest the selected stdlib tree {}: {why}",
-            root.display()
-        ))
-    })
 }
 
 pub(super) fn current_build() -> Result<B3Hash, String> {
@@ -363,52 +264,51 @@ impl Identity {
     }
 }
 
-/// Validates and compiles the snapshot with the first run of the real load.
-/// WAT can pass the engine checks, but cannot produce the exact CPython output.
-pub(super) fn prepare(selected: &PythonGuest) -> Result<Prepared, String> {
-    let guest = Guest::at(selected)?;
-    let mut sandbox = WasmtimeSandbox::new().map_err(|why| prerequisite(why.to_string()))?;
-    run_checked(&mut sandbox, &guest).map_err(|why| {
+pub(super) fn prepare_at(python: &Path) -> Result<Prepared, String> {
+    let interpreter = Interpreter::at(python.to_path_buf())?;
+    run_checked(&interpreter, SCRIPT.as_str()).map_err(|why| {
         prerequisite(format!(
-            "the selected guest is not a usable CPython-WASI fixture: {why}"
+            "the selected interpreter is not a usable CPython host fixture: {why}"
         ))
     })?;
-    Ok(Prepared { guest, sandbox })
+    Ok(Prepared { interpreter })
 }
 
-pub(super) fn raw_job(guest: &Guest, script: &str) -> SandboxJob {
-    SandboxJob {
-        wasm: guest.path.clone(),
-        argv: vec!["python".to_owned(), "-c".to_owned(), script.to_owned()],
-        env: Vec::new(),
-        stdin: Vec::new(),
-        mounts: vec![guest.stdlib.clone()],
-        fuel: Fuel(kernel::consts_policy::SANDBOX_FUEL_DEFAULT),
-        memory: GuestMemory::Wasm32,
-    }
+pub(super) fn run_script(interpreter: &Interpreter, script: &str) -> Result<RunOutcome, String> {
+    let output = Command::new(&interpreter.path)
+        .arg("-c")
+        .arg(script)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|why| {
+            prerequisite(format!(
+                "start host Python {}: {why}",
+                interpreter.path.display()
+            ))
+        })?;
+    Ok(RunOutcome {
+        exit_code: output.status.code().unwrap_or(1),
+        stdout: output.stdout,
+        stderr: output.stderr,
+    })
 }
 
-pub(super) fn run_checked(sandbox: &mut WasmtimeSandbox, guest: &Guest) -> Result<(), String> {
-    let outcome = sandbox
-        .run(&raw_job(guest, SCRIPT.as_str()))
-        .map_err(|why| why.to_string())?;
+pub(super) fn run_checked(interpreter: &Interpreter, script: &str) -> Result<(), String> {
+    let outcome = run_script(interpreter, script)?;
     output_detail(&outcome)
 }
 
 pub(super) struct TimedOutcome {
-    took: Duration,
-    returned: std::time::Instant,
-    outcome: runtime::SandboxOutcome,
+    pub(super) took: Duration,
+    pub(super) returned: std::time::Instant,
+    pub(super) outcome: RunOutcome,
 }
 
-pub(super) fn timed_outcome(
-    sandbox: &mut WasmtimeSandbox,
-    guest: &Guest,
-) -> Result<TimedOutcome, String> {
+pub(super) fn timed_outcome(interpreter: &Interpreter) -> Result<TimedOutcome, String> {
     let started = super::stamp();
-    let outcome = sandbox
-        .run(&raw_job(guest, SCRIPT.as_str()))
-        .map_err(|why| why.to_string())?;
+    let outcome = run_script(interpreter, SCRIPT.as_str())?;
     let returned = super::stamp();
     Ok(TimedOutcome {
         took: returned.duration_since(started),
@@ -417,17 +317,19 @@ pub(super) fn timed_outcome(
     })
 }
 
-pub(super) fn checked_output(outcome: &runtime::SandboxOutcome) -> Result<(), String> {
+pub(super) fn checked_output(outcome: &RunOutcome) -> Result<(), String> {
     output_detail(outcome).map_err(fixture)
 }
 
-/// Returns validation details before the caller assigns the phase-specific code.
-pub(super) fn output_detail(outcome: &runtime::SandboxOutcome) -> Result<(), String> {
-    if outcome.exit != SandboxExit::Success {
-        return Err(format!("the benchmark guest ended with {:?}", outcome.exit));
+pub(super) fn output_detail(outcome: &RunOutcome) -> Result<(), String> {
+    if outcome.exit_code != 0 {
+        return Err(format!(
+            "the benchmark interpreter exited with {}",
+            outcome.exit_code
+        ));
     }
     if !outcome.stderr.is_empty() {
-        return Err("the benchmark guest wrote to stderr".to_owned());
+        return Err("the benchmark interpreter wrote to stderr".to_owned());
     }
     if outcome.stdout != *EXPECTED {
         return Err("the fixed CPython script produced unexpected stdout".to_owned());

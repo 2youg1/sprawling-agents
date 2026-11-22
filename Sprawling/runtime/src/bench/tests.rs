@@ -4,7 +4,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
-use crate::sandbox::{EchoSandbox, Fuel};
 use crate::tools::{EditTool, ExecTool};
 use kernel::{Payload, RunId, Seq, TimeMs};
 use serde_json::Map;
@@ -142,17 +141,15 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_checkpointed() {
             ExecTool::new(
                 crate::tools::ExecSetup {
                     workdir: tmp.path().to_path_buf(),
-                    mounts: Vec::new(),
-                    python_wasm: None,
+            python: None,
                     shell: crate::Shell::Absent,
-                    fuel: Fuel(1000),
                     env_passthrough: Vec::new(),
                     domain: Address::parse("work").unwrap(),
                     run: RunId::from_bytes([1u8; 16]),
                     policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work))
                         .reader(),
                 },
-                Box::new(EchoSandbox::new()),
+                
                 crate::Backlog::new(),
             )
             .unwrap(),
@@ -301,17 +298,15 @@ fn exec_bench(root: &std::path::Path) -> ToolBench {
             ExecTool::new(
                 crate::tools::ExecSetup {
                     workdir: root.to_path_buf(),
-                    mounts: Vec::new(),
-                    python_wasm: None,
+            python: None,
                     shell: crate::Shell::Absent,
-                    fuel: Fuel(1000),
                     env_passthrough: Vec::new(),
                     domain: Address::parse("work").unwrap(),
                     run: RunId::from_bytes([1u8; 16]),
                     policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work))
                         .reader(),
                 },
-                Box::new(EchoSandbox::new()),
+                
                 crate::Backlog::new(),
             )
             .unwrap(),

@@ -85,13 +85,13 @@ impl ExecTool {
         self
     }
 
-    /// Offers the existing WASI guest while refusing sandbox program and shell calls.
+    /// Offers the host Python interpreter while refusing sandbox program and shell calls.
     #[must_use]
     pub fn python_only(mut self) -> Self {
         self.container = None;
         self.program_route = ProgramRoute::Python;
-        self.meta.disclosure = "Executes a Python script. Sandbox execution offers only the \
-                                Python WASI arm; commands in the sandbox refuse."
+        self.meta.disclosure = "Executes a Python script with this machine's interpreter under \
+                                the building's confinement. Commands in the sandbox refuse."
             .to_owned();
         self
     }
@@ -109,19 +109,22 @@ impl ExecTool {
         arm: &str,
         placement: Placement,
     ) -> Result<ToolOutcome, AxError> {
-        let placement = match (placement, self.program_route) {
-            (Placement::Sandbox, ProgramRoute::Host) => Placement::Host.opened_by(&self.setup)?,
-            (Placement::Sandbox, ProgramRoute::Python) => {
+        let placement = match (placement, self.program_route, arm) {
+            (Placement::Sandbox, ProgramRoute::Host, _) => {
+                Placement::Host.opened_by(&self.setup)?
+            }
+            (Placement::Sandbox, ProgramRoute::Python, "python") => placement,
+            (Placement::Sandbox, ProgramRoute::Python, _) => {
                 return Err(AxError::failure(
                     AxCode::SandboxDenied,
                     "execute a program",
-                    "the frozen sandbox arm only offers Python WASI",
+                    "the frozen sandbox arm only offers Python",
                 )
                 .with_recovery(
                     "use the Python arm, or select a program-capable sandbox for the next run",
                 ));
             }
-            (Placement::Sandbox, ProgramRoute::Confined) | (Placement::Host, _) => placement,
+            (Placement::Sandbox, ProgramRoute::Confined, _) | (Placement::Host, _, _) => placement,
         };
         let mut command = match (placement, &self.container) {
             (Placement::Sandbox, _) => command,

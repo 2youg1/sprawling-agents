@@ -87,7 +87,7 @@ esac
     fn tool(&self, work: &std::path::Path, backlog: &Backlog) -> ExecTool {
         ExecTool::new(
             setup(work, None, None),
-            Box::new(EchoSandbox::new()),
+            
             backlog.clone(),
         )
         .unwrap()

@@ -67,7 +67,7 @@ import Sprawling.runtime.spec.Watchdog
 | `pipeline`＋`offload` | 结果信封三附件＋offload 四不变量（独占有损可还原）＋截断定序 |
 | `clock`＋`catalog`＋`mode` | ISO UTC 的唯一拼法＋ClockStamp 与它的发放规则＋ClockReading（§8-10、§8-53）＋渐进披露三类条目＋截断锁的三档：常驻核心、至多 1 KiB 且一个命名空间一行的休眠索引、`tool` 那一扇门（§8-60、§8-61）＋两个 mode 的目录行与合并时的准入（§8-54）＋会话中换运行策略的策略格（§8-62） |
 | `watchdog` | 处置面分级（纠正 Steer→停滞→冻结）；依据只从 kernel::stall 来 |
-| `sandbox` | 缝（trait）＋wasmtime fuel 生产适配器＋直通/故障两替身；A10 三断言 |
+| `sandbox` | 已退役：wasip1／wasmtime 不再进生产面；执行边界见 `tools/exec` |
 | `tools/` | exec 三臂／edit 乐观并发／read 区间读／search／status／succeed，与模型选路的唯一判定 `chosen_path`，以及经它按字节读的 `bound_reader`（§8-14、§8-29–§8-33、§8-59） |
 | `bench`＋`conversation` | ToolBench 按 Effect 过门（§8-14、§8-46）；会话历史的唯一持有者（§8-3、§8-47） |
 | `run` | Dispatch → N 回合 → 冻结的事件序唯一权威（§8-15、§8-45） |
@@ -89,7 +89,6 @@ import Sprawling.runtime.spec.Watchdog
 - A4——同一 PrefixPlan 两次 build 逐字节同（golden）；A15——prompt_assembled 载荷＋同源文档经 `rebuild_prefix` 重建，四段哈希逐段相同。
 - A7——offload 往返（替代体≤原件且≤上限；循 rest_path 续读与循 CAS 取回字节一致；外部清理后自 CAS 重物化字节一致；命中既有哈希直引原 Locator）。
 - A18 零字节——granularity=Off 时打包输出与未接 clock 特性逐字节相同。
-- A10 三断言结论书——fuel 内成功／未授能力被拒／fuel 耗尽中断（真 wasmtime 上）。
 - L0×失败注入矩阵；A6 双守（Done 恒携 kind 合法证据，运行时纵深校验）；A8（到限恒 `Completion::Limit`，恒不记完成）。
 
 分部里的定理是模型对性质的证明：
@@ -162,8 +161,7 @@ sieve  ──▶ offload(tee)、storage(cas 读前一次原文)、kernel(tool::E
 offload ──▶ storage(cas)、kernel(locator)
 watchdog ──▶ kernel(stall/completion)
 catalog ──▶ kernel(tool)、mode
-sandbox ──▶ wasmtime（feature `wasm` 内藏；缝声明恒在）
-tools/ ──▶ kernel(tool/version/discard/gate)、sandbox、storage(cas 经 pipeline)
+tools/ ──▶ kernel(tool/version/discard/gate)、storage(cas 经 pipeline)
 ```
 
 上图只画各模块的主要依赖；crate 之间的依赖以 ARCHITECTURE 的 `depmap` 块为准，文件清单以它的模块图为准。

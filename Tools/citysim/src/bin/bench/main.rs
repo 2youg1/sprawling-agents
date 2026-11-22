@@ -28,14 +28,13 @@ mod scenarios;
 fn main() -> std::process::ExitCode {
     let arguments: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
     match arguments.as_slice() {
-        [command, guest, snapshot, stdlib] if command == python::COLD_COMMAND => {
+        [command, guest, interpreter] if command == python::COLD_COMMAND => {
             return finish(python::cold_child(
                 match guest.to_str() {
                     Some(digest) => digest,
                     None => return finish(Err(invalid_arguments())),
                 },
-                Path::new(snapshot),
-                Path::new(stdlib),
+                Path::new(interpreter),
             ));
         }
         [command] if command == "python" => {

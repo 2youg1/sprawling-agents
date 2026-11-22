@@ -36,7 +36,7 @@ fn a_real_daemon_executes_and_cleans_the_production_container() {
     let backlog = patient();
     let tool = ExecTool::new(
         setup(work.path(), None, Some(PathBuf::from("/bin/sh"))),
-        Box::new(EchoSandbox::new()),
+        
         backlog.clone(),
     )
     .unwrap()
@@ -159,7 +159,7 @@ print('cpu seconds per wall second',ratio)
         let owner = setup(work.path(), None, None);
         let run = owner.run;
         let scope = owner.domain.clone();
-        let background = ExecTool::new(owner, Box::new(EchoSandbox::new()), short.clone())
+        let background = ExecTool::new(owner, short.clone())
             .unwrap()
             .with_container(limits.clone(), runtime.clone());
         let delay = match ending {

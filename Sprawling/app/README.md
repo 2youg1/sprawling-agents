@@ -87,7 +87,7 @@ cargo run -p sprawling -- serve --help
 
 ## Who uses it
 
-`citysim` is the one workspace package that depends on it, and it is a development-only tool (`publish = false`): its two bench binaries `bench` and `bench_startup` time the product's own startup and queries, and read `sprawling::monitor::spread`, `sprawling::monitor::tree`, `sprawling::doctor::usable_python_wasm` and `sprawling::assembly::init_city` to do it ([`ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 3). No product crate depends on it.
+`citysim` is the one workspace package that depends on it, and it is a development-only tool (`publish = false`): its two bench binaries `bench` and `bench_startup` time the product's own startup and queries, and read `sprawling::monitor::spread`, `sprawling::monitor::tree`, `sprawling::doctor::usable_python` and `sprawling::assembly::init_city` to do it ([`ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 3). No product crate depends on it.
 
 ## Specification
 
