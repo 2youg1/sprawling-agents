@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The rows under the transcript that are drawn again on every frame:
-// what waits for the person, who is working, the calls under way, the
-// question `/quit` asks, and the composer. The composer is laid out as
-// the WebUI's is - the words, a line under them that runs as far as the
-// words do and then fades, and the room and the offer under the line -
-// with the slash menu taking the place of that last row while it is
-// open. Nothing here moves on its own: a frame is drawn because
-// something changed, so a terminal that is left alone stays still.
-
 const std = @import("std");
 const part = @import("part.zig");
 const scene = @import("scene.zig");
@@ -19,23 +10,17 @@ const paint = @import("paint.zig");
 const text = @import("text.zig");
 const format = @import("format.zig");
 const transcript = @import("transcript.zig");
+const flow = @import("flow.zig");
 const Grid = @import("grid.zig").Grid;
 
 pub const Error = transcript.Error;
 
-/// Where the cursor belongs once the live region is drawn, counted from
-/// the region's first row.
 pub const Cursor = struct { row: usize, column: usize };
 
-/// The fading end of the composer's line.
 const fade = "╌╌╌┄┄┄";
 
-/// How many rows the slash menu lists at once.
 pub const menu_rows = 5;
 
-/// Draws every live part left in `r`, the first row being the blank one
-/// that parts the region from the transcript, and answers where the
-/// cursor goes. The last row is left unterminated.
 pub fn region(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!Cursor {
     var cursor: Cursor = .{ .row = p.row, .column = grid.mark };
     var drew_status = false;
@@ -47,6 +32,7 @@ pub fn region(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!Cursor {
             .Working => try working(p, r, grid),
             .Calling => try calling(p, r, grid),
             .Asking => try asking(p, r, grid),
+            .Replying => try replying(p, r, grid),
             .Composer => {
                 if (drew_status) try p.end();
                 cursor = try composer(p, r, grid);
@@ -59,7 +45,6 @@ pub fn region(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!Cursor {
     return cursor;
 }
 
-/// The right end of a row: `keys` placed so they end on the last column.
 fn right(p: *paint.Painter, keys: []const Key) paint.Error!void {
     var total: usize = 0;
     for (keys) |key| total += text.width(key.word) + key.gap;
@@ -92,9 +77,6 @@ fn waiting(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     try right(p, &keys);
 }
 
-/// The run working: who, ` is working`, and then, where the row has
-/// room for them, since when and the key that stops it. The resident's
-/// name gives way only to ` is working`; the time and the key go first.
 fn working(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const resident = try r.text();
     const since = try r.word();
@@ -147,7 +129,11 @@ fn asking(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     });
 }
 
-/// The composer, and under it the settings row or the slash menu.
+fn replying(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
+    const said = try r.text();
+    try flow.flow(p, std.mem.trim(u8, said, "\n"), .{ .left = grid.words, .measure = grid.measure(), .style = .plain, .marks = .prose });
+}
+
 fn composer(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!Cursor {
     const typed = try r.text();
     const at = try r.word();
@@ -201,10 +187,6 @@ fn composer(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!Cursor {
     return cursor;
 }
 
-/// The line under the words: solid as far as the words run, at least
-/// two columns, then a fade of thinner dashes. While the line is empty
-/// the solid stretch is faint too, as the WebUI's line drops to half
-/// opacity, so the words written read like progress.
 fn underline(p: *paint.Painter, left: usize, words: usize, solid_style: paint.Style) paint.Error!void {
     try p.to(left);
     const solid = @max(words, 2);
@@ -215,9 +197,6 @@ fn underline(p: *paint.Painter, left: usize, words: usize, solid_style: paint.St
     try p.cut(.faint, fade, p.room());
 }
 
-/// The slash menu: up to `menu_rows` entries around the cursor, the one
-/// under the cursor marked with the accent bar, and a last row that says
-/// how many more there are and which keys move through them.
 fn menu(p: *paint.Painter, r: *scene.Reader, left: usize) Error!void {
     const chosen = try r.word();
     const more = try r.word();
@@ -249,9 +228,6 @@ fn menu(p: *paint.Painter, r: *scene.Reader, left: usize) Error!void {
     try p.fit(.faint, "tab moves · enter chooses · esc closes", p.room());
 }
 
-/// The widest spelling and its arguments among the entries ahead of
-/// `r`, read from a copy so the entries are still there to draw, and
-/// never so wide that no room is left for what each one does.
 fn widestChoice(ahead: scene.Reader, count: u32) Error!usize {
     var r = ahead;
     var widest: usize = 0;

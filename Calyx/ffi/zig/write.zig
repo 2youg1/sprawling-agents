@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Writing a scene: the bytes `console_ffi::scene` writes, little-endian,
-// every string a u32 length and its bytes. Mirrors Calyx/ffi/src/scene.rs
-// so a shell can build frames without Rust and round-trip with Reader.
-
 const std = @import("std");
 const part = @import("part.zig");
 const scene = @import("scene.zig");
@@ -70,6 +66,7 @@ pub const Live = struct {
     working: ?Working = null,
     calling: []const Calling = &.{},
     asking: ?u64 = null,
+    replying: ?[]const u8 = null,
     composer: Composer,
     menu: ?Menu = null,
 };
@@ -92,7 +89,6 @@ pub const Quiet = struct {
     transient: ?[]const u8 = null,
 };
 
-/// Allocator-backed scene bytes the leaf's Reader consumes.
 pub const Scene = struct {
     bytes: std.ArrayList(u8),
 
@@ -208,6 +204,10 @@ fn writeLive(out: *std.Io.Writer, live: Live) Error!void {
     if (live.asking) |runs| {
         try tag(out, .Asking);
         try long(out, runs);
+    }
+    if (live.replying) |said| {
+        try tag(out, .Replying);
+        try text(out, said);
     }
     try tag(out, .Composer);
     try text(out, live.composer.typed);

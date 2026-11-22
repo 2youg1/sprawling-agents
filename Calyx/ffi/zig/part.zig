@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The Zig spelling of `Calyx/ffi/src/part.rs`, which is the
-// definition. `build.rs` compares this file with that one on every build
-// and refuses when they differ, printing the text this file must hold.
-
 pub const Part = enum(u8) {
     Inline = 1,
     Quiet = 2,
@@ -25,6 +21,7 @@ pub const Part = enum(u8) {
     Asking = 33,
     Composer = 34,
     Menu = 35,
+    Replying = 36,
 };
 
 pub const Outcome = enum(u8) {

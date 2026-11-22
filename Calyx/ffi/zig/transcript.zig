@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The lines that go into the terminal's own scrollback and stay there:
-// the banner, what the person said, each run's head, its reasoning, its
-// tool calls with how long each took, its reply, and how it ended. Each
-// is drawn once, so search, selection and copying are the terminal's.
-//
-// A line the person typed is marked as a prompt (OSC 133), so a terminal
-// that keeps those marks can jump from one thing said to the next.
-
 const std = @import("std");
 const part = @import("part.zig");
 const scene = @import("scene.zig");
@@ -22,9 +14,6 @@ const Grid = @import("grid.zig").Grid;
 
 pub const Error = scene.Error || paint.Error;
 
-/// Whether a blank line stands before `next` when `previous` was the
-/// last line drawn: before each thing said, each head and each reply,
-/// and after each reply.
 pub fn spaced(previous: ?part.Part, next: part.Part) bool {
     const before = previous orelse return false;
     return switch (next) {
@@ -33,7 +22,6 @@ pub fn spaced(previous: ?part.Part, next: part.Part) bool {
     };
 }
 
-/// Draws the entry `tag` names, read from `r`, ending its last line.
 pub fn entry(p: *paint.Painter, r: *scene.Reader, tag: part.Part, grid: Grid) Error!void {
     switch (tag) {
         .Banner => try banner(p, r),
@@ -45,12 +33,11 @@ pub fn entry(p: *paint.Painter, r: *scene.Reader, tag: part.Part, grid: Grid) Er
         .Note => try note(p, r, grid),
         .Ended => try ended(p, r, grid),
         .Resolved => try resolved(p, r, grid),
-        .Inline, .Quiet, .Waiting, .Working, .Calling, .Asking, .Composer, .Menu => return error.Malformed,
+        .Inline, .Quiet, .Waiting, .Working, .Calling, .Asking, .Composer, .Menu, .Replying => return error.Malformed,
     }
     try p.end();
 }
 
-/// The time gutter, then the mark: the start of every line with a moment.
 pub fn lead(p: *paint.Painter, grid: Grid, seconds: u32, mark: []const u8, style: paint.Style) paint.Error!void {
     if (grid.timed and seconds != scene.no_time) {
         var b: format.Buffer = undefined;
@@ -61,9 +48,6 @@ pub fn lead(p: *paint.Painter, grid: Grid, seconds: u32, mark: []const u8, style
     try p.to(grid.words);
 }
 
-/// The first line: the city on the left, and on the right where its
-/// page is served and how to open it, the hint going first and then the
-/// address when the window is too narrow for them.
 fn banner(p: *paint.Painter, r: *scene.Reader) Error!void {
     const city = try r.text();
     const address = try r.text();

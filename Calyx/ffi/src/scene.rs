@@ -125,6 +125,7 @@ pub struct Live<'a> {
     pub working: Option<Working<'a>>,
     pub calling: Vec<Calling<'a>>,
     pub asking: Option<u64>,
+    pub replying: Option<&'a str>,
     pub composer: Composer<'a>,
     pub menu: Option<Menu<'a>>,
 }
@@ -186,8 +187,6 @@ impl Scene {
         scene
     }
 
-    /// Host→shell entry list: `u32` count then the same entry encoding as an
-    /// inline scene. The city shell reads this through `host.readEntries`.
     pub fn entry_list(entries: &[Entry]) -> Scene {
         let mut scene = Scene::default();
         scene.count(entries.len());
@@ -269,6 +268,10 @@ impl Scene {
             self.tag(Part::Asking);
             self.long(Some(runs));
         }
+        if let Some(said) = live.replying {
+            self.tag(Part::Replying);
+            self.text(said);
+        }
         let composer = live.composer;
         self.tag(Part::Composer);
         self.text(composer.typed);
@@ -305,25 +308,19 @@ impl Scene {
         self.0.extend_from_slice(&value.to_le_bytes());
     }
 
-    /// A count the leaf reads as a `u32`; past that it reads the most a
-    /// `u32` holds, which no screen reaches.
     fn count(&mut self, value: usize) {
         self.word(u32::try_from(value).unwrap_or(u32::MAX));
     }
 
-    /// A number that may be absent, absent written as `u64::MAX`.
     fn long(&mut self, value: Option<u64>) {
         self.0
             .extend_from_slice(&value.unwrap_or(u64::MAX).to_le_bytes());
     }
 
-    /// A time of day, absent written as `u32::MAX`.
     fn time(&mut self, at: Option<TimeOfDay>) {
         self.word(at.map_or(u32::MAX, |TimeOfDay(seconds)| seconds));
     }
 
-    /// A text, cut at the most bytes a `u32` length counts; the leaf
-    /// draws a sequence cut in the middle as one replacement character.
     fn text(&mut self, text: &str) {
         let bytes = text.as_bytes();
         let length = u32::try_from(bytes.len()).unwrap_or(u32::MAX);

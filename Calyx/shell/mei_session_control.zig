@@ -13,8 +13,6 @@ const mei_session = @import("mei_session.zig");
 
 pub const Action = enum { task, handled, quit };
 
-/// A `/resume` argument is either what the person typed, resolved against the
-/// session directory, or the session the UI just left, which already is.
 const ResumeArg = enum { typed, resolved };
 
 pub fn dispatch(ui: anytype, typed: []const u8) Action {
@@ -103,6 +101,7 @@ fn resumeSession(ui: anytype, path_in: []const u8, arg: ResumeArg) void {
     defer ui.gpa.free(path);
     switch (mei_session.Session.import(ui.gpa, ui.io, path)) {
         .ok => |session| {
+            ui.touch(true);
             const at = ui.now();
             for (ui.pending.items) |line| ui.gpa.free(line);
             ui.pending.clearRetainingCapacity();
@@ -120,6 +119,7 @@ fn resumeSession(ui: anytype, path_in: []const u8, arg: ResumeArg) void {
             rememberCurrent(ui);
             ui.session = session;
             ui.print(entries.items);
+            ui.touch(true);
         },
         .err => |diag| {
             defer ui.gpa.free(diag);
@@ -179,6 +179,11 @@ const Fake = struct {
 
     fn print(self: *Fake, entries: []const write.Entry) void {
         self.printed += entries.len;
+    }
+
+    fn touch(self: *Fake, force: bool) void {
+        _ = self;
+        _ = force;
     }
 
     fn now(self: *Fake) u64 {

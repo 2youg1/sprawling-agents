@@ -18,6 +18,7 @@ const mei_session = @import("mei_session.zig");
 const observation = @import("mei_observation.zig");
 const session_control = @import("mei_session_control.zig");
 const runtime = @import("mei_runtime.zig");
+const present = @import("mei_present.zig");
 
 const replay_batch: usize = 64;
 
@@ -70,6 +71,9 @@ pub const Ui = struct {
     quit: bool = false,
     mei_program: []u8,
     frame_arena: std.heap.ArenaAllocator,
+    queue_arena: std.heap.ArenaAllocator,
+    cadence: present.Cadence = .{},
+    queued: std.ArrayList(write.Entry) = .empty,
 
     fn init(gpa: std.mem.Allocator, io: std.Io, environ: *std.process.Environ.Map, replay: ?[]const u8) !Ui {
         const model = environ.get("HARNESS_MODEL") orelse "auto";
@@ -134,6 +138,7 @@ pub const Ui = struct {
             .reporting = program_status.Reporting.deciding(environ.get("SPRAWLING_PROGRAM_STATUS")),
             .mei_program = mei_program,
             .frame_arena = .init(gpa),
+            .queue_arena = .init(gpa),
         };
     }
 
@@ -147,11 +152,13 @@ pub const Ui = struct {
         if (self.previous_session) |path| self.gpa.free(path);
         for (self.pending.items) |line| self.gpa.free(line);
         self.pending.deinit(self.gpa);
+        self.queued.deinit(self.gpa);
         self.bus.deinit();
         self.seen.deinit();
         self.editor.deinit();
         self.screen.deinit();
         self.frame_arena.deinit();
+        self.queue_arena.deinit();
         self.gpa.free(self.session_dir);
         self.gpa.free(self.mei_program);
         if (self.replay_file) |file| file.close(self.io);
@@ -170,7 +177,8 @@ pub const Ui = struct {
             if (self.lost) return self.giveBack(1);
             self.advanceReplay();
             runtime.drain(self);
-            const timeout: i32 = if (self.process != null or !self.replay_done) 50 else -1;
+            self.flushPresent(false);
+            const timeout = self.pollTimeout();
             if (stdin_filled == 0 and !pollStdin(timeout)) continue;
             const event = termio.readEvent(&stdin_buf, &stdin_filled) catch {
                 self.lost = true;
@@ -181,14 +189,22 @@ pub const Ui = struct {
         }
     }
 
+    fn pollTimeout(self: *const Ui) i32 {
+        const at = nowNs(self.io);
+        if (self.cadence.due(at, false)) return 0;
+        if (self.cadence.dirty) return self.cadence.waitMs(at);
+        if (self.process != null or !self.replay_done) return 50;
+        return -1;
+    }
+
     fn handleEvent(self: *Ui, event: termio.Event) ?u8 {
         switch (event) {
             .key => |key| return self.onKey(key),
             .paste => |pasted| {
                 self.editor.paste(pasted) catch {};
-                self.redraw(&.{});
+                self.touch(true);
             },
-            .resize => self.redraw(&.{}),
+            .resize => self.touch(true),
             .lost => {
                 self.lost = true;
                 runtime.stop(self);
@@ -206,7 +222,7 @@ pub const Ui = struct {
         if (key.code == .esc) return self.escape();
         if (editing(key)) |edit| {
             self.editor.apply(edit) catch {};
-            self.redraw(&.{});
+            self.touch(true);
         }
         return null;
     }
@@ -214,7 +230,7 @@ pub const Ui = struct {
     fn escape(self: *Ui) ?u8 {
         if (!self.editor.isEmpty()) {
             self.editor.apply(.clear) catch {};
-            self.redraw(&.{});
+            self.touch(true);
             return null;
         }
         if (self.process != null) {
@@ -225,16 +241,15 @@ pub const Ui = struct {
 
     fn enter(self: *Ui) void {
         const typed = self.editor.enter() catch {
-            self.redraw(&.{});
+            self.touch(true);
             return;
         } orelse {
-            self.redraw(&.{});
+            self.touch(true);
             return;
         };
         defer self.gpa.free(typed);
         if (std.mem.trim(u8, typed, &std.ascii.whitespace).len == 0) return;
         const at = self.now();
-        _ = self.frame_arena.reset(.retain_capacity);
         const arena = self.frame_arena.allocator();
         const you = arena.alloc(write.Entry, 1) catch return;
         you[0] = .{ .you = .{ .at = observation.tod(at), .said = arena.dupe(u8, typed) catch typed } };
@@ -282,7 +297,6 @@ pub const Ui = struct {
                 return;
             };
             defer self.gpa.free(line);
-            _ = self.frame_arena.reset(.retain_capacity);
             const arena = self.frame_arena.allocator();
             const entries = self.seen.line(arena, line, self.now()) catch continue;
             self.print(entries);
@@ -290,14 +304,61 @@ pub const Ui = struct {
     }
 
     pub fn printNote(self: *Ui, said: []const u8) void {
-        _ = self.frame_arena.reset(.retain_capacity);
         const arena = self.frame_arena.allocator();
         const entries = observation.noteEntries(arena, said) catch return;
         self.print(entries);
     }
 
     pub fn print(self: *Ui, entries: []const write.Entry) void {
-        self.redraw(entries);
+        if (entries.len > 0) {
+            if (!self.enqueueOwned(entries)) {
+                self.cadence.mark();
+                self.flushPresent(true);
+                if (!self.enqueueOwned(entries)) {
+                    self.redraw(entries);
+                    if (self.queued.items.len == 0) {
+                        _ = self.queue_arena.reset(.retain_capacity);
+                    }
+                    _ = self.frame_arena.reset(.retain_capacity);
+                    self.cadence.mark();
+                    self.cadence.presented(nowNs(self.io));
+                    return;
+                }
+            }
+            _ = self.frame_arena.reset(.retain_capacity);
+        }
+        self.cadence.mark();
+        self.flushPresent(false);
+    }
+
+    fn enqueueOwned(self: *Ui, entries: []const write.Entry) bool {
+        const start = self.queued.items.len;
+        const q = self.queue_arena.allocator();
+        for (entries) |entry| {
+            const owned = present.cloneEntry(q, entry) catch {
+                self.queued.shrinkRetainingCapacity(start);
+                return false;
+            };
+            self.queued.append(self.gpa, owned) catch {
+                self.queued.shrinkRetainingCapacity(start);
+                return false;
+            };
+        }
+        return true;
+    }
+
+    pub fn touch(self: *Ui, force: bool) void {
+        self.cadence.mark();
+        self.flushPresent(force);
+    }
+
+    pub fn flushPresent(self: *Ui, force: bool) void {
+        const at = nowNs(self.io);
+        if (!self.cadence.due(at, force)) return;
+        self.redraw(self.queued.items);
+        self.queued.clearRetainingCapacity();
+        _ = self.queue_arena.reset(.retain_capacity);
+        self.cadence.presented(at);
     }
 
     fn redraw(self: *Ui, entries: []const write.Entry) void {
@@ -311,9 +372,11 @@ pub const Ui = struct {
             calling_buf[0] = .{ .name = "python", .subject = "工具波执行中" };
             break :blk calling_buf[0..1];
         } else &.{};
+        const draft = self.seen.draftText();
         const live: write.Live = .{
             .working = working,
             .calling = calling,
+            .replying = if (draft.len > 0) draft else null,
             .composer = .{
                 .typed = typed,
                 .cursor = self.editor.cursorAt(),
@@ -350,6 +413,7 @@ pub const Ui = struct {
         var spins: usize = 0;
         while (self.process != null and spins < 50) : (spins += 1) {
             runtime.drain(self);
+            self.flushPresent(true);
             if (self.process) |*process| {
                 if (process.isFinished()) break;
             } else break;
@@ -359,6 +423,7 @@ pub const Ui = struct {
             process.deinit();
             self.process = null;
         }
+        self.flushPresent(true);
         self.status(.closed);
         self.drawn(self.screen.giveBack());
         return code;
@@ -390,4 +455,10 @@ fn nowMs(io: std.Io) u64 {
     const timestamp = std.Io.Clock.real.now(io);
     const milliseconds = timestamp.toMilliseconds();
     return if (milliseconds < 0) 0 else @intCast(milliseconds);
+}
+
+fn nowNs(io: std.Io) u64 {
+    const timestamp = std.Io.Clock.real.now(io);
+    const nanoseconds = timestamp.toNanoseconds();
+    return if (nanoseconds < 0) 0 else @intCast(nanoseconds);
 }
