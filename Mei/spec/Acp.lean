@@ -6,7 +6,7 @@
 /-!
 # Mei 作为 ACP agent 的会话相位
 
-规定 `Mei/src/acp.rs`：无头核在 `--acp` 下以 ACP version 1 的 **agent** 角色
+规定 `Mei/src/acp/mod.rs`：无头核在 `--acp` 下以 ACP version 1 的 **agent** 角色
 在 stdio 上回答 `initialize` / `session/new` / `session/prompt`，并接受
 `session/cancel`。城侧 `agent_protocols::harness::session` 是对称的 **client**；
 HTTP `POST /acp` 不是本模型。本面是文本会话子集：一条连接一次 `session/new`，
@@ -67,7 +67,7 @@ def promptText : List Block → Option String
       | none => some body
       | some more => some (body ++ "\n" ++ more)
   | .resourceLink name uri :: rest =>
-    if name = "" && uri = "" then promptText rest
+    if name = "" ∧ uri = "" then promptText rest
     else
       let line := linkLine name uri
       match promptText rest with
@@ -79,7 +79,7 @@ theorem promptText_rejects_empty :
     promptText [] = none ∧ promptText [.text ""] = none ∧
       promptText [.other] = none ∧
       promptText [.resourceLink "" ""] = none := by
-  simp [promptText, linkLine]
+  simp [promptText]
 
 theorem promptText_keeps_nonempty_text :
     promptText [.text "a", .other, .text "b"] = some "a\nb" := by

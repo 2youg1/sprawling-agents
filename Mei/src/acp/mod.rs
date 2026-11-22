@@ -300,7 +300,6 @@ where
     let flag = Arc::clone(cancelled);
     let drain = thread::spawn(move || {
         let mut pending = VecDeque::new();
-        let mut rx = rx;
         let outcome = loop {
             if done_rx.try_recv().is_ok() {
                 break Ok((rx, pending));
@@ -312,10 +311,12 @@ where
                 Err(mpsc::RecvTimeoutError::Disconnected) => break Ok((rx, pending)),
             }
         };
-        let _ = back_tx.send(outcome);
+        drop(back_tx.send(outcome));
     });
     let result = turn(turn_input);
-    let _ = done_tx.send(());
+    match done_tx.send(()) {
+        Ok(()) | Err(_) => {}
+    }
     let reclaimed = back_rx.recv().map_err(|_| {
         Error::Diagnostic(Diagnostic::new(
             Code::Protocol,
@@ -324,7 +325,17 @@ where
             "restart `mei --acp`",
         ))
     })?;
-    let _ = drain.join();
+    match drain.join() {
+        Ok(()) => {}
+        Err(_) => {
+            return Err(Error::Diagnostic(Diagnostic::new(
+                Code::Protocol,
+                "join the ACP cancel drain",
+                "the drain thread panicked",
+                "restart `mei --acp`",
+            )));
+        }
+    }
     let (rx, pending) = reclaimed.map_err(|err| {
         Error::Diagnostic(Diagnostic::new(
             Code::Protocol,
