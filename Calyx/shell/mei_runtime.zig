@@ -17,7 +17,7 @@ pub fn submit(ui: anytype, typed: []const u8, at: u64) void {
         ui.printNote("create the run capture directory");
         return;
     };
-    const steer_path = std.fmt.allocPrint(ui.gpa, "{s}{c}steer.jsonl", .{ ui.capture_dir.?, std.fs.path.sep }) catch {
+    const steer_path = mei_process.steerPath(ui.gpa, ui.capture_dir.?) catch {
         finishCapture(ui, .discard);
         ui.printNote("allocate the Mei steer path");
         return;
@@ -149,6 +149,7 @@ pub fn stop(ui: anytype) void {
 
 fn finishCapture(ui: anytype, fate: CaptureFate) void {
     if (ui.steer_path) |path| {
+        std.Io.Dir.cwd().deleteFile(ui.io, path) catch {};
         ui.gpa.free(path);
         ui.steer_path = null;
     }
@@ -195,4 +196,21 @@ test "a steer line is one JSON object ending in a newline" {
     const contents = try std.Io.Dir.cwd().readFileAlloc(io, file_path, gpa, .limited(4096));
     defer gpa.free(contents);
     try std.testing.expectEqualStrings("{\"text\":\"narrow the search\"}\n", contents);
+}
+
+test "creating the steer file leaves the capture directory empty" {
+    const gpa = std.testing.allocator;
+    const io = std.testing.io;
+    const capture = "mei-steer-capture-empty-test";
+    const path = try mei_process.steerPath(gpa, capture);
+    defer gpa.free(path);
+    defer std.Io.Dir.cwd().deleteTree(io, capture) catch {};
+    defer std.Io.Dir.cwd().deleteFile(io, path) catch {};
+    try std.Io.Dir.cwd().createDirPath(io, capture);
+    try createEmptySteer(io, path);
+    var dir = try std.Io.Dir.cwd().openDir(io, capture, .{ .iterate = true });
+    defer dir.close(io);
+    var it = dir.iterate();
+    try std.testing.expect((try it.next(io)) == null);
+    try std.testing.expectEqualStrings("mei-steer-capture-empty-test.steer.jsonl", path);
 }

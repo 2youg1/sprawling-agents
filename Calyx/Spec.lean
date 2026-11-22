@@ -131,13 +131,15 @@ Rust 是宿主边界，不是壳实现。
 
 /-! D11 任务进行中的普通提交是 Steer，经 `MEI_STEER_PATH` 投递给无头核
 
-决定：Calyx 在每次 run 的 capture 目录下独占创建 `steer.jsonl`，经子进程环境
-`MEI_STEER_PATH` 交给 Mei；人在进程仍在时提交的非斜杠文本追加一行 `{"text":"…"}` 并
-flush，不 spawn 第二个 `mei`、不关闭当前组。斜杠在运行中仍提示「Esc 才停止」。Esc 仍是
-杀组取消，与 Steer 分立。理由：核的落点是「接到最新 tool_result 末尾」（`Mei/Spec.lean` D21），
-面只需提供不打断的投递缝；文件 JSONL 跨平台、可与 capture 同生命周期回收。被否：①保持
-「运行中拒绝一切输入」——人无法改道；②经仍打开的 stdin 混写 prompt 与 steer——无头
-`read_to_string` 合同与 argv `-p` 长度限制都会被撕开；③打断当前 python 调用——取消已有指令。
+决定：Calyx 在每次 run 的 capture 目录**旁**独占创建 `{capture}.steer.jsonl`（兄弟文件，
+不写入 capture 目录内），经子进程环境 `MEI_STEER_PATH` 交给 Mei；人在进程仍在时提交的
+非斜杠文本追加一行 `{"text":"…"}` 并 flush，不 spawn 第二个 `mei`、不关闭当前组。斜杠在
+运行中仍提示「Esc 才停止」。Esc 仍是杀组取消，与 Steer 分立。理由：核的落点是「接到最新
+tool_result 末尾」（`Mei/Spec.lean` D21），面只需提供不打断的投递缝；文件 JSONL 跨平台、
+可与 capture 同生命周期回收；capture 目录必须保持空才能被 `MEI_CAPTURE_CREATED` 采纳，
+因此 steer 不得落在目录内。被否：①保持「运行中拒绝一切输入」——人无法改道；②经仍打开的
+stdin 混写 prompt 与 steer——无头 `read_to_string` 合同与 argv `-p` 长度限制都会被撕开；
+③打断当前 python 调用——取消已有指令；④steer 放进 capture 目录——破坏空目录采纳。
 -/
 
 /-! D10 实时、回放与会话导入共用一个可增长读行器，单行上限 32 MiB

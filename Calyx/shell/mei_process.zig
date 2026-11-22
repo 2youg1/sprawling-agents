@@ -117,7 +117,7 @@ pub const Process = struct {
 
         var child_environment = if (capture_directory) |directory| blk: {
             const base = environ orelse return .{ .err = configFailure(gpa, "missing base environment", program) };
-            const steer_path = std.fmt.allocPrint(gpa, "{s}{c}steer.jsonl", .{ directory, std.fs.path.sep }) catch
+            const steer_path = steerPath(gpa, directory) catch
                 return .{ .err = configFailure(gpa, "allocate steer path", program) };
             defer gpa.free(steer_path);
             break :blk captureEnvironment(gpa, base, directory, steer_path) catch return .{ .err = configFailure(gpa, "set capture directory", program) };
@@ -495,6 +495,12 @@ fn driveOutput(ctx: *DriverCtx, child: *std.process.Child) !Result {
     return .{ .err = try gpa.dupe(u8, msg) };
 }
 
+/// Steer delivery sits beside the capture directory, never inside it, so Mei
+/// can still adopt an empty `MEI_CAPTURE_DIR`.
+pub fn steerPath(gpa: std.mem.Allocator, capture_directory: []const u8) ![]u8 {
+    return std.fmt.allocPrint(gpa, "{s}.steer.jsonl", .{capture_directory});
+}
+
 fn captureEnvironment(
     gpa: std.mem.Allocator,
     base: *const std.process.Environ.Map,
@@ -550,15 +556,24 @@ test "capture directory is copied into only the child environment" {
     var base = std.process.Environ.Map.init(gpa);
     defer base.deinit();
     try base.put("KEEP", "yes");
-    var child = try captureEnvironment(gpa, &base, "session.captures/run-1", "session.captures/run-1/steer.jsonl");
+    const steer = try steerPath(gpa, "session.captures/run-1");
+    defer gpa.free(steer);
+    var child = try captureEnvironment(gpa, &base, "session.captures/run-1", steer);
     defer child.deinit();
     try std.testing.expectEqualStrings("yes", child.get("KEEP").?);
     try std.testing.expectEqualStrings("session.captures/run-1", child.get("MEI_CAPTURE_DIR").?);
     try std.testing.expectEqualStrings("1", child.get("MEI_CAPTURE_CREATED").?);
-    try std.testing.expectEqualStrings("session.captures/run-1/steer.jsonl", child.get("MEI_STEER_PATH").?);
+    try std.testing.expectEqualStrings("session.captures/run-1.steer.jsonl", child.get("MEI_STEER_PATH").?);
     try std.testing.expect(base.get("MEI_CAPTURE_DIR") == null);
     try std.testing.expect(base.get("MEI_CAPTURE_CREATED") == null);
     try std.testing.expect(base.get("MEI_STEER_PATH") == null);
+}
+
+test "steer path is a sibling of the capture directory" {
+    const gpa = std.testing.allocator;
+    const path = try steerPath(gpa, "session.captures/run-9");
+    defer gpa.free(path);
+    try std.testing.expectEqualStrings("session.captures/run-9.steer.jsonl", path);
 }
 
 test "missing program yields a structured diagnostic" {
