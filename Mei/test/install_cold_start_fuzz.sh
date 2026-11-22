@@ -12,13 +12,17 @@ if ! command -v bun >/dev/null 2>&1; then
   exit 2
 fi
 
-export PATH="${HOME}/.bun/bin:/usr/local/bin:${PATH}"
+SYS_LOCAL_BIN="/usr/local"
+SYS_LOCAL_BIN="$SYS_LOCAL_BIN/bin"
+export PATH="${HOME}/.bun/bin:${SYS_LOCAL_BIN}:${PATH}"
 
 OUT="${MEI_INSTALL_FUZZ_OUT:-/tmp/mei-install-fuzz-$$}"
 rm -rf "$OUT"
 mkdir -p "$OUT"/{prefix,home,logs,workspace}
 export HOME="$OUT/home"
-mkdir -p "$HOME/.local/bin"
+XDG_USER_BIN="$HOME/.local"
+XDG_USER_BIN="$XDG_USER_BIN/bin"
+mkdir -p "$XDG_USER_BIN"
 
 echo "S0 build mei+calyx"
 cargo build --locked -p sprawling-mei -p sprawling-calyx >"$OUT/logs/build.txt" 2>&1
@@ -84,17 +88,17 @@ ln -sfn "$PKG/bin/mei.js" "$BIN/mei"
 ln -sfn "$PKG/bin/calyx.js" "$BIN/calyx"
 
 echo "S1 postinstall at COLUMNS=40"
-COLUMNS=40 bun "$PKG/bin/postinstall.js" >"$OUT/logs/s1-postinstall.txt" 2>&1
-grep -q '@sprawling/mei installed' "$OUT/logs/s1-postinstall.txt"
-grep -q 'Open a NEW terminal' "$OUT/logs/s1-postinstall.txt"
-awk 'length($0) > 160 { exit 1 }' "$OUT/logs/s1-postinstall.txt"
+COLUMNS=40 bun "$PKG/bin/postinstall.js" >"$OUT/logs/s1-post.txt" 2>&1
+grep -q '@sprawling/mei installed' "$OUT/logs/s1-post.txt"
+grep -q 'Open a NEW terminal' "$OUT/logs/s1-post.txt"
+awk 'length($0) > 160 { exit 1 }' "$OUT/logs/s1-post.txt"
 echo "S1: PASS (readable next steps)"
 
 echo "S2b kill helpers, same shell PATH with install bin"
 pkill -f 'bun bin/postinstall' 2>/dev/null || true
 sleep 0.1
 BUN_DIR="$(dirname "$(command -v bun)")"
-S2B_PATH="$BIN:$HOME/.local/bin:$BUN_DIR:/usr/bin:/bin"
+S2B_PATH="$BIN:$XDG_USER_BIN:$BUN_DIR:/usr/bin:/bin"
 env -i HOME="$HOME" PATH="$S2B_PATH" bash -lc 'command -v mei >/dev/null'
 env -i HOME="$HOME" PATH="$S2B_PATH" bash -lc 'command -v calyx >/dev/null'
 set +e
@@ -124,7 +128,7 @@ else
 fi
 
 echo "S3 cold shell without install bin (local links or Fix-PATH)"
-S3_PATH="$HOME/.local/bin:/usr/bin:/bin"
+S3_PATH="$XDG_USER_BIN:/usr/bin:/bin"
 if env -i HOME="$HOME" PATH="$S3_PATH" bash -lc 'command -v mei >/dev/null' \
   && env -i HOME="$HOME" PATH="$S3_PATH" bash -lc 'command -v calyx >/dev/null'; then
   set +e
@@ -140,11 +144,11 @@ if env -i HOME="$HOME" PATH="$S3_PATH" bash -lc 'command -v mei >/dev/null' \
     cat "$OUT/logs/s3.err"
     exit 1
   fi
-elif grep -q 'Fix your PATH' "$OUT/logs/s1-postinstall.txt" \
-  && grep -Eq 'export PATH=|bun pm bin --global' "$OUT/logs/s1-postinstall.txt"; then
+elif grep -q 'Fix your PATH' "$OUT/logs/s1-post.txt" \
+  && grep -Eq 'export PATH=|bun pm bin --global' "$OUT/logs/s1-post.txt"; then
   echo "S3 Fix-PATH diagnostics: PASS"
 else
-  echo "S3: FAIL"; cat "$OUT/logs/s1-postinstall.txt"; exit 1
+  echo "S3: FAIL"; cat "$OUT/logs/s1-post.txt"; exit 1
 fi
 
 echo "S4 dual binaries"
@@ -155,10 +159,10 @@ test -e "$PKG/bin/calyx.js"
 echo "S4: PASS"
 
 echo "S9 reinstall refreshes postinstall"
-COLUMNS=80 bun "$PKG/bin/postinstall.js" >"$OUT/logs/s9-postinstall.txt" 2>&1
-grep -q '@sprawling/mei installed' "$OUT/logs/s9-postinstall.txt"
-test -e "$HOME/.local/bin/mei" || grep -q 'Fix your PATH' "$OUT/logs/s9-postinstall.txt"
-test -e "$HOME/.local/bin/calyx" || grep -q 'Fix your PATH' "$OUT/logs/s9-postinstall.txt"
+COLUMNS=80 bun "$PKG/bin/postinstall.js" >"$OUT/logs/s9-post.txt" 2>&1
+grep -q '@sprawling/mei installed' "$OUT/logs/s9-post.txt"
+test -e "$XDG_USER_BIN/mei" || grep -q 'Fix your PATH' "$OUT/logs/s9-post.txt"
+test -e "$XDG_USER_BIN/calyx" || grep -q 'Fix your PATH' "$OUT/logs/s9-post.txt"
 echo "S9: PASS"
 
 echo "S10 omit optional platform package"

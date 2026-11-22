@@ -581,13 +581,13 @@ Mei 的 npm 入口要求 Bun，与文档的 `bunx` 前提一致；npm exec 可�
 
 主安装面是根包 `bin` 字段：Bun／npm 把 `mei`／`calyx` 链进 global bin，**不依赖**生命周期
 脚本。`bin/postinstall.js`（`scripts.postinstall`）是附加辅助：在 Bun 实际执行该脚本时，
-① 仅当 `~/.local/bin` 目标不存在或已是本包指向同 shim 的链／包装器时才刷新，否则保留并提示
-冲突（不得删 `cargo install` 等外来命令）；② 写入 `#!/bin/sh`／cmd 包装器，以绝对路径
-`exec` 当前 `bun` 与 shim，使冷壳在 PATH 无 `bun` 时仍可启动（禁止复制 shim 字节，以免
-`require` 基准漂到 `~/.local/bin`）；③ 若 Bun global bin 与已成功写入的 `~/.local/bin`
-均不在 `PATH`，打印 Claude 级「Fix your PATH」（可复制 session `export`／`$env:Path`，并
-注明持久化需人写入启动文件；含 `bun pm bin --global`）。脚本跳过时，人仍靠 global bin +
-该 Fix-PATH 文案（README）完成冷启动。不改 shell profile、不改系统 PATH 注册表。
+① 仅当 `~/.local` 下 bin 目录中目标不存在或已是本包指向同 shim 的链／包装器时才刷新，否则
+保留并提示冲突（不得删 `cargo install` 等外来命令）；② 写入 `#!/bin/sh`／cmd 包装器，以绝对
+路径 `exec` 当前 `bun` 与 shim，使冷壳在 PATH 无 `bun` 时仍可启动（禁止复制 shim 字节，以免
+`require` 基准漂到用户 bin）；③ 若 Bun global bin 与已成功写入的用户 bin 均不在 `PATH`，打印
+Claude 级「Fix your PATH」（可复制 session `export`／`$env:Path`，并注明持久化需人写入启动
+文件；含 `bun pm bin --global`）。脚本跳过时，人仍靠 global bin + 该 Fix-PATH 文案（README）
+完成冷启动。不改 shell profile、不改系统 PATH 注册表。
 
 发布顺序保持平台 npm 包、两个 npm 根包、crates.io：根包的可选依赖先存在，crates.io
 仍在其它渠道之后，因为其版本不可替换。首次出现的 npm 包与 crate 先由有权限的人完成
@@ -595,7 +595,7 @@ Mei 的 npm 入口要求 Bun，与文档的 `bunx` 前提一致；npm exec 可�
 
 参数与理由：Bun 官方 `bunx` 合同支持以 `bun` shebang 固定运行时。产品双 bin（`mei`+`calyx`）
 对齐「装完即可打两个名字」的验收，与已复现失败的「`mei`+自定义 `mei-runtime` 解释器」不同。
-`~/.local/bin` 链与 Fix-PATH 文案解决杀进程／新壳后 Bun global bin 不在登录 PATH 的冷启动
+用户 bin 包装器与 Fix-PATH 文案解决杀进程／新壳后 Bun global bin 不在登录 PATH 的冷启动
 缺口，且不碰 profile。被否：双 bin + 自定义运行时（已复现不能启动）；`node` shebang（只装
 Bun 的用户仍失败）；只在 JavaScript 中检测 Bun；推断执行 JavaScript 的运行时就是安装器；
 为 Mei 复制第二份路由逻辑（入口名分支留在同一 `SHIM`）；把 Mei 塞进 sprawling 归档或 npm

@@ -21,7 +21,7 @@ After a Bun global install, open a **new** terminal and run `mei` or `calyx`. Th
 export PATH="$(bun pm bin --global):$PATH"
 ```
 
-Add that directory to the file your login shell reads so later terminals keep it. When Bun does run the package postinstall, it may also place wrappers under `~/.local/bin` and print the same **Fix your PATH** block; if lifecycle scripts were skipped, the global-bin PATH fix above is still the path. Reinstall with the same Bun command; it refreshes the shim and platform binaries together. Do not omit optional dependencies: the platform package holds both binaries.
+Add that directory to the file your login shell reads so later terminals keep it. When Bun does run the package postinstall, it may also place wrappers in the bin directory under `~/.local` and print the same **Fix your PATH** block; if lifecycle scripts were skipped, the global-bin PATH fix above is still the path. Reinstall with the same Bun command; it refreshes the shim and platform binaries together. Do not omit optional dependencies: the platform package holds both binaries.
 
 The published packages trail this tree until the next release. Build from source for the version in this repository.
 

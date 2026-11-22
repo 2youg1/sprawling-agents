@@ -46,7 +46,10 @@ fn cli_non_unicode_prompt_is_a_usage_error() {
 
 #[cfg(unix)]
 #[test]
-#[expect(clippy::disallowed_methods, reason = "TTY fixture process for crates.io face hint")]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "TTY fixture process for crates.io face hint"
+)]
 fn tty_mei_without_prompt_points_at_the_calyx_install() {
     let mei = env!("CARGO_BIN_EXE_mei");
     let mut command = Command::new("script");

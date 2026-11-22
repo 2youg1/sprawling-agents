@@ -21,7 +21,7 @@ Bun 全局安装后，**新开终端**再运行 `mei` 或 `calyx`。包的 `bin`
 export PATH="$(bun pm bin --global):$PATH"
 ```
 
-把该目录写进登录壳会读的文件，之后新终端才一直可用。若 Bun 执行了包的 postinstall，它还可能在 `~/.local/bin` 放包装器并打印同样的 **Fix your PATH**；生命周期被跳过时，上面的 global bin PATH 修复仍然有效。用同一条 Bun 命令重装即可刷新 shim 与平台二进制。不要省略 optionalDependencies：平台包里才有两个二进制。
+把该目录写进登录壳会读的文件，之后新终端才一直可用。若 Bun 执行了包的 postinstall，它还可能在 `~/.local` 下的 bin 目录放包装器并打印同样的 **Fix your PATH**；生命周期被跳过时，上面的 global bin PATH 修复仍然有效。用同一条 Bun 命令重装即可刷新 shim 与平台二进制。不要省略 optionalDependencies：平台包里才有两个二进制。
 
 已发布包会落后于本树，直到下一次发布；要本仓库的版本，用下方源码构建。
 

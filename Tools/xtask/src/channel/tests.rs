@@ -54,7 +54,6 @@ fn the_shim_execs_rather_than_installs() {
 }
 
 #[test]
-#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
 fn mei_postinstall_prints_fix_path_when_unreachable() {
     let post = super::POSTINSTALL;
     assert!(post.contains("Fix your PATH"));
