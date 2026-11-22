@@ -30,14 +30,16 @@ fn run() -> Result<()> {
     }
     let answer = run_headless(arguments)?;
     let mut out = std::io::stdout();
-    out.write_all(answer.as_bytes()).and_then(|()| out.flush()).map_err(|err| {
-        Error::Diagnostic(Diagnostic::new(
-            Code::Usage,
-            "write the final answer",
-            err.to_string(),
-            "keep stdout open for the headless answer",
-        ))
-    })
+    out.write_all(answer.as_bytes())
+        .and_then(|()| out.flush())
+        .map_err(|err| {
+            Error::Diagnostic(Diagnostic::new(
+                Code::Usage,
+                "write the final answer",
+                err.to_string(),
+                "keep stdout open for the headless answer",
+            ))
+        })
 }
 
 struct Arguments {
@@ -58,7 +60,9 @@ fn arguments() -> Result<Arguments> {
             }
             Some("--acp") => return Err(usage("duplicate --acp".to_owned())),
             Some("-p") if prompt.is_none() => {
-                let value = args.next().ok_or_else(|| usage("-p requires a value".to_owned()))?;
+                let value = args
+                    .next()
+                    .ok_or_else(|| usage("-p requires a value".to_owned()))?;
                 let value = value.into_string().map_err(|value| {
                     usage(format!(
                         "-p prompt must be valid UTF-8, got `{}`",
@@ -294,10 +298,7 @@ fn run_acp() -> Result<()> {
         } else {
             StopReason::EndTurn
         };
-        Ok(Outcome {
-            stop,
-            text: answer,
-        })
+        Ok(Outcome { stop, text: answer })
     });
     match result {
         Ok(()) => {

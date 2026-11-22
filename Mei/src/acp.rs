@@ -6,9 +6,9 @@
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
-use std::sync::Arc;
 use std::thread;
 
 use serde_json::{Value, json};
@@ -182,8 +182,7 @@ pub fn serve_with_meter(
                                 continue;
                             }
                         };
-                        let stop =
-                            finish(cancelled.load(Ordering::SeqCst), outcome.stop);
+                        let stop = finish(cancelled.load(Ordering::SeqCst), outcome.stop);
                         if !outcome.text.is_empty() {
                             write_update(
                                 &mut output,
@@ -194,11 +193,7 @@ pub fn serve_with_meter(
                                 }),
                             )?;
                         }
-                        write_result(
-                            &mut output,
-                            id,
-                            json!({ "stopReason": stop.as_str() }),
-                        )?;
+                        write_result(&mut output, id, json!({ "stopReason": stop.as_str() }))?;
                         first = false;
                     }
                     Err(error) => write_error(&mut output, id, INVALID_PARAMS, error)?,
@@ -326,7 +321,10 @@ fn prompt_params(params: &Value, session_id: &str) -> std::result::Result<String
 }
 
 fn write_result(output: &mut impl Write, id: &Value, result: Value) -> Result<()> {
-    write_message(output, &json!({ "jsonrpc": "2.0", "id": id, "result": result }))
+    write_message(
+        output,
+        &json!({ "jsonrpc": "2.0", "id": id, "result": result }),
+    )
 }
 
 fn write_error(output: &mut impl Write, id: &Value, code: i64, message: String) -> Result<()> {

@@ -12,8 +12,8 @@
 )]
 
 use std::io::{BufRead, BufReader, Write};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::thread;
 use std::time::Duration;
 
@@ -50,10 +50,7 @@ fn finish_prefers_cancel() {
         acp::finish(true, StopReason::EndTurn),
         StopReason::Cancelled
     );
-    assert_eq!(
-        acp::finish(false, StopReason::EndTurn),
-        StopReason::EndTurn
-    );
+    assert_eq!(acp::finish(false, StopReason::EndTurn), StopReason::EndTurn);
 }
 
 #[test]
@@ -180,7 +177,10 @@ fn cancel_after_a_turn_marks_cancelled() {
     let mut stop = None;
     for _ in 0..8 {
         let message = read_line(&mut reader);
-        if let Some(reason) = message.pointer("/result/stopReason").and_then(Value::as_str) {
+        if let Some(reason) = message
+            .pointer("/result/stopReason")
+            .and_then(Value::as_str)
+        {
             stop = Some(reason.to_owned());
             break;
         }
@@ -284,14 +284,10 @@ fn python_tool_cwd_matches_session_cwd_not_spawn_cwd() {
     let _restore = Restore(std::env::current_dir().unwrap());
     std::env::set_current_dir(spawn_home.path()).unwrap();
 
-    let executable = std::process::Command::new(if cfg!(windows) {
-        "python"
-    } else {
-        "python3"
-    })
-    .args(["-c", "import sys; print(sys.executable, end='')"])
-    .output()
-    .unwrap();
+    let executable = std::process::Command::new(if cfg!(windows) { "python" } else { "python3" })
+        .args(["-c", "import sys; print(sys.executable, end='')"])
+        .output()
+        .unwrap();
     assert!(executable.status.success());
     let executable = std::path::PathBuf::from(String::from_utf8(executable.stdout).unwrap());
     let environment = mei::doctor::Environment::new(
@@ -303,9 +299,7 @@ fn python_tool_cwd_matches_session_cwd_not_spawn_cwd() {
     mei::launch::bind_python_to_cwd(&mut python, &mut bound, &session, &environment).unwrap();
     assert_eq!(bound.as_ref(), Some(&session));
     let python = python.as_mut().unwrap();
-    let cwd = python
-        .run("import os\nprint(os.getcwd(), end='')")
-        .unwrap();
+    let cwd = python.run("import os\nprint(os.getcwd(), end='')").unwrap();
     assert_eq!(
         std::path::Path::new(cwd.as_str().unwrap())
             .canonicalize()
