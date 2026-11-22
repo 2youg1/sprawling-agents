@@ -436,7 +436,7 @@ fn composer_status_line_renders_across_the_install_width_matrix() {
                 composer: Composer {
                     typed: "",
                     cursor: 0,
-                    placeholder: "to Mei…",
+                    placeholder: "type a task…",
                     room: "Mei",
                     offer,
                 },
@@ -445,7 +445,15 @@ fn composer_status_line_renders_across_the_install_width_matrix() {
         });
         let (bytes, _) = drawn(&scene);
         let (shown, _) = screen(columns, 8, &[bytes]);
-        assert!(shown.contains("Mei"), "cols={columns}: {shown}");
+        let status = shown
+            .lines()
+            .rev()
+            .find(|row| !row.trim().is_empty())
+            .unwrap_or("");
+        assert!(
+            status.contains("Mei"),
+            "cols={columns} status missing room: {status:?}\n{shown}"
+        );
         for row in shown.lines() {
             assert!(
                 row.chars().count() <= usize::from(columns),
@@ -453,7 +461,10 @@ fn composer_status_line_renders_across_the_install_width_matrix() {
             );
         }
         if columns >= 80 {
-            assert!(shown.contains("Agent Step"), "cols={columns}: {shown}");
+            assert!(
+                status.contains("Agent Step"),
+                "cols={columns} status missing offer: {status:?}\n{shown}"
+            );
         }
     }
 }
