@@ -5,6 +5,7 @@ An existing agent can drive a served city through the CLI, any agent that speaks
 | Connection | Configuration owner | Authentication owner | Tools and models |
 |---|---|---|---|
 | External agent through ACP | The city's `[[agent]]` rows and the room's `[resident] harness` setting | The external agent's own login, run by its own program | The external agent chooses its provider and runs its tools |
+| Mei as an ACP agent | Paste or seat `mei --acp` as an `[[agent]]` row (same consent card as any other ACP agent) | Magpie / `ANTHROPIC_*` on the process, as headless Mei already uses | Mei's sole `python` tool and Magpie route; `mcpServers` from `session/new` are ignored |
 | MCP server | The city's `[[mcp]]` entries | The city's Vault for supplied credentials; the service for account consent | Tools discovered from that server, offered to native residents |
 | Existing agent driving the city | The CLI's wire frame or `dispatch` arguments | The key file on this machine, or city pairing from outside loopback | The city's ordinary commands, queries and run policy |
 
@@ -22,6 +23,8 @@ sprawling help dispatch
 ## Run any ACP agent as a resident
 
 The city is an ACP client: any agent that speaks ACP version 1 over stdio can be a resident, and the city starts it as a separate process. There are three ways in, and every one ends at the same consent card on the ACP page. In the CLI, `/acp` lists the same offers and `/acp <text>` shows what a pasted line parses to; adding is done on the page.
+
+Mei itself speaks that agent role when started as `mei --acp`: the city harness client (or another ACP client) opens `initialize` → `session/new` → `session/prompt` over stdio, and Mei runs its Magpie + python loop. Paste a launch whose command is the installed `mei` with argument `--acp`. This is not the HTTP `POST /acp` city admission route below.
 
 | Way in | What you do | What the city knows before you consent |
 |---|---|---|

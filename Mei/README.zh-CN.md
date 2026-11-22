@@ -4,7 +4,7 @@
 
 Archetype:Mei 是极简 Agent Harness：模型接收任务，通过唯一持久的 **python** 工具行动，看到每个小结果，再循环到最终答复。大输出或非 UTF-8 输出完整落盘，只返回提示和完整路径，或能无损还原非 Unicode 原生路径的 Python 表达式。本包是**无头**核心，Mei 本身不含终端壳。
 
-交互面是 [Calyx](../Calyx/)。`@sprawling/mei` 同时携带无头 `mei` 与 `calyx`；TTY 且无 `-p` 时进入 Calyx，`-p` 或管道仍走无头路径。脚本只使用无头路径。
+交互面是 [Calyx](../Calyx/)。`@sprawling/mei` 同时携带无头 `mei` 与 `calyx`；TTY 且无 `-p` 时进入 Calyx，`-p` 或管道仍走无头路径。脚本只使用无头路径。`mei --acp` 以 [Agent Client Protocol](https://agentclientprotocol.com/) version 1 的 agent 角色在 stdio 上应答，城 harness 或其他 ACP client 可像调用其它 ACP agent 一样调用 Mei；见 [integrations](../docs/integrations.md)。
 
 > **安全优先：** Mei 没有沙箱、权限提示或撤销。生成的 Python 可以读写文件、访问网络，并以当前账户权限运行命令。只用于一次性项目副本和单独、可撤销且有限额的 API key。不要提供私密数据、重要凭证或项目唯一副本。
 

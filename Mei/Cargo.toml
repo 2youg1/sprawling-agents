@@ -35,6 +35,10 @@ path = "test/workspace.rs"
 name = "capture"
 path = "test/capture.rs"
 
+[[test]]
+name = "acp"
+path = "test/acp.rs"
+
 [dependencies]
 serde_json.workspace = true
 
