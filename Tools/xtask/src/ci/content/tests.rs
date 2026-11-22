@@ -162,6 +162,10 @@ fn a_captured_bad_header_cannot_borrow_a_later_good_header() {
 const EXECUTABLE_BUSY_RETRIES: usize = 50;
 
 #[cfg(target_os = "linux")]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "test fixture re-executes its own verifier image (child D4)"
+)]
 fn execute_copy(
     executable: &std::path::Path,
     env: &str,
@@ -178,7 +182,7 @@ fn execute_copy(
                 if error.kind() == std::io::ErrorKind::ExecutableFileBusy
                     && attempts < EXECUTABLE_BUSY_RETRIES =>
             {
-                attempts += 1;
+                attempts = attempts.saturating_add(1);
                 std::thread::sleep(std::time::Duration::from_millis(20));
             }
             other => return other,
@@ -188,10 +192,6 @@ fn execute_copy(
 
 #[cfg(target_os = "linux")]
 #[test]
-#[expect(
-    clippy::disallowed_methods,
-    reason = "test fixture re-executes its own verifier image (child D4)"
-)]
 fn a_replaced_executable_path_does_not_replace_the_loaded_identity() {
     const CHILD: &str = "XTASK_CI_IMAGE_REPLACEMENT_TEST";
     if std::env::var_os(CHILD).is_some() {

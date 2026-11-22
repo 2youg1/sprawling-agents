@@ -277,6 +277,11 @@ fn python_raw_fstring_backslashes_preserve_expression_boundaries() {
     crate::root::fixture::write(&root, "tools/k/src/raw.py", source);
     assert_eq!(check(&root).unwrap().len(), 1);
     std::fs::remove_file(root.join("tools/k/src/raw.py")).unwrap();
+    let escaped = "value = rf\"\\\"\" # forbidden\n";
+    assert_eq!(lexer::measure(escaped, Language::Python).comment_lines, 1);
+    crate::root::fixture::write(&root, "tools/k/src/escaped.py", escaped);
+    assert_eq!(check(&root).unwrap().len(), 1);
+    std::fs::remove_file(root.join("tools/k/src/escaped.py")).unwrap();
     let data = r#"value = f"\N{LATIN SMALL LETTER A}"
 quoted = f"\""
 braces = f"{{# data}}"

@@ -103,6 +103,10 @@ impl Scanner<'_> {
         };
         if byte == b'\\' {
             if string.raw {
+                if self.bytes.get(index.saturating_add(1)) == Some(&string.quote) {
+                    let next = self.advance(index);
+                    return self.advance(next);
+                }
                 return self.advance(index);
             }
             if at(self.bytes, index, b"\\N{") {
