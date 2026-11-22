@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-
 import type { Answer, Call, CommitAnswer, Query, Turn } from "../../wire";
 import { Address, GitOid, RunId, Seq, TimeMs, Tokens, UsdMicros } from "../../wire";
 import { SEARCH } from "./configured";

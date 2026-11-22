@@ -6,7 +6,6 @@
 -->
 
 <script lang="ts" module>
-
   import type {
     Answer,
     BuildingAnswer,
