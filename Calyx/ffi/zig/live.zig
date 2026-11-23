@@ -11,6 +11,7 @@ const text = @import("text.zig");
 const format = @import("format.zig");
 const transcript = @import("transcript.zig");
 const flow = @import("flow.zig");
+const prose = @import("prose.zig");
 const Grid = @import("grid.zig").Grid;
 
 pub const Error = transcript.Error;
@@ -21,7 +22,18 @@ const fade = "╌╌╌┄┄┄";
 
 pub const menu_rows = 5;
 
+pub const TextWindow = struct {
+    skip: usize = 0,
+    rows: usize = std.math.maxInt(usize),
+};
+
+pub const TypedShape = struct { rows: usize, cursor: usize };
+
 pub fn region(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!Cursor {
+    return regionShown(p, r, grid, .{});
+}
+
+pub fn regionShown(p: *paint.Painter, r: *scene.Reader, grid: Grid, win: TextWindow) Error!Cursor {
     var cursor: Cursor = .{ .row = p.row, .column = grid.mark };
     var drew_status = false;
     while (!r.done()) {
@@ -35,7 +47,7 @@ pub fn region(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!Cursor {
             .Replying => try replying(p, r, grid),
             .Composer => {
                 if (drew_status) try p.end();
-                cursor = try composer(p, r, grid);
+                cursor = try composerShown(p, r, grid, win);
             },
             .Inline, .Quiet, .Banner, .You, .Head, .Reasoning, .Tool, .Reply, .Note, .Ended, .Resolved, .Menu => return error.Malformed,
         }
@@ -43,6 +55,38 @@ pub fn region(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!Cursor {
     }
     try p.close();
     return cursor;
+}
+
+pub fn typedShape(typed: []const u8, at: usize, columns: usize) TypedShape {
+    const limit = @max(columns, 2) - 1;
+    const left: usize = if (columns >= 60) 10 else 0;
+    const room = limit -| left;
+    if (typed.len == 0 or room == 0) return .{ .rows = 1, .cursor = 0 };
+    var row: usize = 0;
+    var col: usize = 0;
+    var cursor_row: usize = 0;
+    var index: usize = 0;
+    var byte: usize = 0;
+    while (byte < typed.len) {
+        if (index == at) cursor_row = row;
+        if (typed[byte] == '\n') {
+            row += 1;
+            col = 0;
+            byte += 1;
+            index += 1;
+            continue;
+        }
+        const c = text.char(typed, byte);
+        if (col > 0 and col + c.columns > room) {
+            row += 1;
+            col = 0;
+        }
+        col += c.columns;
+        byte += c.len;
+        index += 1;
+    }
+    if (index <= at) cursor_row = row;
+    return .{ .rows = row + 1, .cursor = cursor_row };
 }
 
 fn right(p: *paint.Painter, keys: []const Key) paint.Error!void {
@@ -131,7 +175,75 @@ fn asking(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
 
 fn replying(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const said = try r.text();
-    try flow.flow(p, std.mem.trim(u8, said, "\n"), .{ .left = grid.words, .measure = grid.measure(), .style = .plain, .marks = .prose });
+    try prose.blocks(p, std.mem.trim(u8, said, "\n"), .{ .left = grid.words, .measure = grid.measure(), .style = .plain, .marks = .prose });
+}
+
+fn showing(win: TextWindow, row: usize) bool {
+    return row >= win.skip and row - win.skip < win.rows;
+}
+
+fn composerShown(p: *paint.Painter, r: *scene.Reader, grid: Grid, win: TextWindow) Error!Cursor {
+    if (win.skip == 0 and win.rows == std.math.maxInt(usize)) return composer(p, r, grid);
+    const typed = try r.text();
+    const at = try r.word();
+    const placeholder = try r.text();
+    const room_name = try r.text();
+    const offer = try r.text();
+    const left = grid.mark;
+    const width = p.limit -| left;
+    try p.to(left);
+    var cursor: Cursor = .{ .row = p.row, .column = left };
+    var widest: usize = 0;
+    var text_row: usize = 0;
+    var col: usize = 0;
+    if (typed.len == 0) {
+        if (showing(win, 0)) try p.fit(.faint, placeholder, p.room());
+    } else {
+        var index: usize = 0;
+        var byte: usize = 0;
+        while (byte < typed.len) {
+            const visible = showing(win, text_row);
+            if (index == at and visible) cursor = .{ .row = p.row, .column = p.column };
+            if (typed[byte] == '\n') {
+                if (visible) {
+                    widest = @max(widest, col);
+                    try p.end();
+                }
+                text_row += 1;
+                col = 0;
+                if (showing(win, text_row)) try p.to(left);
+                byte += 1;
+                index += 1;
+                continue;
+            }
+            const c = text.char(typed, byte);
+            if (col > 0 and col + c.columns > width) {
+                if (visible) {
+                    widest = @max(widest, col);
+                    try p.end();
+                }
+                text_row += 1;
+                col = 0;
+                if (showing(win, text_row)) try p.to(left);
+            }
+            if (showing(win, text_row)) _ = try p.char(.plain, c);
+            col += c.columns;
+            byte += c.len;
+            index += 1;
+        }
+        if (index <= at and showing(win, text_row)) cursor = .{ .row = p.row, .column = p.column };
+        widest = @max(widest, col);
+    }
+    try p.end();
+    try underline(p, left, widest, if (typed.len > 0) .plain else .faint);
+    try p.end();
+    if (!r.done() and r.bytes[r.at] == @backingInt(part.Part.Menu)) {
+        _ = try r.tag();
+        try menu(p, r, left);
+    } else {
+        try statusRow(p, left, room_name, offer);
+    }
+    return cursor;
 }
 
 fn composer(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!Cursor {

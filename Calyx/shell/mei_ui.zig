@@ -19,6 +19,8 @@ const observation = @import("mei_observation.zig");
 const session_control = @import("mei_session_control.zig");
 const runtime = @import("mei_runtime.zig");
 const present = @import("mei_present.zig");
+const menu_mod = @import("menu.zig");
+const mei_view = @import("mei_view.zig");
 
 const replay_batch: usize = 64;
 
@@ -52,6 +54,18 @@ pub const Ui = struct {
     environ: *std.process.Environ.Map,
     editor: editor_mod.Editor,
     screen: screen_mod.Screen,
+    log: std.ArrayList(write.Entry) = .empty,
+    log_arena: std.heap.ArenaAllocator,
+    cards: std.ArrayList(mei_view.Card) = .empty,
+    focus: usize = 0,
+    menu: ?menu_mod.Menu = null,
+    hits: std.ArrayList(mei_view.Hit) = .empty,
+    columns: u16 = 0,
+    rows: u16 = 0,
+    phase: u2 = 0,
+    settle: u2 = 0,
+    settle_ms: u64 = 0,
+    hinted: bool = false,
     seen: observation.Seen,
     bus: mei_process.Bus,
     process: ?mei_process.Process = null,
@@ -72,9 +86,7 @@ pub const Ui = struct {
     quit: bool = false,
     mei_program: []u8,
     frame_arena: std.heap.ArenaAllocator,
-    queue_arena: std.heap.ArenaAllocator,
     cadence: present.Cadence = .{},
-    queued: std.ArrayList(write.Entry) = .empty,
 
     fn init(gpa: std.mem.Allocator, io: std.Io, environ: *std.process.Environ.Map, replay: ?[]const u8) !Ui {
         const model = environ.get("HARNESS_MODEL") orelse "auto";
@@ -139,7 +151,7 @@ pub const Ui = struct {
             .reporting = program_status.Reporting.deciding(environ.get("SPRAWLING_PROGRAM_STATUS")),
             .mei_program = mei_program,
             .frame_arena = .init(gpa),
-            .queue_arena = .init(gpa),
+            .log_arena = .init(gpa),
         };
     }
 
@@ -154,13 +166,17 @@ pub const Ui = struct {
         if (self.previous_session) |path| self.gpa.free(path);
         for (self.pending.items) |line| self.gpa.free(line);
         self.pending.deinit(self.gpa);
-        self.queued.deinit(self.gpa);
+        self.clearMenu();
+        self.freeCards();
+        self.cards.deinit(self.gpa);
+        self.hits.deinit(self.gpa);
+        self.log.deinit(self.gpa);
+        self.log_arena.deinit();
         self.bus.deinit();
         self.seen.deinit();
         self.editor.deinit();
         self.screen.deinit();
         self.frame_arena.deinit();
-        self.queue_arena.deinit();
         self.gpa.free(self.session_dir);
         self.gpa.free(self.mei_program);
         if (self.replay_file) |file| file.close(self.io);
@@ -169,14 +185,14 @@ pub const Ui = struct {
 
     fn loop(self: *Ui) u8 {
         if (self.screen.take() == .lost) return self.giveBack(1);
-        const gateway = self.environ.get("ANTHROPIC_BASE_URL") orelse "http://127.0.0.1:3425";
-        const address = if (std.mem.startsWith(u8, gateway, "http://")) gateway["http://".len..] else gateway;
-        const banner = [_]write.Entry{.{ .banner = .{ .city = self.session_dir, .address = address, .url = gateway } }};
-        self.drawn(self.screen.frameEntries(&banner, null, termio.size()));
+        self.openFace();
+        self.pushBanner();
+        _ = self.redraw();
         var stdin_buf: [4096]u8 = undefined;
         var stdin_filled: usize = 0;
         while (true) {
             if (self.lost) return self.giveBack(1);
+            self.tick();
             self.advanceReplay();
             runtime.drain(self);
             self.flushPresent(false);
@@ -191,12 +207,53 @@ pub const Ui = struct {
         }
     }
 
+    fn openFace(self: *Ui) void {
+        _ = self;
+        termio.enterAlternate() catch {};
+        termio.trackPointer() catch {};
+        termio.setTitle("mei") catch {};
+    }
+
+    fn releaseFace(self: *Ui) void {
+        termio.untrackPointer() catch {};
+        termio.plainKeyboard() catch {};
+        termio.setCursorStyle(.default) catch {};
+        termio.writeAll("\x1b[?25h") catch {};
+        termio.leaveAlternate() catch {};
+        termio.disableRaw() catch {};
+        self.screen.cut();
+    }
+
     fn pollTimeout(self: *const Ui) i32 {
         const at = nowNs(self.io);
         if (self.cadence.due(at, false)) return 0;
         if (self.cadence.dirty) return self.cadence.waitMs(at);
-        if (self.process != null or !self.replay_done) return 50;
+        if (self.settle == 2) {
+            const clock = nowMs(self.io);
+            if (clock >= self.settle_ms) return 0;
+            return @intCast(@min(self.settle_ms - clock, 1000));
+        }
+        if (self.process != null or !self.replay_done or self.seen.since != null or self.seen.calling) return 50;
+        if (!termio.resizeArmed()) return 1000;
         return -1;
+    }
+
+    fn tick(self: *Ui) void {
+        if (!termio.resizeArmed()) {
+            const size = termio.size();
+            if (size.columns != self.columns or size.rows != self.rows) self.noteResize();
+        }
+        if (self.settle == 2 and self.now() >= self.settle_ms) {
+            self.settle = 0;
+            self.touch(true);
+        }
+        if (self.seen.since != null or self.seen.calling) {
+            const phase: u2 = @intCast((self.now() / 160) % 4);
+            if (phase != self.phase) {
+                self.phase = phase;
+                self.touch(true);
+            }
+        }
     }
 
     fn handleEvent(self: *Ui, event: termio.Event) ?u8 {
@@ -204,9 +261,10 @@ pub const Ui = struct {
             .key => |key| return self.onKey(key),
             .paste => |pasted| {
                 self.editor.paste(pasted) catch {};
+                self.refilter();
                 self.touch(true);
             },
-            .resize => self.touch(true),
+            .resize => self.noteResize(),
             .lost => {
                 self.lost = true;
                 runtime.stop(self);
@@ -216,17 +274,105 @@ pub const Ui = struct {
     }
 
     fn onKey(self: *Ui, key: termio.Key) ?u8 {
-        if (key.modifiers.control) return null;
+        if (self.clicked(key)) return null;
+        if (key.modifiers.control) {
+            if (key.code == .char and key.code.char == 'o') {
+                self.cycleFocused();
+                self.touch(true);
+            } else if (key.code == .char and key.code.char == 'c' and !self.hinted) {
+                self.hinted = true;
+                self.printNote("Esc stops the run; /quit leaves");
+            }
+            return null;
+        }
+        if (key.modifiers.alt and (key.code == .up or key.code == .down)) {
+            self.moveFocus(if (key.code == .up) -1 else 1);
+            return null;
+        }
+        if (self.menu != null and self.menuKey(key)) return if (self.quit) 0 else null;
         if (key.code == .enter and !key.modifiers.shift) {
             self.enter();
             return if (self.quit) 0 else null;
         }
         if (key.code == .esc) return self.escape();
+        if (key.code == .tab or key.code == .back_tab) {
+            self.refilter();
+            self.touch(true);
+            return null;
+        }
+        if (key.code == .up or key.code == .down) {
+            const text = self.editor.text.items;
+            const cursor = self.editor.cursorAt();
+            const first = std.mem.indexOfScalar(u21, text[0..@min(cursor, text.len)], '\n') == null;
+            const edit = historyMove(cursor, text.len, self.editor.recalled != null, first, key.code == .up);
+            self.editor.apply(edit) catch {};
+            self.refilter();
+            self.touch(true);
+            return null;
+        }
         if (editing(key)) |edit| {
             self.editor.apply(edit) catch {};
+            self.refilter();
             self.touch(true);
         }
         return null;
+    }
+
+    fn clicked(self: *Ui, key: termio.Key) bool {
+        if (key.code != .click) return false;
+        const click = key.code.click;
+        if (click.release or (click.button & 3) != 0 or click.button >= 64 or click.row == 0) return true;
+        const row = click.row - 1;
+        for (self.hits.items) |hit| {
+            if (row >= hit.row and row < hit.end and hit.card < self.cards.items.len) {
+                self.focus = hit.card;
+                self.cards.items[hit.card].cycle();
+                self.touch(true);
+                break;
+            }
+        }
+        return true;
+    }
+
+    fn menuKey(self: *Ui, key: termio.Key) bool {
+        const menu = &self.menu.?;
+        if (key.code == .tab or key.code == .down) {
+            menu.next();
+        } else if (key.code == .back_tab or key.code == .up) {
+            menu.previous();
+        } else if (key.code == .esc) {
+            self.clearMenu();
+        } else if (key.code == .enter) {
+            const fit = menu.chosenFit() orelse return false;
+            const line = self.gpa.dupe(u8, fit.line) catch return false;
+            defer self.gpa.free(line);
+            const then = fit.then;
+            self.editor.set(line) catch {};
+            self.clearMenu();
+            if (then == .carry) self.enter();
+        } else return false;
+        self.touch(true);
+        return true;
+    }
+
+    fn refilter(self: *Ui) void {
+        const typed = self.editor.textOwned() catch return;
+        defer self.gpa.free(typed);
+        const chosen = if (self.menu) |menu| menu.chosen else 0;
+        self.clearMenu();
+        if (!mei_view.wantsMenu(typed)) return;
+        const fits = mei_view.commands(self.gpa, typed) catch return;
+        self.menu = menu_mod.Menu.of(fits);
+        if (self.menu) |*menu| {
+            if (chosen < menu.fits.len) menu.chosen = chosen;
+        }
+    }
+
+    fn clearMenu(self: *Ui) void {
+        if (self.menu) |*menu| {
+            menu_mod.freeVerbs(self.gpa, menu.fits);
+            self.menu = null;
+        }
     }
 
     fn escape(self: *Ui) ?u8 {
@@ -250,26 +396,33 @@ pub const Ui = struct {
             return;
         };
         defer self.gpa.free(typed);
-        if (std.mem.trim(u8, typed, &std.ascii.whitespace).len == 0) return;
+        self.clearMenu();
+        if (std.mem.trim(u8, typed, &std.ascii.whitespace).len == 0) {
+            self.touch(true);
+            return;
+        }
         const at = self.now();
+        switch (session_control.dispatch(self, typed)) {
+            .handled => self.showYou(typed, at),
+            .quit => self.quit = true,
+            .steer => {
+                self.showYou(typed, at);
+                runtime.steer(self, typed);
+            },
+            .task => {
+                if (self.session == null and !session_control.createSession(self)) return;
+                self.showYou(typed, at);
+                runtime.submit(self, typed, at);
+            },
+        }
+    }
+
+    fn showYou(self: *Ui, typed: []const u8, at: u64) void {
+        self.seen.suppressEcho(typed);
         const arena = self.frame_arena.allocator();
         const you = arena.alloc(write.Entry, 1) catch return;
         you[0] = .{ .you = .{ .at = observation.tod(at), .said = arena.dupe(u8, typed) catch typed } };
         self.print(you);
-        switch (session_control.dispatch(self, typed)) {
-            .handled => return,
-            .quit => {
-                self.quit = true;
-                return;
-            },
-            .steer => {
-                runtime.steer(self, typed);
-                return;
-            },
-            .task => {},
-        }
-        if (self.session == null and !session_control.createSession(self)) return;
-        runtime.submit(self, typed, at);
     }
 
     pub fn now(self: *Ui) u64 {
@@ -317,40 +470,86 @@ pub const Ui = struct {
 
     pub fn print(self: *Ui, entries: []const write.Entry) void {
         if (entries.len > 0) {
-            if (!self.enqueueOwned(entries)) {
-                self.cadence.mark();
-                self.flushPresent(true);
-                if (!self.enqueueOwned(entries)) {
-                    self.redraw(entries);
-                    if (self.queued.items.len == 0) {
-                        _ = self.queue_arena.reset(.retain_capacity);
-                    }
-                    _ = self.frame_arena.reset(.retain_capacity);
-                    self.cadence.mark();
-                    self.cadence.presented(nowNs(self.io));
-                    return;
-                }
-            }
+            self.absorb(entries);
             _ = self.frame_arena.reset(.retain_capacity);
         }
         self.cadence.mark();
         self.flushPresent(false);
     }
 
-    fn enqueueOwned(self: *Ui, entries: []const write.Entry) bool {
-        const start = self.queued.items.len;
-        const q = self.queue_arena.allocator();
-        for (entries) |entry| {
-            const owned = present.cloneEntry(q, entry) catch {
-                self.queued.shrinkRetainingCapacity(start);
-                return false;
-            };
-            self.queued.append(self.gpa, owned) catch {
-                self.queued.shrinkRetainingCapacity(start);
-                return false;
-            };
+    pub fn clearConversation(self: *Ui) void {
+        self.freeLog();
+        self.freeCards();
+        self.focus = 0;
+        self.hits.clearRetainingCapacity();
+        self.pushBanner();
+    }
+
+    fn pushBanner(self: *Ui) void {
+        const gateway = self.environ.get("ANTHROPIC_BASE_URL") orelse "http://127.0.0.1:3425";
+        const address = if (std.mem.startsWith(u8, gateway, "http://"))
+            gateway["http://".len..]
+        else if (std.mem.startsWith(u8, gateway, "https://"))
+            gateway["https://".len..]
+        else
+            gateway;
+        const banner = [_]write.Entry{.{ .banner = .{ .city = self.session_dir, .address = address, .url = gateway } }};
+        self.absorb(&banner);
+    }
+
+    fn absorb(self: *Ui, entries: []const write.Entry) void {
+        const bodies = self.seen.takeBodies() catch return;
+        const allocated = bodies.len > 0;
+        var next: usize = 0;
+        defer {
+            while (next < bodies.len) : (next += 1) {
+                self.gpa.free(bodies[next].code);
+                self.gpa.free(bodies[next].output);
+            }
+            if (allocated) self.gpa.free(bodies);
         }
-        return true;
+        const before = self.cards.items.len;
+        for (entries) |entry| {
+            const paired = entry == .tool and std.mem.eql(u8, entry.tool.name, "python") and next < bodies.len;
+            if (paired) self.cards.ensureUnusedCapacity(self.gpa, 1) catch return;
+            const owned = present.cloneEntry(self.log_arena.allocator(), entry) catch return;
+            self.log.append(self.gpa, owned) catch return;
+            if (paired) {
+                self.cards.appendAssumeCapacity(.{
+                    .code = bodies[next].code,
+                    .output = bodies[next].output,
+                });
+                next += 1;
+            }
+        }
+        if (self.cards.items.len > before) self.focus = self.cards.items.len - 1;
+    }
+
+    fn freeLog(self: *Ui) void {
+        self.log.clearRetainingCapacity();
+        _ = self.log_arena.reset(.retain_capacity);
+    }
+
+    fn freeCards(self: *Ui) void {
+        for (self.cards.items) |card| {
+            self.gpa.free(card.code);
+            self.gpa.free(card.output);
+        }
+        self.cards.clearRetainingCapacity();
+    }
+
+    fn cycleFocused(self: *Ui) void {
+        if (self.cards.items.len == 0) return;
+        if (self.focus >= self.cards.items.len) self.focus = self.cards.items.len - 1;
+        self.cards.items[self.focus].cycle();
+    }
+
+    fn moveFocus(self: *Ui, delta: i2) void {
+        if (self.cards.items.len == 0) return;
+        if (delta < 0) {
+            self.focus = if (self.focus == 0) self.cards.items.len - 1 else self.focus - 1;
+        } else self.focus = (self.focus + 1) % self.cards.items.len;
+        self.touch(true);
     }
 
     pub fn touch(self: *Ui, force: bool) void {
@@ -361,37 +560,101 @@ pub const Ui = struct {
     pub fn flushPresent(self: *Ui, force: bool) void {
         const at = nowNs(self.io);
         if (!self.cadence.due(at, force)) return;
-        self.redraw(self.queued.items);
-        self.queued.clearRetainingCapacity();
-        _ = self.queue_arena.reset(.retain_capacity);
+        if (!self.redraw()) return;
         self.cadence.presented(at);
     }
 
-    fn redraw(self: *Ui, entries: []const write.Entry) void {
-        const typed = self.editor.textOwned() catch return;
+    fn noteResize(self: *Ui) void {
+        const size = termio.size();
+        const dw = if (size.columns > self.columns) size.columns - self.columns else self.columns - size.columns;
+        const dh = if (size.rows > self.rows) size.rows - self.rows else self.rows - size.rows;
+        const room = size.columns >= 40 and size.rows >= 12;
+        if (self.columns != 0 and room and (dw >= 2 or dh >= 2)) self.settle = 1;
+        self.touch(true);
+    }
+
+    fn redraw(self: *Ui) bool {
+        const size = termio.size();
+        const dim = self.settle == 1;
+        if (self.settle == 1) {
+            self.settle = 2;
+            self.settle_ms = self.now() + 80;
+        }
+        const typed = self.editor.textOwned() catch return false;
         defer self.gpa.free(typed);
         var offer_buf: [512]u8 = undefined;
         const offer = self.seen.offer(&offer_buf);
-        const working: ?write.Working = if (self.seen.since) |since| .{ .resident = "Mei", .since = observation.tod(since) } else null;
+        const resident: []const u8 = switch (self.phase) {
+            0 => "Mei",
+            1 => "Mei ·",
+            2 => "Mei ··",
+            3 => "Mei ···",
+        };
+        const working: ?write.Working = if (self.seen.since) |since| .{ .resident = resident, .since = observation.tod(since) } else null;
+        const running: []const u8 = switch (self.phase) {
+            0 => "running",
+            1 => "running ·",
+            2 => "running ··",
+            3 => "running ···",
+        };
         var calling_buf: [1]write.Calling = undefined;
         const calling: []const write.Calling = if (self.seen.calling) blk: {
-            calling_buf[0] = .{ .name = "python", .subject = "工具波执行中" };
+            calling_buf[0] = .{ .name = "python", .subject = running };
             break :blk calling_buf[0..1];
         } else &.{};
-        const draft = self.seen.draftText();
+        var menu_buf: [5]menu_mod.Choice = undefined;
+        var menu_choices: [5]write.Choice = undefined;
+        const menu_live: ?write.Menu = if (self.menu) |*menu| blk: {
+            const win = menu.window(&menu_buf);
+            const shown = win[0];
+            var i: usize = 0;
+            while (i < shown.len and i < menu_choices.len) : (i += 1) {
+                menu_choices[i] = .{
+                    .spelling = shown[i].spelling,
+                    .takes = shown[i].takes,
+                    .summary = shown[i].summary,
+                };
+            }
+            break :blk .{ .shown = menu_choices[0..shown.len], .chosen = win[1], .more = win[2] };
+        } else null;
+        const placeholder: []const u8 = if (self.replay_path != null)
+            "replay; /q exits"
+        else if (self.process != null)
+            "steer…   esc stops"
+        else
+            "to Mei…   / commands · ctrl-o tool";
         const live: write.Live = .{
             .working = working,
             .calling = calling,
-            .replying = if (draft.len > 0) draft else null,
             .composer = .{
                 .typed = typed,
                 .cursor = self.editor.cursorAt(),
-                .placeholder = if (self.replay_path != null) "replay; /q exits" else "to Mei…",
+                .placeholder = placeholder,
                 .room = "Mei",
                 .offer = offer,
             },
+            .menu = menu_live,
         };
-        self.drawn(self.screen.frameEntries(entries, live, termio.size()));
+        const bytes = mei_view.render(
+            self.gpa,
+            self.log.items,
+            self.cards.items,
+            self.focus,
+            self.seen.draftText(),
+            live,
+            size.columns,
+            size.rows,
+            dim,
+            &self.hits,
+        ) catch return false;
+        defer self.gpa.free(bytes);
+        termio.writeAll(bytes) catch {
+            self.lost = true;
+            return false;
+        };
+        self.columns = size.columns;
+        self.rows = size.rows;
+        return true;
     }
 
     fn drawn(self: *Ui, written: screen_mod.Written) void {
@@ -431,10 +694,18 @@ pub const Ui = struct {
         }
         self.flushPresent(true);
         self.status(.closed);
-        self.drawn(self.screen.giveBack());
+        self.releaseFace();
         return code;
     }
 };
+
+fn historyMove(cursor: usize, len: usize, recalled: bool, first: bool, up: bool) editor_mod.Edit {
+    if (up) {
+        if (recalled and first) return .older;
+        return if (cursor == 0) .older else .line_up;
+    }
+    return if (recalled or cursor == len) .newer else .line_down;
+}
 
 const EscEffect = enum { clear_draft, stop_run, idle };
 
@@ -455,8 +726,6 @@ fn editing(key: termio.Key) ?editor_mod.Edit {
         .right => if (alt) .word_right else .right,
         .home => .home,
         .end => .end,
-        .up => .older,
-        .down => .newer,
         else => null,
     };
 }
@@ -475,6 +744,16 @@ fn nowNs(io: std.Io) u64 {
     const timestamp = std.Io.Clock.real.now(io);
     const nanoseconds = timestamp.toNanoseconds();
     return if (nanoseconds < 0) 0 else @intCast(nanoseconds);
+}
+
+test "mei moves within a line until the cursor is at its end" {
+    try std.testing.expectEqual(editor_mod.Edit.line_up, historyMove(3, 8, false, true, true));
+    try std.testing.expectEqual(editor_mod.Edit.older, historyMove(0, 8, false, true, true));
+    try std.testing.expectEqual(editor_mod.Edit.line_down, historyMove(3, 8, false, false, false));
+    try std.testing.expectEqual(editor_mod.Edit.newer, historyMove(8, 8, false, false, false));
+    try std.testing.expectEqual(editor_mod.Edit.newer, historyMove(2, 8, true, false, false));
+    try std.testing.expectEqual(editor_mod.Edit.older, historyMove(4, 4, true, true, true));
+    try std.testing.expectEqual(editor_mod.Edit.line_up, historyMove(6, 10, true, false, true));
 }
 
 test "idle Esc neither clears a draft nor stops a run" {

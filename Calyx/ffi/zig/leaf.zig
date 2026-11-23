@@ -7,6 +7,8 @@ const std = @import("std");
 pub const part = @import("part.zig");
 pub const write = @import("write.zig");
 pub const scene = @import("scene.zig");
+pub const text = @import("text.zig");
+pub const viewport = @import("viewport.zig");
 const frame = @import("frame.zig");
 const quiet = @import("quiet.zig");
 
@@ -48,6 +50,8 @@ test {
     _ = @import("format.zig");
     _ = @import("transcript.zig");
     _ = @import("live.zig");
+    _ = @import("viewport.zig");
+    _ = @import("prose.zig");
 }
 
 test "hostile scene bytes never trap the draw export" {

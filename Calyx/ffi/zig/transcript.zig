@@ -9,6 +9,7 @@ const scene = @import("scene.zig");
 const paint = @import("paint.zig");
 const format = @import("format.zig");
 const flow = @import("flow.zig");
+const prose = @import("prose.zig");
 const text = @import("text.zig");
 const Grid = @import("grid.zig").Grid;
 
@@ -49,17 +50,22 @@ pub fn lead(p: *paint.Painter, grid: Grid, seconds: u32, mark: []const u8, style
 }
 
 fn banner(p: *paint.Painter, r: *scene.Reader) Error!void {
+    try bannerChoice(p, r, true);
+}
+
+pub fn bannerChoice(p: *paint.Painter, r: *scene.Reader, web: bool) Error!void {
     const city = try r.text();
     const address = try r.text();
     const url = try r.text();
     const instruction = "  Type ";
     const command = "/web";
     const action = " to open the WebUI";
+    const hint = instruction.len + command.len + action.len;
     try p.fit(.bold, "sprawling", 9);
     try p.to(11);
     const room = p.room() -| (text.width(city) + 2);
-    const right = text.width(address) + instruction.len + command.len + action.len;
-    const shown_hint = room >= right;
+    const right = text.width(address) + hint;
+    const shown_hint = web and room >= right;
     const shown_address = room >= text.width(address);
     try p.fit(.faint, city, p.room());
     if (!shown_address) return;
@@ -131,7 +137,7 @@ fn tool(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
 
 fn reply(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const said = try r.text();
-    try flow.flow(p, std.mem.trim(u8, said, "\n"), .{ .left = grid.words, .measure = grid.measure(), .style = .plain, .marks = .prose });
+    try prose.blocks(p, std.mem.trim(u8, said, "\n"), .{ .left = grid.words, .measure = grid.measure(), .style = .plain, .marks = .prose });
 }
 
 fn note(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {

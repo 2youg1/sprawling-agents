@@ -69,6 +69,7 @@ pub fn createSession(ui: anytype) bool {
             ui.pending.clearRetainingCapacity();
             ui.session = session;
             ui.seen.reset();
+            ui.clearConversation();
             var buf: [512]u8 = undefined;
             const msg = std.fmt.bufPrint(&buf, "new Mei session: {s}", .{session.pathSlice()}) catch "new Mei session";
             ui.printNote(msg);
@@ -107,6 +108,7 @@ fn resumeSession(ui: anytype, path_in: []const u8, arg: ResumeArg) void {
             for (ui.pending.items) |line| ui.gpa.free(line);
             ui.pending.clearRetainingCapacity();
             ui.seen.reset();
+            ui.clearConversation();
             _ = ui.frame_arena.reset(.retain_capacity);
             const arena = ui.frame_arena.allocator();
             var entries: std.ArrayList(write.Entry) = .empty;
@@ -185,6 +187,10 @@ const Fake = struct {
     fn touch(self: *Fake, force: bool) void {
         _ = self;
         _ = force;
+    }
+
+    fn clearConversation(self: *Fake) void {
+        _ = self;
     }
 
     fn now(self: *Fake) u64 {
