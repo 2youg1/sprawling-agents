@@ -20,6 +20,19 @@ release notes and their commits.
 
 ---
 
+## 0.17.2
+
+**sprawling 0.17.2**
+
+The workspace manifest carries 0.17.2. Cutting it on 2026-11-24 (UTC+8) makes `v0.17.2-261124`. This release corrects Windows console input handling in Mei and the cursor state used when the command menu replaces its draft. The wire stays at 80, `EVENT_LOG_V` stays 2, and the configuration formats stay at format 1.
+
+### Mei and Calyx
+
+- **Windows input follows the console-record backend.** Raw mode disables Quick Edit and virtual-terminal input, enables extended, mouse and window flags, and uses native input records for keys, clicks and resize events. The backend no longer requests Kitty keyboard, bracketed paste or SGR mouse protocols.
+- **Replacing an editor draft resets its cursor.** Opening a command-menu choice no longer reuses a stale cursor and can complete `/quit` without panicking.
+
+---
+
 ## 0.17.1
 
 **sprawling 0.17.1**
