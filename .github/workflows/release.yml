@@ -698,11 +698,33 @@ jobs:
           # Its own two conditions hold: this repository is public, and
           # `xtask channel` writes `repository` into every package it
           # assembles rather than only into the root.
+          # A tag re-cut, or a channel that stopped mid-loop, finds some
+          # versions already on the registry (or staged under the same
+          # semver). Those are left alone rather than failing the job, so
+          # a rerun can finish roots and crates.io after the platforms.
+          publish_one() {
+            local dir="$1"
+            local out
+            set +e
+            out=$(npm publish "$dir" --access public --tag latest --provenance 2>&1)
+            local status=$?
+            set -e
+            printf '%s\n' "$out"
+            if [ "${status}" -eq 0 ]; then
+              return 0
+            fi
+            if printf '%s\n' "$out" | grep -Eq \
+              'previously published versions|previously staged version|cannot publish over the previously'; then
+              echo "already present on npm; continuing"
+              return 0
+            fi
+            return "${status}"
+          }
           for dir in target/npm/@sprawling/sprawling-*/ target/npm/@sprawling/mei-*/; do
-            npm publish "$dir" --access public --tag latest --provenance
+            publish_one "$dir"
           done
-          npm publish target/npm/sprawling --access public --tag latest --provenance
-          npm publish target/npm/@sprawling/mei --access public --tag latest --provenance
+          publish_one target/npm/sprawling
+          publish_one target/npm/@sprawling/mei
 
   system-channels:
     if: *tag-publication
