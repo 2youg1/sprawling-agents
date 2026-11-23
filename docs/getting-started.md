@@ -178,7 +178,7 @@ The standalone release binary needs no JavaScript runtime and no database. The n
 
 ## 1 Install
 
-This guide describes sprawling <!-- xtask:begin workspace_version -->0.17.1<!-- xtask:end -->. The three version components name maturity, the whole-repository release and an individual package release, in that order. Data formats, configuration, the wire and the interface may still change between versions; keep a restorable backup before updating. Each command below installs the version its channel offers now, which may differ from the source version described here.
+This guide describes sprawling <!-- xtask:begin workspace_version -->0.17.2<!-- xtask:end -->. The three version components name maturity, the whole-repository release and an individual package release, in that order. Data formats, configuration, the wire and the interface may still change between versions; keep a restorable backup before updating. Each command below installs the version its channel offers now, which may differ from the source version described here.
 
 Choose one channel:
 

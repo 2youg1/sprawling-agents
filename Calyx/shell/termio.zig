@@ -77,6 +77,8 @@ const ENABLE_PROCESSED_INPUT: u32 = 0x0001;
 const ENABLE_LINE_INPUT: u32 = 0x0002;
 const ENABLE_ECHO_INPUT: u32 = 0x0004;
 const ENABLE_WINDOW_INPUT: u32 = 0x0008;
+const ENABLE_QUICK_EDIT_MODE: u32 = 0x0040;
+const ENABLE_EXTENDED_FLAGS: u32 = 0x0080;
 const ENABLE_VIRTUAL_TERMINAL_INPUT: u32 = 0x0200;
 const ENABLE_VIRTUAL_TERMINAL_PROCESSING: u32 = 0x0004;
 const ENABLE_MOUSE_INPUT: u32 = 0x0010;
@@ -101,8 +103,8 @@ fn activeInputBackend() InputBackend {
 }
 
 fn windowsRawInputMode(mode: u32) u32 {
-    return (mode & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT)) |
-        ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
+    return (mode & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_QUICK_EDIT_MODE | ENABLE_VIRTUAL_TERMINAL_INPUT)) |
+        ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT | ENABLE_EXTENDED_FLAGS;
 }
 
 pub fn enableRaw() Error!void {
@@ -918,8 +920,10 @@ test "Windows input records do not negotiate VT key, paste, or pointer streams" 
 }
 
 test "Windows raw input mode reads native window and mouse records" {
-    const original = ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT;
-    try std.testing.expectEqual(ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT, windowsRawInputMode(original));
+    const original = ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_QUICK_EDIT_MODE | 0x0020;
+    const mode = windowsRawInputMode(original);
+    try std.testing.expectEqual(0x0020 | ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT | ENABLE_EXTENDED_FLAGS, mode);
+    try std.testing.expectEqual(@as(u32, 0), mode & ENABLE_QUICK_EDIT_MODE);
 }
 
 test "a discarded sgr tail stops at its terminator" {
