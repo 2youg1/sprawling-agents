@@ -23,3 +23,24 @@ fn pwsh_is_handed_to_a_run_only_at_major_seven_or_later() {
         None
     );
 }
+
+#[test]
+fn python_is_handed_to_a_run_only_at_major_three() {
+    use crate::doctor::host::three_only;
+    use crate::doctor::{Presence, Version};
+    let at = std::path::PathBuf::from("python");
+    let said = |text: &str| Presence::Present {
+        at: at.clone(),
+        version: Version::Said(text.to_owned()),
+    };
+    assert_eq!(three_only(&said("Python 3.12.1")), Some(at.clone()));
+    assert_eq!(three_only(&said("Python 3.14.0")), Some(at.clone()));
+    assert_eq!(three_only(&said("Python 2.7.18")), None);
+    assert_eq!(
+        three_only(&Presence::Present {
+            at: at.clone(),
+            version: Version::Silent,
+        }),
+        None
+    );
+}

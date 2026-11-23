@@ -80,7 +80,7 @@ pub(crate) fn chromedriver() -> Presence {
 }
 
 pub fn usable_python() -> Option<PathBuf> {
-    usable_path(&look(PYTHON))
+    three_only(&look(PYTHON)).and_then(as_absolute)
 }
 
 pub(crate) fn shell() -> Presence {
@@ -92,7 +92,7 @@ pub(crate) fn pwsh() -> Presence {
 }
 
 pub(crate) fn usable_pwsh() -> Option<PathBuf> {
-    seven_or_later(&pwsh())
+    seven_or_later(&pwsh()).and_then(as_absolute)
 }
 
 pub(super) fn seven_or_later(presence: &Presence) -> Option<PathBuf> {
@@ -107,6 +107,18 @@ pub(super) fn seven_or_later(presence: &Presence) -> Option<PathBuf> {
     (major >= 7).then(|| at.clone())
 }
 
+pub(super) fn three_only(presence: &Presence) -> Option<PathBuf> {
+    let Presence::Present { at, version } = presence else {
+        return None;
+    };
+    let major = version
+        .number()
+        .split('.')
+        .next()
+        .and_then(|major| major.parse::<u32>().ok())?;
+    (major == 3).then(|| at.clone())
+}
+
 pub(crate) fn usable_shell() -> Option<PathBuf> {
     usable_path(&shell())
 }
@@ -115,7 +127,11 @@ fn usable_path(presence: &Presence) -> Option<PathBuf> {
     if !presence.usable() {
         return None;
     }
-    presence.at().map(Path::to_path_buf)
+    presence.at().map(Path::to_path_buf).and_then(as_absolute)
+}
+
+fn as_absolute(at: PathBuf) -> Option<PathBuf> {
+    std::path::absolute(at).ok()
 }
 
 fn look(name: &str) -> Presence {

@@ -164,10 +164,10 @@ pub(crate) enum Detection {
 // bin::doctor::host（形状 4 adapter）：二进制里其他模块问运行中的机器的那一扇门
 pub(crate) fn firefox() -> Presence;        // Gecko 族里运行中的机器有的那个牌子（§8-57）
 pub(crate) fn chromedriver() -> Presence;   // chromedriver 或 msedgedriver，先答上来的那个
-pub fn usable_python() -> Option<PathBuf>;           // 生产 exec 与 citysim 的宿主 Python 共用同一选择门
+pub fn usable_python() -> Option<PathBuf>;           // 仅主版本为 3 的宿主解释器；交出绝对路径（D83）
 pub(crate) fn shell() -> Presence;
 pub(crate) fn pwsh() -> Presence;              // 表里的 `pwsh` 行（runtime D30）
-pub(crate) fn usable_pwsh() -> Option<PathBuf>; // 只在 `pwsh --version` 读出的主版本不小于 7 时
+pub(crate) fn usable_pwsh() -> Option<PathBuf>; // 主版本不小于 7 时交出绝对路径（D83）
 pub(crate) fn components_dir() -> Option<PathBuf>;                                 // ~/.sprawling/components
 
 // accounting::worker::workbench::engine（仍是 adapter，但不再自己探测）
@@ -180,6 +180,7 @@ pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Res
 
 - **谁问谁**：`workbench::engine::machine_half` 问 `doctor::host` 两次（宿主 Python、shell），它自己只留一条判定——shell 只在冻结配置说 `shell = true` 时才递给 bench，问的是 `shell` 还是 `pwsh` 由冻结配置的 `interpreter` 定（`Sprawling/runtime/Spec.lean` §8-13-2 D30）；解释器缺席不拦派活（python 臂在被调用时才拒）。`browser_bidi::lazy::start` 不再按名字盲起，改为 `Engine::choose(&host::firefox(), &host::chromedriver())` 后按路径起。accounting 的 mcp 模块里的 `PYTHON_WASM_ENV` 删除。
 - **`SPRAWLING_PYTHON` 只拼一次**：拼写唯一处是 `doctor::table::PYTHON_VARIABLE`。**选的是「变量优先、PATH 次回」**：设了变量就只信那一处（绝对路径或不在 PATH 上的名字）；空变量与未设一样走 `PATH` 上的 `python3`／`python`。不读组件目录；wasip1 guest 与内容 pin 已退役。
+- **交给 exec 的路径是绝对路径，且 Python 只认主版本 3**（D83）：`usable_python`／`usable_shell`／`usable_pwsh` 在交出前经 `std::path::absolute` 定到启动目录，不经 `canonicalize`（不解符号链接）。`usable_python` 另要求 `Version::Said` 且 `number` 的主版本为 3；Python 2、`Silent` 与其它无法确认主版本为 3 的情况答 `None`，与表行「Python 3」一致。
 - **`Broken` 是第三态，不是 `Absent` 的别名**：一个在 PATH 上却起不来的二进制（权限、坏文件、架构不符）、一个读不了的路径（权限），对 verdict 都算缺，但每一个都带着自己的原因进报告行——**绝不以「absent」一词吞掉一个可以说清的故障**。`Version` 的四态同理：说了、没说、说的不是文本、超时没说；后三者仍算 Present（§8-166 已定：不说话的工具仍是装了的工具）。
 - **本二进制起的每个子进程都由 `doctor::running::stop` 结束**：`ask_version` 读到第一行后杀掉子进程，用的是安装程序超时后走的同一段——杀不掉或收不了尸都不是可以丢掉的 `Result`，而是一句带进 `Fault::Unreadable` 的话，于是「本城起了一个它停不掉的进程」这件事排在它印出的版本号之前给人看。`Fault::Unreadable` 因此是「这台电脑不让本城把这一项做完」的那一态，它携带的那句话就是全部解释，`describe` 原样印出。
 - **`ffmpeg` 进表但 doctor 管不到 `Sprawling/desktop/`**：`Sprawling/desktop/` 跑在 `sprawling desktop` 这个子进程里，它在录制时按名字起 `ffmpeg`，与 doctor 的 `on_search_path` 走同一条 PATH，两个答案因此一致而非因此合一。doctor 报它（Optional，Use 层），`Sprawling/desktop/` 不改——这是这里的边界，如实记。桌面 server 本身不进表：它是本二进制的一个动词（§8-4d），没有要装的东西。
@@ -195,7 +196,7 @@ pub(crate) fn Engine::choose(firefox: &Presence, chromedriver: &Presence) -> Res
 | 变量设了却指向不存在的文件 | `Absent(VariableNamesNothing)` | `absent: SPRAWLING_PYTHON names <path>, which is not there` |
 | `--install` 的网络超时 | 包管理器自己的退出码 → `E_TOOL_UNAVAILABLE`，recovery「run the printed line yourself」 | doctor 自己不上网、不重试、不静默 |
 
-**本章测试**：`the_python_variable_is_spelled_once`；`a_program_that_will_not_start_is_broken_not_absent`（临时目录里放一个不是可执行文件的 `broken.exe`／`broken`）；`a_variable_that_names_nothing_is_said_so`；`a_present_tool_that_says_nothing_is_still_present`；`a_broken_firefox_is_refused_by_its_fault_not_as_absent`（`Engine::choose`）。
+**本章测试**：`the_python_variable_is_spelled_once`；`python_is_handed_to_a_run_only_at_major_three`；`pwsh_is_handed_to_a_run_only_at_major_seven_or_later`；`a_program_that_will_not_start_is_broken_not_absent`（临时目录里放一个不是可执行文件的 `broken.exe`／`broken`）；`a_variable_that_names_nothing_is_said_so`；`a_present_tool_that_says_nothing_is_still_present`；`a_broken_firefox_is_refused_by_its_fault_not_as_absent`（`Engine::choose`）。
 
 **本章验收**：`cargo clippy -p sprawling --all-targets --all-features --locked -- -D warnings`、`cargo nextest run -p sprawling --locked --all-features` 绿；`cargo xtask modmap`／`length`／`header`／`specalign` 绿；`cargo run -p sprawling -- doctor` 仍报 Firefox 那一行。
 -/
@@ -786,7 +787,7 @@ pub(crate) fn pinned(pin: Pin) -> Option<String>;   // 文件为空即 None，�
 - **工具链钉子由构建脚本找，找不到就不钉。** `doctor` 的 develop 层报「钉住的版本」，读的是检出根上的 `rust-toolchain.toml`、`lean-toolchain` 与 `Sprawling/desktop/ffi/zig-version`。这三份文件不在本包里，从包里构建时它们不存在，所以 `build.rs` 在 `checkout_root` 下找它们，把全文写进 `OUT_DIR` 下的 `pins.rs`；只有「不存在」读成空串，别的读失败仍是 `cargo::error`。空串即不钉：`pinned` 答 `None`，页面不画钉住的版本，探测按空前缀接受任何一版。
 - **`packaged` 门守这条线**（Tools/xtask/Spec.lean §8-49）：可发布的包的生产代码里，`include!`、`include_str!`、`include_bytes!` 只指向包目录之内或 `OUT_DIR`。
 - **清单**：`[workspace.package]` 写 `repository`、`homepage`，`publish = true`；每个包写自己的 `description`，本包另写 `readme`、`keywords`、`categories` 与 `include`；`xtask` 与 `citysim` 写 `publish = false`。工作区自己的包在 `[workspace.dependencies]` 里各钉 `version = "=<工作区版本>"`，`guard` 判它们等于 `[workspace.package] version`（Tools/xtask/Spec.lean §8-49）。`sprawling-remote-access` 被二进制链接，随之可发布。`sprawling-desktop-ffi` 也可发布：`sprawling-desktop` 在 Windows 上依赖它，而 crates.io 要求依赖的每个包都在 registry 上；它的包里带着 Zig 叶子的源码与 `zig-version`，构建脚本只读包内的文件，所以从 crates.io 在 Windows 上装这个二进制要先装钉住的那一版 Zig（§8-146）。`sprawling-console-ffi` 同理可发布，包里带着渲染器的 Zig 源码与它自己的 `zig-version`，所以从 crates.io 在任何平台上装这个二进制都要先装那一版 Zig。
-- **`sandbox` 是默认 feature。** `cargo install sprawling` 不写 `--features` 时也带执行引擎，与归档一致；不要引擎的构建写 `--no-default-features`，`just features` 编译这一份，因为别的命令都不再编它。
+- **Python 由宿主解释器提供，执行约束由楼臂提供。** wasip1／`sandbox` feature／随包引擎已退役；`cargo install sprawling` 的默认构建不再携带执行引擎。`just features` 仍编关掉默认 feature 的那一份，核对的是其余仍声明的 feature 组合，不是「无引擎」这一旧口径。
 - **Windows 的产品资源由 Cargo 包信息生成。** `build.rs` 是形状 4 adapter，以 `CARGO_CFG_TARGET_OS` 判断目标平台；目标为 Windows 时调用 `winresource::WindowsResource::new().compile()`，生成物留在 `OUT_DIR` 并交给链接器，其他目标不调用资源编译器。`ProductName` 读 `CARGO_PKG_NAME`，`ProductVersion` 与 `FileVersion` 读 `CARGO_PKG_VERSION`，数字版本也由 Cargo 的版本分量生成；包版本仍只有工作区清单这一处权威。`winresource` 关闭默认的 `toml` feature，不读取 `[package.metadata.winresource]` 中的覆盖项。所需工具是 MSVC 的 Windows SDK `rc.exe`，或 GNU 目标的 MinGW resource toolchain；非 Windows 主机交叉编译 MSVC 时使用 `llvm-rc` 与 `llvm-cvtres`。资源生成失败经 `cargo::error` 使构建失败，错误说明目标资源编译失败并要求检查对应工具链，不能发布一份悄悄缺失产品资源的 Windows 二进制。这些资源描述产品身份，不构成 Authenticode 签名，也不保证 Defender 的分类结果。
 - **发布次序**：`release.yml` 的 `crates` job 在 `channel`（npm）之后跑，也就排在 GitHub release 之后。它先从 `cargo metadata` 取出可发布的包，按 sparse index 挑出还没有本版号的那些，再用 `rust-lang/crates-io-auth-action` 把这次运行的 OIDC 令牌换成 crates.io 的短期令牌（Trusted Publishing），然后 `cargo publish --locked --no-verify --allow-dirty` 把挑出的包逐个点名；cargo 按依赖次序发布，desktop 与它的叶子都是工作区成员，不再单独发。仓库里不存长期令牌。crates.io 的版本不能覆盖，而 `release.yml` 允许同一个 tag 重新发版，所以 crates.io 排在最后；本包这个版本已在 sparse index 上时，job 不再发布、只留一行说明。`--no-verify`：同一棵树已经过 `verify` 调用的共享 CI 验证与 `packaged` 门（D10；调用契约见 `Tools/xtask/Spec.lean` D27），验证构建只是重编一遍，还会耗掉短期令牌的时效。`--allow-dirty`：job 改写了 binstall 的下载地址（D32）。
 - **新可发布包先登记，CI 才发得出去。** 换来的令牌只覆盖登记与这次运行四项全部对上的那些包：仓库 `2youg1/sprawling-agents` 与其 owner 的 GitHub 用户名或组织名、工作流文件名 `release.yml`、environment（两边都不声明，或两边相等）。每个包在 crates.io 上各有一条自己的登记，所以没有登记的包只能由人发——登记在包名第一次由人发布之后、下一次由 CI 发布之前做，因为 crates.io 要求包名先存在才能登记。漏掉登记的包让 job 在 `publish` 步以 `403 Forbidden: The provided access token is not valid for crate <名字>` 停在第一个待发包上，其余一律不发，而此时 GitHub 发布、npm 与 system channels 已经成立。恢复是重跑同一个 run 里失败的 job：令牌按当时的登记重新换发，`pending` 一步跳过已发布的包，不需要新 tag，也不需要长期令牌。
@@ -1035,4 +1036,9 @@ crates.io 上的 `.crate` 只是一个包目录，所以一个构建要读的每
 /-! D33 城目录前的扫描经随系统发行的工具读，读不出就说读不出，且只是建议（§8-166 之一）
 
 文件系统名经 sysinfo 的 `Disks` 读（本 crate 已依赖它，对外全是安全接口），Dev Drive 与排除项经 `std::process::Command` 起动 `fsutil` 与 Windows PowerShell，按 AGENTS.md 平台调用次序的第一档。理由：这两样随 Windows 发行，不加依赖，也不要 `unsafe`；它们拒绝普通用户或说本地化的话时，`Untold` 带上那条命令说出读不出，人知道该以管理员再问还是不必在意。这一段从不进 verdict：慢不是坏，一台没有 Dev Drive 的机器照样跑得起这座城。**被否**：①调 `FSCTL_QUERY_PERSISTENT_VOLUME_STATE` 读 `PERSISTENT_VOLUME_STATE_DEV_VOLUME` 位——没有安全接口，要么 `unsafe` Rust 要么一片 Zig 叶子，而一次只传句柄与常量的调用没有 `(ptr, len)` 边界可放在 Zig 后面；②读 Defender 排除项的注册表键——同样要管理员，换不来任何多读到的东西。**重开参数**：一项测量表明在本地化或非管理员的机器上「说不出」占了多数答案，且 FSCTL 能在普通用户的目录句柄上答出 Dev Drive 位。
+-/
+
+/-! D83 `usable_python` 只交出主版本为 3 的绝对路径；shell／pwsh 同走 `absolute`（§8-47）
+
+exec 经 `Command::current_dir(workdir)` 起解释器时，Unix 上相对程序路径相对新工作目录解析，Doctor 却按启动目录探测，于是相对的 `SPRAWLING_PYTHON` 会在 Doctor 报可用之后于 workdir 下找不到。`std::path::absolute` 按启动目录定路径且不解符号链接，故虚拟环境的 `bin/python` 仍对着自己的 `pyvenv.cfg`；`canonicalize` 会拆掉那一层，被否。主版本门与 `usable_pwsh` 同形：表行与恢复语写的是 Python 3，Windows 回退名 `python` 与覆盖变量都可能指到 2.x 或只吐 `Silent`，不经版本门就会把「缺 Python 3」报成可用。被否：把相对路径留给 exec 再解析——两处 cwd 不一致时 Doctor 与执行永远对不上。
 -/
