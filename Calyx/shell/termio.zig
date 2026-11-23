@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Terminal I/O for the Calyx shell: raw mode, alternate screen, cursor
-// style, and parsing of key / paste / resize escape bytes. Unit tests
-// exercise the parser only; enable/disable need a real TTY.
-
 const std = @import("std");
 const builtin = @import("builtin");
 const posix = std.posix;
@@ -33,6 +29,7 @@ pub const Code = union(enum) {
     down,
     home,
     end,
+    click: struct { column: u16, row: u16, button: u16, release: bool },
     unknown,
 };
 
@@ -71,7 +68,6 @@ const WinModes = struct {
     out_mode: u32,
 };
 
-// Console mode bits (Win32). Kept local so Unix builds do not need them.
 const ENABLE_PROCESSED_INPUT: u32 = 0x0001;
 const ENABLE_LINE_INPUT: u32 = 0x0002;
 const ENABLE_ECHO_INPUT: u32 = 0x0004;
@@ -137,6 +133,14 @@ pub fn plainKeyboard() Error!void {
     try writeAll("\x1b[<u\x1b[?2004l");
 }
 
+pub fn trackPointer() Error!void {
+    try writeAll("\x1b[?1000h\x1b[?1006h");
+}
+
+pub fn untrackPointer() Error!void {
+    try writeAll("\x1b[?1000l\x1b[?1006l");
+}
+
 pub fn setTitle(title: []const u8) Error!void {
     try writeAll("\x1b]2;");
     try writeAll(title);
@@ -164,8 +168,6 @@ pub fn size() Size {
     return .{ .columns = wsz.col, .rows = wsz.row };
 }
 
-/// Read available stdin bytes into `buf` and parse one event. Returns
-/// `null` when more bytes are needed; `lost` when the stream ends.
 pub fn readEvent(buf: []u8, filled: *usize) Error!?Event {
     if (filled.* == 0) {
         const n = readStdin(buf) catch return .lost;
@@ -174,7 +176,6 @@ pub fn readEvent(buf: []u8, filled: *usize) Error!?Event {
     }
     var used: usize = 0;
     const event = parseOne(buf[0..filled.*], &used) orelse {
-        // Lone ESC: wait briefly for a CSI/Alt continuation, else Escape.
         if (filled.* == 1 and buf[0] == 0x1b) {
             if (!waitReadable(50)) {
                 filled.* = 0;
@@ -212,8 +213,6 @@ pub fn waitReadable(timeout_ms: i32) bool {
     return n > 0 and (fds[0].revents & posix.POLL.IN) != 0;
 }
 
-/// Pure escape-sequence parser: consumes one event from `input`, writes
-/// how many bytes it took into `used`, and returns null when incomplete.
 pub fn parseOne(input: []const u8, used: *usize) ?Event {
     if (input.len == 0) return null;
     if (input[0] == 0x1b) return parseEsc(input, used);
@@ -275,6 +274,7 @@ fn parseCsi(input: []const u8, used: *usize) ?Event {
         used.* = 0;
         return null;
     }
+    if (input[2] == '<') return parseSgr(input, used);
     if (std.mem.startsWith(u8, input, "\x1b[200~")) {
         const start = "\x1b[200~".len;
         const end_mark = "\x1b[201~";
@@ -338,6 +338,41 @@ fn parseCsi(input: []const u8, used: *usize) ?Event {
             },
             else => .{ .key = .{ .code = .unknown } },
         };
+    }
+    used.* = 0;
+    return null;
+}
+
+fn parseSgr(input: []const u8, used: *usize) ?Event {
+    var i: usize = 3;
+    var nums: [3]u16 = .{ 0, 0, 0 };
+    var ni: usize = 0;
+    var current: u16 = 0;
+    var saw = false;
+    while (i < input.len) : (i += 1) {
+        const c = input[i];
+        if (c >= '0' and c <= '9') {
+            saw = true;
+            current = current *% 10 +% (c - '0');
+            continue;
+        }
+        if (c == ';') {
+            if (ni < nums.len) nums[ni] = current;
+            ni += 1;
+            current = 0;
+            saw = false;
+            continue;
+        }
+        used.* = i + 1;
+        if (c != 'M' and c != 'm') return .{ .key = .{ .code = .unknown } };
+        if (saw and ni < nums.len) nums[ni] = current;
+        if (ni < 2) return .{ .key = .{ .code = .unknown } };
+        return .{ .key = .{ .code = .{ .click = .{
+            .button = nums[0],
+            .column = if (ni >= 1) nums[1] else 0,
+            .row = if (ni >= 2) nums[2] else 0,
+            .release = c == 'm',
+        } } } };
     }
     used.* = 0;
     return null;
@@ -534,6 +569,17 @@ test "parser reads arrows, delete, and back-tab" {
     const back = parseOne("\x1b[Z", &used).?;
     try std.testing.expectEqual(Code.back_tab, back.key.code);
     try std.testing.expect(back.key.modifiers.shift);
+}
+
+test "parser reads an sgr click" {
+    var used: usize = 0;
+    const press = parseOne("\x1b[<0;5;6M", &used).?;
+    try std.testing.expectEqual(@as(usize, 9), used);
+    try std.testing.expectEqual(@as(u16, 5), press.key.code.click.column);
+    try std.testing.expectEqual(@as(u16, 6), press.key.code.click.row);
+    try std.testing.expect(!press.key.code.click.release);
+    const partial = parseOne("\x1b[<0;5", &used);
+    try std.testing.expect(partial == null);
 }
 
 test "parser reads bracketed paste and resize" {

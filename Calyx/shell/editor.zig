@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 const std = @import("std");
+const leaf = @import("leaf");
 
 pub const Edit = union(enum) {
     insert: u21,
@@ -19,6 +20,8 @@ pub const Edit = union(enum) {
     delete_word,
     older,
     newer,
+    line_up,
+    line_down,
     clear,
 };
 
@@ -29,6 +32,7 @@ pub const Editor = struct {
     history: std.ArrayList([]u8) = .empty,
     recalled: ?usize = null,
     draft: std.ArrayList(u21) = .empty,
+    goal: ?usize = null,
 
     pub fn init(allocator: std.mem.Allocator) Editor {
         return .{ .allocator = allocator };
@@ -75,6 +79,39 @@ pub const Editor = struct {
 
     pub fn apply(self: *Editor, edit: Edit) !void {
         switch (edit) {
+            .older => {
+                if (self.cursor == 0) {
+                    self.goal = null;
+                    try self.recall(if (self.recalled) |n| n +| 1 else 0);
+                } else self.lineUp();
+                return;
+            },
+            .newer => {
+                if (self.recalled != null or self.cursor == self.text.items.len) {
+                    self.goal = null;
+                    if (self.recalled) |n| {
+                        if (n == 0) {
+                            self.recalled = null;
+                            self.text.deinit(self.allocator);
+                            self.text = self.draft;
+                            self.draft = .empty;
+                            self.cursor = self.text.items.len;
+                        } else try self.recall(n - 1);
+                    }
+                } else self.lineDown();
+                return;
+            },
+            .line_up => {
+                self.lineUp();
+                return;
+            },
+            .line_down => {
+                self.lineDown();
+                return;
+            },
+            else => self.goal = null,
+        }
+        switch (edit) {
             .insert => |ch| try self.insert(ch),
             .newline => try self.insert('\n'),
             .backspace => {
@@ -104,25 +141,12 @@ pub const Editor = struct {
                 }
                 self.cursor = start;
             },
-            .older => try self.recall(if (self.recalled) |n| n +| 1 else 0),
-            .newer => {
-                if (self.recalled) |n| {
-                    if (n == 0) {
-                        self.recalled = null;
-                        self.text.deinit(self.allocator);
-                        self.text = self.draft;
-                        self.draft = .empty;
-                        self.cursor = self.text.items.len;
-                    } else {
-                        try self.recall(n - 1);
-                    }
-                }
-            },
             .clear => {
                 self.text.clearRetainingCapacity();
                 self.cursor = 0;
                 self.recalled = null;
             },
+            .older, .newer, .line_up, .line_down => unreachable,
         }
     }
 
@@ -167,6 +191,54 @@ pub const Editor = struct {
         try self.paste(line);
         self.cursor = self.text.items.len;
         self.recalled = back;
+        self.goal = null;
+    }
+
+    fn lineUp(self: *Editor) void {
+        const goal = self.goal orelse self.columnOf(self.cursor);
+        self.goal = goal;
+        const start = self.lineStart(self.cursor);
+        if (start == 0) return;
+        self.cursor = self.indexAtColumn(self.lineStart(start - 1), goal);
+    }
+
+    fn lineDown(self: *Editor) void {
+        const goal = self.goal orelse self.columnOf(self.cursor);
+        self.goal = goal;
+        const end = self.lineEnd(self.cursor);
+        if (end >= self.text.items.len) return;
+        self.cursor = self.indexAtColumn(end + 1, goal);
+    }
+
+    fn lineStart(self: *const Editor, index: usize) usize {
+        var i = index;
+        while (i > 0 and self.text.items[i - 1] != '\n') i -= 1;
+        return i;
+    }
+
+    fn lineEnd(self: *const Editor, index: usize) usize {
+        var i = index;
+        while (i < self.text.items.len and self.text.items[i] != '\n') i += 1;
+        return i;
+    }
+
+    fn columnOf(self: *const Editor, index: usize) usize {
+        var col: usize = 0;
+        var i = self.lineStart(index);
+        while (i < index) : (i += 1) col += leaf.text.columns(self.text.items[i]);
+        return col;
+    }
+
+    fn indexAtColumn(self: *const Editor, line_start: usize, goal: usize) usize {
+        var col: usize = 0;
+        var i = line_start;
+        while (i < self.text.items.len and self.text.items[i] != '\n') {
+            const width = leaf.text.columns(self.text.items[i]);
+            if (col >= goal or col + width > goal) return i;
+            col += width;
+            i += 1;
+        }
+        return i;
     }
 
     fn wordStart(self: *const Editor) usize {
@@ -286,6 +358,12 @@ test "older and newer recall draft" {
     const a = (try ed.enter()).?;
     defer std.testing.allocator.free(a);
     try ed.set("draft");
+    try ed.apply(.end);
+    try ed.apply(.older);
+    const stayed = try ed.textOwned();
+    defer std.testing.allocator.free(stayed);
+    try std.testing.expectEqualStrings("draft", stayed);
+    try ed.apply(.home);
     try ed.apply(.older);
     const recalled = try ed.textOwned();
     defer std.testing.allocator.free(recalled);
@@ -294,6 +372,20 @@ test "older and newer recall draft" {
     const draft = try ed.textOwned();
     defer std.testing.allocator.free(draft);
     try std.testing.expectEqualStrings("draft", draft);
+}
+
+test "up and down move between lines until the ends of the text" {
+    var ed = Editor.init(std.testing.allocator);
+    defer ed.deinit();
+    try ed.set("中文\nmore");
+    try ed.apply(.line_up);
+    try std.testing.expectEqual(@as(usize, 2), ed.cursorAt());
+    try ed.apply(.home);
+    try ed.apply(.line_down);
+    try std.testing.expectEqual(@as(usize, 3), ed.cursorAt());
+    try ed.apply(.home);
+    try ed.apply(.line_up);
+    try std.testing.expectEqual(@as(usize, 0), ed.cursorAt());
 }
 
 test "word left right and delete word" {

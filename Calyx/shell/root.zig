@@ -105,6 +105,7 @@ test {
     _ = @import("mei_process.zig");
     _ = @import("mei_session.zig");
     _ = @import("mei_ui.zig");
+    _ = @import("mei_view.zig");
     _ = @import("host.zig");
     _ = @import("city_ui.zig");
 }

@@ -11,6 +11,18 @@ const local_time = @import("local_time.zig");
 const program_status = @import("program_status.zig");
 const mei_process = @import("mei_process.zig");
 
+pub const PythonBody = struct {
+    code: []u8,
+    output: []u8,
+    took_us: ?u64,
+    outcome: part.Outcome,
+    at: ?u32,
+};
+
+const Pending = struct { id: []u8, code: []u8 };
+
+const empty_code: [0]u8 = .{};
+
 pub const Seen = struct {
     gpa: std.mem.Allocator,
     model: []u8,
@@ -26,6 +38,10 @@ pub const Seen = struct {
     headed: bool = false,
     last_text: []u8 = "",
     draft: []u8 = "",
+    echo: []u8 = "",
+    wave_ms: ?u64 = null,
+    pending: std.ArrayList(Pending) = .empty,
+    bodies: std.ArrayList(PythonBody) = .empty,
     run: bool = false,
 
     pub fn init(gpa: std.mem.Allocator, model: []const u8) !Seen {
@@ -35,6 +51,7 @@ pub const Seen = struct {
             .effort = try gpa.dupe(u8, "high"),
             .last_text = try gpa.dupe(u8, ""),
             .draft = try gpa.dupe(u8, ""),
+            .echo = try gpa.dupe(u8, ""),
         };
     }
 
@@ -45,7 +62,21 @@ pub const Seen = struct {
         self.efforts.deinit(self.gpa);
         self.gpa.free(self.last_text);
         self.gpa.free(self.draft);
+        self.gpa.free(self.echo);
+        self.clearPending();
+        self.pending.deinit(self.gpa);
+        self.clearBodies();
+        self.bodies.deinit(self.gpa);
         self.* = undefined;
+    }
+
+    pub fn suppressEcho(self: *Seen, text: []const u8) void {
+        self.replace(&self.echo, text);
+    }
+
+    pub fn takeBodies(self: *Seen) ![]PythonBody {
+        if (self.bodies.items.len == 0) return &.{};
+        return try self.bodies.toOwnedSlice(self.gpa);
     }
 
     pub fn draftText(self: *const Seen) []const u8 {
@@ -74,6 +105,10 @@ pub const Seen = struct {
         self.effort_actual = false;
         self.setLast("");
         self.clearDraft();
+        self.clearPending();
+        self.clearBodies();
+        self.wave_ms = null;
+        self.replace(&self.echo, "");
     }
 
     pub fn begin(self: *Seen, at: u64) void {
@@ -87,6 +122,8 @@ pub const Seen = struct {
         self.effort_actual = false;
         self.setLast("");
         self.clearDraft();
+        self.clearPending();
+        self.wave_ms = null;
     }
 
     pub fn counts(self: *const Seen) program_status.Counts {
@@ -157,7 +194,7 @@ pub const Seen = struct {
             self.clearDraft();
             return try self.assistant(arena, content, at);
         }
-        if (std.mem.eql(u8, role.string, "user")) return try self.toolResults(arena, content, at);
+        if (std.mem.eql(u8, role.string, "user")) return try self.userMessage(arena, content, at);
         return try noteEntries(arena, raw);
     }
 
@@ -301,6 +338,7 @@ pub const Seen = struct {
                     if (tx == .string) try text.appendSlice(arena, tx.string);
                 }
             } else if (std.mem.eql(u8, ty, "tool_use")) {
+                self.noteCall(block, at);
                 self.calling = true;
             }
         }
@@ -311,44 +349,160 @@ pub const Seen = struct {
         return try entries.toOwnedSlice(arena);
     }
 
-    fn toolResults(self: *Seen, arena: std.mem.Allocator, content: std.json.Value, at: u64) ![]write.Entry {
+    fn userMessage(self: *Seen, arena: std.mem.Allocator, content: std.json.Value, at: u64) ![]write.Entry {
+        if (content == .string) return try self.youUnlessEcho(arena, content.string, at);
         var entries: std.ArrayList(write.Entry) = .empty;
-        if (content == .array) {
-            for (content.array.items) |block| {
-                if (block != .object) continue;
-                const ty = if (block.object.get("type")) |t| (if (t == .string) t.string else "") else "";
-                if (!std.mem.eql(u8, ty, "tool_result")) continue;
-                try entries.append(arena, .{ .tool = .{
-                    .at = tod(at),
-                    .name = "python",
-                    .subject = "",
-                    .took_us = null,
-                    .outcome = .Answered,
-                } });
-                if (block.object.get("content")) |result| {
-                    switch (result) {
-                        .string => |text| if (text.len > 0) try entries.append(arena, .{ .note = try arena.dupe(u8, text) }),
-                        .array => |parts| for (parts.items) |item| {
-                            if (item != .object) continue;
-                            const kind = if (item.object.get("type")) |t| (if (t == .string) t.string else "") else "";
-                            if (std.mem.eql(u8, kind, "text")) {
-                                if (item.object.get("text")) |text| {
-                                    if (text == .string and text.string.len > 0) try entries.append(arena, .{ .note = try arena.dupe(u8, text.string) });
-                                }
-                            } else if (std.mem.eql(u8, kind, "image")) {
-                                try entries.append(arena, .{ .note = "[image attached]" });
-                            }
-                        },
-                        else => {
-                            const text = try std.json.Stringify.valueAlloc(arena, result, .{});
-                            if (text.len > 0) try entries.append(arena, .{ .note = text });
-                        },
+        if (content != .array) return try entries.toOwnedSlice(arena);
+        var said: std.ArrayList(u8) = .empty;
+        defer said.deinit(arena);
+        for (content.array.items) |block| {
+            if (block != .object) continue;
+            const ty = if (block.object.get("type")) |t| (if (t == .string) t.string else "") else "";
+            if (std.mem.eql(u8, ty, "tool_result")) {
+                try self.oneResult(&entries, arena, block, at);
+            } else if (std.mem.eql(u8, ty, "text")) {
+                if (block.object.get("text")) |text| {
+                    if (text == .string and text.string.len > 0) {
+                        if (said.items.len > 0) try said.append(arena, '\n');
+                        try said.appendSlice(arena, text.string);
                     }
                 }
             }
         }
+        if (said.items.len > 0) {
+            if (!(self.echo.len > 0 and std.mem.eql(u8, self.echo, said.items))) {
+                try entries.append(arena, .{ .you = .{ .at = tod(at), .said = try arena.dupe(u8, said.items) } });
+            } else self.replace(&self.echo, "");
+        }
         self.calling = false;
+        self.wave_ms = null;
         return try entries.toOwnedSlice(arena);
+    }
+
+    fn youUnlessEcho(self: *Seen, arena: std.mem.Allocator, said: []const u8, at: u64) ![]write.Entry {
+        if (said.len == 0) return &.{};
+        if (self.echo.len > 0 and std.mem.eql(u8, self.echo, said)) {
+            self.replace(&self.echo, "");
+            return &.{};
+        }
+        const entries = try arena.alloc(write.Entry, 1);
+        entries[0] = .{ .you = .{ .at = tod(at), .said = try arena.dupe(u8, said) } };
+        return entries;
+    }
+
+    fn noteCall(self: *Seen, block: std.json.Value, at: u64) void {
+        if (self.wave_ms == null) self.wave_ms = at;
+        const id = if (block.object.get("id")) |value| (if (value == .string) value.string else "") else "";
+        const code = if (block.object.get("input")) |input|
+            (if (input == .object) (if (input.object.get("code")) |value| (if (value == .string) value.string else "") else "") else "")
+        else
+            "";
+        const owned_id = self.gpa.dupe(u8, id) catch return;
+        const owned_code = self.gpa.dupe(u8, code) catch {
+            self.gpa.free(owned_id);
+            return;
+        };
+        self.pending.append(self.gpa, .{ .id = owned_id, .code = owned_code }) catch {
+            self.gpa.free(owned_id);
+            self.gpa.free(owned_code);
+        };
+    }
+
+    fn oneResult(self: *Seen, entries: *std.ArrayList(write.Entry), arena: std.mem.Allocator, block: std.json.Value, at: u64) !void {
+        const id = if (block.object.get("tool_use_id")) |value| (if (value == .string) value.string else "") else "";
+        const failed = if (block.object.get("is_error")) |value| value == .bool and value.bool else false;
+        const code = self.takeCode(id);
+        const output = if (block.object.get("content")) |result| try self.ownResult(result) else try self.gpa.dupe(u8, "");
+        const took_us = if (self.wave_ms) |start| if (at > start) (at - start) * 1000 else null else null;
+        self.bodies.append(self.gpa, .{
+            .code = code,
+            .output = output,
+            .took_us = took_us,
+            .outcome = if (failed) .Failed else .Answered,
+            .at = tod(at),
+        }) catch {
+            self.release(code);
+            self.release(output);
+            return error.OutOfMemory;
+        };
+        errdefer {
+            const dropped = self.bodies.pop().?;
+            self.release(dropped.code);
+            self.release(dropped.output);
+        }
+        try entries.append(arena, .{ .tool = .{
+            .at = tod(at),
+            .name = "python",
+            .subject = "",
+            .took_us = took_us,
+            .outcome = if (failed) .Failed else .Answered,
+        } });
+    }
+
+    fn takeCode(self: *Seen, id: []const u8) []u8 {
+        var index: usize = 0;
+        while (index < self.pending.items.len) : (index += 1) {
+            if (id.len == 0 or std.mem.eql(u8, self.pending.items[index].id, id)) {
+                const item = self.pending.orderedRemove(index);
+                self.gpa.free(item.id);
+                return item.code;
+            }
+        }
+        if (self.pending.items.len > 0) {
+            const item = self.pending.orderedRemove(0);
+            self.gpa.free(item.id);
+            return item.code;
+        }
+        return self.gpa.dupe(u8, "") catch @constCast(&empty_code);
+    }
+
+    fn ownResult(self: *Seen, result: std.json.Value) ![]u8 {
+        switch (result) {
+            .string => |text| return try self.gpa.dupe(u8, text),
+            .array => |parts| {
+                var out: std.ArrayList(u8) = .empty;
+                errdefer out.deinit(self.gpa);
+                for (parts.items) |item| {
+                    if (item != .object) continue;
+                    const kind = if (item.object.get("type")) |t| (if (t == .string) t.string else "") else "";
+                    const piece: []const u8 = if (std.mem.eql(u8, kind, "text")) blk: {
+                        if (item.object.get("text")) |text| {
+                            if (text == .string) break :blk text.string;
+                        }
+                        break :blk "";
+                    } else if (std.mem.eql(u8, kind, "image"))
+                        "[image attached]"
+                    else
+                        "";
+                    if (piece.len == 0) continue;
+                    if (out.items.len > 0) try out.append(self.gpa, '\n');
+                    try out.appendSlice(self.gpa, piece);
+                }
+                return try out.toOwnedSlice(self.gpa);
+            },
+            else => return try std.json.Stringify.valueAlloc(self.gpa, result, .{}),
+        }
+    }
+
+    fn clearPending(self: *Seen) void {
+        for (self.pending.items) |item| {
+            self.gpa.free(item.id);
+            self.gpa.free(item.code);
+        }
+        self.pending.clearRetainingCapacity();
+    }
+
+    fn clearBodies(self: *Seen) void {
+        for (self.bodies.items) |body| {
+            self.release(body.code);
+            self.release(body.output);
+        }
+        self.bodies.clearRetainingCapacity();
+    }
+
+    fn release(self: *Seen, text: []u8) void {
+        if (text.ptr == &empty_code) return;
+        self.gpa.free(text);
     }
 
     pub fn finished(self: *Seen, arena: std.mem.Allocator, result: mei_process.Result, at: u64) ![]write.Entry {
@@ -459,8 +613,33 @@ test "image results never print base64" {
     var arena_state = std.heap.ArenaAllocator.init(gpa);
     defer arena_state.deinit();
     const entries = try seen.line(arena_state.allocator(), "{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"a\",\"content\":[{\"type\":\"image\",\"source\":{\"data\":\"secret-base64\"}}]}]}", 1);
-    try std.testing.expectEqual(@as(usize, 2), entries.len);
-    try std.testing.expectEqualStrings("[image attached]", entries[1].note);
+    try std.testing.expectEqual(@as(usize, 1), entries.len);
+    try std.testing.expectEqualStrings("python", entries[0].tool.name);
+    try std.testing.expectEqual(@as(usize, 1), seen.bodies.items.len);
+    try std.testing.expectEqualStrings("[image attached]", seen.bodies.items[0].output);
+    try std.testing.expect(std.mem.indexOf(u8, seen.bodies.items[0].output, "secret") == null);
+}
+
+test "a user prompt is shown once and a python call keeps code output and elapsed time" {
+    const gpa = std.testing.allocator;
+    var seen = try Seen.init(gpa, "model");
+    defer seen.deinit();
+    var arena_state = std.heap.ArenaAllocator.init(gpa);
+    defer arena_state.deinit();
+    const arena = arena_state.allocator();
+    seen.suppressEcho("hello");
+    const echo = try seen.line(arena, "{\"role\":\"user\",\"content\":\"hello\"}", 1);
+    try std.testing.expectEqual(@as(usize, 0), echo.len);
+    const again = try seen.line(arena, "{\"role\":\"user\",\"content\":\"再次\"}", 2);
+    try std.testing.expectEqualStrings("再次", again[0].you.said);
+    const assistant = try seen.line(arena, "{\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"running\"},{\"type\":\"tool_use\",\"id\":\"a\",\"name\":\"python\",\"input\":{\"code\":\"print(1)\"}}]}", 1000);
+    try std.testing.expectEqualStrings("running", assistant[assistant.len - 1].reply);
+    try std.testing.expect(seen.calling);
+    const result = try seen.line(arena, "{\"role\":\"user\",\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"a\",\"content\":\"1\\n\"}]}", 2500);
+    try std.testing.expectEqual(@as(usize, 1), result.len);
+    try std.testing.expectEqual(@as(?u64, 1_500_000), result[0].tool.took_us);
+    try std.testing.expectEqualStrings("print(1)", seen.bodies.items[seen.bodies.items.len - 1].code);
+    try std.testing.expectEqualStrings("1\n", seen.bodies.items[seen.bodies.items.len - 1].output);
 }
 
 test "stream deltas stay in the draft until commit" {
