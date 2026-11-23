@@ -20,14 +20,16 @@ fn main() -> Result<(), String> {
 
     let here = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").map_err(|e| e.to_string())?);
     let out = PathBuf::from(std::env::var("OUT_DIR").map_err(|e| e.to_string())?);
-    built(&here, &out)?;
+    let zig_target = zig_target()?;
+    built(&here, &out, &zig_target)?;
     println!(
         "cargo::rustc-link-search=native={}",
         out.join("lib").display()
     );
     println!("cargo::rustc-link-lib=static={LIBRARY}");
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
-    if target_os == "linux" || target_os == "macos" {
+    let target_env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    if (target_os == "linux" || target_os == "macos") && target_env != "musl" {
         println!("cargo::rustc-link-lib=dylib=c");
         println!("cargo::rustc-link-lib=dylib=pthread");
         println!("cargo::rustc-link-lib=dylib=m");
@@ -36,11 +38,45 @@ fn main() -> Result<(), String> {
     Ok(())
 }
 
+fn zig_target() -> Result<String, String> {
+    let arch = match std::env::var("CARGO_CFG_TARGET_ARCH")
+        .map_err(|err| format!("cargo set no CARGO_CFG_TARGET_ARCH: {err}"))?
+        .as_str()
+    {
+        "x86_64" => "x86_64",
+        "aarch64" => "aarch64",
+        other => {
+            return Err(format!(
+                "the Calyx shell is built for x86_64 and aarch64, not {other}"
+            ));
+        }
+    };
+    let os = std::env::var("CARGO_CFG_TARGET_OS")
+        .map_err(|err| format!("cargo set no CARGO_CFG_TARGET_OS: {err}"))?;
+    let env = std::env::var("CARGO_CFG_TARGET_ENV")
+        .map_err(|err| format!("cargo set no CARGO_CFG_TARGET_ENV: {err}"))?;
+    match (os.as_str(), env.as_str()) {
+        ("windows", "gnu") => Ok(format!("{arch}-windows-gnu")),
+        ("windows", _) => Ok(format!("{arch}-windows-msvc")),
+        ("linux", "musl") => Ok(format!("{arch}-linux-musl")),
+        ("linux", _) => Ok(format!("{arch}-linux-gnu")),
+        ("macos", _) => Ok(format!("{arch}-macos")),
+        (other, _) => Err(format!(
+            "the Calyx shell is built for Windows, Linux and macOS, not {other}"
+        )),
+    }
+}
+
 #[expect(clippy::disallowed_methods, reason = "build script (child D4)")]
-fn built(here: &Path, out: &Path) -> Result<(), String> {
+fn built(here: &Path, out: &Path, zig_target: &str) -> Result<(), String> {
     let status = Command::new("zig")
         .current_dir(here)
-        .args(["build", "-Doptimize=safe", "--prefix"])
+        .args([
+            "build",
+            "-Doptimize=safe",
+            &format!("-Dtarget={zig_target}"),
+            "--prefix",
+        ])
         .arg(out)
         .status()
         .map_err(|err| format!("zig did not start: {err}"))?;
@@ -57,7 +93,7 @@ fn built(here: &Path, out: &Path) -> Result<(), String> {
         ));
     }
     Err(format!(
-        "zig build refused the Calyx shell (status {status})"
+        "zig build refused the Calyx shell for {zig_target} (status {status})"
     ))
 }
 
@@ -97,7 +133,6 @@ fn install_face(out: &Path) -> Result<(), String> {
 }
 
 fn profile_dir(out: &Path) -> Result<PathBuf, String> {
-    // OUT_DIR = <target>/<profile>/build/<pkg>/out → profile dir is ../../..
     out.join("../../..")
         .canonicalize()
         .map_err(|err| format!("resolve cargo profile dir from {}: {err}", out.display()))
