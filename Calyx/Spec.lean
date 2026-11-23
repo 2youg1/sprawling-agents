@@ -213,3 +213,20 @@ python 调用允许的图片总量与 JSON 信封。被否：①加大固定缓�
 `mei_observation` 对 delta/commit 与完整行的投影；含 `Replying` 的叶/vt100 帧；
 `zig build test`（`Calyx/`）与受影响的 `console_ffi` 测试绿色。
 -/
+
+/-! D15 `Calyx/build.rs` 把 cargo 目标映成 Zig `-Dtarget`，与帧叶同一映射
+
+决定：`sprawling-calyx` 的 `build.rs` 读 `CARGO_CFG_TARGET_{ARCH,OS,ENV}`，按与
+`Calyx/ffi/build.rs` 相同的三元组映射调用 `zig build -Dtarget=…`（经 `Calyx/build.zig`
+的 `standardTargetOptions`），再链接 `sprawling_calyx_shell`。`linux`+`musl` 映为
+`{arch}-linux-musl`；`linux` 其它 env 映为 `{arch}-linux-gnu`；Windows/macOS 同帧叶。
+对 musl 目标不发出 `dylib=c`/`pthread`/`m`——静态 musl 发行件由 rustc 自己链 libc。
+
+理由：release 的 Linux 行是 `x86_64-unknown-linux-musl` 静态链接；宿主上的 `zig build`
+默认编 glibc，壳归档里留下 `pread64`/`mmap64`/`arc4random_buf` 等名字，musl 不提供，
+链接 `sprawling` 失败。帧叶早已按三元组 `zig build-lib`；壳缺同一规则。
+
+被否：①只在 CI 设 `ZIG_TARGET` 或改 `release.yml`——权威应在包的 build script，与 cargo
+target 同一次构建绑定；②为 musl 另开 feature 跳过壳——静态 Linux 归档必须带 Calyx；
+③继续显式 `dylib=c` 给 musl——与 `crt-static`/`static-pie` 冲突。
+-/

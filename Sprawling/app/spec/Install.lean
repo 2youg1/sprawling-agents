@@ -333,7 +333,8 @@ musl-gcc 为 499–513 s；③链接器每次多出一条 `ignoring deprecated l
 `musl-tools` 与 `CC_<triple>` 换来 Zig 与 cargo-zigbuild 两步安装，要维护的部件没有变少。体积小 3%
 （33.5 MB 对 34.6 MB）抵不过 ASLR。其余构建处也不用它：Windows 一行是 MSVC 目标，cargo-zigbuild 不支持 `*-windows-msvc`；
 macOS 一行与 `ci.yml` 都是宿主构建，系统 C 工具链已对准目标；Nix 构建由 `buildRustPackage` 与 nixpkgs 的工具链负责
-（D50）；本地开发只建宿主目标。Zig 只编译 `Sprawling/desktop/ffi` 的叶子，由那个包的 build script 调用，与链接器无关。
+（D50）；本地开发只建宿主目标。Zig 由各包的 build script 按 cargo 目标三元组调用（桌面帧叶、`Calyx`
+帧叶与壳），与 `musl-gcc` 链接器选择无关；壳侧映射见 `Calyx/Spec.lean` D15。
 
 重开参数：发布矩阵加入一个 runner 不能原生构建、Ubuntu 也没有现成交叉 C 工具链的目标（例如要求 glibc 版本下限的
 `*-linux-gnu` 产物），或 cargo-zigbuild 能交出 `static-pie` 且不比 musl-gcc 慢。
