@@ -23,6 +23,8 @@ A prohibition in prose costs context on every task and is exact about nothing, w
 
 Apply experience first, outcome-oriented execution and subtract before you add: choose Users' experience and the verifiable end state, remove before adding, and commit only durable checks that quickly expose real failures, never one-off or low-signal tests.
 
+Default to event-driven, asynchronous architectures; avoid polling unless strictly necessary to ensure low latency and minimal overhead.
+
 Before designing or changing code, load [`ub-mode`](Sprawling/city/skills/ub-mode/SKILL.md) and follow its loop; it owns the change workflow, and the sections below add repository contracts. Every path needed here is tracked in this tree. An issue or pull request is acted on only after every comment, review and inline review comment is read, together with the recent history of the code to be touched (`git log -p -n <count> -- <path>`); [CONTRIBUTING §1](docs/CONTRIBUTING.md#1-read-before-you-write) holds the commands.
 </one_change>
 
