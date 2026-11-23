@@ -301,7 +301,10 @@ pub const Ui = struct {
             return null;
         }
         if (key.code == .up or key.code == .down) {
-            const edit = historyMove(self.editor.cursorAt(), self.editor.text.items.len, self.editor.recalled != null, key.code == .up);
+            const text = self.editor.text.items;
+            const cursor = self.editor.cursorAt();
+            const first = std.mem.indexOfScalar(u21, text[0..@min(cursor, text.len)], '\n') == null;
+            const edit = historyMove(cursor, text.len, self.editor.recalled != null, first, key.code == .up);
             self.editor.apply(edit) catch {};
             self.refilter();
             self.touch(true);
@@ -696,8 +699,11 @@ pub const Ui = struct {
     }
 };
 
-fn historyMove(cursor: usize, len: usize, recalled: bool, up: bool) editor_mod.Edit {
-    if (up) return if (cursor == 0) .older else .line_up;
+fn historyMove(cursor: usize, len: usize, recalled: bool, first: bool, up: bool) editor_mod.Edit {
+    if (up) {
+        if (recalled and first) return .older;
+        return if (cursor == 0) .older else .line_up;
+    }
     return if (recalled or cursor == len) .newer else .line_down;
 }
 
@@ -741,11 +747,13 @@ fn nowNs(io: std.Io) u64 {
 }
 
 test "mei moves within a line until the cursor is at its end" {
-    try std.testing.expectEqual(editor_mod.Edit.line_up, historyMove(3, 8, false, true));
-    try std.testing.expectEqual(editor_mod.Edit.older, historyMove(0, 8, false, true));
-    try std.testing.expectEqual(editor_mod.Edit.line_down, historyMove(3, 8, false, false));
-    try std.testing.expectEqual(editor_mod.Edit.newer, historyMove(8, 8, false, false));
-    try std.testing.expectEqual(editor_mod.Edit.newer, historyMove(2, 8, true, false));
+    try std.testing.expectEqual(editor_mod.Edit.line_up, historyMove(3, 8, false, true, true));
+    try std.testing.expectEqual(editor_mod.Edit.older, historyMove(0, 8, false, true, true));
+    try std.testing.expectEqual(editor_mod.Edit.line_down, historyMove(3, 8, false, false, false));
+    try std.testing.expectEqual(editor_mod.Edit.newer, historyMove(8, 8, false, false, false));
+    try std.testing.expectEqual(editor_mod.Edit.newer, historyMove(2, 8, true, false, false));
+    try std.testing.expectEqual(editor_mod.Edit.older, historyMove(4, 4, true, true, true));
+    try std.testing.expectEqual(editor_mod.Edit.line_up, historyMove(6, 10, true, false, true));
 }
 
 test "idle Esc neither clears a draft nor stops a run" {

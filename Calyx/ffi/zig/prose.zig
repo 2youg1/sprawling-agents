@@ -10,7 +10,7 @@ const flow = @import("flow.zig");
 
 pub fn blocks(p: *paint.Painter, body: []const u8, column: flow.Column) paint.Error!void {
     if (!needsBlocks(body)) return flow.flow(p, body, column);
-    var fenced = false;
+    var open: ?Fence = null;
     var lines = std.mem.splitScalar(u8, body, '\n');
     var first = true;
     while (lines.next()) |raw| {
@@ -19,29 +19,33 @@ pub fn blocks(p: *paint.Painter, body: []const u8, column: flow.Column) paint.Er
         first = false;
         try p.to(column.left);
         const trimmed = std.mem.trimStart(u8, line, " ");
-        const fence = std.mem.startsWith(u8, trimmed, "```");
-        if (fence) {
-            fenced = !fenced;
+        if (takesFence(open, trimmed)) {
+            open = if (open == null) fenceOf(trimmed) else null;
             try p.fit(.faint, line, column.measure);
             continue;
         }
-        if (fenced) {
+        if (open != null) {
             try codeLine(p, line, column);
             continue;
         }
         if (heading(trimmed)) |mark| {
-            try p.fit(.faint, line[0..mark], mark);
-            try p.fit(.bold, line[mark..], p.room());
+            const cut = cutAt(line, trimmed, mark);
+            try p.fit(.faint, line[0..cut], cut);
+            try p.fit(.bold, line[cut..], p.room());
             continue;
         }
         if (std.mem.startsWith(u8, trimmed, ">")) {
-            try p.fit(.faint, line, column.measure);
+            const cut = cutAt(line, trimmed, 1);
+            try p.fit(.faint, line[0..cut], cut);
+            const rest = flow.Column{ .left = p.column, .measure = p.room(), .style = .faint, .marks = column.marks };
+            try flow.flow(p, line[cut..], rest);
             continue;
         }
         if (listMark(trimmed)) |mark| {
-            try p.fit(.faint, line[0..mark], mark);
+            const cut = cutAt(line, trimmed, mark);
+            try p.fit(.faint, line[0..cut], cut);
             const rest = flow.Column{ .left = p.column, .measure = p.room(), .style = column.style, .marks = column.marks };
-            try flow.flow(p, line[mark..], rest);
+            try flow.flow(p, line[cut..], rest);
             continue;
         }
         if (std.mem.count(u8, line, "|") >= 2) {
@@ -61,7 +65,7 @@ fn needsBlocks(body: []const u8) bool {
     var lines = std.mem.splitScalar(u8, body, '\n');
     while (lines.next()) |raw| {
         const line = std.mem.trimStart(u8, std.mem.trimEnd(u8, raw, "\r"), " ");
-        if (std.mem.startsWith(u8, line, "```")) return true;
+        if (fenceOf(line) != null) return true;
         if (heading(line) != null) return true;
         if (std.mem.startsWith(u8, line, ">")) return true;
         if (listMark(line) != null) return true;
@@ -69,6 +73,29 @@ fn needsBlocks(body: []const u8) bool {
         if (std.mem.indexOf(u8, line, "](") != null) return true;
     }
     return false;
+}
+
+const Fence = struct { mark: u8, len: usize };
+
+fn fenceOf(trimmed: []const u8) ?Fence {
+    if (trimmed.len < 3) return null;
+    const mark = trimmed[0];
+    if (mark != '`' and mark != '~') return null;
+    var n: usize = 0;
+    while (n < trimmed.len and trimmed[n] == mark) n += 1;
+    if (n < 3) return null;
+    return .{ .mark = mark, .len = n };
+}
+
+fn takesFence(open: ?Fence, trimmed: []const u8) bool {
+    const found = fenceOf(trimmed) orelse return false;
+    const current = open orelse return true;
+    if (found.mark != current.mark or found.len < current.len) return false;
+    return std.mem.trimStart(u8, trimmed[found.len..], " \t").len == 0;
+}
+
+fn cutAt(line: []const u8, trimmed: []const u8, mark: usize) usize {
+    return line.len - trimmed.len + mark;
 }
 
 fn heading(line: []const u8) ?usize {
@@ -120,16 +147,24 @@ fn codeLine(p: *paint.Painter, line: []const u8, column: flow.Column) paint.Erro
 
 fn links(p: *paint.Painter, line: []const u8, column: flow.Column) paint.Error!void {
     var at: usize = 0;
-    while (at < line.len and p.room() > 0) {
+    while (at < line.len) {
         if (line[at] == '[') {
             if (linkAt(line, at)) |found| {
+                if (text.width(found.label) > p.room() and p.column > column.left) {
+                    try p.end();
+                    try p.to(column.left);
+                }
                 try p.link(.accent, found.url, found.label);
                 at = found.next;
                 continue;
             }
         }
         const c = text.char(line, at);
-        if (!try p.char(column.style, c)) return;
+        if (!try p.char(column.style, c)) {
+            try p.end();
+            try p.to(column.left);
+            if (!try p.char(column.style, c)) return;
+        }
         at += c.len;
     }
 }
@@ -181,6 +216,26 @@ test "an open fence does not swallow the following paragraph" {
     var p = paint.Painter.init(&out, 40);
     try blocks(&p, "```\ncode\n", .{ .left = 0, .measure = 30, .style = .plain, .marks = .prose });
     try std.testing.expect(std.mem.indexOf(u8, out.buffered(), "code") != null);
+}
+
+test "a longer fence keeps an inner fence as code" {
+    var buffer: [512]u8 = undefined;
+    var out: std.Io.Writer = .fixed(&buffer);
+    var p = paint.Painter.init(&out, 80);
+    try blocks(&p, "````\n[docs](https://example.test)\n````", .{ .left = 0, .measure = 70, .style = .plain, .marks = .prose });
+    try std.testing.expect(std.mem.indexOf(u8, out.buffered(), "\x1b]8;;") == null);
+    try std.testing.expect(std.mem.indexOf(u8, out.buffered(), "docs") != null);
+}
+
+test "a long quote keeps the tail of the line" {
+    var buffer: [1024]u8 = undefined;
+    var out: std.Io.Writer = .fixed(&buffer);
+    var p = paint.Painter.init(&out, 40);
+    const quote = "> abcdefghijabcdefghijabcdefghijabcdefghij";
+    try blocks(&p, quote, .{ .left = 0, .measure = 12, .style = .plain, .marks = .prose });
+    const drawn = out.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "…") == null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "abcdefghijabcdefghij") != null);
 }
 
 test "wide characters keep their columns inside a list" {

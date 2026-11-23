@@ -63,6 +63,8 @@ var saved_unix: if (is_windows) void else ?posix.termios = if (is_windows) {} el
 var saved_win: if (is_windows) ?WinModes else void = if (is_windows) null else {};
 var alternate: bool = false;
 var resize_armed: bool = false;
+var pending_unit: u16 = 0;
+var sgr_drop_until: i64 = 0;
 var winch_read: if (is_windows) void else posix.fd_t = if (is_windows) {} else -1;
 var winch_write: if (is_windows) void else posix.fd_t = if (is_windows) {} else -1;
 
@@ -74,6 +76,7 @@ const WinModes = struct {
 const ENABLE_PROCESSED_INPUT: u32 = 0x0001;
 const ENABLE_LINE_INPUT: u32 = 0x0002;
 const ENABLE_ECHO_INPUT: u32 = 0x0004;
+const ENABLE_WINDOW_INPUT: u32 = 0x0008;
 const ENABLE_VIRTUAL_TERMINAL_INPUT: u32 = 0x0200;
 const ENABLE_VIRTUAL_TERMINAL_PROCESSING: u32 = 0x0004;
 
@@ -184,47 +187,93 @@ pub fn readEvent(buf: []u8, filled: *usize) Error!?Event {
         if (n == 0) return .lost;
         filled.* = n;
     }
+    dropPendingSgr(buf, filled);
+    if (filled.* == 0) return null;
     return finishParse(buf, filled);
 }
 
 fn finishParse(buf: []u8, filled: *usize) Error!?Event {
-    var used: usize = 0;
-    if (parseOne(buf[0..filled.*], &used)) |event| {
-        const rest = filled.* - used;
-        if (rest > 0) @memmove(buf[0..rest], buf[used..filled.*]);
-        filled.* = rest;
-        return event;
-    }
-    if (buf[0] != 0x1b and filled.* < 4) {
-        if (!waitReadable(50)) {
+    if (takeParsed(buf, filled)) |event| return event;
+    const short = buf[0] != 0x1b and filled.* < 4;
+    switch (try continueRead(buf, filled)) {
+        .timeout => {
+            if (short) {
+                filled.* = 0;
+                return null;
+            }
+            const lone = filled.* == 1 and buf[0] == 0x1b;
+            if (!lone and std.mem.startsWith(u8, buf[0..filled.*], "\x1b[<")) {
+                sgr_drop_until = nowMs() + 50;
+            }
             filled.* = 0;
+            if (lone) return .{ .key = .{ .code = .esc } };
             return null;
-        }
-    } else if (!waitReadable(50)) {
-        const lone = filled.* == 1 and buf[0] == 0x1b;
-        filled.* = 0;
-        if (lone) return .{ .key = .{ .code = .esc } };
-        return null;
+        },
+        .resize => return .{ .resize = size() },
+        .grew => {},
     }
-    if (filled.* == buf.len) {
-        @memmove(buf[0 .. filled.* - 1], buf[1..filled.*]);
-        filled.* -= 1;
-    }
-    const n = readStdin(buf[filled.*..]) catch return .lost;
-    if (n == 0) return .lost;
-    filled.* += n;
-    used = 0;
-    if (parseOne(buf[0..filled.*], &used)) |event| {
-        const rest = filled.* - used;
-        if (rest > 0) @memmove(buf[0..rest], buf[used..filled.*]);
-        filled.* = rest;
-        return event;
-    }
-    if (buf[0] == 0x1b) {
-        filled.* = 0;
-        return null;
-    }
+    if (filled.* == 0) return null;
+    if (takeParsed(buf, filled)) |event| return event;
     return null;
+}
+
+const ReadStep = enum { timeout, resize, grew };
+
+fn continueRead(buf: []u8, filled: *usize) Error!ReadStep {
+    switch (wake(50)) {
+        .none => return .timeout,
+        .resize => {
+            _ = drainWinch();
+            return .resize;
+        },
+        .stdin => {
+            if (filled.* == buf.len) {
+                @memmove(buf[0 .. filled.* - 1], buf[1..filled.*]);
+                filled.* -= 1;
+            }
+            const n = try readStdin(buf[filled.*..]);
+            if (n == 0) return error.Unexpected;
+            filled.* += n;
+            dropPendingSgr(buf, filled);
+            return .grew;
+        },
+    }
+}
+
+fn takeParsed(buf: []u8, filled: *usize) ?Event {
+    var used: usize = 0;
+    const event = parseOne(buf[0..filled.*], &used) orelse return null;
+    const rest = filled.* - used;
+    if (rest > 0) @memmove(buf[0..rest], buf[used..filled.*]);
+    filled.* = rest;
+    return event;
+}
+
+fn dropPendingSgr(buf: []u8, filled: *usize) void {
+    if (sgr_drop_until == 0) return;
+    if (nowMs() > sgr_drop_until) {
+        sgr_drop_until = 0;
+        return;
+    }
+    var i: usize = 0;
+    var closed = false;
+    while (i < filled.*) {
+        const b = buf[i];
+        if ((b >= '0' and b <= '9') or b == ';') {
+            i += 1;
+            continue;
+        }
+        if (b == 'M' or b == 'm') {
+            i += 1;
+            closed = true;
+        }
+        break;
+    }
+    if (i == 0) return;
+    const rest = filled.* - i;
+    if (rest > 0) @memmove(buf[0..rest], buf[i..filled.*]);
+    filled.* = rest;
+    if (closed) sgr_drop_until = 0;
 }
 
 fn partialEscape(buf: []const u8) enum { esc, discard } {
@@ -346,10 +395,7 @@ fn readEventWindows() Error!?Event {
                 0x26 => .up,
                 0x27 => .right,
                 0x28 => .down,
-                else => if (record.event.key.unicode >= 32)
-                    .{ .char = record.event.key.unicode }
-                else
-                    .unknown,
+                else => return windowsKey(record.event.key.unicode, mods),
             };
             return .{ .key = .{ .code = code, .modifiers = mods } };
         },
@@ -362,15 +408,67 @@ fn readStdin(buf: []u8) Error!usize {
     return posix.read(posix.STDIN_FILENO, buf) catch return error.Unexpected;
 }
 
-pub fn waitReadable(timeout_ms: i32) bool {
-    if (is_windows) return waitReadableWindows(timeout_ms);
+const Wake = enum { stdin, resize, none };
+
+fn wake(timeout_ms: i32) Wake {
+    if (is_windows) return if (waitReadableWindows(timeout_ms)) .stdin else .none;
     var fds = [_]posix.pollfd{
         .{ .fd = posix.STDIN_FILENO, .events = posix.POLL.IN, .revents = 0 },
         .{ .fd = winch_read, .events = posix.POLL.IN, .revents = 0 },
     };
     const nfd: usize = if (winch_read >= 0) 2 else 1;
-    const n = posix.poll(fds[0..nfd], timeout_ms) catch return false;
-    return n > 0;
+    const n = posix.poll(fds[0..nfd], timeout_ms) catch return .none;
+    if (n <= 0) return .none;
+    if (fds[0].revents & posix.POLL.IN != 0) return .stdin;
+    return .resize;
+}
+
+pub fn waitReadable(timeout_ms: i32) bool {
+    if (is_windows) return waitReadableWindows(timeout_ms);
+    return wake(timeout_ms) != .none;
+}
+
+fn windowsKey(unit: u16, mods: Modifiers) ?Event {
+    if (utf16Unit(&pending_unit, unit)) |cp| {
+        if (cp < 32) {
+            const letter = controlLetter(unit) orelse return .{ .key = .{ .code = .unknown, .modifiers = mods } };
+            var marked = mods;
+            marked.control = true;
+            return .{ .key = .{ .code = .{ .char = letter }, .modifiers = marked } };
+        }
+        return .{ .key = .{ .code = .{ .char = cp }, .modifiers = mods } };
+    }
+    return null;
+}
+
+fn utf16Unit(pending: *u16, unit: u16) ?u21 {
+    if (unit >= 0xD800 and unit <= 0xDBFF) {
+        pending.* = unit;
+        return null;
+    }
+    if (unit >= 0xDC00 and unit <= 0xDFFF) {
+        if (pending.* < 0xD800 or pending.* > 0xDBFF) {
+            pending.* = 0;
+            return null;
+        }
+        const high = pending.*;
+        pending.* = 0;
+        return 0x10000 + (@as(u21, high - 0xD800) << 10) + @as(u21, unit - 0xDC00);
+    }
+    pending.* = 0;
+    return unit;
+}
+
+fn controlLetter(unit: u16) ?u21 {
+    if (unit == 0 or unit >= 32) return null;
+    return @as(u21, unit) | 0x60;
+}
+
+fn nowMs() i64 {
+    if (is_windows) return 0;
+    var ts: posix.timespec = undefined;
+    if (posix.errno(posix.system.clock_gettime(posix.CLOCK.REALTIME, &ts)) != .SUCCESS) return 0;
+    return @as(i64, ts.sec) * 1000 + @divTrunc(@as(i64, ts.nsec), std.time.ns_per_ms);
 }
 
 pub fn parseOne(input: []const u8, used: *usize) ?Event {
@@ -630,7 +728,7 @@ fn enableRawWindows() Error!void {
         if (!WinApi.GetConsoleMode(out_h, &out_mode).toBool()) return error.NotATerminal;
         saved_win = .{ .in_mode = in_mode, .out_mode = out_mode };
         const new_in = (in_mode & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT)) |
-            ENABLE_VIRTUAL_TERMINAL_INPUT;
+            ENABLE_VIRTUAL_TERMINAL_INPUT | ENABLE_WINDOW_INPUT;
         const new_out = out_mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
         if (!WinApi.SetConsoleMode(in_h, new_in).toBool()) return error.NotATerminal;
         if (!WinApi.SetConsoleMode(out_h, new_out).toBool()) return error.NotATerminal;
@@ -730,6 +828,26 @@ test "parser reads arrows, delete, and back-tab" {
     const back = parseOne("\x1b[Z", &used).?;
     try std.testing.expectEqual(Code.back_tab, back.key.code);
     try std.testing.expect(back.key.modifiers.shift);
+}
+
+test "a surrogate pair is one scalar and a control unit keeps its letter" {
+    var pending: u16 = 0;
+    try std.testing.expect(utf16Unit(&pending, 0xD83D) == null);
+    try std.testing.expectEqual(@as(u21, 0x1F600), utf16Unit(&pending, 0xDE00).?);
+    pending = 0;
+    try std.testing.expect(utf16Unit(&pending, 0xDE00) == null);
+    try std.testing.expectEqual(@as(?u21, 'o'), controlLetter(0x0f));
+}
+
+test "a discarded sgr tail stops at its terminator" {
+    sgr_drop_until = nowMs() + 1000;
+    defer sgr_drop_until = 0;
+    var buf = [_]u8{ ';', '6', 'M', 'a' };
+    var filled: usize = buf.len;
+    dropPendingSgr(&buf, &filled);
+    try std.testing.expectEqual(@as(usize, 1), filled);
+    try std.testing.expectEqual(@as(u8, 'a'), buf[0]);
+    try std.testing.expectEqual(@as(i64, 0), sgr_drop_until);
 }
 
 test "a partial escape becomes esc only when it is a lone escape" {
