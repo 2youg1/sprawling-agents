@@ -75,6 +75,7 @@ pub const Editor = struct {
     pub fn set(self: *Editor, value: []const u8) !void {
         self.goal = null;
         self.text.clearRetainingCapacity();
+        self.cursor = 0;
         try self.paste(value);
         self.cursor = self.text.items.len;
     }
@@ -324,6 +325,17 @@ test "insert paste and cursor motion" {
     defer std.testing.allocator.free(t);
     try std.testing.expectEqualStrings("xabc", t);
     try std.testing.expectEqual(@as(usize, 1), ed.cursorAt());
+}
+
+test "set replaces text when the cursor is not at the start" {
+    var ed = Editor.init(std.testing.allocator);
+    defer ed.deinit();
+    try ed.set("/quit");
+    try ed.set("/quit");
+    const text = try ed.textOwned();
+    defer std.testing.allocator.free(text);
+    try std.testing.expectEqualStrings("/quit", text);
+    try std.testing.expectEqual(@as(usize, 5), ed.cursorAt());
 }
 
 test "backslash at end continues the line" {

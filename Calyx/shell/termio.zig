@@ -79,6 +79,31 @@ const ENABLE_ECHO_INPUT: u32 = 0x0004;
 const ENABLE_WINDOW_INPUT: u32 = 0x0008;
 const ENABLE_VIRTUAL_TERMINAL_INPUT: u32 = 0x0200;
 const ENABLE_VIRTUAL_TERMINAL_PROCESSING: u32 = 0x0004;
+const ENABLE_MOUSE_INPUT: u32 = 0x0010;
+
+const InputBackend = enum { virtual_terminal, windows_console };
+
+const InputProtocols = struct {
+    kitty_keyboard: bool,
+    bracketed_paste: bool,
+    sgr_mouse: bool,
+};
+
+fn inputProtocols(backend: InputBackend) InputProtocols {
+    return switch (backend) {
+        .virtual_terminal => .{ .kitty_keyboard = true, .bracketed_paste = true, .sgr_mouse = true },
+        .windows_console => .{ .kitty_keyboard = false, .bracketed_paste = false, .sgr_mouse = false },
+    };
+}
+
+fn activeInputBackend() InputBackend {
+    return if (is_windows) .windows_console else .virtual_terminal;
+}
+
+fn windowsRawInputMode(mode: u32) u32 {
+    return (mode & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT)) |
+        ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
+}
 
 pub fn enableRaw() Error!void {
     if (is_windows) return enableRawWindows();
@@ -133,19 +158,23 @@ pub fn setCursorStyle(style: CursorStyle) Error!void {
 }
 
 pub fn enhanceKeyboard() Error!void {
-    try writeAll("\x1b[>1u\x1b[?2004h");
+    const protocols = inputProtocols(activeInputBackend());
+    if (protocols.kitty_keyboard) try writeAll("\x1b[>1u");
+    if (protocols.bracketed_paste) try writeAll("\x1b[?2004h");
 }
 
 pub fn plainKeyboard() Error!void {
-    try writeAll("\x1b[<u\x1b[?2004l");
+    const protocols = inputProtocols(activeInputBackend());
+    if (protocols.kitty_keyboard) try writeAll("\x1b[<u");
+    if (protocols.bracketed_paste) try writeAll("\x1b[?2004l");
 }
 
 pub fn trackPointer() Error!void {
-    try writeAll("\x1b[?1000h\x1b[?1006h");
+    if (inputProtocols(activeInputBackend()).sgr_mouse) try writeAll("\x1b[?1000h\x1b[?1006h");
 }
 
 pub fn untrackPointer() Error!void {
-    try writeAll("\x1b[?1000l\x1b[?1006l");
+    if (inputProtocols(activeInputBackend()).sgr_mouse) try writeAll("\x1b[?1000l\x1b[?1006l");
 }
 
 pub fn setTitle(title: []const u8) Error!void {
@@ -377,27 +406,11 @@ fn readEventWindows() Error!?Event {
         },
         KEY_EVENT => {
             if (record.event.key.down == 0) return null;
-            const control = record.event.key.control;
-            const mods: Modifiers = .{
-                .shift = control & 0x0010 != 0,
-                .alt = control & 0x0003 != 0,
-                .control = control & 0x000c != 0,
-            };
-            const code: Code = switch (record.event.key.virtual_key) {
-                0x0d => .enter,
-                0x1b => .esc,
-                0x08 => .backspace,
-                0x09 => if (mods.shift) .back_tab else .tab,
-                0x2e => .delete,
-                0x24 => .home,
-                0x23 => .end,
-                0x25 => .left,
-                0x26 => .up,
-                0x27 => .right,
-                0x28 => .down,
-                else => return windowsKey(record.event.key.unicode, mods),
-            };
-            return .{ .key = .{ .code = code, .modifiers = mods } };
+            return windowsKeyEvent(
+                record.event.key.virtual_key,
+                record.event.key.unicode,
+                record.event.key.control,
+            );
         },
         else => return null,
     }
@@ -439,6 +452,29 @@ fn windowsKey(unit: u16, mods: Modifiers) ?Event {
         return .{ .key = .{ .code = .{ .char = cp }, .modifiers = mods } };
     }
     return null;
+}
+
+fn windowsKeyEvent(virtual_key: u16, unit: u16, control: u32) ?Event {
+    const mods: Modifiers = .{
+        .shift = control & 0x0010 != 0,
+        .alt = control & 0x0003 != 0,
+        .control = control & 0x000c != 0,
+    };
+    const code: Code = switch (virtual_key) {
+        0x0d => .enter,
+        0x1b => .esc,
+        0x08 => .backspace,
+        0x09 => if (mods.shift) .back_tab else .tab,
+        0x2e => .delete,
+        0x24 => .home,
+        0x23 => .end,
+        0x25 => .left,
+        0x26 => .up,
+        0x27 => .right,
+        0x28 => .down,
+        else => return windowsKey(unit, mods),
+    };
+    return .{ .key = .{ .code = code, .modifiers = mods } };
 }
 
 fn utf16Unit(pending: *u16, unit: u16) ?u21 {
@@ -727,8 +763,7 @@ fn enableRawWindows() Error!void {
         if (!WinApi.GetConsoleMode(in_h, &in_mode).toBool()) return error.NotATerminal;
         if (!WinApi.GetConsoleMode(out_h, &out_mode).toBool()) return error.NotATerminal;
         saved_win = .{ .in_mode = in_mode, .out_mode = out_mode };
-        const new_in = (in_mode & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT)) |
-            ENABLE_VIRTUAL_TERMINAL_INPUT | ENABLE_WINDOW_INPUT;
+        const new_in = windowsRawInputMode(in_mode);
         const new_out = out_mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
         if (!WinApi.SetConsoleMode(in_h, new_in).toBool()) return error.NotATerminal;
         if (!WinApi.SetConsoleMode(out_h, new_out).toBool()) return error.NotATerminal;
@@ -837,6 +872,54 @@ test "a surrogate pair is one scalar and a control unit keeps its letter" {
     pending = 0;
     try std.testing.expect(utf16Unit(&pending, 0xDE00) == null);
     try std.testing.expectEqual(@as(?u21, 'o'), controlLetter(0x0f));
+}
+
+test "Windows key records preserve navigation and committed Unicode" {
+    const pending = pending_unit;
+    pending_unit = 0;
+    defer pending_unit = pending;
+    const up = windowsKeyEvent(0x26, 0, 0).?;
+    try std.testing.expectEqual(Code.up, up.key.code);
+    const letter = windowsKeyEvent(0x41, 'a', 0).?;
+    try std.testing.expectEqual(Code{ .char = 'a' }, letter.key.code);
+    _ = windowsKeyEvent(0xe7, 0xd83d, 0);
+    const emoji = windowsKeyEvent(0xe7, 0xde00, 0).?;
+    try std.testing.expectEqual(Code{ .char = 0x1f600 }, emoji.key.code);
+}
+
+test "seeded Windows keyboard record fuzz emits only Unicode scalars" {
+    const pending = pending_unit;
+    pending_unit = 0;
+    defer pending_unit = pending;
+    var prng = std.Random.DefaultPrng.init(0x7110_0b1e);
+    const random = prng.random();
+    var round: usize = 0;
+    while (round < 8192) : (round += 1) {
+        const pair = round % 64;
+        const virtual_key: u16 = if (pair < 2) 0xe7 else random.int(u16);
+        const unit: u16 = if (pair == 0) 0xd83d else if (pair == 1) 0xde00 else random.int(u16);
+        if (windowsKeyEvent(virtual_key, unit, random.int(u32))) |event| {
+            switch (event) {
+                .key => |key| switch (key.code) {
+                    .char => |scalar| try std.testing.expect(scalar < 0xd800 or scalar > 0xdfff),
+                    else => {},
+                },
+                else => {},
+            }
+        }
+    }
+}
+
+test "Windows input records do not negotiate VT key, paste, or pointer streams" {
+    try std.testing.expectEqual(
+        InputProtocols{ .kitty_keyboard = false, .bracketed_paste = false, .sgr_mouse = false },
+        inputProtocols(.windows_console),
+    );
+}
+
+test "Windows raw input mode reads native window and mouse records" {
+    const original = ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT;
+    try std.testing.expectEqual(ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT, windowsRawInputMode(original));
 }
 
 test "a discarded sgr tail stops at its terminator" {
