@@ -39,7 +39,7 @@ pub(crate) fn response_wire(kind: DialectKind, resp: &ChatResponse) -> Result<se
                                     // 响应侧的反方向只供测试：造 provider 回复、证往返（wire→canonical→wire 等值）；生产里没有调用者，所以不编进发行的二进制
 ```
 
-- **保三样**：①断点位——canonical 的 `cache: true` 标记翻到 Anthropic 侧＝`cache_control{type:"ephemeral"}`，system 块逐块原位，被标记的消息落在它的最后一块上（缓存区到这一块结束为止）；断点放在哪由 `runtime::prefix::BreakpointPlan` 决定，兼容格式只拼写；OpenAI 侧无显式断点（供应商缓存是隐式前缀匹配），翻译**记录性丢弃**（文档声明，不静默）；②工具形状——`ToolDef{name, description, input_schema}`↔Anthropic `tools[]`／OpenAI `tools[{type:"function",function:{…}}]`，逐字段；tool_use↔tool_calls（id/name/args 无失）；③usage——Anthropic `usage{input_tokens,output_tokens,cache_read_input_tokens,cache_creation_input_tokens}`／OpenAI `usage{prompt_tokens,completion_tokens,prompt_tokens_details.cached_tokens}`→`ModelUsage` 四整数字段加 `dialect`，缺失字段取 0。`input_tokens` 在每个兼容格式下都是整个 prompt（`Sprawling/kernel/Spec.lean` 的 `ModelUsage`）：OpenAI 两面的 `prompt_tokens`／`input_tokens` 本就含缓存部分，照抄；Anthropic 的 `input_tokens` 只数未命中缓存的部分，解析时加上 `cache_read_input_tokens` 与 `cache_creation_input_tokens`，写回线上时减回去。`cost::settle` 按输入价计的是 `input_tokens` 减去两个缓存数。
+- **保三样**：①断点位——canonical 的 `cache: true` 标记翻到 Anthropic 侧＝`cache_control{type:"ephemeral"}`，system 块逐块原位，被标记的消息落在它的最后一块上（缓存区到这一块结束为止）；断点放在哪由 `runtime::prefix::BreakpointPlan` 决定，兼容格式只拼写；OpenAI 侧无显式断点（供应商缓存是隐式前缀匹配），翻译**记录性丢弃**（文档声明，不静默）；②工具形状——`ToolDef{name, description, input_schema}`↔Anthropic `tools[]`／OpenAI `tools[{type:"function",function:{…}}]`，逐字段；tool_use↔tool_calls（对 wire 文法有效的 id、name 与 args 无失；Anthropic 侧见 D49）；③usage——Anthropic `usage{input_tokens,output_tokens,cache_read_input_tokens,cache_creation_input_tokens}`／OpenAI `usage{prompt_tokens,completion_tokens,prompt_tokens_details.cached_tokens}`→`ModelUsage` 四整数字段加 `dialect`，缺失字段取 0。`input_tokens` 在每个兼容格式下都是整个 prompt（`Sprawling/kernel/Spec.lean` 的 `ModelUsage`）：OpenAI 两面的 `prompt_tokens`／`input_tokens` 本就含缓存部分，照抄；Anthropic 的 `input_tokens` 只数未命中缓存的部分，解析时加上 `cache_read_input_tokens` 与 `cache_creation_input_tokens`，写回线上时减回去。`cost::settle` 按输入价计的是 `input_tokens` 减去两个缓存数。
 - 未知 wire 字段：请求侧不产（我们只写自己声明的字段＋overrides）；响应侧忽略未知键、缺必需键报 `E_WIRE_MISMATCH`（subject 写键路径）。
 - canonical 枚举（Role／StopReason／ContentBlock）是闭的，本模块对每一支写出真实的臂；新增一支即在两种兼容格式里同时编译失败，这正是要的，所以没有 fail-closed 通配臂；wire JSON 键序＝serde_json BTreeMap 字典序（确定性，对端语义无关）。
 - `E_ENDPOINT_DIALECT_UNSUPPORTED`：DialectKind 之外的兼容格式请求（wire 探查失败）；本模块两码之外不新增。
@@ -92,6 +92,12 @@ impl ImageBytes {
 - **OpenAI 侧**：user 消息的 `content` 由字符串改写为部件数组 `[{type:"text",text},{type:"image_url",image_url:{url:"data:<mime>;base64,…"}}]`。
 - **工具产出的图随主机与接口面走**（`ChatSpelling.chat_tool_pictures`／`responses_tool_pictures`，§8-17）。`FollowingUser` 把 tool_result 的 `attachments` 落到紧跟其后的一条 user 消息里——图没丢，丢的是「这张图是那次工具调用的结果」这层归属；与断点位、思考块同一规则，**文档声明，不静默**，由测试钉住。`InToolContent` 把图留在 tool 结果上：chat 面写 `role:"tool"` 的部件数组（含 `image_url`），responses 面写 `function_call_output.output` 的部件列表（含 `input_image`）。DeepSeek 的 chat 面是 `FollowingUser`，responses 面是 `InToolContent`；Kimi 的 chat 面是 `InToolContent`；未登记主机两面都取 `FollowingUser`。
 - **base64 依赖**：`base64 0.22` 本就在 `Cargo.lock` 的图里（reqwest／git2 一系已携），直接命名不向锁里添包；自己写一份编码器才是新权威。
+-/
+
+/-! D49 Anthropic 工具 id 在 wire 边界归一化
+
+决定：Anthropic 请求序列化保留非空 ASCII `[A-Za-z0-9_-]+` 的工具 id（包括 `tu_1`、`call-1`）；其他拼法换成 `toolu_` 加 BLAKE3 摘要前十六位小写十六进制，`tool_use.id` 与对应结果的 `tool_use_id` 使用相同映射。理由：账本对所有字符串统一脱敏，分叉会话会把 `secret:redacted/<十六进制>` 当作工具 id 重建；Anthropic 拒收该字符集之外的 id。被否的备选是让 runtime 为工具 id 增加脱敏例外——那会令隐私扫描依赖调用上下文。
+-/
 
 /-! D66 工具产出的图按主机与接口面选择位置，DeepSeek 的 chat 与 responses 不共用一档
 
@@ -114,5 +120,4 @@ impl ImageBytes {
 决定：`pictures_in` 按 locator 规范拼写去重并保留第一次出现的顺序，`pictures_for` 对不同图片的数量执行 `IMAGES_PER_TURN` 准入，同一 locator 只兑付一次；`ImageBytes::insert` 立即写成标准 base64，`encoded` 借用这段文本。重复出现的图片在 wire 上仍各守原位置，去重的是请求上限的计数对象、CAS 读取与编码工作，不改变图片块的数量或顺序。
 
 理由：同一张图重复引用不应重复读盘；四张图的原始字节也不必等所有图片都读完后仍与全部 base64 同时驻留。被否：①把原始字节保留到 `encoded` 每次现编——重复块重复付 CPU，峰值同时持有两族字节；②跨请求 LRU——单次请求的不同图片数量已有上限，缓存读取又要求已发送 Conversation 不变（runtime D129），没有测量证明值得再引进淘汰状态与容量规则。
--/
 -/

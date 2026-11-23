@@ -10,6 +10,8 @@ mod responses;
 
 pub use images::ImageBytes;
 pub use request::request_wire;
+#[cfg(test)]
+pub(crate) use request::sample_request;
 pub(crate) use response::StreamFrames;
 #[cfg(test)]
 pub(crate) use response::response_wire;
