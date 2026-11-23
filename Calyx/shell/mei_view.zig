@@ -83,6 +83,7 @@ pub fn render(
     region: write.Live,
     columns: u16,
     rows: u16,
+    dim: bool,
     hits: *std.ArrayList(Hit),
 ) ![]u8 {
     var arena_state = std.heap.ArenaAllocator.init(gpa);
@@ -116,7 +117,7 @@ pub fn render(
         try entries.append(arena, .{ .reply = draft });
         try marks.append(arena, viewport.no_card);
     }
-    return viewport.draw(gpa, entries.items, marks.items, region, columns, rows, false, hits);
+    return viewport.draw(gpa, entries.items, marks.items, region, columns, rows, false, dim, hits);
 }
 
 fn foldWord(fold: Fold, focused: bool) []const u8 {
@@ -184,23 +185,23 @@ test "a python card defaults to elapsed time and cycles four ways" {
             .offer = "",
         },
     };
-    const timed = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &hits);
+    const timed = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, false, &hits);
     defer gpa.free(timed);
     try std.testing.expect(std.mem.indexOf(u8, timed, "1.5 s") != null);
     try std.testing.expect(std.mem.indexOf(u8, timed, "print(1)") == null);
     try std.testing.expect(std.mem.indexOf(u8, timed, "/web") == null);
     card.cycle();
-    const source = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &hits);
+    const source = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, false, &hits);
     defer gpa.free(source);
     try std.testing.expect(std.mem.indexOf(u8, source, "print(1)") != null);
     try std.testing.expect(std.mem.indexOf(u8, source, "RESULT") == null);
     card.cycle();
-    const output = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &hits);
+    const output = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, false, &hits);
     defer gpa.free(output);
     try std.testing.expect(std.mem.indexOf(u8, output, "print(1)") == null);
     try std.testing.expect(std.mem.indexOf(u8, output, "RESULT") != null);
     card.cycle();
-    const both = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &hits);
+    const both = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, false, &hits);
     defer gpa.free(both);
     try std.testing.expect(std.mem.indexOf(u8, both, "print(1)") != null);
     try std.testing.expect(std.mem.indexOf(u8, both, "RESULT") != null);
@@ -225,7 +226,7 @@ test "the user line stays in the frame above a long reply" {
             .offer = "model · effort high",
         },
     };
-    const bytes = try render(gpa, &log, &.{}, 0, "还在写", region, 80, 24, &hits);
+    const bytes = try render(gpa, &log, &.{}, 0, "还在写", region, 80, 24, false, &hits);
     defer gpa.free(bytes);
     try std.testing.expect(std.mem.indexOf(u8, bytes, "用户的问题") != null);
     try std.testing.expect(std.mem.indexOf(u8, bytes, "还在写") != null);

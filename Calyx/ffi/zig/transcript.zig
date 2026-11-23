@@ -9,6 +9,7 @@ const scene = @import("scene.zig");
 const paint = @import("paint.zig");
 const format = @import("format.zig");
 const flow = @import("flow.zig");
+const prose = @import("prose.zig");
 const text = @import("text.zig");
 const Grid = @import("grid.zig").Grid;
 
@@ -136,7 +137,7 @@ fn tool(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
 
 fn reply(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const said = try r.text();
-    try flow.flow(p, std.mem.trim(u8, said, "\n"), .{ .left = grid.words, .measure = grid.measure(), .style = .plain, .marks = .prose });
+    try prose.blocks(p, std.mem.trim(u8, said, "\n"), .{ .left = grid.words, .measure = grid.measure(), .style = .plain, .marks = .prose });
 }
 
 fn note(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {

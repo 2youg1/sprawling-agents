@@ -77,6 +77,7 @@ pub fn draw(
     columns: u16,
     rows: u16,
     show_web: bool,
+    dim: bool,
     hits: *std.ArrayList(Hit),
 ) Error![]u8 {
     hits.clearRetainingCapacity();
@@ -117,10 +118,19 @@ pub fn draw(
     const live_at = r;
     const live_h = try liveHeight(live_at, cols);
     if (live_h >= window) {
+        const shape = live.typedShape(region.composer.typed, region.composer.cursor, cols);
+        const non_text = live_h -| shape.rows;
+        var text_rows = window -| non_text;
+        if (text_rows == 0) text_rows = 1;
+        var text_skip: usize = 0;
+        if (shape.rows > text_rows) {
+            if (shape.cursor + 1 > text_rows) text_skip = shape.cursor + 1 - text_rows;
+            const max_skip = shape.rows - text_rows;
+            if (text_skip > max_skip) text_skip = max_skip;
+        }
         var live_reader = live_at;
-        var clip = Clip.init(&aw.writer, live_h - window);
-        var p = paint.Painter.init(&clip.writer, cols);
-        const cursor = try live.region(&p, &live_reader, Grid.of(&p));
+        var p = paint.Painter.init(&aw.writer, cols);
+        const cursor = try live.regionShown(&p, &live_reader, Grid.of(&p), .{ .skip = text_skip, .rows = text_rows });
         try place(&aw.writer, &p, cursor);
         try aw.writer.writeAll("\x1b[?25h\x1b[?2026l");
         return try aw.toOwnedSlice();
@@ -128,7 +138,7 @@ pub fn draw(
     const budget = window - live_h;
     const banner_rows: usize = if (banner and budget >= 1) 1 else 0;
     const content_budget = budget - banner_rows;
-    const visible = @min(content_rows, content_budget);
+    const visible = if (dim) 0 else @min(content_rows, content_budget);
     const skip = content_rows - visible;
     r = saved;
     if (banner) {
@@ -238,7 +248,7 @@ fn frameOf(
             .offer = "model",
         },
     };
-    return draw(gpa, entries, &.{}, live_region, columns, rows, web, &hits);
+    return draw(gpa, entries, &.{}, live_region, columns, rows, web, false, &hits);
 }
 
 test "mei viewport clears, anchors the composer, and omits the web hint" {
@@ -297,6 +307,50 @@ test "narrow and wide windows wrap CJK on different rows" {
     try std.testing.expect(std.mem.indexOf(u8, narrow, "中文") != null);
 }
 
+test "a tall composer keeps the cursor line and the status row" {
+    const gpa = std.testing.allocator;
+    var storage: [40 * 4]u8 = undefined;
+    var at: usize = 0;
+    for (0..40) |i| {
+        if (i > 0) {
+            storage[at] = '\n';
+            at += 1;
+        }
+        storage[at] = 'L';
+        storage[at + 1] = '0' + @as(u8, @intCast(i / 10));
+        storage[at + 2] = '0' + @as(u8, @intCast(i % 10));
+        at += 3;
+    }
+    const typed = storage[0..at];
+    const cases = [_]usize{ 0, 20, 39 };
+    for (cases) |line| {
+        var seen_lines: usize = 0;
+        var cursor: usize = 0;
+        while (cursor < typed.len and seen_lines < line) : (cursor += 1) {
+            if (typed[cursor] == '\n') seen_lines += 1;
+        }
+        if (cursor < typed.len and typed[cursor] == '\n') cursor += 1;
+        var hits: std.ArrayList(Hit) = .empty;
+        defer hits.deinit(gpa);
+        const region: write.Live = .{
+            .composer = .{
+                .typed = typed,
+                .cursor = cursor,
+                .placeholder = "to Mei…",
+                .room = "Mei",
+                .offer = "model",
+            },
+        };
+        const bytes = try draw(gpa, &.{}, &.{}, region, 80, 24, false, false, &hits);
+        defer gpa.free(bytes);
+        var label = [_]u8{ 'L', '0' + @as(u8, @intCast(line / 10)), '0' + @as(u8, @intCast(line % 10)) };
+        try std.testing.expect(std.mem.indexOf(u8, bytes, &label) != null);
+        try std.testing.expect(std.mem.indexOf(u8, bytes, "Mei") != null);
+        if (line == 0) try std.testing.expect(std.mem.indexOf(u8, bytes, "L39") == null);
+        if (line == 39) try std.testing.expect(std.mem.indexOf(u8, bytes, "L00") == null);
+    }
+}
+
 test "a click hit names the visible python card" {
     const gpa = std.testing.allocator;
     const entries = [_]write.Entry{
@@ -315,7 +369,7 @@ test "a click hit names the visible python card" {
             .offer = "",
         },
     };
-    const bytes = try draw(gpa, &entries, &marks, region, 80, 24, false, &hits);
+    const bytes = try draw(gpa, &entries, &marks, region, 80, 24, false, false, &hits);
     defer gpa.free(bytes);
     try std.testing.expect(hits.items.len >= 1);
     try std.testing.expectEqual(@as(u16, 3), hits.items[0].card);

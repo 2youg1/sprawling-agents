@@ -63,6 +63,8 @@ pub const Ui = struct {
     columns: u16 = 0,
     rows: u16 = 0,
     phase: u2 = 0,
+    settle: u2 = 0,
+    settle_ms: u64 = 0,
     hinted: bool = false,
     seen: observation.Seen,
     bus: mei_process.Bus,
@@ -226,13 +228,25 @@ pub const Ui = struct {
         const at = nowNs(self.io);
         if (self.cadence.due(at, false)) return 0;
         if (self.cadence.dirty) return self.cadence.waitMs(at);
+        if (self.settle == 2) {
+            const clock = nowMs(self.io);
+            if (clock >= self.settle_ms) return 0;
+            return @intCast(@min(self.settle_ms - clock, 1000));
+        }
         if (self.process != null or !self.replay_done or self.seen.since != null or self.seen.calling) return 50;
-        return 120;
+        if (!termio.resizeArmed()) return 1000;
+        return -1;
     }
 
     fn tick(self: *Ui) void {
-        const size = termio.size();
-        if (size.columns != self.columns or size.rows != self.rows) self.touch(true);
+        if (!termio.resizeArmed()) {
+            const size = termio.size();
+            if (size.columns != self.columns or size.rows != self.rows) self.noteResize();
+        }
+        if (self.settle == 2 and self.now() >= self.settle_ms) {
+            self.settle = 0;
+            self.touch(true);
+        }
         if (self.seen.since != null or self.seen.calling) {
             const phase: u2 = @intCast((self.now() / 160) % 4);
             if (phase != self.phase) {
@@ -250,7 +264,7 @@ pub const Ui = struct {
                 self.refilter();
                 self.touch(true);
             },
-            .resize => self.touch(true),
+            .resize => self.noteResize(),
             .lost => {
                 self.lost = true;
                 runtime.stop(self);
@@ -287,7 +301,7 @@ pub const Ui = struct {
             return null;
         }
         if (key.code == .up or key.code == .down) {
-            const edit: editor_mod.Edit = if (key.code == .up) .older else .newer;
+            const edit = historyMove(self.editor.cursorAt(), self.editor.text.items.len, self.editor.recalled != null, key.code == .up);
             self.editor.apply(edit) catch {};
             self.refilter();
             self.touch(true);
@@ -493,13 +507,15 @@ pub const Ui = struct {
         }
         const before = self.cards.items.len;
         for (entries) |entry| {
+            const paired = entry == .tool and std.mem.eql(u8, entry.tool.name, "python") and next < bodies.len;
+            if (paired) self.cards.ensureUnusedCapacity(self.gpa, 1) catch return;
             const owned = present.cloneEntry(self.log_arena.allocator(), entry) catch return;
             self.log.append(self.gpa, owned) catch return;
-            if (owned == .tool and std.mem.eql(u8, owned.tool.name, "python") and next < bodies.len) {
-                self.cards.append(self.gpa, .{
+            if (paired) {
+                self.cards.appendAssumeCapacity(.{
                     .code = bodies[next].code,
                     .output = bodies[next].output,
-                }) catch return;
+                });
                 next += 1;
             }
         }
@@ -545,8 +561,22 @@ pub const Ui = struct {
         self.cadence.presented(at);
     }
 
+    fn noteResize(self: *Ui) void {
+        const size = termio.size();
+        const dw = if (size.columns > self.columns) size.columns - self.columns else self.columns - size.columns;
+        const dh = if (size.rows > self.rows) size.rows - self.rows else self.rows - size.rows;
+        const room = size.columns >= 40 and size.rows >= 12;
+        if (self.columns != 0 and room and (dw >= 2 or dh >= 2)) self.settle = 1;
+        self.touch(true);
+    }
+
     fn redraw(self: *Ui) bool {
         const size = termio.size();
+        const dim = self.settle == 1;
+        if (self.settle == 1) {
+            self.settle = 2;
+            self.settle_ms = self.now() + 80;
+        }
         const typed = self.editor.textOwned() catch return false;
         defer self.gpa.free(typed);
         var offer_buf: [512]u8 = undefined;
@@ -611,6 +641,7 @@ pub const Ui = struct {
             live,
             size.columns,
             size.rows,
+            dim,
             &self.hits,
         ) catch return false;
         defer self.gpa.free(bytes);
@@ -665,6 +696,11 @@ pub const Ui = struct {
     }
 };
 
+fn historyMove(cursor: usize, len: usize, recalled: bool, up: bool) editor_mod.Edit {
+    if (up) return if (cursor == 0) .older else .line_up;
+    return if (recalled or cursor == len) .newer else .line_down;
+}
+
 const EscEffect = enum { clear_draft, stop_run, idle };
 
 fn escEffect(draft_empty: bool, running: bool) EscEffect {
@@ -702,6 +738,14 @@ fn nowNs(io: std.Io) u64 {
     const timestamp = std.Io.Clock.real.now(io);
     const nanoseconds = timestamp.toNanoseconds();
     return if (nanoseconds < 0) 0 else @intCast(nanoseconds);
+}
+
+test "mei moves within a line until the cursor is at its end" {
+    try std.testing.expectEqual(editor_mod.Edit.line_up, historyMove(3, 8, false, true));
+    try std.testing.expectEqual(editor_mod.Edit.older, historyMove(0, 8, false, true));
+    try std.testing.expectEqual(editor_mod.Edit.line_down, historyMove(3, 8, false, false));
+    try std.testing.expectEqual(editor_mod.Edit.newer, historyMove(8, 8, false, false));
+    try std.testing.expectEqual(editor_mod.Edit.newer, historyMove(2, 8, true, false));
 }
 
 test "idle Esc neither clears a draft nor stops a run" {

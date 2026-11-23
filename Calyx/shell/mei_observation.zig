@@ -350,6 +350,8 @@ pub const Seen = struct {
     }
 
     fn userMessage(self: *Seen, arena: std.mem.Allocator, content: std.json.Value, at: u64) ![]write.Entry {
+        const mark = self.bodies.items.len;
+        errdefer self.rollbackBodies(mark);
         if (content == .string) return try self.youUnlessEcho(arena, content.string, at);
         var entries: std.ArrayList(write.Entry) = .empty;
         if (content != .array) return try entries.toOwnedSlice(arena);
@@ -440,20 +442,29 @@ pub const Seen = struct {
     }
 
     fn takeCode(self: *Seen, id: []const u8) []u8 {
+        if (id.len == 0) {
+            if (self.pending.items.len == 0) return self.gpa.dupe(u8, "") catch @constCast(&empty_code);
+            const item = self.pending.orderedRemove(0);
+            self.gpa.free(item.id);
+            return item.code;
+        }
         var index: usize = 0;
         while (index < self.pending.items.len) : (index += 1) {
-            if (id.len == 0 or std.mem.eql(u8, self.pending.items[index].id, id)) {
+            if (std.mem.eql(u8, self.pending.items[index].id, id)) {
                 const item = self.pending.orderedRemove(index);
                 self.gpa.free(item.id);
                 return item.code;
             }
         }
-        if (self.pending.items.len > 0) {
-            const item = self.pending.orderedRemove(0);
-            self.gpa.free(item.id);
-            return item.code;
-        }
         return self.gpa.dupe(u8, "") catch @constCast(&empty_code);
+    }
+
+    fn rollbackBodies(self: *Seen, mark: usize) void {
+        while (self.bodies.items.len > mark) {
+            const dropped = self.bodies.pop().?;
+            self.release(dropped.code);
+            self.release(dropped.output);
+        }
     }
 
     fn ownResult(self: *Seen, result: std.json.Value) ![]u8 {
@@ -640,6 +651,10 @@ test "a user prompt is shown once and a python call keeps code output and elapse
     try std.testing.expectEqual(@as(?u64, 1_500_000), result[0].tool.took_us);
     try std.testing.expectEqualStrings("print(1)", seen.bodies.items[seen.bodies.items.len - 1].code);
     try std.testing.expectEqualStrings("1\n", seen.bodies.items[seen.bodies.items.len - 1].output);
+    const kept = seen.pending.items.len;
+    const missing = seen.takeCode("missing");
+    defer seen.release(missing);
+    try std.testing.expectEqual(kept, seen.pending.items.len);
 }
 
 test "stream deltas stay in the draft until commit" {

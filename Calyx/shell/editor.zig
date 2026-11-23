@@ -59,6 +59,7 @@ pub const Editor = struct {
     }
 
     pub fn paste(self: *Editor, pasted: []const u8) !void {
+        self.goal = null;
         var i: usize = 0;
         while (i < pasted.len) {
             const utf8_len = @field(std.unicode, "utf8" ++ "ByteSequenceLength");
@@ -72,6 +73,7 @@ pub const Editor = struct {
     }
 
     pub fn set(self: *Editor, value: []const u8) !void {
+        self.goal = null;
         self.text.clearRetainingCapacity();
         try self.paste(value);
         self.cursor = self.text.items.len;
@@ -80,25 +82,21 @@ pub const Editor = struct {
     pub fn apply(self: *Editor, edit: Edit) !void {
         switch (edit) {
             .older => {
-                if (self.cursor == 0) {
-                    self.goal = null;
-                    try self.recall(if (self.recalled) |n| n +| 1 else 0);
-                } else self.lineUp();
+                self.goal = null;
+                try self.recall(if (self.recalled) |n| n +| 1 else 0);
                 return;
             },
             .newer => {
-                if (self.recalled != null or self.cursor == self.text.items.len) {
-                    self.goal = null;
-                    if (self.recalled) |n| {
-                        if (n == 0) {
-                            self.recalled = null;
-                            self.text.deinit(self.allocator);
-                            self.text = self.draft;
-                            self.draft = .empty;
-                            self.cursor = self.text.items.len;
-                        } else try self.recall(n - 1);
-                    }
-                } else self.lineDown();
+                self.goal = null;
+                if (self.recalled) |n| {
+                    if (n == 0) {
+                        self.recalled = null;
+                        self.text.deinit(self.allocator);
+                        self.text = self.draft;
+                        self.draft = .empty;
+                        self.cursor = self.text.items.len;
+                    } else try self.recall(n - 1);
+                }
                 return;
             },
             .line_up => {
@@ -358,12 +356,6 @@ test "older and newer recall draft" {
     const a = (try ed.enter()).?;
     defer std.testing.allocator.free(a);
     try ed.set("draft");
-    try ed.apply(.end);
-    try ed.apply(.older);
-    const stayed = try ed.textOwned();
-    defer std.testing.allocator.free(stayed);
-    try std.testing.expectEqualStrings("draft", stayed);
-    try ed.apply(.home);
     try ed.apply(.older);
     const recalled = try ed.textOwned();
     defer std.testing.allocator.free(recalled);
@@ -372,6 +364,19 @@ test "older and newer recall draft" {
     const draft = try ed.textOwned();
     defer std.testing.allocator.free(draft);
     try std.testing.expectEqualStrings("draft", draft);
+}
+
+test "paste clears the vertical column goal" {
+    var ed = Editor.init(std.testing.allocator);
+    defer ed.deinit();
+    try ed.set("abcd\nwxyz");
+    try ed.apply(.home);
+    try ed.apply(.right);
+    try ed.apply(.right);
+    try ed.apply(.line_down);
+    try ed.paste("X");
+    try ed.apply(.line_up);
+    try std.testing.expectEqual(@as(usize, 3), ed.cursorAt());
 }
 
 test "up and down move between lines until the ends of the text" {

@@ -62,6 +62,9 @@ pub const Error = error{
 var saved_unix: if (is_windows) void else ?posix.termios = if (is_windows) {} else null;
 var saved_win: if (is_windows) ?WinModes else void = if (is_windows) null else {};
 var alternate: bool = false;
+var resize_armed: bool = false;
+var winch_read: if (is_windows) void else posix.fd_t = if (is_windows) {} else -1;
+var winch_write: if (is_windows) void else posix.fd_t = if (is_windows) {} else -1;
 
 const WinModes = struct {
     in_mode: u32,
@@ -94,6 +97,7 @@ pub fn enableRaw() Error!void {
     term.cc[@backingInt(posix.V.TIME)] = 0;
     posix.tcsetattr(fd, .NOW, term) catch |err| return mapTermios(err);
     saved_unix = original;
+    installResize();
 }
 
 pub fn disableRaw() Error!void {
@@ -168,33 +172,189 @@ pub fn size() Size {
     return .{ .columns = wsz.col, .rows = wsz.row };
 }
 
+pub fn resizeArmed() bool {
+    return resize_armed;
+}
+
 pub fn readEvent(buf: []u8, filled: *usize) Error!?Event {
+    if (is_windows and resize_armed) return readEventWindows();
+    if (drainWinch()) return .{ .resize = size() };
     if (filled.* == 0) {
         const n = readStdin(buf) catch return .lost;
         if (n == 0) return .lost;
         filled.* = n;
     }
+    return finishParse(buf, filled);
+}
+
+fn finishParse(buf: []u8, filled: *usize) Error!?Event {
     var used: usize = 0;
-    const event = parseOne(buf[0..filled.*], &used) orelse {
-        if (filled.* == 1 and buf[0] == 0x1b) {
-            if (!waitReadable(50)) {
-                filled.* = 0;
-                return .{ .key = .{ .code = .esc } };
-            }
+    if (parseOne(buf[0..filled.*], &used)) |event| {
+        const rest = filled.* - used;
+        if (rest > 0) @memmove(buf[0..rest], buf[used..filled.*]);
+        filled.* = rest;
+        return event;
+    }
+    if (buf[0] != 0x1b and filled.* < 4) {
+        if (!waitReadable(50)) {
+            filled.* = 0;
+            return null;
         }
-        if (filled.* == buf.len) {
-            @memmove(buf[0 .. filled.* - 1], buf[1..filled.*]);
-            filled.* -= 1;
-        }
-        const n = readStdin(buf[filled.*..]) catch return .lost;
-        if (n == 0) return .lost;
-        filled.* += n;
+    } else if (!waitReadable(50)) {
+        const lone = filled.* == 1 and buf[0] == 0x1b;
+        filled.* = 0;
+        if (lone) return .{ .key = .{ .code = .esc } };
         return null;
+    }
+    if (filled.* == buf.len) {
+        @memmove(buf[0 .. filled.* - 1], buf[1..filled.*]);
+        filled.* -= 1;
+    }
+    const n = readStdin(buf[filled.*..]) catch return .lost;
+    if (n == 0) return .lost;
+    filled.* += n;
+    used = 0;
+    if (parseOne(buf[0..filled.*], &used)) |event| {
+        const rest = filled.* - used;
+        if (rest > 0) @memmove(buf[0..rest], buf[used..filled.*]);
+        filled.* = rest;
+        return event;
+    }
+    if (buf[0] == 0x1b) {
+        filled.* = 0;
+        return null;
+    }
+    return null;
+}
+
+fn partialEscape(buf: []const u8) enum { esc, discard } {
+    if (buf.len == 1 and buf[0] == 0x1b) return .esc;
+    return .discard;
+}
+
+fn installResize() void {
+    if (is_windows or resize_armed) return;
+    var fds: [2]posix.fd_t = undefined;
+    if (std.c.pipe(&fds) != 0) return;
+    setNonblock(fds[0]);
+    setNonblock(fds[1]);
+    winch_read = fds[0];
+    winch_write = fds[1];
+    const mask = posix.sigemptyset();
+    const act: posix.Sigaction = .{
+        .handler = .{ .handler = wakeWinch },
+        .mask = mask,
+        .flags = 0,
     };
-    const rest = filled.* - used;
-    if (rest > 0) @memmove(buf[0..rest], buf[used..filled.*]);
-    filled.* = rest;
-    return event;
+    posix.sigaction(.WINCH, &act, null);
+    resize_armed = true;
+}
+
+fn setNonblock(fd: posix.fd_t) void {
+    if (builtin.os.tag == .windows) return;
+    const get: c_int = 3;
+    const set: c_int = 4;
+    const nonblock: c_uint = if (builtin.os.tag == .macos) 0x0004 else 0o4000;
+    const cur = std.c.fcntl(fd, get, @as(c_uint, 0));
+    if (cur < 0) return;
+    _ = std.c.fcntl(fd, set, @as(c_uint, @intCast(cur)) | nonblock);
+}
+
+fn wakeWinch(_: posix.SIG) callconv(.c) void {
+    if (is_windows or winch_write < 0) return;
+    var byte = [_]u8{1};
+    _ = std.c.write(winch_write, &byte, 1);
+}
+
+fn drainWinch() bool {
+    if (is_windows or winch_read < 0) return false;
+    var junk: [32]u8 = undefined;
+    var saw = false;
+    while (true) {
+        const n = std.c.read(winch_read, &junk, junk.len);
+        if (n <= 0) break;
+        saw = true;
+        if (n < junk.len) break;
+    }
+    return saw;
+}
+
+fn readEventWindows() Error!?Event {
+    if (comptime !is_windows) return null;
+    const KEY_EVENT: u16 = 1;
+    const MOUSE_EVENT: u16 = 2;
+    const WINDOW_BUFFER_SIZE_EVENT: u16 = 4;
+    const KeyRecord = extern struct {
+        down: i32,
+        repeat: u16,
+        virtual_key: u16,
+        scan: u16,
+        unicode: u16,
+        control: u32,
+    };
+    const MouseRecord = extern struct {
+        x: i16,
+        y: i16,
+        button: u32,
+        control: u32,
+        flags: u32,
+    };
+    const Record = extern struct {
+        kind: u16,
+        _pad: u16 = 0,
+        event: extern union {
+            key: KeyRecord,
+            mouse: MouseRecord,
+            size: extern struct { x: i16, y: i16 },
+        },
+    };
+    const ReadConsoleInputW = struct {
+        extern "kernel32" fn ReadConsoleInputW(handle: WinApi.HANDLE, buffer: *Record, length: u32, read: *u32) callconv(.winapi) WinApi.BOOL;
+    }.ReadConsoleInputW;
+    const in_h = WinApi.stdHandle(WinApi.STD_INPUT_HANDLE) catch return .lost;
+    var record: Record = undefined;
+    var count: u32 = 0;
+    if (!ReadConsoleInputW(in_h, &record, 1, &count).toBool() or count == 0) return null;
+    switch (record.kind) {
+        WINDOW_BUFFER_SIZE_EVENT => return .{ .resize = size() },
+        MOUSE_EVENT => {
+            if (record.event.mouse.flags != 0 or record.event.mouse.button & 1 == 0) return null;
+            return .{ .key = .{ .code = .{ .click = .{
+                .column = @intCast(record.event.mouse.x + 1),
+                .row = @intCast(record.event.mouse.y + 1),
+                .button = 0,
+                .release = false,
+            } } } };
+        },
+        KEY_EVENT => {
+            if (record.event.key.down == 0) return null;
+            const control = record.event.key.control;
+            const mods: Modifiers = .{
+                .shift = control & 0x0010 != 0,
+                .alt = control & 0x0003 != 0,
+                .control = control & 0x000c != 0,
+            };
+            const code: Code = switch (record.event.key.virtual_key) {
+                0x0d => .enter,
+                0x1b => .esc,
+                0x08 => .backspace,
+                0x09 => if (mods.shift) .back_tab else .tab,
+                0x2e => .delete,
+                0x24 => .home,
+                0x23 => .end,
+                0x25 => .left,
+                0x26 => .up,
+                0x27 => .right,
+                0x28 => .down,
+                else => if (record.event.key.unicode >= 32)
+                    .{ .char = record.event.key.unicode }
+                else
+                    .unknown,
+            };
+            return .{ .key = .{ .code = code, .modifiers = mods } };
+        },
+        else => return null,
+    }
 }
 
 fn readStdin(buf: []u8) Error!usize {
@@ -204,13 +364,13 @@ fn readStdin(buf: []u8) Error!usize {
 
 pub fn waitReadable(timeout_ms: i32) bool {
     if (is_windows) return waitReadableWindows(timeout_ms);
-    var fds = [_]posix.pollfd{.{
-        .fd = posix.STDIN_FILENO,
-        .events = posix.POLL.IN,
-        .revents = 0,
-    }};
-    const n = posix.poll(&fds, timeout_ms) catch return false;
-    return n > 0 and (fds[0].revents & posix.POLL.IN) != 0;
+    var fds = [_]posix.pollfd{
+        .{ .fd = posix.STDIN_FILENO, .events = posix.POLL.IN, .revents = 0 },
+        .{ .fd = winch_read, .events = posix.POLL.IN, .revents = 0 },
+    };
+    const nfd: usize = if (winch_read >= 0) 2 else 1;
+    const n = posix.poll(fds[0..nfd], timeout_ms) catch return false;
+    return n > 0;
 }
 
 pub fn parseOne(input: []const u8, used: *usize) ?Event {
@@ -474,6 +634,7 @@ fn enableRawWindows() Error!void {
         const new_out = out_mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
         if (!WinApi.SetConsoleMode(in_h, new_in).toBool()) return error.NotATerminal;
         if (!WinApi.SetConsoleMode(out_h, new_out).toBool()) return error.NotATerminal;
+        resize_armed = true;
     }
 }
 
@@ -569,6 +730,12 @@ test "parser reads arrows, delete, and back-tab" {
     const back = parseOne("\x1b[Z", &used).?;
     try std.testing.expectEqual(Code.back_tab, back.key.code);
     try std.testing.expect(back.key.modifiers.shift);
+}
+
+test "a partial escape becomes esc only when it is a lone escape" {
+    try std.testing.expect(partialEscape("\x1b") == .esc);
+    try std.testing.expect(partialEscape("\x1b[<0;5") == .discard);
+    try std.testing.expect(partialEscape("\x1b[") == .discard);
 }
 
 test "parser reads an sgr click" {

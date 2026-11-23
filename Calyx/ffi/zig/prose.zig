@@ -1,0 +1,193 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+const std = @import("std");
+const paint = @import("paint.zig");
+const text = @import("text.zig");
+const flow = @import("flow.zig");
+
+pub fn blocks(p: *paint.Painter, body: []const u8, column: flow.Column) paint.Error!void {
+    if (!needsBlocks(body)) return flow.flow(p, body, column);
+    var fenced = false;
+    var lines = std.mem.splitScalar(u8, body, '\n');
+    var first = true;
+    while (lines.next()) |raw| {
+        const line = std.mem.trimEnd(u8, raw, "\r");
+        if (!first) try p.end();
+        first = false;
+        try p.to(column.left);
+        const trimmed = std.mem.trimStart(u8, line, " ");
+        const fence = std.mem.startsWith(u8, trimmed, "```");
+        if (fence) {
+            fenced = !fenced;
+            try p.fit(.faint, line, column.measure);
+            continue;
+        }
+        if (fenced) {
+            try codeLine(p, line, column);
+            continue;
+        }
+        if (heading(trimmed)) |mark| {
+            try p.fit(.faint, line[0..mark], mark);
+            try p.fit(.bold, line[mark..], p.room());
+            continue;
+        }
+        if (std.mem.startsWith(u8, trimmed, ">")) {
+            try p.fit(.faint, line, column.measure);
+            continue;
+        }
+        if (listMark(trimmed)) |mark| {
+            try p.fit(.faint, line[0..mark], mark);
+            const rest = flow.Column{ .left = p.column, .measure = p.room(), .style = column.style, .marks = column.marks };
+            try flow.flow(p, line[mark..], rest);
+            continue;
+        }
+        if (std.mem.count(u8, line, "|") >= 2) {
+            const kept = flow.Column{ .left = column.left, .measure = column.measure, .style = if (ruleRow(trimmed)) .faint else column.style, .marks = .kept };
+            try flow.flow(p, line, kept);
+            continue;
+        }
+        if (std.mem.indexOf(u8, line, "](") != null) {
+            try links(p, line, column);
+            continue;
+        }
+        try flow.flow(p, line, column);
+    }
+}
+
+fn needsBlocks(body: []const u8) bool {
+    var lines = std.mem.splitScalar(u8, body, '\n');
+    while (lines.next()) |raw| {
+        const line = std.mem.trimStart(u8, std.mem.trimEnd(u8, raw, "\r"), " ");
+        if (std.mem.startsWith(u8, line, "```")) return true;
+        if (heading(line) != null) return true;
+        if (std.mem.startsWith(u8, line, ">")) return true;
+        if (listMark(line) != null) return true;
+        if (std.mem.count(u8, line, "|") >= 2) return true;
+        if (std.mem.indexOf(u8, line, "](") != null) return true;
+    }
+    return false;
+}
+
+fn heading(line: []const u8) ?usize {
+    var n: usize = 0;
+    while (n < line.len and n < 6 and line[n] == '#') n += 1;
+    if (n == 0 or n >= line.len or line[n] != ' ') return null;
+    return n + 1;
+}
+
+fn listMark(line: []const u8) ?usize {
+    if (std.mem.startsWith(u8, line, "- ") or std.mem.startsWith(u8, line, "* ")) return 2;
+    var n: usize = 0;
+    while (n < line.len and line[n] >= '0' and line[n] <= '9') n += 1;
+    if (n > 0 and n + 1 < line.len and line[n] == '.' and line[n + 1] == ' ') return n + 2;
+    return null;
+}
+
+fn ruleRow(line: []const u8) bool {
+    for (line) |byte| {
+        if (byte != '|' and byte != '-' and byte != ':' and byte != ' ') return false;
+    }
+    return std.mem.indexOfScalar(u8, line, '-') != null;
+}
+
+fn codeLine(p: *paint.Painter, line: []const u8, column: flow.Column) paint.Error!void {
+    const trimmed = std.mem.trimStart(u8, line, " ");
+    if (std.mem.startsWith(u8, trimmed, "//") or std.mem.startsWith(u8, trimmed, "#")) {
+        try p.fit(.faint, line, column.measure);
+        return;
+    }
+    var at: usize = 0;
+    var quote: u8 = 0;
+    var slash = false;
+    while (at < line.len and p.room() > 0) {
+        if (quote == 0 and std.mem.startsWith(u8, line[at..], "//")) {
+            try p.fit(.faint, line[at..], p.room());
+            return;
+        }
+        const c = text.char(line, at);
+        if (quote == 0 and (c.cp == '"' or c.cp == '\'')) {
+            quote = @intCast(c.cp);
+        } else if (quote != 0 and c.cp == quote and !slash) quote = 0;
+        slash = quote != 0 and c.cp == '\\' and !slash;
+        const style: paint.Style = if (quote != 0) .accent else .plain;
+        if (!try p.char(style, c)) return;
+        at += c.len;
+    }
+}
+
+fn links(p: *paint.Painter, line: []const u8, column: flow.Column) paint.Error!void {
+    var at: usize = 0;
+    while (at < line.len and p.room() > 0) {
+        if (line[at] == '[') {
+            if (linkAt(line, at)) |found| {
+                try p.link(.accent, found.url, found.label);
+                at = found.next;
+                continue;
+            }
+        }
+        const c = text.char(line, at);
+        if (!try p.char(column.style, c)) return;
+        at += c.len;
+    }
+}
+
+const Link = struct { label: []const u8, url: []const u8, next: usize };
+
+fn linkAt(line: []const u8, at: usize) ?Link {
+    const close = std.mem.indexOfScalarPos(u8, line, at + 1, ']') orelse return null;
+    if (close + 1 >= line.len or line[close + 1] != '(') return null;
+    const end = std.mem.indexOfScalarPos(u8, line, close + 2, ')') orelse return null;
+    if (end == close + 2) return null;
+    return .{
+        .label = line[at + 1 .. close],
+        .url = line[close + 2 .. end],
+        .next = end + 1,
+    };
+}
+
+test "plain prose stays on the flow path" {
+    var buffer: [256]u8 = undefined;
+    var out: std.Io.Writer = .fixed(&buffer);
+    var p = paint.Painter.init(&out, 40);
+    try blocks(&p, "one `city` two", .{ .left = 0, .measure = 30, .style = .plain, .marks = .prose });
+    try std.testing.expect(std.mem.indexOf(u8, out.buffered(), "city") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out.buffered(), "`") != null);
+}
+
+test "headings lists quotes tables and links are marked" {
+    var buffer: [1024]u8 = undefined;
+    var out: std.Io.Writer = .fixed(&buffer);
+    var p = paint.Painter.init(&out, 80);
+    try blocks(&p, "# Title\n- item\n> quoted\n| a | b |\n| --- | --- |\n[docs](https://example.test)\n```\n// note\n```", .{
+        .left = 0,
+        .measure = 70,
+        .style = .plain,
+        .marks = .prose,
+    });
+    const drawn = out.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "Title") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "item") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "quoted") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "https://example.test") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "note") != null);
+}
+
+test "an open fence does not swallow the following paragraph" {
+    var buffer: [256]u8 = undefined;
+    var out: std.Io.Writer = .fixed(&buffer);
+    var p = paint.Painter.init(&out, 40);
+    try blocks(&p, "```\ncode\n", .{ .left = 0, .measure = 30, .style = .plain, .marks = .prose });
+    try std.testing.expect(std.mem.indexOf(u8, out.buffered(), "code") != null);
+}
+
+test "wide characters keep their columns inside a list" {
+    var buffer: [256]u8 = undefined;
+    var out: std.Io.Writer = .fixed(&buffer);
+    var p = paint.Painter.init(&out, 20);
+    try blocks(&p, "- 中文中文中文", .{ .left = 0, .measure = 16, .style = .plain, .marks = .prose });
+    try std.testing.expect(std.mem.indexOf(u8, out.buffered(), "中文") != null);
+    try std.testing.expect(p.column <= p.limit);
+}

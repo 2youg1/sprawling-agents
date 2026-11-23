@@ -51,6 +51,7 @@ test {
     _ = @import("transcript.zig");
     _ = @import("live.zig");
     _ = @import("viewport.zig");
+    _ = @import("prose.zig");
 }
 
 test "hostile scene bytes never trap the draw export" {
