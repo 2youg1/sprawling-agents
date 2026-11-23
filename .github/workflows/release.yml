@@ -87,7 +87,7 @@ jobs:
           ref: ${{ inputs.source-sha || github.sha }}
       - name: install pinned toolchain
         run: rustup show
-      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f # v2
         with:
           tool: cargo-deny
       - name: advisories
@@ -182,7 +182,7 @@ jobs:
       - uses: ./.github/actions/client-artifacts
         with:
           want: bundle
-      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f # v2
         with:
           tool: just
       # The same two recipes for all three rows: `just dist` here and
@@ -322,7 +322,7 @@ jobs:
           if-no-files-found: error
       - name: sign the Windows binary through SignPath
         if: runner.os == 'Windows' && env.SIGN_ARCHIVES == 'true' && vars.SIGNPATH_SIGNING_POLICY_SLUG != ''
-        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        uses: signpath/github-action-submit-signing-request@a2c5b60d9c75f073142b653c354b632eedce097b # v3
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
