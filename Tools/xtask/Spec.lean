@@ -1408,7 +1408,7 @@ CI 使用 `--full --scope-base <event-base>`，始终选择完整图，不用 af
 Windows 的脚本 shell 从实际 Git 安装的 exec-path 定位，不假定安装盘符；不可用时给出修复诊断。
 GitHub 通过同目录 `runs.using: node24` 的本地 action 启动原有 `just verify-sources`，让 runner 的缓存运行时环境
 直接传给子进程。只有 SDK 的 frozen 安装步骤允许失败；验证器启动失败、拒绝与异常退出必须令 action 失败。
-新建发行标签的 push 若没有旧提交（before 为零），使用检出提交的第一个物理父提交作为文件门基线；其他事件的无效基线仍拒绝。
+发行标签（`v*`）的 push 不论新建还是重打，文件门基线都是检出提交的第一个物理父提交；重打标签的 `before` 指名的已退役标签对象不被任何 ref 触达，新 clone 无法解析，故标签事件一律不读 `before`。其他事件的无效基线仍拒绝。
 SDK、适配器与缓存目录留在原检出，安装产物不进入输入副本；Linux core 另运行 xtask clippy、ci 域测试与同一生产图。
 所有键使用工作区唯一的 BLAKE3，内容记录包含路径、字节摘要、可观察的执行位、节点定义、平台、实际验证器字节身份与依赖键。
 capture 每文件只读取一次，同一 buffer 写入独立普通文件并计算身份；检查读取副本而不是之后可能改变的原树。

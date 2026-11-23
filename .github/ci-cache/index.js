@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The runner gives Node actions the cache service environment. Inherit it
-// directly; neither an environment file nor a log should carry its token.
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
@@ -33,20 +31,13 @@ function scopeBase(workspace) {
     }
     if (name === "pull_request") {
       base = event?.pull_request?.base?.sha;
-    } else {
-      base = event?.before;
-      const releaseTag = typeof event?.ref === "string" && event.ref.startsWith("refs/tags/v");
-      if (releaseTag && event.deleted === true) {
+    } else if (typeof event?.ref === "string" && event.ref.startsWith("refs/tags/v")) {
+      if (event.deleted === true) {
         throw new Error("a deleted release tag has no source tree to verify (verification-base)");
       }
-      if (
-        releaseTag &&
-        event.created === true &&
-        event.deleted === false &&
-        base === "0".repeat(40)
-      ) {
-        base = git(["rev-parse", "--verify", "HEAD^"], workspace);
-      }
+      base = git(["rev-parse", "--verify", "HEAD^"], workspace);
+    } else {
+      base = event?.before;
     }
   } else {
     base = git(["merge-base", "origin/main", "HEAD"], workspace);
