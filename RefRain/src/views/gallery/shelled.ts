@@ -3,18 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The made-up city the shell's specimens stand in (`shell.svelte` at
-// 1440, `mob.svelte` on one column): a session whose last turn used a
-// fifth of a 204,800-token window, the two reminders at 30% and 65%,
-// and a page of commits.
 import type { Answer, Call, CommitAnswer, Query, Turn } from "../../wire";
 import { Address, GitOid, RunId, Seq, TimeMs, Tokens, UsdMicros } from "../../wire";
 import { SEARCH } from "./configured";
 import { FIRST_POLICY } from "../../core/commands";
 import { ENDPOINTS } from "./served";
 
-// The room the conversation is in: it has a run waiting, one finished
-// and one going (`resulted.svelte` deals its rooms out in turn).
 export const ROOM = Address.make("release/ledger");
 export const EMPTY_ROOM = Address.make("lab/fresh");
 const SANDBOXED = Address.make("release");
@@ -32,8 +26,7 @@ function call(n: number, tool: string, subject: string): Call {
     called: TimeMs.make(START + n * 1_000),
     answered: TimeMs.make(START + n * 1_000 + 412),
     timing: "measured",
-    // What the city registers the two tools as (`kernel::ToolMeta`),
-    // which every call carries on the wire.
+
     ...(tool === "edit"
       ? { effect: { write: { domain: ROOM } }, render: { diff: { locations: [] } } }
       : { effect: "read", render: "generic" }),
@@ -85,8 +78,6 @@ const COMMITS: readonly CommitAnswer[] = [
   spent: UsdMicros.make(12_000),
 }));
 
-// What the made-up city answers. `calling` decides whether the session's
-// run has done anything a right pane would open on.
 export function answering(calling: boolean): (query: Query) => Answer | undefined {
   return (query) => {
     if (query === "endpoint_view") return { endpoints: ENDPOINTS };
@@ -105,9 +96,7 @@ export function answering(calling: boolean): (query: Query) => Answer | undefine
           },
         },
       };
-    // The working room's building boxes a run in a copied tree, so its
-    // sandbox is a fact the first message head states; the empty room's
-    // building has none, so nothing about a sandbox is drawn there.
+
     if ("building_view" in query && query.building_view.addr === SANDBOXED) {
       return {
         building: {
@@ -122,7 +111,7 @@ export function answering(calling: boolean): (query: Query) => Answer | undefine
             unplanned: { budget: { tokens: Tokens.make(0), usd: UsdMicros.make(0) }, steps: 0 },
           },
           rooms: [ROOM],
-          sandbox: { arm: "copied_tree", fuel: 0, mounts: [SANDBOXED], shell: true },
+          sandbox: { arm: "copied_tree", shell: true },
         },
       };
     }

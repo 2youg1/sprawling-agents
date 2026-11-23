@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Public exec/Backlog daemon regressions (`Sprawling/runtime/spec/Tools/Exec/Container.lean`).
-
 use super::*;
 use serde_json::json;
 
@@ -85,16 +83,12 @@ esac
     }
 
     fn tool(&self, work: &std::path::Path, backlog: &Backlog) -> ExecTool {
-        ExecTool::new(
-            setup(work, None, None),
-            Box::new(EchoSandbox::new()),
-            backlog.clone(),
-        )
-        .unwrap()
-        .with_container(
-            limits(),
-            ContainerRuntime::probe(ContainerEngine::Docker, self.program.clone()).unwrap(),
-        )
+        ExecTool::new(setup(work, None, None), backlog.clone())
+            .unwrap()
+            .with_container(
+                limits(),
+                ContainerRuntime::probe(ContainerEngine::Docker, self.program.clone()).unwrap(),
+            )
     }
 
     fn guardian(&self) -> PathBuf {

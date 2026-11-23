@@ -13,8 +13,8 @@
   import { fill, say } from "../../core/lang";
   import type { Key } from "../../core/lang";
   import { ui } from "../../ui";
-  import { Address, ContainerLimits, EnvVarName, ServerLabel } from "../../wire";
-  import type { Interpreter, SandboxArm, SandboxLimits } from "../../wire";
+  import { ContainerLimits, EnvVarName, ServerLabel } from "../../wire";
+  import type { Address, Interpreter, SandboxArm, SandboxLimits } from "../../wire";
   import Button from "../parts/button.svelte";
   import Field from "../parts/field.svelte";
   import Segmented from "../parts/segmented.svelte";
@@ -42,7 +42,7 @@
   const CONTAINER_FIELDS = ["image", "user", "cpu_millis", "memory_bytes", "pids"] as const;
   type ContainerField = (typeof CONTAINER_FIELDS)[number];
 
-  type ListKey = "mounts" | "env" | "trusted";
+  type ListKey = "env" | "trusted";
 
   interface Draft {
     readonly shell: (typeof SHELL)[number];
@@ -50,7 +50,6 @@
     readonly interpreter: Interpreter;
     readonly arm: ArmChoice;
     readonly containerFields: Readonly<Record<ContainerField, string>>;
-    readonly fuel: string;
     readonly lists: Readonly<Record<ListKey, string>>;
   }
 
@@ -66,9 +65,7 @@
         memory_bytes: limits?.container == null ? "" : String(limits.container.memory_bytes),
         pids: limits?.container == null ? "" : String(limits.container.pids),
       },
-      fuel: limits === null ? "" : String(limits.fuel),
       lists: {
-        mounts: (limits?.mounts ?? []).join("\n"),
         env: (limits?.env_passthrough ?? []).join("\n"),
         trusted: (limits?.trusted ?? []).join("\n"),
       },
@@ -105,9 +102,7 @@
     return { ok };
   }
 
-  const mounts = $derived(decoded(draft.lists.mounts, Address));
   const trusted = $derived(decoded(draft.lists.trusted, ServerLabel));
-  const fuel = $derived(/^[1-9][0-9]*$/.test(draft.fuel.trim()) ? Number(draft.fuel.trim()) : null);
 
   const container = $derived(
     Schema.decodeOption(ContainerLimits)({
@@ -121,7 +116,7 @@
   const containerReady = $derived(draft.arm !== "container" || Option.isSome(container));
 
   const limits = $derived.by((): SandboxLimits | null =>
-    fuel === null || !("ok" in mounts) || !("ok" in trusted) || !containerReady
+    !("ok" in trusted) || !containerReady
       ? null
       : {
           shell: draft.shell === "on",
@@ -130,8 +125,6 @@
           ...(draft.arm === "container" && Option.isSome(container)
             ? { container: container.value }
             : {}),
-          fuel,
-          mounts: mounts.ok,
           env_passthrough: lines(draft.lists.env).map((name) => EnvVarName.make(name)),
           trusted: trusted.ok,
         },
@@ -146,7 +139,6 @@
 
   const why = $derived.by((): string | undefined => {
     if (!known) return say($lang, "sandbox_unknown");
-    if (fuel === null) return say($lang, "sandbox_fuel_needed");
     if (!containerReady) return say($lang, "sandbox_container_needed");
     if (!edited) return say($lang, "sandbox_unchanged");
     return undefined;
@@ -162,12 +154,6 @@
   }
 
   const LISTS = $derived([
-    {
-      key: "mounts",
-      label: "sandbox_mounts",
-      help: "sandbox_mounts_help",
-      bad: "bad" in mounts ? mounts.bad : null,
-    },
     { key: "env", label: "sandbox_env", help: "sandbox_env_help", bad: null },
     {
       key: "trusted",
@@ -232,17 +218,6 @@
         />
       {/each}
     {/if}
-    <Field
-      label={say($lang, "sandbox_fuel")}
-      help={say($lang, "sandbox_fuel_help")}
-      kind="number"
-      step={1}
-      mono
-      value={draft.fuel}
-      onInput={(value) => {
-        edit({ fuel: value });
-      }}
-    />
     {#each LISTS as list (list.key)}
       <label class="flex min-w-0 flex-col gap-snug">
         <span class="text-note text-text-quiet">{say($lang, list.label)}</span>

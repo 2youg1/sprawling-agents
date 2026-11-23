@@ -8,51 +8,25 @@ use super::reporting::{CSV_HEADER, csv_cleanup_error, publish_csv};
 use super::*;
 
 #[test]
-fn stdlib_digest_uses_registered_encoding_and_detects_changes() {
-    let dir = tempfile::tempdir().unwrap();
-    std::fs::create_dir(dir.path().join("a")).unwrap();
-    std::fs::write(dir.path().join("z"), b"last").unwrap();
-    std::fs::write(dir.path().join("a/b"), b"first").unwrap();
-    let mut canonical = b"a/b\0".to_vec();
-    canonical.extend_from_slice(&5_u64.to_le_bytes());
-    canonical.extend_from_slice(b"firstz\0");
-    canonical.extend_from_slice(&4_u64.to_le_bytes());
-    canonical.extend_from_slice(b"last");
-    let before = stdlib_digest(dir.path()).unwrap();
-    assert_eq!(before, B3Hash::digest(&canonical));
-    std::fs::write(dir.path().join("a/b"), b"other").unwrap();
-    assert_ne!(before, stdlib_digest(dir.path()).unwrap());
-    std::fs::write(dir.path().join("a/b"), b"first").unwrap();
-    assert_eq!(before, stdlib_digest(dir.path()).unwrap());
-    std::fs::rename(dir.path().join("z"), dir.path().join("y")).unwrap();
-    assert_ne!(before, stdlib_digest(dir.path()).unwrap());
-}
-
-#[test]
 fn measured_output_failures_carry_a_code_action_and_recovery() {
-    for (exit, stdout, stderr) in [
-        (
-            SandboxExit::Failure { code: 1 },
-            EXPECTED.to_vec(),
-            Vec::new(),
-        ),
-        (SandboxExit::Success, b"wrong output".to_vec(), Vec::new()),
-        (SandboxExit::Success, EXPECTED.to_vec(), b"warning".to_vec()),
+    for (exit_code, stdout, stderr) in [
+        (1, EXPECTED.to_vec(), Vec::new()),
+        (0, b"wrong output".to_vec(), Vec::new()),
+        (0, EXPECTED.to_vec(), b"warning".to_vec()),
     ] {
-        let outcome = runtime::SandboxOutcome {
-            exit,
+        let outcome = RunOutcome {
+            exit_code,
             stdout,
             stderr,
-            ceiling: None,
         };
         let refused = checked_output(&outcome).expect_err("invalid output was accepted");
         assert!(refused.contains("E_INVALID_ARGS"), "{refused}");
         assert!(
-            refused.contains("measure the registered CPython-WASI scenario"),
+            refused.contains("measure the registered host Python scenario"),
             "{refused}"
         );
         assert!(
-            refused.contains("check the selected guest and the fixed script"),
+            refused.contains("check the selected interpreter and the fixed script"),
             "{refused}"
         );
         assert!(!refused.contains("E_TOOL_UNAVAILABLE"), "{refused}");
@@ -60,51 +34,25 @@ fn measured_output_failures_carry_a_code_action_and_recovery() {
 }
 
 #[test]
-fn a_missing_guest_is_a_prerequisite_error() {
-    let refused = measure_from(None, Arm::Baseline).expect_err("a missing guest produced a report");
+fn a_missing_interpreter_is_a_prerequisite_error() {
+    let refused =
+        measure_from(None, Arm::Baseline).expect_err("a missing interpreter produced a report");
     assert!(refused.contains("E_TOOL_UNAVAILABLE"), "{refused}");
     assert!(
-        refused.contains("configure a real CPython-WASI guest"),
+        refused.contains("SPRAWLING_PYTHON") || refused.contains("host Python"),
         "{refused}"
     );
     assert!(!refused.contains("E_INVALID_ARGS"), "{refused}");
 }
 
 #[test]
-fn an_invalid_guest_produces_no_reading() {
+fn an_invalid_interpreter_produces_no_reading() {
     let dir = tempfile::tempdir().unwrap();
-    let wasm = dir.path().join("invalid.wasm");
-    std::fs::write(&wasm, b"not WebAssembly").unwrap();
-    let refused = measure_at(&wasm).expect_err("an invalid guest produced a report");
-    assert!(refused.contains("E_TOOL_UNAVAILABLE"), "{refused}");
-    assert!(
-        refused.contains("configure a real CPython-WASI guest"),
-        "{refused}"
-    );
-    assert!(!refused.contains("E_INVALID_ARGS"), "{refused}");
-}
-
-#[test]
-fn a_correctness_module_is_not_cpython_evidence() {
-    // `(module (func (export "_start")))`: valid enough to run, but
-    // it has no CPython implementation or benchmark output.
-    const EMPTY_START: &[u8] = &[
-        0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x04, 0x01, 0x60, 0x00, 0x00, 0x03,
-        0x02, 0x01, 0x00, 0x07, 0x0a, 0x01, 0x06, b'_', b's', b't', b'a', b'r', b't', 0x00, 0x00,
-        0x0a, 0x04, 0x01, 0x02, 0x00, 0x0b,
-    ];
-    let dir = tempfile::tempdir().unwrap();
-    let wasm = dir.path().join("correctness.wasm");
-    std::fs::write(&wasm, EMPTY_START).unwrap();
-    std::fs::create_dir(dir.path().join("lib")).unwrap();
-    let refused = measure_at(&wasm).expect_err("a WAT fixture produced a CPython report");
+    let bogus = dir.path().join("not-python");
+    std::fs::write(&bogus, b"this is not a python interpreter\n").unwrap();
+    let refused = measure_at(&bogus).expect_err("an invalid interpreter produced a report");
     assert!(refused.contains("E_TOOL_UNAVAILABLE"), "{refused}");
     assert!(!refused.contains("E_INVALID_ARGS"), "{refused}");
-    assert!(refused.contains("unexpected stdout"), "{refused}");
-    assert!(
-        refused.contains("configure a real CPython-WASI guest"),
-        "{refused}"
-    );
 }
 
 #[test]

@@ -7,18 +7,14 @@ use super::*;
 use std::process::Command;
 
 fn native_tool(source: &std::path::Path, scratch: &std::path::Path, backlog: Backlog) -> ExecTool {
-    ExecTool::new(
-        setup(source, None, None),
-        Box::new(EchoSandbox::new()),
-        backlog,
-    )
-    .unwrap()
-    .confined(Confined::with_arm(
-        Confinement::MacosSeatbelt {
-            wrapper: PathBuf::from("/usr/bin/sandbox-exec"),
-        },
-        Some(scratch.to_path_buf()),
-    ))
+    ExecTool::new(setup(source, None, None), backlog)
+        .unwrap()
+        .confined(Confined::with_arm(
+            Confinement::MacosSeatbelt {
+                wrapper: PathBuf::from("/usr/bin/sandbox-exec"),
+            },
+            Some(scratch.to_path_buf()),
+        ))
 }
 
 #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
@@ -188,16 +184,12 @@ fn native_macos_initialization_failure_never_runs_target_or_retains_copy() {
     let source = tempfile::tempdir().unwrap();
     let scratch = tempfile::tempdir().unwrap();
     let missing = source.path().join("missing-wrapper");
-    let tool = ExecTool::new(
-        setup(source.path(), None, None),
-        Box::new(EchoSandbox::new()),
-        patient(),
-    )
-    .unwrap()
-    .confined(Confined::with_arm(
-        Confinement::MacosSeatbelt { wrapper: missing },
-        Some(scratch.path().to_path_buf()),
-    ));
+    let tool = ExecTool::new(setup(source.path(), None, None), patient())
+        .unwrap()
+        .confined(Confined::with_arm(
+            Confinement::MacosSeatbelt { wrapper: missing },
+            Some(scratch.path().to_path_buf()),
+        ));
     let error = tool
         .invoke(&call(line_of(
             "/usr/bin/touch",

@@ -11,9 +11,8 @@ use runtime::Shell;
 use crate::worker::hands::ExecHost;
 
 pub(super) struct MachineHalf {
-    pub(super) python_wasm: Option<PathBuf>,
+    pub(super) python: Option<PathBuf>,
     pub(super) shell: Shell,
-    pub(super) engine: Box<dyn runtime::Sandbox>,
 }
 
 pub(super) fn machine_half(
@@ -34,8 +33,7 @@ pub(super) fn machine_half(
         }
     };
     Ok(MachineHalf {
-        python_wasm: (host.python_wasm)(),
+        python: (host.python)(),
         shell,
-        engine: (host.engine)()?,
     })
 }

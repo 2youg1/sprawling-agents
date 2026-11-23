@@ -29,7 +29,7 @@ fn room_with_a_frozen_shape(city_root: &Path, room: &Address) -> String {
     let file = path(city_root, room, Layer::Resident).unwrap();
     let mut held = std::fs::read_to_string(&file).unwrap();
 
-    held.push_str("\n[sandbox]\nfuel = 900\n");
+    held.push_str("\n[sandbox]\nshell = true\n");
     std::fs::write(&file, &held).unwrap();
     held
 }
@@ -53,7 +53,7 @@ fn clearing_a_session_forgets_the_shape_and_nothing_else() {
     assert_eq!(settled_effort(dir.path(), &room).unwrap(), None);
     let after = std::fs::read_to_string(path(dir.path(), &room, Layer::Resident).unwrap()).unwrap();
     assert!(
-        after.contains("fuel = 900"),
+        after.contains("shell = true"),
         "a key the person wrote is not this session's to forget: {after}"
     );
     assert!(!after.contains("m-local"), "{after}");

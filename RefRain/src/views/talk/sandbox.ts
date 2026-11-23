@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { fill, say } from "../../core/lang";
+import { say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
 import { buildingOf } from "../../core/route";
 import type { Address, Answer, Query, SandboxLimits } from "../../wire";
@@ -18,6 +18,6 @@ export function restriction(held: Answer | undefined): SandboxLimits | null {
   return limits === null || limits.arm === "none" ? null : limits;
 }
 
-export function sandboxSaid(limits: SandboxLimits, lang: Lang): string {
-  return fill(say(lang, "facts_sandbox_said"), { n: String(limits.mounts.length) });
+export function sandboxSaid(_limits: SandboxLimits, lang: Lang): string {
+  return say(lang, "facts_sandbox_said");
 }

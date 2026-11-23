@@ -184,7 +184,7 @@ fn native_macos_release_leaves_another_owners_background_command_alive() {
     let tool = native_tool(source.path(), scratch.path(), backlog.clone());
     let mut other_setup = setup(source.path(), None, Some(PathBuf::from("/bin/sh")));
     other_setup.run = kernel::RunId::from_bytes([2; 16]);
-    let other = ExecTool::new(other_setup, Box::new(EchoSandbox::new()), backlog.clone())
+    let other = ExecTool::new(other_setup, backlog.clone())
         .unwrap()
         .confined(Confined::with_arm(
             Confinement::MacosSeatbelt {

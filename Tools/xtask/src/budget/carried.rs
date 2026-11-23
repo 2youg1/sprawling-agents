@@ -9,14 +9,8 @@ use crate::report::XtaskError;
 
 pub(crate) const CLIENT_MARK: &str = "assets/index-";
 
-const ENGINE_MARK: &str = "all fuel consumed by WebAssembly";
-
 pub(crate) fn carries_client(binary: &Path) -> Result<bool, XtaskError> {
     carries(binary, CLIENT_MARK)
-}
-
-pub(crate) fn carries_engine(binary: &Path) -> Result<bool, XtaskError> {
-    carries(binary, ENGINE_MARK)
 }
 
 fn carries(binary: &Path, mark: &str) -> Result<bool, XtaskError> {
@@ -39,7 +33,7 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
     reason = "test code"
 )]
 mod tests {
-    use super::{CLIENT_MARK, ENGINE_MARK, contains};
+    use super::{CLIENT_MARK, contains};
 
     #[test]
     fn a_binary_without_the_client_table_is_named_by_the_gate() {
@@ -48,15 +42,5 @@ mod tests {
             CLIENT_MARK.as_bytes()
         ));
         assert!(!contains(b"a placeholder build", CLIENT_MARK.as_bytes()));
-    }
-
-    #[test]
-    fn a_binary_without_the_engine_does_not_carry_its_sentence() {
-        let with = format!("...{ENGINE_MARK}...");
-        assert!(contains(with.as_bytes(), ENGINE_MARK.as_bytes()));
-        assert!(!contains(
-            b"this build carries no execution engine",
-            ENGINE_MARK.as_bytes()
-        ));
     }
 }

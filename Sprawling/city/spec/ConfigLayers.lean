@@ -99,17 +99,17 @@ tools = { docs_search = "<tool-definition-b3>" }  # 旧引用迁移前可缺席�
 
 D112 楼的连接器配置只保存引用、位置与 pin，定义默认只在城层。理由：一栋楼想多用或少用一台服务器不该重述传输与凭据引用；城层修改命令后，所有引用它的楼应在下一次 run 使用新定义，同时工具自己的 digest 仍决定哪些内容已获批准。被否：整表上梯复制 `[[mcp]]`，改一处必须逐楼重复，且近层静默遮蔽远层。重开参数：出现独立于楼的第二个定义拥有者时，先扩展 scope 类型与重复判定，不在引用行里塞第二份定义。
 
-**`[sandbox]` 一节**：`CONFIG.toml` 第二节 `[sandbox]`，字段 `shell`（bool，默认 false）、`fuel`（整数，缺省取 `SANDBOX_FUEL_DEFAULT`）、`mounts`（相对 city root 的路径表，reserved prefix 在解析点即拒）。解析仍是「本版本不读的键即拒」——被写下却什么都不发生是唯一没人能诊断的状态。整节整值上梯，语义住 `Sprawling/kernel/Spec.lean` §8-22，此处不复述。
+**`[sandbox]` 一节**：`CONFIG.toml` 第二节 `[sandbox]`，字段 `shell`（bool，默认 false）、`interpreter`、`arm`、`container`、`env_passthrough`、`trusted`。解析仍是「本版本不读的键即拒」——被写下却什么都不发生是唯一没人能诊断的状态。整节整值上梯，语义住 `Sprawling/kernel/Spec.lean` §8-22，此处不复述。
 
 **`[sandbox.container]`**：可选子表由 `kernel::ContainerLimits` 的 serde 输入权威直接解析，
 不另写镜像或额度文法；字段缺席不选择 container。写面通过 `write_sandbox` 原样写回整份
 值，`load_config` 冻结同一份值，运行中的配置不重读。限额未知字段、零值、标签镜像均拒。
 
-**`[sandbox]` 的第四个字段**：`env_passthrough`（字符串表，缺省空表），逐项解成 `kernel::EnvVarName`。与 `mounts` 逐条同形：同一节、同一次整值上梯、同一个解析点拒——`mounts` 在这里拒保留区，`env_passthrough` 在这里拒凭据形状的名字，而“什么叫凭据形状”是 `kernel::secret` 的答案，本模块不重建它。拒绝文字里带着是哪一份文件、哪一个名字，因为一份配置被拒时人手里只有那句话。
+**`[sandbox]` 的第四个字段**：`env_passthrough`（字符串表，缺省空表），逐项解成 `kernel::EnvVarName`。同一节、同一次整值上梯、同一个解析点拒凭据形状的名字，而“什么叫凭据形状”是 `kernel::secret` 的答案，本模块不重建它。拒绝文字里带着是哪一份文件、哪一个名字，因为一份配置被拒时人手里只有那句话。可读挂载字段已退役。
 
-**`[sandbox]` 的第五个字段**：`trusted`（字符串表，缺省空表），逐项解成 `kernel::ServerLabel`。它答的是「这层楼允许哪一台 connector 服务器去做城里谁都收不回的事」（今天只有运行这座城的机器的桌面），语义与读者住 `kernel::SandboxLimits::trusts`，本节只管它在 TOML 里怎么写、在哪一层写、写错了在解析点怎么拒。与 `mounts`／`env_passthrough` 同形：一名一行、缺省为空、整节整值上梯——收不回的效果按服务器逐台放行，而不是一次放宽给所有人。
+**`[sandbox]` 的第五个字段**：`trusted`（字符串表，缺省空表），逐项解成 `kernel::ServerLabel`。它答的是「这层楼允许哪一台 connector 服务器去做城里谁都收不回的事」（今天只有运行这座城的机器的桌面），语义与读者住 `kernel::SandboxLimits::trusts`，本节只管它在 TOML 里怎么写、在哪一层写、写错了在解析点怎么拒。与 `env_passthrough` 同形：一名一行、缺省为空、整节整值上梯——收不回的效果按服务器逐台放行，而不是一次放宽给所有人。
 
-**`[context]` 一节**：`CONFIG.toml` 第四节 `[context]`，一个字段 `second_threshold`（整数百分比）——上下文提醒第二道阈值响在哪一格。值的形状与合法域住 `kernel::config::SecondThreshold`（`Sprawling/kernel/Spec.lean` §8-22），提醒怎么响住 `runtime::reminder`，本节只管它在 TOML 里怎么写、在哪一层写、写错时在哪拒。与 `mounts`／`env_passthrough`／`trusted` 逐条同形：整值上梯、Run 起点冻结、解析点拒——31–90 域外的值在解析点由 `SecondThreshold::parse` 拒（`E_INVALID_ARGS`，恢复语带合法域），不钳位、不读后丢。缺省是「没有一层说话」，而「缺席取 `CTX_REMINDER_SECOND_DEFAULT`」只在 `runtime::reminder` 一处判定。
+**`[context]` 一节**：`CONFIG.toml` 第四节 `[context]`，一个字段 `second_threshold`（整数百分比）——上下文提醒第二道阈值响在哪一格。值的形状与合法域住 `kernel::config::SecondThreshold`（`Sprawling/kernel/Spec.lean` §8-22），提醒怎么响住 `runtime::reminder`，本节只管它在 TOML 里怎么写、在哪一层写、写错时在哪拒。与 `env_passthrough`／`trusted` 逐条同形：整值上梯、Run 起点冻结、解析点拒——31–90 域外的值在解析点由 `SecondThreshold::parse` 拒（`E_INVALID_ARGS`，恢复语带合法域），不钳位、不读后丢。缺省是「没有一层说话」，而「缺席取 `CTX_REMINDER_SECOND_DEFAULT`」只在 `runtime::reminder` 一处判定。
 
 **`[cache]` 一节**：一个字段 `keep_warm`，取 `off` 或 `five_minute`——这一层要不要在提示缓存到期前续期。值的形状与续期判定住 `kernel::keep_warm`（`Sprawling/kernel/spec/KeepWarm.lean` §8-74），本节只管它在 TOML 里怎么写、在哪一层写。拼写由 serde 按闭集读，拼错的词与未知键同样在解析点拒。`city::keep_warm(city_root, addr) -> Result<KeepWarm, AxError>` 爬同一张梯，下层覆盖上层；一层也没说时答 `KeepWarm::Off`——续期是人付钱的请求，默认必须是不发。与 `[context]` 不同，它不进 `FrozenConfig`：续期发生在两次 run 之间。
 
@@ -516,9 +516,7 @@ settings-control ConfigFile.sandbox RefRain/src/views/building/sandbox.svelte
 settings-control SandboxSection.arm RefRain/src/views/building/sandbox.svelte
 settings-control SandboxSection.container RefRain/src/views/building/sandbox.svelte
 settings-control SandboxSection.env_passthrough RefRain/src/views/building/sandbox.svelte
-settings-control SandboxSection.fuel RefRain/src/views/building/sandbox.svelte
 settings-control SandboxSection.interpreter RefRain/src/views/building/sandbox.svelte
-settings-control SandboxSection.mounts RefRain/src/views/building/sandbox.svelte
 settings-control SandboxSection.shell RefRain/src/views/building/sandbox.svelte
 settings-control SandboxSection.trusted RefRain/src/views/building/sandbox.svelte
 settings-control ConfigFile.search RefRain/src/views/setup/search/search.svelte

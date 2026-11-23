@@ -4,20 +4,13 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use std::ffi::OsString;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use kernel::AxError;
 
 use super::family::GECKO;
-use super::table::{
-    CHROMEDRIVER, MSEDGEDRIVER, PWSH, PYTHON_GUEST_B3, PYTHON_WASI, PYTHON_WASM_VARIABLE,
-    REQUIREMENTS, SHELL,
-};
-use super::{Absence, Fault, Machine, PATIENCE, Platform, Presence, ThisMachine, Version};
-
-pub(crate) const ENGINE_CARRIED: bool = cfg!(feature = "sandbox");
-
-static PYTHON_GUEST_CHECK: std::sync::OnceLock<Result<(), Fault>> = std::sync::OnceLock::new();
+use super::table::{CHROMEDRIVER, MSEDGEDRIVER, PWSH, PYTHON, REQUIREMENTS, SHELL};
+use super::{Absence, Machine, PATIENCE, Platform, Presence, ThisMachine};
 
 pub(crate) fn components_dir() -> Option<PathBuf> {
     match accounting::home::Home::detect() {
@@ -86,87 +79,8 @@ pub(crate) fn chromedriver() -> Presence {
     }
 }
 
-pub(crate) fn python_wasm() -> Presence {
-    look(PYTHON_WASI)
-}
-
-pub(super) fn python_component(
-    variable: Option<OsString>,
-    dir: Option<PathBuf>,
-    file: &str,
-) -> Presence {
-    let source = variable
-        .as_ref()
-        .filter(|value| !value.is_empty())
-        .map_or(PythonGuestSource::Pinned, |_| PythonGuestSource::Override);
-    let found = super::probe::component_at(PYTHON_WASM_VARIABLE, variable, dir, file);
-    judge_python_guest(found, source, PYTHON_GUEST_B3, &PYTHON_GUEST_CHECK)
-}
-
-#[derive(Clone, Copy)]
-pub(super) enum PythonGuestSource {
-    Pinned,
-    Override,
-}
-
-pub(super) fn judge_python_guest(
-    found: Presence,
-    source: PythonGuestSource,
-    expected: &str,
-    checked: &std::sync::OnceLock<Result<(), Fault>>,
-) -> Presence {
-    let Presence::Present { at, version } = found else {
-        return found;
-    };
-    if matches!(source, PythonGuestSource::Override) {
-        return Presence::Present {
-            at,
-            version: Version::Said("unpinned override".to_owned()),
-        };
-    }
-    match checked
-        .get_or_init(|| verify_python_guest(&at, expected))
-        .clone()
-    {
-        Ok(()) => {
-            let lib = runtime::PythonGuest::at(at.clone())
-                .stdlib()
-                .host
-                .join("python3.14");
-            let installed = [
-                "encodings/__init__.py",
-                "collections/__init__.py",
-                "difflib.py",
-                "re/__init__.py",
-                "os.py",
-            ]
-            .iter()
-            .all(|name| lib.join(name).is_file());
-            if installed {
-                Presence::Present { at, version }
-            } else {
-                Presence::Broken {
-                    at,
-                    fault: Fault::HalfWritten,
-                }
-            }
-        }
-        Err(fault) => Presence::Broken { at, fault },
-    }
-}
-
-fn verify_python_guest(at: &std::path::Path, expected: &str) -> Result<(), Fault> {
-    let expected = expected.parse::<kernel::B3Hash>().map_err(|why| {
-        Fault::Unreadable(format!("the registered Python guest pin is invalid: {why}"))
-    })?;
-    let bytes = std::fs::read(at)
-        .map_err(|why| Fault::Unreadable(format!("read pinned guest {}: {why}", at.display())))?;
-    let found = kernel::B3Hash::digest(&bytes);
-    if found == expected {
-        Ok(())
-    } else {
-        Err(Fault::DigestMismatch { expected, found })
-    }
+pub fn usable_python() -> Option<PathBuf> {
+    three_only(&look(PYTHON)).and_then(as_absolute)
 }
 
 pub(crate) fn shell() -> Presence {
@@ -178,7 +92,7 @@ pub(crate) fn pwsh() -> Presence {
 }
 
 pub(crate) fn usable_pwsh() -> Option<PathBuf> {
-    seven_or_later(&pwsh())
+    seven_or_later(&pwsh()).and_then(as_absolute)
 }
 
 pub(super) fn seven_or_later(presence: &Presence) -> Option<PathBuf> {
@@ -193,8 +107,16 @@ pub(super) fn seven_or_later(presence: &Presence) -> Option<PathBuf> {
     (major >= 7).then(|| at.clone())
 }
 
-pub fn usable_python_wasm() -> Option<PathBuf> {
-    usable_path(&python_wasm())
+pub(super) fn three_only(presence: &Presence) -> Option<PathBuf> {
+    let Presence::Present { at, version } = presence else {
+        return None;
+    };
+    let major = version
+        .number()
+        .split('.')
+        .next()
+        .and_then(|major| major.parse::<u32>().ok())?;
+    (major == 3).then(|| at.clone())
 }
 
 pub(crate) fn usable_shell() -> Option<PathBuf> {
@@ -205,43 +127,11 @@ fn usable_path(presence: &Presence) -> Option<PathBuf> {
     if !presence.usable() {
         return None;
     }
-    presence.at().map(std::path::Path::to_path_buf)
+    presence.at().map(Path::to_path_buf).and_then(as_absolute)
 }
 
-pub(super) fn built(carried: bool) -> Presence {
-    if !carried {
-        return Presence::Absent(Absence::NotInThisBuild);
-    }
-    let at = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("this binary"));
-    match execution_engine() {
-        Ok(_) => Presence::Present {
-            at,
-            version: Version::Said("wasmtime".to_owned()),
-        },
-        Err(err) => Presence::Broken {
-            at,
-            fault: Fault::WillNotStart(err.to_string()),
-        },
-    }
-}
-
-#[cfg(feature = "sandbox")]
-pub(crate) fn execution_engine() -> Result<Box<dyn runtime::Sandbox>, AxError> {
-    static ENGINE: std::sync::Mutex<Option<runtime::WasmtimeSandbox>> = std::sync::Mutex::new(None);
-    let mut slot = ENGINE
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    if let Some(engine) = slot.as_ref() {
-        return Ok(Box::new(engine.clone()));
-    }
-    let engine = runtime::WasmtimeSandbox::new()?;
-    *slot = Some(engine.clone());
-    Ok(Box::new(engine))
-}
-
-#[cfg(not(feature = "sandbox"))]
-pub(crate) fn execution_engine() -> Result<Box<dyn runtime::Sandbox>, AxError> {
-    Ok(Box::new(runtime::AbsentSandbox))
+fn as_absolute(at: PathBuf) -> Option<PathBuf> {
+    std::path::absolute(at).ok()
 }
 
 fn look(name: &str) -> Presence {
@@ -263,18 +153,33 @@ pub(crate) fn container() -> Result<runtime::tools::ContainerRuntime, AxError> {
         if let Some(program) = find_program(name) {
             match runtime::tools::ContainerRuntime::probe(engine, program) {
                 Ok(runtime) => {
-                    let harness = std::env::current_exe().map_err(|err| AxError::failure(
-                        kernel::AxCode::SandboxDenied, "locate the container guardian", err.to_string()
-                    ).with_recovery("start the installed harness executable so its cleanup helper can be launched"))?;
+                    let harness = std::env::current_exe().map_err(|err| {
+                        AxError::failure(
+                            kernel::AxCode::SandboxDenied,
+                            "locate the container guardian",
+                            err.to_string(),
+                        )
+                        .with_recovery(
+                            "start the installed harness executable so its cleanup helper can be launched",
+                        )
+                    })?;
                     return Ok(runtime.guarded(harness));
                 }
                 Err(err) => failures.push(err.to_string()),
             }
         }
     }
-    Err(AxError::failure(kernel::AxCode::SandboxDenied, "probe the container daemon",
-        format!("no accessible Linux cgroup v2 container daemon: {}", failures.join("; ")))
-        .with_recovery("install and start Docker or Podman with CPU, memory and pids controllers; prepare a local immutable image"))
+    Err(AxError::failure(
+        kernel::AxCode::SandboxDenied,
+        "probe the container daemon",
+        format!(
+            "no accessible Linux cgroup v2 container daemon: {}",
+            failures.join("; ")
+        ),
+    )
+    .with_recovery(
+        "install and start Docker or Podman with CPU, memory and pids controllers; prepare a local immutable image",
+    ))
 }
 
 pub(crate) fn confinement(arm: kernel::SandboxArm) -> Result<runtime::tools::Confined, AxError> {
@@ -295,9 +200,16 @@ pub(crate) fn confinement(arm: kernel::SandboxArm) -> Result<runtime::tools::Con
             }
             #[cfg(not(any(windows, target_os = "macos")))]
             {
-                let wrapper = find_program("bwrap").ok_or_else(|| AxError::failure(kernel::AxCode::SandboxDenied,
-                    "select the native sandbox", "bubblewrap is missing")
-                    .with_recovery("install bubblewrap with unprivileged user namespaces or select another arm"))?;
+                let wrapper = find_program("bwrap").ok_or_else(|| {
+                    AxError::failure(
+                        kernel::AxCode::SandboxDenied,
+                        "select the native sandbox",
+                        "bubblewrap is missing",
+                    )
+                    .with_recovery(
+                        "install bubblewrap with unprivileged user namespaces or select another arm",
+                    )
+                })?;
                 Confinement::LinuxNamespaces { wrapper }
             }
         }

@@ -4,7 +4,6 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
-use crate::sandbox::{EchoSandbox, Fuel};
 use crate::tools::{EditTool, ExecTool};
 use kernel::{Payload, RunId, Seq, TimeMs};
 use serde_json::Map;
@@ -68,13 +67,9 @@ fn dedup_runs_before_the_side_effect() {
         std::fs::read_to_string(tmp.path().join("work/a.txt")).unwrap(),
         "two\n"
     );
-    // The same key again: the tool must not run a second time, and the
-    // file must not change (a second create would be refused as a file
-    // that already stands - dedup means it is never attempted).
+
     let second = bench.invoke(&call, &key(1), now()).unwrap();
-    // What a replay is owed is the answer the first call gave: telling
-    // the model "you already asked" teaches it the call failed when it
-    // succeeded.
+
     let (BenchOutcome::Ran { outcome: once, .. }, BenchOutcome::Duplicate { outcome: again }) =
         (first, second)
     else {
@@ -93,7 +88,7 @@ fn a_write_outside_the_domain_flows_back_as_a_refusal_not_a_dead_turn() {
     let domain = WriteDomain::new(vec![Address::parse("work").unwrap()]).unwrap();
     let elsewhere = WriteDomain::new(vec![Address::parse("elsewhere").unwrap()]).unwrap();
     let mut bench = ToolBench::new(domain);
-    // A tool whose declared domain sits outside the run's domain.
+
     bench
         .register(Box::new(
             EditTool::new(
@@ -142,25 +137,20 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_checkpointed() {
             ExecTool::new(
                 crate::tools::ExecSetup {
                     workdir: tmp.path().to_path_buf(),
-                    mounts: Vec::new(),
-                    python_wasm: None,
+                    python: None,
                     shell: crate::Shell::Absent,
-                    fuel: Fuel(1000),
                     env_passthrough: Vec::new(),
                     domain: Address::parse("work").unwrap(),
                     run: RunId::from_bytes([1u8; 16]),
                     policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work))
                         .reader(),
                 },
-                Box::new(EchoSandbox::new()),
                 crate::Backlog::new(),
             )
             .unwrap(),
         )
     };
 
-    // No net: a command the forecast suspects is refused rather than
-    // run unprotected.
     let mut bare = ToolBench::new(domain.clone());
     bare.register(exec_tool()).unwrap();
     let err = match bare.invoke(&exec_call("rm -rf work"), &key(3), now()) {
@@ -169,8 +159,6 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_checkpointed() {
     };
     assert_eq!(*err.code(), AxCode::ToolUnavailable);
 
-    // With a net: the wave is checkpointed first, and the outcome carries
-    // the commit the sweep will restore from.
     let checkpoint = Checkpoint::open(tmp.path()).unwrap();
     let mut checkpointed_bench =
         ToolBench::new(domain).with_checkpoint(crate::bench::CheckpointNet {
@@ -179,11 +167,9 @@ fn a_suspected_discard_without_a_net_is_refused_and_with_one_is_checkpointed() {
             of: probe_provenance(),
         });
     checkpointed_bench.register(exec_tool()).unwrap();
-    // The shell arm is unconfigured, so the tool itself refuses —
-    // but only after the checkpoint went up, which is what we assert.
+
     let _ = checkpointed_bench.invoke(&exec_call("rm -rf work"), &key(4), now());
-    // The checkpoint went up before the command was allowed to run: a
-    // repository now exists with a commit to restore from.
+
     assert!(
         tmp.path().join(".git").exists(),
         "the checkpoint net was raised"
@@ -242,7 +228,6 @@ fn a_second_tool_claiming_a_taken_name_is_refused() {
     assert_eq!(*err.code(), AxCode::InvalidArgs);
 }
 
-/// Who a checkpoint in this test file is signed as.
 fn probe_provenance() -> storage::Provenance {
     storage::Provenance::new(
         kernel::RunId::CITY,
@@ -257,10 +242,6 @@ fn probe_provenance() -> storage::Provenance {
 
 #[test]
 fn a_documents_bench_lets_its_own_room_through_the_door() {
-    // The tool declares the room it works in, not a file; a documents
-    // domain must not judge the declaration as if it were one. Before
-    // the fix this refused every write with "hall/mayor is not a
-    // Markdown document", and the Mayor could write nothing at all.
     let tmp = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(tmp.path().join("hall")).unwrap();
     let domain = WriteDomain::documents(vec![Address::parse("hall").unwrap()]).unwrap();
@@ -291,7 +272,6 @@ fn a_documents_bench_lets_its_own_room_through_the_door() {
     assert!(tmp.path().join("hall/note.md").is_file());
 }
 
-/// A bench holding `exec` in a `work` domain under `root`.
 fn exec_bench(root: &std::path::Path) -> ToolBench {
     std::fs::create_dir_all(root.join("work")).unwrap();
     let domain = WriteDomain::new(vec![Address::parse("work").unwrap()]).unwrap();
@@ -301,17 +281,14 @@ fn exec_bench(root: &std::path::Path) -> ToolBench {
             ExecTool::new(
                 crate::tools::ExecSetup {
                     workdir: root.to_path_buf(),
-                    mounts: Vec::new(),
-                    python_wasm: None,
+                    python: None,
                     shell: crate::Shell::Absent,
-                    fuel: Fuel(1000),
                     env_passthrough: Vec::new(),
                     domain: Address::parse("work").unwrap(),
                     run: RunId::from_bytes([1u8; 16]),
                     policy: crate::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work))
                         .reader(),
                 },
-                Box::new(EchoSandbox::new()),
                 crate::Backlog::new(),
             )
             .unwrap(),
@@ -347,7 +324,6 @@ fn a_run_started_by_outside_content_is_refused_exec() {
     assert_refused_as_tainted(bench.invoke(&exec_call(), &key(10), now()));
 }
 
-/// A tool whose every call answers with an empty payload.
 struct Answering(kernel::ToolMeta);
 
 impl Tool for Answering {
@@ -363,8 +339,6 @@ impl Tool for Answering {
     }
 }
 
-/// Content that came in through a page or a connector is outside
-/// content wherever the run started, so the exec after it is refused.
 #[test]
 fn a_run_that_read_outside_content_is_refused_exec() {
     let tmp = tempfile::tempdir().unwrap();

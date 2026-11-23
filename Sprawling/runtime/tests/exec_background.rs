@@ -11,10 +11,8 @@
     reason = "test code"
 )]
 
-use std::path::PathBuf;
-
 use kernel::{Address, Payload, RunId, Tool, ToolCall, ToolName};
-use runtime::{Backlog, EchoSandbox, ExecSetup, ExecTool, Fuel, PollBudget, PythonGuest};
+use runtime::{Backlog, ExecSetup, ExecTool, PollBudget};
 use serde_json::{Value, json};
 
 const MARK: &str = "only-for-the-run-that-started-it";
@@ -22,17 +20,14 @@ const MARK: &str = "only-for-the-run-that-started-it";
 fn a_run_at(backlog: &Backlog, building: &str, run: u8, workdir: &std::path::Path) -> ExecTool {
     let setup = ExecSetup {
         workdir: workdir.to_path_buf(),
-        mounts: Vec::new(),
-
-        python_wasm: Some(PythonGuest::at(PathBuf::from("python.wasm"))),
+        python: None,
         shell: runtime::Shell::Absent,
-        fuel: Fuel(1_000_000),
         env_passthrough: Vec::new(),
         domain: Address::parse(building).unwrap(),
         run: RunId::from_bytes([run; 16]),
         policy: runtime::PolicyCell::new(kernel::RunPolicy::of(kernel::Mode::Work)).reader(),
     };
-    ExecTool::new(setup, Box::new(EchoSandbox::new()), backlog.clone()).unwrap()
+    ExecTool::new(setup, backlog.clone()).unwrap()
 }
 
 fn invoke(tool: &mut ExecTool, args: Value) -> Value {
@@ -55,24 +50,29 @@ fn slow_then_mark() -> Value {
             "cmd",
             vec![
                 "/C".to_owned(),
-                format!("ping -n 2 127.0.0.1 >NUL & echo {MARK}"),
+                format!("ping -n 4 127.0.0.1 >NUL & echo {MARK}"),
             ],
         )
     } else {
-        ("sh", vec!["-c".to_owned(), format!("sleep 1; echo {MARK}")])
+        ("sh", vec!["-c".to_owned(), format!("sleep 3; echo {MARK}")])
     };
     let quoted: Vec<String> = args.iter().map(|arg| format!("\"{arg}\"")).collect();
     json!({ "command": format!("{path} {}", quoted.join(" ")), "where": "host" })
 }
 
 fn quick_look() -> Value {
-    json!({ "python": "pass" })
+    let command = if cfg!(windows) {
+        "cmd /C echo looking"
+    } else {
+        "echo looking"
+    };
+    json!({ "command": command, "where": "host" })
 }
 
 #[test]
 fn a_background_result_reaches_only_the_run_that_started_it() {
     let work = tempfile::tempdir().unwrap();
-    let backlog = Backlog::with_window(PollBudget::new(1, 1));
+    let backlog = Backlog::with_window(PollBudget::new(50, 20));
     let mut starter = a_run_at(&backlog, "vault", 1, work.path());
     let mut stranger = a_run_at(&backlog, "lab", 2, work.path());
 
@@ -87,7 +87,15 @@ fn a_background_result_reaches_only_the_run_that_started_it() {
             seen.get("background").is_none(),
             "another run's output reached this run: {seen}"
         );
+        assert!(
+            seen.get("outcome").is_none(),
+            "the poll itself must settle so it does not invent background rows: {seen}"
+        );
         let mine = invoke(&mut starter, quick_look());
+        assert!(
+            mine.get("outcome").is_none(),
+            "the poll itself must settle so a background row is only the slow command: {mine}"
+        );
         if let Some(rows) = mine.get("background") {
             delivered = Some(rows.clone());
             break;

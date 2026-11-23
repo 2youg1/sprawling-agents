@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The bench harness the performance register calls for: its wall-clock
-//! budgets and real CPython-WASI scenarios (`Tools/xtask/budgets.toml`),
-//! measured on this machine, reported with their machine, never gated.
-//!
-//! This is a measuring Main, so it is the second sanctioned sampling
-//! point besides `bin::assembly`: every `Instant::now` here carries the
-//! same `#[expect]` the first one carries.
-//!
-//! Specified by `Tools/citysim/spec/Bench.lean` §8-6.
-
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -28,14 +18,13 @@ mod scenarios;
 fn main() -> std::process::ExitCode {
     let arguments: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
     match arguments.as_slice() {
-        [command, guest, snapshot, stdlib] if command == python::COLD_COMMAND => {
+        [command, guest, interpreter] if command == python::COLD_COMMAND => {
             return finish(python::cold_child(
                 match guest.to_str() {
                     Some(digest) => digest,
                     None => return finish(Err(invalid_arguments())),
                 },
-                Path::new(snapshot),
-                Path::new(stdlib),
+                Path::new(interpreter),
             ));
         }
         [command] if command == "python" => {
@@ -113,9 +102,6 @@ fn finish(outcome: Result<(), String>) -> std::process::ExitCode {
     }
 }
 
-/// The registered fixture's digest, refused when its bytes moved from
-/// the pin: a reading of other bytes would enter the register beside
-/// readings it cannot be compared with (citysim D8).
 fn pinned_fixture(scratch: &Path) -> Result<B3Hash, String> {
     let digest = scenarios::REGISTERED.digest(scratch)?;
     if digest.to_string() == scenarios::REGISTERED.pinned {
@@ -158,8 +144,7 @@ fn draft(n: u64) -> Result<EventDraft, String> {
     );
     let t = TimeMs::new(1_700_000_000_000_u64.saturating_add(n));
     let room = Address::parse("bench/room").map_err(|e| e.to_string())?;
-    // A signal line as `collab` writes it, so the fold scenario reads
-    // every line through the reader production uses.
+
     let signal = collab::Signal::new(
         kernel::event::record::SignalId::parse(&format!("bench-s{n}"))
             .map_err(|e| e.to_string())?,
@@ -182,7 +167,6 @@ fn draft(n: u64) -> Result<EventDraft, String> {
     })
 }
 
-/// Budget row `ledger_append`: append plus fsync, p50 and p99.
 fn ledger_append(scratch: &std::path::Path) -> Result<(), String> {
     let dir = scratch.join("ledger");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -204,7 +188,6 @@ fn ledger_append(scratch: &std::path::Path) -> Result<(), String> {
         reading::row_line("ledger_append", &reading::spread_of(times)?, "")
     );
 
-    // The wave shape production actually uses: one barrier per batch.
     const BATCH: u64 = 1_000;
     let drafts: Vec<EventDraft> = (0..BATCH)
         .map(|n| draft(n.saturating_add(SINGLES)))
@@ -222,12 +205,6 @@ fn ledger_append(scratch: &std::path::Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Budget row `durability_barrier`: what one barrier costs per record as
-/// the batch under it grows.
-///
-/// The absolute figure is the machine's disk. The ratio between the rows
-/// is the design fact: a barrier is a fixed cost, so what a batch buys is
-/// the whole difference between the first row and the last.
 fn durability_barrier(scratch: &std::path::Path) -> Result<(), String> {
     for batch in [1u64, 10, 50] {
         let dir = scratch.join(format!("barrier-{batch}"));
@@ -259,7 +236,6 @@ fn durability_barrier(scratch: &std::path::Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Budget row `prefix_assembly`: one frozen prefix from realistic docs.
 fn prefix_assembly() -> Result<(), String> {
     let addr = |raw: &str| Address::parse(raw).map_err(|e| format!("{e}"));
     let doc = |raw: &str, bytes: usize| -> Result<runtime::SourceDoc, String> {
@@ -297,22 +273,12 @@ fn prefix_assembly() -> Result<(), String> {
     Ok(())
 }
 
-/// Budget row `run_history`: opening yesterday's session.
-///
-/// The work `bin::assembly`'s `run_history` does, over the same public
-/// faces it calls: refresh the resident index, name the newest `limit`
-/// sequences this run wrote, read those lines, parse them. What it
-/// deliberately leaves out is the socket and the JSON frame, which are
-/// the same for every query and would hide the difference this measures.
 fn run_history(scratch: &std::path::Path) -> Result<(), String> {
     let dir = scratch.join("history");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let (mut ledger, _report) = storage::JsonlLedger::open(&dir, TimeMs::new(1_700_000_000_000))
         .map_err(|e| format!("{}", e.into_ax()))?;
-    // Eight sessions interleaved across fifty thousand records: a city
-    // that has been working, which is the only city where this question
-    // is expensive. The session asked about is the *oldest* one, because
-    // that is the one a walk back from the tail would reach last.
+
     const RECORDS: u64 = 50_000;
     const SESSIONS: u64 = 8;
     let session = |n: u64| {

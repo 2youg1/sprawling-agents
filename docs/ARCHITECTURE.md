@@ -99,13 +99,13 @@ every week.
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
 | Content store | BLAKE3 | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
 | Restoration | `git2`, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
-| Sandbox | `wasmtime` + `wasmtime-wasi`, wasip1 only | Fuel-metered execution with **no socket host implementation** — the Python arm's mechanical proof that it cannot reach the network. Cost: an optional feature; a build without it refuses tool execution in three parts rather than pretending. |
+| Exec confinement | OS process arms (`copied_tree`, `native`, `container`) and host Python | Commands and Python scripts run as host processes under the building's chosen arm. Python uses `SPRAWLING_PYTHON` or `python3`/`python` on `PATH`. Network and filesystem guarantees come from the arm, not from a guest ABI. |
 | Credentials | `keyring-core` with one store crate per platform (platform credential service), `secrecy`, `zeroize` | Plaintext lives in the operating system's own vault, never in a file we wrote. The only credential the city takes is a key a person hands it: it signs in to no subscription. |
 | Entropy | `getrandom` | OS entropy for values a stranger must not guess: the door's pairing key, and the salt and nonce of the encrypted vault file. No decision path reads it, so replay never needs it (§10 rule 4). |
 | Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `opt-level = 3`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `3` rather than `"z"` or `"s"` because it is the fastest of the three on the product's common operations, and runtime speed comes before size; the criterion and the readings sit beside the setting in `Cargo.toml`. |
-| Dependency count | <!-- xtask:begin dependency_count -->484<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->414<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest`
 (properties before examples), `insta` (golden output), `trybuild` (proof
@@ -309,7 +309,6 @@ This table is a **machine authority**: `cargo xtask depmap` refuses a
 | `kernel::ledger` | Sprawling/kernel/src/ledger.rs | memory: jsonl segments with tail recovery | citysim: in-memory Ledger |
 | `kernel::tool` | Sprawling/kernel/src/tool.rs | runtime tools, collab tools, browser, protocol | citysim: scripted tools |
 | `kernel::model` | Sprawling/kernel/src/model.rs | gateway: native and endpoint | citysim: scripted model |
-| `runtime::sandbox` | Sprawling/runtime/src/sandbox.rs | wasmtime with fuel metering | pass-through and fault doubles |
 | `runtime::turn::wave` | Sprawling/runtime/src/turn/wave.rs | sprawling: a run's bench in three stages, `accounting::worker::driving::placing` | any `FnMut(&ToolCall, TimeMs)`, which answers as it admits and so runs a wave serially: citysim and the scripted-tool tests |
 | `browser::port` | Sprawling/browser/src/port.rs | WebDriver BiDi session layer | two shipped transports and an offline replay |
 | `remote_access::route` | Sprawling/remote_access/src/route.rs | `route::cloudflare`: a locally managed Cloudflare named tunnel; `route::command`: a command the person wrote | `route::scripted`: a fixed address, and the order it was opened and closed in |
@@ -653,7 +652,7 @@ branch's work is its children.
 
 One WebSocket, three kinds of frame, and a schema hash that both ends check
 on connect: a page from a different build refuses rather than misreads.
-`WIRE_V` is <!-- xtask:begin wire_v -->80<!-- xtask:end -->.
+`WIRE_V` is <!-- xtask:begin wire_v -->81<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|

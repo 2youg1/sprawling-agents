@@ -28,8 +28,6 @@ fn a_city_whose_files_all_parse_has_no_findings() {
     assert!(report.read >= 1, "the building's RULES.toml was read");
 }
 
-/// One bad sample per kind of file; each points at the key its parser
-/// stops on, so the position a person is sent to is the one they wrote.
 #[test]
 fn each_kind_of_file_is_refused_at_the_line_and_column_of_its_error() {
     let dir = tempfile::tempdir().unwrap();
@@ -42,7 +40,7 @@ fn each_kind_of_file_is_refused_at_the_line_and_column_of_its_error() {
     let city_config = CityLayout::new(root).city_config();
     write(&city_config, "# the city\n  wrong = true\n");
     let lab_config = Layer::Building.file(root, &lab).unwrap();
-    write(&lab_config, "\n\n[sandbox]\nmounts = []\nwat = 1\n");
+    write(&lab_config, "\n\n[sandbox]\nshell = false\nwat = 1\n");
     write(&schedule_path(root), "[[job]]\nname = \"a\"\n    zap = 2\n");
     write(&watch_path(root), "\n[[source]]\nname = \"a\"\n\tzap = 1\n");
 

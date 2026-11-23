@@ -6,7 +6,7 @@
 use kernel::{Address, AxError, B3Hash, EventKind, EventRecord, RunId, Seq, TimeMs};
 use serde::{Deserialize, Serialize};
 
-pub const WIRE_V: u32 = 80;
+pub const WIRE_V: u32 = 81;
 mod ask;
 mod monitor;
 

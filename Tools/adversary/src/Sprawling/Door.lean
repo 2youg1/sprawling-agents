@@ -126,10 +126,11 @@ inductive Verb where
   | document (path : String)
   /-- Write what one building's runs may reach into that building's own layer.
 
-  Only the instruction budget travels, because it is the one figure in
-  `SandboxLimits` that a person types a number into: everything else this frame
-  carries is sent at its empty value so that two writes differ in one fact. -/
-  | configureBuilding (addr : String) (fuel : Nat) (idem : IdemKey)
+  Only `container.cpu_millis` travels as a varying number, because it is the one
+  figure in `SandboxLimits` that a person types a number into after fuel retired:
+  everything else this frame carries is sent at a fixed value so that two writes
+  differ in one fact. -/
+  | configureBuilding (addr : String) (cpuMillis : Nat) (idem : IdemKey)
   /-- Everything this person settled about their own reading of the city,
   answered whole.
 
@@ -266,14 +267,19 @@ def Verb.frame : Verb → String
   | .endpointView => query "endpoint_view"
   | .buildingView addr => asked "building_view" [("addr", .str addr)]
   | .document path => asked "document" [("at", .str path)]
-  | .configureBuilding addr fuel idem =>
+  | .configureBuilding addr cpuMillis idem =>
     command "configure_building"
       [ ("addr", .str addr)
       , ("sandbox", Json.mkObj
           [ ("shell", Json.bool false)
-          , ("fuel", Json.num (JsonNumber.fromNat fuel))
-          , ("mounts", Json.arr #[])
-          , ("env_passthrough", Json.arr #[]) ])
+          , ("container", Json.mkObj
+              [ ("image", .str ("sha256:" ++ String.mk (List.replicate 64 'a')))
+              , ("user", Json.num (JsonNumber.fromNat 1000))
+              , ("cpu_millis", Json.num (JsonNumber.fromNat cpuMillis))
+              , ("memory_bytes", Json.num (JsonNumber.fromNat 67108864))
+              , ("pids", Json.num (JsonNumber.fromNat 64)) ])
+          , ("env_passthrough", Json.arr #[])
+          , ("trusted", Json.arr #[]) ])
       , ("mcp", .null)
       , ("desktop", .null)
       , ("idem", .str idem.value) ]

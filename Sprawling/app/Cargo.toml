@@ -91,16 +91,6 @@ self-replace = "=1.5.1"
 # Protected Windows installation path for the read-only privacy identity query.
 winreg = { workspace = true }
 
-[features]
-# The execution engine is on by default, so `cargo install sprawling`
-# builds the binary the release archives carry (`Sprawling/app/Spec.lean` §8-157).
-# Without it `AbsentSandbox` refuses tool execution in three parts and
-# its recovery says "install a build with the `wasm` feature" - this is
-# that feature; `--no-default-features` is the build without it, which
-# `just features` compiles.
-default = ["sandbox"]
-sandbox = ["runtime/wasm"]
-
 # Where `cargo binstall sprawling` fetches the archive release.yml built for
 # this target, so it installs the same binary as the download page instead of
 # compiling the `.crate` (`Sprawling/app/Spec.lean` §8-157). The archive

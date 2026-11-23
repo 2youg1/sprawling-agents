@@ -15,7 +15,6 @@ fn a_container_declaration_reaches_the_frozen_sandbox_whole() {
         &format!(
             "[sandbox]
 shell = false
-fuel = 4000
 [sandbox.container]
 image = '{image}'
 user = 1000
@@ -33,7 +32,6 @@ pids = 64
     assert_eq!(
         frozen.unwrap().sandbox,
         SandboxLimits {
-            fuel: 4000,
             container: Some(kernel::ContainerLimits {
                 image: kernel::ContainerImage::parse(&image).unwrap(),
                 user: std::num::NonZeroU32::new(1000).unwrap(),

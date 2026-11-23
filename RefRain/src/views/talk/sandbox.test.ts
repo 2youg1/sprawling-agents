@@ -8,7 +8,7 @@ import { Address, Tokens, UsdMicros } from "../../wire";
 import type { Answer, SandboxLimits } from "../../wire";
 import { restriction, sandboxQuery } from "./sandbox";
 
-const LIMITS: SandboxLimits = { fuel: 0, mounts: [Address.make("lab")], shell: true };
+const LIMITS: SandboxLimits = { shell: true };
 
 function building(sandbox: SandboxLimits | null): Answer {
   return {

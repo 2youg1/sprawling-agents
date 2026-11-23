@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A building named for what it asks and this machine lacks, rules that
-//! will not read, and a code explained (`Sprawling/app/spec/Doctor.lean` §8-48).
-
 use kernel::Address;
 
 use super::ScriptedMachine;
@@ -21,9 +18,6 @@ fn lab() -> Address {
     Address::parse("lab").unwrap()
 }
 
-/// A building whose `RULES.toml` asks for a browser on a machine with
-/// neither
-/// engine is named, with both roads it tried and why each is closed.
 #[test]
 fn a_building_that_asks_for_a_browser_is_named_when_this_machine_has_none() {
     let findings = examine(&ScriptedMachine::missing(&[
@@ -64,9 +58,6 @@ fn a_building_that_asks_for_a_browser_is_named_when_this_machine_has_none() {
     assert!(lacks(&lab(), &nothing_asked, &findings).is_empty());
 }
 
-/// A building whose shell runs under PowerShell 7 is judged against
-/// the pwsh row: named when pwsh is missing even though the platform's
-/// shell is here, and not judged against the platform's shell at all.
 #[test]
 fn a_building_that_runs_its_shell_under_pwsh_is_named_when_pwsh_is_missing() {
     let findings = examine(&ScriptedMachine::missing(&["pwsh"]));
@@ -92,7 +83,6 @@ fn a_building_that_runs_its_shell_under_pwsh_is_named_when_pwsh_is_missing() {
     assert!(lacks(&lab(), &system, &findings).is_empty());
 }
 
-/// Every capability bit is judged, and each names the items it tries.
 #[test]
 fn every_capability_names_at_least_one_item_the_table_carries() {
     let named: std::collections::BTreeSet<&str> = crate::doctor::REQUIREMENTS
@@ -111,8 +101,6 @@ fn every_capability_names_at_least_one_item_the_table_carries() {
     }
 }
 
-/// A city is walked building by building; one whose rules will not
-/// read is a line about that building, and never a building skipped.
 #[test]
 fn a_building_whose_rules_will_not_read_is_reported_not_skipped() {
     let dir = tempfile::tempdir().unwrap();
@@ -159,37 +147,25 @@ fn a_building_whose_rules_will_not_read_is_reported_not_skipped() {
     );
 }
 
-/// `--explain` connects a refusal code to the items on this machine
-/// that can raise it: one line per item, each ending in the next move
-/// on this platform. A code decided inside the city is said to be so,
-/// and a code nobody knows is said to be unknown.
 #[test]
 fn explain_connects_a_refusal_code_to_what_this_machine_has() {
-    let findings = examine(&ScriptedMachine::missing(&["python-wasi", "shell"]));
+    let findings = examine(&ScriptedMachine::missing(&["host-python", "shell"]));
     let Explanation::Lines(lines) = explain("E_TOOL_UNAVAILABLE", &findings, Platform::current())
     else {
         panic!("E_TOOL_UNAVAILABLE is about this machine");
     };
     let python = lines
         .iter()
-        .find(|line| line.contains("python-wasi"))
-        .expect("the python component is one of the items");
+        .find(|line| line.contains("host-python"))
+        .expect("host Python is one of the items");
     assert!(python.contains("absent"), "{python}");
+    let suggestion = python
+        .split_once("->")
+        .map(|(_, rest)| rest)
+        .expect("the line ends in what to do next");
     assert!(
-        python.contains("->"),
-        "the line ends in what to do next: {python}"
-    );
-    assert!(
-        python.contains("components/python-wasi") || python.contains("manual"),
+        suggestion.contains("manual") || suggestion.contains("Python"),
         "{python}"
-    );
-    let engine = lines
-        .iter()
-        .find(|line| line.contains("sandbox-engine"))
-        .expect("the engine is one of the items");
-    assert!(
-        engine.ends_with("nothing to do"),
-        "a present item has no next move: {engine}"
     );
 
     let Explanation::Lines(browser) =
@@ -209,11 +185,6 @@ fn explain_connects_a_refusal_code_to_what_this_machine_has() {
     ));
 }
 
-/// Checking is what `doctor` does; touching the machine takes the flag,
-/// the one bare word is the city, and `--explain` takes the next word.
-///
-/// A verb that installed by default would act on a person who only
-/// asked what they had, which is the one thing this verb must not do.
 #[test]
 fn the_line_is_read_as_flag_city_and_code() {
     let words =
@@ -253,8 +224,6 @@ fn the_line_is_read_as_flag_city_and_code() {
     );
 }
 
-/// `sprawling doctor <city>` names the building on the screen, and the
-/// verdict is not ready while a building lacks what it asked for.
 #[test]
 fn doctor_with_a_city_names_the_building_on_the_screen() {
     let dir = tempfile::tempdir().unwrap();
@@ -290,11 +259,9 @@ fn doctor_with_a_city_names_the_building_on_the_screen() {
     assert!(ready, "{}", String::from_utf8(screen).unwrap());
 }
 
-/// `--explain` is an explanation, so it exits with success whatever
-/// the machine lacks, and prints one line per item.
 #[test]
 fn explain_on_the_screen_is_one_line_per_item_and_never_a_failure() {
-    let machine = ScriptedMachine::missing(&["python-wasi"]);
+    let machine = ScriptedMachine::missing(&["host-python"]);
     let mut nobody = std::io::Cursor::new(Vec::new());
     let mut screen: Vec<u8> = Vec::new();
     let asked = Asked {
@@ -307,13 +274,10 @@ fn explain_on_the_screen_is_one_line_per_item_and_never_a_failure() {
     let ready = run(&asked, &machine, &mut nobody, &mut screen).unwrap();
     assert!(ready);
     let shown = String::from_utf8(screen).unwrap();
-    assert!(shown.contains("python-wasi"), "{shown}");
+    assert!(shown.contains("host-python"), "{shown}");
     assert!(shown.contains("E_TOOL_UNAVAILABLE"), "{shown}");
 }
 
-/// The page's answer carries the scanning reading the terminal prints:
-/// `DoctorRefresh` reaches `accounting::Machine::report`, and that is
-/// the fold the page reads (`Sprawling/wire/spec/Answer/Doctor.lean` D25).
 #[test]
 fn the_page_carries_the_scanning_reading_the_doctor_took() {
     let city = std::env::temp_dir().join("one");
@@ -336,9 +300,6 @@ fn the_page_carries_the_scanning_reading_the_doctor_took() {
     );
 }
 
-/// The exit code answers whether a User can use this machine: a missing
-/// develop-tier tool is reported and leaves the answer ready, while a
-/// missing required use-tier item makes it not ready on every platform.
 #[test]
 fn only_a_missing_required_use_item_makes_the_doctor_not_ready() {
     let asked = Asked {

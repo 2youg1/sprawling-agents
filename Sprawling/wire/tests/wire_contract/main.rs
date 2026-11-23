@@ -75,7 +75,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `Sprawling/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 80,
+        WIRE_V, 81,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
@@ -94,7 +94,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
     assert_eq!(schema_hash(), kernel::B3Hash::digest(&material));
 }
 
-const WIRE_SCHEMA_GOLDEN: &str = "c86b366698f631d32fce9069aae369e56bab8aa483a8eb3fa8f668e369c345f4";
+const WIRE_SCHEMA_GOLDEN: &str = "13c28a66810d6e35a9b477ccd507c25e458a39811c5fa86e6f574ee331dfd593";
 
 #[cfg(feature = "schema")]
 #[test]
@@ -126,7 +126,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 }
 
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "e0e0ca4f1f5aa8b6a7a3d4a0f38aceb14a153c977917ece491c0dfea3196c71a";
+const WIRE_SHAPE_GOLDEN: &str = "d2642389c18f2f4664543ac9dc549dbf0b67476800ff96e569dd1c975115c5cf";
 
 #[cfg(feature = "server")]
 #[test]

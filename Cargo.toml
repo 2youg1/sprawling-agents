@@ -175,14 +175,12 @@ getrandom = "0.4"
 # bought for was the system zone's reading of one instant. localtime_r is
 # that reading on unix; RUSTSEC-2026-0543 retired chrono from the tree, so
 # the offset crosses `console_ffi::zone` instead (`Calyx/ffi/Spec.lean` D3).
-# Already in the lock beneath wasmtime-wasi, under the same licence.
 libc = "0.2"
 # A skill package is read by walking directory handles, never by
 # re-resolving a path: a directory swapped for a link after its judgement
 # is then outside anything the walk can open (`Sprawling/city/Spec.lean` §8-28).
 # The standard library has no handle-relative open; these two crates are
-# that open in safe Rust, and cap-primitives beneath them is already in
-# the lock beneath wasmtime-wasi, under the same licence.
+# that open in safe Rust.
 cap-std = "4"
 cap-fs-ext = "4"
 # A playback page is checked as a browser would build it: html5ever is the

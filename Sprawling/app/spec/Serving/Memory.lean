@@ -28,15 +28,13 @@
 | 摘要缓存（`DigestCache`） | `storage::digest_cache` | 在盘上，进程里不留 | 无 |
 | playback 导出 | `accounting::playback` | 走账本是流式的，编码直接写进 bundle 的那一份缓冲、到 `BUNDLE_MAX_BYTES`（32 MiB）即停；整份 `Document` 在编码之前仍在内存里（`Sprawling/accounting/Spec.lean` §3） | 选中的记录数 |
 | doctor 扫描 | `bin::doctor` | 子进程的输出逐行读，每行至多 4 KiB，只留调用者选中的行（`doctor::asking`，`Sprawling/app/spec/Doctor.lean` §8-166 之一） | 选中的行数 |
-| guest 的内容 pin | `bin::doctor::host` | 默认组件每进程首次选择时读入完整 wasm、算完 BLAKE3 即释放；`OnceLock` 只留判定，不留字节 | 无 |
-| 已编译的 guest 模块（`Compiled`） | `runtime::sandbox::engine` | 一格：同一进程里所有 `WasmtimeSandbox` 的克隆共用一份编译产物，换 guest 时替换（`Sprawling/runtime/spec/Sandbox.lean` D101） | 无 |
-| guest 的线性内存 | `runtime::sandbox::engine` | run 的 `[core] memory_bytes`（`soft_shares` 臂时，与这个 run 的子进程同一个数，`Sprawling/runtime/spec/Sandbox.lean` D102）；没填时 wasm32 的 4 GiB；调用结束即释放 | 同时在跑的 python 调用数 |
+| （已退役）wasip1 guest 与内容 pin | — | 随 Wasmtime／wasip1 退役删除；Python 现为宿主进程。`copied_tree` 对资源与进程树不保（`Sprawling/runtime/spec/Tools/Exec.lean` D32），backlog 份额只是按 run 预约的记账；`[core] memory_bytes` 只有所选臂提供对应操作系统机制时才真正限位 | — |
 
 账本与 CAS 已经在盘上，所以上表里随城增长的几项（视图、墓碑、旁索引）都可以改成「在盘上，按需读回」；它们读回时走下面的缓存模型。
 
 ### 整台机器
 
-上表是城的进程。在一台小内存的机器上，进程之外还有三类重活各自吃内存：exec 的子进程（编译器、测试、解释器），每个 run 的进程树已经可以由 `[core] memory_bytes` 设上限（`Sprawling/runtime/spec/Tools/Exec.lean` D29、D95）；python 臂的 guest，在城的进程里，由同一个数设上限（上表）；城起动的浏览器。每一项的上限都有了，缺的是「求和」：两次编译同时起就会让机器换页，而一旦换页，模型流、界面与编译一起卡住。求和由一份机器预算做：run 设了内存上限时，它的每条前台命令与每次 python 调用在开始前从这份预算里预约那个数，放不下就按号排队，结果里的 `memory_wait` 说出拿号时前面有几份、持有多少、预算多少（判定与性质在 `Sprawling/runtime/spec/Reserve.lean`，什么预约、持有多久见那里的 D104）。预算的字节由 `bin::serving::placement::machine_budget` 定，每个进程一本账：人层 `config.toml` 顶层的 `memory` 写了字节数就用它；`"auto"` 或不写时，是物理内存减去操作系统的保留（`SYSTEM_KEEPS_BYTES`，2 GiB，桌面系统在任何应用之前就占 2 到 2.5 GiB，取低端）、看城的那个浏览器标签页的估计（`VIEW_KEEPS_BYTES`，400 MiB，一个标签页 150 到 400 MiB，取高端）与城的进程的驻留预算（`storage::resident` 的 `RESIDENT_TOTAL_BYTES`），减不够时为 0，即一次只放行一件重活。文件字节不在此列：它们归操作系统的文件缓存，不在进程里留副本，派生数据经 `storage::resident`。
+上表是城的进程。在一台小内存的机器上，进程之外还有两类重活各自吃内存：exec 的子进程（编译器、测试、解释器），以及城起动的浏览器。`[core] memory_bytes` 在臂提供对应操作系统机制时限位整棵 run 进程树（`Sprawling/runtime/spec/Tools/Exec.lean` D29、D95）；`copied_tree` 不保资源，该上限在这一臂上不落地。缺的是「求和」：两次编译同时起就会让机器换页，而一旦换页，模型流、界面与编译一起卡住。求和由一份机器预算做：run 设了内存上限时，它的每条前台命令与每次 python 调用在开始前从这份预算里预约那个数，放不下就按号排队，结果里的 `memory_wait` 说出拿号时前面有几份、持有多少、预算多少（判定与性质在 `Sprawling/runtime/spec/Reserve.lean`，什么预约、持有多久见那里的 D104）——份额是预约，不是操作系统限额。预算的字节由 `bin::serving::placement::machine_budget` 定，每个进程一本账：人层 `config.toml` 顶层的 `memory` 写了字节数就用它；`"auto"` 或不写时，是物理内存减去操作系统的保留（`SYSTEM_KEEPS_BYTES`，2 GiB，桌面系统在任何应用之前就占 2 到 2.5 GiB，取低端）、看城的那个浏览器标签页的估计（`VIEW_KEEPS_BYTES`，400 MiB，一个标签页 150 到 400 MiB，取高端）与城的进程的驻留预算（`storage::resident` 的 `RESIDENT_TOTAL_BYTES`），减不够时为 0，即一次只放行一件重活。文件字节不在此列：它们归操作系统的文件缓存，不在进程里留副本，派生数据经 `storage::resident`。
 
 ### 模型：一份按字节计预算的缓存
 

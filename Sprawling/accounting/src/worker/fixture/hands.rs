@@ -24,10 +24,9 @@ pub(crate) fn hands() -> Hands {
         desktop_program: no_desktop,
         recipe_for: no_recipe,
         exec_host: ExecHost {
-            python_wasm: absent_path,
+            python: absent_path,
             shell: absent_path,
             pwsh: absent_path,
-            engine: absent_engine,
             confinement: |arm| {
                 Ok(runtime::tools::Confined::with_arm(
                     match arm {
@@ -181,10 +180,6 @@ fn no_recipe(item: &str) -> Result<&'static crate::Recipe, AxError> {
 
 fn absent_path() -> Option<PathBuf> {
     None
-}
-
-fn absent_engine() -> Result<Box<dyn runtime::Sandbox>, AxError> {
-    Ok(Box::new(runtime::AbsentSandbox))
 }
 
 pub(crate) fn roomy_volume(_city: &Path) -> Option<kernel::degradation::VolumeSpace> {

@@ -388,7 +388,7 @@ def statedCeiling  : Record → Option Nat
 def configured     : String                      -- 这个世界写的那栋楼
 def buildingLayer  : String                      -- 楼自己那层的 CONFIG.toml
 def cityLayer      : String                      -- 它上面那层
-def budgets        : List Nat                    -- 互不为子串的七个指令预算
+def budgets        : List Nat                    -- 互不为子串的七个 cpu_millis 数字
 def writeSequence  : Nat → Gen (List Nat)        -- 非空的写序列
 def shrinkSequence : List Nat → List (List Nat)  -- 收缩后仍非空
 def states         : String → Nat → Bool         -- 这份读数陈述了这个数字吗

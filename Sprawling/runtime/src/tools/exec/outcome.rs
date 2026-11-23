@@ -272,29 +272,3 @@ impl ShellTally {
             .map(|(name, count)| (name.as_str(), count))
     }
 }
-
-pub(super) fn exceptional(
-    stdout: &[u8],
-    stderr: &[u8],
-    kind: &str,
-    detail: Option<String>,
-) -> Result<ToolOutcome, AxError> {
-    let mut result = Map::new();
-    result.insert("arm".to_owned(), Value::String("python".to_owned()));
-    result.insert(
-        "stdout".to_owned(),
-        Value::String(String::from_utf8_lossy(stdout).into_owned()),
-    );
-    result.insert(
-        "stderr".to_owned(),
-        Value::String(String::from_utf8_lossy(stderr).into_owned()),
-    );
-    result.insert("outcome".to_owned(), Value::String(kind.to_owned()));
-    if let Some(detail) = detail {
-        result.insert("detail".to_owned(), Value::String(detail));
-    }
-    Ok(ToolOutcome {
-        result: Payload::new(result)?,
-        attachments: Vec::new(),
-    })
-}

@@ -102,17 +102,6 @@ impl ConfigLayer {
         let sandbox = match file.sandbox {
             None => None,
             Some(section) => {
-                let mut mounts = Vec::new();
-                for raw in &section.mounts {
-                    let mount = Address::parse(raw)?;
-                    if mount.is_reserved() {
-                        return Err(refuse(format!(
-                            "{raw}: the city's own subtree is not mountable"
-                        )));
-                    }
-                    mounts.push(mount);
-                }
-
                 let mut env_passthrough = Vec::new();
                 for raw in &section.env_passthrough {
                     let name = kernel::EnvVarName::parse(raw)
@@ -135,10 +124,6 @@ impl ConfigLayer {
                     container: section.container,
                     shell: section.shell,
                     interpreter,
-                    fuel: section
-                        .fuel
-                        .unwrap_or(kernel::consts_policy::SANDBOX_FUEL_DEFAULT),
-                    mounts,
                     env_passthrough,
                     trusted,
                 };
@@ -390,10 +375,6 @@ struct SandboxSection {
 
     #[serde(default)]
     interpreter: Option<String>,
-    #[serde(default)]
-    fuel: Option<u64>,
-    #[serde(default)]
-    mounts: Vec<String>,
     #[serde(default)]
     env_passthrough: Vec<String>,
 

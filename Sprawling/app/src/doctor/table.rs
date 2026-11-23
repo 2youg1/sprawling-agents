@@ -10,24 +10,13 @@ use super::{Detection, Need, PerPlatform, Pin, Platform, Recipe, Requirement, Ti
 use kernel::{AxCode, AxError};
 use wire::DoctorUnread;
 
-pub(super) const PYTHON_WASM_VARIABLE: &str = "SPRAWLING_PYTHON_WASM";
-
-const PYTHON_WASM_FILE: &str = "python.wasm";
-
-macro_rules! python_guest_b3 {
-    () => {
-        "84664c45357d15a2dfb73d1edfcc7daa40de72c07c52346502f16c5d7c3b7360"
-    };
-}
-
-pub(super) const PYTHON_GUEST_B3: &str = python_guest_b3!();
+pub(crate) const PYTHON_VARIABLE: &str = "SPRAWLING_PYTHON";
 
 pub(crate) const CHROMEDRIVER: &str = "chromedriver";
 pub(crate) const MSEDGEDRIVER: &str = "msedgedriver";
-pub(crate) const PYTHON_WASI: &str = "python-wasi";
+pub(crate) const PYTHON: &str = "host-python";
 pub(crate) const SHELL: &str = "shell";
 pub(crate) const PWSH: &str = "pwsh";
-pub(crate) const SANDBOX_ENGINE: &str = "sandbox-engine";
 pub(crate) const FFMPEG: &str = "ffmpeg";
 
 pub(crate) fn recipe_for(item: &str) -> Result<&'static Recipe, AxError> {
@@ -167,37 +156,33 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         pack: None,
     },
     Requirement {
-        name: SANDBOX_ENGINE,
+        name: PYTHON,
         tier: Tier::Use,
         need: Need::Optional,
-        enables: "the exec tool's program and python arms, fuel-metered and with no socket",
-        detect: Detection::Built {
-            carried: super::host::ENGINE_CARRIED,
+        enables: "the exec tool's python arm, which runs the host interpreter under the building's confinement",
+        detect: Detection::Interpreter {
+            variable: PerPlatform {
+                windows: PYTHON_VARIABLE,
+                macos: PYTHON_VARIABLE,
+                linux: PYTHON_VARIABLE,
+            },
+            fallback: PerPlatform {
+                windows: "python",
+                macos: "python3",
+                linux: "python3",
+            },
         },
-        homepage: Some("https://github.com/2youg1/sprawling-agents/releases"),
+        homepage: Some("https://www.python.org/downloads/"),
         recipe: PerPlatform {
-            windows: ENGINE_BY_BUILD,
-            macos: ENGINE_BY_BUILD,
-            linux: ENGINE_BY_BUILD,
-        },
-        pin: Pin::Unpinned,
-        upstream: Upstream::Unread(DoctorUnread::ThisProject),
-        pack: None,
-    },
-    Requirement {
-        name: PYTHON_WASI,
-        tier: Tier::Use,
-        need: Need::Optional,
-        enables: "the exec tool's python arm, which runs in the sandbox with no socket",
-        detect: Detection::Component {
-            variable: PYTHON_WASM_VARIABLE,
-            file: PYTHON_WASM_FILE,
-        },
-        homepage: Some("https://github.com/python/cpython/blob/main/Tools/wasm/README.md"),
-        recipe: PerPlatform {
-            windows: PYTHON_WASI_BY_HAND,
-            macos: PYTHON_WASI_BY_HAND,
-            linux: PYTHON_WASI_BY_HAND,
+            windows: Recipe::Manual(
+                "install Python 3 from https://www.python.org/downloads/ or set SPRAWLING_PYTHON to an interpreter",
+            ),
+            macos: Recipe::Manual(
+                "install Python 3 (for example `brew install python`) or set SPRAWLING_PYTHON to an interpreter",
+            ),
+            linux: Recipe::Manual(
+                "install Python 3 from the distribution packages or set SPRAWLING_PYTHON to an interpreter",
+            ),
         },
         pin: Pin::Unpinned,
         upstream: Upstream::Unread(DoctorUnread::NoSource),
@@ -367,14 +352,3 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
     toolchain::CARGO_FUZZ,
     toolchain::KANI,
 ];
-
-const PYTHON_WASI_BY_HAND: Recipe = Recipe::Manual(concat!(
-    "download python-3.14.9-wasi_sdk-24.zip from ",
-    "https://github.com/brettcannon/cpython-wasi-build/releases/tag/v3.14.9, ",
-    "extract python.wasm and lib/ into ~/.sprawling/components/python-wasi, ",
-    "and check that python.wasm has BLAKE3 ",
-    python_guest_b3!()
-));
-
-const ENGINE_BY_BUILD: Recipe =
-    Recipe::Manual("install a build of sprawling with the `sandbox` feature");

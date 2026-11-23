@@ -378,20 +378,9 @@ struct CollaborationFold { … }   // 暂存 enqueued／consumed，`settle` 产 
 /-!
 ## 8-19 沙箱接上
 
-**原因**：`dispatch_in` 把 `Box::new(runtime::AbsentSandbox)` 写成字面量，而 `Sprawling/app/Cargo.toml` 没有任何 feature 到达 `runtime/wasm`。于是 `runtime::WasmtimeSandbox` 在 `runtime/tests/sandbox_a10.rs` 之外**没有调用方**，任何 sprawling 构建都到不了执行引擎。
+**现形**：wasip1／Wasmtime 与 `sandbox = ["runtime/wasm"]` 已退役。Python 与命令都走 `runtime::tools::exec` 的宿主路径，围栏由楼臂（`confinement`／`container`）提供；解释器缺席时 python 臂在被调用时以 `E_TOOL_UNAVAILABLE` 拒，recovery 点出 `SPRAWLING_PYTHON`／安装 Python 3，不回落到另一条执行引擎。
 
-`AbsentSandbox` 的三段式拒绝里写着 recovery：「use the program arm, or install a build with the `wasm` feature」。**那样的构建不存在。** 只写在文里、无人执行的 recovery 等于没有 recovery——这次是只写在错误消息里、无人可安装的构建。
-
-ARCHITECTURE.md §2 把 wasmtime 列进技术栈并声明了代价（「Cost: an optional feature; a build without it refuses tool execution in three parts rather than pretending」），措辞预设了存在带该 feature 的构建。
-
-**现形**：
-- `Sprawling/app/Cargo.toml` 增 `[features] sandbox = ["runtime/wasm"]`。
-- 引擎的选择收进一个函数 `execution_engine()`，两条 `#[cfg]` 臂各一个实现，`dispatch_in` 的构造点因此不随 feature 改变形状。
-- **带引擎的构建起不来引擎就拒派活，不回落**。回落是「人以为跑在沙箱里、其实没有」的由来。
-
-**默认仍为关**：这是 ARCHITECTURE.md 记录过的取舍（wasmtime 是一大块二进制），不改默认，只让开关存在。`just check` 走 `--all-features`，所以带 feature 的那条臂进门禁；`just dist` 不带，所以交付形态与体积预算不变。
-
-**红是编译红而非行为红，这里说明白**：改动前 `execution_engine` 不存在，测试连编译都过不去。行为面的红需要一个真的 `python.wasm` 与 `SPRAWLING_PYTHON_WASM`，那是交付形态的事，不在此范围内。新测试只在 `cfg(feature = "sandbox")` 下存在，断言引擎给出的不是「this build carries no execution engine」那句话。
+**历史**：曾有一段把 AbsentSandbox／`wasm` feature 接到装配层的改动；宿主 Python 落地后，引擎选择门与带引擎才拒派活的断言一并删除。
 -/
 
 /-!

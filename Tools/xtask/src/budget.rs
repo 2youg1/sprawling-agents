@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Performance ratchet over `Tools/xtask/budgets.toml` (xtask §8-25).
-
 use std::path::Path;
 
 use crate::package::{ReleaseTarget, binary_path};
@@ -14,7 +12,7 @@ mod carried;
 mod weighing;
 
 use carried::CLIENT_MARK;
-pub(crate) use carried::{carries_client, carries_engine};
+pub(crate) use carried::carries_client;
 pub(crate) use weighing::{lockfile_packages, measure};
 
 const BUDGET_KEY: &str = "budget_bytes";
@@ -116,7 +114,7 @@ pub(crate) fn report(root: &Path) -> Result<String, XtaskError> {
         .collect();
     for (name, value) in table {
         if weighed.contains(name) {
-            continue; // already weighed in the table above
+            continue;
         }
         let status = value
             .get("status")

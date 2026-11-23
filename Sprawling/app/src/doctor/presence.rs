@@ -32,11 +32,6 @@ pub(crate) enum Fault {
     HalfWritten,
 
     Unreadable(String),
-
-    DigestMismatch {
-        expected: kernel::B3Hash,
-        found: kernel::B3Hash,
-    },
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -125,9 +120,6 @@ impl Fault {
             Fault::WillNotStart(err) => format!("will not start: {err}"),
             Fault::HalfWritten => "half-written; delete it and install again".to_owned(),
             Fault::Unreadable(err) => err.clone(),
-            Fault::DigestMismatch { expected, found } => {
-                format!("pinned guest digest mismatch: expected {expected}, found {found}")
-            }
         }
     }
 }

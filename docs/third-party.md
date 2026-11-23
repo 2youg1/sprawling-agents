@@ -30,11 +30,6 @@ Calling a face this city did not invent requires knowing the shape of the reques
 | [python/devguide](https://github.com/python/devguide) | CC0 1.0 | the generator that turns the lifecycle data into the release-cycle API and the PEPs, used to confirm which field is the end-of-life date | `_tools/generate_release_cycle.py` | `2439c5ff4529` |
 | [MicrosoftDocs/PowerShell-Docs](https://github.com/MicrosoftDocs/PowerShell-Docs) | CC-BY-4.0 | the single-quote and typographic-quote escaping in `about_Quoting_Rules.md`, used by Mei's displayed PowerShell repair commands | `reference/7.5/Microsoft.PowerShell.Core/About/` | `f835d0e7aa7c` |
 | [anthropics/anthropic-sdk-typescript](https://github.com/anthropics/anthropic-sdk-typescript) | MIT | Messages request/response blocks, string content shorthand, client tool results, opaque thinking and server-tool blocks, and `pause_turn` continuation | `src/resources/messages/messages.ts` | `590783078cd9` |
-| [bytecodealliance/wasmtime](https://github.com/bytecodealliance/wasmtime) | Apache-2.0 with the LLVM exception | the `wasmtime-wasi` feature graph: selecting `p1` without default features excludes p3, while p1 still implies p2 and its component-model and async features | `crates/wasi/Cargo.toml` | `b67df87c061d` |
-| [bytecodealliance/wasmtime](https://github.com/bytecodealliance/wasmtime) | Apache-2.0 with the LLVM exception | the core module resources reported for allocator sizing, and when `initialize_copy_on_write_image` does its work | `crates/wasmtime/src/runtime/module.rs` | `571456d91a06e6fb54d026694f6c6b1005eb42c1` |
-| [bytecodealliance/wasmtime](https://github.com/bytecodealliance/wasmtime) | Apache-2.0 with the LLVM exception | copy-on-write linear-memory initialization: eligibility, platform support, defaults and the dense-image setting | `crates/wasmtime/src/config.rs` | `e64003e6dbf1` |
-| [brettcannon/cpython-wasi-build](https://github.com/brettcannon/cpython-wasi-build) | MIT for the build recipe; the guest asset carries PSF-2.0 and the other notices in its `LICENSE` | CPython 3.14.9 guest and stdlib: asset `python-3.14.9-wasi_sdk-24.zip`; `python.wasm` BLAKE3 `84664c45357d15a2dfb73d1edfcc7daa40de72c07c52346502f16c5d7c3b7360`; rebuilt stdlib tree BLAKE3 `ad0c9882930dc775a44a639af5ab3fe06dc8268ca04775eaeaaaef1a74a298fb` | `.github/workflows/release.yml` | `336281098ca3` |
-
 > **Machine authority**: `.github/workflows/upstream-watch.yml` reads every
 > row above that opens with `| [` and carries a `github.com` link — the
 > repository out of the project link, and the watch path and the tracked
@@ -115,7 +110,7 @@ Two lists exist and they answer different questions, so both are kept and neithe
 
 **What this repository chose** is the table below: every crate named in the `Cargo.toml` of a workspace member, with the licence its own manifest declares. A person asking "whose work did these authors decide to stand on" reads this. The version each is pinned at is in the manifests, and the version it resolves to is in `Cargo.lock`; neither is repeated here.
 
-**What Cargo.lock resolves for the workspace** is <!-- xtask:begin dependency_count -->484<!-- xtask:end --> packages, including workspace members and dependencies used only by tools. This is a workspace lockfile count, not a binary dependency count. `cargo deny check` checks the lockfile on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. The SBOM describes the lockfile, not only packages linked into a binary. **That is the machine authority, and this table is deliberately not a second one**: it is a list a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
+**What Cargo.lock resolves for the workspace** is <!-- xtask:begin dependency_count -->414<!-- xtask:end --> packages, including workspace members and dependencies used only by tools. This is a workspace lockfile count, not a binary dependency count. `cargo deny check` checks the lockfile on every CI run and refuses any licence outside the allowlist in `deny.toml`; `cargo xtask sbom` writes it out as CycloneDX, which `just dist` produces beside the release artifacts. The SBOM describes the lockfile, not only packages linked into a binary. **That is the machine authority, and this table is deliberately not a second one**: it is a list a reader can hold in their head, and it goes stale the way any prose does, while the gate does not.
 
 
 <!-- /coderabbit-ai-generated:v1 -->
@@ -181,9 +176,6 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [url](https://crates.io/crates/url) | MIT OR Apache-2.0 |
 | [uuid](https://crates.io/crates/uuid) | Apache-2.0 OR MIT |
 | [vt100](https://crates.io/crates/vt100) | MIT |
-| [wasmtime](https://crates.io/crates/wasmtime) | Apache-2.0 with the LLVM exception |
-| [wasmtime-wasi](https://crates.io/crates/wasmtime-wasi) | Apache-2.0 with the LLVM exception |
-| [wat](https://crates.io/crates/wat) | Apache-2.0 with the LLVM exception, or Apache-2.0, or MIT |
 | [win32job](https://crates.io/crates/win32job) | MIT OR Apache-2.0 |
 | [winapi-util](https://crates.io/crates/winapi-util) | Unlicense OR MIT |
 | [windows](https://crates.io/crates/windows) | MIT OR Apache-2.0 |

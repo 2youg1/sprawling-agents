@@ -75,15 +75,12 @@ fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
     let permissive = SandboxLimits {
         shell: true,
         interpreter: Interpreter::Pwsh,
-        fuel: 10,
-        mounts: vec![crate::Address::parse("lab/docs").unwrap()],
         env_passthrough: vec![EnvVarName::parse("ProgramFiles").unwrap()],
         trusted: Vec::new(),
         container: None,
         arm: None,
     };
     let terse = SandboxLimits {
-        fuel: 20,
         ..SandboxLimits::default()
     };
     let ladder = LayeredValue {
@@ -95,24 +92,20 @@ fn the_sandbox_resolves_as_one_value_so_a_thin_layer_only_narrows() {
         sandbox: ladder,
         ..StatedConfig::default()
     });
-    assert_eq!(frozen.sandbox.fuel, 20);
     assert!(
         !frozen.sandbox.shell,
         "a layer that speaks about the sandbox speaks about all of it, and silence is the closed answer"
     );
-    assert!(frozen.sandbox.mounts.is_empty());
+    assert!(frozen.sandbox.env_passthrough.is_empty());
     assert_eq!(frozen.sandbox.interpreter, Interpreter::System);
 }
 
 #[test]
-fn an_unstated_sandbox_is_closed_with_the_default_fuel() {
+fn an_unstated_sandbox_is_closed() {
     let frozen = thaw(StatedConfig::default());
     assert!(!frozen.sandbox.shell);
-    assert_eq!(
-        frozen.sandbox.fuel,
-        crate::consts_policy::SANDBOX_FUEL_DEFAULT
-    );
-    assert!(frozen.sandbox.mounts.is_empty());
+    assert_eq!(frozen.sandbox.interpreter, Interpreter::System);
+    assert!(frozen.sandbox.env_passthrough.is_empty());
 }
 
 #[test]
@@ -225,9 +218,6 @@ fn granularity_serde_is_snake_case() {
 
 #[test]
 fn a_credential_shaped_variable_name_is_refused_where_the_config_is_read() {
-    // The judgement has to happen here: a name handed to a child process
-    // cannot be taken back, so it is refused at the one construction
-    // point rather than at the point it would have been used.
     for shaped in [
         "AWS_SECRET_ACCESS_KEY",
         "GITHUB_TOKEN",
@@ -272,8 +262,6 @@ fn the_second_rung_resolves_down_the_same_ladder() {
     );
 }
 
-/// The refusal is the only sentence a person editing a `CONFIG.toml`
-/// gets, so it carries the legal domain; nothing is clamped.
 #[test]
 fn a_stated_rung_is_refused_outside_its_domain_with_the_domain_in_the_refusal() {
     for refused in [30, 91] {
@@ -290,7 +278,7 @@ fn a_stated_rung_is_refused_outside_its_domain_with_the_domain_in_the_refusal() 
 }
 
 #[test]
-fn the_declared_environment_names_ride_the_same_whole_value_ladder_as_mounts() {
+fn the_declared_environment_names_ride_the_same_whole_value_ladder() {
     let city_layer = SandboxLimits {
         env_passthrough: vec![EnvVarName::parse("CARGO_HOME").unwrap()],
         ..SandboxLimits::default()

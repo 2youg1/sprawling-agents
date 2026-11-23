@@ -249,10 +249,6 @@ fn state(presence: &Presence) -> wire::DoctorState {
                 Fault::WillNotStart(said) => wire::DoctorFault::WillNotStart { said: said.clone() },
                 Fault::HalfWritten => wire::DoctorFault::HalfWritten,
                 Fault::Unreadable(said) => wire::DoctorFault::Unreadable { said: said.clone() },
-
-                Fault::DigestMismatch { .. } => wire::DoctorFault::Unreadable {
-                    said: fault.describe(),
-                },
             },
         },
         Presence::Absent(absence) => wire::DoctorState::Absent {

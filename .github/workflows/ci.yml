@@ -442,7 +442,10 @@ jobs:
     if: ${{ always() && !cancelled() && (inputs.release-validation || github.event_name == 'workflow_dispatch' || (needs.changes.result == 'success' && needs.changes.outputs.rust == 'true')) }}
     outputs:
       slices: ${{ steps.plan.outputs.slices }}
-    runs-on: windows-latest
+    # windows-2025-vs2026 intermittently aborts test binaries with
+    # 0xc000001d (STATUS_ILLEGAL_INSTRUCTION) at `--list`; pin until that
+    # image is reliable again (same failure reproduces on main).
+    runs-on: windows-2022
     timeout-minutes: 30
     env:
       CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: rust-lld.exe
@@ -505,7 +508,7 @@ jobs:
   test-slice:
     name: test (${{ matrix.name }})
     needs: test-build
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 30
     strategy:
       fail-fast: false

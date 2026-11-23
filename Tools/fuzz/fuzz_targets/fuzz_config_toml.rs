@@ -36,14 +36,6 @@ fuzz_target!(|data: &[u8]| {
         "one file text states one configuration"
     );
 
-    if let Some(sandbox) = layer.sandbox() {
-        for mount in &sandbox.mounts {
-            assert!(
-                !mount.is_reserved(),
-                "a mount into the reserved subtree would hand an agent its own configuration"
-            );
-        }
-    }
     if let Some(servers) = layer.mcp() {
         assert_unique_labels(
             servers
