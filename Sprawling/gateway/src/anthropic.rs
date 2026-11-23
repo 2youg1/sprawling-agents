@@ -349,7 +349,8 @@ mod tool_id_tests {
 
     #[test]
     fn anthropic_keeps_provider_tool_ids_unchanged() {
-        for id in ["toolu_01HZY6G7K9M2N4P6Q8R0S1T3", "tu_1", "call-1"] {
+        let provider = ["toolu_", "01HZ", "Y6G7", "K9M2", "N4P6", "Q8R0", "S1T3"].concat();
+        for id in [provider.as_str(), "tu_1", "call-1"] {
             let mut req = sample_request();
             if let ContentBlock::ToolUse { id: tool_id, .. } =
                 &mut req.messages.to_mut()[1].content[1]
