@@ -90,8 +90,10 @@ const InputProtocols = struct {
 };
 
 fn inputProtocols(backend: InputBackend) InputProtocols {
-    _ = backend;
-    return .{ .kitty_keyboard = true, .bracketed_paste = true, .sgr_mouse = true };
+    return switch (backend) {
+        .virtual_terminal => .{ .kitty_keyboard = true, .bracketed_paste = true, .sgr_mouse = true },
+        .windows_console => .{ .kitty_keyboard = false, .bracketed_paste = false, .sgr_mouse = false },
+    };
 }
 
 fn activeInputBackend() InputBackend {
@@ -99,8 +101,8 @@ fn activeInputBackend() InputBackend {
 }
 
 fn windowsRawInputMode(mode: u32) u32 {
-    return (mode & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT)) |
-        ENABLE_VIRTUAL_TERMINAL_INPUT | ENABLE_WINDOW_INPUT;
+    return (mode & ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT | ENABLE_VIRTUAL_TERMINAL_INPUT)) |
+        ENABLE_WINDOW_INPUT | ENABLE_MOUSE_INPUT;
 }
 
 pub fn enableRaw() Error!void {

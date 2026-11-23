@@ -75,6 +75,7 @@ pub const Editor = struct {
     pub fn set(self: *Editor, value: []const u8) !void {
         self.goal = null;
         self.text.clearRetainingCapacity();
+        self.cursor = 0;
         try self.paste(value);
         self.cursor = self.text.items.len;
     }
