@@ -20,6 +20,27 @@ release notes and their commits.
 
 ---
 
+## 0.17.1
+
+**sprawling 0.17.1**
+
+The workspace manifest carries 0.17.1. Cutting it on 2026-11-23 (UTC+8) makes `v0.17.1-261123`, and this heading takes that tag when the release is cut. It corrects 0.17.0's distribution and the baseline a re-cut release tag verifies against, and publishes every channel from this tree. The wire stays at 80, `EVENT_LOG_V` stays 2, and the configuration formats stay at format 1.
+
+### Distribution and verification
+
+- **npm and crates.io publish from one tree.** 0.17.0's npm lacked the trusted publisher registration for `@sprawling/mei-windows-x64`, and crates.io received fourteen of twenty crates, so both channels carried a partial release of a tree that no longer matched its tag. All eight npm packages and every public crate now share 0.17.1.
+- **A re-cut `v*` release tag verifies against the tagged commit's first parent.** The source graph took the event's `before` as its baseline, and a re-cut tag's `before` names the tag object it retired, which no ref reaches, so a fresh clone could not resolve it and every gate stopped on `E_CI_SOURCE` before running. The tag path now reads `HEAD^` whether the tag is new or re-cut, so the baseline cannot depend on an object the checkout does not have.
+
+### Mei and Calyx
+
+- **Mei redraws its terminal as an anchored viewport.** Each user turn survives, the composer stays at the bottom, and a resize repaints what was already written; the city console keeps its incremental main-screen frame. A Python call keeps its source and output and shows the elapsed-time line the city tool row uses, and Up and Down recall history only at the ends of the draft (#367).
+
+### Design rules
+
+- **The event-driven default is stated where the change workflow is read.** Tasks start from the one spawn point, and polling appears only where it is necessary to keep latency and overhead down (#372).
+
+---
+
 ## 0.17.0
 
 **sprawling 0.17.0**
