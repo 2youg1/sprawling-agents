@@ -376,6 +376,7 @@ kernel 已有码，语义照 Custody 一节；不新增码。
 - D46 探测失败的再登记沿用书里已登记的行，只给新报的 id 缺省事实：`Sprawling/gateway/spec/Endpoint/Models.lean`
 - D47 人打的 id 经 `named` 登记，读到列表时也收；勾的一个都对不上就拒：`Sprawling/gateway/spec/Endpoint/Models.lean`
 - D48 一次再登记若去掉一个占着角色的模型，就拒绝，并点名那个角色：`Sprawling/gateway/spec/Router.lean`
+- D49 Anthropic 工具 id 在 wire 边界归一化：保留合法 ASCII id，其余确定性映射为 `toolu_<指纹>`：`Sprawling/gateway/spec/Dialect.lean`
 - D64 生成参数的支持情况按 Person → Upstream → Preset 作答，输出偏好与硬上限分开，raw overrides 最后生效：`Sprawling/gateway/spec/Provider/Generation.lean`
 -/
 

@@ -25,6 +25,20 @@ fn role_str(role: Role) -> &'static str {
     }
 }
 
+fn tool_id_wire(id: &str) -> String {
+    if !id.is_empty()
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    {
+        id.to_owned()
+    } else {
+        let digest = kernel::B3Hash::digest(id.as_bytes()).to_string();
+        let fingerprint = digest.get(..16).unwrap_or(digest.as_str());
+        format!("toolu_{fingerprint}")
+    }
+}
+
 fn image_wire(picture: &kernel::ImageRef, images: &ImageBytes) -> Result<Value, AxError> {
     Ok(json!({
         "type": "image",
@@ -48,7 +62,7 @@ fn block_wire(block: &ContentBlock, images: &ImageBytes) -> Result<Value, AxErro
             Ok(json!({ "type": "redacted_thinking", "data": data }))
         }
         ContentBlock::ToolUse { id, name, input } => Ok(json!({
-            "type": "tool_use", "id": id, "name": name.as_str(),
+            "type": "tool_use", "id": tool_id_wire(id), "name": name.as_str(),
             "input": serde_json::to_value(input)
                 .map_err(|err| mismatch("tool_use.input", &err.to_string()))?,
         })),
@@ -70,7 +84,7 @@ fn block_wire(block: &ContentBlock, images: &ImageBytes) -> Result<Value, AxErro
                 Value::Array(parts)
             };
             Ok(json!({
-                "type": "tool_result", "tool_use_id": tool_use_id,
+                "type": "tool_result", "tool_use_id": tool_id_wire(tool_use_id),
                 "content": carried, "is_error": is_error,
             }))
         }
@@ -290,4 +304,67 @@ pub(crate) fn response_wire(resp: &ChatResponse) -> Result<Value, AxError> {
             "cache_creation_input_tokens": resp.usage.cache_write_tokens.reported(),
         },
     }))
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::string_slice,
+    reason = "test code"
+)]
+mod tool_id_tests {
+    use super::*;
+    use crate::dialect::sample_request;
+
+    #[test]
+    fn anthropic_rewrites_redacted_tool_ids_to_accepted_ids() {
+        let mut req = sample_request();
+        for id in [
+            "",
+            "secret:redacted/0123456789abcdef",
+            "call.secret:redacted/0123456789abcdef",
+            "functions.read:0",
+            "toolu_invalid:colon",
+        ] {
+            if let ContentBlock::ToolUse { id: tool_id, .. } =
+                &mut req.messages.to_mut()[1].content[1]
+            {
+                *tool_id = id.to_owned();
+            }
+            if let ContentBlock::ToolResult { tool_use_id, .. } =
+                &mut req.messages.to_mut()[2].content[0]
+            {
+                *tool_use_id = id.to_owned();
+            }
+            let wire = request(&req, &ImageBytes::default()).unwrap();
+            let digest = kernel::B3Hash::digest(id.as_bytes()).to_string();
+            let fingerprint = digest.get(..16).unwrap_or(digest.as_str());
+            let expected = format!("toolu_{fingerprint}");
+            assert_eq!(wire["messages"][1]["content"][1]["id"], expected);
+            assert_eq!(wire["messages"][2]["content"][0]["tool_use_id"], expected);
+        }
+    }
+
+    #[test]
+    fn anthropic_keeps_provider_tool_ids_unchanged() {
+        let provider = ["toolu_", "01HZ", "Y6G7", "K9M2", "N4P6", "Q8R0", "S1T3"].concat();
+        for id in [provider.as_str(), "tu_1", "call-1"] {
+            let mut req = sample_request();
+            if let ContentBlock::ToolUse { id: tool_id, .. } =
+                &mut req.messages.to_mut()[1].content[1]
+            {
+                *tool_id = id.to_owned();
+            }
+            if let ContentBlock::ToolResult { tool_use_id, .. } =
+                &mut req.messages.to_mut()[2].content[0]
+            {
+                *tool_use_id = id.to_owned();
+            }
+            let wire = request(&req, &ImageBytes::default()).unwrap();
+            assert_eq!(wire["messages"][1]["content"][1]["id"], id);
+            assert_eq!(wire["messages"][2]["content"][0]["tool_use_id"], id);
+        }
+    }
 }
