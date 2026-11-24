@@ -77,7 +77,7 @@ fn instrument_monitor_beat() {
     let beat = std::time::Duration::from_secs(1);
     let mut summary = Counters::open(std::env::temp_dir());
     let mut page = Counters::open(std::env::temp_dir());
-    let mut tree = Tree::open(std::process::id());
+    let mut tree = Tree::open(std::process::id()).unwrap();
     let readings = [
         (
             "summary",

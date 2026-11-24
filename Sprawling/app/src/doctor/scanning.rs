@@ -99,7 +99,9 @@ pub(crate) fn read(platform: Option<Platform>, city: &Path) -> Scanning {
 }
 
 fn drive(city: &Path) -> Drive {
-    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let Ok(disks) = sysinfo::Disks::new_with_refreshed_list() else {
+        return Drive::Untold(Untold::NoDisk);
+    };
     let Some(disk) = crate::monitor::volume::holding(&disks, city) else {
         return Drive::Untold(Untold::NoDisk);
     };

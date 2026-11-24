@@ -60,17 +60,16 @@ struct Member {
 }
 
 impl Tree {
-    #[must_use]
-    pub fn open(root: u32) -> Tree {
-        Tree {
-            system: System::new(),
+    pub fn open(root: u32) -> Result<Tree, sysinfo::Error> {
+        Ok(Tree {
+            system: System::new()?,
             root: Pid::from_u32(root),
             last: BTreeMap::new(),
             peak_private_bytes: 0,
             peak_working_set_bytes: 0,
             beats: 0,
             table_reads: 0,
-        }
+        })
     }
 
     pub fn read(&mut self, elapsed: Duration) -> Option<TreeReading> {
