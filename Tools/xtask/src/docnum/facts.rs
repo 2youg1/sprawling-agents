@@ -19,7 +19,7 @@ pub(super) struct Fact {
     recount: fn(&Path, &str) -> Result<String, XtaskError>,
 }
 
-const FACTS: [Fact; 20] = [
+const FACTS: &[Fact] = &[
     Fact {
         key: "wire_v",
         home: "wire::WIRE_V",
@@ -55,12 +55,6 @@ const FACTS: [Fact; 20] = [
         home: "the array in Tools/xtask/src/gates.rs",
         takes: None,
         recount: |_root, _arg| Ok(gates::COUNT.to_string()),
-    },
-    Fact {
-        key: "dependency_count",
-        home: "Cargo.lock",
-        takes: None,
-        recount: |root, _arg| recount::dependency_count(root),
     },
     Fact {
         key: "kani_harnesses",
@@ -273,7 +267,7 @@ mod tests {
         let root = root();
         let named: BTreeSet<&str> = FACTS.iter().map(|fact| fact.key).collect();
         assert_eq!(named.len(), FACTS.len(), "two facts share one key");
-        for fact in &FACTS {
+        for fact in FACTS {
             let key = match fact.takes {
                 None => fact.key.to_owned(),
                 Some(_) => continue,

@@ -76,7 +76,7 @@ pub(super) struct Run {
     child: ChildPeaks,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(super) struct Watched {
     beats: u64,
     seen: Option<Seen>,
@@ -199,7 +199,14 @@ impl Every {
 }
 
 fn watch(watching: &Watching, audience: Audience, out: &mut impl Write) -> Result<(), AxError> {
-    let mut tree = Tree::open(watching.pid);
+    let mut tree = Tree::open(watching.pid).map_err(|error| {
+        AxError::failure(
+            AxCode::ToolUnavailable,
+            "open the process counters",
+            error.to_string(),
+        )
+        .with_recovery("run `sprawling gauge --pid` on a system that exposes process counters")
+    })?;
     let began = monotonic_now();
     let mut previous = began;
     let mut taken = 0_u32;

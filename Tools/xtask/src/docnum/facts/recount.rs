@@ -62,10 +62,6 @@ pub(super) fn wire_tags(kind: &str) -> Result<String, XtaskError> {
     Ok(tags.join(", "))
 }
 
-pub(super) fn dependency_count(root: &Path) -> Result<String, XtaskError> {
-    Ok(crate::budget::lockfile_packages(root)?.to_string())
-}
-
 pub(super) fn files_under(root: &Path, inside: &str, what: &str) -> Result<String, XtaskError> {
     let mut found = 0_usize;
     for member in members(root)? {

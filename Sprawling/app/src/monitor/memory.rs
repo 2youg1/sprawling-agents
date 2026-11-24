@@ -15,7 +15,12 @@ thread_local! {
 #[must_use]
 pub fn read() -> Memory {
     SYSTEM.with(|kept| {
-        let mut system = kept.take().unwrap_or_else(System::new);
+        let Ok(mut system) = kept.take().map_or_else(System::new, Ok) else {
+            return Memory {
+                physical: 0,
+                available: 0,
+            };
+        };
         let memory = refreshed(&mut system);
         kept.set(Some(system));
         memory

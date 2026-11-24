@@ -131,7 +131,6 @@ fn a_gateway_that_accepts_and_stalls_returns_instead_of_hanging() {
     let stalled = thread::spawn(move || {
         let (mut stream, _) = listener.accept().unwrap();
         let mut byte = [0_u8; 1];
-        // Never answer; hold the connection until the client gives up.
         while let Ok(count) = stream.read(&mut byte) {
             if count == 0 {
                 break;
@@ -218,8 +217,6 @@ fn a_slow_gateway_emits_pulse_observations() {
     delayed.join().unwrap();
 }
 
-/// Answers the request headers, writes one byte per beat, and never finishes:
-/// the shape that made a per-read timeout a budget that never runs out.
 fn dribble(beat: Duration) -> (String, thread::JoinHandle<()>) {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
@@ -307,4 +304,48 @@ fn a_dribbling_route_probe_still_ends() {
     );
     assert!(error.contains("IO budget elapsed"), "{error}");
     writer.join().unwrap();
+}
+
+#[cfg(windows)]
+#[test]
+fn a_pending_windows_read_keeps_the_response_on_the_same_socket() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let mut stream = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+    let (mut peer, _) = listener.accept().unwrap();
+    let response = b"HTTP/1.0 200 OK\r\n\r\n{}";
+    let (send, receive) = std::sync::mpsc::channel();
+    let writer = thread::spawn(move || {
+        if receive.recv().is_err() {
+            return;
+        }
+        thread::sleep(Duration::from_millis(40));
+        peer.write_all(response).unwrap();
+        peer.shutdown(std::net::Shutdown::Write).unwrap();
+    });
+
+    let mut pending = Some(send);
+    let mut pulses = Vec::new();
+    let found = read_to_eof(
+        &mut stream,
+        &Timeouts {
+            connect: Duration::from_secs(2),
+            io: Duration::from_secs(2),
+            pulse: Duration::from_secs(2),
+        },
+        ResponseTrace {
+            pulse: &mut pulses,
+            path: "loopback response",
+        },
+        move |socket, buffer| {
+            if let Some(send) = pending.take() {
+                send.send(()).unwrap();
+                Err(std::io::Error::from_raw_os_error(WSA_IO_PENDING))
+            } else {
+                socket.read(buffer)
+            }
+        },
+    );
+    writer.join().unwrap();
+    assert_eq!(found.unwrap(), response);
+    assert!(pulses.is_empty());
 }

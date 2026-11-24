@@ -230,13 +230,13 @@ that has nothing to do with the product. -/
 def withGround (door : Door) (act : Ground → IO α) : IO α := do
   let root ← IO.FS.createTempDir
   try
-    let city := root / "city"
+    let workspace := root / "city"
     -- The home this city is pointed at, made before it is served: a city that
     -- was given a directory nobody created would fall back to reporting that
     -- it has no home, and the person's layer would have nowhere to land.
     let home := root / "home"
     IO.FS.createDirAll home
-    door.raise city home
+    let city ← door.raise workspace home
     servingAt door city home .killed act
   finally
     try IO.FS.removeDirAll root catch _ => pure ()

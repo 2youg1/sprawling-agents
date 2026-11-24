@@ -33,7 +33,7 @@ fn sleeper() -> Child {
 #[test]
 fn a_child_is_read_while_it_runs_and_is_gone_once_it_exits() {
     let mut child = sleeper();
-    let mut tree = Tree::open(child.id());
+    let mut tree = Tree::open(child.id()).unwrap();
     let mut read = Vec::new();
 
     let running = read_until(&mut tree, Duration::ZERO, &mut read, |reading| {

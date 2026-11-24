@@ -115,7 +115,9 @@ impl Beating {
 }
 
 fn beat_until_stopped(root: u32, every: Every, stopped: &mpsc::Receiver<()>) -> Watched {
-    let mut tree = Tree::open(root);
+    let Ok(mut tree) = Tree::open(root) else {
+        return Watched::default();
+    };
     let mut beats = 0_u64;
     let mut read_cost = Duration::ZERO;
     let mut previous = monotonic_now();

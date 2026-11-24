@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! comrak's tree read into the preview tree (`Sprawling/documents/Spec.lean`
-//! D22-D24, D26).
-//!
-//! comrak owns CommonMark and GFM; this module owns which extensions the
-//! grammar reads and how deep a container may nest, and asks `target`
-//! which links become links and `position` where each block lies.
-//! comrak's arena lives for one call and is dropped with it.
-
 use comrak::nodes::{
     AstNode, ListType, NodeCodeBlock, NodeLink, NodeList, NodeValue, TableAlignment,
 };
@@ -21,13 +13,8 @@ use super::target::admitted;
 use super::tree::{Align, Block, Check, Construct, Inline, ListItem, Order, Row, Spacing};
 use crate::span::{Span, offset};
 
-/// How many containers, blocks and inline marks together, a preview
-/// nests before the rest is shown as source (D24): sixteen levels of the
-/// deepest container on the wire stay well inside the 128 levels
-/// `serde_json` reads by default.
 pub(super) const NESTING_MAX: usize = 16;
 
-/// The blocks of `text`, whose first byte is byte `at` of the version.
 pub(super) fn blocks(text: &str, at: u64) -> Vec<Block> {
     let arena = Arena::new();
     let root = parse_document(&arena, text, &grammar());
@@ -37,10 +24,6 @@ pub(super) fn blocks(text: &str, at: u64) -> Vec<Block> {
     lowering.children(root, 0)
 }
 
-/// The one Markdown grammar (D22): CommonMark, GFM's tables,
-/// strikethrough, autolinks and task lists, footnotes left where they
-/// stand, dollar formulas, `---` front matter, and emphasis that closes
-/// beside CJK punctuation. Nothing that rewrites the source.
 fn grammar() -> Options<'static> {
     let mut options = Options::default();
     options.extension.table = true;
@@ -67,6 +50,10 @@ impl Lowering<'_> {
             .collect()
     }
 
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "comrak marks its AST non-exhaustive; disabled and future nodes retain their source"
+    )]
     fn block<'a>(&self, node: &'a AstNode<'a>, depth: usize) -> Block {
         let ast = node.data();
         let span = self.positions.span(ast.sourcepos);
@@ -100,7 +87,7 @@ impl Lowering<'_> {
                     .unwrap_or(Row { cells: Vec::new() }),
                 body: self.rows(node, Head::Skipped, inner),
             },
-            NodeValue::ThematicBreak => Block::Rule { span },
+            NodeValue::ThematicBreak(_) => Block::Rule { span },
             NodeValue::FootnoteDefinition(footnote) => Block::Footnote {
                 span,
                 name: footnote.name.clone(),
@@ -110,43 +97,7 @@ impl Lowering<'_> {
             NodeValue::FrontMatter(front) => {
                 self.unsupported(span, Construct::FrontMatter, front.trim_end())
             }
-            NodeValue::Document
-            | NodeValue::Item(_)
-            | NodeValue::TaskItem(_)
-            | NodeValue::TableRow(_)
-            | NodeValue::TableCell
-            | NodeValue::DescriptionList
-            | NodeValue::DescriptionItem(_)
-            | NodeValue::DescriptionTerm
-            | NodeValue::DescriptionDetails
-            | NodeValue::MultilineBlockQuote(_)
-            | NodeValue::Alert(_)
-            | NodeValue::Subtext
-            | NodeValue::Text(_)
-            | NodeValue::SoftBreak
-            | NodeValue::LineBreak
-            | NodeValue::Code(_)
-            | NodeValue::HtmlInline(_)
-            | NodeValue::Raw(_)
-            | NodeValue::Emph
-            | NodeValue::Strong
-            | NodeValue::Strikethrough
-            | NodeValue::Highlight
-            | NodeValue::Superscript
-            | NodeValue::Link(_)
-            | NodeValue::Image(_)
-            | NodeValue::FootnoteReference(_)
-            | NodeValue::Math(_)
-            | NodeValue::Escaped
-            | NodeValue::WikiLink(_)
-            | NodeValue::Underline
-            | NodeValue::Subscript
-            | NodeValue::SpoileredText
-            | NodeValue::Insert
-            | NodeValue::BlockDirective(_)
-            | NodeValue::CommentInline(_)
-            | NodeValue::MultilineComment(_)
-            | NodeValue::EscapedTag(_) => self.unsupported(span, Construct::Extension, ""),
+            _ => self.unsupported(span, Construct::Extension, ""),
         }
     }
 
@@ -189,12 +140,11 @@ impl Lowering<'_> {
         }
     }
 
-    /// The rows of a table, the head row alone or every other row.
     fn rows<'a>(&self, table: &'a AstNode<'a>, head: Head, inner: usize) -> Vec<Row> {
         table
             .children()
             .filter(|row| {
-                let is_head = matches!(row.data().value, NodeValue::TableRow(true));
+                let is_head = matches!(&row.data().value, NodeValue::TableRow(row) if row.header);
                 match head {
                     Head::Kept => is_head,
                     Head::Skipped => !is_head,
@@ -217,6 +167,10 @@ impl Lowering<'_> {
         out
     }
 
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "comrak marks its AST non-exhaustive; disabled and future nodes retain their source"
+    )]
     fn inline<'a>(&self, node: &'a AstNode<'a>, depth: usize, out: &mut Vec<Inline>) {
         let ast = node.data();
         if depth >= NESTING_MAX {
@@ -230,9 +184,11 @@ impl Lowering<'_> {
         match &ast.value {
             NodeValue::Text(text) => out.push(Inline::Text(text.to_string())),
             NodeValue::Code(code) => out.push(Inline::Code(code.literal.clone())),
-            NodeValue::Emph => out.push(Inline::Emphasis(self.inlines(node, inner))),
-            NodeValue::Strong => out.push(Inline::Strong(self.inlines(node, inner))),
-            NodeValue::Strikethrough => out.push(Inline::Strikethrough(self.inlines(node, inner))),
+            NodeValue::Emph(_) => out.push(Inline::Emphasis(self.inlines(node, inner))),
+            NodeValue::Strong(_) => out.push(Inline::Strong(self.inlines(node, inner))),
+            NodeValue::Strikethrough(_) => {
+                out.push(Inline::Strikethrough(self.inlines(node, inner)))
+            }
             NodeValue::Link(link) => self.link(node, link, inner, out),
             NodeValue::Image(image) => out.push(image_of(node, image)),
             NodeValue::FootnoteReference(reference) => out.push(Inline::FootnoteReference {
@@ -261,38 +217,13 @@ impl Lowering<'_> {
             | NodeValue::SpoileredText
             | NodeValue::Insert
             | NodeValue::WikiLink(_) => out.extend(self.inlines(node, inner)),
-            NodeValue::Document
-            | NodeValue::FrontMatter(_)
-            | NodeValue::BlockQuote
-            | NodeValue::List(_)
-            | NodeValue::Item(_)
-            | NodeValue::DescriptionList
-            | NodeValue::DescriptionItem(_)
-            | NodeValue::DescriptionTerm
-            | NodeValue::DescriptionDetails
-            | NodeValue::CodeBlock(_)
-            | NodeValue::HtmlBlock(_)
-            | NodeValue::Paragraph
-            | NodeValue::Heading(_)
-            | NodeValue::ThematicBreak
-            | NodeValue::FootnoteDefinition(_)
-            | NodeValue::Table(_)
-            | NodeValue::TableRow(_)
-            | NodeValue::TableCell
-            | NodeValue::TaskItem(_)
-            | NodeValue::MultilineBlockQuote(_)
-            | NodeValue::Alert(_)
-            | NodeValue::BlockDirective(_)
-            | NodeValue::CommentInline(_)
-            | NodeValue::MultilineComment(_)
-            | NodeValue::Subtext => out.push(Inline::Unsupported {
+            _ => out.push(Inline::Unsupported {
                 construct: Construct::Extension,
                 source: plain(node),
             }),
         }
     }
 
-    /// A link the grammar admits, or its words as words.
     fn link<'a>(
         &self,
         node: &'a AstNode<'a>,
@@ -324,7 +255,6 @@ impl Lowering<'_> {
     }
 }
 
-/// Which rows of a table [`Lowering::rows`] reads.
 #[derive(Clone, Copy)]
 enum Head {
     Kept,
@@ -348,7 +278,6 @@ fn align(alignment: &TableAlignment) -> Align {
     }
 }
 
-/// An image the grammar admits, or its alternative text as words.
 fn image_of<'a>(node: &'a AstNode<'a>, image: &NodeLink) -> Inline {
     let alt = plain(node);
     if admitted(&image.url) {
@@ -362,8 +291,6 @@ fn image_of<'a>(node: &'a AstNode<'a>, image: &NodeLink) -> Inline {
     }
 }
 
-/// The words under `node`, read without recursion so a subtree of any
-/// depth costs no stack.
 fn plain<'a>(node: &'a AstNode<'a>) -> String {
     node.descendants()
         .filter_map(|descendant| {
@@ -381,6 +308,22 @@ fn plain<'a>(node: &'a AstNode<'a>) -> String {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+#[test]
+fn a_display_formula_keeps_its_source_and_span() {
+    let source = "$$\na^2 + b^2 = c^2\n$$";
+    assert_eq!(
+        blocks(source, 0),
+        vec![Block::Paragraph {
+            span: Span::ordered(0, offset(source.len())),
+            inline: vec![Inline::Unsupported {
+                construct: Construct::Math,
+                source: source.to_owned(),
+            }],
+        }]
+    );
 }
 
 #[cfg(test)]

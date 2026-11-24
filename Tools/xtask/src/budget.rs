@@ -13,7 +13,7 @@ mod weighing;
 
 use carried::CLIENT_MARK;
 pub(crate) use carried::carries_client;
-pub(crate) use weighing::{lockfile_packages, measure};
+pub(crate) use weighing::measure;
 
 const BUDGET_KEY: &str = "budget_bytes";
 const BEST_KEY: &str = "best_bytes";
