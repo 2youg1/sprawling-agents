@@ -32,11 +32,13 @@ fn invalid_catalog(subject: impl Into<String>, value: &Value) -> Error {
     .into()
 }
 
-fn model(entry: &Value) -> Option<Selection> {
+fn model_id(entry: &Value) -> Option<&str> {
     let id = entry.get("id")?.as_str()?.trim();
-    if id.is_empty() {
-        return None;
-    }
+    (!id.is_empty()).then_some(id)
+}
+
+fn model(entry: &Value) -> Option<Selection> {
+    let id = model_id(entry)?;
     let context_tokens = entry
         .get("context_window")
         .and_then(Value::as_u64)
@@ -73,7 +75,7 @@ pub fn select_for(catalog: &Value, requested: Option<&str>) -> Result<Selection>
     if let Some(id) = requested {
         return entries
             .iter()
-            .find(|entry| entry.get("id").and_then(Value::as_str) == Some(id))
+            .find(|entry| model_id(entry) == Some(id.trim()))
             .and_then(model)
             .ok_or_else(|| invalid_catalog(format!("the catalog has no entry for {id}"), catalog));
     }
@@ -81,7 +83,7 @@ pub fn select_for(catalog: &Value, requested: Option<&str>) -> Result<Selection>
         .and_then(|id| {
             entries
                 .iter()
-                .find(|entry| entry.get("id").and_then(Value::as_str) == Some(id))
+                .find(|entry| model_id(entry) == Some(id.trim()))
         })
         .or_else(|| entries.first())
         .ok_or_else(|| invalid_catalog("the catalog has no visible chat model", catalog))?;
@@ -126,6 +128,20 @@ pub fn route(answer: &Value) -> Result<Route> {
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod tests {
     use super::*;
+
+    #[test]
+    fn published_model_identifiers_round_trip_through_the_catalog() {
+        let catalog = serde_json::json!({
+            "first_id": " model/a ",
+            "data": [{"id": "other"}, {"id": " model/a "}]
+        });
+        let discovered = select(&catalog).unwrap();
+        assert_eq!(discovered.model, "model/a");
+        assert_eq!(
+            select_for(&catalog, Some(&discovered.model)).unwrap(),
+            discovered
+        );
+    }
 
     #[test]
     fn the_preferred_route_carries_context_and_efforts() {

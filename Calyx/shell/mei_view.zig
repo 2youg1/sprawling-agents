@@ -12,6 +12,7 @@ const menu_mod = @import("menu.zig");
 pub const Hit = viewport.Hit;
 pub const View = viewport.View;
 pub const Point = viewport.Point;
+pub const Location = viewport.Location;
 pub const Selection = viewport.Selection;
 pub const workingPatch = viewport.workingPatch;
 
@@ -106,44 +107,45 @@ pub fn render(
     defer arena_state.deinit();
     const arena = arena_state.allocator();
     var entries: std.ArrayList(write.Entry) = .empty;
-    var marks: std.ArrayList(u16) = .empty;
+    var items: std.ArrayList(viewport.Item) = .empty;
     var card_i: usize = 0;
-    for (log) |entry| {
+    for (log, 0..) |entry, index| {
         const card_id = std.math.cast(u16, card_i) orelse viewport.no_card;
         if (entry == .tool and std.mem.eql(u8, entry.tool.name, "python") and card_i < cards.len and cards[card_i] == .python) {
             const card = &cards[card_i].python;
             var tool = entry.tool;
             tool.subject = foldWord(card.fold, card_i == focus);
             try entries.append(arena, .{ .tool = tool });
-            try marks.append(arena, card_id);
+            try items.append(arena, .{ .origin = .{ .entry = index }, .card = card_id });
             if (card.fold == .source or card.fold == .both) {
                 try entries.append(arena, .{ .note = try tail(arena, card.code) });
-                try marks.append(arena, viewport.no_card);
+                try items.append(arena, .{ .origin = .{ .entry = index, .fragment = .input } });
             }
             if (card.fold == .output or card.fold == .both) {
                 try entries.append(arena, .{ .note = try tail(arena, card.output) });
-                try marks.append(arena, viewport.no_card);
+                try items.append(arena, .{ .origin = .{ .entry = index, .fragment = .output } });
             }
             card_i += 1;
         } else if (entry == .reasoning and entry.reasoning.body.len != 0 and card_i < cards.len and cards[card_i] == .reasoning) {
             const open = cards[card_i].reasoning;
             try entries.append(arena, if (open) .{ .note = "▾ reasoning" } else entry);
-            try marks.append(arena, card_id);
+            try items.append(arena, .{ .origin = .{ .entry = index }, .card = card_id });
             if (open) {
                 try entries.append(arena, .{ .note = entry.reasoning.body });
-                try marks.append(arena, viewport.no_card);
+                try items.append(arena, .{ .origin = .{ .entry = index, .fragment = .thought } });
             }
             card_i += 1;
         } else {
             try entries.append(arena, entry);
-            try marks.append(arena, viewport.no_card);
+            try items.append(arena, .{ .origin = .{ .entry = index } });
         }
     }
+    view.trackDraft(if (draft.len != 0) log.len else null);
     if (draft.len > 0) {
         try entries.append(arena, .{ .reply = draft });
-        try marks.append(arena, viewport.no_card);
+        try items.append(arena, .{ .origin = .{ .entry = log.len } });
     }
-    return viewport.draw(gpa, entries.items, marks.items, region, columns, rows, false, view, hits);
+    return viewport.draw(gpa, entries.items, items.items, region, columns, rows, false, view, hits);
 }
 
 fn foldWord(fold: Fold, focused: bool) []const u8 {
@@ -212,6 +214,7 @@ test "a python card defaults to elapsed time and cycles four ways" {
         },
     };
     var view: View = .{};
+    defer view.deinit(gpa);
     const timed = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &view, &hits);
     defer gpa.free(timed);
     try std.testing.expect(std.mem.indexOf(u8, timed, "1.5 s") != null);
@@ -254,6 +257,7 @@ test "the user line stays in the frame above a long reply" {
         },
     };
     var view: View = .{};
+    defer view.deinit(gpa);
     const bytes = try render(gpa, &log, &.{}, 0, "还在写", region, 80, 24, &view, &hits);
     defer gpa.free(bytes);
     try std.testing.expect(std.mem.indexOf(u8, bytes, "用户的问题") != null);
@@ -268,6 +272,7 @@ test "the visible reasoning card has a click target and discloses its original t
     var hits: std.ArrayList(Hit) = .empty;
     defer hits.deinit(gpa);
     var view: View = .{};
+    defer view.deinit(gpa);
     const region: write.Live = .{ .composer = .{ .typed = "", .cursor = 0, .placeholder = "Mei", .room = "Mei", .offer = "" } };
     const closed = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &view, &hits);
     defer gpa.free(closed);
@@ -277,6 +282,36 @@ test "the visible reasoning card has a click target and discloses its original t
     const open = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &view, &hits);
     defer gpa.free(open);
     try std.testing.expect(std.mem.indexOf(u8, open, "原样思考文本") != null);
+}
+
+test "widening and opening cards above the viewport preserve its reading place" {
+    const gpa = std.testing.allocator;
+    const log = [_]write.Entry{
+        .{ .tool = .{ .at = null, .name = "python", .subject = "", .took_us = null, .outcome = .Answered } },
+        .{ .reply = "segment-00 segment-01 segment-02 segment-03 segment-04 segment-05 segment-06 segment-07 segment-08 segment-09 segment-10 segment-11 segment-12 segment-13 segment-14 segment-15" },
+    };
+    var code = "visible on open".*;
+    var cards = [_]Card{.{ .python = .{ .code = &code, .output = &.{} } }};
+    var hits: std.ArrayList(Hit) = .empty;
+    defer hits.deinit(gpa);
+    var view: View = .{};
+    defer view.deinit(gpa);
+    const region: write.Live = .{ .composer = .{ .typed = "", .cursor = 0, .placeholder = "Mei", .room = "Mei", .offer = "" } };
+    const bottom = try render(gpa, &log, &cards, 0, "", region, 22, 5, &view, &hits);
+    defer gpa.free(bottom);
+    view.scroll(-10);
+    const narrow = try render(gpa, &log, &cards, 0, "", region, 22, 5, &view, &hits);
+    defer gpa.free(narrow);
+    const row = narrow[0..std.mem.indexOfScalar(u8, narrow, '\n').?];
+    const at = std.mem.indexOf(u8, row, "segment-").?;
+    const word = row[at..][0.."segment-00".len];
+    const wide = try render(gpa, &log, &cards, 0, "", region, 31, 5, &view, &hits);
+    defer gpa.free(wide);
+    try std.testing.expect(std.mem.indexOf(u8, wide[0..std.mem.indexOfScalar(u8, wide, '\n').?], word) != null);
+    cards[0].cycle();
+    const open = try render(gpa, &log, &cards, 0, "", region, 31, 5, &view, &hits);
+    defer gpa.free(open);
+    try std.testing.expect(std.mem.indexOf(u8, open[0..std.mem.indexOfScalar(u8, open, '\n').?], word) != null);
 }
 
 test "a result wave animates both failure and success without moving their names" {
@@ -290,6 +325,7 @@ test "a result wave animates both failure and success without moving their names
     var hits: std.ArrayList(Hit) = .empty;
     defer hits.deinit(gpa);
     var view: View = .{ .completion = .{ .first = 0, .last = 1, .tone = 142 } };
+    defer view.deinit(gpa);
     const region: write.Live = .{ .composer = .{ .typed = "", .cursor = 0, .placeholder = "Mei", .room = "Mei", .offer = "" } };
     const arriving = try render(gpa, &log, &cards, 0, "", region, 80, 24, &view, &hits);
     defer gpa.free(arriving);

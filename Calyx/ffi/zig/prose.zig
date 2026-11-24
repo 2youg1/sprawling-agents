@@ -12,68 +12,70 @@ const math = @import("math.zig");
 const diagram = @import("diagram.zig");
 
 pub fn blocks(p: *paint.Painter, body: []const u8, column: flow.Column) paint.Error!void {
-    if (!needsBlocks(body)) return flow.flow(p, body, column);
+    if (!needsBlocks(body)) return flow.sourced(p, body, column);
     var open: ?Fence = null;
     var display_math = false;
     var lines = std.mem.splitScalar(u8, body, '\n');
     var first = true;
     while (lines.next()) |raw| {
-        const line = std.mem.trimEnd(u8, raw, "\r");
+        const source = std.mem.trimEnd(u8, raw, "\r");
         if (!first) try p.end();
         first = false;
-        try p.to(column.left);
-        const trimmed = std.mem.trimStart(u8, line, " ");
-        if (takesFence(open, trimmed)) {
+        p.sourceLine(body, raw);
+        try p.textLeft(column.left);
+        const trimmed_source = std.mem.trimStart(u8, source, " ");
+        if (takesFence(open, trimmed_source)) {
             if (p.mei and open == null) {
-                const fence = fenceOf(trimmed).?;
-                const info = std.mem.trim(u8, trimmed[fence.len..], " \t");
-                if (std.mem.eql(u8, info, "mermaid") and try diagram.draw(p, &lines, trimmed[0..fence.len], column)) continue;
+                const fence = fenceOf(trimmed_source).?;
+                const info = std.mem.trim(u8, trimmed_source[fence.len..], " \t");
+                if (std.mem.eql(u8, info, "mermaid") and try diagram.draw(p, &lines, trimmed_source[0..fence.len], column, body)) continue;
             }
-            open = if (open == null) fenceOf(trimmed) else null;
-            try p.fit(.faint, line, column.measure);
+            open = if (open == null) fenceOf(trimmed_source) else null;
+            try p.fit(.faint, source, column.measure);
             continue;
         }
         if (open != null) {
-            try codeLine(p, line, column);
+            try codeLine(p, source, column);
             continue;
         }
-        if (p.mei and try table.draw(p, line, &lines, column)) continue;
-        if (p.mei and std.mem.eql(u8, std.mem.trimEnd(u8, trimmed, " \t"), "$$")) {
+        if (p.mei and try table.draw(p, source, &lines, column, body)) continue;
+        if (p.mei and std.mem.eql(u8, std.mem.trimEnd(u8, trimmed_source, " \t"), "$$")) {
             display_math = !display_math;
             continue;
         }
-        if (p.mei and (display_math or std.mem.indexOfScalar(u8, line, '$') != null)) {
-            var converted: [4096]u8 = undefined;
-            const shown = if (display_math) math.expression(&converted, trimmed) else math.line(&converted, line);
-            if (shown) |rendered| {
-                try flow.flow(p, rendered, column);
-                continue;
-            }
+        var converted: [4096]u8 = undefined;
+        if (display_math) {
+            try flow.flow(p, math.expression(&converted, trimmed_source) orelse source, column);
+            continue;
         }
-        if (heading(trimmed)) |mark| {
-            const cut = cutAt(line, trimmed, mark);
+        const line = if (p.mei and std.mem.indexOfScalar(u8, source, '$') != null)
+            math.line(&converted, source) orelse source
+        else
+            source;
+        if (heading(trimmed_source)) |mark| {
+            const cut = cutAt(source, trimmed_source, mark);
             if (!p.mei) try p.fit(.faint, line[0..cut], cut);
             try flow.flow(p, line[cut..], .{ .left = p.column, .measure = p.room(), .style = .bold, .marks = column.marks });
             continue;
         }
-        if (std.mem.startsWith(u8, trimmed, ">")) {
-            const cut = cutAt(line, trimmed, 1);
+        if (std.mem.startsWith(u8, trimmed_source, ">")) {
+            const cut = cutAt(source, trimmed_source, 1);
             try p.fit(.faint, line[0..cut], cut);
             const rest = flow.Column{ .left = p.column, .measure = p.room(), .style = .faint, .marks = column.marks };
             try flow.flow(p, line[cut..], rest);
             continue;
         }
-        if (listMark(trimmed)) |mark| {
-            const cut = cutAt(line, trimmed, mark);
-            if (p.mei and (trimmed[0] == '-' or trimmed[0] == '*')) {
+        if (listMark(trimmed_source)) |mark| {
+            const cut = cutAt(source, trimmed_source, mark);
+            if (p.mei and (trimmed_source[0] == '-' or trimmed_source[0] == '*')) {
                 try p.cut(.faint, "• ", 2);
             } else try p.fit(.faint, line[0..cut], cut);
             const rest = flow.Column{ .left = p.column, .measure = p.room(), .style = column.style, .marks = column.marks };
             try flow.flow(p, line[cut..], rest);
             continue;
         }
-        if (std.mem.count(u8, line, "|") >= 2) {
-            const kept = flow.Column{ .left = column.left, .measure = column.measure, .style = if (ruleRow(trimmed)) .faint else column.style, .marks = .kept };
+        if (std.mem.count(u8, source, "|") >= 2) {
+            const kept = flow.Column{ .left = column.left, .measure = column.measure, .style = if (ruleRow(trimmed_source)) .faint else column.style, .marks = .kept };
             try flow.flow(p, line, kept);
             continue;
         }
@@ -176,8 +178,8 @@ fn links(p: *paint.Painter, line: []const u8, column: flow.Column) paint.Error!v
         if (line[at] == '[') {
             if (linkAt(line, at)) |found| {
                 if (text.width(found.label) > p.room() and p.column > column.left) {
-                    try p.end();
-                    try p.to(column.left);
+                    try p.wrap(false);
+                    try p.textLeft(column.left);
                 }
                 try p.link(.accent, found.url, found.label);
                 at = found.next;
@@ -186,8 +188,8 @@ fn links(p: *paint.Painter, line: []const u8, column: flow.Column) paint.Error!v
         }
         const c = text.char(line, at);
         if (!try p.char(column.style, c)) {
-            try p.end();
-            try p.to(column.left);
+            try p.wrap(false);
+            try p.textLeft(column.left);
             if (!try p.char(column.style, c)) return;
         }
         at += c.len;
@@ -206,6 +208,80 @@ fn linkAt(line: []const u8, at: usize) ?Link {
         .url = line[close + 2 .. end],
         .next = end + 1,
     };
+}
+
+test "formulas preserve the surrounding markdown and the destination of a link" {
+    var buffer: [1024]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&buffer);
+    var painter = paint.Painter.meiFrame(&output, 90);
+    try blocks(&painter, "# A $x^2$ heading\n[docs](https://example.test/$x^2$) gives $x^2$", .{
+        .left = 0,
+        .measure = 89,
+        .style = .plain,
+        .marks = .prose,
+    });
+    const drawn = output.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "\x1b[0;1mA") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "\x1b]8;;https://example.test/$x^2$\x1b\\") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "gives x²") != null);
+}
+
+test "a formula cannot turn into a Markdown block prefix" {
+    var buffer: [256]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&buffer);
+    var painter = paint.Painter.meiFrame(&output, 40);
+    try blocks(&painter, "$- 1$\n$# 1$\n- $x^2$", .{ .left = 0, .measure = 39, .style = .plain, .marks = .prose });
+    try std.testing.expect(std.mem.indexOf(u8, output.buffered(), "- 1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, output.buffered(), "# 1") != null);
+    try std.testing.expectEqual(@as(usize, 1), std.mem.count(u8, output.buffered(), "•"));
+}
+
+test "table escapes are drawn as one cell character" {
+    var buffer: [1024]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&buffer);
+    var painter = paint.Painter.meiFrame(&output, 36);
+    try blocks(&painter, "| regex | value |\n| --- | --- |\n| a\\|b | yes |", .{
+        .left = 0,
+        .measure = 35,
+        .style = .plain,
+        .marks = .prose,
+    });
+    try std.testing.expect(std.mem.indexOf(u8, output.buffered(), "a|b") != null);
+}
+
+test "a narrow Mermaid chart keeps the edge and both node identities" {
+    var buffer: [1024]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&buffer);
+    var painter = paint.Painter.meiFrame(&output, 21);
+    try blocks(&painter, "```mermaid\nflowchart LR\nA[Very long left label here] --> B[Check]\nB --> C[Done]\n```", .{
+        .left = 0,
+        .measure = 20,
+        .style = .plain,
+        .marks = .prose,
+    });
+    const drawn = output.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "↓") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "B: Check") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "C: Done") != null);
+}
+
+test "long Mermaid node identities remain distinct on narrow screens" {
+    var buffer: [512]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&buffer);
+    var painter = paint.Painter.meiFrame(&output, 8);
+    try blocks(&painter, "```mermaid\nflowchart LR\nBuildAlpha --> BuildBeta\n```", .{
+        .left = 0,
+        .measure = 7,
+        .style = .plain,
+        .marks = .prose,
+    });
+    const drawn = output.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "…") == null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "↓") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "BuildA") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "lpha") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "BuildB") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "eta") != null);
 }
 
 test "plain prose stays on the flow path" {

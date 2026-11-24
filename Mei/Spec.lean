@@ -131,12 +131,13 @@ tool_result 的 `content` 是小型完整文本，或“提示 + 完整结果路
 `agent` 决策；`transport` / `python` 适配；`resume` 读完整 JSONL；`workspace` 读取顶层 AGENTS；
 `doctor` 管理运行环境；`capture` 管理输出文件；`acp` 拥有 ACP agent 线协议与相位；
 `main` 装配无头与 `--acp` 两条入口；`error` 诊断。
-生产依赖只有 `serde_json`，安装经操作系统已有的 shell、curl/wget 或 PowerShell 与官方 uv installer。
+生产依赖及理由见 §13。安装经操作系统已有的 shell、curl/wget 或 PowerShell 与官方 uv installer。
 Calyx（及任何 Face 消费者）在进程边界 spawn 无头 `mei`；Mei 不知道 Entry/Zig。
 ACP client（城 harness、编辑器或其他）spawn `mei --acp`；`acp` 不依赖 `agent_protocols` crate。
 
 `ANTHROPIC_BASE_URL` 出站默认 `http://127.0.0.1:3425`；Mei 不监听 2501/3425。
 缺省模型时 GET `/v1/models`，以 `first_id` 命中的可见条目为首选，缺席或失配才取 `data[0]`；空目录失败。
+目录标识去除首尾空白后参与首选与显式模型匹配，空标识无效。
 目录条目同时给出 `context_window` 与 `reasoning_levels`。每次自动路由请求携带独立
 `X-Magpie-Session`，完整响应后 GET `/v1/magpie/route?session=…`，把实际 model/effort 写给 Face。
 路由观测失败不推翻已成功的模型回答，Face 保留 requested model/effort，不声称它们是实际值。
@@ -203,6 +204,9 @@ stderr 观测行（穷尽；非 Messages role）：
 - `{"type":"mei.obs","kind":"model","model":…,"context_tokens":…,"efforts":[…],"effort":…,"effort_source":"requested"}` — 本次请求实际携带的 model；只有它与目录选择一致时才带目录的 `context_tokens`/`efforts`，否则两者为空
 - `{"type":"mei.obs","kind":"route","model":…,"effort":…,"effort_source":"actual"}` — Magpie 已完成的实际路由；不可用时 `available=false`
 - `{"type":"mei.obs","kind":"usage","usage": <response.usage>}` — 响应带 usage 时写一行
+- `{"type":"mei.obs","kind":"tool_start","id": <string>}` — 已通过校验的 Python 调用开始前，`id` 是必填的调用标识
+- `{"type":"mei.obs","kind":"workspace","agents": true}` — 已加载工作区 AGENTS.md，`agents` 是必填布尔值
+- `{"type":"mei.obs","kind":"image","preview": <string>}` — 生成灰阶字符预览时写一行，`preview` 是必填预览文本
 
 `Diagnostic` 渲染 toml 块字段：`code`、`description`、`cause`、`resolution`，
 以及可选 `path` / `value`（写入 cause 叙事所需处）。内部仍可用 action/subject/recovery
@@ -354,7 +358,7 @@ inline 文件占用、spilled 跨进程读取、失败/取消 run、宿主崩溃
 
 /-! ## 13 依赖选型
 
-仅 `serde_json`；std TcpStream/Command/闭包。被否：reqwest、clap、Model/Tool trait、
+`serde_json` 处理协议；`base64` 解码工具图像，`image` 只启用 PNG/JPEG 解码以生成有界字符预览。保留原始工具结果给模型，Face 可直接显示预览，无需再实现格式解码。TCP、进程和回调使用标准库。被否：reqwest、clap、Model/Tool trait、
 Mei 自更新器、为输出捕获引入异步 runtime。uv 官方 installer、`uv python install` 与
 `UV_UNMANAGED_INSTALL` / `UV_PYTHON_INSTALL_DIR` / `UV_PYTHON_BIN_DIR` 的合同见官方文档，
 跟踪关系记入 `docs/third-party.md`。

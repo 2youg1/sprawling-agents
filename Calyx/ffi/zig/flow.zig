@@ -17,6 +17,14 @@ pub const Column = struct {
 };
 
 pub fn flow(p: *paint.Painter, body: []const u8, column: Column) paint.Error!void {
+    try draw(p, body, column, false);
+}
+
+pub fn sourced(p: *paint.Painter, body: []const u8, column: Column) paint.Error!void {
+    try draw(p, body, column, true);
+}
+
+fn draw(p: *paint.Painter, body: []const u8, column: Column, track_source: bool) paint.Error!void {
     var fenced = false;
     var lines = std.mem.splitScalar(u8, body, '\n');
     var first = true;
@@ -24,7 +32,8 @@ pub fn flow(p: *paint.Painter, body: []const u8, column: Column) paint.Error!voi
         const line = std.mem.trimEnd(u8, raw, "\r");
         if (!first) try p.end();
         first = false;
-        try p.to(column.left);
+        if (track_source) p.sourceLine(body, raw);
+        try p.textLeft(column.left);
         const fence = column.marks == .prose and std.mem.startsWith(u8, std.mem.trimStart(u8, line, " "), "```");
         if (fence) {
             fenced = !fenced;
@@ -62,7 +71,7 @@ fn words(p: *paint.Painter, line: []const u8, column: Column) paint.Error!void {
         const needed = measure(line[at..word_end], column.marks) + @intFromBool(pending_space);
         if (p.column + needed > @min(right, p.limit) and p.column > column.left) {
             try p.wrap(pending_space);
-            try p.to(column.left);
+            try p.textLeft(column.left);
             pending_space = false;
         }
         if (pending_space) {
@@ -116,7 +125,7 @@ fn emit(p: *paint.Painter, line: []const u8, span: Span, column: Column, state: 
         const style: paint.Style = if (tick) .faint else state.style(column.style);
         if (!try p.char(style, c)) {
             try p.wrap(false);
-            try p.to(column.left);
+            try p.textLeft(column.left);
             _ = try p.char(style, c);
         }
         at += c.len;

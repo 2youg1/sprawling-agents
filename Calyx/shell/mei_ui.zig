@@ -67,7 +67,7 @@ pub const Ui = struct {
     rows: u16 = 0,
     view: mei_view.View = .{},
     tool_arrived_ms: u64 = 0,
-    press: ?mei_view.Point = null,
+    press: ?Press = null,
     hinted: bool = false,
     seen: observation.Seen,
     bus: mei_process.Bus,
@@ -176,6 +176,7 @@ pub const Ui = struct {
         self.freeCards();
         self.cards.deinit(self.gpa);
         self.hits.deinit(self.gpa);
+        self.view.deinit(self.gpa);
         self.log.deinit(self.gpa);
         self.log_arena.deinit();
         self.bus.deinit();
@@ -293,7 +294,7 @@ pub const Ui = struct {
     fn onKey(self: *Ui, key: termio.Key) ?u8 {
         if (key.code == .wheel) {
             const wheel = key.code.wheel;
-            if (wheel.row > self.view.body_top and wheel.row <= self.view.body_top + self.view.body_rows) {
+            if (wheel.row != 0 and self.view.contains(wheel.row - 1)) {
                 self.view.scroll(wheel.lines);
                 self.view.selection = null;
                 self.touch(true);
@@ -354,16 +355,18 @@ pub const Ui = struct {
         if ((click.button & 3) != 0 or click.button >= 64 or click.row == 0 or click.column == 0) return true;
         const point: mei_view.Point = .{ .row = click.row - 1, .column = click.column - 1 };
         if ((click.button & 32) != 0) {
-            if (self.press) |press| {
-                if (self.onBody(press)) {
-                    self.view.selection = mei_view.Selection.between(press, point);
+            if (self.press) |*press| {
+                press.dragged = true;
+                if (self.dragRange(self.view.down, point)) |range| {
+                    self.view.selection = range;
                     self.touch(true);
                 }
             }
             return true;
         }
         if (!click.release) {
-            self.press = point;
+            self.press = .{ .point = point };
+            self.view.down = if (self.view.contains(point.row)) self.view.location(point) else null;
             if (self.view.selection != null) {
                 self.view.selection = null;
                 self.touch(true);
@@ -372,9 +375,15 @@ pub const Ui = struct {
         }
         const press = self.press orelse return true;
         self.press = null;
-        if (press.before(point) or point.before(press)) {
-            if (self.onBody(press)) self.copySelection(press, point);
+        const down = self.view.down;
+        self.view.down = null;
+        if (press.dragged or !std.meta.eql(press.point, point)) {
+            if (self.dragRange(down, point)) |range| self.copySelection(range);
             return true;
+        }
+        if (down) |body| {
+            const released = self.view.location(point) orelse return true;
+            if (!std.meta.eql(body, released)) return true;
         }
         if (self.menu) |*menu| {
             var choices: [5]menu_mod.Choice = undefined;
@@ -398,14 +407,19 @@ pub const Ui = struct {
         return true;
     }
 
-    fn onBody(self: *const Ui, point: mei_view.Point) bool {
-        return point.row >= self.view.body_top and point.row < self.view.body_top + self.view.body_rows;
+    const Press = struct {
+        point: mei_view.Point,
+        dragged: bool = false,
+    };
+
+    fn dragRange(self: *const Ui, down: ?mei_view.Location, point: mei_view.Point) ?mei_view.Selection {
+        return .{ .start = down orelse return null, .finish = self.view.location(point) orelse return null };
     }
 
-    fn copySelection(self: *Ui, press: mei_view.Point, release: mei_view.Point) void {
+    fn copySelection(self: *Ui, range: mei_view.Selection) void {
         var text: std.Io.Writer.Allocating = .init(self.gpa);
         defer text.deinit();
-        self.view.selection = mei_view.Selection.between(press, release);
+        self.view.selection = range;
         self.view.copy = &text.writer;
         self.touch(true);
         self.view.copy = null;
@@ -603,8 +617,10 @@ pub const Ui = struct {
 
     pub fn clearConversation(self: *Ui) void {
         self.view.follow();
+        self.view.trackDraft(null);
         self.view.completion = null;
         self.view.selection = null;
+        self.view.down = null;
         self.press = null;
         self.freeLog();
         self.freeCards();
@@ -658,6 +674,7 @@ pub const Ui = struct {
             if (paired or thought) self.cards.ensureUnusedCapacity(self.gpa, 1) catch return;
             const owned = present.cloneEntry(self.log_arena.allocator(), entry) catch return;
             self.log.append(self.gpa, owned) catch return;
+            if (entry == .reply and self.seen.draftText().len == 0) self.view.commitDraft(self.log.items.len - 1);
             if (paired) {
                 self.cards.appendAssumeCapacity(.{ .python = .{
                     .code = bodies[next].code,
@@ -720,8 +737,6 @@ pub const Ui = struct {
     }
 
     fn noteResize(self: *Ui) void {
-        self.view.selection = null;
-        self.press = null;
         self.touch(true);
     }
 
