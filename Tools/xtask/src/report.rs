@@ -24,6 +24,19 @@ pub(crate) enum XtaskError {
     },
     #[error("{file}: {msg}")]
     Doc { file: String, msg: String },
+    #[error(
+        "\n```toml\n\
+         code = \"crate-size-bundle-missing\"\n\
+         action = \"measure compressed Cargo archives\"\n\
+         subject = \"RefRain client entry\"\n\
+         path = {entry}\n\
+         value = \"absent\"\n\
+         rule = \"the archives must include the built client\"\n\
+         repair = \"just build-web\"\n\
+         ```",
+        entry = toml::Value::String(.path.display().to_string())
+    )]
+    CrateSizeBundleMissing { path: std::path::PathBuf },
     #[error("command `{cmd}` failed: {msg}")]
     Cmd { cmd: String, msg: String },
     #[error("{msg} ({code})")]

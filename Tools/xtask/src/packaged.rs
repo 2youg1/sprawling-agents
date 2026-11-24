@@ -51,11 +51,7 @@ const CRATE_UPLOAD_LIMIT: u64 = 10_485_760;
 pub(crate) fn check_sizes(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let entry = crate::bundle::dist(root)?.join("index.html");
     if !entry.is_file() {
-        return Err(XtaskError::Doc {
-            file: entry.display().to_string(),
-            msg: "client bundle is absent. Run just build-web before measuring the crates"
-                .to_owned(),
-        });
+        return Err(XtaskError::CrateSizeBundleMissing { path: entry });
     }
     let version = crate::package::workspace_package(root, "version")?;
     let packages: Vec<_> = members::members(root)?

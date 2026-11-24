@@ -178,3 +178,29 @@ fn crate_size_rejects_one_byte_over_the_registry_limit() {
     assert_eq!(violation.gate, "crate-size");
     assert!(violation.violation.contains("10485761"));
 }
+
+#[test]
+fn crate_size_reports_a_missing_client_entry_as_toml() {
+    let root = tempfile::tempdir().unwrap();
+    let app = root.path().join("Sprawling").join("app");
+    std::fs::create_dir_all(&app).unwrap();
+    std::fs::write(
+        app.join("build.rs"),
+        r#"const BUNDLE_DIR: &str = "web-dist";"#,
+    )
+    .unwrap();
+    let message = super::check_sizes(root.path()).unwrap_err().to_string();
+    let report = message
+        .strip_prefix("\n```toml\n")
+        .unwrap()
+        .strip_suffix("```")
+        .unwrap()
+        .parse::<toml::Table>()
+        .unwrap();
+    assert_eq!(report["code"].as_str(), Some("crate-size-bundle-missing"));
+    assert_eq!(
+        report["path"].as_str(),
+        app.join("web-dist").join("index.html").to_str()
+    );
+    assert_eq!(report["repair"].as_str(), Some("just build-web"));
+}

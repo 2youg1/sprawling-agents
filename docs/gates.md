@@ -13,7 +13,6 @@ A violation turns the check red with a message naming the rule, the violation an
 | `xtask boundary` | white-box checks in Rust beside the code; stranger-entry checks in Lean under `Tools/adversary/` |
 | `xtask artifact` | nothing written for a test is compiled into the binary a person downloads |
 | `xtask packaged` | files a publishable package compiles in production (`include!`, `include_str!`, `include_bytes!`) lie inside its directory or its build script's `OUT_DIR`, since crates.io carries nothing else |
-| `xtask crate-size` | Cargo's actual compressed packages fit crates.io's upload limit before publication |
 | `xtask depmap` | `pub(crate)` by default; `pub` traits only on the seam list |
 | `xtask unused` | every declared dependency named by its package's code; every workspace dependency inherited by some package |
 | `xtask npm` | client lockfile in step with its manifest; runtime dependencies exactly `RUNTIME` in `Tools/xtask/src/npm.rs`, each admitted with the reason `RefRain/Spec.lean` §7-9 records; every licence on the `deny.toml` list |
@@ -33,6 +32,8 @@ A violation turns the check red with a message naming the rule, the violation an
 | `xtask release` | nothing published names one machine's home directory, its working notes, or a document this tree does not contain |
 | `xtask guard` | the two lint tables of their own, `Sprawling/desktop/ffi`'s and `Calyx/ffi`'s, each equal to the workspace's except `unsafe_code`, every other crate inheriting the workspace's; every workspace package pinned in `[workspace.dependencies]` to `=` the `[workspace.package]` version and named by no member through a path of its own |
 | `xtask residue` | product roots only from the `[[product_root]]` table in `architecture.toml`; a `layout = "current"` root present on disk; a retired `[[legacy_path]]` absent from the tree and from active configuration path tokens (`crates/…`); the isolation zone is skipped at walk and CHANGELOG filenames are outside the scan by scope; quoted labels that are not paths are not residue; wrong-case siblings of a current root refused; Calyx shell residue under `Calyx/src/console/{ui,editor,screen}` refused permanently (`Calyx/Spec.lean` D7) |
+
+The `gates-artifacts` recipe also runs `cargo xtask crate-size` after building the client. It measures the generated Cargo archives against the crates.io upload limit before publication.
 
 - A red gate has three exits: fix the code, narrow the rule to a precise scope, or delete the gate. Never add an exception. A scope names the property that makes every included case legitimate and has positive and negative fixtures. Review judges that property; a waiver, suppression, grandfather entry or re-priced threshold is not a substitute for it.
 - Put a change to gate machinery — `Tools/xtask/`, `justfile`, `.github/`, `flake.nix`, the root `Cargo.toml`, `deny.toml`, `clippy.toml`, `rust-toolchain.toml`, `lakefile.toml`, `lean-toolchain`, `Tools/xtask/budgets.toml`, `architecture.toml` — in a commit apart from the source it judges, so review sees whether the gate moved to admit it.
