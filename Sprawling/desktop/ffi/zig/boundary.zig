@@ -3,24 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the leaf does with the buffers it is lent, and nothing else.
-//
-// Every operation in `leaf.zig` writes into memory Rust owns, and these
-// four rules are the whole of what it writes there: a stream of handles
-// kept up to the buffer's length and counted in full, a clipboard text
-// copied up to its first zero unit and never past the block, a new text
-// written with exactly one terminator into a block of exactly that size,
-// and a bitmap measured in bytes without overflow. They touch no Win32
-// call, so they are judged three ways without a desktop: the theorems of
-// `Sprawling/desktop/ffi/Spec.lean`, the tests below, and the Rust reference the
-// equivalence check and the fuzz target compare them with.
-
 const std = @import("std");
 const Step = @import("step.zig").Step;
 
-/// A stream of items kept in a buffer as long as it lasts, and counted
-/// past it, so a caller whose buffer was short learns how long to make
-/// the next one instead of reading a list that silently stopped.
 pub fn Kept(comptime T: type) type {
     return struct {
         into: []T,
@@ -39,22 +24,15 @@ pub fn Kept(comptime T: type) type {
     };
 }
 
-/// Where a text another program wrote ends: at its first zero unit, or
-/// at the end of the block when it has none. The block's own size is the
-/// bound; its terminator is a claim this rule does not rely on.
 pub fn textEnd(block: []const u16) usize {
     return std.mem.indexOfScalar(u16, block, 0) orelse block.len;
 }
 
-/// The outcome of a copy: finished with `count` units written, or no
-/// room, with `count` the units the caller must make room for.
 pub const Copied = struct {
     step: Step,
     count: usize,
 };
 
-/// The text of `block` copied into `into`, or how much room it needs.
-/// Nothing is written when the room is short.
 pub fn textCopy(block: []const u16, into: []u16) Copied {
     const end = textEnd(block);
     if (end > into.len) return .{ .step = .NoRoom, .count = end };
@@ -62,22 +40,15 @@ pub fn textCopy(block: []const u16, into: []u16) Copied {
     return .{ .step = .Finished, .count = end };
 }
 
-/// How many units a block for `len` units of text holds: the text and
-/// its one terminator, or nothing when that count overflows.
 pub fn blockUnits(len: usize) ?usize {
     return std.math.add(usize, len, 1) catch null;
 }
 
-/// The same block in bytes, which is what `GlobalAlloc` is asked for.
 pub fn blockBytes(len: usize) ?usize {
     const units = blockUnits(len) orelse return null;
     return std.math.mul(usize, units, @sizeOf(u16)) catch null;
 }
 
-/// `units` and one terminator written into a block that holds exactly
-/// them. A block of any other length is refused before anything is
-/// written, because a size that does not describe its block is a defect
-/// in the caller, not a text to shorten.
 pub fn textFill(units: []const u16, block: []u16) Step {
     const want = blockUnits(units.len) orelse return .Measuring;
     if (block.len != want) return .Measuring;
@@ -86,8 +57,6 @@ pub fn textFill(units: []const u16, block: []u16) Step {
     return .Finished;
 }
 
-/// The bytes of a top-down 32-bit bitmap `width` by `height`, or nothing
-/// for a side that is not positive or a product that overflows.
 pub fn bitmapBytes(width: i32, height: i32) ?usize {
     if (width <= 0 or height <= 0) return null;
     const pixels = std.math.mul(usize, @intCast(width), @intCast(height)) catch return null;
@@ -134,55 +103,48 @@ test "a bitmap's bytes are refused for a side that is not positive or a product 
     try testing.expectEqual(@as(?usize, null), blockBytes(std.math.maxInt(usize)));
 }
 
-/// The properties `Sprawling/desktop/ffi/Spec.lean` proves of the copy, asked of
-/// one input: what is written is the block's text and fits the room,
-/// and a room as long as the answer always suffices.
 fn copyHolds(block: []const u16, capacity: usize) !void {
-    var room: [64]u16 = undefined;
-    const into = room[0..@min(capacity, room.len)];
+    const sentinel: u16 = 0xa55a;
+    var room: [65]u16 = @splat(sentinel);
+    const into = room[0..capacity];
+    const expected = std.mem.indexOfScalar(u16, block, 0) orelse block.len;
     const copied = textCopy(block, into);
-    try testing.expect(copied.count <= block.len);
-    switch (copied.step) {
-        .Finished => {
-            try testing.expect(copied.count <= into.len);
-            try testing.expectEqualSlices(u16, block[0..copied.count], into[0..copied.count]);
-            try testing.expect(std.mem.indexOfScalar(u16, into[0..copied.count], 0) == null);
-        },
-        .NoRoom => {
-            try testing.expect(copied.count > into.len);
-            var enough: [64]u16 = undefined;
-            const again = textCopy(block, enough[0..copied.count]);
-            try testing.expectEqual(Step.Finished, again.step);
-        },
-        else => return error.UnexpectedStep,
+    try testing.expectEqual(expected, copied.count);
+    if (expected <= capacity) {
+        try testing.expectEqual(Step.Finished, copied.step);
+        try testing.expectEqualSlices(u16, block[0..expected], into[0..expected]);
+        try testing.expect(std.mem.allEqual(u16, room[expected..], sentinel));
+    } else {
+        try testing.expectEqual(Step.NoRoom, copied.step);
+        try testing.expect(std.mem.allEqual(u16, &room, sentinel));
     }
 }
 
-/// The fill and the copy are each other's inverse on a text with no zero
-/// in it, which is what a clipboard round trip relies on.
-fn fillHolds(units: []const u16) !void {
-    var block: [65]u16 = undefined;
-    const used = block[0 .. units.len + 1];
-    try testing.expectEqual(Step.Finished, textFill(units, used));
-    if (std.mem.indexOfScalar(u16, units, 0) == null) {
-        try testing.expectEqual(units.len, textEnd(used));
+fn fillHolds(units: []const u16, capacity: usize) !void {
+    const sentinel: u16 = 0xa55a;
+    var block: [66]u16 = @splat(sentinel);
+    try testing.expectEqual(Step.Finished, textFill(units, block[0 .. units.len + 1]));
+    try testing.expectEqualSlices(u16, units, block[0..units.len]);
+    try testing.expectEqual(@as(u16, 0), block[units.len]);
+    try testing.expect(std.mem.allEqual(u16, block[units.len + 1 ..], sentinel));
+    if (capacity != units.len + 1) {
+        @memset(&block, sentinel);
+        try testing.expectEqual(Step.Measuring, textFill(units, block[0..capacity]));
+        try testing.expect(std.mem.allEqual(u16, &block, sentinel));
     }
 }
 
-/// The keep rule asked of one stream: the buffer holds the stream's
-/// prefix, and the count is the stream's length.
 fn keepHolds(stream: []const usize, capacity: usize) !void {
     var room: [64]usize = undefined;
     var kept: Kept(usize) = .{ .into = room[0..@min(capacity, room.len)] };
     for (stream) |item| kept.keep(item);
+    try testing.expectEqual(if (stream.len > capacity) Step.NoRoom else Step.Finished, kept.step());
     try testing.expectEqual(stream.len, kept.count);
     const held = @min(stream.len, kept.into.len);
     try testing.expectEqualSlices(usize, stream[0..held], kept.into[0..held]);
 }
 
-// Coverage-guided where Zig's fuzzer runs (`zig test --fuzz` is not
-// implemented for Windows today), and one trivial input elsewhere.
-test "fuzz: the copy, the fill and the keep hold their properties" {
+test "fuzz: the four desktop buffer rules hold" {
     try testing.fuzz({}, fuzzOne, .{});
 }
 
@@ -194,15 +156,17 @@ fn fuzzOne(_: void, smith: *testing.Smith) !void {
     for (0..len) |at| units[at] = std.mem.readInt(u16, bytes[at * 2 ..][0..2], .little);
     const capacity: usize = smith.valueRangeAtMost(u8, 0, 64);
     try copyHolds(units[0..len], capacity);
-    try fillHolds(units[0..len]);
+    try fillHolds(units[0..len], capacity);
     var stream: [64]usize = undefined;
     for (0..len) |at| stream[at] = units[at];
     try keepHolds(stream[0..len], capacity);
+    const width = smith.value(i32);
+    const height = smith.value(i32);
+    const bytes_wide = @as(i128, width) * height * 4;
+    const expected = if (width > 0 and height > 0) std.math.cast(usize, bytes_wide) else null;
+    try testing.expectEqual(expected, bitmapBytes(width, height));
 }
 
-// Hand-rolled and seeded, so it runs on every platform and replays the
-// same inputs on every run: zero units are drawn often on purpose,
-// because where the first one falls is what the copy is about.
 test "seeded: the copy, the fill and the keep hold their properties" {
     var prng = std.Random.DefaultPrng.init(0x5eed_de5c_70b0);
     const random = prng.random();
@@ -214,7 +178,7 @@ test "seeded: the copy, the fill and the keep hold their properties" {
         }
         const capacity = random.uintLessThan(usize, units.len + 1);
         try copyHolds(units[0..len], capacity);
-        try fillHolds(units[0..len]);
+        try fillHolds(units[0..len], capacity);
         var stream: [64]usize = undefined;
         for (0..len) |at| stream[at] = units[at];
         try keepHolds(stream[0..len], capacity);

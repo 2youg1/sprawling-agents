@@ -27,7 +27,7 @@ D8 **本包的既有 `unsafe` 是逐文件迁移的旧债，不是新代码入�
 
 下面的定理是模型对性质的证明：保留的恰是前缀、计数是全长；复制恒不越过块、写下的恒放得进缓冲、恒不含零、缓冲够长时恒成功；填写恰好一个终止符且与复制互逆；块恒不留在进程手里；GDI 对象恒成对释放。每一组各有一条「拿掉守卫即反例」的定理。
 
-生产实现与模型的一致性由三处检查，均不需要桌面：`desktop_ffi::boundary` 的测试 `the_leaf_and_the_rust_reference_agree_on_every_drawn_input` 用种子化的输入比对 Zig 叶子与 Rust 参考（`src/reference.rs`），每条规则两万个；同一比对的 `the_leaf_and_the_rust_reference_agree_for_as_long_as_asked` 按 `just fuzz-desktop` 给的轮数与种子跑（Rust 一侧的 fuzz）；`zig test zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试（Zig 一侧的 fuzz；覆盖引导的 `--fuzz` 今天不在 Windows 上实现，这里跑的是种子化那一半与 fuzz 测试的单次输入）。资源配对在真窗口上由桌面 server 的契约测试判（`Sprawling/desktop/Spec.lean` §8-11）。
+生产实现与模型的一致性由三处检查，均不需要桌面：`desktop_ffi::boundary` 的测试 `the_leaf_and_the_rust_reference_agree_on_every_drawn_input` 用种子化的输入比对 Zig 叶子与 Rust 参考（`src/reference.rs`），每条规则两万个；同一比对的 `the_leaf_and_the_rust_reference_agree_for_as_long_as_asked` 按 `just fuzz-desktop` 给的轮数与种子跑（Rust 一侧的 fuzz）；`zig test zig/leaf.zig` 跑 Zig 侧的单测、种子化性质测试与 `std.testing.fuzz` 测试（Zig 一侧的 fuzz；覆盖引导的 `--fuzz` 今天不在 Windows 上实现，Windows 跑种子化测试与单次输入，Linux nightly 的 `zig build fuzz --fuzz=100K` 在 ReleaseSafe 下覆盖引导地检验 keep、copy、fill 与 bitmapBytes）。资源配对在真窗口上由桌面 server 的契约测试判（`Sprawling/desktop/Spec.lean` §8-11）。
 -/
 
 /-! ## 3 假设与歧义
@@ -629,7 +629,7 @@ owner 持有：`JobWatch` 只持 port 的句柄值，`Drop` 关它。被否：�
 
 /-! ## 16 测试与约束
 
-已证：§10 的定理。测试：`desktop_ffi` 的 `ended` 与 `boundary` 单测（对拍）；`zig test Sprawling/desktop/ffi/zig/leaf.zig`（Zig 侧单测、种子化性质、fuzz 测试的单次输入）；`just fuzz-desktop`（按给定轮数与种子的长时对拍）。libFuzzer 在这里没有平台：叶子只在 Windows 上编，而 cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时；所以 Rust 一侧以抽样而不是以覆盖来 fuzz。重开参数：cargo-fuzz 在 windows-msvc 上链接得出。环境假设：§3。约束：未触及旧实现的 `unsafe` 只在本包、只包住一次 export 调用并带一行 `SAFETY:`；新增与变更文件由 D8 判零。lint 表与根工作区逐键比对（`xtask guard`），旧债清零后删除差异。
+已证：§10 的定理。测试：`desktop_ffi` 的 `ended` 与 `boundary` 单测（对拍）；`zig test Sprawling/desktop/ffi/zig/leaf.zig`（Zig 侧单测、种子化性质、fuzz 测试的单次输入）；`just fuzz-desktop`（按给定轮数与种子的长时对拍）；在本包目录运行 `zig build fuzz --fuzz=100K`（Linux 上的四条纯规则）。libFuzzer 在这里没有平台：叶子只在 Windows 上编，而 cargo-fuzz 在 windows-msvc 上链接不出 sancov 的节区符号，nightly 也不带 msvc 的 ASan 运行时；所以 Rust 一侧以抽样而不是以覆盖来 fuzz。重开参数：cargo-fuzz 在 windows-msvc 上链接得出。环境假设：§3。约束：未触及旧实现的 `unsafe` 只在本包、只包住一次 export 调用并带一行 `SAFETY:`；新增与变更文件由 D8 判零。lint 表与根工作区逐键比对（`xtask guard`），旧债清零后删除差异。
 -/
 
 /-! ## 17 文档关系

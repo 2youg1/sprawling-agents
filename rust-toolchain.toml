@@ -21,6 +21,6 @@
 # `just check` needs; `rustup component add` still works for anything a
 # person wants locally.
 [toolchain]
-channel = "1.99.0"
+channel = "1.100.0"
 profile = "minimal"
 components = ["rustfmt", "clippy"]
