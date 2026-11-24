@@ -183,3 +183,43 @@ fn a_redirected_private_git_directory_cannot_claim_a_native_project() {
     .unwrap();
     assert!(ProjectRepository::at(&city, &addr).is_err());
 }
+
+#[cfg(windows)]
+#[test]
+fn a_long_source_path_materializes_using_the_private_repository_configuration() {
+    let home = tempfile::tempdir().unwrap();
+    let native = git2::Repository::init(home.path().join("source")).unwrap();
+    let sig = git2::Signature::now("tester", "tester@example.invalid").unwrap();
+    let mut leaf = native.treebuilder(None).unwrap();
+    leaf.insert("entry", native.blob(b"source").unwrap(), 0o100644)
+        .unwrap();
+    let mut id = leaf.write().unwrap();
+    let segment = "package-subdirectory".repeat(3);
+    let mut relative = PathBuf::from("entry");
+    for _level in 0..5 {
+        let mut parent = native.treebuilder(None).unwrap();
+        parent.insert(&segment, id, 0o040000).unwrap();
+        id = parent.write().unwrap();
+        relative = Path::new(&segment).join(relative);
+    }
+    native
+        .commit(
+            Some("HEAD"),
+            &sig,
+            &sig,
+            "long path",
+            &native.find_tree(id).unwrap(),
+            &[],
+        )
+        .unwrap();
+    let snapshot = SourceSnapshot::read(
+        &home.path().join("private"),
+        native.workdir().unwrap(),
+        None,
+    )
+    .unwrap();
+    assert_eq!(
+        std::fs::read(snapshot.path().join(relative)).unwrap(),
+        b"source"
+    );
+}

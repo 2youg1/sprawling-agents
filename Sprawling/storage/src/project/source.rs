@@ -56,7 +56,7 @@ impl SourceSnapshot {
                 path: private.to_owned(),
                 source,
             })?;
-        let checkout = git2::Repository::init(scratch.path()).map_err(&refused)?;
+        let checkout = crate::Checkpoint::open(scratch.path())?.repo;
         let objects = repo.commondir().join("objects");
         checkout
             .odb()
