@@ -127,7 +127,10 @@ fn working(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const doing = " is working";
     const since_width = 17;
     try p.to(grid.mark);
-    try p.fit(if (p.mei and !p.pulse) .faint else .accent, "●", 1);
+    if (p.mei and p.room() != 0) {
+        p.working_mark = .{ .row = p.row, .column = p.column };
+        try p.grayMark(paint.working_glyph, p.working_tone);
+    } else try p.fit(.accent, paint.working_glyph, 1);
     try p.to(grid.words);
     const named = @min(text.width(resident), p.room() -| doing.len);
     const timed = since != scene.no_time and p.room() >= named + doing.len + since_width;

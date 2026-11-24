@@ -9,6 +9,41 @@ const write = leaf.write;
 
 pub const MAX_HZ: u64 = 360;
 pub const MIN_INTERVAL_NS: u64 = 1_000_000_000 / MAX_HZ;
+pub const MOTION_INTERVAL_MS = 40;
+pub const ARRIVAL_MS = 200;
+const tide_half_ms = 1200;
+
+pub fn tideTone(elapsed_ms: u64) u8 {
+    const phase = elapsed_ms % (tide_half_ms * 2);
+    const tide = @min(phase, tide_half_ms * 2 - phase);
+    return 117 + smooth(tide, tide_half_ms, 39);
+}
+
+pub fn arrivalTone(elapsed_ms: u64) ?u8 {
+    if (elapsed_ms >= ARRIVAL_MS) return null;
+    return 117 + smooth(elapsed_ms, ARRIVAL_MS, leaf.viewport.settled_tool_tone - 117);
+}
+
+fn smooth(position: u64, length: u64, range: u64) u8 {
+    const span = length * length * length;
+    const curve = position * position * (3 * length - 2 * position);
+    return @intCast((range * curve + span / 2) / span);
+}
+
+test "the tide eases into and out of each turning point" {
+    try std.testing.expectEqual(@as(u8, 117), tideTone(0));
+    try std.testing.expectEqual(@as(u8, 156), tideTone(1200));
+    try std.testing.expectEqual(tideTone(0), tideTone(2400));
+    try std.testing.expectEqual(tideTone(600), tideTone(1800));
+    try std.testing.expect(tideTone(40) - tideTone(0) < tideTone(640) - tideTone(600));
+    for (0..30) |sample| {
+        const a = tideTone(sample * MOTION_INTERVAL_MS);
+        const b = tideTone((sample + 1) * MOTION_INTERVAL_MS);
+        try std.testing.expect(b >= a and b - a <= 3);
+    }
+    try std.testing.expect(arrivalTone(40).? < arrivalTone(160).?);
+    try std.testing.expectEqual(@as(?u8, null), arrivalTone(ARRIVAL_MS));
+}
 
 pub const Cadence = struct {
     dirty: bool = false,

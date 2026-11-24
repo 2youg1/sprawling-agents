@@ -3,17 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Stable, actionable failures, with raw Provider bodies kept separate
-//! (`Mei/Spec.lean` §8 and §12).
-
 use std::fmt::{Display, Formatter};
 
-/// The result used by every Mei adapter.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// The stable code naming the rule a diagnostic enforces. One variant per
-/// rule, so a misspelled or newly added code fails at compile time instead
-/// of landing in a catch-all arm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Code {
     Usage,
@@ -29,7 +22,6 @@ pub enum Code {
 }
 
 impl Code {
-    /// The wire spelling, stable across releases.
     pub fn as_str(self) -> &'static str {
         match self {
             Code::Usage => "E_MEI_USAGE",
@@ -45,7 +37,6 @@ impl Code {
         }
     }
 
-    /// The rule this code enforces; one arm per variant, no default.
     fn rule(self) -> &'static str {
         match self {
             Code::Usage => {
@@ -67,7 +58,7 @@ impl Code {
                 "The response must satisfy the minimal Anthropic Messages and sole-python-tool contract"
             }
             Code::Python => {
-                "The private Python channel must carry one valid {capture, images} response frame per call and the interpreter must stay alive"
+                "The private Python channel must carry one valid {capture, images, failed} response frame per call and the interpreter must stay alive"
             }
             Code::Session => {
                 "A resume log must contain complete Mei messages from the initial user prompt through an assistant end_turn"
@@ -80,7 +71,6 @@ impl Code {
     }
 }
 
-/// A failure with a stable code and a checked next step.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
     pub code: Code,
@@ -92,7 +82,6 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
-    /// One diagnostic; its rule is derived from the code in one place.
     pub fn new(
         code: Code,
         action: impl Into<String>,
@@ -109,13 +98,11 @@ impl Diagnostic {
         }
     }
 
-    /// Adds the offending value, when naming it helps the repair.
     pub fn with_value(mut self, value: impl Into<String>) -> Diagnostic {
         self.value = Some(value.into().into_boxed_str());
         self
     }
 
-    /// Adds the full path of what failed, when one exists.
     pub fn with_path(mut self, path: impl Into<String>) -> Diagnostic {
         self.path = Some(path.into().into_boxed_str());
         self
@@ -126,16 +113,12 @@ impl Diagnostic {
     }
 }
 
-/// A structured diagnostic or an unwrapped non-200 response body.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     Diagnostic(Diagnostic),
     Body(String),
 }
 
-/// Encodes one TOML basic string without adding a TOML dependency to the
-/// minimal harness. JSON and Rust debug escapes are not interchangeable
-/// with TOML for every control character.
 fn toml_string(text: &str) -> String {
     let mut encoded = String::with_capacity(text.len().saturating_add(2));
     encoded.push('"');
@@ -265,9 +248,6 @@ fn unix_quote(text: &str) -> String {
     text.replace('\'', "'\\''")
 }
 
-/// Convenience for the frequent protocol family: a `Diagnostic` carrying
-/// the `Protocol` code, ready for `with_path`/`with_value`. `?` and
-/// [`From<Diagnostic>`] lift it into [`Error`] at the call site.
 pub fn protocol(
     action: impl Into<String>,
     subject: impl Into<String>,

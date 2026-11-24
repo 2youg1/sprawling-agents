@@ -66,7 +66,7 @@ pub const Ui = struct {
     columns: u16 = 0,
     rows: u16 = 0,
     view: mei_view.View = .{},
-    tool_fade_at: u64 = 0,
+    tool_arrived_ms: u64 = 0,
     press: ?mei_view.Point = null,
     hinted: bool = false,
     seen: observation.Seen,
@@ -236,28 +236,41 @@ pub const Ui = struct {
         const at = nowNs(self.io);
         if (self.cadence.due(at, false)) return 0;
         if (self.cadence.dirty) return self.cadence.waitMs(at);
-        if (self.process != null or !self.replay_done or self.seen.since != null or self.seen.calling) return 50;
-        if (self.view.completed_card != null) return @intCast(@min(self.tool_fade_at -| self.now(), 160));
+        if (self.seen.since != null or self.view.completion != null) return present.MOTION_INTERVAL_MS;
+        if (self.process != null or !self.replay_done or self.seen.calling) return 50;
         if (!termio.resizeArmed()) return 1000;
         return -1;
     }
 
     fn tick(self: *Ui) void {
-        if (self.view.completed_card != null and self.now() >= self.tool_fade_at) {
-            self.view.completed_card = null;
-            self.touch(false);
+        const motion_ms = nowNs(self.io) / std.time.ns_per_ms;
+        if (self.view.completion) |*completion| {
+            const tone = present.arrivalTone(motion_ms -| self.tool_arrived_ms);
+            if (tone != @as(?u8, completion.tone)) {
+                if (tone) |next| completion.tone = next else self.view.completion = null;
+                self.cadence.mark();
+            }
         }
         if (!termio.resizeArmed()) {
             const size = termio.size();
             if (size.columns != self.columns or size.rows != self.rows) self.noteResize();
         }
-        if (self.seen.since != null) {
-            const pulse = (self.now() / 700) % 2 == 0;
-            if (pulse != self.view.pulse) {
-                self.view.pulse = pulse;
-                self.touch(true);
-            }
-        }
+        if (self.seen.since != null) self.advanceTide(present.tideTone(motion_ms));
+    }
+
+    fn advanceTide(self: *Ui, tone: u8) void {
+        if (self.view.working_tone == tone) return;
+        self.view.working_tone = tone;
+        if (self.cadence.dirty) return;
+        const mark = self.view.working_mark orelse return;
+        const size = termio.size();
+        if (size.columns != self.columns or size.rows != self.rows) return;
+        var bytes: [128]u8 = undefined;
+        var patch: std.Io.Writer = .fixed(&bytes);
+        mei_view.workingPatch(&patch, mark, tone) catch unreachable;
+        termio.writeAll(patch.buffered()) catch {
+            self.lost = true;
+        };
     }
 
     fn handleEvent(self: *Ui, event: termio.Event) ?u8 {
@@ -590,7 +603,7 @@ pub const Ui = struct {
 
     pub fn clearConversation(self: *Ui) void {
         self.view.follow();
-        self.view.completed_card = null;
+        self.view.completion = null;
         self.view.selection = null;
         self.press = null;
         self.freeLog();
@@ -638,6 +651,7 @@ pub const Ui = struct {
             if (allocated) self.gpa.free(bodies);
         }
         const before = self.cards.items.len;
+        var first_result: ?u16 = null;
         for (entries) |entry| {
             const paired = entry == .tool and std.mem.eql(u8, entry.tool.name, "python") and next < bodies.len;
             const thought = entry == .reasoning and entry.reasoning.body.len != 0;
@@ -649,9 +663,12 @@ pub const Ui = struct {
                     .code = bodies[next].code,
                     .output = bodies[next].output,
                 } });
-                if (self.process != null) {
-                    self.view.completed_card = std.math.cast(u16, self.cards.items.len - 1);
-                    self.tool_fade_at = self.now() +| 160;
+                const card = self.cards.items.len - 1;
+                if (self.process != null and card < std.math.maxInt(u16)) {
+                    const last: u16 = @intCast(card);
+                    first_result = first_result orelse last;
+                    self.tool_arrived_ms = nowNs(self.io) / std.time.ns_per_ms;
+                    self.view.completion = .{ .first = first_result.?, .last = last, .tone = present.arrivalTone(0).? };
                 }
                 next += 1;
             } else if (thought) {
@@ -859,7 +876,7 @@ fn nowMs(io: std.Io) u64 {
 }
 
 fn nowNs(io: std.Io) u64 {
-    const timestamp = std.Io.Clock.real.now(io);
+    const timestamp = std.Io.Clock.awake.now(io);
     const nanoseconds = timestamp.toNanoseconds();
     return if (nanoseconds < 0) 0 else @intCast(nanoseconds);
 }

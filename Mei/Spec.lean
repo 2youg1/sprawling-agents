@@ -147,8 +147,14 @@ ACP client（城 harness、编辑器或其他）spawn `mei --acp`；`acp` 不依
 ```rust
 pub(crate) trait Ports {
     fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value>;
-    fn exec(&mut self, code: &str) -> Result<Value>;
+    fn exec(&mut self, code: &str) -> Result<Execution>;
     fn steer(&mut self) -> Result<Vec<String>>;
+}
+
+pub(crate) struct Execution {
+    pub content: Value,
+    pub failed: bool,
+    pub previews: Vec<String>,
 }
 
 pub(crate) fn run(
@@ -218,7 +224,7 @@ subprocess、`sys.executable` 和 `show_image(path)` 一致；内联数字由 `I
 无图片时 tool_result content 保持字符串；有图片时为 text（可含大输出提示）+ image 内容块，并完整进入日志。
 `MEI_CAPTURE_DIR` 是 Face 分配当前 run 目录的内部环境接口；缺席时无头核创建临时 run 目录。
 Calyx 先独占创建空目录，再以 `MEI_CAPTURE_CREATED=1` 让 Mei 接管；没有这个标记时既有目录一律拒绝。
-私有控制信道请求传代码，响应传 ASCII capture 文件名与图片块；`Store` 在捕获 root 下拼接原生路径；spilled 提示给完整 Unicode 路径，
+私有控制信道请求传代码，响应传 ASCII capture 文件名、图片块与布尔型 `failed`；缺失或非布尔型 `failed` 属于非法帧。`Store` 在捕获 root 下拼接原生路径；spilled 提示给完整 Unicode 路径，
 或给能在 Python 中无损还原非 Unicode 原生路径的表达式。
 唯一工具 schema 与 agent 整波预检跨 provider 生效，不声明 provider 专有的 `strict` 模式。
 `HARNESS_EXTRA` 浅合并一次；拒绝 `stream: true` 与 `HARNESS_EXTRA.tools`。
@@ -303,7 +309,7 @@ Steer：任务进行中 Face 追加的指示。不打断当前 `exec` / `post`�
   独立 GET，不为自定义 `HARNESS_MODEL` 的旧网关增加前置目录请求；路由观测失败只写 unavailable。
   路由观测是答案到达后的辅助观测，用它自己的短预算（连接与读各不超过 2 s）：网关接受后不再发字节时，
   已到的答案不被辅助观测拖住。
-- `boot.py`：请求是每帧一行 JSON string，响应是 `{capture, images}` 对象；stdout/stderr 重定向到当前 run 的捕获文件；同一执行命名空间保留
+- `boot.py`：请求是每帧一行 JSON string，响应是 `{capture, images, failed}` 对象；stdout/stderr 重定向到当前 run 的捕获文件；同一执行命名空间保留
   变量与 imports，解释器进程保留 cwd；异常只形成 traceback 反馈，循环继续；
   `show_image` 只把图片的 media type 与 base64 数据加入本次调用：一次调用最多 2 张、单张最多 5 MiB，且只在该调用自己的线程上追加，别的线程的或调用结束后的提交被拒绝并给出重读方式；结束后捕获文件的 ASCII basename 经控制信道回传；
   不改写文件、无 alarm。

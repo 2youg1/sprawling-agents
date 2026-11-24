@@ -13,6 +13,7 @@ pub const Hit = viewport.Hit;
 pub const View = viewport.View;
 pub const Point = viewport.Point;
 pub const Selection = viewport.Selection;
+pub const workingPatch = viewport.workingPatch;
 
 pub const Fold = enum(u2) { time, source, output, both };
 
@@ -276,4 +277,27 @@ test "the visible reasoning card has a click target and discloses its original t
     const open = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &view, &hits);
     defer gpa.free(open);
     try std.testing.expect(std.mem.indexOf(u8, open, "原样思考文本") != null);
+}
+
+test "a result wave animates both failure and success without moving their names" {
+    const gpa = std.testing.allocator;
+    const log = [_]write.Entry{
+        .{ .tool = .{ .at = null, .name = "python", .subject = "", .took_us = null, .outcome = .Failed } },
+        .{ .tool = .{ .at = null, .name = "python", .subject = "", .took_us = null, .outcome = .Answered } },
+    };
+    const card: Card = .{ .python = .{ .code = &.{}, .output = &.{} } };
+    const cards = [_]Card{ card, card };
+    var hits: std.ArrayList(Hit) = .empty;
+    defer hits.deinit(gpa);
+    var view: View = .{ .completion = .{ .first = 0, .last = 1, .tone = 142 } };
+    const region: write.Live = .{ .composer = .{ .typed = "", .cursor = 0, .placeholder = "Mei", .room = "Mei", .offer = "" } };
+    const arriving = try render(gpa, &log, &cards, 0, "", region, 80, 24, &view, &hits);
+    defer gpa.free(arriving);
+    try std.testing.expect(std.mem.indexOf(u8, arriving, "\x1b[38;2;142;142;142m×\x1b[39m python") != null);
+    try std.testing.expect(std.mem.indexOf(u8, arriving, "\x1b[38;2;142;142;142m✓\x1b[39m python") != null);
+    view.completion = null;
+    const settled = try render(gpa, &log, &cards, 0, "", region, 80, 24, &view, &hits);
+    defer gpa.free(settled);
+    try std.testing.expect(std.mem.indexOf(u8, settled, "\x1b[38;2;172;172;172m×\x1b[39m python") != null);
+    try std.testing.expect(std.mem.indexOf(u8, settled, "\x1b[38;2;172;172;172m✓\x1b[39m python") != null);
 }

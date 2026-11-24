@@ -22,13 +22,17 @@ const Error = transcript.Error || std.mem.Allocator.Error;
 
 const Anchor = struct { entry: usize, line: usize };
 
+pub const Completion = struct { first: u16, last: u16, tone: u8 };
+pub const settled_tool_tone = paint.settled_tool_tone;
+
 pub const View = struct {
     anchor: ?Anchor = null,
     movement: i32 = 0,
     body_top: usize = 0,
     body_rows: usize = 0,
-    pulse: bool = false,
-    completed_card: ?u16 = null,
+    working_tone: u8 = 117,
+    working_mark: ?Point = null,
+    completion: ?Completion = null,
     selection: ?Selection = null,
     copy: ?*std.Io.Writer = null,
 
@@ -124,6 +128,7 @@ pub fn draw(
     hits: *std.ArrayList(Hit),
 ) Error![]u8 {
     hits.clearRetainingCapacity();
+    view.working_mark = null;
     view.body_top = 0;
     view.body_rows = 0;
     const cols: usize = @max(@as(usize, columns), 2);
@@ -177,8 +182,11 @@ pub fn draw(
         }
         var live_reader = live_at;
         var p = paint.Painter.meiFrame(&aw.writer, cols);
-        p.pulse = view.pulse;
+        p.working_tone = view.working_tone;
         const cursor = try live.regionShown(&p, &live_reader, Grid.of(&p), .{ .skip = text_skip, .rows = text_rows });
+        if (p.working_mark) |mark| if (mark.row < window) {
+            view.working_mark = mark;
+        };
         try place(&aw.writer, &p, cursor);
         try aw.writer.writeAll("\x1b[?25h\x1b[?2026l");
         return try aw.toOwnedSlice();
@@ -223,18 +231,32 @@ pub fn draw(
         .skip = skip,
         .take = visible,
         .origin = banner_rows,
-        .completed_card = view.completed_card,
+        .completion = view.completion,
     });
     const used = banner_rows + visible;
     const top = @max(used, window - live_h);
     if (top > used) try aw.writer.print("\x1b[{d};1H", .{top + 1});
     var lp = paint.Painter.meiFrame(&aw.writer, cols);
-    lp.pulse = view.pulse;
+    lp.working_tone = view.working_tone;
     lp.row = top;
     const cursor = try live.region(&lp, &r, Grid.of(&lp));
+    view.working_mark = lp.working_mark;
     try place(&aw.writer, &lp, cursor);
     try aw.writer.writeAll("\x1b[?25h\x1b[?2026l");
     return try aw.toOwnedSlice();
+}
+
+pub fn workingPatch(out: *std.Io.Writer, mark: Point, tone: u8) paint.Error!void {
+    try out.print("\x1b[?2026h\x1b7\x1b[{d};{d}H", .{ mark.row + 1, mark.column + 1 });
+    try paint.writeGray(out, tone);
+    try out.writeAll(paint.working_glyph ++ "\x1b[39m\x1b8\x1b[?2026l");
+}
+
+test "updating the working point changes just one cell and restores the cursor" {
+    var bytes: [128]u8 = undefined;
+    var writer: std.Io.Writer = .fixed(&bytes);
+    try workingPatch(&writer, .{ .row = 19, .column = 10 }, 142);
+    try std.testing.expectEqualStrings("\x1b[?2026h\x1b7\x1b[20;11H\x1b[38;2;142;142;142m●\x1b[39m\x1b8\x1b[?2026l", writer.buffered());
 }
 
 fn selectedPoint(point: Point, skip: usize, origin: usize, visible: usize, columns: usize) Point {
@@ -268,7 +290,7 @@ const BodyWindow = struct {
     skip: usize,
     take: usize,
     origin: usize,
-    completed_card: ?u16,
+    completion: ?Completion,
 };
 
 fn paintBody(
@@ -286,7 +308,12 @@ fn paintBody(
         const tag = try r.tag();
         if (transcript.spaced(prev, tag)) try p.end();
         const before = p.row;
-        p.just_finished = if (window) |vis| i < vis.marks.len and vis.completed_card == vis.marks[i] else false;
+        p.completion_tone = if (tag == .Tool and window != null) blk: {
+            const vis = window.?;
+            const arriving = vis.completion orelse break :blk null;
+            if (i >= vis.marks.len or vis.marks[i] < arriving.first or vis.marks[i] > arriving.last) break :blk null;
+            break :blk arriving.tone;
+        } else null;
         try transcript.entry(p, r, tag, Grid.of(p));
         const after = p.row;
         if (window) |vis| {

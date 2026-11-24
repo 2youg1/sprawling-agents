@@ -39,13 +39,18 @@ pub fn entry(p: *paint.Painter, r: *scene.Reader, tag: part.Part, grid: Grid) Er
     try p.end();
 }
 
-pub fn lead(p: *paint.Painter, grid: Grid, seconds: u32, mark: []const u8, style: paint.Style) paint.Error!void {
+const MarkStyle = union(enum) { styled: paint.Style, gray: u8 };
+
+fn lead(p: *paint.Painter, grid: Grid, seconds: u32, mark: []const u8, style: MarkStyle) paint.Error!void {
     if (grid.timed and seconds != scene.no_time) {
         var b: format.Buffer = undefined;
         try p.fit(.faint, format.clock(&b, seconds), 8);
     }
     try p.to(grid.mark);
-    try p.fit(style, mark, 1);
+    switch (style) {
+        .styled => |styled| try p.fit(styled, mark, 1),
+        .gray => |tone| try p.grayMark(mark, tone),
+    }
     try p.to(grid.words);
 }
 
@@ -94,7 +99,7 @@ fn you(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const at = try r.word();
     const said = try r.text();
     try p.raw("\x1b]133;A\x1b\\");
-    try lead(p, grid, at, "›", .faint);
+    try lead(p, grid, at, "›", .{ .styled = .faint });
     try flow.flow(p, said, .{ .left = grid.words, .measure = grid.limit -| grid.words, .style = .plain, .marks = .plain });
 }
 
@@ -102,7 +107,7 @@ fn head(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const at = try r.word();
     const resident = try r.text();
     const facts = try r.word();
-    try lead(p, grid, at, "●", .faint);
+    try lead(p, grid, at, "●", .{ .styled = .faint });
     try p.fit(.bold, resident, p.room());
     var gap: []const u8 = "  ";
     for (0..facts) |_| {
@@ -131,7 +136,8 @@ fn tool(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     var b: format.Buffer = undefined;
     const took = if (micros == scene.no_count) "" else format.took(&b, micros);
     const mark = if (!p.mei) "◇" else if (outcome == .Failed) "×" else "✓";
-    try lead(p, grid, at, mark, if (p.mei and (p.just_finished or outcome == .Failed)) .bold else .faint);
+    const style: MarkStyle = if (p.mei) .{ .gray = p.completion_tone orelse paint.settled_tool_tone } else .{ .styled = .faint };
+    try lead(p, grid, at, mark, style);
     try p.fit(.plain, name, 8);
     try p.to(grid.words + 9);
     const figures = grid.figures();
@@ -168,7 +174,7 @@ fn ended(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
         .Cancelled => .{ "cancelled", .faint },
         .Failed => .{ "failed", .alert },
     };
-    try lead(p, grid, at, "■", style);
+    try lead(p, grid, at, "■", .{ .styled = style });
     try p.fit(style, word, p.room());
     if (seconds != scene.no_count) {
         var b: format.Buffer = undefined;
@@ -185,7 +191,7 @@ fn resolved(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
         .Approved => .{ "✓", "approved  " },
         .Denied => .{ "✗", "denied  " },
     };
-    try lead(p, grid, at, mark, .faint);
+    try lead(p, grid, at, mark, .{ .styled = .faint });
     try p.fit(.faint, word, word.len);
     try p.fit(.faint, what, p.room());
 }

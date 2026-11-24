@@ -31,6 +31,7 @@ pub fn build(b: *std.Build) void {
         .linkage = .static,
         .root_module = leaf_c_mod,
     });
+    leaf.bundle_compiler_rt = target.result.os.tag != .windows;
     b.getInstallStep().dependOn(&b.addInstallArtifact(leaf, .{}).step);
 
     const shell_imports = [_]std.Build.Module.Import{
@@ -43,10 +44,6 @@ pub fn build(b: *std.Build) void {
         .pic = pic,
         .imports = &shell_imports,
         .link_libc = true,
-        // std.Io's Windows path helpers use stack frames that emit
-        // ___chkstk_ms, which MSVC Rust does not provide; the archive carries
-        // compiler_rt for that probe. Stack protectors and unwind/debug
-        // printers stay off so LdrRegisterDllNotification is not pulled in.
         .stack_check = false,
         .stack_protector = false,
         .strip = true,

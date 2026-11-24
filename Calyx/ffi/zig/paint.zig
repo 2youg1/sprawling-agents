@@ -27,6 +27,12 @@ pub const Style = enum {
 };
 
 pub const Error = std.Io.Writer.Error;
+pub const working_glyph = "●";
+pub const settled_tool_tone = 172;
+
+pub fn writeGray(out: *std.Io.Writer, tone: u8) Error!void {
+    try out.print("\x1b[38;2;{d};{d};{d}m", .{ tone, tone, tone });
+}
 
 pub const Point = struct {
     row: usize,
@@ -59,8 +65,9 @@ pub const Painter = struct {
     row: usize = 0,
     style: Style = .plain,
     mei: bool = false,
-    pulse: bool = false,
-    just_finished: bool = false,
+    working_tone: u8 = 117,
+    working_mark: ?Point = null,
+    completion_tone: ?u8 = null,
     selection: ?Selection = null,
     copy: ?*std.Io.Writer = null,
     reversed: bool = false,
@@ -120,6 +127,14 @@ pub const Painter = struct {
         try self.styled(style);
         try self.out.writeAll("…");
         self.column += 1;
+    }
+
+    pub fn grayMark(self: *Painter, mark: []const u8, tone: u8) Error!void {
+        if (self.room() == 0) return;
+        try self.styled(.plain);
+        try writeGray(self.out, tone);
+        try self.cut(.plain, mark, 1);
+        try self.out.writeAll("\x1b[39m");
     }
 
     pub fn cut(self: *Painter, style: Style, s: []const u8, max: usize) Error!void {
