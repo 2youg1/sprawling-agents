@@ -357,7 +357,7 @@ pub const Ui = struct {
         if ((click.button & 32) != 0) {
             if (self.press) |*press| {
                 press.dragged = true;
-                if (self.dragRange(press.*, point)) |range| {
+                if (self.dragRange(self.view.down, point)) |range| {
                     self.view.selection = range;
                     self.touch(true);
                 }
@@ -365,7 +365,8 @@ pub const Ui = struct {
             return true;
         }
         if (!click.release) {
-            self.press = .{ .point = point, .body = if (self.view.contains(point.row)) self.view.location(point) else null };
+            self.press = .{ .point = point };
+            self.view.down = if (self.view.contains(point.row)) self.view.location(point) else null;
             if (self.view.selection != null) {
                 self.view.selection = null;
                 self.touch(true);
@@ -374,11 +375,13 @@ pub const Ui = struct {
         }
         const press = self.press orelse return true;
         self.press = null;
+        const down = self.view.down;
+        self.view.down = null;
         if (press.dragged or !std.meta.eql(press.point, point)) {
-            if (self.dragRange(press, point)) |range| self.copySelection(range);
+            if (self.dragRange(down, point)) |range| self.copySelection(range);
             return true;
         }
-        if (press.body) |body| {
+        if (down) |body| {
             const released = self.view.location(point) orelse return true;
             if (!std.meta.eql(body, released)) return true;
         }
@@ -406,12 +409,11 @@ pub const Ui = struct {
 
     const Press = struct {
         point: mei_view.Point,
-        body: ?mei_view.Location,
         dragged: bool = false,
     };
 
-    fn dragRange(self: *const Ui, press: Press, point: mei_view.Point) ?mei_view.Selection {
-        return .{ .start = press.body orelse return null, .finish = self.view.location(point) orelse return null };
+    fn dragRange(self: *const Ui, down: ?mei_view.Location, point: mei_view.Point) ?mei_view.Selection {
+        return .{ .start = down orelse return null, .finish = self.view.location(point) orelse return null };
     }
 
     fn copySelection(self: *Ui, range: mei_view.Selection) void {
@@ -615,8 +617,10 @@ pub const Ui = struct {
 
     pub fn clearConversation(self: *Ui) void {
         self.view.follow();
+        self.view.trackDraft(null);
         self.view.completion = null;
         self.view.selection = null;
+        self.view.down = null;
         self.press = null;
         self.freeLog();
         self.freeCards();
@@ -670,6 +674,7 @@ pub const Ui = struct {
             if (paired or thought) self.cards.ensureUnusedCapacity(self.gpa, 1) catch return;
             const owned = present.cloneEntry(self.log_arena.allocator(), entry) catch return;
             self.log.append(self.gpa, owned) catch return;
+            if (entry == .reply and self.seen.draftText().len == 0) self.view.commitDraft(self.log.items.len - 1);
             if (paired) {
                 self.cards.appendAssumeCapacity(.{ .python = .{
                     .code = bodies[next].code,

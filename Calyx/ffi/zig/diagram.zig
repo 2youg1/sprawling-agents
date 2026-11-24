@@ -56,16 +56,16 @@ pub fn draw(p: *paint.Painter, lines: *Lines, fence: []const u8, area: flow.Colu
         if (!first) try p.end();
         first = false;
         p.sourceLine(body, raw);
-        try p.to(area.left);
+        try p.textLeft(area.left);
         const down = kind == .flowchart and (std.mem.endsWith(u8, header, " TD") or std.mem.endsWith(u8, header, " TB"));
         const label_width = if (item.label.len != 0) 2 + text.width(item.label) else 0;
         if (down or item.left.width() + arrow_width + item.right.width() + label_width > p.room()) {
             try node(p, item.left);
             try p.wrap(false);
-            try p.to(area.left);
+            try p.textLeft(area.left);
             try p.cut(.faint, "↓", 1);
             try p.wrap(false);
-            try p.to(area.left);
+            try p.textLeft(area.left);
             try node(p, item.right);
             if (item.label.len != 0) {
                 try p.wrap(false);
@@ -121,8 +121,18 @@ fn parseNode(raw: []const u8) ?Node {
 }
 
 fn node(p: *paint.Painter, value: Node) paint.Error!void {
+    const left = p.column;
     try p.cut(.faint, "[", 1);
-    try p.fit(.plain, value.id, p.room() -| 1);
+    if (value.id.len > p.room() -| 1) {
+        try flow.flow(p, value.id, .{ .left = left, .measure = p.limit - left, .style = .plain, .marks = .verbatim });
+        if (p.room() == 0) {
+            try p.wrap(false);
+            try p.textLeft(left);
+        }
+        try p.cut(.faint, "]", 1);
+        return;
+    }
+    try p.cut(.plain, value.id, value.id.len);
     if (value.label.len != 0 and p.room() >= 4) {
         try p.cut(.plain, ": ", 2);
         try p.fit(.plain, value.label, p.room() -| 1);

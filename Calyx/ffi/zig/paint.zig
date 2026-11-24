@@ -63,6 +63,7 @@ pub const Painter = struct {
     working_mark: ?Point = null,
     completion_tone: ?u8 = null,
     selection: ?Selection = null,
+    cell_selection: ?layout.CellRange = null,
     copy: ?*std.Io.Writer = null,
     reversed: bool = false,
     selected_base: bool = false,
@@ -93,6 +94,17 @@ pub const Painter = struct {
         }
     }
 
+    pub fn sourceSpan(self: *Painter, width: usize, offset: usize, cell: usize) Error!void {
+        if (self.layout_index) |index| index.span(self.column, width, offset, cell) catch return error.WriteFailed;
+    }
+
+    pub fn textLeft(self: *Painter, column: usize) Error!void {
+        try self.to(column);
+        if (self.layout_index) |index| {
+            if (index.indent == null) index.indent = self.column;
+        }
+    }
+
     fn styled(self: *Painter, style: Style) Error!void {
         const applied: Style = if (self.mei) switch (style) {
             .accent => .plain,
@@ -114,7 +126,14 @@ pub const Painter = struct {
     pub fn char(self: *Painter, style: Style, c: text.Char) Error!bool {
         if (c.columns > self.room()) return false;
         try self.styled(style);
-        const selected = if (c.columns == 0) self.selected_base else if (self.selection) |range| range.contains(self.row, self.column, c.columns) else false;
+        const selected = if (c.columns == 0)
+            self.selected_base
+        else if (self.selection) |range|
+            range.contains(self.row, self.column, c.columns)
+        else if (self.cell_selection) |cell|
+            cell.contains(self.row, self.column, c.columns)
+        else
+            false;
         self.selected_base = selected;
         try self.reverse(selected);
         if (selected) if (self.copy) |copy| try copy.writeAll(c.shown);
@@ -156,9 +175,6 @@ pub const Painter = struct {
         try self.styled(.plain);
         try self.reverse(false);
         self.selected_base = false;
-        if (self.column == 0) {
-            if (self.layout_index) |index| index.indent = stop;
-        }
         if (self.column != 0) {
             if (self.selection) |range| {
                 if (self.copy) |copy| {

@@ -85,7 +85,7 @@ pub fn draw(p: *paint.Painter, header: []const u8, lines: *Lines, area: flow.Col
     try row(p, header, columns, area.left, .bold);
     try p.end();
     p.sourceLine(body, divider);
-    try p.to(area.left);
+    try p.textLeft(area.left);
     for (columns, 0..) |column, i| {
         if (i != 0) try p.cut(.faint, "─┼─", gutter);
         for (0..column.width) |_| try p.cut(.faint, "─", 1);
@@ -107,21 +107,32 @@ fn tableLine(line: []const u8) bool {
     return std.mem.indexOfScalar(u8, line, '|') != null;
 }
 
+const Fragment = struct { rest: []const u8 = "", offset: usize = 0 };
+
 fn row(p: *paint.Painter, line: []const u8, columns: []const Column, left: usize, style: paint.Style) paint.Error!void {
     var cells = Cells.of(line);
-    var fragments: [24][]const u8 = undefined;
-    for (fragments[0..columns.len]) |*fragment| fragment.* = cells.next() orelse "";
+    var fragments: [24]Fragment = @splat(.{});
+    var source_column: usize = 0;
+    var previous: usize = 0;
+    for (fragments[0..columns.len]) |*fragment| {
+        const cell = cells.next() orelse break;
+        if (cell.len == 0) continue;
+        const start = @intFromPtr(cell.ptr) - @intFromPtr(line.ptr);
+        source_column += text.width(line[previous..start]);
+        previous = start;
+        fragment.* = .{ .rest = cell, .offset = source_column };
+    }
     var more = true;
     while (more) {
         more = false;
         var start = left;
-        try p.to(start);
+        try p.textLeft(start);
         for (columns, fragments[0..columns.len], 0..) |column, *fragment, index| {
             if (index != 0) {
                 try p.cut(.faint, " │ ", gutter);
                 start += gutter;
             }
-            const prefix, const width = take(fragment.*, column.width);
+            const prefix, const width = take(fragment.rest, column.width);
             const empty = column.width - width;
             try p.to(start + switch (column.alignment) {
                 .left => 0,
@@ -130,13 +141,17 @@ fn row(p: *paint.Painter, line: []const u8, columns: []const Column, left: usize
             });
             var at: usize = 0;
             while (at < prefix.len) {
+                const before = at;
                 const c = cellChar(prefix, &at);
+                fragment.offset += at - before - c.len;
+                try p.sourceSpan(c.columns, fragment.offset, index);
+                fragment.offset += c.columns;
                 _ = try p.char(style, c);
             }
             start += column.width;
             try p.to(start);
-            fragment.* = std.mem.trimStart(u8, fragment.*[prefix.len..], " ");
-            more = more or fragment.len != 0;
+            fragment.rest = fragment.rest[prefix.len..];
+            more = more or fragment.rest.len != 0;
         }
         if (more) try p.wrap(false);
     }

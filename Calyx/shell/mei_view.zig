@@ -140,6 +140,7 @@ pub fn render(
             try items.append(arena, .{ .origin = .{ .entry = index } });
         }
     }
+    view.trackDraft(if (draft.len != 0) log.len else null);
     if (draft.len > 0) {
         try entries.append(arena, .{ .reply = draft });
         try items.append(arena, .{ .origin = .{ .entry = log.len } });

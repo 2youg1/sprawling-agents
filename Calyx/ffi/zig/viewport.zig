@@ -31,14 +31,46 @@ pub const View = struct {
     movement: i32 = 0,
     body_top: usize = 0,
     visible: std.ArrayList(layout.Row) = .empty,
+    spans: ?std.heap.ArenaAllocator = null,
     working_tone: u8 = 117,
     working_mark: ?Point = null,
     completion: ?Completion = null,
     selection: ?Selection = null,
     copy: ?*std.Io.Writer = null,
+    down: ?Location = null,
+    draft_entry: ?usize = null,
 
     pub fn deinit(self: *View, gpa: std.mem.Allocator) void {
         self.visible.deinit(gpa);
+        if (self.spans) |*spans| spans.deinit();
+    }
+
+    pub fn trackDraft(self: *View, entry: ?usize) void {
+        if (self.draft_entry) |old| {
+            if (entry != @as(?usize, old)) {
+                self.anchor = remapDraft(self.anchor, old, entry);
+                self.down = remapDraft(self.down, old, entry);
+                if (self.selection) |selection| {
+                    const start = remapDraft(selection.start, old, entry);
+                    const finish = remapDraft(selection.finish, old, entry);
+                    self.selection = if (start != null and finish != null) .{ .start = start.?, .finish = finish.? } else null;
+                }
+            }
+        }
+        self.draft_entry = entry;
+    }
+
+    pub fn commitDraft(self: *View, entry: usize) void {
+        self.trackDraft(entry);
+        self.draft_entry = null;
+    }
+
+    fn remapDraft(location_: ?Location, old: usize, new: ?usize) ?Location {
+        var position = location_ orelse return null;
+        if (position.origin.entry == old and position.origin.fragment == .main) {
+            position.origin.entry = new orelse return null;
+        }
+        return position;
     }
 
     pub fn contains(self: *const View, row: usize) bool {
@@ -65,14 +97,14 @@ pub const View = struct {
 
     fn first(self: *View, rows: []const layout.Row, budget: usize) usize {
         const last = rows.len -| budget;
-        const previous = if (self.anchor) |anchor| @min(last, layout.locate(rows, anchor).row) else last;
+        const previous = if (self.anchor) |anchor| @min(last, layout.locate(rows, anchor, .forward).row) else last;
         if (self.movement == 0) return previous;
         const moved = if (self.movement < 0)
             previous -| @as(usize, @abs(self.movement))
         else
             @min(last, previous +| @as(usize, @intCast(self.movement)));
         self.movement = 0;
-        self.anchor = if (moved < last) rows[moved].start else null;
+        self.anchor = if (moved < last) rows[moved].at(0) else null;
         return moved;
     }
 };
@@ -140,6 +172,8 @@ pub fn draw(
     view.working_mark = null;
     view.body_top = 0;
     view.visible.clearRetainingCapacity();
+    if (view.spans == null) view.spans = .init(gpa);
+    _ = view.spans.?.reset(.retain_capacity);
     const cols: usize = @max(@as(usize, columns), 2);
     const window: usize = @max(@as(usize, rows), 1);
     var scene_bytes = try write.Scene.inlineFrame(gpa, .{
@@ -174,8 +208,8 @@ pub fn draw(
     }
     const body = n - @intFromBool(banner);
     const body_items = items[@min(items.len, @intFromBool(banner))..];
-    var index: layout.Index = .{ .gpa = gpa };
-    defer index.rows.deinit(gpa);
+    var index: layout.Index = .{ .gpa = gpa, .arena = view.spans.?.allocator() };
+    defer index.deinit();
     try countBody(&r, body, if (banner) .Banner else null, cols, body_items, &index);
     const body_rows = index.rows.items;
     const live_at = r;
@@ -227,13 +261,19 @@ pub fn draw(
     }
     var clip = Clip.init(&aw.writer, skip, visible);
     var body_painter = paint.Painter.meiFrame(&clip.writer, cols);
-    if (view.selection) |selection| {
-        if (visible > 0) {
-            const first = layout.locate(body_rows, selection.start);
-            const last = layout.locate(body_rows, selection.finish);
-            if (first.before(last) or last.before(first)) {
-                body_painter.selection = paint.Selection.between(first, last);
+    if (view.selection) |range| {
+        if (visible > 0 and !std.meta.eql(range.start, range.finish)) {
+            const selection = range.ordered();
+            if (layout.cellRange(body_rows, selection)) |cell| {
+                body_painter.cell_selection = cell;
                 body_painter.copy = view.copy;
+            } else {
+                const first = layout.locate(body_rows, selection.start, .forward);
+                const last = layout.locate(body_rows, selection.finish, .backward);
+                if (first.before(last) or last.before(first)) {
+                    body_painter.selection = paint.Selection.between(first, last);
+                    body_painter.copy = view.copy;
+                }
             }
         }
     }
@@ -542,33 +582,6 @@ test "a tall composer keeps the cursor line and the status row" {
     }
 }
 
-test "a click hit names the visible python card" {
-    const gpa = std.testing.allocator;
-    const entries = [_]write.Entry{
-        .{ .you = .{ .at = null, .said = "ask" } },
-        .{ .tool = .{ .at = null, .name = "python", .subject = "time", .took_us = 1_500_000, .outcome = .Answered } },
-    };
-    const marks = [_]Item{ .{ .origin = .{ .entry = 0 } }, .{ .origin = .{ .entry = 1 }, .card = 3 } };
-    var hits: std.ArrayList(Hit) = .empty;
-    defer hits.deinit(gpa);
-    const region: write.Live = .{
-        .composer = .{
-            .typed = "",
-            .cursor = 0,
-            .placeholder = "to Mei…",
-            .room = "Mei",
-            .offer = "",
-        },
-    };
-    var view: View = .{};
-    defer view.deinit(gpa);
-    const bytes = try draw(gpa, &entries, &marks, region, 80, 24, false, &view, &hits);
-    defer gpa.free(bytes);
-    try std.testing.expect(hits.items.len >= 1);
-    try std.testing.expectEqual(@as(u16, 3), hits.items[0].card);
-    try std.testing.expect(hits.items[0].end > hits.items[0].row);
-}
-
 fn copiedAfterReflow(
     before: write.Entry,
     after: write.Entry,
@@ -612,4 +625,48 @@ test "a right table cell keeps its selected characters when cells wrap" {
     try copiedAfterReflow(entry, entry, .{ 19, 12 }, .{ .row = 2, .column = 11 }, .{ .row = 2, .column = 14 }, "uvw");
     try copiedAfterReflow(entry, entry, .{ 19, 12 }, .{ .row = 2, .column = 15 }, .{ .row = 2, .column = 11 }, "uvwx");
     try copiedAfterReflow(entry, entry, .{ 19, 9 }, .{ .row = 2, .column = 11 }, .{ .row = 2, .column = 14 }, "uvw");
+}
+
+test "the draft's logical positions follow the first committed reply past its heading" {
+    var view: View = .{};
+    view.trackDraft(4);
+    const first: Location = .{ .origin = .{ .entry = 4 }, .line = 1, .offset = 8 };
+    const last: Location = .{ .origin = .{ .entry = 4 }, .line = 1, .offset = 13 };
+    view.anchor = first;
+    view.down = first;
+    view.selection = .{ .start = first, .finish = last };
+    view.commitDraft(6);
+    try std.testing.expectEqual(@as(usize, 6), view.anchor.?.origin.entry);
+    try std.testing.expectEqual(@as(usize, 6), view.down.?.origin.entry);
+    try std.testing.expectEqual(@as(usize, 6), view.selection.?.finish.origin.entry);
+    try std.testing.expectEqual(@as(usize, 13), view.selection.?.finish.offset);
+    view.trackDraft(null);
+    try std.testing.expect(view.anchor != null);
+}
+
+test "a click hit names the visible python card" {
+    const gpa = std.testing.allocator;
+    const entries = [_]write.Entry{
+        .{ .you = .{ .at = null, .said = "ask" } },
+        .{ .tool = .{ .at = null, .name = "python", .subject = "time", .took_us = 1_500_000, .outcome = .Answered } },
+    };
+    const marks = [_]Item{ .{ .origin = .{ .entry = 0 } }, .{ .origin = .{ .entry = 1 }, .card = 3 } };
+    var hits: std.ArrayList(Hit) = .empty;
+    defer hits.deinit(gpa);
+    const region: write.Live = .{
+        .composer = .{
+            .typed = "",
+            .cursor = 0,
+            .placeholder = "to Mei…",
+            .room = "Mei",
+            .offer = "",
+        },
+    };
+    var view: View = .{};
+    defer view.deinit(gpa);
+    const bytes = try draw(gpa, &entries, &marks, region, 80, 24, false, &view, &hits);
+    defer gpa.free(bytes);
+    try std.testing.expect(hits.items.len >= 1);
+    try std.testing.expectEqual(@as(u16, 3), hits.items[0].card);
+    try std.testing.expect(hits.items[0].end > hits.items[0].row);
 }

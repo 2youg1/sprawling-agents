@@ -51,7 +51,7 @@ fn lead(p: *paint.Painter, grid: Grid, seconds: u32, mark: []const u8, style: Ma
         .styled => |styled| try p.fit(styled, mark, 1),
         .gray => |tone| try p.grayMark(mark, tone),
     }
-    try p.to(grid.words);
+    try p.textLeft(grid.words);
 }
 
 fn banner(p: *paint.Painter, r: *scene.Reader) Error!void {
@@ -100,7 +100,7 @@ fn you(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const said = try r.text();
     try p.raw("\x1b]133;A\x1b\\");
     try lead(p, grid, at, "›", .{ .styled = .faint });
-    try flow.flow(p, said, .{ .left = grid.words, .measure = grid.limit -| grid.words, .style = .plain, .marks = .plain });
+    try flow.sourced(p, said, .{ .left = grid.words, .measure = grid.limit -| grid.words, .style = .plain, .marks = .plain });
 }
 
 fn head(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
@@ -121,7 +121,7 @@ fn head(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
 fn reasoning(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const chars = try r.long();
     var b: format.Buffer = undefined;
-    try p.to(grid.words);
+    try p.textLeft(grid.words);
     try p.fit(.faint, "▸ reasoning ", 12);
     try p.fit(.faint, format.count(&b, chars), p.room());
     try p.fit(.faint, " characters", p.room());
@@ -161,7 +161,7 @@ fn reply(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
 
 fn note(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const said = try r.text();
-    try flow.flow(p, std.mem.trimEnd(u8, said, "\n"), .{ .left = grid.words, .measure = grid.limit -| grid.words, .style = .faint, .marks = .kept });
+    try flow.sourced(p, std.mem.trimEnd(u8, said, "\n"), .{ .left = grid.words, .measure = grid.limit -| grid.words, .style = .faint, .marks = .kept });
 }
 
 fn ended(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
