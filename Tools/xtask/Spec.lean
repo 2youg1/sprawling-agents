@@ -1269,6 +1269,10 @@ pub(crate) fn workspace_package(root: &Path, key: &str) -> Result<String, XtaskE
 pub(crate) fn package_field<'a>(manifest: &'a toml::Value, key: &str) -> Option<&'a str>;
 ```
 
+**`crate-size` 判什么**：`cargo xtask crate-size` 在客户端构建之后，由 Cargo 同批打包准备发布的工作区成员。检查读取各个实际 `.crate` 的压缩文件长度，超过 crates.io 的 10,485,760 字节上限时，给出绝对路径、长度及重新打包的命令，退出 1。缺少客户端入口时给出带 `crate-size-bundle-missing` 错误码的 TOML 诊断，恢复命令是 `just build-web`。缺少客户端入口、Cargo 失败或归档不可读时，xtask 进程退出 2。CI 的 `gates-artifacts` 跑这条检查，发行的 `publish` 等候该结果。
+
+D48 **包大小从生成的归档读取。** 发布 0.18.0 时 Cargo 打出 12.4 MiB 的主包，crates.io 在另外 19 个包上传后以 HTTP 413 拒绝主包。提前称量每个准备发布的压缩包能在任何渠道上传之前暴露超限。被否的是用前端目录的原始大小估算，因为 Cargo 的归档还含 Rust 源码与清单，不同文件的可压缩性也不同。测试用上限和超出 1 字节的文件验证边界。
+
 **`packaged` 判什么**：
 
 - **哪些包**：`members`（§8-39）里 `publish` 为 `Registry` 的包；`publish = false` 的工具包（xtask、citysim）不判，因为它们不会被打包。
@@ -1507,7 +1511,7 @@ D45 **产品根路径表是搬迁与残留门的唯一权威；旧路径在标�
 `Err(XtaskError)`；一次运行怎样把各门的结论合成一个退出码，见 D2（`spec/Report.lean`）。判定路径
 不写盘（§7），所以任何一种失败之后树都与运行之前逐字节相同。
 
-D1 **门自身的故障是一个类型，退出码 2。** `XtaskError`（thiserror）的变体各说一种判不动：`Io{path}`（读写失败）、`Doc{file,msg}`（数据面不可解析）、`Cmd{cmd,msg}`（git/cargo 调用失败）、`UnknownGate`（`unknown-gate`）、`GatePanicked`（`gate-panicked`）、`UnsupportedFileScope`（`unsupported-file-scope`）、`InvalidFileScope`（`invalid-file-scope`）、`StaleBuild`（`stale-build`）、`NoCheckout`（`no-checkout`）、`OutsideCheckout`（`member-outside-checkout`）、`UnknownRole`（`unknown-role`）、`UnknownPackage`（`unknown-package`）；除前三个外，每个的消息都带动作、主体、码与恢复。理由：门坏了必须显性，静默通过是门最坏的失效。被击败的备选：把数据面坏折算成一条违规（退出码 1），那会让「文档坏了」与「代码违规」同形，读者去修错的那一侧。
+D1 **门自身的故障是一个类型，退出码 2。** `XtaskError`（thiserror）的变体各说一种判不动：`Io{path}`（读写失败）、`Doc{file,msg}`（数据面不可解析）、`Cmd{cmd,msg}`（git/cargo 调用失败）、`CrateSizeBundleMissing`（`crate-size-bundle-missing`）、`UnknownGate`（`unknown-gate`）、`GatePanicked`（`gate-panicked`）、`UnsupportedFileScope`（`unsupported-file-scope`）、`InvalidFileScope`（`invalid-file-scope`）、`StaleBuild`（`stale-build`）、`NoCheckout`（`no-checkout`）、`OutsideCheckout`（`member-outside-checkout`）、`UnknownRole`（`unknown-role`）、`UnknownPackage`（`unknown-package`）；除前三个外，每个的消息都带动作、主体、码与恢复。理由：门坏了必须显性，静默通过是门最坏的失效。被击败的备选：把数据面坏折算成一条违规（退出码 1），那会让「文档坏了」与「代码违规」同形，读者去修错的那一侧。
 -/
 
 /-! ## 13 依赖选型

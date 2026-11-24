@@ -540,6 +540,7 @@ gates-sources mode="" *paths:
 # The gates that judge the client bundle, after it is built.
 gates-artifacts: build-web
     cargo xtask gates {{artifact_gates}}
+    cargo xtask crate-size
 
 # The Lean specifications: every module under `Sprawling/` and `Tools/`,
 # each a part of a crate's specification (ARCHITECTURE.md section 11,

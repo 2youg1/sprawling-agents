@@ -165,3 +165,42 @@ fn a_predicate_excludes_production_only_when_it_cannot_hold_without_test() {
         ]
     );
 }
+
+#[test]
+fn crate_size_rejects_one_byte_over_the_registry_limit() {
+    let directory = tempfile::tempdir().unwrap();
+    let archive = directory.path().join("sprawling.crate");
+    let file = std::fs::File::create(&archive).unwrap();
+    file.set_len(10_485_760).unwrap();
+    assert!(super::check_archive_size(&archive).unwrap().is_none());
+    file.set_len(10_485_761).unwrap();
+    let violation = super::check_archive_size(&archive).unwrap().unwrap();
+    assert_eq!(violation.gate, "crate-size");
+    assert!(violation.violation.contains("10485761"));
+}
+
+#[test]
+fn crate_size_reports_a_missing_client_entry_as_toml() {
+    let root = tempfile::tempdir().unwrap();
+    let app = root.path().join("Sprawling").join("app");
+    std::fs::create_dir_all(&app).unwrap();
+    std::fs::write(
+        app.join("build.rs"),
+        r#"const BUNDLE_DIR: &str = "web-dist";"#,
+    )
+    .unwrap();
+    let message = super::check_sizes(root.path()).unwrap_err().to_string();
+    let report = message
+        .strip_prefix("\n```toml\n")
+        .unwrap()
+        .strip_suffix("```")
+        .unwrap()
+        .parse::<toml::Table>()
+        .unwrap();
+    assert_eq!(report["code"].as_str(), Some("crate-size-bundle-missing"));
+    assert_eq!(
+        report["path"].as_str(),
+        app.join("web-dist").join("index.html").to_str()
+    );
+    assert_eq!(report["repair"].as_str(), Some("just build-web"));
+}
