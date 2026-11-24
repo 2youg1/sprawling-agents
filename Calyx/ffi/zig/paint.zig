@@ -63,7 +63,7 @@ pub const Painter = struct {
     working_mark: ?Point = null,
     completion_tone: ?u8 = null,
     selection: ?Selection = null,
-    cell_selection: ?layout.CellRange = null,
+    table_selection: ?layout.TableSelection = null,
     copy: ?*std.Io.Writer = null,
     reversed: bool = false,
     selected_base: bool = false,
@@ -94,8 +94,23 @@ pub const Painter = struct {
         }
     }
 
-    pub fn sourceSpan(self: *Painter, width: usize, offset: usize, cell: usize) Error!void {
-        if (self.layout_index) |index| index.span(self.column, width, offset, cell) catch return error.WriteFailed;
+    pub fn sourceSpan(self: *Painter, width: usize, offset: usize) Error!void {
+        if (self.layout_index) |index| index.span(self.column, width, offset) catch return error.WriteFailed;
+    }
+
+    pub const TableCopy = struct { writer: *std.Io.Writer, range: layout.RowRange };
+
+    pub fn tableCopy(self: *const Painter) ?TableCopy {
+        const writer = self.copy orelse return null;
+        const range = (self.table_selection orelse return null).clip(self.row) orelse return null;
+        return .{ .writer = writer, .range = range };
+    }
+
+    fn rowCopy(self: *const Painter) ?*std.Io.Writer {
+        if (self.table_selection) |table| {
+            if (table.owns(self.row)) return null;
+        }
+        return self.copy;
     }
 
     pub fn textLeft(self: *Painter, column: usize) Error!void {
@@ -128,15 +143,15 @@ pub const Painter = struct {
         try self.styled(style);
         const selected = if (c.columns == 0)
             self.selected_base
+        else if (self.table_selection != null and self.table_selection.?.owns(self.row))
+            self.table_selection.?.contains(self.row, self.column, c.columns)
         else if (self.selection) |range|
             range.contains(self.row, self.column, c.columns)
-        else if (self.cell_selection) |cell|
-            cell.contains(self.row, self.column, c.columns)
         else
             false;
         self.selected_base = selected;
         try self.reverse(selected);
-        if (selected) if (self.copy) |copy| try copy.writeAll(c.shown);
+        if (selected) if (self.rowCopy()) |copy| try copy.writeAll(c.shown);
         try self.out.writeAll(c.shown);
         self.column += c.columns;
         return true;
@@ -177,7 +192,7 @@ pub const Painter = struct {
         self.selected_base = false;
         if (self.column != 0) {
             if (self.selection) |range| {
-                if (self.copy) |copy| {
+                if (self.rowCopy()) |copy| {
                     const first = if (range.first.row == self.row) @max(self.column, range.first.column) else self.column;
                     const last = if (range.last.row == self.row) @min(stop, range.last.column) else stop;
                     if (range.first.row <= self.row and self.row <= range.last.row) try copy.splatByteAll(' ', last -| first);
@@ -200,7 +215,7 @@ pub const Painter = struct {
         if (self.layout_index) |index| index.line(self.column, separation) catch return error.WriteFailed;
         if (self.selection) |range| {
             if (range.first.row <= self.row and self.row < range.last.row) {
-                if (self.copy) |copy| try copy.writeAll(separation);
+                if (self.rowCopy()) |copy| try copy.writeAll(separation);
             }
         }
         try self.styled(.plain);

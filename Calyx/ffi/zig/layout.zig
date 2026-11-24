@@ -49,7 +49,6 @@ const Span = struct {
     column: usize,
     width: usize,
     offset: usize,
-    cell: usize,
 };
 
 pub const Row = struct {
@@ -111,30 +110,48 @@ fn spanAt(rows: []const Row, position: Location, affinity: Affinity) ?SpanHit {
     return edge;
 }
 
-pub const CellRange = struct {
+pub const RowRange = struct {
+    start: usize,
+    finish: usize,
+    continues: bool,
+
+    pub fn contains(self: RowRange, offset: usize, width: usize) bool {
+        return offset + width > self.start and offset < self.finish;
+    }
+};
+
+pub const TableSelection = struct {
     rows: []const Row,
     range: Range,
-    cell: usize,
 
-    pub fn contains(self: CellRange, row: usize, col: usize, width: usize) bool {
-        if (row >= self.rows.len or !self.rows[row].start.sameLine(self.range.start)) return false;
+    pub fn owns(self: TableSelection, row: usize) bool {
+        return row < self.rows.len and self.rows[row].spans.len != 0;
+    }
+
+    pub fn clip(self: TableSelection, row: usize) ?RowRange {
+        if (!self.owns(row)) return null;
+        const line = self.rows[row].start;
+        const starts_here = line.sameLine(self.range.start);
+        const finishes_here = line.sameLine(self.range.finish);
+        if (!starts_here and line.before(self.range.start)) return null;
+        if (!finishes_here and self.range.finish.before(line)) return null;
+        return .{
+            .start = if (starts_here) self.range.start.offset else 0,
+            .finish = if (finishes_here) self.range.finish.offset else std.math.maxInt(usize),
+            .continues = !finishes_here,
+        };
+    }
+
+    pub fn contains(self: TableSelection, row: usize, col: usize, width: usize) bool {
+        const range = self.clip(row) orelse return false;
         for (self.rows[row].spans) |span| {
-            if (span.cell == self.cell and col >= span.column and col < span.column + span.width) {
-                const offset = span.offset + col - span.column;
-                return offset + width > self.range.start.offset and offset < self.range.finish.offset;
+            if (col >= span.column and col < span.column + span.width) {
+                return range.contains(span.offset + col - span.column, width);
             }
         }
         return false;
     }
 };
-
-pub fn cellRange(rows: []const Row, range: Range) ?CellRange {
-    if (!range.start.sameLine(range.finish)) return null;
-    const start = spanAt(rows, range.start, .forward) orelse return null;
-    const finish = spanAt(rows, range.finish, .backward) orelse return null;
-    if (start.span.cell != finish.span.cell) return null;
-    return .{ .rows = rows, .range = range, .cell = start.span.cell };
-}
 
 pub fn locate(rows: []const Row, position: Location, affinity: Affinity) Point {
     if (rows.len == 0) return .{ .row = 0, .column = 0 };
@@ -181,16 +198,16 @@ pub const Index = struct {
         self.indent = null;
     }
 
-    pub fn span(self: *Index, column: usize, width: usize, offset: usize, cell: usize) std.mem.Allocator.Error!void {
+    pub fn span(self: *Index, column: usize, width: usize, offset: usize) std.mem.Allocator.Error!void {
         if (width == 0) return;
         if (self.spans.items.len != 0) {
             const previous = &self.spans.items[self.spans.items.len - 1];
-            if (previous.cell == cell and previous.column + previous.width == column and previous.offset + previous.width == offset) {
+            if (previous.column + previous.width == column and previous.offset + previous.width == offset) {
                 previous.width += width;
                 return;
             }
         }
-        try self.spans.append(self.gpa, .{ .column = column, .width = width, .offset = offset, .cell = cell });
+        try self.spans.append(self.gpa, .{ .column = column, .width = width, .offset = offset });
     }
 
     pub fn line(self: *Index, width: usize, separation: []const u8) std.mem.Allocator.Error!void {

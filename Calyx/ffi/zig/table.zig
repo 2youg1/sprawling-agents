@@ -11,6 +11,7 @@ const text = @import("text.zig");
 const Lines = std.mem.SplitIterator(u8, .scalar);
 const Column = struct { width: usize, alignment: enum { left, center, right } };
 const gutter = 3;
+const separator = " │ ";
 
 const Cells = struct {
     rest: []const u8,
@@ -107,7 +108,19 @@ fn tableLine(line: []const u8) bool {
     return std.mem.indexOfScalar(u8, line, '|') != null;
 }
 
-const Fragment = struct { rest: []const u8 = "", offset: usize = 0 };
+const Fragment = struct {
+    rest: []const u8 = "",
+    offset: usize = 0,
+
+    fn next(self: *Fragment) struct { text.Char, usize } {
+        var at: usize = 0;
+        const c = cellChar(self.rest, &at);
+        const origin = self.offset + at - c.len;
+        self.offset = origin + c.columns;
+        self.rest = self.rest[at..];
+        return .{ c, origin };
+    }
+};
 
 fn row(p: *paint.Painter, line: []const u8, columns: []const Column, left: usize, style: paint.Style) paint.Error!void {
     var cells = Cells.of(line);
@@ -122,14 +135,16 @@ fn row(p: *paint.Painter, line: []const u8, columns: []const Column, left: usize
         previous = start;
         fragment.* = .{ .rest = cell, .offset = source_column };
     }
+    const shown = fragments[0..columns.len];
+    if (p.tableCopy()) |copy| try copyRow(copy, shown);
     var more = true;
     while (more) {
         more = false;
         var start = left;
         try p.textLeft(start);
-        for (columns, fragments[0..columns.len], 0..) |column, *fragment, index| {
+        for (columns, shown, 0..) |column, *fragment, index| {
             if (index != 0) {
-                try p.cut(.faint, " │ ", gutter);
+                try p.cut(.faint, separator, gutter);
                 start += gutter;
             }
             const prefix, const width = take(fragment.rest, column.width);
@@ -139,22 +154,37 @@ fn row(p: *paint.Painter, line: []const u8, columns: []const Column, left: usize
                 .center => empty / 2,
                 .right => empty,
             });
-            var at: usize = 0;
-            while (at < prefix.len) {
-                const before = at;
-                const c = cellChar(prefix, &at);
-                fragment.offset += at - before - c.len;
-                try p.sourceSpan(c.columns, fragment.offset, index);
-                fragment.offset += c.columns;
+            const remaining = fragment.rest.len - prefix.len;
+            while (fragment.rest.len > remaining) {
+                const c, const offset = fragment.next();
+                try p.sourceSpan(c.columns, offset);
                 _ = try p.char(style, c);
             }
             start += column.width;
             try p.to(start);
-            fragment.rest = fragment.rest[prefix.len..];
             more = more or fragment.rest.len != 0;
         }
         if (more) try p.wrap(false);
     }
+}
+
+fn copyRow(copy: paint.Painter.TableCopy, fragments: []const Fragment) paint.Error!void {
+    var last: ?usize = null;
+    for (fragments, 0..) |source, index| {
+        var fragment = source;
+        var selected = false;
+        while (fragment.rest.len != 0) {
+            const c, const offset = fragment.next();
+            if (c.columns != 0) selected = copy.range.contains(offset, c.columns);
+            if (!selected) continue;
+            if (last) |prior| {
+                for (prior..index) |_| try copy.writer.writeAll(separator);
+            }
+            try copy.writer.writeAll(c.shown);
+            last = index;
+        }
+    }
+    if (copy.range.continues) try copy.writer.writeByte('\n');
 }
 
 fn take(s: []const u8, columns: usize) struct { []const u8, usize } {

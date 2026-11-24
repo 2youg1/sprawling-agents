@@ -264,16 +264,12 @@ pub fn draw(
     if (view.selection) |range| {
         if (visible > 0 and !std.meta.eql(range.start, range.finish)) {
             const selection = range.ordered();
-            if (layout.cellRange(body_rows, selection)) |cell| {
-                body_painter.cell_selection = cell;
-                body_painter.copy = view.copy;
-            } else {
-                const first = layout.locate(body_rows, selection.start, .forward);
-                const last = layout.locate(body_rows, selection.finish, .backward);
-                if (first.before(last) or last.before(first)) {
-                    body_painter.selection = paint.Selection.between(first, last);
-                    body_painter.copy = view.copy;
-                }
+            body_painter.table_selection = .{ .rows = body_rows, .range = selection };
+            body_painter.copy = view.copy;
+            const first = layout.locate(body_rows, selection.start, .forward);
+            const last = layout.locate(body_rows, selection.finish, .backward);
+            if (first.before(last) or last.before(first)) {
+                body_painter.selection = paint.Selection.between(first, last);
             }
         }
     }
@@ -627,6 +623,13 @@ test "a right table cell keeps its selected characters when cells wrap" {
     try copiedAfterReflow(entry, entry, .{ 19, 9 }, .{ .row = 2, .column = 11 }, .{ .row = 2, .column = 14 }, "uvw");
 }
 
+test "a selection crossing a table column boundary copies in source order after wrapping" {
+    const entry = write.Entry{ .reply = "| A | B |\n| --- | --- |\n| abcdef | uvwxyz |\n| ghijkl | stuvwx |" };
+    try copiedAfterReflow(entry, entry, .{ 19, 12 }, .{ .row = 2, .column = 6 }, .{ .row = 2, .column = 13 }, "ef │ uv");
+    try copiedAfterReflow(entry, entry, .{ 19, 12 }, .{ .row = 3, .column = 13 }, .{ .row = 2, .column = 6 }, "ef │ uvwxyz\nghijkl │ st");
+    try copiedAfterReflow(entry, entry, .{ 19, 12 }, .{ .row = 2, .column = 17 }, .{ .row = 3, .column = 4 }, "\ngh");
+}
+
 test "the draft's logical positions follow the first committed reply past its heading" {
     var view: View = .{};
     view.trackDraft(4);
@@ -669,10 +672,4 @@ test "a click hit names the visible python card" {
     try std.testing.expect(hits.items.len >= 1);
     try std.testing.expectEqual(@as(u16, 3), hits.items[0].card);
     try std.testing.expect(hits.items[0].end > hits.items[0].row);
-}
-
-test "a selection crossing a table column boundary copies in source order after wrapping" {
-    const entry = write.Entry{ .reply = "| A | B |\n| --- | --- |\n| abcdef | uvwxyz |\n| ghijkl | stuvwx |" };
-    try copiedAfterReflow(entry, entry, .{ 19, 12 }, .{ .row = 2, .column = 6 }, .{ .row = 2, .column = 13 }, "ef │ uv");
-    try copiedAfterReflow(entry, entry, .{ 19, 12 }, .{ .row = 3, .column = 13 }, .{ .row = 2, .column = 6 }, "ef │ uvwxyz\nghijkl │ st");
 }
