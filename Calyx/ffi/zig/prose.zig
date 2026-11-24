@@ -18,38 +18,41 @@ pub fn blocks(p: *paint.Painter, body: []const u8, column: flow.Column) paint.Er
     var lines = std.mem.splitScalar(u8, body, '\n');
     var first = true;
     while (lines.next()) |raw| {
-        const line = std.mem.trimEnd(u8, raw, "\r");
+        const source = std.mem.trimEnd(u8, raw, "\r");
         if (!first) try p.end();
         first = false;
+        p.sourceLine(body, raw);
         try p.to(column.left);
-        const trimmed = std.mem.trimStart(u8, line, " ");
-        if (takesFence(open, trimmed)) {
+        const trimmed_source = std.mem.trimStart(u8, source, " ");
+        if (takesFence(open, trimmed_source)) {
             if (p.mei and open == null) {
-                const fence = fenceOf(trimmed).?;
-                const info = std.mem.trim(u8, trimmed[fence.len..], " \t");
-                if (std.mem.eql(u8, info, "mermaid") and try diagram.draw(p, &lines, trimmed[0..fence.len], column)) continue;
+                const fence = fenceOf(trimmed_source).?;
+                const info = std.mem.trim(u8, trimmed_source[fence.len..], " \t");
+                if (std.mem.eql(u8, info, "mermaid") and try diagram.draw(p, &lines, trimmed_source[0..fence.len], column, body)) continue;
             }
-            open = if (open == null) fenceOf(trimmed) else null;
-            try p.fit(.faint, line, column.measure);
+            open = if (open == null) fenceOf(trimmed_source) else null;
+            try p.fit(.faint, source, column.measure);
             continue;
         }
         if (open != null) {
-            try codeLine(p, line, column);
+            try codeLine(p, source, column);
             continue;
         }
-        if (p.mei and try table.draw(p, line, &lines, column)) continue;
-        if (p.mei and std.mem.eql(u8, std.mem.trimEnd(u8, trimmed, " \t"), "$$")) {
+        if (p.mei and try table.draw(p, source, &lines, column, body)) continue;
+        if (p.mei and std.mem.eql(u8, std.mem.trimEnd(u8, trimmed_source, " \t"), "$$")) {
             display_math = !display_math;
             continue;
         }
-        if (p.mei and (display_math or std.mem.indexOfScalar(u8, line, '$') != null)) {
-            var converted: [4096]u8 = undefined;
-            const shown = if (display_math) math.expression(&converted, trimmed) else math.line(&converted, line);
-            if (shown) |rendered| {
-                try flow.flow(p, rendered, column);
-                continue;
-            }
+        var converted: [4096]u8 = undefined;
+        if (display_math) {
+            try flow.flow(p, math.expression(&converted, trimmed_source) orelse source, column);
+            continue;
         }
+        const line = if (p.mei and std.mem.indexOfScalar(u8, source, '$') != null)
+            math.line(&converted, source) orelse source
+        else
+            source;
+        const trimmed = std.mem.trimStart(u8, line, " ");
         if (heading(trimmed)) |mark| {
             const cut = cutAt(line, trimmed, mark);
             if (!p.mei) try p.fit(.faint, line[0..cut], cut);
@@ -176,7 +179,7 @@ fn links(p: *paint.Painter, line: []const u8, column: flow.Column) paint.Error!v
         if (line[at] == '[') {
             if (linkAt(line, at)) |found| {
                 if (text.width(found.label) > p.room() and p.column > column.left) {
-                    try p.end();
+                    try p.wrap(false);
                     try p.to(column.left);
                 }
                 try p.link(.accent, found.url, found.label);
@@ -186,7 +189,7 @@ fn links(p: *paint.Painter, line: []const u8, column: flow.Column) paint.Error!v
         }
         const c = text.char(line, at);
         if (!try p.char(column.style, c)) {
-            try p.end();
+            try p.wrap(false);
             try p.to(column.left);
             if (!try p.char(column.style, c)) return;
         }
@@ -206,6 +209,51 @@ fn linkAt(line: []const u8, at: usize) ?Link {
         .url = line[close + 2 .. end],
         .next = end + 1,
     };
+}
+
+test "formulas preserve the surrounding markdown and the destination of a link" {
+    var buffer: [1024]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&buffer);
+    var painter = paint.Painter.meiFrame(&output, 90);
+    try blocks(&painter, "# A $x^2$ heading\n[docs](https://example.test/$x^2$) gives $x^2$", .{
+        .left = 0,
+        .measure = 89,
+        .style = .plain,
+        .marks = .prose,
+    });
+    const drawn = output.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "\x1b[0;1mA") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "\x1b]8;;https://example.test/$x^2$\x1b\\") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "gives x²") != null);
+}
+
+test "table escapes are drawn as one cell character" {
+    var buffer: [1024]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&buffer);
+    var painter = paint.Painter.meiFrame(&output, 36);
+    try blocks(&painter, "| regex | value |\n| --- | --- |\n| a\\|b | yes |", .{
+        .left = 0,
+        .measure = 35,
+        .style = .plain,
+        .marks = .prose,
+    });
+    try std.testing.expect(std.mem.indexOf(u8, output.buffered(), "a|b") != null);
+}
+
+test "a narrow Mermaid chart keeps the edge and both node identities" {
+    var buffer: [1024]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&buffer);
+    var painter = paint.Painter.meiFrame(&output, 21);
+    try blocks(&painter, "```mermaid\nflowchart LR\nA[Very long left label here] --> B[Check]\nB --> C[Done]\n```", .{
+        .left = 0,
+        .measure = 20,
+        .style = .plain,
+        .marks = .prose,
+    });
+    const drawn = output.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "↓") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "B: Check") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "C: Done") != null);
 }
 
 test "plain prose stays on the flow path" {
@@ -293,49 +341,4 @@ test "wide characters keep their columns inside a list" {
     try blocks(&p, "- 中文中文中文", .{ .left = 0, .measure = 16, .style = .plain, .marks = .prose });
     try std.testing.expect(std.mem.indexOf(u8, out.buffered(), "中文") != null);
     try std.testing.expect(p.column <= p.limit);
-}
-
-test "formulas preserve the surrounding markdown and the destination of a link" {
-    var buffer: [1024]u8 = undefined;
-    var output: std.Io.Writer = .fixed(&buffer);
-    var painter = paint.Painter.meiFrame(&output, 90);
-    try blocks(&painter, "# A $x^2$ heading\n[docs](https://example.test/$x^2$) gives $x^2$", .{
-        .left = 0,
-        .measure = 89,
-        .style = .plain,
-        .marks = .prose,
-    });
-    const drawn = output.buffered();
-    try std.testing.expect(std.mem.indexOf(u8, drawn, "\x1b[0;1mA") != null);
-    try std.testing.expect(std.mem.indexOf(u8, drawn, "\x1b]8;;https://example.test/$x^2$\x1b\\") != null);
-    try std.testing.expect(std.mem.indexOf(u8, drawn, "gives x²") != null);
-}
-
-test "table escapes are drawn as one cell character" {
-    var buffer: [1024]u8 = undefined;
-    var output: std.Io.Writer = .fixed(&buffer);
-    var painter = paint.Painter.meiFrame(&output, 36);
-    try blocks(&painter, "| regex | value |\n| --- | --- |\n| a\\|b | yes |", .{
-        .left = 0,
-        .measure = 35,
-        .style = .plain,
-        .marks = .prose,
-    });
-    try std.testing.expect(std.mem.indexOf(u8, output.buffered(), "a|b") != null);
-}
-
-test "a narrow Mermaid chart keeps the edge and both node identities" {
-    var buffer: [1024]u8 = undefined;
-    var output: std.Io.Writer = .fixed(&buffer);
-    var painter = paint.Painter.meiFrame(&output, 21);
-    try blocks(&painter, "```mermaid\nflowchart LR\nA[Very long left label here] --> B[Check]\nB --> C[Done]\n```", .{
-        .left = 0,
-        .measure = 20,
-        .style = .plain,
-        .marks = .prose,
-    });
-    const drawn = output.buffered();
-    try std.testing.expect(std.mem.indexOf(u8, drawn, "↓") != null);
-    try std.testing.expect(std.mem.indexOf(u8, drawn, "B: Check") != null);
-    try std.testing.expect(std.mem.indexOf(u8, drawn, "C: Done") != null);
 }

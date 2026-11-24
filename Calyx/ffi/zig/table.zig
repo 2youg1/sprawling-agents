@@ -37,7 +37,7 @@ const Cells = struct {
     }
 };
 
-pub fn draw(p: *paint.Painter, header: []const u8, lines: *Lines, area: flow.Column) paint.Error!bool {
+pub fn draw(p: *paint.Painter, header: []const u8, lines: *Lines, area: flow.Column, body: []const u8) paint.Error!bool {
     if (std.mem.indexOfScalar(u8, header, '|') == null) return false;
     var scan = lines.*;
     const divider = scan.next() orelse return false;
@@ -55,7 +55,7 @@ pub fn draw(p: *paint.Painter, header: []const u8, lines: *Lines, area: flow.Col
         const dash = bar[@intFromBool(left) .. bar.len - @intFromBool(right)];
         if (std.mem.count(u8, dash, "-") != dash.len) return false;
         buffer[count] = .{
-            .width = @max(2, @min(area.measure, text.width(title))),
+            .width = @max(2, take(title, area.measure)[1]),
             .alignment = if (left and right) .center else if (right) .right else .left,
         };
         count += 1;
@@ -68,7 +68,7 @@ pub fn draw(p: *paint.Painter, header: []const u8, lines: *Lines, area: flow.Col
         var cells = Cells.of(line);
         for (columns) |*column| {
             const cell = cells.next() orelse break;
-            column.width = @max(column.width, @min(area.measure, text.width(cell)));
+            column.width = @max(column.width, take(cell, area.measure)[1]);
         }
     }
     const room = area.measure - (count - 1) * gutter;
@@ -84,6 +84,7 @@ pub fn draw(p: *paint.Painter, header: []const u8, lines: *Lines, area: flow.Col
     }
     try row(p, header, columns, area.left, .bold);
     try p.end();
+    p.sourceLine(body, divider);
     try p.to(area.left);
     for (columns, 0..) |column, i| {
         if (i != 0) try p.cut(.faint, "─┼─", gutter);
@@ -96,6 +97,7 @@ pub fn draw(p: *paint.Painter, header: []const u8, lines: *Lines, area: flow.Col
         if (!tableLine(line)) break;
         lines.* = ahead;
         try p.end();
+        p.sourceLine(body, line);
         try row(p, line, columns, area.left, area.style);
     }
     return true;
@@ -126,13 +128,17 @@ fn row(p: *paint.Painter, line: []const u8, columns: []const Column, left: usize
                 .center => empty / 2,
                 .right => empty,
             });
-            try p.cut(style, prefix, width);
+            var at: usize = 0;
+            while (at < prefix.len) {
+                const c = cellChar(prefix, &at);
+                _ = try p.char(style, c);
+            }
             start += column.width;
             try p.to(start);
             fragment.* = std.mem.trimStart(u8, fragment.*[prefix.len..], " ");
             more = more or fragment.len != 0;
         }
-        if (more) try p.end();
+        if (more) try p.wrap(false);
     }
 }
 
@@ -140,10 +146,18 @@ fn take(s: []const u8, columns: usize) struct { []const u8, usize } {
     var bytes: usize = 0;
     var width: usize = 0;
     while (bytes < s.len) {
-        const c = text.char(s, bytes);
+        var after = bytes;
+        const c = cellChar(s, &after);
         if (width + c.columns > columns) break;
-        bytes += c.len;
+        bytes = after;
         width += c.columns;
     }
     return .{ s[0..bytes], width };
+}
+
+fn cellChar(s: []const u8, at: *usize) text.Char {
+    if (std.mem.startsWith(u8, s[at.*..], "\\|")) at.* += 1;
+    const c = text.char(s, at.*);
+    at.* += c.len;
+    return c;
 }

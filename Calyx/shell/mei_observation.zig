@@ -338,12 +338,17 @@ pub const Seen = struct {
         if (content != .array) return try entries.toOwnedSlice(arena);
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(arena);
+        var reply_start: usize = 0;
         for (content.array.items) |block| {
             if (block != .object) continue;
             const ty = if (block.object.get("type")) |t| (if (t == .string) t.string else "") else "";
             if (std.mem.eql(u8, ty, "thinking")) {
                 if (block.object.get("thinking")) |th| {
                     if (th == .string and th.string.len != 0) {
+                        if (reply_start < text.items.len) {
+                            try entries.append(arena, .{ .reply = try arena.dupe(u8, text.items[reply_start..]) });
+                            reply_start = text.items.len;
+                        }
                         const body = try arena.dupe(u8, th.string);
                         try entries.append(arena, .{ .reasoning = .{
                             .characters = std.unicode.utf8CountCodepoints(body) catch body.len,
@@ -353,10 +358,7 @@ pub const Seen = struct {
                 }
             } else if (std.mem.eql(u8, ty, "text")) {
                 if (block.object.get("text")) |tx| {
-                    if (tx == .string and tx.string.len != 0) {
-                        try text.appendSlice(arena, tx.string);
-                        try entries.append(arena, .{ .reply = try arena.dupe(u8, tx.string) });
-                    }
+                    if (tx == .string) try text.appendSlice(arena, tx.string);
                 }
             } else if (std.mem.eql(u8, ty, "tool_use")) {
                 self.noteCall(block, at);
@@ -364,6 +366,7 @@ pub const Seen = struct {
             }
         }
         const said = try text.toOwnedSlice(arena);
+        if (reply_start < said.len) try entries.append(arena, .{ .reply = said[reply_start..] });
         self.setLast(said);
         return try entries.toOwnedSlice(arena);
     }
@@ -719,6 +722,22 @@ test "stream deltas stay in the draft until commit" {
     try std.testing.expectEqualStrings("", seen.draftText());
 }
 
+test "consecutive text fragments form one reply until actual reasoning" {
+    const gpa = std.testing.allocator;
+    var seen = try Seen.init(gpa, "model");
+    defer seen.deinit();
+    var scratch = std.heap.ArenaAllocator.init(gpa);
+    defer scratch.deinit();
+    const line =
+        \\{"role":"assistant","content":[{"type":"text","text":"| A | B |\n"},{"type":"text","text":"| -- | -- |"},{"type":"thinking","thinking":"check"},{"type":"text","text":"seen"},{"type":"text","text":" twice"}]}
+    ;
+    const entries = try seen.line(scratch.allocator(), line, 1);
+    try std.testing.expectEqual(@as(usize, 4), entries.len);
+    try std.testing.expectEqualStrings("| A | B |\n| -- | -- |", entries[1].reply);
+    try std.testing.expectEqualStrings("check", entries[2].reasoning.body);
+    try std.testing.expectEqualStrings("seen twice", entries[3].reply);
+}
+
 test "a complete assistant line drops an open draft" {
     const gpa = std.testing.allocator;
     var seen = try Seen.init(gpa, "model");
@@ -748,20 +767,4 @@ test "head facts keep a copy of the model after it is replaced" {
     _ = try seen.line(arena, "{\"type\":\"mei.obs\",\"kind\":\"model\",\"model\":\"provider/new\"}", 3);
     try std.testing.expectEqualStrings("provider/old", entries[0].head.facts[0]);
     try std.testing.expectEqualStrings("provider/new", seen.model);
-}
-
-test "consecutive text fragments form one reply until actual reasoning" {
-    const gpa = std.testing.allocator;
-    var seen = try Seen.init(gpa, "model");
-    defer seen.deinit();
-    var scratch = std.heap.ArenaAllocator.init(gpa);
-    defer scratch.deinit();
-    const line =
-        \\{"role":"assistant","content":[{"type":"text","text":"| A | B |\n"},{"type":"text","text":"| -- | -- |"},{"type":"thinking","thinking":"check"},{"type":"text","text":"seen"},{"type":"text","text":" twice"}]}
-    ;
-    const entries = try seen.line(scratch.allocator(), line, 1);
-    try std.testing.expectEqual(@as(usize, 4), entries.len);
-    try std.testing.expectEqualStrings("| A | B |\n| -- | -- |", entries[1].reply);
-    try std.testing.expectEqualStrings("check", entries[2].reasoning.body);
-    try std.testing.expectEqualStrings("seen twice", entries[3].reply);
 }

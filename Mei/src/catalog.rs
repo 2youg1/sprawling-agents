@@ -32,11 +32,13 @@ fn invalid_catalog(subject: impl Into<String>, value: &Value) -> Error {
     .into()
 }
 
-fn model(entry: &Value) -> Option<Selection> {
+fn model_id(entry: &Value) -> Option<&str> {
     let id = entry.get("id")?.as_str()?.trim();
-    if id.is_empty() {
-        return None;
-    }
+    (!id.is_empty()).then_some(id)
+}
+
+fn model(entry: &Value) -> Option<Selection> {
+    let id = model_id(entry)?;
     let context_tokens = entry
         .get("context_window")
         .and_then(Value::as_u64)
@@ -73,7 +75,7 @@ pub fn select_for(catalog: &Value, requested: Option<&str>) -> Result<Selection>
     if let Some(id) = requested {
         return entries
             .iter()
-            .find(|entry| entry.get("id").and_then(Value::as_str) == Some(id))
+            .find(|entry| model_id(entry) == Some(id.trim()))
             .and_then(model)
             .ok_or_else(|| invalid_catalog(format!("the catalog has no entry for {id}"), catalog));
     }
@@ -81,7 +83,7 @@ pub fn select_for(catalog: &Value, requested: Option<&str>) -> Result<Selection>
         .and_then(|id| {
             entries
                 .iter()
-                .find(|entry| entry.get("id").and_then(Value::as_str) == Some(id))
+                .find(|entry| model_id(entry) == Some(id.trim()))
         })
         .or_else(|| entries.first())
         .ok_or_else(|| invalid_catalog("the catalog has no visible chat model", catalog))?;

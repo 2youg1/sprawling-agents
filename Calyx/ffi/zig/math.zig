@@ -50,12 +50,29 @@ pub fn line(buffer: []u8, source: []const u8) ?[]const u8 {
     var out: std.Io.Writer = .fixed(buffer);
     var at: usize = 0;
     var changed = false;
-    var in_code = false;
+    var ticks: usize = 0;
     while (at < source.len) {
         const byte = source[at];
-        if (byte == '`') in_code = !in_code;
         const rest = source[at..];
-        if (!in_code and byte == '$' and (at == 0 or source[at - 1] != '\\')) {
+        if (byte == '`') {
+            const width = tickRun(rest);
+            if (ticks == width) {
+                ticks = 0;
+            } else if (ticks == 0 and closesTicks(rest[width..], width)) {
+                ticks = width;
+            }
+            out.writeAll(rest[0..width]) catch return null;
+            at += width;
+            continue;
+        }
+        if (ticks == 0 and std.mem.startsWith(u8, rest, "](")) {
+            if (std.mem.indexOfScalar(u8, rest, ')')) |end| {
+                out.writeAll(rest[0 .. end + 1]) catch return null;
+                at += end + 1;
+                continue;
+            }
+        }
+        if (ticks == 0 and byte == '$' and (at == 0 or source[at - 1] != '\\')) {
             const marker = if (std.mem.startsWith(u8, rest, "$$")) "$$" else "$";
             const body = rest[marker.len..];
             if (std.mem.indexOf(u8, body, marker)) |close| {
@@ -75,6 +92,22 @@ pub fn line(buffer: []u8, source: []const u8) ?[]const u8 {
         at += 1;
     }
     return if (changed) out.buffered() else null;
+}
+
+fn tickRun(source: []const u8) usize {
+    var n: usize = 0;
+    while (n < source.len and source[n] == '`') : (n += 1) {}
+    return n;
+}
+
+fn closesTicks(source: []const u8, width: usize) bool {
+    var rest = source;
+    while (std.mem.indexOfScalar(u8, rest, '`')) |at| {
+        const n = tickRun(rest[at..]);
+        if (n == width) return true;
+        rest = rest[at + n ..];
+    }
+    return false;
 }
 
 pub fn expression(buffer: []u8, source: []const u8) ?[]const u8 {
@@ -157,14 +190,14 @@ fn takeGroup(source: []const u8, at: *usize) Error![]const u8 {
     return error.Unsupported;
 }
 
-test "basic inline and display math retain the visible source of unsupported formulas" {
-    var buffer: [256]u8 = undefined;
-    const rendered = line(&buffer, "Area $\\pi r^2$ and $$\\frac{1}{2}$$ beside $\\opaque{x}$").?;
-    try std.testing.expectEqualStrings("Area π r² and (1)⁄(2) beside $\\opaque{x}$", rendered);
-}
-
 test "math skips code delimited by a matching run of ticks" {
     var buffer: [256]u8 = undefined;
     const rendered = line(&buffer, "``$x^2$` $y^2$`` and $z^2$").?;
     try std.testing.expectEqualStrings("``$x^2$` $y^2$`` and z²", rendered);
+}
+
+test "basic inline and display math retain the visible source of unsupported formulas" {
+    var buffer: [256]u8 = undefined;
+    const rendered = line(&buffer, "Area $\\pi r^2$ and $$\\frac{1}{2}$$ beside $\\opaque{x}$").?;
+    try std.testing.expectEqualStrings("Area π r² and (1)⁄(2) beside $\\opaque{x}$", rendered);
 }

@@ -5,6 +5,7 @@
 
 const std = @import("std");
 const text = @import("text.zig");
+const layout = @import("layout.zig");
 
 pub const Style = enum {
     plain,
@@ -34,14 +35,7 @@ pub fn writeGray(out: *std.Io.Writer, tone: u8) Error!void {
     try out.print("\x1b[38;2;{d};{d};{d}m", .{ tone, tone, tone });
 }
 
-pub const Point = struct {
-    row: usize,
-    column: usize,
-
-    pub fn before(a: Point, b: Point) bool {
-        return a.row < b.row or (a.row == b.row and a.column < b.column);
-    }
-};
+pub const Point = layout.Point;
 
 pub const Selection = struct {
     first: Point,
@@ -71,6 +65,8 @@ pub const Painter = struct {
     selection: ?Selection = null,
     copy: ?*std.Io.Writer = null,
     reversed: bool = false,
+    selected_base: bool = false,
+    layout_index: ?*layout.Index = null,
 
     pub fn init(out: *std.Io.Writer, terminal_width: usize) Painter {
         return .{ .out = out, .limit = @max(terminal_width, 2) - 1 };
@@ -88,6 +84,13 @@ pub const Painter = struct {
 
     pub fn raw(self: *Painter, bytes: []const u8) Error!void {
         try self.out.writeAll(bytes);
+    }
+
+    pub fn sourceLine(self: *Painter, body: []const u8, line: []const u8) void {
+        if (self.layout_index) |index| {
+            index.start.line = 1 + @intFromPtr(line.ptr) - @intFromPtr(body.ptr);
+            index.start.offset = 0;
+        }
     }
 
     fn styled(self: *Painter, style: Style) Error!void {
@@ -111,7 +114,8 @@ pub const Painter = struct {
     pub fn char(self: *Painter, style: Style, c: text.Char) Error!bool {
         if (c.columns > self.room()) return false;
         try self.styled(style);
-        const selected = if (self.selection) |range| range.contains(self.row, self.column, c.columns) else false;
+        const selected = if (c.columns == 0) self.selected_base else if (self.selection) |range| range.contains(self.row, self.column, c.columns) else false;
+        self.selected_base = selected;
         try self.reverse(selected);
         if (selected) if (self.copy) |copy| try copy.writeAll(c.shown);
         try self.out.writeAll(c.shown);
@@ -124,9 +128,7 @@ pub const Painter = struct {
         if (text.width(s) <= allowed) return self.cut(style, s, allowed);
         if (allowed == 0) return;
         try self.cut(style, s, allowed - 1);
-        try self.styled(style);
-        try self.out.writeAll("…");
-        self.column += 1;
+        _ = try self.char(style, text.char("…", 0));
     }
 
     pub fn grayMark(self: *Painter, mark: []const u8, tone: u8) Error!void {
@@ -153,6 +155,10 @@ pub const Painter = struct {
         if (self.column >= stop) return;
         try self.styled(.plain);
         try self.reverse(false);
+        self.selected_base = false;
+        if (self.column == 0) {
+            if (self.layout_index) |index| index.indent = stop;
+        }
         if (self.column != 0) {
             if (self.selection) |range| {
                 if (self.copy) |copy| {
@@ -175,6 +181,7 @@ pub const Painter = struct {
     }
 
     fn newline(self: *Painter, separation: []const u8) Error!void {
+        if (self.layout_index) |index| index.line(self.column, separation) catch return error.WriteFailed;
         if (self.selection) |range| {
             if (range.first.row <= self.row and self.row < range.last.row) {
                 if (self.copy) |copy| try copy.writeAll(separation);
@@ -185,6 +192,7 @@ pub const Painter = struct {
         try self.out.writeAll("\r\n");
         self.column = 0;
         self.row += 1;
+        self.selected_base = false;
     }
 
     pub fn close(self: *Painter) Error!void {
@@ -208,6 +216,21 @@ pub const Painter = struct {
     }
 };
 
+test "selection copies combining marks with their base and includes a visible ellipsis" {
+    var output: std.Io.Writer.Discarding = .init(&.{});
+    var buffer: [16]u8 = undefined;
+    var copy: std.Io.Writer = .fixed(&buffer);
+    const cases = [_][]const u8{ "e\u{0301}", "x", "…" };
+    for (cases, 0..) |wanted, col| {
+        copy.end = 0;
+        var p = Painter.meiFrame(&output.writer, 8);
+        p.selection = Selection.between(.{ .row = 0, .column = col }, .{ .row = 0, .column = col + 1 });
+        p.copy = &copy;
+        try p.fit(.plain, "e\u{0301}xyz", 3);
+        try std.testing.expectEqualStrings(wanted, copy.buffered());
+    }
+}
+
 test "a fitted text never runs past its room" {
     var buffer: [256]u8 = undefined;
     var out: std.Io.Writer = .fixed(&buffer);
@@ -223,19 +246,4 @@ test "link URI cannot terminate OSC or inject terminal commands" {
     var p = Painter.init(&out, 80);
     try p.link(.plain, "https://example/\x07\x1b\\\x1b[2J\u{009c}\x7f\xff中文", "open");
     try std.testing.expectEqualStrings("\x1b]8;;https://example/\\[2J中文\x1b\\open\x1b]8;;\x1b\\", out.buffered());
-}
-
-test "selection copies combining marks with their base and includes a visible ellipsis" {
-    var output: std.Io.Writer.Discarding = .init(&.{});
-    var buffer: [16]u8 = undefined;
-    var copy: std.Io.Writer = .fixed(&buffer);
-    const cases = [_][]const u8{ "e\u{0301}", "x", "…" };
-    for (cases, 0..) |wanted, col| {
-        copy.end = 0;
-        var p = Painter.meiFrame(&output.writer, 8);
-        p.selection = Selection.between(.{ .row = 0, .column = col }, .{ .row = 0, .column = col + 1 });
-        p.copy = &copy;
-        try p.fit(.plain, "e\u{0301}xyz", 3);
-        try std.testing.expectEqualStrings(wanted, copy.buffered());
-    }
 }

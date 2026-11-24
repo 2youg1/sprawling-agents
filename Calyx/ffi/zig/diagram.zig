@@ -6,12 +6,24 @@
 const std = @import("std");
 const flow = @import("flow.zig");
 const paint = @import("paint.zig");
+const text = @import("text.zig");
 
 const Lines = std.mem.SplitIterator(u8, .scalar);
 const Kind = enum { flowchart, sequence };
-const Edge = struct { left: []const u8, right: []const u8, label: []const u8 = "" };
+const Node = struct {
+    id: []const u8,
+    label: []const u8 = "",
 
-pub fn draw(p: *paint.Painter, lines: *Lines, fence: []const u8, area: flow.Column) paint.Error!bool {
+    fn width(self: Node) usize {
+        return 2 + self.id.len + if (self.label.len != 0) 2 + text.width(self.label) else 0;
+    }
+};
+const Edge = struct { left: Node, right: Node, label: []const u8 = "" };
+const arrow = " ──→ ";
+const arrow_width = 5;
+
+pub fn draw(p: *paint.Painter, lines: *Lines, fence: []const u8, area: flow.Column, body: []const u8) paint.Error!bool {
+    if (area.measure < 3) return false;
     var source = lines.*;
     const header = std.mem.trim(u8, source.next() orelse return false, " \t\r");
     const kind: Kind = if (std.mem.startsWith(u8, header, "graph ") or std.mem.startsWith(u8, header, "flowchart "))
@@ -43,18 +55,25 @@ pub fn draw(p: *paint.Painter, lines: *Lines, fence: []const u8, area: flow.Colu
         const item = edge(line, kind) orelse continue;
         if (!first) try p.end();
         first = false;
+        p.sourceLine(body, raw);
         try p.to(area.left);
-        if (kind == .flowchart and (std.mem.endsWith(u8, header, " TD") or std.mem.endsWith(u8, header, " TB"))) {
+        const down = kind == .flowchart and (std.mem.endsWith(u8, header, " TD") or std.mem.endsWith(u8, header, " TB"));
+        const label_width = if (item.label.len != 0) 2 + text.width(item.label) else 0;
+        if (down or item.left.width() + arrow_width + item.right.width() + label_width > p.room()) {
             try node(p, item.left);
-            try p.end();
-            try p.to(area.left + 2);
+            try p.wrap(false);
+            try p.to(area.left);
             try p.cut(.faint, "↓", 1);
-            try p.end();
+            try p.wrap(false);
             try p.to(area.left);
             try node(p, item.right);
+            if (item.label.len != 0) {
+                try p.wrap(false);
+                try flow.flow(p, item.label, .{ .left = area.left, .measure = area.measure, .style = .faint, .marks = .plain });
+            }
         } else {
             try node(p, item.left);
-            try p.cut(.faint, " ──→ ", 5);
+            try p.cut(.faint, arrow, arrow_width);
             try node(p, item.right);
             if (item.label.len != 0) {
                 try p.to(p.column + 2);
@@ -70,25 +89,25 @@ fn closing(line: []const u8, fence: []const u8) bool {
 }
 
 fn edge(line: []const u8, kind: Kind) ?Edge {
-    const arrow = if (kind == .flowchart) "-->" else if (std.mem.indexOf(u8, line, "-->>") != null) "-->>" else "->>";
-    const split = std.mem.indexOf(u8, line, arrow) orelse return null;
-    const from = nodeLabel(line[0..split]) orelse return null;
-    var to = trim(line[split + arrow.len ..]);
+    const delimiter = if (kind == .flowchart) "-->" else if (std.mem.indexOf(u8, line, "-->>") != null) "-->>" else "->>";
+    const split = std.mem.indexOf(u8, line, delimiter) orelse return null;
+    const from = parseNode(line[0..split]) orelse return null;
+    var to = trim(line[split + delimiter.len ..]);
     var label: []const u8 = "";
     if (kind == .sequence) {
         const colon = std.mem.indexOfScalar(u8, to, ':') orelse return null;
         label = trim(to[colon + 1 ..]);
         to = to[0..colon];
     }
-    return .{ .left = from, .right = nodeLabel(to) orelse return null, .label = label };
+    return .{ .left = from, .right = parseNode(to) orelse return null, .label = label };
 }
 
-fn nodeLabel(raw: []const u8) ?[]const u8 {
+fn parseNode(raw: []const u8) ?Node {
     const label = std.mem.trimEnd(u8, trim(raw), ";");
     var index: usize = 0;
     while (index < label.len and (std.ascii.isAlphanumeric(label[index]) or label[index] == '_')) : (index += 1) {}
     if (index == 0) return null;
-    if (index == label.len) return label;
+    if (index == label.len) return .{ .id = label };
     const close: u8 = switch (label[index]) {
         '[' => ']',
         '{' => '}',
@@ -98,12 +117,16 @@ fn nodeLabel(raw: []const u8) ?[]const u8 {
     if (label[label.len - 1] != close or index + 1 >= label.len - 1) return null;
     const body = label[index + 1 .. label.len - 1];
     if (std.mem.indexOfScalar(u8, body, close) != null) return null;
-    return std.mem.trim(u8, body, "\"");
+    return .{ .id = label[0..index], .label = std.mem.trim(u8, body, "\"") };
 }
 
-fn node(p: *paint.Painter, name: []const u8) paint.Error!void {
+fn node(p: *paint.Painter, value: Node) paint.Error!void {
     try p.cut(.faint, "[", 1);
-    try p.fit(.plain, name, p.room() -| 1);
+    try p.fit(.plain, value.id, p.room() -| 1);
+    if (value.label.len != 0 and p.room() >= 4) {
+        try p.cut(.plain, ": ", 2);
+        try p.fit(.plain, value.label, p.room() -| 1);
+    }
     try p.cut(.faint, "]", 1);
 }
 

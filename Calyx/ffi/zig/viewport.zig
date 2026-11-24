@@ -10,31 +10,49 @@ const scene = @import("scene.zig");
 const transcript = @import("transcript.zig");
 const live = @import("live.zig");
 const write = @import("write.zig");
+const layout = @import("layout.zig");
 const Grid = @import("grid.zig").Grid;
 
 pub const Hit = struct { row: u16, end: u16, card: u16 };
 
 pub const no_card: u16 = std.math.maxInt(u16);
+pub const Item = struct { origin: layout.Origin, card: u16 = no_card };
 pub const Point = paint.Point;
-pub const Selection = paint.Selection;
+pub const Location = layout.Location;
+pub const Selection = layout.Range;
 
 const Error = transcript.Error || std.mem.Allocator.Error;
-
-const Anchor = struct { entry: usize, line: usize };
 
 pub const Completion = struct { first: u16, last: u16, tone: u8 };
 pub const settled_tool_tone = paint.settled_tool_tone;
 
 pub const View = struct {
-    anchor: ?Anchor = null,
+    anchor: ?Location = null,
     movement: i32 = 0,
     body_top: usize = 0,
-    body_rows: usize = 0,
+    visible: std.ArrayList(layout.Row) = .empty,
     working_tone: u8 = 117,
     working_mark: ?Point = null,
     completion: ?Completion = null,
     selection: ?Selection = null,
     copy: ?*std.Io.Writer = null,
+
+    pub fn deinit(self: *View, gpa: std.mem.Allocator) void {
+        self.visible.deinit(gpa);
+    }
+
+    pub fn contains(self: *const View, row: usize) bool {
+        return row >= self.body_top and row - self.body_top < self.visible.items.len;
+    }
+
+    pub fn location(self: *const View, point: Point) ?Location {
+        const rows = self.visible.items;
+        if (rows.len == 0) return null;
+        if (point.row < self.body_top) return rows[0].at(0);
+        const row = point.row - self.body_top;
+        if (row >= rows.len) return rows[rows.len - 1].at(std.math.maxInt(usize));
+        return rows[row].at(point.column);
+    }
 
     pub fn scroll(self: *View, lines: i32) void {
         self.movement +|= lines;
@@ -45,25 +63,16 @@ pub const View = struct {
         self.movement = 0;
     }
 
-    fn first(self: *View, offsets: []const usize, budget: usize) usize {
-        const last = offsets[offsets.len - 1] -| budget;
-        const previous = if (self.anchor) |anchor| blk: {
-            if (anchor.entry + 1 >= offsets.len) break :blk last;
-            const lo = offsets[anchor.entry];
-            const hi = offsets[anchor.entry + 1];
-            break :blk @min(last, lo + @min(anchor.line, hi -| (lo + 1)));
-        } else last;
+    fn first(self: *View, rows: []const layout.Row, budget: usize) usize {
+        const last = rows.len -| budget;
+        const previous = if (self.anchor) |anchor| @min(last, layout.locate(rows, anchor).row) else last;
+        if (self.movement == 0) return previous;
         const moved = if (self.movement < 0)
             previous -| @as(usize, @abs(self.movement))
         else
             @min(last, previous +| @as(usize, @intCast(self.movement)));
         self.movement = 0;
-        self.anchor = null;
-        if (moved < last) {
-            var entry: usize = 0;
-            while (entry + 1 < offsets.len and offsets[entry + 1] <= moved) : (entry += 1) {}
-            self.anchor = .{ .entry = entry, .line = moved - offsets[entry] };
-        }
+        self.anchor = if (moved < last) rows[moved].start else null;
         return moved;
     }
 };
@@ -119,7 +128,7 @@ const Clip = struct {
 pub fn draw(
     gpa: std.mem.Allocator,
     entries: []const write.Entry,
-    marks: []const u16,
+    items: []const Item,
     region: write.Live,
     columns: u16,
     rows: u16,
@@ -130,7 +139,7 @@ pub fn draw(
     hits.clearRetainingCapacity();
     view.working_mark = null;
     view.body_top = 0;
-    view.body_rows = 0;
+    view.visible.clearRetainingCapacity();
     const cols: usize = @max(@as(usize, columns), 2);
     const window: usize = @max(@as(usize, rows), 1);
     var scene_bytes = try write.Scene.inlineFrame(gpa, .{
@@ -164,9 +173,11 @@ pub fn draw(
         try drop.end();
     }
     const body = n - @intFromBool(banner);
-    const offsets = try gpa.alloc(usize, body + 1);
-    defer gpa.free(offsets);
-    const content_rows = try countBody(&r, body, if (banner) .Banner else null, cols, offsets);
+    const body_items = items[@min(items.len, @intFromBool(banner))..];
+    var index: layout.Index = .{ .gpa = gpa };
+    defer index.rows.deinit(gpa);
+    try countBody(&r, body, if (banner) .Banner else null, cols, body_items, &index);
+    const body_rows = index.rows.items;
     const live_at = r;
     const live_h = try liveHeight(live_at, cols);
     if (live_h >= window) {
@@ -194,10 +205,10 @@ pub fn draw(
     const budget = window - live_h;
     const banner_rows: usize = if (banner and budget >= 1) 1 else 0;
     const content_budget = budget - banner_rows;
-    const skip = view.first(offsets, content_budget);
-    const visible = @min(content_rows - skip, content_budget);
+    const skip = view.first(body_rows, content_budget);
+    const visible = @min(body_rows.len - skip, content_budget);
     view.body_top = banner_rows;
-    view.body_rows = visible;
+    try view.visible.appendSlice(gpa, body_rows[skip..][0..visible]);
     r = saved;
     if (banner) {
         if (banner_rows == 1) {
@@ -218,14 +229,15 @@ pub fn draw(
     var body_painter = paint.Painter.meiFrame(&clip.writer, cols);
     if (view.selection) |selection| {
         if (visible > 0) {
-            const first = selectedPoint(selection.first, skip, banner_rows, visible, cols);
-            const last = selectedPoint(selection.last, skip, banner_rows, visible, cols);
-            body_painter.selection = Selection.between(first, last);
-            body_painter.copy = view.copy;
+            const first = layout.locate(body_rows, selection.start);
+            const last = layout.locate(body_rows, selection.finish);
+            if (first.before(last) or last.before(first)) {
+                body_painter.selection = paint.Selection.between(first, last);
+                body_painter.copy = view.copy;
+            }
         }
     }
-    try paintBody(&body_painter, &r, body, if (banner) .Banner else null, &.{}, .{
-        .marks = marks[@min(marks.len, @intFromBool(banner))..],
+    try paintBody(&body_painter, &r, body, if (banner) .Banner else null, body_items, .{
         .hits = hits,
         .gpa = gpa,
         .skip = skip,
@@ -259,18 +271,12 @@ test "updating the working point changes just one cell and restores the cursor" 
     try std.testing.expectEqualStrings("\x1b[?2026h\x1b7\x1b[20;11H\x1b[38;2;142;142;142m●\x1b[39m\x1b8\x1b[?2026l", writer.buffered());
 }
 
-fn selectedPoint(point: Point, skip: usize, origin: usize, visible: usize, columns: usize) Point {
-    if (point.row < origin) return .{ .row = skip, .column = 0 };
-    if (point.row >= origin + visible) return .{ .row = skip + visible - 1, .column = columns };
-    return .{ .row = skip + point.row - origin, .column = point.column };
-}
-
-fn countBody(r: *scene.Reader, n: usize, previous: ?part.Part, columns: usize, offsets: []usize) Error!usize {
+fn countBody(r: *scene.Reader, n: usize, previous: ?part.Part, columns: usize, items: []const Item, index: *layout.Index) Error!void {
     var hole: [1]u8 = undefined;
     var sink: std.Io.Writer.Discarding = .init(&hole);
     var p = paint.Painter.meiFrame(&sink.writer, columns);
-    try paintBody(&p, r, n, previous, offsets, null);
-    return p.row;
+    p.layout_index = index;
+    try paintBody(&p, r, n, previous, items, null);
 }
 
 fn liveHeight(r: scene.Reader, columns: usize) Error!usize {
@@ -284,7 +290,6 @@ fn liveHeight(r: scene.Reader, columns: usize) Error!usize {
 }
 
 const BodyWindow = struct {
-    marks: []const u16,
     hits: *std.ArrayList(Hit),
     gpa: std.mem.Allocator,
     skip: usize,
@@ -298,20 +303,21 @@ fn paintBody(
     r: *scene.Reader,
     n: usize,
     previous: ?part.Part,
-    offsets: []usize,
+    items: []const Item,
     window: ?BodyWindow,
 ) Error!void {
     var prev = previous;
     var i: usize = 0;
     while (i < n) : (i += 1) {
-        if (offsets.len != 0) offsets[i] = p.row;
+        const item = if (i < items.len) items[i] else Item{ .origin = .{ .entry = i } };
+        if (p.layout_index) |index| index.begin(item.origin);
         const tag = try r.tag();
         if (transcript.spaced(prev, tag)) try p.end();
         const before = p.row;
         p.completion_tone = if (tag == .Tool and window != null) blk: {
             const vis = window.?;
             const arriving = vis.completion orelse break :blk null;
-            if (i >= vis.marks.len or vis.marks[i] < arriving.first or vis.marks[i] > arriving.last) break :blk null;
+            if (item.card == no_card or item.card < arriving.first or item.card > arriving.last) break :blk null;
             break :blk arriving.tone;
         } else null;
         try transcript.entry(p, r, tag, Grid.of(p));
@@ -319,17 +325,16 @@ fn paintBody(
         if (window) |vis| {
             const lower = @max(before, vis.skip);
             const upper = @min(after, vis.skip + vis.take);
-            if (i < vis.marks.len and vis.marks[i] != no_card and lower < upper) {
+            if (item.card != no_card and lower < upper) {
                 try vis.hits.append(vis.gpa, .{
                     .row = @intCast(vis.origin + lower - vis.skip),
                     .end = @intCast(vis.origin + upper - vis.skip),
-                    .card = vis.marks[i],
+                    .card = item.card,
                 });
             }
         }
         prev = tag;
     }
-    if (offsets.len != 0) offsets[n] = p.row;
 }
 
 fn place(out: *std.Io.Writer, p: *const paint.Painter, cursor: live.Cursor) paint.Error!void {
@@ -357,6 +362,7 @@ fn frameOf(
         },
     };
     var view: View = .{};
+    defer view.deinit(gpa);
     return draw(gpa, entries, &.{}, live_region, columns, rows, web, &view, &hits);
 }
 
@@ -431,14 +437,14 @@ test "wide Mei bodies extend beyond the City measure" {
 
 test "the reading anchor holds when new entries arrive and can follow again" {
     var view: View = .{};
-    const before = [_]usize{ 0, 4, 8, 12, 16 };
-    try std.testing.expectEqual(@as(usize, 10), view.first(&before, 6));
+    var rows: [20]layout.Row = undefined;
+    for (&rows, 0..) |*row, n| row.* = .{ .start = .{ .origin = .{ .entry = n / 4 }, .line = n % 4 }, .indent = 0, .width = 5 };
+    try std.testing.expectEqual(@as(usize, 10), view.first(rows[0..16], 6));
     view.scroll(-5);
-    try std.testing.expectEqual(@as(usize, 5), view.first(&before, 6));
-    try std.testing.expectEqual(@as(usize, 5), view.first(&.{ 0, 4, 8, 12, 16, 20 }, 6));
-    try std.testing.expectEqual(@as(usize, 4), view.first(&.{ 0, 3, 7, 10, 13, 16 }, 6));
+    try std.testing.expectEqual(@as(usize, 5), view.first(rows[0..16], 6));
+    try std.testing.expectEqual(@as(usize, 5), view.first(&rows, 6));
     view.follow();
-    try std.testing.expectEqual(@as(usize, 10), view.first(&.{ 0, 3, 7, 10, 13, 16 }, 6));
+    try std.testing.expectEqual(@as(usize, 14), view.first(&rows, 6));
 }
 
 test "copying from the visible transcript rejoins wrapped words and retains hard breaks" {
@@ -449,14 +455,45 @@ test "copying from the visible transcript rejoins wrapped words and retains hard
     defer hits.deinit(gpa);
     var copied: std.Io.Writer.Allocating = .init(gpa);
     defer copied.deinit();
-    var view: View = .{
-        .selection = Selection.between(.{ .row = 0, .column = 0 }, .{ .row = 20, .column = 0 }),
-        .copy = &copied.writer,
+    var view: View = .{};
+    defer view.deinit(gpa);
+    const initial = try draw(gpa, &entries, &.{}, live_region, 13, 24, false, &view, &hits);
+    defer gpa.free(initial);
+    view.selection = .{
+        .start = view.location(.{ .row = 0, .column = 0 }).?,
+        .finish = view.location(.{ .row = 20, .column = 0 }).?,
     };
+    view.copy = &copied.writer;
     const frame = try draw(gpa, &entries, &.{}, live_region, 13, 24, false, &view, &hits);
     defer gpa.free(frame);
     try std.testing.expectEqualStrings("one two three four\nhard break", copied.written());
     try std.testing.expect(std.mem.indexOf(u8, frame, "\x1b[7m") != null);
+}
+
+test "a drag keeps its original endpoint after the transcript follows new rows and rewraps" {
+    const gpa = std.testing.allocator;
+    const entries = [_]write.Entry{
+        .{ .reply = "one two three four five six" },
+        .{ .note = "new event" },
+    };
+    const region: write.Live = .{ .composer = .{ .typed = "", .cursor = 0, .placeholder = "Mei", .room = "Mei", .offer = "" } };
+    var hits: std.ArrayList(Hit) = .empty;
+    defer hits.deinit(gpa);
+    var view: View = .{};
+    defer view.deinit(gpa);
+    const narrow = try draw(gpa, entries[0..1], &.{}, region, 13, 8, false, &view, &hits);
+    defer gpa.free(narrow);
+    const down = view.location(.{ .row = 1, .column = 2 }).?;
+    const moved = try draw(gpa, &entries, &.{}, region, 23, 7, false, &view, &hits);
+    defer gpa.free(moved);
+    const up = view.location(.{ .row = 0, .column = 10 }).?;
+    var copied: std.Io.Writer.Allocating = .init(gpa);
+    defer copied.deinit();
+    view.selection = .{ .start = down, .finish = up };
+    view.copy = &copied.writer;
+    const selected = try draw(gpa, &entries, &.{}, region, 23, 7, false, &view, &hits);
+    defer gpa.free(selected);
+    try std.testing.expectEqualStrings("three four five six", copied.written());
 }
 
 test "a tall composer keeps the cursor line and the status row" {
@@ -494,6 +531,7 @@ test "a tall composer keeps the cursor line and the status row" {
             },
         };
         var view: View = .{};
+        defer view.deinit(gpa);
         const bytes = try draw(gpa, &.{}, &.{}, region, 80, 24, false, &view, &hits);
         defer gpa.free(bytes);
         var label = [_]u8{ 'L', '0' + @as(u8, @intCast(line / 10)), '0' + @as(u8, @intCast(line % 10)) };
@@ -510,7 +548,7 @@ test "a click hit names the visible python card" {
         .{ .you = .{ .at = null, .said = "ask" } },
         .{ .tool = .{ .at = null, .name = "python", .subject = "time", .took_us = 1_500_000, .outcome = .Answered } },
     };
-    const marks = [_]u16{ no_card, 3 };
+    const marks = [_]Item{ .{ .origin = .{ .entry = 0 } }, .{ .origin = .{ .entry = 1 }, .card = 3 } };
     var hits: std.ArrayList(Hit) = .empty;
     defer hits.deinit(gpa);
     const region: write.Live = .{
@@ -523,6 +561,7 @@ test "a click hit names the visible python card" {
         },
     };
     var view: View = .{};
+    defer view.deinit(gpa);
     const bytes = try draw(gpa, &entries, &marks, region, 80, 24, false, &view, &hits);
     defer gpa.free(bytes);
     try std.testing.expect(hits.items.len >= 1);
