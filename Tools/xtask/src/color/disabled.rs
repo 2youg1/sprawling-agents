@@ -11,7 +11,7 @@ use crate::walk;
 
 const DISABLED_INK: &str = "text-text-disabled";
 
-const CLIENT_EXTS: [&str; 3] = ["svelte", "ts", "css"];
+const CLIENT_EXTS: [&str; 3] = ["ts", "tsx", "css"];
 
 pub(super) fn judge_disabled_ink(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     let mut violations = Vec::new();

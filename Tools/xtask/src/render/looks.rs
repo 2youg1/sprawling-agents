@@ -3,59 +3,81 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
 use crate::sheet::{self, Reading};
 use crate::walk;
 
-const LOOK: &str = ".look.svelte";
+const LOOK: &str = ".look.solid.tsx";
 
-const GALLERY: &str = concat!(crate::walk::client_src!(), "/views/gallery/");
+const GALLERY: &str = concat!(crate::walk::client_src!(), "/views/gallery.solid.tsx");
 
 const HAIRLINE: &str = "1";
 
 pub(super) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    let mut looks = Vec::new();
-    let mut imported = BTreeSet::new();
-    for path in walk::client_files(root, &["svelte", "ts"])? {
-        let rel = walk::rel(root, &path);
-        if rel.ends_with(LOOK) {
-            looks.push((rel.clone(), walk::read_text(&path)?));
-        }
-        if rel.starts_with(GALLERY) {
-            imported.extend(imports(&rel, &walk::read_text(&path)?));
-        }
+    let mut source = BTreeMap::new();
+    for path in walk::client_files(root, &["ts", "tsx", "css"])? {
+        source.insert(walk::rel(root, &path), walk::read_text(&path)?);
     }
+    let drawn = reachable_from(GALLERY, &source);
     let mut out = Vec::new();
-    for (rel, text) in &looks {
-        if rel.starts_with(walk::CLIENT_SRC) && !drawn_by_gallery(rel, &imported) {
+    for (rel, text) in source.iter().filter(|(rel, _)| rel.ends_with(LOOK)) {
+        if rel.starts_with(walk::CLIENT_SRC) && !drawn.contains(rel) {
             out.push(Violation {
                 gate: "render",
                 location: rel.clone(),
                 rule: "every look is drawn by a fixture on the gallery this gate measures"
                     .to_owned(),
-                violation: "no file under RefRain/src/views/gallery/ imports this look or its seat"
+                violation: "the gallery entry cannot reach this look through its fixture imports"
                     .to_owned(),
-                alternative: "import the seat in a gallery case named for its part \
-                              (`<part> · <state>`), so the roles and boxes it draws are read"
+                alternative: "import the seat in a registered gallery case named for its part (`<part> · <state>`), so the roles and boxes it draws are read"
                     .to_owned(),
             });
         }
         sized_from_tokens(rel, text, &mut out);
+        for style in imports(rel, text)
+            .into_iter()
+            .filter(|import| import.ends_with(".css"))
+        {
+            if let Some(sheet) = source.get(&style) {
+                sized_from_tokens(&style, sheet, &mut out);
+            }
+        }
     }
     Ok(out)
 }
 
-fn drawn_by_gallery(rel: &str, imported: &BTreeSet<String>) -> bool {
-    let seat = rel.strip_suffix(LOOK).map(|stem| format!("{stem}.svelte"));
-    imported.contains(rel) || seat.is_some_and(|seat| imported.contains(&seat))
+fn reachable_from(entry: &str, source: &BTreeMap<String, String>) -> BTreeSet<String> {
+    let mut reached = BTreeSet::new();
+    let mut pending = vec![entry.to_owned()];
+    while let Some(rel) = pending.pop() {
+        if !reached.insert(rel.clone()) {
+            continue;
+        }
+        if let Some(text) = source.get(&rel) {
+            pending.extend(
+                imports(&rel, text)
+                    .iter()
+                    .filter_map(|spec| resolved_source(source, spec)),
+            );
+        }
+    }
+    reached
+}
+
+fn resolved_source(source: &BTreeMap<String, String>, spec: &str) -> Option<String> {
+    ["", ".tsx", ".ts", "/index.ts", "/index.tsx"]
+        .into_iter()
+        .map(|suffix| format!("{spec}{suffix}"))
+        .find(|path| source.contains_key(path))
 }
 
 fn imports(rel: &str, text: &str) -> Vec<String> {
     let dir = rel.rsplit_once('/').map_or("", |(dir, _)| dir);
     text.lines()
+        .filter(|line| !line.trim_start().starts_with("import type "))
         .filter(|line| line.contains("from ") || line.contains("import"))
         .flat_map(|line| line.split('"').skip(1).step_by(2))
         .filter(|spec| spec.starts_with("./") || spec.starts_with("../"))
@@ -139,32 +161,44 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_look_is_drawn_when_a_fixture_imports_it_or_its_seat() {
-        let imported: BTreeSet<String> = imports(
-            "RefRain/src/views/gallery/parts/segmented.svelte",
-            "  import Segmented from \"../../parts/segmented.svelte\";\n\
-             const lazy = import(\"./other.svelte\");",
-        )
-        .into_iter()
-        .collect();
-        assert!(drawn_by_gallery(
-            "RefRain/src/views/parts/segmented.look.svelte",
-            &imported
-        ));
-        assert!(imported.contains("RefRain/src/views/gallery/parts/other.svelte"));
-        assert!(!drawn_by_gallery(
-            "RefRain/src/views/parts/tabs.look.svelte",
-            &imported
-        ));
+    fn a_look_is_drawn_when_a_registered_fixture_reaches_it() {
+        let entries = [
+            (
+                "RefRain/src/views/gallery.solid.tsx",
+                r#"import Case from "./gallery/runs";"#,
+            ),
+            (
+                "RefRain/src/views/gallery/runs.tsx",
+                r#"import Board from "../runs/board.solid";"#,
+            ),
+            (
+                "RefRain/src/views/runs/board.solid.tsx",
+                r#"import Look from "./board.look.solid";"#,
+            ),
+            ("RefRain/src/views/runs/board.look.solid.tsx", ""),
+            (
+                "RefRain/src/views/gallery/orphan.tsx",
+                r#"import Look from "../parts/tabs.look.solid";"#,
+            ),
+            ("RefRain/src/views/parts/tabs.look.solid.tsx", ""),
+        ];
+        let source = entries
+            .into_iter()
+            .map(|(path, content)| (path.to_owned(), content.to_owned()))
+            .collect();
+        let reached = reachable_from(GALLERY, &source);
+        assert!(reached.contains("RefRain/src/views/runs/board.look.solid.tsx"));
+        assert!(!reached.contains("RefRain/src/views/parts/tabs.look.solid.tsx"));
     }
 
     #[test]
     fn a_look_spells_no_length_but_the_hairline() {
-        let text = "<div class=\"w-[13px] border-[1px] h-control-sm -mt-[3px]\"></div>\n\
-                    <style>\n  .a { height: 13px; border: 1px solid; margin: 0; }\n\
-                    .b { top: -2px; }\n  .c { gap: var(--gap-2px); inset: 0px; }\n</style>\n";
+        let text = "<div class=\"w-[13px] border-[1px] h-control-sm -mt-[3px]\"></div>\n";
+        let style = ".a { height: 13px; border: 1px solid; margin: 0; }\n\
+                      .b { top: -2px; }\n .c { gap: var(--gap-2px); inset: 0px; }\n";
         let mut out = Vec::new();
-        sized_from_tokens("RefRain/swap/views/parts/x.look.svelte", text, &mut out);
+        sized_from_tokens("RefRain/swap/views/parts/x.look.solid.tsx", text, &mut out);
+        sized_from_tokens("RefRain/swap/views/parts/x.css", style, &mut out);
         let found: Vec<String> = out
             .iter()
             .map(|v| format!("{} {}", v.location, v.violation))
@@ -172,9 +206,9 @@ mod tests {
         assert_eq!(
             found,
             [
-                "RefRain/swap/views/parts/x.look.svelte:1 this line spells 13px",
-                "RefRain/swap/views/parts/x.look.svelte:3 this line spells 13px",
-                "RefRain/swap/views/parts/x.look.svelte:4 this line spells 2px",
+                "RefRain/swap/views/parts/x.look.solid.tsx:1 this line spells 13px",
+                "RefRain/swap/views/parts/x.css:1 this line spells 13px",
+                "RefRain/swap/views/parts/x.css:2 this line spells 2px",
             ]
         );
     }

@@ -77,58 +77,12 @@ fn division_after_increment_still_sees_a_trailing_comment() {
 }
 
 #[test]
-fn svelte_html_comments_count_but_script_strings_do_not() {
-    let reading = lexer::measure(
-        "<!-- note -->\n<script>const x = \"// no\";</script>\n<!-- {/* still html */} -->\n",
-        Language::Svelte,
-    );
-    assert_eq!(reading.comment_lines, 2);
-}
-
-#[test]
-fn markup_urls_are_not_line_comments() {
-    let svelte = lexer::measure("<p>https://example.com</p>\n", Language::Svelte);
-    assert_eq!(svelte.comment_lines, 0, "{svelte:?}");
-    let tsx = lexer::measure(
-        "export function Page() { return <p>https://example.com</p>; }\n",
+fn jsx_comment_expressions_count_and_markup_urls_do_not() {
+    let read = lexer::measure(
+        r#"const view = <a href="https://example.com">https://example.com{ /* text */ }</a>;"#,
         Language::TypeScript,
     );
-    assert_eq!(tsx.comment_lines, 0, "{tsx:?}");
-}
-
-#[test]
-fn svelte_control_blocks_do_not_swallow_following_comments() {
-    let source = "{#if ready}\n<p>ok</p>\n{/if}\n<!-- note -->\n";
-    let reading = lexer::measure(source, Language::Svelte);
-    assert_eq!(reading.comment_lines, 1, "{reading:?}");
-}
-
-#[test]
-fn svelte_block_expressions_use_javascript_lexing() {
-    let source = r#"{#if "}" /* first */ ready}
-<p>ok</p>
-{:else if other /* second */}
-<p>other</p>
-{/if}
-<!-- after -->
-"#;
-    let reading = lexer::measure(source, Language::Svelte);
-    assert_eq!(reading.comment_lines, 3, "{reading:?}");
-    let data = r#"{#if ready}
-<p>ok</p>
-{:else if "/* data */"}
-<p>other</p>
-{/if}
-"#;
-    assert_eq!(lexer::measure(data, Language::Svelte).comment_lines, 0);
-}
-
-#[test]
-fn svelte_script_open_tags_may_span_lines() {
-    let source =
-        "<script\n  lang=\"ts\"\n>\n  // first\n  // second\n  const value = 1;\n</script>\n";
-    let reading = lexer::measure(source, Language::Svelte);
-    assert_eq!(reading.comment_lines, 2, "{reading:?}");
+    assert_eq!(read.comment_lines, 1);
 }
 
 #[test]
@@ -152,32 +106,6 @@ fn division_after_index_still_sees_a_block_comment() {
         Language::TypeScript,
     );
     assert_eq!(reading.comment_lines, 1, "{reading:?}");
-}
-
-#[test]
-fn svelte_mpl_headers_are_excluded_in_every_leading_shape() {
-    let wrap =
-        "<!--\n".to_owned() + &header::notice(Leader::Rust).join("\n") + "\n-->\n<p>ok</p>\n";
-    assert_eq!(
-        lexer::measure(&wrap, Language::Svelte).comment_lines,
-        0,
-        "{wrap}"
-    );
-    let inline = format!("<!-- {} -->\n<p>ok</p>\n", header::NOTICE.join("\n     "));
-    assert_eq!(
-        lexer::measure(&inline, Language::Svelte).comment_lines,
-        0,
-        "{inline}"
-    );
-    let script = format!(
-        "<script lang=\"ts\">\n  {}\n  const x = 1;\n</script>\n",
-        header::notice(Leader::Rust).join("\n  ")
-    );
-    assert_eq!(
-        lexer::measure(&script, Language::Svelte).comment_lines,
-        0,
-        "{script}"
-    );
 }
 
 #[test]
@@ -295,14 +223,4 @@ braces = f"{{# data}}"
 fn css_mpl_and_strings_leave_only_the_real_comment() {
     let source = "/* This Source Code Form is subject to the terms of the Mozilla Public\n * License, v. 2.0. If a copy of the MPL was not distributed with this\n * file, You can obtain one at https://mozilla.org/MPL/2.0/.\n * Copyright (c) 2026 2youg1 and the sprawling contributors */\n.a::after { content: \"/* not a comment */\"; }\n/* real */\n";
     assert_eq!(lexer::measure(source, Language::Css).comment_lines, 1);
-}
-
-#[test]
-fn svelte_style_uses_css_and_script_uses_javascript() {
-    let source = r#"<style>.a::after { content: "// text"; }</style>
-<style>.b::after { content: "/* text */"; }</style>
-<style>/* real css */</style>
-<script>// real script</script>
-"#;
-    assert_eq!(lexer::measure(source, Language::Svelte).comment_lines, 2);
 }

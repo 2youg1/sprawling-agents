@@ -9,10 +9,11 @@ pub(super) fn handed_to_a_reader(src: &str) -> Vec<Said> {
     let mut out = Vec::new();
     let mut block: Option<&'static str> = None;
     let mut comment = false;
+    let mut markup = Markup::default();
     for (index, line) in src.lines().enumerate() {
         let number = index.saturating_add(1);
         let drawn = visible(line, &mut block, &mut comment);
-        for said in text_nodes(&drawn) {
+        for said in markup.text_nodes(&drawn) {
             if let Some(left) = words_the_view_wrote(&said) {
                 out.push(Said {
                     line: number,
@@ -93,53 +94,68 @@ fn visible(line: &str, block: &mut Option<&'static str>, comment: &mut bool) -> 
     }
 }
 
-fn text_nodes(code: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let bytes = code.as_bytes();
-    let mut index: usize = 0;
+#[derive(Default)]
+struct Markup {
+    opened: Vec<Opening>,
+    quote: Option<u8>,
+}
 
-    let mut opened: Vec<Opening> = Vec::new();
-    while let Some(byte) = bytes.get(index) {
-        let after = bytes.get(index.saturating_add(1));
-        if *byte == b'<' {
-            if after != Some(&b'=') {
-                let before = index.checked_sub(1).and_then(|at| bytes.get(at));
-                opened.push(match before {
-                    Some(mark) if mark.is_ascii_alphanumeric() || *mark == b'_' => {
-                        Opening::TypeArgs
-                    }
-                    _ => Opening::Element,
-                });
+impl Markup {
+    fn text_nodes(&mut self, code: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let bytes = code.as_bytes();
+        let mut index: usize = 0;
+        while let Some(byte) = bytes.get(index).copied() {
+            let after = bytes.get(index.saturating_add(1)).copied();
+            if let Some(quote) = self.quote {
+                if byte == b'\\' {
+                    index = index.saturating_add(2);
+                    continue;
+                }
+                if byte == quote {
+                    self.quote = None;
+                }
+            } else if matches!(byte, b'"' | b'\'' | b'`') {
+                self.quote = Some(byte);
+            } else if byte == b'<' && after.is_some_and(starts_element) {
+                self.opened.push(opening_at(bytes, index));
+            } else if byte == b'>'
+                && closes_element(bytes, index, after)
+                && self.opened.pop() == Some(Opening::Element)
+            {
+                let start = index.saturating_add(1);
+                let rest = code.get(start..).unwrap_or("");
+                let end = rest.find(['<', '{', '}']).unwrap_or(rest.len());
+                if rest.get(end..).is_some_and(|tail| tail.starts_with('<'))
+                    && let Some(run) = rest.get(..end)
+                {
+                    out.push(run.to_owned());
+                }
+                index = start.saturating_add(end);
+                continue;
             }
             index = index.saturating_add(1);
-            continue;
         }
-        if *byte != b'>' {
-            index = index.saturating_add(1);
-            continue;
-        }
-        let before = index.checked_sub(1).and_then(|at| bytes.get(at));
-
-        if before == Some(&b'=') || after == Some(&b'=') {
-            index = index.saturating_add(1);
-            continue;
-        }
-        if opened.pop() == Some(Opening::TypeArgs) {
-            index = index.saturating_add(1);
-            continue;
-        }
-        let start = index.saturating_add(1);
-        let rest = code.get(start..).unwrap_or("");
-        let end = rest.find(['<', '{', '}']).unwrap_or(rest.len());
-
-        if rest.get(end..).is_some_and(|tail| tail.starts_with('<'))
-            && let Some(run) = rest.get(..end)
-        {
-            out.push(run.to_owned());
-        }
-        index = start.saturating_add(end);
+        out
     }
-    out
+}
+
+fn starts_element(byte: u8) -> bool {
+    byte.is_ascii_alphabetic() || matches!(byte, b'/' | b'>')
+}
+
+fn opening_at(bytes: &[u8], index: usize) -> Opening {
+    let before = index.checked_sub(1).and_then(|at| bytes.get(at));
+    if before.is_some_and(|mark| mark.is_ascii_alphanumeric() || *mark == b'_') {
+        Opening::TypeArgs
+    } else {
+        Opening::Element
+    }
+}
+
+fn closes_element(bytes: &[u8], index: usize, after: Option<u8>) -> bool {
+    let before = index.checked_sub(1).and_then(|at| bytes.get(at));
+    before != Some(&b'=') && after != Some(b'=')
 }
 
 #[derive(PartialEq, Eq)]

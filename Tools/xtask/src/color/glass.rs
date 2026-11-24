@@ -6,7 +6,7 @@
 use super::Mode;
 use super::contrast::apca_lc_over;
 use super::roles::rung_of;
-use super::tables::{grey_ramp, parse_text_tokens, tier_slack};
+use super::tables::{contrast_rung, parse_text_tokens, tier_slack};
 use crate::report::Violation;
 use crate::theme;
 
@@ -27,23 +27,13 @@ pub(super) fn judge_glass(written: &str, read: &str, mode: Mode) -> Vec<Violatio
             "declare `--glass-opacity: <n>%;` in the theme's root block",
         )];
     };
-    let rungs = grey_ramp(read);
-    let lightness = |role: &str| {
-        let rung = rung_of(written, role)?.to_uppercase();
-        rungs
-            .iter()
-            .find(|(name, _)| *name == rung)
-            .map(|(_, l)| *l)
-    };
+    let colour = |role: &str| contrast_rung(read, &rung_of(written, role)?.to_uppercase());
     let text = parse_text_tokens(read)
         .into_iter()
         .find(|(name, _, _)| name == TEXT);
-    let (Some(fill), Some(backdrop), Some((_, ink, tier)), Some(slack)) = (
-        lightness(GLASS),
-        lightness(BACKDROP),
-        text,
-        tier_slack(read),
-    ) else {
+    let (Some(fill), Some(backdrop), Some((_, Some(ink), tier)), Some(slack)) =
+        (colour(GLASS), colour(BACKDROP), text, tier_slack(read))
+    else {
         return vec![refuse(
             format!(
                 "{}: the glass role, the backdrop role, the text token or the tier slack cannot be read",
@@ -53,7 +43,7 @@ pub(super) fn judge_glass(written: &str, read: &str, mode: Mode) -> Vec<Violatio
         )];
     };
     let reached = apca_lc_over(ink, fill, backdrop, percent);
-    if reached + slack >= f64::from(tier) {
+    if reached.abs() + slack >= f64::from(tier) {
         return Vec::new();
     }
     vec![refuse(

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use super::contrast::{apca_lc, bronze_tier};
+use super::contrast::{ContrastColour, apca_lc, blend_channels, bronze_tier, encoded_contrast};
 use super::tables::{parse_text_tokens, parse_type_scale, text_surface_ceiling};
 use super::*;
 
@@ -125,16 +125,21 @@ fn a_reset_declaration_is_not_a_token() {
 #[test]
 fn the_measurement_reproduces_the_readings_the_design_was_solved_against() {
     for (text, surface, expected) in [
-        (930, 215, 91.6),
-        (930, 172, 92.5),
-        (930, 265, 89.9),
-        (850, 215, 75.5),
-        (770, 215, 60.6),
-        (580, 215, 30.7),
-        (825, 215, 70.8),
-        (610, 172, 35.8),
+        (930, 215, -91.6),
+        (930, 172, -92.5),
+        (930, 265, -89.9),
+        (850, 215, -75.5),
+        (770, 215, -60.6),
+        (580, 215, -30.7),
+        (825, 215, -70.8),
+        (610, 172, -35.8),
     ] {
-        let got = apca_lc(text, surface);
+        let axis = |lightness| ContrastColour {
+            lightness,
+            chroma: GRAY_CHROMA,
+            hue: HUE_AXIS,
+        };
+        let got = apca_lc(axis(text), axis(surface));
         assert!(
             (got - expected).abs() < 0.15,
             "L {text} on L {surface}: expected Lc {expected}, measured {got:.1}"
@@ -149,7 +154,7 @@ fn a_text_token_that_does_not_reach_its_tier_is_caught() {
     assert!(
         found
             .iter()
-            .any(|v| v.violation.contains("TEXT claims Lc 90 and reaches 70.8")),
+            .any(|v| v.violation.contains("TEXT claims Lc 90 and reaches -70.8")),
         "{}",
         rules(&found)
     );
@@ -322,4 +327,36 @@ fn a_shortened_ramp_is_caught() {
     let broken = GOOD.replace("  --color-g5: oklch(0.410 0.014 250);\n", "");
     let found = judge_tokens(&broken, Mode::Dark);
     assert!(found.iter().any(|v| v.violation.contains("found 10")));
+}
+
+#[derive(serde::Deserialize)]
+struct ContrastVector {
+    name: String,
+    text: [f64; 4],
+    surface: [f64; 4],
+    backdrop: [f64; 3],
+    lc: f64,
+}
+
+#[test]
+fn matches_shared_signed_srgb_reference_observations() -> Result<(), serde_json::Error> {
+    let vectors: Vec<ContrastVector> = serde_json::from_str(include_str!(
+        "../../../../RefRain/src/theme/apca-vectors.json"
+    ))?;
+    for ContrastVector {
+        name,
+        text: [r, g, b, alpha],
+        surface: [dr, dg, db, coverage],
+        backdrop,
+        lc,
+    } in vectors
+    {
+        let surface = blend_channels([dr, dg, db], backdrop, coverage);
+        let reached = encoded_contrast(blend_channels([r, g, b], surface, alpha), surface);
+        assert!(
+            (reached - lc).abs() < 0.000_001,
+            "{name}: expected {lc}, reached {reached}"
+        );
+    }
+    Ok(())
 }

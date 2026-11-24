@@ -3,10 +3,25 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use super::contrast::ContrastColour;
+
 struct Oklch {
     lightness: u16,
     chroma: Chroma,
     hue: u16,
+}
+
+impl Oklch {
+    const fn as_contrast(&self) -> Option<ContrastColour> {
+        let Chroma::Fixed(chroma) = self.chroma else {
+            return None;
+        };
+        Some(ContrastColour {
+            lightness: self.lightness,
+            chroma,
+            hue: self.hue,
+        })
+    }
 }
 
 enum Chroma {
@@ -50,15 +65,28 @@ pub(super) fn colour_tokens_without_ratio(source: &str) -> Vec<String> {
         .collect()
 }
 
-pub(super) fn parse_text_tokens(source: &str) -> Vec<(String, u16, u16)> {
-    colour_declarations(source)
-        .into_iter()
-        .filter(|(suffix, _)| is_text(suffix))
-        .filter_map(|(suffix, colour)| {
+pub(super) fn parse_text_tokens(source: &str) -> Vec<(String, Option<ContrastColour>, u16)> {
+    let mut seen = std::collections::BTreeSet::new();
+    declarations(source)
+        .filter_map(|(token, value)| {
+            let suffix = token.strip_prefix("color-").filter(|name| is_text(name))?;
             let tier = declaration(source, &format!("tier-{suffix}")).and_then(whole)?;
-            Some((canonical(&suffix), colour.lightness, tier))
+            seen.insert(suffix).then(|| {
+                (
+                    canonical(suffix),
+                    oklch(value).and_then(|colour| colour.as_contrast()),
+                    tier,
+                )
+            })
         })
         .collect()
+}
+
+pub(super) fn contrast_rung(source: &str, name: &str) -> Option<ContrastColour> {
+    rungs(source)
+        .into_iter()
+        .find(|(rung, _)| rung == name)
+        .and_then(|(_, colour)| colour.as_contrast())
 }
 
 pub(super) fn parse_type_scale(source: &str) -> Vec<(String, u16, u16, u16)> {

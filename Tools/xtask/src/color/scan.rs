@@ -25,7 +25,7 @@ const SPELLS_COLOUR: [&str; 8] = [
     "Sprawling/browser/src/survey/tests.rs",
 ];
 
-const SCAN_EXTS: [&str; 4] = ["rs", "css", "html", "svelte"];
+const SCAN_EXTS: [&str; 4] = ["rs", "css", "html", "tsx"];
 
 pub(super) fn literal_at(line: &str, reading: Reading) -> Option<&'static str> {
     for syntax in ["oklch(", "rgb(", "rgba(", "hsl(", "hsla("] {
@@ -241,12 +241,17 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn a_component_style_is_judged_as_a_stylesheet_and_its_markup_is_not() {
-        let root = std::env::temp_dir().join(format!("color-svelte-{}", std::process::id()));
+    fn a_native_stylesheet_and_its_view_are_read_with_their_own_syntax() {
+        let root = std::env::temp_dir().join(format!("color-native-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        let path = root.join("RefRain/src/views/panel.svelte");
+        let path = root.join("RefRain/src/views/panel.css");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(&path, SVELTE_FIXTURE).unwrap();
+        std::fs::write(&path, STYLE_FIXTURE).unwrap();
+        std::fs::write(
+            path.with_extension("tsx"),
+            r##"<a href="#/gallery" class="[stop-color:var(--color-accent)]" />"##,
+        )
+        .unwrap();
 
         let found = scan_for_literals(&root).unwrap();
         assert_eq!(
@@ -254,21 +259,14 @@ pub(super) mod tests {
                 .iter()
                 .map(|v| v.location.as_str())
                 .collect::<Vec<_>>(),
-            ["RefRain/src/views/panel.svelte:7"]
+            ["RefRain/src/views/panel.css:1"]
         );
         std::fs::remove_dir_all(&root).unwrap();
     }
 
-    pub(in crate::color) const SVELTE_FIXTURE: &str = "<script lang=\"ts\">
-  const rows = [1];
-</script>
-{#each rows as row}<a href=\"#/gallery\">{row}</a>{/each}
-<div class=\"[stop-color:var(--color-accent)]\"></div>
-<style>
-  .x { color: #1a2b3c; }
-  .y { background: var(--color-g3); }
-  .z { border-color: var(--color-raisd); }
-  .w { --color-mine: var(--color-accent); }
-</style>
+    pub(in crate::color) const STYLE_FIXTURE: &str = ".x { color: #1a2b3c; }
+.y { background: var(--color-g3); }
+.z { border-color: var(--color-raisd); }
+.w { --color-mine: var(--color-accent); }
 ";
 }

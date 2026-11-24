@@ -87,11 +87,11 @@ fn the_runtime_allowlist_is_judged_in_both_directions() {
     let missing: Vec<&str> = RUNTIME
         .iter()
         .copied()
-        .filter(|name| *name != "svelte")
+        .filter(|name| *name != "solid-js")
         .collect();
     let out = judged(&missing);
     assert_eq!(out.len(), 1);
-    assert!(out[0].violation.contains("svelte"));
+    assert!(out[0].violation.contains("solid-js"));
 
     assert!(judged(&RUNTIME).is_empty());
 }

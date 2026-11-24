@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Coverage decisions for settable fields (`Tools/xtask/Spec.lean`).
-
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 use std::collections::BTreeSet;
@@ -136,7 +134,7 @@ mod tests {
         ));
         assert!(!covered(
             &fixture,
-            "settings-control Config.added RefRain/src/missing.svelte",
+            "settings-control Config.added RefRain/src/missing.tsx",
             "Config.added"
         ));
         assert!(!covered(

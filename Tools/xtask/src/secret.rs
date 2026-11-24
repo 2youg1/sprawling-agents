@@ -22,8 +22,9 @@ const EXPOSE_WHITELIST: [&str; 5] = [
     "Sprawling/remote_access/src/keys.rs",
 ];
 
-const NOT_CREDENTIALS: [&str; 10] = [
+const NOT_CREDENTIALS: [&str; 11] = [
     "CC_x86_64_unknown_linux_musl",
+    "CanvasRenderingContext2D",
     "io/badge/Ask-DeepWiki-2B6CB0",
     "Win32_System_DataExchange",
     "Win32_System_Threading",
@@ -188,6 +189,9 @@ resolver = \"3\"
 
     #[test]
     fn a_reviewed_identifier_is_matched_whole_and_nothing_else_is() {
+        assert!(is_reviewed_identifier(b"CanvasRenderingContext2D"));
+        let extended = ["CanvasRenderingContext2D", "Extra"].concat();
+        assert!(!is_reviewed_identifier(extended.as_bytes()));
         let reviewed = NOT_CREDENTIALS[0];
         assert!(is_reviewed_identifier(reviewed.as_bytes()));
         let longer = format!("{reviewed}Extra");

@@ -59,7 +59,6 @@ fn language(file: &Path) -> Option<Language> {
         Some("rs") => Some(Language::Rust),
         Some("ts" | "tsx") => Some(Language::TypeScript),
         Some("js" | "mjs") => Some(Language::JavaScript),
-        Some("svelte") => Some(Language::Svelte),
         Some("zig") => Some(Language::Zig),
         Some("py") => Some(Language::Python),
         Some("css") => Some(Language::Css),
