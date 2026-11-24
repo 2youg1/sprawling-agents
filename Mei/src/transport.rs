@@ -148,7 +148,7 @@ impl Client {
                     .with_path(path.clone()),
             )
         })?;
-        let response = read_to_eof(&mut stream, &self.timeouts, pulse, &path)?;
+        let response = read_to_eof(&mut stream, &self.timeouts, pulse, &path, Read::read)?;
         let answer = parse(&response)?;
         if self.session.is_some() {
             let route = match self.route_observation() {
@@ -224,7 +224,7 @@ impl Client {
             )
         })?;
         let mut sink = std::io::sink();
-        let response = read_to_eof(&mut stream, budget, &mut sink, &path)?;
+        let response = read_to_eof(&mut stream, budget, &mut sink, &path, Read::read)?;
         parse(&response)
     }
 
@@ -258,6 +258,7 @@ fn read_to_eof(
     timeouts: &Timeouts,
     pulse: &mut dyn Write,
     path: &str,
+    mut read: impl FnMut(&mut TcpStream, &mut [u8]) -> std::io::Result<usize>,
 ) -> Result<Vec<u8>> {
     let deadline = Instant::now() + timeouts.io;
     let mut response = Vec::new();
@@ -287,7 +288,7 @@ fn read_to_eof(
                 .with_path(path),
             )
         })?;
-        match stream.read(&mut chunk) {
+        match read(stream, &mut chunk) {
             Ok(0) => return Ok(response),
             Ok(count) => response.extend_from_slice(chunk.get(..count).ok_or_else(|| {
                 Error::Diagnostic(
